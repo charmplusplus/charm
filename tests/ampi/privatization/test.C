@@ -56,8 +56,10 @@ void privatization_test_framework(void)
   int failed_before = 0;
   perform_test_batch(failed_before, rank, my_wth);
 
+#if defined test_migration
   if (rank == 0) printf("Requesting migration.\n");
   AMPI_Migrate(AMPI_INFO_LB_SYNC);
+#endif
 
   int failed_after = 0;
   perform_test_batch(failed_after, rank, my_wth);

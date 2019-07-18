@@ -6,12 +6,11 @@
 #include <numeric>
 #include <forward_list>
 #include <bitset>
+#include <complex>
 
 #include "ampi.h"
 #include "ddt.h"
 #include "charm++.h"
-
-using std::vector;
 
 //Uncomment for debug print statements
 #define AMPI_DEBUG(...) //CkPrintf(__VA_ARGS__)
@@ -25,33 +24,25 @@ using std::vector;
  *
  * 2. When AMPI is built on top of MPI, we rename the user's MPI_* calls as AMPI_*.
  */
-#define STRINGIFY(a) #a
+#define STRINGIFY_INTERNAL(a) #a
+#define STRINGIFY(a) STRINGIFY_INTERNAL(a)
 
-#if defined(__linux__)
-  #if CMK_CONVERSE_MPI
-    #define AMPI_API_IMPL(ret, name, ...) \
-      _Pragma(STRINGIFY(weak A##name)) \
-      _Pragma(STRINGIFY(weak AP##name = A##name)) \
-      CLINKAGE \
-      ret A##name(__VA_ARGS__)
-  #else
-    #define AMPI_API_IMPL(ret, name, ...) \
-      _Pragma(STRINGIFY(weak name)) \
-      _Pragma(STRINGIFY(weak P##name = name)) \
-      CLINKAGE \
-      ret name(__VA_ARGS__)
-  #endif
+// keep in sync with ampi_noimpl.C
+#if AMPI_HAVE_PMPI
+  #define AMPI_API_IMPL(ret, name, ...) \
+    CLINKAGE \
+    __attribute__((weak, alias(STRINGIFY(name)))) \
+    ret P##name(__VA_ARGS__); \
+    CLINKAGE \
+    __attribute__((weak)) \
+    ret name(__VA_ARGS__)
 #else // not Linux (no PMPI support):
-  #if CMK_CONVERSE_MPI
-    #define AMPI_API_IMPL(ret, name, ...) \
-      CLINKAGE \
-      ret A##name(__VA_ARGS__)
-  #else
-    #define AMPI_API_IMPL(ret, name, ...) \
-      CLINKAGE \
-      ret name(__VA_ARGS__)
-  #endif
+  #define AMPI_API_IMPL(ret, name, ...) \
+    CLINKAGE \
+    ret name(__VA_ARGS__)
 #endif
+
+extern char * ampi_binary_path;
 
 #if AMPIMSGLOG
 #include "ckliststring.h"
@@ -109,10 +100,19 @@ class fromzDisk : public zdisk {
 #define AMPI_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
 #endif
 
-/* AMPI uses RDMA sends if BigSim is not being used and the underlying comm
- * layer supports it (except for GNI, which has experimental RDMA support). */
+/* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
+#ifndef AMPI_PE_LOCAL_THRESHOLD_DEFAULT
+#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 4096
+#endif
+
+/* messages larger than or equal to this threshold may block on a matching recv if local to the Node */
+#ifndef AMPI_NODE_LOCAL_THRESHOLD_DEFAULT
+#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 16384
+#endif
+
+/* AMPI uses RDMA sends if BigSim is not being used. */
 #ifndef AMPI_RDMA_IMPL
-#define AMPI_RDMA_IMPL ( !CMK_BIGSIM_CHARM && CMK_ONESIDED_IMPL && !CMK_CONVERSE_UGNI )
+#define AMPI_RDMA_IMPL !CMK_BIGSIM_CHARM
 #endif
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
@@ -124,14 +124,7 @@ class fromzDisk : public zdisk {
 #endif
 #endif
 
-/* contiguous messages larger than or equal to this threshold that are being sent
- * within a process are sent via RDMA. */
-#ifndef AMPI_SMP_RDMA_THRESHOLD_DEFAULT
-#define AMPI_SMP_RDMA_THRESHOLD_DEFAULT 16384
-#endif
-
 extern int AMPI_RDMA_THRESHOLD;
-extern int AMPI_SMP_RDMA_THRESHOLD;
 
 #define AMPI_ALLTOALL_THROTTLE   64
 #define AMPI_ALLTOALL_SHORT_MSG  256
@@ -283,6 +276,40 @@ class AmpiOpHeader {
     func(f),dtype(d),len(l),szdata(szd) { }
 };
 
+/*
+ * For within-process Ssend's, we use this in place of a CkNcpyBuffer object in the
+ * AmpiMsg's data. This allows us to handle non-contiguous DDTs directly and to avoid
+ * the cost of pinning memory when doing Ssend's on the same PE and in the same process.
+ */
+class AmpiNcpyShmBuffer {
+ private:
+  int node;
+  int idx;
+  int count;
+  int length;
+  char* buf;
+  CkDDT_DataType* ddt;
+  MPI_Request sreq;
+
+ public:
+  AmpiNcpyShmBuffer() = default;
+  AmpiNcpyShmBuffer(int idx_, int count_, char* buf_, CkDDT_DataType* ddt_, MPI_Request sreq_) noexcept
+    : idx(idx_), count(count_), buf(buf_), ddt(ddt_), sreq(sreq_)
+  {
+    node = CkMyNode();
+    length = ddt_->getSize(count_);
+  }
+  ~AmpiNcpyShmBuffer() = default;
+  inline int getNode() const noexcept { return node; }
+  inline int getIdx() const noexcept { return idx; }
+  inline int getCount() const noexcept { return count; }
+  inline int getLength() const noexcept { return length; }
+  inline int getSreqIdx() const noexcept { return sreq; }
+  inline char* getBuf() const noexcept { CkAssert(node == CkMyNode()); return buf; }
+  inline CkDDT_DataType* getDDT() const noexcept { CkAssert(node == CkMyNode()); return ddt; }
+};
+PUPbytes(AmpiNcpyShmBuffer) // PUP as bytes b/c buf & ddt are only meant to be accessed from within shared memory
+
 //------------------- added by YAN for one-sided communication -----------
 /* the index is unique within a communicator */
 class WinStruct{
@@ -293,9 +320,9 @@ class WinStruct{
 private:
   bool areRecvsPosted;
   bool inEpoch;
-  vector<int> exposureRankList;
-  vector<int> accessRankList;
-  vector<MPI_Request> requestList;
+  std::vector<int> exposureRankList;
+  std::vector<int> accessRankList;
+  std::vector<MPI_Request> requestList;
 
 public:
   WinStruct() noexcept : comm(MPI_COMM_NULL), index(-1), areRecvsPosted(false), inEpoch(false) {
@@ -313,11 +340,11 @@ public:
   void clearEpochExposure() noexcept {
     exposureRankList.clear(); areRecvsPosted = false; requestList.clear(); inEpoch=false;
   }
-  vector<int>& getExposureRankList() noexcept {return exposureRankList;}
-  vector<int>& getAccessRankList() noexcept {return accessRankList;}
-  void setExposureRankList(vector<int> &tmpExposureRankList) noexcept {exposureRankList = tmpExposureRankList;}
-  void setAccessRankList(vector<int> &tmpAccessRankList) noexcept {accessRankList = tmpAccessRankList;}
-  vector<int>& getRequestList() noexcept {return requestList;}
+  std::vector<int>& getExposureRankList() noexcept {return exposureRankList;}
+  std::vector<int>& getAccessRankList() noexcept {return accessRankList;}
+  void setExposureRankList(std::vector<int> &tmpExposureRankList) noexcept {exposureRankList = tmpExposureRankList;}
+  void setAccessRankList(std::vector<int> &tmpAccessRankList) noexcept {accessRankList = tmpAccessRankList;}
+  std::vector<int>& getRequestList() noexcept {return requestList;}
   bool AreRecvsPosted() const noexcept {return areRecvsPosted;}
   void setAreRecvsPosted(bool setR) noexcept {areRecvsPosted = setR;}
   bool isInEpoch() const noexcept {return inEpoch;}
@@ -351,7 +378,7 @@ class win_obj {
   std::string winName;
   bool initflag;
 
-  vector<int> keyvals; // list of keyval attributes
+  std::vector<int> keyvals; // list of keyval attributes
 
   void setName(const char *src) noexcept;
   void getName(char *src,int *len) noexcept;
@@ -367,7 +394,7 @@ class win_obj {
              MPI_Comm comm) noexcept;
   int free() noexcept;
 
-  vector<int>& getKeyvals() { return keyvals; }
+  std::vector<int>& getKeyvals() { return keyvals; }
 
   int put(void *orgaddr, int orgcnt, int orgunit,
           MPI_Aint targdisp, int targcnt, int targunit) noexcept;
@@ -438,52 +465,52 @@ class CProxyElement_ampi;
 //Virtual class describing a virtual topology: Cart, Graph, DistGraph
 class ampiTopology {
  private:
-  vector<int> v; // dummy variable for const& returns from virtual functions
+  std::vector<int> v; // dummy variable for const& returns from virtual functions
 
  public:
   virtual ~ampiTopology() noexcept {};
   virtual void pup(PUP::er &p) noexcept =0;
   virtual int getType() const noexcept =0;
   virtual void dup(ampiTopology* topo) noexcept =0;
-  virtual const vector<int> &getnbors() const noexcept =0;
-  virtual void setnbors(const vector<int> &nbors_) noexcept =0;
+  virtual const std::vector<int> &getnbors() const noexcept =0;
+  virtual void setnbors(const std::vector<int> &nbors_) noexcept =0;
 
-  virtual const vector<int> &getdims() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual const vector<int> &getperiods() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const std::vector<int> &getdims() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const std::vector<int> &getperiods() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
   virtual int getndims() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
-  virtual void setdims(const vector<int> &dims_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setperiods(const vector<int> &periods_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setdims(const std::vector<int> &dims_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setperiods(const std::vector<int> &periods_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
   virtual void setndims(int ndims_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
 
   virtual int getnvertices() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
-  virtual const vector<int> &getindex() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual const vector<int> &getedges() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const std::vector<int> &getindex() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const std::vector<int> &getedges() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
   virtual void setnvertices(int nvertices_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setindex(const vector<int> &index_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setedges(const vector<int> &edges_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setindex(const std::vector<int> &index_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setedges(const std::vector<int> &edges_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
 
   virtual int getInDegree() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
-  virtual const vector<int> &getSources() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual const vector<int> &getSourceWeights() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const std::vector<int> &getSources() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const std::vector<int> &getSourceWeights() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
   virtual int getOutDegree() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
-  virtual const vector<int> &getDestinations() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual const vector<int> &getDestWeights() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const std::vector<int> &getDestinations() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const std::vector<int> &getDestWeights() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
   virtual bool areSourcesWeighted() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return false;}
   virtual bool areDestsWeighted() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return false;}
   virtual void setAreSourcesWeighted(bool val) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
   virtual void setAreDestsWeighted(bool val) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
   virtual void setInDegree(int degree) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setSources(const vector<int> &sources) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setSourceWeights(const vector<int> &sourceWeights) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setSources(const std::vector<int> &sources) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setSourceWeights(const std::vector<int> &sourceWeights) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
   virtual void setOutDegree(int degree) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setDestinations(const vector<int> &destinations) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setDestWeights(const vector<int> &destWeights) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setDestinations(const std::vector<int> &destinations) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setDestWeights(const std::vector<int> &destWeights) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
 };
 
 class ampiCartTopology final : public ampiTopology {
  private:
   int ndims;
-  vector<int> dims, periods, nbors;
+  std::vector<int> dims, periods, nbors;
 
  public:
   ampiCartTopology() noexcept : ndims(-1) {}
@@ -504,21 +531,21 @@ class ampiCartTopology final : public ampiTopology {
     setnbors(topo->getnbors());
   }
 
-  inline const vector<int> &getdims() const noexcept {return dims;}
-  inline const vector<int> &getperiods() const noexcept {return periods;}
+  inline const std::vector<int> &getdims() const noexcept {return dims;}
+  inline const std::vector<int> &getperiods() const noexcept {return periods;}
   inline int getndims() const noexcept {return ndims;}
-  inline const vector<int> &getnbors() const noexcept {return nbors;}
+  inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
-  inline void setdims(const vector<int> &d) noexcept {dims = d; dims.shrink_to_fit();}
-  inline void setperiods(const vector<int> &p) noexcept {periods = p; periods.shrink_to_fit();}
+  inline void setdims(const std::vector<int> &d) noexcept {dims = d; dims.shrink_to_fit();}
+  inline void setperiods(const std::vector<int> &p) noexcept {periods = p; periods.shrink_to_fit();}
   inline void setndims(int nd) noexcept {ndims = nd;}
-  inline void setnbors(const vector<int> &n) noexcept {nbors = n; nbors.shrink_to_fit();}
+  inline void setnbors(const std::vector<int> &n) noexcept {nbors = n; nbors.shrink_to_fit();}
 };
 
 class ampiGraphTopology final : public ampiTopology {
  private:
   int nvertices;
-  vector<int> index, edges, nbors;
+  std::vector<int> index, edges, nbors;
 
  public:
   ampiGraphTopology() noexcept : nvertices(-1) {}
@@ -540,21 +567,21 @@ class ampiGraphTopology final : public ampiTopology {
   }
 
   inline int getnvertices() const noexcept {return nvertices;}
-  inline const vector<int> &getindex() const noexcept {return index;}
-  inline const vector<int> &getedges() const noexcept {return edges;}
-  inline const vector<int> &getnbors() const noexcept {return nbors;}
+  inline const std::vector<int> &getindex() const noexcept {return index;}
+  inline const std::vector<int> &getedges() const noexcept {return edges;}
+  inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setnvertices(int nv) noexcept {nvertices = nv;}
-  inline void setindex(const vector<int> &i) noexcept {index = i; index.shrink_to_fit();}
-  inline void setedges(const vector<int> &e) noexcept {edges = e; edges.shrink_to_fit();}
-  inline void setnbors(const vector<int> &n) noexcept {nbors = n; nbors.shrink_to_fit();}
+  inline void setindex(const std::vector<int> &i) noexcept {index = i; index.shrink_to_fit();}
+  inline void setedges(const std::vector<int> &e) noexcept {edges = e; edges.shrink_to_fit();}
+  inline void setnbors(const std::vector<int> &n) noexcept {nbors = n; nbors.shrink_to_fit();}
 };
 
 class ampiDistGraphTopology final : public ampiTopology {
  private:
   int inDegree, outDegree;
   bool sourcesWeighted, destsWeighted;
-  vector<int> sources, sourceWeights, destinations, destWeights, nbors;
+  std::vector<int> sources, sourceWeights, destinations, destWeights, nbors;
 
  public:
   ampiDistGraphTopology() noexcept : inDegree(-1), outDegree(-1), sourcesWeighted(false), destsWeighted(false) {}
@@ -586,24 +613,24 @@ class ampiDistGraphTopology final : public ampiTopology {
   }
 
   inline int getInDegree() const noexcept {return inDegree;}
-  inline const vector<int> &getSources() const noexcept {return sources;}
-  inline const vector<int> &getSourceWeights() const noexcept {return sourceWeights;}
+  inline const std::vector<int> &getSources() const noexcept {return sources;}
+  inline const std::vector<int> &getSourceWeights() const noexcept {return sourceWeights;}
   inline int getOutDegree() const noexcept {return outDegree;}
-  inline const vector<int> &getDestinations() const noexcept {return destinations;}
-  inline const vector<int> &getDestWeights() const noexcept {return destWeights;}
+  inline const std::vector<int> &getDestinations() const noexcept {return destinations;}
+  inline const std::vector<int> &getDestWeights() const noexcept {return destWeights;}
   inline bool areSourcesWeighted() const noexcept {return sourcesWeighted;}
   inline bool areDestsWeighted() const noexcept {return destsWeighted;}
-  inline const vector<int> &getnbors() const noexcept {return nbors;}
+  inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setAreSourcesWeighted(bool v) noexcept {sourcesWeighted = v ? 1 : 0;}
   inline void setAreDestsWeighted(bool v) noexcept {destsWeighted = v ? 1 : 0;}
   inline void setInDegree(int d) noexcept {inDegree = d;}
-  inline void setSources(const vector<int> &s) noexcept {sources = s; sources.shrink_to_fit();}
-  inline void setSourceWeights(const vector<int> &sw) noexcept {sourceWeights = sw; sourceWeights.shrink_to_fit();}
+  inline void setSources(const std::vector<int> &s) noexcept {sources = s; sources.shrink_to_fit();}
+  inline void setSourceWeights(const std::vector<int> &sw) noexcept {sourceWeights = sw; sourceWeights.shrink_to_fit();}
   inline void setOutDegree(int d) noexcept {outDegree = d;}
-  inline void setDestinations(const vector<int> &d) noexcept {destinations = d; destinations.shrink_to_fit();}
-  inline void setDestWeights(const vector<int> &dw) noexcept {destWeights = dw; destWeights.shrink_to_fit();}
-  inline void setnbors(const vector<int> &nbors_) noexcept {nbors = nbors_; nbors.shrink_to_fit();}
+  inline void setDestinations(const std::vector<int> &d) noexcept {destinations = d; destinations.shrink_to_fit();}
+  inline void setDestWeights(const std::vector<int> &dw) noexcept {destWeights = dw; destWeights.shrink_to_fit();}
+  inline void setnbors(const std::vector<int> &nbors_) noexcept {nbors = nbors_; nbors.shrink_to_fit();}
 };
 
 /* KeyValue class for attribute caching */
@@ -640,7 +667,7 @@ class KeyvalNode {
 class groupStruct {
  private:
   int sz; // -1 if ranks is valid, otherwise the size to pass to std::iota()
-  vector<int> ranks;
+  std::vector<int> ranks;
 
  private:
   bool ranksIsIota() const noexcept {
@@ -653,7 +680,7 @@ class groupStruct {
  public:
   groupStruct() noexcept : sz(0) {}
   groupStruct(int s) noexcept : sz(s) {}
-  groupStruct(vector<int> r) noexcept : sz(-1), ranks(std::move(r)) {
+  groupStruct(std::vector<int> r) noexcept : sz(-1), ranks(std::move(r)) {
     if (ranksIsIota()) {
       sz = ranks.size();
       ranks.clear();
@@ -673,10 +700,10 @@ class groupStruct {
   bool isIota() const noexcept {return (sz != -1);}
   int operator[](int i) const noexcept {return (isIota()) ? i : ranks[i];}
   int size() const noexcept {return (isIota()) ? sz : ranks.size();}
-  vector<int> getRanks() const noexcept {
+  std::vector<int> getRanks() const noexcept {
     if (isIota()) {
       // Lazily create ranks:
-      vector<int> tmpRanks(sz);
+      std::vector<int> tmpRanks(sz);
       std::iota(tmpRanks.begin(), tmpRanks.end(), 0);
       tmpRanks.shrink_to_fit();
       return tmpRanks;
@@ -707,7 +734,7 @@ class ampiCommStruct {
   int topoType; // Type of virtual topology: MPI_CART, MPI_GRAPH, MPI_DIST_GRAPH, or MPI_UNDEFINED
 
   // For communicator attributes (MPI_*_get_attr): indexed by keyval
-  vector<int> keyvals;
+  std::vector<int> keyvals;
 
   // For communicator names
   std::string commName;
@@ -720,12 +747,12 @@ class ampiCommStruct {
     : comm(comm_), ampiID(id_),size(size_), commType(WORLD), indices(size_),
       ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
-  ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_, const vector<int> &indices_) noexcept
+  ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_, const std::vector<int> &indices_) noexcept
     : comm(comm_), ampiID(id_), size(indices_.size()), commType(INTRA), indices(indices_),
       ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
-  ampiCommStruct(MPI_Comm comm_, const CkArrayID &id_, const vector<int> &indices_,
-                 const vector<int> &remoteIndices_) noexcept
+  ampiCommStruct(MPI_Comm comm_, const CkArrayID &id_, const std::vector<int> &indices_,
+                 const std::vector<int> &remoteIndices_) noexcept
     : comm(comm_), ampiID(id_), size(indices_.size()), commType(INTER), indices(indices_),
       remoteIndices(remoteIndices_), ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
@@ -804,9 +831,9 @@ class ampiCommStruct {
   void setArrayID(const CkArrayID &nID) noexcept {ampiID=nID;}
 
   MPI_Comm getComm() const noexcept {return comm;}
-  inline vector<int> getIndices() const noexcept {return indices.getRanks();}
-  inline vector<int> getRemoteIndices() const noexcept {return remoteIndices.getRanks();}
-  vector<int> &getKeyvals() noexcept {return keyvals;}
+  inline std::vector<int> getIndices() const noexcept {return indices.getRanks();}
+  inline std::vector<int> getRemoteIndices() const noexcept {return remoteIndices.getRanks();}
+  std::vector<int> &getKeyvals() noexcept {return keyvals;}
 
   void setName(const char *src) noexcept {
     CkDDT_SetName(commName, src);
@@ -838,7 +865,7 @@ class ampiCommStruct {
   int getRankForIndex(int i) const noexcept {
     if (indices.isIota()) return i;
     else {
-      const vector<int>& ind = indices.getRanks();
+      const std::vector<int>& ind = indices.getRanks();
       for (int r=0;r<ind.size();r++)
         if (ind[r]==i) return r;
       return -1; /*That index isn't in this communicator*/
@@ -896,7 +923,7 @@ class mpi_comm_worlds{
 };
 
 // group operations
-inline void outputOp(const vector<int>& vec) noexcept {
+inline void outputOp(const std::vector<int>& vec) noexcept {
   if (vec.size() > 50) {
     CkPrintf("vector too large to output!\n");
     return;
@@ -908,7 +935,7 @@ inline void outputOp(const vector<int>& vec) noexcept {
   CkPrintf("}\n");
 }
 
-inline int getPosOp(int idx, const vector<int>& vec) noexcept {
+inline int getPosOp(int idx, const std::vector<int>& vec) noexcept {
   for (int r=0; r<vec.size(); r++) {
     if (vec[r] == idx) {
       return r;
@@ -917,8 +944,8 @@ inline int getPosOp(int idx, const vector<int>& vec) noexcept {
   return MPI_UNDEFINED;
 }
 
-inline vector<int> unionOp(const vector<int>& vec1, const vector<int>& vec2) noexcept {
-  vector<int> newvec(vec1);
+inline std::vector<int> unionOp(const std::vector<int>& vec1, const std::vector<int>& vec2) noexcept {
+  std::vector<int> newvec(vec1);
   for (int i=0; i<vec2.size(); i++) {
     if (getPosOp(vec2[i], vec1) == MPI_UNDEFINED) {
       newvec.push_back(vec2[i]);
@@ -927,8 +954,8 @@ inline vector<int> unionOp(const vector<int>& vec1, const vector<int>& vec2) noe
   return newvec;
 }
 
-inline vector<int> intersectOp(const vector<int>& vec1, const vector<int>& vec2) noexcept {
-  vector<int> newvec;
+inline std::vector<int> intersectOp(const std::vector<int>& vec1, const std::vector<int>& vec2) noexcept {
+  std::vector<int> newvec;
   for (int i=0; i<vec1.size(); i++) {
     if (getPosOp(vec1[i], vec2) != MPI_UNDEFINED) {
       newvec.push_back(vec1[i]);
@@ -937,8 +964,8 @@ inline vector<int> intersectOp(const vector<int>& vec1, const vector<int>& vec2)
   return newvec;
 }
 
-inline vector<int> diffOp(const vector<int>& vec1, const vector<int>& vec2) noexcept {
-  vector<int> newvec;
+inline std::vector<int> diffOp(const std::vector<int>& vec1, const std::vector<int>& vec2) noexcept {
+  std::vector<int> newvec;
   for (int i=0; i<vec1.size(); i++) {
     if (getPosOp(vec1[i], vec2) == MPI_UNDEFINED) {
       newvec.push_back(vec1[i]);
@@ -947,15 +974,15 @@ inline vector<int> diffOp(const vector<int>& vec1, const vector<int>& vec2) noex
   return newvec;
 }
 
-inline int* translateRanksOp(int n, const vector<int>& vec1, const int* ranks1,
-                             const vector<int>& vec2, int *ret) noexcept {
+inline int* translateRanksOp(int n, const std::vector<int>& vec1, const int* ranks1,
+                             const std::vector<int>& vec2, int *ret) noexcept {
   for (int i=0; i<n; i++) {
     ret[i] = (ranks1[i] == MPI_PROC_NULL) ? MPI_PROC_NULL : getPosOp(vec1[ranks1[i]], vec2);
   }
   return ret;
 }
 
-inline int compareVecOp(const vector<int>& vec1, const vector<int>& vec2) noexcept {
+inline int compareVecOp(const std::vector<int>& vec1, const std::vector<int>& vec2) noexcept {
   int pos, ret = MPI_IDENT;
   if (vec1.size() != vec2.size()) {
     return MPI_UNEQUAL;
@@ -972,16 +999,16 @@ inline int compareVecOp(const vector<int>& vec1, const vector<int>& vec2) noexce
   return ret;
 }
 
-inline vector<int> inclOp(int n, const int* ranks, const vector<int>& vec) noexcept {
-  vector<int> retvec(n);
+inline std::vector<int> inclOp(int n, const int* ranks, const std::vector<int>& vec) noexcept {
+  std::vector<int> retvec(n);
   for (int i=0; i<n; i++) {
     retvec[i] = vec[ranks[i]];
   }
   return retvec;
 }
 
-inline vector<int> exclOp(int n, const int* ranks, const vector<int>& vec) noexcept {
-  vector<int> retvec;
+inline std::vector<int> exclOp(int n, const int* ranks, const std::vector<int>& vec) noexcept {
+  std::vector<int> retvec;
   bool add = true;
   for (int j=0; j<vec.size(); j++) {
     for (int i=0; i<n; i++) {
@@ -1000,9 +1027,9 @@ inline vector<int> exclOp(int n, const int* ranks, const vector<int>& vec) noexc
   return retvec;
 }
 
-inline vector<int> rangeInclOp(int n, int ranges[][3], const vector<int>& vec,
+inline std::vector<int> rangeInclOp(int n, int ranges[][3], const std::vector<int>& vec,
                                int *flag) noexcept {
-  vector<int> retvec;
+  std::vector<int> retvec;
   int first, last, stride;
   for (int i=0; i<n; i++) {
     first  = ranges[i][0];
@@ -1015,16 +1042,16 @@ inline vector<int> rangeInclOp(int n, int ranges[][3], const vector<int>& vec,
     }
     else {
       *flag = MPI_ERR_ARG;
-      return vector<int>();
+      return std::vector<int>();
     }
   }
   *flag = MPI_SUCCESS;
   return retvec;
 }
 
-inline vector<int> rangeExclOp(int n, int ranges[][3], const vector<int>& vec,
+inline std::vector<int> rangeExclOp(int n, int ranges[][3], const std::vector<int>& vec,
                                int *flag) noexcept {
-  vector<int> ranks;
+  std::vector<int> ranks;
   int first, last, stride;
   for (int i=0; i<n; i++) {
     first  = ranges[i][0];
@@ -1037,7 +1064,7 @@ inline vector<int> rangeExclOp(int n, int ranges[][3], const vector<int>& vec,
     }
     else {
       *flag = MPI_ERR_ARG;
-      return vector<int>();
+      return std::vector<int>();
     }
   }
   *flag = MPI_SUCCESS;
@@ -1094,9 +1121,11 @@ enum AmpiReqSts : char {
   AMPI_REQ_COMPLETED = 2
 };
 
-enum AmpiSendType : bool {
-  BLOCKING_SEND = false,
-  I_SEND = true
+enum AmpiSendType : char {
+  BLOCKING_SEND = 0,
+  I_SEND = 1,
+  BLOCKING_SSEND = 2,
+  I_SSEND = 3
 };
 
 #define MyAlign8(x) (((x)+7)&(~7))
@@ -1151,15 +1180,23 @@ class AmpiRequest {
   virtual void setPersistent(bool p) noexcept {}
   virtual bool isPersistent() const noexcept { return false; }
 
+  /// Deregister memory from a get/put
+  virtual void deregisterMem() { }
+
+  /// Set an intermediate/system buffer that a message will be serialized thru
+  virtual void setSystemBuf(void* buf_, int len=0) { }
+
   /// Receive an AmpiMsg
-  virtual void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept =0;
+  /// Returns true if the msg payload is recv'ed, otherwise return false
+  /// (if the msg is a sync msg, it can't be recv'ed until the caller
+  /// acks the sender to get the real payload)
+  virtual bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept =0;
 
   /// Receive a CkReductionMsg
   virtual void receive(ampi *ptr, CkReductionMsg *msg) noexcept =0;
 
   /// Receive an Rdma message
-  virtual void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq,
-                           int srcRank, MPI_Comm scomm) noexcept { }
+  virtual void receiveRdma(ampi *ptr, char *sbuf, int slength, int srcRank) noexcept { }
 
   /// Set the request's index into AmpiRequestList
   void setReqIdx(MPI_Request idx) noexcept { reqIdx = idx; }
@@ -1229,9 +1266,12 @@ class AmpiRequest {
 
 class IReq final : public AmpiRequest {
  public:
-  bool cancelled  = false; // track if request is cancelled
-  bool persistent = false; // Is this a persistent recv request?
-  int length      = 0; // recv'ed length in bytes
+  bool cancelled   = false; // track if request is cancelled
+  bool persistent  = false; // Is this a persistent recv request?
+  int length       = 0; // recv'ed length in bytes
+  CkNcpyBuffer* targetInfo = nullptr;
+  char* systemBuf  = nullptr; // non-NULL for non-contiguous recv datatypes
+  int systemBufLen = 0; // length in bytes of systemBuf
 
   IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_,
        MPI_Comm comm_, CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
@@ -1255,17 +1295,40 @@ class IReq final : public AmpiRequest {
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
-  void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm) noexcept override;
+  void receiveRdma(ampi *ptr, char *sbuf, int slength, int srcRank) noexcept override;
   int getNumReceivedBytes(CkDDT *ptr) const noexcept override {
     return length;
+  }
+  void setSystemBuf(void* buf_, int len=0) noexcept override {
+    systemBuf = (char*)buf_;
+    systemBufLen = len;
+  }
+  void deregisterMem() noexcept override {
+    if (targetInfo) {
+      targetInfo->deregisterMem();
+      delete targetInfo;
+    }
+    if (systemBuf) {
+      delete [] systemBuf;
+    }
   }
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|cancelled;
     p|persistent;
     p|length;
+    p|systemBufLen;
+    p((char *)&systemBuf, sizeof(char *));
+    bool hasTargetInfo = (targetInfo != NULL);
+    p|hasTargetInfo;
+    if (hasTargetInfo) {
+      if (p.isUnpacking()) {
+        targetInfo = new CkNcpyBuffer();
+      }
+      p|*targetInfo;
+    }
   }
   void print() const noexcept override;
 };
@@ -1293,7 +1356,7 @@ class RednReq final : public AmpiRequest {
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_REDN_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
-  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
@@ -1322,7 +1385,7 @@ class GatherReq final : public AmpiRequest {
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_GATHER_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
-  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
@@ -1332,8 +1395,8 @@ class GatherReq final : public AmpiRequest {
 
 class GathervReq final : public AmpiRequest {
  public:
-  vector<int> recvCounts;
-  vector<int> displs;
+  std::vector<int> recvCounts;
+  std::vector<int> displs;
 
   GathervReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, const int *rc,
              const int *d, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
@@ -1354,7 +1417,7 @@ class GathervReq final : public AmpiRequest {
   int wait(MPI_Status *sts) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GATHERV_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
-  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
@@ -1392,7 +1455,7 @@ class SendReq final : public AmpiRequest {
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_SEND_REQ; }
   bool isUnmatched() const noexcept override { return false; }
@@ -1406,7 +1469,11 @@ class SendReq final : public AmpiRequest {
 
 class SsendReq final : public AmpiRequest {
  private:
+  bool systemBuf = false; // is 'buf' an intermediate/system buffer?
   bool persistent = false; // is this a persistent Ssend request?
+ public:
+  int destRank = MPI_PROC_NULL;
+  CkNcpyBuffer* srcInfo = nullptr;
 
  public:
   SsendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
@@ -1418,23 +1485,24 @@ class SsendReq final : public AmpiRequest {
   SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
            CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
-    buf   = buf_;
-    count = count_;
-    type  = type_;
-    src   = dest_;
-    tag   = tag_;
-    comm  = comm_;
+    buf      = (void*)buf_;
+    count    = count_;
+    type     = type_;
+    tag      = tag_;
+    comm     = comm_;
+    destRank = dest_;
     AMPI_REQUEST_COMMON_INIT
   }
   SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
            int src_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
-    buf   = buf_;
-    count = count_;
-    type  = type_;
-    src   = dest_;
-    tag   = tag_;
-    comm  = comm_;
+    buf      = (void*)buf_;
+    count    = count_;
+    type     = type_;
+    src      = src_;
+    tag      = tag_;
+    comm     = comm_;
+    destRank = dest_;
     AMPI_REQUEST_COMMON_INIT
   }
   SsendReq() =default;
@@ -1444,14 +1512,35 @@ class SsendReq final : public AmpiRequest {
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_SSEND_REQ; }
   bool isUnmatched() const noexcept override { return false; }
   bool isPooledType() const noexcept override { return true; }
+  void deregisterMem() noexcept override {
+    if (srcInfo) {
+      srcInfo->deregisterMem();
+      delete srcInfo;
+    }
+    if (systemBuf) {
+      delete [] (char*)buf;
+    }
+  }
+  void setSystemBuf(void* buf_, int len=0) noexcept override {
+    systemBuf = true;
+    buf = buf_;
+  }
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|persistent;
+    p|destRank;
+    p|systemBuf;
+    bool hasSrcInfo = (srcInfo != NULL);
+    p|hasSrcInfo;
+    if (hasSrcInfo) {
+      if (p.isUnpacking()) srcInfo = new CkNcpyBuffer();
+      p|*srcInfo;
+    }
   }
   void print() const noexcept override;
 };
@@ -1463,7 +1552,7 @@ class GPUReq : public AmpiRequest {
   ~GPUReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GPU_REQ; }
   bool isUnmatched() const noexcept override { return false; }
@@ -1474,14 +1563,14 @@ class GPUReq : public AmpiRequest {
 
 class ATAReq final : public AmpiRequest {
  public:
-  vector<MPI_Request> reqs;
+  std::vector<MPI_Request> reqs;
 
   ATAReq(int numReqs_) noexcept : reqs(numReqs_) {}
   ATAReq() =default;
   ~ATAReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   int getCount() const noexcept { return reqs.size(); }
   AmpiReqType getType() const noexcept override { return AMPI_ATA_REQ; }
@@ -1513,7 +1602,7 @@ class GReq final : public AmpiRequest {
   ~GReq() noexcept { (*freeFn)(extraState); }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   void cancel() noexcept override { (*cancelFn)(extraState, complete); }
   AmpiReqType getType() const noexcept override { return AMPI_G_REQ; }
@@ -1534,7 +1623,7 @@ class AmpiRequestPool;
 
 class AmpiRequestList {
  private:
-  vector<AmpiRequest*> reqs; // indexed by MPI_Request
+  std::vector<AmpiRequest*> reqs; // indexed by MPI_Request
   int startIdx; // start next search from this index
   AmpiRequestPool* reqPool;
  public:
@@ -1620,9 +1709,14 @@ inline void pupFromBuf(const void *data,T &t) noexcept {
 
 class AmpiMsgPool;
 
+enum AmpiMsgType : bool {
+  NCPY_SHM_MSG = true,
+  NCPY_MSG     = false
+};
+
 class AmpiMsg final : public CMessage_AmpiMsg {
  private:
-  int ssendReq; //Index to the sender's request
+  int ssendReq; //Index to the sender's request (MPI_REQUEST_NULL if no request)
   int tag; //MPI tag
   int srcRank; //Communicator rank for source
   int length; //Number of bytes in this message
@@ -1637,14 +1731,15 @@ class AmpiMsg final : public CMessage_AmpiMsg {
 #endif
 
  public:
-  AmpiMsg() noexcept { data = NULL; }
-  AmpiMsg(int sreq, int t, int sRank, int l) noexcept :
-    ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l)
+  AmpiMsg() noexcept : data(NULL) {}
+  AmpiMsg(int sreq, int t, int sRank, int l, MPI_Comm c) noexcept :
+    ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l), comm(c)
   { /* only called from AmpiMsg::pup() since the refnum (seq) will get pup'ed by the runtime */ }
   AmpiMsg(CMK_REFNUM_TYPE seq, int sreq, int t, int sRank, int l) noexcept :
     ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l)
   { CkSetRefNum(this, seq); }
-  inline void setSsendReq(int s) noexcept { CkAssert(s >= 0); ssendReq = s; }
+  inline bool isSsend() const noexcept { return (ssendReq >= 0); }
+  inline void setSsendReq(int s) noexcept { ssendReq = s; }
   inline void setSeq(CMK_REFNUM_TYPE s) noexcept { CkAssert(s >= 0); UsrToEnv(this)->setRef(s); }
   inline void setSrcRank(int sr) noexcept { srcRank = sr; }
   inline void setLength(int l) noexcept { length = l; }
@@ -1661,6 +1756,17 @@ class AmpiMsg final : public CMessage_AmpiMsg {
       return srcRank;
     }
   }
+  inline AmpiMsgType isNcpyShmMsg() const noexcept { CkAssert(isSsend()); return ((AmpiMsgType*)data)[0]; }
+  inline void getNcpyShmBuffer(AmpiNcpyShmBuffer& srcInfo) noexcept {
+    CkAssert(isNcpyShmMsg());
+    PUP::fromMem p(data+sizeof(AmpiMsgType));
+    p | srcInfo;
+  }
+  inline void getNcpyBuffer(CkNcpyBuffer& srcInfo) noexcept {
+    CkAssert(!isNcpyShmMsg());
+    PUP::fromMem p(data+sizeof(AmpiMsgType));
+    p | srcInfo;
+  }
   inline int getSrcRank() const noexcept { return srcRank; }
   inline int getLength() const noexcept { return length; }
   inline char* getData() const noexcept { return data; }
@@ -1668,7 +1774,7 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   inline MPI_Comm getComm() const noexcept { return comm; }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m) noexcept
   {
-    int ref, ssendReq, tag, srcRank, length, origLength;
+    int ref, ssendReq, tag, srcRank, length, origLength, dataLen;
     MPI_Comm comm;
     if(p.isPacking() || p.isSizing()) {
       ref = CkGetRefNum(m);
@@ -1678,14 +1784,31 @@ class AmpiMsg final : public CMessage_AmpiMsg {
       length = m->length;
       origLength = m->origLength;
       comm = m->comm;
+      if (m->isSsend()) {
+        // For SsendMsg's, m->data is a ncpyBuffer object and m->length
+        // is the length of the real msg payload to be recv'ed.
+        PUP::sizer pupSizer;
+        AmpiMsgType msgType;
+        pupSizer | msgType;
+        if (m->isNcpyShmMsg()) {
+          AmpiNcpyShmBuffer srcInfo;
+          pupSizer | srcInfo;
+        } else {
+          CkNcpyBuffer srcInfo;
+          pupSizer | srcInfo;
+        }
+        dataLen = pupSizer.size();
+      } else {
+        dataLen = length;
+      }
     }
-    p(ref); p(ssendReq); p(tag); p(srcRank); p(length); p(origLength); p(comm);
+    p(ref); p(ssendReq); p(tag); p(srcRank); p(length); p(origLength); p(comm); p(dataLen);
     if(p.isUnpacking()) {
       m = new (origLength, 0) AmpiMsg(ref, ssendReq, tag, srcRank, origLength);
       m->setLength(length);
       m->setComm(comm);
     }
-    p(m->data, length);
+    p(m->data, dataLen);
     if(p.isDeleting()) {
       delete m;
       m = 0;
@@ -1696,8 +1819,8 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   friend AmpiMsgPool;
 };
 
-#define AMPI_MSG_POOL_SIZE   32 // Max # of AmpiMsg's allowed in the pool
-#define AMPI_POOLED_MSG_SIZE 64 // Max # of Bytes in pooled msgs' payload
+#define AMPI_MSG_POOL_SIZE    32 // Max # of AmpiMsg's allowed in the pool
+#define AMPI_POOLED_MSG_SIZE 128 // Max # of Bytes in pooled msgs' payload
 
 class AmpiMsgPool {
  private:
@@ -1844,6 +1967,7 @@ public:
   inline CMK_REFNUM_TYPE getSeqIncoming() const noexcept { return seqIncoming; }
 
   inline void incSeqOutgoing() noexcept { seqOutgoing++; if (seqOutgoing==0) seqOutgoing=1; }
+  inline void decSeqOutgoing() noexcept { seqOutgoing--; if (seqOutgoing==0) seqOutgoing=std::numeric_limits<CMK_REFNUM_TYPE>::max(); }
   inline CMK_REFNUM_TYPE getSeqOutgoing() const noexcept { return seqOutgoing; }
 
   inline void incNumOutOfOrder() noexcept { numOutOfOrder++; }
@@ -1885,7 +2009,7 @@ public:
   /// Is this message in order (return >0) or not (return 0)?
   /// Same as put() except we don't call putOutOfOrder() here,
   /// so the caller should do that separately
-  inline int isInOrder(int srcRank, CMK_REFNUM_TYPE seq) noexcept {
+  inline int putIfInOrder(int srcRank, CMK_REFNUM_TYPE seq) noexcept {
     AmpiOtherElement &el = elements[srcRank];
     if (seq == el.getSeqIncoming()) { // In order:
       el.incSeqIncoming();
@@ -1894,6 +2018,11 @@ public:
     else { // Out of order: caller should stash message
       return 0;
     }
+  }
+
+  /// Is this in-order?
+  inline bool isInOrder(int seqIdx, CMK_REFNUM_TYPE seq) noexcept {
+    return (seq == elements[seqIdx].getSeqIncoming());
   }
 
   /// Get an out-of-order message from the table.
@@ -1913,6 +2042,11 @@ public:
     AmpiOtherElement &el = elements[destRank];
     el.incSeqOutgoing();
     return el.getSeqOutgoing();
+  }
+
+  /// Reset the outgoing sequence number to its previous value.
+  inline void resetOutgoing(int destRank) noexcept {
+    elements[destRank].decSeqOutgoing();
   }
 };
 PUPmarshall(AmpiSeqQ)
@@ -1957,8 +2091,8 @@ class ampiParent final : public CBase_ampiParent {
   CkPupPtrVec<WinStruct> winStructList; //List of windows for one-sided communication
   CkPupPtrVec<InfoStruct> infos; // list of all MPI_Infos
   const std::array<MPI_User_function*, AMPI_MAX_PREDEFINED_OP+1>& predefinedOps; // owned by ampiNodeMgr
-  vector<OpStruct> userOps; // list of any user-defined MPI_Ops
-  vector<AmpiMsg *> matchedMsgs; // for use with MPI_Mprobe and MPI_Mrecv
+  std::vector<OpStruct> userOps; // list of any user-defined MPI_Ops
+  std::vector<AmpiMsg *> matchedMsgs; // for use with MPI_Mprobe and MPI_Mrecv
 
   /* MPI_*_get_attr C binding returns a *pointer* to an integer,
    *  so there needs to be some storage somewhere to point to.
@@ -1986,6 +2120,7 @@ class ampiParent final : public CBase_ampiParent {
 
  public:
   void prepareCtv() noexcept;
+  TCharm* getThread() noexcept { return thread; }
 
   MPI_Message putMatchedMsg(AmpiMsg* msg) noexcept {
     // Search thru matchedMsgs for any NULL ones first:
@@ -2125,7 +2260,7 @@ class ampiParent final : public CBase_ampiParent {
   void Checkpoint(int len, const char* dname) noexcept;
   void ResumeThread() noexcept;
   TCharm* getTCharmThread() const noexcept {return thread;}
-  inline ampiParent* blockOnRecv() noexcept;
+  CMI_WARN_UNUSED_RESULT inline ampiParent* blockOnRecv() noexcept;
   inline CkDDT* getDDT() noexcept { return &myDDT; }
 
 #if CMK_LBDB_ON
@@ -2149,7 +2284,7 @@ class ampiParent final : public CBase_ampiParent {
     return universeComm2CommStruct(comm);
   }
 
-  inline vector<int>& getKeyvals(MPI_Comm comm) noexcept {
+  inline std::vector<int>& getKeyvals(MPI_Comm comm) noexcept {
     ampiCommStruct &cs = *(ampiCommStruct *)&comm2CommStruct(comm);
     return cs.getKeyvals();
   }
@@ -2196,9 +2331,9 @@ class ampiParent final : public CBase_ampiParent {
              isCart(comm) || isGraph(comm) || isDistGraph(comm) || isIntra(comm) );
     //isInter omitted because its comm number != its group number
   }
-  inline vector<int> group2vec(MPI_Group group) const noexcept {
+  inline std::vector<int> group2vec(MPI_Group group) const noexcept {
     if (group == MPI_GROUP_NULL || group == MPI_GROUP_EMPTY) {
-      return vector<int>();
+      return std::vector<int>();
     }
     else if (hasComm(group)) {
       return comm2CommStruct((MPI_Comm)group).getIndices();
@@ -2208,7 +2343,7 @@ class ampiParent final : public CBase_ampiParent {
       return groups[group]->getRanks();
     }
   }
-  inline MPI_Group saveGroupStruct(const vector<int>& vec) noexcept {
+  inline MPI_Group saveGroupStruct(const std::vector<int>& vec) noexcept {
     if (vec.empty()) return MPI_GROUP_EMPTY;
     int idx = groups.size();
     groups.resize(idx+1);
@@ -2216,7 +2351,7 @@ class ampiParent final : public CBase_ampiParent {
     return (MPI_Group)idx;
   }
   inline int getRank(const MPI_Group group) const noexcept {
-    vector<int> vec = group2vec(group);
+    std::vector<int> vec = group2vec(group);
     return getPosOp(thisIndex,vec);
   }
   inline AmpiRequestList &getReqs() noexcept { return ampiReqs; }
@@ -2260,14 +2395,14 @@ class ampiParent final : public CBase_ampiParent {
                   int *keyval, void* extra_state) noexcept;
   bool getBuiltinKeyval(int keyval, void *attribute_val) noexcept;
   int setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val) noexcept;
-  bool getUserKeyval(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
+  bool getUserKeyval(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
   int dupUserKeyvals(MPI_Comm old_comm, MPI_Comm new_comm) noexcept;
-  int freeUserKeyval(int context, vector<int>& keyvals, int *keyval) noexcept;
-  int freeUserKeyvals(int context, vector<int>& keyvals) noexcept;
+  int freeUserKeyval(int context, std::vector<int>& keyvals, int *keyval) noexcept;
+  int freeUserKeyvals(int context, std::vector<int>& keyvals) noexcept;
 
-  int setAttr(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val) noexcept;
-  int getAttr(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
-  int deleteAttr(MPI_Comm comm, vector<int>& keyvals, int keyval) noexcept;
+  int setAttr(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val) noexcept;
+  int getAttr(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
+  int deleteAttr(MPI_Comm comm, std::vector<int>& keyvals, int keyval) noexcept;
 
   int addWinStruct(WinStruct *win) noexcept;
   WinStruct *getWinStruct(MPI_Win win) const noexcept;
@@ -2354,10 +2489,11 @@ class ampiParent final : public CBase_ampiParent {
     (func)((void*)invec, inoutvec, &count, &datatype);
   }
 
+  int wait(MPI_Request* req, MPI_Status* sts) noexcept;
   void init() noexcept;
   void finalize() noexcept;
-  void block() noexcept;
-  void yield() noexcept;
+  CMI_WARN_UNUSED_RESULT ampiParent* block() noexcept;
+  CMI_WARN_UNUSED_RESULT ampiParent* yield() noexcept;
 
 #if AMPI_PRINT_MSG_SIZES
 // Map of AMPI routine names to message sizes and number of messages:
@@ -2434,19 +2570,21 @@ class ampi final : public CBase_ampi {
   Amm<AmpiMsg *, AMPI_AMM_COLL_POOL_SIZE> unexpectedBcastMsgs;
 
   // Store generalized request classes created by MPIX_Grequest_class_create
-  vector<greq_class_desc> greq_classes;
+  std::vector<greq_class_desc> greq_classes;
 
  private:
   ampiCommStruct myComm;
-  vector<int> tmpVec; // stores temp group info
+  std::vector<int> tmpVec; // stores temp group info
   CProxy_ampi remoteProxy; // valid only for intercommunicator
   CkPupPtrVec<win_obj> winObjects;
 
  private:
-  void inorder(AmpiMsg *msg) noexcept;
+  inline bool isInOrder(int seqIdx, int seq) noexcept { return oorder.isInOrder(seqIdx, seq); }
+  bool inorder(AmpiMsg *msg) noexcept;
   void inorderBcast(AmpiMsg *msg, bool deleteMsg) noexcept;
-  void inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
-                   MPI_Comm comm, int ssendReq) noexcept;
+  void inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank) noexcept;
+  inline void localInorder(char* buf, int size, int seqIdx, CMK_REFNUM_TYPE seq, int tag,
+                           int srcRank, IReq* ireq) noexcept;
 
   void init() noexcept;
   void findParent(bool forMigration) noexcept;
@@ -2464,16 +2602,20 @@ class ampi final : public CBase_ampi {
   void allInitDone() noexcept;
   void setInitDoneFlag() noexcept;
 
-  void unblock() noexcept;
+  inline void unblock() noexcept {
+    thread->resume();
+  }
+
   void injectMsg(int size, char* buf) noexcept;
+  void genericSync(AmpiMsg *) noexcept;
   void generic(AmpiMsg *) noexcept;
-  void genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
-                   MPI_Comm destcomm, int ssendReq) noexcept;
+  void genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank) noexcept;
   void completedRdmaSend(CkDataMsg *msg) noexcept;
-  void ssend_ack(int sreq) noexcept;
-  void barrierResult() noexcept;
-  void ibarrierResult() noexcept;
+  void completedRdmaRecv(CkDataMsg *msg) noexcept;
+  void requestPut(MPI_Request req, CkNcpyBuffer targetInfo) noexcept;
   void bcastResult(AmpiMsg *msg) noexcept;
+  void barrierResult(void) noexcept;
+  void ibarrierResult(void) noexcept;
   void rednResult(CkReductionMsg *msg) noexcept;
   void irednResult(CkReductionMsg *msg) noexcept;
 
@@ -2498,39 +2640,75 @@ class ampi final : public CBase_ampi {
     }
   }
 
+ private: // for this pointer safety after migration
+  CMI_WARN_UNUSED_RESULT static ampi* static_blockOnColl(ampi* dis) noexcept;
+  static int static_recv(ampi* dis,int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts) noexcept;
+  static void static_probe(ampi* dis,int t,int s,MPI_Comm comm,MPI_Status *sts) noexcept;
+  static void static_mprobe(ampi* dis, int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept;
+
  public: // to be used by MPI_* functions
   inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept {
     return parent->comm2CommStruct(comm);
   }
   inline const ampiCommStruct &getCommStruct() const noexcept { return myComm; }
 
-  inline ampi* blockOnRecv() noexcept;
-  inline ampi* blockOnColl() noexcept;
+  CMI_WARN_UNUSED_RESULT inline ampi* blockOnRecv() noexcept;
+  CMI_WARN_UNUSED_RESULT CMI_FORCE_INLINE ampi* blockOnColl() noexcept {
+    return static_blockOnColl(this);
+  }
   inline void setBlockingReq(AmpiRequest *req) noexcept;
+  CMI_WARN_UNUSED_RESULT inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
+                                                  int t, MPI_Comm comm, MPI_Status* sts) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
+  inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
+  inline void completedSend(MPI_Request req) noexcept;
+  inline void completedRecv(MPI_Request req) noexcept;
 
   inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept;
   AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root,MPI_Comm destcomm) noexcept;
+  AmpiMsg *makeSyncMsg(int t,int sRank,const void *buf,int count,
+                       MPI_Datatype type,CProxy_ampi destProxy,
+                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq) noexcept;
+  AmpiMsg *makeNcpyShmMsg(int t, int sRank, const void* buf, int count,
+                          MPI_Datatype type, int ssendReq, int seq) noexcept;
+  AmpiMsg *makeNcpyMsg(int t, int sRank, const void* buf, int count,
+                       MPI_Datatype type, int ssendReq, int seq) noexcept;
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
-                       MPI_Datatype type,MPI_Comm destcomm, int ssendReq=0) noexcept;
+                       MPI_Datatype type,MPI_Comm destcomm) noexcept;
+  AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
+                       MPI_Datatype type,MPI_Comm destcomm,CMK_REFNUM_TYPE seq) noexcept;
 
   MPI_Request send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
-                   MPI_Comm destcomm, int ssendReq=0, AmpiSendType sendType=BLOCKING_SEND) noexcept;
+                   MPI_Comm destcomm, AmpiSendType sendType=BLOCKING_SEND, MPI_Request=MPI_REQUEST_NULL) noexcept;
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx) noexcept;
-  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destRank,
-                                  MPI_Comm destcomm, ampi* destPtr, int ssendReq, AmpiSendType sendType) noexcept;
+  inline MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
+                                 int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destElem,
+                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
+  inline MPI_Request sendLocalInOrderMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
+                                         int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
+                                         ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
-                                 int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq) noexcept;
+                                 int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
+                                 MPI_Request reqIdx) noexcept;
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const noexcept {
+#if CMK_MULTICORE
+    return true;
+#elif CMK_SMP
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
     return (CkNodeOf(destPe) == CkMyNode());
+#else // non-SMP
+    ampi* destPtr = arrProxy[destIdx].ckLocal();
+    return (destPtr != NULL);
+#endif
   }
-  MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
-                       MPI_Comm destcomm, CProxy_ampi arrproxy, int ssend, AmpiSendType sendType) noexcept;
-  inline void processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count) noexcept;
-  inline void processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
-                             int rcount, MPI_Datatype rtype, MPI_Comm comm) noexcept;
+  inline MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
+                              MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req) noexcept;
+  inline bool processSsendMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
+  inline bool processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
+  inline bool processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
+  inline bool processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
+  inline void processRdmaMsg(const void *sbuf, int slength, void* rbuf, int rcount, MPI_Datatype rtype) noexcept;
   inline void processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count) noexcept;
   inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count,
                                            MPI_User_function* func) noexcept;
@@ -2538,7 +2716,9 @@ class ampi final : public CBase_ampi {
   inline void processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
                                int* recvCounts, int* displs) noexcept;
   inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const noexcept;
-  int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL) noexcept;
+  CMI_FORCE_INLINE int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL) noexcept {
+    return static_recv(this, t, s, buf, count, type, comm, sts);
+  }
   void irecv(void *buf, int count, MPI_Datatype type, int src,
              int tag, MPI_Comm comm, MPI_Request *request) noexcept;
   void mrecv(int tag, int src, void* buf, int count, MPI_Datatype datatype, MPI_Comm comm,
@@ -2553,11 +2733,17 @@ class ampi final : public CBase_ampi {
   void sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
                         int dest, int sendtag, int source, int recvtag,
                         MPI_Comm comm, MPI_Status *status) noexcept;
-  void probe(int t,int s,MPI_Comm comm,MPI_Status *sts) noexcept;
-  void mprobe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept;
+  CMI_FORCE_INLINE void probe(int t,int s,MPI_Comm comm,MPI_Status *sts) noexcept {
+    return static_probe(this, t, s, comm, sts);
+  }
+  CMI_FORCE_INLINE void mprobe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept {
+    return static_mprobe(this, t, s, comm, sts, message);
+  }
   int iprobe(int t,int s,MPI_Comm comm,MPI_Status *sts) noexcept;
   int improbe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept;
-  void barrier() noexcept;
+  CMI_WARN_UNUSED_RESULT ampi * barrier() noexcept;
+  CMI_WARN_UNUSED_RESULT ampi * block() noexcept;
+  CMI_WARN_UNUSED_RESULT ampi * yield() noexcept;
   void ibarrier(MPI_Request *request) noexcept;
   void bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm) noexcept;
   int intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm) noexcept;
@@ -2565,16 +2751,17 @@ class ampi final : public CBase_ampi {
   int intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request) noexcept;
   static void bcastraw(void* buf, int len, CkArrayID aid) noexcept;
   void split(int color,int key,MPI_Comm *dest, int type) noexcept;
-  void commCreate(const vector<int>& vec,MPI_Comm *newcomm) noexcept;
+  void commCreate(const std::vector<int>& vec,MPI_Comm *newcomm) noexcept;
   MPI_Comm cartCreate0D() noexcept;
-  MPI_Comm cartCreate(vector<int>& vec, int ndims, const int* dims) noexcept;
-  void graphCreate(const vector<int>& vec, MPI_Comm *newcomm) noexcept;
-  void distGraphCreate(const vector<int>& vec, MPI_Comm *newcomm) noexcept;
-  void intercommCreate(const vector<int>& rvec, int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept;
+  MPI_Comm cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept;
+  void graphCreate(const std::vector<int>& vec, MPI_Comm *newcomm) noexcept;
+  void distGraphCreate(const std::vector<int>& vec, MPI_Comm *newcomm) noexcept;
+  void intercommCreate(const std::vector<int>& rvec, int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept;
 
   inline bool isInter() const noexcept { return myComm.isinter(); }
   void intercommMerge(int first, MPI_Comm *ncomm) noexcept;
 
+  inline ampiParent* getParent() const noexcept { return parent; }
   inline int getWorldRank() const noexcept {return parent->thisIndex;}
   /// Return our rank in this communicator
   inline int getRank() const noexcept {return myRank;}
@@ -2582,15 +2769,15 @@ class ampi final : public CBase_ampi {
   inline MPI_Comm getComm() const noexcept {return myComm.getComm();}
   inline void setCommName(const char *name) noexcept {myComm.setName(name);}
   inline void getCommName(char *name, int *len) const noexcept {myComm.getName(name,len);}
-  inline vector<int> getIndices() const noexcept { return myComm.getIndices(); }
-  inline vector<int> getRemoteIndices() const noexcept { return myComm.getRemoteIndices(); }
+  inline std::vector<int> getIndices() const noexcept { return myComm.getIndices(); }
+  inline std::vector<int> getRemoteIndices() const noexcept { return myComm.getRemoteIndices(); }
   inline const CProxy_ampi &getProxy() const noexcept {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy() const noexcept {return remoteProxy;}
   inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; thread->resume(); }
   inline int getIndexForRank(int r) const noexcept {return myComm.getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const noexcept {return myComm.getIndexForRemoteRank(r);}
-  void findNeighbors(MPI_Comm comm, int rank, vector<int>& neighbors) const noexcept;
-  inline const vector<int>& getNeighbors() const noexcept { return myComm.getTopologyforNeighbors()->getnbors(); }
+  void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept;
+  inline const std::vector<int>& getNeighbors() const noexcept { return myComm.getTopologyforNeighbors()->getnbors(); }
   inline bool opIsCommutative(MPI_Op op) const noexcept { return parent->opIsCommutative(op); }
   inline MPI_User_function* op2User_function(MPI_Op op) const noexcept { return parent->op2User_function(op); }
   void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm) noexcept;
@@ -2663,9 +2850,9 @@ class ampi final : public CBase_ampi {
                           MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request) noexcept;
 };
 
-ampiParent *getAmpiParent() noexcept;
+CMI_WARN_UNUSED_RESULT ampiParent *getAmpiParent() noexcept;
 bool isAmpiThread() noexcept;
-ampi *getAmpiInstance(MPI_Comm comm) noexcept;
+CMI_WARN_UNUSED_RESULT ampi *getAmpiInstance(MPI_Comm comm) noexcept;
 void checkComm(MPI_Comm comm) noexcept;
 void checkRequest(MPI_Request req) noexcept;
 void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type) noexcept;

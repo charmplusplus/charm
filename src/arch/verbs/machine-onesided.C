@@ -133,7 +133,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
             dest_info->key,
             (uint64_t)(ncpyOpInfo->srcPtr),
             src_info->key,
-            ncpyOpInfo->srcSize,
+            std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
             ncpyOpInfo->srcPe,
             (uint64_t)rdmaPacket,
             IBV_WR_RDMA_READ);
@@ -182,7 +182,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
             src_info->key,
             (uint64_t)(ncpyOpInfo->destPtr),
             dest_info->key,
-            ncpyOpInfo->srcSize,
+            std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
             ncpyOpInfo->destPe,
             (uint64_t)rdmaPacket,
             IBV_WR_RDMA_WRITE);
@@ -193,9 +193,54 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
   CmiVerbsRdmaPtr_t *rdmadest = (CmiVerbsRdmaPtr_t *)info;
 
-  if(mode == CMK_BUFFER_REG) {
+  if(mode != CMK_BUFFER_PREREG && mode != CMK_BUFFER_NOREG) {
     if (ibv_dereg_mr(rdmadest->mr)) {
       CmiAbort("ibv_dereg_mr() failed at LrtsDeregisterMem\n");
     }
   }
+}
+
+void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
+  // Send a message to de-register remote buffer and invoke callback
+  infiPacket packet;
+  MallocInfiPacket(packet);
+
+  struct ibv_mr *packetKey;
+  NcpyOperationInfo *newNcpyOpInfo;
+
+  if(ncpyOpInfo->opMode == CMK_DIRECT_API) {
+    // ncpyOpInfo is not freed
+    newNcpyOpInfo = ncpyOpInfo;
+
+    packetKey = METADATAFIELD(newNcpyOpInfo)->key;
+
+  } else if(ncpyOpInfo->opMode == CMK_EM_API) {
+
+    // ncpyOpInfo is a part of the received message and can be freed before this send completes
+    // for that reason, it is copied into a new message
+    newNcpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyOpInfo->ncpyOpInfoSize);
+
+    memcpy(newNcpyOpInfo, ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize);
+
+    newNcpyOpInfo->freeMe =  CMK_FREE_NCPYOPINFO; // Since this is a copy of ncpyOpInfo, it can be freed
+
+
+    // Register the small message in order to send it to the other side
+    packetKey = ibv_reg_mr(context->pd, (void *)newNcpyOpInfo, newNcpyOpInfo->ncpyOpInfoSize, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+
+    if (!packetKey) {
+      CmiAbort("Memory Registration Failed in LrtsInvokeRemoteDeregAckHandler!\n");
+    }
+  } else {
+
+    CmiAbort("Verbs: LrtsInvokeRemoteDeregAckHandler - ncpyOpInfo->opMode is not valid for dereg\n");
+  }
+
+  packet->size = newNcpyOpInfo->ncpyOpInfoSize;
+  packet->buf  = (char *)newNcpyOpInfo;
+  packet->header.code = INFIRDMA_DIRECT_DEREG_AND_ACK;
+  packet->ogm  = NULL;
+
+  OtherNode node = &nodes[CmiNodeOf(pe)];
+  EnqueuePacket(node, packet, newNcpyOpInfo->ncpyOpInfoSize, packetKey);
 }

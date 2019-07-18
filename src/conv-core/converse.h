@@ -63,9 +63,13 @@
 
 #if CMK_ONESIDED_IMPL
 #define CMI_ZC_MSGTYPE(msg)                  ((CmiMsgHeaderBasic *)msg)->zcMsgType
+#define CMI_IS_ZC_P2P(msg)                   (CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_SEND_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_RECV_MSG)
 #define CMI_IS_ZC_BCAST(msg)                 (CMI_ZC_MSGTYPE(msg) == CMK_ZC_BCAST_SEND_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_BCAST_RECV_MSG)
 #define CMI_IS_ZC_RECV(msg)                  (CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_RECV_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_BCAST_RECV_MSG)
+#define CMI_IS_ZC(msg)                       (CMI_IS_ZC_P2P(msg) || CMI_IS_ZC_BCAST(msg))
 #endif
+
+#define CMI_MSG_NOKEEP(msg)                  ((CmiMsgHeaderBasic *)msg)->nokeep
 
 #define CMIALIGN(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))
 /*#define ALIGN8(x)        (size_t)((~7)&((x)+7)) */
@@ -130,6 +134,15 @@
 #   define CMK_NORETURN __attribute__ ((__noreturn__))
 #  endif
 # endif
+
+// must be placed before return type and at both declaration and definition
+#if defined __GNUC__ && __GNUC__ >= 4
+# define CMI_WARN_UNUSED_RESULT __attribute__ ((warn_unused_result))
+#elif defined _MSC_VER && _MSC_VER >= 1700
+# define CMI_WARN_UNUSED_RESULT _Check_return_
+#else
+# define CMI_WARN_UNUSED_RESULT
+#endif
 
 /* Paste the tokens x and y together, without any space between them.
    The ANSI C way to do this is the bizarre ## "token-pasting" 
@@ -671,6 +684,8 @@ typedef struct
   int num_pus;
   int num_cores;
   int num_sockets;
+
+  int total_num_pus;
 } CmiHwlocTopology;
 
 extern CmiHwlocTopology CmiHwlocTopologyLocal;
@@ -1243,6 +1258,8 @@ void          CmiSyncBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncBroadcastAllFn(int, char *);
 void          CmiFreeBroadcastAllFn(int, char *);
 
+void          CmiWithinNodeBroadcastFn(int, char*);
+
 void          CmiSyncListSendFn(int, const int *, int, char*);
 CmiCommHandle CmiAsyncListSendFn(int, const int *, int, char*);
 void          CmiFreeListSendFn(int, const int *, int, char*);
@@ -1386,6 +1403,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #define CmiSyncNodeBroadcastAll(s,m)        (CmiSyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
+#define CmiWithinNodeBroadcast(s,m)         (CmiWithinNodeBroadcastFn((s),(char *)(m)))
 
 /* counterparts of inter partition */
 #if CMK_HAS_PARTITION
@@ -1423,6 +1441,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
           CmiSyncNodeBroadcastAll(s,m); \
           CmiFree(m); \
         } while(0)
+#define CmiWithinNodeBroadcast(s,m)         (CmiWithinNodeBroadcastFn((s),(char *)(m)))
 #else
 #define CmiSyncNodeBroadcast(s,m)           CmiSyncBroadcast(s,m)
 #define CmiAsyncNodeBroadcast(s,m)          CmiAsyncBroadcast(s,m)
@@ -1430,6 +1449,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #define CmiSyncNodeBroadcastAll(s,m)        CmiSyncBroadcastAll(s,m)
 #define CmiAsyncNodeBroadcastAll(s,m)       CmiAsyncBroadcastAll(s,m)
 #define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
+#define CmiWithinNodeBroadcast(s,m)         CmiSyncSendAndFree(CmiMyPe(),s,m)
 #endif
 /* and the inter partition counterparts */
 #if CMK_HAS_PARTITION
@@ -1704,7 +1724,10 @@ const char *CldGetStrategy(void);
 void CldEnqueue(int pe, void *msg, int infofn);
 void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn);
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn);
+// CldNodeEnqueue enqueues a single message for a node, whereas
+// CldEnqueueWithinNode enqueues a message for each PE on the node.
 void CldNodeEnqueue(int node, void *msg, int infofn);
+void CldEnqueueWithinNode(void *msg, int infofn);
 
 /****** CMM: THE MESSAGE MANAGER ******/
 

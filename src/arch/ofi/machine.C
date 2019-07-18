@@ -49,6 +49,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include "converse.h"
+#include <algorithm>
 
 /*Support for ++debug: */
 #include <unistd.h> /*For getpid()*/
@@ -91,9 +92,9 @@
 #include "request.h"
 
 /* Runtime to exchange EP addresses during LrtsInit() */
-#if CMK_OFI_USE_PMI
+#if CMK_USE_PMI
 #include "runtime-pmi.C"
-#elif CMK_OFI_USE_PMI2
+#elif CMK_USE_PMI2
 #include "runtime-pmi2.C"
 #endif
 
@@ -135,6 +136,8 @@ CpvDeclare(mempool_type*, mempool);
 #define OFI_OP_ACK   0x3ULL
 #define OFI_RDMA_DIRECT_REG_AND_PUT 0x4ULL
 #define OFI_RDMA_DIRECT_REG_AND_GET 0x5ULL
+
+#define OFI_RDMA_DIRECT_DEREG_AND_ACK 0x6ULL
 
 #define OFI_OP_NAMES 0x8ULL
 
@@ -342,8 +345,8 @@ static int fill_av_ofi(int myid, int nnodes, struct fid_ep *ep,
 
 static OFIContext context;
 
-#if CMK_ONESIDED_IMPL
 #include "machine-rdma.h"
+#if CMK_ONESIDED_IMPL
 #include "machine-onesided.h"
 #endif
 
@@ -1146,12 +1149,17 @@ void recv_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
     case OFI_OP_ACK:
         process_long_send_ack(e, req);
         break;
+#if CMK_ONESIDED_IMPL
     case OFI_RDMA_DIRECT_REG_AND_PUT:
         process_onesided_reg_and_put(e, req);
         break;
     case OFI_RDMA_DIRECT_REG_AND_GET:
         process_onesided_reg_and_get(e, req);
         break;
+    case OFI_RDMA_DIRECT_DEREG_AND_ACK:
+        process_onesided_dereg_and_ack(e, req);
+        break;
+#endif
     default:
         MACHSTATE2(3, "--> unknown operation %x len=%ld", e->tag, e->len);
         CmiAbort("!! Wrong operation !!");
@@ -1601,7 +1609,7 @@ int fill_av_ofi(int myid,
                 CmiAbort("OFI::LrtsInit::snprintf error");
             }
 
-            ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen);
+            ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen, i);
             if (ret) {
                 CmiAbort("OFI::LrtsInit::runtime_kvs_get error");
             }
@@ -1750,7 +1758,7 @@ int fill_av(int myid,
             CmiAbort("OFI::LrtsInit::snprintf error");
         }
 
-        ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen);
+        ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen, i);
         if (ret) {
             CmiAbort("OFI::LrtsInit::runtime_kvs_get error");
         }

@@ -35,6 +35,7 @@ class MigrateHello : public CBase_MigrateHello
 {
 private:
     char *data;
+    int currHiNo = 0;
 
 public:
   MigrateHello()
@@ -57,7 +58,7 @@ public:
           CkExit();
       }
       //CkPrintf("executing  %d  %d\n", CkMyPe(), hiNo);
-      thisProxy[thisIndex].SayHi(hiNo+1);
+      currHiNo = hiNo;
       migrateMe(1-CkMyPe());
   }
 
@@ -65,6 +66,12 @@ public:
   {
       if(p.isUnpacking()) data = (char*)malloc(dataSize);
       p(data, dataSize);
+      p | currHiNo;
+  }
+
+  void ckJustMigrated()
+  {
+      thisProxy[thisIndex].SayHi(currHiNo+1);
   }
 };
 

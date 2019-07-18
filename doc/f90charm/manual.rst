@@ -188,7 +188,7 @@ In this step, you need to write a Charm++ interface file (.ci).
 In the file you can declare parallel chare arrays and their
 entry methods. The syntax is the same as in Charm++.
 
-.. code-block:: c++
+.. code-block:: charmci
 
          // ## Just replace Hello throughout with your chare's name. ##
          // ## and add your chare's entry points below where indicated ##

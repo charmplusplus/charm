@@ -18,7 +18,6 @@ syntax() {
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
   echo '<targets>: converse charm++ LIBS AMPI charm4py bigemulator msa'
-  echo '<targets>: doc ps-doc pdf-doc html-doc'
   if test $more = 1
   then
   echo ''
@@ -34,11 +33,11 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
-  echo 'help smp omp tcp bigemulator ooc syncft mlogft causalft papi pthreads'
+  echo 'help smp omp tcp bigemulator ooc syncft papi pthreads'
   echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
   if test $more = 1
   then
@@ -70,7 +69,6 @@ syntax() {
   echo '  bigemulator	  compile for BigSim simulator'
   echo '  ooc		  compile with out of core support'
   echo '  syncft	  compile with Charm++ fault tolerance support'
-  echo '  mlogft	  compile with Charm++ message logging fault tolerance support'
   echo '  papi            compile with PAPI performance counter support (if any)'
   echo ''
   echo "Charm++ dynamic libraries:"
@@ -743,7 +741,7 @@ then
   Echo "File structure already created; skipping directly to make"
 else
 
-for d in benchmarks bin doc examples include lib lib_so tests tmp; do
+for d in benchmarks bin examples include lib lib_so tests tmp; do
   rm -rf "$DESTINATION/$d"
 done
 

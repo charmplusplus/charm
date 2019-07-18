@@ -444,10 +444,10 @@ To interface these with a main program module, say :math:`Pgm` in files
 ``pgm.ci``, ``pgm.h`` and ``pgm.C``, the ``pgm.ci`` file must declare
 the POSE module as extern in the ``mainmodule Pgm`` block. For example:
 
-.. code-block:: c++
+.. code-block:: charmci
 
   mainmodule Pgm {
-    extern module <modname>;
+    extern module modname;
     readonly CkChareID mainhandle;
 
     mainchare main {

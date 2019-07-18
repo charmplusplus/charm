@@ -383,23 +383,6 @@ public:
 		};
 	}
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	OBJ *getPointer(const KEY &key) {
-        int i=key.hash()%this->len;
-        while(1) {//Assumes key or empty slot will be found
-            char *cur=this->entry(i);
-			//An empty slot indicates the key is not here
-            if (this->layout.isEmpty(cur)){
-                return NULL;
-            }
-			//Is this the key?
-            if (key.compare(*(KEY *)this->layout.getKey(cur)))
-                return (OBJ *)this->layout.getObject(cur);
-            this->inc(i);
-        };
-        return NULL;
-    }
-#endif
 
 	//Use this version when you're sure the entry exists--
 	// avoids the test for an empty entry

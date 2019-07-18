@@ -84,6 +84,7 @@ OPTS_CXX="$OPTS_CXX $USER_OPTS_CXX"
 OPTS_LD="$OPTS_LD $USER_OPTS_LD"
 
 [ -z "$CMK_PIC" ] && CMK_PIC='-fpic'
+[ -z "$CMK_PIE" ] && CMK_PIE='-pie -fPIE'
 
 [ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"
 [ -z "$CMK_SEQ_CXX" ] && CMK_SEQ_CXX="$CMK_CXX"

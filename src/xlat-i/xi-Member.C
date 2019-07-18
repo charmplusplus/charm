@@ -53,6 +53,33 @@ void Readonly::print(XStr& str) {
   str << ";\n";
 }
 
+// Method to declare a CkNcpyBuffer for arrays
+void Readonly::genZCDeclForArrays(XStr& str) {
+  str << "    int regMode = CK_BUFFER_REG;\n";
+  str << "    if(CkNumNodes() == 1)\n";
+  str << "      regMode = CK_BUFFER_UNREG;\n"; // No point of registration when there are no ZC ops being performed
+  str << "    CkNcpyBuffer myBuffer(& "<< qName();
+  dims->printZeros(str);
+  str <<", (";
+  dims->printValueProduct(str);
+  str <<" * sizeof(";
+  type->print(str);
+  str <<")), regMode);\n";
+}
+
+// Method to declare a CkNcpyBuffer for std::vector
+void Readonly::genZCDeclForVectors(XStr& str, NamedType *nType) {
+  str << "      int regMode = CK_BUFFER_REG;\n";
+  str << "      if(CkNumNodes() == 1)\n";
+  str << "        regMode = CK_BUFFER_UNREG;\n"; // No point of registration when there are no ZC ops being performed
+  str << "      CkNcpyBuffer myBuffer("<< qName();
+  str << ".data()";
+  str << ", ";
+  str << "sizeof(" << nType->getTparams();
+  str << ") * "<< qName() <<".size()";
+  str <<", regMode);\n";
+}
+
 void Readonly::genDefs(XStr& str) {
   str << "/* DEFS: ";
   print(str);
@@ -80,26 +107,23 @@ void Readonly::genDefs(XStr& str) {
       str <<" * sizeof(";
       type->print(str);
       str << ") >= CMK_ONESIDED_RO_THRESHOLD) {\n";
-      str <<"    CkNcpyBuffer myBuffer(& "<< qName();
-      dims->printZeros(str);
-      str <<", (";
-      dims->printValueProduct(str);
-      str <<" * sizeof(";
-      type->print(str);
-      str <<")), CK_BUFFER_REG);\n";
-      str <<"    if(_impl_p.isPacking() || _impl_p.isSizing()) {\n";
+
+      str <<"    if(_impl_p.isSizing()) {\n";
+      str <<"      CkNcpyBuffer myBuffer;\n";
       str <<"      _impl_p|myBuffer;\n";
-      str <<"      if(_impl_p.isSizing())\n";
-      str <<"        readonlyUpdateNumops();\n";
-      str <<"      else\n";
-      str <<"        readonlyCreateOnSource(myBuffer);\n";
+      str <<"      readonlyUpdateNumops();\n";
       str <<"    }\n";
       str <<"    if(_impl_p.isPacking()) {\n";
+      genZCDeclForArrays(str);
+      str <<"      _impl_p|myBuffer;\n";
+      str <<"      if(CkNumNodes() > 1)\n";
+      str <<"        readonlyCreateOnSource(myBuffer);\n";
       str <<"      PUP::toMem &_impl_p_toMem = *(PUP::toMem *)_impl_pup_er;\n";
       str <<"      envelope *env = UsrToEnv(_impl_p_toMem.get_orig_pointer());\n";
       str <<"      CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_SEND_MSG;\n";
       str <<"    }\n";
       str <<"    if(_impl_p.isUnpacking()) {\n";
+      genZCDeclForArrays(str);
       str <<"      PUP::fromMem &_impl_p_fromMem = *(PUP::fromMem *)_impl_pup_er;\n";
       str <<"      char *ptr = _impl_p_fromMem.get_current_pointer();\n";
       str <<"      PUP::toMem _impl_p_toMem = (PUP::toMem)((void *)ptr);\n";
@@ -136,17 +160,16 @@ void Readonly::genDefs(XStr& str) {
         str <<"  _impl_p|vecUsesZC;\n";
 
         str <<"  if(vecUsesZC) {\n";
-        str <<"    if(_impl_p.isPacking() || _impl_p.isSizing()) {\n";
-        str <<"      CkNcpyBuffer myBuffer("<< qName() << ".data()";
-        str <<", " << "sizeof(" << nType->getTparams() << ") * "<< qName() <<".size()";
-        str <<", CK_BUFFER_REG);\n";
+        str <<"    if(_impl_p.isSizing()) {\n";
+        str <<"      CkNcpyBuffer myBuffer;\n";
         str <<"      _impl_p|myBuffer;\n";
-        str <<"      if(_impl_p.isSizing())\n";
-        str <<"        readonlyUpdateNumops();\n";
-        str <<"      else\n";
-        str <<"        readonlyCreateOnSource(myBuffer);\n";
+        str <<"      readonlyUpdateNumops();\n";
         str <<"    }\n";
         str <<"    if(_impl_p.isPacking()) {\n";
+        genZCDeclForVectors(str, nType);
+        str <<"      _impl_p|myBuffer;\n";
+        str <<"      if(CkNumNodes() > 1)\n";
+        str <<"        readonlyCreateOnSource(myBuffer);\n";
         str <<"      PUP::toMem &_impl_p_toMem_orig = *(PUP::toMem *)_impl_pup_er;\n";
         str <<"      envelope *env = UsrToEnv(_impl_p_toMem_orig.get_orig_pointer());\n";
         str <<"      CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_SEND_MSG;\n";

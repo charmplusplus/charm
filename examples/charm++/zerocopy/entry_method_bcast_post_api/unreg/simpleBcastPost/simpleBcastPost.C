@@ -96,7 +96,7 @@ class zcArray : public CBase_zcArray {
   void recvLargeArray(int *&ptr1, int &n1, CkCallback doneCb, CkNcpyBufferPost *postStruct) {
     DEBUG(CkPrintf("[%d][%d][%d][%d] Array element: recvLargeArray Post \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);)
     ptr1 = myBuffer;
-    postStruct[0].mode = CK_BUFFER_UNREG;
+    postStruct[0].regMode = CK_BUFFER_UNREG;
     CkAssert(n1 == bufferSize);
     DEBUG(CkPrintf("[%d][%d][%d][%d] Array element: recvLargeArray Post done posted buffer is %p and size is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, myBuffer, bufferSize);)
   }
@@ -119,7 +119,7 @@ class zcGroup : public CBase_zcGroup {
   void recvLargeArray(int *&ptr1, int &n1, CkCallback doneCb, CkNcpyBufferPost *postStruct) {
     DEBUG(CkPrintf("[%d][%d][%d] Group: recvLargeArray Post \n", CmiMyPe(), CmiMyNode(), CmiMyRank());)
     ptr1 = myBuffer;
-    postStruct[0].mode = CK_BUFFER_UNREG;
+    postStruct[0].regMode = CK_BUFFER_UNREG;
     CkAssert(n1 == bufferSize);
     DEBUG(CkPrintf("[%d][%d][%d] Group: recvLargeArray Post done posted buffer is %p and size is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), myBuffer, bufferSize);)
   }
@@ -142,7 +142,7 @@ class zcNodegroup : public CBase_zcNodegroup {
   void recvLargeArray(int *&ptr1, int &n1, CkCallback doneCb, CkNcpyBufferPost *postStruct) {
     DEBUG(CkPrintf("[%d][%d][%d] Nodegroup: recvLargeArray Post \n", CmiMyPe(), CmiMyNode(), CmiMyRank());)
     ptr1 = myBuffer;
-    postStruct[0].mode = CK_BUFFER_UNREG;
+    postStruct[0].regMode = CK_BUFFER_UNREG;
     CkAssert(n1 == bufferSize);
     DEBUG(CkPrintf("[%d][%d][%d] Nodegroup: recvLargeArray Post done posted buffer is %p and size is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), myBuffer, bufferSize);)
   }

@@ -42,7 +42,7 @@ main.decl.h: main.ci
 jacobi3d.decl.h: jacobi3d.ci
 	$(CHARMC)   jacobi3d.ci
 
-syncfttest causalfttest: fttest
+syncfttest : fttest
 fttest: main
 	$(call run, ./main 256 128 +p8 +balancer DummyLB )
 	$(call run, ./main 256 128 +p8 +balancer DummyLB +killFile kill_01.txt )

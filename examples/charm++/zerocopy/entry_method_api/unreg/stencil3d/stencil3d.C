@@ -51,7 +51,7 @@ int myrand(int numpes) {
 
 #define index(a,b,c)	((a)+(b)*(blockDimX+2)+(c)*(blockDimX+2)*(blockDimY+2))
 
-#define MAX_ITER	100
+#define MAX_ITER	40
 #define LBPERIOD_ITER	5    // LB is called every LBPERIOD_ITER number of program iterations
 #define CHANGELOAD	30
 #define LEFT		1
@@ -143,10 +143,8 @@ class Stencil: public CBase_Stencil {
     // callback function called on completion of sending ghosts
     void completedSendingGhost(CkDataMsg *msg){
       CkNcpyBuffer *src = (CkNcpyBuffer *)(msg->data);
-      void *ptr = (void *)(src->ptr);
-      // deregister memory
-      src->deregisterMem();
-      free(ptr);
+      double *ptr = (double *)(src->ptr);
+      delete [] ptr;
 
       delete msg;
       counter++;

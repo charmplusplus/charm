@@ -51,8 +51,8 @@ OPTS_CC_GENCPM=""
 OPTS_CXX="" 
 OPTS_F90=""
 OPTS_LD=""  
-OPTS_PIC=""
 USE_PIC="0"
+USE_PIE='0'
 
 CHARMDEBUG=""
 LINK_PYTHON=""
@@ -99,6 +99,7 @@ BUILD_SHARE="0"
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
 ROSE_OMP_TLS_GLOBALS="no"
+AMPI_FUNCPTR_SHIM='0'
 PRINT_BUILDING_BLOCKS=""
 NOABORT=""
 
@@ -533,6 +534,11 @@ do
 		ROSE_OMP_TLS_GLOBALS="yes"
 		;;
 
+	"-ampi-funcptr-shim")
+		AMPI_FUNCPTR_SHIM='1'
+		USE_PIE='1'
+		;;
+
 	"-verbose")
 		echo "Verbose mode set"
 		VERBOSE=true
@@ -864,6 +870,13 @@ do
 		NOABORT="yes"
 		;;
 
+	-clear-input)
+		INPUT_GIVEN=''
+		FILES=''
+		PRE_LIBRARIES=''
+		POST_LIBRARIES=''
+		;;
+
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
@@ -1026,6 +1039,12 @@ then
     OPTS_F90="$OPTS_F90 $TLSGLOBALS_OPTS"
 fi
 
+if [ "$AMPI_FUNCPTR_SHIM" = '1' ]
+then
+    OPTS_CC="$OPTS_CC -DAMPI_USE_FUNCPTR"
+    OPTS_CXX="$OPTS_CXX -DAMPI_USE_FUNCPTR"
+fi
+
 # Look up and add the dependencies for module $1
 findModuleDep() {
 	M=$1
@@ -1092,13 +1111,20 @@ then
 	USE_PIC="1"
 fi
 
-OPTS_PIC="$CMK_PIC"
 if [ "$USE_PIC" = "1" ]
 then
-       OPTS_CC="$OPTS_CC $OPTS_PIC"
-       OPTS_CXX="$OPTS_CXX $OPTS_PIC"
-       OPTS_F90="$OPTS_F90 $OPTS_PIC"
-       OPTS_LD="$OPTS_LD $OPTS_PIC"
+       OPTS_CC="$OPTS_CC $CMK_PIC"
+       OPTS_CXX="$OPTS_CXX $CMK_PIC"
+       OPTS_F90="$OPTS_F90 $CMK_PIC"
+       OPTS_LD="$OPTS_LD $CMK_PIC"
+fi
+
+if [ "$USE_PIE" = "1" ]
+then
+       OPTS_CC="$OPTS_CC $CMK_PIE"
+       OPTS_CXX="$OPTS_CXX $CMK_PIE"
+       OPTS_F90="$OPTS_F90 $CMK_PIE"
+       OPTS_LD="$OPTS_LD $CMK_PIE"
 fi
 
 if [ "$BUILD_SHARE" = "1" ]

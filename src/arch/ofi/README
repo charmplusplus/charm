@@ -102,11 +102,13 @@ libfabric (>=1.4.0).
 Licensing
 ---------
 
-The code for "simple PMI" (under simple_pmi/) was written by the MPICH
-developers. Copyright information can be found in LICENSE-MPICH.
+The code for "simple PMI" (under src/arch/util/proc_management/simple_pmi/) was
+written by the MPICH developers. Copyright information can be found in
+src/arch/util/proc_management/LICENSE-MPICH.
 
 The code used to encode/decode binary so it can be sent via PMI (in
-runtime-codec.h) was written by the Sandia OpenSHMEM developers. Copyright
-information can be found in LICENSE-SandiaOpenSHMEM.
+src/arch/util/proc_management/runtime-codec.h) was written by the Sandia OpenSHMEM
+developers. Copyright information can be found in
+src/arch/util/proc_management/LICENSE-SandiaOpenSHMEM.
 
 Copyright information for the OFI LRTS machine code can be found in LICENSE.

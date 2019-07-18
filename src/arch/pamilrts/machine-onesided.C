@@ -198,7 +198,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
   pami_endpoint_t origin;
   PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)CmiNodeOf(ncpyOpInfo->srcPe), dst_context, &origin);
 
-  getData(my_context, origin, (void *)(ncpyOpInfo->destPtr), ncpyOpInfo, dst_context, rzv_rdma_direct_recv_done, src_Info->offset, &src_Info->mregion, ncpyOpInfo->srcSize);
+  getData(my_context, origin, (void *)(ncpyOpInfo->destPtr), ncpyOpInfo, dst_context, rzv_rdma_direct_recv_done, src_Info->offset, &src_Info->mregion, std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize));
 }
 
 // Perform an RDMA Put call into the remote destination address from the local source address

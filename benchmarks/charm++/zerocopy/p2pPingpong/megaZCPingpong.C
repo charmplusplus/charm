@@ -193,7 +193,7 @@ class Ping1 : public CBase_Ping1 {
           reg_recv_time = 1.0e6*(end_time-start_time)/iterations;
           niter = 0;
           start_time = CkWallTimer();
-          thisProxy[1].zerocopyEMSendApiAndCopy(CkNcpyBuffer(nocopySrcBuffer), size);
+          thisProxy[1].zerocopyEMSendApiAndCopy(CkSendBuffer(nocopySrcBuffer), size);
 
         } else {
           thisProxy[1].regularRecvAndCopy(nocopySrcBuffer, size);
@@ -216,10 +216,10 @@ class Ping1 : public CBase_Ping1 {
           thisProxy.setupDirectPingpong1(size, iterations);
 
         } else {
-          thisProxy[1].zerocopyEMSendApiAndCopy(CkNcpyBuffer(nocopySrcBuffer), size);
+          thisProxy[1].zerocopyEMSendApiAndCopy(CkSendBuffer(nocopySrcBuffer), size);
         }
       } else {
-        thisProxy[0].zerocopyEMSendApiAndCopy(CkNcpyBuffer(nocopySrcBuffer), size);
+        thisProxy[0].zerocopyEMSendApiAndCopy(CkSendBuffer(nocopySrcBuffer), size);
       }
     }
 
@@ -229,10 +229,10 @@ class Ping1 : public CBase_Ping1 {
       iterations = _iterations;
 
       CkCallback srcCb = CkCallback(CkCallback::ignore);
-      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_UNREG);
+      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_UNREG, CK_BUFFER_NODEREG);
 
       CkCallback destCb = CkCallback(CkIndex_Ping1::getCompleteDest1(), thisProxy[thisIndex]);
-      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_UNREG);
+      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_UNREG, CK_BUFFER_NODEREG);
 
       thisProxy[0].beginDirectPingpong1();
     }
@@ -272,10 +272,10 @@ class Ping1 : public CBase_Ping1 {
       iterations = _iterations;
 
       CkCallback srcCb = CkCallback(CkCallback::ignore);
-      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_REG);
+      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_REG, CK_BUFFER_NODEREG);
 
       CkCallback destCb = CkCallback(CkIndex_Ping1::getCompleteDest2(), thisProxy[thisIndex]);
-      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_REG);
+      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_REG, CK_BUFFER_NODEREG);
 
       thisProxy[0].beginDirectPingpong2();
     }
@@ -312,10 +312,10 @@ class Ping1 : public CBase_Ping1 {
       iterations = _iterations;
 
       CkCallback srcCb = CkCallback(CkCallback::ignore);
-      src = CkNcpyBuffer(nocopySrcBufferReg, sizeof(char) * size, srcCb, CK_BUFFER_PREREG);
+      src = CkNcpyBuffer(nocopySrcBufferReg, sizeof(char) * size, srcCb, CK_BUFFER_PREREG, CK_BUFFER_NODEREG);
 
       CkCallback destCb = CkCallback(CkIndex_Ping1::getCompleteDest3(), thisProxy[thisIndex]);
-      dest = CkNcpyBuffer(nocopyDestBufferReg, sizeof(char) * size, destCb, CK_BUFFER_PREREG);
+      dest = CkNcpyBuffer(nocopyDestBufferReg, sizeof(char) * size, destCb, CK_BUFFER_PREREG, CK_BUFFER_NODEREG);
 
       thisProxy[0].beginDirectPingpong3();
     }
@@ -352,10 +352,10 @@ class Ping1 : public CBase_Ping1 {
       iterations = _iterations;
 
       CkCallback srcCb = CkCallback(CkCallback::ignore);
-      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_REG);
+      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_REG, CK_BUFFER_NODEREG);
 
       CkCallback destCb = CkCallback(CkIndex_Ping1::getCompleteDest4(), thisProxy[thisIndex]);
-      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_REG);
+      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_REG, CK_BUFFER_NODEREG);
 
       thisProxy[0].beginDirectPingpong4();
     }
@@ -408,7 +408,7 @@ class Ping1 : public CBase_Ping1 {
     void zerocopyEMRecvApi1(char *&msg, int &size, CkNcpyBufferPost *ncpyPost) {
       msg = nocopyDestBuffer;
 
-      ncpyPost[0].mode = CK_BUFFER_UNREG;
+      ncpyPost[0].regMode = CK_BUFFER_UNREG;
     }
 
     void zerocopyEMRecvApi1(char *msg, int size) {
@@ -434,7 +434,7 @@ class Ping1 : public CBase_Ping1 {
     void zerocopyEMRecvApi2(char *&msg, int &size, CkNcpyBufferPost *ncpyPost) {
       msg = nocopyDestBuffer;
 
-      ncpyPost[0].mode = CK_BUFFER_REG;
+      ncpyPost[0].regMode = CK_BUFFER_REG;
     }
 
     void zerocopyEMRecvApi2(char *msg, int size) {
@@ -460,7 +460,7 @@ class Ping1 : public CBase_Ping1 {
     void zerocopyEMRecvApi3(char *&msg, int &size, CkNcpyBufferPost *ncpyPost) {
       msg = nocopyDestBufferReg;
 
-      ncpyPost[0].mode = CK_BUFFER_PREREG;
+      ncpyPost[0].regMode = CK_BUFFER_PREREG;
     }
 
     // Send and Recv for ZC Entry Method API

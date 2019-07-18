@@ -28,8 +28,8 @@ if [ "$CMK_MACOSX" ]; then
 
       CMK_CC_FLAGS="-fPIC"
       CMK_CXX_FLAGS="-fPIC -Wno-deprecated"
-      CMK_LD_FLAGS="-fPIC -Wl,-no_pie "
-      CMK_LDXX_FLAGS="-fPIC -multiply_defined suppress -Wl,-no_pie"
+      CMK_LD_FLAGS="-fPIC"
+      CMK_LDXX_FLAGS="-fPIC -multiply_defined suppress"
       found=1
       break
     fi

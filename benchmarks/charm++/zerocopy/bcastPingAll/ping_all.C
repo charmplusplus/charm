@@ -360,7 +360,7 @@ public:
 
   void recv_zc_post1(char *&msg, size_t &size, int iter, bool warmUp, int iterations, CkNcpyBufferPost *ncpyPost) {
     msg = myBuffer;
-    ncpyPost[0].mode = CK_BUFFER_UNREG;
+    ncpyPost[0].regMode = CK_BUFFER_UNREG;
   }
 
   void recv_zc_post1(char *msg, size_t size, int iter, bool warmUp, int iterations) {
@@ -369,7 +369,7 @@ public:
 
   void recv_zc_post2(char *&msg, size_t &size, int iter, bool warmUp, int iterations, CkNcpyBufferPost *ncpyPost) {
     msg = myBuffer;
-    ncpyPost[0].mode = CK_BUFFER_REG;
+    ncpyPost[0].regMode = CK_BUFFER_REG;
   }
 
   void recv_zc_post2(char *msg, size_t size, int iter, bool warmUp, int iterations) {
@@ -378,7 +378,7 @@ public:
 
   void recv_zc_post3(char *&msg, size_t &size, int iter, bool warmUp, int iterations, CkNcpyBufferPost *ncpyPost) {
     msg = regBuffer;
-    ncpyPost[0].mode = CK_BUFFER_PREREG;
+    ncpyPost[0].regMode = CK_BUFFER_PREREG;
   }
 
   void recv_zc_post3(char *msg, size_t size, int iter, bool warmUp, int iterations) {

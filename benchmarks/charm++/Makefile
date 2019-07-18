@@ -10,7 +10,6 @@ DIRS = \
   zerocopy \
 
 BGDIRS = \
-  pingpong \
 
 TESTDIRS = $(DIRS)
 

@@ -233,10 +233,6 @@ public:
   double * expectedLoad;	// expected load for future
 
 public:
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	int step;
-	int lbDecisionCount;
-#endif
   LBMigrateMsg(): level(0), n_moves(0), next_lb(0) {}
   void pup(PUP::er &p) {
     int i;

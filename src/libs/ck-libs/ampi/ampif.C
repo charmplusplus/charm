@@ -1,5 +1,7 @@
 #include "ampi.h"
-#include "ampiimpl.h"
+
+#include <string.h>
+#include <vector>
 
 FLINKAGE {
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
@@ -44,6 +46,7 @@ FLINKAGE {
 #define mpi_startall FTN_NAME( MPI_STARTALL , mpi_startall )
 #define mpi_sendrecv FTN_NAME( MPI_SENDRECV , mpi_sendrecv )
 #define mpi_sendrecv_replace FTN_NAME( MPI_SENDRECV_REPLACE , mpi_sendrecv_replace )
+#define mpi_type_match_size FTN_NAME( MPI_TYPE_MATCH_SIZE , mpi_type_match_size )
 #define mpi_type_contiguous FTN_NAME( MPI_TYPE_CONTIGUOUS , mpi_type_contiguous )
 #define mpi_type_vector FTN_NAME( MPI_TYPE_VECTOR , mpi_type_vector )
 #define mpi_type_hvector FTN_NAME( MPI_TYPE_HVECTOR , mpi_type_hvector )
@@ -256,7 +259,9 @@ FLINKAGE {
 #define mpi_win_get_info  FTN_NAME ( MPI_WIN_GET_INFO  , mpi_win_get_info )
 #define mpi_win_fence  FTN_NAME ( MPI_WIN_FENCE  , mpi_win_fence )
 #define mpi_win_lock  FTN_NAME ( MPI_WIN_LOCK  , mpi_win_lock )
+#define mpi_win_lock_all  FTN_NAME ( MPI_WIN_LOCK_ALL , mpi_win_lock_all )
 #define mpi_win_unlock  FTN_NAME ( MPI_WIN_UNLOCK  , mpi_win_unlock )
+#define mpi_win_unlock_all  FTN_NAME ( MPI_WIN_UNLOCK_ALL  , mpi_win_unlock_all )
 #define mpi_win_post  FTN_NAME ( MPI_WIN_POST  , mpi_win_post )
 #define mpi_win_wait  FTN_NAME ( MPI_WIN_WAIT  , mpi_win_wait )
 #define mpi_win_start  FTN_NAME ( MPI_WIN_START  , mpi_win_start )
@@ -522,6 +527,11 @@ void mpi_sendrecv_replace(void *buf, int* count, int* datatype,
   MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
   *ierr = MPI_Sendrecv_replace(buf, *count, *datatype, *dest, *sendtag,
                                *source, *recvtag, *comm, s);
+}
+
+void mpi_type_match_size(int *typeclass, int *size, int *datatype, int *ierr)
+{
+    *ierr = MPI_Type_match_size(*typeclass, *size, (MPI_Datatype*)datatype);
 }
 
 void mpi_barrier(int *comm, int *ierr) noexcept
@@ -1900,9 +1910,19 @@ void mpi_win_lock(int *lock_type, int *rank, int *assert, int *win, int *ierr) n
   *ierr = MPI_Win_lock(*lock_type, *rank, *assert, *win);
 }
 
+void mpi_win_lock_all(int *assert, int *win, int *ierr) noexcept
+{
+  *ierr = MPI_Win_lock_all(*assert, *win);
+}
+
 void mpi_win_unlock(int *rank, int *win, int *ierr) noexcept
 {
   *ierr = MPI_Win_unlock(*rank, *win);
+}
+
+void mpi_win_unlock_all(int *win, int *ierr) noexcept
+{
+  *ierr = MPI_Win_unlock_all(*win);
 }
 
 void mpi_win_post(int *group, int *assertion, int *win, int *ierr) noexcept
@@ -2045,7 +2065,7 @@ void ampif_info_get(int* info, const char *key, int* valuelen, char *value, int 
   char tmpKey[MPI_MAX_INFO_KEY];
   ampif_str_f2c(tmpKey, key, *klen);
 
-  vector<char> tmpValue(*valuelen);
+  std::vector<char> tmpValue(*valuelen);
 
   *ierr = MPI_Info_get(*info, tmpKey, *valuelen, tmpValue.data(), flag);
 
@@ -2272,13 +2292,13 @@ void ampi_gpu_invoke_wr(int *to_call, int *ierr) noexcept {
  *      if 'i' is zero the program name is returned.
  */
 void ampi_command_argument_count(int *count) noexcept {
-  *count = CkGetArgc()-1;
+  *count = AMPI_Get_argc()-1;
 }
 
 void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
 {
-  char **argv = CkGetArgv();
-  int nc = CkGetArgc()-1;
+  char **argv = AMPI_Get_argv();
+  int nc = AMPI_Get_argc()-1;
   int arglen = strlen(argv[*c]);
 
   if (*c >= 0 && *c <= nc) {
@@ -2299,11 +2319,7 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
 
 void ampi_init_universe(int *unicomm, int *ierr) noexcept
 {
-  AMPI_API("AMPI_Init_universe");
-  for(int i=0; i<_mpi_nworlds; i++) {
-    unicomm[i] = MPI_COMM_UNIVERSE[i];
-  }
-  *ierr = MPI_SUCCESS;
+  *ierr = AMPI_Init_universe(unicomm);
 }
 
 } // extern "C"

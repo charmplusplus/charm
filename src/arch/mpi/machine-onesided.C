@@ -96,7 +96,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfoMsg) {
 
   // Post an MPI_Irecv for the destination buffer with the tag
   // ONESIDED_BUFFER_DIRECT_RECV indicates that the method should post an irecv
-  MPIPostOneBuffer(ncpyOpInfoMsg->destPtr, ncpyOpInfoMsg, ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->srcPe, tag, ONESIDED_BUFFER_DIRECT_RECV);
+  MPIPostOneBuffer(ncpyOpInfoMsg->destPtr, ncpyOpInfoMsg, std::min(ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->destSize), ncpyOpInfoMsg->srcPe, tag, ONESIDED_BUFFER_DIRECT_RECV);
 }
 
 // Perform an RDMA Put call into the remote destination address from the local source address
@@ -130,7 +130,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfoMsg) {
 
   // Post an MPI_ISend for the source buffer with the tag
   // ONESIDED_BUFFER_DIRECT_SEND indicates that the method should post an isend
-  MPIPostOneBuffer(ncpyOpInfoMsg->srcPtr, ncpyOpInfoMsg, ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->destPe, tag, ONESIDED_BUFFER_DIRECT_SEND);
+  MPIPostOneBuffer(ncpyOpInfoMsg->srcPtr, ncpyOpInfoMsg, std::min(ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->destSize), ncpyOpInfoMsg->destPe, tag, ONESIDED_BUFFER_DIRECT_SEND);
 }
 
 // Method invoked to deregister source memory (Empty method to maintain API consistency)

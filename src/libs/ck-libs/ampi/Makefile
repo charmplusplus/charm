@@ -2,7 +2,9 @@ CDIR := $(shell cd ../../../.. && pwd)
 -include $(CDIR)/include/conv-mach-opt.mak
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h ampi-interoperate.h ampi.decl.h
+HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h \
+		ampi-interoperate.h ampi.decl.h \
+		ampi_functions.h mpio_functions.h
 HEADDEP=$(HEADERS) ampiimpl.h ddt.h \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
@@ -17,6 +19,25 @@ DEST=$(AMPI_LIBDIR)/$(AMPI_LIB).a
 DESTF=$(AMPI_LIBDIR)/$(AMPI_LIB)f.a
 COMPATLIB=$(AMPI_LIBDIR)/libampi-compat.a
 ROMIOLIB=$(AMPI_LIBDIR)/libampiromio
+
+AMPIFIMPL_OBJ=$(AMPI_LIBDIR)/ampifimpl.o
+AMPIMOD_OBJ=$(AMPI_LIBDIR)/ampimod.o
+
+FUNCPTR_SHIM_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim.o
+FUNCPTR_FORTRAN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_fortran.o
+FUNCPTR_LOADER_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader.o
+FUNCPTR_PIPGLOBALS_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_pipglobals.o
+FUNCPTR_FSGLOBALS_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_fsglobals.o
+
+AMPI_TARGET = $(DEST) $(FUNCPTR_SHIM_OBJ) $(FUNCPTR_LOADER_OBJ)
+AMPIF_TARGET = $(DESTF) $(FUNCPTR_FORTRAN_OBJ)
+
+ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
+  AMPI_TARGET += $(FUNCPTR_PIPGLOBALS_OBJ)
+endif
+ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
+  AMPI_TARGET += $(FUNCPTR_FSGLOBALS_OBJ)
+endif
 
 ifeq ($(CMK_NO_BUILD_SHARED),false)
 	ROMIOLIBSHARED=$(CDIR)/lib_so/libampiromio.$(CMK_SHARED_SUF)
@@ -49,7 +70,7 @@ $(ROMIO): | AMPI AMPIF
 		--enable-f77=`test -f $(DESTF) && echo yes || echo no` \
 		--srcdir=`pwd`
 
-	cp romio/include/mpio.h romio/include/mpiof.h $(CDIR)/include
+	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
 	$(MAKE) -C romio
 	cp romio/lib/libmpio.a $@
 	if [ -n "$(ROMIOLIBSHARED)" ]; then \
@@ -58,10 +79,10 @@ $(ROMIO): | AMPI AMPIF
 	fi
 	@echo "ROMIO built successfully"
 
-AMPI: $(DEST)
+AMPI: $(AMPI_TARGET)
 	@echo "AMPI built successfully"
 
-AMPIF: $(DESTF)
+AMPIF: $(AMPIF_TARGET)
 	@echo "AMPIF built successfully"
 
 $(DEST): $(OBJS) headers
@@ -69,10 +90,10 @@ $(DEST): $(OBJS) headers
 	cp $(AMPI_LIB).dep $(AMPI_LIBDIR)/$(AMPI_LIB).dep
 
 $(DESTF): $(OBJS) headers
-	-$(CHARMC) -c ampifimpl.f90
-	-$(CHARMC) -c ampimod.f90
+	-$(CHARMC) -c ampifimpl.f90 -o $(AMPIFIMPL_OBJ)
+	-$(CHARMC) -c ampimod.f90 -o $(AMPIMOD_OBJ)
 	-$(CHARMC) -cpmod ../../../../include mpi.M
-	-$(CHARMC) $(OBJS) ampifimpl.o ampimod.o -o $@
+	-$(CHARMC) $(OBJS) $(AMPIFIMPL_OBJ) $(AMPIMOD_OBJ) -o $@
 	-cp $(AMPI_LIB)f.dep $(AMPI_LIBDIR)/$(AMPI_LIB)f.dep
 
 $(COMPATLIB): $(COMPAT)
@@ -137,6 +158,21 @@ ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
 
 ddt.o: ddt.C ddt.h $(HEADDEP)
+
+$(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP)
+	$(CHARMC) -ampi-funcptr-shim -c $< -o $@
+
+$(FUNCPTR_FORTRAN_OBJ): ampif.C $(HEADDEP)
+	-$(CHARMC) -ampi-funcptr-shim -c $< -o $@
+
+$(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP)
+	$(CHARMC) -c $< -o $@
+
+$(FUNCPTR_FSGLOBALS_OBJ): ampi_funcptr_fsglobals.C $(HEADDEP)
+	$(CHARMC) -c $< -o $@
+
+$(FUNCPTR_PIPGLOBALS_OBJ): ampi_funcptr_pipglobals.C $(HEADDEP)
+	$(CHARMC) -c $< -o $@
 
 clean:
 	rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) $(COMPATLIB) conv-host charmrun headers *.mod

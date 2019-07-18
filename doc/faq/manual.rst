@@ -344,7 +344,7 @@ In order to make an entry method threaded, one should add the keyword
 *threaded* withing square brackets after the *entry* keyword in the
 interface file:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module M {
      chare X {
@@ -540,7 +540,7 @@ One can have class-static variables as read-onlies. Inside a chare,
 group or array declaration in the *.ci* file, one can have a readonly
 variable declaration. Thus:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    chare someChare {
      ...
