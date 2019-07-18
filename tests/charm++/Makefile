@@ -1,11 +1,17 @@
 DIRS = \
+  megatest \
   alignment \
   simplearrayhello \
   provisioning \
+  load_balancing \
+  chkpt \
   delegation \
   queue \
+  sdag \
+  ckAllocSysMsgTest \
   method_templates \
   demand_creation \
+  startupTest \
   topology \
   io \
   sparse \
@@ -14,6 +20,7 @@ DIRS = \
   charmxi_parsing \
   jacobi3d \
   jacobi3d-sdag \
+  zerocopy \
   within_node_bcast \
 
 # skip sdag, megatest and commtest
