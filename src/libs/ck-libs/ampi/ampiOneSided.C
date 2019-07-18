@@ -202,6 +202,10 @@ int ampiParent::addWinStruct(WinStruct* win) noexcept {
 }
 
 WinStruct *ampiParent::getWinStruct(MPI_Win win) const noexcept {
+#ifdef AMPI_ERROR_CHECKING
+  if (winStructList.size() <= (int) win || win < 0)
+    CkAbort("AMPI> Error: MPI_Win parameter invalid.");
+#endif
   return winStructList[(int)win];
 }
 
@@ -238,7 +242,7 @@ int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank
     }
   }
   else {
-    vector<char> sorgaddr(orgtotalsize);
+    std::vector<char> sorgaddr(orgtotalsize);
     int orgsize = getDDT()->getType(orgtype)->getSize(orgcnt);
     ddt->serialize((char*)orgaddr, sorgaddr.data(), orgcnt, orgsize, PACK);
     thisProxy[rank].winRemotePut(orgtotalsize, sorgaddr.data(), orgcnt, orgtype, targdisp,
@@ -423,7 +427,7 @@ int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, i
     }
   }
   else {
-    vector<char> sorgaddr(orgtotalsize);
+    std::vector<char> sorgaddr(orgtotalsize);
     int orgsize = getDDT()->getType(orgtype)->getSize(orgcnt);
     ddt->serialize((char*)orgaddr, sorgaddr.data(), orgcnt, orgsize, PACK);
     thisProxy[rank].winRemoteAccumulate(orgtotalsize, sorgaddr.data(), orgcnt, orgtype,
@@ -443,7 +447,7 @@ void ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt,
     winobj->accumulate(sorgaddr, targcnt, targdisp, targtype, op, parent);
   }
   else {
-    vector<char> getdata(orgtotalsize);
+    std::vector<char> getdata(orgtotalsize);
     int targsize = getDDT()->getType(targtype)->getSize(targcnt);
     ddt->serialize(getdata.data(), sorgaddr, targcnt, targsize, UNPACK);
     winobj->accumulate(getdata.data(), targcnt, targdisp, targtype, op, parent);
@@ -486,7 +490,7 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
     }
   }
   else {
-    vector<char> sorgaddr(orgtotalsize);
+    std::vector<char> sorgaddr(orgtotalsize);
     int orgsize = getDDT()->getType(orgtype)->getSize(orgcnt);
     orgddt->serialize((char*)orgaddr, sorgaddr.data(), orgcnt, orgsize, PACK);
     msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, sorgaddr.data(), orgcnt, orgtype, targdisp,
@@ -520,7 +524,7 @@ void ampi::winLocalGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, M
     winobj->accumulate(sorgaddr, targcnt, targdisp, targtype, op, parent);
   }
   else {
-    vector<char> getdata(orgtotalsize);
+    std::vector<char> getdata(orgtotalsize);
     int targsize = getDDT()->getType(targtype)->getSize(targcnt);
     tddt->serialize(getdata.data(), sorgaddr, targcnt, targsize, UNPACK);
     winobj->accumulate(getdata.data(), targcnt, targdisp, targtype, op, parent);
@@ -548,7 +552,7 @@ AmpiMsg* ampi::winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgc
     winobj->accumulate(sorgaddr, targcnt, targdisp, targtype, op, parent);
   }
   else {
-    vector<char> getdata(orgtotalsize);
+    std::vector<char> getdata(orgtotalsize);
     int targsize = getDDT()->getType(targtype)->getSize(targcnt);
     tddt->serialize(getdata.data(), sorgaddr, targcnt, targsize, UNPACK);
     winobj->accumulate(getdata.data(), targcnt, targdisp, targtype, op, parent);
@@ -723,7 +727,7 @@ AMPI_API_IMPL(int, MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
   *newwin = ptr->createWinInstance(base, size, disp_unit, info);
   /* set the builtin attributes on the window */
   WinStruct *winStruct = parent->getWinStruct(*newwin);
-  vector<int>& keyvals = ptr->getWinObjInstance(winStruct)->getKeyvals();
+  std::vector<int>& keyvals = ptr->getWinObjInstance(winStruct)->getKeyvals();
   parent->setAttr(*newwin, keyvals, MPI_WIN_BASE, &base);
   parent->setAttr(*newwin, keyvals, MPI_WIN_SIZE, &size);
   parent->setAttr(*newwin, keyvals, MPI_WIN_DISP_UNIT, &disp_unit);
@@ -1021,6 +1025,48 @@ AMPI_API_IMPL(int, MPI_Win_unlock, int rank, MPI_Win win)
   return MPI_SUCCESS;
 }
 
+/*
+ * int AMPI_Win_lock_all(int assert, MPI_Win win)
+ *   Locks access to this MPI_Win object for all ranks.
+ *   Input:
+ *     int assertion : program assertion, used to provide optimization hints
+ *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
+ */
+AMPI_API_IMPL(int, MPI_Win_lock_all, int assert, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_lock_all");
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  int size = ptr->getSize();
+
+  // TODO: optimize for assertions here
+
+  for(int i=0; i<size; i++) {
+    ptr->winLock(MPI_LOCK_SHARED, i, winStruct);
+  }
+  return MPI_SUCCESS;
+}
+
+/*
+ * int AMPI_Win_unlock_all(MPI_Win win)
+ *   Unlocks access to this MPI_Win object for all ranks.
+ *   Input:
+ *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
+ */
+// The RMA call is completed both locally and remotely after unlock.
+AMPI_API_IMPL(int, MPI_Win_unlock_all, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_unlock_all");
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  int size = ptr->getSize();
+
+  for(int i=0; i<size; i++) {
+    ptr->winUnlock(i, winStruct);
+  }
+  return MPI_SUCCESS;
+}
+
 /* the following four functions are yet to implement */
 /*
  * int AMPI_Win_post(MPI_Group group, int assertion, MPI_Win win)
@@ -1274,7 +1320,7 @@ AMPI_API_IMPL(int, MPI_Win_delete_attr, MPI_Win win, int key)
   AMPI_API("AMPI_Win_delete_attr");
   ampiParent *parent = getAmpiParent();
   WinStruct *winStruct = parent->getWinStruct(win);
-  vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
+  std::vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
   return parent->deleteAttr(win, keyvals, key);
 }
 
@@ -1283,7 +1329,7 @@ AMPI_API_IMPL(int, MPI_Win_get_attr, MPI_Win win, int key, void* value, int* fla
   AMPI_API("AMPI_Win_get_attr");
   ampiParent *parent = getAmpiParent();
   WinStruct *winStruct = parent->getWinStruct(win);
-  vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
+  std::vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
   return parent->getAttr(win, keyvals, key, value, flag);
 }
 
@@ -1292,7 +1338,7 @@ AMPI_API_IMPL(int, MPI_Win_set_attr, MPI_Win win, int key, void* value)
   AMPI_API("AMPI_Win_set_attr");
   ampiParent *parent = getAmpiParent();
   WinStruct *winStruct = parent->getWinStruct(win);
-  vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
+  std::vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
   return parent->setAttr(win, keyvals, key, value);
 }
 

@@ -170,7 +170,6 @@ void DecisionTree::DFS( double *input, std::vector<IntDoubleMap>& solutions,
                 //reverse effect exist, keep the one with larger performance improvement
                 if(current->getPotentialImprove() > solutions[level][-effect])
                 {
-                    printf("\n-----detected conflict effects------ reverse %d %f \n", -effect, solutions[level][-effect]);
                     solutions[level].erase(-effect);
                     solutions[level][effect] = current->getPotentialImprove();
                     child->printDataToFile(input, fp);

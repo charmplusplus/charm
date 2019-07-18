@@ -478,6 +478,12 @@ void *CkLocalBranch(CkGroupID gID) {
   return _localBranch(gID);
 }
 
+// Similar to CkLocalBranch, but should be used from non-PE-local, but node-local PE
+// Ensure thread safety while using this function as it is accessing a non-PE-local group
+void *CkLocalBranchOther(CkGroupID gID, int rank) {
+  return _localBranchOther(gID, rank);
+}
+
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
@@ -1918,7 +1924,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
 {
   if (node==CkMyNode()) {
 #if CMK_ONESIDED_IMPL
-    if (CMI_ZC_MSGTYPE(msg) == CMK_REG_NO_ZC_MSG)
+    if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
 #endif
     {
       CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
@@ -2176,8 +2182,8 @@ void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *)) {
   ArrayResumeFromSyncExtCallback = cb;
 }
 
-void (*CreateCallbackMsgExt)(void*, int, int, int, char**, int*) = NULL;
-void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*)) {
+void (*CreateCallbackMsgExt)(void*, int, int, int, int *, char**, int*) = NULL;
+void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*)) {
   CreateCallbackMsgExt = cb;
 }
 
@@ -2368,21 +2374,25 @@ void CkSetMigratable(int aid, int ndims, int *index, char migratable) {
 
 void CkStartQDExt_ChareCallback(int onPE, void* objPtr, int epIdx, int fid)
 {
-  CkStartQD(CkCallback(onPE, objPtr, epIdx, fid));
+  CkStartQD(CkCallback(onPE, objPtr, epIdx, (CMK_REFNUM_TYPE)fid));
 }
 
 void CkStartQDExt_GroupCallback(int gid, int pe, int epIdx, int fid)
 {
-  CkStartQD(CkCallback(gid, pe, epIdx, fid));
+  CkStartQD(CkCallback(gid, pe, epIdx, (CMK_REFNUM_TYPE)fid));
 }
 
 void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, int fid)
 {
-  CkStartQD(CkCallback(aid, idx, ndims, epIdx, fid));
+  CkStartQD(CkCallback(aid, idx, ndims, epIdx, (CMK_REFNUM_TYPE)fid));
+}
+
+void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep)
+{
+  CkStartQD(CkCallback(sid_pe, sid_cnt, rootPE, ep));
 }
 
 void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
-  //ckCheck();    // checks that gid is not zero
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
   PUP::toMem implP((void *)impl_msg->msgBuf);
@@ -2399,7 +2409,6 @@ void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
 
 void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
-  //ckCheck();    // checks that gid is not zero
   int totalSize = 0;
   for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
   int marshall_msg_size = (sizeof(char)*totalSize + 3*sizeof(int));
@@ -2416,8 +2425,7 @@ void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char 
   CkSendMsg(epIdx, impl_msg, &chareID);
 }
 
-void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize) {
-  //ckCheck();    // checks that gid is not zero
+void CkGroupExtSend(int gid, int npes, const int *pes, int epIdx, char *msg, int msgSize) {
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
   PUP::toMem implP((void *)impl_msg->msgBuf);
@@ -2428,15 +2436,16 @@ void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize) {
   CkGroupID gId;
   gId.idx = gid;
 
-  if (pe == -1)
+  if (pes[0] == -1)
     CkBroadcastMsgBranch(epIdx, impl_msg, gId, 0);
+  else if (npes == 1)
+    CkSendMsgBranch(epIdx, impl_msg, pes[0], gId, 0);
   else
-    CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
+    CkSendMsgBranchMulti(epIdx, impl_msg, gId, npes, pes, 0);
 }
 
-void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
+void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
-  //ckCheck();    // checks that gid is not zero
   int totalSize = 0;
   for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
   int marshall_msg_size = (sizeof(char)*totalSize + 3*sizeof(int));
@@ -2449,10 +2458,18 @@ void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs,
   CkGroupID gId;
   gId.idx = gid;
 
-  if (pe == -1)
+  if (pes[0] == -1)
     CkBroadcastMsgBranch(epIdx, impl_msg, gId, 0);
+  else if (npes == 1)
+    CkSendMsgBranch(epIdx, impl_msg, pes[0], gId, 0);
   else
-    CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
+    CkSendMsgBranchMulti(epIdx, impl_msg, gId, npes, pes, 0);
+}
+
+void CkForwardMulticastMsg(int _gid, int num_children, const int *children) {
+  CkGroupID gid;
+  gid.idx = _gid;
+  ((SectionManagerExt*)CkLocalBranch(gid))->forwardMulticastMsg(num_children, children);
 }
 
 void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize) {

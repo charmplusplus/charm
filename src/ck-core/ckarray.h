@@ -135,6 +135,7 @@ public:
 	void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }
+	CkArray *ckLocalBranchOther(int rank) const { return _aid.ckLocalBranchOther(rank); }
 	CkLocMgr *ckLocMgr(void) const;
 	inline operator CkArrayID () const {return ckGetArrayID();}
 	unsigned int numLocalElements() const { return ckLocMgr()->numLocalElements(); }
@@ -537,6 +538,16 @@ class CkArrayReducer;
 
 void _ckArrayInit(void);
 
+// Wrapper class to hold a message pointer
+// Used in ZC Bcast when root node is non-zero
+class MsgPointerWrapper {
+  public:
+    void *msg;
+    void pup(PUP::er &p) {
+      pup_pointer(&p, &msg);
+    }
+};
+
 class CkArray : public CkReductionMgr {
   friend class ArrayElement;
   friend class CProxy_ArrayBase;
@@ -675,6 +686,8 @@ public:
   void recvExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
   void recvBroadcastViaTree(CkMessage *msg);
 
+  void sendZCBroadcast(MsgPointerWrapper w);
+
   /// Whole array destruction, including all elements and the group itself
   void ckDestroy();
 
@@ -710,11 +723,18 @@ private:
 	      "You'll have to either use fewer array listeners, or increase the compile-time\n"
 	      "constant CK_ARRAYLISTENER_MAXLEN!\n");
   }
+
+  void incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper w);
+  void incrementBcastNo();
+
  private:
 
   CkArrayReducer *reducer; //Read-only copy of default reducer
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
+  CkArrayBroadcaster *getBroadcaster() {
+    return broadcaster;
+  }
   void flushStates();
 #if CMK_ONESIDED_IMPL
   void forwardZCMsgToOtherElems(envelope *env);
@@ -728,6 +748,89 @@ public:
 // with usage in maps' populateInitial()
 typedef CkArray CkArrMgr;
 
+#if CMK_ONESIDED_IMPL
+struct ncpyBcastNoMsg{
+  char cmicore[CmiMsgHeaderSizeBytes];
+  int srcPe;
+  void *ref;
+};
+
+void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize);
+#endif
+
 /*@}*/
+
+///This arrayListener is in charge of delivering broadcasts to the array.
+class CkArrayBroadcaster : public CkArrayListener {
+  inline int &getData(ArrayElement *el) {return *ckGetData(el);}
+public:
+  CkArrayBroadcaster(bool _stableLocations, bool _broadcastViaScheduler);
+  CkArrayBroadcaster(CkMigrateMessage *m);
+  virtual void pup(PUP::er &p);
+  virtual ~CkArrayBroadcaster();
+  PUPable_decl(CkArrayBroadcaster);
+
+  virtual void ckElementStamp(int *eltInfo) {*eltInfo=getBcastNo();}
+
+  ///Element was just created on this processor
+  /// Return false if the element migrated away or deleted itself.
+  virtual bool ckElementCreated(ArrayElement *elt)
+    { return bringUpToDate(elt); }
+
+  ///Element just arrived on this processor (so just called pup)
+  /// Return false if the element migrated away or deleted itself.
+  virtual bool ckElementArriving(ArrayElement *elt)
+    { return bringUpToDate(elt); }
+
+  void incoming(CkArrayMessage *msg);
+
+  int incrementBcastNo();
+
+  bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
+
+  void springCleaning(void);
+
+  void flushState();
+
+private:
+  //Number of broadcasts received (also serial number)
+#if CMK_SMP
+  std::atomic<int> bcastNo;
+#else
+  int bcastNo;
+#endif
+
+  int oldBcastNo;//Above value last spring cleaning
+  //This queue stores old broadcasts (in case a migrant arrives
+  // and needs to be brought up to date)
+  CkQ<CkArrayMessage *> oldBcasts;
+  bool stableLocations;
+  bool broadcastViaScheduler;
+
+  bool bringUpToDate(ArrayElement *el);
+
+public:
+#if CMK_SMP
+  int getBcastNo() const {
+    return bcastNo.load(std::memory_order_acquire);
+  }
+  void setBcastNo(int r) {
+    return bcastNo.store(r, std::memory_order_release);
+  }
+  int incBcastNo() {
+    return bcastNo.fetch_add(1, std::memory_order_release);
+  }
+  int decBcastNo() {
+    return bcastNo.fetch_sub(1, std::memory_order_release);
+  }
+#else
+  int getBcastNo() const { return bcastNo; }
+  void setBcastNo(int r) { bcastNo = r; }
+  int incBcastNo() { return bcastNo++; }
+  int decBcastNo() { return bcastNo--; }
+#endif
+
+
+};
 
 #endif

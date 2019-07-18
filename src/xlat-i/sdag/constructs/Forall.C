@@ -17,19 +17,25 @@ void ForallConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
 
   defs << "  int __first = (" << con2->text << "), __last = (" << con3->text
        << "), __stride = (" << con4->text << ");\n";
-  defs << "  if (__first > __last) {\n";
-  defs << "    int __tmp=__first; __first=__last; __last=__tmp;\n";
-  defs << "    __stride = -__stride;\n";
-  defs << "  }\n";
   defs << "  SDAG::CCounter *" << counter
        << " = new SDAG::CCounter(__first, __last, __stride);\n";
-  defs << "  for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
+  defs << "  if (__first > __last) {\n";
+  defs << "    for(int " << con1->text << "=__first;" << con1->text << ">=__last;"
        << con1->text << "+=__stride) {\n";
-  defs << "    SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure("
+  defs << "      SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure("
        << con1->text << ");\n";
-  defs << "    ";
+  defs << "      ";
   generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
 
+  defs << "    }\n";
+  defs << "  } else {\n";
+  defs << "    for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
+       << con1->text << "+=__stride) {\n";
+  defs << "      SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure("
+       << con1->text << ");\n";
+  defs << "      ";
+  generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+  defs << "    }\n";
   defs << "  }\n";
 
   unravelClosuresEnd(defs);

@@ -85,7 +85,7 @@ extern "C" {
 #endif
 
 int AMPI_Main(); /* declaration for C main routine (not a strict prototype!) */
-void AMPI_Main_c(int argc,char **argv); /* C wrapper for calling AMPI_Main() from C++ */
+int AMPI_Main_c(int argc,char **argv); /* C wrapper for calling AMPI_Main() from C++ */
 
 typedef void (*MPI_MainFn) (int,char**);
 
@@ -1080,10 +1080,6 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Type_create_f90_real APMPI_Type_create_f90_real
 #define  MPI_Type_match_size  AMPI_Type_match_size
 #define PMPI_Type_match_size APMPI_Type_match_size
-#define  MPI_Message_c2f  AMPI_Message_c2f
-#define PMPI_Message_c2f APMPI_Message_c2f
-#define  MPI_Message_f2c  AMPI_Message_f2c
-#define PMPI_Message_f2c APMPI_Message_f2c
 #define  MPI_Status_c2f  AMPI_Status_c2f
 #define PMPI_Status_c2f APMPI_Status_c2f
 #define  MPI_Status_c2f08  AMPI_Status_c2f08
@@ -1224,6 +1220,10 @@ typedef int MPIX_Grequest_wait_function(int count, void **array_of_states,
 #define MPI_Errhandler_f2c(errhandler) (MPI_Errhandler)(errhandler)
 #define MPI_Win_c2f(win) (MPI_Fint)(win)
 #define MPI_Win_f2c(win) (MPI_Win)(win)
+#define MPI_Message_c2f(msg) ((MPI_Fint)(msg))
+#define PMPI_Message_c2f(msg) ((MPI_Fint)(msg))
+#define MPI_Message_f2c(msg) ((MPI_Message)(msg))
+#define PMPI_Message_f2c(msg) ((MPI_Message)(msg))
 
 
 /* From ROMIO's mpio.h */

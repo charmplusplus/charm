@@ -1,22 +1,28 @@
-DIRS = \
-  direct_api \
-  large_readonly \
+-include ../../../common.mk
+CHARMDIR = ../../../..
+CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
 
-TESTDIRS = $(DIRS)
+all: zerocopy_with_qd
 
-all: $(foreach i,$(DIRS),build-$i)
+OBJS = zerocopy_with_qd.o
 
-test: $(foreach i,$(TESTDIRS),test-$i)
+zerocopy_with_qd: $(OBJS)
+	$(CHARMC) -language charm++ -o zerocopy_with_qd $(OBJS)
 
-clean: $(foreach i,$(DIRS),clean-$i)
-	rm -f TAGS #*#
-	rm -f core *~
+cifiles: zerocopy_with_qd.ci
+	$(CHARMC)  zerocopy_with_qd.ci
+	touch cifiles
 
-$(foreach i,$(DIRS),build-$i):
-	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+zerocopy_with_qd.o: zerocopy_with_qd.C cifiles
+	$(CHARMC) -c zerocopy_with_qd.C
 
-$(foreach i,$(DIRS),test-$i):
-	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+test: all
+	$(call run, +p1 ./zerocopy_with_qd 60)
+	$(call run, +p4 ./zerocopy_with_qd 100)
+	$(call run, +p6 ./zerocopy_with_qd 142)
+	$(call run, +p4 ./zerocopy_with_qd 100 +noCMAForZC)
+	$(call run, +p6 ./zerocopy_with_qd 142 +noCMAForZC)
 
-$(foreach i,$(DIRS),clean-$i):
-	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'
+clean:
+	rm -f *.decl.h *.def.h *.o
+	rm -f zerocopy_with_qd charmrun cifiles
