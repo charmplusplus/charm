@@ -461,6 +461,8 @@ int main() {
 " CMK_BALANCED_INJECTION_API)
 
 if(${CMK_BUILD_OFI} EQUAL 1)
+  set(tmp ${CMAKE_REQUIRED_LIBRARIES})
+  set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} -lfabric")
   check_c_source_compiles("
     #include <rdma/fabric.h>
     int main(int argc, char **argv)
@@ -470,6 +472,7 @@ if(${CMK_BUILD_OFI} EQUAL 1)
       return 0;
     }
   " CMK_BUILD_ON_OFI)
+  set(CMAKE_REQUIRED_LIBRARIES ${tmp})
   if("${CMK_BUILD_ON_OFI}" STREQUAL "")
     message(FATAL_ERROR "Unable to build ofi.")
   endif()

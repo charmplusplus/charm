@@ -417,6 +417,36 @@ foreach(filename ${src-util-h-sources})
 endforeach()
 
 
+# proc_management
+# file(MAKE_DIRECTORY include/proc_management/simple_pmi)
+
+set(proc_management-sources
+src/arch/util/proc_management/runtime-pmi.C
+src/arch/util/proc_management/runtime-pmix.C
+src/arch/util/proc_management/runtime-codec.h
+src/arch/util/proc_management/runtime-pmi2.C
+src/arch/util/proc_management/runtime.h
+)
+
+set(proc_management-simple_pmi-sources
+src/arch/util/proc_management/simple_pmi/pmi.h
+src/arch/util/proc_management/simple_pmi/mpl.h
+src/arch/util/proc_management/simple_pmi/simple_pmi.C
+src/arch/util/proc_management/simple_pmi/simple_pmiutil.C
+src/arch/util/proc_management/simple_pmi/simple_pmiutil.h
+)
+
+# FIXME: these should be in include/proc_management
+foreach(filename ${proc_management-sources})
+    configure_file(${filename} include/ COPYONLY)
+endforeach()
+
+# FIXME: these should be in include/proc_management/simple_pmi
+foreach(filename ${proc_management-simple_pmi-sources})
+    configure_file(${filename} include/ COPYONLY)
+endforeach()
+
+
 # Charmxi
 add_subdirectory(src/xlat-i)
 
