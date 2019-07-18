@@ -41,6 +41,7 @@ opt_romio=1
 opt_shrinkexpand=0
 opt_smp=0
 opt_stats=0
+opt_suffix=""
 opt_task_queue=0
 opt_tcp=0
 opt_tracing=0
@@ -197,6 +198,9 @@ while [[ $# -gt 0 ]]; do
     -j*)
       opt_parallel=$arg
       ;;
+    --suffix=*)
+      opt_suffix=-${arg#*=}
+      ;;
     *)
       echo "*** Warning: Ignoring unknown option '$arg'."
       ;;
@@ -218,10 +222,11 @@ for option in ${!opt*}; do
   echo "  $option = ${!option}"
 done
 
+builddir=$triplet$opt_suffix
 
-mkdir $triplet
+mkdir $builddir
 
-cd $triplet
+cd $builddir
 
 cmake_args+="-DCMAKE_BUILD_TYPE=$opt_production "
 cmake_args+="-DCMK_AMPI_WITH_ROMIO=$opt_romio "
