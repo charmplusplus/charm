@@ -2000,7 +2000,7 @@ NOF77=0
 NOF90=0
 ARCH=""
 arch_IRIX=""
-MPI_IMPL="ampi"
+# MPI_IMPL=""
 MPI_INCLUDE_DIR=""
 ROMIO_INCLUDE=""
 TEST_LIBNAME=""
@@ -2050,7 +2050,7 @@ F77GETARG="call getarg(i,str)"
 F77IARGC="iargc()"
 F77MPIOINC=""
 FTESTDEFINE=""
-FORTRAN_MPI_OFFSET=""
+FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
 MPIOF_H_INCLUDED=0
 MPI_OFFSET_KIND1="!"
 MPI_OFFSET_KIND2="!"
@@ -12314,7 +12314,7 @@ $as_echo_n "checking if MPIR_Status_set_bytes is defined... " >&6; }
 #include "mpi.h"
      main(int argc, char **argv)
      {
-     	 MPI_Status status;
+     	 MPI_Status *status;
          MPI_Datatype type;
 	 int err;
 

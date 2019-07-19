@@ -66,7 +66,7 @@
 #define AMPI_RENAME_ATEXIT 1
 #endif
 #if AMPI_RENAME_ATEXIT
-#define atexit(...) do {atexit(__VA_ARGS__); atexit(ampiMarkAtexit);} while(0)
+#define atexit(...) (atexit(__VA_ARGS__), atexit(ampiMarkAtexit))
 #endif
 
 /*
@@ -91,6 +91,7 @@ typedef void (*MPI_MainFn) (int,char**);
 
 typedef int MPI_Datatype;
 typedef intptr_t MPI_Aint;
+#define MPI_AINT_FMT_HEX_SPEC "%z"
 typedef int MPI_Fint;
 typedef MPI_Aint MPI_Count;
 typedef long long int MPI_Offset;
@@ -1151,6 +1152,10 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_T_pvar_stop APMPI_T_pvar_stop
 #define  MPI_T_pvar_write  AMPI_T_pvar_write
 #define PMPI_T_pvar_write APMPI_T_pvar_write
+
+/* Extensions needed by ROMIO */
+#define  MPIR_Status_set_bytes  AMPIR_Status_set_bytes
+#define PMPIR_Status_set_bytes APMPIR_Status_set_bytes
 
 #endif //CMK_CONVERSE_MPI
 

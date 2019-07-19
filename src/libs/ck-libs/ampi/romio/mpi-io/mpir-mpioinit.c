@@ -22,6 +22,12 @@ void MPIR_MPIOInit(int * error_code) {
     int flag;
     char myname[] = "MPIR_MPIOInit";
 
+    if (!CtvInitialized(ADIO_Init_keyval))
+    {
+        CtvInitialize(int, ADIO_Init_keyval);
+        CtvAccess(ADIO_Init_keyval) = MPI_KEYVAL_INVALID;
+    }
+
     /* first check if ADIO has been initialized. If not, initialize it */
     if (CtvAccess(ADIO_Init_keyval) == MPI_KEYVAL_INVALID) {
         MPI_Initialized(&flag);

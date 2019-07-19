@@ -10206,6 +10206,30 @@ AMPI_API_IMPL(int, MPI_Comm_free_errhandler, MPI_Errhandler *errhandler)
   return MPI_SUCCESS;
 }
 
+AMPI_API_IMPL(int, MPI_File_call_errhandler, MPI_File file, int errorcode)
+{
+  AMPI_API("AMPI_File_call_errhandler");
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_File_create_errhandler, MPI_File_errhandler_function *function, MPI_Errhandler *errhandler)
+{
+  AMPI_API("AMPI_File_create_errhandler");
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_File_set_errhandler, MPI_File file, MPI_Errhandler errhandler)
+{
+  AMPI_API("AMPI_File_set_errhandler");
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_File_get_errhandler, MPI_File file, MPI_Errhandler *errhandler)
+{
+  AMPI_API("AMPI_File_get_errhandler");
+  return MPI_SUCCESS;
+}
+
 AMPI_API_IMPL(int, MPI_Errhandler_create, MPI_Handler_function *function, MPI_Errhandler *errhandler)
 {
   AMPI_API("AMPI_Errhandler_create");
@@ -11583,6 +11607,14 @@ AMPI_API_IMPL(int, MPI_Pcontrol, const int level, ...)
 //int AMPI_Pcontrol(const int level, ...) {
   //AMPI_API("AMPI_Pcontrol");
   return MPI_SUCCESS;
+}
+
+/* Extensions needed by ROMIO */
+
+AMPI_API_IMPL(int, MPIR_Status_set_bytes, MPI_Status *sts, MPI_Datatype dtype, int nbytes)
+{
+  AMPI_API("AMPIR_Status_set_bytes");
+  return MPI_Status_set_elements_x(sts, MPI_BYTE, nbytes);
 }
 
 /******** AMPI Extensions to the MPI standard *********/
