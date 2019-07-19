@@ -22,7 +22,8 @@ Misc:
 
 Charm++ Features & Fixes:
 
-- Charm++ can now be built with -std=c++17.
+- Support for a new Unified Communication X (UCX) networking backend in LRTS,
+  thanks to Mellanox and Charmworks staff.
 
 - The Zero Copy API now supports broadcast operations, and is used internally
   for transmission of large readonly objects during startup.
@@ -34,6 +35,10 @@ Charm++ Features & Fixes:
 - Addition of a new Zero Copy Post API, for avoiding the receive-side message
   copy. This can be used in both point-to-point and broadcast operations.
 
+- Defined a new API, CkWithinNodeBroadcast, for broadcasting a message from a Group element
+  to all other Group elements in the same process or logical node. If the target entry
+  method is [nokeep], this API avoids making any copies of the message.
+
 - Callbacks to [inline] entry methods are now executed inline by default. Previously,
   this was only done when the callback was constructed with an optional parameter.
 
@@ -44,7 +49,13 @@ Charm++ Features & Fixes:
 - Allocate pinned host memory pool for GPUs dynamically on demand, instead of
   statically at compilation time.
 
-- TRAM and [aggregate] entry methods support multi-dimensional chare arrays.
+- Added an optional parameter for freeing the CkCallback in GPUManager's WorkRequest.
+
+- Fixed a bug in MetaLB and adding tests for MetaLB.
+
+- Fixed a bug in SDAG's code generation for forall statements with negative steps.
+
+- TRAM and [aggregate] entry methods now support multi-dimensional chare arrays.
 
 - Virtual inheritance from multiple PUPable base classes is now allowed.
 
@@ -57,6 +68,11 @@ Charm++ Features & Fixes:
 
 - Defined a new XI-Builder interface, a library front-end for XLAT-I's code generation.
 
+- Fixes to the perfReport and memory tracemodes as well as record/replay in SMP mode,
+  and improvements to PAPI-enabled builds.
+
+- Due to being broken since before v6.8, mlog and causalft builds have been removed.
+
 - Added a charmc option "-module-names" which prints the module names in a .ci file,
   one module name per line in the output.
 
@@ -66,14 +82,25 @@ Charm++ Features & Fixes:
 - Performance measurement programs from the tests and examples directories have been
   recategorized into a new "benchmarks" directory.
 
+- Charm++ can now be built with -std=c++17, and all eligible C files in the Charm++
+  runtime have been transitioned to compile as C++.
+
 - Support for mpi-win-x86_64-gcc builds.
 
-- All eligible C files in the Charm++ runtime have been transitioned to compile as C++.
+- Various improvements to Charm4Py, such as a new sections implementation, are
+  described in the charm4py repository on GitHub.
 
 Adaptive MPI:
 
+- AMPI now uses Charm++'s zero copy API to transfer large messages efficiently using
+  RDMA and CMA wherever possible and profitable.
+
 - More efficient implementations of MPI_Bcast, all MPI_(I)(all)gather(v) routines,
   and reductions with non-commutative operations.
+
+- Added support for MPI_Win_(Un)lock_all and MPI_Type_match_size.
+
+- Fixes to MPI_Mrecv, MPI_Info_dup, and MPI_BOTTOM error handling.
 
 - Stubs for MPI functions currently unimplemented in AMPI are now provided to allow
   more MPI codes to build. These emit -Wdeprecated-declarations diagnostics when used.
@@ -87,6 +114,8 @@ Adaptive MPI:
 
 - AMPI's nm_globals.sh script now works on both Linux and Mac OS and provides
   more useful output for identifying writable global/static variables.
+
+- Fixed AMPI's CUDA support, with the AMPI+CUDA example now working as expected.
 
 ================================================================================
 What's new in Charm++ 6.9.0
