@@ -1238,12 +1238,13 @@ void CkRdmaEMDeregAndAckHandler(void *ack) {
 }
 
 void CkRdmaPrepareP2PMsg(envelope *env) {
-  int numops;
+  int numops, rootNode;
   CkUnpackMessage(&env);
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
 
   up|numops;
+  up|rootNode;
 
   int numToBeDeregOps = 0;
 
@@ -1259,7 +1260,9 @@ void CkRdmaPrepareP2PMsg(envelope *env) {
   if(numToBeDeregOps > 0) { // Allocate structure only if numToBeDeregOps > 0
     up.reset(); // Reset PUP::fromMem to the original buffer
     up|numops;
+    up|rootNode;
     p|numops;
+    p|rootNode;
 
     // Allocate a structure to de-register after completion and invoke acks
     NcpyP2PAckInfo *p2pAckInfo = (NcpyP2PAckInfo *)CmiAlloc(sizeof(NcpyP2PAckInfo) + numops * sizeof(CkNcpyBuffer));
