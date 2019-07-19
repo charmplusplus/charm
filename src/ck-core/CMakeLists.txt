@@ -158,6 +158,7 @@ add_library(moduleCommonLBs
     ${CMAKE_BINARY_DIR}/include/OrbLB.decl.h
     ${CMAKE_BINARY_DIR}/include/BlockLB.decl.h
     ${CMAKE_BINARY_DIR}/include/NodeLevelLB.decl.h
+    ${ck-ci-sources}
 )
 
 if(${EVERYLB})
