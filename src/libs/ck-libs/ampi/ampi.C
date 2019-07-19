@@ -1802,10 +1802,10 @@ int ampiParent::dupUserAttributes(int old_context, std::unordered_map<int, uintp
 }
 
 int ampiParent::freeUserAttributes(int context, std::unordered_map<int, uintptr_t> & attributes) noexcept {
-  for (auto iter = attributes.begin(); iter != attributes.end(); ++iter) {
-    int keyval = iter->first;
+  for (auto & attr : attributes) {
+    int keyval = attr.first;
     KeyvalNode & kv = *kvlist[keyval];
-    void * val = (void *)iter->second;
+    void * val = (void *)attr.second;
     int ret = (*kv.delete_fn)(context, keyval, val, kv.extra_state);
     if (ret != MPI_SUCCESS)
       return ret;
@@ -7069,8 +7069,10 @@ AMPI_API_IMPL(int, MPI_Type_free, MPI_Datatype *datatype)
 {
   AMPI_API("AMPI_Type_free");
 
+  int ret;
+
 #if AMPI_ERROR_CHECKING
-  int ret = checkData("AMPI_Type_free", *datatype);
+  ret = checkData("AMPI_Type_free", *datatype);
   if (ret!=MPI_SUCCESS)
     return ret;
 
