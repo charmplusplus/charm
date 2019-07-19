@@ -206,10 +206,10 @@ while [[ $# -gt 0 ]]; do
       opt_libdir+="-L${arg#*=}/lib "
       ;;
     --libdir=*)
-      opt_libdir+="-L${arg#*=}/lib "
+      opt_libdir+="-L${arg#*=} "
       ;;
     --incdir=*)
-      opt_incdir+="-I${arg#*=}/include "
+      opt_incdir+="-I${arg#*=} "
       ;;
     *)
       echo "*** Warning: Ignoring unknown option '$arg'."
