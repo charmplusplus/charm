@@ -20,8 +20,10 @@ opt_charmpy=0
 opt_controlpoint=0
 opt_drone_mode=0
 opt_error_checking=0
+opt_incdir=""
 opt_lbtime_type= #undef
 opt_lbuserdata=0
+opt_libdir=""
 opt_lockless=0
 opt_mempool_cutoff= #undef
 opt_network=0
@@ -199,6 +201,16 @@ while [[ $# -gt 0 ]]; do
     --suffix=*)
       opt_suffix=-${arg#*=}
       ;;
+    --basedir=*)
+      opt_incdir+="-I${arg#*=}/include "
+      opt_libdir+="-L${arg#*=}/lib "
+      ;;
+    --libdir=*)
+      opt_libdir+="-L${arg#*=}/lib "
+      ;;
+    --incdir=*)
+      opt_incdir+="-I${arg#*=}/include "
+      ;;
     *)
       echo "*** Warning: Ignoring unknown option '$arg'."
       ;;
@@ -227,6 +239,17 @@ rm -rf $builddir
 mkdir $builddir
 
 cd $builddir
+
+if [[ -n $opt_libdir ]]; then
+  mkdir -p include
+  echo "USER_OPTS_LD=$opt_libdir" >> include/conv-mach-pre.sh
+fi
+
+if [[ -n $opt_incdir ]]; then
+  mkdir -p include
+  echo "USER_OPTS_CC='$opt_incdir'" >> include/conv-mach-pre.sh
+  echo "USER_OPTS_CXX='$opt_incdir'" >> include/conv-mach-pre.sh
+fi
 
 cmake_args+="-DCMAKE_BUILD_TYPE=$opt_production "
 cmake_args+="-DCMK_AMPI_WITH_ROMIO=$opt_romio "
