@@ -585,6 +585,7 @@ endif()
 
 if(${TARGET} STREQUAL "LIBS")
   # FIXME: add libs
+  add_subdirectory(src/libs/conv-libs)
 endif()
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
