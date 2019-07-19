@@ -1279,8 +1279,8 @@ static ampi *ampiInit(char **argv) noexcept
 #endif
 
   ampiParent* pptr = getAmpiParent();
-  std::vector<int>& keyvals = pptr->getKeyvals(MPI_COMM_WORLD);
-  pptr->setAttr(MPI_COMM_WORLD, keyvals, MPI_UNIVERSE_SIZE, &_nchunks);
+  auto & attributes = pptr->getAttributes(MPI_COMM_WORLD);
+  pptr->setAttr(MPI_COMM_WORLD, attributes, MPI_UNIVERSE_SIZE, &_nchunks);
   ptr->setCommName("MPI_COMM_WORLD");
 
   pptr->ampiInitCallDone = 0;
@@ -1672,30 +1672,45 @@ int ampiParent::createKeyval(MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_dele
   return 0;
 }
 
-int ampiParent::setUserKeyval(int context, int keyval, void *attribute_val) noexcept {
+int ampiParent::setUserAttribute(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept {
 #if AMPI_ERROR_CHECKING
   if (keyval < 0 || keyval >= kvlist.size() || kvlist[keyval] == NULL) {
     return MPI_ERR_KEYVAL;
   }
 #endif
   KeyvalNode &kv = *kvlist[keyval];
-  if (kv.hasVal()) {
-    int ret = (*kv.delete_fn)(context, keyval, kv.val, kv.extra_state);
+  auto iter = attributes.find(keyval);
+  if (iter != attributes.end()) {
+    void * val = (void *)iter->second;
+    int ret = (*kv.delete_fn)(context, keyval, val, kv.extra_state);
     if (ret != MPI_SUCCESS) {
       return ret;
     }
+    iter->second = (uintptr_t)attribute_val;
   }
-  kvlist[keyval]->setVal(attribute_val);
+  else {
+    attributes.emplace(keyval, (uintptr_t)attribute_val);
+    kv.incRefCount();
+  }
   return MPI_SUCCESS;
 }
 
-int ampiParent::setAttr(int context, std::vector<int>& keyvals, int keyval, void* attribute_val) noexcept {
+int ampiParent::setAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void* attribute_val) noexcept {
   if (kv_set_builtin(keyval, attribute_val)) {
     return MPI_SUCCESS;
   }
-  keyvals.push_back(keyval);
-  kvlist[keyval]->incRefCount();
-  return setUserKeyval(context, keyval, attribute_val);
+  return setUserAttribute(context, attributes, keyval, attribute_val);
+}
+
+int ampiParent::freeKeyval(int keyval) noexcept {
+  if (keyval >= 0 && keyval < kvlist.size() && kvlist[keyval] != NULL) {
+    if (kvlist[keyval]->decRefCount() == 0) {
+      delete kvlist[keyval];
+      kvlist[keyval] = nullptr;
+    }
+    return MPI_SUCCESS;
+  }
+  return MPI_ERR_KEYVAL;
 }
 
 bool ampiParent::kv_set_builtin(int keyval, void* attribute_val) noexcept {
@@ -1738,7 +1753,7 @@ bool ampiParent::kv_get_builtin(int keyval) noexcept {
   };
 }
 
-bool ampiParent::getBuiltinKeyval(int keyval, void *attribute_val) noexcept {
+bool ampiParent::getBuiltinAttribute(int keyval, void *attribute_val) noexcept {
   if (kv_get_builtin(keyval)){
     /* All builtin keyvals are ints except MPI_WIN_BASE, which is a pointer
      * to the window's base address in C but an integer representation of
@@ -1762,25 +1777,23 @@ bool ampiParent::getBuiltinKeyval(int keyval, void *attribute_val) noexcept {
   return false;
 }
 
-// Call copy_fn for each user-defined keyval in old_comm.
-int ampiParent::dupUserKeyvals(MPI_Comm old_comm, MPI_Comm new_comm) noexcept {
-  ampiCommStruct &old_cs = *(ampiCommStruct *)&comm2CommStruct(old_comm);
-  for (int i=0; i<old_cs.getKeyvals().size(); i++) {
-    int keyval = old_cs.getKeyvals()[i];
+// Call copy_fn for each user-defined keyval
+int ampiParent::dupUserAttributes(int old_context, std::unordered_map<int, uintptr_t> & old_attr, std::unordered_map<int, uintptr_t> & new_attr) noexcept {
+  for (auto & attr : old_attr) {
+    int keyval = attr.first;
+    void *val_in = (void *)attr.second;
     void *val_out;
     int flag = 0;
     bool isValid = (keyval != MPI_KEYVAL_INVALID && kvlist[keyval] != NULL);
     if (isValid) {
       // Call the user's copy_fn
       KeyvalNode& kv = *kvlist[keyval];
-      int ret = (*kv.copy_fn)(old_comm, keyval, kv.extra_state, kv.val, &val_out, &flag);
+      int ret = (*kv.copy_fn)(old_context, keyval, kv.extra_state, val_in, &val_out, &flag);
       if (ret != MPI_SUCCESS) {
         return ret;
       }
       if (flag == 1) {
-        // Set keyval in new_comm
-        ampiCommStruct &cs = *(ampiCommStruct *)&comm2CommStruct(new_comm);
-        cs.getKeyvals().push_back(keyval);
+        new_attr.emplace(keyval, (uintptr_t)val_out);
         kv.incRefCount();
       }
     }
@@ -1788,85 +1801,47 @@ int ampiParent::dupUserKeyvals(MPI_Comm old_comm, MPI_Comm new_comm) noexcept {
   return MPI_SUCCESS;
 }
 
-int ampiParent::freeUserKeyval(int context, std::vector<int>& keyvals, int* keyval) noexcept {
-  if (*keyval < 0 || *keyval >= kvlist.size()) {
-    return MPI_SUCCESS;
-  }
-  // Call the user's delete_fn
-  KeyvalNode& kv = *kvlist[*keyval];
-  int ret = (*kv.delete_fn)(context, *keyval, kv.val, kv.extra_state);
-  if (ret != MPI_SUCCESS) {
-    return ret;
-  }
-  // Remove keyval from comm/win/type keyvals list
-  kv.clearVal();
-  for (int i=0; i<keyvals.size(); i++) {
-    if (keyvals[i] == *keyval) {
-      keyvals[*keyval] = MPI_KEYVAL_INVALID;
-    }
-  }
-  if (!keyvals.empty()) {
-    while (keyvals.back() == MPI_KEYVAL_INVALID) keyvals.pop_back();
-  }
-  // Remove keyval from parent kvlist if no remaining references to it
-  if (kv.decRefCount() == 0) {
-    delete kvlist[*keyval];
-    kvlist[*keyval] = NULL;
-  }
-  *keyval = MPI_KEYVAL_INVALID;
-  return MPI_SUCCESS;
-}
-
-int ampiParent::freeUserKeyvals(int context, std::vector<int>& keyvals) noexcept {
-  for (int i=0; i<keyvals.size(); i++) {
-    int keyval = keyvals[i];
-    // Call the user's delete_fn
-    KeyvalNode& kv = *kvlist[keyval];
-    int ret = (*kv.delete_fn)(context, keyval, kv.val, kv.extra_state);
-    if (ret != MPI_SUCCESS) {
+int ampiParent::freeUserAttributes(int context, std::unordered_map<int, uintptr_t> & attributes) noexcept {
+  for (auto iter = attributes.begin(); iter != attributes.end(); ++iter) {
+    int keyval = iter->first;
+    KeyvalNode & kv = *kvlist[keyval];
+    void * val = (void *)iter->second;
+    int ret = (*kv.delete_fn)(context, keyval, val, kv.extra_state);
+    if (ret != MPI_SUCCESS)
       return ret;
-    }
-    kv.clearVal();
-    keyvals[i] = MPI_KEYVAL_INVALID;
-    // Remove keyval from parent kvlist if no remaining references to it
+
     if (kv.decRefCount() == 0) {
       delete kvlist[keyval];
       kvlist[keyval] = NULL;
     }
   }
-  keyvals.clear();
+  attributes.clear();
   return MPI_SUCCESS;
 }
 
-bool ampiParent::getUserKeyval(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept {
-  if (keyval < 0 || keyval >= kvlist.size() || kvlist[keyval] == NULL) {
+bool ampiParent::getUserAttribute(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept {
+  auto iter = attributes.find(keyval);
+  if (iter == attributes.end()) {
     *flag = 0;
     return false;
   }
   else {
-    for (int i=0; i<keyvals.size(); i++) {
-      int kv = keyvals[i];
-      if (keyval == kv) { // Found a matching keyval
-        *(void **)attribute_val = kvlist[keyval]->getVal();
-        *flag = 1;
-        return true;
-      }
-    }
-    *flag = 0;
-    return false;
+    *(void **)attribute_val = (void *)iter->second;
+    *flag = 1;
+    return true;
   }
 }
 
-int ampiParent::getAttr(int context, std::vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept {
+int ampiParent::getAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept {
   if (keyval == MPI_KEYVAL_INVALID) {
     *flag = 0;
     return MPI_ERR_KEYVAL;
   }
-  else if (getBuiltinKeyval(keyval, attribute_val)) {
+  else if (getBuiltinAttribute(keyval, attribute_val)) {
     *flag = 1;
     return MPI_SUCCESS;
   }
-  else if (getUserKeyval(context, keyvals, keyval, attribute_val, flag)) {
+  else if (getUserAttribute(context, attributes, keyval, attribute_val, flag)) {
     *flag = 1;
     return MPI_SUCCESS;
   }
@@ -1876,8 +1851,25 @@ int ampiParent::getAttr(int context, std::vector<int>& keyvals, int keyval, void
   }
 }
 
-int ampiParent::deleteAttr(int context, std::vector<int>& keyvals, int keyval) noexcept {
-  return freeUserKeyval(context, keyvals, &keyval);
+int ampiParent::deleteAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval) noexcept {
+  auto iter = attributes.find(keyval);
+
+  if (keyval < 0 || keyval >= kvlist.size() || kvlist[keyval] == NULL || iter == attributes.end())
+    return MPI_ERR_KEYVAL;
+
+  KeyvalNode & kv = *kvlist[keyval];
+  void * val = (void *)iter->second;
+  int ret = (*kv.delete_fn)(context, keyval, val, kv.extra_state);
+  if (ret != MPI_SUCCESS)
+    return ret;
+
+  attributes.erase(iter);
+  if (kv.decRefCount() == 0) {
+    delete kvlist[keyval];
+    kvlist[keyval] = nullptr;
+  }
+
+  return MPI_SUCCESS;
 }
 
 /*
@@ -4483,6 +4475,13 @@ AMPI_API_IMPL(int, MPI_Finalize, void)
     // AMPI_Exit() never returns.
   AMPI_API("AMPI_Finalize");
 
+  ampiParent* parent = getAmpiParent();
+  int ret;
+  if ((ret = parent->freeUserAttributes(MPI_COMM_WORLD, parent->getAttributes(MPI_COMM_WORLD))) != MPI_SUCCESS)
+    return ret;
+  if ((ret = parent->freeUserAttributes(MPI_COMM_SELF, parent->getAttributes(MPI_COMM_SELF))) != MPI_SUCCESS)
+    return ret;
+
 #if AMPI_PRINT_IDLE
   CkPrintf("[%d] Idle time %fs.\n", CkMyPe(), totalidle);
 #endif
@@ -7081,7 +7080,14 @@ AMPI_API_IMPL(int, MPI_Type_free, MPI_Datatype *datatype)
     return ampiErrhandler("AMPI_Type_free", MPI_ERR_TYPE);
   }
 #endif
-  getDDT()->freeType(*datatype);
+
+  ampiParent* parent = getAmpiParent();
+  CkDDT * ddt = parent->getDDT();
+  ret = parent->freeUserAttributes(*datatype, ddt->getType(*datatype)->getAttributes());
+  if (ret != MPI_SUCCESS)
+    return ret;
+
+  ddt->freeType(*datatype);
   *datatype = MPI_DATATYPE_NULL;
   return MPI_SUCCESS;
 }
@@ -7241,8 +7247,13 @@ AMPI_API_IMPL(int, MPI_Type_dup, MPI_Datatype oldtype, MPI_Datatype *newtype)
     return ret;
 #endif
 
-  getDDT()->createDup(oldtype, newtype);
-  return MPI_SUCCESS;
+  ampiParent * parent = getAmpiParent();
+  CkDDT * ddt = parent->getDDT();
+  ddt->createDup(oldtype, newtype);
+
+  auto & old_attr = ddt->getType(oldtype)->getAttributes();
+  auto & new_attr = ddt->getType(*newtype)->getAttributes();
+  return parent->dupUserAttributes(oldtype, old_attr, new_attr);
 }
 
 AMPI_API_IMPL(int, MPI_Type_match_size, int typeclass, int size, MPI_Datatype *rtype)
@@ -7285,8 +7296,8 @@ AMPI_API_IMPL(int, MPI_Type_set_attr, MPI_Datatype datatype, int keyval, void *a
 #endif
 
   ampiParent *parent = getAmpiParent();
-  std::vector<int>& keyvals = parent->getDDT()->getType(datatype)->getKeyvals();
-  int err = parent->setAttr(datatype, keyvals, keyval, attribute_val);
+  auto & attributes = parent->getDDT()->getType(datatype)->getAttributes();
+  int err = parent->setAttr(datatype, attributes, keyval, attribute_val);
   return ampiErrhandler("AMPI_Type_set_attr", err);
 }
 
@@ -7302,8 +7313,8 @@ AMPI_API_IMPL(int, MPI_Type_get_attr, MPI_Datatype datatype, int keyval,
 #endif
 
   ampiParent *parent = getAmpiParent();
-  std::vector<int>& keyvals = parent->getDDT()->getType(datatype)->getKeyvals();
-  int err = parent->getAttr(datatype, keyvals, keyval, attribute_val, flag);
+  auto & attributes = parent->getDDT()->getType(datatype)->getAttributes();
+  int err = parent->getAttr(datatype, attributes, keyval, attribute_val, flag);
   return ampiErrhandler("AMPI_Type_get_attr", err);
 }
 
@@ -7318,8 +7329,8 @@ AMPI_API_IMPL(int, MPI_Type_delete_attr, MPI_Datatype datatype, int keyval)
 #endif
 
   ampiParent *parent = getAmpiParent();
-  std::vector<int>& keyvals = parent->getDDT()->getType(datatype)->getKeyvals();
-  int err = parent->deleteAttr(datatype, keyvals, keyval);
+  auto & attributes = parent->getDDT()->getType(datatype)->getAttributes();
+  int err = parent->deleteAttr(datatype, attributes, keyval);
   return ampiErrhandler("AMPI_Type_delete_attr", err);
 }
 
@@ -9755,7 +9766,10 @@ AMPI_API_IMPL(int, MPI_Comm_dup, MPI_Comm comm, MPI_Comm *newcomm)
     ptr->topoDup(topoType, rank, comm, newcomm);
   }
 
-  int ret = getAmpiParent()->dupUserKeyvals(comm, *newcomm);
+  ampiParent * parent = getAmpiParent();
+  auto & old_attr = parent->getAttributes(comm);
+  auto & new_attr = parent->getAttributes(*newcomm);
+  int ret = parent->dupUserAttributes(comm, old_attr, new_attr);
   ampi * unused = getAmpiInstance(comm)->barrier();
 
 #if AMPIMSGLOG
@@ -9862,12 +9876,9 @@ AMPI_API_IMPL(int, MPI_Comm_free, MPI_Comm *comm)
   AMPI_API("AMPI_Comm_free");
   int ret = MPI_SUCCESS;
   if (*comm != MPI_COMM_NULL) {
-    // FIXME: free user-defined attribute keyvals owned by this communicator
-#if 0
-    ampiParent* parent = getAmpiParent();
-    ret = parent->freeUserKeyvals(*comm, parent->getKeyvals(*comm));
-#endif
     if (*comm != MPI_COMM_WORLD && *comm != MPI_COMM_SELF) {
+      ampiParent* parent = getAmpiParent();
+      ret = parent->freeUserAttributes(*comm, parent->getAttributes(*comm));
       ampi* ptr = getAmpiInstance(*comm);
       ptr->thisProxy[ptr->thisIndex].ckDestroy();
     }
@@ -10667,8 +10678,8 @@ AMPI_API_IMPL(int, MPI_Comm_create_keyval, MPI_Comm_copy_attr_function *copy_fn,
 AMPI_API_IMPL(int, MPI_Comm_free_keyval, int *keyval)
 {
   AMPI_API("AMPI_Comm_free_keyval");
-  std::vector<int>& keyvals = getAmpiParent()->getKeyvals(MPI_COMM_WORLD);
-  int ret = getAmpiParent()->freeUserKeyval(MPI_COMM_WORLD, keyvals, keyval);
+  int ret = getAmpiParent()->freeKeyval(*keyval);
+  *keyval = MPI_KEYVAL_INVALID;
   return ampiErrhandler("AMPI_Comm_free_keyval", ret);
 }
 
@@ -10676,9 +10687,7 @@ AMPI_API_IMPL(int, MPI_Comm_set_attr, MPI_Comm comm, int keyval, void* attribute
 {
   AMPI_API("AMPI_Comm_set_attr");
   ampiParent *parent = getAmpiParent();
-  ampiCommStruct &cs = const_cast<ampiCommStruct &>(parent->comm2CommStruct(comm));
-  std::vector<int>& keyvals = cs.getKeyvals();
-  int ret = parent->setAttr(comm, keyvals, keyval, attribute_val);
+  int ret = parent->setAttr(comm, parent->getAttributes(comm), keyval, attribute_val);
   return ampiErrhandler("AMPI_Comm_set_attr", ret);
 }
 
@@ -10686,9 +10695,7 @@ AMPI_API_IMPL(int, MPI_Comm_get_attr, MPI_Comm comm, int keyval, void *attribute
 {
   AMPI_API("AMPI_Comm_get_attr");
   ampiParent *parent = getAmpiParent();
-  ampiCommStruct &cs = const_cast<ampiCommStruct &>(parent->comm2CommStruct(comm));
-  std::vector<int>& keyvals = cs.getKeyvals();
-  int ret = parent->getAttr(comm, keyvals, keyval, attribute_val, flag);
+  int ret = parent->getAttr(comm, parent->getAttributes(comm), keyval, attribute_val, flag);
   return ampiErrhandler("AMPI_Comm_get_attr", ret);
 }
 
@@ -10696,9 +10703,7 @@ AMPI_API_IMPL(int, MPI_Comm_delete_attr, MPI_Comm comm, int keyval)
 {
   AMPI_API("AMPI_Comm_delete_attr");
   ampiParent *parent = getAmpiParent();
-  ampiCommStruct &cs = const_cast<ampiCommStruct &>(parent->comm2CommStruct(comm));
-  std::vector<int>& keyvals = cs.getKeyvals();
-  int ret = parent->deleteAttr(comm, keyvals, keyval);
+  int ret = parent->deleteAttr(comm, parent->getAttributes(comm), keyval);
   return ampiErrhandler("AMPI_Comm_delete_attr", ret);
 }
 
