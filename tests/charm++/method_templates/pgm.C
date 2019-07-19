@@ -61,7 +61,8 @@ class pgm : public CBase_pgm
             if (++nDone == 2) {
                 CkExit();
             } else {
-                // After the sum/avg reduction completes, do the count less reduction
+                // After the sum/avg reduction completes, perform a reduction
+                // to count the number of elements less than a given threshold
                 CkCallback cntCB(CkReductionTarget(pgm, acceptResults< cntType >), thisProxy);
                 arrProxy.doSomething( cntType(0.5), countReducer, cntCB );
             }
