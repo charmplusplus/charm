@@ -81,6 +81,15 @@ foreach(in_f ${ci-files})
 
     set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/${ci-output})
 
+    if(${ci-output} MATCHES "search.decl.h")
+        set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output})
+        add_custom_command(
+          OUTPUT ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output}
+          COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${in_f}
+          WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/cklibs
+          DEPENDS ${in_f} charmxi
+          )
+    endif()
     add_custom_command(
       OUTPUT ${CMAKE_BINARY_DIR}/include/${ci-output}
       COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${in_f}

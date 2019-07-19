@@ -10,12 +10,12 @@ add_library(ampi-compat compat_ampius.C compat_ampifus.C compat_ampi.c
        compat_ampim.C compat_ampifm.C compat_ampicm.C
        compat_ampicpp.C)
 
-add_library(moduleampi ${ampi-cxx-sources} ${ampi-h-sources} ${all-ci-outputs})
-add_dependencies(moduleampi moduletcharm)
+add_library(moduleampi ${ampi-cxx-sources} ${ampi-h-sources})
+add_dependencies(moduleampi moduletcharm ck)
 
 if(${CMK_CAN_LINK_FORTRAN})
-    add_library(moduleampif ${ampi-f90-sources} ${ampi-cxx-sources} ${ampi-h-sources} ${all-ci-outputs})
-    add_dependencies(moduleampif moduletcharm)
+    add_library(moduleampif ${ampi-f90-sources} ${ampi-cxx-sources} ${ampi-h-sources})
+    add_dependencies(moduleampif moduletcharm ck)
 endif()
 
 # FIXME: add fsglobls/pipglobals
