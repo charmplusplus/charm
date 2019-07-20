@@ -584,7 +584,6 @@ if(NOT ${TARGET} STREQUAL "charm++")
 endif()
 
 if(${TARGET} STREQUAL "LIBS")
-  # FIXME: add libs
   add_subdirectory(src/libs/conv-libs)
   add_subdirectory(src/libs/ck-libs)
 endif()
