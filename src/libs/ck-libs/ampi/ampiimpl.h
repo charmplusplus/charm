@@ -1299,7 +1299,7 @@ class IReq final : public AmpiRequest {
   void deregisterMem(CkNcpyBuffer *targetInfo) noexcept override {
     if (targetInfo) {
       targetInfo->deregisterMem();
-      delete targetInfo;
+      // targetInfo is owned by the CkDataMsg and so is freed with it
     }
     if (systemBuf) {
       delete [] systemBuf;
@@ -1502,7 +1502,7 @@ class SsendReq final : public AmpiRequest {
   void deregisterMem(CkNcpyBuffer *srcInfo) noexcept override {
     if (srcInfo) {
       srcInfo->deregisterMem();
-      delete srcInfo;
+      // srcInfo is owned by the CkDataMsg and so is freed with it
     }
     if (systemBuf) {
       delete [] (char*)buf;
