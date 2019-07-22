@@ -19,6 +19,7 @@ direct_api.o: direct_api.C cifiles
 test: all
 	$(call run, +p1 ./direct_api 60)
 	$(call run, +p4 ./direct_api 100)
+	$(call run, +p4 ./direct_api 100 +noCMAForZC)
 
 clean:
 	rm -f *.decl.h *.def.h *.o

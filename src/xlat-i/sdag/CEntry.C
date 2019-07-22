@@ -42,8 +42,12 @@ void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
         if (var.name) {
           if (var.isRdma) {
             defs << "#if CMK_ONESIDED_IMPL\n";
-            if (var.isFirstRdma)
+            if (var.isFirstRdma) {
               defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams << ";\n";
+              // Root node is used for ZC Bcast and since this is a direct sdag call
+              // CkMyNode() is the root source node for the broadcast
+              defs << "  genClosure->getP" << i++ << "() = " << "CkMyNode()" << ";\n";
+            }
             defs << "  genClosure->getP" << i << "() = "
                  << "ncpyBuffer_" << var.name << ";\n";
             defs << "#else\n";

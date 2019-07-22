@@ -236,7 +236,7 @@ private:
 
 public:
   bool lb_in_progress;
-
+  bool ignore_periodic;
 };
 
 class MetaBalancerRedn : public CBase_MetaBalancerRedn {
