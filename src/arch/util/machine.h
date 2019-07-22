@@ -57,17 +57,17 @@ extern FILE *debugLog;
 # define MACHSTATE_I(prio,args) if ((debugLog)&&(prio)>=MACHINE_DEBUG_PRIO) {\
 	CmiMemLock(); fprintf args ; fflush(debugLog); CmiMemUnlock(); }
 # define MACHSTATE(prio,str) \
-	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer()))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "#str"\n",CmiMyRank(),CmiWallTimer()))
 # define MACHSTATE1(prio,str,a) \
-	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "#str"\n",CmiMyRank(),CmiWallTimer(),a))
 # define MACHSTATE2(prio,str,a,b) \
-	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a,b))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "#str"\n",CmiMyRank(),CmiWallTimer(),a,b))
 # define MACHSTATE3(prio,str,a,b,c) \
-	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a,b,c))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "#str"\n",CmiMyRank(),CmiWallTimer(),a,b,c))
 # define MACHSTATE4(prio,str,a,b,c,d) \
-	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a,b,c,d))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "#str"\n",CmiMyRank(),CmiWallTimer(),a,b,c,d))
 # define MACHSTATE5(prio,str,a,b,c,d,e) \
-	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a,b,c,d,e))
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "#str"\n",CmiMyRank(),CmiWallTimer(),a,b,c,d,e))
 #else
 # define MACHINE_DEBUG_LOG 0
 # define MACHSTATE(n,x) /*empty*/
