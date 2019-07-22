@@ -157,7 +157,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo)
     if (ncpyOpInfo->isSrcRegistered != 0) {
         UcxRmaOp(ncpyOpInfo, UCX_RMA_OP_GET);
     } else {
-        // Remote buffer is not registered, ask peer to perform put
+        // Remote buffer is not registered, ask peer to register and send back to me for GET
 
         UcxSendMsg(CmiNodeOf(ncpyOpInfo->srcPe), ncpyOpInfo->srcPe,
                    ncpyOpInfo->ncpyOpInfoSize, (char*)ncpyOpInfo,
@@ -189,7 +189,7 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo)
         // ncpyOpInfo is not freed
         newNcpyOpInfo = ncpyOpInfo;
 
-    } else if(ncpyOpInfo->opMode == CMK_EM_API) {
+    } else if(ncpyOpInfo->opMode == CMK_EM_API || ncpyOpInfo->opMode == CMK_BCAST_EM_API) {
 
         // ncpyOpInfo is a part of the received message and can be freed before this send completes
         // for that reason, it is copied into a new message

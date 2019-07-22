@@ -424,7 +424,10 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
             ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
 
             // Invoke source ack
-            ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+            if(ncpyOpInfo->opMode != CMK_BCAST_EM_API) {
+                ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+                CmiInvokeNcpyAck(ncpyOpInfo);
+            }
 
         } else if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->destPe)) { // destination node
 
@@ -437,12 +440,11 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
 
             // Invoke destination ack
             ncpyOpInfo->opMode = CMK_EM_API_DEST_ACK_INVOKE;
+            CmiInvokeNcpyAck(ncpyOpInfo);
 
         } else {
             CmiAbort(" Cannot de-register on a different node than the source or destinaton");
         }
-
-        CmiInvokeNcpyAck(ncpyOpInfo);
     }
 #endif
 
