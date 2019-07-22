@@ -1505,6 +1505,43 @@ void forwardMessageToPeerNodes(envelope *myMsg, UChar msgType) {
 }
 
 void handleBcastEntryMethodApiCompletion(NcpyOperationInfo *info){
+
+// The following CMK_REG_REQUIRED is only used by the UCX layer. For CMK_REG_REQUIRED
+// layers (GNI, OFI and Verbs), the code simply returns from LrtsInvokeRemoteDeregAckHandler.
+#if CMK_REG_REQUIRED
+
+  NcpyEmBufferInfo *emBuffInfo = (NcpyEmBufferInfo *)(info->refPtr);
+
+  char *ref = (char *)(emBuffInfo);
+
+  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+  int ncpyObjSize = getNcpyOpInfoTotalSize(
+                    layerInfoSize,
+                    sizeof(CkCallback),
+                    layerInfoSize,
+                    0);
+
+
+  NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)(ref - (emBuffInfo->index) * (sizeof(NcpyEmBufferInfo) + ncpyObjSize - sizeof(NcpyOperationInfo)) - sizeof(NcpyEmInfo));
+
+  int rootNode = getRootNode((envelope *)ncpyEmInfo->msg);
+  CmiSpanningTreeInfo *t = getSpanningTreeInfo(rootNode);
+
+  // De-register source for reverse operations when regMode == UNREG and deregMode == DEREG
+  // on the first level of intermediate nodes i.e. t->parent == rootNode.
+  // This is only required for the UCX layer since the UCX layer (unlike GNI, OFI and Verbs) doesn't
+  // implement the GET for an UNREG source with a REG and PUT operation, since PUT doesn't guarantee
+  // remote destination data transfer completion. In the UCX layer, since a GET for an UNREG source
+  // is implemented with a remote REG and send-back mechanism, followed by a GET, it is important
+  // to de-register the root's source buffer now.
+  if(t->parent == rootNode &&
+     info->isSrcRegistered == 1 &&
+     info->srcRegMode == CK_BUFFER_UNREG &&
+     info->srcDeregMode == CK_BUFFER_DEREG) {
+    CmiInvokeRemoteDeregAckHandler(info->srcPe, info);
+  }
+#endif
+
   if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
     // invoking the entry method
     // Invoke the ackhandler function to update the counter
