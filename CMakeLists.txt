@@ -586,6 +586,7 @@ endif()
 if(${TARGET} STREQUAL "LIBS")
   add_subdirectory(src/libs/conv-libs)
   add_subdirectory(src/libs/ck-libs)
+  add_subdirectory(src/langs/bluegene)
 endif()
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")

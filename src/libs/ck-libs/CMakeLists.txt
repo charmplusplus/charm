@@ -11,6 +11,7 @@ add_library(modulemsa multiphaseSharedArrays/msa.h multiphaseSharedArrays/msa-co
 add_dependencies(modulemsa ck)
 
 # armci
+configure_file(armci/armci.h ${CMAKE_BINARY_DIR}/include COPYONLY)
 add_library(modulearmci armci/armci_vp.C armci/armci_impl.h armci/armci_api.C armci/armci.h)
 add_dependencies(modulearmci ck)
 
@@ -21,8 +22,17 @@ set(collide-h-sources collide/collide_util.h collide/bbox.h
     collide/collide_buffers.h)
 set(collide-cxx-sources collide/collide_util.C collide/collide_serial.C
 collide/collidecharm.C collide/collide_buffers.C)
-add_library(modulecollide ${collide-h-sources} ${collide-cxx-sources})
+
+foreach(file collide/collide_util.h collide/bbox.h collide/collide_cfg.h
+    collide/collide_buffers.h collide/collidecharm.h collide/collidec.h
+    collide/collidef.h)
+    configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+endforeach(file)
+configure_file(collide/libmodulecollide.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
+add_library(modulecollidecharm ${collide-h-sources} ${collide-cxx-sources})
+add_library(modulecollide ${collide-h-sources} ${collide-cxx-sources} collide/threadCollide.C)
 add_dependencies(modulecollide ck)
+add_dependencies(modulecollidecharm ck)
 
 # mblock
 configure_file(mblock/libmodulemblock.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
