@@ -7,9 +7,9 @@
 
 extern "C" void CmiAbort(const char *fmt, ...) {
 	fprintf(stderr,"Fatal error>");
-    va_list p; va_start(p, fmt);
-    vfprintf(stderr,fmt,p);
-    va_end(p);
+	va_list p; va_start(p, fmt);
+	vfprintf(stderr,fmt,p);
+	va_end(p);
 	abort();
 }
 
