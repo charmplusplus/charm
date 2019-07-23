@@ -1,0 +1,151 @@
+// Tests forall and refnum functionality in SDAG by using multiple forall loops
+// and different ways to set refnums for a given entry method.
+
+module refnum {
+  array [1D] RefnumTest {
+    entry RefnumTest(int s);
+
+    entry [reductiontarget] void recvNum(int n);
+    entry void recvData(CkDataMsg* m);
+
+    entry void run(int messages) {
+      // Send out the requested number of messages, each with unique refnum
+      // which is set in one of 3 ways:
+      // 1) via the first integer of a parameter marshalled method
+      // 2) via the refnum explicitly set for a reduction
+      // 3) via the refnum explicitly set for a callback
+      serial {
+        // The first third of the messages will be marshalled. The second third
+        // will be via reductions, and the last third will be via callback.
+        int marshall_start = 0;
+        int redn_start = messages / 3;
+        int cb_start = 2 * messages / 3;
+
+        // The sum of all refnums is just the sum from 1 to 'messages'
+        refnum_sum = 0;
+        expected_refnum_sum = (messages * (messages + 1)) / 2;
+
+        // The sum of the marshalled messages is the sum of the first third
+        marshall_sum = 0;
+        expected_marshall_sum = (redn_start * (redn_start - 1)) / 2;
+        for (int i = marshall_start; i < redn_start; i++) {
+          thisProxy[thisIndex].recvNum(i);
+        }
+
+        // To signify a reduction, we send -1 as the data, so the sum is just
+        // -1 * number of array elements * number of redn messages.
+        redn_sum = 0;
+        expected_redn_sum = -1 * array_size * (cb_start - redn_start);
+        for (int i = redn_start; i < cb_start; i++) {
+          CkCallback cb(CkReductionTarget(RefnumTest, recvNum), thisProxy);
+          cb.setRefNum(i);
+          int data = -1;
+          contribute(sizeof(int), &data, CkReduction::sum_int, cb);
+        }
+
+        // The data messages contain our own index, so the sum is just the
+        // number of cb messages * thisIndex.
+        cb_sum = 0;
+        expected_cb_sum = thisIndex * (messages - cb_start + 1);
+        for (int i = cb_start; i <= messages; i++) {
+          CkCallback cb(CkIndex_RefnumTest::recvData(NULL), thisProxy[thisIndex]);
+          cb.setRefNum(i);
+          int data = thisIndex;
+          cb.send(sizeof(int), &data);
+        }
+
+        // The first forall loop ignores even powers of 2. We use this sume to
+        // check that those iterations are correctly executed even though they
+        // are not triggered by a message.
+        ignored_sum = 0;
+        expected_ignored_sum = 0;
+        for (int i = 2; i < messages; i *= 2) {
+          expected_ignored_sum += i;
+        }
+      }
+
+      // This loop receives messages with even refnums, ignoring powers of 2.
+      // It tests positive stride loops, and forall statements which branch
+      // based on index and message type.
+      forall [index] (0:messages, 2) {
+        if (index & (index - 1)) {
+          case {
+            when recvNum[index](int n) serial {
+              refnum_sum += index; 
+              if (n > 0) marshall_sum += n;
+              else redn_sum += n;
+            }
+            when recvData[index](CkDataMsg* m) serial {
+              refnum_sum += index;
+              cb_sum += (int)m->data[0];
+              delete m;
+            }
+          }
+        } else {
+          serial { ignored_sum += index; }
+        }
+      }
+
+      // This regular for loop receives all the power of two messages to ensure
+      // that the serial part of the for all was handled correctly.
+      for (index = 1; index < messages; index *= 2) {
+        case {
+          when recvNum[index](int n) serial {
+            refnum_sum += index; 
+            if (n > 0) marshall_sum += n;
+            else redn_sum += n;
+          }
+          when recvData[index](CkDataMsg* m) serial {
+            refnum_sum += index;
+            cb_sum += (int)m->data[0];
+            delete m;
+          }
+        }
+      }
+
+      // This loop receives the rest of the messages (all odds except 1)
+      // It tests forall loops with a negative stride, and ones that don't end
+      // exactly on the end condition. These were previously broken.
+      forall [index] (messages + (messages % 2 - 1):2, -2) {
+        case {
+          when recvNum[index](int n) serial {
+            refnum_sum += index; 
+            if (n > 0) marshall_sum += n;
+            else redn_sum += n;
+          }
+          when recvData[index](CkDataMsg* m) serial {
+            refnum_sum += index;
+            cb_sum += (int)m->data[0];
+            delete m;
+          }
+        }
+      }
+
+      // This tests single refnum receives (0 was not covered by any of the
+      // above loops).
+      when recvNum[0](int n) {}
+
+      serial {
+        CkAssert(refnum_sum == expected_refnum_sum);
+        CkAssert(marshall_sum == expected_marshall_sum);
+        CkAssert(redn_sum == expected_redn_sum);
+        CkAssert(cb_sum == expected_cb_sum);
+        CkAssert(ignored_sum == expected_ignored_sum);
+        contribute(CkCallback(CkReductionTarget(Main, refnumTestDone), mainProxy));
+      }
+
+      // Make sure all messages were received exactly once above. These should
+      // never trigger.
+      overlap {
+        when recvNum(int n) serial {
+          CkPrintf("Missed out on %i\n", n);
+          CkAbort("Missed messages\n");
+        }
+        when recvData(CkDataMsg* m) serial {
+          CkPrintf("Missed out on %i\n", (int)m->data[0]);
+          CkAbort("Missed messages\n");
+        }
+      }
+    }
+  }
+}

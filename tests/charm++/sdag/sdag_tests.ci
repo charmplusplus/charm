@@ -1,0 +1,22 @@
+mainmodule sdag_tests {
+  extern module basic;
+  extern module refnum;
+  extern module migration;
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_BasicTest basicTestProxy;
+  readonly CProxy_RefnumTest refnumTestProxy;
+  readonly CProxy_MigrationTest migrationTestProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg* msg);
+
+    entry void doBasicTest();
+    entry void doRefnumTest();
+    entry void doMigrationTest();
+
+    entry void basicTestDone();
+    entry [reductiontarget] void refnumTestDone();
+    entry [reductiontarget] void migrationTestDone();
+  }
+}
