@@ -88,13 +88,11 @@ void* swapTLS(void* newptr)
 
 // ----- TLS segment size determination -----
 
+static tlsseg_t CmiTLSDefaultInfo;
+
 #if CMK_HAS_DL_ITERATE_PHDR
 
 # include <link.h>
-
-static inline void CmiTLSStatsInit(void)
-{
-}
 
 static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
 {
@@ -115,11 +113,11 @@ static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
   return 0;
 }
 
-static void populateTLSSegStats(tlsseg_t * t)
+static inline void CmiTLSStatsInit(void)
 {
-  t->size = 0;
-  t->align = 0;
-  dl_iterate_phdr(count_tls_sizes, t); /* count all PT_TLS sections */
+  CmiTLSDefaultInfo.size = 0;
+  CmiTLSDefaultInfo.align = 0;
+  dl_iterate_phdr(count_tls_sizes, &CmiTLSDefaultInfo); /* count all PT_TLS sections */
 }
 
 #elif defined __APPLE__
@@ -247,20 +245,10 @@ static size_t GetTLVSizeFromMachOHeader()
   return totalsize;
 }
 
-static size_t CmiTLSSize;
-
 static inline void CmiTLSStatsInit(void)
 {
-  // calculate the TLS size once at startup
-  CmiTLSSize = GetTLVSizeFromMachOHeader();
-}
-
-static void populateTLSSegStats(tlsseg_t * t)
-{
-  // fill the struct with the cached size
-  t->size = CmiTLSSize;
-  // Apple uses alignment by 16
-  t->align = 16;
+  CmiTLSDefaultInfo.size = GetTLVSizeFromMachOHeader();
+  CmiTLSDefaultInfo.align = 16; // Apple uses alignment by 16
 }
 
 #elif CMK_HAS_ELF_H && CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT
@@ -324,20 +312,12 @@ static void CmiTLSStatsInit()
     CmiTLSExecutableStart = *pCmiExecutableStart;
   else
     CmiPrintf("Charm++> Error: \"CmiExecutableStart\" symbol not found. -tlsglobals disabled.\n");
-}
 
-static void populateTLSSegStats(tlsseg_t * t)
-{
   Phdr* phdr = getTLSPhdrEntry();
   if (phdr != NULL)
   {
-    t->align = phdr->p_align;
-    t->size = phdr->p_memsz;
-  }
-  else
-  {
-    t->size = 0;
-    t->align = 0;
+    CmiTLSDefaultInfo.align = phdr->p_align;
+    CmiTLSDefaultInfo.size = phdr->p_memsz;
   }
 }
 
@@ -345,11 +325,6 @@ static void populateTLSSegStats(tlsseg_t * t)
 
 static inline void CmiTLSStatsInit()
 {
-}
-
-static void populateTLSSegStats(tlsseg_t * t)
-{
-  t->size = 0;
 }
 
 #endif
@@ -373,17 +348,17 @@ void CmiTLSInit()
     }
 
     CmiTLSStatsInit();
+    CmiTLSDefaultInfo.size = CMIALIGN(CmiTLSDefaultInfo.size, CmiTLSDefaultInfo.align);
   }
 #endif
 }
 
 void CmiTLSAllocNewSeg(tlsseg_t* t, CthThread th)
 {
-  populateTLSSegStats(t);
+  *t = CmiTLSDefaultInfo;
 
-  if (t->size > 0)
+  if (CmiTLSDefaultInfo.size > 0)
   {
-    t->size = CMIALIGN(t->size, t->align);
     t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size);
     memcpy((void*)t->memseg, (char *)getTLS() - t->size, t->size);
     t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
