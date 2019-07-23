@@ -348,6 +348,7 @@ void CmiTLSInit()
     }
 
     CmiTLSStatsInit();
+    CmiTLSDefaultInfo.memseg = (Addr)getTLS();
   }
 #endif
 }
@@ -360,7 +361,7 @@ void CmiTLSAllocNewSeg(tlsseg_t* t, CthThread th)
   {
     t->size = CMIALIGN(t->size, t->align);
     t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size);
-    memcpy((void*)t->memseg, (char *)getTLS() - t->size, t->size);
+    memcpy((void*)t->memseg, (char *)CmiTLSDefaultInfo.memseg - t->size, t->size);
     t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
     /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), t->align, t->memseg, t->size); */
   }
