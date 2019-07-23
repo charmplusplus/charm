@@ -67,7 +67,6 @@ class Main: public CBase_Main {
 
       if (m->argc!=4 && m->argc!=5) {
 	CkPrintf("Usage: %s <#elements> <#iterations> <msg size> [ldb freq]\n", m->argv[0]);
-	delete m;
 	CkExit(1);
       }
 

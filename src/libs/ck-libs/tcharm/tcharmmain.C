@@ -30,8 +30,6 @@ public:
   }
   
   TCharmMain(CkArgMsg *msg) {
-    delete msg;
-    
     TCHARM_Set_exit(); // Exit when done running these threads.
     
     /*Call user-overridable Fortran setup.

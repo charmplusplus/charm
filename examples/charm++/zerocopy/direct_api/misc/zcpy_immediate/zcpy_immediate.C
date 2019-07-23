@@ -17,7 +17,6 @@ public:
       CkExit(1);
     }
     numElements = atoi(m->argv[1]);
-    delete m;
     if(numElements % 2 != 0){
       CkPrintf("Argument <numelements> should be even");
       CkExit(1);

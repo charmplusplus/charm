@@ -19,11 +19,9 @@ public:
             branchfactor = atoi(msg->argv[2]);
             depth = atoi(msg->argv[3]);
             target = atoi(msg->argv[4]);            
-            delete msg;
         }else
         {
             CkPrintf("Check input parameter\n");
-            delete msg;
             CkExit();
         }
 

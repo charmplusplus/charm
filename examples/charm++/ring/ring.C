@@ -80,7 +80,6 @@ main::main(CkArgMsg* m)
   for (int i=0;i<msg1->listsize;i++) 
     msg1->list1[i]=i;
   CProxy_Btest::ckNew(msg1);
-  delete m;
 }
 
 // Keeps track of the number of rings that terminated. An alternative 

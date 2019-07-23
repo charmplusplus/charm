@@ -30,7 +30,6 @@ private:
   int migrations;
 public:
   Main(CkArgMsg* msg) : iteration(0), migrations(0) {
-    delete msg;
     // Test currently requires an equal number of objects on every PE
     // TODO: Make a test that works with some empty PEs
     arrayProxy = CProxy_TestArray::ckNew(CkNumPes() * OBJS_PER_PE);

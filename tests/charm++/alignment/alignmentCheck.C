@@ -84,8 +84,6 @@ class TestDriver : public CBase_TestDriver {
 public:
 
   TestDriver(CkArgMsg *m) {
-    delete m;
-
     CProxy_Destination destinationChare =
       CProxy_Destination::ckNew(CkNumPes() - 1);
 

@@ -16,8 +16,6 @@ void verifyValuesWithIndex(int *arr, int size, int startIndex);
 class main : public CBase_main {
   public:
     main(CkArgMsg *m) {
-      delete m;
-
       // Create a chare array
       arrProxy = CProxy_arr::ckNew(CkNumPes() * NUM_ELEMENTS_PER_PE);
 

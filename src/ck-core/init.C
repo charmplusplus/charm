@@ -1776,6 +1776,8 @@ void _initCharm(int unused_argc, char **argv)
 
 		CmiCheckAffinity(); // check for thread oversubscription
 
+		CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0, GroupDepNum{});
+		msg->argv = argv;
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
 			size_t size = _chareTable[_mainTable[i]->chareIdx]->size;
@@ -1784,13 +1786,12 @@ void _initCharm(int unused_argc, char **argv)
 			_mainTable[i]->setObj(obj);
 			CkpvAccess(_currentChare) = obj;
 			CkpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
-			CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0, GroupDepNum{});
-			msg->argc = CmiGetArgc(argv);
-			msg->argv = argv;
       quietMode = 0;  // allow printing any mainchare user messages
+			msg->argc = CmiGetArgc(argv);
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
       if (quietModeRequested) quietMode = 1;
 		}
+		CkFreeMsg(msg);
                 _mainDone = true;
 
 		_STATS_RECORD_CREATE_CHARE_N(nMains);

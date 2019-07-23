@@ -117,7 +117,6 @@ main::main(CkArgMsg* m)
   CkGroupID gid = CProxy_test::ckNew();
   CProxy_test grp(gid);
   grp.measure(nchunks);
-  delete m;
 }
 
 #include "speed.def.h"

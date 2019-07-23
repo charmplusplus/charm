@@ -33,7 +33,6 @@ main::main(CkArgMsg *m)
     maxFiles=atoi(m->argv[3]);
   if(m->argc>4)
     skipToRead=(m->argv[4][0]=='r');
-  delete m;
   if(numElements/maxFiles<=0)
     CkAbort("This works better with more elements than files");
   //rejigger their choices, possibly reducing the number of files below max

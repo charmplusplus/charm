@@ -10,7 +10,6 @@ class MainHi : public CBase_MainHi
 public:
   MainHi(CkArgMsg *m) {
     mainHi = thisProxy;
-    delete m;
     thisProxy.StartHi(10);
   }
 

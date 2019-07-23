@@ -26,7 +26,6 @@ class Main : public CBase_Main {
     Main(CkArgMsg *msg) {
       // Call the init function using the message argc and argv
       init_hello(msg->argc, msg->argv);
-      delete msg;
     }
 };
 #endif

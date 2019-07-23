@@ -72,7 +72,6 @@ Main::Main(CkArgMsg* m) {
     CkPrintf("Usage: -t(#iterations) -c(#chunks) -a(#test instances) -m(running mode, 1 for use Charm threads; 2 for use pthreads )  -p(#threads)\n");
     CkExit(1);
   }
-  delete m;
 
   omp_set_num_threads(numChunks);
 

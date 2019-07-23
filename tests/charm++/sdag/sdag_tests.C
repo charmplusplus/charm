@@ -16,7 +16,6 @@
 class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
-    delete m;
     mainProxy = thisProxy;
     basicTestProxy = CProxy_BasicTest::ckNew(CkNumPes() - 1);
     refnumTestProxy = CProxy_RefnumTest::ckNew(REFNUM_ELEMS, REFNUM_ELEMS);

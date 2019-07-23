@@ -49,7 +49,6 @@ public:
     NumReductions = atoi(m->argv[4]);
     SectionSize = atoi(m->argv[5]);
 
-    delete m;
     CkPrintf("Running Hello on %d processors for %d elements\n",
 	     CkNumPes(),NumElements);
     mid = thishandle;

@@ -35,8 +35,6 @@ struct Main : public CBase_Main {
             max_iter = atoi(m->argv[3]);
         }
         
-        delete m;
-
         iter = 0;
 		mainProxy = thisProxy;
 		// Construct an array of allToAll chares to do the calculation

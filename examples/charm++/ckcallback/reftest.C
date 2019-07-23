@@ -9,7 +9,6 @@ public:
   size_t order { 0 };
 
   Main(CkArgMsg* msg) {
-    delete msg;
     magic_number = 29;
     max_iter = 1000;
     thisProxy.caller();

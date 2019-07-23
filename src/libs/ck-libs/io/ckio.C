@@ -72,7 +72,7 @@ namespace Ck { namespace IO {
         Director(CkArgMsg *m)
           : filesOpened(0), opnum(0), sessionID(0)
         {
-          delete m;
+          //delete m;
           director = thisProxy;
           managers = CProxy_Manager::ckNew();
         }

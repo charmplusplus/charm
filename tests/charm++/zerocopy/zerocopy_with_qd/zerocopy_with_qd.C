@@ -27,7 +27,6 @@ class Main : public CBase_Main {
       if(numElements % 2 != 0) {
         CkAbort("<array size> argument is not even\n");
       }
-      delete m;
 
       arr_size = 2000000;
       vec_size = 2000000;

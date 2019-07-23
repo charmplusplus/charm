@@ -183,7 +183,6 @@ main::main(CkArgMsg *msg)
   int argc = msg->argc;
   char **argv = msg->argv;
   int numtests, i;
-  delete msg;
   mainhandle = thishandle;
   if (nTests<=0)
     CkAbort("Megatest: No tests registered-- is MEGATEST_REGISTER_TEST malfunctioning?");
@@ -203,6 +202,7 @@ main::main(CkArgMsg *msg)
   num_tests_to_skip = argc;
   tests_to_skip = argv;
   CProxy_main(thishandle).start();
+  CmiPrintf("At end of ctor\n");
 }
 
 void main::start()

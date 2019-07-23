@@ -55,7 +55,6 @@ public:
           CkExit();
       }
     }
-    delete m;
 
     // Calculate kernel clock count
     int cuda_device = 0;

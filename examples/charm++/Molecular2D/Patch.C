@@ -40,7 +40,6 @@ Main::Main(CkArgMsg* msg) {
   radius = DEFAULT_RADIUS;
   finalStepCount = DEFAULT_FINALSTEPCOUNT;
 
-  delete msg;
   mainProxy = thisProxy;
 
   // initializing the cell 2D array

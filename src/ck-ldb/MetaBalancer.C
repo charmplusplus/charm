@@ -102,7 +102,7 @@ MetaLBInit::MetaLBInit(CkArgMsg *m) {
     _metalb = CProxy_MetaBalancer::ckNew();
   }
 #endif
-  delete m;
+  //delete m;
 }
 
 // called from init.C

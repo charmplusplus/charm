@@ -8,8 +8,6 @@ struct Main : CBase_Main {
   Main(CkArgMsg* msg)
     : numRecv(0)
   {
-    delete msg;
-
     mainProxy = thisProxy;
 
     const int X = 3;

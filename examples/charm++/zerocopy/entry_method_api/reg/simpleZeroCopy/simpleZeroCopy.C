@@ -18,7 +18,6 @@ class Main : public CBase_Main{
         CkExit(1);
       }
       numElements = atoi(m->argv[1]);
-      delete m;
       if(numElements%2 != 0){
         ckout<<"Argument <numelements> should be even"<<endl;
         CkExit(1);

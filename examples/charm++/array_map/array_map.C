@@ -71,8 +71,6 @@ public:
 class Main : public CBase_Main {
 public:
   Main(CkArgMsg* msg) {
-    delete msg;
-
     // Sums for testing mapping
     int sum1, sum2;
     // Create a new map object

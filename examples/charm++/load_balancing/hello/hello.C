@@ -6,8 +6,6 @@
 class Main : public CBase_Main {
   public:
     Main(CkArgMsg* m) {
-      delete m;
-
       // 2 chares per PE
       int n = 2 * CkNumPes();
 

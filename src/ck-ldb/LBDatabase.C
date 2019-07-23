@@ -152,7 +152,7 @@ LBDBInit::LBDBInit(CkArgMsg *m)
     CProxy_LBDatabase(_lbdb).ckLocalBranch()->StartLB();
   }
 #endif
-  delete m;
+  //delete m;
 }
 
 // called from init.C

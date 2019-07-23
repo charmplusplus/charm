@@ -24,7 +24,6 @@ public:
     {
         // Usage: histogram [number_of_worker_threads]
         if (m->argc > 1) WORKERS=atoi(m->argv[1]);
-        delete m;
 
         // Actually build the shared arrays: a 2d array to hold arbitrary
         // data, and a 1d histogram array.

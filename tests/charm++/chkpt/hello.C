@@ -19,7 +19,6 @@ public:
     step=0;	
     a=123;b[0]=456;b[1]=789;
     nElements=8;
-    delete m;
     
     chkpPENum = CkNumPes();
     chkpNodeNum = CkNumNodes();

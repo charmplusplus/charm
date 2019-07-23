@@ -63,7 +63,6 @@ class Main : public CBase_Main {
           CkExit();
       }
     }
-    delete m;
 
     // print configuration
     CkPrintf("\n[CUDA matmul example]\n");

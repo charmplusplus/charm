@@ -27,7 +27,7 @@ class ckcallback_main : public CBase_ckcallback_main {
 public:
 	ckcallback_main(CkArgMsg *m) {
 		_ckcallbackgroup=CProxy_ckcallback_group::ckNew();
-		delete m;
+		//delete m;
 	}
 };
 

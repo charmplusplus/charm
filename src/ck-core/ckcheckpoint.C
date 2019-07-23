@@ -862,7 +862,7 @@ class CkCheckpointInit : public Chare {
 public:
   CkCheckpointInit(CkArgMsg *msg) {
     _sysChkptMgr = CProxy_CkCheckpointMgr::ckNew();
-    delete msg;
+    //delete msg;
   }
   CkCheckpointInit(CkMigrateMessage *m) {delete m;}
 };

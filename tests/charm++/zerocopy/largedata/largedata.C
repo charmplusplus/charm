@@ -35,7 +35,6 @@ public:
       CmiAbort("Incorrect arguments\n");
     }
     CkPrintf("Large data transfer with payload: %zd iterations: %d\n", payload, iterations);
-    delete m;
 
     // Initialize
     niter = 0;

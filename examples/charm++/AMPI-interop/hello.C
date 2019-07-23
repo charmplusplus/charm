@@ -14,7 +14,6 @@ public:
     // Process command-line arguments
     nElements = 2;
     if (m->argc > 1) nElements=atoi(m->argv[1]);
-    delete m;
 
     // Init the AMPI chare group
     AmpiInteropInit();

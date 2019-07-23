@@ -20,7 +20,6 @@ public:
     else if(m->argc > 1){
         nElements=atoi(m->argv[1]);
     }
-    delete m;
 
     //Check correctness of partitions semantics
     assert(CkNumPes() == expectedNumPes);

@@ -50,7 +50,6 @@ class Main : public CBase_Main {
           CkExit();
       }
     }
-    delete m;
 
     // print configuration
     CkPrintf("\n[CUDA mempool example]\n");

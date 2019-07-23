@@ -17,7 +17,6 @@ class groupring_message : public CMessage_groupring_message {
 class groupring_main : public CBase_groupring_main {
   public:
     groupring_main(CkArgMsg *m) {
-      delete m;
     }
     groupring_main(CkMigrateMessage *m) {}
 };

@@ -30,8 +30,6 @@ public:
       }
     }
 
-    delete m;
-
     CkPrintf("\n[OpenMP offloading + Charm++ Vector Addition]\n");
     CkPrintf("Vector size: %lu doubles\n", n);
 

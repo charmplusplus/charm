@@ -159,7 +159,6 @@ class Main : public CBase_Main {
       CkPrintf("Higher priority for GPU methods and callbacks: %s\n", (gpu_prio) ? "ON" : "OFF");
       CkPrintf("GPU handler PEs: %d\n", gpu_pes);
       CkPrintf("Sync mode: %s\n\n", (sync_mode) ? "ON" : "OFF");
-      delete m;
 
       // calculate kernel clock count
       int cuda_device = 0;

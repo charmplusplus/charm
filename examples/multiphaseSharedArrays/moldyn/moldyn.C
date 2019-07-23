@@ -57,7 +57,6 @@ public:
         if(m->argc >2 ) NUM_ATOMS=atoi(m->argv[2]);
         if(m->argc >3 ) CACHE_SIZE_BYTES=atoi(m->argv[3]);
         if(m->argc >4 ) detailedTimings= ((atoi(m->argv[4])!=0)?true:false) ; // 1D, 2D, 3D
-        delete m;
         reallyDone = 0;
 
         XyzMSA coords(NUM_ATOMS, NUM_WORKERS, CACHE_SIZE_BYTES);

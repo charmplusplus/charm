@@ -177,7 +177,6 @@ public:
         if(m->argc<2)
         {
             CkPrintf("Usage: tsp type(0-random graph, 1 inputfile, 2 inputfile) (Size of Problem) initialgrain\n");
-            delete m;
             CkExit(1);
         }
         int type = atoi(m->argv[1]);
@@ -199,7 +198,6 @@ public:
 
         CkPrintf("start\n");
         searchEngineProxy.start();
-        delete m;
     }
 
 };

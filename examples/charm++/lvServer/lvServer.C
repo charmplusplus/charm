@@ -34,8 +34,6 @@ public:
 
   Main(CkArgMsg* m)
   {
-	delete m;
-	
 	CkPrintf("lvServer with %d slices on %d Processors\n", nChares, CkNumPes());
 	mainProxy=thishandle;
 	

@@ -35,7 +35,6 @@ public:
   {
     nElements=5;
     if(m->argc > 1) nElements = atoi(m->argv[1]);
-    delete m;
     CkPrintf("Running Hello on %d processors for %d elements\n",
 	     CkNumPes(),nElements);
     mid = thishandle;

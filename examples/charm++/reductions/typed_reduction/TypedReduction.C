@@ -28,7 +28,6 @@ Driver::Driver(CkArgMsg* args) {
     if (args->argc > 1) array_size = strtol(args->argv[1], NULL, 10);
     w = CProxy_Worker::ckNew(array_size);
     w.untyped_reduce();
-    delete args;
 }
 
 void Driver::untyped_done(CkReductionMsg* m) {

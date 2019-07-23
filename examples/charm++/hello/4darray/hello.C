@@ -48,7 +48,6 @@ public:
 	numZ = atoi(m->argv[4]);
       }
     }
-    delete m;
 
     //Start the computation
     CkPrintf("Running Hello on %d processors for [%d][%d][%d][%d] elements\n",

@@ -12,7 +12,7 @@ waitqd_QDChare::waitqd_QDChare(CkArgMsg *m) {
   waitStarted = false;
   threadList = 0;
   _waitqd_qdhandle = thishandle;
-  delete m;
+  //delete m;
 }
 
 void waitqd_QDChare::waitQD(void) {

@@ -45,7 +45,6 @@ struct Main : public CBase_Main {
       numTasks = atol(m->argv[3]); //the number of tasks that 1D partition is splitted into
     else
       numTasks = CmiMyNodeSize();  //default to 1/core
-    delete m;
     
     mainProxy = thisProxy;
 

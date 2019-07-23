@@ -74,7 +74,6 @@ public:
     chunkSize = msg->argc > 4 ?  atoi(msg->argv[4]) : DEFAULT_CHUNK_SIZE;
     opNum = msg->argc > 5 ?  atoi(msg->argv[5]) : DEFAULT_OP_NUM;
     iter = msg->argc > 6 ?  atoi(msg->argv[6]) : DEFAULT_NUM_ITERS;
-    delete msg;
     CkPrintf("Running dot product code with %d iterations.\n", iter);
 #ifdef OMP_HYBRID
     omp_set_num_threads(omp_get_max_threads());

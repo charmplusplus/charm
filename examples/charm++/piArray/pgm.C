@@ -14,7 +14,6 @@ main::main(CkArgMsg * m)
 
   ns = atoi(m->argv[1]);
   nc = atoi(m->argv[2]);
-  delete m;
 
   starttime = CkWallTimer();
 

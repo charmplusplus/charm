@@ -22,8 +22,6 @@ private:
   int test_num;
 public:
   Main(CkArgMsg* msg) {
-    delete msg;
-
     ngProxy = CProxy_TestNodeGroup::ckNew();
     gProxy = CProxy_TestGroup::ckNew();
 

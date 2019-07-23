@@ -18,7 +18,6 @@ public:
   int counter;
   Main(CkArgMsg* m)
   {
-    delete m;
     counter=0;
     nElements=5;
 
