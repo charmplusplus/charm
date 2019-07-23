@@ -360,9 +360,12 @@ void CmiTLSAllocNewSeg(tlsseg_t* t, CthThread th)
   if (CmiTLSDefaultInfo.size > 0)
   {
     t->size = CMIALIGN(t->size, t->align);
-    t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size);
+    t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size + sizeof(void *) * 3);
     memcpy((void*)t->memseg, (char *)CmiTLSDefaultInfo.memseg - t->size, t->size);
     t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
+    auto memsegend = (void **)t->memseg;
+    memsegend[2] = memsegend[0] = memsegend;
+    memsegend[1] = nullptr;
     /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), t->align, t->memseg, t->size); */
   }
   else
