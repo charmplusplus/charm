@@ -40,7 +40,7 @@ configure_file(mblock/mblock.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
 configure_file(mblock/mblockf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
 
 add_library(libmodulemblock mblock/mblock.C mblock/patch.C
-mblock/compat_driver.C mblock/compat_fdriver.C mblock/mblock.h
+mblock/compat_driver.c mblock/compat_fdriver.c mblock/mblock.h
 mblock/mblockf.h mblock/patch.h mblock/gridutil.h mblock/mblock_impl.h)
 add_dependencies(libmodulemblock ck)
 
