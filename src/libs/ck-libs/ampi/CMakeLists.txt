@@ -48,6 +48,10 @@ if(${CMK_AMPI_WITH_ROMIO})
     ExternalProject_Add(romio
         URL ${CMAKE_CURRENT_SOURCE_DIR}/romio
         CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/ &&
+            export MPI_IMPL=ampi &&
+            export FROM_MPICH=no &&
+            export FROM_MPICH2=no && 
+            export FROM_LAM=no &&
             export CFLAGS=-ampi-romio-configure &&
             export FFLAGS=-ampi-romio-configure &&
             export F77=${CMAKE_BINARY_DIR}/bin/ampif90 &&
