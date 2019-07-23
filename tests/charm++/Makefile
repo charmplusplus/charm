@@ -1,7 +1,8 @@
 DIRS = \
   megatest \
   alignment \
-  simplearrayhello \
+  simplearraytest \
+  simplegrouptest \
   provisioning \
   load_balancing \
   chkpt \

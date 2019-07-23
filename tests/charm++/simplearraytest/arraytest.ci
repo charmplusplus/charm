@@ -1,0 +1,34 @@
+mainmodule arraytest {
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void all_complete();
+    entry [reductiontarget] void reduction(int sum);
+
+    // Send messages to each array, then wait for reductions whose sum should
+    // be equivalent to summing all indices in the array.
+    entry void run_tests() {
+      for (test_num = 0; test_num < arrays.size(); test_num++) {
+        serial { arrays[test_num][0].p2p(0); }
+
+        when reduction(int sum) serial {
+          int expected_sum = (sizes[test_num] * (sizes[test_num] - 1)) / 2;
+          CkAssert(sum == expected_sum);
+          arrays[test_num].bcast();
+        }
+
+        when reduction(int sum) serial {
+          int expected_sum = (sizes[test_num] * (sizes[test_num] - 1)) / 2;
+          CkAssert(sum == expected_sum);
+        }
+      }
+    }
+  };
+
+  array [1D] TestArray {
+    entry TestArray(int size);
+    entry void p2p(int idx);
+    entry void bcast();
+  };
+};

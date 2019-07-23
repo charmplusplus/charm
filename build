@@ -962,7 +962,7 @@ then
   Echo "-------------------------------------------------"
 	Echo "$PROGRAM built successfully."
 	Echo "Next, try out a sample program like" \
-	     "$DESTINATION/tests/charm++/simplearrayhello"
+	     "$DESTINATION/examples/charm++/hello"
 else
         printError
 fi

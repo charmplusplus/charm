@@ -1,0 +1,51 @@
+mainmodule grouptest {
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void all_complete();
+    entry [reductiontarget] void reduction(int sum);
+
+    entry void run_tests() {
+      serial { groupProxy[0].p2p(0); }
+
+      when reduction(int sum) serial {
+        int expected_sum = (CkNumPes() * (CkNumPes() - 1)) / 2;
+        CkAssert(sum == expected_sum);
+        groupProxy.bcast();
+      }
+
+      when reduction(int sum) serial {
+        int expected_sum = (CkNumPes() * (CkNumPes() - 1)) / 2;
+        CkAssert(sum == expected_sum);
+        test_num++;
+      }
+
+      serial { nodeGroupProxy[0].p2p(0); }
+
+      when reduction(int sum) serial {
+        int expected_sum = (CkNumNodes() * (CkNumNodes() - 1)) / 2;
+        CkAssert(sum == expected_sum);
+        nodeGroupProxy.bcast();
+      }
+
+      when reduction(int sum) serial {
+        int expected_sum = (CkNumNodes() * (CkNumNodes() - 1)) / 2;
+        CkAssert(sum == expected_sum);
+        test_num++;
+      }
+    }
+  };
+
+  group TestGroup {
+    entry TestGroup();
+    entry void p2p(int idx);
+    entry void bcast();
+  };
+
+  nodegroup TestNodeGroup {
+    entry TestNodeGroup();
+    entry void p2p(int idx);
+    entry void bcast();
+  };
+};
