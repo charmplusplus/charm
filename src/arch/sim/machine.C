@@ -84,7 +84,12 @@ static void CmiNotifyIdleCcd(void *ignored1, double ignored2)
 
 void CmiAbort(const char *message)
 {
-  CmiError(message);
+  char newmsg[256];
+  va_list args;
+  va_start(args, message);
+  vsnprintf(newmsg, sizeof(newmsg), message, args);
+  va_end(args);
+  CmiError(newmsg);
   exit(1);
   CMI_NORETURN_FUNCTION_END
 }
