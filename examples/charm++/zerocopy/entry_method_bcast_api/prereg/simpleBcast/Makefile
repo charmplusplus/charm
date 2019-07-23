@@ -16,6 +16,8 @@ simpleBcast.o : simpleBcast.C cifiles
 test: all
 	$(call run, +p4 ./simpleBcast)
 	$(call run, +p6 ./simpleBcast)
+	$(call run, +p4 ./simpleBcast +noCMAForZC)
+	$(call run, +p6 ./simpleBcast +noCMAForZC)
 
 clean:
 	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun simpleBcast

@@ -4,10 +4,15 @@ Modifications
 Here is a list of modifications and clarifications to the version of
 ROMIO integrated into AMPI:
 
+* Commented out the unconditional assignment of MPI_IMPL in the configure
+  script so that AMPI can specify it when configuring.
 * Used MPI_Info_* calls from AMPI, and darray calls from ROMIO.
 * Set -DHAVE_STATUS_SET_BYTES in configure and configure.in, and
   add status setting call in adio/common/status_setb.c
+* Extended the ADIOI_Datatype_iscontig stub so that count == 0 types
+  are considered contiguous. (Needed for HDF5's parallel tests.)
 * Use AMPI's AMPI_Type_is_contiguous() extension in adio/common/iscontig.c
+  (currently disabled pending review of CkDDT's contiguity handling)
 * Excluded directories doc, lib, man, and test in the distribution.
   (lib will be generated in the building directory $CHARMDIR/tmp/)
 * The final library lib/$ARCH/libmpio.a is copied to

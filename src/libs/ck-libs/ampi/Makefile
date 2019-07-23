@@ -60,6 +60,7 @@ all: AMPI AMPIF $(COMPATLIB) $(ROMIO)
 $(ROMIO): | AMPI AMPIF
 	@echo "Building ROMIO"
 	cd romio && \
+		MPI_IMPL="ampi" FROM_MPICH="no" FROM_MPICH2="no" FROM_LAM="no" \
 		MPI_LIB="" \
 		CFLAGS="$(OPTS) -ampi-romio-configure" \
 		FFLAGS="$(OPTS) -ampi-romio-configure" \

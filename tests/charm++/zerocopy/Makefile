@@ -4,6 +4,7 @@ DIRS = \
   direct_api \
   zc_post_modify_size \
   dereg_and_nodereg \
+  bcast_nonzero_root \
 
 TESTDIRS = $(DIRS)
 

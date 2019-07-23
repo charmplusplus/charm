@@ -27,6 +27,8 @@ $(NAME).o: $(NAME).C cifiles
 test: all
 	$(call run, ./pgm +p4 200000 10)
 	$(call run, ./pgm +p6 200000 10)
+	$(call run, ./pgm +p4 200000 10 +noCMAForZC)
+	$(call run, ./pgm +p6 200000 10 +noCMAForZC)
 
 test-bench: all
 	$(call run, ./pgm +p10)

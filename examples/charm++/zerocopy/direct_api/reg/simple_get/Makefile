@@ -18,6 +18,7 @@ simple_get.o: simple_get.C cifiles
 test: all
 	$(call run, +p1 ./simple_get 20 )
 	$(call run, +p2 ./simple_get 20 )
+	$(call run, +p2 ./simple_get 20 +noCMAForZC )
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o simple_get charmrun cifiles

@@ -126,7 +126,7 @@ class CkDDT_DataType
   MPI_Aint trueLB;
   MPI_Aint baseExtent;
   CkDDT_DataType *baseType;
-  std::vector<int> keyvals;
+  std::unordered_map<int, uintptr_t> attributes;
   std::string name;
 
  public:
@@ -197,14 +197,18 @@ class CkDDT_DataType
     }
     return -1;
   }
-  std::vector<int>& getKeyvals() noexcept { return keyvals; }
+  std::unordered_map<int, uintptr_t> & getAttributes() noexcept { return attributes; }
   void setName(const char *src) noexcept { CkDDT_SetName(name, src); }
   void getName(char *dest, int *len) const noexcept {
     int length = *len = name.size();
     memcpy(dest, &name[0], length);
     dest[length] = '\0';
   }
+  std::string getName() const noexcept {return name;}
+  std::string getConfig() const noexcept;
+  virtual std::string getTypeMap() const noexcept;
   void setAbsolute(bool arg) noexcept { isAbsolute = arg; }
+  bool getAbsolute() const noexcept { return isAbsolute; }
 };
 
 /*
@@ -225,6 +229,7 @@ class CkDDT_Contiguous final : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -251,6 +256,7 @@ class CkDDT_Vector : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -275,6 +281,7 @@ class CkDDT_HVector final : public CkDDT_Vector
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -309,6 +316,7 @@ class CkDDT_HIndexed_Block : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -365,6 +373,7 @@ class CkDDT_HIndexed : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -427,6 +436,7 @@ class CkDDT_Struct final : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
