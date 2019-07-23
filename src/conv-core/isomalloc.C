@@ -2475,11 +2475,20 @@ void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
 #else
   n = (CmiIsomallocBlockList *)CmiIsomallocPlain(sizeof(CmiIsomallocBlockList)+nBytes);
 #endif
-  /*Link the new block into the circular blocklist*/
-  n->prev=l;
-  n->next=l->next;
-  l->next->prev=n;
-  l->next=n;
+
+  if (l)
+  {
+    /*Link the new block into the circular blocklist*/
+    n->prev=l;
+    n->next=l->next;
+    l->next->prev=n;
+    l->next=n;
+  }
+  else
+  {
+    n->prev = n->next = nullptr;
+  }
+
   return Slot_toUser(n);
 }
 
@@ -2488,11 +2497,20 @@ void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,siz
 {
   CmiIsomallocBlockList *n; /*Newly created slot*/
   n=(CmiIsomallocBlockList *)isomalloc_internal_alloc_aligned(align, nBytes, sizeof(CmiIsomallocBlockList), l);
-  /*Link the new block into the circular blocklist*/
-  n->prev=l;
-  n->next=l->next;
-  l->next->prev=n;
-  l->next=n;
+
+  if (l)
+  {
+    /*Link the new block into the circular blocklist*/
+    n->prev=l;
+    n->next=l->next;
+    l->next->prev=n;
+    l->next=n;
+  }
+  else
+  {
+    n->prev = n->next = nullptr;
+  }
+
   return Slot_toUser(n);
 }
 
