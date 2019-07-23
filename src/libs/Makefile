@@ -11,4 +11,3 @@ charmlibs: convlibs
 clean:
 	$(MAKE) -C conv-libs clean
 	$(MAKE) -C ck-libs clean
-	$(MAKE) -C other clean
