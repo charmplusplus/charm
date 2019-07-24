@@ -6003,7 +6003,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status 
     //memory operation. So we need to return from this function and do the while loop
     //in the outer function call.
     if (_BgInOutOfCoreMode) {
-      *result = -1
+      *result = -1;
       return parent;
     }
 #endif
@@ -6096,7 +6096,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* GathervReq::wait(ampiParent* parent, MPI_Stat
 #if CMK_BIGSIM_CHARM
   *result = 0;
 #endif
-  return 0;
+  return parent;
 }
 
 CMI_WARN_UNUSED_RESULT ampiParent* SendReq::wait(ampiParent* parent, MPI_Status *sts, int* result) noexcept {
@@ -6278,6 +6278,7 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
 
   // If any requests are incomplete, block until all have been completed
   if (pptr->numBlockedReqs > 0) {
+    pptr = pptr->blockOnRecv();
     reqs = pptr->getReqs(); //update pointer in case of migration while suspended
 
     for (int i=0; i<count; i++) {
