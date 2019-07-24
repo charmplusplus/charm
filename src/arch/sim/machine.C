@@ -82,7 +82,7 @@ static void CmiNotifyIdleCcd(void *ignored1, double ignored2)
  *
  ************************************************************************/
 
-void CmiAbort(const char *message)
+void CmiAbort(const char *message, ...)
 {
   char newmsg[256];
   va_list args;
