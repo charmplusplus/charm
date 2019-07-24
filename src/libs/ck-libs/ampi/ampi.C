@@ -3078,8 +3078,8 @@ void ampi::waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept
   if (*req != MPI_REQUEST_NULL && (sendType == BLOCKING_SEND || sendType == BLOCKING_SSEND)) {
     AmpiRequestList& reqList = getReqs();
     AmpiRequest& sreq = *reqList[*req];
-    sreq.wait(parent, MPI_STATUS_IGNORE);
-    getAmpiParent()->getReqs().free(*req, parent->getDDT());
+    parent = sreq.wait(parent, MPI_STATUS_IGNORE);
+    parent->getReqs().free(*req, parent->getDDT());
     *req = MPI_REQUEST_NULL;
   }
 }
@@ -3677,7 +3677,8 @@ int ampi::static_recv(ampi *dis, int t, int s, void* buf, int count, MPI_Datatyp
   )
   MPI_Request req;
   dis->irecv(buf, count, type, s, t, comm, &req);
-  return dis->parent->wait(&req, sts);
+  ampiParent* unused = dis->parent->wait(&req, sts);
+  return MPI_SUCCESS;
 }
 
 void ampi::static_probe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts) noexcept
@@ -4233,7 +4234,7 @@ int testRequest(ampiParent* pptr, MPI_Request *reqIdx, int *flag, MPI_Status *st
   AmpiRequestList& reqList = pptr->getReqs();
   AmpiRequest& req = *reqList[*reqIdx];
   if(1 == (*flag = req.test())){
-    req.wait(pptr, sts);
+    pptr = req.wait(pptr, sts);
     reqList.freeNonPersReq(pptr, *reqIdx);
   }
   return MPI_SUCCESS;
@@ -4250,7 +4251,7 @@ int testRequestNoFree(ampiParent* pptr, MPI_Request *reqIdx, int *flag, MPI_Stat
   AmpiRequest& req = *reqList[*reqIdx];
   *flag = req.test();
   if(*flag)
-    req.wait(pptr, sts);
+    pptr = req.wait(pptr, sts);
   return MPI_SUCCESS;
 }
 
@@ -4839,7 +4840,7 @@ AMPI_API_IMPL(int, MPI_Mrecv, void* buf, int count, MPI_Datatype datatype, MPI_M
     IReq *newreq = parent->reqPool.newReq<IReq>(buf, count, datatype, src, tag, comm, getDDT());
     MPI_Request request = reqs.insert(newreq);
     newreq->receive(ptr, msg);
-    getAmpiParent()->wait(&request, status);
+    parent = parent->wait(&request, status);
   }
   else {
     if (status != MPI_STATUS_IGNORE) {
@@ -5937,7 +5938,7 @@ void SsendReq::start(MPI_Request reqIdx) noexcept {
   ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm, I_SSEND, reqIdx);
 }
 
-int IReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *sts, int* result) noexcept {
   // ampi::generic() writes directly to the buffer, so the only thing we do here is wait
 
   while (!complete) {
@@ -5952,15 +5953,20 @@ int IReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
       if (sts != MPI_STATUS_IGNORE) sts->MPI_CANCEL = 1;
       complete = true;
       parent->resumeOnRecv = false;
-      return 0;
+#if CMK_BIGSIM_CHARM
+      *result = 0;
+#endif
+      return parent;
     }
 
 #if CMK_BIGSIM_CHARM
     //Because of the out-of-core emulation, this pointer is changed after in-out
     //memory operation. So we need to return from this function and do the while loop
     //in the outer function call.
-    if(_BgInOutOfCoreMode)
-      return -1;
+    if (_BgInOutOfCoreMode) {
+      *result = -1;
+      return parent;
+    }
 #endif
   } // end of while
   parent->resumeOnRecv = false;
@@ -5976,10 +5982,13 @@ int IReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
     sts->MPI_CANCEL = 0;
   }
 
-  return 0;
+#if CMK_BIGSIM_CHARM
+  *result = 0;
+#endif
+  return parent;
 }
 
-int RednReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status *sts, int* result) noexcept {
   // ampi::irednResult() writes directly to the buffer, so the only thing we do here is wait
 
   while (!complete) {
@@ -5993,8 +6002,10 @@ int RednReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
     //Because of the out-of-core emulation, this pointer is changed after in-out
     //memory operation. So we need to return from this function and do the while loop
     //in the outer function call.
-    if (_BgInOutOfCoreMode)
-      return -1;
+    if (_BgInOutOfCoreMode) {
+      *result = -1
+      return parent;
+    }
 #endif
   }
   parent->resumeOnColl = false;
@@ -6007,10 +6018,14 @@ int RednReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
     sts->MPI_COMM = comm;
     sts->MPI_CANCEL = 0;
   }
-  return 0;
+
+#if CMK_BIGSIM_CHARM
+  *result = 0;
+#endif
+  return parent;
 }
 
-int GatherReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+CMI_WARN_UNUSED_RESULT ampiParent* GatherReq::wait(ampiParent* parent, MPI_Status *sts, int* result) noexcept {
   // ampi::irednResult() writes directly to the buffer, so the only thing we do here is wait
 
   while (!complete) {
@@ -6024,8 +6039,10 @@ int GatherReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
     //Because of the out-of-core emulation, this pointer is changed after in-out
     //memory operation. So we need to return from this function and do the while loop
     //in the outer function call.
-    if (_BgInOutOfCoreMode)
-      return -1;
+    if (_BgInOutOfCoreMode) {
+      *result = -1;
+      return parent;
+    }
 #endif
   }
   parent->resumeOnColl = false;
@@ -6038,10 +6055,14 @@ int GatherReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
     sts->MPI_COMM = comm;
     sts->MPI_CANCEL = 0;
   }
-  return 0;
+
+#if CMK_BIGSIM_CHARM
+  *result = 0;
+#endif
+  return parent;
 }
 
-int GathervReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+CMI_WARN_UNUSED_RESULT ampiParent* GathervReq::wait(ampiParent* parent, MPI_Status *sts, int* result) noexcept {
   // ampi::irednResult writes directly to the buffer, so the only thing we do here is wait
 
   while (!complete) {
@@ -6055,8 +6076,10 @@ int GathervReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
     //Because of the out-of-core emulation, this pointer is changed after in-out
     //memory operation. So we need to return from this function and do the while loop
     //in the outer function call.
-    if (_BgInOutOfCoreMode)
-      return -1;
+    if (_BgInOutOfCoreMode) {
+      *result = -1;
+      return parent;
+    }
 #endif
   }
   parent->resumeOnColl = false;
@@ -6069,10 +6092,14 @@ int GathervReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
     sts->MPI_COMM = comm;
     sts->MPI_CANCEL = 0;
   }
+
+#if CMK_BIGSIM_CHARM
+  *result = 0;
+#endif
   return 0;
 }
 
-int SendReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+CMI_WARN_UNUSED_RESULT ampiParent* SendReq::wait(ampiParent* parent, MPI_Status *sts, int* result) noexcept {
   while (!complete) {
     parent->resumeOnRecv = true;
     parent->numBlockedReqs = 1;
@@ -6086,48 +6113,49 @@ int SendReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
     sts->MPI_COMM = comm;
     sts->MPI_CANCEL = 0;
   }
-  return 0;
+  return parent;
 }
 
-int SsendReq::wait(ampiParent* disParent, MPI_Status *sts) noexcept {
+CMI_WARN_UNUSED_RESULT ampiParent* SsendReq::wait(ampiParent* parent, MPI_Status *sts, int* result) noexcept {
   while (!complete) {
-    disParent->resumeOnRecv = true;
-    disParent->numBlockedReqs = 1;
+    parent->resumeOnRecv = true;
+    parent->numBlockedReqs = 1;
     setBlocked(true);
-    disParent = disParent->block();
+    parent = parent->block();
     setBlocked(false);
   }
-  disParent->resumeOnRecv = false;
+  parent->resumeOnRecv = false;
   if (sts != MPI_STATUS_IGNORE) {
     sts->MPI_COMM = comm;
     sts->MPI_CANCEL = 0;
   }
-  return 0;
+  return parent;
 }
 
-int ATAReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+CMI_WARN_UNUSED_RESULT ampiParent* ATAReq::wait(ampiParent* parent, MPI_Status *sts, int* result) noexcept {
   MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
   reqs.clear();
   complete = true;
-  return 0;
+  return parent;
 }
 
-int GReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+CMI_WARN_UNUSED_RESULT ampiParent* GReq::wait(ampiParent* parent, MPI_Status *sts, int* result) noexcept {
   MPI_Status tmpStatus;
   if (pollFn)
     (*pollFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
   (*queryFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
   complete = true;
-  return 0;
+  return parent;
 }
 
 AMPI_API_IMPL(int, MPI_Wait, MPI_Request *request, MPI_Status *sts)
 {
   AMPI_API("AMPI_Wait");
-  return getAmpiParent()->wait(request, sts);
+  ampiParent* unused = getAmpiParent()->wait(request, sts);
+  return MPI_SUCCESS;
 }
 
-int ampiParent::wait(MPI_Request *request, MPI_Status *sts) noexcept
+CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_Status *sts) noexcept
 {
   if(*request == MPI_REQUEST_NULL){
     clearStatus(sts);
@@ -6156,16 +6184,17 @@ int ampiParent::wait(MPI_Request *request, MPI_Status *sts) noexcept
   CkAssert(pptr->numBlockedReqs == 0);
 
   int waitResult = -1;
+#if CMK_BIGSIM_CHARM
   do{
+#endif
     AmpiRequest& waitReq = *reqs[*request];
-    waitResult = waitReq.wait(pptr, sts);
+    pptr = waitReq.wait(pptr, sts, &waitResult);
 #if CMK_BIGSIM_CHARM
     if(_BgInOutOfCoreMode){
       reqs = getReqs();
     }
-#endif
   }while(waitResult==-1);
-  pptr = getAmpiParent(); // update pointer in case of migration while suspended
+#endif
   reqs = pptr->getReqs();
 
   CkAssert(pptr->numBlockedReqs == 0);
@@ -6229,7 +6258,7 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
     }
     AmpiRequest& req = *reqs[request[i]];
     if (req.test()) {
-      req.wait(pptr, (sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
+      pptr = req.wait(pptr, (sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
       req.setBlocked(false);
 #if AMPIMSGLOG
       if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -6249,7 +6278,6 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
 
   // If any requests are incomplete, block until all have been completed
   if (pptr->numBlockedReqs > 0) {
-    pptr = getAmpiParent()->blockOnRecv();
     reqs = pptr->getReqs(); //update pointer in case of migration while suspended
 
     for (int i=0; i<count; i++) {
@@ -6261,7 +6289,7 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
       if (!req.test())
         CkAbort("In AMPI_Waitall, all requests should have completed by now!");
 #endif
-      req.wait(pptr, (sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
+      pptr = req.wait(pptr, (sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
       req.setBlocked(false);
 #if AMPIMSGLOG
       if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -6275,7 +6303,7 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
     }
   }
 
-  CkAssert(getAmpiParent()->numBlockedReqs == 0);
+  CkAssert(pptr->numBlockedReqs == 0);
 
 #if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_WAITALL(&reqs); // setup forward and backward dependence
@@ -6307,7 +6335,7 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
     }
     AmpiRequest& req = *reqs[request[i]];
     if (req.test()) {
-      req.wait(pptr, sts);
+      pptr = req.wait(pptr, sts);
       reqs.unblockReqs(&request[0], i);
       reqs.freeNonPersReq(pptr, request[i]);
       *idx = i;
@@ -6336,7 +6364,7 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
     }
     AmpiRequest& req = *reqs[request[i]];
     if (req.test()) {
-      req.wait(pptr, sts);
+      pptr = req.wait(pptr, sts);
       reqs.unblockReqs(&request[i], count-i);
       reqs.freeNonPersReq(pptr, request[i]);
       *idx = i;
@@ -6378,7 +6406,7 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
     }
     AmpiRequest& req = *reqs[array_of_requests[i]];
     if (req.test()) {
-      req.wait(pptr, &sts);
+      pptr = req.wait(pptr, &sts);
       array_of_indices[(*outcount)] = i;
       (*outcount)++;
       if (array_of_statuses != MPI_STATUSES_IGNORE)
@@ -6411,7 +6439,7 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
       }
       AmpiRequest& req = *reqs[array_of_requests[i]];
       if (req.test()) {
-        req.wait(pptr, &sts);
+        pptr = req.wait(pptr, &sts);
         array_of_indices[(*outcount)] = i;
         (*outcount)++;
         if (array_of_statuses != MPI_STATUSES_IGNORE)
@@ -6492,7 +6520,7 @@ bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
     }
     AmpiRequest& req = *reqList[reqs[i]];
     if (req.test()) {
-      req.wait(pptr, sts);
+      pptr = req.wait(pptr, sts);
       reqList.freeNonPersReq(pptr, reqs[i]);
       std::swap(reqs[i], reqs.back());
       reqs.pop_back();
@@ -6671,7 +6699,7 @@ AMPI_API_IMPL(int, MPI_Testall, int count, MPI_Request *request, int *flag, MPI_
       int reqIdx = request[i];
       if (reqIdx != MPI_REQUEST_NULL) {
         AmpiRequest& req = *reqs[reqIdx];
-        req.wait(pptr, (sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
+        pptr = req.wait(pptr, (sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
         reqs.freeNonPersReq(pptr, request[i]);
       }
     }
@@ -11984,13 +12012,13 @@ bool GPUReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept
   return complete;
 }
 
-int GPUReq::wait(MPI_Status *sts) noexcept
+CMI_WARN_UNUSED_RESULT ampiParent* GPUReq::wait(ampiParent* parent, MPI_Status *sts, int* result) noexcept
 {
   (void)sts;
   while (!complete) {
-    ampiParent* unused = getAmpiParent()->block();
+    parent = parent->block();
   }
-  return 0;
+  return parent;
 }
 
 bool GPUReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
