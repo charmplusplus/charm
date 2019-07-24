@@ -1,0 +1,293 @@
+#!/bin/bash
+
+# Thin wrapper around cmake to start a build with a similar command line as ./build
+
+set -o errexit -o nounset
+
+############ Begin option parsing
+
+target=$1
+triplet=$2
+shift
+shift
+
+opt_ampi_error_checking=0
+opt_ampi_mpich_tests=0
+opt_build_shared=0
+opt_ccs=0
+opt_charmdebug=0
+opt_charmpy=0
+opt_controlpoint=0
+opt_drone_mode=0
+opt_error_checking=0
+opt_incdir=""
+opt_lbtime_type= #undef
+opt_lbuserdata=0
+opt_libdir=""
+opt_lockless=0
+opt_mempool_cutoff= #undef
+opt_network=0
+opt_numa=0
+opt_omp=0
+opt_parallel=-j1
+opt_prio_type=  #undef
+opt_production=0
+opt_pthreads=0
+opt_qlogic=0
+opt_randomized_msgq=0
+opt_refnum_type= #undef
+opt_replay=0
+opt_romio=1
+opt_shrinkexpand=0
+opt_smp=0
+opt_stats=0
+opt_suffix=""
+opt_task_queue=0
+opt_tcp=0
+opt_tracing=0
+opt_tracing_commthread=0
+opt_zlib=1
+
+opt_CC= #undef
+opt_CXX= #undef
+opt_FC= #undef
+
+while [[ $# -gt 0 ]]; do
+  arg=$1
+  shift
+  case $arg in
+  # Platform specific options
+    smp)
+      opt_smp=1
+      ;;
+    omp)
+      opt_omp=1
+      ;;
+    tcp)
+      opt_tcp=1
+      ;;
+    pthreads)
+      opt_pthreads=1
+      ;;
+  # Compilers
+    gcc)
+      opt_CC=gcc
+      opt_CXX=g++
+      ;;
+    gfortran)
+      opt_FC=gfortran
+      ;;
+    clang)
+      opt_CC=clang
+      opt_CXX=clang++
+      ;;
+    flang)
+      opt_FC=flang
+      ;;
+    icc|iccstatic)
+      opt_CC=icc
+      opt_CXX=icpc
+      ;;
+    ifort)
+      opt_FC=ifort
+      ;;
+    xlc|xlc64)
+      opt_CC=xlc_r
+      opt_CXX=xlC_r
+      opt_FC=xlf90_r
+      ;;
+    pgcc|pgf90)
+      echo "*** Warning: Ignoring unsupported option '$arg'."
+      ;;
+    mpicxx)
+      opt_CC=mpicc
+      opt_CXX=mpicxx
+      opt_FC=mpif90
+      ;;
+  # Charm++ dynamic libraries
+    --no-build-shared)
+      opt_build_shared=0
+      ;;
+    --build-shared)
+      opt_build_shared=1
+      ;;
+  # Enable/disable features
+    --enable-error-checking)
+      opt_error_checking=1
+      ;;
+    --enable-ampi-error-checking)
+      opt_ampi_error_checking=1
+      ;;
+    --enable-stats)
+      opt_stats=1
+      ;;
+    --enable-tracing)
+      opt_tracing=1
+      ;;
+    --enable-tracing-commthread)
+      opt_tracing_commthread=1
+      ;;
+    --enable-task-queue)
+      opt_task_queue=1
+      ;;
+    --enable-drone-mode)
+      opt_drone_mode=1
+      ;;
+    --enable-charmdebug)
+      opt_charmdebug=1
+      ;;
+    --enable-replay)
+      opt_replay=1
+      ;;
+    --enable-ccs)
+      opt_ccs=1
+      ;;
+    --enable-controlpoint)
+      opt_controlpoint=1
+      ;;
+    --enable-lbuserdata)
+      opt_lbuserdata=1
+      ;;
+    --enable-lockless-queue)
+      opt_lockless-queue=1
+      ;;
+    --enable-shrinkexpand)
+      opt_shrinkexpand=1
+      ;;
+    --enable-charmpy)
+      opt_charmpy=1
+      ;;
+    --with-numa)
+      opt_numa=1
+      ;;
+    --with-lbtime-type=*)
+      opt_lbtime_type=${arg#*=}
+      ;;
+    --with-qlogic)
+      opt_qlogic=1
+      ;;
+    --with-refnum-type=*)
+      opt_refnum_type=${arg#*=}
+      ;;
+    --with-prio-type=*)
+      opt_prio_type=${arg#*=}
+      ;;
+    --enable-randomized-msgq)
+      opt_randomized_msgq=1
+      ;;
+    --with-mempool-cutoff=*)
+      opt_mempool_cutoff=${arg#*=}
+      ;;
+    --enable-ampi-mpich-tests)
+      opt_ampi_mpich_tests=1
+      ;;
+    --enable-zlib)
+      opt_zlib=1
+      ;;
+    --with-production)
+      opt_production=1
+      ;;
+    --with-romio)
+      opt_romio=1
+      ;;
+    --without-romio)
+      opt_romio=0
+      ;;
+
+  # Miscellaneous options
+    -j*)
+      opt_parallel=$arg
+      ;;
+    --suffix=*)
+      opt_suffix=-${arg#*=}
+      ;;
+    --basedir=*)
+      opt_incdir+="-I${arg#*=}/include "
+      opt_libdir+="-L${arg#*=}/lib "
+      ;;
+    --libdir=*)
+      opt_libdir+="-L${arg#*=} "
+      ;;
+    --incdir=*)
+      opt_incdir+="-I${arg#*=} "
+      ;;
+    *)
+      echo "*** Warning: Ignoring unknown option '$arg'."
+      ;;
+  esac
+done
+
+
+############ End option parsing
+
+opt_network=$(echo $triplet | cut -d '-' -f1)
+
+[[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
+
+
+echo "Build options for $triplet:"
+
+# Print selected options
+for option in ${!opt*}; do
+  echo "  $option = ${!option}"
+done
+
+builddir=$triplet$opt_suffix
+
+rm -rf $builddir
+
+mkdir $builddir
+
+cd $builddir
+
+if [[ -n $opt_libdir ]]; then
+  mkdir -p include
+  echo "USER_OPTS_LD=$opt_libdir" >> include/conv-mach-pre.sh
+fi
+
+if [[ -n $opt_incdir ]]; then
+  mkdir -p include
+  echo "USER_OPTS_CC='$opt_incdir'" >> include/conv-mach-pre.sh
+  echo "USER_OPTS_CXX='$opt_incdir'" >> include/conv-mach-pre.sh
+fi
+
+cmake_args+="-DCMAKE_BUILD_TYPE=$opt_production "
+cmake_args+="-DCMK_AMPI_WITH_ROMIO=$opt_romio "
+cmake_args+="-DAMPI_ERROR_CHECKING=$opt_ampi_error_checking "
+cmake_args+="-DAMPI_MPICH_TESTS=$opt_ampi_mpich_tests "
+cmake_args+="-DBUILD_SHARED=$opt_build_shared "
+cmake_args+="-DCCS=$opt_ccs "
+cmake_args+="-DCHARMDEBUG=$opt_charmdebug "
+cmake_args+="-DCHARMPY=$opt_charmpy "
+cmake_args+="-DCONTROLPOINT=$opt_controlpoint "
+cmake_args+="-DDRONE_MODE=$opt_drone_mode "
+cmake_args+="-DERROR_CHECKING=$opt_error_checking "
+[[ -n $opt_lbtime_type ]] && cmake_args+="-DLBTIME_TYPE=$opt_lbtime_type "
+cmake_args+="-DLBUSERDATA=$opt_lbuserdata "
+cmake_args+="-DLOCKLESS_QUEUE=$opt_lockless "
+[[ -n $opt_mempool_cutoff ]] && cmake_args+="-DCMK_MEMPOOL_CUTOFFNUM=$opt_mempool_cutoff "
+cmake_args+="-DNETWORK=$opt_network "
+cmake_args+="-DNUMA=$opt_numa "
+cmake_args+="-DOMP=$opt_omp "
+[[ -n $opt_prio_type ]] && cmake_args+="-DPRIO_TYPE=$opt_prio_type "
+cmake_args+="-DPTHREADS=$opt_pthreads "
+cmake_args+="-DQLOGIC=$opt_qlogic "
+cmake_args+="-DRANDOMIZED_MSGQ=$opt_randomized_msgq "
+[[ -n $opt_refnum_type ]] && cmake_args+="-DREFNUM_TYPE=$opt_refnum_type "
+cmake_args+="-DREPLAY=$opt_replay "
+cmake_args+="-DSHRINKEXPAND=$opt_shrinkexpand "
+cmake_args+="-DSMP=$opt_smp "
+cmake_args+="-DSTATS=$opt_stats "
+cmake_args+="-DTARGET=$target "
+cmake_args+="-DTASK_QUEUE=$opt_task_queue "
+cmake_args+="-DTCP=$opt_tcp "
+cmake_args+="-DTRACING=$opt_tracing "
+cmake_args+="-DTRACING_COMMTHREAD=$opt_tracing_commthread "
+cmake_args+="-DZLIB=$opt_zlib "
+
+
+CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. $cmake_args
+
+make $opt_parallel
+
+echo 'Build successful.'
