@@ -8,6 +8,7 @@
    application code without interference from MPI functions used by 
    MPI-IO. */
 
+#if 0
 #ifndef USE_MPI_VERSIONS
 
 #undef MPI_Abort
@@ -382,4 +383,5 @@
 #undef MPI_Type_create_keyval
 #define MPI_Type_create_keyval PMPI_Type_create_keyval
 
+#endif
 #endif
