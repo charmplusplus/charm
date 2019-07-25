@@ -361,7 +361,7 @@ void CldGraphModuleInit(char **argv)
       CmiPrintf("Charm++> Steal work when load is fewer than %d. \n", WS_Threshold);
 #if CMK_IMMEDIATE_MSG
   if(_steal_immediate && CmiMyPe() == 0)
-      CmiPrintf("Charm++> Steal work using immediate messages. \n", WS_Threshold);
+      CmiPrintf("Charm++> Steal work using immediate messages. \n");
 #endif
 }
 

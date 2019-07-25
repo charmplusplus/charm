@@ -478,7 +478,7 @@ void GreedyRefineLB::work(LDStats *stats)
                "but maxload after lb is %f higher than greedy. Consider testing with A=0, B=-1\n",
                CkMyPe(), migrationRatio, greedyRatio);
     }
-    CkPrintf("[%d] GreedyRefineLB: after lb, max_load=%.3f, migrations=%d(%.2f%), ratioToGreedy=%.3f\n",
+    CkPrintf("[%d] GreedyRefineLB: after lb, max_load=%.3f, migrations=%d(%.2f%%), ratioToGreedy=%.3f\n",
              CkMyPe(), maxLoad, nmoves, 100.0*migrationRatio, greedyRatio);
   }
 }

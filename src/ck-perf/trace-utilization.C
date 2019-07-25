@@ -113,7 +113,7 @@ All of these would be packed as bytes into the message:
 
  */
 void TraceUtilizationBOC::ccsRequestSumDetailCompressed(CkCcsRequestMsg *m) {
-  CkPrintf("CCS request for compressed sum detail. (found %d stored in deque)\n",  storedSumDetailResults.size() );
+  CkPrintf("CCS request for compressed sum detail. (found %zu stored in deque)\n",  storedSumDetailResults.size() );
   //  CkAssert(sumDetail);
   int datalength;
 
@@ -403,7 +403,7 @@ void printCompressedBuf(compressedBuffer b){
       for(int j=0;j<recordLength;j++){
 	ep_T ep = b.pop<ep_T>();
 	utilization_T v = b.pop<utilization_T>();
-	CkPrintf("(%d,%f) ", ep, v);
+	CkPrintf("(%d,%d) ", ep, v);
       }
     
       CkPrintf("\n");

@@ -134,9 +134,9 @@ public:
 
         if(warmUp == false) {
             if(size < 1 << 24)
-              CkPrintf("%d\t\t\t%d\t\t\t%lf\t\t\t%lf\t\t\t\t%lf\n", size, iterations, reg_time, zcpy_send_time, zcpy_recv_time);
+              CkPrintf("%zu\t\t\t%d\t\t\t%lf\t\t\t%lf\t\t\t\t%lf\n", size, iterations, reg_time, zcpy_send_time, zcpy_recv_time);
             else
-              CkPrintf("%d\t\t%d\t\t\t%lf\t\t\t%lf\t\t\t\t%lf\n", size, iterations, reg_time, zcpy_send_time, zcpy_recv_time);
+              CkPrintf("%zu\t\t%d\t\t\t%lf\t\t\t%lf\t\t\t\t%lf\n", size, iterations, reg_time, zcpy_send_time, zcpy_recv_time);
         }
         size = size << 1;
         if(warmUp)

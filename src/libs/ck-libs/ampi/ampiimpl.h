@@ -920,7 +920,7 @@ inline void outputOp(const std::vector<int>& vec) noexcept {
     CkPrintf("vector too large to output!\n");
     return;
   }
-  CkPrintf("output vector: size=%d {",vec.size());
+  CkPrintf("output vector: size=%zu {",vec.size());
   for (int i=0; i<vec.size(); i++) {
     CkPrintf(" %d ", vec[i]);
   }

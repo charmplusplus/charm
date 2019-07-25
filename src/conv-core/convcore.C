@@ -584,7 +584,7 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
   int dummy = 0, found = CmiGetArgIntDesc(argv, arg, &dummy, desc);
 
   if (found)
-    CmiPrintf(warning);
+    CmiPrintf("%s", warning);
 }
 
 /*****************************************************************************
@@ -4039,8 +4039,7 @@ void CmiError(const char *format, ...)
 
 void __cmi_assert(const char *errmsg)
 {
-  CmiError("[%d] %s\n", CmiMyPe(), errmsg);
-  CmiAbort(errmsg);
+  CmiAbort("[%d] %s\n", CmiMyPe(), errmsg);
 }
 
 char *CmiCopyMsg(char *msg, int len)
