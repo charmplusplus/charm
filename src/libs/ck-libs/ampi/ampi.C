@@ -5960,7 +5960,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *st
       complete = true;
       parent->resumeOnRecv = false;
 #if CMK_BIGSIM_CHARM
-      *result = 0;
+      if (result) *result = 0;
 #endif
       return parent;
     }
@@ -5970,7 +5970,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *st
     //memory operation. So we need to return from this function and do the while loop
     //in the outer function call.
     if (_BgInOutOfCoreMode) {
-      *result = -1;
+      if (result) *result = -1;
       return parent;
     }
 #endif
@@ -5989,7 +5989,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *st
   }
 
 #if CMK_BIGSIM_CHARM
-  *result = 0;
+  if (result) *result = 0;
 #endif
   return parent;
 }
