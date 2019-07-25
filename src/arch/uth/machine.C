@@ -30,6 +30,7 @@ void CmiAbort(const char *message, ...)
   vsnprintf(newmsg, sizeof(newmsg), message, args);
   va_end(args);
   CmiError(newmsg);
+  CmiError("\n");
   exit(1);
   CMI_NORETURN_FUNCTION_END
 }

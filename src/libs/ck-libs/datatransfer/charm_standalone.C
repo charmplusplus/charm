@@ -10,6 +10,7 @@ extern "C" void CmiAbort(const char *fmt, ...) {
 	va_list p; va_start(p, fmt);
 	vfprintf(stderr,fmt,p);
 	va_end(p);
+	fprintf(stderr, "\n");
 	abort();
 }
 
