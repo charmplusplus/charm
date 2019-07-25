@@ -1173,7 +1173,7 @@ class AmpiRequest {
   virtual bool isPersistent() const noexcept { return false; }
 
   /// Deregister memory from a get/put
-  virtual void deregisterMem() { }
+  virtual void deregisterMem(CkNcpyBuffer* info) { }
 
   /// Set an intermediate/system buffer that a message will be serialized thru
   virtual void setSystemBuf(void* buf_, int len=0) { }
@@ -1261,7 +1261,6 @@ class IReq final : public AmpiRequest {
   bool cancelled   = false; // track if request is cancelled
   bool persistent  = false; // Is this a persistent recv request?
   int length       = 0; // recv'ed length in bytes
-  CkNcpyBuffer* targetInfo = nullptr;
   char* systemBuf  = nullptr; // non-NULL for non-contiguous recv datatypes
   int systemBufLen = 0; // length in bytes of systemBuf
 
@@ -1297,10 +1296,10 @@ class IReq final : public AmpiRequest {
     systemBuf = (char*)buf_;
     systemBufLen = len;
   }
-  void deregisterMem() noexcept override {
+  void deregisterMem(CkNcpyBuffer *targetInfo) noexcept override {
     if (targetInfo) {
       targetInfo->deregisterMem();
-      delete targetInfo;
+      // targetInfo is owned by the CkDataMsg and so is freed with it
     }
     if (systemBuf) {
       delete [] systemBuf;
@@ -1313,14 +1312,6 @@ class IReq final : public AmpiRequest {
     p|length;
     p|systemBufLen;
     p((char *)&systemBuf, sizeof(char *));
-    bool hasTargetInfo = (targetInfo != NULL);
-    p|hasTargetInfo;
-    if (hasTargetInfo) {
-      if (p.isUnpacking()) {
-        targetInfo = new CkNcpyBuffer();
-      }
-      p|*targetInfo;
-    }
   }
   void print() const noexcept override;
 };
@@ -1465,7 +1456,6 @@ class SsendReq final : public AmpiRequest {
   bool persistent = false; // is this a persistent Ssend request?
  public:
   int destRank = MPI_PROC_NULL;
-  CkNcpyBuffer* srcInfo = nullptr;
 
  public:
   SsendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
@@ -1509,10 +1499,10 @@ class SsendReq final : public AmpiRequest {
   AmpiReqType getType() const noexcept override { return AMPI_SSEND_REQ; }
   bool isUnmatched() const noexcept override { return false; }
   bool isPooledType() const noexcept override { return true; }
-  void deregisterMem() noexcept override {
+  void deregisterMem(CkNcpyBuffer *srcInfo) noexcept override {
     if (srcInfo) {
       srcInfo->deregisterMem();
-      delete srcInfo;
+      // srcInfo is owned by the CkDataMsg and so is freed with it
     }
     if (systemBuf) {
       delete [] (char*)buf;
@@ -1527,12 +1517,6 @@ class SsendReq final : public AmpiRequest {
     p|persistent;
     p|destRank;
     p|systemBuf;
-    bool hasSrcInfo = (srcInfo != NULL);
-    p|hasSrcInfo;
-    if (hasSrcInfo) {
-      if (p.isUnpacking()) srcInfo = new CkNcpyBuffer();
-      p|*srcInfo;
-    }
   }
   void print() const noexcept override;
 };
@@ -2654,8 +2638,8 @@ class ampi final : public CBase_ampi {
                                                   int t, MPI_Comm comm, MPI_Status* sts) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
-  inline void completedSend(MPI_Request req) noexcept;
-  inline void completedRecv(MPI_Request req) noexcept;
+  inline void completedSend(MPI_Request req, CkNcpyBuffer *srcInfo=nullptr) noexcept;
+  inline void completedRecv(MPI_Request req, CkNcpyBuffer *targetInfo=nullptr) noexcept;
 
   inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept;
   AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root,MPI_Comm destcomm) noexcept;

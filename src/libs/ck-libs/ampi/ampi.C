@@ -1802,10 +1802,10 @@ int ampiParent::dupUserAttributes(int old_context, std::unordered_map<int, uintp
 }
 
 int ampiParent::freeUserAttributes(int context, std::unordered_map<int, uintptr_t> & attributes) noexcept {
-  for (auto iter = attributes.begin(); iter != attributes.end(); ++iter) {
-    int keyval = iter->first;
+  for (auto & attr : attributes) {
+    int keyval = attr.first;
     KeyvalNode & kv = *kvlist[keyval];
-    void * val = (void *)iter->second;
+    void * val = (void *)attr.second;
     int ret = (*kv.delete_fn)(context, keyval, val, kv.extra_state);
     if (ret != MPI_SUCCESS)
       return ret;
@@ -2887,7 +2887,7 @@ void ampi::inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
 }
 
 // Callback signaling that the send buffer is now safe to re-use
-void ampi::completedSend(MPI_Request reqIdx) noexcept
+void ampi::completedSend(MPI_Request reqIdx, CkNcpyBuffer *srcInfo/*=nullptr*/) noexcept
 {
   MSG_ORDER_DEBUG(
      CkPrintf("[%d] VP %d in completedSend, reqIdx = %d\n",
@@ -2896,7 +2896,7 @@ void ampi::completedSend(MPI_Request reqIdx) noexcept
 
   AmpiRequestList& reqList = getReqs();
   AmpiRequest& sreq = (*reqList[reqIdx]);
-  sreq.deregisterMem();
+  sreq.deregisterMem(srcInfo);
   sreq.complete = true;
 
   handleBlockedReq(&sreq);
@@ -2908,11 +2908,12 @@ void ampi::completedRdmaSend(CkDataMsg *msg) noexcept
 {
   // refnum is the index into reqList for this SendReq
   int reqIdx = CkGetRefNum(msg);
-  completedSend(reqIdx);
+  CkNcpyBuffer *srcInfo = (CkNcpyBuffer *)(msg->data);
+  completedSend(reqIdx, srcInfo);
   // [nokeep] entry method, so do not delete msg
 }
 
-void ampi::completedRecv(MPI_Request reqIdx) noexcept
+void ampi::completedRecv(MPI_Request reqIdx, CkNcpyBuffer *targetInfo/*=nullptr*/) noexcept
 {
   MSG_ORDER_DEBUG(
     CkPrintf("[%d] VP %d in completedRecv, reqIdx = %d\n", CkMyPe(), parent->thisIndex, reqIdx);
@@ -2925,7 +2926,7 @@ void ampi::completedRecv(MPI_Request reqIdx) noexcept
     // deserialize message from intermediate/system buffer into non-contiguous user buffer
     processRdmaMsg(ireq.systemBuf, ireq.systemBufLen, ireq.buf, ireq.count, ireq.type);
   }
-  ireq.deregisterMem();
+  ireq.deregisterMem(targetInfo);
   ireq.complete = true;
 
   handleBlockedReq(&ireq);
@@ -2936,7 +2937,8 @@ void ampi::completedRdmaRecv(CkDataMsg *msg) noexcept
 {
   // refnum is the index into reqList for this IReq
   int reqIdx = CkGetRefNum(msg);
-  completedRecv(reqIdx);
+  CkNcpyBuffer *targetInfo = (CkNcpyBuffer *)(msg->data);
+  completedRecv(reqIdx, targetInfo);
   // [nokeep] entry method, so do not delete msg
 }
 
@@ -3024,9 +3026,10 @@ AmpiMsg* ampi::makeNcpyMsg(int t, int sRank, const void* buf, int count,
   CkCallback sendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true /*inline*/);
   sendCB.setRefnum(ssendReq);
   SsendReq& req = *((SsendReq*)(getReqs()[ssendReq]));
+  CkNcpyBuffer srcInfo;
 
   if (ddt->isContig()) {
-    req.srcInfo = new CkNcpyBuffer(buf, len, sendCB);
+    srcInfo = CkNcpyBuffer(buf, len, sendCB);
   }
   else {
     // NOTE: if DDT could provide us with a list of pointers to contiguous chunks
@@ -3034,7 +3037,7 @@ AmpiMsg* ampi::makeNcpyMsg(int t, int sRank, const void* buf, int count,
     //       now we just copy into a contiguous system buffer and then send that.
     char* sbuf = new char[len];
     ddt->serialize((char*)buf, sbuf, count, len, PACK);
-    req.srcInfo = new CkNcpyBuffer(sbuf, len, sendCB);
+    srcInfo = CkNcpyBuffer(sbuf, len, sendCB);
     req.setSystemBuf(sbuf); // completedSend will need to free this
     // NOTE: We could set 'req.complete = true' here, but then we'd
     //       have to make sure req.systemBuf gets freed by someone else
@@ -3044,7 +3047,7 @@ AmpiMsg* ampi::makeNcpyMsg(int t, int sRank, const void* buf, int count,
   AmpiMsgType msgType = NCPY_MSG;
   PUP::sizer pupSizer;
   pupSizer | msgType;
-  pupSizer | (*req.srcInfo);
+  pupSizer | srcInfo;
   int srcInfoLen = pupSizer.size();
 
   AmpiMsg *msg = CkpvAccess(msgPool).newAmpiMsg(seq, ssendReq, t, sRank, srcInfoLen);
@@ -3052,7 +3055,7 @@ AmpiMsg* ampi::makeNcpyMsg(int t, int sRank, const void* buf, int count,
 
   PUP::toMem pupPacker(msg->getData());
   pupPacker | msgType;
-  pupPacker | (*req.srcInfo);
+  pupPacker | srcInfo;
   return msg;
 }
 
@@ -3319,21 +3322,22 @@ void ampi::requestPut(MPI_Request reqIdx, CkNcpyBuffer targetInfo) noexcept {
   CkDDT_DataType* sddt = getDDT()->getType(req.type);
   CkCallback sendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true /*inline*/);
   sendCB.setRefnum(reqIdx);
+  CkNcpyBuffer srcInfo;
 
   if (sddt->isContig()) {
-    req.srcInfo = new CkNcpyBuffer(req.buf, req.count, sendCB);
+    srcInfo = CkNcpyBuffer(req.buf, req.count, sendCB);
   }
   else {
     int len = sddt->getSize(req.count);
     char* sbuf = new char[len];
     sddt->serialize((char*)req.buf, sbuf, req.count, len, PACK);
-    req.srcInfo = new CkNcpyBuffer(sbuf, len, sendCB);
+    srcInfo = CkNcpyBuffer(sbuf, len, sendCB);
     req.setSystemBuf(sbuf); // completedSend will need to free this
     // NOTE: We could set 'req.statusIreq = true' here, but then we'd
     // have to make sure systemBuf gets freed by someone in case the
     // user tries to free 'req' before the put() actually completes...
   }
-  req.srcInfo->put(targetInfo);
+  srcInfo.put(targetInfo);
 }
 
 bool ampi::processSsendMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
@@ -3409,9 +3413,10 @@ bool ampi::processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
     CkCallback recvCB(CkIndex_ampi::completedRdmaRecv(NULL), thisProxy[thisIndex], true /*inline*/);
     recvCB.setRefnum(req);
     IReq& ireq = *((IReq*)(parent->ampiReqs[req]));
+    CkNcpyBuffer targetInfo;
 
     if (rddt->isContig()) {
-      ireq.targetInfo = new CkNcpyBuffer(buf, len, recvCB);
+      targetInfo = CkNcpyBuffer(buf, len, recvCB);
     }
     else {
       // Allocate a contiguous intermediate buffer for the put(),
@@ -3419,9 +3424,9 @@ bool ampi::processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
       int slen = srcInfo.getLength();
       char* sbuf = new char[slen];
       ireq.setSystemBuf(sbuf, slen); // completedRecv will need to free this
-      ireq.targetInfo = new CkNcpyBuffer(sbuf, slen, recvCB);
+      targetInfo = CkNcpyBuffer(sbuf, slen, recvCB);
     }
-    thisProxy[srcInfo.getIdx()].requestPut(srcInfo.getSreqIdx(), *ireq.targetInfo);
+    thisProxy[srcInfo.getIdx()].requestPut(srcInfo.getSreqIdx(), targetInfo);
     return false;
   }
 }
@@ -3439,16 +3444,17 @@ bool ampi::processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
   int len = ddt->getSize(count);
   IReq& ireq = *((IReq*)(parent->ampiReqs[req]));
   ireq.length = len;
+  CkNcpyBuffer targetInfo;
 
   if (ddt->isContig()) {
-    ireq.targetInfo = new CkNcpyBuffer(buf, len, recvCB);
+    targetInfo = CkNcpyBuffer(buf, len, recvCB);
   }
   else {
     char* sbuf = new char[len];
     ireq.setSystemBuf(sbuf);
-    ireq.targetInfo = new CkNcpyBuffer(sbuf, len, recvCB);
+    targetInfo = CkNcpyBuffer(sbuf, len, recvCB);
   }
-  ireq.targetInfo->get(srcInfo);
+  targetInfo.get(srcInfo);
   return ireq.complete; // did the get() complete inline (i.e. src is in same process as target)?
 }
 
@@ -7095,8 +7101,10 @@ AMPI_API_IMPL(int, MPI_Type_free, MPI_Datatype *datatype)
 {
   AMPI_API("AMPI_Type_free");
 
+  int ret;
+
 #if AMPI_ERROR_CHECKING
-  int ret = checkData("AMPI_Type_free", *datatype);
+  ret = checkData("AMPI_Type_free", *datatype);
   if (ret!=MPI_SUCCESS)
     return ret;
 

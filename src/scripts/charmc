@@ -9,6 +9,12 @@
 #
 ##############################################################################
 
+# Filter extra cmake arguments
+# This has no effect when building Charm++ without cmake
+if [ "$1" = "@CMAKE_C_COMPILER@" ]; then shift; fi
+if [ "$1" = "@CMAKE_CXX_COMPILER@" ]; then shift; fi
+if [ "$1" = "@CMAKE_Fortran_COMPILER@" ]; then shift; fi
+
 #Prepare aliases for the external commands we use--
 # Note that adding /bin/ to everything breaks Cygwin32.
 RM="rm -f"
@@ -45,12 +51,12 @@ OPTS=""
 #charm internal flag, only pass to c and cxx, not f90
 OPTS_CPP_INTERNAL="-D__CHARMC__=1"
 OPTS_CPP=
-OPTS_LDRO="" 
+OPTS_LDRO=""
 OPTS_CC=""
 OPTS_CC_GENCPM=""
-OPTS_CXX="" 
+OPTS_CXX=""
 OPTS_F90=""
-OPTS_LD=""  
+OPTS_LD=""
 USE_PIC="0"
 USE_PIE='0'
 
@@ -60,22 +66,22 @@ OBJECT=""
 EXPLICIT_OBJECT="no"
 EXPLICIT_COMPILATION="no"
 POST_LANGUAGE=""
-POST_LIBRARIES=""    
-PRE_LIBRARIES=""  
-USE_F90_LIBRARIES="0"  
-USE_F77_LIBRARIES="0"  
+POST_LIBRARIES=""
+PRE_LIBRARIES=""
+USE_F90_LIBRARIES="0"
+USE_F77_LIBRARIES="0"
 F90_MODDIR=
 AMPIMAIN=""
 AMPI=""
 AMPIF=""
-COPYTO=""        
-MODCOPIES=""        
+COPYTO=""
+MODCOPIES=""
 MODULES=""
 BALANCER=""
-FILES=""       
-OBJECTFILES=""  
-DELETE=""    
-MAINOBJ=""   
+FILES=""
+OBJECTFILES=""
+DELETE=""
+MAINOBJ=""
 GENCPM=""
 OPTIMIZE_MODE=""
 PRODUCTION_MODE=""
@@ -127,7 +133,7 @@ INPUT_GIVEN=""
 # Args: any additional messages
 printUsage() {
     printVersion
-    echo 
+    echo
     echo "Usage: charmc [ flags ] <files>"
     echo
     echo "  flags:"
@@ -247,7 +253,7 @@ Debugf() {
 Debug() {
     if [ -n "$DEBUG_SCRIPT" ]
     then
-	echo 
+	echo
 	echo "------- Charmc Debugging info: $* -------"
 	echo "CHARMBIN=$CHARMBIN"
 	echo "CHARMINC=$CHARMINC"
@@ -331,7 +337,7 @@ then
 	CHARMBIN=`dirname $SCRIPT`
 #	CHARMBIN=`cd $CHARMBIN; pwd`
 # NOTE: this script no longer tries to follow soft links
-# to find the "original" charmc-- if this is bad, 
+# to find the "original" charmc-- if this is bad,
 # translate these lines to Bourne shell from C shell:
 # -------------------- Begin C Shell ------------------------->
 #    if ($SCRIPT:h != $SCRIPT:t) then
@@ -388,12 +394,12 @@ fi
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
 CHARMLIBSO=
-if test -d "$CHARMBIN/../lib_so" 
+if test -d "$CHARMBIN/../lib_so"
 then
   CHARMLIBSO=`cd $CHARMBIN/../lib_so 2>/dev/null && pwd`
   #getting absolute path is harder than thought because of symbolic links and ..
   #ksh needs cd -P to resolve werid symbolic links, however -P is not portable
-  #csh is ok too if it exists 
+  #csh is ok too if it exists
   test -z "$CHARMLIBSO" && CHARMLIBSO=`cd -P $CHARMBIN/../lib_so 2>/dev/null && pwd`
   test -z "$CHARMLIBSO" && CHARMLIBSO=`csh -c "cd $CHARMBIN/../lib_so >& /dev/null && pwd"`
   test -z "$CHARMLIBSO" && echo "$CHARMBIN/../lib_so: not found" && exit 1
@@ -459,7 +465,7 @@ do
 			POST_LANGUAGE=1
 			;;
 
-		*) 
+		*)
 			LANGUAGE="$1"
 			POST_LANGUAGE=1
 			;;
@@ -520,7 +526,7 @@ do
 	"-no-trace-mpi")
 		TAU_TRACE_MPI=0
 		;;
-	
+
 	"-swapglobal"|"-swapglobals")
 		SWAPGLOBALS="1"
 		USE_PIC="1"
@@ -641,15 +647,15 @@ do
 	"-rpath-origin")
 		RPATH_ORIGIN="yes"
 		;;
-	
+
 	"-fortran"|"-flib"|"-flibs")
-		USE_F90_LIBRARIES="1" 
+		USE_F90_LIBRARIES="1"
 		;;
 	"-f77")
-		USE_F77="1" 
+		USE_F77="1"
 		;;
 	"-fortran77"|"-f77lib"|"-f77libs")
-		USE_F77_LIBRARIES="1" 
+		USE_F77_LIBRARIES="1"
 		;;
 	"-E")
 # Run preprocessor only
@@ -730,7 +736,7 @@ do
 		;;
 
 	-D*|-I*)
-		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null 
+		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null
 		then
 		  OPTS_CPP="$OPTS_CPP "\"$arg\"
 		else
@@ -793,7 +799,7 @@ do
 	-Wl,*)
 		POST_LIBRARIES="$POST_LIBRARIES $arg"
 		;;
-	
+
 	"-pg"|"-g"|-W*|-O*)
 		OPTS="$OPTS $arg"
 		;;
@@ -960,7 +966,7 @@ Debug "Read config script, setting defaults..."
 
 Debug "Setting vars..."
 
-if [ "$USE_BUILD_OPTIONS" = "1" ]  
+if [ "$USE_BUILD_OPTIONS" = "1" ]
 then
 	[ -n "$VERBOSE" ] && echo "Charmc applying build time options: $BUILDOPTS"
 	OPTS="$OPTS $BUILDOPTS"
@@ -1135,7 +1141,7 @@ then
 		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
 		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
 		;;
-	*)	
+	*)
 		BUILD_SHARE="0"
 		;;
 	esac
@@ -1208,8 +1214,8 @@ then
     CMK_CC="$CMK_SEQ_CC"
     CMK_LD="$CMK_SEQ_LD"
     CMK_CXX="$CMK_SEQ_CXX"
-    CMK_CF90="$CMK_SEQ_F90 " 
-    CMK_LDXX="$CMK_SEQ_LDXX" 
+    CMK_CF90="$CMK_SEQ_F90 "
+    CMK_LDXX="$CMK_SEQ_LDXX"
     CMK_AR="$CMK_SEQ_AR"
     CMK_RANLIB="$CMK_SEQ_RANLIB"
 
@@ -1221,10 +1227,10 @@ fi
 
 if [ -n "$NATIVE" ]
 then
-    CMK_CC="$CMK_NATIVE_CC " 
-    CMK_LD="$CMK_NATIVE_LD" 
-    CMK_CXX="$CMK_NATIVE_CXX " 
-    CMK_LDXX="$CMK_NATIVE_LDXX" 
+    CMK_CC="$CMK_NATIVE_CC "
+    CMK_LD="$CMK_NATIVE_LD"
+    CMK_CXX="$CMK_NATIVE_CXX "
+    CMK_LDXX="$CMK_NATIVE_LDXX"
 
     CMK_CC_FLAGS="$CMK_NATIVE_CC_FLAGS"
     CMK_LD_FLAGS="$CMK_NATIVE_LD_FLAGS"
@@ -1281,7 +1287,7 @@ then
   echo "include $TAU_MAKEFILE" > _make.tau.tmp
   echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
   TAU_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_LIBS`
-  TAU_MPI_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS` 
+  TAU_MPI_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS`
   TAU_MPI_FLIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS`
   TAU_DEFS=`make --no-print-directory -f _make.tau.tmp print-TAU_DEFS`
   TAU_INCLUDE=`make --no-print-directory -f _make.tau.tmp print-TAU_INCLUDE`
@@ -1295,7 +1301,7 @@ OPTS_CXX="$OPTS $TAU_DEFS $TAU_INCLUDE $OPTS_CXX"
 OPTS_F90="$OPTS $OPTS_F90"
 OPTS_LD="$OPTS $OPTS_LD"
 
-# There's really no analog for this in the Bourne shell: 
+# There's really no analog for this in the Bourne shell:
 #  -------- C Shell ------> onintr failure
 # Luckily, it's irrelevant as long as nobody sends us a ^Z.
 
@@ -1773,14 +1779,14 @@ fi
 
 
 Copyobj() {
-	if [ "a$COPYTO" != "a" -a "a$COPYTO" != "a$OBJECT" ] 
+	if [ "a$COPYTO" != "a" -a "a$COPYTO" != "a$OBJECT" ]
 	then
 		[ -d $COPYTO ] && COPYTO="$COPYTO/"
 		if [ "a$PROG_EXT" != "a" -a -r "$OBJECT$PROG_EXT" ] ; then
 			Warning "Appending $PROG_EXT to object file name"
 			OBJECT="$OBJECT$PROG_EXT"
 		fi
-		[ ! -d $COPYTO ] && DoNoErrCheck $RM $COPYTO 
+		[ ! -d $COPYTO ] && DoNoErrCheck $RM $COPYTO
 		Do $CP $OBJECT $COPYTO
 	fi
 	test -n "$COPY_EXIT" && Success
@@ -1789,7 +1795,7 @@ Copyobj() {
 Copymod() {
 	for COPY in `echo $MODCOPIES`
 	do
-		if [ "a$COPY" != "a$OBJECT" ] 
+		if [ "a$COPY" != "a$OBJECT" ]
 		then
 			[ -d $COPY ] && COPY="$COPY/"
 			if [ -n "$CMK_MOD_NAME_ALLCAPS" ] ; then
@@ -1799,7 +1805,7 @@ Copymod() {
 			  Warning "Appending .$CMK_MOD_EXT to object file name"
 			  OBJECT="$OBJECT.$CMK_MOD_EXT"
 			fi
-			[ ! -d $COPY ] && DoNoErrCheck $RM $COPY 
+			[ ! -d $COPY ] && DoNoErrCheck $RM $COPY
 			Do $CP $OBJECT $COPY
 		fi
 	done
@@ -1842,6 +1848,15 @@ done
 
 Debug "About to compile..."
 
+# Filter spurious cmake arguments
+# CHARM_CXX_FLAGS=`echo $CHARM_CXX_FLAGS | sed s,"$CMK_CXX",,g `
+# CHARM_CC_FLAGS=`echo $CHARM_CC_FLAGS | sed s,"$CMK_CC",,g `
+# CMK_CF90_COMPONLY=`echo $CMK_CF90 | awk '{print $1}'`
+# FILES=`echo $FILES | sed s,"$CMK_CF90_COMPONLY",,g`
+# OPTS_F90=`echo $OPTS_F90 | sed s,"$CMK_CF90_COMPONLY",,g`
+
+# echo $CHARM_CC_FLAGS
+
 for FILE in $FILES
 do
 	BASE=`stripExtention \`basename $FILE\``
@@ -1853,8 +1868,8 @@ do
 	# in case of: charmc -o object.o -c foo.c,
 	# avoid foo.c => remove foo.o => foo.o => object.o,
 	# instead generate object.o directly.
- 	# remove and generate foo.o may be dangerous in parallel make 
-	# for example in the case of compiling several objs from one 
+ 	# remove and generate foo.o may be dangerous in parallel make
+	# for example in the case of compiling several objs from one
 	# same c file such as memory.C.
 	if [ $numFiles = 1 -a -n "$OBJECT" ]
 	then
@@ -1874,7 +1889,7 @@ do
 		DoNoErrCheck $RM $BASEO `stripExtention $BASEO`.f.o
         esac
 #	fi
-	if [ ! -z "$SKIPLINK" ] 
+	if [ ! -z "$SKIPLINK" ]
 	then
 		DESTO=""
 	fi
@@ -2032,7 +2047,7 @@ MakeSO() {
 	Copyobj
 }
 
-if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ] 
+if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ]
 then
 # We have no target object, or are playing preprocessor tricks-- just end
 	Debugf "No target object-- finished"
@@ -2085,10 +2100,10 @@ case "$OBJECT" in
 	  COPYTO_SAVE=$COPYTO
 	  if [ -z "$COPYTO" ]
 	  then
-	    DESTDIR=`echo $OBJECT | sed -e 's@lib/[^/]*\.a$@lib_so@'`
-	    OBJECT=`echo $OBJECT | sed -e 's@lib/\([^/]*\)\.a$@lib_so/\1.a@'`
+	    DESTDIR=`echo $OBJECT | sed -e 's,lib/[^/]*\.a$,lib_so,'`
+	    OBJECT=`echo $OBJECT | sed -e 's,lib/\([^/]*\)\.a$,lib_so/\1.a,'`
 	  else
-	    COPYTO=`echo $COPYTO | sed -e 's@lib[/]*$@lib_so@'`
+	    COPYTO=`echo $COPYTO | sed -e 's,lib[/]*$,lib_so,'`
 	    DESTDIR=$COPYTO
 	  fi
 	  OBJECT=`echo $OBJECT | sed -e 's/\.a$/.'"$CMK_SHARED_SUF"'/'`
