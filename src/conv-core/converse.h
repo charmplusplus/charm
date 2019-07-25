@@ -1041,8 +1041,17 @@ char *CmiPrintDate(void);
 #define CsdEmpty()            (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
 #define CsdLength()           (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
 #if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.C */
+#if defined __GNUC__ || defined __clang__
+__attribute__ ((format (printf, 1, 2)))
+#endif
 void  CmiPrintf(const char *, ...);
+#if defined __GNUC__ || defined __clang__
+__attribute__ ((format (printf, 1, 2)))
+#endif
 void  CmiError(const char *, ...);
+#if defined __GNUC__ || defined __clang__
+__attribute__ ((format (scanf, 1, 2)))
+#endif
 int   CmiScanf(const char *, ...);
 /* CmiFlush is disabled in this case */
 #define CmiFlush(stream) 
@@ -1060,7 +1069,13 @@ int   CmiScanf(const char *, ...);
 */
 #include <stdarg.h>
 
+#if defined __GNUC__ || defined __clang__
+__attribute__ ((format (printf, 1, 2)))
+#endif
 void  CmiPrintf(const char *format, ...);
+#if defined __GNUC__ || defined __clang__
+__attribute__ ((format (printf, 1, 2)))
+#endif
 void  CmiError(const char *format, ...);
 /* CmiFlush works only when CMK_CMIPRINTF_IS_A_BUILTIN is false */
 #define CmiFlush(stream)  fflush(stream);
@@ -1771,7 +1786,13 @@ void realConverseExit(int exitcode);
 #if CMK_SHRINK_EXPAND
 void ConverseCleanup(void);
 #endif
-CMK_NORETURN void CmiAbort(const char *msg, ...);
+
+CMK_NORETURN
+#if defined __GNUC__ || defined __clang__
+__attribute__ ((format (printf, 1, 2)))
+#endif
+void CmiAbort(const char *msg, ...);
+
 void CmiOutOfMemory(int nBytes);
 
 #if CMK_MEMCHECK_OFF
