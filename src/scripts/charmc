@@ -883,6 +883,12 @@ do
 		POST_LIBRARIES=''
 		;;
 
+	# compatibility with libtool
+	-install_name|-current_version|-compatibility_version)
+		OPTS="$OPTS -Wl,$arg,$1"
+		shift
+		;;
+
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
