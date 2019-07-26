@@ -26,11 +26,17 @@ jacobi: $(OBJS)
 jacobi.o: jacobi.C
 	$(AMPICC) -c $(PARAMETERS) $<
 
-syncfttest: $(foreach i,$(TARGETS),test-$i)
+syncfttest: $(foreach i,$(TARGETS),test-$i) $(foreach i,$(TARGETS),smptest-$i)
 
 test-jacobi: jacobi
 	$(call run, ./jacobi 2 2 2 200 +vp8 +p8 +isomalloc_sync +killFile kill_01.txt )
 	$(call run, ./jacobi 4 2 2 200 +vp16 +p8 +isomalloc_sync +killFile kill_02.txt )
+
+smptest-jacobi: jacobi
+	$(call run, ./jacobi 2 2 2 200 +vp8 +p8 ++ppn 4 +isomalloc_sync +killFile kill_01.txt )
+	$(call run, ./jacobi 4 2 2 200 +vp16 +p8 ++ppn 4 +isomalloc_sync +killFile kill_02.txt )
+	$(call run, ./jacobi 2 2 2 200 +vp8 +p8 ++ppn 8 +isomalloc_sync +killFile kill_01.txt )
+	$(call run, ./jacobi 4 2 2 200 +vp16 +p8 ++ppn 8 +isomalloc_sync +killFile kill_02.txt )
 
 clean:
 	rm -f *.o jacobi jacobi.o *~ moduleinit.C charmrun conv-host ampirun

@@ -24,6 +24,14 @@ test: pgm
 	$(call run, ./pgm +p2 +vp4 )
 	$(call run, ./pgm +p2 +vp20 )
 
+smptest: pgm
+	$(call run, ./pgm +p2 ++ppn 2 +vp1 )
+	$(call run, ./pgm +p2 ++ppn 2 +vp4 )
+	$(call run, ./pgm +p2 ++ppn 2 +vp20 )
+	$(call run, ./pgm +p4 ++ppn 2 +vp1 )
+	$(call run, ./pgm +p4 ++ppn 2 +vp8 )
+	$(call run, ./pgm +p4 ++ppn 2 +vp20 )
+
 bgtest: pgm
 	$(call run, ./pgm +p1 +vp1 +x1 +y1 +z1 )
 	$(call run, ./pgm +p1 +vp2 +x1 +y1 +z1 )
