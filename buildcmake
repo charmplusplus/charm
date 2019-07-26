@@ -20,22 +20,23 @@ opt_charmpy=0
 opt_controlpoint=0
 opt_drone_mode=0
 opt_error_checking=0
+opt_extra_opts=""
 opt_incdir=""
-opt_lbtime_type= #undef
+opt_lbtime_type="double"
 opt_lbuserdata=0
 opt_libdir=""
 opt_lockless=0
-opt_mempool_cutoff= #undef
+opt_mempool_cutoff=26
 opt_network=0
 opt_numa=0
 opt_omp=0
 opt_parallel=-j1
-opt_prio_type=  #undef
+opt_prio_type="bitvec"
 opt_production=0
 opt_pthreads=0
 opt_qlogic=0
 opt_randomized_msgq=0
-opt_refnum_type= #undef
+opt_refnum_type="unsigned short"
 opt_replay=0
 opt_romio=1
 opt_shrinkexpand=0
@@ -212,7 +213,8 @@ while [[ $# -gt 0 ]]; do
       opt_incdir+="-I${arg#*=} "
       ;;
     *)
-      echo "*** Warning: Ignoring unknown option '$arg'."
+      echo "*** Warning: Adding unknown option '$arg' to compiler flags."
+      opt_extra_opts+="$arg "
       ;;
   esac
 done
@@ -251,42 +253,41 @@ if [[ -n $opt_incdir ]]; then
   echo "USER_OPTS_CXX='$opt_incdir'" >> include/conv-mach-pre.sh
 fi
 
-cmake_args+="-DCMAKE_BUILD_TYPE=$opt_production "
-cmake_args+="-DCMK_AMPI_WITH_ROMIO=$opt_romio "
-cmake_args+="-DAMPI_ERROR_CHECKING=$opt_ampi_error_checking "
-cmake_args+="-DAMPI_MPICH_TESTS=$opt_ampi_mpich_tests "
-cmake_args+="-DBUILD_SHARED=$opt_build_shared "
-cmake_args+="-DCCS=$opt_ccs "
-cmake_args+="-DCHARMDEBUG=$opt_charmdebug "
-cmake_args+="-DCHARMPY=$opt_charmpy "
-cmake_args+="-DCONTROLPOINT=$opt_controlpoint "
-cmake_args+="-DDRONE_MODE=$opt_drone_mode "
-cmake_args+="-DERROR_CHECKING=$opt_error_checking "
-[[ -n $opt_lbtime_type ]] && cmake_args+="-DLBTIME_TYPE=$opt_lbtime_type "
-cmake_args+="-DLBUSERDATA=$opt_lbuserdata "
-cmake_args+="-DLOCKLESS_QUEUE=$opt_lockless "
-[[ -n $opt_mempool_cutoff ]] && cmake_args+="-DCMK_MEMPOOL_CUTOFFNUM=$opt_mempool_cutoff "
-cmake_args+="-DNETWORK=$opt_network "
-cmake_args+="-DNUMA=$opt_numa "
-cmake_args+="-DOMP=$opt_omp "
-[[ -n $opt_prio_type ]] && cmake_args+="-DPRIO_TYPE=$opt_prio_type "
-cmake_args+="-DPTHREADS=$opt_pthreads "
-cmake_args+="-DQLOGIC=$opt_qlogic "
-cmake_args+="-DRANDOMIZED_MSGQ=$opt_randomized_msgq "
-[[ -n $opt_refnum_type ]] && cmake_args+="-DREFNUM_TYPE=$opt_refnum_type "
-cmake_args+="-DREPLAY=$opt_replay "
-cmake_args+="-DSHRINKEXPAND=$opt_shrinkexpand "
-cmake_args+="-DSMP=$opt_smp "
-cmake_args+="-DSTATS=$opt_stats "
-cmake_args+="-DTARGET=$target "
-cmake_args+="-DTASK_QUEUE=$opt_task_queue "
-cmake_args+="-DTCP=$opt_tcp "
-cmake_args+="-DTRACING=$opt_tracing "
-cmake_args+="-DTRACING_COMMTHREAD=$opt_tracing_commthread "
-cmake_args+="-DZLIB=$opt_zlib "
-
-
-CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. $cmake_args
+CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
+  -DCMAKE_BUILD_TYPE="$opt_production" \
+  -DCMK_AMPI_WITH_ROMIO="$opt_romio" \
+  -DAMPI_ERROR_CHECKING="$opt_ampi_error_checking" \
+  -DAMPI_MPICH_TESTS="$opt_ampi_mpich_tests" \
+  -DBUILD_SHARED="$opt_build_shared" \
+  -DCCS="$opt_ccs" \
+  -DCHARMDEBUG="$opt_charmdebug" \
+  -DCHARMPY="$opt_charmpy" \
+  -DCONTROLPOINT="$opt_controlpoint" \
+  -DDRONE_MODE="$opt_drone_mode" \
+  -DERROR_CHECKING="$opt_error_checking" \
+  -DEXTRA_OPTS="$opt_extra_opts" \
+  -DLBTIME_TYPE="$opt_lbtime_type" \
+  -DLBUSERDATA="$opt_lbuserdata" \
+  -DLOCKLESS_QUEUE="$opt_lockless" \
+  -DCMK_MEMPOOL_CUTOFFNUM="$opt_mempool_cutoff" \
+  -DNETWORK="$opt_network" \
+  -DNUMA="$opt_numa" \
+  -DOMP="$opt_omp" \
+  -DPRIO_TYPE="$opt_prio_type" \
+  -DPTHREADS="$opt_pthreads" \
+  -DQLOGIC="$opt_qlogic" \
+  -DRANDOMIZED_MSGQ="$opt_randomized_msgq" \
+  -DREFNUM_TYPE="$opt_refnum_type" \
+  -DREPLAY="$opt_replay" \
+  -DSHRINKEXPAND="$opt_shrinkexpand" \
+  -DSMP="$opt_smp" \
+  -DSTATS="$opt_stats" \
+  -DTARGET="$target" \
+  -DTASK_QUEUE="$opt_task_queue" \
+  -DTCP="$opt_tcp" \
+  -DTRACING="$opt_tracing" \
+  -DTRACING_COMMTHREAD="$opt_tracing_commthread" \
+  -DZLIB="$opt_zlib"
 
 make $opt_parallel
 
