@@ -67,7 +67,7 @@
 #define CMK_PERSISTENT_COMM                                0
 
 /* Enables support for immediate messages if set to 1. */
-#define CMK_IMMEDIATE_MSG				   0
+#define CMK_IMMEDIATE_MSG				   1
 
 /* This is needed to be 1 if the machine layer is used in some architectures
    where there is no coprocessor, and to pull messages out of the network there
