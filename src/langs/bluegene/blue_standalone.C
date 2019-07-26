@@ -10,8 +10,12 @@ extern "C" void CmiOutOfMemory(int nbytes) {
        abort();
 }
 
-extern "C" void CmiAbort(const char *why) {
-        fprintf(stderr,"Fatal error> %s\n",why);
+extern "C" void CmiAbort(const char *fmt, ...) {
+        fprintf(stderr,"Fatal error> ");
+        va_list p; va_start(p, fmt);
+        vfprintf(stderr, fmt, p);
+        va_end(p);
+        fprintf(stderr, "\n");
         abort();
 }
 

@@ -246,7 +246,7 @@ extern int ccsRunning;
 #endif
 
 /* ===== Beginning of Common Function Declarations ===== */
-CMK_NORETURN void CmiAbort(const char *message);
+CMK_NORETURN void CmiAbort(const char *message, ...);
 static void PerrorExit(const char *msg);
 
 /* This function handles the msg received as which queue to push into */
@@ -1755,8 +1755,13 @@ void CmiAbortHelper(const char *source, const char *message, const char *suggest
   LrtsAbort(message);
 }
 
-void CmiAbort(const char *message) {
-  CmiAbortHelper("Called CmiAbort", message, NULL, 1, 0);
+void CmiAbort(const char *message, ...) {
+  char newmsg[256];
+  va_list args;
+  va_start(args, message);
+  vsnprintf(newmsg, sizeof(newmsg), message, args);
+  va_end(args);
+  CmiAbortHelper("Called CmiAbort", newmsg, NULL, 1, 0);
   CMI_NORETURN_FUNCTION_END
 }
 
