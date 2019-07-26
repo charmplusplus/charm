@@ -4883,11 +4883,11 @@ void ampi::sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, 
   reqs[1] = send(stag, getRank(), sbuf, scount, stype, dest, comm, I_SEND);
 
   if (sts == MPI_STATUS_IGNORE) {
-    parent->waitall(2, reqs);
+    parent = parent->waitall(2, reqs);
   }
   else {
     MPI_Status statuses[2];
-    parent->waitall(2, reqs, statuses);
+    parent = parent->waitall(2, reqs, statuses);
     *sts = statuses[0];
   }
 }
@@ -4936,11 +4936,11 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
   reqs[1] = send(sendtag, getRank(), tmpBuf.data(), count, datatype, dest, comm, I_SEND);
 
   if (status == MPI_STATUS_IGNORE) {
-    parent->waitall(2, reqs);
+    parent = parent->waitall(2, reqs);
   }
   else {
     MPI_Status statuses[2];
-    parent->waitall(2, reqs, statuses);
+    parent = parent->waitall(2, reqs, statuses);
     *status = statuses[0];
   }
 }
@@ -6139,10 +6139,10 @@ CMI_WARN_UNUSED_RESULT ampiParent* SsendReq::wait(ampiParent* parent, MPI_Status
 }
 
 CMI_WARN_UNUSED_RESULT ampiParent* ATAReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
-  parent->waitall(reqs.size(), reqs.data());
+  parent = parent->waitall(reqs.size(), reqs.data());
   reqs.clear();
   complete = true;
-  return getAmpiParent();
+  return parent;
 }
 
 CMI_WARN_UNUSED_RESULT ampiParent* GReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
@@ -6225,9 +6225,9 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_St
   return MPI_SUCCESS;
 }
 
-int ampiParent::waitall(int count, MPI_Request request[], MPI_Status sts[]/*=MPI_STATUSES_IGNORE*/) noexcept
+CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request request[], MPI_Status sts[]/*=MPI_STATUSES_IGNORE*/) noexcept
 {
-  if (count == 0) return MPI_SUCCESS;
+  if (count == 0) return this;
 
   ampiParent* pptr = this;
   AmpiRequestList& reqs = getReqs();
@@ -6245,7 +6245,7 @@ int ampiParent::waitall(int count, MPI_Request request[], MPI_Status sts[]/*=MPI
       PUParray(*fromPUPer, (char *)(waitReq->buf), pupBytes);
       PUParray(*fromPUPer, (char *)(&sts[i]), sizeof(MPI_Status));
     }
-    return MPI_SUCCESS;
+    return pptr;
   }
 #endif
 #if CMK_BIGSIM_CHARM
@@ -6313,14 +6313,15 @@ int ampiParent::waitall(int count, MPI_Request request[], MPI_Status sts[]/*=MPI
   TRACE_BG_AMPI_WAITALL(&reqs); // setup forward and backward dependence
 #endif
 
-  return MPI_SUCCESS;
+  return pptr;
 }
 
 AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts[])
 {
   AMPI_API("AMPI_Waitall");
   checkRequests(count, request);
-  return getAmpiParent()->waitall(count, request, sts);
+  ampiParent* unused = getAmpiParent()->waitall(count, request, sts);
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_Status *sts)
@@ -8870,7 +8871,7 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*dst),
                                sendcount, sendtype, dst, comm, I_SEND);
     }
-    pptr->waitall(reqs.size(), reqs.data());
+    pptr = pptr->waitall(reqs.size(), reqs.data());
   }
   else if (itemsize <= AMPI_ALLTOALL_LONG_MSG) {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
@@ -8887,7 +8888,7 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
         reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*dst),
                                       sendcount, sendtype, dst, comm, I_SEND);
       }
-      pptr->waitall(blockSize*2, reqs.data());
+      pptr = pptr->waitall(blockSize*2, reqs.data());
     }
   }
   else {
@@ -9042,7 +9043,7 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*sdispls[dst]),
                                sendcounts[dst], sendtype, dst, comm, I_SEND);
     }
-    pptr->waitall(size*2, reqs.data());
+    pptr = pptr->waitall(size*2, reqs.data());
   }
   else {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
@@ -9059,7 +9060,7 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
         reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*sdispls[dst]),
                                       sendcounts[dst], sendtype, dst, comm);
       }
-      getAmpiParent()->waitall(blockSize*2, reqs.data());
+      pptr = getAmpiParent()->waitall(blockSize*2, reqs.data());
     }
   }
 
@@ -9192,7 +9193,7 @@ AMPI_API_IMPL(int, MPI_Alltoallw, const void *sendbuf, const int *sendcounts, co
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
                                sendcounts[dst], sendtypes[dst], dst, comm, I_SEND);
     }
-    pptr->waitall(size*2, reqs.data());
+    pptr = pptr->waitall(size*2, reqs.data());
   }
   else {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
@@ -9209,7 +9210,7 @@ AMPI_API_IMPL(int, MPI_Alltoallw, const void *sendbuf, const int *sendcounts, co
         reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
                                       sendcounts[dst], sendtypes[dst], dst, comm);
       }
-      getAmpiParent()->waitall(blockSize*2, reqs.data());
+      pptr = getAmpiParent()->waitall(blockSize*2, reqs.data());
     }
   }
 
@@ -9324,7 +9325,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MP
                                       sendcount, sendtype, neighbors[i], comm, I_SEND);
   }
 
-  return pptr->waitall(reqs.size(), reqs.data());
+  pptr = pptr->waitall(reqs.size(), reqs.data());
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Ineighbor_alltoall, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
@@ -9428,7 +9430,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallv, const void* sendbuf, const int *sendc
                                       sendcounts[i], sendtype, neighbors[i], comm, I_SEND);
   }
 
-  return pptr->waitall(reqs.size(), reqs.data());
+  pptr = pptr->waitall(reqs.size(), reqs.data());
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Ineighbor_alltoallv, const void* sendbuf, const int *sendcounts, const int *sdispls,
@@ -9531,7 +9534,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallw, const void* sendbuf, const int *sendc
                                       sendcounts[i], sendtypes[i], neighbors[i], comm, I_SEND);
   }
 
-  return pptr->waitall(reqs.size(), reqs.data());
+  pptr = pptr->waitall(reqs.size(), reqs.data());
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Ineighbor_alltoallw, const void* sendbuf, const int *sendcounts, const MPI_Aint *sdispls,
@@ -9633,7 +9637,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgather, const void* sendbuf, int sendcount, M
                                       sendtype, neighbors[i], comm, I_SEND);
   }
 
-  return pptr->waitall(reqs.size(), reqs.data());
+  pptr = pptr->waitall(reqs.size(), reqs.data());
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Ineighbor_allgather, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
@@ -9733,7 +9738,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, 
                                       sendtype, neighbors[i], comm, I_SEND);
   }
 
-  return pptr->waitall(reqs.size(), reqs.data());
+  pptr = pptr->waitall(reqs.size(), reqs.data());
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Ineighbor_allgatherv, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
@@ -11070,7 +11076,8 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
     topo->setDestWeights(tmpWeights);
   }
 
-  return ptr->waitall(sends, requests.data());
+  ptr = ptr->waitall(sends, requests.data());
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Topo_test, MPI_Comm comm, int *status)
