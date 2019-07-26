@@ -47,6 +47,11 @@ test: all
 	@echo "########################################################################################"
 	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS))
 
+smptest: all
+	@echo "########################################################################################"
+	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS) ++ppn 2)
+	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS) ++ppn 4)
+
 
 mylib.o: mylib.C mylib.h mylib.decl.h mylib.def.h
 pgm.o: pgm.C client.decl.h mylib.h mylib.decl.h mylib.def.h utils.h client.def.h

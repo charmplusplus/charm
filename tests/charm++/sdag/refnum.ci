@@ -77,7 +77,7 @@ module refnum {
             }
             when recvData[index](CkDataMsg* m) serial {
               refnum_sum += index;
-              cb_sum += (int)m->data[0];
+              cb_sum += ((int*)(m->getData()))[0];
               delete m;
             }
           }
@@ -97,7 +97,7 @@ module refnum {
           }
           when recvData[index](CkDataMsg* m) serial {
             refnum_sum += index;
-            cb_sum += (int)m->data[0];
+            cb_sum += ((int*)(m->getData()))[0];
             delete m;
           }
         }
@@ -115,7 +115,7 @@ module refnum {
           }
           when recvData[index](CkDataMsg* m) serial {
             refnum_sum += index;
-            cb_sum += (int)m->data[0];
+            cb_sum += ((int*)(m->getData()))[0];
             delete m;
           }
         }
