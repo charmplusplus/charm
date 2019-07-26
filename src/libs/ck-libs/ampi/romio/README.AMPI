@@ -24,6 +24,8 @@ ROMIO integrated into AMPI:
   the mpi.h include has been moved to the bottom of mpio.h.in, and one
   item that depends on mpi.h typedefs has been moved to ampi.h.
 * HAVE_MPI_OFFSET is unconditionally defined to 1.
+* MPIR_Ext_cs_yield has been corrected to ROMIO_THREAD_CS_YIELD in
+  adio/common/ad_i{read,write}_coll.c.
 
 
 Variable privatization
