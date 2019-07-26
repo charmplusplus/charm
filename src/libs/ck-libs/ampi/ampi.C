@@ -6026,7 +6026,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status 
   }
 
 #if CMK_BIGSIM_CHARM
-  it (result) *result = 0;
+  if (result) *result = 0;
 #endif
   return parent;
 }
