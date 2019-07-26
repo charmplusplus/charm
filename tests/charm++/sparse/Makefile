@@ -22,3 +22,8 @@ sparse.o: sparse.C sparse.h cifiles
 test: all
 	@echo "Testing bulk construction of sparse arrays..."
 	$(call run, ./sparse +p4 )
+
+smptest: all
+	@echo "Testing bulk construction of sparse arrays..."
+	$(call run, ./sparse +p2 ++ppn 2 )
+	$(call run, ./sparse +p4 ++ppn 2 )

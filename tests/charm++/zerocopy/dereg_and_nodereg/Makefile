@@ -23,6 +23,12 @@ test: all
 	$(call run, +p4 ./dereg_and_nodereg 50 +noCMAForZC)
 	$(call run, +p6 ./dereg_and_nodereg 100 +noCMAForZC)
 
+smptest: all
+	$(call run, +p4 ./dereg_and_nodereg 50 ++ppn 4)
+	$(call run, +p6 ./dereg_and_nodereg 100 ++ppn 3)
+	$(call run, +p4 ./dereg_and_nodereg 50 +noCMAForZC ++ppn 4)
+	$(call run, +p6 ./dereg_and_nodereg 100 +noCMAForZC ++ppn 3)
+
 clean:
 	rm -f *.decl.h *.def.h *.o
 	rm -f dereg_and_nodereg charmrun cifiles

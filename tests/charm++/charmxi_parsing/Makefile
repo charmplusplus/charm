@@ -12,6 +12,7 @@ all: $(TARGETS)
 
 test: $(foreach i,$(TARGETS),test-$i)
 
+smptest: $(foreach i,$(TARGETS),smptest-$i)
 
 define TARGETRULES
 
@@ -21,7 +22,12 @@ $1: $1.o
 
 # test
 test-$1: $1
-	$$(call run,./$1)
+	$$(call run,./$1 +p1)
+	$$(call run,./$1 +p2)
+
+smptest-$1: $1
+	$$(call run,./$1 +p2 ++ppn 2)
+	$$(call run,./$1 +p4 ++ppn 2)
 
 # avoid deleting decl/def after building them
 .PRECIOUS: $1.decl.h $1.def.h

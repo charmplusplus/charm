@@ -21,6 +21,12 @@ test: all
 	$(call run, +p4 ./zc_post_modify_size)
 	$(call run, +p4 ./zc_post_modify_size +noCMAForZC)
 
+smptest: all
+	$(call run, +p2 ./zc_post_modify_size ++ppn 2)
+	$(call run, +p4 ./zc_post_modify_size ++ppn 2)
+	$(call run, +p2 ./zc_post_modify_size +noCMAForZC ++ppn 2)
+	$(call run, +p4 ./zc_post_modify_size +noCMAForZC ++ppn 2)
+
 clean:
 	rm -f *.decl.h *.def.h *.o
 	rm -f zc_post_modify_size charmrun cifiles
