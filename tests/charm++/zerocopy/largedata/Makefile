@@ -30,6 +30,12 @@ test: all
 	$(call run, ./pgm +p4 200000 10 +noCMAForZC)
 	$(call run, ./pgm +p6 200000 10 +noCMAForZC)
 
+smptest: all
+	$(call run, ./pgm +p4 200000 10 ++ppn 2)
+	$(call run, ./pgm +p4 200000 10 ++ppn 4)
+	$(call run, ./pgm +p4 200000 10 +noCMAForZC ++ppn 2)
+	$(call run, ./pgm +p4 200000 10 +noCMAForZC ++ppn 4)
+
 test-bench: all
 	$(call run, ./pgm +p10)
 

@@ -25,6 +25,12 @@ test: all
 	$(call run, +p4 ./bcast_nonzero_root +noCMAForZC)
 	$(call run, +p6 ./bcast_nonzero_root +noCMAForZC)
 
+smptest: all
+	$(call run, +p4 ./bcast_nonzero_root ++ppn 4)
+	$(call run, +p6 ./bcast_nonzero_root ++ppn 3)
+	$(call run, +p4 ./bcast_nonzero_root +noCMAforZC ++ppn 4)
+	$(call run, +p6 ./bcast_nonzero_root +noCMAForZC ++ppn 3)
+
 clean:
 	rm -f *.decl.h *.def.h *.o
 	rm -f bcast_nonzero_root charmrun cifiles
