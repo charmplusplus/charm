@@ -23,6 +23,10 @@ sectionReduction.decl.h sectionReduction.def.h: sectionReduction.ci
 test: all
 	$(call run, ./pgm +p4 20 20 20 5 )
 
+smptest: all
+	$(call run, ./pgm 20 20 20 5 +p2 ++ppn 2)
+	$(call run, ./pgm 20 20 20 5 +p4 ++ppn 2)
+
 clean:
 	rm -f *.decl.h *.def.h *.o
 	rm -f pgm charmrun
