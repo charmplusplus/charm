@@ -4518,16 +4518,16 @@ MPI_Request ampi::postReq(AmpiRequest* newreq) noexcept
   return request;
 }
 
-AMPI_API_IMPL(int, MPI_Send, const void *msg, int count, MPI_Datatype type,
+AMPI_API_IMPL(int, MPI_Send, const void *buf, int count, MPI_Datatype type,
                              int dest, int tag, MPI_Comm comm)
 {
   AMPI_API("AMPI_Send");
 
-  handle_MPI_BOTTOM((void*&)msg, type);
+  handle_MPI_BOTTOM((void*&)buf, type);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Send", comm, 1, count, 1, type, 1, tag, 1, dest, 1, msg, 1);
+  ret = errorCheck("AMPI_Send", comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -4539,7 +4539,7 @@ AMPI_API_IMPL(int, MPI_Send, const void *msg, int count, MPI_Datatype type,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm);
+  ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
 
   return MPI_SUCCESS;
 }
@@ -4583,15 +4583,15 @@ AMPI_API_IMPL(int, MPI_Rsend, const void *buf, int count, MPI_Datatype datatype,
   return MPI_Send(buf, count, datatype, dest, tag, comm);
 }
 
-AMPI_API_IMPL(int, MPI_Ssend, const void *msg, int count, MPI_Datatype type,
+AMPI_API_IMPL(int, MPI_Ssend, const void *buf, int count, MPI_Datatype type,
                               int dest, int tag, MPI_Comm comm)
 {
   AMPI_API("AMPI_Ssend");
 
-  handle_MPI_BOTTOM((void*&)msg, type);
+  handle_MPI_BOTTOM((void*&)buf, type);
 
 #if AMPI_ERROR_CHECKING
-  int ret = errorCheck("AMPI_Ssend", comm, 1, count, 1, type, 1, tag, 1, dest, 1, msg, 1);
+  int ret = errorCheck("AMPI_Ssend", comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -4603,7 +4603,7 @@ AMPI_API_IMPL(int, MPI_Ssend, const void *msg, int count, MPI_Datatype type,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm, BLOCKING_SSEND);
+  ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, BLOCKING_SSEND);
 
   return MPI_SUCCESS;
 }
@@ -4644,15 +4644,15 @@ AMPI_API_IMPL(int, MPI_Issend, const void *buf, int count, MPI_Datatype type, in
   return MPI_SUCCESS;
 }
 
-AMPI_API_IMPL(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, int tag,
+AMPI_API_IMPL(int, MPI_Recv, void *buf, int count, MPI_Datatype type, int src, int tag,
                              MPI_Comm comm, MPI_Status *status)
 {
   AMPI_API("AMPI_Recv");
 
-  handle_MPI_BOTTOM(msg, type);
+  handle_MPI_BOTTOM(buf, type);
 
 #if AMPI_ERROR_CHECKING
-  int ret = errorCheck("AMPI_Recv", comm, 1, count, 1, type, 1, tag, 1, src, 1, msg, 1);
+  int ret = errorCheck("AMPI_Recv", comm, 1, count, 1, type, 1, tag, 1, src, 1, buf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -4661,20 +4661,20 @@ AMPI_API_IMPL(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, i
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)msg, (pptr->pupBytes));
+    PUParray(*(pptr->fromPUPer), (char *)buf, (pptr->pupBytes));
     PUParray(*(pptr->fromPUPer), (char *)status, sizeof(MPI_Status));
     return MPI_SUCCESS;
   }
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  if(-1==ptr->recv(tag,src,msg,count,type,comm,status)) CkAbort("AMPI> Error in MPI_Recv");
+  if(-1==ptr->recv(tag,src,buf,count,type,comm,status)) CkAbort("AMPI> Error in MPI_Recv");
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
     (pptr->pupBytes) = getDDT()->getSize(type) * count;
     (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)msg, (pptr->pupBytes));
+    PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
     PUParray(*(pptr->toPUPer), (char *)status, sizeof(MPI_Status));
   }
 #endif
