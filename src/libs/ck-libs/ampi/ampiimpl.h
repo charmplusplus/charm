@@ -2466,6 +2466,7 @@ class ampiParent final : public CBase_ampiParent {
   }
 
   CMI_WARN_UNUSED_RESULT ampiParent* wait(MPI_Request* req, MPI_Status* sts) noexcept;
+  CMI_WARN_UNUSED_RESULT ampiParent* waitall(int count, MPI_Request request[], MPI_Status sts[]=MPI_STATUSES_IGNORE) noexcept;
   void init() noexcept;
   void finalize() noexcept;
   CMI_WARN_UNUSED_RESULT ampiParent* block() noexcept;
