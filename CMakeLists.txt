@@ -102,6 +102,9 @@ option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 option(EVERYLB             "Compile EveryLB suite of load balancing strategies" OFF)
 option(F90CHARM            "Build f90charm" OFF)
 
+set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
+add_compile_options(${EXTRA_OPTS})
+
 if(${DRONE_MODE})
   set(CMK_DRONE_MODE 1)
 else()

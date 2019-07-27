@@ -367,6 +367,9 @@ void _performOneRputForWorkerThread(MSG_LIST *ptr) {
 
 void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
 
+  if(ncpyOpInfo->opMode == CMK_BCAST_EM_API)
+    return;
+
   // ncpyOpInfo is a part of the received message and can be freed before this send completes
   // for that reason, it is copied into a new message
   NcpyOperationInfo *newNcpyOpInfo = newNcpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyOpInfo->ncpyOpInfoSize);
