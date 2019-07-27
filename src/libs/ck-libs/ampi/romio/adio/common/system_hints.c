@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- 
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- 
  * vim: ts=8 sts=4 sw=4 noexpandtab
  *
  *   Copyright (C) 2007 UChicago/Argonne LLC. 
@@ -21,9 +21,6 @@
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
-#ifdef HAVE_SYS_STAT_H
-#include <sys/stat.h>
-#endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -31,33 +28,28 @@
 #include <io.h>
 #endif
 
-#ifndef PATH_MAX
-#define PATH_MAX 65535
-#endif
-
 /*#define SYSHINT_DEBUG 1  */
 
 #define ROMIO_HINT_DEFAULT_CFG "/etc/romio-hints"
 #define ROMIO_HINT_ENV_VAR "ROMIO_HINTS"
 
- /* should suppress unused warnings on GCC */
-static void dump_keys(MPI_Info info) ATTRIBUTE((unused, used));
-
 /* debug function: a routine I want in the library to make my life easier when
- * using a source debugger. please ignore any "defined but not used" warnings
- */
-static void dump_keys(MPI_Info info)
+ * using a source debugger.  Now optionally used in ADIO_Open. */
+void ADIOI_Info_print_keyvals(MPI_Info info)
 {
     int i, nkeys, flag;
-    char key[MPI_MAX_INFO_KEY];
-    char value[MPI_MAX_INFO_VAL];
+    char key[MPI_MAX_INFO_KEY+1];
+    char value[MPI_MAX_INFO_VAL+1];
+
+    if (info == MPI_INFO_NULL)
+	return;
 
     MPI_Info_get_nkeys(info, &nkeys);
 
     for (i=0; i<nkeys; i++) {
 	MPI_Info_get_nthkey(info, i, key);
-	ADIOI_Info_get(info, key, MPI_MAX_INFO_VAL-1, value, &flag);
-	printf("key = %s, value = %s\n", key, value);
+	ADIOI_Info_get(info, key, MPI_MAX_INFO_VAL, value, &flag);
+	printf("key = %-25s value = %-10s\n", key, value);
     }
     return;
 }
@@ -89,24 +81,34 @@ static int find_file(void)
  * alone on the assumption that the caller knows best. 
  *
  * because MPI-IO hints are optional, we can get away with limited error
- * reporting.  */
-static int file_to_info(int fd, MPI_Info info)
+ * reporting.
+ *
+ * for better scalability, the config file will be read on one processor and
+ * broadcast to all others */
+static int file_to_info_all(int fd, MPI_Info info, int rank, MPI_Comm comm)
 {
     char *buffer, *token, *key, *val, *garbage;
     char *pos1=NULL, *pos2=NULL;
-    int flag, ret;
-    char dummy;
-    struct stat statbuf;
+    int flag;
+    ssize_t ret;
+    int valuelen;
 
-    /* assumption: config files will be small (less than 1MB) */
-    fstat(fd, &statbuf);
-    /* add 1 to size to make room for NULL termination */
-    buffer = (char *)ADIOI_Calloc(statbuf.st_size + 1, sizeof (char));
-    if (buffer == NULL) return -1;
+    /* assumption: config files will be small */
+#define HINTFILE_MAX_SIZE 1024*4
+    buffer = (char *)ADIOI_Calloc(HINTFILE_MAX_SIZE, sizeof (char));
 
-    ret = read(fd, buffer, statbuf.st_size);
-    if (ret < 0) return -1;
+    if (rank == 0) {
+	ret = read(fd, buffer, HINTFILE_MAX_SIZE);
+	/* any error: bad/nonexistent fd, no perms, anything: set up a null
+	 * buffer and the subsequent string parsing will quit immediately */
+	if (ret == -1)
+	    buffer[0] = '\0';
+    }
+    MPI_Bcast(buffer, HINTFILE_MAX_SIZE, MPI_BYTE, 0, comm);
+
     token = strtok_r(buffer, "\n", &pos1);
+    if (token == NULL)
+	goto fn_exit;
     do {
 	if ( (key = strtok_r(token, " \t", &pos2)) == NULL) 
 	    /* malformed line: found no items */
@@ -126,27 +128,29 @@ static int file_to_info(int fd, MPI_Info info)
 #endif
 	/* don't actually care what the value is. only want to know if key
 	 * exists: we leave it alone if so*/
-	ADIOI_Info_get(info, key, 1, &dummy, &flag);
+	ADIOI_Info_get_valuelen(info, key, &valuelen, &flag);
 	if (flag == 1) continue;
 	ADIOI_Info_set(info, key, val);
     } while ((token = strtok_r(NULL, "\n", &pos1)) != NULL);
+
+fn_exit:
     ADIOI_Free(buffer);
     return 0;
 }
 
-void ADIOI_process_system_hints(MPI_Info info)
+void ADIOI_process_system_hints(ADIO_File fd, MPI_Info info)
 {
-    int hintfd;
+    int hintfd=-1, rank;
 
-    hintfd = find_file();
-    if (hintfd < 0) {
-#ifdef SYSHINT_DEBUG
-	perror("ADIOI_process_system_hints");
-#endif
-	return;
+    MPI_Comm_rank(fd->comm, &rank);
+    if (rank == 0) {
+	hintfd = find_file();
     }
-    file_to_info(hintfd, info);
-    close(hintfd);
+    /* hintfd only significant on rank 0.  -1 (on rank 0) means no hintfile found  */
+    file_to_info_all(hintfd, info, rank, fd->comm);
+
+    if (hintfd != -1)
+	close(hintfd);
 }
 
 /* given 'info', incorporate any hints in 'sysinfo' that are not already set
@@ -155,8 +159,10 @@ void ADIOI_incorporate_system_hints(MPI_Info info,
 	MPI_Info sysinfo, 
 	MPI_Info *new_info) 
 {
-    int i, nkeys_sysinfo, flag;
-    char  val[MPI_MAX_INFO_VAL], key[MPI_MAX_INFO_KEY];
+    int i, nkeys_sysinfo, nkeys_info=0, flag=0; /* must initialize flag to 0 */
+    int valuelen;
+
+    char  val[MPI_MAX_INFO_VAL+1], key[MPI_MAX_INFO_KEY+1];
 
     if (sysinfo == MPI_INFO_NULL)
 	nkeys_sysinfo = 0;
@@ -171,15 +177,21 @@ void ADIOI_incorporate_system_hints(MPI_Info info,
 
     if (info == MPI_INFO_NULL) 
 	MPI_Info_create(new_info);
-    else
+    else {
+	/* tiny optimization: if 'info' has no keys, we can skip the check if a
+	 * hint is set: no keys means nothing has been set, and there's nothing
+	 * we might step on */
+	MPI_Info_get_nkeys(info, &nkeys_info);
 	MPI_Info_dup(info, new_info);
+    }
 
     for (i=0; i<nkeys_sysinfo; i++) {
 	MPI_Info_get_nthkey(sysinfo, i, key);
 	/* don't care about the value, just want to know if hint set already*/
-	if (info != MPI_INFO_NULL) ADIOI_Info_get(info, key, 1, val, &flag); 
+	if (info != MPI_INFO_NULL && nkeys_info)
+	    ADIOI_Info_get_valuelen(info, key, &valuelen, &flag);
 	if (flag == 1) continue;  /* skip any hints already set by user */
-	ADIOI_Info_get(sysinfo, key, MPI_MAX_INFO_VAL-1, val, &flag);
+	ADIOI_Info_get(sysinfo, key, MPI_MAX_INFO_VAL, val, &flag);
 	ADIOI_Info_set(*new_info, key, val);
 	flag = 0;
     }

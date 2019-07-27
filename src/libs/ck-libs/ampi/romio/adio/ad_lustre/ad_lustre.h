@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
  *   Copyright (C) 1997 University of Chicago.
  *   See COPYRIGHT notice in top-level directory.
@@ -35,12 +35,16 @@
 #include <signal.h>
 #endif
 
-#ifdef HAVE_AIO_H
-#include <aio.h>
-#ifdef HAVE_SYS_AIO_H
-#include <sys/aio.h>
-#endif
-#endif /* End of HAVE_SYS_AIO_H */
+#ifdef HAVE_AIO_LITE_H
+#include <aio-lite.h>
+#else
+ #ifdef  HAVE_AIO_H
+ #include <aio.h>
+ #endif
+ #ifdef HAVE_SYS_AIO_H
+ #include <sys/aio.h>
+ #endif
+#endif /* End of HAVE_AIO_LITE_H */
 
 void ADIOI_LUSTRE_Open(ADIO_File fd, int *error_code);
 void ADIOI_LUSTRE_Close(ADIO_File fd, int *error_code);
@@ -48,15 +52,15 @@ void ADIOI_LUSTRE_ReadContig(ADIO_File fd, void *buf, int count,
                              MPI_Datatype datatype, int file_ptr_type,
                              ADIO_Offset offset, ADIO_Status *status,
                              int *error_code);
-void ADIOI_LUSTRE_WriteContig(ADIO_File fd, void *buf, int count,
+void ADIOI_LUSTRE_WriteContig(ADIO_File fd, const void *buf, int count,
                               MPI_Datatype datatype, int file_ptr_type,
                               ADIO_Offset offset, ADIO_Status *status,
                               int *error_code);
-void ADIOI_LUSTRE_WriteStrided(ADIO_File fd, void *buf, int count,
+void ADIOI_LUSTRE_WriteStrided(ADIO_File fd, const void *buf, int count,
 			       MPI_Datatype datatype, int file_ptr_type,
 			       ADIO_Offset offset, ADIO_Status *status,
 			       int *error_code);
-void ADIOI_LUSTRE_WriteStridedColl(ADIO_File fd, void *buf, int count,
+void ADIOI_LUSTRE_WriteStridedColl(ADIO_File fd, const void *buf, int count,
 		                   MPI_Datatype datatype, int file_ptr_type,
 		                   ADIO_Offset offset, ADIO_Status *status,
                                    int *error_code);

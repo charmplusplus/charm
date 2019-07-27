@@ -558,7 +558,7 @@ AMPI_FUNC(int, MPIX_Grequest_class_allocate, MPIX_Grequest_class greq_class,
 
 
 /* Extensions needed by ROMIO */
-AMPI_FUNC(int, MPIR_Status_set_bytes, MPI_Status *sts, MPI_Datatype dtype, int nbytes)
+AMPI_FUNC(int, MPIR_Status_set_bytes, MPI_Status *sts, MPI_Datatype dtype, MPI_Count nbytes)
 
 #include "mpio_functions.h"
 
