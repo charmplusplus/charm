@@ -674,6 +674,9 @@ MPI_Win ampi::createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_In
 int ampi::deleteWinInstance(MPI_Win win) noexcept {
   WinStruct *winStruct = parent->getWinStruct(win);
   win_obj *winobj = winObjects[winStruct->index];
+  if (winStruct->ownsMemory) {
+    MPI_Free_mem(winobj->baseAddr);
+  }
   parent->removeWinStruct(winStruct); // really it does nothing at all
   winobj->free();
   return MPI_SUCCESS;
@@ -731,6 +734,28 @@ AMPI_API_IMPL(int, MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
   parent->setAttr(*newwin, attributes, MPI_WIN_BASE, &base);
   parent->setAttr(*newwin, attributes, MPI_WIN_SIZE, &size);
   parent->setAttr(*newwin, attributes, MPI_WIN_DISP_UNIT, &disp_unit);
+  ptr = ptr->barrier(); // synchronize all participating virtual processes
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Win_allocate, MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, void *baseptr, MPI_Win *win)
+{
+  AMPI_API("AMPI_Win_allocate");
+
+  int res = MPI_Alloc_mem(size, info, (void**)baseptr);
+  if(res != MPI_SUCCESS)
+    return res;
+
+  ampiParent *parent = getAmpiParent();
+  ampi *ptr = getAmpiInstance(comm);
+  *win = ptr->createWinInstance(*((void**)baseptr), size, disp_unit, info);
+  /* set the builtin attributes on the window */
+  WinStruct *winStruct = parent->getWinStruct(*win);
+  auto & attributes = ptr->getWinObjInstance(winStruct)->getAttributes();
+  parent->setAttr(*win, attributes, MPI_WIN_BASE, &baseptr);
+  parent->setAttr(*win, attributes, MPI_WIN_SIZE, &size);
+  parent->setAttr(*win, attributes, MPI_WIN_DISP_UNIT, &disp_unit);
+  winStruct->ownsMemory = true;
   ptr = ptr->barrier(); // synchronize all participating virtual processes
   return MPI_SUCCESS;
 }
@@ -1297,7 +1322,9 @@ int AMPI_Iget_data(void *data, MPI_Status status) {
 AMPI_API_IMPL(int, MPI_Alloc_mem, MPI_Aint size, MPI_Info info, void *baseptr)
 {
   //NOTE: do not use AMPI_API() here, so that the memory allocated is migratable!
-  *(void **)baseptr = malloc(size);
+  *((void **) baseptr) = malloc(size);
+  if(*((void **) baseptr) == nullptr)
+    return MPI_ERR_NO_MEM;
   return MPI_SUCCESS;
 }
 

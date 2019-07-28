@@ -317,6 +317,10 @@ class WinStruct{
   MPI_Comm comm;
   int index;
 
+  // Windows created with MPI_Win_allocate/MPI_Win_allocate_shared need to free their
+  // memory region on MPI_Win_free.
+  bool ownsMemory = false;
+
 private:
   bool areRecvsPosted;
   bool inEpoch;
