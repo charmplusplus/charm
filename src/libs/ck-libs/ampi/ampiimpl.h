@@ -317,6 +317,10 @@ class WinStruct{
   MPI_Comm comm;
   int index;
 
+  // Windows created with MPI_Win_allocate/MPI_Win_allocate_shared need to free their
+  // memory region on MPI_Win_free.
+  bool ownsMemory = false;
+
 private:
   bool areRecvsPosted;
   bool inEpoch;
@@ -332,7 +336,7 @@ public:
     exposureRankList.clear(); accessRankList.clear(); requestList.clear();
   }
   void pup(PUP::er &p) noexcept {
-    p|comm; p|index; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
+    p|comm; p|index; p|ownsMemory; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
   }
   void clearEpochAccess() noexcept {
     accessRankList.clear(); inEpoch = false;
