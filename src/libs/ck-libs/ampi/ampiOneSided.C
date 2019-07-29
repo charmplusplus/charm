@@ -744,7 +744,7 @@ AMPI_API_IMPL(int, MPI_Win_allocate, MPI_Aint size, int disp_unit, MPI_Info info
 
   int res = MPI_Alloc_mem(size, info, (void**)baseptr);
   if(res != MPI_SUCCESS)
-    return res;
+    return ampiErrhandler("AMPI_Win_allocate", res);
 
   ampiParent *parent = getAmpiParent();
   ampi *ptr = getAmpiInstance(comm);
@@ -1324,7 +1324,7 @@ AMPI_API_IMPL(int, MPI_Alloc_mem, MPI_Aint size, MPI_Info info, void *baseptr)
   //NOTE: do not use AMPI_API() here, so that the memory allocated is migratable!
   *((void **) baseptr) = malloc(size);
   if(*((void **) baseptr) == nullptr)
-    return MPI_ERR_NO_MEM;
+    return ampiErrhandler("AMPI_Alloc_mem", MPI_ERR_NO_MEM);
   return MPI_SUCCESS;
 }
 
