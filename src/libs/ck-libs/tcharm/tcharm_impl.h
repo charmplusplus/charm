@@ -351,7 +351,7 @@ class TCharmAPIRoutine {
 private:
 	bool doIsomalloc; // Whether to enable/disable Isomalloc for Heap memory
 	bool doSwapglobals; // Whether to swap sets of global variables
-	tlsseg_t oldtlsseg; // for TLS globals
+	tlsseg_t oldtlsseg{}; // for TLS globals
 #if CMK_TRACE_ENABLED
 	double start; // starting time of trace event
 	int tcharm_routineID; // TCharm routine ID that is traced
@@ -416,8 +416,7 @@ public:
 #endif
 		}
 		if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-			tlsseg_t cur;
-			CtgInstallCthTLS(&cur, &oldtlsseg); // switch back to user's CthThread
+			CtgInstallCthTLS(&oldtlsseg); // switch back to user's CthThread
 		}
 
 #if CMK_BIGSIM_CHARM

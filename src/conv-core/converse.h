@@ -1603,11 +1603,8 @@ void CtgFree(CtgGlobals g);
 CtgGlobals CtgCurrentGlobals(void);
 
 /** for TLS globals */
-void CtgInstallTLS(void *cur, void *next);
 void CtgInstallMainThreadTLS(void *cur);
-void CtgInstallCthTLS(void *cur, void *next);
-void CmiEnableTLS(void);
-void CmiDisableTLS(void);
+void CtgInstallCthTLS(void *next);
 
 /* The thread listener structure. The user must register one such listener
 	if he wants to find out when a thread is suspended or when it starts running
