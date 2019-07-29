@@ -246,6 +246,7 @@ FLINKAGE {
 #define mpi_type_get_contents FTN_NAME ( MPI_TYPE_GET_CONTENTS , mpi_type_get_contents )
 
 #define mpi_win_create FTN_NAME ( MPI_WIN_CREATE , mpi_win_create )
+#define mpi_win_allocate FTN_NAME ( MPI_WIN_ALLOCATE , mpi_win_allocate )
 #define mpi_win_free  FTN_NAME ( MPI_WIN_FREE  , mpi_win_free )
 #define mpi_win_create_errhandler FTN_NAME ( MPI_WIN_CREATE_ERRHANDLER , mpi_win_create_errhandler )
 #define mpi_win_call_errhandler FTN_NAME ( MPI_WIN_CALL_ERRHANDLER , mpi_win_call_errhandler )
@@ -1833,6 +1834,12 @@ void mpi_win_create(void *base, MPI_Aint *size, int *disp_unit,
                     int *info, int *comm, MPI_Win *newwin, int *ierr) noexcept
 {
   *ierr = MPI_Win_create(base, *size, *disp_unit, *info, *comm, newwin);
+}
+
+void mpi_win_allocate(MPI_Aint *size, int *disp_unit,
+                      int *info, int *comm, void *base, MPI_Win *win, int *ierr) noexcept
+{
+  *ierr = MPI_Win_allocate(*size, *disp_unit, *info, *comm, base, win);
 }
 
 void mpi_win_free(int *win, int *ierr) noexcept

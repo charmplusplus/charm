@@ -336,7 +336,7 @@ public:
     exposureRankList.clear(); accessRankList.clear(); requestList.clear();
   }
   void pup(PUP::er &p) noexcept {
-    p|comm; p|index; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
+    p|comm; p|index; p|ownsMemory; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
   }
   void clearEpochAccess() noexcept {
     accessRankList.clear(); inEpoch = false;
