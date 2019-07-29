@@ -184,7 +184,7 @@ class CkNcpyBuffer{
       CmiSetRdmaCommonInfo(&layerInfo[0], ptr, cnt);
 
       /* Set the pointer layerInfo unconditionally for layers that don't require pinning (MPI, PAMI)
-       * or if regMode is REG, PREREG on layers that require pinning (GNI, Verbs, OFI) */
+       * or if regMode is REG, PREREG on layers that require pinning (GNI, Verbs, OFI, UCX) */
 #if CMK_REG_REQUIRED
       if(regMode == CK_BUFFER_REG || regMode == CK_BUFFER_PREREG)
 #endif
@@ -248,22 +248,25 @@ class CkNcpyBuffer{
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
-  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
+  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
 
   friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
 
 
-  friend void performEmApiNcpyTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, int child_count, char *ref, int extraSize, CkNcpyMode ncpyMode, ncpyEmApiMode emMode);
+  friend void performEmApiNcpyTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, CmiSpanningTreeInfo *t, char *ref, int extraSize, CkNcpyMode ncpyMode, ncpyEmApiMode emMode);
 
   friend void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, char *ref, int extraSize, ncpyEmApiMode emMode);
 
-  friend void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child_count, ncpyEmApiMode emMode);
+  friend void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, CmiSpanningTreeInfo *t, ncpyEmApiMode emMode);
 
   friend void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode emMode);
 
+#if CMK_ONESIDED_IMPL
   friend void deregisterMemFromMsg(envelope *env, bool isRecv);
   friend void CkRdmaEMDeregAndAckHandler(void *ack);
+  friend inline void deregisterBuffer(CkNcpyBuffer &buffInfo);
+#endif
 };
 
 // Ack handler for the Zerocopy Direct API
@@ -287,6 +290,9 @@ void invokeDestinationCallback(NcpyOperationInfo *info);
 // Method to enqueue a message after the completion of an payload transfer
 void enqueueNcpyMessage(int destPe, void *msg);
 
+// Method to increment Qd counter
+inline void zcQdIncrement();
+
 /*********************************** Zerocopy Entry Method API ****************************/
 static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
   return CkNcpyBuffer(ptr_, 0, cb_, regMode_, deregMode_);
@@ -306,7 +312,8 @@ enum class ncpyHandlerIdx: char {
   EM_ACK,
   BCAST_ACK,
   BCAST_POST_ACK,
-  CMA_DEREG_ACK
+  CMA_DEREG_ACK,
+  CMA_DEREG_ACK_DIRECT
 };
 
 // Converse message to invoke the Ncpy handler on a remote process
@@ -351,7 +358,7 @@ struct NcpyEmBufferInfo{
  */
 envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg = NULL);
 
-void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info);
 
@@ -365,7 +372,7 @@ void CkUnpackRdmaPtrs(char *msgBuf);
 
 // Determine the number of ncpy ops and the sum of the ncpy buffer sizes
 // from the metadata message
-void getRdmaNumopsAndBufsize(envelope *env, int &numops, int &bufsize);
+void getRdmaNumopsAndBufsize(envelope *env, int &numops, int &bufsize, int &rootNode);
 
 // Ack handler function for the nocopy EM API
 void CkRdmaEMAckHandler(int destPe, void *ack);
@@ -578,6 +585,13 @@ void CkRdmaEMDeregAndAckHandler(void *ack);
 
 
 inline bool isDeregReady(CkNcpyBuffer &buffInfo);
+
+inline void deregisterBuffer(CkNcpyBuffer &buffInfo);
+inline void deregisterDestBuffer(NcpyOperationInfo *ncpyOpInfo);
+inline void deregisterSrcBuffer(NcpyOperationInfo *ncpyOpInfo);
+
+inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo);
+int getRootNode(envelope *env);
 
 #endif /* End of CMK_ONESIDED_IMPL */
 

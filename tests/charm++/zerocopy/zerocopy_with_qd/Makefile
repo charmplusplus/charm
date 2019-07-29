@@ -19,6 +19,15 @@ zerocopy_with_qd.o: zerocopy_with_qd.C cifiles
 test: all
 	$(call run, +p1 ./zerocopy_with_qd 60)
 	$(call run, +p4 ./zerocopy_with_qd 100)
+	$(call run, +p6 ./zerocopy_with_qd 142)
+	$(call run, +p4 ./zerocopy_with_qd 100 +noCMAForZC)
+	$(call run, +p6 ./zerocopy_with_qd 142 +noCMAForZC)
+
+smptest: all
+	$(call run, +p4 ./zerocopy_with_qd 100 ++ppn 4)
+	$(call run, +p6 ./zerocopy_with_qd 142 ++ppn 3)
+	$(call run, +p4 ./zerocopy_with_qd 100 +noCMAForZC ++ppn 4)
+	$(call run, +p6 ./zerocopy_with_qd 142 +noCMAForZC ++ppn 3)
 
 clean:
 	rm -f *.decl.h *.def.h *.o

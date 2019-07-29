@@ -31,9 +31,7 @@
 
 #include <infiniband/verbs.h>
 
-#if CMK_ONESIDED_IMPL
 #include "machine-rdma.h"
-#endif
 
 #if ! QLOGIC
 enum ibv_mtu mtu = IBV_MTU_2048;
@@ -1848,6 +1846,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 			processRdmaRequest(rdmaPacket,nodeNo,0);
 		}*/
 	}
+#if CMK_ONESIDED_IMPL
 	if(header->code == INFIRDMA_DIRECT_REG_AND_PUT){
 		// Register the source buffer and perform PUT
 		NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(buffer->buf+sizeof(struct infiPacketHeader));
@@ -1884,13 +1883,30 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		
 		resetNcpyOpInfoPointers(ncpyOpInfo);
 		
-		// Deregister the source buffer
-		LrtsDeregisterMem(ncpyOpInfo->srcPtr, (char *)ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->srcPe, ncpyOpInfo->srcRegMode);
+		if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->srcPe)) {
+			// Deregister the source buffer
+			LrtsDeregisterMem(ncpyOpInfo->srcPtr, (char *)ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->srcPe, ncpyOpInfo->srcRegMode);
+			
+			ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+			
+			// Invoke source ack
+			ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+			
+		} else if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->destPe)) {
+			// Deregister the destination buffer
+			LrtsDeregisterMem(ncpyOpInfo->destPtr, (char *)ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
+			
+			ncpyOpInfo->isDestRegistered = 0; // Set isDestRegistered to 0 after de-registration
+			
+			// Invoke destination ack
+			ncpyOpInfo->opMode = CMK_EM_API_DEST_ACK_INVOKE;
+			
+		} else {
+			 CmiAbort(" Cannot de-register on a different node than the source or destinaton");
+			
+		}
 		
-		ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
-		
-		// Invoke source ack
-		ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+		// Invoke ack
 		CmiInvokeNcpyAck(ncpyOpInfo);
 	}
 	if(header->code == INFIRDMA_DIRECT_REG_AND_GET){
@@ -1904,7 +1920,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		
 		registerDirectMemory(newNcpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(),
 		                     newNcpyOpInfo->destPtr,
-		                     newNcpyOpInfo->srcSize);
+		                     newNcpyOpInfo->destSize);
 		// Set the destination as registered
 		newNcpyOpInfo->isDestRegistered = 1;
 		
@@ -1921,7 +1937,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_READ);
 	}
-
+#endif
 	{
 		struct ibv_sge list = {
 			(uintptr_t) buffer->buf,
@@ -1962,7 +1978,10 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 			GarbageCollectMsg(packet->ogm);	
 		}
 	}else{
-		if(packet->header.code == INFIRDMA_START || packet->header.code == INFIRDMA_ACK || packet->header.code ==  INFIDUMMYPACKET){
+		if(packet->header.code == INFIRDMA_START ||
+		   packet->header.code == INFIRDMA_ACK ||
+		   packet->header.code ==  INFIDUMMYPACKET ||
+		   packet->header.code == INFIRDMA_DIRECT_DEREG_AND_ACK) {
                    if (packet->buf) CmiFree(packet->buf);  /* gzheng */
 		}
 	}

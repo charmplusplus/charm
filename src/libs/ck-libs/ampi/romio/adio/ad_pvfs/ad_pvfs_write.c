@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -20,10 +20,10 @@ void ADIOI_PVFS_WriteContig(ADIO_File fd, void *buf, int count,
 			    ADIO_Offset offset, ADIO_Status *status,
 			    int *error_code)
 {
-    int err=-1, datatype_size, len;
+    MPI_Count err=-1, datatype_size, len;
     static char myname[] = "ADIOI_PVFS_WRITECONTIG";
 
-    MPI_Type_size(datatype, &datatype_size);
+    MPI_Type_size_x(datatype, &datatype_size);
     len = datatype_size * count;
 
     if (file_ptr_type == ADIO_EXPLICIT_OFFSET) {
@@ -96,10 +96,11 @@ void ADIOI_PVFS_WriteStrided(ADIO_File fd, void *buf, int count,
 
     ADIOI_Flatlist_node *flat_buf, *flat_file;
     int i, j, k, err=-1, bwr_size, fwr_size=0, st_index=0;
-    int bufsize, num, size, sum, n_etypes_in_filetype, size_in_filetype;
+    int num, size, sum, n_etypes_in_filetype, size_in_filetype;
+    MPI_Count bufsize;
     int n_filetypes, etype_in_filetype;
     ADIO_Offset abs_off_in_filetype=0;
-    int filetype_size, etype_size, buftype_size;
+    MPI_Count filetype_size, etype_size, buftype_size;
     MPI_Aint filetype_extent, buftype_extent, indx;
     int buf_count, buftype_is_contig, filetype_is_contig;
     ADIO_Offset off, disp;
@@ -128,14 +129,17 @@ void ADIOI_PVFS_WriteStrided(ADIO_File fd, void *buf, int count,
     ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
     ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
 
-    MPI_Type_size(fd->filetype, &filetype_size);
+    MPI_Type_size_x(fd->filetype, &filetype_size);
     if ( ! filetype_size ) {
+#ifdef HAVE_STATUS_SET_BYTES
+	MPIR_Status_set_bytes(status, datatype, 0);
+#endif
 	*error_code = MPI_SUCCESS; 
 	return;
     }
 
     MPI_Type_extent(fd->filetype, &filetype_extent);
-    MPI_Type_size(datatype, &buftype_size);
+    MPI_Type_size_x(datatype, &buftype_size);
     MPI_Type_extent(datatype, &buftype_extent);
     etype_size = fd->etype_size;
     
@@ -146,9 +150,7 @@ void ADIOI_PVFS_WriteStrided(ADIO_File fd, void *buf, int count,
 	ADIO_Offset combine_buf_remain;
 /* noncontiguous in memory, contiguous in file. use writev */
 
-	ADIOI_Flatten_datatype(datatype);
-	flat_buf = ADIOI_Flatlist;
-	while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	flat_buf = ADIOI_Flatten_and_find(datatype);
 
 	/* allocate our "combine buffer" to pack data into before writing */
 	combine_buf = (char *) ADIOI_Malloc(fd->hints->ind_wr_buffer_size);
@@ -362,9 +364,7 @@ void ADIOI_PVFS_WriteStrided(ADIO_File fd, void *buf, int count,
 	else {
 /* noncontiguous in memory as well as in file */
 
-	    ADIOI_Flatten_datatype(datatype);
-	    flat_buf = ADIOI_Flatlist;
-	    while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	    flat_buf = ADIOI_Flatten_and_find(datatype);
 
 	    k = num = buf_count = 0;
 	    indx = flat_buf->indices[0];
@@ -466,10 +466,11 @@ void ADIOI_PVFS_WriteStridedListIO(ADIO_File fd, void *buf, int count,
 
     ADIOI_Flatlist_node *flat_buf, *flat_file;
     int i, j, k, err=-1, bwr_size, fwr_size=0, st_index=0;
-    int bufsize, size, sum, n_etypes_in_filetype, size_in_filetype;
+    int size, sum, n_etypes_in_filetype, size_in_filetype;
+    MPI_Count bufsize;
     int n_filetypes, etype_in_filetype;
     ADIO_Offset abs_off_in_filetype=0;
-    int filetype_size, etype_size, buftype_size;
+    MPI_Count filetype_size, etype_size, buftype_size;
     MPI_Aint filetype_extent, buftype_extent;
     int buf_count, buftype_is_contig, filetype_is_contig;
     ADIO_Offset userbuf_off;
@@ -512,14 +513,17 @@ void ADIOI_PVFS_WriteStridedListIO(ADIO_File fd, void *buf, int count,
     ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
     ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
 
-    MPI_Type_size(fd->filetype, &filetype_size);
+    MPI_Type_size_x(fd->filetype, &filetype_size);
     if ( ! filetype_size ) {
+#ifdef HAVE_STATUS_SET_BYTES
+	MPIR_Status_set_bytes(status, datatype, 0);
+#endif
 	*error_code = MPI_SUCCESS; 
 	return;
     }
 
     MPI_Type_extent(fd->filetype, &filetype_extent);
-    MPI_Type_size(datatype, &buftype_size);
+    MPI_Type_size_x(datatype, &buftype_size);
     MPI_Type_extent(datatype, &buftype_extent);
     etype_size = fd->etype_size;
     
@@ -531,9 +535,7 @@ void ADIOI_PVFS_WriteStridedListIO(ADIO_File fd, void *buf, int count,
         int64_t file_offsets;
 	int32_t file_lengths;
 
-	ADIOI_Flatten_datatype(datatype);
-	flat_buf = ADIOI_Flatlist;
-	while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	flat_buf = ADIOI_Flatten_and_find(datatype);
 	
 	if (file_ptr_type == ADIO_EXPLICIT_OFFSET) {
 	    off = fd->disp + etype_size * offset;
@@ -800,9 +802,7 @@ void ADIOI_PVFS_WriteStridedListIO(ADIO_File fd, void *buf, int count,
     else {
         /* noncontiguous in memory as well as in file */
 
-        ADIOI_Flatten_datatype(datatype);
-	flat_buf = ADIOI_Flatlist;
-	while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	flat_buf = ADIOI_Flatten_and_find(datatype);
 
 	size_wrote = 0;
 	n_filetypes = st_n_filetypes;

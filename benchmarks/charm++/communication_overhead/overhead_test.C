@@ -154,10 +154,10 @@ public:
       delete msg;
       if (++nReceived == kFactor) {
         nReceived = 0;
-        operationFinished(NULL);
         msg = new (msgSize) SimpleMessage();
 	msg->size = msgSize;
         thisProxy[neighbor].operationFinished(msg);
+        operationFinished(NULL);
       }
     }
     else {

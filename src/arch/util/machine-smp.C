@@ -359,28 +359,28 @@ void CmiDestroyLock(CmiNodeLock lk)
 void CmiYield(void) { sched_yield(); }
 
 int barrier = 0;
-pthread_cond_t barrier_cond = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t barrier_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t barrier_cond[CMI_NUM_NODE_BARRIER_TYPES] = { PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER };
+pthread_mutex_t barrier_mutex[CMI_NUM_NODE_BARRIER_TYPES] = { PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER };
 
 void CmiNodeBarrierCount(int nThreads, uint8_t mode)
 {
-  static unsigned int volatile level = 0;
+  static unsigned int volatile level[CMI_NUM_NODE_BARRIER_TYPES] = { 0, 0 };
   unsigned int cur;
-  pthread_mutex_lock(&barrier_mutex);
-  cur = level;
+  pthread_mutex_lock(&barrier_mutex[mode]);
+  cur = level[mode];
   /* CmiPrintf("[%d] CmiNodeBarrierCount: %d of %d level:%d\n", CmiMyPe(), barrier, nThreads, level); */
   barrier++;
   if(barrier != nThreads) {
       /* occasionally it wakes up without having reach the count */
-    while (cur == level)
-      pthread_cond_wait(&barrier_cond, &barrier_mutex);
+    while (cur == level[mode])
+      pthread_cond_wait(&barrier_cond[mode], &barrier_mutex[mode]);
   }
   else{
     barrier = 0;
-    level++;  /* !level;  */
-    pthread_cond_broadcast(&barrier_cond);
+    level[mode]++;  /* !level;  */
+    pthread_cond_broadcast(&barrier_cond[mode]);
   }
-  pthread_mutex_unlock(&barrier_mutex);
+  pthread_mutex_unlock(&barrier_mutex[mode]);
 }
 
 static CmiNodeLock comm_mutex;
@@ -579,7 +579,8 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-  pthread_mutex_destroy(&barrier_mutex);
+  for (int i=0; i < CMI_NUM_NODE_BARRIER_TYPES; i++)
+    pthread_mutex_destroy(&barrier_mutex[i]);
 #ifdef CMK_NO_ASM_AVAILABLE
   CmiDestroyLock(cmiMemoryLock);
 #endif

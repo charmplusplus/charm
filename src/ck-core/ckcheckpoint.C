@@ -54,7 +54,12 @@ extern char *_shrinkexpand_basedir;
 #endif
 
 #if CMK_ONESIDED_IMPL
-extern UInt numZerocopyROops; // Required for broadcasting RO Data after recovering from failure
+// Required for broadcasting RO Data after recovering from failure
+#if CMK_SMP
+extern std::atomic<UInt> numZerocopyROops;
+#else
+extern UInt  numZerocopyROops; 
+#endif
 #endif
 
 void CkCreateLocalChare(int epIdx, envelope *env);
@@ -101,8 +106,14 @@ static void bdcastRO(void){
 	envelope *env = _allocEnv(RODataMsg, ps.size());
 	PUP::toMem pp((char *)EnvToUsr(env));
 #if CMK_ONESIDED_IMPL
-	pp|numZerocopyROops; // Messages of type 'RODataMsg' need to have numZerocopyROops pupped in order
-                       // to be processed inside _processRODataMsg
+	// Messages of type 'RODataMsg' need to have numZerocopyROops pupped in order
+	// to be processed inside _processRODataMsg
+#if CMK_SMP
+	UInt numZerocopyROopsTemp = numZerocopyROops.load(std::memory_order_relaxed);
+	pp|numZerocopyROopsTemp;
+#else
+	pp|numZerocopyROops;
+#endif
 #endif
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 	
@@ -241,11 +252,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", CkMyPe());
 	PUP::toDisk pGroups(fGroups);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CkPupGroupData(pGroups, true);
-#else
         CkPupGroupData(pGroups);
-#endif
 	if(pGroups.checkError())
 	  success = false;
 	if(CmiFclose(fGroups)!=0)
@@ -256,11 +263,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	if (CkMyRank() == 0) {
 	  FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", CkMyNode());
 	  PUP::toDisk pNodeGroups(fNodeGroups);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-          CkPupNodeGroupData(pNodeGroups, true);
-#else
           CkPupNodeGroupData(pNodeGroups);
-#endif
 	  if(pNodeGroups.checkError())
 	    success = false;
 	  if(CmiFclose(fNodeGroups)!=0)
@@ -446,9 +449,6 @@ typedef void GroupCreationFn(CkGroupID groupID, int constructorIdx, envelope *en
 static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *objectTable,
                               unsigned int &numObjects, int constructionMsgType,
                               GroupCreationFn creationFn
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-                              , bool create
-#endif
                              )
 {
   int numGroups = 0, i;
@@ -500,21 +500,12 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
       envelope* env = UsrToEnv((CkMessage *)m);
       env->setMsgtype(constructionMsgType);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-      if(create)
-#endif
       {
         creationFn(gID, eIdx, env);
       }
     }   // end of unPacking
     IrrGroup *gobj = objectTable->find(gID).getObj();
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    if(creationFn == CkCreateLocalGroup && !create)
-    {
-      gobj->mlogData->teamRecoveryFlag = 1;
-    }
-#endif
 
     // if using migration constructor, you'd better have a pup
     gobj->virtual_pup(p);
@@ -522,31 +513,19 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
 }
 
 void CkPupGroupData(PUP::er &p
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-                    , bool create
-#endif
   )
 {
         CkPupPerPlaceData(p, CkpvAccess(_groupIDTable), CkpvAccess(_groupTable),
                           CkpvAccess(_numGroups), BocInitMsg, &CkCreateLocalGroup
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-                          , create
-#endif
                          );
 }
 
 void CkPupNodeGroupData(PUP::er &p
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-                        , bool create
-#endif
   )
 {
           CkPupPerPlaceData(p, &CksvAccess(_nodeGroupIDTable),
                             CksvAccess(_nodeGroupTable), CksvAccess(_numNodeGroups),
                             NodeBocInitMsg, &CkCreateLocalNodeGroup
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-                            , create
-#endif
                            );
 }
 
@@ -628,19 +607,11 @@ void CkPupProcessorData(PUP::er &p)
     CkPupChareData(p);
 
     // save groups 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CkPupGroupData(p,true);
-#else
     CkPupGroupData(p);
-#endif
 
     // save nodegroups
     if(CkMyRank()==0) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CkPupNodeGroupData(p,true);	
-#else
         CkPupNodeGroupData(p);
-#endif
     }
 
     // pup array elements
@@ -797,11 +768,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	FILE* fGroups = openCheckpointFile(dirname, "Groups", "rb",
                                      (CkNumPes() == _numPes) ? CkMyPe() : 0);
 	PUP::fromDisk pGroups(fGroups);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CkPupGroupData(pGroups,true);
-#else
     CkPupGroupData(pGroups);
-#endif
 	CmiFclose(fGroups);
 
 	// restore nodegroups
@@ -810,11 +777,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
                 FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "rb",
                                                        (CkNumNodes() == _numNodes) ? CkMyNode() : 0);
                 PUP::fromDisk pNodeGroups(fNodeGroups);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CkPupNodeGroupData(pNodeGroups,true);
-#else
         CkPupNodeGroupData(pNodeGroups);
-#endif
 		CmiFclose(fNodeGroups);
 	}
 
@@ -869,11 +832,7 @@ void CkResumeRestartMain(char * msg) {
     CkPupROData(pRO);
     CmiPrintf("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CkPupGroupData(pRO,true);
-#else
     CkPupGroupData(pRO);
-#endif
     CmiPrintf("[%d]CkResumeRestartMain: Group restored %d\n",CkMyPe(), CkpvAccess(_numGroups)-1);
   }
 

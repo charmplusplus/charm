@@ -201,26 +201,50 @@ void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int m
 }
 
 void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
+
+  if(ncpyOpInfo->opMode == CMK_BCAST_EM_API)
+    return;
+
   // Send a message to de-register remote buffer and invoke callback
   infiPacket packet;
   MallocInfiPacket(packet);
 
-  packet->size = ncpyOpInfo->ncpyOpInfoSize;
-  packet->buf  = (char *)ncpyOpInfo;
-  packet->header.code = INFIRDMA_DIRECT_DEREG_AND_ACK;
-  packet->ogm  = NULL;
-
   struct ibv_mr *packetKey;
+  NcpyOperationInfo *newNcpyOpInfo;
+
   if(ncpyOpInfo->opMode == CMK_DIRECT_API) {
-    packetKey = METADATAFIELD(ncpyOpInfo)->key;
-  } else if(ncpyOpInfo->opMode == CMK_EM_API || ncpyOpInfo->opMode == CMK_BCAST_EM_API) {
+    // ncpyOpInfo is not freed
+    newNcpyOpInfo = ncpyOpInfo;
+
+    packetKey = METADATAFIELD(newNcpyOpInfo)->key;
+
+  } else if(ncpyOpInfo->opMode == CMK_EM_API) {
+
+    // ncpyOpInfo is a part of the received message and can be freed before this send completes
+    // for that reason, it is copied into a new message
+    newNcpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyOpInfo->ncpyOpInfoSize);
+
+    memcpy(newNcpyOpInfo, ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize);
+
+    newNcpyOpInfo->freeMe =  CMK_FREE_NCPYOPINFO; // Since this is a copy of ncpyOpInfo, it can be freed
+
+
     // Register the small message in order to send it to the other side
-    packetKey = ibv_reg_mr(context->pd, (void *)ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+    packetKey = ibv_reg_mr(context->pd, (void *)newNcpyOpInfo, newNcpyOpInfo->ncpyOpInfoSize, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+
     if (!packetKey) {
       CmiAbort("Memory Registration Failed in LrtsInvokeRemoteDeregAckHandler!\n");
     }
+  } else {
+
+    CmiAbort("Verbs: LrtsInvokeRemoteDeregAckHandler - ncpyOpInfo->opMode is not valid for dereg\n");
   }
 
-  OtherNode node = &nodes[CmiNodeOf(ncpyOpInfo->srcPe)];
-  EnqueuePacket(node, packet, ncpyOpInfo->ncpyOpInfoSize, packetKey);
+  packet->size = newNcpyOpInfo->ncpyOpInfoSize;
+  packet->buf  = (char *)newNcpyOpInfo;
+  packet->header.code = INFIRDMA_DIRECT_DEREG_AND_ACK;
+  packet->ogm  = NULL;
+
+  OtherNode node = &nodes[CmiNodeOf(pe)];
+  EnqueuePacket(node, packet, newNcpyOpInfo->ncpyOpInfoSize, packetKey);
 }

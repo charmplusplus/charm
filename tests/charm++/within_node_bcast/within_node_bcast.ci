@@ -1,0 +1,63 @@
+mainmodule within_node_bcast {
+
+  message TestMessage {
+    int data[];
+  };
+
+  readonly CProxy_TestNodeGroup ngProxy;
+  readonly CProxy_TestGroup gProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg* msg);
+    entry [reductiontarget] void testDone(int result);
+    entry void runTests() {
+      serial { CkPrintf("Testing within-node broadcast\n"); }
+      for (test_num = 0; test_num < ITERATIONS; test_num++) {
+        serial {
+          CkCallback cb(CkReductionTarget(Main, testDone), thisProxy);
+          TestMessage* msg = new (DATA_SIZE) TestMessage(test_num, cb);
+          std::fill(msg->data, msg->data + DATA_SIZE, test_num);
+          ngProxy.recvCopy(msg);
+        }
+
+        when testDone(int result1), testDone(int result2) serial {
+          if (result1 != result2) {
+            CkPrintf("Results for test %i do not match! (%i, %i)\n",
+                test_num, result1, result2);
+            CkAbort("Test failed in results checking!!\n");
+          }
+        }
+      }
+
+      serial { CkPrintf("Testing [nokeep] within-node broadcast\n"); }
+      for (test_num = 0; test_num < ITERATIONS; test_num++) {
+        serial {
+          CkCallback cb(CkReductionTarget(Main, testDone), thisProxy);
+          TestMessage* msg = new (DATA_SIZE) TestMessage(test_num, cb);
+          std::fill(msg->data, msg->data + DATA_SIZE, test_num);
+          ngProxy.recv(msg);
+        }
+
+        when testDone(int result1), testDone(int result2) serial {
+          if (result1 != result2) {
+            CkPrintf("Results for test %i do not match! (%i, %i)\n",
+                test_num, result1, result2);
+            CkAbort("Test failed in results checking!!\n");
+          }
+        }
+      }
+    }
+  };
+
+  nodegroup TestNodeGroup {
+    entry TestNodeGroup();
+    entry void recv(TestMessage* msg);
+    entry void recvCopy(TestMessage* msg);
+  };
+
+  group TestGroup {
+    entry TestGroup();
+    entry [nokeep] void recv(TestMessage* msg);
+    entry void recvCopy(TestMessage* msg);
+  };
+};
