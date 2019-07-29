@@ -68,11 +68,11 @@ AMPI_CUSTOM_FUNC(int, MPI_TYPE_DUP_FN         , MPI_Datatype, int, void *, void 
 #include "pup_c_functions.h"
 
 /***pt2pt***/
-AMPI_FUNC(int, MPI_Send, const void *msg, int count, MPI_Datatype type, int dest,
+AMPI_FUNC(int, MPI_Send, const void *buf, int count, MPI_Datatype type, int dest,
               int tag, MPI_Comm comm)
-AMPI_FUNC(int, MPI_Ssend, const void *msg, int count, MPI_Datatype type, int dest,
+AMPI_FUNC(int, MPI_Ssend, const void *buf, int count, MPI_Datatype type, int dest,
                int tag, MPI_Comm comm)
-AMPI_FUNC(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, int tag,
+AMPI_FUNC(int, MPI_Recv, void *buf, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status)
 AMPI_FUNC(int, MPI_Mrecv, void* buf, int count, MPI_Datatype datatype, MPI_Message *message,
                   MPI_Status *status)
