@@ -35,7 +35,7 @@ public:
     }
     bufferSize =
       args->argc == 4 ? atoi(args->argv[3]) : TRAM_BUFFER_SIZE;
-    CkPrintf("size of envelope: %d\n\n", sizeof(envelope));
+    CkPrintf("size of envelope: %zu\n\n", sizeof(envelope));
     delete args;
 
     iters = dataSizeMin / DATA_ITEM_SIZE;

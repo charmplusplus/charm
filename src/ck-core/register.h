@@ -296,8 +296,8 @@ class CkRegisteredInfo {
 	void outOfBounds(int idx) {
 		const char *exampleName="";
 		if (vec.size()>0) exampleName=vec[0]->name;
-		CkPrintf("register.h> CkRegisteredInfo<%d,%s> called with invalid index "
-			"%d (should be less than %d)\n", sizeof(T),exampleName,
+		CkPrintf("register.h> CkRegisteredInfo<%zu,%s> called with invalid index "
+			"%d (should be less than %zu)\n", sizeof(T),exampleName,
 			idx, vec.size());
 		CkAbort("Registered idx is out of bounds-- is message or memory corrupted?");
 	}
