@@ -1322,8 +1322,8 @@ int AMPI_Iget_data(void *data, MPI_Status status) {
 AMPI_API_IMPL(int, MPI_Alloc_mem, MPI_Aint size, MPI_Info info, void *baseptr)
 {
   //NOTE: do not use AMPI_API() here, so that the memory allocated is migratable!
-  *((void **) baseptr) = malloc(size);
-  if(*((void **) baseptr) == nullptr)
+  *(void **) baseptr = malloc(size);
+  if(*(void **) baseptr == nullptr)
     return ampiErrhandler("AMPI_Alloc_mem", MPI_ERR_NO_MEM);
   return MPI_SUCCESS;
 }
