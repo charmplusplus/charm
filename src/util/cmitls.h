@@ -43,9 +43,10 @@ extern "C" {
 #endif
 
 void CmiTLSInit(void);
-void allocNewTLSSeg(tlsseg_t* t, CthThread th);
-void switchTLS(tlsseg_t*, tlsseg_t*);
-void currentTLS(tlsseg_t*);
+void CmiTLSAllocNewSeg(tlsseg_t* t, CthThread th);
+void CmiTLSSwap(tlsseg_t*, tlsseg_t*);
+void CmiTLSGet(tlsseg_t*);
+void CmiTLSSet(tlsseg_t*);
 
 #ifdef __cplusplus
 }

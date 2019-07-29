@@ -524,49 +524,27 @@ static void CthThreadBaseFree(CthThreadBase *th)
 #if CMK_THREADS_BUILD_TLS
 CthCpvStatic(tlsseg_t, _ctgTLS);
 
-// Generic TLS interface for callers that don't know which thread
-// they are switching to (main thread or CthThread).
-void CtgInstallTLS(void *cur, void *next)
+static void CthSwitchTLS(tlsseg_t * cur, tlsseg_t * next)
 {
-  tlsseg_t *newtls = (tlsseg_t *)next;
-  if (newtls == NULL)   newtls = &CthCpvAccess(_ctgTLS);
-  switchTLS((tlsseg_t *)cur, newtls);
+  CmiTLSSwap(cur, next);
 }
 
 // TLS interface for callers who know if they are context switching
 // to the main thread or a CthThread (this avoids branching).
 void CtgInstallMainThreadTLS(void *cur)
 {
-  switchTLS((tlsseg_t *)cur, &CthCpvAccess(_ctgTLS));
+  CmiAssert(cur != NULL);
+  CmiTLSSwap((tlsseg_t *)cur, &CthCpvAccess(_ctgTLS));
 }
 
-void CtgInstallCthTLS(void *cur, void *next)
+void CtgInstallCthTLS(void *next)
 {
   CmiAssert(next != NULL);
-  switchTLS((tlsseg_t *)cur, (tlsseg_t *)next);
-}
-
-static tlsseg_t  _oldtlsseg[128] = {0};
-static int       tlsseg_ptr = -1;
-void CmiDisableTLS(void)
-{
-  tlsseg_ptr++;
-  CmiAssert(tlsseg_ptr < 128);
-  switchTLS(&_oldtlsseg[tlsseg_ptr], &CthCpvAccess(_ctgTLS));
-}
-
-void CmiEnableTLS(void)
-{
-  tlsseg_t  dummy;
-  switchTLS(&dummy, &_oldtlsseg[tlsseg_ptr]);
-  tlsseg_ptr --;
+  CmiTLSSet((tlsseg_t *)next);
 }
 #else
-void CtgInstallTLS(void *cur, void *next) {}
 void CtgInstallMainThreadTLS(void *cur) {}
-void CtgInstallCthTLS(void *cur, void *next) {}
-void CmiDisableTLS(void) {}
-void CmiEnableTLS(void) {}
+void CtgInstallCthTLS(void *next) {}
 #endif
 
 static void CthBaseInit(char **argv)
@@ -597,7 +575,7 @@ static void CthBaseInit(char **argv)
   CmiTLSInit();
   CthCpvInitialize(tlsseg_t, _ctgTLS);
   CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
-  currentTLS(&CthCpvAccess(_ctgTLS));
+  CmiTLSGet(&CthCpvAccess(_ctgTLS));
 #endif
 }
 
@@ -1738,7 +1716,7 @@ void CthResume(CthThread t)
   tc = CthCpvAccess(CthCurrent);
 
 #if CMK_THREADS_BUILD_TLS
-  switchTLS(&B(tc)->tlsseg, &B(t)->tlsseg);
+  CthSwitchTLS(&B(tc)->tlsseg, &B(t)->tlsseg);
 #endif
 
   if (t != tc) { /* Actually switch threads */
@@ -1890,7 +1868,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   CthAliasEnable(B(CthCpvAccess(CthCurrent)));
 
 #if CMK_THREADS_BUILD_TLS
-  allocNewTLSSeg(&B(result)->tlsseg, result);
+  CmiTLSAllocNewSeg(&B(result)->tlsseg, result);
 #endif
 
   return result;  
@@ -2075,7 +2053,7 @@ void CthResume(CthThread t)
   if (t == tc) return;
 
 #if CMK_THREADS_BUILD_TLS
-  switchTLS(&B(tc)->tlsseg, &B(t)->tlsseg);
+  CthSwitchTLS(&B(tc)->tlsseg, &B(t)->tlsseg);
 #endif
 
   CthBaseResume(t);
@@ -2130,7 +2108,7 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
   }
 
 #if CMK_THREADS_BUILD_TLS
-  allocNewTLSSeg(&B(result)->tlsseg, result);
+  CmiTLSAllocNewSeg(&B(result)->tlsseg, result);
 #endif
 
   return result;

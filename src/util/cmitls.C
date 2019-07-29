@@ -377,7 +377,7 @@ void CmiTLSInit()
 #endif
 }
 
-void allocNewTLSSeg(tlsseg_t* t, CthThread th)
+void CmiTLSAllocNewSeg(tlsseg_t* t, CthThread th)
 {
   populateTLSSegStats(t);
 
@@ -396,14 +396,19 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th)
   }
 }
 
-void switchTLS(tlsseg_t* cur, tlsseg_t* next)
+void CmiTLSSwap(tlsseg_t* cur, tlsseg_t* next)
 {
   cur->memseg = (Addr)swapTLS((void*)next->memseg);
 }
 
-void currentTLS(tlsseg_t* cur)
+void CmiTLSGet(tlsseg_t* cur)
 {
   cur->memseg = (Addr)getTLS();
+}
+
+void CmiTLSSet(tlsseg_t* next)
+{
+  setTLS((void*)next->memseg);
 }
 
 #endif

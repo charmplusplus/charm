@@ -168,16 +168,6 @@ FLINKAGE void FTN_NAME(CMIENABLEISOMALLOC, cmienableisomalloc) ()
   CmiEnableIsomalloc();
 }
 
-FLINKAGE void FTN_NAME(CMIDISABLETLS, cmidisabletls) ()
-{
-  CmiDisableTLS();
-}
-
-FLINKAGE void FTN_NAME(CMIENABLETLS, cmienabletls) ()
-{
-  CmiEnableTLS();
-}
-
 FLINKAGE void FTN_NAME(CMIMEMORYCHECK, cmimemorycheck) ()
 {
   CmiMemoryCheck();
