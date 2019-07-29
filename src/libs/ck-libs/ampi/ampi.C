@@ -45,17 +45,10 @@ int ampiErrhandler(const char* func, int errcode) noexcept {
     // Abort with a nice message of the form: 'func' failed with error code 'errstr'.
     //  where 'func' is the name of the failed AMPI_ function and 'errstr'
     //  is the string returned by AMPI_Error_string for errcode.
-    int funclen = strlen(func);
-    const char* filler = " failed with error code ";
-    int fillerlen = strlen(filler);
     int errstrlen;
     char errstr[MPI_MAX_ERROR_STRING];
     MPI_Error_string(errcode, errstr, &errstrlen);
-    std::vector<char> str(funclen + fillerlen + errstrlen);
-    strcpy(str.data(), func);
-    strcat(str.data(), filler);
-    strcat(str.data(), errstr);
-    CkAbort(str.data());
+    CkAbort("%s failed with error code %s", func, errstr);
   }
   return errcode;
 }
@@ -4091,7 +4084,7 @@ void GathervReq::print() const noexcept {
 
 void ATAReq::print() const noexcept { //not complete for reqs
   AmpiRequest::print();
-  CkPrintf("In ATAReq: num_reqs=%d\n", reqs.size());
+  CkPrintf("In ATAReq: num_reqs=%zu\n", reqs.size());
 }
 
 void GReq::print() const noexcept {

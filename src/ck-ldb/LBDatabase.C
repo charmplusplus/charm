@@ -258,8 +258,7 @@ void _loadbalancerInit()
   LBSimulation::doSimulation = CmiGetArgIntDesc(argv, "+LBSim", &LBSimulation::simStep, "Read LB state from LBDumpFile since this step");
   // check for stupid LBSim parameter
   if (LBSimulation::doSimulation && LBSimulation::simStep < 0) {
-    CmiPrintf("LB> Argument LBSim (%d) invalid, should be >= 0\n");
-    CkExit();
+    CkAbort("LB> Argument LBSim (%d) invalid, should be >= 0\n", LBSimulation::simStep);
     return;
   }
   CmiGetArgIntDesc(argv, "+LBSimSteps", &LBSimulation::simStepSize, "Read LB state for this number of steps");

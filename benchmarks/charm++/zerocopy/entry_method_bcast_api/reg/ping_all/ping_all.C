@@ -105,9 +105,9 @@ public:
         niter = 0;
         if(warmUp == false) {
             if(size < 1 << 24)
-              CkPrintf("%d\t\t\t%d\t\t\t%lf\t\t\t%lf\n", size, iterations, reg_time, zcpy_time);
+              CkPrintf("%zu\t\t\t%d\t\t\t%lf\t\t\t%lf\n", size, iterations, reg_time, zcpy_time);
             else
-              CkPrintf("%d\t\t%d\t\t\t%lf\t\t\t%lf\n", size, iterations, reg_time, zcpy_time);
+              CkPrintf("%zu\t\t%d\t\t\t%lf\t\t\t%lf\n", size, iterations, reg_time, zcpy_time);
         }
         size = size << 1;
         if(warmUp)
