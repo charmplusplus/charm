@@ -1077,7 +1077,7 @@ static void print_btree_node(btreenode *node, int node_num)
   int i;
   CmiPrintf("Node %2d: ", node_num);
   for (i = 0; i < node->num_blocks; i++)
-    CmiPrintf("%d:[%lld,%lld] ", i, node->blocks[i].startslot, node->blocks[i].nslots);
+    CmiPrintf("%d:[%" PRId64 ",%" PRId64 "] ", i, node->blocks[i].startslot, node->blocks[i].nslots);
   CmiPrintf("\n");
 }
 
@@ -1134,7 +1134,7 @@ static void print_list_array(slotset *ss)
       else
         CmiPrintf(" ->");
 
-      CmiPrintf("[%lld,%lld]", dlln->sb->startslot, dlln->sb->nslots);
+      CmiPrintf("[%" PRId64 ",%" PRId64 "]", dlln->sb->startslot, dlln->sb->nslots);
       dlln = dlln->next;
     }
     CmiPrintf("\n");
@@ -1292,7 +1292,7 @@ unmap_slots(CmiInt8 slot, CmiInt8 nslots)
 static void map_failed(CmiInt8 s,CmiInt8 n)
 {
   void *addr=slot2addr(s);
-  CmiError("Charm++> Isomalloc map failed to allocate %d bytes at %p, errno: %d.\n",
+  CmiError("Charm++> Isomalloc map failed to allocate %" PRId64 " bytes at %p, errno: %d.\n",
       slotsize*n, addr, errno);
   CmiAbort("Exiting\n");
 }
@@ -1837,14 +1837,14 @@ static void init_ranges(char **argv)
 
         /* update */
         if (s > e)  {
-          if (CmiMyPe()==0) CmiPrintf("[%d] Invalid isomalloc region: %lx - %lx.\n", CmiMyPe(), s, e);
+          if (CmiMyPe()==0) CmiPrintf("[%d] Invalid isomalloc region: %" PRIxPTR " - %" PRIxPTR ".\n", CmiMyPe(), s, e);
           CmiAbort("Isomalloc> failed to find consolidated isomalloc region!");
         }
         freeRegion.start = (char *)(uintptr_t)s;
         freeRegion.len = (char *)(uintptr_t)e -(char *)(uintptr_t)s;
 
         if (CmiMyPe() == 0)
-          CmiPrintf("Charm++> Consolidated Isomalloc memory region: %p - %p (%d MB).\n",
+          CmiPrintf("Charm++> Consolidated Isomalloc memory region: %p - %p (%zu MB).\n",
               freeRegion.start,freeRegion.start+freeRegion.len,
               freeRegion.len/meg);
 #if __FAULT__
@@ -2011,7 +2011,7 @@ static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size)
   /*Always satisfy mallocs with local slots:*/
   s=get_slots(CpvAccess(myss),n);
   if (s==-1) {
-    CmiError("Not enough address space left on processor %d to isomalloc %d bytes!\n",
+    CmiError("Not enough address space left on processor %d to isomalloc %zu bytes!\n",
         CmiMyPe(),size);
     CmiAbort("Out of virtual address space for isomalloc");
   }

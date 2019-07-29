@@ -29,8 +29,7 @@ void CmiAbort(const char *message, ...)
   va_start(args, message);
   vsnprintf(newmsg, sizeof(newmsg), message, args);
   va_end(args);
-  CmiError(newmsg);
-  CmiError("\n");
+  CmiError("%s\n", newmsg);
   exit(1);
   CMI_NORETURN_FUNCTION_END
 }
@@ -287,8 +286,7 @@ static void CmiParseArgs(char **argv)
   _Cmi_numpes=1;
   CmiGetArgInt(argv,"+p",&_Cmi_numpes);
   if (CmiNumPes()<1) {
-    printf("Error: must specify number of processors to simulate with +pXXX\n",CmiNumPes());
-    exit(1);
+    CmiAbort("Error: must specify number of processors to simulate with +pXXX");
   }
 }
 

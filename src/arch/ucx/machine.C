@@ -118,16 +118,14 @@ static void UcxPrepostRxBuffers();
 #define UCX_CHECK_STATUS(_status, _str) \
 { \
     if (UCS_STATUS_IS_ERR(_status)) { \
-        std::string s = std::string("UCX: ") + _str + " failed: " + ucs_status_string(_status); \
-        CmiAbort(s.c_str()); \
+        CmiAbort("UCX: " _str " failed: %s", ucs_status_string(_status)); \
     } \
 }
 
 #define UCX_CHECK_RET(_ret, _str, _cond) \
 { \
     if (_cond) { \
-        std::string s = std::string("UCX: ") + _str + " failed: " + std::to_string(_ret); \
-        CmiAbort(s.c_str()); \
+        CmiAbort("UCX: " _str " failed: %d", _ret); \
     } \
 }
 
@@ -371,7 +369,7 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
 {
     UcxRequest *req = (UcxRequest*)request;
 
-    UCX_LOG(3, "status %d len %d, buf %p, req %p, tag %zu\n",
+    UCX_LOG(3, "status %d len %zu, buf %p, req %p, tag %zu\n",
             status,  info->length, req->msgBuf, request, info->sender_tag);
 
     if (ucs_unlikely(status == UCS_ERR_CANCELED)) {
@@ -492,7 +490,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size,
     sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_DIRECT;
     sTag |= tag;
 
-    UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%i",
+    UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
             destNode, destPE, size, msg, tag);
 #if CMK_SMP
     UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
@@ -605,7 +603,7 @@ void LrtsAdvanceCommunication(int whileidle)
        msg = ucp_tag_probe_nb(ucxCtx.worker, UCX_MSG_TAG_PROBE,
                               UCX_MSG_TAG_MASK, 1, &info);
        if (msg != NULL) {
-           UCX_LOG(3, "Got msg %p, len %d\n", msg, info.length);
+           UCX_LOG(3, "Got msg %p, len %zu\n", msg, info.length);
            UcxPostRxReq(UCX_MSG_TAG_PROBE, info.length, msg);
        }
 
