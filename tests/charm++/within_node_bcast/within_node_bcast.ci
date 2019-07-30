@@ -24,9 +24,8 @@ mainmodule within_node_bcast {
 
         when testDone(int result1), testDone(int result2) serial {
           if (result1 != result2) {
-            CkPrintf("Results for test %i do not match! (%i, %i)\n",
-                test_num, result1, result2);
-            CkAbort("Test failed in results checking!!\n");
+            CkAbort("Results for test %i/%i do not match! (%i, %i)\n",
+                test_num+1, ITERATIONS, result1, result2);
           }
         }
       }
@@ -43,9 +42,8 @@ mainmodule within_node_bcast {
 
         when testDone(int result1), testDone(int result2) serial {
           if (result1 != result2) {
-            CkPrintf("Results for test %i do not match! (%i, %i)\n",
-                test_num, result1, result2);
-            CkAbort("Test failed in results checking!!\n");
+            CkAbort("Results for test %i/%i do not match! (%i, %i)\n",
+                test_num+1, ITERATIONS, result1, result2);
           }
         }
       }
@@ -68,9 +66,8 @@ mainmodule within_node_bcast {
 
         when testDone(int result1), testDone(int result2) serial {
           if (result1 != result2) {
-            CkPrintf("Results for test %i do not match! (%i, %i)\n",
-                test_num, result1, result2);
-            CkAbort("Test failed in results checking!!\n");
+            CkAbort("Results for test %i/%i do not match! (%i, %i)\n",
+                test_num+1, ITERATIONS, result1, result2);
           }
         }
       }
@@ -92,9 +89,8 @@ mainmodule within_node_bcast {
 
         when testDone(int result1), testDone(int result2) serial {
           if (result1 != result2) {
-            CkPrintf("Results for test %i do not match! (%i, %i)\n",
-                test_num, result1, result2);
-            CkAbort("Test failed in results checking!!\n");
+            CkAbort("Results for test %i/%i do not match! (%i, %i)\n",
+                test_num+1, ITERATIONS, result1, result2);
           }
         }
       }
