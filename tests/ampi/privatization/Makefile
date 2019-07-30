@@ -80,9 +80,14 @@ test: $(foreach i,$(TARGETS),test-$i)
 ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
+smptest: $(foreach i,$(TARGETS),smptest-$i)
+ifeq (,$(TARGETS))
+	@echo $(EMPTY_MESSAGE)
+endif
 
 everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$j-$i))
 test-everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i))
+smptest-everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),smptest-$j-$i))
 
 
 add_if_contains = $(subst $2,$3,$(findstring $2,$1))
@@ -129,6 +134,21 @@ test-f90-$1: f90-$1
 
 test-$1: $$(foreach j,$$(LANGUAGES),test-$$j-$1)
 
+# smptest
+smptest-cxx-$1: cxx-$1
+	$$(call run, ./cxx-$1 +p2 ++ppn 2 +vp2 )
+	$$(call run, ./cxx-$1 +p2 ++ppn 2 +vp4 )
+	$$(call run, ./cxx-$1 +p4 ++ppn 2 +vp4 )
+	$$(call run, ./cxx-$1 +p4 ++ppn 2 +vp8 )
+
+smptest-f90-$1: f90-$1
+	$$(call run, ./f90-$1 +p2 ++ppn 2 +vp2 )
+	$$(call run, ./f90-$1 +p2 ++ppn 2 +vp4 )
+	$$(call run, ./f90-$1 +p4 ++ppn 2 +vp4 )
+	$$(call run, ./f90-$1 +p4 ++ppn 2 +vp8 )
+
+smptest-$1: $$(foreach j,$$(LANGUAGES),smptest-$$j-$1)
+
 endef
 
 $(foreach i,$(VARIANTS),$(eval $(call VARIANT_RULES,$i)))
@@ -144,4 +164,4 @@ clean:
 	rm -f *.o *.a *.so *.mod $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(strip $j-$i $(wildcard $j-$i$(FUNCPTR_SHIM_SUFFIX)*)))) charmrun ampirun
 
 .SUFFIXES:
-.PHONY: all test everything test-everything $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i) test-$i $i)
+.PHONY: all test smptest everything test-everything smptest-everything $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i) test-$i $i) $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),smptest-$j-$i) smptest-$i $i)

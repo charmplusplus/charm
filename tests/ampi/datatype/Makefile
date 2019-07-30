@@ -12,6 +12,8 @@ datatype.o: datatype.C
 test: datatype
 	$(call run, ./datatype +p1 +vp4)
 
+smptest: datatype
+
 bgtest: datatype
 	$(call run, ./datatype +p1 +vp4 +x1 +y1 +z1 )
 

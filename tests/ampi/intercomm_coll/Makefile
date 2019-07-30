@@ -13,6 +13,8 @@ test: intercomm_coll
 	$(call run, ./intercomm_coll +p1 +vp4)
 #	$(call run, ./intercomm_coll +p2 +vp4)
 
+smptest: intercomm_coll
+
 bgtest: intercomm_coll
 	$(call run, ./intercomm_coll +p1 +vp4 +x1 +y1 +z1 )
 #	$(call run, ./intercomm_coll +p2 +vp4 +x2 +y1 +z1 )
