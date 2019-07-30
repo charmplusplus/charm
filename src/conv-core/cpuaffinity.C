@@ -241,6 +241,46 @@ int CmiSetCPUAffinity(int mycore)
   return result;
 }
 
+int CmiSetCPUAffinityLogical(int mycore)
+{
+  int core = mycore;
+  if (core < 0) {
+    core = CmiHwlocTopologyLocal.num_pus + core;
+  }
+  if (core < 0) {
+    CmiError("Error: Invalid parameter to CmiSetCPUAffinityLogical: %d\n", mycore);
+    CmiAbort("CmiSetCPUAffinityLogical failed!");
+  }
+
+  CpvAccess(myCPUAffToCore) = core;
+
+  hwloc_topology_t topology;
+
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+
+  int thread_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PU);
+  int thread_assignment = core % thread_unitcount;
+
+  hwloc_obj_t thread_obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PU, thread_assignment);
+
+  int result = -1;
+
+  if (thread_obj != nullptr)
+#if CMK_SMP
+    result = set_thread_affinity(topology, thread_obj->cpuset);
+#else
+    result = set_process_affinity(topology, thread_obj->cpuset);
+#endif
+
+  cmi_hwloc_topology_destroy(topology);
+
+  if (result == -1)
+    CmiError("Error: CmiSetCPUAffinityLogical failed to bind PE #%d to PU #%d.\n", CmiMyPe(), mycore);
+
+  return result;
+}
+
 /* This implementation assumes the default x86 CPU mask size used by Linux */
 /* For a large SMP machine, this code should be changed to use a variable sized   */
 /* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
@@ -485,7 +525,7 @@ static void cpuAffinityRecvHandler(void *msg)
 
   DEBUGP(("[%d %d] set to core #: %d\n", CmiMyNode(), CmiMyPe(), myrank));
 
-  if (-1 != CmiSetCPUAffinity(myrank)) {
+  if (-1 != CmiSetCPUAffinityLogical(myrank)) {
     DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
   }
   else{
