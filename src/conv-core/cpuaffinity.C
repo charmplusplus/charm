@@ -251,9 +251,6 @@ int CmiSetCPUAffinityLogical(int mycore)
     CmiError("Error: Invalid parameter to CmiSetCPUAffinityLogical: %d\n", mycore);
     CmiAbort("CmiSetCPUAffinityLogical failed!");
   }
-
-  CpvAccess(myCPUAffToCore) = core;
-
   hwloc_topology_t topology;
 
   cmi_hwloc_topology_init(&topology);
@@ -267,11 +264,15 @@ int CmiSetCPUAffinityLogical(int mycore)
   int result = -1;
 
   if (thread_obj != nullptr)
+  {
 #if CMK_SMP
     result = set_thread_affinity(topology, thread_obj->cpuset);
 #else
     result = set_process_affinity(topology, thread_obj->cpuset);
 #endif
+
+    CpvAccess(myCPUAffToCore) = thread_obj->os_index;
+  }
 
   cmi_hwloc_topology_destroy(topology);
 
