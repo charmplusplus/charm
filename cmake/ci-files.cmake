@@ -52,12 +52,18 @@ foreach(in_f ${ci-files})
         set(ci-output collide.decl.h)
     elseif(${in_f} MATCHES src/ck-core/ckarray.ci)
         set(ci-output CkArray.decl.h)
+    elseif(${in_f} MATCHES src/libs/ck-libs/TMRC2D/tri.ci)
+        # set(ci-output refine.decl.h) # ; not needed during LIBS build
+        continue()
     elseif(${in_f} MATCHES src/libs/ck-libs/tmr/tri.ci)
-        set(ci-output tri_refine.decl.h) # incorrect file name to prevent name clash with TMRC2D/tri.ci
+        # set(ci-output tri_refine.decl.h) # incorrect file name to prevent name clash with TMRC2D/tri.ci ; not needed during LIBS build
+        continue()
     elseif(${in_f} MATCHES src/libs/ck-libs/ParFUM-Tops-Dev/ParFUM_TOPS.ci)
-        set(ci-output ParFUM_TOPS_dev.decl.h) # incorrect file name to prevent name clash with ParFUM-Tops/ParFUM_TOPS.ci
-    # elseif(${in_f} MATCHES src/libs/ck-libs/TMRC2D/old_pgm.ci)
-    #     set(ci-output Pgm.decl.h)
+        # set(ci-output ParFUM_TOPS_dev.decl.h) # incorrect file name to prevent name clash with ParFUM-Tops/ParFUM_TOPS.ci ; not needed during LIBS build
+        continue()
+    elseif(${in_f} MATCHES src/libs/ck-libs/TMRC2D/old_pgm.ci)
+        # set(ci-output Pgm.decl.h) #disabled, as it clashes with another pgm.decl.h
+        continue()
     elseif(${in_f} MATCHES src/libs/ck-libs/TMRC2D/refine.ci)
         set(ci-output TMR_Interface.decl.h)
     elseif(${in_f} MATCHES src/libs/ck-libs/pmaf/chunk.ci)
