@@ -240,7 +240,9 @@ target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/to
 target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager)
 
 # Fortran interface
-add_library(ckf charmf.C charmmod.f90 charmf.h ${ck-ci-sources})
-add_library(ckmainf mainf.f90)
+if(${CMK_CAN_LINK_FORTRAN})
+    add_library(ckf charmf.C charmmod.f90 charmf.h ${ck-ci-sources})
+    add_library(ckmainf mainf.f90)
+endif()
 
 add_library(mpi-mainmodule mpi-mainmodule.C ${ck-ci-sources})
