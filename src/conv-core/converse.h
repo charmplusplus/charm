@@ -590,7 +590,8 @@ for each processor in the node.
 */
 #ifdef CMK_CPV_IS_SMP
 
-#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD && 0
+/* Disabled where pthreads are available because this interferes with tlsglobals */
 #define CpvDeclare(t,v) CMK_THREADLOCAL t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
                         t ** CMK_TAG(Cpv_addr_,v)

@@ -295,7 +295,8 @@ int _Cmi_forceSpinOnIdle=0;
 extern std::atomic<int> _cleanUp;
 extern void CharmScheduler(void);
 
-#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD && defined _WIN32
+/* Disabled where pthreads are available because this interferes with tlsglobals */
 static CMK_THREADLOCAL struct CmiStateStruct     Cmi_mystate;
 static CmiState     *Cmi_state_vector;
 
@@ -430,7 +431,8 @@ void CommunicationServerThread(int sleepTime);
 static void *call_startfn(void *vindex)
 {
   size_t index = (size_t)vindex;
-#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD && defined _WIN32
+/* Disabled where pthreads are available because this interferes with tlsglobals */
   if (index<_Cmi_mynodesize) 
     CmiStateInit(index+Cmi_nodestart, index, &Cmi_mystate);
   else
@@ -499,7 +501,7 @@ static void CmiStartThreads(char **argv)
   if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
 #endif
 
-#if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
+#if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD && defined _WIN32)
   pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
     (CmiState)calloc(_Cmi_mynodesize+1, sizeof(struct CmiStateStruct));
@@ -509,6 +511,7 @@ static void CmiStartThreads(char **argv)
 /*  CmiStateInit(-1,_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize)); */
   CmiStateInit(_Cmi_mynode+CmiNumPes(),_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize));
 #else
+/* Disabled where pthreads are available because this interferes with tlsglobals */
     /* for main thread */
   Cmi_state_vector = (CmiState *)calloc(_Cmi_mynodesize+1, sizeof(CmiState));
 #if CMK_CONVERSE_MPI
@@ -561,7 +564,7 @@ static void CmiStartThreads(char **argv)
 #endif
     pthread_attr_destroy(&attr);
   }
-#if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
+#if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD && defined _WIN32)
 #if CMK_CONVERSE_MPI
   if(!CharmLibInterOperate)
     pthread_setspecific(Cmi_state_key, Cmi_state_vector+_Cmi_mynodesize);
