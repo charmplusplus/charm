@@ -26,4 +26,7 @@ if($CMK_TRACE_ENABLED})
     add_library(trace-memory trace-memory.C)
 endif()
 add_library(trace-converse trace-converse.C)
-add_library(tracef_f tracef_f.f90)
+
+if(${CMK_CAN_LINK_FORTRAN})
+    add_library(tracef_f tracef_f.f90)
+endif()
