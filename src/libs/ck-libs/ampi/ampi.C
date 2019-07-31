@@ -815,6 +815,7 @@ void AMPI_Setup_Switch(void) {
 int AMPI_PE_LOCAL_THRESHOLD = AMPI_PE_LOCAL_THRESHOLD_DEFAULT;
 int AMPI_NODE_LOCAL_THRESHOLD = AMPI_NODE_LOCAL_THRESHOLD_DEFAULT;
 int AMPI_RDMA_THRESHOLD = AMPI_RDMA_THRESHOLD_DEFAULT;
+int AMPI_SSEND_THRESHOLD = AMPI_SSEND_THRESHOLD_DEFAULT;
 
 static bool nodeinit_has_been_called=false;
 CtvDeclare(ampiParent*, ampiPtr);
@@ -1000,8 +1001,8 @@ static void ampiNodeInit() noexcept
     localThresholdSet = true;
   }
   if (CkMyNode() == 0 && localThresholdSet) {
-#if AMPI_LOCAL_IMPL
-#if CMK_SMP
+#if AMPI_PE_LOCAL_IMPL
+#if AMPI_NODE_LOCAL_IMPL
     CkPrintf("AMPI> PE-local messaging threshold is %d Bytes and Node-local messaging threshold is %d Bytes.\n",
              AMPI_PE_LOCAL_THRESHOLD, AMPI_NODE_LOCAL_THRESHOLD);
 #else
@@ -1010,10 +1011,10 @@ static void ampiNodeInit() noexcept
     if (AMPI_NODE_LOCAL_THRESHOLD != AMPI_NODE_LOCAL_THRESHOLD_DEFAULT) {
       CkPrintf("Warning: AMPI Node-local messaging threshold ignored on non-SMP build.\n");
     }
-#endif //CMK_SMP
+#endif
 #else
     CkPrintf("Warning: AMPI local messaging threshold ignored since local sends are disabled.\n");
-#endif //AMPI_LOCAL_IMPL
+#endif //AMPI_PE_LOCAL_IMPL
   }
   if ((value = getenv("AMPI_RDMA_THRESHOLD"))) {
     AMPI_RDMA_THRESHOLD = atoi(value);
@@ -1023,6 +1024,12 @@ static void ampiNodeInit() noexcept
 #else
       CkPrintf("Warning: AMPI RDMA threshold ignored since AMPI RDMA is disabled.\n");
 #endif
+    }
+  }
+  if ((value = getenv("AMPI_SSEND_THRESHOLD"))) {
+    AMPI_SSEND_THRESHOLD = atoi(value);
+    if (CkMyNode() == 0) {
+      CkPrintf("AMPI> Synchronous messaging threshold is %d Bytes.\n", AMPI_SSEND_THRESHOLD);
     }
   }
 
@@ -2977,10 +2984,11 @@ AmpiMsg *ampi::makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root
 //       within, meaning we have to handle that case in ampi::processSsendNcpyShmMsg().
 AmpiMsg *ampi::makeSyncMsg(int t,int sRank,const void *buf,int count,
                            MPI_Datatype type,CProxy_ampi destProxy,
-                           int destIdx, int ssendReq,CMK_REFNUM_TYPE seq) noexcept
+                           int destIdx, int ssendReq,CMK_REFNUM_TYPE seq,
+                           ampi* destPtr) noexcept
 {
   CkAssert(ssendReq >= 0);
-  if (destLikelyWithinProcess(destProxy, destIdx)) {
+  if (destLikelyWithinProcess(destProxy, destIdx, destPtr)) {
     return makeNcpyShmMsg(t, sRank, buf, count, type, ssendReq, seq);
   }
   else {
@@ -3161,56 +3169,16 @@ void ampi::localInorder(char* buf, int size, int seqIdx, CMK_REFNUM_TYPE seq, in
 }
 
 // Call genericRdma inline on the local destination object
-MPI_Request ampi::sendLocalInOrderMsg(int tag, int srcRank, const void* buf, int size, MPI_Datatype type,
-                                      int count, int destRank, MPI_Comm destComm, CMK_REFNUM_TYPE seq,
-                                      ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept
+MPI_Request ampi::sendLocalMsg(int tag, int srcRank, const void* buf, int size, MPI_Datatype type,
+                               int count, int destRank, MPI_Comm destComm, CMK_REFNUM_TYPE seq,
+                               ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept
 {
   int seqIdx = srcRank;
 
-  if (seq == 0 || destPtr->isInOrder(seqIdx, seq)) {
-    IReq* ireq = (IReq*)destPtr->postedReqs.get(tag, srcRank);
-    if (ireq != nullptr) { // Found a matching preposted request in the destination rank's queue
-      MSG_ORDER_DEBUG(
-        CkPrintf("[%d] AMPI vp %d sending local, in-order, matched msg inline to vp %d\n",
-                 CkMyPe(), parent->thisIndex, destPtr->parent->thisIndex);
-      )
-      CkDDT_DataType* sddt = getDDT()->getType(type);
-      if (sddt->isContig()) {
-        destPtr->localInorder((char*)buf, size, seqIdx, seq, tag, srcRank, ireq);
-      }
-      else {
-        // NOTE: Intermediate copy here could be avoided if DDT
-        // could copy directly b/w two non-contiguous datatypes
-        std::vector<char> sbuf(size);
-        sddt->serialize((char*)buf, sbuf.data(), count, size, PACK); // intermediate copy for noncontig DDTs
-        destPtr->localInorder(sbuf.data(), size, seqIdx, seq, tag, srcRank, ireq);
-      }
-
-      if (reqIdx != MPI_REQUEST_NULL) { // Persistent Send request
-        AmpiRequestList& reqList = getReqs();
-        AmpiRequest& sreq = (*reqList[reqIdx]);
-        CkAssert(sreq.isPersistent());
-        sreq.complete = true;
-        return reqIdx;
-      }
-      else if (sendType == BLOCKING_SEND || sendType == BLOCKING_SSEND) {
-        return MPI_REQUEST_NULL;
-      }
-      else if (sendType == I_SEND || sendType == BLOCKING_SEND) {
-        return postReq(parent->reqPool.newReq<SendReq>(type, destComm, getDDT(), AMPI_REQ_COMPLETED));
-      }
-      else {
-        CkAssert(sendType == I_SSEND);
-        return postReq(parent->reqPool.newReq<SsendReq>(type, destComm, getDDT(), AMPI_REQ_COMPLETED));
-      }
-    }
-  }
-
-  if (size >= AMPI_PE_LOCAL_THRESHOLD ||
-     (sendType == BLOCKING_SSEND || sendType == I_SSEND)) {
+  if (size >= AMPI_PE_LOCAL_THRESHOLD || (sendType == BLOCKING_SSEND || sendType == I_SSEND)) {
     // Block on the matching request to avoid making an intermediate copy
     MSG_ORDER_DEBUG(
-      CkPrintf("[%d] AMPI vp %d sending local, out-of-order/unexpected msg inline using a Sync send from to vp %d\n",
+      CkPrintf("[%d] AMPI vp %d sending local msg inline using a Sync send to vp %d\n",
                CkMyPe(), parent->thisIndex, destPtr->parent->thisIndex);
     )
     if (reqIdx == MPI_REQUEST_NULL) {
@@ -3218,10 +3186,14 @@ MPI_Request ampi::sendLocalInOrderMsg(int tag, int srcRank, const void* buf, int
                                                         (sendType == BLOCKING_SSEND) ?
                                                         AMPI_REQ_BLOCKED : AMPI_REQ_PENDING));
     }
-    destPtr->genericSync(makeSyncMsg(tag, srcRank, buf, count, type, destPtr->thisProxy, destPtr->thisIndex, reqIdx, seq));
+    destPtr->genericSync(makeSyncMsg(tag, srcRank, buf, count, type, destPtr->thisProxy, destPtr->thisIndex, reqIdx, seq, destPtr));
     return reqIdx;
   }
-  else { // SendReq is pre-completed since we directly copied the send buffer
+  else {
+    MSG_ORDER_DEBUG(
+      CkPrintf("[%d] AMPI vp %d sending local msg inline to vp %d\n",
+               CkMyPe(), parent->thisIndex, destPtr->parent->thisIndex);
+    )
     destPtr->generic(makeAmpiMsg(destRank, tag, srcRank, buf, count, type, destComm, seq));
     return MPI_REQUEST_NULL;
   }
@@ -3229,7 +3201,7 @@ MPI_Request ampi::sendLocalInOrderMsg(int tag, int srcRank, const void* buf, int
 
 MPI_Request ampi::sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
                               int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destProxy,
-                              int destIdx, AmpiSendType sendType, MPI_Request reqIdx) noexcept
+                              int destIdx, AmpiSendType sendType, MPI_Request reqIdx, ampi* destPtr) noexcept
 {
   if (reqIdx == MPI_REQUEST_NULL) {
     reqIdx = postReq(parent->reqPool.newReq<SsendReq>((void*)buf, count, type, rank, t, destcomm, sRank, getDDT(),
@@ -3237,14 +3209,13 @@ MPI_Request ampi::sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype ty
                                                       AMPI_REQ_BLOCKED : AMPI_REQ_PENDING));
   }
   // All sync messages go thru ampi::genericSync (not generic or genericRdma)
-#if AMPI_LOCAL_IMPL
-  ampi* destPtr = destProxy[destIdx].ckLocal();
+#if AMPI_PE_LOCAL_IMPL
   if (destPtr != NULL) {
-    destPtr->genericSync(makeSyncMsg(t, sRank, buf, count, type, destProxy, destIdx, reqIdx, seq));
+    destPtr->genericSync(makeSyncMsg(t, sRank, buf, count, type, destProxy, destIdx, reqIdx, seq, destPtr));
   } else
 #endif
   {
-    destProxy[destIdx].genericSync(makeSyncMsg(t, sRank, buf, count, type, destProxy, destIdx, reqIdx, seq));
+    destProxy[destIdx].genericSync(makeSyncMsg(t, sRank, buf, count, type, destProxy, destIdx, reqIdx, seq, NULL));
   }
   return reqIdx;
 }
@@ -3266,34 +3237,47 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   CMK_REFNUM_TYPE seq = getSeqNo(rank, destcomm, t);
 
   MSG_ORDER_DEBUG(
-    CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d, seq=%d (to %d)\n",parent->thisIndex,t,sRank,destcomm,seq,destIdx);
+    CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d, seq=%d (to %d)\n",
+             parent->thisIndex, t, sRank, destcomm, seq, destIdx);
   )
 
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int size = ddt->getSize(count);
-#if AMPI_LOCAL_IMPL
   ampi *destPtr = arrProxy[destIdx].ckLocal();
+#if AMPI_PE_LOCAL_IMPL
   if (destPtr != nullptr) {
-    return sendLocalInOrderMsg(t, sRank, buf, size, type, count, rank, destcomm, seq, destPtr, sendType, reqIdx);
+    // Complete message inline to PE-local destination VP
+    return sendLocalMsg(t, sRank, buf, size, type, count, rank, destcomm,
+                        seq, destPtr, sendType, reqIdx);
   }
 #endif
   if (
-#if AMPI_LOCAL_IMPL
-      (size >= AMPI_PE_LOCAL_THRESHOLD && destPtr != NULL) ||
-#endif
-#if CMK_SMP
-      (size >= AMPI_NODE_LOCAL_THRESHOLD && destLikelyWithinProcess(arrProxy, destIdx)) ||
+#if AMPI_NODE_LOCAL_IMPL
+      (size >= AMPI_NODE_LOCAL_THRESHOLD && destLikelyWithinProcess(arrProxy, destIdx, destPtr)) ||
 #endif
       (sendType == BLOCKING_SSEND || sendType == I_SSEND))
   {
-    return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm, seq, arrProxy, destIdx, sendType, reqIdx);
+    // Avoid sender- and receiver-side copies via zero copy direct API
+    // (optimized for within-process transfers)
+    return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm,
+                       seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
   }
 #if AMPI_RDMA_IMPL
   if (ddt->isContig() && size >= AMPI_RDMA_THRESHOLD) {
-    return sendRdmaMsg(t, sRank, buf, size, type, destIdx, rank, destcomm, seq, arrProxy, reqIdx);
+    // Avoid sender-side copy via zero copy entry method API
+    return sendRdmaMsg(t, sRank, buf, size, type, destIdx,
+                       rank, destcomm, seq, arrProxy, reqIdx);
   }
 #endif
+  if (size >= AMPI_SSEND_THRESHOLD) {
+    // Avoid sender- and receiver-side copies via zero copy direct API
+    return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm,
+                       seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
+  }
+
+  // Send via normal Charm++ message with copies on both sender- and receiver-sides
   arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, seq));
+
   if (reqIdx != MPI_REQUEST_NULL) { // Persistent send request
     AmpiRequestList& reqList = parent->ampiReqs;
     AmpiRequest& sreq = (*reqList[reqIdx]);
@@ -3382,7 +3366,7 @@ bool ampi::processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
     // complete the sender's SsendReq, inline if possible
     int srcIdx = srcInfo.getIdx();
     MPI_Request sreqIdx = msg->getSsendReq();
-#if AMPI_LOCAL_IMPL
+#if AMPI_PE_LOCAL_IMPL
     ampi* srcPtr = thisProxy[srcIdx].ckLocal();
     if (srcPtr != NULL) {
       srcPtr->completedSend(sreqIdx);
