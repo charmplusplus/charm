@@ -9,6 +9,8 @@
 #if CMK_HAS_MALLOC_H
 #include <malloc.h>
 #endif
+#include <errno.h>
+#include <algorithm>
 
 #include "memory-isomalloc.h"
 
@@ -89,6 +91,15 @@ void* swapTLS(void* newptr)
 // ----- TLS segment size determination -----
 
 static tlsseg_t CmiTLSDefaultInfo;
+
+#if CMK_THREADS_COPY_ERRNO_ELIGIBLE
+static ptrdiff_t errno_offset;
+
+ptrdiff_t CthGetErrnoOffset()
+{
+  return errno_offset;
+}
+#endif
 
 #if CMK_HAS_DL_ITERATE_PHDR
 
@@ -350,6 +361,11 @@ void CmiTLSInit()
     CmiTLSStatsInit();
     CmiTLSDefaultInfo.size = CMIALIGN(CmiTLSDefaultInfo.size, CmiTLSDefaultInfo.align);
     CmiTLSDefaultInfo.memseg = (Addr)getTLS();
+
+#if CMK_THREADS_COPY_ERRNO_ELIGIBLE
+    errno_offset = (const char *)CmiTLSDefaultInfo.memseg - (const char *)&errno;
+    CmiAssert(std::abs(errno_offset) <= CmiTLSDefaultInfo.size);
+#endif
   }
 #endif
 }

@@ -3,7 +3,14 @@
 
 #include "conv-config.h"
 
+#define CMK_THREADS_COPY_ERRNO_ELIGIBLE 0
+
 #if CMK_HAS_TLS_VARIABLES
+
+#if defined __linux__
+# undef CMK_THREADS_COPY_ERRNO_ELIGIBLE
+# define CMK_THREADS_COPY_ERRNO_ELIGIBLE 1
+#endif
 
 #if CMK_HAS_ELF_H \
     && ((CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT) || CMK_HAS_DL_ITERATE_PHDR)
@@ -47,6 +54,10 @@ void CmiTLSAllocNewSeg(tlsseg_t* t, CthThread th);
 void CmiTLSSwap(tlsseg_t*, tlsseg_t*);
 void CmiTLSGet(tlsseg_t*);
 void CmiTLSSet(tlsseg_t*);
+
+#if CMK_THREADS_COPY_ERRNO_ELIGIBLE
+ptrdiff_t CthGetErrnoOffset(void);
+#endif
 
 #ifdef __cplusplus
 }

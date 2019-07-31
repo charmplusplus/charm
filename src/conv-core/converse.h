@@ -1575,6 +1575,8 @@ void       CthSwitchThread(CthThread t);
 size_t     CthStackOffset(CthThread t, char *p);
 char     * CthPointer(CthThread t, size_t pos);
 
+int      * CthGetErrno(void);
+
 /* unimplemented: preemptive threads */
 void       CthAutoYield(CthThread t, int flag);
 double     CthAutoYieldFreq(CthThread t);

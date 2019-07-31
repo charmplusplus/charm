@@ -94,6 +94,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "converse.h"
 
@@ -144,7 +145,11 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW;
 
 #if CMK_THREADS_BUILD_TLS
 #include "cmitls.h"
+#define CMK_THREADS_COPY_ERRNO CMK_THREADS_COPY_ERRNO_ELIGIBLE
+#else
+#define CMK_THREADS_COPY_ERRNO 0
 #endif
+
 #define CthDebug(...)  //CmiPrintf(__VA_ARGS__)
 
   /**************************** Shared Base Thread Class ***********************/
@@ -527,20 +532,45 @@ CthCpvStatic(tlsseg_t, _ctgTLS);
 static void CthSwitchTLS(tlsseg_t * cur, tlsseg_t * next)
 {
   CmiTLSSwap(cur, next);
+
+#if CMK_THREADS_COPY_ERRNO
+  const ptrdiff_t errno_offset = CthGetErrnoOffset();
+  auto parent_errno = (int *)((char *)CthCpvAccess(_ctgTLS).memseg - errno_offset);
+  auto cur_errno = (int *)((char *)cur->memseg - errno_offset);
+  auto next_errno = (int *)((char *)next->memseg - errno_offset);
+  *cur_errno = *parent_errno;
+  *parent_errno = *next_errno;
+#endif
 }
 
 // TLS interface for callers who know if they are context switching
 // to the main thread or a CthThread (this avoids branching).
-void CtgInstallMainThreadTLS(void *cur)
+void CtgInstallMainThreadTLS(void *cur_ptr)
 {
-  CmiAssert(cur != NULL);
-  CmiTLSSwap((tlsseg_t *)cur, &CthCpvAccess(_ctgTLS));
+  CmiAssert(cur_ptr != NULL);
+  auto cur = (tlsseg_t *)cur_ptr;
+  CmiTLSSwap(cur, &CthCpvAccess(_ctgTLS));
+
+#if CMK_THREADS_COPY_ERRNO
+  const ptrdiff_t errno_offset = CthGetErrnoOffset();
+  auto parent_errno = (int *)((char *)CthCpvAccess(_ctgTLS).memseg - errno_offset);
+  auto cur_errno = (int *)((char *)cur->memseg - errno_offset);
+  *cur_errno = *parent_errno;
+#endif
 }
 
-void CtgInstallCthTLS(void *next)
+void CtgInstallCthTLS(void *next_ptr)
 {
-  CmiAssert(next != NULL);
-  CmiTLSSet((tlsseg_t *)next);
+  CmiAssert(next_ptr != NULL);
+  auto next = (tlsseg_t *)next_ptr;
+  CmiTLSSet(next);
+
+#if CMK_THREADS_COPY_ERRNO
+  const ptrdiff_t errno_offset = CthGetErrnoOffset();
+  auto parent_errno = (int *)((char *)CthCpvAccess(_ctgTLS).memseg - errno_offset);
+  auto next_errno = (int *)((char *)next->memseg - errno_offset);
+  *parent_errno = *next_errno;
+#endif
 }
 #else
 void CtgInstallMainThreadTLS(void *cur) {}
@@ -2207,4 +2237,13 @@ void *CmiIsomallocMallocAlignForThread(CthThread th, size_t align, size_t nBytes
   if (B(th)->isomallocBlockList == NULL && CmiIsomallocEnabled())
     B(th)->isomallocBlockList = CmiIsomallocBlockListNew();
   return CmiIsomallocBlockListMallocAlign(B(th)->isomallocBlockList, align, nBytes);
+}
+
+int * CthGetErrno()
+{
+#if CMK_THREADS_COPY_ERRNO
+  return (int *)((char *)CthCpvAccess(_ctgTLS).memseg - CthGetErrnoOffset());
+#else
+  return &errno;
+#endif
 }

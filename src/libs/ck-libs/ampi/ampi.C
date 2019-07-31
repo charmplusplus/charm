@@ -11709,6 +11709,11 @@ CLINKAGE int AMPI_Get_argc()
   return CkGetArgc();
 }
 
+CLINKAGE int * AMPI_Get_errno()
+{
+  return CthGetErrno();
+}
+
 CLINKAGE int AMPI_Migrate(MPI_Info hints)
 {
   AMPI_API("AMPI_Migrate", hints);

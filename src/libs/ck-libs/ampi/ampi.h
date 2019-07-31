@@ -3,6 +3,13 @@
 
 #include <stdlib.h> /* for redefinition of exit() below */
 #include <inttypes.h> /* for intptr_t */
+
+#include <errno.h>
+#ifdef errno
+# undef errno
+#endif
+#define errno (*AMPI_Get_errno())
+
 #include "charm-api.h"
 
 #define AMPI_INTERNAL_SKIP_FUNCTIONS
