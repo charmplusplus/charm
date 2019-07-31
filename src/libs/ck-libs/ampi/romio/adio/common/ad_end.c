@@ -16,7 +16,7 @@ void ADIO_End(int *error_code)
 
     /* if a default errhandler was set on MPI_FILE_NULL then we need to ensure
      * that our reference to that errhandler is released */
-    PMPI_File_set_errhandler(MPI_FILE_NULL, MPI_ERRORS_RETURN);
+    MPI_File_set_errhandler(MPI_FILE_NULL, MPI_ERRORS_RETURN);
 
 /* delete the flattened datatype list */
     curr = CtvAccess(ADIOI_Flatlist);
