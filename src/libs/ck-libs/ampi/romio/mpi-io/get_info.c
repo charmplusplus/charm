@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -16,6 +16,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_get_info as PMPI_File_get_info
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_get_info(MPI_File fh, MPI_Info *info_used) __attribute__((weak,alias("PMPI_File_get_info")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -34,27 +36,27 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPI_File_get_info(MPI_File mpi_fh, MPI_Info *info_used)
+int MPI_File_get_info(MPI_File fh, MPI_Info *info_used)
 {
     int error_code;
-    ADIO_File fh;
+    ADIO_File adio_fh;
     static char myname[] = "MPI_FILE_GET_INFO";
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    ROMIO_THREAD_CS_ENTER();
 
-    fh = MPIO_File_resolve(mpi_fh);
+    adio_fh = MPIO_File_resolve(fh);
 
     /* --BEGIN ERROR HANDLING-- */
-    MPIO_CHECK_FILE_HANDLE(fh, myname, error_code);
+    MPIO_CHECK_FILE_HANDLE(adio_fh, myname, error_code);
     /* --END ERROR HANDLING-- */
 
-    error_code = MPI_Info_dup(fh->info, info_used);
+    error_code = MPI_Info_dup(adio_fh->info, info_used);
     /* --BEGIN ERROR HANDLING-- */
     if (error_code != MPI_SUCCESS)
-	error_code = MPIO_Err_return_file(fh, error_code);
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
     /* --END ERROR HANDLING-- */
 
 fn_exit:
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+    ROMIO_THREAD_CS_EXIT();
     return  error_code;
 }

@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -6,9 +6,6 @@
 
 #include "adio.h"
 #include "adio_extern.h"
-#ifdef ROMIO_INSIDE_MPICH2
-#include "mpiimpl.h"
-#endif
 
 void ADIO_End(int *error_code)
 {
@@ -19,9 +16,7 @@ void ADIO_End(int *error_code)
 
     /* if a default errhandler was set on MPI_FILE_NULL then we need to ensure
      * that our reference to that errhandler is released */
-    #if 0
     PMPI_File_set_errhandler(MPI_FILE_NULL, MPI_ERRORS_RETURN);
-    #endif
 
 /* delete the flattened datatype list */
     curr = CtvAccess(ADIOI_Flatlist);
@@ -45,11 +40,7 @@ void ADIO_End(int *error_code)
     datarep = CtvAccess(ADIOI_Datarep_head);
     while (datarep) {
         datarep_next = datarep->next;
-#ifdef HAVE_MPIU_FUNCS
-        MPIU_Free(datarep->name);
-#else
         ADIOI_Free(datarep->name);
-#endif
         ADIOI_Free(datarep);
         datarep = datarep_next;
     }

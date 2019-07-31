@@ -1,18 +1,18 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
  */
 
-#include <unistd.h>
 
 #include "adio.h"
 #include "adio_extern.h"
+#include <unistd.h>
 
 
 /* #define IO_DEBUG 1 */
-void ADIOI_NOLOCK_WriteStrided(ADIO_File fd, void *buf, int count,
+void ADIOI_NOLOCK_WriteStrided(ADIO_File fd, const void *buf, int count,
 			     MPI_Datatype datatype, int file_ptr_type,
 			     ADIO_Offset offset, ADIO_Status *status, int
 			     *error_code)
@@ -27,13 +27,14 @@ void ADIOI_NOLOCK_WriteStrided(ADIO_File fd, void *buf, int count,
 /* offset is in units of etype relative to the filetype. */
 
     ADIOI_Flatlist_node *flat_buf, *flat_file;
-    int j, k, err=-1, st_index=0;
+    int j, k, st_index=0;
+    off_t err_lseek=-1;
+    ssize_t err=-1;
     ADIO_Offset fwr_size=0, bwr_size, new_bwr_size, new_fwr_size, i_offset, num;
-    unsigned bufsize; 
-    int n_etypes_in_filetype;
+    ADIO_Offset bufsize, n_etypes_in_filetype;
     ADIO_Offset n_filetypes, etype_in_filetype, size, sum;
     ADIO_Offset abs_off_in_filetype=0, size_in_filetype;
-    int filetype_size, etype_size, buftype_size;
+    MPI_Count filetype_size, etype_size, buftype_size;
     MPI_Aint filetype_extent, buftype_extent, indx;
     int buf_count, buftype_is_contig, filetype_is_contig;
     ADIO_Offset off, disp;
@@ -56,8 +57,11 @@ void ADIOI_NOLOCK_WriteStrided(ADIO_File fd, void *buf, int count,
     ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
     ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
 
-    MPI_Type_size(fd->filetype, &filetype_size);
+    MPI_Type_size_x(fd->filetype, &filetype_size);
     if ( ! filetype_size ) {
+#ifdef HAVE_STATUS_SET_BYTES
+	MPIR_Status_set_bytes(status, datatype, 0);
+#endif
 	*error_code = MPI_SUCCESS; 
 	return;
     }
@@ -68,7 +72,7 @@ void ADIOI_NOLOCK_WriteStrided(ADIO_File fd, void *buf, int count,
 #endif
 
     MPI_Type_extent(fd->filetype, &filetype_extent);
-    MPI_Type_size(datatype, &buftype_size);
+    MPI_Type_size_x(datatype, &buftype_size);
     MPI_Type_extent(datatype, &buftype_extent);
     etype_size = fd->etype_size;
     
@@ -80,9 +84,7 @@ void ADIOI_NOLOCK_WriteStrided(ADIO_File fd, void *buf, int count,
 	ADIO_Offset combine_buf_remain;
 /* noncontiguous in memory, contiguous in file. use writev */
 
-	ADIOI_Flatten_datatype(datatype);
-	flat_buf = CtvAccess(ADIOI_Flatlist);
-	while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	flat_buf = ADIOI_Flatten_and_find(datatype);
 
 	/* allocate our "combine buffer" to pack data into before writing */
 	combine_buf = (char *) ADIOI_Malloc(fd->hints->ind_wr_buffer_size);
@@ -139,7 +141,7 @@ void ADIOI_NOLOCK_WriteStrided(ADIO_File fd, void *buf, int count,
 				    flat_buf->blocklens[i]);
 #endif
         ADIOI_Assert(flat_buf->blocklens[i] == (unsigned)flat_buf->blocklens[i]);
-        ADIOI_Assert((((ADIO_Offset)(MPIR_Upint)buf) + (ADIO_Offset)j*(ADIO_Offset)buftype_extent + flat_buf->indices[i]) == (ADIO_Offset)((MPIR_Upint)buf + (ADIO_Offset)j*(ADIO_Offset)buftype_extent + flat_buf->indices[i]));
+        ADIOI_Assert((((ADIO_Offset)(MPIU_Upint)buf) + (ADIO_Offset)j*(ADIO_Offset)buftype_extent + flat_buf->indices[i]) == (ADIO_Offset)((MPIU_Upint)buf + (ADIO_Offset)j*(ADIO_Offset)buftype_extent + flat_buf->indices[i]));
 #ifdef ADIOI_MPE_LOGGING
 		    MPE_Log_event( ADIOI_MPE_write_a, 0, NULL );
 #endif
@@ -271,11 +273,11 @@ void ADIOI_NOLOCK_WriteStrided(ADIO_File fd, void *buf, int count,
 		    printf("[%d/%d] c mem nc file writing loc = %Ld sz = %d\n", 
 			    rank, nprocs, off, fwr_size);
 #endif
-		    err = lseek(fd->fd_sys, off, SEEK_SET);
+		    err_lseek = lseek(fd->fd_sys, off, SEEK_SET);
 #ifdef ADIOI_MPE_LOGGING
 		    MPE_Log_event(ADIOI_MPE_lseek_b, 0, NULL);
 #endif
-		    if (err == -1) err_flag = 1;
+		    if (err_lseek == -1) err_flag = 1;
 #ifdef ADIOI_MPE_LOGGING
 		    MPE_Log_event(ADIOI_MPE_write_a, 0, NULL);
 #endif
@@ -307,9 +309,7 @@ void ADIOI_NOLOCK_WriteStrided(ADIO_File fd, void *buf, int count,
 	else {
 /* noncontiguous in memory as well as in file */
 
-	    ADIOI_Flatten_datatype(datatype);
-	    flat_buf = CtvAccess(ADIOI_Flatlist);
-	    while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	    flat_buf = ADIOI_Flatten_and_find(datatype);
 
 	    k = num = buf_count = 0;
 	    indx = flat_buf->indices[0];

@@ -317,6 +317,10 @@ class WinStruct{
   MPI_Comm comm;
   int index;
 
+  // Windows created with MPI_Win_allocate/MPI_Win_allocate_shared need to free their
+  // memory region on MPI_Win_free.
+  bool ownsMemory = false;
+
 private:
   bool areRecvsPosted;
   bool inEpoch;
@@ -332,7 +336,7 @@ public:
     exposureRankList.clear(); accessRankList.clear(); requestList.clear();
   }
   void pup(PUP::er &p) noexcept {
-    p|comm; p|index; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
+    p|comm; p|index; p|ownsMemory; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
   }
   void clearEpochAccess() noexcept {
     accessRankList.clear(); inEpoch = false;
@@ -920,7 +924,7 @@ inline void outputOp(const std::vector<int>& vec) noexcept {
     CkPrintf("vector too large to output!\n");
     return;
   }
-  CkPrintf("output vector: size=%d {",vec.size());
+  CkPrintf("output vector: size=%zu {",vec.size());
   for (int i=0; i<vec.size(); i++) {
     CkPrintf(" %d ", vec[i]);
   }
@@ -2466,6 +2470,7 @@ class ampiParent final : public CBase_ampiParent {
   }
 
   CMI_WARN_UNUSED_RESULT ampiParent* wait(MPI_Request* req, MPI_Status* sts) noexcept;
+  CMI_WARN_UNUSED_RESULT ampiParent* waitall(int count, MPI_Request request[], MPI_Status sts[]=MPI_STATUSES_IGNORE) noexcept;
   void init() noexcept;
   void finalize() noexcept;
   CMI_WARN_UNUSED_RESULT ampiParent* block() noexcept;

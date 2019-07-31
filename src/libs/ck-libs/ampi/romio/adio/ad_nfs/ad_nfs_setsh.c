@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -30,7 +30,7 @@ Unlock
 
 void ADIOI_NFS_Set_shared_fp(ADIO_File fd, ADIO_Offset offset, int *error_code)
 {
-    int err;
+    ssize_t err;
     MPI_Comm dupcommself;
     static char myname[] = "ADIOI_NFS_SET_SHARED_FP";
 

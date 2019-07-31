@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2003 University of Chicago. 
@@ -32,9 +32,9 @@ int MPIO_Waitany(int count, MPIO_Request requests[], int *index,
 		 MPI_Status *status)
 {
     int i, flag, err; 
-    MPIU_THREADPRIV_DECL;
+    MPID_THREADPRIV_DECL;
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    ROMIO_THREAD_CS_ENTER();
 
     if (count == 1) {
 	err = MPIO_Wait( requests, status );
@@ -50,13 +50,13 @@ int MPIO_Waitany(int count, MPIO_Request requests[], int *index,
     }
     if (i == count) {
 	*index = MPI_UNDEFINED;
-#ifdef MPICH2
+#ifdef MPICH
 	/* need to set empty status */
 	if (status != MPI_STATUS_IGNORE) {
 	    status->MPI_SOURCE = MPI_ANY_SOURCE;
 	    status->MPI_TAG    = MPI_ANY_TAG;
-	    status->count      = 0;
-	    status->cancelled  = 0;
+            MPIR_STATUS_SET_COUNT(*status, 0);
+            MPIR_STATUS_SET_CANCEL_BIT(*status, 0);
 	}
 #endif
 	err = MPI_SUCCESS;
@@ -78,7 +78,7 @@ int MPIO_Waitany(int count, MPIO_Request requests[], int *index,
     } while (flag == 0);
 
 fn_exit:
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+    ROMIO_THREAD_CS_EXIT();
 
     return err;
 }

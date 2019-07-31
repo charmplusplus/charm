@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2003 University of Chicago, Ohio Supercomputer Center. 
@@ -112,7 +112,8 @@ void ADIOI_GRIDFTP_WriteContig(ADIO_File fd, void *buf, int count,
 			     *error_code)
 {
     char myname[]="ADIOI_GRIDFTP_WriteContig";
-    int myrank, nprocs, datatype_size;
+    int myrank, nprocs;
+    MPI_Count datatype_size;
     globus_size_t len,bytes_written=0;
     globus_off_t goff;
     globus_result_t result;
@@ -127,7 +128,7 @@ void ADIOI_GRIDFTP_WriteContig(ADIO_File fd, void *buf, int count,
 
     MPI_Comm_size(fd->comm, &nprocs);
     MPI_Comm_rank(fd->comm, &myrank);
-    MPI_Type_size(datatype, &datatype_size);
+    MPI_Type_size_x(datatype, &datatype_size);
 
     if (file_ptr_type != ADIO_EXPLICIT_OFFSET)
     {
@@ -219,11 +220,11 @@ void ADIOI_GRIDFTP_WriteDiscontig(ADIO_File fd, void *buf, int count,
     MPI_Comm_rank(fd->comm,&myrank);
     MPI_Comm_size(fd->comm,&nprocs);
     etype_size=fd->etype_size;
-    MPI_Type_size(fd->filetype,&ftype_size);
+    MPI_Type_size_x(fd->filetype,&ftype_size);
     MPI_Type_extent(fd->filetype,&ftype_extent);
     /* This is arguably unnecessary, as this routine assumes that the
        buffer in memory is contiguous */
-    MPI_Type_size(datatype,&btype_size);
+    MPI_Type_size_x(datatype,&btype_size);
     MPI_Type_extent(datatype,&btype_extent);
     ADIOI_Datatype_iscontig(datatype,&buf_contig);
     
@@ -241,10 +242,7 @@ void ADIOI_GRIDFTP_WriteDiscontig(ADIO_File fd, void *buf, int count,
     /* from here we can assume btype_extent==btype_size */
 
     /* Flatten out fd->filetype so we know which blocks to skip */
-    ADIOI_Flatten_datatype(fd->filetype);
-    flat_file = ADIOI_Flatlist;
-    while (flat_file->type != fd->filetype && flat_file->next!=NULL)
-	flat_file = flat_file->next;
+    flat_file = ADIOI_Flatten_and_find(fd->filetype);
 
     /* Figure out how big the area to write is */
     /* ASSUMPTION: ftype_size is an integer multiple of btype_size or vice versa. */
@@ -406,7 +404,7 @@ void ADIOI_GRIDFTP_WriteStrided(ADIO_File fd, void *buf, int count,
     MPI_Comm_size(fd->comm, &nprocs);
     MPI_Comm_rank(fd->comm, &myrank);
 
-    MPI_Type_size(datatype,&btype_size);
+    MPI_Type_size_x(datatype,&btype_size);
     bufsize=count*btype_size;
     ADIOI_Datatype_iscontig(fd->filetype,&file_contig);
     ADIOI_Datatype_iscontig(datatype,&buf_contig);

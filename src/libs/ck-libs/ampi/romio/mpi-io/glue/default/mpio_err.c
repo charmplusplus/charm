@@ -1,14 +1,14 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *   Copyright (C) 2004 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
  */
 
-#include <stdarg.h>
-#include <stdio.h>
-
 #include "mpioimpl.h"
 #include "adio_extern.h"
+
+#include <stdarg.h>
+#include <stdio.h>
 
 /* Default error handling implementation.
  *

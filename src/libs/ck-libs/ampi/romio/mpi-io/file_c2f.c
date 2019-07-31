@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -16,6 +16,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_c2f as PMPI_File_c2f
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+MPI_Fint MPI_File_c2f(MPI_File fh) __attribute__((weak,alias("PMPI_File_c2f")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -33,7 +35,7 @@ Input Parameters:
 Return Value:
   Fortran file handle (integer)
 @*/
-MPI_Fint MPI_File_c2f(MPI_File mpi_fh)
+MPI_Fint MPI_File_c2f(MPI_File fh)
 {
-    return MPIO_File_c2f(mpi_fh);
+    return MPIO_File_c2f(fh);
 }

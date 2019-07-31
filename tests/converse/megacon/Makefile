@@ -92,3 +92,7 @@ test: pgm
 	$(call run, ./pgm +p2 )
 	$(call run, ./pgm +p3 )
 	$(call run, ./pgm +p4 )
+
+smptest: pgm
+	$(call run, ./pgm +p2 ++ppn 2)
+	$(call run, ./pgm +p4 ++ppn 2)
