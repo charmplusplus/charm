@@ -68,11 +68,11 @@ AMPI_CUSTOM_FUNC(int, MPI_TYPE_DUP_FN         , MPI_Datatype, int, void *, void 
 #include "pup_c_functions.h"
 
 /***pt2pt***/
-AMPI_FUNC(int, MPI_Send, const void *msg, int count, MPI_Datatype type, int dest,
+AMPI_FUNC(int, MPI_Send, const void *buf, int count, MPI_Datatype type, int dest,
               int tag, MPI_Comm comm)
-AMPI_FUNC(int, MPI_Ssend, const void *msg, int count, MPI_Datatype type, int dest,
+AMPI_FUNC(int, MPI_Ssend, const void *buf, int count, MPI_Datatype type, int dest,
                int tag, MPI_Comm comm)
-AMPI_FUNC(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, int tag,
+AMPI_FUNC(int, MPI_Recv, void *buf, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status)
 AMPI_FUNC(int, MPI_Mrecv, void* buf, int count, MPI_Datatype datatype, MPI_Message *message,
                   MPI_Status *status)
@@ -472,6 +472,7 @@ AMPI_CUSTOM_FUNC(int, MPI_WIN_DUP_FN         , MPI_Win, int, void *, void *, voi
 /***windows/rma***/
 AMPI_FUNC(int, MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
                     MPI_Info info, MPI_Comm comm, MPI_Win *newwin)
+AMPI_FUNC(int, MPI_Win_allocate, MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, void *baseptr, MPI_Win *win)
 AMPI_FUNC(int, MPI_Win_free, MPI_Win *win)
 AMPI_FUNC(int, MPI_Win_create_errhandler, MPI_Win_errhandler_function *win_errhandler_fn,
                                MPI_Errhandler *errhandler)
@@ -558,7 +559,7 @@ AMPI_FUNC(int, MPIX_Grequest_class_allocate, MPIX_Grequest_class greq_class,
 
 
 /* Extensions needed by ROMIO */
-AMPI_FUNC(int, MPIR_Status_set_bytes, MPI_Status *sts, MPI_Datatype dtype, int nbytes)
+AMPI_FUNC(int, MPIR_Status_set_bytes, MPI_Status *sts, MPI_Datatype dtype, MPI_Count nbytes)
 
 #include "mpio_functions.h"
 
@@ -683,7 +684,6 @@ AMPI_FUNC_NOIMPL(int, MPI_Unpublish_name, const char *service_name, MPI_Info inf
 
 /* A.2.9 One-Sided Communications C Bindings */
 
-AMPI_FUNC_NOIMPL(int, MPI_Win_allocate, MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, void *baseptr, MPI_Win *win)
 AMPI_FUNC_NOIMPL(int, MPI_Win_allocate_shared, MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, void *baseptr, MPI_Win *win)
 AMPI_FUNC_NOIMPL(int, MPI_Win_attach, MPI_Win win, void *base, MPI_Aint size)
 AMPI_FUNC_NOIMPL(int, MPI_Win_create_dynamic, MPI_Info info, MPI_Comm comm, MPI_Win *win)

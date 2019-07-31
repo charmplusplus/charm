@@ -31,32 +31,28 @@ AdaptiveLB::AdaptiveLB(const CkLBOptions &opt): CBase_AdaptiveLB(opt)
 
   LBAllocFn fn = getLBAllocFn(greedyLBString);
   if (fn == NULL) {
-    CkPrintf("LB> Invalid load balancer: %s.\n", greedyLBString);
-    CmiAbort("");
+    CkAbort("LB> Invalid load balancer: %s.\n", greedyLBString);
   }
   BaseLB *glb = fn();
   greedyLB = (CentralLB*)glb;
 
   fn = getLBAllocFn(refineLBString);
   if (fn == NULL) {
-    CkPrintf("LB> Invalid load balancer: %s.\n", refineLBString);
-    CmiAbort("");
+    CkAbort("LB> Invalid load balancer: %s.\n", refineLBString);
   }
   BaseLB *rlb = fn();
   refineLB = (CentralLB*)rlb;
 
   fn = getLBAllocFn(metisLBString);
   if (fn == NULL) {
-    CkPrintf("LB> Invalid load balancer: %s.\n", metisLBString);
-    CmiAbort("");
+    CkAbort("LB> Invalid load balancer: %s.\n", metisLBString);
   }
   BaseLB *slb = fn();
   metisLB = (CentralLB*)slb;
 
   fn = getLBAllocFn(commRefineLBString);
   if (fn == NULL) {
-    CkPrintf("LB> Invalid load balancer: %s.\n", commRefineLBString);
-    CmiAbort("");
+    CkAbort("LB> Invalid load balancer: %s.\n", commRefineLBString);
   }
   BaseLB *crlb = fn();
   commRefineLB = (CentralLB*)crlb;
@@ -97,8 +93,8 @@ void AdaptiveLB::work(LDStats* stats)
   double commOverhead = (totalMsgs * alpha) + (totalBytes * beta);
 
   CkPrintf("AdaptiveLB> Total load %E\n", totalLoad);
-  CkPrintf("AdaptiveLB> Total Msgs %d\n", totalMsgs);
-  CkPrintf("AdaptiveLB> Total Bytes %ld\n", totalBytes);
+  CkPrintf("AdaptiveLB> Total Msgs %ld\n", totalMsgs);
+  CkPrintf("AdaptiveLB> Total Bytes %lld\n", totalBytes);
   CkPrintf("AdaptiveLB> Total Comm Overhead %E Total Load %E\n", commOverhead, totalLoad);
 
   double tmp;

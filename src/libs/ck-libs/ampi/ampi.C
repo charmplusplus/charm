@@ -45,17 +45,10 @@ int ampiErrhandler(const char* func, int errcode) noexcept {
     // Abort with a nice message of the form: 'func' failed with error code 'errstr'.
     //  where 'func' is the name of the failed AMPI_ function and 'errstr'
     //  is the string returned by AMPI_Error_string for errcode.
-    int funclen = strlen(func);
-    const char* filler = " failed with error code ";
-    int fillerlen = strlen(filler);
     int errstrlen;
     char errstr[MPI_MAX_ERROR_STRING];
     MPI_Error_string(errcode, errstr, &errstrlen);
-    std::vector<char> str(funclen + fillerlen + errstrlen);
-    strcpy(str.data(), func);
-    strcat(str.data(), filler);
-    strcat(str.data(), errstr);
-    CkAbort(str.data());
+    CkAbort("%s failed with error code %s", func, errstr);
   }
   return errcode;
 }
@@ -4091,7 +4084,7 @@ void GathervReq::print() const noexcept {
 
 void ATAReq::print() const noexcept { //not complete for reqs
   AmpiRequest::print();
-  CkPrintf("In ATAReq: num_reqs=%d\n", reqs.size());
+  CkPrintf("In ATAReq: num_reqs=%zu\n", reqs.size());
 }
 
 void GReq::print() const noexcept {
@@ -4518,16 +4511,16 @@ MPI_Request ampi::postReq(AmpiRequest* newreq) noexcept
   return request;
 }
 
-AMPI_API_IMPL(int, MPI_Send, const void *msg, int count, MPI_Datatype type,
+AMPI_API_IMPL(int, MPI_Send, const void *buf, int count, MPI_Datatype type,
                              int dest, int tag, MPI_Comm comm)
 {
   AMPI_API("AMPI_Send");
 
-  handle_MPI_BOTTOM((void*&)msg, type);
+  handle_MPI_BOTTOM((void*&)buf, type);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Send", comm, 1, count, 1, type, 1, tag, 1, dest, 1, msg, 1);
+  ret = errorCheck("AMPI_Send", comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -4539,7 +4532,7 @@ AMPI_API_IMPL(int, MPI_Send, const void *msg, int count, MPI_Datatype type,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm);
+  ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
 
   return MPI_SUCCESS;
 }
@@ -4583,15 +4576,15 @@ AMPI_API_IMPL(int, MPI_Rsend, const void *buf, int count, MPI_Datatype datatype,
   return MPI_Send(buf, count, datatype, dest, tag, comm);
 }
 
-AMPI_API_IMPL(int, MPI_Ssend, const void *msg, int count, MPI_Datatype type,
+AMPI_API_IMPL(int, MPI_Ssend, const void *buf, int count, MPI_Datatype type,
                               int dest, int tag, MPI_Comm comm)
 {
   AMPI_API("AMPI_Ssend");
 
-  handle_MPI_BOTTOM((void*&)msg, type);
+  handle_MPI_BOTTOM((void*&)buf, type);
 
 #if AMPI_ERROR_CHECKING
-  int ret = errorCheck("AMPI_Ssend", comm, 1, count, 1, type, 1, tag, 1, dest, 1, msg, 1);
+  int ret = errorCheck("AMPI_Ssend", comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -4603,7 +4596,7 @@ AMPI_API_IMPL(int, MPI_Ssend, const void *msg, int count, MPI_Datatype type,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm, BLOCKING_SSEND);
+  ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, BLOCKING_SSEND);
 
   return MPI_SUCCESS;
 }
@@ -4644,15 +4637,15 @@ AMPI_API_IMPL(int, MPI_Issend, const void *buf, int count, MPI_Datatype type, in
   return MPI_SUCCESS;
 }
 
-AMPI_API_IMPL(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, int tag,
+AMPI_API_IMPL(int, MPI_Recv, void *buf, int count, MPI_Datatype type, int src, int tag,
                              MPI_Comm comm, MPI_Status *status)
 {
   AMPI_API("AMPI_Recv");
 
-  handle_MPI_BOTTOM(msg, type);
+  handle_MPI_BOTTOM(buf, type);
 
 #if AMPI_ERROR_CHECKING
-  int ret = errorCheck("AMPI_Recv", comm, 1, count, 1, type, 1, tag, 1, src, 1, msg, 1);
+  int ret = errorCheck("AMPI_Recv", comm, 1, count, 1, type, 1, tag, 1, src, 1, buf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -4661,20 +4654,20 @@ AMPI_API_IMPL(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, i
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)msg, (pptr->pupBytes));
+    PUParray(*(pptr->fromPUPer), (char *)buf, (pptr->pupBytes));
     PUParray(*(pptr->fromPUPer), (char *)status, sizeof(MPI_Status));
     return MPI_SUCCESS;
   }
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  if(-1==ptr->recv(tag,src,msg,count,type,comm,status)) CkAbort("AMPI> Error in MPI_Recv");
+  if(-1==ptr->recv(tag,src,buf,count,type,comm,status)) CkAbort("AMPI> Error in MPI_Recv");
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
     (pptr->pupBytes) = getDDT()->getSize(type) * count;
     (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)msg, (pptr->pupBytes));
+    PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
     PUParray(*(pptr->toPUPer), (char *)status, sizeof(MPI_Status));
   }
 #endif
@@ -4883,11 +4876,11 @@ void ampi::sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, 
   reqs[1] = send(stag, getRank(), sbuf, scount, stype, dest, comm, I_SEND);
 
   if (sts == MPI_STATUS_IGNORE) {
-    MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+    parent = parent->waitall(2, reqs);
   }
   else {
     MPI_Status statuses[2];
-    MPI_Waitall(2, reqs, statuses);
+    parent = parent->waitall(2, reqs, statuses);
     *sts = statuses[0];
   }
 }
@@ -4936,11 +4929,11 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
   reqs[1] = send(sendtag, getRank(), tmpBuf.data(), count, datatype, dest, comm, I_SEND);
 
   if (status == MPI_STATUS_IGNORE) {
-    MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+    parent = parent->waitall(2, reqs);
   }
   else {
     MPI_Status statuses[2];
-    MPI_Waitall(2, reqs, statuses);
+    parent = parent->waitall(2, reqs, statuses);
     *status = statuses[0];
   }
 }
@@ -6026,7 +6019,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status 
   }
 
 #if CMK_BIGSIM_CHARM
-  it (result) *result = 0;
+  if (result) *result = 0;
 #endif
   return parent;
 }
@@ -6139,7 +6132,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* SsendReq::wait(ampiParent* parent, MPI_Status
 }
 
 CMI_WARN_UNUSED_RESULT ampiParent* ATAReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
-  MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
+  parent = parent->waitall(reqs.size(), reqs.data());
   reqs.clear();
   complete = true;
   return parent;
@@ -6185,8 +6178,8 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_St
   _TRACE_BG_TLINE_END(&curLog);
 #endif
 
-  AMPI_DEBUG("AMPI_Wait request=%d reqs[*request]=%p reqs[*request]->tag=%d &reqs=%d\n",
-             *request, reqs[*request], (int)(reqs[*request]->tag), reqs);
+  AMPI_DEBUG("AMPI_Wait request=%d reqs[*request]=%p reqs[*request]->tag=%d &reqs=%p\n",
+             *request, reqs[*request], (int)(reqs[*request]->tag), &reqs);
   CkAssert(pptr->numBlockedReqs == 0);
 
   int waitResult = -1;
@@ -6225,16 +6218,13 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_St
   return MPI_SUCCESS;
 }
 
-AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts[])
+CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request request[], MPI_Status sts[]/*=MPI_STATUSES_IGNORE*/) noexcept
 {
-  AMPI_API("AMPI_Waitall");
+  if (count == 0) return this;
 
-  checkRequests(count, request);
-  if (count == 0) return MPI_SUCCESS;
-
-  ampiParent* pptr = getAmpiParent();
-  AmpiRequestList& reqs = pptr->getReqs();
-  CkAssert(pptr->numBlockedReqs == 0);
+  ampiParent* pptr = this;
+  AmpiRequestList& reqs = getReqs();
+  CkAssert(numBlockedReqs == 0);
 
 #if AMPIMSGLOG
   if(msgLogRead){
@@ -6244,11 +6234,11 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
         continue;
       }
       AmpiRequest *waitReq = reqs[request[i]];
-      (*(pptr->fromPUPer))|(pptr->pupBytes);
-      PUParray(*(pptr->fromPUPer), (char *)(waitReq->buf), pptr->pupBytes);
-      PUParray(*(pptr->fromPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
+      (*fromPUPer)|pupBytes;
+      PUParray(*fromPUPer, (char *)(waitReq->buf), pupBytes);
+      PUParray(*fromPUPer, (char *)(&sts[i]), sizeof(MPI_Status));
     }
-    return MPI_SUCCESS;
+    return pptr;
   }
 #endif
 #if CMK_BIGSIM_CHARM
@@ -6267,23 +6257,23 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
       pptr = req.wait(pptr, (sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
       req.setBlocked(false);
 #if AMPIMSGLOG
-      if(msgLogWrite && record_msglog(pptr->thisIndex)){
-        (pptr->pupBytes) = getDDT()->getSize(req.type) * req.count;
-        (*(pptr->toPUPer))|(pptr->pupBytes);
-        PUParray(*(pptr->toPUPer), (char *)(req.buf), pptr->pupBytes);
-        PUParray(*(pptr->toPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
+      if(msgLogWrite && record_msglog(thisIndex)){
+        pupBytes = getDDT()->getSize(req.type) * req.count;
+        (*toPUPer)|pupBytes;
+        PUParray(*toPUPer, (char *)(req.buf), pupBytes);
+        PUParray(*toPUPer, (char *)(&sts[i]), sizeof(MPI_Status));
       }
 #endif
-      reqs.freeNonPersReq(pptr, request[i]);
+      reqs.freeNonPersReq(this, request[i]);
     }
     else {
       req.setBlocked(true);
-      pptr->numBlockedReqs++;
+      numBlockedReqs++;
     }
   }
 
   // If any requests are incomplete, block until all have been completed
-  if (pptr->numBlockedReqs > 0) {
+  if (numBlockedReqs > 0) {
     pptr = pptr->blockOnRecv();
     reqs = pptr->getReqs(); //update pointer in case of migration while suspended
 
@@ -6316,6 +6306,14 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
   TRACE_BG_AMPI_WAITALL(&reqs); // setup forward and backward dependence
 #endif
 
+  return pptr;
+}
+
+AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts[])
+{
+  AMPI_API("AMPI_Waitall");
+  checkRequests(count, request);
+  ampiParent* unused = getAmpiParent()->waitall(count, request, sts);
   return MPI_SUCCESS;
 }
 
@@ -8817,16 +8815,17 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
     return ret;
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
+  ampiParent *pptr = getAmpiParent();
+  ampi *ptr = pptr->comm2ampi(comm);
 
-  if(getAmpiParent()->isInter(comm))
+  if(pptr->isInter(comm))
     CkAbort("AMPI does not implement MPI_Alltoall for Inter-communicators!");
   if(ptr->getSize() == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
 
-  int itemsize = getDDT()->getSize(sendtype) * sendcount;
-  int itemextent = getDDT()->getExtent(sendtype) * sendcount;
-  int extent = getDDT()->getExtent(recvtype) * recvcount;
+  int itemsize = pptr->getDDT()->getSize(sendtype) * sendcount;
+  int itemextent = pptr->getDDT()->getExtent(sendtype) * sendcount;
+  int extent = pptr->getDDT()->getExtent(recvtype) * recvcount;
   int size = ptr->getSize();
   int rank = ptr->getRank();
 
@@ -8865,7 +8864,7 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*dst),
                                sendcount, sendtype, dst, comm, I_SEND);
     }
-    MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
+    pptr = pptr->waitall(reqs.size(), reqs.data());
   }
   else if (itemsize <= AMPI_ALLTOALL_LONG_MSG) {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
@@ -8882,7 +8881,7 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
         reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*dst),
                                       sendcount, sendtype, dst, comm, I_SEND);
       }
-      MPI_Waitall(blockSize*2, reqs.data(), MPI_STATUSES_IGNORE);
+      pptr = pptr->waitall(blockSize*2, reqs.data());
     }
   }
   else {
@@ -8996,17 +8995,18 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
     return ret;
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
+  ampiParent *pptr = getAmpiParent();
+  ampi *ptr = pptr->comm2ampi(comm);
   int size = ptr->getSize();
 
-  if(getAmpiParent()->isInter(comm))
+  if(pptr->isInter(comm))
     CkAbort("AMPI does not implement MPI_Alltoallv for Inter-communicators!");
   if(size == 1)
     return copyDatatype(sendtype,sendcounts[0],recvtype,recvcounts[0],sendbuf,recvbuf);
 
   int rank = ptr->getRank();
-  int itemextent = getDDT()->getExtent(sendtype);
-  int extent = getDDT()->getExtent(recvtype);
+  int itemextent = pptr->getDDT()->getExtent(sendtype);
+  int extent = pptr->getDDT()->getExtent(recvtype);
 
   if (recvbuf == sendbuf) {
     for (int i=0; i<size; i++) {
@@ -9036,7 +9036,7 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*sdispls[dst]),
                                sendcounts[dst], sendtype, dst, comm, I_SEND);
     }
-    MPI_Waitall(size*2, reqs.data(), MPI_STATUSES_IGNORE);
+    pptr = pptr->waitall(size*2, reqs.data());
   }
   else {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
@@ -9053,7 +9053,7 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
         reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*sdispls[dst]),
                                       sendcounts[dst], sendtype, dst, comm);
       }
-      MPI_Waitall(blockSize*2, reqs.data(), MPI_STATUSES_IGNORE);
+      pptr = getAmpiParent()->waitall(blockSize*2, reqs.data());
     }
   }
 
@@ -9147,11 +9147,12 @@ AMPI_API_IMPL(int, MPI_Alltoallw, const void *sendbuf, const int *sendcounts, co
     return ret;
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
+  ampiParent *pptr = getAmpiParent();
+  ampi *ptr = pptr->comm2ampi(comm);
   int size = ptr->getSize();
   int rank = ptr->getRank();
 
-  if(getAmpiParent()->isInter(comm))
+  if(pptr->isInter(comm))
     CkAbort("AMPI does not implement MPI_Alltoallw for Inter-communicators!");
   if(size == 1)
     return copyDatatype(sendtypes[0],sendcounts[0],recvtypes[0],recvcounts[0],sendbuf,recvbuf);
@@ -9185,7 +9186,7 @@ AMPI_API_IMPL(int, MPI_Alltoallw, const void *sendbuf, const int *sendcounts, co
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
                                sendcounts[dst], sendtypes[dst], dst, comm, I_SEND);
     }
-    MPI_Waitall(size*2, reqs.data(), MPI_STATUSES_IGNORE);
+    pptr = pptr->waitall(size*2, reqs.data());
   }
   else {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
@@ -9202,7 +9203,7 @@ AMPI_API_IMPL(int, MPI_Alltoallw, const void *sendbuf, const int *sendcounts, co
         reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
                                       sendcounts[dst], sendtypes[dst], dst, comm);
       }
-      MPI_Waitall(blockSize*2, reqs.data(), MPI_STATUSES_IGNORE);
+      pptr = getAmpiParent()->waitall(blockSize*2, reqs.data());
     }
   }
 
@@ -9294,7 +9295,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MP
     return ret;
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
+  ampiParent *pptr = getAmpiParent();
+  ampi *ptr = pptr->comm2ampi(comm);
   int rank_in_comm = ptr->getRank();
 
   if (ptr->getSize() == 1)
@@ -9316,8 +9318,7 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MP
                                       sendcount, sendtype, neighbors[i], comm, I_SEND);
   }
 
-  MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
-
+  pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
 
@@ -9399,7 +9400,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallv, const void* sendbuf, const int *sendc
     return ret;
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
+  ampiParent *pptr = getAmpiParent();
+  ampi *ptr = pptr->comm2ampi(comm);
   int rank_in_comm = ptr->getRank();
 
   if (ptr->getSize() == 1)
@@ -9421,8 +9423,7 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallv, const void* sendbuf, const int *sendc
                                       sendcounts[i], sendtype, neighbors[i], comm, I_SEND);
   }
 
-  MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
-
+  pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
 
@@ -9505,7 +9506,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallw, const void* sendbuf, const int *sendc
     return ret;
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
+  ampiParent *pptr = getAmpiParent();
+  ampi *ptr = pptr->comm2ampi(comm);
   int rank_in_comm = ptr->getRank();
 
   if (ptr->getSize() == 1)
@@ -9525,8 +9527,7 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallw, const void* sendbuf, const int *sendc
                                       sendcounts[i], sendtypes[i], neighbors[i], comm, I_SEND);
   }
 
-  MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
-
+  pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
 
@@ -9607,7 +9608,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgather, const void* sendbuf, int sendcount, M
     return ret;
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
+  ampiParent *pptr = getAmpiParent();
+  ampi *ptr = pptr->comm2ampi(comm);
   int rank_in_comm = ptr->getRank();
 
   if (ptr->getSize() == 1)
@@ -9628,8 +9630,7 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgather, const void* sendbuf, int sendcount, M
                                       sendtype, neighbors[i], comm, I_SEND);
   }
 
-  MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
-
+  pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
 
@@ -9710,7 +9711,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, 
     return ret;
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
+  ampiParent *pptr = getAmpiParent();
+  ampi *ptr = pptr->comm2ampi(comm);
   int rank_in_comm = ptr->getRank();
 
   if (ptr->getSize() == 1)
@@ -9729,8 +9731,7 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, 
                                       sendtype, neighbors[i], comm, I_SEND);
   }
 
-  MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
-
+  pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
 
@@ -9848,7 +9849,7 @@ AMPI_API_IMPL(int, MPI_Comm_split, MPI_Comm src, int color, int key, MPI_Comm *d
   AMPI_API("AMPI_Comm_split");
   {
     ampiParent *pptr = getAmpiParent();
-    ampi *ptr = getAmpiInstance(src);
+    ampi *ptr = pptr->comm2ampi(src);
     if (pptr->isInter(src)) {
       ptr->split(color, key, dest, MPI_INTER);
     }
@@ -11068,8 +11069,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
     topo->setDestWeights(tmpWeights);
   }
 
-  MPI_Waitall(sends, requests.data(), MPI_STATUSES_IGNORE);
-
+  ptr = ptr->waitall(sends, requests.data());
   return MPI_SUCCESS;
 }
 
@@ -11645,7 +11645,7 @@ AMPI_API_IMPL(int, MPI_Pcontrol, const int level, ...)
 
 /* Extensions needed by ROMIO */
 
-AMPI_API_IMPL(int, MPIR_Status_set_bytes, MPI_Status *sts, MPI_Datatype dtype, int nbytes)
+AMPI_API_IMPL(int, MPIR_Status_set_bytes, MPI_Status *sts, MPI_Datatype dtype, MPI_Count nbytes)
 {
   AMPI_API("AMPIR_Status_set_bytes");
   return MPI_Status_set_elements_x(sts, MPI_BYTE, nbytes);

@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -113,13 +113,13 @@ void mpi_type_create_darray_(int *size,int *rank,int *ndims,
 
 #else
 /* Prototype to keep compiler happy */
-FORTRAN_API void FORT_CALL mpi_type_create_darray_(MPI_Fint *size,MPI_Fint *rank,MPI_Fint *ndims,
+FORTRAN_API void FORT_CALL void mpi_type_create_darray_(MPI_Fint *size,MPI_Fint *rank,MPI_Fint *ndims,
 					       MPI_Fint *array_of_gsizes,MPI_Fint *array_of_distribs,
 					       MPI_Fint *array_of_dargs,MPI_Fint *array_of_psizes,
                                                MPI_Fint *order,MPI_Fint *oldtype,
 				       		MPI_Fint *newtype, MPI_Fint *ierr);
 
-FORTRAN_API void FORT_CALL mpi_type_create_darray_(MPI_Fint *size,MPI_Fint *rank,MPI_Fint *ndims,
+FORTRAN_API void FORT_CALL void mpi_type_create_darray_(MPI_Fint *size,MPI_Fint *rank,MPI_Fint *ndims,
 					       MPI_Fint *array_of_gsizes,MPI_Fint *array_of_distribs,
 					       MPI_Fint *array_of_dargs,MPI_Fint *array_of_psizes,
                                                MPI_Fint *order,MPI_Fint *oldtype,

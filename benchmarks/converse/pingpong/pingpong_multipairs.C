@@ -56,9 +56,9 @@ void reduceHandlerFunc(char *msg)
   if(CpvAccess(recvNum) == HALF)
   {
     double us_time = (CpvAccess(sumTime))/(2.*(nCycles-skip)*HALF)*1e6;
-    CmiPrintf("%d\t\t  %.2lf   %.2f\n",
-        CpvAccess(msgSize)-CmiMsgHeaderSizeBytes,
-        us_time, (CpvAccess(msgSize)-CmiMsgHeaderSizeBytes)/us_time);
+    size_t msgSizeDiff = CpvAccess(msgSize)-CmiMsgHeaderSizeBytes;
+    CmiPrintf("%zu\t\t  %.2lf   %.2f\n",
+        msgSizeDiff, us_time, msgSizeDiff/us_time);
     CpvAccess(recvNum) = 0;
 
     if (CpvAccess(msgSize) < maxMsgSize)

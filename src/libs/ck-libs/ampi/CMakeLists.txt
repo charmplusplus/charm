@@ -44,10 +44,23 @@ configure_file(libmoduleampif.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
 
 # ROMIO
 if(${CMK_AMPI_WITH_ROMIO})
+    if(${CMK_CAN_LINK_FORTRAN})
+        set(romio_f77 yes)
+    else()
+        set(romio_f77 no)
+    endif()
+    if(${BUILD_SHARED})
+        set(romio_shared yes)
+    else()
+        set(romio_shared no)
+    endif()
+    set(romio_dir ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio)
     include(ExternalProject)
     ExternalProject_Add(romio
         URL ${CMAKE_CURRENT_SOURCE_DIR}/romio
-        CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/ &&
+        # touch: update timestamps on these files so that ROMIO's Makefile does not run configure a second time
+        CONFIGURE_COMMAND cd ${romio_dir} &&
+            touch aclocal.m4 Makefile.in configure config.status &&
             export MPI_IMPL=ampi &&
             export FROM_MPICH=no &&
             export FROM_MPICH2=no && 
@@ -58,13 +71,16 @@ if(${CMK_AMPI_WITH_ROMIO})
             export CC=${CMAKE_BINARY_DIR}/bin/ampicc &&
             ./configure
             --disable-aio
-            --enable-f77=${CMK_CAN_LINK_FORTRAN}
+            --enable-f77=${romio_f77}
+            --enable-static=yes
+            --enable-shared=${romio_shared}
+            --disable-weak-symbols
              > /dev/null
-        COMMAND cp -f  ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/include/mpio.h ${CMAKE_BINARY_DIR}/include/
-        COMMAND cp -f  ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
-        BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/ && make > /dev/null
-        COMMAND # build shared library
-            test ${BUILD_SHARED} -eq 1 && find .. -name *.o -exec ${CMAKE_CXX_COMPILER_LAUNCHER} -shared -o ${CMAKE_BINARY_DIR}/lib_so/libampiromio${CMAKE_SHARED_LIBRARY_SUFFIX} {} + ; || true
+        COMMAND cp -f ${romio_dir}/include/mpio.h ${CMAKE_BINARY_DIR}/include/
+        COMMAND cp -f ${romio_dir}/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
+        BUILD_COMMAND cd ${romio_dir} && make > /dev/null
+        COMMAND cp -f ${romio_dir}/.libs/libromio.a ${CMAKE_BINARY_DIR}/lib/libampiromio.a
+        COMMAND test ${BUILD_SHARED} -eq 1 && cp -f ${romio_dir}/.libs/libromio${CMAKE_SHARED_LIBRARY_SUFFIX} ${CMAKE_BINARY_DIR}/lib_so/libampiromio${CMAKE_SHARED_LIBRARY_SUFFIX} || true
         INSTALL_COMMAND "" # No install step
         LIST_SEPARATOR ^^
     )
