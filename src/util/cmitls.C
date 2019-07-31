@@ -348,6 +348,7 @@ void CmiTLSInit()
     }
 
     CmiTLSStatsInit();
+    CmiTLSDefaultInfo.size = CMIALIGN(CmiTLSDefaultInfo.size, CmiTLSDefaultInfo.align);
     CmiTLSDefaultInfo.memseg = (Addr)getTLS();
   }
 #endif
@@ -359,7 +360,6 @@ void CmiTLSAllocNewSeg(tlsseg_t* t, CthThread th)
 
   if (CmiTLSDefaultInfo.size > 0)
   {
-    t->size = CMIALIGN(t->size, t->align);
     t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size + sizeof(void *) * 3);
     memcpy((void*)t->memseg, (char *)CmiTLSDefaultInfo.memseg - t->size, t->size);
     t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
