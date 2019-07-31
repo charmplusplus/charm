@@ -105,6 +105,13 @@ option(F90CHARM            "Build f90charm" OFF)
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 add_compile_options(${EXTRA_OPTS})
 
+set(CMK_REPLAYSYTEM ${REPLAY})
+
+if(${REPLAY} AND NOT ${TRACING})
+  set(CMK_REPLAYSYTEM 0)
+  message(WARNING "Charm record/replay is disabled because tracing is disabled")
+endif()
+
 if(${DRONE_MODE})
   set(CMK_DRONE_MODE 1)
 else()
