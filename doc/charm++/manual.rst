@@ -12262,8 +12262,8 @@ bear, without worrying that they will perturb execution to avoid the
 bug.
 
 Support for record-replay is enabled in common builds of Charm++. Builds
-with the ``--with-production`` option disable this support to reduce
-overhead. To record traces, simply run the program with an additional
+with either of the ``--with-production`` or ``--disable-tracing`` options
+disable record-replay support. To record traces, simply run the program with an additional
 command line-flag ``+record``. The generated traces can be repeated with
 the command-line flag ``+replay``. The full range of parallel and
 sequential debugging techniques are available to apply during

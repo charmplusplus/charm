@@ -260,7 +260,14 @@ then
   Echo "Charm record/replay is disabled"
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
 else
-  Echo "Charm record/replay is enabled"
+  if test "$enable_tracing" = "no"
+  then
+    Echo "Charm record/replay is disabled because tracing is disabled"
+    AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
+  else
+    Echo "Charm record/replay is enabled"
+    AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 1, [enable replay])
+  fi
 fi
 
 AC_ARG_ENABLE([ccs],
