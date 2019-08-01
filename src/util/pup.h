@@ -126,6 +126,37 @@ typedef enum {
   dataType_last //<- for setting table lengths, etc.
 } dataType;
 
+template <class T>
+dataType getXlateDataType(T *a) {
+  if(std::is_same<T, signed char>::value) return Tchar;
+#if CMK_SIGNEDCHAR_DIFF_CHAR
+  else if(std::is_same<T, char>::value) return Tchar;
+#endif
+  else if(std::is_same<T, short>::value) return Tshort;
+  else if(std::is_same<T, int>::value) return Tint;
+  else if(std::is_same<T, long>::value) return Tlong;
+  else if(std::is_same<T, unsigned char>::value) return Tuchar;
+  else if(std::is_same<T, unsigned short>::value) return Tushort;
+  else if(std::is_same<T, unsigned int>::value) return Tuint;
+  else if(std::is_same<T, unsigned long>::value) return Tulong;
+  else if(std::is_same<T, float>::value) return Tfloat;
+  else if(std::is_same<T, double>::value) return Tdouble;
+#if CMK_LONG_DOUBLE_DEFINED
+  else if(std::is_same<T, long double>::value) return Tlongdouble;
+#endif
+  else if(std::is_same<T, bool>::value) return Tbool;
+#ifdef CMK_PUP_LONG_LONG
+  else if(std::is_same<T, CMK_PUP_LONG_LONG>::value) return Tlonglong;
+  else if(std::is_same<T, unsigned CMK_PUP_LONG_LONG>::value) return Tulonglong;
+#endif
+#if CMK_HAS_INT16
+  else if(std::is_same<T, CmiInt16>::value) return Tint128;
+  else if(std::is_same<T, CmiUInt16>::value) return Tuint128;
+#endif
+  CmiAbort("getXlateDataType: Matching primitive data type not found in dataType enum");
+}
+
+
 //This should be a 1-byte unsigned type
 typedef unsigned char myByte;
 
@@ -208,85 +239,16 @@ class er {
   bool hasComments(void) const {return (PUP_er_state&IS_COMMENTS)!=0?true:false;}
 
 //For single elements, pretend it's an array containing one element
-  void operator()(signed char &v)     {(*this)(&v,1);}
-#if CMK_SIGNEDCHAR_DIFF_CHAR
-  void operator()(char &v)            {(*this)(&v,1);}
-#endif
-  void operator()(short &v)           {(*this)(&v,1);}
-  void operator()(int &v)             {(*this)(&v,1);}
-  void operator()(long &v)            {(*this)(&v,1);}
-  void operator()(unsigned char &v)   {(*this)(&v,1);}
-  void operator()(unsigned short &v)  {(*this)(&v,1);}
-  void operator()(unsigned int &v)    {(*this)(&v,1);}
-  void operator()(unsigned long &v)   {(*this)(&v,1);}
-  void operator()(float &v)           {(*this)(&v,1);}
-  void operator()(double &v)          {(*this)(&v,1);}
-#if CMK_LONG_DOUBLE_DEFINED
-  void operator()(long double &v)     {(*this)(&v,1);}
-#endif
-  void operator()(bool &v)         {(*this)(&v,1);}
-#ifdef CMK_PUP_LONG_LONG
-  void operator()(CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
-  void operator()(unsigned CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
-#endif
-#if CMK_HAS_INT16
-  void operator()(CmiInt16 &v) {(*this)(&v,1);}
-  void operator()(CmiUInt16 &v) {(*this)(&v,1);}
-#endif
+  template<class T>
+  void operator()(T &v)               {(*this)(&v,1);}
+
   void operator()(void* &v,void* sig) {(*this)(&v,1,sig);}
-  
-//For arrays:
-  //Integral types:
-  void operator()(signed char *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(signed char),Tchar);}
-#if CMK_SIGNEDCHAR_DIFF_CHAR
-  void operator()(char *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(char),Tchar);}
-#endif
-  void operator()(short *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(short),Tshort);}
-  void operator()(int *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(int),Tint);}
-  void operator()(long *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(long),Tlong);}
 
-  //Unsigned integral types:
-  void operator()(unsigned char *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned char),Tuchar);}
-  void operator()(unsigned short *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned short),Tushort);}
-  void operator()(unsigned int *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned int),Tuint);}
-  void operator()(unsigned long *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned long),Tulong);}
-
-  //Floating-point types:
-  void operator()(float *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(float),Tfloat);}
-  void operator()(double *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(double),Tdouble);}
-
-#if CMK_LONG_DOUBLE_DEFINED
-  void operator()(long double *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(long double),Tlongdouble);}
-#endif
-
-  //For bools:
-  void operator()(bool *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(bool),Tbool);}
-
-#ifdef CMK_PUP_LONG_LONG
-  void operator()(CMK_PUP_LONG_LONG *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(CMK_PUP_LONG_LONG),Tlonglong);}
-  void operator()(unsigned CMK_PUP_LONG_LONG *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned CMK_PUP_LONG_LONG),Tulonglong);}
-#endif
-#if CMK_HAS_INT16
-  void operator()(CmiInt16 *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(CmiInt16),Tint128);}
-  void operator()(CmiUInt16 *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(CmiUInt16),Tuint128);}
-#endif
+  //For arrays:
+  template<class T>
+  void operator()(T *a,size_t nItems) {
+    bytes((void *)a,nItems, sizeof(T), getXlateDataType(a));
+  }
 
   //For pointers: the last parameter is to make it more difficult to call
   //(should not be used in normal code as pointers may loose meaning across processor)
