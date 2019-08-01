@@ -1,4 +1,5 @@
 -include ../../../common.mk
+-include ../../../../include/conv-mach-opt.mak
 CHARMDIR = ../../../..
 CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
 
@@ -19,13 +20,17 @@ direct_api.o: direct_api.C cifiles
 test: all
 	$(call run, +p1 ./direct_api 60)
 	$(call run, +p4 ./direct_api 100)
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p4 ./direct_api 100 +noCMAForZC)
+endif
 
 smptest: all
 	$(call run, +p2 ./direct_api 60 ++ppn 2)
 	$(call run, +p4 ./direct_api 100 ++ppn 2)
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p2 ./direct_api 60 +noCMAForZC ++ppn 2)
 	$(call run, +p4 ./direct_api 100 +noCMAForZC ++ppn 2)
+endif
 
 clean:
 	rm -f *.decl.h *.def.h *.o

@@ -21,6 +21,7 @@ else
 	$(call run, +p4 ./nodegroupTest)
 	$(call run, +p4 ./nodegroupTest +noCMAForZC)
 endif
+endif
 
 clean:
 	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun nodegroupTest

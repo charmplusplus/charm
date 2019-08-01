@@ -1,4 +1,5 @@
 -include ../../../../../common.mk
+-include ../../../../../../include/conv-mach-opt.mak
 CHARMC=../../../../../../bin/charmc $(OPTS)
 
 all: simple_get
@@ -18,7 +19,9 @@ simple_get.o: simple_get.C cifiles
 test: all
 	$(call run, +p1 ./simple_get 20 )
 	$(call run, +p2 ./simple_get 20 )
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p2 ./simple_get 20 +noCMAForZC )
+endif
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o simple_get charmrun cifiles
