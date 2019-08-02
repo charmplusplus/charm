@@ -1,4 +1,5 @@
 -include ../../../common.mk
+-include ../../../../include/conv-mach-opt.mak
 CHARMDIR = ../../../..
 CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
 
@@ -21,15 +22,19 @@ test: all
 	$(call run, +p2 ./bcast_nonzero_root)
 	$(call run, +p4 ./bcast_nonzero_root)
 	$(call run, +p6 ./bcast_nonzero_root)
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p2 ./bcast_nonzero_root +noCMAForZC)
 	$(call run, +p4 ./bcast_nonzero_root +noCMAForZC)
 	$(call run, +p6 ./bcast_nonzero_root +noCMAForZC)
+endif
 
 smptest: all
 	$(call run, +p4 ./bcast_nonzero_root ++ppn 4)
 	$(call run, +p6 ./bcast_nonzero_root ++ppn 3)
-	$(call run, +p4 ./bcast_nonzero_root +noCMAforZC ++ppn 4)
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p4 ./bcast_nonzero_root +noCMAForZC ++ppn 4)
 	$(call run, +p6 ./bcast_nonzero_root +noCMAForZC ++ppn 3)
+endif
 
 clean:
 	rm -f *.decl.h *.def.h *.o
