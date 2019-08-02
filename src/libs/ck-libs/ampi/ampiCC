@@ -80,6 +80,10 @@ Do() {
   eval "$@"
 }
 
+if [ $BUILD_CUDA -eq 1 ]; then
+  ARGS="$ARGS -I$CUDA_DIR/include"
+fi
+
 if [ -n "$FSGLOBALS" ]
 then
   if [ "$CMK_SUPPORTS_FSGLOBALS" != '1' ]
