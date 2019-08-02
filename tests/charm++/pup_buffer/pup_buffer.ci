@@ -1,0 +1,15 @@
+mainmodule pup_buffer
+{
+  readonly CProxy_arr arrProxy;
+  readonly CProxy_main mainProxy;
+
+  mainchare main {
+    entry main(CkArgMsg *);
+    entry [reductiontarget] void done();
+  };
+
+  array [1D] arr{
+    entry arr();
+    entry void run();
+  };
+}
