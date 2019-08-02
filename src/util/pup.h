@@ -57,6 +57,7 @@ class bar {
 #include <stdio.h> /*<- for "FILE *" */
 #include <type_traits>
 #include <utility>
+#include <functional>
 
 #ifndef __cplusplus
 #error "Use pup_c.h for C programs-- pup.h is for C++ programs"
@@ -248,6 +249,20 @@ class er {
   template<class T>
   void operator()(T *a,size_t nItems) {
     bytes((void *)a,nItems, sizeof(T), getXlateDataType(a));
+  }
+
+  template<class T>
+  void pup_buffer(T *&a, size_t nItems) {
+    if(isUnpacking()) a = (T *)malloc(nItems * sizeof(T));
+    bytes((void *)a,nItems, sizeof(T), getXlateDataType(a));
+    if(isPacking()) free(a);
+  }
+
+  template<class T>
+  void pup_buffer(T *&a, size_t nItems, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+    if(isUnpacking()) a = (T *)allocate(nItems);
+    bytes((void *)a,nItems, sizeof(T), getXlateDataType(a));
+    if(isPacking()) deallocate(a);
   }
 
   //For pointers: the last parameter is to make it more difficult to call
