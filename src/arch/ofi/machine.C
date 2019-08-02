@@ -163,23 +163,18 @@ static inline int process_completion_queue();
       int pm_ret = posix_memalign((void**)(&ptr), CACHELINE_LEN, size); \
       if (unlikely((pm_ret != 0) || !ptr))                              \
       {                                                                 \
-          CmiPrintf("posix_memalign: ret %d", pm_ret);                  \
-          if (pm_ret == ENOMEM)                                         \
-              CmiAbort("posix_memalign: out of memory");                \
-          else                                                          \
-              CmiAbort("posix_memalign: error");                        \
+          CmiAbort("posix_memalign: ret %d", pm_ret);                   \
       }                                                                 \
   } while (0)
 
 #define OFI_RETRY(func)                                 \
     do {                                                \
-        ssize_t _ret;                                   \
+        intmax_t _ret;                                  \
         do {                                            \
             _ret = func;                                \
             if (likely(_ret == 0)) break;               \
             if (_ret != -FI_EAGAIN) {                   \
-                CmiPrintf("OFI_RETRY: ret %d\n", _ret); \
-                CmiAbort("OFI_RETRY error");            \
+                CmiAbort("OFI_RETRY: ret %jd\n", _ret); \
             }                                           \
             process_completion_queue();                 \
         } while (_ret == -FI_EAGAIN);                   \

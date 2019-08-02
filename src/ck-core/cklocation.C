@@ -1553,8 +1553,7 @@ CkMigratable::~CkMigratable() {
 }
 
 void CkMigratable::CkAbort(const char *why) const {
-	CkError("CkMigratable '%s' aborting:\n",_chareTable[thisChareType]->name);
-	::CkAbort(why);
+	::CkAbort("CkMigratable '%s' aborting: %s",_chareTable[thisChareType]->name, why);
 }
 
 void CkMigratable::ResumeFromSync(void)
@@ -2940,8 +2939,7 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 	}
 #if CMK_ERROR_CHECKING
 	if (bufSize > std::numeric_limits<int>::max()) {
-		CmiPrintf("Cannot migrate an object with size greater than %zu bytes!\n", std::numeric_limits<int>::max());
-		CmiAbort("");
+		CkAbort("Cannot migrate an object with size greater than %d bytes!\n", std::numeric_limits<int>::max());
 	}
 #endif
 
@@ -2965,8 +2963,8 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 		p.becomeDeleting(); 
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		if (p.size()!=bufSize) {
-			CkError("ERROR! Array element claimed it was %d bytes to a "
-				"sizing PUP::er, but copied %d bytes into the packing PUP::er!\n",
+			CkError("ERROR! Array element claimed it was %zu bytes to a "
+				"sizing PUP::er, but copied %zu bytes into the packing PUP::er!\n",
 				bufSize,p.size());
 			CkAbort("Array element's pup routine has a direction mismatch.\n");
 		}
@@ -3032,9 +3030,9 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	pupElementsFor(p,rec,CkElementCreation_migrate);
 	if (p.size()!=msg->length) {
 		CkError("ERROR! Array element claimed it was %d bytes to a"
-			"packing PUP::er, but %d bytes in the unpacking PUP::er!\n",
+			"packing PUP::er, but %zu bytes in the unpacking PUP::er!\n",
 			msg->length,p.size());
-		CkError("(I have %d managers; he claims %d managers)\n",
+		CkError("(I have %zu managers; it claims %d managers)\n",
 			managers.size(), msg->nManagers);
 		
 		CkAbort("Array element's pup routine has a direction mismatch.\n");

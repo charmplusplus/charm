@@ -184,10 +184,9 @@ static FILE* openCheckpointFile(const char *dirname, const char *basename,
 
         FILE *fp = CmiFopen(out.str().c_str(), mode);
         if (!fp) {
-                ostringstream error;
-                error << "PE " << CkMyPe() << " failed to open checkpoint file: " << out.str()
-                      << ", mode: " << mode << " status: " << strerror(errno);
-                CkAbort(error.str().c_str());
+
+                CkAbort("PE %d failed to open checkpoint file: %s, mode: %s, status: %s",
+				CkMyPe(), out.str().c_str(), mode, strerror(errno));
         }
         return fp;
 }
@@ -394,9 +393,7 @@ void CkPupChareData(PUP::er &p)
 	  if (p.isUnpacking()) {
 		  int migCtor = _chareTable[chare_type]->migCtor;
 		  if(migCtor==-1) {
-			  char buf[512];
-			  sprintf(buf,"Chare %s needs a migration constructor and PUP'er routine for restart.\n", _chareTable[chare_type]->name);
-			  CkAbort(buf);
+			  CkAbort("Chare %s needs a migration constructor and PUP'er routine for restart.\n", _chareTable[chare_type]->name);
 		  }
 		  void *m = CkAllocSysMsg();
 		  envelope* env = UsrToEnv((CkMessage *)m);
@@ -476,9 +473,7 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
       //CkPrintf("[%d] CkPupPerPlaceData: %s group %s \n", CkMyPe(), p.typeString(), tmpInfo[i].name);
 
       if(tmpInfo[i].MigCtor==-1) {
-        char buf[512];
-        sprintf(buf,"(Node)Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name);
-        CkAbort(buf);
+        CkAbort("(Node)Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name);
       }
     }
   }

@@ -487,7 +487,7 @@ void TraceLogger::openLogFiles()
 	//	CmiPrintf("FILE NAME %s at %d \n",fName[i],i);
 	    	CmiAbort("Cannot open Projector Trace File for writing ... \n");
   	}
-	CmiPrintf("[%d]Iteration %d : fp %d \n",CmiMyPe(),i,fp);
+	CmiPrintf("[%d]Iteration %d : fp %s\n",CmiMyPe(),i,fName[i]);
 	fptrs[i] = fp;
 
 	if(i == 1)

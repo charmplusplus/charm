@@ -96,18 +96,33 @@ class fromzDisk : public zdisk {
 
 /* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
  * if tracing is not being used (see bug #1640 for more details on the latter). */
-#ifndef AMPI_LOCAL_IMPL
-#define AMPI_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#ifndef AMPI_PE_LOCAL_IMPL
+#define AMPI_PE_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#endif
+
+/* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
+ * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
+#ifndef AMPI_NODE_LOCAL_IMPL
+#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
 #ifndef AMPI_PE_LOCAL_THRESHOLD_DEFAULT
-#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 4096
+#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 8192
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the Node */
 #ifndef AMPI_NODE_LOCAL_THRESHOLD_DEFAULT
-#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 16384
+#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 32768
+#endif
+
+/* messages larger than or equal to this threshold will always block on a matching recv */
+#ifndef AMPI_SSEND_THRESHOLD_DEFAULT
+#if CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#define AMPI_SSEND_THRESHOLD_DEFAULT 262144
+#else
+#define AMPI_SSEND_THRESHOLD_DEFAULT 131072
+#endif
 #endif
 
 /* AMPI uses RDMA sends if BigSim is not being used. */
@@ -117,11 +132,7 @@ class fromzDisk : public zdisk {
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
 #ifndef AMPI_RDMA_THRESHOLD_DEFAULT
-#if CMK_USE_IBVERBS || CMK_OFI || CMK_CONVERSE_UGNI
-#define AMPI_RDMA_THRESHOLD_DEFAULT 65536
-#else
-#define AMPI_RDMA_THRESHOLD_DEFAULT 32768
-#endif
+#define AMPI_RDMA_THRESHOLD_DEFAULT 102400
 #endif
 
 extern int AMPI_RDMA_THRESHOLD;
@@ -317,6 +328,10 @@ class WinStruct{
   MPI_Comm comm;
   int index;
 
+  // Windows created with MPI_Win_allocate/MPI_Win_allocate_shared need to free their
+  // memory region on MPI_Win_free.
+  bool ownsMemory = false;
+
 private:
   bool areRecvsPosted;
   bool inEpoch;
@@ -332,7 +347,7 @@ public:
     exposureRankList.clear(); accessRankList.clear(); requestList.clear();
   }
   void pup(PUP::er &p) noexcept {
-    p|comm; p|index; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
+    p|comm; p|index; p|ownsMemory; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
   }
   void clearEpochAccess() noexcept {
     accessRankList.clear(); inEpoch = false;
@@ -920,7 +935,7 @@ inline void outputOp(const std::vector<int>& vec) noexcept {
     CkPrintf("vector too large to output!\n");
     return;
   }
-  CkPrintf("output vector: size=%d {",vec.size());
+  CkPrintf("output vector: size=%zu {",vec.size());
   for (int i=0; i<vec.size(); i++) {
     CkPrintf(" %d ", vec[i]);
   }
@@ -2646,7 +2661,8 @@ class ampi final : public CBase_ampi {
   AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root,MPI_Comm destcomm) noexcept;
   AmpiMsg *makeSyncMsg(int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,CProxy_ampi destProxy,
-                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq) noexcept;
+                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq,
+                       ampi* destPtr) noexcept;
   AmpiMsg *makeNcpyShmMsg(int t, int sRank, const void* buf, int count,
                           MPI_Datatype type, int ssendReq, int seq) noexcept;
   AmpiMsg *makeNcpyMsg(int t, int sRank, const void* buf, int count,
@@ -2661,22 +2677,22 @@ class ampi final : public CBase_ampi {
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx) noexcept;
   inline MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
                                  int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destElem,
-                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
-  inline MPI_Request sendLocalInOrderMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
-                                         int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
-                                         ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
+                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx, ampi* destPtr) noexcept;
+  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
+                                  int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
+                                  ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
                                  int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
                                  MPI_Request reqIdx) noexcept;
-  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const noexcept {
+  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx, ampi* destPtr) const noexcept {
 #if CMK_MULTICORE
     return true;
 #elif CMK_SMP
+    if (destPtr != NULL) return true;
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
     return (CkNodeOf(destPe) == CkMyNode());
 #else // non-SMP
-    ampi* destPtr = arrProxy[destIdx].ckLocal();
     return (destPtr != NULL);
 #endif
   }

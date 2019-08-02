@@ -891,6 +891,8 @@ typedef void (*MPI_MigrateFn)(void);
 /***windows/rma***/
 #define  MPI_Win_create  AMPI_Win_create
 #define PMPI_Win_create APMPI_Win_create
+#define  MPI_Win_allocate  AMPI_Win_allocate
+#define PMPI_Win_allocate APMPI_Win_allocate
 #define  MPI_Win_free  AMPI_Win_free
 #define PMPI_Win_free APMPI_Win_free
 #define  MPI_Win_create_errhandler  AMPI_Win_create_errhandler
@@ -1031,8 +1033,6 @@ typedef void (*MPI_MigrateFn)(void);
 #define  MPI_Comm_spawn  AMPI_Comm_spawn
 #define PMPI_Comm_spawn APMPI_Comm_spawn
 
-#define  MPI_Win_allocate  AMPI_Win_allocate
-#define PMPI_Win_allocate APMPI_Win_allocate
 #define  MPI_Win_allocate_shared  AMPI_Win_allocate_shared
 #define PMPI_Win_allocate_shared APMPI_Win_allocate_shared
 #define  MPI_Win_attach  AMPI_Win_attach

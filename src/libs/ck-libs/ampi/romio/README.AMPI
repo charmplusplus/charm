@@ -26,6 +26,8 @@ ROMIO integrated into AMPI:
 * HAVE_MPI_OFFSET is unconditionally defined to 1.
 * MPIR_Ext_cs_yield has been corrected to ROMIO_THREAD_CS_YIELD in
   adio/common/ad_i{read,write}_coll.c.
+* PMPI_File_set_errhandler has been corrected to MPI_File_set_errhandler
+  in adio/common/ad_end.c and mpi-io/close.c.
 
 
 Variable privatization
