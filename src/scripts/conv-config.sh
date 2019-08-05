@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Generic converse configuration script:
 #   Reads various configuration scripts and sets defaults.

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ##############################################################################
 # charmc: Compiler for Converse/Charm/Charm++ programs
 #
