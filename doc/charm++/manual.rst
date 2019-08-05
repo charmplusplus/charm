@@ -327,7 +327,7 @@ To enable syntax highlighting of .ci files in Vim, do the following:
    $ vim ~/.vim/filetype.vim
 
 And paste the following line in that file:
-.  
+
 .. code-block:: vim
 
    au! BufRead,BufNewFile *.ci set filetype=ci
