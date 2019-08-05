@@ -80,7 +80,7 @@ Do() {
   eval "$@"
 }
 
-if [ $BUILD_CUDA -eq 1 ]; then
+if [ -n "$BUILD_CUDA" ] && [ "$BUILD_CUDA" -eq 1 ]; then
   ARGS="$ARGS -I$CUDA_DIR/include"
 fi
 
