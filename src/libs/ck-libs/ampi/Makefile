@@ -1,6 +1,11 @@
 CDIR := $(shell cd ../../../.. && pwd)
 -include $(CDIR)/include/conv-mach-opt.mak
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+
+ifeq ($(BUILD_CUDA),1)
+CUDA_INCLUDE=-I$(CUDA_DIR)/include
+endif
+
+CHARMC=$(CDIR)/bin/charmc $(OPTS) $(CUDA_INCLUDE)
 
 HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h \
 		ampi-interoperate.h ampi.decl.h \
