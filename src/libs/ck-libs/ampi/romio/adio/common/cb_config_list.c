@@ -24,8 +24,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "converse.h" //for Ctv*
-
 /* token types */
 #define AGG_WILDCARD 1
 #define AGG_STRING   2
@@ -37,14 +35,7 @@
 #undef CB_CONFIG_LIST_DEBUG
 
 /* a couple of globals keep things simple */
-// AMPI: make variables thread-private
-CtvDeclare(int, ADIOI_cb_config_list_keyval); //=MPI_KEYVAL_INVALID
-CtvStaticDeclare(char*, yylval);
-CtvStaticDeclare(char*, token_ptr);
-
-// AMPI: cb_config_list_keyval needs initialization,
-// cb_config_list_keyval_init_done stores if this was done already
-CtvStaticDeclare(int, cb_config_list_keyval_init_done);
+#include "adio_extern.h"
 
 /* internal stuff */
 static int get_max_procs(int cb_nodes);
@@ -140,24 +131,14 @@ int ADIOI_cb_gather_name_array(MPI_Comm comm,
     ADIO_cb_name_array array = NULL;
     int alloc_size;
 
-    // AMPI: on first CtvInitialize(), value will be zero;
-    // subsequent initializations will not change the value
-    CtvInitialize(int, cb_config_list_keyval_init_done);
-
-    if (CtvAccess(cb_config_list_keyval_init_done) != 1) {
-       CtvAccess(cb_config_list_keyval_init_done) = 1;
-       CtvInitialize(int, ADIOI_cb_config_list_keyval);
-       CtvAccess(ADIOI_cb_config_list_keyval) = MPI_KEYVAL_INVALID;
-    }
-
-    if (CtvAccess(ADIOI_cb_config_list_keyval) == MPI_KEYVAL_INVALID) {
+    if (ADIO_Global(ADIOI_cb_config_list_keyval) == MPI_KEYVAL_INVALID) {
         /* cleaned up by ADIOI_End_call */
 	MPI_Keyval_create((MPI_Copy_function *) ADIOI_cb_copy_name_array, 
 			  (MPI_Delete_function *) ADIOI_cb_delete_name_array,
-			  &CtvAccess(ADIOI_cb_config_list_keyval), NULL);
+			  &ADIO_Global(ADIOI_cb_config_list_keyval), NULL);
     }
     else {
-	MPI_Attr_get(comm, CtvAccess(ADIOI_cb_config_list_keyval), (void *) &array, &found);
+	MPI_Attr_get(comm, ADIO_Global(ADIOI_cb_config_list_keyval), (void *) &array, &found);
         if (found) {
             ADIOI_Assert(array != NULL);
 	    *arrayp = array;
@@ -273,8 +254,8 @@ int ADIOI_cb_gather_name_array(MPI_Comm comm,
      * it next time an open is performed on this same comm, and on the
      * dupcomm, so we can use it in I/O operations.
      */
-    MPI_Attr_put(comm, CtvAccess(ADIOI_cb_config_list_keyval), array);
-    MPI_Attr_put(dupcomm, CtvAccess(ADIOI_cb_config_list_keyval), array);
+    MPI_Attr_put(comm, ADIO_Global(ADIOI_cb_config_list_keyval), array);
+    MPI_Attr_put(dupcomm, ADIO_Global(ADIOI_cb_config_list_keyval), array);
     *arrayp = array;
     return 0;
 }
@@ -308,15 +289,13 @@ int ADIOI_cb_config_list_parse(char *config_list,
     if (cur_procname == NULL) {
 	return -1;
     }
-    CtvInitialize(char*, yylval);
-    CtvAccess(yylval) = ADIOI_Malloc((MPI_MAX_INFO_VAL+1) * sizeof(char));
-    if (CtvAccess(yylval) == NULL) {
+    ADIO_Global(yylval) = ADIOI_Malloc((MPI_MAX_INFO_VAL+1) * sizeof(char));
+    if (ADIO_Global(yylval) == NULL) {
 	ADIOI_Free(cur_procname);
 	return -1;
     }
 
-    CtvInitialize(char*, token_ptr);
-    CtvAccess(token_ptr) = config_list;
+    ADIO_Global(token_ptr) = config_list;
 
     /* right away let's make sure cb_nodes isn't too big */
     if (cb_nodes > nr_procnames) cb_nodes = nr_procnames;
@@ -327,8 +306,8 @@ int ADIOI_cb_config_list_parse(char *config_list,
     used_procnames = ADIOI_Malloc(array->namect * sizeof(char));
     if (used_procnames == NULL) {
 	ADIOI_Free(cur_procname);
-	ADIOI_Free(CtvAccess(yylval));
-	CtvAccess(yylval) = NULL;
+	ADIOI_Free(ADIO_Global(yylval));
+	ADIO_Global(yylval) = NULL;
 	return -1;
     }
     memset(used_procnames, 0, array->namect);
@@ -342,8 +321,8 @@ int ADIOI_cb_config_list_parse(char *config_list,
 	    ranklist[cur_rank] = cur_rank;
 	}
 	ADIOI_Free(cur_procname);
-	ADIOI_Free(CtvAccess(yylval));
-	CtvAccess(yylval) = NULL;
+	ADIOI_Free(ADIO_Global(yylval));
+	ADIO_Global(yylval) = NULL;
     	ADIOI_Free(used_procnames);
 	return cb_nodes;
     }
@@ -353,8 +332,8 @@ int ADIOI_cb_config_list_parse(char *config_list,
 
 	if (token == AGG_EOS) {
 	    ADIOI_Free(cur_procname);
-	    ADIOI_Free(CtvAccess(yylval));
-	    CtvAccess(yylval) = NULL;
+	    ADIOI_Free(ADIO_Global(yylval));
+	    ADIO_Global(yylval) = NULL;
     	    ADIOI_Free(used_procnames);
 	    return cur_rank;
 	}
@@ -363,8 +342,8 @@ int ADIOI_cb_config_list_parse(char *config_list,
 	    /* maybe ignore and try to keep going? */
 	    FPRINTF(stderr, "error parsing config list\n");
 	    ADIOI_Free(cur_procname);
-	    ADIOI_Free(CtvAccess(yylval));
-	    CtvAccess(yylval) = NULL;
+	    ADIOI_Free(ADIO_Global(yylval));
+	    ADIO_Global(yylval) = NULL;
     	    ADIOI_Free(used_procnames);
 	    return cur_rank;
 	}
@@ -375,7 +354,7 @@ int ADIOI_cb_config_list_parse(char *config_list,
 	else {
 	    /* AGG_STRING is the only remaining case */
 	    /* save procname (for now) */
-	    ADIOI_Strncpy(cur_procname, CtvAccess(yylval), MPI_MAX_INFO_VAL+1);
+	    ADIOI_Strncpy(cur_procname, ADIO_Global(yylval), MPI_MAX_INFO_VAL+1);
 	    cur_procname_p = cur_procname;
 	}
 
@@ -396,8 +375,8 @@ int ADIOI_cb_config_list_parse(char *config_list,
 		    nr_procnames, ranklist, cb_nodes, &cur_rank);
     }
     ADIOI_Free(cur_procname);
-    ADIOI_Free(CtvAccess(yylval));
-    CtvAccess(yylval) = NULL;
+    ADIOI_Free(ADIO_Global(yylval));
+    ADIO_Global(yylval) = NULL;
     ADIOI_Free(used_procnames);
     return cur_rank;
 }
@@ -699,7 +678,7 @@ static int get_max_procs(int cb_nodes)
 	if (token != AGG_WILDCARD && token != AGG_STRING) return -1;
 	if (token == AGG_WILDCARD) max_procs = cb_nodes;
 	else if (token == AGG_STRING) {
-	    max_procs = (int)strtol(CtvAccess(yylval), &errptr, 10);
+	    max_procs = (int)strtol(ADIO_Global(yylval), &errptr, 10);
 	    if (*errptr != '\0') {
 		/* some garbage value; default to 1 */
 		max_procs = 1;
@@ -738,23 +717,23 @@ static int cb_config_list_lex(void)
 {
     int slen;
 
-    if (*CtvAccess(token_ptr) == '\0') return AGG_EOS;
+    if (*ADIO_Global(token_ptr) == '\0') return AGG_EOS;
 
-    slen = (int)strcspn(CtvAccess(token_ptr), DELIMS);
+    slen = (int)strcspn(ADIO_Global(token_ptr), DELIMS);
 
-    if (*CtvAccess(token_ptr) == COLON) {
-	CtvAccess(token_ptr)++;
+    if (*ADIO_Global(token_ptr) == COLON) {
+	ADIO_Global(token_ptr)++;
 	return AGG_COLON;
     }
-    if (*CtvAccess(token_ptr) == COMMA) {
-	CtvAccess(token_ptr)++;
+    if (*ADIO_Global(token_ptr) == COMMA) {
+	ADIO_Global(token_ptr)++;
 	return AGG_COMMA;
     }
 
-    if (*CtvAccess(token_ptr) == '*') {
+    if (*ADIO_Global(token_ptr) == '*') {
 	/* make sure that we don't have characters after the '*' */
 	if (slen == 1) {
-	    CtvAccess(token_ptr)++;
+	    ADIO_Global(token_ptr)++;
 	    return AGG_WILDCARD;
 	}
 	else return AGG_ERROR;
@@ -767,8 +746,8 @@ static int cb_config_list_lex(void)
      * should ensure that no one tries to use wildcards with strings 
      * (e.g. "ccn*").
      */
-    ADIOI_Strncpy(CtvAccess(yylval), CtvAccess(token_ptr), slen);
-    CtvAccess(yylval)[slen] = '\0';
-    CtvAccess(token_ptr) += slen;
+    ADIOI_Strncpy(ADIO_Global(yylval), ADIO_Global(token_ptr), slen);
+    ADIO_Global(yylval)[slen] = '\0';
+    ADIO_Global(token_ptr) += slen;
     return AGG_STRING;
 }

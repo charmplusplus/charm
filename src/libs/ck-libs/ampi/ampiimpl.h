@@ -13,6 +13,12 @@
 #include "ddt.h"
 #include "charm++.h"
 
+#if CMK_AMPI_WITH_ROMIO
+# define HAVE_MPI_INFO
+// TODO: Sync CMK_HAS_LUSTREFS with ROMIO_LUSTRE
+# include "mpio_globals.h"
+#endif
+
 // Set to 1 to print debug statements
 #define AMPI_DO_DEBUG 0
 
@@ -2157,6 +2163,10 @@ class ampiParent final : public CBase_ampiParent {
 
  public:
   bool ampiInitCallDone;
+
+#if CMK_AMPI_WITH_ROMIO
+  ADIO_GlobalStruct romio_globals;
+#endif
 
  private:
   bool kv_set_builtin(int keyval, void* attribute_val) noexcept;

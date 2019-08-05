@@ -2,7 +2,7 @@ set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoa
 
 set(ampi-f90-sources ampifimpl.f90 ampimod.f90)
 
-set(ampi-h-sources ampi.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h mpio_functions.h mpio.h mpio_functions.h mpiof.h)
+set(ampi-h-sources ampi.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h mpio_functions.h mpio.h mpio_functions.h mpio_globals.h mpiof.h)
 
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 

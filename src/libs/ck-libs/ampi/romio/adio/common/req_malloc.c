@@ -72,11 +72,11 @@ void ADIOI_Free_request(ADIOI_Req_node *node)
 
     (node->reqd).cookie = 0;
 
-    if (!CtvAccess(ADIOI_Req_avail_tail))
-	CtvAccess(ADIOI_Req_avail_head) = CtvAccess(ADIOI_Req_avail_tail) = node;
+    if (!ADIO_Global(ADIOI_Req_avail_tail))
+	ADIO_Global(ADIOI_Req_avail_head) = ADIO_Global(ADIOI_Req_avail_tail) = node;
     else {
-	CtvAccess(ADIOI_Req_avail_tail)->next = node;
-	CtvAccess(ADIOI_Req_avail_tail) = node;
+	ADIO_Global(ADIOI_Req_avail_tail)->next = node;
+	ADIO_Global(ADIOI_Req_avail_tail) = node;
     }
     node->next = NULL;
 }
