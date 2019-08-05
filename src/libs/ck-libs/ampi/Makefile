@@ -43,7 +43,7 @@ ifeq ($(CMK_NO_BUILD_SHARED),false)
 	ROMIOLIBSHARED=$(CDIR)/lib_so/libampiromio.$(CMK_SHARED_SUF)
 endif
 
-ifeq ($(CMK_AMPI_WITH_ROMIO),true)
+ifeq ($(CMK_AMPI_WITH_ROMIO),1)
 	ROMIO=$(ROMIOLIB).a
 endif
 
