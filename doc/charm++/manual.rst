@@ -10757,6 +10757,8 @@ the command line while configuring from a blank slate. To build with all
 defaults, ``cmake .`` is sufficient, though invoking CMake from a
 separate location (ex:
 ``mkdir mybuild && cd mybuild && cmake ../charm``) is recommended.
+Please see Section :numref:`sec:cmakeinstall` for building Charm++
+directly with CMake.
 
 Installation through the Spack package manager
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10799,6 +10801,8 @@ select another version with the ``@`` option (for example,
 
    	$ spack install charmpp@develop
 
+
+.. sec:cmakeinstall:
 
 Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
