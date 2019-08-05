@@ -14,7 +14,6 @@
 
 #include "adio.h"
 #include "mpio.h"
-#include "converse.h" //For Ctv*
 
 #ifdef ROMIO_INSIDE_MPICH
 #include "glue_romio.h"

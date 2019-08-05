@@ -19,7 +19,7 @@ void ADIO_End(int *error_code)
     MPI_File_set_errhandler(MPI_FILE_NULL, MPI_ERRORS_RETURN);
 
 /* delete the flattened datatype list */
-    curr = CtvAccess(ADIOI_Flatlist);
+    curr = ADIOI_Flatlist;
     while (curr) {
 	if (curr->blocklens) ADIOI_Free(curr->blocklens);
 	if (curr->indices) ADIOI_Free(curr->indices);
@@ -27,17 +27,17 @@ void ADIO_End(int *error_code)
 	ADIOI_Free(curr);
 	curr = next;
     }
-    CtvAccess(ADIOI_Flatlist) = NULL;
+    ADIOI_Flatlist = NULL;
 
 /* free file and info tables used for Fortran interface */
-    if (CtvAccess(ADIOI_Ftable)) ADIOI_Free(CtvAccess(ADIOI_Ftable));
+    if (ADIOI_Ftable) ADIOI_Free(ADIOI_Ftable);
 #ifndef HAVE_MPI_INFO
     if (MPIR_Infotable) ADIOI_Free(MPIR_Infotable);
 #endif
 
 
 /* free the memory allocated for a new data representation, if any */
-    datarep = CtvAccess(ADIOI_Datarep_head);
+    datarep = ADIOI_Datarep_head;
     while (datarep) {
         datarep_next = datarep->next;
         ADIOI_Free(datarep->name);
@@ -45,10 +45,10 @@ void ADIO_End(int *error_code)
         datarep = datarep_next;
     }
 
-    if( CtvAccess(ADIOI_syshints) != MPI_INFO_NULL)
-	    MPI_Info_free(&CtvAccess(ADIOI_syshints));
+    if( ADIOI_syshints != MPI_INFO_NULL)
+	    MPI_Info_free(&ADIOI_syshints);
 
-    MPI_Op_free(&CtvAccess(ADIO_same_amode));
+    MPI_Op_free(&ADIO_same_amode);
 
     *error_code = MPI_SUCCESS;
 }
@@ -72,8 +72,8 @@ int ADIOI_End_call(MPI_Comm comm, int keyval, void *attribute_val, void
     /* The end call will be called after all possible uses of this keyval, even
      * if a file was opened with MPI_COMM_SELF.  Note, this assumes LIFO
      * MPI_COMM_SELF attribute destruction behavior mandated by MPI-2.2. */
-    if (CtvAccess(ADIOI_cb_config_list_keyval) != MPI_KEYVAL_INVALID)
-        MPI_Keyval_free(&CtvAccess(ADIOI_cb_config_list_keyval));
+    if (ADIOI_cb_config_list_keyval != MPI_KEYVAL_INVALID)
+        MPI_Keyval_free(&ADIOI_cb_config_list_keyval);
 
     ADIO_End(&error_code);
     return error_code;
