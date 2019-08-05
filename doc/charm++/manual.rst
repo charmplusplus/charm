@@ -10802,7 +10802,7 @@ select another version with the ``@`` option (for example,
    	$ spack install charmpp@develop
 
 
-.. sec:cmakeinstall:
+.. _sec:cmakeinstall:
 
 Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
