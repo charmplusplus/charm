@@ -4,6 +4,7 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h \
 		ampi-interoperate.h ampi.decl.h \
+		mpio_globals.h \
 		ampi_functions.h mpio_functions.h
 HEADDEP=$(HEADERS) ampiimpl.h ddt.h \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
@@ -118,6 +119,7 @@ headers: $(HEADERS)
 	cp ampiimpl.h $(CDIR)/include/          # For AMPI + Charm++ interop
 	cp ddt.h $(CDIR)/include/               # For AMPI + Charm++ interop
 	cp ampi-interoperate.h $(CDIR)/include/ # For AMPI + Charm++ interop
+	cp mpio_globals.h $(CDIR)/include/
 	cp ampiCC $(CDIR)/bin/ampicc
 	cp ampiCC $(CDIR)/bin/ampiCC
 	cp ampiCC $(CDIR)/bin/ampicxx

@@ -1334,6 +1334,10 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_) noe
   userJustMigratedFn=NULL;
   prepareCtv();
 
+#if CMK_AMPI_WITH_ROMIO
+  ADIO_Init_Globals(&romio_globals);
+#endif
+
   // Allocate an empty groupStruct to represent MPI_EMPTY_GROUP
   groups.push_back(new groupStruct);
 
@@ -1363,6 +1367,50 @@ ampiParent::ampiParent(CkMigrateMessage *msg) noexcept
   AsyncEvacuate(false);
 #endif
 }
+
+#if CMK_AMPI_WITH_ROMIO
+void ADIO_Init_Globals(struct ADIO_GlobalStruct * globals)
+{
+  globals->ADIOI_Flatlist = NULL;
+  globals->ADIOI_Datarep_head = NULL;
+  /* list of datareps registered by the user */
+
+  /* for f2c and c2f conversion */
+  globals->ADIOI_Ftable = NULL;
+  globals->ADIOI_Ftable_ptr = 0;
+  globals->ADIOI_Ftable_max = 0;
+  globals->ADIOI_Reqtable = NULL;
+  globals->ADIOI_Reqtable_ptr = 0;
+  globals->ADIOI_Reqtable_max = 0;
+#ifndef HAVE_MPI_INFO
+  globals->MPIR_Infotable = NULL;
+  globals->MPIR_Infotable_ptr = 0;
+  globals->MPIR_Infotable_max = 0;
+#endif
+
+  globals->ADIOI_syshints = MPI_INFO_NULL;
+
+  globals->ADIO_same_amode = MPI_OP_NULL;
+
+#if defined(ROMIO_XFS) || defined(ROMIO_LUSTRE) || defined(AMPI_INTERNAL_ADIOI_DIRECT)
+  globals->ADIOI_Direct_read = 0;
+  globals->ADIOI_Direct_write = 0;
+#endif
+
+  globals->ADIO_Init_keyval = MPI_KEYVAL_INVALID;
+
+  globals->ADIOI_DFLT_ERR_HANDLER = MPI_ERRORS_RETURN;
+
+  globals->ADIOI_cb_config_list_keyval = MPI_KEYVAL_INVALID;
+  globals->yylval = NULL;
+  globals->token_ptr = NULL;
+}
+
+struct ADIO_GlobalStruct * ADIO_Globals()
+{
+  return &getAmpiParent()->romio_globals;
+}
+#endif
 
 PUPfunctionpointer(MPI_MigrateFn)
 
@@ -1399,6 +1447,11 @@ void ampiParent::pup(PUP::er &p) noexcept {
   p|numBlockedReqs;
   p|bsendBufferSize;
   p((char *)&bsendBuffer, sizeof(void *));
+
+#if CMK_AMPI_WITH_ROMIO
+  // requires memory-isomalloc
+  pup_bytes(&p, &romio_globals, sizeof(romio_globals));
+#endif
 
   // pup blockingReq
   AmpiReqType reqType;

@@ -221,7 +221,7 @@ void ADIOI_GEN_WriteStrided(ADIO_File fd, const void *buf, int count,
     else {  /* noncontiguous in file */
 
 /* filetype already flattened in ADIO_Open */
-	flat_file = CtvAccess(ADIOI_Flatlist);
+	flat_file = ADIOI_Flatlist;
 	while (flat_file->type != fd->filetype) flat_file = flat_file->next;
 	disp = fd->disp;
 

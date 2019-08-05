@@ -24,7 +24,7 @@ void MPIR_Get_file_error_routine( MPI_Errhandler,
    includes a reference count.  Not currently used. */
 int MPIR_ROMIO_Set_file_errhand( MPI_File file_ptr, MPI_Errhandler e )
 {
-    if (file_ptr == MPI_FILE_NULL) CtvAccess(ADIOI_DFLT_ERR_HANDLER) = e;
+    if (file_ptr == MPI_FILE_NULL) ADIOI_DFLT_ERR_HANDLER = e;
     /* --BEGIN ERROR HANDLING-- */
     else if (file_ptr->cookie != ADIOI_FILE_COOKIE) {
 	return MPI_ERR_FILE;
@@ -37,10 +37,10 @@ int MPIR_ROMIO_Set_file_errhand( MPI_File file_ptr, MPI_Errhandler e )
 int MPIR_ROMIO_Get_file_errhand( MPI_File file_ptr, MPI_Errhandler *e )
 {
     if (file_ptr == MPI_FILE_NULL) {
-	if (CtvAccess(ADIOI_DFLT_ERR_HANDLER) == MPI_ERRORS_RETURN)
+	if (ADIOI_DFLT_ERR_HANDLER == MPI_ERRORS_RETURN)
 	    *e = 0;
 	else {
-	    *e = CtvAccess(ADIOI_DFLT_ERR_HANDLER);
+	    *e = ADIOI_DFLT_ERR_HANDLER;
 	}
     }
     /* --BEGIN ERROR HANDLING-- */

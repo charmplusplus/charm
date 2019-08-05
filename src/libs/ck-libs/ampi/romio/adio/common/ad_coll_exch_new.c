@@ -63,7 +63,7 @@ void ADIOI_Print_flatlist_node(ADIOI_Flatlist_node *flatlist_node_p)
 ADIOI_Flatlist_node * ADIOI_Add_contig_flattened(MPI_Datatype contig_type)
 {
     MPI_Count contig_type_sz = -1;
-    ADIOI_Flatlist_node *flat_node_p = CtvAccess(ADIOI_Flatlist);
+    ADIOI_Flatlist_node *flat_node_p = ADIOI_Flatlist;
     
     /* Add contig type to the end of the list if it doesn't already
      * exist. */
@@ -162,7 +162,7 @@ void ADIOI_Exch_file_views(int myrank, int nprocs, int file_ptr_type,
 	filetype_sz = filetype_extent;
     }
     else {
-        flat_file_p = CtvAccess(ADIOI_Flatlist);
+        flat_file_p = ADIOI_Flatlist;
         while (flat_file_p->type != fd->filetype)
             flat_file_p = flat_file_p->next; 
     }
@@ -465,7 +465,7 @@ void ADIOI_Exch_file_views(int myrank, int nprocs, int file_ptr_type,
 #ifdef DEBUG
     if (fd->is_agg == 1)
     {
-	ADIOI_Flatlist_node *fr_node_p = CtvAccess(ADIOI_Flatlist);
+	ADIOI_Flatlist_node *fr_node_p = ADIOI_Flatlist;
 	for (i = 0; i < nprocs; i++)
 	{
 	    fprintf(stderr, "client_file_view_state_arr[%d]=(fp_ind=%Ld,"
