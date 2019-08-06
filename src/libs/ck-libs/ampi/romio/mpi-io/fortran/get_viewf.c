@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -180,6 +180,8 @@ FORTRAN_API void FORT_CALL mpi_file_get_view_( MPI_Fint *fh, MPI_Offset *disp, M
         *ierr = MPI_ERR_UNKNOWN;
     }
 
+    *etype = MPI_Type_c2f(etype_c);
+    *filetype = MPI_Type_c2f(filetype_c);
     ADIOI_Free(tmprep);
 }
 #endif

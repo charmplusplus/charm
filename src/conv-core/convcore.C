@@ -584,7 +584,7 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
   int dummy = 0, found = CmiGetArgIntDesc(argv, arg, &dummy, desc);
 
   if (found)
-    CmiPrintf(warning);
+    CmiPrintf("%s", warning);
 }
 
 /*****************************************************************************
@@ -2846,20 +2846,9 @@ void CmiGroupInit(void)
 void CmiSyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   int i;
-#if CMK_BROADCAST_USE_CMIREFERENCE
-  for(i=0;i<npes;i++) {
-    if (pes[i] == CmiMyPe())
-      CmiSyncSend(pes[i], len, msg);
-    else {
-      CmiReference(msg);
-      CmiSyncSendAndFree(pes[i], len, msg);
-    }
-  }
-#else
   for(i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
-#endif
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
@@ -2871,14 +2860,6 @@ CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
 
 void CmiFreeListSendFn(int npes, const int *pes, int len, char *msg)
 {
-#if CMK_BROADCAST_USE_CMIREFERENCE
-  if (npes == 1) {
-    CmiSyncSendAndFree(pes[0], len, msg);
-    return;
-  }
-  CmiSyncListSendFn(npes, pes, len, msg);
-  CmiFree(msg);
-#else
   int i;
   for(i=0;i<npes-1;i++) {
     CmiSyncSend(pes[i], len, msg);
@@ -2887,7 +2868,6 @@ void CmiFreeListSendFn(int npes, const int *pes, int len, char *msg)
     CmiSyncSendAndFree(pes[npes-1], len, msg);
   else 
     CmiFree(msg);
-#endif
 }
 
 #endif
@@ -3108,11 +3088,13 @@ static void *CmiAllocFindEnclosing(void *blk) {
 }
 
 void CmiInitMsgHeader(void *msg, int size) {
+  if(size >= CmiMsgHeaderSizeBytes) {
 #if CMK_ONESIDED_IMPL
-  // Set zcMsgType in the converse message header to CMK_REG_NO_ZC_MSG
-  if(size >= CmiMsgHeaderSizeBytes)
+    // Set zcMsgType in the converse message header to CMK_REG_NO_ZC_MSG
     CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
 #endif
+    CMI_MSG_NOKEEP(msg) = 0;
+  }
 }
 
 int CmiGetReference(void *blk)
@@ -4008,6 +3990,11 @@ void CmiIOInit(char **argv) {
 }
 #endif
 
+void CmiPuts(const char * str)
+{
+  CmiPrintf("%s", str);
+}
+
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
 
 void CmiPrintf(const char *format, ...)
@@ -4057,8 +4044,7 @@ void CmiError(const char *format, ...)
 
 void __cmi_assert(const char *errmsg)
 {
-  CmiError("[%d] %s\n", CmiMyPe(), errmsg);
-  CmiAbort(errmsg);
+  CmiAbort("[%d] %s\n", CmiMyPe(), errmsg);
 }
 
 char *CmiCopyMsg(char *msg, int len)

@@ -25,11 +25,7 @@
 #define DEBUGF(x)  // CkPrintf x;
 
 // turn on or off fragmentation in multicast
-#if CMK_MESSAGE_LOGGING
-#define SPLIT_MULTICAST  0
-#else
 #define SPLIT_MULTICAST  1
-#endif
 
 // maximum number of fragments into which a message can be broken
 // NOTE: CkReductionMsg::{nFrags,fragNo} and reductionInfo::npProcessed are int8_t,
@@ -883,10 +879,6 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
   for (int i=0; i< sid._elems.size()-1; i++) {
      CProxyElement_ArrayBase ap(a, sid._elems[i]);
      void *newMsg=CkCopyMsg((void **)&m);
-#if CMK_MESSAGE_LOGGING
-	envelope *env = UsrToEnv(newMsg);
-	env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
-#endif
      ap.ckSend((CkArrayMessage *)newMsg,ep,opts|CK_MSG_LB_NOTRACE);
   }
   if (!sid._elems.empty()) {
@@ -898,10 +890,6 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
 void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *sid, int opts)
 {
         DEBUGF(("ArraySectionSend\n"));
-#if CMK_MESSAGE_LOGGING
-	envelope *env = UsrToEnv(m);
-	env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
-#endif
 
     for (int snum = 0; snum < nsid; snum++) {
         void *msgCopy = m;
@@ -914,10 +902,6 @@ void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsi
 
 void CkMulticastMgr::GroupSectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *sid)
 {
-#if CMK_MESSAGE_LOGGING
-  envelope *env = UsrToEnv(m);
-  env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
-#endif
 
   DEBUGF(("[%d] GroupSectionSend, nsid: %d \n", CkMyPe(), nsid));
   for (int snum = 0; snum < nsid; snum++) {
@@ -1092,10 +1076,6 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   for (i=0; i<entry->children.size(); i++) {
     multicastGrpMsg *newmsg = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
-#if CMK_MESSAGE_LOGGING
-	envelope *env = UsrToEnv(newmsg);
-	env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
-#endif
     newmsg->_cookie = entry->children[i];
     mCastGrp[entry->children[i].get_pe()].recvMsg(newmsg);
   }
@@ -1278,10 +1258,6 @@ inline CkReductionMsg *CkMulticastMgr::buildContributeMsg(int dataSize,void *dat
   msg->rebuilt = (id.get_pe() == CkMyPe())?0:1;
   msg->callback = cb;
   msg->userFlag=userFlag;
-#if CMK_MESSAGE_LOGGING
-  envelope *env = UsrToEnv(msg);
-  env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
-#endif
   return msg;
 }
 
@@ -1349,10 +1325,6 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
     msg->callback           = cb;
     msg->userFlag           = userFlag;
 
-#if CMK_MESSAGE_LOGGING
-	envelope *env = UsrToEnv(msg);
-	env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
-#endif
 
     mCastGrp[mpe].recvRedMsg(msg);
 
@@ -1385,10 +1357,6 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
   }
 
   CkReductionMsg *msg = CkReductionMsg::buildNew(dataSize, NULL);
-#if CMK_MESSAGE_LOGGING
-  envelope *env = UsrToEnv(msg);
-  env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
-#endif
 
   // initialize msg header
   msg->redNo      = redInfo.msgs[0][0]->redNo;
@@ -1446,10 +1414,6 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
 
     // Perform the actual reduction
     CkReductionMsg *newmsg = (*f)(rmsgs.size(), rmsgs.data());
-#if CMK_MESSAGE_LOGGING
-	envelope *env = UsrToEnv(newmsg);
-	env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
-#endif
     newmsg->redNo  = redInfo.redNo;
     newmsg->nFrags = nFrags;
     newmsg->fragNo = fragNo;
@@ -1646,10 +1610,6 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
       if (!msg->callback.isInvalid()) msg_cb = msg->callback;
       // Perform the actual reduction (streaming)
       CkReductionMsg *newmsg = (*f)(rmsgs.size(), rmsgs.data());
-#if CMK_MESSAGE_LOGGING
-      envelope *env = UsrToEnv(newmsg);
-      env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
-#endif
       newmsg->redNo  = oldRedNo;
       newmsg->nFrags = nFrags;
       newmsg->fragNo = fragNo;

@@ -503,7 +503,7 @@ void SRtable::FreeTable()
 void SRtable::dump()
 {
   SRentry *tmp;
-  CkPrintf("\nSRtable: offset=%d b=%d size_b=%d\n", offset, b, size_b);
+  CkPrintf("\nSRtable: offset=%lld b=%d size_b=%d\n", offset, b, size_b);
   for (int i=0; i<b; i++) {
     tmp = buckets[i];
     CkPrintf("... Bucket[%d]: ", i);

@@ -213,6 +213,26 @@ void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
   CmiSyncMulticastAndFree(grp, len, msg);
 }
 
+void CldEnqueueWithinNode(void *msg, int infofn)
+{
+  int len, queueing, priobits;
+  unsigned int *prioptr;
+  CldPackFn pfn;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+
+  // If message is NOKEEP, do not pack it since its pointer is just going to
+  // be shared with the other PEs on this node.
+  if (pfn && !CMI_MSG_NOKEEP(msg)) {
+    pfn(&msg);
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  }
+  CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
+  CmiSetInfo(msg,infofn);
+
+  CmiWithinNodeBroadcast(len, (char *)msg);
+}
+
 void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
 {
   int len, queueing, priobits,i; unsigned int *prioptr;
@@ -341,7 +361,7 @@ void CldGraphModuleInit(char **argv)
       CmiPrintf("Charm++> Steal work when load is fewer than %d. \n", WS_Threshold);
 #if CMK_IMMEDIATE_MSG
   if(_steal_immediate && CmiMyPe() == 0)
-      CmiPrintf("Charm++> Steal work using immediate messages. \n", WS_Threshold);
+      CmiPrintf("Charm++> Steal work using immediate messages. \n");
 #endif
 }
 

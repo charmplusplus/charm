@@ -71,9 +71,6 @@ public:
   CkMarshalledCLBStatsMessage bufMsg;
   SpanningTree st;
   CentralLB(const CkLBOptions & opt) : CBase_CentralLB(opt), concurrent(false) { initLB(opt);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        lbDecisionCount= resumeCount=0;
-#endif
 #if CMK_SHRINK_EXPAND
 		manager_init();
 #endif
@@ -125,9 +122,6 @@ public:
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ProcessMigrationDecision();
   void ProcessReceiveMigration();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	void ReceiveDummyMigration(int _step);
-#endif
   void MissMigrate(int waitForBarrier);
 
   //Shrink-Expand related functions
@@ -298,17 +292,8 @@ private:
 
 public:
   int useMem();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    int savedBalancing;
-    void endMigrationDone(int balancing);
-    int lbDecisionCount ,resumeCount;
-#endif
 };
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
-    void resumeCentralLbAfterChkpt(void *lb);
-	void resumeAfterRestoreParallelRecovery(void *_lb);
-#endif
 
 // CLBStatsMsg is not directly sent in the entry function
 // CkMarshalledCLBStatsMessage is used instead to use the pup defined here.
@@ -335,9 +320,6 @@ public:
 
   char * avail_vector;
   int next_lb;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	int step;
-#endif
 
 public:
   CLBStatsMsg(int osz, int csz);

@@ -10,5 +10,9 @@ pgm: iotest.ci iotest.C
 test: pgm
 	$(call run, ./pgm +p4 4 )
 
+smptest: pgm
+	$(call run, ./pgm 4 +p2 ++ppn 2)
+	$(call run, ./pgm 4 +p4 ++ppn 2)
+
 clean:
 	rm -f *.o *.decl.h *.def.h pgm test*

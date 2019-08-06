@@ -1,29 +1,20 @@
 language: cpp
 
 cache: ccache
-
+before_install:
+  - |
+      if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+        git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {
+          echo "Only docs were updated, stopping build process."
+          exit
+        }
+      fi
 install:
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install ccache; fi
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then export PATH="/usr/local/opt/ccache/libexec:$PATH"; fi
 
 matrix:
   include:
-  - os: linux
-    name: "NetLRTS-Linux"
-    dist: xenial
-    env: CACHE_NAME=netlrts-linux
-    script:
-    - ./build LIBS netlrts-linux-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C netlrts-linux-x86_64/tmp -j3 all-test-tests all-test-examples OPTS="-g"
-    - make -C netlrts-linux-x86_64/tmp test-tests test-examples TESTOPTS="++local +isomalloc_sync"
-  - os: linux
-    name: "NetLRTS-Linux SMP"
-    dist: xenial
-    env: CACHE_NAME=netlrts-linux-smp
-    script:
-    - ./build LIBS netlrts-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C netlrts-linux-x86_64-smp/tmp -j3 all-test-tests all-test-examples OPTS="-g"
-    - make -C netlrts-linux-x86_64-smp/tmp test-tests test-examples TESTOPTS="++local +setcpuaffinity +isomalloc_sync +CmiSleepOnIdle"
   - os: linux
     name: "MPI-Linux SMP"
     dist: xenial

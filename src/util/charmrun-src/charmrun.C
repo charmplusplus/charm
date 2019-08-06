@@ -2221,10 +2221,8 @@ static int req_handle_ending(ChMessage *msg, SOCKET fd)
 
 #if CMK_SHRINK_EXPAND
   // When using shrink-expand, only PE 0 will send an "ending" request.
-#elif (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-  if (req_ending == my_process_table.size())
 #else
-  if (req_ending == arg_requested_pes)
+  if (req_ending == my_process_table.size())
 #endif
   {
 #if CMK_SHRINK_EXPAND
@@ -2453,10 +2451,6 @@ static nodetab_process * _crash_charmrun_process; /* last restart socket */
 static int crashed_pe_id;
 static int restarted_pe_id;
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-static int numCrashes = 0; /*number of crashes*/
-static SOCKET last_crashed_fd = -1;
-#endif
 
 /**
  * @brief Handles an ACK after a crash. Once it has received all the pending
@@ -2476,9 +2470,6 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
       req_send_initnodetab1(_crash_charmrun_process->req_client);
       _last_crash = nullptr;
       count = 0;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-      last_crashed_fd = -1;
-#endif
     }
   }
 
@@ -2492,9 +2483,6 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
     req_send_initnodetab(*_last_crash);
     _last_crash = nullptr;
     count = 0;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    last_crashed_fd = -1;
-#endif
   }
   return 0;
 }
@@ -2557,9 +2545,7 @@ static void error_in_req_serve_client(nodetab_process & p)
   fprintf(stderr, "Socket %d failed \n", fd);
 
   fflush(stdout);
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   skt_close(fd);
-#endif
 
   /** should also send a message to all the other processors telling them that
    * this guy has crashed*/
@@ -2572,9 +2558,6 @@ static void error_in_req_serve_client(nodetab_process & p)
    into my_process_table and the nodetab_table*/
 
   reconnect_crashed_client(p);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  skt_close(fd);
-#endif
 }
 #endif
 
@@ -2594,20 +2577,10 @@ static int req_handler_dispatch(ChMessage *msg, nodetab_process & p)
 #ifdef HSTART
   if (!arg_hierarchical_start)
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    if (recv_status < 0) {
-      if (replyFd == last_crashed_fd) {
-        return REQ_OK;
-      }
-      DEBUGF(("recv_status %d on socket %d \n", recv_status, replyFd));
-      error_in_req_serve_client(p);
-    }
-#else
   if (recv_status < 0) {
     error_in_req_serve_client(p);
     return REQ_OK;
   }
-#endif
 #endif
 
   if (strcmp(cmd, "ping") == 0)

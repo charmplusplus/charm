@@ -53,6 +53,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "register.h"
 #include "ck.h"
 #include "pathHistory.h"
+#include "ckarray.h"
 
 CpvDeclare(int ,serializer); // if !CMK_FAULT_EVAC, serializer is always 0
 
@@ -86,47 +87,6 @@ bool _isNotifyChildInRed;
 #   define str(x) /**/
 #   define DEBUG(x)
 #endif
-
-///This arrayListener is in charge of delivering broadcasts to the array.
-class CkArrayBroadcaster : public CkArrayListener {
-  inline int &getData(ArrayElement *el) {return *ckGetData(el);}
-public:
-  CkArrayBroadcaster(bool _stableLocations, bool _broadcastViaScheduler);
-  CkArrayBroadcaster(CkMigrateMessage *m);
-  virtual void pup(PUP::er &p);
-  virtual ~CkArrayBroadcaster();
-  PUPable_decl(CkArrayBroadcaster);
-
-  virtual void ckElementStamp(int *eltInfo) {*eltInfo=bcastNo;}
-
-  ///Element was just created on this processor
-  /// Return false if the element migrated away or deleted itself.
-  virtual bool ckElementCreated(ArrayElement *elt)
-    { return bringUpToDate(elt); }
-
-  ///Element just arrived on this processor (so just called pup)
-  /// Return false if the element migrated away or deleted itself.
-  virtual bool ckElementArriving(ArrayElement *elt)
-    { return bringUpToDate(elt); }
-
-  void incoming(CkArrayMessage *msg);
-
-  bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
-
-  void springCleaning(void);
-
-  void flushState();
-private:
-  int bcastNo;//Number of broadcasts received (also serial number)
-  int oldBcastNo;//Above value last spring cleaning
-  //This queue stores old broadcasts (in case a migrant arrives
-  // and needs to be brought up to date)
-  CkQ<CkArrayMessage *> oldBcasts;
-  bool stableLocations;
-  bool broadcastViaScheduler;
-
-  bool bringUpToDate(ArrayElement *el);
-};
 
 ///This arrayListener is in charge of performing reductions on the array.
 class CkArrayReducer : public CkArrayListener {
@@ -269,12 +229,6 @@ void ArrayElement::initBasics(void)
     CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			  l->ckElementCreating(this));
   }
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	if(mlogData == NULL)
-		mlogData = new ChareMlogData();
-	mlogData->objID.type = TypeArray;
-	mlogData->objID.data.array.id = (CkGroupID)thisArrayID;
-#endif
 #ifdef _PIPELINED_ALLREDUCE_
 	allredMgr = NULL;
 #endif
@@ -497,12 +451,6 @@ void ArrayElement::CkAbort(const char *str) const
 }
 
 void ArrayElement::recvBroadcast(CkMessage *m){
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	CkArrayMessage *bcast = (CkArrayMessage *)m;
-    envelope *env = UsrToEnv(m);
-	int epIdx= env->piggyBcastIdx;
-    ckInvokeEntry(epIdx,bcast,true);
-#endif
 }
 
 #if CMK_CHARMPY
@@ -875,38 +823,6 @@ CkArray::CkArray(CkArrayOptions &&opts,
   if (opts.staticInsertion)
     initDone();
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	// creating the spanning tree to be used for broadcast
-	children = (int *) CmiAlloc(sizeof(int) * _MLOG_BCAST_BFACTOR_);
-	numChildren = 0;
-	
-	// computing the level of the tree this pe is in
-	// we should use the geometric series formula, but now a quick and dirty code should suffice
-	// PE 0 is at level 0, PEs 1.._MLOG_BCAST_BFACTOR_ are at level 1 and so on
-	int level = 0;
-	int aux = CmiMyPe();
-	int max = CmiNumPes();
-	int factor = _MLOG_BCAST_BFACTOR_;
-	int startLevel = 0;
-	int startNextLevel = 1;
-	while(aux >= 0){
-		level++;
-		startLevel = startNextLevel;
-		startNextLevel += factor;
-		aux -= factor;
-		factor *= _MLOG_BCAST_BFACTOR_;
-	}
-
-	// adding children to the tree
-	int first = startNextLevel + (CmiMyPe() - startLevel) * _MLOG_BCAST_BFACTOR_;
-	for(int i=0; i<_MLOG_BCAST_BFACTOR_; i++){
-		if(first + i >= CmiNumPes())
-			break;
-		children[i] = first + i;
-		numChildren++;
-	}
- 
-#endif
 
 
   if (opts.reductionClient.type != CkCallback::invalid && CkMyPe() == 0)
@@ -1291,22 +1207,28 @@ CkArrayReducer::~CkArrayReducer() {}
 
 CkArrayBroadcaster::CkArrayBroadcaster(bool stableLocations_, bool broadcastViaScheduler_)
     :CkArrayListener(1), //Each array element carries a broadcast number
-     bcastNo(0), oldBcastNo(0), stableLocations(stableLocations_), broadcastViaScheduler(broadcastViaScheduler_)
-{ }
+     oldBcastNo(0), stableLocations(stableLocations_), broadcastViaScheduler(broadcastViaScheduler_)
+{
+  setBcastNo(0);
+}
 
 CkArrayBroadcaster::CkArrayBroadcaster(CkMigrateMessage *m)
-    :CkArrayListener(m), bcastNo(-1), oldBcastNo(-1), broadcastViaScheduler(false)
-{ }
+    :CkArrayListener(m), oldBcastNo(-1), broadcastViaScheduler(false)
+{
+  setBcastNo(-1);
+}
 
 void CkArrayBroadcaster::pup(PUP::er &p) {
   CkArrayListener::pup(p);
   /* Assumption: no migrants during checkpoint, so no need to
      save old broadcasts. */
-  p|bcastNo;
+  int bcastNum = getBcastNo();
+  p|bcastNum;
   p|stableLocations;
   p|broadcastViaScheduler;
   if (p.isUnpacking()) {
-    oldBcastNo=bcastNo; /* because we threw away oldBcasts */
+    setBcastNo(bcastNum);
+    oldBcastNo=bcastNum; /* because we threw away oldBcasts */
   }
 }
 
@@ -1316,10 +1238,26 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
   while (NULL!=(msg=oldBcasts.deq())) delete msg;
 }
 
+int CkArrayBroadcaster::incrementBcastNo() {
+  return 1 + incBcastNo();
+}
+
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
-  bcastNo++;
-  DEBB((AA "Received broadcast %d\n" AB,bcastNo));
+
+#if CMK_ONESIDED_IMPL
+  if((CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_SEND_MSG ||
+      CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_MSG) &&
+      getRootNode(UsrToEnv(msg)) != 0 &&
+      CkMyPe() == 0) {
+    // Do not increment as it has already been incremented
+  } else
+#endif
+  {
+    incBcastNo();
+  }
+
+  DEBB((AA "Received broadcast %d\n" AB,getBcastNo()));
 
   if (stableLocations)
     return;
@@ -1334,16 +1272,12 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
 {
   int &elBcastNo=getData(el);
   // if this array element already received this message, skip it
-  if (elBcastNo >= bcastNo) return false;
+  if (elBcastNo >= getBcastNo()) return false;
   elBcastNo++;
   DEBB((AA "Delivering broadcast %d to element %s\n" AB,elBcastNo,idx2str(el)));
 
   CkAssert(UsrToEnv(bcast)->getMsgtype() == ForArrayEltMsg);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
-  DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
-  return true;
-#else
   if (!broadcastViaScheduler)
     return el->ckInvokeEntry(bcast->array_ep(), bcast, doFree);
   else {
@@ -1356,7 +1290,6 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
     CkArrayManagerDeliver(CkMyPe(), bcast, 0);
     return true;
   }
-#endif
 }
 
 /// Deliver all needed broadcasts to the given local element
@@ -1364,10 +1297,11 @@ bool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 {
   if (stableLocations) return true;
   int &elBcastNo=getData(el);
-  if (elBcastNo<bcastNo)
+  int bcastNum = getBcastNo();
+  if (elBcastNo<bcastNum)
   {//This element needs some broadcasts-- it must have
    //been migrating during the broadcast.
-    int i,nDeliver=bcastNo-elBcastNo;
+    int i,nDeliver=bcastNum-elBcastNo;
     DEBM((AA "Migrator %s missed %d broadcasts--\n" AB,idx2str(el),nDeliver));
 
     //Skip the old junk at the front of the bcast queue
@@ -1392,19 +1326,21 @@ bool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 
 void CkArrayBroadcaster::springCleaning(void)
 {
+  int bcastNum = getBcastNo();
   //Remove old broadcast messages
-  int nDelete=oldBcasts.length()-(bcastNo-oldBcastNo);
+  int nDelete=oldBcasts.length()-(bcastNum-oldBcastNo);
   if (nDelete>0) {
     DEBK((AA "Cleaning out %d old broadcasts\n" AB,nDelete));
     for (int i=0;i<nDelete;i++)
       delete oldBcasts.deq();
   }
-  oldBcastNo=bcastNo;
+  oldBcastNo=bcastNum;
 }
 
 void CkArrayBroadcaster::flushState() 
 { 
-  bcastNo = oldBcastNo = 0; 
+  setBcastNo(0);
+  oldBcastNo = 0; 
   CkArrayMessage *msg;
   while (NULL!=(msg=oldBcasts.deq())) delete msg;
 }
@@ -1427,12 +1363,6 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
  	  int skipsched = opts & CK_MSG_EXPEDITED; 
 	  //int serializer=0;//1623802937%CkNumPes();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-                CProxy_CkArray ap(_aid);
-                ap[CpvAccess(serializer)].sendBroadcast(msg);
-                CkGroupID _id = _aid;
-//              printf("[%d] At ckBroadcast in CProxy_ArrayBase id %d epidx %d \n",CkMyPe(),_id.idx,ep);
-#else
 	  if (CkMyPe()==CpvAccess(serializer))
 	  {
 		DEBB((AA "Sending array broadcast\n" AB));
@@ -1441,15 +1371,48 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 		else
 			CProxy_CkArray(_aid).recvBroadcast(msg);
 	  } else {
-		DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,CpvAccess(serializer)));
-		CProxy_CkArray ap(_aid);
-		if (skipsched)
-			ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
-		else
-			ap[CpvAccess(serializer)].sendBroadcast(msg);
-	  }
+			DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,CpvAccess(serializer)));
+			CProxy_CkArray ap(_aid);
+#if CMK_ONESIDED_IMPL
+			if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG ||
+				CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) {
+				
+				// ZC Bcast is implemented on non-zero root nodes by sending a small message to Node 0 (through comm thread)
+				// to increment bcastNo on PE 0 i.e. the serializerPe (implemented as an atomic). After incrementing, an ack message is sent back to
+				// this PE (which is the root node pe) to perform a broadcast
+				MsgPointerWrapper w;
+				w.msg = msg;
+				ap[CpvAccess(serializer)].incrementBcastNoAndSendBack(CkMyPe(), w);
+			} else
 #endif
+			{
+				// Regular Bcast (non ZC) is implemented on non-zero root nodes by forwarding the message to PE 0 and
+				// then having PE 0 perform the broadcast rooted at Node 0. This is done to ensure single delivery (and avoid
+				// multiple delivery or no delivery of the message) when load balancing occurs during a broadcast
+				DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,CpvAccess(serializer)));
+				if (skipsched)
+					ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
+				else
+					ap[CpvAccess(serializer)].sendBroadcast(msg);
+			}
+		}
 	}
+}
+
+void CkArray::incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper w){
+    // increment bcastNo
+    broadcaster->incrementBcastNo();
+
+    // Send back to CkArray on that index
+    thisProxy[srcPe].sendZCBroadcast(w);
+  }
+
+void CkArray::incrementBcastNo(){
+  int zcBcastNo = broadcaster->incrementBcastNo();
+}
+
+void CkArray::sendZCBroadcast(MsgPointerWrapper w) {
+  thisProxy.recvBroadcast((CkArrayMessage *)(w.msg));
 }
 
 /// Reflect a broadcast off this Pe:
@@ -1457,19 +1420,8 @@ void CkArray::sendBroadcast(CkMessage *msg)
 {
 	CK_MAGICNUMBER_CHECK
 	if(CkMyPe() == CpvAccess(serializer)){
-#if _MLOG_BCAST_TREE_
-		// Using the spanning tree to broadcast the message
-		for(int i=0; i<numChildren; i++){
-			CkMessage *copyMsg = (CkMessage *) CkCopyMsg((void **)&msg);
-			thisProxy[children[i]].recvBroadcastViaTree(copyMsg);
-		}
-	
-		// delivering message locally
-		recvBroadcast(msg);	
-#else
 		//Broadcast the message to all processors
 		thisProxy.recvBroadcast(msg);
-#endif
 	}else{
 		thisProxy[CpvAccess(serializer)].sendBroadcast(msg);
 	}
@@ -1481,58 +1433,8 @@ void CkArray::sendExpeditedBroadcast(CkMessage *msg)
 	thisProxy.recvExpeditedBroadcast(msg);
 }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-int _tempBroadcastCount=0;
-
-// Delivers a message using the spanning tree
-void CkArray::recvBroadcastViaTree(CkMessage *msg)
-{
-	CK_MAGICNUMBER_CHECK
-
-	// Using the spanning tree to broadcast the message
-	for(int i=0; i<numChildren; i++){
-		CkMessage *copyMsg = (CkMessage *) CkCopyMsg((void **)&msg);
-		thisProxy[children[i]].recvBroadcastViaTree(copyMsg);
-	}
-
-	// delivering message locally
-	recvBroadcast(msg);	
-}
-
-void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index){
-    if(homePe(*index)==CmiMyPe()){
-        CkArrayMessage *bcast = (CkArrayMessage *)data;
-        int epIdx=bcast->array_ep();
-        DEBUG(CmiPrintf("[%d] gid %d broadcastHomeElements to index %s entry name %s\n",CmiMyPe(),thisgroup.idx,idx2str(*index),_entryTable[bcast->array_ep_bcast()]->name));
-        CkArrayMessage *copy = (CkArrayMessage *)   CkCopyMsg((void **)&bcast);
-        envelope *env = UsrToEnv(copy);
-        env->sender.data.group.onPE = CkMyPe();
-#if defined(_FAULT_CAUSAL_)
-        env->TN = 0;
-#endif
-		env->SN = 0;
-        env->piggyBcastIdx = epIdx;
-        env->setEpIdx(CkIndex_ArrayElement::recvBroadcast(0));
-        env->setArrayMgr(thisgroup);
-        env->setRecipientID(ck::ObjID(thisgroup, rec->getID());
-        env->setSrcPe(CkMyPe());
-        env->getsetArrayHops() = 0;
-        deliver(copy,CkDeliver_queue);
-        _tempBroadcastCount++;
-    }else{
-        if(locMgr->homeElementCount != -1){
-            DEBUG(CmiPrintf("[%d] gid %d skipping broadcast to index %s \n",CmiMyPe(),thisgroup.idx,idx2str(*index)));
-        }
-    }
-}
-
-void CkArray::staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index){
-    arr->broadcastHomeElements(data,rec,index);
-}
-#else
 void CkArray::recvBroadcastViaTree(CkMessage *msg){
 }
-#endif
 
 
 /// Increment broadcast count; deliver to all local elements
@@ -1555,10 +1457,6 @@ void CkArray::recvBroadcast(CkMessage *m)
 
 	broadcaster->incoming(msg);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        _tempBroadcastCount=0;
-        locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
-#else
 #if CMK_BIGSIM_CHARM
         void *root;
         _TRACE_BG_TLINE_END(&root);
@@ -1583,7 +1481,6 @@ void CkArray::recvBroadcast(CkMessage *m)
 
     } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG) { // deliver to all array elements
 
-      //CmiPrintf("[%d][%d][%d] Received a ZC BCAST RECV MSG and len is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), len);
 
       unsigned int i=0;
       bool doFree = false;
@@ -1620,7 +1517,6 @@ void CkArray::recvBroadcast(CkMessage *m)
       env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
     }
 #endif
-#endif
   }
 
 #if CMK_BIGSIM_CHARM
@@ -1632,13 +1528,8 @@ void CkArray::recvBroadcast(CkMessage *m)
 
 	// CkArrayBroadcaster doesn't have msg buffered, and there was
 	// no last delivery to transfer ownership
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	if (stableLocations)
-	  delete msg;
-#else
 	if (stableLocations && len == 0)
 	  delete msg;
-#endif
 }
 
 #if CMK_ONESIDED_IMPL

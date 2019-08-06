@@ -1069,10 +1069,15 @@ void ConverseExit(int exitcode) {
 }
 
 /* exit() called on any node would abort the whole program */
-void CmiAbort(const char * message) {
+void CmiAbort(const char * message, ...) {
+    char newmsg[256];
+    va_list args;
+    va_start(args, message);
+    vsnprintf(newmsg, sizeof(newmsg), message, args);
+    va_end(args);
     CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
              "{snd:%d,rcv:%d} Reason: %s\n",CmiMyPe(),
-             MSGQLEN(), ORECVS(), message);
+             MSGQLEN(), ORECVS(), newmsg);
 
     //CmiPrintStackTrace(0);
     //while (msgQueueLen > 0 || outstanding_recvs > 0) {
@@ -1525,6 +1530,29 @@ void CmiFreeBroadcastAllFn(int size, char *msg) {
 
     CmiFree(msg);
 #endif
+}
+
+void CmiWithinNodeBroadcastFn(int size, char* msg) {
+  int nodeFirst = CmiNodeFirst(CmiMyNode());
+  int nodeLast = nodeFirst + CmiNodeSize(CmiMyNode());
+  if (CMI_MSG_NOKEEP(msg)) {
+    for (int i = nodeFirst; i < CmiMyPe(); i++) {
+      CmiReference(msg);
+      CmiFreeSendFn(i, size, msg);
+    }
+    for (int i = CmiMyPe() + 1; i < nodeLast; i++) {
+      CmiReference(msg);
+      CmiFreeSendFn(i, size, msg);
+    }
+  } else {
+    for (int i = nodeFirst; i < CmiMyPe(); i++) {
+      CmiSyncSendFn(i, size, msg);
+    }
+    for (int i = CmiMyPe() + 1; i < nodeLast; i++) {
+      CmiSyncSendFn(i, size, msg);
+    }
+  }
+  CmiSyncSendAndFree(CmiMyPe(), size, msg);
 }
 
 #if !CMK_ENABLE_ASYNC_PROGRESS  

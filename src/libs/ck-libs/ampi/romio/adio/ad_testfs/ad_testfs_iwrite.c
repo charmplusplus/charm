@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2001 University of Chicago. 
@@ -15,17 +15,18 @@
  *
  * Implemented by immediately calling WriteContig()
  */
-void ADIOI_TESTFS_IwriteContig(ADIO_File fd, void *buf, int count, 
+void ADIOI_TESTFS_IwriteContig(ADIO_File fd, const void *buf, int count,
 			       MPI_Datatype datatype, int file_ptr_type,
 			       ADIO_Offset offset, ADIO_Request *request, int
 			       *error_code)
 {
     ADIO_Status status;
-    int myrank, nprocs, typesize, len;
+    int myrank, nprocs;
+    MPI_Count typesize, len;
 
     *error_code = MPI_SUCCESS;
 
-    MPI_Type_size(datatype, &typesize);
+    MPI_Type_size_x(datatype, &typesize);
     MPI_Comm_size(fd->comm, &nprocs);
     MPI_Comm_rank(fd->comm, &myrank);
     FPRINTF(stdout, "[%d/%d] ADIOI_TESTFS_IwriteContig called on %s\n", 
@@ -40,20 +41,20 @@ void ADIOI_TESTFS_IwriteContig(ADIO_File fd, void *buf, int count,
 
 }
 
-void ADIOI_TESTFS_IwriteStrided(ADIO_File fd, void *buf, int count,
+void ADIOI_TESTFS_IwriteStrided(ADIO_File fd, const void *buf, int count,
 				MPI_Datatype datatype, int file_ptr_type,
 				ADIO_Offset offset, ADIO_Request *request, int
 				*error_code)
 {
     ADIO_Status status;
     int myrank, nprocs;
-    int typesize;
+    MPI_Count typesize;
 
     *error_code = MPI_SUCCESS;
 
     MPI_Comm_size(fd->comm, &nprocs);
     MPI_Comm_rank(fd->comm, &myrank);
-    MPI_Type_size(datatype, &typesize);
+    MPI_Type_size_x(datatype, &typesize);
 
     FPRINTF(stdout, "[%d/%d] ADIOI_TESTFS_IwriteStrided called on %s\n", 
 	    myrank, nprocs, fd->filename);

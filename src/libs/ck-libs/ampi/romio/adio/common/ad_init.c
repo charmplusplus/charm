@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -69,7 +69,6 @@ void ADIO_Init(int *argc, char ***argv, int *error_code)
     CtvInitialize(int, ADIOI_Reqtable_max);
     CtvInitialize(MPI_Info, ADIOI_syshints);
     CtvInitialize(MPI_Op, ADIO_same_amode);
-    CtvInitialize(int, ADIO_Init_keyval);
     CtvInitialize(MPI_Errhandler, ADIOI_DFLT_ERR_HANDLER);
 
     CtvAccess(ADIOI_Flatlist) = NULL;
@@ -82,7 +81,6 @@ void ADIO_Init(int *argc, char ***argv, int *error_code)
     CtvAccess(ADIOI_Reqtable_max) = 0;
     CtvAccess(ADIOI_syshints) = MPI_INFO_NULL;
     CtvAccess(ADIO_same_amode) = MPI_OP_NULL;
-    CtvAccess(ADIO_Init_keyval) = MPI_KEYVAL_INVALID;
     CtvAccess(ADIOI_DFLT_ERR_HANDLER) = MPI_ERRORS_RETURN;
 
 /* initialize the linked list containing flattened datatypes */
@@ -103,11 +101,6 @@ void ADIO_Init(int *argc, char ***argv, int *error_code)
     else ADIOI_Direct_write = 0;
 #endif
 
-    /* Assume system-wide hints won't change between runs: move hint processing
-     * from ADIO_Open to here */
-    /* FIXME should be checking error code from MPI_Info_create here */
-    MPI_Info_create(&CtvAccess(ADIOI_syshints));
-    ADIOI_process_system_hints(CtvAccess(ADIOI_syshints));
 
 #ifdef ADIOI_MPE_LOGGING
     {

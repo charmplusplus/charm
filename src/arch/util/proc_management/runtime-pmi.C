@@ -133,6 +133,15 @@ int runtime_get_max_keylen(int *len)
     return 0;
 }
 
+int runtime_get_max_vallen(int *len)
+{
+    if (!initialized) {
+        return 1;
+    }
+    *len = (max_valuelen -1) / 2;
+    return 0;
+}
+
 int runtime_kvs_put(const char *k, const void *v, int vlen)
 {
     int ret;
@@ -169,7 +178,7 @@ int runtime_kvs_put(const char *k, const void *v, int vlen)
     return 0;
 }
 
-int runtime_kvs_get(const char *k, void *v, int vlen)
+int runtime_kvs_get(const char *k, void *v, int vlen, int id)
 {
     int ret;
 
