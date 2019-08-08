@@ -50,12 +50,15 @@
 #define PRINT_ARG(arg, last) \
   if ("\"\""!=#arg) std::cout << #arg << "=" << arg << (last ? "" : ", ");
 
+extern int quietModeRequested;
+
 // Prints PE:VP, function name, and argument name/value for each function argument
 #define AMPI_DEBUG_ARGS(function_name, ...) \
+  if(!quietModeRequested) { \
   std::cout << "[" << CkMyPe() << ":" << \
   (isAmpiThread() ? getAmpiParent()->thisIndex : -1) << "] "<< function_name <<"("; \
   FOR_EACH(PRINT_ARG, __VA_ARGS__); \
-  std::cout << ")" << std::endl;
+  std::cout << ")" << std::endl; }
 
 #else // !AMPI_DO_DEBUG
 
