@@ -238,7 +238,7 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
     if (grtDOP[i] > simulationPEs) simulationPEs = grtDOP[i];
   } 
   fclose(fp);
-  CkPrintf("Max model PEs: %d  Max simulation PEs: %d  Recommended #PEs: %lld\n",
+  CkPrintf("Max model PEs: %d  Max simulation PEs: %d  Recommended #PEs: %" PRId64 "\n",
 	   modelPEs, simulationPEs, avgPEs);
   free(gvtDOP);
   free(grtDOP);

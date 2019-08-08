@@ -23,7 +23,7 @@ int IDXL_Layout::type_size(int dataType,const char *callingRoutine)
       case IDXL_LONG_DOUBLE : return sizeof(long double); 
       case IDXL_INDEX_0 : return sizeof(int);
       case IDXL_INDEX_1 : return sizeof(int);
-      default: IDXL_Abort(callingRoutine,"Expected an IDXL data type, but got %d",dataType);
+      default: IDXL_Abort("Expected an IDXL data type, but got %d", callingRoutine, dataType);
     }
     return -1;
 }
@@ -117,7 +117,7 @@ void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *c
         case IDXL_REAL : assignFn<float>(dt.width,(float*)lhs, (float)0.0); break;
         case IDXL_DOUBLE : assignFn<double>(dt.width,(double*)lhs, 0.0); break;
         case IDXL_LONG_DOUBLE : assignFn<long double>(dt.width,(long double*)lhs, 0.0L); break;
-        default: IDXL_Abort(callingRoutine,"Invalid IDXL data type %d",dt.type);
+        default: IDXL_Abort("Invalid IDXL data type %d", callingRoutine, dt.type);
       }
       break;
     case IDXL_PROD:
@@ -147,7 +147,7 @@ void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *c
         case IDXL_LONG_DOUBLE : assignFn<long double>(dt.width,(long double*)lhs, LDBL_MAX); break;
       }
       break;
-    default: IDXL_Abort(callingRoutine,"Expected an IDXL reduction type, but got %d",op);
+    default: IDXL_Abort("Expected an IDXL reduction type, but got %d", callingRoutine, op);
   }
 }
 
@@ -169,9 +169,9 @@ reduction_combine_fn reduction_combine(const IDXL_Layout& dt, int op,const char 
     case IDXL_PROD: idxl_type_return(dt.type, prodFn); break;
     case IDXL_MIN: idxl_type_return(dt.type, minFn); break;
     case IDXL_MAX: idxl_type_return(dt.type, maxFn); break;
-    default: IDXL_Abort(callingRoutine,"Expected an IDXL reduction type, but got %d",op);
+    default: IDXL_Abort("Expected an IDXL reduction type, but got %d", callingRoutine, op);
   }
-  IDXL_Abort(callingRoutine,"Expected an IDXL data type, but got %d",dt.type);
+  IDXL_Abort("Expected an IDXL data type, but got %d", callingRoutine, dt.type);
   return NULL;
 }
 
@@ -285,7 +285,7 @@ void IDXL_Layout::scatteradd(int nIndices,const int *indices,
 /********************** Data_list: *******************/
 void IDXL_Layout_List::badLayout(IDXL_Layout_t l,const char *callingRoutine) const
 {
-	IDXL_Abort(callingRoutine,"Expected an IDXL_Layout_t, got %d",l);
+	IDXL_Abort("Expected an IDXL_Layout_t, got %d", callingRoutine, l);
 }
 
 IDXL_Layout_List::IDXL_Layout_List() {
@@ -320,7 +320,7 @@ IDXL_Layout_t IDXL_Layout_List::put(const IDXL_Layout &dt) {
 			return FIRST_DT+i;
 		}
 	// if we get here, the table is full:
-	IDXL_Abort("","Registered too many IDXL_Layouts! (only have room for %d)",MAX_DT);
+	IDXL_Abort("Registered too many IDXL_Layouts! (only have room for %d)", "", MAX_DT);
 	return 0; // For whining compilers
 }
 void IDXL_Layout_List::destroy(IDXL_Layout_t l,const char *callingRoutine) {

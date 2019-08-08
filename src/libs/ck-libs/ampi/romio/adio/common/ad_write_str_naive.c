@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2001 University of Chicago. 
@@ -8,7 +8,7 @@
 #include "adio.h"
 #include "adio_extern.h"
 
-void ADIOI_GEN_WriteStrided_naive(ADIO_File fd, void *buf, int count,
+void ADIOI_GEN_WriteStrided_naive(ADIO_File fd, const void *buf, int count,
                        MPI_Datatype buftype, int file_ptr_type,
                        ADIO_Offset offset, ADIO_Status *status, int
                        *error_code)
@@ -19,11 +19,11 @@ void ADIOI_GEN_WriteStrided_naive(ADIO_File fd, void *buf, int count,
     /* bwr == buffer write; fwr == file write */
     ADIO_Offset bwr_size, fwr_size=0, sum, size_in_filetype; 
     int b_index;
-    unsigned bufsize; 
-    int n_etypes_in_filetype;
+    MPI_Count bufsize;
+    ADIO_Offset n_etypes_in_filetype;
     ADIO_Offset size, n_filetypes, etype_in_filetype;
     ADIO_Offset abs_off_in_filetype=0, req_len;
-    int filetype_size, etype_size, buftype_size;
+    MPI_Count filetype_size, etype_size, buftype_size;
     MPI_Aint filetype_extent, buftype_extent; 
     int buf_count, buftype_is_contig, filetype_is_contig;
     ADIO_Offset userbuf_off;
@@ -35,14 +35,17 @@ void ADIOI_GEN_WriteStrided_naive(ADIO_File fd, void *buf, int count,
     ADIOI_Datatype_iscontig(buftype, &buftype_is_contig);
     ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
 
-    MPI_Type_size(fd->filetype, &filetype_size);
+    MPI_Type_size_x(fd->filetype, &filetype_size);
     if ( ! filetype_size ) {
+#ifdef HAVE_STATUS_SET_BYTES
+	MPIR_Status_set_bytes(status, buftype, 0);
+#endif
 	*error_code = MPI_SUCCESS; 
 	return;
     }
 
     MPI_Type_extent(fd->filetype, &filetype_extent);
-    MPI_Type_size(buftype, &buftype_size);
+    MPI_Type_size_x(buftype, &buftype_size);
     MPI_Type_extent(buftype, &buftype_extent);
     etype_size = fd->etype_size;
 
@@ -55,9 +58,7 @@ void ADIOI_GEN_WriteStrided_naive(ADIO_File fd, void *buf, int count,
     	int b_count;
 	/* noncontiguous in memory, contiguous in file. */
 
-	ADIOI_Flatten_datatype(buftype);
-	flat_buf = CtvAccess(ADIOI_Flatlist);
-	while (flat_buf->type != buftype) flat_buf = flat_buf->next;
+	flat_buf = ADIOI_Flatten_and_find(buftype);
 
         off = (file_ptr_type == ADIO_INDIVIDUAL) ? fd->fp_ind : 
               fd->disp + (ADIO_Offset)etype_size * offset;
@@ -82,7 +83,7 @@ void ADIOI_GEN_WriteStrided_naive(ADIO_File fd, void *buf, int count,
 		req_len = flat_buf->blocklens[b_index];
 
     ADIOI_Assert(req_len == (int) req_len);
-    ADIOI_Assert((((ADIO_Offset)(MPIR_Upint)buf) + userbuf_off) == (ADIO_Offset)(MPIR_Upint)((MPIR_Upint)buf + userbuf_off));
+    ADIOI_Assert((((ADIO_Offset)(MPIU_Upint)buf) + userbuf_off) == (ADIO_Offset)(MPIU_Upint)((MPIU_Upint)buf + userbuf_off));
 		ADIO_WriteContig(fd, 
 				(char *) buf + userbuf_off,
 				(int)req_len, 
@@ -243,7 +244,7 @@ void ADIOI_GEN_WriteStrided_naive(ADIO_File fd, void *buf, int count,
 		    req_len = fwr_size;
 
         ADIOI_Assert(req_len == (int) req_len);
-        ADIOI_Assert((((ADIO_Offset)(MPIR_Upint)buf) + userbuf_off) == (ADIO_Offset)(MPIR_Upint)((MPIR_Upint)buf + userbuf_off));
+        ADIOI_Assert((((ADIO_Offset)(MPIU_Upint)buf) + userbuf_off) == (ADIO_Offset)(MPIU_Upint)((MPIU_Upint)buf + userbuf_off));
 		    ADIO_WriteContig(fd, 
 				    (char *) buf + userbuf_off,
 				    (int)req_len, 
@@ -286,9 +287,7 @@ void ADIOI_GEN_WriteStrided_naive(ADIO_File fd, void *buf, int count,
 	    ADIO_Offset i_offset, tmp_bufsize = 0;
 	    /* noncontiguous in memory as well as in file */
 
-	    ADIOI_Flatten_datatype(buftype);
-	    flat_buf = CtvAccess(ADIOI_Flatlist);
-	    while (flat_buf->type != buftype) flat_buf = flat_buf->next;
+	    flat_buf = ADIOI_Flatten_and_find(buftype);
 
 	    b_index = buf_count = 0;
 	    i_offset = flat_buf->indices[0];
@@ -309,7 +308,7 @@ void ADIOI_GEN_WriteStrided_naive(ADIO_File fd, void *buf, int count,
 		    userbuf_off = i_offset;
 
         ADIOI_Assert(req_len == (int) req_len);
-        ADIOI_Assert((((ADIO_Offset)(MPIR_Upint)buf) + userbuf_off) == (ADIO_Offset)(MPIR_Upint)((MPIR_Upint)buf + userbuf_off));
+        ADIOI_Assert((((ADIO_Offset)(MPIU_Upint)buf) + userbuf_off) == (ADIO_Offset)(MPIU_Upint)((MPIU_Upint)buf + userbuf_off));
 		    ADIO_WriteContig(fd, 
 				    (char *) buf + userbuf_off,
 				    (int)req_len, 

@@ -42,7 +42,7 @@ public:
         array_height = array_width = atoi(m->argv[1]);
         block_height = block_width = atoi(m->argv[2]);
         if (array_width < block_width || array_width % block_width != 0)
-          CkAbort("array_size % block_size != 0!");
+          CkAbort("array_size %% block_size != 0!");
 
         num_chare_rows = array_height / block_height;
         num_chare_cols = array_width / block_width;

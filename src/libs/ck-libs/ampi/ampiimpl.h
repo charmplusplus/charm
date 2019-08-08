@@ -96,18 +96,33 @@ class fromzDisk : public zdisk {
 
 /* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
  * if tracing is not being used (see bug #1640 for more details on the latter). */
-#ifndef AMPI_LOCAL_IMPL
-#define AMPI_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#ifndef AMPI_PE_LOCAL_IMPL
+#define AMPI_PE_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#endif
+
+/* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
+ * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
+#ifndef AMPI_NODE_LOCAL_IMPL
+#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
 #ifndef AMPI_PE_LOCAL_THRESHOLD_DEFAULT
-#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 4096
+#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 8192
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the Node */
 #ifndef AMPI_NODE_LOCAL_THRESHOLD_DEFAULT
-#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 16384
+#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 32768
+#endif
+
+/* messages larger than or equal to this threshold will always block on a matching recv */
+#ifndef AMPI_SSEND_THRESHOLD_DEFAULT
+#if CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#define AMPI_SSEND_THRESHOLD_DEFAULT 262144
+#else
+#define AMPI_SSEND_THRESHOLD_DEFAULT 131072
+#endif
 #endif
 
 /* AMPI uses RDMA sends if BigSim is not being used. */
@@ -117,11 +132,7 @@ class fromzDisk : public zdisk {
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
 #ifndef AMPI_RDMA_THRESHOLD_DEFAULT
-#if CMK_USE_IBVERBS || CMK_OFI || CMK_CONVERSE_UGNI
-#define AMPI_RDMA_THRESHOLD_DEFAULT 65536
-#else
-#define AMPI_RDMA_THRESHOLD_DEFAULT 32768
-#endif
+#define AMPI_RDMA_THRESHOLD_DEFAULT 102400
 #endif
 
 extern int AMPI_RDMA_THRESHOLD;
@@ -317,6 +328,10 @@ class WinStruct{
   MPI_Comm comm;
   int index;
 
+  // Windows created with MPI_Win_allocate/MPI_Win_allocate_shared need to free their
+  // memory region on MPI_Win_free.
+  bool ownsMemory = false;
+
 private:
   bool areRecvsPosted;
   bool inEpoch;
@@ -332,7 +347,7 @@ public:
     exposureRankList.clear(); accessRankList.clear(); requestList.clear();
   }
   void pup(PUP::er &p) noexcept {
-    p|comm; p|index; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
+    p|comm; p|index; p|ownsMemory; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
   }
   void clearEpochAccess() noexcept {
     accessRankList.clear(); inEpoch = false;
@@ -920,7 +935,7 @@ inline void outputOp(const std::vector<int>& vec) noexcept {
     CkPrintf("vector too large to output!\n");
     return;
   }
-  CkPrintf("output vector: size=%d {",vec.size());
+  CkPrintf("output vector: size=%zu {",vec.size());
   for (int i=0; i<vec.size(); i++) {
     CkPrintf(" %d ", vec[i]);
   }
@@ -1161,7 +1176,7 @@ class AmpiRequest {
 
   /// Block until this request is finished,
   ///  returning a valid MPI error code.
-  virtual int wait(MPI_Status *sts) noexcept =0;
+  virtual CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept =0;
 
   /// Mark this request for cancellation.
   /// Supported only for IReq requests
@@ -1173,7 +1188,7 @@ class AmpiRequest {
   virtual bool isPersistent() const noexcept { return false; }
 
   /// Deregister memory from a get/put
-  virtual void deregisterMem() { }
+  virtual void deregisterMem(CkNcpyBuffer* info) { }
 
   /// Set an intermediate/system buffer that a message will be serialized thru
   virtual void setSystemBuf(void* buf_, int len=0) { }
@@ -1261,7 +1276,6 @@ class IReq final : public AmpiRequest {
   bool cancelled   = false; // track if request is cancelled
   bool persistent  = false; // Is this a persistent recv request?
   int length       = 0; // recv'ed length in bytes
-  CkNcpyBuffer* targetInfo = nullptr;
   char* systemBuf  = nullptr; // non-NULL for non-contiguous recv datatypes
   int systemBufLen = 0; // length in bytes of systemBuf
 
@@ -1279,7 +1293,7 @@ class IReq final : public AmpiRequest {
   IReq() =default;
   ~IReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   void cancel() noexcept override { if (!complete) cancelled = true; }
   AmpiReqType getType() const noexcept override { return AMPI_I_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1297,10 +1311,10 @@ class IReq final : public AmpiRequest {
     systemBuf = (char*)buf_;
     systemBufLen = len;
   }
-  void deregisterMem() noexcept override {
+  void deregisterMem(CkNcpyBuffer *targetInfo) noexcept override {
     if (targetInfo) {
       targetInfo->deregisterMem();
-      delete targetInfo;
+      // targetInfo is owned by the CkDataMsg and so is freed with it
     }
     if (systemBuf) {
       delete [] systemBuf;
@@ -1313,14 +1327,6 @@ class IReq final : public AmpiRequest {
     p|length;
     p|systemBufLen;
     p((char *)&systemBuf, sizeof(char *));
-    bool hasTargetInfo = (targetInfo != NULL);
-    p|hasTargetInfo;
-    if (hasTargetInfo) {
-      if (p.isUnpacking()) {
-        targetInfo = new CkNcpyBuffer();
-      }
-      p|*targetInfo;
-    }
   }
   void print() const noexcept override;
 };
@@ -1344,7 +1350,7 @@ class RednReq final : public AmpiRequest {
   RednReq() =default;
   ~RednReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_REDN_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1373,7 +1379,7 @@ class GatherReq final : public AmpiRequest {
   GatherReq() =default;
   ~GatherReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_GATHER_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1406,7 +1412,7 @@ class GathervReq final : public AmpiRequest {
   GathervReq() =default;
   ~GathervReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent*  wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GATHERV_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
@@ -1443,7 +1449,7 @@ class SendReq final : public AmpiRequest {
   SendReq() noexcept {}
   ~SendReq() noexcept {}
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
@@ -1465,7 +1471,6 @@ class SsendReq final : public AmpiRequest {
   bool persistent = false; // is this a persistent Ssend request?
  public:
   int destRank = MPI_PROC_NULL;
-  CkNcpyBuffer* srcInfo = nullptr;
 
  public:
   SsendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
@@ -1500,7 +1505,7 @@ class SsendReq final : public AmpiRequest {
   SsendReq() =default;
   ~SsendReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
@@ -1509,10 +1514,10 @@ class SsendReq final : public AmpiRequest {
   AmpiReqType getType() const noexcept override { return AMPI_SSEND_REQ; }
   bool isUnmatched() const noexcept override { return false; }
   bool isPooledType() const noexcept override { return true; }
-  void deregisterMem() noexcept override {
+  void deregisterMem(CkNcpyBuffer *srcInfo) noexcept override {
     if (srcInfo) {
       srcInfo->deregisterMem();
-      delete srcInfo;
+      // srcInfo is owned by the CkDataMsg and so is freed with it
     }
     if (systemBuf) {
       delete [] (char*)buf;
@@ -1527,12 +1532,6 @@ class SsendReq final : public AmpiRequest {
     p|persistent;
     p|destRank;
     p|systemBuf;
-    bool hasSrcInfo = (srcInfo != NULL);
-    p|hasSrcInfo;
-    if (hasSrcInfo) {
-      if (p.isUnpacking()) srcInfo = new CkNcpyBuffer();
-      p|*srcInfo;
-    }
   }
   void print() const noexcept override;
 };
@@ -1543,7 +1542,7 @@ class GPUReq : public AmpiRequest {
   GPUReq() noexcept;
   ~GPUReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GPU_REQ; }
@@ -1561,7 +1560,7 @@ class ATAReq final : public AmpiRequest {
   ATAReq() =default;
   ~ATAReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   int getCount() const noexcept { return reqs.size(); }
@@ -1593,7 +1592,7 @@ class GReq final : public AmpiRequest {
   GReq() =default;
   ~GReq() noexcept { (*freeFn)(extraState); }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   void cancel() noexcept override { (*cancelFn)(extraState, complete); }
@@ -1631,8 +1630,8 @@ class AmpiRequestList {
     return reqs[n];
 #endif
   }
-  void free(AmpiRequestPool& reqPool, int idx, CkDDT *ddt) noexcept;
-  void freeNonPersReq(int &idx) noexcept;
+  void free(int idx, CkDDT *ddt) noexcept;
+  void freeNonPersReq(ampiParent* pptr, int &idx) noexcept;
   inline int insert(AmpiRequest* req) noexcept {
     for (int i=startIdx; i<reqs.size(); i++) {
       if (reqs[i] == NULL) {
@@ -2481,7 +2480,8 @@ class ampiParent final : public CBase_ampiParent {
     (func)((void*)invec, inoutvec, &count, &datatype);
   }
 
-  int wait(MPI_Request* req, MPI_Status* sts) noexcept;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(MPI_Request* req, MPI_Status* sts) noexcept;
+  CMI_WARN_UNUSED_RESULT ampiParent* waitall(int count, MPI_Request request[], MPI_Status sts[]=MPI_STATUSES_IGNORE) noexcept;
   void init() noexcept;
   void finalize() noexcept;
   CMI_WARN_UNUSED_RESULT ampiParent* block() noexcept;
@@ -2649,18 +2649,20 @@ class ampi final : public CBase_ampi {
     return static_blockOnColl(this);
   }
   inline void setBlockingReq(AmpiRequest *req) noexcept;
+  inline AmpiRequestPool& getReqPool() const { return parent->reqPool; }
   CMI_WARN_UNUSED_RESULT inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
                                                   int t, MPI_Comm comm, MPI_Status* sts) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
-  inline void completedSend(MPI_Request req) noexcept;
-  inline void completedRecv(MPI_Request req) noexcept;
+  inline void completedSend(MPI_Request req, CkNcpyBuffer *srcInfo=nullptr) noexcept;
+  inline void completedRecv(MPI_Request req, CkNcpyBuffer *targetInfo=nullptr) noexcept;
 
   inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept;
   AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root,MPI_Comm destcomm) noexcept;
   AmpiMsg *makeSyncMsg(int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,CProxy_ampi destProxy,
-                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq) noexcept;
+                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq,
+                       ampi* destPtr) noexcept;
   AmpiMsg *makeNcpyShmMsg(int t, int sRank, const void* buf, int count,
                           MPI_Datatype type, int ssendReq, int seq) noexcept;
   AmpiMsg *makeNcpyMsg(int t, int sRank, const void* buf, int count,
@@ -2675,22 +2677,22 @@ class ampi final : public CBase_ampi {
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx) noexcept;
   inline MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
                                  int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destElem,
-                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
-  inline MPI_Request sendLocalInOrderMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
-                                         int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
-                                         ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
+                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx, ampi* destPtr) noexcept;
+  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
+                                  int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
+                                  ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
                                  int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
                                  MPI_Request reqIdx) noexcept;
-  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const noexcept {
+  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx, ampi* destPtr) const noexcept {
 #if CMK_MULTICORE
     return true;
 #elif CMK_SMP
+    if (destPtr != NULL) return true;
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
     return (CkNodeOf(destPe) == CkMyNode());
 #else // non-SMP
-    ampi* destPtr = arrProxy[destIdx].ckLocal();
     return (destPtr != NULL);
 #endif
   }

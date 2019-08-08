@@ -156,7 +156,7 @@ static int set_process_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset
   {
     char *str;
     cmi_hwloc_bitmap_asprintf(&str, cpuset);
-    CmiPrintf("HWLOC> [%d] Process %p bound to cpuset: %s\n", CmiMyPe(), process, str);
+    CmiPrintf("HWLOC> [%d] Process %p bound to cpuset: %s\n", CmiMyPe(), (const void *)process, str);
     free(str);
   }
 #endif
@@ -188,7 +188,7 @@ static int set_thread_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset)
   {
     char *str;
     cmi_hwloc_bitmap_asprintf(&str, cpuset);
-    CmiPrintf("HWLOC> [%d] Thread %p bound to cpuset: %s\n", CmiMyPe(), thread, str);
+    CmiPrintf("HWLOC> [%d] Thread %p bound to cpuset: %s\n", CmiMyPe(), (const void *)thread, str);
     free(str);
   }
 #endif
@@ -231,6 +231,47 @@ int CmiSetCPUAffinity(int mycore)
 
   if (result == -1)
     CmiError("Error: CmiSetCPUAffinity failed to bind PE #%d to PU #%d.\n", CmiMyPe(), mycore);
+
+  return result;
+}
+
+int CmiSetCPUAffinityLogical(int mycore)
+{
+  int core = mycore;
+  if (core < 0) {
+    core = CmiHwlocTopologyLocal.num_pus + core;
+  }
+  if (core < 0) {
+    CmiError("Error: Invalid parameter to CmiSetCPUAffinityLogical: %d\n", mycore);
+    CmiAbort("CmiSetCPUAffinityLogical failed!");
+  }
+  hwloc_topology_t topology;
+
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+
+  int thread_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PU);
+  int thread_assignment = core % thread_unitcount;
+
+  hwloc_obj_t thread_obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PU, thread_assignment);
+
+  int result = -1;
+
+  if (thread_obj != nullptr)
+  {
+#if CMK_SMP
+    result = set_thread_affinity(topology, thread_obj->cpuset);
+#else
+    result = set_process_affinity(topology, thread_obj->cpuset);
+#endif
+
+    CpvAccess(myCPUAffToCore) = thread_obj->os_index;
+  }
+
+  cmi_hwloc_topology_destroy(topology);
+
+  if (result == -1)
+    CmiError("Error: CmiSetCPUAffinityLogical failed to bind PE #%d to PU #%d.\n", CmiMyPe(), mycore);
 
   return result;
 }
@@ -479,7 +520,7 @@ static void cpuAffinityRecvHandler(void *msg)
 
   DEBUGP(("[%d %d] set to core #: %d\n", CmiMyNode(), CmiMyPe(), myrank));
 
-  if (-1 != CmiSetCPUAffinity(myrank)) {
+  if (-1 != CmiSetCPUAffinityLogical(myrank)) {
     DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
   }
   else{

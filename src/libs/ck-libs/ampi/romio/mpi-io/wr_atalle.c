@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -16,6 +16,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_write_at_all_end as PMPI_File_write_at_all_end
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_write_at_all_end(MPI_File fh, const void *buf, MPI_Status *status) __attribute__((weak,alias("PMPI_File_write_at_all_end")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -24,7 +26,7 @@
 #endif
 
 /*@
-    MPI_File_write_at_all_end - Complete a split collective write using explict offset
+    MPI_File_write_at_all_end - Complete a split collective write using explicit offset
 
 Input Parameters:
 . fh - file handle (handle)
@@ -35,12 +37,12 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPI_File_write_at_all_end(MPI_File mpi_fh, void *buf, MPI_Status *status)
+int MPI_File_write_at_all_end(MPI_File fh, ROMIO_CONST void *buf, MPI_Status *status)
 {
     int error_code;
     static char myname[] = "MPI_FILE_WRITE_AT_ALL_END";
 
-    error_code = MPIOI_File_write_all_end(mpi_fh, buf, myname, status);
+    error_code = MPIOI_File_write_all_end(fh, buf, myname, status);
 
     return error_code;
 }

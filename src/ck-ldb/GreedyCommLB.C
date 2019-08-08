@@ -140,7 +140,7 @@ void GreedyCommLB::work(LDStats* stats)
     ObjectRecord *x;
     int i;
     
-    if (_lb_args.debug()) CkPrintf("In GreedyCommLB strategy\n",CkMyPe());
+    if (_lb_args.debug()) CkPrintf("[%d] In GreedyCommLB strategy\n",CkMyPe());
     npe = stats->nprocs();
     nobj = stats->n_objs;
 

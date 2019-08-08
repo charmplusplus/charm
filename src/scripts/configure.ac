@@ -260,7 +260,14 @@ then
   Echo "Charm record/replay is disabled"
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
 else
-  Echo "Charm record/replay is enabled"
+  if test "$enable_tracing" = "no"
+  then
+    Echo "Charm record/replay is disabled because tracing is disabled"
+    AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
+  else
+    Echo "Charm record/replay is enabled"
+    AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 1, [enable replay])
+  fi
 fi
 
 AC_ARG_ENABLE([ccs],
@@ -2332,6 +2339,10 @@ int main() {
 EOT
 test_link "whether has support for shm transport using Cross Memory Attach" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_CMA, $pass, [whether supports cma])
+CMK_HAS_CMA="$pass"
+
+test "$CMK_HAS_CMA" = '1' -a "$CMK_MULTICORE" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_USE_CMA='1' || CMK_USE_CMA='0'
+add_make_flag "CMK_USE_CMA:=$CMK_USE_CMA" 'Cross Memory Attach'
 
 #### check if -rdynamic works ####
 cat > $t <<EOT

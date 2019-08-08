@@ -1,0 +1,105 @@
+// Test of basic SDAG features: when, for, while, overlap, if, case
+
+module basic {
+  chare BasicTest {
+    entry BasicTest();
+
+    // Sent by Main multiple times
+    entry void fizz();
+    entry void buzz();
+
+    // Sent by Main exactly one time each
+    entry void call1();
+    entry void call2();
+
+    // Sent from within the while loop as responses to the call1/2 messages
+    entry void response1();
+    entry void response2();
+    entry void responseBoth();
+
+    // Called throughout run() as differet tests complete
+    entry void unlock1();
+    entry void unlock2();
+    entry void unlock3();
+
+    // Never called, but used as a potential pitfall in case statements
+    entry void never();
+
+    entry void run() {
+      serial { thisProxy.unlock1(); }
+
+      // SDAG version of FizzBuzz to test for loops and if/else.
+      // The appropriate number of fizz and buzz messages were sent by Main,
+      // and this loop is responsible for ordering them.
+      serial { CkPrintf("Testing SDAG for loops, and if/else\n"); }
+      for (for_index = 1; for_index <= FOR_ITERATIONS; for_index++) {
+        if (for_index % 3 == 0 && for_index % 5 == 0) {
+          when fizz(), buzz() serial { CkPrintf("FizzBuzz\n"); }
+        } else if (for_index % 3 == 0) {
+          when fizz() serial { CkPrintf("Fizz\n"); }
+        } else if (for_index % 5 == 0) {
+          when buzz() serial { CkPrintf("Buzz\n"); }
+        } else {
+          serial { CkPrintf("%i\n", for_index); }
+        }
+      }
+
+      // Ensure we actually did the entire for loop
+      serial { CkAssert(for_index == FOR_ITERATIONS +1); thisProxy.unlock2(); }
+
+      // This tests while loops and the case statement.
+      // Main sent call1 and call2 messages, and each iteration of the while
+      // will handle one of the possible cases. The cases with never() should
+      // never be triggered, but are there to test that case will not get stuck
+      // on partially satisfied dependencies. The case where both are handled is
+      // semantically valid, but likely will never trigger based on actual
+      // implementation.
+      serial { CkPrintf("Testing SDAG while loops and case statements\n"); }
+      while (do_while) {
+        case {
+          when call1(), never() serial { CkAbort("Received never()\n"); }
+          when call2(), never() serial { CkAbort("Received never()\n"); }
+          when call1() serial { thisProxy.response1(); }
+          when call2() serial { thisProxy.response2(); }
+          when call1(), call2() serial { thisProxy.responseBoth(); }
+          when response1(), response2() serial { do_while = false; }
+          when responseBoth() serial { do_while = false; }
+        }
+      }
+
+      // Ensure we actually did the entire while loop
+      serial { CkAssert(do_while == false); thisProxy.unlock3(); }
+
+      // Test overlap to ensure all previous tests completed and we receive all
+      // three unlock messages.
+      serial { CkPrintf("Testing SDAG overlap statements\n"); }
+      overlap {
+        when unlock1() serial { unlocked1 = true; }
+        when unlock2() serial { unlocked2 = true; }
+        when unlock3() serial { unlocked3 = true; }
+      }
+
+      // Assert all overlap messages were handled, then let main know the test
+      // is completed.
+      serial {
+        CkAssert(unlocked1 && unlocked2 && unlocked3);
+        mainProxy.basicTestDone();
+      }
+
+      // If there were for some reason any unhandled messages, fail
+      overlap {
+        when fizz() serial { CkAbort("Extra fizz\n"); }
+        when buzz() serial { CkAbort("Extra buzz\n"); }
+        when call1() serial { CkAbort("Extra call1\n"); }
+        when call2() serial { CkAbort("Extra call2\n"); }
+        when response1() serial { CkAbort("Extra response1\n"); }
+        when response2() serial { CkAbort("Extra response2\n"); }
+        when responseBoth() serial { CkAbort("Extra reponseBoth\n"); }
+        when unlock1() serial { CkAbort("Extra unlock1\n"); }
+        when unlock2() serial { CkAbort("Extra unlock2\n"); }
+        when unlock3() serial { CkAbort("Extra unlock3\n"); }
+        when never() serial { CkAbort("Extra never\n"); }
+      }
+    }
+  }
+}

@@ -31,9 +31,9 @@ public:
     localTableSize = (1l << N) / numElementsPerPe;
     tableSize = localTableSize * CkNumPes() * numElementsPerPe;
 
-    CkPrintf("Global table size   = 2^%d * %d = %lld words\n",
+    CkPrintf("Global table size   = 2^%d * %d = %" PRId64 " words\n",
              N, CkNumPes(), tableSize);
-    CkPrintf("Number of processors = %d\nNumber of updates = %lld\n",
+    CkPrintf("Number of processors = %d\nNumber of updates = %" PRId64 "\n",
              CkNumPes(), 4 * tableSize);
 
     driverProxy = thishandle;
@@ -70,7 +70,7 @@ public:
   }
 
   void reportErrors(CmiInt8 globalNumErrors) {
-    CkPrintf("Found %lld errors in %lld locations (%s).\n", globalNumErrors,
+    CkPrintf("Found %" PRId64 " errors in %" PRId64 " locations (%s).\n", globalNumErrors,
              tableSize, globalNumErrors <= 0.01 * tableSize ?
              "passed" : "failed");
     CkExit();
