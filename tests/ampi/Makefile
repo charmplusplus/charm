@@ -8,6 +8,7 @@ DIRS = \
   datatype \
   privatization \
   jacobi3d \
+  exit \
 #  chkpt \
 
 ifeq ($(BUILD_MPICH_TESTS),true)
