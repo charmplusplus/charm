@@ -31,6 +31,12 @@ test:  lb_test
 	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 )
 	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 )
 
+smptest: lb_test
+	$(call run, +p2 ./lb_test 100 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 ++ppn 2)
+	$(call run, +p2 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1  ++ppn 2)
+	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 ++ppn 2)
+	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1  ++ppn 2)
+
 test_every:  lb_test.every
 	$(call run, +p4 ./lb_test.every 100 100 10 40 10 1000 ring +balancer RecBipartLB +LBDebug 1 )
 

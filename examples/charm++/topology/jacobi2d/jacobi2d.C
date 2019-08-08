@@ -69,9 +69,9 @@ class Main : public CBase_Main
         blockDimY = atoi(m->argv[4]);
       }
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
-        CkAbort("array_size_X % block_size_X != 0!");
+        CkAbort("array_size_X %% block_size_X != 0!");
       if (arrayDimY < blockDimY || arrayDimY % blockDimY != 0)
-        CkAbort("array_size_Y % block_size_Y != 0!");
+        CkAbort("array_size_Y %% block_size_Y != 0!");
 
       // store the main proxy
       mainProxy = thisProxy;

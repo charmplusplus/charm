@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2004 University of Chicago. 
@@ -16,11 +16,16 @@
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-#ifdef HAVE_AIO_H
-#include <aio.h>
-#endif
-#ifdef HAVE_SYS_AIO_H
-#include <sys/aio.h>
+
+#ifdef HAVE_AIO_LITE_H
+#include <aio-lite.h>
+#else
+ #ifdef  HAVE_AIO_H
+ #include <aio.h>
+ #endif
+ #ifdef HAVE_SYS_AIO_H
+ #include <sys/aio.h>
+ #endif
 #endif
 
 /* Workaround for incomplete set of definitions if __REDIRECT is not 

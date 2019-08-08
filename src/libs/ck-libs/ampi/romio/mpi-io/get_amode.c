@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -16,6 +16,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_get_amode as PMPI_File_get_amode
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_get_amode(MPI_File fh, int *amode) __attribute__((weak,alias("PMPI_File_get_amode")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -34,19 +36,19 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPI_File_get_amode(MPI_File mpi_fh, int *amode)
+int MPI_File_get_amode(MPI_File fh, int *amode)
 {
     int error_code=MPI_SUCCESS;
     static char myname[] = "MPI_FILE_GET_AMODE";
-    ADIO_File fh;
+    ADIO_File adio_fh;
     
-    fh = MPIO_File_resolve(mpi_fh);
+    adio_fh = MPIO_File_resolve(fh);
 
     /* --BEGIN ERROR HANDLING-- */
-    MPIO_CHECK_FILE_HANDLE(fh, myname, error_code);
+    MPIO_CHECK_FILE_HANDLE(adio_fh, myname, error_code);
     /* --END ERROR HANDLING-- */
 
-    *amode = fh->access_mode;
+    *amode = adio_fh->orig_access_mode;
 
 fn_exit:
     return error_code;

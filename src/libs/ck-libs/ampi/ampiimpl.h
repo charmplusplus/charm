@@ -96,18 +96,33 @@ class fromzDisk : public zdisk {
 
 /* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
  * if tracing is not being used (see bug #1640 for more details on the latter). */
-#ifndef AMPI_LOCAL_IMPL
-#define AMPI_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#ifndef AMPI_PE_LOCAL_IMPL
+#define AMPI_PE_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#endif
+
+/* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
+ * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
+#ifndef AMPI_NODE_LOCAL_IMPL
+#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
 #ifndef AMPI_PE_LOCAL_THRESHOLD_DEFAULT
-#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 4096
+#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 8192
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the Node */
 #ifndef AMPI_NODE_LOCAL_THRESHOLD_DEFAULT
-#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 16384
+#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 32768
+#endif
+
+/* messages larger than or equal to this threshold will always block on a matching recv */
+#ifndef AMPI_SSEND_THRESHOLD_DEFAULT
+#if CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#define AMPI_SSEND_THRESHOLD_DEFAULT 262144
+#else
+#define AMPI_SSEND_THRESHOLD_DEFAULT 131072
+#endif
 #endif
 
 /* AMPI uses RDMA sends if BigSim is not being used. */
@@ -117,11 +132,7 @@ class fromzDisk : public zdisk {
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
 #ifndef AMPI_RDMA_THRESHOLD_DEFAULT
-#if CMK_USE_IBVERBS || CMK_OFI || CMK_CONVERSE_UGNI
-#define AMPI_RDMA_THRESHOLD_DEFAULT 65536
-#else
-#define AMPI_RDMA_THRESHOLD_DEFAULT 32768
-#endif
+#define AMPI_RDMA_THRESHOLD_DEFAULT 102400
 #endif
 
 extern int AMPI_RDMA_THRESHOLD;
@@ -317,6 +328,10 @@ class WinStruct{
   MPI_Comm comm;
   int index;
 
+  // Windows created with MPI_Win_allocate/MPI_Win_allocate_shared need to free their
+  // memory region on MPI_Win_free.
+  bool ownsMemory = false;
+
 private:
   bool areRecvsPosted;
   bool inEpoch;
@@ -332,7 +347,7 @@ public:
     exposureRankList.clear(); accessRankList.clear(); requestList.clear();
   }
   void pup(PUP::er &p) noexcept {
-    p|comm; p|index; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
+    p|comm; p|index; p|ownsMemory; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
   }
   void clearEpochAccess() noexcept {
     accessRankList.clear(); inEpoch = false;
@@ -378,7 +393,7 @@ class win_obj {
   std::string winName;
   bool initflag;
 
-  std::vector<int> keyvals; // list of keyval attributes
+  std::unordered_map<int, uintptr_t> attributes;
 
   void setName(const char *src) noexcept;
   void getName(char *src,int *len) noexcept;
@@ -394,7 +409,7 @@ class win_obj {
              MPI_Comm comm) noexcept;
   int free() noexcept;
 
-  std::vector<int>& getKeyvals() { return keyvals; }
+  std::unordered_map<int, uintptr_t> & getAttributes() { return attributes; }
 
   int put(void *orgaddr, int orgcnt, int orgunit,
           MPI_Aint targdisp, int targcnt, int targunit) noexcept;
@@ -636,29 +651,21 @@ class ampiDistGraphTopology final : public ampiTopology {
 /* KeyValue class for attribute caching */
 class KeyvalNode {
  public:
-  void *val;
   MPI_Copy_function *copy_fn;
   MPI_Delete_function *delete_fn;
   void *extra_state;
   int refCount;
-  bool isValSet;
 
-  KeyvalNode() : val(NULL), copy_fn(NULL), delete_fn(NULL), extra_state(NULL), refCount(1), isValSet(false) { }
+  KeyvalNode() : copy_fn(NULL), delete_fn(NULL), extra_state(NULL), refCount(1) { }
   KeyvalNode(MPI_Copy_function *cf, MPI_Delete_function *df, void* es) :
-             val(NULL), copy_fn(cf), delete_fn(df), extra_state(es), refCount(1), isValSet(false) { }
-  bool hasVal() const { return isValSet; }
-  void clearVal() { isValSet = false; }
-  void setVal(void *v) { val = v; isValSet = true; }
-  void* getVal() const { return val; }
+             copy_fn(cf), delete_fn(df), extra_state(es), refCount(1) { }
   void incRefCount() { refCount++; }
   int decRefCount() { CkAssert(refCount > 0); refCount--; return refCount; }
   void pup(PUP::er& p) {
-    p((char *)val, sizeof(void *));
     p((char *)copy_fn, sizeof(void *));
     p((char *)delete_fn, sizeof(void *));
     p((char *)extra_state, sizeof(void *));
     p|refCount;
-    p|isValSet;
   }
 };
 
@@ -734,7 +741,7 @@ class ampiCommStruct {
   int topoType; // Type of virtual topology: MPI_CART, MPI_GRAPH, MPI_DIST_GRAPH, or MPI_UNDEFINED
 
   // For communicator attributes (MPI_*_get_attr): indexed by keyval
-  std::vector<int> keyvals;
+  std::unordered_map<int, uintptr_t> attributes;
 
   // For communicator names
   std::string commName;
@@ -785,7 +792,7 @@ class ampiCommStruct {
     commType       = obj.commType;
     indices        = obj.indices;
     remoteIndices  = obj.remoteIndices;
-    keyvals        = obj.keyvals;
+    attributes     = obj.attributes;
     commName       = obj.commName;
   }
 
@@ -814,7 +821,7 @@ class ampiCommStruct {
     commType       = obj.commType;
     indices        = obj.indices;
     remoteIndices  = obj.remoteIndices;
-    keyvals        = obj.keyvals;
+    attributes     = obj.attributes;
     commName       = obj.commName;
     return *this;
   }
@@ -833,7 +840,7 @@ class ampiCommStruct {
   MPI_Comm getComm() const noexcept {return comm;}
   inline std::vector<int> getIndices() const noexcept {return indices.getRanks();}
   inline std::vector<int> getRemoteIndices() const noexcept {return remoteIndices.getRanks();}
-  std::vector<int> &getKeyvals() noexcept {return keyvals;}
+  std::unordered_map<int, uintptr_t> & getAttributes() noexcept {return attributes;}
 
   void setName(const char *src) noexcept {
     CkDDT_SetName(commName, src);
@@ -881,7 +888,7 @@ class ampiCommStruct {
     p|commType;
     p|indices;
     p|remoteIndices;
-    p|keyvals;
+    p|attributes;
     p|commName;
     p|topoType;
     if (topoType != MPI_UNDEFINED) {
@@ -928,7 +935,7 @@ inline void outputOp(const std::vector<int>& vec) noexcept {
     CkPrintf("vector too large to output!\n");
     return;
   }
-  CkPrintf("output vector: size=%d {",vec.size());
+  CkPrintf("output vector: size=%zu {",vec.size());
   for (int i=0; i<vec.size(); i++) {
     CkPrintf(" %d ", vec[i]);
   }
@@ -1169,7 +1176,7 @@ class AmpiRequest {
 
   /// Block until this request is finished,
   ///  returning a valid MPI error code.
-  virtual int wait(MPI_Status *sts) noexcept =0;
+  virtual CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept =0;
 
   /// Mark this request for cancellation.
   /// Supported only for IReq requests
@@ -1181,7 +1188,7 @@ class AmpiRequest {
   virtual bool isPersistent() const noexcept { return false; }
 
   /// Deregister memory from a get/put
-  virtual void deregisterMem() { }
+  virtual void deregisterMem(CkNcpyBuffer* info) { }
 
   /// Set an intermediate/system buffer that a message will be serialized thru
   virtual void setSystemBuf(void* buf_, int len=0) { }
@@ -1269,7 +1276,6 @@ class IReq final : public AmpiRequest {
   bool cancelled   = false; // track if request is cancelled
   bool persistent  = false; // Is this a persistent recv request?
   int length       = 0; // recv'ed length in bytes
-  CkNcpyBuffer* targetInfo = nullptr;
   char* systemBuf  = nullptr; // non-NULL for non-contiguous recv datatypes
   int systemBufLen = 0; // length in bytes of systemBuf
 
@@ -1287,7 +1293,7 @@ class IReq final : public AmpiRequest {
   IReq() =default;
   ~IReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   void cancel() noexcept override { if (!complete) cancelled = true; }
   AmpiReqType getType() const noexcept override { return AMPI_I_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1305,10 +1311,10 @@ class IReq final : public AmpiRequest {
     systemBuf = (char*)buf_;
     systemBufLen = len;
   }
-  void deregisterMem() noexcept override {
+  void deregisterMem(CkNcpyBuffer *targetInfo) noexcept override {
     if (targetInfo) {
       targetInfo->deregisterMem();
-      delete targetInfo;
+      // targetInfo is owned by the CkDataMsg and so is freed with it
     }
     if (systemBuf) {
       delete [] systemBuf;
@@ -1321,14 +1327,6 @@ class IReq final : public AmpiRequest {
     p|length;
     p|systemBufLen;
     p((char *)&systemBuf, sizeof(char *));
-    bool hasTargetInfo = (targetInfo != NULL);
-    p|hasTargetInfo;
-    if (hasTargetInfo) {
-      if (p.isUnpacking()) {
-        targetInfo = new CkNcpyBuffer();
-      }
-      p|*targetInfo;
-    }
   }
   void print() const noexcept override;
 };
@@ -1352,7 +1350,7 @@ class RednReq final : public AmpiRequest {
   RednReq() =default;
   ~RednReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_REDN_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1381,7 +1379,7 @@ class GatherReq final : public AmpiRequest {
   GatherReq() =default;
   ~GatherReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_GATHER_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1414,7 +1412,7 @@ class GathervReq final : public AmpiRequest {
   GathervReq() =default;
   ~GathervReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent*  wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GATHERV_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
@@ -1451,7 +1449,7 @@ class SendReq final : public AmpiRequest {
   SendReq() noexcept {}
   ~SendReq() noexcept {}
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
@@ -1473,7 +1471,6 @@ class SsendReq final : public AmpiRequest {
   bool persistent = false; // is this a persistent Ssend request?
  public:
   int destRank = MPI_PROC_NULL;
-  CkNcpyBuffer* srcInfo = nullptr;
 
  public:
   SsendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
@@ -1508,7 +1505,7 @@ class SsendReq final : public AmpiRequest {
   SsendReq() =default;
   ~SsendReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
@@ -1517,10 +1514,10 @@ class SsendReq final : public AmpiRequest {
   AmpiReqType getType() const noexcept override { return AMPI_SSEND_REQ; }
   bool isUnmatched() const noexcept override { return false; }
   bool isPooledType() const noexcept override { return true; }
-  void deregisterMem() noexcept override {
+  void deregisterMem(CkNcpyBuffer *srcInfo) noexcept override {
     if (srcInfo) {
       srcInfo->deregisterMem();
-      delete srcInfo;
+      // srcInfo is owned by the CkDataMsg and so is freed with it
     }
     if (systemBuf) {
       delete [] (char*)buf;
@@ -1535,12 +1532,6 @@ class SsendReq final : public AmpiRequest {
     p|persistent;
     p|destRank;
     p|systemBuf;
-    bool hasSrcInfo = (srcInfo != NULL);
-    p|hasSrcInfo;
-    if (hasSrcInfo) {
-      if (p.isUnpacking()) srcInfo = new CkNcpyBuffer();
-      p|*srcInfo;
-    }
   }
   void print() const noexcept override;
 };
@@ -1551,7 +1542,7 @@ class GPUReq : public AmpiRequest {
   GPUReq() noexcept;
   ~GPUReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GPU_REQ; }
@@ -1569,7 +1560,7 @@ class ATAReq final : public AmpiRequest {
   ATAReq() =default;
   ~ATAReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   int getCount() const noexcept { return reqs.size(); }
@@ -1601,7 +1592,7 @@ class GReq final : public AmpiRequest {
   GReq() =default;
   ~GReq() noexcept { (*freeFn)(extraState); }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   void cancel() noexcept override { (*cancelFn)(extraState, complete); }
@@ -1639,8 +1630,8 @@ class AmpiRequestList {
     return reqs[n];
 #endif
   }
-  void free(AmpiRequestPool& reqPool, int idx, CkDDT *ddt) noexcept;
-  void freeNonPersReq(int &idx) noexcept;
+  void free(int idx, CkDDT *ddt) noexcept;
+  void freeNonPersReq(ampiParent* pptr, int &idx) noexcept;
   inline int insert(AmpiRequest* req) noexcept {
     for (int i=startIdx; i<reqs.size(); i++) {
       if (reqs[i] == NULL) {
@@ -2284,9 +2275,9 @@ class ampiParent final : public CBase_ampiParent {
     return universeComm2CommStruct(comm);
   }
 
-  inline std::vector<int>& getKeyvals(MPI_Comm comm) noexcept {
-    ampiCommStruct &cs = *(ampiCommStruct *)&comm2CommStruct(comm);
-    return cs.getKeyvals();
+  inline std::unordered_map<int, uintptr_t> & getAttributes(MPI_Comm comm) noexcept {
+    ampiCommStruct & cs = const_cast<ampiCommStruct &>(comm2CommStruct(comm));
+    return cs.getAttributes();
   }
 
   inline ampi *comm2ampi(MPI_Comm comm) const noexcept {
@@ -2393,16 +2384,16 @@ class ampiParent final : public CBase_ampiParent {
 
   int createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
                   int *keyval, void* extra_state) noexcept;
-  bool getBuiltinKeyval(int keyval, void *attribute_val) noexcept;
-  int setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val) noexcept;
-  bool getUserKeyval(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
-  int dupUserKeyvals(MPI_Comm old_comm, MPI_Comm new_comm) noexcept;
-  int freeUserKeyval(int context, std::vector<int>& keyvals, int *keyval) noexcept;
-  int freeUserKeyvals(int context, std::vector<int>& keyvals) noexcept;
+  bool getBuiltinAttribute(int keyval, void *attribute_val) noexcept;
+  int setUserAttribute(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
+  bool getUserAttribute(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
+  int dupUserAttributes(int old_context, std::unordered_map<int, uintptr_t> & old_attr, std::unordered_map<int, uintptr_t> & new_attr) noexcept;
+  int freeUserAttributes(int context, std::unordered_map<int, uintptr_t> & attributes) noexcept;
+  int freeKeyval(int keyval) noexcept;
 
-  int setAttr(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val) noexcept;
-  int getAttr(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
-  int deleteAttr(MPI_Comm comm, std::vector<int>& keyvals, int keyval) noexcept;
+  int setAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
+  int getAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
+  int deleteAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval) noexcept;
 
   int addWinStruct(WinStruct *win) noexcept;
   WinStruct *getWinStruct(MPI_Win win) const noexcept;
@@ -2489,7 +2480,8 @@ class ampiParent final : public CBase_ampiParent {
     (func)((void*)invec, inoutvec, &count, &datatype);
   }
 
-  int wait(MPI_Request* req, MPI_Status* sts) noexcept;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(MPI_Request* req, MPI_Status* sts) noexcept;
+  CMI_WARN_UNUSED_RESULT ampiParent* waitall(int count, MPI_Request request[], MPI_Status sts[]=MPI_STATUSES_IGNORE) noexcept;
   void init() noexcept;
   void finalize() noexcept;
   CMI_WARN_UNUSED_RESULT ampiParent* block() noexcept;
@@ -2657,18 +2649,20 @@ class ampi final : public CBase_ampi {
     return static_blockOnColl(this);
   }
   inline void setBlockingReq(AmpiRequest *req) noexcept;
+  inline AmpiRequestPool& getReqPool() const { return parent->reqPool; }
   CMI_WARN_UNUSED_RESULT inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
                                                   int t, MPI_Comm comm, MPI_Status* sts) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
-  inline void completedSend(MPI_Request req) noexcept;
-  inline void completedRecv(MPI_Request req) noexcept;
+  inline void completedSend(MPI_Request req, CkNcpyBuffer *srcInfo=nullptr) noexcept;
+  inline void completedRecv(MPI_Request req, CkNcpyBuffer *targetInfo=nullptr) noexcept;
 
   inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept;
   AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root,MPI_Comm destcomm) noexcept;
   AmpiMsg *makeSyncMsg(int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,CProxy_ampi destProxy,
-                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq) noexcept;
+                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq,
+                       ampi* destPtr) noexcept;
   AmpiMsg *makeNcpyShmMsg(int t, int sRank, const void* buf, int count,
                           MPI_Datatype type, int ssendReq, int seq) noexcept;
   AmpiMsg *makeNcpyMsg(int t, int sRank, const void* buf, int count,
@@ -2683,22 +2677,22 @@ class ampi final : public CBase_ampi {
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx) noexcept;
   inline MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
                                  int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destElem,
-                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
-  inline MPI_Request sendLocalInOrderMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
-                                         int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
-                                         ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
+                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx, ampi* destPtr) noexcept;
+  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
+                                  int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
+                                  ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
                                  int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
                                  MPI_Request reqIdx) noexcept;
-  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const noexcept {
+  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx, ampi* destPtr) const noexcept {
 #if CMK_MULTICORE
     return true;
 #elif CMK_SMP
+    if (destPtr != NULL) return true;
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
     return (CkNodeOf(destPe) == CkMyNode());
 #else // non-SMP
-    ampi* destPtr = arrProxy[destIdx].ckLocal();
     return (destPtr != NULL);
 #endif
   }

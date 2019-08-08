@@ -59,7 +59,7 @@ CpmInvokable blk_fibtop(int n)
   Cpm_blk_fibthr(CpmMakeThread(blk_randpe()), n, CmiMyPe(), &acc);
   CthSuspend();
   if (acc.total != 21) {
-    CmiPrintf("blkinhand failed. %08x\n", CthSelf());
+    CmiPrintf("blkinhand failed. %p\n", CthSelf());
     CmiPrintf("Failure in blk_fibtop\n");
     exit(1);
   }

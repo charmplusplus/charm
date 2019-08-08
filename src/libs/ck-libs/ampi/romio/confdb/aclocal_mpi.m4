@@ -34,7 +34,7 @@ if test "X$pac_lib_mpi_is_building" != "Xyes" ; then
      fi
   fi
   # Look for MPILIB first if it is defined
-  AC_SEARCH_LIBS(MPI_Init,$MPILIB mpi mpich mpich2)
+  AC_SEARCH_LIBS(MPI_Init,$MPILIB mpi mpich)
   if test "$ac_cv_search_MPI_Init" = "no" ; then
     ifelse($2,,
     AC_MSG_ERROR([Could not find MPI library]),[$2])
@@ -125,8 +125,8 @@ AC_DEFUN([PAC_ARG_MPI_KNOWN_TYPES],[
 AC_ARG_WITH(mpich,
 [--with-mpich=path  - Assume that we are building with MPICH],
 ac_mpi_type=mpich)
-# Allow MPICH2 as well as MPICH
-AC_ARG_WITH(mpich2,
+# Allow MPICH as well as MPICH
+AC_ARG_WITH(mpich,
 [--with-mpich=path  - Assume that we are building with MPICH],
 ac_mpi_type=mpich)
 AC_ARG_WITH(lammpi,
@@ -157,7 +157,7 @@ if test "$ac_mpi_type" = "unknown" -a "$pac_lib_mpi_is_building" = "yes" ; then
 fi
 ])
 dnl
-dnl Because of autoconf insists on moving code to the beginning of 
+dnl Because autoconf insists on moving code to the beginning of
 dnl certain definitions, it is *not possible* to define a single command
 dnl that selects compilation scripts and also check for other options.
 dnl Thus, this needs to be divided into 
@@ -165,6 +165,8 @@ dnl   MPI_FIND_COMPILER_SCRIPTS
 dnl which can fail (i.e., not find a script), and
 dnl   MPI_FIND_COMPILERS
 dnl which runs the various PROC_xx for the compilers.
+dnl WARNING: this function ignores --program-suffix and --program-prefix.
+dnl However, this function is not currently used at all.
 AC_DEFUN([PAC_MPI_FIND_COMPILER_SCRIPTS],[
 # Set defaults
 MPIRUN_NP="-np "
@@ -420,6 +422,7 @@ fi
 dnl
 dnl This uses the selected CC etc to check for include paths and libraries
 AC_DEFUN([PAC_MPI_CHECK_MPI_LIB],[
+AC_REQUIRE([AC_PROG_CC])
 case $ac_mpi_type in
     mpich)
 	;;
@@ -435,7 +438,7 @@ case $ac_mpi_type in
         LDFLAGS="$LDFLAGS -L$with_mpichnt/lib"
         AC_CHECK_LIB(mpich,MPI_Init,found="yes",found="no")
         if test "$found" = "no" ; then
-          AC_CHECK_LIB(mpich2,MPI_Init,found="yes",found="no")
+          AC_CHECK_LIB(mpich,MPI_Init,found="yes",found="no")
         fi
 	if test "$enable_cxx" != no ; then
 	    AC_PROG_CXX
@@ -469,7 +472,7 @@ case $ac_mpi_type in
 	;;
 
     generic)
-	AC_SEARCH_LIBS(MPI_Init,mpi mpich2 mpich)
+	AC_SEARCH_LIBS(MPI_Init,mpi mpich mpich)
 	if test "$ac_cv_lib_mpi_MPI_Init" = "yes" ; then
 	    MPILIBNAME="mpi"
 	fi	

@@ -22,9 +22,14 @@ void ConverseCommonExit(void);
  *
  ************************************************************************/
 
-void CmiAbort(const char *message)
+void CmiAbort(const char *message, ...)
 {
-  CmiError(message);
+  char newmsg[256];
+  va_list args;
+  va_start(args, message);
+  vsnprintf(newmsg, sizeof(newmsg), message, args);
+  va_end(args);
+  CmiError("%s\n", newmsg);
   exit(1);
   CMI_NORETURN_FUNCTION_END
 }
@@ -281,8 +286,7 @@ static void CmiParseArgs(char **argv)
   _Cmi_numpes=1;
   CmiGetArgInt(argv,"+p",&_Cmi_numpes);
   if (CmiNumPes()<1) {
-    printf("Error: must specify number of processors to simulate with +pXXX\n",CmiNumPes());
-    exit(1);
+    CmiAbort("Error: must specify number of processors to simulate with +pXXX");
   }
 }
 
