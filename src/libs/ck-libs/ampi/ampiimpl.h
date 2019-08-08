@@ -21,7 +21,7 @@
 #define AMPI_DEBUG(...) CkPrintf(__VA_ARGS__)
 
 // Support for variable-argument macros (up to 16 arguments)
-#define FE_1(WHAT, X) WHAT(X, true) 
+#define FE_1(WHAT, X) WHAT(X, true /*last argument*/) 
 #define FE_2(WHAT, X, ...) WHAT(X, false)FE_1(WHAT, __VA_ARGS__)
 #define FE_3(WHAT, X, ...) WHAT(X, false)FE_2(WHAT, __VA_ARGS__)
 #define FE_4(WHAT, X, ...) WHAT(X, false)FE_3(WHAT, __VA_ARGS__)
@@ -42,15 +42,18 @@
 
 // Perform 'action' (PRINT_ARG in this case) on each argument
 #define FOR_EACH(action,...) \
-  GET_MACRO(__VA_ARGS__,FE_16,FE_15,FE_14,FE_13,FE_12,FE_11,FE_10,FE_9,FE_8,FE_7,FE_6,FE_5,FE_4,FE_3,FE_2,FE_1)(action,__VA_ARGS__)
+  GET_MACRO(__VA_ARGS__,FE_16,FE_15,FE_14,FE_13,\
+    FE_12,FE_11,FE_10,FE_9,FE_8,FE_7,FE_6,FE_5,FE_4,FE_3,FE_2,FE_1)(action,__VA_ARGS__)
 
 // Prints a single argument name and its value (unless the argument name is
 // '""', which indicates a nonexistent argument)
-#define PRINT_ARG(arg, last) if ("\"\""!=#arg) std::cout << #arg << "=" << arg << (last ? "" : ", ");
+#define PRINT_ARG(arg, last) \
+  if ("\"\""!=#arg) std::cout << #arg << "=" << arg << (last ? "" : ", ");
 
 // Prints PE:VP, function name, and argument name/value for each function argument
 #define AMPI_DEBUG_ARGS(function_name, ...) \
-  std::cout << "[" << CkMyPe() << ":" << (isAmpiThread() ? getAmpiParent()->thisIndex : -1) << "] "<< function_name <<"("; \
+  std::cout << "[" << CkMyPe() << ":" << \
+  (isAmpiThread() ? getAmpiParent()->thisIndex : -1) << "] "<< function_name <<"("; \
   FOR_EACH(PRINT_ARG, __VA_ARGS__); \
   std::cout << ")" << std::endl;
 
