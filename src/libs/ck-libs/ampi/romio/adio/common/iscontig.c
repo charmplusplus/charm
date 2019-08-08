@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -9,37 +9,24 @@
 #include "mpisgi2.h"
 #endif */
 
-#ifdef AMPI
-void MPIR_Datatype_iscontig(MPI_Datatype datatype, int *flag){
-  AMPI_Type_is_contiguous(datatype, flag);
-}
-
-void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
-{
-    MPIR_Datatype_iscontig(datatype, flag);
-}
-
-#elif (defined(MPICH) || defined(MPICH2))
-/* MPICH2 also provides this routine */
+#if defined(MPICH)
+/* MPICH also provides this routine */
 void MPIR_Datatype_iscontig(MPI_Datatype datatype, int *flag);
 
 void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
 {
     MPIR_Datatype_iscontig(datatype, flag);
 
-    /* if it is MPICH2 and the datatype is reported as contigous,
-       check if the true_lb is non-zero, and if so, mark the 
-       datatype as noncontiguous */
-#ifdef MPICH2
+    /* if the datatype is reported as contigous, check if the true_lb is
+     * non-zero, and if so, mark the datatype as noncontiguous */
     if (*flag) {
         MPI_Aint true_extent, true_lb;
-        
+
         MPI_Type_get_true_extent(datatype, &true_lb, &true_extent);
 
         if (true_lb > 0)
             *flag = 0;
     }
-#endif
 }
 
 #elif (defined(MPIHP) && defined(HAVE_MPI_INFO))
@@ -73,8 +60,17 @@ void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
 /* void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag) is defined
  * and implemented in OpenMPI itself */
 
+#elif defined AMPI && 0
+/* disabled pending review of CkDDT's contiguity handling */
+
+void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
+{
+    AMPI_Type_is_contiguous(datatype, flag);
+}
+
 #else
 
+/* AMPI: This function has been modified to add the count == 0 check. */
 void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
 {
     int nints, nadds, ntypes, combiner;
@@ -94,7 +90,10 @@ void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
 	types = (MPI_Datatype *) ADIOI_Malloc((ntypes+1)*sizeof(MPI_Datatype));
 	MPI_Type_get_contents(datatype, nints, nadds, ntypes, ints,
 			      adds, types); 
-	ADIOI_Datatype_iscontig(types[0], flag);
+	if (nints != 0 && ints[0] == 0)
+		*flag = 1;
+	else
+		ADIOI_Datatype_iscontig(types[0], flag);
 
 #ifndef MPISGI
 /* There is a bug in SGI's impl. of MPI_Type_get_contents. It doesn't
@@ -108,7 +107,26 @@ void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
 	ADIOI_Free(types);
 	break;
     default:
-	*flag = 0;
+	ints = (int *) ADIOI_Malloc((nints+1)*sizeof(int));
+	adds = (MPI_Aint *) ADIOI_Malloc((nadds+1)*sizeof(MPI_Aint));
+	types = (MPI_Datatype *) ADIOI_Malloc((ntypes+1)*sizeof(MPI_Datatype));
+	MPI_Type_get_contents(datatype, nints, nadds, ntypes, ints,
+			      adds, types);
+	if (nints != 0 && ints[0] == 0)
+		*flag = 1;
+	else
+		*flag = 0;
+
+#ifndef MPISGI
+/* There is a bug in SGI's impl. of MPI_Type_get_contents. It doesn't
+   return new datatypes. Therefore no need to free. */
+	MPI_Type_get_envelope(types[0], &ni, &na, &nt, &cb);
+	if (cb != MPI_COMBINER_NAMED) MPI_Type_free(types);
+#endif
+
+	ADIOI_Free(ints);
+	ADIOI_Free(adds);
+	ADIOI_Free(types);
 	break;
     }
 

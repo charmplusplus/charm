@@ -3442,7 +3442,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue, SMSG_QUEUE *prio_queue)
             ptr = (MSG_LIST*)PCQueuePop(current_queue);
             CMI_PCQUEUEPOP_UNLOCK(current_queue)
             if (ptr == 0) break;
-#if CMK_SMP
+#if CMK_SMP && CMK_ONESIDED_IMPL
             if (ptr->tag == RDMA_COMM_PERFORM_GET_TAG) {
                 // Comm thread performing GET on behalf of worker thread for Direct API
                 _performOneRgetForWorkerThread(ptr);

@@ -478,6 +478,12 @@ void *CkLocalBranch(CkGroupID gID) {
   return _localBranch(gID);
 }
 
+// Similar to CkLocalBranch, but should be used from non-PE-local, but node-local PE
+// Ensure thread safety while using this function as it is accessing a non-PE-local group
+void *CkLocalBranchOther(CkGroupID gID, int rank) {
+  return _localBranchOther(gID, rank);
+}
+
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
@@ -1518,6 +1524,10 @@ void _noCldNodeEnqueue(int node, envelope *env)
   }
 }
 
+#if CMK_REPLAYSYSTEM && !CMK_TRACE_ENABLED
+#error "Building with Record/Replay support requires tracing support!"
+#endif
+
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
   envelope *env = UsrToEnv(msg);
@@ -2193,6 +2203,7 @@ void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
 
 int CkMyPeHook() { return CkMyPe(); }
 int CkNumPesHook() { return CkNumPes(); }
+void CmiAbortHook(const char *msg) { CmiAbort("%s", msg); }
 
 void ReadOnlyExt::setData(void *msg, size_t msgSize) {
   ro_data = malloc(msgSize);
@@ -2541,7 +2552,7 @@ static FILE *openReplayFile(const char *prefix, const char *suffix, const char *
   FILE *f = fopen(fName.c_str(), permissions);
   REPLAYDEBUG("openReplayfile " << fName.c_str());
   if (f==NULL) {
-    CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
+    CkPrintf("[%d] Could not open replay file '%s' with permissions '%s'\n",
              CkMyPe(), fName.c_str(), permissions);
     CkAbort("openReplayFile> Could not open replay file");
   }
@@ -2847,14 +2858,12 @@ class CkMessageDetailReplay : public CkMessageWatcher {
     CmiUInt4 size; size_t nread;
     if ((nread=fread(&size, 4, 1, f)) < 1) {
       if (feof(f)) return NULL;
-      CkPrintf("Broken record file (metadata) got %d\n",nread);
-      CkAbort("");
+      CkAbort("Broken record file (metadata) got %zu\n",nread);
     }
     void *env = CmiAlloc(size);
     long tell = ftell(f);
     if ((nread=fread(env, size, 1, f)) < 1) {
-      CkPrintf("Broken record file (data) expecting %d, got %d (file position %lld)\n",size,nread,tell);
-      CkAbort("");
+      CkAbort("Broken record file (data) expecting %d, got %zu (file position %ld)\n",size,nread,tell);
     }
     //*(int*)env = 0x34567890; // set first integer as magic
     return env;

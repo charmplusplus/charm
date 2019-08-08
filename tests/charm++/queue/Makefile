@@ -8,6 +8,8 @@ test: $(TARGETS)
 	$(call run, ./pgm  +p1)
 	$(call run, ./msgqtest  +p1)
 
+smptest: $(TARGETS)
+
 pgm.C: main.decl.h
 
 msgqtest.C: main.decl.h

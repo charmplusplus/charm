@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
  *   Copyright (C) 1997 University of Chicago.
  *   See COPYRIGHT notice in top-level directory.
@@ -144,7 +144,7 @@
     } \
 }
 
-void ADIOI_LUSTRE_WriteStrided(ADIO_File fd, void *buf, int count,
+void ADIOI_LUSTRE_WriteStrided(ADIO_File fd, const void *buf, int count,
 			       MPI_Datatype datatype, int file_ptr_type,
 			       ADIO_Offset offset, ADIO_Status * status,
 			       int *error_code)
@@ -156,7 +156,7 @@ void ADIOI_LUSTRE_WriteStrided(ADIO_File fd, void *buf, int count,
     int n_etypes_in_filetype;
     ADIO_Offset num, size, n_filetypes, etype_in_filetype, st_n_filetypes;
     ADIO_Offset abs_off_in_filetype=0;
-    int filetype_size, etype_size, buftype_size;
+    MPI_Count filetype_size, etype_size, buftype_size;
     MPI_Aint filetype_extent, buftype_extent;
     int buf_count, buftype_is_contig, filetype_is_contig;
     ADIO_Offset userbuf_off;
@@ -186,14 +186,17 @@ void ADIOI_LUSTRE_WriteStrided(ADIO_File fd, void *buf, int count,
     ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
     ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
 
-    MPI_Type_size(fd->filetype, &filetype_size);
+    MPI_Type_size_x(fd->filetype, &filetype_size);
     if (!filetype_size) {
+#ifdef HAVE_STATUS_SET_BYTES
+	MPIR_Status_set_bytes(status, datatype, 0);
+#endif
 	*error_code = MPI_SUCCESS;
 	return;
     }
 
     MPI_Type_extent(fd->filetype, &filetype_extent);
-    MPI_Type_size(datatype, &buftype_size);
+    MPI_Type_size_x(datatype, &buftype_size);
     MPI_Type_extent(datatype, &buftype_extent);
     etype_size = fd->etype_size;
 
@@ -206,10 +209,7 @@ void ADIOI_LUSTRE_WriteStrided(ADIO_File fd, void *buf, int count,
     /* Different buftype to different filetype */
     if (!buftype_is_contig && filetype_is_contig) {
         /* noncontiguous in memory, contiguous in file. */
-	ADIOI_Flatten_datatype(datatype);
-	flat_buf = ADIOI_Flatlist;
-	while (flat_buf->type != datatype)
-	    flat_buf = flat_buf->next;
+	flat_buf = ADIOI_Flatten_and_find(datatype);
 
 	off = (file_ptr_type == ADIO_INDIVIDUAL) ? fd->fp_ind :
             fd->disp + (ADIO_Offset)etype_size * offset;
@@ -433,10 +433,7 @@ void ADIOI_LUSTRE_WriteStrided(ADIO_File fd, void *buf, int count,
         }
         else {
 /* noncontiguous in memory as well as in file */
-
-	        ADIOI_Flatten_datatype(datatype);
-	        flat_buf = ADIOI_Flatlist;
-            while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	    flat_buf = ADIOI_Flatten_and_find(datatype);
 
 		k = num = buf_count = 0;
             i_offset = flat_buf->indices[0];

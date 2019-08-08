@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -10,7 +10,6 @@
    building the profiling interface
  */
 
-#if 0
 #ifdef MPIO_BUILD_PROFILING
 
 #undef MPI_File_open
@@ -70,6 +69,15 @@
 #define MPI_File_get_position PMPI_File_get_position
 #undef MPI_File_get_byte_offset
 #define MPI_File_get_byte_offset PMPI_File_get_byte_offset
+
+#undef MPI_File_iread_at_all
+#define MPI_File_iread_at_all PMPI_File_iread_at_all
+#undef MPI_File_iwrite_at_all
+#define MPI_File_iwrite_at_all PMPI_File_iwrite_at_all
+#undef MPI_File_iread_all
+#define MPI_File_iread_all  PMPI_File_iread_all
+#undef MPI_File_iwrite_all
+#define MPI_File_iwrite_all PMPI_File_iwrite_all
 
 #undef MPI_File_read_shared
 #define MPI_File_read_shared PMPI_File_read_shared
@@ -202,7 +210,5 @@
 #define MPIX_Grequest_start PMPIX_Grequest_start
 #undef MPIX_Grequest_class_create
 #define MPIX_Grequest_class_create PMPIX_Grequest_class_create
-
-#endif
 
 #endif

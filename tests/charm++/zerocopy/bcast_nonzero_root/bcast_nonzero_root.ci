@@ -1,0 +1,39 @@
+mainmodule bcast_nonzero_root
+{
+
+  readonly CProxy_arr arrProxy;
+  readonly CProxy_grp grpProxy;
+  readonly CProxy_nodegrp ngProxy;
+  readonly CProxy_tester testerProxy;
+  readonly CProxy_main mProxy;
+
+  mainchare main
+  {
+    entry main(CkArgMsg *);
+    entry void beginTest();
+  };
+
+  group tester {
+    entry tester();
+    entry void beginTest();
+    entry [reductiontarget] void bcastDone();
+  };
+
+  array [1D] arr{
+    entry arr();
+    entry void recv_zerocopy(nocopy int buffer[size], size_t size, int testIndex);
+    entry void recv_zerocopy_post(nocopypost int buffer[size], size_t size, int testIndex);
+  };
+
+  group grp{
+    entry grp();
+    entry void recv_zerocopy(nocopy int buffer[size], size_t size, int testIndex);
+    entry void recv_zerocopy_post(nocopypost int buffer[size], size_t size, int testIndex);
+  };
+
+  nodegroup nodegrp{
+    entry nodegrp();
+    entry void recv_zerocopy(nocopy int buffer[size], size_t size, int testIndex);
+    entry void recv_zerocopy_post(nocopypost int buffer[size], size_t size, int testIndex);
+  };
+}

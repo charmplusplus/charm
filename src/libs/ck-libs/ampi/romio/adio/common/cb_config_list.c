@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2001 University of Chicago. 
@@ -73,6 +73,10 @@ int ADIOI_cb_bcast_rank_map(ADIO_File fd)
 {
     int my_rank;
     char *value;
+	int error_code = MPI_SUCCESS;
+	static char myname[] = "ADIOI_cb_bcast_rank_map";
+    char *p;
+    int i;
 
     MPI_Bcast(&(fd->hints->cb_nodes), 1, MPI_INT, 0, fd->comm);
     if (fd->hints->cb_nodes > 0) {
@@ -80,7 +84,13 @@ int ADIOI_cb_bcast_rank_map(ADIO_File fd)
 	if (my_rank != 0) {
 	    fd->hints->ranklist = ADIOI_Malloc(fd->hints->cb_nodes*sizeof(int));
 	    if (fd->hints->ranklist == NULL) {
-		/* NEED TO HANDLE ENOMEM */
+                error_code = MPIO_Err_create_code(error_code,
+                                                  MPIR_ERR_RECOVERABLE,
+                                                  myname,
+                                                  __LINE__,
+                                                  MPI_ERR_OTHER,
+                                                  "**nomem2",0);
+                return error_code;
 	    }
 	}
 	MPI_Bcast(fd->hints->ranklist, fd->hints->cb_nodes, MPI_INT, 0, 
@@ -91,6 +101,18 @@ int ADIOI_cb_bcast_rank_map(ADIO_File fd)
     value = (char *) ADIOI_Malloc((MPI_MAX_INFO_VAL+1)*sizeof(char));
     ADIOI_Snprintf(value, MPI_MAX_INFO_VAL+1, "%d", fd->hints->cb_nodes);
     ADIOI_Info_set(fd->info, "cb_nodes", value);
+    p = value;
+    /* the (by MPI rank) list of aggregators can be larger than
+     * MPI_MAX_INFO_VAL, so we will simply truncate when we reach capacity. I
+     * wasn't clever enough to figure out how to rewind and put '...' at the
+     * end in the truncate case */
+    for (i=0; i< fd->hints->cb_nodes; i++) {
+        int incr, remain = (MPI_MAX_INFO_VAL) - (p-value);
+        incr = ADIOI_Snprintf(p, remain, "%d ", fd->hints->ranklist[i]);
+    if (incr >= remain) break;
+        p += incr;
+    }
+    ADIOI_Info_set(fd->info, "romio_aggregator_list", value);
     ADIOI_Free(value);
 
     return 0;
@@ -197,6 +219,7 @@ int ADIOI_cb_gather_name_array(MPI_Comm comm,
 	
 	procname[0] = ADIOI_Malloc(alloc_size);
 	if (procname[0] == NULL) {
+	    ADIOI_Free(array);
 	    return -1;
 	}
 
@@ -676,7 +699,7 @@ static int get_max_procs(int cb_nodes)
 	if (token != AGG_WILDCARD && token != AGG_STRING) return -1;
 	if (token == AGG_WILDCARD) max_procs = cb_nodes;
 	else if (token == AGG_STRING) {
-	    max_procs = strtol(CtvAccess(yylval), &errptr, 10);
+	    max_procs = (int)strtol(CtvAccess(yylval), &errptr, 10);
 	    if (*errptr != '\0') {
 		/* some garbage value; default to 1 */
 		max_procs = 1;
@@ -698,7 +721,7 @@ static int get_max_procs(int cb_nodes)
  *
  * Returns a token of types defined at top of this file.
  */
-#ifdef ROMIO_BGL
+#if defined(BGQPLATFORM)
 /* On BlueGene, the ',' character shows up in get_processor_name, so we have to
  * use a different delimiter */
 #define COLON ':'

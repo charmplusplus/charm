@@ -259,4 +259,12 @@
        integer, parameter :: MPI_MESSAGE_NULL = -1
        integer, parameter :: MPI_MESSAGE_NO_PROC = -2
 
+       ! necessary for ROMIO's tests
+       integer, parameter :: MPI_ORDER_C = 56
+       integer, parameter :: MPI_ORDER_FORTRAN = 57
+       integer, parameter :: MPI_DISTRIBUTE_BLOCK = 121
+       integer, parameter :: MPI_DISTRIBUTE_CYCLIC = 122
+       integer, parameter :: MPI_DISTRIBUTE_NONE = 123
+       integer, parameter :: MPI_DISTRIBUTE_DFLT_DARG = -49767
+
        include 'mpiof.h'

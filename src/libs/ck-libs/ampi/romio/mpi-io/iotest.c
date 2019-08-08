@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -47,7 +47,7 @@ int MPIO_Test(MPIO_Request *request, int *flag, MPI_Status *status)
 {
     int error_code;
     static char myname[] = "MPIO_TEST";
-    MPIU_THREADPRIV_DECL;
+    MPID_THREADPRIV_DECL;
 #ifdef MPI_hpux
     int fl_xmpi;
 
@@ -56,7 +56,7 @@ int MPIO_Test(MPIO_Request *request, int *flag, MPI_Status *status)
     }
 #endif /* MPI_hpux */
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    ROMIO_THREAD_CS_ENTER();
 
     if (*request == MPIO_REQUEST_NULL) {
 	    error_code = MPI_SUCCESS;
@@ -89,7 +89,7 @@ int MPIO_Test(MPIO_Request *request, int *flag, MPI_Status *status)
 #endif /* MPI_hpux */
 
 fn_exit:
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+    ROMIO_THREAD_CS_EXIT();
     return error_code;
 }
 #endif

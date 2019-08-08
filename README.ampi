@@ -73,8 +73,7 @@ Incompatibilities and Extensions
 AMPI has some known flaws and incompatibilities with other MPI implementations:
     * RMA routines do not have support for derived datatypes.
     * Not all collectives are supported on intercommunicators.
-    * No support for MPI_Pack_external, MPI_Pack_external_size, MPI_Unpack_external,
-      or MPI_Type_match_size.
+    * No support for MPI_Pack_external, MPI_Pack_external_size, MPI_Unpack_external.
 
 AMPI also has extensions to the MPI standard to enable use of the high-level
 features provided by the Charm++ adaptive runtime system. All extensions are

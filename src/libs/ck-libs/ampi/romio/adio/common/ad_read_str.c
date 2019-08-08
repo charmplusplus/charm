@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -51,11 +51,11 @@ void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, int count,
     ADIOI_Flatlist_node *flat_buf, *flat_file;
     ADIO_Offset i_offset, new_brd_size, brd_size, size;
     int i, j, k, st_index=0;
-    unsigned num, bufsize; 
+    MPI_Count num, bufsize;
     int n_etypes_in_filetype;
     ADIO_Offset n_filetypes, etype_in_filetype, st_n_filetypes, size_in_filetype;
     ADIO_Offset abs_off_in_filetype=0, new_frd_size, frd_size=0, st_frd_size;
-    int filetype_size, etype_size, buftype_size, partial_read;
+    MPI_Count filetype_size, etype_size, buftype_size, partial_read;
     MPI_Aint filetype_extent, buftype_extent; 
     int buf_count, buftype_is_contig, filetype_is_contig;
     ADIO_Offset userbuf_off, req_len, sum;
@@ -85,18 +85,21 @@ void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, int count,
     ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
     ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
 
-    MPI_Type_size(fd->filetype, &filetype_size);
+    MPI_Type_size_x(fd->filetype, &filetype_size);
     if ( ! filetype_size ) {
+#ifdef HAVE_STATUS_SET_BYTES
+	MPIR_Status_set_bytes(status, datatype, 0);
+#endif
 	*error_code = MPI_SUCCESS; 
 	return;
     }
 
     MPI_Type_extent(fd->filetype, &filetype_extent);
-    MPI_Type_size(datatype, &buftype_size);
+    MPI_Type_size_x(datatype, &buftype_size);
     MPI_Type_extent(datatype, &buftype_extent);
     etype_size = fd->etype_size;
 
-    ADIOI_Assert((buftype_size * count) == ((ADIO_Offset)(unsigned)buftype_size * (ADIO_Offset)count));
+    ADIOI_Assert((buftype_size * count) == ((ADIO_Offset)(MPI_Count)buftype_size * (ADIO_Offset)count));
     bufsize = buftype_size * count;
 
 /* get max_bufsize from the info object. */
@@ -112,9 +115,7 @@ void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, int count,
 
 /* noncontiguous in memory, contiguous in file. */
 
-	ADIOI_Flatten_datatype(datatype);
-	flat_buf = CtvAccess(ADIOI_Flatlist);
-	while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	flat_buf = ADIOI_Flatten_and_find(datatype);
 
         off = (file_ptr_type == ADIO_INDIVIDUAL) ? fd->fp_ind : 
                  fd->disp + (ADIO_Offset)etype_size * offset;
@@ -215,7 +216,8 @@ void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, int count,
 	 * block e.g. with subarray types that actually describe the whole
 	 * array */
 	if (buftype_is_contig && bufsize <= frd_size) {
-            ADIO_ReadContig(fd, buf, bufsize, MPI_BYTE, ADIO_EXPLICIT_OFFSET,
+	    /* a count of bytes can overflow. operate on original type instead */
+            ADIO_ReadContig(fd, buf, count, datatype, ADIO_EXPLICIT_OFFSET,
                              offset, status, error_code);
 
 	    if (file_ptr_type == ADIO_INDIVIDUAL) {
@@ -317,9 +319,7 @@ void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, int count,
 	else {
 /* noncontiguous in memory as well as in file */
 
-	    ADIOI_Flatten_datatype(datatype);
-	    flat_buf = CtvAccess(ADIOI_Flatlist);
-	    while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	    flat_buf = ADIOI_Flatten_and_find(datatype);
 
 	    k = num = buf_count = 0;
 	    i_offset = flat_buf->indices[0];

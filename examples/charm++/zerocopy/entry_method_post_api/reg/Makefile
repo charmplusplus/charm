@@ -1,6 +1,7 @@
 DIRS = \
   simpleZeroCopy \
   nodegroupTest \
+  multiplePostedBuffers \
 
 TESTDIRS = $(DIRS)
 

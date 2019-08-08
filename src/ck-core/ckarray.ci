@@ -2,6 +2,8 @@ module CkArray {
   extern module CkReduction;
   extern module CkLocation;
 
+  class MsgPointerWrapper;
+
   readonly bool _isAnytimeMigration;
   
   group [migratable] CkArray : CkReductionMgr {
@@ -10,6 +12,7 @@ module CkArray {
         entry [inline] void insertElement(CkMarshalledMessage, CkArrayIndex, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
         entry [inline] void demandCreateElement(const CkArrayIndex &idx, int ctor, CkDeliver_t type);
         entry void remoteBeginInserting(void);
+	entry void sendZCBroadcast(MsgPointerWrapper p);
 	entry void remoteDoneInserting(void);
 	entry void initDone(void);
 	//Broadcast
@@ -18,6 +21,7 @@ module CkArray {
 	entry void recvBroadcastViaTree(CkMessage *);
 	entry [expedited] void sendExpeditedBroadcast(CkMessage *);
 	entry [expedited] void recvExpeditedBroadcast(CkMessage *);
+	entry [expedited] void incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper p);
 
         entry void ckDestroy();
   };

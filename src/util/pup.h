@@ -68,7 +68,6 @@ class bar {
 #ifndef CHARM_H
 #  include "converse.h" // <- for CMK_* defines
 #endif
-extern "C" void CmiAbort(const char *msg);
 #endif
 
 //We need CkMigrateMessage only to distinguish the migration

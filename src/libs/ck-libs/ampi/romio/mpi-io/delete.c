@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -16,6 +16,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_delete as PMPI_File_delete
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_delete(const char *filename, MPI_Info info) __attribute__((weak,alias("PMPI_File_delete")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -32,7 +34,7 @@ Input Parameters:
 
 .N fortran
 @*/
-int MPI_File_delete(char *filename, MPI_Info info)
+int MPI_File_delete(const char *filename, MPI_Info info)
 {
     int error_code, file_system;
     char *tmp;
@@ -46,7 +48,7 @@ int MPI_File_delete(char *filename, MPI_Info info)
 
     MPIU_UNREFERENCED_ARG(info);
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    ROMIO_THREAD_CS_ENTER();
 
     MPIR_MPIOInit(&error_code);
     if (error_code != MPI_SUCCESS) goto fn_exit;
@@ -88,6 +90,6 @@ int MPI_File_delete(char *filename, MPI_Info info)
 #endif /* MPI_hpux */
 
 fn_exit:
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+    ROMIO_THREAD_CS_EXIT();
     return error_code;
 }
