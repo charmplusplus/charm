@@ -4624,8 +4624,7 @@ AMPI_API_IMPL(int, MPI_Issend, const void *buf, int count, MPI_Datatype type, in
 AMPI_API_IMPL(int, MPI_Recv, void *buf, int count, MPI_Datatype type, int src, int tag,
                              MPI_Comm comm, MPI_Status *status)
 {
-  AMPI_API("AMPI_Recv", buf, count, type, src, tag,
-                              comm, status);
+  AMPI_API("AMPI_Recv", buf, count, type, src, tag, comm, status);
 
   handle_MPI_BOTTOM(buf, type);
 
