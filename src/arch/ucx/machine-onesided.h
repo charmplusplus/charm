@@ -21,5 +21,13 @@ void UcxRmaOp(NcpyOperationInfo *ncpyOpInfo, int op);
 
 void UcxRmaReqCompleted(void *request, ucs_status_t status);
 
+inline void UcxMemMap(UcxRdmaInfo *info, void *ptr, int size);
 
+void UcxRmaSendCompleted(void *request, ucs_status_t status);
+void UcxRmaSendCompletedAndFree(void *request, ucs_status_t status);
+
+inline void* UcxSendMsg(int destNode, int destPE, int size,
+                        char *msg, ucp_tag_t tag, ucp_send_callback_t cb);
+
+inline void UcxMemMap(UcxRdmaInfo *info, void *ptr, int size);
 #endif

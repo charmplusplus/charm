@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*  
  *  (C) 2007 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
@@ -20,7 +20,7 @@
 
 #define BUFSIZE 512
 
-static void handle_error(int errcode, char *str)
+static void handle_error(int errcode, const char *str)
 {
         char msg[MPI_MAX_ERROR_STRING];
         int resultlen;

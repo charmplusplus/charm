@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
  *   Copyright (C) 1997 University of Chicago.
  *   See COPYRIGHT notice in top-level directory.
@@ -215,8 +215,8 @@ void ADIOI_LUSTRE_Calc_my_req(ADIO_File fd, ADIO_Offset *offset_list,
 	    my_req[i].offsets = (ADIO_Offset *)
 		                ADIOI_Malloc(count_my_req_per_proc[i] *
                                              sizeof(ADIO_Offset));
-	    my_req[i].lens = (int *) ADIOI_Malloc(count_my_req_per_proc[i] *
-				                  sizeof(int));
+	    my_req[i].lens = ADIOI_Malloc(count_my_req_per_proc[i] *
+				                  sizeof(ADIO_Offset));
 	    count_my_req_procs++;
 	}
 	my_req[i].count = 0;	/* will be incremented where needed later */
@@ -310,8 +310,13 @@ int ADIOI_LUSTRE_Docollect(ADIO_File fd, int contig_access_count,
                fd->comm);
     MPI_Allreduce(&contig_access_count, &total_access_count, 1, MPI_INT, MPI_SUM,
                fd->comm);
-    /* estimate average req_size */
-    avg_req_size = (int)(total_req_size / total_access_count);
+    /* avoid possible divide-by-zero) */
+    if (total_access_count != 0) {
+	/* estimate average req_size */
+	avg_req_size = (int)(total_req_size / total_access_count);
+    } else {
+	avg_req_size = 0;
+    }
     /* get hint of big_req_size */
     big_req_size = fd->hints->fs_hints.lustre.coll_threshold;
     /* Don't perform collective I/O if there are big requests */

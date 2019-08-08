@@ -10,6 +10,8 @@
 #ifndef MPIO_INCLUDE
 #define MPIO_INCLUDE
 
+#define MPICH_ATTR_POINTER_WITH_TYPE_TAG(a,b)
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -36,11 +38,11 @@ typedef struct ADIOI_RequestD *MPIO_Request;
 #endif
 #define MPIO_REQUEST_DEFINED
 
-#ifndef HAVE_MPI_OFFSET
-//@DEFINE_MPI_OFFSET@
+// #ifndef HAVE_MPI_OFFSET
+// @DEFINE_MPI_OFFSET@
 #define HAVE_MPI_OFFSET 1 /* ROMIO requires AMPI to set this */
 /* AMPI: HAVE_MPI_DATAREP_FUNCTIONS moved to ampi.h */
-#endif
+// #endif
 
 #ifndef NEEDS_MPI_FINT
 @NEEDS_MPI_FINT@
@@ -71,19 +73,23 @@ typedef int MPI_Fint;
 
 #define MPI_DISPLACEMENT_CURRENT   -54278278
 
-#ifndef MPICH2
+// #ifndef MPICH
 /* FIXME: Make sure that we get a consistent definition of MPI_FILE_NULL
-	in MPICH2 */
-/* MPICH2 defines null object handles differently */
+	in MPICH */
+/* MPICH defines null object handles differently */
 #define MPI_FILE_NULL           ((MPI_File) 0)
-#endif
+// #endif
 #define MPIO_REQUEST_NULL       ((MPIO_Request) 0)
 
 #define MPI_SEEK_SET            600
 #define MPI_SEEK_CUR            602
 #define MPI_SEEK_END            604
 
+/* Open MPI: don't define MPI_MAX_DATAREP_STRING here; it's defined in
+   OMPI's mpi.h. */
+#ifndef OPEN_MPI
 #define MPI_MAX_DATAREP_STRING  128
+#endif
 
 #ifndef HAVE_MPI_DARRAY_SUBARRAY
 @HAVE_MPI_DARRAY_SUBARRAY@

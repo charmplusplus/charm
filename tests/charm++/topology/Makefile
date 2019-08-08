@@ -20,3 +20,6 @@ rtc.o: rtc.C topo.decl.h
 test: all
 	$(call run, ./rtc +p4 )
 
+smptest: all
+	$(call run, ./rtc +p2 ++ppn 2)
+	$(call run, ./rtc +p4 ++ppn 2)

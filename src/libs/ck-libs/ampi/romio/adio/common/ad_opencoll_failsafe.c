@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2007 UChicago/Argonne LLC
@@ -15,6 +15,7 @@
 void ADIOI_FAILSAFE_OpenColl(ADIO_File fd, int rank, 
 	int access_mode, int *error_code)
 {
+    MPI_Comm tmp_comm;
     int orig_amode_excl, orig_amode_wronly;
 
     orig_amode_excl = access_mode;
@@ -25,12 +26,20 @@ void ADIOI_FAILSAFE_OpenColl(ADIO_File fd, int rank,
 	 * and others who reach later will return error. */ 
 	if(rank == fd->hints->ranklist[0]) {
 	    fd->access_mode = access_mode;
+
+	    /* if the lower-level file system tries to communicate, COMM_SELF
+	     * will ensure it doesn't get stuck waiting for non-existant
+	     * participants */
+	    tmp_comm = fd->comm;
+	    fd->comm = MPI_COMM_SELF;
 	    (*(fd->fns->ADIOI_xxx_Open))(fd, error_code);
 	    MPI_Bcast(error_code, 1, MPI_INT, \
-		    fd->hints->ranklist[0], fd->comm);
+		    fd->hints->ranklist[0], tmp_comm);
 	    /* if no error, close the file and reopen normally below */
 	    if (*error_code == MPI_SUCCESS)
 		(*(fd->fns->ADIOI_xxx_Close))(fd, error_code);
+	    /* and put it all back the way we found it for subsequent code */
+	    fd->comm = tmp_comm;
 	}
 	else MPI_Bcast(error_code, 1, MPI_INT,
 		fd->hints->ranklist[0], fd->comm);
@@ -43,15 +52,13 @@ void ADIOI_FAILSAFE_OpenColl(ADIO_File fd, int rank,
 	}
     }
     /* if we are doing deferred open, non-aggregators should return now */
-    if (fd->hints->deferred_open ) {
-        if (fd->agg_comm == MPI_COMM_NULL) {
-            /* we might have turned off EXCL for the aggregators.
-             * restore access_mode that non-aggregators get the right
-             * value from get_amode */
-            fd->access_mode = orig_amode_excl;
-            *error_code = MPI_SUCCESS;
-            return;
-        }
+    if (fd->hints->deferred_open && !(fd->is_agg)) {
+	/* we might have turned off EXCL for the aggregators.
+	 * restore access_mode that non-aggregators get the right
+	 * value from get_amode */
+	fd->access_mode = orig_amode_excl;
+	*error_code = MPI_SUCCESS;
+	return;
     }
 
 /* For writing with data sieving, a read-modify-write is needed. If 
@@ -74,6 +81,7 @@ void ADIOI_FAILSAFE_OpenColl(ADIO_File fd, int rank,
     if (*error_code != MPI_SUCCESS) 
         (*(fd->fns->ADIOI_xxx_Open))(fd, error_code);
 
+    if(*error_code != MPI_SUCCESS) return;
     /* if we turned off EXCL earlier, then we should turn it back on */
     if (fd->access_mode != orig_amode_excl) fd->access_mode = orig_amode_excl;
 

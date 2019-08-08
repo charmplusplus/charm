@@ -56,10 +56,10 @@ class pvtObjectNode {
   /// Dump data fields
   void dump() {
     if (localObjPtr == NULL)
-      CkPrintf("ovt=%d index=%d present=%s sync=%s ptr=NULL",
+      CkPrintf("ovt=%lld index=%d present=%s sync=%s ptr=NULL",
 	       ovt, index, present?"true":"false", (sync==0)?"OPT":"CON");
     else 
-      CkPrintf("ovt=%d index=%d present=%s sync=%s ptr!=NULL",
+      CkPrintf("ovt=%lld index=%d present=%s sync=%s ptr!=NULL",
 	       ovt, index, present?"true":"false", (sync==0)?"OPT":"CON");
   }
   /// Check validity of data fields

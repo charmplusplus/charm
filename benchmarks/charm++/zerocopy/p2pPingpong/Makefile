@@ -1,4 +1,5 @@
 -include ../../../common.mk
+-include ../../../../include/conv-mach-opt.mak
 CHARMC=../../../../bin/charmc $(OPTS)
 
 all:	megaZCPingpong
@@ -18,12 +19,16 @@ megaZCPingpong.o: megaZCPingpong.C cifiles
 test: all
 	$(call run, +p1 ./megaZCPingpong 1024 8192 2 1 1)
 	$(call run, +p2 ./megaZCPingpong 1024 8192 2 1 1)
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p2 ./megaZCPingpong 1024 8192 2 1 1 +noCMAForZC)
+endif
 
 test-bench: all
 	$(call run, ./megaZCPingpong +p1)
 	$(call run, ./megaZCPingpong +p2)
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, ./megaZCPingpong +p2 +noCMAForZC)
+endif
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o megaZCPingpong charmrun cifiles

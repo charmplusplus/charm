@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2007 UChicago/Argonne LLC
@@ -19,11 +19,9 @@ void ADIOI_SCALEABLE_OpenColl(ADIO_File fd, int rank,
     int orig_amode_wronly;
 
     /* if we are doing deferred open, non-aggregators should return now */
-    if (fd->hints->deferred_open ) {
-        if (fd->agg_comm == MPI_COMM_NULL) {
-            *error_code = MPI_SUCCESS;
-            return;
-        }
+    if (fd->hints->deferred_open && !(fd->is_agg)) {
+	*error_code = MPI_SUCCESS;
+	return;
     } 
     
     /* For writing with data sieving, a read-modify-write is needed. If 

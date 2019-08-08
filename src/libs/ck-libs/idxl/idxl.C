@@ -13,14 +13,6 @@ Orion Sky Lawlor, olawlor@acm.org, 1/7/2003
 #include "idxl.h"
 #include "charm-api.h"
 
-void IDXL_Abort(const char *callingRoutine,const char *msg,int m0,int m1,int m2)
-{
-	char msg1[1024], msg2[1536];
-	sprintf(msg1,msg,m0,m1,m2);
-	sprintf(msg2,"Fatal error in IDXL routine %s:\n%s",callingRoutine,msg1);
-	CkAbort(msg2);
-}
-
 CLINKAGE void pupIDXL_Chunk(pup_er cp) {
 	PUP::er &p=*(PUP::er *)cp;
 	IDXL_Chunk *c=(IDXL_Chunk *)TCHARM_Get_global(IDXL_globalID);
@@ -38,7 +30,7 @@ CLINKAGE void pupIDXL_Chunk(pup_er cp) {
 }
 IDXL_Chunk *IDXL_Chunk::get(const char *callingRoutine) {
 	IDXL_Chunk *c=getNULL();
-	if(!c) IDXL_Abort(callingRoutine,"IDXL is not initialized");
+	if(!c) IDXL_Abort("IDXL is not initialized", callingRoutine);
 	return c;
 }
 
@@ -136,7 +128,7 @@ IDXL_t IDXL_Chunk::addStatic(IDXL *idx,IDXL_t at) {
 /// Check this IDXL for validity
 void IDXL_Chunk::check(IDXL_t at,const char *callingRoutine) const {
 	if (at<IDXL_DYNAMIC_IDXL_T || at>=IDXL_LAST_IDXL_T)
-			IDXL_Abort(callingRoutine,"Invalid IDXL_t %d",at);
+			IDXL_Abort("Invalid IDXL_t %d", callingRoutine, at);
 }
 IDXL &IDXL_Chunk::lookup(IDXL_t at,const char *callingRoutine) {
 	IDXL *ret=0;
@@ -145,7 +137,7 @@ IDXL &IDXL_Chunk::lookup(IDXL_t at,const char *callingRoutine) {
 	else if (at>=IDXL_STATIC_IDXL_T && at<IDXL_STATIC_IDXL_T+static_idxls.size())
 		ret=static_idxls[at-IDXL_STATIC_IDXL_T];
 	if (ret==NULL) 
-		IDXL_Abort(callingRoutine,"Trying to look up invalid IDXL_t %d",at);
+		IDXL_Abort("Trying to look up invalid IDXL_t %d", callingRoutine, at);
 	return *ret;
 }
 const IDXL &IDXL_Chunk::lookup(IDXL_t at,const char *callingRoutine) const {
@@ -159,9 +151,9 @@ void IDXL_Chunk::destroy(IDXL_t at,const char *callingRoutine) {
 	else if (at>=IDXL_STATIC_IDXL_T && at<IDXL_STATIC_IDXL_T+static_idxls.size())
 		ret=&static_idxls[at-IDXL_STATIC_IDXL_T];
 	if (ret==NULL)
-		IDXL_Abort(callingRoutine,"Trying to destroy invalid IDXL_t %d",at);
+		IDXL_Abort("Trying to destroy invalid IDXL_t %d", callingRoutine, at);
 	if (*ret==NULL)
-		IDXL_Abort(callingRoutine,"Trying to destroy already deleted IDXL_t %d",at);
+		IDXL_Abort("Trying to destroy already deleted IDXL_t %d", callingRoutine, at);
 	if (at<IDXL_STATIC_IDXL_T)
 		delete *ret; /* only destroy dynamically allocated IDXLs */
 	*ret=NULL;

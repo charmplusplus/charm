@@ -268,12 +268,12 @@ public:
 
         if(warmUp == false) {
           if(printFormat == 0) // csv print format
-            CkPrintf("%d,%d,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf\n",size, iterations, reg_time1, zcpy_send_time1, zcpy_send_time2, zcpy_send_time3, reg_time2, zcpy_send_with_copy_time, zcpy_recv_time1, zcpy_recv_time2, zcpy_recv_time3);
+            CkPrintf("%zu,%d,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf\n",size, iterations, reg_time1, zcpy_send_time1, zcpy_send_time2, zcpy_send_time3, reg_time2, zcpy_send_with_copy_time, zcpy_recv_time1, zcpy_recv_time2, zcpy_recv_time3);
           else { // regular print format
             if(size < 1 << 24)
-              CkPrintf("%d\t\t\t%d\t\t||\t%lf\t\t%lf\t\t%lf\t\t%lf\t\t||\t%lf\t\t\t%lf\t\t\t%lf\t\t%lf\t\t%lf\n", size, iterations, reg_time1, zcpy_send_time1, zcpy_send_time2, zcpy_send_time3, reg_time2, zcpy_send_with_copy_time, zcpy_recv_time1, zcpy_recv_time2, zcpy_recv_time3);
+              CkPrintf("%zu\t\t\t%d\t\t||\t%lf\t\t%lf\t\t%lf\t\t%lf\t\t||\t%lf\t\t\t%lf\t\t\t%lf\t\t%lf\t\t%lf\n", size, iterations, reg_time1, zcpy_send_time1, zcpy_send_time2, zcpy_send_time3, reg_time2, zcpy_send_with_copy_time, zcpy_recv_time1, zcpy_recv_time2, zcpy_recv_time3);
             else
-              CkPrintf("%d\t\t%d\t\t||\t%lf\t\t%lf\t\t%lf\t\t%lf\t\t||\t%lf\t\t\t%lf\t\t\t%lf\t\t%lf\t\t%lf\n", size, iterations, reg_time1, zcpy_send_time1, zcpy_send_time2, zcpy_send_time3, reg_time2, zcpy_send_with_copy_time, zcpy_recv_time1, zcpy_recv_time2, zcpy_recv_time3);
+              CkPrintf("%zu\t\t%d\t\t||\t%lf\t\t%lf\t\t%lf\t\t%lf\t\t||\t%lf\t\t\t%lf\t\t\t%lf\t\t%lf\t\t%lf\n", size, iterations, reg_time1, zcpy_send_time1, zcpy_send_time2, zcpy_send_time3, reg_time2, zcpy_send_with_copy_time, zcpy_recv_time1, zcpy_recv_time2, zcpy_recv_time3);
           }
         }
         size = size << 1;

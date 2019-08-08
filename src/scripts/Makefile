@@ -162,7 +162,6 @@ Tau:
 	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
 
 LIBS: CONVLIBS CHARMLIBS everylb
-	$(MAKE) -C libs otherlibs
 	echo "Built LIBS Successfully"
 
 bgtest: bigsim LIBS

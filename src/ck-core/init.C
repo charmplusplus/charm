@@ -818,7 +818,11 @@ static void _sendTriggers(void)
   {
     CksvAccess(_triggersSent) = true;
     num = CmiMyNodeSize();
+#if CMK_REPLAYSYSTEM
+    envelope *env = _allocEnvNoIncEvent(RODataMsg); // Notice that the type here is irrelevant
+#else    
     envelope *env = _allocEnv(RODataMsg); // Notice that the type here is irrelevant
+#endif    
     env->setSrcPe(CkMyPe());
     CmiSetHandler(env, _triggerHandlerIdx);
     first = CmiNodeFirst(CmiMyNode());

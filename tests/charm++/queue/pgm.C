@@ -235,7 +235,6 @@ struct main : public CBase_main
     #endif
     #endif
     int tests = 0, success = 0, fail = 0;
-    char message[100];
 
     RUN_TEST(test_empty);
     RUN_TEST(test_one);
@@ -250,8 +249,7 @@ struct main : public CBase_main
 #endif
 
     if (fail) {
-      sprintf(message, "%d/%d tests failed\n", fail, tests);
-      CkAbort(message);
+      CkAbort("%d/%d tests failed\n", fail, tests);
     }
     else {
       CkPrintf("All %d tests passed\n", tests);

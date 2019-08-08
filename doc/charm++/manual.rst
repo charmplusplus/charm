@@ -10799,6 +10799,40 @@ select another version with the ``@`` option (for example,
 
    	$ spack install charmpp@develop
 
+
+Installation with CMake
+~~~~~~~~~~~~~~~~~~~~~~~
+
+As an experimental feature, Charm++ can be installed with the CMake tool, version 3.11 or newer.
+This is currently only supported on Linux and Darwin, but not on Windows.
+Currently, only the `charm++` and `AMPI` targets are available.
+
+After downloading and unpacking Charm++, it can be installed in the following way:
+
+.. code-block:: bash
+
+   $ cd charm
+   $ mkdir build
+   $ cd build
+   $ cmake ..
+   $ make -j4
+
+
+By default, CMake builds the netlrts version. 
+Other configuration options can be specified in the cmake command above.
+For example, to build the MPI version of Charm++ with SMP, the following command can be used:
+
+.. code-block:: bash
+
+   $ cmake .. -DNETWORK=mpi -DSMP=on
+
+To simplify building with CMake, the `buildcmake` command is a simple wrapper around cmake
+that supports many of the options that `build` supports.
+
+.. code-block:: bash
+
+   $ ./buildcmake AMPI netlrts-linux-x86_64 smp --with-production
+
 Charm++ installation directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -12228,8 +12262,8 @@ bear, without worrying that they will perturb execution to avoid the
 bug.
 
 Support for record-replay is enabled in common builds of Charm++. Builds
-with the ``--with-production`` option disable this support to reduce
-overhead. To record traces, simply run the program with an additional
+with either of the ``--with-production`` or ``--disable-tracing`` options
+disable record-replay support. To record traces, simply run the program with an additional
 command line-flag ``+record``. The generated traces can be repeated with
 the command-line flag ``+replay``. The full range of parallel and
 sequential debugging techniques are available to apply during
