@@ -9,7 +9,7 @@ unsupported in AMPI. Calling these functions aborts the application.
 
 #define AMPI_NOIMPL_BODY(function_name) \
     { \
-        AMPI_API(STRINGIFY(function_name)); \
+        AMPI_API(STRINGIFY(function_name), ""); \
         CkAbort(STRINGIFY(function_name) " is not implemented in AMPI."); \
     }
 
