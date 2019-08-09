@@ -1420,11 +1420,6 @@ fi
 if [ -n "$AMPI" ]
 then
   CMK_SYSINC="-I$CHARMINC/ampi $CMK_SYSINC"
-  if [ -n "$BUILD_CUDA" ] && [ "$BUILD_CUDA" -eq 1 ]; then
-    # If Charm++ is built with CUDA support, all AMPI applications need to be built with CUDA
-    POST_LIBRARIES="$POST_LIBRARIES -L$CUDA_DIR/lib64 -lcudart" # For normal build
-    USER_POST_LIBRARIES="$USER_POST_LIBRARIES -L$CUDA_DIR/lib64 -lcudart" # For -standalone build
-  fi
 fi
 
 if [ "$TLSGLOBALS" = "1" ]
