@@ -3,9 +3,29 @@
 cff-version: "1.0.3"
 title: "Charm++"
 authors:
-  - affiliation: "University of Illinois at Urbana-Champaign"
-    family-names: Kale
-    given-names: Laxmikant
-message: "If you use this software, please cite it directly using using these metadata and/or cite chapter one,
-The Charm++ Programming Model, of the book Parallel Science and Engineering Applications: The Charm++ Approach
-(https://doi.org/10.1201/b16251) (available at https://charm.cs.illinois.edu/papers/13-46)"
+  - family-names: "Kale"
+    given-names: "Laxmikant V."
+    affiliation: "University of Illinois at Urbana-Champaign"
+message: "If you use this software, please cite it directly using using these metadata."
+references:
+  - type: "book"
+    authors:
+      - family-names: "Kale"
+        given-names: "Laxmikant V."
+        affiliation: "Department of Computer Science, University of Illinois at Urbana-Champaign"
+      - family-names: "Zheng"
+        given-names: "Gengbin"
+        affiliation: "National Center for Supercomputing Applications, University of Illinois at Urbana-Champaign"
+    doi: "https://doi.org/10.1201/b16251"
+    editors:
+      - family-names: "Kale"
+        given-names: "Laxmikant V."
+      - family-names: "Bhatele"
+        given-names: "Abhinav"
+    publisher:
+      name: "CRC Press"
+      city: "Boca Raton"
+    section: "Chapter 1: The Charm++ Programming Model"
+    title: "Parallel Science and Engineering Applications: The Charm++ Approach"
+    url: "http://charm.cs.illinois.edu/newPapers/13-46/paper.pdf"
+    year: 2014
