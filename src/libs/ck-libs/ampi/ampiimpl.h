@@ -7,13 +7,66 @@
 #include <forward_list>
 #include <bitset>
 #include <complex>
+#include <iostream>
 
 #include "ampi.h"
 #include "ddt.h"
 #include "charm++.h"
 
-//Uncomment for debug print statements
-#define AMPI_DEBUG(...) //CkPrintf(__VA_ARGS__)
+// Set to 1 to print debug statements
+#define AMPI_DO_DEBUG 0
+
+#if AMPI_DO_DEBUG
+
+#define AMPI_DEBUG(...) CkPrintf(__VA_ARGS__)
+
+// Support for variable-argument macros (up to 16 arguments)
+#define FE_1(WHAT, X) WHAT(X, true /*last argument*/) 
+#define FE_2(WHAT, X, ...) WHAT(X, false)FE_1(WHAT, __VA_ARGS__)
+#define FE_3(WHAT, X, ...) WHAT(X, false)FE_2(WHAT, __VA_ARGS__)
+#define FE_4(WHAT, X, ...) WHAT(X, false)FE_3(WHAT, __VA_ARGS__)
+#define FE_5(WHAT, X, ...) WHAT(X, false)FE_4(WHAT, __VA_ARGS__)
+#define FE_6(WHAT, X, ...) WHAT(X, false)FE_5(WHAT, __VA_ARGS__)
+#define FE_7(WHAT, X, ...) WHAT(X, false)FE_6(WHAT, __VA_ARGS__)
+#define FE_8(WHAT, X, ...) WHAT(X, false)FE_7(WHAT, __VA_ARGS__)
+#define FE_9(WHAT, X, ...) WHAT(X, false)FE_8(WHAT, __VA_ARGS__)
+#define FE_10(WHAT, X, ...) WHAT(X,false)FE_9(WHAT, __VA_ARGS__)
+#define FE_11(WHAT, X, ...) WHAT(X,false)FE_10(WHAT, __VA_ARGS__)
+#define FE_12(WHAT, X, ...) WHAT(X,false)FE_11(WHAT, __VA_ARGS__)
+#define FE_13(WHAT, X, ...) WHAT(X,false)FE_12(WHAT, __VA_ARGS__)
+#define FE_14(WHAT, X, ...) WHAT(X,false)FE_13(WHAT, __VA_ARGS__)
+#define FE_15(WHAT, X, ...) WHAT(X,false)FE_14(WHAT, __VA_ARGS__)
+#define FE_16(WHAT, X, ...) WHAT(X,false)FE_15(WHAT, __VA_ARGS__)
+
+#define GET_MACRO(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,NAME,...) NAME
+
+// Perform 'action' (PRINT_ARG in this case) on each argument
+#define FOR_EACH(action,...) \
+  GET_MACRO(__VA_ARGS__,FE_16,FE_15,FE_14,FE_13,\
+    FE_12,FE_11,FE_10,FE_9,FE_8,FE_7,FE_6,FE_5,FE_4,FE_3,FE_2,FE_1)(action,__VA_ARGS__)
+
+// Prints a single argument name and its value (unless the argument name is
+// '""', which indicates a nonexistent argument)
+#define PRINT_ARG(arg, last) \
+  if ("\"\""!=#arg) std::cout << #arg << "=" << arg << (last ? "" : ", ");
+
+extern int quietModeRequested;
+
+// Prints PE:VP, function name, and argument name/value for each function argument
+#define AMPI_DEBUG_ARGS(function_name, ...) \
+  if(!quietModeRequested) { \
+  std::cout << "[" << CkMyPe() << ":" << \
+  (isAmpiThread() ? getAmpiParent()->thisIndex : -1) << "] "<< function_name <<"("; \
+  FOR_EACH(PRINT_ARG, __VA_ARGS__); \
+  std::cout << ")" << std::endl; }
+
+#else // !AMPI_DO_DEBUG
+
+#define AMPI_DEBUG(...) /*empty*/
+#define AMPI_DEBUG_ARGS(...) /*empty*/
+
+#endif // AMPI_DO_DEBUG
+
 
 /*
  * All MPI_* routines must be defined using the AMPI_API_IMPL macro.
@@ -2938,14 +2991,16 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 
 //Use this to mark the start of AMPI interface routines that can only be called on AMPI threads:
 #if CMK_ERROR_CHECKING
-#define AMPI_API(routineName) \
+#define AMPI_API(routineName, ...) \
   if (!isAmpiThread()) { CkAbort("AMPI> cannot call MPI routines from non-AMPI threads!"); } \
-  TCHARM_API_TRACE(routineName, "ampi");
+  TCHARM_API_TRACE(routineName, "ampi"); AMPI_DEBUG_ARGS(routineName, __VA_ARGS__)
 #else
-#define AMPI_API(routineName) TCHARM_API_TRACE(routineName, "ampi")
+#define AMPI_API(routineName, ...) TCHARM_API_TRACE(routineName, "ampi"); \
+  AMPI_DEBUG_ARGS(routineName, __VA_ARGS__) 
 #endif
 
 //Use this for MPI_Init and routines than can be called before AMPI threads have been initialized:
-#define AMPI_API_INIT(routineName) TCHARM_API_TRACE(routineName, "ampi")
+#define AMPI_API_INIT(routineName, ...) TCHARM_API_TRACE(routineName, "ampi"); \
+  AMPI_DEBUG_ARGS(routineName, __VA_ARGS__)
 
 #endif // _AMPIIMPL_H
