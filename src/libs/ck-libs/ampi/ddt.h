@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <set>
 #include "charm++.h"
 #include "ampi.h"
 
@@ -43,6 +44,7 @@
 #define CkDDT_INDEXED             47
 #define CkDDT_HINDEXED            48
 #define CkDDT_STRUCT              49
+#define CkDDT_MAX_PREDEFINED_TYPE 50
 
 enum CkDDT_Dir : bool {
   PACK   = true,
@@ -446,15 +448,13 @@ class CkDDT_Struct final : public CkDDT_DataType
  *                       (to minimize per-rank memory fooprint), which holds the CkDDT_DataType
  *                       object pointers for all predefined types.
  * userTypeTable - a vector that holds the CkDDT_DataType object pointers for all user-defined types
- * types - used to identify which CkDDT_DataType derived class a type object really is,
- *         for PUPing the userTypeTable
  */
 class CkDDT
 {
  private:
   const std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable;
   std::vector<CkDDT_DataType *> userTypeTable;
-  std::vector<int> types;
+  std::set<int> freeTypes; // TODO: replace with a priority queue structure that can be serialized trivially
 
  public:
   // static methods used by ampi.C for predefined types creation:
