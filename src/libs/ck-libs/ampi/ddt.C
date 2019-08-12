@@ -5,12 +5,30 @@
 void
 CkDDT::pup(PUP::er &p) noexcept
 {
-  p|types;
+  size_t numTypes = userTypeTable.size();
+  p|numTypes;
+
+  std::vector<signed char> types;
+  if (p.isPacking()) {
+    types.resize(numTypes);
+    for (int i=0; i<userTypeTable.size(); i++) {
+      types[i] = userTypeTable[i] == nullptr ? MPI_DATATYPE_NULL : std::max(AMPI_MAX_PREDEFINED_TYPE, std::min(CkDDT_MAX_PREDEFINED_TYPE, userTypeTable[i]->getType()));
+    }
+    p(types.data(), numTypes);
+    types.clear();
+  }
+  else if (p.isSizing()) {
+    p((signed char *)nullptr, numTypes);
+  }
+
   if (p.isUnpacking()) {
-    userTypeTable.resize(types.size(), nullptr);
+    types.resize(numTypes);
+    p(types.data(), numTypes);
+    userTypeTable.resize(numTypes, nullptr);
     for (int i=0; i<types.size(); i++) {
       switch (types[i]) {
         case MPI_DATATYPE_NULL:
+          freeTypes.emplace(i);
           break;
         case CkDDT_CONTIGUOUS:
           userTypeTable[i] = new CkDDT_Contiguous;
@@ -41,11 +59,19 @@ CkDDT::pup(PUP::er &p) noexcept
           break;
       }
     }
+
+    for (int i=0; i<types.size(); i++) {
+      if (types[i] != MPI_DATATYPE_NULL) {
+        userTypeTable[i]->pupType(p, this);
+      }
+    }
+
+    return;
   }
 
-  for (int i=0; i<types.size(); i++) {
-    if (types[i] != MPI_DATATYPE_NULL) {
-      userTypeTable[i]->pupType(p, this);
+  for (CkDDT_DataType * userType : userTypeTable) {
+    if (userType != nullptr) {
+      userType->pupType(p, this);
     }
   }
 }
@@ -53,7 +79,6 @@ CkDDT::pup(PUP::er &p) noexcept
 void
 CkDDT::freeType(int index) noexcept
 {
-  CkAssert(types.size() == userTypeTable.size());
   if (index > AMPI_MAX_PREDEFINED_TYPE) {
     int idx = index - AMPI_MAX_PREDEFINED_TYPE - 1;
     // Decrement the ref count and free the type if there are no references to it.
@@ -72,17 +97,23 @@ CkDDT::freeType(int index) noexcept
 
       // Free non-primitive type
       delete userTypeTable[idx];
-      userTypeTable[idx] = nullptr;
-      types[idx] = MPI_DATATYPE_NULL;
-      // Free all NULL types from back of userTypeTable
-      while (!userTypeTable.empty() && userTypeTable.back() == nullptr) {
+      if (idx == userTypeTable.size()-1) {
         userTypeTable.pop_back();
-        CkAssert(types.back() == MPI_DATATYPE_NULL);
-        types.pop_back();
+        // Free all NULL types from back of userTypeTable
+        while (!userTypeTable.empty() && userTypeTable.back() == nullptr) {
+          --idx;
+          userTypeTable.pop_back();
+          auto iter = freeTypes.find(idx);
+          if (iter != freeTypes.end())
+            freeTypes.erase(iter);
+        }
+      }
+      else {
+        userTypeTable[idx] = nullptr;
+        freeTypes.emplace(idx);
       }
     }
   }
-  CkAssert(types.size() == userTypeTable.size());
 }
 
 CkDDT::~CkDDT() noexcept
@@ -98,17 +129,16 @@ int
 CkDDT::insertType(CkDDT_DataType* ptr, int type) noexcept
 {
   // Search thru non-predefined types for a free one first:
-  CkAssert(types.size() == userTypeTable.size());
-  for (int i=0; i<types.size(); i++) {
-    if (types[i] == MPI_DATATYPE_NULL) {
-      types[i] = type;
-      userTypeTable[i] = ptr;
-      return AMPI_MAX_PREDEFINED_TYPE + 1 + i;
-    }
+  if (!freeTypes.empty()) {
+    auto iter = freeTypes.begin();
+    int i = *iter;
+    freeTypes.erase(iter);
+    userTypeTable[i] = ptr;
+    return AMPI_MAX_PREDEFINED_TYPE + 1 + i;
   }
-  types.push_back(type);
+
   userTypeTable.push_back(ptr);
-  return AMPI_MAX_PREDEFINED_TYPE + types.size();
+  return AMPI_MAX_PREDEFINED_TYPE + userTypeTable.size();
 }
 
 void
@@ -1722,10 +1752,10 @@ CkDDT_Struct::getNumBasicElements(int bytes) const noexcept
   }
 
   int rem = bytes % size;
-  const std::vector<CkDDT_DataType *> &types = getBaseTypes();
+  const std::vector<CkDDT_DataType *> &baseTypes = getBaseTypes();
   int basicTypes = 0;
-  for (int i=0; i<types.size(); i++) {
-    basicTypes += types[i]->getNumBasicElements(types[i]->getSize());
+  for (int i=0; i<baseTypes.size(); i++) {
+    basicTypes += baseTypes[i]->getNumBasicElements(baseTypes[i]->getSize());
   }
 
   int count = (bytes / size) * basicTypes;
@@ -1733,13 +1763,13 @@ CkDDT_Struct::getNumBasicElements(int bytes) const noexcept
     return count;
   }
 
-  for (int i=0; i<types.size(); i++) {
-    int type_size = types[i]->getSize();
+  for (int i=0; i<baseTypes.size(); i++) {
+    int type_size = baseTypes[i]->getSize();
     if ((type_size * arrayBlockLength[i]) > rem) {
-      return count + types[i]->getNumBasicElements(rem);
+      return count + baseTypes[i]->getNumBasicElements(rem);
     }
     else {
-      count += types[i]->getNumBasicElements(type_size) * arrayBlockLength[i];
+      count += baseTypes[i]->getNumBasicElements(type_size) * arrayBlockLength[i];
       rem -= type_size * arrayBlockLength[i];
     }
     if (rem == 0) {
