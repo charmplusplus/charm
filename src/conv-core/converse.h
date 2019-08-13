@@ -684,6 +684,7 @@ extern int CmiPhysicalRank(int pe);
 extern void CmiInitCPUAffinity(char **argv);
 extern int CmiPrintCPUAffinity(void);
 extern int CmiSetCPUAffinity(int core);
+extern int CmiSetCPUAffinityLogical(int core);
 extern void CmiInitCPUTopology(char **argv);
 extern int CmiOnCore(void);
 
@@ -1090,6 +1091,8 @@ void  CmiError(const char *format, ...);
 #define CmiScanf  scanf
 
 #endif
+
+void CmiPuts(const char *);
 
 #if defined(__STDC__) || defined(__cplusplus)
 #define __CMK_STRING(x) #x

@@ -1524,6 +1524,10 @@ void _noCldNodeEnqueue(int node, envelope *env)
   }
 }
 
+#if CMK_REPLAYSYSTEM && !CMK_TRACE_ENABLED
+#error "Building with Record/Replay support requires tracing support!"
+#endif
+
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
   envelope *env = UsrToEnv(msg);
@@ -2199,6 +2203,7 @@ void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
 
 int CkMyPeHook() { return CkMyPe(); }
 int CkNumPesHook() { return CkNumPes(); }
+void CmiAbortHook(const char *msg) { CmiAbort("%s", msg); }
 
 void ReadOnlyExt::setData(void *msg, size_t msgSize) {
   ro_data = malloc(msgSize);

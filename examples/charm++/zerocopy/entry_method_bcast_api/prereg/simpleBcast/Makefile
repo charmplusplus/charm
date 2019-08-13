@@ -1,4 +1,5 @@
 -include ../../../../../common.mk
+-include ../../../../../../include/conv-mach-opt.mak
 CHARMC=../../../../../../bin/charmc $(OPTS)
 
 all: simpleBcast
@@ -16,8 +17,10 @@ simpleBcast.o : simpleBcast.C cifiles
 test: all
 	$(call run, +p4 ./simpleBcast)
 	$(call run, +p6 ./simpleBcast)
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p4 ./simpleBcast +noCMAForZC)
 	$(call run, +p6 ./simpleBcast +noCMAForZC)
+endif
 
 clean:
 	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun simpleBcast

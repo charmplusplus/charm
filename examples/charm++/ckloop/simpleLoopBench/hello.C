@@ -114,7 +114,7 @@ Main::Main(CkArgMsg* m) {
 	double avgtime = (endtime-starttime)*1e6/5; //in the unit of us
 	CkPrintf("Calibration: avg time %.3f us of 5 consecutive runs, so a 100us-loop will iterate %d times\n", avgtime, (int)(loopTimes*100.0/avgtime));
 		
-    CmiSetCPUAffinity(0);
+    CmiSetCPUAffinityLogical(0);
     CkStartQD(CkIndex_Main::doTests((CkQdMsg *)0), &thishandle);
 };
 

@@ -7,13 +7,66 @@
 #include <forward_list>
 #include <bitset>
 #include <complex>
+#include <iostream>
 
 #include "ampi.h"
 #include "ddt.h"
 #include "charm++.h"
 
-//Uncomment for debug print statements
-#define AMPI_DEBUG(...) //CkPrintf(__VA_ARGS__)
+// Set to 1 to print debug statements
+#define AMPI_DO_DEBUG 0
+
+#if AMPI_DO_DEBUG
+
+#define AMPI_DEBUG(...) CkPrintf(__VA_ARGS__)
+
+// Support for variable-argument macros (up to 16 arguments)
+#define FE_1(WHAT, X) WHAT(X, true /*last argument*/) 
+#define FE_2(WHAT, X, ...) WHAT(X, false)FE_1(WHAT, __VA_ARGS__)
+#define FE_3(WHAT, X, ...) WHAT(X, false)FE_2(WHAT, __VA_ARGS__)
+#define FE_4(WHAT, X, ...) WHAT(X, false)FE_3(WHAT, __VA_ARGS__)
+#define FE_5(WHAT, X, ...) WHAT(X, false)FE_4(WHAT, __VA_ARGS__)
+#define FE_6(WHAT, X, ...) WHAT(X, false)FE_5(WHAT, __VA_ARGS__)
+#define FE_7(WHAT, X, ...) WHAT(X, false)FE_6(WHAT, __VA_ARGS__)
+#define FE_8(WHAT, X, ...) WHAT(X, false)FE_7(WHAT, __VA_ARGS__)
+#define FE_9(WHAT, X, ...) WHAT(X, false)FE_8(WHAT, __VA_ARGS__)
+#define FE_10(WHAT, X, ...) WHAT(X,false)FE_9(WHAT, __VA_ARGS__)
+#define FE_11(WHAT, X, ...) WHAT(X,false)FE_10(WHAT, __VA_ARGS__)
+#define FE_12(WHAT, X, ...) WHAT(X,false)FE_11(WHAT, __VA_ARGS__)
+#define FE_13(WHAT, X, ...) WHAT(X,false)FE_12(WHAT, __VA_ARGS__)
+#define FE_14(WHAT, X, ...) WHAT(X,false)FE_13(WHAT, __VA_ARGS__)
+#define FE_15(WHAT, X, ...) WHAT(X,false)FE_14(WHAT, __VA_ARGS__)
+#define FE_16(WHAT, X, ...) WHAT(X,false)FE_15(WHAT, __VA_ARGS__)
+
+#define GET_MACRO(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,NAME,...) NAME
+
+// Perform 'action' (PRINT_ARG in this case) on each argument
+#define FOR_EACH(action,...) \
+  GET_MACRO(__VA_ARGS__,FE_16,FE_15,FE_14,FE_13,\
+    FE_12,FE_11,FE_10,FE_9,FE_8,FE_7,FE_6,FE_5,FE_4,FE_3,FE_2,FE_1)(action,__VA_ARGS__)
+
+// Prints a single argument name and its value (unless the argument name is
+// '""', which indicates a nonexistent argument)
+#define PRINT_ARG(arg, last) \
+  if ("\"\""!=#arg) std::cout << #arg << "=" << arg << (last ? "" : ", ");
+
+extern int quietModeRequested;
+
+// Prints PE:VP, function name, and argument name/value for each function argument
+#define AMPI_DEBUG_ARGS(function_name, ...) \
+  if(!quietModeRequested) { \
+  std::cout << "[" << CkMyPe() << ":" << \
+  (isAmpiThread() ? getAmpiParent()->thisIndex : -1) << "] "<< function_name <<"("; \
+  FOR_EACH(PRINT_ARG, __VA_ARGS__); \
+  std::cout << ")" << std::endl; }
+
+#else // !AMPI_DO_DEBUG
+
+#define AMPI_DEBUG(...) /*empty*/
+#define AMPI_DEBUG_ARGS(...) /*empty*/
+
+#endif // AMPI_DO_DEBUG
+
 
 /*
  * All MPI_* routines must be defined using the AMPI_API_IMPL macro.
@@ -96,18 +149,33 @@ class fromzDisk : public zdisk {
 
 /* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
  * if tracing is not being used (see bug #1640 for more details on the latter). */
-#ifndef AMPI_LOCAL_IMPL
-#define AMPI_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#ifndef AMPI_PE_LOCAL_IMPL
+#define AMPI_PE_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#endif
+
+/* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
+ * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
+#ifndef AMPI_NODE_LOCAL_IMPL
+#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
 #ifndef AMPI_PE_LOCAL_THRESHOLD_DEFAULT
-#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 4096
+#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 8192
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the Node */
 #ifndef AMPI_NODE_LOCAL_THRESHOLD_DEFAULT
-#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 16384
+#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 32768
+#endif
+
+/* messages larger than or equal to this threshold will always block on a matching recv */
+#ifndef AMPI_SSEND_THRESHOLD_DEFAULT
+#if CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#define AMPI_SSEND_THRESHOLD_DEFAULT 262144
+#else
+#define AMPI_SSEND_THRESHOLD_DEFAULT 131072
+#endif
 #endif
 
 /* AMPI uses RDMA sends if BigSim is not being used. */
@@ -117,11 +185,7 @@ class fromzDisk : public zdisk {
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
 #ifndef AMPI_RDMA_THRESHOLD_DEFAULT
-#if CMK_USE_IBVERBS || CMK_OFI || CMK_CONVERSE_UGNI
-#define AMPI_RDMA_THRESHOLD_DEFAULT 65536
-#else
-#define AMPI_RDMA_THRESHOLD_DEFAULT 32768
-#endif
+#define AMPI_RDMA_THRESHOLD_DEFAULT 102400
 #endif
 
 extern int AMPI_RDMA_THRESHOLD;
@@ -2650,7 +2714,8 @@ class ampi final : public CBase_ampi {
   AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root,MPI_Comm destcomm) noexcept;
   AmpiMsg *makeSyncMsg(int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,CProxy_ampi destProxy,
-                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq) noexcept;
+                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq,
+                       ampi* destPtr) noexcept;
   AmpiMsg *makeNcpyShmMsg(int t, int sRank, const void* buf, int count,
                           MPI_Datatype type, int ssendReq, int seq) noexcept;
   AmpiMsg *makeNcpyMsg(int t, int sRank, const void* buf, int count,
@@ -2665,22 +2730,22 @@ class ampi final : public CBase_ampi {
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx) noexcept;
   inline MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
                                  int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destElem,
-                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
-  inline MPI_Request sendLocalInOrderMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
-                                         int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
-                                         ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
+                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx, ampi* destPtr) noexcept;
+  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
+                                  int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
+                                  ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
                                  int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
                                  MPI_Request reqIdx) noexcept;
-  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const noexcept {
+  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx, ampi* destPtr) const noexcept {
 #if CMK_MULTICORE
     return true;
 #elif CMK_SMP
+    if (destPtr != NULL) return true;
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
     return (CkNodeOf(destPe) == CkMyNode());
 #else // non-SMP
-    ampi* destPtr = arrProxy[destIdx].ckLocal();
     return (destPtr != NULL);
 #endif
   }
@@ -2926,14 +2991,16 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 
 //Use this to mark the start of AMPI interface routines that can only be called on AMPI threads:
 #if CMK_ERROR_CHECKING
-#define AMPI_API(routineName) \
+#define AMPI_API(routineName, ...) \
   if (!isAmpiThread()) { CkAbort("AMPI> cannot call MPI routines from non-AMPI threads!"); } \
-  TCHARM_API_TRACE(routineName, "ampi");
+  TCHARM_API_TRACE(routineName, "ampi"); AMPI_DEBUG_ARGS(routineName, __VA_ARGS__)
 #else
-#define AMPI_API(routineName) TCHARM_API_TRACE(routineName, "ampi")
+#define AMPI_API(routineName, ...) TCHARM_API_TRACE(routineName, "ampi"); \
+  AMPI_DEBUG_ARGS(routineName, __VA_ARGS__) 
 #endif
 
 //Use this for MPI_Init and routines than can be called before AMPI threads have been initialized:
-#define AMPI_API_INIT(routineName) TCHARM_API_TRACE(routineName, "ampi")
+#define AMPI_API_INIT(routineName, ...) TCHARM_API_TRACE(routineName, "ampi"); \
+  AMPI_DEBUG_ARGS(routineName, __VA_ARGS__)
 
 #endif // _AMPIIMPL_H

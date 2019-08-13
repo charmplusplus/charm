@@ -3990,6 +3990,11 @@ void CmiIOInit(char **argv) {
 }
 #endif
 
+void CmiPuts(const char * str)
+{
+  CmiPrintf("%s", str);
+}
+
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
 
 void CmiPrintf(const char *format, ...)

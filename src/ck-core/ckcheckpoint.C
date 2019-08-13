@@ -498,6 +498,8 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
       {
         creationFn(gID, eIdx, env);
       }
+
+      CkFreeSysMsg(m);
     }   // end of unPacking
     IrrGroup *gobj = objectTable->find(gID).getObj();
 

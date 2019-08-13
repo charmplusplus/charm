@@ -1,4 +1,5 @@
 -include ../../../common.mk
+-include ../../../../include/conv-mach-opt.mak
 CHARMDIR = ../../../..
 CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
 
@@ -19,13 +20,17 @@ zc_post_modify_size.o: zc_post_modify_size.C cifiles
 test: all
 	$(call run, +p1 ./zc_post_modify_size)
 	$(call run, +p4 ./zc_post_modify_size)
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p4 ./zc_post_modify_size +noCMAForZC)
+endif
 
 smptest: all
 	$(call run, +p2 ./zc_post_modify_size ++ppn 2)
 	$(call run, +p4 ./zc_post_modify_size ++ppn 2)
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p2 ./zc_post_modify_size +noCMAForZC ++ppn 2)
 	$(call run, +p4 ./zc_post_modify_size +noCMAForZC ++ppn 2)
+endif
 
 clean:
 	rm -f *.decl.h *.def.h *.o
