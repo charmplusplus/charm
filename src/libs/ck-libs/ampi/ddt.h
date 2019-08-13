@@ -44,7 +44,7 @@
 #define CkDDT_INDEXED             47
 #define CkDDT_HINDEXED            48
 #define CkDDT_STRUCT              49
-#define CkDDT_MAX_PREDEFINED_TYPE 50
+#define CkDDT_FIRST_USER_TYPE     50
 
 enum CkDDT_Dir : bool {
   PACK   = true,
@@ -445,9 +445,10 @@ class CkDDT_Struct final : public CkDDT_DataType
  * This class maintains the table of all datatypes (predefined and user-defined).
  *
  * predefinedTypeTable - a reference to a const array declared as a static global variable
- *                       (to minimize per-rank memory fooprint), which holds the CkDDT_DataType
+ *                       (to minimize per-rank memory footprint), which holds the CkDDT_DataType
  *                       object pointers for all predefined types.
  * userTypeTable - a vector that holds the CkDDT_DataType object pointers for all user-defined types
+ * freeTypes - an ordered set of freed slot indexes in the userTypeTable, available for reuse.
  */
 class CkDDT
 {

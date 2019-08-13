@@ -12,7 +12,9 @@ CkDDT::pup(PUP::er &p) noexcept
   if (p.isPacking()) {
     types.resize(numTypes);
     for (int i=0; i<userTypeTable.size(); i++) {
-      types[i] = userTypeTable[i] == nullptr ? MPI_DATATYPE_NULL : std::max(AMPI_MAX_PREDEFINED_TYPE, std::min(CkDDT_MAX_PREDEFINED_TYPE, userTypeTable[i]->getType()));
+      types[i] = userTypeTable[i] == nullptr
+        ? MPI_DATATYPE_NULL
+        : std::max(AMPI_MAX_PREDEFINED_TYPE, std::min(CkDDT_FIRST_USER_TYPE, userTypeTable[i]->getType()));
     }
     p(types.data(), numTypes);
     types.clear();
