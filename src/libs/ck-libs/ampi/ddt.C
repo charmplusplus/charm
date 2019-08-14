@@ -12,9 +12,10 @@ CkDDT::pup(PUP::er &p) noexcept
   if (p.isPacking()) {
     types.resize(numTypes);
     for (int i=0; i<userTypeTable.size(); i++) {
-      types[i] = userTypeTable[i] == nullptr
-        ? MPI_DATATYPE_NULL
-        : std::max(AMPI_MAX_PREDEFINED_TYPE, std::min(CkDDT_FIRST_USER_TYPE, userTypeTable[i]->getType()));
+      if (userTypeTable[i] == nullptr)
+        types[i] = MPI_DATATYPE_NULL;
+      else // only the CkDDT types matter for unpacking so clamp all other values to fit in a signed char
+        types[i] = std::max(AMPI_MAX_PREDEFINED_TYPE, std::min(CkDDT_FIRST_USER_TYPE, userTypeTable[i]->getType()));
     }
     p(types.data(), numTypes);
     types.clear();
@@ -130,7 +131,7 @@ CkDDT::~CkDDT() noexcept
 int
 CkDDT::insertType(CkDDT_DataType* ptr, int type) noexcept
 {
-  // Search thru non-predefined types for a free one first:
+  // Try to fill a freed slot before adding to the end of the table
   if (!freeTypes.empty()) {
     auto iter = freeTypes.begin();
     int i = *iter;

@@ -455,7 +455,7 @@ class CkDDT
  private:
   const std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable;
   std::vector<CkDDT_DataType *> userTypeTable;
-  std::set<int> freeTypes; // TODO: replace with a priority queue structure that can be serialized trivially
+  std::set<int> freeTypes;
 
  public:
   // static methods used by ampi.C for predefined types creation:
