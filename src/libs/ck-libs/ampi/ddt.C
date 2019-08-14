@@ -104,11 +104,9 @@ CkDDT::freeType(int index) noexcept
         userTypeTable.pop_back();
         // Free all NULL types from back of userTypeTable
         while (!userTypeTable.empty() && userTypeTable.back() == nullptr) {
-          --idx;
           userTypeTable.pop_back();
-          auto iter = freeTypes.find(idx);
-          if (iter != freeTypes.end())
-            freeTypes.erase(iter);
+          // Normally we would also erase --idx from freeTypes but std::priority_queue does not support that.
+          // Instead, handle that during insertType.
         }
       }
       else {
@@ -133,11 +131,18 @@ CkDDT::insertType(CkDDT_DataType* ptr, int type) noexcept
 {
   // Try to fill a freed slot before adding to the end of the table
   if (!freeTypes.empty()) {
-    auto iter = freeTypes.begin();
-    int i = *iter;
-    freeTypes.erase(iter);
-    userTypeTable[i] = ptr;
-    return AMPI_MAX_PREDEFINED_TYPE + 1 + i;
+    int i = freeTypes.top();
+    // std::priority_queue only supports erasing the front element,
+    // so there might be stale entries past the end of userTypeTable.
+    if (i < userTypeTable.size()) {
+      freeTypes.pop();
+      userTypeTable[i] = ptr;
+      return AMPI_MAX_PREDEFINED_TYPE + 1 + i;
+    }
+    else {
+      // if so, clear them out
+      freeTypes = decltype(freeTypes){};
+    }
   }
 
   userTypeTable.push_back(ptr);
