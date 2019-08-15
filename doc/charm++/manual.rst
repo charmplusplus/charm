@@ -10758,6 +10758,8 @@ the command line while configuring from a blank slate. To build with all
 defaults, ``cmake .`` is sufficient, though invoking CMake from a
 separate location (ex:
 ``mkdir mybuild && cd mybuild && cmake ../charm``) is recommended.
+Please see Section :numref:`sec:cmakeinstall` for building Charm++
+directly with CMake.
 
 Installation through the Spack package manager
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10801,31 +10803,32 @@ select another version with the ``@`` option (for example,
    	$ spack install charmpp@develop
 
 
+.. _sec:cmakeinstall:
+
 Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 As an experimental feature, Charm++ can be installed with the CMake tool, version 3.11 or newer.
-This is currently only supported on Linux and Darwin, but not on Windows.
-Currently, only the `charm++` and `AMPI` targets are available.
+This is currently supported on Linux and Darwin, but not on Windows.
 
 After downloading and unpacking Charm++, it can be installed in the following way:
 
 .. code-block:: bash
 
    $ cd charm
-   $ mkdir build
-   $ cd build
+   $ mkdir build-cmake
+   $ cd build-cmake
    $ cmake ..
    $ make -j4
 
 
 By default, CMake builds the netlrts version. 
 Other configuration options can be specified in the cmake command above.
-For example, to build the MPI version of Charm++ with SMP, the following command can be used:
+For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the following command can be used:
 
 .. code-block:: bash
 
-   $ cmake .. -DNETWORK=mpi -DSMP=on
+   $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
 
 To simplify building with CMake, the `buildcmake` command is a simple wrapper around cmake
 that supports many of the options that `build` supports.
