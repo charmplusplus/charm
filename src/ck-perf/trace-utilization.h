@@ -55,7 +55,7 @@ class TraceUtilizationInit : public Chare {
  public:
   TraceUtilizationInit(CkArgMsg *m) {
     delete m;
-    CkPrintf("[%d] TraceUtilizationInit creating traceUtilizationGroupProxy");
+    CkPrintf("[%d] TraceUtilizationInit creating traceUtilizationGroupProxy", CkMyPe());
     fflush(stdout);
    
     traceUtilizationGroupProxy = CProxy_TraceUtilizationBOC::ckNew();

@@ -1479,7 +1479,7 @@ static void *meta_malloc(size_t size) {
     }
     if (disableVerbosity == 0) {
       disableVerbosity = 1;
-      CmiPrintf("allocating %p: %d bytes\n",(void *)s,size);
+      CmiPrintf("allocating %p: %zu bytes\n",(void *)s,size);
       disableVerbosity = 0;
     }
   } else {

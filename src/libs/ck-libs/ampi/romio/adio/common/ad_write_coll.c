@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -35,7 +35,7 @@ static void ADIOI_W_Exchange_data(ADIO_File fd, void *buf, char *write_buf,
                          int *send_buf_idx, int *curr_to_proc,
                          int *done_to_proc, int *hole, int iter, 
                          MPI_Aint buftype_extent, int *buf_idx, int *error_code);
-static void ADIOI_Fill_send_buffer(ADIO_File fd, void *buf, ADIOI_Flatlist_node
+void ADIOI_Fill_send_buffer(ADIO_File fd, void *buf, ADIOI_Flatlist_node
                            *flat_buf, char **send_buf, ADIO_Offset 
                            *offset_list, ADIO_Offset *len_list, int *send_size, 
                            MPI_Request *requests, int *sent_to_proc, 
@@ -51,7 +51,7 @@ void ADIOI_Heap_merge(ADIOI_Access *others_req, int *count,
                       int nprocs, int nprocs_recv, int total_elements);
 
 
-void ADIOI_GEN_WriteStridedColl(ADIO_File fd, void *buf, int count,
+void ADIOI_GEN_WriteStridedColl(ADIO_File fd, const void *buf, int count,
                        MPI_Datatype datatype, int file_ptr_type,
                        ADIO_Offset offset, ADIO_Status *status, int
                        *error_code)
@@ -81,7 +81,9 @@ void ADIOI_GEN_WriteStridedColl(ADIO_File fd, void *buf, int count,
     int old_error, tmp_error;
 
     if (fd->hints->cb_pfr != ADIOI_HINT_DISABLE) { 
-	ADIOI_IOStridedColl (fd, buf, count, ADIOI_WRITE, datatype, 
+        /* Cast away const'ness as the below function is used for read
+         * and write */
+	ADIOI_IOStridedColl (fd, (char *) buf, count, ADIOI_WRITE, datatype,
 			file_ptr_type, offset, status, error_code);
 	return;
     }
@@ -202,7 +204,8 @@ void ADIOI_GEN_WriteStridedColl(ADIO_File fd, void *buf, int count,
     ADIOI_Free(my_req);
 
 /* exchange data and write in sizes of no more than coll_bufsize. */
-    ADIOI_Exch_and_write(fd, buf, datatype, nprocs, myrank,
+    /* Cast away const'ness for the below function */
+    ADIOI_Exch_and_write(fd, (char *) buf, datatype, nprocs, myrank,
                         others_req, offset_list,
 			len_list, contig_access_count, min_st_offset,
 			fd_size, fd_start, fd_end, buf_idx, error_code);
@@ -268,9 +271,9 @@ void ADIOI_GEN_WriteStridedColl(ADIO_File fd, void *buf, int count,
 
 #ifdef HAVE_STATUS_SET_BYTES
     if (status) {
-      int bufsize, size;
+      MPI_Count bufsize, size;
       /* Don't set status if it isn't needed */
-      MPI_Type_size(datatype, &size);
+      MPI_Type_size_x(datatype, &size);
       bufsize = size * count;
       MPIR_Status_set_bytes(status, datatype, bufsize);
     }
@@ -363,7 +366,7 @@ static void ADIOI_Exch_and_write(ADIO_File fd, void *buf, MPI_Datatype
     MPI_Allreduce(&ntimes, &max_ntimes, 1, MPI_INT, MPI_MAX,
 		  fd->comm); 
 
-    if (ntimes) write_buf = (char *) ADIOI_Malloc(coll_bufsize);
+    write_buf = fd->io_buf;
 
     curr_offlen_ptr = (int *) ADIOI_Calloc(nprocs, sizeof(int)); 
     /* its use is explained below. calloc initializes to 0. */
@@ -399,9 +402,7 @@ static void ADIOI_Exch_and_write(ADIO_File fd, void *buf, MPI_Datatype
 
     ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
     if (!buftype_is_contig) {
-	ADIOI_Flatten_datatype(datatype);
-	flat_buf = CtvAccess(ADIOI_Flatlist);
-        while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	flat_buf = ADIOI_Flatten_and_find(datatype);
     }
     MPI_Type_extent(datatype, &buftype_extent);
 
@@ -464,7 +465,7 @@ static void ADIOI_Exch_and_write(ADIO_File fd, void *buf, MPI_Datatype
 		    }
 		    if (req_off < off + size) {
 			count[i]++;
-      ADIOI_Assert((((ADIO_Offset)(MPIR_Upint)write_buf)+req_off-off) == (ADIO_Offset)(MPIR_Upint)(write_buf+req_off-off));
+      ADIOI_Assert((((ADIO_Offset)(MPIU_Upint)write_buf)+req_off-off) == (ADIO_Offset)(MPIU_Upint)(write_buf+req_off-off));
 			MPI_Address(write_buf+req_off-off, 
                                &(others_req[i].mem_ptrs[j]));
       ADIOI_Assert((off + size - req_off) == (int)(off + size - req_off));
@@ -527,9 +528,10 @@ static void ADIOI_Exch_and_write(ADIO_File fd, void *buf, MPI_Datatype
 
     for (i=0; i<nprocs; i++) count[i] = recv_size[i] = 0;
     for (m=ntimes; m<max_ntimes; m++) {
+	ADIOI_Assert(size == (int)size);
 	/* nothing to recv, but check for send. */
 	ADIOI_W_Exchange_data(fd, buf, write_buf, flat_buf, offset_list, 
-                            len_list, send_size, recv_size, off, size, count, 
+                            len_list, send_size, recv_size, off, (int)size, count,
                             start_pos, partial_recv, 
                             sent_to_proc, nprocs, myrank, 
 			    buftype_is_contig, contig_access_count,
@@ -540,7 +542,6 @@ static void ADIOI_Exch_and_write(ADIO_File fd, void *buf, MPI_Datatype
         if (*error_code != MPI_SUCCESS) return;
     }
 
-    if (ntimes) ADIOI_Free(write_buf);
     ADIOI_Free(curr_offlen_ptr);
     ADIOI_Free(count);
     ADIOI_Free(partial_recv);
@@ -580,8 +581,8 @@ static void ADIOI_W_Exchange_data(ADIO_File fd, void *buf, char *write_buf,
     MPI_Request *requests, *send_req;
     MPI_Datatype *recv_types;
     MPI_Status *statuses, status;
-    int *srt_len, sum;
-    ADIO_Offset *srt_off;
+    int *srt_len=NULL, sum;
+    ADIO_Offset *srt_off=NULL;
     static char myname[] = "ADIOI_W_EXCHANGE_DATA";
 
 /* exchange recv_size info so that each process knows how much to
@@ -608,8 +609,8 @@ static void ADIOI_W_Exchange_data(ADIO_File fd, void *buf, char *write_buf,
 		tmp_len[i] = others_req[i].lens[k];
 		others_req[i].lens[k] = partial_recv[i];
 	    }
-	    MPI_Type_hindexed(count[i], 
-                 &(others_req[i].lens[start_pos[i]]),
+	    ADIOI_Type_create_hindexed_x(count[i],
+		     &(others_req[i].lens[start_pos[i]]),
 	             &(others_req[i].mem_ptrs[start_pos[i]]), 
 			 MPI_BYTE, recv_types+j);
 	    /* absolute displacements; use MPI_BOTTOM in recv */
@@ -656,7 +657,8 @@ static void ADIOI_W_Exchange_data(ADIO_File fd, void *buf, char *write_buf,
         else { /* coalesce the sorted offset-length pairs */
             for (i=1; i<sum; i++) {
                 if (srt_off[i] <= srt_off[0] + srt_len[0]) {
-		    int new_len = srt_off[i] + srt_len[i] - srt_off[0];
+		    /* ok to cast: operating on cb_buffer_size chunks */
+		    int new_len = (int)srt_off[i] + srt_len[i] - (int)srt_off[0];
 		    if (new_len > srt_len[0]) srt_len[0] = new_len;
 		}
 		else
@@ -829,7 +831,7 @@ static void ADIOI_W_Exchange_data(ADIO_File fd, void *buf, char *write_buf,
 { \
     while (size) { \
         size_in_buf = ADIOI_MIN(size, flat_buf_sz); \
-  ADIOI_Assert((((ADIO_Offset)(MPIR_Upint)buf) + user_buf_idx) == (ADIO_Offset)(MPIR_Upint)((MPIR_Upint)buf + user_buf_idx)); \
+  ADIOI_Assert((((ADIO_Offset)(MPIU_Upint)buf) + user_buf_idx) == (ADIO_Offset)(MPIU_Upint)((MPIU_Upint)buf + user_buf_idx)); \
   ADIOI_Assert(size_in_buf == (size_t)size_in_buf); \
         memcpy(&(send_buf[p][send_buf_idx[p]]), \
                ((char *) buf) + user_buf_idx, size_in_buf); \
@@ -856,7 +858,7 @@ static void ADIOI_W_Exchange_data(ADIO_File fd, void *buf, char *write_buf,
 
 
 
-static void ADIOI_Fill_send_buffer(ADIO_File fd, void *buf, ADIOI_Flatlist_node
+void ADIOI_Fill_send_buffer(ADIO_File fd, void *buf, ADIOI_Flatlist_node
                            *flat_buf, char **send_buf, ADIO_Offset 
                            *offset_list, ADIO_Offset *len_list, int *send_size, 
                            MPI_Request *requests, int *sent_to_proc, 
@@ -926,7 +928,8 @@ static void ADIOI_Fill_send_buffer(ADIO_File fd, void *buf, ADIOI_Flatlist_node
       ADIOI_Assert((curr_to_proc[p] + len - done_to_proc[p]) == (unsigned)(curr_to_proc[p] + len - done_to_proc[p]));
 		        buf_incr = curr_to_proc[p] + len - done_to_proc[p];
       ADIOI_Assert((done_to_proc[p] + size) == (unsigned)(done_to_proc[p] + size));
-			curr_to_proc[p] = done_to_proc[p] + size;
+			/* ok to cast: bounded by cb buffer size */
+			curr_to_proc[p] = done_to_proc[p] + (int)size;
 		        ADIOI_BUF_COPY
 		    }
 		    else {
@@ -969,7 +972,7 @@ void ADIOI_Heap_merge(ADIOI_Access *others_req, int *count,
 {
     typedef struct {
 	ADIO_Offset *off_list;
-	int *len_list;
+	ADIO_Offset *len_list;
 	int nelem;
     } heap_struct;
 

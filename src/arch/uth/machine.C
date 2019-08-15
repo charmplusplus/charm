@@ -22,9 +22,14 @@ void ConverseCommonExit(void);
  *
  ************************************************************************/
 
-void CmiAbort(const char *message)
+void CmiAbort(const char *message, ...)
 {
-  CmiError(message);
+  char newmsg[256];
+  va_list args;
+  va_start(args, message);
+  vsnprintf(newmsg, sizeof(newmsg), message, args);
+  va_end(args);
+  CmiError("%s\n", newmsg);
   exit(1);
   CMI_NORETURN_FUNCTION_END
 }
@@ -240,6 +245,28 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
 #endif
 }
 
+void CmiWithinNodeBroadcastFn(int size, char* msg) {
+  int nodeFirst = CmiNodeFirst(CmiMyNode());
+  int nodeLast = nodeFirst + CmiNodeSize(CmiMyNode());
+  if (CMI_MSG_NOKEEP(msg)) {
+    for (int i = nodeFirst; i < CmiMyPe(); i++) {
+      CmiReference(msg);
+      CmiFreeSendFn(i, size, msg);
+    }
+    for (int i = CmiMyPe() + 1; i < nodeLast; i++) {
+      CmiReference(msg);
+      CmiFreeSendFn(i, size, msg);
+    }
+  } else {
+    for (int i = nodeFirst; i < CmiMyPe(); i++) {
+      CmiSyncSendFn(i, size, msg);
+    }
+    for (int i = CmiMyPe() + 1; i < nodeLast; i++) {
+      CmiSyncSendFn(i, size, msg);
+    }
+  }
+  CmiSyncSendAndFree(CmiMyPe(), size, msg);
+}
 
 int CmiBarrier(void)
 {
@@ -259,8 +286,7 @@ static void CmiParseArgs(char **argv)
   _Cmi_numpes=1;
   CmiGetArgInt(argv,"+p",&_Cmi_numpes);
   if (CmiNumPes()<1) {
-    printf("Error: must specify number of processors to simulate with +pXXX\n",CmiNumPes());
-    exit(1);
+    CmiAbort("Error: must specify number of processors to simulate with +pXXX");
   }
 }
 

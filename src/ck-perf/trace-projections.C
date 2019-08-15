@@ -1038,7 +1038,7 @@ TraceProjections::TraceProjections(char **argv):
   if (CmiGetArgLongDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
 		       "Log entries to buffer per I/O")) {
     if (CkMyPe() == 0) {
-      CmiPrintf("Trace: logsize: %ld\n", CkpvAccess(CtrLogBufSize));
+      CmiPrintf("Trace: logsize: %" PRId64 "\n", CkpvAccess(CtrLogBufSize));
     }
   }
   checknested = 
@@ -1941,12 +1941,12 @@ void TraceProjectionsBOC::print_warning()
     if (flush_count == 0) return;
     std::set<int>::iterator it;
     CkPrintf("*************************************************************\n");
-    CkPrintf("Warning: Projections log flushed to disk %d times on %d cores:", flush_count, list.size());
+    CkPrintf("Warning: Projections log flushed to disk %d times on %zu cores:", flush_count, list.size());
     for (it=list.begin(); it!=list.end(); it++)
       CkPrintf(" %d", *it);
     CkPrintf(".\n");
     CkPrintf("Warning: The performance data is likely invalid, unless the flushes have been explicitly synchronized by your program.\n");
-    CkPrintf("Warning: This may be fixed by specifying a larger +logsize (current value %d).\n", CkpvAccess(CtrLogBufSize));
+    CkPrintf("Warning: This may be fixed by specifying a larger +logsize (current value %" PRId64 ").\n", CkpvAccess(CtrLogBufSize));
     CkPrintf("*************************************************************\n");
 }
 

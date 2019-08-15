@@ -50,7 +50,7 @@ public:
     arrayDimY = atoi(m->argv[2]);
     numChares = atoi(m->argv[3]);
     if (arrayDimX < numChares || arrayDimX % numChares != 0)
-      CkAbort("array_size_X % numChares != 0!");
+      CkAbort("array_size_X %% numChares != 0!");
     blockDimX = arrayDimX / numChares;
 
     maxiterations = MAX_ITER;

@@ -17,11 +17,9 @@ TopologyAgent::TopologyAgent(CentralLB::LDStats* lbDB,int p): Agent(p), stats(lb
 	LBtopoFn topofn;
 	topofn = LBTopoLookup(_lbtopo);
   if (topofn == NULL) {
-  	char str[1024];
    	CmiPrintf("LBAgent> Fatal error: Unknown topology: %s. Choose from:\n", _lbtopo);
    	printoutTopo();
-   	sprintf(str, "LBAgent> Fatal error: Unknown topology: %s", _lbtopo);
-   	CmiAbort(str);
+	CmiAbort("LBAgent> Fatal error: Unknown topology: %s", _lbtopo);
   }
 	topo = topofn(p);
 

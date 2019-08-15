@@ -27,8 +27,7 @@ PhasebyArrayLB::PhasebyArrayLB(const CkLBOptions &opt): CBase_PhasebyArrayLB(opt
   p++;
   LBAllocFn fn = getLBAllocFn(p);
   if (fn == NULL) {
-  	CkPrintf("LB> Invalid load balancer: %s.\n", p);
-  	CmiAbort("");
+	CkAbort("LB> Invalid load balancer: %s.\n", p);
   }
   lb = (CentralLB *)fn();
 }

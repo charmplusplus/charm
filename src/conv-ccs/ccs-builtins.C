@@ -232,7 +232,7 @@ static void CpdList_ccs_list_items_set(char *msg)
     PUP_toNetwork_unpack p(req.extra);
     pupCpd(p,acc,req);
     if (p.size()!=req.extraLen)
-    	CmiPrintf("Size mismatch during ccs_list_items.set: client sent %d bytes, but %d bytes used!\n",
+	CmiPrintf("Size mismatch during ccs_list_items.set: client sent %d bytes, but %zu bytes used!\n",
 		req.extraLen,p.size());
   }
   CmiFree(msg);
@@ -294,7 +294,7 @@ static void CpdList_ccs_list_items_fmt(char *msg)
       PUP_fmt p(pp);
       pupCpd(p,acc,req);
       if (pp.size()!=bufLen)
-	CmiError("ERROR! Sizing/packing length mismatch for %s list pup function (%d sizing, %d packing)\n",
+	CmiError("ERROR! Sizing/packing length mismatch for %s list pup function (%d sizing, %zu packing)\n",
 		acc->getPath(),bufLen,pp.size());
     }
     CcsSendReply(bufLen,(void *)buf);

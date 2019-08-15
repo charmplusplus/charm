@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -47,16 +47,16 @@ MPI_Fint MPIO_Request_c2f(MPIO_Request request)
     return (MPI_Fint) request;
 #else
     int i;
-    MPIU_THREADPRIV_DECL;
+    MPID_THREADPRIV_DECL;
 
-    /* We can make this test outside of the ALLFUNC mutex because it does
+    /* We can make this test outside of the GLOBAL mutex because it does
        not access any shared data */
     if ((request <= (MPIO_Request) 0) || (request->cookie != ADIOI_REQ_COOKIE))
     {
 	    return (MPI_Fint) 0;
     }
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    ROMIO_THREAD_CS_ENTER();
     if (!ADIOI_Reqtable) {
 	ADIOI_Reqtable_max = 1024;
 	ADIOI_Reqtable = (MPIO_Request *)
@@ -75,7 +75,7 @@ MPI_Fint MPIO_Request_c2f(MPIO_Request request)
     ADIOI_Reqtable_ptr++;
     ADIOI_Reqtable[ADIOI_Reqtable_ptr] = request;
 
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+    ROMIO_THREAD_CS_EXIT();
     return (MPI_Fint) ADIOI_Reqtable_ptr;
 #endif
 }

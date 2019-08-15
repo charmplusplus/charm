@@ -803,7 +803,7 @@ MBlockChunk::print(void)
 {
   CkPrintf("-------------------- Block %d --------------------\n",thisIndex);
   b->print();
-  CkPrintf("--------------------------------------------------\n",thisIndex);
+  CkPrintf("--------------------------------------------------\n");
 }  
   
 static void cmm_pup_mblock_message(pup_er p,void **msg) {
