@@ -71,6 +71,7 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 }
 
 /********************* CONTEXT-SWITCHING FUNCTIONS ******************/
+static int _exitcode = 0;
 
 static void CmiNext(void)
 {
@@ -81,7 +82,7 @@ static void CmiNext(void)
     t = CmiThreads[index];
     if ((t)&&(!CmiBarred[index])) break;
     index = (index+1) % CmiNumPes();
-    if (index == orig) exit(0);
+    if (index == orig) exit(_exitcode);
   }
   _Cmi_mype = index;
   CthResume(t);
@@ -314,6 +315,7 @@ void ConverseExit(int exitcode)
 {
   ConverseCommonExit();
   CmiThreads[CmiMyPe()] = 0;
+  _exitcode = exitcode; // Used in CmiNext()
   CmiNext();
 }
 
