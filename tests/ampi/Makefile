@@ -18,6 +18,7 @@ endif
 NOBGDIRS = \
   intercomm_coll \
   privatization \
+  datatype \
 
 FTDIRS = \
   jacobi3d
