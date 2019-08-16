@@ -73,7 +73,7 @@ static void BroadcastShutdown(void *null, double t)
 */
 }
 
-void BgShutdown()
+void BgShutdown(int exitcode)
 {
   /* when doing timing correction, do a converse quiescence detection
      to wait for all timing correction messages
@@ -100,7 +100,7 @@ void BgShutdown()
       CmiPrintf("\nBG> BigSim emulator shutdown gracefully!\n");
       CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
     }
-    ConverseExit();
+    ConverseExit(exitcode);
     exit(0);
   }
   else {

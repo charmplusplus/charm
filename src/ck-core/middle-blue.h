@@ -47,7 +47,20 @@
 #define CkNumberHandlerEx(n, x, p)  BgNumberHandlerEx(n, (BgHandlerEx)(x), p)
 
 #undef ConverseExit
-#define ConverseExit(...)             BgCharmExit()
+#define ConverseExit          BgCharmExit
+
+/* Optional parameter for BgCharmExit() - based on
+https://stackoverflow.com/a/28074198/1250282 */
+
+#define BGEXIT_1(x) realBgCharmExit(x)
+#define BGEXIT_0() BGEXIT_1(0) /* Default BgCharmExit() exit code: 0 */
+
+#define BG_FUNC_CHOOSER(_f1, _f2, _f3, ...) _f3
+#define BG_FUNC_RECOMPOSER(argsWithParentheses) BG_FUNC_CHOOSER argsWithParentheses
+#define BG_CHOOSE_FROM_ARG_COUNT(...) BG_FUNC_RECOMPOSER((__VA_ARGS__, BGEXIT_2, BGEXIT_1, ))
+#define BG_NO_ARG_EXPANDER() ,,BGEXIT_0
+#define BG_MACRO_CHOOSER(...) BG_CHOOSE_FROM_ARG_COUNT(CONV_NO_ARG_EXPANDER __VA_ARGS__ ())
+#define BgCharmExit(...) BG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 
 /**
   This version Blue Gene Charm++ use a whole Blue Gene node as 
@@ -203,10 +216,10 @@ void CkReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
 /** common functions for two versions */
 namespace BGConverse {
 
-static inline void BgCharmExit()
+static inline void BgCharmExit(int exitcode)
 {
 //  traceCharmClose();
-  if (CkMyPe() == 0)  BgShutdown();
+  if (CkMyPe() == 0)  BgShutdown(exitcode);
 }
 
 }

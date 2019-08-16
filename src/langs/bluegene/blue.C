@@ -1510,7 +1510,7 @@ static void sanityCheck()
   if (cva(bgMach).x==0 || cva(bgMach).y==0 || cva(bgMach).z==0)  {
     if (CmiMyPe() == 0)
       CmiPrintf("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n");
-    BgShutdown(); 
+    BgShutdown(1); 
   } 
   else if (cva(bgMach).numCth==0 || cva(bgMach).numWth==0) { 
 #if 1
