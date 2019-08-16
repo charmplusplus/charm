@@ -444,7 +444,7 @@ To retrieve the node specific data, call:
 
 After completion of execution, user program invokes a function:
 
-``void BgShutdown()``
+``void BgShutdown(int exitcode /*optional*/)``
 
 to terminate the emulator.
 
