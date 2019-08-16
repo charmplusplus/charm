@@ -26,15 +26,16 @@ Charm++-prefix
 src/arch/win/createlink.exe
 
 # Ignore directories created from compilation
-/netlrts-*
-/verbs-*
-/mpi-*
-/multicore-*
-/uth-*
-/pami*
 /gemini_gni-crayxe*
 /gni-*
+/mpi-*
+/multicore-*
+/netlrts-*
 /ofi-*
+/pami*
+/ucx-*
+/uth-*
+/verbs-*
 
 # Ignore cruft that would result from compiling charm example/test code
 # Note this is negated inside src/arch to permit addition of new charmrun files in there
