@@ -5,6 +5,7 @@
 #include <vector>
 #include <array>
 #include <queue>
+#include <functional>
 #include "charm++.h"
 #include "ampi.h"
 
