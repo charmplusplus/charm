@@ -5,7 +5,6 @@ CHARMC=../../../bin/ampicxx $(OPTS) $(MOPTS)
 # - Fortran EXIT()
 # - C exit(), return
 # - Other main() prototypes
-# - Implicit 'return 0' at end of main()
 
 all: exit_explicit exit_return
 
@@ -19,10 +18,6 @@ exit_return: exit_return.C
 test: all
 	$(call run, ./exit_explicit 2>&1); [ $$? -eq 42 ] && echo "exit_explicit test passed." || (echo "exit_explicit test failed (exit code was $$?, but expected 42)."; false)
 	$(call run, ./exit_return 2>&1); [ $$? -eq 42 ] && echo "exit_return test passed." || (echo "exit_return test failed (exit code was $$?, but expected 42)."; false)
-
-bgtest: all
-	$(call run, ./exit_explicit +x1 +y1 +z1 2>&1); [ $$? -eq 42 ] && echo "exit_explicit test passed." || (echo "exit_explicit test failed (exit code was $$?, but expected 42)."; false)
-	$(call run, ./exit_return +x1 +y1 +z1 2>&1); [ $$? -eq 42 ] && echo "exit_return test passed." || (echo "exit_return test failed (exit code was $$?, but expected 42)."; false)
 
 clean:
 	rm -f *.o exit_explicit exit_return charmrun ampirun

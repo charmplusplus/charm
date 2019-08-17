@@ -203,7 +203,7 @@ void BgSetStrategyBigSimDefault(CthThread t);
 /** 
   shutdown the emulator 
 */
-void BgShutdown(int exitcode);
+void BgShutdown();
 
 /**
   get Blue Gene timer, one for each thread
