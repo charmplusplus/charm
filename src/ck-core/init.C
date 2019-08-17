@@ -1097,6 +1097,7 @@ CkQ<CkExitFn> _CkExitFnVec;
 // Trigger exit on PE 0,
 // which traverses _CkExitFnVec to call every registered user exit function.
 // Every user exit function should end with CkExit() to continue the chain.
+// When compiled, #defines in charm.h rename this function to "realCkExit".
 void CkExit(int exitcode)
 {
   DEBUGF(("[%d] CkExit called \n",CkMyPe()));
