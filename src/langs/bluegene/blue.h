@@ -203,21 +203,7 @@ void BgSetStrategyBigSimDefault(CthThread t);
 /** 
   shutdown the emulator 
 */
-
-/* Optional parameter for BgShutdown() - based on
-https://stackoverflow.com/a/28074198/1250282 */
-
-#define BGS_EXIT_1(x) realBgShutdown(x)
-#define BGS_EXIT_0() BGS_EXIT_1(0) /* Default BgShutdown() exit code: 0 */
-
-#define BGS_FUNC_CHOOSER(_f1, _f2, _f3, ...) _f3
-#define BGS_FUNC_RECOMPOSER(argsWithParentheses) BGS_FUNC_CHOOSER argsWithParentheses
-#define BGS_CHOOSE_FROM_ARG_COUNT(...) BGS_FUNC_RECOMPOSER((__VA_ARGS__, BGS_EXIT_2, BGS_EXIT_1, ))
-#define BGS_NO_ARG_EXPANDER() ,,BGS_EXIT_0
-#define BGS_MACRO_CHOOSER(...) BGS_CHOOSE_FROM_ARG_COUNT(CONV_NO_ARG_EXPANDER __VA_ARGS__ ())
-#define BgShutdown(...) BGS_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
-
-void realBgShutdown(int exitcode);
+void BgShutdown(int exitcode);
 
 /**
   get Blue Gene timer, one for each thread
