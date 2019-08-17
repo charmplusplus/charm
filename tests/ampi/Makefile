@@ -19,6 +19,7 @@ NOBGDIRS = \
   intercomm_coll \
   privatization \
   exit \
+  datatype \
 
 FTDIRS = \
   jacobi3d
