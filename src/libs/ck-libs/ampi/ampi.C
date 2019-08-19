@@ -2988,10 +2988,13 @@ AmpiMsg *ampi::makeSyncMsg(int t,int sRank,const void *buf,int count,
                            ampi* destPtr) noexcept
 {
   CkAssert(ssendReq >= 0);
+#if AMPI_NODE_LOCAL_IMPL
   if (destLikelyWithinProcess(destProxy, destIdx, destPtr)) {
     return makeNcpyShmMsg(t, sRank, buf, count, type, ssendReq, seq);
   }
-  else {
+  else
+#endif
+  {
     return makeNcpyMsg(t, sRank, buf, count, type, ssendReq, seq);
   }
 }
@@ -3297,15 +3300,15 @@ void ampi::requestPut(MPI_Request reqIdx, CkNcpyBuffer targetInfo) noexcept {
     CkPrintf("[%d] VP %d in requestPut, reqIdx = %d\n", CkMyPe(), parent->thisIndex, reqIdx);
   )
   CkDDT_DataType* sddt = getDDT()->getType(req.type);
+  int len = sddt->getSize(req.count);
   CkCallback sendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true /*inline*/);
   sendCB.setRefnum(reqIdx);
   CkNcpyBuffer srcInfo;
 
   if (sddt->isContig()) {
-    srcInfo = CkNcpyBuffer(req.buf, req.count, sendCB);
+    srcInfo = CkNcpyBuffer(req.buf, len, sendCB);
   }
   else {
-    int len = sddt->getSize(req.count);
     char* sbuf = new char[len];
     sddt->serialize((char*)req.buf, sbuf, req.count, len, PACK);
     srcInfo = CkNcpyBuffer(sbuf, len, sendCB);
