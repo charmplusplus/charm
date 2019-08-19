@@ -20,7 +20,7 @@ Misc:
   review from Gerrit to GitHub. Our GitHub repository is at:
   https://github.com/UIUC-PPL/charm .
   
-- As a preview feature, Charm++ can now be build with CMake (version 3.11 or higher).
+- As a preview feature, Charm++ can now be built with CMake (version 3.11 or higher).
   To try it, you can replace your `./build` command with `./buildcmake`, which supports
   most of the options of `./build`. The old build system is still available.
   Please see https://charm.readthedocs.io/en/latest/charm++/manual.html#installation-with-cmake
