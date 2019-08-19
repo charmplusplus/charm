@@ -2988,10 +2988,13 @@ AmpiMsg *ampi::makeSyncMsg(int t,int sRank,const void *buf,int count,
                            ampi* destPtr) noexcept
 {
   CkAssert(ssendReq >= 0);
+#if AMPI_NODE_LOCAL_IMPL
   if (destLikelyWithinProcess(destProxy, destIdx, destPtr)) {
     return makeNcpyShmMsg(t, sRank, buf, count, type, ssendReq, seq);
   }
-  else {
+  else
+#endif
+  {
     return makeNcpyMsg(t, sRank, buf, count, type, ssendReq, seq);
   }
 }
