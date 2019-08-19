@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -16,6 +16,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_get_atomicity as PMPI_File_get_atomicity
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_get_atomicity(MPI_File fh, int *flag) __attribute__((weak,alias("PMPI_File_get_atomicity")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -34,19 +36,19 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPI_File_get_atomicity(MPI_File mpi_fh, int *flag)
+int MPI_File_get_atomicity(MPI_File fh, int *flag)
 {
     int error_code;
-    ADIO_File fh;
+    ADIO_File adio_fh;
     static char myname[] = "MPI_FILE_GET_ATOMICITY";
     
-    fh = MPIO_File_resolve(mpi_fh);
+    adio_fh = MPIO_File_resolve(fh);
 
     /* --BEGIN ERROR HANDLING-- */
-    MPIO_CHECK_FILE_HANDLE(fh, myname, error_code);
+    MPIO_CHECK_FILE_HANDLE(adio_fh, myname, error_code);
     /* --END ERROR HANDLING-- */
 
-    *flag = fh->atomicity;
+    *flag = adio_fh->atomicity;
 
 fn_exit:
     return MPI_SUCCESS;

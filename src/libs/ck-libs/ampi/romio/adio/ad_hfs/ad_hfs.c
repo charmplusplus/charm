@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2001 University of Chicago. 
@@ -33,4 +33,6 @@ struct ADIOI_Fns_struct ADIO_HFS_operations = {
     ADIOI_GEN_Flush, /* Flush */
     ADIOI_HFS_Resize, /* Resize */
     ADIOI_GEN_Delete, /* Delete */
+    ADIOI_GEN_IreadStridedColl, /* IreadStridedColl */
+    ADIOI_GEN_IwriteStridedColl /* IwriteStridedColl */
 };

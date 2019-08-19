@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -26,8 +26,8 @@ ADIO_Offset ADIOI_GEN_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
     ADIO_Offset n_etypes_in_filetype, n_filetypes, etype_in_filetype;
     ADIO_Offset abs_off_in_filetype=0;
     ADIO_Offset size_in_filetype, sum;
-    unsigned filetype_size;
-    int etype_size, filetype_is_contig;
+    MPI_Count filetype_size, etype_size;
+    int filetype_is_contig;
     MPI_Aint filetype_extent;
 
     ADIOI_UNREFERENCED_ARG(whence);
@@ -35,13 +35,13 @@ ADIO_Offset ADIOI_GEN_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
     ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
     etype_size = fd->etype_size;
 
-    if (filetype_is_contig) off = fd->disp + (ADIO_Offset)etype_size * offset;
+    if (filetype_is_contig) off = fd->disp + etype_size * offset;
     else {
         flat_file = CtvAccess(ADIOI_Flatlist);
         while (flat_file->type != fd->filetype) flat_file = flat_file->next;
 
 	MPI_Type_extent(fd->filetype, &filetype_extent);
-	MPI_Type_size(fd->filetype, (int*)&filetype_size);
+	MPI_Type_size_x(fd->filetype, &filetype_size);
 	if ( ! filetype_size ) {
 	    /* Since offset relative to the filetype size, we can't
 	       do compute the offset when that result is zero.

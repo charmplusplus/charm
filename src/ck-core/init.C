@@ -818,7 +818,11 @@ static void _sendTriggers(void)
   {
     CksvAccess(_triggersSent) = true;
     num = CmiMyNodeSize();
+#if CMK_REPLAYSYSTEM
+    envelope *env = _allocEnvNoIncEvent(RODataMsg); // Notice that the type here is irrelevant
+#else    
     envelope *env = _allocEnv(RODataMsg); // Notice that the type here is irrelevant
+#endif    
     env->setSrcPe(CkMyPe());
     CmiSetHandler(env, _triggerHandlerIdx);
     first = CmiNodeFirst(CmiMyNode());
@@ -1093,6 +1097,7 @@ CkQ<CkExitFn> _CkExitFnVec;
 // Trigger exit on PE 0,
 // which traverses _CkExitFnVec to call every registered user exit function.
 // Every user exit function should end with CkExit() to continue the chain.
+// When compiled, #defines in charm.h rename this function to "realCkExit".
 void CkExit(int exitcode)
 {
   DEBUGF(("[%d] CkExit called \n",CkMyPe()));

@@ -36,18 +36,14 @@ void postRdma(
   OtherNode node = nodes_by_pe[peNum];
 #if CMK_IBVERBS_TOKENS_FLOW
   if(context->tokensLeft<0){
-    char errMsg[200];
-    sprintf(errMsg, "No remaining tokens! Pass a larger value for maxTokens (%d) using argument +IBVMaxSendTokens\n", maxTokens);
-    CmiAbort(errMsg);
+    CmiAbort("No remaining tokens! Pass a larger value for maxTokens (%d) using argument +IBVMaxSendTokens\n", maxTokens);
   }
 #endif
 
   int retval;
   if (retval = ibv_post_send(node->infiData->qp, &wr, &bad_wr)) {
-    char errMsg[200];
     CmiPrintf(" Pe:%d, Node:%d, thread id:%d infidata nodeno:[%d] failed with return value %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), node->infiData->nodeNo, retval);
-    sprintf(errMsg,"ibv_post_send failed in postRdma!! Try passing a larger value for maxTokens (%d) using argument +IBVMaxSendTokens\n",maxTokens);
-    CmiAbort(errMsg);
+    CmiAbort("ibv_post_send failed in postRdma!! Try passing a larger value for maxTokens (%d) using argument +IBVMaxSendTokens\n",maxTokens);
   }
 }
 
@@ -201,6 +197,10 @@ void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int m
 }
 
 void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
+
+  if(ncpyOpInfo->opMode == CMK_BCAST_EM_API)
+    return;
+
   // Send a message to de-register remote buffer and invoke callback
   infiPacket packet;
   MallocInfiPacket(packet);

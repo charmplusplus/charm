@@ -43,11 +43,12 @@ void startRing()
 //the pingpong has finished, record message time
 void ringFinished(char *msg)
 {
+  size_t msgSizeDiff = CpvAccess(msgSize)-CmiMsgHeaderSizeBytes;
   CmiFree(msg);
 
   //Print the time for that message size
-  CmiPrintf("Size=%d bytes, time=%lf microseconds one-way\n",
-      CpvAccess(msgSize)-CmiMsgHeaderSizeBytes,
+  CmiPrintf("Size=%zu bytes, time=%lf microseconds one-way\n",
+      msgSizeDiff,
       (1e6*(CpvAccess(endTime)-CpvAccess(startTime)))/(2.*CpvAccess(nCycles)));
 
 

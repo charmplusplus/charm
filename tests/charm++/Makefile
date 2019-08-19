@@ -1,3 +1,5 @@
+-include ../../include/conv-mach-opt.mak
+
 DIRS = \
   megatest \
   alignment \
@@ -39,6 +41,13 @@ TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
 all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
+ifeq ($(CMK_SMP),1)
+ifneq ($(CMK_MULTICORE),1)
+	make smptest
+endif
+endif
+
+smptest: $(foreach i,$(TESTDIRS),smptest-$i)
 
 bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
 
@@ -53,6 +62,9 @@ $(foreach i,$(DIRS),build-$i):
 
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),smptest-$i):
+	$(MAKE) -C $(subst smptest-,,$@) smptest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
 $(foreach i,$(DIRS),bgtest-$i):
 	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'

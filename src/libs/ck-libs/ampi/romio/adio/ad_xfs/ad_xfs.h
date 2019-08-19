@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -8,7 +8,6 @@
 #ifndef AD_XFS_INCLUDE
 #define AD_XFS_INCLUDE
 
-#define _XOPEN_SOURCE 500
 #include <unistd.h>
 #include <sys/types.h>
 #include <fcntl.h>

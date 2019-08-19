@@ -67,7 +67,7 @@
 #define CMK_PERSISTENT_COMM                                0
 
 /* Enables support for immediate messages if set to 1. */
-#define CMK_IMMEDIATE_MSG				   0
+#define CMK_IMMEDIATE_MSG				   1
 
 /* This is needed to be 1 if the machine layer is used in some architectures
    where there is no coprocessor, and to pull messages out of the network there
@@ -78,7 +78,7 @@
 /* This is required to define LrtsLock/LrtsUnlock */
 #define CMK_USE_COMMON_LOCK                                1
 
-#define CMK_ONESIDED_IMPL                                  0
+#define CMK_ONESIDED_IMPL                                  1
 
 /* Should be enough to fit UCP memh + rkey */
 #define CMK_NOCOPY_DIRECT_BYTES                            256
