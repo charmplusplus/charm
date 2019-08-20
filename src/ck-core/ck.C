@@ -2171,6 +2171,11 @@ void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char 
   ArrayMsgRecvExtCallback = cb;
 }
 
+void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int) = NULL;
+void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int *, int, int, char *, int)) {
+  ArrayBcastRecvExtCallback = cb;
+}
+
 int (*ArrayElemLeaveExt)(int, int, int *, char**, int) = NULL;
 void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int)) {
   ArrayElemLeaveExt = cb;
