@@ -1329,11 +1329,7 @@ void CkArrayBroadcaster::deliver(CkArrayMessage *bcast,
   int msgSize; implP|msgSize;
   int ep; implP|ep;
   int dcopy_start; implP|dcopy_start;
-  ArrayBcastRecvExtCallback(arrayId,
-                            numDim,
-                            numInts,
-                            numValidElements,
-                            validIndexes.data(),
+  ArrayBcastRecvExtCallback(arrayId, numDim, numInts, numValidElements, validIndexes.data(),
                             ep, msgSize, msg_buf+(3*sizeof(int)), dcopy_start);
   if (doFree)
     delete bcast;
