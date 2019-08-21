@@ -2,22 +2,24 @@ module CkLocation {
   extern module CkMarshall;
 
   message CkArrayElementMigrateMessage {
-	char packData[];
+    char packData[];
   };
 
   group [migratable] CkLocMgr {
-	entry CkLocMgr(CkArrayOptions opts);
-	entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
-        entry [expedited] void requestLocation(CkArrayIndex idx, int peToTell,
-                                               bool suppressIfHere, int ifNonExistent, int chareType, CkArrayID mgr);
-        entry [expedited] void requestLocation(CmiUInt8 id, int peToTell,
-                                               bool suppressIfHere);
-	entry [expedited] void updateLocation(CkArrayIndex idx, CmiUInt8 id, int nowOnPe);
-        entry [expedited] void updateLocation(CmiUInt8 id, int nowOnPe);
-	entry void reclaimRemote(CkArrayIndex idx,int deletedOnPe);
-	
-	//Load balancing:
-	entry void dummyAtSync(void);
+    entry CkLocMgr(CkArrayOptions opts);
+    entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
+    entry [expedited] void requestLocation(
+        CkArrayIndex idx, int peToTell, bool suppressIfHere, int ifNonExistent,
+        int chareType, CkArrayID mgr);
+    entry [expedited] void requestLocation(
+        CmiUInt8 id, int peToTell, bool suppressIfHere);
+    entry [expedited] void updateLocation(
+        CkArrayIndex idx, CmiUInt8 id, int nowOnPe);
+    entry [expedited] void updateLocation(CmiUInt8 id, int nowOnPe);
+    entry void reclaimRemote(CkArrayIndex idx,int deletedOnPe);
+
+    //Load balancing:
+    entry void dummyAtSync(void);
   };
   
   // Array Map object support:
@@ -55,7 +57,7 @@ module CkLocation {
     entry CldMap(void);
   };
 
- group [migratable] ConfigurableRRMap : RRMap {
+  group [migratable] ConfigurableRRMap : RRMap {
     entry ConfigurableRRMap(void);
   };
 
