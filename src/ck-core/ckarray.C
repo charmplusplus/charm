@@ -1471,20 +1471,18 @@ void CkArray::recvBroadcast(CkMessage *m)
     // extract this field here so we can still check it even if msg is freed
     const auto zc_msgtype = CMI_ZC_MSGTYPE(UsrToEnv(msg));
 
-    unsigned int firstElemIndex=0; // used for delivery only to the first local element
-
-    if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG) { // message contains pointers to the posted buffer, which contains the data received
+    if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG && len > 0 ) { // message contains pointers to the posted buffer, which contains the data received
       // All operations done, already consumed by other array elements, now deliver to the first element
 
       bool doFree = true; // free it since all ops are done
-      broadcaster->deliver(msg, (ArrayElement*)localElemVec[firstElemIndex], doFree);
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
 
-    } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG) { // message is used by the receiver to post the receiver buffer
+    } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG && len > 0 ) { // message is used by the receiver to post the receiver buffer
       // Initial metadata message, send only to the first element, other elements are sent CMK_ZC_BCAST_RECV_DONE_MSG after rget completion
 
       bool doFree = false; // do not free since msg will be reused to send buffers to peers,
                            // msg will be finally freed by the first element in the CMK_ZC_BCAST_RECV_ALL_DONE_MSG branch
-      broadcaster->deliver(msg, (ArrayElement*)localElemVec[firstElemIndex], doFree);
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
 
     } else
 #endif
