@@ -528,7 +528,6 @@ public:
 private:
 	/// The core of the location manager: map array index to element representative
 	LocRecHash hash;
-	CmiImmediateLockType hashImmLock;
 
 	//Map object
 	CkGroupID mapID;
