@@ -2057,12 +2057,10 @@ void CkLocRec::setPupSize(size_t obj_pup_size) {
 // removes it from the hash table, which would invalidate an iterator.
 void CkLocMgr::flushLocalRecs(void)
 {
-  CmiImmediateLock(hashImmLock);
   while (hash.size()) {
     CkLocRec* rec = hash.begin()->second;
     callMethod(rec, &CkMigratable::ckDestroy);
   }
-  CmiImmediateUnlock(hashImmLock);
 }
 
 // All records are local records after the 64bit ID update
@@ -2100,14 +2098,12 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
         metalbID = _metalb;
 #endif
         initLB(lbdbID, metalbID);
-	hashImmLock = CmiCreateImmediateLock();
 }
 
 CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	:IrrGroup(m),thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe())
 {
 	duringMigration = false;
-	hashImmLock = CmiCreateImmediateLock();
 }
 
 CkLocMgr::~CkLocMgr() {
@@ -2118,7 +2114,6 @@ CkLocMgr::~CkLocMgr() {
   the_lbdb->UnregisterOM(myLBHandle);
 #endif
   map->unregisterArray(mapHandle);
-  CmiDestroyLock(hashImmLock);
 }
 
 void CkLocMgr::pup(PUP::er &p){
@@ -2520,9 +2515,7 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id) {
 	if (NULL==elementNrec(id))
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
-		CmiImmediateLock(hashImmLock);
 		hash.erase(id);
-		CmiImmediateUnlock(hashImmLock);
 #if CMK_ERROR_CHECKING
 	//Make sure it's really gone
 	if (NULL!=elementNrec(id))
@@ -2812,12 +2805,10 @@ CkLocIterator::~CkLocIterator() {}
 /// Iterate over our local elements:
 void CkLocMgr::iterate(CkLocIterator &dest) {
   //Poke through the hash table for local ArrayRecs.
-  CmiImmediateLock(hashImmLock);
   for (LocRecHash::iterator it = hash.begin(); it != hash.end(); it++) {
     CkLocation loc(this,it->second);
     dest.addLocation(loc);
   }
-  CmiImmediateUnlock(hashImmLock);
 }
 
 
@@ -3207,9 +3198,7 @@ void CkLocMgr::setDuringDestruction(bool _duringDestruction) {
 //Add given element array record at idx, replacing the existing record
 void CkLocMgr::insertRec(CkLocRec *rec, const CmiUInt8 &id) {
     CkLocRec *old_rec = elementNrec(id);
-    CmiImmediateLock(hashImmLock);
     hash[id] = rec;
-    CmiImmediateUnlock(hashImmLock);
     delete old_rec;
 }
 
