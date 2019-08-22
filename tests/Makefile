@@ -1,5 +1,6 @@
-# Temporary hack that needs to be removed / replaced
 -include ../include/conv-mach-opt.mak
+
+# Temporary hack that needs to be removed / replaced
 OPTS += $(OPTSATBUILDTIME)
 
 DIRS = \
@@ -16,7 +17,16 @@ FTDIRS = \
   charm++ \
   ampi \
 
-TESTDIRS = $(DIRS)
+TESTDIRS = \
+  util \
+  charm++ \
+  ampi \
+
+# TODO: eliminate the need for this
+ifneq ($(BUILD_CUDA),1)
+  TESTDIRS += \
+    converse \
+endif
 
 all: $(foreach i,$(DIRS),build-$i)
 
