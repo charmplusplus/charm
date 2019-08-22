@@ -2,7 +2,7 @@
 # Note that we have omitted the release date and version due to using the umbrella DOI
 ---
 cff-version: "1.0.3"
-title: "Charm++"
+title: "The Charm++ Parallel Programming System"
 authors:
   - family-names: "Kale"
     given-names: "Laxmikant V."
