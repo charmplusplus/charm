@@ -20,7 +20,7 @@ TESTDIRS = \
   bigsim \
   collide \
 
-# TODO: eliminate the need for this
+# TODO #2467: eliminate the need for this
 ifneq ($(BUILD_CUDA),1)
   TESTDIRS += \
     converse \
