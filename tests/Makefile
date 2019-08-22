@@ -18,13 +18,12 @@ FTDIRS = \
   ampi \
 
 TESTDIRS = \
-  util \
   charm++ \
   ampi \
 
 # TODO #2467: eliminate the need for this
 ifneq ($(BUILD_CUDA),1)
-  TESTDIRS += converse
+  TESTDIRS += converse util
 endif
 
 all: $(foreach i,$(DIRS),build-$i)
