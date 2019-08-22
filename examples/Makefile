@@ -2,19 +2,6 @@
 
 DIRS = \
   charm++ \
-  converse \
-  ampi \
-  armci \
-  bigsim \
-  collide \
-
-BGDIRS = \
-  charm++ \
-  ampi \
-  armci \
-
-TESTDIRS = \
-  charm++ \
   ampi \
   armci \
   bigsim \
@@ -22,8 +9,15 @@ TESTDIRS = \
 
 # TODO #2467: eliminate the need for this
 ifneq ($(BUILD_CUDA),1)
-  TESTDIRS += converse
+  DIRS += converse
 endif
+
+BGDIRS = \
+  charm++ \
+  ampi \
+  armci \
+
+TESTDIRS = $(DIRS)
 
 all: $(foreach i,$(DIRS),build-$i)
 

@@ -4,10 +4,13 @@
 OPTS += $(OPTSATBUILDTIME)
 
 DIRS = \
-  util \
   charm++ \
-  converse \
   ampi \
+
+# TODO #2467: eliminate the need for this
+ifneq ($(BUILD_CUDA),1)
+  DIRS += converse util
+endif
 
 BGDIRS = \
   charm++ \
@@ -17,14 +20,7 @@ FTDIRS = \
   charm++ \
   ampi \
 
-TESTDIRS = \
-  charm++ \
-  ampi \
-
-# TODO #2467: eliminate the need for this
-ifneq ($(BUILD_CUDA),1)
-  TESTDIRS += converse util
-endif
+TESTDIRS = $(DIRS)
 
 all: $(foreach i,$(DIRS),build-$i)
 
