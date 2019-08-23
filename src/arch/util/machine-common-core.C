@@ -1716,7 +1716,7 @@ if (MSG_STATISTIC)
     if (CmiMyRank() == 0) CmiExitXpmem();
     CmiNodeAllBarrier();
 #endif
-    if (CmiMyRank() == 0) LrtsExit();
+    if (CmiMyRank() == 0) LrtsExit(exitcode);
 #endif
     CmiYield();
     if (!CharmLibInterOperate || userDrivenMode) {

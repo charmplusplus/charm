@@ -654,7 +654,7 @@ void LrtsExit(int exitcode)
 
         ret = runtime_fini();
         UCX_CHECK_PMI_RET(ret, "runtime_fini");
-        exit(0);
+        exit(exitcode);
     }
 }
 
