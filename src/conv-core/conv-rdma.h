@@ -274,5 +274,17 @@ struct ncpyHandlerMsg{
   void *ref;
 };
 
+struct zcPupSourceInfo{
+  CmiNcpyBuffer src;
+  std::function<void (void *)> deallocate;
+};
+
+void zcPupDone(void *ref);
+void zcPupHandler(ncpyHandlerMsg *msg);
+
+zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src);
+zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src, std::function<void (void *)> deallocate);
+
+void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest);
 
 #endif

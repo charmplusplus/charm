@@ -1,5 +1,5 @@
--include ../../common.mk
-CHARMDIR = ../../..
+-include ../../../common.mk
+CHARMDIR = ../../../..
 CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
 
 all: pup_buffer
@@ -19,12 +19,13 @@ pup_buffer.o: pup_buffer.C cifiles
 test: all
 	$(call run, +p1 ./pup_buffer +balancer RotateLB)
 	$(call run, +p4 ./pup_buffer +balancer RotateLB)
+	$(call run, +p4 ./pup_buffer +balancer RotateLB +noCMAForZC)
 
 smptest: all
 	$(call run, +p2 ./pup_buffer ++ppn 2 +balancer RotateLB)
+	$(call run, +p2 ./pup_buffer ++ppn 2 +balancer RotateLB +noCMAForZC)
 	$(call run, +p4 ./pup_buffer ++ppn 2 +balancer RotateLB)
-	$(call run, +p2 ./pup_buffer +noCMAForZC ++ppn 2 +balancer RotateLB)
-	$(call run, +p4 ./pup_buffer +noCMAForZC ++ppn 2 +balancer RotateLB)
+	$(call run, +p4 ./pup_buffer ++ppn 2 +balancer RotateLB +noCMAForZC)
 
 clean:
 	rm -f *.decl.h *.def.h *.o

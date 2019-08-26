@@ -492,6 +492,9 @@ private:
 public:
 	void callMethod(CkLocRec *rec,CkMigratable_voidfn_t fn);
 
+	// Deliver buffered msgs that were buffered because of active rdma gets
+	void deliverAnyBufferedRdmaMsgs(CmiUInt8);
+
 //Data Members:
     //Map array ID to manager and elements
     ArrayIdMap managers;
@@ -511,6 +514,7 @@ public:
     MsgBuffer bufferedMsgs;
     MsgBuffer bufferedRemoteMsgs;
     MsgBuffer bufferedShadowElemMsgs;
+    MsgBuffer bufferedActiveRgetMsgs;
 
     IndexMsgBuffer bufferedIndexMsgs;
 

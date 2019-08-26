@@ -4,8 +4,11 @@
 #include "converse.h"
 #include "conv-rdma.h"
 #include <algorithm>
+#include <vector>
 
 bool useCMAForZC;
+CpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets);
+static int zc_pup_handler_idx;
 
 // Methods required to keep the Nocopy Direct API functional on non-LRTS layers
 #if !CMK_USE_LRTS
@@ -129,6 +132,7 @@ void CmiOnesidedDirectInit(void) {
   get_request_handler_idx = CmiRegisterHandler((CmiHandler)getRequestHandler);
   put_data_handler_idx = CmiRegisterHandler((CmiHandler)putDataHandler);
 #endif
+  zc_pup_handler_idx = CmiRegisterHandler((CmiHandler)zcPupHandler);
 }
 
 /****************************** Zerocopy Direct API *****************************/
@@ -150,49 +154,6 @@ void CmiNcpyBuffer::cmaGet(CmiNcpyBuffer &source) {
          std::min(cnt, source.cnt));
 }
 #endif
-
-void CmiNcpyBuffer::rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck) {
-
-  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
-
-  if(regMode == CMK_BUFFER_UNREG) {
-    // register it because it is required for RPUT
-    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
-
-    isRegistered = true;
-  }
-
-  int rootNode = -1; // -1 is the rootNode for p2p operations
-
-  NcpyOperationInfo *ncpyOpInfo = createNcpyOpInfo(*this, destination, ackSize, srcAck, destAck, rootNode, CMK_DIRECT_API, (void *)ref);
-
-  CmiIssueRput(ncpyOpInfo);
-}
-
-// Returns CmiNcpyMode::MEMCPY if both the PEs are the same and memcpy can be used
-// Returns CmiNcpyMode::CMA if both the PEs are in the same physical node and CMA can be used
-// Returns CmiNcpyMode::RDMA if RDMA needs to be used
-CmiNcpyMode findTransferMode(int srcPe, int destPe) {
-  if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
-    return CmiNcpyMode::MEMCPY;
-#if CMK_USE_CMA
-  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
-    return CmiNcpyMode::CMA;
-#endif
-  else
-    return CmiNcpyMode::RDMA;
-}
-
-CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
-  if(srcNode==destNode)
-    return CmiNcpyMode::MEMCPY;
-#if CMK_USE_CMA
-  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(CmiNodeFirst(srcNode), CmiNodeFirst(destNode)))
-    return CmiNcpyMode::CMA;
-#endif
-  else
-    return CmiNcpyMode::RDMA;
-}
 
 
 void CmiNcpyBuffer::rdmaGet(CmiNcpyBuffer &source, int ackSize, char *srcAck, char *destAck) {
@@ -274,3 +235,107 @@ void CmiNcpyBuffer::cmaPut(CmiNcpyBuffer &destination) {
                        std::min(cnt, destination.cnt));
 }
 #endif
+
+void CmiNcpyBuffer::rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck) {
+
+  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+
+  if(regMode == CMK_BUFFER_UNREG) {
+    // register it because it is required for RPUT
+    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
+
+    isRegistered = true;
+  }
+
+  int rootNode = -1; // -1 is the rootNode for p2p operations
+
+  NcpyOperationInfo *ncpyOpInfo = createNcpyOpInfo(*this, destination, ackSize, srcAck, destAck, rootNode, CMK_DIRECT_API, (void *)ref);
+
+  CmiIssueRput(ncpyOpInfo);
+}
+
+// Returns CmiNcpyMode::MEMCPY if both the PEs are the same and memcpy can be used
+// Returns CmiNcpyMode::CMA if both the PEs are in the same physical node and CMA can be used
+// Returns CmiNcpyMode::RDMA if RDMA needs to be used
+CmiNcpyMode findTransferMode(int srcPe, int destPe) {
+  if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
+    return CmiNcpyMode::MEMCPY;
+#if CMK_USE_CMA
+  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
+    return CmiNcpyMode::CMA;
+#endif
+  else
+    return CmiNcpyMode::RDMA;
+}
+
+CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
+  if(srcNode==destNode)
+    return CmiNcpyMode::MEMCPY;
+#if CMK_USE_CMA
+  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(CmiNodeFirst(srcNode), CmiNodeFirst(destNode)))
+    return CmiNcpyMode::CMA;
+#endif
+  else
+    return CmiNcpyMode::RDMA;
+}
+
+zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src) {
+  zcPupSourceInfo *srcInfo = new zcPupSourceInfo();
+  srcInfo->src = src;
+  srcInfo->deallocate = free;
+  return srcInfo;
+}
+
+zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src, std::function<void (void *)> deallocate) {
+  zcPupSourceInfo *srcInfo = new zcPupSourceInfo();
+  srcInfo->src = src;
+  srcInfo->deallocate = deallocate;
+  return srcInfo;
+}
+
+void zcPupDone(void *ref) {
+  zcPupSourceInfo *srcInfo = (zcPupSourceInfo *)(ref);
+#if CMK_REG_REQUIRED
+  deregisterBuffer(srcInfo->src);
+#endif
+
+  srcInfo->deallocate((void *)srcInfo->src.ptr);
+}
+
+void zcPupHandler(ncpyHandlerMsg *msg) {
+  zcPupDone(msg->ref);
+}
+
+void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest) {
+  CmiNcpyMode transferMode = findTransferMode(src.pe, dest.pe);
+  if(transferMode == CmiNcpyMode::MEMCPY) {
+    CmiAbort("zcPupGet: memcpyGet should not happen\n");
+  }
+#if CMK_USE_CMA
+  else if(transferMode == CmiNcpyMode::CMA) {
+    dest.cmaGet(src);
+
+#if CMK_REG_REQUIRED
+    // De-register destination buffer
+    deregisterBuffer(dest);
+#endif
+
+    if(src.ref) {
+      ncpyHandlerMsg *msg = (ncpyHandlerMsg *)CmiAlloc(sizeof(ncpyHandlerMsg));
+      msg->ref = (void *)src.ref;
+
+      CmiSetHandler(msg, zc_pup_handler_idx);
+      CmiSyncSendAndFree(src.pe, sizeof(ncpyHandlerMsg), (char *)msg);
+    }
+    else
+      CmiAbort("zcPupGet - src.ref is NULL\n");
+  }
+#endif
+  else {
+    int ackSize = 0;
+    int rootNode = -1; // -1 is the rootNode for p2p operations
+    NcpyOperationInfo *ncpyOpInfo = dest.createNcpyOpInfo(src, dest, ackSize, NULL, NULL, rootNode, CMK_ZC_PUP, NULL);
+    CpvAccess(newZCPupGets).push_back(ncpyOpInfo);
+  }
+}
+

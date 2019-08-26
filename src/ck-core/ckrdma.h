@@ -407,9 +407,35 @@ inline void deregisterBuffer(CkNcpyBuffer &buffInfo);
 inline void deregisterDestBuffer(NcpyOperationInfo *ncpyOpInfo);
 inline void deregisterSrcBuffer(NcpyOperationInfo *ncpyOpInfo);
 
-inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo);
+inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo, ncpyHandlerIdx opMode);
 int getRootNode(envelope *env);
 
 #endif /* End of CMK_ONESIDED_IMPL */
 
+// Function declaration for EM Ncpy Ack handler initialization
+void initEMNcpyAckHandler(void);
+
+struct zcPupIncompleteInfo {
+  int numRdmaOps;
+  std::vector<envelope*> bufferedMessages;
+};
+
+struct zcPupPendingRgetsMsg {
+  char cmicore[CmiMsgHeaderSizeBytes];
+  CmiUInt8 id;
+  int numops;
+  CkGroupID locMgrId;
+};
+
+
+void zcPupGetCompleted(NcpyOperationInfo *ncpyOpInfo);
+
+void _zcpyPupCompleteHandler(zcPupPendingRgetsMsg *msg);
+
+class CkLocMgr;
+void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *mgr);
+
+void CkRdmaZCPupCustomHandler(void *ack);
+
+void _ncpyAckHandler(ncpyHandlerMsg *msg);
 #endif

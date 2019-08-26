@@ -9,13 +9,17 @@
 #include "spanningTree.h"
 #include <algorithm>
 #include "ckarray.h"
+#include "cklocation.h"
 
 #if CMK_SMP
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
 #endif
 
 // Integer used to store the ncpy ack handler idx
-static int ncpy_handler_idx, ncpy_bcastNo_handler_idx;
+static int ncpy_handler_idx, ncpy_bcastNo_handler_idx, zcpy_pup_complete_handler_idx;
+CkpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets);
+CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
+CksvExtern(CmiNodeLock, _nodeZCPendingLock);
 
 /*********************************** Zerocopy Direct API **********************************/
 
@@ -67,7 +71,7 @@ CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
 #if CMK_REG_REQUIRED
     // De-register source and invoke cb
     if(source.isRegistered && source.deregMode == CMK_BUFFER_DEREG)
-      invokeCmaDirectRemoteDeregAckHandler(source); // Send a message to de-register source buffer and invoke callback
+      invokeCmaDirectRemoteDeregAckHandler(source, ncpyHandlerIdx::CMA_DEREG_ACK_DIRECT); // Send a message to de-register source buffer and invoke callback
     else
 #endif
       source.cb.send(sizeof(CkNcpyBuffer), &source); //Invoke the source callback
@@ -145,7 +149,7 @@ CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
 #if CMK_REG_REQUIRED
     // De-register destination invoke cb
     if(destination.isRegistered && destination.deregMode == CMK_BUFFER_DEREG)
-      invokeCmaDirectRemoteDeregAckHandler(destination); // Send a message to de-register dest buffer and invoke callback
+      invokeCmaDirectRemoteDeregAckHandler(destination, ncpyHandlerIdx::CMA_DEREG_ACK_DIRECT); // Send a message to de-register dest buffer and invoke callback
     else
 #endif
       destination.cb.send(sizeof(CkNcpyBuffer), &destination); //Invoke the destination callback
@@ -308,6 +312,9 @@ void CkRdmaDirectAckHandler(void *ack) {
     case CMK_READONLY_BCAST         : readonlyGetCompleted(info);
                                       break;
 #endif
+    case CMK_ZC_PUP                 : zcPupGetCompleted(info);
+                                      break;
+
     default                         : CkAbort("CkRdmaDirectAckHandler: Unknown ncpyOpInfo->opMode");
                                       break;
   }
@@ -1964,6 +1971,28 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
   // Free ncpyOpInfo allocated inside readonlyGet
   CmiFree(ncpyOpInfo);
 }
+/***************************** End of Zerocopy Readonly Bcast Support ****************************/
+
+inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo, ncpyHandlerIdx opMode) {
+  PUP::sizer implSizer;
+  implSizer|buffInfo;
+
+  ncpyHandlerMsg *msg = (ncpyHandlerMsg *)CmiAlloc(sizeof(ncpyHandlerMsg) + implSizer.size());
+
+  PUP::toMem implP((void *)((char *)msg + sizeof(ncpyHandlerMsg)));
+  implP|buffInfo;
+
+  msg->opMode = opMode;
+  CmiSetHandler(msg, ncpy_handler_idx);
+  QdCreate(1); // Matching QdProcess in _ncpyAckHandler
+  CmiSyncSendAndFree(buffInfo.pe, sizeof(ncpyHandlerMsg) + implSizer.size(), (char *)msg);
+}
+
+void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize) {
+  CmiSetHandler(bcastNoMsg, ncpy_bcastNo_handler_idx);
+  CmiBecomeImmediate(bcastNoMsg);
+  CmiSyncNodeSendAndFree(CmiNodeOf(serializerPe), msgSize, (char *)bcastNoMsg);
+}
 
 inline void _ncpyBcastNoHandler(ncpyBcastNoMsg *bcastNoMsg) {
 
@@ -1983,6 +2012,30 @@ inline void _ncpyBcastNoHandler(ncpyBcastNoMsg *bcastNoMsg) {
   arrProxy[bcastNoMsg->srcPe].sendZCBroadcast(w);
 }
 
+#endif  /* End of CMK_ONESIDED_IMPL */
+
+// Register converse handler for invoking ncpy ack
+void initEMNcpyAckHandler(void) {
+#if CMK_ONESIDED_IMPL
+  ncpy_bcastNo_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyBcastNoHandler);
+#endif
+  ncpy_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyAckHandler);
+#if CMK_SMP
+  zcpy_pup_complete_handler_idx = CmiRegisterHandler((CmiHandler)_zcpyPupCompleteHandler);
+#endif
+}
+
+inline void invokeRemoteNcpyAckHandler(int pe, void *ref, ncpyHandlerIdx opMode) {
+  ncpyHandlerMsg *msg = (ncpyHandlerMsg *)CmiAlloc(sizeof(ncpyHandlerMsg));
+  msg->ref = ref;
+  msg->opMode = opMode;
+
+  CmiSetHandler(msg, ncpy_handler_idx);
+  QdCreate(1); // Matching QdProcess in _ncpyAckHandler
+  CmiSyncSendAndFree(pe, sizeof(ncpyHandlerMsg), (char *)msg);
+}
+
+#if CMK_ONESIDED_IMPL
 inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
   QdProcess(1);
 
@@ -2003,43 +2056,86 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
                                                  break;
   }
 }
+#endif  /* End of CMK_ONESIDED_IMPL */
 
-// Register converse handler for invoking ncpy ack
-void initEMNcpyAckHandler(void) {
-  ncpy_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyAckHandler);
-  ncpy_bcastNo_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyBcastNoHandler);
-}
 
-inline void invokeRemoteNcpyAckHandler(int pe, void *ref, ncpyHandlerIdx opMode) {
-  ncpyHandlerMsg *msg = (ncpyHandlerMsg *)CmiAlloc(sizeof(ncpyHandlerMsg));
-  msg->ref = ref;
-  msg->opMode = opMode;
+/***************************** Zerocopy PUP Support ****************************/
 
-  CmiSetHandler(msg, ncpy_handler_idx);
-  QdCreate(1); // Matching QdProcess in _ncpyAckHandler
-  CmiSyncSendAndFree(pe, sizeof(ncpyHandlerMsg), (char *)msg);
-}
-
-inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo) {
-  PUP::sizer implSizer;
-  implSizer|buffInfo;
-
-  ncpyHandlerMsg *msg = (ncpyHandlerMsg *)CmiAlloc(sizeof(ncpyHandlerMsg) + implSizer.size());
-
-  PUP::toMem implP((void *)((char *)msg + sizeof(ncpyHandlerMsg)));
-  implP|buffInfo;
-
-  msg->opMode = ncpyHandlerIdx::CMA_DEREG_ACK_DIRECT;
-  CmiSetHandler(msg, ncpy_handler_idx);
-  QdCreate(1); // Matching QdProcess in _ncpyAckHandler
-  CmiSyncSendAndFree(buffInfo.pe, sizeof(ncpyHandlerMsg) + implSizer.size(), (char *)msg);
-}
-
-void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize) {
-
-  CmiSetHandler(bcastNoMsg, ncpy_bcastNo_handler_idx);
-  CmiBecomeImmediate(bcastNoMsg);
-  CmiSyncNodeSendAndFree(CmiNodeOf(serializerPe), msgSize, (char *)bcastNoMsg);
+#if CMK_SMP
+// Executed on the worker thread to enqueue all buffered messages after Rgets complete
+void _zcpyPupCompleteHandler(zcPupPendingRgetsMsg *msg) {
+  CProxy_CkLocMgr(msg->locMgrId).ckLocalBranch()->deliverAnyBufferedRdmaMsgs(msg->id);
 }
 #endif
-/* End of CMK_ONESIDED_IMPL */
+
+// Executed on the comm. thread in SMP mode
+void zcPupGetCompleted(NcpyOperationInfo *info) {
+  if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
+    zcPupPendingRgetsMsg *ref = (zcPupPendingRgetsMsg *)(info->destRef);
+
+    auto iter = CksvAccess(pendingZCOps).find(ref->id);
+    if(iter != CksvAccess(pendingZCOps).end()) { // Entry found in pendingZCOps
+
+      CmiLock(CksvAccess(_nodeZCPendingLock));
+      int counter = --iter->second;
+      CmiUnlock(CksvAccess(_nodeZCPendingLock));
+
+      if(counter == 0) { // All Rgets have completed
+
+        CmiLock(CksvAccess(_nodeZCPendingLock));
+        // remove this entry from the map
+        CksvAccess(pendingZCOps).erase(iter);
+        CmiUnlock(CksvAccess(_nodeZCPendingLock));
+
+#if CMK_SMP
+        // Send a message to all PEs on this node to handle all buffered messages
+        CmiSetHandler(ref, zcpy_pup_complete_handler_idx);
+        for(int i=0; i<CmiMyNodeSize(); i++) {
+          CmiSyncSend(CmiNodeFirst(CmiMyNode()) + i,
+                      sizeof(zcPupPendingRgetsMsg),
+                      (char *)ref);
+        }
+#else
+        // On worker thread, handle all buffered messages
+        CProxy_CkLocMgr(ref->locMgrId).ckLocalBranch()->deliverAnyBufferedRdmaMsgs(ref->id);
+#endif
+        //TODO:Free this message
+      }
+    } else {
+      CmiAbort("zcPupGetCompleted: object not found\n");
+    }
+    if(info->ackMode == CMK_SRC_DEST_ACK)
+      invokeRemoteNcpyAckHandler(info->srcPe, (void *)info->srcRef, ncpyHandlerIdx::CMA_DEREG_ACK_ZC_PUP_CUSTOM);
+  } else {
+    zcPupDone((void *)info->srcRef);
+  }
+}
+
+// Issue Rgets for ZC Pup using NcpyOperationInfo stored in newZCPupGets
+void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
+
+  // Allocate a zcPupPendingRgetsMsg that is used for ack handling
+  zcPupPendingRgetsMsg *ref = (zcPupPendingRgetsMsg *)CmiAlloc(sizeof(zcPupPendingRgetsMsg));
+  ref->id = id;
+  ref->numops = CkpvAccess(newZCPupGets).size();
+  ref->locMgrId = locMgr->getGroupID();
+
+  for(std::vector<NcpyOperationInfo *>::iterator it = CkpvAccess(newZCPupGets).begin();
+        it != CkpvAccess(newZCPupGets).end(); ++it) {
+    (*it)->destRef = (char *)ref;
+    zcQdIncrement();
+    CmiIssueRget(*it); // Issue the Rget
+  }
+
+  // Create an entry for the unordered map with idx as the index and the vector size as the value
+  std::pair<CmiUInt8, CmiUInt1> idNumOpsVal(id, CkpvAccess(newZCPupGets).size());
+
+  CmiLock(CksvAccess(_nodeZCPendingLock));
+  CksvAccess(pendingZCOps).insert(idNumOpsVal);
+  CmiUnlock(CksvAccess(_nodeZCPendingLock));
+
+  // Create an entry for the unordered map with idx as the index and vector of messages as the value
+  std::pair<CmiUInt8, std::vector<CkArrayMessage*>> idEmptyVecVal(id, std::vector<CkArrayMessage *>());
+  locMgr->bufferedActiveRgetMsgs.insert(idEmptyVecVal); // does not require locking as it is owned by locMgr
+}
+/***************************** End of Zerocopy PUP Support ****************************/

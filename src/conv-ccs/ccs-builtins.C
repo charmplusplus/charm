@@ -699,6 +699,15 @@ void PUP_fmt::synchronize(unsigned int m) {
 	fieldHeader(typeCode_sync,1);
 	p(m);
 }
+
+void PUP_fmt::pup_buffer(void *&ptr,size_t n,size_t itemSize,PUP::dataType t) {
+  bytes(ptr, n, itemSize, t);
+}
+
+void PUP_fmt::pup_buffer(void *&ptr,size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate){
+  bytes(ptr, n, itemSize, t);
+}
+
 void PUP_fmt::bytes(void *ptr,size_t n,size_t itemSize,PUP::dataType t) {
 	if(itemSize > INT_MAX || n > INT_MAX || itemSize*n > INT_MAX)
 		CmiAbort("Ccs does not support messages greater than INT_MAX...\n");

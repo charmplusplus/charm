@@ -2,6 +2,7 @@ mainmodule pup_buffer
 {
   readonly CProxy_arr arrProxy;
   readonly CProxy_main mainProxy;
+  readonly int totalElems;
 
   mainchare main {
     entry main(CkArgMsg *);
@@ -11,5 +12,6 @@ mainmodule pup_buffer
   array [1D] arr{
     entry arr();
     entry void run();
+    entry void verify();
   };
 }

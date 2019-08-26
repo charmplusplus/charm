@@ -1,9 +1,10 @@
 #include "pup_buffer.decl.h"
-#define SIZE 1000
+#define SIZE 1000000
 #define TOTAL_ITER 10
 
 CProxy_arr arrProxy;
 CProxy_main mainProxy;
+int totalElems;
 
 class main : public CBase_main {
   public:
@@ -12,7 +13,8 @@ class main : public CBase_main {
 
       mainProxy = thisProxy;
 
-      arrProxy = CProxy_arr::ckNew(10 * CkNumPes());
+      totalElems = 1 * CkNumPes();
+      arrProxy = CProxy_arr::ckNew(totalElems);
       arrProxy.run();
     }
 
@@ -41,12 +43,14 @@ class arr : public CBase_arr {
       delete msg;
     }
 
+    ~arr() {}
+
     static void *buff_allocate(size_t n) {
       return new int[n];
     }
 
     static void buff_deallocate(void *ptr) {
-      free(ptr);
+      delete [] (int *)(ptr);
     }
 
     void pup(PUP::er &p) {
@@ -58,9 +62,13 @@ class arr : public CBase_arr {
       else // Test pup_buffer default
         p.pup_buffer(buffer, SIZE);
 
-      if(p.isUnpacking())
-        for(int i=0; i < SIZE; i++)
-          CkAssert(buffer[i] == thisIndex);
+    }
+
+    void verify() {
+      for(int i=0; i < SIZE; i++) {
+        CkAssert(buffer[i] == thisIndex);
+      }
+      run();
     }
 
     void run() {
@@ -68,7 +76,10 @@ class arr : public CBase_arr {
       if(thisIndex == 0)
         CmiPrintf("Iteration %d completed\n", iteration);
       if(iteration < TOTAL_ITER) {
-        AtSync();
+        if(iteration % 5 == 0)
+          AtSync();
+        else
+          thisProxy[(thisIndex + 1) % totalElems].verify();
       } else {
         contribute(cb);
       }

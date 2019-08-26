@@ -19,7 +19,6 @@ DIRS = \
   sparse \
   reductionTesting \
   partitions \
-  pup_buffer \
   charmxi_parsing \
   jacobi3d \
   jacobi3d-sdag \

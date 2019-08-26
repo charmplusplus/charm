@@ -23,6 +23,7 @@ virtual functions are defined here.
 #include "pup.h"
 #include "ckhashtable.h"
 
+#include "conv-rdma.h"
 #if defined(_WIN32)
 #include <io.h>
 
@@ -164,6 +165,71 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
 	n*=itemSize; 
 	memcpy(p,(const void *)buf,n); 
 	buf+=n;
+}
+
+void PUP::sizer::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t) {
+#ifdef CK_CHECK_PUP
+	nBytes+=sizeof(pupCheckRec);
+#endif
+	nBytes+=sizeof(CmiNcpyBuffer);
+}
+
+void PUP::sizer::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+	pup_buffer(p, n, itemSize, t);
+}
+
+void PUP::toMem::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+	pup_buffer(p, n, itemSize, t, malloc, free);
+}
+
+void PUP::fromMem::pup_buffer_generic(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, bool isMalloc) {
+#ifdef CK_CHECK_PUP
+	((pupCheckRec *)buf)->check(t,n);
+	buf+=sizeof(pupCheckRec);
+#endif
+	// Unpup a CmiNcpyBuffer object with the callback
+	CmiNcpyBuffer src;
+
+	PUP::fromMem fMem(buf);
+	fMem|src;
+	CmiAssert(sizeof(src) == sizeof(CmiNcpyBuffer));
+
+	// Allocate only if inter-process
+	if(isUnpacking()) {
+		if(CmiNodeOf(src.pe)!=CmiMyNode()) {
+			if(isMalloc)
+				p = malloc(n * itemSize);
+			else
+				p = allocate(n);
+			CmiNcpyBuffer dest(p, n*itemSize);
+			zcPupGet(src, dest);
+		} else
+			p = (void *)src.ptr;
+	}
+	buf+=sizeof(src);
+}
+
+void PUP::fromMem::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+	pup_buffer_generic(p, n, itemSize, t, malloc, true);
+}
+
+void PUP::toMem::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+#ifdef CK_CHECK_PUP
+	((pupCheckRec *)buf)->write(t,n);
+	buf+=sizeof(pupCheckRec);
+#endif
+	// Create a CmiNcpyBuffer object with the callback
+	CmiNcpyBuffer src(p, n*itemSize);
+	zcPupSourceInfo *srcInfo = zcPupAddSource(src, deallocate);
+	src.ref = srcInfo;
+	CmiAssert(sizeof(src) == sizeof(CmiNcpyBuffer));
+	PUP::toMem tMem(buf);
+	tMem|src;
+	buf+=sizeof(src);
+}
+
+void PUP::fromMem::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+	pup_buffer_generic(p, n, itemSize, t, allocate, false);
 }
 
 extern "C" {
@@ -308,8 +374,29 @@ void PUP::toDisk::bytes(void *p,size_t n,size_t itemSize,dataType /*t*/)
     error = true;
   }
 }
+
+void PUP::toDisk::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+  if(isPacking()) free(p);
+}
+
+void PUP::toDisk::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+  if(isPacking()) deallocate(p);
+}
+
 void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType /*t*/)
 {/* CkPrintf("reading %d bytes\n",itemSize*n); */ CmiFread(p,itemSize,n,F);}
+
+void PUP::fromDisk::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  if(isUnpacking()) p = malloc(n * itemSize);
+  bytes(p, n, itemSize, t);
+}
+
+void PUP::fromDisk::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  if(isUnpacking()) p = allocate(n * itemSize);
+  bytes(p, n, itemSize, t);
+}
 
 /****************** Seek support *******************
 For seeking:
@@ -600,6 +687,14 @@ void PUP::toTextUtil::synchronize(unsigned int m)
 #endif
 }
 
+void PUP::toTextUtil::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void PUP::toTextUtil::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 void PUP::toTextUtil::bytes(void *p,size_t n,size_t itemSize,dataType t) {
   if (t==Tchar) 
   { /*Character data is written out directly (rather than numerically)*/
@@ -694,6 +789,14 @@ PUP::toText::toText(char *outBuf)
   :toTextUtil(IS_PACKING+IS_COMMENTS,outBuf),buf(outBuf),charCount(0) { }
 
 /************** To/from text FILE ****************/
+void PUP::toTextFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void PUP::toTextFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 void PUP::toTextFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (size_t i=0;i<n;i++) 
@@ -775,6 +878,15 @@ double PUP::fromTextFile::readDouble(void) {
   }
   return ret;
 }
+
+void PUP::fromTextFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void PUP::fromTextFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 void PUP::fromTextFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (size_t i=0;i<n;i++) 
