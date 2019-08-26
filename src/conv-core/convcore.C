@@ -69,6 +69,7 @@
 #endif
 
 #include "converse.h"
+#include "conv-rdma.h"
 #include "conv-trace.h"
 #include "sockRoutines.h"
 #include "queueing.h"
@@ -86,6 +87,7 @@
 #endif
 
 extern const char * const CmiCommitID;
+extern bool useCMAForZC;
 
 #if CMI_QD
 void initQd(char **argv);
@@ -3849,10 +3851,13 @@ void ConverseCommonInit(char **argv)
   CmiPersistentInit();
   CmiIsomallocInit(argv);
 
-#if !CMK_ONESIDED_IMPL
   // Initialize converse handlers for supporting generic Direct Nocopy API
   CmiOnesidedDirectInit();
-#endif
+
+  useCMAForZC = true;
+  if (CmiGetArgFlagDesc(argv, "+noCMAForZC", "When Cross Memory Attach (CMA) is supported, the program does not use CMA when using the Zerocopy API")) {
+    useCMAForZC = false;
+  }
 
   CmiDeliversInit();
   CsdInit(argv);

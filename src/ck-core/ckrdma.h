@@ -6,6 +6,8 @@
 #define _CKRDMA_H_
 
 #include "envelope.h"
+#include "ckcallback.h"
+#include "conv-rdma.h"
 
 /*********************************** Zerocopy Direct API **********************************/
 
@@ -17,38 +19,11 @@
 #define CK_BUFFER_DEREG     CMK_BUFFER_DEREG
 #define CK_BUFFER_NODEREG   CMK_BUFFER_NODEREG
 
-#ifndef CMK_NOCOPY_DIRECT_BYTES
-
-#if defined(_WIN32)
-#define CMK_NOCOPY_DIRECT_BYTES 1
-/* It is required to declare CMK_NOCOPY_DIRECT_BYTES to 1 instead of 0
- * as this avoids the C2229 error (illegal zero-sized array)
- * for char layerInfo[CMK_NOCOPY_DIRECT_BYTES] which is seen for
- * a 0 sized array on VC++
- */
-#else
-#define CMK_NOCOPY_DIRECT_BYTES 0
-#endif // end of if defined(_WIN32)
-
-#endif // end of ifndef CMK_NOCOPY_DIRECT_BYTES
-
-#ifndef CMK_COMMON_NOCOPY_DIRECT_BYTES
-#define CMK_COMMON_NOCOPY_DIRECT_BYTES 0
-#endif
-
 #define CkRdmaAlloc CmiRdmaAlloc
 #define CkRdmaFree  CmiRdmaFree
 
-// Represents the mode of the zerocopy transfer
-// CkNcpyMode::MEMCPY indicates that the PEs are on the logical node and memcpy can be used
-// CkNcpyMode::CMA indicates that the PEs are on the same physical node and CMA can be used
-// CkNcpyMode::RDMA indicates that the neither MEMCPY or CMA can be used and REMOTE Direct Memory Access needs to be used
-enum class CkNcpyMode : char { MEMCPY, CMA, RDMA };
-
-// Represents the completion status of the zerocopy transfer (used as a return value for CkNcpyBuffer::get & CkNcpyBuffer:::put)
-// CMA and MEMCPY transfers complete instantly and return CkNcpyStatus::complete
-// RDMA transfers use a remote asynchronous call and hence return CkNcpyStatus::incomplete
-enum class CkNcpyStatus : char { incomplete, complete };
+#define CkNcpyStatus CmiNcpyStatus
+#define CkNcpyMode CmiNcpyMode
 
 // P2P_SEND mode is used for EM P2P Send API
 // BCAST_SEND mode is used for EM BCAST Send API
@@ -67,63 +42,17 @@ struct CkNcpyBufferPost {
 
 // Class to represent an Zerocopy buffer
 // CkSendBuffer(....) passed by the user internally translates to a CkNcpyBuffer
-class CkNcpyBuffer{
-
-  private:
-
-  // bool to indicate registration for current values of ptr and cnt on pe
-  bool isRegistered;
-
-  // machine specific information about the buffer
-  #ifdef __GNUC__
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wpedantic"
-  #endif
-  char layerInfo[CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES];
-  #ifdef __GNUC__
-  #pragma GCC diagnostic pop
-  #endif
-
-#if CMK_ERROR_CHECKING
-  void checkRegModeIsValid() {
-    if(regMode < CK_BUFFER_REG || regMode > CK_BUFFER_NOREG) CmiAbort("checkRegModeIsValid: Invalid value for regMode!\n");
-  }
-
-  void checkDeregModeIsValid() {
-    if(deregMode < CK_BUFFER_DEREG || deregMode > CK_BUFFER_NODEREG) CmiAbort("checkDeregModeIsValid: Invalid value for deregMode!\n");
-  }
-#endif
-
+class CkNcpyBuffer : public CmiNcpyBuffer {
   public:
-  // pointer to the buffer
-  const void *ptr;
-
-  // number of bytes
-  size_t cnt;
 
   // callback to be invoked on the sender/receiver
   CkCallback cb;
 
-  // home pe
-  int pe;
-
-  // regMode
-  unsigned short int regMode;
-
-  // deregMode
-  unsigned short int deregMode;
-
-  // reference pointer
-  const void *ref;
-
-  // ack handling pointer used for bcast and CMA p2p transfers
-  const void *refAckInfo;
-
-  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), ref(NULL), refAckInfo(NULL) {}
+  CkNcpyBuffer() : CmiNcpyBuffer() {}
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
     cb = CkCallback(CkCallback::ignore);
-    init(ptr_, cnt_, regMode_, deregMode_);
+    CmiNcpyBuffer::init(ptr_, cnt_, regMode_, deregMode_);
   }
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
@@ -136,108 +65,15 @@ class CkNcpyBuffer{
 
   void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
     cb   = cb_;
-    init(ptr_, cnt_, regMode_, deregMode_);
+    CmiNcpyBuffer::init(ptr_, cnt_, regMode_, deregMode_);
   }
-
-  void init(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
-    ptr  = ptr_;
-    cnt  = cnt_;
-    pe   = CkMyPe();
-    regMode = regMode_;
-    deregMode = deregMode_;
-
-    isRegistered = false;
-
-#if CMK_ERROR_CHECKING
-    // Ensure that regMode is valid
-    checkRegModeIsValid();
-
-    // Ensure that deregMode is valid
-    checkDeregModeIsValid();
-#endif
-
-    ref = NULL;
-    refAckInfo = NULL;
-
-    // Register memory everytime new values are initialized
-    if(cnt > 0)
-      registerMem();
-  }
-
-  void setRef(const void *ref_) {
-    ref = ref_;
-  }
-
-  const void *getRef() {
-    return ref;
-  }
-
-  // Register(Pin) the memory for the buffer
-  void registerMem()
-  {
-    // Check that this object is local when registerMem is called
-    CkAssert(CkNodeOf(pe) == CkMyNode());
-
-    // Set machine layer information when regMode is not CK_BUFFER_NOREG
-    if(regMode != CK_BUFFER_NOREG) {
-
-      CmiSetRdmaCommonInfo(&layerInfo[0], ptr, cnt);
-
-      /* Set the pointer layerInfo unconditionally for layers that don't require pinning (MPI, PAMI)
-       * or if regMode is REG, PREREG on layers that require pinning (GNI, Verbs, OFI, UCX) */
-#if CMK_REG_REQUIRED
-      if(regMode == CK_BUFFER_REG || regMode == CK_BUFFER_PREREG)
-#endif
-      {
-        CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
-        isRegistered = true;
-      }
-    }
-  }
-
-  void setMode(unsigned short int regMode_) { regMode = regMode_; }
-
-  void memcpyGet(CkNcpyBuffer &source);
-  void memcpyPut(CkNcpyBuffer &destination);
-
-#if CMK_USE_CMA
-  void cmaGet(CkNcpyBuffer &source);
-  void cmaPut(CkNcpyBuffer &destination);
-#endif
-
-  void rdmaGet(CkNcpyBuffer &source);
-  void rdmaPut(CkNcpyBuffer &destination);
 
   CkNcpyStatus get(CkNcpyBuffer &source);
   CkNcpyStatus put(CkNcpyBuffer &destination);
 
-  // Deregister(Unpin) the memory that is registered for the buffer
-  void deregisterMem() {
-    // Check that this object is local when deregisterMem is called
-    CkAssert(CkNodeOf(pe) == CkMyNode());
-
-    if(isRegistered == false)
-      return;
-
-#if CMK_REG_REQUIRED
-    if(regMode != CK_BUFFER_NOREG) {
-      CmiDeregisterMem(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, regMode);
-      isRegistered = false;
-    }
-#endif
-  }
-
   void pup(PUP::er &p) {
-    p((char *)&ptr, sizeof(ptr));
-    p((char *)&ref, sizeof(ref));
-    p((char *)&refAckInfo, sizeof(refAckInfo));
-    p|cnt;
+    CmiNcpyBuffer::pup(p);
     p|cb;
-    p|pe;
-    p|regMode;
-    p|deregMode;
-    p|isRegistered;
-    PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
   }
 
   friend void CkRdmaDirectAckHandler(void *ack);
@@ -302,27 +138,9 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int reg
   return CkNcpyBuffer(ptr_, 0, regMode_, deregMode_);
 }
 
+
+
 #if CMK_ONESIDED_IMPL
-// Represents the remote handler tag that should be invoked
-// ncpyHandlerIdx::EM_ACK tag is used to remotely invoke CkRdmaEMAckHandler
-// ncpyHandlerIdx::BCAST_ACK tag is used to remotely invoke CkRdmaEMBcastAckHandler
-// ncpyHandlerIdx::BCAST_POST_ACK is used to remotely invoke CkRdmaEMBcastPostAckHandler
-// ncpyHandlerIdx::CMA_DEREG_ACK is used to remotely invoke CkRdmaEMDeregAndAckHandler
-enum class ncpyHandlerIdx: char {
-  EM_ACK,
-  BCAST_ACK,
-  BCAST_POST_ACK,
-  CMA_DEREG_ACK,
-  CMA_DEREG_ACK_DIRECT
-};
-
-// Converse message to invoke the Ncpy handler on a remote process
-struct ncpyHandlerMsg{
-  char cmicore[CmiMsgHeaderSizeBytes];
-  ncpyHandlerIdx opMode;
-  void *ref;
-};
-
 // NOTE: Inside CkRdmaIssueRgets, a large message allocation is made consisting of space
 // for the destination or receiver buffers and some additional information required for processing
 // and acknowledgment handling. The space for additional information is typically equal to
@@ -582,7 +400,6 @@ inline void invokeRemoteNcpyAckHandler(int pe, void *ref, ncpyHandlerIdx opMode)
 
 // Handler method invoked on the ZC p2p API source for de-registration and ack handling for CMA transfers
 void CkRdmaEMDeregAndAckHandler(void *ack);
-
 
 inline bool isDeregReady(CkNcpyBuffer &buffInfo);
 

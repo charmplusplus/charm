@@ -2207,7 +2207,7 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "conv-trace.h"
 #include "persistent.h"
 
-#include "conv-rdma.h"
+#include "cmirdmautils.h"
 
 /* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
 extern int _BgOutOfCoreFlag;

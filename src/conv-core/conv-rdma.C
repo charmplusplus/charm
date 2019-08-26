@@ -2,7 +2,10 @@
  * Specific implementations are in arch/layer/machine-onesided.{h,c}
  */
 #include "converse.h"
+#include "conv-rdma.h"
 #include <algorithm>
+
+bool useCMAForZC;
 
 // Methods required to keep the Nocopy Direct API functional on non-LRTS layers
 #if !CMK_USE_LRTS
@@ -15,6 +18,7 @@ int CmiGetRdmaCommonInfoSize() {
 #endif
 
 #if !CMK_ONESIDED_IMPL
+/****************************** Zerocopy Direct API For non-RDMA layers *****************************/
 /* Support for generic implementation */
 
 // Function Pointer to Acknowledement handler function for the Direct API
@@ -57,13 +61,6 @@ static void putDataHandler(ConverseRdmaMsg *payloadMsg) {
   ncpyOpInfo->ackMode = CMK_DEST_ACK; // Only invoke the destination ack
   ncpyOpInfo->freeMe  = CMK_DONT_FREE_NCPYOPINFO;
   ncpyDirectAckHandlerFn(ncpyOpInfo);
-}
-
-// Rget/Rput operations are implemented as normal converse messages
-// This method is invoked during converse initialization to initialize these message handlers
-void CmiOnesidedDirectInit(void) {
-  get_request_handler_idx = CmiRegisterHandler((CmiHandler)getRequestHandler);
-  put_data_handler_idx = CmiRegisterHandler((CmiHandler)putDataHandler);
 }
 
 void CmiSetDirectNcpyAckHandler(RdmaAckCallerFn fn) {
@@ -123,5 +120,157 @@ void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short 
 
 void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode) {}
 
+#endif
 
+// Rget/Rput operations are implemented as normal converse messages
+// This method is invoked during converse initialization to initialize these message handlers
+void CmiOnesidedDirectInit(void) {
+#if !CMK_ONESIDED_IMPL
+  get_request_handler_idx = CmiRegisterHandler((CmiHandler)getRequestHandler);
+  put_data_handler_idx = CmiRegisterHandler((CmiHandler)putDataHandler);
+#endif
+}
+
+/****************************** Zerocopy Direct API *****************************/
+
+// Get Methods
+void CmiNcpyBuffer::memcpyGet(CmiNcpyBuffer &source) {
+  // memcpy the data from the source buffer into the destination buffer
+  memcpy((void *)ptr, source.ptr, std::min(cnt, source.cnt));
+}
+
+#if CMK_USE_CMA
+void CmiNcpyBuffer::cmaGet(CmiNcpyBuffer &source) {
+  CmiIssueRgetUsingCMA(source.ptr,
+         source.layerInfo,
+         source.pe,
+         ptr,
+         layerInfo,
+         pe,
+         std::min(cnt, source.cnt));
+}
+#endif
+
+void CmiNcpyBuffer::rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck) {
+
+  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+
+  if(regMode == CMK_BUFFER_UNREG) {
+    // register it because it is required for RPUT
+    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
+
+    isRegistered = true;
+  }
+
+  int rootNode = -1; // -1 is the rootNode for p2p operations
+
+  NcpyOperationInfo *ncpyOpInfo = createNcpyOpInfo(*this, destination, ackSize, srcAck, destAck, rootNode, CMK_DIRECT_API, (void *)ref);
+
+  CmiIssueRput(ncpyOpInfo);
+}
+
+// Returns CmiNcpyMode::MEMCPY if both the PEs are the same and memcpy can be used
+// Returns CmiNcpyMode::CMA if both the PEs are in the same physical node and CMA can be used
+// Returns CmiNcpyMode::RDMA if RDMA needs to be used
+CmiNcpyMode findTransferMode(int srcPe, int destPe) {
+  if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
+    return CmiNcpyMode::MEMCPY;
+#if CMK_USE_CMA
+  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
+    return CmiNcpyMode::CMA;
+#endif
+  else
+    return CmiNcpyMode::RDMA;
+}
+
+CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
+  if(srcNode==destNode)
+    return CmiNcpyMode::MEMCPY;
+#if CMK_USE_CMA
+  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(CmiNodeFirst(srcNode), CmiNodeFirst(destNode)))
+    return CmiNcpyMode::CMA;
+#endif
+  else
+    return CmiNcpyMode::RDMA;
+}
+
+
+void CmiNcpyBuffer::rdmaGet(CmiNcpyBuffer &source, int ackSize, char *srcAck, char *destAck) {
+
+  //int ackSize = sizeof(CmiCallback);
+
+  if(regMode == CMK_BUFFER_UNREG) {
+    // register it because it is required for RGET
+    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
+
+    isRegistered = true;
+  }
+
+  int rootNode = -1; // -1 is the rootNode for p2p operations
+
+  NcpyOperationInfo *ncpyOpInfo = createNcpyOpInfo(source, *this, ackSize, srcAck, destAck, rootNode, CMK_DIRECT_API, (void *)ref);
+
+  CmiIssueRget(ncpyOpInfo);
+}
+
+NcpyOperationInfo *CmiNcpyBuffer::createNcpyOpInfo(CmiNcpyBuffer &source, CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck, int rootNode, int opMode, void *refPtr) {
+
+  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+
+  // Create a general object that can be used across layers and can store the state of the CmiNcpyBuffer objects
+  int ncpyObjSize = getNcpyOpInfoTotalSize(
+                      layerInfoSize,
+                      ackSize,
+                      layerInfoSize,
+                      ackSize);
+
+  NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyObjSize);
+
+  setNcpyOpInfo(source.ptr,
+                (char *)(source.layerInfo),
+                layerInfoSize,
+                srcAck,
+                ackSize,
+                source.cnt,
+                source.regMode,
+                source.deregMode,
+                source.isRegistered,
+                source.pe,
+                source.ref,
+                destination.ptr,
+                (char *)(destination.layerInfo),
+                layerInfoSize,
+                destAck,
+                ackSize,
+                destination.cnt,
+                destination.regMode,
+                destination.deregMode,
+                destination.isRegistered,
+                destination.pe,
+                destination.ref,
+                rootNode,
+                ncpyOpInfo);
+
+  ncpyOpInfo->opMode = opMode;
+  ncpyOpInfo->refPtr = refPtr;
+
+  return ncpyOpInfo;
+}
+
+// Put Methods
+void CmiNcpyBuffer::memcpyPut(CmiNcpyBuffer &destination) {
+  // memcpy the data from the source buffer into the destination buffer
+  memcpy((void *)destination.ptr, ptr, std::min(cnt, destination.cnt));
+}
+
+#if CMK_USE_CMA
+void CmiNcpyBuffer::cmaPut(CmiNcpyBuffer &destination) {
+  CmiIssueRputUsingCMA(destination.ptr,
+                       destination.layerInfo,
+                       destination.pe,
+                       ptr,
+                       layerInfo,
+                       pe,
+                       std::min(cnt, destination.cnt));
+}
 #endif

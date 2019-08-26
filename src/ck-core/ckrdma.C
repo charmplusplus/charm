@@ -15,76 +15,9 @@
 #endif
 
 // Integer used to store the ncpy ack handler idx
-bool useCMAForZC;
 static int ncpy_handler_idx, ncpy_bcastNo_handler_idx;
 
 /*********************************** Zerocopy Direct API **********************************/
-// Get Methods
-void CkNcpyBuffer::memcpyGet(CkNcpyBuffer &source) {
-  // memcpy the data from the source buffer into the destination buffer
-  memcpy((void *)ptr, source.ptr, std::min(cnt, source.cnt));
-}
-
-#if CMK_USE_CMA
-void CkNcpyBuffer::cmaGet(CkNcpyBuffer &source) {
-  CmiIssueRgetUsingCMA(source.ptr,
-         source.layerInfo,
-         source.pe,
-         ptr,
-         layerInfo,
-         pe,
-         std::min(cnt, source.cnt));
-}
-#endif
-
-void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
-
-  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
-  int ackSize = sizeof(CkCallback);
-
-  if(regMode == CK_BUFFER_UNREG) {
-    // register it because it is required for RGET
-    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
-
-    isRegistered = true;
-  }
-
-  // Create a general object that can be used across layers and can store the state of the CkNcpyBuffer objects
-  int ncpyObjSize = getNcpyOpInfoTotalSize(
-                      layerInfoSize,
-                      ackSize,
-                      layerInfoSize,
-                      ackSize);
-
-  NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyObjSize);
-
-  setNcpyOpInfo(source.ptr,
-                (char *)(source.layerInfo),
-                layerInfoSize,
-                (char *)(&source.cb),
-                ackSize,
-                source.cnt,
-                source.regMode,
-                source.deregMode,
-                source.isRegistered,
-                source.pe,
-                source.ref,
-                ptr,
-                (char *)(layerInfo),
-                layerInfoSize,
-                (char *)(&cb),
-                ackSize,
-                cnt,
-                regMode,
-                deregMode,
-                isRegistered,
-                pe,
-                ref,
-                -1,  // -1 is the rootNode for p2p operations
-                ncpyOpInfo);
-
-  CmiIssueRget(ncpyOpInfo);
-}
 
 // Perform a nocopy get operation into this destination using the passed source
 CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
@@ -156,7 +89,7 @@ CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
 
     zcQdIncrement();
 
-    rdmaGet(source);
+    rdmaGet(source, sizeof(CkCallback), (char *)&source.cb, (char *)&cb);
 
     // rdma data transfer incomplete
     return CkNcpyStatus::incomplete;
@@ -164,73 +97,6 @@ CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
   } else {
     CkAbort("CkNcpyBuffer::get : Invalid CkNcpyMode");
   }
-}
-
-// Put Methods
-void CkNcpyBuffer::memcpyPut(CkNcpyBuffer &destination) {
-  // memcpy the data from the source buffer into the destination buffer
-  memcpy((void *)destination.ptr, ptr, std::min(cnt, destination.cnt));
-}
-
-#if CMK_USE_CMA
-void CkNcpyBuffer::cmaPut(CkNcpyBuffer &destination) {
-  CmiIssueRputUsingCMA(destination.ptr,
-                       destination.layerInfo,
-                       destination.pe,
-                       ptr,
-                       layerInfo,
-                       pe,
-                       std::min(cnt, destination.cnt));
-}
-#endif
-
-void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
-
-  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
-  int ackSize = sizeof(CkCallback);
-
-  if(regMode == CK_BUFFER_UNREG) {
-    // register it because it is required for RPUT
-    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
-
-    isRegistered = true;
-  }
-
-  // Create a general object that can be used across layers that can store the state of the CkNcpyBuffer objects
-  int ncpyObjSize = getNcpyOpInfoTotalSize(
-                      layerInfoSize,
-                      ackSize,
-                      layerInfoSize,
-                      ackSize);
-
-  NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyObjSize);
-
-  setNcpyOpInfo(ptr,
-                (char *)(layerInfo),
-                layerInfoSize,
-                (char *)(&cb),
-                ackSize,
-                cnt,
-                regMode,
-                deregMode,
-                isRegistered,
-                pe,
-                ref,
-                destination.ptr,
-                (char *)(destination.layerInfo),
-                layerInfoSize,
-                (char *)(&destination.cb),
-                ackSize,
-                destination.cnt,
-                destination.regMode,
-                destination.deregMode,
-                destination.isRegistered,
-                destination.pe,
-                destination.ref,
-                -1,  // -1 is the rootNode for p2p operations
-                ncpyOpInfo);
-
-  CmiIssueRput(ncpyOpInfo);
 }
 
 // Perform a nocopy put operation into the passed destination using this source
@@ -301,7 +167,7 @@ CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
 
     zcQdIncrement();
 
-    rdmaPut(destination);
+    rdmaPut(destination, sizeof(CkCallback), (char *)&cb, (char *)&destination.cb);
 
     // rdma data transfer incomplete
     return CkNcpyStatus::incomplete;
@@ -417,9 +283,6 @@ void CkRdmaDirectAckHandler(void *ack) {
 
   NcpyOperationInfo *info = (NcpyOperationInfo *)(ack);
 
-  CkCallback *srcCb = (CkCallback *)(info->srcAck);
-  CkCallback *destCb = (CkCallback *)(info->destAck);
-
   switch(info->opMode) {
     case CMK_DIRECT_API             : handleDirectApiCompletion(info); // Ncpy Direct API
                                       break;
@@ -471,31 +334,6 @@ void invokeCallback(void *cb, int pe, CkNcpyBuffer &buff) {
     //Invoke the destination callback
     ((CkCallback *)(cb))->send(sizeof(CkNcpyBuffer), &buff);
 #endif
-}
-
-// Returns CkNcpyMode::MEMCPY if both the PEs are the same and memcpy can be used
-// Returns CkNcpyMode::CMA if both the PEs are in the same physical node and CMA can be used
-// Returns CkNcpyMode::RDMA if RDMA needs to be used
-CkNcpyMode findTransferMode(int srcPe, int destPe) {
-  if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
-    return CkNcpyMode::MEMCPY;
-#if CMK_USE_CMA
-  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
-    return CkNcpyMode::CMA;
-#endif
-  else
-    return CkNcpyMode::RDMA;
-}
-
-CkNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
-  if(srcNode==destNode)
-    return CkNcpyMode::MEMCPY;
-#if CMK_USE_CMA
-  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(CmiNodeFirst(srcNode), CmiNodeFirst(destNode)))
-    return CkNcpyMode::CMA;
-#endif
-  else
-    return CkNcpyMode::RDMA;
 }
 
 void enqueueNcpyMessage(int destPe, void *msg){
@@ -2060,47 +1898,14 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
   }
 #endif
   else {
-
-
-    int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
-    int ackSize = 0;
-    int ncpyObjSize = getNcpyOpInfoTotalSize(
-                      layerInfoSize,
-                      ackSize,
-                      layerInfoSize,
-                      ackSize);
-    NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyObjSize);
-    setNcpyOpInfo(src.ptr,
-                  (char *)(src.layerInfo),
-                  layerInfoSize,
-                  NULL,
-                  ackSize,
-                  src.cnt,
-                  src.regMode,
-                  src.deregMode,
-                  src.isRegistered,
-                  src.pe,
-                  src.ref,
-                  dest.ptr,
-                  (char *)(dest.layerInfo),
-                  layerInfoSize,
-                  NULL,
-                  ackSize,
-                  dest.cnt,
-                  dest.regMode,
-                  dest.deregMode,
-                  dest.isRegistered,
-                  dest.pe,
-                  dest.ref,
-                  0, // Root Node is always 0 for Readonly bcast (the spanning tree is rooted at Node 0)
-                  ncpyOpInfo);
-
-    ncpyOpInfo->opMode = CMK_READONLY_BCAST;
-    ncpyOpInfo->refPtr = refPtr;
-
     // Initialize previously allocated structure for ack tracking on intermediate nodes
     if(t.child_count != 0)
       readonlyCreateOnSource(dest);
+
+    int ackSize = 0;
+    int rootNode = 0;// Root Node is always 0 for Readonly bcast (the spanning tree is rooted at Node 0)
+
+    NcpyOperationInfo *ncpyOpInfo = dest.createNcpyOpInfo(src, dest, ackSize, NULL, NULL, rootNode, CMK_READONLY_BCAST, refPtr);
 
     zcQdIncrement();
 
