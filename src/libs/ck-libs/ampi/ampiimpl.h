@@ -171,7 +171,9 @@ class fromzDisk : public zdisk {
 
 /* messages larger than or equal to this threshold will always block on a matching recv */
 #ifndef AMPI_SSEND_THRESHOLD_DEFAULT
-#if CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#if CMK_BIGSIM_CHARM
+#define AMPI_SSEND_THRESHOLD_DEFAULT 1000000000
+#elif CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
 #define AMPI_SSEND_THRESHOLD_DEFAULT 262144
 #else
 #define AMPI_SSEND_THRESHOLD_DEFAULT 131072
