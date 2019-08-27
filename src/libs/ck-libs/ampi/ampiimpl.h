@@ -171,7 +171,7 @@ class fromzDisk : public zdisk {
 
 /* messages larger than or equal to this threshold will always block on a matching recv */
 #ifndef AMPI_SSEND_THRESHOLD_DEFAULT
-#if CMK_BIGSIM_CHARM
+#if CMK_BIGSIM_CHARM // ZC Direct API-based rendezvous protocol is not supported by BigSim
 #define AMPI_SSEND_THRESHOLD_DEFAULT 1000000000
 #elif CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
 #define AMPI_SSEND_THRESHOLD_DEFAULT 262144
