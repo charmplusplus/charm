@@ -154,7 +154,7 @@ dataType getXlateDataType(T *a) {
   else if(std::is_same<T, CmiInt16>::value) return Tint128;
   else if(std::is_same<T, CmiUInt16>::value) return Tuint128;
 #endif
-  CmiAbort("getXlateDataType: Matching primitive data type not found in dataType enum");
+  CmiAbort("getXlateDataType: Matching primitive data type not found in dataType enum for type - %s", typeid(*a).name());
 }
 
 
