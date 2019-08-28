@@ -35,7 +35,8 @@ class arr : public CBase_arr {
 
       usesAtSync = true;
 
-      for(int i=0; i < SIZE; i++) buffer[i] = thisIndex;
+      for(int i=0; i < SIZE; i++)
+        buffer[i] = thisIndex;
       cb = CkCallback(CkReductionTarget(main, done), mainProxy);
     }
 
@@ -81,6 +82,7 @@ class arr : public CBase_arr {
         else
           thisProxy[(thisIndex + 1) % totalElems].verify();
       } else {
+        delete [] buffer;
         contribute(cb);
       }
     }
