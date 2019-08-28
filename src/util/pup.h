@@ -251,11 +251,15 @@ class er {
     bytes((void *)a,nItems, sizeof(T), getXlateDataType(a));
   }
 
+  // Standard pup_buffer API that calls malloc for allocation on isUnpacking and free for deallocation on isPacking
   template<class T>
   void pup_buffer(T *&a, size_t nItems) {
     pup_buffer((void *&)a, nItems, sizeof(T), getXlateDataType(a));
   }
 
+  // Custom pup_buffer API that calls user provided 'allocate' function for allocation on isUnpacking and
+  // user provided 'deallocate' function for deallocation on isPacking
+  // Custom pup_buffer behaves same as the standard pup_buffer except for calling custom allocator and deallocator methods
   template<class T>
   void pup_buffer(T *&a, size_t nItems, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
     pup_buffer((void *&)a, nItems, sizeof(T), getXlateDataType(a), allocate, deallocate);
