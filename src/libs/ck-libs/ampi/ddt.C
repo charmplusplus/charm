@@ -746,14 +746,14 @@ CkDDT_DataType::setSize(MPI_Aint _lb, MPI_Aint _extent) noexcept
 }
 
 void
-CkDDT_DataType::pup(PUP::er &p)
+CkDDT_DataType::pup(PUP::er &p) noexcept
 {
   p|datatype;
   p|refCount;
   p|size;
   p|extent;
   p|count;
-  p|basesize;
+  p|baseSize;
   p|baseExtent;
   p|baseIndex;
   p|trueExtent;
@@ -815,13 +815,13 @@ CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noex
 }
 
 void
-CkDDT_Contiguous::pup(PUP::er &p)
+CkDDT_Contiguous::pup(PUP::er &p) noexcept
 {
   p|datatype;
   p|size;
   p|extent;
   p|count;
-  p|basesize;
+  p|baseSize;
   p|baseExtent;
   p|baseIndex;
   p|lb;
@@ -931,13 +931,13 @@ CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int
 }
 
 void
-CkDDT_Vector::pup(PUP::er &p)
+CkDDT_Vector::pup(PUP::er &p) noexcept
 {
   p|datatype;
   p|size;
   p|extent;
   p|count;
-  p|basesize;
+  p|baseSize;
   p|baseExtent;
   p|blockLength;
   p|strideLength;
@@ -1073,7 +1073,7 @@ CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt) noexcept
 }
 
 void
-CkDDT_HVector::pup(PUP::er &p)
+CkDDT_HVector::pup(PUP::er &p) noexcept
 {
   CkDDT_Vector::pup(p);
 }
@@ -1206,13 +1206,13 @@ CkDDT_HVector::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[
 }
 
 void
-CkDDT_Indexed::pup(PUP::er &p)
+CkDDT_Indexed::pup(PUP::er &p) noexcept
 {
   p|datatype;
   p|size;
   p|extent;
   p|count;
-  p|basesize;
+  p|baseSize;
   p|baseExtent;
   p|baseIndex;
   p|lb;
@@ -1306,7 +1306,7 @@ CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], 
 }
 
 void
-CkDDT_HIndexed::pup(PUP::er &p)
+CkDDT_HIndexed::pup(PUP::er &p) noexcept
 {
   CkDDT_Indexed::pup(p);
 }
@@ -1438,13 +1438,13 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[],
 }
 
 void
-CkDDT_Indexed_Block::pup(PUP::er &p)
+CkDDT_Indexed_Block::pup(PUP::er &p) noexcept
 {
   p|datatype;
   p|size;
   p|extent;
   p|count;
-  p|basesize;
+  p|baseSize;
   p|baseExtent;
   p|baseIndex;
   p|lb;
@@ -1453,7 +1453,7 @@ CkDDT_Indexed_Block::pup(PUP::er &p)
   p|trueLB;
   p|iscontig;
   p|numElements;
-  p|BlockLength;
+  p|arrayBlockLength;
   p|arrayDisplacements;
 
   /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
@@ -1544,13 +1544,13 @@ CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[
 }
 
 void
-CkDDT_HIndexed_Block::pup(PUP::er &p)
+CkDDT_HIndexed_Block::pup(PUP::er &p) noexcept
 {
   p|datatype;
   p|size;
   p|extent;
   p|count;
-  p|basesize;
+  p|baseSize;
   p|baseExtent;
   p|baseIndex;
   p|lb;
@@ -1559,7 +1559,7 @@ CkDDT_HIndexed_Block::pup(PUP::er &p)
   p|trueLB;
   p|iscontig;
   p|numElements;
-  p|BlockLength;
+  p|arrayBlockLength;
   p|arrayDisplacements;
 
   /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
@@ -1700,7 +1700,7 @@ CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d
 }
 
 void
-CkDDT_Struct::pup(PUP::er &p)
+CkDDT_Struct::pup(PUP::er &p) noexcept
 {
   p|datatype;
   p|size;
