@@ -745,6 +745,28 @@ CkDDT_DataType::setSize(MPI_Aint _lb, MPI_Aint _extent) noexcept
   }
 }
 
+void
+CkDDT_DataType::pup(PUP::er &p)
+{
+  p|datatype;
+  p|refCount;
+  p|size;
+  p|extent;
+  p|count;
+  p|basesize;
+  p|baseExtent;
+  p|baseIndex;
+  p|trueExtent;
+  p|trueLB;
+  p|lb;
+  p|ub;
+  p|iscontig;
+  p|isAbsolute;
+  p|numElements;
+  p|nameLen;
+  p|name;
+}
+
 int
 CkDDT_DataType::getNumBasicElements(int bytes) const noexcept
 {
@@ -790,6 +812,27 @@ CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noex
   *nd = 0;
   *combiner = MPI_COMBINER_NAMED;
   return MPI_SUCCESS;
+}
+
+void
+CkDDT_Contiguous::pup(PUP::er &p)
+{
+  p|datatype;
+  p|size;
+  p|extent;
+  p|count;
+  p|basesize;
+  p|baseExtent;
+  p|baseIndex;
+  p|lb;
+  p|ub;
+  p|trueExtent;
+  p|trueLB;
+  p|iscontig;
+  p|numElements;
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
 }
 
 int
@@ -885,6 +928,29 @@ CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int
   i[0] = count;
   d[0] = baseIndex;
   return MPI_SUCCESS;
+}
+
+void
+CkDDT_Vector::pup(PUP::er &p)
+{
+  p|datatype;
+  p|size;
+  p|extent;
+  p|count;
+  p|basesize;
+  p|baseExtent;
+  p|blockLength;
+  p|strideLength;
+  p|baseIndex;
+  p|lb;
+  p|ub;
+  p|trueExtent;
+  p|trueLB;
+  p|iscontig;
+  p|numElements;
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
 }
 
 int
@@ -1004,6 +1070,12 @@ CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt) noexcept
   if (p.isUnpacking()) {
     baseType = ddt->getType(baseIndex);
   }
+}
+
+void
+CkDDT_HVector::pup(PUP::er &p)
+{
+  CkDDT_Vector::pup(p);
 }
 
 int
@@ -1133,6 +1205,29 @@ CkDDT_HVector::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[
   return MPI_SUCCESS;
 }
 
+void
+CkDDT_Indexed::pup(PUP::er &p)
+{
+  p|datatype;
+  p|size;
+  p|extent;
+  p|count;
+  p|basesize;
+  p|baseExtent;
+  p|baseIndex;
+  p|lb;
+  p|ub;
+  p|trueExtent;
+  p|trueLB;
+  p|iscontig;
+  p|numElements;
+  p|arrayBlockLength;
+  p|arrayDisplacements;
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
+}
+
 int
 CkDDT_HVector::getNumBasicElements(int bytes) const noexcept
 {
@@ -1208,6 +1303,12 @@ CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], 
   }
   d[0] = baseIndex;
   return MPI_SUCCESS;
+}
+
+void
+CkDDT_HIndexed::pup(PUP::er &p)
+{
+  CkDDT_Indexed::pup(p);
 }
 
 int
@@ -1336,6 +1437,29 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[],
   return MPI_SUCCESS;
 }
 
+void
+CkDDT_Indexed_Block::pup(PUP::er &p)
+{
+  p|datatype;
+  p|size;
+  p|extent;
+  p|count;
+  p|basesize;
+  p|baseExtent;
+  p|baseIndex;
+  p|lb;
+  p|ub;
+  p|trueExtent;
+  p|trueLB;
+  p|iscontig;
+  p|numElements;
+  p|BlockLength;
+  p|arrayDisplacements;
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
+}
+
 int
 CkDDT_HIndexed_Block::getNumBasicElements(int bytes) const noexcept
 {
@@ -1417,6 +1541,29 @@ CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[
   }
   d[0] = baseIndex;
   return MPI_SUCCESS;
+}
+
+void
+CkDDT_HIndexed_Block::pup(PUP::er &p)
+{
+  p|datatype;
+  p|size;
+  p|extent;
+  p|count;
+  p|basesize;
+  p|baseExtent;
+  p|baseIndex;
+  p|lb;
+  p|ub;
+  p|trueExtent;
+  p|trueLB;
+  p|iscontig;
+  p|numElements;
+  p|BlockLength;
+  p|arrayDisplacements;
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
 }
 
 int
@@ -1550,6 +1697,27 @@ CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d
   }
   d[0] = baseIndex;
   return MPI_SUCCESS;
+}
+
+void
+CkDDT_Struct::pup(PUP::er &p)
+{
+  p|datatype;
+  p|size;
+  p|extent;
+  p|count;
+  p|lb;
+  p|ub;
+  p|trueExtent;
+  p|trueLB;
+  p|iscontig;
+  p|numElements;
+  p|arrayBlockLength;
+  p|arrayDisplacements;
+  p|index;
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
 }
 
 int
