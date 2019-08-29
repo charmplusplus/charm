@@ -76,7 +76,7 @@
 #define CMK_LBDB_ON                    1
 
 #define CMK_64BIT                      1
-#define CMK_AMD64                      1
+#define CMK_AMD64                      0
 
 /* By default use simple PMI */
 #define CMK_USE_PMI                    1
