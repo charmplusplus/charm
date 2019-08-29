@@ -4,7 +4,7 @@
 int initial_grainsize;
 char inputfile[50];
 
-class Main
+class Main : public CBase_Main
 {
 public:
     Main(CkArgMsg* msg )

@@ -7,9 +7,9 @@ namespace xi {
 
 class IntExprConstruct : public SdagConstruct {
  public:
-  explicit IntExprConstruct(const char *ccode);
+  explicit IntExprConstruct(const char* ccode);
 };
 
-}   // namespace xi
+}  // namespace xi
 
 #endif  // ifndef _INTEXPR_H

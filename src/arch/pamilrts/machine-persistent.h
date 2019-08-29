@@ -78,7 +78,7 @@ void _initPersistent( pami_context_t *contexts, int nc);
 PersistentHandle getPersistentHandle(PersistentHandle h, int toindex);
 void *PerAlloc(int size);
 void PerFree(char *msg);
-int PumpPersistent();
+int PumpPersistent(void);
 void swapSendSlotBuffers(PersistentSendsTable *slot);
 void swapRecvSlotBuffers(PersistentReceivesTable *slot);
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes);

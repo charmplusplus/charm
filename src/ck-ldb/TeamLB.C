@@ -12,13 +12,15 @@
 #include "ckgraph.h"
 #include <metis.h>
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(TeamLB, "Use Metis(tm) to partition object graph at two levels: team level and processor level")
 
 TeamLB::TeamLB(const CkLBOptions &opt): CBase_TeamLB(opt)
 {
   lbname = "TeamLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] TeamLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> TeamLB created.\n");
 
   // setting number of teams and team size
   teamSize = _lb_args.teamSize();

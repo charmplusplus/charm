@@ -28,6 +28,8 @@
 
 using std::vector;
 
+extern int quietModeRequested;
+
 /**
  *  Class to contain additional data about the vertices in object graph
  */
@@ -154,8 +156,8 @@ void BQueue::push(Vertex *vert)
 
 RecBipartLB::RecBipartLB(const CkLBOptions &opt) : CBase_RecBipartLB(opt) {
   lbname = "RecBipartLB";
-  if(CkMyPe() == 0)
-    CkPrintf("RecBipartLB created\n");
+  if(CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> RecBipartLB created.\n");
 }
 
 bool RecBipartLB::QueryBalanceNow(int _step) {
@@ -533,7 +535,7 @@ void RefineBoundary(ObjGraph *ogr,vector<Vertex *> &partition1, vector<Vertex *>
 
 int modifypartitions(ObjGraph *ogr,vector<Vertex *> &partition1, vector<Vertex *> &partition2, BQueue *q1, BQueue *q2,int ec, int parent)
 {
-  int newedgecut;
+  int newedgecut = 0;
   if(q1->getBoundary()==1)//we are swapping vertex out of boundaryline1
   {
     int e2=vhelpers[q1->getVertextoswap()]->getEdgestopart2();

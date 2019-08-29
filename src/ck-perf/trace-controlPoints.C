@@ -80,7 +80,7 @@ void TraceControlPoints::creation(envelope *, int epIdx, int num) {
 }
 
 void TraceControlPoints::creationMulticast(envelope *, int epIdx, int num, 
-				    int *pelist) {
+				    const int *pelist) {
   //  CkPrintf("[%d] Multicast Message for Entry Method id %d sent to %d pes\n", CkMyPe(), epIdx, num);
 }
 
@@ -241,10 +241,7 @@ TraceControlPoints *localControlPointTracingInstance(){
 
 
 extern "C" void traceControlPointsExitFunction() {
-  // The exit function of any Charm++ module must call CkExit() or
-  // the entire exit process will hang if multiple modules are linked.
-  // FIXME: This is NOT a feature. Something needs to be done about this.
-  CkExit();
+  CkContinueExit();
 }
 
 // Initialization of the parallel trace module.

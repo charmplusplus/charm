@@ -5,7 +5,7 @@
 #include "xi-symbol.h"
 #include "xi-util.h"
 
-int processAst(AstChildren<Module> *m, const bool chareNames,
+int processAst(xi::AstChildren<xi::Module> *m, const bool chareNames,
                const bool dependsMode, const int fortranMode_,
                const int internalMode_, char* fname_, char* origFile_);
 

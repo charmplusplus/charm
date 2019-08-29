@@ -1,0 +1,52 @@
+mainmodule megaZCPingpong{
+
+  readonly CProxy_main mainProxy;
+  readonly int minSize;
+  readonly int maxSize;
+  readonly int smallIter;
+  readonly int bigIter;
+  readonly int printFormat;
+
+  mainchare main{
+    entry main(CkArgMsg *m);
+    entry void maindone();
+  };
+
+  array [1D] Ping1 {
+    entry Ping1();
+
+    entry void start(int _size, bool _warmUp);
+
+    entry void regularRecvOnly(char msg[size], int size);
+
+    entry void zerocopyEMSendApi1(nocopy char msg[size], int size);
+    entry void zerocopyEMSendApi2(nocopy char msg[size], int size);
+    entry void zerocopyEMSendApi3(nocopy char msg[size], int size);
+
+    entry void regularRecvAndCopy(char msg[size], int size);
+
+    entry void recvNcpySrcInfo(CkNcpyBuffer src);
+
+    entry void setupDirectPingpong1(int _size, int _iterations);
+    entry void beginDirectPingpong1();
+    entry void getCompleteDest1();
+
+    entry void setupDirectPingpong2(int _size, int _iterations);
+    entry void beginDirectPingpong2();
+    entry void getCompleteDest2();
+
+    entry void setupDirectPingpong3(int _size, int _iterations);
+    entry void beginDirectPingpong3();
+    entry void getCompleteDest3();
+
+    entry void setupDirectPingpong4(int _size, int _iterations);
+    entry void beginDirectPingpong4();
+    entry void getCompleteDest4();
+
+    entry void zerocopyEMSendApiAndCopy(nocopy char msg[size], int size);
+
+    entry void zerocopyEMRecvApi1(nocopypost char msg[size], int size);
+    entry void zerocopyEMRecvApi2(nocopypost char msg[size], int size);
+    entry void zerocopyEMRecvApi3(nocopypost char msg[size], int size);
+  };
+}

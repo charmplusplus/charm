@@ -5,14 +5,13 @@
 
 namespace xi {
 
-struct SdagCollection
-{
-  CParsedFile *pf;
+struct SdagCollection {
+  CParsedFile* pf;
   bool sdagPresent;
-  SdagCollection(CParsedFile *p);
-  void addNode(Entry *e);
+  SdagCollection(CParsedFile* p);
+  void addNode(Entry* e);
 };
 
-}   // namespace xi
+}  // namespace xi
 
 #endif  // ifndef _SDAG_COLLECTION_H

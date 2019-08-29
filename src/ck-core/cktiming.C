@@ -80,7 +80,6 @@ static int outputTiming = 0;
 #endif
 
 // called on all PEs once
-extern "C"
 void initBigSimTrace(int outputParams, int _outputTiming)
 {
   CkpvInitialize(int, outputParameters);
@@ -130,7 +129,6 @@ void initBigSimTrace(int outputParams, int _outputTiming)
 
 }
 
-extern "C"
 void finalizeBigSimTrace()
 {
   if (CkpvAccess(bgfp) != NULL) {
@@ -144,7 +142,6 @@ void finalizeBigSimTrace()
   }
 }
 
-extern "C"
 void startTraceBigSim(){
 
   CkAssert(CkpvAccess(insideTraceBracket) == false);
@@ -212,7 +209,6 @@ void startTraceBigSim(){
 }
   
 
-extern "C"
 void endTraceBigSim_20param(char * eventname, int stepno, int num_params, double p1 , double p2 , double p3 , double p4 , double p5 , double p6 , double p7 , double p8 , double p9 , double p10 , double p11 , double p12 , double p13 , double p14 , double p15 , double p16 , double p17 , double p18 , double p19 , double p20 ) {
 
 #if WITH_MAMBO
@@ -252,7 +248,7 @@ if(num_params==18) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
 if(num_params==19) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f", p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19);
 if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f", p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20);
 
-	char paramString[2048];
+	char paramString[2560];
 	sprintf(paramString, "params:{ %s }", params);
 	
 	char eventNameString[1024];
@@ -275,7 +271,7 @@ if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
 #endif
 
  
-  char timeString[512];
+  char timeString[4096];
   timeString[0] = 0;
   char stepString[128];
   stepString[0] = 0;

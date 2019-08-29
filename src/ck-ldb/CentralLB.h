@@ -70,15 +70,12 @@ private:
 public:
   CkMarshalledCLBStatsMessage bufMsg;
   SpanningTree st;
-  CentralLB(const CkLBOptions & opt) : CBase_CentralLB(opt) { initLB(opt);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        lbDecisionCount= resumeCount=0;
-#endif
+  CentralLB(const CkLBOptions & opt) : CBase_CentralLB(opt), concurrent(false) { initLB(opt);
 #if CMK_SHRINK_EXPAND
 		manager_init();
 #endif
   }
-  CentralLB(CkMigrateMessage *m) : CBase_CentralLB(m) {
+  CentralLB(CkMigrateMessage *m) : CBase_CentralLB(m), concurrent(false) {
 #if CMK_SHRINK_EXPAND
 		manager_init();
 #endif
@@ -100,6 +97,7 @@ public:
 
   void SetPESpeed(int);
   int GetPESpeed();
+  inline void setConcurrent(bool c) { concurrent = c; }
 
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
@@ -107,12 +105,14 @@ public:
                             // making projections output look funny
   void SendStats();
   void ReceiveCounts(int *counts, int n);
-  void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
-  void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg); // Receive stats using a tree structure  
+  void ReceiveStats(CkMarshalledCLBStatsMessage &&msg);	// Receive stats on PE 0
+  void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &&msg); // Receive stats using a tree structure  
+  void ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage &&msg);
   
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 
   void t_LoadBalance(void); 
+  void ApplyDecision(void);
   void ResumeClients(int);                      // Resuming clients needs
 
   void ResumeClients(); // to be resumed via message
@@ -122,9 +122,6 @@ public:
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ProcessMigrationDecision();
   void ProcessReceiveMigration();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	void ReceiveDummyMigration(int _step);
-#endif
   void MissMigrate(int waitForBarrier);
 
   //Shrink-Expand related functions
@@ -146,7 +143,7 @@ public:
 
   // Migrated-element callback
   static void staticMigrated(void* me, LDObjHandle h, int waitBarrier=1);
-  void Migrated(LDObjHandle h, int waitBarrier=1);
+  void Migrated(int waitBarrier=1);
 
   void MigrationDone(int balancing);  // Call when migration is complete
   void CheckMigrationComplete();      // Call when all migration is complete
@@ -267,10 +264,10 @@ protected:
   void findSimResults(LDStats* stats, int count, 
                       LBMigrateMsg* msg, LBSimulation* simResults);
   void removeNonMigratable(LDStats* statsDataList, int count);
-	CProxy_CentralLB thisProxy;
-  void loadbalance_with_thread() { use_thread = 1; }
+  void loadbalance_with_thread() { use_thread = true; }
+
+  bool concurrent;
 private:  
-//CProxy_CentralLB thisProxy;
   int myspeed;
   int stats_msg_count;
   CLBStatsMsg **statsMsgsList;
@@ -281,29 +278,22 @@ private:
   int future_migrates_expected;
   int lbdone;
   double start_lb_time;
+  double strat_start_time;
   LBMigrateMsg   *storedMigrateMsg;
   LBScatterMsg   *storedScatterMsg;
-  int  reduction_started;
-  int  use_thread;
+  bool  reduction_started;
+  bool  use_thread;
 
   FutureModel *predicted_model;
 
   void BuildStatsMsg();
   void buildStats();
+  void printStrategyStats(LBMigrateMsg *msg);
 
 public:
   int useMem();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    int savedBalancing;
-    void endMigrationDone(int balancing);
-    int lbDecisionCount ,resumeCount;
-#endif
 };
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
-    void resumeCentralLbAfterChkpt(void *lb);
-	void resumeAfterRestoreParallelRecovery(void *_lb);
-#endif
 
 // CLBStatsMsg is not directly sent in the entry function
 // CkMarshalledCLBStatsMessage is used instead to use the pup defined here.
@@ -330,9 +320,6 @@ public:
 
   char * avail_vector;
   int next_lb;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	int step;
-#endif
 
 public:
   CLBStatsMsg(int osz, int csz);

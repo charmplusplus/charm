@@ -1,12 +1,13 @@
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
+AMPICXX=../../../bin/ampicxx $(OPTS)
 
 OBJS = hello.o
 
 all:	cifiles hello
 
 hello: $(OBJS)
-	$(CHARMC) -language ampi -module collide -o hello $(OBJS)
+	$(AMPICXX)  -module collide -o hello $(OBJS)
 
 cifiles: hello.ci
 	$(CHARMC)  hello.ci
@@ -14,8 +15,8 @@ cifiles: hello.ci
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o hello charmrun
 
-hello.o: hello.C 
-	$(CHARMC) -c hello.C
+hello.o: hello.C
+	$(AMPICXX) -c hello.C
 
 test: all
 	$(call run, ./hello +p4 +vp10 )

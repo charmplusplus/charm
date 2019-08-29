@@ -1,1 +1,2 @@
-CMK_LIBS="$CMK_LIBS -lrt"
+CMK_SYSLIBS="$CMK_SYSLIBS -lrt -lpthread"
+

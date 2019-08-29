@@ -54,7 +54,7 @@ typedef struct {
   PersistentHandle myHand;
 } PersistentReq;
 
-void CmiPersistentInit();
+void CmiPersistentInit(void);
 
 PersistentHandle CmiCreatePersistent(int destPE, int maxBytes);
 PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes);
@@ -66,9 +66,9 @@ PersistentReq CmiCreateReceiverPersistent(int maxBytes);
 PersistentHandle CmiRegisterReceivePersistent(PersistentReq req);
 void CmiUsePersistentHandle(PersistentHandle *p, int n);
 void CmiDestroyPersistent(PersistentHandle h);
-void CmiDestroyAllPersistent();
+void CmiDestroyAllPersistent(void);
 
-void CmiPersistentOneSend();
+void CmiPersistentOneSend(void);
 #else
 
 typedef int PersistentRecvHandle;

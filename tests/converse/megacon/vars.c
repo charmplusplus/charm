@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <converse.h>
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
-typedef struct vars_chare
+typedef struct vars_chare_s
 {
   int countdown;
   CthThread pending;
@@ -27,8 +27,9 @@ CpmInvokable vars_ack(vars_chare c)
     CthAwaken(c->pending);
 }
 
-void vars_check_ctv_privacy(vars_chare c)
+void vars_check_ctv_privacy(void *v)
 {
+  vars_chare c = (vars_chare)v;
   int me = (size_t)CthSelf();
   CtvAccess(ctv1) = me;
   vars_ack(c);
@@ -65,7 +66,8 @@ CpmInvokable vars_check_cpv_and_csv(vars_chare c)
 
 CpmInvokable vars_control()
 {
-  struct vars_chare c; CthThread t1,t2;
+  struct vars_chare_s c;
+  CthThread t1,t2;
 
   t1 = CthCreate(vars_check_ctv_privacy, (void *)&c, 0);
   t2 = CthCreate(vars_check_ctv_privacy, (void *)&c, 0);
@@ -74,16 +76,16 @@ CpmInvokable vars_control()
 
   CthAwaken(t1); CthAwaken(t2);
   c.countdown = 2; c.pending = CthSelf(); CthSuspend();
-  
+
   CthAwaken(t1); CthAwaken(t2);
   c.countdown = 2; c.pending = CthSelf(); CthSuspend();
-  
+
   Cpm_vars_set_cpv_and_csv(CpmSend(CpmALL), &c);
   c.countdown = CmiNumPes(); c.pending = CthSelf(); CthSuspend();
-  
+
   Cpm_vars_check_cpv_and_csv(CpmSend(CpmALL), &c);
   c.countdown = CmiNumPes(); c.pending = CthSelf(); CthSuspend();
-  
+
   Cpm_megacon_ack(CpmSend(0));
 }
 
@@ -96,7 +98,19 @@ void vars_moduleinit()
 {
   CpmInitializeThisModule();
   CtvInitialize(int, ctv1);
+  if (!CtvInitialized(ctv1)) {
+    CmiPrintf("ctv initialization test failed.\n");
+    exit(1);
+  }
   CpvInitialize(int, cpv1);
+  if (!CpvInitialized(cpv1)) {
+    CmiPrintf("cpv initialization test failed.\n");
+    exit(1);
+  }
   CsvInitialize(int, csv1);
+  if (!CsvInitialized(csv1)) {
+    CmiPrintf("csv initialization test failed.\n");
+    exit(1);
+  }
 }
 

@@ -7,10 +7,18 @@
 #include "ccs-server.h"
 #include "conv-ccs.h"
 
-#if CMK_CCS_AVAILABLE
-extern "C" void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
+#ifdef _WIN32
+# include <sys/types.h>
+# include <io.h>
+# include <process.h>
+# define write _write
+# define getpid _getpid
+#endif
 
-extern "C" void req_fw_handler(char *msg)
+#if CMK_CCS_AVAILABLE
+void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
+
+void req_fw_handler(char *msg)
 {
   int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
   CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
@@ -44,16 +52,12 @@ extern "C" void req_fw_handler(char *msg)
   CmiFree(msg);
 }
 
-#ifdef _MSC_VER
-extern "C" size_t write(int fd, const void *buf, size_t count);
-#endif
-
-extern "C" int rep_fw_handler_idx;
+extern int rep_fw_handler_idx;
 /**
  * Decide if the reply is ready to be forwarded to the waiting client,
  * or if combination is required (for broadcast/multicast CCS requests.
  */
-extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
+int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
   int repPE = (int)ChMessageInt(rep->pe);
   if (repPE <= -1) {
     /* Reduce the message to get the final reply */
@@ -80,8 +84,12 @@ extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
     if (_conditionalDelivery == 0) CcsImpl_reply(rep, repLen, repData);
     else {
       /* We are the child of a conditional delivery, write to the parent the reply */
-      write(conditionalPipe[1], &repLen, 4);
-      write(conditionalPipe[1], repData, repLen);
+      if (write(conditionalPipe[1], &repLen, 4) != 4) {
+        CmiAbort("CCS> writing reply length to parent failed!");
+      }
+      if (write(conditionalPipe[1], repData, repLen) != repLen) {
+        CmiAbort("CCS> writing reply data to parent failed!");
+      }
     }
   }
   return 0;
@@ -115,9 +123,9 @@ void ccs_getinfo(char *msg)
 typedef int pid_t;
 #endif
 
-extern "C" {
-
+CpvCExtern(void *, debugQueue);
 CpvDeclare(void *, debugQueue);
+CpvCExtern(int, freezeModeFlag);
 CpvDeclare(int, freezeModeFlag);
 
 /*
@@ -147,8 +155,6 @@ int CpdIsFrozen(void) {
   return CpvAccess(freezeModeFlag);
 }
 
-}
-
 #if CMK_BIGSIM_CHARM
 #include "blue_impl.h"
 void BgProcessMessageFreezeMode(threadInfo *t, char *msg) {
@@ -172,9 +178,9 @@ void BgProcessMessageFreezeMode(threadInfo *t, char *msg) {
 #endif
 
 void PrintDebugStackTrace(void *);
-extern "C" void * MemoryToSlot(void *ptr);
-extern "C" int Slot_StackTrace(void *s, void ***stack);
-extern "C" int Slot_ChareOwner(void *s);
+void * MemoryToSlot(void *ptr);
+int Slot_StackTrace(void *s, void ***stack);
+int Slot_ChareOwner(void *s);
 
 #include <stdarg.h>
 void CpdNotify(int type, ...) {

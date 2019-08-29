@@ -43,8 +43,8 @@
 
 
 /* TODO | FIXME - Find platform independent way of ensuring alignment
- * (using __attribute__((aligned(XXX))) doesn't seem to work in net-win and
- * net-sol builds).  Just to be safe since compilers should do this anyway.
+ * (using __attribute__((aligned(XXX))) doesn't seem to work in netlrts-win and
+ * netlrts-sol builds).  Just to be safe since compilers should do this anyway.
  */
 
 /* TODO | FIXME - Add a function that will test the functionality of the

@@ -43,9 +43,9 @@ Main::Main(CkArgMsg* m) {
   */
 
   if (N < T || N % T != 0)
-    CkAbort("N % T != 0!");
+    CkAbort("N %% T != 0!");
   if (K < T || K % T != 0)
-    CkAbort("K % T != 0!");
+    CkAbort("K %% T != 0!");
 
   // print info
   CkPrintf("Running Matrix Multiplication on %d processors with (%d, %d) chares\n", CkNumPes(), num_chares_per_dim, num_chares_per_dim);
@@ -188,11 +188,11 @@ void Compute::compute(){
     }
     fclose(fp);
 #endif
-    contribute(0,0,CkReduction::concat, CkCallback(CkIndex_Main::done(), mainProxy));
+    contribute(CkCallback(CkReductionTarget(Main, done), mainProxy));
     CkPrintf("[%d,%d] comps: %d iter: %d\n", thisIndex.x, thisIndex.y, -1, iteration);
   }
   else{
-    contribute(0,0,CkReduction::concat,CkCallback(CkIndex_Compute::resumeFromBarrier(), thisProxy));
+    contribute(CkCallback(CkReductionTarget(Compute, resumeFromBarrier), thisProxy));
   }
 }
 

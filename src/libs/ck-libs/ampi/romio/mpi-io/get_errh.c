@@ -1,6 +1,5 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -18,6 +17,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_get_errhandler as PMPI_File_get_errhandler
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_get_errhandler(MPI_File file, MPI_Errhandler *errhandler) __attribute__((weak,alias("PMPI_File_get_errhandler")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -36,25 +37,35 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPI_File_get_errhandler(MPI_File fh, MPI_Errhandler *errhandler)
+int MPI_File_get_errhandler(MPI_File mpi_fh, MPI_Errhandler *errhandler)
 {
     int error_code = MPI_SUCCESS;
-#ifndef PRINT_ERR_MSG
+    ADIO_File fh;
     static char myname[] = "MPI_FILE_GET_ERRHANDLER";
-#endif
+    MPID_THREADPRIV_DECL;
 
-    if (fh == MPI_FILE_NULL) *errhandler = ADIOI_DFLT_ERR_HANDLER;
-    else if (fh->cookie != ADIOI_FILE_COOKIE) {
-#ifdef PRINT_ERR_MSG
-	FPRINTF(stderr, "MPI_File_close: Invalid file handle\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_FILE, MPIR_ERR_FILE_CORRUPT, 
-              myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(MPI_FILE_NULL, error_code, myname);
-#endif
+    ROMIO_THREAD_CS_ENTER();
+
+    if (mpi_fh == MPI_FILE_NULL) {
+	*errhandler = CtvAccess(ADIOI_DFLT_ERR_HANDLER);
     }
-    else *errhandler = fh->err_handler;
+    else {
+	fh = MPIO_File_resolve(mpi_fh);
+	/* --BEGIN ERROR HANDLING-- */
+	if ((fh <= (MPI_File) 0) || ((fh)->cookie != ADIOI_FILE_COOKIE))
+	{
+	    error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+					      myname, __LINE__, MPI_ERR_ARG,
+					      "**iobadfh", 0);
+	    error_code = MPIO_Err_return_file(MPI_FILE_NULL, error_code);
+	    goto fn_exit;
+	}
+	/* --END ERROR HANDLING-- */
 
-    return error_code;
+	*errhandler = fh->err_handler;
+    }
+
+fn_exit:
+    ROMIO_THREAD_CS_EXIT();
+    return MPI_SUCCESS;
 }

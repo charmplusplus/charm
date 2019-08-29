@@ -11,6 +11,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#ifdef __cplusplus
+# define CMI_EXTERN extern "C"
+#else
+# define CMI_EXTERN
+#endif
+
 extern int _tpm_numpes;
 extern int _tpm_numthreads;
 

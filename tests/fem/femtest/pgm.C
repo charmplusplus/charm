@@ -446,7 +446,7 @@ driver(void)
       delete[] elGnum;
     }
 
-#if ENABLE_MIG /*Only works with isomalloc*/
+#if ENABLE_MIG /*Only works with -memory isomalloc*/
     printf("Before migrate: Thread %d on pe %d\n",myId,CkMyPe());
     FEM_Migrate();
     printf("After migrate: Thread %d on pe %d\n",myId,CkMyPe());

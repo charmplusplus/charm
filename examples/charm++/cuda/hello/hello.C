@@ -1,71 +1,78 @@
 #include <stdio.h>
+#include "hapi.h"
 #include "hello.decl.h"
 
-/*readonly*/ CProxy_Main mainProxy;
-/*readonly*/ int nElements;
-/*readonly*/ CProxy_Hello arr; 
+/* readonly */ CProxy_Main mainProxy;
+/* readonly */ int nElements;
+/* readonly */ CProxy_Hello arr;
 
-extern void kernelSetup(void *cb); 
+extern void kernelSetup(cudaStream_t stream, void* cb);
 
-/*mainchare*/
-class Main : public CBase_Main
-{
-public:
-  Main(CkArgMsg* m)
-  {
-    //Process command-line arguments
-    nElements=5;
-    if(m->argc >1 ) nElements=atoi(m->argv[1]);
+/* mainchare */
+class Main : public CBase_Main {
+ public:
+  Main(CkArgMsg* m) {
+    // default values
+    mainProxy = thisProxy;
+    nElements = 5;
+
+    // handle arguments
+    int c;
+    while ((c = getopt(m->argc, m->argv, "c:")) != -1) {
+      switch (c) {
+        case 'c':
+          nElements = atoi(optarg);
+          break;
+        default:
+          CkPrintf("Usage: %s -c [chares]\n", m->argv[0]);
+          CkExit();
+      }
+    }
     delete m;
 
-    //Start the computation
-    CkPrintf("Running Hello on %d processors for %d elements\n",
-	     CkNumPes(),nElements);
-    mainProxy = thisProxy;
+    // print configuration
+    CkPrintf("\n[CUDA hello example]\n");
+    CkPrintf("Chares: %d\n", nElements);
 
+    // create 1D chare array
     arr = CProxy_Hello::ckNew(nElements);
 
-    arr[0].SayHi();
+    // start by triggering first chare element
+    arr[0].greet();
   };
 
-  void done(void)
-  {
-    CkPrintf("All done\n");
+  void done() {
+    CkPrintf("\nAll done\n");
     CkExit();
-  };
+  }
 };
 
-/*array [1D]*/
-class Hello : public CBase_Hello
-{
-public:
-  Hello()
-  {
-    CkPrintf("Hello %d created\n",thisIndex);
-  }
+/* array [1D] */
+class Hello : public CBase_Hello {
+  cudaStream_t stream;
 
-  Hello(CkMigrateMessage *m) {}
+ public:
+  Hello() { hapiCheck(cudaStreamCreate(&stream)); }
 
-  void SayHi()
-  {
-    CkArrayIndex1D myIndex = CkArrayIndex1D(thisIndex); 
-    CkCallback *cb; 
-    cb = new CkCallback(CkIndex_Hello::SendHi(), myIndex, thisArrayID); 
+  ~Hello() { hapiCheck(cudaStreamDestroy(stream)); }
 
-    CkPrintf("Hi from element %d\n", thisIndex);
-    if (thisIndex < nElements-1)
-      kernelSetup((void *) cb); 
-    else 
-      //We've been around once-- we're done.
+  void greet() {
+    CkArrayIndex1D myIndex = CkArrayIndex1D(thisIndex);
+    CkCallback* cb =
+        new CkCallback(CkIndex_Hello::pass(), myIndex, thisArrayID);
+
+    CkPrintf("Hello, I'm chare %d!\n", thisIndex);
+    if (thisIndex < nElements - 1)
+      kernelSetup(stream, (void*)cb);
+    else
+      // we've been around once, we're done
       mainProxy.done();
   }
 
-  void SendHi() {
-    //Pass the hello on:
-    CkPrintf("Sending a Hi Message\n"); 
-    thisProxy[thisIndex+1].SayHi();
+  void pass() {
+    // pass the hello on
+    thisProxy[thisIndex + 1].greet();
   }
-
 };
 
 #include "hello.def.h"

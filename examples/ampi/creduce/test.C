@@ -26,8 +26,8 @@ int main(int argc, char **argv)
   }
 
   MPI_Ireduce(&inval, &outval, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD, &req);
+  MPI_Wait(&req, MPI_STATUS_IGNORE);
   if (rank == 0) {
-    MPI_Wait(&req, MPI_STATUS_IGNORE);
     if (outval == expect)
       printf("MPI_Ireduce test passed\n");
     else {

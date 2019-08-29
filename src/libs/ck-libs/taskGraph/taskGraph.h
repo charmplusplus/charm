@@ -38,14 +38,14 @@ public:
 
 public:
   taskGraphSolver(CkArrayID set, int x)
-    : __taskDeps(), __taskSet(set), __taskIndex(CkArrayIndex1D(x)) {};
+    : __taskSet(set), __taskIndex(CkArrayIndex1D(x)), __taskDeps() {}
   taskGraphSolver(CkArrayID set, int x, int y)
-    : __taskDeps(), __taskSet(set), __taskIndex(CkArrayIndex2D(x,y)) {};
+    : __taskSet(set), __taskIndex(CkArrayIndex2D(x,y)), __taskDeps() {}
   taskGraphSolver(CkArrayID set, int x, int y, int z)
-    : __taskDeps(), __taskSet(set), __taskIndex(CkArrayIndex3D(x,y,z)) {};
+    : __taskSet(set), __taskIndex(CkArrayIndex3D(x,y,z)), __taskDeps() {}
   taskGraphSolver(CkArrayID set, CkArrayIndex taskIndex)
-    : __taskDeps(), __taskSet(set), __taskIndex(taskIndex) {};
-  taskGraphSolver(CkMigrateMessage *m) : PUP::able(m) {};
+    : __taskSet(set), __taskIndex(taskIndex), __taskDeps() {}
+  taskGraphSolver(CkMigrateMessage *m) : PUP::able(m) {}
 
   virtual void pup(PUP::er &p) {
   }

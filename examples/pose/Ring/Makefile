@@ -25,7 +25,7 @@ CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS)
 
 # Default Location variables
 # **************************
-#POSE_ROOT=$(HOME)/charm/net-linux/lib
+#POSE_ROOT=$(HOME)/charm/netlrts-linux/lib
 
 # Default module names
 # - MAKE MODIFICATIONS HERE

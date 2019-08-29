@@ -3,12 +3,14 @@
 module EveryLB {
   extern module DummyLB;
   extern module GreedyLB;
+  extern module GreedyRefineLB;
   extern module CommLB;
   extern module RandCentLB;
   extern module RefineLB;
   extern module RefineCommLB;
   extern module RotateLB;
   extern module DistributedLB;
+  extern module HierarchicalLB;
   extern module HybridLB;
   extern module ComboCentLB;
   extern module RefineSwapLB;
@@ -31,6 +33,8 @@ module EveryLB {
   extern module RecBipartLB;
   extern module CommAwareRefineLB;
   extern module AdaptiveLB;
+  extern module MetisLB;
+  extern module GridMetisLB;
 
   initnode void initEveryLB(void);
 };

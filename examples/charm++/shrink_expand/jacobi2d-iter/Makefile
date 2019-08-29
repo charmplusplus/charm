@@ -6,7 +6,7 @@ OBJS = jacobi2d.o
 all: jacobi2d
 
 jacobi2d: $(OBJS)
-	$(CHARMC) -language charm++ -module CommonLBs -lrt -g -o jacobi2d $(OBJS)
+	$(CHARMC) -language charm++ -module CommonLBs -g -o jacobi2d $(OBJS)
 
 jacobi2d.decl.h: jacobi2d.ci
 	$(CHARMC)  jacobi2d.ci

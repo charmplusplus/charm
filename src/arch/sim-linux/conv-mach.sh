@@ -1,11 +1,8 @@
-CMK_CPP_CHARM='/lib/cpp'
-CMK_CPP_C='gcc -E'
-CMK_CXXPP='g++ -x c++ -E'
-CMK_CC='gcc'
-CMK_CXX='g++'
+. $CHARMINC/cc-gcc.sh
+
 CMK_CF77='f77'
 CMK_CF90='f90'
-CMK_RANLIB='ranlib'
-CMK_LIBS='-lckqt'
 CMK_QT='i386-gcc'
 CMK_XIOPTS=''
+CMK_NO_PARTITIONS="1"
+CMK_CCS_AVAILABLE='0'

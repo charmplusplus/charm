@@ -23,7 +23,7 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
 
 
@@ -34,7 +34,8 @@
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  1
 
-#define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 
@@ -65,6 +66,8 @@
 
 #undef NODE_0_IS_CONVHOST
 #define NODE_0_IS_CONVHOST                                 1
+
+#define CMK_CONVERSE_MPI                                   0
 
 #endif
 

@@ -10,7 +10,7 @@
 #include <string>
 using namespace std;
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 #include <direct.h>
 #define CHDIR _chdir
 #define GETCWD _getcwd
@@ -223,7 +223,7 @@ void TraceTau::creation(envelope *, int epIdx, int num) {
 }
 
 void TraceTau::creationMulticast(envelope *, int epIdx, int num, 
-				 int *pelist) {
+				 const int *pelist) {
   dprintf("[%d] Multicast Message for Entry Method id %d sent to %d pes\n",
 	  CkMyPe(), epIdx, num);
 }
@@ -398,13 +398,10 @@ void TraceTau::traceClose(void)
 
 extern "C" void traceTauExitFunction() {
   dprintf("traceTauExitFunction called.\n");
-  // The exit function of any Charm++ module must call CkExit() or
-  // the entire exit process will hang if multiple modules are linked.
-  // FIXME: This is NOT a feature. Something needs to be done about this.
   //TAU_PROFILE_EXIT("exiting...");
   //TAU_PROFILE_EXIT("done");
   //eventStack.push(NULL);
-  CkExit();
+  CkContinueExit();
 }
 
 // Initialization of the parallel trace module.

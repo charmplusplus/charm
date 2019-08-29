@@ -26,6 +26,7 @@ Date: 04/19/2005
 #define _DIJKSTRA_LIKE_ 0
 #define _INIT_FROM_FILE  
 
+extern int quietModeRequested;
 
 CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology")
 
@@ -33,8 +34,8 @@ CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology")
 TopoLB::TopoLB(const CkLBOptions &opt) : CBase_TopoLB (opt)
 {
   lbname = "TopoLB";
-  if (CkMyPe () == 0) {
-    CkPrintf ("[%d] TopoLB created\n",CkMyPe());
+  if (CkMyPe () == 0 && !quietModeRequested) {
+    CkPrintf("CharmLB> TopoLB created.\n");
   }
 }
 
@@ -163,13 +164,14 @@ void TopoLB::computePartitions(CentralLB::LDStats *stats,int count,int *newmap)
 			else if (cdata.receiver.get_type() == LD_OBJLIST_MSG) {
 				//CkPrintf("in objlist..\n");
         int nobjs;
-        LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+        const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
         int senderID = stats->getHash(cdata.sender);
         for (j=0; j<nobjs; j++) {
            int recverID = stats->getHash(objs[j]);
-           if((senderID == -1)||(recverID == -1))
+           if((senderID == -1)||(recverID == -1)) {
               if (_lb_args.migObjOnly()) continue;
               else CkAbort("Error in search\n");
+           }
            comm[senderID][recverID] += cdata.messages;
            comm[recverID][senderID] += cdata.messages;
         }
@@ -348,7 +350,7 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
     if(!cdata.from_proc() && cdata.receiver.get_type()==LD_OBJLIST_MSG)
     {
       int nobjs=0;
-      LDObjKey *receivers=cdata.receiver.get_destObjs(nobjs);
+      const LDObjKey *receivers=cdata.receiver.get_destObjs(nobjs);
       int sender=stats->getHash(cdata.sender);
       int send_part=newmap[sender];
       
@@ -907,7 +909,7 @@ double TopoLB::getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>map)
     if(!cdata.from_proc() && cdata.receiver.get_type()==LD_OBJLIST_MSG)
     {
       int nobjs=0;
-      LDObjKey *receivers=cdata.receiver.get_destObjs(nobjs);
+      const LDObjKey *receivers=cdata.receiver.get_destObjs(nobjs);
       int sender=stats->getHash(cdata.sender);
       int send_part=map[sender];
       

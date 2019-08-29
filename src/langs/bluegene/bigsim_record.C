@@ -59,39 +59,61 @@ BgMessageReplay::BgMessageReplay(FILE * f_, int node) :f(f_) {
   lcount = rcount = 0;
 
   int d;
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read node/processor level value from file");
+  }
   if (nodelevel != d) {
     CmiPrintf("BgReplay> Fatal error: can not replay %s logs.\n", d?"node level":"processor level");
     CmiAbort("BgReplay error");
   }
 
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read global worker thread ID from file");
+  }
   BgSetGlobalWorkerThreadID(d);
 
   nodeInfo *myNode = cta(threadinfo)->myNode;
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read myNode->x value from file");
+  }
   myNode->x = d;
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read myNode->y value from file");
+  }
   myNode->y = d;
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read myNode->z value from file");
+  }
   myNode->z = d;
 
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read thread ID from file");
+  }
   BgSetThreadID(d);
   if (nodelevel == 0 && d != 0)
     CmiAbort("BgReplay> Fatal error: can not replay processor level log of rank other than 0.");
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read num nodes from file");
+  }
   BgSetNumNodes(d);
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read num work threads per node from file");
+  }
   if (nodelevel == 1 && d/BgNumNodes() != BgGetNumWorkThread())
     CmiAbort("BgReplay> Fatal error: the number of worker threads is not the same as in the logs.\n");
   BgSetNumWorkThread(d/BgNumNodes());
 
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read cva(bgMach).x from file");
+  }
   cva(bgMach).x = d;
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read cva(bgMach).y from file");
+  }
   cva(bgMach).y = d;
-  fread(&d, sizeof(int), 1, f);
+  if (fread(&d, sizeof(int), 1, f) != 1) {
+    CmiAbort("BigSim failed to read cva(bgMach).z from file");
+  }
   cva(bgMach).z = d;
 
   //myNode->id = nodeInfo::XYZ2Local(myNode->x,myNode->y,myNode->z);
@@ -110,7 +132,9 @@ void BgRead_nodeinfo(int node, int &startpe, int &endpe)
       CmiPrintf("BgReplayNode> metadata file for node %d does not exist!\n", node);
       CmiAbort("BgRead_nodeinfo");
     }
-    fscanf(fp, "%d %d\n", &startpe, &endpe);
+    if (fscanf(fp, "%d %d\n", &startpe, &endpe) != 2) {
+      CmiAbort("BigSim failed to read node info from file");
+    }
     fclose(fp);
 }
 

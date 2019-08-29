@@ -1,6 +1,6 @@
 /// Global POSE data and functions; includes and dependencies handled here
 
-#if ! defined(_WIN32) || defined(__CYGWIN__)
+#if ! defined(_WIN32)
 #include "unistd.h"
 #endif
 
@@ -51,7 +51,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   CkPrintf("Initializing POSE...  \n");
   POSEreadCmdLine();
   if (pose_config.checkpoint_gvt_interval) {
-    CkPrintf("POSE checkpointing interval set to %lld GVT ticks\n", pose_config.checkpoint_gvt_interval);
+    CkPrintf("POSE checkpointing interval set to %d GVT ticks\n", pose_config.checkpoint_gvt_interval);
   }
   if (pose_config.checkpoint_time_interval) {
     CkPrintf("POSE checkpointing interval set to %d seconds\n", pose_config.checkpoint_time_interval);

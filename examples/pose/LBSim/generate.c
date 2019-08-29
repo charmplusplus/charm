@@ -34,7 +34,7 @@ VerticesListType * InitVertices();
 
 
 /* For testing... 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   gengraph(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
 }
@@ -57,7 +57,7 @@ void gengraph(long int pV, int pC, int pseed, int *pes, int *npe, int tofile,int
 { int i,j;
   EdgeListType * EdgeList;
   /* VerticesListType * vertices; */
-  extern EdgeListType * InitEdgeList();
+  extern EdgeListType * InitEdgeList(int);
   char dircmd[20], dirname[10],filename[20];
   FILE *fp;
 
@@ -166,7 +166,7 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 	/* first add edges for a C-way spanning tree.*/
         varr=(int **)calloc(V, sizeof(int*));
         for (i=0;i<V;i++)
-            varr[i]=calloc(2, sizeof(int));
+            varr[i] = (int *)calloc(2, sizeof(int));
 	
 	if (C>1) c1 = C-1;
 
@@ -306,10 +306,7 @@ static void sort(int *adj, int fromIndex, int toIndex);
 void countDegrees(Edge *edges, Vertex *vertRecs, int V, int E);
 
 VerticesListType * 
-InitVertices(EdgeList, V,E)
-     EdgeListType * EdgeList;
-     int V;
-     int E;
+InitVertices(EdgeListType * EdgeList, int V, int E)
 { /* returns a structure of type VerticesListType, which contains an arry of 
      vertex records, and an array of adjacency information. See typedef. */
   /* First allocate the adjacency subarray of size E, and vertex subarray size V.
@@ -508,7 +505,7 @@ static void enqueue(Q *q, int i);
 
 static void diameter(void)
 {
-  Q * makeQueue();
+  extern Q * makeQueue(void);
   int i,j, k, v, w, start;
   int *distance;
   int *histogram;

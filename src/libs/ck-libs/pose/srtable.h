@@ -81,8 +81,8 @@ class SRentry {
   /// Dump data fields
   void dump() {
     if (next)
-      CkPrintf("TS:%d #s:%d #r:%d n:!NULL ", timestamp, sends, recvs); 
-    else CkPrintf("TS:%d #s:%d #r:%d n:NULL ",timestamp, sends, recvs);
+      CkPrintf("TS:%lld #s:%d #r:%d n:!NULL ", timestamp, sends, recvs);
+    else CkPrintf("TS:%lld #s:%d #r:%d n:NULL ",timestamp, sends, recvs);
   }
   /// Dump data fields to a string
   char *dumpString();

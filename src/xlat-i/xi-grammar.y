@@ -27,6 +27,7 @@ extern unsigned char in_comment;
 extern unsigned int lineno;
 extern int in_bracket,in_braces,in_int_expr;
 extern std::list<Entry *> connectEntries;
+extern char* yytext;
 AstChildren<Module> *modlist;
 
 void yyerror(const char *);
@@ -35,6 +36,7 @@ namespace xi {
 
 const int MAX_NUM_ERRORS = 10;
 int num_errors = 0;
+bool firstRdma = true;
 
 bool enable_warnings = true;
 
@@ -112,6 +114,8 @@ void ReservedWord(int token, int fCol, int lCol);
 %token CREATEHERE CREATEHOME NOKEEP NOTRACE APPWORK
 %token VOID
 %token CONST
+%token NOCOPY
+%token NOCOPYPOST
 %token PACKED
 %token VARSIZE
 %token ENTRY
@@ -120,7 +124,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token WHILE
 %token WHEN
 %token OVERLAP
-%token ATOMIC
+%token SERIAL
 %token IF
 %token ELSE
 %token PYTHON LOCAL
@@ -135,6 +139,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token MEMCRITICAL
 %token REDUCTIONTARGET
 %token CASE
+%token TYPENAME
 
 %type <modlist>		ModuleEList File
 %type <module>		Module
@@ -247,6 +252,8 @@ Name		: IDENT
 		| EXCLUSIVE { ReservedWord(EXCLUSIVE, @$.first_column, @$.last_column); YYABORT; }
 		| IMMEDIATE { ReservedWord(IMMEDIATE, @$.first_column, @$.last_column); YYABORT; }
 		| SKIPSCHED { ReservedWord(SKIPSCHED, @$.first_column, @$.last_column); YYABORT; }
+		| NOCOPY { ReservedWord(NOCOPY, @$.first_column, @$.last_column); YYABORT; }
+		| NOCOPYPOST { ReservedWord(NOCOPYPOST, @$.first_column, @$.last_column); YYABORT; }
 		| INLINE { ReservedWord(INLINE, @$.first_column, @$.last_column); YYABORT; }
 		| VIRTUAL { ReservedWord(VIRTUAL, @$.first_column, @$.last_column); YYABORT; }
 		| MIGRATABLE { ReservedWord(MIGRATABLE, @$.first_column, @$.last_column); YYABORT; }
@@ -265,7 +272,7 @@ Name		: IDENT
 		| WHILE { ReservedWord(WHILE, @$.first_column, @$.last_column); YYABORT; }
 		| WHEN { ReservedWord(WHEN, @$.first_column, @$.last_column); YYABORT; }
 		| OVERLAP { ReservedWord(OVERLAP, @$.first_column, @$.last_column); YYABORT; }
-		| ATOMIC { ReservedWord(ATOMIC, @$.first_column, @$.last_column); YYABORT; }
+		| SERIAL { ReservedWord(SERIAL, @$.first_column, @$.last_column); YYABORT; }
 		| IF { ReservedWord(IF, @$.first_column, @$.last_column); YYABORT; }
 		| ELSE { ReservedWord(ELSE, @$.first_column, @$.last_column); YYABORT; }
 		/* | PYTHON { ReservedWord(PYTHON, @$.first_column, @$.last_column); YYABORT; } */
@@ -281,12 +288,19 @@ Name		: IDENT
 		| CASE { ReservedWord(CASE, @$.first_column, @$.last_column); YYABORT; }
 		;
 
+
 QualName	: IDENT
 		{ $$ = $1; }
 		| QualName ':'':' IDENT
 		{
 		  char *tmp = new char[strlen($1)+strlen($4)+3];
 		  sprintf(tmp,"%s::%s", $1, $4);
+		  $$ = tmp;
+		}
+		| QualName ':'':' ARRAY
+		{
+		  char *tmp = new char[strlen($1)+5+3];
+		  sprintf(tmp,"%s::array", $1);
 		  $$ = tmp;
 		}
 		;
@@ -321,15 +335,16 @@ ConstructSemi   : USING NAMESPACE QualName
                 { $2->setExtern($1); $$ = $2; }
                 | OptExtern Message
                 { $2->setExtern($1); $$ = $2; }
-                | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters
+                | EXTERN ENTRY EAttribs EReturn QualNamedType Name OptTParams EParameters
                 {
-                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, @1.first_line, @$.last_line);
+                  Entry *e = new Entry(lineno, $3, $4, $6, $8, 0, 0, 0, @1.first_line, @$.last_line);
                   int isExtern = 1;
                   e->setExtern(isExtern);
-                  e->targs = $6;
+                  e->targs = $7;
                   e->label = new XStr;
-                  $4->print(*e->label);
+                  $5->print(*e->label);
                   $$ = e;
+                  firstRdma = true;
                 }
                 ;
 
@@ -386,7 +401,7 @@ TParamList	: TParam
 		;
 
 TParamEList	: /* Empty */
-		{ $$ = 0; }
+		{ $$ = new TParamList(0); }
 		| TParamList
 		{ $$ = $1; }
 		;
@@ -435,6 +450,12 @@ QualNamedType	: QualName OptTParams {
                     splitScopedName($1, &scope, &basename);
                     $$ = new NamedType(basename, $2, scope);
                 }
+		| TYPENAME QualName OptTParams
+		{
+			const char* basename, *scope;
+			splitScopedName($2, &scope, &basename);
+			$$ = new NamedType(basename, $3, scope, true);
+		}
                 ;
 
 SimpleType	: BuiltinType
@@ -483,14 +504,30 @@ BaseDataType	: SimpleType
 		{ $$ = new ConstType($1); }
 		;
 
-RestrictedType : BaseDataType '&'
+RestrictedType : BaseDataType '&' '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new RValueReferenceType($1)); }
+		| BaseDataType '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new ReferenceType($1)); }
+		| BaseDataType '.' '.' '.'
+		{ $$ = new EllipsisType($1); }
+		| BaseDataType '&' '&'
+		{ $$ = new RValueReferenceType($1); }
+		| BaseDataType '&'
 		{ $$ = new ReferenceType($1); }
 		| BaseDataType
 		{ $$ = $1; }
 		;
 
-Type		: BaseType '&'
-                { $$ = new ReferenceType($1); }
+Type		: BaseType '&' '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new RValueReferenceType($1)); }
+		| BaseType '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new ReferenceType($1)); }
+		| BaseType '.' '.' '.'
+		{ $$ = new EllipsisType($1); }
+		| BaseType '&' '&'
+		{ $$ = new RValueReferenceType($1); }
+		| BaseType '&'
+		{ $$ = new ReferenceType($1); }
 		| BaseType
 		{ $$ = $1; }
 		;
@@ -609,6 +646,8 @@ VarList		: Var
 
 Message		: MESSAGE MAttribs NamedType
 		{ $$ = new Message(lineno, $3); }
+		| MESSAGE MAttribs NamedType '{' '}'
+		{ $$ = new Message(lineno, $3); }
 		| MESSAGE MAttribs NamedType '{' VarList '}'
 		{ $$ = new Message(lineno, $3, $5); }
 		;
@@ -645,8 +684,8 @@ ArrayIndexType	: '[' NUMBER Name ']'
 			sprintf(buf,"%sD",$2);
 			$$ = new NamedType(buf); 
 		}
-		| '[' Name ']'
-		{ $$ = new NamedType($2); }
+		| '[' QualNamedType ']'
+		{ $$ = $2; }
 		;
 
 Array		: ARRAY ArrayAttribs ArrayIndexType NamedType OptBaseList MemberEList
@@ -700,7 +739,13 @@ OptNameInit	: /* Empty */
 		}
 		;
 
-TVar		: CLASS Name OptTypeInit
+TVar		: CLASS '.' '.' '.' Name OptTypeInit
+		{ $$ = new TTypeEllipsis(new NamedEllipsisType($5), $6); }
+		| TYPENAME '.' '.' '.' IDENT OptTypeInit
+		{ $$ = new TTypeEllipsis(new NamedEllipsisType($5), $6); }
+		| CLASS Name OptTypeInit
+		{ $$ = new TType(new NamedType($2), $3); }
+		| TYPENAME IDENT OptTypeInit
 		{ $$ = new TType(new NamedType($2), $3); }
 		| FuncType OptNameInit
 		{ $$ = new TFunc($1, $2); }
@@ -867,6 +912,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                     $7->setEntry($$);
                     $7->param = new ParamList($5);
                   }
+                  firstRdma = true;
 		}
 		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
 		{ 
@@ -876,6 +922,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                     $5->setEntry($$);
                     $5->param = new ParamList($4);
                   }
+                  firstRdma = true;
 		  if (e->param && e->param->isCkMigMsgPtr()) {
 		    WARNING("CkMigrateMsg chare constructor is taken for granted",
 		            @$.first_column, @$.last_column);
@@ -897,6 +944,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                   $$->setAccelParam(accelParamList);
                   $$->setAccelCodeBody(codeBody);
                   $$->setAccelCallbackName(new XStr(callbackName));
+                  firstRdma = true;
                 }
 		;
 
@@ -961,15 +1009,7 @@ EAttrib		: THREADED
                 { $$ = SREDUCE; }
                 | AGGREGATE
 		{
-#ifdef CMK_USING_XLC
-        WARNING("a known bug in xl compilers (PMR 18366,122,000) currently breaks "
-                "aggregate entry methods.\n"
-                "Until a fix is released, this tag will be ignored on those compilers.",
-                @1.first_column, @1.last_column, @1.first_line);
-        $$ = 0;
-#else
         $$ = SAGGREGATE;
-#endif
     }
 		| error
 		{
@@ -1063,6 +1103,26 @@ Parameter	: Type
 			in_bracket=0;
 			$$ = new Parameter(lineno, $1->getType(), $1->getName() ,$2);
 		} 
+		| NOCOPY ParamBracketStart CCode ']'
+		{ /*Stop grabbing CPROGRAM segments*/
+			in_bracket=0;
+			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
+			$$->setRdma(CMK_ZC_P2P_SEND_MSG);
+			if(firstRdma) {
+				$$->setFirstRdma(true);
+				firstRdma = false;
+			}
+		}
+		| NOCOPYPOST ParamBracketStart CCode ']'
+		{ /*Stop grabbing CPROGRAM segments*/
+			in_bracket=0;
+			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
+			$$->setRdma(CMK_ZC_P2P_RECV_MSG);
+			if(firstRdma) {
+				$$->setFirstRdma(true);
+				firstRdma = false;
+			}
+		}
 		;
 
 AccelBufferType : READONLY  { $$ = Parameter::ACCEL_BUFFER_TYPE_READONLY; }
@@ -1198,7 +1258,7 @@ WhenConstruct   : WHEN SEntryList '{' '}'
 		{ $$ = new WhenConstruct($2, $4); }
 		;
 
-NonWhenConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptSemiColon
+NonWhenConstruct : SERIAL OptTraceName ParamBraceStart CCode ParamBraceEnd OptSemiColon
 		{ $$ = 0; }
 		| OVERLAP '{' Olist '}'
 		{ $$ = 0; }
@@ -1224,8 +1284,8 @@ NonWhenConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptSe
 		{ $$ = 0; }
 		;
 
-SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptSemiColon
-		{ $$ = new AtomicConstruct($4, $2, @3.first_line); }
+SingleConstruct : SERIAL OptTraceName ParamBraceStart CCode ParamBraceEnd OptSemiColon
+		{ $$ = new SerialConstruct($4, $2, @3.first_line); }
 		| OVERLAP '{' Olist '}'
 		{ $$ = new OverlapConstruct($3); }	
 		| WhenConstruct
@@ -1251,7 +1311,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptSem
 		| WHILE StartIntExpr IntExpr EndIntExpr '{' Slist '}'
 		{ $$ = new WhileConstruct($3, $6); }
 		| ParamBraceStart CCode ParamBraceEnd OptSemiColon
-		{ $$ = new AtomicConstruct($2, NULL, @$.first_line); }
+		{ $$ = new SerialConstruct($2, NULL, @$.first_line); }
 		| error
 		{
 		  ERROR("unknown SDAG construct or malformed entry method declaration.\n"
@@ -1285,10 +1345,12 @@ StartIntExpr	: '('
 SEntry		: IDENT EParameters
 		{
 		  $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, @$.first_line, @$.last_line);
+		  firstRdma = true;
 		}
 		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
 		{
 		  $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, @$.first_line, @$.last_line);
+		  firstRdma = true;
 		}
 		;
 
@@ -1315,4 +1377,7 @@ HashIFDefComment: HASHIFDEF Name
 
 %%
 
-void yyerror(const char *msg) { }
+void yyerror(const char *s) 
+{
+	fprintf(stderr, "[PARSE-ERROR] Unexpected/missing token at line %d. Current token being parsed: '%s'.\n", lineno, yytext);
+}

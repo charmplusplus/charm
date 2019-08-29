@@ -1,0 +1,114 @@
+OFI LRTS machine
+----------------
+
+This is an implementation of the Converse LRTS machine over the Open Fabrics
+Interfaces (OFI) API.  More information about OFI can be found at
+
+    https://ofiwg.github.io/libfabric/
+
+
+PMI-based launcher
+------------------
+
+This implementation requires a PMI-based launcher to run jobs. The application
+(client) uses the PMI protocol to communicate with the PMI server. Typically,
+the server side is provided by the launcher -- e.g. mpiexec.hydra, srun.  The
+client side needs to be built in the application.
+
+On some systems, it is possible to re-use an implementation of the client side
+provided by SLURM.
+
+On others, we provide, for convenience, an implementation of the client side
+called "simple PMI" that was written by the MPICH developers.
+
+By default, we build simple PMI in the application as it works for all cases.
+However, it is also possible to use SLURM's implementation of the client side
+instead. See the "Build the OFI LRTS machine" section for more information.
+
+
+Build the OFI LRTS machine
+--------------------------
+
+To build the OFI LRTS machine with simple PMI:
+
+    ./build charm++ ofi-linux-x84_64 smp icc
+
+(Note: the resulting binary will work with mpiexec.hydra or srun)
+
+
+To build the OFI LRTS machine with SLURM PMI:
+
+    ./build charm++ ofi-linux-x84_64 slurmpmi smp icc
+
+
+To build the OFI LRTS machine with SLURM PMI2:
+
+    ./build charm++ ofi-linux-x84_64 slurmpmi2 smp icc
+
+
+Launch a job
+------------
+
+To launch an application with mpiexec.hydra:
+
+    mpiexec.hydra -hosts host1,host2 -n 2 ./hello
+
+
+Runtime options
+---------------
+
+Several options can be used at runtime:
+    +ofi_eager_maxsize: (default: 65536) Threshold between buffered and RMA
+                        paths.
+    +ofi_cq_entries_count: (default: 8) Maximum number of entries to read from
+                           the completion queue with each call to fi_cq_read().
+    +ofi_use_inject: (default: 1) Whether to use buffered send.
+    +ofi_num_recvs: (default: 8) Number of pre-posted receive buffers.
+    +ofi_runtime_tcp: (default: off) During the initialization phase, the
+                      OFI EP names need to be exchanged among all nodes. By
+                      default, the exchange is done with both PMI and OFI. If
+                      this flag is set then the exchange is done with PMI only.
+
+    +ofi_mempool_init_size_mb: (default: 8) The initial size of memory pool in MBytes.
+    +ofi_mempool_expand_size_mb: (default: 4) The size of expanding chunk in MBytes.
+    +ofi_mempool_max_size_mb: (default: 512) The limit for total size
+                              of memory pool in MBytes.
+    +ofi_mempool_lb_size: (default: 1024) The left border size in bytes
+                          from which the memory pool is used.
+    +ofi_mempool_rb_size: (default: 67108864) The right border size in bytes
+                          to which the memory pool is used.
+
+
+Known issue(s)
+--------------
+
+1) There is a known issue with versions of PSM2 older than 10.2.85 where
+non-MPI applications fail to start with the following error:
+
+    hfi_userinit: assign_context command failed: Invalid argument
+    PSM2 can't open hfi unit: -1 (err=23)
+
+The solution is to either:
+    - install a newer version of PSM2 (>= 10.2.85), or
+    - set the environment variable PSM2_SHAREDCONTEXTS to 0
+
+        e.g. mpiexec.hydra -genv PSM2_SHAREDCONTEXTS=0 -hosts ...
+
+2) There is another known issue with libfabric 1.3.0 which may cause a message
+corruption under certain conditions. The solution is to use a newer version of
+libfabric (>=1.4.0).
+
+
+Licensing
+---------
+
+The code for "simple PMI" (under src/arch/util/proc_management/simple_pmi/) was
+written by the MPICH developers. Copyright information can be found in
+src/arch/util/proc_management/LICENSE-MPICH.
+
+The code used to encode/decode binary so it can be sent via PMI (in
+src/arch/util/proc_management/runtime-codec.h) was written by the Sandia OpenSHMEM
+developers. Copyright information can be found in
+src/arch/util/proc_management/LICENSE-SandiaOpenSHMEM.
+
+Copyright information for the OFI LRTS machine code can be found in LICENSE.

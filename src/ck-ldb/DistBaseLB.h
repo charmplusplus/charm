@@ -71,8 +71,6 @@ protected:
   int migrates_expected;
 
 private:
-  CProxy_DistBaseLB  thisProxy;
-
 	bool lb_started;
   double start_lb_time;
   double strat_start_time;

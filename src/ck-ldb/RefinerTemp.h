@@ -13,7 +13,7 @@
 class RefinerTemp {
 public:
   RefinerTemp(double _overload)
-    : overLoad(_overload), computes(0), P(CkNumPes())
+    : overLoad(_overload), P(CkNumPes()), computes(0)
     { 
     processors=0; 
     procFreq = new int[P];
@@ -42,8 +42,8 @@ protected:
   virtual void computeAverage();
   double computeMax();
 double computeMax(int*);
-  int isHeavy(processorInfo *p);
-  int isLight(processorInfo *p);
+  bool isHeavy(processorInfo *p);
+  bool isLight(processorInfo *p);
   void removeComputes();
 
   double overLoad;

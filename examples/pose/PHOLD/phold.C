@@ -17,7 +17,7 @@ main::main(CkArgMsg *m)
 
   if(m->argc<7) {
     CkPrintf("Usage: phold <#LPs> <#initMsgs> <initMsgDist (RANDOM)> <timestampIncFn (RANDOM)> <moveFn (RANDOM)> [ -g[f|m|c|z] | -t<granularity> ] <spacialLocality (%)> <timescale (>=100)>\n");
-    CkExit();
+    CkExit(1);
   }
   numLPs = atoi(m->argv[1]);
   map = (int *)malloc(numLPs*sizeof(int));

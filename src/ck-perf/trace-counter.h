@@ -166,19 +166,19 @@ class TraceCounter : public Trace {
     };
 
   private:
-    enum TC_Status { IDLE, WORKING };
+    enum TC_Status : int8_t { IDLE, WORKING };
     int cancel_beginIdle, cancel_endIdle;
     
     // command line processing
-    CounterArg* firstArg_;      // pointer to start of linked list of args
-    CounterArg* lastArg_;       // pointer to end of linked list of args
     int         argStrSize_;    // size of max arg string (formatted output)
-    CounterArg* commandLine_;   // list of command line args
     int         commandLineSz_; // size of commande line args array
-    CounterArg* counter1_;      // point to current counter, circle linked list
-    CounterArg* counter2_;      // point to current counter, circle linked list
     int         counter1Sz_;    // size of cycle
     int         counter2Sz_;    // size of cycle
+    CounterArg* firstArg_;      // pointer to start of linked list of args
+    CounterArg* lastArg_;       // pointer to end of linked list of args
+    CounterArg* commandLine_;   // list of command line args
+    CounterArg* counter1_;      // point to current counter, circle linked list
+    CounterArg* counter2_;      // point to current counter, circle linked list
     
     // result of different command line opts
     bool        overview_;      // if true, just measure between phases
@@ -189,16 +189,16 @@ class TraceCounter : public Trace {
 
     // store between start/stop of counter read
     int         execEP_;        // id currently executing entry point
+    int         genStart_;      // track value of start_counters
     double      startEP_;       // start time of currently executing ep
     double      startIdle_;     // start time of currently executing idle
-    int         genStart_;      // track value of start_counters
 
     // store state
     double      idleTime_;        // total idle time
     int         phase_;           // current phase
     int         reductionPhase_;  // for reduction output
-    bool        traceOn_;         // true if trace is turned on
     TC_Status   status_;          // to prevent errors
+    bool        traceOn_;         // true if trace is turned on
     bool        dirty_;           // true if endExecute called 
 
     //! start/stop the overall counting ov eps (don't write to logCount, 

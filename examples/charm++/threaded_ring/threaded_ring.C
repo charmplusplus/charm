@@ -4,8 +4,6 @@ Main::Main(CkArgMsg*)
 {
     nElems = 10;
     CProxy_Ring A = CProxy_Ring::ckNew(nElems);
-    CkCallback* cb = new CkCallback(CkCallback::ckExit);
-    A.ckSetReductionClient(cb);
     A.run();
 }
 
@@ -19,7 +17,8 @@ void Ring::run()
         waitFor();
     }
     CkPrintf("[%d] done\n", thisIndex);
-    contribute(0, 0, CkReduction::concat);
+    CkCallback cb(CkCallback::ckExit);
+    contribute(cb);
 }
 
 void Ring::getData()

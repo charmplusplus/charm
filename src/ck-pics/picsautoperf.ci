@@ -3,6 +3,7 @@ module TraceAutoPerf {
     entry TraceAutoPerfInit(CkArgMsg *m);
   };
 
+  initnode void _initTraceAutoPerfNode();
   initproc void _initTraceAutoPerfBOC();
   readonly CProxy_TraceAutoPerfBOC autoPerfProxy;
 

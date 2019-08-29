@@ -63,11 +63,9 @@ bool _lb_debug2=0;
       LBtopoFn topofn;
       topofn = LBTopoLookup(_lbtopo);
       if (topofn == NULL) {
-        char str[1024];
         CmiPrintf("NeighborCommLB> Fatal error: Unknown topology: %s. Choose from:\n", _lbtopo);
         printoutTopo();
-        sprintf(str, "NeighborCommLB> Fatal error: Unknown topology: %s", _lbtopo);
-        CmiAbort(str);
+        CkAbort("NeighborCommLB> Fatal error: Unknown topology: %s", _lbtopo);
       }
       topo = topofn(CkNumPes());
     }
@@ -75,11 +73,9 @@ bool _lb_debug2=0;
     if (_lb_debug2) 
       CkPrintf("[%d] Topology dimension = %d\n", CkMyPe(), dimension);
     if (dimension == -1) {
-      char str[1024];
       CmiPrintf("NeighborCommLB> Fatal error: Unsupported topology: %s. Only some of the following are supported:\n", _lbtopo);
       printoutTopo();
-      sprintf(str, "NeighborCommLB> Fatal error: Unsupported topology: %s", _lbtopo);
-      CmiAbort(str);
+      CkAbort("NeighborCommLB> Fatal error: Unsupported topology: %s", _lbtopo);
     }
 
     // Position of this processor
@@ -96,7 +92,7 @@ bool _lb_debug2=0;
       }
       sprintf(now, "]\n");
       now += strlen(now);
-      CkPrintf(temp);
+      CkPrintf("%s", temp);
     }
 
     // Then calculate the communication center of each object
@@ -171,7 +167,7 @@ bool _lb_debug2=0;
         }
         sprintf(now, "]\n");
         now += strlen(now);
-        CkPrintf(temp);
+        CkPrintf("%s", temp);
       }
     }
     

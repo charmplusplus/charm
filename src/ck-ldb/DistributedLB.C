@@ -7,6 +7,8 @@
 
 #include "elements.h"
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
 
 using std::vector;
@@ -16,9 +18,17 @@ DistributedLB::DistributedLB(CkMigrateMessage *m) : CBase_DistributedLB(m) {
 
 DistributedLB::DistributedLB(const CkLBOptions &opt) : CBase_DistributedLB(opt) {
   lbname = "DistributedLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] DistributedLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested) {
+    CkPrintf("CharmLB> DistributedLB created: threshold %lf, max phases %i\n",
+        kTargetRatio, kMaxPhases);
+  }
   InitLB(opt);
+}
+
+void DistributedLB::initnodeFn()
+{
+  _registerCommandLineOpt("+DistLBTargetRatio");
+  _registerCommandLineOpt("+DistLBMaxPhases");
 }
 
 void DistributedLB::turnOn()
@@ -47,34 +57,42 @@ void DistributedLB::turnOff()
 
 void DistributedLB::InitLB(const CkLBOptions &opt) {
   thisProxy = CProxy_DistributedLB(thisgroup);
-  if (opt.getSeqNo() > 0) turnOff();
+  if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+    turnOff();
+
+  // Set constants
+  kUseAck = true;
+  kPartialInfoCount = -1;
+  kMaxPhases = _lb_args.maxDistPhases();
+  kTargetRatio = _lb_args.targetRatio();
 }
 
 void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
-	if (CkMyPe() == 0)
-		CkPrintf("[%d] In DistributedLB strategy\n", CkMyPe());
+  if (CkMyPe() == 0 && _lb_args.debug() >= 1) {
+    start_time = CmiWallTimer();
+    CkPrintf("In DistributedLB strategy at %lf\n", start_time);
+  }
 
-  // Initialize constants
-  kUseAck = true;
-  kTransferThreshold = 1.05;
-  // Indicates use all the information present
-  kPartialInfoCount = -1;
+  // Set constants for this iteration (these depend on CkNumPes() or number of
+  // objects, so may not be constant for the entire program)
+  kMaxObjPickTrials = stats->n_objs;
   // Maximum number of times we will try to find a PE to transfer an object
   // successfully
   kMaxTrials = CkNumPes();
   // Max gossip messages sent from each PE
   kMaxGossipMsgCount = 2 * CmiLog2(CkNumPes());
- 
+
+  // Reset member variables for this LB iteration
+  phase_number = 0;
   my_stats = stats;
 
 	my_load = 0.0;
 	for (int i = 0; i < my_stats->n_objs; i++) {
 		my_load += my_stats->objData[i].wallTime; 
   }
+  init_load = my_load;
   b_load = my_stats->total_walltime - (my_stats->idletime + my_load);
-  //my_load += b_load;
 
-  // Reset member variables
 	pe_no.clear();
 	loads.clear();
 	distribution.clear();
@@ -82,10 +100,20 @@ void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
   gossip_msg_count = 0;
   negack_count = 0;
 
+  total_migrates = 0;
+  total_migrates_ack = 0;
+
   srand((unsigned)(CmiWallTimer()*1.0e06) + CkMyPe());
-  // Use reduction to obtain the average load in the system
-  CkCallback cb(CkReductionTarget(DistributedLB, AvgLoadReduction), thisProxy);
-  contribute(sizeof(double), &my_load, CkReduction::sum_double, cb);
+
+  // Do a reduction to obtain load information for the system
+  CkReduction::tupleElement tupleRedn[] = {
+    CkReduction::tupleElement(sizeof(double), &my_load, CkReduction::sum_double),
+    CkReduction::tupleElement(sizeof(double), &my_load, CkReduction::max_double)
+  };
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, 2);
+  CkCallback cb(CkIndex_DistributedLB::LoadReduction(NULL), thisProxy);
+  msg->setCallback(cb);
+  contribute(msg);
 }
 
 /*
@@ -93,21 +121,46 @@ void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
 * gossiping starts. Only the underloaded processors gossip.
 * Termination of gossip is via QD and callback is DoneGossip.
 */
-void DistributedLB::AvgLoadReduction(double x) {
-  avg_load = x/CkNumPes();
-  // Calculate the average load by considering the threshold for imbalance
-  thr_avg = ceil(kTransferThreshold * avg_load);
+void DistributedLB::LoadReduction(CkReductionMsg* redn_msg) {
+  int count;
+  CkReduction::tupleElement* results;
+  redn_msg->toTuple(&results, &count);
+  delete redn_msg;
 
-  // If my load is less than the avg_load, I am underloaded. Initiate the gossip
-  // by sending my load information to random neighbors.
-  if (my_load < avg_load) {
+  // Set the initial global load stats and print when LBDebug is on
+  avg_load = *(double*)results[0].data / CkNumPes();
+  max_load = *(double*)results[1].data;
+  load_ratio = max_load / avg_load;
+
+  if (CkMyPe() == 0 && _lb_args.debug() >= 1) {
+    CkPrintf("DistributedLB>>>Before LB: max = %lf, avg = %lf, ratio = %lf\n",
+        max_load, avg_load, load_ratio);
+  }
+
+  // If there are no overloaded processors, immediately terminate
+  if (load_ratio <= kTargetRatio) {
+    if (CkMyPe() == 0 && _lb_args.debug() >= 1) {
+      CkPrintf("DistributedLB>>>Load ratio already within the target of %lf, ending early.\n",
+          kTargetRatio);
+    }
+    PackAndSendMigrateMsgs();
+    delete [] results;
+    return;
+  }
+
+  // Set transfer threshold for the gossip phase, for which only PEs lower than
+  // the target ratio are considered underloaded.
+  transfer_threshold = kTargetRatio * avg_load;
+
+  // If my load is under the acceptance threshold, then I am underloaded and
+  // can receive more work. So assuming there exists an overloaded PE that can
+  // donate work, I will start gossipping my load information.
+  if (my_load < transfer_threshold) {
 		double r_loads[1];
 		int r_pe_no[1];
     r_loads[0] = my_load;
     r_pe_no[0] = CkMyPe();
-    // Initialize the req_hop of the message to 0
-		req_hop = 0;
-    GossipLoadInfo(req_hop, CkMyPe(), 1, r_pe_no, r_loads);
+    GossipLoadInfo(CkMyPe(), 1, r_pe_no, r_loads);
   }
 
   // Start quiescence detection at PE 0.
@@ -115,12 +168,13 @@ void DistributedLB::AvgLoadReduction(double x) {
     CkCallback cb(CkIndex_DistributedLB::DoneGossip(), thisProxy);
     CkStartQD(cb);
   }
+  delete [] results;
 }
 
 /*
 * Gossip load information between peers. Receive the gossip message.
 */
-void DistributedLB::GossipLoadInfo(int req_h, int from_pe, int n,
+void DistributedLB::GossipLoadInfo(int from_pe, int n,
     int remote_pe_no[], double remote_loads[]) {
   // Placeholder temp vectors for the sorted pe and their load 
   vector<int> p_no;
@@ -165,7 +219,6 @@ void DistributedLB::GossipLoadInfo(int req_h, int from_pe, int n,
   // After the merge sort, swap. Now pe_no and loads have updated information
   pe_no.swap(p_no);
   loads.swap(l);
-	req_hop = req_h + 1;
 
   SendLoadInfo();
 }
@@ -188,9 +241,10 @@ void DistributedLB::SendLoadInfo() {
     rand_nbor1 = rand() % CkNumPes();
   } while (rand_nbor1 == CkMyPe());
   // Pick the second neighbor which is not the same as the first one.
-  do {
-    rand_nbor2 = rand() % CkNumPes();
-  } while ((rand_nbor2 == CkMyPe()) || (rand_nbor2 == rand_nbor1));
+  if(CkNumPes() > 2)
+    do {
+      rand_nbor2 = rand() % CkNumPes();
+    } while ((rand_nbor2 == CkMyPe()) || (rand_nbor2 == rand_nbor1));
 
   // kPartialInfoCount indicates how much information is send in gossip. If it
   // is set to -1, it means use all the information available.
@@ -202,8 +256,10 @@ void DistributedLB::SendLoadInfo() {
     l[i] = loads[i];
   }
 
-  thisProxy[rand_nbor1].GossipLoadInfo(req_hop, CkMyPe(), info_count, p, l);
-  thisProxy[rand_nbor2].GossipLoadInfo(req_hop, CkMyPe(), info_count, p, l);
+  thisProxy[rand_nbor1].GossipLoadInfo(CkMyPe(), info_count, p, l);
+
+  if(CkNumPes() > 2)
+    thisProxy[rand_nbor2].GossipLoadInfo(CkMyPe(), info_count, p, l);
 
   // Increment the outgoind msg count
   gossip_msg_count++;
@@ -216,10 +272,99 @@ void DistributedLB::SendLoadInfo() {
 * Callback invoked when gossip is done and QD is detected
 */
 void DistributedLB::DoneGossip() {
-  // The gossip is done, now perform load balance based on the information
-  // received in the information propagation stage (gossip)
-  LoadBalance();
-  theLbdb->nextLoadbalancer(seqno);
+  if (CkMyPe() == 0 && _lb_args.debug() >= 1) {
+    double end_time = CmiWallTimer();
+    CkPrintf("DistributedLB>>>Gossip finished at %lf (%lf elapsed)\n",
+        end_time, end_time - start_time);
+  }
+  // Set a new transfer threshold for the actual load balancing phase. It starts
+  // high so that load is initially only transferred from the most loaded PEs.
+  // In subsequent phases it gets relaxed to allow less overloaded PEs to
+  // transfer load as well.
+  transfer_threshold = (max_load + avg_load) / 2;
+  lb_started = true;
+  underloaded_pe_count = pe_no.size();
+  Setup();
+  StartNextLBPhase();
+}
+
+void DistributedLB::StartNextLBPhase() {
+  if (underloaded_pe_count == 0 || my_load <= transfer_threshold) {
+    // If this PE has no information about underloaded processors, or it has
+    // no objects to donate to underloaded processors then do nothing.
+    DoneWithLBPhase();
+  } else {
+    // Otherwise this PE has work to donate, and should attempt to do so.
+    LoadBalance();
+  }
+}
+
+void DistributedLB::DoneWithLBPhase() {
+  phase_number++;
+
+  int count = 1;
+  if (_lb_args.debug() >= 1) count = 3;
+  CkReduction::tupleElement tupleRedn[] = {
+    CkReduction::tupleElement(sizeof(double), &my_load, CkReduction::max_double),
+    CkReduction::tupleElement(sizeof(double), &total_migrates, CkReduction::sum_int),
+    CkReduction::tupleElement(sizeof(double), &negack_count, CkReduction::max_int)
+  };
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, count);
+  CkCallback cb(CkIndex_DistributedLB::AfterLBReduction(NULL), thisProxy);
+  msg->setCallback(cb);
+  contribute(msg);
+}
+
+void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
+  int count, migrations, max_nacks;
+  CkReduction::tupleElement* results;
+  redn_msg->toTuple(&results, &count);
+  delete redn_msg;
+
+  // Update load stats and print if in debug mode
+  max_load = *(double*)results[0].data;
+  double old_ratio = load_ratio;
+  load_ratio = max_load / avg_load;
+  if (count > 1) migrations = *(int*)results[1].data;
+  if (count > 2) max_nacks = *(int*)results[2].data;
+
+  if (CkMyPe() == 0 && _lb_args.debug() >= 1) {
+    CkPrintf("DistributedLB>>>After phase %i: max = %lf, avg = %lf, ratio = %lf\n",
+        phase_number, max_load, avg_load, load_ratio);
+  }
+
+  // Try more phases as long as our load ratio is still worse than our target,
+  // our transfer threshold hasn't decayed below the target, and we haven't hit
+  // the maximum number of phases yet.
+  if (load_ratio > kTargetRatio &&
+      transfer_threshold > kTargetRatio * avg_load &&
+      phase_number < kMaxPhases) {
+    // Relax the transfer ratio to allow more phases based on whether or not the
+    // previous phase was able to reduce the load ratio at all.
+    if (std::abs(load_ratio - old_ratio) < 0.01) {
+      // The previous phase didn't meaningfully reduce the max load, so relax
+      // the transfer threshold.
+      transfer_threshold = (transfer_threshold + avg_load) / 2;
+    } else {
+      // The previous phase did reduce the max load, so update the transfer
+      // threshold based on the new max load.
+      transfer_threshold = (max_load + avg_load) / 2;
+    }
+    StartNextLBPhase();
+  } else {
+    if (CkMyPe() == 0 && _lb_args.debug() >= 1) {
+      double end_time = CmiWallTimer();
+      CkPrintf("DistributedLB>>>Balancing completed at %lf (%lf elapsed)\n",
+          end_time, end_time - start_time);
+      CkPrintf("DistributedLB>>>%i total migrations with %i negative ack max\n",
+          migrations, max_nacks);
+    }
+    Cleanup();
+    PackAndSendMigrateMsgs();
+    if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+      theLbdb->nextLoadbalancer(seqno);
+  }
+  delete [] results;
 }
 
 /*
@@ -227,89 +372,60 @@ void DistributedLB::DoneGossip() {
 * information propagation stage (gossip).
 */
 void DistributedLB::LoadBalance() {
-  if (lb_started) {
-    return;
-  }
-  lb_started = true;
-  underloaded_pe_count = pe_no.size();
-
   CkVec<int> obj_no;
   CkVec<int> obj_pe_no;
 
   // Balance load and add objs to be transferred to obj_no and pe to be
   // transferred to in obj_pe_no
-  LoadBalance(obj_no, obj_pe_no);
-  total_migrates = obj_no.length();
-  total_migrates_ack = total_migrates;
+  MapObjsToPe(objs, obj_no, obj_pe_no);
+  total_migrates += obj_no.length();
+  total_migrates_ack = obj_no.length();
 
   // If there is no migration, then this is done
-  if (total_migrates == 0) {	
-    // Total migrates will be 0
-    msg = new(total_migrates,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
-    msg->n_moves = total_migrates;
-    // Wait for all acks before starting to transfer
-    contribute(CkCallback(CkReductionTarget(DistributedLB, SendAfterBarrier),
-                thisProxy));
+  if (obj_no.length() == 0) {
+    DoneWithLBPhase();
 	}
 }
 
-/*
-* Callback for the barrier after the load balance decisions are made and acks
-* received.
-* Once all that has been done, now process the migration decision.
-*/
-void DistributedLB::SendAfterBarrier() {
-  ProcessMigrationDecision(msg);
-}
-
-/*
-* Map the objects present in this PE to other PEs for load balance and store the
-* result in obj_no and obj_pe_no. obj_no contains the index of the object to be
-* transferred and corresponding entry in obj_pe_no indicates the PE to which it
-* is transferred.
-*/
-void DistributedLB::LoadBalance(CkVec<int> &obj_no, CkVec<int> &obj_pe_no) {
+void DistributedLB::Setup() {
   objs_count = 0;
+  double avg_objload = 0.0;
+  double max_objload = 0.0;
   // Count the number of objs that are migratable and whose load is not 0.
   for(int i=0; i < my_stats->n_objs; i++) {
     if (my_stats->objData[i].migratable &&
-        my_stats->objData[i].wallTime > 0.0001) {
+      my_stats->objData[i].wallTime > 0.000001) {
       objs_count++;
     }
-  }
-  // If I am underloaded or if I did not receive information about any
-  // underloaded pes in the system, then return
-  if (underloaded_pe_count <= 0 || my_load < thr_avg) {
-    return;
   }
  
   // Create a min heap of objs. The idea is to transfer smaller objs. The reason
   // is that since we are making probabilistic transfer of load, sending small
   // objs will result in better load balance.
-  minHeap objs(objs_count);
+  objs = new minHeap(objs_count);
   for(int i=0; i < my_stats->n_objs; i++) {
     if (my_stats->objData[i].migratable &&
         my_stats->objData[i].wallTime > 0.0001) {
       InfoRecord* item = new InfoRecord;
       item->load = my_stats->objData[i].wallTime;
       item->Id = i;
-      objs.insert(item);
+      objs->insert(item);
     }
   }
 
   // Calculate the probabilities and cdf for PEs based on their load
   // distribution
 	CalculateCumulateDistribution();
+}
 
-  // Map the objects in the objs mapping where obj_no contains the object number
-  // and the corresponding entry in obj_pe_no is the new mapping.
-  MapObjsToPe(objs, obj_no, obj_pe_no);
+void DistributedLB::Cleanup() {
 
   // Delete the object records from the heap
   InfoRecord* obj;
-  while (NULL!=(obj=objs.deleteMin())) {
+  while (NULL!=(obj=objs->deleteMin())) {
     delete obj;
   }
+  delete objs;
 }
 
 /*
@@ -317,14 +433,14 @@ void DistributedLB::LoadBalance(CkVec<int> &obj_no, CkVec<int> &obj_pe_no) {
 * can be transferred and finds suitable receiver PEs. The mapping is stored in
 * obj_no and the corresponding entry in obj_pe_no indicates the receiver PE.
 */
-void DistributedLB::MapObjsToPe(minHeap &objs, CkVec<int> &obj_no,
+void DistributedLB::MapObjsToPe(minHeap *objs, CkVec<int> &obj_no,
     CkVec<int> &obj_pe_no) {
   int p_id;
   double p_load;
   int rand_pe;
 
   // While my load is more than the threshold, try to transfer objs
-  while (my_load > (thr_avg)) {
+  while (my_load > transfer_threshold) {
     // If there is only one object, then nothing can be done to balance it.
     if (objs_count < 2) break;
 
@@ -332,15 +448,9 @@ void DistributedLB::MapObjsToPe(minHeap &objs, CkVec<int> &obj_no,
     bool success = false;
 
     // Get the smallest object
-    InfoRecord* obj = objs.deleteMin();
+    InfoRecord* obj = objs->deleteMin();
     // No more objects to retrieve
     if (obj == 0) break;
-
-    // If transferring this object makes this PE underloaded, then don't
-    // transfer
-    if ((my_load - obj->load) < (thr_avg)) {
-      break;
-    }
 
     // Pick random PE based on the probability and the find is successful only
     // if on transferring the object, that PE does not become overloaded
@@ -349,14 +459,17 @@ void DistributedLB::MapObjsToPe(minHeap &objs, CkVec<int> &obj_no,
       if (rand_pe == -1) break;
       p_id = pe_no[rand_pe];
       p_load = loads[rand_pe];
-      if ((p_load + obj->load) < avg_load) {
+      if (p_load + obj->load < transfer_threshold) {
         success = true;
       }
       kMaxTrials--;
     } while (!success && (kMaxTrials > 0));
 
+    kMaxObjPickTrials--;
+
     // No successful in finding a suitable PE to transfer the object
     if (!success) {
+      objs->insert(obj);
       break;
     }
 
@@ -392,7 +505,7 @@ void DistributedLB::InformMigration(int obj_id, int from_pe, double obj_load,
     bool force) {
   // If not using ack based scheme or adding this obj does not make this PE
   // overloaded, then accept the migrated obj and return. 
-  if (!kUseAck || (my_load + obj_load) <= (thr_avg)) {
+  if (!kUseAck || my_load + obj_load <= transfer_threshold) {
     migrates_expected++;
     // add to my load and reply true
     my_load += obj_load;
@@ -409,6 +522,7 @@ void DistributedLB::InformMigration(int obj_id, int from_pe, double obj_load,
     my_load += obj_load;
   } else {
     // If my_load + obj_load is > threshold, then reply with negative ack 
+    //CkPrintf("[%d] Cannot accept obj with load %lf my_load %lf and init_load %lf migrates_expected %d\n", CkMyPe(), obj_load, my_load, init_load, migrates_expected);
     thisProxy[from_pe].RecvAck(obj_id, CkMyPe(), false);
   }
 }
@@ -428,11 +542,12 @@ void DistributedLB::RecvAck(int obj_id, int assigned_pe, bool can_accept) {
     migrateMe->from_pe = CkMyPe();
     migrateMe->to_pe = assigned_pe;
     migrateInfo.push_back(migrateMe);
-  } else if (negack_count > 0.1*underloaded_pe_count) {
+  } else if (negack_count > 0.01*underloaded_pe_count) {
     // If received negative acks more than the specified threshold, then drop it
     negack_count++;
     total_migrates--;
     objs_count++;
+    my_load += my_stats->objData[obj_id].wallTime;
   } else {
     // Try to transfer again. Add the object back to a heap, update my load and
     // try to find a suitable PE now.
@@ -441,11 +556,11 @@ void DistributedLB::RecvAck(int obj_id, int assigned_pe, bool can_accept) {
     objs_count++;
     my_load += my_stats->objData[obj_id].wallTime;
 
-    minHeap objs(1);
+    minHeap* objs = new minHeap(1);
     InfoRecord* item = new InfoRecord;
     item->load = my_stats->objData[obj_id].wallTime;
     item->Id = obj_id;
-    objs.insert(item);
+    objs->insert(item);
 
     CkVec<int> obj_no;
     CkVec<int> obj_pe_no;
@@ -459,7 +574,7 @@ void DistributedLB::RecvAck(int obj_id, int assigned_pe, bool can_accept) {
       total_migrates++;
     }
     InfoRecord* obj;
-    while (NULL!=(obj=objs.deleteMin())) {
+    while (NULL!=(obj=objs->deleteMin())) {
       delete obj;
     }
   }
@@ -467,18 +582,21 @@ void DistributedLB::RecvAck(int obj_id, int assigned_pe, bool can_accept) {
   // Whenever all the acks have been received, create migration msg, go into the
   // barrier and wait for everyone to finish their load balancing phase
   if (total_migrates_ack == 0) {
-    msg = new(total_migrates,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
-    msg->n_moves = total_migrates;
-    for(int i=0; i < total_migrates; i++) {
-      MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
-      msg->moves[i] = *item;
-      delete item;
-      migrateInfo[i] = 0;
-    }
-    migrateInfo.clear();
-    contribute(CkCallback(CkReductionTarget(DistributedLB, SendAfterBarrier),
-                thisProxy));
+    DoneWithLBPhase();
   }
+}
+
+void DistributedLB::PackAndSendMigrateMsgs() {
+  LBMigrateMsg* msg = new(total_migrates,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+  msg->n_moves = total_migrates;
+  for(int i=0; i < total_migrates; i++) {
+    MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
+    msg->moves[i] = *item;
+    delete item;
+    migrateInfo[i] = 0;
+  }
+  migrateInfo.clear();
+  ProcessMigrationDecision(msg);
 }
 
 /*
@@ -507,7 +625,7 @@ void DistributedLB::CalculateCumulateDistribution() {
   // The min loaded PEs have probabilities inversely proportional to their load.
 	double cumulative = 0.0;
 	for (int i = 0; i < underloaded_pe_count; i++) {
-		cumulative += (thr_avg - loads[i])/thr_avg;
+		cumulative += (transfer_threshold - loads[i])/transfer_threshold;
 		distribution.push_back(cumulative);
 	}
 

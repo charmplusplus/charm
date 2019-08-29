@@ -14,6 +14,8 @@ simulation.
 A) INSTALLING BIGSIM:
 ====================
 
+Skip ahead to section C for quick start instructions.
+
 The BigSim package depends on Charm++. So, assuming that the application can be
 an MPI or Charm++ code, one needs to build Charm++ with support for AMPI. We
 need to compile two different versions of Charm, one for emulating the user
@@ -23,21 +25,21 @@ A special Charm++ build is necessary for emulation with BigSim.  This new build
 needs to use the BigSim machine-layer, because the emulator needs to run on top
 of that. On a 64-bit Linux machine, this new build can be produced by
 
-   ./build bgampi net-linux-x86_64 bigemulator -O2
+   ./build bgampi netlrts-linux-x86_64 bigemulator -O2
 
 The first argument ("bgampi") is a target meaning that bigsim, charm++ and LIBS
 will be compiled. The "bigemulator" argument implies that the BigSim machine
 layer will be used for running the programs. This should produce a
-sub-directory such as "net-linux-x86_64-bigemulator", with a valid Charm++
+sub-directory such as "netlrts-linux-x86_64-bigemulator", with a valid Charm++
 instance.
 
 To compile the simulator which is called BigSimulator (or BigNetSim), we need
-the regular Charm++ build (net-linux-x86_64 in our example).  It needs to be
+the regular Charm++ build (netlrts-linux-x86_64 in our example).  It needs to be
 complemented with a few more libaries from BigSim and with the Pose
 discrete-event simulator. These pieces can be built, respectively, with:
 
-   ./build bgampi net-linux-x86_64 -O2
-   ./build pose net-linux-x86_64 -O2
+   ./build bgampi netlrts-linux-x86_64 -O2
+   ./build pose netlrts-linux-x86_64 -O2
 
 Access to the discrete-event simulation is realized via a Charm++ package
 originally named BigNetSim (now called BigSimulator). Assuming that the
@@ -55,7 +57,6 @@ the binary "../tmp/bigsimulator". That file, together with file
 "BlueGene/netconfig.vc", will be used during a simulation. It may be useful to
 set the variable SEQUENTIAL to 1 in Makefile.common to build a sequential
 (non-parallel) version of bigsimulator.
-
 
 
 B) USING BIGSIM:
@@ -83,7 +84,7 @@ processor:
    charmrun +p4 prog +vp8
 
 Notice that both 'mpicc' and 'charmrun' must be taken from the regular Charm++
-build in step (A), i.e. 'net-linux-x86_64' in our example.
+build in step (A), i.e. 'netlrts-linux-x86_64' in our example.
 
 
 B-2) Running a BigSim emulation:
@@ -91,7 +92,7 @@ B-2) Running a BigSim emulation:
 
 Here, one must point his/her path to the Charm++ instance produced for
 emulation; in our example of step (A), this would be under subdir
-"net-linux-x86_64-bigemulator". Next, one must compile again the MPI code,
+"netlrts-linux-x86_64-bigemulator". Next, one must compile again the MPI code,
 preparing it for the emulation:
 
    mpicc -o prog_emul prog.c -swapglobals
@@ -213,4 +214,47 @@ as
 
 This form of simulation will generate new files with extensions ".sts" and
 ".log" (such as 'prog_emul-bg.*.log') which can be visualized in Projections. 
+
+
+C) QUICK START:
+===============
+
+This is a step-by-step quick tutorial for simple usage of BigSim simulation framework and visualizing its Projections output logs.
+For more information, please refer to the BigSim and Projections manuals.
+
+1- build charm (and AMPI) with bigemulator and bigsim (replace "linux" with "darwin" for mac):
+	cd charm
+	./build charm++ netlrts-linux-x86_64 bigemulator bigsim
+	./build AMPI netlrts-linux-x86_64 bigemulator bigsim
+
+2- compile your code using charm or AMPI compilers located in "netlrts-linux-x86_64-bigemulator-bigsim/bin", for example:
+	cd tests/ampi/jacobi3d; make 
+
+3- run your application emulating the target machine, for example:
+	./charmrun +p1 jacobi 4 4 2 5 +vp32 +x32 +y1 +z1 +cth1 +wth1 +bglog
+
+4- download BigSim's simulator
+	git clone https://charm.cs.illinois.edu/gerrit/BigFastSim
+
+5- build BigFastSim:
+	cd BigFastSim/Release
+	vim makefile  #change CHARMPATH=$(HOME)/charm/netlrts-linux-x86_64-bigemulator-bigsim/
+	make
+
+6- copy simulator to trace files' directory:
+	cd ~/charm/tests/ampi/jacobi3d
+	cp ~/BigFastSim/Release/seqSimulator .
+
+7- run the simulator with projections output: (to see other options such as changing latency and bandwidth run "./seqSimulator -help")
+	./seqSimulator -tproj
+
+8- download and make Projections:
+	git clone https://github.com/UIUC-PPL/projections
+	cd projections
+	ant
+
+9- run Projections:
+	./bin/projections #open tproj.sts file
+
+After opening the symbol file (file/open <tproj.sts>), you can use different features of Projections such as tools/Timelines.
 

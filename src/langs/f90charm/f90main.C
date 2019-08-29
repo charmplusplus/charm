@@ -7,25 +7,6 @@ extern void _initCharm(int argc, char **argv);
 
 CkChareID mainhandle;
 
-// called from futil.f90 program main
-extern "C" void FTN_NAME(CONVERSEMAIN, conversemain)(int *argc,char _argv[][80],int length[])
-{
-  int i;
-  char **argv = new char*[*argc+2];
-
-  for(i=0;i<=*argc;i++) {
-    if (length[i] < 100) {
-      _argv[i][length[i]]='\0';
-      argv[i] = &(_argv[i][0]);
-    } else {
-      argv[i][0] = '\0';
-    }
-  }
-  argv[*argc+1]=0;
-
-  ConverseInit(*argc, argv, _initCharm, 0, 0);
-}
-
 
 f90main::f90main(CkArgMsg *msg)
 {

@@ -21,7 +21,7 @@ cp mkfiles/$CMK_QT Makefile
 cat >> Makefile << EOF
 
 mostlyclean:
-	rm -f qtmd.h libqt.a libstp.a meas.o stp.o qt.o
+	rm -f qtmd.h libckqt.a libstp.a meas.o stp.o qt.o
 	rm -f qtmdb.s qtmds.s qtmdc.o qtmdb.o qtmds.o run
 
 clean: mostlyclean

@@ -15,6 +15,8 @@
 #undef CMK_USE_KQUEUE
 #define CMK_USE_KQUEUE                                     0
 
+#define CMK_NOT_USE_TLS_THREAD                             1
+
 /*#if !CMK_GCC_X86_ASM || !CMK_GCC_X86_ASM_ATOMICINCREMENT */
 /* #define CMK_PCQUEUE_LOCK                                    1 */
 /*#endif */

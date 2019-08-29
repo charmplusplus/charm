@@ -1,23 +1,27 @@
 module CkArray {
   extern module CkReduction;
   extern module CkLocation;
-  extern module CkArrayReductionMgr;
+
+  class MsgPointerWrapper;
 
   readonly bool _isAnytimeMigration;
   
   group [migratable] CkArray : CkReductionMgr {
-	entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg, CkNodeGroupID nodereductionProxy);
+	entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg);
 	//Insertion
         entry [inline] void insertElement(CkMarshalledMessage, CkArrayIndex, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
         entry [inline] void demandCreateElement(const CkArrayIndex &idx, int ctor, CkDeliver_t type);
         entry void remoteBeginInserting(void);
+	entry void sendZCBroadcast(MsgPointerWrapper p);
 	entry void remoteDoneInserting(void);
+	entry void initDone(void);
 	//Broadcast
 	entry void sendBroadcast(CkMessage *);
 	entry void recvBroadcast(CkMessage *);
 	entry void recvBroadcastViaTree(CkMessage *);
 	entry [expedited] void sendExpeditedBroadcast(CkMessage *);
 	entry [expedited] void recvExpeditedBroadcast(CkMessage *);
+	entry [expedited] void incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper p);
 
         entry void ckDestroy();
   };
@@ -40,7 +44,8 @@ module CkArray {
     entry void inmem_checkpoint(CkArrayCheckPTReqMessage *);
     // _PIPELINED_ALLREDUCE_
     entry void defrag(CkReductionMsg*);
-
+    // Called by migrateMe
+    entry void ckEmigrate(int toPe);
   };
 
   message CkCreateArrayAsyncMsg {

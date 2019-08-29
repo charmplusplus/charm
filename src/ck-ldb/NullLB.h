@@ -31,7 +31,6 @@ public:
     lbname="NullLB"; 
   }
 private:
-  CProxy_NullLB thisProxy;
   void init();
 };
 

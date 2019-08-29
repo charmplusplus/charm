@@ -7,11 +7,11 @@ namespace xi {
 
 class ElseConstruct : public BlockConstruct {
  public:
-  ElseConstruct(SdagConstruct *body);
-  void generateCode(XStr&, XStr&, Entry *);
+  ElseConstruct(SdagConstruct* body);
+  void generateCode(XStr&, XStr&, Entry*);
   void numberNodes();
 };
 
-}   // namespace xi
+}  // namespace xi
 
 #endif  // ifndef _ELSE_H

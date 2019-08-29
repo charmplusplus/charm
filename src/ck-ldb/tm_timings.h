@@ -23,11 +23,7 @@ typedef struct timeval CLOCK_T;
 
 #else    /* for windows */
 
-#ifdef __CYGWIN__
-typedef struct timeb CLOCK_T;
-#else
 typedef struct _timeb CLOCK_T;
-#endif
 
 #define CLOCK(c) _ftime(&c)
 #define CLOCK_DIFF(c1,c2)  \

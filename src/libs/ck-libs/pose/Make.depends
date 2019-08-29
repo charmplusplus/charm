@@ -27,7 +27,6 @@ eventID.o: eventID.C eventID.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -42,11 +41,10 @@ eventID.o: eventID.C eventID.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+   ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h
 	$(CHARMC) -o eventID.o eventID.C
 stats.o: stats.C ../../../../include/charm++.h \
@@ -77,7 +75,6 @@ stats.o: stats.C ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -92,11 +89,10 @@ stats.o: stats.C ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h stats.h stats.decl.h \
   ../../../../include/sdag.h pose_config.h \
   ../../../../include/conv-config.h stats.def.h
@@ -129,7 +125,6 @@ srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -144,11 +139,10 @@ srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h srtable.h pose.h pose.decl.h \
   ../../../../include/sdag.h pose_config.h \
   ../../../../include/conv-config.h eventID.h mempool.h mempool.decl.h \
@@ -186,7 +180,6 @@ cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -201,11 +194,10 @@ cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h \
   ../../../../include/sdag.h pose_config.h \
   ../../../../include/conv-config.h mempool.h mempool.decl.h \
@@ -243,7 +235,6 @@ memory_temporal.o: memory_temporal.C ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -258,11 +249,10 @@ memory_temporal.o: memory_temporal.C ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h \
   ../../../../include/sdag.h pose_config.h \
   ../../../../include/conv-config.h eventID.h mempool.h mempool.decl.h \
@@ -300,7 +290,6 @@ mempool.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -315,11 +304,10 @@ mempool.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h \
   ../../../../include/sdag.h pose_config.h \
   ../../../../include/conv-config.h eventID.h mempool.h mempool.decl.h \
@@ -357,7 +345,6 @@ pvtobj.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -372,11 +359,10 @@ pvtobj.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -413,7 +399,6 @@ lbObject.o: lbObject.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -428,11 +413,10 @@ lbObject.o: lbObject.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -469,7 +453,6 @@ ldbal.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -484,11 +467,10 @@ ldbal.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -525,7 +507,6 @@ gvt.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -540,11 +521,10 @@ gvt.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -582,7 +562,6 @@ event.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -597,11 +576,10 @@ event.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -638,7 +616,6 @@ eqheap.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -653,11 +630,10 @@ eqheap.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -694,7 +670,6 @@ evq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -709,11 +684,10 @@ evq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -750,7 +724,6 @@ sim.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -765,11 +738,10 @@ sim.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -806,7 +778,6 @@ rep.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -821,11 +792,10 @@ rep.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -862,7 +832,6 @@ strat.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -877,11 +846,10 @@ strat.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -918,7 +886,6 @@ seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -933,11 +900,10 @@ seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -974,7 +940,6 @@ cons.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -989,11 +954,10 @@ cons.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1030,7 +994,6 @@ opt.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1045,11 +1008,10 @@ opt.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1086,7 +1048,6 @@ opt2.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1101,11 +1062,10 @@ opt2.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1142,7 +1102,6 @@ opt3.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1157,11 +1116,10 @@ opt3.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1198,7 +1156,6 @@ spec.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1213,11 +1170,10 @@ spec.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1254,7 +1210,6 @@ adapt.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1269,11 +1224,10 @@ adapt.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1310,7 +1264,6 @@ adapt2.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1325,11 +1278,10 @@ adapt2.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1366,7 +1318,6 @@ adapt3.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1381,11 +1332,10 @@ adapt3.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1422,7 +1372,6 @@ adapt4.o: adapt4.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1437,11 +1386,10 @@ adapt4.o: adapt4.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1478,7 +1426,6 @@ adapt5.o: adapt5.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1493,11 +1440,10 @@ adapt5.o: adapt5.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1534,7 +1480,6 @@ pose.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1549,11 +1494,10 @@ pose.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1590,7 +1534,6 @@ eventID.seq.o: eventID.C eventID.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1605,11 +1548,10 @@ eventID.seq.o: eventID.C eventID.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h
 	$(CHARMC) -o eventID.seq.o -DSEQUENTIAL_POSE=1 eventID.C
 stats.seq.o: stats.C ../../../../include/charm++.h \
@@ -1640,7 +1582,6 @@ stats.seq.o: stats.C ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1655,11 +1596,10 @@ stats.seq.o: stats.C ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h stats.h stats.decl.h \
   ../../../../include/sdag.h pose_config.h \
   ../../../../include/conv-config.h stats.def.h
@@ -1692,7 +1632,6 @@ srtable.seq.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1707,11 +1646,10 @@ srtable.seq.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h srtable.h pose.h pose.decl.h \
   ../../../../include/sdag.h pose_config.h \
   ../../../../include/conv-config.h eventID.h mempool.h mempool.decl.h \
@@ -1749,7 +1687,6 @@ cancel.seq.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1764,11 +1701,10 @@ cancel.seq.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h \
   ../../../../include/sdag.h pose_config.h \
   ../../../../include/conv-config.h mempool.h mempool.decl.h \
@@ -1806,7 +1742,6 @@ memory_temporal.seq.o: memory_temporal.C ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1821,11 +1756,10 @@ memory_temporal.seq.o: memory_temporal.C ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h \
   ../../../../include/sdag.h pose_config.h \
   ../../../../include/conv-config.h eventID.h mempool.h mempool.decl.h \
@@ -1863,7 +1797,6 @@ mempool.seq.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1878,11 +1811,10 @@ mempool.seq.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h \
   ../../../../include/sdag.h pose_config.h \
   ../../../../include/conv-config.h eventID.h mempool.h mempool.decl.h \
@@ -1920,7 +1852,6 @@ pvtobj.seq.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1935,11 +1866,10 @@ pvtobj.seq.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -1976,7 +1906,6 @@ lbObject.seq.o: lbObject.C pose.h pose.decl.h \
   ../../../../include/sockRoutines.h ../../../../include/ccs-server.h \
   ../../../../include/ckobjQ.h ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -1991,11 +1920,10 @@ lbObject.seq.o: lbObject.C pose.h pose.decl.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2032,7 +1960,6 @@ ldbal.seq.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2047,11 +1974,10 @@ ldbal.seq.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2088,7 +2014,6 @@ gvt.seq.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2103,11 +2028,10 @@ gvt.seq.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2145,7 +2069,6 @@ event.seq.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2160,11 +2083,10 @@ event.seq.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2201,7 +2123,6 @@ eqheap.seq.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2216,11 +2137,10 @@ eqheap.seq.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2257,7 +2177,6 @@ evq.seq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2272,11 +2191,10 @@ evq.seq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2313,7 +2231,6 @@ sim.seq.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2328,11 +2245,10 @@ sim.seq.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2369,7 +2285,6 @@ rep.seq.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2384,11 +2299,10 @@ rep.seq.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2425,7 +2339,6 @@ strat.seq.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2440,11 +2353,10 @@ strat.seq.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2481,7 +2393,6 @@ seq.seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2496,11 +2407,10 @@ seq.seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2537,7 +2447,6 @@ cons.seq.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2552,11 +2461,10 @@ cons.seq.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2593,7 +2501,6 @@ opt.seq.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2608,11 +2515,10 @@ opt.seq.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2649,7 +2555,6 @@ opt2.seq.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2664,11 +2569,10 @@ opt2.seq.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2705,7 +2609,6 @@ opt3.seq.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2720,11 +2623,10 @@ opt3.seq.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2761,7 +2663,6 @@ spec.seq.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2776,11 +2677,10 @@ spec.seq.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2817,7 +2717,6 @@ adapt.seq.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2832,11 +2731,10 @@ adapt.seq.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2873,7 +2771,6 @@ adapt2.seq.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2888,11 +2785,10 @@ adapt2.seq.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2929,7 +2825,6 @@ adapt3.seq.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -2944,11 +2839,10 @@ adapt3.seq.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -2985,7 +2879,6 @@ adapt4.seq.o: adapt4.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -3000,11 +2893,10 @@ adapt4.seq.o: adapt4.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -3041,7 +2933,6 @@ adapt5.seq.o: adapt5.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -3056,11 +2947,10 @@ adapt5.seq.o: adapt5.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
@@ -3097,7 +2987,6 @@ pose.seq.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -3112,11 +3001,10 @@ pose.seq.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   pose_config.h ../../../../include/conv-config.h eventID.h mempool.h \
   mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \

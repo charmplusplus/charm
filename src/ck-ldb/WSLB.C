@@ -3,7 +3,7 @@
 */
 /*@{*/
 
-#ifndef  WIN32
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 
@@ -19,6 +19,8 @@
 //#define VACATE_PROC (CkNumPes()/2)
 #define VACATE_AFTER 30
 #define UNVACATE_AFTER 15
+
+extern int quietModeRequested;
 
 CreateLBFunc_Def(WSLB, "Workstation load balancer")
 
@@ -41,8 +43,8 @@ WSLB::WSLB(const CkLBOptions &opt) : CBase_WSLB(opt)
 #if CMK_LBDB_ON
   thisProxy = CProxy_WSLB(thisgroup);
   lbname = "WSLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] WSLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> WSLB created.\n");
 
   mystep = 0;
   theLbdb->

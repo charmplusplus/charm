@@ -20,14 +20,16 @@
 using std::cout;
 using std::endl;
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(RefineSwapLB,
     "always assign the heaviest obj onto lightest loaded processor.")
 
 RefineSwapLB::RefineSwapLB(const CkLBOptions &opt): CBase_RefineSwapLB(opt)
 {
   lbname = "RefineSwapLB";
-  if (CkMyPe()==0)
-    CkPrintf("[%d] RefineSwapLB created\n",CkMyPe());
+  if (CkMyPe()==0 && !quietModeRequested)
+    CkPrintf("CharmLB> RefineSwapLB created.\n");
 }
 
 bool RefineSwapLB::QueryBalanceNow(int _step)
@@ -114,6 +116,9 @@ bool refine(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
     for (int j = 0; j < min_pe_heap.size(); j++) {
       obj_considered = pe_obj[max_pe][i];
       pe_considered = min_pe_heap[j];
+
+      // Skip over objects that cannot be migrated
+      if (!ogr->vertices[obj_considered].isMigratable()) continue;
    
       if (parr->procs[pe_considered].getTotalLoad() +
           ogr->vertices[obj_considered].getVertexLoad() < (avg_load + threshold)) {
@@ -169,7 +174,9 @@ bool IsSwapPossWithPe(ProcArray* parr, ObjGraph* ogr, std::vector<int>* pe_obj,
      //     ogr->vertices[pe_cons].getVertexLoad(), diff);
 
       if (ogr->vertices[pe_cons].getVertexLoad() <
-          ogr->vertices[max_pe_obj].getVertexLoad()) {
+          ogr->vertices[max_pe_obj].getVertexLoad() &&
+          ogr->vertices[pe_cons].isMigratable() &&
+          ogr->vertices[max_pe_obj].isMigratable()) {
         if ((diff + ogr->vertices[pe_cons].getVertexLoad()) >
             ogr->vertices[max_pe_obj].getVertexLoad()) {
           //CkPrintf("\tSwapping %d with %d\n", max_pe_obj, pe_cons);
@@ -255,8 +262,10 @@ void RefineSwapLB::work(LDStats* stats)
   double threshold = avg_load * 0.01;
   double lower_bound_load = avg_load - threshold;
   double upper_bound_load = avg_load + threshold;
-  cout <<"Average load " << avg_load << endl;
-  
+
+  if (_lb_args.debug()>1)
+    cout <<"Average load " << avg_load << endl;
+
   std::vector<int> min_pe_heap;
   std::vector<int> max_pe_heap;
 

@@ -8,7 +8,7 @@ network format, and send/recv the actual requests
 and replies.
 
 Depending on the situation, this code is called from
-conv-host.c, or conv-core.c/conv-ccs.c (for 
+conv-host.c, or conv-core.c/conv-ccs.C (for
 NODE_0_IS_CONVHOST).  All the routines in this file
 should be called from within only one machine&program-- 
 the CCS server.  That is, you can't receive a request
@@ -47,7 +47,7 @@ typedef struct {
   ChMessageInt_t len;/*Bytes of message data to follow*/
 } CcsImplHeader;
 
-/********* CCS Implementation (not in ccs-server.c) ********/
+/********* CCS Implementation (not in ccs-server.C) ********/
 /*Deliver this request data to the appropriate PE. */
 void CcsImpl_netRequest(CcsImplHeader *hdr,const void *reqData);
 
@@ -62,7 +62,7 @@ void CcsImpl_kill(void);
 /*Convert CCS header & message data into a converse message to handler*/
 char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_len);
 
-/******************* ccs-server.c routines ***************/
+/******************* ccs-server.C routines ***************/
 /*Make a new Ccs Server socket, on the given port.
 Returns the actual port and IP address.
 */

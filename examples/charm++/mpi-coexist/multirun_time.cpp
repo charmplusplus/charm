@@ -31,6 +31,8 @@ int main(int argc, char **argv){
     return 1;
   }
 
+// Currently, only MPI builds support this style of interop
+#if CMK_CONVERSE_MPI
   MPI_Comm_split(MPI_COMM_WORLD, 1, peid, &newComm);
 
   //initialize Charm for each set
@@ -72,7 +74,12 @@ int main(int argc, char **argv){
 
   //final synchronization
   MPI_Barrier(MPI_COMM_WORLD);
-  
+#else
+  if (peid == 0) {
+    printf("This test program is a no-op with non-MPI builds\n");
+  }
+#endif
+
   MPI_Finalize();
   return 0;  
 }

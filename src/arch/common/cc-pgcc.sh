@@ -1,16 +1,14 @@
 
 # machine specific recommendation
-CMK_DEFS=""
 case `hostname` in
-*.ranger.tacc.utexas.edu) CMK_DEFS="-tp barcelona-64 " ;;
+*.ranger.tacc.utexas.edu) CMK_DEFS="$CMK_DEFS -tp barcelona-64" ;;
 esac
 
 CMK_CPP_C="pgcc -E "
-CMK_CC="pgcc -fPIC $CMK_DEFS  -DCMK_FIND_FIRST_OF_PREDICATE=1 "
+CMK_CC="pgcc -fPIC -DCMK_FIND_FIRST_OF_PREDICATE=1 "
 CMK_CC_RELIABLE="gcc "
 #CMK_CXX="pgCC --instantiate=used "
-CMK_CXX="pgCC -fPIC $CMK_DEFS  -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
-CMK_CXXPP="pgCC -E  -DCMK_FIND_FIRST_OF_PREDICATE=1 "
+CMK_CXX="pgCC -fPIC -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 
@@ -42,3 +40,4 @@ fi
 CMK_F90LIBS="-L$f90libdir  -lpgf90 -lpgf90_rpm1 -lpgf902 -lpgf90rtl -lpgftnrtl "
 CMK_F90_USE_MODDIR=""
 
+CMK_COMPILER='pgcc'

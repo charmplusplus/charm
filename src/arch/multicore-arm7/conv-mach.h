@@ -23,7 +23,7 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
 
 
@@ -34,8 +34,9 @@
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  1
 
-#define CMK_THREADS_USE_CONTEXT                            0 
+#define CMK_THREADS_USE_CONTEXT                            1 
 #define CMK_THREADS_USE_JCONTEXT                           0
+#define CMK_THREADS_USE_FCONTEXT                           0
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 
@@ -53,15 +54,19 @@
 
 #if CMK_HAS_STDINT_H
 #include <stdint.h>
+#define CMK_TYPEDEF_INT1 int8_t
 #define CMK_TYPEDEF_INT2 int16_t
 #define CMK_TYPEDEF_INT4 int32_t
 #define CMK_TYPEDEF_INT8 int64_t
+#define CMK_TYPEDEF_UINT1 uint8_t
 #define CMK_TYPEDEF_UINT2 uint16_t
 #define CMK_TYPEDEF_UINT4 uint32_t
 #define CMK_TYPEDEF_UINT8 uint64_t
 #else
+#define CMK_TYPEDEF_INT1 signed char
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
+#define CMK_TYPEDEF_UINT1 unsigned char
 #define CMK_TYPEDEF_UINT2 unsigned short
 #define CMK_TYPEDEF_UINT4 unsigned int
 #if CMK_LONG_LONG_DEFINED
@@ -90,3 +95,5 @@
 
 
 #define CMK_SMP						   1
+
+#define CMK_CONVERSE_MPI                                   0

@@ -7,11 +7,11 @@ namespace xi {
 
 class WhileConstruct : public BlockConstruct {
  public:
-  WhileConstruct(SdagConstruct *pred, SdagConstruct *body);
-  void generateCode(XStr&, XStr&, Entry *);
+  WhileConstruct(SdagConstruct* pred, SdagConstruct* body);
+  void generateCode(XStr&, XStr&, Entry*);
   void numberNodes();
 };
 
-}   // namespace xi
+}  // namespace xi
 
 #endif  // ifndef _WHILE_H

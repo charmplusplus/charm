@@ -135,15 +135,15 @@ Convert N-byte boolean to machine boolean.
 static void cvt_bool(int N,const myByte *in,myByte *out,size_t nElem)
 {
 	size_t i;
-        for (i=nElem-1;i>=0;i--)
+        for (i=nElem;i>1;i--)
 	{
-		const myByte *s=&in[N*i];
+		const myByte *s=&in[N*(i-1)];
 		bool ret=false;
 		int j;
                 for (j=0;j<N;j++)
 			if (s[j]!=0) //Some bit is set
 				ret=true;
-		((bool *)(out))[i]=ret;
+		((bool *)(out))[i-1]=ret;
 	}
 }
 

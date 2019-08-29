@@ -44,7 +44,9 @@ do
 		;;
 	++quiet)
 		QUIET=1
-		args=$args" "$1
+		;;
+	++no-quiet)
+		QUIET=0
 		;;
 	*) 
 		args=$args" "$1
@@ -62,6 +64,8 @@ then
 else
   pes=$quot
 fi 
+
+test $QUIET -eq 1 && args=$args" "++quiet
 
 test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
 

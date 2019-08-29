@@ -62,12 +62,12 @@ void alignmentTest(std::vector<TestMessage*> &allMsgs, const std::string &identi
   }
 
   CkPrintf("Alignment information at the %s:\n", identifier.c_str());
-  CkPrintf("Chunk header aligned to %d bytes\n", alignHdr);
-  CkPrintf("Envelope aligned to %d bytes\n", alignEnv);
-  CkPrintf("Start of user data aligned to %d bytes\n", alignUsr);
-  CkPrintf("First varsize array aligned to %d bytes\n", alignVar1);
-  CkPrintf("Second varsize array aligned to %d bytes\n", alignVar2);
-  CkPrintf("Priority field aligned to %d bytes\n", alignPrio);
+  CkPrintf("Chunk header aligned to %zu bytes\n", alignHdr);
+  CkPrintf("Envelope aligned to %zu bytes\n", alignEnv);
+  CkPrintf("Start of user data aligned to %zu bytes\n", alignUsr);
+  CkPrintf("First varsize array aligned to %zu bytes\n", alignVar1);
+  CkPrintf("Second varsize array aligned to %zu bytes\n", alignVar2);
+  CkPrintf("Priority field aligned to %zu bytes\n", alignPrio);
 
   if (alignEnv >= ALIGN_BYTES && alignUsr >= ALIGN_BYTES &&
       alignVar1 >= ALIGN_BYTES && alignVar2 >= ALIGN_BYTES &&
@@ -89,8 +89,8 @@ public:
     CProxy_Destination destinationChare =
       CProxy_Destination::ckNew(CkNumPes() - 1);
 
-    CkPrintf("Size of Converse envelope: %d bytes\n", CmiReservedHeaderSize);
-    CkPrintf("Size of Charm++ envelope: %d bytes\n", sizeof(envelope));
+    CkPrintf("Size of Converse envelope: %zu bytes\n", CmiReservedHeaderSize);
+    CkPrintf("Size of Charm++ envelope: %zu bytes\n", sizeof(envelope));
     CkPrintf("Default alignment: %d bytes\n", ALIGN_BYTES);
 
     int msgSizes[] = {varSize1, varSize2};

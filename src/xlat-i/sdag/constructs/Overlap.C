@@ -2,14 +2,13 @@
 
 namespace xi {
 
-OverlapConstruct::OverlapConstruct(SdagConstruct *olist)
-: BlockConstruct(SOVERLAP, 0, 0, 0, 0, 0, olist, 0)
-{
+OverlapConstruct::OverlapConstruct(SdagConstruct* olist)
+    : BlockConstruct(SOVERLAP, 0, 0, 0, 0, 0, olist, 0) {
   label_str = "overlap";
 }
 
 void OverlapConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
-  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
@@ -20,9 +19,10 @@ void OverlapConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   endMethod(defs);
 
   // trace
-  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  strcat(nameStr,"_end");
-  generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
+  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
+  strcat(nameStr, "_end");
+  generateClosureSignature(decls, defs, entry, false, "void", label, true,
+                           encapStateChild);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
   generateEventBracket(defs, SOVERLAP_END);
@@ -39,4 +39,4 @@ void OverlapConstruct::numberNodes(void) {
   SdagConstruct::numberNodes();
 }
 
-}   // namespace xi
+}  // namespace xi

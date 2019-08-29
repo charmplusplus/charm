@@ -9,17 +9,17 @@
 /*readonly*/ int vectorSize;
 
 Main::Main()
-{ };
+{}
 
 Main::Main(CkMigrateMessage* msg) 
-{};
+{}
 
 Main::Main(CkArgMsg *m) 
 {
 	if(m->argc < 5)
 	{
 		CkPrintf("Incorrect usage. Please read the readme.txt file\n");
-		CkExit();
+		CkExit(1);
 	}
 	arrayDimensionX = atoi(m->argv[1]);
 	arrayDimensionY = atoi(m->argv[2]);
@@ -30,8 +30,6 @@ Main::Main(CkArgMsg *m)
 	mainProxy = thisProxy;
 	mainhandle = thishandle;
 	testProxy3D = CProxy_Test3D::ckNew(arrayDimensionX, arrayDimensionY, arrayDimensionZ);
-	CkCallback *cb = new CkCallback(CkIndex_Main::reportSum(NULL), mainProxy);
-	testProxy3D.ckSetReductionClient(cb);
 	
 	//Multicast stuff
 	CkArrayID testArrayID = testProxy3D.ckGetArrayID();
@@ -47,7 +45,6 @@ Main::Main(CkArgMsg *m)
 	for(int i=0; i < N; i++) {
 		//chose elements from chare array to be added to the sectionProxy
 		sectionProxy[i] = CProxySection_Test3D::ckNew(testArrayID, 0, arrayDimensionX-1, i+1, 0, arrayDimensionY-1, i+1, 0, arrayDimensionZ-1, i+1);
-		sectionProxy[i].setReductionClient(cb);
 		//message
 		DummyMsg *msg = new DummyMsg;
 		msg->section = i;
@@ -56,7 +53,7 @@ Main::Main(CkArgMsg *m)
 	//Quiscence
 	int myIndex = CkIndex_Main::QuiDetect();
 	CkStartQD(myIndex, &mainhandle);
-};
+}
 
 void Main::reportSum(CkReductionMsg *m)
 {
@@ -69,10 +66,11 @@ void Main::reportSum(CkReductionMsg *m)
 	}
 	CkPrintf("\n");
 	delete m;
-};
+}
 
 void Main:: QuiDetect()
 {
 	CkExit();
-};
+}
+
 #include "main.def.h"

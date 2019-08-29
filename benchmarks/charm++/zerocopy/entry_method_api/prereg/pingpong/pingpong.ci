@@ -1,0 +1,20 @@
+mainmodule pingpong {
+
+  readonly CProxy_main mainProxy;
+  readonly int minSize;
+  readonly int maxSize;
+  readonly int smallIter;
+  readonly int bigIter;
+
+  mainchare main {
+    entry main(CkArgMsg *m);
+    entry void maindone(void);
+  };
+  array [1D] Ping1 {
+    entry Ping1();
+    entry void start(int size, bool warmUp);
+    entry void freeBuffer();
+    entry void recv(char msg[size], int size, bool warmUp);
+    entry void recv_zerocopy(nocopy char msg[size], int size, bool warmUp);
+  };
+};

@@ -1,6 +1,5 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -17,6 +16,9 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_set_view as PMPI_File_set_view
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_set_view(MPI_File fh, MPI_Offset disp, MPI_Datatype etype, MPI_Datatype filetype,
+                      const char *datarep, MPI_Info info) __attribute__((weak,alias("PMPI_File_set_view")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -38,139 +40,165 @@ Input Parameters:
 .N fortran
 @*/
 int MPI_File_set_view(MPI_File fh, MPI_Offset disp, MPI_Datatype etype,
-		 MPI_Datatype filetype, char *datarep, MPI_Info info)
+		      MPI_Datatype filetype, ROMIO_CONST char *datarep, MPI_Info info)
 {
-    ADIO_Fcntl_t *fcntl_struct;
-    int filetype_size, etype_size, error_code;
-#ifndef PRINT_ERR_MSG
+    int error_code;
+    MPI_Count filetype_size, etype_size;
     static char myname[] = "MPI_FILE_SET_VIEW";
-#endif
     ADIO_Offset shared_fp, byte_off;
+    ADIO_File adio_fh;
 
-#ifdef PRINT_ERR_MSG
-    if ((fh <= (MPI_File) 0) || (fh->cookie != ADIOI_FILE_COOKIE)) {
-	FPRINTF(stderr, "MPI_File_set_view: Invalid file handle\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-#else
-    ADIOI_TEST_FILE_HANDLE(fh, myname);
-#endif
+    ROMIO_THREAD_CS_ENTER();
 
-    if ((disp < 0) && (disp != MPI_DISPLACEMENT_CURRENT)) {
-#ifdef PRINT_ERR_MSG
-	FPRINTF(stderr, "MPI_File_set_view: Invalid disp argument\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_ARG, MPIR_ERR_DISP_ARG,
-				     myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);	    
-#endif
+    adio_fh = MPIO_File_resolve(fh);
+
+    /* --BEGIN ERROR HANDLING-- */
+    MPIO_CHECK_FILE_HANDLE(adio_fh, myname, error_code);
+
+    if ((disp < 0) && (disp != MPI_DISPLACEMENT_CURRENT))
+    {
+	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+					  myname, __LINE__, MPI_ERR_ARG, 
+					  "**iobaddisp", 0);
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
+	goto fn_exit;
     }
 
     /* rudimentary checks for incorrect etype/filetype.*/
     if (etype == MPI_DATATYPE_NULL) {
-#ifdef PRINT_ERR_MSG
-	FPRINTF(stderr, "MPI_File_set_view: Invalid etype\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_ARG, MPIR_ERR_ETYPE_ARG,
-				     myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);	    
-#endif
+	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+					  myname, __LINE__, MPI_ERR_ARG,
+					  "**ioetype", 0);
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
+	goto fn_exit;
+    }
+    MPIO_DATATYPE_ISCOMMITTED(etype, error_code);
+    if (error_code != MPI_SUCCESS) {
+        error_code = MPIO_Err_return_file(adio_fh, error_code);
+        goto fn_exit;
     }
 
     if (filetype == MPI_DATATYPE_NULL) {
-#ifdef PRINT_ERR_MSG
-	FPRINTF(stderr, "MPI_File_set_view: Invalid filetype\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_ARG, MPIR_ERR_FILETYPE_ARG,
-				     myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);	    
-#endif
+	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+					  myname, __LINE__, MPI_ERR_ARG,
+					  "**iofiletype", 0);
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
+	goto fn_exit;
+    }
+    MPIO_DATATYPE_ISCOMMITTED(filetype, error_code);
+    if (error_code != MPI_SUCCESS) {
+        error_code = MPIO_Err_return_file(adio_fh, error_code);
+        goto fn_exit;
     }
 
-    if ((fh->access_mode & MPI_MODE_SEQUENTIAL) && (disp != MPI_DISPLACEMENT_CURRENT)) {
-#ifdef PRINT_ERR_MSG
-        FPRINTF(stderr, "MPI_File_set_view: disp must be set to MPI_DISPLACEMENT_CURRENT since file was opened with MPI_MODE_SEQUENTIAL\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_ARG, 1,
-				     myname, (char *) 0, "%s", "displacement must be set to MPI_DISPLACEMENT_CURRENT since file was opened with MPI_MODE_SEQUENTIAL");
-	return ADIOI_Error(fh, error_code, myname);	    
-#endif
+    if ((adio_fh->access_mode & MPI_MODE_SEQUENTIAL) &&
+	(disp != MPI_DISPLACEMENT_CURRENT))
+    {
+	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+					  myname, __LINE__, MPI_ERR_ARG, 
+					  "**iodispifseq", 0);
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
+	goto fn_exit;
     }
 
-    if ((disp == MPI_DISPLACEMENT_CURRENT) && !(fh->access_mode & MPI_MODE_SEQUENTIAL)) {
-#ifdef PRINT_ERR_MSG
-        FPRINTF(stderr, "MPI_File_set_view: disp can be set to MPI_DISPLACEMENT_CURRENT only if file was opened with MPI_MODE_SEQUENTIAL\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_ARG, 1,
-				     myname, (char *) 0, "%s", "displacement can be set to MPI_DISPLACEMENT_CURRENT only if file was opened with MPI_MODE_SEQUENTIAL");
-	return ADIOI_Error(fh, error_code, myname);	    
-#endif
+    if ((disp == MPI_DISPLACEMENT_CURRENT) &&
+	!(adio_fh->access_mode & MPI_MODE_SEQUENTIAL))
+    {
+	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+					  myname, __LINE__, MPI_ERR_ARG, 
+					  "**iodispifseq", 0);
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
+	goto fn_exit;
+    }
+    MPIO_CHECK_INFO_ALL(info, error_code, adio_fh->comm);
+    /* --END ERROR HANDLING-- */
+
+    MPI_Type_size_x(filetype, &filetype_size);
+    MPI_Type_size_x(etype, &etype_size);
+
+    /* --BEGIN ERROR HANDLING-- */
+    if (etype_size != 0 && filetype_size % etype_size != 0)
+    {
+	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+					  myname, __LINE__, MPI_ERR_ARG,
+					  "**iofiletype", 0);
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
+	goto fn_exit;
     }
 
-    MPI_Type_size(filetype, &filetype_size);
-    MPI_Type_size(etype, &etype_size);
-    if (filetype_size % etype_size != 0) {
-#ifdef PRINT_ERR_MSG
-	FPRINTF(stderr, "MPI_File_set_view: Filetype must be constructed out of one or more etypes\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_IO, MPIR_ERR_FILETYPE,
-				     myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);	    
-#endif
+    if ((datarep == NULL) || (strcmp(datarep, "native") &&
+	    strcmp(datarep, "NATIVE") &&
+	    strcmp(datarep, "external32") &&
+	    strcmp(datarep, "EXTERNAL32") &&
+	    strcmp(datarep, "internal") &&
+	    strcmp(datarep, "INTERNAL")) )
+    {
+	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+					  myname, __LINE__,
+					  MPI_ERR_UNSUPPORTED_DATAREP, 
+					  "**unsupporteddatarep",0);
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
+	goto fn_exit;
     }
-
-    if (strcmp(datarep, "native") && strcmp(datarep, "NATIVE")) {
-#ifdef PRINT_ERR_MSG
-	FPRINTF(stderr, "MPI_File_set_view: Only \"native\" data representation currently supported\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_UNSUPPORTED_DATAREP, 
-               MPIR_ERR_NOT_NATIVE_DATAREP, myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);	    
-#endif
-    }
-
-    fcntl_struct = (ADIO_Fcntl_t *) ADIOI_Malloc(sizeof(ADIO_Fcntl_t));
-    fcntl_struct->disp = disp;
-    fcntl_struct->etype = etype;
-    fcntl_struct->filetype = filetype;
-    fcntl_struct->info = info;
-    fcntl_struct->iomode = fh->iomode;
+    /* --END ERROR HANDLING-- */
 
     if (disp == MPI_DISPLACEMENT_CURRENT) {
-	MPI_Barrier(fh->comm);
-	ADIO_Get_shared_fp(fh, 0, &shared_fp, &error_code);
-	/* MPI_Barrier(fh->comm); 
-           deleting this because there is a barrier below */
-	ADIOI_Get_byte_offset(fh, shared_fp, &byte_off);
-	fcntl_struct->disp = byte_off;
+	MPI_Barrier(adio_fh->comm);
+	ADIO_Get_shared_fp(adio_fh, 0, &shared_fp, &error_code);
+	/* TODO: check error code */
+
+	MPI_Barrier(adio_fh->comm);
+	ADIOI_Get_byte_offset(adio_fh, shared_fp, &byte_off);
+	/* TODO: check error code */
+
+	disp = byte_off;
     }
 
-    ADIO_Fcntl(fh, ADIO_FCNTL_SET_VIEW, fcntl_struct, &error_code);
+    ADIO_Set_view(adio_fh, disp, etype, filetype, info, &error_code);
+
+    /* --BEGIN ERROR HANDLING-- */
+    if (error_code != MPI_SUCCESS) {
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
+	goto fn_exit;
+    }
+    /* --END ERROR HANDLING-- */
 
     /* reset shared file pointer to zero */
+    if (ADIO_Feature(adio_fh, ADIO_SHARED_FP) &&
+        (adio_fh->shared_fp_fd != ADIO_FILE_NULL))
+    {
+	/* only one process needs to set it to zero, but I don't want to 
+	   create the shared-file-pointer file if shared file pointers have 
+	   not been used so far. Therefore, every process that has already 
+	   opened the shared-file-pointer file sets the shared file pointer 
+	   to zero. If the file was not opened, the value is automatically 
+	   zero. Note that shared file pointer is stored as no. of etypes
+	   relative to the current view, whereas indiv. file pointer is
+	   stored in bytes. */
 
-    if ((fh->file_system != ADIO_PIOFS) && (fh->file_system != ADIO_PVFS) && 
-        (fh->shared_fp_fd != ADIO_FILE_NULL)) 
-	ADIO_Set_shared_fp(fh, 0, &error_code);
-    /* only one process needs to set it to zero, but I don't want to 
-       create the shared-file-pointer file if shared file pointers have 
-       not been used so far. Therefore, every process that has already 
-       opened the shared-file-pointer file sets the shared file pointer 
-       to zero. If the file was not opened, the value is automatically 
-       zero. Note that shared file pointer is stored as no. of etypes
-       relative to the current view, whereas indiv. file pointer is
-       stored in bytes. */
+	ADIO_Set_shared_fp(adio_fh, 0, &error_code);
+	/* --BEGIN ERROR HANDLING-- */
+	if (error_code != MPI_SUCCESS)
+	    error_code = MPIO_Err_return_file(adio_fh, error_code);
+	/* --END ERROR HANDLING-- */
+    }
 
-    if ((fh->file_system != ADIO_PIOFS) && (fh->file_system != ADIO_PVFS))
-	MPI_Barrier(fh->comm); /* for above to work correctly */
+    if (ADIO_Feature(adio_fh, ADIO_SHARED_FP))
+    {
+	MPI_Barrier(adio_fh->comm); /* for above to work correctly */
+    }
+    if (strcmp(datarep, "external32") && strcmp(datarep, "EXTERNAL32"))
+	adio_fh->is_external32 = 0;
+    else
+	adio_fh->is_external32 = 1;
 
-    ADIOI_Free(fcntl_struct);
+fn_exit:
+    ROMIO_THREAD_CS_EXIT();
+
     return error_code;
+fn_fail:
+	/* --BEGIN ERROR HANDLING-- */
+	error_code = MPIO_Err_return_file(fh, error_code);
+	goto fn_exit;
+	/* --END ERROR HANDLING-- */
 }

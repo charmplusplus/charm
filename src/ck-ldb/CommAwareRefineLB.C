@@ -49,13 +49,15 @@ inline void getPossiblePes(vector<int>& possible_pes, int randomly_obj_id,
 double upper_threshold;
 double lower_threshold;
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(CommAwareRefineLB, "always assign the heaviest obj onto lightest loaded processor.")
 
 CommAwareRefineLB::CommAwareRefineLB(const CkLBOptions &opt): CBase_CommAwareRefineLB(opt)
 {
   lbname = "CommAwareRefineLB";
-  if (CkMyPe()==0)
-    CkPrintf("[%d] CommAwareRefineLB created\n",CkMyPe());
+  if (CkMyPe()==0 && !quietModeRequested)
+    CkPrintf("CharmLB> CommAwareRefineLB created.\n");
 }
 
 bool CommAwareRefineLB::QueryBalanceNow(int _step)

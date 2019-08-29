@@ -5,7 +5,7 @@
 #include <pup.h>
 #include <ckcallback.h>
 
-#include <CkIO.decl.h>
+#include "CkIO.decl.h"
 
 namespace Ck { namespace IO {
   /// Note: The values in options are not currently a stable or working interface.

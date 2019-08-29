@@ -111,7 +111,9 @@ CmiPrintf("\n\n\nBroadcast begin EXIT\n");
     CmiSetHandler(sendmsg, cva(simState).beginExitHandler);
     CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
 
+#if CMI_QD
     CmiStartQD(BroadcastShutdown, NULL);
+#endif
 
 #if 0
     // trapped here, so close the log
@@ -265,11 +267,14 @@ int BGMach::read(char *file)
   return 0;
 }
 
-int main(int argc,char *argv[])
+extern "C" int bigsim_main(int argc, char **argv)
 {
   ConverseInit(argc,argv,(CmiStartFn)bgMain,0,0);
   return 0;
 }
 
-
+int main(int argc, char **argv)
+{
+  return bigsim_main(argc, argv);
+}
 

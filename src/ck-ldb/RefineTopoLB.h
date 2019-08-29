@@ -1,5 +1,5 @@
 #ifndef _REFINETOPOLB_H_
-#define _REINETOPOLB_H_
+#define _REFINETOPOLB_H_
 
 #include "CentralLB.h"
 #include "TopoLB.h"

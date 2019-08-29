@@ -16,6 +16,7 @@ public:
   }
   virtual double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) = 0;
   virtual void print() = 0;
+  virtual ~BigSimNetwork() { }
 };
 
 class DummyNetwork: public BigSimNetwork

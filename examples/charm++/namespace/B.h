@@ -8,7 +8,7 @@ namespace Base { namespace Derived {
       public: 
         B();
         B(CkMigrateMessage *m);
-        void quit();
+        virtual void quit();
     };
 } }
 

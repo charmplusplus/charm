@@ -2,7 +2,7 @@
 #ifndef __TRACE_CORE_API_H__
 #define __TRACE_CORE_API_H__
 
-CpvCExtern(int,_traceCoreOn);
+CpvExtern(int,_traceCoreOn);
 #ifdef __cplusplus
 extern "C" {
 #endif

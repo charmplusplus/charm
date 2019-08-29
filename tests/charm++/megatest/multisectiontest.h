@@ -58,6 +58,23 @@ class multisection_proxymsg : public CMessage_multisectionGID_msg, CkMcastBaseMs
 };
 
 
+
+/* this chare creates all other chares in the test
+*/
+class multisectiontest_main : public CBase_multisectiontest_main
+{
+  private:
+    CProxy_multisectiontest_master masterproxy;
+    CProxySection_multisectiontest_grp groupLowProxy, groupHighProxy;
+    CProxySection_multisectiontest_array1d arrayLowProxy, arrayHighProxy;
+    multisectionAID_msg *amsg, *amsg2;
+    multisectionGID_msg *mmsg, *gmsg, *gmsg2;
+  public:
+    multisectiontest_main();
+    void sendMsgs();
+};
+
+
 /* this could be a chare, but singleton chares are unusual and
    would make the code look weirder than necessary */
 

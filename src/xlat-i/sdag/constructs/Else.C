@@ -1,16 +1,15 @@
-#include "Else.h"
 #include "CParsedFile.h"
+#include "Else.h"
 
 namespace xi {
 
-ElseConstruct::ElseConstruct(SdagConstruct *body)
-: BlockConstruct(SELSE, 0, 0, 0, 0, 0, body, 0)
-{
+ElseConstruct::ElseConstruct(SdagConstruct* body)
+    : BlockConstruct(SELSE, 0, 0, 0, 0, 0, body, 0) {
   label_str = "else";
 }
 
 void ElseConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
-  strcpy(nameStr,label->charstar());
+  strcpy(nameStr, label->charstar());
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 #if CMK_BIGSIM_CHARM
   // trace
@@ -22,12 +21,13 @@ void ElseConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   endMethod(defs);
 
   // trace
-  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  strcat(nameStr,"_end");
-  generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
+  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
+  strcat(nameStr, "_end");
+  generateClosureSignature(decls, defs, entry, false, "void", label, true,
+                           encapStateChild);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
-  generateEventBracket(defs,SELSE_END);
+  generateEventBracket(defs, SELSE_END);
 #endif
   defs << "  ";
   generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
@@ -41,4 +41,4 @@ void ElseConstruct::numberNodes(void) {
   SdagConstruct::numberNodes();
 }
 
-}   // namespace xi
+}  // namespace xi

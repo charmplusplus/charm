@@ -11,7 +11,7 @@ mainmodule jacobi2d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void report(CkReductionMsg *msg);
+    entry [reductiontarget] void report(double error);
   };
 
   array [2D] Jacobi {

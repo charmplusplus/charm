@@ -11,13 +11,15 @@
 #define _USE_RESIDUAL_MOVES_ 1
 //#include "heap.h"
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(RefineKLB, "Move objects away from overloaded processor to reach average")
 
 RefineKLB::RefineKLB(const CkLBOptions &opt): CBase_RefineKLB(opt)
 {
   lbname = (char *)"RefineKLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] RefineKLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> RefineKLB created.\n");
 }
 
 void RefineKLB::work(LDStats* stats)
@@ -185,7 +187,7 @@ void RefineKLB::performGreedyMoves(int count, BaseLB::LDStats* stats,int *from_p
   {
     delete procObjs[i];
   }
-  delete procObjs;
+  delete[] procObjs;
   delete unassignedComputes;
   delete leastLoadedP;
 }

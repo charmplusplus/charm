@@ -140,11 +140,11 @@ class Main : public CBase_Main {
 	}
 
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
-        CkAbort("array_size_X % block_size_X != 0!");
+        CkAbort("array_size_X %% block_size_X != 0!");
       if (arrayDimY < blockDimY || arrayDimY % blockDimY != 0)
-        CkAbort("array_size_Y % block_size_Y != 0!");
+        CkAbort("array_size_Y %% block_size_Y != 0!");
       if (arrayDimZ < blockDimZ || arrayDimZ % blockDimZ != 0)
-        CkAbort("array_size_Z % block_size_Z != 0!");
+        CkAbort("array_size_Z %% block_size_Z != 0!");
 
       num_chare_x = arrayDimX / blockDimX;
       num_chare_y = arrayDimY / blockDimY;
@@ -171,10 +171,6 @@ class Main : public CBase_Main {
 
 		//Start the computation
 		startTime = CmiWallTimer();
-
-		//Registering the callback
-		CkCallback *cb = new CkCallback(CkIndex_Main::report(NULL), mainProxy);
-		array.ckSetReductionClient(cb);
 
 		array.doStep();
     }
@@ -418,16 +414,17 @@ class Jacobi: public CBase_Jacobi {
 #ifdef CMK_MESSAGE_LOGGING
 		if(iterations % ckptFreq == 0){
 			AtSync();
-		} else {
-			contribute(sizeof(int), &iterations, CkReduction::max_int);
-		}
-#else
-		contribute(sizeof(int), &iterations, CkReduction::max_int);
+		} else
 #endif
+    {
+      CkCallback cb(CkIndex_Main::report(NULL), mainProxy);
+			contribute(sizeof(int), &iterations, CkReduction::max_int, cb);
+		}
 	}
 
 	void ResumeFromSync(){
-		contribute(sizeof(int), &iterations, CkReduction::max_int);
+    CkCallback cb(CkIndex_Main::report(NULL), mainProxy);
+		contribute(sizeof(int), &iterations, CkReduction::max_int, cb);
 	}
 
     // Check to see if we have received all neighbor values yet

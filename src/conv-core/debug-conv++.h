@@ -1,6 +1,8 @@
 //#include "debug-conv.h"
 #include "pup.h"
 
+#include "register.h"
+
 #ifndef DEBUG_CONV_PLUSPLUS_H
 #define DEBUG_CONV_PLUSPLUS_H
 
@@ -67,6 +69,7 @@ public:
    location in memory, path is a constant string, and the 
    pup routine is completely random-access.
 */
+template <class T>
 class CpdSimpleListAccessor : public CpdListAccessor {
 public:
 	/// This routine is called to pup each item of the list.
@@ -74,7 +77,7 @@ public:
 	typedef void (*pupFn)(PUP::er &p,int itemNo);
 private:
 	const char *path;
-	size_t &length;
+	CkRegisteredInfo<T> *info;
 	pupFn pfn;
 public:
 	/**
@@ -86,12 +89,17 @@ public:
 			    In particular, this means length must not be moved!
 	     \param pfn_ Function to pup the items in the list.
 	*/
-	CpdSimpleListAccessor(const char *path_,size_t &length_,pupFn pfn_)
-		:path(path_),length(length_),pfn(pfn_) { }
-	virtual ~CpdSimpleListAccessor();
-	virtual const char *getPath(void) const;
-	virtual size_t getLength(void) const;
-	virtual void pup(PUP::er &p,CpdListItemsRequest &req);
+	CpdSimpleListAccessor(const char *path_, CkRegisteredInfo<T> *info_, pupFn pfn_)
+		:path(path_),info(info_),pfn(pfn_) { }
+	virtual ~CpdSimpleListAccessor() {}
+	virtual const char *getPath(void) const { return path; }
+	virtual size_t getLength(void) const { return info->size(); }
+	virtual void pup(PUP::er &p,CpdListItemsRequest &req) {
+          for (int i = req.lo; i < req.hi; i++) {
+            beginItem(p, i);
+            (*pfn)(p, i);
+          }
+        }
 };
 
 #endif

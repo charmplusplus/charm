@@ -42,6 +42,7 @@ void* CkObjID::getObject(){
 				}
 			default:
 				CkAbort("Object lookup by ID failed with invalid object type!");
+				return NULL;
 		}
 }
 
@@ -64,8 +65,9 @@ int CkObjID::guessPE(){
 				}
 			default:
 				CkAbort("PE lookup by object ID failed with invalid object type!");
+				return -1;
 		}
-};
+}
 
 char *CkObjID::toString(char *buf) const {
 	
@@ -94,7 +96,7 @@ char *CkObjID::toString(char *buf) const {
 	}
 	
 	return buf;
-};
+}
 
 void CkObjID::updatePosition(int PE){
 	if(guessPE() == PE){

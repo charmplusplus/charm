@@ -53,14 +53,14 @@ ID     [_a-zA-Z][_a-zA-Z0-9]*
 #ifdef yywrap
 #undef yywrap
 #endif
-yywrap(){ return(1); }
+int yywrap(){ return(1); }
 
 void yytokget()
 {
   yytoktype=yylex();
 }
 
-void yychkword(char *s)
+void yychkword(const char *s)
 {
   if (strcmp(yytext, s)) {
     fprintf(stderr,"%s expected\n", s);
@@ -438,7 +438,7 @@ void usage()
   exit(1);
 }
 
-FILE *fopen_nofail(char *path, char *mode)
+FILE *fopen_nofail(const char *path, const char *mode)
 {
   FILE *res = fopen(path, mode);
   if (res==0) {
@@ -455,7 +455,7 @@ void disclaim(FILE *f, char *src)
   fprintf(f,"\n");
 }
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   if (argc != 3) usage();
   file_src = fopen_nofail(argv[1], "r");

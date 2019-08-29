@@ -15,8 +15,8 @@ then
       PAPI_LIBDIR="/usr/apps/tools/papi/lib"
     fi
     CMK_LIBDIR="-L$PAPI_LIBDIR"
-    CMK_LD="$CMK_LD -Wl,-rpath,$PAPI_LIBDIR"
-    CMK_LDXX="$CMK_LDXX -Wl,-rpath,$PAPI_LIBDIR"
+    CMK_LD_FLAGS="$CMK_LD_FLAGS -Wl,-rpath,$PAPI_LIBDIR"
+    CMK_LDXX_FLAGS="$CMK_LDXX_FLAGS -Wl,-rpath,$PAPI_LIBDIR"
   fi
 fi
 
@@ -27,7 +27,7 @@ then
   PAPI_INCDIR="$HOME/papi/include"
   CMK_INCDIR="$CMK_INCDIR -I$PAPI_INCDIR"
   CMK_LIBDIR="-L$PAPI_LIBDIR"
-  CMK_LD="$CMK_LD -Wl,-rpath,$PAPI_LIBDIR"
-  CMK_LDXX="$CMK_LDXX -Wl,-rpath,$PAPI_LIBDIR" 
+  CMK_LD_FLAGS="$CMK_LD_FLAGS -Wl,-rpath,$PAPI_LIBDIR"
+  CMK_LDXX_FLAGS="$CMK_LDXX_FLAGS -Wl,-rpath,$PAPI_LIBDIR"
   CMK_LIBS="$CMK_LIBS -lpapi"
 fi

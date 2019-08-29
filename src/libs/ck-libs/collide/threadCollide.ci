@@ -4,6 +4,8 @@ module collide {
     Collision colls[];
   };
 
+  initnode void collideNodeInit(void);
+
   group threadCollideMgr : collideClient {
     entry threadCollideMgr(void);
     entry void sendRemote(CkReductionMsg *m);

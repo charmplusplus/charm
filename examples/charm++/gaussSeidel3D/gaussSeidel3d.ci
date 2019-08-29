@@ -20,7 +20,7 @@ mainmodule gaussSeidel3d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void report();
+    entry [reductiontarget] void report();
   };
 
   array [3D] GaussSeidel {

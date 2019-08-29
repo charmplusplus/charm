@@ -4,7 +4,7 @@
 int initial_grainsize;
 int numQueens;
 
-class Main
+class Main : public CBase_Main
 {
 public:
     Main(CkArgMsg* msg )

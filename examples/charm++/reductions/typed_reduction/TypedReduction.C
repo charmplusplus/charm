@@ -23,13 +23,11 @@ static int fudged_random(int seed_val)
 ////////////////////////////////////
 
 Driver::Driver(CkArgMsg* args) {
-    driverProxy = this;
+    driverProxy = thisProxy;
     array_size = 10;
     if (args->argc > 1) array_size = strtol(args->argv[1], NULL, 10);
     w = CProxy_Worker::ckNew(array_size);
-    CkCallback *cb = new CkCallback(CkIndex_Driver::untyped_done(NULL), thisProxy);
-    w.ckSetReductionClient(cb);
-    w.reduce();
+    w.untyped_reduce();
     delete args;
 }
 
@@ -39,23 +37,17 @@ void Driver::untyped_done(CkReductionMsg* m) {
     CkAssert(output[0] == array_size);
 
     delete m;
-    CkCallback *cb = new CkCallback(
-            CkReductionTarget(Driver, typed_done), thisProxy);
-    w.ckSetReductionClient(cb);
-    w.reduce();
+    w.typed_reduce();
 }
 
 void Driver::typed_done(int result)
 {
     CkPrintf("Typed Sum: %d\n", result);
     CkAssert(result == array_size);
-    CkCallback *cb = new CkCallback(
-            CkReductionTarget(Driver, typed_array_done), thisProxy);
-    w.ckSetReductionClient(cb);
-    w.reduce_array();
+    w.reduce_array_ints();
 }
 
-void Driver::typed_array_done(int* results, int n)
+void Driver::typed_array_ints_done(int* results, int n)
 {
     CkPrintf("Typed Sum: [ ");
     for (int i=0; i<n; ++i) CkPrintf("%d ", results[i]);
@@ -64,13 +56,10 @@ void Driver::typed_array_done(int* results, int n)
     int contribution[3]={1,2,3};
     for (int i=0; i<n; ++i) CkAssert(results[i] == contribution[i]*array_size);
 
-    CkCallback *cb = new CkCallback(
-            CkReductionTarget(Driver, typed_array_done2), thisProxy);
-    w.ckSetReductionClient(cb);
-    w.reduce_array();
+    w.reduce_indiv_ints();
 }
 
-void Driver::typed_array_done2(int x, int y, int z)
+void Driver::typed_indiv_ints_done(int x, int y, int z)
 {
     CkPrintf("Typed Sum: (x, y, z) = (%d, %d, %d)\n", x, y, z);
 
@@ -78,13 +67,10 @@ void Driver::typed_array_done2(int x, int y, int z)
     CkAssert(y == array_size * 2);
     CkAssert(z == array_size * 3);
 
-    CkCallback *cb = new CkCallback(
-            CkReductionTarget(Driver, typed_array_done3), thisProxy);
-    w.ckSetReductionClient(cb);
     w.reduce_array_doubles();
 }
 
-void Driver::typed_array_done3(int n, double* results)
+void Driver::typed_array_doubles_done(int n, double* results)
 {
     CkPrintf("Typed Sum: [ ");
     for (int i=0; i<n; ++i) CkPrintf("%.5g ", results[i]);
@@ -93,9 +79,6 @@ void Driver::typed_array_done3(int n, double* results)
     double contribution[3] = { 0.16180, 0.27182, 0.31415 };
     for (int i=0; i<n; ++i) CkAssert(approx_equal(results[i], contribution[i]*array_size));
 
-    CkCallback *cb = new CkCallback(
-        CkReductionTarget(Driver, set_done), thisProxy);
-    w.ckSetReductionClient(cb);
     w.reduce_set();
 }
 
@@ -120,6 +103,7 @@ void Driver::set_done(CkReductionMsg* msg)
     CkAssert(set_size == array_size);
     int gauss = array_size * (array_size+1) / 2;
     CkAssert(total_set_elements == gauss);
+    delete msg;
 
     CkPrintf("Random data for tuple & statistics reduction: ");
     w.reduce_tuple();
@@ -186,6 +170,7 @@ void Driver::tuple_reducer_done(CkReductionMsg* msg)
     CkAssert(total_set_elements == gauss);
 
     delete[] results;
+    delete msg;
     CkExit();
 }
 
@@ -193,28 +178,44 @@ void Driver::tuple_reducer_done(CkReductionMsg* msg)
 
 Worker::Worker() { }
 
-void Worker::reduce() {
+void Worker::untyped_reduce() {
     int contribution=1;
-    contribute(1*sizeof(int), &contribution, CkReduction::sum_int); 
+    contribute(1*sizeof(int), &contribution, CkReduction::sum_int,
+               CkCallback(CkIndex_Driver::untyped_done(NULL), driverProxy));
 }
 
-void Worker::reduce_array() {
+void Worker::typed_reduce() {
+    int contribution=1;
+    contribute(1*sizeof(int), &contribution, CkReduction::sum_int,
+               CkCallback(CkReductionTarget(Driver, typed_done), driverProxy));
+}
+
+void Worker::reduce_array_ints() {
     int contribution[3]={1,2,3};
-    contribute(3*sizeof(int), contribution, CkReduction::sum_int); 
+    contribute(3*sizeof(int), contribution, CkReduction::sum_int,
+               CkCallback(CkReductionTarget(Driver, typed_array_ints_done), driverProxy));
+}
+
+void Worker::reduce_indiv_ints() {
+    int contribution[3]={1,2,3};
+    contribute(3*sizeof(int), contribution, CkReduction::sum_int,
+               CkCallback(CkReductionTarget(Driver, typed_indiv_ints_done), driverProxy));
 }
 
 void Worker::reduce_array_doubles() {
     double contribution[3] = { 0.16180, 0.27182, 0.31415 };
-    contribute(3*sizeof(double), contribution, CkReduction::sum_double);
+    contribute(3*sizeof(double), contribution, CkReduction::sum_double,
+               CkCallback(CkReductionTarget(Driver, typed_array_doubles_done), driverProxy));
 }
 
 void Worker::reduce_set() {
     int arraySize = thisIndex + 1;
-    int* setData = new int[arraySize];
-    for (int idx = 0; idx < arraySize; ++idx)
+    std::vector<int> setData(arraySize);
+    for (int idx = 0; idx < setData.size(); ++idx)
         setData[idx] = idx;
 
-    contribute(arraySize * sizeof(int), setData, CkReduction::set);
+    contribute(setData.size() * sizeof(int), setData.data(), CkReduction::set,
+               CkCallback(CkIndex_Driver::set_done(NULL), driverProxy));
 }
 
 void Worker::reduce_tuple() {
@@ -224,8 +225,8 @@ void Worker::reduce_tuple() {
     CkReduction::statisticsElement stats(val);
 
     int arraySize = thisIndex + 1;
-    int* setData = new int[arraySize];
-    for (int idx = 0; idx < arraySize; ++idx)
+    std::vector<int> setData(arraySize);
+    for (int idx = 0; idx < setData.size(); ++idx)
         setData[idx] = idx;
 
     int tuple_size = 5;
@@ -234,11 +235,11 @@ void Worker::reduce_tuple() {
         CkReduction::tupleElement(sizeof(int), &val, CkReduction::max_int),
         CkReduction::tupleElement(sizeof(int), &val, CkReduction::sum_int),
         CkReduction::tupleElement(sizeof(CkReduction::statisticsElement), &stats, CkReduction::statistics),
-        CkReduction::tupleElement(arraySize * sizeof(int), setData, CkReduction::set)};
+        CkReduction::tupleElement(setData.size() * sizeof(int), setData.data(), CkReduction::set)};
 
     CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
 
-    CkCallback cb(CkReductionTarget(Driver, tuple_reducer_done), driverProxy);
+    CkCallback cb(CkIndex_Driver::tuple_reducer_done(NULL), driverProxy);
     msg->setCallback(cb);
     contribute(msg);
 }

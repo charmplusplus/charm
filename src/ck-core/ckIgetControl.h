@@ -28,7 +28,6 @@ typedef   CkFutureID     CkIGetID;
 #endif
 
 extern "C" void TokenUpdatePeriodic();
-extern "C" int getRSS();
 
 #if IGET_FLOWCONTROL==0
 

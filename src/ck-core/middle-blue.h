@@ -46,7 +46,8 @@
 #define CkNumberHandler(n, x)       BgNumberHandler(n, (BgHandler)(x))
 #define CkNumberHandlerEx(n, x, p)  BgNumberHandlerEx(n, (BgHandlerEx)(x), p)
 
-#define ConverseExit             BgCharmExit
+#undef ConverseExit
+#define ConverseExit(...)             BgCharmExit()
 
 /**
   This version Blue Gene Charm++ use a whole Blue Gene node as 

@@ -13,6 +13,7 @@
 #include "debug-conv++.h"
 #include "pup.h"
 #include "cklists.h"
+#include <vector>
 
 void CkPupMessage(PUP::er &p,void **atMsg,int pack_detail=1);
 
@@ -45,13 +46,13 @@ class DebugEntryInfo {
 public:
   // true if this entry method has a breakpoint set
   bool isBreakpoint;
-  CkVec<DebugPersistentCheck> preProcess;
-  CkVec<DebugPersistentCheck> postProcess;
+  std::vector<DebugPersistentCheck> preProcess;
+  std::vector<DebugPersistentCheck> postProcess;
 
   DebugEntryInfo() : isBreakpoint(false) { }
 };
 
-typedef CkVec<DebugEntryInfo> DebugEntryTable;
+typedef std::vector<DebugEntryInfo> DebugEntryTable;
 
 //These pup functions are useful in CpdLists, as they document the name
 //  of the variable.  Your object must be named "c" (a stupid hack).

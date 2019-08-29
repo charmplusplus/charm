@@ -27,7 +27,7 @@ module TraceProjections {
   //   initialized as it is intended for important runtime registrations.
   // In this case, we have user-specific reductions and the registration of
   //   an module exit function.
-  initproc void registerOutlierReduction(void);
+  initnode void registerOutlierReduction(void);
   initnode void initTraceProjectionsBOC(void);
   
   readonly CkGroupID traceProjectionsGID;

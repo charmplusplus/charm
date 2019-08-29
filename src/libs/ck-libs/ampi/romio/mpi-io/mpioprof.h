@@ -1,6 +1,5 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -71,6 +70,15 @@
 #undef MPI_File_get_byte_offset
 #define MPI_File_get_byte_offset PMPI_File_get_byte_offset
 
+#undef MPI_File_iread_at_all
+#define MPI_File_iread_at_all PMPI_File_iread_at_all
+#undef MPI_File_iwrite_at_all
+#define MPI_File_iwrite_at_all PMPI_File_iwrite_at_all
+#undef MPI_File_iread_all
+#define MPI_File_iread_all  PMPI_File_iread_all
+#undef MPI_File_iwrite_all
+#define MPI_File_iwrite_all PMPI_File_iwrite_all
+
 #undef MPI_File_read_shared
 #define MPI_File_read_shared PMPI_File_read_shared
 #undef MPI_File_write_shared
@@ -115,6 +123,8 @@
 
 #undef MPI_File_get_type_extent
 #define MPI_File_get_type_extent PMPI_File_get_type_extent
+#undef MPI_Register_datarep
+#define MPI_Register_datarep PMPI_Register_datarep
 #undef MPI_File_set_atomicity
 #define MPI_File_set_atomicity PMPI_File_set_atomicity
 #undef MPI_File_get_atomicity
@@ -140,15 +150,29 @@
 #endif
 
 #undef MPIO_Test
+#undef PMPIO_Test
 #define MPIO_Test PMPIO_Test
 #undef MPIO_Wait
+#undef PMPIO_Wait
 #define MPIO_Wait PMPIO_Wait
+#undef MPIO_Testall
+#define MPIO_Testall PMPIO_Testall
+#undef MPIO_Waitall
+#define MPIO_Waitall PMPIO_Waitall
+#undef MPIO_Testany
+#define MPIO_Testany PMPIO_Testany
+#undef MPIO_Waitany
+#define MPIO_Waitany PMPIO_Waitany
+#undef MPIO_Testsome
+#define MPIO_Testsome PMPIO_Testsome
+#undef MPIO_Waitsome
+#define MPIO_Waitsome PMPIO_Waitsome
 #undef MPIO_Request_f2c
 #define MPIO_Request_f2c PMPIO_Request_f2c
 #undef MPIO_Request_c2f
 #define MPIO_Request_c2f PMPIO_Request_c2f
 
-#ifdef MPI_INFO_SRC  /* only in info source directory */
+#if defined(HAVE_MPI_INFO_SRC)  /* only in info source directory */
 
 #undef MPI_Info_create
 #define MPI_Info_create PMPI_Info_create
@@ -174,5 +198,17 @@
 #define MPI_Info_f2c PMPI_Info_f2c
 
 #endif
+
+#undef MPI_Grequest_start
+#define MPI_Grequest_start PMPI_Grequest_start
+#undef MPI_Grequest_complete
+#define MPI_Grequest_complete PMPI_Grequest_complete
+#undef MPI_Status_set_cancelled
+#define MPI_Status_set_cancelled PMPI_Status_set_cancelled
+
+#undef MPIX_Grequest_start
+#define MPIX_Grequest_start PMPIX_Grequest_start
+#undef MPIX_Grequest_class_create
+#define MPIX_Grequest_class_create PMPIX_Grequest_class_create
 
 #endif

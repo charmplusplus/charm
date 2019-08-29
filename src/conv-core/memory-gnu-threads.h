@@ -111,9 +111,9 @@ typedef void *tsd_key_t[256];
   for(i=0; i<256; i++) (*key)[i] = 0; \
 } while(0)
 #define tsd_setspecific(key, data) \
- (key[(unsigned)pthread_self() % 256] = (data))
+ (key[(uintptr_t)pthread_self() % 256] = (data))
 #define tsd_getspecific(key, vptr) \
- (vptr = key[(unsigned)pthread_self() % 256])
+ (vptr = key[(uintptr_t)pthread_self() % 256])
 
 #else
 

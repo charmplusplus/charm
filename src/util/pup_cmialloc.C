@@ -50,7 +50,7 @@ void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg, size_t msg_size) {
     buf = origBuf + ALIGN8_LONG(size());
 
     chnk_hdr.size = msg_size;
-    chnk_hdr.ref = origBuf - (buf + sizeof(CmiChunkHeader));
+    chnk_hdr.setRef(origBuf - (buf + sizeof(CmiChunkHeader)));
     
     //Copy the Chunk header
     memcpy(buf, &chnk_hdr, sizeof(CmiChunkHeader));
@@ -65,7 +65,7 @@ void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg, size_t msg_size) {
 
 void PUP_fromCmiAllocMem::pupCmiAllocBuf(void **msg) {
     //First align buf
-    buf = (PUP::myByte *)ALIGN8_LONG((long)buf);
+    buf = (PUP::myByte *)(intptr_t)ALIGN8_LONG((intptr_t)buf);
 
     //Now get the chunk header
     CmiChunkHeader chnk_hdr;    
@@ -80,7 +80,7 @@ void PUP_fromCmiAllocMem::pupCmiAllocBuf(void **msg) {
     buf += chnk_hdr.size;
     
     //update the reference count of the original buf
-    REFFIELD(origBuf) ++;
+    REFFIELDINC(origBuf);
 }
 
 

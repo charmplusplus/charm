@@ -72,7 +72,7 @@ class BGQTorusManager {
     inline int getProcsPerNode() { return procsPerNode; }
     inline int* isTorus() { return torus; }
 
-    inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) { //5D Torus mapping to 3D logical network, don't know if it is useful!
+    inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) const { //5D Torus mapping to 3D logical network, don't know if it is useful!
         pe = CmiGetPeGlobal(pe, CmiMyPartition());
         t = pe % (thdsPerProc*procsPerNode);
         int e = pe / (thdsPerProc*procsPerNode) % rn_NE;
@@ -86,7 +86,7 @@ class BGQTorusManager {
         x = (a + 1) * rn_NB - 1 - (((a % 2)==0)?(rn_NB - b - 1) : b);
     }
 
-    inline void rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t) {
+    inline void rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t) const {
         int tempdims[6];
 
         pe = CmiGetPeGlobal(pe, CmiMyPartition());
@@ -106,7 +106,7 @@ class BGQTorusManager {
 
     }
    
-    inline int coordinatesToRank(int x, int y, int z, int t) {  //3D logic mapping to 5D torus, don't know if it is useful!
+    inline int coordinatesToRank(int x, int y, int z, int t) const {  //3D logic mapping to 5D torus, don't know if it is useful!
         int pe;
         int a = x/rn_NB;
         int b = ((a % 2)==0)?(x % rn_NB) : (rn_NB - (x % rn_NB) - 1);
@@ -135,7 +135,7 @@ class BGQTorusManager {
 #endif
     }    
 
-    inline int coordinatesToRank(int a, int b, int c, int d, int e, int t) {
+    inline int coordinatesToRank(int a, int b, int c, int d, int e, int t) const {
         int pe;
         int tempdims[6];
         tempdims[0] = a;

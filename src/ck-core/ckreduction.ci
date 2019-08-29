@@ -16,7 +16,7 @@ module CkReduction {
   message CkReductionInactiveMsg;
   
   group [migratable] CkReductionMgr : CkGroupInitCallback {
-	entry CkReductionMgr(CProxy_CkArrayReductionMgr);
+	entry CkReductionMgr();
 
 	entry [expedited] void RecvMsg(CkReductionMsg *);
 	//Sent down the reduction tree (used by barren PEs)
@@ -28,8 +28,6 @@ module CkReduction {
 
 	entry [expedited] void Barrier_RecvMsg(CkReductionMsg *);
 
-	//call back for using NodeGroup Reductions added by sayantan
-	entry void ArrayReductionHandler(CkReductionMsg *m);
 	entry void contributeViaMessage(CkReductionMsg *m);
   entry void AddToInactiveList(CkReductionInactiveMsg *m);
   };
@@ -37,21 +35,16 @@ module CkReduction {
   nodegroup CkNodeReductionMgr : IrrGroup {
 	entry CkNodeReductionMgr(void);
 
-	//Sent down the reduction tree (used by barren PEs)
-	entry void ReductionStarting(CkReductionNumberMsg *);
-
 	//Sent up the reduction tree with reduced data
 	entry [expedited] void RecvMsg(CkReductionMsg *);
 
-	// restart local groups if they are not attached
-	entry void restartLocalGroupReductions(int number);
-
+#if CMK_FAULT_EVAC
 	entry void DeleteChild(int child);
 	entry void DeleteNewChild(int child);
 	entry void modifyTree(int code,int size,int data[size]);
 	entry void collectMaxRedNo(int redNo);
 	entry void unblockNode(int maxRedNo);
-	
+#endif
   };
 
   

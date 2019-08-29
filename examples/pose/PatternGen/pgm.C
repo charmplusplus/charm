@@ -21,20 +21,20 @@ main::main(CkArgMsg *m) {
     CkPrintf("   Pattern parameters: none\n");
     CkPrintf("\n");
     CkPrintf("For more details on the patterns, see the README file.\n\n");
-    CkExit();
+    CkExit(1);
   }
 
   numWorkers = atoi(m->argv[1]);
   if (numWorkers < 1) {
     CkPrintf("Number of Worker objects (%d) must be positive\n", numWorkers);
-    CkExit();
+    CkExit(1);
   }
 
   patternNum = atoi(m->argv[2]);
   if ((patternNum < 0) || (patternNum >= NUM_AVAILABLE_PATTERNS)) {
     CkPrintf("Invalid pattern number: %d\n", patternNum);
     CkPrintf("Options: 0-%d\n", NUM_AVAILABLE_PATTERNS - 1);
-    CkExit();
+    CkExit(1);
   }
 
   CkPrintf("Pattern %d selected with %d Worker objects spread across %d PE(s)\n", patternNum, numWorkers, CkNumPes());

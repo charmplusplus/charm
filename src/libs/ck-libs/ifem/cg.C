@@ -75,7 +75,7 @@ void cgSolver::iterate(void)
 	fma(n,s_k, r_k,beta,s_k);
 }
 
-CDECL void ILSI_CG_Solver(ILSI_Param *param, ILSI_Comm *comm,
+CLINKAGE void ILSI_CG_Solver(ILSI_Param *param, ILSI_Comm *comm,
 	int n, const real *b, real *x)
 {
 	int maxIterations=1000000000;

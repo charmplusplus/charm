@@ -3,7 +3,7 @@ module CkMulticast {
   message cookieMsg;
   message multicastSetupMsg {
     CkArrayIndex arrIdx[];
-    int  lastKnown[];
+    int  peElems[];
   };
   message multicastGrpMsg;
 //  message CkMcastReductionMsg {

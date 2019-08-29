@@ -3,16 +3,19 @@
 
 //#include <converse.h> // for size_t
 #include "pup.h"
+#include "pup_stl.h"
 #include <stdlib.h> // for size_t
 #include <string.h> // for memcpy
+#include <vector>
 
 //"Documentation" class: prevents people from using copy constructors 
-class CkNoncopyable {
-	//These aren't defined anywhere-- don't use them!
-	CkNoncopyable(const CkNoncopyable &c);
-	CkNoncopyable &operator=(const CkNoncopyable &c);
-public:
+struct CkNoncopyable {
 	CkNoncopyable(void) {}
+	CkNoncopyable(const CkNoncopyable &c) = delete;
+	CkNoncopyable& operator=(const CkNoncopyable &c) = delete;
+	CkNoncopyable(CkNoncopyable&&) = default;
+	CkNoncopyable& operator=(CkNoncopyable &&) = default;
+	~CkNoncopyable() = default;
 };
 
 //Implementation class 
@@ -32,39 +35,57 @@ template <class T> void pupCkQ(PUP::er &p,CkQ<T> &q);
 /// A single-ended FIFO queue.
 ///  See CkMsgQ if T is a Charm++ message type.
 template <class T>
-class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
-    T *block;
-    int blklen;
+class CkQ {
+    std::vector<T> block;
     int first;
     int len;
     int mask;
     void _expand(void) {
-      // blklen is always kept as a power of 2
+      // block.size() is always kept as a power of 2
+      int blklen = block.size();
       int newlen = blklen<<1;
       mask |= blklen;
       if (blklen==0) {
+	CmiAssert(first == 0);
 	newlen = 16;
 	mask = 0x0f;
       }
-      T *newblk = new T[newlen];
-      this->elementCopy(newblk,block+first,blklen-first);
-      this->elementCopy(newblk+blklen-first,block,first);
-      delete[] block; block = newblk;
-      blklen = newlen; first = 0;
+      block.resize(newlen);
+      if (first != 0) {
+        // Rearrange elements of block so that first = 0
+        CmiAssert(first > 0 && first < blklen);
+        CmiAssert(newlen >= 2*blklen);
+        std::move(block.begin(), block.begin()+first, block.begin()+blklen);
+        std::move(block.begin()+first, block.begin()+blklen, block.begin());
+        std::move(block.begin()+blklen, block.begin()+(blklen+first), block.begin()+(blklen-first));
+        first = 0;
+      }
     }
   public:
-    CkQ() : block(NULL), blklen(0), first(0),len(0),mask(0) {}
+    CkQ() : first(0),len(0),mask(0) {}
+    CkQ(CkQ &&rhs)
+      : block(rhs.block)
+      , first(rhs.first)
+      , len(rhs.len)
+      , mask(rhs.mask)
+    {
+      rhs.block.clear();
+      rhs.len = 0;
+    }
     CkQ(int sz) :first(0),len(0) {
       int size = 2;
       mask = 0x03;
       while (1<<size < sz) { mask |= 1<<size; size++; }
-      blklen = 1<<size;
-      block = new T[blklen];
+      int blklen = 1<<size;
+      block.resize(blklen);
     }
-    ~CkQ() { delete[] block; }
-    int length(void) { return len; }
-    int isEmpty(void) { return (len==0); }
-    T deq(void) {
+    CkQ(const CkQ&) = delete;
+    void operator=(const CkQ&) = delete;
+    void operator=(CkQ&&) = delete; // Assignment of one queue to another makes no sense
+    ~CkQ() {}
+    inline int length() const { return len; }
+    inline int isEmpty() const { return (len==0); }
+    T deq() {
       if(len>0) {
         T &ret = block[first];
 	first = (first+1)&mask;
@@ -73,26 +94,26 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       } else return T(); //For builtin types like int, void*, this is equivalent to T(0)
     }
     void enq(const T &elt) {
-      if(len==blklen) _expand();
+      if((size_t)len==block.size()) _expand();
       block[(first+len)&mask] = elt;
       len++;
     }
     // stack semantics, needed to replace FIFO_QUEUE of converse
     void push(const T &elt) {
-      if(len==blklen) _expand();
-      first = (first-1+blklen)&mask;
+      if(len==block.size()) _expand();
+      first = (first-1+block.size())&mask;
       block[first] = elt;
       len++;
     }
     // stack semantics: look at the element on top of the stack
-    T& peek() {
+    inline T& peek() {
       return block[first];
     }
     // insert an element at pos.
     void insert(int pos, const T &elt) {
-      while(len==blklen || pos>=blklen) _expand();
+      while(len==block.size() || pos>=block.size()) _expand();
       for (int i=len; i>pos; i--)
-        block[(i+first)&mask] = block[(i-1+first)&mask];
+        block[(i+first)&mask] = std::move(block[(i-1+first)&mask]);
       block[(pos+first)&mask] = elt;
       if (pos > len) len = pos+1;
       else len++;
@@ -102,17 +123,17 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       if (pos >= len) return T(0);
       T ret = block[(pos+first)&mask];
       for (int i=pos; i<len-1; i++)
-        block[(i+first)&mask] = block[(i+1+first)&mask];
+        block[(i+first)&mask] = std::move(block[(i+1+first)&mask]);
       len--;
       return ret;
     }
     // delete all elements from pos
-    void removeFrom(int pos) {
+    inline void removeFrom(int pos) {
       CmiAssert (pos < len && pos>=0);
       len = pos;
     }
     //Peek at the n'th item from the queue
-    T& operator[](size_t n)
+    inline T& operator[](size_t n)
     {
     	n=(n+first)&mask;
     	return block[n];
@@ -127,39 +148,22 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       }
       return newblk;
     }
-#ifdef _MSC_VER
-/* Visual C++ 6.0's operator overloading is buggy,
-   so use default operator|, which calls this pup routine. */
      void pup(PUP::er &p) {
-        pupCkQ(p,*this);
+       p.syncComment(PUP::sync_begin_array);
+       p|len;
+       for (int i=0;i<len;i++) {
+         p.syncComment(PUP::sync_item);
+         if (p.isUnpacking()) {
+           T t;
+           p|t;
+           enq(t);
+         } else {
+           p|block[(i+first)&mask];
+         }
+       }
+       p.syncComment(PUP::sync_end_array);
      }
-#endif
 };
-
-/// Default pup routine for CkQ: pup each of the elements
-template <class T>
-inline void pupCkQ(PUP::er &p,CkQ<T> &q) {
-    p.syncComment(PUP::sync_begin_array);
-    int l=q.length();
-    p|l;
-    for (int i=0;i<l;i++) {
-    	p.syncComment(PUP::sync_item);
-    	if (p.isUnpacking()) {
-		T t;
-		p|t;
-		q.enq(t);
-	} else {
-		p|q[i];
-	}
-    }
-    p.syncComment(PUP::sync_end_array);
-}
-
-#ifndef _MSC_VER
-/// Default pup routine for CkVec: pup each of the elements
-template <class T>
-inline void operator|(PUP::er &p,CkQ<T> &q) {pupCkQ(p,q);}
-#endif
 
 /// "Flag" class: do not initialize this object.
 /// This is sometimes needed for global variables, 
@@ -172,9 +176,9 @@ template <class T> void pupCkVec(PUP::er &p,CkVec<T> &vec);
 
 /// A typesafe, automatically growing array.
 /// Classes used must have a default constructor and working copy constructor.
-/// This class is modelled after, but *not* identical to, the
-/// (still nonportable) std::vector.
+/// This class is modelled after, but *not* identical to, std::vector.
 ///   The elements of the array are pup'd using plain old "p|elt;".
+///   The main use case for CkVec is global variables (see CkSkipInitialization above).
 template <class T>
 class CkVec : private CkSTLHelper<T> {
     typedef CkVec<T> this_type;

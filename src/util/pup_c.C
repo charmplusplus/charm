@@ -22,72 +22,72 @@ a C++ "PUP::er &" type.  We actually want a
 #define mp (*(PUP::er *)p)
 
 /*Allocate PUP::er of different kind */
-CDECL pup_er pup_new_sizer(void)
+CLINKAGE pup_er pup_new_sizer(void)
   { return new PUP::sizer; }
-CDECL pup_er pup_new_toMem(void *Nbuf)
+CLINKAGE pup_er pup_new_toMem(void *Nbuf)
   { return new PUP::toMem(Nbuf); }
-CDECL pup_er pup_new_fromMem(const void *Nbuf)
+CLINKAGE pup_er pup_new_fromMem(const void *Nbuf)
   { return new PUP::fromMem(Nbuf); }
-CDECL pup_er pup_new_network_sizer(void)
+CLINKAGE pup_er pup_new_network_sizer(void)
   { return new PUP_toNetwork_sizer; }
-CDECL pup_er pup_new_network_pack(void *Nbuf)
+CLINKAGE pup_er pup_new_network_pack(void *Nbuf)
   { return new PUP_toNetwork_pack(Nbuf); }
-CDECL pup_er pup_new_network_unpack(const void *Nbuf)
+CLINKAGE pup_er pup_new_network_unpack(const void *Nbuf)
   { return new PUP_toNetwork_unpack(Nbuf); }
 #if CMK_CCS_AVAILABLE
 #include "ccs-builtins.h"
-CDECL pup_er pup_new_fmt(pup_er p)
+CLINKAGE pup_er pup_new_fmt(pup_er p)
   { return new PUP_fmt(mp); }
-CDECL void pup_fmt_sync_begin_object(pup_er p)
+CLINKAGE void pup_fmt_sync_begin_object(pup_er p)
   { mp.synchronize(PUP::sync_begin_object); }
-CDECL void pup_fmt_sync_end_object(pup_er p)
+CLINKAGE void pup_fmt_sync_end_object(pup_er p)
   { mp.synchronize(PUP::sync_end_object); }
-CDECL void pup_fmt_sync_begin_array(pup_er p)
+CLINKAGE void pup_fmt_sync_begin_array(pup_er p)
   { mp.synchronize(PUP::sync_begin_array); }
-CDECL void pup_fmt_sync_end_array(pup_er p)
+CLINKAGE void pup_fmt_sync_end_array(pup_er p)
   { mp.synchronize(PUP::sync_end_array); }
-CDECL void pup_fmt_sync_item(pup_er p)
+CLINKAGE void pup_fmt_sync_item(pup_er p)
   { mp.syncComment(PUP::sync_item); }
 #endif
-CDECL void pup_destroy(pup_er p)
+CLINKAGE void pup_destroy(pup_er p)
   { delete ((PUP::er *)p); }
 
 /*Determine what kind of pup_er we have--
 return 1 for true, 0 for false.*/
-CDECL int pup_isPacking(const pup_er p)
+CLINKAGE int pup_isPacking(const pup_er p)
   { return (mp.isPacking())?1:0;}
-CDECL int pup_isUnpacking(const pup_er p)
+CLINKAGE int pup_isUnpacking(const pup_er p)
   { return (mp.isUnpacking())?1:0;}
-CDECL int pup_isSizing(const pup_er p)
+CLINKAGE int pup_isSizing(const pup_er p)
   { return (mp.isSizing())?1:0;}
-CDECL int pup_isDeleting(const pup_er p)
+CLINKAGE int pup_isDeleting(const pup_er p)
   { return (mp.isDeleting())?1:0;}
-CDECL int pup_isUserlevel(const pup_er p)
+CLINKAGE int pup_isUserlevel(const pup_er p)
   { return (mp.isUserlevel())?1:0;}
-CDECL int pup_isRestarting(const pup_er p)
+CLINKAGE int pup_isRestarting(const pup_er p)
   { return (mp.isRestarting())?1:0;}
-CDECL char* pup_typeString(const pup_er p)
+CLINKAGE char* pup_typeString(const pup_er p)
   { return (char *)mp.typeString(); }
 
-FDECL int FTN_NAME(FPUP_ISPACKING,fpup_ispacking)(const pup_er p)
+FLINKAGE int FTN_NAME(FPUP_ISPACKING,fpup_ispacking)(const pup_er p)
   { return (mp.isPacking())?1:0;}
-FDECL int FTN_NAME(FPUP_ISUNPACKING,fpup_isunpacking)(const pup_er p)
+FLINKAGE int FTN_NAME(FPUP_ISUNPACKING,fpup_isunpacking)(const pup_er p)
   { return (mp.isUnpacking())?1:0;}
-FDECL int FTN_NAME(FPUP_ISSIZING,fpup_issizing)(const pup_er p)
+FLINKAGE int FTN_NAME(FPUP_ISSIZING,fpup_issizing)(const pup_er p)
   { return (mp.isSizing())?1:0;}
-FDECL int FTN_NAME(FPUP_ISDELETING,fpup_isdeleting)(const pup_er p)
+FLINKAGE int FTN_NAME(FPUP_ISDELETING,fpup_isdeleting)(const pup_er p)
   { return (mp.isDeleting())?1:0;}
-FDECL int FTN_NAME(FPUP_ISUSERLEVEL,fpup_isuserlevel)(const pup_er p)
+FLINKAGE int FTN_NAME(FPUP_ISUSERLEVEL,fpup_isuserlevel)(const pup_er p)
   { return (mp.isUserlevel())?1:0;}
 
 /*Read the size of the pupper */
-CDECL size_t pup_size(const pup_er p)
+CLINKAGE size_t pup_size(const pup_er p)
   { return mp.size(); }
 
 #define SIZE_APPROX_BITS 13
 
 /* Utilities to approximately encode large sizes, within 0.5% */
-CDECL CMK_TYPEDEF_UINT2 pup_encodeSize(size_t s)
+CLINKAGE CMK_TYPEDEF_UINT2 pup_encodeSize(size_t s)
 {
   // Use the top two bits to indicate a scaling factor as a power of 256. At
   // each step up in size, we'll thus lose the bottom 8 bits out of 14:
@@ -104,7 +104,7 @@ CDECL CMK_TYPEDEF_UINT2 pup_encodeSize(size_t s)
   return (power << SIZE_APPROX_BITS) | s;
 }
 
-CDECL size_t pup_decodeSize(CMK_TYPEDEF_UINT2 a)
+CLINKAGE size_t pup_decodeSize(CMK_TYPEDEF_UINT2 a)
 {
   CmiUInt2 power = a >> SIZE_APPROX_BITS;
   size_t factor = 1UL << (8 * power);
@@ -115,11 +115,11 @@ CDECL size_t pup_decodeSize(CMK_TYPEDEF_UINT2 a)
 }
 
 /*Insert a synchronization into the data stream */
-CDECL void pup_syncComment(const pup_er p, unsigned int sync, char *message)
+CLINKAGE void pup_syncComment(const pup_er p, unsigned int sync, const char *message)
   { mp.syncComment(sync, message); }
-/*FDECL void FNT_NAME(FPUP_SYNCCOMMENT,fpup_syncComment)(const pup_er p, unsigned int sync, char *message)
+/*FLINKAGE void FNT_NAME(FPUP_SYNCCOMMENT,fpup_syncComment)(const pup_er p, unsigned int sync, const char *message)
   { mp.syncComment(sync, message); }*/
-CDECL void pup_comment(const pup_er p, char *message)
+CLINKAGE void pup_comment(const pup_er p, const char *message)
   { mp.comment(message); }
 
 #undef PUP_BASIC_DATATYPE /*from pup_c.h*/
@@ -133,9 +133,9 @@ void pup_ints(pup_er p,int *iarr,size_t nItems) <- array pack/unpack
   {(PUP::er * cast p)(iarr,nItems);}
 */
 #define PUP_BASIC_DATATYPE(typeName,type) \
- CDECL void pup_##typeName(pup_er p,type *v) \
+ CLINKAGE void pup_##typeName(pup_er p,type *v) \
    {mp(*v);} \
- CDECL void pup_##typeName##s(pup_er p,type *arr,size_t nItems) \
+ CLINKAGE void pup_##typeName##s(pup_er p,type *arr,size_t nItems) \
    {mp(arr,nItems);}
 
 PUP_BASIC_DATATYPE(char,char)
@@ -152,15 +152,15 @@ PUP_BASIC_DATATYPE(int8,CMK_TYPEDEF_INT8)
 PUP_BASIC_DATATYPE(size_t,size_t)
 
 // Pointers have a different signature, so they need special treatment
-CDECL void pup_pointer(pup_er p,void **v) {mp(*v,(void*)NULL);}
-CDECL void pup_pointers(pup_er p,void **arr,size_t nItems) {mp(arr,nItems,(void*)NULL);}
+CLINKAGE void pup_pointer(pup_er p,void **v) {mp(*v,(void*)NULL);}
+CLINKAGE void pup_pointers(pup_er p,void **arr,size_t nItems) {mp(arr,nItems,(void*)NULL);}
 
 #define PUP_BASIC_DATATYPEF(typeUP,typelo,type) \
- FDECL void FTN_NAME(FPUP_##typeUP,fpup_##typelo)(pup_er p,type *v) \
+ FLINKAGE void FTN_NAME(FPUP_##typeUP,fpup_##typelo)(pup_er p,type *v) \
    {mp(*v);} \
- FDECL void FTN_NAME(FPUP_##typeUP##SG,fpup_##typelo##sg)(pup_er p,type *arr,size_t *nItems) \
+ FLINKAGE void FTN_NAME(FPUP_##typeUP##SG,fpup_##typelo##sg)(pup_er p,type *arr,int *nItems) \
    {mp(arr,*nItems);} \
- FDECL void FTN_NAME(FPUP_##typeUP##S,fpup_##typelo##s)(pup_er p,type *arr,size_t *nItems) \
+ FLINKAGE void FTN_NAME(FPUP_##typeUP##S,fpup_##typelo##s)(pup_er p,type *arr,int *nItems) \
    {mp(arr,*nItems);}
 
 PUP_BASIC_DATATYPEF(CHAR,char,char)
@@ -172,31 +172,31 @@ PUP_BASIC_DATATYPEF(DOUBLE,double,double)
 PUP_BASIC_DATATYPEF(LOGICAL,logical,int)
 
 
-FDECL void FTN_NAME(FPUP_COMPLEX,fpup_complex)(pup_er p, float *v)
+FLINKAGE void FTN_NAME(FPUP_COMPLEX,fpup_complex)(pup_er p, float *v)
 {mp(v,2);}
 
-FDECL void FTN_NAME(FPUP_COMPLEXESG,fpup_complexesg)(pup_er p, float *arr, int *nItems)
+FLINKAGE void FTN_NAME(FPUP_COMPLEXESG,fpup_complexesg)(pup_er p, float *arr, int *nItems)
 {mp(arr,2*(*nItems));}
 
-FDECL void FTN_NAME(FPUP_COMPLEXES,fpup_complexes)(pup_er p, float *arr, int *nItems)
+FLINKAGE void FTN_NAME(FPUP_COMPLEXES,fpup_complexes)(pup_er p, float *arr, int *nItems)
 {mp(arr,2*(*nItems));}
 
-FDECL void FTN_NAME(FPUP_DOUBLECOMPLEX,fpup_doublecomplex)(pup_er p, double *v)
+FLINKAGE void FTN_NAME(FPUP_DOUBLECOMPLEX,fpup_doublecomplex)(pup_er p, double *v)
 {mp(v,2);}
 
-FDECL void FTN_NAME(FPUP_DOUBLECOMPLEXESG,fpup_doublecomplexesg)(pup_er p, double *arr, int *nItems)
+FLINKAGE void FTN_NAME(FPUP_DOUBLECOMPLEXESG,fpup_doublecomplexesg)(pup_er p, double *arr, int *nItems)
 {mp(arr,2*(*nItems));}
 
-FDECL void FTN_NAME(FPUP_DOUBLECOMPLEXES,fpup_doublecomplexes)(pup_er p, double *arr, int *nItems)
+FLINKAGE void FTN_NAME(FPUP_DOUBLECOMPLEXES,fpup_doublecomplexes)(pup_er p, double *arr, int *nItems)
 {mp(arr,2*(*nItems));}
 
 /*Pack/unpack untyped byte array:*/
-CDECL void pup_bytes(pup_er p,void *ptr,size_t nBytes)
+CLINKAGE void pup_bytes(pup_er p,void *ptr,size_t nBytes)
 {
   mp((char *)ptr,nBytes);
 }
 
-FDECL void FTN_NAME(FPUP_BYTES,fpup_bytes)(pup_er p,void *ptr,size_t *nBytes)
+FLINKAGE void FTN_NAME(FPUP_BYTES,fpup_bytes)(pup_er p,void *ptr,int *nBytes)
 {
   mp((char *)ptr,*nBytes);
 }

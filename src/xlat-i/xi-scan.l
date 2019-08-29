@@ -111,6 +111,8 @@ struct rwentry rwtable[] = {
 {  "immediate",  IMMEDIATE },
 {  "expedited",  SKIPSCHED },
 {  "aggregate", AGGREGATE },
+{  "nocopy",  NOCOPY },
+{  "nocopypost",  NOCOPYPOST },
 {  "inline",  	INLINE },
 {  "local",      LOCAL },
 {  "virtual",    VIRTUAL },
@@ -127,8 +129,8 @@ struct rwentry rwtable[] = {
 {  "unsigned",   UNSIGNED },
 {  "void",	VOID },
 {  "const",	CONST },
-{  "atomic", 	ATOMIC },
-{  "serial",    ATOMIC },
+{  "atomic", 	SERIAL },
+{  "serial",    SERIAL },
 {  "when", 	WHEN },
 {  "while", 	WHILE },
 {  "for",	FOR },
@@ -146,6 +148,7 @@ struct rwentry rwtable[] = {
 {  "memcritical", MEMCRITICAL },
 {  "reductiontarget", REDUCTIONTARGET },
 {  "case",       CASE },
+{  "typename", TYPENAME },
 {  "",		0 }
 };
 

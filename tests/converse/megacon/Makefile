@@ -5,7 +5,7 @@ OBJS=blkinhand.o megacon.o ringsimple.o ring.o fibobj.o fibthr.o broadc.o priote
 
 all: pgm
 
-pgm: $(OBJS) 
+pgm: $(OBJS)
 	$(CHARMC) -o pgm $(OBJS) -language converse++
 
 megacon.o: megacon.c
@@ -92,3 +92,7 @@ test: pgm
 	$(call run, ./pgm +p2 )
 	$(call run, ./pgm +p3 )
 	$(call run, ./pgm +p4 )
+
+smptest: pgm
+	$(call run, ./pgm +p2 ++ppn 2)
+	$(call run, ./pgm +p4 ++ppn 2)

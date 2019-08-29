@@ -144,7 +144,7 @@ static inline void BgSyncNodeBroadcastAll(int nb, char *m)
   BgSyncNodeBroadcastAllAndFree(nb, dupm);
 }
 
-static inline void BgSyncListSendAndFree(int npes, int *pes, int nb, char *m)
+static inline void BgSyncListSendAndFree(int npes, const int *pes, int nb, char *m)
 {
   BgSyncListSend(npes, pes, CmiGetHandler(m), LARGE_WORK, nb, m);
 }

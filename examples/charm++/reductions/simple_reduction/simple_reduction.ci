@@ -1,4 +1,5 @@
 mainmodule simple_reduction {
+  readonly CProxy_main mainProxy;
   readonly int units;
   readonly double dOne;
   readonly double dTwo;

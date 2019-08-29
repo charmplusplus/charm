@@ -40,7 +40,8 @@ public:
   main(CkArgMsg* m)
   {
     if(m->argc < 6) {
-      CkAbort("Usage: hello <nElements> <completeMsgSize> <nFrags> <nReductioins> <sectionSize>\n");
+      CkPrintf("Usage: hello <nElements> <completeMsgSize> <nFrags> <nReductioins> <sectionSize>\n");
+      CkExit(1);
     }
     NumElements = atoi(m->argv[1]);
     CompleteMsgSize = atoi(m->argv[2]);
@@ -108,8 +109,6 @@ public:
     delete [] al;
     cnt.reductionsRemaining=NumReductions;
     cnt.reductionNo=0;
-    CkCallback *cb = new CkCallback(CkIndex_Hello::cb_client(NULL), CkArrayIndex1D(0), thisProxy);
-    mg->setReductionClient(mcp, cb);
 
     HiMsg *hiMsg = new (2, 0) HiMsg;
     hiMsg->data[0] = 22;

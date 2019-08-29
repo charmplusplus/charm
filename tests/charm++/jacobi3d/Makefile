@@ -23,15 +23,6 @@ syncfttest: jacobi3d
 	$(call run, ./jacobi3d 256 256 256 64 64 32 +p7 +balancer DummyLB +killFile kill_02.txt )
 	$(call run, ./jacobi3d 256 256 256 64 64 32 +p7 +balancer DummyLB +killFile kill_03.txt )
 
-causalfttest: jacobi3d
-	$(call run, ./jacobi3d 256 128 +p8 +balancer DummyLB )
-	$(call run, ./jacobi3d 256 128 +p8 +balancer DummyLB +killFile kill_01.txt )
-	$(call run, ./jacobi3d 256 128 +p8 +balancer DummyLB +fastRecovery 1 +killFile kill_01.txt )
-	$(call run, ./jacobi3d 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_02.txt )
-	$(call run, ./jacobi3d 256 256 256 64 64 32 +p8 +balancer DummyLB +fastRecovery 2 +killFile kill_02.txt )
-	$(call run, ./jacobi3d 256 256 256 64 64 32 +p8 +balancer DummyLB +fastRecovery 4 +killFile kill_02.txt )
-	$(call run, ./jacobi3d 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_03.txt )
-
 mpisyncfttest: jacobi3d
 	$(call run, ./jacobi3d 256 128 150 50 +p10 +wp8 +balancer DummyLB )
 	$(call run, ./jacobi3d 256 128 150 50 +p10 +wp8 +balancer DummyLB +killFile kill_04.txt )

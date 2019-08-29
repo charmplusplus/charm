@@ -291,4 +291,7 @@ bool TreeNode::test(double *input) {
   if(!children.empty()) {
     return data.condition->test(input);
   }
+  else {
+    return false;
+  }
 }

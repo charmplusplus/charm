@@ -32,8 +32,8 @@ class PUP_pagedDisk : public PUP::er {
 	protected:
 	pup_pagetable *_pagetable;
 	void  *handle; // handle of the object to be restored
-	PUP_pagedDisk(unsigned int type,void *objhandle,pup_pagetable *pgtable):PUP::er(type),handle(objhandle),_pagetable(pgtable){
-	};
+	PUP_pagedDisk(unsigned int type,void *objhandle,pup_pagetable *pgtable):PUP::er(type),_pagetable(pgtable),handle(objhandle){
+	}
 
 };
 

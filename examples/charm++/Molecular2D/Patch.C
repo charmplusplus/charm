@@ -158,7 +158,7 @@ void Patch::createComputes() {
       computeArray(px1, py1, px2, py2).insert((currPE++) % numPes);
   } // end of for loop
 
-  contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::computeCreationDone(), mainProxy));
+  contribute(CkCallback(CkReductionTarget(Main, computeCreationDone), mainProxy));
 }
 
 // Function to start interaction among particles in neighboring cells as well as its own particles
@@ -261,7 +261,7 @@ void Patch::checkNextStep(){
     // checking for next step
     if (stepCount >= finalStepCount) {
       print();
-      contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::allDone(), mainProxy)); 
+      contribute(CkCallback(CkReductionTarget(Main, allDone), mainProxy));
     } else {
       thisProxy(thisIndex.x, thisIndex.y).start();
     }

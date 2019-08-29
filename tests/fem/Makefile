@@ -1,21 +1,26 @@
-DIRS=femtest 
+DIRS = \
+  femtest \
 
-all:
-	for d in $(DIRS); do \
-		(cd $$d; $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+TESTDIRS = $(DIRS)
 
-test:
-	for d in $(DIRS); do \
-		(cd $$d; $(MAKE) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+all: $(foreach i,$(DIRS),build-$i)
 
-bgtest:
-	for d in $(DIRS); do \
-		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+test: $(foreach i,$(TESTDIRS),test-$i)
 
-clean:
-	for d in $(DIRS); do (cd $$d; $(MAKE) clean OPTS='$(OPTS)'); done
+bgtest: $(foreach i,$(TESTDIRS),bgtest-$i)
+
+clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
 	rm -f core *~
+
+$(foreach i,$(DIRS),build-$i):
+	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+
+$(foreach i,$(DIRS),test-$i):
+	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),bgtest-$i):
+	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

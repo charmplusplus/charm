@@ -44,20 +44,21 @@ class Check : public CBase_Check {
    CkSectionInfo cookie;
    public:
    Check() {}
-   Check(CkMigrateMessage* msg) {}		
+   Check(CkMigrateMessage* msg) {}
    void createSection(){
 	  int numpes = CkNumPes(), step=1;
 	  int me = CkMyPe();
 	  if(CkMyPe() == 0){   //root
-		 CkVec<int> elems; 
+		 CkVec<int> elems;
 		 for(int i=0; i<numpes; i+=step){
 			elems.push_back(i);
 			ckout<<i<<" : "<<endl;
 		 }
-		 secProxy = CProxySection_Check(checkGroup.ckGetGroupID(), elems.getVec(), elems.size()); 
+		 //branching factor for the spanning tree
+		 int bfactor = 4;
+		 secProxy = CProxySection_Check(checkGroup.ckGetGroupID(), elems.getVec(), elems.size(), bfactor); 
 		 CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 		 secProxy.ckSectionDelegate(mCastGrp);
-		 mCastGrp->setReductionClient(secProxy, new CkCallback(CkReductionTarget(Main,done), mainProxy));
 		 sectionBcastMsg *msg = new sectionBcastMsg(1);
 		 secProxy.recvMsg(msg);
 	  }
@@ -68,7 +69,8 @@ class Check : public CBase_Check {
 	  int me = msg->k;
 	  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 	  CkGetSectionInfo(cookie, msg);
-	  mCastGrp->contribute(sizeof(int), &me, CkReduction::sum_int, cookie);
+	  mCastGrp->contribute(sizeof(int), &me, CkReduction::sum_int, cookie,
+		  CkCallback(CkReductionTarget(Main, done), mainProxy));
 	  CkFreeMsg(msg);
    }
 };

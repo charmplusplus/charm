@@ -3,7 +3,7 @@
 #include <math.h>
 
 
-typedef struct CldNeighborData
+typedef struct CldNeighborData_s
 {
   int pe, load;
 } *CldNeighborData;

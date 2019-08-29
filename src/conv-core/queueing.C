@@ -551,33 +551,36 @@ void *CqsPrioqDequeue(_prioq pq)
 Queue CqsCreate(void)
 {
   Queue q = (Queue)CmiAlloc(sizeof(struct Queue_struct));
+#if CMK_USE_STL_MSGQ
+  q->stlQ = (void*) new conv::msgQ<prio_t>;
+#else
   q->length = 0;
   q->maxlen = 0;
-#ifdef FASTQ
-  /*  printf("\nIN fastq"); */
-#endif
   CqsDeqInit(&(q->zeroprio));
   CqsPrioqInit(&(q->negprioq));
   CqsPrioqInit(&(q->posprioq));
-#if CMK_USE_STL_MSGQ
-  q->stlQ = (void*) new conv::msgQ<prio_t>;
 #endif
   return q;
 }
 
 void CqsDelete(Queue q)
 {
-  CmiFree(q->negprioq.heap);
-  CmiFree(q->posprioq.heap);
 #if CMK_USE_STL_MSGQ
   if (q->stlQ != NULL) delete (conv::msgQ<prio_t>*)(q->stlQ);
+#else
+  CmiFree(q->negprioq.heap);
+  CmiFree(q->posprioq.heap);
 #endif
   CmiFree(q);
 }
 
 unsigned int CqsMaxLength(Queue q)
 {
+#if CMK_USE_STL_MSGQ
+  return (unsigned int)((conv::msgQ<prio_t> *)q->stlQ)->max_size();
+#else
   return q->maxlen;
+#endif
 }
 
 #if CMK_USE_STL_MSGQ
@@ -749,9 +752,11 @@ static struct prio_struct kprio_max  = { 32, 1, {((unsigned int)(-1))} };
 
 _prio CqsGetPriority(Queue q)
 {
+#if !CMK_USE_STL_MSGQ
   if (q->negprioq.heapnext>1) return &(q->negprioq.heap[1]->pri);
   if (q->zeroprio.head != q->zeroprio.tail) { return &kprio_zero; }
   if (q->posprioq.heapnext>1) return &(q->posprioq.heap[1]->pri);
+#endif
   return &kprio_max;
 }
 
@@ -944,11 +949,13 @@ int CqsRemoveSpecificPrioq(_prioq q, const void *msgPtr){
 }
 
 void CqsRemoveSpecific(Queue q, const void *msgPtr){
+#if !CMK_USE_STL_MSGQ
   if( CqsRemoveSpecificPrioq(&(q->negprioq), msgPtr) == 0 )
     if( CqsRemoveSpecificDeq(&(q->zeroprio), msgPtr) == 0 )  
       if(CqsRemoveSpecificPrioq(&(q->posprioq), msgPtr) == 0){
 	CmiPrintf("Didn't remove the specified entry because it was not found\n");
-      }  
+      }
+#endif
 }
 
 #ifdef ADAPT_SCHED_MEM

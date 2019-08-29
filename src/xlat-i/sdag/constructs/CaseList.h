@@ -7,13 +7,14 @@ namespace xi {
 
 class CaseListConstruct : public SdagConstruct {
  public:
-  CaseListConstruct(WhenConstruct *);
-  CaseListConstruct(WhenConstruct *, CaseListConstruct *);
-  void generateCode(XStr&, XStr&, Entry *);
-  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
+  CaseListConstruct(WhenConstruct*);
+  CaseListConstruct(WhenConstruct*, CaseListConstruct*);
+  void generateCode(XStr&, XStr&, Entry*);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&,
+                      std::list<CStateVar*>&, int);
   void numberNodes();
 };
 
-}   // namespace xi
+}  // namespace xi
 
 #endif  // ifndef _CASELIST_H

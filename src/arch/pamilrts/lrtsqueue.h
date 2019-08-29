@@ -65,7 +65,7 @@ void LRTSQueueInit      (void           * l2mem,
   L2_AtomicStore(&queue->_l2state->Producer, 0);
   L2_AtomicStore(&queue->_l2state->UpperBound, qsize);
   
-  rc = posix_memalign ((void **)&queue->_array,
+  rc = (pami_result_t)posix_memalign ((void **)&queue->_array,
 		       64, /*L1 line size for BG/Q */
 		       sizeof(LRTSQueueElement) * qsize);
 
@@ -77,7 +77,7 @@ int LRTSQueuePush(LRTSQueue queue,
 		     void                   * element) 
 {
   //fprintf(stderr,"Insert message %p\n", element);
-  register int qsize_1 = queue->_qsize - 1;
+  int qsize_1 = queue->_qsize - 1;
   uint64_t index = L2_AtomicLoadIncrementBounded(&queue->_l2state->Producer);
   L1P_FlushRequests();
   if (index != L2_ATOMIC_FULL) {
@@ -91,7 +91,7 @@ int LRTSQueuePush(LRTSQueue queue,
   
   //No ordering is guaranteed if there is overflow
   pthread_mutex_lock(&queue->_overflowMutex);
-  PCQueuePush(queue->_overflowQ, element);
+  PCQueuePush(queue->_overflowQ, (char *)element);
   pthread_mutex_unlock(&queue->_overflowMutex);
   
   return L2A_SUCCESS;
@@ -102,7 +102,7 @@ void * LRTSQueuePop(LRTSQueue    queue)
   uint64_t head, tail;
   tail = queue->_l2state->Producer;
   head = queue->_l2state->Consumer;
-  register int qsize_1 = queue->_qsize-1;
+  int qsize_1 = queue->_qsize-1;
 
   volatile void *e = NULL;
   if (head < tail) {    
@@ -198,7 +198,7 @@ int LRTSQueue2QSpinWait (LRTSQueue    queue0,
 }
 
 typedef pami_result_t (*pamix_proc_memalign_fn) (void**, size_t, size_t, const char*);
-void   LRTSQueuePreInit()
+void   LRTSQueuePreInit(void)
 {
     pami_result_t rc;
     int actualNodeSize = 64/Kernel_ProcessCount(); 
@@ -214,7 +214,7 @@ void   LRTSQueuePreInit()
     CmiAssert (rc == 0);    
 }
 
-LRTSQueue  LRTSQueueCreate()
+LRTSQueue  LRTSQueueCreate(void)
 {
     static  int  position=0;
     int place;

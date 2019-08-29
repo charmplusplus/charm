@@ -13,7 +13,7 @@ mpi: test.C
 	mpiCC -o pgm test.C $(OPTS)
 
 clean:
-	rm -f *.o *.mod pgm *~ conv-host charmrun
+	rm -f *.o *.mod pgm *~ conv-host charmrun ampirun
 
 test: pgm
 	$(call run, ./pgm +p1 +vp1 )

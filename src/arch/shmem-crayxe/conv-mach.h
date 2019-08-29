@@ -13,7 +13,7 @@
 #define CMK_ARENA_MALLOC                                   1
 
 #define CMK_GETPAGESIZE_AVAILABLE                          1
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
 
 #define CMI_IO_BUFFER_EXPLICIT                             1

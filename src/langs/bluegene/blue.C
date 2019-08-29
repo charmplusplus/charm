@@ -255,7 +255,7 @@ inline double Count2Time(long_long *papiValues, int n) {
      Handler Table, one per thread
 ****************************************************************************/
 
-extern "C" void defaultBgHandler(char *null, void *uPtr)
+void defaultBgHandler(char *null, void *uPtr)
 {
   CmiAbort("BG> Invalid Handler called!\n");
 }
@@ -525,7 +525,6 @@ double BgGetCurTime()
   return tCURRTIME;
 }
 
-extern "C" 
 void BgElapse(double t)
 {
 //  ASSERT(tTHREADTYPE == WORK_THREAD);
@@ -534,7 +533,6 @@ void BgElapse(double t)
 }
 
 // advance virtual timer no matter what scheme is used
-extern "C" 
 void BgAdvance(double t)
 {
 //  ASSERT(tTHREADTYPE == WORK_THREAD);
@@ -558,7 +556,6 @@ char * getFullBuffer()
  * called by a Converse handler or sendPacket()
  * add message msgPtr to a bluegene node's inbuffer queue 
  */
-extern "C"
 void addBgNodeInbuffer(char *msgPtr, int lnodeID)
 {
 #if CMK_ERROR_CHECKING
@@ -1080,7 +1077,7 @@ void BgThreadBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char
 /**
  send a msg to a list of processors (processors represented in global seq #
 */
-void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbytes, char *msg)
+void BgSyncListSend(int npes, const int *pes, int handlerID, WorkType type, int numbytes, char *msg)
 {
   nodeInfo *myNode = cta(threadinfo)->myNode;
 
@@ -1294,7 +1291,7 @@ void BgSetWorkerThreadStart(BgStartHandler f)
   workStartFunc = f;
 }
 
-extern "C" void CthResumeNormalThread(CthThreadToken* token);
+void CthResumeNormalThread(CthThreadToken* token);
 
 // kernel function for processing a bluegene message
 void BgProcessMessageDefault(threadInfo *tinfo, char *msg)
@@ -1541,7 +1538,7 @@ CmiStartFn bgMain(int argc, char **argv)
 
   BgProcessMessage = BgProcessMessageDefault;
 #if CMK_CONDS_USE_SPECIAL_CODE
-  // overwrite possible implementation in machine.c
+  // overwrite possible implementation in machine.C
   CmiSwitchToPE = CmiSwitchToPEFn;
 #endif
 
@@ -1811,7 +1808,7 @@ if(bgUseOutOfCore){
 #if BIGSIM_OUT_OF_CORE
   //initialize variables related to get precise
   //physical memory usage info for a process
-  bgMemPageSize = getpagesize();
+  bgMemPageSize = CmiGetPageSize();
   memset(bgMemStsFile, 0, 25); 
   sprintf(bgMemStsFile, "/proc/%d/statm", getpid());
 #endif
@@ -1967,7 +1964,7 @@ static void beginExitHandlerFunc(void *msg)
   delayCheckFlag = 0;
 //CmiPrintf("\n\n\nbeginExitHandlerFunc called on %d\n", CmiMyPe());
   programExit = 1;
-#if LIMITED_SEND
+#if LIMITED_SEND && CMI_QD
   CQdCreate(CpvAccess(cQdState), BgNodeSize());
 #endif
 
@@ -2285,7 +2282,6 @@ void BgSetStrategyBigSimDefault(CthThread t)
   a->suspend = bigsimThreadListener_suspend;
   a->resume = bigsimThreadListener_resume;
   a->free = NULL;
-  a->awaken = NULL;
   CthAddListener(t, a);
 }
 

@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <converse.h>
 #define entries    10
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 typedef struct
 {
-  char core[CmiMsgHeaderSizeBytes]; 
+  char core[CmiMsgHeaderSizeBytes];
   int hops, ringno;
   int data[10];
 } ringmsg;
@@ -38,6 +38,8 @@ void ringsimple_hop(ringmsg *msg)
 void ringsimple_init(void)
 {
   int i; ringmsg msg={{0},1000,0,{0}};
+
+  CmiInitMsgHeader(msg.core, sizeof(ringmsg));
   for (i=0; i<10; i++) msg.data[i] = i;
   CmiSetHandler(&msg, CpvAccess(ringsimple_hop_index));
   for (i=0; i<entries; i++) {
@@ -51,6 +53,3 @@ void ringsimple_moduleinit()
   CpvInitialize(int, ringsimple_hop_index);
   CpvAccess(ringsimple_hop_index) = CmiRegisterHandler((CmiHandler)ringsimple_hop);
 }
-
-
-

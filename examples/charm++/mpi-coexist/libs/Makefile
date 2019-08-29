@@ -1,14 +1,19 @@
-all: libs
+DIRS = \
+  hi \
+  hello \
+  kNeighbor \
 
-DIRS=hi hello kNeighbor
-
-libs:
-	for d in $(DIRS); do \
-		(cd $$d && $(MAKE) all || exit 1) || exit 1; \
-	done
+all: $(foreach i,$(DIRS),build-$i)
 	for d in $(DIRS); do \
 		cp $$d/"libmodule$$d.a" ../; \
 	done
 
-clean:
-	for d in $(DIRS); do (cd $$d; $(MAKE) clean); done
+clean: $(foreach i,$(DIRS),clean-$i)
+
+$(foreach i,$(DIRS),build-$i):
+	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'
+
+libs: all

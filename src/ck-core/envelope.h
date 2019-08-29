@@ -29,12 +29,6 @@
 #define CkMsgAlignOffset(x)     (CkMsgAlignLength(x)-(x))
 #define CkPriobitsToInts(nBits)    ((nBits+CkIntbits-1)/CkIntbits)
 
-#if CMK_MESSAGE_LOGGING
-#define CK_FREE_MSG_MLOG 	0x1
-#define CK_BYPASS_DET_MLOG 	0x2
-#define CK_MULTICAST_MSG_MLOG 	0x4
-#define CK_REDUCTION_MSG_MLOG 	0x8
-#endif
 
 /**
     \addtogroup CriticalPathFramework 
@@ -91,9 +85,6 @@ typedef unsigned short UShort;
 typedef unsigned char  UChar;
 
 #include "charm.h" // for CkGroupID, and CkEnvelopeType
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#include "ckobjid.h" //for the ckobjId
-#endif
 
 /**
 @addtogroup CkEnvelope
@@ -154,7 +145,6 @@ namespace ck {
       struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
         CkGroupID g;           ///< GroupID
         CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
-        CkGroupID dep;         ///< create after dep is created (constructor only!)
         int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
         UShort arrayEp;        ///< Used only for array broadcasts
       } group;
@@ -181,31 +171,13 @@ namespace ck {
       UChar queueing:4; ///< Queueing strategy (FIFO, LIFO, PFIFO, ...)
       UChar isPacked:1; ///< If true, message must be unpacked before use
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
+      UChar isVarSysMsg:1; ///< True if msg is a variable sized sys message that doesn't use a pool
     };
 
   }
 }
 
-#if (defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-#define CMK_ENVELOPE_FT_FIELDS                           \
-  CkObjID sender;                                        \
-  CkObjID recver;                                        \
-  MCount SN;                                             \
-  int incarnation;                                       \
-  int flags;                                             \
-  UInt piggyBcastIdx;
-#elif defined(_FAULT_CAUSAL_)
-#define CMK_ENVELOPE_FT_FIELDS                           \
-  CkObjID sender;                                        \
-  CkObjID recver;                                        \
-  MCount SN;                                             \
-  MCount TN;                                             \
-  int incarnation;                                       \
-  int flags;                                             \
-  UInt piggyBcastIdx;
-#else
 #define CMK_ENVELOPE_FT_FIELDS
-#endif
 
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
 #define CMK_ENVELOPE_OPTIONAL_FIELDS                                           \
@@ -217,12 +189,13 @@ namespace ck {
 #define CMK_ENVELOPE_FIELDS                                                    \
   /* Converse message envelope, Must be first field in this class */           \
   char   core[CmiReservedHeaderSize];                                          \
-  ck::impl::u_type type; /* Depends on message type (attribs.mtype) */         \
   UInt   pe;           /* source processor */                                  \
-  UInt   totalsize;    /* Byte count from envelope start to end of priobits */ \
+  ck::impl::u_type type; /* Depends on message type (attribs.mtype) */         \
+  UInt   totalsize;    /* Byte count from envelope start to end of group dependencies */ \
   CMK_ENVELOPE_OPTIONAL_FIELDS                                                 \
   CMK_REFNUM_TYPE ref; /* Used by futures and SDAG */                          \
   UShort priobits;     /* Number of bits of priority data after user data */   \
+  UShort groupDepNum;  /* Number of group dependencies */                      \
   UShort epIdx;        /* Entry point to call */                               \
   ck::impl::s_attribs attribs;
 
@@ -234,14 +207,31 @@ private:
       CMK_ENVELOPE_FT_FIELDS
     };
 
+    #ifdef __clang__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-private-field"
+    #endif
     CMK_ENVELOPE_FIELDS
+    #ifdef __clang__
+    #pragma GCC diagnostic pop
+    #endif
 
 public:
 
     CMK_ENVELOPE_FT_FIELDS
 
+    #if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wpedantic"
+    #if defined(__clang__)
+    #pragma GCC diagnostic ignored "-Wunused-private-field"
+    #endif
+    #endif
     // padding to ensure ALIGN_BYTES alignment
     UChar align[CkMsgAlignOffset(sizeof(envelopeSizeHelper))];
+    #if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+    #endif
 
     void pup(PUP::er &p);
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
@@ -255,7 +245,7 @@ public:
     UChar  getMsgtype(void) const { return attribs.mtype; }
     void   setMsgtype(const UChar m) { attribs.mtype = m; }
 #if CMK_ERROR_CHECKING
-    UChar  isUsed(void) { return attribs.isUsed; }
+    UChar  isUsed(void) const { return attribs.isUsed; }
     void   setUsed(const UChar u) { attribs.isUsed=u; }
 #else /* CMK_ERROR_CHECKING */
     inline void setUsed(const UChar u) {}
@@ -265,7 +255,7 @@ public:
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
     UInt   getUsersize(void) const { 
-      return totalsize - getPrioBytes() - sizeof(envelope); 
+      return totalsize - getGroupDepSize() - getPrioBytes() - sizeof(envelope); 
     }
     void   setUsersize(const UInt s) {
       if (s == getUsersize()) {
@@ -273,7 +263,7 @@ public:
       }
       CkAssert(s < getUsersize());
       UInt newPrioOffset = sizeof(envelope) + CkMsgAlignLength(s);
-      UInt newTotalsize = newPrioOffset + getPrioBytes();
+      UInt newTotalsize = newPrioOffset + getPrioBytes() + getGroupDepSize();
       void *newPrioPtr = (void *) ((char *) this + newPrioOffset); 
       // use memmove instead of memcpy in case memory areas overlap
       memmove(newPrioPtr, getPrioPtr(), getPrioBytes()); 
@@ -288,53 +278,59 @@ public:
 
     UChar  isPacked(void) const { return attribs.isPacked; }
     void   setPacked(const UChar p) { attribs.isPacked = p; }
+    UChar  isVarSysMsg(void) const { return attribs.isVarSysMsg; }
+    void   setIsVarSysMsg(const UChar d) { attribs.isVarSysMsg = d; }
     UShort getPriobits(void) const { return priobits; }
     void   setPriobits(const UShort p) { priobits = p; }
     UShort getPrioWords(void) const { return CkPriobitsToInts(priobits); }
     UShort getPrioBytes(void) const { return getPrioWords()*sizeof(int); }
     void*  getPrioPtr(void) const { 
-      return (void *)((char *)this + totalsize - getPrioBytes());
+      return (void *)((char *)this + totalsize - getGroupDepSize() - getPrioBytes());
     }
-    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
+    void* getGroupDepPtr(void) const {
+      return (void *)((char *)this + totalsize - getGroupDepSize());
+    }
+    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0, const GroupDepNum groupDepNumRequest=GroupDepNum{}, const bool incEvent=true)
     {
+#if CMK_LOCKLESS_QUEUE
+      CkAssert(type>=NewChareMsg && type<LAST_CK_ENVELOPE_TYPE);
+#else
       CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
+#endif
 #if CMK_USE_STL_MSGQ
       // Ideally, this should be a static compile-time assert. However we need API changes for that
       CkAssert(sizeof(CMK_MSG_PRIO_TYPE) >= sizeof(int)*CkPriobitsToInts(prio));
 #endif
 
       UInt tsize = sizeof(envelope)+ 
-            CkMsgAlignLength(size)+
-	    sizeof(int)*CkPriobitsToInts(prio);
+                   CkMsgAlignLength(size)+
+                   sizeof(int)*CkPriobitsToInts(prio) +
+                   sizeof(CkGroupID)*(int)groupDepNumRequest;
+
+      //CkPrintf("[%d] inside envelope alloc groupDepNum:%d\n", CkMyPe(), (int)groupDepNumRequest);
+
       envelope *env = (envelope *)CmiAlloc(tsize);
 #if CMK_REPLAYSYSTEM
       //for record-replay
       memset(env, 0, sizeof(envelope));
-      env->setEvent(++CkpvAccess(envelopeEventID));
+      if(incEvent)
+	env->setEvent(++CkpvAccess(envelopeEventID));
+      else
+	env->setEvent(CkpvAccess(envelopeEventID));
 #endif
       env->setMsgtype(type);
       env->totalsize = tsize;
       env->priobits = prio;
       env->setPacked(0);
-      env->type.group.dep.setZero();
+      env->setGroupDepNum((int)groupDepNumRequest);
       _SET_USED(env, 0);
-      env->setRef(0);
       env->setEpIdx(0);
+      env->setIsVarSysMsg(0);
 
 #if USE_CRITICAL_PATH_HEADER_ARRAY
       env->pathHistory.reset();
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-      env->sender.type = TypeInvalid;
-      env->recver.type = TypeInvalid;
-      env->SN = 0;
-      env->flags = 0;
-#if defined(_FAULT_CAUSAL_)
-      env->TN = 0;
-#endif
-	  env->incarnation = -1;
-#endif
 
       return env;
     }
@@ -342,7 +338,7 @@ public:
 #if CMK_REPLAYSYSTEM
       setEvent(++CkpvAccess(envelopeEventID));
 #endif
-      type.group.dep.setZero();
+      memset(getGroupDepPtr(), 0, getGroupDepSize());
     }
     UShort getEpIdx(void) const { return epIdx; }
     void   setEpIdx(const UShort idx) { epIdx = idx; }
@@ -365,7 +361,7 @@ public:
     }
     
  // Chare-specific fields
-    UInt isForAnyPE(void) { 
+    UInt isForAnyPE(void) const {
       CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
       return type.chare.forAnyPe; 
     }
@@ -389,7 +385,7 @@ public:
     void   setObjPtr(void *p) { 
       CkAssert(getMsgtype()==ForChareMsg); type.chare.ptr = p; 
     }
-    UInt getByPe(void) { 
+    UInt getByPe(void) const {
       CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
       return type.chare.bype; 
     }
@@ -410,19 +406,20 @@ public:
       type.group.g = g;
     }
     void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.epoch=epoch; }
-    int getGroupEpoch(void) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return type.group.epoch; }
+    int getGroupEpoch(void) const { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return type.group.epoch; }
     void setRednMgr(CkNodeGroupID r){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
  type.group.rednMgr = r; }
     CkNodeGroupID getRednMgr(){       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
  return type.group.rednMgr; }
-    CkGroupID getGroupDep(){       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
- return type.group.dep; }
-    void setGroupDep(const CkGroupID &r){       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
-      type.group.dep = r; }
+    UShort getGroupDepSize() const { return groupDepNum*sizeof(CkGroupID); }
+    UShort getGroupDepNum() const { return groupDepNum; }
+    void setGroupDepNum(const UShort &r) { groupDepNum = r; }
+    CkGroupID getGroupDep(int index=0) { return *((CkGroupID *)getGroupDepPtr() + index); }
+    void setGroupDep(const CkGroupID &r, int index=0) {
+      *(((CkGroupID *)getGroupDepPtr())+ index) = r;
+    }
 
 // Array-specific fields
     CkGroupID getArrayMgr(void) const { 
@@ -443,7 +440,7 @@ public:
     UInt &getsetArraySrcPe(void) {return pe;}
 #endif
     UChar &getsetArrayHops(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.hopCount;}
-    int getArrayIfNotThere(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.ifNotThere;}
+    int getArrayIfNotThere(void) const { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.ifNotThere;}
     void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); type.array.ifNotThere=nt;}
 
     void setRecipientID(ck::ObjID objid)
@@ -452,7 +449,7 @@ public:
       type.array.id = objid.getID();
     }
 
-    CmiUInt8 getRecipientID()
+    CmiUInt8 getRecipientID() const
     {
       CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
       return type.array.id;
@@ -477,12 +474,18 @@ inline void *EnvToUsr(const envelope *const env) {
   return (void *)((intptr_t)env + sizeof(envelope));
 }
 
-inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0) {
-  return envelope::alloc(msgtype,size,prio);
+inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0, const GroupDepNum groupDepNum=GroupDepNum{}) {
+  return envelope::alloc(msgtype,size,prio,groupDepNum);
 }
 
-inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
-  return EnvToUsr(envelope::alloc(msgtype,size,prio));
+#if CMK_REPLAYSYSTEM
+inline envelope *_allocEnvNoIncEvent(const int msgtype, const int size=0, const int prio=0, const GroupDepNum groupDepNum=GroupDepNum{}) {
+  return envelope::alloc(msgtype,size,prio,groupDepNum,false);
+}
+#endif
+
+inline void *_allocMsg(const int msgtype, const int size, const int prio=0, const GroupDepNum groupDepNum=GroupDepNum{}) {
+  return EnvToUsr(envelope::alloc(msgtype,size,prio,groupDepNum));
 }
 
 inline void _resetEnv(envelope *env) {
@@ -506,7 +509,7 @@ class MsgPool: public SafePool<void *> {
 private:
     static void *_alloc(void) {
       /* CkAllocSysMsg() called in .def.h is not thread of sigio safe */
-      envelope *env = _allocEnv(ForChareMsg,0,0);
+      envelope *env = _allocEnv(ForChareMsg,0,0,GroupDepNum{});
       env->setQueueing(_defaultQueueing);
       env->setMsgIdx(0);
       return EnvToUsr(env);
@@ -517,13 +520,6 @@ private:
     }
 public:
     MsgPool():SafePool<void*>(_alloc, CkFreeMsg, _reset) {}
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        void *get(void){
-            return allocfn();
-        }
-        void put(void *m){
-        }
-#endif
 };
 
 CkpvExtern(MsgPool*, _msgPool);

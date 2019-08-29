@@ -5,6 +5,9 @@ mainmodule hello {
   readonly int numY;
   readonly int numZ;
 
+  //message used to broadcast to sections
+  message sectionBcastMsg;
+
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void done_1(void);
@@ -14,7 +17,7 @@ mainmodule hello {
   array [4D] Hello {
     entry Hello(void);
     entry void SayHi(int hiNo);
-    entry void SayBye();
+    entry void SayBye(sectionBcastMsg *msg);
   };
 
   group HelloMap : CkArrayMap {

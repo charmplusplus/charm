@@ -2,15 +2,13 @@
 
 namespace xi {
 
-SListConstruct::SListConstruct(SdagConstruct *single_construct)
-: SdagConstruct(SSLIST, single_construct)
-{
+SListConstruct::SListConstruct(SdagConstruct* single_construct)
+    : SdagConstruct(SSLIST, single_construct) {
   label_str = "slist";
 }
 
-SListConstruct::SListConstruct(SdagConstruct *single_construct, SListConstruct *tail)
-: SdagConstruct(SSLIST, single_construct, tail)
-{
+SListConstruct::SListConstruct(SdagConstruct* single_construct, SListConstruct* tail)
+    : SdagConstruct(SSLIST, single_construct, tail) {
   label_str = "slist";
 }
 
@@ -23,9 +21,11 @@ void SListConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateCall(defs, encapState, encapState, constructs->front()->label);
   endMethod(defs);
 
-  generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
+  generateClosureSignature(decls, defs, entry, false, "void", label, true,
+                           encapStateChild);
   defs << "  ";
-  generateCall(defs, encapState, encapStateChild, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, encapState, encapStateChild, next->label,
+               nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 
   generateChildrenCode(decls, defs, entry);
@@ -38,8 +38,7 @@ void SListConstruct::numberNodes() {
 
 void SListConstruct::propagateState(std::list<EncapState*> encap,
                                     std::list<CStateVar*>& plist,
-                                    std::list<CStateVar*>& wlist,
-                                    int uniqueVarNum) {
+                                    std::list<CStateVar*>& wlist, int uniqueVarNum) {
   stateVars = new std::list<CStateVar*>();
   stateVars->insert(stateVars->end(), plist.begin(), plist.end());
   stateVarsChildren = stateVars;
@@ -50,4 +49,4 @@ void SListConstruct::propagateState(std::list<EncapState*> encap,
   propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
 }
 
-}   // namespace xi
+}  // namespace xi

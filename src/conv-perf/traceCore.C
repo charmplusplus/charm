@@ -12,7 +12,6 @@
 #include "converseEvents.h"	//TODO: remove this hack for REGISTER_CONVESE
 #include "charmEvents.h"	//TODO: remove this hack for REGISTER_CHARM
 #include "machineEvents.h"	// for machine events
-//#include "ampiEvents.h" 	/* for ampi events */
 
 CpvExtern(double, _traceCoreInitTime);
 CpvExtern(char*, _traceCoreRoot);
@@ -305,7 +304,7 @@ void TraceEntry::write(FILE* fp, int prevLID, int prevSeek, int nextLID, int nex
 
 /***************** Class TraceLogger Definition *****************/
 TraceLogger::TraceLogger(char* program, int b):
-	numLangs(1), numEntries(0), lastWriteFlag(0), prevLID(0), prevSeek(0)
+	numEntries(0), numLangs(1), lastWriteFlag(false), prevLID(0), prevSeek(0)
 {
   binary = b;
 
@@ -323,7 +322,7 @@ TraceLogger::TraceLogger(char* program, int b):
   pgm = new char[strlen(program)+1];
   sprintf(pgm, "%s", program);
   numEntries = 0;
-  isWriting = 0;
+  isWriting = false;
   buffer = NULL;
 
   //CmiPrintf("In TraceLogger Constructor %s %d",pgm,strlen(program)+1);
@@ -340,9 +339,9 @@ TraceLogger::TraceLogger(char* program, int b):
 TraceLogger::~TraceLogger()
 {
   if(binary)
-  { lastWriteFlag = 1; writeBinary(); }
+  { lastWriteFlag = true; writeBinary(); }
   else
-  { lastWriteFlag = 1; write(); }
+  { lastWriteFlag = true; write(); }
   for (int lID=0;lID<MAX_NUM_LANGUAGES;lID++) {
     delete[] lName[lID];
     delete[] fName[lID];
@@ -417,7 +416,7 @@ void TraceLogger::write(void)
 		prevSeek = currSeek; prevLID = currLID;
 		flushLogFiles();
   	}
-	if(lastWriteFlag==1) {
+	if(lastWriteFlag) {
 		currLID  = pool[i].languageID;
 		FILE* fp = fptrs[currLID];
 		if(fp == NULL)
@@ -450,7 +449,7 @@ void TraceLogger::add(int lID, int eID, double timestamp, int iLen, int* iData, 
   numEntries = numEntries+1;
 if(numEntries>= poolSize) {
     double writeTime = TraceCoreTimer();
-    isWriting = 1;
+    isWriting = true;
     if(binary) writeBinary();
 	else 	   write();
 
@@ -464,7 +463,7 @@ if(numEntries>= poolSize) {
 	    delete buffer;
 	    buffer = NULL;
     }
-        isWriting = 0;
+        isWriting = false;
 	//TODO
     //new (&pool[numEntries++]) TraceEntry(0, BEGIN_INTERRUPT, writeTime);
     //new (&pool[numEntries++]) TraceEntry(0, END_INTERRUPT, TraceCoreTimer());
@@ -488,7 +487,7 @@ void TraceLogger::openLogFiles()
 	//	CmiPrintf("FILE NAME %s at %d \n",fName[i],i);
 	    	CmiAbort("Cannot open Projector Trace File for writing ... \n");
   	}
-	CmiPrintf("[%d]Iteration %d : fp %d \n",CmiMyPe(),i,fp);
+	CmiPrintf("[%d]Iteration %d : fp %s\n",CmiMyPe(),i,fName[i]);
 	fptrs[i] = fp;
 
 	if(i == 1)

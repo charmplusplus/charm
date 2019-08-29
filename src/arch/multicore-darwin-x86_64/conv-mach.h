@@ -19,6 +19,8 @@
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 #define CMK_MALLOC_USE_GNUOLD_MALLOC                       0
 
+#undef CMK_MEMORY_BUILD_GNU_HOOKS
+#define CMK_MEMORY_BUILD_GNU_HOOKS                         0
 #define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
 
@@ -60,9 +62,12 @@
 */
 #define CMK_USE_KQUEUE                                     1
 
+#define CMK_NOT_USE_TLS_THREAD                             1
+
 #if !CMK_GCC_X86_ASM || !CMK_GCC_X86_ASM_ATOMICINCREMENT
 #define CMK_PCQUEUE_LOCK                                   1
 #endif
 
-#endif
+#define CMK_CONVERSE_MPI                                   0
 
+#endif

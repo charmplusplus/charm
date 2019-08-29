@@ -7,12 +7,13 @@ class NLBStatsMsg;
 // a regular class with pup defined.
 class CkMarshalledNLBStatsMessage {
   NLBStatsMsg *msg;
-  //Don't use these: only pass by reference
-  void operator=(const CkMarshalledNLBStatsMessage &);
+  void operator=(const CkMarshalledNLBStatsMessage &) = delete;
+  void operator=(CkMarshalledNLBStatsMessage &&) = delete;
+  CkMarshalledNLBStatsMessage(const CkMarshalledNLBStatsMessage &rhs) = delete;
 public:
   inline CkMarshalledNLBStatsMessage(void) {msg=NULL;}
   CkMarshalledNLBStatsMessage(NLBStatsMsg *m) {msg=m;} //Takes ownership of message
-  CkMarshalledNLBStatsMessage(const CkMarshalledNLBStatsMessage &);
+  CkMarshalledNLBStatsMessage(CkMarshalledNLBStatsMessage &&rhs) { msg = rhs.msg; rhs.msg = nullptr; }
   ~CkMarshalledNLBStatsMessage();
   NLBStatsMsg *getMessage(void) {void *ret=msg; msg=NULL; return (NLBStatsMsg*)ret;}
   void pup(PUP::er &p);

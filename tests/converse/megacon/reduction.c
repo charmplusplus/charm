@@ -4,7 +4,7 @@ static int reduction_debug = 0;
 
 #define DebugPrintf  if (reduction_debug) CmiPrintf
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 typedef struct _mesg {
   char head[CmiMsgHeaderSizeBytes];
@@ -81,7 +81,7 @@ void broadcast_msg(mesg m) {
 
 void reduction_struct(void *data) {
   int i, sum=0;
-  struct twoInts *two = (struct twoInts *)data; 
+  struct twoInts *two = (struct twoInts *)data;
   CmiAssert(CmiMyPe() == 0);
   for (i=0; i<CmiNumPes(); ++i) sum += i+1;
   if (two->positive != sum || two->negative != -2*sum) {

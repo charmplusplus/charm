@@ -7,13 +7,15 @@
 #include "ckheap.h"
 #include "RefineLB.h"
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(RefineLB, "Move objects away from overloaded processor to reach average")
 
 RefineLB::RefineLB(const CkLBOptions &opt): CBase_RefineLB(opt)
 {
   lbname = (char *)"RefineLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] RefineLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> RefineLB created.\n");
 }
 
 void RefineLB::work(LDStats* stats)

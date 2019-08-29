@@ -25,7 +25,6 @@ protected:
   virtual void work(LDStats* stats);
 
 private:  
-//  CProxy_CentralLB thisProxy;
   CkVec<CentralLB *>  clbs;
 };
 

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <converse.h>
 
-typedef struct incmsg
+typedef struct incmsg_s
 {
   char head[CmiMsgHeaderSizeBytes];
   int n;
@@ -12,7 +12,7 @@ CpvDeclare(int, deadlock_inc_idx);
 CpvDeclare(int, deadlock_cram_idx);
 CpvDeclare(int, deadlock_count);
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 void deadlock_inc(incmsg m)
 {
@@ -25,13 +25,13 @@ void deadlock_inc(incmsg m)
 
 void deadlock_cram(char *msg)
 {
-  struct incmsg m={{0},1};
+  struct incmsg_s m={{0},1};
   int count = 0;
   CmiSetHandler(&m, CpvAccess(deadlock_inc_idx));
   while (count<5000) {
     CmiSyncSend(1-CmiMyPe(), sizeof(m), &m);
     count++;
-  } 
+  }
   m.n = -count;
   CmiSyncSend(1-CmiMyPe(), sizeof(m), &m);
   CmiFree(msg);
@@ -40,6 +40,7 @@ void deadlock_cram(char *msg)
 void deadlock_init()
 {
   char msg[CmiMsgHeaderSizeBytes]={0};
+  CmiInitMsgHeader(msg, sizeof(struct incmsg_s));
   if (CmiNumPes()<2) {
     CmiPrintf("warning: need 2 processors for deadlock-test, skipping.\n");
     Cpm_megacon_ack(CpmSend(0));
@@ -68,7 +69,7 @@ static char* fCramHeader(char *msg){
 
 static char* fCramContent(char *msg){
   char *temp;
-  
+
   temp = (char *)malloc(strlen(_fCramContentStr) + 1);
   strcpy(temp, _fCramContentStr);
   return(temp);
@@ -84,7 +85,7 @@ static char* fIncHeader(char *msg){
 
 static char* fIncContent(char *msg){
   char *temp;
-  
+
   temp = (char *)malloc(strlen(_fIncContentStr) + 1 + 5);
   sprintf(temp, "%s:%d", _fIncContentStr, ((incmsg)msg)->n);
   return(temp);
@@ -96,13 +97,13 @@ char* makeIncSymbolTableInfo()
   int size;
   char *returnInfo;
   char temp[10];
-  
+
   size = 200;
   returnInfo = (char *)malloc(size * sizeof(char));
   strcpy(returnInfo, "");
   strcat(returnInfo, "Converse Handler : deadlock_inc");
   strcat(returnInfo, "#");
-  
+
   return(returnInfo);
 }
 
@@ -117,13 +118,13 @@ char* makeCramSymbolTableInfo()
   int size;
   char *returnInfo;
   char temp[10];
-  
+
   size = 200;
   returnInfo = (char *)malloc(size * sizeof(char));
   strcpy(returnInfo, "");
   strcat(returnInfo, "Converse Handler : deadlock_cram");
   strcat(returnInfo, "#");
-  
+
   return(returnInfo);
 }
 
@@ -139,14 +140,14 @@ void deadlock_moduleinit()
 #if CMK_DEBUG_MODE
   handlerArrayRegister(CpvAccess(deadlock_inc_idx), fIncHeader, fIncContent);
   handlerArrayRegister(CpvAccess(deadlock_cram_idx),fCramHeader, fCramContent);
-  
+
   symbolTableFnArrayRegister(CpvAccess(deadlock_inc_idx), 1,
-			     makeIncSymbolTableInfo,
-			     getInd);
+      makeIncSymbolTableInfo,
+      getInd);
   symbolTableFnArrayRegister(CpvAccess(deadlock_cram_idx), 1,
-			     makeCramSymbolTableInfo,
-			     getInd);
-  
+      makeCramSymbolTableInfo,
+      getInd);
+
 #endif
   CpvAccess(deadlock_count) = 0;
 }
