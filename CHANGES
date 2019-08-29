@@ -105,7 +105,7 @@ Adaptive MPI:
   RDMA and CMA wherever possible and profitable.
 
 - More efficient implementations of MPI_Bcast, all MPI_(I)(all)gather(v) routines,
-  and reductions with non-commutative operations.
+  reductions with non-commutative operations, and user-defined datatype creation.
 
 - Added support for MPI_Win_(Un)lock_all and MPI_Type_match_size.
 
