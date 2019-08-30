@@ -593,6 +593,9 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
  *
  *****************************************************************************/
 #include "cmibacktrace.C"
+#include "cmidemangle.h"
+#include <dlfcn.h> // for dladdr()
+#include <libgen.h> // for basename()
 
 /*
 Convert "X(Y) Z" to "Y Z"-- remove text prior to first '(', and supress
@@ -636,26 +639,27 @@ static const char* _implGetBacktraceSys(const char *name) {
 
 /** Print out the names of these function pointers. */
 void CmiBacktracePrint(void **retPtrs,int nLevels) {
-  if (nLevels>0) {
-    int i;
-    char **names=CmiBacktraceLookup(retPtrs,nLevels);
-    if (names==NULL) return;
+  if (nLevels > 0) {
     CmiPrintf("[%d] Stack Traceback:\n", CmiMyPe());
-    for (i=0;i<nLevels;i++) {
-      if (names[i] == NULL) continue;
-      {
-      const char *trimmed=_implTrimParenthesis(names[i], 0);
-      const char *print=trimmed;
-      const char *sys=_implGetBacktraceSys(print);
-      if (sys) {
-          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n",i,sys,print);
+    void* callstack[256];
+    int frames = backtrace(callstack, 256);
+    for (int i = 0; i < frames; ++i) {
+      Dl_info info;
+      int res = dladdr(callstack[i], &info);
+      if (res) { /* dladdr() succeeded, print the address, filename, and function name */
+        const char *filename = basename((char*)info.dli_fname);
+        const char *symbolname = info.dli_sname;
+        const char *demangled_symbol_name = symbolname ? CmiDemangle(symbolname).c_str() : "";
+        const char *sys=_implGetBacktraceSys(symbolname);
+        if (sys) {
+          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n", i, sys, demangled_symbol_name);
           break; /*Stop when we hit Charm++ runtime.*/
-      } else {
-          CmiPrintf("  [%d:%d] %s\n",CmiMyPe(),i,print);
+        }
+        CmiPrintf("  [%d:%d] %s %p %s\n", CmiMyPe(), i, filename, callstack[i], demangled_symbol_name);
+      } else { /* dladdr() failed, just print the address */
+        CmiPrintf("  [%d:%d] %p\n", CmiMyPe(), i, callstack[i]);
       }
-     }
     }
-    free(names);
   }
 }
 
