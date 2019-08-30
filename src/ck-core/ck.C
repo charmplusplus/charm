@@ -2203,7 +2203,6 @@ void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
 
 int CkMyPeHook() { return CkMyPe(); }
 int CkNumPesHook() { return CkNumPes(); }
-void CmiAbortHook(const char *msg) { CmiAbort("%s", msg); }
 
 void ReadOnlyExt::setData(void *msg, size_t msgSize) {
   ro_data = malloc(msgSize);
