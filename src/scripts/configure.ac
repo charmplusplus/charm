@@ -820,7 +820,9 @@ EOT
       if test $strictpass -eq 1
       then
         got_opt_whole_archive="true"
-        IFS=' ' read LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST <<< $i
+        IFS=' ' read LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST <<EOF
+        $i
+        EOF
         add_flag "$(echo LDXX_WHOLE_ARCHIVE_PRE=\"$LDXX_WHOLE_ARCHIVE_PRE\")" "Flags to link whole archives into libcharm.so"
         add_flag "$(echo LDXX_WHOLE_ARCHIVE_POST=\"$LDXX_WHOLE_ARCHIVE_POST\")" "Flags to link whole archives into libcharm.so"
         break
