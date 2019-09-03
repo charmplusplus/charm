@@ -5,11 +5,11 @@ set(ck-cxx-sources
     ../ck-ldb/CentralPredictor.C ../ck-ldb/ckgraph.C
     ../ck-ldb/ckheap.C ../ck-ldb/ckset.C
     ../ck-ldb/DistBaseLB.C ../ck-ldb/forestTest.C
-    ../ck-ldb/HybridBaseLB.C ../ck-ldb/LBAgent.C
+    ../ck-ldb/HybridBaseLB.C
     ../ck-ldb/LBComm.C ../ck-ldb/LBDatabase.C
     ../ck-ldb/lbdbf.C
     ../ck-ldb/LBMachineUtil.C
-    ../ck-ldb/LBObj.C ../ck-ldb/LBProfit.C
+    ../ck-ldb/LBObj.C
     ../ck-ldb/LBSimulation.C ../ck-ldb/LButil.C
     ../ck-ldb/manager.C ../ck-ldb/MetaBalancer.C
     ../ck-ldb/NullLB.C ../ck-ldb/readmodel.C
@@ -71,8 +71,7 @@ set(ldb-cxx-sources  ../ck-ldb/BlockLB.C
     ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C
     ../ck-ldb/DummyLB.C ../ck-ldb/EveryLB.C
     ../ck-ldb/GreedyLB.C ../ck-ldb/GreedyRefineLB.C
-    ../ck-ldb/LBAgent.C ../ck-ldb/LBProfit.C
-    ../ck-ldb/LButil.C ../ck-ldb/ObjGraph.C
+    ../ck-ldb/LButil.C
     ../ck-ldb/RandCentLB.C ../ck-ldb/RefineLB.C
     ../ck-ldb/Refiner.C ../ck-ldb/RefinerTemp.C
     ../ck-ldb/RotateLB.C ../ck-ldb/TempAwareRefineLB.C
@@ -84,11 +83,11 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/DistBaseLB.h ../ck-ldb/DistributedLB.h ../ck-ldb/DummyLB.h
     ../ck-ldb/GreedyLB.h ../ck-ldb/GreedyRefineLB.h
     ../ck-ldb/HybridBaseLB.h ../ck-ldb/HybridLBMsg.h
-    ../ck-ldb/LBAgent.h ../ck-ldb/LBComm.h
+    ../ck-ldb/LBComm.h
     ../ck-ldb/LBDatabase.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
-    ../ck-ldb/LBObj.h ../ck-ldb/LBProfit.h ../ck-ldb/LBSimulation.h
+    ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
     ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h
-    ../ck-ldb/NullLB.h ../ck-ldb/ObjGraph.h
+    ../ck-ldb/NullLB.h
     ../ck-ldb/RandCentLB.h ../ck-ldb/RandomForestModel.h
     ../ck-ldb/RefineLB.h ../ck-ldb/Refiner.h
     ../ck-ldb/RefinerTemp.h ../ck-ldb/RotateLB.h
