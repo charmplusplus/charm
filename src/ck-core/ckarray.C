@@ -1516,21 +1516,18 @@ void CkArray::recvBroadcast(CkMessage *m)
     // extract this field here so we can still check it even if msg is freed
     const auto zc_msgtype = CMI_ZC_MSGTYPE(UsrToEnv(msg));
 
-    // All done, deliver to the first element
-    if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG) {
+    if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG && len > 0 ) { // message contains pointers to the posted buffer, which contains the data received
+      // All operations done, already consumed by other array elements, now deliver to the first element
 
-      unsigned int i=0;
-      bool doFree = true;
-      if (stableLocations && i == len-1) doFree = true;
-      broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
+      bool doFree = true; // free it since all ops are done
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
 
-    } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG) { // deliver to all array elements
+    } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG && len > 0 ) { // message is used by the receiver to post the receiver buffer
+      // Initial metadata message, send only to the first element, other elements are sent CMK_ZC_BCAST_RECV_DONE_MSG after rget completion
 
-
-      unsigned int i=0;
-      bool doFree = false;
-      if (stableLocations && i == len-1) doFree = true;
-      broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
+      bool doFree = false; // do not free since msg will be reused to send buffers to peers,
+                           // msg will be finally freed by the first element in the CMK_ZC_BCAST_RECV_ALL_DONE_MSG branch
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
 
     } else
 #endif
@@ -1550,7 +1547,8 @@ void CkArray::recvBroadcast(CkMessage *m)
 		bool doFree = false;
 		if (stableLocations && i == len-1) doFree = true;
 #if CMK_ONESIDED_IMPL
-		if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
+		if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;  // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the first element
+                                                                   // during CMK_ZC_BCAST_ALL_DONE_MSG
 #endif
 		CmiAssert(i < localElemVec.size());
 		broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
@@ -1593,7 +1591,7 @@ void CkArray::forwardZCMsgToOtherElems(envelope *env) {
 
    int len = localElemVec.size();
 
-   for (unsigned int i = 1; i < len; ++i) {
+   for (unsigned int i = 1; i < len; ++i) { // Send to all elements except the first element
      bool doFree = false;
      if (stableLocations && i == len-1 && CMI_ZC_MSGTYPE(env)!=CMK_ZC_BCAST_RECV_DONE_MSG) doFree = true;
      broadcaster->deliver((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[i], doFree);

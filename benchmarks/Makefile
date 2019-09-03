@@ -1,11 +1,16 @@
+-include ../include/conv-mach-opt.mak
+
 # Temporary hack that needs to be removed / replaced
--include ../tmp/buildopts.mk
 OPTS += $(OPTSATBUILDTIME)
 
 DIRS = \
   ampi \
   charm++ \
-  converse \
+
+# TODO #2467: eliminate the need for this
+ifneq ($(BUILD_CUDA),1)
+  DIRS += converse
+endif
 
 BGDIRS = \
   ampi \
