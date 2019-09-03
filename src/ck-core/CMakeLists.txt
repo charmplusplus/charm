@@ -7,8 +7,8 @@ set(ck-cxx-sources
     ../ck-ldb/DistBaseLB.C ../ck-ldb/forestTest.C
     ../ck-ldb/HybridBaseLB.C ../ck-ldb/LBAgent.C
     ../ck-ldb/LBComm.C ../ck-ldb/LBDatabase.C
-    ../ck-ldb/lbdb.C ../ck-ldb/lbdbf.C
-    ../ck-ldb/LBDBManager.C ../ck-ldb/LBMachineUtil.C
+    ../ck-ldb/lbdbf.C
+    ../ck-ldb/LBMachineUtil.C
     ../ck-ldb/LBObj.C ../ck-ldb/LBProfit.C
     ../ck-ldb/LBSimulation.C ../ck-ldb/LButil.C
     ../ck-ldb/manager.C ../ck-ldb/MetaBalancer.C
@@ -84,7 +84,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/DistBaseLB.h ../ck-ldb/DistributedLB.h ../ck-ldb/DummyLB.h
     ../ck-ldb/GreedyLB.h ../ck-ldb/GreedyRefineLB.h
     ../ck-ldb/HybridBaseLB.h ../ck-ldb/HybridLBMsg.h
-    ../ck-ldb/LBAgent.h ../ck-ldb/LBComm.h ../ck-ldb/LBDBManager.h
+    ../ck-ldb/LBAgent.h ../ck-ldb/LBComm.h
     ../ck-ldb/LBDatabase.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBProfit.h ../ck-ldb/LBSimulation.h
     ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h
@@ -96,7 +96,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/ScotchTopoLB.h ../ck-ldb/TempAwareRefineLB.h
     ../ck-ldb/ZoltanLB.h ../ck-ldb/ckgraph.h
     ../ck-ldb/ckheap.h ../ck-ldb/ckset.h
-    ../ck-ldb/elements.h ../ck-ldb/lbdb++.h
+    ../ck-ldb/elements.h
     ../ck-ldb/lbdb.h ../ck-ldb/manager.h)
 
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
