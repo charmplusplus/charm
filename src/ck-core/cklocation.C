@@ -1280,7 +1280,7 @@ void _propMapInit(void)
   speeds = new int[CkNumPes()];
   int hdlr = CkRegisterHandler(_speedHdlr);
   CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CkMyPe());
-  int s = LDProcessorSpeed();
+  int s = LBDatabase::ProcessorSpeed();
   speedMsg msg;
   CmiSetHandler(&msg, hdlr);
   msg.node = CkMyNode();
@@ -1984,20 +1984,20 @@ bool CkLocRec::invokeEntry(CkMigratable *obj,void *msg,
 #if CMK_LBDB_ON
 
 void CkLocRec::staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period) {
-	CkLocRec *el=(CkLocRec *)LDObjUserData(h);
+	CkLocRec *el = (CkLocRec*)(LBDatabase::Object()->GetObjUserData(h));
 	DEBL((AA "MetaBalancer wants to resume waiting chare %s\n" AB,idx2str(el->idx)));
 	el->myLocMgr->informLBPeriod(el, lb_ideal_period);
 }
 
 void CkLocRec::staticMetaLBCallLBOnChares(LDObjHandle h) {
-	CkLocRec *el=(CkLocRec *)LDObjUserData(h);
+	CkLocRec *el = (CkLocRec*)(LBDatabase::Object()->GetObjUserData(h));
 	DEBL((AA "MetaBalancer wants to call LoadBalance on chare %s\n" AB,idx2str(el->idx)));
 	el->myLocMgr->metaLBCallLB(el);
 }
 
 void CkLocRec::staticMigrate(LDObjHandle h, int dest)
 {
-	CkLocRec *el=(CkLocRec *)LDObjUserData(h);
+	CkLocRec *el = (CkLocRec*)(LBDatabase::Object()->GetObjUserData(h));
 	DEBL((AA "Load balancer wants to migrate %s to %d\n" AB,idx2str(el->idx),dest));
 	el->recvMigrate(dest);
 }

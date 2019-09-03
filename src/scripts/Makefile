@@ -286,8 +286,8 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           ckobjid.h\
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
-	  waitqd.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h lbdb++.h LBProfit.h $(LBHEADERS) \
-          LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
+	  waitqd.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h LBProfit.h $(LBHEADERS) \
+          LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
 	  RefinerTemp.h Refiner.h ckgraph.h ckheap.h \
           elements.h topology.h manager.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h \
@@ -745,9 +745,9 @@ CK_LIBS_CORE=$(L)/libck.a
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o\
-           waitqd.o LBDatabase.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdb.o lbdbf.o ckobjQ.o  \
+           waitqd.o LBDatabase.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckobjid.o\
-           LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
+           LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o DistBaseLB.o \
            ckgraph.o LButil.o RefinerTemp.o Refiner.o \
            manager.o ckset.o ckheap.o \
@@ -819,8 +819,8 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
   CkReduction.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
-  cklocation.h ckmulticast.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
-  LBMachineUtil.h lbdb++.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
+  cklocation.h ckmulticast.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h LBObj.h LBOM.h LBComm.h \
+  LBMachineUtil.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \

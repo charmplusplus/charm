@@ -691,14 +691,15 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
 
 
 #if CMK_LBDB_ON && 0
+    // TODO: This code is ifdef'd out but is broken, the list of LB objects will
+    // likely have nullptrs in it, which this doesn't check for
     LBDatabase * myLBdatabase = LBDatabaseObj();
-    LBDB * myLBDB = myLBdatabase->getLBDB();       // LBDB is Defined in LBDBManager.h
-    const CkVec<LBObj*> objs = myLBDB->getObjs();
+    const std::vector<LBObjEntry> objs = myLBdatabase->getObjs();
     
     LBRealType maxObjWallTime = -1.0;
     
-    for(int i=0;i<objs.length();i++){
-      LBObj* o = objs[i];
+    for(int i=0;i<objs.size();i++){
+      LBObj* o = objs[i].obj;
       const LDObjData d = o->ObjData();
       LBRealType cpuTime = d.cpuTime;
       LBRealType wallTime = d.wallTime;
