@@ -298,6 +298,47 @@ enum CkElementCreation_t : uint8_t
 #  define CMK_RANK_0(pe) pe
 #endif
 
+class CkLocCache : public CBase_CkLocCache
+{
+private:
+  // Map of ID to PE
+  typedef std::unordered_map<CmiUInt8, int> IdPeMap;
+  IdPeMap id2pe;
+
+  // Temporarily needed to map ID to home PE
+  CkLocMgr* mgr;
+
+public:
+  CkLocCache() = default;
+  CkLocCache(CkMigrateMessage* m) : CBase_CkLocCache(m) {}
+  ~CkLocCache() = default;
+  void pup(PUP::er& p) {}
+
+  void inform(CmiUInt8 id, int nowOnPe);
+  int homePe(const CmiUInt8 id) const;
+  void requestLocation(CmiUInt8 id);
+  void requestLocation(CmiUInt8 id, int peToTell);
+  void updateLocation(CmiUInt8 id, int nowOnPe);
+  void erase(CmiUInt8 id) { id2pe.erase(id); }
+
+  inline int whichPE(const CmiUInt8 id) const
+  {
+    IdPeMap::const_iterator itr = id2pe.find(id);
+    return itr != id2pe.end() ? itr->second : -1;
+  }
+
+  inline int lastKnown(CmiUInt8 id) const
+  {
+    int pe = whichPE(id);
+    if (pe == -1)
+      return homePe(id);
+    else
+      return pe;
+  }
+
+  void handshake(CkLocMgr* mgr) { this->mgr = mgr; }
+};
+
 /**
  * A group which manages the location of an indexed set of
  * migratable objects.  Knows about insertions, deletions,
@@ -306,19 +347,17 @@ enum CkElementCreation_t : uint8_t
 class CkLocMgr : public IrrGroup
 {
 private:
+  CkMagicNumber<CkMigratable> magic;  // To detect heap corruption
+
   typedef std::unordered_map<CkArrayID, CkArray*, ArrayIDHasher> ArrayIdMap;
-  typedef std::unordered_map<CmiUInt8, int> IdPeMap;
   typedef std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
   typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage*>, IndexHasher>
       IndexMsgBuffer;
-  typedef std::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >,
-                             IndexHasher>
+  typedef std::unordered_map<CkArrayIndex, std::vector<int>, IndexHasher>
       LocationRequestBuffer;
   typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
   typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
   typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
-
-  CkMagicNumber<CkMigratable> magic;  // To detect heap corruption
 
   // Internal interface:
   void AtSyncBarrierReached();
@@ -343,9 +382,6 @@ private:
   void deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx, CkDeliver_t type,
                       int opts);
 
-  // Deliver any buffered msgs to a newly created array element
-  void deliverAnyBufferedMsgs(CmiUInt8, MsgBuffer& buffer);
-
   // Create a new local record at this array index.
   CkLocRec* createLocal(const CkArrayIndex& idx, bool forMigration, bool ignoreArrival,
                         bool notifyHome);
@@ -354,12 +390,14 @@ private:
 
   // The core of the location manager: map array index to element representative
   LocRecHash hash;
-  CmiImmediateLockType hashImmLock;
 
   // Map object
   CkGroupID mapID;
   int mapHandle;
   CkArrayMap* map;
+
+  CkGroupID cacheID;
+  CkLocCache* cache;
 
   CkGroupID lbmgrID;
   CkGroupID metalbID;
@@ -367,8 +405,16 @@ private:
   std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
 
   ck::ArrayIndexCompressor* compressor;
+
   CkArrayIndex bounds;
   void checkInBounds(const CkArrayIndex& idx);
+
+  inline void insertID(const CkArrayIndex& idx, const CmiUInt8 id)
+  {
+    if (compressor)
+      return;
+    idx2id[idx] = id;
+  }
 
 #if CMK_LBDB_ON
   CkSyncBarrier* syncBarrier;
@@ -388,10 +434,9 @@ public:
   // Data Members:
   // Map array ID to manager and elements
   ArrayIdMap managers;
-  // Map object ID to location
-  IdPeMap id2pe;
 
   // Map array element index to object ID
+  // TODO: Only used for non-compressible: Can this be compile time or something?
   IdxIdMap idx2id;
   // Next ID to assign newly constructed array elements
   CmiUInt8 idCounter;
@@ -407,6 +452,10 @@ public:
   MsgBuffer bufferedActiveRgetMsgs;
 
   IndexMsgBuffer bufferedIndexMsgs;
+  IndexMsgBuffer bufferedDemandMsgs;
+
+  void deliverAnyBufferedMsgs(CmiUInt8, MsgBuffer& buffer);
+  void deliverAnyBufferedMsgs(const CkArrayIndex&, CmiUInt8, IndexMsgBuffer&);
 
   bool addElementToRec(CkLocRec* rec, CkArray* m, CkMigratable* elt, int ctorIdx,
                        void* ctorMsg);
@@ -428,6 +477,8 @@ public:
   inline CProxy_CkLocMgr& getProxy(void) { return thisProxy; }
   inline CProxyElement_CkLocMgr& getLocalProxy(void) { return thislocalproxy; }
 
+  inline CkGroupID getLocationCache() const { return cacheID; }
+
   // Interface used by external users:
   /// Home mapping
   inline int homePe(const CkArrayIndex& idx) const
@@ -444,21 +495,23 @@ public:
   {
     return CMK_RANK_0(map->procNum(mapHandle, idx));
   }
-  inline bool isHome(const CkArrayIndex& idx) const
+  inline bool isHome(const CkArrayIndex& idx) const { return homePe(idx) == CkMyPe(); }
+  inline int whichPE(const CmiUInt8 id) const { return cache->whichPE(id); }
+  inline int whichPE(const CkArrayIndex& idx) const
   {
-    return (bool)(homePe(idx) == CkMyPe());
+    CmiUInt8 id;
+    if (!lookupID(idx, id))
+      return -1;
+    return cache->whichPE(id);
   }
-  int whichPE(const CkArrayIndex& idx) const;
-  int whichPE(const CmiUInt8 id) const;
-  /// Return the "last-known" location (returns a processor number)
-  int lastKnown(const CkArrayIndex& idx);
-  int lastKnown(CmiUInt8 id);
-
-  inline void insertID(const CkArrayIndex& idx, const CmiUInt8 id)
+  inline int lastKnown(const CmiUInt8 id) const { return cache->lastKnown(id); }
+  inline int lastKnown(const CkArrayIndex& idx) const
   {
-    if (compressor)
-      return;
-    idx2id[idx] = id;
+    int pe = whichPE(idx);
+    if (pe == -1)
+      return homePe(idx);
+    else
+      return pe;
   }
 
   inline CmiUInt8 lookupID(const CkArrayIndex& idx) const
@@ -469,7 +522,7 @@ public:
     }
     else
     {
-      CkLocMgr::IdxIdMap::const_iterator itr = idx2id.find(idx);
+      IdxIdMap::const_iterator itr = idx2id.find(idx);
       CkAssert(itr != idx2id.end());
       return itr->second;
     }
@@ -484,7 +537,7 @@ public:
     }
     else
     {
-      CkLocMgr::IdxIdMap::const_iterator itr = idx2id.find(idx);
+      IdxIdMap::const_iterator itr = idx2id.find(idx);
       if (itr == idx2id.end())
       {
         return false;
@@ -497,7 +550,6 @@ public:
     }
   }
 
-  // Lookup CkArrayIndex for a CmiUInt8, used by BlockLB and OrbLB
   inline CkArrayIndex lookupIdx(const CmiUInt8& id) const
   {
     if (compressor)
@@ -506,7 +558,7 @@ public:
     }
     else
     {
-      CkLocMgr::IdxIdMap::const_iterator itr;
+      IdxIdMap::const_iterator itr;
       for (itr = idx2id.begin(); itr != idx2id.end(); itr++)
       {
         if (itr->second == id)
@@ -516,6 +568,8 @@ public:
       return itr->first;
     }
   }
+
+  CkGroupID getMap() const { return mapID; }
 
   // Look up array element in hash table.  Index out-of-bounds if not found.
   CkLocRec* elementRec(const CkArrayIndex& idx);
@@ -587,12 +641,13 @@ public:
   // ResumeFromSync is not called for these elements until the Rgets have completed
   ElemMap toBeResumeFromSynced;
 
+  // Deliver any buffered msgs to a newly created array element
+  void deliverAllBufferedMsgs(CmiUInt8);
+  void deliverAllBufferedMsgs(const CkArrayIndex&, CmiUInt8);
+
   // Advisories:
   /// This index now lives on the given processor-- update local records
   void inform(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe);
-  void inform(CmiUInt8 id, int nowOnPe);
-
-  /// This index now lives on the given processor-- tell the home processor
   void informHome(const CkArrayIndex& idx, int nowOnPe);
 
   /// This message took several hops to reach us-- fix it
@@ -613,6 +668,7 @@ public:
   // This index will no longer be used-- delete the associated elements
   void reclaim(CkLocRec* rec);
 
+  void requestDemandCreation(const CkArrayIndex&, int, int, int, CkArrayID);
   bool demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx, int onPe,
                            CkDeliver_t type);
   void demandCreateElement(const CkArrayIndex& idx, int chareType, int onPe,
@@ -620,11 +676,9 @@ public:
 
   // Communication:
   void immigrate(CkArrayElementMigrateMessage* msg);
-  void requestLocation(const CkArrayIndex& idx, int peToTell, bool suppressIfHere,
-                       int ifNonExistent, int chareType, CkArrayID mgr);
-  void requestLocation(CmiUInt8 id, int peToTell, bool suppressIfHere);
+  void requestLocation(const CkArrayIndex& idx);
+  bool requestLocation(const CkArrayIndex& idx, int peToTell);
   void updateLocation(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe);
-  void updateLocation(CmiUInt8 id, int nowOnPe);
   void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
   void dummyAtSync(void);
 

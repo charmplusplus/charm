@@ -119,6 +119,8 @@ CkArrayOptions& CkArrayOptions::bindTo(const CkArrayID& b) {
   // Stupid bug: need a way for arrays to stay the same size *FOREVER*,
   // not just initially.
   // setNumInitial(arr->getNumInitial());
+  setMap(arr->getLocMgr()->getMap());
+  setLocationCache(arr->getLocMgr()->getLocationCache());
   return setLocationManager(arr->getLocMgr()->getGroupID());
 }
 
@@ -187,6 +189,7 @@ void CkArrayOptions::pup(PUP::er& p) {
   p | map;
   p | locMgr;
   p | mCastMgr;
+  p | locCache;
   p | arrayListeners;
   p | reductionClient;
   p | initCallback;
