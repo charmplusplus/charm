@@ -48,7 +48,7 @@ Chunk::Chunk(int t, int x, int y){
     }
 
     usesAtSync = false;
-    //LBDatabase *lbdb = getLBDB();
+    //LBManager *lbdb = getLBDB();
     //lbdb->SetLBPeriod(50);
     temp = (double*) malloc(sizeof(double)*myydim);
 }

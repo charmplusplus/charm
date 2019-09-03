@@ -19,7 +19,7 @@ public:
   ~DistBaseLB();
 
   static void staticAtSync(void*);
-  void AtSync(void); // Everything is at the PE barrier
+  void InvokeLB(void); // Everything is at the PE barrier
 
   void barrierDone();
 	static void staticStartLB(void*);
@@ -28,8 +28,7 @@ public:
   void ResumeClients();
   void ResumeClients(int balancing);
   // Migrated-element callback
-  static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);
-  void Migrated(LDObjHandle h, int waitBarrier);
+  void Migrated(int waitBarrier);
 
   struct LDStats {  // Passed to Strategy
     int from_pe;

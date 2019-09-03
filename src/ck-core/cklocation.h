@@ -42,9 +42,9 @@ public:
 
 /* Utility */
 //#if CMK_LBDB_ON
-#include "LBDatabase.h"
+#include "LBManager.h"
 #include "MetaBalancer.h"
-class LBDatabase;
+class LBManager;
 //#endif
 
 //Forward declarations
@@ -431,8 +431,8 @@ typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
     void metaLBCallLB(CkLocRec *rec);
 
 #if CMK_LBDB_ON
-	LBDatabase *getLBDB(void) const { return the_lbdb; }
-    MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
+	LBManager *getLBMgr(void) const { return lbmgr; }
+	MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
 	const LDOMHandle &getOMHandle(void) const { return myLBHandle; }
 #endif
 
@@ -450,6 +450,8 @@ typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
         void updateLocation(CmiUInt8 id, int nowOnPe);
 	void reclaimRemote(const CkArrayIndex &idx,int deletedOnPe);
 	void dummyAtSync(void);
+
+  void AtSyncBarrierReached();
 
 	/// return a list of migratables in this local record
 	void migratableList(CkLocRec *rec, std::vector<CkMigratable *> &list);
@@ -548,7 +550,7 @@ private:
 	int mapHandle;
 	CkArrayMap *map;
 
-	CkGroupID lbdbID;
+	CkGroupID lbmgrID;
 	CkGroupID metalbID;
 
 	std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
@@ -558,19 +560,19 @@ private:
 	void checkInBounds(const CkArrayIndex &idx);
 
 #if CMK_LBDB_ON
-	LBDatabase *the_lbdb;
+	LBManager *lbmgr;
   MetaBalancer *the_metalb;
-	LDBarrierClient dummyBarrierHandle;
 	static void staticDummyResumeFromSync(void* data);
-	void dummyResumeFromSync(void);
 	static void staticRecvAtSync(void* data);
-	void recvAtSync(void);
 	LDOMHandle myLBHandle;
         LDBarrierReceiver lbBarrierReceiver;
 #endif
 private:
-	void initLB(CkGroupID lbdbID, CkGroupID metalbID);
+	void initLB(CkGroupID lbmgrID, CkGroupID metalbID);
 
+public:
+  void recvAtSync(void);
+  void dummyResumeFromSync(void);
 
 };
 

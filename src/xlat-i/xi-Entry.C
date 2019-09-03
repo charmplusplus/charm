@@ -867,10 +867,10 @@ void Entry::genGroupDefs(XStr& str) {
              "  // if there is a running obj being measured, stop it temporarily\n"
              "  LDObjHandle objHandle;\n"
              "  int objstopped = 0;\n"
-             "  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);\n"
-             "  if (the_lbdb->RunningObject(&objHandle)) {\n"
+             "  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);\n"
+             "  if (the_lbmgr->RunningObject(&objHandle)) {\n"
              "    objstopped = 1;\n"
-             "    the_lbdb->ObjectStop(objHandle);\n"
+             "    the_lbmgr->ObjectStop(objHandle);\n"
              "  }\n"
              "#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
@@ -886,7 +886,7 @@ void Entry::genGroupDefs(XStr& str) {
           << ");\n"
              "#endif\n";
       str << "#if CMK_LBDB_ON\n"
-             "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
+             "  if (objstopped) the_lbmgr->ObjectStart(objHandle);\n"
              "#endif\n";
       if (isAppWork()) str << " _TRACE_END_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";

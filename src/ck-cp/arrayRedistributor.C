@@ -15,7 +15,7 @@
 
 //#include "ControlPoints.decl.h"
 #include "trace-controlPoints.h"
-#include "LBDatabase.h"
+#include "LBManager.h"
 #include "controlPoints.h"
 #include "pathHistory.h"
 #include "arrayRedistributor.h"

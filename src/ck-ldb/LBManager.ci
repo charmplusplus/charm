@@ -1,0 +1,18 @@
+module LBManager {
+  extern module CkMarshall;
+  extern module BaseLB;
+
+  readonly CkGroupID _lbmgr;
+
+  mainchare LBMgrInit {
+    entry LBMgrInit(CkArgMsg *m);
+  };
+
+  group [migratable] LBManager {
+    entry void LBManager(void);
+    entry void ResumeClients();
+    entry void recv_lb_start(int lb_step, int phynode, int pe);
+    initnode void initnodeFn();
+  };
+
+};

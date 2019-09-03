@@ -4,7 +4,7 @@
 
 #include "controlPoints.h"
 #include "trace-controlPoints.h"
-#include "LBDatabase.h"
+#include "LBManager.h"
 #include "controlPoints.h"
 #include "charm++.h"
 #include "trace-projections.h"
