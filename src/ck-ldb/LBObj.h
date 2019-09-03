@@ -8,11 +8,11 @@
 
 #include "lbdb.h"
 
-class LBDB;
+class LBDatabase;
 
 class LBObj
 {
-friend class LBDB;
+friend class LBDatabase;
 
 public:
   LBObj(const LDObjHandle &_h, void *usr_ptr = NULL, bool _migratable=true, bool _asyncArrival = false) {

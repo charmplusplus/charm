@@ -185,7 +185,7 @@ int BaseLB::LDStats::getHash(const CmiUInt8 &oid, const LDOMid &mid)
         int index = (id+hash)%hashSize;
 	if (index == -1 || objHash[index] == -1) return -1;
         if (objData[objHash[index]].objID() == oid &&
-            LDOMidEqual(objData[objHash[index]].omID(), mid))
+            objData[objHash[index]].omID() == mid)
             return objHash[index];
     }
     //  CkPrintf("not found \n");

@@ -159,7 +159,7 @@ ObjGraph::Node* ObjGraph::find_node(const LDObjKey &edge_key)
     const CmiUInt8 objid =
       stats->objData[from_node->index].objID();
     //    CkPrintf("Comparing %d to %d\n",objid.id[0],edge_id.id[0]);
-    if (LDOMidEqual(omid,edge_omid) && objid == edge_id )
+    if (omid == edge_omid && objid == edge_id )
       break;
     from_node = from_node->nxt_hash;
   }
