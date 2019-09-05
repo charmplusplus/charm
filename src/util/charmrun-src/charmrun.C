@@ -241,6 +241,20 @@ static char *substr(const char *lo, const char *hi)
   return res;
 }
 
+
+/* get substring from lo to hi, remove quote chars */
+static const char *substr_const(const char *lo, const char *hi)
+{
+  if (is_quote(*lo))
+    lo++;
+  if (is_quote(*(hi - 1)))
+    hi--;
+  int len = hi - lo;
+  assert(len>0);
+  const char *res = strndup(lo,len);
+  return res;
+}
+
 static int subeqs(const char *lo, const char *hi, const char *str)
 {
   int len = strlen(str);
@@ -1520,7 +1534,7 @@ static void nodetab_init_with_nodelist()
             exit(1);
           }
 
-          const std::string hostname = substr(b2, e2);
+          const std::string hostname = substr_const(b2, e2);
           auto host_iter = temp_hosts.find(hostname);
           if (host_iter != temp_hosts.end())
           {
@@ -3292,6 +3306,7 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
   std::queue<SOCKET> open_sockets;
 
   ChMessage msg;
+  msg.len=-1;
 #if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
 # ifdef HSTART
   if (!(arg_hierarchical_start && !arg_child_charmrun && charmrun_phase == 1))
@@ -3327,6 +3342,7 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
 
       if (skt_select1(req_client, 1) != 0)
       {
+	if(msg.len!=-1) ChMessage_free(&msg);
         ChMessage_recv(req_client, &msg);
 
         int nodeNo = ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
@@ -4654,7 +4670,7 @@ static int ssh_fork(const nodetab_process & p, const char *startScript)
   const char *s = h->shell;
   const char *e = skipstuff(s);
   while (*s) {
-    sshargv.push_back(substr(s, e));
+    sshargv.push_back(substr_const(s, e));
     s = skipblanks(e);
     e = skipstuff(s);
   }
@@ -5334,7 +5350,7 @@ static int ssh_fork_one(nodetab_process & p, const char *startScript)
   const char *s = h->shell;
   const char *e = skipstuff(s);
   while (*s) {
-    sshargv.push_back(substr(s, e));
+    sshargv.push_back(substr_const(s, e));
     s = skipblanks(e);
     e = skipstuff(s);
   }
