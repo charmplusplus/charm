@@ -12,14 +12,26 @@ repository-code: "https://github.com/UIUC-PPL/charm"
 doi: "10.5281/zenodo.3370873"
 notes: |
   @misc{charm-zenodo,
-    author = {Kale, Laxmikant and White, Sam and Ramos, Evan and Jain, Nikhil
-    and Bhatele, Abhinav and Bohm, Eric and Venkataraman, Ramprasad and
-    Chakravorty, Sayantan and Becker, Aaron and Bhat, Nitin and Diener,
-    Matthias and Lifflander, Jonathan and Menon, Harshitha and Buch, Ronak and
-    Acun, Bilge and Galvez, Juan J. and Charalambides, Minas and Gunter, Ralf
-    and Ni, Xiang and Robson, Michael and Philips, Jim and Mikida, Eric and
-    Choi, Jaemin and Chandrasekar, Kavitha and Gupta, Abhishek and Senthil,
-    Karthik and Langer, Akhil and Booth, Jonathan and Edward Hutter},
+    author = {Kale, Laxmikant and Acun, Bilge and Bak, Seonmyeong and Becker, Aaron and
+      Bhandarkar, Milind and Bhat, Nitin and Bhatele, Abhinav and Bohm, Eric and
+      Bordage, Cyril and Brunner, Robert and Buch, Ronak and Chakravorty, Sayantan
+      and Chandrasekar, Kavitha and Choi, Jaemin and Denardo, Michael and DeSouza,
+      Jayant and Diener, Matthias and Dokania, Harshit and Dooley, Isaac and Fenton,
+      Wayne and Galvez, Juan and Gioachin, Fillipo and Gupta, Abhishek and Gupta,
+      Gagan and Gupta, Manish and Gursoy, Attila and Harsh, Vipul and Hu, Fang and
+      Huang, Chao and Jagathesan, Narain and Jain, Nikhil and Jetley, Pritish and
+      Jindal, Prateek and Kanakagiri, Raghavendra and Koenig, Greg and Krishnan,
+      Sanjeev and Kumar, Sameer and Kunzman, David and Lang, Michael and Langer,
+      Akhil and Lawlor, Orion and Wai Lee, Chee and Lifflander, Jonathan and Mahesh,
+      Karthik and Mendes, Celso and Menon, Harshitha and Mei, Chao and Meneses,
+      Esteban and Mikida, Eric and Miller, Phil and Mokos, Ryan and Narayanan,
+      Venkatasubrahmanian and Ni, Xiang and Nomura, Kevin and Paranjpye, Sameer and
+      Ramachandran, Parthasarathy and Ramkumar, Balkrishna and Ramos, Evan and
+      Robson, Michael and Saboo, Neelam and Saletore, Vikram and Sarood, Osman and
+      Senthil, Karthik and Shah, Nimish and Shu, Wennie and B. Sinha, Amitabh and
+      Sun, Yanhua and Sura, Zehra and Totoni, Ehsan and Varadarajan, Krishnan and
+      Venkataraman, Ramprasad and Wang, Jackie and Wesolowski, Lukasz and White, Sam
+      and Wilmarth, Terry and Wright, Jeff and Yelon, Joshua and Zheng, Gengbin},
     doi = {10.5281/zenodo.3370873},
     month = {Aug},
     title = {{The Charm++ Parallel Programming System}},
