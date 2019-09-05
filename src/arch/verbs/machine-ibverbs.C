@@ -31,9 +31,7 @@
 
 #include <infiniband/verbs.h>
 
-#if CMK_ONESIDED_IMPL
 #include "machine-rdma.h"
-#endif
 
 #if ! QLOGIC
 enum ibv_mtu mtu = IBV_MTU_2048;
@@ -1848,6 +1846,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 			processRdmaRequest(rdmaPacket,nodeNo,0);
 		}*/
 	}
+#if CMK_ONESIDED_IMPL
 	if(header->code == INFIRDMA_DIRECT_REG_AND_PUT){
 		// Register the source buffer and perform PUT
 		NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(buffer->buf+sizeof(struct infiPacketHeader));
@@ -1938,7 +1937,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_READ);
 	}
-
+#endif
 	{
 		struct ibv_sge list = {
 			(uintptr_t) buffer->buf,

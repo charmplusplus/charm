@@ -34,7 +34,7 @@ inline int chooseProc(int count)
 
 void RandCentLB::work(LDStats* stats)
 {
-  if (_lb_args.debug()) CkPrintf("Calling RandCentLB strategy\n",CkMyPe());
+  if (_lb_args.debug()) CkPrintf("[%d] Calling RandCentLB strategy\n",CkMyPe());
 
   int proc, n_pes = stats->nprocs();
 

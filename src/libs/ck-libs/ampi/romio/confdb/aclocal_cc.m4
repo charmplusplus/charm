@@ -3,8 +3,15 @@ ifdef([AC_PROG_CC_GNU],,[AC_DEFUN([AC_PROG_CC_GNU],)])
 
 dnl PAC_PROG_CC - reprioritize the C compiler search order
 AC_DEFUN([PAC_PROG_CC],[
+        dnl Many standard autoconf/automake/libtool macros, such as LT_INIT,
+        dnl perform an AC_REQUIRE([AC_PROG_CC]).  If this macro (PAC_PROG_CC)
+        dnl comes after LT_INIT (or similar) then the default compiler search
+        dnl path will be used instead.  This AC_BEFORE macro ensures that a
+        dnl warning will be emitted at autoconf-time (autogen.sh-time) to help
+        dnl developers notice this case.
+        AC_BEFORE([$0],[AC_PROG_CC])
 	PAC_PUSH_FLAG([CFLAGS])
-	AC_PROG_CC([gcc icc pgcc xlc xlC pathcc cc])
+	AC_PROG_CC([icc pgcc xlc xlC pathcc gcc clang cc])
 	PAC_POP_FLAG([CFLAGS])
 ])
 dnl
@@ -38,7 +45,11 @@ CFLAGS_orig="$CFLAGS"
 CFLAGS_opt="$pac_opt $CFLAGS"
 pac_result="unknown"
 
-AC_LANG_CONFTEST([AC_LANG_PROGRAM()])
+AC_LANG_CONFTEST([
+	AC_LANG_PROGRAM([[#include <stdio.h>
+                          const char hw[] = "Hello, World\n";]],
+		[[fputs (hw, stdout);]])
+])
 CFLAGS="$CFLAGS_orig"
 rm -f pac_test1.log
 PAC_LINK_IFELSE_LOG([pac_test1.log], [], [
@@ -62,7 +73,7 @@ rm -f conftest.$ac_ext
 # triggered, it gives an error that the option is not recognized.  So we 
 # need to test with a conftest file that will generate warnings.
 # 
-# add an extra switch, pac_c_check_compiler_option_invalidprototest, to
+# add an extra switch, pac_c_check_compiler_option_prototest, to
 # disable this test just in case some new compiler does not like it.
 #
 # Linking with a program with an invalid prototype to ensure a compiler warning.
@@ -71,7 +82,18 @@ if test "$pac_result" = "yes" \
      -a "$pac_c_check_compiler_option_prototest" != "no" ; then
     AC_MSG_CHECKING([whether C compiler option $1 works with an invalid prototype program])
     AC_LINK_IFELSE([
-        AC_LANG_SOURCE([void main(){ return 0; }])
+        dnl We want a warning, but we don't want to inadvertently disable
+        dnl special warnings like -Werror-implicit-function-declaration (e.g.,
+        dnl in PAC_CC_STRICT) by compiling something that might actually be
+        dnl treated as an error by the compiler.  So we try to elicit an
+        dnl "unused variable" warning and/or an "uninitialized" warning with the
+        dnl test program below.
+        dnl
+        dnl The old sanity program was:
+        dnl   void main() {return 0;}
+        dnl which clang (but not GCC) would treat as an *error*, invalidating
+        dnl the test for any given parameter.
+        AC_LANG_SOURCE([int main(int argc, char **argv){ int foo, bar = 0; foo += 1; return foo; }])
     ],[pac_result=yes],[pac_result=no])
     AC_MSG_RESULT([$pac_result])
 fi
@@ -251,7 +273,7 @@ int Foo(int a) { return a; }
 # only within a single object file!  This tests that case.
 # Note that there is an extern int PFoo declaration before the
 # pragma.  Some compilers require this in order to make the weak symbol
-# extenally visible.  
+# externally visible.  
 if test "$has_pragma_weak" = yes ; then
     PAC_COMPLINK_IFELSE([
         AC_LANG_SOURCE([
@@ -320,9 +342,7 @@ if test -n "$pragma_extra_message" ; then
 fi
 dnl
 ])
-if test "$pac_cv_prog_c_weak_symbols" = "no" ; then
-    ifelse([$2],,:,[$2])
-else
+if test "$pac_cv_prog_c_weak_symbols" != "no" ; then
     case "$pac_cv_prog_c_weak_symbols" in
         "pragma weak") AC_DEFINE(HAVE_PRAGMA_WEAK,1,[Supports weak pragma])
         ;;
@@ -331,7 +351,6 @@ else
         "pragma _CRI") AC_DEFINE(HAVE_PRAGMA_CRI_DUP,1,[Cray style weak pragma])
         ;;
     esac
-    ifelse([$1],,:,[$1])
 fi
 AC_CACHE_CHECK([whether __attribute__ ((weak)) allowed],
 pac_cv_attr_weak,[
@@ -346,8 +365,21 @@ pac_cv_attr_weak_import=yes,pac_cv_attr_weak_import=no)])
 # Check if the alias option for weak attributes is allowed
 AC_CACHE_CHECK([whether __attribute__((weak,alias(...))) allowed],
 pac_cv_attr_weak_alias,[
-AC_TRY_COMPILE([int foo(int) __attribute__((weak,alias("__foo")));],[int a;],
-pac_cv_attr_weak_alias=yes,pac_cv_attr_weak_alias=no)])
+PAC_PUSH_FLAG([CFLAGS])
+# force an error exit if the weak attribute isn't understood
+CFLAGS=-Werror
+AC_TRY_COMPILE([int __foo(int a){return 0;} int foo(int) __attribute__((weak,alias("__foo")));],[int a;],
+pac_cv_attr_weak_alias=yes,pac_cv_attr_weak_alias=no)
+# Restore original CFLAGS
+PAC_POP_FLAG([CFLAGS])])
+if test "$pac_cv_attr_weak_alias" = "yes" ; then
+    AC_DEFINE(HAVE_WEAK_ATTRIBUTE,1,[Attribute style weak pragma])
+fi
+if test "$pac_cv_prog_c_weak_symbols" = "no" -a "$pac_cv_attr_weak_alias" = "no" ; then
+    ifelse([$2],,:,[$2])
+else
+    ifelse([$1],,:,[$1])
+fi
 ])
 
 #
@@ -429,6 +461,13 @@ export enable_strict_done
 if test "$enable_strict_done" != "yes" ; then
 
     # Some comments on strict warning options.
+    # These were added to improve portability
+    #   -Wstack-usage=262144 -- 32 bit FreeBSD did not like the mprobe test
+    #       allocating a big variable on the stack. (See tt#2160).  The "right"
+    #       value requires further investigation; 1 MiB would have at least
+    #       caught #2160 at compile-time, and only two other tests show a
+    #       warning at 256k.
+    #
     # These were added to reduce warnings:
     #   -Wno-missing-field-initializers  -- We want to allow a struct to be 
     #       initialized to zero using "struct x y = {0};" and not require 
@@ -444,13 +483,6 @@ if test "$enable_strict_done" != "yes" ; then
     #	    msg_sz_t) variables.
     #   -Wno-format-zero-length -- this warning is irritating and useless, since
     #                              a zero-length format string is very well defined
-    #   -Wno-type-limits -- There are places where we compare an unsigned to 
-    #	    a constant that happens to be zero e.g., if x is unsigned and 
-    #	    MIN_VAL is zero, we'd like to do "MPIU_Assert(x >= MIN_VAL);".
-    #       Note this option is not supported by gcc 4.2.  This needs to be added 
-    #	    after most other warning flags, so that we catch a gcc bug on 32-bit 
-    #	    that doesn't give a warning that this is unsupported, unless another
-    #	    warning is triggered, and then if gives an error.
     # These were removed to reduce warnings:
     #   -Wcast-qual -- Sometimes we need to cast "volatile char*" to 
     #	    "char*", e.g., for memcpy.
@@ -466,6 +498,34 @@ if test "$enable_strict_done" != "yes" ; then
     #   -Wdeclaration-after-statement -- This is a C89
     #       requirement. When compiling with C99, this should be
     #       disabled.
+    #   -Wfloat-equal -- There are places in hwloc that set a float var to 0, then 
+    #       compare it to 0 later to see if it was updated.  Also when using strtod()
+    #       one needs to compare the return value with 0 to see whether a conversion
+    #       was performed.
+    #   -Werror-implicit-function-declaration -- implicit function declarations
+    #       should never be tolerated.  This also ensures that we get quick
+    #       compilation failures rather than later link failures that usually
+    #       come from a function name typo.
+    #   -Wcast-align -- Casting alignment warnings.  This is an
+    #       important check, but is temporarily disabled, since it is
+    #       throwing too many (correct) warnings currently, causing us
+    #       to miss other warnings.
+    #   -Wshorten-64-to-32 -- Bad type-casting warnings.  This is an
+    #       important check, but is temporarily disabled, since it is
+    #       throwing too many (correct) warnings currently, causing us
+    #       to miss other warnings.
+    #
+    # This was removed because it masks important failures (see ticket #2094).
+    # However, since Intel compiler currently does not include -Wtype-limits
+    # in -Wextra, -Wtype-limits was added to handle warnings with the Intel
+    # compiler.
+    #   -Wno-type-limits -- There are places where we compare an unsigned to 
+    #	    a constant that happens to be zero e.g., if x is unsigned and 
+    #	    MIN_VAL is zero, we'd like to do "MPIU_Assert(x >= MIN_VAL);".
+    #       Note this option is not supported by gcc 4.2.  This needs to be added 
+    #	    after most other warning flags, so that we catch a gcc bug on 32-bit 
+    #	    that doesn't give a warning that this is unsupported, unless another
+    #	    warning is triggered, and then if gives an error.
     # the embedded newlines in this string are safe because we evaluate each
     # argument in the for-loop below and append them to the CFLAGS with a space
     # as the separator instead
@@ -481,12 +541,10 @@ if test "$enable_strict_done" != "yes" ; then
         -Wshadow
         -Wmissing-declarations
         -Wno-long-long
-        -Wfloat-equal
         -Wundef
         -Wno-endif-labels
         -Wpointer-arith
         -Wbad-function-cast
-        -Wcast-align
         -Wwrite-strings
         -Wno-sign-compare
         -Wold-style-definition
@@ -498,12 +556,14 @@ if test "$enable_strict_done" != "yes" ; then
         -Wno-pointer-sign
         -Wvariadic-macros
         -Wno-format-zero-length
-	-Wno-type-limits
+        -Wtype-limits
+        -Werror-implicit-function-declaration
+        -Wstack-usage=262144
     "
 
-    enable_c89=yes
-    enable_c99=no
-    enable_posix=yes
+    enable_c89=no
+    enable_c99=yes
+    enable_posix=2001
     enable_opt=yes
     flags="`echo $1 | sed -e 's/:/ /g' -e 's/,/ /g'`"
     for flag in ${flags}; do
@@ -511,14 +571,24 @@ if test "$enable_strict_done" != "yes" ; then
 	     c89)
 		enable_strict_done="yes"
 		enable_c89=yes
+                enable_c99=no
 		;;
 	     c99)
 		enable_strict_done="yes"
+                enable_c89=no
 		enable_c99=yes
 		;;
-	     posix)
+	     posix1995)
 		enable_strict_done="yes"
-		enable_posix=yes
+		enable_posix=1995
+		;;
+	     posix|posix2001)
+		enable_strict_done="yes"
+		enable_posix=2001
+		;;
+	     posix2008)
+		enable_strict_done="yes"
+		enable_posix=2008
 		;;
 	     noposix)
 		enable_strict_done="yes"
@@ -534,8 +604,8 @@ if test "$enable_strict_done" != "yes" ; then
 		;;
 	     all|yes)
 		enable_strict_done="yes"
-		enable_c89=yes
-		enable_posix=yes
+		enable_c99=yes
+		enable_posix=2001
 		enable_opt=yes
 	        ;;
 	     no)
@@ -556,17 +626,28 @@ if test "$enable_strict_done" != "yes" ; then
        	  pac_cc_strict_flags="-O2"
        fi
        pac_cc_strict_flags="$pac_cc_strict_flags $pac_common_strict_flags"
-       if test "${enable_posix}" = "yes" ; then
-       	  PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=199506L],[pac_cc_strict_flags])
-       fi
        # We only allow one of strict-C99 or strict-C89 to be
        # enabled. If C99 is enabled, we automatically disable C89.
        if test "${enable_c99}" = "yes" ; then
        	  PAC_APPEND_FLAG([-std=c99],[pac_cc_strict_flags])
+          # Use -D_STDC_C99= for Solaris compilers. See
+          # http://lists.gnu.org/archive/html/autoconf/2010-12/msg00059.html
+          # for discussion on why not to use -xc99
+          PAC_APPEND_FLAG([-D_STDC_C99=],[pac_cc_strict_flags])
        elif test "${enable_c89}" = "yes" ; then
        	  PAC_APPEND_FLAG([-std=c89],[pac_cc_strict_flags])
        	  PAC_APPEND_FLAG([-Wdeclaration-after-statement],[pac_cc_strict_flags])
        fi
+       # POSIX 2001 should be used with C99. But the default standard for some
+       # compilers are not C99. We must test the support of POSIX 2001 after
+       # testing C99.
+       case "$enable_posix" in
+            no)   : ;;
+            1995) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=199506L],[pac_cc_strict_flags]) ;;
+            2001) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=200112L],[pac_cc_strict_flags]) ;;
+            2008) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=200809L],[pac_cc_strict_flags]) ;;
+            *)    AC_MSG_ERROR([internal error, unexpected POSIX version: '$enable_posix']) ;;
+       esac
     fi
 
     # See if the above options work with the compiler
@@ -1158,25 +1239,22 @@ dnl Sets 'NEEDS_<funcname>_DECL' if 'funcname' is not declared by the
 dnl headerfiles.
 dnl
 dnl Approach:
-dnl Try to compile a program with the function, but passed with an incorrect
-dnl calling sequence.  If the compilation fails, then the declaration
-dnl is provided within the header files.  If the compilation succeeds,
-dnl the declaration is required.
+dnl Attempt to assign library function to function pointer.  If the function
+dnl is not declared in a header, this will fail.  Use a non-static global so
+dnl the compiler does not warn about an unused variable.
 dnl
-dnl We use a 'double' as the first argument to try and catch varargs
-dnl routines that may use an int or pointer as the first argument.
+dnl Simply calling the function is not enough because C89 compilers allow
+dnl calls to implicitly-defined functions.  Re-declaring a library function
+dnl with an incompatible prototype is also not sufficient because some
+dnl compilers (notably clang-3.2) only produce a warning in this case.
 dnl
-dnl There is one difficulty - if the compiler has been instructed to
-dnl fail on implicitly defined functions, then this test will always
-dnl fail.
-dnl 
 dnl D*/
 AC_DEFUN([PAC_FUNC_NEEDS_DECL],[
 AC_CACHE_CHECK([whether $2 needs a declaration],
 pac_cv_func_decl_$2,[
 AC_TRY_COMPILE([$1
-int $2(double, int, double, const char *);],[int a=$2(1.0,27,1.0,"foo");],
-pac_cv_func_decl_$2=yes,pac_cv_func_decl_$2=no)])
+void (*fptr)(void) = (void(*)(void))$2;],[],
+pac_cv_func_decl_$2=no,pac_cv_func_decl_$2=yes)])
 if test "$pac_cv_func_decl_$2" = "yes" ; then
 changequote(<<,>>)dnl
 define(<<PAC_FUNC_NAME>>, translit(NEEDS_$2_DECL, [a-z *], [A-Z__]))dnl
@@ -1287,7 +1365,6 @@ AC_SUBST(RANLIB_AFTER_INSTALL)
 
 #
 # determine if the compiler defines a symbol containing the function name
-# Inspired by checks within the src/mpid/globus/configure.in file in MPICH2
 #
 # These tests check not only that the compiler defines some symbol, such
 # as __FUNCTION__, but that the symbol correctly names the function.
@@ -1598,3 +1675,21 @@ AC_DEFUN([PAC_C_MACRO_VA_ARGS],[
      AC_MSG_RESULT([yes])],
     [AC_MSG_RESULT([no])])
 ])dnl
+
+# Will AC_DEFINE([HAVE_BUILTIN_EXPECT]) if the compiler supports __builtin_expect.
+AC_DEFUN([PAC_C_BUILTIN_EXPECT],[
+AC_MSG_CHECKING([if C compiler supports __builtin_expect])
+
+AC_TRY_LINK(, [
+    return __builtin_expect(1, 1) ? 1 : 0
+], [
+    have_builtin_expect=yes
+    AC_MSG_RESULT([yes])
+], [
+    have_builtin_expect=no
+    AC_MSG_RESULT([no])
+])
+if test x$have_builtin_expect = xyes ; then
+    AC_DEFINE([HAVE_BUILTIN_EXPECT], [1], [Define to 1 if the compiler supports __builtin_expect.])
+fi
+])

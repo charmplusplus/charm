@@ -8,9 +8,9 @@ USE_WR = #-DUSE_WR
 CUDATOOLKIT_HOME ?= /usr/local/cuda
 NVCC = $(CUDATOOLKIT_HOME)/bin/nvcc
 NVCC_FLAGS = -c -std=c++11 $(USE_WR)
-NVCC_INC = -I../../../../include
-CHARMC_INC = -I$(CUDATOOLKIT_HOME)/include
-LD_LIBS = -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
+NVCC_INC = -I$(CUDATOOLKIT_HOME)/include
+CHARM_INC = -I../../../../include
+LD_LIBS =
 
 TARGET = hello
 all: $(TARGET)
@@ -24,10 +24,10 @@ $(TARGET).decl.h: $(TARGET).ci
 	$(CHARMC) $<
 
 $(TARGET).o: $(TARGET).C $(TARGET).decl.h
-	$(CHARMC) $(CHARMC_INC) -c $<
+	$(CHARMC) -c $<
 
 $(TARGET)CUDA.o: $(TARGET).cu
-	$(NVCC) -o $@ $(NVCC_FLAGS) $(NVCC_INC) $<
+	$(NVCC) -o $@ $(NVCC_FLAGS) $(NVCC_INC) $(CHARM_INC) $<
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o $(TARGET) charmrun

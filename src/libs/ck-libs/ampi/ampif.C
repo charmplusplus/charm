@@ -2,7 +2,6 @@
 
 #include <string.h>
 #include <vector>
-using std::vector;
 
 FLINKAGE {
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
@@ -237,12 +236,17 @@ FLINKAGE {
 #define mpi_finalize FTN_NAME( MPI_FINALIZE , mpi_finalize )
 #define mpi_finalized FTN_NAME( MPI_FINALIZED , mpi_finalized )
 #define mpi_abort FTN_NAME( MPI_ABORT , mpi_abort )
+#define mpi_file_call_errhandler FTN_NAME( MPI_FILE_CALL_ERRHANDLER , mpi_file_call_errhandler )
+#define mpi_file_create_errhandler FTN_NAME( MPI_FILE_CREATE_ERRHANDLER , mpi_file_create_errhandler )
+#define mpi_file_set_errhandler FTN_NAME( MPI_FILE_SET_ERRHANDLER , mpi_file_set_errhandler )
+#define mpi_file_get_errhandler FTN_NAME( MPI_FILE_GET_ERRHANDLER , mpi_file_get_errhandler )
 
 /* MPI-2 */
 #define mpi_type_get_envelope FTN_NAME ( MPI_TYPE_GET_ENVELOPE , mpi_type_get_envelope )
 #define mpi_type_get_contents FTN_NAME ( MPI_TYPE_GET_CONTENTS , mpi_type_get_contents )
 
 #define mpi_win_create FTN_NAME ( MPI_WIN_CREATE , mpi_win_create )
+#define mpi_win_allocate FTN_NAME ( MPI_WIN_ALLOCATE , mpi_win_allocate )
 #define mpi_win_free  FTN_NAME ( MPI_WIN_FREE  , mpi_win_free )
 #define mpi_win_create_errhandler FTN_NAME ( MPI_WIN_CREATE_ERRHANDLER , mpi_win_create_errhandler )
 #define mpi_win_call_errhandler FTN_NAME ( MPI_WIN_CALL_ERRHANDLER , mpi_win_call_errhandler )
@@ -304,6 +308,9 @@ FLINKAGE {
 #define ampif_info_get_valuelen FTN_NAME ( AMPIF_INFO_GET_VALUELEN , ampif_info_get_valuelen )
 #define ampif_add_error_string FTN_NAME ( AMPIF_ADD_ERROR_STRING , ampif_add_error_string )
 #define ampif_print FTN_NAME( AMPIF_PRINT , ampif_print )
+
+/* Extensions needed by ROMIO */
+#define mpir_status_set_bytes FTN_NAME ( MPIR_STATUS_SET_BYTES, mpir_status_set_bytes )
 
 /* AMPI extensions */
 #define ampi_migrate FTN_NAME( AMPI_MIGRATE , ampi_migrate )
@@ -1552,6 +1559,21 @@ void mpi_comm_free_errhandler(int *errhandler, int *ierr) noexcept
   *ierr = MPI_Comm_free_errhandler(errhandler);
 }
 
+void mpi_file_create_errhandler(void (*function)(MPI_File*,int*,...), int *errhandler, int *ierr) noexcept
+{
+  *ierr = MPI_File_create_errhandler(function, errhandler);
+}
+
+void mpi_file_set_errhandler(MPI_File* file, int* errhandler, int *ierr) noexcept
+{
+  *ierr = MPI_File_set_errhandler(*file, *errhandler);
+}
+
+void mpi_file_get_errhandler(MPI_File* file, int *errhandler, int *ierr) noexcept
+{
+  *ierr = MPI_File_get_errhandler(*file, errhandler);
+}
+
 void mpi_errhandler_create(void (*function)(MPI_Comm*,int*,...), int *errhandler, int *ierr) noexcept
 {
   *ierr = MPI_Errhandler_create(function, errhandler);
@@ -1814,6 +1836,12 @@ void mpi_win_create(void *base, MPI_Aint *size, int *disp_unit,
   *ierr = MPI_Win_create(base, *size, *disp_unit, *info, *comm, newwin);
 }
 
+void mpi_win_allocate(MPI_Aint *size, int *disp_unit,
+                      int *info, int *comm, void *base, MPI_Win *win, int *ierr) noexcept
+{
+  *ierr = MPI_Win_allocate(*size, *disp_unit, *info, *comm, base, win);
+}
+
 void mpi_win_free(int *win, int *ierr) noexcept
 {
   *ierr = MPI_Win_free(win);
@@ -2066,7 +2094,7 @@ void ampif_info_get(int* info, const char *key, int* valuelen, char *value, int 
   char tmpKey[MPI_MAX_INFO_KEY];
   ampif_str_f2c(tmpKey, key, *klen);
 
-  vector<char> tmpValue(*valuelen);
+  std::vector<char> tmpValue(*valuelen);
 
   *ierr = MPI_Info_get(*info, tmpKey, *valuelen, tmpValue.data(), flag);
 
@@ -2111,6 +2139,13 @@ void mpi_info_free(int* info, int* ierr) noexcept
 void mpi_pcontrol(int *level) noexcept
 {
   MPI_Pcontrol(*level);
+}
+
+/* Extensions needed by ROMIO */
+void mpir_status_set_bytes(int *status, int* datatype, MPI_Count *nbytes, int* ierr) noexcept
+{
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = MPIR_Status_set_bytes(s, *datatype, *nbytes);
 }
 
 /* AMPI Extensions */

@@ -160,9 +160,9 @@ class Main : public CBase_Main {
 
     if (sFlag && !bFlag) block_x = block_y = grid_x;
     if (grid_x < block_x || grid_x % block_x != 0)
-      CkAbort("array_size_X % block_size_X != 0!");
+      CkAbort("array_size_X %% block_size_X != 0!");
     if (grid_y < block_y || block_y % block_y != 0)
-      CkAbort("array_size_Y % block_size_Y != 0!");
+      CkAbort("array_size_Y %% block_size_Y != 0!");
     if (offload_ratio < 0.0f || offload_ratio > 1.0f)
       CkAbort("offload_ratio should be between 0 and 1!");
     if (offload_ratio > 0.0f && global_exec_mode == CPU_MODE) {

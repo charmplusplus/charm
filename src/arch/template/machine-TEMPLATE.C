@@ -81,7 +81,7 @@ void CmiMachineProgressImpl(void) {
 }
 #endif
 
-void CmiAbort(const char *message) {
+void CmiAbort(const char *message, ...) {
 }
 
 

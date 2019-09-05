@@ -6,7 +6,7 @@ export CHARMINC=../include
 if test -n "$BUILD_CUDA"
 then
   echo "---------------------- special.sh for cuda executing ----------------"
-  if [ "$CMK_GDIR" == "gni" ] ; then
+  if [ "$CMK_GDIR" = "gni" ] ; then
     export CRAY_CUDA_PROXY=1
   fi
 

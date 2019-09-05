@@ -82,7 +82,7 @@ above.
 
 .. code-block:: c++
 
-  void CmiAbort(char *msg)
+  void CmiAbort(char *msg, ...)
 
 This function can be used portably to abnormally terminate a Converse
 program. Before termination, it prints a message supplied as ``msg``.

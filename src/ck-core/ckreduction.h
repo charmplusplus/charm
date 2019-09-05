@@ -337,6 +337,10 @@ struct CkReductionTypesExt {
     int min_ulong_long = CkReduction::min_ulong_long;
     int min_float = CkReduction::min_float;
     int min_double = CkReduction::min_double;
+    // logical and, or, xor
+    int logical_and_bool = CkReduction::logical_and_bool;
+    int logical_or_bool = CkReduction::logical_or_bool;
+    int logical_xor_bool = CkReduction::logical_xor_bool;
     // External custom reducer in Python
     int external_py = CkReduction::external_py;
 };

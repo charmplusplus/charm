@@ -333,6 +333,9 @@ void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int m
 
 void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
 
+  if(ncpyOpInfo->opMode == CMK_BCAST_EM_API)
+    return;
+
   OFIRequest *req;
 
   // Send a message to de-register buffer and invoke source ack

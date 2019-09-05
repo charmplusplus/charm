@@ -696,7 +696,7 @@ void RefinerApprox::Refine(int count, CentralLB::LDStats* stats,
 void  RefinerApprox::printStats(int newStats)
 {
 	
-    CkPrintf("%Proc#\tLoad\tObjLoad\tBgdLoad\n");
+    CkPrintf("%%Proc#\tLoad\tObjLoad\tBgdLoad\n");
     for(int i=0;i<P;i++)
     {
 	CkPrintf("%d\t\t%lf\t%lf\t%lf\n",i,processors[i].load,processors[i].computeLoad,processors[i].backgroundLoad);

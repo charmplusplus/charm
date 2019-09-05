@@ -205,7 +205,7 @@ void GreedyAgentLB::work(LDStats* stats)
 
 	max_neighbors = topologyAgent->topo->max_neighbors();
 	
-  if (_lb_args.debug()) CkPrintf("In GreedyAgentLB strategy\n",CkMyPe());
+  if (_lb_args.debug()) CkPrintf("[%d] In GreedyAgentLB strategy\n",CkMyPe());
 
   heapSize--;
 	

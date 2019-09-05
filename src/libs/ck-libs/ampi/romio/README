@@ -5,13 +5,13 @@
 Major Changes in this version:
 ------------------------------
 * Fixed performance problems with the darray and subarray datatypes
-  when using MPICH2.
+  when using MPICH.
 
-* Better support for building against existing MPICH and MPICH2 versions.
+* Better support for building against existing MPICH and MPICH versions.
 
   When building against an existing MPICH installation, use the
-  "--with-mpi=mpich" option to ROMIO configure.  For MPICH2, use the
-  "--with-mpi=mpich2" option.  These will allow ROMIO to take advantage
+  "--with-mpi=mpich" option to ROMIO configure.  For MPICH, use the
+  "--with-mpi=mpich" option.  These will allow ROMIO to take advantage
   of internal features of these implementations.
 
 * Deprecation of SFS, HFS, and PIOFS implementations.
@@ -161,9 +161,9 @@ Major Changes in Version 1.0.3:
 Major Changes Version 1.0.2:
 ---------------------------
 
-* Implemented the shared file pointer functions (Section 9.4.4 of MPI-2) and 
-  split collective I/O functions (Section 9.4.5). Therefore, the main
-   components of the MPI-2 I/O chapter not yet implemented are 
+* Implemented the shared file pointer functions and
+  split collective I/O functions. Therefore, the main
+   components of the MPI I/O chapter not yet implemented are
   file interoperability and error handling.
 
 * Added support for using "direct I/O" on SGI's XFS file system. 
@@ -298,13 +298,13 @@ General Information
 -------------------
 
 ROMIO is a high-performance, portable implementation of MPI-IO (the
-I/O chapter in MPI-2). ROMIO's home page is at
-http://www.mcs.anl.gov/romio .  The MPI-2 standard is available at
+I/O chapter in MPI). ROMIO's home page is at
+http://www.mcs.anl.gov/romio .  The MPI standard is available at
 http://www.mpi-forum.org/docs/docs.html .
 
-This version of ROMIO includes everything defined in the MPI-2 I/O
-chapter except support for file interoperability (Sec. 9.5 of MPI-2) and
-user-defined error handlers for files (Sec. 4.13.3).  The subarray and
+This version of ROMIO includes everything defined in the MPI I/O
+chapter except support for file interoperability and
+user-defined error handlers for files.  The subarray and
 distributed array datatype constructor functions from Chapter 4
 (Sec. 4.14.4 & 4.14.5) have been implemented. They are useful for
 accessing arrays stored in files. The functions MPI_File_f2c and
@@ -492,7 +492,7 @@ to include the file mpio.h for C or mpiof.h for Fortran in your MPI-IO
 program.  
 
 Note that on HP machines running HPUX and on NEC SX-4, you need to
-compile Fortran programs with mpif90, because the f77 compilers on
+compile Fortran programs with mpifort, because the f77 compilers on
 these machines don't support 8-byte integers. 
 
 With MPICH, HP MPI, or NEC MPI, you can compile MPI-IO programs as 
@@ -500,9 +500,9 @@ With MPICH, HP MPI, or NEC MPI, you can compile MPI-IO programs as
 or 
    mpif77 foo.f
 or
-   mpif90 foo.f
+   mpifort foo.f
 
-As mentioned above, mpif90 is preferred over mpif77 on HPUX and NEC
+As mentioned above, mpifort is preferred over mpif77 on HPUX and NEC
 because the f77 compilers on those machines do not support 8-byte integers.
 
 With SGI MPI, you can compile MPI-IO programs as 
@@ -566,7 +566,7 @@ systems because they don't support fcntl file locks, and ROMIO uses
 that feature to implement shared file pointers.
 
 * On HP machines running HPUX and on NEC SX-4, you need to compile
-Fortran programs with mpif90 instead of mpif77, because the f77
+Fortran programs with mpifort instead of mpif77, because the f77
 compilers on these machines don't support 8-byte integers.
 
 * The file-open mode MPI_MODE_EXCL does not work on Intel PFS file system,
@@ -587,7 +587,7 @@ Use a larger number if you still get the error message.
 
 * If a Fortran program uses a file handle created using ROMIO's C
 interface, or vice-versa, you must use the functions MPI_File_c2f 
-or MPI_File_f2c (see MPI-2 Section 4.12.4). Such a situation occurs,
+or MPI_File_f2c. Such a situation occurs,
 for example, if a Fortran program uses an I/O library written in C
 with MPI-IO calls. Similar functions MPIO_Request_f2c and
 MPIO_Request_c2f are also provided.

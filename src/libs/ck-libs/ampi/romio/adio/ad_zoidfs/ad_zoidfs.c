@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2003 University of Chicago. 
@@ -35,6 +35,8 @@ struct ADIOI_Fns_struct ADIO_ZOIDFS_operations = {
     ADIOI_ZOIDFS_Resize, /* Resize */
     ADIOI_ZOIDFS_Delete, /* Delete */
     ADIOI_ZOIDFS_Feature,
+    ADIOI_GEN_IreadStridedColl, /* IreadStridedColl */
+    ADIOI_GEN_IwriteStridedColl /* IwriteStridedColl */
 };
 
 /* 

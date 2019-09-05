@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2004 University of Chicago. 
@@ -21,7 +21,7 @@ MPI_File MPIO_File_create(int size)
 {
     MPI_File mpi_fh;
 
-    mpi_fh = (MPI_File) ADIOI_Malloc(size);
+    mpi_fh = (MPI_File) ADIOI_Calloc(size,1);
     return mpi_fh;
 }
 
@@ -66,7 +66,7 @@ MPI_Fint MPIO_File_c2f(MPI_File fh)
 #else
     int i;
 
-    if ((fh <= (MPI_File) 0) || (fh->cookie != ADIOI_FILE_COOKIE))
+    if ((fh == NULL) || (fh->cookie != ADIOI_FILE_COOKIE))
 	return (MPI_Fint) 0;
     if (!CtvAccess(ADIOI_Ftable)) {
 	CtvAccess(ADIOI_Ftable_max) = 1024;

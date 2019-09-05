@@ -333,12 +333,10 @@ int LBDB::Migrate(LDObjHandle h, int dest)
     //CmiPrintf("[%d] LBDB::Migrate: incoming handle %d with handle range 0-%d\n", CkMyPe(), h.handle, objCount);
 
   if (h.handle >= objs.size()) {
-    CmiPrintf("[%d] LBDB::Migrate: Handle %d out of range 0-%d\n",CkMyPe(),h.handle,objs.size());
-    CmiAbort("LB handle out of range!");
+    CkAbort("[%d] LBDB::Migrate: Handle %d out of range 0-%zu\n",CkMyPe(),h.handle,objs.size());
   }
   else if (!(objs[h.handle].obj)) {
-    CmiPrintf("[%d] LBDB::Migrate: Handle %d no longer registered, range 0-%d\n", CkMyPe(),h.handle,objs.size());
-    CmiAbort("LB handle no longer registered!");
+    CkAbort("[%d] LBDB::Migrate: Handle %d no longer registered, range 0-%zu\n", CkMyPe(),h.handle,objs.size());
   }
 
   LBOM *const om = oms[(objs[h.handle].obj)->parentOM().handle];

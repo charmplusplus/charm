@@ -49,10 +49,6 @@ class pgm : public CBase_pgm
             // Setup a redn cb and start the parallel sum computation of sum and avg
             CkCallback avgCB(CkReductionTarget(pgm, acceptResults<avg>), thisProxy);
             arrProxy.doSomething(avg(), avgReducer, avgCB);
-
-            // Setup a redn cb and start the parallel count of num elements less than given threshold
-            CkCallback cntCB(CkReductionTarget(pgm, acceptResults< cntType >), thisProxy);
-            arrProxy.doSomething( cntType(0.5), countReducer, cntCB );
         }
 
         template <typename T>
@@ -62,8 +58,14 @@ class pgm : public CBase_pgm
                 << op
                 << "\n";
             CkPrintf("%s", out.str().c_str());
-            if (++nDone == 2)
+            if (++nDone == 2) {
                 CkExit();
+            } else {
+                // After the sum/avg reduction completes, perform a reduction
+                // to count the number of elements less than a given threshold
+                CkCallback cntCB(CkReductionTarget(pgm, acceptResults< cntType >), thisProxy);
+                arrProxy.doSomething( cntType(0.5), countReducer, cntCB );
+            }
         }
 
     private:

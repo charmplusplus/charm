@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *   ad_panfs.c
  *
@@ -11,8 +11,18 @@
 /* adioi.h has the ADIOI_Fns_struct define */
 #include "adioi.h"
 
+#ifndef ROMIOCONF_H_INCLUDED
+#include "romioconf.h"
+#define ROMIOCONF_H_INCLUDED
+#endif
+
+
 struct ADIOI_Fns_struct ADIO_PANFS_operations = {
-    ADIOI_PANFS_Open, /* Open */
+#ifdef HAVE_PAN_FS_CLIENT_RAIDN_ENCODING_T
+    ADIOI_PANFS_Open6, /* Open, using newer Panasas features */
+#else
+    ADIOI_PANFS_Open,  /* open, but using Panasas5 and earlier features */
+#endif
     ADIOI_GEN_OpenColl,
     ADIOI_PANFS_ReadContig, /* ReadContig */
     ADIOI_PANFS_WriteContig, /* WriteContig */
@@ -41,4 +51,7 @@ struct ADIOI_Fns_struct ADIO_PANFS_operations = {
     ADIOI_PANFS_Resize, /* Resize */
     ADIOI_GEN_Delete, /* Delete */
     ADIOI_GEN_Feature,
+    "PANFS: Panasas PanFS",
+    ADIOI_GEN_IreadStridedColl, /* IreadStridedColl */
+    ADIOI_GEN_IwriteStridedColl /* IwriteStridedColl */
 };
