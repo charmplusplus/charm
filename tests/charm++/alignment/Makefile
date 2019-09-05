@@ -19,3 +19,7 @@ alignmentCheck.o: alignmentCheck.C alignmentCheck.decl.h
 
 test: all
 	$(call run, +p2 ./alignmentCheck )
+
+smptest: all
+	$(call run, ./alignmentCheck +p2 ++ppn 2 )
+	$(call run, ./alignmentCheck +p4 ++ppn 2 )

@@ -138,12 +138,16 @@ void MPI_Tester::test(void)
 	int next=(rank+1)%size;
 	int prev=(rank-1+size)%size;
 	int tag=12387, recvVal=-1;
-	
+
+	// There is a known issue with using the Zero Copy API with BigSim.
+	// AMPI implements MPI_(I)Ssend's and large messages using the Zero
+	// Copy API, so we avoid testing those paths when using BigSim.
+#if !BIGSIM_TEST
 	// Forward around ring:
 	MPI_Isend(&rank,1,MPI_INT,next,tag,comm,&req);
 	testEqual(recv(prev,tag),prev,"Received rank (using prev as source)");
 	MPI_Wait(&req, MPI_STATUS_IGNORE);
-	
+
 	// Forward around ring:
         if (size >= 2) {
 	  if (rank == 0) {
@@ -153,7 +157,7 @@ void MPI_Tester::test(void)
 	  else if (rank == 1)
 	    testEqual(recv(prev,tag),prev,"Received rank (using prev as source)");
 	}
-
+#endif
 	// Simultaneous forward and backward (large messages):
 	const int msgSize = 32768;
 	MPI_Request sendReq[2], recvReq[2];

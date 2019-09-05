@@ -139,7 +139,7 @@ public:
     if(isValid())
       CkPrintf("[%d] Idle Time is Min=%.2lf%% Avg=%.2lf%% Max=%.2lf%%\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);    
     else
-      CkPrintf("[%d] Idle Time is invalid\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);
+      CkPrintf("[%d] Idle Time is invalid\n", CkMyPe());
   }
   
 }; 
@@ -166,7 +166,7 @@ public:
     if(isValid())
       CkPrintf("[%d] Overhead Time is Min=%.2lf%% Avg=%.2lf%% Max=%.2lf%%\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);    
     else
-      CkPrintf("[%d] Overhead Time is invalid\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);
+      CkPrintf("[%d] Overhead Time is invalid\n", CkMyPe());
   }
   
 }; 

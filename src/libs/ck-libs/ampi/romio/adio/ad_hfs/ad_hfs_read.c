@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -15,12 +15,12 @@ void ADIOI_HFS_ReadContig(ADIO_File fd, void *buf, int count,
                      MPI_Datatype datatype, int file_ptr_type,
 		     ADIO_Offset offset, ADIO_Status *status, int *error_code)
 {
-    int err=-1, datatype_size, len;
+    MPI_Count err=-1, datatype_size, len;
 #ifndef PRINT_ERR_MSG
     static char myname[] = "ADIOI_HFS_READCONTIG";
 #endif
 
-    MPI_Type_size(datatype, &datatype_size);
+    MPI_Type_size_x(datatype, &datatype_size);
     len = datatype_size * count;
 
 #ifdef SPPUX
@@ -56,7 +56,7 @@ void ADIOI_HFS_ReadContig(ADIO_File fd, void *buf, int count,
 #endif
 
 	if (err == -1 ) {
-#ifdef MPICH2
+#ifdef MPICH
 	    *error_code = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, myname, __LINE__, MPI_ERR_IO, "**io",
 		"**io %s", strerror(errno));
 #elif defined(PRINT_ERR_MSG)

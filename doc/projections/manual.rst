@@ -1388,8 +1388,10 @@ Performance Counters
 
 This view is enabled when Charm++ is compiled with the ``papi`` option,
 which enables the collection of performance counter data using PAPI.
-Currently, this collects ``PAPI_L1_TCM``, ``PAPI_L1_TCA``,
-``PAPI_L2_TCM``, and ``PAPI_L2_TCA`` on all platforms except Cray, where
+Currently, this collects the highest level cache misses and accesses
+available on the system (``PAPI_L1_TCM`` and ``PAPI_L1_TCA``,
+``PAPI_L2_TCM`` and ``PAPI_L2_TCA``, or ``PAPI_L3_TCM`` and
+``PAPI_L3_TCA``) on all platforms except Cray, where
 it collects ``PAPI_FP_OPS``, ``PAPI_TOT_INS``,
 ``perf::PERF_COUNT_HW_CACHE_LL:MISS``, ``DATA_PREFETCHER:ALL``,
 ``PAPI_L1_DCA`` and ``PAPI_TOT_CYC``. This tool shows the values of the

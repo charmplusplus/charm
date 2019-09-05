@@ -333,12 +333,10 @@ int LBDB::Migrate(LDObjHandle h, int dest)
     //CmiPrintf("[%d] LBDB::Migrate: incoming handle %d with handle range 0-%d\n", CkMyPe(), h.handle, objCount);
 
   if (h.handle >= objs.size()) {
-    CmiPrintf("[%d] LBDB::Migrate: Handle %d out of range 0-%d\n",CkMyPe(),h.handle,objs.size());
-    CmiAbort("LB handle out of range!");
+    CkAbort("[%d] LBDB::Migrate: Handle %d out of range 0-%zu\n",CkMyPe(),h.handle,objs.size());
   }
   else if (!(objs[h.handle].obj)) {
-    CmiPrintf("[%d] LBDB::Migrate: Handle %d no longer registered, range 0-%d\n", CkMyPe(),h.handle,objs.size());
-    CmiAbort("LB handle no longer registered!");
+    CkAbort("[%d] LBDB::Migrate: Handle %d no longer registered, range 0-%zu\n", CkMyPe(),h.handle,objs.size());
   }
 
   LBOM *const om = oms[(objs[h.handle].obj)->parentOM().handle];
@@ -623,18 +621,24 @@ void LocalBarrier::CheckBarrier()
   if (!on) return;
 
   // If there are no clients, resume as soon as we're turned on
-
   if (client_count == 0) {
     cur_refcount++;
     CallReceivers();
   }
-  if (at_count >= client_count) {
-    bool at_barrier = false;
 
-    for(std::list<client*>::iterator i = clients.begin(); i != clients.end(); ++i)
-      if ((*i)->refcount >= cur_refcount)
-	at_barrier = true;
-		
+  // If there have been enough AtBarrier calls, check to see if all clients have
+  // made it to the barrier. It's possible to have gotten multiple AtSync calls
+  // from a single client, which is why this check is necessary.
+  if (at_count >= client_count) {
+    bool at_barrier = true;
+
+    for (auto& c : clients) {
+      if (c->refcount < cur_refcount) {
+        at_barrier = false;
+        break;
+      }
+    }
+
     if (at_barrier) {
       at_count -= client_count;
       cur_refcount++;

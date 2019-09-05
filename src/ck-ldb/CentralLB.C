@@ -711,7 +711,7 @@ void CentralLB::LoadBalance()
   }
 
 #if CMK_REPLAYSYSTEM
-  if (_replaySystem && !concurrent) {
+  if (!concurrent) {
     loadBalancer_pointers = (LDHandle*)malloc(CkNumPes()*sizeof(LDHandle));
     for (int i=0; i<statsData->n_objs; ++i) loadBalancer_pointers[statsData->from_proc[i]] = statsData->objData[i].handle.omhandle.ldb;
   }
@@ -739,7 +739,7 @@ void CentralLB::ApplyDecision() {
 
 #if CMK_REPLAYSYSTEM
   CpdHandleLBMessage(&migrateMsg);
-  if (_replaySystem && !concurrent) {
+  if (!concurrent) {
     for (int i=0; i<migrateMsg->n_moves; ++i) migrateMsg->moves[i].obj.omhandle.ldb = loadBalancer_pointers[migrateMsg->moves[i].from_pe];
     free(loadBalancer_pointers);
   }
@@ -1635,8 +1635,7 @@ void CentralLB::readStatsMsgs(const char* filename)
   int i;
   FILE *f = fopen(filename, "r");
   if (f==NULL) {
-    CmiPrintf("Fatal Error> Cannot open LB Dump file %s!\n", filename);
-    CmiAbort("");
+    CkAbort("Fatal Error> Cannot open LB Dump file %s!\n", filename);
   }
 
   // at this stage, we need to rebuild the statsMsgList and
@@ -1682,8 +1681,7 @@ void CentralLB::writeStatsMsgs(const char* filename)
 #if CMK_LBDB_ON
   FILE *f = fopen(filename, "w");
   if (f==NULL) {
-    CmiPrintf("Fatal Error> writeStatsMsgs failed to open the output file %s!\n", filename);
-    CmiAbort("");
+    CkAbort("Fatal Error> writeStatsMsgs failed to open the output file %s!\n", filename);
   }
 
   const PUP::machineInfo &machInfo = PUP::machineInfo::current();
