@@ -39,7 +39,6 @@
 /*Win32 has screwy names for the standard UNIX calls:*/
 #define getcwd _getcwd
 #define strdup _strdup
-#define strndup _strndup
 #define unlink _unlink
 #define open _open
 #define fdopen _fdopen
