@@ -39,6 +39,7 @@
 /*Win32 has screwy names for the standard UNIX calls:*/
 #define getcwd _getcwd
 #define strdup _strdup
+#define strndup _strndup
 #define unlink _unlink
 #define open _open
 #define fdopen _fdopen
@@ -238,20 +239,6 @@ static char *substr(const char *lo, const char *hi)
   char *res = (char *) malloc(1 + len);
   memcpy(res, lo, len);
   res[len] = 0;
-  return res;
-}
-
-
-/* get substring from lo to hi, remove quote chars */
-static const char *substr_const(const char *lo, const char *hi)
-{
-  if (is_quote(*lo))
-    lo++;
-  if (is_quote(*(hi - 1)))
-    hi--;
-  int len = hi - lo;
-  assert(len>0);
-  const char *res = strndup(lo,len);
   return res;
 }
 
@@ -1534,7 +1521,7 @@ static void nodetab_init_with_nodelist()
             exit(1);
           }
 
-          const std::string hostname = substr_const(b2, e2);
+          const std::string hostname = substr(b2, e2);
           auto host_iter = temp_hosts.find(hostname);
           if (host_iter != temp_hosts.end())
           {
@@ -4670,7 +4657,7 @@ static int ssh_fork(const nodetab_process & p, const char *startScript)
   const char *s = h->shell;
   const char *e = skipstuff(s);
   while (*s) {
-    sshargv.push_back(substr_const(s, e));
+    sshargv.push_back(substr(s, e));
     s = skipblanks(e);
     e = skipstuff(s);
   }
@@ -5350,7 +5337,7 @@ static int ssh_fork_one(nodetab_process & p, const char *startScript)
   const char *s = h->shell;
   const char *e = skipstuff(s);
   while (*s) {
-    sshargv.push_back(substr_const(s, e));
+    sshargv.push_back(substr(s, e));
     s = skipblanks(e);
     e = skipstuff(s);
   }
