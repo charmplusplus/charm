@@ -594,8 +594,11 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
  *****************************************************************************/
 #include "cmibacktrace.C"
 #include "cmidemangle.h"
+
+#if CMK_USE_BACKTRACE
 #include <dlfcn.h> // for dladdr()
 #include <libgen.h> // for basename()
+#endif
 
 /*
 Convert "X(Y) Z" to "Y Z"-- remove text prior to first '(', and supress
@@ -639,28 +642,27 @@ static const char* _implGetBacktraceSys(const char *name) {
 
 /** Print out the names of these function pointers. */
 void CmiBacktracePrint(void **retPtrs,int nLevels) {
+#if CMK_USE_BACKTRACE
   if (nLevels > 0) {
-    CmiPrintf("[%d] Stack Traceback:\n", CmiMyPe());
-    void* callstack[256];
-    int frames = backtrace(callstack, 256);
-    for (int i = 0; i < frames; ++i) {
+    CmiPrintf("[%d] Stack Traceback %d:\n", CmiMyPe(), nLevels);
+    for (int i = 0; i < nLevels; ++i) {
       Dl_info info;
-      int res = dladdr(callstack[i], &info);
+      int res = dladdr(retPtrs[i], &info);
       if (res) { /* dladdr() succeeded, print the address, filename, and function name */
         const char *filename = basename((char*)info.dli_fname);
-        const char *symbolname = info.dli_sname;
-        const char *demangled_symbol_name = symbolname ? CmiDemangle(symbolname).c_str() : "";
-        const char *sys=_implGetBacktraceSys(symbolname);
+        const char *demangled_symbol_name = CmiDemangle(info.dli_sname).c_str();
+        const char *sys=_implGetBacktraceSys(demangled_symbol_name);
         if (sys) {
           CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n", i, sys, demangled_symbol_name);
           break; /*Stop when we hit Charm++ runtime.*/
         }
-        CmiPrintf("  [%d:%d] %s %p %s\n", CmiMyPe(), i, filename, callstack[i], demangled_symbol_name);
+        CmiPrintf("  [%d:%d] %s %p %s\n", CmiMyPe(), i, filename, retPtrs[i], demangled_symbol_name);
       } else { /* dladdr() failed, just print the address */
-        CmiPrintf("  [%d:%d] %p\n", CmiMyPe(), i, callstack[i]);
+        CmiPrintf("  [%d:%d] %p\n", CmiMyPe(), i, retPtrs[i]);
       }
     }
   }
+#endif
 }
 
 /* Print (to stdout) the names of the functions that have been 

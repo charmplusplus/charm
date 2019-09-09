@@ -126,13 +126,15 @@ inline std::string demangle( char const * name )
 
 } // namespace boost
 
+#undef BOOST_CORE_HAS_CXXABI_H
 
 // Added for Charm++:
 inline std::string CmiDemangle(char const * name)
 {
+    if(!name)
+        return "";
     return boost::core::demangle(name);
 }
 
-#undef BOOST_CORE_HAS_CXXABI_H
 
 #endif // #ifndef BOOST_CORE_DEMANGLE_HPP_INCLUDED
