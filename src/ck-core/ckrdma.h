@@ -101,7 +101,6 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
 #if CMK_ONESIDED_IMPL
   friend void deregisterMemFromMsg(envelope *env, bool isRecv);
   friend void CkRdmaEMDeregAndAckHandler(void *ack);
-  friend inline void deregisterBuffer(CkNcpyBuffer &buffInfo);
 #endif
 };
 
@@ -403,7 +402,6 @@ void CkRdmaEMDeregAndAckHandler(void *ack);
 
 inline bool isDeregReady(CkNcpyBuffer &buffInfo);
 
-inline void deregisterBuffer(CkNcpyBuffer &buffInfo);
 inline void deregisterDestBuffer(NcpyOperationInfo *ncpyOpInfo);
 inline void deregisterSrcBuffer(NcpyOperationInfo *ncpyOpInfo);
 

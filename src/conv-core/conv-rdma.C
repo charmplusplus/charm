@@ -254,6 +254,11 @@ void CmiNcpyBuffer::rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAc
   CmiIssueRput(ncpyOpInfo);
 }
 
+inline void deregisterBuffer(CmiNcpyBuffer &buffInfo) {
+  CmiDeregisterMem(buffInfo.ptr, buffInfo.layerInfo + CmiGetRdmaCommonInfoSize(), buffInfo.pe, buffInfo.regMode);
+  buffInfo.isRegistered = false;
+}
+
 // Returns CmiNcpyMode::MEMCPY if both the PEs are the same and memcpy can be used
 // Returns CmiNcpyMode::CMA if both the PEs are in the same physical node and CMA can be used
 // Returns CmiNcpyMode::RDMA if RDMA needs to be used
@@ -306,6 +311,14 @@ void zcPupHandler(ncpyHandlerMsg *msg) {
   zcPupDone(msg->ref);
 }
 
+void invokeZCPupHandler(void *ref, int pe) {
+  ncpyHandlerMsg *msg = (ncpyHandlerMsg *)CmiAlloc(sizeof(ncpyHandlerMsg));
+  msg->ref = (void *)ref;
+
+  CmiSetHandler(msg, zc_pup_handler_idx);
+  CmiSyncSendAndFree(pe, sizeof(ncpyHandlerMsg), (char *)msg);
+}
+
 void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest) {
   CmiNcpyMode transferMode = findTransferMode(src.pe, dest.pe);
   if(transferMode == CmiNcpyMode::MEMCPY) {
@@ -320,13 +333,8 @@ void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest) {
     deregisterBuffer(dest);
 #endif
 
-    if(src.ref) {
-      ncpyHandlerMsg *msg = (ncpyHandlerMsg *)CmiAlloc(sizeof(ncpyHandlerMsg));
-      msg->ref = (void *)src.ref;
-
-      CmiSetHandler(msg, zc_pup_handler_idx);
-      CmiSyncSendAndFree(src.pe, sizeof(ncpyHandlerMsg), (char *)msg);
-    }
+    if(src.ref)
+      invokeZCPupHandler((void *)src.ref, src.pe);
     else
       CmiAbort("zcPupGet - src.ref is NULL\n");
   }

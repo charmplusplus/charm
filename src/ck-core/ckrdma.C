@@ -399,11 +399,6 @@ inline bool isDeregReady(CkNcpyBuffer &buffInfo) {
   return false;
 }
 
-inline void deregisterBuffer(CkNcpyBuffer &buffInfo) {
-  CmiDeregisterMem(buffInfo.ptr, buffInfo.layerInfo + CmiGetRdmaCommonInfoSize(), buffInfo.pe, buffInfo.regMode);
-  buffInfo.isRegistered = false;
-}
-
 inline void deregisterDestBuffer(NcpyOperationInfo *ncpyOpInfo) {
   CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
   ncpyOpInfo->isDestRegistered = 0;
@@ -2104,8 +2099,14 @@ void zcPupGetCompleted(NcpyOperationInfo *info) {
     } else {
       CmiAbort("zcPupGetCompleted: object not found\n");
     }
-    if(info->ackMode == CMK_SRC_DEST_ACK)
-      invokeRemoteNcpyAckHandler(info->srcPe, (void *)info->srcRef, ncpyHandlerIdx::CMA_DEREG_ACK_ZC_PUP_CUSTOM);
+    if(info->ackMode == CMK_SRC_DEST_ACK) {
+      invokeZCPupHandler((void *)info->srcRef, info->srcPe);
+
+#if CMK_REG_REQUIRED
+      // De-register destination buffer
+      deregisterDestBuffer(info);
+#endif
+    }
   } else {
     zcPupDone((void *)info->srcRef);
   }

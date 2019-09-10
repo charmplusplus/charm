@@ -263,10 +263,21 @@ class CmiNcpyBuffer {
   void rdmaGet(CmiNcpyBuffer &source, int ackSize, char *srcAck, char *destAck);
   void rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck);
 
+#if CMK_ONESIDED_IMPL
+  friend inline void deregisterBuffer(CmiNcpyBuffer &buffInfo);
+#endif
+
 
 };
 
 /***************************** Other Util *********************************/
+
+void invokeZCPupHandler(void *ref, int pe);
+inline void deregisterBuffer(CmiNcpyBuffer &buffInfo);
+CmiNcpyMode findTransferMode(int srcPe, int destPe);
+CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode);
+
+
 // Converse message to invoke the Ncpy handler on a remote process
 struct ncpyHandlerMsg{
   char cmicore[CmiMsgHeaderSizeBytes];
