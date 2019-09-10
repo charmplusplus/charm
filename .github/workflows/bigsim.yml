@@ -1,13 +1,13 @@
 name: NetLRTS Linux BigSim
 
- on: [push]
+on: [push]
 
- jobs:
+jobs:
   build:
 
-     runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
-     steps:
+    steps:
     - uses: actions/checkout@v1
     - name: build
       run: ./build LIBS netlrts-linux-x86_64 bigsim -j4
