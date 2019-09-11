@@ -901,7 +901,12 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
   for (int l = 0; l < listeners.size(); l++) listeners[l]->ckBeginInserting();
 
   /// Set up initial elements (if any)
-  locMgr->populateInitial(opts, initMsg.getMessage(), this);
+  CkGroupID mapID = opts.getMap();
+  CkArrayMap* map = (CkArrayMap*)CkLocalBranch(mapID);
+  if (map == NULL)
+    CkAbort("ERROR! Local branch of array map is NULL!");
+  map->storeCkArrayOpts(opts);
+  map->populateInitial(locMgr->getMapHandle(), opts, initMsg.getMessage(), this);
   if (opts.isStaticInsertion())
     remoteDoneInserting();
 
