@@ -1092,8 +1092,6 @@ void  CmiError(const char *format, ...);
 
 #endif
 
-void CmiPuts(const char *);
-
 #if defined(__STDC__) || defined(__cplusplus)
 #define __CMK_STRING(x) #x
 #else

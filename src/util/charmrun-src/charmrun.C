@@ -3292,6 +3292,7 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
   std::queue<SOCKET> open_sockets;
 
   ChMessage msg;
+  msg.len=-1;
 #if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
 # ifdef HSTART
   if (!(arg_hierarchical_start && !arg_child_charmrun && charmrun_phase == 1))
@@ -3327,6 +3328,7 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
 
       if (skt_select1(req_client, 1) != 0)
       {
+	if(msg.len!=-1) ChMessage_free(&msg);
         ChMessage_recv(req_client, &msg);
 
         int nodeNo = ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
