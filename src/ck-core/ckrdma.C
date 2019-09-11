@@ -2013,8 +2013,8 @@ inline void _ncpyBcastNoHandler(ncpyBcastNoMsg *bcastNoMsg) {
 void initEMNcpyAckHandler(void) {
 #if CMK_ONESIDED_IMPL
   ncpy_bcastNo_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyBcastNoHandler);
-#endif
   ncpy_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyAckHandler);
+#endif
 #if CMK_SMP
   zcpy_pup_complete_handler_idx = CmiRegisterHandler((CmiHandler)_zcpyPupCompleteHandler);
 #endif
