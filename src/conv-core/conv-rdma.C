@@ -254,11 +254,6 @@ void CmiNcpyBuffer::rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAc
   CmiIssueRput(ncpyOpInfo);
 }
 
-inline void deregisterBuffer(CmiNcpyBuffer &buffInfo) {
-  CmiDeregisterMem(buffInfo.ptr, buffInfo.layerInfo + CmiGetRdmaCommonInfoSize(), buffInfo.pe, buffInfo.regMode);
-  buffInfo.isRegistered = false;
-}
-
 // Returns CmiNcpyMode::MEMCPY if both the PEs are the same and memcpy can be used
 // Returns CmiNcpyMode::CMA if both the PEs are in the same physical node and CMA can be used
 // Returns CmiNcpyMode::RDMA if RDMA needs to be used

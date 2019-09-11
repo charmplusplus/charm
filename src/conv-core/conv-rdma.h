@@ -273,7 +273,10 @@ class CmiNcpyBuffer {
 /***************************** Other Util *********************************/
 
 void invokeZCPupHandler(void *ref, int pe);
-inline void deregisterBuffer(CmiNcpyBuffer &buffInfo);
+inline void deregisterBuffer(CmiNcpyBuffer &buffInfo) {
+  CmiDeregisterMem(buffInfo.ptr, buffInfo.layerInfo + CmiGetRdmaCommonInfoSize(), buffInfo.pe, buffInfo.regMode);
+  buffInfo.isRegistered = false;
+}
 CmiNcpyMode findTransferMode(int srcPe, int destPe);
 CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode);
 
