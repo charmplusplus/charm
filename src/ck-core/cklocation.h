@@ -586,6 +586,7 @@ public:
     }
   }
 
+  int getMapHandle() const { return mapHandle; }
   CkGroupID getMap() const { return mapID; }
 
   // Look up array element in hash table.  Index out-of-bounds if not found.
@@ -613,14 +614,6 @@ public:
   /// Add a new local array manager to our list.
   void addManager(CkArrayID aid, CkArray* mgr);
   void deleteManager(CkArrayID aid, CkArray* mgr);
-
-  /// Populate this array with initial elements and store CkArrayOptions to the underlying
-  /// map
-  void populateInitial(CkArrayOptions& options, void* initMsg, CkArray* mgr)
-  {
-    map->storeCkArrayOpts(options);
-    map->populateInitial(mapHandle, options, initMsg, mgr);
-  }
 
   // Deliver buffered msgs that were buffered because of active rdma gets
   void deliverAnyBufferedRdmaMsgs(CmiUInt8);
