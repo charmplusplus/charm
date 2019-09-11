@@ -2060,6 +2060,7 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
 // Executed on the worker thread to enqueue all buffered messages after Rgets complete
 void _zcpyPupCompleteHandler(zcPupPendingRgetsMsg *msg) {
   CProxy_CkLocMgr(msg->locMgrId).ckLocalBranch()->deliverAnyBufferedRdmaMsgs(msg->id);
+  CmiFree(msg);
 }
 #endif
 
@@ -2094,7 +2095,7 @@ void zcPupGetCompleted(NcpyOperationInfo *info) {
         // On worker thread, handle all buffered messages
         CProxy_CkLocMgr(ref->locMgrId).ckLocalBranch()->deliverAnyBufferedRdmaMsgs(ref->id);
 #endif
-        //TODO:Free this message
+        CmiFree(ref);
       }
     } else {
       CmiAbort("zcPupGetCompleted: object not found\n");
@@ -2110,6 +2111,8 @@ void zcPupGetCompleted(NcpyOperationInfo *info) {
   } else {
     zcPupDone((void *)info->srcRef);
   }
+  if(info->freeMe == CMK_FREE_NCPYOPINFO)
+    CmiFree(info);
 }
 
 // Issue Rgets for ZC Pup using NcpyOperationInfo stored in newZCPupGets

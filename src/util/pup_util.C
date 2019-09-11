@@ -203,8 +203,12 @@ void PUP::fromMem::pup_buffer_generic(void *&p,size_t n, size_t itemSize, dataTy
 				p = allocate(n);
 			CmiNcpyBuffer dest(p, n*itemSize);
 			zcPupGet(src, dest);
-		} else
+		} else {
 			p = (void *)src.ptr;
+			// Free the allocated zcPupSourceInfo
+			zcPupSourceInfo *srcInfo = (zcPupSourceInfo *)(src.ref);
+			delete srcInfo;
+		}
 	}
 	buf+=sizeof(src);
 }

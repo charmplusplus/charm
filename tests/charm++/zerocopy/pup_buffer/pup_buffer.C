@@ -30,7 +30,7 @@ class arr : public CBase_arr {
   int iteration;
   public:
     arr() {
-      buffer = new int[SIZE];
+      buffer = (int *)malloc(sizeof(int) * SIZE);
       iteration = 0;
 
       usesAtSync = true;
@@ -82,7 +82,7 @@ class arr : public CBase_arr {
         else
           thisProxy[(thisIndex + 1) % totalElems].verify();
       } else {
-        delete [] buffer;
+        free(buffer);
         contribute(cb);
       }
     }
