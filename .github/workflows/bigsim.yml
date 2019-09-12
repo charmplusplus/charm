@@ -1,0 +1,15 @@
+name: NetLRTS Linux BigSim
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./build LIBS netlrts-linux-x86_64 bigsim -j4
+    - name: test
+      run: make -C netlrts-linux-x86_64-bigsim/tmp bgtest TESTOPTS="++local ++no-va-randomization"
