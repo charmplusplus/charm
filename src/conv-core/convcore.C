@@ -644,7 +644,7 @@ static const char* _implGetBacktraceSys(const char *name) {
 void CmiBacktracePrint(void **retPtrs,int nLevels) {
 #if CMK_USE_BACKTRACE
   if (nLevels > 0) {
-    CmiPrintf("[%d] Stack Traceback %d:\n", CmiMyPe(), nLevels);
+    CmiPrintf("[%d] Stack Traceback:\n", CmiMyPe());
     for (int i = 0; i < nLevels; ++i) {
       Dl_info info;
       int res = dladdr(retPtrs[i], &info);
