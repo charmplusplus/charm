@@ -60,16 +60,18 @@ references:
     section: "Chapter 1: The Charm++ Programming Model"
     title: "Parallel Science and Engineering Applications: The Charm++ Approach"
     url: "http://charm.cs.illinois.edu/newPapers/13-46/paper.pdf"
-    year: 2014
+    year: 2013
     notes: |
       @incollection{Kale2013,
         address = {Boca Raton, FL, USA},
-        author = {Kale, Laxmikant V. and Bhatele, Abhinav},
+        author = {Kale, Laxmikant V. and Zheng, Gengbin},
         booktitle = {{Parallel Science and Engineering Applications: The Charm++ Approach}},
         chapter = 1,
         doi = {10.1201/b16251},
         edition = {1st},
+        editor = {Kale, Laxmikant V. and Bhatele, Abhinav},
         isbn = {1466504129, 9781466504127},
+        pages = {1-16},
         publisher = {CRC Press, Inc.},
         title = {{Chapter 1: The Charm++ Programming Model}},
         year = {2013},
