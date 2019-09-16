@@ -644,19 +644,19 @@ static const char* _implGetBacktraceSys(const char *name) {
 void CmiBacktracePrint(void **retPtrs,int nLevels) {
 #if CMK_USE_BACKTRACE
   if (nLevels > 0) {
-    CmiPrintf("[%d] Stack Traceback %d:\n", CmiMyPe(), nLevels);
+    CmiPrintf("[%d] Stack Traceback:\n", CmiMyPe());
     for (int i = 0; i < nLevels; ++i) {
       Dl_info info;
       int res = dladdr(retPtrs[i], &info);
       if (res) { /* dladdr() succeeded, print the address, filename, and function name */
         const char *filename = basename((char*)info.dli_fname);
-        const char *demangled_symbol_name = CmiDemangle(info.dli_sname).c_str();
-        const char *sys=_implGetBacktraceSys(demangled_symbol_name);
+        const std::string demangled_symbol_name = CmiDemangle(info.dli_sname);
+        const char *sys=_implGetBacktraceSys(demangled_symbol_name.c_str());
         if (sys) {
-          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n", i, sys, demangled_symbol_name);
+          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n", i, sys, demangled_symbol_name.c_str());
           break; /*Stop when we hit Charm++ runtime.*/
         }
-        CmiPrintf("  [%d:%d] %s %p %s\n", CmiMyPe(), i, filename, retPtrs[i], demangled_symbol_name);
+        CmiPrintf("  [%d:%d] %s %p %s\n", CmiMyPe(), i, filename, retPtrs[i], demangled_symbol_name.c_str());
       } else { /* dladdr() failed, just print the address */
         CmiPrintf("  [%d:%d] %p\n", CmiMyPe(), i, retPtrs[i]);
       }
