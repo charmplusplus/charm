@@ -1459,77 +1459,6 @@ Returns the number of children of nodeNum in the spanning tree.
 This function fills the array children with node numbers of children of
 nodeNum in the spanning tree.
 
-Isomalloc
----------
-
-It is occasionally useful to allocate memory at a globally unique
-virtual address. This is trivial on a shared memory machine (where every
-address is globally unique); but more difficult on a distributed memory
-machine (where each node has its own separate data at address
-0x80000000). Isomalloc provides a uniform interface for allocating
-globally unique virtual addresses.
-
-Isomalloc can thus be thought of as a software distributed shared memory
-implementation; except data movement between processors is explicit (by
-making a subroutine call), not on demand (by taking a page fault).
-
-Isomalloc is useful when moving highly interlinked data structures from
-one processor to another, because internal pointers will still point to
-the correct locations, even on a new processor. This is especially
-useful when the format of the data structure is complex or unknown, as
-with thread stacks.
-
-.. code-block:: c++
-
-  void *CmiIsomalloc(int size)
-
-Allocate size bytes at a unique virtual address. Returns a pointer to
-the allocated region.
-
-CmiIsomalloc makes allocations with page granularity (typically several
-kilobytes); so it is not recommended for small allocations.
-
-.. code-block:: c++
-
-  void CmiIsomallocFree(void *doomedBlock)
-
-Release the given block, which must have been previously returned by
-CmiIsomalloc. Also releases the used virtual address range, which the
-system may subsequently reuse.
-
-After a CmiIsomallocFree, references to that block will likely result in
-a segmentation violation. It is illegal to call CmiIsomallocFree more
-than once on the same block.
-
-.. code-block:: c++
-
-  void CmiIsomallocPup(pup_er p,void **block)
-
-Pack/Unpack the given block. This routine can be used to move blocks
-across processors, save blocks to disk, or checkpoint blocks.
-
-After unpacking, the pointer is guaranteed to have the same value that
-it did before packing.
-
-Note- Use of this function to pup individual blocks is not supported any
-longer. All the blocks allocated via CmiIsomalloc are pupped by the RTS
-as one single unit.
-
-.. code-block:: c++
-
-  int CmiIsomallocLength(void *block);
-
-Return the length, in bytes, of this isomalloc’d block.
-
-.. code-block:: c++
-
-  int CmiIsomallocInRange(void *address)
-
-Return 1 if the given address may have been previously allocated to this
-processor using Isomalloc; 0 otherwise.
-``CmiIsomallocInRange(malloc(size))`` is guaranteed to be zero;
-``CmiIsomallocInRange(CmiIsomalloc(size))`` is guaranteed to be one.
-
 Threads
 =======
 
@@ -1589,27 +1518,6 @@ thread of control that came into existence when your program was first
 ``exec``\ ’d was not created with ``CthCreate``, but it can be retrieved
 (say, by calling ``CthSelf`` in ``main``), and it can be used like any
 other ``CthThread``.
-
-.. code-block:: c++
-
-  CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size)
-
-Create a thread that can later be moved to other processors. Otherwise
-identical to CthCreate.
-
-This is only a hint to the runtime system; some threads implementations
-cannot migrate threads, others always create migratable threads. In
-these cases, CthCreateMigratable is equivalent to CthCreate.
-
-.. code-block:: c++
-
-  CthThread CthPup(pup_er p,CthThread t)
-
-Pack/Unpack a thread. This can be used to save a thread to disk, migrate
-a thread between processors, or checkpoint the state of a thread.
-
-Only a suspended thread can be Pup’d. Only a thread created with
-CthCreateMigratable can be Pup’d.
 
 .. code-block:: c++
 

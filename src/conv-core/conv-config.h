@@ -81,10 +81,6 @@
 #define CMK_64BIT                1
 #endif
 
-#ifndef CMK_USE_MEMPOOL_ISOMALLOC
-#define CMK_USE_MEMPOOL_ISOMALLOC 0
-#endif
-
 #ifndef CMK_REPLAYSYSTEM
 #define CMK_REPLAYSYSTEM            1
 #endif

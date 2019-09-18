@@ -15,29 +15,25 @@ NOTE: isomalloc is threadsafe, so the isomallocs are not wrapped in CmiMemLock.
 
 #include "memory-isomalloc.h"
 
+struct CmiMemoryIsomallocState {
+  CmiIsomallocContext * context;
+  unsigned char disabled;
+};
+
 /*The current allocation arena */
-CpvStaticDeclare(CmiIsomallocBlockList *,isomalloc_blocklist);
-CpvStaticDeclare(CmiIsomallocBlockList *,pushed_blocklist);
-
-#define ISOMALLOC_PUSH \
-	CmiIsomallocBlockList *pushed_blocklist=CpvAccess(isomalloc_blocklist);\
-	CpvAccess(isomalloc_blocklist)=NULL;\
-
-#define ISOMALLOC_POP \
-	CpvAccess(isomalloc_blocklist)=pushed_blocklist;\
+CpvStaticDeclare(struct CmiMemoryIsomallocState, isomalloc_state);
 
 /* temporarily disable/enable isomalloc. Note the following two fucntions
  * must be used in pair, and no suspend of thread is allowed in between
  * */
-void CmiDisableIsomalloc()
+void CmiMemoryIsomallocDisablePush()
 {
-	CpvAccess(pushed_blocklist)=CpvAccess(isomalloc_blocklist);
-	CpvAccess(isomalloc_blocklist)=NULL;
+  CpvAccess(isomalloc_state).disabled++;
 }
-
-void CmiEnableIsomalloc()
+void CmiMemoryIsomallocDisablePop()
 {
-	CpvAccess(isomalloc_blocklist)=CpvAccess(pushed_blocklist);
+  CmiAssert(CpvAccess(isomalloc_state).disabled > 0);
+  CpvAccess(isomalloc_state).disabled--;
 }
 
 #if CMK_HAS_TLS_VARIABLES
@@ -62,10 +58,9 @@ extern int _sync_iso_warned;
 static void meta_init(char **argv)
 {
    if (CmiMyRank()==0) CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
-   CpvInitialize(CmiIsomallocBlockList *,isomalloc_blocklist);
-   CpvInitialize(CmiIsomallocBlockList *,pushed_blocklist);
-   CpvAccess(isomalloc_blocklist) = NULL;
-   CpvAccess(pushed_blocklist) = NULL;
+   CpvInitialize(struct CmiMemoryIsomallocState, isomalloc_state);
+   CpvAccess(isomalloc_state).context = NULL;
+   CpvAccess(isomalloc_state).disabled = 0;
 #if CMK_HAS_TLS_VARIABLES
    isomalloc_thread = 1;         /* isomalloc is allowed in this pthread */
 #endif
@@ -85,21 +80,21 @@ static void *meta_malloc(size_t size)
         int _isomalloc_thread = isomalloc_thread;
         if (CmiThreadIs(CMI_THREAD_IS_TLS)) _isomalloc_thread = 1;
 #endif
-	if (meta_inited && CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)
+	if (meta_inited && CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context && !CpvAccess(isomalloc_state).disabled
 #if CMK_HAS_TLS_VARIABLES
              && _isomalloc_thread
 #endif
            )
 	{ /*Isomalloc a new block and link it in*/
-		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
+		CmiMemoryIsomallocDisablePush();
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
 		if (CmiIsFortranLibraryCall()==1) {
 		  ret=mm_malloc(size);
 		}
 		else
 #endif
-		ret=CmiIsomallocBlockListMalloc(pushed_blocklist,size);
-		ISOMALLOC_POP
+		ret = CmiIsomallocContextMalloc(CpvAccess(isomalloc_state).context, size);
+		CmiMemoryIsomallocDisablePop();
 	}
 	else /*Just use regular malloc*/
 		ret=mm_malloc(size);
@@ -108,11 +103,11 @@ static void *meta_malloc(size_t size)
 
 static void meta_free(void *mem)
 {	
-	if (mem != NULL && CmiIsomallocInRange(mem)) 
+	if (mem != NULL && CmiIsomallocInRange(mem))
 	{ /*Unlink this slot and isofree*/
-		ISOMALLOC_PUSH
-		CmiIsomallocBlockListFree(mem);
-		ISOMALLOC_POP
+		CmiMemoryIsomallocDisablePush();
+		CmiIsomallocContextFree(CpvAccess(isomalloc_state).context, mem);
+		CmiMemoryIsomallocDisablePop();
 	}
 	else /*Just use regular malloc*/
 		mm_free(mem);
@@ -140,9 +135,8 @@ static void *meta_realloc(void *oldBuffer, size_t newSize)
 	newBuffer = meta_malloc(newSize);
 	if ( newBuffer && oldBuffer ) {
 		/*Must preserve old buffer contents, so we need the size of the
-		  buffer.  SILLY HACK: muck with internals of blocklist header.*/
-		size_t size=CmiIsomallocLength(((CmiIsomallocBlockList *)oldBuffer)-1)-
-			sizeof(CmiIsomallocBlockList);
+		  buffer.  SILLY HACK: muck with internals of context header.*/
+		size_t size=CmiIsomallocContextGetLength(CpvAccess(isomalloc_state).context, oldBuffer);
 		if (size>newSize) size=newSize;
 		if (size > 0)
 			memcpy(newBuffer, oldBuffer, size);
@@ -155,17 +149,17 @@ static void *meta_realloc(void *oldBuffer, size_t newSize)
 static void *meta_memalign(size_t align, size_t size)
 {
 	void *ret=NULL;
-	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)) 
+	if (CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context && !CpvAccess(isomalloc_state).disabled)
 	{ /*Isomalloc a new block and link it in*/
-		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
+		CmiMemoryIsomallocDisablePush();
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
 		if (CmiIsFortranLibraryCall()==1) {
 		  ret=mm_memalign(align, size);
 		}
 		else
 #endif
-		  ret=CmiIsomallocBlockListMallocAlign(pushed_blocklist,align,size);
-		ISOMALLOC_POP
+		  ret = CmiIsomallocContextMallocAlign(CpvAccess(isomalloc_state).context, align, size);
+		CmiMemoryIsomallocDisablePop();
 	}
 	else /*Just use regular memalign*/
 		ret=mm_memalign(align, size);
@@ -175,17 +169,17 @@ static void *meta_memalign(size_t align, size_t size)
 static int meta_posix_memalign(void **outptr, size_t align, size_t size)
 {
 	int ret = 0;
-	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist))
+	if (CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context && !CpvAccess(isomalloc_state).disabled)
 	{ /*Isomalloc a new block and link it in*/
-		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
+		CmiMemoryIsomallocDisablePush();
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
 		if (CmiIsFortranLibraryCall()==1) {
 		  ret=mm_posix_memalign(outptr, align, size);
 		}
 		else
 #endif
-		  *outptr = CmiIsomallocBlockListMallocAlign(pushed_blocklist,align,size);
-		ISOMALLOC_POP
+		  *outptr = CmiIsomallocContextMallocAlign(CpvAccess(isomalloc_state).context, align, size);
+		CmiMemoryIsomallocDisablePop();
 	}
 	else /*Just use regular posix_memalign*/
 		ret=mm_posix_memalign(outptr, align, size);
@@ -195,17 +189,17 @@ static int meta_posix_memalign(void **outptr, size_t align, size_t size)
 static void *meta_aligned_alloc(size_t align, size_t size)
 {
 	void *ret=NULL;
-	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist))
+	if (CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context && !CpvAccess(isomalloc_state).disabled)
 	{ /*Isomalloc a new block and link it in*/
-		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
+		CmiMemoryIsomallocDisablePush();
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
 		if (CmiIsFortranLibraryCall()==1) {
 		  ret=mm_aligned_alloc(align, size);
 		}
 		else
 #endif
-		  ret=CmiIsomallocBlockListMallocAlign(pushed_blocklist,align,size);
-		ISOMALLOC_POP
+		  ret = CmiIsomallocContextMallocAlign(CpvAccess(isomalloc_state).context, align, size);
+		CmiMemoryIsomallocDisablePop();
 	}
 	else /*Just use regular aligned_alloc*/
 		ret=mm_aligned_alloc(align, size);
@@ -242,20 +236,8 @@ void free_nomigrate(void *mem)
 
 #define CMK_MEMORY_HAS_ISOMALLOC
 
-/*Make this blockList "active"-- the recipient of incoming
-mallocs.  Returns the old blocklist.*/
-CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
+/*Make this context "active"-- the recipient of incoming mallocs.*/
+void CmiMemoryIsomallocContextActivate(CmiIsomallocContext *l)
 {
-	CmiIsomallocBlockList **s=&CpvAccess(isomalloc_blocklist);
-	CmiIsomallocBlockList *ret=*s;
-	*s=l;
-	return ret;
+	CpvAccess(isomalloc_state).context = l;
 }
-
-CmiIsomallocBlockList *CmiIsomallocBlockListCurrent(void){
-	return CpvAccess(isomalloc_blocklist);
-}
-
-
-
-

@@ -3,12 +3,15 @@ AMPICC=../../../bin/ampicxx $(OPTS)
 
 
 VARIANTS := \
+  default \
   gnu-isomalloc \
   os-isomalloc \
 
 
 # for determining `all`, `test` rules
-CANDIDATES := $(VARIANTS)
+CANDIDATES := \
+  gnu-isomalloc \
+  os-isomalloc \
 
 
 # Determine which methods to test in the current environment and target.
@@ -26,7 +29,7 @@ endef
 $(foreach i,$(CANDIDATES),$(eval $(call TEST_TARGET_AVAILABILITY,$i)))
 
 # command pieces
-TESTFLAGS := +balancer RotateLB +LBPeriod 0.01
+TESTFLAGS := +balancer RandCentLB +LBPeriod 0.01
 
 # build rules
 all: $(foreach i,$(TARGETS),$i)
