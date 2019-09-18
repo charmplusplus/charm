@@ -1685,15 +1685,8 @@ static void _CkMigratable_prefetchInit(void)
  * This tiny class is used to convey information to the
  * newly created CkMigratable object when its constructor is called.
  */
-class CkMigratable_initInfo
-{
-public:
-  CkLocRec* locRec;
-  int chareType;
-  bool forPrefetch; /* If true, this creation is only a prefetch restore-from-disk.*/
-};
 
-CkpvStaticDeclare(CkMigratable_initInfo, mig_initInfo);
+CkpvDeclare(CkMigratable_initInfo, mig_initInfo);
 
 void _CkMigratable_initInfoInit(void)
 {
@@ -2730,42 +2723,6 @@ CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex& idx)
   return id;
 }
 
-// Add a new local array element, calling element's constructor
-bool CkLocMgr::addElement(CkArrayID mgr, const CkArrayIndex& idx, CkMigratable* elt,
-                          int ctorIdx, void* ctorMsg)
-{
-  CK_MAGICNUMBER_CHECK
-
-  CmiUInt8 id = getNewObjectID(idx);
-
-  CkLocRec* rec = elementNrec(id);
-  if (rec == NULL)
-  {
-    // This is the first we've heard of the element -- add a new local record
-    rec = createLocal(idx, false, false, true);
-#if CMK_GLOBAL_LOCATION_UPDATE
-    if (homePe(idx) != CkMyPe())
-    {
-      DEBC((AA "Global location broadcast for new element idx %s "
-               "assigned to %d \n" AB,
-            idx2str(idx), CkMyPe()));
-      thisProxy.updateLocation(id, CkMyPe());
-    }
-#endif
-  }
-  else
-  {
-    // rec is *already* local -- must not be the first insertion
-    processDeliverBufferedMsgs(id, bufferedShadowElemMsgs);
-  }
-
-  if (!addElementToRec(rec, managers[mgr], elt, ctorIdx, ctorMsg))
-    return false;
-  elt->ckFinishConstruction();
-  return true;
-}
-
-// As above, but shared with the migration code
 bool CkLocMgr::addElementToRec(CkLocRec* rec, CkArray* mgr, CkMigratable* elt,
                                int ctorIdx, void* ctorMsg)
 {

@@ -317,6 +317,15 @@ enum CkElementCreation_t : uint8_t
 #  define CMK_RANK_0(pe) pe
 #endif
 
+class CkMigratable_initInfo
+{
+public:
+  CkLocRec* locRec;
+  int chareType;
+  bool forPrefetch; /* If true, this creation is only a prefetch restore-from-disk.*/
+};
+CkpvExtern(CkMigratable_initInfo, mig_initInfo);
+
 class CkLocCache : public CBase_CkLocCache
 {
 private:
@@ -407,10 +416,6 @@ private:
   void callMethod(CkLocRec* rec, CkMigratable_voidfn_arg_t fn, void*);
 
   void deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx, int opts);
-
-  // Create a new local record at this array index.
-  CkLocRec* createLocal(const CkArrayIndex& idx, bool forMigration, bool ignoreArrival,
-                        bool notifyHome, int epoch = 0);
 
   LocationRequestBuffer bufferedLocationRequests;
 
@@ -624,11 +629,9 @@ public:
   // carrying out rgets)
   void processAfterActiveRgetsCompleted(CmiUInt8 id);
 
-  /// Add a new local array element, calling element's constructor
-  /// Returns true if the element was successfully added; false if the element migrated
-  /// away or deleted itself.
-  bool addElement(CkArrayID aid, const CkArrayIndex& idx, CkMigratable* elt, int ctorIdx,
-                  void* ctorMsg);
+  // Create a new local record at this array index.
+  CkLocRec* createLocal(const CkArrayIndex& idx, bool forMigration, bool ignoreArrival,
+                        bool notifyHome, int epoch = 0);
 
   /// Done inserting elements for now
   void doneInserting(void);

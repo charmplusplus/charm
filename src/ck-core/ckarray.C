@@ -1039,21 +1039,54 @@ void CkArray::insertElement(CkMarshalledMessage&& m, const CkArrayIndex& idx,
 }
 
 /// This method is called by ck.C or the user to add an element.
-bool CkArray::insertElement(CkArrayMessage* me, const CkArrayIndex& idx,
+bool CkArray::insertElement(CkArrayMessage* m, const CkArrayIndex& idx,
                             int listenerData[CK_ARRAYLISTENER_MAXLEN])
 {
   CK_MAGICNUMBER_CHECK
   int onPe;
+  // Element's sibling already lives somewhere else, so insert there instead.
   if (locMgr->isRemote(idx, &onPe))
-  { /* element's sibling lives somewhere else, so insert there */
-    thisProxy[onPe].insertElement(me, idx, listenerData);
+  {
+    thisProxy[onPe].insertElement(m, idx, listenerData);
     return false;
   }
-  int ctorIdx = me->array_ep();
+  int ctorIdx = m->array_ep();
   int chareType = _entryTable[ctorIdx]->chareIdx;
-  ArrayElement* elt = allocate(chareType, me, false, listenerData);
-  if (!locMgr->addElement(thisgroup, idx, elt, ctorIdx, (void*)me))
+  ArrayElement* elt = allocate(chareType, m, false, listenerData);
+
+  // Get the ID for this element
+  CmiUInt8 id = locMgr->getNewObjectID(idx);
+  CkLocRec* rec = locMgr->elementNrec(id);
+
+  // See if a location record needs to be created
+  if (rec == NULL)
+  {
+    rec = locMgr->createLocal(idx, false, false, true);
+  }
+  else
+  {
+    // TODO: Why?
+    locMgr->deliverAllBufferedMsgs(id);
+  }
+
+  // Make sure the element doesn't already exist, then add it.
+  if (getEltFromArrMgr(id))
+  {
+    CkAbort("Cannot insert array element twice!");
+  }
+  putEltInArrMgr(id, elt);
+
+  // Set the constructor info for the new element
+  CkMigratable_initInfo& i = CkpvAccess(mig_initInfo);
+  i.locRec = rec;
+  i.chareType = _entryTable[ctorIdx]->chareIdx;
+
+  // Execute the constructor
+  if (!rec->invokeEntry(elt, (void*)m, ctorIdx, true))
     return false;
+
+  elt->ckFinishConstruction();
+
   CK_ARRAYLISTENER_LOOP(listeners, if (!l->ckElementCreated(elt)) return false;);
   // The initCallback will only be valid if it was set in CkArrayOptions and this is the
   // first wave of insertions.
