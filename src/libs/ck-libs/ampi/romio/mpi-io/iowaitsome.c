@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2003 University of Chicago. 
@@ -32,9 +32,9 @@ int MPIO_Waitsome(int count, MPIO_Request requests[], int *outcount,
 		  int indices[], MPI_Status *statuses)
 {
     int i, flag, err; 
-    MPIU_THREADPRIV_DECL;
+    MPID_THREADPRIV_DECL;
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    ROMIO_THREAD_CS_ENTER();
 
     if (count == 1) {
 	err = MPIO_Wait( requests, statuses );
@@ -76,6 +76,6 @@ int MPIO_Waitsome(int count, MPIO_Request requests[], int *outcount,
     } while (*outcount == 0);
 
 fn_exit:
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+    ROMIO_THREAD_CS_EXIT();
     return err;
 }

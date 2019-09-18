@@ -26,6 +26,10 @@ test: all
 	$(call run, ./ckAllocSysMsgTest 40  5  2 3  +p2 )
 	$(call run, ./ckAllocSysMsgTest 30 10 10 3  +p4 )
 
+smptest: all
+	$(call run, ./ckAllocSysMsgTest 30 10 10 3  +p2 ++ppn 2)
+	$(call run, ./ckAllocSysMsgTest 40  5  2 3  +p2 ++ppn 2)
+	$(call run, ./ckAllocSysMsgTest 30 10 10 3  +p4 ++ppn 2)
 
 bgtest: all
 	$(call run, ./ckAllocSysMsgTest 30 10 10 3  +p4 +x2 +y2 +z2)

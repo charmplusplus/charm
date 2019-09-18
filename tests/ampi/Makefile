@@ -8,6 +8,7 @@ DIRS = \
   datatype \
   privatization \
   jacobi3d \
+  exit \
 #  chkpt \
 
 ifeq ($(BUILD_MPICH_TESTS),true)
@@ -17,6 +18,8 @@ endif
 NOBGDIRS = \
   intercomm_coll \
   privatization \
+  exit \
+  datatype \
 
 FTDIRS = \
   jacobi3d

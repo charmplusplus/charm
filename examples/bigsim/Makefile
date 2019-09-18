@@ -1,9 +1,13 @@
 -include ../../../include/conv-mach-opt.mak
 
 DIRS = \
-  emulator \
 # Disabled due to host/target incompatibility described in bug #89
 #  tools \
+
+# TODO #2467: eliminate the need for this
+ifneq ($(BUILD_CUDA),1)
+  DIRS += emulator
+endif
 
 ifneq (0,$(CMK_TRACE_ENABLED))
   DIRS += sdag

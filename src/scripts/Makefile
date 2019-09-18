@@ -162,7 +162,6 @@ Tau:
 	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
 
 LIBS: CONVLIBS CHARMLIBS everylb
-	$(MAKE) -C libs otherlibs
 	echo "Built LIBS Successfully"
 
 bgtest: bigsim LIBS
@@ -662,9 +661,9 @@ MEM_DEPS=memory-gnu.C memory-gnu-internal.C converse.h conv-mach.h $(CVHEADERS)
 
 # $1 is the name of the module, $2 is any additional dependency beyond memory.C and $(MEM_DEPS), $3 is extra arguments to charmc
 define libmem
-$(L)/libmemory-$1.a: memory.C $(MEM_DEPS) $2
-	$(CHARMC) -I. -o libmemory-$1.o $3 $$<
-	$(CHARMC) -I. -o $$@ $3 libmemory-$1.o
+$(L)/libmemory-$1.a: memory.C $$(MEM_DEPS) $2
+	$$(CHARMC) -I. -o libmemory-$1.o $3 $$<
+	$$(CHARMC) -I. -o $$@ $3 libmemory-$1.o
 endef
 
 $(eval $(call libmem,default,                           ,-DCMK_MEMORY_BUILD_DEFAULT))
@@ -698,12 +697,12 @@ LIBTHREADSDEPS = $(CVHEADERS) QUICK_THREADS
 
 # $1 is the name of the module, $2 is any additional dependency beyond threads.C and $(LIBTHREADSDEPS), $3 is extra arguments to charmc, $4 is an option to include 'boost-context'
 define libthreads
-$(L)/libthreads-$1.a: threads.C $(LIBTHREADSDEPS) $2
-	$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 $$<
+$(L)/libthreads-$1.a: threads.C $$(LIBTHREADSDEPS) $2
+	$$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 $$<
 ifeq (1,$$(strip $4))
-	$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$(wildcard boost-context/*.o) libthreads-$1.o
+	$$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$(wildcard boost-context/*.o) libthreads-$1.o
 else
-	$(CHARMC) -IQuickThreads -I. -o $$@ $3 libthreads-$1.o
+	$$(CHARMC) -IQuickThreads -I. -o $$@ $3 libthreads-$1.o
 endif
 endef
 

@@ -79,7 +79,7 @@ class zerocopyObject : public CBase_zerocopyObject{
   int destIndex, iter, num, j;
   int mixedZeroCopySentCounter, sdagZeroCopySentCounter, sdagZeroCopyRecvCounter;
   bool firstMigrationPending;
-  CkCallback cb, sdagCb, cbCopy;
+  CkCallback cb, sdagCb, cbCopy, compReductionCb, lbReductionCb;
   int idx_zerocopySent, idx_sdagZeroCopySent;;
   CProxy_Main mainProxy;
 
@@ -111,6 +111,8 @@ class zerocopyObject : public CBase_zerocopyObject{
       cb = CkCallback(idx_zerocopySent, thisProxy[thisIndex]);
       cbCopy = cb;
       sdagCb = CkCallback(idx_sdagZeroCopySent, thisProxy[thisIndex]);
+      compReductionCb = CkCallback(CkReductionTarget(Main, done), mainProxy);
+      lbReductionCb = CkCallback(CkReductionTarget(zerocopyObject, BarrierDone), thisProxy);
     }
 
     void pup(PUP::er &p){
@@ -125,6 +127,8 @@ class zerocopyObject : public CBase_zerocopyObject{
       p|sdagZeroCopyRecvCounter;
       p|mainProxy;
       p|sdagCb;
+      p|compReductionCb;
+      p|lbReductionCb;
 
       // sdagRun only uses iArr1 and dArr2
       // other others needn't be pupped/unpupped
@@ -314,21 +318,13 @@ class zerocopyObject : public CBase_zerocopyObject{
       if(thisIndex == 0)
           CkPrintf("sdagRun: Iteration %d completed\n", iter);
 
-      //increase iteration and continue
-      iter++;
-
-      //load balance
-      if(iter % LBPERIOD_ITER == 0)
-        AtSync();
-      else if(iter<= TOTAL_ITER)
+      if(iter < TOTAL_ITER)
         thisProxy[thisIndex].sdagRun();
-      else {
-        CkCallback reductionCb(CkReductionTarget(Main, done), mainProxy);
-        contribute(reductionCb);
-      }
+      else
+        contribute(compReductionCb);
     }
 
-    void sdagRecv(int iter, int &n1, int *& ptr1, int &n2, double *&ptr2, CkNcpyBufferPost *ncpyPost) {
+    void sdagRecv(int index, int &n1, int *& ptr1, int &n2, double *&ptr2, CkNcpyBufferPost *ncpyPost) {
       ptr1 = iArr1;
       ptr2 = dArr2;
       // NOTE: The same arrays are used to receive the data for all the 'num' sdag iterations and
@@ -340,9 +336,6 @@ class zerocopyObject : public CBase_zerocopyObject{
       ncpyPost[1].regMode = CK_BUFFER_UNREG;
     }
 
-    void ResumeFromSync() {
-      thisProxy[thisIndex].sdagRun();
-    }
 };
 
 #include "simpleZeroCopy.def.h"

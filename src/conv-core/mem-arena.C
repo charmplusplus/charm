@@ -1029,7 +1029,7 @@ static void print_btree_node(btreenode *node, int node_num) {
   int i;
   CmiPrintf("Node %2d: ", node_num);
   for (i = 0; i < node->num_blocks; i++) {
-    CmiPrintf("%d:[%lld,%lld] ", i, node->blocks[i].startslot, node->blocks[i].nslots);
+    CmiPrintf("%d:[%" PRId64 ",%" PRId64 "] ", i, node->blocks[i].startslot, node->blocks[i].nslots);
   }
   CmiPrintf("\n");
 }
@@ -1083,7 +1083,7 @@ static void print_list_array(slotset *ss) {
       } else {
 	CmiPrintf(" ->");
       }
-      CmiPrintf("[%lld,%lld]", dlln->sb->startslot, dlln->sb->nslots);
+      CmiPrintf("[%" PRId64 ",%" PRId64 "]", dlln->sb->startslot, dlln->sb->nslots);
       dlln = dlln->next;
     }
     CmiPrintf("\n");

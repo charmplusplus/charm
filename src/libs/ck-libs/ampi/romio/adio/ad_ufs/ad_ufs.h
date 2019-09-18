@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -7,10 +7,10 @@
 #ifndef AD_UNIX_INCLUDE
 #define AD_UNIX_INCLUDE
 
+#include "adio.h"
 #include <unistd.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#include "adio.h"
 
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
@@ -18,11 +18,16 @@
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-#ifdef HAVE_AIO_H
-#include <aio.h>
-#endif
-#ifdef HAVE_SYS_AIO_H
-#include <sys/aio.h>
+
+#ifdef HAVE_AIO_LITE_H
+#include <aio-lite.h>
+#else
+ #ifdef  HAVE_AIO_H
+ #include <aio.h>
+ #endif
+ #ifdef HAVE_SYS_AIO_H
+ #include <sys/aio.h>
+ #endif
 #endif
 
 /* Workaround for incomplete set of definitions if __REDIRECT is not 

@@ -290,7 +290,7 @@ public:
     void* getGroupDepPtr(void) const {
       return (void *)((char *)this + totalsize - getGroupDepSize());
     }
-    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0, const GroupDepNum groupDepNumRequest=GroupDepNum{})
+    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0, const GroupDepNum groupDepNumRequest=GroupDepNum{}, const bool incEvent=true)
     {
 #if CMK_LOCKLESS_QUEUE
       CkAssert(type>=NewChareMsg && type<LAST_CK_ENVELOPE_TYPE);
@@ -313,7 +313,10 @@ public:
 #if CMK_REPLAYSYSTEM
       //for record-replay
       memset(env, 0, sizeof(envelope));
-      env->setEvent(++CkpvAccess(envelopeEventID));
+      if(incEvent)
+	env->setEvent(++CkpvAccess(envelopeEventID));
+      else
+	env->setEvent(CkpvAccess(envelopeEventID));
 #endif
       env->setMsgtype(type);
       env->totalsize = tsize;
@@ -474,6 +477,12 @@ inline void *EnvToUsr(const envelope *const env) {
 inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0, const GroupDepNum groupDepNum=GroupDepNum{}) {
   return envelope::alloc(msgtype,size,prio,groupDepNum);
 }
+
+#if CMK_REPLAYSYSTEM
+inline envelope *_allocEnvNoIncEvent(const int msgtype, const int size=0, const int prio=0, const GroupDepNum groupDepNum=GroupDepNum{}) {
+  return envelope::alloc(msgtype,size,prio,groupDepNum,false);
+}
+#endif
 
 inline void *_allocMsg(const int msgtype, const int size, const int prio=0, const GroupDepNum groupDepNum=GroupDepNum{}) {
   return EnvToUsr(envelope::alloc(msgtype,size,prio,groupDepNum));
