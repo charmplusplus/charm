@@ -1,0 +1,35 @@
+module tree_level {
+
+  message LBStatsMsg_1 {
+    int pe_ids[];
+    float bgloads[];
+    float speeds[];
+    unsigned int obj_start[];
+    float oloads[];
+    unsigned int order[];
+  };
+
+  message LLBMigrateMsg {
+    int num_incoming[];
+    int obj_start[];
+    int to_pes[];
+  };
+
+  message SubtreeLoadMsg {
+  };
+
+  message SubtreeMigrateDecisionMsg {
+    // FIXME? I don't think this layout is ideal, but I don't know if ci files
+    // support array of custom structs in messages
+    int src_groups[];
+    int dest_groups[];
+    int loads[];
+  };
+
+  message TokenListMsg {
+    int local_ids[];
+    int oldPes[];
+    float loads[];
+  };
+
+}

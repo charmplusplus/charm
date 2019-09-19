@@ -93,10 +93,10 @@ $1: $$(foreach j,$$(LANGUAGES),$$j-$1)
 
 # link
 cxx-$1: $1-test.o $1-test-cxx.o cxx-$1-other-object.o | libcxx-$1-static-library.a $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,libcxx-$1-shared-library.so) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,libcxx-$1-shared-library-dynamic.so)
-	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) $$^ -balancer RotateLB -rpath-origin -L. -lcxx-$1-static-library $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,-lcxx-$1-shared-library) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,-ldl)
+	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) $$^ -balancer TreeLB -rpath-origin -L. -lcxx-$1-static-library $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,-lcxx-$1-shared-library) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,-ldl)
 
 f90-$1: $1-test.o $1-test-f90.o
-	$$(AMPIF90) -o $$@ $$(OPTS_f90_$1) $$^ -balancer RotateLB
+	$$(AMPIF90) -o $$@ $$(OPTS_f90_$1) $$^ -balancer TreeLB
 
 libcxx-$1-%.so: cxx-$1-%-so.o
 	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) -shared -standalone $$<
@@ -116,16 +116,16 @@ $1-%.o f90-$1-%.o: %.f90
 
 # test
 test-cxx-$1: cxx-$1
-	$$(call run, ./cxx-$1 +p1 +vp2 )
-	$$(call run, ./cxx-$1 +p1 +vp4 )
-	$$(call run, ./cxx-$1 +p2 +vp2 )
-	$$(call run, ./cxx-$1 +p2 +vp4 )
+	$$(call run, ./cxx-$1 +p1 +vp2 +balancer RotateLB)
+	$$(call run, ./cxx-$1 +p1 +vp4 +balancer RotateLB)
+	$$(call run, ./cxx-$1 +p2 +vp2 +balancer RotateLB)
+	$$(call run, ./cxx-$1 +p2 +vp4 +balancer RotateLB)
 
 test-f90-$1: f90-$1
-	$$(call run, ./f90-$1 +p1 +vp2 )
-	$$(call run, ./f90-$1 +p1 +vp4 )
-	$$(call run, ./f90-$1 +p2 +vp2 )
-	$$(call run, ./f90-$1 +p2 +vp4 )
+	$$(call run, ./f90-$1 +p1 +vp2 +balancer RotateLB)
+	$$(call run, ./f90-$1 +p1 +vp4 +balancer RotateLB)
+	$$(call run, ./f90-$1 +p2 +vp2 +balancer RotateLB)
+	$$(call run, ./f90-$1 +p2 +vp4 +balancer RotateLB)
 
 test-$1: $$(foreach j,$$(LANGUAGES),test-$$j-$1)
 

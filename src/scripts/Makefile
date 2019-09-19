@@ -96,7 +96,7 @@ charm4py: libcharm
 
 LIBCHARM_LIBS= libck.a libconv-core.a libconv-util.a libmemory-default.a libconv-machine.a \
                libthreads-default.a libconv-partition.a libtmgr.a libhwloc_embedded.a \
-               libldb-rand.a libconv-ldb.a libmoduleGreedyRefineLB.a libmoduleRandCentLB.a
+               libldb-rand.a libconv-ldb.a libmoduleTreeLB.a
 
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
@@ -275,7 +275,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
 	sockRoutines.h sockRoutines.C cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
-	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h cmirdmautils.h
+	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp cmirdmautils.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
@@ -290,14 +290,14 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  RefinerTemp.h Refiner.h ckgraph.h ckheap.h \
           elements.h topology.h manager.h \
-	  BaseLB.h CentralLB.h CentralLBMsg.h \
+	  BaseLB.h CentralLB.h CentralLBMsg.h TreeLB.h \
 	  DistBaseLB.h HybridBaseLB.h HybridLBMsg.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkMulticast.decl.h	\
           CkReduction.decl.h \
           waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkCheckpointStatus.decl.h CkMemCheckpoint.decl.h \
-          LBManager.decl.h MetaBalancer.decl.h CentralLB.decl.h \
+          LBManager.decl.h MetaBalancer.decl.h CentralLB.decl.h TreeLB.decl.h tree_level.decl.h \
           BaseLB.decl.h \
 	  DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
@@ -748,7 +748,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
            waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
 	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckobjid.o\
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
-	   BaseLB.o CentralLB.o HybridBaseLB.o DistBaseLB.o \
+	   BaseLB.o CentralLB.o TreeLB.o HybridBaseLB.o DistBaseLB.o \
            ckgraph.o LButil.o RefinerTemp.o Refiner.o \
            manager.o ckset.o ckheap.o \
 	   LBSimulation.o modifyScheduler.o \

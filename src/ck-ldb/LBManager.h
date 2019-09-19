@@ -7,6 +7,8 @@
 #define LBMANAGER_H
 
 #include "LBDatabase.h"
+#include "json.hpp"
+using json = nlohmann::json;
 
 #define LB_FORMAT_VERSION     3
 
@@ -37,12 +39,13 @@ private:
   int _lb_statson;		// stats collection
   int _lb_traceComm;		// stats collection for comm
   int _lb_central_pe;           // processor number for centralized startegy
-  int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
   int _lb_teamSize;		// specifies the team size for TeamLB
   int _lb_maxDistPhases;  // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio; // Specifies the target load ratio for LBs that aim for a particular load ratio
   int _lb_metaLbOn;
   char* _lb_metaLbModelDir;
+  char* _lb_treeLBFile = (char*)"treelb.json";
+  std::vector<const char*> _lb_legacyCentralizedStrategies;  // list of centralized strategies specified by command-line (legacy mode)
 
  public:
   CkLBArgs() {
@@ -54,7 +57,6 @@ private:
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
     _lb_printsumamry = _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
-    _lb_percentMovesAllowed=100;
     _lb_loop = 0;
     _lb_central_pe = 0;
     _lb_teamSize = 1;
@@ -63,6 +65,7 @@ private:
     _lb_metaLbOn = 0;
     _lb_metaLbModelDir = nullptr;
   }
+  inline char*& treeLBFile() { return _lb_treeLBFile; }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
   inline int & teamSize() {return _lb_teamSize; }
@@ -80,11 +83,11 @@ private:
   inline int & central_pe() { return _lb_central_pe; }
   inline double & alpha() { return _lb_alpha; }
   inline double & beta() { return _lb_beta; }
-  inline int & percentMovesAllowed() { return _lb_percentMovesAllowed;}
   inline int & maxDistPhases() { return _lb_maxDistPhases; }
   inline double & targetRatio() { return _lb_targetRatio; }
   inline int & metaLbOn() {return _lb_metaLbOn;}
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
+  inline std::vector<const char*>& legacyCentralizedStrategies() { return _lb_legacyCentralizedStrategies; }
 };
 
 extern CkLBArgs _lb_args;
@@ -284,6 +287,9 @@ public:
   static void initnodeFn(void);
 
   void pup(PUP::er& p);
+
+  void configureTreeLB(const char *json_str);
+  void configureTreeLB(json &config);
 
   /*
    * Calls from object managers to load database

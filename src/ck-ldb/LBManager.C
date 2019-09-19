@@ -14,6 +14,7 @@
 #include "LBSimulation.h"
 #include "topology.h"
 #include "DistributedLB.h"
+#include "TreeLB.h"
 
 CkGroupID _lbmgr;
 
@@ -163,6 +164,8 @@ void _loadbalancerInit()
   char *balancer = NULL;
   CmiArgGroup("Charm++","Load Balancer");
 
+  CmiGetArgStringDesc(argv, "+TreeLBFile", &_lb_args.treeLBFile(), "TreeLB config file");
+
   // turn on MetaBalancer if set
   _lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB", "Turn on MetaBalancer");
   CmiGetArgStringDesc(argv, "+MetaLBModelDir", &_lb_args.metaLbModelDir(),
@@ -199,9 +202,32 @@ void _loadbalancerInit()
       CkPrintf(
           "Warning: MetaLB is activated. For Automatic strategy selection in MetaLB, "
           "pass directory of model files using +MetaLBModelDir.\n");
-    while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
-      if (CkMyRank() == 0)
-        lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
+    if (CkMyRank() == 0) {
+      bool TreeLB_registered = false;
+      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
+        if (strcmp(balancer, "GreedyLB") == 0)
+          _lb_args.legacyCentralizedStrategies().push_back("Greedy");
+        else if (strcmp(balancer, "GreedyRefineLB") == 0)
+          _lb_args.legacyCentralizedStrategies().push_back("GreedyRefine");
+        else if (strcmp(balancer, "RefineLB") == 0)
+          _lb_args.legacyCentralizedStrategies().push_back("RefineA");
+        else if (strcmp(balancer, "RandCentLB") == 0)
+          _lb_args.legacyCentralizedStrategies().push_back("Random");
+        else if (strcmp(balancer, "DummyLB") == 0)
+          _lb_args.legacyCentralizedStrategies().push_back("Dummy");
+        else if (strcmp(balancer, "RotateLB") == 0)
+          _lb_args.legacyCentralizedStrategies().push_back("Rotate");
+        else
+          lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
+        if (strcmp(balancer, "TreeLB") == 0) TreeLB_registered = true;
+      }
+      if (_lb_args.legacyCentralizedStrategies().size() > 0) {
+        if (!TreeLB_registered)
+          lbRegistry.addRuntimeBalancer("TreeLB");
+        if (_lb_args.legacyCentralizedStrategies().size() > 1)
+          // should this be supported?
+          CkAbort("Sequencing multiple centralized strategies with TreeLB not supported\n");
+      }
     }
   }
 
@@ -216,8 +242,6 @@ void _loadbalancerInit()
   // now called in cldb.C: CldModuleGeneralInit()
   // registerLBTopos();
   CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
-  //Read the percentage parameter for RefineKLB and GreedyRefineLB
-  CmiGetArgIntDesc(argv, "+LBPercentMoves", &_lb_args.percentMovesAllowed() , "Percentage of chares to be moved (used by RefineKLB and GreedyRefineLB) [0-100]");
 
   /**************** FUTURE PREDICTOR ****************/
   _lb_predict = CmiGetArgFlagDesc(argv, "+LBPredictor", "Turn on LB future predictor");
@@ -368,9 +392,9 @@ void LBManager::initnodeFn()
 
   _registerCommandLineOpt("+balancer");
   _registerCommandLineOpt("+LBPeriod");
+  _registerCommandLineOpt("+TreeLBFile");
   _registerCommandLineOpt("+LBLoop");
   _registerCommandLineOpt("+LBTopo");
-  _registerCommandLineOpt("+LBPercentMoves");
   _registerCommandLineOpt("+LBPredictor");
   _registerCommandLineOpt("+LBPredictorDelay");
   _registerCommandLineOpt("+LBPredictorWindow");
@@ -629,7 +653,23 @@ void LBManager::nextLoadbalancer(int seq) {
 
 // switch strategy
 void LBManager::switchLoadbalancer(int switchFrom, int switchTo) {
-    //TODO: Implement turn off / on
+  if(lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB") {
+    json config;
+    if(lbNames[switchTo] == "Hybrid") {
+      config["tree"] = "PE_Process_Root";
+      config["Root"]["pe"] = 0;
+      config["Root"]["step_freq"] = 3;
+      config["Root"]["strategies"] = {"GreedyRefine"};
+      config["Process"]["strategies"] = {"GreedyRefine"};
+    } else {
+      config["tree"] = "PE_Root";
+      config["Root"]["pe"] = 0;
+      config["Root"]["strategies"] = {lbNames[switchTo]};
+    }
+    configureTreeLB(config);
+  } else {
+    //TODO: Implement turn off / on for Distributed
+  }
 }
 
 // return the seq-th load balancer string name of
@@ -683,6 +723,27 @@ void LBManager::pup(PUP::er& p)
       metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
     }
   }
+}
+
+extern "C" void configureTreeLB(const char *json_str) {
+  ((LBManager *)CkLocalBranch(_lbmgr))->configureTreeLB(json_str);
+}
+
+void LBManager::configureTreeLB(const char *json_str) {
+  json config = json::parse(json_str);
+  configureTreeLB(config);
+}
+
+void LBManager::configureTreeLB(json &config) {
+  bool found = false;
+  for (int i=0; i < nloadbalancers; i++) {
+    if (strcmp(loadbalancers[i]->lbName(), "TreeLB") == 0) {
+      ((TreeLB*)loadbalancers[i])->configure(config);
+      found = true;
+      //break; // not sure if there could be more than one TreeLB
+    }
+  }
+  if (!found) CkAbort("LBManager: TreeLB is not in my list of load balancers");
 }
 
 void LBManager::ResetAdaptive() {
