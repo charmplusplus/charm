@@ -30,7 +30,7 @@ Misc:
   the load balancing infrastructure. There will be changes to the process of selecting and using
   load balancers, writing custom load balancers, and the internals of the load balancing
   infrastructure. Programs that rely on custom load balancers or the internals of the LB
-  infrastructure will likely require some changes for compatability.
+  infrastructure will likely require some changes for compatibility.
 
 Charm++ Features & Fixes:
 
@@ -78,7 +78,7 @@ Charm++ Features & Fixes:
 
 - Section reductions are now optimized for streamable operations.
 
-- Core dump files are now available for builds with --with-production.
+- Core dump files are now available for --with-production builds.
 
 - Defined a new XI-Builder interface, a library front-end for XLAT-I's code generation.
 
@@ -109,7 +109,7 @@ Charm++ Features & Fixes:
 
 Adaptive MPI:
 
-- AMPI now uses Charm++'s zero copy API to transfer large messages efficiently using
+- AMPI now uses Charm++'s Zero Copy API to transfer large messages efficiently using
   RDMA and CMA wherever possible and profitable.
 
 - More efficient implementations of MPI_Bcast, all MPI_(I)(all)gather(v) routines,
