@@ -4,8 +4,6 @@
 /*@{*/
 
 #include "HybridBaseLB.h"
-#include "GreedyLB.h"
-#include "RefineLB.h"
 
 #define  DEBUGF(x)     // CmiPrintf x;
 
