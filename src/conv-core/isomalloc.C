@@ -912,7 +912,6 @@ struct isommap
 
     if (p.isUnpacking())
     {
-#if __FAULT__
       if (start < isomallocStart || isomallocEnd < allocated_extent)
         CmiAbort("Could not unpack Isomalloc memory region, virtual memory regions do not overlap: "
                  "current %p - %p, context %p - %p",
@@ -920,19 +919,26 @@ struct isommap
 
       if (isomallocEnd < end)
         end = (uint8_t *)CMIALIGN((uintptr_t)isomallocEnd - (pagesize-1), pagesize);
-#endif
-
-      void * const mapped = map_global_memory(start, totalsize);
-      if (mapped == nullptr)
-        CmiAbort("Failed to unpack Isomalloc memory region!");
     }
 
-    p(start, totalsize);
+    uint8_t * localstart = start;
+
+    p.pup_buffer(localstart, totalsize,
+                 [localstart](size_t totalsize) -> void *
+                 {
+                   void * const mapped = map_global_memory(localstart, totalsize);
+                   if (mapped == nullptr)
+                     CmiAbort("Failed to unpack Isomalloc memory region!");
+                   return mapped;
+                 },
+                 [totalsize](void * start)
+                 {
+                   unmap_global_memory(start, totalsize);
+                 }
+                 );
 
     if (p.isDeleting())
-    {
-      clear();
-    }
+      allocated_extent = start; // the context no longer owns the mmapped region
   }
 
   void clear()
