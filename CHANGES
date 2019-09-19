@@ -61,7 +61,9 @@ Charm++ Features & Fixes:
 - Allocate pinned host memory pool for GPUs dynamically on demand, instead of
   statically at compilation time.
 
-- Added an optional parameter for freeing the CkCallback in GPUManager's WorkRequest.
+- Memory copy operations in GPUManager WorkRequest API are reverted to be asynchronous.
+
+- Added an optional parameter for freeing the CkCallback object in GPUManager WorkRequest API.
 
 - Fixed a bug in MetaLB and adding tests for MetaLB.
 
