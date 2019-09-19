@@ -1,0 +1,16 @@
+name: Verbs Linux SMP
+
+# Buildonly test, as the machine layer needs an actual device to run.
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: apt-get install libibverbs-dev
+      run: ./build LIBS verbs-linux-x86_64 smp -j4
