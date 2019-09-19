@@ -75,6 +75,7 @@ class EntryInfo {
       message type but store different data in it, like parameter
       marshalled messages.
     */
+    std::atomic<int> breakPointSet;
     CkMessagePupFn messagePup;
 #endif
 
@@ -108,6 +109,9 @@ class EntryInfo {
       ownsName(ownsN), name(n)
     {
       if (ownsName) initName(n);
+#if CMK_CHARMDEBUG
+      breakPointSet=0;
+#endif      
     }
 
     ~EntryInfo()

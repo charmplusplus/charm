@@ -1039,9 +1039,12 @@ void CmiTimerInit(char **argv)
   if(CmiMyRank() == 0) _absoluteTime = tmptime;   /* initialize only  once */
 #if !(__FAULT__)
   /* try to synchronize calling barrier */
-  CmiBarrier();
-  CmiBarrier();
-  CmiBarrier();
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    {
+      CmiBarrier();
+      CmiBarrier();
+      CmiBarrier();
+    }
 #endif
 if(CmiMyRank() == 0) /* initialize only  once */
   {
@@ -1057,7 +1060,8 @@ if(CmiMyRank() == 0) /* initialize only  once */
   }
 
 #if !(__FAULT__)
-  CmiBarrier();
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    CmiBarrier();
 /*  CmiBarrierZero(); */
 #endif
 }
@@ -1138,10 +1142,13 @@ double CmiInitTime(void)
 void CmiTimerInit(char **argv)
 {
   struct rusage ru;
-
-  CmiBarrier();
-  CmiBarrier();
-
+#if !(__FAULT__)
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    {
+      CmiBarrier();
+      CmiBarrier();
+    }
+#endif
   _cpu_speed_factor = 1.0/(readMHz()*1.0e6); 
   rdtsc(); rdtsc(); rdtsc(); rdtsc(); rdtsc();
   CpvInitialize(double, inittime_walltime);
@@ -1151,8 +1158,10 @@ void CmiTimerInit(char **argv)
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
-
-  CmiBarrierZero();
+#if !(__FAULT__)
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    CmiBarrierZero();
+#endif  
 }
 
 double CmiCpuTimer(void)
@@ -1211,9 +1220,11 @@ void CmiTimerInit(char **argv)
 
   /* try to synchronize calling barrier */
 #if !(__FAULT__)
-  CmiBarrier();
-  CmiBarrier();
-  CmiBarrier();
+  if(CpvAccess(cmiArgDebugFlag)==0){
+    CmiBarrier();
+    CmiBarrier();
+    CmiBarrier();
+  }
 #endif
   CpvAccess(inittime) = GetTimeBase (); 
 }
@@ -1287,7 +1298,7 @@ void CmiTimerInit(char **argv)
   CpvAccess(clocktick) =  1.0 / ((double) __ppc_get_timebase_freq());
 
   /* try to synchronize calling barrier */
-#if !(__FAULT__)
+#if !(__FAULT__) && !CMK_CHARMDEBUG
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
@@ -3798,19 +3809,21 @@ void ConverseCommonInit(char **argv)
   CmiIOInit(argv);
 #endif
   if (CmiMyPe() == 0)
-      CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
+    CmiPrintf("[%d] Converse/Charm++ Commit ID: %s\n", CmiMyPe(), CmiCommitID);
 
   CpvInitialize(int, cmiMyPeIdle);
   CpvAccess(cmiMyPeIdle) = 0;
-
 #if CONVERSE_POOL
   CmiPoolAllocInit(30);  
 #endif
   CmiTmpInit(argv);
+  if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
+    {
+      CpvAccess(cmiArgDebugFlag) = 1;
+    }
   CmiTimerInit(argv);
   CstatsInit(argv);
   CmiInitCPUAffinityUtil();
-
   CcdModuleInit(argv);
   CmiHandlerInit();
   CmiReductionsInit();
@@ -3833,7 +3846,7 @@ void ConverseCommonInit(char **argv)
     if(CmiMyRank() == 0) CmiAbort("The option +CmiSpinOnIdle is mutually exclusive with the options +CmiSleepOnIdle and +CmiNoProcForComThread");
   }
 #endif
-	
+
 #if CMK_TRACE_ENABLED
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
@@ -3854,10 +3867,12 @@ void ConverseCommonInit(char **argv)
 
   CmiDeliversInit();
   CsdInit(argv);
+
 #if CMK_CCS_AVAILABLE
   ccsRunning = 0;
   CcsInit(argv);
 #endif
+
   CpdInit();
   CthSchedInit();
   CmiGroupInit();
@@ -4011,7 +4026,7 @@ void CmiPrintf(const char *format, ...)
   }
   va_end(args);
 #if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);
@@ -4031,7 +4046,7 @@ void CmiError(const char *format, ...)
   CmiFlush(stderr);  /* stderr is always flushed */
   va_end(args);
 #if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);

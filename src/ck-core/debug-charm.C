@@ -40,13 +40,6 @@ CkpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints w
 CkpvDeclare(DebugEntryTable, _debugEntryTable);
 CpdPersistentChecker persistentCheckerUselessClass;
 
-void CpdFinishInitialization() {
-  CkpvInitialize(int, skipBreakpoint);
-  CkpvAccess(skipBreakpoint) = 0;
-  CkpvInitialize(DebugEntryTable, _debugEntryTable);
-  CkpvAccess(_debugEntryTable).resize(_entryTable.size());
-}
-
 void resetAllCRC();
 void checkAllCRC(int report);
 
@@ -69,7 +62,7 @@ int CpdInUserCode() {return cpdInSystem==0 && _debugData.length()>0 && _debugDat
 // Function called right before an entry method
 void CpdBeforeEp(int ep, void *obj, void *msg) {
 #if CMK_CHARMDEBUG
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     DebugRecursiveEntry entry;
     entry.previousChareID = setMemoryChareIDFromPtr(obj);
     entry.alreadyUserCode = _entryTable[ep]->inCharm ? 0 : 1;
@@ -99,7 +92,7 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
 // Function called right after an entry method
 void CpdAfterEp(int ep) {
 #if CMK_CHARMDEBUG
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     DebugRecursiveEntry entry = _debugData.peek();
     std::vector<DebugPersistentCheck> &postExecutes = CkpvAccess(_debugEntryTable)[ep].postProcess;
     for (int i=0; i<postExecutes.size(); ++i) {
@@ -776,10 +769,20 @@ void CpdBreakPointInit()
   CkpvAccess(lastBreakPointMsg) = NULL;
   CkpvAccess(lastBreakPointObject) = NULL;
   CkpvAccess(lastBreakPointIndex) = 0;
-  CpvAccess(_debugMsg) = CkRegisterMsg("debug_msg",0,0,0,0);
-  CpvAccess(_debugChare) = CkRegisterChare("debug_Chare",0,TypeChare);
-  CkRegisterChareInCharm(CpvAccess(_debugChare));
+  if(CkMyRank() == 0)
+    {
+      CpvAccess(_debugMsg) = CkRegisterMsg("debug_msg",0,0,0,0);
+      CpvAccess(_debugChare) = CkRegisterChare("debug_Chare",0,TypeChare);
+      CkRegisterChareInCharm(CpvAccess(_debugChare));
+    }
   CpvAccess(breakPointEntryTable) = new CpdBpFuncTable_t(10,0.5,CkHashFunction_int,CkHashCompare_int );
+}
+
+void CpdFinishInitialization() {
+  CkpvInitialize(int, skipBreakpoint);
+  CkpvAccess(skipBreakpoint) = 0;
+  CkpvInitialize(DebugEntryTable, _debugEntryTable);
+  CkpvAccess(_debugEntryTable).resize(_entryTable.size());
 }
 
 static void _call_freeze_on_break_point(void * msg, void * object)
@@ -798,6 +801,7 @@ static void _call_freeze_on_break_point(void * msg, void * object)
       CkpvAccess(lastBreakPointMsg) = msg;
       CkpvAccess(lastBreakPointObject) = object;
       CkpvAccess(lastBreakPointIndex) = CkMessageToEpIdx(msg);
+      //      CkPrintf("[%d] notify for bp %s m %p o %p idx %d\n",CkMyPe(), breakPointEntryInfo->name, msg, object,CkpvAccess(lastBreakPointIndex));
       CpdNotify(CPD_BREAKPOINT,breakPointEntryInfo->name);
       CpdFreeze();
 #if CMK_BIGSIM_CHARM
@@ -852,11 +856,15 @@ void CpdDeliverSingleMessage () {
 //ccs handler when continue from a break point
 void CpdContinueFromBreakPoint ()
 {
+  
+  //  CkPrintf("[%d] CpdContinueFromBreakPoint\n",CkMyPe());
+  
     CpdUnFreeze();
     if ( (CkpvAccess(lastBreakPointMsg) != NULL) && (CkpvAccess(lastBreakPointObject) != NULL) )
     {
         EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CkpvAccess(lastBreakPointIndex));
         if (breakPointEntryInfo != NULL) {
+	  //	  CkPrintf("[%d] Continue found calling lastBreakPoint\n",CkMyPe());
            breakPointEntryInfo->call(CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject));
 #if CMK_BIGSIM_CHARM
            ((workThreadInfo*)cta(threadinfo))->stopScheduler();
@@ -866,6 +874,12 @@ void CpdContinueFromBreakPoint ()
           
         }
     }
+    /*        else
+    {
+                  CmiPrintStackTrace(0);
+                  CkPrintf("[%d] Continue found lastBreakPointmsg %p object %p idx %d\n",CkMyPe(), CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject), CkpvAccess(lastBreakPointIndex));
+    }
+    */
     CkpvAccess(lastBreakPointMsg) = NULL;
     CkpvAccess(lastBreakPointObject) = NULL;
 }
@@ -889,8 +903,14 @@ void CpdSetBreakPoint (char *msg)
              breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, 1, 0 );
              //CmiPrintf("Breakpoint is set for function %s with an epIdx = %ld\n", _entryTable[tableIdx]->name, tableIdx);
              CpvAccess(breakPointEntryTable)->put(tableIdx) = breakPointEntryInfo;
-             _entryTable[tableIdx]->name = "debug_breakpoint_ep";
-             _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
+#if CMK_SMP	     
+	    if(++_entryTable[tableIdx]->breakPointSet==CkMyNodeSize() )
+#endif	       
+	      {
+
+		_entryTable[tableIdx]->name = "debug_breakpoint_ep";
+		_entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
+	      }
            } else {
              if (breakPointEntryInfo->msgIdx == 0) {
                // Reset the breakpoint info
@@ -930,10 +950,17 @@ void CpdRemoveBreakPoint (char *msg)
       if (CkpvAccess(_debugEntryTable)[idx].isBreakpoint) {
         EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
         if (breakPointEntryInfo != NULL) {
+	  
           if (--breakPointEntryInfo->msgIdx == 0) {
             // If we are the last to delete the breakpoint, then restore the original name and call function pointer
-            _entryTable[idx]->name =  breakPointEntryInfo->name;
-            _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+#if CMK_SMP	    
+	    if(_entryTable[idx]->breakPointSet--==0)
+#endif	      
+	      {
+	      _entryTable[idx]->name =  breakPointEntryInfo->name;
+	      _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+	    }
+	    //	    CkPrintf("[%d] remonebp _entryTable[%d]->breakPointSet %d\n",CkMyPe(), idx,  _entryTable[idx]->breakPointSet.load());
           }
           reply = ~0 ;
           CkpvAccess(_debugEntryTable)[idx].isBreakpoint = false;
@@ -959,8 +986,15 @@ void CpdRemoveAllBreakPoints ()
     int idx = *(int *)keyPointer;
     if (--breakPointEntryInfo->msgIdx == 0) {
       // If we are the last to delete the breakpoint, then restore the original name and call function pointer
-      _entryTable[idx]->name =  breakPointEntryInfo->name;
-      _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+#if CMK_SMP	    
+      if(_entryTable[idx]->breakPointSet--==0)
+#endif	      
+	{
+	  
+	  _entryTable[idx]->name =  breakPointEntryInfo->name;
+	  _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+	}
+      //      CkPrintf("[%d] remallbp _entryTable[%d]->breakPointSet %d\n",CkMyPe(), idx,  _entryTable[idx]->breakPointSet.load());
     }
     CkpvAccess(_debugEntryTable)[idx].isBreakpoint = false;
   }

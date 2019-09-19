@@ -361,7 +361,7 @@ static void KillOnAllSigs(int sigNo)
   already_in_signal_handler=1;
 
 #if CMK_CCS_AVAILABLE
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     int reply = 0;
     CpdNotify(CPD_SIGNAL,sigNo);
 #if ! CMK_BIGSIM_CHARM

@@ -316,7 +316,8 @@ void _registerDone(void)
 {
   __registerDone = 1;
 #if CMK_CHARMDEBUG
-  if (CkMyRank() == 0) {
+  //  if (CkMyRank() == 0)
+    {
     CpdListRegister(new CpdSimpleListAccessor<EntryInfo>("charm/entries",&_entryTable,pupEntry));
     CpdListRegister(new CpdSimpleListAccessor<MsgInfo>("charm/messages",&_msgTable,pupMsg));
     CpdListRegister(new CpdSimpleListAccessor<ChareInfo>("charm/chares",&_chareTable,pupChare));

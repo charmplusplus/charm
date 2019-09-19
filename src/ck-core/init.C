@@ -1558,9 +1558,9 @@ void _initCharm(int unused_argc, char **argv)
 	}
 
 	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */
-	if (CkMyRank() == 0) {
+	//	if (CkMyRank() == 0) {
 	  CpdBreakPointInit();
-	}
+	  //	}
 	CmiNodeAllBarrier();
 
 	// Execute the initcalls registered in modules
@@ -1569,7 +1569,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CHARMDEBUG
 	CpdFinishInitialization();
 #endif
-	if (CkMyRank() == 0)
+	//	if (CkMyRank() == 0)
 	  _registerDone();
 	CmiNodeAllBarrier();
 
@@ -1818,7 +1818,7 @@ void _initCharm(int unused_argc, char **argv)
         // Should not use CpdFreeze inside a thread (since this processor is really a user-level thread)
        if (CpvAccess(cpdSuspendStartup))
        { 
-          //CmiPrintf("In Parallel Debugging mode .....\n");
+	 if(CkMyPe()==0) CmiPrintf("In Parallel Debugging mode .....\n");
           CpdFreeze();
        }
 #endif
