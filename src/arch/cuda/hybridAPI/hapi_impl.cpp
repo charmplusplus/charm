@@ -166,9 +166,11 @@ public:
 
   void init();
   int createStreams();
+  int createNStreams(int);
   void destroyStreams();
   cudaStream_t getNextStream();
   cudaStream_t getStream(int);
+  int getNStreams();
   void allocateBuffers(hapiWorkRequest*);
   void hostToDeviceTransfer(hapiWorkRequest*);
   void deviceToHostTransfer(hapiWorkRequest*);
@@ -182,6 +184,7 @@ CsvDeclare(GPUManager, gpu_manager);
 void GPUManager::init() {
   next_buffer_ = NUM_BUFFERS;
   streams_ = NULL;
+  n_streams_ = 0;
   last_stream_id_ = -1;
   running_kernel_idx_ = 0;
   data_setup_idx_ = 0;
@@ -249,42 +252,77 @@ void GPUManager::init() {
 // which depends on the compute capability of the device.
 // Returns the number of created streams.
 int GPUManager::createStreams() {
-  if (streams_)
-    return n_streams_;
+  int new_n_streams = 0;
 
-#if CMK_SMP || CMK_MULTICORE
   if (device_prop_.major == 3) {
     if (device_prop_.minor == 0)
-      n_streams_ = 16;
+      new_n_streams = 16;
     else if (device_prop_.minor == 2)
-      n_streams_ = 4;
+      new_n_streams = 4;
     else // 3.5, 3.7 or unknown 3.x
-      n_streams_ = 32;
+      new_n_streams = 32;
   }
   else if (device_prop_.major == 5) {
     if (device_prop_.minor == 3)
-      n_streams_ = 16;
+      new_n_streams = 16;
     else // 5.0, 5.2 or unknown 5.x
-      n_streams_ = 32;
+      new_n_streams = 32;
   }
   else if (device_prop_.major == 6) {
     if (device_prop_.minor == 1)
-      n_streams_ = 32;
+      new_n_streams = 32;
     else if (device_prop_.minor == 2)
-      n_streams_ = 16;
+      new_n_streams = 16;
     else // 6.0 or unknown 6.x
-      n_streams_ = 128;
+      new_n_streams = 128;
   }
   else // unknown (future) compute capability
-    n_streams_ = 128;
-#else
-  n_streams_ = 4; // FIXME per PE in non-SMP mode
+    new_n_streams = 128;
+#if !CMK_SMP && !CMK_MULTICORE
+  // Allocate total physical streams between GPU managers sharing a device...
+  // i.e. PEs / num devices
+  int device_count;
+  hapiCheck(cudaGetDeviceCount(&device_count));
+  int pes_per_device = CmiNumPesOnPhysicalNode(0) / device_count;
+  pes_per_device = pes_per_device > 0 ? pes_per_device : 1;
+  new_n_streams =  (new_n_streams + pes_per_device - 1) / pes_per_device;
 #endif
 
-  streams_ = new cudaStream_t[n_streams_];
-  for (int i = 0; i < n_streams_; i++) {
+#if CMK_SMP || CMK_MULTICORE
+  CmiLock(CsvAccess(gpu_manager).stream_lock_);
+#endif
+  int total_n_streams = createNStreams(new_n_streams);
+#if CMK_SMP || CMK_MULTICORE
+  CmiUnlock(CsvAccess(gpu_manager).stream_lock_);
+#endif
+
+  return total_n_streams;
+}
+
+int GPUManager::createNStreams(int new_n_streams) {
+  if (new_n_streams <= n_streams_) {
+    return n_streams_;
+  }
+
+  cudaStream_t* old_streams = streams_;
+
+  streams_ = new cudaStream_t[new_n_streams];
+
+  int i = 0;
+  // Copy old streams
+  for (; i < n_streams_; i++) {
+    // TODO alt. use memcpy?
+    streams_[i] = old_streams[i];
+  }
+
+  // Create new streams
+  for (; i < new_n_streams; i++) {
     hapiCheck(cudaStreamCreate(&streams_[i]));
   }
+
+  // Update
+  n_streams_ = new_n_streams;
+  delete [] old_streams;
 
   return n_streams_;
 }
@@ -312,6 +350,13 @@ cudaStream_t GPUManager::getStream(int i) {
   if (i < 0 || i >= n_streams_)
     CmiAbort("[HAPI] invalid stream ID");
   return streams_[i];
+}
+
+int GPUManager::getNStreams() {
+  if (!streams_) // NULL - default stream
+    return 1;
+
+  return n_streams_;
 }
 
 // Allocates device buffers.
@@ -395,9 +440,8 @@ void GPUManager::hostToDeviceTransfer(hapiWorkRequest* wr) {
     host_buffers_[index] = bi.host_buffer;
 
     if (bi.transfer_to_device) {
-      // TODO should be changed back to async for performance
-      hapiCheck(cudaMemcpy(device_buffers_[index], host_buffers_[index], size,
-                                cudaMemcpyHostToDevice));
+      hapiCheck(cudaMemcpyAsync(device_buffers_[index], host_buffers_[index], size,
+                                cudaMemcpyHostToDevice, wr->stream));
 
 #ifdef HAPI_DEBUG
       printf("[HAPI] transferring buffer %d from host to device, time: %.2f, "
@@ -415,9 +459,8 @@ void GPUManager::deviceToHostTransfer(hapiWorkRequest* wr) {
     size_t size = bi.size;
 
     if (bi.transfer_to_host) {
-      // TODO should be changed back to async for performance
-      hapiCheck(cudaMemcpy(host_buffers_[index], device_buffers_[index], size,
-                                cudaMemcpyDeviceToHost));
+      hapiCheck(cudaMemcpyAsync(host_buffers_[index], device_buffers_[index], size,
+                                cudaMemcpyDeviceToHost, wr->stream));
 
 #ifdef HAPI_DEBUG
       printf("[HAPI] transferring buffer %d from device to host, time %.2f, "
@@ -688,6 +731,35 @@ void hapiEnqueue(hapiWorkRequest* wr) {
 hapiWorkRequest* hapiCreateWorkRequest() {
   return (new hapiWorkRequest);
 }
+
+hapiWorkRequest::hapiWorkRequest() :
+    grid_dim(0), block_dim(0), shared_mem(0), host_to_device_cb(NULL),
+    kernel_cb(NULL), device_to_host_cb(NULL), runKernel(NULL), state(0),
+    user_data(NULL), free_user_data(false), free_host_to_device_cb(false),
+    free_kernel_cb(false), free_device_to_host_cb(false)
+  {
+#ifdef HAPI_TRACE
+    trace_name = "";
+#endif
+#ifdef HAPI_INSTRUMENT_WRS
+    chare_index = -1;
+#endif
+
+#if CMK_SMP || CMK_MULTICORE
+    CmiLock(CsvAccess(gpu_manager).stream_lock_);
+#endif
+
+    // Create default per-PE streams if none exist
+    if (CsvAccess(gpu_manager).getStream(0) == NULL) {
+      CsvAccess(gpu_manager).createNStreams(CmiMyNodeSize());
+    }
+
+    stream = CsvAccess(gpu_manager).getStream(CmiMyRank() % CsvAccess(gpu_manager).getNStreams());
+
+#if CMK_SMP || CMK_MULTICORE
+    CmiUnlock(CsvAccess(gpu_manager).stream_lock_);
+#endif
+  }
 
 static void createPool(int *nbuffers, int n_slots, CkVec<BufferPool> &pools);
 static void releasePool(CkVec<BufferPool> &pools);

@@ -116,19 +116,7 @@ typedef struct hapiWorkRequest {
   char comp_phase;
 #endif
 
-  hapiWorkRequest() :
-    grid_dim(0), block_dim(0), shared_mem(0), host_to_device_cb(NULL),
-    kernel_cb(NULL), device_to_host_cb(NULL), runKernel(NULL), state(0),
-    user_data(NULL), free_user_data(false), free_host_to_device_cb(false),
-    free_kernel_cb(false), free_device_to_host_cb(false), stream(NULL)
-  {
-#ifdef HAPI_TRACE
-    trace_name = "";
-#endif
-#ifdef HAPI_INSTRUMENT_WRS
-    chare_index = -1;
-#endif
-  }
+  hapiWorkRequest();
 
   ~hapiWorkRequest() {
     if (free_user_data)

@@ -2715,8 +2715,7 @@ void ampi::generic(AmpiMsg* msg) noexcept
     if (n>0 && inorder(msg)) { // This message was in-order, and is not an incomplete sync message
       for (int i=1; i<n; i++) { // It enables other, previously out-of-order messages
         msg = oorder.getOutOfOrder(seqIdx);
-        CkAssert(msg);
-        if (!inorder(msg)) break; // Returns false if msg is an incomplete sync message
+        if (!msg || !inorder(msg)) break; // Returns false if msg is an incomplete sync message
       }
     }
   } else { //Cross-world or system messages are unordered
@@ -2745,7 +2744,7 @@ void ampi::bcastResult(AmpiMsg* msg) noexcept
   if (n>0) { // This message was in-order
     inorderBcast(msg, false); // inorderBcast() is [nokeep]-aware, unlike inorder()
     if (n>1) { // It enables other, previously out-of-order messages
-      while((msg=oorder.getOutOfOrder(seqIdx))!=0) {
+      while((msg = oorder.getOutOfOrder(seqIdx)) != nullptr) {
         inorderBcast(msg, true);
       }
     }
@@ -2853,8 +2852,7 @@ void ampi::genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
       inorderRdma(buf, size, seq, tag, srcRank);
       for (int i=1; i<n; i++) { // It enables other, previously out-of-order messages
         AmpiMsg* msg = oorder.getOutOfOrder(seqIdx);
-        CkAssert(msg);
-        if (!inorder(msg)) break; // Returns false if msg is an incomplete sync message
+        if (!msg || !inorder(msg)) break; // Returns false if msg is an incomplete sync message
       }
     } else { // This message was out-of-order: stash it (as an AmpiMsg)
       AmpiMsg *msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank);
@@ -2988,10 +2986,13 @@ AmpiMsg *ampi::makeSyncMsg(int t,int sRank,const void *buf,int count,
                            ampi* destPtr) noexcept
 {
   CkAssert(ssendReq >= 0);
+#if AMPI_NODE_LOCAL_IMPL
   if (destLikelyWithinProcess(destProxy, destIdx, destPtr)) {
     return makeNcpyShmMsg(t, sRank, buf, count, type, ssendReq, seq);
   }
-  else {
+  else
+#endif
+  {
     return makeNcpyMsg(t, sRank, buf, count, type, ssendReq, seq);
   }
 }
@@ -3155,8 +3156,8 @@ void ampi::localInorder(char* buf, int size, int seqIdx, CMK_REFNUM_TYPE seq, in
     handleBlockedReq(ireq);
     ireq->receiveRdma(this, buf, size, srcRank);
     if (n > 1) { // It enables other, previously out-of-order messages
-      AmpiMsg *msg = NULL;
-      while ((msg = oorder.getOutOfOrder(seqIdx)) != 0) {
+      AmpiMsg *msg = nullptr;
+      while ((msg = oorder.getOutOfOrder(seqIdx)) != nullptr) {
         if (!inorder(msg)) break; // Returns false if msg is an incomplete sync message
       }
     }
@@ -3297,15 +3298,15 @@ void ampi::requestPut(MPI_Request reqIdx, CkNcpyBuffer targetInfo) noexcept {
     CkPrintf("[%d] VP %d in requestPut, reqIdx = %d\n", CkMyPe(), parent->thisIndex, reqIdx);
   )
   CkDDT_DataType* sddt = getDDT()->getType(req.type);
+  int len = sddt->getSize(req.count);
   CkCallback sendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true /*inline*/);
   sendCB.setRefnum(reqIdx);
   CkNcpyBuffer srcInfo;
 
   if (sddt->isContig()) {
-    srcInfo = CkNcpyBuffer(req.buf, req.count, sendCB);
+    srcInfo = CkNcpyBuffer(req.buf, len, sendCB);
   }
   else {
-    int len = sddt->getSize(req.count);
     char* sbuf = new char[len];
     sddt->serialize((char*)req.buf, sbuf, req.count, len, PACK);
     srcInfo = CkNcpyBuffer(sbuf, len, sendCB);
@@ -4025,7 +4026,7 @@ void AmpiSeqQ::putOutOfOrder(int seqIdx, AmpiMsg *msg) noexcept
 AmpiMsg *AmpiSeqQ::getOutOfOrder(int seqIdx) noexcept
 {
   AmpiOtherElement &el=elements[seqIdx];
-  if (el.getNumOutOfOrder()==0) return 0; // No more out-of-order left.
+  if (el.getNumOutOfOrder() == 0) return nullptr; // No more out-of-order left.
   // Walk through our out-of-order queue, searching for our next message:
   for (int i=0;i<out.length();i++) {
     AmpiMsg *msg=out.deq();
@@ -4038,7 +4039,7 @@ AmpiMsg *AmpiSeqQ::getOutOfOrder(int seqIdx) noexcept
       out.enq(msg);
   }
   // We walked the whole queue-- ours is not there.
-  return 0;
+  return nullptr;
 }
 
 void AmpiRequest::print() const noexcept {

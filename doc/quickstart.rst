@@ -10,8 +10,8 @@ To download the latest Charm++ release, run:
 
 .. code-block:: console
 
-   $ wget http://charm.cs.illinois.edu/distrib/charm-6.9.0.tar.gz
-   $ tar xzf charm-6.9.0.tar.gz
+   $ wget https://charm.cs.illinois.edu/distrib/charm-latest.tar.gz
+   $ tar xzf charm-latest.tar.gz
 
 To download the development version of Charm++, run:
 

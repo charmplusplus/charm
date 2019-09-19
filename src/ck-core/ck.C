@@ -2171,6 +2171,11 @@ void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char 
   ArrayMsgRecvExtCallback = cb;
 }
 
+void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int) = NULL;
+void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int *, int, int, char *, int)) {
+  ArrayBcastRecvExtCallback = cb;
+}
+
 int (*ArrayElemLeaveExt)(int, int, int *, char**, int) = NULL;
 void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int)) {
   ArrayElemLeaveExt = cb;
@@ -2203,7 +2208,6 @@ void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
 
 int CkMyPeHook() { return CkMyPe(); }
 int CkNumPesHook() { return CkNumPes(); }
-void CmiAbortHook(const char *msg) { CmiAbort("%s", msg); }
 
 void ReadOnlyExt::setData(void *msg, size_t msgSize) {
   ro_data = malloc(msgSize);
