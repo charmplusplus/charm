@@ -1629,10 +1629,10 @@ void CtgUninstall(void);
 /** Return the current global list */
 CtgGlobals CtgCurrentGlobals(void);
 
-void CthInterceptionsImmediateActivate(CthThread th);
-void CthInterceptionsImmediateDeactivate(CthThread th);
 void CthInterceptionsDeactivatePush(CthThread th);
 void CthInterceptionsDeactivatePop(CthThread th);
+int  CthInterceptionsTemporarilyActivateStart(CthThread th);
+void CthInterceptionsTemporarilyActivateEnd(CthThread th, int old);
 
 /* The thread listener structure. The user must register one such listener
 	if he wants to find out when a thread is suspended or when it starts running
