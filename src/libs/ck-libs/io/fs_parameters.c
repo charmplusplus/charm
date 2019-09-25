@@ -43,7 +43,8 @@ size_t CkGetFileStripeSize(const char *filename) {
   }
 
   if (rc != 0) {
-    CkAbort("[CkIO] llapi_file_get_stripe error");
+    CkPrintf("[CkIO] Cannot extract lustre file stripe size for %s, using default of 4 MB\n", filename);
+    return 4 * 1024 * 1024;
   }
 
   return lump->lmm_stripe_size;

@@ -1292,6 +1292,51 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
   }
 }
 
+#if CMK_CHARMPY
+
+extern void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int);
+
+void CkArrayBroadcaster::deliver(CkArrayMessage *bcast,
+                                 std::vector<CkMigratable*> &elements,
+                                 int arrayId, bool doFree)
+{
+  if (elements.size() == 0)
+    return;
+  CkAssert(UsrToEnv(bcast)->getMsgtype() == ForArrayEltMsg);
+
+  ArrayElement *el = (ArrayElement*)elements[0];
+  // get number of dimensions and number of ints used by CkArrayIndex of this array
+  const int numDim = el->thisIndexMax.getDimension();
+  const int numInts = el->thisIndexMax.nInts;
+  // store array index data of elements that are going to receive the broadcast, to pass to Charm4py
+  std::vector<int> validIndexes(elements.size() * numInts);
+  int numValidElements = 0;
+  int j = 0;
+  for (CkMigratable *m : elements) {
+    ArrayElement *el = (ArrayElement*)m;
+    int &elBcastNo = getData(el);
+    // if this array element already received this message, skip it
+    if (elBcastNo >= bcastNo) continue;
+    elBcastNo++;
+    DEBB((AA "Delivering broadcast %d to element %s\n" AB,elBcastNo,idx2str(el)));
+    int *index = el->thisIndexMax.data();
+    for (int i=0; i < numInts; i++) validIndexes[j++] = index[i];
+    numValidElements++;
+  }
+
+  char *msg_buf = ((CkMarshallMsg *)bcast)->msgBuf;
+  PUP::fromMem implP(msg_buf);
+  int msgSize; implP|msgSize;
+  int ep; implP|ep;
+  int dcopy_start; implP|dcopy_start;
+  ArrayBcastRecvExtCallback(arrayId, numDim, numInts, numValidElements, validIndexes.data(),
+                            ep, msgSize, msg_buf+(3*sizeof(int)), dcopy_start);
+  if (doFree)
+    delete bcast;
+}
+
+#endif
+
 /// Deliver all needed broadcasts to the given local element
 bool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 {
@@ -1471,26 +1516,26 @@ void CkArray::recvBroadcast(CkMessage *m)
     // extract this field here so we can still check it even if msg is freed
     const auto zc_msgtype = CMI_ZC_MSGTYPE(UsrToEnv(msg));
 
-    // All done, deliver to the first element
-    if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG) {
+    if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG && len > 0 ) { // message contains pointers to the posted buffer, which contains the data received
+      // All operations done, already consumed by other array elements, now deliver to the first element
 
-      unsigned int i=0;
-      bool doFree = true;
-      if (stableLocations && i == len-1) doFree = true;
-      broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
+      bool doFree = true; // free it since all ops are done
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
 
-    } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG) { // deliver to all array elements
+    } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG && len > 0 ) { // message is used by the receiver to post the receiver buffer
+      // Initial metadata message, send only to the first element, other elements are sent CMK_ZC_BCAST_RECV_DONE_MSG after rget completion
 
-
-      unsigned int i=0;
-      bool doFree = false;
-      if (stableLocations && i == len-1) doFree = true;
-      broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
+      bool doFree = false; // do not free since msg will be reused to send buffers to peers,
+                           // msg will be finally freed by the first element in the CMK_ZC_BCAST_RECV_ALL_DONE_MSG branch
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
 
     } else
 #endif
 
     {
+#if CMK_CHARMPY
+      broadcaster->deliver(msg, localElemVec, thisgroup.idx, stableLocations);
+#else
       for (unsigned int i = 0; i < len; ++i) {
 #if CMK_BIGSIM_CHARM
                 //BgEntrySplit("split-broadcast");
@@ -1502,7 +1547,8 @@ void CkArray::recvBroadcast(CkMessage *m)
 		bool doFree = false;
 		if (stableLocations && i == len-1) doFree = true;
 #if CMK_ONESIDED_IMPL
-		if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
+		if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;  // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the first element
+                                                                   // during CMK_ZC_BCAST_ALL_DONE_MSG
 #endif
 		CmiAssert(i < localElemVec.size());
 		broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
@@ -1517,6 +1563,7 @@ void CkArray::recvBroadcast(CkMessage *m)
       env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
     }
 #endif
+#endif // CMK_CHARMPY
   }
 
 #if CMK_BIGSIM_CHARM
@@ -1544,7 +1591,7 @@ void CkArray::forwardZCMsgToOtherElems(envelope *env) {
 
    int len = localElemVec.size();
 
-   for (unsigned int i = 1; i < len; ++i) {
+   for (unsigned int i = 1; i < len; ++i) { // Send to all elements except the first element
      bool doFree = false;
      if (stableLocations && i == len-1 && CMI_ZC_MSGTYPE(env)!=CMK_ZC_BCAST_RECV_DONE_MSG) doFree = true;
      broadcaster->deliver((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[i], doFree);

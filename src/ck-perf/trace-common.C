@@ -918,11 +918,8 @@ CkpvDeclare(int, papiEventSet);
 CkpvDeclare(LONG_LONG_PAPI*, papiValues);
 CkpvDeclare(int, papiStarted);
 CkpvDeclare(int, papiStopped);
-#ifdef USE_SPP_PAPI
-int papiEvents[NUMPAPIEVENTS];
-#else
-int papiEvents[NUMPAPIEVENTS];
-#endif
+CkpvDeclare(int*, papiEvents);
+CkpvDeclare(int, numEvents);
 #endif // CMK_HAS_COUNTER_PAPI
 
 #if CMK_HAS_COUNTER_PAPI
@@ -963,17 +960,21 @@ void initPAPI() {
   if (PAPI_create_eventset(&CkpvAccess(papiEventSet)) != PAPI_OK) {
     CmiAbort("PAPI failed to create event set!\n");
   }
+  CkpvInitialize(int*, papiEvents);
+  CkpvInitialize(int, numEvents);
 #ifdef USE_SPP_PAPI
+  CkpvAccess(numEvents) = NUMPAPIEVENTS;
+  CkpvAccess(papiEvents) = new int[CkpvAccess(numEvents)];
   //  CmiPrintf("Using SPP counters for PAPI\n");
   if(PAPI_query_event(PAPI_FP_OPS)==PAPI_OK) {
-    papiEvents[0] = PAPI_FP_OPS;
+    CkpvAccess(papiEvents)[0] = PAPI_FP_OPS;
   }else{
     if(CmiMyPe()==0){
       CmiAbort("WARNING: PAPI_FP_OPS doesn't exist on this platform!");
     }
   }
   if(PAPI_query_event(PAPI_TOT_INS)==PAPI_OK) {
-    papiEvents[1] = PAPI_TOT_INS;
+    CkpvAccess(papiEvents)[1] = PAPI_TOT_INS;
   }else{
     CmiAbort("WARNING: PAPI_TOT_INS doesn't exist on this platform!");
   }
@@ -981,47 +982,43 @@ void initPAPI() {
   int ret;
   ret=PAPI_event_name_to_code("perf::PERF_COUNT_HW_CACHE_LL:MISS",&EventCode);
   if(PAPI_query_event(EventCode)==PAPI_OK) {
-    papiEvents[2] = EventCode;
+    CkpvAccess(papiEvents)[2] = EventCode;
   }else{
     CmiAbort("WARNING: perf::PERF_COUNT_HW_CACHE_LL:MISS doesn't exist on this platform!");
   }
   ret=PAPI_event_name_to_code("DATA_PREFETCHER:ALL",&EventCode);
   if(PAPI_query_event(EventCode)==PAPI_OK) {
-    papiEvents[3] = EventCode;
+    CkpvAccess(papiEvents)[3] = EventCode;
   }else{
     CmiAbort("WARNING: DATA_PREFETCHER:ALL doesn't exist on this platform!");
   }
   if(PAPI_query_event(PAPI_L1_DCA)==PAPI_OK) {
-    papiEvents[4] = PAPI_L1_DCA;
+    CkpvAccess(papiEvents)[4] = PAPI_L1_DCA;
   }else{
     CmiAbort("WARNING: PAPI_L1_DCA doesn't exist on this platform!");
   }
   if(PAPI_query_event(PAPI_TOT_CYC)==PAPI_OK) {
-    papiEvents[5] = PAPI_TOT_CYC;
+    CkpvAccess(papiEvents)[5] = PAPI_TOT_CYC;
   }else{
     CmiAbort("WARNING: PAPI_TOT_CYC doesn't exist on this platform!");
   }
 #else
-  // just uses { PAPI_L2_DCM, PAPI_FP_OPS } the 2 initialized PAPI_EVENTS
-#endif
+  CkpvAccess(numEvents) = NUMPAPIEVENTS;
+  CkpvAccess(papiEvents) = new int[CkpvAccess(numEvents)];
   if (PAPI_query_event(PAPI_L1_TCM) == PAPI_OK && PAPI_query_event(PAPI_L1_TCA) == PAPI_OK) {
-    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L1_TCM);
-    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L1_TCA);
-    papiEvents[0] = PAPI_L1_TCM;
-    papiEvents[1] = PAPI_L1_TCA;
+    CkpvAccess(papiEvents)[0] = PAPI_L1_TCM;
+    CkpvAccess(papiEvents)[1] = PAPI_L1_TCA;
   } else if (PAPI_query_event(PAPI_L2_TCM) == PAPI_OK && PAPI_query_event(PAPI_L2_TCA) == PAPI_OK) {
-    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L2_TCM);
-    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L2_TCA);
-    papiEvents[0] = PAPI_L2_TCM;
-    papiEvents[1] = PAPI_L2_TCA;
+    CkpvAccess(papiEvents)[0] = PAPI_L2_TCM;
+    CkpvAccess(papiEvents)[1] = PAPI_L2_TCA;
   } else if (PAPI_query_event(PAPI_L3_TCM) == PAPI_OK && PAPI_query_event(PAPI_L3_TCA) == PAPI_OK) {
-    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L3_TCM);
-    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L3_TCA);
-    papiEvents[0] = PAPI_L3_TCM;
-    papiEvents[1] = PAPI_L3_TCA;
+    CkpvAccess(papiEvents)[0] = PAPI_L3_TCM;
+    CkpvAccess(papiEvents)[1] = PAPI_L3_TCA;
   } else {
     CmiAbort("PAPI: no cache miss/access events supported on any level!\n");
   }
+#endif
+  papiRetValue = PAPI_add_events(CkpvAccess(papiEventSet), CkpvAccess(papiEvents), CkpvAccess(numEvents));
   if (papiRetValue < 0) {
     if (papiRetValue == PAPI_ECNFLCT) {
       CmiAbort("PAPI events conflict! Please re-assign event types!\n");
@@ -1034,18 +1031,18 @@ void initPAPI() {
   }
   if(CkMyPe()==0)
     {
-      CmiPrintf("Registered %d PAPI counters: ", NUMPAPIEVENTS);
+      CmiPrintf("Registered %d PAPI counters:",CkpvAccess(numEvents));
       char nameBuf[PAPI_MAX_STR_LEN];
-      for(int i = 0;i < NUMPAPIEVENTS; i++)
+      for(int i=0;i<CkpvAccess(numEvents);i++)
 	{
-	  PAPI_event_code_to_name(papiEvents[i], nameBuf);
+	  PAPI_event_code_to_name(CkpvAccess(papiEvents)[i], nameBuf);
 	  CmiPrintf("%s ",nameBuf);
 	}
       CmiPrintf("\n");
     }
   CkpvInitialize(LONG_LONG_PAPI*, papiValues);
-  CkpvAccess(papiValues) = (LONG_LONG_PAPI*)malloc(NUMPAPIEVENTS*sizeof(LONG_LONG_PAPI));
-  memset(CkpvAccess(papiValues), 0, NUMPAPIEVENTS*sizeof(LONG_LONG_PAPI));
+  CkpvAccess(papiValues) = (LONG_LONG_PAPI*)malloc(CkpvAccess(numEvents)*sizeof(LONG_LONG_PAPI));
+  memset(CkpvAccess(papiValues), 0, CkpvAccess(numEvents)*sizeof(LONG_LONG_PAPI));
 #endif
 }
 #endif

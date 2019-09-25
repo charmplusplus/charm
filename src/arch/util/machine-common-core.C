@@ -203,7 +203,7 @@ extern int CharmLibInterOperate;
 std::atomic<int> ckExitComplete {0};
 
 #if CMK_SMP
-std::atomic<int> commThdExit {0};
+std::atomic<int> numPEsReadyForExit {0};
 
 /**
  *  The macro defines whether to have a comm thd to offload some
@@ -1639,7 +1639,7 @@ static void CommunicationServer(int sleepTime) {
 #if CMK_SMP 
     AdvanceCommunication(1);
 
-    if (std::atomic_load_explicit(&commThdExit, std::memory_order_acquire) == CmiMyNodeSize()) {
+    if (std::atomic_load_explicit(&numPEsReadyForExit, std::memory_order_acquire) == CmiMyNodeSize()) {
         MACHSTATE(2, "CommunicationServer exiting {");
         LrtsDrainResources();
         MACHSTATE(2, "} CommunicationServer EXIT");
@@ -1649,7 +1649,6 @@ static void CommunicationServer(int sleepTime) {
 #if CMK_USE_XPMEM
         CmiExitXpmem();
 #endif
-        CmiNodeAllBarrier();
         LrtsExit(_exitcode);
         if(CharmLibInterOperate) {
           ckExitComplete = 1;
@@ -1709,14 +1708,18 @@ if (MSG_STATISTIC)
     /* In SMP, the communication thread will exit */
     if (CmiMyRank() == 0)
         _exitcode = exitcode;
-    std::atomic_fetch_add_explicit(&commThdExit, 1, std::memory_order_release); /* atomic increment */
-    CmiNodeAllBarrier();
-#if CMK_SMP_NO_COMMTHD
-#if CMK_USE_XPMEM
+#if CMK_SMP_NO_COMMTHD && CMK_USE_XPMEM
+    CmiNodeAllBarrier(); /* Ensure all threads have reached here before freeing xpmem buffers */
     if (CmiMyRank() == 0) CmiExitXpmem();
-    CmiNodeAllBarrier();
 #endif
-    if (CmiMyRank() == 0) LrtsExit();
+    std::atomic_fetch_add_explicit(&numPEsReadyForExit, 1, std::memory_order_release); /* atomic increment */
+#if CMK_SMP_NO_COMMTHD
+    if (CmiMyRank() == 0) {
+      /* Spinning on this load is necessary to ensure all threads have fully exited the
+         barrier, otherwise exit may destroy it before all threads have left */
+      while (std::atomic_load_explicit(&numPEsReadyForExit, std::memory_order_acquire) != CmiMyNodeSize()) {}
+      LrtsExit(exitcode);
+    }
 #endif
     CmiYield();
     if (!CharmLibInterOperate || userDrivenMode) {

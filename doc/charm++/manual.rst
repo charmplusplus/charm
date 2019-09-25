@@ -1083,8 +1083,8 @@ several fields:
        void someEntry(parameters2);
    };
 
-Note that A must have a *migration constructor*, which is typically
-empty:
+Note that A must have a *migration constructor* if it is to be migratable.
+The migration constructor is typically empty:
 
 .. code-block:: c++
 
@@ -2341,10 +2341,10 @@ Objects can be created in one of two ways: they can be created using a
 normal constructor as usual; or they can be created using their pup
 constructor. The pup constructor for Charm++ array elements and
 PUP::able objects is a “migration constructor” that takes a single
-“CkMigrateMessage \*"; for other objects, such as parameter marshalled
-objects, the pup constructor has no parameters. The pup constructor is
-always followed by a call to the object’s pup method in ``isUnpacking``
-mode.
+“CkMigrateMessage \*" which the user should not free; for other objects,
+such as parameter marshalled objects, the pup constructor has no parameters.
+The pup constructor is always followed by a call to the object’s pup method
+in ``isUnpacking`` mode.
 
 Once objects are created, they respond to regular user methods and
 remote entry methods as usual. At any time, the object pup method can be
@@ -7553,7 +7553,8 @@ concrete subclasses require these four features:
 
 -  A migration constructor — a constructor that takes ``CkMigrateMessage *``.
    This is used to create the new object on the receive side,
-   immediately before calling the new object's pup routine.
+   immediately before calling the new object's pup routine. Users should not free
+   the CkMigrateMessage.
 
 -  A working, virtual ``pup`` method. You can omit this if your class has no
    data that needs to be packed.
@@ -10729,6 +10730,7 @@ appropriate choices for the build one wants to perform.
    IBVERBS with 64 bit Linux                                        ``./build charm++ verbs-linux-x86_64 --with-production -j8``
    OFI with 64 bit Linux                                            ``./build charm++ ofi-linux-x86_64 --with-production -j8``
    UCX with 64 bit Linux                                            ``./build charm++ ucx-linux-x86_64 --with-production -j8``
+   UCX with 64 bit Linux (Armv8)                                    ``./build charm++ ucx-linux-arm8 --with-production -j8``
    Net with 64 bit Windows                                          ``./build charm++ netlrts-win-x86_64 --with-production -j8``
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
    Net with 64 bit Mac                                              ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
@@ -10757,6 +10759,8 @@ the command line while configuring from a blank slate. To build with all
 defaults, ``cmake .`` is sufficient, though invoking CMake from a
 separate location (ex:
 ``mkdir mybuild && cd mybuild && cmake ../charm``) is recommended.
+Please see Section :numref:`sec:cmakeinstall` for building Charm++
+directly with CMake.
 
 Installation through the Spack package manager
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10800,31 +10804,32 @@ select another version with the ``@`` option (for example,
    	$ spack install charmpp@develop
 
 
+.. _sec:cmakeinstall:
+
 Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 As an experimental feature, Charm++ can be installed with the CMake tool, version 3.11 or newer.
-This is currently only supported on Linux and Darwin, but not on Windows.
-Currently, only the `charm++` and `AMPI` targets are available.
+This is currently supported on Linux and Darwin, but not on Windows.
 
 After downloading and unpacking Charm++, it can be installed in the following way:
 
 .. code-block:: bash
 
    $ cd charm
-   $ mkdir build
-   $ cd build
+   $ mkdir build-cmake
+   $ cd build-cmake
    $ cmake ..
    $ make -j4
 
 
 By default, CMake builds the netlrts version. 
 Other configuration options can be specified in the cmake command above.
-For example, to build the MPI version of Charm++ with SMP, the following command can be used:
+For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the following command can be used:
 
 .. code-block:: bash
 
-   $ cmake .. -DNETWORK=mpi -DSMP=on
+   $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
 
 To simplify building with CMake, the `buildcmake` command is a simple wrapper around cmake
 that supports many of the options that `build` supports.

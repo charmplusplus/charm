@@ -787,6 +787,9 @@ public:
   int incrementBcastNo();
 
   bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
+#if CMK_CHARMPY
+  void deliver(CkArrayMessage *bcast, std::vector<CkMigratable*> &elements, int arrayId, bool doFree);
+#endif
 
   void springCleaning(void);
 
