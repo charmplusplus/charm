@@ -31,6 +31,14 @@ Misc:
   load balancers, writing custom load balancers, and the internals of the load balancing
   infrastructure. Programs that rely on custom load balancers or the internals of the LB
   infrastructure will likely require some changes for compatibility.
+  
+Known Issues:
+
+- A hang occurs in multiprocess runs in SMP mode with completion detection on GNI builds.
+  (https://github.com/UIUC-PPL/charm/issues/2508)
+- Recent InfiniBand machines crash in SMP builds due to problem in verbs layer implementation.
+  Users are recommended to use UCX in the time being if possible.
+  (https://github.com/UIUC-PPL/charm/issues/2532)
 
 Charm++ Features & Fixes:
 
