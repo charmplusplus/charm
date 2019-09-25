@@ -67,7 +67,7 @@ static inline typename std::enable_if<std::is_pointer<T>::value>::type pup_raw_p
 
 int _sync_iso = 0;
 #if __FAULT__
-static int _restart = 0;
+static char CmiIsomallocRestart;
 #endif
 static int _mmap_probe = 0;
 
@@ -136,7 +136,8 @@ static void disable_isomalloc(const char * why)
 {
   isomallocStart = nullptr;
   isomallocEnd = nullptr;
-  if (CmiMyPe() == 0) CmiPrintf("Charm++> Disabling isomalloc because %s.\n", why);
+  if (CmiMyPe() == 0)
+    CmiPrintf("Converse> Disabling Isomalloc: %s.\n", why);
 }
 
 #if !CMK_HAS_MMAP
@@ -606,13 +607,80 @@ static int try_largest_mmap_region(memRegion_t * destRegion)
   return 1;
 }
 
-#ifndef CMK_CPV_IS_SMP
-#define CMK_CPV_IS_SMP
+struct CmiAddressSpaceRegion
+{
+  CmiUInt8 s, e;
+};
+
+CmiAddressSpaceRegion IsoRegion;
+
+struct CmiAddressSpaceRegionMsg
+{
+  char converseHeader[CmiMsgHeaderSizeBytes];
+  CmiAddressSpaceRegion region;
+};
+
+static std::atomic<char> CmiIsomallocSyncHandlerDone;
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+extern void CommunicationServerThread(int sleepTime);
+static std::atomic<char> CmiIsomallocSyncCommThreadDone;
 #endif
+
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+static void CmiIsomallocSyncWaitCommThread()
+{
+  do
+    CommunicationServerThread(5);
+  while (!CmiIsomallocSyncCommThreadDone.load());
+
+  CommunicationServerThread(5);
+}
+#endif
+
+static void CmiIsomallocSyncWait()
+{
+  do
+    CsdSchedulePoll();
+  while (!CmiIsomallocSyncHandlerDone.load());
+
+  CsdSchedulePoll();
+}
+
+static int CmiIsomallocSyncHandlerNode0Idx;
+static int CmiIsomallocSyncHandlerOtherNodesIdx;
+
+static void CmiIsomallocSyncHandlerNode0(void * msg)
+{
+  CmiAddressSpaceRegion & region = ((CmiAddressSpaceRegionMsg *)msg)->region;
+  DEBUG_PRINT("Isomalloc> Node %d received region for comparison: %" PRIx64 " %" PRIx64 "\n",
+              CmiMyNode(), region.s, region.e);
+
+  if (region.s > IsoRegion.s)
+    IsoRegion.s = region.s;
+  if (region.e < IsoRegion.e)
+    IsoRegion.e = region.e;
+
+  CmiFree(msg);
+
+  static int received = 1;
+  if (++received == CmiNumNodes())
+    CmiIsomallocSyncHandlerDone = 1;
+}
+static void CmiIsomallocSyncHandlerOtherNodes(void * msg)
+{
+  const CmiAddressSpaceRegion region = ((CmiAddressSpaceRegionMsg *)msg)->region;
+  DEBUG_PRINT("Isomalloc> Node %d received region for assignment: %" PRIx64 " %" PRIx64 "\n",
+              CmiMyNode(), region.s, region.e);
+
+  IsoRegion = region;
+
+  CmiFree(msg);
+
+  CmiIsomallocSyncHandlerDone = 1;
+}
 
 static void CmiIsomallocInitExtent()
 {
-  memRegion_t freeRegion{};
 #if 0
   /*Largest value a signed int can hold*/
   static constexpr memRange_t intMax = (((memRange_t)1) << (sizeof(int) * 8 - 1)) - 1;
@@ -620,6 +688,8 @@ static void CmiIsomallocInitExtent()
 
   if (CmiMyRank() == 0 && isomallocStart == nullptr)
   {
+    memRegion_t freeRegion{};
+
     /* Find the largest unused region of virtual address space */
     /*Round slot size up to nearest page size*/
     slotsize = 1024 * 1024;
@@ -629,7 +699,6 @@ static void CmiIsomallocInitExtent()
 #if ISOMALLOC_DEBUG
     if (CmiMyPe() == 0) DEBUG_PRINT("[%d] Using slotsize of %zu\n", CmiMyPe(), slotsize);
 #endif
-    freeRegion.len = 0u;
 
 #ifdef CMK_MMAP_START_ADDRESS /* Hardcoded start address, for machines where automatic \
                                  fails */
@@ -645,7 +714,7 @@ static void CmiIsomallocInitExtent()
       }
       else
       {
-        if (freeRegion.len == 0u) find_largest_free_region(&freeRegion);
+        find_largest_free_region(&freeRegion);
       }
     }
 
@@ -664,233 +733,133 @@ static void CmiIsomallocInitExtent()
       memRange_t start = CMIALIGN((uintptr_t)freeRegion.start, division_size);
       memRange_t end = CMIALIGN((uintptr_t)freeRegion.start + freeRegion.len - (division_size-1), division_size);
       memRange_t len = end - start;
-      freeRegion.start = (uint8_t *)start;
-      freeRegion.len = len;
+      IsoRegion.s = start;
+      IsoRegion.e = end;
       DEBUG_PRINT("[%d] Isomalloc memory region: 0x%zx - 0x%zx (%zu gigs)\n", CmiMyPe(),
                   start, end, len/gig);
     }
-  } /* end if myrank == 0 */
-
-  CmiNodeAllBarrier();
-
-  /*
-     on some machines, isomalloc memory regions on different nodes
-     can be different. use +isomalloc_sync to calculate the
-     intersect of all memory regions on all nodes.
-     */
-  if (_sync_iso == 1)
-  {
-#ifdef __FAULT__
-    if (_restart == 1)
-    {
-      CmiUInt8 s = (CmiUInt8)freeRegion.start;
-      CmiUInt8 e = (CmiUInt8)(freeRegion.start + freeRegion.len);
-      CmiUInt8 ss, ee;
-      int try_count, fd;
-      char fname[128];
-      sprintf(fname, ".isomalloc");
-      try_count = 0;
-      while ((fd = open(fname, O_RDONLY)) == -1 && try_count < 10000)
-      {
-        try_count++;
-      }
-      if (fd == -1)
-      {
-        CmiAbort(
-            "isomalloc_sync failed during restart, make sure you have a shared file "
-            "system.");
-      }
-      if (read(fd, &ss, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-      {
-        CmiAbort("Isomalloc> call to read() failed during restart!");
-      }
-      if (read(fd, &ee, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-      {
-        CmiAbort("Isomalloc> call to read() failed during restart!");
-      }
-      close(fd);
-      if (ss < s || ee > e)
-        CmiAbort(
-            "isomalloc_sync failed during restart, virtual memory regions do not "
-            "overlap.");
-      else
-      {
-        freeRegion.start = (uint8_t *)ss;
-        freeRegion.len = (uint8_t *)ee - (uint8_t *)ss;
-      }
-      CmiPrintf(
-          "Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%zu MB).\n",
-          freeRegion.start, freeRegion.start + freeRegion.len, freeRegion.len / meg);
-      goto AFTER_SYNC;
-    }
-#endif
-    if (CmiMyRank() == 0 && freeRegion.len > 0u)
-    {
-      if (CmiBarrier() == -1 && CmiMyPe() == 0)
-        CmiAbort("Charm++ Error> +isomalloc_sync requires CmiBarrier() implemented.\n");
-      else
-      {
-        uintptr_t s = (uintptr_t)freeRegion.start;
-        uintptr_t e = (uintptr_t)freeRegion.start + freeRegion.len;
-        int fd, i;
-        char fname[128];
-
-        if (CmiMyNode() == 0)
-          CmiPrintf("Charm++> Synchronizing isomalloc memory region...\n");
-
-        sprintf(fname, ".isomalloc.%d", CmiMyNode());
-
-        /* remove file before writing for safe */
-        unlink(fname);
-#if CMK_HAS_SYNC && !CMK_DISABLE_SYNC
-        if (system("sync") == -1)
-        {
-          CmiAbort(
-              "Isomalloc> call to system(\"sync\") failed while synchronizing memory "
-              "regions!");
-        }
-#endif
-
-        CmiBarrier();
-
-        /* write region into file */
-        while ((fd = open(fname, O_WRONLY | O_TRUNC | O_CREAT, 0644)) == -1)
-#ifndef __MINGW_H
-          CMK_CPV_IS_SMP
-#endif
-              ;
-        if (write(fd, &s, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-        {
-          CmiAbort(
-              "Isomalloc> call to write() failed while synchronizing memory regions!");
-        }
-        if (write(fd, &e, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-        {
-          CmiAbort(
-              "Isomalloc> call to write() failed while synchronizing memory regions!");
-        }
-        close(fd);
-
-#if CMK_HAS_SYNC && !CMK_DISABLE_SYNC
-        if (system("sync") == -1)
-        {
-          CmiAbort(
-              "Isomalloc> call to system(\"sync\") failed while synchronizing memory "
-              "regions!");
-        }
-#endif
-
-        CmiBarrier();
-
-        for (i = 0; i < CmiNumNodes(); i++)
-        {
-          CmiUInt8 ss, ee;
-          int try_count;
-          char fname[128];
-          if (i == CmiMyNode()) continue;
-          sprintf(fname, ".isomalloc.%d", i);
-          try_count = 0;
-          while ((fd = open(fname, O_RDONLY)) == -1 && try_count < 10000)
-          {
-            try_count++;
-#ifndef __MINGW_H
-            CMK_CPV_IS_SMP
-#endif
-                ;
-          }
-          if (fd == -1)
-          {
-            CmiAbort("isomalloc_sync failed, make sure you have a shared file system.");
-          }
-          if (read(fd, &ss, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-          {
-            CmiAbort(
-                "Isomalloc> call to read() failed while synchronizing memory regions!");
-          }
-          if (read(fd, &ee, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-          {
-            CmiAbort(
-                "Isomalloc> call to read() failed while synchronizing memory regions!");
-          }
-#if ISOMALLOC_DEBUG
-          if (CmiMyPe() == 0)
-            DEBUG_PRINT("[%d] load node %d isomalloc region: %" PRIx64 " %" PRIx64 ".\n", CmiMyPe(), i,
-                        ss, ee);
-#endif
-          close(fd);
-          if (ss > s) s = ss;
-          if (ee < e) e = ee;
-        }
-
-        CmiBarrier();
-
-        unlink(fname);
-#if CMK_HAS_SYNC && !CMK_DISABLE_SYNC
-        if (system("sync") == -1)
-        {
-          CmiAbort(
-              "Isomalloc> call to system(\"sync\") failed while synchronizing memory "
-              "regions!");
-        }
-#endif
-
-        /* update */
-        if (s > e)
-        {
-          if (CmiMyPe() == 0)
-            CmiPrintf("[%d] Invalid isomalloc region: %" PRIxPTR " - %" PRIxPTR ".\n", CmiMyPe(), s, e);
-          CmiAbort("Isomalloc> failed to find consolidated isomalloc region!");
-        }
-        freeRegion.start = (uint8_t *)(uintptr_t)s;
-        freeRegion.len = (uint8_t *)(uintptr_t)e - (uint8_t *)(uintptr_t)s;
-
-        if (CmiMyPe() == 0)
-          CmiPrintf("Charm++> Consolidated Isomalloc memory region: %p - %p (%zu MB).\n",
-                    freeRegion.start, freeRegion.start + freeRegion.len,
-                    freeRegion.len / meg);
-#if __FAULT__
-        if (CmiMyPe() == 0)
-        {
-          int fd;
-          char fname[128];
-          CmiUInt8 s = (CmiUInt8)freeRegion.start;
-          CmiUInt8 e = (CmiUInt8)(freeRegion.start + freeRegion.len);
-          sprintf(fname, ".isomalloc");
-          while ((fd = open(fname, O_WRONLY | O_TRUNC | O_CREAT, 0644)) == -1)
-            ;
-          if (write(fd, &s, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-          {
-            CmiAbort(
-                "Isomalloc> call to write() failed while synchronizing memory regions!");
-          }
-          if (write(fd, &e, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-          {
-            CmiAbort(
-                "Isomalloc> call to write() failed while synchronizing memory regions!");
-          }
-          close(fd);
-        }
-#endif
-      } /* end of barrier test */
-    }   /* end of rank 0 */
-    else
-    {
-      CmiBarrier();
-      CmiBarrier();
-      CmiBarrier();
-      CmiBarrier();
-    }
   }
 
-#ifdef __FAULT__
-    AFTER_SYNC:
+  /* isomalloc_sync
+   * Available address space regions can vary across nodes.
+   * Calculate the intersection of all memory regions on all nodes.
+   */
+
+  CmiAssignOnce(&CmiIsomallocSyncHandlerNode0Idx, CmiRegisterHandler(CmiIsomallocSyncHandlerNode0));
+  CmiAssignOnce(&CmiIsomallocSyncHandlerOtherNodesIdx, CmiRegisterHandler(CmiIsomallocSyncHandlerOtherNodes));
+
+#if __FAULT__
+  if (CmiIsomallocRestart)
+  {
+    if (CmiMyRank() == 0)
+    {
+      CmiAddressSpaceRegion previous;
+
+      int try_count = 0, fd;
+      while ((fd = open(".isomalloc", O_RDONLY)) == -1 && try_count < 10000)
+        try_count++;
+
+      if (fd == -1)
+        CmiAbort("isomalloc_sync failed during restart, make sure you have a shared file system.");
+      if (read(fd, &previous, sizeof(CmiAddressSpaceRegion)) != sizeof(CmiAddressSpaceRegion))
+        CmiAbort("Isomalloc> call to read() failed during restart!");
+
+      close(fd);
+      if (previous.s < IsoRegion.s || previous.e > IsoRegion.e)
+        CmiError("Isomalloc> Warning: virtual memory regions do not overlap: "
+                 "current %" PRIx64 " - %" PRIx64 ", previous %" PRIx64 " - %" PRIx64 "\n",
+                 IsoRegion.s, IsoRegion.e, previous.s, previous.e);
+      else
+        IsoRegion = previous;
+
+      if (CmiMyPe() == 0)
+        CmiPrintf("Isomalloc> Synchronized global address space.\n");
+
+      DEBUG_PRINT("Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%" PRId64 " MB).\n",
+                  (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
+    }
+  }
+  else
+#endif
+  if (_sync_iso && CmiNumNodes() > 1)
+  {
+    if (CmiMyRank() == 0)
+    {
+      auto msg = (CmiAddressSpaceRegionMsg *)CmiAlloc(sizeof(CmiAddressSpaceRegionMsg));
+
+      if (CmiMyNode() == 0)
+      {
+        DEBUG_PRINT("Charm++> Synchronizing Isomalloc memory region...\n");
+
+        CmiIsomallocSyncWait();
+
+        DEBUG_PRINT("Isomalloc> Node %d sending region for assignment: %" PRIx64 " %" PRIx64 "\n",
+                    CmiMyNode(), IsoRegion.s, IsoRegion.e);
+        msg->region = IsoRegion;
+        CmiSetHandler((char *)msg, CmiIsomallocSyncHandlerOtherNodesIdx);
+        CmiSyncNodeBroadcastAndFree(sizeof(CmiAddressSpaceRegionMsg), msg);
+
+        CsdSchedulePoll();
+
+        if (IsoRegion.s >= IsoRegion.e)
+          CmiAbort("Isomalloc> failed to find consolidated region: %" PRIx64 " - %" PRIx64 ".\n",
+                   IsoRegion.s, IsoRegion.e);
+
+        if (CmiMyPe() == 0)
+          CmiPrintf("Isomalloc> Synchronized global address space.\n");
+
+        DEBUG_PRINT("Charm++> Consolidated Isomalloc memory region: %p - %p (%" PRId64 " MB).\n",
+                    (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
+      }
+      else
+      {
+        DEBUG_PRINT("Isomalloc> Node %d sending region for comparison: %" PRIx64 " %" PRIx64 "\n",
+                    CmiMyNode(), IsoRegion.s, IsoRegion.e);
+
+        msg->region = IsoRegion;
+        CmiSetHandler((char *)msg, CmiIsomallocSyncHandlerNode0Idx);
+        CmiSyncNodeSendAndFree(0, sizeof(CmiAddressSpaceRegionMsg), msg);
+
+        CmiIsomallocSyncWait();
+      }
+
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+      CmiIsomallocSyncCommThreadDone = 1;
+#endif
+    }
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+    else if (CmiInCommThread())
+    {
+      CmiIsomallocSyncWaitCommThread();
+    }
+#endif
+    else
+    {
+      CmiIsomallocSyncWait();
+    }
+
+    CmiBarrier();
+  }
+
+  if (CmiMyRank() == 0)
+  {
+#if __FAULT__
+    if (!CmiIsomallocRestart && CmiMyNode() == 0)
+    {
+      int fd;
+      while ((fd = open(".isomalloc", O_WRONLY | O_TRUNC | O_CREAT, 0644)) == -1)
+        ;
+      if (write(fd, &IsoRegion, sizeof(CmiAddressSpaceRegion)) != sizeof(CmiAddressSpaceRegion))
+        CmiAbort("Isomalloc> call to write() failed while synchronizing memory regions!");
+      close(fd);
+    }
 #endif
 
-  if (CmiMyRank() == 0 && freeRegion.len > 0u)
-  {
-    /*Isomalloc covers entire unused region*/
-    isomallocStart = freeRegion.start;
-    isomallocEnd = freeRegion.start + freeRegion.len;
+    if (IsoRegion.e > IsoRegion.s)
+    {
+      isomallocStart = (uint8_t *)(uintptr_t)IsoRegion.s;
+      isomallocEnd = (uint8_t *)(uintptr_t)IsoRegion.e;
+    }
   }
 
   CmiNodeAllBarrier();
@@ -942,6 +911,16 @@ struct isommap
 
     if (p.isUnpacking())
     {
+#if __FAULT__
+      if (start < isomallocStart || isomallocEnd < allocated_extent)
+        CmiAbort("Could not unpack Isomalloc memory region, virtual memory regions do not overlap: "
+                 "current %p - %p, context %p - %p",
+                 isomallocStart, isomallocEnd, start, allocated_extent);
+
+      if (isomallocEnd < end)
+        end = (uint8_t *)CMIALIGN((uintptr_t)isomallocEnd - (pagesize-1), pagesize);
+#endif
+
       void * const mapped = map_global_memory(start, totalsize);
       if (mapped == nullptr)
         CmiAbort("Failed to unpack Isomalloc memory region!");
@@ -2325,15 +2304,26 @@ int CmiIsomallocInRange(void * addr)
 }
 
 int _sync_iso_warned = 0;
+#if CMK_CONVERSE_MPI && (CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING)
+extern int num_workpes, total_pes;
+#endif
 
 void CmiIsomallocInit(char ** argv)
 {
+#if CMK_CONVERSE_MPI && (CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING)
+  if (num_workpes != total_pes)
+  {
+    disable_isomalloc("+wp is active and spare processor init code is WIP");
+    return;
+  }
+#endif
+
 #if CMK_NO_ISO_MALLOC
-  disable_isomalloc("isomalloc disabled by conv-mach");
+  disable_isomalloc("unsupported platform");
 #else
   if (CmiGetArgFlagDesc(argv, "+noisomalloc", "disable isomalloc"))
   {
-    disable_isomalloc("isomalloc disabled by user.");
+    disable_isomalloc("specified by user");
     return;
   }
 #if CMK_MMAP_PROBE
@@ -2348,12 +2338,12 @@ void CmiIsomallocInit(char ** argv)
           argv, "+isomalloc_test",
           "mmap test common areas for the largest available isomalloc region"))
     _mmap_probe = 0;
-  if (CmiGetArgFlagDesc(argv, "+isomalloc_sync", "synchronize isomalloc region globaly"))
+  if (CmiGetArgFlagDesc(argv, "+isomalloc_sync", "synchronize isomalloc region globally"))
     _sync_iso = 1;
 #if __FAULT__
   if (CmiGetArgFlagDesc(argv, "+restartisomalloc",
                         "restarting isomalloc on this processor after a crash"))
-    _restart = 1;
+    CmiIsomallocRestart = 1;
 #endif
   if (!init_map())
   {
