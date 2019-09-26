@@ -1143,9 +1143,17 @@ if [ "$BUILD_SHARE" = "1" ]
 then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
-	*.a|*.so|*.so.*|*.sl|*.dylib)
+	*.a)
 		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
 		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
+		;;
+	*.so|*.so.*|*.sl|*.dylib)
+		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
+		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
+		if [ "$CMK_MACOSX" = "1" -a -z "$STANDALONE" ]; then
+			fname=`basename $OBJECT`
+			OPTS_LD="$OPTS_LD -Wl,-install_name,$CHARMLIBSO/$fname"
+		fi
 		;;
 	*)
 		BUILD_SHARE="0"
