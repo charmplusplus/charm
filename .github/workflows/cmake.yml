@@ -12,4 +12,4 @@ jobs:
     - name: build
       run: ./buildcmake LIBS netlrts-linux-x86_64 -g -j4 --with-production
     - name: test
-      run: make -C netlrts-linux-x86_64/tmp -j3 all-test-tests all-test-examples OPTS="-g" &&  make -C netlrts-linux-x86_64/tmp test-tests test-examples TESTOPTS="++local +isomalloc_sync"
+      run: make -C netlrts-linux-x86_64/test OPTS="-g" TESTOPTS="++local +isomalloc_sync"
