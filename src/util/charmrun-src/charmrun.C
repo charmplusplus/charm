@@ -972,8 +972,11 @@ static void arg_init(int argc, const char **argv)
         (argv) + 1; /*Skip over charmrun (0) here and program name (1) later*/
   arg_argc = pparam_countargs(arg_argv);
   if (arg_argc < 1) {
-    fprintf(stderr, "ERROR> You must specify a node-program.\n");
-    pparam_printdocs();
+    if (!arg_help)
+    {
+      fprintf(stderr, "ERROR> You must specify a node-program.\n");
+      pparam_printdocs();
+    }
     exit(1);
   }
 
