@@ -1568,8 +1568,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CHARMDEBUG
 	CpdFinishInitialization();
 #endif
-	//	if (CkMyRank() == 0)
-	  _registerDone();
+	_registerDone();
 	CmiNodeAllBarrier();
 
 	CkpvAccess(_myStats) = new Stats();
