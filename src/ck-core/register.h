@@ -75,8 +75,9 @@ class EntryInfo {
       message type but store different data in it, like parameter
       marshalled messages.
     */
-    std::atomic<int> breakPointSet;
     CkMessagePupFn messagePup;
+    /// guard entryTable call and name swap for breakpoint in SMP
+    std::atomic<int> breakPointSet;
 #endif
 
     /// Charm++ Tracing enabled for this ep (can change dynamically)

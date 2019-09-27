@@ -1558,9 +1558,8 @@ void _initCharm(int unused_argc, char **argv)
 	}
 
 	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */
-	//	if (CkMyRank() == 0) {
-	  CpdBreakPointInit();
-	  //	}
+	CpdBreakPointInit();
+	
 	CmiNodeAllBarrier();
 
 	// Execute the initcalls registered in modules
