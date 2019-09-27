@@ -111,7 +111,7 @@ void Entry::check() {
   }
 
   if (isTramTarget()) {
-    if (param && (!param->isMarshalled() || param->isVoid() || param->next != NULL))
+    if (param && (/*!param->isMarshalled() ||*/ param->isVoid() || param->next != NULL))
       XLAT_ERROR_NOCOL(
           "'aggregate' entry methods must be parameter-marshalled "
           "and take a single argument",
@@ -1094,7 +1094,7 @@ void Entry::genTramInstantiation(XStr& str) {
           << "    }\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str() << " tramProxy =\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()
-          << "::ckNew(2, dims, gId, itemsPerBuffer, false, 10.0);\n"
+          << "::ckNew(2, dims, gId, itemsPerBuffer, false, 0.01);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
           << "  }\n";
     }
@@ -1111,7 +1111,7 @@ XStr Entry::tramBaseType() {
 void Entry::genTramRegs(XStr& str) {
   if (isTramTarget()) {
     XStr messageTypeString;
-    messageTypeString << "MeshStreamerMessage<" << dataItemType() << ">";
+    messageTypeString << "MeshStreamerMessageV";
 
     XStr baseTypeString = tramBaseType();
 
