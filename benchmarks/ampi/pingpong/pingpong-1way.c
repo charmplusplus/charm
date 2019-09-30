@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <mpi.h>
 
-int finish();
 void run(int msg_size, int iter, int my_id, int p, char *message_s, char *message_r, int printFormat);
 
 int main(int argc, char **argv)
@@ -27,7 +26,9 @@ int main(int argc, char **argv)
     if(my_id == 0) {
       printf("Doesn't have required input params. Usage: ./pgm <min-msg-size> <max-msg-size> <low-iter> <high-iter> <print-format (0 for csv, 1 for regular)>\n");
     }
-    finish();
+
+    MPI_Finalize();
+    return -1;
   } else {
     min_msg_size = atoi(argv[1]);
     max_msg_size  = atoi(argv[2]);
@@ -36,8 +37,8 @@ int main(int argc, char **argv)
     printFormat = atoi(argv[5]);
   }
 
-  message_s = (char*)malloc (max_msg_size);
-  message_r = (char*)malloc (max_msg_size);
+  message_s = (char*)calloc (max_msg_size, 1);
+  message_r = (char*)calloc (max_msg_size, 1);
 
   msg_size = min_msg_size;
 
@@ -60,12 +61,8 @@ int main(int argc, char **argv)
   free(message_s);
   free(message_r);
 
-  return finish();
-}
-
-int finish() {
   MPI_Finalize();
-  return -1;
+  return 0;
 }
 
 void run(int msg_size, int iter, int my_id, int p, char *message_s, char *message_r, int printFormat) {
