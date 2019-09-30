@@ -31,9 +31,9 @@ Linux, Windows, MacOS)), etc. The communication protocols and
 infrastructures supported by Charm++ are UDP, MPI, OFI, UCX, Infiniband,
 uGNI, and PAMI. Charm++ programs can run without changing the source on
 all these platforms. Charm++ programs can also interoperate with MPI
-programs (§ :numref:`sec:mpiinterop`). Please see the Installation and Usage
+programs (Section :numref:`sec:mpiinterop`). Please see the Installation and Usage
 section for details about installing, compiling and running Charm++
-programs (§ :numref:`sec:install`).
+programs (Section :numref:`sec:install`).
 
 Programming Model
 -----------------
@@ -87,8 +87,7 @@ scheduler, it repeats the cycle. I.e. there is no pre-emptive scheduling
 of other invocations.
 
 When a chare method executes, it may create method invocations for other
-chares. The Charm Runtime System (RTS, sometimes referred to as the
-Chare Kernel in the manual) locates the PE where the targeted chare
+chares. The Charm Runtime System (RTS) locates the PE where the targeted chare
 resides, and delivers the invocation to the scheduler on that PE.
 
 Methods of a chare that can be remotely invoked are called *entry*
@@ -122,7 +121,7 @@ So, one can think of Charm++ as supporting a *global object space*.
 
 Every Charm++ program must have at least one mainchare. Each mainchare
 is created by the system on processor 0 when the Charm++ program starts
-up. Execution of a Charm++ program begins with the Charm Kernel
+up. Execution of a Charm++ program begins with the Charm RTS
 constructing all the designated mainchares. For a mainchare named X,
 execution starts at constructor X() or X(CkArgMsg \*) which are
 equivalent. Typically, the mainchare constructor starts the computation
@@ -146,7 +145,7 @@ allowing for some localized non-determinism (e.g. a pair of methods may
 execute in any order, but when they both finish, the execution continues
 in a pre-determined manner, say executing a 3rd entry method). To
 simplify expression of such control structures, Charm++ provides two
-methods: the structured dagger notation (Sec :numref:`sec:sdag`), which
+methods: the structured dagger notation (Section :numref:`sec:sdag`), which
 is the main notation we recommend you use. Alternatively, you may use
 threaded entry methods, in combination with *futures* and *sync* methods
 (See :numref:`threaded`). The threaded methods run in light-weight
@@ -193,7 +192,7 @@ features of the Charm++ programming system. Part I, “Basic Usage”, is
 sufficient for writing full-fledged applications. Note that only the
 last two chapters of this part involve the notion of physical processors
 (cores, nodes, ..), with the exception of simple query-type utilities
-(Sec :numref:`basic utility fns`). We strongly suggest that all
+(Section :numref:`basic utility fns`). We strongly suggest that all
 application developers, beginners and experts alike, try to stick to the
 basic language to the extent possible, and use features from the
 advanced sections only when you are convinced they are essential. (They
@@ -1513,7 +1512,7 @@ the contributed elements if you need to know which array element gave a
 particular contribution. Additionally, if the contributed elements are
 of a complex data type, you will likely have to supply code for
 serializing/deserializing them. Consider using the PUP interface
-(§ :numref:`sec:pup`) to simplify your object serialization
+(Section :numref:`sec:pup`) to simplify your object serialization
 needs.
 
 If the outcome of your reduction is dependent on the order in which data
@@ -1832,7 +1831,7 @@ denoting the desired reference number in square brackets between the
 entry method name and its parameter list. For parameter marshalled entry
 methods, the reference number expression will be compared for equality
 with the entry method’s first argument. For entry methods that accept an
-explicit message (§ :numref:`messages`), the reference number on the
+explicit message (Section :numref:`messages`), the reference number on the
 message can be set by calling the function
 ``CkSetRefNum(void *msg, CMK_REFNUM_TYPE ref)``. Matching is used in the
 loop example below, and in
@@ -3482,7 +3481,7 @@ particular branch of a nodegroup, it may be executed by *any* PE in that
 logical node. Thus two invocations of a single entry method on a
 particular branch of a NodeGroup may be executed *concurrently* by two
 different PEs in the logical node. If this could cause data races in
-your program, please consult § :numref:`sec:nodegroups/exclusive`
+your program, please consult Section :numref:`sec:nodegroups/exclusive`
 (below).
 
 .. _sec:nodegroups/exclusive:
@@ -3501,7 +3500,7 @@ PE within that logical node will execute any other *exclusive* methods.
 However, PEs in the logical node may still execute *non-exclusive* entry
 method invocations. An entry method can be marked exclusive by tagging
 it with the exclusive attribute, as explained in
-§ :numref:`attributes`.
+Section :numref:`attributes`.
 
 Accessing the Local Branch of a NodeGroup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -3588,7 +3587,7 @@ sequence:
    However, if your program structure requires it, you can explicitly
    specify that the creation of certain Groups/NodeGroups depends on the
    creation of others, as described in
-   § :numref:`sec:groups/creation`. In addition, since those
+   Section :numref:`sec:groups/creation`. In addition, since those
    objects are initialized after the initialization of readonly
    variables, readonly variables can be used in the constructors of
    Groups and NodeGroups.
@@ -3680,7 +3679,7 @@ with the entire message comprises a contiguous buffer of memory.
 **Packed Messages.** A *packed* message is used to communicate
 non-linear data structures via messages. However, we defer a more
 detailed description of their use to
-§ :numref:`sec:messages/packed_msgs`.
+Section :numref:`sec:messages/packed_msgs`.
 
 .. _memory allocation:
 
@@ -3807,7 +3806,7 @@ write:
 
 Notice the last argument to the overloaded new operator, which specifies
 the number of bits used to store message priority. The section on
-prioritized execution (§ :numref:`prioritized message passing`)
+prioritized execution (Section :numref:`prioritized message passing`)
 describes how priorities can be employed in your program.
 
 Another version of the overloaded new operator allows you to pass in an
@@ -5584,7 +5583,7 @@ returned data can either be in the form of a Charm++ message or any type
 that has the PUP method implemented. Because the caller of a sync entry
 method will block, it must execute in a thread separate from the
 scheduler; that is, it must be a threaded entry method (*cf.*
-§ :numref:`threaded`, above). If a sync entry method returns a value,
+Section :numref:`threaded`, above). If a sync entry method returns a value,
 it is provided as the return value from the invocation on the proxy
 object:
 
@@ -5827,7 +5826,7 @@ has two variants which expect the following arguments:
    Upon quiescence detection, the specified callback is called with no
    parameters. Note that using this variant, you could have your program
    terminate after quiescence is detected, by supplying the above method
-   with a CkExit callback (§ :numref:`sec:callbacks/creating`).
+   with a CkExit callback (Section :numref:`sec:callbacks/creating`).
 
 #. An index corresponding to the entry function that is to be called,
    and a handle to the chare on which that entry function should be
@@ -5863,7 +5862,7 @@ this:
 
 Note that CkWaitQD should only be called from a threaded entry method
 because a call to CkWaitQD suspends the current thread of execution
-(*cf.* § :numref:`threaded`).
+(*cf.* Section :numref:`threaded`).
 
 .. _advanced arrays:
 
@@ -8334,7 +8333,7 @@ a MPI+OpenMP hybrid program, Charm++ will work perfectly with any
 shared-memory parallel programming languages (e.g. OpenMP). As with
 ordinary OpenMP applications, the number of threads used in the OpenMP
 parts of the program can be controlled with the ``OMP_NUM_THREADS``
-environment variable. See Sec. :numref:`charmrun` for details on how
+environment variable. See Section :numref:`charmrun` for details on how
 to propagate such environment variables.
 
 If there are no spare cores allocated, to avoid resource contention, a
