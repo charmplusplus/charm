@@ -10908,31 +10908,31 @@ Simple PMI, Slurm PMI, Slurm PMI 2 and PMIx (using OpenMPI). Currently, in order
 use PMIx for process management, it is required to have OpenMPI installed on the system.
 Additionally, in order to use the other supported process management interfaces, it is
 required to have a non-OpenMPI based MPI implementation installed on the system (e.g.
-Intel MPI, Mvapich, MPICH, etc.).
+Intel MPI, MVAPICH, MPICH, etc.).
 
 The following section shows examples of build commands that can be used to build targets
-with the UCX backend using different process management interfaces. In all these cases,
-in order for Charm++ to find UCX path, it is required to pass the UCX build directory
-as ``--basedir``.
+with the UCX backend using different process management interfaces. It should be noted that
+unless UCX is installed in a system directory, in order for Charm++ to find the UCX installation,
+it is required to pass the UCX build directory as ``--basedir``.
 
 To build the Charm++ target with Simple PMI, do not specify any additional option as shown
 in the build command.
 
 .. code-block:: bash
 
-   $ ./build Charm++ ucx-linux-x86_64 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+   $ ./build charm++ ucx-linux-x86_64 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
 
 To build the Charm++ target with Slurm PMI, specify ``slurmpmi`` in the build command.
 
 .. code-block:: bash
 
-   $ ./build Charm++ ucx-linux-x86_64 slurmpmi --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+   $ ./build charm++ ucx-linux-x86_64 slurmpmi --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
 
 Similarly, to build the Charm++ target with Slurm PMI 2, specify ``slurmpmi2`` in the build command.
 
 .. code-block:: bash
 
-   $ ./build Charm++ ucx-linux-x86_64 slurmpmi2 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+   $ ./build charm++ ucx-linux-x86_64 slurmpmi2 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
 
 To build the Charm++ target with PMIx, you would require an OpenMPI implementation with PMIx
 enabled to be installed on your system. In case OpenMPI is not available in your environment,
@@ -10940,11 +10940,11 @@ you can build OpenMPI from scratch using the following steps:
 
 .. code-block:: bash
 
-  wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
-  tar -xvf openmpi-4.0.1.tar.gz
-  ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
-  make -j24
-  make install all
+  $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
+  $ tar -xvf openmpi-4.0.1.tar.gz
+  $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
+  $ make -j24
+  $ make install all
 
 After installing OpenMPI or using the pre-installed OpenMPI, you can build the Charm++ target with
 the UCX backend by specifying ``ompipmix`` in the build command and passing the OpenMPI installation
@@ -10952,7 +10952,7 @@ path as ``--basedir`` (in addition to passing the UCX build directory)
 
 .. code-block:: bash
 
-   $ ./build Charm++ ucx-linux-x86_64 ompipmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/openmpi-4.0.1/build -j16
+   $ ./build charm++ ucx-linux-x86_64 ompipmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/openmpi-4.0.1/build -j16
 
 It should be noted that the pmix version is the most stable version of using the UCX backend. We're in the
 process of debugging some recent issues with Simple PMI, Slurm PMI and Slurm PMI2.
@@ -11730,12 +11730,15 @@ Instructions to run Charm++ programs for Specific Builds
 UCX
 ^^^
 When Charm++ is built with UCX using Simple PMI, Slurm PMI or Slurm PMI2, ensure that
-an MPI implementation which is not OpenMPI is loaded in the environment. Use the mpiexec/mpirun
+an MPI implementation which is not OpenMPI is loaded in the environment. Use the mpirun
 launcher provided by the non-OpenMPI implementation to launch programs. Alternatively, you
 can also use any system provided launchers.
 
 When Charm++ is built with UCX using PMIx, ensure that an OpenMPI implementation is loaded
 in the environment. Use the mpiexec/mpirun launcher provided with OpenMPI to launch programs.
+
+Note that due to bug #2477, binaries built with UCX cannot be run in standalone mode i.e without
+a launcher.
 
 .. _sec:keywords:
 
