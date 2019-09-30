@@ -294,15 +294,52 @@ use them to build your AMPI program using the same syntax as other
 compilers like ``gcc``. These scripts automatically handle the details of
 linking against AMPI and the Charm++ runtime system. They are intended as
 drop-in replacements for ``mpicc`` wrappers provided by most conventional
-MPI implementations. All command line flags that you would use
-for other compilers can be used with the AMPI compilers the same way.
-For example:
+MPI implementations.
+
+.. _tab:toolchain:
+.. table:: Full list of AMPI toolchain wrappers.
+
+   ============ ==============
+   Command Name Purpose
+   ============ ==============
+   ampicc       C
+   ampiCC       C++
+   ampicxx      C++
+   ampic++      C++
+   ampif77      Fortran 77
+   ampif90      Fortran 90
+   ampifort     Fortran 90
+   ampirun      Program Launch
+   ampiexec     Program Launch
+   ============ ==============
+
+All command line flags that you would use for other compilers can be used
+with the AMPI compilers the same way. For example:
 
 .. code-block:: bash
 
    $ ampicc -c pgm.c -O3
    $ ampif90 -c pgm.f90 -O0 -g
    $ ampicc -o pgm pgm.o -lm -O3
+
+For consistency with other MPI implementations, these wrappers are also
+provided using their standard names with the suffix ``.ampi``:
+
+.. code-block:: bash
+
+   $ mpicc.ampi -c pgm.c -O3
+   $ mpif90.ampi -c pgm.f90 -O0 -g
+   $ mpicc.ampi -o pgm pgm.o -lm -O3
+
+Additionally, the ``bin/ampi`` subdirectory of Charm++ installations
+contains the wrappers with their exact standard names, allowing them to
+be given precedence as shell commands in a ``module``-like fashion by
+adding this directory to the ``$PATH`` environment variable:
+
+   $ export PATH=/home/user/charm/netlrts-linux-x86_64/bin/ampi:$PATH
+   $ mpicc -c pgm.c -O3
+   $ mpif90 -c pgm.f90 -O0 -g
+   $ mpicc -o pgm pgm.o -lm -O3
 
 These wrappers also allow the user to configure AMPI and Charm++-specific
 functionality.

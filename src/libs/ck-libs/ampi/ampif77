@@ -1,6 +1,6 @@
 #!/bin/bash
-CHARMBIN=`dirname $0`
+CHARMBIN=$(dirname $0)
 
 export AMPICC_MODE='ampif'
 
-$CHARMBIN/ampiCC $@
+$CHARMBIN/ampiCC "$@"

@@ -9,6 +9,8 @@
 #
 ##############################################################################
 
+export FROM_CHARMC='1'
+
 # Filter extra cmake arguments
 # This has no effect when building Charm++ without cmake
 if [ "$1" = "@CMAKE_C_COMPILER@" ]; then shift; fi
