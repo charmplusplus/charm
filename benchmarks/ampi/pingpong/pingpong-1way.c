@@ -23,8 +23,6 @@ int main(int argc, char **argv)
   MPI_Comm_rank( MPI_COMM_WORLD, &my_id );
   MPI_Comm_size( MPI_COMM_WORLD, &p );
 
-  printf("[Rank: %d][Num procs: %d] argc = %d\n", my_id, p, argc);
-
   if(argc < 6) {
     if(my_id == 0) {
       printf("Doesn't have required input params. Usage: ./pgm <min-msg-size> <max-msg-size> <low-iter> <high-iter> <print-format (0 for csv, 1 for regular)>\n");
