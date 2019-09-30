@@ -42,6 +42,8 @@
 #undef  CMK_IMMEDIATE_MSG
 #define CMK_IMMEDIATE_MSG				   1
 
+#define CMK_NO_ISO_MALLOC                                  1
+
 /*
 #define CMK_PCQUEUE_LOCK                                   1
 */

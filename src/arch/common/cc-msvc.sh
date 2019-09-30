@@ -15,4 +15,6 @@ CMK_RANLIB="echo "
 CMK_LIBS=""
 CMK_MOD_EXT="vo"
 
+CMK_NO_ISO_MALLOC='1'
+
 CMK_COMPILER='msvc'

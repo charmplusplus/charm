@@ -53,9 +53,6 @@
 #define CMK_LBDB_ON                                        1
 
 #define CMK_STACKSIZE_DEFAULT                              262144
-/*
-#define CMK_NO_ISO_MALLOC                                  1
-*/
 
 
 /* Mac-specific optimizations */

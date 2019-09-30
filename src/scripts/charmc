@@ -1540,7 +1540,7 @@ case "$MEMORY" in
 esac
 
 # Isomalloc does not work on BGQ or Windows:
-if [ "$CMK_BLUEGENEQ" = "1" -o "$CMK_COMPILER" = "msvc" ] && [ "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]
+if [ "$CMK_NO_ISO_MALLOC" = "1" -a "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]
 then
   Abort "Error: Isomalloc is not supported on BlueGene/Q or Windows."
 fi

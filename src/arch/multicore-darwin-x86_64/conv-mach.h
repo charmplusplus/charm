@@ -57,9 +57,7 @@
 #define CMK_LBDB_ON					   1
 
 #define CMK_STACKSIZE_DEFAULT				   65536
-/*
-#define CMK_NO_ISO_MALLOC				   1
-*/
+
 #define CMK_USE_KQUEUE                                     1
 
 #define CMK_NOT_USE_TLS_THREAD                             1

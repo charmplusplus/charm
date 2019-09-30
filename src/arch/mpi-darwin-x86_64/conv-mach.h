@@ -59,8 +59,6 @@
 #undef CMK_STACKSIZE_DEFAULT
 #define CMK_STACKSIZE_DEFAULT                              262144
 
-//#define CMK_NO_ISO_MALLOC                                1
-
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
