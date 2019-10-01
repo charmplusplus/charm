@@ -131,6 +131,8 @@ public:
     if (d.data != NULL) {
       init();
       memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
+    } else {
+      data = NULL;
     }
   }
 
@@ -139,12 +141,16 @@ public:
     if (d.data != NULL) {
       if (data==NULL) init();
       memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
+    } else if (data != NULL) {
+      delete [] data;
+      data = NULL;
     }
     return *this;
   }
-  inline void init() { data = new char[CkpvAccess(lbobjdatalayout).size()]; }
   inline void pup(PUP::er &p);
   void *getData(int idx) { if (data==NULL) init(); return (void*)(data+idx); }
+private:
+  inline void init() { data = new char[CkpvAccess(lbobjdatalayout).size()]; }
 };
 
 typedef struct {
