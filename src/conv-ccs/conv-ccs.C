@@ -546,7 +546,6 @@ CpvDeclare(int, cpdSuspendStartup);
 
 void CcsInit(char **argv)
 {
-
   CpvInitialize(CkHashtable_c, ccsTab);
   CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(CcsHandlerRec),5);
   CpvInitialize(CcsImplHeader *, ccsReq);
@@ -600,9 +599,9 @@ void CcsInit(char **argv)
 
      if (CmiGetArgFlagDesc(argv, "+DebugSuspend", "Suspend execution at beginning of program")) {
 #if CMK_SMP       
-       if(CmiMyRank() != CmiMyNodeSize()) CpvAccess(cpdSuspendStartup) = 1;
+       if(!CmiInCommThread()) CpvAccess(cpdSuspendStartup) = 1;
 #else
-       if(CmiMyRank() == 0) CpvAccess(cpdSuspendStartup) = 1;
+       CpvAccess(cpdSuspendStartup) = 1;
 #endif       
        //       CmiPrintf("[%d] set SuspendStartup %d\n",CmiMyPe(), CpvAccess(cpdSuspendStartup));
      }

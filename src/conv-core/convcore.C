@@ -3809,7 +3809,7 @@ void ConverseCommonInit(char **argv)
   CmiIOInit(argv);
 #endif
   if (CmiMyPe() == 0)
-    CmiPrintf("[%d] Converse/Charm++ Commit ID: %s\n", CmiMyPe(), CmiCommitID);
+    CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
 
   CpvInitialize(int, cmiMyPeIdle);
   CpvAccess(cmiMyPeIdle) = 0;

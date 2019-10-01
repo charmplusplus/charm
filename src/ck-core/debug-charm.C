@@ -874,12 +874,13 @@ void CpdContinueFromBreakPoint ()
           
         }
     }
-    /*        else
-    {
-                  CmiPrintStackTrace(0);
-                  CkPrintf("[%d] Continue found lastBreakPointmsg %p object %p idx %d\n",CkMyPe(), CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject), CkpvAccess(lastBreakPointIndex));
+#if 0
+    else 
+      {//debugging block
+	CmiPrintStackTrace(0);
+	CkPrintf("[%d] Continue found lastBreakPointmsg %p object %p idx %d\n",CkMyPe(), CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject), CkpvAccess(lastBreakPointIndex));
     }
-    */
+#endif    
     CkpvAccess(lastBreakPointMsg) = NULL;
     CkpvAccess(lastBreakPointObject) = NULL;
 }
@@ -950,7 +951,6 @@ void CpdRemoveBreakPoint (char *msg)
       if (CkpvAccess(_debugEntryTable)[idx].isBreakpoint) {
         EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
         if (breakPointEntryInfo != NULL) {
-	  
           if (--breakPointEntryInfo->msgIdx == 0) {
             // If we are the last to delete the breakpoint, then restore the original name and call function pointer
 #if CMK_SMP	    

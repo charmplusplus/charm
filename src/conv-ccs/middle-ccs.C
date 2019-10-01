@@ -55,16 +55,16 @@ void req_fw_handler(char *msg)
   // Charmrun gave us a message that is being handled on the rank 0 CCS PE
   // i.e., PE 0, but needs to get forwarded to the real PE destination
   if(destPE>0 && destPE!=CmiMyPe())
+    
     {
       int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+ChMessageInt(hdr->len);
       CmiSyncSend(destPE, len, msg);      
     }
-  else{
-#endif    
-    CcsHandleRequest(hdr, msg+offset);
-#if CMK_SMP    
-  }
-#endif  
+  else
+#endif        
+    {
+      CcsHandleRequest(hdr, msg+offset);
+    }
   CmiFree(msg);
 
 }
