@@ -288,13 +288,7 @@ int GPUManager::createStreams() {
   new_n_streams =  (new_n_streams + pes_per_device - 1) / pes_per_device;
 #endif
 
-#if CMK_SMP || CMK_MULTICORE
-  CmiLock(CsvAccess(gpu_manager).stream_lock_);
-#endif
   int total_n_streams = createNStreams(new_n_streams);
-#if CMK_SMP || CMK_MULTICORE
-  CmiUnlock(CsvAccess(gpu_manager).stream_lock_);
-#endif
 
   return total_n_streams;
 }

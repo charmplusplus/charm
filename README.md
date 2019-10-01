@@ -98,6 +98,7 @@ of the `<options>` below.
 | `gni-crayxe`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
 | `verbs-linux-x86_64`      | Linux   | IB Verbs      | GNU compiler                          |
 | `ofi-linux-x86_64`        | Linux   | OFI           | GNU compiler                          |
+| `ucx-linux-x86_64`        | Linux   | UCX           | GNU compiler                          |
 
 
 To choose `<version>`, your choice is determined by two options:
@@ -106,7 +107,7 @@ To choose `<version>`, your choice is determined by two options:
     - `netlrts-`: Charm++ communicates using the regular TCP/IP stack (UDP packets),
     which works everywhere but is fairly slow.  Use this option for networks of workstations,
     clusters, or single-machine development and testing.
-    * `gni-`, `pamilrts-`, `verbs-`, `ofi-`: Charm++ communicates using direct calls to the machine's
+    * `gni-`, `pamilrts-`, `verbs-`, `ofi-`, `ucx-` : Charm++ communicates using direct calls to the machine's
     communication primitives. Use these versions on machines that support them for best performance.
     * `mpi-`: Charm++ communicates using MPI calls. This will work on almost every distributed machine,
     but performance is often worse than using the machine's direct calls referenced above.
