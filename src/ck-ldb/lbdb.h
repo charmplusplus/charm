@@ -131,6 +131,8 @@ public:
     if (d.data != NULL) {
       init();
       memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
+    } else {
+      data = NULL;
     }
   }
 
