@@ -15,7 +15,7 @@
 
 cmake_minimum_required(VERSION 3.11)
 
-project(Charm++ LANGUAGES CXX C VERSION 6.9.0)
+project(Charm++ LANGUAGES CXX C VERSION 6.10.0)
 
 find_package(Threads REQUIRED)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler

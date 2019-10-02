@@ -2,7 +2,7 @@
 # Increment the last 2 digits when making an API change
 # Increase the first three after branching for a release
 
-AC_INIT(Charm++, 60900, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
+AC_INIT(Charm++, 61000, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
