@@ -112,10 +112,6 @@ NOABORT=""
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
 
-CMK_CELL=0
-SPU_USE_CPP=0
-SPU_EXTRA_LIBS=""
-
 MPI_INTEROPERATE=""
 NO_MAIN_MODULE=""
 NO_MAIN=""
@@ -548,15 +544,6 @@ do
 	"-verbose")
 		echo "Verbose mode set"
 		VERBOSE=true
-		;;
-
-        "-spu-cpp")
-		SPU_USE_CPP=1
-		;;
-
-        "-spu-lib")
-		SPU_EXTRA_LIBS="$SPU_EXTRA_LIBS -l$1"
-		shift
 		;;
 
         "-intrinsic")
@@ -1392,34 +1379,6 @@ case "$PARADIGM" in
 	;;
 esac
 
-# DMK - ACCEL SUPPORT - If this is a cell build, add the spe code object to POST_LIBRARIES
-if [ $CMK_CELL -eq 1 ]
-then
-
-  if [ "$PARADIGM" = "converse++" ]
-  then
-    # Include a "do nothing" register_accel_spe_funcs() function
-    POST_LIBRARIES="$POST_LIBRARIES -lnoAccelStub"
-  fi
-
-  if [ "$PARADIGM" = "charm++" ]
-  then
-
-    if [ $SPU_USE_CPP -eq 1 ]
-    then
-        SPU_COMPILER=$CMK_SPU_CXX
-        SPU_LINKER=$CMK_SPU_LDXX
-    else
-        SPU_COMPILER=$CMK_SPU_CC
-        SPU_LINKER=$CMK_SPU_LD
-    fi
-
-    # Include the spe object file for linking into main executable
-    POST_LIBRARIES="$POST_LIBRARIES main__funcLookup__.genSPECode.ppe.o"
-
-  fi
-fi
-
 if [ "$AMPIMAIN" != "" ]
 then
 	OBJECTFILES="$CHARMLIB/lib$AMPIMAIN.o $OBJECTFILES"
@@ -2136,20 +2095,6 @@ esac
 fi
 # If the above case returns, we're not creating a .o or .a file,
 # so linking is needed.
-
-if [ $CMK_CELL -eq 1 ]
-then
-
-  if [ "$PARADIGM" = "charm++" ]
-  then
-
-    # Make the spe object file to be included
-    Do $SPU_COMPILER -c -I$CHARMINC $CMK_SYSINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
-    Do $SPU_LINKER -L$CHARMLIB -o main__funcLookup__.genSPECode main__funcLookup__.genSPECode.o $CMK_SPERT_LIBS $SPU_EXTRA_LIBS
-    Do $CMK_PPU_EMBEDSPU spert_main main__funcLookup__.genSPECode main__funcLookup__.genSPECode.ppe.o
-
-  fi
-fi
 
 # check if we're linking a sequential object
 case "$LANGUAGE" in
