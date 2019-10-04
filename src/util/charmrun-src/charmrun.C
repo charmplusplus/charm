@@ -594,14 +594,14 @@ static int pparam_parseopt()
       sprintf(pparam_error, "Option %s not recognized.", opt);
       return -1;
     } else {
-      /*Unrecognized + option-- skip it.*/
+      /*Unrecognized single '+' option-- skip it.*/
       pparam_pos++;
       return 0;
     }
   }
   auto def = deffind.def;
   /* handle flag-options */
-  if ((def->type == 'f') && (opt[1] != '+') && (opt[2])) {
+  if ((def->type == 'f') && (opt[1] != '+') && (opt[2] != '\0')) {
     sprintf(pparam_error, "Option %s should not include a value", opt);
     return -1;
   }
@@ -611,19 +611,20 @@ static int pparam_parseopt()
     return 0;
   }
   /* handle non-flag options */
-  if ((opt[1] == '+') || (opt[2] == 0)) {
+  const char * optname = opt;
+  if ((opt[1] == '+') || (opt[2] == '\0')) { // special single '+' handling
     pparam_delarg(pparam_pos);
     opt = pparam_argv[pparam_pos];
   } else
     opt += 2;
-  if ((opt == 0) || (opt[0] == 0)) {
-    sprintf(pparam_error, "%s must be followed by a value.", opt);
+  if ((opt == nullptr) || (opt[0] == '\0')) {
+    sprintf(pparam_error, "%s must be followed by a value.", optname);
     return -1;
   }
   int ok = pparam_setdef(def, opt);
   pparam_delarg(pparam_pos);
   if (ok < 0) {
-    sprintf(pparam_error, "Illegal value for %s", opt);
+    sprintf(pparam_error, "Illegal value for %s", optname);
     return -1;
   }
   return 0;
