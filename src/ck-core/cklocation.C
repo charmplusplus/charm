@@ -2122,6 +2122,9 @@ CkLocMgr::~CkLocMgr() {
 }
 
 void CkLocMgr::pup(PUP::er &p){
+  if (p.isPacking() && pendingImmigrate.size() > 0)
+    CkAbort("Attempting to pup location manager with buffered migration messages."
+            " Likely cause is checkpointing before array creation has fully completed\n");
 	IrrGroup::pup(p);
 	p|mapID;
 	p|mapHandle;
