@@ -3592,17 +3592,18 @@ static void req_client_connect(std::vector<nodetab_process> & process_table)
 {
   skt_set_abort(client_connect_problem_skt);
 
+  std::vector<nodetab_process> phase2_processes;
+
   if (arg_mpiexec)
   {
-    req_construct_phase2_processes(process_table);
+    req_construct_phase2_processes(phase2_processes);
+    req_add_phase2_processes(phase2_processes);
     req_client_connect_table(process_table);
     req_all_clients_connected();
     return;
   }
 
   req_client_connect_table(process_table);
-
-  std::vector<nodetab_process> phase2_processes;
   req_construct_phase2_processes(phase2_processes);
 
   if (phase2_processes.size() > 0)
