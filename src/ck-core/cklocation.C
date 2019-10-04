@@ -2194,9 +2194,19 @@ void CkLocMgr::pup(PUP::er &p){
 /// Add a new local array manager to our list.
 void CkLocMgr::addManager(CkArrayID id,CkArray *mgr)
 {
-	CK_MAGICNUMBER_CHECK
-	DEBC((AA "Adding new array manager\n" AB));
-	managers[id] = mgr;
+  CK_MAGICNUMBER_CHECK
+  DEBC((AA "Adding new array manager\n" AB));
+  managers[id] = mgr;
+  auto i = pendingImmigrate.begin();
+  while (i != pendingImmigrate.end()) {
+    auto msg = *i;
+    if (msg->nManagers <= managers.size()) {
+      i = pendingImmigrate.erase(i);
+      immigrate(msg);
+    } else {
+      i++;
+    }
+  }
 }
 
 void CkLocMgr::deleteManager(CkArrayID id, CkArray *mgr) {
@@ -3015,9 +3025,9 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	if (msg->nManagers < managers.size())
 		CkAbort("Array element arrived from location with fewer managers!\n");
 	if (msg->nManagers > managers.size()) {
-		//Some array managers haven't registered yet-- throw it back
-		DEBM((AA "Busy-waiting for array registration on migrating %s\n" AB,idx2str(idx)));
-		thisProxy[CkMyPe()].immigrate(msg);
+		//Some array managers haven't registered yet -- buffer the message
+		DEBM((AA "Buffering %s immigrate msg waiting for array registration\n" AB,idx2str(idx)));
+		pendingImmigrate.push_back(msg);
 		return;
 	}
 
