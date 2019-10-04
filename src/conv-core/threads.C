@@ -302,9 +302,6 @@ void CthAliasEnable(CthThreadBase *t) {
   /* Linux mmap flag MAP_POPULATE, to pre-fault in all the pages,
      only seems to slow down overall performance. */
   /* Linux mmap flag MAP_GROWSDOWN is rejected at runtime under 2.4.25 */
-#if CMK_AIX
-  if (_curMappedStack) munmap(_curMappedStack->stack,_curMappedStack->stacksize);
-#endif
   s=mmap(t->stack,t->stacksize,
       PROT_READ|PROT_WRITE|PROT_EXEC, /* exec for gcc nested function thunks */
       flags, t->aliasStackHandle,0);
