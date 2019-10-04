@@ -4920,10 +4920,6 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
 #ifdef CMK_GFORTRAN
   fprintf(f, "GFORTRAN_UNBUFFERED_ALL=YES; export GFORTRAN_UNBUFFERED_ALL\n");
 #endif
-#if CMK_USE_MX
-  fprintf(f, "MX_MONOTHREAD=1; export MX_MONOTHREAD\n");
-/*fprintf(f,"MX_RCACHE=1; export MX_RCACHE\n");*/
-#endif
 
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, nodeno);
