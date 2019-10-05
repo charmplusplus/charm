@@ -4920,13 +4920,6 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
 #ifdef CMK_GFORTRAN
   fprintf(f, "GFORTRAN_UNBUFFERED_ALL=YES; export GFORTRAN_UNBUFFERED_ALL\n");
 #endif
-#if CMK_USE_MX
-  fprintf(f, "MX_MONOTHREAD=1; export MX_MONOTHREAD\n");
-/*fprintf(f,"MX_RCACHE=1; export MX_RCACHE\n");*/
-#endif
-#if CMK_AIX && CMK_SMP
-  fprintf(f, "MALLOCMULTIHEAP=1; export MALLOCMULTIHEAP\n");
-#endif
 
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, nodeno);
@@ -5505,9 +5498,6 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
   for (envc = 0; env[envc]; envc++)
     ;
   int extra = 0;
-#if CMK_AIX && CMK_SMP
-  ++extra;
-#endif
   const int proc_active = proc_per.active();
   extra += proc_active;
 #if CMK_SMP
@@ -5521,11 +5511,6 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
   envp[envc] = (char *) malloc(256);
   envp[envc + 1] = (char *) malloc(256);
   int n = 2;
-#if CMK_AIX && CMK_SMP
-  envp[envc + n] = (char *) malloc(256);
-  sprintf(envp[envc + n], "MALLOCMULTIHEAP=1");
-  ++n;
-#endif
   // cpu affinity hints
   using Unit = typename TopologyRequest::Unit;
   if (proc_active)
