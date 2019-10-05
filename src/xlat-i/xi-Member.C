@@ -288,45 +288,6 @@ void PUPableClass::genReg(XStr& str) {
   if (next) next->genReg(str);
 }
 
-// DMK - Accel Support
-int PUPableClass::genAccels_spe_c_funcBodies(XStr& str) {
-  int rtn = 0;
-  if (next) {
-    rtn += next->genAccels_spe_c_funcBodies(str);
-  }
-  return rtn;
-}
-
-void PUPableClass::genAccels_spe_c_regFuncs(XStr& str) {
-  if (next) {
-    next->genAccels_spe_c_regFuncs(str);
-  }
-}
-
-void PUPableClass::genAccels_spe_c_callInits(XStr& str) {
-  if (next) {
-    next->genAccels_spe_c_callInits(str);
-  }
-}
-
-void PUPableClass::genAccels_spe_h_includes(XStr& str) {
-  if (next) {
-    next->genAccels_spe_h_includes(str);
-  }
-}
-
-void PUPableClass::genAccels_spe_h_fiCountDefs(XStr& str) {
-  if (next) {
-    next->genAccels_spe_h_fiCountDefs(str);
-  }
-}
-
-void PUPableClass::genAccels_ppe_c_regFuncs(XStr& str) {
-  if (next) {
-    next->genAccels_ppe_c_regFuncs(str);
-  }
-}
-
 /***************** InitCall **************/
 InitCall::InitCall(int l, const char* n, int nodeCall) : name(n) {
   line = l;
@@ -342,12 +303,6 @@ void InitCall::genReg(XStr& str) {
   if (container) str << container->baseName() << "::";
   str << name;
   str << "," << isNodeCall << ");\n";
-}
-
-void InitCall::genAccels_spe_c_callInits(XStr& str) {
-  if (isAccel()) {
-    str << "    " << name << "();\n";
-  }
 }
 
 /***************** Include support **************/
