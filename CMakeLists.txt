@@ -1,15 +1,18 @@
 # CMake-based build system for Charm++ and AMPI
 #
-# Supported targets: charm++, AMPI
+# This build system currently requires CMake 3.11+ due to
+# using CMAKE_Fortran_COMPILER_LAUNCHER to launch charmc to compile
+# Fortran files. A potential workaround is outlined in the same location
+# where CMAKE_Fortran_COMPILER_LAUNCHER is set.
 #
-# When updating any of the following:
+# When updating any of the following files:
 # - any Makefile
 # - adding, deleting, renaming any source file
 # - any configure script
 #
 # , please also update:
 # - this file
-# - buildcmake
+# - the buildcmake script
 # - files in cmake/
 
 
@@ -55,7 +58,7 @@ else()
 endif()
 
 # Build options
-set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,verbs")
+set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,verbs")
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS")
 
 # Platform specific options (choose multiple if desired):
@@ -291,7 +294,8 @@ configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @O
 # set_property(GLOBAL PROPERTY RULE_LAUNCH_CUSTOM ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_CXX_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
-# FIXME: the next line is the only reason we require cmake 3.11+
+# FIXME: CMAKE_Fortran_COMPILER_LAUNCHER is the only reason we require CMake 3.11+.
+# See also https://gitlab.kitware.com/cmake/cmake/issues/17499
 set(CMAKE_Fortran_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_CXX_LINK_EXECUTABLE
       "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
