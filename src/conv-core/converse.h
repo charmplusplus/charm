@@ -2203,9 +2203,6 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "conv-lists.h"
 #include "conv-trace.h"
 #include "persistent.h"
-#if CMK_CELL
-#include "cell-api.h"
-#endif
 
 #include "conv-rdma.h"
 

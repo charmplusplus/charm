@@ -139,44 +139,6 @@ void Template::genGlobalCode(XStr scope, XStr& decls, XStr& defs) {
   if (!external && entity) entity->genGlobalCode(scope, decls, defs);
 }
 
-int Template::genAccels_spe_c_funcBodies(XStr& str) {
-  int rtn = 0;
-  if (!external && entity) {
-    rtn += entity->genAccels_spe_c_funcBodies(str);
-  }
-  return rtn;
-}
-
-void Template::genAccels_spe_c_regFuncs(XStr& str) {
-  if (!external && entity) {
-    entity->genAccels_spe_c_regFuncs(str);
-  }
-}
-
-void Template::genAccels_spe_c_callInits(XStr& str) {
-  if (!external && entity) {
-    entity->genAccels_spe_c_callInits(str);
-  }
-}
-
-void Template::genAccels_spe_h_includes(XStr& str) {
-  if (!external && entity) {
-    entity->genAccels_spe_h_includes(str);
-  }
-}
-
-void Template::genAccels_spe_h_fiCountDefs(XStr& str) {
-  if (!external && entity) {
-    entity->genAccels_spe_h_fiCountDefs(str);
-  }
-}
-
-void Template::genAccels_ppe_c_regFuncs(XStr& str) {
-  if (!external && entity) {
-    entity->genAccels_ppe_c_regFuncs(str);
-  }
-}
-
 void Template::preprocess() {
   if (entity) entity->preprocess();
 }
