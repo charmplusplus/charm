@@ -289,6 +289,7 @@ typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHas
 typedef std::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
 typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
 typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
+typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
 
 	CkLocMgr(CkArrayOptions opts);
 	CkLocMgr(CkMigrateMessage *m);
@@ -517,6 +518,11 @@ public:
     MsgBuffer bufferedActiveRgetMsgs;
 
     IndexMsgBuffer bufferedIndexMsgs;
+
+    // Vector stores the CkMigratable elements that have active Rgets
+    // ResumeFromSync is not called for these elements until the Rgets have completed
+    //std::vector<CkMigratable *> toBeResumeFromSynced;
+    ElemMap toBeResumeFromSynced;
 
 	bool addElementToRec(CkLocRec *rec,CkArray *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);

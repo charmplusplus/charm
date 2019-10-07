@@ -431,7 +431,7 @@ void zcPupGetCompleted(NcpyOperationInfo *ncpyOpInfo);
 void _zcpyPupCompleteHandler(zcPupPendingRgetsMsg *msg);
 
 class CkLocMgr;
-void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *mgr);
+void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr);
 
 void CkRdmaZCPupCustomHandler(void *ack);
 

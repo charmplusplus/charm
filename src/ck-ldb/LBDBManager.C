@@ -548,6 +548,8 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
   new_client->data = data;
   new_client->refcount = cur_refcount;
 
+  CmiPrintf("[%d][%d][%d] LocalBarrier::AddClient and Data is %p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), data);
+
 #if CMK_BIGSIM_CHARM
   if(_BgOutOfCoreFlag!=2){
     //during out-of-core emualtion for BigSim, if taking procs from disk to mem,

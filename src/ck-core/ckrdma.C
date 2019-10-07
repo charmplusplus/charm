@@ -2131,6 +2131,8 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
     CmiIssueRget(*it); // Issue the Rget
   }
 
+  CmiPrintf("[%d][%d][%d] zcPupIssueRgets, issuing rget with id %lu\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), id);
+
   // Create an entry for the unordered map with idx as the index and the vector size as the value
   std::pair<CmiUInt8, CmiUInt1> idNumOpsVal(id, CkpvAccess(newZCPupGets).size());
 

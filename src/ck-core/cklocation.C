@@ -1754,7 +1754,23 @@ void CkMigratable::staticResumeFromSync(void* data)
   if (_lb_args.metaLbOn()) {
   	el->clearMetaLBData();
 	}
+
+  CmiPrintf("[%d][%d][%d] CkMigratable::staticResumeFromSync calling resume from sync on %p with id %lu\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), data, el->ckGetID());
+
+  CkLocMgr *localLocMgr = el->myRec->getLocMgr();
+
+  auto iter = localLocMgr->bufferedActiveRgetMsgs.find(el->ckGetID());
+
+  if(iter != localLocMgr->bufferedActiveRgetMsgs.end()) {
+
+    CmiPrintf("[%d][%d][%d] ***Active Rgets in progress* - Don't resume From Sync\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+
+    std::pair<CmiUInt8, CkMigratable*> idElemPair(el->ckGetID(), el);
+    localLocMgr->toBeResumeFromSynced.insert(idElemPair);
+
+  } else {
 	el->ResumeFromSync();
+  }
 }
 
 void CkMigratable::setMigratable(int migratable) 
@@ -2251,6 +2267,11 @@ CkLocRec *CkLocMgr::createLocal(const CkArrayIndex &idx,
 
 // Used to handle messages that were buffered because of active rgets in progress
 void CkLocMgr::deliverAnyBufferedRdmaMsgs(CmiUInt8 id) {
+
+    // call ckJustMigrated
+    CkLocRec *myLocRec = elementNrec(id);
+    callMethod(myLocRec, &CkMigratable::ckJustMigrated);
+
     auto iter = bufferedActiveRgetMsgs.find(id);
     if(iter != bufferedActiveRgetMsgs.end()) {
       std::vector<CkArrayMessage *> bufferedMsgs = iter->second;
@@ -2258,6 +2279,12 @@ void CkLocMgr::deliverAnyBufferedRdmaMsgs(CmiUInt8 id) {
       for(auto msg : bufferedMsgs) {
         CmiHandleMessage(UsrToEnv(msg));
       }
+    }
+
+    auto iter2 = toBeResumeFromSynced.find(id);
+    if(iter2 != toBeResumeFromSynced.end()) {
+      iter2->second->ResumeFromSync();
+      toBeResumeFromSynced.erase(iter2);
     }
 }
 
@@ -3054,11 +3081,13 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	CmiAssert(CkpvAccess(newZCPupGets).empty()); // Ensure that vector is empty
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_migrate);
-	if(!CkpvAccess(newZCPupGets).empty()) {
+	bool zcRgetsActive = !CkpvAccess(newZCPupGets).empty();
+	if(zcRgetsActive) {
 		// newZCPupGets is not empty, rgets need to be launched
 		// newZCPupGets is populated with NcpyOperationInfo during pupElementsFor by pup_buffer calls that require Rgets
 		// Issue Rgets using the populated newZCPupGets vector
 		zcPupIssueRgets(msg->id, this);
+    CmiPrintf("[%d][%d][%d] completed launching RGETS\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
 	}
 	CkpvAccess(newZCPupGets).clear(); // Clear this to reuse the vector
 	if (p.size()!=msg->length) {
@@ -3082,8 +3111,10 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	}
 #endif
 
-	//Let all the elements know we've arrived
-	callMethod(rec,&CkMigratable::ckJustMigrated);
+  if(!zcRgetsActive) {
+    	//Let all the elements know we've arrived
+    	callMethod(rec,&CkMigratable::ckJustMigrated);
+  }
 
 #if CMK_FAULT_EVAC
 	/*
