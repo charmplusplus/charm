@@ -448,9 +448,6 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   return;
 #else
 
-#if CMK_USE_GM
-  CmiBarrier();
-#endif
 
 
 #if 0

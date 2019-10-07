@@ -79,7 +79,12 @@ $(ROMIO): | AMPI AMPIF
 	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
 	$(MAKE) -C romio
 	cp romio/.libs/libromio.a $@
-	test -n "$(ROMIOLIBSHARED)" && cp romio/.libs/libromio.$(CMK_SHARED_SUF) $(ROMIOLIBSHARED) || true
+ifneq ($(ROMIOLIBSHARED),)
+	cp romio/.libs/libromio.$(CMK_SHARED_SUF) $(ROMIOLIBSHARED)
+ifeq ($(CMK_MACOSX),1)
+	install_name_tool -id $(ROMIOLIBSHARED) $(ROMIOLIBSHARED)
+endif
+endif
 	@echo "ROMIO built successfully"
 
 AMPI: $(AMPI_TARGET)

@@ -594,14 +594,14 @@ static int pparam_parseopt()
       sprintf(pparam_error, "Option %s not recognized.", opt);
       return -1;
     } else {
-      /*Unrecognized + option-- skip it.*/
+      /*Unrecognized single '+' option-- skip it.*/
       pparam_pos++;
       return 0;
     }
   }
   auto def = deffind.def;
   /* handle flag-options */
-  if ((def->type == 'f') && (opt[1] != '+') && (opt[2])) {
+  if ((def->type == 'f') && (opt[1] != '+') && (opt[2] != '\0')) {
     sprintf(pparam_error, "Option %s should not include a value", opt);
     return -1;
   }
@@ -611,19 +611,20 @@ static int pparam_parseopt()
     return 0;
   }
   /* handle non-flag options */
-  if ((opt[1] == '+') || (opt[2] == 0)) {
+  const char * optname = opt;
+  if ((opt[1] == '+') || (opt[2] == '\0')) { // special single '+' handling
     pparam_delarg(pparam_pos);
     opt = pparam_argv[pparam_pos];
   } else
     opt += 2;
-  if ((opt == 0) || (opt[0] == 0)) {
-    sprintf(pparam_error, "%s must be followed by a value.", opt);
+  if ((opt == nullptr) || (opt[0] == '\0')) {
+    sprintf(pparam_error, "%s must be followed by a value.", optname);
     return -1;
   }
   int ok = pparam_setdef(def, opt);
   pparam_delarg(pparam_pos);
   if (ok < 0) {
-    sprintf(pparam_error, "Illegal value for %s", opt);
+    sprintf(pparam_error, "Illegal value for %s", optname);
     return -1;
   }
   return 0;
@@ -972,8 +973,11 @@ static void arg_init(int argc, const char **argv)
         (argv) + 1; /*Skip over charmrun (0) here and program name (1) later*/
   arg_argc = pparam_countargs(arg_argv);
   if (arg_argc < 1) {
-    fprintf(stderr, "ERROR> You must specify a node-program.\n");
-    pparam_printdocs();
+    if (!arg_help)
+    {
+      fprintf(stderr, "ERROR> You must specify a node-program.\n");
+      pparam_printdocs();
+    }
     exit(1);
   }
 
@@ -3592,17 +3596,18 @@ static void req_client_connect(std::vector<nodetab_process> & process_table)
 {
   skt_set_abort(client_connect_problem_skt);
 
+  std::vector<nodetab_process> phase2_processes;
+
   if (arg_mpiexec)
   {
-    req_construct_phase2_processes(process_table);
+    req_construct_phase2_processes(phase2_processes);
+    req_add_phase2_processes(phase2_processes);
     req_client_connect_table(process_table);
     req_all_clients_connected();
     return;
   }
 
   req_client_connect_table(process_table);
-
-  std::vector<nodetab_process> phase2_processes;
   req_construct_phase2_processes(phase2_processes);
 
   if (phase2_processes.size() > 0)
@@ -4920,13 +4925,6 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
 #ifdef CMK_GFORTRAN
   fprintf(f, "GFORTRAN_UNBUFFERED_ALL=YES; export GFORTRAN_UNBUFFERED_ALL\n");
 #endif
-#if CMK_USE_MX
-  fprintf(f, "MX_MONOTHREAD=1; export MX_MONOTHREAD\n");
-/*fprintf(f,"MX_RCACHE=1; export MX_RCACHE\n");*/
-#endif
-#if CMK_AIX && CMK_SMP
-  fprintf(f, "MALLOCMULTIHEAP=1; export MALLOCMULTIHEAP\n");
-#endif
 
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, nodeno);
@@ -5505,9 +5503,6 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
   for (envc = 0; env[envc]; envc++)
     ;
   int extra = 0;
-#if CMK_AIX && CMK_SMP
-  ++extra;
-#endif
   const int proc_active = proc_per.active();
   extra += proc_active;
 #if CMK_SMP
@@ -5521,11 +5516,6 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
   envp[envc] = (char *) malloc(256);
   envp[envc + 1] = (char *) malloc(256);
   int n = 2;
-#if CMK_AIX && CMK_SMP
-  envp[envc + n] = (char *) malloc(256);
-  sprintf(envp[envc + n], "MALLOCMULTIHEAP=1");
-  ++n;
-#endif
   // cpu affinity hints
   using Unit = typename TopologyRequest::Unit;
   if (proc_active)

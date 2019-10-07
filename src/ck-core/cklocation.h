@@ -538,6 +538,8 @@ private:
 	CkGroupID lbdbID;
 	CkGroupID metalbID;
 
+	std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
+
 	ck::ArrayIndexCompressor *compressor;
 	CkArrayIndex bounds;
 	void checkInBounds(const CkArrayIndex &idx);
