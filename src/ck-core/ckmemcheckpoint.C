@@ -161,6 +161,16 @@ inline int CkMemCheckPT::BuddyPE(int pe)
   return budpe;
 }
 
+inline int CkMemCheckPT::ReverseBuddyPE(int pe)
+{
+  int budpe = pe;
+  while (budpe == pe || isFailed(budpe))
+  {
+    budpe = (budpe == 0 ? CkNumPes() : budpe) - 1;
+  }
+  return budpe;
+}
+
 // called in array element constructor
 // choose and register with 2 buddies for checkpoiting 
 #if CMK_MEM_CHECKPOINT
@@ -1694,14 +1704,9 @@ void pingCheckHandler()
 #if CMK_MEM_CHECKPOINT
   double now = CmiWallTimer();
   if (lastPingTime > 0 && now - lastPingTime > FAIL_DET_THRESHOLD && !CkInLdb() && !CkInRestarting() && !CkInCheckpointing()) {
-    int i, pe, buddy;
     // tell everyone the buddy dies
     CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
-    for (i = 1; i < CmiNumPes(); i++) {
-       pe = (CmiMyPe() - i + CmiNumPes()) % CmiNumPes();
-       if (obj->BuddyPE(pe) == CmiMyPe()) break;
-    }
-    buddy = pe;
+    int buddy = obj->ReverseBuddyPE(CmiMyPe());
     CmiPrintf("[%d] detected buddy processor %d died %f %f. \n", CmiMyPe(), buddy, now, lastPingTime);
     /*for (int pe = 0; pe < CmiNumPes(); pe++) {
       if (obj->isFailed(pe) || pe == buddy) continue;
