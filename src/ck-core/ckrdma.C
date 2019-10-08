@@ -2059,7 +2059,7 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
 #if CMK_SMP
 // Executed on the worker thread to enqueue all buffered messages after Rgets complete
 void _zcpyPupCompleteHandler(zcPupPendingRgetsMsg *msg) {
-  CProxy_CkLocMgr(msg->locMgrId).ckLocalBranch()->deliverAnyBufferedRdmaMsgs(msg->id);
+  CProxy_CkLocMgr(msg->locMgrId).ckLocalBranch()->processAfterActiveRgetsCompleted(msg->id);
   CmiFree(msg);
 }
 #endif
@@ -2093,7 +2093,7 @@ void zcPupGetCompleted(NcpyOperationInfo *info) {
         }
 #else
         // On worker thread, handle all buffered messages
-        CProxy_CkLocMgr(ref->locMgrId).ckLocalBranch()->deliverAnyBufferedRdmaMsgs(ref->id);
+        CProxy_CkLocMgr(ref->locMgrId).ckLocalBranch()->processAfterActiveRgetsCompleted(ref->id);
 #endif
         CmiFree(ref);
       }
@@ -2130,8 +2130,6 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
     zcQdIncrement();
     CmiIssueRget(*it); // Issue the Rget
   }
-
-  CmiPrintf("[%d][%d][%d] zcPupIssueRgets, issuing rget with id %lu\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), id);
 
   // Create an entry for the unordered map with idx as the index and the vector size as the value
   std::pair<CmiUInt8, CmiUInt1> idNumOpsVal(id, CkpvAccess(newZCPupGets).size());

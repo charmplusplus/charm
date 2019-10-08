@@ -496,6 +496,11 @@ public:
 	// Deliver buffered msgs that were buffered because of active rdma gets
 	void deliverAnyBufferedRdmaMsgs(CmiUInt8);
 
+	// Take all those actions that were waiting for the rgets launched from pup_buffer to complete
+	// These actions include: calling ckJustMigrated, calling ResumeFromSync and delivering any buffered messages
+	// that were sent for the element (which was still carrying out rgets)
+	void processAfterActiveRgetsCompleted(CmiUInt8 id);
+
 //Data Members:
     //Map array ID to manager and elements
     ArrayIdMap managers;
@@ -519,9 +524,8 @@ public:
 
     IndexMsgBuffer bufferedIndexMsgs;
 
-    // Vector stores the CkMigratable elements that have active Rgets
+    // Map stores the CkMigratable elements that have active Rgets
     // ResumeFromSync is not called for these elements until the Rgets have completed
-    //std::vector<CkMigratable *> toBeResumeFromSynced;
     ElemMap toBeResumeFromSynced;
 
 	bool addElementToRec(CkLocRec *rec,CkArray *m,

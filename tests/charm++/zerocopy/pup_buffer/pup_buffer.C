@@ -55,15 +55,6 @@ class arr : public CBase_arr {
     }
 
     void pup(PUP::er &p) {
-
-      if(p.isSizing()) {
-        //CmiPrintf("[%d][%d][%d][%d] arr:isSizing %p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, this);
-      } else if(p.isPacking()) {
-        //CmiPrintf("[%d][%d][%d][%d] arr:isPacking %p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, this);
-      } else if(p.isUnpacking()) {
-        //CmiPrintf("[%d][%d][%d][%d] arr:isUnpacking %p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, this);
-      }
-
       p|iteration;
       p|cb;
 
@@ -98,13 +89,10 @@ class arr : public CBase_arr {
     }
 
     void ckJustMigrated() {
-      CmiPrintf("[%d][%d][%d][%d] arr:ckJustMigrated\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);
       verify();
     }
 
     void ResumeFromSync() {
-      CmiPrintf("[%d][%d][%d][%d] arr:ResumeFromSync\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);
-      // Verify from migration is complete
       verify();
       run();
     }
