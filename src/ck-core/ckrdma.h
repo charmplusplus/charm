@@ -423,6 +423,9 @@ struct zcPupPendingRgetsMsg {
   CmiUInt8 id;
   int numops;
   CkGroupID locMgrId;
+#if CMK_SMP
+  int pe;
+#endif
 };
 
 

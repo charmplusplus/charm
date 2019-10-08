@@ -2086,11 +2086,9 @@ void zcPupGetCompleted(NcpyOperationInfo *info) {
 #if CMK_SMP
         // Send a message to all PEs on this node to handle all buffered messages
         CmiSetHandler(ref, zcpy_pup_complete_handler_idx);
-        for(int i=0; i<CmiMyNodeSize(); i++) {
-          CmiSyncSend(CmiNodeFirst(CmiMyNode()) + i,
-                      sizeof(zcPupPendingRgetsMsg),
-                      (char *)ref);
-        }
+        CmiSyncSend(ref->pe,
+                    sizeof(zcPupPendingRgetsMsg),
+                    (char *)ref);
 #else
         // On worker thread, handle all buffered messages
         CProxy_CkLocMgr(ref->locMgrId).ckLocalBranch()->processAfterActiveRgetsCompleted(ref->id);
@@ -2123,6 +2121,9 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
   ref->id = id;
   ref->numops = CkpvAccess(newZCPupGets).size();
   ref->locMgrId = locMgr->getGroupID();
+#if CMK_SMP
+  ref->pe = CmiMyPe();
+#endif
 
   for(std::vector<NcpyOperationInfo *>::iterator it = CkpvAccess(newZCPupGets).begin();
         it != CkpvAccess(newZCPupGets).end(); ++it) {
