@@ -1092,8 +1092,6 @@ void  CmiError(const char *format, ...);
 
 #endif
 
-void CmiPuts(const char *);
-
 #if defined(__STDC__) || defined(__cplusplus)
 #define __CMK_STRING(x) #x
 #else
@@ -2205,9 +2203,6 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "conv-lists.h"
 #include "conv-trace.h"
 #include "persistent.h"
-#if CMK_CELL
-#include "cell-api.h"
-#endif
 
 #include "conv-rdma.h"
 

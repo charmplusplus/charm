@@ -2388,7 +2388,7 @@ convcore.o: convcore.C converse.h conv-header.h conv-config.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h \
  sockRoutines.h conv-ccs.h ccs-server.h ckhashtable.h pup.h \
- memory-isomalloc.h quiescence.h cmibacktrace.C hrctimer.h
+ memory-isomalloc.h quiescence.h cmibacktrace.C hrctimer.h cmidemangle.h
 
 converseProjections.o: converseProjections.C converse.h conv-header.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach-common.h \

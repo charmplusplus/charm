@@ -1,5 +1,5 @@
 -include ../../common.mk
--include ../../include/conv-mach-opt.mak
+-include ../../../include/conv-mach-opt.mak
 OPTS=-O3 
 MPIOPTS=-O3
 CHARMC=../../../bin/ampicxx $(OPTS)
@@ -20,16 +20,28 @@ pipe: pingpong-pipeline.c
 # This test runs longer on BGQ, so reduce the number of iterations run there:
 test: all
 ifeq ($(CMK_BLUEGENEQ),1)
-	$(call run, +p1 ./pgm 1000 16 +vp2)
-	$(call run, +p2 ./pgm 100 16 +vp2)
+	$(call run, +p1 ./pgm 16 1024 10 5 1 +vp2)
+	$(call run, +p2 ./pgm 16 1024 10 5 1 +vp2)
 else
-	$(call run, +p1 ./pgm 100000 16 +vp2)
-	$(call run, +p2 ./pgm 10000 16 +vp2)
+	$(call run, +p1 ./pgm 16 1048576 100 10 1 +vp2)
+	$(call run, +p2 ./pgm 16 1048576 100 10 1 +vp2)
+endif
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p1 ./pgm 16 1048576 100 10 1 +vp2 +noCMAForZC)
+	$(call run, +p2 ./pgm 16 1048576 100 10 1 +vp2 +noCMAForZC)
 endif
 
 bgtest: all
-	$(call run, +p1 ./pgm 10 16 +vp2 +x1 +y1 +z1 )
-	$(call run, +p2 ./pgm 10 16 +vp2 +x2 +y1 +z1 )
+	$(call run, +p1 ./pgm 16 1024 +vp2 +x1 +y1 +z1 )
+	$(call run, +p2 ./pgm 16 1024 +vp2 +x2 +y1 +z1 )
+
+test-bench: all
+	$(call run, +p1 ./pgm 16 67108864 10000 1000 0 +vp2)
+	$(call run, +p2 ./pgm 16 67108674 10000 1000 0 +vp2)
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p1 ./pgm 16 67108864 10000 1000 0 +vp2 +noCMAForZC)
+	$(call run, +p2 ./pgm 16 67108674 10000 1000 0 +vp2 +noCMAForZC)
+endif
 
 clean:
 	rm -rf charmrun conv-host moduleinit* *.o pingpong pgm pgm-mpi pgm-pipe pgm-pipe-mpi *~ *.sts core ampirun

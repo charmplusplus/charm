@@ -137,8 +137,10 @@ static int set_process_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset
 {
 #ifdef _WIN32
   HANDLE process = GetCurrentProcess();
+# define PRINTF_PROCESS "%p"
 #else
   pid_t process = getpid();
+# define PRINTF_PROCESS "%d"
 #endif
 
   if (cmi_hwloc_set_proc_cpubind(topology, process, cpuset, HWLOC_CPUBIND_PROCESS|HWLOC_CPUBIND_STRICT))
@@ -156,12 +158,14 @@ static int set_process_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset
   {
     char *str;
     cmi_hwloc_bitmap_asprintf(&str, cpuset);
-    CmiPrintf("HWLOC> [%d] Process %p bound to cpuset: %s\n", CmiMyPe(), (const void *)process, str);
+    CmiPrintf("HWLOC> [%d] Process " PRINTF_PROCESS " bound to cpuset: %s\n", CmiMyPe(), process, str);
     free(str);
   }
 #endif
 
   return 0;
+
+#undef PRINTF_PROCESS
 }
 
 #if CMK_SMP

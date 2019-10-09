@@ -124,6 +124,7 @@ extern void registerReadOnlyRecvExtCallback(void (*cb)(int, char*));
 extern void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char*, int));
 extern void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int));
 extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int));
+extern void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int*, int, int, char *, int));
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
 extern void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int));
 extern void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *));
@@ -131,7 +132,6 @@ extern void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *))
 extern void StartCharmExt(int argc, char **argv); // start Converse/Charm, argv are the command-line arguments
 extern int CkMyPeHook(void);   // function equivalent of CkMyPe macro
 extern int CkNumPesHook(void); // function equivalent of CkNumPes macro
-extern void CmiAbortHook(const char *msg);
 /// Get current redNo of specified group instance on this PE
 extern int CkGroupGetReductionNumber(int gid);
 /// Get current redNo of specified array element on this PE
