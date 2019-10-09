@@ -87,7 +87,7 @@ if(${CMK_AMPI_WITH_ROMIO})
 
     # Since we link a program with charmc as part of ROMIO's configure,
     # we need all libraries built at this point.
-    add_dependencies(romio moduleampi ampi-compat ck modulecompletion conv-partition conv-util hwloc)
+    add_dependencies(romio moduleampi ampi-compat ck modulecompletion conv-partition conv-util hwloc conv-static conv-core)
     if(${CMK_CAN_LINK_FORTRAN})
         add_dependencies(romio moduleampif)
     endif()
