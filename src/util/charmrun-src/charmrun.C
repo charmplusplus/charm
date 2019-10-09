@@ -594,14 +594,14 @@ static int pparam_parseopt()
       sprintf(pparam_error, "Option %s not recognized.", opt);
       return -1;
     } else {
-      /*Unrecognized + option-- skip it.*/
+      /*Unrecognized single '+' option-- skip it.*/
       pparam_pos++;
       return 0;
     }
   }
   auto def = deffind.def;
   /* handle flag-options */
-  if ((def->type == 'f') && (opt[1] != '+') && (opt[2])) {
+  if ((def->type == 'f') && (opt[1] != '+') && (opt[2] != '\0')) {
     sprintf(pparam_error, "Option %s should not include a value", opt);
     return -1;
   }
@@ -611,19 +611,20 @@ static int pparam_parseopt()
     return 0;
   }
   /* handle non-flag options */
-  if ((opt[1] == '+') || (opt[2] == 0)) {
+  const char * optname = opt;
+  if ((opt[1] == '+') || (opt[2] == '\0')) { // special single '+' handling
     pparam_delarg(pparam_pos);
     opt = pparam_argv[pparam_pos];
   } else
     opt += 2;
-  if ((opt == 0) || (opt[0] == 0)) {
-    sprintf(pparam_error, "%s must be followed by a value.", opt);
+  if ((opt == nullptr) || (opt[0] == '\0')) {
+    sprintf(pparam_error, "%s must be followed by a value.", optname);
     return -1;
   }
   int ok = pparam_setdef(def, opt);
   pparam_delarg(pparam_pos);
   if (ok < 0) {
-    sprintf(pparam_error, "Illegal value for %s", opt);
+    sprintf(pparam_error, "Illegal value for %s", optname);
     return -1;
   }
   return 0;
@@ -972,8 +973,11 @@ static void arg_init(int argc, const char **argv)
         (argv) + 1; /*Skip over charmrun (0) here and program name (1) later*/
   arg_argc = pparam_countargs(arg_argv);
   if (arg_argc < 1) {
-    fprintf(stderr, "ERROR> You must specify a node-program.\n");
-    pparam_printdocs();
+    if (!arg_help)
+    {
+      fprintf(stderr, "ERROR> You must specify a node-program.\n");
+      pparam_printdocs();
+    }
     exit(1);
   }
 
@@ -3592,17 +3596,18 @@ static void req_client_connect(std::vector<nodetab_process> & process_table)
 {
   skt_set_abort(client_connect_problem_skt);
 
+  std::vector<nodetab_process> phase2_processes;
+
   if (arg_mpiexec)
   {
-    req_construct_phase2_processes(process_table);
+    req_construct_phase2_processes(phase2_processes);
+    req_add_phase2_processes(phase2_processes);
     req_client_connect_table(process_table);
     req_all_clients_connected();
     return;
   }
 
   req_client_connect_table(process_table);
-
-  std::vector<nodetab_process> phase2_processes;
   req_construct_phase2_processes(phase2_processes);
 
   if (phase2_processes.size() > 0)
