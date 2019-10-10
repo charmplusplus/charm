@@ -45,7 +45,7 @@ int MPI_File_set_errhandler(MPI_File mpi_fh, MPI_Errhandler errhandler)
     ROMIO_THREAD_CS_ENTER();
 
     if (mpi_fh == MPI_FILE_NULL) {
-	CtvAccess(ADIOI_DFLT_ERR_HANDLER) = errhandler;
+	ADIOI_DFLT_ERR_HANDLER = errhandler;
     }
     else {
 	fh = MPIO_File_resolve(mpi_fh);

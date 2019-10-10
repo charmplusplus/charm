@@ -35,8 +35,8 @@ Variable privatization
 
 ROMIO has several global variables that need to be privatized for AMPI.
 The following table contains the currently known global variables and how they
-are handled in this integrated version of ROMIO. Privatization is done with
-the Ctv* functions of Charm++.
+are handled in this integrated version of ROMIO. Privatization is done manually
+by including the globals in the ampiParent class.
 
 ================ ========= =========================== ==================================
 Defined in       Type (nm) Variable name               Status

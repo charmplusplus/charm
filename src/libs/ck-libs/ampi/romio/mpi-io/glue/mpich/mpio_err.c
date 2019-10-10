@@ -63,7 +63,7 @@ int MPIO_Err_return_file(MPI_File mpi_fh, int error_code)
 
     /* First, get the handler and the corresponding function */
     if (mpi_fh == MPI_FILE_NULL) {
-	e = CtvAccess(ADIOI_DFLT_ERR_HANDLER);
+	e = ADIOI_DFLT_ERR_HANDLER;
     }
     else {
 	ADIO_File fh;

@@ -3,6 +3,10 @@
 cmd=""
 args=""
 QUIET=0
+XTERM='xterm'
+DEBUG=0
+DEBUG_NO_PAUSE=0
+DEBUGGER=''
 
 while [ $# -gt 0 ]
 do
@@ -24,6 +28,32 @@ do
 		# consume and ignore, local-mode is all that multicore supports
 		shift
 		;;
+	++xterm)
+		XTERM=$2
+		shift
+		shift
+		;;
+	++debug)
+		DEBUG=1
+		shift
+		;;
+	++no-debug)
+		DEBUG=0
+		shift
+		;;
+	++debug-no-pause)
+		DEBUG_NO_PAUSE=1
+		shift
+		;;
+	++no-debug-no-pause)
+		DEBUG_NO_PAUSE=0
+		shift
+		;;
+	++debugger)
+		DEBUGGER=$2
+		shift
+		shift
+		;;
 	+*)
 		args=$args" "$1
 		shift
@@ -40,6 +70,26 @@ do
 done
 
 test $QUIET -eq 1 && args=$args" "++quiet
+
+if [ "$DEBUG" = '1' -o "$DEBUG_NO_PAUSE" = '1' ]
+then
+  if [ -z "$DEBUGGER" ]
+  then
+    [ "`uname -s 2>/dev/null`" = 'Darwin' ] && DEBUGGER='lldb' || DEBUGGER='gdb'
+  fi
+
+  DEBUG_RUN='-ex r'
+  DEBUG_POSTFIX='--args'
+  if [ "$DEBUGGER" = 'lldb' ]
+  then
+    DEBUG_RUN='-o r'
+    DEBUG_POSTFIX='--'
+  fi
+
+  args="$DEBUG_POSTFIX $args"
+  [ "$DEBUG_NO_PAUSE" = '1' ] && args="$DEBUG_RUN $args"
+  args="$XTERM -e $DEBUGGER $args"
+fi
 
 test $QUIET -eq 0 && echo Running command: $cmd $args
 test $QUIET -eq 0 && echo
