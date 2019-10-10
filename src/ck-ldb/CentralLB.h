@@ -99,9 +99,7 @@ public:
   int GetPESpeed();
   inline void setConcurrent(bool c) { concurrent = c; }
 
-//  static void staticAtSync(void*);
-//  void AtSync(void); // Everything is at the PE barrier
-  void InvokeLB();
+  void InvokeLB(); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
   void SendStats();

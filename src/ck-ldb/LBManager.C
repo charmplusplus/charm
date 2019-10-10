@@ -995,8 +995,8 @@ void LocalBarrier::DecreaseBarrier(int c)
   at_count-=c;
 }
 
-void LBManager::invoke_lb_start(int pe, int lb_step, int myphynode, int mype) {
-  thisProxy[pe].recv_lb_start(lb_step, myphynode, mype);
+void LBManager::invokeLbStart(int pe, int lb_step, int myphynode, int mype) {
+  thisProxy[pe].recvLbStart(lb_step, myphynode, mype);
 }
 
 void LocalBarrier::propagate_atsync() {
@@ -1006,26 +1006,26 @@ void LocalBarrier::propagate_atsync() {
     if(!_mgr->rank0pe) {
       if(!_mgr->received_from_rank0) {
         int node_rank0_pe = CkNodeFirst(myphynode);
-        _mgr->invoke_lb_start(node_rank0_pe, cur_refcount, myphynode, mype);
+        _mgr->invokeLbStart(node_rank0_pe, cur_refcount, myphynode, mype);
       }
     } else {
       int peFirst = CkNodeFirst(CkMyNode());
       for (std::list<int>::iterator it=_mgr->local_pes_to_notify.begin(); it != _mgr->local_pes_to_notify.end(); ++it)
-        _mgr->invoke_lb_start(*it, cur_refcount, myphynode, mype);
+        _mgr->invokeLbStart(*it, cur_refcount, myphynode, mype);
       if(!_mgr->received_from_left && myphynode > 0) {
         int pe = CkNodeFirst(myphynode - 1);
-        _mgr->invoke_lb_start(pe, cur_refcount, myphynode, mype);
+        _mgr->invokeLbStart(pe, cur_refcount, myphynode, mype);
       }
       if(!_mgr->received_from_right && myphynode < CkNumNodes()-1) {
         int pe = CkNodeFirst(myphynode + 1);
-        _mgr->invoke_lb_start(pe, cur_refcount, myphynode, mype);
+        _mgr->invokeLbStart(pe, cur_refcount, myphynode, mype);
       }
     }
     propagated_atsync_step = cur_refcount;
   }
 }
 
-void LBManager::recv_lb_start(int lb_step, int phynode, int pe) {
+void LBManager::recvLbStart(int lb_step, int phynode, int pe) {
   if(lb_step != localBarrier.cur_refcount || startedAtSync)
     return;
   int mype = CkMyPe();

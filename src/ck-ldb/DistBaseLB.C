@@ -36,8 +36,6 @@ DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
   thisProxy = CProxy_DistBaseLB(thisgroup);
   receiver = lbmgr->AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
       (void*)(this));
-//  notifier = lbmgr->NotifyMigrated((LDMigratedFn)(staticMigrated),
-//      (void*)(this));
   startLbFnHdl = lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB),
       (void*)(this));
   lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)this);
@@ -64,7 +62,6 @@ DistBaseLB::~DistBaseLB() {
 #if CMK_LBDB_ON
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   if (lbmgr) {
-//    lbmgr->RemoveNotifyMigrated(notifier);
     lbmgr-> RemoveStartLBFn((LDStartLBFn)(staticStartLB));
   }
   if (mig_msgs) {
@@ -102,7 +99,7 @@ void DistBaseLB::InvokeLB() {
 }
 
 // Assemble the stats for the local PE. The stats are collected by the
-// LBManager so assembl all the stats.
+// LBManager so assemble all the stats.
 void DistBaseLB::AssembleStats() {
 #if CMK_LBDB_ON
 #if CMK_LB_CPUTIMER

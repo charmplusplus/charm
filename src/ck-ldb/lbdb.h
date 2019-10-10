@@ -256,15 +256,6 @@ typedef struct _LDCommData {
 } LDCommData;
 
 /*
- * Requests to load balancer
- *   FIXME: these routines don't seem to exist anywhere-- are they obsolete?
- *   Are the official versions now in LBManager.h?
- */
-void LBBalance(void *param);
-void LBCollectStatsOn(void);
-void LBCollectStatsOff(void);
-
-/*
  * Callbacks from database to object managers
  */
 typedef void (*LDMigrateFn)(LDObjHandle handle, int dest);

@@ -42,8 +42,6 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
   receiver = lbmgr->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
 			    (void*)(this));
-//  notifier = lbmgr->
-//    NotifyMigrated((LDMigratedFn)(staticMigrated), (void*)(this));
 
   statsStrategy = FULL;
 
@@ -104,13 +102,6 @@ void HybridBaseLB::initTree()
 HybridBaseLB::~HybridBaseLB()
 {
 #if CMK_LBDB_ON
-  lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
-  if (lbmgr) {
-//    lbmgr->
-//      RemoveNotifyMigrated(notifier);
-    //lbmgr->
-    //  RemoveStartLBFn((LDStartLBFn)(staticStartLB));
-  }
   delete tree;
 #endif
 }

@@ -315,6 +315,7 @@ public:
     lbdb_obj->GetCommInfo(bytes, msgs, withinbytes, outsidebytes, num_nghbors, hops, hopbytes);}
   void CollectStatsOn(void) { lbdb_obj->CollectStatsOn();}
   void CollectStatsOff(void) { lbdb_obj->CollectStatsOff();}
+  bool StatsOn(void) {lbdb_obj->StatsOn();}
   int RunningObject(LDObjHandle* _o) const { return lbdb_obj->RunningObject(_o);}
   const LDObjHandle *RunningObject() { return lbdb_obj->RunningObject();}
   void ObjTime(LDObjHandle h, double walltime, double cputime) {
@@ -363,8 +364,8 @@ public:
   void DumpDatabase(void);
 
   void reset();
-  void recv_lb_start(int lb_step, int phynode, int pe);
-  void invoke_lb_start(int pe, int lb_step, int phynode, int mype);
+  void recvLbStart(int lb_step, int phynode, int pe);
+  void invokeLbStart(int pe, int lb_step, int phynode, int mype);
 
   /*
    * Calls from load balancer to load database

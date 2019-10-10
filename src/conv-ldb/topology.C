@@ -5,7 +5,6 @@
 
 #include <math.h>
 
-//#include "LBManager.h"
 #include <vector>
 #include "converse.h"
 #include "topology.h"

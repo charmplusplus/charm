@@ -79,8 +79,6 @@ void CentralLB::initLB(const CkLBOptions &opt)
   //  CkPrintf("Construct in %d\n",CkMyPe());
   loadbalancer = thisgroup;
   // create and turn on by default
-//  notifier = lbmgr->
-//    NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
   startLbFnHdl = lbmgr->
     AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 
@@ -132,8 +130,6 @@ CentralLB::~CentralLB()
   delete statsData;
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   if (lbmgr) {
-//    lbmgr->
-//      RemoveNotifyMigrated(notifier);
     lbmgr->
       RemoveStartLBFn((LDStartLBFn)(staticStartLB));
     lbmgr->RemoveClients((Chare*)(this));
@@ -666,7 +662,7 @@ void CentralLB::LoadBalance()
   // if we are in simulation mode read data
   if (LBSimulation::doSimulation) simulationRead();
 
-  char *availVector = LBManagerObj()->availVector();
+  char *availVector = lbmgr->availVector();
   for(proc = 0; proc < clients; proc++)
       statsData->procs[proc].available = (bool)availVector[proc];
 
