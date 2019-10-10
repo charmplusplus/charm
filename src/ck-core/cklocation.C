@@ -32,7 +32,7 @@
 CkpvExtern(int, _lb_obj_index);                // for lbdb user data for obj index
 #endif // CMK_LBDB_ON
 
-CkpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets); // used for ZC Pup
+CpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets); // used for ZC Pup
 #ifndef CMK_CHARE_USE_PTR
 CkpvExtern(int, currentChareIdx);
 #endif
@@ -3072,17 +3072,17 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	CkLocRec *rec=createLocal(idx,true,msg->ignoreArrival,false /* home told on departure */ );
 	
 	envelope *env = UsrToEnv(msg);
-	CmiAssert(CkpvAccess(newZCPupGets).empty()); // Ensure that vector is empty
+	CmiAssert(CpvAccess(newZCPupGets).empty()); // Ensure that vector is empty
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_migrate);
-	bool zcRgetsActive = !CkpvAccess(newZCPupGets).empty();
+	bool zcRgetsActive = !CpvAccess(newZCPupGets).empty();
 	if(zcRgetsActive) {
 		// newZCPupGets is not empty, rgets need to be launched
 		// newZCPupGets is populated with NcpyOperationInfo during pupElementsFor by pup_buffer calls that require Rgets
 		// Issue Rgets using the populated newZCPupGets vector
 		zcPupIssueRgets(msg->id, this);
 	}
-	CkpvAccess(newZCPupGets).clear(); // Clear this to reuse the vector
+	CpvAccess(newZCPupGets).clear(); // Clear this to reuse the vector
 	if (p.size()!=msg->length) {
 		CkError("ERROR! Array element claimed it was %d bytes to a"
 			"packing PUP::er, but %zu bytes in the unpacking PUP::er!\n",

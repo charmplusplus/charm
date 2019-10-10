@@ -17,7 +17,7 @@
 
 // Integer used to store the ncpy ack handler idx
 static int ncpy_handler_idx, ncpy_bcastNo_handler_idx, zcpy_pup_complete_handler_idx;
-CkpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets);
+CpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets);
 CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
 CksvExtern(CmiNodeLock, _nodeZCPendingLock);
 
@@ -2119,21 +2119,21 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
   // Allocate a zcPupPendingRgetsMsg that is used for ack handling
   zcPupPendingRgetsMsg *ref = (zcPupPendingRgetsMsg *)CmiAlloc(sizeof(zcPupPendingRgetsMsg));
   ref->id = id;
-  ref->numops = CkpvAccess(newZCPupGets).size();
+  ref->numops = CpvAccess(newZCPupGets).size();
   ref->locMgrId = locMgr->getGroupID();
 #if CMK_SMP
   ref->pe = CmiMyPe();
 #endif
 
-  for(std::vector<NcpyOperationInfo *>::iterator it = CkpvAccess(newZCPupGets).begin();
-        it != CkpvAccess(newZCPupGets).end(); ++it) {
+  for(std::vector<NcpyOperationInfo *>::iterator it = CpvAccess(newZCPupGets).begin();
+        it != CpvAccess(newZCPupGets).end(); ++it) {
     (*it)->destRef = (char *)ref;
     zcQdIncrement();
     CmiIssueRget(*it); // Issue the Rget
   }
 
   // Create an entry for the unordered map with idx as the index and the vector size as the value
-  std::pair<CmiUInt8, CmiUInt1> idNumOpsVal(id, CkpvAccess(newZCPupGets).size());
+  std::pair<CmiUInt8, CmiUInt1> idNumOpsVal(id, CpvAccess(newZCPupGets).size());
 
   CmiLock(CksvAccess(_nodeZCPendingLock));
   CksvAccess(pendingZCOps).insert(idNumOpsVal);
