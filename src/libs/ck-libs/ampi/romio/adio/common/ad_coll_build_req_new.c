@@ -281,7 +281,7 @@ static inline int get_next_fr_off(ADIO_File fd,
 {
     MPI_Aint fr_extent = -1;
     ADIO_Offset tmp_off, off_rem;
-    ADIOI_Flatlist_node *fr_node_p = CtvAccess(ADIOI_Flatlist);
+    ADIOI_Flatlist_node *fr_node_p = ADIOI_Flatlist;
     int i = -1, fr_dtype_ct = 0;
 
     /* Should have already been flattened in calc_file_realms() */
