@@ -23,14 +23,14 @@ typedef struct CmiIsomallocContext CmiIsomallocContext;
 /* TODO: Some kind of registration scheme so multiple users can coexist.
  * No use case for this currently exists. */
 CmiIsomallocContext * CmiIsomallocContextCreate(int myunit, int numunits);
-void CmiIsomallocContextDelete(CmiIsomallocContext * pool);
-void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext ** pPool);
+void CmiIsomallocContextDelete(CmiIsomallocContext * ctx);
+void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext ** ctxptr);
 
 /*Allocate/free from this context*/
-void * CmiIsomallocContextMalloc(CmiIsomallocContext * pool, size_t nBytes);
-void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * pool, size_t align, size_t nBytes);
-void CmiIsomallocContextFree(CmiIsomallocContext * pool, void * ptr);
-size_t CmiIsomallocContextGetLength(CmiIsomallocContext * pool, void * ptr);
+void * CmiIsomallocContextMalloc(CmiIsomallocContext * ctx, size_t size);
+void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * ctx, size_t align, size_t size);
+void CmiIsomallocContextFree(CmiIsomallocContext * ctx, void * ptr);
+size_t CmiIsomallocContextGetLength(CmiIsomallocContext * ctx, void * ptr);
 
 CmiIsomallocContext * CmiIsomallocGetThreadContext(CthThread th);
 
@@ -47,7 +47,7 @@ void * malloc_nomigrate(size_t size);
 void free_nomigrate(void *mem);
 
 /*Make this context active for malloc interception.*/
-void CmiMemoryIsomallocContextActivate(CmiIsomallocContext * pool);
+void CmiMemoryIsomallocContextActivate(CmiIsomallocContext * ctx);
 
 /* Only for internal runtime use, not for Isomalloc users. */
 void CmiMemoryIsomallocDisablePush(void);

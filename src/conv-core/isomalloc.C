@@ -116,7 +116,7 @@ static uint8_t * isomallocEnd;
   real mmap versions are disabled.*/
 /* Disabled because currently unused */
 static int disabled_map_warned = 0;
-static void * disabled_map(int nBytes)
+static void * disabled_map(int size)
 {
   if (!disabled_map_warned)
   {
@@ -126,7 +126,7 @@ static void * disabled_map(int nBytes)
           "Charm++> Warning: Isomalloc is uninitialized."
           " You won't be able to migrate threads.\n");
   }
-  return malloc(nBytes);
+  return malloc(size);
 }
 static void disabled_unmap(void * bk) { free(bk); }
 #endif
@@ -2206,51 +2206,51 @@ CmiIsomallocContext * CmiIsomallocContextCreate(int myunit, int numunits)
   return ctx;
 }
 
-void CmiIsomallocContextDelete(CmiIsomallocContext * pool)
+void CmiIsomallocContextDelete(CmiIsomallocContext * ctx)
 {
 #if ISOMEMPOOL_DEBUG
-  pool->print_contents();
+  ctx->print_contents();
 #endif
-  delete pool;
+  delete ctx;
 }
 
-void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext ** pPool)
+void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext ** ctxptr)
 {
   PUP::er & p = *(PUP::er *)cpup;
 
   if (p.isUnpacking())
   {
-    *pPool = new CmiIsomallocContext{PUP::reconstruct{}};
+    *ctxptr = new CmiIsomallocContext{PUP::reconstruct{}};
   }
 
-  p | **pPool;
+  p | **ctxptr;
 
   if (p.isDeleting())
   {
-    delete *pPool;
-    *pPool = nullptr;
+    delete *ctxptr;
+    *ctxptr = nullptr;
   }
 }
 
-void * CmiIsomallocContextMalloc(CmiIsomallocContext * pool, size_t nBytes)
+void * CmiIsomallocContextMalloc(CmiIsomallocContext * ctx, size_t size)
 {
-  return pool->alloc(nBytes);
+  return ctx->alloc(size);
 }
 
-void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * pool, size_t align, size_t nBytes)
+void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * ctx, size_t align, size_t size)
 {
-  return pool->alloc(nBytes, isomalloc_internal_validate_align(align));
+  return ctx->alloc(size, isomalloc_internal_validate_align(align));
 }
 
-void CmiIsomallocContextFree(CmiIsomallocContext * pool, void * ptr)
+void CmiIsomallocContextFree(CmiIsomallocContext * ctx, void * ptr)
 {
   if (ptr == nullptr)
     return;
 
-  pool->free(ptr);
+  ctx->free(ptr);
 }
 
-size_t CmiIsomallocContextGetLength(CmiIsomallocContext * pool, void * ptr)
+size_t CmiIsomallocContextGetLength(CmiIsomallocContext * ctx, void * ptr)
 {
-  return pool->length(ptr);
+  return ctx->length(ptr);
 }

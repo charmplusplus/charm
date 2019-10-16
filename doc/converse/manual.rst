@@ -1459,6 +1459,107 @@ Returns the number of children of nodeNum in the spanning tree.
 This function fills the array children with node numbers of children of
 nodeNum in the spanning tree.
 
+Isomalloc
+---------
+
+It is occasionally useful to allocate memory at a globally unique
+virtual address. This is trivial on a shared memory machine (where every
+address is globally unique) but more difficult on a distributed memory
+machine. Isomalloc provides a uniform interface for allocating globally
+unique virtual addresses.
+
+Isomalloc can thus be thought of as a software distributed shared memory
+implementation; except data movement between processors is explicit (by
+making a subroutine call), not on demand (by taking a page fault).
+
+Isomalloc is useful when moving highly interlinked data structures from
+one processor to another, because internal pointers will still point to
+the correct locations, even on a new processor. This is especially
+useful when the format of the data structure is complex or unknown, as
+with thread stacks.
+
+Effective management of the virtual address space across a distributed
+machine is a complex task that requires a certain level of organization.
+Therefore, Isomalloc is not well-suited to a fully dynamic API for
+allocating and migrating blocks on an individual basis. All allocations
+made using Isomalloc are managed as part of contexts corresponding to
+some unit of work, such as migratable threads. These contexts are
+migrated all at once. The total number of contexts must be determined
+before any use of Isomalloc takes place.
+
+This API may evolve as new use cases emerge.
+
+.. code-block:: c++
+
+  CmiIsomallocContext * CmiIsomallocContextCreate(int myunit, int numunits)
+
+Construct a context for a given unit of work, out of a total number of
+slots available. Successive calls to this function must always pass
+the same value for ``numunits``. For example, if you are writing code
+using migratable threads, you must know at the beginning of execution
+what the maximum possible number of threads simultaneously in existence
+will be across the entire job, and each thread must have a globally
+unique ID. Multiple distinct sets of slots are currently unsupported.
+
+This function in particular is likely to change in the future if new
+code using Isomalloc is developed, especially in the realm of
+interoperability between multiple simultaneous uses.
+
+.. code-block:: c++
+
+  void CmiIsomallocContextDelete(CmiIsomallocContext * ctx)
+
+Destroy a given context, releasing all allocations owned by it and all
+virtual address space used by it.
+
+.. code-block:: c++
+
+  void * CmiIsomallocContextMalloc(CmiIsomallocContext * ctx, size_t size)
+
+Allocate ``size`` bytes at a unique virtual address. Returns a pointer
+to the allocated region.
+
+.. code-block:: c++
+
+  void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * ctx, size_t align, size_t size)
+
+Same as above, but with the alignment also specified. It must be a power
+of two.
+
+.. code-block:: c++
+
+  void CmiIsomallocContextFree(CmiIsomallocContext * ctx, void * ptr)
+
+Release the given block, which must have been previously allocated by
+the given Isomalloc context. It may also release the underlying virtual
+address range, which the system may subsequently reuse.
+
+After a call to this function, any use of the freed space could corrupt
+the heap or cause a segmentation fault. It is illegal to free the same
+block more than once.
+
+.. code-block:: c++
+
+  void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext ** ctxptr)
+
+Pack/Unpack the given context. This routine can be used to move contexts
+across processors, save them to disk, or checkpoint them.
+
+.. code-block:: c++
+
+  int CmiIsomallocContextGetLength(void * ptr)
+
+Return the length, in bytes, of this isomalloc’d block.
+
+.. code-block:: c++
+
+  int CmiIsomallocInRange(void * ptr)
+
+Return 1 if the given address is in the virtual address space used by
+Isomalloc, 0 otherwise.
+``CmiIsomallocInRange(malloc(size))`` is guaranteed to be zero;
+``CmiIsomallocInRange(CmiIsomallocContextMalloc(ctx, size))`` is guaranteed to be one.
+
 Threads
 =======
 
@@ -1518,6 +1619,29 @@ thread of control that came into existence when your program was first
 ``exec``\ ’d was not created with ``CthCreate``, but it can be retrieved
 (say, by calling ``CthSelf`` in ``main``), and it can be used like any
 other ``CthThread``.
+
+.. code-block:: c++
+
+  CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext *ctx)
+
+Create a thread that can later be moved to other processors. Otherwise
+identical to CthCreate. An Isomalloc context is required for organized
+allocation management of the thread's stack, as well as any global
+variable privatization and heap interception in use.
+
+This is only a hint to the runtime system; some threads implementations
+cannot migrate threads, others always create migratable threads. In
+these cases, CthCreateMigratable is equivalent to CthCreate.
+
+.. code-block:: c++
+
+  CthThread CthPup(pup_er p,CthThread t)
+
+Pack/Unpack a thread. This can be used to save a thread to disk, migrate
+a thread between processors, or checkpoint the state of a thread.
+
+Only a suspended thread can be Pup’d. Only a thread created with
+CthCreateMigratable can be Pup’d.
 
 .. code-block:: c++
 
