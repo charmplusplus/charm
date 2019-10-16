@@ -73,18 +73,22 @@ static void meta_init(char **argv)
 #endif
 }
 
+static bool meta_active()
+{
+  return meta_inited
+    && CpvInitialized(isomalloc_state)
+    && CpvAccess(isomalloc_state).context
+    && !CpvAccess(isomalloc_state).disabled
+#if CMK_HAS_TLS_VARIABLES
+    && (isomalloc_thread || CmiThreadIs(CMI_THREAD_IS_TLS))
+#endif
+    ;
+}
+
 static void *meta_malloc(size_t size)
 {
 	void *ret=NULL;
-#if CMK_HAS_TLS_VARIABLES
-        int _isomalloc_thread = isomalloc_thread;
-        if (CmiThreadIs(CMI_THREAD_IS_TLS)) _isomalloc_thread = 1;
-#endif
-	if (meta_inited && CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context && !CpvAccess(isomalloc_state).disabled
-#if CMK_HAS_TLS_VARIABLES
-             && _isomalloc_thread
-#endif
-           )
+	if (meta_active())
 	{ /*Isomalloc a new block and link it in*/
 		CmiMemoryIsomallocDisablePush();
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
@@ -149,7 +153,7 @@ static void *meta_realloc(void *oldBuffer, size_t newSize)
 static void *meta_memalign(size_t align, size_t size)
 {
 	void *ret=NULL;
-	if (CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context && !CpvAccess(isomalloc_state).disabled)
+	if (meta_active())
 	{ /*Isomalloc a new block and link it in*/
 		CmiMemoryIsomallocDisablePush();
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
@@ -169,7 +173,7 @@ static void *meta_memalign(size_t align, size_t size)
 static int meta_posix_memalign(void **outptr, size_t align, size_t size)
 {
 	int ret = 0;
-	if (CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context && !CpvAccess(isomalloc_state).disabled)
+	if (meta_active())
 	{ /*Isomalloc a new block and link it in*/
 		CmiMemoryIsomallocDisablePush();
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
@@ -189,7 +193,7 @@ static int meta_posix_memalign(void **outptr, size_t align, size_t size)
 static void *meta_aligned_alloc(size_t align, size_t size)
 {
 	void *ret=NULL;
-	if (CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context && !CpvAccess(isomalloc_state).disabled)
+	if (meta_active())
 	{ /*Isomalloc a new block and link it in*/
 		CmiMemoryIsomallocDisablePush();
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
