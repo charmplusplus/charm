@@ -10,7 +10,7 @@ Introduction
 ============
 
 This manual describes Adaptive MPI (AMPI), which is an implementation of
-the MPI standard [1]_ on top of Charm++. AMPI acts as a regular MPI
+the MPI standard (version 3.1) on top of Charm++. AMPI acts as a regular MPI
 implementation (akin to MPICH, OpenMPI, MVAPICH, etc.) with several
 built-in extensions that allow MPI developers to take advantage of
 Charm++’s dynamic runtime system, which provides support for process
@@ -205,12 +205,12 @@ load while simultaneously minimizing communication overhead.
 AMPI Compliance to MPI Standards
 --------------------------------
 
-Currently AMPI supports the MPI-2.2 standard, with preliminary support
+Currently AMPI supports the MPI-3.1 standard, with support
 for most MPI-3.1 features and a collection of extensions explained in
 detail in this manual. One-sided communication calls in MPI-2 and MPI-3
 are implemented, but they do not yet take advantage of RMA features.
 Non-blocking collectives have been defined in AMPI since before
-MPI-3.0’s adoption of them. Also ROMIO [2]_ has been integrated into
+MPI-3.0’s adoption of them. Also ROMIO [1]_ has been integrated into
 AMPI to support parallel I/O features.
 
 AMPI Extensions to MPI Standards
@@ -723,10 +723,10 @@ around. This approach is portable across systems and compilers and may
 also improve locality and hence cache utilization. It also does not have
 the context-switch overhead of swapping globals. We have multiple tools
 for automating these transformations for different languages. Currently,
-there is a tool called *Photran*\  [3]_ for refactoring Fortran codes
+there is a tool called *Photran*\  [2]_ for refactoring Fortran codes
 that can do this transformation. It is Eclipse-based and works by
 constructing Abstract Syntax Trees (ASTs) of the program. We also have a
-tool built on top of the *ROSE compiler*\  [4]_ that works for C/C++ and
+tool built on top of the *ROSE compiler*\  [3]_ that works for C/C++ and
 Fortran programs that is available upon request. It emits patches for
 all files containing global variables which can then be applied to the
 source code.
@@ -1212,7 +1212,7 @@ the main program into a subroutine and naming it ``MPI_Main``.
 Thus now, we have two ``MPI_Main``\ s, one for the fluids code and one
 for the solids code. We now make these codes co-exist within the same
 executable, by first renaming these ``MPI_Main``\ s as ``Fluids_Main``
-and ``Solids_Main``\  [5]_ writing a subroutine called ``MPI_Setup``.
+and ``Solids_Main``\  [4]_ writing a subroutine called ``MPI_Setup``.
 
 .. code-block:: fortran
 
@@ -2123,21 +2123,15 @@ set the following environment variable to see program output to stdout:
    $ export GFORTRAN_UNBUFFERED_ALL=1
 
 .. [1]
-   Currently, AMPI supports the MPI-2.2 standard, and the MPI-3.1
-   standard is under active development, though we already support
-   non-blocking and neighborhood collectives among other MPI-3.1
-   features.
-
-.. [2]
    http://www-unix.mcs.anl.gov/romio/
 
-.. [3]
+.. [2]
    http://www.eclipse.org/photran
 
-.. [4]
+.. [3]
    http://rosecompiler.org/
 
-.. [5]
+.. [4]
    Currently, we assume that the interface code, which does mapping and
    interpolation among the boundary values of Fluids and Solids domain,
    is integrated with one of Fluids and Solids.
