@@ -22,7 +22,9 @@ void req_fw_handler(char *msg)
 {
   int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
   CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
+
   int destPE = (int)ChMessageInt(hdr->pe);
+  //  CmiPrintf("[%d] req_fw_handler got msg for pe %d\n",CmiMyPe(),destPE);
   if (CmiMyPe() == 0 && destPE == -1) {
     /* Broadcast message to all other processors */
     int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+ChMessageInt(hdr->len);
@@ -48,8 +50,23 @@ void req_fw_handler(char *msg)
       }
     }
   }
-  CcsHandleRequest(hdr, msg+offset);
+  
+#if CMK_SMP
+  // Charmrun gave us a message that is being handled on the rank 0 CCS PE
+  // i.e., PE 0, but needs to get forwarded to the real PE destination
+  if(destPE>0 && destPE!=CmiMyPe())
+    
+    {
+      int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+ChMessageInt(hdr->len);
+      CmiSyncSend(destPE, len, msg);      
+    }
+  else
+#endif        
+    {
+      CcsHandleRequest(hdr, msg+offset);
+    }
   CmiFree(msg);
+
 }
 
 extern int rep_fw_handler_idx;
