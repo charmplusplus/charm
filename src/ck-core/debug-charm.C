@@ -954,7 +954,7 @@ void CpdRemoveBreakPoint (char *msg)
           if (--breakPointEntryInfo->msgIdx == 0) {
             // If we are the last to delete the breakpoint, then restore the original name and call function pointer
 #if CMK_SMP	    
-	    if(_entryTable[idx]->breakPointSet--==0)
+	    if(--_entryTable[idx]->breakPointSet==0)
 #endif	      
 	      {
 	      _entryTable[idx]->name =  breakPointEntryInfo->name;
@@ -987,10 +987,9 @@ void CpdRemoveAllBreakPoints ()
     if (--breakPointEntryInfo->msgIdx == 0) {
       // If we are the last to delete the breakpoint, then restore the original name and call function pointer
 #if CMK_SMP	    
-      if(_entryTable[idx]->breakPointSet--==0)
+      if(--_entryTable[idx]->breakPointSet==0)
 #endif	      
 	{
-	  
 	  _entryTable[idx]->name =  breakPointEntryInfo->name;
 	  _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
 	}
