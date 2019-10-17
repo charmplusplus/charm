@@ -77,12 +77,12 @@ void pingBuddy();
 void pingCheckHandler();
 
 // 0 - use QD, 1 - use reduction
-#define CMK_CHKP_USE_REDN 1
+#define CMK_CHKP_USE_REDN 0
 
 #define CMK_CHKP_ALL		1
 #define CMK_USE_BARRIER		0
 
-#define FAIL_DET_THRESHOLD 5.0
+#define FAIL_DET_THRESHOLD 3.0
 
 //stream remote records happned only if CK_NO_PROC_POOL =1 which means the chares to pe map will change
 #define STREAMING_INFORMHOME                    1
