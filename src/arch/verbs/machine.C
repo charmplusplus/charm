@@ -2105,17 +2105,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 }
 
 
-#if CMK_CELL
-
-#include "spert_ppu.h"
-
-void machine_OffloadAPIProgress(void) {
-  LOCK_IF_AVAILABLE();
-  OffloadAPIProgress();
-  UNLOCK_IF_AVAILABLE();
-}
-#endif
-
 void LrtsPrepareEnvelope(char *msg, int size)
 {
   CMI_MSG_SIZE(msg) = size;

@@ -7,6 +7,8 @@
 
 #include "mpioimpl.h"
 
+#include "adio_extern.h"
+
 /* Hooks for allocation of MPI_File handles.
  *
  * Three functions are used in ROMIO for allocation/deallocation
@@ -36,10 +38,6 @@ void MPIO_File_free(MPI_File *mpi_fh)
     *mpi_fh = MPI_FILE_NULL;
 }
 
-CtvExtern(ADIO_File*, ADIOI_Ftable);
-CtvExtern(int, ADIOI_Ftable_ptr);
-CtvExtern(int, ADIOI_Ftable_max);
-
 MPI_File MPIO_File_f2c(MPI_Fint fh)
 {
 #ifndef INT_LT_POINTER
@@ -50,12 +48,12 @@ MPI_File MPIO_File_f2c(MPI_Fint fh)
        may not be 8-byte aligned.*/
 #else
     if (!fh) return MPI_FILE_NULL;
-    if ((fh < 0) || (fh > CtvAccess(ADIOI_Ftable_ptr))) {
+    if ((fh < 0) || (fh > ADIOI_Ftable_ptr)) {
 	FPRINTF(stderr, "MPI_File_f2c: Invalid file handle\n");
 	/* there is no way to return an error from MPI_File_f2c */
 	return MPI_FILE_NULL;
     }
-    return CtvAccess(ADIOI_Ftable)[fh];
+    return ADIOI_Ftable[fh];
 #endif
 }
 
@@ -68,23 +66,23 @@ MPI_Fint MPIO_File_c2f(MPI_File fh)
 
     if ((fh == NULL) || (fh->cookie != ADIOI_FILE_COOKIE))
 	return (MPI_Fint) 0;
-    if (!CtvAccess(ADIOI_Ftable)) {
-	CtvAccess(ADIOI_Ftable_max) = 1024;
-	CtvAccess(ADIOI_Ftable) = (MPI_File *)
-	    ADIOI_Malloc(CtvAccess(ADIOI_Ftable_max)*sizeof(MPI_File)); 
-        CtvAccess(ADIOI_Ftable_ptr) = 0;  /* 0 can't be used though, because 
+    if (!ADIOI_Ftable) {
+	ADIOI_Ftable_max = 1024;
+	ADIOI_Ftable = (MPI_File *)
+	    ADIOI_Malloc(ADIOI_Ftable_max*sizeof(MPI_File)); 
+        ADIOI_Ftable_ptr = 0;  /* 0 can't be used though, because 
                                   MPI_FILE_NULL=0 */
-	for (i=0; i<CtvAccess(ADIOI_Ftable_max); i++) CtvAccess(ADIOI_Ftable)[i] = MPI_FILE_NULL;
+	for (i=0; i<ADIOI_Ftable_max; i++) ADIOI_Ftable[i] = MPI_FILE_NULL;
     }
-    if (CtvAccess(ADIOI_Ftable_ptr) == CtvAccess(ADIOI_Ftable_max)-1) {
-	CtvAccess(ADIOI_Ftable) = (MPI_File *) ADIOI_Realloc(CtvAccess(ADIOI_Ftable), 
-                           (CtvAccess(ADIOI_Ftable_max)+1024)*sizeof(MPI_File));
-	for (i=CtvAccess(ADIOI_Ftable_max); i<CtvAccess(ADIOI_Ftable_max)+1024; i++) 
-	    CtvAccess(ADIOI_Ftable)[i] = MPI_FILE_NULL;
-	CtvAccess(ADIOI_Ftable_max) += 1024;
+    if (ADIOI_Ftable_ptr == ADIOI_Ftable_max-1) {
+	ADIOI_Ftable = (MPI_File *) ADIOI_Realloc(ADIOI_Ftable, 
+                           (ADIOI_Ftable_max+1024)*sizeof(MPI_File));
+	for (i=ADIOI_Ftable_max; i<ADIOI_Ftable_max+1024; i++) 
+	    ADIOI_Ftable[i] = MPI_FILE_NULL;
+	ADIOI_Ftable_max += 1024;
     }
-    CtvAccess(ADIOI_Ftable_ptr)++;
-    CtvAccess(ADIOI_Ftable)[CtvAccess(ADIOI_Ftable_ptr)] = fh;
-    return (MPI_Fint) CtvAccess(ADIOI_Ftable_ptr);
+    ADIOI_Ftable_ptr++;
+    ADIOI_Ftable[ADIOI_Ftable_ptr] = fh;
+    return (MPI_Fint) ADIOI_Ftable_ptr;
 #endif
 }

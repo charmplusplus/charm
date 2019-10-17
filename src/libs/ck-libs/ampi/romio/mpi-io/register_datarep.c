@@ -86,7 +86,7 @@ int MPI_Register_datarep(ROMIO_CONST char *datarep,
 
     /* --BEGIN ERROR HANDLING-- */
     /* check datarep isn't already registered */
-    for (adio_datarep = CtvAccess(ADIOI_Datarep_head); adio_datarep; adio_datarep = adio_datarep->next) {
+    for (adio_datarep = ADIOI_Datarep_head; adio_datarep; adio_datarep = adio_datarep->next) {
 	if (!strncmp(datarep, adio_datarep->name, MPI_MAX_DATAREP_STRING)) {
 	    error_code = MPIO_Err_create_code(MPI_SUCCESS,
 					      MPIR_ERR_RECOVERABLE,
@@ -132,9 +132,9 @@ int MPI_Register_datarep(ROMIO_CONST char *datarep,
     adio_datarep->read_conv_fn  = read_conversion_fn;
     adio_datarep->write_conv_fn = write_conversion_fn;
     adio_datarep->extent_fn     = dtype_file_extent_fn;
-    adio_datarep->next          = CtvAccess(ADIOI_Datarep_head);
+    adio_datarep->next          = ADIOI_Datarep_head;
 
-    CtvAccess(ADIOI_Datarep_head) = adio_datarep;
+    ADIOI_Datarep_head = adio_datarep;
 
     error_code = MPI_SUCCESS;
 

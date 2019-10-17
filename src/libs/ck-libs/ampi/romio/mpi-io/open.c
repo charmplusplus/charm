@@ -29,7 +29,6 @@ int MPI_File_open(MPI_Comm comm, const char *filename, int amode, MPI_Info info,
 #include "adio_extern.h"
 
 
-CtvExtern(int, ADIO_Init_keyval);
 
 /*@
     MPI_File_open - Opens a file
@@ -114,7 +113,7 @@ int MPI_File_open(MPI_Comm comm, ROMIO_CONST char *filename, int amode,
  * MPI_MODE_CREATE|MPI_MODE_RDWR, and B with MPI_MODE_RDWR:  MPI_BAND yields
  * MPI_MODE_RDWR.  A determines amodes are different, but B proceeds having not
  * detected an error */
-    MPI_Allreduce(&amode, &tmp_amode, 1, MPI_INT, CtvAccess(ADIO_same_amode), dupcomm);
+    MPI_Allreduce(&amode, &tmp_amode, 1, MPI_INT, ADIO_same_amode, dupcomm);
 
     if (tmp_amode == ADIO_AMODE_NOMATCH) {
 	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
