@@ -5520,8 +5520,9 @@ struct local_nodestart
   char **envp;
   int n;
 
-  char **dparamp;
-  std::vector<char *> dparamv;
+  const char ** dparamp;
+  std::vector<const char *> dparamv;
+  std::vector<char *> heapAllocated;
 
   local_nodestart(const char ** extra_argv = nullptr)
   {
@@ -5604,10 +5605,11 @@ struct local_nodestart
         exit(1);
       }
 
-      dparamv.push_back(strdup(abs_xterm));
-      dparamv.push_back(strdup("-title"));
-      dparamv.push_back(strdup(pparam_argv[1]));
-      dparamv.push_back(strdup("-e"));
+      heapAllocated.push_back(abs_xterm);
+      dparamv.push_back(abs_xterm);
+      dparamv.push_back("-title");
+      dparamv.push_back(pparam_argv[1]);
+      dparamv.push_back("-e");
 
       std::vector<const char *> cparamv;
       if (arg_debug || arg_debug_no_pause)
@@ -5631,13 +5633,15 @@ struct local_nodestart
         cparamv.push_back(pparam_argv[i]);
 
       if (extra_argv != nullptr)
-        for (char ** param = (char **)extra_argv; *param != nullptr; ++param)
+        for (const char ** param = extra_argv; *param != nullptr; ++param)
           cparamv.push_back(*param);
 
       if (!(arg_debug || arg_debug_no_pause))
         cparamv.push_back("; echo \"program exited with code $?\" ; read eoln");
 
-      dparamv.push_back(cstring_join(cparamv, " "));
+      char * cparam = cstring_join(cparamv, " ");
+      heapAllocated.push_back(cparam);
+      dparamv.push_back(cparam);
 
       if (arg_verbose)
       {
@@ -5656,10 +5660,10 @@ struct local_nodestart
     {
       if (extra_argv != nullptr)
       {
-        for (char ** param = (char **)(pparam_argv+1); *param != nullptr; ++param)
+        for (const char ** param = pparam_argv+1; *param != nullptr; ++param)
           dparamv.push_back(*param);
 
-        for (char ** param = (char **)extra_argv; *param != nullptr; ++param)
+        for (const char ** param = extra_argv; *param != nullptr; ++param)
           dparamv.push_back(*param);
 
         dparamv.push_back(nullptr);
@@ -5668,7 +5672,7 @@ struct local_nodestart
       }
       else
       {
-        dparamp = (char **)(pparam_argv+1);
+        dparamp = pparam_argv+1;
       }
     }
   }
@@ -5709,7 +5713,7 @@ struct local_nodestart
 
   ~local_nodestart()
   {
-    for (char *p : dparamv)
+    for (char * p : heapAllocated)
       free(p);
     for (int i = envc, i_end = envc + n; i < i_end; ++i)
       free(envp[i]);
