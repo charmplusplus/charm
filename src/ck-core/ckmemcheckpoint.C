@@ -74,6 +74,9 @@ void pingCheckHandler();
 #define CK_NO_PROC_POOL				0
 #endif
 
+// 0 - use QD, 1 - use reduction
+#define CMK_CHKP_USE_REDN 1
+
 #define CMK_CHKP_ALL		1
 #define CMK_USE_BARRIER		0
 
@@ -1020,7 +1023,7 @@ void CkMemCheckPT::recoverBuddies()
   }
 #endif
 
-#if 1
+#if CMK_CHKP_USE_REDN
   if (expectCount == 0) {
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, recoverArrayElements), thisProxy));
     //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
@@ -1040,8 +1043,10 @@ void CkMemCheckPT::gotData()
   if (ackCount == expectCount) {
     ackCount = 0;
     expectCount = -1;
+#if CMK_CHKP_USE_REDN
     //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, recoverArrayElements), thisProxy));
+#endif
   }
 }
 
@@ -1135,7 +1140,7 @@ void CkMemCheckPT::recoverArrayElements()
   // _crashedNode = -1;
   CpvAccess(_crashedNode) = -1;
   inRestarting = false;
-#if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
+#if (!STREAMING_INFORMHOME && CK_NO_PROC_POOL) || !CMK_CHKP_USE_REDN
   if (CkMyPe() == 0)
     CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
 #else
