@@ -76,6 +76,8 @@ class EntryInfo {
       marshalled messages.
     */
     CkMessagePupFn messagePup;
+    /// guard entryTable call and name swap for breakpoint in SMP
+    std::atomic<int> breakPointSet;
 #endif
 
     /// Charm++ Tracing enabled for this ep (can change dynamically)
@@ -108,6 +110,9 @@ class EntryInfo {
       ownsName(ownsN), name(n)
     {
       if (ownsName) initName(n);
+#if CMK_CHARMDEBUG
+      breakPointSet=0;
+#endif      
     }
 
     ~EntryInfo()

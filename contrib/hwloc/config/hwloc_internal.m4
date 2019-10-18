@@ -1,6 +1,6 @@
 dnl -*- Autoconf -*-
 dnl
-dnl Copyright © 2010-2017 Inria.  All rights reserved.
+dnl Copyright © 2010-2019 Inria.  All rights reserved.
 dnl Copyright © 2009, 2011 Université Bordeaux
 dnl Copyright © 2004-2005 The Trustees of Indiana University and Indiana
 dnl                         University Research and Technology
@@ -64,6 +64,11 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
                   AS_HELP_STRING([--disable-libxml2],
 		                 [Do not use libxml2 for XML support, use a custom minimalistic support]))
 
+    # I/O?
+    AC_ARG_ENABLE([io],
+                  AS_HELP_STRING([--disable-io],
+                                 [Disable I/O discovery entirely (PCI, LinuxIO, CUDA, OpenCL, NVML, GL)]))
+
     # PCI?
     AC_ARG_ENABLE([pci],
                   AS_HELP_STRING([--disable-pci],
@@ -88,11 +93,6 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
     AC_ARG_ENABLE([gl],
 		  AS_HELP_STRING([--disable-gl],
 				 [Disable the GL display device discovery]))
-
-    # Linux libnuma
-    AC_ARG_ENABLE([libnuma],
-                  AS_HELP_STRING([--disable-libnuma],
-                                 [Disable the Linux libnuma]))
 
     # LibUdev
     AC_ARG_ENABLE([libudev],
@@ -264,6 +264,29 @@ EOF
 
     if test "x$hwloc_cairo_happy" = "xyes"; then
         AC_DEFINE([HWLOC_HAVE_CAIRO], [1], [Define to 1 if you have the `cairo' library.])
+        AC_MSG_CHECKING([whether lstopo Cairo/X11 interactive graphical output is supported])
+        if test "x$hwloc_x11_keysym_happy" = xyes; then
+          save_CPPFLAGS="$CPPFLAGS"
+          CPPFLAGS="$CPPFLAGS $HWLOC_CAIRO_CFLAGS $HWLOC_X11_CPPFLAGS"
+          AC_PREPROC_IFELSE([
+            AC_LANG_PROGRAM([[
+              #include <cairo.h>
+            ]], [[
+              #ifndef CAIRO_HAS_XLIB_SURFACE
+              #error
+              #endif
+            ]])
+          ], [
+            AC_MSG_RESULT([yes])
+            lstopo_have_x11=yes
+            AC_DEFINE([LSTOPO_HAVE_X11], 1, [Define if lstopo Cairo/X11 interactive graphical output is supported])
+          ], [
+            AC_MSG_RESULT([no (missing CAIRO_HAS_XLIB_SURFACE)])
+          ])
+          CPPFLAGS="$save_CPPFLAGS"
+        else
+          AC_MSG_RESULT([no (missing X11)])
+        fi
     else
         AS_IF([test "$enable_cairo" = "yes"],
               [AC_MSG_WARN([--enable-cairo requested, but Cairo/X11 support was not found])
@@ -317,16 +340,38 @@ EOF
     _HWLOC_CHECK_DIFF_U
     _HWLOC_CHECK_DIFF_W
 
+    # Solaris needs -lsocket for socket/bind/... in hwloc-ps
+    AC_CHECK_DECLS([bind], [
+      AC_CHECK_LIB([socket], [bind],
+                   [need_libsocket=yes])
+    ], [], [[#include <sys/socket.h>]])
+    if test x$need_libsocket = xyes; then
+      # keep -lsocket first in case there's also -lnsl which cannot be before -lsocket
+      HWLOC_PS_LIBS="-lsocket $HWLOC_PS_LIBS"
+    fi
+    AC_SUBST(HWLOC_PS_LIBS)
+
     AC_CHECK_HEADERS([time.h], [
       AC_CHECK_FUNCS([clock_gettime])
     ])
 
     # Only generate this if we're building the utilities
+    # Even the netloc library Makefile is here because
+    # we don't embed libnetloc yet, it's useless without tools
     AC_CONFIG_FILES(
         hwloc_config_prefix[utils/Makefile]
         hwloc_config_prefix[utils/hwloc/Makefile]
         hwloc_config_prefix[utils/lstopo/Makefile]
-        hwloc_config_prefix[hwloc.pc])
+        hwloc_config_prefix[hwloc.pc]
+
+        hwloc_config_prefix[netloc/Makefile]
+        hwloc_config_prefix[utils/netloc/infiniband/Makefile]
+        hwloc_config_prefix[utils/netloc/draw/Makefile]
+        hwloc_config_prefix[utils/netloc/scotch/Makefile]
+        hwloc_config_prefix[utils/netloc/mpi/Makefile]
+        hwloc_config_prefix[netloc.pc]
+        hwloc_config_prefix[netlocscotch.pc]
+   )
 ])dnl
 
 #-----------------------------------------------------------------------
@@ -336,17 +381,25 @@ AC_DEFUN([HWLOC_SETUP_TESTS],[
     cat <<EOF
 
 ###
-### Configuring hwloc tests
+### Configuring tests
 ###
 EOF
 
     AC_CHECK_LIB([pthread], [pthread_self], [hwloc_have_pthread=yes])
 
-    # linux-libnuma.h testing requires libnuma with numa_bitmask_alloc()
-    AC_CHECK_LIB([numa], [numa_available], [
-      AC_CHECK_DECL([numa_bitmask_alloc], [hwloc_have_linux_libnuma=yes], [],
-    	      [#include <numa.h>])
-    ])
+    HWLOC_PKG_CHECK_MODULES([NUMA], [numa], [numa_available], [numa.h],
+                            [hwloc_have_linux_libnuma=yes],
+			    [
+			     # libnuma didn't have a .pc before 2.0.12, look for it manually.
+			     AC_CHECK_LIB([numa], [numa_available], [
+				# and make sure this old release has at least numa_bitmask_alloc() for our tests
+			        AC_CHECK_DECL([numa_bitmask_alloc],
+				              [hwloc_have_linux_libnuma=yes
+					       HWLOC_NUMA_LIBS=-lnuma
+					      ],
+					      [],
+					      [#include <numa.h>])
+			     ])])
 
     AC_CHECK_HEADERS([stdlib.h], [
       AC_CHECK_FUNCS([mkstemp])
@@ -357,16 +410,6 @@ EOF
                    [AC_DEFINE([HAVE_LIBIBVERBS], 1, [Define to 1 if we have -libverbs])
                     hwloc_have_libibverbs=yes])
     ])
-
-    AC_CHECK_HEADERS([myriexpress.h], [
-      AC_MSG_CHECKING(if MX_NUMA_NODE exists)
-      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <myriexpress.h>]],
-                                         [[int a = MX_NUMA_NODE;]])],
-                        [AC_MSG_RESULT(yes)
-                         AC_CHECK_LIB([myriexpress], [mx_get_info],
-                                      [AC_DEFINE([HAVE_MYRIEXPRESS], 1, [Define to 1 if we have -lmyriexpress])
-                                       hwloc_have_myriexpress=yes])],
-                        [AC_MSG_RESULT(no)])])
 
     AC_CHECK_PROGS(XMLLINT, [xmllint])
 
@@ -390,33 +433,68 @@ int foo(void) {
     # Only generate these files if we're making the tests
     AC_CONFIG_FILES(
         hwloc_config_prefix[tests/Makefile]
-        hwloc_config_prefix[tests/linux/Makefile]
-        hwloc_config_prefix[tests/linux/allowed/Makefile]
-        hwloc_config_prefix[tests/linux/gather/Makefile]
-        hwloc_config_prefix[tests/xml/Makefile]
-        hwloc_config_prefix[tests/ports/Makefile]
-        hwloc_config_prefix[tests/rename/Makefile]
-        hwloc_config_prefix[tests/linux/allowed/test-topology.sh]
-        hwloc_config_prefix[tests/linux/gather/test-gather-topology.sh]
-        hwloc_config_prefix[tests/linux/test-topology.sh]
-        hwloc_config_prefix[tests/xml/test-topology.sh]
-        hwloc_config_prefix[tests/wrapper.sh]
-        hwloc_config_prefix[utils/hwloc/hwloc-assembler-remote]
+        hwloc_config_prefix[tests/hwloc/Makefile]
+        hwloc_config_prefix[tests/hwloc/linux/Makefile]
+        hwloc_config_prefix[tests/hwloc/linux/allowed/Makefile]
+        hwloc_config_prefix[tests/hwloc/linux/gather/Makefile]
+        hwloc_config_prefix[tests/hwloc/x86/Makefile]
+        hwloc_config_prefix[tests/hwloc/x86+linux/Makefile]
+        hwloc_config_prefix[tests/hwloc/xml/Makefile]
+        hwloc_config_prefix[tests/hwloc/ports/Makefile]
+        hwloc_config_prefix[tests/hwloc/rename/Makefile]
+        hwloc_config_prefix[tests/hwloc/linux/allowed/test-topology.sh]
+        hwloc_config_prefix[tests/hwloc/linux/gather/test-gather-topology.sh]
+        hwloc_config_prefix[tests/hwloc/linux/test-topology.sh]
+        hwloc_config_prefix[tests/hwloc/x86/test-topology.sh]
+        hwloc_config_prefix[tests/hwloc/x86+linux/test-topology.sh]
+        hwloc_config_prefix[tests/hwloc/xml/test-topology.sh]
+        hwloc_config_prefix[tests/hwloc/wrapper.sh]
         hwloc_config_prefix[utils/hwloc/hwloc-compress-dir]
         hwloc_config_prefix[utils/hwloc/hwloc-gather-topology]
         hwloc_config_prefix[utils/hwloc/test-hwloc-annotate.sh]
-        hwloc_config_prefix[utils/hwloc/test-hwloc-assembler.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-calc.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-compress-dir.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-diffpatch.sh]
-        hwloc_config_prefix[utils/hwloc/test-hwloc-distances.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-distrib.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-info.sh]
         hwloc_config_prefix[utils/hwloc/test-fake-plugin.sh]
-        hwloc_config_prefix[utils/lstopo/test-hwloc-ls.sh]
-        hwloc_config_prefix[contrib/systemd/Makefile])
+        hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/Makefile]
+        hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh]
+        hwloc_config_prefix[utils/lstopo/test-lstopo.sh]
+        hwloc_config_prefix[utils/lstopo/test-lstopo-shmem.sh]
+        hwloc_config_prefix[utils/netloc/infiniband/netloc_ib_gather_raw]
+        hwloc_config_prefix[contrib/hwloc-ps.www/Makefile]
+        hwloc_config_prefix[contrib/systemd/Makefile]
+        hwloc_config_prefix[contrib/misc/Makefile]
+        hwloc_config_prefix[contrib/windows/Makefile]
+        hwloc_config_prefix[contrib/windows/test-windows-version.sh]
+        hwloc_config_prefix[tests/netloc/Makefile]
+        hwloc_config_prefix[tests/netloc/tests.sh]
+    )
 
-    AC_CONFIG_COMMANDS([chmoding-scripts], [chmod +x ]hwloc_config_prefix[tests/linux/test-topology.sh ]hwloc_config_prefix[tests/xml/test-topology.sh ]hwloc_config_prefix[tests/linux/allowed/test-topology.sh ]hwloc_config_prefix[tests/linux/gather/test-gather-topology.sh ]hwloc_config_prefix[tests/wrapper.sh ]hwloc_config_prefix[utils/hwloc/hwloc-assembler-remote ]hwloc_config_prefix[utils/hwloc/hwloc-compress-dir ]hwloc_config_prefix[utils/hwloc/hwloc-gather-topology ]hwloc_config_prefix[utils/hwloc/test-hwloc-annotate.sh ]hwloc_config_prefix[utils/hwloc/test-hwloc-assembler.sh ]hwloc_config_prefix[utils/hwloc/test-hwloc-calc.sh ]hwloc_config_prefix[utils/hwloc/test-hwloc-compress-dir.sh ]hwloc_config_prefix[utils/hwloc/test-hwloc-diffpatch.sh ]hwloc_config_prefix[utils/hwloc/test-hwloc-distances.sh ]hwloc_config_prefix[utils/hwloc/test-hwloc-distrib.sh ]hwloc_config_prefix[utils/hwloc/test-hwloc-info.sh ]hwloc_config_prefix[utils/hwloc/test-fake-plugin.sh ]hwloc_config_prefix[utils/lstopo/test-hwloc-ls.sh])
+    AC_CONFIG_COMMANDS([chmoding-scripts], [chmod +x] \
+      hwloc_config_prefix[tests/hwloc/linux/test-topology.sh] \
+      hwloc_config_prefix[tests/hwloc/x86/test-topology.sh] \
+      hwloc_config_prefix[tests/hwloc/x86+linux/test-topology.sh] \
+      hwloc_config_prefix[tests/hwloc/xml/test-topology.sh] \
+      hwloc_config_prefix[tests/hwloc/linux/allowed/test-topology.sh] \
+      hwloc_config_prefix[tests/hwloc/linux/gather/test-gather-topology.sh] \
+      hwloc_config_prefix[tests/hwloc/wrapper.sh] \
+      hwloc_config_prefix[utils/hwloc/hwloc-compress-dir] \
+      hwloc_config_prefix[utils/hwloc/hwloc-gather-topology] \
+      hwloc_config_prefix[utils/hwloc/test-hwloc-annotate.sh] \
+      hwloc_config_prefix[utils/hwloc/test-hwloc-calc.sh] \
+      hwloc_config_prefix[utils/hwloc/test-hwloc-compress-dir.sh] \
+      hwloc_config_prefix[utils/hwloc/test-hwloc-diffpatch.sh] \
+      hwloc_config_prefix[utils/hwloc/test-hwloc-distrib.sh] \
+      hwloc_config_prefix[utils/hwloc/test-hwloc-info.sh] \
+      hwloc_config_prefix[utils/hwloc/test-fake-plugin.sh] \
+      hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh] \
+      hwloc_config_prefix[utils/lstopo/test-lstopo.sh] \
+      hwloc_config_prefix[utils/lstopo/test-lstopo-shmem.sh] \
+      hwloc_config_prefix[utils/netloc/infiniband/netloc_ib_gather_raw] \
+      hwloc_config_prefix[contrib/windows/test-windows-version.sh] \
+      hwloc_config_prefix[tests/netloc/tests.sh])
 
     # These links are only needed in standalone mode.  It would
     # be nice to m4 foreach this somehow, but whenever I tried
@@ -425,28 +503,34 @@ int foo(void) {
     # built in standalone mode, only generate them in
     # standalone mode.
     AC_CONFIG_LINKS(
-	hwloc_config_prefix[tests/ports/topology-solaris.c]:hwloc_config_prefix[src/topology-solaris.c]
-	hwloc_config_prefix[tests/ports/topology-solaris-chiptype.c]:hwloc_config_prefix[src/topology-solaris-chiptype.c]
-	hwloc_config_prefix[tests/ports/topology-aix.c]:hwloc_config_prefix[src/topology-aix.c]
-	hwloc_config_prefix[tests/ports/topology-osf.c]:hwloc_config_prefix[src/topology-osf.c]
-	hwloc_config_prefix[tests/ports/topology-windows.c]:hwloc_config_prefix[src/topology-windows.c]
-	hwloc_config_prefix[tests/ports/topology-darwin.c]:hwloc_config_prefix[src/topology-darwin.c]
-	hwloc_config_prefix[tests/ports/topology-freebsd.c]:hwloc_config_prefix[src/topology-freebsd.c]
-	hwloc_config_prefix[tests/ports/topology-netbsd.c]:hwloc_config_prefix[src/topology-netbsd.c]
-	hwloc_config_prefix[tests/ports/topology-hpux.c]:hwloc_config_prefix[src/topology-hpux.c]
-	hwloc_config_prefix[tests/ports/topology-bgq.c]:hwloc_config_prefix[src/topology-bgq.c]
-	hwloc_config_prefix[tests/ports/topology-opencl.c]:hwloc_config_prefix[src/topology-opencl.c]
-	hwloc_config_prefix[tests/ports/topology-cuda.c]:hwloc_config_prefix[src/topology-cuda.c]
-	hwloc_config_prefix[tests/ports/topology-nvml.c]:hwloc_config_prefix[src/topology-nvml.c]
-	hwloc_config_prefix[tests/ports/topology-gl.c]:hwloc_config_prefix[src/topology-gl.c])
+	hwloc_config_prefix[tests/hwloc/ports/topology-solaris.c]:hwloc_config_prefix[hwloc/topology-solaris.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-solaris-chiptype.c]:hwloc_config_prefix[hwloc/topology-solaris-chiptype.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-aix.c]:hwloc_config_prefix[hwloc/topology-aix.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-windows.c]:hwloc_config_prefix[hwloc/topology-windows.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-darwin.c]:hwloc_config_prefix[hwloc/topology-darwin.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-freebsd.c]:hwloc_config_prefix[hwloc/topology-freebsd.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-netbsd.c]:hwloc_config_prefix[hwloc/topology-netbsd.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-hpux.c]:hwloc_config_prefix[hwloc/topology-hpux.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-bgq.c]:hwloc_config_prefix[hwloc/topology-bgq.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-opencl.c]:hwloc_config_prefix[hwloc/topology-opencl.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-cuda.c]:hwloc_config_prefix[hwloc/topology-cuda.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-nvml.c]:hwloc_config_prefix[hwloc/topology-nvml.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-gl.c]:hwloc_config_prefix[hwloc/topology-gl.c]
+	hwloc_config_prefix[tests/hwloc/ports/lstopo-windows.c]:hwloc_config_prefix[utils/lstopo/lstopo-windows.c])
     ])
 ])dnl
 
 #-----------------------------------------------------------------------
 
+AC_DEFUN([_HWLOC_PROG_DIFF], [
+  AC_ARG_VAR(DIFF, [diff tool])
+  AC_PATH_PROG([DIFF], [diff])
+])
+
 AC_DEFUN([_HWLOC_CHECK_DIFF_U], [
+  AC_REQUIRE([_HWLOC_PROG_DIFF])
   AC_MSG_CHECKING([whether diff accepts -u])
-  if diff -u /dev/null /dev/null 2> /dev/null
+  if $DIFF -u /dev/null /dev/null 2> /dev/null
   then
     AC_MSG_RESULT([yes])
     HWLOC_DIFF_U="-u"
@@ -458,8 +542,9 @@ AC_DEFUN([_HWLOC_CHECK_DIFF_U], [
 ])
 
 AC_DEFUN([_HWLOC_CHECK_DIFF_W], [
+  AC_REQUIRE([_HWLOC_PROG_DIFF])
   AC_MSG_CHECKING([whether diff accepts -w])
-  if diff -w /dev/null /dev/null 2> /dev/null
+  if $DIFF -w /dev/null /dev/null 2> /dev/null
   then
     AC_MSG_RESULT([yes])
     HWLOC_DIFF_W="-w"

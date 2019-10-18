@@ -2971,7 +2971,6 @@ else
   export am_libhwloc_embedded_la_rpath=''
 fi
 AC_SUBST(am_libhwloc_embedded_la_rpath)
-enable_libnuma='no'
 enable_pci='no'
 enable_libudev='no'
 enable_libxml2='no'
