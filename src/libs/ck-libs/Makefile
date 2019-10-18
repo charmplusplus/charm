@@ -1,4 +1,6 @@
-CHARMC=../../bin/charmc $(OPTS)
+CDIR := ../..
+-include $(CDIR)/include/conv-mach-opt.mak
+CHARMC=$(CDIR)/bin/charmc $(OPTS)
 CHARMINC=.
 
 SIMPLE_DIRS = completion cache sparseContiguousReducer tcharm ampi idxl \
@@ -38,9 +40,11 @@ datatransfer: ampi fem collide
 NDMeshStreamer: completion
 
 pythonCCS:
-	-(CHARMINC=../../../include;. $$CHARMINC/conv-config.sh; \
-	if test "$$CMK_BUILD_PYTHON" != ""; then ($(MAKE) -C $@ all OPTS='$(OPTS)' || exit 1); fi)
+ifneq ($(CMK_BUILD_PYTHON),)
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+endif
 
+clean: $(foreach i,$(DIRS),clean-$i)
 
-clean:
-	for d in $(DIRS); do (cd $$d && $(MAKE) clean OPTS='$(OPTS)'); done
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

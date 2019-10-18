@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 #include <memory.h>
+#include <type_traits>
+#include <vector>
 
 #include "charm.h"
 #include "middle.h"
@@ -71,10 +73,11 @@ class CkEntryOptions : public CkNoncopyable {
 	typedef unsigned int prio_t; //Datatype used to represent priorities
 	prio_t *prioPtr; //Points to message priority values
 	prio_t prioStore; //For short priorities, stores the priority value
-	CkGroupID  depGroupID;  // group dependence
+	std::vector<CkGroupID> depGroupIDs;  // group dependencies
 public:
 	CkEntryOptions(void): queueingtype(CK_QUEUEING_FIFO), prioBits(0), 
-                              prioPtr(NULL), prioStore(0) { depGroupID.setZero(); }
+                              prioPtr(NULL), prioStore(0) {
+	}
 
 	~CkEntryOptions() {
 		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
@@ -129,13 +132,22 @@ public:
 	}
 	
 	inline CkEntryOptions& setQueueing(int queueingtype_) { queueingtype=queueingtype_; return *this; }
-	inline CkEntryOptions& setGroupDepID(const CkGroupID &gid) { depGroupID = gid; return *this; }
+	inline CkEntryOptions& setGroupDepID(const CkGroupID &gid) {
+		depGroupIDs.clear();
+		depGroupIDs.push_back(gid);
+		return *this;
+	}
+	inline CkEntryOptions& addGroupDepID(const CkGroupID &gid) { depGroupIDs.push_back(gid); return *this; }
 
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
 	inline int getPriorityBits(void) const {return prioBits;}
 	inline const prio_t *getPriorityPtr(void) const {return prioPtr;}
-	inline const CkGroupID getGroupDepID() const { return depGroupID; }
+	inline CkGroupID getGroupDepID() const { return depGroupIDs[0]; }
+	inline CkGroupID getGroupDepID(int index) const { return depGroupIDs[index]; }
+	inline int getGroupDepSize() const { return sizeof(CkGroupID)*(depGroupIDs.size()); }
+	inline int getGroupDepNum() const { return depGroupIDs.size(); }
+	inline const CkGroupID *getGroupDepPtr() const { return &(depGroupIDs[0]); }
 };
 
 #include "CkMarshall.decl.h"
@@ -181,8 +193,6 @@ public:
 
 #include "ckcallback.h"
 
-#include "ckrdmawrapper.h"
-
 #include "ckrdma.h"
 
 /********************* Superclass of all Chares ******************/
@@ -202,10 +212,7 @@ public:
 // for object message queue
 #include "ckobjQ.h"
 #if CMK_SMP && CMK_TASKQUEUE
-#include "cktaskQ.h"
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-class ChareMlogData;
+#include "conv-taskQ.h"
 #endif
 
 #define CHARE_MAGIC    0x201201
@@ -226,9 +233,6 @@ class Chare {
 #endif
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    ChareMlogData *mlogData;
 #endif
     Chare(CkMigrateMessage *m);
     Chare();
@@ -344,13 +348,56 @@ class IrrGroup : public Chare {
     virtual bool isReductionMgr(void){ return false; }
     static bool isIrreducible(){ return true;}
     virtual void flushStates() {}
-		/*
-			FAULT_EVAC
-		*/
+
+    virtual void CkAddThreadListeners(CthThread tid, void *msg);
+
+#if CMK_FAULT_EVAC
 		virtual void evacuate(){};
 		virtual void doneEvacuate(){};
-    virtual void CkAddThreadListeners(CthThread tid, void *msg);
+#endif
 };
+
+#if CMK_CHARMPY
+
+extern void (*GroupMsgRecvExtCallback)(int, int, int, char *, int);        // callback to forward received msg to external Group chare
+extern void (*ChareMsgRecvExtCallback)(int, void*, int, int, char *, int); // callback to forward received msg to external Chare
+
+/// Supports readonlies outside of the C/C++ runtime. See README.charm4py
+class ReadOnlyExt {
+public:
+  static void *ro_data; // on PE 0, points to the readonly data that is broadcast to every PE
+  static size_t data_size;
+
+  static void setData(void *msg, size_t msgSize);
+  static void _roPup(void *pup_er); // pack/unpack readonly data
+};
+
+/// Lightweight object to support mainchares defined outside of the C/C++ runtime.
+/// Relays messages to appropiate external chare. See README.charm4py
+class MainchareExt: public Chare {
+public:
+  MainchareExt(CkArgMsg *m);
+
+  static void __Ctor_CkArgMsg(void *impl_msg, void *impl_obj_void) {
+    new (impl_obj_void) MainchareExt((CkArgMsg*)impl_msg);
+  }
+
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    //fprintf(stderr, "MainchareExt:: entry method invoked\n");
+    MainchareExt *obj = static_cast<MainchareExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    int ep; implP|ep;
+    int dcopy_start; implP|dcopy_start;
+    // relay msg to external chare
+    ChareMsgRecvExtCallback(obj->thishandle.onPE, obj->thishandle.objPtr, ep, msgSize,
+                            impl_buf+(3*sizeof(int)), dcopy_start);
+  }
+};
+
+#endif
 
 // As described in http://www.gotw.ca/publications/mxc++-item-4.htm
 template<typename D, typename B>
@@ -405,6 +452,8 @@ void recursive_pup(T *obj, PUP::er &p) {
   recursive_pup_impl<T, IsDerivedFrom<T, CBase>::Is>()(obj, p);
 }
 
+class CProxy_ArrayBase;
+
 // CBaseX::pup must be an empty override, so that the recursive PUPing
 // doesn't call an implementation multiple times up the inheritance
 // hierarchy, and old-style calls to CBase_foo::pup actually produce
@@ -414,6 +463,10 @@ void recursive_pup(T *obj, PUP::er &p) {
   typedef typename CProxy_Derived::index_t index_t;           \
   typedef typename CProxy_Derived::proxy_t proxy_t;           \
   typedef typename CProxy_Derived::element_t element_t;       \
+  template <typename T = proxy_t>                             \
+  typename std::enable_if<std::is_base_of<CProxy_ArrayBase, T>::value>::type migrateMe(int toPe) { \
+    this->thisProxy[this->thisIndex].ckEmigrate(toPe);        \
+  }                                                           \
   CProxy_Derived thisProxy;                                   \
   void pup(PUP::er &p) { (void)p; }                           \
   inline void _sdag_pup(PUP::er &p) { (void)p; }              \
@@ -648,12 +701,12 @@ class CkDelegateMgr : public IrrGroup {
 */
 class CProxy {
   private:
-    CkGroupID delegatedGroupId;      
-    bool isNodeGroup;
     mutable CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
     CkDelegateData *delegatedPtr; // private data for use by delegatedMgr.
+    CkGroupID delegatedGroupId;
+    bool isNodeGroup;
   protected: //Never allocate CProxy's-- only subclass them.
- CProxy() :  isNodeGroup(false), delegatedMgr(0), delegatedPtr(0)
+ CProxy() :  delegatedMgr(0), delegatedPtr(0), isNodeGroup(false)
       {delegatedGroupId.setZero(); }
 
 #define CK_DELCTOR_PARAM CkDelegateMgr *dTo,CkDelegateData *dPtr
@@ -959,10 +1012,10 @@ public:
   inline CkSectionID &ckGetSectionID() {return _sid[0]; }
   inline CkSectionID &ckGetSectionID(int i) {return _sid[i]; }
   inline CkGroupID ckGetGroupIDn(int i) const {return _sid[i]._cookie.get_aid();}
-  inline int *ckGetElements() const {return _sid[0].pelist;}
-  inline int *ckGetElements(int i) const {return _sid[i].pelist;}
-  inline int ckGetNumElements() const { return _sid[0].npes; }
-  inline int ckGetNumElements(int i) const { return _sid[i].npes; }
+  inline const int *ckGetElements() const {return _sid[0].pelist.data();}
+  inline const int *ckGetElements(int i) const {return _sid[i].pelist.data();}
+  inline int ckGetNumElements() const { return _sid[0].pelist.size(); }
+  inline int ckGetNumElements(int i) const { return _sid[i].pelist.size(); }
   inline int ckGetBfactor() const { return _sid[0].bfactor; }
   void pup(PUP::er &p) {
     CProxy_Group::pup(p);
@@ -1044,8 +1097,31 @@ class CProxy_NodeGroup : public CProxy{
 
 };
 
+class CProxyElement_NodeGroup : public CProxy_NodeGroup {
+  private:
+    int _onNode;
+  public:
+    CProxyElement_NodeGroup() {}
+    CProxyElement_NodeGroup(CkGroupID g, int onNode)
+      : CProxy_NodeGroup(g), _onNode(onNode) {}
+    CProxyElement_NodeGroup(CkGroupID g, int onNode, CK_DELCTOR_PARAM)
+      : CProxy_NodeGroup(g, CK_DELCTOR_ARGS), _onNode(onNode) {}
+    CProxyElement_NodeGroup(const IrrGroup *g)
+      : CProxy_NodeGroup(g), _onNode(CkMyNode()) {}
+
+    bool operator ==(const CProxyElement_NodeGroup& other) {
+      return ckGetGroupID() == other.ckGetGroupID() &&
+             ckGetGroupPe() == other.ckGetGroupPe();
+    }
+
+    int ckGetGroupPe(void) const { return _onNode; }
+    void pup(PUP::er &p) {
+      CProxy_NodeGroup::pup(p);
+      p(_onNode);
+    }
+};
+
 typedef CProxy_Group CProxy_IrrGroup;
-typedef CProxyElement_Group CProxyElement_NodeGroup;
 typedef CProxyElement_Group CProxyElement_IrrGroup;
 typedef CProxySection_Group CProxySection_NodeGroup;
 typedef CProxySection_Group CProxySection_IrrGroup;
@@ -1056,12 +1132,86 @@ typedef CProxySection_Group CProxySection_IrrGroup;
 //Defines the actual "Group"
 #include "ckreduction.h"
 
+#if CMK_CHARMPY
+
+/// Lightweight object to support chares defined outside of the C/C++ runtime
+/// Relays messages to appropiate external chare. See README.charm4py
+class GroupExt: public Group {
+public:
+  GroupExt(void *impl_msg);
+
+  static void __GroupExt(void *impl_msg, void *impl_obj_void) {
+    new (impl_obj_void) GroupExt(impl_msg);
+  }
+
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    //fprintf(stderr, "GroupExt:: entry method invoked\n");
+    GroupExt *obj = static_cast<GroupExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    int ep; implP|ep;
+    int dcopy_start; implP|dcopy_start;
+    // relay received msg to external chare
+    GroupMsgRecvExtCallback(obj->thisgroup.idx, ep, msgSize, impl_buf+(3*sizeof(int)),
+                            dcopy_start);
+  }
+};
+
+class SectionManagerExt: public GroupExt {
+public:
+
+  SectionManagerExt(void *impl_msg) : GroupExt(impl_msg) {}
+
+  static void __SectionManagerExt(void *impl_msg, void *impl_obj_void) {
+    new (impl_obj_void) SectionManagerExt(impl_msg);
+  }
+
+  // entry methods of SectionManager other than sendToSection
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    SectionManagerExt *obj = static_cast<SectionManagerExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    implP|obj->ep;
+    int dcopy_start; implP|dcopy_start;
+    GroupMsgRecvExtCallback(obj->thisgroup.idx, obj->ep, msgSize, impl_buf+(3*sizeof(int)),
+                            dcopy_start);
+  }
+
+  // sendToSection entry method
+  static void __sendToSection(void *impl_msg, void *impl_obj_void) {
+    SectionManagerExt *obj = static_cast<SectionManagerExt *>(impl_obj_void);
+    obj->msg = impl_msg; // store msg for forwarding to children in multicast spanning tree
+    SectionManagerExt::__entryMethod(impl_msg, impl_obj_void);
+    // if msg != null because I haven't forwarded it (I'm a leaf) delete it now
+    CkFreeMsg(obj->msg);
+  }
+
+  // Used by Charm4py SectionManager to forward a multicast msg to its children without copying.
+  // The msg was received by SectionManagerExt::__sendToSection. When forwardMulticastMsg is reached, we
+  // are still inside the GroupMsgRecvExtCallback call, so the msg has not been deleted yet
+  void forwardMulticastMsg(int num_children, const int *children) {
+    CkSendMsgBranchMulti(ep, msg, thisgroup, num_children, children);
+    // CkSendMsgBranchMulti deletes the msg, so mark it as null to not delete it again
+    msg = nullptr;
+  }
+
+private:
+  int ep;
+  void *msg;
+};
+
+#endif
+
 class CkQdMsg {
   public:
-    void *operator new(size_t s) { return CkAllocMsg(0,(int)s,0); }
+    void *operator new(size_t s) { return CkAllocMsg(0,(int)s,0,GroupDepNum{}); }
     void operator delete(void* ptr) { CkFreeMsg(ptr); }
-    static void *alloc(int, size_t s, int*, int) {
-      return CkAllocMsg(0,(int)s,0);
+    static void *alloc(int, size_t s, int*, int, int) {
+      return CkAllocMsg(0,(int)s,0,GroupDepNum{});
     }
     static void *pack(CkQdMsg *m) { return (void*) m; }
     static CkQdMsg *unpack(void *buf) { return (CkQdMsg*) buf; }
@@ -1109,12 +1259,6 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #endif
 
 
-#if defined(_FAULT_MLOG_) 
-#include "ckmessagelogging.h"
-#endif
-#if defined(_FAULT_CAUSAL_)
-#include "ckcausalmlog.h"
-#endif
 
 #include "ckmemcheckpoint.h"
 #include "readonly.h"
@@ -1131,8 +1275,77 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "ckcallback-ccs.h"
 
 
+template<typename... tArgs>
+int CkRegisterEp(const std::string& name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags) {
+  std::string combined(name);
 
+  size_t argStart = name.find('(');
+  if (argStart == std::string::npos)
+    argStart = name.length();
 
+#if defined(__GNUG__) || defined(__clang__)
+  std::string functionName = __PRETTY_FUNCTION__;
+  std::string templateString = functionName.substr(functionName.find("tArgs = ") + 8);
+#ifdef __clang__
+  // Clang seems to use the format [tArgs = <args>], so remove the closing ]
+  // (the opening one will have been removed by the substr above)
+  if (templateString.rfind(']') != std::string::npos)
+    templateString.erase(templateString.rfind(']'));
+#else // __GNUG__
+  // Gcc seems to use the format [with tArgs = {args}; ...]
+  // so find and extract the substring bounded by {}
+  // Assumes that there are no occurrences of '}' inside tArgs
+  size_t openingPos = templateString.find('{'), closingPos = templateString.find('}');
+  if (openingPos != std::string::npos && closingPos != std::string::npos && closingPos > openingPos + 1)
+    templateString = templateString.substr(openingPos + 1, closingPos - openingPos - 1);
+  templateString = "<" + templateString + ">";
+#endif
+#elif defined(_MSC_VER)
+  // Vc++ seems to use the format int __cdecl CkRegisterEp<class tArgs>(...)
+  // so find '<' and try to match with '>' until a full expression is found
+  std::string functionName = __FUNCSIG__;
+  std::string templateString;
+  size_t openingIndex = functionName.find('<');
+  if (openingIndex != std::string::npos) {
+    int count = 1;
+    size_t index = openingIndex + 1;
+    while (count > 0 && index < functionName.length()) {
+      switch (functionName[index]) {
+        case '<':
+          count++;
+          break;
+        case '>':
+          count--;
+          break;
+        default:
+          break;
+      }
+
+      index++;
+    }
+
+    // if we've found a matching set of <>, then fill in args, otherwise leave empty
+    if (count == 0) {
+      templateString = functionName.substr(openingIndex, index - openingIndex + 1);
+    }
+  }
+#else
+  // { ()... } is a pack expansion, calls typeid(var).name() for each var in tArgs
+  std::vector<std::string> tArgNames = { (typeid(tArgs).name())... };
+
+  std::string templateString = "<";
+  for (auto it = tArgNames.begin(); it != tArgNames.end(); it++) {
+    templateString += *it;
+    if (it + 1 != tArgNames.end())
+      templateString += ", ";
+  }
+  templateString += ">";
+#endif
+
+  combined.insert(argStart, templateString);
+
+  return CkRegisterEpTemplated(combined.c_str(), call, msgIdx, chareIdx, ck_ep_flags);
+}
 
 CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts);
 inline CkMarshallMsg *CkAllocateMarshallMsg(int size,const CkEntryOptions *opts=NULL)
@@ -1224,6 +1437,9 @@ public:
     ++refcount;
   }
 };
+
+// Method to check if the Charm RTS initialization phase has completed
+void checkForInitDone(bool rdmaROCompleted);
 
 #endif
 

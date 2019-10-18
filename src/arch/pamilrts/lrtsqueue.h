@@ -65,7 +65,7 @@ void LRTSQueueInit      (void           * l2mem,
   L2_AtomicStore(&queue->_l2state->Producer, 0);
   L2_AtomicStore(&queue->_l2state->UpperBound, qsize);
   
-  rc = posix_memalign ((void **)&queue->_array,
+  rc = (pami_result_t)posix_memalign ((void **)&queue->_array,
 		       64, /*L1 line size for BG/Q */
 		       sizeof(LRTSQueueElement) * qsize);
 

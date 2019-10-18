@@ -40,7 +40,8 @@ public:
   main(CkArgMsg* m)
   {
     if(m->argc < 2) {
-      CkAbort("Usage: hello <nElements>\n");
+      CkPrintf("Usage: hello <nElements>\n");
+      CkExit(1);
     }
     nElements = atoi(m->argv[1]);
     delete m;

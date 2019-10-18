@@ -30,42 +30,59 @@ class DistributedLB : public CBase_DistributedLB {
 public:
   DistributedLB(const CkLBOptions &);
   DistributedLB(CkMigrateMessage *m);
-  void GossipLoadInfo(int, int, int, int[], double[]);
-  void AvgLoadReduction(double x);
+  static void initnodeFn(void);
+
+  void GossipLoadInfo(int, int, int[], double[]);
+  void LoadReduction(CkReductionMsg* msg);
+  void AfterLBReduction(CkReductionMsg* msg);
   void DoneGossip();
   void InformMigration(int obj_id, int from_pe, double obj_load, bool force);
   void RecvAck(int obj_id, int assigned_pe, bool can_accept);
-  void SendAfterBarrier();
   void turnOn();
   void turnOff();
 
 private:
+  // Load information obtained via gossipping
   int underloaded_pe_count;
   std::vector<int> pe_no;
   std::vector<double> loads;
   std::vector<double> distribution;
 
+  minHeap* objs;
+
   int total_migrates_ack;
   int total_migrates;
   std::vector<MigrateInfo*> migrateInfo;
-  LBMigrateMsg* msg;
-  
+
+  // Constant variables for configuring how the strategy works
   bool kUseAck;
-  double kTransferThreshold;
   int kPartialInfoCount;
   int kMaxTrials;
   int kMaxGossipMsgCount;
+  int kMaxObjPickTrials;
+  int kMaxPhases;
+  double kTargetRatio;
 
-  int gossip_msg_count;
-  bool lb_started;
-  int objs_count;
-	double my_load;
-	double avg_load;
+  // Global stats about the load gather from reductions
+  double avg_load;
+  double max_load;
+  double load_ratio;
+
+  // Information about this PEs load
+  double my_load;
+  double init_load;
   double b_load;
   double b_load_per_obj;
-  double thr_avg;
-	int req_hop;
+
+  // Control flow variables
+  bool lb_started;
+  int phase_number;
+  int gossip_msg_count;
+  int objs_count;
   int negack_count;
+  double transfer_threshold;
+
+  double start_time;
 
   const DistBaseLB::LDStats* my_stats;
 
@@ -73,11 +90,17 @@ private:
   void SendLoadInfo();
   void LoadBalance();
   void LoadBalance(CkVec<int> &obj_no, CkVec<int> &obj_pe_no);
-  void MapObjsToPe(minHeap &objs, CkVec<int> &obj_no, CkVec<int> &obj_pe_no);
+  void MapObjsToPe(minHeap *objs, CkVec<int> &obj_no, CkVec<int> &obj_pe_no);
 	int PickRandReceiverPeIdx() const;
 	void CalculateCumulateDistribution();
   void Strategy(const DistBaseLB::LDStats* const stats);
+  void Setup();
+  void Cleanup();
+  void PackAndSendMigrateMsgs();
+  void StartNextLBPhase();
+  void DoneWithLBPhase();
 
+  // TODO: Should this use the lb_started flag?
   bool QueryBalanceNow(int step) { return true; };
 };
 

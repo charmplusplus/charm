@@ -1,8 +1,8 @@
 #ifndef _GLOBALS_H_
 #define _GLOBALS_H_
 
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 namespace xi {
 
@@ -25,11 +25,11 @@ extern int numConnects;
 extern int numCases;
 extern int numCaseLists;
 
-extern FILE *fh;
+extern FILE* fh;
 
-extern void pH(int, const char *, ...);
+extern void pH(int, const char*, ...);
 extern void resetNumbers(void);
 
-}
+}  // namespace xi
 
 #endif

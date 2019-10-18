@@ -3,7 +3,7 @@
 
 CDIR=../../../../..
 LIBDIR=$(CDIR)/lib
-CC=$(CDIR)/bin/charmc -I. -I../GKlib
+CC=$(CDIR)/bin/charmc -I. -I../GKlib $(OPTS)
 
 OBJS = b64.o blas.o csr.o error.o \
 	evaluate.o fkvkselect.o fs.o getopt.o \

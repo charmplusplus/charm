@@ -12,14 +12,16 @@
 
 extern LBAllocFn getLBAllocFn(const char *lbname);
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(AdaptiveLB, "Allow multiple strategies to work serially")
 
 AdaptiveLB::AdaptiveLB(const CkLBOptions &opt): CBase_AdaptiveLB(opt)
 {
   lbname = "AdaptiveLB";
   const char *lbs = theLbdb->loadbalancer(opt.getSeqNo());
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] AdaptiveLB created with %s\n",CkMyPe(), lbs);
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> AdaptiveLB created with %s.\n", lbs);
 
   char *lbcopy = strdup(lbs);
   const char *greedyLBString = "GreedyLB";
@@ -29,32 +31,28 @@ AdaptiveLB::AdaptiveLB(const CkLBOptions &opt): CBase_AdaptiveLB(opt)
 
   LBAllocFn fn = getLBAllocFn(greedyLBString);
   if (fn == NULL) {
-    CkPrintf("LB> Invalid load balancer: %s.\n", greedyLBString);
-    CmiAbort("");
+    CkAbort("LB> Invalid load balancer: %s.\n", greedyLBString);
   }
   BaseLB *glb = fn();
   greedyLB = (CentralLB*)glb;
 
   fn = getLBAllocFn(refineLBString);
   if (fn == NULL) {
-    CkPrintf("LB> Invalid load balancer: %s.\n", refineLBString);
-    CmiAbort("");
+    CkAbort("LB> Invalid load balancer: %s.\n", refineLBString);
   }
   BaseLB *rlb = fn();
   refineLB = (CentralLB*)rlb;
 
   fn = getLBAllocFn(metisLBString);
   if (fn == NULL) {
-    CkPrintf("LB> Invalid load balancer: %s.\n", metisLBString);
-    CmiAbort("");
+    CkAbort("LB> Invalid load balancer: %s.\n", metisLBString);
   }
   BaseLB *slb = fn();
   metisLB = (CentralLB*)slb;
 
   fn = getLBAllocFn(commRefineLBString);
   if (fn == NULL) {
-    CkPrintf("LB> Invalid load balancer: %s.\n", commRefineLBString);
-    CmiAbort("");
+    CkAbort("LB> Invalid load balancer: %s.\n", commRefineLBString);
   }
   BaseLB *crlb = fn();
   commRefineLB = (CentralLB*)crlb;
@@ -95,8 +93,8 @@ void AdaptiveLB::work(LDStats* stats)
   double commOverhead = (totalMsgs * alpha) + (totalBytes * beta);
 
   CkPrintf("AdaptiveLB> Total load %E\n", totalLoad);
-  CkPrintf("AdaptiveLB> Total Msgs %d\n", totalMsgs);
-  CkPrintf("AdaptiveLB> Total Bytes %ld\n", totalBytes);
+  CkPrintf("AdaptiveLB> Total Msgs %ld\n", totalMsgs);
+  CkPrintf("AdaptiveLB> Total Bytes %lld\n", totalBytes);
   CkPrintf("AdaptiveLB> Total Comm Overhead %E Total Load %E\n", commOverhead, totalLoad);
 
   double tmp;

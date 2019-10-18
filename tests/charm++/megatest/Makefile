@@ -33,7 +33,9 @@ OBJS=megatest.o \
      immediatering.o \
      callback.o \
      inlineem.o \
-     completion_test.o
+     completion_test.o \
+     groupdependence.o
+
 
 
 #     priolongtest.o \
@@ -66,7 +68,8 @@ OBJS_REV=megatest.o \
      varsizetest.o \
      nodering.o \
      groupring.o \
-     inlineem.o
+     inlineem.o \
+     groupdependence.o
 
 #     priolongtest.o \
 
@@ -78,7 +81,7 @@ CIFILES =  \
       groupcast.def.h  migration.def.h      queens.def.h     varraystest.def.h\
       groupring.def.h  nodecast.def.h       reduction.def.h  varsizetest.def.h\
       groupsectiontest.def.h multisectiontest.def.h inlineem.def.h varsizetest2.def.h\
-      groupmulti.def.h completion_test.def.h #priolongtest.def.h
+      groupmulti.def.h completion_test.def.h groupdependence.def.h #priolongtest.def.h
 
 .SUFFIXES:
 .SUFFIXES: .o .C .def.h .decl.h .ci .h
@@ -106,6 +109,10 @@ test: pgm
 	$(call run, ./pgm +p2 )
 	$(call run, ./pgm +p3 )
 	$(call run, ./pgm +p4 )
+
+smptest: pgm
+	$(call run, ./pgm +p2 ++ppn 2 )
+	$(call run, ./pgm +p4 ++ppn 2 )
 
 depends:  $(CIFILES)
 	echo "Creating " $(DEPENDFILE) " ...";	\

@@ -1,0 +1,35 @@
+/**
+ * Author: Jonathan Lifflander
+ *
+ * Hierarchical Greedy LB based on the description in this paper:
+ *
+ * HPDC 12:
+ *   "Work Stealing and Persistence-based Load Balancers for Iterative
+ *    Overdecomposed Applications"
+ *    Jonathan Lifflander, Sriram Krishnamoorthy, Laxmikant V. Kale
+ *
+*/
+
+module HierarchicalLB {
+  extern module DistBaseLB;
+
+  initnode void lbinit(void);
+
+  group [migratable] HierarchicalLB : DistBaseLB {
+    entry void HierarchicalLB(const CkLBOptions &);
+    entry [reductiontarget] void avg_load_reduction(double x);
+    entry void done_hier();
+    entry void lb_tree_msg(
+      double const child_load, int const child, std::map<int, std::list<int64_t>> load,
+      int child_size
+    );
+    entry void down_tree_msg(
+      int const& from, std::map<int, std::list<int64_t>> excess_load, bool final_child
+    );
+    entry void transfer_objects(
+      int const& to_pe, std::vector<int> const& lst
+    );
+    entry void finished_transfer_requests();
+  };
+
+};

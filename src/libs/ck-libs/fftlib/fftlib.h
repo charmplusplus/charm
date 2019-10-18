@@ -5,12 +5,16 @@
 #include "ckcomplex.h"
 #include "rfftw.h"
 
+#define DEPRECATED(func) func
+
 #define COMPLEX_TO_REAL -11
 #define REAL_TO_COMPLEX -12
 #define COMPLEX_TO_COMPLEX -13
 #define NULL_TO_NULL -14
 
 #define MAX_FFTS 5
+
+#warning "This Charm 3D FFT library is deprecated. Use the new CharmFFT instead: http://charm.cs.illinois.edu/manuals/html/libraries/4.html"
 
 class NormalFFTinfo {
  public:

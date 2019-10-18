@@ -1,3 +1,5 @@
+# NOTE: cc-clang.sh is used by default on BGQ rather than this
+
 . $CHARMINC/cc-bluegene.sh
 
 if test -d "$BGQ_INSTALL/comm/include"
@@ -35,3 +37,4 @@ CMK_SYSINC="$BGQ_INC"
 CMK_SYSLIBS="$BGQ_LIB"
 
 CMK_COMPILER='bgxlc'
+CMK_CCS_AVAILABLE='0'

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2017 Inria.  All rights reserved.
+ * Copyright © 2009-2019 Inria.  All rights reserved.
  * Copyright © 2009-2012 Université Bordeaux
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -45,12 +45,16 @@
  * See hwloc/bitmap.h for bitmap specific macros.
  * See hwloc/helper.h for high-level topology traversal helpers.
  * See hwloc/inlines.h for the actual inline code of some functions below.
+ * See hwloc/export.h for exporting topologies to XML or to synthetic descriptions.
+ * See hwloc/distances.h for querying and modifying distances between objects.
+ * See hwloc/diff.h for manipulating differences between similar topologies.
  */
 
 #ifndef HWLOC_H
 #define HWLOC_H
 
-#include <hwloc/autogen/config.h>
+#include "hwloc/autogen/config.h"
+
 #include <sys/types.h>
 #include <stdio.h>
 #include <string.h>
@@ -59,13 +63,13 @@
 /*
  * Symbol transforms
  */
-#include <hwloc/rename.h>
+#include "hwloc/rename.h"
 
 /*
  * Bitmap definitions
  */
 
-#include <hwloc/bitmap.h>
+#include "hwloc/bitmap.h"
 
 
 #ifdef __cplusplus
@@ -79,13 +83,17 @@ extern "C" {
 
 /** \brief Indicate at build time which hwloc API version is being used.
  *
- * This number is updated to (X>>16)+(Y>>8)+Z when a new release X.Y.Z
+ * This number is updated to (X<<16)+(Y<<8)+Z when a new release X.Y.Z
  * actually modifies the API.
  *
  * Users may check for available features at build time using this number
- * (see \ref faq_upgrade).
+ * (see \ref faq_version_api).
+ *
+ * \note This should not be confused with HWLOC_VERSION, the library version.
+ * Two stable releases of the same series usually have the same ::HWLOC_API_VERSION
+ * even if their HWLOC_VERSION are different.
  */
-#define HWLOC_API_VERSION 0x00010b00
+#define HWLOC_API_VERSION 0x00020100
 
 /** \brief Indicate at runtime which hwloc API version was used at build time.
  *
@@ -94,7 +102,7 @@ extern "C" {
 HWLOC_DECLSPEC unsigned hwloc_get_api_version(void);
 
 /** \brief Current component and plugin ABI version (see hwloc/plugins.h) */
-#define HWLOC_COMPONENT_ABI 4
+#define HWLOC_COMPONENT_ABI 6
 
 /** @} */
 
@@ -141,10 +149,8 @@ typedef hwloc_const_bitmap_t hwloc_const_cpuset_t;
  * Each bit may be converted into a NUMA node object using
  * hwloc_get_numanode_obj_by_os_index().
  *
- * When binding memory on a system without any NUMA node
- * (when the whole memory is considered as a single memory bank),
- * the nodeset may be either empty (no memory selected)
- * or full (whole system memory selected).
+ * When binding memory on a system without any NUMA node,
+ * the single main memory bank is considered as NUMA node #0.
  *
  * See also \ref hwlocality_helper_nodeset_convert.
  */
@@ -167,36 +173,22 @@ typedef hwloc_const_bitmap_t hwloc_const_nodeset_t;
  * may be defined in the future!  If you need to compare types, use
  * hwloc_compare_types() instead.
  */
+#define HWLOC_OBJ_TYPE_MIN HWLOC_OBJ_MACHINE /**< \private Sentinel value */
 typedef enum {
-    /* ***************************************************************
-       WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
-
-       If new enum values are added here, you MUST also go update the
-       obj_type_order[] and obj_order_type[] arrays in src/topology.c.
-
-       WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
-       *************************************************************** */
-
-  HWLOC_OBJ_SYSTEM,	/**< \brief Whole system (may be a cluster of machines).
-  			  * The whole system that is accessible to hwloc.
-			  * That may comprise several machines in SSI systems
-			  * like Kerrighed.
-			  */
   HWLOC_OBJ_MACHINE,	/**< \brief Machine.
-			  * The typical root object type.
 			  * A set of processors and memory with cache
 			  * coherency.
+			  *
+			  * This type is always used for the root object of a topology,
+			  * and never used anywhere else.
+			  * Hence its parent is always \c NULL.
 			  */
-  HWLOC_OBJ_NUMANODE,	/**< \brief NUMA node.
-			  * A set of processors around memory which the
-			  * processors can directly access.
-			  */
-  HWLOC_OBJ_PACKAGE,	/**< \brief Physical package, what goes into a socket.
-			  * In the physical meaning, i.e. that you can add
-			  * or remove physically.
-			  */
-  HWLOC_OBJ_CACHE,	/**< \brief Cache.
-			  * Can be L1i, L1d, L2, L3, ...
+
+  HWLOC_OBJ_PACKAGE,	/**< \brief Physical package.
+			  * The physical package that usually gets inserted
+			  * into a socket on the motherboard.
+			  * A processor package usually contains multiple cores,
+			  * and possibly some dies.
 			  */
   HWLOC_OBJ_CORE,	/**< \brief Core.
 			  * A computation unit (may be shared by several
@@ -207,9 +199,22 @@ typedef enum {
 			  * other logical processors, e.g. in the case of
 			  * an SMT core).
 			  *
+			  * This is the smallest object representing CPU resources,
+			  * it cannot have any child except Misc objects.
+			  *
 			  * Objects of this kind are always reported and can
 			  * thus be used as fallback when others are not.
 			  */
+
+  HWLOC_OBJ_L1CACHE,	/**< \brief Level 1 Data (or Unified) Cache. */
+  HWLOC_OBJ_L2CACHE,	/**< \brief Level 2 Data (or Unified) Cache. */
+  HWLOC_OBJ_L3CACHE,	/**< \brief Level 3 Data (or Unified) Cache. */
+  HWLOC_OBJ_L4CACHE,	/**< \brief Level 4 Data (or Unified) Cache. */
+  HWLOC_OBJ_L5CACHE,	/**< \brief Level 5 Data (or Unified) Cache. */
+
+  HWLOC_OBJ_L1ICACHE,	/**< \brief Level 1 instruction Cache (filtered out by default). */
+  HWLOC_OBJ_L2ICACHE,	/**< \brief Level 2 instruction Cache (filtered out by default). */
+  HWLOC_OBJ_L3ICACHE,	/**< \brief Level 3 instruction Cache (filtered out by default). */
 
   HWLOC_OBJ_GROUP,	/**< \brief Group objects.
 			  * Objects which do not fit in the above but are
@@ -220,52 +225,92 @@ typedef enum {
 			  * NUMA nodes according to their distances.
 			  * See also \ref faq_groups.
 			  *
-			  * These objects are ignored when they do not bring
-			  * any structure.
+			  * These objects are removed when they do not bring
+			  * any structure (see ::HWLOC_TYPE_FILTER_KEEP_STRUCTURE).
 			  */
 
-  HWLOC_OBJ_MISC,	/**< \brief Miscellaneous objects.
+  HWLOC_OBJ_NUMANODE,	/**< \brief NUMA node.
+			  * An object that contains memory that is directly
+			  * and byte-accessible to the host processors.
+			  * It is usually close to some cores (the corresponding objects
+			  * are descendants of the NUMA node object in the hwloc tree).
+			  *
+			  * This is the smallest object representing Memory resources,
+			  * it cannot have any child except Misc objects.
+			  * However it may have Memory-side cache parents.
+			  *
+			  * There is always at least one such object in the topology
+			  * even if the machine is not NUMA.
+			  *
+			  * Memory objects are not listed in the main children list,
+			  * but rather in the dedicated Memory children list.
+			  *
+			  * NUMA nodes have a special depth ::HWLOC_TYPE_DEPTH_NUMANODE
+			  * instead of a normal depth just like other objects in the
+			  * main tree.
+			  */
+
+  HWLOC_OBJ_BRIDGE,	/**< \brief Bridge (filtered out by default).
+			  * Any bridge that connects the host or an I/O bus,
+			  * to another I/O bus.
+			  * They are not added to the topology unless I/O discovery
+			  * is enabled with hwloc_topology_set_flags().
+			  * I/O objects are not listed in the main children list,
+			  * but rather in the dedicated io children list.
+			  * I/O objects have NULL CPU and node sets.
+			  */
+  HWLOC_OBJ_PCI_DEVICE,	/**< \brief PCI device (filtered out by default).
+			  * They are not added to the topology unless I/O discovery
+			  * is enabled with hwloc_topology_set_flags().
+			  * I/O objects are not listed in the main children list,
+			  * but rather in the dedicated io children list.
+			  * I/O objects have NULL CPU and node sets.
+			  */
+  HWLOC_OBJ_OS_DEVICE,	/**< \brief Operating system device (filtered out by default).
+			  * They are not added to the topology unless I/O discovery
+			  * is enabled with hwloc_topology_set_flags().
+			  * I/O objects are not listed in the main children list,
+			  * but rather in the dedicated io children list.
+			  * I/O objects have NULL CPU and node sets.
+			  */
+
+  HWLOC_OBJ_MISC,	/**< \brief Miscellaneous objects (filtered out by default).
 			  * Objects without particular meaning, that can e.g. be
 			  * added by the application for its own use, or by hwloc
 			  * for miscellaneous objects such as MemoryModule (DIMMs).
+			  * These objects are not listed in the main children list,
+			  * but rather in the dedicated misc children list.
+			  * Misc objects may only have Misc objects as children,
+			  * and those are in the dedicated misc children list as well.
+			  * Misc objects have NULL CPU and node sets.
 			  */
 
-  HWLOC_OBJ_BRIDGE,	/**< \brief Bridge.
-			  * Any bridge that connects the host or an I/O bus,
-			  * to another I/O bus.
-			  * Bridge objects have neither CPU sets nor node sets.
-			  * They are not added to the topology unless I/O discovery
-			  * is enabled with hwloc_topology_set_flags().
+  HWLOC_OBJ_MEMCACHE,	/**< \brief Memory-side cache (filtered out by default).
+			  * A cache in front of a specific NUMA node.
+			  *
+			  * This object always has at least one NUMA node as a memory child.
+			  *
+			  * Memory objects are not listed in the main children list,
+			  * but rather in the dedicated Memory children list.
+			  *
+			  * Memory-side cache have a special depth ::HWLOC_TYPE_DEPTH_MEMCACHE
+			  * instead of a normal depth just like other objects in the
+			  * main tree.
 			  */
-  HWLOC_OBJ_PCI_DEVICE,	/**< \brief PCI device.
-			  * These objects have neither CPU sets nor node sets.
-			  * They are not added to the topology unless I/O discovery
-			  * is enabled with hwloc_topology_set_flags().
-			  */
-  HWLOC_OBJ_OS_DEVICE,	/**< \brief Operating system device.
-			  * These objects have neither CPU sets nor node sets.
-			  * They are not added to the topology unless I/O discovery
-			  * is enabled with hwloc_topology_set_flags().
-			  */
+
+  HWLOC_OBJ_DIE,	/**< \brief Die within a physical package.
+			 * A subpart of the physical package, that contains multiple cores.
+			 * \hideinitializer
+			 */
 
   HWLOC_OBJ_TYPE_MAX    /**< \private Sentinel value */
-
-    /* ***************************************************************
-       WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
-
-       If new enum values are added here, you MUST also go update the
-       obj_type_order[] and obj_order_type[] arrays in src/topology.c.
-
-       WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
-       *************************************************************** */
 } hwloc_obj_type_t;
 
 /** \brief Cache type. */
 typedef enum hwloc_obj_cache_type_e {
   HWLOC_OBJ_CACHE_UNIFIED,      /**< \brief Unified cache. */
   HWLOC_OBJ_CACHE_DATA,         /**< \brief Data cache. */
-  HWLOC_OBJ_CACHE_INSTRUCTION   /**< \brief Instruction cache.
-				  * Only used when the ::HWLOC_TOPOLOGY_FLAG_ICACHES topology flag is set. */
+  HWLOC_OBJ_CACHE_INSTRUCTION   /**< \brief Instruction cache (filtered out by default). */
 } hwloc_obj_cache_type_t;
 
 /** \brief Type of one side (upstream or downstream) of an I/O bridge. */
@@ -276,8 +321,8 @@ typedef enum hwloc_obj_bridge_type_e {
 
 /** \brief Type of a OS device. */
 typedef enum hwloc_obj_osdev_type_e {
-  HWLOC_OBJ_OSDEV_BLOCK,	/**< \brief Operating system block device.
-				  * For instance "sda" on Linux. */
+  HWLOC_OBJ_OSDEV_BLOCK,	/**< \brief Operating system block device, or non-volatile memory device.
+				  * For instance "sda" or "dax2.0" on Linux. */
   HWLOC_OBJ_OSDEV_GPU,		/**< \brief Operating system GPU device.
 				  * For instance ":0.0" for a GL display,
 				  * "card0" for a Linux DRM device. */
@@ -306,7 +351,9 @@ typedef enum hwloc_obj_osdev_type_e {
  * contain packages which contain caches, which contain cores, which contain
  * processors).
  *
- * \note ::HWLOC_OBJ_PU will always be the deepest.
+ * \note ::HWLOC_OBJ_PU will always be the deepest,
+ * while ::HWLOC_OBJ_MACHINE is always the highest.
+ *
  * \note This does not mean that the actual topology will respect that order:
  * e.g. as of today cores may also contain caches, and packages may also contain
  * nodes. This is thus just to be seen as a fallback comparison method.
@@ -327,79 +374,124 @@ enum hwloc_compare_types_e {
 
 union hwloc_obj_attr_u;
 
-/** \brief Object memory */
-struct hwloc_obj_memory_s {
-  hwloc_uint64_t total_memory; /**< \brief Total memory (in bytes) in this object and its children */
-  hwloc_uint64_t local_memory; /**< \brief Local memory (in bytes) */
-
-  /** \brief Size of array \p page_types */
-  unsigned page_types_len;
-  /** \brief Array of local memory page types, \c NULL if no local memory and \p page_types is 0.
-   *
-   * The array is sorted by increasing \p size fields.
-   * It contains \p page_types_len slots.
-   */
-  struct hwloc_obj_memory_page_type_s {
-    hwloc_uint64_t size;	/**< \brief Size of pages */
-    hwloc_uint64_t count;	/**< \brief Number of pages of this size */
-  } * page_types;
-};
-
 /** \brief Structure of a topology object
  *
- * Applications must not modify any field except hwloc_obj.userdata.
+ * Applications must not modify any field except \p hwloc_obj.userdata.
  */
 struct hwloc_obj {
   /* physical information */
   hwloc_obj_type_t type;		/**< \brief Type of object */
+  char *subtype;			/**< \brief Subtype string to better describe the type field. */
 
   unsigned os_index;			/**< \brief OS-provided physical index number.
 					 * It is not guaranteed unique across the entire machine,
 					 * except for PUs and NUMA nodes.
+					 * Set to HWLOC_UNKNOWN_INDEX if unknown or irrelevant for this object.
 					 */
+#define HWLOC_UNKNOWN_INDEX (unsigned)-1
+
   char *name;				/**< \brief Object-specific name if any.
 					 * Mostly used for identifying OS devices and Misc objects where
 					 * a name string is more useful than numerical indexes.
 					 */
 
-  struct hwloc_obj_memory_s memory;	/**< \brief Memory attributes */
+  hwloc_uint64_t total_memory; /**< \brief Total memory (in bytes) in NUMA nodes below this object. */
 
   union hwloc_obj_attr_u *attr;		/**< \brief Object type-specific Attributes,
 					 * may be \c NULL if no attribute value was found */
 
   /* global position */
-  unsigned depth;			/**< \brief Vertical index in the hierarchy.
-					 * If the topology is symmetric, this is equal to the
-					 * parent depth plus one, and also equal to the number
-					 * of parent/child links from the root object to here.
+  int depth;				/**< \brief Vertical index in the hierarchy.
+					 *
+					 * For normal objects, this is the depth of the horizontal level
+					 * that contains this object and its cousins of the same type.
+					 * If the topology is symmetric, this is equal to the parent depth
+					 * plus one, and also equal to the number of parent/child links
+					 * from the root object to here.
+					 *
+					 * For special objects (NUMA nodes, I/O and Misc) that are not
+					 * in the main tree, this is a special negative value that
+					 * corresponds to their dedicated level,
+					 * see hwloc_get_type_depth() and ::hwloc_get_type_depth_e.
+					 * Those special values can be passed to hwloc functions such
+					 * hwloc_get_nbobjs_by_depth() as usual.
 					 */
   unsigned logical_index;		/**< \brief Horizontal index in the whole list of similar objects,
 					 * hence guaranteed unique across the entire machine.
 					 * Could be a "cousin_rank" since it's the rank within the "cousin" list below
+					 * Note that this index may change when restricting the topology
+					 * or when inserting a group.
 					 */
-  signed os_level;			/**< \brief OS-provided physical level, -1 if unknown or meaningless */
 
   /* cousins are all objects of the same type (and depth) across the entire topology */
   struct hwloc_obj *next_cousin;	/**< \brief Next object of same type and depth */
   struct hwloc_obj *prev_cousin;	/**< \brief Previous object of same type and depth */
 
   /* children of the same parent are siblings, even if they may have different type and depth */
-  struct hwloc_obj *parent;		/**< \brief Parent, \c NULL if root (system object) */
-  unsigned sibling_rank;		/**< \brief Index in parent's \c children[] array */
-  struct hwloc_obj *next_sibling;	/**< \brief Next object below the same parent */
-  struct hwloc_obj *prev_sibling;	/**< \brief Previous object below the same parent */
+  struct hwloc_obj *parent;		/**< \brief Parent, \c NULL if root (Machine object) */
+  unsigned sibling_rank;		/**< \brief Index in parent's \c children[] array. Or the index in parent's Memory, I/O or Misc children list. */
+  struct hwloc_obj *next_sibling;	/**< \brief Next object below the same parent (inside the same list of children). */
+  struct hwloc_obj *prev_sibling;	/**< \brief Previous object below the same parent (inside the same list of children). */
+  /** @name List and array of normal children below this object (except Memory, I/O and Misc children). */
+  /**@{*/
+  unsigned arity;			/**< \brief Number of normal children.
+					 * Memory, Misc and I/O children are not listed here
+					 * but rather in their dedicated children list.
+					 */
+  struct hwloc_obj **children;		/**< \brief Normal children, \c children[0 .. arity -1] */
+  struct hwloc_obj *first_child;	/**< \brief First normal child */
+  struct hwloc_obj *last_child;		/**< \brief Last normal child */
+  /**@}*/
 
-  /* children array below this object */
-  unsigned arity;			/**< \brief Number of children */
-  struct hwloc_obj **children;		/**< \brief Children, \c children[0 .. arity -1] */
-  struct hwloc_obj *first_child;	/**< \brief First child */
-  struct hwloc_obj *last_child;		/**< \brief Last child */
+  int symmetric_subtree;		/**< \brief Set if the subtree of normal objects below this object is symmetric,
+					  * which means all normal children and their children have identical subtrees.
+					  *
+					  * Memory, I/O and Misc children are ignored.
+					  *
+					  * If set in the topology root object, lstopo may export the topology
+					  * as a synthetic string.
+					  */
 
-  /* misc */
-  void *userdata;			/**< \brief Application-given private data pointer,
-					 * initialized to \c NULL, use it as you wish.
-					 * See hwloc_topology_set_userdata_export_callback()
-					 * if you wish to export this field to XML. */
+  /** @name List of Memory children below this object. */
+  /**@{*/
+  unsigned memory_arity;		/**< \brief Number of Memory children.
+					 * These children are listed in \p memory_first_child.
+					 */
+  struct hwloc_obj *memory_first_child;	/**< \brief First Memory child.
+					 * NUMA nodes and Memory-side caches are listed here
+					 * (\p memory_arity and \p memory_first_child)
+					 * instead of in the normal children list.
+					 * See also hwloc_obj_type_is_memory().
+					 *
+					 * A memory hierarchy starts from a normal CPU-side object
+					 * (e.g. Package) and ends with NUMA nodes as leaves.
+					 * There might exist some memory-side caches between them
+					 * in the middle of the memory subtree.
+					 */
+  /**@}*/
+
+  /** @name List of I/O children below this object. */
+  /**@{*/
+  unsigned io_arity;			/**< \brief Number of I/O children.
+					 * These children are listed in \p io_first_child.
+					 */
+  struct hwloc_obj *io_first_child;	/**< \brief First I/O child.
+					 * Bridges, PCI and OS devices are listed here (\p io_arity and \p io_first_child)
+					 * instead of in the normal children list.
+					 * See also hwloc_obj_type_is_io().
+					 */
+  /**@}*/
+
+  /** @name List of Misc children below this object. */
+  /**@{*/
+  unsigned misc_arity;			/**< \brief Number of Misc children.
+					 * These children are listed in \p misc_first_child.
+					 */
+  struct hwloc_obj *misc_first_child;	/**< \brief First Misc child.
+					 * Misc objects are listed here (\p misc_arity and \p misc_first_child)
+					 * instead of in the normal children list.
+					 */
+  /**@}*/
 
   /* cpusets and nodesets */
   hwloc_cpuset_t cpuset;		/**< \brief CPUs covered by this object
@@ -409,38 +501,23 @@ struct hwloc_obj {
                                           * object and known how (the children path between this object and the PU
                                           * objects).
                                           *
-                                          * If the ::HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM configuration flag is set, some of
-                                          * these CPUs may be offline, or not allowed for binding, see online_cpuset
-                                          * and allowed_cpuset.
+                                          * If the ::HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED configuration flag is set,
+                                          * some of these CPUs may not be allowed for binding,
+                                          * see hwloc_topology_get_allowed_cpuset().
                                           *
+					  * \note All objects have non-NULL CPU and node sets except Misc and I/O objects.
+					  *
                                           * \note Its value must not be changed, hwloc_bitmap_dup() must be used instead.
                                           */
   hwloc_cpuset_t complete_cpuset;       /**< \brief The complete CPU set of logical processors of this object,
                                           *
-                                          * This includes not only the same as the cpuset field, but also some CPUs for
-                                          * which topology information is unknown or incomplete, and the CPUs that are
-                                          * ignored when the ::HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM flag is not set.
+                                          * This may include not only the same as the cpuset field, but also some CPUs for
+                                          * which topology information is unknown or incomplete, some offlines CPUs, and
+                                          * the CPUs that are ignored when the ::HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED flag
+                                          * is not set.
                                           * Thus no corresponding PU object may be found in the topology, because the
                                           * precise position is undefined. It is however known that it would be somewhere
                                           * under this object.
-                                          *
-                                          * \note Its value must not be changed, hwloc_bitmap_dup() must be used instead.
-                                          */
-  hwloc_cpuset_t online_cpuset;         /**< \brief The CPU set of online logical processors
-                                          *
-                                          * This includes the CPUs contained in this object that are online, i.e. draw
-                                          * power and can execute threads.  It may however not be allowed to bind to
-                                          * them due to administration rules, see allowed_cpuset.
-                                          *
-                                          * \note Its value must not be changed, hwloc_bitmap_dup() must be used instead.
-                                          */
-  hwloc_cpuset_t allowed_cpuset;        /**< \brief The CPU set of allowed logical processors
-                                          *
-                                          * This includes the CPUs contained in this object which are allowed for
-                                          * binding, i.e. passing them to the hwloc binding functions should not return
-                                          * permission errors.  This is usually restricted by administration rules.
-                                          * Some of them may however be offline so binding to them may still not be
-                                          * possible, see online_cpuset.
                                           *
                                           * \note Its value must not be changed, hwloc_bitmap_dup() must be used instead.
                                           */
@@ -454,52 +531,47 @@ struct hwloc_obj {
                                           *
                                           * In the end, these nodes are those that are close to the current object.
                                           *
-                                          * If the ::HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM configuration flag is set, some of
-                                          * these nodes may not be allowed for allocation, see allowed_nodeset.
+                                          * If the ::HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED configuration flag is set,
+                                          * some of these nodes may not be allowed for allocation,
+                                          * see hwloc_topology_get_allowed_nodeset().
                                           *
                                           * If there are no NUMA nodes in the machine, all the memory is close to this
-                                          * object, so \p nodeset is full.
+                                          * object, so only the first bit may be set in \p nodeset.
                                           *
+					  * \note All objects have non-NULL CPU and node sets except Misc and I/O objects.
+					  *
                                           * \note Its value must not be changed, hwloc_bitmap_dup() must be used instead.
                                           */
   hwloc_nodeset_t complete_nodeset;     /**< \brief The complete NUMA node set of this object,
                                           *
-                                          * This includes not only the same as the nodeset field, but also some NUMA
-                                          * nodes for which topology information is unknown or incomplete, and the nodes
-                                          * that are ignored when the ::HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM flag is not set.
+                                          * This may include not only the same as the nodeset field, but also some NUMA
+                                          * nodes for which topology information is unknown or incomplete, some offlines
+                                          * nodes, and the nodes that are ignored when the ::HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED
+                                          * flag is not set.
                                           * Thus no corresponding NUMA node object may be found in the topology, because the
                                           * precise position is undefined. It is however known that it would be
                                           * somewhere under this object.
                                           *
                                           * If there are no NUMA nodes in the machine, all the memory is close to this
-                                          * object, so \p complete_nodeset is full.
-                                          *
-                                          * \note Its value must not be changed, hwloc_bitmap_dup() must be used instead.
-                                          */
-  hwloc_nodeset_t allowed_nodeset;      /**< \brief The set of allowed NUMA memory nodes
-                                          *
-                                          * This includes the NUMA memory nodes contained in this object which are
-                                          * allowed for memory allocation, i.e. passing them to NUMA node-directed
-                                          * memory allocation should not return permission errors. This is usually
-                                          * restricted by administration rules.
-                                          *
-                                          * If there are no NUMA nodes in the machine, all the memory is close to this
-                                          * object, so \p allowed_nodeset is full.
+                                          * object, so only the first bit is set in \p complete_nodeset.
                                           *
                                           * \note Its value must not be changed, hwloc_bitmap_dup() must be used instead.
                                           */
 
-  struct hwloc_distances_s **distances;	/**< \brief Distances between all objects at same depth below this object */
-  unsigned distances_count;
-
-  struct hwloc_obj_info_s *infos;	/**< \brief Array of stringified info type=name. */
+  struct hwloc_info_s *infos;		/**< \brief Array of stringified info type=name. */
   unsigned infos_count;			/**< \brief Size of infos array. */
 
-  int symmetric_subtree;		/**< \brief Set if the subtree of objects below this object is symmetric,
-					  * which means all children and their children have identical subtrees.
-					  * If set in the topology root object, lstopo may export the topology
-					  * as a synthetic string.
-					  */
+  /* misc */
+  void *userdata;			/**< \brief Application-given private data pointer,
+					 * initialized to \c NULL, use it as you wish.
+					 * See hwloc_topology_set_userdata_export_callback() in hwloc/export.h
+					 * if you wish to export this field to XML. */
+
+  hwloc_uint64_t gp_index;			/**< \brief Global persistent index.
+					 * Generated by hwloc, unique across the topology (contrary to os_index)
+					 * and persistent across topology changes (contrary to logical_index).
+					 * Mostly used internally, but could also be used by application to identify objects.
+					 */
 };
 /**
  * \brief Convenience typedef; a pointer to a struct hwloc_obj.
@@ -508,6 +580,21 @@ typedef struct hwloc_obj * hwloc_obj_t;
 
 /** \brief Object type-specific Attributes */
 union hwloc_obj_attr_u {
+  /** \brief NUMA node-specific Object Attributes */
+  struct hwloc_numanode_attr_s {
+    hwloc_uint64_t local_memory; /**< \brief Local memory (in bytes) */
+    unsigned page_types_len; /**< \brief Size of array \p page_types */
+    /** \brief Array of local memory page types, \c NULL if no local memory and \p page_types is 0.
+     *
+     * The array is sorted by increasing \p size fields.
+     * It contains \p page_types_len slots.
+     */
+    struct hwloc_memory_page_type_s {
+      hwloc_uint64_t size;	/**< \brief Size of pages */
+      hwloc_uint64_t count;	/**< \brief Number of pages of this size */
+    } * page_types;
+  } numanode;
+
   /** \brief Cache-specific Object Attributes */
   struct hwloc_cache_attr_s {
     hwloc_uint64_t size;		  /**< \brief Size of cache in bytes */
@@ -519,7 +606,11 @@ union hwloc_obj_attr_u {
   } cache;
   /** \brief Group-specific Object Attributes */
   struct hwloc_group_attr_s {
-    unsigned depth;			  /**< \brief Depth of group object */
+    unsigned depth;			  /**< \brief Depth of group object.
+					   *   It may change if intermediate Group objects are added. */
+    unsigned kind;			  /**< \brief Internally-used kind of group. */
+    unsigned subkind;			  /**< \brief Internally-used subkind to distinguish different levels of groups with same kind */
+    unsigned char dont_merge;		  /**< \brief Flag preventing groups from being automatically merged with identical parent or children. */
   } group;
   /** \brief PCI Device specific Object Attributes */
   struct hwloc_pcidev_attr_s {
@@ -551,51 +642,11 @@ union hwloc_obj_attr_u {
   } osdev;
 };
 
-/** \brief Distances between objects
- *
- * One object may contain a distance structure describing distances
- * between all its descendants at a given relative depth. If the
- * containing object is the root object of the topology, then the
- * distances are available for all objects in the machine.
- *
- * If the \p latency pointer is not \c NULL, the pointed array contains
- * memory latencies (non-zero values), see below.
- *
- * In the future, some other types of distances may be considered.
- * In these cases, \p latency may be \c NULL.
- */
-struct hwloc_distances_s {
-  unsigned relative_depth;	/**< \brief Relative depth of the considered objects
-				 * below the object containing this distance information. */
-  unsigned nbobjs;		/**< \brief Number of objects considered in the matrix.
-				 * It is the number of descendant objects at \p relative_depth
-				 * below the containing object.
-				 * It corresponds to the result of hwloc_get_nbobjs_inside_cpuset_by_depth(). */
-
-  float *latency;		/**< \brief Matrix of latencies between objects, stored as a one-dimension array.
-				 * May be \c NULL if the distances considered here are not latencies.
-				 *
-				 * Unless defined by the user, this currently contains latencies
-				 * between NUMA nodes (as reported in the System Locality Distance Information Table
-				 * (SLIT) in the ACPI specification), which may or may not be accurate.
-				 * It corresponds to the latency for accessing the memory of one node
-				 * from a core in another node.
-				 *
-				 * Values are normalized to get 1.0 as the minimal value in the matrix.
-				 * Latency from i-th to j-th object is stored in slot i*nbobjs+j.
-				 */
-  float latency_max;		/**< \brief The maximal value in the latency matrix. */
-  float latency_base;		/**< \brief The multiplier that should be applied to latency matrix
-				 * to retrieve the original OS-provided latencies.
-				 * Usually 10 on Linux since ACPI SLIT uses 10 for local latency.
-				 */
-};
-
 /** \brief Object info
  *
  * \sa hwlocality_info_attr
  */
-struct hwloc_obj_info_s {
+struct hwloc_info_s {
   char *name;	/**< \brief Info name */
   char *value;	/**< \brief Info value */
 };
@@ -626,7 +677,7 @@ HWLOC_DECLSPEC int hwloc_topology_init (hwloc_topology_t *topologyp);
 /** \brief Build the actual topology
  *
  * Build the actual topology once initialized with hwloc_topology_init() and
- * tuned with \ref hwlocality_configuration routines.
+ * tuned with \ref hwlocality_configuration and \ref hwlocality_setsource routines.
  * No other routine may be called earlier using this topology context.
  *
  * \param topology is the topology to be loaded with objects.
@@ -641,7 +692,7 @@ HWLOC_DECLSPEC int hwloc_topology_init (hwloc_topology_t *topologyp);
  * \note The binding of the current thread or process may temporarily change
  * during this call but it will be restored before it returns.
  *
- * \sa hwlocality_configuration
+ * \sa hwlocality_configuration and hwlocality_setsource
  */
 HWLOC_DECLSPEC int hwloc_topology_load(hwloc_topology_t topology);
 
@@ -663,6 +714,25 @@ HWLOC_DECLSPEC void hwloc_topology_destroy (hwloc_topology_t topology);
  */
 HWLOC_DECLSPEC int hwloc_topology_dup(hwloc_topology_t *newtopology, hwloc_topology_t oldtopology);
 
+/** \brief Verify that the topology is compatible with the current hwloc library.
+ *
+ * This is useful when using the same topology structure (in memory)
+ * in different libraries that may use different hwloc installations
+ * (for instance if one library embeds a specific version of hwloc,
+ * while another library uses a default system-wide hwloc installation).
+ *
+ * If all libraries/programs use the same hwloc installation, this function
+ * always returns success.
+ *
+ * \return \c 0 on success.
+ *
+ * \return \c -1 with \p errno set to \c EINVAL if incompatible.
+ *
+ * \note If sharing between processes with hwloc_shmem_topology_write(),
+ * the relevant check is already performed inside hwloc_shmem_topology_adopt().
+ */
+HWLOC_DECLSPEC int hwloc_topology_abi_check(hwloc_topology_t topology);
+
 /** \brief Run internal checks on a topology structure
  *
  * The program aborts if an inconsistency is detected in the given topology.
@@ -675,485 +745,6 @@ HWLOC_DECLSPEC int hwloc_topology_dup(hwloc_topology_t *newtopology, hwloc_topol
  * hwloc_topology_load().
  */
 HWLOC_DECLSPEC void hwloc_topology_check(hwloc_topology_t topology);
-
-/** @} */
-
-
-
-/** \defgroup hwlocality_configuration Topology Detection Configuration and Query
- *
- * Several functions can optionally be called between hwloc_topology_init() and
- * hwloc_topology_load() to configure how the detection should be performed,
- * e.g. to ignore some objects types, define a synthetic topology, etc.
- *
- * If none of them is called, the default is to detect all the objects of the
- * machine that the caller is allowed to access.
- *
- * This default behavior may also be modified through environment variables
- * if the application did not modify it already.
- * Setting HWLOC_XMLFILE in the environment enforces the discovery from a XML
- * file as if hwloc_topology_set_xml() had been called.
- * HWLOC_FSROOT switches to reading the topology from the specified Linux
- * filesystem root as if hwloc_topology_set_fsroot() had been called.
- * Finally, HWLOC_THISSYSTEM enforces the return value of
- * hwloc_topology_is_thissystem().
- *
- * @{
- */
-
-/** \brief Ignore an object type.
- *
- * Ignore all objects from the given type.
- * The bottom-level type ::HWLOC_OBJ_PU may not be ignored.
- * The top-level object of the hierarchy will never be ignored, even if this function
- * succeeds.
- * Group objects are always ignored if they do not bring any structure
- * since they are designed to add structure to the topology.
- * I/O objects may not be ignored, topology flags should be used to configure
- * their discovery instead.
- */
-HWLOC_DECLSPEC int hwloc_topology_ignore_type(hwloc_topology_t topology, hwloc_obj_type_t type);
-
-/** \brief Ignore an object type if it does not bring any structure.
- *
- * Ignore all objects from the given type as long as they do not bring any structure:
- * Each ignored object should have a single children or be the only child of its parent.
- * The bottom-level type ::HWLOC_OBJ_PU may not be ignored.
- * I/O objects may not be ignored, topology flags should be used to configure
- * their discovery instead.
- */
-HWLOC_DECLSPEC int hwloc_topology_ignore_type_keep_structure(hwloc_topology_t topology, hwloc_obj_type_t type);
-
-/** \brief Ignore all objects that do not bring any structure.
- *
- * Ignore all objects that do not bring any structure:
- * This is equivalent to calling hwloc_topology_ignore_type_keep_structure()
- * for all object types.
- */
-HWLOC_DECLSPEC int hwloc_topology_ignore_all_keep_structure(hwloc_topology_t topology);
-
-/** \brief Flags to be set onto a topology context before load.
- *
- * Flags should be given to hwloc_topology_set_flags().
- * They may also be returned by hwloc_topology_get_flags().
- */
-enum hwloc_topology_flags_e {
- /** \brief Detect the whole system, ignore reservations and offline settings.
-   *
-   * Gather all resources, even if some were disabled by the administrator.
-   * For instance, ignore Linux Cgroup/Cpusets and gather all processors and memory nodes,
-   * and ignore the fact that some resources may be offline.
-   *
-   * When this flag is not set, PUs that are disallowed are not added to the topology.
-   * Parent objects (package, core, cache, etc.) are added only if some of their children are allowed.
-   * NUMA nodes are always added but their available memory is set to 0 when disallowed.
-   *
-   * If the current topology is exported to XML and reimported later, this flag
-   * should be set again in the reimported topology so that disallowed resources
-   * are reimported as well.
-   * \hideinitializer
-   */
-  HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM = (1UL<<0),
-
- /** \brief Assume that the selected backend provides the topology for the
-   * system on which we are running.
-   *
-   * This forces hwloc_topology_is_thissystem() to return 1, i.e. makes hwloc assume that
-   * the selected backend provides the topology for the system on which we are running,
-   * even if it is not the OS-specific backend but the XML backend for instance.
-   * This means making the binding functions actually call the OS-specific
-   * system calls and really do binding, while the XML backend would otherwise
-   * provide empty hooks just returning success.
-   *
-   * Setting the environment variable HWLOC_THISSYSTEM may also result in the
-   * same behavior.
-   *
-   * This can be used for efficiency reasons to first detect the topology once,
-   * save it to an XML file, and quickly reload it later through the XML
-   * backend, but still having binding functions actually do bind.
-   * \hideinitializer
-   */
-  HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM = (1UL<<1),
-
-  /** \brief Detect PCI devices.
-   *
-   * By default, I/O devices are ignored. This flag enables I/O device
-   * detection using the pci backend. Only the common PCI devices (GPUs,
-   * NICs, block devices, ...) and host bridges (objects that connect the host
-   * objects to an I/O subsystem) will be added to the topology.
-   * Additionally it also enables MemoryModule misc objects.
-   * Uncommon devices and other bridges (such as PCI-to-PCI bridges) will be
-   * ignored.
-   * \hideinitializer
-   */
-  HWLOC_TOPOLOGY_FLAG_IO_DEVICES = (1UL<<2),
-
-  /** \brief Detect PCI bridges.
-   *
-   * This flag should be combined with ::HWLOC_TOPOLOGY_FLAG_IO_DEVICES to enable
-   * the detection of both common devices and of all useful bridges (bridges that
-   * have at least one device behind them).
-   * \hideinitializer
-   */
-  HWLOC_TOPOLOGY_FLAG_IO_BRIDGES = (1UL<<3),
-
-  /** \brief Detect the whole PCI hierarchy.
-   *
-   * This flag enables detection of all I/O devices (even the uncommon ones
-   * such as DMA channels) and bridges (even those that have no device behind
-   * them) using the pci backend.
-   * This implies ::HWLOC_TOPOLOGY_FLAG_IO_DEVICES.
-   * \hideinitializer
-   */
-  HWLOC_TOPOLOGY_FLAG_WHOLE_IO = (1UL<<4),
-
-  /** \brief Detect instruction caches.
-   *
-   * This flag enables detection of Instruction caches,
-   * instead of only Data and Unified caches.
-   * \hideinitializer
-   */
-  HWLOC_TOPOLOGY_FLAG_ICACHES = (1UL<<5),
-
-  /** \brief Get the set of allowed resources from the local operating system even if the topology was loaded from XML or synthetic description.
-   *
-   * If the topology was loaded from XML or from a synthetic string,
-   * restrict it by applying the current process restrictions such as
-   * Linux Cgroup/Cpuset.
-   *
-   * This is useful when the topology is not loaded directly from
-   * the local machine (e.g. for performance reason) and it comes
-   * with all resources, while the running process is restricted
-   * to only parts of the machine.
-   *
-   * This flag is ignored unless ::HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM is
-   * also set since the loaded topology must match the underlying machine
-   * where restrictions will be gathered from.
-   *
-   * Setting the environment variable HWLOC_THISSYSTEM_ALLOWED_RESOURCES
-   * would result in the same behavior.
-   * \hideinitializer
-   */
-  HWLOC_TOPOLOGY_FLAG_THISSYSTEM_ALLOWED_RESOURCES = (1UL<<6)
-};
-
-/** \brief Set OR'ed flags to non-yet-loaded topology.
- *
- * Set a OR'ed set of ::hwloc_topology_flags_e onto a topology that was not yet loaded.
- *
- * If this function is called multiple times, the last invokation will erase
- * and replace the set of flags that was previously set.
- *
- * The flags set in a topology may be retrieved with hwloc_topology_get_flags()
- */
-HWLOC_DECLSPEC int hwloc_topology_set_flags (hwloc_topology_t topology, unsigned long flags);
-
-/** \brief Get OR'ed flags of a topology.
- *
- * Get the OR'ed set of ::hwloc_topology_flags_e of a topology.
- *
- * \return the flags previously set with hwloc_topology_set_flags().
- */
-HWLOC_DECLSPEC unsigned long hwloc_topology_get_flags (hwloc_topology_t topology);
-
-/** \brief Change which process the topology is viewed from
- *
- * On some systems, processes may have different views of the machine, for
- * instance the set of allowed CPUs. By default, hwloc exposes the view from
- * the current process. Calling hwloc_topology_set_pid() permits to make it
- * expose the topology of the machine from the point of view of another
- * process.
- *
- * \note \p hwloc_pid_t is \p pid_t on Unix platforms,
- * and \p HANDLE on native Windows platforms.
- *
- * \note -1 is returned and errno is set to ENOSYS on platforms that do not
- * support this feature.
- */
-HWLOC_DECLSPEC int hwloc_topology_set_pid(hwloc_topology_t __hwloc_restrict topology, hwloc_pid_t pid);
-
-/** \brief Change the file-system root path when building the topology from sysfs/procfs.
- *
- * On Linux system, use sysfs and procfs files as if they were mounted on the given
- * \p fsroot_path instead of the main file-system root. Setting the environment
- * variable HWLOC_FSROOT may also result in this behavior.
- * Not using the main file-system root causes hwloc_topology_is_thissystem()
- * to return 0.
- *
- * Note that this function does not actually load topology
- * information; it just tells hwloc where to load it from.  You'll
- * still need to invoke hwloc_topology_load() to actually load the
- * topology information.
- *
- * \return -1 with errno set to ENOSYS on non-Linux and on Linux systems that
- * do not support it.
- * \return -1 with the appropriate errno if \p fsroot_path cannot be used.
- *
- * \note For convenience, this backend provides empty binding hooks which just
- * return success.  To have hwloc still actually call OS-specific hooks, the
- * ::HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM has to be set to assert that the loaded
- * file is really the underlying system.
- *
- * \note On success, the Linux component replaces the previously enabled
- * component (if any), but the topology is not actually modified until
- * hwloc_topology_load().
- */
-HWLOC_DECLSPEC int hwloc_topology_set_fsroot(hwloc_topology_t __hwloc_restrict topology, const char * __hwloc_restrict fsroot_path);
-
-/** \brief Enable synthetic topology.
- *
- * Gather topology information from the given \p description,
- * a space-separated string of numbers describing
- * the arity of each level.
- * Each number may be prefixed with a type and a colon to enforce the type
- * of a level.  If only some level types are enforced, hwloc will try to
- * choose the other types according to usual topologies, but it may fail
- * and you may have to specify more level types manually.
- * See also the \ref synthetic.
- *
- * If \p description was properly parsed and describes a valid topology
- * configuration, this function returns 0.
- * Otherwise -1 is returned and errno is set to EINVAL.
- *
- * Note that this function does not actually load topology
- * information; it just tells hwloc where to load it from.  You'll
- * still need to invoke hwloc_topology_load() to actually load the
- * topology information.
- *
- * \note For convenience, this backend provides empty binding hooks which just
- * return success.
- *
- * \note On success, the synthetic component replaces the previously enabled
- * component (if any), but the topology is not actually modified until
- * hwloc_topology_load().
- */
-HWLOC_DECLSPEC int hwloc_topology_set_synthetic(hwloc_topology_t __hwloc_restrict topology, const char * __hwloc_restrict description);
-
-/** \brief Enable XML-file based topology.
- *
- * Gather topology information from the XML file given at \p xmlpath.
- * Setting the environment variable HWLOC_XMLFILE may also result in this behavior.
- * This file may have been generated earlier with hwloc_topology_export_xml()
- * or lstopo file.xml.
- *
- * Note that this function does not actually load topology
- * information; it just tells hwloc where to load it from.  You'll
- * still need to invoke hwloc_topology_load() to actually load the
- * topology information.
- *
- * \return -1 with errno set to EINVAL on failure to read the XML file.
- *
- * \note See also hwloc_topology_set_userdata_import_callback()
- * for importing application-specific object userdata.
- *
- * \note For convenience, this backend provides empty binding hooks which just
- * return success.  To have hwloc still actually call OS-specific hooks, the
- * ::HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM has to be set to assert that the loaded
- * file is really the underlying system.
- *
- * \note On success, the XML component replaces the previously enabled
- * component (if any), but the topology is not actually modified until
- * hwloc_topology_load().
- */
-HWLOC_DECLSPEC int hwloc_topology_set_xml(hwloc_topology_t __hwloc_restrict topology, const char * __hwloc_restrict xmlpath);
-
-/** \brief Enable XML based topology using a memory buffer (instead of
- * a file, as with hwloc_topology_set_xml()).
- *
- * Gather topology information from the XML memory buffer given at \p
- * buffer and of length \p size.  This buffer may have been filled
- * earlier with hwloc_topology_export_xmlbuffer().
- *
- * Note that this function does not actually load topology
- * information; it just tells hwloc where to load it from.  You'll
- * still need to invoke hwloc_topology_load() to actually load the
- * topology information.
- *
- * \return -1 with errno set to EINVAL on failure to read the XML buffer.
- *
- * \note See also hwloc_topology_set_userdata_import_callback()
- * for importing application-specific object userdata.
- *
- * \note For convenience, this backend provides empty binding hooks which just
- * return success.  To have hwloc still actually call OS-specific hooks, the
- * ::HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM has to be set to assert that the loaded
- * file is really the underlying system.
- *
- * \note On success, the XML component replaces the previously enabled
- * component (if any), but the topology is not actually modified until
- * hwloc_topology_load().
- */
-HWLOC_DECLSPEC int hwloc_topology_set_xmlbuffer(hwloc_topology_t __hwloc_restrict topology, const char * __hwloc_restrict buffer, int size);
-
-/** \brief Prepare the topology for custom assembly.
- *
- * The topology then contains a single root object.
- * It must then be built by inserting other topologies with
- * hwloc_custom_insert_topology() or single objects with
- * hwloc_custom_insert_group_object_by_parent().
- * hwloc_topology_load() must be called to finalize the new
- * topology as usual.
- *
- * \note If nothing is inserted in the topology,
- * hwloc_topology_load() will fail with errno set to EINVAL.
- *
- * \note The cpuset and nodeset of the root object are NULL because
- * these sets are meaningless when assembling multiple topologies.
- *
- * \note On success, the custom component replaces the previously enabled
- * component (if any), but the topology is not actually modified until
- * hwloc_topology_load().
- */
-HWLOC_DECLSPEC int hwloc_topology_set_custom(hwloc_topology_t topology);
-
-/** \brief Provide a distance matrix.
- *
- * Provide the matrix of distances between a set of objects of the given type.
- * \p nbobjs must be at least 2.
- * The set may or may not contain all the existing objects of this type.
- * The objects are specified by their OS/physical index in the \p os_index
- * array. The \p distances matrix follows the same order.
- * The distance from object i to object j in the i*nbobjs+j.
- *
- * A single latency matrix may be defined for each type.
- * If another distance matrix already exists for the given type,
- * either because the user specified it or because the OS offers it,
- * it will be replaced by the given one.
- * If \p nbobjs is \c 0, \p os_index is \c NULL and \p distances is \c NULL,
- * the existing distance matrix for the given type is removed.
- *
- * \note Distance matrices are ignored in multi-node topologies.
- */
-HWLOC_DECLSPEC int hwloc_topology_set_distance_matrix(hwloc_topology_t __hwloc_restrict topology,
-						      hwloc_obj_type_t type, unsigned nbobjs,
-						      unsigned *os_index, float *distances);
-
-/** \brief Does the topology context come from this system?
- *
- * \return 1 if this topology context was built using the system
- * running this program.
- * \return 0 instead (for instance if using another file-system root,
- * a XML topology file, or a synthetic topology).
- */
-HWLOC_DECLSPEC int hwloc_topology_is_thissystem(hwloc_topology_t  __hwloc_restrict topology) __hwloc_attribute_pure;
-
-/** \brief Flags describing actual discovery support for this topology. */
-struct hwloc_topology_discovery_support {
-  /** \brief Detecting the number of PU objects is supported. */
-  unsigned char pu;
-};
-
-/** \brief Flags describing actual PU binding support for this topology.
- *
- * A flag may be set even if the feature isn't supported in all cases
- * (e.g. binding to random sets of non-contiguous objects).
- */
-struct hwloc_topology_cpubind_support {
-  /** Binding the whole current process is supported.  */
-  unsigned char set_thisproc_cpubind;
-  /** Getting the binding of the whole current process is supported.  */
-  unsigned char get_thisproc_cpubind;
-  /** Binding a whole given process is supported.  */
-  unsigned char set_proc_cpubind;
-  /** Getting the binding of a whole given process is supported.  */
-  unsigned char get_proc_cpubind;
-  /** Binding the current thread only is supported.  */
-  unsigned char set_thisthread_cpubind;
-  /** Getting the binding of the current thread only is supported.  */
-  unsigned char get_thisthread_cpubind;
-  /** Binding a given thread only is supported.  */
-  unsigned char set_thread_cpubind;
-  /** Getting the binding of a given thread only is supported.  */
-  unsigned char get_thread_cpubind;
-  /** Getting the last processors where the whole current process ran is supported */
-  unsigned char get_thisproc_last_cpu_location;
-  /** Getting the last processors where a whole process ran is supported */
-  unsigned char get_proc_last_cpu_location;
-  /** Getting the last processors where the current thread ran is supported */
-  unsigned char get_thisthread_last_cpu_location;
-};
-
-/** \brief Flags describing actual memory binding support for this topology.
- *
- * A flag may be set even if the feature isn't supported in all cases
- * (e.g. binding to random sets of non-contiguous objects).
- */
-struct hwloc_topology_membind_support {
-  /** Binding the whole current process is supported.  */
-  unsigned char set_thisproc_membind;
-  /** Getting the binding of the whole current process is supported.  */
-  unsigned char get_thisproc_membind;
-  /** Binding a whole given process is supported.  */
-  unsigned char set_proc_membind;
-  /** Getting the binding of a whole given process is supported.  */
-  unsigned char get_proc_membind;
-  /** Binding the current thread only is supported.  */
-  unsigned char set_thisthread_membind;
-  /** Getting the binding of the current thread only is supported.  */
-  unsigned char get_thisthread_membind;
-  /** Binding a given memory area is supported. */
-  unsigned char set_area_membind;
-  /** Getting the binding of a given memory area is supported.  */
-  unsigned char get_area_membind;
-  /** Allocating a bound memory area is supported. */
-  unsigned char alloc_membind;
-  /** First-touch policy is supported. */
-  unsigned char firsttouch_membind;
-  /** Bind policy is supported. */
-  unsigned char bind_membind;
-  /** Interleave policy is supported. */
-  unsigned char interleave_membind;
-  /** Replication policy is supported. */
-  unsigned char replicate_membind;
-  /** Next-touch migration policy is supported. */
-  unsigned char nexttouch_membind;
-  /** Migration flags is supported. */
-  unsigned char migrate_membind;
-  /** Getting the last NUMA nodes where a memory area was allocated is supported */
-  unsigned char get_area_memlocation;
-};
-
-/** \brief Set of flags describing actual support for this topology.
- *
- * This is retrieved with hwloc_topology_get_support() and will be valid until
- * the topology object is destroyed.  Note: the values are correct only after
- * discovery.
- */
-struct hwloc_topology_support {
-  struct hwloc_topology_discovery_support *discovery;
-  struct hwloc_topology_cpubind_support *cpubind;
-  struct hwloc_topology_membind_support *membind;
-};
-
-/** \brief Retrieve the topology support.
- *
- * Each flag indicates whether a feature is supported.
- * If set to 0, the feature is not supported.
- * If set to 1, the feature is supported, but the corresponding
- * call may still fail in some corner cases.
- *
- * These features are also listed by hwloc-info \--support
- */
-HWLOC_DECLSPEC const struct hwloc_topology_support *hwloc_topology_get_support(hwloc_topology_t __hwloc_restrict topology);
-
-/** \brief Set the topology-specific userdata pointer.
- *
- * Each topology may store one application-given private data pointer.
- * It is initialized to \c NULL.
- * hwloc will never modify it.
- *
- * Use it as you wish, after hwloc_topology_init() and until hwloc_topolog_destroy().
- *
- * This pointer is not exported to XML.
- */
-HWLOC_DECLSPEC void hwloc_topology_set_userdata(hwloc_topology_t topology, const void *userdata);
-
-/** \brief Retrieve the topology-specific userdata pointer.
- *
- * Retrieve the application-given private data pointer that was
- * previously set with hwloc_topology_set_userdata().
- */
-HWLOC_DECLSPEC void * hwloc_topology_get_userdata(hwloc_topology_t topology);
 
 /** @} */
 
@@ -1172,10 +763,10 @@ HWLOC_DECLSPEC void * hwloc_topology_get_userdata(hwloc_topology_t topology);
  *
  * This is the depth of ::HWLOC_OBJ_PU objects plus one.
  *
- * \note I/O and Misc objects are ignored when computing the depth
- * of the tree (they are placed on special levels, or none).
+ * \note NUMA nodes, I/O and Misc objects are ignored when computing
+ * the depth of the tree (they are placed on special levels).
  */
-HWLOC_DECLSPEC unsigned hwloc_topology_get_depth(hwloc_topology_t __hwloc_restrict topology) __hwloc_attribute_pure;
+HWLOC_DECLSPEC int hwloc_topology_get_depth(hwloc_topology_t __hwloc_restrict topology) __hwloc_attribute_pure;
 
 /** \brief Returns the depth of objects of type \p type.
  *
@@ -1186,30 +777,53 @@ HWLOC_DECLSPEC unsigned hwloc_topology_get_depth(hwloc_topology_t __hwloc_restri
  * If type is absent but a similar type is acceptable, see also
  * hwloc_get_type_or_below_depth() and hwloc_get_type_or_above_depth().
  *
- * If some objects of the given type exist in different levels,
- * for instance L1 and L2 caches, or L1i and L1d caches,
- * the function returns ::HWLOC_TYPE_DEPTH_MULTIPLE.
- * See hwloc_get_cache_type_depth() in hwloc/helper.h to better handle this
- * case.
+ * If ::HWLOC_OBJ_GROUP is given, the function may return ::HWLOC_TYPE_DEPTH_MULTIPLE
+ * if multiple levels of Groups exist.
  *
- * If an I/O object type is given, the function returns a virtual value
- * because I/O objects are stored in special levels that are not CPU-related.
+ * If a NUMA node, I/O or Misc object type is given, the function returns a virtual
+ * value because these objects are stored in special levels that are not CPU-related.
  * This virtual depth may be passed to other hwloc functions such as
  * hwloc_get_obj_by_depth() but it should not be considered as an actual
  * depth by the application. In particular, it should not be compared with
  * any other object depth or with the entire topology depth.
+ * \sa hwloc_get_memory_parents_depth().
  *
- * If ::HWLOC_OBJ_MISC is given, the function returns ::HWLOC_TYPE_DEPTH_UNKNOWN.
+ * \sa hwloc_type_sscanf_as_depth() for returning the depth of objects
+ * whose type is given as a string.
  */
 HWLOC_DECLSPEC int hwloc_get_type_depth (hwloc_topology_t topology, hwloc_obj_type_t type);
 
 enum hwloc_get_type_depth_e {
     HWLOC_TYPE_DEPTH_UNKNOWN = -1,    /**< \brief No object of given type exists in the topology. \hideinitializer */
-    HWLOC_TYPE_DEPTH_MULTIPLE = -2,   /**< \brief Objects of given type exist at different depth in the topology. \hideinitializer */
-    HWLOC_TYPE_DEPTH_BRIDGE = -3,     /**< \brief Virtual depth for bridge object level. \hideinitializer */
-    HWLOC_TYPE_DEPTH_PCI_DEVICE = -4, /**< \brief Virtual depth for PCI device object level. \hideinitializer */
-    HWLOC_TYPE_DEPTH_OS_DEVICE = -5   /**< \brief Virtual depth for software device object level. \hideinitializer */
+    HWLOC_TYPE_DEPTH_MULTIPLE = -2,   /**< \brief Objects of given type exist at different depth in the topology (only for Groups). \hideinitializer */
+    HWLOC_TYPE_DEPTH_NUMANODE = -3,   /**< \brief Virtual depth for NUMA nodes. \hideinitializer */
+    HWLOC_TYPE_DEPTH_BRIDGE = -4,     /**< \brief Virtual depth for bridge object level. \hideinitializer */
+    HWLOC_TYPE_DEPTH_PCI_DEVICE = -5, /**< \brief Virtual depth for PCI device object level. \hideinitializer */
+    HWLOC_TYPE_DEPTH_OS_DEVICE = -6,  /**< \brief Virtual depth for software device object level. \hideinitializer */
+    HWLOC_TYPE_DEPTH_MISC = -7,       /**< \brief Virtual depth for Misc object. \hideinitializer */
+    HWLOC_TYPE_DEPTH_MEMCACHE = -8    /**< \brief Virtual depth for MemCache object. \hideinitializer */
 };
+
+/** \brief Return the depth of parents where memory objects are attached.
+ *
+ * Memory objects have virtual negative depths because they are not part of
+ * the main CPU-side hierarchy of objects. This depth should not be compared
+ * with other level depths.
+ *
+ * If all Memory objects are attached to Normal parents at the same depth,
+ * this parent depth may be compared to other as usual, for instance
+ * for knowing whether NUMA nodes is attached above or below Packages.
+ *
+ * \return The depth of Normal parents of all memory children
+ * if all these parents have the same depth. For instance the depth of
+ * the Package level if all NUMA nodes are attached to Package objects.
+ *
+ * \return ::HWLOC_TYPE_DEPTH_MULTIPLE if Normal parents of all
+ * memory children do not have the same depth. For instance if some
+ * NUMA nodes are attached to Packages while others are attached to
+ * Groups.
+ */
+HWLOC_DECLSPEC int hwloc_get_memory_parents_depth (hwloc_topology_t topology);
 
 /** \brief Returns the depth of objects of type \p type or below
  *
@@ -1217,8 +831,12 @@ enum hwloc_get_type_depth_e {
  * function returns the depth of the first "present" object typically found
  * inside \p type.
  *
- * If some objects of the given type exist in different levels, for instance
- * L1 and L2 caches, the function returns ::HWLOC_TYPE_DEPTH_MULTIPLE.
+ * This function is only meaningful for normal object types.
+ * If a memory, I/O or Misc object type is given, the corresponding virtual
+ * depth is always returned (see hwloc_get_type_depth()).
+ *
+ * May return ::HWLOC_TYPE_DEPTH_MULTIPLE for ::HWLOC_OBJ_GROUP just like
+ * hwloc_get_type_depth().
  */
 static __hwloc_inline int
 hwloc_get_type_or_below_depth (hwloc_topology_t topology, hwloc_obj_type_t type) __hwloc_attribute_pure;
@@ -1229,8 +847,12 @@ hwloc_get_type_or_below_depth (hwloc_topology_t topology, hwloc_obj_type_t type)
  * function returns the depth of the first "present" object typically
  * containing \p type.
  *
- * If some objects of the given type exist in different levels, for instance
- * L1 and L2 caches, the function returns ::HWLOC_TYPE_DEPTH_MULTIPLE.
+ * This function is only meaningful for normal object types.
+ * If a memory, I/O or Misc object type is given, the corresponding virtual
+ * depth is always returned (see hwloc_get_type_depth()).
+ *
+ * May return ::HWLOC_TYPE_DEPTH_MULTIPLE for ::HWLOC_OBJ_GROUP just like
+ * hwloc_get_type_depth().
  */
 static __hwloc_inline int
 hwloc_get_type_or_above_depth (hwloc_topology_t topology, hwloc_obj_type_t type) __hwloc_attribute_pure;
@@ -1239,13 +861,13 @@ hwloc_get_type_or_above_depth (hwloc_topology_t topology, hwloc_obj_type_t type)
  *
  * \p depth should between 0 and hwloc_topology_get_depth()-1.
  *
- * \return -1 if depth \p depth does not exist.
+ * \return (hwloc_obj_type_t)-1 if depth \p depth does not exist.
  */
-HWLOC_DECLSPEC hwloc_obj_type_t hwloc_get_depth_type (hwloc_topology_t topology, unsigned depth) __hwloc_attribute_pure;
+HWLOC_DECLSPEC hwloc_obj_type_t hwloc_get_depth_type (hwloc_topology_t topology, int depth) __hwloc_attribute_pure;
 
 /** \brief Returns the width of level at depth \p depth.
  */
-HWLOC_DECLSPEC unsigned hwloc_get_nbobjs_by_depth (hwloc_topology_t topology, unsigned depth) __hwloc_attribute_pure;
+HWLOC_DECLSPEC unsigned hwloc_get_nbobjs_by_depth (hwloc_topology_t topology, int depth) __hwloc_attribute_pure;
 
 /** \brief Returns the width of level type \p type
  *
@@ -1257,20 +879,19 @@ hwloc_get_nbobjs_by_type (hwloc_topology_t topology, hwloc_obj_type_t type) __hw
 
 /** \brief Returns the top-object of the topology-tree.
  *
- * Its type is typically ::HWLOC_OBJ_MACHINE but it could be different
- * for complex topologies.
+ * Its type is ::HWLOC_OBJ_MACHINE.
  */
 static __hwloc_inline hwloc_obj_t
 hwloc_get_root_obj (hwloc_topology_t topology) __hwloc_attribute_pure;
 
 /** \brief Returns the topology object at logical index \p idx from depth \p depth */
-HWLOC_DECLSPEC hwloc_obj_t hwloc_get_obj_by_depth (hwloc_topology_t topology, unsigned depth, unsigned idx) __hwloc_attribute_pure;
+HWLOC_DECLSPEC hwloc_obj_t hwloc_get_obj_by_depth (hwloc_topology_t topology, int depth, unsigned idx) __hwloc_attribute_pure;
 
 /** \brief Returns the topology object at logical index \p idx with type \p type
  *
  * If no object for that type exists, \c NULL is returned.
- * If there are several levels with objects of that type, \c NULL is returned
- * and ther caller may fallback to hwloc_get_obj_by_depth().
+ * If there are several levels with objects of that type (::HWLOC_OBJ_GROUP),
+ * \c NULL is returned and the caller may fallback to hwloc_get_obj_by_depth().
  */
 static __hwloc_inline hwloc_obj_t
 hwloc_get_obj_by_type (hwloc_topology_t topology, hwloc_obj_type_t type, unsigned idx) __hwloc_attribute_pure;
@@ -1280,7 +901,7 @@ hwloc_get_obj_by_type (hwloc_topology_t topology, hwloc_obj_type_t type, unsigne
  * If \p prev is \c NULL, return the first object at depth \p depth.
  */
 static __hwloc_inline hwloc_obj_t
-hwloc_get_next_obj_by_depth (hwloc_topology_t topology, unsigned depth, hwloc_obj_t prev);
+hwloc_get_next_obj_by_depth (hwloc_topology_t topology, int depth, hwloc_obj_t prev);
 
 /** \brief Returns the next object of type \p type.
  *
@@ -1296,13 +917,14 @@ hwloc_get_next_obj_by_type (hwloc_topology_t topology, hwloc_obj_type_t type,
 
 
 
-/** \defgroup hwlocality_object_strings Converting between Object Types, Sets and Attributes, and Strings
+/** \defgroup hwlocality_object_strings Converting between Object Types and Attributes, and Strings
  * @{
  */
 
 /** \brief Return a constant stringified object type.
  *
  * This function is the basic way to convert a generic type into a string.
+ * The output string may be parsed back by hwloc_type_sscanf().
  *
  * hwloc_obj_type_snprintf() may return a more precise output for a specific
  * object, but it requires the caller to provide the output buffer.
@@ -1317,13 +939,18 @@ HWLOC_DECLSPEC const char * hwloc_obj_type_string (hwloc_obj_type_t type) __hwlo
  *
  * The output is guaranteed to be the same for all objects of a same topology level.
  *
+ * If \p verbose is 1, longer type names are used, e.g. L1Cache instead of L1.
+ *
+ * The output string may be parsed back by hwloc_type_sscanf().
+ *
  * If \p size is 0, \p string may safely be \c NULL.
  *
  * \return the number of character that were actually written if not truncating,
  * or that would have been written (not including the ending \\0).
  */
-HWLOC_DECLSPEC int hwloc_obj_type_snprintf(char * __hwloc_restrict string, size_t size, hwloc_obj_t obj,
-				   int verbose);
+HWLOC_DECLSPEC int hwloc_obj_type_snprintf(char * __hwloc_restrict string, size_t size,
+					   hwloc_obj_t obj,
+					   int verbose);
 
 /** \brief Stringify the attributes of a given topology object into a human-readable form.
  *
@@ -1336,51 +963,61 @@ HWLOC_DECLSPEC int hwloc_obj_type_snprintf(char * __hwloc_restrict string, size_
  * \return the number of character that were actually written if not truncating,
  * or that would have been written (not including the ending \\0).
  */
-HWLOC_DECLSPEC int hwloc_obj_attr_snprintf(char * __hwloc_restrict string, size_t size, hwloc_obj_t obj, const char * __hwloc_restrict separator,
-				   int verbose);
-
-/** \brief Stringify the cpuset containing a set of objects.
- *
- * If \p size is 0, \p string may safely be \c NULL.
- *
- * \return the number of character that were actually written if not truncating,
- * or that would have been written (not including the ending \\0).
- */
-HWLOC_DECLSPEC int hwloc_obj_cpuset_snprintf(char * __hwloc_restrict str, size_t size, size_t nobj, const hwloc_obj_t * __hwloc_restrict objs);
+HWLOC_DECLSPEC int hwloc_obj_attr_snprintf(char * __hwloc_restrict string, size_t size,
+					   hwloc_obj_t obj, const char * __hwloc_restrict separator,
+					   int verbose);
 
 /** \brief Return an object type and attributes from a type string.
  *
- * Convert strings such as "Package" or "Cache" into the corresponding types.
+ * Convert strings such as "Package" or "L1iCache" into the corresponding types.
  * Matching is case-insensitive, and only the first letters are actually
  * required to match.
  *
- * This function is guaranteed to match any string returned by hwloc_obj_type_string()
- * or hwloc_obj_type_snprintf().
+ * The matched object type is set in \p typep (which cannot be \c NULL).
  *
- * Types that have specific attributes, for instance caches and groups,
- * may be returned in \p depthattrp and \p typeattrp. They are ignored
- * when these pointers are \c NULL.
- *
- * For instance "L2i" or "L2iCache" would return
- * type HWLOC_OBJ_CACHE in \p typep, 2 in \p depthattrp,
- * and HWLOC_OBJ_CACHE_TYPE_INSTRUCTION in \p typeattrp
- * (this last pointer should point to a hwloc_obj_cache_type_t).
- * "Group3" would return type HWLOC_OBJ_GROUP type and 3 in \p depthattrp.
+ * Type-specific attributes, for instance Cache type, Cache depth, Group depth,
+ * Bridge type or OS Device type may be returned in \p attrp.
  * Attributes that are not specified in the string (for instance "Group"
  * without a depth, or "L2Cache" without a cache type) are set to -1.
  *
- * \p typeattrp is only filled if the size specified in \p typeattrsize
- * is large enough. It is currently only used for caches, and the required
- * size is at least the size of hwloc_obj_cache_type_t.
+ * \p attrp is only filled if not \c NULL and if its size specified in \p attrsize
+ * is large enough. It should be at least as large as union hwloc_obj_attr_u.
  *
  * \return 0 if a type was correctly identified, otherwise -1.
  *
- * \note This is an extended version of the now deprecated hwloc_obj_type_of_string()
+ * \note This function is guaranteed to match any string returned by
+ * hwloc_obj_type_string() or hwloc_obj_type_snprintf().
+ *
+ * \note This is an extended version of the now deprecated hwloc_obj_type_sscanf().
  */
-HWLOC_DECLSPEC int hwloc_obj_type_sscanf(const char *string,
-					 hwloc_obj_type_t *typep,
-					 int *depthattrp,
-					 void *typeattrp, size_t typeattrsize);
+HWLOC_DECLSPEC int hwloc_type_sscanf(const char *string,
+				     hwloc_obj_type_t *typep,
+				     union hwloc_obj_attr_u *attrp, size_t attrsize);
+
+/** \brief Return an object type and its level depth from a type string.
+ *
+ * Convert strings such as "Package" or "L1iCache" into the corresponding types
+ * and return in \p depthp the depth of the corresponding level in the
+ * topology \p topology.
+ *
+ * If no object of this type is present on the underlying architecture,
+ * ::HWLOC_TYPE_DEPTH_UNKNOWN is returned.
+ *
+ * If multiple such levels exist (for instance if giving Group without any depth),
+ * the function may return ::HWLOC_TYPE_DEPTH_MULTIPLE instead.
+ *
+ * The matched object type is set in \p typep if \p typep is non \c NULL.
+ *
+ * \note This function is similar to hwloc_type_sscanf() followed
+ * by hwloc_get_type_depth() but it also automatically disambiguates
+ * multiple group levels etc.
+ *
+ * \note This function is guaranteed to match any string returned by
+ * hwloc_obj_type_string() or hwloc_obj_type_snprintf().
+ */
+HWLOC_DECLSPEC int hwloc_type_sscanf_as_depth(const char *string,
+					      hwloc_obj_type_t *typep,
+					      hwloc_topology_t topology, int *depthp);
 
 /** @} */
 
@@ -1407,14 +1044,16 @@ hwloc_obj_get_info_by_name(hwloc_obj_t obj, const char *name) __hwloc_attribute_
  *
  * The input strings are copied before being added in the object infos.
  *
+ * \return \c 0 on success, \c -1 on error.
+ *
  * \note This function may be used to enforce object colors in the lstopo
  * graphical output by using "lstopoStyle" as a name and "Background=#rrggbb"
  * as a value. See CUSTOM COLORS in the lstopo(1) manpage for details.
  *
  * \note If \p value contains some non-printable characters, they will
- * be dropped when exporting to XML, see hwloc_topology_export_xml().
+ * be dropped when exporting to XML, see hwloc_topology_export_xml() in hwloc/export.h.
  */
-HWLOC_DECLSPEC void hwloc_obj_add_info(hwloc_obj_t obj, const char *name, const char *value);
+HWLOC_DECLSPEC int hwloc_obj_add_info(hwloc_obj_t obj, const char *name, const char *value);
 
 /** @} */
 
@@ -1422,10 +1061,13 @@ HWLOC_DECLSPEC void hwloc_obj_add_info(hwloc_obj_t obj, const char *name, const 
 
 /** \defgroup hwlocality_cpubinding CPU binding
  *
- * It is often useful to call hwloc_bitmap_singlify() first so that a single CPU
- * remains in the set. This way, the process will not even migrate between
- * different CPUs inside the given set.
- * Some operating systems also only support that kind of binding.
+ * Some operating systems only support binding threads or processes to a single PU.
+ * Others allow binding to larger sets such as entire Cores or Packages or
+ * even random sets of invididual PUs. In such operating system, the scheduler
+ * is free to run the task on one of these PU, then migrate it to another PU, etc.
+ * It is often useful to call hwloc_bitmap_singlify() on the target CPU set before
+ * passing it to the binding function to avoid these expensive migrations.
+ * See the documentation of hwloc_bitmap_singlify() for details.
  *
  * Some operating systems do not provide all hwloc-supported
  * mechanisms to bind processes, threads, etc.
@@ -1569,10 +1211,10 @@ HWLOC_DECLSPEC int hwloc_set_proc_cpubind(hwloc_topology_t topology, hwloc_pid_t
  * and \p HANDLE on native Windows platforms.
  *
  * \note As a special case on Linux, if a tid (thread ID) is supplied
- * instead of a pid (process ID) and ::HWLOC_CPUBIND_THREAD is passed in flags,
+ * instead of a pid (process ID) and HWLOC_CPUBIND_THREAD is passed in flags,
  * the binding for that specific thread is returned.
  *
- * \note On non-Linux systems, ::HWLOC_CPUBIND_THREAD can not be used in \p flags.
+ * \note On non-Linux systems, HWLOC_CPUBIND_THREAD can not be used in \p flags.
  */
 HWLOC_DECLSPEC int hwloc_get_proc_cpubind(hwloc_topology_t topology, hwloc_pid_t pid, hwloc_cpuset_t set, int flags);
 
@@ -1681,11 +1323,9 @@ HWLOC_DECLSPEC int hwloc_get_proc_last_cpu_location(hwloc_topology_t topology, h
  *                            HWLOC_MEMBIND_BIND, 0);
  * \endcode
  *
- * Each hwloc memory binding function is available in two forms: one
- * that takes a bitmap argument (a CPU set by default, or a NUMA memory
- * node set if the flag ::HWLOC_MEMBIND_BYNODESET is specified),
- * and another one (whose name ends with _nodeset) that always takes
- * a NUMA memory node set.
+ * Each hwloc memory binding function takes a bitmap argument that
+ * is a CPU set by default, or a NUMA memory node set if the flag
+ * ::HWLOC_MEMBIND_BYNODESET is specified.
  * See \ref hwlocality_object_sets and \ref hwlocality_bitmap for a
  * discussion of CPU sets and NUMA memory node sets.
  * It is also possible to convert between CPU set and node set using
@@ -1716,21 +1356,20 @@ typedef enum {
   /** \brief Reset the memory allocation policy to the system default.
    * Depending on the operating system, this may correspond to
    * ::HWLOC_MEMBIND_FIRSTTOUCH (Linux),
-   * or ::HWLOC_MEMBIND_BIND (AIX, HP-UX, OSF, Solaris, Windows).
-   * This policy is never returned by get membind functions when running
-   * on normal machines.
-   * It is only returned when binding hooks are empty because the topology
-   * was loaded from XML, or HWLOC_THISSYSTEM=0, etc.
+   * or ::HWLOC_MEMBIND_BIND (AIX, HP-UX, Solaris, Windows).
+   * This policy is never returned by get membind functions.
+   * The nodeset argument is ignored.
    * \hideinitializer */
   HWLOC_MEMBIND_DEFAULT =	0,
 
-  /** \brief Allocate memory
-   * but do not immediately bind it to a specific locality. Instead,
-   * each page in the allocation is bound only when it is first
-   * touched. Pages are individually bound to the local NUMA node of
-   * the first thread that touches it. If there is not enough memory
-   * on the node, allocation may be done in the specified nodes
-   * before allocating on other nodes.
+  /** \brief Allocate each memory page individually on the local NUMA
+   * node of the thread that touches it.
+   *
+   * The given nodeset should usually be hwloc_topology_get_topology_nodeset()
+   * so that the touching thread may run and allocate on any node in the system.
+   *
+   * On AIX, if the nodeset is smaller, pages are allocated locally (if the local
+   * node is in the nodeset) or from a random non-local node (otherwise).
    * \hideinitializer */
   HWLOC_MEMBIND_FIRSTTOUCH =	1,
 
@@ -1747,29 +1386,18 @@ typedef enum {
    * \hideinitializer */
   HWLOC_MEMBIND_INTERLEAVE =	3,
 
-  /** \brief Replicate memory on the given nodes; reads from this
-   * memory will attempt to be serviced from the NUMA node local to
-   * the reading thread. Replicating can be useful when multiple
-   * threads from the specified NUMA nodes will be sharing the same
-   * read-only data.
-   *
-   * This policy can only be used with existing memory allocations
-   * (i.e., the hwloc_set_*membind*() functions); it cannot be used
-   * with functions that allocate new memory (i.e., the hwloc_alloc*()
-   * functions).
-   * \hideinitializer */
-  HWLOC_MEMBIND_REPLICATE =	4,
-
   /** \brief For each page bound with this policy, by next time
    * it is touched (and next time only), it is moved from its current
    * location to the local NUMA node of the thread where the memory
    * reference occurred (if it needs to be moved at all).
    * \hideinitializer */
-  HWLOC_MEMBIND_NEXTTOUCH =	5,
+  HWLOC_MEMBIND_NEXTTOUCH =	4,
 
   /** \brief Returned by get_membind() functions when multiple
    * threads or parts of a memory area have differing memory binding
    * policies.
+   * Also returned when binding is unknown because binding hooks are empty
+   * when the topology is loaded from XML without HWLOC_THISSYSTEM=1, etc.
    * \hideinitializer */
   HWLOC_MEMBIND_MIXED = -1
 } hwloc_membind_policy_t;
@@ -1828,29 +1456,15 @@ typedef enum {
 
   /** \brief Consider the bitmap argument as a nodeset.
    *
-   * Functions whose name ends with _nodeset() take a nodeset argument.
-   * Other functions take a bitmap argument that is considered a nodeset
-   * if this flag is given, or a cpuset otherwise.
+   * The bitmap argument is considered a nodeset if this flag is given,
+   * or a cpuset otherwise by default.
    *
    * Memory binding by CPU set cannot work for CPU-less NUMA memory nodes.
    * Binding by nodeset should therefore be preferred whenever possible.
+   * \hideinitializer
    */
   HWLOC_MEMBIND_BYNODESET =     (1<<5)
 } hwloc_membind_flags_t;
-
-/** \brief Set the default memory binding policy of the current
- * process or thread to prefer the NUMA node(s) specified by \p nodeset
- *
- * If neither ::HWLOC_MEMBIND_PROCESS nor ::HWLOC_MEMBIND_THREAD is
- * specified, the current process is assumed to be single-threaded.
- * This is the most portable form as it permits hwloc to use either
- * process-based OS functions or thread-based OS functions, depending
- * on which are available.
- *
- * \return -1 with errno set to ENOSYS if the action is not supported
- * \return -1 with errno set to EXDEV if the binding cannot be enforced
- */
-HWLOC_DECLSPEC int hwloc_set_membind_nodeset(hwloc_topology_t topology, hwloc_const_nodeset_t nodeset, hwloc_membind_policy_t policy, int flags);
 
 /** \brief Set the default memory binding policy of the current
  * process or thread to prefer the NUMA node(s) specified by \p set
@@ -1868,49 +1482,6 @@ HWLOC_DECLSPEC int hwloc_set_membind_nodeset(hwloc_topology_t topology, hwloc_co
  * \return -1 with errno set to EXDEV if the binding cannot be enforced
  */
 HWLOC_DECLSPEC int hwloc_set_membind(hwloc_topology_t topology, hwloc_const_bitmap_t set, hwloc_membind_policy_t policy, int flags);
-
-/** \brief Query the default memory binding policy and physical locality of the
- * current process or thread.
- *
- * This function has two output parameters: \p nodeset and \p policy.
- * The values returned in these parameters depend on both the \p flags
- * passed in and the current memory binding policies and nodesets in
- * the queried target.
- *
- * Passing the ::HWLOC_MEMBIND_PROCESS flag specifies that the query
- * target is the current policies and nodesets for all the threads in
- * the current process.  Passing ::HWLOC_MEMBIND_THREAD specifies that
- * the query target is the current policy and nodeset for only the
- * thread invoking this function.
- *
- * If neither of these flags are passed (which is the most portable
- * method), the process is assumed to be single threaded.  This allows
- * hwloc to use either process-based OS functions or thread-based OS
- * functions, depending on which are available.
- *
- * ::HWLOC_MEMBIND_STRICT is only meaningful when ::HWLOC_MEMBIND_PROCESS
- * is also specified.  In this case, hwloc will check the default
- * memory policies and nodesets for all threads in the process.  If
- * they are not identical, -1 is returned and errno is set to EXDEV.
- * If they are identical, the values are returned in \p nodeset and \p
- * policy.
- *
- * Otherwise, if ::HWLOC_MEMBIND_PROCESS is specified (and
- * ::HWLOC_MEMBIND_STRICT is \em not specified), \p nodeset is set to
- * the logical OR of all threads' default nodeset.
- * If all threads' default policies are the same, \p policy is set to
- * that policy.  If they are different, \p policy is set to
- * ::HWLOC_MEMBIND_MIXED.
- *
- * In the ::HWLOC_MEMBIND_THREAD case (or when neither
- * ::HWLOC_MEMBIND_PROCESS or ::HWLOC_MEMBIND_THREAD is specified), there
- * is only one nodeset and policy; they are returned in \p nodeset and
- * \p policy, respectively.
- *
- * If any other flags are specified, -1 is returned and errno is set
- * to EINVAL.
- */
-HWLOC_DECLSPEC int hwloc_get_membind_nodeset(hwloc_topology_t topology, hwloc_nodeset_t nodeset, hwloc_membind_policy_t * policy, int flags);
 
 /** \brief Query the default memory binding policy and physical locality of the
  * current process or thread.
@@ -1959,17 +1530,6 @@ HWLOC_DECLSPEC int hwloc_get_membind_nodeset(hwloc_topology_t topology, hwloc_no
 HWLOC_DECLSPEC int hwloc_get_membind(hwloc_topology_t topology, hwloc_bitmap_t set, hwloc_membind_policy_t * policy, int flags);
 
 /** \brief Set the default memory binding policy of the specified
- * process to prefer the NUMA node(s) specified by \p nodeset
- *
- * \return -1 with errno set to ENOSYS if the action is not supported
- * \return -1 with errno set to EXDEV if the binding cannot be enforced
- *
- * \note \p hwloc_pid_t is \p pid_t on Unix platforms,
- * and \p HANDLE on native Windows platforms.
- */
-HWLOC_DECLSPEC int hwloc_set_proc_membind_nodeset(hwloc_topology_t topology, hwloc_pid_t pid, hwloc_const_nodeset_t nodeset, hwloc_membind_policy_t policy, int flags);
-
-/** \brief Set the default memory binding policy of the specified
  * process to prefer the NUMA node(s) specified by \p set
  *
  * If ::HWLOC_MEMBIND_BYNODESET is specified, set is considered a nodeset.
@@ -1982,44 +1542,6 @@ HWLOC_DECLSPEC int hwloc_set_proc_membind_nodeset(hwloc_topology_t topology, hwl
  * and \p HANDLE on native Windows platforms.
  */
 HWLOC_DECLSPEC int hwloc_set_proc_membind(hwloc_topology_t topology, hwloc_pid_t pid, hwloc_const_bitmap_t set, hwloc_membind_policy_t policy, int flags);
-
-/** \brief Query the default memory binding policy and physical locality of the
- * specified process.
- *
- * This function has two output parameters: \p nodeset and \p policy.
- * The values returned in these parameters depend on both the \p flags
- * passed in and the current memory binding policies and nodesets in
- * the queried target.
- *
- * Passing the ::HWLOC_MEMBIND_PROCESS flag specifies that the query
- * target is the current policies and nodesets for all the threads in
- * the specified process.  If ::HWLOC_MEMBIND_PROCESS is not specified
- * (which is the most portable method), the process is assumed to be
- * single threaded.  This allows hwloc to use either process-based OS
- * functions or thread-based OS functions, depending on which are
- * available.
- *
- * Note that it does not make sense to pass ::HWLOC_MEMBIND_THREAD to
- * this function.
- *
- * If ::HWLOC_MEMBIND_STRICT is specified, hwloc will check the default
- * memory policies and nodesets for all threads in the specified
- * process.  If they are not identical, -1 is returned and errno is
- * set to EXDEV.  If they are identical, the values are returned in \p
- * nodeset and \p policy.
- *
- * Otherwise, \p nodeset is set to the logical OR of all threads'
- * default nodeset.  If all threads' default policies are the same, \p
- * policy is set to that policy.  If they are different, \p policy is
- * set to ::HWLOC_MEMBIND_MIXED.
- *
- * If any other flags are specified, -1 is returned and errno is set
- * to EINVAL.
- *
- * \note \p hwloc_pid_t is \p pid_t on Unix platforms,
- * and \p HANDLE on native Windows platforms.
- */
-HWLOC_DECLSPEC int hwloc_get_proc_membind_nodeset(hwloc_topology_t topology, hwloc_pid_t pid, hwloc_nodeset_t nodeset, hwloc_membind_policy_t * policy, int flags);
 
 /** \brief Query the default memory binding policy and physical locality of the
  * specified process.
@@ -2063,15 +1585,6 @@ HWLOC_DECLSPEC int hwloc_get_proc_membind_nodeset(hwloc_topology_t topology, hwl
 HWLOC_DECLSPEC int hwloc_get_proc_membind(hwloc_topology_t topology, hwloc_pid_t pid, hwloc_bitmap_t set, hwloc_membind_policy_t * policy, int flags);
 
 /** \brief Bind the already-allocated memory identified by (addr, len)
- * to the NUMA node(s) specified by \p nodeset.
- *
- * \return 0 if \p len is 0.
- * \return -1 with errno set to ENOSYS if the action is not supported
- * \return -1 with errno set to EXDEV if the binding cannot be enforced
- */
-HWLOC_DECLSPEC int hwloc_set_area_membind_nodeset(hwloc_topology_t topology, const void *addr, size_t len, hwloc_const_nodeset_t nodeset, hwloc_membind_policy_t policy, int flags);
-
-/** \brief Bind the already-allocated memory identified by (addr, len)
  * to the NUMA node(s) specified by \p set.
  *
  * If ::HWLOC_MEMBIND_BYNODESET is specified, set is considered a nodeset.
@@ -2082,32 +1595,6 @@ HWLOC_DECLSPEC int hwloc_set_area_membind_nodeset(hwloc_topology_t topology, con
  * \return -1 with errno set to EXDEV if the binding cannot be enforced
  */
 HWLOC_DECLSPEC int hwloc_set_area_membind(hwloc_topology_t topology, const void *addr, size_t len, hwloc_const_bitmap_t set, hwloc_membind_policy_t policy, int flags);
-
-/** \brief Query the physical NUMA node(s) and binding policy of the memory
- * identified by (\p addr, \p len ).
- *
- * This function has two output parameters: \p nodeset and \p policy.
- * The values returned in these parameters depend on both the \p flags
- * passed in and the memory binding policies and nodesets of the pages
- * in the address range.
- *
- * If ::HWLOC_MEMBIND_STRICT is specified, the target pages are first
- * checked to see if they all have the same memory binding policy and
- * nodeset.  If they do not, -1 is returned and errno is set to EXDEV.
- * If they are identical across all pages, the nodeset and policy are
- * returned in \p nodeset and \p policy, respectively.
- *
- * If ::HWLOC_MEMBIND_STRICT is not specified, \p nodeset is set to the
- * union of all NUMA node(s) containing pages in the address range.
- * If all pages in the target have the same policy, it is returned in
- * \p policy.  Otherwise, \p policy is set to ::HWLOC_MEMBIND_MIXED.
- *
- * If \p len is 0, -1 is returned and errno is set to EINVAL.
- *
- * If any other flags are specified, -1 is returned and errno is set
- * to EINVAL.
- */
-HWLOC_DECLSPEC int hwloc_get_area_membind_nodeset(hwloc_topology_t topology, const void *addr, size_t len, hwloc_nodeset_t nodeset, hwloc_membind_policy_t * policy, int flags);
 
 /** \brief Query the CPUs near the physical NUMA node(s) and binding policy of
  * the memory identified by (\p addr, \p len ).
@@ -2131,10 +1618,10 @@ HWLOC_DECLSPEC int hwloc_get_area_membind_nodeset(hwloc_topology_t topology, con
  * If ::HWLOC_MEMBIND_BYNODESET is specified, set is considered a nodeset.
  * Otherwise it's a cpuset.
  *
- * If \p len is 0, -1 is returned and errno is set to EINVAL.
- *
  * If any other flags are specified, -1 is returned and errno is set
  * to EINVAL.
+ *
+ * If \p len is 0, -1 is returned and errno is set to EINVAL.
  */
 HWLOC_DECLSPEC int hwloc_get_area_membind(hwloc_topology_t topology, const void *addr, size_t len, hwloc_bitmap_t set, hwloc_membind_policy_t * policy, int flags);
 
@@ -2152,12 +1639,10 @@ HWLOC_DECLSPEC int hwloc_get_area_membind(hwloc_topology_t topology, const void 
  * so this function may return something that is already
  * outdated.
  *
- * If ::HWLOC_MEMBIND_BYNODESET is specified, set is considered a nodeset.
- * Otherwise it's a cpuset.
+ * If ::HWLOC_MEMBIND_BYNODESET is specified in \p flags, set is
+ * considered a nodeset. Otherwise it's a cpuset.
  *
  * If \p len is 0, \p set is emptied.
- *
- * Flags are currently unused.
  */
 HWLOC_DECLSPEC int hwloc_get_area_memlocation(hwloc_topology_t topology, const void *addr, size_t len, hwloc_bitmap_t set, int flags);
 
@@ -2169,19 +1654,6 @@ HWLOC_DECLSPEC int hwloc_get_area_memlocation(hwloc_topology_t topology, const v
  * \note The allocated memory should be freed with hwloc_free().
  */
 HWLOC_DECLSPEC void *hwloc_alloc(hwloc_topology_t topology, size_t len);
-
-/** \brief Allocate some memory on NUMA memory nodes specified by \p nodeset
- *
- * \return NULL with errno set to ENOSYS if the action is not supported
- * and ::HWLOC_MEMBIND_STRICT is given
- * \return NULL with errno set to EXDEV if the binding cannot be enforced
- * and ::HWLOC_MEMBIND_STRICT is given
- * \return NULL with errno set to ENOMEM if the memory allocation failed
- * even before trying to bind.
- *
- * \note The allocated memory should be freed with hwloc_free().
- */
-HWLOC_DECLSPEC void *hwloc_alloc_membind_nodeset(hwloc_topology_t topology, size_t len, hwloc_const_nodeset_t nodeset, hwloc_membind_policy_t policy, int flags) __hwloc_attribute_malloc;
 
 /** \brief Allocate some memory on NUMA memory nodes specified by \p set
  *
@@ -2198,15 +1670,6 @@ HWLOC_DECLSPEC void *hwloc_alloc_membind_nodeset(hwloc_topology_t topology, size
  * \note The allocated memory should be freed with hwloc_free().
  */
 HWLOC_DECLSPEC void *hwloc_alloc_membind(hwloc_topology_t topology, size_t len, hwloc_const_bitmap_t set, hwloc_membind_policy_t policy, int flags) __hwloc_attribute_malloc;
-
-/** \brief Allocate some memory on NUMA memory nodes specified by \p nodeset
- *
- * This is similar to hwloc_alloc_membind() except that it is allowed to change
- * the current memory binding policy, thus providing more binding support, at
- * the expense of changing the current state.
- */
-static __hwloc_inline void *
-hwloc_alloc_membind_policy_nodeset(hwloc_topology_t topology, size_t len, hwloc_const_nodeset_t nodeset, hwloc_membind_policy_t policy, int flags) __hwloc_attribute_malloc;
 
 /** \brief Allocate some memory on NUMA memory nodes specified by \p set
  *
@@ -2229,330 +1692,671 @@ HWLOC_DECLSPEC int hwloc_free(hwloc_topology_t topology, void *addr, size_t len)
 
 
 
+/** \defgroup hwlocality_setsource Changing the Source of Topology Discovery
+ *
+ * If none of the functions below is called, the default is to detect all the objects
+ * of the machine that the caller is allowed to access.
+ *
+ * This default behavior may also be modified through environment variables
+ * if the application did not modify it already.
+ * Setting HWLOC_XMLFILE in the environment enforces the discovery from a XML
+ * file as if hwloc_topology_set_xml() had been called.
+ * Setting HWLOC_SYNTHETIC enforces a synthetic topology as if
+ * hwloc_topology_set_synthetic() had been called.
+ *
+ * Finally, HWLOC_THISSYSTEM enforces the return value of
+ * hwloc_topology_is_thissystem().
+ *
+ * @{
+ */
+
+/** \brief Change which process the topology is viewed from.
+ *
+ * On some systems, processes may have different views of the machine, for
+ * instance the set of allowed CPUs. By default, hwloc exposes the view from
+ * the current process. Calling hwloc_topology_set_pid() permits to make it
+ * expose the topology of the machine from the point of view of another
+ * process.
+ *
+ * \note \p hwloc_pid_t is \p pid_t on Unix platforms,
+ * and \p HANDLE on native Windows platforms.
+ *
+ * \note -1 is returned and errno is set to ENOSYS on platforms that do not
+ * support this feature.
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_pid(hwloc_topology_t __hwloc_restrict topology, hwloc_pid_t pid);
+
+/** \brief Enable synthetic topology.
+ *
+ * Gather topology information from the given \p description,
+ * a space-separated string of <type:number> describing
+ * the object type and arity at each level.
+ * All types may be omitted (space-separated string of numbers) so that
+ * hwloc chooses all types according to usual topologies.
+ * See also the \ref synthetic.
+ *
+ * Setting the environment variable HWLOC_SYNTHETIC
+ * may also result in this behavior.
+ *
+ * If \p description was properly parsed and describes a valid topology
+ * configuration, this function returns 0.
+ * Otherwise -1 is returned and errno is set to EINVAL.
+ *
+ * Note that this function does not actually load topology
+ * information; it just tells hwloc where to load it from.  You'll
+ * still need to invoke hwloc_topology_load() to actually load the
+ * topology information.
+ *
+ * \note For convenience, this backend provides empty binding hooks which just
+ * return success.
+ *
+ * \note On success, the synthetic component replaces the previously enabled
+ * component (if any), but the topology is not actually modified until
+ * hwloc_topology_load().
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_synthetic(hwloc_topology_t __hwloc_restrict topology, const char * __hwloc_restrict description);
+
+/** \brief Enable XML-file based topology.
+ *
+ * Gather topology information from the XML file given at \p xmlpath.
+ * Setting the environment variable HWLOC_XMLFILE may also result in this behavior.
+ * This file may have been generated earlier with hwloc_topology_export_xml() in hwloc/export.h,
+ * or lstopo file.xml.
+ *
+ * Note that this function does not actually load topology
+ * information; it just tells hwloc where to load it from.  You'll
+ * still need to invoke hwloc_topology_load() to actually load the
+ * topology information.
+ *
+ * \return -1 with errno set to EINVAL on failure to read the XML file.
+ *
+ * \note See also hwloc_topology_set_userdata_import_callback()
+ * for importing application-specific object userdata.
+ *
+ * \note For convenience, this backend provides empty binding hooks which just
+ * return success.  To have hwloc still actually call OS-specific hooks, the
+ * ::HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM has to be set to assert that the loaded
+ * file is really the underlying system.
+ *
+ * \note On success, the XML component replaces the previously enabled
+ * component (if any), but the topology is not actually modified until
+ * hwloc_topology_load().
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_xml(hwloc_topology_t __hwloc_restrict topology, const char * __hwloc_restrict xmlpath);
+
+/** \brief Enable XML based topology using a memory buffer (instead of
+ * a file, as with hwloc_topology_set_xml()).
+ *
+ * Gather topology information from the XML memory buffer given at \p
+ * buffer and of length \p size.  This buffer may have been filled
+ * earlier with hwloc_topology_export_xmlbuffer() in hwloc/export.h.
+ *
+ * Note that this function does not actually load topology
+ * information; it just tells hwloc where to load it from.  You'll
+ * still need to invoke hwloc_topology_load() to actually load the
+ * topology information.
+ *
+ * \return -1 with errno set to EINVAL on failure to read the XML buffer.
+ *
+ * \note See also hwloc_topology_set_userdata_import_callback()
+ * for importing application-specific object userdata.
+ *
+ * \note For convenience, this backend provides empty binding hooks which just
+ * return success.  To have hwloc still actually call OS-specific hooks, the
+ * ::HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM has to be set to assert that the loaded
+ * file is really the underlying system.
+ *
+ * \note On success, the XML component replaces the previously enabled
+ * component (if any), but the topology is not actually modified until
+ * hwloc_topology_load().
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_xmlbuffer(hwloc_topology_t __hwloc_restrict topology, const char * __hwloc_restrict buffer, int size);
+
+/** \brief Flags to be passed to hwloc_topology_set_components()
+ */
+enum hwloc_topology_components_flag_e {
+  /** \brief Blacklist the target component from being used.
+   * \hideinitializer
+   */
+  HWLOC_TOPOLOGY_COMPONENTS_FLAG_BLACKLIST = (1UL<<0)
+};
+
+/** \brief Prevent a discovery component from being used for a topology.
+ *
+ * \p name is the name of the discovery component that should not be used
+ * when loading topology \p topology. The name is a string such as "cuda".
+ *
+ * For components with multiple phases, it may also be suffixed with the name
+ * of a phase, for instance "linux:io".
+ *
+ * \p flags should be ::HWLOC_TOPOLOGY_COMPONENTS_FLAG_BLACKLIST.
+ *
+ * This may be used to avoid expensive parts of the discovery process.
+ * For instance, CUDA-specific discovery may be expensive and unneeded
+ * while generic I/O discovery could still be useful.
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_components(hwloc_topology_t __hwloc_restrict topology, unsigned long flags, const char * __hwloc_restrict name);
+
+/** @} */
+
+
+
+/** \defgroup hwlocality_configuration Topology Detection Configuration and Query
+ *
+ * Several functions can optionally be called between hwloc_topology_init() and
+ * hwloc_topology_load() to configure how the detection should be performed,
+ * e.g. to ignore some objects types, define a synthetic topology, etc.
+ *
+ * @{
+ */
+
+/** \brief Flags to be set onto a topology context before load.
+ *
+ * Flags should be given to hwloc_topology_set_flags().
+ * They may also be returned by hwloc_topology_get_flags().
+ */
+enum hwloc_topology_flags_e {
+ /** \brief Detect the whole system, ignore reservations, include disallowed objects.
+   *
+   * Gather all resources, even if some were disabled by the administrator.
+   * For instance, ignore Linux Cgroup/Cpusets and gather all processors and memory nodes.
+   *
+   * When this flag is not set, PUs and NUMA nodes that are disallowed are not added to the topology.
+   * Parent objects (package, core, cache, etc.) are added only if some of their children are allowed.
+   * All existing PUs and NUMA nodes in the topology are allowed.
+   * hwloc_topology_get_allowed_cpuset() and hwloc_topology_get_allowed_nodeset()
+   * are equal to the root object cpuset and nodeset.
+   *
+   * When this flag is set, the actual sets of allowed PUs and NUMA nodes are given
+   * by hwloc_topology_get_allowed_cpuset() and hwloc_topology_get_allowed_nodeset().
+   * They may be smaller than the root object cpuset and nodeset.
+   *
+   * If the current topology is exported to XML and reimported later, this flag
+   * should be set again in the reimported topology so that disallowed resources
+   * are reimported as well.
+   * \hideinitializer
+   */
+  HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED = (1UL<<0),
+
+ /** \brief Assume that the selected backend provides the topology for the
+   * system on which we are running.
+   *
+   * This forces hwloc_topology_is_thissystem() to return 1, i.e. makes hwloc assume that
+   * the selected backend provides the topology for the system on which we are running,
+   * even if it is not the OS-specific backend but the XML backend for instance.
+   * This means making the binding functions actually call the OS-specific
+   * system calls and really do binding, while the XML backend would otherwise
+   * provide empty hooks just returning success.
+   *
+   * Setting the environment variable HWLOC_THISSYSTEM may also result in the
+   * same behavior.
+   *
+   * This can be used for efficiency reasons to first detect the topology once,
+   * save it to an XML file, and quickly reload it later through the XML
+   * backend, but still having binding functions actually do bind.
+   * \hideinitializer
+   */
+  HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM = (1UL<<1),
+
+ /** \brief Get the set of allowed resources from the local operating system even if the topology was loaded from XML or synthetic description.
+   *
+   * If the topology was loaded from XML or from a synthetic string,
+   * restrict it by applying the current process restrictions such as
+   * Linux Cgroup/Cpuset.
+   *
+   * This is useful when the topology is not loaded directly from
+   * the local machine (e.g. for performance reason) and it comes
+   * with all resources, while the running process is restricted
+   * to only parts of the machine.
+   *
+   * This flag is ignored unless ::HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM is
+   * also set since the loaded topology must match the underlying machine
+   * where restrictions will be gathered from.
+   *
+   * Setting the environment variable HWLOC_THISSYSTEM_ALLOWED_RESOURCES
+   * would result in the same behavior.
+   * \hideinitializer
+   */
+  HWLOC_TOPOLOGY_FLAG_THISSYSTEM_ALLOWED_RESOURCES = (1UL<<2)
+};
+
+/** \brief Set OR'ed flags to non-yet-loaded topology.
+ *
+ * Set a OR'ed set of ::hwloc_topology_flags_e onto a topology that was not yet loaded.
+ *
+ * If this function is called multiple times, the last invokation will erase
+ * and replace the set of flags that was previously set.
+ *
+ * The flags set in a topology may be retrieved with hwloc_topology_get_flags()
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_flags (hwloc_topology_t topology, unsigned long flags);
+
+/** \brief Get OR'ed flags of a topology.
+ *
+ * Get the OR'ed set of ::hwloc_topology_flags_e of a topology.
+ *
+ * \return the flags previously set with hwloc_topology_set_flags().
+ */
+HWLOC_DECLSPEC unsigned long hwloc_topology_get_flags (hwloc_topology_t topology);
+
+/** \brief Does the topology context come from this system?
+ *
+ * \return 1 if this topology context was built using the system
+ * running this program.
+ * \return 0 instead (for instance if using another file-system root,
+ * a XML topology file, or a synthetic topology).
+ */
+HWLOC_DECLSPEC int hwloc_topology_is_thissystem(hwloc_topology_t  __hwloc_restrict topology) __hwloc_attribute_pure;
+
+/** \brief Flags describing actual discovery support for this topology. */
+struct hwloc_topology_discovery_support {
+  /** \brief Detecting the number of PU objects is supported. */
+  unsigned char pu;
+  /** \brief Detecting the number of NUMA nodes is supported. */
+  unsigned char numa;
+  /** \brief Detecting the amount of memory in NUMA nodes is supported. */
+  unsigned char numa_memory;
+  /** \brief Detecting and identifying PU objects that are not available to the current process is supported. */
+  unsigned char disallowed_pu;
+  /** \brief Detecting and identifying NUMA nodes that are not available to the current process is supported. */
+  unsigned char disallowed_numa;
+};
+
+/** \brief Flags describing actual PU binding support for this topology.
+ *
+ * A flag may be set even if the feature isn't supported in all cases
+ * (e.g. binding to random sets of non-contiguous objects).
+ */
+struct hwloc_topology_cpubind_support {
+  /** Binding the whole current process is supported.  */
+  unsigned char set_thisproc_cpubind;
+  /** Getting the binding of the whole current process is supported.  */
+  unsigned char get_thisproc_cpubind;
+  /** Binding a whole given process is supported.  */
+  unsigned char set_proc_cpubind;
+  /** Getting the binding of a whole given process is supported.  */
+  unsigned char get_proc_cpubind;
+  /** Binding the current thread only is supported.  */
+  unsigned char set_thisthread_cpubind;
+  /** Getting the binding of the current thread only is supported.  */
+  unsigned char get_thisthread_cpubind;
+  /** Binding a given thread only is supported.  */
+  unsigned char set_thread_cpubind;
+  /** Getting the binding of a given thread only is supported.  */
+  unsigned char get_thread_cpubind;
+  /** Getting the last processors where the whole current process ran is supported */
+  unsigned char get_thisproc_last_cpu_location;
+  /** Getting the last processors where a whole process ran is supported */
+  unsigned char get_proc_last_cpu_location;
+  /** Getting the last processors where the current thread ran is supported */
+  unsigned char get_thisthread_last_cpu_location;
+};
+
+/** \brief Flags describing actual memory binding support for this topology.
+ *
+ * A flag may be set even if the feature isn't supported in all cases
+ * (e.g. binding to random sets of non-contiguous objects).
+ */
+struct hwloc_topology_membind_support {
+  /** Binding the whole current process is supported.  */
+  unsigned char set_thisproc_membind;
+  /** Getting the binding of the whole current process is supported.  */
+  unsigned char get_thisproc_membind;
+  /** Binding a whole given process is supported.  */
+  unsigned char set_proc_membind;
+  /** Getting the binding of a whole given process is supported.  */
+  unsigned char get_proc_membind;
+  /** Binding the current thread only is supported.  */
+  unsigned char set_thisthread_membind;
+  /** Getting the binding of the current thread only is supported.  */
+  unsigned char get_thisthread_membind;
+  /** Binding a given memory area is supported. */
+  unsigned char set_area_membind;
+  /** Getting the binding of a given memory area is supported.  */
+  unsigned char get_area_membind;
+  /** Allocating a bound memory area is supported. */
+  unsigned char alloc_membind;
+  /** First-touch policy is supported. */
+  unsigned char firsttouch_membind;
+  /** Bind policy is supported. */
+  unsigned char bind_membind;
+  /** Interleave policy is supported. */
+  unsigned char interleave_membind;
+  /** Next-touch migration policy is supported. */
+  unsigned char nexttouch_membind;
+  /** Migration flags is supported. */
+  unsigned char migrate_membind;
+  /** Getting the last NUMA nodes where a memory area was allocated is supported */
+  unsigned char get_area_memlocation;
+};
+
+/** \brief Set of flags describing actual support for this topology.
+ *
+ * This is retrieved with hwloc_topology_get_support() and will be valid until
+ * the topology object is destroyed.  Note: the values are correct only after
+ * discovery.
+ */
+struct hwloc_topology_support {
+  struct hwloc_topology_discovery_support *discovery;
+  struct hwloc_topology_cpubind_support *cpubind;
+  struct hwloc_topology_membind_support *membind;
+};
+
+/** \brief Retrieve the topology support.
+ *
+ * Each flag indicates whether a feature is supported.
+ * If set to 0, the feature is not supported.
+ * If set to 1, the feature is supported, but the corresponding
+ * call may still fail in some corner cases.
+ *
+ * These features are also listed by hwloc-info \--support
+ */
+HWLOC_DECLSPEC const struct hwloc_topology_support *hwloc_topology_get_support(hwloc_topology_t __hwloc_restrict topology);
+
+/** \brief Type filtering flags.
+ *
+ * By default, most objects are kept (::HWLOC_TYPE_FILTER_KEEP_ALL).
+ * Instruction caches, I/O and Misc objects are ignored by default (::HWLOC_TYPE_FILTER_KEEP_NONE).
+ * Die and Group levels are ignored unless they bring structure (::HWLOC_TYPE_FILTER_KEEP_STRUCTURE).
+ *
+ * Note that group objects are also ignored individually (without the entire level)
+ * when they do not bring structure.
+ */
+enum hwloc_type_filter_e {
+  /** \brief Keep all objects of this type.
+   *
+   * Cannot be set for ::HWLOC_OBJ_GROUP (groups are designed only to add more structure to the topology).
+   * \hideinitializer
+   */
+  HWLOC_TYPE_FILTER_KEEP_ALL = 0,
+
+  /** \brief Ignore all objects of this type.
+   *
+   * The bottom-level type ::HWLOC_OBJ_PU, the ::HWLOC_OBJ_NUMANODE type, and
+   * the top-level type ::HWLOC_OBJ_MACHINE may not be ignored.
+   * \hideinitializer
+   */
+  HWLOC_TYPE_FILTER_KEEP_NONE = 1,
+
+  /** \brief Only ignore objects if their entire level does not bring any structure.
+   *
+   * Keep the entire level of objects if at least one of these objects adds
+   * structure to the topology. An object brings structure when it has multiple
+   * children and it is not the only child of its parent.
+   *
+   * If all objects in the level are the only child of their parent, and if none
+   * of them has multiple children, the entire level is removed.
+   *
+   * Cannot be set for I/O and Misc objects since the topology structure does not matter there.
+   * \hideinitializer
+   */
+  HWLOC_TYPE_FILTER_KEEP_STRUCTURE = 2,
+
+  /** \brief Only keep likely-important objects of the given type.
+   *
+   * It is only useful for I/O object types.
+   * For ::HWLOC_OBJ_PCI_DEVICE and ::HWLOC_OBJ_OS_DEVICE, it means that only objects
+   * of major/common kinds are kept (storage, network, OpenFabrics, Intel MICs, CUDA,
+   * OpenCL, NVML, and displays).
+   * Also, only OS devices directly attached on PCI (e.g. no USB) are reported.
+   * For ::HWLOC_OBJ_BRIDGE, it means that bridges are kept only if they have children.
+   *
+   * This flag equivalent to ::HWLOC_TYPE_FILTER_KEEP_ALL for Normal, Memory and Misc types
+   * since they are likely important.
+   * \hideinitializer
+   */
+  HWLOC_TYPE_FILTER_KEEP_IMPORTANT = 3
+};
+
+/** \brief Set the filtering for the given object type.
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_type_filter(hwloc_topology_t topology, hwloc_obj_type_t type, enum hwloc_type_filter_e filter);
+
+/** \brief Get the current filtering for the given object type.
+ */
+HWLOC_DECLSPEC int hwloc_topology_get_type_filter(hwloc_topology_t topology, hwloc_obj_type_t type, enum hwloc_type_filter_e *filter);
+
+/** \brief Set the filtering for all object types.
+ *
+ * If some types do not support this filtering, they are silently ignored.
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_all_types_filter(hwloc_topology_t topology, enum hwloc_type_filter_e filter);
+
+/** \brief Set the filtering for all CPU cache object types.
+ *
+ * Memory-side caches are not involved since they are not CPU caches.
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_cache_types_filter(hwloc_topology_t topology, enum hwloc_type_filter_e filter);
+
+/** \brief Set the filtering for all CPU instruction cache object types.
+ *
+ * Memory-side caches are not involved since they are not CPU caches.
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_icache_types_filter(hwloc_topology_t topology, enum hwloc_type_filter_e filter);
+
+/** \brief Set the filtering for all I/O object types.
+ */
+HWLOC_DECLSPEC int hwloc_topology_set_io_types_filter(hwloc_topology_t topology, enum hwloc_type_filter_e filter);
+
+/** \brief Set the topology-specific userdata pointer.
+ *
+ * Each topology may store one application-given private data pointer.
+ * It is initialized to \c NULL.
+ * hwloc will never modify it.
+ *
+ * Use it as you wish, after hwloc_topology_init() and until hwloc_topolog_destroy().
+ *
+ * This pointer is not exported to XML.
+ */
+HWLOC_DECLSPEC void hwloc_topology_set_userdata(hwloc_topology_t topology, const void *userdata);
+
+/** \brief Retrieve the topology-specific userdata pointer.
+ *
+ * Retrieve the application-given private data pointer that was
+ * previously set with hwloc_topology_set_userdata().
+ */
+HWLOC_DECLSPEC void * hwloc_topology_get_userdata(hwloc_topology_t topology);
+
+/** @} */
+
+
+
 /** \defgroup hwlocality_tinker Modifying a loaded Topology
  * @{
  */
 
-/** \brief Add a MISC object to the topology
- *
- * A new MISC object will be created and inserted into the topology at the
- * position given by bitmap \p cpuset. This offers a way to add new
- * intermediate levels to the topology hierarchy.
- *
- * \p cpuset and \p name will be copied to setup the new object attributes.
- *
- * \return the newly-created object.
- * \return \c NULL if the insertion conflicts with the existing topology tree.
- *
- * \note If \p name contains some non-printable characters, they will
- * be dropped when exporting to XML, see hwloc_topology_export_xml().
- */
-HWLOC_DECLSPEC hwloc_obj_t hwloc_topology_insert_misc_object_by_cpuset(hwloc_topology_t topology, hwloc_const_cpuset_t cpuset, const char *name);
-
-/** \brief Add a MISC object as a leaf of the topology
- *
- * A new MISC object will be created and inserted into the topology at the
- * position given by parent. It is appended to the list of existing children,
- * without ever adding any intermediate hierarchy level. This is useful for
- * annotating the topology without actually changing the hierarchy.
- *
- * \p name will be copied to the setup the new object attributes.
- * However, the new leaf object will not have any \p cpuset.
- *
- * \return the newly-created object
- *
- * \note If \p name contains some non-printable characters, they will
- * be dropped when exporting to XML, see hwloc_topology_export_xml().
- */
-HWLOC_DECLSPEC hwloc_obj_t hwloc_topology_insert_misc_object_by_parent(hwloc_topology_t topology, hwloc_obj_t parent, const char *name);
-
 /** \brief Flags to be given to hwloc_topology_restrict(). */
 enum hwloc_restrict_flags_e {
-  /** \brief Adapt distance matrices according to objects being removed during restriction.
-   * If this flag is not set, distance matrices are removed.
+  /** \brief Remove all objects that became CPU-less.
+   * By default, only objects that contain no PU and no memory are removed.
    * \hideinitializer
    */
-  HWLOC_RESTRICT_FLAG_ADAPT_DISTANCES = (1<<0),
+  HWLOC_RESTRICT_FLAG_REMOVE_CPULESS = (1UL<<0),
+
+  /** \brief Restrict by nodeset instead of CPU set.
+   * Only keep objects whose nodeset is included or partially included in the given set.
+   * This flag may not be used with ::HWLOC_RESTRICT_FLAG_BYNODESET.
+   */
+  HWLOC_RESTRICT_FLAG_BYNODESET =  (1UL<<3),
+
+  /** \brief Remove all objects that became Memory-less.
+   * By default, only objects that contain no PU and no memory are removed.
+   * This flag may only be used with ::HWLOC_RESTRICT_FLAG_BYNODESET.
+   * \hideinitializer
+   */
+  HWLOC_RESTRICT_FLAG_REMOVE_MEMLESS = (1UL<<4),
 
   /** \brief Move Misc objects to ancestors if their parents are removed during restriction.
    * If this flag is not set, Misc objects are removed when their parents are removed.
    * \hideinitializer
    */
-  HWLOC_RESTRICT_FLAG_ADAPT_MISC = (1<<1),
+  HWLOC_RESTRICT_FLAG_ADAPT_MISC = (1UL<<1),
 
   /** \brief Move I/O objects to ancestors if their parents are removed during restriction.
    * If this flag is not set, I/O devices and bridges are removed when their parents are removed.
    * \hideinitializer
    */
-  HWLOC_RESTRICT_FLAG_ADAPT_IO = (1<<2)
+  HWLOC_RESTRICT_FLAG_ADAPT_IO = (1UL<<2)
 };
 
-/** \brief Restrict the topology to the given CPU set.
+/** \brief Restrict the topology to the given CPU set or nodeset.
  *
  * Topology \p topology is modified so as to remove all objects that
- * are not included (or partially included) in the CPU set \p cpuset.
+ * are not included (or partially included) in the CPU set \p set.
  * All objects CPU and node sets are restricted accordingly.
+ *
+ * If ::HWLOC_RESTRICT_FLAG_BYNODESET is passed in \p flags,
+ * \p set is considered a nodeset instead of a CPU set.
  *
  * \p flags is a OR'ed set of ::hwloc_restrict_flags_e.
  *
  * \note This call may not be reverted by restricting back to a larger
- * cpuset. Once dropped during restriction, objects may not be brought
+ * set. Once dropped during restriction, objects may not be brought
  * back, except by loading another topology with hwloc_topology_load().
  *
  * \return 0 on success.
  *
- * \return -1 with errno set to EINVAL if the input cpuset is invalid.
+ * \return -1 with errno set to EINVAL if the input set is invalid.
  * The topology is not modified in this case.
  *
  * \return -1 with errno set to ENOMEM on failure to allocate internal data.
  * The topology is reinitialized in this case. It should be either
  * destroyed with hwloc_topology_destroy() or configured and loaded again.
  */
-HWLOC_DECLSPEC int hwloc_topology_restrict(hwloc_topology_t __hwloc_restrict topology, hwloc_const_cpuset_t cpuset, unsigned long flags);
+HWLOC_DECLSPEC int hwloc_topology_restrict(hwloc_topology_t __hwloc_restrict topology, hwloc_const_bitmap_t set, unsigned long flags);
 
-/** @} */
+/** \brief Flags to be given to hwloc_topology_allow(). */
+enum hwloc_allow_flags_e {
+  /** \brief Mark all objects as allowed in the topology.
+   *
+   * \p cpuset and \p nođeset given to hwloc_topology_allow() must be \c NULL.
+   * \hideinitializer */
+  HWLOC_ALLOW_FLAG_ALL = (1UL<<0),
 
+  /** \brief Only allow objects that are available to the current process.
+   *
+   * The topology must have ::HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM so that the set
+   * of available resources can actually be retrieved from the operating system.
+   *
+   * \p cpuset and \p nođeset given to hwloc_topology_allow() must be \c NULL.
+   * \hideinitializer */
+  HWLOC_ALLOW_FLAG_LOCAL_RESTRICTIONS = (1UL<<1),
 
-
-/** \defgroup hwlocality_custom Building Custom Topologies
- *
- * A custom topology may be initialized by calling hwloc_topology_set_custom()
- * after hwloc_topology_init(). It may then be modified by inserting objects
- * or entire topologies. Once done assembling, hwloc_topology_load() should
- * be invoked as usual to finalize the topology.
- * @{
- */
-
-/** \brief Insert an existing topology inside a custom topology
- *
- * Duplicate the existing topology \p oldtopology inside a new
- * custom topology \p newtopology as a leaf of object \p newparent.
- *
- * If \p oldroot is not \c NULL, duplicate \p oldroot and all its
- * children instead of the entire \p oldtopology. Passing the root
- * object of \p oldtopology in \p oldroot is equivalent to passing
- * \c NULL.
- *
- * The custom topology \p newtopology must have been prepared with
- * hwloc_topology_set_custom() and not loaded with hwloc_topology_load()
- * yet.
- *
- * \p newparent may be either the root of \p newtopology or an object
- * that was added through hwloc_custom_insert_group_object_by_parent().
- *
- * \note The cpuset and nodeset of the \p newparent object are not
- * modified based on the contents of \p oldtopology.
- */
-HWLOC_DECLSPEC int hwloc_custom_insert_topology(hwloc_topology_t newtopology, hwloc_obj_t newparent, hwloc_topology_t oldtopology, hwloc_obj_t oldroot);
-
-/** \brief Insert a new group object inside a custom topology
- *
- * An object with type ::HWLOC_OBJ_GROUP is inserted as a new child
- * of object \p parent.
- *
- * \p groupdepth is the depth attribute to be given to the new object.
- * It may for instance be 0 for top-level groups, 1 for their children,
- * and so on.
- *
- * The custom topology \p newtopology must have been prepared with
- * hwloc_topology_set_custom() and not loaded with hwloc_topology_load()
- * yet.
- *
- * \p parent may be either the root of \p topology or an object that
- * was added earlier through hwloc_custom_insert_group_object_by_parent().
- *
- * \note The cpuset and nodeset of the new group object are NULL because
- * these sets are meaningless when assembling multiple topologies.
- *
- * \note The cpuset and nodeset of the \p parent object are not modified.
- */
-HWLOC_DECLSPEC hwloc_obj_t hwloc_custom_insert_group_object_by_parent(hwloc_topology_t topology, hwloc_obj_t parent, int groupdepth);
-
-/** @} */
-
-
-
-/** \defgroup hwlocality_xmlexport Exporting Topologies to XML
- * @{
- */
-
-/** \brief Export the topology into an XML file.
- *
- * This file may be loaded later through hwloc_topology_set_xml().
- *
- * \return -1 if a failure occured.
- *
- * \note See also hwloc_topology_set_userdata_export_callback()
- * for exporting application-specific object userdata.
- *
- * \note The topology-specific userdata pointer is ignored when exporting to XML.
- *
- * \note Only printable characters may be exported to XML string attributes.
- * Any other character, especially any non-ASCII character, will be silently
- * dropped.
- *
- * \note If \p name is "-", the XML output is sent to the standard output.
- */
-HWLOC_DECLSPEC int hwloc_topology_export_xml(hwloc_topology_t topology, const char *xmlpath);
-
-/** \brief Export the topology into a newly-allocated XML memory buffer.
- *
- * \p xmlbuffer is allocated by the callee and should be freed with
- * hwloc_free_xmlbuffer() later in the caller.
- *
- * This memory buffer may be loaded later through hwloc_topology_set_xmlbuffer().
- *
- * \return -1 if a failure occured.
- *
- * \note See also hwloc_topology_set_userdata_export_callback()
- * for exporting application-specific object userdata.
- *
- * \note The topology-specific userdata pointer is ignored when exporting to XML.
- *
- * \note Only printable characters may be exported to XML string attributes.
- * Any other character, especially any non-ASCII character, will be silently
- * dropped.
- */
-HWLOC_DECLSPEC int hwloc_topology_export_xmlbuffer(hwloc_topology_t topology, char **xmlbuffer, int *buflen);
-
-/** \brief Free a buffer allocated by hwloc_topology_export_xmlbuffer() */
-HWLOC_DECLSPEC void hwloc_free_xmlbuffer(hwloc_topology_t topology, char *xmlbuffer);
-
-/** \brief Set the application-specific callback for exporting object userdata
- *
- * The object userdata pointer is not exported to XML by default because hwloc
- * does not know what it contains.
- *
- * This function lets applications set \p export_cb to a callback function
- * that converts this opaque userdata into an exportable string.
- *
- * \p export_cb is invoked during XML export for each object whose
- * \p userdata pointer is not \c NULL.
- * The callback should use hwloc_export_obj_userdata() or
- * hwloc_export_obj_userdata_base64() to actually export
- * something to XML (possibly multiple times per object).
- *
- * \p export_cb may be set to \c NULL if userdata should not be exported to XML.
- *
- * \note The topology-specific userdata pointer is ignored when exporting to XML.
- */
-HWLOC_DECLSPEC void hwloc_topology_set_userdata_export_callback(hwloc_topology_t topology,
-								void (*export_cb)(void *reserved, hwloc_topology_t topology, hwloc_obj_t obj));
-
-/** \brief Export some object userdata to XML
- *
- * This function may only be called from within the export() callback passed
- * to hwloc_topology_set_userdata_export_callback().
- * It may be invoked one of multiple times to export some userdata to XML.
- * The \p buffer content of length \p length is stored with optional name
- * \p name.
- *
- * When importing this XML file, the import() callback (if set) will be
- * called exactly as many times as hwloc_export_obj_userdata() was called
- * during export(). It will receive the corresponding \p name, \p buffer
- * and \p length arguments.
- *
- * \p reserved, \p topology and \p obj must be the first three parameters
- * that were given to the export callback.
- *
- * Only printable characters may be exported to XML string attributes.
- * If a non-printable character is passed in \p name or \p buffer,
- * the function returns -1 with errno set to EINVAL.
- *
- * If exporting binary data, the application should first encode into
- * printable characters only (or use hwloc_export_obj_userdata_base64()).
- * It should also take care of portability issues if the export may
- * be reimported on a different architecture.
- */
-HWLOC_DECLSPEC int hwloc_export_obj_userdata(void *reserved, hwloc_topology_t topology, hwloc_obj_t obj, const char *name, const void *buffer, size_t length);
-
-/** \brief Encode and export some object userdata to XML
- *
- * This function is similar to hwloc_export_obj_userdata() but it encodes
- * the input buffer into printable characters before exporting.
- * On import, decoding is automatically performed before the data is given
- * to the import() callback if any.
- *
- * This function may only be called from within the export() callback passed
- * to hwloc_topology_set_userdata_export_callback().
- *
- * The function does not take care of portability issues if the export
- * may be reimported on a different architecture.
- */
-HWLOC_DECLSPEC int hwloc_export_obj_userdata_base64(void *reserved, hwloc_topology_t topology, hwloc_obj_t obj, const char *name, const void *buffer, size_t length);
-
-/** \brief Set the application-specific callback for importing userdata
- *
- * On XML import, userdata is ignored by default because hwloc does not know
- * how to store it in memory.
- *
- * This function lets applications set \p import_cb to a callback function
- * that will get the XML-stored userdata and store it in the object as expected
- * by the application.
- *
- * \p import_cb is called during hwloc_topology_load() as many times as
- * hwloc_export_obj_userdata() was called during export. The topology
- * is not entirely setup yet. Object attributes are ready to consult,
- * but links between objects are not.
- *
- * \p import_cb may be \c NULL if userdata should be ignored during import.
- *
- * \note \p buffer contains \p length characters followed by a null byte ('\0').
- *
- * \note This function should be called before hwloc_topology_load().
- *
- * \note The topology-specific userdata pointer is ignored when importing from XML.
- */
-HWLOC_DECLSPEC void hwloc_topology_set_userdata_import_callback(hwloc_topology_t topology,
-								void (*import_cb)(hwloc_topology_t topology, hwloc_obj_t obj, const char *name, const void *buffer, size_t length));
-
-/** @} */
-
-
-/** \defgroup hwlocality_syntheticexport Exporting Topologies to Synthetic
- * @{
- */
-
-/** \brief Flags for exporting synthetic topologies.
- *
- * Flags to be given as a OR'ed set to hwloc_topology_export_synthetic().
- */
-enum hwloc_topology_export_synthetic_flags_e {
- /** \brief Export extended types such as L2dcache as basic types such as Cache.
-  *
-  * This is required if loading the synthetic description with hwloc < 1.9.
-  * \hideinitializer
-  */
- HWLOC_TOPOLOGY_EXPORT_SYNTHETIC_FLAG_NO_EXTENDED_TYPES = (1UL<<0),
-
- /** \brief Do not export level attributes.
-  *
-  * Ignore level attributes such as memory/cache sizes or PU indexes.
-  * This is required if loading the synthetic description with hwloc < 1.10.
-  * \hideinitializer
-  */
- HWLOC_TOPOLOGY_EXPORT_SYNTHETIC_FLAG_NO_ATTRS = (1UL<<1)
+  /** \brief Allow a custom set of objects, given to hwloc_topology_allow() as \p cpuset and/or \p nodeset parameters.
+   * \hideinitializer */
+  HWLOC_ALLOW_FLAG_CUSTOM = (1UL<<2)
 };
 
-/** \brief Export the topology as a synthetic string.
+/** \brief Change the sets of allowed PUs and NUMA nodes in the topology.
  *
- * At most \p buflen characters will be written in \p buffer,
- * including the terminating \0.
+ * This function only works if the ::HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED
+ * was set on the topology. It does not modify any object, it only changes
+ * the sets returned by hwloc_topology_get_allowed_cpuset() and
+ * hwloc_topology_get_allowed_nodeset().
  *
- * This exported string may be given back to hwloc_topology_set_synthetic().
+ * It is notably useful when importing a topology from another process
+ * running in a different Linux Cgroup.
  *
- * \p flags is a OR'ed set of hwloc_topology_export_synthetic_flags_e.
+ * \p flags must be set to one flag among ::hwloc_allow_flags_e.
  *
- * \return The number of characters that were written,
- * not including the terminating \0.
- *
- * \return -1 if the topology could not be exported,
- * for instance if it is not symmetric.
- *
- * \note A 1024-byte buffer should be large enough for exporting
- * topologies in the vast majority of cases.
+ * \note Removing objects from a topology should rather be performed with
+ * hwloc_topology_restrict().
  */
-  HWLOC_DECLSPEC int hwloc_topology_export_synthetic(hwloc_topology_t topology, char *buffer, size_t buflen, unsigned long flags);
+HWLOC_DECLSPEC int hwloc_topology_allow(hwloc_topology_t __hwloc_restrict topology, hwloc_const_cpuset_t cpuset, hwloc_const_nodeset_t nodeset, unsigned long flags);
+
+/** \brief Add a MISC object as a leaf of the topology
+ *
+ * A new MISC object will be created and inserted into the topology at the
+ * position given by parent. It is appended to the list of existing Misc children,
+ * without ever adding any intermediate hierarchy level. This is useful for
+ * annotating the topology without actually changing the hierarchy.
+ *
+ * \p name is supposed to be unique across all Misc objects in the topology.
+ * It will be duplicated to setup the new object attributes.
+ *
+ * The new leaf object will not have any \p cpuset.
+ *
+ * \return the newly-created object
+ *
+ * \return \c NULL on error.
+ *
+ * \return \c NULL if Misc objects are filtered-out of the topology (::HWLOC_TYPE_FILTER_KEEP_NONE).
+ *
+ * \note If \p name contains some non-printable characters, they will
+ * be dropped when exporting to XML, see hwloc_topology_export_xml() in hwloc/export.h.
+ */
+HWLOC_DECLSPEC hwloc_obj_t hwloc_topology_insert_misc_object(hwloc_topology_t topology, hwloc_obj_t parent, const char *name);
+
+/** \brief Allocate a Group object to insert later with hwloc_topology_insert_group_object().
+ *
+ * This function returns a new Group object.
+ * The caller should (at least) initialize its sets before inserting the object.
+ * See hwloc_topology_insert_group_object().
+ *
+ * The \p subtype object attribute may be set to display something else
+ * than "Group" as the type name for this object in lstopo.
+ * Custom name/value info pairs may be added with hwloc_obj_add_info() after
+ * insertion.
+ *
+ * The \p kind group attribute should be 0. The \p subkind group attribute may
+ * be set to identify multiple Groups of the same level.
+ *
+ * It is recommended not to set any other object attribute before insertion,
+ * since the Group may get discarded during insertion.
+ *
+ * The object will be destroyed if passed to hwloc_topology_insert_group_object()
+ * without any set defined.
+ */
+HWLOC_DECLSPEC hwloc_obj_t hwloc_topology_alloc_group_object(hwloc_topology_t topology);
+
+/** \brief Add more structure to the topology by adding an intermediate Group
+ *
+ * The caller should first allocate a new Group object with hwloc_topology_alloc_group_object().
+ * Then it must setup at least one of its CPU or node sets to specify
+ * the final location of the Group in the topology.
+ * Then the object can be passed to this function for actual insertion in the topology.
+ *
+ * The group \p dont_merge attribute may be set to prevent the core from
+ * ever merging this object with another object hierarchically-identical.
+ *
+ * Either the cpuset or nodeset field (or both, if compatible) must be set
+ * to a non-empty bitmap. The complete_cpuset or complete_nodeset may be set
+ * instead if inserting with respect to the complete topology
+ * (including disallowed, offline or unknown objects).
+ *
+ * It grouping several objects, hwloc_obj_add_other_obj_sets() is an easy way
+ * to build the Group sets iteratively.
+ *
+ * These sets cannot be larger than the current topology, or they would get
+ * restricted silently.
+ *
+ * The core will setup the other sets after actual insertion.
+ *
+ * \return The inserted object if it was properly inserted.
+ *
+ * \return An existing object if the Group was discarded because the topology already
+ * contained an object at the same location (the Group did not add any locality information).
+ * Any name/info key pair set before inserting is appended to the existing object.
+ *
+ * \return \c NULL if the insertion failed because of conflicting sets in topology tree.
+ *
+ * \return \c NULL if Group objects are filtered-out of the topology (::HWLOC_TYPE_FILTER_KEEP_NONE).
+ *
+ * \return \c NULL if the object was discarded because no set was initialized in the Group
+ * before insert, or all of them were empty.
+ */
+HWLOC_DECLSPEC hwloc_obj_t hwloc_topology_insert_group_object(hwloc_topology_t topology, hwloc_obj_t group);
+
+/** \brief Setup object cpusets/nodesets by OR'ing another object's sets.
+ *
+ * For each defined cpuset or nodeset in \p src, allocate the corresponding set
+ * in \p dst and add \p src to it by OR'ing sets.
+ *
+ * This function is convenient between hwloc_topology_alloc_group_object()
+ * and hwloc_topology_insert_group_object(). It builds the sets of the new Group
+ * that will be inserted as a new intermediate parent of several objects.
+ */
+HWLOC_DECLSPEC int hwloc_obj_add_other_obj_sets(hwloc_obj_t dst, hwloc_obj_t src);
 
 /** @} */
 
@@ -2564,15 +2368,21 @@ enum hwloc_topology_export_synthetic_flags_e {
 
 
 /* high-level helpers */
-#include <hwloc/helper.h>
+#include "hwloc/helper.h"
 
 /* inline code of some functions above */
-#include <hwloc/inlines.h>
+#include "hwloc/inlines.h"
+
+/* exporting to XML or synthetic */
+#include "hwloc/export.h"
+
+/* distances */
+#include "hwloc/distances.h"
 
 /* topology diffs */
-#include <hwloc/diff.h>
+#include "hwloc/diff.h"
 
 /* deprecated headers */
-#include <hwloc/deprecated.h>
+#include "hwloc/deprecated.h"
 
 #endif /* HWLOC_H */

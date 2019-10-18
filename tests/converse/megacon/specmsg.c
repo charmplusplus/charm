@@ -64,7 +64,7 @@ CpmInvokable specmsg_begin()
 CpmInvokable specmsg_request(int pe, specmsg_chare c)
 {
   Cpm_specmsg_step3(CpmSend(pe), c);
-  Cpm_specmsg_step2(CpmSend(pe), c); 
+  Cpm_specmsg_step2(CpmSend(pe), c);
   Cpm_specmsg_step4(CpmSend(pe), c);
   Cpm_specmsg_step1(CpmSend(pe), c);
 }

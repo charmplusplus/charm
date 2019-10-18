@@ -606,12 +606,13 @@ void BgSendPendingCorrections(BgTimeLineRec &tlinerec, int mynode)
     newSendIdx++;
   }
 
+#if CMI_QD
   if(sendIdx != newSendIdx){
     if(newSendIdx == tlinerec.length())
       CQdProcess(CpvAccess(cQdState),1);
     //CmiPrintf("Created:%d Processed:%d\n",CQdGetCreated(CpvAccess(cQdState)), CQdGetProcessed(CpvAccess(cQdState)));
   }
-
+#endif
 }
 
 #if USE_MULTISEND
@@ -755,7 +756,6 @@ void bgUpdateProj(int eType)
 extern int updateRealMsgs(bgCorrectionMsg *cm, int nodeidx);
 
 // must be called on each processor
-extern "C"
 void BgStartCorrection()
 {
 
@@ -849,7 +849,9 @@ static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec *tlinerecs,
       // counter for processed correction message
       stateCounters.corrMsgProcCnt++;
     }
+#if CMI_QD
     CQdProcess(CpvAccess(cQdState), 1);
+#endif
     CmiFree(cm);
   }  /* for */
   if (minLog != NULL) {
@@ -871,7 +873,9 @@ CmiPrintf("QUEUE LEN %d: %d\n", mynode, cmsg.length());
     newSendIdx = min(sendIdx,minIdx);
     if(sendIdx != newSendIdx){
       if(sendIdx == tlinerec.length())
+#if CMI_QD
 	CQdCreate(CpvAccess(cQdState),1);
+#endif
       sendIdx = newSendIdx;
     }
 #endif
@@ -970,7 +974,7 @@ static void enqueueCorrectionMsg(int nodeidx, bgCorrectionMsg* m)
       CmiFree(m);
     }
     else {
-#if 1
+#if CMI_QD
       CQdCreate(CpvAccess(cQdState), 1);
 #endif
       cmsg.enq(m);
@@ -1164,7 +1168,9 @@ static void sendHeartbeat(double t, StateCounters &counters)
   msg->gvt = t;
   msg->counters = counters;
   CmiSetHandler(msg, cva(heartbeatHandler));
+#if CMI_QD
   CQdCreate(CpvAccess(cQdState), -1);
+#endif
   if (parent == -1) {
 //    CmiPrintf("HEART BEAT %f Count:%d %d %d %d ival:%d %d at %f\n", gvt, msg->counters.realMsgProcCnt,msg->counters.corrMsgProcCnt,msg->counters.corrMsgEnqCnt, msg->counters.corrMsgCRCnt, hearbeatInterval, programExit,CmiWallTimer());
     CmiSetHandler(msg, cva(heartbeatHandler));
@@ -1184,7 +1190,9 @@ static void sendHeartbeatFunc()
 //Only called for inner-node
 void heartbeatHandlerFunc(char *msg)
 {
+#if CMI_QD
   CQdProcess(CpvAccess(cQdState), -1);
+#endif
   static int reported = 0;
   static double localGvt = INVALIDTIME;
   static double lastGvt = INVALIDTIME;
@@ -1260,7 +1268,9 @@ void recvGVT(char *msg)
   hearbeatInterval = m->newInterval;
 //CmiPrintf("[%d] get gvt: %f \n", CmiMyPe(), gvt);
   if (nChildren) {
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), -nChildren);
+#endif
     for (int i=0; i<nChildren-1; i++)
       CmiSyncSend(children[i], sizeof(HeartBeatMsg), msg);
     CmiSyncSendAndFree(children[nChildren-1], sizeof(HeartBeatMsg), msg);
@@ -1274,7 +1284,9 @@ void recvGVT(char *msg)
 
 void heartbeatBcastHandlerFunc(char *msg)
 {
+#if CMI_QD
   CQdProcess(CpvAccess(cQdState), -1);
+#endif
   recvGVT(msg);
 }
 

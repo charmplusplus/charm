@@ -39,8 +39,7 @@ namespace SDAG {
 
 #include <vector>
 #include <list>
-#include <map>
-#include <set>
+#include <unordered_set>
 #include <memory>
 
 #include <pup_stl.h>
@@ -351,7 +350,7 @@ namespace SDAG {
       return true;
     }
 
-    Buffer* tryFindMessage(int entry, bool hasRef, CMK_REFNUM_TYPE refnum, std::set<Buffer*>* ignore) {
+    Buffer* tryFindMessage(int entry, bool hasRef, CMK_REFNUM_TYPE refnum, std::unordered_set<Buffer*>* ignore) {
       // @todo sequential lookup for buffer with reference number or ignore set
       for (std::list<Buffer*>::iterator iter = buffer[entry].begin();
            iter != buffer[entry].end();

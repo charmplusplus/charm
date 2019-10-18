@@ -22,12 +22,16 @@
 #define __ICC__
 #endif
 
-#ifdef __MSC__
-#define CMK_THREADLOCAL __declspec(thread)
+/*
+ * KEEPINSYNC: converse.h
+ */
+#if defined _MSC_VER
+# define CMK_THREADLOCAL __declspec(thread)
 #else
-#define CMK_THREADLOCAL __thread
+# define CMK_THREADLOCAL __thread
 #endif
 
+#define _XOPEN_SOURCE
 #include "gk_arch.h" /*!< This should be here, prior to the includes */
 
 

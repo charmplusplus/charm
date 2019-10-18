@@ -68,7 +68,6 @@ class bar {
 #ifndef CHARM_H
 #  include "converse.h" // <- for CMK_* defines
 #endif
-extern "C" void CmiAbort(const char *msg);
 #endif
 
 //We need CkMigrateMessage only to distinguish the migration
@@ -86,17 +85,17 @@ namespace PUP {
    */
   struct reconstruct {};
   namespace detail {
-    template <typename T, bool b = std::is_constructible<reconstruct, T>::value>
+    template <typename T, bool b = std::is_constructible<T, reconstruct>::value>
     struct TemporaryObjectHolder { };
     template <typename T>
     struct TemporaryObjectHolder<T, true>
     {
-      T t{reconstruct()};
+      typename std::remove_cv<typename std::remove_reference<T>::type>::type t{reconstruct()};
     };
     template <typename T>
     struct TemporaryObjectHolder<T, false>
     {
-      T t{};
+      typename std::remove_cv<typename std::remove_reference<T>::type>::type t{};
     };
     template <typename T>
     void operator|(er &p, TemporaryObjectHolder<T> &t) {
@@ -427,6 +426,22 @@ class mem : public er { //Memory-buffer packers and unpackers
  public:
   //Return the current number of buffer bytes used
   size_t size(void) const {return buf-origBuf;}
+
+  inline char* get_current_pointer() const {
+    return reinterpret_cast<char*>(buf);
+  }
+
+  inline char* get_orig_pointer() const {
+    return reinterpret_cast<char*>(origBuf);
+  }
+
+  inline void reset() {
+    buf = origBuf;
+  }
+
+  inline void advance(size_t const offset) {
+    buf += offset;
+  }
 };
 
 //For packing into a preallocated, presized memory buffer
@@ -711,14 +726,14 @@ public:
 #define PUPable_operator_inside(className)\
     friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     friend inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+	PUP::able *pa=a;  p(&pa);  a=dynamic_cast<className *>(pa);\
     }
 
 //  Macros to be used outside a class body.
 #define PUPable_operator_outside(className)\
     inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+	PUP::able *pa=a;  p(&pa);  a=dynamic_cast<className *>(pa);\
     }
 
 //Declarations to include in a PUP::able's body.
@@ -740,6 +755,11 @@ public:\
     virtual const PUP::able::PUP_ID &get_PUP_ID(void) const; \
     static void register_PUP_ID(const char* name);
 
+#define PUPable_decl_base_template(baseClassName, className)                   \
+  PUPable_decl_inside_base_template(SINGLE_ARG(baseClassName),                 \
+                                    SINGLE_ARG(className))                     \
+  PUPable_operator_inside(SINGLE_ARG(className))
+
 #define PUPable_decl_inside_template(className)	\
 private: \
     static PUP::able* call_PUP_constructor(void) { \
@@ -750,6 +770,22 @@ public: \
         return my_PUP_ID; }					\
     static void register_PUP_ID(const char* name) { \
         my_PUP_ID=register_constructor(name,call_PUP_constructor);}
+
+#define PUPable_decl_inside_base_template(baseClassName, className)            \
+private:                                                                       \
+    static PUP::able *call_PUP_constructor(void) {                             \
+        return new className((CkMigrateMessage *)0);                           \
+    }                                                                          \
+    static PUP::able::PUP_ID my_PUP_ID;                                        \
+                                                                               \
+public:                                                                        \
+    virtual const PUP::able::PUP_ID &get_PUP_ID(void) const {                  \
+        return my_PUP_ID;                                                      \
+    }                                                                          \
+    static void register_PUP_ID(const char *name) {                            \
+        my_PUP_ID =                                                            \
+           baseClassName::register_constructor(name, call_PUP_constructor);    \
+    }
 
 //PUPable_decl for classes inside a namespace: in header at file scope
 #define PUPable_decl_outside(className) \
@@ -928,15 +964,35 @@ template<class T> inline void PUParray(PUP::er &p,T *t,size_t n) { \
 }
 
 #else /* !CK_DEFAULT_BITWISE_PUP */
-/// Normal case: Call pup routines by default
+
+// Defines is_pupable to allow enums to be pupped in pup_stl.h
+namespace details {
+
+template <typename... Ts>
+struct make_void {
+  typedef void type;
+};
+template <typename... Ts>
+using void_t = typename make_void<Ts...>::type;
+
+template <typename T, typename U = void>
+struct is_pupable : std::false_type {};
+
+template <typename T>
+struct is_pupable<
+    T, void_t<decltype(std::declval<T>().pup(std::declval<PUP::er &>()))>>
+    : std::true_type {};
+
+}
+
 /**
-  Default operator|: call pup routine.
+  Default operator|: call pup routine (as long as T has a pup function).
 */
-template<class T>
-inline void operator|(PUP::er &p,T &t) { 
-	p.syncComment(PUP::sync_begin_object);
-	t.pup(p);
-	p.syncComment(PUP::sync_end_object); 
+template <class T, typename std::enable_if<details::is_pupable<T>::value, int>::type = 0>
+inline void operator|(PUP::er &p, T &t) {
+  p.syncComment(PUP::sync_begin_object);
+  t.pup(p);
+  p.syncComment(PUP::sync_end_object);
 }
 
 /**

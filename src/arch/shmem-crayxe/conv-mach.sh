@@ -1,4 +1,4 @@
-#CMK_DEFS="-I/opt/xt-mpt/1.5.47/mpich2-64/T/include "
+#CMK_DEFS="$CMK_DEFS -I/opt/xt-mpt/1.5.47/mpich2-64/T/include"
 #CMK_LD_DEFS="-lrca "
 
 PGCC=`CC -V 2>/dev/null | grep pgCC`
@@ -70,3 +70,4 @@ CMK_F90_MODINC="-I"
 CMK_MOD_EXT="mod"
 
 CMK_NO_BUILD_SHARED=true
+CMK_NO_PARTITIONS="1"

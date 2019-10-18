@@ -1,3 +1,7 @@
+#include "conv-config.h"
+
+#if CMI_QD
+
 #ifndef _CONV_QD_H
 #define _CONV_QD_H
 
@@ -15,14 +19,16 @@ CpvExtern(CQdState, cQdState);
 
 void CQdInit(void);
 void CQdCpvInit(void);
-void CQdCreate(CQdState, int);
-void CQdProcess(CQdState, int);
-int  CQdGetCreated(CQdState);
-int  CQdGetProcessed(CQdState);
+void CQdCreate(CQdState, CmiInt8);
+void CQdProcess(CQdState, CmiInt8);
+CmiInt8 CQdGetCreated(CQdState);
+CmiInt8 CQdGetProcessed(CQdState);
 void CQdRegisterCallback(CQdVoidFn, void *);
 void CmiStartQD(CQdVoidFn, void *);
 
 #ifdef __cplusplus
 }
 #endif
+#endif
+
 #endif

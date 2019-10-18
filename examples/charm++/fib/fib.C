@@ -13,7 +13,7 @@ struct Fib : public CBase_Fib {
 
   Fib(int n, bool isRoot_, CProxy_Fib parent_)
     : parent(parent_), isRoot(isRoot_) {
-    calc(n);
+    thisProxy.calc(n);
   }
 
   int seqFib(int n) { return (n < 2) ? n : seqFib(n - 1) + seqFib(n - 2); }

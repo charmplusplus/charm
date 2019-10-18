@@ -169,7 +169,6 @@ void _createTracesummary(char **argv)
 
 
 /// function call for starting a phase in trace summary logs 
-extern "C" 
 void CkSummary_StartPhase(int phase)
 {
    CkpvAccess(_trace)->startPhase(phase);
@@ -177,7 +176,6 @@ void CkSummary_StartPhase(int phase)
 
 
 /// function call for adding an event mark
-extern "C" 
 void CkSummary_MarkEvent(int eventType)
 {
    CkpvAccess(_trace)->addEventType(eventType);
@@ -611,8 +609,8 @@ void BinEntry::write(FILE* fp)
   writeU(fp, getU());
 }
 
-TraceSummary::TraceSummary(char **argv):binStart(0.0),idleStart(0.0),
-					binTime(0.0),binIdle(0.0),msgNum(0)
+TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
+					binTime(0.0),binIdle(0.0)
 {
   if (CkpvAccess(traceOnPe) == 0) return;
 
@@ -1284,7 +1282,7 @@ void TraceSummaryBOC::write(void)
 
 }
 
-extern "C" void CombineSummary()
+static void CombineSummary()
 {
 #if CMK_TRACE_ENABLED
   CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());

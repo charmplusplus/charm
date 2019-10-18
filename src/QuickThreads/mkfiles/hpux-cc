@@ -9,8 +9,8 @@ qt: md/hppa.h qt.c md/hppa.s
 	#$(CC) -pedantic -Wall -c -o qt.o qt.c
 	$(CC) -Wall -c -o qt.o qt.c
 	$(CC) -c -o qtmds.o md/hppa.s
-	ar q libqt.a qt.o qtmds.o
-	CC -b -o libqt.sl qt.o qtmds.o
+	ar q libckqt.a qt.o qtmds.o
+	CC -b -o libckqt.sl qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
@@ -19,4 +19,4 @@ stp:
 testpgm:
 	$(CC) -c meas.c
 	$(CC) -o qtmdb.o md/hppa_b.s
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -o run meas.o qtmdb.o libstp.a libckqt.a

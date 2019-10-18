@@ -12,6 +12,7 @@ mainmodule pgm {
     entry Chare1();
     entry void prioMarshalling(int test);
     entry void prioMessage(TestMsg* msg);
+    entry void prioVoidMessage();
     entry void normalPrio(int test2);
   }
 }

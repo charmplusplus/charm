@@ -1,3 +1,5 @@
+# NOTE: cc-clang.sh is used by default on BGQ rather than this
+
 . $CHARMINC/cc-bluegene.sh
 
 BGQ_INC="-I$BGQ_ZLIB/include"
@@ -43,3 +45,4 @@ CMK_CF90_FIXED="mpixlf90_r "
 CMK_SYSLIBS="$BGQ_LIB"
 
 CMK_COMPILER='bgxlc'
+CMK_CCS_AVAILABLE='0'

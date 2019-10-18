@@ -65,6 +65,12 @@ clean:
 	rm -f libmodulepose.a
 	rm -f libmoduleseqpose.a
 
+CISRC := $(wildcard *.ci)
+CIOBJ := $(CISRC:.ci=.decl.h)
+
+%.decl.h: %.ci
+	$(CHARMC) $<
+
 CIDEPENDFILE = Make.cidepends
 DEPENDFILE = Make.depends
 
@@ -72,11 +78,7 @@ include $(CHARM)/tmp/charm.mk
 include $(CIDEPENDFILE)
 include $(DEPENDFILE)
 
-depends: cidepends.default
-	echo "Building ci files ..."
-	for cifile in $(wildcard *.ci); do \
-	    $(CHARMC) $$cifile ; \
-	done
+depends: cidepends.default $(CIOBJ)
 	echo "Creating " $(DEPENDFILE) " ..."; 	\
 	if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \

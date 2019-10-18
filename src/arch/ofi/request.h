@@ -24,6 +24,7 @@
         (r)->size             = 0; \
         (r)->mode             = 0; \
         (r)->data.recv_buffer = 0; \
+        (r)->freeMe           = 1; \
     } while (0)
 
 typedef enum request_state
@@ -67,6 +68,7 @@ typedef struct OFIRequest
     int                destPE;
     int                size;
     int                mode;
+    int                freeMe;
     struct fid_mr      *mr;
     union
     {
@@ -100,7 +102,7 @@ typedef struct request_cache_t
 
 static inline request_cache_t* create_request_cache()
 {
-    request_cache_t* cache = malloc(sizeof(*cache));
+    request_cache_t* cache = (request_cache_t*)malloc(sizeof(*cache));
     if (cache)
     {
         cache->next = 0;

@@ -51,8 +51,8 @@ CpmInvokable fibobj_result(int n, fibobj_chare cpos)
       Cpm_fibobj_result(CpmSend(c->ppe), c->total, c->ppos);
     else {
       if (c->total != FIB_OUTPUT) {
-	CmiPrintf("Fib: results incorrect.\n");
-	exit(1);
+        CmiPrintf("Fib: results incorrect.\n");
+        exit(1);
       }
       Cpm_megacon_ack(CpmSend(0));
     }
@@ -82,6 +82,3 @@ void fibobj_moduleinit()
 {
   CpmInitializeThisModule();
 }
-
-
-

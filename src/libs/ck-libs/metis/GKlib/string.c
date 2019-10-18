@@ -13,6 +13,9 @@ of standard functions (but with enhanced functionality).
 */
 /************************************************************************/
 
+#ifdef __arm__
+#define _GNU_SOURCE
+#endif
 #include <GKlib.h>
 
 
@@ -483,6 +486,8 @@ char *gk_time2str(time_t time)
 
 
 #if !defined(WIN32) && !defined(__MINGW32__)
+
+#include <time.h>
 /************************************************************************/
 /*! \brief Converts a date/time string into its equivalent time_t value
 

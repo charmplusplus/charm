@@ -10,7 +10,7 @@
 #include "converse.h"
 #include "topology.h"
 
-CMI_EXTERNC_VARIABLE char *_lbtopo;			/* topology name string */
+extern char *_lbtopo;			/* topology name string */
 
 int LBTopology::get_hop_count(int src,int dest)
 {
@@ -1324,6 +1324,13 @@ public:
 
 static LBTopoVec* lbTopoMap;
 static CmiNodeLock lbTopoMapInitLock;
+static bool lbTopoInitialized = false;
+
+void LBTopoInit() {
+  CmiAssert(!lbTopoInitialized);
+  lbTopoMapInitLock = CmiCreateLock();
+  lbTopoInitialized = true;
+}
 
 extern "C"
 LBtopoFn LBTopoLookup(const char *name)

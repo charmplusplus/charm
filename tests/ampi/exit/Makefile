@@ -1,15 +1,23 @@
 -include ../../common.mk
 CHARMC=../../../bin/ampicxx $(OPTS) $(MOPTS)
 
-all: test_exit
+# Other tests that could be here:
+# - Fortran EXIT()
+# - C exit(), return
+# - Other main() prototypes
 
-test_exit: test_exit.C
-	$(CHARMC) -o $@ test_exit.C
+all: exit_explicit exit_return
 
-# Check that application exits correctly with exit code 42.
-test: clean test_exit
-	$(call run, test_exit 2>&1)| tee tmp.out; grep -q "Application terminated with exit code 42" tmp.out && echo "Exit test passed." || (echo "Exit test failed."; false)
-	@rm -f tmp.out
+exit_explicit: exit_explicit.C
+	$(CHARMC) -o $@ $<
+
+exit_return: exit_return.C
+	$(CHARMC) -o $@ $<
+
+# Check that all applications exit with exit code 42.
+test: all
+	$(call run, ./exit_explicit 2>&1); [ $$? -eq 42 ] && echo "exit_explicit test passed." || (echo "exit_explicit test failed (exit code was $$?, but expected 42)."; false)
+	$(call run, ./exit_return 2>&1); [ $$? -eq 42 ] && echo "exit_return test passed." || (echo "exit_return test failed (exit code was $$?, but expected 42)."; false)
 
 clean:
-	rm -f *.o test_exit charmrun
+	rm -f *.o exit_explicit exit_return charmrun ampirun

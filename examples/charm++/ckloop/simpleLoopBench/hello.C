@@ -76,6 +76,7 @@ Main::Main(CkArgMsg* m) {
 	}
     else{		
 		CkPrintf("Usage: -t(#iterations) -c(#chunks) -a(#test instances) -m(running mode, 1 for use Charm threads; 2 for use pthreads )  -p(#threads)\n");
+        CkExit(1);
 	}
     delete m;
 	
@@ -113,7 +114,7 @@ Main::Main(CkArgMsg* m) {
 	double avgtime = (endtime-starttime)*1e6/5; //in the unit of us
 	CkPrintf("Calibration: avg time %.3f us of 5 consecutive runs, so a 100us-loop will iterate %d times\n", avgtime, (int)(loopTimes*100.0/avgtime));
 		
-    CmiSetCPUAffinity(0);
+    CmiSetCPUAffinityLogical(0);
     CkStartQD(CkIndex_Main::doTests((CkQdMsg *)0), &thishandle);
 };
 
@@ -222,7 +223,19 @@ void TestInstance::doTest(int curstep, int curTestMode) {
     double timerec = CkWallTimer();
     
     if(curTestMode == 0){
+#if USE_LAMBDA
+    CkLoop_Parallelize( numChunks, 0, loopTimes-1,
+      [=](int start, int end, void* result) {
+        int tmp=0;
+        for (int i=start; i<=end; i++) {
+          tmp+=(int)(sqrt(1+cos(i*1.57)));
+        }
+        *(int *)result = tmp;
+      }, &result, CKLOOP_INT_SUM
+    );
+#else
 	    CkLoop_Parallelize(doCalc, 0, NULL, numChunks, 0, loopTimes-1, 1, &result, CKLOOP_INT_SUM);
+#endif
     }else if(curTestMode == 1){
         result = openMPWork(0, loopTimes-1);
     }

@@ -6,23 +6,30 @@ protected:
   CkLocRec *myRec;
 private:
   int thisChareType;//My chare type
-  void commonInit(void);
-  bool asyncEvacuate;
   int atsync_iteration;
-
-  enum state {
+  double prev_load;
+  enum state : uint8_t {
     OFF,
     ON,
     PAUSE,
     DECIDED,
     LOAD_BALANCE
   } local_state;
-  double  prev_load;
   bool can_reset;
+protected:
+  bool usesAtSync;//You must set this in the constructor to use AtSync().
+  bool usesAutoMeasure; //You must set this to use auto lb instrumentation.
+  bool barrierRegistered;//True iff barrier handle below is set
 
+private: //Load balancer state:
+  LDBarrierClient ldBarrierHandle;//Transient (not migrated)
+  LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)
 public:
   CkArrayIndex thisIndexMax;
 
+private:
+  void commonInit(void);
+public:
   CkMigratable(void);
   CkMigratable(CkMigrateMessage *m);
   virtual ~CkMigratable();
@@ -75,10 +82,6 @@ protected:
   /// A more verbose form of abort
   virtual void CkAbort(const char *str) const;
 
-  bool usesAtSync;//You must set this in the constructor to use AtSync().
-  bool usesAutoMeasure; //You must set this to use auto lb instrumentation.
-  bool barrierRegistered;//True iff barrier handle below is set
-
 public:
   virtual void ResumeFromSync(void);
   virtual void UserSetLBLoad(void);  /// user define this when setLBLoad is true
@@ -92,9 +95,7 @@ public:
   void AtSync(int waitForMigration=1);
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
-private: //Load balancer state:
-  LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
-  LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)  
+private:
   static void staticResumeFromSync(void* data);
 public:
   void ReadyMigrate(bool ready);
@@ -119,10 +120,13 @@ private:
   bool isInCore; //If true, the object is present in memory
 #endif
 
-  // FAULT_EVAC
+#if CMK_FAULT_EVAC
+private:
+  bool asyncEvacuate;
   void AsyncEvacuate(bool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
 public:
   bool isAsyncEvacuate(){return asyncEvacuate;};
+#endif
 };
 
 #endif // CKMIGRATABLE_H

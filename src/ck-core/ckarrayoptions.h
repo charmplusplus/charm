@@ -95,6 +95,7 @@ class CkArrayOptions {
  public:
   // Used by external world:
   CkArrayOptions(void);                         ///< Default: empty array
+  CkArrayOptions(int ndims, int dims[]);        ///< With initial elements nD
   CkArrayOptions(int ni1_);                     ///< With initial elements 1D
   CkArrayOptions(int ni1_, int ni2_);           ///< With initial elements 2D
   CkArrayOptions(int ni1_, int ni2_, int ni3);  ///< With initial elements 3D

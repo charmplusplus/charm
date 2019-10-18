@@ -85,7 +85,7 @@ class TraceEntry
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) { free(ptr); }
-#if defined(WIN32) || CMK_MULTIPLE_DELETE
+#if defined(_WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
 

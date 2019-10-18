@@ -18,6 +18,8 @@
 #include "ckgraph.h"
 #include <algorithm>
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(TempAwareRefineLB, "always assign the heaviest obj onto lightest loaded processor.")
 
 #ifdef TEMP_LDB
@@ -187,8 +189,8 @@ freqs[12] = 1333000;
 	procFreqNewEffect = NULL;
 	avgChipTemp=NULL;
   lbname = "TempAwareRefineLB";
-  if (CkMyPe()==0)
-    CkPrintf("[%d] TempAwareRefineLB created\n",CkMyPe());
+  if (CkMyPe()==0 && !quietModeRequested)
+    CkPrintf("CharmLB> TempAwareRefineLB created.\n");
 
   char logFile[100];
   snprintf(logFile, sizeof(logFile), "temp_freq.log.%d", CkMyPe());

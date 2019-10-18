@@ -1,19 +1,18 @@
 #ifndef _SERIAL_H
 #define _SERIAL_H
 
-#include "xi-BlockConstruct.h"
 #include "CParsedFile.h"
+#include "xi-BlockConstruct.h"
 
 namespace xi {
 
 class SerialConstruct : public BlockConstruct {
  public:
-  SerialConstruct(const char *code, const char *trace_name, int line_no);
+  SerialConstruct(const char* code, const char* trace_name, int line_no);
   void propagateStateToChildren(std::list<EncapState*> encap,
                                 std::list<CStateVar*>& stateVarsChildren,
-                                std::list<CStateVar*>& wlist,
-                                int uniqueVarNum);
-  void generateCode(XStr&, XStr&, Entry *);
+                                std::list<CStateVar*>& wlist, int uniqueVarNum);
+  void generateCode(XStr&, XStr&, Entry*);
   void generateTrace();
   void numberNodes();
 
@@ -21,6 +20,6 @@ class SerialConstruct : public BlockConstruct {
   int line_no_;
 };
 
-}   // namespace xi
+}  // namespace xi
 
 #endif  // ifndef _SERIAL_H

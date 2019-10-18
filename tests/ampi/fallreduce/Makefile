@@ -13,7 +13,7 @@ pgm.o: pgm.f90
 # clean up .o, .mod, .exe and EMACS backup files
 #
 clean:
-	rm -f *.o *.mod pgm *~ conv-host charmrun
+	rm -f *.o *.mod pgm *~ conv-host charmrun ampirun
 
 test: pgm
 	$(call run, ./pgm +p2 +vp4 )

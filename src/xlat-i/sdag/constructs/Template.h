@@ -3,8 +3,6 @@
 
 #include "xi-BlockConstruct.h"
 
-namespace xi {
-
-}   // namespace xi
+namespace xi {}  // namespace xi
 
 #endif  // ifndef _template_H

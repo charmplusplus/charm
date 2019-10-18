@@ -3,11 +3,21 @@
 #include "ckarrayoptions.h"
 
 CkArrayOptions::CkArrayOptions(void)  // Default: empty array
-    : numInitial(),
-      start(),
+    : start(),
       end(),
       step(),
+      numInitial(),
       bounds(),
+      map(_defaultArrayMapID) {
+  init();
+}
+
+CkArrayOptions::CkArrayOptions(int ndims, int dims[]) // With initial elements (nD)
+    : start(CkArrayIndex(ndims, 0)),
+      end(CkArrayIndex(ndims, dims)),
+      step(CkArrayIndex(ndims, 1)),
+      numInitial(end),
+      bounds(end),
       map(_defaultArrayMapID) {
   init();
 }

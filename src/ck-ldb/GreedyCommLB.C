@@ -19,6 +19,8 @@ Status:
 #include "GreedyCommLB.h"
 #include "manager.h"
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(GreedyCommLB, "Greedy algorithm which takes communication graph into account")
 
 void GreedyCommLB::init()
@@ -32,8 +34,8 @@ void GreedyCommLB::init()
 GreedyCommLB::GreedyCommLB(const CkLBOptions &opt): CBase_GreedyCommLB(opt)
 {
     init();
-    if (CkMyPe() == 0)
-	CkPrintf("[%d] GreedyCommLB created\n",CkMyPe());
+    if (CkMyPe() == 0 && !quietModeRequested)
+	CkPrintf("CharmLB> GreedyCommLB created.\n");
 }
 
 GreedyCommLB::GreedyCommLB(CkMigrateMessage *m):CBase_GreedyCommLB(m) {
@@ -138,7 +140,7 @@ void GreedyCommLB::work(LDStats* stats)
     ObjectRecord *x;
     int i;
     
-    if (_lb_args.debug()) CkPrintf("In GreedyCommLB strategy\n",CkMyPe());
+    if (_lb_args.debug()) CkPrintf("[%d] In GreedyCommLB strategy\n",CkMyPe());
     npe = stats->nprocs();
     nobj = stats->n_objs;
 
@@ -191,7 +193,7 @@ void GreedyCommLB::work(LDStats* stats)
 	 }
          else if (commData.recv_type()==LD_OBJLIST_MSG) {
 		int nobjs;
-		LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
+		const LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
 		xcoord = stats->getHash(commData.sender);
 		for (int i=0; i<nobjs; i++) {
 		  ycoord = stats->getHash(objs[i]);

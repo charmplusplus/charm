@@ -10,6 +10,7 @@ module EveryLB {
   extern module RefineCommLB;
   extern module RotateLB;
   extern module DistributedLB;
+  extern module HierarchicalLB;
   extern module HybridLB;
   extern module ComboCentLB;
   extern module RefineSwapLB;

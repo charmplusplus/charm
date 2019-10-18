@@ -24,6 +24,7 @@
  *                                                                                      *
  ****************************************************************************************/
 
+.file "ontop_x86_64_sysv_elf_gas.S"
 .text
 .globl ontop_fcontext
 .type ontop_fcontext,@function
@@ -34,8 +35,10 @@ ontop_fcontext:
 
     leaq  -0x38(%rsp), %rsp /* prepare stack */
 
+#if !defined(BOOST_USE_TSX)
     stmxcsr  (%rsp)     /* save MMX control- and status-word */
     fnstcw   0x4(%rsp)  /* save x87 control-word */
+#endif
 
     movq  %r12, 0x8(%rsp)  /* save R12 */
     movq  %r13, 0x10(%rsp)  /* save R13 */
@@ -50,8 +53,10 @@ ontop_fcontext:
     /* restore RSP (pointing to context-data) from RDI */
     movq  %rdi, %rsp
 
+#if !defined(BOOST_USE_TSX)
     ldmxcsr  (%rsp)     /* restore MMX control- and status-word */
     fldcw    0x4(%rsp)  /* restore x87 control-word */
+#endif
 
     movq  0x8(%rsp), %r12  /* restore R12 */
     movq  0x10(%rsp), %r13  /* restore R13 */

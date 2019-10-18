@@ -53,7 +53,7 @@ public:
  *  symbol name a link alias of the C version.
  */
 #define FORTRAN_NAME_SOLVER(CAPITALNAME,Cname,lowercasename) \
-CDECL void FTN_NAME(CAPITALNAME,lowercasename) \
+CLINKAGE void FTN_NAME(CAPITALNAME,lowercasename) \
 	(ILSI_Param *param, ILSI_Comm *comm,int n, const double *b, double *x) \
 { Cname(param,comm,n,b,x); }
 

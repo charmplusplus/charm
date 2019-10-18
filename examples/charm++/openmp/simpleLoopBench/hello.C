@@ -68,8 +68,9 @@ Main::Main(CkArgMsg* m) {
   if (m->argc >1 ){
     processCommandLine(m->argc,m->argv);
   }
-  else{
+  else {
     CkPrintf("Usage: -t(#iterations) -c(#chunks) -a(#test instances) -m(running mode, 1 for use Charm threads; 2 for use pthreads )  -p(#threads)\n");
+    CkExit(1);
   }
   delete m;
 
@@ -105,7 +106,7 @@ Main::Main(CkArgMsg* m) {
   endtime = CkWallTimer();
   double avgtime = (endtime-starttime)*1e6/5; //in the unit of us
   CkPrintf("Calibration: avg time %.3f us of 5 consecutive runs, so a 100us-loop will iterate %d times\n", avgtime, (int)(loopTimes*100.0/avgtime));
-  CmiSetCPUAffinity(0);
+  CmiSetCPUAffinityLogical(0);
   CkStartQD(CkIndex_Main::doTests((CkQdMsg *)0), &thishandle);
 };
 

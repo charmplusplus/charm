@@ -20,7 +20,7 @@ jacobi: jacobi.C
 
 jacobi.iso: jacobi.C
 	$(CHARMC) -c -DNO_PUP jacobi.C -o jacobi.iso.o
-	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module CommonLBs -memory isomalloc -Wl,--allow-multiple-definition
+	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module CommonLBs -memory isomalloc
 
 jacobi.tls: jacobi.C
 	-$(CHARMC) -c -tlsglobal jacobi.C -o jacobi.tls.o 
@@ -47,5 +47,5 @@ bgtest: jacobi
 	[ ! -s "jacobi.iso" ] || $(call run, +p2 ./jacobi.iso 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1 )
 
 clean:
-	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls
+	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls ampirun
 	rm -rf 40 80 120

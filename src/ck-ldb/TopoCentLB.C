@@ -19,6 +19,8 @@
 //#define RAND_COMM
 #define make_mapping 0
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology")
 
 
@@ -34,8 +36,8 @@ CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology")
 TopoCentLB::TopoCentLB(const CkLBOptions &opt) : CBase_TopoCentLB (opt)
 {
   lbname = "TopoCentLB";
-  if (CkMyPe () == 0) {
-    CkPrintf ("[%d] TopoCentLB created\n",CkMyPe());
+  if (CkMyPe () == 0 && !quietModeRequested) {
+    CkPrintf("CharmLB> TopoCentLB created.\n");
   }
 }
 
@@ -122,13 +124,14 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
 			else if (cdata.receiver.get_type() == LD_OBJLIST_MSG) {
 				//CkPrintf("in objlist..\n");
         int nobjs;
-        LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+        const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
         int senderID = stats->getHash(cdata.sender);
         for (j=0; j<nobjs; j++) {
            int recverID = stats->getHash(objs[j]);
-           if((senderID == -1)||(recverID == -1))
+           if((senderID == -1)||(recverID == -1)) {
               if (_lb_args.migObjOnly()) continue;
               else CkAbort("Error in search\n");
+           }
            comm[senderID][recverID] += cdata.messages;
            comm[recverID][senderID] += cdata.messages;
         }
@@ -580,15 +583,16 @@ void TopoCentLB :: work(LDStats *stats)
       }
       else if(cdata.receiver.get_type() == LD_OBJLIST_MSG) {
 	int nobjs;
-    	LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+	const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
 	int senderID = stats->getHash(cdata.sender);
 	for(j = 0; j < n_pes; j++)
 	  addedComm[j]=0;
 	for (j=0; j<nobjs; j++) {
 	  int recverID = stats->getHash(objs[j]);
-	  if((senderID == -1)||(recverID == -1))
+	  if((senderID == -1)||(recverID == -1)) {
 	    if (_lb_args.migObjOnly()) continue;
 	    else CkAbort("Error in search\n");
+	  }
 					
 	  if(newmap[senderID]==newmap[recverID])
 	    continue;

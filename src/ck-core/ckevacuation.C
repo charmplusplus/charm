@@ -1,3 +1,5 @@
+#if CMK_FAULT_EVAC
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,14 +7,7 @@
 #include "ck.h"
 #include "ckevacuation.h"
 
-//#define DEBUGC(x) x
-#define DEBUGC(x) 
-
-/***********************************************************************************************/
-/*
-	FAULT_EVAC
-*/
-
+#define DEBUGC(x) //x 
 
 
 int _ckEvacBcastIdx;
@@ -154,7 +149,7 @@ void CkEvacuatedElement(){
 }
 
 int evacuate;
-extern "C" void CkClearAllArrayElements();
+void CkClearAllArrayElements();
 
 void CkDecideEvacPe(){
 	if(evacuate > 0){
@@ -172,7 +167,6 @@ int numEvacuated;
 /*
 	Code for moving off all the array elements on a processor
 */
-extern "C"
 void CkClearAllArrayElements(){
 	if(evacuate != 1){
 			return;
@@ -244,7 +238,7 @@ void CkElementEvacuate::addLocation(CkLocation &loc){
 			This is in all probability a location containing an ampi, ampiParent and their
 			associated TCharm thread.
 		*/
-		CkVec<CkMigratable *>list;
+		std::vector<CkMigratable *>list;
 		locMgr->migratableList(rec,list);
 		DEBUGC(printf("[%d] ArrayElement not ready to Evacuate number of migratable %d \n",CkMyPe(),list.size()));
 		for(int i=0;i<list.size();i++){
@@ -344,3 +338,6 @@ void processRaiseEvacFile(char *raiseEvacFile){
 	}
 	fclose(fp);	
 }
+
+#endif
+

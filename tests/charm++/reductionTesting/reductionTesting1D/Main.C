@@ -7,10 +7,10 @@
 
 
 Main::Main()
-{ };
+{}
 
 Main::Main(CkMigrateMessage* msg) 
-{};
+{}
 
 Main::Main(CkArgMsg *m) 
 {
@@ -43,7 +43,7 @@ Main::Main(CkArgMsg *m)
 	//Quiscence
 	int myIndex = CkIndex_Main::QuiDetect();
 	CkStartQD(myIndex, &mainhandle);
-};
+}
 
 void Main::reportSum(CkReductionMsg *m)
 {
@@ -56,7 +56,7 @@ void Main::reportSum(CkReductionMsg *m)
 	}
 	CkPrintf("\n");
 	delete m;
-};
+}
 
 void Main::QuiDetect()
 {
@@ -91,6 +91,6 @@ void Main::QuiDetect()
 		CkPrintf("\n");
 	}*/
 	CkExit();
-};
+}
 
 #include "main.def.h"

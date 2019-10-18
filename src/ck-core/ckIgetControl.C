@@ -1,6 +1,6 @@
 #include "charm++.h"
 #include "ckIgetControl.h"
-#ifndef WIN32
+#ifndef _WIN32
 #include <sys/time.h>
 #include <sys/resource.h>
 #endif
@@ -52,12 +52,14 @@ IGetControlClass::iget_free(int size)
      }
   }
 
+static int getRSS();
+
 void
 IGetControlClass::iget_updateTokenNum() {
     double currenttime = CmiWallTimer();
     if(currenttime-lastupdatetime<1)
        return;
-    int totalMemUsed = (int)getRSS();
+    int totalMemUsed = getRSS();
     if(totalMemUsed<=0) return;
     int leftMem = IGET_TOTALMEMORY-totalMemUsed;
     int iget_token_new = (leftMem)/(int)IGET_UNITMESSAGE;
@@ -134,7 +136,7 @@ getAvailMemory(int grainsize)
   unsigned long size = chunk;
   char *data = NULL, *olddata = NULL;
   unsigned long init_pf = 0;
-  int pagesize = getpagesize();
+  int pagesize = CmiGetPageSize();
 /*
   if(grainsize >= 10*1024*1024)
     subchunk = 20*1024*1024;    
@@ -178,20 +180,19 @@ getAvailMemory(int grainsize)
   return size;
 }
 
-extern "C"
+extern void getAvailSysMem();
 void getAvailSysMem() {
   IGET_TOTALMEMORY = getAvailMemory(0); 
   printf("total physical memory : %d\n", IGET_TOTALMEMORY);
 }
 
-extern "C"
+extern void TokenUpdatePeriodic();
 void TokenUpdatePeriodic()
 {
   TheIGetControlClass.iget_updateTokenNum();
 }
 
-extern "C"
-int getRSS()
+static int getRSS()
 {
   int ret=-1, i=0;
   pid_t pid;

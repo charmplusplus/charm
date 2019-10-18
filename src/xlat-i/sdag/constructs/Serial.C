@@ -2,20 +2,18 @@
 
 namespace xi {
 
-extern void RemoveSdagComments(char *str);
+extern void RemoveSdagComments(char* str);
 
-SerialConstruct::SerialConstruct(const char *code, const char *trace_name, int line_no)
-: BlockConstruct(SSERIAL, NULL, 0, 0, 0, 0, 0, 0), line_no_(line_no)
-{
-  char *tmp = strdup(code);
+SerialConstruct::SerialConstruct(const char* code, const char* trace_name, int line_no)
+    : BlockConstruct(SSERIAL, NULL, 0, 0, 0, 0, 0, 0), line_no_(line_no) {
+  char* tmp = strdup(code);
   text = new XStr(tmp);
   free(tmp);
 
-  if (trace_name)
-  {
+  if (trace_name) {
     tmp = strdup(trace_name);
-    tmp[strlen(tmp)-1]=0;
-    traceName = new XStr(tmp+1);
+    tmp[strlen(tmp) - 1] = 0;
+    traceName = new XStr(tmp + 1);
     free(tmp);
   }
 
@@ -25,14 +23,13 @@ SerialConstruct::SerialConstruct(const char *code, const char *trace_name, int l
 void SerialConstruct::propagateStateToChildren(std::list<EncapState*> encap,
                                                std::list<CStateVar*>& stateVarsChildren,
                                                std::list<CStateVar*>& wlist,
-                                               int uniqueVarNum)
-{}
+                                               int uniqueVarNum) {}
 
 void SerialConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 
 #if CMK_BIGSIM_CHARM
-  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
   generateBeginExec(defs, nameStr);
 #endif
 
@@ -64,7 +61,8 @@ void SerialConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     defs << "{ // begin serial block\n";
     defs << "#line " << line_no_ << " \"" << cur_file << "\"\n";
     defs << text << "\n";
-    defs << "#" << "\n";
+    defs << "#"
+         << "\n";
     indentBy(defs, indent);
     defs << "} // end serial block\n";
 
@@ -85,12 +83,12 @@ void SerialConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
 void SerialConstruct::generateTrace() {
   char traceText[1024];
   if (traceName) {
-    sprintf(traceText, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
+    sprintf(traceText, "%s_%s", CParsedFile::className->charstar(),
+            traceName->charstar());
     // remove blanks
-    for (unsigned int i=0; i<strlen(traceText); i++)
-      if (traceText[i]==' '||traceText[i]=='\t') traceText[i]='_';
-  }
-  else {
+    for (unsigned int i = 0; i < strlen(traceText); i++)
+      if (traceText[i] == ' ' || traceText[i] == '\t') traceText[i] = '_';
+  } else {
     sprintf(traceText, "%s%s", CParsedFile::className->charstar(), label->charstar());
   }
   traceName = new XStr(traceText);
@@ -103,4 +101,4 @@ void SerialConstruct::numberNodes(void) {
   SdagConstruct::numberNodes();
 }
 
-}   // namespace xi
+}  // namespace xi

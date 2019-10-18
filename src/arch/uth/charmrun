@@ -13,7 +13,7 @@ do
                 pes=$2
                 shift
                 ;;
-        +p*)
+        +p[0-9]*)
                 pes=`echo $1 | awk '{print substr($1,3)}'`
                 ;;
         *)

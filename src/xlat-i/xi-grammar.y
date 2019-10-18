@@ -115,6 +115,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token VOID
 %token CONST
 %token NOCOPY
+%token NOCOPYPOST
 %token PACKED
 %token VARSIZE
 %token ENTRY
@@ -138,6 +139,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token MEMCRITICAL
 %token REDUCTIONTARGET
 %token CASE
+%token TYPENAME
 
 %type <modlist>		ModuleEList File
 %type <module>		Module
@@ -251,6 +253,7 @@ Name		: IDENT
 		| IMMEDIATE { ReservedWord(IMMEDIATE, @$.first_column, @$.last_column); YYABORT; }
 		| SKIPSCHED { ReservedWord(SKIPSCHED, @$.first_column, @$.last_column); YYABORT; }
 		| NOCOPY { ReservedWord(NOCOPY, @$.first_column, @$.last_column); YYABORT; }
+		| NOCOPYPOST { ReservedWord(NOCOPYPOST, @$.first_column, @$.last_column); YYABORT; }
 		| INLINE { ReservedWord(INLINE, @$.first_column, @$.last_column); YYABORT; }
 		| VIRTUAL { ReservedWord(VIRTUAL, @$.first_column, @$.last_column); YYABORT; }
 		| MIGRATABLE { ReservedWord(MIGRATABLE, @$.first_column, @$.last_column); YYABORT; }
@@ -294,6 +297,12 @@ QualName	: IDENT
 		  sprintf(tmp,"%s::%s", $1, $4);
 		  $$ = tmp;
 		}
+		| QualName ':'':' ARRAY
+		{
+		  char *tmp = new char[strlen($1)+5+3];
+		  sprintf(tmp,"%s::array", $1);
+		  $$ = tmp;
+		}
 		;
 Module		: MODULE Name ConstructEList
 		{ 
@@ -326,14 +335,14 @@ ConstructSemi   : USING NAMESPACE QualName
                 { $2->setExtern($1); $$ = $2; }
                 | OptExtern Message
                 { $2->setExtern($1); $$ = $2; }
-                | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters
+                | EXTERN ENTRY EAttribs EReturn QualNamedType Name OptTParams EParameters
                 {
-                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, @1.first_line, @$.last_line);
+                  Entry *e = new Entry(lineno, $3, $4, $6, $8, 0, 0, 0, @1.first_line, @$.last_line);
                   int isExtern = 1;
                   e->setExtern(isExtern);
-                  e->targs = $6;
+                  e->targs = $7;
                   e->label = new XStr;
-                  $4->print(*e->label);
+                  $5->print(*e->label);
                   $$ = e;
                   firstRdma = true;
                 }
@@ -441,6 +450,12 @@ QualNamedType	: QualName OptTParams {
                     splitScopedName($1, &scope, &basename);
                     $$ = new NamedType(basename, $2, scope);
                 }
+		| TYPENAME QualName OptTParams
+		{
+			const char* basename, *scope;
+			splitScopedName($2, &scope, &basename);
+			$$ = new NamedType(basename, $3, scope, true);
+		}
                 ;
 
 SimpleType	: BuiltinType
@@ -489,14 +504,30 @@ BaseDataType	: SimpleType
 		{ $$ = new ConstType($1); }
 		;
 
-RestrictedType : BaseDataType '&'
+RestrictedType : BaseDataType '&' '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new RValueReferenceType($1)); }
+		| BaseDataType '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new ReferenceType($1)); }
+		| BaseDataType '.' '.' '.'
+		{ $$ = new EllipsisType($1); }
+		| BaseDataType '&' '&'
+		{ $$ = new RValueReferenceType($1); }
+		| BaseDataType '&'
 		{ $$ = new ReferenceType($1); }
 		| BaseDataType
 		{ $$ = $1; }
 		;
 
-Type		: BaseType '&'
-                { $$ = new ReferenceType($1); }
+Type		: BaseType '&' '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new RValueReferenceType($1)); }
+		| BaseType '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new ReferenceType($1)); }
+		| BaseType '.' '.' '.'
+		{ $$ = new EllipsisType($1); }
+		| BaseType '&' '&'
+		{ $$ = new RValueReferenceType($1); }
+		| BaseType '&'
+		{ $$ = new ReferenceType($1); }
 		| BaseType
 		{ $$ = $1; }
 		;
@@ -653,8 +684,8 @@ ArrayIndexType	: '[' NUMBER Name ']'
 			sprintf(buf,"%sD",$2);
 			$$ = new NamedType(buf); 
 		}
-		| '[' Name ']'
-		{ $$ = new NamedType($2); }
+		| '[' QualNamedType ']'
+		{ $$ = $2; }
 		;
 
 Array		: ARRAY ArrayAttribs ArrayIndexType NamedType OptBaseList MemberEList
@@ -708,7 +739,13 @@ OptNameInit	: /* Empty */
 		}
 		;
 
-TVar		: CLASS Name OptTypeInit
+TVar		: CLASS '.' '.' '.' Name OptTypeInit
+		{ $$ = new TTypeEllipsis(new NamedEllipsisType($5), $6); }
+		| TYPENAME '.' '.' '.' IDENT OptTypeInit
+		{ $$ = new TTypeEllipsis(new NamedEllipsisType($5), $6); }
+		| CLASS Name OptTypeInit
+		{ $$ = new TType(new NamedType($2), $3); }
+		| TYPENAME IDENT OptTypeInit
 		{ $$ = new TType(new NamedType($2), $3); }
 		| FuncType OptNameInit
 		{ $$ = new TFunc($1, $2); }
@@ -1070,7 +1107,17 @@ Parameter	: Type
 		{ /*Stop grabbing CPROGRAM segments*/
 			in_bracket=0;
 			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
-			$$->setRdma(true);
+			$$->setRdma(CMK_ZC_P2P_SEND_MSG);
+			if(firstRdma) {
+				$$->setFirstRdma(true);
+				firstRdma = false;
+			}
+		}
+		| NOCOPYPOST ParamBracketStart CCode ']'
+		{ /*Stop grabbing CPROGRAM segments*/
+			in_bracket=0;
+			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
+			$$->setRdma(CMK_ZC_P2P_RECV_MSG);
 			if(firstRdma) {
 				$$->setFirstRdma(true);
 				firstRdma = false;

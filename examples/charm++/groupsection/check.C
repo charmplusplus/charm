@@ -69,8 +69,8 @@ class Check : public CBase_Check {
 	  int me = msg->k;
 	  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 	  CkGetSectionInfo(cookie, msg);
-    CkCallback cb(CkReductionTarget(Main, done), mainProxy);
-	  mCastGrp->contribute(sizeof(int), &me, CkReduction::sum_int, cookie, cb);
+	  mCastGrp->contribute(sizeof(int), &me, CkReduction::sum_int, cookie,
+		  CkCallback(CkReductionTarget(Main, done), mainProxy));
 	  CkFreeMsg(msg);
    }
 };

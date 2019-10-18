@@ -11,7 +11,19 @@ CMK_CXX="$MPICXX "
 
 CMK_CPP_C_FLAGS="$CMK_CPP_C_FLAGS"
 CMK_CC_FLAGS="$CMK_CC_FLAGS $CMK_AMD64"
-CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64 -stdlib=libc++"
+
+CMK_CLANG_CXX_FLAGS="-stdlib=libc++"
+CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
+case "${CMK_REAL_COMPILER##*/}" in
+  gcc|g++|gcc-*|g++-*)
+    CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64"
+    CMK_COMPILER='gcc'
+    ;;
+  clang|clang++|clang-*|clang++-*)
+    CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64 $CMK_CLANG_CXX_FLAGS"
+    CMK_COMPILER='clang'
+    ;;
+esac
 
 CMK_XIOPTS=""
 
@@ -22,9 +34,9 @@ CMK_NATIVE_LDXX='clang++'
 CMK_NATIVE_LIBS=""
 
 CMK_NATIVE_CC_FLAGS="$CMK_GCC64"
-CMK_NATIVE_LD_FLAGS="-Wl,-no_pie $CMK_GCC64"
+CMK_NATIVE_LD_FLAGS="$CMK_GCC64"
 CMK_NATIVE_CXX_FLAGS="$CMK_GCC64 -stdlib=libc++"
-CMK_NATIVE_LDXX_FLAGS="-Wl,-no_pie $CMK_GCC64 -stdlib=libc++"
+CMK_NATIVE_LDXX_FLAGS="$CMK_GCC64 -stdlib=libc++"
 
 CMK_CF90=`which f95 2>/dev/null`
 if test -n "$CMK_CF90"
@@ -41,12 +53,6 @@ else
 fi
 
 # setting for shared lib
-# need -lc++ for c++ reference, and it needs to be put at very last
-# of command line.
-# Mac environment variable
-test -z "$MACOSX_DEPLOYMENT_TARGET" && export MACOSX_DEPLOYMENT_TARGET=10.7
 CMK_SHARED_SUF="dylib"
 CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
-CMK_LD_SHARED_LIBS="-lc++"
 CMK_LD_SHARED_ABSOLUTE_PATH=true
-CMK_COMPILER='clang'

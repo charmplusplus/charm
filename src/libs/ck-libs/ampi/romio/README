@@ -1,8 +1,112 @@
           ROMIO: A High-Performance, Portable MPI-IO Implementation
 
-                      Version 1.2.4, May 2002
+                      Version 2008-03-09
 
-Major Changes in this Version:
+Major Changes in this version:
+------------------------------
+* Fixed performance problems with the darray and subarray datatypes
+  when using MPICH.
+
+* Better support for building against existing MPICH and MPICH versions.
+
+  When building against an existing MPICH installation, use the
+  "--with-mpi=mpich" option to ROMIO configure.  For MPICH, use the
+  "--with-mpi=mpich" option.  These will allow ROMIO to take advantage
+  of internal features of these implementations.
+
+* Deprecation of SFS, HFS, and PIOFS implementations.
+
+  These are no longer actively supported, although the code will continue
+  to be distributed for now.
+
+* Initial support for the Panasas PanFS filesystem.
+
+  PanFS allows users to specify the layout of a file at file-creation time.
+  Layout information includes the number of StorageBlades (SB)
+  across which the data is stored, the number of SBs across which a 
+  parity stripe is written, and the number of consecutive stripes that 
+  are placed on the same set of SBs.   The panfs_layout_* hints are only 
+  used if supplied at file-creation time.
+ 
+  panfs_layout_type - Specifies the layout of a file:
+                      2 = RAID0
+                      3 = RAID5 Parity Stripes
+  panfs_layout_stripe_unit - The size of the stripe unit in bytes
+  panfs_layout_total_num_comps - The total number of StorageBlades a file
+                                 is striped across.
+  panfs_layout_parity_stripe_width - If the layout type is RAID5 Parity
+                                     Stripes, this hint specifies the 
+                                     number of StorageBlades in a parity
+                                     stripe.
+  panfs_layout_parity_stripe_depth - If the layout type is RAID5 Parity
+                                     Stripes, this hint specifies the
+                                     number of contiguous parity stripes written 
+                                     across the same set of SBs.
+  panfs_layout_visit_policy - If the layout type is RAID5 Parity Stripes, 
+                              the policy used to determine the parity 
+                              stripe a given file offset is written to:
+                              1 = Round Robin
+
+  PanFS supports the "concurrent write" (CW) mode, where groups of cooperating 
+  clients can disable the PanFS consistency mechanisms and use their own 
+  consistency protocol.  Clients participating in concurrent write mode use 
+  application specific information to improve performance while maintaining 
+  file consistency.  All clients accessing the file(s) must enable concurrent 
+  write mode.  If any client does not enable concurrent write mode, then the 
+  PanFS consistency protocol will be invoked.  Once a file is opened in CW mode 
+  on a machine, attempts to open a file in non-CW mode will fail with 
+  EACCES.  If a file is already opened in non-CW mode, attempts to open 
+  the file in CW mode will fail with EACCES.  The following hint is 
+  used to enable concurrent write mode.
+
+  panfs_concurrent_write - If set to 1 at file open time, the file 
+                           is opened using the PanFS concurrent write 
+                           mode flag.  Concurrent write mode is not a
+                           persistent attribute of the file.
+
+  Below is an example PanFS layout using the following parameters:
+ 
+  - panfs_layout_type                = 3
+  - panfs_layout_total_num_comps     = 100
+  - panfs_layout_parity_stripe_width = 10
+  - panfs_layout_parity_stripe_depth = 8
+  - panfs_layout_visit_policy        = 1
+
+   Parity Stripe Group 1     Parity Stripe Group 2  . . . Parity Stripe Group 10
+  ----------------------    ----------------------        --------------------
+   SB1    SB2  ... SB10     SB11    SB12 ...  SB20  ...   SB91   SB92 ... SB100
+  -----------------------   -----------------------       ---------------------
+   D1     D2   ...  D10      D91    D92  ...  D100        D181   D182  ... D190
+   D11    D12       D20      D101   D102      D110        D191   D192      D193
+   D21    D22       D30      . . .                        . . .
+   D31    D32       D40
+   D41    D42       D50
+   D51    D52       D60
+   D61    D62       D70
+   D71    D72       D80
+   D81    D82       D90      D171   D172      D180        D261   D262   D270
+   D271   D272      D273     . . .                        . . .
+   ...
+
+* Initial support for the Globus GridFTP filesystem.  Work contributed by Troy
+  Baer (troy@osc.edu).  
+
+Major Changes in Version 1.2.5:
+------------------------------
+
+* Initial support for MPICH-2
+
+* fix for a bug in which ROMIO would get confused for some permutations
+  of the aggregator list
+
+* direct io on IRIX's XFS should work now
+
+* fixed an issue with the Fortran bindings that would cause them to fail
+   when some compilers tried to build them.
+
+* Initial support for deferred opens
+
+Major Changes in Version 1.2.4:
 ------------------------------
 * Added section describing ROMIO MPI_FILE_SYNC and MPI_FILE_CLOSE behavior to 
   User's Guide
@@ -57,9 +161,9 @@ Major Changes in Version 1.0.3:
 Major Changes Version 1.0.2:
 ---------------------------
 
-* Implemented the shared file pointer functions (Section 9.4.4 of MPI-2) and 
-  split collective I/O functions (Section 9.4.5). Therefore, the main
-   components of the MPI-2 I/O chapter not yet implemented are 
+* Implemented the shared file pointer functions and
+  split collective I/O functions. Therefore, the main
+   components of the MPI I/O chapter not yet implemented are
   file interoperability and error handling.
 
 * Added support for using "direct I/O" on SGI's XFS file system. 
@@ -194,13 +298,13 @@ General Information
 -------------------
 
 ROMIO is a high-performance, portable implementation of MPI-IO (the
-I/O chapter in MPI-2). ROMIO's home page is at
-http://www.mcs.anl.gov/romio .  The MPI-2 standard is available at
+I/O chapter in MPI). ROMIO's home page is at
+http://www.mcs.anl.gov/romio .  The MPI standard is available at
 http://www.mpi-forum.org/docs/docs.html .
 
-This version of ROMIO includes everything defined in the MPI-2 I/O
-chapter except support for file interoperability (Sec. 9.5 of MPI-2) and
-user-defined error handlers for files (Sec. 4.13.3).  The subarray and
+This version of ROMIO includes everything defined in the MPI I/O
+chapter except support for file interoperability and
+user-defined error handlers for files.  The subarray and
 distributed array datatype constructor functions from Chapter 4
 (Sec. 4.14.4 & 4.14.5) have been implemented. They are useful for
 accessing arrays stored in files. The functions MPI_File_f2c and
@@ -246,10 +350,11 @@ Using ROMIO on NFS
 
 To use ROMIO on NFS, file locking with fcntl must work correctly on
 the NFS installation. On some installations, fcntl locks don't work.
-To get them to work, you need to use Version 3 of NFS and
-have the system administrator mount the NFS file system with the 
-"noac" option (no attribute caching). Turning off attribute caching 
-may reduce performance, but it is necessary for correct behavior.
+To get them to work, you need to use Version 3 of NFS, ensure that the
+lockd daemon is running on all the machines, and have the system
+administrator mount the NFS file system with the "noac" option (no
+attribute caching). Turning off attribute caching may reduce
+performance, but it is necessary for correct behavior.
 
 The following are some instructions we received from Ian Wells of HP
 for setting the noac option on NFS. We have not tried them
@@ -387,7 +492,7 @@ to include the file mpio.h for C or mpiof.h for Fortran in your MPI-IO
 program.  
 
 Note that on HP machines running HPUX and on NEC SX-4, you need to
-compile Fortran programs with mpif90, because the f77 compilers on
+compile Fortran programs with mpifort, because the f77 compilers on
 these machines don't support 8-byte integers. 
 
 With MPICH, HP MPI, or NEC MPI, you can compile MPI-IO programs as 
@@ -395,9 +500,9 @@ With MPICH, HP MPI, or NEC MPI, you can compile MPI-IO programs as
 or 
    mpif77 foo.f
 or
-   mpif90 foo.f
+   mpifort foo.f
 
-As mentioned above, mpif90 is preferred over mpif77 on HPUX and NEC
+As mentioned above, mpifort is preferred over mpif77 on HPUX and NEC
 because the f77 compilers on those machines do not support 8-byte integers.
 
 With SGI MPI, you can compile MPI-IO programs as 
@@ -461,7 +566,7 @@ systems because they don't support fcntl file locks, and ROMIO uses
 that feature to implement shared file pointers.
 
 * On HP machines running HPUX and on NEC SX-4, you need to compile
-Fortran programs with mpif90 instead of mpif77, because the f77
+Fortran programs with mpifort instead of mpif77, because the f77
 compilers on these machines don't support 8-byte integers.
 
 * The file-open mode MPI_MODE_EXCL does not work on Intel PFS file system,
@@ -482,7 +587,7 @@ Use a larger number if you still get the error message.
 
 * If a Fortran program uses a file handle created using ROMIO's C
 interface, or vice-versa, you must use the functions MPI_File_c2f 
-or MPI_File_f2c (see MPI-2 Section 4.12.4). Such a situation occurs,
+or MPI_File_f2c. Such a situation occurs,
 for example, if a Fortran program uses an I/O library written in C
 with MPI-IO calls. Similar functions MPIO_Request_f2c and
 MPIO_Request_c2f are also provided.

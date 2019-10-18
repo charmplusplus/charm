@@ -1,8 +1,8 @@
-PAMI_INC=${CHARMBASE}/ibm_includes/pami
-PAMI_LIB=/opt/ibm/spectrum_mpi/lib/pami_port
+PAMI_INC=${MPI_ROOT}/pami_devel/include
+PAMI_LIB=${MPI_ROOT}/lib/pami_port
 
-LIBCOLL_INC=${CHARMBASE}/ibm_includes/libcoll
-LIBCOLL_LIB=/opt/ibm/spectrum_mpi/lib
+LIBCOLL_INC=${MPI_ROOT}/pami_devel/include
+LIBCOLL_LIB=${MPI_ROOT}/lib/pami_port
 
 CXX=xlC_r
 CC=xlc_r
@@ -16,8 +16,8 @@ CMK_LDXX="$CMK_CXX "
 
 CMK_CPP_C_FLAGS="-E"
 
-CMK_C_OPTIMIZE='-O3 -g'
-CMK_CXX_OPTIMIZE='-O3 -g'
+CMK_C_OPTIMIZE='-O3'
+CMK_CXX_OPTIMIZE='-O3'
 
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
@@ -41,13 +41,40 @@ CMK_F90_MODINC='-p'
 CMK_F90_USE_MODDIR=''
 
 F90DIR=`which ifort 2> /dev/null`
-if test -h "$F90DIR"
-then
-  F90DIR=`readlink $F90DIR`
-fi
 if test -x "$F90DIR"
 then
-  F90LIBDIR="`dirname $F90DIR`/../lib"
+  MYDIR="$PWD"
+  cd `dirname "$F90DIR"`
+  if test -L 'ifort'
+  then
+    F90DIR=`readlink ifort`
+    cd `dirname "$F90DIR"`
+  fi
+  F90DIR=`pwd -P`
+  cd "$MYDIR"
+
+  Minor=`basename $F90DIR`
+  F90LIBDIR="$F90DIR/../lib/$Minor"
+  if ! test -x "$F90LIBDIR"
+  then
+    F90LIBDIR="$F90DIR/../lib"
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../compiler/lib/$Minor"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../lib/$Minor"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../compiler/lib/${Minor}_lin"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../lib/${Minor}_lin"
+    fi
+  fi
   F90MAIN="$F90LIBDIR/for_main.o"
 fi
 # for_main.o is important for main() in f90 code
@@ -56,3 +83,4 @@ CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport -lifcore "
 CMK_F77LIBS="$CMK_F90LIBS"
 
 CMK_COMPILER='xlc'
+CMK_NO_PARTITIONS="1"

@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include "mpi.h"
 
+#define SIZE1 100
+#define SIZE2 200
+#define N 100
+
 int getRank(void) {
 	int rank; 
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
@@ -63,6 +67,11 @@ public:
 	int rank,size; //Our rank in, and true size of the communicator
 	
 	MPI_Tester(MPI_Comm comm,int trueSize=-1);
+	~MPI_Tester()
+	{
+		if (comm != MPI_COMM_NULL && comm != MPI_COMM_SELF && comm != MPI_COMM_WORLD)
+			MPI_Comm_free(&comm);
+	}
 	void test(void);
 	void testMigrate(void);
 
@@ -90,8 +99,10 @@ private:
 		testEqual(sts.MPI_TAG,tag,"Recv status tag");
 		if (source!=MPI_ANY_SOURCE)
 			testEqual(sts.MPI_SOURCE,source,"Recv status source");
+#ifdef AMPI
 		testEqual(sts.MPI_COMM,comm,"Recv status comm");
-		/* not in standard: testEqual(1,sts.MPI_LENGTH,"Recv status length");*/
+		testEqual(sts.MPI_LENGTH,sizeof(int),"Recv status length");
+#endif
 		return recvVal;
 	}
 	
@@ -127,12 +138,16 @@ void MPI_Tester::test(void)
 	int next=(rank+1)%size;
 	int prev=(rank-1+size)%size;
 	int tag=12387, recvVal=-1;
-	
+
+	// There is a known issue with using the Zero Copy API with BigSim.
+	// AMPI implements MPI_(I)Ssend's and large messages using the Zero
+	// Copy API, so we avoid testing those paths when using BigSim.
+#if !BIGSIM_TEST
 	// Forward around ring:
 	MPI_Isend(&rank,1,MPI_INT,next,tag,comm,&req);
 	testEqual(recv(prev,tag),prev,"Received rank (using prev as source)");
 	MPI_Wait(&req, MPI_STATUS_IGNORE);
-	
+
 	// Forward around ring:
         if (size >= 2) {
 	  if (rank == 0) {
@@ -142,7 +157,7 @@ void MPI_Tester::test(void)
 	  else if (rank == 1)
 	    testEqual(recv(prev,tag),prev,"Received rank (using prev as source)");
 	}
-
+#endif
 	// Simultaneous forward and backward (large messages):
 	const int msgSize = 32768;
 	MPI_Request sendReq[2], recvReq[2];
@@ -253,7 +268,7 @@ void MPI_Tester::drain(void) {
 		if (flag) {
 			int len; MPI_Get_count(&sts,MPI_BYTE,&len);
 			char *msg=new char[len];
-			MPI_Recv(msg,len,MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, sts.MPI_COMM, &sts);
+			MPI_Recv(msg,len,MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, comm, &sts);
 			flagSet=1;
 		}
 	} while (flag==1);
@@ -266,20 +281,20 @@ void MPI_Tester::drain(void) {
 
 void MPI_Tester::testMigrate(void) {
 	beginTest(2,"Migration");
+
+#ifdef AMPI
 	int flag, srcPe;
 	MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &srcPe, &flag);
 	if (!flag) {
 		printf("Missing AMPI_MY_WTH attribute on MPI_COMM_WORLD\n");
 		MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
 	}
-	MPI_Info hints;
-
-	MPI_Info_create(&hints);
-	MPI_Info_set(hints, "ampi_load_balance", "sync");
+#endif
 	
 	TEST_MPI(MPI_Barrier,(comm));
 	
-	AMPI_Migrate(hints);
+#ifdef AMPI
+	AMPI_Migrate(AMPI_INFO_LB_SYNC);
 	
 	TEST_MPI(MPI_Barrier,(comm));
 
@@ -291,6 +306,7 @@ void MPI_Tester::testMigrate(void) {
 	}
 	if (srcPe!=destPe) printf("[%d] migrated from %d to %d\n",
 				rank,srcPe,destPe);
+#endif
 }
 
 int main(int argc,char **argv)
@@ -300,6 +316,7 @@ int main(int argc,char **argv)
 	if (argc>1) verboseLevel=atoi(argv[1]);
 	if (argc>2) nLoop=atoi(argv[2]);
 	MPI_Comm comm=MPI_COMM_WORLD;
+{ // scope so that ~MPI_Tester is called before MPI_Finalize
 	MPI_Tester masterTester(comm);
 	
 for (int loop=0;loop<nLoop;loop++) {
@@ -351,15 +368,151 @@ for (int loop=0;loop<nLoop;loop++) {
 		if(rank == 1 || rank > 3)
 		  testFailed("Testing construction of group and new communicator");		
 	      }
+	      if (newcomm != MPI_COMM_NULL) {
+	        MPI_Comm_free(&newcomm);
+	      }
 	    }
 	  }
 	
-	
-	if (1 && loop!=nLoop-1) 
-	  masterTester.testMigrate();
- }
- 
-	if (getRank()==0) printf("All tests passed\n");
-	MPI_Finalize();
-	return 0;
+	if (1)
+	{
+	  int *A,*B,rank,rankSplitter,destrank,nprocs,i;
+	  int errs=0;
+	  MPI_Win win;
+	  MPI_Comm splitter;
+	  MPI_Group comm_group,group;
+	  MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
+	  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+
+	  if (nprocs > 1)
+	  {
+	    i = MPI_Alloc_mem(SIZE2 * sizeof(int), MPI_INFO_NULL, &A);
+	    if (i)
+	    {
+	      printf("Can't allocate memory in test program\n");fflush(stdout);
+	      MPI_Abort(MPI_COMM_WORLD, 1);
+	    }
+	    i = MPI_Alloc_mem(SIZE2 * sizeof(int), MPI_INFO_NULL, &B);
+	    if (i)
+	    {
+	      printf("Can't allocate memory in test program\n");fflush(stdout);
+	      MPI_Abort(MPI_COMM_WORLD, 1);
+	    }
+
+	    MPI_Comm_split(MPI_COMM_WORLD,rank/2,rank,&splitter);
+	    MPI_Comm_group(splitter,&comm_group);
+	    MPI_Comm_rank(splitter,&rankSplitter);
+	    int sizeSplitter;
+	    MPI_Comm_size(splitter,&sizeSplitter);
+	    if (rank == 0)
+	    {
+	      for (i=0;i<SIZE2;i++)
+	      {
+		A[i] = B[i] = i;
+	      }
+	      MPI_Win_create(NULL,0,1,MPI_INFO_NULL,splitter,&win);
+	      destrank = 1;
+	      MPI_Group_incl(comm_group,1,&destrank,&group);
+	      MPI_Win_start(group,0,win);
+	      for (i=0; i<SIZE1; i++)
+	      {
+		MPI_Put(A+i,1,MPI_INT,1,i,1,MPI_INT,win);
+	      }
+	      for (i=0; i<SIZE1; i++)
+	      {
+		MPI_Get(B+i,1,MPI_INT,1,SIZE1+i,1,MPI_INT,win);
+	      }
+	      MPI_Win_complete(win);
+	      for (i=0;i<SIZE1;i++)
+	      {
+		if (B[i] != (-4)*(i+SIZE1))
+		{
+		  printf("MPI_Put/Get Test failed on rank 0 as array B doesn't contain the correct values\n");
+		  MPI_Abort(MPI_COMM_WORLD,1);
+		}
+	      }
+	    }
+	    else if (rank == 1)
+	    {
+	      for (i=0;i<SIZE2;i++)
+	      {
+		B[i] = (-4)*i;
+	      }
+	      MPI_Win_create(B,SIZE2*sizeof(int),sizeof(int),MPI_INFO_NULL,splitter,&win);
+	      destrank=0;
+	      MPI_Group_incl(comm_group,1,&destrank,&group);
+	      MPI_Win_post(group,0,win);
+	      MPI_Win_wait(win);
+	      for (i=0;i<SIZE1;i++)
+	      {
+		if (B[i] != i)
+		{
+		  printf("MPI_Put/Get Test failed on rank 1 as array B doesn't contain the correct values\n");
+		  MPI_Abort(MPI_COMM_WORLD,1);
+		}
+	      }
+	    }
+
+	    if (rank < 2) MPI_Group_free(&group);
+	    MPI_Group_free(&comm_group);
+	    if (rank < 2) { MPI_Win_free(&win); }
+	    MPI_Free_mem(A);
+	    MPI_Free_mem(B);
+	  }
+	}
+
+	if (1)
+	{
+	  int rank, nprocs, A[N], i;
+	  MPI_Win win;
+	  MPI_Comm comm;
+	  MPI_Group group;
+	  MPI_Comm_group(MPI_COMM_WORLD, &group);
+	  MPI_Comm_create(MPI_COMM_WORLD,group,&comm);
+	  MPI_Comm_size(comm,&nprocs);
+	  MPI_Comm_rank(comm,&rank);
+	  if ((nprocs > 1) && (nprocs%2 == 0))
+	  {
+	    if (rank%2 == 0)
+	    {
+	      for (i=0; i<N; i++)
+		A[i] = i;
+
+	      MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, comm, &win);
+	      MPI_Win_fence(0, win);
+	      MPI_Accumulate(A, N, MPI_INT, rank+1, 0, N, MPI_INT, MPI_SUM, win);
+	      MPI_Win_fence(0, win);
+	    }
+	    else /* rank%2 == 1 */
+	    {
+	      for (i=0; i<N; i++)
+		A[i] = 0;		// this makes it different from what its going to be updated as
+	      MPI_Win_create(A, N*sizeof(int), sizeof(int), MPI_INFO_NULL, comm, &win);
+	      MPI_Win_fence(0, win);
+	      MPI_Win_fence(0, win);
+	      for (i=0; i<N; i++)
+	      {
+		if (A[i] != i)
+		{
+		  printf("MPI_Accumulate Test failed as array A doesn't contain the correct values\n");
+		  MPI_Abort(MPI_COMM_WORLD,1);
+		}
+	      }
+	    }
+	    MPI_Win_free(&win);
+	  }
+	  MPI_Group_free(&group);
+	  if (comm != MPI_COMM_NULL) {
+	    MPI_Comm_free(&comm);
+	  }
+	}
+
+	if (1 && loop!=nLoop-1)
+	masterTester.testMigrate();
+      }
+
+      if (getRank()==0) printf("All tests passed\n");
+}
+      MPI_Finalize();
+      return 0;
 }

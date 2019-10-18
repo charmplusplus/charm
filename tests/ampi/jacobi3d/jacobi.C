@@ -3,7 +3,7 @@
 #include "mpi.h"
 
 #if CMK_BLUEGENE_CHARM
-extern void BgPrintf(char *);
+extern "C" void BgPrintf(const char *);
 #define BGPRINTF(x)  if (thisIndex == 0) BgPrintf(x);
 #else
 #define BGPRINTF(x)
@@ -15,6 +15,10 @@ extern void BgPrintf(char *);
 #define CKPT_FREQ 100
 #define NO_PUP
 
+/*
+ * These globals variables are written once to the same value on
+ * all ranks and so are safe wrt to AMPI's virtualization.
+ */
 int NX, NY, NZ;
 
 class chunk {
@@ -140,21 +144,15 @@ int main(int ac, char** av)
   else
     niter = 20;
 
-  /* Set up MPI_Info hints for AMPI_Migrate() */
+  /* Set up MPI_Info hints for Message Logging FT */
   MPI_Info_create(&hints);
-#ifdef CMK_MEM_CHECKPOINT
-  MPI_Info_set(hints, "ampi_checkpoint", "in_memory");
-#elif CMK_MESSAGE_LOGGING
+#ifdef CMK_MESSAGE_LOGGING
   MPI_Info_set(hints, "ampi_checkpoint", "message_logging");
 #endif
 
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-#if CMK_AIX
-  cp = (chunk*)malloc(sizeof(chunk));
-#else
   cp = new chunk;
-#endif
 #if defined(AMPI) && ! defined(NO_PUP)
   AMPI_Register_pup((MPI_PupFn)chunk_pup, (void*)&cp, &cp_idx);
 #endif
@@ -239,7 +237,11 @@ int main(int ac, char** av)
     starttime = MPI_Wtime();
 #ifdef AMPI
     if(iter%CKPT_FREQ == 50) {
+#ifdef CMK_MEM_CHECKPOINT
+		AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
+#elif CMK_MESSAGE_LOGGING
 		AMPI_Migrate(hints);
+#endif
     }
 #endif
   }

@@ -1,0 +1,19 @@
+mainmodule check1d {
+
+	readonly CProxy_Main mainProxy;
+	readonly CProxy_Check checkArray;
+	readonly int numchares;
+
+	message sectionBcastMsg;
+
+	mainchare Main {
+		entry [nokeep] Main(CkArgMsg* msg);
+		entry [reductiontarget] void done(int q, int output[q]);
+	};
+
+	array[1D] Check {
+		entry Check();
+		entry void createSection();
+		entry void recvMsg(sectionBcastMsg *msg);
+	};
+};

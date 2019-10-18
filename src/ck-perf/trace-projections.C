@@ -127,8 +127,7 @@ struct TraceThreadListener {
   CmiObjId idx;
 };
 
-extern "C"
-void traceThreadListener_suspend(struct CthThreadListener *l)
+static void traceThreadListener_suspend(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
@@ -136,8 +135,7 @@ void traceThreadListener_suspend(struct CthThreadListener *l)
   traceSuspend();
 }
 
-extern "C"
-void traceThreadListener_resume(struct CthThreadListener *l) 
+static void traceThreadListener_resume(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
@@ -149,8 +147,7 @@ void traceThreadListener_resume(struct CthThreadListener *l)
   a->ml=0;
 }
 
-extern "C"
-void traceThreadListener_free(struct CthThreadListener *l) 
+static void traceThreadListener_free(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   delete a;
@@ -177,7 +174,7 @@ void TraceProjections::traceAddThreadListeners(CthThread tid, envelope *e)
 
 void LogPool::openLog(const char *mode)
 {
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   if(compressed) {
     do {
       zfp = gzopen(fname, mode);
@@ -205,7 +202,7 @@ void LogPool::openLog(const char *mode)
 
 void LogPool::closeLog(void)
 {
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   if(compressed) {
     gzclose(zfp);
     return;
@@ -288,7 +285,7 @@ void LogPool::createFile(const char *fix)
 
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   int len;
   if(compressed)
     len = strlen(pathPlusFilePrefix)+strlen(".logold")+strlen(pestr)+strlen(".gz")+3;
@@ -299,7 +296,7 @@ void LogPool::createFile(const char *fix)
 #endif
 
   fname = new char[len];
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   if(compressed) {
     sprintf(fname, "%s.%s.log.gz", pathPlusFilePrefix,pestr);
   }
@@ -334,24 +331,7 @@ void LogPool::createSts(const char *fix)
     CmiAbort("Error!!\n");
   }
   delete[] fname;
-}  
-
-void LogPool::createTopo(const char *fix)
-{
-  CkAssert(CkMyPe() == 0);
-  // create the topo file
-  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(fix)+strlen(".topo")+2];
-  sprintf(fname, "%s%s.topo", CkpvAccess(traceRoot), fix);
-  do
-    {
-      topofp = fopen(fname, "w");
-    } while (!stsfp && (errno == EINTR || errno == EMFILE));
-  if(stsfp==0){
-    CmiPrintf("Cannot open projections topo file for writing due to %s\n", strerror(errno));
-    CmiAbort("Error!!\n");
-  }
-  delete[] fname;
-}  
+}
 
 void LogPool::createRC()
 {
@@ -401,7 +381,7 @@ void LogPool::writeHeader()
   if (headerWritten) return;
   headerWritten = true;
   if(!binary) {
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
     if(compressed) {
       gzprintf(zfp, "PROJECTIONS-RECORD %d\n", numEntries);
     } 
@@ -435,7 +415,7 @@ void LogPool::write(int writedelta)
   if (binary) {
     p = new PUP::toDisk(writedelta?deltafp:fp);
   }
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   else if (compressed) {
     p = new toProjectionsGZFile(writedelta?deltazfp:zfp);
   }
@@ -502,12 +482,12 @@ void LogPool::writeSts(void)
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
   fprintf(stsfp, "TOTAL_PHASES %d\n", numPhases);
 #if CMK_HAS_COUNTER_PAPI
-  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", NUMPAPIEVENTS);
-  // for now, use i, next time use papiEvents[i].
+  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", CkpvAccess(numEvents));
+  // for now, use i, next time use CkpvAccess(papiEvents)[i].
   // **CW** papi event names is a hack.
   char eventName[PAPI_MAX_STR_LEN];
-  for (i=0;i<NUMPAPIEVENTS;i++) {
-    PAPI_event_code_to_name(papiEvents[i], eventName);
+  for (i=0;i<CkpvAccess(numEvents);i++) {
+    PAPI_event_code_to_name(CkpvAccess(papiEvents)[i], eventName);
     fprintf(stsfp, "PAPI_EVENT %d %s\n", i, eventName);
   }
 #endif
@@ -525,17 +505,6 @@ void LogPool::writeSts(void)
 
 void LogPool::writeSts(TraceProjections *traceProj){
   writeSts();
-  if (traceProj != NULL) {
-    CkHashtableIterator  *funcIter = traceProj->getfuncIterator();
-    funcIter->seekStart();
-    int numFuncs = traceProj->getFuncNumber();
-    fprintf(stsfp,"TOTAL_FUNCTIONS %d \n",numFuncs);
-    while(funcIter->hasNext()) {
-      StrKey *key;
-      int *obj = (int *)funcIter->next((void **)&key);
-      fprintf(stsfp,"FUNCTION %d %s \n",*obj,key->getStr());
-    }
-  }
   fprintf(stsfp, "END\n");
   fclose(stsfp);
 }
@@ -558,13 +527,6 @@ void LogPool::writeRC(void)
     */
 #endif //PROJ_ANALYSIS
   fclose(rcfp);
-}
-
-void LogPool::writeTopo(void)
-{
-  TopoManager tmgr;
-  tmgr.printAllocation(topofp);
-  fclose(topofp);
 }
 
 void LogPool::writeStatis(void)
@@ -742,9 +704,10 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
 #endif	
 }
 
-void LogPool::addUserBracketEventNestedID(double time, UShort mIdx, int event, int nestedID){
+void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
+                                          UShort mIdx, int event, int nestedID) {
   new (&pool[numEntries++])
-  LogEntry(time, USER_EVENT_PAIR, mIdx, 0, event, CkMyPe(), 0, 0, 0, 0, 0, 0, nestedID);
+  LogEntry(time, type, mIdx, 0, event, CkMyPe(), 0, 0, 0, 0, 0, 0, nestedID);
   if(poolSize == numEntries){
     flushLogBuffer();
   }
@@ -823,7 +786,7 @@ void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, d
 */
 void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 				   int event, int pe, int ml, CmiObjId *id,
-				   double recvT, int numPe, int *pelist)
+				   double recvT, int numPe, const int *pelist)
 {
   lastCreationEvent = numEntries;
   new (&pool[numEntries++])
@@ -871,7 +834,7 @@ void LogPool::modLastEntryTimestamp(double ts)
 //void LogEntry::addPapi(LONG_LONG_PAPI *papiVals)
 //{
 //#if CMK_HAS_COUNTER_PAPI
-//   memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+//   memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*CkpvAccess(numEvents));
 //#endif
 //}
 
@@ -890,6 +853,8 @@ void LogEntry::pup(PUP::er &p)
   switch (type) {
     case USER_EVENT:
     case USER_EVENT_PAIR:
+    case BEGIN_USER_EVENT_PAIR:
+    case END_USER_EVENT_PAIR:
       p|mIdx; p|itime; p|event; p|pe; p|nestedID;
       break;
     case BEGIN_IDLE:
@@ -906,12 +871,29 @@ void LogEntry::pup(PUP::er &p)
         icputime = (CMK_TYPEDEF_UINT8)(1.0e6*cputime);
       }
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; 
-      p|msglen; p|irecvtime; 
-      p|id.id[0]; p|id.id[1]; p|id.id[2]; p|id.id[3];
+      p|msglen; p|irecvtime;
+      { // This brace is so that ndims can be declared inside a switch
+        const int ndims = _chareTable[_entryTable[eIdx]->chareIdx]->ndims;
+        // Should only be true if the chare is part of an array, otherwise ndims should be -1
+        if (ndims >= 1) {
+          if (ndims >= 4) {
+            short int* idShorts = (short int*)&(id.id);
+            for (int i = 0; i < ndims; i++)
+              p | idShorts[i];
+          }
+          else {
+            for (int i = 0; i < ndims; i++)
+              p | id.id[i];
+          }
+        }
+        else {
+          p|id.id[0]; p|id.id[1]; p|id.id[2]; p|id.id[3];
+        }
+      }
       p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       //p|numPapiEvents;
-      for (i=0; i<NUMPAPIEVENTS; i++) {
+      for (i=0; i<CkpvAccess(numEvents); i++) {
 	// not yet!!!
 	//	p|papiIDs[i]; 
 	p|papiValues[i];
@@ -930,7 +912,7 @@ void LogEntry::pup(PUP::er &p)
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen; p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       //p|numPapiEvents;
-      for (i=0; i<NUMPAPIEVENTS; i++) {
+      for (i=0; i<CkpvAccess(numEvents); i++) {
 	// not yet!!!
 	//	p|papiIDs[i];
 	p|papiValues[i];
@@ -972,8 +954,8 @@ void LogEntry::pup(PUP::er &p)
 	  space2 = ' ';
           p | space2;
 	  if (p.isUnpacking()) {
-	    userSuppliedNote = new char[length+1];
-	    userSuppliedNote[length] = '\0';
+	    userSuppliedNote = new char[length2+1];
+	    userSuppliedNote[length2] = '\0';
 	  }
    	  PUParray(p,userSuppliedNote, length2);
 	  break;
@@ -1031,18 +1013,6 @@ void LogEntry::pup(PUP::er &p)
     case END_TRACE:
       p|itime;
       break;
-    case BEGIN_FUNC:
-	p | itime;
-	p | mIdx;
-	p | event;
-	if(!p.isUnpacking()){
-		p(fName,flen-1);
-	}
-	break;
-    case END_FUNC:
-	p | itime;
-	p | mIdx;
-	break;
     case END_PHASE:
       p|eIdx; // FIXME: actually the phase ID
       p|itime;
@@ -1056,9 +1026,9 @@ void LogEntry::pup(PUP::er &p)
 }
 
 TraceProjections::TraceProjections(char **argv): 
-  curevent(0), inEntry(false), computationStarted(false),
-	converseExit(false), endTime(0.0), traceNestedEvents(false),
-	currentPhaseID(0), lastPhaseEvent(NULL), _logPool(NULL)
+  _logPool(NULL), curevent(0), inEntry(false), computationStarted(false),
+	traceNestedEvents(false), converseExit(false),
+	currentPhaseID(0), lastPhaseEvent(NULL), endTime(0.0)
 {
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
   if (CkpvAccess(traceOnPe) == 0) return;
@@ -1068,7 +1038,7 @@ TraceProjections::TraceProjections(char **argv):
   if (CmiGetArgLongDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
 		       "Log entries to buffer per I/O")) {
     if (CkMyPe() == 0) {
-      CmiPrintf("Trace: logsize: %ld\n", CkpvAccess(CtrLogBufSize));
+      CmiPrintf("Trace: logsize: %" PRId64 "\n", CkpvAccess(CtrLogBufSize));
     }
   }
   checknested = 
@@ -1081,11 +1051,11 @@ TraceProjections::TraceProjections(char **argv):
     CmiGetArgFlagDesc(argv,"+binary-trace",
 		      "Write log files in binary format");
 
-  CmiInt8 nSubdirs = 0;
-  CmiGetArgLongDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
+  int nSubdirs = 0;
+  CmiGetArgIntDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
 
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   int compressed = true;
   CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
   int disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files pre-compressed with gzip");
@@ -1111,13 +1081,12 @@ TraceProjections::TraceProjections(char **argv):
   _logPool->setNumSubdirs(nSubdirs);
   _logPool->setBinary(binary);
   _logPool->setWriteSummaryFiles(writeSummaryFiles);
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   _logPool->setCompressed(compressed);
 #endif
   if (CkMyPe() == 0) {
     _logPool->createSts();
     _logPool->createRC();
-    _logPool->createTopo();
   }
   funcCount=1;
 
@@ -1219,7 +1188,6 @@ void TraceProjections::traceClose(void)
   if(CkMyPe()==0){
     _logPool->writeSts(this);
     _logPool->writeRC();
-    _logPool->writeTopo();
   }
   CkpvAccess(_trace)->endComputation();
   delete _logPool;              // will write
@@ -1258,7 +1226,6 @@ void TraceProjections::closeTrace() {
     // CkPrintf("Pe 0 will now write sts and projrc files\n");
     _logPool->writeSts(this);
     _logPool->writeRC();
-    _logPool->writeTopo();
     // CkPrintf("Pe 0 has now written sts and projrc files\n");
 
     CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
@@ -1302,8 +1269,24 @@ void TraceProjections::userBracketEvent(int e, double bt, double et, int nestedI
 {
   if (!computationStarted) return;
   // two events record Begin/End of event e.
-  _logPool->addUserBracketEventNestedID(TraceTimer(bt), e, curevent, nestedID);
-  _logPool->addUserBracketEventNestedID(TraceTimer(et), e, curevent++, nestedID);
+  _logPool->addUserBracketEventNestedID(USER_EVENT_PAIR, TraceTimer(bt),
+                                        e, curevent, nestedID);
+  _logPool->addUserBracketEventNestedID(USER_EVENT_PAIR, TraceTimer(et),
+                                        e, curevent++, nestedID);
+}
+
+void TraceProjections::beginUserBracketEvent(int e, int nestedID=0)
+{
+  if (!computationStarted) return;
+  _logPool->addUserBracketEventNestedID(BEGIN_USER_EVENT_PAIR, TraceTimer(),
+                                        e, curevent++, nestedID);
+}
+
+void TraceProjections::endUserBracketEvent(int e, int nestedID=0)
+{
+  if (!computationStarted) return;
+  _logPool->addUserBracketEventNestedID(END_USER_EVENT_PAIR, TraceTimer(),
+                                        e, curevent++, nestedID);
 }
 
 void TraceProjections::userSuppliedData(int d)
@@ -1356,6 +1339,7 @@ void TraceProjections::creation(envelope *e, int ep, int num)
   } else {
     int type=e->getMsgtype();
     e->setEvent(curevent);
+    CpvAccess(curPeEvent) = curevent;
     if (num > 1) {
       _logPool->add(CREATION_BCAST, type, ep, curTime,
 		    curevent++, CkMyPe(), e->getTotalsize(), 
@@ -1432,7 +1416,7 @@ void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
 */
 
 void TraceProjections::creationMulticast(envelope *e, int ep, int num,
-					 int *pelist)
+					 const int *pelist)
 {
 #if CMK_TRACE_ENABLED
   double curTime = TraceTimer();
@@ -1524,10 +1508,10 @@ void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
 				    int mlen, CmiObjId *idx, void *obj )
 {
   if (traceNestedEvents) {
-    if (! nestedEvents.isEmpty()) {
+    if (!nestedEvents.empty()) {
       endExecuteLocal();
     }
-    nestedEvents.enq(NestedEvent(event, msgType, ep, srcPe, mlen, idx));
+    nestedEvents.emplace(event, msgType, ep, srcPe, mlen, idx);
   }
   beginExecuteLocal(event, msgType, ep, srcPe, mlen, idx);
 }
@@ -1559,11 +1543,11 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
 
 void TraceProjections::endExecute(void)
 {
-  if (traceNestedEvents) nestedEvents.deq();
+  if (traceNestedEvents && !nestedEvents.empty()) nestedEvents.pop();
   endExecuteLocal();
   if (traceNestedEvents) {
-    if (! nestedEvents.isEmpty()) {
-      NestedEvent &ne = nestedEvents.peek();
+    if (!nestedEvents.empty()) {
+      NestedEvent &ne = nestedEvents.top();
       beginExecuteLocal(ne.event, ne.msgType, ne.ep, ne.srcPe, ne.ml, ne.idx);
     }
   }
@@ -1717,68 +1701,6 @@ int TraceProjections::idxRegistered(int idx)
     return 0;
 }
 
-void TraceProjections::regFunc(const char *name, int &idx, int idxSpecifiedByUser){
-    StrKey k(name);
-    int num = funcHashtable.get(k);
-    
-    if(num!=0) {
-	return;
-	//as for mpi programs, the same function may be registered for several times
-	//CmiError("\"%s has been already registered! Please change the name!\"\n", name);
-    }
-    
-    int isIdxExisting=0;
-    if(idxSpecifiedByUser)
-	isIdxExisting=idxRegistered(idx);
-    if(isIdxExisting){
-	return;
-	//same reason with num!=0
-	//CmiError("The identifier %d for the trace function has been already registered!", idx);
-    }
-
-    if(idxSpecifiedByUser) {
-    	StrKey newKey = StrKey(name);
-    	int &ref = funcHashtable.put(newKey);
-    	ref=idx;
-        funcCount++;
-	idxVec.push_back(idx);	
-    } else {
-    	StrKey newKey = StrKey(name);
-    	int &ref = funcHashtable.put(newKey);
-    	ref=funcCount;
-    	num = funcCount;
-    	funcCount++;
-    	idx = num;
-	idxVec.push_back(idx);
-    }
-}
-
-void TraceProjections::beginFunc(const char *name,char *file,int line){
-	StrKey k(name);
-	unsigned short  num = (unsigned short)funcHashtable.get(k);
-	beginFunc(num,file,line);
-}
-
-void TraceProjections::beginFunc(int idx,char *file,int line){
-	if(idx <= 0){
-		CmiError("Unregistered function id %d being used in %s:%d \n",idx,file,line);
-	}	
-	_logPool->add(BEGIN_FUNC,TraceTimer(),idx,line,file);
-}
-
-void TraceProjections::endFunc(const char *name){
-	StrKey k(name);
-	int num = funcHashtable.get(k);
-	endFunc(num);	
-}
-
-void TraceProjections::endFunc(int num){
-	if(num <= 0){
-		printf("endFunc without start :O\n");
-	}
-	_logPool->add(END_FUNC,TraceTimer(),num,0,NULL);
-}
-
 // specialized PUP:ers for handling trace projections logs
 void toProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
@@ -1833,7 +1755,7 @@ void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
     };
 }
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
 void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
@@ -1888,9 +1810,9 @@ void TraceProjections::endPhase() {
 
 void registerOutlierReduction() {
   outlierReductionType =
-    CkReduction::addReducer(outlierReduction);
+    CkReduction::addReducer(outlierReduction, false, "outlierReduction");
   minMaxReductionType =
-    CkReduction::addReducer(minMaxReduction);
+    CkReduction::addReducer(minMaxReduction, false, "minMaxReduction");
 }
 
 /**
@@ -1905,8 +1827,7 @@ void registerOutlierReduction() {
  * done.
  *
  */
-// FIXME: WHY extern "C"???
-extern "C" void TraceProjectionsExitHandler()
+static void TraceProjectionsExitHandler()
 {
 #if CMK_TRACE_ENABLED
 #if DEBUG_KMEANS
@@ -2020,12 +1941,12 @@ void TraceProjectionsBOC::print_warning()
     if (flush_count == 0) return;
     std::set<int>::iterator it;
     CkPrintf("*************************************************************\n");
-    CkPrintf("Warning: Projections log flushed to disk %d times on %d cores:", flush_count, list.size());
+    CkPrintf("Warning: Projections log flushed to disk %d times on %zu cores:", flush_count, list.size());
     for (it=list.begin(); it!=list.end(); it++)
       CkPrintf(" %d", *it);
     CkPrintf(".\n");
     CkPrintf("Warning: The performance data is likely invalid, unless the flushes have been explicitly synchronized by your program.\n");
-    CkPrintf("Warning: This may be fixed by specifying a larger +logsize (current value %d).\n", CkpvAccess(CtrLogBufSize));
+    CkPrintf("Warning: This may be fixed by specifying a larger +logsize (current value %" PRId64 ").\n", CkpvAccess(CtrLogBufSize));
     CkPrintf("*************************************************************\n");
 }
 

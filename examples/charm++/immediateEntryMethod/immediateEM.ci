@@ -1,0 +1,21 @@
+mainmodule immediateEM {
+
+  readonly CProxy_main mainProxy;
+  message immMessage;
+
+  mainchare main {
+    entry main(CkArgMsg *m);
+    entry void invokeRegularEntryMethod();
+    entry void invokeImmediateEntryMethod();
+    entry void invokeImmediateEntryMethodCb();
+    entry void invokeImmediateEntryMethodWithMessage();
+    entry void done();
+  };
+
+  nodegroup NG1{
+    entry NG1();
+    entry void regularEntryMethod();
+    entry [immediate] void immediateEntryMethod();
+    entry [immediate] void immediateEntryMethodWithMessage(immMessage *);
+  };
+};

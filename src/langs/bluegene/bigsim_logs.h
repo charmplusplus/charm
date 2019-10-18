@@ -88,7 +88,7 @@ public:
   char   eType;
   bgEvents(): index(-1) {}
   bgEvents(void *d, int idx, double t, bgEventCallBackFn fn, void *ptr, char e):
-	data(d), index(idx), rTime(t), callbackFn(fn), usrPtr(ptr), eType(e) {}
+	callbackFn(fn), usrPtr(ptr), data(d), index(idx), rTime(t), eType(e) {}
   inline void update(double startT, double recvT, int e) {
 	if (eType==e) callbackFn(data, startT+rTime, recvT, usrPtr);
   }
@@ -247,8 +247,8 @@ public:
   CkQ<BgTimeLog *>   sendingLogs;	// send buffered
 #endif
 public:
-  BgTimeLineRec(): timeline(1024), commit(0), counter(1), correctSendIdx(0), 
-		   startIdx(0), bgCurLog(NULL), bgPrevLog(NULL) {
+  BgTimeLineRec(): timeline(1024), commit(0), startIdx(0), correctSendIdx(0),
+		   counter(1), bgCurLog(NULL), bgPrevLog(NULL) {
       if (bgcorroff) startCorrFlag=0; else startCorrFlag=1;
       minCorrection = INVALIDTIME;
     }

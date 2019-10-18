@@ -3,22 +3,22 @@
 
 #include "converse.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* 
  * These functions are called from Converse, and should be provided C binding
  * by the tracing strategies.
  */
 
-CMI_EXTERNC
 void traceInit(char **argv);
 void traceCharmInit(char **argv);	/* init trace module in ck */
 void traceMessageRecv(char *msg, int pe);
 void traceBeginIdle(void);
 void traceEndIdle(void);
-CMI_EXTERNC
 void traceResume(int,int,CmiObjId *);
-CMI_EXTERNC
 void traceSuspend(void);
-CMI_EXTERNC
 void traceAwaken(CthThread t);
 void traceUserEvent(int);
 void beginAppWork(void);
@@ -27,10 +27,14 @@ void beginTuneOverhead(void);
 void endTuneOverhead(void);
 void traceUserBracketEvent(int, double, double);
 void traceUserBracketEventNestedID(int, double, double, int nestedID);
+void traceBeginUserBracketEvent(int eventID);
+void traceBeginUserBracketEventNestedID(int eventID, int nestedID);
+void traceEndUserBracketEvent(int eventID);
+void traceEndUserBracketEventNestedID(int eventID, int nestedID);
 void traceUserSuppliedData(int);
 void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et);
 void traceUserSuppliedNote(const char*);
-void traceMemoryUsage();
+void traceMemoryUsage(void);
 int  traceRegisterUserEvent(const char*, int e
 #ifdef __cplusplus
 =-1
@@ -53,19 +57,9 @@ void traceGetMsgID(char *msg, int *pe, int *event);
 void traceSetMsgID(char *msg, int pe, int event);
 
 /* Support for machine layers to register their user events to projections */
-void registerMachineUserEventsFunction(void (*eventRegistrationFunc)());
+void registerMachineUserEventsFunction(void (*eventRegistrationFunc)(void));
 
-int traceRegisterFunction(const char*, int idx
-#ifdef __cplusplus
-=-999
-#endif
-);
-void traceBeginFuncIndexProj(int, const char* file, int);
-void traceEndFuncIndexProj(int);
-
-CMI_EXTERNC
 void traceClose(void);
-CMI_EXTERNC
 void traceCharmClose(void);          /* close trace in ck */
 void traceBegin(void);
 void traceEnd(void);
@@ -110,6 +104,10 @@ int  traceAvailable(void);
 #define TRACE_COMM_SET_MSGID(msg, pe, event) 
 #define TRACE_COMM_GET_MSGID(msg, pe, event) 
 #define TRACE_COMM_SET_COMM_MSGID(msg)
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

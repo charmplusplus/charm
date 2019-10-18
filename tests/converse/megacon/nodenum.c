@@ -34,7 +34,7 @@ CpmInvokable nodenum_ack(nodenum_chare c)
 
 CpmInvokable nodenum_reply(nodenum_chare c, int pe, int rank, int host)
 {
-  c->info[pe].pe   = pe; 
+  c->info[pe].pe   = pe;
   c->info[pe].rank = rank;
   c->info[pe].host = host;
   nodenum_ack(c);
@@ -66,7 +66,7 @@ CpmInvokable nodenum_control()
   c.countdown = CmiNumPes(); c.pending = CthSelf(); CthSuspend();
   Cpm_nodenum_collect_info(CpmSend(CpmALL), &c);
   c.countdown = CmiNumPes(); c.pending = CthSelf(); CthSuspend();
-  
+
   /* check that the processor/host/rank table contains reasonable values */
   if ((c.info[0].host != 0)||(c.info[0].rank != 0)||(c.info[0].pe != 0))
     goto badnum;
@@ -80,7 +80,7 @@ CpmInvokable nodenum_control()
       if (curr->rank != 0) goto badnum;
     }
   }
-  
+
   Cpm_megacon_ack(CpmSend(0));
   return;
 badnum:

@@ -25,10 +25,6 @@ The calls needed to use the reduction manager are:
 #define FRAG_THRESHOLD 131072
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#define MAX_INT 5000000
-#define _MLOG_REDUCE_P2P_ 0
-#endif
 
 //This message is sent between group objects on a single PE
 // to let each know the other has been created.
@@ -86,17 +82,22 @@ class contributorInfo {
 public:
 	int redNo;//Current reduction number
 	contributorInfo() {redNo=0;}
-	//Migration utilities:
-	void pup(PUP::er &p);
+	inline void pup(PUP::er& p) { // allow calling pup(), but also define as PUPbytes
+		p((char *)this, sizeof(contributorInfo));
+	}
 };
+PUPbytes(contributorInfo)
 
 class countAdjustment {
 public:
   int gcount;//Adjustment to global count (applied at reduction end)
   int lcount;//Adjustment to local count (applied continually)
   countAdjustment(int ignored=0) {(void)ignored; gcount=0; lcount=0;}
-  void pup(PUP::er& p){ p|gcount; p|lcount; }
+  inline void pup(PUP::er& p) { // allow calling pup(), but also define as PUPbytes
+    p((char *)this, sizeof(countAdjustment));
+  }
 };
+PUPbytes(countAdjustment)
 
 /** @todo: Fwd decl for a temporary class. Remove after
  * delegated cross-array reductions are implemented more optimally
@@ -118,6 +119,7 @@ public:
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  */
 
+  // KEEPINSYNC: charmmod.f90
 	typedef enum {
 	//A placeholder invalid reduction type
 		invalid=0,
@@ -154,6 +156,7 @@ public:
 
 	//Compute the logical XOR of the values passed by each element.
 	// The resulting value will be 1 if an odd number of source value is nonzero.
+	// logical_xor does not exist
                 logical_xor_int,logical_xor_bool,
 
                 // Compute the logical bitvector AND of the values passed by each element.
@@ -182,7 +185,10 @@ public:
         statistics,
 
         // Combine multiple data/reducer pairs into one reduction
-        tuple
+        tuple,
+
+        // Perform reduction using external reducer defined in Python (for Charm4py)
+        external_py
 	} reducerType;
 
 	//This structure is used with the set reducer above,
@@ -231,12 +237,19 @@ public:
   struct reducerStruct {
     reducerFn fn;
     bool streamable;
-    reducerStruct(reducerFn f=NULL, bool s=false) : fn(f), streamable(s) {}
+#if CMK_ERROR_CHECKING
+    const char *name; // aids in debugging conflicts between multiple overlapping reductions
+#endif
+    reducerStruct(reducerFn f=NULL, bool s=false, const char *n=NULL) : fn(f), streamable(s)
+#if CMK_ERROR_CHECKING
+                  ,name(n)
+#endif
+    {}
   };
 
 	//Add the given reducer to the list.  Returns the new reducer's
 	// reducerType.  Must be called in the same order on every node.
-	static reducerType addReducer(reducerFn fn, bool streamable=false);
+	static reducerType addReducer(reducerFn fn, bool streamable=false, const char* name=NULL);
 
 private:
 	friend class CkReductionMgr;
@@ -257,6 +270,84 @@ private:
 	CkReduction();
 };
 PUPbytes(CkReduction::reducerType)
+
+#if CMK_CHARMPY
+//CkReductionTypesExt struct to expose the reducerTypes for external
+//modules like Charm4py
+        /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                 The order of reducerTypes here should match the order in "class ReducerTypes" in
+                 charmlib_ctypes.py and "struct CkReductionTypesExt" in charmlib_cffi_build.py
+
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  */
+struct CkReductionTypesExt {
+    // No-op reducer
+    int nop = CkReduction::nop;
+    // Sum reducers
+    int sum_char = CkReduction::sum_char;
+    int sum_short = CkReduction::sum_short;
+    int sum_int = CkReduction::sum_int;
+    int sum_long = CkReduction::sum_long;
+    int sum_long_long = CkReduction::sum_long_long;
+    int sum_uchar = CkReduction::sum_uchar;
+    int sum_ushort = CkReduction::sum_ushort;
+    int sum_uint = CkReduction::sum_uint;
+    int sum_ulong = CkReduction::sum_ulong;
+    int sum_ulong_long = CkReduction::sum_ulong_long;
+    int sum_float = CkReduction::sum_float;
+    int sum_double = CkReduction::sum_double;
+    // Product reducers
+    int product_char = CkReduction::product_char;
+    int product_short = CkReduction::product_short;
+    int product_int = CkReduction::product_int;
+    int product_long = CkReduction::product_long;
+    int product_long_long = CkReduction::product_long_long;
+    int product_uchar = CkReduction::product_uchar;
+    int product_ushort = CkReduction::product_ushort;
+    int product_uint = CkReduction::product_uint;
+    int product_ulong = CkReduction::product_ulong;
+    int product_ulong_long = CkReduction::product_ulong_long;
+    int product_float = CkReduction::product_float;
+    int product_double = CkReduction::product_double;
+    // Max reducers
+    int max_char = CkReduction::max_char;
+    int max_short = CkReduction::max_short;
+    int max_int = CkReduction::max_int;
+    int max_long = CkReduction::max_long;
+    int max_long_long = CkReduction::max_long_long;
+    int max_uchar = CkReduction::max_uchar;
+    int max_ushort = CkReduction::max_ushort;
+    int max_uint = CkReduction::max_uint;
+    int max_ulong = CkReduction::max_ulong;
+    int max_ulong_long = CkReduction::max_ulong_long;
+    int max_float = CkReduction::max_float;
+    int max_double = CkReduction::max_double;
+    // Min reducers
+    int min_char = CkReduction::min_char;
+    int min_short = CkReduction::min_short;
+    int min_int = CkReduction::min_int;
+    int min_long = CkReduction::min_long;
+    int min_long_long = CkReduction::min_long_long;
+    int min_uchar = CkReduction::min_uchar;
+    int min_ushort = CkReduction::min_ushort;
+    int min_uint = CkReduction::min_uint;
+    int min_ulong = CkReduction::min_ulong;
+    int min_ulong_long = CkReduction::min_ulong_long;
+    int min_float = CkReduction::min_float;
+    int min_double = CkReduction::min_double;
+    // logical and, or, xor
+    int logical_and_bool = CkReduction::logical_and_bool;
+    int logical_or_bool = CkReduction::logical_or_bool;
+    int logical_xor_bool = CkReduction::logical_xor_bool;
+    // External custom reducer in Python
+    int external_py = CkReduction::external_py;
+};
+
+extern "C" CkReductionTypesExt charm_reducers;
+
+#endif
 
 //A CkReductionMsg is sent up the reduction tree-- it
 // carries a contribution, or several reduced contributions.
@@ -280,80 +371,78 @@ public:
 		CkReduction::reducerType reducer=CkReduction::invalid,
                 CkReductionMsg *buf = NULL);
 
-	inline int getLength(void) const {return dataSize;}
-	inline int getSize(void) const {return dataSize;}
-	inline void *getData(void) {return data;}
-	inline const void *getData(void) const {return data;}
+	inline int getLength() const {return dataSize;}
+	inline int getSize() const {return dataSize;}
+	inline void *getData() {return data;}
+	inline const void *getData() const {return data;}
 
-	inline int getGcount(void){return gcount;}
-	inline CkReduction::reducerType getReducer(void){return reducer;}
-	inline int getRedNo(void){return redNo;}
+	inline int getGcount() const {return gcount;}
+	inline CkReduction::reducerType getReducer() const {return reducer;}
+	inline int getRedNo() const {return redNo;}
 
-	inline CMK_REFNUM_TYPE getUserFlag(void) const {return userFlag;}
+	inline CMK_REFNUM_TYPE getUserFlag() const {return userFlag;}
 	inline void setUserFlag(CMK_REFNUM_TYPE f) { userFlag=f;}
 
 	inline void setCallback(const CkCallback &cb) { callback=cb; }
 
 	//Return true if this message came straight from a contribute call--
 	// if it didn't come from a previous reduction function.
-	inline bool isFromUser(void) const {return sourceFlag==-1;}
+	inline bool isFromUser() const {return sourceFlag==-1;}
 
-	inline bool isMigratableContributor(void) const {return migratableContributor;}
+	inline bool isMigratableContributor() const {return migratableContributor;}
 	inline void setMigratableContributor(bool _mig){ migratableContributor = _mig;}
 
     // Tuple reduction
     static CkReductionMsg* buildFromTuple(CkReduction::tupleElement* reductions, int num_reductions);
     void toTuple(CkReduction::tupleElement** out_reductions, int* num_reductions);
 
-	~CkReductionMsg();
+	~CkReductionMsg() {}
 
 //Implementation-only fields (don't access these directly!)
 	//Msg runtime support
-	static void *alloc(int msgnum, size_t size, int *reqSize, int priobits);
+	static void *alloc(int msgnum, size_t size, int *reqSize, int priobits, GroupDepNum groupDepNum=GroupDepNum{});
 	static void *pack(CkReductionMsg *);
 	static CkReductionMsg *unpack(void *in);
 
-#if CMK_BIGSIM_CHARM
-	/* AMPI reductions use bare CkReductionMsg's instead of AmpiMsg's */
-	void *event; // the event point that corresponds to this message
-	int eventPe; // the PE that the event is located on
-#endif
+private:
+	inline int nSources() const {return std::abs(sourceFlag);}
+
+	//Default constructor is private so you must use "buildNew", above
+	CkReductionMsg() {}
 
 private:
 	int dataSize;//Length of array below, in bytes
-	void *data;//Reduction data
-	CMK_REFNUM_TYPE userFlag; //Some sort of identifying flag, for client use
-	CkCallback callback; //What to do when done
-	bool migratableContributor; // are the contributors migratable
-
 	int sourceFlag;/*Flag:
 		0 indicates this is a placeholder message (meaning: nothing to report)
 		-1 indicates this is a single (non-reduced) contribution.
   		>0 indicates this is a reduced contribution.
   	*/
-  	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
 #if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_ )
     int sourceProcessorCount;
 #endif
     int fromPE;
-private:
-#if CMK_BIGSIM_CHARM
-        void *log;
-#endif
-	CkReduction::reducerType reducer;
-	//contributorInfo *ci;//Source contributor, or NULL if none
 	int redNo;//The serial number of this reduction
 	int gcount;//Contribution to the global contributor count
+	CkReduction::reducerType reducer;
+	CMK_REFNUM_TYPE userFlag; //Some sort of identifying flag, for client use
+	bool migratableContributor; // are the contributors migratable
         // for section multicast/reduction library
-        CkSectionInfo sid;   // section cookie for multicast
-        char rebuilt;          // indicate if the multicast tree needs rebuilt
-        int nFrags;
-        int fragNo;      // fragment of a reduction msg (when pipelined)
+        int8_t rebuilt;          // indicate if the multicast tree needs rebuilt
+        int8_t nFrags;
+        int8_t fragNo;      // fragment of a reduction msg (when pipelined)
                          // value = 0 to nFrags-1
+        CkSectionInfo sid;   // section cookie for multicast
+	CkCallback callback; //What to do when done
+#if CMK_BIGSIM_CHARM
+public:
+	/* AMPI reductions use bare CkReductionMsg's instead of AmpiMsg's */
+	void *event; // the event point that corresponds to this message
+	int eventPe; // the PE that the event is located on
+private:
+        void *log;
+#endif
+	void *data;//Reduction data
 	double dataStorage;//Start of data array (so it's double-aligned)
-
-	//Default constructor is private so you must use "buildNew", above
-    CkReductionMsg();
 };
 
 
@@ -441,7 +530,7 @@ private:
 	bool interrupt; /* flag for use in non-smp: false means interrupt can occur, true means not (also acts as a lock) */
 
 	/*vector storing the children of this node*/
-	CkVec<int> kids;
+	std::vector<int> kids;
 	
 //State:
 	void startReduction(int number,int srcPE);
@@ -475,12 +564,12 @@ private:
 	bool isPresent(int num) const {return (bool)(num==redNo);}
 	bool isFuture(int num) const {return (bool)(num>redNo);}
 
-	/*FAULT_EVAC*/
+#if CMK_FAULT_EVAC
 	bool oldleaf;
 	bool blocked;
 	int newParent;
 	int additionalGCount,newAdditionalGCount; //gcount that gets passed to u from the node u replace
-	CkVec<int> newKids;
+	std::vector<int> newKids;
 	CkMsgQ<CkReductionMsg> bufferedMsgs;
 	CkMsgQ<CkReductionMsg> bufferedRemoteMsgs;
 	enum {OLDPARENT,OLDCHILDREN,NEWPARENT,LEAFPARENT};
@@ -489,11 +578,12 @@ private:
 	int tempModificationRedNo;
 	bool readyDeletion;
 	bool killed;
+#endif
 	
 //Checkpointing utilities
  public:
 	virtual void pup(PUP::er &p);
-	/*FAULT_EVAC*/
+#if CMK_FAULT_EVAC
 	virtual void evacuate();
 	virtual void doneEvacuate();
 	void DeleteChild(int deletedChild);
@@ -505,6 +595,7 @@ private:
 	int findMaxRedNo();
 	void updateTree();
 	void clearBlockedMsgs();
+#endif
 };
 
 
@@ -603,32 +694,12 @@ public:
 		when there are no gcount
 	*/
 	int getGCount(){return gcount;};
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	void decGCount(){gcount--;}
-	void incNumImmigrantRecObjs(){
-		numImmigrantRecObjs++;
-	}
-	void decNumImmigrantRecObjs(){
-		numImmigrantRecObjs--;
-	}
-	void incNumEmigrantRecObjs(){
-		numEmigrantRecObjs++;
-	}
-	void decNumEmigrantRecObjs(){
-		numEmigrantRecObjs--;
-	}
-
-#endif
 
         //Combine (& free) the current message vector.
 	static CkReductionMsg *reduceMessages(CkMsgQ<CkReductionMsg> &msgs);
 
 private:
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	int numImmigrantRecObjs;
-	int numEmigrantRecObjs;
-#endif
 
 //Data members
 	//Stored callback function (may be NULL if none has been set)
@@ -681,8 +752,8 @@ private:
 	int parent;
 	int numKids;
 	/*vector storing the children of this node*/
-	CkVec<int> newKids;
-	CkVec<int> kids;
+	std::vector<int> newKids;
+	std::vector<int> kids;
 	void init_BinomialTree();
 
 	void init_TopoTree();
@@ -698,11 +769,9 @@ private:
 
 	//This vector of adjustments is indexed by redNo,
 	// starting from the current redNo.
-	CkVec<countAdjustment> adjVec;
+	std::vector<countAdjustment> adjVec;
 	//Return the countAdjustment struct for the given redNo:
 	countAdjustment &adj(int number);
-	//Shift the list of countAdjustments down
-	void shiftAdjVec(void);
 
 protected:
 	bool hasParent(void);
@@ -808,8 +877,10 @@ class Group : public CkReductionMgr
 	virtual void flushStates() {
 		CkReductionMgr::flushStates();
 		reductionInfo.redNo = 0;
- 	}
+	}
 	virtual void CkAddThreadListeners(CthThread tid, void *msg);
+
+	int getRedNo() const { return reductionInfo.redNo; }
 
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
         CK_BARRIER_CONTRIBUTE_METHODS_DECL

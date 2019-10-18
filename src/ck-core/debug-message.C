@@ -25,7 +25,7 @@
 */
 void CkPupMessage(PUP::er &p,void **atMsg,int pack_mode) {
 	UChar type;
-	int size,prioBits,envSize;
+	int size,prioBits,envSize,groupDepNum;
 
 	/* pup this simple flag so that we can handle the NULL msg */
 	int isNull = (*atMsg == NULL);   // be overwritten when unpacking
@@ -42,16 +42,18 @@ void CkPupMessage(PUP::er &p,void **atMsg,int pack_mode) {
 		type=env->getMsgtype();
 		size=env->getTotalsize();
 		prioBits=env->getPriobits();
+		groupDepNum=env->getGroupDepNum();
 		envSize=sizeof(envelope);
 	}
 	p(type);
 	p(wasPacked);
 	p(size);
 	p(prioBits);
+	p(groupDepNum);
 	p(envSize);
-	int userSize=size-envSize-sizeof(int)*CkPriobitsToInts(prioBits);
+	int userSize=size-envSize-sizeof(int)*CkPriobitsToInts(prioBits)-groupDepNum*sizeof(CkGroupID);
 	if (p.isUnpacking())
-		env=_allocEnv(type,userSize,prioBits);
+		env=_allocEnv(type,userSize,prioBits,GroupDepNum{groupDepNum});
 	if (pack_mode == 1) {
 	  /*Pup entire header and message as raw bytes.*/
 	  p((char *)env,size);
@@ -103,15 +105,13 @@ void envelope::pup(PUP::er &p) {
         if (!p.isUnpacking()) d = attribs.isUsed;
         p|d;
         if (p.isUnpacking()) attribs.isUsed = d; 
-        if (!p.isUnpacking()) d = attribs.isRdma;
-        p|d;
-        if (p.isUnpacking()) attribs.isRdma = d;
 	p(epIdx);
 	p(pe);
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
 	p(event);
 #endif
 	p((char*)getPrioPtr(),getPrioBytes());
+	p((char*)getGroupDepPtr(),getGroupDepSize());
 	switch(getMsgtype()) {
 	case NewChareMsg: case NewVChareMsg: 
 	case ForChareMsg: case ForVidMsg: case FillVidMsg:
@@ -121,7 +121,6 @@ void envelope::pup(PUP::er &p) {
 	case NodeBocInitMsg: case BocInitMsg: case ForNodeBocMsg: case ForBocMsg:
 		p|type.group.g;
 		p|type.group.rednMgr;
-		p|type.group.dep;
 		p|type.group.epoch;
 		p|type.group.arrayEp;
 		break;
@@ -145,6 +144,6 @@ void envelope::pup(PUP::er &p) {
 void CkMessage::pup(PUP::er &p) {
 	//Default message pup: just copy user portion as bytes
 	envelope *env=UsrToEnv((void *)this);
-	int userSize=env->getTotalsize()-sizeof(envelope)-env->getPrioBytes();
+	int userSize=env->getTotalsize()-sizeof(envelope)-env->getPrioBytes()-env->getGroupDepSize();
 	p((char *)this,userSize);
 }

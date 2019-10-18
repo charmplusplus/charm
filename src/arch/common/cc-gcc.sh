@@ -1,16 +1,16 @@
-CMK_CPP_CHARM='cpp -P'
-CMK_CPP_C='gcc'
-CMK_CC='gcc'
-CMK_CXX='g++'
-CMK_LD='gcc'
-CMK_LDXX='g++'
+CMK_CPP_CHARM="cpp -P"
+CMK_CPP_C="gcc$CMK_COMPILER_SUFFIX"
+CMK_CC="gcc$CMK_COMPILER_SUFFIX"
+CMK_CXX="g++$CMK_COMPILER_SUFFIX"
+CMK_LD="gcc$CMK_COMPILER_SUFFIX"
+CMK_LDXX="g++$CMK_COMPILER_SUFFIX"
 
 CMK_CPP_C_FLAGS="-E"
 
 CMK_LD_SHARED='-shared'
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_RANLIB='ranlib'
-CMK_LIBS='-lckqt'
+CMK_LIBS="$CMK_LIBS -lckqt"
 CMK_PIC='-fPIC'
 
 if [ "$CMK_MACOSX" ]; then
@@ -28,8 +28,8 @@ if [ "$CMK_MACOSX" ]; then
 
       CMK_CC_FLAGS="-fPIC"
       CMK_CXX_FLAGS="-fPIC -Wno-deprecated"
-      CMK_LD_FLAGS="-fPIC -Wl,-no_pie "
-      CMK_LDXX_FLAGS="-fPIC -multiply_defined suppress -Wl,-no_pie"
+      CMK_LD_FLAGS="-fPIC"
+      CMK_LDXX_FLAGS="-fPIC -multiply_defined suppress"
       found=1
       break
     fi
@@ -38,6 +38,17 @@ if [ "$CMK_MACOSX" ]; then
     echo "No suitable non-clang gcc found, exiting"
     exit 1
   fi
+fi
+
+if [ "$CMK_COMPILER" = "msvc" ]; then
+  CMK_AR='ar q'
+  CMK_LIBS='-lws2_32 -lpsapi -lkernel32'
+  CMK_SEQ_LIBS="$CMK_LIBS"
+
+  CMK_NATIVE_CC="$CMK_CC"
+  CMK_NATIVE_LD="$CMK_LD"
+  CMK_NATIVE_CXX="$CMK_CXX"
+  CMK_NATIVE_LDXX="$CMK_LDXX"
 fi
 
 CMK_COMPILER='gcc'

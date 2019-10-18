@@ -10,3 +10,7 @@
 #undef CMK_TIMER_USE_SPECIAL
 #define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
+
+#undef CMK_NOT_USE_TLS_THREAD
+#define CMK_NOT_USE_TLS_THREAD   1
+

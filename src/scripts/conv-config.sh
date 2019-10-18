@@ -38,7 +38,6 @@ CMK_LD_SHARED="-shared"
 
 # Use gnu1x instead of c1x to get _GNU_SOURCE features and inline assembly extensions
 [ -z "$CMK_ENABLE_C11" ] && CMK_ENABLE_C11="-std=gnu1x"
-[ -z "$CMK_ENABLE_CPP11" ] && CMK_ENABLE_CPP11="-std=c++11"
 
 [ -z "$CMK_CC" ] && CMK_CC='cc '
 [ -z "$CMK_CXX" ] && CMK_CXX='c++ '
@@ -58,21 +57,7 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_CF77" ] && CMK_CF77_FIXED="$CMK_CF90"
 [ -z "$CMK_CF77_FIXED" ] && CMK_CF77_FIXED="$CMK_CF77"
 
-if [ -r $CHARMINC/conv-mach-opt.sh ]
-then
-. $CHARMINC/conv-mach-opt.sh
-fi
-
-CMK_CC_RELIABLE="$CMK_CC_RELIABLE $CMK_DEFS "
-CMK_CC_FASTEST="$CMK_CC_FASTEST $CMK_DEFS "
-
-OPTS_CC="$OPTS_CC $USER_OPTS_CC"
-OPTS_CXX="$OPTS_CXX $USER_OPTS_CXX"
-OPTS_LD="$OPTS_LD $USER_OPTS_LD"
-OPTS_LDXX="$OPTS_LDXX $USER_OPTS_LDXX"
-
-[ -z "$CMK_PIC" ] && CMK_PIC='-fpic'
-
+# set CMK_NATIVE defaults before adding potentially target-specific build-line args
 [ -z "$CMK_NATIVE_CC" ] && CMK_NATIVE_CC="$CMK_CC"
 [ -z "$CMK_NATIVE_CXX" ] && CMK_NATIVE_CXX="$CMK_CXX"
 [ -z "$CMK_NATIVE_LD" ] && CMK_NATIVE_LD="$CMK_LD"
@@ -85,6 +70,21 @@ OPTS_LDXX="$OPTS_LDXX $USER_OPTS_LDXX"
 [ -z "$CMK_NATIVE_CXX_FLAGS" ] && CMK_NATIVE_CXX_FLAGS="$CMK_CXX_FLAGS"
 [ -z "$CMK_NATIVE_LD_FLAGS" ] && CMK_NATIVE_LD_FLAGS="$CMK_LD_FLAGS"
 [ -z "$CMK_NATIVE_LDXX_FLAGS" ] && CMK_NATIVE_LDXX_FLAGS="$CMK_LDXX_FLAGS"
+
+if [ -r $CHARMINC/conv-mach-opt.sh ]
+then
+. $CHARMINC/conv-mach-opt.sh
+fi
+
+CMK_CC_RELIABLE="$CMK_CC_RELIABLE $CMK_DEFS "
+CMK_CC_FASTEST="$CMK_CC_FASTEST $CMK_DEFS "
+
+OPTS_CC="$OPTS_CC $USER_OPTS_CC"
+OPTS_CXX="$OPTS_CXX $USER_OPTS_CXX"
+OPTS_LD="$OPTS_LD $USER_OPTS_LD"
+
+[ -z "$CMK_PIC" ] && CMK_PIC='-fpic'
+[ -z "$CMK_PIE" ] && CMK_PIE='-pie -fPIE'
 
 [ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"
 [ -z "$CMK_SEQ_CXX" ] && CMK_SEQ_CXX="$CMK_CXX"
@@ -116,8 +116,6 @@ CMK_SEQ_CC_FLAGS="$CMK_SEQ_CC_FLAGS $CMK_SEQ_DEFS"
 CMK_SEQ_CXX_FLAGS="$CMK_SEQ_CXX_FLAGS $CMK_SEQ_DEFS"
 CMK_SEQ_LD_FLAGS="$CMK_SEQ_LD_FLAGS $CMK_SEQ_DEFS"
 CMK_SEQ_LDXX_FLAGS="$CMK_SEQ_LDXX_FLAGS $CMK_SEQ_DEFS"
-
-[ -z "$CMK_CELL" ] && CMK_CELL=0
 
 [ -z "$CMK_C_OPENMP" ] && CMK_C_OPENMP="-fopenmp"
 [ -z "$CMK_F_OPENMP" ] && CMK_F_OPENMP="$CMK_C_OPENMP"

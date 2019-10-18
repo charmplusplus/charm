@@ -1,7 +1,5 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
- *
  *   Copyright (C) 2001 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
  */
@@ -14,13 +12,14 @@ void ADIOI_TESTFS_ReadContig(ADIO_File fd, void *buf, int count,
 			     ADIO_Offset offset, ADIO_Status *status, int
 			     *error_code)
 {
-    int myrank, nprocs, datatype_size;
+    int myrank, nprocs;
+    MPI_Count datatype_size;
 
     *error_code = MPI_SUCCESS;
 
     MPI_Comm_size(fd->comm, &nprocs);
     MPI_Comm_rank(fd->comm, &myrank);
-    MPI_Type_size(datatype, &datatype_size);
+    MPI_Type_size_x(datatype, &datatype_size);
     FPRINTF(stdout, "[%d/%d] ADIOI_TESTFS_ReadContig called on %s\n", myrank, 
 	    nprocs, fd->filename);
     if (file_ptr_type != ADIO_EXPLICIT_OFFSET)
@@ -28,17 +27,13 @@ void ADIOI_TESTFS_ReadContig(ADIO_File fd, void *buf, int count,
 	offset = fd->fp_ind;
 	fd->fp_ind += datatype_size * count;
 	fd->fp_sys_posn = fd->fp_ind;
-#if 0
-	FPRINTF(stdout, "[%d/%d]    new file position is %Ld\n", myrank, 
-		nprocs, (long long) fd->fp_ind);
-#endif
     }
     else {
 	fd->fp_sys_posn = offset + datatype_size * count;
     }
 
-    FPRINTF(stdout, "[%d/%d]    reading (buf = 0x%x, loc = %Ld, sz = %Ld)\n",
-	    myrank, nprocs, (int) buf, (long long) offset, 
+    FPRINTF(stdout, "[%d/%d]    reading (buf = %p, loc = %lld, sz = %lld)\n",
+	    myrank, nprocs, buf, (long long) offset, 
 	    (long long) datatype_size * count);
 
 #ifdef HAVE_STATUS_SET_BYTES

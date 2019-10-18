@@ -1,6 +1,9 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
+/*  
+ *  (C) 2001 by Argonne National Laboratory.
+ *      See COPYRIGHT in top-level directory.
+ */
 #include "mpi.h"
-#include "mpio.h"  /* not necessary with MPICH 1.1.1 or HPMPI 1.4 */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -11,7 +14,7 @@
    block-distributed array to a file corresponding to the global array
    in row-major (C) order.
    Note that the file access pattern is noncontiguous.
-
+  
    Array size 128^3. For other array sizes, change array_of_gsizes below.*/
 
 
@@ -19,7 +22,8 @@ int main(int argc, char **argv)
 {
     MPI_Datatype newtype;
     int i, ndims, array_of_gsizes[3], array_of_distribs[3];
-    int order, nprocs, len, *buf, bufcount, mynod;
+    int order, nprocs, len, *buf, mynod;
+    MPI_Count bufcount;
     int array_of_dargs[3], array_of_psizes[3];
     MPI_File fh;
     MPI_Status status;
@@ -31,7 +35,7 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &mynod);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-/* process 0 takes the file name as a command-line argument and
+/* process 0 takes the file name as a command-line argument and 
    broadcasts it to other processes */
     if (!mynod) {
 	i = 1;
@@ -60,9 +64,9 @@ int main(int argc, char **argv)
     ndims = 3;
     order = MPI_ORDER_C;
 
-    array_of_gsizes[0] = 128;
-    array_of_gsizes[1] = 128;
-    array_of_gsizes[2] = 128;
+    array_of_gsizes[0] = 128*17;
+    array_of_gsizes[1] = 128*9;
+    array_of_gsizes[2] = 128*11;
 
     array_of_distribs[0] = MPI_DISTRIBUTE_BLOCK;
     array_of_distribs[1] = MPI_DISTRIBUTE_BLOCK;
@@ -80,14 +84,14 @@ int main(int argc, char **argv)
 			   array_of_psizes, order, MPI_INT, &newtype);
     MPI_Type_commit(&newtype);
 
-    MPI_Type_size(newtype, &bufcount);
+    MPI_Type_size_x(newtype, &bufcount);
     bufcount = bufcount/sizeof(int);
     buf = (int *) malloc(bufcount * sizeof(int));
 
 /* to eliminate paging effects, do the operations once but don't time
    them */
 
-    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR,
+    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, 
                   MPI_INFO_NULL, &fh);
     MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", MPI_INFO_NULL);
     MPI_File_write_all(fh, buf, bufcount, MPI_INT, &status);
@@ -98,7 +102,7 @@ int main(int argc, char **argv)
     MPI_Barrier(MPI_COMM_WORLD);
 /* now time write_all */
 
-    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR,
+    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, 
                   MPI_INFO_NULL, &fh);
     MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", MPI_INFO_NULL);
 
@@ -120,8 +124,8 @@ int main(int argc, char **argv)
     MPI_Barrier(MPI_COMM_WORLD);
 /* now time read_all */
 
-    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR,
-                  MPI_INFO_NULL, &fh);
+    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, 
+                  MPI_INFO_NULL, &fh); 
     MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", MPI_INFO_NULL);
 
     MPI_Barrier(MPI_COMM_WORLD);

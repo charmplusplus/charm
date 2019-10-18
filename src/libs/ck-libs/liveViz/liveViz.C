@@ -185,7 +185,7 @@ void vizReductionHandler(void *r_msg)
 }
 
 static void liveVizNodeInit(void) {
-  image_combine_reducer=CkReduction::addReducer(imageCombineReducer);
+  image_combine_reducer=CkReduction::addReducer(imageCombineReducer, false, "imageCombineReducer");
 }
 
 #else

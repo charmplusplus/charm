@@ -29,26 +29,14 @@ CMK_NATIVE_CXX_FLAGS="$CMK_GCC64 "
 CMK_NATIVE_LDXX_FLAGS="$CMK_GCC64 "
 
 # fortran compiler
-CMK_CF90=`which f95 2>/dev/null`
-if test -n "$CMK_CF90"
+CMK_CXX_IS_GCC=`$MPICXX -V 2>&1 | grep 'g++' `
+CMK_CXX_IS_ICC=`$MPICXX -V 2>&1 | grep Intel `
+if test -n "$CMK_CXX_IS_GCC"
 then
-#    CMK_FPP="cpp -P -CC"
-#    CMK_CF90="$CMK_CF90 -fpic -fautomatic -fdollar-ok "
-#    CMK_CF90_FIXED="$CMK_CF90 -ffixed-form "
-#    CMK_F90LIBS="-lgfortran "
-#    CMK_F90_USE_MODDIR=1
-#    CMK_F90_MODINC="-I"
-#    CMK_MOD_NAME_ALLCAPS=
-#    CMK_MOD_EXT="mod"
     . $CHARMINC/conv-mach-gfortran.sh
-else
-    CMK_CF77='g77 '
-    CMK_CF90='f90 '
-    CMK_CF90_FIXED="$CMK_CF90 -W132 "
-    CMK_F90LIBS='-L/usr/absoft/lib -L/opt/absoft/lib -lf90math -lfio -lU77 -lf77math '
-    CMK_F77LIBS='-lg2c '
-    CMK_F90_USE_MODDIR=1
-    CMK_F90_MODINC='-p'
+elif test -n "$CMK_CXX_IS_ICC"
+then
+    . $CHARMINC/conv-mach-ifort.sh
 fi
 
 CMK_COMPILER='mpicc'

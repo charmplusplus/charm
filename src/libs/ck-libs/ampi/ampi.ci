@@ -31,7 +31,7 @@ module ampi {
   initproc void ampiProcInit(void);
 
   array[1D] ampiParent {
-    entry EXPEDITED_NOTRACE ampiParent(int universeNo, CProxy_TCharm threads_);
+    entry EXPEDITED_NOTRACE ampiParent(int universeNo, CProxy_TCharm threads_, int nRanks_);
     entry EXPEDITED void ResumeThread();
     entry EXPEDITED void Checkpoint(int len, char dname[len]);
     entry EXPEDITED void ExchangeProxy(CProxy_ampi);
@@ -43,13 +43,17 @@ module ampi {
     entry EXPEDITED_REDN void allInitDone(void);
     entry EXPEDITED void setInitDoneFlag();
     entry EXPEDITED void unblock(void);
-    entry EXPEDITED void ssend_ack(int);
+    entry EXPEDITED void injectMsg(int size, char buf[size]);
+    entry EXPEDITED void genericSync(AmpiMsg *);
     entry EXPEDITED void generic(AmpiMsg *);
-    entry EXPEDITED void genericRdma(nocopy char buf[size], int size, int seq, int tag,
-                                     int srcRank, MPI_Comm destcomm, int ssendReq);
+    entry EXPEDITED void genericRdma(nocopy char buf[size], int size, CMK_REFNUM_TYPE seq, int tag, int srcRank);
+    entry EXPEDITED void completedSend(int sreqIdx);
     entry EXPEDITED_NOKEEP void completedRdmaSend(CkDataMsg *msg);
+    entry EXPEDITED_NOKEEP void completedRdmaRecv(CkDataMsg *msg);
+    entry EXPEDITED void requestPut(MPI_Request req, CkNcpyBuffer targetInfo);
     entry EXPEDITED_REDN void barrierResult(void);
     entry EXPEDITED_REDN void ibarrierResult(void);
+    entry EXPEDITED_NOKEEP void bcastResult(AmpiMsg *);
     entry EXPEDITED_NOKEEP void rednResult(CkReductionMsg *msg);
     entry EXPEDITED_NOKEEP void irednResult(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void splitPhase1(CkReductionMsg *msg);

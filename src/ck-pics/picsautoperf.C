@@ -1,5 +1,13 @@
 #include  <stdlib.h>
 #include <stdio.h>
+
+#ifndef __STDC_FORMAT_MACROS
+# define __STDC_FORMAT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+# define __STDC_LIMIT_MACROS
+#endif
+#include <inttypes.h>
 #include "charm++.h"
 #include "pathHistory.h"
 #include "TopoManager.h"
@@ -252,6 +260,7 @@ void TraceAutoPerfBOC::endStepResumeCb(bool fromGlobal, int fromPE, CkCallback c
   {
     t->endStep(false);
   }
+  currentAppStep++;
   setAutoPerfDoneCallback(cb);
   run(fromGlobal, fromPE); 
 }
@@ -288,8 +297,9 @@ void TraceAutoPerfBOC::resume( ) {
 void TraceAutoPerfBOC::run(bool fromGlobal, int fromPE)
 {
   TraceAutoPerf *t = localAutoPerfTracingInstance();
-  if(picsStep % PERIOD_PERF == 0 )
+  if(picsStep % PERIOD_PERF == 0 ) {
     getPerfData(0, CkCallback::ignore );
+  }
   else
   {
     if(fromGlobal && CkMyPe() == fromPE)
@@ -350,33 +360,35 @@ void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phase
   int steps = currentAppStep-lastAnalyzeStep;
 
   //derive metrics from raw performance data
-  data[AVG_LoadPerPE] = data[AVG_UtilizationPercentage]/numpes * totaltime/steps;
-  data[AVG_UtilizationPercentage] /= numpes; 
-  data[AVG_IdlePercentage] /= numpes; 
-  data[AVG_OverheadPercentage] /= numpes; 
-  data[MAX_LoadPerPE] = data[MAX_UtilizationPercentage]*totaltime/steps;
-  data[AVG_BytesPerMsg] = data[AVG_BytesPerObject]/data[AVG_NumMsgsPerObject];
-  data[AVG_NumMsgPerPE] = (data[AVG_NumMsgsPerObject]/numpes)/steps;
-  data[AVG_BytesPerPE] = data[AVG_BytesPerObject]/numpes/steps;
-  data[AVG_CacheMissRate] = data[AVG_CacheMissRate]/numpes/steps;
+  if (steps > 0) {
+    data[AVG_LoadPerPE] = data[AVG_UtilizationPercentage]/numpes * totaltime/steps;
+    data[AVG_UtilizationPercentage] /= numpes; 
+    data[AVG_IdlePercentage] /= numpes; 
+    data[AVG_OverheadPercentage] /= numpes; 
+    data[MAX_LoadPerPE] = data[MAX_UtilizationPercentage]*totaltime/steps;
+    data[AVG_BytesPerMsg] = data[AVG_BytesPerObject]/data[AVG_NumMsgsPerObject];
+    data[AVG_NumMsgPerPE] = (data[AVG_NumMsgsPerObject]/numpes)/steps;
+    data[AVG_BytesPerPE] = data[AVG_BytesPerObject]/numpes/steps;
+    data[AVG_CacheMissRate] = data[AVG_CacheMissRate]/numpes/steps;
 
-  data[AVG_NumMsgRecv] = data[AVG_NumMsgRecv]/numpes/steps;
-  data[AVG_BytesMsgRecv] = data[AVG_BytesMsgRecv]/numpes/steps;
+    data[AVG_NumMsgRecv] = data[AVG_NumMsgRecv]/numpes/steps;
+    data[AVG_BytesMsgRecv] = data[AVG_BytesMsgRecv]/numpes/steps;
 
-  data[AVG_EntryMethodDuration] /= data[AVG_NumInvocations];
-  data[AVG_EntryMethodDuration_1] /= data[AVG_NumInvocations_1];
-  data[AVG_EntryMethodDuration_2] /= data[AVG_NumInvocations_2];
-  data[AVG_NumInvocations] = data[AVG_NumInvocations]/numpes/steps;
-  data[AVG_NumInvocations_1] = data[AVG_NumInvocations_1]/numpes/steps;
-  data[AVG_NumInvocations_2] = data[AVG_NumInvocations_2]/numpes/steps;
+    data[AVG_EntryMethodDuration] /= data[AVG_NumInvocations];
+    data[AVG_EntryMethodDuration_1] /= data[AVG_NumInvocations_1];
+    data[AVG_EntryMethodDuration_2] /= data[AVG_NumInvocations_2];
+    data[AVG_NumInvocations] = data[AVG_NumInvocations]/numpes/steps;
+    data[AVG_NumInvocations_1] = data[AVG_NumInvocations_1]/numpes/steps;
+    data[AVG_NumInvocations_2] = data[AVG_NumInvocations_2]/numpes/steps;
 
-  data[AVG_LoadPerObject] /= data[AVG_NumObjectsPerPE];
-  data[AVG_NumMsgsPerObject] /= data[AVG_NumObjectsPerPE];
-  data[AVG_BytesPerObject] /= data[AVG_NumObjectsPerPE];
+    data[AVG_LoadPerObject] /= data[AVG_NumObjectsPerPE];
+    data[AVG_NumMsgsPerObject] /= data[AVG_NumObjectsPerPE];
+    data[AVG_BytesPerObject] /= data[AVG_NumObjectsPerPE];
 
-  data[AVG_NumObjectsPerPE] = data[AVG_NumObjectsPerPE]/numpes/steps;
+    data[AVG_NumObjectsPerPE] = data[AVG_NumObjectsPerPE]/numpes/steps;
+  }
 
-  CkPrintf("\nPICS Data: PEs in group: %d\nIDLE%: %.2f\nOVERHEAD%: %.2f\nUTIL%: %.2f\nAVG_ENTRY_DURATION: %f\n", numpes, data[AVG_IdlePercentage], data[AVG_OverheadPercentage], data[AVG_UtilizationPercentage], data[AVG_EntryMethodDuration]);
+  CkPrintf("\nPICS Data: PEs in group: %d\nIDLE: %.2f%%\nOVERHEAD: %.2f%%\nUTIL: %.2f%%\nAVG_ENTRY_DURATION: %fs\n", numpes, data[AVG_IdlePercentage]*100, data[AVG_OverheadPercentage]*100, data[AVG_UtilizationPercentage]*100, data[AVG_EntryMethodDuration]);
 }
 
 void TraceAutoPerfBOC::getPerfData(int reductionPE, CkCallback cb) {
@@ -441,7 +453,7 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   }
 
   TRACE_START(PICS_CODE);
-  fprintf(CkpvAccess(fpSummary), "NEWITER %d %d %d %llu %d\n", analyzeStep, CkMyPe(), CkpvAccess(numOfPhases)*PERIOD_PERF, (CMK_TYPEDEF_UINT8)(CkWallTimer()*1000000), currentAppStep); 
+  fprintf(CkpvAccess(fpSummary), "NEWITER %d %d %d %" PRIu64 " %d\n", analyzeStep, CkMyPe(), CkpvAccess(numOfPhases)*PERIOD_PERF, (CMK_TYPEDEF_UINT8)(CkWallTimer()*1000000), currentAppStep); 
   for(int j=0; j<CkpvAccess(numOfPhases)*PERIOD_PERF; j++)
   {
     formatPerfData(data, j/CkpvAccess(numOfPhases), j%CkpvAccess(numOfPhases));
@@ -670,7 +682,7 @@ TraceAutoPerfBOC::~TraceAutoPerfBOC() { }
 
 TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
 {
-  printf("Charm++ - PICS > Enabled pics autoPerf ......\n");
+  CkPrintf("PICS> Enabled PICS autoPerf\n");
   char **argv = args->argv;
   isPeriodicalAnalysis = CmiGetArgFlagDesc(argv,"+auto-pics","start performance analysis periodically");
   isIdleAnalysis = CmiGetArgFlagDesc(argv,"+idleAnalysis","start performance analysis when idle");
@@ -682,7 +694,7 @@ TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
   CkpvAccess(fpSummary) = NULL;
   if(CmiGetArgIntDesc(argv,"+picsGroupSize", &treeGroupSize,"number of processors within a PICS group ")) {
     treeBranchFactor = 2;
-    CkPrintf("Charm++ - PICS >>>>>>>>> set scalable tree branch factor %d  group is %d \n", treeBranchFactor, treeGroupSize);
+    CkPrintf("PICS> Set scalable tree branch factor %d  group is %d\n", treeBranchFactor, treeGroupSize);
   }
   else
   {
@@ -691,13 +703,13 @@ TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
   }
 
   if(CmiGetArgIntDesc(argv,"+picsCollectionMode", &PICS_collection_mode, "Collection mode (0 full, 1 partial")) {
-    CkPrintf("Charm++ -PICS >>>>>>>>> set scalable collection mode %d \n", PICS_collection_mode);
+    CkPrintf("PICS> Set scalable collection mode %d\n", PICS_collection_mode);
   }else{
     PICS_collection_mode = FULL;
   }
 
   if(CmiGetArgIntDesc(argv,"+picsEvaluationMode", &PICS_evaluation_mode, "Evaluation mode (0 SEQ, 1 PARALLEL")) {
-    CkPrintf("Charm++ - PICS >>>>>>>>> set scalable evaluation mode %d \n", PICS_evaluation_mode);
+    CkPrintf("PICS> Set scalable evaluation mode %d\n", PICS_evaluation_mode);
   }else
   {
     PICS_evaluation_mode = SEQUENTIAL;
@@ -728,7 +740,7 @@ extern "C" void traceAutoPerfExitFunction() {
 
 void _initTraceAutoPerfNode()
 {
-  PerfDataReductionType = CkReduction::addReducer(PerfDataReduction);
+  PerfDataReductionType = CkReduction::addReducer(PerfDataReduction, false, "PerfDataReduction");
 }
 
 void _initTraceAutoPerfBOC()

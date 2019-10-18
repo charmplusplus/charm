@@ -7,8 +7,9 @@
 */
 #include <stdlib.h> /* for exit */
 #include <unistd.h> /* for execv */
-#include <sys/wait.h> /* for sys/wait.h */
+#include <sys/wait.h> /* for waitpid */
 #include <errno.h> 
+#include <string.h> /* for strdup */
 int CkSystem (const char *command) {
    int pid, status;
 

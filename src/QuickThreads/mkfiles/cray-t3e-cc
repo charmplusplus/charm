@@ -8,7 +8,7 @@ qt: md/t3e.h qt.c md/t3e.s
 	ln -s md/t3e.h qtmd.h
 	$(CC) -c -o qt.o qt.c
 	cam -o qtmds.o md/t3e.s
-	ar q libqt.a qt.o qtmds.o
+	ar q libckqt.a qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
@@ -17,5 +17,5 @@ stp:
 testpgm:
 	$(CC) -c meas.c
 	cam -o qtmdb.o md/t3e_b.s
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -o run meas.o qtmdb.o libstp.a libckqt.a
 

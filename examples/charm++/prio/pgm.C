@@ -8,7 +8,7 @@ struct Main : CBase_Main {
   int numToSend;
 
   Main(CkArgMsg* m)
-    : numToSend(30)
+    : numToSend(40)
   {
     delete m;
 
@@ -16,13 +16,18 @@ struct Main : CBase_Main {
 
     CProxy_Chare1 c1 = CProxy_Chare1::ckNew();
 
-    for (int i = 0; i < numToSend; i += 3) {
+    for (int i = 0; i < numToSend; i += 4) {
       c1.prioMarshalling(10, & CkEntryOptions().setPriority(-1) );
 
       TestMsg* msg = new (8*sizeof(int)) TestMsg;
       *(int*)CkPriorityPtr(msg) = -2;
       CkSetQueueing(msg, CK_QUEUEING_IFIFO);
       c1.prioMessage(msg);
+
+      CkEntryOptions opts;
+      opts.setPriority(-1);
+      opts.setQueueing(CK_QUEUEING_ILIFO);
+      c1.prioVoidMessage(&opts);
 
       c1.normalPrio(20);
     }
@@ -45,6 +50,10 @@ struct Chare1 : CBase_Chare1 {
     CkPrintf("prioMessage arrived\n");
     mainProxy.finished();
     delete msg;
+  }
+  void prioVoidMessage() {
+    CkPrintf("prioVoidMessage arrived\n");
+    mainProxy.finished();
   }
   void normalPrio(int test2) {
     CkPrintf("normalPrio arrived\n");

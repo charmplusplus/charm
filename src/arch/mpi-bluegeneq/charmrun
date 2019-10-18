@@ -4,6 +4,9 @@
 # have to pass bank using -A or set PROJECT environment variable
 
 args=""
+
+# Arguments that need to be passed to the charm application, not mpirun (e.g. ++quiet)
+charm_args=""
 pes=1
 machinefile=""
 pernode=32
@@ -24,7 +27,7 @@ do
 		pes=$2
 		shift
 		;;
-	+p*)
+	+p[0-9]*)
 		pes=`echo $1 | awk '{print substr($1,3)}'`
 		;;
   -machinefile)
@@ -46,7 +49,12 @@ do
 		;;
 	++quiet)
 		QUIET=1
-		args=$args" "$1
+		;;
+	++no-quiet)
+		QUIET=0
+		;;
+	++local|++no-local)
+		# Ignored (unsupported by MPI layer)
 		;;
   --pernode)
     pernode=$2
@@ -58,6 +66,10 @@ do
 	esac
 	shift
 done
+
+test $QUIET -eq 1 && charm_args=$charm_args" "++quiet
+
+args=$args" "$charm_args
 
 
 test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"

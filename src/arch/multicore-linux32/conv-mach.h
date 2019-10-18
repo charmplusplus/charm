@@ -31,7 +31,8 @@
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  1
 
-#define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 
@@ -60,6 +61,6 @@
 /*Replaced by CMK_NOT_USE_TLS_THREAD as the default case*/
 /*#define CMK_USE_TLS_THREAD                                 1 */
 
+#define CMK_CONVERSE_MPI                                   0
+
 #endif
-
-

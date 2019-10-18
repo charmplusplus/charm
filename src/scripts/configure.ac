@@ -1,5 +1,9 @@
+# Decimal representation of Charm++ release line and API revision
+# Increment the last 2 digits when making an API change
+# Increase the first three after branching for a release
 
-AC_INIT(Charm++, 2.6)
+AC_INIT(Charm++, 61000, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
+
 AC_CONFIG_SRCDIR(./Makefile)
 
 AC_CONFIG_HEADER(conv-autoconfig.h)
@@ -16,21 +20,25 @@ get_full_command_name()
     fi
 }
 
+ConvSh='../tmp/conv-mach-opt.sh'
+ConvMak='../tmp/conv-mach-opt.mak'
+
 #clean up conv-mach-opt.sh
-sed -e '/Option added by configure/d' ../include/conv-mach-opt.sh  | sed -e '/^$/d' > conv-mach-opt.sh.clean
-cp -f conv-mach-opt.sh.clean   ../include/conv-mach-opt.sh
+sed -e '/Option added by configure/d' "$ConvSh" | sed -e '/^$/d' > conv-mach-opt.sh.clean
+cp -f conv-mach-opt.sh.clean   "$ConvSh"
 rm -f conv-mach-opt.sh.clean
+
+#clean up conv-mach-opt.mak
+sed -e '/Option added by configure/d' "$ConvMak" | sed -e '/^$/d' > conv-mach-opt.mak.clean
+cp -f conv-mach-opt.mak.clean   "$ConvMak"
+rm -f conv-mach-opt.mak.clean
 
 CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
-# Decimal representation of Charm++ release line and API revision
-# Increment the last 2 digits when making an API change
-# Increase the first three after branching for a release
-VERSION=60900
-echo $VERSION > ../include/VERSION
-AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ Release/API version number])
+echo AC_PACKAGE_VERSION > ../include/VERSION
+AC_DEFINE_UNQUOTED([CHARM_VERSION], AC_PACKAGE_VERSION, [Charm++ Release/API version number])
 
 charmout="charmconfig.out"
 /bin/rm -rf $charmout
@@ -45,8 +53,9 @@ Echo() {
 # add_flag $1 $2
 # $2 is description
 add_flag() {
-        key=`echo $1 | cut -d'=' -f1`
-        last=`grep "$key=" ../include/conv-mach-opt.sh 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
+        key=$1
+        key="${key%%=*}"
+        last=`grep -w "$key" "$ConvSh" 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
         skip=0
 	if test -n "$last" -a  "$last" = "$1" 
 	then
@@ -54,7 +63,7 @@ add_flag() {
         fi
 	if test $skip = 0
         then
-	  cat >> ../include/conv-mach-opt.sh << EOT
+	  cat >> "$ConvSh" << EOT
 
 $1   # Option added by configure script's $2 section
 EOT
@@ -63,13 +72,53 @@ EOT
 
 # remove_flag $1
 remove_flag() {
-     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.sh > tmp.$$
-     cp tmp.$$ ../include/conv-mach-opt.sh
+     sed -e '/^'"$1"'=/d' "$ConvSh" > tmp.$$
+     cp tmp.$$ "$ConvSh"
+     /bin/rm -f tmp.$$
+}
+
+# add into conv-mach-opt.mak
+# add_make_flag $1 $2
+# $2 is description
+add_make_flag() {
+        key=$1
+        key="${key%%=*}"
+        key="${key%%:*}"
+        last=`grep -w "$key" "$ConvMak" 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
+        skip=0
+	if test -n "$last" -a  "$last" = "$1"
+	then
+	  skip=1
+        fi
+	if test $skip = 0
+        then
+	  # The lack of whitespace around $1 here is necessary.
+	  cat >> "$ConvMak" << EOT
+
+$1# Option added by configure script's $2 section
+EOT
+	fi
+}
+
+# remove_make_flag $1
+remove_make_flag() {
+     sed -e '/^'"$1"'=/d' "$ConvMak" > tmp.$$
+     cp tmp.$$ "$ConvMak"
      /bin/rm -f tmp.$$
 }
 
 add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
 add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
+add_make_flag "CMK_COMPILER:=$CMK_COMPILER" 'basic setup'
+add_make_flag "CMK_SMP:=$CMK_SMP" 'basic setup'
+add_make_flag "CMK_SHARED_SUF:=$CMK_SHARED_SUF" 'basic setup'
+add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
+add_make_flag "CMK_MACOSX:=$CMK_MACOSX" 'basic setup'
+add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
+add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
+add_make_flag "CMK_UTH:=$CMK_UTH" 'basic setup'
+add_make_flag "CMK_USE_LRTS:=$CMK_USE_LRTS" 'basic setup'
+add_make_flag "BUILD_CUDA:=$BUILD_CUDA" 'basic setup'
 
 # enable/disable error checking
 AC_ARG_ENABLE([error-checking],
@@ -129,10 +178,12 @@ then
   Echo "Charm tracing is disabled"
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 0, [disable tracing])
   add_flag CMK_TRACE_ENABLED=0
+  add_make_flag 'CMK_TRACE_ENABLED:=0' 'tracing'
 else
   Echo "Charm tracing is enabled"
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 1, [enable tracing])
   add_flag CMK_TRACE_ENABLED=1
+  add_make_flag 'CMK_TRACE_ENABLED:=1' 'tracing'
 fi
 
 AC_ARG_ENABLE([tracing-commthread],
@@ -150,20 +201,54 @@ else
 fi
 
 
+# enable task queue
+AC_ARG_ENABLE([task_queue],
+            [AS_HELP_STRING([--enable-task-queue],
+              [enable task queue])],
+            [enable_task_queue=$enableval],
+            [enable_task_queue=no])
+
+if test "$enable_task_queue" = "no"
+then
+  Echo "Task Queue is disabled"
+  AC_DEFINE_UNQUOTED(CMK_TASKQUEUE, 0, [disable task queue])
+else
+  Echo "Task Queue is enabled"
+  AC_DEFINE_UNQUOTED(CMK_TASKQUEUE, 1, [enable task queue])
+fi
+
+# enable drone mode
+AC_ARG_ENABLE([drone_mode],
+            [AS_HELP_STRING([--enable-drone-mode],
+              [enable drone mode])],
+            [enable_drone_mode=$enableval],
+            [enable_drone_mode=no])
+
+if test "$enable_drone_mode" = "no"
+then
+  Echo "Drone mode is disabled"
+  AC_DEFINE_UNQUOTED(CMK_DRONE_MODE, 0, [disable drone mode])
+else
+  Echo "Drone mode is enabled"
+  AC_DEFINE_UNQUOTED(CMK_DRONE_MODE, 1, [enable drone mode])
+fi
+
 AC_ARG_ENABLE([charmdebug],
             [AS_HELP_STRING([--enable-charmdebug],
               [enable charmDebug])], ,
             [enable_charmdebug=yes])
 
-if test "$enable_charmdebug" = "no"
+if test "$enable_charmdebug" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
 then
   Echo "CharmDebug is disabled" 
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 0, [disable charmdebug])
   add_flag CMK_CHARMDEBUG=0
+  add_make_flag 'CMK_CHARMDEBUG:=0'
 else
   Echo "CharmDebug is enabled" 
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 1, [enable charmdebug])
   add_flag CMK_CHARMDEBUG=1
+  add_make_flag 'CMK_CHARMDEBUG:=1'
 fi
 
 AC_ARG_ENABLE([replay],
@@ -177,7 +262,14 @@ then
   Echo "Charm record/replay is disabled"
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
 else
-  Echo "Charm record/replay is enabled"
+  if test "$enable_tracing" = "no"
+  then
+    Echo "Charm record/replay is disabled because tracing is disabled"
+    AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
+  else
+    Echo "Charm record/replay is enabled"
+    AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 1, [enable replay])
+  fi
 fi
 
 AC_ARG_ENABLE([ccs],
@@ -185,7 +277,7 @@ AC_ARG_ENABLE([ccs],
               [enable CCS])], ,
             [enable_ccs=yes])
 
-if test "$enable_ccs" = "no"
+if test "$enable_ccs" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
 then
   Echo "CCS is disabled" 
   AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
@@ -224,6 +316,22 @@ else
   AC_DEFINE_UNQUOTED(CMK_LB_USER_DATA, 0, [disable lb user data])
 fi
 
+AC_ARG_ENABLE([lockless-queue],
+            [AS_HELP_STRING([--enable-lockless-queue],
+              [enable lockless queue for PE local and node queue])],
+            [enable_lockless_queue=$enableval],
+            [enable_lockless_queue=no])
+
+if test "$enable_lockless_queue" = "no"
+then
+  Echo "Lockless queue for PE local and node queue is disabled"
+  AC_DEFINE_UNQUOTED(CMK_LOCKLESS_QUEUE, 0, [disable lockless queue for pe/node queue])
+else
+  Echo "Lockless queue for PE local and node queue is enabled"
+  AC_DEFINE_UNQUOTED(CMK_LOCKLESS_QUEUE, 1, [enable lockless queue for pe/node queue])
+fi
+
+
 AC_ARG_ENABLE([shrinkexpand],
             [AS_HELP_STRING([--enable-shrinkexpand],
               [enable malleable jobs / shrink expand])],
@@ -244,6 +352,21 @@ then
 else
   Echo "Charm shrink expand is disabled"
   AC_DEFINE_UNQUOTED(CMK_SHRINK_EXPAND, 0, [disable shrinkexpand])
+fi
+
+AC_ARG_ENABLE([charmpy],
+            [AS_HELP_STRING([--enable-charmpy],
+              [enable charm4py support])],
+            [enable_charmpy=$enableval],
+            [enable_charmpy=no])
+
+if test "$enable_charmpy" = "yes"
+then
+  Echo "charm4py support is enabled"
+  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 1, [enable charmpy])
+else
+  Echo "charm4py support is disabled"
+  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 0, [disable charmpy])
 fi
 
 AC_ARG_WITH([numa],
@@ -273,6 +396,10 @@ else
   test_finish 1
 fi
 
+AC_DEFINE_UNQUOTED(CMK_LBID_64BIT, 1, [enable 64 bit LB ID])
+
+AC_DEFINE_UNQUOTED(CMK_CKSECTIONINFO_STL, 1, [enable STL CkSectionInfo])
+
 AC_ARG_WITH([qlogic],
             [AS_HELP_STRING([--with-qlogic],
               [QLogic based Infiniband])],[with_qlogic=yes],
@@ -289,7 +416,7 @@ fi
 #
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
-base_version=`cat .vdir`
+base_version="$CMK_VDIR"
 AC_DEFINE_UNQUOTED(CMK_MACHINE_NAME, "$version",[machine name])
 AC_MSG_RESULT($version)
 AC_SUBST(base_version)
@@ -371,6 +498,30 @@ test_cxx() {
 	/bin/rm -f out
 }
 
+# Test: tries to compile C++ file $t (described by $1) using native compiler.
+#  If successful, prints $2 and sets $pass/clears $fail
+#  If failure, prints $3 and sets $pass/clears $fail
+#  additional arguments to c++ compiler are passed as $4
+test_native_cxx() {
+        AC_MSG_CHECKING("$1")
+	echo "### $1" >> $charmout
+	cat $t >> $charmout
+	echo $CMK_NATIVE_CXX $CMK_NATIVE_CXX_FLAGS -I../include -I. $CMK_INCDIR $CMK_SYSINC $OPTS_CXX -c $t -o test.o $4 >> $charmout
+	$CMK_NATIVE_CXX $CMK_NATIVE_CXX_FLAGS -I../include -I. $CMK_INCDIR $CMK_SYSINC $OPTS_CXX -c $t -o test.o $4 > out 2>&1
+	test_result $? "$1" "$2" "$3"
+	strictpass=$pass
+	strictfail=$fail
+        if test $pass -eq 1
+	then
+          if grep -i "warn" out > /dev/null 2>&1 || grep -i "(W)" out > /dev/null 2>&1
+	  then
+	    strictpass="0" && strictfail="1"
+          fi
+        fi
+	cat out >> $charmout
+	/bin/rm -f out
+}
+
 # Testlink: tries to compile and link a C++ file $t (described by $1).
 #  If successful, prints $2 and sets $pass/clears $fail
 #  If failure, prints $3 and sets $pass/clears $fail
@@ -385,8 +536,8 @@ test_link() {
         then
           test_result 1 "$1" "$2" "$3"
         else
-          echo $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> $charmout
-          $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> out 2>&1
+          echo $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 $5 >> $charmout
+          $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 $5 >> out 2>&1
           ret=$?
 	  test ! -x testlink && ret=1
           test_result $ret "$1" "$2" "$3"
@@ -418,8 +569,8 @@ test_linkc() {
         then
           test_result 1 "$1" "$2" "$3"
         else
-          echo $CMK_LD $CMK_LD_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> $charmout
-          $CMK_LD $CMK_LD_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> out 2>&1
+          echo $CMK_LD $CMK_LD_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> $charmout
+          $CMK_LD $CMK_LD_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> out 2>&1
           test_result $? "$1" "$2" "$3"
         fi
  	strictpass=$pass
@@ -461,7 +612,7 @@ test_linkso() {
 test_finish() {
 	rm -f $t $tc testlink test.o	> /dev/null 2>&1
 	/bin/rm -f out
-	test $1 -eq 1 && echo "*** Please find detailed output in charmconfig.out ***"
+	test $1 -eq 1 && echo "*** Please find detailed output in tmp/charmconfig.out ***"
 	exit $1
 }
 
@@ -531,9 +682,9 @@ int main() {
 	return 0;
 }
 EOT
-#echo "set C++ linker as: $CMK_LDXX $OPTS_LDXX"
+#echo "set C++ linker as: $CMK_LDXX $OPTS_LD"
 AC_MSG_CHECKING("C++ linker as")
-AC_MSG_RESULT("$CMK_LDXX $OPTS_LDXX")
+AC_MSG_RESULT("$CMK_LDXX $OPTS_LD")
 test_link "whether linker works" "ok" "no" ""
 if test $fail -eq 1
 then
@@ -613,11 +764,25 @@ then
   echo "Charm++ requires C++11 support, but doesn't know the flag to enable it"
   echo
   echo "For Intel's compiler please see"
-  echo "https://charm.cs.illinois.edu/redmine/issues/1560"
+  echo "https://github.com/UIUC-PPL/charm/issues/1560"
   echo "about making a suitable version of gcc/g++/libstdc++ available"
   echo
   echo "For Blue Gene/Q please use the Clang compiler"
   test_finish 1
+fi
+
+test_native_cxx "whether native C++ compiler supports C++11 without flags" "yes" "no" ""
+if test $strictpass -ne 1
+then
+  # Flags for g++/clang++/icpc/xlC++, pgCC, and CrayCC respectively
+  for i in "-std=c++11" "--c++11" "-h std=c++11"; do
+    test_native_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
+    if test $strictpass -eq 1
+    then
+      add_flag "$(echo CMK_NATIVE_CXX_FLAGS=\"\$CMK_NATIVE_CXX_FLAGS $i\")" "Enable C++11 support"
+      break
+    fi
+done
 fi
 
 # Workaround for bug #1045 appearing in GCC >6.x
@@ -628,8 +793,52 @@ then
     OPTS_CXX="$OPTS_CXX -fno-lifetime-dse"
 fi
 
+# Test for a flag tlsglobals sometimes depends on
+test_cxx "whether C++ compiler accepts -mno-tls-direct-seg-refs" "yes" "no" "-mno-tls-direct-seg-refs"
+if test $strictpass -eq 1
+then
+    add_flag 'CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="1"' "tlsglobals"
+fi
+
+# Determine compiler/linker flags to build libcharm.so for charm4py
+if test "$enable_charmpy" = "yes"
+then
+
+  cat > $t <<EOT
+int main() { return 0; }
+EOT
+
+  test_cxx "whether C++ compiler accepts --no-as-needed" "yes" "no" "--no-as-needed"
+  if test $strictpass -eq 1
+  then
+      add_flag "$(echo CXX_NO_AS_NEEDED=\"--no-as-needed\")" "--no-as-needed flag necessary for compilers that default to linking with --as-needed"
+  fi
+
+  got_opt_whole_archive=""
+  # Flags for g++/clang++/icpc, Apple-LLVM respectively
+  for i in "-Wl,--whole-archive -Wl,--no-whole-archive" "-Wl,-all_load"; do
+      test_link "whether linker supports '$i'" "yes" "no" "" "$i"
+      if test $strictpass -eq 1
+      then
+        got_opt_whole_archive="true"
+        IFS=' ' read LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST <<EOF
+        $i
+EOF
+        add_flag "$(echo LDXX_WHOLE_ARCHIVE_PRE=\"$LDXX_WHOLE_ARCHIVE_PRE\")" "Flags to link whole archives into libcharm.so"
+        add_flag "$(echo LDXX_WHOLE_ARCHIVE_POST=\"$LDXX_WHOLE_ARCHIVE_POST\")" "Flags to link whole archives into libcharm.so"
+        break
+      fi
+  done
+
+  if test -z $got_opt_whole_archive
+  then
+    echo "Don't know how to build libcharm.so for Charm4py"
+    test_finish 1
+  fi
+fi
+
 # Figure out if the user has asked to enable the latest language standards
-USER_ASKED_FOR_NEW_STD=`echo "$BUILDOPTS" | grep "-use-new-std" | wc -l`
+USER_ASKED_FOR_NEW_STD=`echo "$BUILDOPTS" | grep "\-use-new-std" | wc -l`
 
 # If the user has asked for the newer standards, check if the compilers know about them
 if test $USER_ASKED_FOR_NEW_STD -ge 1
@@ -653,28 +862,7 @@ then
         # For the rest of configure, append this to compilation flags
         OPTS_CC="$CMK_ENABLE_C11 $OPTS_CC"
 fi
-
-#### check if C++ compiler supports cpp11 compilation flags ####
-cat > $t <<EOT
-#include <iostream>
-
-int foo()
-{
-  return 0;
-}
-EOT
-test_cxx "whether c++ compiler knows of the cpp11 standard" "ok" "no" "$CMK_ENABLE_CPP11"
-AC_DEFINE_UNQUOTED(CMK_COMPILER_KNOWS_CPP11, $pass, [whether c++ compiler knows of the cpp11 standard] )
-if test $pass -eq 1
-then
-        # Record results for charmc's future use
-        add_flag 'CMK_COMPILER_KNOWS_CPP11="1"' "cpp11"
-        # For the rest of configure, append this to compilation flags
-        OPTS_CXX="$CMK_ENABLE_CPP11 $OPTS_CXX"
-fi
-
 fi # endif USER_ASKED_FOR_NEW_STD
-
 
 # Perform the tests
 
@@ -738,7 +926,36 @@ else
   fi
 fi
 
-#### Check if compiler if 64 bit ####
+AC_ARG_WITH([mempool-cutoff],
+            [AS_HELP_STRING([--with-mempool-cutoff=N],
+                            [exponent of the maximum power of two to use for bin sizes in the mempool])],
+            [], [with_mempool_cutoff=26])
+
+if test "$((6 < $with_mempool_cutoff && $with_mempool_cutoff < 32))" = '1'
+then
+  Echo "Using mempool cutoff... 2^$with_mempool_cutoff"
+  AC_DEFINE_UNQUOTED(CMK_MEMPOOL_CUTOFFNUM, $((with_mempool_cutoff - 6)), [mempool cutoff])
+else
+  Echo "Invalid number ($with_mempool_cutoff) specified for mempool cutoff. Valid range: 7 <= N <= 31"
+  test_finish 1
+fi
+
+# enable mpich tests
+AC_ARG_ENABLE([ampi-mpich-tests],
+            [AS_HELP_STRING([--enable-ampi-mpich-tests],
+            [enable mpich tests for ampi])],
+            [enable_ampi_mpich_tests=yes],
+            [enable_ampi_mpich_tests=no])
+
+if test "$enable_ampi_mpich_tests" = "yes"
+then
+  AC_DEFINE([AMPI_ERRHANDLER_RETURN], [1], [enable ampi fatal error return])
+  add_make_flag "BUILD_MPICH_TESTS:=true" 'mpich tests setup'
+else
+  AC_DEFINE([AMPI_ERRHANDLER_RETURN], [0], [disable ampi fatal error return])
+fi
+
+#### Check if compiler is 64 bit ####
 cat > $t <<EOT
 #include <stdio.h>
 
@@ -780,6 +997,26 @@ EOT
 test_cxx "whether compiler supports std::alignment_of" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ALIGNMENT_OF, $strictpass, [whether compiler supports std::alignment_of])
 
+### Check if compiler implements regex ###
+cat > $t <<EOT
+#include <regex>
+void foo()
+{
+#if __cplusplus >= 201103L &&                             \
+    (!defined(__GLIBCXX__) || (__cplusplus >= 201402L) || \
+        (defined(_GLIBCXX_REGEX_DFS_QUANTIFIERS_LIMIT) || \
+         defined(_GLIBCXX_REGEX_STATE_LIMIT)           || \
+             (defined(_GLIBCXX_RELEASE)                && \
+             _GLIBCXX_RELEASE > 4)))
+// compiler has regex support, continue
+#else
+// force compilation to fail
+static_assert(false, "compiler has no regex implementation");
+#endif
+}
+EOT
+test_cxx "whether compiler implements regex" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_REGEX, $pass, [whether compiler implements regex])
 
 #### test if has values.h ####
 cat > $t <<EOT
@@ -852,6 +1089,9 @@ EOT
 test_cxx "whether __int64 works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int64_DEFINED], $pass, [whether __int64 works])
 
+
+CMK_HAS_INT16=0
+
 #### Check __int128 ####
 cat > $t <<EOT
 #include <stdlib.h>
@@ -865,6 +1105,7 @@ test_cxx "whether __int128 (128-bit integer) works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int128_DEFINED], $pass, [whether __int128 works])
 if test $pass -eq 1
 then
+  CMK_HAS_INT16=1
   add_flag CMK_HAS_INT16=1
 fi
 
@@ -883,8 +1124,14 @@ test_cxx "whether __int128_t (128-bit integer) works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int128_t_DEFINED], $pass, [whether __int128_t works])
 if test $pass -eq 1
 then
+  CMK_HAS_INT16=1
   add_flag CMK_HAS_INT16=1
 fi
+
+#### Summarize *int128* ####
+
+AC_DEFINE_UNQUOTED([CMK_HAS_INT16], $CMK_HAS_INT16, [whether any 128-bit integer works])
+
 
 ### Check if we have C++11 <atomic> ###
 cat > $t <<EOT
@@ -928,6 +1175,10 @@ cat > $t <<EOT
 #include <ucontext.h>
 struct _libc_fpstate   fpstate;
 fpregset_t *fp;
+int main() {
+  ucontext_t context;
+  context.uc_mcontext.fpregs = 0;
+}
 EOT
 test_cxx "whether ucontext has FPU pointer" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_CONTEXT_FPU_POINTER, $pass, [whether ucontext has pointer])
@@ -1000,19 +1251,6 @@ EOT
 test_cxx "whether C++ signed char and char differ" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIGNEDCHAR_DIFF_CHAR, $pass, [whether C++ signed char and char differ])
 
-### check if varsize array on stack ####
-cat > $t <<EOT
-#include <stdio.h>
-void foo()
-{
-  int size=10;
-  char arr[size];
-}
-
-EOT
-test_cxx "whether C++ allows declaration of varsize array" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_DECLARE_VARSIZE_ARRAY, $pass, [whether C++ allows declaration of variable sized array])
-
 #### check if typeinfo exists and works #####
 cat > $t <<EOT
 #include <typeinfo>
@@ -1069,61 +1307,18 @@ EOT
 test_cxx "whether std::inserter is defined" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STD_INSERTER, $pass, [whether std::inserter works])
 
+#### check if C++17's std::void_t is defined #####
+cat > $t <<EOT
+#include <type_traits>
+
+template<typename T, typename = std::void_t<>>
+struct has_pup_member : std::false_type {};
+
+EOT
+test_cxx "whether std::void_t is defined" "ok" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STD_VOID_T, $pass, [whether std::void_t works])
 
 ####### Check support for features added by the new C11 and CPP11 standards ########
-
-#### check if std::unordered_map is defined #####
-cat > $t <<EOT
-#include <unordered_map>
-
-int foo()
-{
-  std::unordered_map<int,int> myhashtbl;
-  myhashtbl[[0]] = 42;
-  myhashtbl[[1234]] = 0;
-  return myhashtbl[[1234]];
-}
-EOT
-test_cxx "whether std::unordered_map is defined" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_STD_UNORDERED_MAP, $pass, [whether std::unordered_map works])
-
-if test $pass -ne 1
-then
-	echo "Charm++ requires std::unordered_map support"
-	test_finish 1
-fi
-
-#### check if anon structs are permitted #####
-cat > $t <<EOT
-#include <iostream>
-using std::cout;
-
-struct idx
-{
-    const static int dims = 3;
-    union
-    {
-        int data[[dims]];
-        struct { int x, y, z; };
-    };
-
-    idx(const int i=0, const int j=0, const int k=0): x(i), y(j), z(k) {}
-};
-
-int main()
-{
-    cout<<"Hello World!\n";
-    idx myidx(1, 2, 3);
-    cout<< "idx = ("
-        << myidx.data[[0]] << ","
-        << myidx.data[[1]] << ","
-        << myidx.z << ")\n";
-    return (myidx.data[[0]] == 1 && myidx.y == 2 && myidx.data[[2]] == 3);
-}
-EOT
-test_cxx "whether anon structs are permitted" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_ANON_STRUCTS, $pass, [whether anon structs are permitted])
-
 
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
@@ -1243,41 +1438,84 @@ test_linkc "whether synchronization primitives (__sync_synchronize) works in C" 
 AC_DEFINE_UNQUOTED(CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE, $pass, [whether sync_synchronize primitives works in C])
 
 
+### test for __executable_start ###
+
+cat > $tc <<EOT
+extern int __executable_start;
+int main()
+{
+  return __executable_start;
+}
+EOT
+test_linkc "whether has __executable_start" "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK_HAS_EXECUTABLE_START], $pass, [whether has __executable_start])
+
 ### test if switching TLS register ###
 if test $in64bit = 1
 then
 cat > $t <<EOT
-#include <elf.h>
-#include <stdlib.h>
-#include <malloc.h>
-
 void switchTLS() {
-  Elf64_Addr m1, m2;
+  void * m1, * m2;
   asm volatile ("movq %%fs:0x0, %0\n\t"
                 "movq %1, %%fs:0x0\n\t"
-                : "=r"(m1)
+                : "=&r"(m1)
                 : "r"(m2));
 }
 EOT
 test_cxx "whether switching TLS register (64-bit) is supported" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING64, $strictpass, [Allows switching TLS 64-bit.])
+AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING_X86_64, $strictpass, [Allows switching TLS on x86_64.])
 else
 cat > $t <<EOT
-#include <elf.h>
-#include <stdlib.h>
-#include <malloc.h>
-
 void switchTLS() {
-  Elf32_Addr m1, m2;
+  void * m1, * m2;
   asm volatile ("movl %%gs:0x0, %0\n\t"
                 "movl %1, %%gs:0x0\n\t"
-                : "=r"(m1)
+                : "=&r"(m1)
                 : "r"(m2));
 }
 EOT
 test_cxx "whether switching TLS register (32-bit) is supported" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING32, $strictpass, [Allows switching TLS in 32-bit.])
+AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING_X86, $strictpass, [Allows switching TLS on x86.])
 fi
+
+### test for dl_iterate_phdr ###
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <link.h>
+#include <stddef.h>
+static int callback(struct dl_phdr_info* info, size_t size, void* data)
+{
+  return 0;
+}
+int main()
+{
+  dl_iterate_phdr(callback, NULL);
+  return 0;
+}
+EOT
+test_linkc "whether has dl_iterate_phdr" "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK_HAS_DL_ITERATE_PHDR], $pass, [whether has dl_iterate_phdr])
+
+
+### test for __malloc_hook ###
+
+cat > $tc <<EOT
+extern int __malloc_hook;
+int main()
+{
+  return __malloc_hook;
+}
+EOT
+test_linkc "whether has __malloc_hook" "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK_HAS_MALLOC_HOOK], $pass, [whether has __malloc_hook])
+add_make_flag "CMK_HAS_MALLOC_HOOK:=$pass" 'whether has __malloc_hook'
+
 
 #### test if we can build OFI ####
 if test "$CMK_BUILD_OFI" = 1
@@ -1325,6 +1563,32 @@ fi
 
 fi
 
+#### test if we can build UCX ####
+if test "$CMK_BUILD_UCX" = 1
+then
+cat > $tc <<EOT
+#include <ucp/api/ucp.h>
+int main(int argc, char **argv)
+{
+  unsigned major, minor, number;
+  ucp_get_version(&major, &minor, &number);
+  return 0;
+}
+EOT
+test_cc "whether build on UCX" "yes" "no" "-lucp"
+AC_DEFINE_UNQUOTED(CMK_BUILD_ON_UCX, $strictpass, [build UCX.])
+BUILD_UCX=$strictpass
+
+if test $BUILD_UCX -eq 0
+then
+  echo "Error: Unable to compile UCX"
+  test_finish 1
+else
+  test_linkc "whether -lucp" "ok" "no" "-lucp"
+fi
+
+fi
+
 #### test if we can build MPI ####
 if test "$CMK_BUILD_MPI" = 1
 then
@@ -1348,7 +1612,7 @@ then
   test_finish 1
 fi
 
-if test $BUILD_MPI -eq 1 -a -z "$BGP_FLOOR"
+if test $BUILD_MPI -eq 1
 then
   test_linkc "whether need to specify MPI library" "no" "yes" ""
   if test $pass -ne 1
@@ -1413,8 +1677,13 @@ fi
 
 #### test for getrusage with RUSAGE_THREAD ###
 cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
 #include <sys/time.h>
-#define __USE_GNU   1
 #include <sys/resource.h>
 int main() {
   struct rusage usage;
@@ -1573,6 +1842,18 @@ int main() {
 EOT
 test_link "whether has mallinfo" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLINFO, $pass, [whether has mallinfo])
+
+#### test for __morecore ###
+cat > $t <<EOT
+#include <cstddef>
+int main() {
+  extern void *(*__morecore)(ptrdiff_t);
+  __morecore(0);
+  return 0;
+}
+EOT
+test_link "whether expects __morecore symbol" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_EXPECTS_MORECORE, $pass, [whether expects __morecore symbol])
 
 #### test for popen ###
 cat > $t <<EOT
@@ -1791,13 +2072,131 @@ fi
 
 if test $pass -eq 1 -o $noldl -eq 1
 then
+	CMK_HAS_DLOPEN='1'
 # One version or another of dlopen worked: compile it in
 	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1, [dlopen])
 fi
 
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
+  return dlsym(RTLD_DEFAULT, "main") != NULL;
+}
+EOT
+test_cc "whether has RTLD_DEFAULT" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_RTLD_DEFAULT, $pass, [whether has RTLD_DEFAULT])
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
+  return dlsym(RTLD_NEXT, "main") != NULL;
+}
+EOT
+test_cc "whether has RTLD_NEXT" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_RTLD_NEXT, $pass, [whether has RTLD_NEXT])
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
+  return dlmopen(LM_ID_NEWLM, "foo.so", 0) == NULL;
+}
+EOT
+test_cc "whether has dlmopen" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_DLMOPEN, $pass, [whether has dlmopen])
+CMK_HAS_DLMOPEN="$pass"
+
+cat > $tc <<EOT
+#include <unistd.h>
+int main()
+{
+  char exe[[1024]];
+  return readlink("/proc/self/exe", exe, sizeof(exe)-1) == -1;
+}
+EOT
+test_cc "whether has readlink" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_READLINK, $pass, [whether has readlink])
+CMK_HAS_READLINK="$pass"
+
+cat > $tc <<EOT
+#include <limits.h>
+#include <stdlib.h>
+int main()
+{
+  return realpath("/proc/self/exe", NULL) == NULL;
+}
+EOT
+test_cc "whether has realpath" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_REALPATH, $pass, [whether has realpath])
+CMK_HAS_REALPATH="$pass"
+
+case "$CMK_VDIR" in
+  *-win-*|*-win64)
+    CMK_CAN_GET_BINARY_PATH='1'
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='0' # TODO: technically possible, but more work to be done
+    ;;
+  *-darwin*)
+    CMK_CAN_GET_BINARY_PATH='1'
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY="$CMK_HAS_DLOPEN"
+    ;;
+  *)
+    if test "$CMK_HAS_READLINK" = '1' -o "$CMK_HAS_REALPATH" = '1'
+    then
+      CMK_CAN_GET_BINARY_PATH='1'
+    else
+      CMK_CAN_GET_BINARY_PATH='0'
+    fi
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY="$CMK_HAS_DLOPEN"
+    ;;
+esac
+
+if test "$CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1'
+then
+  CMK_SUPPORTS_FSGLOBALS='1'
+else
+  CMK_SUPPORTS_FSGLOBALS='0'
+fi
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_FSGLOBALS, $CMK_SUPPORTS_FSGLOBALS, [whether supports filesystem globals])
+add_flag "CMK_SUPPORTS_FSGLOBALS=$CMK_SUPPORTS_FSGLOBALS" 'filesystem globals'
+add_make_flag "CMK_SUPPORTS_FSGLOBALS:=$CMK_SUPPORTS_FSGLOBALS" 'filesystem globals'
+
+if test "$CMK_HAS_DLMOPEN" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1'
+then
+  CMK_SUPPORTS_PIPGLOBALS='1'
+else
+  CMK_SUPPORTS_PIPGLOBALS='0'
+fi
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIPGLOBALS, $CMK_SUPPORTS_PIPGLOBALS, [whether supports PiP globals])
+add_flag "CMK_SUPPORTS_PIPGLOBALS=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
+add_make_flag "CMK_SUPPORTS_PIPGLOBALS:=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
+
+
 ### test gethostname ####
 cat > $tc <<EOT
-#ifdef WIN32
+#ifdef _WIN32
 #include <Winsock2.h>
 #else
 #include <stdlib.h>
@@ -1812,7 +2211,7 @@ int main()
   return 0;
 }
 EOT
-test_linkc "whether gethostname call exists" "yes" "no" ""
+test_cc "whether gethostname call exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_GETHOSTNAME, $pass, [whether gethostname() exists])
 
 #### check if getProcAddress works ####
@@ -1875,6 +2274,8 @@ void *foo(void *a,int l,int fd) {
 EOT
 test_cxx "whether the mmap() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MMAP, $pass, [whether the mmap() syscall exists])
+add_flag "CMK_HAS_MMAP=$pass"
+add_make_flag "CMK_HAS_MMAP:=$pass"
 
 #### check if mmap accepts MAP_ANON ####
 cat > $t <<EOT
@@ -1942,10 +2343,36 @@ int main() {
 EOT
 test_link "whether has support for shm transport using Cross Memory Attach" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_CMA, $pass, [whether supports cma])
+CMK_HAS_CMA="$pass"
+
+test "$CMK_HAS_CMA" = '1' -a "$CMK_MULTICORE" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_USE_CMA='1' || CMK_USE_CMA='0'
+add_make_flag "CMK_USE_CMA:=$CMK_USE_CMA" 'Cross Memory Attach'
+
+#### check if -rdynamic works ####
+cat > $t <<EOT
+int main() {
+  return 0;
+}
+EOT
+TRACE_LINK_FLAG=''
+CAN_EXPORT_SYMBOLS='0'
+for i in '-rdynamic' '-Wl,--export-dynamic'; do
+  test_link "whether has $i" "yes" "no" "$i"
+  if test "$strictpass" = '1'; then
+    TRACE_LINK_FLAG="$i"
+    CAN_EXPORT_SYMBOLS='1'
+    break
+  fi
+done
+
+if test "$CAN_EXPORT_SYMBOLS" = '1'; then
+  add_flag 'CMK_LD="$CMK_LD '$TRACE_LINK_FLAG'"' "exporting program symbols to shared objects"
+  add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "exporting program symbols to shared objects"
+fi
 
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
-#include "cmibacktrace.c"
+#include "cmibacktrace.C"
 
 int main() {
 	int nLevels=1;
@@ -1954,15 +2381,8 @@ int main() {
 	return 0;
 }
 EOT
-TRACE_LINK_FLAG="-rdynamic"
 test_link "whether glibc backtrace works" "yes" "no" "-DCMK_USE_BACKTRACE=1 $TRACE_LINK_FLAG"
 AC_DEFINE_UNQUOTED(CMK_USE_BACKTRACE, $pass, [whether glibc backtrace works])
-
-if test $strictpass -eq 1
-then 
-	add_flag 'CMK_LD="$CMK_LD '$TRACE_LINK_FLAG'"' "backtrace"
-	add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "backtrace"
-fi
 
 #### test sleep ####
 cat > $t <<EOT
@@ -2000,9 +2420,16 @@ test_cxx "whether personality() and ADDR_NO_RANDOMIZE exist" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ADDR_NO_RANDOMIZE, $pass, [whether personality() and ADDR_NO_RANDOMIZE exist])
 
 
+# enable/disable zlib
+AC_ARG_ENABLE([zlib],
+            [AS_HELP_STRING([--enable-zlib],
+              [enable zlib support])],
+            [enable_zlib=$enableval],
+            [enable_zlib=yes])
+
 #### test if has zlib ####
 # bproc doesnot like -lz in any case
-if test -z "$CMK_BPROC"
+if test -z "$CMK_BPROC" && test "$enable_zlib" = "yes"
 then
 
 cat > $t <<EOT
@@ -2015,10 +2442,10 @@ int main() {
 }
 EOT
 test_link "whether has zlib" "yes" "no" "-lz"
-AC_DEFINE_UNQUOTED(CMK_PROJECTIONS_USE_ZLIB, $pass, [whether has zlib])
+AC_DEFINE_UNQUOTED(CMK_USE_ZLIB, $pass, [whether has zlib])
 if test $pass -eq 1
 then 
-	add_flag 'CMK_LIBZ="-lz"' "zlib"
+	add_flag 'CMK_SYSLIBS="$CMK_SYSLIBS -lz"' "zlib"
 fi
 
 fi
@@ -2032,6 +2459,10 @@ int main() {
 EOT
 test_cxx "whether has elf.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK_HAS_ELF_H], $pass, [whether has elf.h])
+if test $pass -eq 1
+then
+	add_flag "CMK_HAS_ELF_H='1'" "elf.h"
+fi
 
 #### test if has Multiprocessing.h for apple ####
 cat > $t <<EOT
@@ -2060,7 +2491,7 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether ntohl is available" "yes" "no" ""
+test_cc "whether ntohl is available" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_NTOHL, $pass, [whether ntohl is available])
 
 ### test for libjpeg ####
@@ -2081,6 +2512,7 @@ AC_DEFINE_UNQUOTED(CMK_USE_LIBJPEG, $pass, [whether has libjpeg])
 if test $pass -eq 1
 then
         add_flag 'CMK_LIBJPEG="-ljpeg"' "libjpeg"
+        add_make_flag 'CMK_LIBJPEG:=-ljpeg' 'libjpeg'
 fi
 
 #### check if PAPI exists ####
@@ -2131,6 +2563,7 @@ AC_DEFINE_UNQUOTED(CMK_PYTHON_VERSION, ${PYTHON_VERSION}, [Python version])
 if test $pass -eq 1
 then
 	add_flag "CMK_BUILD_PYTHON=$PYTHON_VERSION" "python"
+	add_make_flag "CMK_BUILD_PYTHON:=$PYTHON_VERSION" 'python'
 fi
 
 ## Cray specific test
@@ -2157,7 +2590,7 @@ int main() {
     return 0;
 }
 EOT
-test_linkc "whether PMI_Get_nid exists" "yes" "no" ""
+test_linkc "whether PMI_Get_nid exists" "yes" "no" "$CMK_CRAY_LIBS"
 AC_DEFINE_UNQUOTED(CMK_HAS_PMI_GET_NID, $pass, [whether PMI_Get_nid exists])
 
 #### test if Cray mesh topology will work ####
@@ -2234,7 +2667,7 @@ int main() {
     return 0;
 }
 EOT
-test_linkc "whether GNI_GetBIConfig exists" "yes" "no" ""
+test_linkc "whether GNI_GetBIConfig exists" "yes" "no" "$CMK_CRAY_LIBS"
 AC_DEFINE_UNQUOTED(CMK_BALANCED_INJECTION_API, $pass, [whether Cray gni_pub has GNI_GetBIConfig])
 fi # end of BIConfig test
 
@@ -2255,6 +2688,8 @@ test_linkso "whether can build shared library" "yes" "no" ""
 if test $pass -eq 0
 then 
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
+	add_make_flag 'CMK_NO_BUILD_SHARED:=true' 'build-shared'
+	CMK_NO_BUILD_SHARED='true'
 else
 	BUILD_SHARED=1
         if test "$BUILD_MPI" = "1"
@@ -2276,6 +2711,8 @@ EOT
 	if test $BUILD_SHARED -eq 0
 	then
 		add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
+		add_make_flag 'CMK_NO_BUILD_SHARED:=true' 'build-shared'
+		CMK_NO_BUILD_SHARED='true'
 	fi
 fi
 
@@ -2437,6 +2874,83 @@ EOF
   /bin/rm -f conftest.f90
 fi
 
+### test if the C++ linker succeeds with a Fortran entry point ##
+
+cat > conftest.f90 <<EOF
+      PROGRAM empty
+      END PROGRAM
+EOF
+test_link_fortran_main() {
+  AC_MSG_CHECKING("$1")
+  echo "### $1" >> $charmout
+  cat conftest.f90 >> $charmout
+  echo $CMK_CF90 -c conftest.f90 -o test.o $4 >> $charmout
+  $CMK_CF90 -c conftest.f90 -o test.o $4 > out 2>&1
+  if test $? -ne 0
+  then
+    test_result 1 "$1" "$2" "$3"
+  else
+    echo $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $CMK_F90LIBS $CMK_F90MAINLIBS $4 $5 >> $charmout
+    $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $CMK_F90LIBS $CMK_F90MAINLIBS $4 $5 >> out 2>&1
+    ret=$?
+    test ! -x testlink && ret=1
+    test_result $ret "$1" "$2" "$3"
+  fi
+  cat out >> $charmout
+}
+test_link_fortran_main "whether the C++ linker succeeds with a Fortran entry point" "yes" "no" ""
+/bin/rm -f conftest.f90 test.o testlink out
+if test $pass -eq 1
+then
+  add_flag "CMK_CAN_LINK_FORTRAN='1'" "Fortran"
+fi
+
+### check for OpenMP availability ###
+cat > $tc <<EOT
+#include <stdio.h>
+#include <omp.h>
+
+int main(void)
+{
+  int iam = 0, np = 1;
+
+  #pragma omp parallel default(shared) private(iam, np)
+  {
+    np = omp_get_num_threads();
+    iam = omp_get_thread_num();
+    printf("Hello from thread %d of %d\n", iam, np);
+  }
+
+  return 0;
+}
+EOT
+test_linkc "whether OpenMP is supported" "yes" "no" "$CMK_C_OPENMP"
+if test $pass -eq 1
+then
+	add_flag "CMK_HAS_OPENMP='1'" "OpenMP"
+fi
+
+### check for Lustre FS availability ###
+cat > $tc <<EOT
+#include <stdio.h>
+#include <lustre/lustreapi.h>
+#include <lustre/lustre_user.h>
+
+int main() {
+  llapi_printf(LLAPI_MSG_NORMAL, "Lustre FS is available");
+  return 0;
+}
+EOT
+test_linkc "whether has lustre fs" "yes" "no" "-llustreapi"
+AC_DEFINE_UNQUOTED(CMK_HAS_LUSTREFS, $pass, [whether has lustrefs])
+if test $pass -eq 1
+then
+  add_make_flag 'CMK_LUSTREAPI:=-llustreapi' "lustreapi"
+else
+  add_make_flag 'CMK_LUSTREAPI:=' "lustreapi"
+fi
+
+
 # for hwloc
 eval "`./charmc -print-building-blocks $OPTS`"
 export CC="$(get_full_command_name "$CMK_SEQ_CC")"
@@ -2446,17 +2960,23 @@ AC_SUBST(CC_FOR_BUILD)
 export HWLOC_FLAGS="$CHARM_CC_FLAGS"
 export CFLAGS="$CMK_SEQ_CC_FLAGS"
 export AR="$(get_full_command_name "${CMK_SEQ_AR%% *}")"
-export am_libhwloc_embedded_la_rpath="-rpath $CHARMLIBSO"
-AC_SUBST(am_libhwloc_embedded_la_rpath)
 enable_embedded_mode='yes'
 enable_static='yes'
-enable_shared='yes'
-enable_libnuma='no'
+if test "$CMK_NO_BUILD_SHARED" = 'false'
+then
+  enable_shared='yes'
+  export am_libhwloc_embedded_la_rpath="-rpath $CHARMLIBSO"
+else
+  enable_shared='no'
+  export am_libhwloc_embedded_la_rpath=''
+fi
+AC_SUBST(am_libhwloc_embedded_la_rpath)
 enable_pci='no'
 enable_libudev='no'
 enable_libxml2='no'
 enable_visibility='no'
 enable_nvml='no'
+enable_opencl='no'
 . hwloc/VERSION
 export libhwloc_so_version
 AC_SUBST(libhwloc_so_version)
@@ -2467,18 +2987,12 @@ AC_CANONICAL_TARGET
 AC_USE_SYSTEM_EXTENSIONS
 LT_INIT
 
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([no-define])
 
 AC_CONFIG_MACRO_DIR(hwloc/config)
 HWLOC_SET_SYMBOL_PREFIX([cmi_])
 HWLOC_SETUP_CORE([hwloc], [happy=yes], [happy=no])
 HWLOC_DO_AM_CONDITIONALS
 add_flag 'CMK_HWLOC_LIBS="-lhwloc_embedded '"$HWLOC_EMBEDDED_LIBS"'"' "hwloc"
-add_flag 'CMK_CC_FLAGS="$CMK_CC_FLAGS '"$HWLOC_EMBEDDED_CFLAGS"'"' 'hwloc'
-add_flag 'CMK_CXX_FLAGS="$CMK_CXX_FLAGS '"$HWLOC_EMBEDDED_CFLAGS"'"' 'hwloc'
 
-AC_OUTPUT(
-libs/ck-libs/ampi/ampiCC,
-
-chmod +x libs/ck-libs/ampi/ampiCC
-)
+AC_OUTPUT
