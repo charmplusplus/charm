@@ -387,8 +387,6 @@ private:
 
   using ArrayIdMap = std::unordered_map<CkArrayID, CkArray*, ArrayIDHasher>;
   using MsgBuffer = std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> >;
-  using IndexMsgBuffer =
-      std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage*>, IndexHasher>;
   using LocationRequestBuffer =
       std::unordered_map<CkArrayIndex, std::vector<int>, IndexHasher>;
   using IdxIdMap = std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher>;
@@ -415,8 +413,6 @@ private:
   typedef void (CkMigratable::*CkMigratable_voidfn_t)(void);
   typedef void (CkMigratable::*CkMigratable_voidfn_arg_t)(void*);
   void callMethod(CkLocRec* rec, CkMigratable_voidfn_arg_t fn, void*);
-
-  void deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx, int opts);
 
   LocationRequestBuffer bufferedLocationRequests;
 
@@ -474,20 +470,7 @@ public:
   CmiUInt8 idCounter;
   CmiUInt8 getNewObjectID(const CkArrayIndex& idx);
 
-  /// Map idx to undelivered msgs
-  /// @todo: We should not buffer msgs for uncreated array elements forever.
-  /// After some timeout or other policy, we should throw errors or warnings
-  /// or at least report and discard any msgs addressed to uncreated array elements
-  MsgBuffer bufferedMsgs;
-  MsgBuffer bufferedRemoteMsgs;
-  MsgBuffer bufferedShadowElemMsgs;
   MsgBuffer bufferedActiveRgetMsgs;
-
-  IndexMsgBuffer bufferedIndexMsgs;
-  IndexMsgBuffer bufferedDemandMsgs;
-
-  void processDeliverBufferedMsgs(CmiUInt8, MsgBuffer& buffer);
-  void processPrepBufferedMsgs(const CkArrayIndex&, CmiUInt8, IndexMsgBuffer&);
 
   bool addElementToRec(CkLocRec* rec, CkArray* m, CkMigratable* elt, int ctorIdx,
                        void* ctorMsg);
@@ -646,10 +629,6 @@ public:
   // Map stores the CkMigratable elements that have active Rgets
   // ResumeFromSync is not called for these elements until the Rgets have completed
   ElemMap toBeResumeFromSynced;
-
-  // Deliver any buffered msgs to a newly created array element
-  void processAllDeliverBufferedMsgs(CmiUInt8);
-  void processAllPrepBufferedMsgs(const CkArrayIndex&, CmiUInt8);
 
   // Advisories:
   /// This index now lives on the given processor-- update local records

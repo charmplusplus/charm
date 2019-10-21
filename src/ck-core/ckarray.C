@@ -86,6 +86,8 @@ bool _isNotifyChildInRed;
 #  define DEBUG(x)
 #endif
 
+extern int _messageBufferingThreshold;
+
 /// This arrayListener is in charge of performing reductions on the array.
 class CkArrayReducer : public CkArrayListener
 {
@@ -1066,7 +1068,7 @@ bool CkArray::insertElement(CkArrayMessage* m, const CkArrayIndex& idx,
   else
   {
     // TODO: Why?
-    locMgr->deliverAllBufferedMsgs(id);
+    // locMgr->deliverAllBufferedMsgs(id);
   }
 
   // Make sure the element doesn't already exist, then add it.
@@ -1791,10 +1793,7 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
 
   locMgr->checkInBounds(idx);
 
-  if (type == CkDeliver_queue)
-  {
-    _TRACE_CREATION_DETAILED(env, msg->array_ep());
-  }
+  _TRACE_CREATION_DETAILED(env, msg->array_ep());
 
   // TODO: This was taken out of CkLocMgr::deliverMsg. Need to figure out where
   // it belongs? Probably here and maybe in buffered sends. Or maybe buffered send
@@ -1832,14 +1831,22 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
     {
       // We know the ID, but not the location. Fallback to a protocol which may
       // send or buffer the message.
-      locMgr->deliverUnknown(msg, thisgroup, id, idx, type, opts);
+      sendUnknown(msg, id, idx, type, opts);
     }
   }
   else
   {
     // We do not know the ID or the location, so buffer the message.
     env->setRecipientID(ck::ObjID(thisgroup, 0));
-    locMgr->deliverUnknown(msg, thisgroup, idx, type, opts);
+    if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
+    {
+      demandCreateUnknown(msg, idx, type, opts);
+    }
+    else
+    {
+      // We can't send the message even if we wanted to, so buffer it.
+      bufferUnknown(msg, idx, type, opts);
+    }
   }
 }
 
@@ -1847,6 +1854,8 @@ int CkArray::deliverMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int 
 {
   CkAssert(thisgroup == UsrToEnv(msg)->getArrayMgr());
   int destPE = locMgr->whichPe(id);
+  // TODO: I think deliverMsg is also called when a message is sent to home
+  // because it is small and unknown. So we may still need that path here too.
   CkAssert(destPE >= 0);
   if (destPE != CkMyPe() || type == CkDeliver_queue)
   {
@@ -1901,6 +1910,101 @@ int CkArray::deliverMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int 
     if (wasAnObjRunning) the_lbdb->ObjectStart(objHandle);
   #endif*/
   return result;
+}
+
+// TODO: Need to come up with a design doc for exactly what cases can occur when
+// attempting to deliver a message:
+// 1. We don't know the ID - we aren't aware if the element even exists, need
+// to go through home
+// 2. We know the ID but don't have a location cached - we aren't aware if the
+// element even exists, so need to go through home BUT we can send the actual
+// message if we like because we have the ID at least.
+// 3. We know the ID, and have a location cached - we know that the element
+// exists (or existed but has been deleted), so we can send to that location.
+// Important here is that we don't insert a location into the cache UNTIL we
+// know the element exists. So this insertion must come from the element
+// arriving on us/being created on us, or being informed by someone via location
+// updates. Therefore it would be bad here (in deliver unknown) to insert home
+// as the location, because it would then imply in the future that we know where
+// the element is. Even though this would cause messages to take the same path
+// as the 'unknown' case, it may have other incorrect implications, such as not
+// doing demand creation, etc.
+void CkArray::sendUnknown(CkArrayMessage* msg, CmiUInt8 id, const CkArrayIndex& idx,
+                          CkDeliver_t type, int opts)
+{
+  CK_MAGICNUMBER_CHECK
+  CkAssert(id == msg->array_element_id());
+
+  int home = locMgr->homePe(idx);
+  if (UsrToEnv(msg)->getTotalsize() < _messageBufferingThreshold && home != CkMyPe())
+  {
+    // If the message is small, we can send it to its home and let home deal with
+    // forwarding it, or buffering it if it doesn't exist.
+    // TODO: This is a hack to ensure that home updates our location table if
+    // the object exists. There is probably a better way to do this.
+    msg->array_hops() += 2;
+    CkArrayManagerDeliver(home, msg, opts);
+  }
+  else if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
+  {
+    // If it's big and demand creation, buffer and send the request
+    demandCreateUnknown(msg, idx, type, opts);
+  }
+  else
+  {
+    // If it's big and not demand creation, buffer and send the request
+    bufferUnknown(msg, idx, type, opts);
+  }
+}
+
+void CkArray::demandCreateUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
+                                  CkDeliver_t type, int opts)
+{
+  int home = locMgr->homePe(idx);
+  if (home != CkMyPe())
+  {
+    if (bufferedCreationMsgs.find(idx) == bufferedCreationMsgs.end())
+    {
+      locMgr->thisProxy[home].requestDemandCreation(
+          idx, CkMyPe(), msg->array_ifNotThere(),
+          _entryTable[UsrToEnv(msg)->getEpIdx()]->chareIdx, thisgroup);
+    }
+    bufferedCreationMsgs[idx].push_back(msg);
+  }
+  else
+  {
+    bufferedCreationMsgs[idx].push_back(msg);
+    locMgr->demandCreateElement(msg, idx, -1, type);
+  }
+}
+
+void CkArray::bufferUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
+                            CkDeliver_t type, int opts)
+{
+  if (bufferedIndexMsgs.find(idx) == bufferedIndexMsgs.end())
+  {
+    locMgr->requestLocation(idx);
+  }
+  bufferedIndexMsgs[idx].push_back(msg);
+}
+
+void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
+{
+  for (CkArrayMessage* msg : bufferedIndexMsgs[idx])
+  {
+    UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
+    // TODO: Why all buffered messages delivered via queue?
+    sendMsg(msg, idx, CkDeliver_queue);
+  }
+  bufferedIndexMsgs.erase(idx);
+
+  for (CkArrayMessage* msg : bufferedCreationMsgs[idx])
+  {
+    UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
+    // TODO: Why all buffered messages delivered via queue?
+    sendMsg(msg, idx, CkDeliver_queue);
+  }
+  bufferedCreationMsgs.erase(idx);
 }
 
 #include "CkArray.def.h"
