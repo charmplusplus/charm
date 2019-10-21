@@ -774,6 +774,8 @@ class Builtin_kvs{
 // ------------ startup support -----------
 FLINKAGE void FTN_NAME(MPI_MAIN,mpi_main)(void);
 
+static int AMPI_threadstart_idx = -1;
+
 /*Startup routine used if user *doesn't* write
   a TCHARM_User_setup routine.
  */
@@ -820,7 +822,6 @@ void FTN_NAME(AMPICURRENTSTACKUSAGE, ampicurrentstackusage)(void){
 
 CLINKAGE
 void AMPI_threadstart(void *data);
-static int AMPI_threadstart_idx = -1;
 
 #if CMK_TRACE_ENABLED
 CsvExtern(funcmap*, tcharm_funcmap);
