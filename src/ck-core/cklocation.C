@@ -20,6 +20,7 @@
 #include <sstream>
 #include <limits>
 #include "pup_stl.h"
+#include <stdarg.h>
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
