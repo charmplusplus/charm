@@ -627,6 +627,13 @@ class CkArray : public CkReductionMgr
   friend class ArrayElement;
   friend class CProxy_ArrayBase;
   friend class CProxyElement_ArrayBase;
+  friend class CkLocMgr;
+
+  typedef std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
+  typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage*>, IndexHasher>
+      IndexMsgBuffer;
+  IndexMsgBuffer bufferedIndexMsgs;
+  IndexMsgBuffer bufferedCreationMsgs;
 
   CkMagicNumber<ArrayElement> magic;  // To detect heap corruption
   CkLocMgr* locMgr;
@@ -673,6 +680,15 @@ public:
   void sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
                int opts = 0);
   int deliverMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts = 0);
+  void sendUnknown(CkArrayMessage* msg, CmiUInt8 id, const CkArrayIndex& idx,
+                   CkDeliver_t type, int opts = 0);
+  void demandCreateUnknown(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
+                           int opts = 0);
+  void bufferUnknown(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
+                     int opts = 0);
+
+  void sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id);
+
   inline void deliver(CkMessage* m, const CkArrayIndex& idx, CkDeliver_t type,
                       int opts = 0)
   {
