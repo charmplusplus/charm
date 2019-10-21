@@ -680,14 +680,17 @@ public:
   }
   /// Deliver message to this element (directly if local)
   /// doFree if is local
+  void sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
+               int opts = 0);
+  int deliverMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts = 0);
   inline void deliver(CkMessage* m, const CkArrayIndex& idx, CkDeliver_t type,
                       int opts = 0)
   {
-    locMgr->prepMsg((CkArrayMessage*)m, thisgroup, idx, type, opts);
+    sendMsg((CkArrayMessage*)m, idx, type, opts);
   }
   inline int deliver(CkArrayMessage* m, CkDeliver_t type)
   {
-    return locMgr->deliverMsg(m, thisgroup, m->array_element_id(), NULL, type);
+    return deliverMsg(m, m->array_element_id(), type);
   }
   /// Fetch a local element via its ID (return NULL if not local)
   inline ArrayElement* lookup(const CmiUInt8 id)

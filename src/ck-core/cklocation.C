@@ -2673,7 +2673,9 @@ void CkLocMgr::processDeliverBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer)
   // deliver all buffered messages
   for (CkArrayMessage* m : messagesToFlush)
   {
-    deliverMsg(m, UsrToEnv(m)->getArrayMgr(), id, NULL, CkDeliver_queue);
+    CkArray* arr = (CkArray*)CkLocalBranch(UsrToEnv(m)->getArrayMgr());
+    CkAssert(arr);
+    arr->deliverMsg(m, id, CkDeliver_queue);
   }
 
   CkAssert(itr->second.empty());  // Nothing should have been added, since we
@@ -2701,8 +2703,11 @@ void CkLocMgr::processPrepBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
     envelope* env = UsrToEnv(m);
     CkGroupID mgr = ck::ObjID(env->getRecipientID()).getCollectionID();
     env->setRecipientID(ck::ObjID(mgr, id));
-    // Send the updated message
-    sendMsg(m, mgr, id, &idx, CkDeliver_queue);
+    // TODO: Should this be based on recipient ID, or env->getArrayMgr() like
+    // above? Should those two always be the same?
+    CkArray* arr = (CkArray*)CkLocalBranch(mgr);
+    CkAssert(arr);
+    arr->deliverMsg(m, id, CkDeliver_queue);
   }
 
   CkAssert(itr->second.empty());  // Nothing should have been added, since we
@@ -2886,119 +2891,25 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id)
 #endif
 }
 
-void CkLocMgr::recordSend(const CkArrayIndex* idx, const CmiUInt8 id,
-                          const unsigned int bytes, const int opts)
-{
-#if CMK_LBDB_ON
-  if ((idx || compressor) && !(opts & CK_MSG_LB_NOTRACE) && lbmgr->CollectingCommStats())
-  {
-    // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
-    // is enabled, so add the group information if so.
-#  if CMK_GLOBAL_LOCATION_UPDATE
-    const CmiUInt8 lbObjId = ck::ObjID(thisgroup, id).getID();
-#  else
-    const CmiUInt8 lbObjId = id;
-#  endif
-    lbmgr->Send(myLBHandle, lbObjId, bytes, cache->getPe(id), 1);
-  }
-#endif
-}
-
-/************************** LocMgr: MESSAGING *************************/
-/// Deliver message to this element, going via the scheduler if local
-/// @return 0 if object local, 1 if not
-int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
-                         const CkArrayIndex* idx, CkDeliver_t type,
-                         int opts /* = 0 */)
-{
-  CkLocRec* rec = elementNrec(id);
-
-  // Known, remote location or unknown location
-  if (rec == NULL)
-  {
-    // known location
-    int destPE = cache->getPe(id);
-    if (destPE != -1)
-    {
-      msg->array_hops()++;
-      // TODO: If we encounter too many hops, we should re-route the message back through
-      // home for a more direct path. This doesn't currently work however, because of a
-      // bug where homePe(id) may be different from homePe(idx).
-      CkArrayManagerDeliver(destPE, msg, opts);
-      return true;
-    }
-    // unknown location
-    deliverUnknown(msg, idx, opts);
-    return true;
-  }
-
-  // Send via the msg q
-  if (type == CkDeliver_queue)
-  {
-    CkArrayManagerDeliver(CkMyPe(), msg, opts);
-    return true;
-  }
-
-  CkAssert((CkGroupID)mgr == UsrToEnv(msg)->getArrayMgr());
-  CkArray* arr = managers[mgr];
-  if (!arr)
-  {
-    bufferedShadowElemMsgs[id].push_back(msg);
-    return true;
-  }
-  CkMigratable* obj = arr->lookup(id);
-  if (obj == NULL)
-  {  // That sibling of this object isn't created yet!
-    if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
-    {
-      return demandCreateElement(msg, rec->getIndex(), CkMyPe());
-    }
-    else
-    {  // BUFFERING message for nonexistent element
-      bufferedShadowElemMsgs[id].push_back(msg);
-      return true;
-    }
-  }
-
-  if (msg->array_hops() > 1)
-    multiHop(msg);
-
-#if CMK_LBDB_ON
-  // if there is a running obj being measured, stop it temporarily
-  LDObjHandle objHandle;
-  bool wasAnObjRunning = false;
-  if ((wasAnObjRunning = lbmgr->RunningObject(&objHandle)))
-  {
-    lbmgr->ObjectStop(objHandle);
-  }
-#endif
-  // Finally, call the entry method
-  bool result = ((CkLocRec*)rec)->invokeEntry(obj, (void*)msg, msg->array_ep(), true);
-#if CMK_LBDB_ON
-  if (wasAnObjRunning)
-    lbmgr->ObjectStart(objHandle);
-#endif
-  return result;
-}
-
-// This function should only get called once for any given send, when
-// the destination is thought to be known. deliverMsg, which actually
-// performs delivery to the target element or kicks off the chain that
-// puts this message on the wire, can be called multiple times, which
-// may be necessary due to migrations, etc.
-void CkLocMgr::sendMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
-                       const CkArrayIndex* idx, CkDeliver_t type,
-                       int opts /* = 0 */)
-{
-  // Trace this send for LB
-  recordSend(idx, id, UsrToEnv(msg)->getTotalsize(), opts);
-
-  // Actually trigger delivery
-  deliverMsg(msg, mgr, id, idx, type, opts);
-}
-
-void CkLocMgr::prepMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
-                       CkDeliver_t type, int opts)
+// TODO: Need to come up with a design doc for exactly what cases can occur when
+// attempting to deliver a message:
+// 1. We don't know the ID - we aren't aware if the element even exists, need
+// to go through home
+// 2. We know the ID but don't have a location cached - we aren't aware if the
+// element even exists, so need to go through home BUT we can send the actual
+// message if we like because we have the ID at least.
+// 3. We know the ID, and have a location cached - we know that the element
+// exists (or existed but has been deleted), so we can send to that location.
+// Important here is that we don't insert a location into the cache UNTIL we
+// know the element exists. So this insertion must come from the element
+// arriving on us/being created on us, or being informed by someone via location
+// updates. Therefore it would be bad here (in deliver unknown) to insert home
+// as the location, because it would then imply in the future that we know where
+// the element is. Even though this would cause messages to take the same path
+// as the 'unknown' case, it may have other incorrect implications, such as not
+// doing demand creation, etc.
+void CkLocMgr::deliverUnknown(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
+                              const CkArrayIndex& idx, CkDeliver_t type, int opts)
 {
   CK_MAGICNUMBER_CHECK
   DEBS((AA "send %s\n" AB, idx2str(idx)));
@@ -3125,16 +3036,16 @@ void CkLocMgr::deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx, int 
       {
         CkArrayManagerDeliver(CkMyPe(), msg);
       }
+      return;
     }
-    else
-    {  // Has a manager-- must buffer the message
-      // Buffer the msg
-      bufferedMsgs[id].push_back(msg);
-      // If requested, demand-create the element:
-      if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
-      {
-        CkAbort("Demand creation of elements is currently unimplemented");
-      }
+
+    // Buffer the msg
+    bufferedIndexMsgs[idx].push_back(msg);
+
+    // If requested, demand-create the element:
+    if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
+    {
+      demandCreateElement(msg, idx, -1);
     }
   }
 }
