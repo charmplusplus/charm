@@ -1559,7 +1559,7 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) n
     } else if (isIntra(comm)) {
       intraChildRegister(s);
     }else
-      CkAbort("ampiParent received child with bad communicator");
+      CkAbort("ampiParent received child with bad communicator: %d", comm);
   }
 
   return thread;

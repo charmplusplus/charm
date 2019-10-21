@@ -2320,7 +2320,7 @@ class ampiParent final : public CBase_ampiParent {
     if (isDistGraph(comm)) return getDistGraph(comm);
     if (isInter(comm)) return getInter(comm);
     if (isIntra(comm)) return getIntra(comm);
-    CkAbort("Invalid communicator used!");
+    CkAbort("Invalid communicator used: %d", comm);
     return getWorldStruct();
   }
 
@@ -2359,7 +2359,7 @@ class ampiParent final : public CBase_ampiParent {
       const ampiCommStruct &st=getIntra(comm);
       return st.getProxy()[thisIndex].ckLocal();
     }
-    CkAbort("Invalid communicator used!");
+    CkAbort("Invalid communicator used: %d", comm);
     return NULL;
   }
 
