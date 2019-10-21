@@ -6111,7 +6111,7 @@ is the constructor message to pass, and ``mgr`` is the array manager which
 creates the elements.
 
 To create an element, call ``void CkArray::insertInitial(CkArrayIndex
-idx,void\* ctorMsg)`` on ``mgr``, passing in the index and a copy of the
+idx, void* ctorMsg)`` on ``mgr``, passing in the index and a copy of the
 constructor message. For example, to insert a 2D element (x,y), call:
 
 .. code-block:: c++
