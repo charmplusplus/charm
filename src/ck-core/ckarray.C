@@ -443,11 +443,11 @@ int ArrayElement::ckDebugChareID(char *str, int limit) {
 }
 
 /// A more verbose form of abort
-void ArrayElement::CkAbort(const char *str) const
+void ArrayElement::CkAbort(const char *format, ...) const
 {
 	CkError("[%d] Array element at index %s aborting:\n",
 		CkMyPe(), idx2str(thisIndexMax));
-	CkMigratable::CkAbort(str);
+	CkMigratable::CkAbort(format);
 }
 
 void ArrayElement::recvBroadcast(CkMessage *m){

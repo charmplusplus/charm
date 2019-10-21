@@ -80,7 +80,7 @@ public:
 
 protected:
   /// A more verbose form of abort
-  virtual void CkAbort(const char *str) const;
+  virtual void CkAbort(const char *format, ...) const;
 
 public:
   virtual void ResumeFromSync(void);
