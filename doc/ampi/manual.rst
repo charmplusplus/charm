@@ -2025,11 +2025,6 @@ set the following environment variable to see program output to stdout:
 .. [4]
    http://rosecompiler.org/
 
-.. [5]
-   Currently, we assume that the interface code, which does mapping and
-   interpolation among the boundary values of Fluids and Solids domain,
-   is integrated with one of Fluids and Solids.
-
 .. [PiP2018]
    Atsushi Hori, Min Si, Balazs Gerofi, Masamichi Takagi, Jai Dayal, Pavan
    Balaji, and Yutaka Ishikawa. 2018. Process-in-process: techniques for
