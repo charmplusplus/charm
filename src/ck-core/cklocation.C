@@ -1554,12 +1554,8 @@ CkMigratable::~CkMigratable() {
 }
 
 void CkMigratable::CkAbort(const char *format, ...) const {
-	char newmsg[256];
-	va_list args;
-	va_start(args, format);
-	vsnprintf(newmsg, sizeof(newmsg), format, args);
-	va_end(args);
-	::CkAbort("CkMigratable '%s' aborting: %s",_chareTable[thisChareType]->name, newmsg);
+	CkError("CkMigratable '%s' aborting: ", _chareTable[thisChareType]->name);
+	::CkAbort(format);
 }
 
 void CkMigratable::ResumeFromSync(void)
