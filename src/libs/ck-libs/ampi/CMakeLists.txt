@@ -6,7 +6,7 @@ set(ampi-h-sources ampi.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr
 
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
-add_library(ampi-compat compat_ampius.C compat_ampifus.C compat_ampi.c
+add_library(ampi-compat compat_ampi.c
        compat_ampim.C compat_ampifm.C compat_ampicm.C
        compat_ampicpp.C)
 

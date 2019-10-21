@@ -229,7 +229,7 @@ are only available in Fortran.
    AMPI_Migrate_to_pe    AMPI_Set_migratable          AMPI_Evacuate
    AMPI_Load_set_value   AMPI_Load_start_measure      AMPI_Load_stop_measure
    AMPI_Iget             AMPI_Iget_wait               AMPI_Iget_data
-   AMPI_Iget_free        AMPI_Type_is_contiguous      AMPI_Register_main
+   AMPI_Iget_free        AMPI_Type_is_contiguous
    AMPI_Yield            AMPI_Suspend                 AMPI_Resume
    AMPI_Alltoall_medium  AMPI_Alltoall_long
    AMPI_Register_just_migrated         AMPI_Register_about_to_migrate
@@ -1193,118 +1193,6 @@ for this get request including the data buffer. Finally,
    int AMPI_Iget_free(MPI_Request *request, MPI_Status *status, MPI_Win win);
 
    int AMPI_Iget_data(void *data, MPI_Status status);
-
-Extensions for Interoperability
--------------------------------
-
-Interoperability between different modules is essential for coding
-coupled simulations. In this extension to AMPI, each MPI application
-module runs within its own group of user-level threads distributed over
-the physical parallel machine. In order to let AMPI know which ranks are
-to be created, and in what order, a top level registration routine needs
-to be written. A real-world example will make this clear. We have an MPI
-code for fluids and another MPI code for solids, both with their main
-programs, then we first transform each individual code to run correctly
-under AMPI as standalone codes. Aside from the global and static
-variable privatization transformations needed, this also involves making
-the main program into a subroutine and naming it ``MPI_Main``.
-
-Thus now, we have two ``MPI_Main``\ s, one for the fluids code and one
-for the solids code. We now make these codes co-exist within the same
-executable, by first renaming these ``MPI_Main``\ s as ``Fluids_Main``
-and ``Solids_Main``\  [5]_ writing a subroutine called ``MPI_Setup``.
-
-.. code-block:: fortran
-
-   !FORTRAN EXAMPLE
-   SUBROUTINE MPI_Setup
-     USE ampi
-     CALL AMPI_Register_main(Solids_Main)
-     CALL AMPI_Register_main(Fluids_Main)
-   END SUBROUTINE
-
-.. code-block:: c++
-
-   //C Example
-   void MPI_Setup(){
-     AMPI_Register_main(Solids_Main);
-     AMPI_Register_main(Fluids_Main);
-   }
-
-This subroutine is called from the internal initialization routines of
-AMPI and tells AMPI how many numbers of distinct modules exist, and
-which orchestrator subroutines they execute.
-
-The number of ranks to create for each module is specified on the
-command line when an AMPI program is run. Appendix B explains how AMPI
-programs are run, and how to specify the number of ranks (``+vp``
-option). In the above case, suppose one wants to create 128 ranks of
-Solids and 64 ranks of Fluids on 32 physical processors, one would
-specify those with multiple ``+vp`` options on the command line as:
-
-.. code-block:: bash
-
-   $ ./charmrun gen1.x +p 32 +vp 128 +vp 64
-
-This will ensure that multiple modules representing different complete
-applications can co-exist within the same executable. They can also
-continue to communicate among their own ranks using the same AMPI
-function calls to send and receive with communicator argument as
-``MPI_COMM_WORLD``. But this would be completely useless if these
-individual applications cannot communicate with each other, which is
-essential for building efficient coupled codes. For this purpose, we
-have extended the AMPI functionality to allow multiple
-"``COMM_WORLD``\ s"; one for each application. These *world
-communicators* form a "communicator universe" an array of communicators
-aptly called *MPI_COMM_UNIVERSE*. This array of communicators is indexed
-[1 . . . ``MPI_MAX_COMM``]. In the current implementation,
-``MPI_MAX_COMM`` is 8, that is, maximum of 8 applications can co-exist
-within the same executable.
-
-The order of these ``COMM_WORLD``\ s within ``MPI_COMM_UNIVERSE`` is
-determined by the order in which individual applications are registered
-in ``MPI_Setup``.
-
-Thus, in the above example, the communicator for the Solids module would
-be ``MPI_COMM_UNIVERSE(1)`` and communicator for Fluids module would be
-``MPI_COMM_UNIVERSE(2)``.
-
-Now any rank within one application can communicate with any rank in the
-other application using the familiar send or receive AMPI calls by
-specifying the appropriate communicator and the rank number within that
-communicator in the call. For example if a Solids rank number 36 wants
-to send data to rank number 47 within the Fluids module, it calls:
-
-.. code-block:: fortran
-
-   !FORTRAN EXAMPLE
-   INTEGER , PARAMETER :: Fluids_Comm = 2
-   CALL MPI_Send(InitialTime, 1, MPI_Double_Precision, tag,
-                 47, MPI_Comm_Universe(Fluids_Comm), ierr)
-
-.. code-block:: c++
-
-   //C Example
-   int Fluids_Comm = 2;
-   ierr = MPI_Send(InitialTime, 1, MPI_DOUBLE, tag,
-                   47, MPI_Comm_Universe(Fluids_Comm));
-
-The Fluids rank has to issue a corresponding receive call to receive
-this data:
-
-.. code-block:: fortran
-
-   !FORTRAN EXAMPLE
-   INTEGER , PARAMETER :: Solids_Comm = 1
-   CALL MPI_Recv(InitialTime, 1, MPI_Double_Precision, tag,
-                 36, MPI_Comm_Universe(Solids_Comm), stat, ierr)
-
-.. code-block:: c++
-
-   //C Example
-   int Solids_Comm = 1;
-   ierr = MPI_Recv(InitialTime, 1, MPI_DOUBLE, tag,
-                   36, MPI_Comm_Universe(Solids_Comm), &stat);
 
 Charm++ Interoperability
 ------------------------

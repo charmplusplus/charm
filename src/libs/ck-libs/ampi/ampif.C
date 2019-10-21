@@ -321,8 +321,6 @@ FLINKAGE {
 #define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
 #define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
 #define ampi_set_migratable FTN_NAME ( AMPI_SET_MIGRATABLE , ampi_set_migratable )
-#define ampi_init_universe FTN_NAME( AMPI_INIT_UNIVERSE , ampi_init_universe )
-#define ampi_register_main FTN_NAME( AMPI_REGISTER_MAIN , ampi_register_main )
 #define ampi_register_pup FTN_NAME( AMPI_REGISTER_PUP , ampi_register_pup )
 #define ampi_register_about_to_migrate FTN_NAME ( AMPI_REGISTER_ABOUT_TO_MIGRATE , ampi_register_about_to_migrate )
 #define ampi_register_just_migrated FTN_NAME ( AMPI_REGISTER_JUST_MIGRATED , ampi_register_just_migrated )
@@ -2191,11 +2189,6 @@ void ampi_set_migratable(int *mig, int *ierr) noexcept
   *ierr = AMPI_Set_migratable(*mig);
 }
 
-void ampi_register_main(MPI_MainFn fn, const char *name, int *ierr) noexcept
-{
-  *ierr = AMPI_Register_main(fn, name);
-}
-
 void ampi_register_pup(MPI_PupFn fn, void *data, int *idx, int *ierr) noexcept
 {
   *ierr = AMPI_Register_pup(fn, data, idx);
@@ -2351,11 +2344,6 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
     memset(str, ' ', *len);
     *ierr = 1;
   }
-}
-
-void ampi_init_universe(int *unicomm, int *ierr) noexcept
-{
-  *ierr = AMPI_Init_universe(unicomm);
 }
 
 } // extern "C"
