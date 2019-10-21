@@ -1781,4 +1781,126 @@ void CkArray::ckDestroy()
   delete this;
 }
 
+void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
+                      int opts)
+{
+  CK_MAGICNUMBER_CHECK
+  DEBS((AA "send %s\n" AB, idx2str(idx)));
+  envelope* env = UsrToEnv(msg);
+  env->setMsgtype(ForArrayEltMsg);
+
+  locMgr->checkInBounds(idx);
+
+  if (type == CkDeliver_queue)
+  {
+    _TRACE_CREATION_DETAILED(env, msg->array_ep());
+  }
+
+  // TODO: This was taken out of CkLocMgr::deliverMsg. Need to figure out where
+  // it belongs? Probably here and maybe in buffered sends. Or maybe buffered send
+  // should call this function, rather than deliver.
+  /*#if CMK_LBDB_ON
+    // TODO: This should maybe only be done from a send explicitly?
+    if (type == CkDeliver_queue
+        && !(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats()) {
+  #if CMK_GLOBAL_LOCATION_UPDATE
+      const CmiUInt8 lbObjId = ck::ObjID(thisgroup, id).getID();
+  #else
+      const CmiUInt8 lbObjId = id;
+  #endif
+      lbmgr->Send(
+          myLBHandle,
+          lbObjId,
+          UsrToEnv(msg)->getTotalsize(),
+          cache->lastKnown(id),
+          1);
+    }
+  #endif*/
+
+  CmiUInt8 id;
+  if (locMgr->lookupID(idx, id))
+  {
+    env->setRecipientID(ck::ObjID(thisgroup, id));
+    if (locMgr->whichPe(id) != -1)
+    {
+      // We know the ID and the location, so we can send the message as normal
+      // Local deliver is probably different than remote delivery. Remote is one
+      // function call, local is unique.
+      deliverMsg(msg, id, type, opts);
+    }
+    else
+    {
+      // We know the ID, but not the location. Fallback to a protocol which may
+      // send or buffer the message.
+      locMgr->deliverUnknown(msg, thisgroup, id, idx, type, opts);
+    }
+  }
+  else
+  {
+    // We do not know the ID or the location, so buffer the message.
+    env->setRecipientID(ck::ObjID(thisgroup, 0));
+    locMgr->deliverUnknown(msg, thisgroup, idx, type, opts);
+  }
+}
+
+int CkArray::deliverMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts)
+{
+  CkAssert(thisgroup == UsrToEnv(msg)->getArrayMgr());
+  int destPE = locMgr->whichPe(id);
+  CkAssert(destPE >= 0);
+  if (destPE != CkMyPe() || type == CkDeliver_queue)
+  {
+    msg->array_hops()++;
+    // If we are hopping more than twice, we've discovered a stale chain
+    // of cache entries. Just route through home instead.
+    if (msg->array_hops() > 2 && CkMyPe() != locMgr->homePe(id))
+    {
+      destPE = locMgr->homePe(id);
+    }
+    CkArrayManagerDeliver(destPE, msg, opts);
+    return true;
+  }
+
+  CkLocRec* rec = locMgr->elementNrec(id);
+  CkMigratable* obj = lookup(id);
+  // NOTE: If obj is NULL, then there shouldn't have been an element in anyones
+  // loc table, so we should not end up here I dont think. Maybe it is possible
+  // from someone else just sending to an elements home? Or if there's bound
+  // elemets elsewhere.
+  CkAssert(rec && obj);
+  /*if (obj == NULL) { // That sibling of this object isn't created yet!
+    if (opts & CK_MSG_KEEP) {
+      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+    }
+    if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer) {
+      return locMgr->demandCreateElement(msg, rec->getIndex(), CkMyPe(), type);
+    } else { // BUFFERING message for nonexistent element
+      locMgr->bufferedShadowElemMsgs[id].push_back(msg);
+      return true;
+    }
+  }*/
+
+  // TODO: This is not dead, it doesnt seem. CkSendMsgArrayInline calls
+  // CkArray::deliver with CkDeliver_inline, which should hit this path in some
+  // cases. One case where that function is used is a callback to an inline
+  // entry method. May be called somewhere else in CkArray.C.
+  if (msg->array_hops() > 1)
+    locMgr->multiHop(msg);
+
+  /*#if CMK_LBDB_ON
+    // if there is a running obj being measured, stop it temporarily
+    LDObjHandle objHandle;
+    bool wasAnObjRunning = false;
+    if ((wasAnObjRunning = the_lbdb->RunningObject(&objHandle))) {
+      the_lbdb->ObjectStop(objHandle);
+    }
+  #endif*/
+  // Finally, call the entry method
+  bool result = rec->invokeEntry(obj, (void*)msg, msg->array_ep(), true);
+  /*#if CMK_LBDB_ON
+    if (wasAnObjRunning) the_lbdb->ObjectStart(objHandle);
+  #endif*/
+  return result;
+}
+
 #include "CkArray.def.h"
