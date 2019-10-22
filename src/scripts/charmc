@@ -441,6 +441,12 @@ do
 		SKIP_MODULEINIT="yes"
 		;;
 
+    "-isysroot")
+        # Ignore -isysroot and the following argument (macOS SDK path), which charmc 
+        # can not parse (#2495).
+        shift
+        ;;
+
 	"-language")
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
