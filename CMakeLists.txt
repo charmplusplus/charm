@@ -15,8 +15,8 @@
 # - the buildcmake script
 # - files in cmake/
 
-
-cmake_minimum_required(VERSION 3.11)
+# 3.4 added CMAKE_C_COMPILER_LAUNCHER and CMAKE_CXX_COMPILER_LAUNCHER
+cmake_minimum_required(VERSION 3.4)
 
 project(Charm++ LANGUAGES CXX C VERSION 6.10.0)
 
@@ -28,13 +28,25 @@ find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran c
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-enable_language(Fortran OPTIONAL)
+# Setting charmc as the compiler launcher for Fortran files only works with
+# CMake 3.11.0 or above. See 'CMAKE_Fortran_COMPILER_LAUNCHER' below for details.
+if(${CMAKE_VERSION} VERSION_LESS "3.11.0")
+  message(WARNING "CMake version 3.11.0 or higher is needed for Fortran support in Charm++.")
+else()
+  include(CheckLanguage)
+  check_language(Fortran)
+  if(CMAKE_Fortran_COMPILER)
+    enable_language(Fortran OPTIONAL)
+    include(FortranCInterface)
+    FortranCInterface_VERIFY()
+    FortranCInterface_VERIFY(CXX)
+  else()
+    message(STATUS "No Fortran support")
+  endif()
+endif()
 
 if(${FortranCInterface_VERIFIED_CXX})
   set(CMK_CAN_LINK_FORTRAN 1)
-  include(FortranCInterface)
-  FortranCInterface_VERIFY()
-  FortranCInterface_VERIFY(CXX)
 else()
   set(CMK_CAN_LINK_FORTRAN 0)
 endif()

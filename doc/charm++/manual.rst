@@ -10808,7 +10808,8 @@ select another version with the ``@`` option (for example,
 Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-As an experimental feature, Charm++ can be installed with the CMake tool, version 3.11 or newer.
+As an experimental feature, Charm++ can be installed with the CMake tool,
+version 3.4 or newer (3.11 if you need Fortran support).
 This is currently supported on Linux and Darwin, but not on Windows.
 
 After downloading and unpacking Charm++, it can be installed in the following way:
