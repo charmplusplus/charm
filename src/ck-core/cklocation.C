@@ -20,6 +20,7 @@
 #include <sstream>
 #include <limits>
 #include "pup_stl.h"
+#include <stdarg.h>
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
@@ -1552,8 +1553,14 @@ CkMigratable::~CkMigratable() {
 	thisIndexMax.dimension=0;
 }
 
-void CkMigratable::CkAbort(const char *why) const {
-	::CkAbort("CkMigratable '%s' aborting: %s",_chareTable[thisChareType]->name, why);
+void CkMigratable::CkAbort(const char *format, ...) const {
+	char newmsg[256];
+	va_list args;
+	va_start(args, format);
+	vsnprintf(newmsg, sizeof(newmsg), format, args);
+	va_end(args);
+
+	::CkAbort("CkMigratable '%s' aborting: %s", _chareTable[thisChareType]->name, newmsg);
 }
 
 void CkMigratable::ResumeFromSync(void)

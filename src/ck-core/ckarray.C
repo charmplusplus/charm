@@ -54,6 +54,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ck.h"
 #include "pathHistory.h"
 #include "ckarray.h"
+#include <stdarg.h>
 
 CpvDeclare(int ,serializer); // if !CMK_FAULT_EVAC, serializer is always 0
 
@@ -443,11 +444,15 @@ int ArrayElement::ckDebugChareID(char *str, int limit) {
 }
 
 /// A more verbose form of abort
-void ArrayElement::CkAbort(const char *str) const
+void ArrayElement::CkAbort(const char *format, ...) const
 {
-	CkError("[%d] Array element at index %s aborting:\n",
-		CkMyPe(), idx2str(thisIndexMax));
-	CkMigratable::CkAbort(str);
+	char newmsg[256];
+	va_list args;
+	va_start(args, format);
+	vsnprintf(newmsg, sizeof(newmsg), format, args);
+	va_end(args);
+
+	CkMigratable::CkAbort("[%d] Array element at index %s aborting:\n%s", CkMyPe(), idx2str(thisIndexMax), newmsg);
 }
 
 void ArrayElement::recvBroadcast(CkMessage *m){
