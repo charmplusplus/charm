@@ -180,7 +180,7 @@ inline int CkMemCheckPT::ReverseBuddyPE(int pe)
 void ArrayElement::init_checkpt() {
 	if (!_memChkptOn) return;
 	if (CkInRestarting()) {
-	  CkPrintf("[%d] Warning: init_checkpt called during restart, possible bug in migration constructor!\n");
+	  CkPrintf("[%d] Warning: init_checkpt called during restart, possible bug in migration constructor!\n", CmiMyPe());
 	}
 	// only master init checkpoint
         if (thisArray->getLocMgr()->managers.begin()->second != thisArray) return;
