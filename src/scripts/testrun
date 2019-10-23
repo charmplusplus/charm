@@ -49,7 +49,7 @@ done
 
 #if ppn is zero, don't do division test
 if [[ $ppn -eq 0 ]] ; then
-    ./charmrun $*
+    time ./charmrun $*
 else #division test
     #check if p divides ppn
     m=`expr $p % $ppn`
