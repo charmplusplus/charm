@@ -2036,7 +2036,7 @@ void ConverseCleanup(void)
 
       ret[argc+5]="+myoldpe";
       char temp3[50];
-      sprintf(temp3,"%d", _Cmi_mype);
+      sprintf(temp3,"%d", CmiMyPe());
       ret[argc+6]=temp3;
 
       if (restart_idx == -1) {
