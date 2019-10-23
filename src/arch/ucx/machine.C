@@ -36,7 +36,7 @@
 #define UCX_MSG_NUM_RX_REQS_MAX         1024
 #define UCX_TAG_MSG_BITS                4
 #define UCX_TAG_RMA_BITS                4
-#define UCX_MSG_TAG_DIRECT              UCS_BIT(0)
+#define UCX_MSG_TAG_EAGER               UCS_BIT(0)
 #define UCX_MSG_TAG_PROBE               UCS_BIT(1)
 #define UCX_RMA_TAG_GET                 UCS_BIT(UCX_TAG_MSG_BITS + 1)
 #define UCX_RMA_TAG_REG_AND_SEND_BACK   UCS_BIT(UCX_TAG_MSG_BITS + 2)
@@ -213,7 +213,7 @@ static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, void *rxBuf,
         handleOneRecvedMsg(size, (char*)rxBuf);
     }
 
-    if (tag & UCX_MSG_TAG_DIRECT) {
+    if (tag & UCX_MSG_TAG_EAGER) {
         // Preposted RX request will be released in UcxPostRxBuffers
         ++ucxCtx.numFreeRxReqs;
     } else {
@@ -228,7 +228,7 @@ static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
     void *buf = CmiAlloc(size);
     UcxRequest *req;
 
-    if (tag == UCX_MSG_TAG_DIRECT) {
+    if (tag == UCX_MSG_TAG_EAGER) {
         req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, buf,
                                            ucxCtx.eagerSize,
                                            ucp_dt_make_contig(1), tag,
@@ -412,10 +412,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     ucxCtx.rxReqs = (UcxRequest**)CmiAlloc(sizeof(UcxRequest*) * ucxCtx.numRxReqs);
     CmiEnforce(ucxCtx.rxReqs);
 
-    // Post RX requests for direct protocol
+    // Post RX requests for eager protocol
     ucxCtx.numFreeRxReqs = 0;
     for (int i = 0; i < ucxCtx.numRxReqs; i++) {
-        ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_DIRECT, ucxCtx.eagerSize, NULL);
+        ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
     }
 
     // Ensure connects completion
@@ -445,10 +445,10 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
     }
 
     if (req->msgBuf != NULL) {
-        // Request is not completed immideately
+        // Request is not completed immediately
         UcxHandleRxReq(req, req->msgBuf, info->length, info->sender_tag);
     } else {
-        // Request completed immideately, save real sender tag
+        // Request completed immediately, save real sender tag
         req->tag = info->sender_tag;
     }
 }
@@ -460,7 +460,7 @@ static void UcxPostRxBuffers()
     for (i = 0, numPosted = 0; i < ucxCtx.numRxReqs; i++) {
         if (ucxCtx.rxReqs[i]->completed) {
             UCX_REQUEST_FREE(ucxCtx.rxReqs[i]);
-            ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_DIRECT,
+            ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_EAGER,
                                             ucxCtx.eagerSize, NULL);
             ++numPosted;
             CmiAssert(!ucxCtx.rxReqs[i]->completed);
@@ -491,7 +491,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size,
     ucp_tag_t sTag;
 
     // Combine tag and sTag: sTag defines msg protocol, tag may indicate RMA requests
-    sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_DIRECT;
+    sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_EAGER;
     sTag |= tag;
 
     UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
