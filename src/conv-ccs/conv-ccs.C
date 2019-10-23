@@ -77,7 +77,7 @@ CcsHandlerRec *CcsGetHandler(const char *name) {
 void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge) {
   CcsHandlerRec *rec=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&name);
   if (rec==NULL) {
-    CmiAbort("CCS: Unknown CCS handler name.\n");
+    CmiAbort("[%d] CCS: Unknown CCS handler name %s.\n",CmiMyPe(),name);
   }
   rec->mergeFn=newMerge;
   rec->redID=CmiGetGlobalReduction();
@@ -233,9 +233,10 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 /*Look up handler's converse ID*/
   char *handlerStr=hdr->handler;
   CcsHandlerRec *fn=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
+  //  CmiPrintf("[%d] CCS: CCS handler name '%s' requested.\n",CmiMyPe(), hdr->handler);
   if (fn==NULL) {
-    CmiPrintf("CCS: Unknown CCS handler name '%s' requested. Ignoring...\n",
-	      hdr->handler);
+    CmiPrintf("[%d] CCS: Unknown CCS handler name '%s' requested. Ignoring...\n"
+	      ,CmiMyPe(), hdr->handler);
     CpvAccess(ccsReq)=hdr;
     CcsSendReply(0,NULL); /*Send an empty reply to the possibly waiting client*/
     return;
@@ -583,9 +584,8 @@ void CcsInit(char **argv)
   }
 #endif
   /* if in parallel debug mode i.e ++cpd, freeze */
-  if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
+  if (CpvAccess(cmiArgDebugFlag))
   {
-    if(CmiMyRank() == 0) CpvAccess(cmiArgDebugFlag) = 1;
      if (CmiGetArgStringDesc(argv, "+DebugDisplay",&(CpvAccess(displayArgument)), "X display for gdb used only in cpd mode"))
      {
         if (CpvAccess(displayArgument) == NULL)
@@ -598,7 +598,12 @@ void CcsInit(char **argv)
      }
 
      if (CmiGetArgFlagDesc(argv, "+DebugSuspend", "Suspend execution at beginning of program")) {
-       if(CmiMyRank() == 0) CpvAccess(cpdSuspendStartup) = 1;
+#if CMK_SMP       
+       if(!CmiInCommThread()) CpvAccess(cpdSuspendStartup) = 1;
+#else
+       CpvAccess(cpdSuspendStartup) = 1;
+#endif       
+       //       CmiPrintf("[%d] set SuspendStartup %d\n",CmiMyPe(), CpvAccess(cpdSuspendStartup));
      }
   }
 

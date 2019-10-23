@@ -10,8 +10,6 @@
 #include <malloc.h>
 #endif
 
-#include "memory-isomalloc.h"
-
 #if CMK_HAS_TLS_VARIABLES
 
 extern int quietModeRequested;
@@ -40,7 +38,6 @@ extern int quietModeRequested;
 extern "C" {
 void* getTLS();
 void setTLS(void*);
-void* swapTLS(void*);
 }
 
 #if CMK_TLS_SWITCHING_X86_64
@@ -78,28 +75,20 @@ void setTLS(void* newptr)
 #endif
 }
 
-void* swapTLS(void* newptr)
-{
-  void* oldptr = getTLS();
-  setTLS(newptr);
-  return oldptr;
-}
-
 
 // ----- TLS segment size determination -----
+
+static tlsdesc_t CmiTLSDescription;
+static tlsseg_t CmiTLSPrimarySegment;
 
 #if CMK_HAS_DL_ITERATE_PHDR
 
 # include <link.h>
 
-static inline void CmiTLSStatsInit(void)
-{
-}
-
 static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
 {
   size_t i;
-  tlsseg_t* t = (tlsseg_t*)data;
+  auto t = (tlsdesc_t *)data;
 
   for (i = 0; i < info->dlpi_phnum; i++)
   {
@@ -115,11 +104,11 @@ static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
   return 0;
 }
 
-static void populateTLSSegStats(tlsseg_t * t)
+static inline void CmiTLSStatsInit(void)
 {
-  t->size = 0;
-  t->align = 0;
-  dl_iterate_phdr(count_tls_sizes, t); /* count all PT_TLS sections */
+  CmiTLSDescription.size = 0;
+  CmiTLSDescription.align = 0;
+  dl_iterate_phdr(count_tls_sizes, &CmiTLSDescription); /* count all PT_TLS sections */
 }
 
 #elif defined __APPLE__
@@ -247,20 +236,10 @@ static size_t GetTLVSizeFromMachOHeader()
   return totalsize;
 }
 
-static size_t CmiTLSSize;
-
 static inline void CmiTLSStatsInit(void)
 {
-  // calculate the TLS size once at startup
-  CmiTLSSize = GetTLVSizeFromMachOHeader();
-}
-
-static void populateTLSSegStats(tlsseg_t * t)
-{
-  // fill the struct with the cached size
-  t->size = CmiTLSSize;
-  // Apple uses alignment by 16
-  t->align = 16;
+  CmiTLSDescription.size = GetTLVSizeFromMachOHeader();
+  CmiTLSDescription.align = 16; // Apple uses alignment by 16
 }
 
 #elif CMK_HAS_ELF_H && CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT
@@ -324,20 +303,12 @@ static void CmiTLSStatsInit()
     CmiTLSExecutableStart = *pCmiExecutableStart;
   else
     CmiPrintf("Charm++> Error: \"CmiExecutableStart\" symbol not found. -tlsglobals disabled.\n");
-}
 
-static void populateTLSSegStats(tlsseg_t * t)
-{
   Phdr* phdr = getTLSPhdrEntry();
   if (phdr != NULL)
   {
-    t->align = phdr->p_align;
-    t->size = phdr->p_memsz;
-  }
-  else
-  {
-    t->size = 0;
-    t->align = 0;
+    CmiTLSDescription.align = phdr->p_align;
+    CmiTLSDescription.size = phdr->p_memsz;
   }
 }
 
@@ -345,11 +316,6 @@ static void populateTLSSegStats(tlsseg_t * t)
 
 static inline void CmiTLSStatsInit()
 {
-}
-
-static void populateTLSSegStats(tlsseg_t * t)
-{
-  t->size = 0;
 }
 
 #endif
@@ -373,37 +339,40 @@ void CmiTLSInit()
     }
 
     CmiTLSStatsInit();
+    CmiTLSDescription.size = CMIALIGN(CmiTLSDescription.size, CmiTLSDescription.align);
+    CmiTLSPrimarySegment.memseg = (Addr)getTLS();
   }
 #endif
 }
 
-void allocNewTLSSeg(tlsseg_t* t, CthThread th)
+tlsdesc_t CmiTLSGetDescription()
 {
-  populateTLSSegStats(t);
-
-  if (t->size > 0)
-  {
-    t->size = CMIALIGN(t->size, t->align);
-    t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size);
-    memcpy((void*)t->memseg, (char *)getTLS() - t->size, t->size);
-    t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
-    /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), t->align, t->memseg, t->size); */
-  }
-  else
-  {
-    /* since we don't have a PT_TLS section to copy, keep whatever the system gave us */
-    t->memseg = (Addr)getTLS();
-  }
+  return CmiTLSDescription;
 }
 
-void switchTLS(tlsseg_t* cur, tlsseg_t* next)
+tlsseg_t CmiTLSCreateSegUsingPtr(void * ptr)
 {
-  cur->memseg = (Addr)swapTLS((void*)next->memseg);
+  tlsseg_t t{};
+  auto memseg = (char *)ptr;
+  memcpy(memseg, (char *)CmiTLSPrimarySegment.memseg - CmiTLSDescription.size, CmiTLSDescription.size);
+  t.memseg = (Addr)(memseg + CmiTLSDescription.size);
+  /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), CmiTLSDescription.align, t.memseg, CmiTLSDescription.size); */
+  return t;
 }
 
-void currentTLS(tlsseg_t* cur)
+void * CmiTLSGetBuffer(tlsseg_t * t)
+{
+  return (char *)t->memseg - CmiTLSDescription.size;
+}
+
+void CmiTLSSegmentGet(tlsseg_t * cur)
 {
   cur->memseg = (Addr)getTLS();
+}
+
+void CmiTLSSegmentSet(tlsseg_t * next)
+{
+  setTLS((void*)next->memseg);
 }
 
 #endif

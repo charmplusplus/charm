@@ -594,14 +594,14 @@ static int pparam_parseopt()
       sprintf(pparam_error, "Option %s not recognized.", opt);
       return -1;
     } else {
-      /*Unrecognized + option-- skip it.*/
+      /*Unrecognized single '+' option-- skip it.*/
       pparam_pos++;
       return 0;
     }
   }
   auto def = deffind.def;
   /* handle flag-options */
-  if ((def->type == 'f') && (opt[1] != '+') && (opt[2])) {
+  if ((def->type == 'f') && (opt[1] != '+') && (opt[2] != '\0')) {
     sprintf(pparam_error, "Option %s should not include a value", opt);
     return -1;
   }
@@ -611,19 +611,20 @@ static int pparam_parseopt()
     return 0;
   }
   /* handle non-flag options */
-  if ((opt[1] == '+') || (opt[2] == 0)) {
+  const char * optname = opt;
+  if ((opt[1] == '+') || (opt[2] == '\0')) { // special single '+' handling
     pparam_delarg(pparam_pos);
     opt = pparam_argv[pparam_pos];
   } else
     opt += 2;
-  if ((opt == 0) || (opt[0] == 0)) {
-    sprintf(pparam_error, "%s must be followed by a value.", opt);
+  if ((opt == nullptr) || (opt[0] == '\0')) {
+    sprintf(pparam_error, "%s must be followed by a value.", optname);
     return -1;
   }
   int ok = pparam_setdef(def, opt);
   pparam_delarg(pparam_pos);
   if (ok < 0) {
-    sprintf(pparam_error, "Illegal value for %s", opt);
+    sprintf(pparam_error, "Illegal value for %s", optname);
     return -1;
   }
   return 0;
@@ -931,10 +932,6 @@ static void arg_init(int argc, const char **argv)
   pparam_flag(&auto_provision, 0, "auto-provision", "fully utilize available resources");
   pparam_flag(&auto_provision, 0, "autoProvision", "fully utilize available resources");
 
-#ifdef HSTART
-  arg_argv = (const char **)dupargv(argv);
-#endif
-
 #if CMK_SHRINK_EXPAND
   /* move it to a function */
   saved_argc = argc;
@@ -966,14 +963,18 @@ static void arg_init(int argc, const char **argv)
 #endif
 
 #ifdef HSTART
-  if (!arg_hierarchical_start || arg_child_charmrun)
+  if (arg_hierarchical_start && !arg_child_charmrun)
+    arg_argv = (const char **)dupargv(argv);
+  else
 #endif
-    arg_argv =
-        (argv) + 1; /*Skip over charmrun (0) here and program name (1) later*/
+    arg_argv = argv + 1; /*Skip over charmrun (0) here and program name (1) later*/
   arg_argc = pparam_countargs(arg_argv);
   if (arg_argc < 1) {
-    fprintf(stderr, "ERROR> You must specify a node-program.\n");
-    pparam_printdocs();
+    if (!arg_help)
+    {
+      fprintf(stderr, "ERROR> You must specify a node-program.\n");
+      pparam_printdocs();
+    }
     exit(1);
   }
 
@@ -3584,7 +3585,7 @@ static void req_construct_phase2_processes(std::vector<nodetab_process> & phase2
   }
 }
 
-static void start_nodes_local(std::vector<nodetab_process> &);
+static void start_nodes_local(const std::vector<nodetab_process> &);
 static void start_nodes_ssh(std::vector<nodetab_process> &);
 static void finish_nodes(std::vector<nodetab_process> &);
 
@@ -3592,17 +3593,18 @@ static void req_client_connect(std::vector<nodetab_process> & process_table)
 {
   skt_set_abort(client_connect_problem_skt);
 
+  std::vector<nodetab_process> phase2_processes;
+
   if (arg_mpiexec)
   {
-    req_construct_phase2_processes(process_table);
+    req_construct_phase2_processes(phase2_processes);
+    req_add_phase2_processes(phase2_processes);
     req_client_connect_table(process_table);
     req_all_clients_connected();
     return;
   }
 
   req_client_connect_table(process_table);
-
-  std::vector<nodetab_process> phase2_processes;
   req_construct_phase2_processes(phase2_processes);
 
   if (phase2_processes.size() > 0)
@@ -3835,9 +3837,9 @@ static void req_charmrun_connect(void)
 
 #endif
 
-#ifndef CMK_BPROC
+static void start_one_node_ssh(nodetab_process & p, const char ** argv = arg_argv);
 
-static void start_one_node_ssh(nodetab_process & p);
+#ifndef CMK_BPROC
 
 static void start_nodes_batch_and_connect(std::vector<nodetab_process> & process_table)
 {
@@ -4423,7 +4425,7 @@ static void start_nodes_daemon(std::vector<nodetab_process> & process_table)
   Fall back to the daemon.*/
 static void start_nodes_ssh(std::vector<nodetab_process> & process_table) { start_nodes_daemon(process_table); }
 static void finish_nodes(std::vector<nodetab_process> & process_table) {}
-static void start_one_node_ssh(nodetab_process & p) {}
+static void start_one_node_ssh(nodetab_process & p, const char ** argv) {}
 static void start_nodes_mpiexec() {}
 
 static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting) {}
@@ -4445,27 +4447,32 @@ static void envCat(char *dest, LPTSTR oldEnv)
 
 /* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
-static void start_nodes_local(std::vector<nodetab_process> & process_table)
+struct local_nodestart
 {
-  char cmdLine[10000];     /*Program command line, including executable name*/
-                           /*Command line too long.*/
-                           /*
-                             if (strlen(pparam_argv[1])+strlen(args) > 10000)
-                                   return 0;
-                           */
-  strcpy(cmdLine, pparam_argv[1]);
-  const char **param = pparam_argv + 2;
-  while (*param) {
-    strcat(cmdLine, " ");
-    strcat(cmdLine, *param);
-    param++;
+  std::string cmdLine; /*Program command line, including executable name*/
+
+  local_nodestart(const char ** extra_argv = nullptr)
+    : cmdLine{pparam_argv[1]}
+  {
+    append_argv(pparam_argv + 2);
+    if (extra_argv != nullptr)
+      append_argv(extra_argv);
   }
 
-  PROCESS_INFORMATION pi; /* process Information for the process spawned */
-  char environment[10000]; /*Doubly-null terminated environment strings*/
-  for (nodetab_process & p : process_table)
+  void append_argv(const char ** param)
+  {
+    while (*param) {
+      cmdLine += " ";
+      cmdLine += *param;
+      param++;
+    }
+  }
+
+  void start(const nodetab_process & p)
   {
     STARTUPINFO si = {0}; /* startup info for the process spawned */
+    PROCESS_INFORMATION pi; /* process Information for the process spawned */
+    char environment[10000]; /*Doubly-null terminated environment strings*/
 
     sprintf(environment, "NETSTART=%s", create_netstart(p.nodeno));
     /*Paste all system environment strings */
@@ -4479,7 +4486,7 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
 
     int ret;
     ret = CreateProcess(NULL,          /* application name */
-                        cmdLine,       /* command line */
+                        cmdLine.c_str(), /* command line */
                         NULL, /*&sa,*/ /* process SA */
                         NULL, /*&sa,*/ /* thread SA */
                         FALSE,         /* inherit flag */
@@ -4514,6 +4521,14 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
       exit(1);
     }
   }
+};
+
+static void start_nodes_local(const std::vector<nodetab_process> & process_table)
+{
+  local_nodestart state;
+
+  for (const nodetab_process & p : process_table)
+    state.start(p);
 }
 
 #elif CMK_BPROC
@@ -4920,13 +4935,6 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
 #ifdef CMK_GFORTRAN
   fprintf(f, "GFORTRAN_UNBUFFERED_ALL=YES; export GFORTRAN_UNBUFFERED_ALL\n");
 #endif
-#if CMK_USE_MX
-  fprintf(f, "MX_MONOTHREAD=1; export MX_MONOTHREAD\n");
-/*fprintf(f,"MX_RCACHE=1; export MX_RCACHE\n");*/
-#endif
-#if CMK_AIX && CMK_SMP
-  fprintf(f, "MALLOCMULTIHEAP=1; export MALLOCMULTIHEAP\n");
-#endif
 
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, nodeno);
@@ -5296,10 +5304,8 @@ static void start_next_level_charmruns()
 #endif
 
 /* returns pid */
-static void start_one_node_ssh(nodetab_process & p)
+static void start_one_node_ssh(nodetab_process & p, const char ** argv)
 {
-  const nodetab_host * h = p.host;
-
   char startScript[200];
   sprintf(startScript, "/tmp/charmrun.%d.%d", getpid(), p.nodeno);
   FILE *f = fopen(startScript, "w");
@@ -5312,7 +5318,7 @@ static void start_one_node_ssh(nodetab_process & p)
       exit(1);
     }
   }
-  ssh_script(f, p, arg_argv);
+  ssh_script(f, p, argv);
   fclose(f);
 
   p.ssh_pid = ssh_fork(p, startScript);
@@ -5399,6 +5405,41 @@ static void start_nodes_mpiexec()
   /* all ssh_pid remain zero: skip finish_nodes */
 }
 
+static int finish_one_node(nodetab_process & p, int & retries, const char ** argv = arg_argv)
+{
+  int status = 0;
+  waitpid(p.ssh_pid, &status, 0); /* check if the process is finished */
+  if (!WIFEXITED(status))
+    return 1;
+
+  const int exitstatus = WEXITSTATUS(status);
+  if (!exitstatus)
+  { /* good */
+    p.ssh_pid = 0; /* process is finished */
+    return 0;
+  }
+
+  fprintf(stderr, "Charmrun> Error %d returned from remote shell (%s:%d)\n",
+          exitstatus, p.host->name, p.nodeno);
+
+  if (exitstatus != 255)
+    exit(1);
+
+  if (++retries <= MAX_NUM_RETRIES)
+  {
+    fprintf(stderr, "Charmrun> Reconnection attempt %d of %d\n",
+            retries, MAX_NUM_RETRIES);
+    start_one_node_ssh(p, argv);
+  }
+  else
+  {
+    fprintf(stderr, "Charmrun> Too many reconnection attempts; bailing out\n");
+    exit(1);
+  }
+
+  return 2;
+}
+
 static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting)
 {
   std::vector<int> num_retries(stop - start, 0);
@@ -5412,34 +5453,9 @@ static void finish_set_nodes(std::vector<nodetab_process> & process_table, int s
       // the ssh connection to process 0 runs until the end of the program, so we don't wait
       // for that process until the end
       if (p.nodeno == 0 && arg_interactive && !charmrun_exiting) continue;
-      const nodetab_host * h = p.host;
       if (p.ssh_pid != 0) {
         done = 0; /* we are not finished yet */
-        int status = 0;
-        waitpid(p.ssh_pid, &status, 0); /* check if the process is finished */
-        if (WIFEXITED(status)) {
-          if (!WEXITSTATUS(status)) { /* good */
-            p.ssh_pid = 0;          /* process is finished */
-          } else {
-            fprintf(stderr,
-                    "Charmrun> Error %d returned from remote shell (%s:%d)\n",
-                    WEXITSTATUS(status), h->name, p.nodeno);
-
-            if (WEXITSTATUS(status) != 255)
-              exit(1);
-
-            if (++num_retries[i - start] <= MAX_NUM_RETRIES) {
-              fprintf(stderr, "Charmrun> Reconnection attempt %d of %d\n",
-                      num_retries[i - start], MAX_NUM_RETRIES);
-              start_one_node_ssh(p);
-            } else {
-              fprintf(
-                  stderr,
-                  "Charmrun> Too many reconnection attempts; bailing out\n");
-              exit(1);
-            }
-          }
-        }
+        finish_one_node(p, num_retries[i - start]);
       }
     }
   }
@@ -5455,20 +5471,22 @@ static void finish_nodes(std::vector<nodetab_process> & process_table)
     finish_set_nodes(process_table, 0, process_table.size());
 }
 
+static void kill_one_node(nodetab_process & p)
+{
+  int status = 0;
+  if (arg_verbose)
+    printf("Charmrun> waiting for remote shell (%s:%d), pid %d\n",
+           p.host->name, p.nodeno, p.ssh_pid);
+  kill(p.ssh_pid, 9);
+  waitpid(p.ssh_pid, &status, 0); /*<- no zombies*/
+  p.ssh_pid = 0;
+}
+
 static void kill_nodes()
 {
   /*Now wait for all the ssh'es to finish*/
   for (nodetab_process & p : my_process_table)
-  {
-    const nodetab_host * h = p.host;
-    int status = 0;
-    if (arg_verbose)
-      printf("Charmrun> waiting for remote shell (%s:%d), pid %d\n", h->name,
-             p.nodeno, p.ssh_pid);
-    kill(p.ssh_pid, 9);
-    waitpid(p.ssh_pid, &status, 0); /*<- no zombies*/
-    p.ssh_pid = 0;
-  }
+    kill_one_node(p);
 }
 
 
@@ -5496,148 +5514,166 @@ static char *find_abs_path(const char *target)
 
 /* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
-static void start_nodes_local(std::vector<nodetab_process> & process_table)
+struct local_nodestart
 {
-  char ** env = main_envp;
-
-  /* copy environ and expanded to hold NETSTART and CmiNumNodes */
   int envc;
-  for (envc = 0; env[envc]; envc++)
-    ;
-  int extra = 0;
-#if CMK_AIX && CMK_SMP
-  ++extra;
-#endif
-  const int proc_active = proc_per.active();
-  extra += proc_active;
-#if CMK_SMP
-  const int onewth_active = onewth_per.active();
-  extra += onewth_active;
-#endif
+  char **envp;
+  int n;
 
-  char **envp = (char **) malloc((envc + 2 + extra + 1) * sizeof(void *));
-  for (int i = 0; i < envc; i++)
-    envp[i] = env[i];
-  envp[envc] = (char *) malloc(256);
-  envp[envc + 1] = (char *) malloc(256);
-  int n = 2;
-#if CMK_AIX && CMK_SMP
-  envp[envc + n] = (char *) malloc(256);
-  sprintf(envp[envc + n], "MALLOCMULTIHEAP=1");
-  ++n;
-#endif
-  // cpu affinity hints
-  using Unit = typename TopologyRequest::Unit;
-  if (proc_active)
-  {
-    envp[envc + n] = (char *) malloc(256);
-    switch (proc_per.unit())
-    {
-      case Unit::Host:
-        sprintf(envp[envc + n], "CmiProcessPerHost=%d", proc_per.host);
-        break;
-      case Unit::Socket:
-        sprintf(envp[envc + n], "CmiProcessPerSocket=%d", proc_per.socket);
-        break;
-      case Unit::Core:
-        sprintf(envp[envc + n], "CmiProcessPerCore=%d", proc_per.core);
-        break;
-      case Unit::PU:
-        sprintf(envp[envc + n], "CmiProcessPerPU=%d", proc_per.pu);
-        break;
-      default:
-        break;
-    }
-    ++n;
-  }
-#if CMK_SMP
-  if (onewth_active)
-  {
-    envp[envc + n] = (char *) malloc(256);
-    switch (onewth_per.unit())
-    {
-      case Unit::Host:
-        sprintf(envp[envc + n], "CmiOneWthPerHost=%d", 1);
-        break;
-      case Unit::Socket:
-        sprintf(envp[envc + n], "CmiOneWthPerSocket=%d", 1);
-        break;
-      case Unit::Core:
-        sprintf(envp[envc + n], "CmiOneWthPerCore=%d", 1);
-        break;
-      case Unit::PU:
-        sprintf(envp[envc + n], "CmiOneWthPerPU=%d", 1);
-        break;
-      default:
-        break;
-    }
-    ++n;
-  }
-#endif
-  envp[envc + n] = 0;
-
-  /* insert xterm gdb in front of command line and pass args to gdb */
   char **dparamp;
   std::vector<char *> dparamv;
-  if (arg_debug || arg_debug_no_pause || arg_in_xterm)
+
+  local_nodestart(const char ** extra_argv = nullptr)
   {
-    char *abs_xterm=find_abs_path(arg_xterm);
-    if(!abs_xterm)
+    char ** env = main_envp;
+
+    /* copy environ and expanded to hold NETSTART and CmiNumNodes */
+    for (envc = 0; env[envc]; envc++)
+      ;
+    int extra = 0;
+    const int proc_active = proc_per.active();
+    extra += proc_active;
+#if CMK_SMP
+    const int onewth_active = onewth_per.active();
+    extra += onewth_active;
+#endif
+
+    envp = (char **) malloc((envc + 2 + extra + 1) * sizeof(void *));
+    for (int i = 0; i < envc; i++)
+      envp[i] = env[i];
+    envp[envc] = (char *) malloc(256);
+    envp[envc + 1] = (char *) malloc(256);
+    n = 2;
+    // cpu affinity hints
+    using Unit = typename TopologyRequest::Unit;
+    if (proc_active)
     {
-      fprintf(stderr, "Charmrun> cannot find xterm for debugging, please add it to your path\n");
-      exit(1);
-    }
-
-    dparamv.push_back(strdup(abs_xterm));
-    dparamv.push_back(strdup("-title"));
-    dparamv.push_back(strdup(pparam_argv[1]));
-    dparamv.push_back(strdup("-e"));
-
-    std::vector<const char *> cparamv;
-    if (arg_debug || arg_debug_no_pause)
-    {
-      const bool isLLDB = strcmp(arg_debugger, "lldb") == 0;
-      const char *commandflag = isLLDB ? "-o" : "-ex";
-      const char *argsflag = isLLDB ? "--" : "--args";
-
-      cparamv.push_back(arg_debugger);
-
-      if (arg_debug_no_pause)
+      envp[envc + n] = (char *) malloc(256);
+      switch (proc_per.unit())
       {
-        cparamv.push_back(commandflag);
-        cparamv.push_back("r");
+        case Unit::Host:
+          sprintf(envp[envc + n], "CmiProcessPerHost=%d", proc_per.host);
+          break;
+        case Unit::Socket:
+          sprintf(envp[envc + n], "CmiProcessPerSocket=%d", proc_per.socket);
+          break;
+        case Unit::Core:
+          sprintf(envp[envc + n], "CmiProcessPerCore=%d", proc_per.core);
+          break;
+        case Unit::PU:
+          sprintf(envp[envc + n], "CmiProcessPerPU=%d", proc_per.pu);
+          break;
+        default:
+          break;
+      }
+      ++n;
+    }
+#if CMK_SMP
+    if (onewth_active)
+    {
+      envp[envc + n] = (char *) malloc(256);
+      switch (onewth_per.unit())
+      {
+        case Unit::Host:
+          sprintf(envp[envc + n], "CmiOneWthPerHost=%d", 1);
+          break;
+        case Unit::Socket:
+          sprintf(envp[envc + n], "CmiOneWthPerSocket=%d", 1);
+          break;
+        case Unit::Core:
+          sprintf(envp[envc + n], "CmiOneWthPerCore=%d", 1);
+          break;
+        case Unit::PU:
+          sprintf(envp[envc + n], "CmiOneWthPerPU=%d", 1);
+          break;
+        default:
+          break;
+      }
+      ++n;
+    }
+#endif
+    envp[envc + n] = 0;
+
+    /* insert xterm gdb in front of command line and pass args to gdb */
+    if (arg_debug || arg_debug_no_pause || arg_in_xterm)
+    {
+      char *abs_xterm=find_abs_path(arg_xterm);
+      if(!abs_xterm)
+      {
+        fprintf(stderr, "Charmrun> cannot find xterm for debugging, please add it to your path\n");
+        exit(1);
       }
 
-      cparamv.push_back(argsflag);
+      dparamv.push_back(strdup(abs_xterm));
+      dparamv.push_back(strdup("-title"));
+      dparamv.push_back(strdup(pparam_argv[1]));
+      dparamv.push_back(strdup("-e"));
+
+      std::vector<const char *> cparamv;
+      if (arg_debug || arg_debug_no_pause)
+      {
+        const bool isLLDB = strcmp(arg_debugger, "lldb") == 0;
+        const char *commandflag = isLLDB ? "-o" : "-ex";
+        const char *argsflag = isLLDB ? "--" : "--args";
+
+        cparamv.push_back(arg_debugger);
+
+        if (arg_debug_no_pause)
+        {
+          cparamv.push_back(commandflag);
+          cparamv.push_back("r");
+        }
+
+        cparamv.push_back(argsflag);
+      }
+
+      for (int i = 1; pparam_argv[i] != nullptr; ++i)
+        cparamv.push_back(pparam_argv[i]);
+
+      if (extra_argv != nullptr)
+        for (char ** param = (char **)extra_argv; *param != nullptr; ++param)
+          cparamv.push_back(*param);
+
+      if (!(arg_debug || arg_debug_no_pause))
+        cparamv.push_back("; echo \"program exited with code $?\" ; read eoln");
+
+      dparamv.push_back(cstring_join(cparamv, " "));
+
+      if (arg_verbose)
+      {
+        printf("Charmrun> xterm args:");
+        for (const char *p : dparamv)
+          printf(" %s", p);
+        printf("\n");
+      }
+
+      // null terminate your argv or face the wrath of undefined behavior
+      dparamv.push_back(nullptr);
+
+      dparamp = dparamv.data();
     }
-
-    for (int i = 1; pparam_argv[i] != nullptr; ++i)
-      cparamv.push_back(pparam_argv[i]);
-
-    if (!(arg_debug || arg_debug_no_pause))
-      cparamv.push_back("; echo \"program exited with code $?\" ; read eoln");
-
-    dparamv.push_back(cstring_join(cparamv, " "));
-
-    if (arg_verbose)
+    else
     {
-      printf("Charmrun> xterm args:");
-      for (const char *p : dparamv)
-        printf(" %s", p);
-      printf("\n");
+      if (extra_argv != nullptr)
+      {
+        for (char ** param = (char **)(pparam_argv+1); *param != nullptr; ++param)
+          dparamv.push_back(*param);
+
+        for (char ** param = (char **)extra_argv; *param != nullptr; ++param)
+          dparamv.push_back(*param);
+
+        dparamv.push_back(nullptr);
+
+        dparamp = dparamv.data();
+      }
+      else
+      {
+        dparamp = (char **)(pparam_argv+1);
+      }
     }
-
-    // null terminate your argv or face the wrath of undefined behavior
-    dparamv.push_back(nullptr);
-
-    dparamp = dparamv.data();
-  }
-  else
-  {
-    dparamp = (char **)(pparam_argv+1);
   }
 
-  for (const nodetab_process & p : process_table)
+  void start(const nodetab_process & p)
   {
     if (arg_verbose)
       printf("Charmrun> start %d node program on localhost.\n", p.nodeno);
@@ -5670,11 +5706,23 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
       exit(1);
     }
   }
-  for (char *p : dparamv)
-    free(p);
-  for (int i = envc, i_end = envc + n; i < i_end; ++i)
-    free(envp[i]);
-  free(envp);
+
+  ~local_nodestart()
+  {
+    for (char *p : dparamv)
+      free(p);
+    for (int i = envc, i_end = envc + n; i < i_end; ++i)
+      free(envp[i]);
+    free(envp);
+  }
+};
+
+static void start_nodes_local(const std::vector<nodetab_process> & process_table)
+{
+  local_nodestart state;
+
+  for (const nodetab_process & p : process_table)
+    state.start(p);
 }
 
 #ifdef __FAULT__
@@ -5686,11 +5734,6 @@ static int current_restart_phase = 1;
  */
 static void restart_node(nodetab_process & p)
 {
-  char startScript[200];
-  /** write the startScript file to be sent**/
-  sprintf(startScript, "/tmp/charmrun.%d.%d", getpid(), p.nodeno);
-  FILE *f = fopen(startScript, "w");
-
   /** add an argument to the argv of the new process
   so that the restarting processor knows that it
   is a restarting processor */
@@ -5704,8 +5747,9 @@ static void restart_node(nodetab_process & p)
     restart_argv[i] = arg_argv[i];
     i++;
   }
-  restart_argv[i] = "+restartaftercrash";
 
+  const char ** added_restart_argv = restart_argv + i;
+  restart_argv[i] = "+restartaftercrash";
   char phase_str[10];
   sprintf(phase_str, "%d", ++current_restart_phase);
   restart_argv[i + 1] = phase_str;
@@ -5735,25 +5779,30 @@ processor to connect it to a new one**/
   ++next_replacement_host;
   next_replacement_host %= host_count;
 
-  ssh_script(f, p, restart_argv);
-  fclose(f);
-  /**start the new processor */
-  int restart_ssh_pid = ssh_fork(p, startScript);
-  /**wait for the reply from the new process*/
-  int status = 0;
-  if (arg_debug_no_pause || arg_debug)
-    ;
-  else {
-    do {
-      waitpid(restart_ssh_pid, &status, 0);
-    } while (!WIFEXITED(status));
-    if (WEXITSTATUS(status) != 0) {
-      fprintf(stderr,
-              "Charmrun> Error %d returned from new attempted remote shell \n",
-              WEXITSTATUS(status));
-      exit(1);
-    }
+  if (arg_mpiexec)
+  {
+    fprintf(stderr, "Charmrun> Restarting unsupported with ++mpiexec!\n");
+    exit(1);
   }
+  else if (!arg_local)
+  {
+    start_one_node_ssh(p, restart_argv);
+
+#if !CMK_SSH_KILL
+    int retries = 0, unfinished;
+    do
+      unfinished = finish_one_node(p, retries, restart_argv);
+    while (unfinished);
+#endif
+  }
+  else
+  {
+    local_nodestart state{added_restart_argv};
+    state.start(p);
+  }
+
+  free(restart_argv);
+
   PRINT(("Charmrun finished launching new process in %fs\n",
          GetClock() - ftTimer));
 }
@@ -5834,6 +5883,10 @@ static void reconnect_crashed_client(nodetab_process & crashed)
       req_send_initnodetab(req_clients[socket_index]); */
     ChMessage_free(&msg);
   }
+
+#if CMK_SSH_KILL
+  kill_one_node(crashed);
+#endif
 }
 
 /**

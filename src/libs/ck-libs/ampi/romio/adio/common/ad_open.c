@@ -77,7 +77,7 @@ MPI_File ADIO_Open(MPI_Comm orig_comm,
 
     fd->fortran_handle = -1;
 
-    fd->err_handler = CtvAccess(ADIOI_DFLT_ERR_HANDLER);
+    fd->err_handler = ADIOI_DFLT_ERR_HANDLER;
 
     fd->io_buf_window = MPI_WIN_NULL;
     fd->io_buf_put_amounts_window = MPI_WIN_NULL;
@@ -111,19 +111,19 @@ MPI_File ADIO_Open(MPI_Comm orig_comm,
      *
      * a code might do an "initialize from 0", so we can only skip hint
      * processing once everyone has particpiated in hint processing */
-    if (CtvAccess(ADIOI_syshints) == MPI_INFO_NULL)
+    if (ADIOI_syshints == MPI_INFO_NULL)
 	syshints_processed = 0;
     else
 	syshints_processed = 1;
 
     MPI_Allreduce(&syshints_processed, &can_skip, 1, MPI_INT, MPI_MIN, fd->comm);
     if (!can_skip) {
-	if (CtvAccess(ADIOI_syshints) == MPI_INFO_NULL)
-	    MPI_Info_create(&CtvAccess(ADIOI_syshints));
-	ADIOI_process_system_hints(fd, CtvAccess(ADIOI_syshints));
+	if (ADIOI_syshints == MPI_INFO_NULL)
+	    MPI_Info_create(&ADIOI_syshints);
+	ADIOI_process_system_hints(fd, ADIOI_syshints);
     }
 
-    ADIOI_incorporate_system_hints(info, CtvAccess(ADIOI_syshints), &dupinfo);
+    ADIOI_incorporate_system_hints(info, ADIOI_syshints, &dupinfo);
     ADIO_SetInfo(fd, dupinfo, &err);
     if (dupinfo != MPI_INFO_NULL) {
 	*error_code = MPI_Info_free(&dupinfo);

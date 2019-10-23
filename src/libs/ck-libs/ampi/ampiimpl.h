@@ -13,6 +13,10 @@
 #include "ddt.h"
 #include "charm++.h"
 
+#if CMK_AMPI_WITH_ROMIO
+# include "mpio_globals.h"
+#endif
+
 // Set to 1 to print debug statements
 #define AMPI_DO_DEBUG 0
 
@@ -974,16 +978,6 @@ class ampiCommStruct {
 };
 PUPmarshall(ampiCommStruct)
 
-class mpi_comm_worlds{
-  ampiCommStruct comms[MPI_MAX_COMM_WORLDS];
- public:
-  ampiCommStruct &operator[](int i) noexcept {return comms[i];}
-  void pup(PUP::er &p) noexcept {
-    for (int i=0;i<MPI_MAX_COMM_WORLDS;i++)
-      comms[i].pup(p);
-  }
-};
-
 // group operations
 inline void outputOp(const std::vector<int>& vec) noexcept {
   if (vec.size() > 50) {
@@ -1139,8 +1133,6 @@ inline std::vector<int> rangeExclOp(int n, int ranges[][3], const std::vector<in
 #include "ampi.decl.h"
 #include "charm-api.h"
 #include <sys/stat.h> // for mkdir
-
-extern int _mpi_nworlds;
 
 //MPI_ANY_TAG is defined in ampi.h to MPI_TAG_UB_VALUE+1
 #define MPI_ATA_SEQ_TAG     MPI_TAG_UB_VALUE+2
@@ -2099,7 +2091,6 @@ PUPmarshall(AmpiSeqQ)
 
 
 inline CProxy_ampi ampiCommStruct::getProxy() const noexcept {return ampiID;}
-const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo) noexcept;
 
 // Max value of a predefined MPI_Op (values defined in ampi.h)
 #define AMPI_MAX_PREDEFINED_OP 13
@@ -2122,7 +2113,6 @@ class ampiParent final : public CBase_ampiParent {
   CkDDT myDDT;
 
  private:
-  MPI_Comm worldNo; //My MPI_COMM_WORLD
   ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
 
   CkPupPtrVec<ampiCommStruct> splitComm;     //Communicators from MPI_Comm_split
@@ -2159,6 +2149,10 @@ class ampiParent final : public CBase_ampiParent {
 
  public:
   bool ampiInitCallDone;
+
+#if CMK_AMPI_WITH_ROMIO
+  ADIO_GlobalStruct romio_globals;
+#endif
 
  private:
   bool kv_set_builtin(int keyval, void* attribute_val) noexcept;
@@ -2232,7 +2226,7 @@ class ampiParent final : public CBase_ampiParent {
   void intraChildRegister(const ampiCommStruct &s) noexcept;
 
  public:
-  ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_) noexcept;
+  ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept;
   ampiParent(CkMigrateMessage *msg) noexcept;
   void ckAboutToMigrate() noexcept;
   void ckJustMigrated() noexcept;
@@ -2319,7 +2313,6 @@ class ampiParent final : public CBase_ampiParent {
 
   inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept {
     if (comm==MPI_COMM_WORLD) return getWorldStruct();
-    if (comm==worldNo) return getWorldStruct();
     if (isSplit(comm)) return getSplit(comm);
     if (isGroup(comm)) return getGroup(comm);
     if (isCart(comm)) return getCart(comm);
@@ -2327,7 +2320,8 @@ class ampiParent final : public CBase_ampiParent {
     if (isDistGraph(comm)) return getDistGraph(comm);
     if (isInter(comm)) return getInter(comm);
     if (isIntra(comm)) return getIntra(comm);
-    return universeComm2CommStruct(comm);
+    CkAbort("Invalid communicator used: %d", comm);
+    return getWorldStruct();
   }
 
   inline std::unordered_map<int, uintptr_t> & getAttributes(MPI_Comm comm) noexcept {
@@ -2337,7 +2331,6 @@ class ampiParent final : public CBase_ampiParent {
 
   inline ampi *comm2ampi(MPI_Comm comm) const noexcept {
     if (comm==MPI_COMM_WORLD) return worldPtr;
-    if (comm==worldNo) return worldPtr;
     if (isSplit(comm)) {
       const ampiCommStruct &st=getSplit(comm);
       return st.getProxy()[thisIndex].ckLocal();
@@ -2366,14 +2359,13 @@ class ampiParent final : public CBase_ampiParent {
       const ampiCommStruct &st=getIntra(comm);
       return st.getProxy()[thisIndex].ckLocal();
     }
-    if (comm>MPI_COMM_WORLD) return worldPtr; //Use MPI_WORLD ampi for cross-world messages:
-    CkAbort("Invalid communicator used!");
+    CkAbort("Invalid communicator used: %d", comm);
     return NULL;
   }
 
   inline bool hasComm(const MPI_Group group) const noexcept {
     MPI_Comm comm = (MPI_Comm)group;
-    return ( comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm) ||
+    return ( comm==MPI_COMM_WORLD || isSplit(comm) || isGroup(comm) ||
              isCart(comm) || isGraph(comm) || isDistGraph(comm) || isIntra(comm) );
     //isInter omitted because its comm number != its group number
   }
@@ -2980,7 +2972,7 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 "AMPI_Win_wait", "AMPI_Exit" /*AMPI extensions:*/, "AMPI_Migrate",
 "AMPI_Load_start_measure", "AMPI_Load_stop_measure",
 "AMPI_Load_set_value", "AMPI_Migrate_to_pe", "AMPI_Set_migratable",
-"AMPI_Register_pup", "AMPI_Get_pup_data", "AMPI_Register_main",
+"AMPI_Register_pup", "AMPI_Get_pup_data",
 "AMPI_Register_about_to_migrate", "AMPI_Register_just_migrated",
 "AMPI_Iget", "AMPI_Iget_wait", "AMPI_Iget_free", "AMPI_Iget_data",
 "AMPI_Type_is_contiguous", "AMPI_Yield", "AMPI_Suspend",

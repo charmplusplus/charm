@@ -13,6 +13,10 @@ ppn=1
 machinefile=""
 QUIET=0
 LOCAL=0
+XTERM='xterm'
+DEBUG=0
+DEBUG_NO_PAUSE=0
+DEBUGGER=''
 
 while [ $# -gt 0 ]
 do
@@ -58,6 +62,26 @@ do
 	++no-local)
 		LOCAL=0
 		;;
+	++xterm)
+		XTERM=$2
+		shift
+		;;
+	++debug)
+		DEBUG=1
+		;;
+	++no-debug)
+		DEBUG=0
+		;;
+	++debug-no-pause)
+		DEBUG_NO_PAUSE=1
+		;;
+	++no-debug-no-pause)
+		DEBUG_NO_PAUSE=0
+		;;
+	++debugger)
+		DEBUGGER=$2
+		shift
+		;;
 	*)
 		args=$args" "$1
 		;;
@@ -69,6 +93,26 @@ test $QUIET -eq 1 && charm_args=$charm_args" "++quiet
 test $LOCAL -eq 1 && charm_args=$charm_args" "++local
 
 args=$args" "$charm_args
+
+if [ "$DEBUG" = '1' -o "$DEBUG_NO_PAUSE" = '1' ]
+then
+  if [ -z "$DEBUGGER" ]
+  then
+    [ "`uname -s 2>/dev/null`" = 'Darwin' ] && DEBUGGER='lldb' || DEBUGGER='gdb'
+  fi
+
+  DEBUG_RUN='-ex r'
+  DEBUG_POSTFIX='--args'
+  if [ "$DEBUGGER" = 'lldb' ]
+  then
+    DEBUG_RUN='-o r'
+    DEBUG_POSTFIX='--'
+  fi
+
+  args="$DEBUG_POSTFIX $args"
+  [ "$DEBUG_NO_PAUSE" = '1' ] && args="$DEBUG_RUN $args"
+  args="$XTERM -e $DEBUGGER $args"
+fi
 
 rem=`expr $pes % $ppn`
 quot=`expr $pes / $ppn`

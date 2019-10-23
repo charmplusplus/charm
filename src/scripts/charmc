@@ -112,10 +112,6 @@ NOABORT=""
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
 
-CMK_CELL=0
-SPU_USE_CPP=0
-SPU_EXTRA_LIBS=""
-
 MPI_INTEROPERATE=""
 NO_MAIN_MODULE=""
 NO_MAIN=""
@@ -445,6 +441,12 @@ do
 		SKIP_MODULEINIT="yes"
 		;;
 
+	"-isysroot")
+		# Ignore -isysroot and the following argument (macOS SDK path),
+		# which charmc can not parse (Bug #2495).
+		shift
+		;;
+
 	"-language")
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
@@ -548,15 +550,6 @@ do
 	"-verbose")
 		echo "Verbose mode set"
 		VERBOSE=true
-		;;
-
-        "-spu-cpp")
-		SPU_USE_CPP=1
-		;;
-
-        "-spu-lib")
-		SPU_EXTRA_LIBS="$SPU_EXTRA_LIBS -l$1"
-		shift
 		;;
 
         "-intrinsic")
@@ -1143,9 +1136,17 @@ if [ "$BUILD_SHARE" = "1" ]
 then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
-	*.a|*.so|*.so.*|*.sl|*.dylib)
+	*.a)
 		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
 		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
+		;;
+	*.so|*.so.*|*.sl|*.dylib)
+		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
+		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
+		if [ "$CMK_MACOSX" = "1" -a -z "$STANDALONE" ]; then
+			fname=`basename $OBJECT`
+			OPTS_LD="$OPTS_LD -Wl,-install_name,$CHARMLIBSO/$fname"
+		fi
 		;;
 	*)
 		BUILD_SHARE="0"
@@ -1384,34 +1385,6 @@ case "$PARADIGM" in
 	;;
 esac
 
-# DMK - ACCEL SUPPORT - If this is a cell build, add the spe code object to POST_LIBRARIES
-if [ $CMK_CELL -eq 1 ]
-then
-
-  if [ "$PARADIGM" = "converse++" ]
-  then
-    # Include a "do nothing" register_accel_spe_funcs() function
-    POST_LIBRARIES="$POST_LIBRARIES -lnoAccelStub"
-  fi
-
-  if [ "$PARADIGM" = "charm++" ]
-  then
-
-    if [ $SPU_USE_CPP -eq 1 ]
-    then
-        SPU_COMPILER=$CMK_SPU_CXX
-        SPU_LINKER=$CMK_SPU_LDXX
-    else
-        SPU_COMPILER=$CMK_SPU_CC
-        SPU_LINKER=$CMK_SPU_LD
-    fi
-
-    # Include the spe object file for linking into main executable
-    POST_LIBRARIES="$POST_LIBRARIES main__funcLookup__.genSPECode.ppe.o"
-
-  fi
-fi
-
 if [ "$AMPIMAIN" != "" ]
 then
 	OBJECTFILES="$CHARMLIB/lib$AMPIMAIN.o $OBJECTFILES"
@@ -1611,7 +1584,7 @@ fi
 
 if [ "$BUILD_SHARE" = "0" ]
 then
-       MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
+       MIDDLE_LIBS="$MEM_OBJ $THREAD_OBJ $MIDDLE_LIBS"
 fi
 
 CMK_SYSLIBS="$CMK_SYSLIBS -lm"
@@ -1655,7 +1628,7 @@ case "$PARADIGM" in
 	;;
 "converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
+	MIDDLE_LIBS="-lconv-core $MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
 "c"|"C"|"c++"|"C++"|"f90"|"f77")
   ;;
@@ -2128,20 +2101,6 @@ esac
 fi
 # If the above case returns, we're not creating a .o or .a file,
 # so linking is needed.
-
-if [ $CMK_CELL -eq 1 ]
-then
-
-  if [ "$PARADIGM" = "charm++" ]
-  then
-
-    # Make the spe object file to be included
-    Do $SPU_COMPILER -c -I$CHARMINC $CMK_SYSINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
-    Do $SPU_LINKER -L$CHARMLIB -o main__funcLookup__.genSPECode main__funcLookup__.genSPECode.o $CMK_SPERT_LIBS $SPU_EXTRA_LIBS
-    Do $CMK_PPU_EMBEDSPU spert_main main__funcLookup__.genSPECode main__funcLookup__.genSPECode.ppe.o
-
-  fi
-fi
 
 # check if we're linking a sequential object
 case "$LANGUAGE" in

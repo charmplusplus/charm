@@ -528,7 +528,6 @@ public:
 private:
 	/// The core of the location manager: map array index to element representative
 	LocRecHash hash;
-	CmiImmediateLockType hashImmLock;
 
 	//Map object
 	CkGroupID mapID;
@@ -537,6 +536,8 @@ private:
 
 	CkGroupID lbdbID;
 	CkGroupID metalbID;
+
+	std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
 
 	ck::ArrayIndexCompressor *compressor;
 	CkArrayIndex bounds;
