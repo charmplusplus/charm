@@ -1957,6 +1957,32 @@ void CkArray::sendUnknown(CkArrayMessage* msg, CmiUInt8 id, const CkArrayIndex& 
   }
 }
 
+bool CkArray::demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx,
+                                  CkDeliver_t type)
+{
+  int onPe = -1;
+  if (msg->array_ifNotThere() == CkArray_IfNotThere_createhere)
+  {
+    onPe = UsrToEnv(msg)->getsetArraySrcPe();
+  }
+  else
+  {  // Createhome
+    onPe = locMgr->homePe(idx);
+  }
+
+  int chareType = _entryTable[msg->array_ep()]->chareIdx;
+  int ctor = _chareTable[chareType]->getDefaultCtor();
+  if (ctor == -1)
+  {
+    CkAbort(
+        "Can't create array element to handle message--\n"
+        "The element has no default constructor in the .ci file!\n");
+  }
+
+  thisProxy[onPe].demandCreateElement(idx, ctor, type);
+  return onPe == CkMyPe();
+}
+
 void CkArray::demandCreateUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
                                   CkDeliver_t type, int opts)
 {
@@ -1965,16 +1991,51 @@ void CkArray::demandCreateUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   {
     if (bufferedCreationMsgs.find(idx) == bufferedCreationMsgs.end())
     {
-      locMgr->thisProxy[home].requestDemandCreation(
+      thisProxy[home].requestDemandCreation(
           idx, CkMyPe(), msg->array_ifNotThere(),
-          _entryTable[UsrToEnv(msg)->getEpIdx()]->chareIdx, thisgroup);
+          _entryTable[UsrToEnv(msg)->getEpIdx()]->chareIdx);
     }
     bufferedCreationMsgs[idx].push_back(msg);
   }
   else
   {
     bufferedCreationMsgs[idx].push_back(msg);
-    locMgr->demandCreateElement(msg, idx, -1, type);
+    demandCreateElement(msg, idx, type);
+  }
+}
+
+void CkArray::requestDemandCreation(const CkArrayIndex& idx, int fromPe, int createOnPe,
+                                    int chareType)
+{
+  CkAssert(locMgr->homePe(idx) == CkMyPe());
+  CkAssert(fromPe != CkMyPe());
+  int ctor = _chareTable[chareType]->getDefaultCtor();
+  if (ctor == -1)
+  {
+    CkAbort(
+        "Can't use demand creation for an element which has no default "
+        "constructor defined in the .ci file!\n");
+  }
+  // TODO: What if the location does already exist due to bound arrays, but the
+  // specific element does not?
+  if (!locMgr->requestLocation(idx, fromPe))
+  {
+    switch (createOnPe)
+    {
+      case CkArray_IfNotThere_createhome:
+        // TODO: How does this inform the "fromPe" to release the buffered msg?
+        // Answer: The requestLocation call in the if
+        thisProxy[CkMyPe()].demandCreateElement(idx, ctor, CkDeliver_inline);
+        // locMgr->demandCreateElement(idx, chareType, CkMyPe(), thisgroup);
+        break;
+      case CkArray_IfNotThere_createhere:
+        // locMgr->demandCreateElement(idx, chareType, fromPe, thisgroup);
+        thisProxy[fromPe].demandCreateElement(idx, ctor, CkDeliver_inline);
+        break;
+      default:
+        CkAbort("Invalid demand creation request\n");
+        break;
+    }
   }
 }
 

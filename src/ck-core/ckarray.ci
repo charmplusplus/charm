@@ -9,10 +9,10 @@ module CkArray {
   group [migratable] CkArray : CkReductionMgr {
     entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg);
 
-    // Insertion
-    entry [inline] void insertElement(CkMarshalledMessage, CkArrayIndex,
-        int listenerData[CK_ARRAYLISTENER_MAXLEN]);
-    entry [inline] void demandCreateElement(const CkArrayIndex &idx, int ctor);
+    //Insertion
+    entry [inline] void insertElement(CkMarshalledMessage, CkArrayIndex, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
+    entry [inline] void demandCreateElement(const CkArrayIndex &idx, int ctor, CkDeliver_t type);
+    entry [expedited] void requestDemandCreation(const CkArrayIndex& idx, int forPe, int onPe, int cType);
     entry void remoteBeginInserting(void);
     entry void sendZCBroadcast(MsgPointerWrapper p);
     entry void remoteDoneInserting(void);
