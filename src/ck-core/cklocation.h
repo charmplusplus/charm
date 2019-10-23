@@ -652,11 +652,6 @@ public:
   // This index will no longer be used-- delete the associated elements
   void reclaim(CkLocRec* rec);
 
-  void requestDemandCreation(const CkArrayIndex&, int, int, int, CkArrayID);
-  bool demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx, int onPe);
-  void demandCreateElement(const CkArrayIndex& idx, int chareType, int onPe,
-                           CkArrayID mgr);
-
   // Communication:
   void immigrate(CkArrayElementMigrateMessage* msg);
   void requestLocation(const CkArrayIndex& idx);

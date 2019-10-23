@@ -794,7 +794,11 @@ public:
 
   /// Demand-creation:
   /// Demand-create an element at this index on this processor
-  void demandCreateElement(const CkArrayIndex& idx, int ctor);
+  void demandCreateElement(const CkArrayIndex& idx, int ctor, CkDeliver_t type);
+  bool demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx,
+                           CkDeliver_t type);
+  void requestDemandCreation(const CkArrayIndex& idx, int fromPe, int createOnPe,
+                             int chareType);
 
   /// Broadcast communication:
   void sendBroadcast(CkMessage* msg);
