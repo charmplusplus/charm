@@ -8,7 +8,7 @@ HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h \
 		ampi_functions.h mpio_functions.h
 HEADDEP=$(HEADERS) ampiimpl.h ddt.h \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
-COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
+COMPAT=compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
 	   compat_ampicpp.o
 OBJS=ampi.o ampif.o ampiOneSided.o \
@@ -128,10 +128,6 @@ headers: $(HEADERS)
 	cp ampirun $(CDIR)/bin/ampirun
 	cp nm_globals.sh $(CDIR)/bin/nm_globals.sh
 	touch headers
-
-compat_ampius.o: compat_ampius.C
-
-compat_ampifus.o: compat_ampifus.C
 
 compat_ampim.o: compat_ampim.C
 

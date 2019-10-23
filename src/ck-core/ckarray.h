@@ -343,7 +343,7 @@ protected:
   CkArrayID thisArrayID;//My source array's ID
 
   //More verbose form of abort
-  virtual void CkAbort(const char *str) const;
+  virtual void CkAbort(const char *format, ...) const;
 
 private:
 //Array implementation methods:

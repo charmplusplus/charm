@@ -542,9 +542,10 @@ when running a Charm++ program.
 ``void CkAssert(int expression)``
 Aborts the program if expression is 0.
 
-``void CkAbort(const char \*message)``
+``void CkAbort(const char *format, ...)``
 Causes the program to abort, printing
-the given error message. This function never returns.
+the given error message. Supports printf-style formatting.
+This function never returns.
 
 ``void CkExit()``
 This call informs the Charm RTS that computation on all
@@ -6110,7 +6111,7 @@ is the constructor message to pass, and ``mgr`` is the array manager which
 creates the elements.
 
 To create an element, call ``void CkArray::insertInitial(CkArrayIndex
-idx,void\* ctorMsg)`` on ``mgr``, passing in the index and a copy of the
+idx, void* ctorMsg)`` on ``mgr``, passing in the index and a copy of the
 constructor message. For example, to insert a 2D element (x,y), call:
 
 .. code-block:: c++
@@ -10808,7 +10809,8 @@ select another version with the ``@`` option (for example,
 Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-As an experimental feature, Charm++ can be installed with the CMake tool, version 3.11 or newer.
+As an experimental feature, Charm++ can be installed with the CMake tool,
+version 3.4 or newer (3.11 if you need Fortran support).
 This is currently supported on Linux and Darwin, but not on Windows.
 
 After downloading and unpacking Charm++, it can be installed in the following way:

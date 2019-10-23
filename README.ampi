@@ -84,7 +84,6 @@ prefixed with AMPI_:
       manual for more information on how to use it.
     * AMPI_Register_pup is used to register PUP routines and user data.
     * AMPI_Get_pup_data returns a pointer to user data managed by the runtime.
-    * AMPI_Register_main is used to register multiple AMPI modules.
     * AMPI_Load_set_value sets the calling rank's load to the given user value.
     * AMPI_Load_start_measure starts load balance information collection.
     * AMPI_Load_stop_measure stops load balance information collection.

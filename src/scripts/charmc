@@ -441,6 +441,12 @@ do
 		SKIP_MODULEINIT="yes"
 		;;
 
+	"-isysroot")
+		# Ignore -isysroot and the following argument (macOS SDK path),
+		# which charmc can not parse (Bug #2495).
+		shift
+		;;
+
 	"-language")
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
@@ -1578,7 +1584,7 @@ fi
 
 if [ "$BUILD_SHARE" = "0" ]
 then
-       MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
+       MIDDLE_LIBS="$MEM_OBJ $THREAD_OBJ $MIDDLE_LIBS"
 fi
 
 CMK_SYSLIBS="$CMK_SYSLIBS -lm"
@@ -1622,7 +1628,7 @@ case "$PARADIGM" in
 	;;
 "converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
+	MIDDLE_LIBS="-lconv-core $MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
 "c"|"C"|"c++"|"C++"|"f90"|"f77")
   ;;

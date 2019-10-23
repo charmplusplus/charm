@@ -152,6 +152,15 @@ void CldModuleInit(char **);
 #include <mpi.h>
 #endif
 
+#ifndef _WIN32
+void * CmiAlignedAlloc(size_t alignment, size_t size)
+{
+  void * ptr = nullptr;
+  errno = posix_memalign(&ptr, alignment, size);
+  return ptr;
+}
+#endif
+
 #if CMK_TRACE_ENABLED
 struct envelope;
 void traceAddThreadListeners(CthThread tid, struct envelope *env);

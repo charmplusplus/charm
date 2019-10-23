@@ -365,7 +365,8 @@ CLINKAGE int ARMCI_Malloc(void *ptr_arr[], armci_size_t bytes) {
 // the success nor failure of the operation. Hence, it is assumed always
 // that free works.
 CLINKAGE int ARMCI_Free(void *address) {
-  CmiIsomallocBlockListFree(address);
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->BlockFree(address);
 //  free(address);
   TCHARM_API_TRACE("ARMCI_Free", "armci");
   return 0;
@@ -379,7 +380,8 @@ CLINKAGE void *ARMCI_Malloc_local(armci_size_t bytes){
 }
 
 CLINKAGE int ARMCI_Free_local(void *ptr){
-  CmiIsomallocBlockListFree(ptr);
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->BlockFree(ptr);
   TCHARM_API_TRACE("ARMCI_Free_local", "armci");
   //free(ptr);
   return 0;

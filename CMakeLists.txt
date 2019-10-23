@@ -15,8 +15,8 @@
 # - the buildcmake script
 # - files in cmake/
 
-
-cmake_minimum_required(VERSION 3.11)
+# 3.4 added CMAKE_C_COMPILER_LAUNCHER and CMAKE_CXX_COMPILER_LAUNCHER
+cmake_minimum_required(VERSION 3.4)
 
 project(Charm++ LANGUAGES CXX C VERSION 6.10.0)
 
@@ -28,13 +28,25 @@ find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran c
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-enable_language(Fortran OPTIONAL)
+# Setting charmc as the compiler launcher for Fortran files only works with
+# CMake 3.11.0 or above. See 'CMAKE_Fortran_COMPILER_LAUNCHER' below for details.
+if(${CMAKE_VERSION} VERSION_LESS "3.11.0")
+  message(WARNING "CMake version 3.11.0 or higher is needed for Fortran support in Charm++.")
+else()
+  include(CheckLanguage)
+  check_language(Fortran)
+  if(CMAKE_Fortran_COMPILER)
+    enable_language(Fortran OPTIONAL)
+    include(FortranCInterface)
+    FortranCInterface_VERIFY()
+    FortranCInterface_VERIFY(CXX)
+  else()
+    message(STATUS "No Fortran support")
+  endif()
+endif()
 
 if(${FortranCInterface_VERIFIED_CXX})
   set(CMK_CAN_LINK_FORTRAN 1)
-  include(FortranCInterface)
-  FortranCInterface_VERIFY()
-  FortranCInterface_VERIFY(CXX)
 else()
   set(CMK_CAN_LINK_FORTRAN 0)
 endif()
@@ -502,7 +514,6 @@ ExternalProject_Add(hwloc
         --disable-cairo
         --disable-cuda
         --disable-gl
-        --disable-libnuma
         --disable-libxml2
         --disable-nvml
         --disable-opencl
@@ -519,7 +530,7 @@ ExternalProject_Add(hwloc
         CC=${CHARM_CC}
         > /dev/null
     BUILD_COMMAND make V=$(VERBOSE)
-    COMMAND cp src/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
+    COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
