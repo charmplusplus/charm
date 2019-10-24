@@ -1731,6 +1731,7 @@ if (MSG_STATISTIC)
 }
 /* ##### End of Functions Related with Machine Running ##### */
 
+CMK_NORETURN
 void CmiAbortHelper(const char *source, const char *message, const char *suggestion,
                     int tellDebugger, int framesToSkip) {
   if (tellDebugger)
@@ -1765,7 +1766,6 @@ void CmiAbort(const char *message, ...) {
   vsnprintf(newmsg, sizeof(newmsg), message, args);
   va_end(args);
   CmiAbortHelper("Called CmiAbort", newmsg, NULL, 1, 0);
-  CMI_NORETURN_FUNCTION_END
 }
 
 /* ##### Beginning of Functions Providing Incoming Network Messages ##### */

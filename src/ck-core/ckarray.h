@@ -343,6 +343,10 @@ protected:
   CkArrayID thisArrayID;//My source array's ID
 
   //More verbose form of abort
+  CMK_NORETURN
+#if defined __GNUC__ || defined __clang__
+  __attribute__ ((format (printf, 2, 3)))
+#endif
   virtual void CkAbort(const char *format, ...) const;
 
 private:
