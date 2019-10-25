@@ -423,6 +423,7 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
   DEBUGF("[%d] inmem_restore restore: mgr: %d \n", CmiMyPe(), m->locMgr);  
   // m->index.print();
   PUP::fromMem p(m->packData);
+  p.becomeRestarting();
   CkLocMgr *mgr = CProxy_CkLocMgr(m->locMgr).ckLocalBranch();
   CmiAssert(mgr);
   CmiUInt8 id = mgr->lookupID(m->index);
@@ -1158,6 +1159,7 @@ void CkMemCheckPT::gotReply(){
 void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,std::vector<CkGroupID> * gmap, std::vector<CkArrayIndex> * imap){
 #if CMK_CHKP_ALL
 	PUP::fromMem p(msg->packData);
+	p.becomeRestarting();
 	int numElements = 0;
 	p|numElements;
 	if(p.isUnpacking()){
@@ -1391,6 +1393,7 @@ static void recoverProcDataHandler(char *msg)
    CpvAccess(_curRestartPhase) = procMsg->cur_restart_phase;
    CmiPrintf("[%d] ----- recoverProcDataHandler  cur_restart_phase:%d at time: %f\n", CkMyPe(), CpvAccess(_curRestartPhase), CkWallTimer());
    PUP::fromMem p(procMsg->packData);
+   p.becomeRestarting();
    _handleProcData(p);
 
    CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->resetLB(CkMyPe());
