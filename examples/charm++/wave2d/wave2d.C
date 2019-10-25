@@ -5,9 +5,6 @@
 // The discretization used below is described in the accompanying paper.pdf
 // Author: Isaac Dooley 2008
 
-/*readonly*/ CProxy_Main mainProxy;
-/*readonly*/ CProxy_Wave arrayProxy;
-
 #define TotalDataWidth  800
 #define TotalDataHeight 800
 #define chareArrayWidth  16
@@ -25,13 +22,11 @@ public:
   Main(CkArgMsg* m) {
     delete m;
 
-    mainProxy = thisProxy; // store the main proxy
-    
     CkPrintf("Running wave2d on %d processors\n", CkNumPes());
 
     // Create new array of worker chares
     CkArrayOptions opts(chareArrayWidth, chareArrayHeight);
-    arrayProxy = CProxy_Wave::ckNew(opts);
+    CProxy_Wave arrayProxy = CProxy_Wave::ckNew(opts);
 
     // setup liveviz
     CkCallback c(CkIndex_Wave::requestNextFrame(0),arrayProxy);
@@ -41,31 +36,6 @@ public:
     //Start the computation
     arrayProxy.begin_iteration();
   }
-
-  // Each worker calls this method
-  void iterationCompleted(int iteration)
-  {
-      if (iteration == total_iterations) {
-	CkPrintf("Program Done!\n");
-	CkExit();
-      } else { 
-	// Start the next iteration
-	if(iteration % 20 == 0) CkPrintf("Completed %d iterations\n", iteration);    
-#ifdef CMK_MEM_CHECKPOINT
-      if (iteration != 0 && iteration % 200 == 0)
-      {
-        CkCallback cb(CkIndex_Wave::begin_iteration(), arrayProxy);
-        CkStartMemCheckpoint(cb);
-      }
-      else
-#endif
-      {
-        arrayProxy.begin_iteration();
-      }
-    }
-  }
-  
-  
 };
 
 class Wave: public CBase_Wave {
@@ -240,7 +210,7 @@ public:
       pressure_new = tmp;
 
       messages_due = 4;
-      contribute(sizeof(int), &iteration, CkReduction::min_int, CkCallback(CkReductionTarget(Main,iterationCompleted), mainProxy));
+      contribute(sizeof(int), &iteration, CkReduction::min_int, CkCallback(CkReductionTarget(Wave, iterationCompleted), thisProxy(0, 0)));
       ++iteration;
     }
   }
@@ -293,7 +263,29 @@ public:
     liveVizDeposit(m, sx,sy, w,h, intensity, this);
 
   }
-  
+
+  // Each worker calls this method
+  void iterationCompleted(int iteration)
+  {
+      if (iteration == total_iterations) {
+	CkPrintf("Program Done!\n");
+	CkExit();
+      } else {
+	// Start the next iteration
+	if(iteration % 20 == 0) CkPrintf("Completed %d iterations\n", iteration);
+#ifdef CMK_MEM_CHECKPOINT
+      if (iteration != 0 && iteration % 200 == 0)
+      {
+	CkCallback cb(CkIndex_Wave::begin_iteration(), thisProxy);
+	CkStartMemCheckpoint(cb);
+      }
+      else
+#endif
+      {
+	thisProxy.begin_iteration();
+      }
+    }
+  }
 };
 
 #include "wave2d.def.h"
