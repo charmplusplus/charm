@@ -342,7 +342,7 @@ void TraceAutoPerfBOC::setNumOfPhases(int num, const char names[], CkCallback cb
     strcpy(name, names + i*40);
     CkpvAccess(phaseNames)[i] = name;
   }
-  contribute(0, NULL, CkReduction::nop, cb);
+  contribute(cb);
 }
 
 // set the call back function, which is invoked after auto perf is done
