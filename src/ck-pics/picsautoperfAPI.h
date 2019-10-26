@@ -8,22 +8,13 @@
 #endif
 
 struct PicsConfig {
-  bool fromGlobal;
-  int numPhases;
-  int collectionMode;
-  int evaluationMode;
-  int warmupSteps;
-  int pauseSteps;
-  char **phaseNames;
-  PicsConfig() {
-    fromGlobal = true;
-    numPhases = PICS_INVALID;
-    collectionMode = PICS_INVALID;
-    evaluationMode = PICS_INVALID;
-    warmupSteps = PICS_INVALID;
-    pauseSteps = PICS_INVALID;
-    phaseNames = nullptr;
-  }
+  bool fromGlobal = true;
+  int numPhases = PICS_INVALID;
+  int collectionMode = PICS_INVALID;
+  int evaluationMode = PICS_INVALID;
+  int warmupSteps = PICS_INVALID;
+  int pauseSteps = PICS_INVALID;
+  char **phaseNames = nullptr;
 };
 
 void PICS_registerAutoPerfDone(CkCallback cb, int frameworkShouldAdvancePhase);
