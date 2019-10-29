@@ -510,20 +510,12 @@ static void* hostToDeviceCallback(void* arg) {
   NVTXTracer nvtx_range("hostToDeviceCallback", NVTXColor::Asbestos);
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
-  if (hapiInvokeCallback) {
-    hapiInvokeCallback(wr->host_to_device_cb);
-  }
-  else {
-    CmiAbort("hapiInvokeCallback is not set");
-  }
+  CmiAssert(hapiInvokeCallback);
+  hapiInvokeCallback(wr->host_to_device_cb);
 
   // inform QD that the host-to-device transfer is complete
-  if (hapiQdProcess) {
-    hapiQdProcess(1);
-  }
-  else {
-    CmiAbort("hapiQdProcess is not set");
-  }
+  CmiAssert(hapiQdProcess);
+  hapiQdProcess(1);
 
   return NULL;
 }
@@ -534,20 +526,12 @@ static void* kernelCallback(void* arg) {
   NVTXTracer nvtx_range("kernelCallback", NVTXColor::Asbestos);
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
-  if (hapiInvokeCallback) {
-    hapiInvokeCallback(wr->kernel_cb);
-  }
-  else {
-    CmiAbort("hapiInvokeCallback is not set");
-  }
+  CmiAssert(hapiInvokeCallback);
+  hapiInvokeCallback(wr->kernel_cb);
 
   // inform QD that the kernel is complete
-  if (hapiQdProcess) {
-    hapiQdProcess(1);
-  }
-  else {
-    CmiAbort("hapiQdProcess is not set");
-  }
+  CmiAssert(hapiQdProcess);
+  hapiQdProcess(1);
 
   return NULL;
 }
@@ -562,23 +546,15 @@ static void* deviceToHostCallback(void* arg) {
 
   // invoke user callback
   if (wr->device_to_host_cb) {
-    if (hapiInvokeCallback) {
-      hapiInvokeCallback(wr->device_to_host_cb);
-    }
-    else {
-      CmiAbort("hapiInvokeCallback is not set");
-    }
+    CmiAssert(hapiInvokeCallback);
+    hapiInvokeCallback(wr->device_to_host_cb);
   }
 
   hapiWorkRequestCleanup(wr);
 
   // inform QD that device-to-host transfer is complete
-  if (hapiQdProcess) {
-    hapiQdProcess(1);
-  }
-  else {
-    CmiAbort("hapiQdProcess is not set");
-  }
+  CmiAssert(hapiQdProcess);
+  hapiQdProcess(1);
 
   return NULL;
 }
@@ -594,21 +570,13 @@ static void* lightCallback(void *arg) {
 
   // invoke user callback
   if (cb) {
-    if (hapiInvokeCallback) {
-      hapiInvokeCallback(cb);
-    }
-    else {
-      CmiAbort("hapiInvokeCallback is not set");
-    }
+    CmiAssert(hapiInvokeCallback);
+    hapiInvokeCallback(cb);
   }
 
   // notify process to QD
-  if (hapiQdProcess) {
-    hapiQdProcess(1);
-  }
-  else {
-    CmiAbort("hapiQdProcess is not set");
-  }
+  CmiAssert(hapiQdProcess);
+  hapiQdProcess(1);
 
   return NULL;
 }
@@ -710,12 +678,8 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   if (wr->host_to_device_cb) {
     // while there is an ongoing workrequest, quiescence should not be detected
     // even if all PEs seem idle
-    if (hapiQdCreate) {
-      hapiQdCreate(1);
-    }
-    else {
-      CmiAbort("hapiQdCreate is not set");
-    }
+    CmiAssert(hapiQdCreate);
+    hapiQdCreate(1);
 
 #ifdef HAPI_CUDA_CALLBACK
     addCallback(wr, AfterHostToDevice);
@@ -729,12 +693,8 @@ void hapiEnqueue(hapiWorkRequest* wr) {
 
   // add kernel callback
   if (wr->kernel_cb) {
-    if (hapiQdCreate) {
-      hapiQdCreate(1);
-    }
-    else {
-      CmiAbort("hapiQdCreate is not set");
-    }
+    CmiAssert(hapiQdCreate);
+    hapiQdCreate(1);
 
 #ifdef HAPI_CUDA_CALLBACK
     addCallback(wr, AfterKernel);
@@ -747,12 +707,8 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   CsvAccess(gpu_manager).deviceToHostTransfer(wr);
 
   // add device-to-host transfer callback
-  if (hapiQdCreate) {
-    hapiQdCreate(1);
-  }
-  else {
-    CmiAbort("hapiQdCreate is not set");
-  }
+  CmiAssert(hapiQdCreate);
+  hapiQdCreate(1);
 #ifdef HAPI_CUDA_CALLBACK
   // always invoked to free memory
   addCallback(wr, AfterDeviceToHost);
@@ -1257,12 +1213,8 @@ void hapiPollEvents() {
     if (cudaEventQuery(hev.event) == cudaSuccess) {
       // invoke Charm++ callback if one was given
       if (hev.cb) {
-        if (hapiInvokeCallback) {
-          hapiInvokeCallback(hev.cb, hev.cb_msg);
-        }
-        else {
-          CmiAbort("hapiInvokeCallback is not set");
-        }
+        CmiAssert(hapiInvokeCallback);
+        hapiInvokeCallback(hev.cb, hev.cb_msg);
       }
 
       // clean up hapiWorkRequest
@@ -1274,12 +1226,8 @@ void hapiPollEvents() {
       CpvAccess(n_hapi_events)--;
 
       // inform QD that an event was processed
-      if (hapiQdProcess) {
-        hapiQdProcess(1);
-      }
-      else {
-        CmiAbort("hapiQdProcess is not set");
-      }
+      CmiAssert(hapiQdProcess);
+      hapiQdProcess(1);
     }
     else {
       // stop going through the queue once we encounter a non-successful event
@@ -1350,12 +1298,8 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
 
   // while there is an ongoing workrequest, quiescence should not be detected
   // even if all PEs seem idle
-  if (hapiQdCreate) {
-    hapiQdCreate(1);
-  }
-  else {
-    CmiAbort("hapiQdCreate is not set");
-  }
+  CmiAssert(hapiQdCreate);
+  hapiQdCreate(1);
 }
 
 cudaError_t hapiMalloc(void** devPtr, size_t size) {
