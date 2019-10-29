@@ -232,8 +232,11 @@ while [[ $# -gt 0 ]]; do
       opt_parallel=$arg
       ;;
     -j)
-      opt_parallel="$arg$1"
-      shift
+      opt_parallel="$arg"
+      if [[ $# -gt 0 && $1 == [0-9]* ]]; then
+        opt_parallel+="$1"
+        shift
+      fi
       ;;
     --suffix=*)
       opt_suffix=-${arg#*=}
