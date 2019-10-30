@@ -1,4 +1,10 @@
-       !!! Values here must match those in ampi.h !!!
+       !!! Values here must match those in ampi.h, or otherwise be !!!
+       !!! converted from the Fortran to the C value in ampif.C    !!!
+       !!! Note: we can't have more than 72 characters per line,   !!!
+       !!!       the first 6 characters per line must be blank,    !!!
+       !!!       and we can't have any line continuations in this  !!!
+       !!!       file in order to support all three of fixed-form, !!!
+       !!!       free-form, and line-extended fixed-form source.   !!!
 
        integer, parameter :: MPI_SUCCESS                   = 0
        integer, parameter :: MPI_ERR_BUFFER                = 1
@@ -101,18 +107,21 @@
        integer, parameter :: MPI_DOUBLE_COMPLEX    = MPI_COMPLEX16
        integer, parameter :: MPI_COMPLEX32         = 41
 
-       integer, parameter :: MPI_COMBINER_NAMED          = 1
-       integer, parameter :: MPI_COMBINER_CONTIGUOUS     = 2
-       integer, parameter :: MPI_COMBINER_VECTOR         = 3
-       integer, parameter :: MPI_COMBINER_HVECTOR        = 4
-       integer, parameter :: MPI_COMBINER_INDEXED        = 5
-       integer, parameter :: MPI_COMBINER_HINDEXED       = 6
-       integer, parameter :: MPI_COMBINER_STRUCT         = 7
-       integer, parameter :: MPI_COMBINER_DARRAY         = 8
-       integer, parameter :: MPI_COMBINER_RESIZED        = 9
-       integer, parameter :: MPI_COMBINER_SUBARRAY       = 10
-       integer, parameter :: MPI_COMBINER_INDEXED_BLOCK  = 11
-       integer, parameter :: MPI_COMBINED_HINDEXED_BLOCK = 12
+       integer, parameter :: MPI_COMBINER_NAMED            = 1
+       integer, parameter :: MPI_COMBINER_CONTIGUOUS       = 2
+       integer, parameter :: MPI_COMBINER_VECTOR           = 3
+       integer, parameter :: MPI_COMBINER_HVECTOR          = 4
+       integer, parameter :: MPI_COMBINER_HVECTOR_INTEGER  = 5
+       integer, parameter :: MPI_COMBINER_INDEXED          = 6
+       integer, parameter :: MPI_COMBINER_HINDEXED         = 7
+       integer, parameter :: MPI_COMBINER_HINDEXED_INTEGER = 8
+       integer, parameter :: MPI_COMBINER_STRUCT           = 9
+       integer, parameter :: MPI_COMBINER_STRUCT_INTEGER   = 10
+       integer, parameter :: MPI_COMBINER_DARRAY           = 11
+       integer, parameter :: MPI_COMBINER_RESIZED          = 12
+       integer, parameter :: MPI_COMBINER_SUBARRAY         = 13
+       integer, parameter :: MPI_COMBINER_INDEXED_BLOCK    = 14
+       integer, parameter :: MPI_COMBINED_HINDEXED_BLOCK   = 15
 
        integer, parameter :: MPI_TAG_UB_VALUE = 1073741824
 
@@ -148,21 +157,21 @@
        integer, parameter :: MPI_CART  = 2
        integer, parameter :: MPI_DIST_GRAPH = 3
 
-       integer, parameter :: MPI_TAG_UB            = -1
-       integer, parameter :: MPI_HOST              = -2
-       integer, parameter :: MPI_IO                = -3
-       integer, parameter :: MPI_WTIME_IS_GLOBAL   = -4
-       integer, parameter :: MPI_APPNUM            = -5
-       integer, parameter :: MPI_UNIVERSE_SIZE     = -6
-       integer, parameter :: MPI_WIN_BASE          = -7
-       integer, parameter :: MPI_WIN_SIZE          = -8
-       integer, parameter :: MPI_WIN_DISP_UNIT     = -9
-       integer, parameter :: MPI_WIN_MODEL         = -10
-       integer, parameter :: MPI_WIN_CREATE_FLAVOR = -11
-       integer, parameter :: AMPI_MY_WTH           = -12
-       integer, parameter :: AMPI_NUM_WTHS         = -13
-       integer, parameter :: AMPI_MY_PROCESS       = -14
-       integer, parameter :: AMPI_NUM_PROCESSES    = -15
+       integer, parameter :: MPI_TAG_UB            = -2
+       integer, parameter :: MPI_HOST              = -3
+       integer, parameter :: MPI_IO                = -4
+       integer, parameter :: MPI_WTIME_IS_GLOBAL   = -5
+       integer, parameter :: MPI_APPNUM            = -6
+       integer, parameter :: MPI_UNIVERSE_SIZE     = -7
+       integer, parameter :: MPI_WIN_BASE          = -8
+       integer, parameter :: MPI_WIN_SIZE          = -9
+       integer, parameter :: MPI_WIN_DISP_UNIT     = -10
+       integer, parameter :: MPI_WIN_MODEL         = -11
+       integer, parameter :: MPI_WIN_CREATE_FLAVOR = -12
+       integer, parameter :: AMPI_MY_WTH           = -13
+       integer, parameter :: AMPI_NUM_WTHS         = -14
+       integer, parameter :: AMPI_MY_PROCESS       = -15
+       integer, parameter :: AMPI_NUM_PROCESSES    = -16
 
        integer, parameter :: MPI_STATUS_SIZE = 8
 
@@ -171,10 +180,10 @@
        integer, parameter :: MPI_COMM        = 3
        integer, parameter :: MPI_ERROR       = 5
 
-       integer, dimension(MPI_STATUS_SIZE), parameter ::                &
-     & MPI_STATUS_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/)
-       integer, dimension(MPI_STATUS_SIZE), parameter ::                &
-     & MPI_STATUSES_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/)
+       integer, dimension(MPI_STATUS_SIZE) :: MPI_STATUS_IGNORE
+       parameter (MPI_STATUS_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/))
+       integer, dimension(MPI_STATUS_SIZE) :: MPI_STATUSES_IGNORE
+       parameter (MPI_STATUSES_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/))
 
        integer, parameter :: MPI_COMM_SELF        = 1000000
        integer, parameter :: MPI_COMM_FIRST_SPLIT = 1000000
@@ -185,8 +194,6 @@
        integer, parameter :: MPI_COMM_FIRST_INTRA = 6000000
        integer, parameter :: MPI_COMM_FIRST_RESVD = 7000000
        integer, parameter :: MPI_COMM_WORLD       = 9000000
-       integer, parameter :: MPI_MAX_COMM_WORLDS  = 8
-       integer :: MPI_COMM_UNIVERSE(1:MPI_MAX_COMM_WORLDS)
 
        integer, parameter :: MPI_INFO_ENV              = 0
        integer, parameter :: AMPI_INFO_LB_SYNC         = 1
@@ -249,5 +256,13 @@
 
        integer, parameter :: MPI_MESSAGE_NULL = -1
        integer, parameter :: MPI_MESSAGE_NO_PROC = -2
+
+       ! necessary for ROMIO's tests
+       integer, parameter :: MPI_ORDER_C = 56
+       integer, parameter :: MPI_ORDER_FORTRAN = 57
+       integer, parameter :: MPI_DISTRIBUTE_BLOCK = 121
+       integer, parameter :: MPI_DISTRIBUTE_CYCLIC = 122
+       integer, parameter :: MPI_DISTRIBUTE_NONE = 123
+       integer, parameter :: MPI_DISTRIBUTE_DFLT_DARG = -49767
 
        include 'mpiof.h'

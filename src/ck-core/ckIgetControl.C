@@ -52,12 +52,14 @@ IGetControlClass::iget_free(int size)
      }
   }
 
+static int getRSS();
+
 void
 IGetControlClass::iget_updateTokenNum() {
     double currenttime = CmiWallTimer();
     if(currenttime-lastupdatetime<1)
        return;
-    int totalMemUsed = (int)getRSS();
+    int totalMemUsed = getRSS();
     if(totalMemUsed<=0) return;
     int leftMem = IGET_TOTALMEMORY-totalMemUsed;
     int iget_token_new = (leftMem)/(int)IGET_UNITMESSAGE;
@@ -178,20 +180,19 @@ getAvailMemory(int grainsize)
   return size;
 }
 
-extern "C"
+extern void getAvailSysMem();
 void getAvailSysMem() {
   IGET_TOTALMEMORY = getAvailMemory(0); 
   printf("total physical memory : %d\n", IGET_TOTALMEMORY);
 }
 
-extern "C"
+extern void TokenUpdatePeriodic();
 void TokenUpdatePeriodic()
 {
   TheIGetControlClass.iget_updateTokenNum();
 }
 
-extern "C"
-int getRSS()
+static int getRSS()
 {
   int ret=-1, i=0;
   pid_t pid;

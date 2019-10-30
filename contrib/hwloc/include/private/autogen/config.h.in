@@ -3,7 +3,7 @@
 /* -*- c -*-
  *
  * Copyright © 2009, 2011, 2012 CNRS, inria., Université Bordeaux  All rights reserved.
- * Copyright © 2009 Cisco Systems, Inc.  All rights reserved.
+ * Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -54,9 +54,9 @@
 /* Define to 1 if you have the <cuda_runtime_api.h> header file. */
 #undef HAVE_CUDA_RUNTIME_API_H
 
-/* Define to 1 if you have the declaration of `CL_DEVICE_TOPOLOGY_AMD', and to
-   0 if you don't. */
-#undef HAVE_DECL_CL_DEVICE_TOPOLOGY_AMD
+/* Define to 1 if you have the declaration of `bind', and to 0 if you don't.
+   */
+#undef HAVE_DECL_BIND
 
 /* Define to 1 if you have the declaration of `CTL_HW', and to 0 if you don't.
    */
@@ -86,6 +86,10 @@
    if you don't. */
 #undef HAVE_DECL_LGRP_LATENCY_COOKIE
 
+/* Define to 1 if you have the declaration of `modff', and to 0 if you don't.
+   */
+#undef HAVE_DECL_MODFF
+
 /* Define to 1 if you have the declaration of
    `nvmlDeviceGetMaxPcieLinkGeneration', and to 0 if you don't. */
 #undef HAVE_DECL_NVMLDEVICEGETMAXPCIELINKGENERATION
@@ -108,10 +112,6 @@
 /* Define to 1 if you have the declaration of `snprintf', and to 0 if you
    don't. */
 #undef HAVE_DECL_SNPRINTF
-
-/* Define to 1 if you have the declaration of `strcasecmp', and to 0 if you
-   don't. */
-#undef HAVE_DECL_STRCASECMP
 
 /* Define to 1 if you have the declaration of `strtoull', and to 0 if you
    don't. */
@@ -237,17 +237,11 @@
 /* Define to 1 if you have the `mkstemp' function. */
 #undef HAVE_MKSTEMP
 
-/* Define to 1 if we have -lmyriexpress */
-#undef HAVE_MYRIEXPRESS
-
-/* Define to 1 if you have the <myriexpress.h> header file. */
-#undef HAVE_MYRIEXPRESS_H
+/* Define to 1 if you have the <mpi.h> header file. */
+#undef HAVE_MPI_H
 
 /* Define to 1 if you have the `nl_langinfo' function. */
 #undef HAVE_NL_LANGINFO
-
-/* Define to 1 if you have the <numaif.h> header file. */
-#undef HAVE_NUMAIF_H
 
 /* Define to 1 if the system has the type `NUMA_NODE_RELATIONSHIP'. */
 #undef HAVE_NUMA_NODE_RELATIONSHIP
@@ -315,6 +309,9 @@
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
+
+/* Define to 1 if you have the `strcasecmp' function. */
+#undef HAVE_STRCASECMP
 
 /* Define to 1 if you have the `strftime' function. */
 #undef HAVE_STRFTIME
@@ -489,6 +486,10 @@
 /* Define to 1 if you have the `clzl' function. */
 #undef HWLOC_HAVE_CLZL
 
+/* Define to 1 if snprintf supports NULL output buffer and returns the correct
+   length on truncation */
+#undef HWLOC_HAVE_CORRECT_SNPRINTF
+
 /* Define to 1 if the CPU_SET macro works */
 #undef HWLOC_HAVE_CPU_SET
 
@@ -515,6 +516,9 @@
 
 /* Define to 1 if function `flsl' is declared by system headers */
 #undef HWLOC_HAVE_DECL_FLSL
+
+/* Define to 1 if function `strcasecmp' is declared by system headers */
+#undef HWLOC_HAVE_DECL_STRCASECMP
 
 /* Define to 1 if function `strncasecmp' is declared by system headers */
 #undef HWLOC_HAVE_DECL_STRNCASECMP
@@ -543,17 +547,12 @@
 /* Define to 1 if you have the `libxml2' library. */
 #undef HWLOC_HAVE_LIBXML2
 
-/* Define to 1 if building the Linux PCI component */
+/* Define to 1 for I/O discovery in the Linux component */
+#undef HWLOC_HAVE_LINUXIO
+
+/* Define to 1 if enabling Linux-specific PCI discovery in the Linux I/O
+   component */
 #undef HWLOC_HAVE_LINUXPCI
-
-/* Define to 1 if mbind is available. */
-#undef HWLOC_HAVE_MBIND
-
-/* Define to 1 if migrate_pages is available. */
-#undef HWLOC_HAVE_MIGRATE_PAGES
-
-/* Define to 1 if move_pages is available. */
-#undef HWLOC_HAVE_MOVE_PAGES
 
 /* Define to 1 if you have the `NVML' library. */
 #undef HWLOC_HAVE_NVML
@@ -578,13 +577,10 @@
 /* Define to 1 if glibc provides a prototype of sched_setaffinity() */
 #undef HWLOC_HAVE_SCHED_SETAFFINITY
 
-/* Define to 1 if set_mempolicy is available. */
-#undef HWLOC_HAVE_SET_MEMPOLICY
-
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HWLOC_HAVE_STDINT_H
 
-/* Define to 1 if function `syscall' is available */
+/* Define to 1 if function `syscall' is available with 6 parameters */
 #undef HWLOC_HAVE_SYSCALL
 
 /* Define to 1 if you have the `windows.h' header. */
@@ -607,9 +603,6 @@
 
 /* Define to 1 on *NETBSD */
 #undef HWLOC_NETBSD_SYS
-
-/* Define to 1 on OSF */
-#undef HWLOC_OSF_SYS
 
 /* The size of `unsigned int', as computed by sizeof */
 #undef HWLOC_SIZEOF_UNSIGNED_INT
@@ -639,6 +632,18 @@
    VERSION */
 #undef HWLOC_VERSION
 
+/* The library version optional greek suffix string */
+#undef HWLOC_VERSION_GREEK
+
+/* The library version major number */
+#undef HWLOC_VERSION_MAJOR
+
+/* The library version minor number */
+#undef HWLOC_VERSION_MINOR
+
+/* The library version release number */
+#undef HWLOC_VERSION_RELEASE
+
 /* Define to 1 on WINDOWS */
 #undef HWLOC_WIN_SYS
 
@@ -648,8 +653,14 @@
 /* Define to 1 on x86_64 */
 #undef HWLOC_X86_64_ARCH
 
+/* Define if lstopo Cairo/X11 interactive graphical output is supported */
+#undef LSTOPO_HAVE_X11
+
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
+
+/* Define to 1 if scotch is netlocscotch is enabled */
+#undef NETLOC_SCOTCH
 
 /* Name of package */
 #undef PACKAGE

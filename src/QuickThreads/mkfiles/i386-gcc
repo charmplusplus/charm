@@ -10,7 +10,9 @@ qt: md/i386.h qt.c md/i386.s
 	ln -s md/i386.h qtmd.h
 	$(CHARMC) -o qt.o qt.c
 	as --32 -o qtmds.o md/i386.s
+ifeq (false,$(CMK_NO_BUILD_SHARED))
 	$(CHARMC) -shared -o libckqt.$(CMK_SHARED_SUF) qt.o qtmds.o
+endif
 	ar q libckqt.a qt.o qtmds.o
 
 stp:

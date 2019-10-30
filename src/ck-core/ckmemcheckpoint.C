@@ -76,6 +76,9 @@ static int buddyDieHandlerIdx;
 #define CK_NO_PROC_POOL				0
 #endif
 
+// 0 - use QD, 1 - use reduction
+#define CMK_CHKP_USE_REDN 1
+
 #define CMK_CHKP_ALL		1
 #define CMK_USE_BARRIER		0
 
@@ -163,13 +166,23 @@ inline int CkMemCheckPT::BuddyPE(int pe)
   return budpe;
 }
 
+inline int CkMemCheckPT::ReverseBuddyPE(int pe)
+{
+  int budpe = pe;
+  while (budpe == pe || isFailed(budpe))
+  {
+    budpe = (budpe == 0 ? CkNumPes() : budpe) - 1;
+  }
+  return budpe;
+}
+
 // called in array element constructor
 // choose and register with 2 buddies for checkpoiting 
 #if CMK_MEM_CHECKPOINT
 void ArrayElement::init_checkpt() {
 	if (!_memChkptOn) return;
 	if (CkInRestarting()) {
-	  CkPrintf("[%d] Warning: init_checkpt called during restart, possible bug in migration constructor!\n");
+	  CkPrintf("[%d] Warning: init_checkpt called during restart, possible bug in migration constructor!\n", CmiMyPe());
 	}
 	// only master init checkpoint
         if (thisArray->getLocMgr()->managers.begin()->second != thisArray) return;
@@ -410,6 +423,7 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
   DEBUGF("[%d] inmem_restore restore: mgr: %d \n", CmiMyPe(), m->locMgr);  
   // m->index.print();
   PUP::fromMem p(m->packData);
+  p.becomeRestarting();
   CkLocMgr *mgr = CProxy_CkLocMgr(m->locMgr).ckLocalBranch();
   CmiAssert(mgr);
   CmiUInt8 id = mgr->lookupID(m->index);
@@ -779,7 +793,7 @@ void CkMemCheckPT::report()
   //this checkpoint has finished, update the pointer
   CpvAccess(chkpPointer) = CpvAccess(chkpPointer)^1;
   if(CkMyPe()==0)
-  CkPrintf("[%d] Checkpoint Processor data: %d \n", CkMyPe(), CpvAccess(procChkptBuf)[CpvAccess(chkpPointer)]->len);
+    CkPrintf("[%d] Checkpoint Processor data: %zu\n", CkMyPe(), CpvAccess(procChkptBuf)[CpvAccess(chkpPointer)]->len);
 #endif
 }
 
@@ -1010,7 +1024,7 @@ void CkMemCheckPT::recoverBuddies()
   }
 #endif
 
-#if 0
+#if CMK_CHKP_USE_REDN
   if (expectCount == 0) {
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, recoverArrayElements), thisProxy));
     //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
@@ -1030,10 +1044,11 @@ void CkMemCheckPT::gotData()
   if (ackCount == expectCount) {
     ackCount = 0;
     expectCount = -1;
+#if CMK_CHKP_USE_REDN
     //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
 # if 0
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, recoverArrayElements), thisProxy));
-# endif
+#endif
   }
 }
 
@@ -1127,7 +1142,7 @@ void CkMemCheckPT::recoverArrayElements()
   // _crashedNode = -1;
   CpvAccess(_crashedNode) = -1;
   inRestarting = false;
-#if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
+#if (!STREAMING_INFORMHOME && CK_NO_PROC_POOL) || !CMK_CHKP_USE_REDN
   if (CkMyPe() == 0)
     CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
 #else
@@ -1149,6 +1164,7 @@ void CkMemCheckPT::gotReply(){
 void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,std::vector<CkGroupID> * gmap, std::vector<CkArrayIndex> * imap){
 #if CMK_CHKP_ALL
 	PUP::fromMem p(msg->packData);
+	p.becomeRestarting();
 	int numElements = 0;
 	p|numElements;
 	if(p.isUnpacking()){
@@ -1380,6 +1396,7 @@ static void recoverProcDataHandler(char *msg)
    CpvAccess(_curRestartPhase) = procMsg->cur_restart_phase;
    CmiPrintf("[%d] ----- recoverProcDataHandler  cur_restart_phase:%d at time: %f\n", CkMyPe(), CpvAccess(_curRestartPhase), CkWallTimer());
    PUP::fromMem p(procMsg->packData);
+   p.becomeRestarting();
    _handleProcData(p);
 
    CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->resetLB(CkMyPe());
@@ -1528,7 +1545,6 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
 
 // can be called in other files
 // return true if it is in restarting
-extern "C"
 int CkInRestarting()
 {
 #if CMK_MEM_CHECKPOINT
@@ -1542,20 +1558,17 @@ int CkInRestarting()
 #endif
 }
 
-extern "C"
-int CkInCheckpointing()
+static int CkInCheckpointing()
 {
   return CkMemCheckPT::inCheckpointing;
 }
 
-extern "C"
 void CkSetInLdb(){
 #if CMK_MEM_CHECKPOINT
 	CkMemCheckPT::inLoadbalancing = true;
 #endif
 }
 
-extern "C"
 int CkInLdb(){
 #if CMK_MEM_CHECKPOINT
 	return (int)CkMemCheckPT::inLoadbalancing;
@@ -1563,7 +1576,6 @@ int CkInLdb(){
 	return 0;
 }
 
-extern "C"
 void CkResetInLdb(){
 #if CMK_MEM_CHECKPOINT
 	CkMemCheckPT::inLoadbalancing = false;
@@ -1590,7 +1602,7 @@ void init_memcheckpt(char **argv)
 }
 #endif
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 class CkMemCheckPTInit: public Chare {
 public:
@@ -1618,8 +1630,7 @@ static void notifyHandler(char *msg)
 #endif
 }
 
-extern "C"
-void notify_crash(int node)
+static void notify_crash(int node)
 {
 #ifdef CMK_MEM_CHECKPOINT
   CpvAccess( _crashedNode) = node;
@@ -1641,7 +1652,7 @@ void notify_crash(int node)
 #endif
 }
 
-extern "C" void (*notify_crash_fn)(int node);
+extern void (*notify_crash_fn)(int node);
 
 #if CMK_CONVERSE_MPI
 void mpi_restart_crashed(int pe, int rank);
@@ -1702,14 +1713,9 @@ void pingCheckHandler()
 #if CMK_MEM_CHECKPOINT
   double now = CmiWallTimer();
   if (lastPingTime > 0 && now - lastPingTime > FAIL_DET_THRESHOLD && !CkInLdb() && !CkInRestarting() && !CkInCheckpointing()) {
-    int i, pe, buddy;
     // tell everyone the buddy dies
     CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
-    for (i = 1; i < CmiNumPes(); i++) {
-       pe = (CmiMyPe() - i + CmiNumPes()) % CmiNumPes();
-       if (obj->BuddyPE(pe) == CmiMyPe()) break;
-    }
-    buddy = pe;
+    int buddy = obj->ReverseBuddyPE(CmiMyPe());
     CmiPrintf("[%d] detected buddy processor %d died %f %f. \n", CmiMyPe(), buddy, now, lastPingTime);
 #if CMK_CONVERSE_MPI
     char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
@@ -1796,7 +1802,6 @@ void CkRegisterRestartHandler( )
 }
 
 
-extern "C"
 int CkHasCheckpoints()
 {
   return (int)checkpointed;

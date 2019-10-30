@@ -58,7 +58,6 @@ A more readable summary is at:
 #include <algorithm>
 #include "converse.h"
 #include "pup.h"
-#include "memory-isomalloc.h"
 
 #include <elf.h>
 
@@ -115,7 +114,7 @@ extern ELFXX_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
 
 std::vector<char *>  _blacklist;
 static bool loaded = false;
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 static void readBlacklist()
 {
@@ -363,64 +362,10 @@ CtgGlobalList::CtgGlobalList() {
 /****************** Global Variable Storage and Swapping *********************/
 CpvStaticDeclare(CtgGlobals,_curCtg);
 
-struct CtgGlobalStruct {
-public:
-    /* This is set when our data is pointed to by the current GOT */
-    bool installed;
-
-    /* Pointer to our global data segment. */
-    void *data_seg;  
-    size_t seg_size; /* size in bytes of data segment */
-    
-    void allocate(size_t size, CthThread tid) {
-      seg_size=size;
-        /* global data segment need to be isomalloc */
-      if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-        data_seg=CmiIsomallocMallocForThread(tid, seg_size);
-      else
-        data_seg=malloc(seg_size);
-    }
-    
-    CtgGlobalStruct(void) {
-      installed=false;
-      data_seg=0;
-    }
-    ~CtgGlobalStruct() {
-      if (data_seg) {
-        if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-        {
-#if !CMK_USE_MEMPOOL_ISOMALLOC
-          CmiIsomallocBlockListFree(data_seg);
-#endif
-        }
-        else
-          free(data_seg);
-        data_seg = NULL;
-      }
-    }
-    
-    void pup(PUP::er &p);
-};
-
-void CtgGlobalStruct::pup(PUP::er &p) {
-    p | seg_size;
-        /* global data segment need to be isomalloc pupped */
-    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-#if CMK_USE_MEMPOOL_ISOMALLOC
-      pup_bytes(&p, &data_seg, sizeof(void*));
-#else
-      CmiIsomallocPup(&p, &data_seg);
-#endif
-      else {
-      if (p.isUnpacking()) allocate(seg_size, NULL);
-      p((char *)data_seg, seg_size);
-    }
-}
-
 /// Singleton object describing our global variables:
 static CtgGlobalList *_ctgList=NULL;
 /// Singleton object describing the original values for the globals.
-static CtgGlobalStruct *_ctgListGlobals=NULL;
+static CtgGlobalStruct _ctgListGlobals;
 
 /** Initialize the globals support (called on each processor). */
 void CtgInit(void) {
@@ -435,57 +380,48 @@ void CtgInit(void) {
 	*/
 		readBlacklist();
 		CtgGlobalList *l=new CtgGlobalList;
-		CtgGlobalStruct *g=new CtgGlobalStruct;
+		CtgGlobalStruct * g = &_ctgListGlobals;
 		if (!quietModeRequested && CmiMyPe() == 0) {
 			CmiPrintf("Charm++> -swapglobals enabled for automatic privatization of global variables.\n"
 				"WARNING> -swapglobals does not handle static variables.\n");
 		}
 		
-		g->allocate(l->getSize(), NULL);
+		g->data_seg = malloc(l->getSize());
 		l->read(g->data_seg);
 		l->install(g->data_seg);
 		_ctgList=l;
-		_ctgListGlobals=g;
 	}
-	
+
 	CpvAccess(_curCtg)=_ctgListGlobals;
+
+#if CMK_ERROR_CHECKING
+  // Could ensure _ctgList->getSize() is the same on all logical nodes.
+#endif
+}
+
+size_t CtgGetSize()
+{
+  return _ctgList->getSize();
 }
 
 /** Copy the current globals into this new set */
-CtgGlobals CtgCreate(CthThread tid) {
-	CtgGlobalStruct *g=new CtgGlobalStruct;
-	g->allocate(_ctgList->getSize(), tid);
-	_ctgList->read(g->data_seg);
-	return g;
-}
-/** PUP this (not currently installed) globals set */
-CtgGlobals CtgPup(pup_er pv, CtgGlobals g) {
-	PUP::er *p=(PUP::er *)pv;
-	if (p->isUnpacking()) g=new CtgGlobalStruct;
-	if (g->installed) 
-		CmiAbort("CtgPup called on currently installed globals!\n");
-	g->pup(*p);
-	if (g->seg_size!=_ctgList->getSize())
-		CmiAbort("CtgPup: global variable size changed during migration!\n");
+CtgGlobals CtgCreate(void * buffer) {
+	CtgGlobalStruct g = { buffer };
+	_ctgList->read(buffer);
 	return g;
 }
 
-/** Install this set of globals. If g==NULL, returns to original globals. */
+/** Install this set of globals. */
 void CtgInstall(CtgGlobals g) {
-	CtgGlobals *cur=&CpvAccess(_curCtg);
-	CtgGlobals oldG=*cur;
-	if (g==NULL) g=_ctgListGlobals;
-	if (g == oldG) return;
-	*cur=g;
-	oldG->installed=false;
-	_ctgList->install(g->data_seg);
-	g->installed=true;
+	CtgGlobals * cur = &CpvAccess(_curCtg);
+	if (cur->data_seg == g.data_seg)
+	  return;
+	cur->data_seg = g.data_seg;
+	_ctgList->install(g.data_seg);
 }
 
-/** Delete this (not currently installed) set of globals. */
-void CtgFree(CtgGlobals g) {
-	if (g->installed) CmiAbort("CtgFree called on currently installed globals!\n");
-	delete g;
+void CtgUninstall() {
+	CtgInstall(_ctgListGlobals);
 }
 
 CtgGlobals CtgCurrentGlobals(void){
@@ -494,6 +430,6 @@ CtgGlobals CtgCurrentGlobals(void){
 
 #else // CMI_SWAPGLOBALS
 
-#include "global-nop.c"
+#include "global-nop.C"
 
 #endif

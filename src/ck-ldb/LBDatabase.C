@@ -222,7 +222,7 @@ void _loadbalancerInit()
   CmiGetArgDoubleDesc(argv,"+LBPeriod", &_lb_args.lbperiod(),"the minimum time period in seconds allowed for two consecutive automatic load balancing");
   _lb_args.loop() = CmiGetArgFlagDesc(argv, "+LBLoop", "Use multiple load balancing strategies in loop");
 
-  // now called in cldb.c: CldModuleGeneralInit()
+  // now called in cldb.C: CldModuleGeneralInit()
   // registerLBTopos();
   CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
   //Read the percentage parameter for RefineKLB and GreedyRefineLB
@@ -258,8 +258,7 @@ void _loadbalancerInit()
   LBSimulation::doSimulation = CmiGetArgIntDesc(argv, "+LBSim", &LBSimulation::simStep, "Read LB state from LBDumpFile since this step");
   // check for stupid LBSim parameter
   if (LBSimulation::doSimulation && LBSimulation::simStep < 0) {
-    CmiPrintf("LB> Argument LBSim (%d) invalid, should be >= 0\n");
-    CkExit();
+    CkAbort("LB> Argument LBSim (%d) invalid, should be >= 0\n", LBSimulation::simStep);
     return;
   }
   CmiGetArgIntDesc(argv, "+LBSimSteps", &LBSimulation::simStepSize, "Read LB state for this number of steps");

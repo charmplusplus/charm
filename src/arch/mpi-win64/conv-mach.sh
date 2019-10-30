@@ -29,18 +29,17 @@ else
 fi
 HPC_SDK=`cygpath -d "$HPC_SDK"`
 
-# These include paths for MS MPI (added through the $INCLUDE variable) have a
-# lower priority than paths added via -I, thus allowing us to use AMPI's mpi.h
-# when compiling AMPI applications.
-export INCLUDE="$INCLUDE;`cygpath -wl "$HPC_SDK\Inc"`;`cygpath -wl "$HPC_SDK\Include"`"
-# MSMPI_INCLUDE="-I `cygpath -u "$HPC_SDK\Include"`"
+HPC_SDK_INCLUDE="$HPC_SDK\Inc"
+if ! test -d "$HPC_SDK_INCLUDE"
+then
+  HPC_SDK_INCLUDE="$HPC_SDK\Include"
+fi
+MSMPI_INCLUDE="-I `cygpath -u "$HPC_SDK_INCLUDE"`"
 if test -n "MSMPI_SUFFIX_INC"
 then
-  export INCLUDE="$INCLUDE;`cygpath -wl "$HPC_SDK\Include$MSMPI_SUFFIX_INC"`"
-  # MSMPI_INCLUDE="-I `cygpath -u "$HPC_SDK\Include$MSMPI_SUFFIX_INC"` $MSMPI_INCLUDE"
+  MSMPI_INCLUDE="-I `cygpath -u "$HPC_SDK_INCLUDE$MSMPI_SUFFIX_INC"` $MSMPI_INCLUDE"
 fi
 
-# Adding $MSMPI_INCLUDE to our compiler flags would be necessary to build
-# mpi-win-x86_64 with GCC, but this has issues with the order of -I parameters.
+CMK_SYSINC="$MSMPI_INCLUDE"
 
 CMK_MPI_LIB="-L `cygpath -u "$HPC_SDK\Lib$MSMPI_SUFFIX_LIB"` -lmsmpi"

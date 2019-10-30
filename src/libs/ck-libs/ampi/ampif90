@@ -1,29 +1,10 @@
 #!/bin/sh
 CHARMBIN=`dirname $0`
 
-STANDALONE=""
-
-processArgs() {
-while [ ! $# -eq 0 ]
-do
-  arg="$1"
-  case "$arg" in
-  -standalone)
-     STANDALONE="true"
-     ;;
-  *)
-     ;;
-  esac
-  shift
-done
-}
-
-eval processArgs "$@"
-
-[ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" ] && ROMIO=-lampiromio
+export AMPICC_MODE='ampif'
 
 cp -n $CHARMBIN/../include/mpif.h .
-$CHARMBIN/charmc -language ampif -default-to-aout $@ $ROMIO
+$CHARMBIN/ampiCC $@
 status=$?
 /bin/rm -f mpif.h
 exit $status

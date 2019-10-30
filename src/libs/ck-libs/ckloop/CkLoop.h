@@ -59,8 +59,8 @@ private:
     std::atomic<int> numDynamicChunksFired{0};
 
 public:
-    CurLoopInfo(int maxChunks):numChunks(0),fnPtr(NULL), lowerIndex(-1), upperIndex(0),
-            paramNum(0), param(NULL), curChunkIdx(-1), finishFlag(0), redBufs(NULL), bufSpace(NULL), inited(0) {
+    CurLoopInfo(int maxChunks):curChunkIdx(-1),numChunks(0),fnPtr(NULL), lowerIndex(-1), upperIndex(0),
+            paramNum(0), param(NULL), redBufs(NULL), bufSpace(NULL), finishFlag(0), inited(0) {
         redBufs = new void *[maxChunks];
         bufSpace = new char[maxChunks * CMI_CACHE_LINE_SIZE];
         for (int i=0; i<maxChunks; i++) redBufs[i] = (void *)(bufSpace+i*CMI_CACHE_LINE_SIZE);

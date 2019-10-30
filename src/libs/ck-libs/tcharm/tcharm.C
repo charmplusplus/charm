@@ -67,6 +67,10 @@ void TCharm::nodeInit()
     CsvAccess(tcharm_funcmap) = new funcmap();
   }
 #endif
+
+  // Assumes no anytime migration and only static insertion
+  _isAnytimeMigration = false;
+  _isStaticInsertion = true;
 }
 
 void TCharm::procInit()
@@ -175,20 +179,14 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     if (tcharm_nomig) { /*Nonmigratable version, for debugging*/
       tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
     } else {
-      /* HACK: Isomalloc gets memory from the mempool, which allocates chunks of memory in sizes
-       * that are powers of two only. Isomalloc & mempool also add their own metadata to every allocation,
-       * so we try to play nice with that here (since the stacksize is often already a power of two): */
-      int isomalloc_offset=64;
-      tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize-isomalloc_offset);
+      CmiIsomallocContext * heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
+      tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
     }
 #if CMK_BIGSIM_CHARM
     BgAttach(tid);
     BgUnsetStartOutOfCore();
 #endif
   }
-#if CMI_SWAPGLOBALS
-  threadGlobals=CtgCreate(tid);
-#endif
   CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
   isStopped=true;
@@ -200,11 +198,6 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
-  if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) {
-    heapBlocks = CmiIsomallocBlockListNew();
-  } else {
-    heapBlocks = 0;
-  }
   nUd=0;
   usesAtSync=true;
   run();
@@ -215,11 +208,7 @@ TCharm::TCharm(CkMigrateMessage *msg)
 {
   initMsg=NULL;
   tid=NULL;
-#if CMI_SWAPGLOBALS
-  threadGlobals=NULL;
-#endif
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
-  heapBlocks=0;
 
 #if CMK_FAULT_EVAC
 	AsyncEvacuate(true);
@@ -331,9 +320,6 @@ void TCharm::pupThread(PUP::er &pc) {
     pup_er p=(pup_er)&pc;
     checkPupMismatch(pc,5138,"before TCHARM thread"); 
 
-    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-      CmiIsomallocBlockListPup(p,&heapBlocks);
-
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
@@ -341,9 +327,6 @@ void TCharm::pupThread(PUP::er &pc) {
       BgAttach(tid);
 #endif
     }
-#if CMI_SWAPGLOBALS
-    threadGlobals=CtgPup(p,threadGlobals);
-#endif
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
 
@@ -382,31 +365,22 @@ void TCharm::UserData::pup(PUP::er &p)
 TCharm::~TCharm()
 {
   //BIGSIM_OOC DEBUGGING
-  //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
-
-  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
 
   CthFree(tid);
-#if CMI_SWAPGLOBALS
-  CtgFree(threadGlobals);
-#endif
 
   delete initMsg;
 }
 
-void TCharm::migrateTo(int destPE) noexcept {
-	if (destPE==CkMyPe()) return;
+CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
+	if (destPE==CkMyPe()) return this;
 	if (CthMigratable() == 0) {
 	    CkPrintf("Warning> thread migration is not supported!\n");
-            return;
+            return this;
         }
 	asyncMigrate = true;
 	// Make sure migrateMe gets called *after* we suspend:
-	thisProxy[thisIndex].migrateDelayed(destPE);
-	suspend();
-}
-void TCharm::migrateDelayed(int destPE) {
-	migrateMe(destPE);
+	thisProxy[thisIndex].ckEmigrate(destPE);
+	return suspend();
 }
 void TCharm::ckJustMigrated() {
 	ArrayElement::ckJustMigrated();
@@ -429,7 +403,6 @@ void TCharm::ckAboutToMigrate(){
 // clear the data before restarting from disk
 void TCharm::clear()
 {
-  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
   delete initMsg;
 }
@@ -461,38 +434,41 @@ void TCharm::run() noexcept
 }
 
 //Go to sync, block, possibly migrate, and then resume
-void TCharm::migrate() noexcept
+CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 {
 #if CMK_LBDB_ON
   DBG("going to sync");
   AtSync();
-  stop();
+  return stop();
 #else
   DBG("skipping sync, because there is no load balancer");
+  return this;
 #endif
 }
 
 #if CMK_FAULT_EVAC
-void TCharm::evacuate() noexcept {
+CMI_WARN_UNUSED_RESULT TCharm * TCharm::evacuate() noexcept {
 	//CkClearAllArrayElementsCPP();
 	if(CkpvAccess(startedEvac)){
 		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);
-		suspend();
+		return suspend();
 	}
+	return this;
 }
 #endif
 
 //calls atsync with async mode
-void TCharm::async_migrate() noexcept
+CMI_WARN_UNUSED_RESULT TCharm * TCharm::async_migrate() noexcept
 {
 #if CMK_LBDB_ON
   DBG("going to sync at async mode");
   ReadyMigrate(false);
   asyncMigrate = true;
   AtSync(0);
-  schedule();
+  return schedule();
 #else
   DBG("skipping sync, because there is no load balancer");
+  return this;
 #endif
 }
 
@@ -500,16 +476,17 @@ void TCharm::async_migrate() noexcept
 Note:
  thread can only migrate at the point when this is called
 */
-void TCharm::allow_migrate()
+CMI_WARN_UNUSED_RESULT TCharm * TCharm::allow_migrate()
 {
 #if CMK_LBDB_ON
   int nextPe = MigrateToPe();
   if (nextPe != -1) {
-    migrateTo(nextPe);
+    return migrateTo(nextPe);
   }
 #else
   DBG("skipping sync, because there is no load balancer");
 #endif
+  return this;
 }
 
 //Resume from sync: start the thread again
@@ -540,7 +517,7 @@ CkArrayID TCHARM_Get_threads() {
 /************* Startup/Shutdown Coordination Support ************/
 
 //Called when we want to go to a barrier
-void TCharm::barrier() noexcept {
+CMI_WARN_UNUSED_RESULT TCharm * TCharm::barrier() noexcept {
 	//Contribute to a synchronizing reduction
 	contribute(CkCallback(CkReductionTarget(TCharm, atBarrier), thisProxy[0]));
 #if CMK_BIGSIM_CHARM
@@ -548,10 +525,11 @@ void TCharm::barrier() noexcept {
         _TRACE_BG_TLINE_END(&curLog);
 	TRACE_BG_AMPI_BREAK(NULL, "TCharm_Barrier_START", NULL, 0, 1);
 #endif
-	stop();
+	TCharm * dis = stop();
 #if CMK_BIGSIM_CHARM
 	 _TRACE_BG_SET_INFO(NULL, "TCHARM_Barrier_END",  &curLog, 1);
 #endif
+	return dis;
 }
 
 //Called when we've reached the barrier
@@ -572,7 +550,7 @@ void TCharm::done(int exitcode) noexcept {
 		contribute(exitmsg);
 	}
 	isSelfDone = true;
-	stop();
+	TCharm * unused = stop();
 }
 //Called when all threads are done running
 void TCharm::atExit(CkReductionMsg* msg) noexcept {
@@ -610,7 +588,7 @@ Callable from UserSetup:
 */
 
 // Read the command line to figure out how many threads to create:
-CDECL int TCHARM_Get_num_chunks()
+CLINKAGE int TCHARM_Get_num_chunks()
 {
 	TCHARMAPI("TCHARM_Get_num_chunks");
 	if (CkMyPe()!=0) CkAbort("TCHARM_Get_num_chunks should only be called on PE 0 during setup!");
@@ -621,7 +599,7 @@ CDECL int TCHARM_Get_num_chunks()
 	lastNumChunks=nChunks;
 	return nChunks;
 }
-FDECL int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)()
+FLINKAGE int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)()
 {
 	return TCHARM_Get_num_chunks();
 }
@@ -640,33 +618,33 @@ void TCHARM_Thread_options::sanityCheck() {
 TCHARM_Thread_options g_tcharmOptions(1);
 
 /*Set the size of the thread stack*/
-CDECL void TCHARM_Set_stack_size(int newStackSize)
+CLINKAGE void TCHARM_Set_stack_size(int newStackSize)
 {
 	TCHARMAPI("TCHARM_Set_stack_size");
 	g_tcharmOptions.stackSize=newStackSize;
 }
-FDECL void FTN_NAME(TCHARM_SET_STACK_SIZE,tcharm_set_stack_size)
+FLINKAGE void FTN_NAME(TCHARM_SET_STACK_SIZE,tcharm_set_stack_size)
 	(int *newSize)
 { TCHARM_Set_stack_size(*newSize); }
 
-CDECL void TCHARM_Set_exit() { g_tcharmOptions.exitWhenDone=true; }
+CLINKAGE void TCHARM_Set_exit() { g_tcharmOptions.exitWhenDone=true; }
 
 /*Create a new array of threads, which will be bound to by subsequent libraries*/
-CDECL void TCHARM_Create(int nThreads,
+CLINKAGE void TCHARM_Create(int nThreads,
 			int threadFn)
 {
 	TCHARMAPI("TCHARM_Create");
 	TCHARM_Create_data(nThreads,
 			 threadFn,NULL,0);
 }
-FDECL void FTN_NAME(TCHARM_CREATE,tcharm_create)
+FLINKAGE void FTN_NAME(TCHARM_CREATE,tcharm_create)
 	(int *nThreads,int threadFn)
 { TCHARM_Create(*nThreads,threadFn); }
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg);
 
 /*As above, but pass along (arbitrary) data to threads*/
-CDECL void TCHARM_Create_data(int nThreads,
+CLINKAGE void TCHARM_Create_data(int nThreads,
 		  int threadFn,
 		  void *threadData,int threadDataLen)
 {
@@ -681,7 +659,7 @@ CDECL void TCHARM_Create_data(int nThreads,
 	g_tcharmOptions=TCHARM_Thread_options(1);
 }
 
-FDECL void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
+FLINKAGE void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 	(int *nThreads,
 		  int threadFn,
 		  void *threadData,int *threadDataLen)
@@ -695,31 +673,34 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
   CkAssert(CkpvAccess(mapCreated)==true);
 
   if(haveConfigurableRRMap()){
-    CkPrintf("USING ConfigurableRRMap\n");
+    CkPrintf("TCharm> using ConfigurableRRMap\n");
     mapID=CProxy_ConfigurableRRMap::ckNew();
+    opts.setMap(mapID);
   } else if(mapping==NULL){
 #if CMK_BIGSIM_CHARM
     mapID=CProxy_BlockMap::ckNew();
+    opts.setMap(mapID);
 #else
-#if __FAULT__
-	mapID=CProxy_RRMap::ckNew();
-#else
-    mapID=CkCreatePropMap();
-#endif
+    /* do nothing: use the default map */
 #endif
   } else if(0 == strcmp(mapping,"BLOCK_MAP")) {
-    CkPrintf("USING BLOCK_MAP\n");
+    CkPrintf("TCharm> using BLOCK_MAP\n");
     mapID = CProxy_BlockMap::ckNew();
+    opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"RR_MAP")) {
-    CkPrintf("USING RR_MAP\n");
+    CkPrintf("TCharm> using RR_MAP\n");
     mapID = CProxy_RRMap::ckNew();
+    opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"MAPFILE")) {
-    CkPrintf("Reading map from file\n");
+    CkPrintf("TCharm> reading map from mapfile\n");
     mapID = CProxy_ReadFileMap::ckNew();
-  } else {  // "PROP_MAP" or anything else
+    opts.setMap(mapID);
+  } else if(0 == strcmp(mapping,"PROP_MAP")) {
+    CkPrintf("TCharm> using PROP_MAP\n");
     mapID = CkCreatePropMap();
+    opts.setMap(mapID);
   }
-  opts.setMap(mapID);
+  opts.setStaticInsertion(true);
   opts.setSectionAutoDelegate(false);
   return CProxy_TCharm::ckNew(msg,opts);
 }
@@ -742,27 +723,26 @@ CkArrayOptions TCHARM_Attach_start(CkArrayID *retTCharmArray,int *retNumElts)
 }
 
 void TCHARM_Suspend() {
-	TCharm *tc=TCharm::get();
-	tc->suspend();
+	TCharm * unused = TCharm::get()->suspend();
 }
 
 /***********************************
 Callable from worker thread
 */
-CDECL int TCHARM_Element()
+CLINKAGE int TCHARM_Element()
 { 
 	TCHARMAPI("TCHARM_Element");
 	return TCharm::get()->getElement();
 }
-CDECL int TCHARM_Num_elements()
+CLINKAGE int TCHARM_Num_elements()
 { 
 	TCHARMAPI("TCHARM_Num_elements");
 	return TCharm::get()->getNumElements();
 }
 
-FDECL int FTN_NAME(TCHARM_ELEMENT,tcharm_element)()
+FLINKAGE int FTN_NAME(TCHARM_ELEMENT,tcharm_element)()
 { return TCHARM_Element();}
-FDECL int FTN_NAME(TCHARM_NUM_ELEMENTS,tcharm_num_elements)()
+FLINKAGE int FTN_NAME(TCHARM_NUM_ELEMENTS,tcharm_num_elements)()
 { return TCHARM_Num_elements();}
 
 //Make sure this address will migrate with us when we move:
@@ -781,13 +761,13 @@ static void checkAddress(void *data)
 }
 
 /* Old "register"-based userdata: */
-CDECL int TCHARM_Register(void *data,TCHARM_Pup_fn pfn)
+CLINKAGE int TCHARM_Register(void *data,TCHARM_Pup_fn pfn)
 { 
 	TCHARMAPI("TCHARM_Register");
 	checkAddress(data);
 	return TCharm::get()->add(TCharm::UserData(pfn,TCharm::get()->getThread(),data));
 }
-FDECL int FTN_NAME(TCHARM_REGISTER,tcharm_register)
+FLINKAGE int FTN_NAME(TCHARM_REGISTER,tcharm_register)
 	(void *data,TCHARM_Pup_fn pfn)
 { 
 	TCHARMAPI("TCHARM_Register");
@@ -795,16 +775,16 @@ FDECL int FTN_NAME(TCHARM_REGISTER,tcharm_register)
 	return TCharm::get()->add(TCharm::UserData(pfn,TCharm::get()->getThread(),data));
 }
 
-CDECL void *TCHARM_Get_userdata(int id)
+CLINKAGE void *TCHARM_Get_userdata(int id)
 {
 	TCHARMAPI("TCHARM_Get_userdata");
 	return TCharm::get()->lookupUserData(id);
 }
-FDECL void *FTN_NAME(TCHARM_GET_USERDATA,tcharm_get_userdata)(int *id)
+FLINKAGE void *FTN_NAME(TCHARM_GET_USERDATA,tcharm_get_userdata)(int *id)
 { return TCHARM_Get_userdata(*id); }
 
 /* New hardcoded-ID userdata: */
-CDECL void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn pup_or_NULL)
+CLINKAGE void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn pup_or_NULL)
 {
 	TCHARMAPI("TCHARM_Set_global");
 	TCharm *tc=TCharm::get();
@@ -815,7 +795,7 @@ CDECL void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn p
 	}
 	tc->sud[globalID]=TCharm::UserData(pup_or_NULL,tc->getThread(),new_value);
 }
-CDECL void *TCHARM_Get_global(int globalID)
+CLINKAGE void *TCHARM_Get_global(int globalID)
 {
 	//Skip TCHARMAPI("TCHARM_Get_global") because there's no dynamic allocation here,
 	// and this routine should be as fast as possible.
@@ -824,7 +804,7 @@ CDECL void *TCHARM_Get_global(int globalID)
 	return v[globalID].getData();
 }
 
-CDECL void TCHARM_Migrate()
+CLINKAGE void TCHARM_Migrate()
 {
 	TCHARMAPI("TCHARM_Migrate");
 	if (CthMigratable() == 0) {
@@ -832,56 +812,56 @@ CDECL void TCHARM_Migrate()
 	    CkPrintf("Warning> thread migration is not supported!\n");
           return;
         }
-	TCharm::get()->migrate();
+	TCharm * unused = TCharm::get()->migrate();
 }
 FORTRAN_AS_C(TCHARM_MIGRATE,TCHARM_Migrate,tcharm_migrate,(void),())
 
-CDECL void TCHARM_Async_Migrate()
+CLINKAGE void TCHARM_Async_Migrate()
 {
 	TCHARMAPI("TCHARM_Async_Migrate");
-	TCharm::get()->async_migrate();
+	TCharm * unused = TCharm::get()->async_migrate();
 }
 FORTRAN_AS_C(TCHARM_ASYNC_MIGRATE,TCHARM_Async_Migrate,tcharm_async_migrate,(void),())
 
-CDECL void TCHARM_Allow_Migrate()
+CLINKAGE void TCHARM_Allow_Migrate()
 {
 	TCHARMAPI("TCHARM_Allow_Migrate");
-	TCharm::get()->allow_migrate();
+	TCharm * unused = TCharm::get()->allow_migrate();
 }
 FORTRAN_AS_C(TCHARM_ALLOW_MIGRATE,TCHARM_Allow_Migrate,tcharm_allow_migrate,(void),())
 
-CDECL void TCHARM_Migrate_to(int destPE)
+CLINKAGE void TCHARM_Migrate_to(int destPE)
 {
 	TCHARMAPI("TCHARM_Migrate_to");
-	TCharm::get()->migrateTo(destPE);
+	TCharm * unused = TCharm::get()->migrateTo(destPE);
 }
 
 #if CMK_FAULT_EVAC
-CDECL void TCHARM_Evacuate()
+CLINKAGE void TCHARM_Evacuate()
 {
 	TCHARMAPI("TCHARM_Migrate_to");
-	TCharm::get()->evacuate();
+	TCharm * unused = TCharm::get()->evacuate();
 }
 #endif
 
 FORTRAN_AS_C(TCHARM_MIGRATE_TO,TCHARM_Migrate_to,tcharm_migrate_to,
 	(int *destPE),(*destPE))
 
-CDECL void TCHARM_Yield()
+CLINKAGE void TCHARM_Yield()
 {
 	TCHARMAPI("TCHARM_Yield");
-	TCharm::get()->schedule();
+	TCharm * unused = TCharm::get()->schedule();
 }
 FORTRAN_AS_C(TCHARM_YIELD,TCHARM_Yield,tcharm_yield,(void),())
 
-CDECL void TCHARM_Barrier()
+CLINKAGE void TCHARM_Barrier()
 {
 	TCHARMAPI("TCHARM_Barrier");
-	TCharm::get()->barrier();
+	TCharm * unused = TCharm::get()->barrier();
 }
 FORTRAN_AS_C(TCHARM_BARRIER,TCHARM_Barrier,tcharm_barrier,(void),())
 
-CDECL void TCHARM_Done(int exitcode)
+CLINKAGE void TCHARM_Done(int exitcode)
 {
 	TCHARMAPI("TCHARM_Done");
 	TCharm *c=TCharm::getNULL();
@@ -891,7 +871,7 @@ CDECL void TCHARM_Done(int exitcode)
 FORTRAN_AS_C(TCHARM_DONE,TCHARM_Done,tcharm_done,(int *exitcode),(*exitcode))
 
 
-CDECL double TCHARM_Wall_timer()
+CLINKAGE double TCHARM_Wall_timer()
 {
   TCHARMAPI("TCHARM_Wall_timer");
   TCharm *c=TCharm::getNULL();
@@ -905,12 +885,12 @@ CDECL double TCHARM_Wall_timer()
 /*Include Fortran-style "iargc" and "getarg" routines.
 These are needed to get access to the command-line arguments from Fortran.
 */
-FDECL int FTN_NAME(TCHARM_IARGC,tcharm_iargc)() {
+FLINKAGE int FTN_NAME(TCHARM_IARGC,tcharm_iargc)() {
   TCHARMAPI("tcharm_iargc");
   return CkGetArgc()-1;
 }
 
-FDECL void FTN_NAME(TCHARM_GETARG,tcharm_getarg)
+FLINKAGE void FTN_NAME(TCHARM_GETARG,tcharm_getarg)
 	(int *i_p,char *dest,int destLen)
 {
   TCHARMAPI("tcharm_getarg");
@@ -926,14 +906,14 @@ FDECL void FTN_NAME(TCHARM_GETARG,tcharm_getarg)
 
 //These silly routines are used for serial startup:
 extern void _initCharm(int argc, char **argv);
-CDECL void TCHARM_Init(int *argc,char ***argv) {
+CLINKAGE void TCHARM_Init(int *argc,char ***argv) {
 	if (!tcharm_initted) {
 	  ConverseInit(*argc, *argv, (CmiStartFn) _initCharm,1,1);
 	  _initCharm(*argc,*argv);
 	}
 }
 
-FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)()
+FLINKAGE void FTN_NAME(TCHARM_INIT,tcharm_init)()
 {
 	int argc=1;
 	const char *argv_sto[2]={"foo",NULL};
@@ -975,9 +955,9 @@ TCharm::TCharmSemaphore *TCharm::getSema(int id) {
 	if (s->data==NULL) 
 	{ //Semaphore isn't filled yet: wait until it is
 		s->thread=CthSelf();
-		suspend(); //Will be woken by semaPut
+		TCharm * dis = suspend(); //Will be woken by semaPut
 		// Semaphore may have moved-- find it again
-		s=findSema(id);
+		s = dis->findSema(id);
 		if (s->data==NULL) CkAbort("TCharm::semaGet awoken too early!");
 	}
 	return s;
@@ -1032,7 +1012,7 @@ passing the request out of the thread to our array element
 before calling system().
 */
 
-CDECL int 
+CLINKAGE int
 TCHARM_System(const char *shell_command)
 {
 	return TCharm::get()->system(shell_command);
@@ -1044,7 +1024,7 @@ int TCharm::system(const char *cmd)
 	s.cmd=cmd;
 	s.ret=&ret;
 	thisProxy[thisIndex].callSystem(s);
-	suspend();
+	TCharm * unused = suspend();
 	return ret;
 }
 

@@ -1,6 +1,5 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -8,59 +7,32 @@
 
 #include "ad_piofs.h"
 #include "adio_extern.h"
-#ifdef PROFILE
-#include "mpe.h"
-#endif
 
 void ADIOI_PIOFS_WriteContig(ADIO_File fd, void *buf, int count, 
                      MPI_Datatype datatype, int file_ptr_type,
 		     ADIO_Offset offset, ADIO_Status *status, int *error_code)
 {
-    int err=-1, datatype_size, len;
+    MPI_Count err=-1, datatype_size, len;
 #ifndef PRINT_ERR_MSG
     static char myname[] = "ADIOI_PIOFS_WRITECONTIG";
 #endif
 
-    MPI_Type_size(datatype, &datatype_size);
+    MPI_Type_size_x(datatype, &datatype_size);
     len = datatype_size * count;
 
     if (file_ptr_type == ADIO_EXPLICIT_OFFSET) {
 	if (fd->fp_sys_posn != offset) {
-#ifdef PROFILE
-            MPE_Log_event(11, 0, "start seek");
-#endif
 	    llseek(fd->fd_sys, offset, SEEK_SET);
-#ifdef PROFILE
-            MPE_Log_event(12, 0, "end seek");
-#endif
 	}
-#ifdef PROFILE
-        MPE_Log_event(5, 0, "start write");
-#endif
 	err = write(fd->fd_sys, buf, len);
-#ifdef PROFILE
-        MPE_Log_event(6, 0, "end write");
-#endif
 	fd->fp_sys_posn = offset + err;
 	/* individual file pointer not updated */        
     }
     else { /* write from curr. location of ind. file pointer */
 	if (fd->fp_sys_posn != fd->fp_ind) {
-#ifdef PROFILE
-            MPE_Log_event(11, 0, "start seek");
-#endif
 	    llseek(fd->fd_sys, fd->fp_ind, SEEK_SET);
-#ifdef PROFILE
-            MPE_Log_event(12, 0, "end seek");
-#endif
 	}
-#ifdef PROFILE
-        MPE_Log_event(5, 0, "start write");
-#endif
 	err = write(fd->fd_sys, buf, len);
-#ifdef PROFILE
-        MPE_Log_event(6, 0, "end write");
-#endif
 	fd->fp_ind += err;
 	fd->fp_sys_posn = fd->fp_ind;
     }
@@ -69,16 +41,19 @@ void ADIOI_PIOFS_WriteContig(ADIO_File fd, void *buf, int count,
     if (err != -1) MPIR_Status_set_bytes(status, datatype, err);
 #endif
 
-#ifdef PRINT_ERR_MSG
-    *error_code = (err == -1) ? MPI_ERR_UNKNOWN : MPI_SUCCESS;
-#else
     if (err == -1) {
+#ifdef MPICH
+	*error_code = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, myname, __LINE__, MPI_ERR_IO, "**io",
+	    "**io %s", strerror(errno));
+#elif defined(PRINT_ERR_MSG)
+	*error_code =  MPI_ERR_UNKNOWN;
+#else
 	*error_code = MPIR_Err_setmsg(MPI_ERR_IO, MPIR_ADIO_ERROR,
 			      myname, "I/O Error", "%s", strerror(errno));
 	ADIOI_Error(fd, *error_code, myname);
+#endif
     }
     else *error_code = MPI_SUCCESS;
-#endif
 }
 
 
@@ -96,10 +71,11 @@ void ADIOI_PIOFS_WriteStrided(ADIO_File fd, void *buf, int count,
     ADIOI_Flatlist_node *flat_buf, *flat_file;
     struct iovec *iov;
     int i, j, k, err=-1, bwr_size, fwr_size=0, st_index=0;
-    int bufsize, num, size, sum, n_etypes_in_filetype, size_in_filetype;
+    int num, size, sum, n_etypes_in_filetype, size_in_filetype;
+    MPI_Count bufsize;
     int n_filetypes, etype_in_filetype;
     ADIO_Offset abs_off_in_filetype=0;
-    int filetype_size, etype_size, buftype_size;
+    MPI_Count filetype_size, etype_size, buftype_size;
     MPI_Aint filetype_extent, buftype_extent, indx;
     int buf_count, buftype_is_contig, filetype_is_contig;
     ADIO_Offset off, disp;
@@ -116,14 +92,17 @@ void ADIOI_PIOFS_WriteStrided(ADIO_File fd, void *buf, int count,
     ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
     ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
 
-    MPI_Type_size(fd->filetype, &filetype_size);
+    MPI_Type_size_x(fd->filetype, &filetype_size);
     if ( ! filetype_size ) {
+#ifdef HAVE_STATUS_SET_BYTES
+	MPIR_Status_set_bytes(status, datatype, 0);
+#endif
 	*error_code = MPI_SUCCESS; 
 	return;
     }
 
     MPI_Type_extent(fd->filetype, &filetype_extent);
-    MPI_Type_size(datatype, &buftype_size);
+    MPI_Type_size_x(datatype, &buftype_size);
     MPI_Type_extent(datatype, &buftype_extent);
     etype_size = fd->etype_size;
     
@@ -133,9 +112,7 @@ void ADIOI_PIOFS_WriteStrided(ADIO_File fd, void *buf, int count,
 
 /* noncontiguous in memory, contiguous in file. use writev */
 
-	ADIOI_Flatten_datatype(datatype);
-	flat_buf = ADIOI_Flatlist;
-	while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	flat_buf = ADIOI_Flatten_and_find(datatype);
 
 /* There is a limit of 16 on the number of iovecs for readv/writev! */
 
@@ -172,17 +149,20 @@ void ADIOI_PIOFS_WriteStrided(ADIO_File fd, void *buf, int count,
 	if (file_ptr_type == ADIO_INDIVIDUAL) fd->fp_ind = off;
 
 	ADIOI_Free(iov);
-#ifdef PRINT_ERR_MSG
-	*error_code = (err_flag) ? MPI_ERR_UNKNOWN : MPI_SUCCESS;
-#else
 	if (err_flag) {
+#ifdef MPICH
+	    *error_code = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, myname, __LINE__, MPI_ERR_IO, "**io",
+		"**io %s", strerror(errno));
+#elif defined(PRINT_ERR_MSG) 
+	    *error_code =  MPI_ERR_UNKNOWN;
+#else /* MPICH-1 */
 	    *error_code = MPIR_Err_setmsg(MPI_ERR_IO, MPIR_ADIO_ERROR,
 			      myname, "I/O Error", "%s", strerror(errno));
 	    ADIOI_Error(fd, *error_code, myname);
+#endif
 	}
 	else *error_code = MPI_SUCCESS;
-#endif
-    }
+    } /* if (!buftype_is_contig && filetype_is_contig) ... */
 
     else {  /* noncontiguous in file */
 
@@ -250,18 +230,8 @@ void ADIOI_PIOFS_WriteStrided(ADIO_File fd, void *buf, int count,
                 if (fwr_size) { 
                     /* TYPE_UB and TYPE_LB can result in 
                        fwr_size = 0. save system call in such cases */ 
-#ifdef PROFILE
-		    MPE_Log_event(11, 0, "start seek");
-#endif
 		    llseek(fd->fd_sys, off, SEEK_SET);
-#ifdef PROFILE
-		    MPE_Log_event(12, 0, "end seek");
-		    MPE_Log_event(5, 0, "start write");
-#endif
 		    err = write(fd->fd_sys, ((char *) buf) + i, fwr_size);
-#ifdef PROFILE
-		    MPE_Log_event(6, 0, "end write");
-#endif
 		    if (err == -1) err_flag = 1;
 		}
 		i += fwr_size;
@@ -286,9 +256,7 @@ void ADIOI_PIOFS_WriteStrided(ADIO_File fd, void *buf, int count,
 	else {
 /* noncontiguous in memory as well as in file */
 
-	    ADIOI_Flatten_datatype(datatype);
-	    flat_buf = ADIOI_Flatlist;
-	    while (flat_buf->type != datatype) flat_buf = flat_buf->next;
+	    flat_buf = ADIOI_Flatten_and_find(datatype);
 
 	    k = num = buf_count = 0;
 	    indx = flat_buf->indices[0];
@@ -299,18 +267,8 @@ void ADIOI_PIOFS_WriteStrided(ADIO_File fd, void *buf, int count,
 	    while (num < bufsize) {
 		size = ADIOI_MIN(fwr_size, bwr_size);
 		if (size) {
-#ifdef PROFILE
-		    MPE_Log_event(11, 0, "start seek");
-#endif
 		    llseek(fd->fd_sys, off, SEEK_SET);
-#ifdef PROFILE
-		    MPE_Log_event(12, 0, "end seek");
-		    MPE_Log_event(5, 0, "start write");
-#endif
 		    err = write(fd->fd_sys, ((char *) buf) + indx, size);
-#ifdef PROFILE
-		    MPE_Log_event(6, 0, "end write");
-#endif
 		    if (err == -1) err_flag = 1;
 		}
 
@@ -355,17 +313,20 @@ void ADIOI_PIOFS_WriteStrided(ADIO_File fd, void *buf, int count,
 	}
 
         if (file_ptr_type == ADIO_INDIVIDUAL) fd->fp_ind = off;
-#ifdef PRINT_ERR_MSG
-	*error_code = (err_flag) ? MPI_ERR_UNKNOWN : MPI_SUCCESS;
-#else
 	if (err_flag) {
+#ifdef MPICH
+	    *error_code = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, myname, __LINE__, MPI_ERR_IO, "**io",
+		"**io %s", strerror(errno));
+#elif defined(PRINT_ERR_MSG)
+	    *error_code = MPI_ERR_UNKNOWN;
+#else /* MPICH-1 */
 	    *error_code = MPIR_Err_setmsg(MPI_ERR_IO, MPIR_ADIO_ERROR,
 			      myname, "I/O Error", "%s", strerror(errno));
 	    ADIOI_Error(fd, *error_code, myname);
+#endif
 	}
 	else *error_code = MPI_SUCCESS;
-#endif
-    }
+    } 
 
     fd->fp_sys_posn = -1;   /* set it to null. */
 

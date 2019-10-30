@@ -35,6 +35,8 @@ void broadc_recv(mesg m)
 void broadc_start_cycle(bchare c)
 {
   struct mesg_s m={{0},CmiMyPe(),c,0x12345678}; struct mesg_s *mp; CmiCommHandle h;
+
+  CmiInitMsgHeader(m.head, sizeof(struct mesg_s));
   switch (c->totalsent) {
     case 0:
       CmiSetHandler(&m, CpvAccess(broadc_recv_idx));

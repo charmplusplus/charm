@@ -29,7 +29,7 @@
 #include <algorithm>
 #include <math.h>
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 // a solution is feasible if num migrations <= user-specified limit
 // LOAD_MIG_BAL is used to control tradeoff between maxload and migrations
@@ -478,7 +478,7 @@ void GreedyRefineLB::work(LDStats *stats)
                "but maxload after lb is %f higher than greedy. Consider testing with A=0, B=-1\n",
                CkMyPe(), migrationRatio, greedyRatio);
     }
-    CkPrintf("[%d] GreedyRefineLB: after lb, max_load=%.3f, migrations=%d(%.2f%), ratioToGreedy=%.3f\n",
+    CkPrintf("[%d] GreedyRefineLB: after lb, max_load=%.3f, migrations=%d(%.2f%%), ratioToGreedy=%.3f\n",
              CkMyPe(), maxLoad, nmoves, 100.0*migrationRatio, greedyRatio);
   }
 }

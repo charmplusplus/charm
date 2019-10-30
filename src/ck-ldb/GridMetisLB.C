@@ -11,7 +11,7 @@
 #include "GridMetisLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (GridMetisLB, "Grid load balancer that uses Metis to optimize communication graph")
 
@@ -281,7 +281,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   int recv_object;
   int send_index;
   int recv_index;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int num_objects;
   int *xadj;
   int num_edges;
@@ -527,7 +527,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
   int recv_object;
   int send_index;
   int recv_index;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int num_objects;
   int *xadj;
   int num_edges;

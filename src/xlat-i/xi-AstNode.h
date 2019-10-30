@@ -36,17 +36,6 @@ class AstNode : public Printable {
     (void)decls;
     (void)defs;
   }
-
-  // DMK - Accel Support
-  virtual int genAccels_spe_c_funcBodies(XStr& str) {
-    (void)str;
-    return 0;
-  }
-  virtual void genAccels_spe_c_regFuncs(XStr& str) { (void)str; }
-  virtual void genAccels_spe_c_callInits(XStr& str) { (void)str; }
-  virtual void genAccels_spe_h_includes(XStr& str) { (void)str; }
-  virtual void genAccels_spe_h_fiCountDefs(XStr& str) { (void)str; }
-  virtual void genAccels_ppe_c_regFuncs(XStr& str) { (void)str; }
 };
 
 template <typename Child>
@@ -87,14 +76,6 @@ class AstChildren : public virtual AstNode {
   void genTramTypes();
   void genTramRegs(XStr& str);
   void genTramPups(XStr& scope, XStr& decls, XStr& defs);
-
-  // Accelerated Entry Method support
-  int genAccels_spe_c_funcBodies(XStr& str);
-  void genAccels_spe_c_regFuncs(XStr& str);
-  void genAccels_spe_c_callInits(XStr& str);
-  void genAccels_spe_h_includes(XStr& str);
-  void genAccels_spe_h_fiCountDefs(XStr& str);
-  void genAccels_ppe_c_regFuncs(XStr& str);
 
   template <typename T>
   void recurse(T arg, void (Child::*fn)(T));
@@ -341,43 +322,6 @@ void AstChildren<Child>::genTramPups(XStr& scope, XStr& decls, XStr& defs) {
       (*i)->genTramPups(scope, decls, defs);
     }
   }
-}
-
-template <typename Child>
-int AstChildren<Child>::genAccels_spe_c_funcBodies(XStr& str) {
-  int rtn = 0;
-  for (typename std::list<Child*>::iterator i = children.begin(); i != children.end();
-       ++i) {
-    if (*i) {
-      rtn += (*i)->genAccels_spe_c_funcBodies(str);
-    }
-  }
-  return rtn;
-}
-
-template <typename Child>
-void AstChildren<Child>::genAccels_spe_c_regFuncs(XStr& str) {
-  details::perElemGen(children, str, &Child::genAccels_spe_c_regFuncs);
-}
-
-template <typename Child>
-void AstChildren<Child>::genAccels_spe_c_callInits(XStr& str) {
-  details::perElemGen(children, str, &Child::genAccels_spe_c_callInits);
-}
-
-template <typename Child>
-void AstChildren<Child>::genAccels_spe_h_includes(XStr& str) {
-  details::perElemGen(children, str, &Child::genAccels_spe_h_includes);
-}
-
-template <typename Child>
-void AstChildren<Child>::genAccels_spe_h_fiCountDefs(XStr& str) {
-  details::perElemGen(children, str, &Child::genAccels_spe_h_fiCountDefs);
-}
-
-template <typename Child>
-void AstChildren<Child>::genAccels_ppe_c_regFuncs(XStr& str) {
-  details::perElemGen(children, str, &Child::genAccels_ppe_c_regFuncs);
 }
 
 }  // namespace xi

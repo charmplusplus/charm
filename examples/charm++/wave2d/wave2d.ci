@@ -1,11 +1,7 @@
 mainmodule wave2d {
 
-  readonly CProxy_Main mainProxy;
-  readonly CProxy_Wave arrayProxy;
-
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry [reductiontarget] void iterationCompleted(int iteration);
   };
 
   array [2D] Wave {
@@ -15,6 +11,8 @@ mainmodule wave2d {
 
     // A method for requesting data to be displayed graphically to the user
     entry void requestNextFrame(liveVizRequestMsg *m);
+
+    entry [reductiontarget] void iterationCompleted(int iteration);
   };
 
 

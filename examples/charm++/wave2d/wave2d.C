@@ -5,9 +5,6 @@
 // The discretization used below is described in the accompanying paper.pdf
 // Author: Isaac Dooley 2008
 
-/*readonly*/ CProxy_Main mainProxy;
-/*readonly*/ CProxy_Wave arrayProxy;
-
 #define TotalDataWidth  800
 #define TotalDataHeight 800
 #define chareArrayWidth  16
@@ -23,13 +20,13 @@ class Main : public CBase_Main
 {
 public:
   Main(CkArgMsg* m) {
-    mainProxy = thisProxy; // store the main proxy
-    
+    delete m;
+
     CkPrintf("Running wave2d on %d processors\n", CkNumPes());
 
     // Create new array of worker chares
     CkArrayOptions opts(chareArrayWidth, chareArrayHeight);
-    arrayProxy = CProxy_Wave::ckNew(opts);
+    CProxy_Wave arrayProxy = CProxy_Wave::ckNew(opts);
 
     // setup liveviz
     CkCallback c(CkIndex_Wave::requestNextFrame(0),arrayProxy);
@@ -39,29 +36,6 @@ public:
     //Start the computation
     arrayProxy.begin_iteration();
   }
-
-  // Each worker calls this method
-  void iterationCompleted(int iteration)
-  {
-      if (iteration == total_iterations) {
-	CkPrintf("Program Done!\n");
-	CkExit();
-      } else { 
-	// Start the next iteration
-	if(iteration % 20 == 0) CkPrintf("Completed %d iterations\n", iteration);    
-      if (iteration != 0 && iteration % 200 == 0)
-      {
-        CkCallback cb(CkIndex_Wave::begin_iteration(), arrayProxy);
-        CkStartMemCheckpoint(cb);
-      }
-      else
-      {
-        arrayProxy.begin_iteration();
-      }
-    }
-  }
-  
-  
 };
 
 class Wave: public CBase_Wave {
@@ -75,6 +49,11 @@ public:
   double *pressure_new;  // time t+1
 
   double *buffers[4];
+
+  double *left_edge;
+  double *right_edge;
+
+  unsigned char *intensity;
 
   int iteration;
 
@@ -106,6 +85,11 @@ public:
     buffers[right]= new double[myheight];
     buffers[up]   = new double[mywidth];
     buffers[down] = new double[mywidth];
+
+    left_edge = new double[myheight];
+    right_edge = new double[myheight];
+
+    intensity = new unsigned char[3 * mywidth * myheight];
 
     messages_due = 4;
   }
@@ -160,6 +144,11 @@ public:
     delete [] buffers[right];
     delete [] buffers[up];
     delete [] buffers[down];
+
+    delete [] right_edge;
+    delete [] left_edge;
+
+    delete [] intensity;
   }
 
   void begin_iteration(void) {
@@ -167,8 +156,6 @@ public:
     double *top_edge = &pressure[0];
     double *bottom_edge = &pressure[(myheight-1)*mywidth];
 
-    double *left_edge = new double[myheight];
-    double *right_edge = new double[myheight];
     for(int i=0;i<myheight;++i){
       left_edge[i] = pressure[i*mywidth];
       right_edge[i] = pressure[i*mywidth + mywidth-1];
@@ -182,9 +169,6 @@ public:
     thisProxy(thisIndex.x, mod(thisIndex.y-1, chareArrayHeight)).recvGhosts(down, mywidth, top_edge);
     // Send my bottom edge
     thisProxy(thisIndex.x, mod(thisIndex.y+1, chareArrayHeight)).recvGhosts(up, mywidth, bottom_edge);
-
-    delete [] right_edge;
-    delete [] left_edge;
   }
   
   void recvGhosts(int whichSide, int size, double ghost_values[]) {
@@ -226,7 +210,7 @@ public:
       pressure_new = tmp;
 
       messages_due = 4;
-      contribute(sizeof(int), &iteration, CkReduction::min_int, CkCallback(CkReductionTarget(Main,iterationCompleted), mainProxy));
+      contribute(sizeof(int), &iteration, CkReduction::min_int, CkCallback(CkReductionTarget(Wave, iterationCompleted), thisProxy(0, 0)));
       ++iteration;
     }
   }
@@ -243,7 +227,6 @@ public:
     
     // set the output pixel values for my rectangle
     // Each RGB component is a char which can have 256 possible values.
-    unsigned char *intensity= new unsigned char[3*w*h];
     for(int i=0;i<myheight;++i){
       for(int j=0;j<mywidth;++j){
 
@@ -278,10 +261,31 @@ public:
     }
 
     liveVizDeposit(m, sx,sy, w,h, intensity, this);
-    delete[] intensity;
 
   }
-  
+
+  // Each worker calls this method
+  void iterationCompleted(int iteration)
+  {
+      if (iteration == total_iterations) {
+	CkPrintf("Program Done!\n");
+	CkExit();
+      } else {
+	// Start the next iteration
+	if(iteration % 20 == 0) CkPrintf("Completed %d iterations\n", iteration);
+#ifdef CMK_MEM_CHECKPOINT
+      if (iteration != 0 && iteration % 200 == 0)
+      {
+	CkCallback cb(CkIndex_Wave::begin_iteration(), thisProxy);
+	CkStartMemCheckpoint(cb);
+      }
+      else
+#endif
+      {
+	thisProxy.begin_iteration();
+      }
+    }
+  }
 };
 
 #include "wave2d.def.h"

@@ -92,14 +92,6 @@ class Template : public Construct {
   void outputClosuresDef(XStr& str);
   void preprocess();
   void check();
-
-  // DMK - Accel Support
-  int genAccels_spe_c_funcBodies(XStr& str);
-  void genAccels_spe_c_regFuncs(XStr& str);
-  void genAccels_spe_c_callInits(XStr& str);
-  void genAccels_spe_h_includes(XStr& str);
-  void genAccels_spe_h_fiCountDefs(XStr& str);
-  void genAccels_ppe_c_regFuncs(XStr& str);
 };
 
 /* An entity that could be templated, i.e. chare, group or a message */

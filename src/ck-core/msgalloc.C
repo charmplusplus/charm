@@ -3,7 +3,6 @@
 
 CkpvDeclare(size_t *, _offsets);
 
-extern "C"
 void *CkAllocSysMsg(const CkEntryOptions *opts)
 {
   if(opts == NULL)
@@ -28,13 +27,11 @@ void *CkAllocSysMsg(const CkEntryOptions *opts)
   return EnvToUsr(env);
 }
 
-extern "C"
 void CkFreeSysMsg(void *m)
 {
   CkpvAccess(_msgPool)->put(m);
 }
 
-extern "C"
 void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits, GroupDepNum groupDepNum)
 {
   envelope* env = _allocEnv(ForChareMsg, msgBytes, prioBits, groupDepNum);
@@ -46,7 +43,6 @@ void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits, GroupDepNum groupDepNum
   return EnvToUsr(env);
 }
 
-extern "C"
 void* CkAllocBuffer(void *msg, int bufsize)
 {
   bufsize = CkMsgAlignLength(bufsize);
@@ -64,7 +60,6 @@ void* CkAllocBuffer(void *msg, int bufsize)
   return EnvToUsr(packbuf);;
 }
 
-extern "C"
 void  CkFreeMsg(void *msg)
 {
   if (msg!=NULL) {
@@ -73,7 +68,6 @@ void  CkFreeMsg(void *msg)
 }
 
 
-extern "C"
 void* CkCopyMsg(void **pMsg)
 {// cannot simply memcpy, because srcMsg could be varsize msg
   void *srcMsg = *pMsg;
@@ -101,14 +95,12 @@ void* CkCopyMsg(void **pMsg)
   return srcMsg;
 }
 
-extern "C"
 void  CkSetQueueing(void *msg, int strategy)
 {
   UsrToEnv(msg)->setQueueing((unsigned char) strategy);
 }
 
 
-extern "C"
 void* CkPriorityPtr(void *msg)
 {
 #if CMK_ERROR_CHECKING

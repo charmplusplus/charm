@@ -28,8 +28,8 @@ extern void * (*CpdDebug_mergeMemStat)(int *size, void *data, void **remoteData,
 
 CpvExtern(int, cmiArgDebugFlag);
 extern char ** memoryBackup;
-extern void CpdCheckMemory();
-extern void CpdResetMemory();
+extern void CpdCheckMemory(void);
+extern void CpdResetMemory(void);
 
 void CpdInit(void);
 void CpdFreeze(void);

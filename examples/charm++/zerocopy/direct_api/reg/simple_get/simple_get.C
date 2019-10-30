@@ -108,6 +108,7 @@ public:
     // Cast m->data as (CkNcpyBuffer *)
     CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
     src->deregisterMem();
+    delete m;
 
     if(cbCounter == 3) {
       CkPrintf("[%d][%d][%d] Get Source Done\n", thisIndex, CkMyPe(), CkMyNode());
@@ -123,6 +124,7 @@ public:
     // Cast m->data as (CkNcpyBuffer *)
     CkNcpyBuffer *dest = (CkNcpyBuffer *)(m->data);
     dest->deregisterMem();
+    delete m;
 
     if(cbCounter == 3) {
       CkPrintf("[%d][%d][%d] Get Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
@@ -153,9 +155,23 @@ public:
     CkNcpyBuffer myDest3(cArr1, size*sizeof(char), cb);
 
     // Perform Get from Index 0's sources into my destinations
-    myDest1.get(src1);
-    myDest2.get(src2);
-    myDest3.get(src3);
+    CkNcpyStatus status1 = myDest1.get(src1);
+    if(status1 == CkNcpyStatus::complete)
+      CmiPrintf("[%d][%d][%d] Get 1 is complete\n", thisIndex, CkMyPe(), CkMyNode());
+    else if(status1 == CkNcpyStatus::incomplete)
+      CmiPrintf("[%d][%d][%d] Get 1 is still incomplete\n", thisIndex, CkMyPe(), CkMyNode());
+
+    CkNcpyStatus status2 = myDest2.get(src2);
+    if(status2 == CkNcpyStatus::complete)
+      CmiPrintf("[%d][%d][%d] Get 2 is complete\n", thisIndex, CkMyPe(), CkMyNode());
+    else if(status2 == CkNcpyStatus::incomplete)
+      CmiPrintf("[%d][%d][%d] Get 2 is still incomplete\n", thisIndex, CkMyPe(), CkMyNode());
+
+    CkNcpyStatus status3 = myDest3.get(src3);
+    if(status3 == CkNcpyStatus::complete)
+      CmiPrintf("[%d][%d][%d] Get 3 is complete\n", thisIndex, CkMyPe(), CkMyNode());
+    else if(status3 == CkNcpyStatus::incomplete)
+      CmiPrintf("[%d][%d][%d] Get 3 is still incomplete\n", thisIndex, CkMyPe(), CkMyNode());
   }
 
   // Executed on Index 1

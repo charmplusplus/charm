@@ -14,7 +14,7 @@ CmiInt8 localTableSize;
 // Handle to the test driver (chare)
 CProxy_TestDriver driverProxy;
 // Handle to the communication library (group)
-CProxy_ArrayMeshStreamer<dtype, int, Updater,
+CProxy_ArrayMeshStreamer<dtype, CkArrayIndex1D, Updater,
                          SimpleMeshRouter> aggregator;
 // Number of chares per PE
 int numElementsPerPe;
@@ -36,9 +36,9 @@ public:
     localTableSize = (1l << N) / numElementsPerPe;
     tableSize = localTableSize * CkNumPes() * numElementsPerPe;
 
-    CkPrintf("Global table size   = 2^%d * %d = %lld words\n",
+    CkPrintf("Global table size   = 2^%d * %d = %" PRId64 " words\n",
              N, CkNumPes(), tableSize);
-    CkPrintf("Number of processors = %d\nNumber of updates = %lld\n",
+    CkPrintf("Number of processors = %d\nNumber of updates = %" PRId64 "\n",
              CkNumPes(), 4 * tableSize);
 
     driverProxy = thishandle;
@@ -49,7 +49,7 @@ public:
 
     // Instantiate communication library group with a handle to the client
     aggregator =
-      CProxy_ArrayMeshStreamer<dtype, int, Updater, SimpleMeshRouter>
+      CProxy_ArrayMeshStreamer<dtype, CkArrayIndex1D, Updater, SimpleMeshRouter>
       ::ckNew(numMsgsBuffered, 2, dims, updater_array, 1);
 
     delete args;
@@ -83,7 +83,7 @@ public:
   }
 
   void reportErrors(CmiInt8 globalNumErrors) {
-    CkPrintf("Found %lld errors in %lld locations (%s).\n", globalNumErrors,
+    CkPrintf("Found %" PRId64 " errors in %" PRId64 " locations (%s).\n", globalNumErrors,
              tableSize, globalNumErrors <= 0.01 * tableSize ?
              "passed" : "failed");
     CkExit();
@@ -139,7 +139,7 @@ public:
     CmiUInt8 key = HPCC_starts(4 * globalStartmyProc);
     // Get a pointer to the local communication library object
     //  from its proxy handle
-    ArrayMeshStreamer<dtype, int, Updater, SimpleMeshRouter>
+    ArrayMeshStreamer<dtype, CkArrayIndex1D, Updater, SimpleMeshRouter>
       * localAggregator = aggregator.ckLocalBranch();
 
     // Generate this chare's share of global updates

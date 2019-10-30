@@ -12,7 +12,7 @@
 #include "RotateLB.decl.h"
 #include "RotateLB.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (RotateLB, "Rotate each object to the next higher PE")
 

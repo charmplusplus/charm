@@ -9,6 +9,12 @@
 #
 ##############################################################################
 
+# Filter extra cmake arguments
+# This has no effect when building Charm++ without cmake
+if [ "$1" = "@CMAKE_C_COMPILER@" ]; then shift; fi
+if [ "$1" = "@CMAKE_CXX_COMPILER@" ]; then shift; fi
+if [ "$1" = "@CMAKE_Fortran_COMPILER@" ]; then shift; fi
+
 #Prepare aliases for the external commands we use--
 # Note that adding /bin/ to everything breaks Cygwin32.
 RM="rm -f"
@@ -45,14 +51,14 @@ OPTS=""
 #charm internal flag, only pass to c and cxx, not f90
 OPTS_CPP_INTERNAL="-D__CHARMC__=1"
 OPTS_CPP=
-OPTS_LDRO="" 
+OPTS_LDRO=""
 OPTS_CC=""
 OPTS_CC_GENCPM=""
-OPTS_CXX="" 
+OPTS_CXX=""
 OPTS_F90=""
-OPTS_LD=""  
-OPTS_PIC=""
+OPTS_LD=""
 USE_PIC="0"
+USE_PIE='0'
 
 CHARMDEBUG=""
 LINK_PYTHON=""
@@ -60,21 +66,22 @@ OBJECT=""
 EXPLICIT_OBJECT="no"
 EXPLICIT_COMPILATION="no"
 POST_LANGUAGE=""
-POST_LIBRARIES=""    
-PRE_LIBRARIES=""  
-USE_F90_LIBRARIES="0"  
-USE_F77_LIBRARIES="0"  
+POST_LIBRARIES=""
+PRE_LIBRARIES=""
+USE_F90_LIBRARIES="0"
+USE_F77_LIBRARIES="0"
 F90_MODDIR=
 AMPIMAIN=""
+AMPI=""
 AMPIF=""
-COPYTO=""        
-MODCOPIES=""        
+COPYTO=""
+MODCOPIES=""
 MODULES=""
 BALANCER=""
-FILES=""       
-OBJECTFILES=""  
-DELETE=""    
-MAINOBJ=""   
+FILES=""
+OBJECTFILES=""
+DELETE=""
+MAINOBJ=""
 GENCPM=""
 OPTIMIZE_MODE=""
 PRODUCTION_MODE=""
@@ -98,15 +105,12 @@ BUILD_SHARE="0"
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
 ROSE_OMP_TLS_GLOBALS="no"
+AMPI_FUNCPTR_SHIM='0'
 PRINT_BUILDING_BLOCKS=""
 NOABORT=""
 
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
-
-CMK_CELL=0
-SPU_USE_CPP=0
-SPU_EXTRA_LIBS=""
 
 MPI_INTEROPERATE=""
 NO_MAIN_MODULE=""
@@ -125,7 +129,7 @@ INPUT_GIVEN=""
 # Args: any additional messages
 printUsage() {
     printVersion
-    echo 
+    echo
     echo "Usage: charmc [ flags ] <files>"
     echo
     echo "  flags:"
@@ -151,7 +155,7 @@ printUsage() {
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
     echo "  Other options that are not listed here will be passed directly to the"
     echo "underlying compiler and/or linker."
-    echo "Parallel Programming Lab, UIUC, 2018."
+    echo "Parallel Programming Lab, UIUC, 2019."
     echo $*
     exit 1
 }
@@ -245,7 +249,7 @@ Debugf() {
 Debug() {
     if [ -n "$DEBUG_SCRIPT" ]
     then
-	echo 
+	echo
 	echo "------- Charmc Debugging info: $* -------"
 	echo "CHARMBIN=$CHARMBIN"
 	echo "CHARMINC=$CHARMINC"
@@ -329,7 +333,7 @@ then
 	CHARMBIN=`dirname $SCRIPT`
 #	CHARMBIN=`cd $CHARMBIN; pwd`
 # NOTE: this script no longer tries to follow soft links
-# to find the "original" charmc-- if this is bad, 
+# to find the "original" charmc-- if this is bad,
 # translate these lines to Bourne shell from C shell:
 # -------------------- Begin C Shell ------------------------->
 #    if ($SCRIPT:h != $SCRIPT:t) then
@@ -386,12 +390,12 @@ fi
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
 CHARMLIBSO=
-if test -d "$CHARMBIN/../lib_so" 
+if test -d "$CHARMBIN/../lib_so"
 then
   CHARMLIBSO=`cd $CHARMBIN/../lib_so 2>/dev/null && pwd`
   #getting absolute path is harder than thought because of symbolic links and ..
   #ksh needs cd -P to resolve werid symbolic links, however -P is not portable
-  #csh is ok too if it exists 
+  #csh is ok too if it exists
   test -z "$CHARMLIBSO" && CHARMLIBSO=`cd -P $CHARMBIN/../lib_so 2>/dev/null && pwd`
   test -z "$CHARMLIBSO" && CHARMLIBSO=`csh -c "cd $CHARMBIN/../lib_so >& /dev/null && pwd"`
   test -z "$CHARMLIBSO" && echo "$CHARMBIN/../lib_so: not found" && exit 1
@@ -437,10 +441,16 @@ do
 		SKIP_MODULEINIT="yes"
 		;;
 
+	"-isysroot")
+		# Ignore -isysroot and the following argument (macOS SDK path),
+		# which charmc can not parse (Bug #2495).
+		shift
+		;;
+
 	"-language")
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
-		"ampi") AddModules tcharmmain ampi ;;
+		"ampi") AddModules tcharmmain ampi ; AMPI="1" ;;
 		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ; AMPIF="1" ;;
 		"armci") AddModules tcharmmain armci ;;
 		"armcif") AddModules tcharmmain armci ; USE_F90_LIBRARIES="1" ;;
@@ -457,7 +467,7 @@ do
 			POST_LANGUAGE=1
 			;;
 
-		*) 
+		*)
 			LANGUAGE="$1"
 			POST_LANGUAGE=1
 			;;
@@ -518,7 +528,7 @@ do
 	"-no-trace-mpi")
 		TAU_TRACE_MPI=0
 		;;
-	
+
 	"-swapglobal"|"-swapglobals")
 		SWAPGLOBALS="1"
 		USE_PIC="1"
@@ -532,18 +542,14 @@ do
 		ROSE_OMP_TLS_GLOBALS="yes"
 		;;
 
+	"-ampi-funcptr-shim")
+		AMPI_FUNCPTR_SHIM='1'
+		USE_PIE='1'
+		;;
+
 	"-verbose")
 		echo "Verbose mode set"
 		VERBOSE=true
-		;;
-
-        "-spu-cpp")
-		SPU_USE_CPP=1
-		;;
-
-        "-spu-lib")
-		SPU_EXTRA_LIBS="$SPU_EXTRA_LIBS -l$1"
-		shift
 		;;
 
         "-intrinsic")
@@ -634,15 +640,15 @@ do
 	"-rpath-origin")
 		RPATH_ORIGIN="yes"
 		;;
-	
+
 	"-fortran"|"-flib"|"-flibs")
-		USE_F90_LIBRARIES="1" 
+		USE_F90_LIBRARIES="1"
 		;;
 	"-f77")
-		USE_F77="1" 
+		USE_F77="1"
 		;;
 	"-fortran77"|"-f77lib"|"-f77libs")
-		USE_F77_LIBRARIES="1" 
+		USE_F77_LIBRARIES="1"
 		;;
 	"-E")
 # Run preprocessor only
@@ -723,7 +729,7 @@ do
 		;;
 
 	-D*|-I*)
-		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null 
+		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null
 		then
 		  OPTS_CPP="$OPTS_CPP "\"$arg\"
 		else
@@ -786,7 +792,7 @@ do
 	-Wl,*)
 		POST_LIBRARIES="$POST_LIBRARIES $arg"
 		;;
-	
+
 	"-pg"|"-g"|-W*|-O*)
 		OPTS="$OPTS $arg"
 		;;
@@ -796,7 +802,7 @@ do
 		shift
 		;;
 
-	-l*|*.a)
+	-l*|*.a|*.so|*.so.*|*.dylib)
 		if [ -n "$POST_LANGUAGE" ]
 		then
 			POST_LIBRARIES="$POST_LIBRARIES $arg"
@@ -863,6 +869,19 @@ do
 		NOABORT="yes"
 		;;
 
+	-clear-input)
+		INPUT_GIVEN=''
+		FILES=''
+		PRE_LIBRARIES=''
+		POST_LIBRARIES=''
+		;;
+
+	# compatibility with libtool
+	-install_name|-current_version|-compatibility_version)
+		OPTS="$OPTS -Wl,$arg,$1"
+		shift
+		;;
+
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
@@ -887,6 +906,12 @@ trap 'End 1' 2
 # Process original command-line arguments
 eval processArgs "$@"
 
+# Do not skip linking if user explicitly specified an output file
+# This allows generating dependencies while compiling
+if [ "$GENDEPENDS" = "yes" -a "$EXPLICIT_OBJECT" = "yes" ]; then
+	SKIPLINK=""
+fi
+
 USER_POST_LIBRARIES="$POST_LIBRARIES"
 USER_PRE_LIBRARIES="$PRE_LIBRARIES"
 
@@ -897,10 +922,6 @@ do
 
 	case "$FILE" in
 	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
-		# make sure to link against shared charm library if creating a shared object:
-		case "$FILE" in
-			*.so|*.so.*|*.dylib) CHARM_SHARED=1 ;;
-		esac
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
 	*.c|*.s|*.S|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
@@ -944,7 +965,7 @@ Debug "Read config script, setting defaults..."
 
 Debug "Setting vars..."
 
-if [ "$USE_BUILD_OPTIONS" = "1" ]  
+if [ "$USE_BUILD_OPTIONS" = "1" ]
 then
 	[ -n "$VERBOSE" ] && echo "Charmc applying build time options: $BUILDOPTS"
 	OPTS="$OPTS $BUILDOPTS"
@@ -1016,9 +1037,17 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs -ftls-model=initial-exec"
-    OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs -ftls-model=initial-exec"
-    OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs -ftls-model=initial-exec"
+    TLSGLOBALS_OPTS='-ftls-model=initial-exec'
+    [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" = '1' ] && TLSGLOBALS_OPTS="$TLSGLOBALS_OPTS -mno-tls-direct-seg-refs"
+    OPTS_CC="$OPTS_CC $TLSGLOBALS_OPTS"
+    OPTS_CXX="$OPTS_CXX $TLSGLOBALS_OPTS"
+    OPTS_F90="$OPTS_F90 $TLSGLOBALS_OPTS"
+fi
+
+if [ "$AMPI_FUNCPTR_SHIM" = '1' ]
+then
+    OPTS_CC="$OPTS_CC -DAMPI_USE_FUNCPTR"
+    OPTS_CXX="$OPTS_CXX -DAMPI_USE_FUNCPTR"
 fi
 
 # Look up and add the dependencies for module $1
@@ -1087,23 +1116,39 @@ then
 	USE_PIC="1"
 fi
 
-OPTS_PIC="$CMK_PIC"
 if [ "$USE_PIC" = "1" ]
 then
-       OPTS_CC="$OPTS_CC $OPTS_PIC"
-       OPTS_CXX="$OPTS_CXX $OPTS_PIC"
-       OPTS_F90="$OPTS_F90 $OPTS_PIC"
-       OPTS_LD="$OPTS_LD $OPTS_PIC"
+       OPTS_CC="$OPTS_CC $CMK_PIC"
+       OPTS_CXX="$OPTS_CXX $CMK_PIC"
+       OPTS_F90="$OPTS_F90 $CMK_PIC"
+       OPTS_LD="$OPTS_LD $CMK_PIC"
+fi
+
+if [ "$USE_PIE" = "1" ]
+then
+       OPTS_CC="$OPTS_CC $CMK_PIE"
+       OPTS_CXX="$OPTS_CXX $CMK_PIE"
+       OPTS_F90="$OPTS_F90 $CMK_PIE"
+       OPTS_LD="$OPTS_LD $CMK_PIE"
 fi
 
 if [ "$BUILD_SHARE" = "1" ]
 then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
-	*.a|*.so|*.so.*|*.sl|*.dylib)
- 		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
+	*.a)
+		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
+		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
 		;;
-	*)	
+	*.so|*.so.*|*.sl|*.dylib)
+		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
+		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
+		if [ "$CMK_MACOSX" = "1" -a -z "$STANDALONE" ]; then
+			fname=`basename $OBJECT`
+			OPTS_LD="$OPTS_LD -Wl,-install_name,$CHARMLIBSO/$fname"
+		fi
+		;;
+	*)
 		BUILD_SHARE="0"
 		;;
 	esac
@@ -1176,8 +1221,8 @@ then
     CMK_CC="$CMK_SEQ_CC"
     CMK_LD="$CMK_SEQ_LD"
     CMK_CXX="$CMK_SEQ_CXX"
-    CMK_CF90="$CMK_SEQ_F90 " 
-    CMK_LDXX="$CMK_SEQ_LDXX" 
+    CMK_CF90="$CMK_SEQ_F90 "
+    CMK_LDXX="$CMK_SEQ_LDXX"
     CMK_AR="$CMK_SEQ_AR"
     CMK_RANLIB="$CMK_SEQ_RANLIB"
 
@@ -1189,10 +1234,10 @@ fi
 
 if [ -n "$NATIVE" ]
 then
-    CMK_CC="$CMK_NATIVE_CC " 
-    CMK_LD="$CMK_NATIVE_LD" 
-    CMK_CXX="$CMK_NATIVE_CXX " 
-    CMK_LDXX="$CMK_NATIVE_LDXX" 
+    CMK_CC="$CMK_NATIVE_CC "
+    CMK_LD="$CMK_NATIVE_LD"
+    CMK_CXX="$CMK_NATIVE_CXX "
+    CMK_LDXX="$CMK_NATIVE_LDXX"
 
     CMK_CC_FLAGS="$CMK_NATIVE_CC_FLAGS"
     CMK_LD_FLAGS="$CMK_NATIVE_LD_FLAGS"
@@ -1249,7 +1294,7 @@ then
   echo "include $TAU_MAKEFILE" > _make.tau.tmp
   echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
   TAU_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_LIBS`
-  TAU_MPI_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS` 
+  TAU_MPI_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS`
   TAU_MPI_FLIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS`
   TAU_DEFS=`make --no-print-directory -f _make.tau.tmp print-TAU_DEFS`
   TAU_INCLUDE=`make --no-print-directory -f _make.tau.tmp print-TAU_INCLUDE`
@@ -1263,7 +1308,7 @@ OPTS_CXX="$OPTS $TAU_DEFS $TAU_INCLUDE $OPTS_CXX"
 OPTS_F90="$OPTS $OPTS_F90"
 OPTS_LD="$OPTS $OPTS_LD"
 
-# There's really no analog for this in the Bourne shell: 
+# There's really no analog for this in the Bourne shell:
 #  -------- C Shell ------> onintr failure
 # Luckily, it's irrelevant as long as nobody sends us a ^Z.
 
@@ -1274,7 +1319,7 @@ OPTS_LD="$OPTS $OPTS_LD"
 ##############################################################################
 Debug "Checking language..."
 
-[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE=c
+[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE='c++'
 [ -z "$PARADIGM" -a -n "$LANGUAGE" ] && PARADIGM="$LANGUAGE"
 [ -z "$PARADIGM" ] && PARADIGM="charm++"
 
@@ -1340,37 +1385,14 @@ case "$PARADIGM" in
 	;;
 esac
 
-# DMK - ACCEL SUPPORT - If this is a cell build, add the spe code object to POST_LIBRARIES
-if [ $CMK_CELL -eq 1 ]
-then
-
-  if [ "$PARADIGM" = "converse++" ]
-  then
-    # Include a "do nothing" register_accel_spe_funcs() function
-    POST_LIBRARIES="$POST_LIBRARIES -lnoAccelStub"
-  fi
-
-  if [ "$PARADIGM" = "charm++" ]
-  then
-
-    if [ $SPU_USE_CPP -eq 1 ]
-    then
-        SPU_COMPILER=$CMK_SPU_CXX
-        SPU_LINKER=$CMK_SPU_LDXX
-    else
-        SPU_COMPILER=$CMK_SPU_CC
-        SPU_LINKER=$CMK_SPU_LD
-    fi
-
-    # Include the spe object file for linking into main executable
-    POST_LIBRARIES="$POST_LIBRARIES main__funcLookup__.genSPECode.ppe.o"
-
-  fi
-fi
-
 if [ "$AMPIMAIN" != "" ]
 then
 	OBJECTFILES="$CHARMLIB/lib$AMPIMAIN.o $OBJECTFILES"
+fi
+
+if [ -n "$AMPI" ]
+then
+  CMK_SYSINC="-I$CHARMINC/ampi $CMK_SYSINC"
 fi
 
 if [ "$TLSGLOBALS" = "1" ]
@@ -1380,13 +1402,13 @@ then
       echo "Error: -tlsglobals is not supported with the uth machine layer."
       exit 1
     fi
-    if ! `$CMK_CC --version | grep -q gcc`
+    if [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" != '1' ] && [ "$CMK_COMPILER" != 'clang' -o "$CMK_MACOSX" != '1' ]
     then
-      echo "Warning: -tlsglobals may not work with compilers other than GCC."
+      echo "Warning: -tlsglobals may not work with compilers that do not recognize -mno-tls-direct-seg-refs."
     fi
-    if ! `$CMK_LD -Wl,--version,-v 2>&1 | grep -q elf`
+    if [ "$CMK_HAS_ELF_H" != '1' -a "$CMK_MACOSX" != '1' ]
     then
-      echo "Warning: -tlsglobals may not work with a linker that does not report ELF support."
+      echo "Warning: -tlsglobals requires elf.h"
     fi
 fi
 
@@ -1521,11 +1543,7 @@ then
 fi
 if [ "$TLSGLOBALS"  = "1" ]
 then
-    # make sure we don't add an extra -tls
-  if ! echo $THREAD | grep '\-tls$' > /dev/null 2> /dev/null
-  then
-    THREAD=${THREAD}-tls
-  fi
+  THREAD=${THREAD%-tls}-tls
 fi
 
 THREAD_OBJ="-lthreads-${THREAD}"
@@ -1566,7 +1584,7 @@ fi
 
 if [ "$BUILD_SHARE" = "0" ]
 then
-       MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
+       MIDDLE_LIBS="$MEM_OBJ $THREAD_OBJ $MIDDLE_LIBS"
 fi
 
 CMK_SYSLIBS="$CMK_SYSLIBS -lm"
@@ -1608,13 +1626,9 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"converse")
-	MAKE_LD="1"
-	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
-	;;
-"converse++"|"bgconverse++"|"bluegene"|"bigsim")
+"converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
+	MIDDLE_LIBS="-lconv-core $MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
 "c"|"C"|"c++"|"C++"|"f90"|"f77")
   ;;
@@ -1744,14 +1758,14 @@ fi
 
 
 Copyobj() {
-	if [ "a$COPYTO" != "a" -a "a$COPYTO" != "a$OBJECT" ] 
+	if [ "a$COPYTO" != "a" -a "a$COPYTO" != "a$OBJECT" ]
 	then
 		[ -d $COPYTO ] && COPYTO="$COPYTO/"
 		if [ "a$PROG_EXT" != "a" -a -r "$OBJECT$PROG_EXT" ] ; then
 			Warning "Appending $PROG_EXT to object file name"
 			OBJECT="$OBJECT$PROG_EXT"
 		fi
-		[ ! -d $COPYTO ] && DoNoErrCheck $RM $COPYTO 
+		[ ! -d $COPYTO ] && DoNoErrCheck $RM $COPYTO
 		Do $CP $OBJECT $COPYTO
 	fi
 	test -n "$COPY_EXIT" && Success
@@ -1760,7 +1774,7 @@ Copyobj() {
 Copymod() {
 	for COPY in `echo $MODCOPIES`
 	do
-		if [ "a$COPY" != "a$OBJECT" ] 
+		if [ "a$COPY" != "a$OBJECT" ]
 		then
 			[ -d $COPY ] && COPY="$COPY/"
 			if [ -n "$CMK_MOD_NAME_ALLCAPS" ] ; then
@@ -1770,7 +1784,7 @@ Copymod() {
 			  Warning "Appending .$CMK_MOD_EXT to object file name"
 			  OBJECT="$OBJECT.$CMK_MOD_EXT"
 			fi
-			[ ! -d $COPY ] && DoNoErrCheck $RM $COPY 
+			[ ! -d $COPY ] && DoNoErrCheck $RM $COPY
 			Do $CP $OBJECT $COPY
 		fi
 	done
@@ -1813,6 +1827,15 @@ done
 
 Debug "About to compile..."
 
+# Filter spurious cmake arguments
+# CHARM_CXX_FLAGS=`echo $CHARM_CXX_FLAGS | sed s,"$CMK_CXX",,g `
+# CHARM_CC_FLAGS=`echo $CHARM_CC_FLAGS | sed s,"$CMK_CC",,g `
+# CMK_CF90_COMPONLY=`echo $CMK_CF90 | awk '{print $1}'`
+# FILES=`echo $FILES | sed s,"$CMK_CF90_COMPONLY",,g`
+# OPTS_F90=`echo $OPTS_F90 | sed s,"$CMK_CF90_COMPONLY",,g`
+
+# echo $CHARM_CC_FLAGS
+
 for FILE in $FILES
 do
 	BASE=`stripExtention \`basename $FILE\``
@@ -1824,8 +1847,8 @@ do
 	# in case of: charmc -o object.o -c foo.c,
 	# avoid foo.c => remove foo.o => foo.o => object.o,
 	# instead generate object.o directly.
- 	# remove and generate foo.o may be dangerous in parallel make 
-	# for example in the case of compiling several objs from one 
+ 	# remove and generate foo.o may be dangerous in parallel make
+	# for example in the case of compiling several objs from one
 	# same c file such as memory.C.
 	if [ $numFiles = 1 -a -n "$OBJECT" ]
 	then
@@ -1842,10 +1865,10 @@ do
         case "$FILE_EXT" in
         .c|.s|.S|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[ $VERBOSE ] && echo "Compiling $FILE"
-		DoNoErrCheck $RM $BASEO $BASE.f.o
+		DoNoErrCheck $RM $BASEO `stripExtention $BASEO`.f.o
         esac
 #	fi
-	if [ ! -z "$SKIPLINK" ] 
+	if [ ! -z "$SKIPLINK" ]
 	then
 		DESTO=""
 	fi
@@ -1960,11 +1983,11 @@ MakeSO() {
 	dir=`cd $dir; pwd`
 	OBJECT=$dir/$fname
 	fi
-	if test "$MAKE_LDXX" = "1"
+	if test "$MAKE_LD" = '1'
 	then
-	  soTool="$CMK_LDXX $CMK_LDXX_FLAGS"
-	else
 	  soTool="$CMK_LD $CMK_LD_FLAGS"
+	else
+	  soTool="$CMK_LDXX $CMK_LDXX_FLAGS"
 	fi
 	if [ -n "$STANDALONE" ]
 	then
@@ -2003,7 +2026,7 @@ MakeSO() {
 	Copyobj
 }
 
-if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ] 
+if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ]
 then
 # We have no target object, or are playing preprocessor tricks-- just end
 	Debugf "No target object-- finished"
@@ -2056,10 +2079,10 @@ case "$OBJECT" in
 	  COPYTO_SAVE=$COPYTO
 	  if [ -z "$COPYTO" ]
 	  then
-	    DESTDIR=`echo $OBJECT | sed -e 's@lib/[^/]*\.a$@lib_so@'`
-	    OBJECT=`echo $OBJECT | sed -e 's@lib/\([^/]*\)\.a$@lib_so/\1.a@'`
+	    DESTDIR=`echo $OBJECT | sed -e 's,lib/[^/]*\.a$,lib_so,'`
+	    OBJECT=`echo $OBJECT | sed -e 's,lib/\([^/]*\)\.a$,lib_so/\1.a,'`
 	  else
-	    COPYTO=`echo $COPYTO | sed -e 's@lib[/]*$@lib_so@'`
+	    COPYTO=`echo $COPYTO | sed -e 's,lib[/]*$,lib_so,'`
 	    DESTDIR=$COPYTO
 	  fi
 	  OBJECT=`echo $OBJECT | sed -e 's/\.a$/.'"$CMK_SHARED_SUF"'/'`
@@ -2078,20 +2101,6 @@ esac
 fi
 # If the above case returns, we're not creating a .o or .a file,
 # so linking is needed.
-
-if [ $CMK_CELL -eq 1 ]
-then
-
-  if [ "$PARADIGM" = "charm++" ]
-  then
-
-    # Make the spe object file to be included
-    Do $SPU_COMPILER -c -I$CHARMINC $CMK_SYSINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
-    Do $SPU_LINKER -L$CHARMLIB -o main__funcLookup__.genSPECode main__funcLookup__.genSPECode.o $CMK_SPERT_LIBS $SPU_EXTRA_LIBS
-    Do $CMK_PPU_EMBEDSPU spert_main main__funcLookup__.genSPECode main__funcLookup__.genSPECode.ppe.o
-
-  fi
-fi
 
 # check if we're linking a sequential object
 case "$LANGUAGE" in
@@ -2349,7 +2358,7 @@ then
   if [ -x $CHARMBIN/$targ ]
   then
 	DoNoErrCheck $RM $targ
-	DoNoErrCheck $CP $CHARMBIN/$targ $targ
+	DoNoErrCheck $CP $CHARMBIN/$targ $targ 2> /dev/null
   fi
 fi
 

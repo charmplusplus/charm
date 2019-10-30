@@ -22,7 +22,10 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o charmrun *~ kNeighbor kNeighbor.prj
 
 test: all
+	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer RefineLB +LBDebug 1 )
 	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer GreedyLB +LBDebug 1 )
+	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer GreedyRefineLB +LBDebug 1 )
+	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer DistributedLB +LBDebug 1 )
 
 bgtest: all
 	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer GreedyLB +x2 +y2 +z1 +cth1 +wth1 +LBDebug 1 )

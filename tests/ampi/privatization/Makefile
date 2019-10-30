@@ -1,4 +1,5 @@
 -include ../../common.mk
+-include ../../../include/conv-mach-opt.mak
 AMPICC=../../../bin/ampicxx $(OPTS)
 AMPIF90=../../../bin/ampif90 $(OPTS)
 
@@ -14,6 +15,8 @@ VARIANTS := \
   swapglobals \
   tlsglobals \
   roseomptlsglobals \
+  fsglobals \
+  pipglobals \
 
 
 # for determining `all`, `test` rules
@@ -21,22 +24,28 @@ CANDIDATES := \
   swapglobals \
   tlsglobals \
 
+# Don't enable these for universal testing because they are not 100% portable to all platforms and toolchain versions.
+# ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
+#   CANDIDATES += fsglobals
+# endif
+# ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
+#   CANDIDATES += pipglobals
+# endif
+
 
 # Define what options to pass to charmc for each method.
+$(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(eval OPTS_$j_$i := -$i)))
 OPTS_cxx_control :=
-OPTS_cxx_swapglobals := -swapglobals
-OPTS_cxx_tlsglobals := -tlsglobals
-OPTS_cxx_roseomptlsglobals := -roseomptlsglobals
 OPTS_f90_control :=
-OPTS_f90_swapglobals := -swapglobals
-OPTS_f90_tlsglobals := -tlsglobals -fopenmp
-OPTS_f90_roseomptlsglobals := -roseomptlsglobals
+OPTS_f90_tlsglobals += -fopenmp
 
 # Define the features that each privatization method supports.
-FEATURES_cxx_control := staticvars sharedlib dynamiclib
-FEATURES_cxx_swapglobals :=
-FEATURES_cxx_tlsglobals := staticvars sharedlib
-FEATURES_cxx_roseomptlsglobals := staticvars sharedlib
+FEATURES_cxx_control := migration staticvars sharedlib dynamiclib
+FEATURES_cxx_swapglobals := migration
+FEATURES_cxx_tlsglobals := migration staticvars sharedlib
+FEATURES_cxx_roseomptlsglobals := migration staticvars sharedlib
+FEATURES_cxx_fsglobals := staticvars
+FEATURES_cxx_pipglobals := staticvars sharedlib
 
 
 # Determine which methods to test in the current environment and target.
@@ -61,6 +70,12 @@ endef
 $(foreach i,$(CANDIDATES),$(eval $(call TEST_TARGET_AVAILABILITY,$i)))
 
 
+# Universal settings
+LINKOPTS := -module CommonLBs -balancer RandCentLB
+
+
+# Rule construction
+
 EMPTY_MESSAGE := "No privatization methods supported for current AMPI target."
 
 all: $(foreach i,$(TARGETS),$i)
@@ -84,10 +99,10 @@ $1: $$(foreach j,$$(LANGUAGES),$$j-$1)
 
 # link
 cxx-$1: $1-test.o $1-test-cxx.o cxx-$1-other-object.o | libcxx-$1-static-library.a $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,libcxx-$1-shared-library.so) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,libcxx-$1-shared-library-dynamic.so)
-	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) $$^ -balancer RotateLB -rpath-origin -L. -lcxx-$1-static-library $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,-lcxx-$1-shared-library) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,-ldl)
+	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) $$^ $$(LINKOPTS) -rpath-origin -L. -lcxx-$1-static-library $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,-lcxx-$1-shared-library) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,-ldl)
 
 f90-$1: $1-test.o $1-test-f90.o
-	$$(AMPIF90) -o $$@ $$(OPTS_f90_$1) $$^ -balancer RotateLB
+	$$(AMPIF90) -o $$@ $$(OPTS_f90_$1) $$^ $$(LINKOPTS)
 
 libcxx-$1-%.so: cxx-$1-%-so.o
 	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) -shared -standalone $$<
@@ -129,8 +144,10 @@ tlsglobals-test-f90.o: test-f90-tlsglobals.f90
 	$(AMPIF90) -o $@ $(OPTS_f90_tlsglobals) -c $<
 
 
+FUNCPTR_SHIM_SUFFIX := .user
+
 clean:
-	rm -f *.o *.a *.so $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$j-$i)) charmrun ampirun
+	rm -f *.o *.a *.so *.mod $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(strip $j-$i $(wildcard $j-$i$(FUNCPTR_SHIM_SUFFIX)*)))) charmrun ampirun
 
 .SUFFIXES:
 .PHONY: all test everything test-everything $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i) test-$i $i)

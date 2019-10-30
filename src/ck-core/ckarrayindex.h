@@ -276,6 +276,10 @@ public:
 		{ return (CkArray *)CkLocalBranch(_gid); }
 	static CkArray *CkLocalBranch(CkArrayID id)
 		{ return (CkArray *)::CkLocalBranch(id); }
+	CkArray *ckLocalBranchOther(int rank) const
+		{ return (CkArray *)CkLocalBranchOther(_gid, rank); }
+	static CkArray *CkLocalBranchOther(CkArrayID id, int rank)
+		{ return (CkArray *)::CkLocalBranchOther(id, rank); }
 	void pup(PUP::er &p) {p | _gid; }
 	bool operator == (const CkArrayID& other) const {
 		return (_gid == other._gid);

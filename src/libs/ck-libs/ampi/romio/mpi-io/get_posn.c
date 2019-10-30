@@ -1,12 +1,12 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
  */
 
 #include "mpioimpl.h"
+#include "adioi.h"
 
 #ifdef HAVE_WEAK_SYMBOLS
 
@@ -17,6 +17,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_get_position as PMPI_File_get_position
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_get_position(MPI_File fh, MPI_Offset *offset) __attribute__((weak,alias("PMPI_File_get_position")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -39,32 +41,19 @@ Output Parameters:
 @*/
 int MPI_File_get_position(MPI_File fh, MPI_Offset *offset)
 {
-#ifndef PRINT_ERR_MSG
     int error_code;
+    ADIO_File adio_fh;
     static char myname[] = "MPI_FILE_GET_POSITION";
-#endif
 
-#ifdef PRINT_ERR_MSG
-    if ((fh <= (MPI_File) 0) || (fh->cookie != ADIOI_FILE_COOKIE)) {
-	FPRINTF(stderr, "MPI_File_get_position: Invalid file handle\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-#else
-    ADIOI_TEST_FILE_HANDLE(fh, myname);
-#endif
+    adio_fh = MPIO_File_resolve(fh);
 
-    if (fh->access_mode & MPI_MODE_SEQUENTIAL) {
-#ifdef PRINT_ERR_MSG
-	FPRINTF(stderr, "MPI_File_get_position: Can't use this function because file was opened with MPI_MODE_SEQUENTIAL\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_UNSUPPORTED_OPERATION, MPIR_ERR_AMODE_SEQ,
-				     myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);
-#endif
-    }
+    /* --BEGIN ERROR HANDLING-- */
+    MPIO_CHECK_FILE_HANDLE(adio_fh, myname, error_code);
+    MPIO_CHECK_NOT_SEQUENTIAL_MODE(adio_fh, myname, error_code);
+    /* --END ERROR HANDLING-- */
 
-    ADIOI_Get_position(fh, (ADIO_Offset*)offset);
+    ADIOI_Get_position(adio_fh, offset);
 
+fn_exit:
     return MPI_SUCCESS;
 }

@@ -1,12 +1,16 @@
-# Temporary hack that needs to be removed / replaced
 -include ../include/conv-mach-opt.mak
+
+# Temporary hack that needs to be removed / replaced
 OPTS += $(OPTSATBUILDTIME)
 
 DIRS = \
-  util \
   charm++ \
-  converse \
   ampi \
+
+# TODO #2467: eliminate the need for this
+ifneq ($(BUILD_CUDA),1)
+  DIRS += converse util
+endif
 
 BGDIRS = \
   charm++ \
@@ -24,7 +28,7 @@ test: $(foreach i,$(TESTDIRS),test-$i)
 
 bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
 
-syncfttest causalfttest mpisyncfttest mlogfttest: $(foreach i,$(filter $(FTDIRS),$(TESTDIRS)),test-$i)
+syncfttest mpisyncfttest : $(foreach i,$(filter $(FTDIRS),$(TESTDIRS)),test-$i)
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#

@@ -46,7 +46,9 @@ do
 		;;
 	++quiet)
 		QUIET=1
-		args=$args" "$1
+		;;
+	++no-quiet)
+		QUIET=0
 		;;
   --pernode)
     pernode=$2
@@ -59,6 +61,8 @@ do
 	shift
 done
 
+
+test $QUIET -eq 1 && args=$args" "++quiet
 
 test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
 

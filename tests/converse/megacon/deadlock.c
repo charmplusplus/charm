@@ -40,6 +40,7 @@ void deadlock_cram(char *msg)
 void deadlock_init()
 {
   char msg[CmiMsgHeaderSizeBytes]={0};
+  CmiInitMsgHeader(msg, sizeof(struct incmsg_s));
   if (CmiNumPes()<2) {
     CmiPrintf("warning: need 2 processors for deadlock-test, skipping.\n");
     Cpm_megacon_ack(CpmSend(0));

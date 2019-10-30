@@ -8,8 +8,8 @@ $(LIBDIR)/libcms.a: cms.o
 	rm -f ../../../../include/cms.h
 	cp cms.h ../../../../include
 
-cms.o: cms.c
-	$(CHARMC) -c cms.c
+cms.o: cms.C
+	$(CHARMC) -c cms.C
 
 clean:
 	rm -f *.o $(LIBDIR)/libcms.a

@@ -1,11 +1,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-// specify the version of the UNIX APIs that we want to use (for ucontext headers)
-#define _XOPEN_SOURCE                                       
-
 #define CMK_AMD64                                          1
-#define CMK_64BIT    1
+#define CMK_64BIT                                          1
 #define CMK_CONVERSE_MPI                                   1
 
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
@@ -54,15 +51,15 @@
 #define CMK_TIMER_USE_TIMES                                0
 
 
-#define CMK_DEBUG_MODE					   0 
+#define CMK_DEBUG_MODE                                     0
 #define CMK_WEB_MODE                                       1
 
-#define CMK_LBDB_ON					   1
+#define CMK_LBDB_ON                                        1
 
-#undef CMK_STACKSIZE_DEFAULT				 
-#define CMK_STACKSIZE_DEFAULT				   262144
+#undef CMK_STACKSIZE_DEFAULT
+#define CMK_STACKSIZE_DEFAULT                              262144
 
-//#define CMK_NO_ISO_MALLOC				   1
+//#define CMK_NO_ISO_MALLOC                                1
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0

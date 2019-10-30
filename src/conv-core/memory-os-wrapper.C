@@ -17,23 +17,23 @@
 
 struct mallinfo;
 
-extern "C" void * (*mm_malloc)(size_t);
-extern "C" void * (*mm_calloc)(size_t,size_t);
-extern "C" void * (*mm_realloc)(void*,size_t);
-extern "C" void * (*mm_memalign)(size_t,size_t);
-extern "C" int (*mm_posix_memalign)(void **,size_t,size_t);
-extern "C" void * (*mm_aligned_alloc)(size_t,size_t);
-extern "C" void * (*mm_valloc)(size_t);
-extern "C" void * (*mm_pvalloc)(size_t);
-extern "C" void (*mm_free)(void*);
-extern "C" void (*mm_cfree)(void*);
-extern "C" struct mallinfo (*mm_mallinfo)(void);
+extern void * (*mm_malloc)(size_t);
+extern void * (*mm_calloc)(size_t,size_t);
+extern void * (*mm_realloc)(void*,size_t);
+extern void * (*mm_memalign)(size_t,size_t);
+extern int (*mm_posix_memalign)(void **,size_t,size_t);
+extern void * (*mm_aligned_alloc)(size_t,size_t);
+extern void * (*mm_valloc)(size_t);
+extern void * (*mm_pvalloc)(size_t);
+extern void (*mm_free)(void*);
+extern void (*mm_cfree)(void*);
+extern struct mallinfo (*mm_mallinfo)(void);
 
   
 extern char initialize_memory_wrapper_status;
 char initialize_memory_wrapper_status;
 
-extern "C" void initialize_memory_wrapper() {
+void initialize_memory_wrapper() {
   initialize_memory_wrapper_status = 1;
 
   // wait to install these all at once because dlsym calls them, and a mismatch would be bad

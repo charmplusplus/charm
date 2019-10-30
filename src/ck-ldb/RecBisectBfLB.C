@@ -37,7 +37,7 @@ extern "C" {
   void destroySet(BV_Set* s);
 }
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(RecBisectBfLB, "Recursive partitioning with Breadth first enumeration")
 

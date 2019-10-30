@@ -37,8 +37,8 @@ public:
 
 public:
   TraceSummaryBOC(void): count(0), bins(NULL), nBins(0), 
-    nTracedPEs(0), nextBinIndexCcs(0), firstTime(true) {};
-  TraceSummaryBOC(CkMigrateMessage *m):CBase_TraceSummaryBOC(m) {};
+    nTracedPEs(0), firstTime(true), nextBinIndexCcs(0) {}
+  TraceSummaryBOC(CkMigrateMessage *m):CBase_TraceSummaryBOC(m) {}
   void startSumOnly();
   void askSummary(int size);
   void sendSummaryBOC(double *results, int n);

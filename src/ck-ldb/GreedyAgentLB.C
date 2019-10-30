@@ -14,7 +14,7 @@
 
 #define LOAD_OFFSET 0.05
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(GreedyAgentLB,"always assign the heaviest obj onto lightest loaded processor taking into account the topology")
 
@@ -205,7 +205,7 @@ void GreedyAgentLB::work(LDStats* stats)
 
 	max_neighbors = topologyAgent->topo->max_neighbors();
 	
-  if (_lb_args.debug()) CkPrintf("In GreedyAgentLB strategy\n",CkMyPe());
+  if (_lb_args.debug()) CkPrintf("[%d] In GreedyAgentLB strategy\n",CkMyPe());
 
   heapSize--;
 	

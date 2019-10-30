@@ -1,5 +1,9 @@
 DIRS = \
+  hello \
   stencil3d \
+  kNeighbor \
+
+BGDIRS = \
   kNeighbor \
 
 TESTDIRS = $(DIRS)
@@ -8,7 +12,7 @@ all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 
-bgtest: $(foreach i,$(TESTDIRS),bgtest-$i)
+bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#

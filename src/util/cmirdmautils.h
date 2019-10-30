@@ -19,7 +19,8 @@ typedef struct ncpystruct{
   char *srcAck;
   int srcAckSize;
   int srcSize;
-  unsigned short int srcMode;
+  unsigned short int srcRegMode;
+  unsigned short int srcDeregMode;
   unsigned short int isSrcRegistered;
   const void *srcRef;
 
@@ -30,19 +31,33 @@ typedef struct ncpystruct{
   char *destAck;
   int destAckSize;
   int destSize;
-  unsigned short int destMode;
+  unsigned short int destRegMode;
+  unsigned short int destDeregMode;
   unsigned short int isDestRegistered;
   const void *destRef;
 
+  unsigned char opMode; // CMK_DIRECT_API for p2p direct api
+                        // CMK_DIRECT_API_REVERSE for p2p direct api with inverse operation
+                        // CMK_EM_API for p2p entry method api
+                        // CMK_EM_API_REVERSE for p2p entry method api with inverse operation
+
   // Variables used for ack handling
-  int ackMode; // 0 for call both src and dest acks
-               // 1 for call just src ack
-               // 2 for call just dest ack
-  int freeMe; // 1 for free, 0 for do not free
+  unsigned char ackMode; // CMK_SRC_DEST_ACK for call both src and dest acks
+                         // CMK_SRC_ACK for call just src ack
+                         // CMK_DEST_ACK for call just dest ack
+
+  unsigned char freeMe;  // CMK_FREE_NCPYOPINFO in order to free NcpyOperationInfo
+                         // CMK_DONT_FREE_NCPYOPINFO in order to not free NcpyOperationInfo
+
+  void *refPtr;
 
   int ncpyOpInfoSize;
 
 }NcpyOperationInfo;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int getNcpyOpInfoTotalSize(
   int srcLayerSize,
@@ -57,7 +72,8 @@ void setNcpyOpInfo(
   char *srcAck,
   int srcAckSize,
   int srcSize,
-  unsigned short int srcMode,
+  unsigned short int srcRegMode,
+  unsigned short int srcDeregMode,
   unsigned short int isSrcRegistered,
   int srcPe,
   const void *srcRef,
@@ -67,11 +83,19 @@ void setNcpyOpInfo(
   char *destAck,
   int destAckSize,
   int destSize,
-  unsigned short int destMode,
+  unsigned short int destRegMode,
+  unsigned short int destDeregMode,
   unsigned short int isdestRegistered,
   int destPe,
   const void *destRef,
   NcpyOperationInfo *ncpyOpInfo);
 
 void resetNcpyOpInfoPointers(NcpyOperationInfo *ncpyOpInfo);
+
+void setReverseModeForNcpyOpInfo(NcpyOperationInfo *ncpyOpInfo);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

@@ -132,7 +132,7 @@ typedef int *NetFEMF;
 
 /*----------------------------------------------
 All NetFEM calls must be between a Begin and End pair:*/
-CDECL NetFEM NetFEM_Begin(
+CLINKAGE NetFEM NetFEM_Begin(
 	int source,/*Integer ID for the source of this data (need not be sequential)*/
 	int timestep,/*Integer ID for this instant (need not be sequential)*/
 	int dim,/*Number of spatial dimensions (2 or 3)*/
@@ -145,12 +145,12 @@ CDECL NetFEM NetFEM_Begin(
 	//FIXME: actually use source
 	return (NetFEM)(new NetFEM_updatePackage(source,timestep,dim,flavor));
 }
-FDECL NetFEMF FTN_NAME(NETFEM_BEGIN,netfem_begin)(int *s,int *t,int *d,int *f)
+FLINKAGE NetFEMF FTN_NAME(NETFEM_BEGIN,netfem_begin)(int *s,int *t,int *d,int *f)
 {
 	return (NetFEMF)NetFEM_Begin(*s,*t,*d,*f);
 }
 
-CDECL void NetFEM_End(NetFEM n) { /*Publish these updates*/
+CLINKAGE void NetFEM_End(NetFEM n) { /*Publish these updates*/
 	NETFEMAPI("NetFEM_End");
 	if (N->getFlavor().doWrite) 
 	{ /* Write data to disk, in file named "NetFEM/<timestep>/<vp>.dat" */
@@ -176,7 +176,7 @@ CDECL void NetFEM_End(NetFEM n) { /*Publish these updates*/
 	}
 	getState()->add(N);
 }
-FDECL void FTN_NAME(NETFEM_END,netfem_end)(NetFEMF nf) {
+FLINKAGE void FTN_NAME(NETFEM_END,netfem_end)(NetFEMF nf) {
 	NetFEM_End((NetFEM)NF);
 }
 
@@ -185,7 +185,7 @@ FDECL void FTN_NAME(NETFEM_END,netfem_end)(NetFEMF nf) {
    In 3D, node i has location (loc[3*i+0],loc[3*i+1],loc[3*i+2])
 */
 
-CDECL void NetFEM_Nodes_field(NetFEM n,int nNodes,
+CLINKAGE void NetFEM_Nodes_field(NetFEM n,int nNodes,
 		int init_offset,int distance,
 		const void *loc,const char *name) 
 {
@@ -195,18 +195,18 @@ CDECL void NetFEM_Nodes_field(NetFEM n,int nNodes,
 		CkShiftPointer((double *)loc,init_offset),name));
 }
 
-FDECL void FTN_NAME(NETFEM_NODES_FIELD,netfem_nodes_field)
+FLINKAGE void FTN_NAME(NETFEM_NODES_FIELD,netfem_nodes_field)
 	(NetFEMF nf,int *nNodes,int *off,int *dist,const void *loc,FTN_STR_DECL)
 {
 	CkShortStr s=FTN_STR;
 	NetFEM_Nodes_field((NetFEM)NF,*nNodes,*off,*dist,loc,s);
 }
 
-CDECL void NetFEM_Nodes(NetFEM n,int nNodes,const double *loc,const char *name) {
+CLINKAGE void NetFEM_Nodes(NetFEM n,int nNodes,const double *loc,const char *name) {
 	NetFEM_Nodes_field(n,nNodes,0,N->getDim()*sizeof(double),loc,name);
 }
 
-FDECL void FTN_NAME(NETFEM_NODES,netfem_nodes)
+FLINKAGE void FTN_NAME(NETFEM_NODES,netfem_nodes)
 	(NetFEMF nf,int *nNodes,const double *loc,FTN_STR_DECL)
 {
 	CkShortStr s=FTN_STR;
@@ -217,7 +217,7 @@ FDECL void FTN_NAME(NETFEM_NODES,netfem_nodes)
    Element i is adjacent to nodes conn[nodePerEl*i+{0,1,...,nodePerEl-1}]
 */
 
-CDECL void NetFEM_Elements_field(NetFEM n,int nEl,int nodePerEl,
+CLINKAGE void NetFEM_Elements_field(NetFEM n,int nEl,int nodePerEl,
 	int initOffset,int bytePerEl,int idxBase,
 	const void *conn,const char *name)
 {
@@ -226,7 +226,7 @@ CDECL void NetFEM_Elements_field(NetFEM n,int nEl,int nodePerEl,
 		idxBase,CkShiftPointer((int *)conn,initOffset),name));
 }
 
-FDECL void FTN_NAME(NETFEM_ELEMENTS_FIELD,netfem_elements_field)
+FLINKAGE void FTN_NAME(NETFEM_ELEMENTS_FIELD,netfem_elements_field)
 	(NetFEMF nf,int *nEl,int *nodePer,
 	int *initOff,int *bytePer,int *idxBase,
 	const void *conn,FTN_STR_DECL)
@@ -235,12 +235,12 @@ FDECL void FTN_NAME(NETFEM_ELEMENTS_FIELD,netfem_elements_field)
 	NetFEM_Elements_field((NetFEM)NF,*nEl,*nodePer,*initOff,*bytePer,*idxBase,conn,s);
 }
 
-CDECL void NetFEM_Elements(NetFEM n,int nEl,int nodePerEl,const int *conn,const char *name)
+CLINKAGE void NetFEM_Elements(NetFEM n,int nEl,int nodePerEl,const int *conn,const char *name)
 {
 	NetFEM_Elements_field(n,nEl,nodePerEl,0,sizeof(int)*nodePerEl,0,conn,name);
 }
 
-FDECL void FTN_NAME(NETFEM_ELEMENTS,netfem_elements)
+FLINKAGE void FTN_NAME(NETFEM_ELEMENTS,netfem_elements)
 	(NetFEMF nf,int *nEl,int *nodePerEl,const int *conn,FTN_STR_DECL)
 {
 	CkShortStr s=FTN_STR;
@@ -253,7 +253,7 @@ FDECL void FTN_NAME(NETFEM_ELEMENTS,netfem_elements)
 Associate a spatial vector (e.g., displacement, velocity, accelleration)
 with each of the previous objects (nodes or elements).
 */
-CDECL void NetFEM_Vector_field(NetFEM n,const void *start,
+CLINKAGE void NetFEM_Vector_field(NetFEM n,const void *start,
 	int init_offset,int distance,
 	const char *name)
 {
@@ -261,7 +261,7 @@ CDECL void NetFEM_Vector_field(NetFEM n,const void *start,
 	NetFEM_format fmt(N->getDim(),distance);
 	N->getItem()->add(CkShiftPointer((double *)start,init_offset),fmt,name,true);
 }
-FDECL void FTN_NAME(NETFEM_VECTOR_FIELD,netfem_vector_field)
+FLINKAGE void FTN_NAME(NETFEM_VECTOR_FIELD,netfem_vector_field)
 	(NetFEMF nf,const double *start,int *init_offset,int *distance,FTN_STR_DECL)
 {
 	NETFEMAPI("NetFEM_vector_field");
@@ -272,11 +272,11 @@ FDECL void FTN_NAME(NETFEM_VECTOR_FIELD,netfem_vector_field)
 /*Simpler version of the above if your data is packed as
 data[item*3+{0,1,2}].
 */
-CDECL void NetFEM_Vector(NetFEM n,const double *data,const char *name)
+CLINKAGE void NetFEM_Vector(NetFEM n,const double *data,const char *name)
 {
 	NetFEM_Vector_field(n,data,0,sizeof(double)*N->getDim(),name);
 }
-FDECL void FTN_NAME(NETFEM_VECTOR,netfem_vector)
+FLINKAGE void FTN_NAME(NETFEM_VECTOR,netfem_vector)
 	(NetFEMF nf,const double *data,FTN_STR_DECL)
 {
 	CkShortStr s=FTN_STR;
@@ -287,7 +287,7 @@ FDECL void FTN_NAME(NETFEM_VECTOR,netfem_vector)
 Associate a scalar (e.g., stress, temperature, pressure, damage)
 with each of the previous objects (nodes or elements).
 */
-CDECL void NetFEM_Scalar_field(NetFEM n,const void *start,
+CLINKAGE void NetFEM_Scalar_field(NetFEM n,const void *start,
 	int vec_len,int init_offset,int distance,
 	const char *name)
 {
@@ -296,7 +296,7 @@ CDECL void NetFEM_Scalar_field(NetFEM n,const void *start,
 	N->getItem()->add(CkShiftPointer((double *)start,init_offset),fmt,name,false);
 }
 
-FDECL void FTN_NAME(NETFEM_SCALAR_FIELD,netfem_scalar_field)
+FLINKAGE void FTN_NAME(NETFEM_SCALAR_FIELD,netfem_scalar_field)
 	(NetFEMF nf,const double *start,int *veclen,int *init_offset,
 	 int *distance,FTN_STR_DECL)
 {
@@ -307,12 +307,12 @@ FDECL void FTN_NAME(NETFEM_SCALAR_FIELD,netfem_scalar_field)
 
 
 /*Simpler version of above for contiguous double-precision data*/
-CDECL void NetFEM_Scalar(NetFEM n,const double *start,int doublePer,
+CLINKAGE void NetFEM_Scalar(NetFEM n,const double *start,int doublePer,
 	const char *name)
 {
 	NetFEM_Scalar_field(n,start,doublePer,0,sizeof(double)*doublePer,name);
 }
-FDECL void FTN_NAME(NETFEM_SCALAR,netfem_scalar)
+FLINKAGE void FTN_NAME(NETFEM_SCALAR,netfem_scalar)
 	(NetFEMF nf,const double *start,int *veclen,FTN_STR_DECL)
 {
 	CkShortStr s=FTN_STR;

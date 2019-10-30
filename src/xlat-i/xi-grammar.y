@@ -115,6 +115,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token VOID
 %token CONST
 %token NOCOPY
+%token NOCOPYPOST
 %token PACKED
 %token VARSIZE
 %token ENTRY
@@ -252,6 +253,7 @@ Name		: IDENT
 		| IMMEDIATE { ReservedWord(IMMEDIATE, @$.first_column, @$.last_column); YYABORT; }
 		| SKIPSCHED { ReservedWord(SKIPSCHED, @$.first_column, @$.last_column); YYABORT; }
 		| NOCOPY { ReservedWord(NOCOPY, @$.first_column, @$.last_column); YYABORT; }
+		| NOCOPYPOST { ReservedWord(NOCOPYPOST, @$.first_column, @$.last_column); YYABORT; }
 		| INLINE { ReservedWord(INLINE, @$.first_column, @$.last_column); YYABORT; }
 		| VIRTUAL { ReservedWord(VIRTUAL, @$.first_column, @$.last_column); YYABORT; }
 		| MIGRATABLE { ReservedWord(MIGRATABLE, @$.first_column, @$.last_column); YYABORT; }
@@ -1105,7 +1107,17 @@ Parameter	: Type
 		{ /*Stop grabbing CPROGRAM segments*/
 			in_bracket=0;
 			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
-			$$->setRdma(true);
+			$$->setRdma(CMK_ZC_P2P_SEND_MSG);
+			if(firstRdma) {
+				$$->setFirstRdma(true);
+				firstRdma = false;
+			}
+		}
+		| NOCOPYPOST ParamBracketStart CCode ']'
+		{ /*Stop grabbing CPROGRAM segments*/
+			in_bracket=0;
+			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
+			$$->setRdma(CMK_ZC_P2P_RECV_MSG);
 			if(firstRdma) {
 				$$->setFirstRdma(true);
 				firstRdma = false;

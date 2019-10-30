@@ -127,8 +127,7 @@ struct TraceThreadListener {
   CmiObjId idx;
 };
 
-extern "C"
-void traceThreadListener_suspend(struct CthThreadListener *l)
+static void traceThreadListener_suspend(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
@@ -136,8 +135,7 @@ void traceThreadListener_suspend(struct CthThreadListener *l)
   traceSuspend();
 }
 
-extern "C"
-void traceThreadListener_resume(struct CthThreadListener *l) 
+static void traceThreadListener_resume(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
@@ -149,8 +147,7 @@ void traceThreadListener_resume(struct CthThreadListener *l)
   a->ml=0;
 }
 
-extern "C"
-void traceThreadListener_free(struct CthThreadListener *l) 
+static void traceThreadListener_free(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   delete a;
@@ -485,12 +482,12 @@ void LogPool::writeSts(void)
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
   fprintf(stsfp, "TOTAL_PHASES %d\n", numPhases);
 #if CMK_HAS_COUNTER_PAPI
-  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", NUMPAPIEVENTS);
-  // for now, use i, next time use papiEvents[i].
+  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", CkpvAccess(numEvents));
+  // for now, use i, next time use CkpvAccess(papiEvents)[i].
   // **CW** papi event names is a hack.
   char eventName[PAPI_MAX_STR_LEN];
-  for (i=0;i<NUMPAPIEVENTS;i++) {
-    PAPI_event_code_to_name(papiEvents[i], eventName);
+  for (i=0;i<CkpvAccess(numEvents);i++) {
+    PAPI_event_code_to_name(CkpvAccess(papiEvents)[i], eventName);
     fprintf(stsfp, "PAPI_EVENT %d %s\n", i, eventName);
   }
 #endif
@@ -789,7 +786,7 @@ void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, d
 */
 void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 				   int event, int pe, int ml, CmiObjId *id,
-				   double recvT, int numPe, int *pelist)
+				   double recvT, int numPe, const int *pelist)
 {
   lastCreationEvent = numEntries;
   new (&pool[numEntries++])
@@ -837,7 +834,7 @@ void LogPool::modLastEntryTimestamp(double ts)
 //void LogEntry::addPapi(LONG_LONG_PAPI *papiVals)
 //{
 //#if CMK_HAS_COUNTER_PAPI
-//   memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+//   memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*CkpvAccess(numEvents));
 //#endif
 //}
 
@@ -896,7 +893,7 @@ void LogEntry::pup(PUP::er &p)
       p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       //p|numPapiEvents;
-      for (i=0; i<NUMPAPIEVENTS; i++) {
+      for (i=0; i<CkpvAccess(numEvents); i++) {
 	// not yet!!!
 	//	p|papiIDs[i]; 
 	p|papiValues[i];
@@ -915,7 +912,7 @@ void LogEntry::pup(PUP::er &p)
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen; p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       //p|numPapiEvents;
-      for (i=0; i<NUMPAPIEVENTS; i++) {
+      for (i=0; i<CkpvAccess(numEvents); i++) {
 	// not yet!!!
 	//	p|papiIDs[i];
 	p|papiValues[i];
@@ -957,8 +954,8 @@ void LogEntry::pup(PUP::er &p)
 	  space2 = ' ';
           p | space2;
 	  if (p.isUnpacking()) {
-	    userSuppliedNote = new char[length+1];
-	    userSuppliedNote[length] = '\0';
+	    userSuppliedNote = new char[length2+1];
+	    userSuppliedNote[length2] = '\0';
 	  }
    	  PUParray(p,userSuppliedNote, length2);
 	  break;
@@ -1029,9 +1026,9 @@ void LogEntry::pup(PUP::er &p)
 }
 
 TraceProjections::TraceProjections(char **argv): 
-  curevent(0), inEntry(false), computationStarted(false),
-	converseExit(false), endTime(0.0), traceNestedEvents(false),
-	currentPhaseID(0), lastPhaseEvent(NULL), _logPool(NULL)
+  _logPool(NULL), curevent(0), inEntry(false), computationStarted(false),
+	traceNestedEvents(false), converseExit(false),
+	currentPhaseID(0), lastPhaseEvent(NULL), endTime(0.0)
 {
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
   if (CkpvAccess(traceOnPe) == 0) return;
@@ -1041,7 +1038,7 @@ TraceProjections::TraceProjections(char **argv):
   if (CmiGetArgLongDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
 		       "Log entries to buffer per I/O")) {
     if (CkMyPe() == 0) {
-      CmiPrintf("Trace: logsize: %ld\n", CkpvAccess(CtrLogBufSize));
+      CmiPrintf("Trace: logsize: %" PRId64 "\n", CkpvAccess(CtrLogBufSize));
     }
   }
   checknested = 
@@ -1419,7 +1416,7 @@ void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
 */
 
 void TraceProjections::creationMulticast(envelope *e, int ep, int num,
-					 int *pelist)
+					 const int *pelist)
 {
 #if CMK_TRACE_ENABLED
   double curTime = TraceTimer();
@@ -1830,8 +1827,7 @@ void registerOutlierReduction() {
  * done.
  *
  */
-// FIXME: WHY extern "C"???
-extern "C" void TraceProjectionsExitHandler()
+static void TraceProjectionsExitHandler()
 {
 #if CMK_TRACE_ENABLED
 #if DEBUG_KMEANS
@@ -1945,12 +1941,12 @@ void TraceProjectionsBOC::print_warning()
     if (flush_count == 0) return;
     std::set<int>::iterator it;
     CkPrintf("*************************************************************\n");
-    CkPrintf("Warning: Projections log flushed to disk %d times on %d cores:", flush_count, list.size());
+    CkPrintf("Warning: Projections log flushed to disk %d times on %zu cores:", flush_count, list.size());
     for (it=list.begin(); it!=list.end(); it++)
       CkPrintf(" %d", *it);
     CkPrintf(".\n");
     CkPrintf("Warning: The performance data is likely invalid, unless the flushes have been explicitly synchronized by your program.\n");
-    CkPrintf("Warning: This may be fixed by specifying a larger +logsize (current value %d).\n", CkpvAccess(CtrLogBufSize));
+    CkPrintf("Warning: This may be fixed by specifying a larger +logsize (current value %" PRId64 ").\n", CkpvAccess(CtrLogBufSize));
     CkPrintf("*************************************************************\n");
 }
 

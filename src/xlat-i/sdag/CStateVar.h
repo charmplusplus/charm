@@ -20,6 +20,7 @@ struct CStateVar {
   int isMsg;
   bool isRdma;
   bool isFirstRdma;
+  bool isRecvRdma;
   bool isCounter, isSpeculator, isBgParentLog;
 
   CStateVar(int v, const char* t, int np, const char* n, XStr* r, const char* a, int m);

@@ -13,6 +13,9 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #include "ckcallback-ccs.h"
 #include "CkCallback.decl.h"
 #include "envelope.h"
+
+extern "C" void LibCkExit();  // Included for CkCallback::ckExit with interop
+
 /*readonly*/ CProxy_ckcallback_group _ckcallbackgroup;
 
 typedef CkHashtableT<CkHashtableAdaptorT<unsigned int>, CkCallback*> threadCB_t;
@@ -90,30 +93,30 @@ void *CkCallback::impl_thread_delay(void) const
 /*These can't be defined in the .h file like the other constructors
  * because we need CkCallback before CProxyElement* are defined.
  */
-CkCallback::CkCallback(Chare *p, int ep, bool doInline) {
+CkCallback::CkCallback(Chare *p, int ep, bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendChare:sendChare;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendChare : sendChare;
 	d.chare.ep=ep; 
 	d.chare.id=p->ckGetChareID();
         d.chare.hasRefnum= false;
         d.chare.refnum = 0;
 }
-CkCallback::CkCallback(Group *p, int ep, bool doInline) {
+CkCallback::CkCallback(Group *p, int ep, bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendGroup:sendGroup;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendGroup : sendGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyPe();
         d.group.hasRefnum= false;
         d.group.refnum = 0;
 }
-CkCallback::CkCallback(NodeGroup *p, int ep, bool doInline) {
+CkCallback::CkCallback(NodeGroup *p, int ep, bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendNodeGroup:sendNodeGroup;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendNodeGroup : sendNodeGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyNode();
         d.group.hasRefnum= false;
         d.group.refnum = 0;
@@ -129,21 +132,21 @@ CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp) {
         d.group.refnum = 0;
 }
 
-CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline) {
+CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendNodeGroup:sendNodeGroup;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendNodeGroup : sendNodeGroup;
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID(); d.group.onPE=onPE;
         d.group.hasRefnum= false;
         d.group.refnum = 0;
 }
 
-CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
+CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendGroup:sendGroup;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendGroup : sendGroup;
 	d.group.ep=ep; 
 	d.group.id=grpElt.ckGetGroupID(); 
 	d.group.onPE=grpElt.ckGetGroupPe();
@@ -151,11 +154,11 @@ CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
         d.group.refnum = 0;
 }
 
-CkCallback::CkCallback(int ep, const CProxyElement_NodeGroup &grpElt, bool doInline) {
+CkCallback::CkCallback(int ep, const CProxyElement_NodeGroup &grpElt, bool forceInline) {
 #if CMK_ERROR_CHECKING
   memset(this, 0, sizeof(CkCallback));
 #endif
-  type = doInline ? isendNodeGroup : sendNodeGroup;
+  type = (forceInline || _entryTable[ep]->isInline) ? isendNodeGroup : sendNodeGroup;
   d.group.ep = ep;
   d.group.id = grpElt.ckGetGroupID();
   d.group.onPE = grpElt.ckGetGroupPe();
@@ -163,11 +166,11 @@ CkCallback::CkCallback(int ep, const CProxyElement_NodeGroup &grpElt, bool doInl
   d.group.refnum = 0;
 }
 
-CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline) {
+CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendArray:sendArray;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendArray : sendArray;
 	d.array.ep=ep; 
 	d.array.id=arrElt.ckGetArrayID(); 
 	d.array.idx = arrElt.ckGetIndex();
@@ -175,11 +178,12 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInlin
         d.array.refnum = 0;
 }
 
-CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline) {
+#if !CMK_CHARMPY
+CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=bcastSection;
+      type=bcastSection; // forceInline currently ignored
       d.section.ep=ep; 
       CkSectionID secID=sectElt.ckGetSectionID(0); 
       d.section.sinfo = secID._cookie.info;
@@ -205,12 +209,13 @@ CkCallback::CkCallback(int ep, CkSectionID &id) {
       d.section.hasRefnum = false;
       d.section.refnum = 0;
 }
+#endif
 
-CkCallback::CkCallback(ArrayElement *p, int ep,bool doInline) {
+CkCallback::CkCallback(ArrayElement *p, int ep,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendArray:sendArray;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendArray : sendArray;
     d.array.ep=ep; 
 	d.array.id=p->ckGetArrayID(); 
 	d.array.idx = p->ckGetArrayIndex();
@@ -220,50 +225,73 @@ CkCallback::CkCallback(ArrayElement *p, int ep,bool doInline) {
 
 #if CMK_CHARMPY
 
-// currently this is only used with Charmpy, so we are only enabling it for that case
-// to guarantee best performance for non-charmpy applications
+// currently this is only used with Charm4py, so we are only enabling it for that case
+// to guarantee best performance for non-charm4py applications
 
-// function pointer to interact with Charmpy to generate callback msg
-extern void (*CreateReductionTargetMsgExt)(void*, int, int, int, char**, int*);
+// function pointer to interact with Charm4py to generate callback msg
+extern void (*CreateCallbackMsgExt)(void*, int, int, int, int *, char**, int*);
 
 static void CkCallbackSendExt(const CkCallback &cb, void *msg)
 {
-  CkAssert(msg != NULL);
   char *extResultMsgData[2] = {NULL, NULL};
   int extResultMsgDataSizes[2] = {0, 0};
-  CkReductionMsg* redMsg = (CkReductionMsg*) msg;
+  void *data = NULL;
+  int dataLen = 0;
+  int reducerType = -1;
+  if (msg != NULL) {
+    // right now this can only be a CkReductionMsg
+    CkReductionMsg* redMsg = (CkReductionMsg*)msg;
+    data = redMsg->getData();
+    dataLen = redMsg->getLength();
+    reducerType = redMsg->getReducer();
+  }
 
+  int _pe = -1;
+  int sectionInfo[3] = {-1, 0, 0};
   switch (cb.type) {
     case CkCallback::sendChare: // Send message to a chare
-      CreateReductionTargetMsgExt(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
-                                  cb.d.chare.refnum, extResultMsgData, extResultMsgDataSizes);
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.chare.refnum, sectionInfo,
+                                  extResultMsgData, extResultMsgDataSizes);
       CkChareExtSend_multi(cb.d.chare.id.onPE, cb.d.chare.id.objPtr, cb.d.chare.ep,
                            2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::sendGroup: // Send message to a group element
-      CreateReductionTargetMsgExt(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
-                                  cb.d.group.refnum, extResultMsgData, extResultMsgDataSizes);
-      CkGroupExtSend_multi(cb.d.group.id.idx, cb.d.group.onPE, cb.d.group.ep,
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum, sectionInfo,
+                                  extResultMsgData, extResultMsgDataSizes);
+      CkGroupExtSend_multi(cb.d.group.id.idx, 1, &(cb.d.group.onPE), cb.d.group.ep,
                            2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::sendArray: // Send message to an array element
-      CreateReductionTargetMsgExt(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
-                                  cb.d.array.refnum, extResultMsgData, extResultMsgDataSizes);
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.array.refnum, sectionInfo,
+                                  extResultMsgData, extResultMsgDataSizes);
       CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), cb.d.array.idx.dimension,
                            cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::bcastGroup:
-      CreateReductionTargetMsgExt(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
-                                  cb.d.group.refnum, extResultMsgData, extResultMsgDataSizes);
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum, sectionInfo,
+                                  extResultMsgData, extResultMsgDataSizes);
       // onPE is set to -1 since its a bcast
-      CkGroupExtSend_multi(cb.d.group.id.idx, -1, cb.d.group.ep, 2, extResultMsgData, extResultMsgDataSizes);
+      CkGroupExtSend_multi(cb.d.group.id.idx, 1, &_pe, cb.d.group.ep, 2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::bcastArray:
-      CreateReductionTargetMsgExt(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
-                                  cb.d.array.refnum, extResultMsgData, extResultMsgDataSizes);
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.array.refnum, sectionInfo,
+                                  extResultMsgData, extResultMsgDataSizes);
       // numDimensions is set to 0 since its bcast
       CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), 0,
                            cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
+      break;
+    case CkCallback::bcastSection: // Send message to a section
+      sectionInfo[0] = cb.d.section.sid_pe;
+      sectionInfo[1] = cb.d.section.sid_cnt;
+      sectionInfo[2] = cb.d.section.ep;
+      CreateCallbackMsgExt(data, dataLen, reducerType, 0, sectionInfo,
+                           extResultMsgData, extResultMsgDataSizes);
+      // after CreateCallbackMsgExt:
+      // sectionInfo[0] contains SectionManager gid
+      // sectionInfo[1] contains SectionManager ep (for sending section broadcasts)
+      // send to SectionManager on root PE
+      CkGroupExtSend_multi(sectionInfo[0], 1, &(cb.d.section.rootPE), sectionInfo[1],
+                           2, extResultMsgData, extResultMsgDataSizes);
       break;
     default:
       CkAbort("Unsupported callback for ext reduction, or corrupted callback");
@@ -293,7 +321,7 @@ void CkCallback::send(void *msg) const
   int opts = 0;
 
 #if CMK_CHARMPY
-  if (isCkExtReductionCb) { // callback target is external
+  if (isExtCallback) { // callback target is external
     CkCallbackSendExt(*this, msg);
     return;
   }
@@ -304,9 +332,10 @@ void CkCallback::send(void *msg) const
 	case ignore: //Just ignore the callback
 		if (msg) CkFreeMsg(msg);
 		break;
-	case ckExit: //Call ckExit
+	case ckExit: //Call ckExit (or LibCkExit if in interop mode)
 		if (msg) CkFreeMsg(msg);
-		CkExit();
+		if (CharmLibInterOperate) LibCkExit();
+		else CkExit();
 		break;
 	case resumeThread: //Resume a waiting thread
 		if (d.thread.onPE==CkMyPe()) {
@@ -388,6 +417,7 @@ void CkCallback::send(void *msg) const
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
 		CkBroadcastMsgArray(d.array.ep, msg, d.array.id);
 		break;
+#if !CMK_CHARMPY
 	case bcastSection: {
 		if(!msg)msg=CkAllocSysMsg();
                 if (d.section.hasRefnum) CkSetRefNum(msg, d.section.refnum);
@@ -396,6 +426,7 @@ void CkCallback::send(void *msg) const
 		CkBroadcastMsgSection(d.section.ep, msg, secID);
 		break;
              }
+#endif
 	case replyCCS: { /* Send CkDataMsg as a CCS reply */
 		void *data=NULL;
 		int length=0;
@@ -475,6 +506,9 @@ void CkCallback::pup(PUP::er &p) {
   default:
     CkAbort("Inconsistent CkCallback type");
   }
+#if CMK_CHARMPY
+  p|isExtCallback;
+#endif
 }
 
 bool CkCallback::containsPointer() const {
@@ -491,13 +525,18 @@ bool CkCallback::containsPointer() const {
   case bcastGroup:
   case bcastNodeGroup:
   case bcastArray:
+#if CMK_CHARMPY
+  case bcastSection:
+#endif
     return false;
 
   case resumeThread:
   case callCFn:
   case call1Fn:
   case replyCCS:
+#if !CMK_CHARMPY
   case bcastSection:
+#endif
     return true;
 
   case sendChare:

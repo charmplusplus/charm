@@ -86,7 +86,7 @@ gk_graph_t *gk_graph_Read(char *filename, int format, int isfewgts,
                 int isfvwgts, int isfvsizes)
 {
   ssize_t i, k, l;
-  size_t nfields, nvtxs, nedges, fmt, ncon, lnlen;
+  size_t nfields, nvtxs=0, nedges=0, fmt, ncon, lnlen;
   int32_t ival;
   float fval;
   int readsizes=0, readwgts=0, readvals=0, numbering=0;

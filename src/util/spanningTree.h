@@ -29,11 +29,20 @@ void getPETopoTreeEdges(int pe, int rootPE, int *pes, int numpes, unsigned int b
 /// C API to ST_RecursivePartition_getTreeInfo (see below)
 void get_topo_tree_nbs(int root, int *parent, int *child_count, int **children);
 
+/**
+ * partition given PEs into numparts topology-aware partitions.
+ * 'pes' array is modified in place, to contain pes grouped by partition (but
+ * there is no guarantee on order of PEs within a partition). The part_offsets
+ * array will contain the starting offset of each partition in 'pes' (space
+ * has to be allocated by caller)
+ */
+void partitionPEs(int *pes, int numpes, int numparts, int *part_offsets);
+
 #if defined(__cplusplus)
 }
 #endif
 
-// Fragile: machine-broadcast.c depends on this header, but we don't want
+// Fragile: machine-broadcast.C depends on this header, but we don't want
 // Converse to see charm++.h. Symptoms will include bigsim breakage.
 #if defined __cplusplus && !defined CONVERSE_MACHINE_BROADCAST_C_
 #include "charm++.h"
@@ -146,6 +155,12 @@ public:
 #endif
   }
 
+  /**
+   * Specify a virtual root, considered to be on a separate physical node
+   * as all other pes/nodes passed to the algorithm.
+   */
+  void setVirtualRoot(int root) { virtualRoot = root; }
+
 private:
 
   class PhyNode;
@@ -172,6 +187,7 @@ private:
   bool nodeTree;
   bool preSorted;
   TopoManager *tmgr;
+  int virtualRoot = -1;
 };
 
 #endif
