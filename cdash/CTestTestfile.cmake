@@ -1,5 +1,5 @@
 add_test(tests/ "make" "-C" "./tests/" "test")
-set_tests_properties(tests/ PROPERTIES  TIMEOUT "1200" WORKING_DIRECTORY "..")
+set_tests_properties(tests/ PROPERTIES  TIMEOUT "1200")
 add_test(examples/ "make" "-C" "./examples/" "test")
 set_tests_properties(examples/ PROPERTIES  TIMEOUT "1200")
 add_test(benchmarks/ "make" "-C" "./benchmarks/" "test")

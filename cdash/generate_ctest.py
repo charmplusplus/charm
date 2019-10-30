@@ -26,7 +26,7 @@ pyctest.BUILD_COMMAND = "./build LIBS netlrts-darwin-x86_64 -j8 -g"
 # Define test for tests/ directory
 tests = pyctest.test()
 tests.SetName("tests/")
-tests.SetProperty("WORKING_DIRECTORY", "..")
+# tests.SetProperty("WORKING_DIRECTORY", "..")
 tests.SetCommand(["make", "-C", "./tests/", "test"])
 tests.SetProperty("TIMEOUT", "1200")
 
