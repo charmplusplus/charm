@@ -21,7 +21,7 @@ pyctest.PROJECT_NAME = urllib.parse.quote("Charm++")
 pyctest.set("CTEST_DROP_SITE", "my.cdash.org")
 pyctest.DROP_LOCATION = "/cdash/submit.php?project=" + pyctest.PROJECT_NAME
 pyctest.BUILD_NAME = "netlrts-darwin-x86_64"
-pyctest.BUILD_COMMAND = "cd .. && ./build LIBS netlrts-darwin-x86_64 -j8 -g"
+pyctest.BUILD_COMMAND = "sh -c 'cd .. && ./build LIBS netlrts-darwin-x86_64 -j8 -g'"
 
 # Define test for tests/ directory
 tests = pyctest.test()
