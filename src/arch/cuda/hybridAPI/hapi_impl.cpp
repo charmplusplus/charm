@@ -146,7 +146,7 @@ public:
   bool init_instr_;
 #endif
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiNodeLock queue_lock_;
   CmiNodeLock progress_lock_;
   CmiNodeLock stream_lock_;
@@ -185,7 +185,7 @@ void GPUManager::init() {
   data_setup_idx_ = 0;
   data_cleanup_idx_ = 0;
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   // create mutex locks
   queue_lock_ = CmiCreateLock();
   progress_lock_ = CmiCreateLock();
@@ -273,7 +273,7 @@ int GPUManager::createStreams() {
   }
   else // unknown (future) compute capability
     new_n_streams = 128;
-#if !CMK_SMP && !CMK_MULTICORE
+#if !CMK_SMP
   // Allocate total physical streams between GPU managers sharing a device...
   // i.e. PEs / num devices
   int device_count;
@@ -395,7 +395,7 @@ void GPUManager::allocateBuffers(hapiWorkRequest* wr) {
       hapiCheck(cudaMalloc((void **)&device_buffers_[index], size));
 
 #ifdef HAPI_DEBUG
-      printf("[HAPI] allocated buffer %d at %p, time: %.2f, size: %zu\n",
+      CmiPrintf("[HAPI] allocated buffer %d at %p, time: %.2f, size: %zu\n",
              index, device_buffers_[index], cutGetTimerValue(timerHandle),
              size);
 #endif
@@ -433,7 +433,7 @@ void GPUManager::hostToDeviceTransfer(hapiWorkRequest* wr) {
                                 cudaMemcpyHostToDevice, wr->stream));
 
 #ifdef HAPI_DEBUG
-      printf("[HAPI] transferring buffer %d from host to device, time: %.2f, "
+      CmiPrintf("[HAPI] transferring buffer %d from host to device, time: %.2f, "
              "size: %zu\n", index, cutGetTimerValue(timerHandle), size);
 #endif
     }
@@ -452,7 +452,7 @@ void GPUManager::deviceToHostTransfer(hapiWorkRequest* wr) {
                                 cudaMemcpyDeviceToHost, wr->stream));
 
 #ifdef HAPI_DEBUG
-      printf("[HAPI] transferring buffer %d from device to host, time %.2f, "
+      CmiPrintf("[HAPI] transferring buffer %d from device to host, time %.2f, "
              "size: %zu\n", index, cutGetTimerValue(timerHandle), size);
 #endif
     }
@@ -470,7 +470,7 @@ void GPUManager::freeBuffers(hapiWorkRequest* wr) {
       device_buffers_[index] = NULL;
 
 #ifdef HAPI_DEBUG
-      printf("[HAPI] freed buffer %d, time %.2f\n",
+      CmiPrintf("[HAPI] freed buffer %d, time %.2f\n",
              index, cutGetTimerValue(timerHandle));
 #endif
     }
@@ -478,14 +478,14 @@ void GPUManager::freeBuffers(hapiWorkRequest* wr) {
 }
 
 inline static void hapiWorkRequestCleanup(hapiWorkRequest* wr) {
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).progress_lock_);
 #endif
 
   // free device buffers
   CsvAccess(gpu_manager).freeBuffers(wr);
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).progress_lock_);
 #endif
 
@@ -664,7 +664,7 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   NVTXTracer nvtx_range("enqueue", NVTXColor::Pomegranate);
 #endif
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).progress_lock_);
 #endif
 
@@ -721,7 +721,7 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   }
 #endif
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).progress_lock_);
 #endif
 }
@@ -745,7 +745,7 @@ hapiWorkRequest::hapiWorkRequest() :
     chare_index = -1;
 #endif
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
     CmiLock(CsvAccess(gpu_manager).stream_lock_);
 #endif
 
@@ -756,7 +756,7 @@ hapiWorkRequest::hapiWorkRequest() :
 
     stream = CsvAccess(gpu_manager).getStream(CmiMyRank() % CsvAccess(gpu_manager).getNStreams());
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
     CmiUnlock(CsvAccess(gpu_manager).stream_lock_);
 #endif
   }
@@ -779,7 +779,7 @@ void setHybridAPIDevice() {
 
 // Clean up and delete memory used by HAPI.
 void exitHybridAPI() {
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   // destroy mutex locks
   CmiDestroyLock(CsvAccess(gpu_manager).queue_lock_);
   CmiDestroyLock(CsvAccess(gpu_manager).progress_lock_);
@@ -799,21 +799,21 @@ void exitHybridAPI() {
   for (int i = 0; i < CsvAccess(gpu_manager).time_idx_; i++) {
     switch (CsvAccess(gpu_manager).gpu_events_[i].event_type) {
     case DataSetup:
-      printf("[HAPI] kernel %s data setup\n",
+      CmiPrintf("[HAPI] kernel %s data setup\n",
              CsvAccess(gpu_manager).gpu_events_[i].trace_name);
       break;
     case DataCleanup:
-      printf("[HAPI] kernel %s data cleanup\n",
+      CmiPrintf("[HAPI] kernel %s data cleanup\n",
              CsvAccess(gpu_manager).gpu_events_[i].trace_name);
       break;
     case KernelExecution:
-      printf("[HAPI] kernel %s execution\n",
+      CmiPrintf("[HAPI] kernel %s execution\n",
              CsvAccess(gpu_manager).gpu_events_[i].trace_name);
       break;
     default:
-      printf("[HAPI] invalid timer identifier\n");
+      CmiPrintf("[HAPI] invalid timer identifier\n");
     }
-    printf("[HAPI] %.2f:%.2f\n",
+    CmiPrintf("[HAPI] %.2f:%.2f\n",
            CsvAccess(gpu_manager).gpu_events_[i].cmi_start_time -
            CsvAccess(gpu_manager).gpu_events_[0].cmi_start_time,
            CsvAccess(gpu_manager).gpu_events_[i].cmi_end_time -
@@ -835,7 +835,7 @@ static inline void gpuEventStart(hapiWorkRequest* wr, int* index,
   *index = shared_time_idx_;
   shared_gpu_events_[shared_time_idx_].stage = stage;
 #ifdef HAPI_DEBUG
-  printf("[HAPI] start event %d of WR %s, profiling stage %d\n",
+  CmiPrintf("[HAPI] start event %d of WR %s, profiling stage %d\n",
          event, wr->trace_name, stage);
 #endif
 #endif // HAPI_TRACE
@@ -850,7 +850,7 @@ static inline void gpuEventEnd(int index) {
                         CsvAccess(gpu_manager).gpu_events_[index].cmi_start_time,
                         CsvAccess(gpu_manager).gpu_events_[index].cmi_end_time);
 #ifdef HAPI_DEBUG
-  printf("[HAPI] end event %d of WR %s, profiling stage %d\n",
+  Cmiprintf("[HAPI] end event %d of WR %s, profiling stage %d\n",
           CsvAccess(gpu_manager).gpu_events_[index].event_type,
           CsvAccess(gpu_manager).gpu_events_[index].trace_name,
           CsvAccess(gpu_manager).gpu_events_[index].stage);
@@ -867,7 +867,7 @@ static inline void hapiWorkRequestStartTime(hapiWorkRequest* wr) {
 static inline void profileWorkRequestEvent(hapiWorkRequest* wr,
                                            WorkRequestStage event) {
 #ifdef HAPI_INSTRUMENT_WRS
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).inst_lock_);
 #endif
 
@@ -893,14 +893,14 @@ static inline void profileWorkRequestEvent(hapiWorkRequest* wr,
         vec[phase].n++;
         break;
       default:
-        printf("[HAPI] invalid event during profileWorkRequestEvent\n");
+        CmiPrintf("[HAPI] invalid event during profileWorkRequestEvent\n");
     }
   }
   else {
-    printf("[HAPI] instrumentation not initialized!\n");
+    CmiPrintf("[HAPI] instrumentation not initialized!\n");
   }
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).inst_lock_);
 #endif
 #endif // HAPI_INSTRUMENT_WRS
@@ -993,7 +993,7 @@ static int findPool(size_t size){
     BufferPool newpool;
     hapiCheck(cudaMallocHost((void**)&newpool.head, size + sizeof(BufferPoolHeader)));
     if (newpool.head == NULL) {
-      printf("[HAPI (%d)] findPool: failed to allocate newpool %d head, size %zu\n",
+      CmiPrintf("[HAPI (%d)] findPool: failed to allocate newpool %d head, size %zu\n",
              CmiMyPe(), boundary_array_len, size);
       CmiAbort("[HAPI] failed newpool allocation");
     }
@@ -1022,10 +1022,10 @@ static void* getBufferFromPool(int pool, size_t size){
   BufferPoolHeader* ret;
 
   if (pool < 0 || pool >= CsvAccess(gpu_manager).mempool_free_bufs_.size()) {
-    printf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %zu invalid pool\n",
+    CmiPrintf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %zu invalid pool\n",
            CmiMyPe(), pool, size);
 #ifdef HAPI_MEMPOOL_DEBUG
-    printf("[HAPI (%d)] num: %d\n", CmiMyPe(),
+    CmiPrintf("[HAPI (%d)] num: %d\n", CmiMyPe(),
            CsvAccess(gpu_manager).mempool_free_bufs_[pool].num);
 #endif
     CmiAbort("[HAPI] exiting after invalid pool");
@@ -1035,7 +1035,7 @@ static void* getBufferFromPool(int pool, size_t size){
     hapiCheck(cudaMallocHost((void**)&hd, sizeof(BufferPoolHeader) +
                              CsvAccess(gpu_manager).mempool_free_bufs_[pool].size));
 #ifdef HAPI_MEMPOOL_DEBUG
-    printf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %zu expand by 1\n",
+    CmiPrintf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %zu expand by 1\n",
            CmiMyPe(), pool, size);
 #endif
     if (hd == NULL) {
@@ -1065,7 +1065,7 @@ static void returnBufferToPool(int pool, BufferPoolHeader* hd) {
 }
 
 void* hapiPoolMalloc(size_t size) {
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).mempool_lock_);
 #endif
 
@@ -1096,7 +1096,7 @@ void* hapiPoolMalloc(size_t size) {
     CsvAccess(gpu_manager).mempool_initialized_ = true;
 
 #ifdef HAPI_MEMPOOL_DEBUG
-    printf("[HAPI (%d)] done creating buffer pool\n", CmiMyPe());
+    CmiPrintf("[HAPI (%d)] done creating buffer pool\n", CmiMyPe());
 #endif
   }
 
@@ -1104,12 +1104,12 @@ void* hapiPoolMalloc(size_t size) {
   void* buf = getBufferFromPool(pool, size);
 
 #ifdef HAPI_MEMPOOL_DEBUG
-  printf("[HAPI (%d)] hapiPoolMalloc size %zu pool %d left %d\n",
+  CmiPrintf("[HAPI (%d)] hapiPoolMalloc size %zu pool %d left %d\n",
          CmiMyPe(), size, pool,
          CsvAccess(gpu_manager).mempool_free_bufs_[pool].num);
 #endif
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).mempool_lock_);
 #endif
 
@@ -1128,18 +1128,18 @@ void hapiPoolFree(void* ptr) {
   size_t size = hd->size;
 #endif
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).mempool_lock_);
 #endif
 
   returnBufferToPool(pool, hd);
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).mempool_lock_);
 #endif
 
 #ifdef HAPI_MEMPOOL_DEBUG
-  printf("[HAPI (%d)] hapiPoolFree size %zu pool %d left %d\n",
+  CmiPrintf("[HAPI (%d)] hapiPoolFree size %zu pool %d left %d\n",
          CmiMyPe(), size, pool,
          CsvAccess(gpu_manager).mempool_free_bufs_[pool].num);
 #endif
@@ -1147,7 +1147,7 @@ void hapiPoolFree(void* ptr) {
 
 #ifdef HAPI_INSTRUMENT_WRS
 void hapiInitInstrument(int n_chares, int n_types) {
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).inst_lock_);
 #endif
 
@@ -1159,13 +1159,13 @@ void hapiInitInstrument(int n_chares, int n_types) {
     CsvAccess(gpu_manager).init_instr_ = true;
   }
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).inst_lock_);
 #endif
 }
 
 hapiRequestTimeInfo* hapiQueryInstrument(int chare, char type, char phase) {
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).inst_lock_);
 #endif
 
@@ -1176,13 +1176,13 @@ hapiRequestTimeInfo* hapiQueryInstrument(int chare, char type, char phase) {
     return NULL;
   }
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).inst_lock_);
 #endif
 }
 
 void hapiClearInstrument() {
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).inst_lock_);
 #endif
 
@@ -1195,7 +1195,7 @@ void hapiClearInstrument() {
   CsvAccess(gpu_manager).avg_times_.clear();
   CsvAccess(gpu_manager).init_instr_ = false;
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).inst_lock_);
 #endif
 }
@@ -1238,13 +1238,13 @@ void hapiPollEvents() {
 }
 
 int hapiCreateStreams() {
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).stream_lock_);
 #endif
 
   int ret = CsvAccess(gpu_manager).createStreams();
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).stream_lock_);
 #endif
 
@@ -1252,13 +1252,13 @@ int hapiCreateStreams() {
 }
 
 cudaStream_t hapiGetStream() {
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).stream_lock_);
 #endif
 
   cudaStream_t ret = CsvAccess(gpu_manager).getNextStream();
 
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).stream_lock_);
 #endif
 
@@ -1272,7 +1272,7 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
   recordEvent(stream, cb, cb_msg);
 #else
   /* FIXME works for now (faster too), but CmiAlloc might not be thread-safe
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).queue_lock_);
 #endif
 */
@@ -1290,7 +1290,7 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
   hapiCheck(cudaStreamAddCallback(stream, CUDACallback, (void*)conv_msg, 0));
 
   /*
-#if CMK_SMP || CMK_MULTICORE
+#if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).queue_lock_);
 #endif
 */
