@@ -22,7 +22,13 @@ void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size) {
 }
 
 int CmiGetRdmaCommonInfoSize() {
+#if CMK_USE_CMA
   return sizeof(CmiCommonRdmaInfo_t);
+#else
+  return 0; // If CMK_USE_CMA is false, sizeof(CmiCommonRdmaInfo_t) is 1 (size of an empty structure in C++)
+            // However, 0 is returned since CMK_COMMON_NOCOPY_DIRECT_BYTES is set to 0 when CMK_USE_CMA is false
+            // because the offset (returned by CmiGetRdmaCommonInfoSize) should equal CMK_COMMON_NOCOPY_DIRECT_BYTES
+#endif
 }
 
 #if CMK_USE_CMA
