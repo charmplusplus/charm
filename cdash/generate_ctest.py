@@ -26,19 +26,20 @@ pyctest.BUILD_COMMAND = "cd .. && ./build LIBS netlrts-darwin-x86_64 -j8 -g"
 # Define test for tests/ directory
 tests = pyctest.test()
 tests.SetName("tests/")
-tests.SetCommand(["make", "-C", "../tests/", "test"])
+tests.SetProperty("WORKING_DIRECTORY", "..")
+tests.SetCommand(["make", "-C", "./tests/", "test"])
 tests.SetProperty("TIMEOUT", "1200")
 
 # Define test for examples/ directory
 examples = pyctest.test()
 examples.SetName("examples/")
-examples.SetCommand(["make", "-C", "../examples/", "test"])
+examples.SetCommand(["make", "-C", "./examples/", "test"])
 examples.SetProperty("TIMEOUT", "1200")
 
 # Define test for benchmarks/ directory
 benchmarks = pyctest.test()
 benchmarks.SetName("benchmarks/")
-benchmarks.SetCommand(["make", "-C", "../benchmarks/", "test"])
+benchmarks.SetCommand(["make", "-C", "./benchmarks/", "test"])
 benchmarks.SetProperty("TIMEOUT", "1200")
 
 # Run all tests
