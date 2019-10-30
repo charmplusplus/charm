@@ -1,15 +1,15 @@
-#include "hapi.h"
-#include "hapi_impl.h"
-#include "converse.h"
-#include "ckcallback.h"
-#include "cklists.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
 #include <queue>
 #include <atomic>
-#include "cuda.h"
+#include <vector>
 
+#include <cuda_runtime.h>
+
+#include "converse.h"
+#include "hapi.h"
+#include "hapi_impl.h"
 #ifdef HAPI_NVTX_PROFILE
 #include "hapi_nvtx.h"
 #endif
@@ -30,10 +30,6 @@ typedef struct gpuEventTimer {
   int event_type;
   const char* trace_name;
 } gpuEventTimer;
-#endif
-
-#ifdef HAPI_INSTRUMENT_WRS
-static bool initializedInstrument();
 #endif
 
 // Event stages used for profiling.
@@ -80,14 +76,12 @@ static inline int getMyCudaDevice(int my_node) {
   return my_node % device_count;
 }
 
-// A function in ck.C which casts the void* to a CkCallback object and invokes
-// the Charm++ callback.
-extern void CUDACallbackManager(void* fn);
-extern int CmiMyPe();
+// Used to invoke user's Charm++ callback function
+void (*hapiInvokeCallback)(void*, void*) = NULL;
 
 // Functions used to support quiescence detection.
-extern void QdCreate(int n);
-extern void QdProcess(int n);
+void (*hapiQdCreate)(int) = NULL;
+void (*hapiQdProcess)(int) = NULL;
 
 // Initial size of the user-addressed portion of host/device buffer arrays;
 // the system-addressed portion of host/device buffer arrays (used when there
@@ -113,8 +107,8 @@ public:
 // Scale the amount of memory each node pins.
 #define HAPI_MEMPOOL_SCALE 1.0
 
-  CkVec<BufferPool> mempool_free_bufs_;
-  CkVec<size_t> mempool_boundaries_;
+  std::vector<BufferPool> mempool_free_bufs_;
+  std::vector<size_t> mempool_boundaries_;
   bool mempool_initialized_;
 
   // The runtime system keeps track of all allocated buffers on the GPU.
@@ -148,7 +142,7 @@ public:
 #endif
 
 #ifdef HAPI_INSTRUMENT_WRS
-  CkVec<CkVec<CkVec<hapiRequestTimeInfo> > > avg_times_;
+  std::vector<std::vector<std::vector<hapiRequestTimeInfo>>> avg_times_;
   bool init_instr_;
 #endif
 
@@ -157,6 +151,7 @@ public:
   CmiNodeLock progress_lock_;
   CmiNodeLock stream_lock_;
   CmiNodeLock mempool_lock_;
+  CmiNodeLock inst_lock_;
 #endif
 
   cudaDeviceProp device_prop_;
@@ -196,6 +191,7 @@ void GPUManager::init() {
   progress_lock_ = CmiCreateLock();
   stream_lock_ = CmiCreateLock();
   mempool_lock_ = CmiCreateLock();
+  inst_lock_ = CmiCreateLock();
 #endif
 
 #ifdef HAPI_TRACE
@@ -235,7 +231,6 @@ void GPUManager::init() {
   // set up mempool metadata
   mempool_initialized_ = false;
   mempool_boundaries_.reserve(HAPI_MEMPOOL_NUM_SLOTS);
-  mempool_boundaries_.length() = HAPI_MEMPOOL_NUM_SLOTS;
 
   size_t buf_size = HAPI_MEMPOOL_MIN_BUFFER_SIZE;
   for(int i = 0; i < HAPI_MEMPOOL_NUM_SLOTS; i++){
@@ -515,10 +510,12 @@ static void* hostToDeviceCallback(void* arg) {
   NVTXTracer nvtx_range("hostToDeviceCallback", NVTXColor::Asbestos);
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
-  CUDACallbackManager(wr->host_to_device_cb);
+  CmiAssert(hapiInvokeCallback);
+  hapiInvokeCallback(wr->host_to_device_cb);
 
   // inform QD that the host-to-device transfer is complete
-  QdProcess(1);
+  CmiAssert(hapiQdProcess);
+  hapiQdProcess(1);
 
   return NULL;
 }
@@ -529,10 +526,12 @@ static void* kernelCallback(void* arg) {
   NVTXTracer nvtx_range("kernelCallback", NVTXColor::Asbestos);
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
-  CUDACallbackManager(wr->kernel_cb);
+  CmiAssert(hapiInvokeCallback);
+  hapiInvokeCallback(wr->kernel_cb);
 
   // inform QD that the kernel is complete
-  QdProcess(1);
+  CmiAssert(hapiQdProcess);
+  hapiQdProcess(1);
 
   return NULL;
 }
@@ -547,13 +546,15 @@ static void* deviceToHostCallback(void* arg) {
 
   // invoke user callback
   if (wr->device_to_host_cb) {
-    CUDACallbackManager(wr->device_to_host_cb);
+    CmiAssert(hapiInvokeCallback);
+    hapiInvokeCallback(wr->device_to_host_cb);
   }
 
   hapiWorkRequestCleanup(wr);
 
   // inform QD that device-to-host transfer is complete
-  QdProcess(1);
+  CmiAssert(hapiQdProcess);
+  hapiQdProcess(1);
 
   return NULL;
 }
@@ -568,12 +569,14 @@ static void* lightCallback(void *arg) {
   void* cb = *((void**)conv_msg_tmp);
 
   // invoke user callback
-  if (cb != NULL) {
-    CUDACallbackManager(cb);
+  if (cb) {
+    CmiAssert(hapiInvokeCallback);
+    hapiInvokeCallback(cb);
   }
 
   // notify process to QD
-  QdProcess(1);
+  CmiAssert(hapiQdProcess);
+  hapiQdProcess(1);
 
   return NULL;
 }
@@ -675,7 +678,8 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   if (wr->host_to_device_cb) {
     // while there is an ongoing workrequest, quiescence should not be detected
     // even if all PEs seem idle
-    QdCreate(1);
+    CmiAssert(hapiQdCreate);
+    hapiQdCreate(1);
 
 #ifdef HAPI_CUDA_CALLBACK
     addCallback(wr, AfterHostToDevice);
@@ -689,7 +693,8 @@ void hapiEnqueue(hapiWorkRequest* wr) {
 
   // add kernel callback
   if (wr->kernel_cb) {
-    QdCreate(1);
+    CmiAssert(hapiQdCreate);
+    hapiQdCreate(1);
 
 #ifdef HAPI_CUDA_CALLBACK
     addCallback(wr, AfterKernel);
@@ -702,7 +707,8 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   CsvAccess(gpu_manager).deviceToHostTransfer(wr);
 
   // add device-to-host transfer callback
-  QdCreate(1);
+  CmiAssert(hapiQdCreate);
+  hapiQdCreate(1);
 #ifdef HAPI_CUDA_CALLBACK
   // always invoked to free memory
   addCallback(wr, AfterDeviceToHost);
@@ -755,8 +761,8 @@ hapiWorkRequest::hapiWorkRequest() :
 #endif
   }
 
-static void createPool(int *nbuffers, int n_slots, CkVec<BufferPool> &pools);
-static void releasePool(CkVec<BufferPool> &pools);
+static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
+static void releasePool(std::vector<BufferPool> &pools);
 
 // Initialization of HAPI functionalities.
 void initHybridAPI() {
@@ -861,16 +867,19 @@ static inline void hapiWorkRequestStartTime(hapiWorkRequest* wr) {
 static inline void profileWorkRequestEvent(hapiWorkRequest* wr,
                                            WorkRequestStage event) {
 #ifdef HAPI_INSTRUMENT_WRS
-  if (initializedInstrument()) {
+#if CMK_SMP || CMK_MULTICORE
+  CmiLock(CsvAccess(gpu_manager).inst_lock_);
+#endif
+
+  if (CsvAccess(gpu_manager).init_instr_) {
     double tt = CmiWallTimer() - (wr->phase_start_time);
     int index = wr->chare_index;
     char type = wr->comp_type;
     char phase = wr->comp_phase;
 
-    CkVec<hapiRequestTimeInfo> &vec = wr->avg_times_[index][type];
-    if (vec.length() <= phase){
-      vec.growAtLeast(phase);
-      vec.length() = phase+1;
+    std::vector<hapiRequestTimeInfo> &vec = CsvAccess(gpu_manager).avg_times_[index][type];
+    if (vec.size() <= phase) {
+      vec.resize(phase+1);
     }
     switch (event) {
       case DataSetup:
@@ -887,7 +896,14 @@ static inline void profileWorkRequestEvent(hapiWorkRequest* wr,
         printf("[HAPI] invalid event during profileWorkRequestEvent\n");
     }
   }
+  else {
+    printf("[HAPI] instrumentation not initialized!\n");
+  }
+
+#if CMK_SMP || CMK_MULTICORE
+  CmiUnlock(CsvAccess(gpu_manager).inst_lock_);
 #endif
+#endif // HAPI_INSTRUMENT_WRS
 }
 
 // Create a pool with n_slots slots.
@@ -895,12 +911,11 @@ static inline void profileWorkRequestEvent(hapiWorkRequest* wr,
 // TODO list the alignment/fragmentation issues with either of two allocation schemes:
 // if single, large buffer is allocated for each subpool
 // if multiple, smaller buffers are allocated for each subpool
-static void createPool(int *n_buffers, int n_slots, CkVec<BufferPool> &pools){
-  CkVec<size_t>& mempool_boundaries = CsvAccess(gpu_manager).mempool_boundaries_;
+static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &pools){
+  std::vector<size_t>& mempool_boundaries = CsvAccess(gpu_manager).mempool_boundaries_;
 
   // initialize pools
   pools.reserve(n_slots);
-  pools.length() = n_slots;
   for (int i = 0; i < n_slots; i++) {
     pools[i].size = mempool_boundaries[i];
     pools[i].head = NULL;
@@ -956,18 +971,18 @@ static void createPool(int *n_buffers, int n_slots, CkVec<BufferPool> &pools){
   }
 }
 
-static void releasePool(CkVec<BufferPool> &pools){
-  for (int i = 0; i < pools.length(); i++) {
+static void releasePool(std::vector<BufferPool> &pools){
+  for (int i = 0; i < pools.size(); i++) {
     BufferPoolHeader* hdr = pools[i].head;
     if (hdr != NULL) {
       hapiCheck(cudaFreeHost((void*)hdr));
     }
   }
-  pools.free();
+  pools.clear();
 }
 
 static int findPool(size_t size){
-  int boundary_array_len = CsvAccess(gpu_manager).mempool_boundaries_.length();
+  int boundary_array_len = CsvAccess(gpu_manager).mempool_boundaries_.size();
   if (size <= CsvAccess(gpu_manager).mempool_boundaries_[0]) {
     return 0;
   }
@@ -994,7 +1009,7 @@ static int findPool(size_t size){
 
     return boundary_array_len;
   }
-  for (int i = 0; i < CsvAccess(gpu_manager).mempool_boundaries_.length()-1; i++) {
+  for (int i = 0; i < CsvAccess(gpu_manager).mempool_boundaries_.size()-1; i++) {
     if (CsvAccess(gpu_manager).mempool_boundaries_[i] < size &&
         size <= CsvAccess(gpu_manager).mempool_boundaries_[i+1]) {
       return (i + 1);
@@ -1006,7 +1021,7 @@ static int findPool(size_t size){
 static void* getBufferFromPool(int pool, size_t size){
   BufferPoolHeader* ret;
 
-  if (pool < 0 || pool >= CsvAccess(gpu_manager).mempool_free_bufs_.length()) {
+  if (pool < 0 || pool >= CsvAccess(gpu_manager).mempool_free_bufs_.size()) {
     printf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %zu invalid pool\n",
            CmiMyPe(), pool, size);
 #ifdef HAPI_MEMPOOL_DEBUG
@@ -1131,44 +1146,58 @@ void hapiPoolFree(void* ptr) {
 }
 
 #ifdef HAPI_INSTRUMENT_WRS
-void hapiInitInstrument(int n_chares, char n_types) {
-  avg_times_.reserve(n_chares);
-  avg_times_.length() = n_chares;
-  for (int i = 0; i < n_chares; i++) {
-    avg_times_[i].reserve(n_types);
-    avg_times_[i].length() = n_types;
-  }
-  init_instr_ = true;
-}
+void hapiInitInstrument(int n_chares, int n_types) {
+#if CMK_SMP || CMK_MULTICORE
+  CmiLock(CsvAccess(gpu_manager).inst_lock_);
+#endif
 
-static bool initializedInstrument() {
-  return init_instr_;
+  if (!CsvAccess(gpu_manager).init_instr_) {
+    CsvAccess(gpu_manager).avg_times_.resize(n_chares);
+    for (int i = 0; i < n_chares; i++) {
+      CsvAccess(gpu_manager).avg_times_[i].resize(n_types);
+    }
+    CsvAccess(gpu_manager).init_instr_ = true;
+  }
+
+#if CMK_SMP || CMK_MULTICORE
+  CmiUnlock(CsvAccess(gpu_manager).inst_lock_);
+#endif
 }
 
 hapiRequestTimeInfo* hapiQueryInstrument(int chare, char type, char phase) {
-  if (phase < avg_times_[chare][type].length()) {
-    return &avg_times_[chare][type][phase];
+#if CMK_SMP || CMK_MULTICORE
+  CmiLock(CsvAccess(gpu_manager).inst_lock_);
+#endif
+
+  if (phase < CsvAccess(gpu_manager).avg_times_[chare][type].size()) {
+    return &CsvAccess(gpu_manager).avg_times_[chare][type][phase];
   }
   else {
     return NULL;
   }
+
+#if CMK_SMP || CMK_MULTICORE
+  CmiUnlock(CsvAccess(gpu_manager).inst_lock_);
+#endif
 }
 
 void hapiClearInstrument() {
-  for (int chare = 0; chare < avg_times_.length(); chare++) {
-    for (int type = 0; type < avg_times_[chare].length(); type++) {
-      for (int phase = 0; phase < avg_times_[chare][type].length(); phase++) {
-        avg_times_[chare][type][phase].transferTime = 0.0;
-        avg_times_[chare][type][phase].kernelTime = 0.0;
-        avg_times_[chare][type][phase].cleanupTime = 0.0;
-        avg_times_[chare][type][phase].n = 0;
-      }
-      avg_times_[chare][type].length() = 0;
+#if CMK_SMP || CMK_MULTICORE
+  CmiLock(CsvAccess(gpu_manager).inst_lock_);
+#endif
+
+  for (int chare = 0; chare < CsvAccess(gpu_manager).avg_times_.size(); chare++) {
+    for (char type = 0; type < CsvAccess(gpu_manager).avg_times_[chare].size(); type++) {
+      CsvAccess(gpu_manager).avg_times_[chare][type].clear();
     }
-    avg_times_[chare].length() = 0;
+    CsvAccess(gpu_manager).avg_times_[chare].clear();
   }
-  avg_times_.length() = 0;
-  init_instr_ = false;
+  CsvAccess(gpu_manager).avg_times_.clear();
+  CsvAccess(gpu_manager).init_instr_ = false;
+
+#if CMK_SMP || CMK_MULTICORE
+  CmiUnlock(CsvAccess(gpu_manager).inst_lock_);
+#endif
 }
 #endif // HAPI_INSTRUMENT_WRS
 
@@ -1184,7 +1213,8 @@ void hapiPollEvents() {
     if (cudaEventQuery(hev.event) == cudaSuccess) {
       // invoke Charm++ callback if one was given
       if (hev.cb) {
-        ((CkCallback*)hev.cb)->send(hev.cb_msg);
+        CmiAssert(hapiInvokeCallback);
+        hapiInvokeCallback(hev.cb, hev.cb_msg);
       }
 
       // clean up hapiWorkRequest
@@ -1196,7 +1226,8 @@ void hapiPollEvents() {
       CpvAccess(n_hapi_events)--;
 
       // inform QD that an event was processed
-      QdProcess(1);
+      CmiAssert(hapiQdProcess);
+      hapiQdProcess(1);
     }
     else {
       // stop going through the queue once we encounter a non-successful event
@@ -1267,7 +1298,8 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
 
   // while there is an ongoing workrequest, quiescence should not be detected
   // even if all PEs seem idle
-  QdCreate(1);
+  CmiAssert(hapiQdCreate);
+  hapiQdCreate(1);
 }
 
 cudaError_t hapiMalloc(void** devPtr, size_t size) {
