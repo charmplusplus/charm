@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/bin/bash --login
+# Use a --login shell to make sure modules etc. get loaded.
 
 set -o errexit -o nounset
 
@@ -27,10 +28,22 @@ case "$-" in
 esac
 
 echo "$0: Running autobuild test."
+
 echo "=== Script: ==="
 cat $0
 echo "=== End Script ==="
+
 echo "PWD=$(pwd)"
+
+echo "=== Configuration: ==="
+echo "AUTOBUILD_MACHINE_NAME=$AUTOBUILD_MACHINE_NAME"
+echo "AUTOBUILD_BRANCH=$AUTOBUILD_BRANCH"
+echo "AUTOBUILD_BUILD_NAME=$AUTOBUILD_BUILD_NAME"
+echo "AUTOBUILD_BUILD_COMMAND=$AUTOBUILD_BUILD_COMMAND"
+echo "=== End Configuration ==="
+
+echo
+echo
 
 
 rm -rf charm_autobuild
