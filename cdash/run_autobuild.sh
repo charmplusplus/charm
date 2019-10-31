@@ -8,7 +8,7 @@ set -o errexit -o nounset
 AUTOBUILD_MACHINE_NAME="Quartz"
 AUTOBUILD_BRANCH="cdash"
 AUTOBUILD_BUILD_NAME="ofi-linux-x86_64"
-AUTOBUILD_BUILD_COMMAND="./build LIBS $AUTOBUILD_BUILD_NAME -j8 -g --with-production"
+AUTOBUILD_BUILD_COMMAND="./build all-test $AUTOBUILD_BUILD_NAME -j8 -g --with-production"
 
 # Configuration ends here
 
