@@ -29,21 +29,21 @@ pyctest.BUILD_COMMAND = "sh -c 'cd .. && ./build LIBS ${CTEST_BUILD_NAME} -j8 -g
 tests = pyctest.test()
 tests.SetName("tests/")
 tests.SetProperty("WORKING_DIRECTORY", "..")
-tests.SetCommand(["make", "-C", "./tests/", "test"])
+tests.SetCommand(["make", "-C", "./tests/", "test", "TESTOPTS=++local"])
 tests.SetProperty("TIMEOUT", "1200")
 
 # Define test for examples/ directory
 examples = pyctest.test()
 examples.SetName("examples/")
 examples.SetProperty("WORKING_DIRECTORY", "..")
-examples.SetCommand(["make", "-C", "./examples/", "test"])
+examples.SetCommand(["make", "-C", "./examples/", "test", "TESTOPTS=++local"])
 examples.SetProperty("TIMEOUT", "1200")
 
 # Define test for benchmarks/ directory
 benchmarks = pyctest.test()
 benchmarks.SetName("benchmarks/")
 benchmarks.SetProperty("WORKING_DIRECTORY", "..")
-benchmarks.SetCommand(["make", "-C", "./benchmarks/", "test"])
+benchmarks.SetCommand(["make", "-C", "./benchmarks/", "test", "TESTOPTS=++local"])
 benchmarks.SetProperty("TIMEOUT", "1200")
 
 # Run all tests

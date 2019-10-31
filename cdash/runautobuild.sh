@@ -20,6 +20,6 @@ echo "set(CTEST_SOURCE_DIRECTORY \"$(pwd)/cdash\")"    >> cdash/CTestCustom.cmak
 echo "set(CTEST_BINARY_DIRECTORY \"$(pwd)/cdash\")"    >> cdash/CTestCustom.cmake
 echo "set(CTEST_SITE \"$AUTOBUILD_MACHINE_NAME\")"     >> cdash/CTestCustom.cmake
 echo "set(CTEST_BUILD_NAME \"$AUTOBUILD_BUILD_NAME\")" >> cdash/CTestCustom.cmake
-echo "set(CTEST_BUILD_COMMAND \"sh -c \'cd .. && $AUTOBUILD_BUILD_COMMAND\'\")" >> cdash/CTestCustom.cmake
+echo "set(CTEST_BUILD_COMMAND \"sh -c 'cd .. && $AUTOBUILD_BUILD_COMMAND'\")" >> cdash/CTestCustom.cmake
 
 ctest -VV -S cdash/Stages.cmake -DSTAGES="Start;Update;Build;Test;Submit"
