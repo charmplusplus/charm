@@ -1,10 +1,5 @@
 # CMake-based build system for Charm++ and AMPI
 #
-# This build system currently requires CMake 3.11+ due to
-# using CMAKE_Fortran_COMPILER_LAUNCHER to launch charmc to compile
-# Fortran files. A potential workaround is outlined in the same location
-# where CMAKE_Fortran_COMPILER_LAUNCHER is set.
-#
 # When updating any of the following files:
 # - any Makefile
 # - adding, deleting, renaming any source file
@@ -15,7 +10,7 @@
 # - the buildcmake script
 # - files in cmake/
 
-# 3.4 added CMAKE_C_COMPILER_LAUNCHER and CMAKE_CXX_COMPILER_LAUNCHER
+# Version 3.4 added CMAKE_C_COMPILER_LAUNCHER and CMAKE_CXX_COMPILER_LAUNCHER
 cmake_minimum_required(VERSION 3.4)
 
 project(Charm++ LANGUAGES CXX C VERSION 6.10.0)
