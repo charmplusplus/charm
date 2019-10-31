@@ -69,7 +69,7 @@ void CmiInitHwlocTopology(void)
     // Legacy: Determine the system's total PU count
 
     cmi_hwloc_topology_init(&legacy_topology);
-    cmi_hwloc_topology_set_flags(legacy_topology, cmi_hwloc_topology_get_flags(legacy_topology) | HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED);
+    cmi_hwloc_topology_set_flags(legacy_topology, cmi_hwloc_topology_get_flags(legacy_topology) | HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM);
     cmi_hwloc_topology_load(legacy_topology);
 
     depth = cmi_hwloc_get_type_depth(legacy_topology, HWLOC_OBJ_PU);
