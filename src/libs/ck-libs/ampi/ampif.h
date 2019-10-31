@@ -194,8 +194,6 @@
        integer, parameter :: MPI_COMM_FIRST_INTRA = 6000000
        integer, parameter :: MPI_COMM_FIRST_RESVD = 7000000
        integer, parameter :: MPI_COMM_WORLD       = 9000000
-       integer, parameter :: MPI_MAX_COMM_WORLDS  = 8
-       integer :: MPI_COMM_UNIVERSE(1:MPI_MAX_COMM_WORLDS)
 
        integer, parameter :: MPI_INFO_ENV              = 0
        integer, parameter :: AMPI_INFO_LB_SYNC         = 1

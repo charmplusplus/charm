@@ -152,6 +152,15 @@ void CldModuleInit(char **);
 #include <mpi.h>
 #endif
 
+#ifndef _WIN32
+void * CmiAlignedAlloc(size_t alignment, size_t size)
+{
+  void * ptr = nullptr;
+  errno = posix_memalign(&ptr, alignment, size);
+  return ptr;
+}
+#endif
+
 #if CMK_TRACE_ENABLED
 struct envelope;
 void traceAddThreadListeners(CthThread tid, struct envelope *env);
@@ -593,6 +602,12 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
  *
  *****************************************************************************/
 #include "cmibacktrace.C"
+#include "cmidemangle.h"
+
+#if CMK_USE_BACKTRACE
+#include <dlfcn.h> // for dladdr()
+#include <libgen.h> // for basename()
+#endif
 
 /*
 Convert "X(Y) Z" to "Y Z"-- remove text prior to first '(', and supress
@@ -636,27 +651,27 @@ static const char* _implGetBacktraceSys(const char *name) {
 
 /** Print out the names of these function pointers. */
 void CmiBacktracePrint(void **retPtrs,int nLevels) {
-  if (nLevels>0) {
-    int i;
-    char **names=CmiBacktraceLookup(retPtrs,nLevels);
-    if (names==NULL) return;
+#if CMK_USE_BACKTRACE
+  if (nLevels > 0) {
     CmiPrintf("[%d] Stack Traceback:\n", CmiMyPe());
-    for (i=0;i<nLevels;i++) {
-      if (names[i] == NULL) continue;
-      {
-      const char *trimmed=_implTrimParenthesis(names[i], 0);
-      const char *print=trimmed;
-      const char *sys=_implGetBacktraceSys(print);
-      if (sys) {
-          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n",i,sys,print);
+    for (int i = 0; i < nLevels; ++i) {
+      Dl_info info;
+      int res = dladdr(retPtrs[i], &info);
+      if (res) { /* dladdr() succeeded, print the address, filename, and function name */
+        const char *filename = basename((char*)info.dli_fname);
+        const std::string demangled_symbol_name = CmiDemangle(info.dli_sname);
+        const char *sys=_implGetBacktraceSys(demangled_symbol_name.c_str());
+        if (sys) {
+          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n", i, sys, demangled_symbol_name.c_str());
           break; /*Stop when we hit Charm++ runtime.*/
-      } else {
-          CmiPrintf("  [%d:%d] %s\n",CmiMyPe(),i,print);
+        }
+        CmiPrintf("  [%d:%d] %s %p %s\n", CmiMyPe(), i, filename, retPtrs[i], demangled_symbol_name.c_str());
+      } else { /* dladdr() failed, just print the address */
+        CmiPrintf("  [%d:%d] %p\n", CmiMyPe(), i, retPtrs[i]);
       }
-     }
     }
-    free(names);
   }
+#endif
 }
 
 /* Print (to stdout) the names of the functions that have been 
@@ -1033,9 +1048,12 @@ void CmiTimerInit(char **argv)
   if(CmiMyRank() == 0) _absoluteTime = tmptime;   /* initialize only  once */
 #if !(__FAULT__)
   /* try to synchronize calling barrier */
-  CmiBarrier();
-  CmiBarrier();
-  CmiBarrier();
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    {
+      CmiBarrier();
+      CmiBarrier();
+      CmiBarrier();
+    }
 #endif
 if(CmiMyRank() == 0) /* initialize only  once */
   {
@@ -1051,7 +1069,8 @@ if(CmiMyRank() == 0) /* initialize only  once */
   }
 
 #if !(__FAULT__)
-  CmiBarrier();
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    CmiBarrier();
 /*  CmiBarrierZero(); */
 #endif
 }
@@ -1132,10 +1151,13 @@ double CmiInitTime(void)
 void CmiTimerInit(char **argv)
 {
   struct rusage ru;
-
-  CmiBarrier();
-  CmiBarrier();
-
+#if !(__FAULT__)
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    {
+      CmiBarrier();
+      CmiBarrier();
+    }
+#endif
   _cpu_speed_factor = 1.0/(readMHz()*1.0e6); 
   rdtsc(); rdtsc(); rdtsc(); rdtsc(); rdtsc();
   CpvInitialize(double, inittime_walltime);
@@ -1145,8 +1167,10 @@ void CmiTimerInit(char **argv)
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
-
-  CmiBarrierZero();
+#if !(__FAULT__)
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    CmiBarrierZero();
+#endif  
 }
 
 double CmiCpuTimer(void)
@@ -1205,9 +1229,11 @@ void CmiTimerInit(char **argv)
 
   /* try to synchronize calling barrier */
 #if !(__FAULT__)
-  CmiBarrier();
-  CmiBarrier();
-  CmiBarrier();
+  if(CpvAccess(cmiArgDebugFlag)==0){
+    CmiBarrier();
+    CmiBarrier();
+    CmiBarrier();
+  }
 #endif
   CpvAccess(inittime) = GetTimeBase (); 
 }
@@ -1281,7 +1307,7 @@ void CmiTimerInit(char **argv)
   CpvAccess(clocktick) =  1.0 / ((double) __ppc_get_timebase_freq());
 
   /* try to synchronize calling barrier */
-#if !(__FAULT__)
+#if !(__FAULT__) && !CMK_CHARMDEBUG
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
@@ -1883,11 +1909,6 @@ extern void machine_OffloadAPIProgress(void);
 /** The main scheduler loop that repeatedly executes messages from a queue, forever. */
 void CsdScheduleForever(void)
 {
-  #if CMK_CELL
-    #define CMK_CELL_PROGRESS_FREQ  96  /* (MSG-Q Entries x1.5) */
-    int progressCount = CMK_CELL_PROGRESS_FREQ;
-  #endif
-
   int isIdle=0;
   SCHEDULE_TOP
   while (1) {
@@ -1912,23 +1933,8 @@ void CsdScheduleForever(void)
       if (isIdle) {isIdle=0;CsdEndIdle();}
 #endif
       SCHEDULE_MESSAGE
-
-      #if CMK_CELL
-        if (progressCount <= 0) {
-          /*OffloadAPIProgress();*/
-          machine_OffloadAPIProgress();
-          progressCount = CMK_CELL_PROGRESS_FREQ;
-	}
-        progressCount--;
-      #endif
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
-
-      #if CMK_CELL
-        /*OffloadAPIProgress();*/
-        machine_OffloadAPIProgress();
-        progressCount = CMK_CELL_PROGRESS_FREQ;
-      #endif
     }
 #if !CSD_NO_PERIODIC
     CsdPeriodic();
@@ -3792,19 +3798,21 @@ void ConverseCommonInit(char **argv)
   CmiIOInit(argv);
 #endif
   if (CmiMyPe() == 0)
-      CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
+    CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
 
   CpvInitialize(int, cmiMyPeIdle);
   CpvAccess(cmiMyPeIdle) = 0;
-
 #if CONVERSE_POOL
   CmiPoolAllocInit(30);  
 #endif
   CmiTmpInit(argv);
+  if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
+    {
+      CpvAccess(cmiArgDebugFlag) = 1;
+    }
   CmiTimerInit(argv);
   CstatsInit(argv);
   CmiInitCPUAffinityUtil();
-
   CcdModuleInit(argv);
   CmiHandlerInit();
   CmiReductionsInit();
@@ -3827,7 +3835,7 @@ void ConverseCommonInit(char **argv)
     if(CmiMyRank() == 0) CmiAbort("The option +CmiSpinOnIdle is mutually exclusive with the options +CmiSleepOnIdle and +CmiNoProcForComThread");
   }
 #endif
-	
+
 #if CMK_TRACE_ENABLED
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
@@ -3848,10 +3856,12 @@ void ConverseCommonInit(char **argv)
 
   CmiDeliversInit();
   CsdInit(argv);
+
 #if CMK_CCS_AVAILABLE
   ccsRunning = 0;
   CcsInit(argv);
 #endif
+
   CpdInit();
   CthSchedInit();
   CmiGroupInit();
@@ -3865,11 +3875,6 @@ void ConverseCommonInit(char **argv)
   CmiInitImmediateMsg();
   CldModuleInit(argv);
   
-#if CMK_CELL
-  void CmiInitCell();
-  CmiInitCell();
-#endif
-
   /* main thread is suspendable */
 /*
   CthSetSuspendable(CthSelf(), 0);
@@ -3894,10 +3899,6 @@ void ConverseCommonExit(void)
   CmiFlush(stdout);  /* end of program, always flush */
 #endif
 
-#if CMK_CELL
-  CloseOffloadAPI();
-#endif
-
 #if CMK_CUDA
   // ensure all PEs have finished GPU work before destructing
   if(CmiMyRank() < CmiMyNodeSize()) {
@@ -3911,31 +3912,6 @@ void ConverseCommonExit(void)
   EmergencyExit();
 }
 
-
-#if CMK_CELL != 0
-
-extern void register_accel_spe_funcs(void);
-
-void CmiInitCell(void)
-{
-  // Create a unique string for each PPE to use for the timing
-  //   data file's name
-  char fileNameBuf[64];
-  sprintf(fileNameBuf, "speTiming.%d", CmiMyPe());
-
-  InitOffloadAPI(offloadCallback, NULL, NULL, fileNameBuf);
-  //CcdCallOnConditionKeep(CcdPERIODIC, 
-  //      (CcdVoidFn) OffloadAPIProgress, NULL);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) OffloadAPIProgress, NULL);
-
-  // Register accelerated entry methods on the PPE
-  register_accel_spe_funcs();
-}
-
-#include "cell-api.c"
-
-#endif
 
 /****
  * CW Lee - 9/14/2005
@@ -3990,11 +3966,6 @@ void CmiIOInit(char **argv) {
 }
 #endif
 
-void CmiPuts(const char * str)
-{
-  CmiPrintf("%s", str);
-}
-
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
 
 void CmiPrintf(const char *format, ...)
@@ -4010,7 +3981,7 @@ void CmiPrintf(const char *format, ...)
   }
   va_end(args);
 #if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);
@@ -4030,7 +4001,7 @@ void CmiError(const char *format, ...)
   CmiFlush(stderr);  /* stderr is always flushed */
   va_end(args);
 #if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);

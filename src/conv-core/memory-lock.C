@@ -5,20 +5,6 @@
   code; \
   CmiMemUnlock();
 
-/* Wrap a reentrant CmiMemLock around this code */
-#define REENTRANT_MEM_LOCK_AROUND(code) \
-  int myRank=CmiMyRank(); \
-  if (myRank!=rank_holding_CmiMemLock) { \
-  	CmiMemLock(); \
-	rank_holding_CmiMemLock=myRank; \
-	code; \
-	rank_holding_CmiMemLock=-1; \
-	CmiMemUnlock(); \
-  } \
-  else /* I'm already holding the memLock (reentrancy) */ { \
-  	code; \
-  }
-
 static void meta_init(char **argv)
 {
 /*   if (CmiMyRank()==0) CmiMemoryIs_flag|=CMI_MEMORY_IS_OSLOCK;   */

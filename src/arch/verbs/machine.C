@@ -869,12 +869,12 @@ static void CommunicationInterrupt(int ignored)
   MACHSTATE1(2,"--BEGIN SIGIO comm_mutex_isLocked: %d--", comm_flag)
   {
     /*Make sure any malloc's we do in here are NOT migratable:*/
-    CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
+    CmiMemoryIsomallocDisablePush();
 /*    _Cmi_myrank=1; */
     CommunicationServerNet(0, COMM_SERVER_FROM_INTERRUPT);  /* from interrupt */
     //CommunicationServer(0);  /* from interrupt */
 /*    _Cmi_myrank=0; */
-    CmiIsomallocBlockListActivate(oldList);
+    CmiMemoryIsomallocDisablePop();
   }
   MACHSTATE(2,"--END SIGIO--")
 }
@@ -2104,17 +2104,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   *myNodeID = Lrts_myNode;
 }
 
-
-#if CMK_CELL
-
-#include "spert_ppu.h"
-
-void machine_OffloadAPIProgress(void) {
-  LOCK_IF_AVAILABLE();
-  OffloadAPIProgress();
-  UNLOCK_IF_AVAILABLE();
-}
-#endif
 
 void LrtsPrepareEnvelope(char *msg, int size)
 {

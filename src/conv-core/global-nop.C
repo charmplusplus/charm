@@ -13,8 +13,8 @@ void CtgInit(void) {
 	CpvInitialize(int, CmiPICMethod);
         CpvAccess(CmiPICMethod) = CMI_PIC_NOP;
 }
+size_t CtgGetSize() { return 0; }
 void CtgInstall(CtgGlobals g) {}
-CtgGlobals CtgCreate(CthThread tid) {return 0;}
-CtgGlobals CtgPup(pup_er p,CtgGlobals g) { return 0;}
-void CtgFree(CtgGlobals g) {}
-CtgGlobals CtgCurrentGlobals(void) { return 0; }
+void CtgUninstall() {}
+CtgGlobals CtgCreate(void * buffer) { return CtgGlobalStruct{}; }
+CtgGlobals CtgCurrentGlobals() { return CtgGlobalStruct{}; }

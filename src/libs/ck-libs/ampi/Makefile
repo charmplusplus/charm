@@ -4,10 +4,11 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h \
 		ampi-interoperate.h ampi.decl.h \
+		mpio_globals.h \
 		ampi_functions.h mpio_functions.h
 HEADDEP=$(HEADERS) ampiimpl.h ddt.h \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
-COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
+COMPAT=compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
 	   compat_ampicpp.o
 OBJS=ampi.o ampif.o ampiOneSided.o \
@@ -43,7 +44,7 @@ ifeq ($(CMK_NO_BUILD_SHARED),false)
 	ROMIOLIBSHARED=$(CDIR)/lib_so/libampiromio.$(CMK_SHARED_SUF)
 endif
 
-ifeq ($(CMK_AMPI_WITH_ROMIO),true)
+ifeq ($(CMK_AMPI_WITH_ROMIO),1)
 	ROMIO=$(ROMIOLIB).a
 endif
 
@@ -79,7 +80,12 @@ $(ROMIO): | AMPI AMPIF
 	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
 	$(MAKE) -C romio
 	cp romio/.libs/libromio.a $@
-	test -n "$(ROMIOLIBSHARED)" && cp romio/.libs/libromio.$(CMK_SHARED_SUF) $(ROMIOLIBSHARED) || true
+ifneq ($(ROMIOLIBSHARED),)
+	cp romio/.libs/libromio.$(CMK_SHARED_SUF) $(ROMIOLIBSHARED)
+ifeq ($(CMK_MACOSX),1)
+	install_name_tool -id $(ROMIOLIBSHARED) $(ROMIOLIBSHARED)
+endif
+endif
 	@echo "ROMIO built successfully"
 
 AMPI: $(AMPI_TARGET)
@@ -113,6 +119,7 @@ headers: $(HEADERS)
 	cp ampiimpl.h $(CDIR)/include/          # For AMPI + Charm++ interop
 	cp ddt.h $(CDIR)/include/               # For AMPI + Charm++ interop
 	cp ampi-interoperate.h $(CDIR)/include/ # For AMPI + Charm++ interop
+	cp mpio_globals.h $(CDIR)/include/
 	cp ampiCC $(CDIR)/bin/ampicc
 	cp ampiCC $(CDIR)/bin/ampiCC
 	cp ampiCC $(CDIR)/bin/ampicxx
@@ -121,10 +128,6 @@ headers: $(HEADERS)
 	cp ampirun $(CDIR)/bin/ampirun
 	cp nm_globals.sh $(CDIR)/bin/nm_globals.sh
 	touch headers
-
-compat_ampius.o: compat_ampius.C
-
-compat_ampifus.o: compat_ampifus.C
 
 compat_ampim.o: compat_ampim.C
 
