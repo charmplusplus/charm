@@ -23,7 +23,7 @@ pyctest.PROJECT_NAME = urllib.parse.quote("Charm++")
 pyctest.set("CTEST_DROP_SITE", "my.cdash.org")
 pyctest.DROP_LOCATION = "/cdash/submit.php?project=" + pyctest.PROJECT_NAME
 pyctest.BUILD_NAME = "undefined_BUILD_NAME"
-pyctest.BUILD_COMMAND = "sh -c 'cd .. && ./build LIBS ${CTEST_BUILD_NAME} -j8 -g --with-production'"
+pyctest.BUILD_COMMAND = "sh -c 'cd .. && ./build all-test ${CTEST_BUILD_NAME} -j8 -g --with-production'"
 
 # Define test for tests/ directory
 tests = pyctest.test()
