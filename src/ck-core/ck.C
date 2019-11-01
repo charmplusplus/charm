@@ -437,13 +437,11 @@ void CkSectionID::pup(PUP::er &p) {
 /**** Tiny random API routines */
 
 #if CMK_CUDA
-void CUDACallbackManager(void *fn) {
-  if (fn != NULL) {
-    CkCallback *cb = (CkCallback*) fn;
-    cb->send();
+void CUDACallbackManager(void *fn, void *msg) {
+  if (fn) {
+    ((CkCallback*)fn)->send(msg);
   }
 }
-
 #endif
 
 void QdCreate(int n) {

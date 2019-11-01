@@ -79,6 +79,14 @@ never be excluded...
 
 #if CMK_CUDA
 #include "hapi_impl.h"
+
+extern void (*hapiInvokeCallback)(void*, void*);
+extern void CUDACallbackManager(void*, void*);
+
+extern void (*hapiQdCreate)(int);
+extern void (*hapiQdProcess)(int);
+extern void QdCreate(int);
+extern void QdProcess(int);
 #endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
@@ -1691,6 +1699,9 @@ void _initCharm(int unused_argc, char **argv)
       CmiNodeBarrier();
     }
     hapiRegisterCallbacks();
+    hapiInvokeCallback = CUDACallbackManager;
+    hapiQdCreate = QdCreate;
+    hapiQdProcess = QdProcess;
 #endif
 
     if(CmiMyPe() == 0) {
