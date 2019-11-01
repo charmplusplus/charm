@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Shell script to test for multiple test cases
 
 touch outputs
