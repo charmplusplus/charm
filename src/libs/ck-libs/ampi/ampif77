@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 CHARMBIN=`dirname $0`
 
 export AMPICC_MODE='ampif'
