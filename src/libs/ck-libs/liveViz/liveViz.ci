@@ -18,4 +18,11 @@ module liveViz {
 		entry LiveVizBoundElement();
 		entry [local] void deposit(CkReductionMsg *msg);
 	}; 
+
+  group LiveVizBalanceGroup {
+    entry LiveVizBalanceGroup();
+    entry void reduceBalanceData(CkCcsRequestMsg* m);
+    entry void doReduction();
+    entry [reductiontarget] void sendReply(int data[n], int n);
+  };
 }

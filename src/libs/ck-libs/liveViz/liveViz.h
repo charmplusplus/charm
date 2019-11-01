@@ -146,6 +146,54 @@ public:
 	}
 };
 
+class LiveVizBalanceGroup : public CBase_LiveVizBalanceGroup {
+private:
+  CkGroupID lbdbID;
+  LBDatabase* lbdb;
+  CkCcsRequestMsg* msg;
+public:
+  LiveVizBalanceGroup() {
+    lbdbID = _lbdb;
+    lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
+    msg = NULL;
+  }
+
+  void reduceBalanceData(CkCcsRequestMsg* m) {
+    CkAssert(msg == NULL);
+    msg = m;
+    thisProxy.doReduction();
+  }
+
+  void doReduction() {
+    const int osz = lbdb->GetObjDataSz();
+    LDObjData* objData = new LDObjData[osz];
+    lbdb->GetObjData(objData);
+
+    int len = osz + 2;
+    int* buf = new int[len];
+    buf[0] = CkMyPe();
+    buf[1] = osz;
+    for (int i = 0; i < osz; i++) {
+      buf[i+2] = (int)(objData[i].wallTime * 1000);
+    }
+
+    contribute(sizeof(int) * len, buf, CkReduction::concat, CkCallback(CkReductionTarget(LiveVizBalanceGroup, sendReply), thisProxy[0]));
+    delete[] buf;
+  }
+
+  void sendReply(int* data, int n) {
+    int total_size = n+1;
+    int total_pes = CkNumPes();
+    int* buf = new int[total_size];
+    buf[0] = total_pes;
+    memcpy(&(buf[1]), data, n*sizeof(int));
+    CcsSendDelayedReply(msg->reply, total_size * sizeof(int), buf);
+    delete[] buf;
+    delete msg;
+    msg = NULL;
+  }
+};
+
 
 
 #endif /* def(thisHeader) */
