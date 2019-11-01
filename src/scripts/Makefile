@@ -563,12 +563,12 @@ cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/confi
 
 hwloc-target:  conv-autoconfig.h
 	( $(MAKE) -C hwloc )
-	( test -e hwloc/src/.libs/libhwloc_embedded.lib && cp -f hwloc/src/.libs/libhwloc_embedded.lib hwloc/src/.libs/libhwloc_embedded.a ) || true
-	( cp -f hwloc/src/.libs/libhwloc_embedded.a $(L) )
+	( test -e hwloc/hwloc/.libs/libhwloc_embedded.lib && cp -f hwloc/hwloc/.libs/libhwloc_embedded.lib hwloc/hwloc/.libs/libhwloc_embedded.a ) || true
+	( cp -f hwloc/hwloc/.libs/libhwloc_embedded.a $(L) )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
 ifeq (false,$(CMK_NO_BUILD_SHARED))
-	( test -d ../lib_so && cp -f hwloc/src/.libs/libhwloc_embedded.*$(CMK_SHARED_SUF)* ../lib_so/ ) || true
+	( test -d ../lib_so && cp -f hwloc/hwloc/.libs/libhwloc_embedded.*$(CMK_SHARED_SUF)* ../lib_so/ ) || true
 endif
 	touch $@
 

@@ -361,7 +361,7 @@ static void KillOnAllSigs(int sigNo)
   already_in_signal_handler=1;
 
 #if CMK_CCS_AVAILABLE
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     int reply = 0;
     CpdNotify(CPD_SIGNAL,sigNo);
 #if ! CMK_BIGSIM_CHARM
@@ -909,12 +909,12 @@ static void CommunicationInterrupt(int ignored)
   MACHSTATE1(2,"--BEGIN SIGIO comm_mutex_isLocked: %d--", comm_flag)
   {
     /*Make sure any malloc's we do in here are NOT migratable:*/
-    CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
+    CmiMemoryIsomallocDisablePush();
 /*    _Cmi_myrank=1; */
     CommunicationServerNet(0, COMM_SERVER_FROM_INTERRUPT);  /* from interrupt */
     //CommunicationServer(0);  /* from interrupt */
 /*    _Cmi_myrank=0; */
-    CmiIsomallocBlockListActivate(oldList);
+    CmiMemoryIsomallocDisablePop();
   }
   MACHSTATE(2,"--END SIGIO--")
 }
@@ -2011,11 +2011,11 @@ void ConverseCleanup(void)
         }
       }
 
-      char **ret;
+      const char **ret;
       if (restart_idx == -1) {
-        ret=(char **)malloc(sizeof(char *)*(argc+10));
+        ret=(const char **)malloc(sizeof(char *)*(argc+10));
       } else {
-        ret=(char **)malloc(sizeof(char *)*(argc+8));
+        ret=(const char **)malloc(sizeof(char *)*(argc+8));
       }
 
       for (i=0;i<argc;i++) {
@@ -2037,7 +2037,7 @@ void ConverseCleanup(void)
 
       ret[argc+5]="+myoldpe";
       char temp3[50];
-      sprintf(temp3,"%d", _Cmi_mype);
+      sprintf(temp3,"%d", CmiMyPe());
       ret[argc+6]=temp3;
 
       if (restart_idx == -1) {
@@ -2081,7 +2081,7 @@ void ConverseCleanup(void)
       }
 
       // TODO: check variant of execv that takes file descriptor
-      execv(ret[0], ret); // Need to check if the process name is always first arg
+      execv(ret[0], const_cast<char * const *>(ret)); // Need to check if the process name is always first arg
       /* should not be here */
       MACHSTATE1(3,"execv error: %s", strerror(errno));
       CmiPrintf("[%d] should not be here\n", CmiMyPe());

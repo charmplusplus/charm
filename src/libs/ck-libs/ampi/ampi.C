@@ -184,11 +184,6 @@ int errorCheck(const char* func, MPI_Comm comm, bool ifComm, int count,
 }
 
 //------------- startup -------------
-static mpi_comm_worlds mpi_worlds;
-
-int _mpi_nworlds; /*Accessed by ampif*/
-int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
-
 typedef struct { float val; int idx; } FloatInt;
 typedef struct { double val; int idx; } DoubleInt;
 typedef struct { long val; int idx; } LongInt;
@@ -777,39 +772,19 @@ class Builtin_kvs{
 };
 
 // ------------ startup support -----------
-int _ampi_fallback_setup_count = -1;
-CLINKAGE void AMPI_Setup(void);
-FLINKAGE void FTN_NAME(AMPI_SETUP,ampi_setup)(void);
-
 FLINKAGE void FTN_NAME(MPI_MAIN,mpi_main)(void);
 
-/*Main routine used when missing MPI_Setup routine*/
-CLINKAGE
-void AMPI_Fallback_Main(int argc,char **argv)
-{
-  int ret = 0;
-  // Only one of the following four main functions actually runs application code,
-  // the others are stubs provided by compat_ampi*.
-  ret += AMPI_Main_cpp();
-  ret += AMPI_Main_cpp(argc,argv);
-  ret += AMPI_Main_c(argc,argv);
-  FTN_NAME(MPI_MAIN,mpi_main)(); // returns void
-  AMPI_Exit(ret);
-}
+static int AMPI_threadstart_idx = -1;
 
-void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen);
 /*Startup routine used if user *doesn't* write
   a TCHARM_User_setup routine.
  */
 CLINKAGE
-void AMPI_Setup_Switch(void) {
-  _ampi_fallback_setup_count=0;
-  FTN_NAME(AMPI_SETUP,ampi_setup)();
-  AMPI_Setup();
-  if (_ampi_fallback_setup_count==2)
-  { //Missing AMPI_Setup in both C and Fortran:
-    ampiCreateMain(AMPI_Fallback_Main,"default",strlen("default"));
-  }
+void AMPI_Setup(void) {
+  STARTUP_DEBUG("AMPI_Setup")
+  int _nchunks=TCHARM_Get_num_chunks();
+  //Make a new threads array:
+  TCHARM_Create(_nchunks,AMPI_threadstart_idx);
 }
 
 int AMPI_PE_LOCAL_THRESHOLD = AMPI_PE_LOCAL_THRESHOLD_DEFAULT;
@@ -847,7 +822,6 @@ void FTN_NAME(AMPICURRENTSTACKUSAGE, ampicurrentstackusage)(void){
 
 CLINKAGE
 void AMPI_threadstart(void *data);
-static int AMPI_threadstart_idx = -1;
 
 #if CMK_TRACE_ENABLED
 CsvExtern(funcmap*, tcharm_funcmap);
@@ -982,12 +956,7 @@ static void ampiNodeInit() noexcept
   }
 #endif
 
-  _mpi_nworlds=0;
-  for(int i=0;i<MPI_MAX_COMM_WORLDS; i++)
-  {
-    MPI_COMM_UNIVERSE[i] = MPI_COMM_WORLD+1+i;
-  }
-  TCHARM_Set_fallback_setup(AMPI_Setup_Switch);
+  TCHARM_Set_fallback_setup(AMPI_Setup);
 
   /* read AMPI environment variables */
   char *value;
@@ -1108,70 +1077,34 @@ static inline int record_msglog(int rank) noexcept {
 }
 #endif
 
-PUPfunctionpointer(MPI_MainFn)
-
-class MPI_threadstart_t {
- public:
-  MPI_MainFn fn;
-  MPI_threadstart_t() noexcept {}
-  MPI_threadstart_t(MPI_MainFn fn_) noexcept :fn(fn_) {}
-  void start() {
-    char **argv=CmiCopyArgs(CkGetArgv());
-    int argc=CkGetArgc();
-
-    // Set a pointer to somewhere close to the bottom of the stack.
-    // This is used for roughly estimating the stack usage later.
-    CtvAccess(stackBottom) = &argv;
-
-#if !CMK_NO_BUILD_SHARED
-    // If charm++ is built with shared libraries, it does not support
-    // a custom AMPI_Setup method and always uses AMPI_Fallback_Main.
-    // Works around bug #1508.
-    if (_ampi_fallback_setup_count != -1 && _ampi_fallback_setup_count != 2 && CkMyPe() == 0) {
-      CkAbort("AMPI> The application provided a custom AMPI_Setup() method, "
-      "but AMPI is built with shared library support. This is an unsupported "
-      "configuration. Please recompile charm++/AMPI without `-build-shared` or "
-      "remove the AMPI_Setup() function from your application.\n");
-    }
-    AMPI_Fallback_Main(argc,argv);
-#else
-    (fn)(argc,argv);
-#endif
-  }
-  void pup(PUP::er &p) noexcept {
-    p|fn;
-  }
-};
-PUPmarshall(MPI_threadstart_t)
-
 CLINKAGE
 void AMPI_threadstart(void *data)
 {
   STARTUP_DEBUG("MPI_threadstart")
-  MPI_threadstart_t t;
-  pupFromBuf(data,t);
 #if CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn)) CthTraceResume(CthSelf());
 #endif
-  t.start();
-}
 
-void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen)
-{
-  STARTUP_DEBUG("ampiCreateMain")
-  int _nchunks=TCHARM_Get_num_chunks();
-  //Make a new threads array:
-  MPI_threadstart_t s(mainFn);
-  memBuf b; pupIntoBuf(b,s);
-  TCHARM_Create_data(_nchunks,AMPI_threadstart_idx,
-                     b.getData(), b.getSize());
+  char **argv=CmiCopyArgs(CkGetArgv());
+  int argc=CkGetArgc();
+
+  // Set a pointer to somewhere close to the bottom of the stack.
+  // This is used for roughly estimating the stack usage later.
+  CtvAccess(stackBottom) = &argv;
+
+  int ret = 0;
+  // Only one of the following four main functions actually runs application code,
+  // the others are stubs provided by compat_ampi*.
+  ret += AMPI_Main_cpp();
+  ret += AMPI_Main_cpp(argc,argv);
+  ret += AMPI_Main_c(argc,argv);
+  FTN_NAME(MPI_MAIN,mpi_main)(); // returns void
+  AMPI_Exit(ret);
 }
 
 /* TCharm Semaphore ID's for AMPI startup */
 #define AMPI_TCHARM_SEMAID 0x00A34100 /* __AMPI__ */
 #define AMPI_BARRIER_SEMAID 0x00A34200 /* __AMPI__ */
-
-static CProxy_ampiWorlds ampiWorldsGroup;
 
 // Create MPI_COMM_SELF from MPI_COMM_WORLD
 static void createCommSelf() noexcept {
@@ -1225,19 +1158,12 @@ static ampi *ampiInit(char **argv) noexcept
 
     // FIXME: Need to serialize global communicator allocation in one place.
     //Allocate the next communicator
-    if(_mpi_nworlds == MPI_MAX_COMM_WORLDS)
-    {
-      CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
-    }
-    int new_idx=_mpi_nworlds;
-    new_world=MPI_COMM_WORLD+new_idx;
-
     //Create and attach the ampiParent array
     CkArrayID threads;
     opts=TCHARM_Attach_start(&threads,&_nchunks);
     opts.setSectionAutoDelegate(false);
     CkArrayCreatedMsg *m;
-    CProxy_ampiParent::ckNew(new_world, threads, _nchunks, opts, CkCallbackResumeThread((void*&)m));
+    CProxy_ampiParent::ckNew(threads, _nchunks, opts, CkCallbackResumeThread((void*&)m));
     parent = CProxy_ampiParent(m->aid);
     delete m;
     STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
@@ -1251,20 +1177,13 @@ static ampi *ampiInit(char **argv) noexcept
     //Make a new ampi array
     CkArrayID empty;
 
-    ampiCommStruct worldComm(new_world,empty,_nchunks);
+    ampiCommStruct worldComm(MPI_COMM_WORLD, empty, _nchunks);
     CProxy_ampi arr;
     CkArrayCreatedMsg *m;
     CProxy_ampi::ckNew(parent, worldComm, opts, CkCallbackResumeThread((void*&)m));
     arr = CProxy_ampi(m->aid);
     delete m;
 
-    //Broadcast info. to the mpi_worlds array
-    // FIXME: remove race condition from MPI_COMM_UNIVERSE broadcast
-    ampiCommStruct newComm(new_world,arr,_nchunks);
-    if (ampiWorldsGroup.ckGetGroupID().isZero())
-      ampiWorldsGroup=CProxy_ampiWorlds::ckNew(newComm);
-    else
-      ampiWorldsGroup.add(newComm);
     STARTUP_DEBUG("ampiInit> arrays created")
   }
 
@@ -1304,27 +1223,10 @@ static ampi *ampiInit(char **argv) noexcept
   return ptr;
 }
 
-/// This group is used to broadcast the MPI_COMM_UNIVERSE communicators.
-class ampiWorlds : public CBase_ampiWorlds {
- public:
-  ampiWorlds(const ampiCommStruct &nextWorld) noexcept {
-    ampiWorldsGroup=thisgroup;
-    add(nextWorld);
-  }
-  ampiWorlds(CkMigrateMessage *m) noexcept : CBase_ampiWorlds(m) {}
-  void pup(PUP::er &p) noexcept { }
-  void add(const ampiCommStruct &nextWorld) noexcept {
-    int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD);
-    mpi_worlds[new_idx]=nextWorld;
-    if (_mpi_nworlds<=new_idx) _mpi_nworlds=new_idx+1;
-    STARTUP_DEBUG("ampiInit> listed MPI_COMM_UNIVERSE "<<new_idx)
-  }
-};
-
 //-------------------- ampiParent -------------------------
-ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_) noexcept
+ampiParent::ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept
   : threads(threads_), ampiReqs(64, &reqPool), myDDT(ampiPredefinedTypes),
-    worldNo(worldNo_), predefinedOps(ampiPredefinedOps), isTmpRProxySet(false)
+    predefinedOps(ampiPredefinedOps), isTmpRProxySet(false)
 {
   int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")
@@ -1333,6 +1235,10 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_) noe
   userAboutToMigrateFn=NULL;
   userJustMigratedFn=NULL;
   prepareCtv();
+
+#if CMK_AMPI_WITH_ROMIO
+  ADIO_Init_Globals(&romio_globals);
+#endif
 
   // Allocate an empty groupStruct to represent MPI_EMPTY_GROUP
   groups.push_back(new groupStruct);
@@ -1364,11 +1270,54 @@ ampiParent::ampiParent(CkMigrateMessage *msg) noexcept
 #endif
 }
 
+#if CMK_AMPI_WITH_ROMIO
+void ADIO_Init_Globals(struct ADIO_GlobalStruct * globals)
+{
+  globals->ADIOI_Flatlist = NULL;
+  globals->ADIOI_Datarep_head = NULL;
+  /* list of datareps registered by the user */
+
+  /* for f2c and c2f conversion */
+  globals->ADIOI_Ftable = NULL;
+  globals->ADIOI_Ftable_ptr = 0;
+  globals->ADIOI_Ftable_max = 0;
+  globals->ADIOI_Reqtable = NULL;
+  globals->ADIOI_Reqtable_ptr = 0;
+  globals->ADIOI_Reqtable_max = 0;
+#ifndef HAVE_MPI_INFO
+  globals->MPIR_Infotable = NULL;
+  globals->MPIR_Infotable_ptr = 0;
+  globals->MPIR_Infotable_max = 0;
+#endif
+
+  globals->ADIOI_syshints = MPI_INFO_NULL;
+
+  globals->ADIO_same_amode = MPI_OP_NULL;
+
+#if defined(ROMIO_XFS) || defined(ROMIO_LUSTRE) || defined(AMPI_INTERNAL_ADIOI_DIRECT)
+  globals->ADIOI_Direct_read = 0;
+  globals->ADIOI_Direct_write = 0;
+#endif
+
+  globals->ADIO_Init_keyval = MPI_KEYVAL_INVALID;
+
+  globals->ADIOI_DFLT_ERR_HANDLER = MPI_ERRORS_RETURN;
+
+  globals->ADIOI_cb_config_list_keyval = MPI_KEYVAL_INVALID;
+  globals->yylval = NULL;
+  globals->token_ptr = NULL;
+}
+
+struct ADIO_GlobalStruct * ADIO_Globals()
+{
+  return &getAmpiParent()->romio_globals;
+}
+#endif
+
 PUPfunctionpointer(MPI_MigrateFn)
 
 void ampiParent::pup(PUP::er &p) noexcept {
   p|threads;
-  p|worldNo;
   p|myDDT;
   p|splitComm;
   p|groupComm;
@@ -1399,6 +1348,11 @@ void ampiParent::pup(PUP::er &p) noexcept {
   p|numBlockedReqs;
   p|bsendBufferSize;
   p((char *)&bsendBuffer, sizeof(void *));
+
+#if CMK_AMPI_WITH_ROMIO
+  // requires memory-isomalloc
+  pup_bytes(&p, &romio_globals, sizeof(romio_globals));
+#endif
 
   // pup blockingReq
   AmpiReqType reqType;
@@ -1564,7 +1518,7 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) n
 {
   if (thread==NULL) prepareCtv(); //Prevents CkJustMigrated race condition
 
-  if (s.getComm()>=MPI_COMM_WORLD)
+  if (s.getComm()==MPI_COMM_WORLD)
   { //We now have our COMM_WORLD-- register it
     //Note that split communicators don't keep a raw pointer, so
     //they don't need to re-register on migration.
@@ -1587,7 +1541,7 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) n
   else { //Register the new communicator:
     MPI_Comm comm = s.getComm();
     STARTUP_DEBUG("ampiParent> registering new communicator "<<comm)
-    if (comm>=MPI_COMM_WORLD) {
+    if (comm==MPI_COMM_WORLD) {
       // Pass the new ampi to the waiting ampiInit
       thread->semaPut(AMPI_TCHARM_SEMAID, ptr);
     } else if (isSplit(comm)) {
@@ -1605,7 +1559,7 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) n
     } else if (isIntra(comm)) {
       intraChildRegister(s);
     }else
-      CkAbort("ampiParent received child with bad communicator");
+      CkAbort("ampiParent received child with bad communicator: %d", comm);
   }
 
   return thread;
@@ -2612,18 +2566,6 @@ void ampi::topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newComm) noe
 }
 
 //------------------------ communication -----------------------
-const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo) noexcept
-{
-  if (universeNo>MPI_COMM_WORLD) {
-    int worldDex=universeNo-MPI_COMM_WORLD-1;
-    if (worldDex>=_mpi_nworlds)
-      CkAbort("Bad world communicator passed to universeComm2CommStruct");
-    return mpi_worlds[worldDex];
-  }
-  CkAbort("Bad communicator passed to universeComm2CommStruct");
-  return mpi_worlds[0]; // meaningless return
-}
-
 CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::block() noexcept {
   TCharm * disThread = thread->suspend();
   ampiParent* disParent = getAmpiParent();
@@ -11638,15 +11580,6 @@ AMPI_API_IMPL(int, MPIR_Status_set_bytes, MPI_Status *sts, MPI_Datatype dtype, M
 
 /******** AMPI Extensions to the MPI standard *********/
 
-CLINKAGE int AMPI_Init_universe(int * unicomm)
-{
-  AMPI_API("AMPI_Init_universe", unicomm);
-  for(int i=0; i<_mpi_nworlds; i++) {
-    unicomm[i] = MPI_COMM_UNIVERSE[i];
-  }
-  return MPI_SUCCESS;
-}
-
 CLINKAGE char ** AMPI_Get_argv()
 {
   return CkGetArgv();
@@ -11812,28 +11745,6 @@ int AMPI_Load_set_value(double value)
 
 void _registerampif(void) {
   _registerampi();
-}
-
-CLINKAGE
-int AMPI_Register_main(MPI_MainFn mainFn,const char *name)
-{
-  AMPI_API("AMPI_Register_main", mainFn, name);
-  if (TCHARM_Element()==0)
-  { // I'm responsible for building the TCHARM threads:
-    ampiCreateMain(mainFn,name,strlen(name));
-  }
-  return MPI_SUCCESS;
-}
-
-FLINKAGE
-void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
-(MPI_MainFn mainFn,const char *name,int nameLen)
-{
-  AMPI_API("AMPI_register_main", name, nameLen);
-  if (TCHARM_Element()==0)
-  { // I'm responsible for building the TCHARM threads:
-    ampiCreateMain(mainFn,name,nameLen);
-  }
 }
 
 CLINKAGE

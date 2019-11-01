@@ -329,7 +329,7 @@ static CcsSecMan *CcsSecMan_default(const char *authFile)
 }
 
 /*********************************************************/
-#define CCSDBG(x) /*printf x*/
+#define CCSDBG(x) //printf x
 
 /*CCS Server state is all stored in global variables.
 Since there's only one server, this is ugly but OK.
@@ -436,7 +436,7 @@ int CcsServer_recvRequest(CcsImplHeader *hdr,void **reqData)
     ret=0;
   }
 
-  CCSDBG(("CCS   Got all %d data bytes for request.\n",reqBytes));
+  CCSDBG(("CCS   Ret %d request.\n",ret));
   skt_set_abort(old);
 
   return ret;

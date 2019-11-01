@@ -1,10 +1,42 @@
 #!/bin/bash
 
-# Thin wrapper around cmake to start a build with a similar command line as ./build
+# Thin wrapper around CMake to start a build with a similar command line as ./build
 
 set -o errexit -o nounset
 
+# Check that CMake is available and that the version is sufficiently new
+
+command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
+
+if [[ $rc -ne 0 ]]; then
+  echo "Warning: CMake unavailable, running ./build instead."
+  sleep 2
+  exec ./build $@
+fi
+
+cmake_version_major=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 1 -d'.')
+cmake_version_minor=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 2 -d'.')
+
+if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 4) ]]; then
+  echo "Warning: The CMake version is too old (needed: 3.4.0 or later), running ./build instead."
+  sleep 2
+  exec ./build $@
+fi
+
+usage()
+{
+  echo "Usage: $0 <target> <triplet> [other options]"
+  echo "  See the Charm++ manual at"
+  echo "  https://charm.rtfd.io/en/latest/charm++/manual.html#installing-charm"
+  echo "  for full instructions."
+}
+
 ############ Begin option parsing
+
+if [[ $# -lt 2 ]]; then
+  usage
+  exit 1
+fi
 
 target=$1
 triplet=$2
@@ -196,8 +228,15 @@ while [[ $# -gt 0 ]]; do
       ;;
 
   # Miscellaneous options
-    -j*)
+    -j[0-9]*)
       opt_parallel=$arg
+      ;;
+    -j)
+      opt_parallel="$arg"
+      if [[ $# -gt 0 && $1 == [0-9]* ]]; then
+        opt_parallel+="$1"
+        shift
+      fi
       ;;
     --suffix=*)
       opt_suffix=-${arg#*=}
