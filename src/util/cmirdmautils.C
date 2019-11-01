@@ -35,6 +35,7 @@ void setNcpyOpInfo(
     unsigned short int isDestRegistered,
     int destPe,
     const void *destRef,
+    unsigned int rootNode,
     NcpyOperationInfo *ncpyOpInfo) {
 
   char *base = (char *)ncpyOpInfo + sizeof(NcpyOperationInfo);
@@ -94,6 +95,8 @@ void setNcpyOpInfo(
   ncpyOpInfo->opMode  = CMK_DIRECT_API; // default operation mode is CMK_DIRECT_API
   ncpyOpInfo->ackMode = CMK_SRC_DEST_ACK; // default ack mode is CMK_SRC_DEST_ACK
   ncpyOpInfo->freeMe  = CMK_FREE_NCPYOPINFO; // default ack mode is CMK_FREE_NCPYOPINFO
+
+  ncpyOpInfo->rootNode = rootNode;
 
   ncpyOpInfo->ncpyOpInfoSize = sizeof(NcpyOperationInfo) + srcLayerSize + destLayerSize + srcAckSize + destAckSize;
 }
