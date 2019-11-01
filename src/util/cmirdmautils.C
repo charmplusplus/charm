@@ -35,7 +35,7 @@ void setNcpyOpInfo(
     unsigned short int isDestRegistered,
     int destPe,
     const void *destRef,
-    unsigned int rootNode,
+    int rootNode,
     NcpyOperationInfo *ncpyOpInfo) {
 
   char *base = (char *)ncpyOpInfo + sizeof(NcpyOperationInfo);

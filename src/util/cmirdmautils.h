@@ -53,7 +53,7 @@ typedef struct ncpystruct{
 
   int ncpyOpInfoSize;
 
-  unsigned int rootNode; // used only for Broadcast, -1 for p2p operations
+  int rootNode; // used only for Broadcast, -1 for p2p operations
 
 }NcpyOperationInfo;
 
@@ -90,7 +90,7 @@ void setNcpyOpInfo(
   unsigned short int isdestRegistered,
   int destPe,
   const void *destRef,
-  unsigned int rootNode,
+  int rootNode,
   NcpyOperationInfo *ncpyOpInfo);
 
 void resetNcpyOpInfoPointers(NcpyOperationInfo *ncpyOpInfo);
