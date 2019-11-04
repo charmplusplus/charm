@@ -128,12 +128,12 @@ AC_ARG_ENABLE([error-checking],
 
 if test "$enable_error_checking" = "no"
 then
-  Echo "Error checking is disabled" 
+  Echo "Charm++/LIBS error checking is disabled" 
   AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 0, [disable error checking])
   add_flag 'OPTS_CC="$OPTS_CC -U_FORTIFY_SOURCE"' 'error checking'
   add_flag 'OPTS_CXX="$OPTS_CXX -U_FORTIFY_SOURCE"' 'error checking'
 else
-  Echo "Error checking is enabled" 
+  Echo "Charm++/LIBS error checking is enabled" 
   AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 1, [enable error checking])
 fi
 
