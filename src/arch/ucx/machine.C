@@ -463,7 +463,6 @@ static void UcxPostRxBuffers()
             ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_EAGER,
                                             ucxCtx.eagerSize, NULL);
             ++numPosted;
-            CmiAssert(!ucxCtx.rxReqs[i]->completed);
         }
     }
     UCX_LOG(3, "UCX: posted %d of %d rx requests (free reqs %d)",
