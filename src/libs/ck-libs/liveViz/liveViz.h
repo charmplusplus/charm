@@ -156,6 +156,18 @@ public:
     lbdbID = _lbdb;
     lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
     msg = NULL;
+    if (thisIndex == 0)
+      CcsRegisterHandler("lvBalance", CkCallback(CkIndex_LiveVizBalanceGroup::reduceBalanceData(NULL), thisProxy[thisIndex]));
+  }
+  LiveVizBalanceGroup(CkMigrateMessage * m) : CBase_LiveVizBalanceGroup(m) { }
+  void pup(PUP::er & p) {
+    if (p.isUnpacking()) {
+      lbdbID = _lbdb;
+      lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
+      msg = NULL;
+      if (p.isRestarting() && thisIndex == 0)
+        CcsRegisterHandler("lvBalance", CkCallback(CkIndex_LiveVizBalanceGroup::reduceBalanceData(NULL), thisProxy[thisIndex]));
+    }
   }
 
   void reduceBalanceData(CkCcsRequestMsg* m) {

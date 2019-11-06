@@ -19,7 +19,7 @@ module liveViz {
 		entry [local] void deposit(CkReductionMsg *msg);
 	}; 
 
-  group LiveVizBalanceGroup {
+  group [migratable] LiveVizBalanceGroup {
     entry LiveVizBalanceGroup();
     entry void reduceBalanceData(CkCcsRequestMsg* m);
     entry void doReduction();

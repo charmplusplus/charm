@@ -55,6 +55,7 @@ void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c, CkArrayOpt
 void liveVizInitComplete(void *rednMessage) {
   delete (CkReductionMsg *)rednMessage;
   liveViz0Init(lv_config);
+  CProxy_LiveVizBalanceGroup::ckNew();
 }
 
 liveVizRequestMsg *liveVizRequestMsg::buildNew(const liveVizRequest &req,const void *data,int dataLen)

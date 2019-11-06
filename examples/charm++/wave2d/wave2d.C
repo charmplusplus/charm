@@ -7,8 +7,8 @@
 
 #define TotalDataWidth  800
 #define TotalDataHeight 800
-#define chareArrayWidth  16
-#define chareArrayHeight  16
+#define chareArrayWidth  8
+#define chareArrayHeight  8
 #define total_iterations 5000
 #define numInitialPertubations 5
 
@@ -59,6 +59,8 @@ public:
 
   Wave()
   {
+    usesAtSync = true;
+
     iteration = 0;
 
     CommonInit();

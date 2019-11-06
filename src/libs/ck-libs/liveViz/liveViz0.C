@@ -306,11 +306,9 @@ void liveViz0Deposit(const liveVizRequest &req,byte * imageData)
 
 //Startup routine-- must be called on processor 0
 void liveViz0Init(const liveVizConfig &cfg) {
-  CProxy_LiveVizBalanceGroup proxy = CProxy_LiveVizBalanceGroup::ckNew();
   config=cfg;
   CcsRegisterHandler("lvConfig",(CmiHandler)getImageConfigHandler);
   CcsRegisterHandler("lvImage", (CmiHandler)getImageHandler);
-  CcsRegisterHandler("lvBalance", CkCallback(CkIndex_LiveVizBalanceGroup::reduceBalanceData(NULL), proxy[0]));
   if (config.getVerbose(1))
     CmiPrintf("CCS getImage handlers registered.  Waiting for clients...\n");
 }
