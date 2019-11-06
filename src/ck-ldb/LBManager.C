@@ -1064,11 +1064,14 @@ void LocalBarrier::CheckBarrier(int recvd_iter)
   }
 
   if (at_count >= client_count) {
-    bool at_barrier = false;
+    bool at_barrier = true;
 
-    for(std::list<Chare*>::iterator i = _mgr->chares.begin(); i != _mgr->chares.end(); ++i)
-      if ((*i)->r_count >= cur_refcount && (*i)->atsync)
-        at_barrier = true;
+    for(std::list<Chare*>::iterator i = _mgr->chares.begin(); i != _mgr->chares.end(); ++i) {
+      if ((*i)->r_count < cur_refcount && (*i)->atsync) {
+        at_barrier = false;
+        break;
+      }
+    }
 
     if (at_barrier) {
       _mgr->startedAtSync = true;
