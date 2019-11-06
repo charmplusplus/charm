@@ -2964,13 +2964,11 @@ enable_embedded_mode='yes'
 enable_static='yes'
 if test "$CMK_NO_BUILD_SHARED" = 'false'
 then
-  enable_shared='yes'
-  export am_libhwloc_embedded_la_rpath="-rpath $CHARMLIBSO"
-else
-  enable_shared='no'
-  export am_libhwloc_embedded_la_rpath=''
+  # Force building of shared hwloc library in embedded mode.
+  # See https://github.com/UIUC-PPL/charm/issues/2599 and 
+  # https://github.com/open-mpi/hwloc/issues/371 for more details.
+  export LDFLAGS="-rpath $CHARMLIBSO"
 fi
-AC_SUBST(am_libhwloc_embedded_la_rpath)
 enable_pci='no'
 enable_libudev='no'
 enable_libxml2='no'
