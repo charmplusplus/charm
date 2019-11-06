@@ -14,6 +14,7 @@ FSGLOBALS=''
 PIPGLOBALS=''
 EXPLICIT_COMPILATION=''
 BUILD_SHARE=''
+SHOW_COMPILER_VERSION=''
 
 ARGS=''
 OBJECT=''
@@ -26,6 +27,9 @@ do
   -show)
      echo "charmc"
      exit 0
+     ;;
+  -v|--version)
+     SHOW_COMPILER_VERSION=$arg
      ;;
   -verbose)
      VERBOSE='true'
@@ -74,6 +78,14 @@ done
 }
 
 eval processArgs "$@"
+
+# If there are no args except -v or --version specified, just run
+# charmc with -v or --version. Helps with configure scripts that
+# parse the output to detect compiler versions.
+if [[ -z $ARGS ]] && [[ -n $SHOW_COMPILER_VERSION ]]; then
+  $CHARMBIN/charmc $SHOW_COMPILER_VERSION
+  exit $?
+fi
 
 Do() {
   [ -n "$VERBOSE" ] && echo "$AMPICC: Executing $@" 1>&2
