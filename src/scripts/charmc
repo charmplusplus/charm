@@ -118,6 +118,7 @@ NO_MAIN=""
 CUSTOM_PARTITION=""
 PREPROCESS_CI="yes"
 INPUT_GIVEN=""
+SHOW_COMPILER_VERSION=""
 
 ####################################################################
 #
@@ -421,6 +422,12 @@ do
 	"-V")
 		printVersion
 		exit 0
+		;;
+
+	-v|--version)
+		# Make sure compiler version is printed even if no file to compile is specified
+		SHOW_COMPILER_VERSION="$arg"
+		OPTS="$OPTS $arg"
 		;;
 
 	"-machine")
@@ -2028,6 +2035,7 @@ MakeSO() {
 
 if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ]
 then
+	[[ -n $SHOW_COMPILER_VERSION ]] && $CHARM_CXX $SHOW_COMPILER_VERSION
 # We have no target object, or are playing preprocessor tricks-- just end
 	Debugf "No target object-- finished"
 	Success
