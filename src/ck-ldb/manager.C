@@ -18,7 +18,8 @@ realloc_state pending_realloc_state;
 char * se_avail_vector;
 extern "C" int numProcessAfterRestart;
 extern "C" CcsDelayedReply shrinkExpandreplyToken;
-extern "C" char willContinue=0;
+extern "C" char willContinue;
+char willContinue;
 #endif
 extern int load_balancer_created;
 static void handler(char *bit_map)

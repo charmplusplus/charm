@@ -2010,11 +2010,11 @@ void ConverseCleanup(void)
         }
       }
 
-      char **ret;
+      const char **ret;
       if (restart_idx == -1) {
-        ret=(char **)malloc(sizeof(char *)*(argc+10));
+        ret=(const char **)malloc(sizeof(char *)*(argc+10));
       } else {
-        ret=(char **)malloc(sizeof(char *)*(argc+8));
+        ret=(const char **)malloc(sizeof(char *)*(argc+8));
       }
 
       for (i=0;i<argc;i++) {
@@ -2036,7 +2036,7 @@ void ConverseCleanup(void)
 
       ret[argc+5]="+myoldpe";
       char temp3[50];
-      sprintf(temp3,"%d", _Cmi_mype);
+      sprintf(temp3,"%d", CmiMyPe());
       ret[argc+6]=temp3;
 
       if (restart_idx == -1) {
@@ -2080,7 +2080,7 @@ void ConverseCleanup(void)
       }
 
       // TODO: check variant of execv that takes file descriptor
-      execv(ret[0], ret); // Need to check if the process name is always first arg
+      execv(ret[0], const_cast<char * const *>(ret)); // Need to check if the process name is always first arg
       /* should not be here */
       MACHSTATE1(3,"execv error: %s", strerror(errno));
       CmiPrintf("[%d] should not be here\n", CmiMyPe());
