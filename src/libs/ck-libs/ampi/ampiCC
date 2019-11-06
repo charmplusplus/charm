@@ -30,6 +30,7 @@ do
      ;;
   -v|--version)
      SHOW_COMPILER_VERSION=$arg
+     ARGS+=" $arg"
      ;;
   -verbose)
      VERBOSE='true'
