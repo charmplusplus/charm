@@ -21,6 +21,7 @@ module liveViz {
 
   group [migratable] LiveVizBalanceGroup {
     entry LiveVizBalanceGroup();
+    entry void registerCallback();
     entry void reduceBalanceData(CkCcsRequestMsg* m);
     entry void doReduction();
     entry [reductiontarget] void sendReply(int data[n], int n);

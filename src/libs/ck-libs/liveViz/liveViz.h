@@ -157,7 +157,7 @@ public:
     lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
     msg = NULL;
     if (thisIndex == 0)
-      CcsRegisterHandler("lvBalance", CkCallback(CkIndex_LiveVizBalanceGroup::reduceBalanceData(NULL), thisProxy[thisIndex]));
+      registerCallback(); // don't need to go through the scheduler
   }
   LiveVizBalanceGroup(CkMigrateMessage * m) : CBase_LiveVizBalanceGroup(m) { }
   void pup(PUP::er & p) {
@@ -166,8 +166,11 @@ public:
       lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
       msg = NULL;
       if (p.isRestarting() && thisIndex == 0)
-        CcsRegisterHandler("lvBalance", CkCallback(CkIndex_LiveVizBalanceGroup::reduceBalanceData(NULL), thisProxy[thisIndex]));
+        thisProxy[thisIndex].registerCallback(); // need to go through the scheduler
     }
+  }
+  void registerCallback() {
+    CcsRegisterHandler("lvBalance", CkCallback(CkIndex_LiveVizBalanceGroup::reduceBalanceData(NULL), thisProxy[thisIndex]));
   }
 
   void reduceBalanceData(CkCcsRequestMsg* m) {
