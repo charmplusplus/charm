@@ -1,0 +1,216 @@
+// This program solves the 2-d wave equation over a grid.
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <cmath>
+#include "mpi.h"
+
+#define CHECKPT_FREQ    200
+#define LIVE_VIZ_BUFFER_UPDATE_FREQ 1
+
+#define NumIters        5000
+#define TotalDataWidth  800
+#define TotalDataHeight 800
+#define NumInitPerturbs 5
+
+enum : int { left=0, right, up, down }; // used as an MPI tag
+
+void update_live_viz_buffer(int w, int h, double* p, unsigned char* i);
+
+int main(int argc, char **argv) {
+  int my_rank, comm_size, num_wths, flag;
+
+  MPI_Init(&argc, &argv);
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
+
+  const int comm_dim = round(sqrt(comm_size));
+  if (comm_size != comm_dim * comm_dim) {
+    if (my_rank == 0) {
+      printf("Error: wave2d must be run with a perfect square number of VPs!\n");
+    }
+    MPI_Finalize();
+    return 1;
+  }
+  else if (my_rank == 0) {
+    MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_NUM_WTHS, &num_wths, &flag);
+    printf("Running wave2d on %d VPs on %d PEs\n", comm_size, num_wths);
+  }
+
+  // Set up neighbors
+  MPI_Comm comm2D;
+  const int ndims = 2;
+  int my_cart_rank, reorder, left_nbor, right_nbor, up_nbor, down_nbor;
+  int dims[ndims], coord[ndims], wrap_around[ndims];
+  dims[0] = comm_dim; dims[1] = comm_dim;
+  wrap_around[0] = 0; wrap_around[1] = 0;
+  reorder = 1;
+
+  MPI_Dims_create(comm_size, ndims, dims);
+  MPI_Cart_create(MPI_COMM_WORLD, ndims, dims, wrap_around, reorder, &comm2D);
+  MPI_Cart_coords(comm2D, my_rank, ndims, coord);
+  MPI_Cart_rank(comm2D, coord, &my_cart_rank);
+  MPI_Cart_shift(comm2D, 0, 1, &left_nbor, &right_nbor);
+  MPI_Cart_shift(comm2D, 1, 1, &down_nbor, &up_nbor);
+
+  const int num_nbors = 4;
+  const int my_width  = TotalDataWidth / comm_dim;
+  const int my_height = TotalDataHeight / comm_dim;
+  const int my_x = coord[0];
+  const int my_y = coord[1];
+
+  // Allocate buffers
+  double *pressure_old = new double[my_width*my_height]; // time t-1
+  double *pressure     = new double[my_width*my_height]; // time t
+  double *pressure_new = new double[my_width*my_height]; // time t+1
+  double *buffers[num_nbors];
+  buffers[left]  = new double[my_height];
+  buffers[right] = new double[my_height];
+  buffers[up]    = new double[my_width];
+  buffers[down]  = new double[my_width];
+  double *left_edge  = new double[my_height];
+  double *right_edge = new double[my_height];
+  MPI_Request request[num_nbors*2];
+  unsigned char *intensity;
+
+  // Setup some Initial pressure pertubations for timesteps t-1 and t
+  srand(0); // Force the same random numbers to be used for each rank
+  for (int i = 0; i < my_height*my_width; i++) { pressure[i] = pressure_old[i] = 0.0; }
+  for (int s = 0; s < NumInitPerturbs; s++) {
+    // Determine where to place a circle within the interior of the 2-d domain
+    int radius  = 20 + rand() % 30;
+    int xcenter = radius + rand() % (TotalDataWidth - 2*radius);
+    int ycenter = radius + rand() % (TotalDataHeight - 2*radius);
+    // Draw the circle
+    for (int i = 0; i < my_height; i++) {
+      for (int j = 0; j < my_width; j++) {
+        int globalx = my_x*my_width + j; // The coordinate in the global data array (not just in this rank's portion)
+        int globaly = my_y*my_height + i;
+        double distanceToCenter = sqrt((globalx-xcenter)*(globalx-xcenter) + (globaly-ycenter)*(globaly-ycenter));
+        if (distanceToCenter < radius) {
+          double rscaled = (distanceToCenter/radius)*3.0*3.14159/2.0; // ranges from 0 to 3pi/2
+          double t = 700.0 * cos(rscaled) ; // Range won't exceed -700 to 700
+          pressure[i*my_width+j] = pressure_old[i*my_width+j] = t;
+        }
+      }
+    }
+  }
+
+#if AMPI_WITH_LIVE_VIZ
+  intensity = new unsigned char[3*my_width*my_height]; // liveViz pixel buffer
+  AMPI_Init_live_viz(my_x*my_width, my_y*my_height, my_width, my_height, intensity);
+#endif
+
+  for (int iter = 0; iter < NumIters; iter++) {
+    // Exchange edge buffers with neighboring ranks
+    MPI_Irecv(buffers[right], my_height, MPI_DOUBLE, right_nbor, right, MPI_COMM_WORLD, &request[0]);
+    MPI_Irecv(buffers[left],  my_height, MPI_DOUBLE, left_nbor,  left,  MPI_COMM_WORLD, &request[1]);
+    MPI_Irecv(buffers[up],    my_width,  MPI_DOUBLE, up_nbor,    up,    MPI_COMM_WORLD, &request[2]);
+    MPI_Irecv(buffers[down],  my_width,  MPI_DOUBLE, down_nbor,  down,  MPI_COMM_WORLD, &request[3]);
+
+    for (int i = 0; i < my_height; i++) { left_edge[i] = pressure[i*my_width]; }
+    MPI_Isend(left_edge, my_height, MPI_DOUBLE, left_nbor, right, MPI_COMM_WORLD, &request[4]);
+    for (int i = 0; i < my_height; i++) { right_edge[i] = pressure[i*my_width + my_width-1]; }
+    MPI_Isend(right_edge, my_height, MPI_DOUBLE, right_nbor, left, MPI_COMM_WORLD, &request[5]);
+    double *top_edge = &pressure[0];
+    MPI_Isend(top_edge, my_width, MPI_DOUBLE, up_nbor, down, MPI_COMM_WORLD, &request[6]);
+    double *bottom_edge = &pressure[(my_height-1)*my_width];
+    MPI_Isend(bottom_edge, my_width, MPI_DOUBLE, down_nbor, up, MPI_COMM_WORLD, &request[7]);
+
+    MPI_Waitall(num_nbors*2, request, MPI_STATUSES_IGNORE);
+
+    for (int i = 0; i < my_height; i++) {
+      for (int j = 0; j < my_width; j++) {
+        // Current time's pressures for neighboring array locations
+        double L = (j==0           ? buffers[left][i]  : pressure[i*my_width+j-1]);
+        double R = (j==my_width-1  ? buffers[right][i] : pressure[i*my_width+j+1]);
+        double U = (i==0           ? buffers[up][j]    : pressure[(i-1)*my_width+j]);
+        double D = (i==my_height-1 ? buffers[down][j]  : pressure[(i+1)*my_width+j]);
+        // Current time's pressure for this array location
+        double curr = pressure[i*my_width+j];
+        // Previous time's pressure for this array location
+        double old  = pressure_old[i*my_width+j];
+        // Compute the future time's pressure for this array location
+        pressure_new[i*my_width+j] = 0.4*0.4*(L+R+U+D - 4.0*curr)-old+2.0*curr;
+      }
+    }
+
+    // Advance to next step by shifting the data back one step in time
+    double *tmp = pressure_old;
+    pressure_old = pressure;
+    pressure = pressure_new;
+    pressure_new = tmp;
+
+    // Continuously update the liveViz buffer, which liveViz/AMPI
+    // will use in the background periodically
+    if (iter % LIVE_VIZ_BUFFER_UPDATE_FREQ == 0) {
+      update_live_viz_buffer(my_width, my_height, pressure, intensity);
+    }
+
+    if (my_rank == 0 && iter % 20 == 0) {
+      printf("Completed %d iterations\n", iter);
+    }
+#if CMK_MEM_CHECKPOINT
+    if (iter != 0 && iter % 200 == 0) {
+      AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
+    }
+#endif
+  }
+
+  // Clean up and exit
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (my_rank == 0) printf("Program Done!\n");
+  delete [] pressure_new;
+  delete [] pressure;
+  delete [] pressure_old;
+  delete [] buffers[left];
+  delete [] buffers[right];
+  delete [] buffers[up];
+  delete [] buffers[down];
+  delete [] right_edge;
+  delete [] left_edge;
+#if AMPI_WITH_LIVE_VIZ
+  delete [] intensity;
+#endif
+  MPI_Comm_free(&comm2D);
+  MPI_Finalize();
+  return 0;
+}
+
+// Update the portion of the image that the graphical liveViz client will illustrate
+void update_live_viz_buffer(int w, int h, double* pressure, unsigned char* intensity)
+{
+#if AMPI_WITH_LIVE_VIZ
+  // Set the output pixel values for my rectangle
+  // Each RGB component is a char which can have 256 possible values.
+  for (int i = 0; i < h; i++) {
+    for (int j = 0; j < w; j++) {
+      double p = pressure[i*w+j];
+      if (p > 255.0) p = 255.0;   // Keep values in valid range
+      if (p < -255.0) p = -255.0; // Keep values in valid range
+      if (p > 0) { // Positive values are red
+        intensity[3*(i*w+j)+0] = 255;   // RED component
+        intensity[3*(i*w+j)+1] = 255-p; // GREEN component
+        intensity[3*(i*w+j)+2] = 255-p; // BLUE component
+      } else { // Negative values are blue
+        intensity[3*(i*w+j)+0] = 255+p; // RED component
+        intensity[3*(i*w+j)+1] = 255+p; // GREEN component
+        intensity[3*(i*w+j)+2] = 255;   // BLUE component
+      }
+    }
+  }
+  // Draw a green border on right and bottom of this rank's pixel buffer.
+  // This will overwrite some pressure values at these pixels.
+  for (int i = 0; i < h; i++) {
+    intensity[3*(i*w+w-1)+0] = 0;     // RED component
+    intensity[3*(i*w+w-1)+1] = 255;   // GREEN component
+    intensity[3*(i*w+w-1)+2] = 0;     // BLUE component
+  }
+  for (int i = 0; i < w; i++) {
+    intensity[3*((h-1)*w+i)+0] = 0;   // RED component
+    intensity[3*((h-1)*w+i)+1] = 255; // GREEN component
+    intensity[3*((h-1)*w+i)+2] = 0;   // BLUE component
+  }
+#endif
+}
+

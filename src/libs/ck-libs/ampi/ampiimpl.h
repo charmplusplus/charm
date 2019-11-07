@@ -2154,6 +2154,13 @@ class ampiParent final : public CBase_ampiParent {
   ADIO_GlobalStruct romio_globals;
 #endif
 
+#if AMPI_WITH_LIVE_VIZ
+ public:
+  void liveVizSetup(int wOffset, int hOffset, int w, int h, unsigned char* buf) noexcept {
+    thread->liveVizSetup(wOffset, hOffset, w, h, buf);
+  }
+#endif
+
  private:
   bool kv_set_builtin(int keyval, void* attribute_val) noexcept;
   bool kv_get_builtin(int keyval) noexcept;

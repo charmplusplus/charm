@@ -20,6 +20,10 @@ $(SIMPLE_DIRS) ParFUM ParFUM-Tops $(FEM_DIRS):
 
 FEM: $(FEM_DIRS) 
 
+ifeq ($(AMPI_WITH_LIVE_VIZ),1)
+tcharm: liveViz
+endif
+
 ampi:  tcharm
 idxl:  ampi
 multiphaseSharedArrays:

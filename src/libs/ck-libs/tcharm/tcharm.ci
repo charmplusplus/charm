@@ -4,6 +4,7 @@ module tcharm {
   };
   array [1D] TCharm {
     entry TCharm(TCharmInitMsg *initMsg);
+    entry [expedited] void liveVizRequestNextFrame(liveVizRequestMsg *msg);
     entry [reductiontarget] void atBarrier(void);
     entry void atExit(CkReductionMsg *msg);
     entry void start(void);
