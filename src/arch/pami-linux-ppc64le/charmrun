@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Conv-host for MPI:
 #  Translates +pN-style conv-host options into

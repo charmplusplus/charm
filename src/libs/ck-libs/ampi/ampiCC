@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 AMPICC="$0"
 CHARMBIN=`dirname $0`
 CHARMLIB="$CHARMBIN/../lib"

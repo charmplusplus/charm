@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Silly shorthand, used for source reorganization
 if [ $(dirname $0) = "." ]

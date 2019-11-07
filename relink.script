@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # The essential directories for the proper functioning of charm++ is
 # usually linked to the latest build version. For the convenience of

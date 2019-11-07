@@ -254,9 +254,9 @@ class CkNcpyBuffer{
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
 
 
-  friend void performEmApiNcpyTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, CmiSpanningTreeInfo *t, char *ref, int extraSize, CkNcpyMode ncpyMode, ncpyEmApiMode emMode);
+  friend void performEmApiNcpyTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, CmiSpanningTreeInfo *t, char *ref, int extraSize, CkNcpyMode ncpyMode, int rootNode, ncpyEmApiMode emMode);
 
-  friend void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, char *ref, int extraSize, ncpyEmApiMode emMode);
+  friend void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, char *ref, int extraSize, int rootNode, ncpyEmApiMode emMode);
 
   friend void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, CmiSpanningTreeInfo *t, ncpyEmApiMode emMode);
 
