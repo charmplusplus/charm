@@ -311,7 +311,7 @@ static inline void _parseCommandLineOpts(char **argv)
       faultFunc = CkMemRestart;
 # endif
       if (!quietModeRequested)
-        CmiPrintf("CharmFT> Restarting node %d after crash...\n", CmiMyNode());
+        CkPrintf("CharmFT> Restarting node %d after crash...\n", CmiMyNode());
   }
   // reading the killFile
   if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
