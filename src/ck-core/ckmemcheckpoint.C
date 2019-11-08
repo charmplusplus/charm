@@ -351,11 +351,15 @@ CkMemCheckPT::CkMemCheckPT(int w)
 #if CK_NO_PROC_POOL
   if (numnodes <= 2)
 #else
-  if (numnodes  == 1)
+  if (numnodes == 1)
 #endif
   {
     if (CkMyPe() == 0 && !quietModeRequested)
-      CkPrintf("CharmFT> Warning: In-memory checkpointing is disabled because there are too few nodes.\n");
+#if CK_NO_PROC_POOL
+      CkPrintf("CharmFT> Warning: In-memory checkpointing is disabled because there are less than three nodes.\n");
+#else
+      CkPrintf("CharmFT> Warning: In-memory checkpointing is disabled because there is only one node.\n");
+#endif
     _memChkptOn = false;
   }
   inRestarting = false;
@@ -775,7 +779,7 @@ void CkMemCheckPT::cpFinish()
   if (peCount == 2) 
 {
     if (!quietModeRequested)
-      CmiPrintf("CharmFT> Checkpoint finished in %f seconds.\n", CmiWallTimer()-startTime);
+      CkPrintf("CharmFT> Checkpoint finished in %f seconds.\n", CmiWallTimer()-startTime);
     cpCallback.send();
     peCount = 0;
     thisProxy.report();
@@ -1725,7 +1729,7 @@ void pingCheckHandler()
     CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
     int buddy = obj->ReverseBuddyPE(CmiMyPe());
     if (!quietModeRequested)
-      CmiPrintf("CharmFT> Node %d detected buddy %d died at %f s (last ping: %f s). \n", CmiMyNode(), buddy, now, lastPingTime);
+      CkPrintf("CharmFT> Node %d detected buddy %d died at %f s (last ping: %f s). \n", CmiMyNode(), buddy, now, lastPingTime);
     /*for (int pe = 0; pe < CmiNumPes(); pe++) {
       if (obj->isFailed(pe) || pe == buddy) continue;
       char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
