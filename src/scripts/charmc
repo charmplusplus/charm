@@ -2036,7 +2036,7 @@ MakeSO() {
 
 if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ]
 then
-	[[ -n $PASSTHROUGH_COMPILER_OPTIONS ]] && $CHARM_CXX $PASSTHROUGH_COMPILER_OPTIONS
+	[[ -n "$PASSTHROUGH_COMPILER_OPTIONS" ]] && $CHARM_CXX $PASSTHROUGH_COMPILER_OPTIONS
 # We have no target object, or are playing preprocessor tricks-- just end
 	Debugf "No target object-- finished"
 	Success
