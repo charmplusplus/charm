@@ -24,7 +24,7 @@ case "$-" in
         ;;
     *)
         # Non-interactive shell, run Nightly
-        AUTOBUILD_CTEST_MODEL="Experimental"
+        AUTOBUILD_CTEST_MODEL="Nightly"
         ;;
 esac
 
@@ -46,8 +46,6 @@ echo "AUTOBUILD_CTEST_MODEL=$AUTOBUILD_CTEST_MODEL"
 echo "=== End Autobuild configuration ==="
 echo
 echo
-
-exit
 
 rm -rf charm_autobuild
 git clone --branch $AUTOBUILD_BRANCH https://github.com/UIUC-PPL/charm charm_autobuild
