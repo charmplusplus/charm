@@ -425,7 +425,8 @@ do
 		;;
 
 	-v|--version|-print-search-dirs)
-		# Make sure compiler version is printed even if no file to compile is specified
+		# Make sure these compiler options are passed through even if no
+		# file to compile is specified
 		PASSTHROUGH_COMPILER_OPTIONS+=" $arg"
 		OPTS="$OPTS $arg"
 		;;
