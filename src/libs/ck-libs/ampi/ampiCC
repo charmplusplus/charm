@@ -14,7 +14,7 @@ FSGLOBALS=''
 PIPGLOBALS=''
 EXPLICIT_COMPILATION=''
 BUILD_SHARE=''
-SHOW_COMPILER_VERSION=''
+PASSTHROUGH_COMPILER_OPTIONS=''
 
 ARGS=''
 OBJECT=''
@@ -28,9 +28,8 @@ do
      echo "charmc"
      exit 0
      ;;
-  -v|--version)
-     SHOW_COMPILER_VERSION=$arg
-     ARGS+=" $arg"
+  -v|--version|-print-search-dirs)
+     PASSTHROUGH_COMPILER_OPTIONS+=" $arg"
      ;;
   -verbose)
      VERBOSE='true'
@@ -80,13 +79,15 @@ done
 
 eval processArgs "$@"
 
-# If there are no args except -v or --version specified, just run
-# charmc with -v or --version. Helps with configure scripts that
-# parse the output to detect compiler versions.
-if [[ -z $ARGS ]] && [[ -n $SHOW_COMPILER_VERSION ]]; then
-  $CHARMBIN/charmc $SHOW_COMPILER_VERSION
+# If there are no filename arguments specified, just pass through
+# compiler options to charmc. Helps with configure scripts that
+# parse the output to detect compiler versions, search paths, etc.
+if [[ -z "$ARGS" && -n "$PASSTHROUGH_COMPILER_OPTIONS" ]]; then
+  $CHARMBIN/charmc $PASSTHROUGH_COMPILER_OPTIONS
   exit $?
 fi
+
+ARGS+=" $PASSTHROUGH_COMPILER_OPTIONS"
 
 Do() {
   [ -n "$VERBOSE" ] && echo "$AMPICC: Executing $@" 1>&2

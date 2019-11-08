@@ -118,7 +118,7 @@ NO_MAIN=""
 CUSTOM_PARTITION=""
 PREPROCESS_CI="yes"
 INPUT_GIVEN=""
-SHOW_COMPILER_VERSION=""
+PASSTHROUGH_COMPILER_OPTIONS=""
 
 ####################################################################
 #
@@ -424,9 +424,9 @@ do
 		exit 0
 		;;
 
-	-v|--version)
+	-v|--version|-print-search-dirs)
 		# Make sure compiler version is printed even if no file to compile is specified
-		SHOW_COMPILER_VERSION="$arg"
+		PASSTHROUGH_COMPILER_OPTIONS+=" $arg"
 		OPTS="$OPTS $arg"
 		;;
 
@@ -2035,7 +2035,7 @@ MakeSO() {
 
 if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ]
 then
-	[[ -n $SHOW_COMPILER_VERSION ]] && $CHARM_CXX $SHOW_COMPILER_VERSION
+	[[ -n $PASSTHROUGH_COMPILER_OPTIONS ]] && $CHARM_CXX $PASSTHROUGH_COMPILER_OPTIONS
 # We have no target object, or are playing preprocessor tricks-- just end
 	Debugf "No target object-- finished"
 	Success
