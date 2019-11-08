@@ -5,10 +5,11 @@ set -o errexit -o nounset
 
 # Configuration starts here
 
-AUTOBUILD_MACHINE_NAME="Quartz"
-AUTOBUILD_BRANCH="cdash"
-AUTOBUILD_BUILD_NAME="ofi-linux-x86_64"
-AUTOBUILD_BUILD_COMMAND="./build all-test $AUTOBUILD_BUILD_NAME -j8 -g --with-production"
+AUTOBUILD_MACHINE_NAME=${AUTOBUILD_MACHINE_NAME:-$(hostname)}
+AUTOBUILD_BRANCH=${AUTOBUILD_BRANCH:-cdash}
+AUTOBUILD_BUILD_NAME=${AUTOBUILD_BUILD_NAME:-netlrts-linux-x86_64}
+AUTOBUILD_BUILD_COMMAND=${AUTOBUILD_BUILD_COMMAND:-./build all-test $AUTOBUILD_BUILD_NAME -j8 -g --with-production}
+AUTOBUILD_TESTOPTS=${AUTOBUILD_TESTOPTS:-++local}
 
 # Configuration ends here
 
@@ -23,28 +24,30 @@ case "$-" in
         ;;
     *)
         # Non-interactive shell, run Nightly
-        AUTOBUILD_CTEST_MODEL="Nightly"
+        AUTOBUILD_CTEST_MODEL="Experimental"
         ;;
 esac
 
 echo "$0: Running autobuild test."
-
-echo "=== Script: ==="
+echo
+echo "=== Autobuild script: ==="
 cat $0
-echo "=== End Script ==="
-
+echo "=== End Autobuild script ==="
+echo
 echo "PWD=$(pwd)"
-
-echo "=== Configuration: ==="
+echo
+echo "=== Autobuild configuration: ==="
 echo "AUTOBUILD_MACHINE_NAME=$AUTOBUILD_MACHINE_NAME"
 echo "AUTOBUILD_BRANCH=$AUTOBUILD_BRANCH"
 echo "AUTOBUILD_BUILD_NAME=$AUTOBUILD_BUILD_NAME"
 echo "AUTOBUILD_BUILD_COMMAND=$AUTOBUILD_BUILD_COMMAND"
-echo "=== End Configuration ==="
-
+echo "AUTOBUILD_TESTOPTS=$AUTOBUILD_TESTOPTS"
+echo "AUTOBUILD_CTEST_MODEL=$AUTOBUILD_CTEST_MODEL"
+echo "=== End Autobuild configuration ==="
 echo
 echo
 
+exit
 
 rm -rf charm_autobuild
 git clone --branch $AUTOBUILD_BRANCH https://github.com/UIUC-PPL/charm charm_autobuild
