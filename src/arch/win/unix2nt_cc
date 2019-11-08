@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ##############################################################################
 # unix2nt_cc:  for VC++ ver 8 and later (VS 2003, 2008, 2010)
 # Maps UNIX C/C++ compiler command-line options to 

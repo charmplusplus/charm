@@ -1,5 +1,3 @@
-##!/bin/sh -l
-
 # Check that some hugepages module is loaded
 if echo $LOADEDMODULES | grep -q craype-hugepages; then
     true

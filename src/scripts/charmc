@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ##############################################################################
 # charmc: Compiler for Converse/Charm/Charm++ programs
 #
@@ -118,6 +118,7 @@ NO_MAIN=""
 CUSTOM_PARTITION=""
 PREPROCESS_CI="yes"
 INPUT_GIVEN=""
+PASSTHROUGH_COMPILER_OPTIONS=""
 
 ####################################################################
 #
@@ -421,6 +422,13 @@ do
 	"-V")
 		printVersion
 		exit 0
+		;;
+
+	-v|--version|-print-search-dirs)
+		# Make sure these compiler options are passed through even if no
+		# file to compile is specified
+		PASSTHROUGH_COMPILER_OPTIONS+=" $arg"
+		OPTS="$OPTS $arg"
 		;;
 
 	"-machine")
@@ -2028,6 +2036,7 @@ MakeSO() {
 
 if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ]
 then
+	[[ -n "$PASSTHROUGH_COMPILER_OPTIONS" ]] && $CHARM_CXX $PASSTHROUGH_COMPILER_OPTIONS
 # We have no target object, or are playing preprocessor tricks-- just end
 	Debugf "No target object-- finished"
 	Success
