@@ -17,16 +17,17 @@ AUTOBUILD_TESTOPTS=${AUTOBUILD_TESTOPTS:-++local}
 ############################
 ############################
 
-case "$-" in
-    *i*)
+PPPID=$(ps h -o ppid= $PPID)
+P_COMMAND=$(ps h -o %c $PPPID)
+
+if [[ $P_COMMAND != "cron" ]]; then
         # Interactive shell, run Experimental
         AUTOBUILD_CTEST_MODEL="Experimental"
-        ;;
-    *)
+else
         # Non-interactive shell, run Nightly
         AUTOBUILD_CTEST_MODEL="Nightly"
-        ;;
-esac
+fi
+
 
 echo "$0: Running autobuild test."
 echo
