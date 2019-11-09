@@ -5,7 +5,7 @@ set -o errexit -o nounset
 
 # Configuration starts here
 
-AUTOBUILD_MACHINE_NAME=${AUTOBUILD_MACHINE_NAME:-$(hostname)}
+AUTOBUILD_MACHINE_NAME=${AUTOBUILD_MACHINE_NAME:-$(hostname -s)}
 AUTOBUILD_BRANCH=${AUTOBUILD_BRANCH:-cdash}
 AUTOBUILD_BUILD_NAME=${AUTOBUILD_BUILD_NAME:-netlrts-linux-x86_64}
 AUTOBUILD_BUILD_COMMAND=${AUTOBUILD_BUILD_COMMAND:-./build all-test $AUTOBUILD_BUILD_NAME -j8 -g --with-production}
