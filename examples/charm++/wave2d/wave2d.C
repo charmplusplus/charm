@@ -9,8 +9,9 @@
 #define TotalDataHeight 800
 #define chareArrayWidth  16
 #define chareArrayHeight  16
-#define total_iterations 5000
+#define total_iterations 50000
 #define numInitialPertubations 5
+#define addDropIter 1000
 
 #define mod(a,b)  (((a)+b)%b)
 
@@ -150,7 +151,24 @@ public:
 
     delete [] intensity;
   }
-
+  void add_drop()
+  {
+    // Determine where to place a circle within the interior of the 2-d domain
+    int radius = 5+rand() % 10;
+    int xcenter = radius + rand() % (mywidth - 2*radius);
+    int ycenter = radius + rand() % (myheight - 2*radius);
+    // Draw the circle
+    for(int i=0;i<myheight;i++){
+      for(int j=0; j<mywidth; j++){
+	  double distanceToCenter = sqrt((j-xcenter)*(j-xcenter) + (i-ycenter)*(i-ycenter));
+	  if (distanceToCenter < radius) {
+	    double rscaled = (distanceToCenter/radius)*3.0*3.14159/2.0; // ranges from 0 to 3pi/2 
+	    double t = 700.0 * cos(rscaled) ; // Range won't exceed -700 to 700
+	    pressure[i*mywidth+j] = pressure_old[i*mywidth+j] = t;
+	  }
+      }
+    }
+  }
   void begin_iteration(void) {
 
     double *top_edge = &pressure[0];
@@ -181,7 +199,6 @@ public:
     if (--messages_due == 0) {
 
       // Compute the new values based on the current and previous step values
-
       for(int i=0;i<myheight;++i){
 	for(int j=0;j<mywidth;++j){
 
@@ -199,6 +216,8 @@ public:
 
 	  // Compute the future time's pressure for this array location
 	  pressure_new[i*mywidth+j] = 0.4*0.4*(L+R+U+D - 4.0*curr)-old+2.0*curr;
+	  // overdamp
+	  pressure_new[i*mywidth+j] *= 0.9995;
 
 	}
       }
@@ -284,6 +303,12 @@ public:
       {
 	thisProxy.begin_iteration();
       }
+    }
+    // randomly add drops every addDropIter
+    if(iteration >1 && iteration % addDropIter ==0){
+      int dropx=rand() % chareArrayWidth;
+      int dropy=rand() % chareArrayHeight;
+      thisProxy(dropx, dropy).add_drop();
     }
   }
 };

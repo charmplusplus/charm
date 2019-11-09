@@ -11,7 +11,7 @@ mainmodule wave2d {
 
     // A method for requesting data to be displayed graphically to the user
     entry void requestNextFrame(liveVizRequestMsg *m);
-
+    entry void add_drop();
     entry [reductiontarget] void iterationCompleted(int iteration);
   };
 
