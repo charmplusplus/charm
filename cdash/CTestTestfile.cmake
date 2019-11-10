@@ -1,4 +1,4 @@
-add_test(build-tests "make" "-C" "../$ENV{AUTOBUILD_BUILD_NAME}/tmp" "-j4" "all-test-tests" "all-test-examples" "all-test-benchmarks" "OPTS=\"-g\"")
+add_test(build-tests "make" "-C" "../tmp" "-j4" "all-test-tests" "all-test-examples" "all-test-benchmarks" "OPTS=\"-g\"")
 add_test(tests/ "make" "-C" "../tests" "test" "TESTOPTS=$ENV{AUTOBUILD_TEST_OPTS}")
 set_tests_properties(tests/ PROPERTIES  TIMEOUT "1200")
 add_test(examples/ "make" "-C" "../examples" "test" "TESTOPTS=$ENV{AUTOBUILD_TEST_OPTS}")
