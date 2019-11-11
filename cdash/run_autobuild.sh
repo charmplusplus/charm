@@ -20,7 +20,7 @@ AUTOBUILD_TEST_OPTS=${AUTOBUILD_TEST_OPTS:-++local}
 
 # Check if we were started by cron
 PPPID=$(ps h -o ppid= $PPID)
-P_COMMAND=$(ps h -o %c $PPPID)
+P_COMMAND=$(basename -a $(ps h -o comm $PPPID))
 
 if [[ $P_COMMAND != "cron" ]]; then
         # Interactive shell, run Experimental
@@ -51,7 +51,7 @@ echo
 echo
 
 
-mydir=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
+mydir=$(mktemp -p . -d 2>/dev/null || gmktemp -p . -d )
 
 rm -rf $mydir
 git clone --branch $AUTOBUILD_BRANCH https://github.com/UIUC-PPL/charm $mydir
@@ -66,4 +66,5 @@ echo "set(CTEST_MODEL \"$AUTOBUILD_CTEST_MODEL\")" >> cdash/CTestCustom.cmake
 
 ctest -VV -S cdash/Stages.cmake -DSTAGES="Start;Update;Build;Test;Submit"
 
+cd ..
 rm -rf $mydir
