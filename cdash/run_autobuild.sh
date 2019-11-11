@@ -20,7 +20,7 @@ AUTOBUILD_TEST_OPTS=${AUTOBUILD_TEST_OPTS:-++local}
 
 # Check if we were started by cron
 PPPID=$(ps h -o ppid= $PPID)
-P_COMMAND=$(basename -a $(ps h -o comm $PPPID))
+P_COMMAND=$(basename $(ps h -o comm= $PPPID))
 
 if [[ $P_COMMAND != "cron" ]]; then
         # Interactive shell, run Experimental
