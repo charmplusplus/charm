@@ -50,9 +50,12 @@ echo "=== End Autobuild configuration ==="
 echo
 echo
 
-rm -rf charm_autobuild
-git clone --branch $AUTOBUILD_BRANCH https://github.com/UIUC-PPL/charm charm_autobuild
-cd charm_autobuild
+
+mydir=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
+
+rm -rf $mydir
+git clone --branch $AUTOBUILD_BRANCH https://github.com/UIUC-PPL/charm $mydir
+cd $mydir
 
 echo "set(CTEST_SOURCE_DIRECTORY \"$(pwd)/cdash\")"    >> cdash/CTestCustom.cmake
 echo "set(CTEST_BINARY_DIRECTORY \"$(pwd)/cdash\")"    >> cdash/CTestCustom.cmake
@@ -62,3 +65,5 @@ echo "set(CTEST_BUILD_COMMAND \"sh -c 'cd .. && $AUTOBUILD_BUILD_COMMAND'\")" >>
 echo "set(CTEST_MODEL \"$AUTOBUILD_CTEST_MODEL\")" >> cdash/CTestCustom.cmake
 
 ctest -VV -S cdash/Stages.cmake -DSTAGES="Start;Update;Build;Test;Submit"
+
+rm -rf $mydir
