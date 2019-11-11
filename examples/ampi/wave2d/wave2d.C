@@ -50,8 +50,10 @@ int main(int argc, char **argv) {
   MPI_Cart_create(MPI_COMM_WORLD, ndims, dims, wrap_around, reorder, &comm2D);
   MPI_Cart_coords(comm2D, my_rank, ndims, coord);
   MPI_Cart_rank(comm2D, coord, &my_cart_rank);
-  MPI_Cart_shift(comm2D, 0, 1, &left_nbor, &right_nbor);
-  MPI_Cart_shift(comm2D, 1, 1, &down_nbor, &up_nbor);
+  MPI_Cart_shift(comm2D, 0, -1, &my_cart_rank, &left_nbor);
+  MPI_Cart_shift(comm2D, 0,  1, &my_cart_rank, &right_nbor);
+  MPI_Cart_shift(comm2D, 1, -1, &my_cart_rank, &up_nbor);
+  MPI_Cart_shift(comm2D, 1,  1, &my_cart_rank, &down_nbor);
 
   const int num_nbors = 4;
   const int my_width  = TotalDataWidth / comm_dim;
