@@ -79,6 +79,14 @@ never be excluded...
 
 #if CMK_CUDA
 #include "hapi_impl.h"
+
+extern void (*hapiInvokeCallback)(void*, void*);
+extern void CUDACallbackManager(void*, void*);
+
+extern void (*hapiQdCreate)(int);
+extern void (*hapiQdProcess)(int);
+extern void QdCreate(int);
+extern void QdProcess(int);
 #endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
@@ -302,16 +310,16 @@ static inline void _parseCommandLineOpts(char **argv)
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
-      CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
+      if (!quietModeRequested)
+        CkPrintf("CharmFT> Restarting node %d after crash...\n", CmiMyNode());
   }
   // reading the killFile
   if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
     if(faultFunc == NULL){
       //do not read the killfile if this is a restarting processor
       killFlag = true;
-      if(CmiMyPe() == 0){
-        printf("[%d] killFlag set to true for file %s\n",CkMyPe(),killFile);
-      }
+      if (CmiMyPe() == 0 && !quietModeRequested)
+        CkPrintf("CharmFT> Using diagnostic kill file: %s\n", killFile);
     }
   }
 #endif
@@ -1691,6 +1699,9 @@ void _initCharm(int unused_argc, char **argv)
       CmiNodeBarrier();
     }
     hapiRegisterCallbacks();
+    hapiInvokeCallback = CUDACallbackManager;
+    hapiQdCreate = QdCreate;
+    hapiQdProcess = QdProcess;
 #endif
 
     if(CmiMyPe() == 0) {

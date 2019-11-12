@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # A small script for removing unneeded symbols
 # from all the conv-mach files.  You'll need to edit
 # the script to remove the symbols you want to remove.

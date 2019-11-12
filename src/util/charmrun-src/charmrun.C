@@ -2471,7 +2471,8 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
     if (count == nodetab_rank0_table.size() - 1) {
       /* only after everybody else update its nodetab, can this
          restarted process continue */
-      PRINT(("Charmrun> continue node: %d\n", _last_crash->nodeno));
+      if (arg_verbose)
+        PRINT(("Charmrun> Restarted node %d\n", _last_crash->nodeno));
       req_send_initnodetab1(_crash_charmrun_process->req_client);
       _last_crash = nullptr;
       count = 0;
@@ -2484,7 +2485,8 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
       if (count == my_process_table.size() - 1) {
     // only after everybody else update its nodetab, can this restarted process
     // continue
-    PRINT(("Charmrun> continue node: %d\n", _last_crash->nodeno));
+    if (arg_verbose)
+      PRINT(("Charmrun> Restarted node %d\n", _last_crash->nodeno));
     req_send_initnodetab(*_last_crash);
     _last_crash = nullptr;
     count = 0;
@@ -2555,7 +2557,7 @@ static void crashed_process_common(nodetab_process & p)
 
 static void error_in_req_serve_client(nodetab_process & p)
 {
-  printf("Charmrun> Process %d (host %s) failed: Socket error\n", p.nodeno, p.host->name);
+  PRINT(("Charmrun> Process %d (host %s) failed: Socket error\n", p.nodeno, p.host->name));
   fflush(stdout);
 
 #if 0
@@ -5833,8 +5835,9 @@ processor to connect it to a new one**/
 
   free(restart_argv);
 
-  PRINT(("Charmrun finished launching new process in %fs\n",
-         GetClock() - ftTimer));
+  if (arg_verbose)
+    PRINT(("Charmrun> Finished launching new process in %f s\n",
+           GetClock() - ftTimer));
 }
 
 /**
@@ -5882,8 +5885,6 @@ static void reconnect_crashed_client(nodetab_process & crashed)
       fprintf(stderr, "Charmrun: Bad initnode data length. Aborting\n");
       fprintf(stderr, "Charmrun: possibly because: %s.\n", msg.data);
     }
-    fprintf(stderr, "crashed_node %d reconnected fd %d  \n",
-            crashed.nodeno, req_client);
 
     /** update the nodetab entry corresponding to
     this node, skip the restarted one */
