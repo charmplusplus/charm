@@ -1049,10 +1049,6 @@ void LocalBarrier::CheckBarrier(int recvd_iter)
 
   if (!on) return;
 
-  if (client_count == 1 && recvd_iter < 0){
-    return;
-  }
-
   // If there are no clients, resume as soon as we're turned on
   //  CkPrintf("\n[PE-%d] at_count=%d, client_count=%d\n", CkMyPe(), at_count, client_count);
   if (client_count == 0) {
