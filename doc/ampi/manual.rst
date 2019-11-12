@@ -229,7 +229,7 @@ script is:
 
 .. code-block:: bash
 
-   $ build <target> <version> <opts>
+   $ ./build <target> <version> <opts>
 
 For building AMPI (which also includes building Charm++ and other
 libraries needed by AMPI), specify ``<target>`` to be ``AMPI``. And
@@ -258,7 +258,7 @@ off:
 
    $ ./build AMPI gni-crayxc --with-production --disable-ampi-error-checking
 
-AMPI can also be built with support for shared memory on any
+AMPI can also be built with support for multithreaded parallelism on any
 communication layer by adding "smp" as an option after the build target.
 For example, on an Infiniband Linux cluster:
 
@@ -390,7 +390,7 @@ Other options
 ~~~~~~~~~~~~~
 
 Note that for AMPI programs compiled with gfortran, users may need to
-set the following environment variable to see program output to stdout:
+set the following environment variable to see program output on stdout:
 
 .. code-block:: bash
 
@@ -427,7 +427,7 @@ C or C++
 The main function can be left as is, if ``mpi.h`` is included before the
 main function. This header file has a preprocessor macro that renames
 main, and the renamed version is called by the AMPI runtime for each
-thread.
+rank.
 
 Command Line Argument Parsing
 -----------------------------
@@ -884,15 +884,15 @@ different schemes.
 .. _tab:portability:
 .. table:: Portability of current implementations of three privatization schemes. "Yes" means we have implemented this technique. "Maybe" indicates there are no theoretical problems, but no implementation exists. "No" indicates the technique is impossible on this platform.
 
-   ==================== === ====== ====== ==== ======= ===== =====
-   Privatization Scheme x86 x86_64 Mac OS BG/Q Windows PPC   ARM7
-   ==================== === ====== ====== ==== ======= ===== =====
-   Transformation       Yes Yes    Yes    Yes  Yes     Yes   Yes
-   GOT-Globals          Yes Yes    No     No   No      Yes   Yes
-   TLS-Globals          Yes Yes    Yes    No   Maybe   Maybe Maybe
-   PiP-Globals          Yes Yes    No     No   No      Yes   Yes
-   FS-Globals           Yes Yes    Yes    No   Maybe   Yes   Yes
-   ==================== === ====== ====== ==== ======= ===== =====
+   ==================== ===== ====== ==== ======= === ====== ===== =====
+   Privatization Scheme Linux Mac OS BG/Q Windows x86 x86_64 PPC   ARM7
+   ==================== ===== ====== ==== ======= === ====== ===== =====
+   TLS-Globals          Yes   Yes    No   Maybe   Yes Yes    Maybe Maybe
+   PiP-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
+   FS-Globals           Yes   Yes    No   Maybe   Yes Yes    Yes   Yes
+   GOT-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
+   Manual Change        Yes   Yes    Yes  Yes     Yes Yes    Yes   Yes
+   ==================== ===== ====== ==== ======= === ====== ===== =====
 
 Extensions
 ==========
@@ -940,7 +940,9 @@ be copied at migration time, we have added a few calls to AMPI. These
 include the ability to register thread-specific data with the run-time
 system, and the means to pack and unpack all of the thread’s data.
 
-**Most users may skip this section unless you have specific needs.**
+.. warning::
+
+   Most users may skip this section unless you have specific needs.
 
 AMPI packs up any data internal to the runtime in use by the rank,
 including the thread’s stack. This means that the local variables
