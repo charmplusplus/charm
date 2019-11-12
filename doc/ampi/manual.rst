@@ -288,8 +288,8 @@ job to override the default specified at build time.
 Building AMPI Programs
 ----------------------
 
-AMPI provides compiler wrappers such as *ampicc*, *ampif90*, and
-*ampicxx* in the ``bin`` subdirectory of Charm++ installations. You can
+AMPI provides compiler wrappers such as ``ampicc``, ``ampif90``, and
+``ampicxx`` in the ``bin`` subdirectory of Charm++ installations. You can
 use them to build your AMPI program using the same syntax as other
 compilers like ``gcc``. These scripts automatically handle the details of
 linking against AMPI and the Charm++ runtime system. They are intended as
