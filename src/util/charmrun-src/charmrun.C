@@ -2237,7 +2237,11 @@ static int req_handle_ending(ChMessage *msg, SOCKET fd)
       skt_close(p.req_client);
     if (arg_verbose)
       printf("Charmrun> Graceful exit with exit code %d.\n", _exitcode);
+#if CMK_USE_SSH
+    if (arg_interactive && !arg_ssh_display)
+#else
     if (arg_interactive)
+#endif
       finish_set_nodes(my_process_table, 0, 1, true);
     exit(_exitcode);
   }
@@ -2467,7 +2471,8 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
     if (count == nodetab_rank0_table.size() - 1) {
       /* only after everybody else update its nodetab, can this
          restarted process continue */
-      PRINT(("Charmrun> continue node: %d\n", _last_crash->nodeno));
+      if (arg_verbose)
+        PRINT(("Charmrun> Restarted node %d\n", _last_crash->nodeno));
       req_send_initnodetab1(_crash_charmrun_process->req_client);
       _last_crash = nullptr;
       count = 0;
@@ -2480,7 +2485,8 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
       if (count == my_process_table.size() - 1) {
     // only after everybody else update its nodetab, can this restarted process
     // continue
-    PRINT(("Charmrun> continue node: %d\n", _last_crash->nodeno));
+    if (arg_verbose)
+      PRINT(("Charmrun> Restarted node %d\n", _last_crash->nodeno));
     req_send_initnodetab(*_last_crash);
     _last_crash = nullptr;
     count = 0;
@@ -2535,30 +2541,31 @@ static int req_handle_crash(ChMessage *msg, nodetab_process & p)
   /*Anounce crash to all child charmruns*/
   announce_crash(p);
 }
-
-#endif
 #endif
 
-#ifdef __FAULT__
-static void error_in_req_serve_client(nodetab_process & p)
+static void crashed_process_common(nodetab_process & p)
 {
-  const SOCKET fd = p.req_client;
-  fprintf(stderr, "Socket %d failed \n", fd);
+  skt_close(p.req_client);
 
-  fflush(stdout);
-  skt_close(fd);
-
-  /** should also send a message to all the other processors telling them that
-   * this guy has crashed*/
-  /*announce_crash(p);*/
   restart_node(p);
 
-  fprintf(stderr, "charmrun says process %d failed (on host %s)\n", p.nodeno, p.host->name);
-  /** after the crashed processor has been recreated
-   it connects to charmrun. That data must now be filled
-   into my_process_table and the nodetab_table*/
-
+  // After the crashed processor has been recreated
+  // it connects to Charmrun. That data must now be filled
+  // into the node table.
   reconnect_crashed_client(p);
+}
+
+static void error_in_req_serve_client(nodetab_process & p)
+{
+  PRINT(("Charmrun> Process %d (host %s) failed: Socket error\n", p.nodeno, p.host->name));
+  fflush(stdout);
+
+#if 0
+  // Disabled since sockets do not adequately distinguish host faults from process faults
+  p.host->crashed = true;
+#endif
+
+  crashed_process_common(p);
 }
 #endif
 
@@ -3621,7 +3628,10 @@ static void req_client_connect(std::vector<nodetab_process> & process_table)
           start_nodes_ssh(phase2_processes);
         }
 #if !CMK_SSH_KILL
-        finish_nodes(phase2_processes);
+#if CMK_USE_SSH
+        if (!arg_ssh_display)
+#endif
+          finish_nodes(phase2_processes);
 #endif
       }
       else
@@ -3855,11 +3865,13 @@ static void start_nodes_batch_and_connect(std::vector<nodetab_process> & process
     for (int c = clientstart; c < clientend; ++c)
       start_one_node_ssh(process_table[c]);
 
+#if !CMK_SSH_KILL
 #if CMK_USE_SSH
     /* ssh x11 forwarding will make sure ssh exit */
     if (!arg_ssh_display)
 #endif
       finish_set_nodes(process_table, clientstart, clientend);
+#endif
 
     // batch implementation of req_client_connect functionality below this line to end of function
 
@@ -4269,7 +4281,11 @@ int main(int argc, const char **argv, char **envp)
   /* Hierarchical startup*/
   if (arg_hierarchical_start) {
 #if !CMK_SSH_KILL
+#if CMK_USE_SSH
+    if ((!arg_batch_spawn || (!arg_child_charmrun)) && !arg_ssh_display)
+#else
     if (!arg_batch_spawn || (!arg_child_charmrun))
+#endif
       finish_nodes(my_process_table);
 #endif
 
@@ -4283,14 +4299,21 @@ int main(int argc, const char **argv, char **envp)
 #endif
   {
 #if !CMK_SSH_KILL
+#if CMK_USE_SSH
+    if (!arg_batch_spawn && !arg_ssh_display)
+#else
     if (!arg_batch_spawn)
+#endif
       finish_nodes(my_process_table);
 #endif
     if (!arg_batch_spawn)
       req_client_connect(my_process_table);
   }
 #if CMK_SSH_KILL
-  kill_nodes();
+#if CMK_USE_SSH
+  if (!arg_ssh_display)
+#endif
+    kill_nodes();
 #endif
   if (arg_verbose)
     printf("Charmrun> node programs all connected\n");
@@ -4801,13 +4824,17 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
           "  if [ $1 -ne 0 ]\n"
           "  then\n"
           "    Echo Exiting with error code $1\n"
-          "  fi\n"
+          "  fi\n");
 #if CMK_SSH_KILL /*End by killing ourselves*/
-          "  sleep 5\n" /*Delay until any error messages are flushed*/
-          "  kill -9 $$\n"
-#else            /*Exit normally*/
-          "  exit $1\n"
+#if CMK_USE_SSH
+  if (!arg_ssh_display)
 #endif
+    fprintf(f,
+            "  sleep 5\n" /*Delay until any error messages are flushed*/
+            "  kill -9 $$\n");
+#endif           /*Exit normally*/
+  fprintf(f,
+          "  exit $1\n"
           "}\n");
   fprintf(f, /*Find: locates a binary program in PATH, sets loc*/
           "Find() {\n"
@@ -4975,7 +5002,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "  Echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
     fprintf(f, "  Echo 'need to run xhost to authorize connections.'\n");
     fprintf(f, "  Echo '(See manual for xhost for security issues)'\n");
-    fprintf(f, "  Echo 'Or try ++batch 1 ++ssh-display to rely on SSH X11 "
+    fprintf(f, "  Echo 'Or try ++ssh-display to rely on SSH X11 "
                "forwarding'\n");
     fprintf(f, "  Exit 1\n");
     fprintf(f, "fi\n");
@@ -5520,8 +5547,9 @@ struct local_nodestart
   char **envp;
   int n;
 
-  char **dparamp;
-  std::vector<char *> dparamv;
+  const char ** dparamp;
+  std::vector<const char *> dparamv;
+  std::vector<char *> heapAllocated;
 
   local_nodestart(const char ** extra_argv = nullptr)
   {
@@ -5604,10 +5632,11 @@ struct local_nodestart
         exit(1);
       }
 
-      dparamv.push_back(strdup(abs_xterm));
-      dparamv.push_back(strdup("-title"));
-      dparamv.push_back(strdup(pparam_argv[1]));
-      dparamv.push_back(strdup("-e"));
+      heapAllocated.push_back(abs_xterm);
+      dparamv.push_back(abs_xterm);
+      dparamv.push_back("-title");
+      dparamv.push_back(pparam_argv[1]);
+      dparamv.push_back("-e");
 
       std::vector<const char *> cparamv;
       if (arg_debug || arg_debug_no_pause)
@@ -5631,13 +5660,15 @@ struct local_nodestart
         cparamv.push_back(pparam_argv[i]);
 
       if (extra_argv != nullptr)
-        for (char ** param = (char **)extra_argv; *param != nullptr; ++param)
+        for (const char ** param = extra_argv; *param != nullptr; ++param)
           cparamv.push_back(*param);
 
       if (!(arg_debug || arg_debug_no_pause))
         cparamv.push_back("; echo \"program exited with code $?\" ; read eoln");
 
-      dparamv.push_back(cstring_join(cparamv, " "));
+      char * cparam = cstring_join(cparamv, " ");
+      heapAllocated.push_back(cparam);
+      dparamv.push_back(cparam);
 
       if (arg_verbose)
       {
@@ -5656,10 +5687,10 @@ struct local_nodestart
     {
       if (extra_argv != nullptr)
       {
-        for (char ** param = (char **)(pparam_argv+1); *param != nullptr; ++param)
+        for (const char ** param = pparam_argv+1; *param != nullptr; ++param)
           dparamv.push_back(*param);
 
-        for (char ** param = (char **)extra_argv; *param != nullptr; ++param)
+        for (const char ** param = extra_argv; *param != nullptr; ++param)
           dparamv.push_back(*param);
 
         dparamv.push_back(nullptr);
@@ -5668,7 +5699,7 @@ struct local_nodestart
       }
       else
       {
-        dparamp = (char **)(pparam_argv+1);
+        dparamp = pparam_argv+1;
       }
     }
   }
@@ -5709,7 +5740,7 @@ struct local_nodestart
 
   ~local_nodestart()
   {
-    for (char *p : dparamv)
+    for (char * p : heapAllocated)
       free(p);
     for (int i = envc, i_end = envc + n; i < i_end; ++i)
       free(envp[i]);
@@ -5759,10 +5790,7 @@ static void restart_node(nodetab_process & p)
   /** change the nodetable entry of the crashed
 processor to connect it to a new one**/
   static int next_replacement_host = 0;
-  p.host->crashed = true;
   const int host_count = host_table.size();
-#if 0
-  // Disabled since ft does not distinguish host faults from process faults
   int hosts_checked = 0;
   while (host_table[next_replacement_host]->crashed)
   {
@@ -5774,7 +5802,6 @@ processor to connect it to a new one**/
       exit(1);
     }
   }
-#endif
   p.host = host_table[next_replacement_host];
   ++next_replacement_host;
   next_replacement_host %= host_count;
@@ -5789,10 +5816,15 @@ processor to connect it to a new one**/
     start_one_node_ssh(p, restart_argv);
 
 #if !CMK_SSH_KILL
-    int retries = 0, unfinished;
-    do
-      unfinished = finish_one_node(p, retries, restart_argv);
-    while (unfinished);
+#if CMK_USE_SSH
+    if (!arg_ssh_display)
+#endif
+    {
+      int retries = 0, unfinished;
+      do
+        unfinished = finish_one_node(p, retries, restart_argv);
+      while (unfinished);
+    }
 #endif
   }
   else
@@ -5803,8 +5835,9 @@ processor to connect it to a new one**/
 
   free(restart_argv);
 
-  PRINT(("Charmrun finished launching new process in %fs\n",
-         GetClock() - ftTimer));
+  if (arg_verbose)
+    PRINT(("Charmrun> Finished launching new process in %f s\n",
+           GetClock() - ftTimer));
 }
 
 /**
@@ -5852,8 +5885,6 @@ static void reconnect_crashed_client(nodetab_process & crashed)
       fprintf(stderr, "Charmrun: Bad initnode data length. Aborting\n");
       fprintf(stderr, "Charmrun: possibly because: %s.\n", msg.data);
     }
-    fprintf(stderr, "crashed_node %d reconnected fd %d  \n",
-            crashed.nodeno, req_client);
 
     /** update the nodetab entry corresponding to
     this node, skip the restarted one */
@@ -5885,7 +5916,10 @@ static void reconnect_crashed_client(nodetab_process & crashed)
   }
 
 #if CMK_SSH_KILL
-  kill_one_node(crashed);
+#if CMK_USE_SSH
+  if (!arg_ssh_display)
+#endif
+    kill_one_node(crashed);
 #endif
 }
 

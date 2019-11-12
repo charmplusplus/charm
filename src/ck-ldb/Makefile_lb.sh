@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #Typical load balancers
 COMMON_LDBS="DummyLB GreedyLB GreedyRefineLB RandCentLB RefineLB RotateLB DistributedLB"

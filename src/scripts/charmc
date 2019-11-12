@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ##############################################################################
 # charmc: Compiler for Converse/Charm/Charm++ programs
 #
@@ -118,6 +118,7 @@ NO_MAIN=""
 CUSTOM_PARTITION=""
 PREPROCESS_CI="yes"
 INPUT_GIVEN=""
+PASSTHROUGH_COMPILER_OPTIONS=""
 
 ####################################################################
 #
@@ -423,6 +424,13 @@ do
 		exit 0
 		;;
 
+	-v|--version|-print-search-dirs)
+		# Make sure these compiler options are passed through even if no
+		# file to compile is specified
+		PASSTHROUGH_COMPILER_OPTIONS+=" $arg"
+		OPTS="$OPTS $arg"
+		;;
+
 	"-machine")
 		MACHTYPE="$1"
 		shift
@@ -439,6 +447,12 @@ do
 	"-standalone")
 		STANDALONE="true"
 		SKIP_MODULEINIT="yes"
+		;;
+
+	"-isysroot")
+		# Ignore -isysroot and the following argument (macOS SDK path),
+		# which charmc can not parse (Bug #2495).
+		shift
 		;;
 
 	"-language")
@@ -1578,7 +1592,7 @@ fi
 
 if [ "$BUILD_SHARE" = "0" ]
 then
-       MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
+       MIDDLE_LIBS="$MEM_OBJ $THREAD_OBJ $MIDDLE_LIBS"
 fi
 
 CMK_SYSLIBS="$CMK_SYSLIBS -lm"
@@ -1622,7 +1636,7 @@ case "$PARADIGM" in
 	;;
 "converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
+	MIDDLE_LIBS="-lconv-core $MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
 "c"|"C"|"c++"|"C++"|"f90"|"f77")
   ;;
@@ -2022,6 +2036,7 @@ MakeSO() {
 
 if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ]
 then
+	[[ -n "$PASSTHROUGH_COMPILER_OPTIONS" ]] && $CHARM_CXX $PASSTHROUGH_COMPILER_OPTIONS
 # We have no target object, or are playing preprocessor tricks-- just end
 	Debugf "No target object-- finished"
 	Success

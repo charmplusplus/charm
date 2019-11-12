@@ -246,11 +246,6 @@ CMK_TYPEDEF_UINT8 _memory_allocated = 0;
 CMK_TYPEDEF_UINT8 _memory_allocated_max = 0; /* High-Water Mark */
 CMK_TYPEDEF_UINT8 _memory_allocated_min = 0; /* Low-Water Mark */
 
-/*Rank of the processor that's currently holding the CmiMemLock,
-or -1 if nobody has it.  Only set when malloc might be reentered.
-*/
-static int rank_holding_CmiMemLock=-1;
-
 /* By default, there are no flags */
 static int CmiMemoryIs_flag=0;
 
@@ -412,12 +407,6 @@ void CmiMemoryInit(char ** argv)
   CmiOutOfMemoryInit();
   if (getenv("MEMORYUSAGE_NO_MALLINFO"))  skip_mallinfo = 1;
 }
-
-CLINKAGE void *malloc_reentrant(size_t);
-CLINKAGE void free_reentrant(void *);
-
-void *malloc_reentrant(size_t size) { return malloc(size); }
-void free_reentrant(void *mem) { free(mem); }
 
 /******Start of a general way to get memory usage information*****/
 /*CMK_TYPEDEF_UINT8 CmiMemoryUsage() { return 0; }*/
@@ -742,20 +731,6 @@ void CmiMemoryInit(char **argv)
   code; \
   if (CmiMemoryInited && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) CmiMemUnlock();
 
-/* Wrap a reentrant CmiMemLock around this code */
-#define REENTRANT_MEM_LOCK_AROUND(code) \
-  int myRank=CmiMyRank(); \
-  if (myRank!=rank_holding_CmiMemLock) { \
-  	CmiMemLock(); \
-	rank_holding_CmiMemLock=myRank; \
-	code; \
-	rank_holding_CmiMemLock=-1; \
-	CmiMemUnlock(); \
-  } \
-  else /* I'm already holding the memLock (reentrancy) */ { \
-  	code; \
-  }
-
 void *malloc(size_t size) CMK_THROW
 {
   void *result;
@@ -827,28 +802,6 @@ void *pvalloc(size_t size) CMK_THROW
   MEM_LOCK_AROUND( result = meta_pvalloc(size); )
   if (result==NULL) CmiOutOfMemory(size);
   return result;
-}
-
-/*These are special "reentrant" versions of malloc,
-for use from code that may be called from within malloc.
-The only difference is that these versions check a global
-flag to see if they already hold the memory lock before
-actually trying the lock, which prevents a deadlock where
-you try to aquire one of your own locks.
-*/
-
-CLINKAGE void *malloc_reentrant(size_t);
-CLINKAGE void free_reentrant(void *);
-
-void *malloc_reentrant(size_t size) {
-  void *result;
-  REENTRANT_MEM_LOCK_AROUND( result = meta_malloc(size); )
-  return result;
-}
-
-void free_reentrant(void *mem)
-{
-  REENTRANT_MEM_LOCK_AROUND( meta_free(mem); )
 }
 
 /** Return number of bytes currently allocated, if possible. */
@@ -967,14 +920,9 @@ void free_nomigrate(void *mem) { free(mem); }
 
 #ifndef CMK_MEMORY_HAS_ISOMALLOC
 #include "memory-isomalloc.h"
-/*Not using isomalloc heaps, so forget about activating block list:*/
-CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
-   {return l;}
-CmiIsomallocBlockList *CmiIsomallocBlockListCurrent(void){
-	return NULL;
-}
-void CmiEnableIsomalloc(void) {}
-void CmiDisableIsomalloc(void) {}
+void CmiMemoryIsomallocContextActivate(CmiIsomallocContext *l) {}
+void CmiMemoryIsomallocDisablePush() {}
+void CmiMemoryIsomallocDisablePop() {}
 #endif
 
 #ifndef CMI_MEMORY_ROUTINES
