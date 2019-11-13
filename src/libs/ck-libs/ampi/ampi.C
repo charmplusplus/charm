@@ -3040,7 +3040,7 @@ AmpiMsg* ampi::makeNcpyMsg(int t, int sRank, const void* buf, int count,
     char* sbuf = new char[len];
     ddt->serialize((char*)buf, sbuf, count, len, PACK);
     srcInfo = CkNcpyBuffer(sbuf, len, sendCB);
-    req.setSystemBuf(sbuf); // completedSend will need to free this
+    req.setSystemBuf(sbuf, len); // completedSend will need to free this
     // NOTE: We could set 'req.complete = true' here, but then we'd
     //       have to make sure req.systemBuf gets freed by someone else
     //       in case 'req' is freed before the put() actually completes...
@@ -3310,7 +3310,7 @@ void ampi::requestPut(MPI_Request reqIdx, CkNcpyBuffer targetInfo) noexcept {
     char* sbuf = new char[len];
     sddt->serialize((char*)req.buf, sbuf, req.count, len, PACK);
     srcInfo = CkNcpyBuffer(sbuf, len, sendCB);
-    req.setSystemBuf(sbuf); // completedSend will need to free this
+    req.setSystemBuf(sbuf, len); // completedSend will need to free this
     // NOTE: We could set 'req.statusIreq = true' here, but then we'd
     // have to make sure systemBuf gets freed by someone in case the
     // user tries to free 'req' before the put() actually completes...
@@ -3429,7 +3429,7 @@ bool ampi::processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
   }
   else {
     char* sbuf = new char[len];
-    ireq.setSystemBuf(sbuf);
+    ireq.setSystemBuf(sbuf, len);
     targetInfo = CkNcpyBuffer(sbuf, len, recvCB);
   }
   targetInfo.get(srcInfo);
