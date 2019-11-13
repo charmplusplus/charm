@@ -7,7 +7,6 @@
 #     * Charm++ runtime
 #     * ITC++ Translator
 #     * Languages
-#     * Documentation
 #
 # This Makefile is common to all machines.  This works because the charmc
 # is smart enough to "conceal" the differences between machines.  charmc
