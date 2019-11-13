@@ -20,20 +20,18 @@ CkCallback clientGetImageCallback;
 void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c)
 {
   if (CkMyPe()!=0) CkAbort("liveVizInit must be called only on processor 0!");
-  clientGetImageCallback=c;
   //Broadcast the liveVizConfig object via our group:
   //  lv_config can't be a readonly because we may be called after
   //  main::main (because, e.g., communication is needed to find the
   //  bounding box inside cfg).
   usingBoundArray = false;
-  lvG = CProxy_liveVizGroup::ckNew(cfg);
+  lvG = CProxy_liveVizGroup::ckNew(cfg, c);
 }
 
 //Called by clients to start liveViz.
 void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c, CkArrayOptions &opts)
 {
   if (CkMyPe()!=0) CkAbort("liveVizInit must be called only on processor 0!");
-  clientGetImageCallback=c;
   //Broadcast the liveVizConfig object via our group:
   //  lv_config can't be a readonly because we may be called after
   //  main::main (because, e.g., communication is needed to find the
@@ -49,7 +47,7 @@ void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c, CkArrayOpt
   }
   boundOpts.bindTo(a);
   lvBoundArray = CProxy_LiveVizBoundElement::ckNew(boundOpts);
-  lvG = CProxy_liveVizGroup::ckNew(cfg);
+  lvG = CProxy_liveVizGroup::ckNew(cfg, c);
 }
 
 
@@ -57,6 +55,7 @@ void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c, CkArrayOpt
 void liveVizInitComplete(void *rednMessage) {
   delete (CkReductionMsg *)rednMessage;
   liveViz0Init(lv_config);
+  CProxy_LiveVizBalanceGroup::ckNew();
 }
 
 liveVizRequestMsg *liveVizRequestMsg::buildNew(const liveVizRequest &req,const void *data,int dataLen)

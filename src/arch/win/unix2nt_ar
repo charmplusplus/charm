@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ##############################################################################
 # unix2nt_ar: Maps UNIX ar command options to 
 # Microsoft Visual C++ 6.0 LIB command line options.

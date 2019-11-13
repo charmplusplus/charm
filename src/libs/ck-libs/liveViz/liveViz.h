@@ -172,20 +172,31 @@ public:
       lbdb->getLoadBalancers()[0]->turnOff();
     }
     balancingOn = false;
+    if (thisIndex == 0)
+      registerCallbacks(); // don't need to go through the scheduler
   }
-
-  LiveVizBalanceGroup(CkMigrateMessage* m) {}
+  LiveVizBalanceGroup(CkMigrateMessage* m) : CBase_LiveVizBalanceGroup(m) { }
 
   void pup(PUP::er& p) {
-    p | lbdbID;
-    lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
+    // TODO: Need to fix pup for syncft compatibility
     p | hasReply;
     p | hasRequest;
-    // TODO: Need to fix pup for syncft compatibility
     //p | replyTag;
     p | data_size;
     //PUParray(data, data_size);
     //p | lbReceiver;
+
+    if (p.isUnpacking()) {
+      lbdbID = _lbdb;
+      lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
+      if (p.isRestarting() && thisIndex == 0)
+        thisProxy[thisIndex].registerCallbacks(); // need to go through the scheduler
+    }
+  }
+
+  void registerCallbacks() {
+    CcsRegisterHandler("lvBalanceData", CkCallback(CkIndex_LiveVizBalanceGroup::lbDataRequest(NULL), thisProxy[0]));
+  CcsRegisterHandler("lvBalanceInteraction", CkCallback(CkIndex_LiveVizBalanceGroup::doBalanceRequest(NULL), thisProxy[0]));
   }
 
   static void staticRecvAtSync(void* data) {

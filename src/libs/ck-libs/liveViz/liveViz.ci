@@ -9,7 +9,7 @@ module liveViz {
 
 	readonly CProxy_liveVizGroup lvG;
 	group [migratable] liveVizGroup {
-		entry liveVizGroup(const liveVizConfig &cfg);
+		entry liveVizGroup(const liveVizConfig &cfg, CkCallback c);
 	};
 
 	readonly CProxy_LiveVizBoundElement lvBoundArray;
@@ -21,8 +21,11 @@ module liveViz {
 
   group [migratable] LiveVizBalanceGroup {
     entry LiveVizBalanceGroup();
+    entry void registerCallbacks();
+
     entry void lbDataRequest(CkCcsRequestMsg* m);
     entry void doBalanceRequest(CkCcsRequestMsg* m);
+
     entry void doBalance();
     entry [reductiontarget] void gatherData(int data[n], int n);
   };

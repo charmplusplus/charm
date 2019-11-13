@@ -201,7 +201,7 @@ class er {
   void becomeUserlevel(void) {PUP_er_state|=IS_USERLEVEL;}
   bool isUserlevel(void) const {return (PUP_er_state&IS_USERLEVEL)!=0?true:false;}
   
-  //This indicates that the pup routine should not call system objects' pups.
+  //This indicates that the pup routine is restoring from a checkpoint.
   void becomeRestarting(void) {PUP_er_state|=IS_RESTARTING;}
   bool isRestarting(void) const {return (PUP_er_state&IS_RESTARTING)!=0?true:false;}
   

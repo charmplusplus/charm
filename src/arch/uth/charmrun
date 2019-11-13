@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Just executes all its arguments.
 PATH=.:$PATH

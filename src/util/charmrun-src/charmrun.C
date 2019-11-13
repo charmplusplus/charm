@@ -2535,30 +2535,31 @@ static int req_handle_crash(ChMessage *msg, nodetab_process & p)
   /*Anounce crash to all child charmruns*/
   announce_crash(p);
 }
-
-#endif
 #endif
 
-#ifdef __FAULT__
-static void error_in_req_serve_client(nodetab_process & p)
+static void crashed_process_common(nodetab_process & p)
 {
-  const SOCKET fd = p.req_client;
-  fprintf(stderr, "Socket %d failed \n", fd);
+  skt_close(p.req_client);
 
-  fflush(stdout);
-  skt_close(fd);
-
-  /** should also send a message to all the other processors telling them that
-   * this guy has crashed*/
-  /*announce_crash(p);*/
   restart_node(p);
 
-  fprintf(stderr, "charmrun says process %d failed (on host %s)\n", p.nodeno, p.host->name);
-  /** after the crashed processor has been recreated
-   it connects to charmrun. That data must now be filled
-   into my_process_table and the nodetab_table*/
-
+  // After the crashed processor has been recreated
+  // it connects to Charmrun. That data must now be filled
+  // into the node table.
   reconnect_crashed_client(p);
+}
+
+static void error_in_req_serve_client(nodetab_process & p)
+{
+  printf("Charmrun> Process %d (host %s) failed: Socket error\n", p.nodeno, p.host->name);
+  fflush(stdout);
+
+#if 0
+  // Disabled since sockets do not adequately distinguish host faults from process faults
+  p.host->crashed = true;
+#endif
+
+  crashed_process_common(p);
 }
 #endif
 
@@ -5520,8 +5521,9 @@ struct local_nodestart
   char **envp;
   int n;
 
-  char **dparamp;
-  std::vector<char *> dparamv;
+  const char ** dparamp;
+  std::vector<const char *> dparamv;
+  std::vector<char *> heapAllocated;
 
   local_nodestart(const char ** extra_argv = nullptr)
   {
@@ -5604,10 +5606,11 @@ struct local_nodestart
         exit(1);
       }
 
-      dparamv.push_back(strdup(abs_xterm));
-      dparamv.push_back(strdup("-title"));
-      dparamv.push_back(strdup(pparam_argv[1]));
-      dparamv.push_back(strdup("-e"));
+      heapAllocated.push_back(abs_xterm);
+      dparamv.push_back(abs_xterm);
+      dparamv.push_back("-title");
+      dparamv.push_back(pparam_argv[1]);
+      dparamv.push_back("-e");
 
       std::vector<const char *> cparamv;
       if (arg_debug || arg_debug_no_pause)
@@ -5631,13 +5634,15 @@ struct local_nodestart
         cparamv.push_back(pparam_argv[i]);
 
       if (extra_argv != nullptr)
-        for (char ** param = (char **)extra_argv; *param != nullptr; ++param)
+        for (const char ** param = extra_argv; *param != nullptr; ++param)
           cparamv.push_back(*param);
 
       if (!(arg_debug || arg_debug_no_pause))
         cparamv.push_back("; echo \"program exited with code $?\" ; read eoln");
 
-      dparamv.push_back(cstring_join(cparamv, " "));
+      char * cparam = cstring_join(cparamv, " ");
+      heapAllocated.push_back(cparam);
+      dparamv.push_back(cparam);
 
       if (arg_verbose)
       {
@@ -5656,10 +5661,10 @@ struct local_nodestart
     {
       if (extra_argv != nullptr)
       {
-        for (char ** param = (char **)(pparam_argv+1); *param != nullptr; ++param)
+        for (const char ** param = pparam_argv+1; *param != nullptr; ++param)
           dparamv.push_back(*param);
 
-        for (char ** param = (char **)extra_argv; *param != nullptr; ++param)
+        for (const char ** param = extra_argv; *param != nullptr; ++param)
           dparamv.push_back(*param);
 
         dparamv.push_back(nullptr);
@@ -5668,7 +5673,7 @@ struct local_nodestart
       }
       else
       {
-        dparamp = (char **)(pparam_argv+1);
+        dparamp = pparam_argv+1;
       }
     }
   }
@@ -5709,7 +5714,7 @@ struct local_nodestart
 
   ~local_nodestart()
   {
-    for (char *p : dparamv)
+    for (char * p : heapAllocated)
       free(p);
     for (int i = envc, i_end = envc + n; i < i_end; ++i)
       free(envp[i]);
@@ -5759,10 +5764,7 @@ static void restart_node(nodetab_process & p)
   /** change the nodetable entry of the crashed
 processor to connect it to a new one**/
   static int next_replacement_host = 0;
-  p.host->crashed = true;
   const int host_count = host_table.size();
-#if 0
-  // Disabled since ft does not distinguish host faults from process faults
   int hosts_checked = 0;
   while (host_table[next_replacement_host]->crashed)
   {
@@ -5774,7 +5776,6 @@ processor to connect it to a new one**/
       exit(1);
     }
   }
-#endif
   p.host = host_table[next_replacement_host];
   ++next_replacement_host;
   next_replacement_host %= host_count;
