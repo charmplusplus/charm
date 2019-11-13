@@ -701,8 +701,8 @@ fully support ELF, and it requires ld version 2.23 or older, or else a
 patched version of ld 2.24+ that we provide here:
 https://charm.cs.illinois.edu/gerrit/gitweb?p=libbfd-patches.git;a=tree;f=swapglobals
 
-Manual Change
-~~~~~~~~~~~~~
+Manual Code Editing
+~~~~~~~~~~~~~~~~~~~
 
 We have employed a strategy of argument passing to do this privatization
 transformation. That is, the global variables are bunched together in a
@@ -891,7 +891,7 @@ different schemes.
    PiP-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
    FS-Globals           Yes   Yes    No   Maybe   Yes Yes    Yes   Yes
    GOT-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
-   Manual Change        Yes   Yes    Yes  Yes     Yes Yes    Yes   Yes
+   Manual Code Editing  Yes   Yes    Yes  Yes     Yes Yes    Yes   Yes
    ==================== ===== ====== ==== ======= === ====== ===== =====
 
 Extensions
