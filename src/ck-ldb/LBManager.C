@@ -1005,18 +1005,20 @@ void LocalBarrier::propagate_atsync() {
     int myphynode = CkNodeOf(mype);
     if(!_mgr->rank0pe) {
       if(!_mgr->received_from_rank0) {
+        // If this PE is non-rank0 and non-empty PE, then trigger AtSync barrier on rank0
         int node_rank0_pe = CkNodeFirst(myphynode);
         _mgr->invokeLbStart(node_rank0_pe, cur_refcount, myphynode, mype);
       }
-    } else {
+    } else { // Rank0 PE
       int peFirst = CkNodeFirst(CkMyNode());
+      // Flood non-zero ranks on this node
       for (std::list<int>::iterator it=_mgr->local_pes_to_notify.begin(); it != _mgr->local_pes_to_notify.end(); ++it)
         _mgr->invokeLbStart(*it, cur_refcount, myphynode, mype);
-      if(!_mgr->received_from_left && myphynode > 0) {
+      if(!_mgr->received_from_left && myphynode > 0) { // Flood left node
         int pe = CkNodeFirst(myphynode - 1);
         _mgr->invokeLbStart(pe, cur_refcount, myphynode, mype);
       }
-      if(!_mgr->received_from_right && myphynode < CkNumNodes()-1) {
+      if(!_mgr->received_from_right && myphynode < CkNumNodes()-1) { // Flood right node
         int pe = CkNodeFirst(myphynode + 1);
         _mgr->invokeLbStart(pe, cur_refcount, myphynode, mype);
       }
@@ -1038,8 +1040,8 @@ void LBManager::recvLbStart(int lb_step, int phynode, int pe) {
     local_pes_to_notify.remove(pe);
   else
     received_from_rank0 = true;
-  if(localBarrier.client_count == 1 && chares.front()->checkLocMgr()) //dummyAtSync is always a client
-    localBarrier.CheckBarrier(true);
+  if(localBarrier.client_count == 1 && chares.front()->checkLocMgr()) // CkLocMgr is usually a client on each PE
+    localBarrier.CheckBarrier(true); // Empty PE invokes barrier on self on receiving a flood msg
 }
 
 void LocalBarrier::CheckBarrier(bool flood_atsync)
@@ -1054,7 +1056,6 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
   }
 
   // If there are no clients, resume as soon as we're turned on
-  //  CkPrintf("\n[PE-%d] at_count=%d, client_count=%d\n", CkMyPe(), at_count, client_count);
   if (client_count == 0) {
     cur_refcount++;
     for (std::list<Chare *>::iterator i = _mgr->chares.begin(); i != _mgr->chares.end(); ++i)
