@@ -232,7 +232,8 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
   // Create subdirectories by grouping PEs
   // Nodegroups are fine since # of logical nodes <= # of PEs
   int numPes = CkNumPes();
-  for (int i = 0; i < numPes / PE_GROUP_SIZE; i++) {
+  int numPeGroups = ceil((double)numPes / PE_GROUP_SIZE);
+  for (int i = 0; i < numPeGroups; i++) {
     dirPath << "/sub" << i;
     CmiMkdir(dirPath.str().c_str());
   }
