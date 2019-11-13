@@ -10,6 +10,7 @@
 #include "ckimage.h"
 #include "colorScale.h"
 #include "pup_toNetwork.h"
+#include "BaseLB.h"
 
 /********************** LiveViz ***********************/
 #include "liveViz.decl.h"
@@ -150,50 +151,135 @@ class LiveVizBalanceGroup : public CBase_LiveVizBalanceGroup {
 private:
   CkGroupID lbdbID;
   LBDatabase* lbdb;
-  CkCcsRequestMsg* msg;
+  bool hasReply, hasRequest;
+  CcsDelayedReply replyTag;
+  int* data;
+  int data_size;
+  bool balancingOn;
+  LDBarrierReceiver lbReceiver;
+
 public:
   LiveVizBalanceGroup() {
     lbdbID = _lbdb;
     lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
-    msg = NULL;
+    lbReceiver = lbdb->AddLocalBarrierReceiver((LDResumeFn)staticRecvAtSync, (void*)this);
+    lbdb->AddMigrationDoneFn(staticDoneLB, (void*)this);
+    data = NULL;
+    data_size = 0;
+    hasReply = hasRequest = false;
+
+    for (int i = 0; i < lbdb->getNLoadBalancers(); i++) {
+      lbdb->getLoadBalancers()[0]->turnOff();
+    }
+    balancingOn = false;
   }
 
-  void reduceBalanceData(CkCcsRequestMsg* m) {
-    CkAssert(msg == NULL);
-    msg = m;
-    thisProxy.doReduction();
+  LiveVizBalanceGroup(CkMigrateMessage* m) {}
+
+  void pup(PUP::er& p) {
+    p | lbdbID;
+    lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
+    p | hasReply;
+    p | hasRequest;
+    // TODO: Need to fix pup for syncft compatibility
+    //p | replyTag;
+    p | data_size;
+    //PUParray(data, data_size);
+    //p | lbReceiver;
   }
 
-  void doReduction() {
-    const int osz = lbdb->GetObjDataSz();
-    LDObjData* objData = new LDObjData[osz];
+  static void staticRecvAtSync(void* data) {
+    ((LiveVizBalanceGroup*)data)->recvAtSync();
+  }
+
+  static void staticDoneLB(void* data) {
+    ((LiveVizBalanceGroup*)data)->doneLB();
+  }
+
+  void recvAtSync() {
+    int osz = lbdb->GetObjDataSz();
+    LDObjData* objData = new LDObjData[osz]; 
     lbdb->GetObjData(objData);
+    
+    double wt, cput, idle, bgwt, bgcpu;
+    lbdb->GetTime(&wt, &cput, &idle, &bgwt, &bgcpu);
 
-    int len = osz + 2;
+    int len = osz + 4;
     int* buf = new int[len];
     buf[0] = CkMyPe();
-    buf[1] = osz;
+    buf[1] = (int)(bgwt * 1000);
+    buf[2] = (int)(idle * 1000);
+    buf[3] = osz;
     for (int i = 0; i < osz; i++) {
-      buf[i+2] = (int)(objData[i].wallTime * 1000);
+      buf[i+4] = (int)(objData[i].wallTime * 1000);
     }
 
-    contribute(sizeof(int) * len, buf, CkReduction::concat, CkCallback(CkReductionTarget(LiveVizBalanceGroup, sendReply), thisProxy[0]));
+    contribute(sizeof(int) * len, buf, CkReduction::concat,
+        CkCallback(CkReductionTarget(LiveVizBalanceGroup, gatherData),
+            thisProxy[0]));
     delete[] buf;
+
+    if (!balancingOn) {
+      lbdb->ResumeClients();
+      lbdb->ClearLoads();
+    }
   }
 
-  void sendReply(int* data, int n) {
-    int total_size = n+1;
-    int total_pes = CkNumPes();
-    int* buf = new int[total_size];
-    buf[0] = total_pes;
-    memcpy(&(buf[1]), data, n*sizeof(int));
-    CcsSendDelayedReply(msg->reply, total_size * sizeof(int), buf);
-    delete[] buf;
+  void doneLB() {
+    balancingOn = false;
+    for (int i = 0; i < lbdb->getNLoadBalancers(); i++) {
+      lbdb->getLoadBalancers()[0]->turnOff();
+    }
+  }
+
+  void doBalanceRequest(CkCcsRequestMsg* msg) {
+    thisProxy.doBalance();
+    int x;
+    if (lbdb->getNLoadBalancers() > 0) {
+      x = 1;
+    } else {
+      x = 0;
+    }
+    CcsSendDelayedReply(msg->reply, sizeof(int), &x);
     delete msg;
-    msg = NULL;
+  }
+
+  void doBalance() {
+    if (lbdb->getNLoadBalancers() > 0) {
+      lbdb->getLoadBalancers()[0]->turnOn();
+      balancingOn = true;
+    } else {
+      CmiPrintf("Can't turn on load balancing, no LB specified!\n");
+    }
+  }
+
+  void lbDataRequest(CkCcsRequestMsg* m) {
+    replyTag = m->reply;
+    hasRequest = true;
+    delete m;
+    if (hasReply) {
+      sendReply();
+    }
+  }
+
+  void gatherData(int* d, int n) {
+    hasReply = true;
+    data_size = n+1;
+    int total_pes = CkNumPes();
+    data = new int[data_size];
+    data[0] = total_pes;
+    memcpy(&(data[1]), d, n*sizeof(int));
+    if (hasRequest) {
+      sendReply();
+    }
+  }
+
+  void sendReply() {
+    CcsSendDelayedReply(replyTag, data_size * sizeof(int), data);
+    hasReply = hasRequest = false;
+    delete[] data;
+    data = NULL;
   }
 };
-
-
 
 #endif /* def(thisHeader) */

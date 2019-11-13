@@ -19,10 +19,11 @@ module liveViz {
 		entry [local] void deposit(CkReductionMsg *msg);
 	}; 
 
-  group LiveVizBalanceGroup {
+  group [migratable] LiveVizBalanceGroup {
     entry LiveVizBalanceGroup();
-    entry void reduceBalanceData(CkCcsRequestMsg* m);
-    entry void doReduction();
-    entry [reductiontarget] void sendReply(int data[n], int n);
+    entry void lbDataRequest(CkCcsRequestMsg* m);
+    entry void doBalanceRequest(CkCcsRequestMsg* m);
+    entry void doBalance();
+    entry [reductiontarget] void gatherData(int data[n], int n);
   };
 }

@@ -310,7 +310,8 @@ void liveViz0Init(const liveVizConfig &cfg) {
   config=cfg;
   CcsRegisterHandler("lvConfig",(CmiHandler)getImageConfigHandler);
   CcsRegisterHandler("lvImage", (CmiHandler)getImageHandler);
-  CcsRegisterHandler("lvBalance", CkCallback(CkIndex_LiveVizBalanceGroup::reduceBalanceData(NULL), proxy[0]));
+  CcsRegisterHandler("lvBalanceData", CkCallback(CkIndex_LiveVizBalanceGroup::lbDataRequest(NULL), proxy[0]));
+  CcsRegisterHandler("lvBalanceInteraction", CkCallback(CkIndex_LiveVizBalanceGroup::doBalanceRequest(NULL), proxy[0]));
   if (config.getVerbose(1))
     CmiPrintf("CCS getImage handlers registered.  Waiting for clients...\n");
 }
