@@ -158,10 +158,9 @@ class fromzDisk : public zdisk {
 #endif
 
 /* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
- * BigSim is not being used and if tracing is not being used (such msgs are currently untraced).
- * This is currently disabled due to Bug #2472. */
+ * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
 #ifndef AMPI_NODE_LOCAL_IMPL
-#define AMPI_NODE_LOCAL_IMPL 0 // (CMK_SMP && !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
