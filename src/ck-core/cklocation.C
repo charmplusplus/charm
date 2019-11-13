@@ -1572,6 +1572,11 @@ void Chare::AtSyncBarrierReached(void)
   CkAbort("::AtSyncBarrierReached() not defined for this array element!\n");
 }
 
+bool Chare::checkLocMgr(void)
+{
+  return false;
+}
+
 void CkMigratable::UserSetLBLoad() {
 	CkAbort("::UserSetLBLoad() not defined for this array element!\n");
 }

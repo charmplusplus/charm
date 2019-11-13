@@ -982,12 +982,12 @@ void LocalBarrier::TurnOffReceiver(LDBarrierReceiver c)
   (*c.i)->on = 0;
 }
 
-void LocalBarrier::AtBarrier(Chare* _n_c, int recvd_iter)
+void LocalBarrier::AtBarrier(Chare* _n_c, bool flood_atsync)
 {
   _n_c->r_count++;
   at_count++;
 
-  CheckBarrier(recvd_iter);
+  CheckBarrier(flood_atsync);
 }
 
 void LocalBarrier::DecreaseBarrier(int c)
@@ -1038,16 +1038,20 @@ void LBManager::recvLbStart(int lb_step, int phynode, int pe) {
     local_pes_to_notify.remove(pe);
   else
     received_from_rank0 = true;
-  if(localBarrier.client_count == 1) { //dummyAtSync is always a client
-    localBarrier.CheckBarrier(1);
-  }
+  if(localBarrier.client_count == 1 && chares.front()->checkLocMgr()) //dummyAtSync is always a client
+    localBarrier.CheckBarrier(true);
 }
 
-void LocalBarrier::CheckBarrier(int recvd_iter)
+void LocalBarrier::CheckBarrier(bool flood_atsync)
 {
   if(_lb_args.lbperiod() != -1.0) return;
 
   if (!on) return;
+
+  if (client_count == 1 && !flood_atsync){
+    if(_mgr->chares.front()->checkLocMgr())
+      return;
+  }
 
   // If there are no clients, resume as soon as we're turned on
   //  CkPrintf("\n[PE-%d] at_count=%d, client_count=%d\n", CkMyPe(), at_count, client_count);

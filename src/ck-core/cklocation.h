@@ -296,6 +296,7 @@ typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
         ~CkLocMgr();
 
 	inline bool isLocMgr(void) { return true; }
+  inline bool checkLocMgr(void){return true;}
 	CkGroupID &getGroupID(void) {return thisgroup;}
 	inline CProxy_CkLocMgr &getProxy(void) {return thisProxy;}
 	inline CProxyElement_CkLocMgr &getLocalProxy(void) {return thislocalproxy;}

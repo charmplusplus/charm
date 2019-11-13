@@ -241,6 +241,7 @@ class Chare {
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
     virtual void ResumeFromSync(void);
     virtual void AtSyncBarrierReached(void);
+    virtual bool checkLocMgr(void);
     /// Pack/UnPack - tell the runtime how to serialize this class's
     /// data for migration, checkpoint, etc.
     virtual void pup(PUP::er &p);

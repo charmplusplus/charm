@@ -10,6 +10,8 @@
 
 #define LB_FORMAT_VERSION     3
 
+#define LB_MANAGER_VERSION 1
+
 
 class MetaBalancer;
 extern int _lb_version;
@@ -143,14 +145,14 @@ public:
   void RemoveReceiver(LDBarrierReceiver h);
   void TurnOnReceiver(LDBarrierReceiver h);
   void TurnOffReceiver(LDBarrierReceiver h);
-  void AtBarrier(Chare* _n_c, int recvd_iter=-1);
+  void AtBarrier(Chare* _n_c, bool flood_atsync=false);
   void DecreaseBarrier(int c);
   void TurnOn() { on = true; CheckBarrier(); };
   void TurnOff() { on = false; };
 
 public:
   void CallReceivers(void);
-  void CheckBarrier(int recvd_iter=-1);
+  void CheckBarrier(bool flood_atsync=false);
   void ResumeClients(void);
 
   std::list<receiver*> receivers;
