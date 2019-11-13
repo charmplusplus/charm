@@ -2,6 +2,7 @@ mainmodule wave2d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
+    entry void add_drop(CkCcsRequestMsg* m);
   };
 
   array [2D] Wave {
@@ -11,7 +12,7 @@ mainmodule wave2d {
 
     // A method for requesting data to be displayed graphically to the user
     entry void requestNextFrame(liveVizRequestMsg *m);
-    entry void add_drop();
+    entry void add_drop(int x, int y);
     entry [reductiontarget] void iterationCompleted(int iteration);
   };
 

@@ -19,6 +19,8 @@ enum { left=0, right, up, down };
 
 class Main : public CBase_Main
 {
+private:
+    CProxy_Wave arrayProxy;
 public:
   Main(CkArgMsg* m) {
     delete m;
@@ -27,16 +29,31 @@ public:
 
     // Create new array of worker chares
     CkArrayOptions opts(chareArrayWidth, chareArrayHeight);
-    CProxy_Wave arrayProxy = CProxy_Wave::ckNew(opts);
+    arrayProxy = CProxy_Wave::ckNew(opts);
 
     // setup liveviz
     CkCallback c(CkIndex_Wave::requestNextFrame(0),arrayProxy);
     liveVizConfig cfg(liveVizConfig::pix_color,true);
     liveVizInit(cfg,arrayProxy,c, opts);
 
+    CcsRegisterHandler("lvImageInteraction", CkCallback(CkIndex_Main::add_drop(NULL), thisProxy));
+
     //Start the computation
     arrayProxy.begin_iteration();
   }
+
+  void add_drop(CkCcsRequestMsg* m) {
+    int x, y;
+    PUP_toNetwork_unpack p(m->data);
+    p | x;
+    p | y;
+    int xChare = x / (TotalDataWidth / chareArrayWidth);
+    int yChare = y / (TotalDataHeight / chareArrayHeight);
+    arrayProxy(xChare, yChare).add_drop(x, y);
+    CcsSendDelayedReply(m->reply, sizeof(int), &x);
+    delete m;
+  }
+
 };
 
 class Wave: public CBase_Wave {
@@ -151,12 +168,13 @@ public:
 
     delete [] intensity;
   }
-  void add_drop()
+
+  void add_drop(int x, int y)
   {
     // Determine where to place a circle within the interior of the 2-d domain
+    int xcenter = x - (mywidth * thisIndex.x);
+    int ycenter = y - (myheight * thisIndex.y);
     int radius = 5+rand() % 10;
-    int xcenter = radius + rand() % (mywidth - 2*radius);
-    int ycenter = radius + rand() % (myheight - 2*radius);
     // Draw the circle
     for(int i=0;i<myheight;i++){
       for(int j=0; j<mywidth; j++){
@@ -306,9 +324,11 @@ public:
     }
     // randomly add drops every addDropIter
     if(iteration >1 && iteration % addDropIter ==0){
-      int dropx=rand() % chareArrayWidth;
-      int dropy=rand() % chareArrayHeight;
-      thisProxy(dropx, dropy).add_drop();
+      int dropx=rand() % TotalDataWidth;
+      int dropy=rand() % TotalDataWidth;
+      int charex = dropx / (TotalDataWidth / chareArrayWidth);
+      int charey = dropy / (TotalDataHeight / chareArrayHeight);
+      thisProxy(charex, charey).add_drop(dropx, dropy);
     }
   }
 };
