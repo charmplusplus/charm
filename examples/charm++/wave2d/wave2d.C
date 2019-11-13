@@ -7,10 +7,11 @@
 
 #define TotalDataWidth  800
 #define TotalDataHeight 800
-#define chareArrayWidth  8
-#define chareArrayHeight  8
-#define total_iterations 5000
+#define chareArrayWidth  16
+#define chareArrayHeight  16
+#define total_iterations 50000
 #define numInitialPertubations 5
+#define addDropIter 1000
 
 #define mod(a,b)  (((a)+b)%b)
 
@@ -18,6 +19,8 @@ enum { left=0, right, up, down };
 
 class Main : public CBase_Main
 {
+private:
+    CProxy_Wave arrayProxy;
 public:
   Main(CkArgMsg* m) {
     delete m;
@@ -26,16 +29,31 @@ public:
 
     // Create new array of worker chares
     CkArrayOptions opts(chareArrayWidth, chareArrayHeight);
-    CProxy_Wave arrayProxy = CProxy_Wave::ckNew(opts);
+    arrayProxy = CProxy_Wave::ckNew(opts);
 
     // setup liveviz
     CkCallback c(CkIndex_Wave::requestNextFrame(0),arrayProxy);
     liveVizConfig cfg(liveVizConfig::pix_color,true);
     liveVizInit(cfg,arrayProxy,c, opts);
 
+    CcsRegisterHandler("lvImageInteraction", CkCallback(CkIndex_Main::add_drop(NULL), thisProxy));
+
     //Start the computation
     arrayProxy.begin_iteration();
   }
+
+  void add_drop(CkCcsRequestMsg* m) {
+    int x, y;
+    PUP_toNetwork_unpack p(m->data);
+    p | x;
+    p | y;
+    int xChare = x / (TotalDataWidth / chareArrayWidth);
+    int yChare = y / (TotalDataHeight / chareArrayHeight);
+    arrayProxy(xChare, yChare).add_drop(x, y);
+    CcsSendDelayedReply(m->reply, sizeof(int), &x);
+    delete m;
+  }
+
 };
 
 class Wave: public CBase_Wave {
@@ -153,6 +171,24 @@ public:
     delete [] intensity;
   }
 
+  void add_drop(int x, int y)
+  {
+    // Determine where to place a circle within the interior of the 2-d domain
+    int xcenter = x - (mywidth * thisIndex.x);
+    int ycenter = y - (myheight * thisIndex.y);
+    int radius = 5+rand() % 10;
+    // Draw the circle
+    for(int i=0;i<myheight;i++){
+      for(int j=0; j<mywidth; j++){
+	  double distanceToCenter = sqrt((j-xcenter)*(j-xcenter) + (i-ycenter)*(i-ycenter));
+	  if (distanceToCenter < radius) {
+	    double rscaled = (distanceToCenter/radius)*3.0*3.14159/2.0; // ranges from 0 to 3pi/2 
+	    double t = 700.0 * cos(rscaled) ; // Range won't exceed -700 to 700
+	    pressure[i*mywidth+j] = pressure_old[i*mywidth+j] = t;
+	  }
+      }
+    }
+  }
   void begin_iteration(void) {
 
     double *top_edge = &pressure[0];
@@ -183,7 +219,6 @@ public:
     if (--messages_due == 0) {
 
       // Compute the new values based on the current and previous step values
-
       for(int i=0;i<myheight;++i){
 	for(int j=0;j<mywidth;++j){
 
@@ -201,6 +236,8 @@ public:
 
 	  // Compute the future time's pressure for this array location
 	  pressure_new[i*mywidth+j] = 0.4*0.4*(L+R+U+D - 4.0*curr)-old+2.0*curr;
+	  // overdamp
+	  pressure_new[i*mywidth+j] *= 0.9995;
 
 	}
       }
@@ -286,6 +323,14 @@ public:
       {
 	thisProxy.begin_iteration();
       }
+    }
+    // randomly add drops every addDropIter
+    if(iteration >1 && iteration % addDropIter ==0){
+      int dropx=rand() % TotalDataWidth;
+      int dropy=rand() % TotalDataWidth;
+      int charex = dropx / (TotalDataWidth / chareArrayWidth);
+      int charey = dropy / (TotalDataHeight / chareArrayHeight);
+      thisProxy(charex, charey).add_drop(dropx, dropy);
     }
   }
 };
