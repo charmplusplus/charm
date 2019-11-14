@@ -221,24 +221,21 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	// make dir on all PEs in case it is a local directory
 	CmiMkdir(dirname);
 
-  // Create partition directories (if applicable)
-  ostringstream dirPath;
-  dirPath << dirname;
-  if (CmiNumPartitions() > 1) {
-    addPartitionDirectory(dirPath);
-    CmiMkdir(dirPath.str().c_str());
-  }
+	// Create partition directories (if applicable)
+	ostringstream dirPath;
+	dirPath << dirname;
+	if (CmiNumPartitions() > 1) {
+		addPartitionDirectory(dirPath);
+		CmiMkdir(dirPath.str().c_str());
+	}
 
-  // Create subdirectories by grouping PEs
-  // Nodegroups are fine since # of logical nodes <= # of PEs
-  int numPes = CkNumPes();
-  int numPeGroups = ceil((double)numPes / PE_GROUP_SIZE);
-  for (int i = 0; i < numPeGroups; i++) {
-    dirPath << "/sub" << i;
-    CmiMkdir(dirPath.str().c_str());
-  }
+	// Create subdirectories by grouping PEs
+	// Nodegroups are fine since # of logical nodes <= # of PEs
+	int myPeGroup = CkMyPe() / PE_GROUP_SIZE;
+	dirPath << "/sub" << myPeGroup;
+	CmiMkdir(dirPath.str().c_str());
 
-  bool success = true;
+	bool success = true;
 	if (CkMyPe() == 0) {
 #if CMK_SHRINK_EXPAND
     if (pending_realloc_state == REALLOC_IN_PROGRESS) {
