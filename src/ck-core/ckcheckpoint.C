@@ -30,7 +30,7 @@ void noopit(const char*, ...)
 #define DEBUGC(x) x
 //#define DEBUGC(x) 
 
-#define PE_GROUP_SIZE 256
+#define SUBDIR_SIZE 256
 
 CkGroupID _sysChkptMgr;
 
@@ -180,8 +180,8 @@ static FILE* openCheckpointFile(const char *dirname, const char *basename,
   out << dirname;
   addPartitionDirectory(out);
   if (id != -1) {
-    int sub_id = id / PE_GROUP_SIZE;
-    out << "/sub" << sub_id;
+    int subdir_id = id / SUBDIR_SIZE;
+    out << "/sub" << subdir_id;
   }
   out << "/" << basename;
   if (id != -1) {
@@ -230,10 +230,10 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	}
 
 	// Due to file system issues we have observed, divide checkpoints
-	// into subdirectories to avoid having too many files in a single directory 
+	// into subdirectories to avoid having too many files in a single directory
 	// Nodegroups are fine since # of logical nodes <= # of PEs
-	int myPeGroup = CkMyPe() / PE_GROUP_SIZE;
-	dirPath << "/sub" << myPeGroup;
+	int mySubDir = CkMyPe() / SUBDIR_SIZE;
+	dirPath << "/sub" << mySubDir;
 	CmiMkdir(dirPath.str().c_str());
 
 	bool success = true;
