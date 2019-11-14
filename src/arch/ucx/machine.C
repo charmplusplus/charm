@@ -141,10 +141,11 @@ void UcxRequestInit(void *request)
 
 static void UcxInitEps(int numNodes, int myId)
 {
+    size_t maxval = 0, addrlen = 0;
+    size_t len, partLen;
     ucp_address_t *address;
     ucs_status_t status;
     ucp_ep_params_t eParams;
-    size_t addrlen, maxval, len, partLen;
     ucp_ep_h ep;
     int i, j, ret, peer, maxkey, parts;
     char *keys, *addrp, *remoteAddr;
