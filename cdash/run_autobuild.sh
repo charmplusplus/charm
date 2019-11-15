@@ -22,7 +22,7 @@ AUTOBUILD_TEST_OPTS=${AUTOBUILD_TEST_OPTS:-++local}
 PPPID=$(ps h -o ppid= $PPID)
 P_COMMAND=$(basename $(ps h -o comm= $PPPID))
 
-if [[ $P_COMMAND != "cron" ]]; then
+if [[ $P_COMMAND != "cron" && $P_COMMAND != "systemd" ]]; then
         # Interactive shell, run Experimental
         AUTOBUILD_CTEST_MODEL="Experimental"
 else
