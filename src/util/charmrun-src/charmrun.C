@@ -2237,7 +2237,11 @@ static int req_handle_ending(ChMessage *msg, SOCKET fd)
       skt_close(p.req_client);
     if (arg_verbose)
       printf("Charmrun> Graceful exit with exit code %d.\n", _exitcode);
+#if CMK_USE_SSH
+    if (arg_interactive && !arg_ssh_display)
+#else
     if (arg_interactive)
+#endif
       finish_set_nodes(my_process_table, 0, 1, true);
     exit(_exitcode);
   }
@@ -3624,7 +3628,10 @@ static void req_client_connect(std::vector<nodetab_process> & process_table)
           start_nodes_ssh(phase2_processes);
         }
 #if !CMK_SSH_KILL
-        finish_nodes(phase2_processes);
+#if CMK_USE_SSH
+        if (!arg_ssh_display)
+#endif
+          finish_nodes(phase2_processes);
 #endif
       }
       else
@@ -3858,11 +3865,13 @@ static void start_nodes_batch_and_connect(std::vector<nodetab_process> & process
     for (int c = clientstart; c < clientend; ++c)
       start_one_node_ssh(process_table[c]);
 
+#if !CMK_SSH_KILL
 #if CMK_USE_SSH
     /* ssh x11 forwarding will make sure ssh exit */
     if (!arg_ssh_display)
 #endif
       finish_set_nodes(process_table, clientstart, clientend);
+#endif
 
     // batch implementation of req_client_connect functionality below this line to end of function
 
@@ -4272,7 +4281,11 @@ int main(int argc, const char **argv, char **envp)
   /* Hierarchical startup*/
   if (arg_hierarchical_start) {
 #if !CMK_SSH_KILL
+#if CMK_USE_SSH
+    if ((!arg_batch_spawn || (!arg_child_charmrun)) && !arg_ssh_display)
+#else
     if (!arg_batch_spawn || (!arg_child_charmrun))
+#endif
       finish_nodes(my_process_table);
 #endif
 
@@ -4286,14 +4299,21 @@ int main(int argc, const char **argv, char **envp)
 #endif
   {
 #if !CMK_SSH_KILL
+#if CMK_USE_SSH
+    if (!arg_batch_spawn && !arg_ssh_display)
+#else
     if (!arg_batch_spawn)
+#endif
       finish_nodes(my_process_table);
 #endif
     if (!arg_batch_spawn)
       req_client_connect(my_process_table);
   }
 #if CMK_SSH_KILL
-  kill_nodes();
+#if CMK_USE_SSH
+  if (!arg_ssh_display)
+#endif
+    kill_nodes();
 #endif
   if (arg_verbose)
     printf("Charmrun> node programs all connected\n");
@@ -4804,13 +4824,17 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
           "  if [ $1 -ne 0 ]\n"
           "  then\n"
           "    Echo Exiting with error code $1\n"
-          "  fi\n"
+          "  fi\n");
 #if CMK_SSH_KILL /*End by killing ourselves*/
-          "  sleep 5\n" /*Delay until any error messages are flushed*/
-          "  kill -9 $$\n"
-#else            /*Exit normally*/
-          "  exit $1\n"
+#if CMK_USE_SSH
+  if (!arg_ssh_display)
 #endif
+    fprintf(f,
+            "  sleep 5\n" /*Delay until any error messages are flushed*/
+            "  kill -9 $$\n");
+#endif           /*Exit normally*/
+  fprintf(f,
+          "  exit $1\n"
           "}\n");
   fprintf(f, /*Find: locates a binary program in PATH, sets loc*/
           "Find() {\n"
@@ -4978,7 +5002,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "  Echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
     fprintf(f, "  Echo 'need to run xhost to authorize connections.'\n");
     fprintf(f, "  Echo '(See manual for xhost for security issues)'\n");
-    fprintf(f, "  Echo 'Or try ++batch 1 ++ssh-display to rely on SSH X11 "
+    fprintf(f, "  Echo 'Or try ++ssh-display to rely on SSH X11 "
                "forwarding'\n");
     fprintf(f, "  Exit 1\n");
     fprintf(f, "fi\n");
@@ -5792,10 +5816,15 @@ processor to connect it to a new one**/
     start_one_node_ssh(p, restart_argv);
 
 #if !CMK_SSH_KILL
-    int retries = 0, unfinished;
-    do
-      unfinished = finish_one_node(p, retries, restart_argv);
-    while (unfinished);
+#if CMK_USE_SSH
+    if (!arg_ssh_display)
+#endif
+    {
+      int retries = 0, unfinished;
+      do
+        unfinished = finish_one_node(p, retries, restart_argv);
+      while (unfinished);
+    }
 #endif
   }
   else
@@ -5887,7 +5916,10 @@ static void reconnect_crashed_client(nodetab_process & crashed)
   }
 
 #if CMK_SSH_KILL
-  kill_one_node(crashed);
+#if CMK_USE_SSH
+  if (!arg_ssh_display)
+#endif
+    kill_one_node(crashed);
 #endif
 }
 
