@@ -1,8 +1,21 @@
 mainmodule wave2d {
 
+  readonly CProxy_Wave waveProxy;
+  readonly CProxy_CcsGroup ccsProxy;
+
   mainchare Main {
     entry Main(CkArgMsg *m);
+  };
+
+  // Temporary group to handle CCS interactions with LiveViz demo. Putting
+  // these interaction in the main chare has weird interactions with sync ft
+  // when the failure is on PE 0. A better API within live viz should remove
+  // the need for this group.
+  group [migratable] CcsGroup {
+    entry CcsGroup();
     entry void add_drop(CkCcsRequestMsg* m);
+    entry void requestPerfData(CkCcsRequestMsg* msg);
+    entry void addPerfData(int iter, int ms_per_iter);
   };
 
   array [2D] Wave {

@@ -15,12 +15,13 @@
 
 #define mod(a,b)  (((a)+b)%b)
 
+/*readonly*/ CProxy_Wave waveProxy;
+/*readonly*/ CProxy_CcsGroup ccsProxy;
+
 enum { left=0, right, up, down };
 
 class Main : public CBase_Main
 {
-private:
-    CProxy_Wave arrayProxy;
 public:
   Main(CkArgMsg* m) {
     delete m;
@@ -29,31 +30,76 @@ public:
 
     // Create new array of worker chares
     CkArrayOptions opts(chareArrayWidth, chareArrayHeight);
-    arrayProxy = CProxy_Wave::ckNew(opts);
+    waveProxy = CProxy_Wave::ckNew(opts);
 
     // setup liveviz
-    CkCallback c(CkIndex_Wave::requestNextFrame(0),arrayProxy);
+    CkCallback c(CkIndex_Wave::requestNextFrame(0), waveProxy);
     liveVizConfig cfg(liveVizConfig::pix_color,true);
-    liveVizInit(cfg,arrayProxy,c, opts);
-
-    CcsRegisterHandler("lvImageInteraction", CkCallback(CkIndex_Main::add_drop(NULL), thisProxy));
+    liveVizInit(cfg, waveProxy, c, opts);
+    ccsProxy = CProxy_CcsGroup::ckNew();
 
     //Start the computation
-    arrayProxy.begin_iteration();
+    waveProxy.begin_iteration();
+  }
+};
+
+class CcsGroup : public CBase_CcsGroup {
+private:
+  std::vector<int> perf_data;
+public:
+  CcsGroup() {
+    if (CkMyPe() == 0) {
+      CcsRegisterHandler("lvImageInteraction",
+          CkCallback(CkIndex_CcsGroup::add_drop(NULL), thisProxy[0]));
+      CcsRegisterHandler("lvStatRequest",
+          CkCallback(CkIndex_CcsGroup::requestPerfData(NULL), thisProxy[0]));
+      perf_data.push_back(0);
+    }
+  }
+
+  CcsGroup(CkMigrateMessage* m) {
+    if (CkMyPe() == 0) {
+      CcsRegisterHandler("lvImageInteraction",
+          CkCallback(CkIndex_CcsGroup::add_drop(NULL), thisProxy[0]));
+      CcsRegisterHandler("lvStatRequest",
+          CkCallback(CkIndex_CcsGroup::requestPerfData(NULL), thisProxy[0]));
+    }
+  }
+
+  void pup(PUP::er& p) {
+    p | perf_data;
   }
 
   void add_drop(CkCcsRequestMsg* m) {
-    int x, y;
+    CkAssert(CkMyPe() == 0);
+    int x, y, dropped;
     PUP_toNetwork_unpack p(m->data);
     p | x;
     p | y;
+
     int xChare = x / (TotalDataWidth / chareArrayWidth);
     int yChare = y / (TotalDataHeight / chareArrayHeight);
-    arrayProxy(xChare, yChare).add_drop(x, y);
-    CcsSendDelayedReply(m->reply, sizeof(int), &x);
+    waveProxy(xChare, yChare).add_drop(x, y);
+
+    dropped = 1;
+    CcsSendDelayedReply(m->reply, sizeof(int), &dropped);
     delete m;
   }
 
+  void requestPerfData(CkCcsRequestMsg* msg) {
+    CkAssert(CkMyPe() == 0);
+    CcsSendDelayedReply(msg->reply, sizeof(int) * perf_data.size(), perf_data.data());
+    delete msg;
+    perf_data.clear();
+    perf_data.push_back(0);
+  }
+
+  void addPerfData(int iter, int ms_per_iter) {
+    CkAssert(CkMyPe() == 0);
+    perf_data.push_back(iter);
+    perf_data.push_back(ms_per_iter);
+    perf_data[0]++;
+  }
 };
 
 class Wave: public CBase_Wave {
@@ -74,6 +120,9 @@ public:
   unsigned char *intensity;
 
   int iteration;
+
+  bool started_timer;
+  double start_time;
 
   Wave()
   {
@@ -112,6 +161,8 @@ public:
     intensity = new unsigned char[3 * mywidth * myheight];
 
     messages_due = 4;
+
+    started_timer = false;
   }
 
   // Setup some Initial pressure pertubations for timesteps t-1 and t
@@ -147,6 +198,8 @@ public:
     CBase_Wave::pup(p);
 
     p|iteration;
+    p|started_timer;
+    p|start_time;
 
     size_t size = mywidth * myheight;
 
@@ -190,6 +243,10 @@ public:
     }
   }
   void begin_iteration(void) {
+    if (!started_timer) {
+      started_timer = true;
+      start_time = CmiWallTimer();
+    }
 
     double *top_edge = &pressure[0];
     double *bottom_edge = &pressure[(myheight-1)*mywidth];
@@ -312,7 +369,13 @@ public:
 	CkExit();
       } else {
 	// Start the next iteration
-	if(iteration % 20 == 0) CkPrintf("Completed %d iterations\n", iteration);
+	if(iteration % 20 == 0) {
+    CkPrintf("Completed %d iterations\n", iteration);
+    double curr_time = CmiWallTimer();
+    double total_time = curr_time - start_time;
+    ccsProxy[0].addPerfData(iteration, (int)(total_time * 1000) / 20);
+    started_timer = false;
+  }
 #ifdef CMK_MEM_CHECKPOINT
       if (iteration != 0 && iteration % 200 == 0)
       {
