@@ -5,7 +5,7 @@ OBJS = wave2d.o
 all: wave2d
 
 wave2d: $(OBJS)
-	$(CHARMC) -language charm++ -o wave2d $(OBJS)
+	$(CHARMC) -language charm++ -o wave2d $(OBJS) -module CommonLBs
 
 wave2d.decl.h: wave2d.ci
 	$(CHARMC)  wave2d.ci

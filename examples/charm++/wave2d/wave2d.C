@@ -251,6 +251,7 @@ public:
       messages_due = 4;
       contribute(sizeof(int), &iteration, CkReduction::min_int, CkCallback(CkReductionTarget(Wave, iterationCompleted), thisProxy(0, 0)));
       ++iteration;
+      if (iteration % 20 == 0) AtSync();
     }
   }
 
