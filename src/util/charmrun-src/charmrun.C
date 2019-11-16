@@ -1757,21 +1757,62 @@ sockets.
 
 #if CMK_CCS_AVAILABLE
 
+struct CcsImplContainer {
+  ChMessageHeader ch; /*Make a charmrun header*/
+  CcsImplHeader hdr;  /*Ccs internal header*/
+};
+
+std::unordered_map<std::string, std::pair<CcsImplContainer, void *>> CcsRequests;
+
+static void send_ccs_request(CcsImplContainer & h, void * reqData, int pe)
+{
+  if (!check_stdio_header(&h.hdr)) {
+    // ("CCSDBG: Sending %s %d\n", h.hdr.handler, pe);
+
+    const int reqBytes = ChMessageInt(h.hdr.len);
+
+#define LOOPBACK 0
+#if LOOPBACK /*Immediately reply "there's nothing!" (for performance           \
+                testing)*/
+    CcsServer_sendReply(&g.hdr, 0, 0);
+#else
+    int destpe = pe;
+#if CMK_BIGSIM_CHARM
+    const int pe_count = pe_to_process_map.size();
+    destpe = destpe % pe_count;
+#endif
+    if (replay_single)
+      destpe = 0;
+    /*Fill out the charmrun header & forward the CCS request*/
+    ChMessageHeader_new("req_fw", sizeof(h.hdr) + reqBytes, &h.ch);
+
+    const void *bufs[3];
+    int lens[3];
+    bufs[0] = &h;
+    lens[0] = sizeof(h);
+    bufs[1] = reqData;
+    lens[1] = reqBytes;
+    const SOCKET ctrlfd = pe_to_process_map[pe]->req_client;
+    skt_sendV(ctrlfd, 2, bufs, lens);
+
+#endif
+  }
+}
+
 /*The Ccs Server socket became active--
 rec'v the message and respond to the request,
 by forwarding the request to the appropriate node.
  */
 static void req_ccs_connect(void)
 {
-  struct {
-    ChMessageHeader ch; /*Make a charmrun header*/
-    CcsImplHeader hdr;  /*Ccs internal header*/
-  } h;
+  CcsImplContainer h;
   void *reqData; /*CCS request data*/
   if (0 == CcsServer_recvRequest(&h.hdr, &reqData))
     return; /*Malformed request*/
   int pe = ChMessageInt(h.hdr.pe);
   int reqBytes = ChMessageInt(h.hdr.len);
+
+  // printf("CCSDBG: Request %s %d\n", h.hdr.handler, pe);
 
   if (pe == -1) {
     /*Treat -1 as broadcast and sent to 0 as root of the spanning tree*/
@@ -1799,34 +1840,14 @@ static void req_ccs_connect(void)
     reqBytes -= pe * sizeof(ChMessageInt_t);
     pe = ChMessageInt(*(ChMessageInt_t *) reqData);
   }
-
-  if (!check_stdio_header(&h.hdr)) {
-
-#define LOOPBACK 0
-#if LOOPBACK /*Immediately reply "there's nothing!" (for performance           \
-                testing)*/
-    CcsServer_sendReply(&h.hdr, 0, 0);
-#else
-    int destpe = pe;
-#if CMK_BIGSIM_CHARM
-    destpe = destpe % pe_count;
-#endif
-    if (replay_single)
-      destpe = 0;
-    /*Fill out the charmrun header & forward the CCS request*/
-    ChMessageHeader_new("req_fw", sizeof(h.hdr) + reqBytes, &h.ch);
-
-    const void *bufs[3];
-    int lens[3];
-    bufs[0] = &h;
-    lens[0] = sizeof(h);
-    bufs[1] = reqData;
-    lens[1] = reqBytes;
-    const SOCKET ctrlfd = pe_to_process_map[pe]->req_client;
-    skt_sendV(ctrlfd, 2, bufs, lens);
-
-#endif
+  else {
+    CcsRequests[std::string{h.hdr.handler}] = {h, reqData};
+    send_ccs_request(h, reqData, pe);
+    // don't free
+    return;
   }
+
+  send_ccs_request(h, reqData, pe);
   free(reqData);
 }
 
@@ -1842,6 +1863,15 @@ static int req_ccs_reply_fw(ChMessage *msg, SOCKET srcFd)
   CcsImplHeader hdr;
   skt_recvN(srcFd, &hdr, sizeof(hdr));
   len -= sizeof(hdr);
+
+  // printf("CCSDBG: Response %s %d\n", hdr.handler, ChMessageInt(hdr.pe));
+
+  auto iter = CcsRequests.find(std::string{hdr.handler});
+  if (iter != CcsRequests.end())
+  {
+    free(iter->second.second);
+    CcsRequests.erase(iter);
+  }
 
 #define m (4 * 1024)              /* packets of message to recv/send at once */
   if (len < m || hdr.attr.auth) { /* short or authenticated message: grab the
@@ -2494,6 +2524,18 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
   return 0;
 }
 
+static int req_handle_restarted(ChMessage *msg, SOCKET fd)
+{
+#if CMK_CCS_AVAILABLE
+  for (auto & request : CcsRequests)
+  {
+    auto & mypair = request.second;
+    send_ccs_request(mypair.first, mypair.second, ChMessageInt(mypair.first.hdr.pe));
+  }
+#endif
+  return 0;
+}
+
 #ifdef HSTART
 /* send initnode to root*/
 static int set_crashed_socket_id(ChMessage *msg, SOCKET fd)
@@ -2616,6 +2658,8 @@ static int req_handler_dispatch(ChMessage *msg, nodetab_process & p)
 #ifdef __FAULT__
   else if (strcmp(cmd, "crash_ack") == 0)
     return req_handle_crashack(msg, replyFd);
+  else if (strcmp(cmd, "restarted") == 0)
+    return req_handle_restarted(msg, replyFd);
 #ifdef HSTART
   else if (strcmp(cmd, "initnode") == 0)
     return req_handle_crash(msg, p);

@@ -15,3 +15,7 @@ static void crash_node_handle(ChMessage *m){
 	// fprintf(stdout,"[%d] got crash mesg for %d \n",CmiMyPe(),crashed_node);
 }
 
+void SendCharmrunRestartedCallback()
+{
+	ctrl_sendone_nolock("restarted",NULL,0,NULL,0);
+}
