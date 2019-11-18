@@ -154,13 +154,12 @@ private:
   int* data;
   int data_size;
   bool balancingOn;
-  LDBarrierReceiver lbReceiver;
 
 public:
   LiveVizBalanceGroup() {
     lbdbID = _lbdb;
     lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
-    lbReceiver = lbdb->AddLocalBarrierReceiver((LDResumeFn)staticRecvAtSync, (void*)this);
+    lbdb->AddLocalBarrierReceiver((LDResumeFn)staticRecvAtSync, (void*)this);
     lbdb->AddMigrationDoneFn(staticDoneLB, (void*)this);
 
     data_size = CkNumPes() * 4 + 1;
@@ -178,6 +177,7 @@ public:
     if (thisIndex == 0)
       registerCallbacks(); // don't need to go through the scheduler
   }
+
   LiveVizBalanceGroup(CkMigrateMessage* m) : CBase_LiveVizBalanceGroup(m) { }
 
   void pup(PUP::er& p) {
@@ -185,8 +185,15 @@ public:
     if (p.isUnpacking()) {
       lbdbID = _lbdb;
       lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
-      lbReceiver = lbdb->AddLocalBarrierReceiver((LDResumeFn)staticRecvAtSync, (void*)this);
+      lbdb->AddLocalBarrierReceiver((LDResumeFn)staticRecvAtSync, (void*)this);
       lbdb->AddMigrationDoneFn(staticDoneLB, (void*)this);
+      data_size = CkNumPes() * 4 + 1;
+      data = new int[data_size];
+      data[0] = CkNumPes();
+      for (int i = 0; i < CkNumPes(); i++) {
+        data[(i*4)+1] = i;
+        data[(i*4)+2] = data[(i*4)+3] = data[(i*4)+4] = 0;
+      }
       if (!balancingOn) {
         for (int i = 0; i < lbdb->getNLoadBalancers(); i++) {
           lbdb->getLoadBalancers()[0]->turnOff();
