@@ -151,8 +151,6 @@ class LiveVizBalanceGroup : public CBase_LiveVizBalanceGroup {
 private:
   CkGroupID lbdbID;
   LBDatabase* lbdb;
-  bool hasReply, hasRequest;
-  CcsDelayedReply replyTag;
   int* data;
   int data_size;
   bool balancingOn;
@@ -164,9 +162,14 @@ public:
     lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
     lbReceiver = lbdb->AddLocalBarrierReceiver((LDResumeFn)staticRecvAtSync, (void*)this);
     lbdb->AddMigrationDoneFn(staticDoneLB, (void*)this);
-    data = NULL;
-    data_size = 0;
-    hasReply = hasRequest = false;
+
+    data_size = CkNumPes() * 4 + 1;
+    data = new int[data_size];
+    data[0] = CkNumPes();
+    for (int i = 0; i < CkNumPes(); i++) {
+      data[(i*4)+1] = i;
+      data[(i*4)+2] = data[(i*4)+3] = data[(i*4)+4] = 0;
+    }
 
     for (int i = 0; i < lbdb->getNLoadBalancers(); i++) {
       lbdb->getLoadBalancers()[0]->turnOff();
@@ -179,13 +182,6 @@ public:
 
   void pup(PUP::er& p) {
     // TODO: Need to fix pup for syncft compatibility
-    p | hasReply;
-    p | hasRequest;
-    //p | replyTag;
-    p | data_size;
-    //PUParray(data, data_size);
-    //p | lbReceiver;
-
     if (p.isUnpacking()) {
       lbdbID = _lbdb;
       lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
@@ -265,31 +261,22 @@ public:
   }
 
   void lbDataRequest(CkCcsRequestMsg* m) {
-    replyTag = m->reply;
-    hasRequest = true;
+    sendReply(m->reply);
     delete m;
-    if (hasReply) {
-      sendReply();
-    }
   }
 
   void gatherData(int* d, int n) {
-    hasReply = true;
+    delete[] data;
     data_size = n+1;
-    int total_pes = CkNumPes();
     data = new int[data_size];
+
+    int total_pes = CkNumPes();
     data[0] = total_pes;
     memcpy(&(data[1]), d, n*sizeof(int));
-    if (hasRequest) {
-      sendReply();
-    }
   }
 
-  void sendReply() {
+  void sendReply(CcsDelayedReply replyTag) {
     CcsSendDelayedReply(replyTag, data_size * sizeof(int), data);
-    hasReply = hasRequest = false;
-    delete[] data;
-    data = NULL;
   }
 };
 
