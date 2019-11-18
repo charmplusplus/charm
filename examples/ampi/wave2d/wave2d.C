@@ -8,14 +8,16 @@
 #define CHECKPT_FREQ    200
 #define LIVE_VIZ_BUFFER_UPDATE_FREQ 1
 
-#define NumIters        5000
+#define NumIters        50000
 #define TotalDataWidth  800
 #define TotalDataHeight 800
 #define NumInitPerturbs 5
+#define AddDropIter     1000
 
 enum : int { left=0, right, up, down }; // used as an MPI tag
 
 void update_live_viz_buffer(int w, int h, double* p, unsigned char* i);
+void add_drop(int w, int h, double* p, double* p_old);
 
 int main(int argc, char **argv) {
   int my_rank, comm_size, num_wths, flag;
@@ -40,7 +42,7 @@ int main(int argc, char **argv) {
   // Set up neighbors
   MPI_Comm comm2D;
   const int ndims = 2;
-  int my_cart_rank, reorder, left_nbor, right_nbor, up_nbor, down_nbor;
+  int my_cart_rank, reorder, left_nbor, right_nbor, up_nbor, down_nbor, add_drop_rank;
   int dims[ndims], coord[ndims], wrap_around[ndims];
   dims[0] = comm_dim; dims[1] = comm_dim;
   wrap_around[0] = 0; wrap_around[1] = 0;
@@ -74,6 +76,7 @@ int main(int argc, char **argv) {
   double *right_edge = new double[my_height];
   MPI_Request request[num_nbors*2];
   unsigned char *intensity;
+  add_drop_rank = 0;
 
   // Setup some Initial pressure pertubations for timesteps t-1 and t
   srand(0); // Force the same random numbers to be used for each rank
@@ -134,6 +137,8 @@ int main(int argc, char **argv) {
         double old  = pressure_old[i*my_width+j];
         // Compute the future time's pressure for this array location
         pressure_new[i*my_width+j] = 0.4*0.4*(L+R+U+D - 4.0*curr)-old+2.0*curr;
+        // overdamp
+	      pressure_new[i*my_width+j] *= 0.9995;
       }
     }
 
@@ -142,6 +147,14 @@ int main(int argc, char **argv) {
     pressure_old = pressure;
     pressure = pressure_new;
     pressure_new = tmp;
+
+    // Add a drop?
+    if (iter != 0 && iter % AddDropIter == 0) {
+      if (my_rank == add_drop_rank) {
+        add_drop(my_width, my_height, pressure, pressure_old);
+      }
+      add_drop_rank = (add_drop_rank+1 == comm_size) ? 0 : add_drop_rank+1;
+    }
 
     // Continuously update the liveViz buffer, which liveViz/AMPI
     // will use in the background periodically
@@ -214,5 +227,23 @@ void update_live_viz_buffer(int w, int h, double* pressure, unsigned char* inten
     intensity[3*((h-1)*w+i)+2] = 0;   // BLUE component
   }
 #endif
+}
+
+void add_drop(int my_width, int my_height, double* pressure, double* pressure_old) {
+  // Determine where to place a circle within the interior of the 2-d domain
+  int radius = 5+rand() % 10;
+  int xcenter = radius + rand() % (my_width - 2*radius);
+  int ycenter = radius + rand() % (my_height - 2*radius);
+  // Draw the circle
+  for(int i=0;i<my_height;i++){
+    for(int j=0; j<my_width; j++){
+      double distanceToCenter = sqrt((j-xcenter)*(j-xcenter) + (i-ycenter)*(i-ycenter));
+      if (distanceToCenter < radius) {
+        double rscaled = (distanceToCenter/radius)*3.0*3.14159/2.0; // ranges from 0 to 3pi/2
+        double t = 700.0 * cos(rscaled) ; // Range won't exceed -700 to 700
+        pressure[i*my_width+j] = pressure_old[i*my_width+j] = t;
+      }
+    }
+  }
 }
 
