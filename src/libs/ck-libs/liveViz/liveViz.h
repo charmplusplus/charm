@@ -181,12 +181,20 @@ public:
   LiveVizBalanceGroup(CkMigrateMessage* m) : CBase_LiveVizBalanceGroup(m) { }
 
   void pup(PUP::er& p) {
-    // TODO: Need to fix pup for syncft compatibility
+    p | balancingOn;
     if (p.isUnpacking()) {
       lbdbID = _lbdb;
       lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
-      if (p.isRestarting() && thisIndex == 0)
+      lbReceiver = lbdb->AddLocalBarrierReceiver((LDResumeFn)staticRecvAtSync, (void*)this);
+      lbdb->AddMigrationDoneFn(staticDoneLB, (void*)this);
+      if (!balancingOn) {
+        for (int i = 0; i < lbdb->getNLoadBalancers(); i++) {
+          lbdb->getLoadBalancers()[0]->turnOff();
+        }
+      }
+      if (p.isRestarting() && thisIndex == 0) {
         thisProxy[thisIndex].registerCallbacks(); // need to go through the scheduler
+      }
     }
   }
 
