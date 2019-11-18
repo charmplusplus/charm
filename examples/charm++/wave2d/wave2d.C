@@ -49,25 +49,25 @@ private:
 public:
   CcsGroup() {
     if (CkMyPe() == 0) {
-      CcsRegisterHandler("lvImageInteraction",
-          CkCallback(CkIndex_CcsGroup::add_drop(NULL), thisProxy[0]));
-      CcsRegisterHandler("lvStatRequest",
-          CkCallback(CkIndex_CcsGroup::requestPerfData(NULL), thisProxy[0]));
+      registerHandlers();
       perf_data.push_back(0);
     }
   }
 
-  CcsGroup(CkMigrateMessage* m) {
-    if (CkMyPe() == 0) {
-      CcsRegisterHandler("lvImageInteraction",
-          CkCallback(CkIndex_CcsGroup::add_drop(NULL), thisProxy[0]));
-      CcsRegisterHandler("lvStatRequest",
-          CkCallback(CkIndex_CcsGroup::requestPerfData(NULL), thisProxy[0]));
-    }
+  CcsGroup(CkMigrateMessage* m) {}
+
+  void registerHandlers() {
+    CcsRegisterHandler("lvImageInteraction",
+        CkCallback(CkIndex_CcsGroup::add_drop(NULL), thisProxy[0]));
+    CcsRegisterHandler("lvStatRequest",
+        CkCallback(CkIndex_CcsGroup::requestPerfData(NULL), thisProxy[0]));
   }
 
   void pup(PUP::er& p) {
     p | perf_data;
+    if (p.isRestarting() && thisIndex == 0) {
+      thisProxy[thisIndex].registerHandlers();
+    }
   }
 
   void add_drop(CkCcsRequestMsg* m) {

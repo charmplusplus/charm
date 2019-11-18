@@ -13,6 +13,7 @@ mainmodule wave2d {
   // the need for this group.
   group [migratable] CcsGroup {
     entry CcsGroup();
+    entry void registerHandlers();
     entry void add_drop(CkCcsRequestMsg* m);
     entry void requestPerfData(CkCcsRequestMsg* msg);
     entry void addPerfData(int iter, int ms_per_iter);
