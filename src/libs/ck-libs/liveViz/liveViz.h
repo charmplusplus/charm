@@ -226,14 +226,15 @@ public:
     double wt, cput, idle, bgwt, bgcpu;
     lbdb->GetTime(&wt, &cput, &idle, &bgwt, &bgcpu);
 
-    int len = osz + 4;
+    int len = (osz*2) + 4;
     int* buf = new int[len];
     buf[0] = CkMyPe();
     buf[1] = (int)(bgwt * 1000);
     buf[2] = (int)(idle * 1000);
     buf[3] = osz;
     for (int i = 0; i < osz; i++) {
-      buf[i+4] = (int)(objData[i].wallTime * 1000);
+      buf[(i*2)+4] = (int)objData[i].id();
+      buf[(i*2)+5] = (int)(objData[i].wallTime * 1000);
     }
 
     contribute(sizeof(int) * len, buf, CkReduction::concat,
