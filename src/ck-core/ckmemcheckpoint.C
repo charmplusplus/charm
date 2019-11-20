@@ -1218,8 +1218,10 @@ void CkMemCheckPT::finishUp()
        if (!quietModeRequested)
          CkPrintf("CharmFT> Restart finished in %f seconds.\n", CkWallTimer()-restartT);
 
+#ifdef __FAULT__
     extern void SendCharmrunRestartedCallback();
     SendCharmrunRestartedCallback();
+#endif
   }
 #if CMK_CONVERSE_MPI	
   if (CmiMyPe() == BuddyPE(thisFailedPe)) {
