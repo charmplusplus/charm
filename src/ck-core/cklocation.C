@@ -2149,16 +2149,15 @@ void CkLocMgr::pup(PUP::er &p){
         p | count;
         DEBUG(CmiPrintf("[%d] Unpacking Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
         for(int i=0;i<count;i++){
-            CkArrayIndex idx;
+            CmiUInt8 id;
             int pe = 0;
-            p | idx;
+            p | id;
             p | pe;
   //          CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe);
-            inform(idx, lookupID(idx), pe);
-            CmiUInt8 id = lookupID(idx);
+            inform(lookupIdx(id), id, pe);
             CkLocRec *rec = elementNrec(id);
             CmiAssert(rec!=NULL);
-            CmiAssert(lastKnown(idx) == pe);
+            CmiAssert(lastKnown(id) == pe);
         }
 #endif
 		// delay doneInserting when it is unpacking during restart.
@@ -2175,11 +2174,11 @@ void CkLocMgr::pup(PUP::er &p){
 #if __FAULT__
         int count=0;
         std::vector<int> pe_list;
-        std::vector<CmiUInt8> idx_list;
+        std::vector<CmiUInt8> id_list;
         for (auto itr = id2pe.begin(); itr != id2pe.end(); ++itr)
             if (homePe(itr->first) == CmiMyPe() && itr->second != CmiMyPe())
             {
-                idx_list.push_back(itr->first);
+                id_list.push_back(itr->first);
                 pe_list.push_back(itr->second);
                 count++;
             }
@@ -2188,7 +2187,7 @@ void CkLocMgr::pup(PUP::er &p){
         // syncft code depends on this exact arrangement:
         for (int i=0; i<count; i++)
         {
-          p | idx_list[i];
+          p | id_list[i];
           p | pe_list[i];
         }
 #endif
