@@ -17,9 +17,6 @@
 
 void CreateHybridBaseLB();
 
-/// for backward compatibility
-typedef LBMigrateMsg NLBMigrateMsg;
-
 inline int mymin(int x, int y) { return x<y?x:y; }
 
 // base class
@@ -465,6 +462,6 @@ private:
 };
 
 
-#endif /* NBORBASELB_H */
+#endif /* HYBRIDBASELB_H */
 
 /*@}*/
