@@ -145,7 +145,7 @@ public:
 	void contribute(int n,const bbox3d *boxes,const int *prio) 
 	{
 		CollideBoxesPrio(collide,thisIndex,n,boxes,prio);
-		thread->suspend(); //Will be resumed by call to resultsDone()
+		TCharm * unused = thread->suspend(); //Will be resumed by call to resultsDone()
 	}
 	
 	/// No more collisions will arrive this step.

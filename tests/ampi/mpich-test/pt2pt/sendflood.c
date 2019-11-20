@@ -141,12 +141,13 @@ int main(int argc, char *argv[])
     if (verbose) {
         fclose(pf);
     }
-    MPI_Finalize();
 
     /* This test fails if it hangs */
     if (rank == 0) {
         printf(" No Errors\n");
     }
+
+    MPI_Finalize();
 
     return 0;
 }

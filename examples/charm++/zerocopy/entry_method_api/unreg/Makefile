@@ -1,5 +1,4 @@
 DIRS = \
-  pingpong \
   simpleZeroCopy \
   stencil3d \
 

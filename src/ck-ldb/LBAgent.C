@@ -17,11 +17,9 @@ TopologyAgent::TopologyAgent(CentralLB::LDStats* lbDB,int p): Agent(p), stats(lb
 	LBtopoFn topofn;
 	topofn = LBTopoLookup(_lbtopo);
   if (topofn == NULL) {
-  	char str[1024];
    	CmiPrintf("LBAgent> Fatal error: Unknown topology: %s. Choose from:\n", _lbtopo);
    	printoutTopo();
-   	sprintf(str, "LBAgent> Fatal error: Unknown topology: %s", _lbtopo);
-   	CmiAbort(str);
+	CmiAbort("LBAgent> Fatal error: Unknown topology: %s", _lbtopo);
   }
 	topo = topofn(p);
 
@@ -285,7 +283,7 @@ MulticastAgent::MulticastAgent(BaseLB::LDStats* stats, int p): Agent(p)
       // stores all objects that belong to this multicast
     minfo.objs.push_back(sender);
     int nobjs;
-    LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
+    const LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
     for (int i=0; i<nobjs; i++) {
        int receiver = stats->getHash(objs[i]);
        if((sender == -1)||(receiver == -1)) {

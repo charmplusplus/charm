@@ -147,9 +147,9 @@ public:
   void RemoveNotifyMigrated(int handle);
 
   inline void TurnManualLBOn() 
-       { useBarrier = false; }
+       { useBarrier = false; LocalBarrierOff(); }
   inline void TurnManualLBOff() 
-       { useBarrier = true; }
+       { useBarrier = true; if (oms_registering == 0) LocalBarrierOn(); }
 
   int AddStartLBFn(LDStartLBFn fn, void* data);
   void TurnOnStartLBFn(int handle)
@@ -200,9 +200,9 @@ public:
   inline void TurnOffBarrierReceiver(LDBarrierReceiver h) 
        { localBarrier.TurnOffReceiver(h); };
   inline void AtLocalBarrier(LDBarrierClient h) 
-       { if (useBarrier) localBarrier.AtBarrier(h); };
+       { localBarrier.AtBarrier(h); };
   inline void DecreaseLocalBarrier(LDBarrierClient h, int c) 
-       { if (useBarrier) localBarrier.DecreaseBarrier(h, c); };
+       { localBarrier.DecreaseBarrier(h, c); };
   inline void ResumeClients() 
        { localBarrier.ResumeClients(); };
   inline void MeasuredObjTime(double wtime, double ctime) {
@@ -303,16 +303,6 @@ private:
   int            startLBFn_count;
 public:
   int useMem();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    int validObjHandle(LDObjHandle h ){
-            if(h.handle >= objs.size())
-                return 0;
-            if(objs[h.handle].obj == NULL)
-                return 0;
-
-            return 1;
-    }
-#endif
 
 
   const ObjList& getObjs() {return objs;}

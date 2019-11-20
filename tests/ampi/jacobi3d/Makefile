@@ -26,7 +26,7 @@ jacobi: $(OBJS)
 jacobi.o: jacobi.C
 	$(AMPICC) -c $(PARAMETERS) $<
 
-syncfttest causalfttest: $(foreach i,$(TARGETS),test-$i)
+syncfttest: $(foreach i,$(TARGETS),test-$i)
 
 test-jacobi: jacobi
 	$(call run, ./jacobi 2 2 2 200 +vp8 +p8 +isomalloc_sync +killFile kill_01.txt )

@@ -122,11 +122,11 @@ am__v_P_1 = :
 AM_V_GEN = $(am__v_GEN_@AM_V@)
 am__v_GEN_ = $(am__v_GEN_@AM_DEFAULT_V@)
 am__v_GEN_0 = @echo "  GEN     " $@;
-am__v_GEN_1 = 
+am__v_GEN_1 =
 AM_V_at = $(am__v_at_@AM_V@)
 am__v_at_ = $(am__v_at_@AM_DEFAULT_V@)
 am__v_at_0 = @
-am__v_at_1 = 
+am__v_at_1 =
 SOURCES =
 DIST_SOURCES =
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
@@ -478,7 +478,7 @@ include/mpitestconf.h: include/stamp-h1
 include/stamp-h1: $(top_srcdir)/include/mpitestconf.h.in $(top_builddir)/config.status
 	@rm -f include/stamp-h1
 	cd $(top_builddir) && $(SHELL) ./config.status include/mpitestconf.h
-$(top_srcdir)/include/mpitestconf.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps) 
+$(top_srcdir)/include/mpitestconf.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 	($(am__cd) $(top_srcdir) && $(AUTOHEADER))
 	rm -f include/stamp-h1
 	touch $@
@@ -927,10 +927,14 @@ $(top_builddir)/util/mtest_datatype.$(OBJEXT): $(top_srcdir)/util/mtest_datatype
 $(top_builddir)/util/mtest_datatype_gen.$(OBJEXT): $(top_srcdir)/util/mtest_datatype_gen.c
 	(cd $(top_builddir)/util && $(MAKE) mtest_datatype_gen.$(OBJEXT))
 
+test: all testing
+	echo "Done"
+
 testing:
-	$(top_builddir)/runtests -srcdir=$(srcdir) -tests=testlist \
-		-mpiexec=${MPIEXEC} -xmlfile=summary.xml \
-		-tapfile=summary.tap -junitfile=summary.junit.xml
+	$(top_builddir)/runtests -srcdir=$(srcdir) -tests=testlist.ampi \
+		-mpiexec="./ampirun" -xmlfile=summary.xml \
+		-tapfile=summary.tap -junitfile=summary.junit.xml \
+		-ampitestopts=$(TESTOPTS)
 
 # Need to patch some things up:
 # Make sure to disable rebuilding the autotools related files - the

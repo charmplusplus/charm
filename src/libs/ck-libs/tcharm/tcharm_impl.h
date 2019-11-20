@@ -82,13 +82,9 @@ CtvExtern(TCharm *,_curTCharm);
 class TCharm: public CBase_TCharm
 {
  private:
-	friend class TCharmAPIRoutine; //So he can get to heapBlocks:
+	friend class TCharmAPIRoutine;
 
 	CthThread tid; //Our migratable thread
-	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
-#if CMI_SWAPGLOBALS
-	CtgGlobals threadGlobals; //Global data
-#endif
 
 	//isSelfDone is added for out-of-core emulation in BigSim
 	//when thread is brought back into core, ResumeFromSync is called
@@ -160,7 +156,6 @@ class TCharm: public CBase_TCharm
 	virtual void ckJustRestored();
 	virtual void ckAboutToMigrate();
 
-	void migrateDelayed(int destPE);
 	void atBarrier();
 	void atExit(CkReductionMsg *msg) noexcept;
 	void clear();
@@ -199,13 +194,13 @@ class TCharm: public CBase_TCharm
 
 	//Client-callable routines:
 	//Sleep till entire array is here
-	void barrier() noexcept;
+	CMI_WARN_UNUSED_RESULT TCharm * barrier() noexcept;
 
 	//Block, migrate to destPE, and resume
-	void migrateTo(int destPE) noexcept;
+	CMI_WARN_UNUSED_RESULT TCharm * migrateTo(int destPE) noexcept;
 
 #if CMK_FAULT_EVAC
-	void evacuate() noexcept;
+	CMI_WARN_UNUSED_RESULT TCharm * evacuate() noexcept;
 #endif
 
 	//Thread finished running
@@ -233,15 +228,15 @@ class TCharm: public CBase_TCharm
 	inline void startTiming() noexcept {ckStartTiming();}
 
 	//Block our thread, run the scheduler, and come back
-	void schedule() noexcept {
+	CMI_WARN_UNUSED_RESULT TCharm * schedule() noexcept {
 		DBG("thread schedule");
 		start(); // Calls CthAwaken
-		stop(); // Calls CthSuspend
+		return stop(); // Calls CthSuspend
 	}
 
 
 	//As above, but start/stop the thread itself, too.
-	void stop() noexcept { //Blocks; will not return until "start" called.
+	CMI_WARN_UNUSED_RESULT TCharm * stop() noexcept { //Blocks; will not return until "start" called.
 		#if CMK_ERROR_CHECKING
 		if (tid != CthSelf())
 			CkAbort("Called TCharm::stop from outside TCharm thread!\n");
@@ -252,16 +247,25 @@ class TCharm: public CBase_TCharm
 		isStopped=true;
 		DBG("thread suspended");
 
+		return stop_static();
+	}
+
+ private:
+	CMI_WARN_UNUSED_RESULT static TCharm * stop_static() noexcept {
+		TCharm::deactivateThread();
 		CthSuspend();
 		/* SUBTLE: We have to do the get() because "this" may have changed
 		 * during a migration-suspend.  If you access *any* members
 		 * from this point onward, you'll cause heap corruption if
 		 * we're resuming from migration!  (OSL 2003/9/23) */
 		TCharm *dis=TCharm::get();
+		TCharm::activateThread();
 		dis->isStopped=false;
 		dis->startTiming();
+		return dis;
 	}
 
+ public:
 	void start() noexcept {
 		isStopped=false; // do not migrate while running
 		DBG("thread resuming soon");
@@ -269,7 +273,9 @@ class TCharm: public CBase_TCharm
 	}
 
 	//Aliases:
-	inline void suspend() noexcept {stop();}
+	inline CMI_WARN_UNUSED_RESULT TCharm * suspend() noexcept {
+		return stop();
+	}
 	inline void resume() noexcept {
 		//printf("in thcarm::resume, isStopped=%d\n", isStopped);
 		if (isStopped){
@@ -281,31 +287,21 @@ class TCharm: public CBase_TCharm
 	}
 
 	//Go to sync, block, possibly migrate, and then resume
-	void migrate() noexcept;
-	void async_migrate() noexcept;
-	void allow_migrate();
+	CMI_WARN_UNUSED_RESULT TCharm * migrate() noexcept;
+	CMI_WARN_UNUSED_RESULT TCharm * async_migrate() noexcept;
+	CMI_WARN_UNUSED_RESULT TCharm * allow_migrate();
 
 	//Entering thread context: turn stuff on
-	static void activateThread(void) noexcept {
-		// NOTE: if changing the body of this function, you also need to
-		//       modify TCharmAPIRoutine's destructor, which has the body
-		//       of this routine inlined into it to avoid extra branching.
-		TCharm *tc=CtvAccess(_curTCharm);
-		if (tc!=NULL) {
-			if (tc->heapBlocks)
-				CmiIsomallocBlockListActivate(tc->heapBlocks);
-#if CMI_SWAPGLOBALS
-			if (tc->threadGlobals)
-				CtgInstall(tc->threadGlobals);
-#endif
-		}
+	static void activateThread() noexcept {
+		TCharm *tc = CtvAccess(_curTCharm);
+		if (tc != nullptr)
+			CthInterceptionsDeactivatePop(tc->getThread());
 	}
 	//Leaving this thread's context: turn stuff back off
 	static void deactivateThread() noexcept {
-		CmiIsomallocBlockListActivate(NULL);
-#if CMI_SWAPGLOBALS
-		CtgInstall(NULL);
-#endif
+		TCharm *tc = CtvAccess(_curTCharm);
+		if (tc != nullptr)
+			CthInterceptionsDeactivatePush(tc->getThread());
 	}
 
 	/// System() call emulation:
@@ -341,9 +337,6 @@ int tcharm_routineNametoID(char const *routineName) noexcept
 // - Traces library code entry/exit with appropriate build flags
 class TCharmAPIRoutine {
 private:
-	bool doIsomalloc; // Whether to enable/disable Isomalloc for Heap memory
-	bool doSwapglobals; // Whether to swap sets of global variables
-	tlsseg_t oldtlsseg; // for TLS globals
 #if CMK_TRACE_ENABLED
 	double start; // starting time of trace event
 	int tcharm_routineID; // TCharm routine ID that is traced
@@ -373,14 +366,6 @@ public:
 		tcharm_routineID = tcharm_routineNametoID(routineName);
 #endif
 
-		doIsomalloc = (CmiIsomallocBlockListCurrent() != NULL);
-#if CMI_SWAPGLOBALS
-		doSwapglobals = (CtgCurrentGlobals() != NULL);
-#endif
-		if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-			CtgInstallMainThreadTLS(&oldtlsseg); //switch to main thread
-		}
-		//Disable migratable memory allocation while in Charm++:
 		TCharm::deactivateThread();
 
 #if CMK_TRACE_ENABLED
@@ -394,23 +379,7 @@ public:
 		double stop = CmiWallTimer();
 #endif
 
-		TCharm *tc=CtvAccess(_curTCharm);
-		if(tc != NULL){
-			//Reenable migratable memory allocation
-			// NOTE: body of TCharm::activateThread() is inlined here:
-			if(doIsomalloc){
-				CmiIsomallocBlockListActivate(tc->heapBlocks);
-			}
-#if CMI_SWAPGLOBALS
-			if(doSwapglobals){
-				CtgInstall(tc->threadGlobals);
-			}
-#endif
-		}
-		if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-			tlsseg_t cur;
-			CtgInstallCthTLS(&cur, &oldtlsseg); // switch back to user's CthThread
-		}
+		TCharm::activateThread();
 
 #if CMK_BIGSIM_CHARM
 		void *log;

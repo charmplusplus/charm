@@ -3,11 +3,19 @@ Charm++ Documentation
 =====================
 
 
+- Charm++ Tutorial: http://charmplusplus.org/tutorial/
+- Charm++ Development: https://github.com/UIUC-PPL/charm
+- Nightly regression tests: http://charm.cs.illinois.edu/autobuild/cur/
+- Charm++ mailing list: charm@cs.illinois.edu
+- Charm++ discourse group: https://charm.discourse.group
+
+
 .. toctree::
    :maxdepth: 1
    :caption: Charm++
    :numbered:
 
+   quickstart
    charm++/manual
    ampi/manual
    f90charm/manual
@@ -28,7 +36,7 @@ Charm++ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: BigSim (Blue Gene) Performance Simulator
+   :caption: BigSim (Blue Gene) Simulator
    :numbered:
 
    bigsim/manual
@@ -60,3 +68,10 @@ Charm++ Documentation
    charj/manual
    jade/manual
    parfum/manual
+
+.. toctree::
+   :maxdepth: 1
+   :caption: License
+   :numbered: 0
+
+   license

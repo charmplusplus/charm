@@ -66,6 +66,7 @@
  *                                                     *
  *******************************************************/
 
+.file "ontop_ppc64_sysv_elf_gas.S"
 .globl ontop_fcontext
 #if _CALL_ELF == 2
 	.text
@@ -172,6 +173,9 @@ ontop_fcontext:
 #if _CALL_ELF == 2
     # restore CTR
     mtctr  %r5
+
+    # store cb entrypoint in %r12, used for TOC calculation
+    mr %r12, %r5
 
     # copy transfer_t into ontop_fn arg registers
     mr  %r3, %r7

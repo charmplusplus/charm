@@ -48,11 +48,12 @@ int main(int argc, char *argv[])
     }
 
     MPI_Type_free(&type);
-    MPI_Finalize();
 
     if (wrank == 0) {
         printf(" No errors\n");
     }
+
+    MPI_Finalize();
 
     return 0;
 }

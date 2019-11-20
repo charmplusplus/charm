@@ -18,9 +18,7 @@ typedef int FileToken;
 #include <unistd.h>
 #endif
 
-extern "C" {
-  #include "fs_parameters.h"
-}
+#include "fs_parameters.h"
 
 using std::min;
 using std::max;
@@ -56,11 +54,8 @@ namespace Ck { namespace IO {
       };
 
       void fatalError(string desc, string file) {
-        std::stringstream out;
-        out << "FATAL ERROR on PE " << CkMyPe()
-            << " working on file '" << file << "': "
-            << desc << "; system reported " << strerror(errno) << std::endl;
-        CkAbort(out.str().c_str());
+        CkAbort("FATAL ERROR on PE %d working on file '%s': %s; system reported %s\n",
+			CkMyPe(), file.c_str(), desc.c_str(), strerror(errno));
       }
 
       class Director : public CBase_Director {

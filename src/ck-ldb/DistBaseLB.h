@@ -12,10 +12,6 @@
 
 void CreateDistBaseLB();
 
-/// for backward compatibility
-typedef LBMigrateMsg NLBMigrateMsg;
-
-
 class DistBaseLB : public CBase_DistBaseLB {
 public:
   DistBaseLB(const CkLBOptions &);

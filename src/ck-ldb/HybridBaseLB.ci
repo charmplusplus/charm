@@ -3,7 +3,6 @@ module HybridBaseLB {
 extern module LBDatabase;
 extern module BaseLB;
 
-include "NeighborLBMsg.h";
 include "CentralLBMsg.h";
 include "HybridLBMsg.h";
 

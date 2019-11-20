@@ -6,13 +6,11 @@
 #include "HybridBaseLB.h"
 #include "LBDBManager.h"
 #include "GreedyLB.h"
-#include "GreedyCommLB.h"
-#include "RefineCommLB.h"
 #include "RefineLB.h"
 
 #define  DEBUGF(x)     // CmiPrintf x;
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(HybridBaseLB, "HybridBase load balancer")
 

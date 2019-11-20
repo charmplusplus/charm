@@ -756,7 +756,6 @@ void bgUpdateProj(int eType)
 extern int updateRealMsgs(bgCorrectionMsg *cm, int nodeidx);
 
 // must be called on each processor
-extern "C"
 void BgStartCorrection()
 {
 

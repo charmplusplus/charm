@@ -1,59 +1,42 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
  */
 
-#include "converse.h" //For Ctv*
+#include "mpio_globals.h"
 
-CtvExtern(ADIOI_Flatlist_node*, ADIOI_Flatlist);
+#define ADIOI_Flatlist (ADIO_Globals()->ADIOI_Flatlist)
 
-CtvExtern(ADIOI_Async_node*, ADIOI_Async_list_head);
-CtvExtern(ADIOI_Async_node*, ADIOI_Async_list_tail);
-
-CtvExtern(ADIOI_Async_node*, ADIOI_Async_avail_head);
-CtvExtern(ADIOI_Async_node*, ADIOI_Async_avail_tail);
-
-CtvExtern(ADIOI_Malloc_async*, ADIOI_Malloc_async_head);
-CtvExtern(ADIOI_Malloc_async*, ADIOI_Malloc_async_tail);
-
-CtvExtern(ADIOI_Req_node*, ADIOI_Req_avail_head);
-CtvExtern(ADIOI_Req_node*, ADIOI_Req_avail_tail);
-
-CtvExtern(ADIOI_Malloc_req*, ADIOI_Malloc_req_head);
-CtvExtern(ADIOI_Malloc_req*, ADIOI_Malloc_req_tail);
-// extern ADIOI_Async_node *ADIOI_Async_list_head, *ADIOI_Async_list_tail; 
-// /* list of outstanding asynchronous requests */
-
-// extern ADIOI_Async_node *ADIOI_Async_avail_head, *ADIOI_Async_avail_tail;
-// /* list of available (already malloced) nodes for the async list */
-// extern ADIOI_Malloc_async *ADIOI_Malloc_async_head, *ADIOI_Malloc_async_tail;
-// /* list of malloced areas in memory, which must be freed in ADIO_End */
-
-// extern ADIOI_Req_node *ADIOI_Req_avail_head, *ADIOI_Req_avail_tail;
-//     /* list of available (already malloced) request objects */
-// extern ADIOI_Malloc_req *ADIOI_Malloc_req_head, *ADIOI_Malloc_req_tail;
-//     /* list of malloced areas for requests, which must be freed in ADIO_End */
+#define ADIOI_Datarep_head (ADIO_Globals()->ADIOI_Datarep_head)
 
 /* for f2c and c2f conversion */
-// extern ADIO_File *ADIOI_Ftable;
-// extern int ADIOI_Ftable_ptr, ADIOI_Ftable_max;
-// extern ADIO_Request *ADIOI_Reqtable;
-// extern int ADIOI_Reqtable_ptr, ADIOI_Reqtable_max;
-CtvExtern(ADIO_File*, ADIOI_Ftable);
-CtvExtern(int, ADIOI_Ftable_ptr);
-CtvExtern(int, ADIOI_Ftable_max);
-CtvExtern(ADIO_Request*, ADIOI_Reqtable);
-CtvExtern(int, ADIOI_Reqtable_ptr);
-CtvExtern(int, ADIOI_Reqtable_max);
+#define ADIOI_Ftable (ADIO_Globals()->ADIOI_Ftable)
+#define ADIOI_Ftable_ptr (ADIO_Globals()->ADIOI_Ftable_ptr)
+#define ADIOI_Ftable_max (ADIO_Globals()->ADIOI_Ftable_max)
+#define ADIOI_Reqtable (ADIO_Globals()->ADIOI_Reqtable)
+#define ADIOI_Reqtable_ptr (ADIO_Globals()->ADIOI_Reqtable_ptr)
+#define ADIOI_Reqtable_max (ADIO_Globals()->ADIOI_Reqtable_max)
 #ifndef HAVE_MPI_INFO
-extern MPI_Info *MPIR_Infotable;
-extern int MPIR_Infotable_ptr, MPIR_Infotable_max;
+#define MPIR_Infotable (ADIO_Globals()->MPIR_Infotable)
+#define MPIR_Infotable_ptr (ADIO_Globals()->MPIR_Infotable_ptr)
+#define MPIR_Infotable_max (ADIO_Globals()->MPIR_Infotable_max)
 #endif
-#ifdef XFS
-extern int ADIOI_Direct_read, ADIOI_Direct_write;
+#if defined(ROMIO_XFS) || defined(ROMIO_LUSTRE) || 1
+#define ADIOI_Direct_read (ADIO_Globals()->ADIOI_Direct_read)
+#define ADIOI_Direct_write (ADIO_Globals()->ADIOI_Direct_write)
 #endif
 
-CtvExtern(MPI_Errhandler, ADIOI_DFLT_ERR_HANDLER);
+#define ADIO_Init_keyval (ADIO_Globals()->ADIO_Init_keyval)
+
+#define ADIOI_DFLT_ERR_HANDLER (ADIO_Globals()->ADIOI_DFLT_ERR_HANDLER)
+
+#define ADIOI_syshints (ADIO_Globals()->ADIOI_syshints)
+
+#define ADIO_same_amode (ADIO_Globals()->ADIO_same_amode)
+
+#define ADIOI_cb_config_list_keyval (ADIO_Globals()->ADIOI_cb_config_list_keyval)
+
+#define yylval (ADIO_Globals()->yylval)
+#define token_ptr (ADIO_Globals()->token_ptr)

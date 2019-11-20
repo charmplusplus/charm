@@ -9,7 +9,7 @@ module liveViz {
 
 	readonly CProxy_liveVizGroup lvG;
 	group [migratable] liveVizGroup {
-		entry liveVizGroup(const liveVizConfig &cfg);
+		entry liveVizGroup(const liveVizConfig &cfg, CkCallback c);
 	};
 
 	readonly CProxy_LiveVizBoundElement lvBoundArray;

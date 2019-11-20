@@ -241,7 +241,7 @@ mempool_type* mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
   mptr->block_tail = 0;
   mptr->limit = limit;
   mptr->size = pool_size;
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+#if CMK_SMP && CMK_CONVERSE_UGNI
   mptr->mempoolLock = CmiCreateLock();
 #endif
   mptr->block_head.mptr = (struct mempool_type*)pool;
@@ -285,7 +285,7 @@ void mempool_destroy(mempool_type* mptr)
 // append slot_header size before the real memory buffer
 void* mempool_malloc(mempool_type* mptr, size_t size, int expand)
 {
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+#if CMK_SMP && CMK_CONVERSE_UGNI
   CmiLock(mptr->mempoolLock);
 #endif
 
@@ -375,7 +375,7 @@ void* mempool_malloc(mempool_type* mptr, size_t size, int expand)
 
     head_free->block_ptr = current;
     current->used += power;
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+#if CMK_SMP && CMK_CONVERSE_UGNI
     CmiUnlock(mptr->mempoolLock);
 #endif
     DEBUG_PRINT("Malloc done\n");
@@ -422,14 +422,14 @@ void* mempool_large_malloc(mempool_type* mptr, size_t size, int expand)
   head_free->block_ptr = (block_header*)current;
   head_free->size = expand_size - sizeof(large_block_header);
   head_free->status = -1;
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+#if CMK_SMP && CMK_CONVERSE_UGNI
   CmiUnlock(mptr->mempoolLock);
 #endif
   DEBUG_PRINT("Large malloc done\n");
   return (char*)head_free + sizeof(used_header);
 }
 
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+#if CMK_SMP && CMK_CONVERSE_UGNI
 void mempool_free_thread(void* ptr_free)
 {
   slot_header* to_free = (slot_header*)((char*)ptr_free - sizeof(used_header));

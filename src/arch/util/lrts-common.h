@@ -18,9 +18,9 @@
 #endif // end of CMK_USE_CMA
 
 // Converse Message header contains msgtype which is set to one of these message types
-enum MsgType {
-  // CMK_REG_MSG refers to a message which contains the payload being sent
-  CMK_REG_MSG=0,
+enum cmiCMAMsgType {
+  // CMK_REG_NOCMA_MSG refers to a message which contains the payload being sent
+  CMK_REG_NO_CMA_MSG=0,
 
   // CMK_CMA_MD_MSG refers to a message which contains payload metadata (pe, pid, address, size) without the payload
   // This message is used by the receiving process (running on the same physical host) to perform a CMA read operation
@@ -35,4 +35,15 @@ enum MsgType {
 #if CMK_USE_CMA
 #undef  CMK_COMMON_NOCOPY_DIRECT_BYTES // previous definition is in conv-mach-common.h
 #define CMK_COMMON_NOCOPY_DIRECT_BYTES sizeof(pid_t)
+#endif
+
+#if CMK_ONESIDED_IMPL
+// This macro is used to specify the threshold size in bytes, above which
+// the Zerocopy API is used to broadcast large readonly variables to all
+// processes
+#define CMK_ONESIDED_RO_THRESHOLD      1048576
+
+// TODO: Modify and move this variable to <layer>/conv-common.h by running experiments on each layer
+// CMK_ONESIDED_RO_THRESHOLD is currently set to 1 MiB arbitrarily until the experiments are conducted
+
 #endif

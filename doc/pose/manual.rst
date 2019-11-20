@@ -1,6 +1,6 @@
-=====================
-POSE Reference Manual
-=====================
+======================================================
+Parallel Object-Oriented Simulation Environment (POSE)
+======================================================
 
 .. contents::
    :depth: 3
@@ -24,7 +24,7 @@ behavior of the object. However, POSE is intended to perform best with a
 special type of *adaptive* synchronization strategy which changes it’s
 behavior on a per object basis. Thus, other synchronization strategies
 may not be properly maintained. There are two significant versions of
-the adaptive strategy, adapt4, a simple, stable version, and adept, the
+the adaptive strategy, *adapt4*, a simple, stable version, and *adept*, the
 development version.
 
 Developing a model in POSE
@@ -51,7 +51,7 @@ PDES in POSE
 ------------
 
 A simulation in POSE consists of a set of Charm++ chares performing
-timestamped events in parallel. In POSE, these chares are called posers.
+timestamped events in parallel. In POSE, these chares are called *posers*.
 POSE is designed to work with many such entities per processor. The more
 a system can be broken down into its parallel components when designing
 the simulation model, the more potential parallelism in the final
@@ -73,7 +73,7 @@ were executed. If this is the case, a rollback will occur. If not, the
 event is simply executed along with the others in the queue.
 
 Time can also pass on a poser within the course of executing an event.
-An elapse function is used to advance the OVT.
+An *elapse* function is used to advance the OVT.
 
 POSE maintains a global clock, the global virtual time (GVT), that
 represents the progress of the entire simulation.
@@ -131,9 +131,9 @@ To run the program in parallel, a ``charmrun`` executable was created by
 ``charmc``. The flag ``+p`` is used to specify a number of processors to
 run the program on. For example:
 
-::
+.. code-block:: bash
 
-   > ./charmrun pgm +p4
+   $ ./charmrun pgm +p4
 
 This runs the executable ``pgm`` on 4 processors. For more information
 on how to use ``charmrun`` and set up your environment for parallel
@@ -194,23 +194,29 @@ currently not implemented in POSE.
 All event messages inherit from a POSE type ``eventMsg`` which includes
 data for timestamps and miscellaneous POSE statistics.
 
-| ``message myMessage;``
-| Posers are described similar to chares, with a few exceptions. First,
-  the ``poser`` keyword is used to denote that the class is a POSE
-  simulation object class. Second, event methods are tagged with the
-  keyword ``event`` in square brackets. Finally, three components are
-  specified which indicate how objects of the poser class are to be
-  simulated. The *sim* component controls the wrapper class and event
-  queue used by the object. The *strat* component controls the
-  synchronization strategy the object should use (*i.e.* adaptive or
-  basic optimistic). The *rep* component specifies the global state
-  representation, which controls how the global state is kept accurate
-  depending on the synchronization strategy being used (*i.e.*
-  checkpointing or no checkpointing). Currently, there is only one
-  wrapper type, ``sim``. This 3-tuple syntax is likely to become
-  obsolete, replaced simply by synchronization strategy only. Keeping
-  the global state accurate is largely a function of the synchronization
-  strategy used.
+A message is declared in the ``.ci`` file as follows:
+
+.. code-block:: none
+
+  message myMessage;
+
+
+Posers are described similar to chares, with a few exceptions. First,
+the ``poser`` keyword is used to denote that the class is a POSE
+simulation object class. Second, event methods are tagged with the
+keyword ``event`` in square brackets. Finally, three components are
+specified which indicate how objects of the poser class are to be
+simulated. The *sim* component controls the wrapper class and event
+queue used by the object. The *strat* component controls the
+synchronization strategy the object should use (*i.e.* adaptive or
+basic optimistic). The *rep* component specifies the global state
+representation, which controls how the global state is kept accurate
+depending on the synchronization strategy being used (*i.e.*
+checkpointing or no checkpointing). Currently, there is only one
+wrapper type, ``sim``. This 3-tuple syntax is likely to become
+obsolete, replaced simply by synchronization strategy only. Keeping
+the global state accurate is largely a function of the synchronization
+strategy used.
 
 .. code-block:: none
 
@@ -243,7 +249,7 @@ Currently, event messages are declared with no reference to what they
 might inherit from (unlike in Charm++). The translator takes care of
 this. In addition, they must define ``operator=``.
 
-::
+.. code-block:: c++
 
   class myMessage {
     public:
@@ -262,7 +268,7 @@ as well. In addition, a ``pup`` and ``operator=`` must be provided.
 The ``pup`` method should call the ``pup`` method of the global state
 representation class being used.
 
-::
+.. code-block:: c++
 
   class mySim {
     int anInt; float aFloat; char aString[20];
@@ -292,7 +298,7 @@ fit. It could be given an empty body and should still work for POSE.
 Poser entry constructors (those described in the ``.ci`` file) should
 follow the template below:
 
-::
+.. code-block:: c++
 
   mySim::mySim(myMessage *m)
   {
@@ -310,23 +316,29 @@ those.
 
 An event method should have the following form:
 
-| ``void mySim::myEventMethod(eventMsg *m) { // body of method };``
-| Again, :math:`m` is never deleted in the body of the event. A side
-  effect of optimistic synchronization and rollback is that we would
-  like the effects of event execution to be dependent only upon the
-  state encapsulated in the corresponding poser. Thus, accessing
-  arbitrary states outside of the simulation, such as by calling
-  ``rand``, is forbidden. We are planning to fix this problem by adding
-  a ``POSE_rand()`` operation which will generate a random number the
-  first time the event is executed, and will checkpoint the number for
-  use in subsequent re-executions should a rollback occur.
+.. code-block:: c++
+
+  void mySim::myEventMethod(eventMsg *m) {
+    // body of method
+  };
+
+
+Again, :math:`m` is never deleted in the body of the event. A side
+effect of optimistic synchronization and rollback is that we would
+like the effects of event execution to be dependent only upon the
+state encapsulated in the corresponding poser. Thus, accessing
+arbitrary states outside of the simulation, such as by calling
+``rand``, is forbidden. We are planning to fix this problem by adding
+a ``POSE_rand()`` operation which will generate a random number the
+first time the event is executed, and will checkpoint the number for
+use in subsequent re-executions should a rollback occur.
 
 Creation of Poser Objects
 -------------------------
 
 Posers are created within a module using the following syntax:
 
-::
+.. code-block:: c++
 
   int hdl = 13; // handle should be unique
   myMessage *m = new myMessage;
@@ -339,7 +351,7 @@ simulation time zero, and can be referred to by the handle 13.
 Creating a poser from outside the module (*i.e.* from ``main``) is
 somewhat more complex:
 
-::
+.. code-block:: c++
 
   int hdl = 13;
   myMessage *m = new myMessage;
@@ -363,7 +375,7 @@ There are three ways to send events within a POSE module. The first and
 most commonly used way involves specifying and offset in simulation time
 from the current time. The syntax follows:
 
-::
+.. code-block:: c++
 
   aMsg = new eventMsg;
   POSE_invoke(myEventMethod(aMsg), mySim, hdl, 0);
@@ -381,7 +393,7 @@ are not a part of the simulation, they do not have a current time, or
 OVT, by which to specify an offset. The syntax is nearly identical to
 that above, only the last parameter is an absolute time.
 
-::
+.. code-block:: c++
 
   aMsg = new eventMsg;
   POSE_invoke_at(myEventMethod(aMsg), mySim, hdl, 56);
@@ -397,7 +409,7 @@ outside any module, but this is not recommended.
 The third approach is useful when an object send events to itself. It is
 simply a slightly shorter syntax for the same thing as ``POSE_invoke``:
 
-::
+.. code-block:: c++
 
   aMsg = new eventMsg;
   POSE_local_invoke(myEventMethod(aMsg), offset);
@@ -414,9 +426,13 @@ OVT) to the timestamp of the event.
 It is also possible to elapse time on an object while the object is
 executing an event. This is accomplished thus:
 
-| ``elapse(42);``
-| The example above would simulate the passage of forty-two time units
-  by adding as much to the object’s current OVT.
+.. code-block:: c++
+
+ elapse(42);
+
+
+The example above would simulate the passage of forty-two time units
+by adding as much to the object’s current OVT.
 
 Interacting with a POSE Module and the POSE System
 --------------------------------------------------
@@ -428,10 +444,10 @@ To interface these with a main program module, say :math:`Pgm` in files
 ``pgm.ci``, ``pgm.h`` and ``pgm.C``, the ``pgm.ci`` file must declare
 the POSE module as extern in the ``mainmodule Pgm`` block. For example:
 
-::
+.. code-block:: charmci
 
   mainmodule Pgm {
-    extern module <modname>;
+    extern module modname;
     readonly CkChareID mainhandle;
 
     mainchare main {
@@ -458,7 +474,10 @@ each with a unique handle. The programmer is responsible for choosing
 and keeping track of the handles created for posers. Once all posers are
 created, the simulation can be started:
 
-| ``POSE_start();``
+.. code-block:: c++
+
+  POSE_start();
+
 
 Configuring POSE
 ================
@@ -547,7 +566,7 @@ POSE Command Line Options
 
 Command line options are handled like Charm++ command line parameters.
 For namespace purity all POSE command line options have a \_pose suffix.
-They can be inspected by appending a -h to an execution of a POSE
+They can be inspected by appending a ``-h`` to an execution of a POSE
 program. Command line options override any defaults set in the
 ``pose_config.h`` file
 
@@ -641,7 +660,7 @@ Glossary of POSE-specific Terms
      on. For example, to register the function ``wrapUp`` in the main
      module as a callback:
 
-   ::
+   .. code-block:: c++
 
         CProxy_main M(mainhandle);
         POSE_registerCallBack(CkCallback(CkIndex_main::wrapUp(), M));

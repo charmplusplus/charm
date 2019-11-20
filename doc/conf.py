@@ -20,7 +20,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'Charm++'
-copyright = '2018, PPL'
+copyright = '2019, PPL'
 author = 'PPL'
 
 # The short X.Y version
@@ -63,7 +63,7 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'README.rst']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'

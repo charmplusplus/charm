@@ -19,18 +19,31 @@
 #endif
 
 // Flag that tells the system if we are replaying using Record/Replay
-CMI_EXTERNC_VARIABLE int _replaySystem;
+extern int _replaySystem;
 
 #if CMK_CHARMDEBUG
-extern "C" int ConverseDeliver(int pe);
+int ConverseDeliver(int pe);
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
   if (!ConverseDeliver(pe)) {
     CmiFree(msg);
     return;
   }
+#if CMK_ONESIDED_IMPL
+  envelope *env = (envelope *)msg;
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC(msg))
+    CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
+#endif
   CldEnqueue(pe, msg, infofn);
 }
-inline void _CldEnqueueMulti(int npes, int *pes, void *msg, int infofn) {
+inline void _CldEnqueueWithinNode(void *msg, int infofn) {
+  if (!ConverseDeliver(-1)) {
+    CmiFree(msg);
+    return;
+  }
+  CldEnqueueWithinNode(msg, infofn);
+}
+inline void _CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn) {
   if (!ConverseDeliver(-1)) {
     CmiFree(msg);
     return;
@@ -49,19 +62,38 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
     CmiFree(msg);
     return;
   }
+#if CMK_ONESIDED_IMPL
+  envelope *env = (envelope *)msg;
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC(msg))
+    CkRdmaPrepareZCMsg(env, node);
+#endif
   CldNodeEnqueue(node, msg, infofn);
 }
 #else
 
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
+#if CMK_ONESIDED_IMPL
+  envelope *env = (envelope *)msg;
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC(msg))
+    CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
+#endif
   CldEnqueue(pe, msg, infofn);
 }
 
 inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
+#if CMK_ONESIDED_IMPL
+  envelope *env = (envelope *)msg;
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC(msg))
+    CkRdmaPrepareZCMsg(env, node);
+#endif
   CldNodeEnqueue(node, msg, infofn);
 }
-#define _CldEnqueueMulti  CldEnqueueMulti
-#define _CldEnqueueGroup  CldEnqueueGroup
+#define _CldEnqueueMulti      CldEnqueueMulti
+#define _CldEnqueueGroup      CldEnqueueGroup
+#define _CldEnqueueWithinNode CldEnqueueWithinNode
 #endif
 
 #ifndef CMK_CHARE_USE_PTR
@@ -226,7 +258,7 @@ extern void _createGroup(CkGroupID groupID, envelope *env);
 extern void _createNodeGroup(CkGroupID groupID, envelope *env);
 extern int _getGroupIdx(int,int,int);
 static inline IrrGroup *_lookupGroupAndBufferIfNotThere(const CkCoreState *ck, const envelope *env,const CkGroupID &groupID);
-
+extern IrrGroup* _getCkLocalBranchFromGroupID(CkGroupID &gID);
 
 void QdCreate(int n);
 void QdProcess(int n);

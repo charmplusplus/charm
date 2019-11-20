@@ -19,7 +19,8 @@ typedef struct ncpystruct{
   char *srcAck;
   int srcAckSize;
   int srcSize;
-  unsigned short int srcMode;
+  unsigned short int srcRegMode;
+  unsigned short int srcDeregMode;
   unsigned short int isSrcRegistered;
   const void *srcRef;
 
@@ -30,7 +31,8 @@ typedef struct ncpystruct{
   char *destAck;
   int destAckSize;
   int destSize;
-  unsigned short int destMode;
+  unsigned short int destRegMode;
+  unsigned short int destDeregMode;
   unsigned short int isDestRegistered;
   const void *destRef;
 
@@ -51,7 +53,13 @@ typedef struct ncpystruct{
 
   int ncpyOpInfoSize;
 
+  int rootNode; // used only for Broadcast, -1 for p2p operations
+
 }NcpyOperationInfo;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int getNcpyOpInfoTotalSize(
   int srcLayerSize,
@@ -66,7 +74,8 @@ void setNcpyOpInfo(
   char *srcAck,
   int srcAckSize,
   int srcSize,
-  unsigned short int srcMode,
+  unsigned short int srcRegMode,
+  unsigned short int srcDeregMode,
   unsigned short int isSrcRegistered,
   int srcPe,
   const void *srcRef,
@@ -76,13 +85,20 @@ void setNcpyOpInfo(
   char *destAck,
   int destAckSize,
   int destSize,
-  unsigned short int destMode,
+  unsigned short int destRegMode,
+  unsigned short int destDeregMode,
   unsigned short int isdestRegistered,
   int destPe,
   const void *destRef,
+  int rootNode,
   NcpyOperationInfo *ncpyOpInfo);
 
 void resetNcpyOpInfoPointers(NcpyOperationInfo *ncpyOpInfo);
 
 void setReverseModeForNcpyOpInfo(NcpyOperationInfo *ncpyOpInfo);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

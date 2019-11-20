@@ -1,0 +1,10 @@
+# Absolute path to Raja install folder should be set here.
+RAJA_INSTALL_PATH ?= ~/raja/install
+
+RAJA_INC = $(RAJA_INSTALL_PATH)/include
+RAJA_LIB = $(RAJA_INSTALL_PATH)/lib
+
+# GPU compute capability should be used here, 3.5 and above recommended
+NVCC_OPTS = -restrict -arch sm_35 --expt-extended-lambda -O3 -Xcompiler=-fPIE -Xcompiler=-fopenmp -std=c++11 -x cu
+
+CHARMC = ../../../../../bin/charmc $(OPTS)

@@ -111,6 +111,7 @@ public:
     CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
     src->deregisterMem(); // in PREREG mode, actual de-registration is not performed
     // the above API call is only for demonstration and testing
+    delete m;
 
     if(cbCounter == 3) {
       CkPrintf("[%d][%d][%d] Put Source Done\n", thisIndex, CkMyPe(), CkMyNode());
@@ -127,6 +128,7 @@ public:
     CkNcpyBuffer *dest = (CkNcpyBuffer *)(m->data);
     dest->deregisterMem(); // in PREREG mode, actual de-registration is not performed
     // the above API call is only for demonstration and testing
+    delete m;
 
     if(cbCounter == 3) {
       CkPrintf("[%d][%d][%d] Put Destination Done\n", thisIndex, CkMyPe(), CkMyNode());

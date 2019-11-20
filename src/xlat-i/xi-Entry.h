@@ -47,6 +47,8 @@ class Entry : public Member {
   XStr* genClosureTypeNameProxyTemp;
   int line, entryCount;
   int first_line_, last_line_;
+  int numRdmaSendParams; // stores the number of rdma send parameters (marked nocopy)
+  int numRdmaRecvParams; // stores the number of rdma recv parameters (marked nocopypost)
 
  private:
   int attribs;
@@ -63,6 +65,9 @@ class Entry : public Member {
   int hasCallMarshall;
   void genCall(XStr& dest, const XStr& preCall, bool redn_wrapper = false,
                bool usesImplBuf = false);
+
+  void genRegularCall(XStr& dest, const XStr& preCall, bool redn_wrapper = false,
+               bool usesImplBuf = false, bool isRdmaPost = false);
 
   XStr epStr(bool isForRedn = false, bool templateCall = false);
   XStr epIdx(int fromProxy = 1, bool isForRedn = false);
@@ -104,11 +109,6 @@ class Entry : public Member {
   void genAccelFullCallList(XStr& str);
   void genAccelIndexWrapperDecl_general(XStr& str);
   void genAccelIndexWrapperDef_general(XStr& str);
-  void genAccelIndexWrapperDecl_spe(XStr& str);
-  void genAccelIndexWrapperDef_spe(XStr& str);
-  int genAccels_spe_c_funcBodies(XStr& str);
-  void genAccels_spe_c_regFuncs(XStr& str);
-  void genAccels_ppe_c_regFuncs(XStr& str);
 
   XStr aggregatorIndexType();
   XStr dataItemType();
@@ -212,6 +212,8 @@ class Entry : public Member {
   int getLine();
   void genTramRegs(XStr& str);
   void genTramPups(XStr& scope, XStr& decls, XStr& defs);
+
+  Chare* getContainer(void) const;
 };
 
 // TODO(Ralf): why not simply use list<Entry*> instead?

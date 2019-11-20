@@ -7,7 +7,7 @@ mainmodule randomAccess {
   // Handle to the test driver (chare)
   readonly CProxy_TestDriver               driverProxy;
   // Handle to the communication library (group)
-  readonly CProxy_ArrayMeshStreamer<dtype, int, Updater,
+  readonly CProxy_ArrayMeshStreamer<dtype, CkArrayIndex1D, Updater,
                                     SimpleMeshRouter> aggregator;
   // Number of chares per PE
   readonly int            numElementsPerPe;
@@ -29,8 +29,8 @@ mainmodule randomAccess {
   };
 
   // Setup required for the communication library
-  message MeshStreamerMessage<ArrayDataItem<dtype, int> >;
-  group ArrayMeshStreamer<dtype, int, Updater, SimpleMeshRouter>;
-  group MeshStreamer<ArrayDataItem<dtype, int>, SimpleMeshRouter>;
+  message MeshStreamerMessage<ArrayDataItem<dtype, CkArrayIndex1D> >;
+  group ArrayMeshStreamer<dtype, CkArrayIndex1D, Updater, SimpleMeshRouter>;
+  group MeshStreamer<ArrayDataItem<dtype, CkArrayIndex1D>, SimpleMeshRouter>;
 
 };

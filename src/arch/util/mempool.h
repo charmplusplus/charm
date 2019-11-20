@@ -113,7 +113,7 @@ typedef struct mempool_type
   size_t block_tail;
   size_t limit;
   size_t size;
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+#if CMK_SMP && CMK_CONVERSE_UGNI
   CmiNodeLock mempoolLock;
   char padding[CMIPADDING((6 * sizeof(size_t) + sizeof(CmiNodeLock)), 16)];
 #elif !CMK_64BIT
@@ -128,8 +128,7 @@ static_assert(sizeof(block_header) % 16 == 0, "block_header is not a multiple of
 static_assert(sizeof(large_block_header) % 16 == 0, "large_block_header is not a multiple of 16 bytes");
 static_assert(sizeof(mempool_type) % 16 == 0, "mempool_type is not a multiple of 16 bytes");
 
-extern "C"
-{
+extern "C" {
 #endif
 
 mempool_type* mempool_init(size_t pool_size, mempool_newblockfn newfn, mempool_freeblock freefn, size_t limit);
@@ -137,7 +136,7 @@ void mempool_destroy(mempool_type* mptr);
 void* mempool_malloc(mempool_type* mptr, size_t size, int expand);
 void* mempool_large_malloc(mempool_type* mptr, size_t size, int expand);
 void mempool_free(mempool_type* mptr, void* ptr_free);
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+#if CMK_SMP && CMK_CONVERSE_UGNI
 void mempool_free_thread(void* ptr_free);
 #endif
 

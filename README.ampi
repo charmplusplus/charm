@@ -73,8 +73,7 @@ Incompatibilities and Extensions
 AMPI has some known flaws and incompatibilities with other MPI implementations:
     * RMA routines do not have support for derived datatypes.
     * Not all collectives are supported on intercommunicators.
-    * No support for MPI_Pack_external, MPI_Pack_external_size, MPI_Unpack_external,
-      or MPI_Type_match_size.
+    * No support for MPI_Pack_external, MPI_Pack_external_size, MPI_Unpack_external.
 
 AMPI also has extensions to the MPI standard to enable use of the high-level
 features provided by the Charm++ adaptive runtime system. All extensions are
@@ -85,7 +84,6 @@ prefixed with AMPI_:
       manual for more information on how to use it.
     * AMPI_Register_pup is used to register PUP routines and user data.
     * AMPI_Get_pup_data returns a pointer to user data managed by the runtime.
-    * AMPI_Register_main is used to register multiple AMPI modules.
     * AMPI_Load_set_value sets the calling rank's load to the given user value.
     * AMPI_Load_start_measure starts load balance information collection.
     * AMPI_Load_stop_measure stops load balance information collection.

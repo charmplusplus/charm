@@ -1,6 +1,6 @@
-=======================
-Threaded Charm++ Manual
-=======================
+=========================
+Threaded Charm++ (TCharm)
+=========================
 
 .. contents::
    :depth: 3
@@ -232,7 +232,7 @@ merely sizing a buffer, or checkpointing your values).
 pup functions are much easier to write than explain- a simple C heap
 block and the corresponding pup function is:
 
-::
+.. code-block:: c++
 
         typedef struct {
           int n1;/*Length of first array below*/
@@ -294,7 +294,7 @@ You indicate to TCharm that you want a pup routine called using the
 routine below. An arbitrary number of blocks can be registered in this
 fashion.
 
-::
+.. code-block:: c++
 
   void TCHARM_Register(void *block, TCharmPupFn pup_fn)
 
@@ -308,7 +308,7 @@ Associate the given data block and pup function. Can only be called
 from the parallel context. For the declarations above, you call
 TCHARM_Register as:
 
-::
+.. code-block:: c++
 
              /*In C/C++ driver() function*/
              my_block m;
@@ -334,7 +334,7 @@ Fortran, the "TARGET" attribute must be used on the block (as above) or
 else the compiler may not update values during a migration, because it
 believes only it can access the block.
 
-::
+.. code-block:: c++
 
   void TCHARM_Migrate()
 
@@ -363,7 +363,7 @@ deleting pup handle, so you need not handle that case.
 
 A C example is:
 
-::
+.. code-block:: c++
 
         int g_arr[17];
         double g_f;
@@ -409,7 +409,7 @@ A Fortran example is:
 You register your global variable pup routine using the method below.
 Multiple pup routines can be registered the same way.
 
-::
+.. code-block:: c++
 
   void TCHARM_Readonly_globals(TCharmPupGlobalFn pup_fn)
 
@@ -441,7 +441,7 @@ frameworks cannot be attached more than once to single set of threads.
 That is, a single thread cannot have two attached AMPI frameworks, since
 the MPI_COMM_WORLD for such a thread would be indeterminate.
 
-::
+.. code-block:: c++
 
   void TCHARM_Create(int nThreads, TCharmThreadStartFn thread_fn)
 
@@ -463,7 +463,7 @@ to the current set of threads.
 
 To attach a chare array to the TCharm array, use:
 
-::
+.. code-block:: c++
 
   CkArrayOptions TCHARM_Attach_start(CkArrayID *retTCharmArray,int
   *retNumElts)
@@ -482,52 +482,52 @@ Command-line Options
 The complete set of link-time arguments relevant to TCharm is:
 
 -memory isomalloc
-   Enable memory allocation that will automatically migrate with the
-   thread, as described in
-   Section :numref:`sec:isomalloc`.
+  Enable memory allocation that will automatically migrate with the
+  thread, as described in
+  Section :numref:`sec:isomalloc`.
 
 -balancer B
-   Enable this load balancing strategy. The current set of balancers B
-   includes RefineLB (make only small changes each time), MetisLB (remap
-   threads using graph partitioning library), HeapCentLB (remap threads
-   using a greedy algorithm), and RandCentLB (remap threads to random
-   processors). You can only have one balancer.
+  Enable this load balancing strategy. The current set of balancers B
+  includes RefineLB (make only small changes each time), MetisLB (remap
+  threads using graph partitioning library), HeapCentLB (remap threads
+  using a greedy algorithm), and RandCentLB (remap threads to random
+  processors). You can only have one balancer.
 
 -module F
-   Link in this framework. The current set of frameworks F includes
-   ampi, collide, fem, mblock, and netfem. You can link in multiple
-   frameworks.
+  Link in this framework. The current set of frameworks F includes
+  ampi, collide, fem, mblock, and netfem. You can link in multiple
+  frameworks.
 
 The complete set of command-line arguments relevant to TCharm is:
 
-+p N
-   Run on N physical processors.
+\+p N
+  Run on N physical processors.
 
 +vp N
-   Create N “virtual processors”, or threads. This is the value returned
-   by TCharmGetNumChunks.
+  Create N “virtual processors”, or threads. This is the value returned
+  by TCharmGetNumChunks.
 
 ++debug
-   Start each program in a debugger window. See Charm++ Installation and
-   Usage Manual for details.
+  Start each program in a debugger window. See Charm++ Installation and
+  Usage Manual for details.
 
-+tcharm_stacksize N
-   Create N-byte thread stacks. This value can be overridden using
-   TCharmSetStackSize().
++tcharm\_stacksize N
+  Create N-byte thread stacks. This value can be overridden using
+  TCharmSetStackSize().
 
-+tcharm_nomig
-   Disable thread migration. This can help determine whether a problem
-   you encounter is caused by our migration framework.
++tcharm\_nomig
+  Disable thread migration. This can help determine whether a problem
+  you encounter is caused by our migration framework.
 
-+tcharm_nothread
-   Disable threads entirely. This can help determine whether a problem
-   you encounter is caused by our threading framework. This generally
-   only works properly when using only one thread.
++tcharm\_nothread
+  Disable threads entirely. This can help determine whether a problem
+  you encounter is caused by our threading framework. This generally
+  only works properly when using only one thread.
 
-+tcharm_trace F
-   Trace all calls made to the framework F. This can help to understand
-   a complex program. This feature is not available if Charm++ was
-   compiled with CMK_OPTIMIZE.
++tcharm\_trace F
+  Trace all calls made to the framework F. This can help to understand
+  a complex program. This feature is not available if Charm++ was
+  compiled with CMK_OPTIMIZE.
 
 .. _sec:tlib:
 
@@ -539,16 +539,16 @@ writes a program for a library written on TCharm. This section gives an
 overview of how to go about writing a library in Charm++ that uses
 TCharm.
 
--  Compared to using plain MPI, TCharm provides the ability to access
-   all of Charm++, including arrays and groups.
+- Compared to using plain MPI, TCharm provides the ability to access
+  all of Charm++, including arrays and groups.
 
--  Compared to using plain Charm++, using TCharm with your library
-   automatically provides your users with a clean C/F90 API (described
-   in the preceding chapters) for basic thread memory management, I/O,
-   and migration. It also allows you to use a convenient
-   "thread->suspend()" and "thread->resume()" API for blocking a thread,
-   and works properly with the load balancer, unlike
-   CthSuspend/CthAwaken.
+- Compared to using plain Charm++, using TCharm with your library
+  automatically provides your users with a clean C/F90 API (described
+  in the preceding chapters) for basic thread memory management, I/O,
+  and migration. It also allows you to use a convenient
+  "thread->suspend()" and "thread->resume()" API for blocking a thread,
+  and works properly with the load balancer, unlike
+  CthSuspend/CthAwaken.
 
 The overall scheme for writing a TCharm-based library "Foo" is:
 
@@ -569,7 +569,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
    context because a TCharm::semaGet blocks if a local TCharm::semaGet
    hasn’t yet executed.
 
-   ::
+   .. code-block:: c++
 
       //This is either called by FooFallbackSetuo mentioned above, or by the user
       //directly from TCHARM_User_setup (for multi-module programs)
@@ -591,7 +591,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
    design is to avoid the Ctv, and instead hand the user an opaque
    handle that includes your array proxy.
 
-   ::
+   .. code-block:: c++
 
       //_fooptr is the Ctv that points to the current chunk FooChunk and is only valid in
       //routines called from fooDriver()
@@ -605,7 +605,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
 
 #. Define the array used by the library
 
-   ::
+   .. code-block:: c++
 
       class FooChunk: public TCharmClient1D {
          CProxy_FooChunk thisProxy;
@@ -638,7 +638,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
 #. Block a thread for communication using thread->suspend and
    thread->resume
 
-   ::
+   .. code-block:: c++
 
       int FooChunk::doCommunicate(...)
       {
@@ -678,7 +678,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
    the user passes you an index-the int index will need to be
    decremented before use, or incremented before a return.
 
-   ::
+   .. code-block:: c++
 
       CLINKAGE void FOO_Communicate(int x, double y, int * arr) {
          TCHARM_API_TRACE("FOO_Communicate", "foo"); //2nd parameter is the name of the library

@@ -1,6 +1,5 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -17,6 +16,9 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_write_shared as PMPI_File_write_shared
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_write_shared(MPI_File fh, const void *buf, int count, MPI_Datatype datatype,
+                          MPI_Status *status) __attribute__((weak,alias("PMPI_File_write_shared")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -40,105 +42,108 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPI_File_write_shared(MPI_File fh, void *buf, int count, 
+int MPI_File_write_shared(MPI_File fh, ROMIO_CONST void *buf, int count,
                           MPI_Datatype datatype, MPI_Status *status)
 {
-    int error_code, bufsize, buftype_is_contig, filetype_is_contig;
-#ifndef PRINT_ERR_MSG
+    int error_code, buftype_is_contig, filetype_is_contig;
+    ADIO_Offset bufsize;
     static char myname[] = "MPI_FILE_READ_SHARED";
-#endif
-    int datatype_size, incr;
+    MPI_Count datatype_size, incr;
     ADIO_Offset off, shared_fp;
+    ADIO_File adio_fh;
+    void *e32buf = NULL;
+    const void *xbuf = NULL;
 
-#ifdef PRINT_ERR_MSG
-    if ((fh <= (MPI_File) 0) || (fh->cookie != ADIOI_FILE_COOKIE)) {
-	FPRINTF(stderr, "MPI_File_write_shared: Invalid file handle\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-#else
-    ADIOI_TEST_FILE_HANDLE(fh, myname);
-#endif
+    ROMIO_THREAD_CS_ENTER();
 
-    if (count < 0) {
-#ifdef PRINT_ERR_MSG
-	FPRINTF(stderr, "MPI_File_write_shared: Invalid count argument\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_ARG, MPIR_ERR_COUNT_ARG,
-				     myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);
-#endif
-    }
+    adio_fh = MPIO_File_resolve(fh);
 
-    if (datatype == MPI_DATATYPE_NULL) {
-#ifdef PRINT_ERR_MSG
-        FPRINTF(stderr, "MPI_File_write_shared: Invalid datatype\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_TYPE, MPIR_ERR_TYPE_NULL,
-				     myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);	    
+    /* --BEGIN ERROR HANDLING-- */
+    MPIO_CHECK_FILE_HANDLE(adio_fh, myname, error_code);
+    MPIO_CHECK_COUNT(adio_fh, count, myname, error_code);
+    MPIO_CHECK_DATATYPE(adio_fh, datatype, myname, error_code);
+    /* --END ERROR HANDLING-- */
+
+    MPI_Type_size_x(datatype, &datatype_size);
+
+    /* --BEGIN ERROR HANDLING-- */
+    MPIO_CHECK_COUNT_SIZE(adio_fh, count, datatype_size, myname, error_code);
+    /* --END ERROR HANDLING-- */
+
+    if (count*datatype_size == 0) {
+#ifdef HAVE_STATUS_SET_BYTES
+       MPIR_Status_set_bytes(status, datatype, 0);
 #endif
+       error_code = MPI_SUCCESS;
+       goto fn_exit;
     }
 
-    MPI_Type_size(datatype, &datatype_size);
-    if (count*datatype_size == 0) return MPI_SUCCESS;
-
-    if ((count*datatype_size) % fh->etype_size != 0) {
-#ifdef PRINT_ERR_MSG
-        FPRINTF(stderr, "MPI_File_write_shared: Only an integral number of etypes can be accessed\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_IO, MPIR_ERR_ETYPE_FRACTIONAL,
-				     myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);	    
-#endif
-    }
-
-    if ((fh->file_system == ADIO_PIOFS) || (fh->file_system == ADIO_PVFS)) {
-#ifdef PRINT_ERR_MSG
-	FPRINTF(stderr, "MPI_File_write_shared: Shared file pointer not supported on PIOFS and PVFS\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_UNSUPPORTED_OPERATION, 
-                    MPIR_ERR_NO_SHARED_FP, myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);
-#endif
-    }
+    /* --BEGIN ERROR HANDLING-- */
+    MPIO_CHECK_INTEGRAL_ETYPE(adio_fh, count, datatype_size, myname, error_code);
+    MPIO_CHECK_FS_SUPPORTS_SHARED(adio_fh, myname, error_code);
+    /* --END ERROR HANDLING-- */
 
     ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
-    ADIOI_Datatype_iscontig(fh->filetype, &filetype_is_contig);
+    ADIOI_Datatype_iscontig(adio_fh->filetype, &filetype_is_contig);
 
-    incr = (count*datatype_size)/fh->etype_size;
-    ADIO_Get_shared_fp(fh, incr, &shared_fp, &error_code);
-    if (error_code != MPI_SUCCESS) {
-	FPRINTF(stderr, "MPI_File_write_shared: Error! Could not access shared file pointer.\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
+    ADIOI_TEST_DEFERRED(adio_fh, myname, &error_code);
+
+    incr = (count*datatype_size)/adio_fh->etype_size;
+
+    ADIO_Get_shared_fp(adio_fh, incr, &shared_fp, &error_code);
+    /* --BEGIN ERROR HANDLING-- */
+    if (error_code != MPI_SUCCESS)
+    {
+	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_FATAL,
+					  myname, __LINE__, MPI_ERR_INTERN, 
+					  "**iosharedfailed", 0);
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
+	goto fn_exit;
+    }
+    /* --END ERROR HANDLING-- */
+
+    xbuf = buf;
+    if (adio_fh->is_external32) {
+	error_code = MPIU_external32_buffer_setup(buf, count, datatype, &e32buf);
+	if (error_code != MPI_SUCCESS) 
+	    goto fn_exit;
+
+	xbuf = e32buf;
     }
 
-    /* contiguous or strided? */
-    if (buftype_is_contig && filetype_is_contig) {
+    if (buftype_is_contig && filetype_is_contig)
+    {
         /* convert bufocunt and shared_fp to bytes */
 	bufsize = datatype_size * count;
-	off = fh->disp + fh->etype_size * shared_fp;
+	off = adio_fh->disp + adio_fh->etype_size * shared_fp;
 
         /* if atomic mode requested, lock (exclusive) the region, because there
            could be a concurrent noncontiguous request. On NFS, locking is 
            done in the ADIO_WriteContig.*/
 
-        if ((fh->atomicity) && (fh->file_system != ADIO_NFS))
-            ADIOI_WRITE_LOCK(fh, off, SEEK_SET, bufsize);
+        if ((adio_fh->atomicity) && (adio_fh->file_system != ADIO_NFS))
+            ADIOI_WRITE_LOCK(adio_fh, off, SEEK_SET, bufsize);
 
-	ADIO_WriteContig(fh, buf, count, datatype, ADIO_EXPLICIT_OFFSET,
+	ADIO_WriteContig(adio_fh, xbuf, count, datatype, ADIO_EXPLICIT_OFFSET,
 		     off, status, &error_code); 
 
-        if ((fh->atomicity) && (fh->file_system != ADIO_NFS))
-            ADIOI_UNLOCK(fh, off, SEEK_SET, bufsize);
+        if ((adio_fh->atomicity) && (adio_fh->file_system != ADIO_NFS))
+            ADIOI_UNLOCK(adio_fh, off, SEEK_SET, bufsize);
     }
     else
-	ADIO_WriteStrided(fh, buf, count, datatype, ADIO_EXPLICIT_OFFSET,
-			 shared_fp, status, &error_code); 
-    /* For strided and atomic mode, locking is done in ADIO_WriteStrided */
+    {
+	ADIO_WriteStrided(adio_fh, xbuf, count, datatype, ADIO_EXPLICIT_OFFSET,
+			 shared_fp, status, &error_code);
+	/* For strided and atomic mode, locking is done in ADIO_WriteStrided */
+    }
 
+    /* --BEGIN ERROR HANDLING-- */
+    if (error_code != MPI_SUCCESS)
+	error_code = MPIO_Err_return_file(adio_fh, error_code);
+    /* --END ERROR HANDLING-- */
+
+fn_exit:
+    if (e32buf != NULL) ADIOI_Free(e32buf);
+    ROMIO_THREAD_CS_EXIT();
     return error_code;
 }

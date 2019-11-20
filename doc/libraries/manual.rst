@@ -1,6 +1,6 @@
-=====================================
-Converse and Charm++ Libraries Manual
-=====================================
+==============================
+Converse and Charm++ Libraries
+==============================
 
 .. contents::
    :depth: 3
@@ -55,14 +55,14 @@ The liveViz routines are in the Charm++ header “liveViz.h”.
 A typical program provides a chare array with one entry method with the
 following prototype:
 
-::
+.. code-block:: c++
 
      entry void functionName(liveVizRequestMsg *m);
 
 This entry method is supposed to deposit its (array element’s) chunk of
 the image. This entry method has following structure:
 
-::
+.. code-block:: c++
 
      void myArray::functionName (liveVizRequestMsg *m)
      {
@@ -87,10 +87,10 @@ image will have the pixel with highest intensity or in other words
 largest value), you need to pass one more parameter (liveVizCombine_t)
 to the “liveVizDeposit” function:
 
-::
+.. code-block:: c++
 
     liveVizDeposit (m, startX, startY, width, height, imageBuff, this,
-                      max_image_data);
+                    max_image_data);
 
 You can also reduce floating-point image data using sum_float_image_data
 or max_float_image_data.
@@ -114,12 +114,12 @@ routine below. This routine converts fully assembled ‘float’ pixels to
 RGB 3-byte pixels, and is called only on processor 0 after each client
 request.
 
-::
+.. code-block:: c++
 
-   extern "C"
-   void liveVizFloatToRGB(liveVizRequest &req,
-           const float *floatSrc, unsigned char *destRgb,
-           int nPixels);
+  extern "C"
+  void liveVizFloatToRGB(liveVizRequest &req,
+      const float *floatSrc, unsigned char *destRgb,
+      int nPixels);
 
 liveViz Initialization
 ----------------------
@@ -132,7 +132,7 @@ main chare:
    method ’functionName’ (described above). You must create the chare
    array using a CkArrayOptions ’opts’ parameter. For instance,
 
-   ::
+   .. code-block:: c++
 
       	CkArrayOptions opts(rows, cols);
       	array = CProxy_Type::ckNew(opts);
@@ -170,7 +170,7 @@ The liveVizConfig parameters are:
 
 A typical 2D, RGB, non-push call to liveVizConfig looks like this:
 
-::
+.. code-block:: c++
 
       liveVizConfig cfg(true,false);
 
@@ -205,7 +205,7 @@ First we describe the use of Poll Mode, and then we will describe the
 differences. liveVizPoll must get control during the creation of your
 array, so you call liveVizPollInit with no parameters.
 
-::
+.. code-block:: c++
 
    	liveVizPollInit();
    	CkArrayOptions opts(nChares);
@@ -217,15 +217,15 @@ requests them. Each server generated image is buffered until the client
 can get the image. The buffered images will be stored in memory on
 processor 0.
 
-::
+.. code-block:: c++
 
-     liveVizPollDeposit( this,
-                         startX,startY,            // Location of local piece
-                         localSizeX,localSizeY,    // Dimensions of the piece I'm depositing
-                         globalSizeX,globalSizeY,  // Dimensions of the entire image
-                         img,                      // Image byte array
-                         sum_image_data,           // Desired image combiner
-                         3                         // Bytes/pixel
+     liveVizPollDeposit(this,
+                        startX,startY,            // Location of local piece
+                        localSizeX,localSizeY,    // Dimensions of the piece I'm depositing
+                        globalSizeX,globalSizeY,  // Dimensions of the entire image
+                        img,                      // Image byte array
+                        sum_image_data,           // Desired image combiner
+                        3                         // Bytes/pixel
                        );
 
 The last two parameters are optional. By default they are set to
@@ -233,7 +233,7 @@ sum_image_data and 3 bytes per pixel.
 
 A sample liveVizPoll server and client are available at:
 
-::
+.. code-block:: none
 
               .../charm/examples/charm++/lvServer
               .../ccs_tools/bin/lvClient
@@ -336,7 +336,7 @@ To use MSA in a Charm++ program:
 
 -  ``#include “msa/msa.h”`` in your header file.
 
--  Compile using ``charmc`` with the option “``-module msa``”
+-  Compile using ``charmc`` with the option ``-module msa``
 
 The API is as follows: See the example programs in
 ``charm/pgms/charm++/multiphaseSharedArrays``.
@@ -441,39 +441,35 @@ unique identifier for the newly created set of proxies.
 
 An example of Charm-FFT initialization using Charm_createFFT:
 
-::
+.. code-block:: charmci
 
-   // .ci
+  // .ci
+  extern module fft_charm;
 
-       extern module fft_charm;
+  mainchare Main {
+      entry Main(CkArgMsg *m);
+  }
 
-       mainchare Main {
-           entry Main(CkArgMsg *m);
-       }
+  group Driver {
+      entry Driver(FFT_Type fft_type);
+      entry void proxyCreated(idMsg *msg);
+      entry void fftDone();
+  }
 
-       group Driver {
-           entry Driver(FFT_Type fft_type);
-           entry void proxyCreated(idMsg *msg);
-           entry void fftDone();
-       }
+  // .C
+  Main::Main(CkArgMsg *m) {
+      ...
+      /* Assume FFT of size N_x, N_y, N_z */
+      FFT_Type fft_type = CC
 
-   // .C
+      Charm_createFFT(N_x, N_y, N_z, z_x, z_y, y_x, y_z, x_yz, cutoff, hmati,
+                      fft_type, CkCallback(CkIndex_Driver::proxyCreated(NULL), driverProxy));
+  }
 
-       Main::Main(CkArgMsg *m) {
-
-           ...
-           /* Assume FFT of size N_x, N_y, N_z */
-           FFT_Type fft_type = CC
-
-           Charm_createFFT(N_x, N_y, N_z, z_x, z_y, y_x, y_z, x_yz, cutoff, hmati
-   , fft_type, CkCallback(CkIndex_Driver::proxyCreated(NULL), driverProxy));
-       }
-
-       Driver::proxyCreated(idMsg *msg) {
-
-           CProxy_fft2d fftProxy = msg-> id;
-           delete msg;
-       }
+  Driver::proxyCreated(idMsg *msg) {
+      CProxy_fft2d fftProxy = msg->id;
+      delete msg;
+  }
 
 In this example, an entry method *Driver::proxyCreated* will be called
 when an FFT instance has been created.
@@ -481,7 +477,7 @@ when an FFT instance has been created.
 Using the newly received proxy, the user can identify whether a local PE
 has XPencils and/or ZPencils.
 
-::
+.. code-block:: c++
 
        void Driver::proxyCreated(idMsg *msg) {
          CProxy_fft2d fftProxy = msg->id;
@@ -497,7 +493,7 @@ has XPencils and/or ZPencils.
 Then, the grid’s dimensions on a PE can be acquired by using
 *Charm_getOutputExtents* and *Charm_getInputExtents*.
 
-::
+.. code-block:: c++
 
        if (hasX) {
          Charm_getOutputExtents(gridStart[MY_X], gridEnd[MY_X],
@@ -522,7 +518,7 @@ output buffers. In most cases, this is simply the product of the three
 dimensions, but for real-to-complex FFT calcaultion, FFTW-style storage
 for the input buffers is used (as shown below).
 
-::
+.. code-block:: c++
 
        dataSize = gridLength[MY_X] * gridLength[MY_Y] * gridLength[MY_Z];
 
@@ -549,7 +545,7 @@ FFT operation is complete.
 
 For forward FFT
 
-::
+.. code-block:: c++
 
        if (CkMyPe() == 0) {
            Charm_doForwardFFT(CkCallback(CkIndex_Driver::fftDone(), thisProxy), fftProxy);
@@ -557,7 +553,7 @@ For forward FFT
 
 For backward FFT
 
-::
+.. code-block:: c++
 
        if (CkMyPe() == 0) {
            Charm_doBackwardFFT(CkCallback(CkIndex_Driver::fftDone(), thisProxy), fftProxy);
@@ -733,7 +729,7 @@ To use TRAM for sending to a group, a GroupMeshStreamer group should be
 created. Either of the following two GroupMeshStreamer constructors can
 be used for that purpose:
 
-::
+.. code-block:: c++
 
    template<class dtype, class ClientType, class RouterType>
    GroupMeshStreamer<dtype, ClientType, RouterType>::
@@ -759,7 +755,7 @@ Sending to a Chare Array
 For sending to a chare array, an ArrayMeshStreamer group should be
 created, which has a similar constructor interface to GroupMeshStreamer:
 
-::
+.. code-block:: c++
 
    template <class dtype, class itype, class ClientType,
              class RouterType>
@@ -836,7 +832,7 @@ each of the three modes.
 When using completion detection, each local instance of TRAM must be
 initialized using the following variant of the overloaded init function:
 
-::
+.. code-block:: c++
 
    template <class dtype, class RouterType>
    void MeshStreamer<dtype, RouterType>::
@@ -872,7 +868,7 @@ termination. In this case, each local instance of TRAM must be
 initialized using a different interface for the overloaded init
 function:
 
-::
+.. code-block:: c++
 
    template <class dtype, class RouterType>
    void MeshStreamer<dtype, RouterType>::
@@ -892,7 +888,7 @@ CkArrayID object for the chare array that will perform the sends,
 precluding the need to manually determine the number of client chares
 per PE:
 
-::
+.. code-block:: c++
 
    template <class dtype, class RouterType>
    void MeshStreamer<dtype, RouterType>::
@@ -904,22 +900,22 @@ per PE:
 
 The init interface for using quiescence detection is:
 
-::
+.. code-block:: c++
 
    template <class dtype, class RouterType>
    void MeshStreamer<dtype, RouterType>::init(CkCallback startCb,
                                               int prio);
 
-| After initialization is finished, the system invokes startCb,
-  signaling to the user that the library is ready to accept data items
-  for sending.
+After initialization is finished, the system invokes startCb,
+signaling to the user that the library is ready to accept data items
+for sending.
 
 Sending
 ~~~~~~~
 
 Sending with TRAM is done through calls to insertData and broadcast.
 
-::
+.. code-block:: c++
 
    template <class dtype, class RouterType>
    void MeshStreamer<dtype, RouterType>::
@@ -955,9 +951,9 @@ Receiving
 To receive data items sent using TRAM, the user must define the process
 function for each client group and array:
 
-::
+.. code-block:: c++
 
-   void process(const dtype  &ran);
+   void process(const dtype &ran);
 
 Each item is delivered by the library using a separate call to process
 on the destination PE. The call is made locally, so process should not
@@ -983,7 +979,7 @@ of the primary mechanisms.
 Termination typically requires the user to issue a number of calls to
 the done function:
 
-::
+.. code-block:: c++
 
    template <class dtype, class RouterType>
    void MeshStreamer<dtype, RouterType>::
@@ -1086,19 +1082,19 @@ follows:
 
 -  Registration of the message type:
 
-   ::
+   .. code-block:: c++
 
       message MeshStreamerMessage<dtype>;
 
 -  Registration of the base aggregator class
 
-   ::
+   .. code-block:: c++
 
       group MeshStreamer<dtype, RouterType>;
 
 -  Registration of the derived aggregator class
 
-   ::
+   .. code-block:: c++
 
       group GroupMeshStreamer<dtype, ClientType, RouterType>;
 
@@ -1107,20 +1103,20 @@ follows:
 
 -  Registration of the message type:
 
-   ::
+   .. code-block:: c++
 
       message MeshStreamerMessage<ArrayDataItem<dtype, itype> >;
 
 -  Registration of the base aggregator class
 
-   ::
+   .. code-block:: c++
 
       group MeshStreamer<ArrayDataItem<dtype, itype>,
                          RouterType>;
 
 -  Registration of the derived aggregator class
 
-   ::
+   .. code-block:: c++
 
       group ArrayMeshStreamer<dtype, itype, ClientType,
                               RouterType>;
@@ -1128,8 +1124,8 @@ follows:
 Example
 -------
 
-For example code showing how to use TRAM, see examples/charm++/TRAM and
-tests/charm++/streamingAllToAll in the Charm++ repository.
+For example code showing how to use TRAM, see ``examples/charm++/TRAM`` and
+``benchmarks/charm++/streamingAllToAll`` in the Charm++ repository.
 
 .. _gpumanager:
 
@@ -1189,12 +1185,12 @@ Building GPU Manager
 --------------------
 
 GPU Manager is not included by default when building Charm++. In order
-to use GPU Manager, the user must build Charm++ using the ``CUDA``
+to use GPU Manager, the user must build Charm++ using the ``cuda``
 option, e.g.
 
-::
+.. code-block:: bash
 
-   ./build charm++ netlrts-linux-x86_64 cuda -j8
+   $ ./build charm++ netlrts-linux-x86_64 cuda -j8
 
 Building GPU Manager requires an installation of the CUDA toolkit on the
 system.
@@ -1224,13 +1220,13 @@ informs the runtime that a chare has offloaded work to the GPU, allowing
 the provided Charm++ callback to be invoked once it is complete. The
 non-blocking API has the following prototype:
 
-::
+.. code-block:: c++
 
      void hapiAddCallback(cudaStream_t stream, CkCallback* callback);
 
 Other HAPI calls:
 
-::
+.. code-block:: c++
 
      void hapiCreateStreams();
      cudaStream_t hapiGetStream();

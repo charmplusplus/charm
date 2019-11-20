@@ -18,7 +18,7 @@
 #include "ckgraph.h"
 #include <algorithm>
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(TempAwareRefineLB, "always assign the heaviest obj onto lightest loaded processor.")
 

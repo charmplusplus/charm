@@ -26,10 +26,15 @@ CMK_CPP_C_FLAGS="-E"
 
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
-CMK_NATIVE_CC='gcc '
-CMK_NATIVE_LD='gcc '
-CMK_NATIVE_CXX='g++ -Wno-deprecated '
+CMK_NATIVE_CC='gcc'
+CMK_NATIVE_LD='gcc'
+CMK_NATIVE_CXX='g++'
 CMK_NATIVE_LDXX='g++'
+
+CMK_NATIVE_CC_FLAGS='-Wno-deprecated'
+CMK_NATIVE_CXX_FLAGS='-Wno-deprecated'
+CMK_NATIVE_LD_FLAGS=''
+CMK_NATIVE_LDXX_FLAGS=''
 
 CMK_LIBS='-lckqt'
 CMK_RANLIB="$BGQ_BIN/powerpc64-bgq-linux-ranlib "

@@ -5,8 +5,7 @@
 #define DEBUGF(x) // CmiPrintf x
 
 CkpvStaticDeclare(TraceMemory*, _trace);
-extern "C" void memory_trace_all_existing_mallocs();
-extern "C" int get_memory_allocated_user_total();
+extern int get_memory_allocated_user_total();
 
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.

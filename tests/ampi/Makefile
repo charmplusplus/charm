@@ -1,3 +1,5 @@
+-include ../../include/conv-mach-opt.mak
+
 DIRS = \
   megampi \
   stacksize \
@@ -6,16 +8,24 @@ DIRS = \
   datatype \
   privatization \
   jacobi3d \
+  exit \
 #  chkpt \
+
+ifeq ($(BUILD_MPICH_TESTS),true)
+DIRS += mpich-test
+endif
 
 NOBGDIRS = \
   intercomm_coll \
   privatization \
+  exit \
+  datatype \
 
 FTDIRS = \
   jacobi3d
 
 TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
+
 
 all: $(foreach i,$(DIRS),build-$i)
 
@@ -23,9 +33,9 @@ test: $(foreach i,$(TESTDIRS),test-$i)
 
 bgtest: $(foreach i,$(filter-out $(NOBGDIRS),$(TESTDIRS)),bgtest-$i)
 
-syncfttest causalfttest: $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
+syncfttest : $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
 
-mpisyncfttest mlogfttest:
+mpisyncfttest :
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
@@ -42,3 +52,13 @@ $(foreach i,$(DIRS),bgtest-$i):
 
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'
+
+
+# additional dependencies
+
+mpich-test/Makefile:
+	cd mpich-test && ./configure.sh && cd ..
+
+build-mpich-test: mpich-test/Makefile
+test-mpich-test: mpich-test/Makefile
+bgtest-mpich-test: mpich-test/Makefile

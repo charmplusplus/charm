@@ -61,7 +61,7 @@ void HelloStart(int elems)
 {
   if(CkMyPe() == 0) {
     CkPrintf("HelloStart - Starting lib by calling constructor of MainHello\n");
-    CProxy_MainHello mainhello = CProxy_MainHello::ckNew(elems);
+    CProxy_MainHello mainhello = CProxy_MainHello::ckNew(elems, 0);
   }
   StartCharmScheduler();
 }

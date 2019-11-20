@@ -1,6 +1,6 @@
-==============================================
-The Charm++ Parallel Programming System Manual
-==============================================
+=======================================
+The Charm++ Parallel Programming System
+=======================================
 
 .. contents::
    :depth: 3
@@ -28,12 +28,12 @@ platforms supported by Charm++ are the IBM BlueGene/Q and OpenPOWER
 systems, Cray XE, XK, and XC systems, Omni-Path and Infiniband clusters,
 single workstations and networks of workstations (including x86 (running
 Linux, Windows, MacOS)), etc. The communication protocols and
-infrastructures supported by Charm++ are UDP, MPI, OFI, Infiniband,
+infrastructures supported by Charm++ are UDP, MPI, OFI, UCX, Infiniband,
 uGNI, and PAMI. Charm++ programs can run without changing the source on
 all these platforms. Charm++ programs can also interoperate with MPI
-programs (§ :numref:`sec:interop`). Please see the Installation and Usage
+programs (Section :numref:`sec:mpiinterop`). Please see the Installation and Usage
 section for details about installing, compiling and running Charm++
-programs (§ :numref:`sec:install`).
+programs (Section :numref:`sec:install`).
 
 Programming Model
 -----------------
@@ -48,10 +48,12 @@ the assignment at runtime as necessary. Charm++ is the main (and early)
 exemplar of this programming model. AMPI is another example within the
 Charm++ family of the same model.
 
+.. _mainchare:
+
 Execution Model
 ---------------
 
-A basic unit of parallel computation in Charm++ programs is a *chare* .
+A basic unit of parallel computation in Charm++ programs is a *chare*.
 A chare is similar to a process, an actor, an ADA task, etc. At its most
 basic level, it is just a C++ object. A Charm++ computation consists of
 a large number of chares distributed on available processors of the
@@ -85,8 +87,7 @@ scheduler, it repeats the cycle. I.e. there is no pre-emptive scheduling
 of other invocations.
 
 When a chare method executes, it may create method invocations for other
-chares. The Charm Runtime System (RTS, sometimes referred to as the
-Chare Kernel in the manual) locates the PE where the targeted chare
+chares. The Charm Runtime System (RTS) locates the PE where the targeted chare
 resides, and delivers the invocation to the scheduler on that PE.
 
 Methods of a chare that can be remotely invoked are called *entry*
@@ -120,7 +121,7 @@ So, one can think of Charm++ as supporting a *global object space*.
 
 Every Charm++ program must have at least one mainchare. Each mainchare
 is created by the system on processor 0 when the Charm++ program starts
-up. Execution of a Charm++ program begins with the Charm Kernel
+up. Execution of a Charm++ program begins with the Charm RTS
 constructing all the designated mainchares. For a mainchare named X,
 execution starts at constructor X() or X(CkArgMsg \*) which are
 equivalent. Typically, the mainchare constructor starts the computation
@@ -144,7 +145,7 @@ allowing for some localized non-determinism (e.g. a pair of methods may
 execute in any order, but when they both finish, the execution continues
 in a pre-determined manner, say executing a 3rd entry method). To
 simplify expression of such control structures, Charm++ provides two
-methods: the structured dagger notation (Sec :numref:`sec:sdag`), which
+methods: the structured dagger notation (Section :numref:`sec:sdag`), which
 is the main notation we recommend you use. Alternatively, you may use
 threaded entry methods, in combination with *futures* and *sync* methods
 (See :numref:`threaded`). The threaded methods run in light-weight
@@ -191,7 +192,7 @@ features of the Charm++ programming system. Part I, “Basic Usage”, is
 sufficient for writing full-fledged applications. Note that only the
 last two chapters of this part involve the notion of physical processors
 (cores, nodes, ..), with the exception of simple query-type utilities
-(Sec :numref:`basic utility fns`). We strongly suggest that all
+(Section :numref:`basic utility fns`). We strongly suggest that all
 application developers, beginners and experts alike, try to stick to the
 basic language to the extent possible, and use features from the
 advanced sections only when you are convinced they are essential. (They
@@ -285,6 +286,8 @@ programs can be referred in section :numref:`basic utility fns`.
 Basic Charm++ Programming
 =========================
 
+.. _programstructure:
+
 Program Structure, Compilation and Utilities
 --------------------------------------------
 
@@ -334,18 +337,35 @@ Sublime Text
 Syntax highlighting in Sublime Text (version 3 or newer) can be enabled
 by installing the *Charmci* package through Package Control.
 
+Emacs
+'''''
+
+Syntax highlighting in Emacs can be enabled by triggering C++ handling on the .ci file extension by adding the following line to your .emacs file.
+
+.. code-block:: emacs
+
+   (add-to-list 'auto-mode-alist '("\\.ci\\'" . c++-mode))
+
+Pygments
+''''''''
+
+Pygments supports syntax highlighting of .ci files starting with version 2.4.0,
+when setting ``charmci`` as the highlighting language, or automatically for files with
+the ``.ci`` filename extension.
+
+
 Modules
 ~~~~~~~
 
 The top-level construct in a *ci* file is a named container for
-interface declarations called a module. Modules allow related
+interface declarations called a *module*. Modules allow related
 declarations to be grouped together, and cause generated code for these
 declarations to be grouped into files named after the module. Modules
 cannot be nested, but each *ci* file can have several modules. Modules
-are specified using the keyword module. A module name must be a valid
+are specified using the keyword *module*. A module name must be a valid
 C++ identifier.
 
-::
+.. code-block:: charmci
 
    module myFirstModule {
        // Parallel interface declarations go here
@@ -377,17 +397,15 @@ user program entities.
 It should be noted that the generated files have no dependence on the
 name of the *ci* file, but only on the names of the modules. This can
 make automated dependency-based build systems slightly more complicated.
-We adopt some conventions to ease this process. This is described
-in :numref:`AppendixSectionDescribingPhilRamsWorkOnCi.stampAndCharmc-M`.
 
 Module Dependencies
 ~~~~~~~~~~~~~~~~~~~
 
 A module may depend on the parallel entities declared in another module.
-It can express this dependency using the extern keyword. externed
+It can express this dependency using the *extern* keyword. *extern* ed
 modules do not have to be present in the same *ci* file.
 
-::
+.. code-block:: charmci
 
    module mySecondModule {
 
@@ -398,9 +416,9 @@ modules do not have to be present in the same *ci* file.
        ...
    };
 
-The extern keyword places an include statement for the decl.h file of
-the externed module in the generated code of the current module. Hence,
-decl.h files generated from externed modules are required during the
+The *extern* keyword places an include statement for the decl.h file of
+the *extern* ed module in the generated code of the current module. Hence,
+decl.h files generated from *extern* ed modules are required during the
 compilation of the source code for the current module. This is usually
 required anyway because of the dependencies between user program
 entities across the two modules.
@@ -411,18 +429,18 @@ The Main Module and Reachable Modules
 Charm++ software can contain several module definitions from several
 independently developed libraries / components. However, the user
 program must specify exactly one module as containing the starting point
-of the program’s execution. This module is called the mainmodule. Every
-Charm++ program has to contain precisely one mainmodule.
+of the program’s execution. This module is called the *mainmodule*. Every
+Charm++ program has to contain precisely one *mainmodule*.
 
-All modules that are “reachable” from the mainmodule via a chain of
-externed module dependencies are included in a Charm++ program. More
+All modules that are “reachable” from the *mainmodule* via a chain of
+*extern* ed module dependencies are included in a Charm++ program. More
 precisely, during program execution, the Charm++ runtime system will
 recognize only the user program entities that are declared in reachable
 modules. The decl.h and def.h files may be generated for other modules,
 but the runtime system is not aware of entities declared in such
 unreachable modules.
 
-::
+.. code-block:: charmci
 
    module A {
        ...
@@ -463,10 +481,10 @@ requires other declarations / definitions in the user program’s
 sequential code. Usually, this can be achieved by placing such user code
 before the point of inclusion of the decl.h file. However, this can
 become laborious if the decl.h file has to included in several places.
-Charm++ supports the keyword include in *ci* files to permit the
+Charm++ supports the keyword *include* in *ci* files to permit the
 inclusion of any header directly into the generated decl.h files.
 
-::
+.. code-block:: charmci
 
    module A {
        include "myUtilityClass.h"; //< Note the semicolon
@@ -494,7 +512,7 @@ The Charm++ framework implements its own main function and
 retains control until the parallel execution environment is initialized
 and ready for executing user code. Hence, the user program must not
 define a *main()* function. Control enters the user code via the
-mainchare of the mainmodule. This will be discussed in further detail
+*mainchare* of the *mainmodule*. This will be discussed in further detail
 in :numref:`mainchare`.
 
 Using the facilities described thus far, the parallel interface
@@ -506,12 +524,12 @@ software.
 Compiling Charm++ Programs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Charm++ provides a compiler-wrapper called charmc that handles all *ci*,
+Charm++ provides a compiler-wrapper called *charmc* that handles all *ci*,
 C, C++ and Fortran source files that are part of a user program. Users can
 invoke charmc to parse their interface descriptions, compile source code
 and link objects into binaries. It also links against the appropriate
 set of charm framework objects and libraries while producing a binary.
-charmc and its functionality is described in :numref:`sec:compile`.
+*charmc* and its functionality is described in :numref:`sec:compile`.
 
 .. _basic utility fns:
 
@@ -521,12 +539,16 @@ Utility Functions
 The following calls provide basic rank information and utilities useful
 when running a Charm++ program.
 
-void CkAssert(int expression) Aborts the program if expression is 0.
+``void CkAssert(int expression)``
+Aborts the program if expression is 0.
 
-void CkAbort(const char \*message) Causes the program to abort, printing
-the given error message. This function never returns.
+``void CkAbort(const char *format, ...)``
+Causes the program to abort, printing
+the given error message. Supports printf-style formatting.
+This function never returns.
 
-void CkExit() This call informs the Charm RTS that computation on all
+``void CkExit()``
+This call informs the Charm RTS that computation on all
 processors should terminate. This routine never returns, so any code
 after the call to CkExit() inside the function that calls it will not
 execute. Other processors will continue executing until they receive
@@ -534,7 +556,8 @@ notification to stop, so it is a good idea to ensure through
 synchronization that all useful work has finished before calling
 CkExit().
 
-double CkWallTimer()
+``double CkWallTimer()``
+Returns the elapsed wall time since the start of execution.
 
 Information about Logical Machine Entities
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -545,29 +568,38 @@ following functions provide basic information about such logical machine
 that a Charm++ program runs on. PE and “node” are numbered starting from
 zero.
 
-``int CkNumPes()`` returns the total number of PEs across all nodes.
+``int CkNumPes()``
+Returns the total number of PEs across all nodes.
 
-``int CkMyPe()`` returns the index of the PE on which the call was made.
+``int CkMyPe()``
+Returns the index of the PE on which the call was made.
 
-``int CkNumNodes()`` returns the total number of logical Charm++ nodes.
+``int CkNumNodes()``
+Returns the total number of logical Charm++ nodes.
 
-``int CkMyNode()`` returns the index of the “node” on which the call was
+``int CkMyNode()``
+Returns the index of the “node” on which the call was
 made.
 
-``int CkMyRank()`` returns the rank number of the PE on a “node” on which
+``int CkMyRank()``
+Returns the rank number of the PE on a “node” on which
 the call was made. PEs within a “node” are also ranked starting from
 zero.
 
-``int CkNodeFirst(int nd)`` returns the index of the first PE on the logical
+``int CkNodeFirst(int nd)``
+Returns the index of the first PE on the logical
 node :math:`nd`.
 
-``int CkNodeSize(int nd)`` returns the number of PEs on the logical node
+``int CkNodeSize(int nd)``
+Returns the number of PEs on the logical node
 :math:`nd` on which the call was made.
 
-``int CkNodeOf(int pe)`` returns the “node” number that PE :math:`pe`
+``int CkNodeOf(int pe)``
+Returns the “node” number that PE :math:`pe`
 belongs to.
 
-``int CkRankOf(int pe)`` returns the rank of the given PE within its node.
+``int CkRankOf(int pe)``
+Returns the rank of the given PE within its node.
 
 Terminal I/O
 ^^^^^^^^^^^^
@@ -584,7 +616,8 @@ special forms shown below. The special forms below are still useful,
 however, since they obey well-defined (but still lax) ordering
 requirements.
 
-``int CkPrintf(format [, arg]*)`` This call is used for atomic terminal
+``int CkPrintf(format [, arg]*)``
+This call is used for atomic terminal
 output. Its usage is similar to ``printf`` in C. However, CkPrintf has
 some special properties that make it more suited for parallel
 programming. CkPrintf routes all terminal output to a single end point
@@ -627,7 +660,7 @@ entry method and is used to create or spawn chare objects during
 execution. Class member functions are annotated as entry methods by
 declaring them in the interface file as:
 
-::
+.. code-block:: charmci
 
    entry void Entry1(parameters);
 
@@ -643,7 +676,7 @@ parameter marshalling.
 For example, a chare could have this entry method declaration in the
 interface (``.ci``) file:
 
-::
+.. code-block:: charmci
 
      entry void foo(int i,int k);
 
@@ -654,7 +687,7 @@ Since Charm++ runs on distributed memory machines, we cannot pass an
 array via a pointer in the usual C++ way. Instead, we must specify the
 length of the array in the interface file, as:
 
-::
+.. code-block:: charmci
 
      entry void bar(int n,double arr[n]);
 
@@ -676,7 +709,7 @@ section.
 Array parameters and other parameters can be combined in arbitrary ways,
 as:
 
-::
+.. code-block:: charmci
 
      entry void doLine(float data[n],int n);
      entry void doPlane(float data[n*n],int n);
@@ -711,7 +744,7 @@ large structure by reference than by value.
 As an example, refer to the following code from
 ``examples/charm++/PUP/HeapPUP``:
 
-::
+.. code-block:: charmci
 
    // In HeapObject.h:
 
@@ -788,7 +821,7 @@ constructor that is an entry method, and may have any number of other
 entry methods. All chare classes and their entry methods are declared in
 the interface (``.ci``) file:
 
-::
+.. code-block:: charmci
 
        chare ChareType
        {
@@ -807,7 +840,7 @@ constructs can be used in the interface file, as demonstrated in
 To be concrete, the C++ definition of the chare above might have the
 following definition in a ``.h`` file:
 
-::
+.. code-block:: c++
 
       class ChareType : public CBase_ChareType {
           // Data and member functions as in C++
@@ -853,7 +886,7 @@ Once you have declared and defined a chare class, you will want to
 create some chare objects to use. Chares are created by the ``ckNew``
 method, which is a static method of the chare’s proxy class:
 
-::
+.. code-block:: c++
 
       CProxy_chareType::ckNew(parameters, int destPE);
 
@@ -877,14 +910,14 @@ takes two arguments, an ``int`` and a ``double``.
 #. This will create a new chare of type C on any processor and return a
    proxy to that chare:
 
-   ::
+   .. code-block:: c++
 
          CProxy_C chareProxy = CProxy_C::ckNew(1, 10.0);
 
 #. This will create a new chare of type C on processor destPE and return
    a proxy to that chare:
 
-   ::
+   .. code-block:: c++
 
          CProxy_C chareProxy = CProxy_C::ckNew(1, 10.0, destPE);
 
@@ -898,7 +931,7 @@ Method Invocation on Chares
 A message may be sent to a chare through a proxy object using the
 notation:
 
-::
+.. code-block:: c++
 
        chareProxy.EntryMethod(parameters)
 
@@ -913,7 +946,7 @@ You can get direct access to a local chare using the proxy’s ckLocal
 method, which returns an ordinary C++ pointer to the chare if it exists on
 the local processor, and NULL otherwise.
 
-::
+.. code-block:: c++
 
        C *c=chareProxy.ckLocal();
        if (c==NULL) {
@@ -938,7 +971,7 @@ can be accessed in the same way as C++ “global” variables on any process.
 Compound data structures containing pointers can be made available as
 read-only variables using read-only messages(see
 section :numref:`messages`) or read-only arrays(see
-section :numref:`basic arrays`. Note that memory has to be
+section :numref:`basic arrays`). Note that memory has to be
 allocated for read-only messages by using new to create the message in
 the ``main`` function of the mainchare.
 
@@ -946,14 +979,14 @@ Read-only variables are declared by using the type modifier readonly,
 which is similar to const in C++. Read-only data is specified in the
 ``.ci`` file (the interface file) as:
 
-::
+.. code-block:: charmci
 
     readonly Type ReadonlyVarName;
 
 The variable ReadonlyVarName is declared to be a read-only variable of
 type Type. Type must be a single token and not a type expression.
 
-::
+.. code-block:: charmci
 
     readonly message MessageType *ReadonlyMsgName;
 
@@ -962,7 +995,7 @@ type MessageType. Pointers are not allowed to be readonly variables
 unless they are pointers to message types. In this case, the message
 will be initialized on every PE.
 
-::
+.. code-block:: charmci
 
     readonly Type ReadonlyArrayName [arraysize];
 
@@ -974,7 +1007,7 @@ Read-only variables must be declared either as global or as public class
 static data in the C/C++ implementation files, and these declarations have
 the usual form:
 
-::
+.. code-block:: c++
 
     Type ReadonlyVarName;
     MessageType *ReadonlyMsgName;
@@ -1021,7 +1054,7 @@ Declaring a One-dimensional Array
 
 You can declare a one-dimensional (1D) chare array as:
 
-::
+.. code-block:: charmci
 
    //In the .ci file:
    array [1D] A {
@@ -1041,7 +1074,7 @@ several fields:
 -  thisIndex: the element’s array index (an array element can obtain a
    proxy to itself like this thisProxy[thisIndex])
 
-::
+.. code-block:: c++
 
    class A : public CBase_A {
      public:
@@ -1050,10 +1083,10 @@ several fields:
        void someEntry(parameters2);
    };
 
-Note that A must have a *migration constructor*, which is typically
-empty:
+Note that A must have a *migration constructor* if it is to be migratable.
+The migration constructor is typically empty:
 
-::
+.. code-block:: c++
 
    //In the .C file:
    A::A(void)
@@ -1076,7 +1109,7 @@ Declaring Multi-dimensional Arrays
 Charm++ supports multi-dimensional or user-defined indices. These array
 types can be declared as:
 
-::
+.. code-block:: charmci
 
    //In the .ci file:
    array [1D]  ArrayA { entry ArrayA(); entry void e(parameters);}
@@ -1093,7 +1126,7 @@ CkArrayIndexFoo, which must be defined before including the ``.decl.h``
 file (see section :numref:`user-defined array index type` on
 user-defined array indices for more information).
 
-::
+.. code-block:: c++
 
    //In the .h file:
    class ArrayA : public CBase_ArrayA { public: ArrayA(){} ...};
@@ -1143,14 +1176,14 @@ array creation. CProxy_Array::ckNew returns a proxy object, which can be
 kept, copied, or sent in messages. The following creates a 1D array
 containing elements indexed (0, 1, …, dimX-1):
 
-::
+.. code-block:: c++
 
    CProxy_ArrayA a1 = CProxy_ArrayA::ckNew(params, dimX);
 
 Likewise, a dense multidimensional array can be created by passing the
 extents at creation time to ckNew.
 
-::
+.. code-block:: c++
 
    CProxy_ArrayB a2 = CProxy_ArrayB::ckNew(params, dimX, dimY);
    CProxy_ArrayC a3 = CProxy_ArrayC::ckNew(params, dimX, dimY, dimZ);
@@ -1197,7 +1230,7 @@ depending on the dimensionality of the array:
 To send a message to an array element, index the proxy and call the
 method name:
 
-::
+.. code-block:: c++
 
    a1[i].doSomething(parameters);
    a3(x,y,z).doAnother(parameters);
@@ -1211,7 +1244,7 @@ Messages are not guaranteed to be delivered in order. For instance, if a
 method is invoked on method A and then method B; it is possible that B
 is executed before A.
 
-::
+.. code-block:: c++
 
    a1[i].A();
    a1[i].B();
@@ -1226,7 +1259,7 @@ Broadcasts on Chare Arrays
 To broadcast a message to all the current elements of an array, simply
 omit the index (invoke an entry method on the chare array proxy):
 
-::
+.. code-block:: c++
 
    a1.doIt(parameters); //<- invokes doIt on each array element
 
@@ -1247,7 +1280,7 @@ group.
 The data to be reduced comes from a call to the member contribute
 method:
 
-::
+.. code-block:: c++
 
    void contribute(int nBytes, const void *data, CkReduction::reducerType type);
 
@@ -1260,7 +1293,7 @@ the same reduction type.
 For example, if we want to sum each array/group member’s single integer
 myInt, we would use:
 
-::
+.. code-block:: c++
 
        // Inside any member method
        int myInt=get_myInt();
@@ -1271,7 +1304,7 @@ numbers. For example, if each element of a chare array has a pair of
 doubles forces[2], the corresponding elements of which are to be added
 across all elements, from each element call:
 
-::
+.. code-block:: c++
 
        double forces[2]=get_my_forces();
        contribute(2*sizeof(double),forces,CkReduction::sum_double);
@@ -1282,7 +1315,7 @@ don’t use &forces.
 A slightly simpler interface is available for ``std::vector<T>``, since
 the class determines the size and count of the underlying type:
 
-::
+.. code-block:: c++
 
        CkCallback cb(...);
        vector<double> forces(2);
@@ -1304,7 +1337,7 @@ callback to the reduction target, the entry method index is generated by
 ``CkIndex_ChareClass::method_name(...)``. For example, the code for a
 typed reduction that yields an ``int``, would look like this:
 
-::
+.. code-block:: charmci
 
      // In the .ci file...
      entry [reductiontarget] void done(int result);
@@ -1338,7 +1371,7 @@ data; they can also be used to signal the fact that all array/group
 members have reached a certain synchronization point. In this case, a
 simpler version of contribute may be used:
 
-::
+.. code-block:: c++
 
        contribute();
 
@@ -1432,7 +1465,7 @@ arrays- just pass the correct number of bytes to contribute.
 CkReduction::set returns a collection of CkReduction::setElement
 objects, one per contribution. This class has the definition:
 
-::
+.. code-block:: c++
 
    class CkReduction::setElement
    {
@@ -1445,7 +1478,7 @@ objects, one per contribution. This class has the definition:
 Example: Suppose you would like to contribute 3 integers from each array
 element. In the reduction method you would do the following:
 
-::
+.. code-block:: c++
 
    void ArrayClass::methodName (CkCallback &cb)
    {
@@ -1460,7 +1493,7 @@ element. In the reduction method you would do the following:
 Inside the reduction’s target method, the contributions can be accessed
 by using the ``CkReduction::setElement->next()`` iterator.
 
-::
+.. code-block:: c++
 
    void SomeClass::reductionTargetMethod (CkReductionMsg *msg)
    {
@@ -1480,7 +1513,7 @@ the contributed elements if you need to know which array element gave a
 particular contribution. Additionally, if the contributed elements are
 of a complex data type, you will likely have to supply code for
 serializing/deserializing them. Consider using the PUP interface
-(§ :numref:`sec:pup`) to simplify your object serialization
+(Section :numref:`sec:pup`) to simplify your object serialization
 needs.
 
 If the outcome of your reduction is dependent on the order in which data
@@ -1497,7 +1530,7 @@ reduced in the same order as each other. As an example, a chare array
 element can contribute to a gatherv-like operation using a tuple
 reduction that consists of two set reductions.
 
-::
+.. code-block:: c++
 
    int tupleSize = 2;
    CkReduction::tupleElement tupleRedn[] = {
@@ -1509,10 +1542,14 @@ reduction that consists of two set reductions.
    msg->setCallback(allgathervCB);
    contribute(msg);
 
+Note that ``CkReduction::tupleElement`` only holds pointers to the data that
+will make up the reduction message, therefore any local variables used must
+remain in scope until ``CkReductionMsg::buildFromTuple`` completes.
+
 The result of this reduction is a single CkReductionMsg that can be
 processed as multiple reductions:
 
-::
+.. code-block:: c++
 
    void Foo::allgathervResult (CkReductionMsg* msg)
    {
@@ -1537,7 +1574,7 @@ Destroying Array Elements
 To destroy an array element - detach it from the array, call its
 destructor, and release its memory-invoke its Array destroy method, as:
 
-::
+.. code-block:: c++
 
    a1[i].ckDestroy();
 
@@ -1564,7 +1601,7 @@ one another, related to data and synchronization dependencies.
 Consider one way of expressing these constraints using flags, buffers,
 and counters, as in the following example:
 
-::
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1634,7 +1671,7 @@ messages in a ``when`` statement, or to do local operations before a
 message is sent or after it’s received. The earlier example can be
 adapted to use serial blocks as follows:
 
-::
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1688,7 +1725,7 @@ generated-code macro in the class.
 Serial blocks can also specify a textual ‘label’ that will appear in
 traces, as follows:
 
-::
+.. code-block:: charmci
 
      entry void firstInput(Input i) {
        serial "process first" {
@@ -1714,7 +1751,7 @@ processed; otherwise, control is returned to the Charm++ scheduler.
 
 The use of ``when`` substantially simplifies the example from above:
 
-::
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1764,7 +1801,7 @@ For simplicity, ``when`` constructs can also specify multiple expected
 entry methods that all feed into a single body, by separating their
 prototypes with commas:
 
-::
+.. code-block:: charmci
 
    entry void startStep() {
      when firstInput(Input first),
@@ -1795,7 +1832,7 @@ denoting the desired reference number in square brackets between the
 entry method name and its parameter list. For parameter marshalled entry
 methods, the reference number expression will be compared for equality
 with the entry method’s first argument. For entry methods that accept an
-explicit message (§ :numref:`messages`), the reference number on the
+explicit message (Section :numref:`messages`), the reference number on the
 message can be set by calling the function
 ``CkSetRefNum(void *msg, CMK_REFNUM_TYPE ref)``. Matching is used in the
 loop example below, and in
@@ -1809,7 +1846,7 @@ they appeared in plain C or C++ code. In the running example,
 start the next step. Instead of this arrangement, the loop structure can
 be made explicit:
 
-::
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1846,7 +1883,7 @@ be made explicit:
 If this code should instead run for a fixed number of iterations, we can
 instead use a for loop:
 
-::
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1909,7 +1946,7 @@ independently before the call to ``computeInteractions``. Since we don’t
 care which order they get processed in, and want it to happen as soon as
 possible, we can apply ``overlap``:
 
-::
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1962,7 +1999,7 @@ the body.
 
 The syntax of ``forall`` is
 
-::
+.. code-block:: c++
 
    forall [IDENT] (MIN:MAX,STRIDE) BODY
 
@@ -1990,7 +2027,7 @@ the runtime will not “commit” to this branch until the second arrives.
 If another dependency fully matches, the partial match will be ignored
 and can be used to trigger another ``when`` later in the execution.
 
-::
+.. code-block:: c++
 
    case {
      when a() { }
@@ -2016,7 +2053,7 @@ file).
 
 For example, an array named “Foo” that uses sdag code might contain:
 
-::
+.. code-block:: c++
 
    class Foo : public CBase_Foo {
    public:
@@ -2065,7 +2102,7 @@ includes support special for STL containers to ease development in C++.
 
 Like many C++ concepts, the PUP framework is easier to use than describe:
 
-::
+.. code-block:: c++
 
    class foo : public mySuperclass {
     private:
@@ -2148,7 +2185,7 @@ For arrays, you can use the utility method PUParray, which takes the
 PUP::er, the array base pointer, and the array length. This utility
 method is defined for user-defined types T as:
 
-::
+.. code-block:: c++
 
        template<class T>
        inline void PUParray(PUP::er &p,T *array,int length) {
@@ -2180,7 +2217,7 @@ PUPbytes, you can define an operator\ ``|`` to pup the object. For
 example, if myClass contains two fields a and b, the operator\ ``|``
 might look like:
 
-::
+.. code-block:: c++
 
      inline void operator|(PUP::er &p,myClass &c) {
        p|c.a;
@@ -2304,10 +2341,10 @@ Objects can be created in one of two ways: they can be created using a
 normal constructor as usual; or they can be created using their pup
 constructor. The pup constructor for Charm++ array elements and
 PUP::able objects is a “migration constructor” that takes a single
-“CkMigrateMessage \*"; for other objects, such as parameter marshalled
-objects, the pup constructor has no parameters. The pup constructor is
-always followed by a call to the object’s pup method in ``isUnpacking``
-mode.
+“CkMigrateMessage \*" which the user should not free; for other objects,
+such as parameter marshalled objects, the pup constructor has no parameters.
+The pup constructor is always followed by a call to the object’s pup method
+in ``isUnpacking`` mode.
 
 Once objects are created, they respond to regular user methods and
 remote entry methods as usual. At any time, the object pup method can be
@@ -2334,7 +2371,7 @@ generated superclasses.
 
 A simple example for an array follows:
 
-::
+.. code-block:: c++
 
    //In the .h file:
    class A2 : public CBase_A2 {
@@ -2387,7 +2424,7 @@ parameters must abide by the standard PUP contract (see section
 A simple example of using PUP to marshall user defined data types
 follows:
 
-::
+.. code-block:: charmci
 
    class Buffer {
    public:
@@ -2845,7 +2882,7 @@ to configure the load balancer, etc. These functions are:
    load balancing from occurring too often in *automatic without sync
    mode*. Here is how to use it:
 
-   ::
+   .. code-block:: c++
 
       // if used in an array element
       LBDatabase *lbdb = getLBDB();
@@ -2889,8 +2926,7 @@ Below are the descriptions about the compiler and runtime options:
    -  | *-module CommonLBs*
       | links a special module CommonLBs which includes some commonly
         used Charm++ built-in load balancers. The commonly used load
-        balancers include
-        ``DummyLB, GreedyLB, GreedyRefineLB, CommLB, RandCentLB, RefineLB, RefineCommLB, RotateLB, DistributedLB, HybridLB, ComboCentLB, RefineSwapLB, NeighborLB, OrbLB, BlockLB, GreedyCommLB``
+        balancers include: *DummyLB, GreedyLB, GreedyRefineLB, CommLB, RandCentLB, RefineLB, RefineCommLB, RotateLB, DistributedLB, HybridLB, ComboCentLB, RefineSwapLB, NeighborLB, OrbLB, BlockLB, GreedyCommLB*
 
    -  | *-balancer GreedyCommLB*
       | links the load balancer GreedyCommLB and invokes it at runtime.
@@ -2930,10 +2966,10 @@ Below are the descriptions about the compiler and runtime options:
    working directory to the *tmp* subdirectory of your build and making
    them by name.
 
-   ::
+   .. code-block:: bash
 
-       cd netlrts-linux-x86_64/tmp
-       make PhasebyArrayLB
+      $ cd netlrts-linux-x86_64/tmp
+      $ make PhasebyArrayLB
 
 #. **Write and use your own load balancer**
 
@@ -3111,7 +3147,7 @@ Simple Load Balancer Usage Example - Automatic with Sync LB
 A simple example of how to use a load balancer in sync mode in one’s
 application is presented below.
 
-::
+.. code-block:: charmci
 
    /*** lbexample.ci ***/
    mainmodule lbexample {
@@ -3131,7 +3167,7 @@ application is presented below.
 
 ——————————————————————————-
 
-::
+.. code-block:: c++
 
    /*** lbexample.C ***/
    #include <stdio.h>
@@ -3236,7 +3272,7 @@ Group Definition
 
 In the interface (``.ci``) file, we declare
 
-::
+.. code-block:: c++
 
    group Foo {
      // Interface specifications as for normal chares
@@ -3251,7 +3287,7 @@ In the interface (``.ci``) file, we declare
 The definition of the ``Foo`` class is given in the ``.h`` file, as
 follows:
 
-::
+.. code-block:: c++
 
    class Foo : public CBase_Foo {
      // Data and member functions as in C++
@@ -3271,13 +3307,13 @@ Groups are created using ckNew like chares and chare arrays. Given the
 declarations and definitions of group ``Foo`` from above, we can create
 a group in the following manner:
 
-::
+.. code-block:: c++
 
    CProxy_Foo fooProxy = CProxy_Foo::ckNew(parameters1);
 
 One can also use ckNew to get a CkGroupID as shown below:
 
-::
+.. code-block:: c++
 
    CkGroupID fooGroupID = CProxy_Foo::ckNew(parameters1);
 
@@ -3286,7 +3322,7 @@ CkEntryOptions. For example, in the following code, the creation of
 group ``GroupB`` on each PE depends on the creation of ``GroupA`` on
 that PE.
 
-::
+.. code-block:: c++
 
    // Create GroupA
    CkGroupID groupAID = CProxy_GroupA::ckNew(parameters1);
@@ -3314,7 +3350,7 @@ group through a proxy of that group. If we have a group with a proxy
 that branch of the group which resides on PE ``somePE``, we would
 accomplish this with the following syntax:
 
-::
+.. code-block:: c++
 
    fooProxy[somePE].someEntryMethod(parameters);
 
@@ -3322,7 +3358,7 @@ This call is asynchronous and non-blocking; it returns immediately after
 sending the message. A message may be broadcast to all branches of a
 group (i.e., to all PEs) using the notation :
 
-::
+.. code-block:: c++
 
    fooProxy.anotherEntryMethod(parameters);
 
@@ -3331,11 +3367,26 @@ on all branches of the group. This call is also asynchronous and
 non-blocking, and it, too, returns immediately after sending the
 message.
 
+Finally, when running in SMP mode with multiple PEs per node, one can
+broadcast a message to the branches of a group local to the sending node:
+
+.. code-block:: c++
+
+   CkWithinNodeBroadcast(CkIndex_Foo::bar(), msg, fooProxy);
+
+Where ``CkIndex_Foo::bar()`` is the index of the entry method you wish to
+invoke, msg is the ``Charm++`` message (section :numref:`messages`) you wish to
+send, and ``fooProxy`` is the proxy to the group you wish to send. As before,
+it is an asynchrounous call which returns immediately. Furthermore, if the
+receiving entry method is marked as ``[nokeep]`` (:numref:`attributes`), the
+message pointer will be shared with each group chare instead of creating an
+independent copy per receiver.
+
 Recall that each PE hosts a branch of every instantiated group.
 Sequential objects, chares and other groups can gain access to this
 *PE-local* branch using ckLocalBranch():
 
-::
+.. code-block:: c++
 
    GroupType *g=groupProxy.ckLocalBranch();
 
@@ -3384,7 +3435,7 @@ NodeGroup Declaration
 Node groups are defined in a similar way to groups.  [10]_ For example,
 in the interface file, we declare:
 
-::
+.. code-block:: c++
 
     nodegroup NodeGroupType {
      // Interface specifications as for normal chares
@@ -3392,7 +3443,7 @@ in the interface file, we declare:
 
 In the ``.h`` file, we define NodeGroupType as follows:
 
-::
+.. code-block:: c++
 
     class NodeGroupType : public CBase_NodeGroupType {
      // Data and member functions as in C++
@@ -3416,7 +3467,7 @@ number* argument to the square bracket operator of the proxy object. A
 broadcast is expressed by omitting the square bracket notation. For
 completeness, example syntax for these two cases is shown below:
 
-::
+.. code-block:: c++
 
     // Invoke `someEntryMethod' on the i-th logical node of
     // a NodeGroup whose proxy is `myNodeGroupProxy':
@@ -3431,7 +3482,7 @@ particular branch of a nodegroup, it may be executed by *any* PE in that
 logical node. Thus two invocations of a single entry method on a
 particular branch of a NodeGroup may be executed *concurrently* by two
 different PEs in the logical node. If this could cause data races in
-your program, please consult § :numref:`sec:nodegroups/exclusive`
+your program, please consult Section :numref:`sec:nodegroups/exclusive`
 (below).
 
 .. _sec:nodegroups/exclusive:
@@ -3450,7 +3501,7 @@ PE within that logical node will execute any other *exclusive* methods.
 However, PEs in the logical node may still execute *non-exclusive* entry
 method invocations. An entry method can be marked exclusive by tagging
 it with the exclusive attribute, as explained in
-§ :numref:`attributes`.
+Section :numref:`attributes`.
 
 Accessing the Local Branch of a NodeGroup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -3482,7 +3533,7 @@ the routine exactly once on *every logical node* before the computation
 begins, or to declare a regular C++ subroutine initproc to be executed
 exactly once on *every PE*.
 
-::
+.. code-block:: charmci
 
    module foo {
        initnode void fooNodeInit(void);
@@ -3537,7 +3588,7 @@ sequence:
    However, if your program structure requires it, you can explicitly
    specify that the creation of certain Groups/NodeGroups depends on the
    creation of others, as described in
-   § :numref:`sec:groups/creation`. In addition, since those
+   Section :numref:`sec:groups/creation`. In addition, since those
    objects are initialized after the initialization of readonly
    variables, readonly variables can be used in the constructors of
    Groups and NodeGroups.
@@ -3629,7 +3680,9 @@ with the entire message comprises a contiguous buffer of memory.
 **Packed Messages.** A *packed* message is used to communicate
 non-linear data structures via messages. However, we defer a more
 detailed description of their use to
-§ :numref:`sec:messages/packed_msgs`.
+Section :numref:`sec:messages/packed_msgs`.
+
+.. _memory allocation:
 
 Using Messages In Your Program
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -3647,7 +3700,7 @@ code for messages. Message declaration is straightforward for fixed-size
 messages. Given a message of type ``MyFixedSizeMsg``, simply include the
 following in the .ci file:
 
-::
+.. code-block:: charmci
 
     message MyFixedSizeMsg;
 
@@ -3657,7 +3710,7 @@ encapsulate. The following example illustrates this requirement. In it,
 a message of type ``MyVarsizeMsg``, which encapsulates three
 variable-length arrays of different types, is declared:
 
-::
+.. code-block:: charmci
 
     message MyVarsizeMsg {
       int arr1[];
@@ -3673,7 +3726,7 @@ type of your message is ``T``, then ``class T`` must inherit from
 example, for our fixed size message type ``MyFixedSizeMsg`` above, we
 might write the following in the .h file:
 
-::
+.. code-block:: c++
 
    class MyFixedSizeMsg : public CMessage_MyFixedSizeMsg {
      int var1;
@@ -3688,7 +3741,7 @@ In particular, note the inclusion of the static array of ``double``\ s,
 ``double``\ s. Similarly, for our example varsize message of type
 ``MyVarsizeMsg``, we would write something like:
 
-::
+.. code-block:: c++
 
    class MyVarsizeMsg : public CMessage_MyVarsizeMsg {
      // variable-length arrays
@@ -3716,7 +3769,7 @@ Thus the mtype class declaration should be similar to:
 place, messages can be allocated and used in the program. Messages are
 allocated using the C++ new operator:
 
-::
+.. code-block:: c++
 
     MessageType *msgptr =
      new [(int sz1, int sz2, ... , int priobits=0)] MessageType[(constructor arguments)];
@@ -3727,7 +3780,7 @@ prioritized messages. These arguments are not specified for fixed size
 messages. For instance, to allocate a message of our example message
 ``MyFixedSizeMsg``, we write:
 
-::
+.. code-block:: c++
 
    MyFixedSizeMsg *msg = new MyFixedSizeMsg(<constructor args>);
 
@@ -3741,20 +3794,20 @@ used to store the message priority. So, if we wanted to create
 ``MyVarsizeMsg`` whose ``arr1``, ``arr2`` and ``arr3`` arrays contain
 10, 20 and 7 elements of their respective types, we would write:
 
-::
+.. code-block:: c++
 
    MyVarsizeMsg *msg = new (10, 20, 7) MyVarsizeMsg(<constructor args>);
 
 Further, to add a 32-bit priority bitvector to this message, we would
 write:
 
-::
+.. code-block:: c++
 
    MyVarsizeMsg *msg = new (10, 20, 7, sizeof(uint32_t)*8) VarsizeMessage;
 
 Notice the last argument to the overloaded new operator, which specifies
 the number of bits used to store message priority. The section on
-prioritized execution (§ :numref:`prioritized message passing`)
+prioritized execution (Section :numref:`prioritized message passing`)
 describes how priorities can be employed in your program.
 
 Another version of the overloaded new operator allows you to pass in an
@@ -3762,7 +3815,7 @@ array containing the size of each variable-length array, rather than
 specifying individual sizes as separate arguments. For example, we could
 create a message of type ``MyVarsizeMsg`` in the following manner:
 
-::
+.. code-block:: c++
 
    int sizes[3];
    sizes[0] = 10;               // arr1 will have 10 elements
@@ -3775,7 +3828,7 @@ create a message of type ``MyVarsizeMsg`` in the following manner:
 set the various elements of the encapsulated arrays in the following
 manner:
 
-::
+.. code-block:: c++
 
      msg->arr1[13] = 1;
      msg->arr2[5] = 32.82;
@@ -3785,7 +3838,7 @@ manner:
 And pass it to an asynchronous entry method invocation, thereby sending
 it to the corresponding chare:
 
-::
+.. code-block:: c++
 
    myChareArray[someIndex].foo(msg);
 
@@ -3806,7 +3859,7 @@ The Charm++ interface translator generates implementation for three
 static methods for the message class CMessage_mtype. These methods have
 the prototypes:
 
-::
+.. code-block:: c++
 
        static void* alloc(int msgnum, size_t size, int* array, int priobits);
        static void* pack(mtype*);
@@ -3823,7 +3876,7 @@ packed message where each field requires individual allocation. The
 alloc method should actually allocate the message using CkAllocMsg,
 whose signature is given below:
 
-::
+.. code-block:: c++
 
    void *CkAllocMsg(int msgnum, int size, int priobits);
 
@@ -3831,7 +3884,7 @@ For varsize messages, these static methods ``alloc``, ``pack``, and
 ``unpack`` are generated by the interface translator. For example, these
 methods for the VarsizeMessage class above would be similar to:
 
-::
+.. code-block:: c++
 
    // allocate memory for varmessage so charm can keep track of memory
    static void* alloc(int msgnum, size_t size, int* array, int priobits)
@@ -3904,7 +3957,7 @@ with parameter marshalling or the PUP framework described later.
 Packed messages are declared in the ``.ci`` file the same way as
 ordinary messages:
 
-::
+.. code-block:: c++
 
    message PMessage;
 
@@ -3914,7 +3967,7 @@ unpack. These methods are called by the Charm++ runtime system, when the
 message is determined to be crossing address-space boundary. The
 prototypes for these methods are as follows:
 
-::
+.. code-block:: c++
 
    static void *PMessage::pack(PMessage *in);
    static PMessage *PMessage::unpack(void *in);
@@ -3946,7 +3999,7 @@ following tasks are done in the unpack method:
 
 Here is an example of a packed-message implementation:
 
-::
+.. code-block:: c++
 
    // File: pgm.ci
    mainmodule PackExample {
@@ -4026,7 +4079,7 @@ specify the keyword for the desired attribute in the attribute list of
 that entry method’s ``.ci`` file declaration. The syntax for this is as
 follows:
 
-::
+.. code-block:: c++
 
    entry [attribute1, ..., attributeN] void EntryMethod(parameters);
 
@@ -4049,7 +4102,7 @@ sync
    scheduler, e.g. a threaded entry methods. Calls expecting a return
    value will receive it as the return from the proxy invocation:
 
-   ::
+   .. code-block:: c++
 
        ReturnMsg* m;
        m = A[i].foo(a, b, c);
@@ -4064,7 +4117,7 @@ exclusive
    is executing on node N, and another one is scheduled to run on the
    same node, the second exclusive method will wait to execute until the
    first one finishes. An example can be found in
-   ``tests/charm++/pingpong``.
+   ``benchmarks/charm++/pingpong``.
 
 nokeep
    entry methods take only a message as their lone argument, and the
@@ -4235,7 +4288,7 @@ For parameter marshaling, the queueingtype can be set for
 CkEntryOptions, which is passed to an entry method invocation as the
 optional last parameter.
 
-::
+.. code-block:: c++
 
      CkEntryOptions opts1, opts2;
      opts1.setQueueing(CK_QUEUEING_FIFO);
@@ -4262,7 +4315,7 @@ Messages
 The first two options, CK_QUEUEING_FIFO and CK_QUEUEING_LIFO, are used
 as follows:
 
-::
+.. code-block:: c++
 
      MsgType *msg1 = new MsgType ;
      CkSetQueueing(msg1, CK_QUEUEING_FIFO);
@@ -4292,15 +4345,15 @@ priorities will be dequeued and delivered before numerically greater
 priorities. The FIFO and LIFO queueing strategies then control the
 relative order in which messages of the same priority will be delivered.
 
-| To attach a priority field to a message, one needs to set aside space
-  in the message’s buffer while allocating the message . To achieve
-  this, the size of the priority field in bits should be specified as a
-  placement argument to the new operator, as described in
-  section :numref:`memory allocation`. Although the
-  size of the priority field is specified in bits, it is always padded
-  to an integral number of ``int``\ s. A pointer to the priority part of
-  the message buffer can be obtained with this call:
-| void \*CkPriorityPtr(MsgType msg)
+To attach a priority field to a message, one needs to set aside space
+in the message’s buffer while allocating the message . To achieve
+this, the size of the priority field in bits should be specified as a
+placement argument to the new operator, as described in
+section :numref:`memory allocation`. Although the
+size of the priority field is specified in bits, it is always padded
+to an integral number of ``int``\ s. A pointer to the priority part of
+the message buffer can be obtained with this call:
+``void *CkPriorityPtr(MsgType msg)``.
 
 Integer priorities are quite straightforward. One allocates a message
 with an extra integer parameter to “new” (see the first line of the
@@ -4309,7 +4362,7 @@ to hold the priority. One then stores the priority in the message.
 Finally, one informs the system that the message contains an integer
 priority using CkSetQueueing:
 
-::
+.. code-block:: c++
 
      MsgType *msg = new (8*sizeof(int)) MsgType;
      *(int*)CkPriorityPtr(msg) = prio;
@@ -4405,8 +4458,8 @@ Zero Copy Messaging API
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Apart from using messages, Charm++ also provides APIs to avoid sender
-and receiver side copies. On RDMA enabled networks like GNI, Verbs, PAMI
-and OFI, these internally make use of one-sided communication by using
+and receiver side copies. On RDMA enabled networks like GNI, Verbs, PAMI, OFI,
+and UCX these internally make use of one-sided communication by using
 the underlying Remote Direct Memory Access (RDMA) enabled network. For
 large arrays (few 100 KBs or more), the cost of copying during
 marshalling the message can be quite high. Using these APIs can help not
@@ -4421,71 +4474,77 @@ mainly due to additional small messages required for sending the
 metadata message and the acknowledgment message on completion.
 
 For within process data-transfers, this API uses regular memcpy to
-achieve zerocopy semantics. Similarly, on CMA-enabled machines, in a few
+achieve zero copy semantics. Similarly, on CMA-enabled machines, in a few
 cases, this API takes advantage of CMA to perform inter-process
 intra-physical host data transfers. This API is also functional on
 non-RDMA enabled networks like regular ethernet, except that it does not
 avoid copies and behaves like a regular Charm++ entry method invocation.
 
-There are two APIs that provide Zero copy semantics in Charm++:
+There are three APIs that provide zero copy semantics in Charm++:
 
 -  Zero Copy Direct API
 
 -  Zero Copy Entry Method Send API
 
+-  Zero Copy Entry Method Post API
+
 Zero Copy Direct API
 ^^^^^^^^^^^^^^^^^^^^
 
-The Zero copy Direct API allows users to explicitly invoke a standard
+The Zero Copy Direct API allows users to explicitly invoke a standard
 set of methods on predefined buffer information objects to avoid copies.
 Unlike the Entry Method API which calls the zero copy operation for
 every zero copy entry method invocation, the direct API provides a more
 flexible interface by allowing the user to exploit the persistent nature
 of iterative applications to perform zero copy operations using the same
 buffer information objects across iteration boundaries. It is also more
-beneficial than the Zero copy entry method API because unlike the entry
-method API, which avoids just the sender side copy, the Zero copy Direct
+beneficial than the Zero Copy Entry Method Send API because unlike the entry
+method Send API, which avoids just the sender side copy, the Zero Copy Direct
 API avoids both sender and receiver side copies.
 
-To send an array using the zero copy Direct API, define a CkNcpyBuffer
+To send an array using the Zero Copy Direct API, define a CkNcpyBuffer
 object on the sender chare specifying the pointer, size, a CkCallback
-object and an optional mode parameter.
+object and optional reg-mode and dereg-mode parameters.
 
-::
+.. code-block:: c++
 
    CkCallback srcCb(CkIndex_Ping1::sourceDone, thisProxy[thisIndex]);
    // CkNcpyBuffer object representing the source buffer
-   CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_REG);
+   CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb);
+   // ^ is equivalent to CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_REG, CK_BUFFER_DEREG);
 
 When used inside a CkNcpyBuffer object that represents the source buffer
 information, the callback is specified to notify about the safety of
 reusing the buffer and indicates that the get or put call has been
-completed. In those cases where the application can determine safety of
+completed. In those cases where the application can determine the safety of
 reusing the buffer through other synchronization mechanisms, the
 callback is not entirely useful and in such cases,
 ``CkCallback::ignore`` can be passed as the callback parameter. The
-optional mode operator is used to determine the network registration
-mode for the buffer. It is only relevant on networks requiring explicit
-memory registration for performing RDMA operations. These networks
-include GNI, OFI and Verbs. When the mode is not specified by the user,
-the default mode is considered to be ``CK_BUFFER_REG``
+optional reg-mode and dereg-mode parameters are used to determine the network
+registration mode and de-registration mode for the buffer. They are only relevant on
+networks requiring explicit memory registration for performing RDMA operations.
+These networks include GNI, OFI, UCX and Verbs. When the reg-mode is not specified by the user,
+the default reg-mode is considered to be ``CK_BUFFER_REG`` and similarly, when the
+dereg-mode is not specified by the user, the default dereg-mode is considered to be
+``CK_BUFFER_DEREG``.
 
-Similarly, to receive an array using the Zero copy Direct API, define
+Similarly, to receive an array using the Zero Copy Direct API, define
 another CkNcpyBuffer object on the receiver chare object specifying the
-pointer, the size, a CkCallback object and an optional mode parameter.
-When used inside a CkNcpyBuffer object that represents the destination
-buffer, the callback is specified to notify the completion of data
+pointer, the size, a CkCallback object and the optional reg-mode and dereg-mode
+parameters. When used inside a CkNcpyBuffer object that represents the
+destination buffer, the callback is specified to notify the completion of data
 transfer into the CkNcpyBuffer buffer. In those cases where the
 application can determine data transfer completion through other
 synchronization mechanisms, the callback is not entirely useful and in
 such cases, ``CkCallback::ignore`` can be passed as the callback
 parameter.
 
-::
+.. code-block:: c++
 
    CkCallback destCb(CkIndex_Ping1::destinationDone, thisProxy[thisIndex]);
    // CkNcpyBuffer object representing the destination buffer
-   CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb, CK_BUFFER_REG);
+   CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb);
+   // is equivalent to CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb, CK_BUFFER_REG, CK_BUFFER_DEREG);
 
 Once the source CkNcpyBuffer and destination CkNcpyBuffer objects have
 been defined on the sender and receiver chares, to perform a get
@@ -4494,7 +4553,7 @@ This can be done using a regular entry method invocation as shown in the
 following code snippet, where the sender, arrProxy[0] sends its source
 object to the receiver chare, arrProxy[1].
 
-::
+.. code-block:: c++
 
    // On Index 0 of arrProxy chare array
    arrProxy[1].recvNcpySrcObj(source);
@@ -4504,7 +4563,7 @@ can perform a get operation on its destination CkNcpyBuffer object by
 passing the source object as an argument to the runtime defined get
 method as shown in the following code snippet.
 
-::
+.. code-block:: c++
 
    // On Index 1 of arrProxy chare array
    // Call get on the local destination object passing the source object
@@ -4516,14 +4575,14 @@ into the local destination buffer.
 Similarly, a receiver’s destination CkNcpyBuffer object can be sent to
 the sender for the sender to perform a put on its source object by
 passing the source CkNcpyBuffer object as an argument to the runtime
-defined put method as shown in in the code snippet.
+defined put method as shown in the code snippet.
 
-::
+.. code-block:: c++
 
    // On Index 1 of arrProxy chare array
    arrProxy[0].recvNcpyDestObj(dest);
 
-::
+.. code-block:: c++
 
    // On Index 0 of arrProxy chare array
    // Call put on the local source object passing the destination object
@@ -4534,7 +4593,7 @@ in both the objects are invoked. Within the CkNcpyBuffer source
 callback, ``sourceDone()``, the buffer can be safely modified or freed
 as shown in the following code snippet.
 
-::
+.. code-block:: c++
 
    // Invoked by the runtime on source (Index 0)
    void sourceDone() {
@@ -4547,7 +4606,7 @@ Similarly, inside the CkNcpyBuffer destination callback,
 complete into the destination buffer and the user can begin operating on
 the newly available data as shown in the following code snippet.
 
-::
+.. code-block:: c++
 
    // Invoked by the runtime on destination (Index 1)
    void destinationDone() {
@@ -4569,7 +4628,7 @@ illustrates the accessing of the original buffer pointer in the callback
 method by casting the ``data`` field of the ``CkDataMsg`` object into a
 ``CkNcpyBuffer`` object.
 
-::
+.. code-block:: c++
 
    // Invoked by the runtime on source (Index 0)
    void sourceDone(CkDataMsg *msg) {
@@ -4578,12 +4637,14 @@ method by casting the ``data`` field of the ``CkDataMsg`` object into a
 
        // access buffer pointer and free it
        free(source->ptr);
+
+       delete msg;
    }
 
 The following code snippet illustrates the usage of the ``setRef``
 method.
 
-::
+.. code-block:: c++
 
    const void *refPtr = &index;
    CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_REG);
@@ -4593,7 +4654,7 @@ Similar to the buffer pointer, the user set arbitrary reference pointer
 can be also accessed in the callback method. This is shown in the next
 code snippet.
 
-::
+.. code-block:: c++
 
    // Invoked by the runtime on source (Index 0)
    void sourceDone(CkDataMsg *msg) {
@@ -4608,6 +4669,8 @@ code snippet.
 
        // get reference pointer
        const void *refPtr = src->ref;
+
+       delete msg;
    }
 
 The usage of ``CkDataMsg`` and ``setRef`` in order to access the
@@ -4658,16 +4721,16 @@ be dynamically allocated. Additionally, the objects are also reusable
 across iteration boundaries i.e. after sending the CkNcpyBuffer object,
 the remote PE can use the same object to perform get or put. This
 pattern of using the same objects across iterations is demonstrated in
-``examples/charm++/zerocopy/direct_api/reg/pingpong``.
+``benchmarks/charm++/zerocopy/direct_api/reg/pingpong``.
 
 This API is demonstrated in ``examples/charm++/zerocopy/direct_api``
 
-Memory Registration and Modes of Operation
+Memory Registration and Registration Modes
 ''''''''''''''''''''''''''''''''''''''''''
 
-There are four modes of operation for the Zero Copy Direct API. These
-modes act as control switches on networks that require memory
-registration like GNI, OFI and Verbs, in order to perform RDMA
+There are four modes of memory registration for the Zero Copy API. These
+registration modes act as control switches on networks that require memory
+registration like GNI, OFI, UCX and Verbs, in order to perform RDMA
 operations . They dictate the functioning of the API providing flexible
 options based on user requirement. On other networks, where network
 memory management is not necessary (Netlrts) or is internally handled by
@@ -4730,18 +4793,50 @@ actual networking or registration information. It cannot be used for
 performing any zerocopy operations. This mode was added as it was useful
 for implementing a runtime system feature.
 
-Memory De-registration
-''''''''''''''''''''''
+Memory De-registration and De-registration Modes
+''''''''''''''''''''''''''''''''''''''''''''''''
 
-Similar to memory registration, there is a method available to
-de-register memory after the completion of the operations. This allows
-for other buffers to use the registered memory as machines/networks are
-limited by the maximum amount of registered or pinned memory. Registered
-memory can be de-registered by calling the ``deregisterMem()`` method on
-the CkNcpyBuffer object.
+On network layers that require explicit memory registration, it is
+important to de-register the registered memory. Since networks are limited
+by the maximum registered or pinned memory, not de-registering pinned memory can
+lead to a pinned memory leak, which could potentially reduce application performance
+because it limits the amount of pinned memory available to the process.
 
-Other Methods
-'''''''''''''
+Similar to memory registration modes, the ZC API also provides two de-registration modes.
+
+``CK_BUFFER_DEREG``:
+
+
+``CK_BUFFER_DEREG`` is the default mode that is used when no dereg-mode is
+specified. This mode signals to the RTS that all the memory registered by the ``CkNcpyBuffer``
+object should be de-registered by the RTS. Hence, when ``CK_BUFFER_DEREG`` is specified by the user,
+it is the runtime system's responsibility to de-register the buffer registered by the ``CkNcpyBuffer``
+object. This dereg-mode is used when the user is not likely to reuse the buffer and wants the
+de-registration responsibility transferred to the RTS.
+
+``CK_BUFFER_NODEREG``:
+
+This mode is specified when the user doesn't want the RTS to de-register the buffer after the
+completion of the zero copy operation. It is beneficial when the user wants to reuse the same buffer
+(and reuse the ``CkNcpyBuffer`` object) by avoiding the cost of de-registration and registration.
+
+
+Important Methods
+'''''''''''''''''
+
+The Zero Copy API provides important methods that offer utilities that
+can be used by the user.
+
+The ``deregisterMem`` method is used by the user to de-register memory after
+the completion of the zero copy operations. This allows for other buffers to use the
+registered memory as machines/networks are limited by the maximum amount of
+registered or pinned memory. Registered memory can be de-registered by calling
+the ``deregisterMem()`` method on the CkNcpyBuffer object.
+
+.. code-block:: c++
+
+   // de-register previously registered buffer
+   dest.registerMem();
 
 In addition to ``deregisterMem()``, there are other methods in a
 CkNcpyBuffer object that offer other utilities. The
@@ -4752,7 +4847,7 @@ example, after using a CkNcpyBuffer object called ``srcInfo``, the user
 can re-initialize the same object with other values. This is shown in
 the following code snippet.
 
-::
+.. code-block:: c++
 
    // initialize src with new values
    src.init(ptr, 200, newCb, CK_BUFFER_REG);
@@ -4768,60 +4863,192 @@ de-registration, if intended to register again, it is required to call
 allocated from a preregistered mempool. This is required to set the
 registration memory handles and will not incur any registration costs.
 
-::
+.. code-block:: c++
 
    // register previously de-registered buffer
    src.registerMem();
 
+It should be noted that the Zero Copy Direct API is optimized only for
+point to point communication. Although it can be used for use cases where a
+single buffer needs to be broadcasted to multiple recipients, it is very likely
+that the API will currently perform suboptimally. This is primarily
+because of the implementation which assumes point to point communication for the
+Zero Copy Direct API. Having the same source buffer information (CkNcpyBuffer)
+being passed to a large number of processes, with each process performing a get call
+from the same source process will cause network congestion at the source process by
+slowing down each get operation because of competing get calls.
+
+We are currently working on optimizing the Zero Copy Direct API for broadcast operations.
+Currently, the Zero Copy Entry Method Send API and the Zero Copy Entry Method Post API
+handle optimized broadcast operations by using a spanning tree as explained in the following
+sections.
+
 Zero Copy Entry Method Send API
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The Zero copy Entry Method Send API only allows the user to only avoid
-the sender side copy without avoiding the receiver side copy. It
-offloads the user from the responsibility of making additional calls to
+The Zero Copy Entry Method Send API allows the user to only avoid
+the sender side copy. On the receiver side, the buffer is allocated by the
+runtime system and a pointer to the Readonly buffer is provided to the user
+as an entry method parameter.
+For a broadcast operation, there is only one buffer allocated by the
+runtime system for each recipient process and a pointer to the same buffer is passed
+to all the recipient objects on that process (or logical node).
+
+This API offloads the user from the responsibility of making additional calls to
 support zero copy semantics. It extends the capability of the existing
 entry methods with slight modifications in order to send large buffers
 without a copy.
 
-To send an array using the zero copy message send API, specify the array
+To send an array using the Zero Copy Message Send API, specify the array
 parameter in the .ci file with the nocopy specifier.
 
-::
+.. code-block:: charmci
 
+   // same .ci specification is used for p2p and bcast operations
    entry void foo (int size, nocopy int arr[size]);
 
 While calling the entry method from the .C file, wrap the array i.e the
-pointer in a CkSendBuffer wrapper.
+pointer in a CkSendBuffer wrapper. The CkSendBuffer wrapper is essentially
+a method that constructs a CkNcpyBuffer around the passed pointer.
 
-::
+.. code-block:: c++
 
+   // for point to point send
    arrayProxy[0].foo(500000, CkSendBuffer(arrPtr));
+
+   // for readonly broadcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr));
 
 Until the RDMA operation is completed, it is not safe to modify the
 buffer. To be notified on completion of the RDMA operation, pass an
 optional callback object in the CkSendBuffer wrapper associated with the
 specific nocopy array.
 
-::
+.. code-block:: c++
 
-   CkCallback cb(CkIndex_Foo::zerocopySent(NULL), thisProxy[thisIndex]);
-   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb));
+   CkCallback cb1(CkIndex_Foo::zerocopySent(), thisProxy[thisIndex]);
 
-The callback will be invoked on completion of the RDMA operation
-associated with the corresponding array. Inside the callback, it is safe
-to overwrite the buffer sent via the zero copy entry method send API and
-this buffer can be accessed by dereferencing the CkDataMsg received in
-the callback.
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1));
 
-::
+   // for readonly broadcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1));
+
+The CkSendBuffer wrapper also allows users to specify two optional mode parameters.
+These are used to determine the network registration mode and network de-registration
+mode for the buffer.  It is only relevant on networks requiring explicit memory registration
+for performing RDMA operations. These networks include GNI, OFI, and Verbs. When the registration mode
+is not specified by the user, the default mode is considered to be ``CK_BUFFER_REG``. Similarly, when
+the de-registration mode is not specified by the user, the default mode is considered to be ``CK_BUFFER_DEREG``.
+Note that in order to specify a de-registration mode, the registration mode has to be specified in the
+constructor because of how default parameters work with constructors.
+
+.. code-block:: c++
+
+   /* Specifying registration modes only, without any de-registration mode (uses default de-reg mode) */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1)); for REG reg-mode because of REG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1)); for REG reg-mode because of REG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   /* Specifying de-registration modes */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+
+The memory registration mode and de-registration mode can also be specified without a callback, as shown below:
+
+.. code-block:: c++
+
+   /* Specifying registration modes only, without any de-registration mode (uses default de-reg mode) */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr)); for REG reg-mode because of REG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr)); for REG reg-mode because of REG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   /* Specifying de-registration modes */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+
+In the case of point to point communication, the callback will be invoked on completion
+of the RDMA operation associated with the corresponding array.
+
+For zero copy broadcast operations, the callback will be invoked when all the broadcast
+recipient processes have successfully received the broadcasted array. Note that this does
+not necessarily mean that the recipient objects have received the data i.e. it is possible that the
+process (or the logical node) has received the data, but the individual entry methods
+are still waiting in the scheduler (and are scheduled to run) and hence have not received the
+data.
+
+
+Inside the callback, it is safe to overwrite the buffer sent via the Zero Copy Entry Method Send API.
+
+.. code-block:: c++
 
    //called when RDMA operation is completed
-   void zerocopySent(CkDataMsg *m)
+   void zerocopySent() {
+     // update the buffer to the next pointer
+     updateBuffer();
+   }
+
+The callback methods can also take a pointer to a ``CkDataMsg`` message.
+This message can be used to access the original buffer information
+object i.e. the ``CkNcpyBuffer`` object constructed by CkSendBuffer and
+used for the zero copy transfer. The buffer information object available in
+the callback allows access to all its information including the buffer pointer.
+
+.. code-block:: c++
+
+   //called when RDMA operation is completed
+   void zerocopySent(CkDataMsg *msg)
    {
-     //get access to the pointer and free the allocated buffer
-     void *ptr = *((void **)(m->data));
-     free(ptr);
-     delete m;
+     // Cast msg->data to a CkNcpyBuffer to get the source buffer information object
+     CkNcpyBuffer *source = (CkNcpyBuffer *)(msg->data));
+
+     // access buffer pointer and free it
+     free(ptr); // if the callback is executed on the source process
+     delete msg;
    }
 
 The RDMA call is associated with a nocopy array rather than the entry
@@ -4831,6 +5058,19 @@ it is attached to and not to all the nocopy arrays passed in an entry
 method invocation. On completion of the RDMA call for each array, the
 corresponding callback is separately invoked.
 
+On the receiver side, the entry method is defined as a regular entry method in the .C file,
+with the nocopy parameter being received as a pointer as shown below:
+
+.. code-block:: c++
+
+   void foo (int size, int *arr) {
+     // data received in runtime system buffer pointed by arr
+     // Note that 'arr' buffer is Readonly
+
+     computeValues();
+   }
+
+
 As an example, for an entry method with two nocopy array parameters,
 each called with the same callback, the callback will be invoked twice:
 on completing the transfer of each of the two nocopy parameters.
@@ -4838,41 +5078,43 @@ on completing the transfer of each of the two nocopy parameters.
 For multiple arrays to be sent via RDMA, declare the entry method in the
 .ci file as:
 
-::
+.. code-block:: charmci
 
    entry void foo (int size1, nocopy int arr1[size1], int size2, nocopy double arr2[size2]);
 
 In the .C file, it is also possible to have different callbacks
 associated with each nocopy array.
 
-::
+.. code-block:: c++
 
    CkCallback cb1(CkIndex_Foo::zerocopySent1(NULL), thisProxy[thisIndex]);
    CkCallback cb2(CkIndex_Foo::zerocopySent2(NULL), thisProxy[thisIndex]);
    arrayProxy[0].foo(500000, CkSendBuffer(arrPtr1, cb1), 1024000, CkSendBuffer(arrPtr2, cb2));
 
-This API is demonstrated in
+This API for point to point communication is demonstrated in
 ``examples/charm++/zerocopy/entry_method_api`` and
-``tests/charm++/pingpong``
+``benchmarks/charm++/pingpong``. For broadcast operations, the usage of this API is
+demonstrated in ``examples/charm++/zerocopy/entry_method_bcast_api``.
 
 It should be noted that calls to entry methods with nocopy specified
-parameters are currently only supported for point to point operations
-and not for collective operations. Additionally, there is also no
-support for migration of chares that have pending RDMA transfer
-requests.
+parameters is currently supported for point to point operations
+and only collection-wide broadcast operations like broadcasts across an entire
+chare array or group or nodegroup. It is yet to be supported for section broadcasts.
+Additionally, there is also no support for migration of chares that have
+pending RDMA transfer requests.
 
 It should also be noted that the benefit of this API can be seen for
 large arrays on only RDMA enabled networks. On networks which do not
-support RDMA and for within process sends (which uses shared memory),
+support RDMA, and, for within process sends (which uses shared memory),
 the API is functional but doesn’t show any performance benefit as it
 behaves like a regular entry method that copies its arguments.
 
 Table :numref:`tab:rdmathreshold` displays the
-message size thresholds for the zero copy entry method send API on
+message size thresholds for the Zero Copy Entry Method Send API on
 popular systems and build architectures. These results were obtained by
-running ``examples/charm++/zerocopy/entry_method_api/pingpong`` in
+running ``benchmarks/charm++/zerocopy/entry_method_api/pingpong`` in
 non-SMP mode on production builds. For message sizes greater than or
-equal to the displayed thresholds, the zero copy API is found to perform
+equal to the displayed thresholds, the Zero Copy API is found to perform
 better than the regular message send API. For network layers that are
 not pamilrts, gni, verbs, ofi or mpi, the generic implementation is
 used.
@@ -4891,6 +5133,152 @@ used.
    Intel Cluster (Bridges)       Intel Omni-Path ``ofi-linux-x86_64``   64 KB           32 KB      32 KB
    Intel KNL Cluster (Stampede2) Intel Omni-Path ``ofi-linux-x86_64``   1 MB            64 KB      64 KB
    ============================= =============== ====================== =============== ========== ==========
+
+Zero Copy Entry Method Post API
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Zero Copy Entry Method Post API is an extension of the Zero Copy Entry Method
+Send API. This API allows users to receive the sent data in a user posted buffer. In
+addition to saving the sender side copy, it also avoids the receiver side copy by not
+using any intermediate buffers and directly receiving the data in the user posted buffer.
+Unlike the Zero Copy Entry Method Send API, this API should be used when the user wishes
+to receive the data in a user posted buffer, which is allocated and managed by the user.
+
+The posting of the receiver buffer happens at an object level, where each recipient object,
+for example, a chare array element or a group element or nodegroup element posts a receiver
+buffer using a special version of the entry method.
+
+To send an array using the Zero Copy Post API, specify the array
+parameter in the .ci file with the nocopypost specifier.
+
+.. code-block:: charmci
+
+   // same .ci specification is used for p2p and bcast operations
+   entry void foo (int size, nocopypost int arr[size]);
+
+   // ^ note that the nocopypost specifier is different from nocopy and
+   // indicates the usage of the post API for the array arr
+
+The sender side code for the Zero Copy Entry Method Post API is exactly the same as
+Zero Copy Entry Method Send API and can be referenced from the previous section. In this section,
+we will highlight the differences between the two APIs and demonstrate the usage of the Post API
+on the receiver side.
+
+As previously mentioned, the Zero Copy Entry Method Post API posts user buffers to receive the
+data sent by the sender. This is done using a special overloaded version of the recipient
+entry method, called Post entry method. The overloaded function has all the entry method parameters
+and an additional ``CkNcpyBufferPost`` array parameter at the end of the signature. Additionally, the
+entry method parameters are specified as references instead of values. Inside this post entry method,
+the received references can be initialized by the user. The pointer reference is assigned to a user
+allocated buffer, i.e. the buffer in which the user wishes to receive the data. The size variable
+reference could be assigned to a value (or variable) that represents the size of the data of that type
+that needs to be received. If this reference variable is not assigned inside the post entry method, the size specified
+at the sender in the CkSendBuffer wrapper will be used as the default size. The post entry method also
+allows the receiver to specify the memory registration mode and the memory de-registration mode.
+This is done by indexing the ncpyPost array and assigning the ``regMode`` and ``deregMode`` parameters
+present inside each array element of the ``CkNcpyBufferPost`` array. When the network memory
+registration mode is unassigned by the user, the default ``CK_BUFFER_REG`` regMode is used. Similarly, when
+the de-registration mode is unassigned by the user, the default ``CK_BUFFER_DEREG`` deregMode is used.
+
+For the entry method ``foo`` specified with a nocopypost specifier, the resulting post function defined
+in the .C file will be:
+
+.. code-block:: c++
+
+   void foo (int &size, int *& arr, CkNcpyBufferPost *ncpyPost) {
+     arr = myBuffer;      // myBuffer is a user allocated buffer
+
+     size = 2000;         // 2000 ints need to be received.
+
+     ncpyPost[0].regMode = CK_BUFFER_REG; // specify the regMode for the 0th pointer
+
+     ncpyPost[0].deregMode = CK_BUFFER_DEREG; // specify the deregMode for the 0th pointer
+   }
+
+In addition to the post entry method, the regular entry method also needs to be defined
+as in the case of the Entry Method Send API, where the nocopypost parameter is being received
+as a pointer as shown below:
+
+.. code-block:: c++
+
+  void foo (int size, int *arr) {
+    // arr points to myBuffer and the data sent is received in myBuffer
+    // Note that 'arr' buffer is the same as myBuffer, which is user allocated and managed
+
+    computeValues();
+  }
+
+Similarly, for sending and receiving multiple arrays, the .ci file specification will be:
+
+.. code-block:: charmci
+
+  entry void foo(nocopypost int arr1[size1], int size1, nocopypost char arr2[size2], int size2);
+
+
+In the .C file, we define a post entry method and a regular entry method:
+
+.. code-block:: c++
+
+  // post entry method
+  void foo(int *& arr1, int & size1, char *& arr2, int & size2, CkNcpyBufferPost *ncpyPost) {
+
+    arr1 = myBuffer1;
+    ncpyPost[0].regMode = CK_BUFFER_UNREG;
+    ncpyPost[0].deregMode = CK_BUFFER_DEREG;
+
+    arr2 = myBuffer2; // myBuffer2 is allocated using CkRdmaAlloc
+    ncpyPost[1].regMode = CK_BUFFER_PREREG;
+    ncpyPost[1].deregMode = CK_BUFFER_NODEREG;
+  }
+
+  // regular entry method
+  void foo(int *arr1, int size1, char *arr2, int size2) {
+
+    // sent buffer is received in myBuffer1, same as arr1
+
+    // sent buffer is received in myBuffer2, same as arr2
+  }
+
+It is important to note that the ``CkNcpyBufferPost`` array has as many elements as the
+number of ``nocopypost`` parameters in the entry method declaration in the .ci file. For
+n nocopypost parameters, the ``CkNcpyBufferPost`` array is indexed by 0 to n-1.
+
+This API for point to point communication is demonstrated in
+``examples/charm++/zerocopy/entry_method_post_api`` and
+for broadcast operations, the usage of this API is
+demonstrated in ``examples/charm++/zerocopy/entry_method_bcast_post_api``.
+
+Similar to the Zero Copy Entry Method Send API, it should be noted that calls to
+entry methods with nocopypost specified parameters are currently supported for
+point to point operations and only collection-wide broadcast operations like broadcasts
+across an entire chare array or group or nodegroup. It is yet to be supported for
+section broadcasts. Additionally, there is also no support for migration of chares that have
+pending RDMA transfer requests.
+
+
+Using Zerocopy Post API in iterative applications
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In iterative applications, when using the Zerocopy Post API, it is important to post different
+buffers for each iteration in order to receive each iteration's sent data in a separate buffer.
+Posting the same buffer across iterations could lead to overwriting the buffer when the receiver receives
+a message for that entry method. An example illustrating the use of the Zerocopy Post API to post
+different buffers in an iterative program, which uses SDAG is
+``examples/charm++/zerocopy/entry_method_post_api/reg/multiplePostedBuffers``. It is also important
+to post different buffers for each unique sender in order to receive each sender's data in a separate
+buffer. Posting the same buffer for different senders would overwrite the buffer when the receiver
+receives a message for that entry method.
+
+Additionally, in iterative applications which use load balancing, for the load balancing iterations,
+it is required to ensure that the Zerocopy sends are performed only after all chare array elements have
+completed migration. This can be achieved by a chare array wide reduction after ``ResumeFromSync`` has been
+reached. This programming construct has the same effect as that of a barrier, enforced after array elements
+have completed load balancing. This is required to avoid cases where it is possible that the buffer is
+posted on receiving a send and is then freed by the destructor or the unpacking pup method,
+which is invoked by the RTS because of migration due to load balancing. This scheme of using a
+reduction following ``ResumeFromSync`` is illustrated in
+``examples/charm++/zerocopy/entry_method_post_api/reg/simpleZeroCopy`` and
+``examples/charm++/zerocopy/entry_method_post_api/reg/multiplePostedBuffers``.
 
 .. _callbacks:
 
@@ -4927,7 +5315,7 @@ that identifies which entry method will be called. An entry method index
 is the Charm++ version of a function pointer. The entry method index can
 be obtained using the syntax:
 
-::
+.. code-block:: c++
 
    int myIdx = CkIndex_ChareName::EntryMethod(parameters);
 
@@ -4950,11 +5338,20 @@ The intended behavior upon a callback’s invocation is specified through
 the choice of callback constructor used when creating the callback.
 Possible constructors are:
 
+#. CkCallback(int ep, const CkChareID &id) - When invoked, the callback
+   will send its message to the given entry method (specified by the
+   entry point index - ep) of the given Chare (specified by the chare
+   id). Note that a chare proxy will also work in place of a chare id:
+
+   .. code-block:: c++
+
+      CkCallback(CkIndex_Foo::bar(NULL), thisProxy[thisIndex])
+
 #. CkCallback(void (\*CallbackFn)(void \*, void \*), void \*param) - When
    invoked, the callback will pass param and the result message to the
    given C function, which should have a prototype like:
 
-   ::
+   .. code-block:: c++
 
       void myCallbackFn(void *param, void *message)
 
@@ -4972,15 +5369,6 @@ Possible constructors are:
 
 #. CkCallback(CkCallback::ckExit) - When invoked, the callback will call
    CkExit(), ending the Charm++ program.
-
-#. CkCallback(int ep, const CkChareID &id) - When invoked, the callback
-   will send its message to the given entry method (specified by the
-   entry point index - ep) of the given Chare (specified by the chare
-   id). Note that a chare proxy will also work in place of a chare id:
-
-   ::
-
-      	CkCallback myCB(CkIndex_myChare::myEntry(NULL), myChareProxy);
 
 #. CkCallback(int ep, const CkArrayID &id) - When invoked, the callback
    will broadcast its message to the given entry method of the given
@@ -5014,7 +5402,7 @@ send on the callback with the result message as an argument. As an
 example, a library which accepts a CkCallback object from the user and
 then invokes it to return a result may have the following interface:
 
-::
+.. code-block:: c++
 
    //Main library entry point, called by asynchronous users:
    void myLibrary(...library parameters...,const CkCallback &cb)
@@ -5057,7 +5445,7 @@ is invoked on the associated callback. It can be used in situations when
 the return value is not needed, and only the synchronization is
 important. For example:
 
-::
+.. code-block:: c++
 
    // Call the "doWork" method and wait until it has completed
    void mainControlFlow() {
@@ -5076,7 +5464,7 @@ retrieved by passing a pointer to *CkCallbackResumeThread*. This pointer
 will be modified by *CkCallbackResumeThread* to point to the incoming
 message. Notice that the input pointer has to be cast to *(void*&)*:
 
-::
+.. code-block:: c++
 
    // Call the "doWork" method and wait until it has completed
    void mainControlFlow() {
@@ -5102,7 +5490,7 @@ CkCallbackResumeThread callbacks below.
 For heap allocation, the user must explicitly “delete” the callback in
 order to suspend the thread.
 
-::
+.. code-block:: c++
 
    // Call the "doWork" method and wait until it has completed
    void mainControlFlow() {
@@ -5122,7 +5510,7 @@ situation, the function “thread_delay” can be invoked on the callback to
 force the thread to suspend. This also works for heap allocated
 callbacks.
 
-::
+.. code-block:: c++
 
    // Call the "doWork" method and wait until it has completed
    void mainControlFlow() {
@@ -5136,24 +5524,24 @@ callbacks.
      ...some more work after the thread is resumed...
    }
 
-| In all cases a *CkCallbackResumeThread* can be used to suspend a
-  thread only once.
-| (See Main.cpp of `Barnes-Hut
-  MiniApp <http://charmplusplus.org/miniApps/#barnes>`__ for a complete
-  example).
-| *Deprecated usage*: in the past, “thread_delay” was used to retrieve
-  the incoming message from the callback. While that is still allowed
-  for backward compatibility, its usage is deprecated. The old usage is
-  subject to memory leaks and dangling pointers.
+In all cases a *CkCallbackResumeThread* can be used to suspend a
+thread only once.
+(See Main.cpp of `Barnes-Hut
+MiniApp <http://charmplusplus.org/miniApps/#barnes>`__ for a complete
+example).
+*Deprecated usage*: in the past, “thread_delay” was used to retrieve
+the incoming message from the callback. While that is still allowed
+for backward compatibility, its usage is deprecated. The old usage is
+subject to memory leaks and dangling pointers.
 
-| Callbacks can also be tagged with reference numbers which can be
-  matched inside SDAG code. When the callback is created, the creator
-  can set the refnum and the runtime system will ensure that the message
-  invoked on the callback’s destination will have that refnum. This
-  allows the receiver of the final callback to match the messages based
-  on the refnum value. (See
-  ``examples/charm++/examples/charm++/ckcallback`` for a complete
-  example).
+Callbacks can also be tagged with reference numbers which can be
+matched inside SDAG code. When the callback is created, the creator
+can set the refnum and the runtime system will ensure that the message
+invoked on the callback’s destination will have that refnum. This
+allows the receiver of the final callback to match the messages based
+on the refnum value. (See
+``examples/charm++/examples/charm++/ckcallback`` for a complete
+example).
 
 Waiting for Completion
 ----------------------
@@ -5196,11 +5584,11 @@ returned data can either be in the form of a Charm++ message or any type
 that has the PUP method implemented. Because the caller of a sync entry
 method will block, it must execute in a thread separate from the
 scheduler; that is, it must be a threaded entry method (*cf.*
-§ :numref:`threaded`, above). If a sync entry method returns a value,
+Section :numref:`threaded`, above). If a sync entry method returns a value,
 it is provided as the return value from the invocation on the proxy
 object:
 
-::
+.. code-block:: c++
 
     ReturnMsg* m;
     m = A[i].foo(a, b, c);
@@ -5228,25 +5616,25 @@ until the value is available.
 Charm++ provides all the necessary infrastructure to use futures by
 means of the following functions:
 
-::
+.. code-block:: c++
 
     CkFuture CkCreateFuture(void)
     void CkReleaseFuture(CkFuture fut)
     int CkProbeFuture(CkFuture fut)
     void *CkWaitFuture(CkFuture fut)
-    void  CkSendToFuture(CkFuture fut, void *msg)
+    void CkSendToFuture(CkFuture fut, void *msg)
 
 To illustrate the use of all these functions, a Fibonacci example in
 Charm++ using futures in presented below:
 
-::
+.. code-block:: charmci
 
    chare fib {
      entry fib(bool amIroot, int n, CkFuture f);
-     entry  [threaded] void run(bool amIroot, int n, CkFuture f);
+     entry [threaded] void run(bool amIroot, int n, CkFuture f);
    };
 
-::
+.. code-block:: c++
 
    void  fib::run(bool amIRoot, int n, CkFuture f) {
       if (n < THRESHOLD)
@@ -5307,14 +5695,14 @@ consumed does not need to be known, just the number of producers is
 required.
 
 The completion detection feature is implemented in Charm++ as a module,
-and therefore is only included when “``-module completion``” is
+and therefore is only included when ``-module completion`` is
 specified when linking your application.
 
 First, the detector should be constructed. This call would typically
 belong in application startup code (it initializes the group that keeps
 track of completion):
 
-::
+.. code-block:: c++
 
    CProxy_CompletionDetector detector = CProxy_CompletionDetector::ckNew();
 
@@ -5322,7 +5710,7 @@ When it is time to start completion detection, invoke the following
 method of the library on *all* branches of the completion detection
 group:
 
-::
+.. code-block:: c++
 
    void start_detection(int num_producers,
                         CkCallback start,
@@ -5351,7 +5739,7 @@ should be set below the application’s priority if possible.
 
 For example, the call
 
-::
+.. code-block:: c++
 
    detector.start_detection(10,
                             CkCallback(CkIndex_chare1::start_test(), thisProxy),
@@ -5370,7 +5758,7 @@ completion detection library is set to 0 in this case.
 Once initialization is complete (the “start” callback is triggered),
 make the following call to the library:
 
-::
+.. code-block:: c++
 
    void CompletionDetector::produce(int events_produced)
    void CompletionDetector::produce() // 1 by default
@@ -5378,31 +5766,31 @@ make the following call to the library:
 For example, within the code for a chare array object, you might make
 the following call:
 
-::
+.. code-block:: c++
 
    detector.ckLocalBranch()->produce(4);
 
 Once all the “events” that this chare is going to produce have been sent
 out, make the following call:
 
-::
+.. code-block:: c++
 
    void CompletionDetector::done(int producers_done)
    void CompletionDetector::done() // 1 by default
 
-::
+.. code-block:: c++
 
    detector.ckLocalBranch()->done();
 
 At the same time, objects can also consume produced elements, using the
 following calls:
 
-::
+.. code-block:: c++
 
    void CompletionDetector::consume(int events_consumed)
    void CompletionDetector::consume() // 1 by default
 
-::
+.. code-block:: c++
 
    detector.ckLocalBranch()->consume();
 
@@ -5432,20 +5820,20 @@ has two variants which expect the following arguments:
 
 #. A CkCallback object. The syntax of this call looks like:
 
-   ::
+   .. code-block:: c++
 
         CkStartQD(const CkCallback& cb);
 
    Upon quiescence detection, the specified callback is called with no
    parameters. Note that using this variant, you could have your program
    terminate after quiescence is detected, by supplying the above method
-   with a CkExit callback (§ :numref:`sec:callbacks/creating`).
+   with a CkExit callback (Section :numref:`sec:callbacks/creating`).
 
 #. An index corresponding to the entry function that is to be called,
    and a handle to the chare on which that entry function should be
    called. The syntax of this call looks like this:
 
-   ::
+   .. code-block:: c++
 
        CkStartQD(int Index,const CkChareID* chareID);
 
@@ -5454,7 +5842,7 @@ has two variants which expect the following arguments:
    CkIndex object corresponding to the chare containing that entry
    method. The syntax of this call is as follows:
 
-   ::
+   .. code-block:: c++
 
       myIdx=CkIndex_ChareClass::entryMethod(parameters);
 
@@ -5469,13 +5857,13 @@ CkWaitQD, by contrast, does not register a callback. Rather, CkWaitQD
 parameters and returns no value. A call to CkWaitQD simply looks like
 this:
 
-::
+.. code-block:: c++
 
      CkWaitQD();
 
 Note that CkWaitQD should only be called from a threaded entry method
 because a call to CkWaitQD suspends the current thread of execution
-(*cf.* § :numref:`threaded`).
+(*cf.* Section :numref:`threaded`).
 
 .. _advanced arrays:
 
@@ -5497,11 +5885,11 @@ proxy’s ckLocal method, which returns an ordinary C++ pointer to the
 element if it exists on the local processor, and NULL if the element
 does not exist or is on another processor.
 
-::
+.. code-block:: c++
 
    A1 *a=a1[i].ckLocal();
-   if (a==NULL) //...is remote-- send message
-   else //...is local-- directly use members and methods of a
+   if (a==NULL) // ...is remote -- send message
+   else // ...is local -- directly use members and methods of a
 
 Note that if the element migrates or is deleted, any pointers obtained
 with ckLocal are no longer valid. It is best, then, to either avoid
@@ -5539,17 +5927,17 @@ array elements. A CkArrayOptions object will be constructed
 automatically in this special common case. Thus the following code
 segments all do exactly the same thing:
 
-::
+.. code-block:: c++
 
-   //Implicit CkArrayOptions
-     a1=CProxy_A1::ckNew(parameters,nElements);
+   // Implicit CkArrayOptions
+   a1=CProxy_A1::ckNew(parameters,nElements);
 
-   //Explicit CkArrayOptions
-     a1=CProxy_A1::ckNew(parameters,CkArrayOptions(nElements));
+   // Explicit CkArrayOptions
+   a1=CProxy_A1::ckNew(parameters,CkArrayOptions(nElements));
 
-   //Separate CkArrayOptions
-     CkArrayOptions opts(nElements);
-     a1=CProxy_A1::ckNew(parameters,opts);
+   // Separate CkArrayOptions
+   CkArrayOptions opts(nElements);
+   a1=CProxy_A1::ckNew(parameters,opts);
 
 Note that the “numElements” in an array element is simply the
 numElements passed in when the array was created. The true number of
@@ -5571,7 +5959,7 @@ passed into the CkArrayOptions constructor, or set one at a time. The
 following shows two different ways to create CkArrayOptions for a 2D
 array with only the odd indices from (1,1) to (10,10) being populated:
 
-::
+.. code-block:: c++
 
    // Set at construction
    CkArrayOptions options(CkArrayIndex2D(1,1),
@@ -5588,7 +5976,7 @@ The default for start is :math:`0^d` and the default for step is
 :math:`1^d` (where :math:`d` is the dimension of the array), so the
 following are equivalent:
 
-::
+.. code-block:: c++
 
    // Specify just the number of elements
    CkArrayOptions options(nElements);
@@ -5631,38 +6019,42 @@ which can be used similar to custom ones described below.
 A custom map object is implemented as a group which inherits from
 CkArrayMap and defines these virtual methods:
 
-::
+.. code-block:: c++
 
-   class CkArrayMap : public Group
-   {
-   public:
-     //...
+    class CkArrayMap : public Group {
+    public:
+      // ...
 
-     //Return an ``arrayHdl'', given some information about the array
-     virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
-     //Return the home processor number for this element of this array
-     virtual int procNum(int arrayHdl,const CkArrayIndex &element);
-   }
+      // Return an arrayHdl, given some information about the array
+      virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
+      // Return the home processor number for this element of this array
+      virtual int procNum(int arrayHdl,const CkArrayIndex &element);
+    };
 
 For example, a simple 1D blockmapping scheme. Actual mapping is handled
 in the procNum function.
 
-::
+.. code-block:: charmci
 
-   class BlockMap : public CkArrayMap
-   {
+    // In the .ci file:
+    group BlockMap : CkArrayMap {
+      entry BlockMap();
+    };
+
+    // In the .C/.h files
+    class BlockMap : public CkArrayMap {
     public:
-     BlockMap(void) {}
-     BlockMap(CkMigrateMessage *m){}
-     int registerArray(CkArrayIndex& numElements,CkArrayID aid) {
-       return 0;
-     }
-     int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) {
-       int elem=*(int *)idx.data();
-       int penum =  (elem/(32/CkNumPes()));
-       return penum;
-     }
-   };
+      BlockMap(void) {}
+      BlockMap(CkMigrateMessage* m){}
+      int registerArray(CkArrayIndex& numElements,CkArrayID aid) {
+        return 0;
+      }
+      int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) {
+        int elem = *(int*)idx.data();
+        int penum = (elem/(32/CkNumPes()));
+        return penum;
+      }
+    };
 
 Note that the first argument to the procNum method exists for reasons
 internal to the runtime system and is not used in the calculation of
@@ -5671,67 +6063,72 @@ processor numbers.
 Once you’ve instantiated a custom map object, you can use it to control
 the location of a new array’s elements using the setMap method of the
 CkArrayOptions object described above. For example, if you’ve declared a
-map object named “BlockMap”:
+map object named BlockMap:
 
-::
+.. code-block:: c++
 
-   //Create the map group
-     CProxy_BlockMap myMap=CProxy_BlockMap::ckNew();
-   //Make a new array using that map
-     CkArrayOptions opts(nElements);
-     opts.setMap(myMap);
-     a1=CProxy_A1::ckNew(parameters,opts);
+    // Create the map group
+    CProxy_BlockMap myMap=CProxy_BlockMap::ckNew();
+
+    // Make a new array using that map
+    CkArrayOptions opts(nElements);
+    opts.setMap(myMap);
+    a1=CProxy_A1::ckNew(parameters,opts);
+
+A very basic example which also demonstrates how initial elements are created
+may be found in ``examples/charm++/array_map``
 
 An example which constructs one element per physical node may be found
-in ``examples/charm++/PUP/pupDisk``
+in ``examples/charm++/PUP/pupDisk``.
 
 Other 3D Torus network oriented map examples are in
-``examples/charm++/topology``
+``examples/charm++/topology``.
 
 .. _array initial:
 
 Initial Elements
 ^^^^^^^^^^^^^^^^
 
-The map object described above can also be used to create the initial
-set of array elements in a distributed fashion. An array’s initial
-elements are created by its map object, by making a call to
-populateInitial on each processor.
+The map object described above can also be used to create the initial set of
+array elements in a distributed fashion. An array’s initial elements are
+created by its map object, by making a call to populateInitial on each
+processor. This function is defined in the CkArrayMap class to iterate through
+the index space of the initial elements (defined as a start index, end index,
+and step index) and call procNum for each index. If the PE returned by procNum
+is the same as the calling PE, then an object is created on that PE.
 
-You can create your own set of elements by creating your own map object
-and overriding this virtual function of CkArrayMap:
+If there is a more direct way to determine the elements to create on each PE,
+the populateInitial function can be overridden by using the following signature:
 
-::
+.. code-block:: c++
 
-     virtual void populateInitial(int arrayHdl,int numInitial,
-   	void *msg,CkArray *mgr)
+    virtual void populateInitial(int arrayHdl, CkArrayOptions& options,
+        void* ctorMsg,CkArray* mgr)
 
-In this call, arrayHdl is the value returned by registerArray,
-numInitial is the number of elements passed to CkArrayOptions, msg is
-the constructor message to pass, and mgr is the array to create.
+In this call, ``arrayHdl`` is the value returned by registerArray, ``options``
+contains the CkArrayOptions passed into the array at construction, ``ctorMsg``
+is the constructor message to pass, and ``mgr`` is the array manager which
+creates the elements.
 
-populateInitial creates new array elements using the method void
-CkArray::insertInitial(CkArrayIndex idx,void \*ctorMsg). For example, to
-create one row of 2D array elements on each processor, you would write:
+To create an element, call ``void CkArray::insertInitial(CkArrayIndex
+idx, void* ctorMsg)`` on ``mgr``, passing in the index and a copy of the
+constructor message. For example, to insert a 2D element (x,y), call:
 
-::
+.. code-block:: c++
 
-   void xyElementMap::populateInitial(int arrayHdl,int numInitial,
-   	void *msg,CkArray *mgr)
-   {
-     if (numInitial==0) return; //No initial elements requested
+    mgr->insertInitial(CkArrayIndex2D(x,y), CkCopyMsg(&msg));
 
-     //Create each local element
-     int y=CkMyPe();
-     for (int x=0;x<numInitial;x++) {
-       mgr->insertInitial(CkArrayIndex2D(x,y),CkCopyMsg(&msg));
-     }
-     mgr->doneInserting();
-     CkFreeMsg(msg);
-   }
+After inserting elements, inform the array manager that all elements have been
+created, and free the constructor message:
 
-Thus calling ckNew(10) on a 3-processor machine would result in 30
-elements being created.
+.. code-block:: c++
+
+    mgr->doneInserting();
+    CkFreeMsg(msg);
+
+A simple example using populateInitial can be found in
+``examples/charm++/array_map``
+
 
 Bound Arrays
 ^^^^^^^^^^^^
@@ -5743,14 +6140,14 @@ migrate together. For example, this code creates two arrays A and B
 which are bound together- A[i] and B[i] will always be on the same
 processor.
 
-::
+.. code-block:: c++
 
-   //Create the first array normally
-     aProxy=CProxy_A::ckNew(parameters,nElements);
-   //Create the second array bound to the first
-     CkArrayOptions opts(nElements);
-     opts.bindTo(aProxy);
-     bProxy=CProxy_B::ckNew(parameters,opts);
+   // Create the first array normally
+   aProxy=CProxy_A::ckNew(parameters,nElements);
+   // Create the second array bound to the first
+   CkArrayOptions opts(nElements);
+   opts.bindTo(aProxy);
+   bProxy=CProxy_B::ckNew(parameters,opts);
 
 An arbitrary number of arrays can be bound together- in the example
 above, we could create yet another array C and bind it to A or B. The
@@ -5784,7 +6181,7 @@ element migrated, the *data* pointer in *UserArray* is re-allocated in
 *pup()*, thus *UserArray* is responsible to refresh the pointer *dest*
 stored in *Alibrary*.
 
-::
+.. code-block:: c++
 
    class Alibrary: public CProxy_Alibrary {
    public:
@@ -5792,23 +6189,23 @@ stored in *Alibrary*.
      void set_ptr(double *ptr) { dest = ptr; }
      virtual void pup(PUP::er &p);
    private:
-     double *dest;           // point to user data in user defined bound array
+     double *dest; // point to user data in user defined bound array
    };
 
    class UserArray: public CProxy_UserArray {
    public:
      virtual void pup(PUP::er &p) {
-                   p|len;
-                   if(p.isUnpacking()) {
-                     data = new double[len];
-                     Alibrary *myfellow = AlibraryProxy(thisIndex).ckLocal();
-                     myfellow->set_ptr(data);    // refresh data in bound array
-                   }
-                   p(data, len);
+       p|len;
+       if(p.isUnpacking()) {
+         data = new double[len];
+         Alibrary *myfellow = AlibraryProxy(thisIndex).ckLocal();
+         myfellow->set_ptr(data); // refresh data in bound array
+       }
+       p(data, len);
      }
    private:
-     CProxy_Alibrary  AlibraryProxy;   // proxy to my bound array
-     double *data;          // user allocated data pointer
+     CProxy_Alibrary AlibraryProxy; // proxy to my bound array
+     double *data; // user allocated data pointer
      int len;
    };
 
@@ -5839,31 +6236,31 @@ at any time. Array elements need not be contiguous.
 If using insert to create all the elements of the array, you must call
 CProxy_Array::doneInserting before using the array.
 
-::
+.. code-block:: c++
 
-   //In the .C file:
+   // In the .C file:
    int x,y,z;
-   CProxy_A1 a1=CProxy_A1::ckNew();  //Creates a new, empty 1D array
+   CProxy_A1 a1=CProxy_A1::ckNew(); // Creates a new, empty 1D array
    for (x=...) {
-      a1[x  ].insert(parameters);  //Bracket syntax
-      a1(x+1).insert(parameters);  // or equivalent parenthesis syntax
+      a1[x  ].insert(parameters); // Bracket syntax
+      a1(x+1).insert(parameters); // or equivalent parenthesis syntax
    }
    a1.doneInserting();
 
-   CProxy_A2 a2=CProxy_A2::ckNew();   //Creates 2D array
+   CProxy_A2 a2=CProxy_A2::ckNew(); // Creates 2D array
    for (x=...) for (y=...)
-      a2(x,y).insert(parameters);  //Can't use brackets!
+      a2(x,y).insert(parameters); // Can't use brackets!
    a2.doneInserting();
 
-   CProxy_A3 a3=CProxy_A3::ckNew();   //Creates 3D array
+   CProxy_A3 a3=CProxy_A3::ckNew(); // Creates 3D array
    for (x=...) for (y=...) for (z=...)
       a3(x,y,z).insert(parameters);
    a3.doneInserting();
 
-   CProxy_AF aF=CProxy_AF::ckNew();   //Creates user-defined index array
+   CProxy_AF aF=CProxy_AF::ckNew(); // Creates user-defined index array
    for (...) {
-      aF[CkArrayIndexFoo(...)].insert(parameters); //Use brackets...
-      aF(CkArrayIndexFoo(...)).insert(parameters); //  ...or parenthesis
+      aF[CkArrayIndexFoo(...)].insert(parameters); // Use brackets...
+      aF(CkArrayIndexFoo(...)).insert(parameters); // ...or parenthesis
    }
    aF.doneInserting();
 
@@ -5902,7 +6299,7 @@ constructor, which must exist and be listed in the .ci file. A single
 array can have a mix of demand-creation and classic entry methods; and
 demand-created and normally created elements.
 
-A simple example of demand creation ``tests/charm++/demand_creation``
+A simple example of demand creation ``tests/charm++/demand_creation``.
 
 .. _asynchronous_array_creation:
 
@@ -5915,12 +6312,12 @@ restriction and let the array creation be made from any PE. To do this,
 CkCallback must be given as an argument for ckNew to provide the created
 chare array’s CkArrayID to the callback function.
 
-::
+.. code-block:: c++
 
    CProxy_SomeProxy::ckNew(parameters, nElements, CkCallback(CkIndex_MyClass::someFunction(NULL), thisProxy));
 
    void someFunction(CkArrayCreatedMsg *m) {
-       CProxy_AnotherProxy(m->aid)[index].myFunction();    // m->aid is CkArrayID
+       CProxy_AnotherProxy(m->aid)[index].myFunction(); // m->aid is CkArrayID
        delete m;
    }
 
@@ -5932,15 +6329,14 @@ default constructor is expected to be used.
 Alternatively, CkArrayOptions can be used in place of nElements to
 further configure array characteristics.
 
-::
+.. code-block:: c++
 
    // Creating a 3-dimensional chare array with 2 parameters
-
    CkArrayOptions options(dimX, dimY, dimZ);
    CProxy_AnotherProxy::ckNew(param1, param2, options, CkCallback(CkIndex_SomeClass::anotherFunction(NULL), thisProxy));
 
 A demonstration of asynchronous array creation can be found in
-``examples/charm++/hello/darray``
+``examples/charm++/hello/darray``.
 
 .. _user-defined array index type:
 
@@ -5948,81 +6344,76 @@ User-defined Array Indices
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Charm++ array indices are arbitrary collections of integers. To define a
-new array index, you create an ordinary C++ class which inherits from
-CkArrayIndex and sets the “nInts” member to the length, in integers, of
-the array index.
+new array index type, you create an ordinary C++ class which inherits from
+CkArrayIndex, allocates custom data in the space it has set aside for index
+data, and sets the “nInts” member to the length, in integers, of the custom
+index data.
 
 For example, if you have a structure or class named “Foo”, you can use a
 Foo object as an array index by defining the class:
 
-::
+.. code-block:: c++
 
-   #include <charm++.h>
-   class CkArrayIndexFoo:public CkArrayIndex {
-       Foo f;
-   public:
-       CkArrayIndexFoo(const Foo &in)
-       {
-           f=in;
-           nInts=sizeof(f)/sizeof(int);
-       }
-       //Not required, but convenient: cast-to-foo operators
-       operator Foo &() {return f;}
-       operator const Foo &() const {return f;}
-   };
+    // Include to inherit from CkArrayIndex
+    #include <charm++.h>
 
-Note that Foo’s size must be an integral number of integers- you must
-pad it with zero bytes if this is not the case. Also, Foo must be a
-simple class- it cannot contain pointers, have virtual functions, or
-require a destructor. Finally, there is a Charm++ configuration-time
-option called CK_ARRAYINDEX_MAXLEN which is the largest allowable number
-of integers in an array index. The default is 3; but you may override
-this to any value by passing “-DCK_ARRAYINDEX_MAXLEN=n” to the
-Charm++ build script as well as all user code. Larger values will
-increase the size of each message.
+    class CkArrayIndexFoo : public CkArrayIndex {
+    private:
+      Foo* f;
+    public:
+      CkArrayIndexFoo(const Foo &in) {
+        f = new (index) Foo(in);
+        nInts = sizeof(Foo)/sizeof(int);
+      }
+    };
+
+Note that Foo must be allocated using placement new pointing to the "index"
+member of CkArrayIndex. Furthermore, its size must be an integral number of
+integers- you must pad it with zero bytes if this is not the case. Also, Foo
+must be a simple class- it cannot contain pointers, have virtual functions, or
+require a destructor. Finally, there is a Charm++ configuration-time option
+called CK_ARRAYINDEX_MAXLEN which is the largest allowable number of integers
+in an array index. The default is 3; but you may override this to any value by
+passing “-DCK_ARRAYINDEX_MAXLEN=n” to the Charm++ build script as well as all
+user code. Larger values will increase the size of each message.
 
 You can then declare an array indexed by Foo objects with
 
-::
+.. code-block:: charmci
 
-   //in the .ci file:
-   array [Foo] AF { entry AF(); ... }
+    // in the .ci file:
+    array [Foo] AF { entry AF(); ... }
 
-   //in the .h file:
-   class AF : public CBase_AF
-   { public: AF() {} ... }
+    // in the .h file:
+    class AF : public CBase_AF
+    { public: AF() {} ... }
 
-   //in the .C file:
-       Foo f;
-       CProxy_AF a=CProxy_AF::ckNew();
-       a[CkArrayIndexFoo(f)].insert();
-       ...
+    // in the .C file:
+    Foo f;
+    CProxy_AF a=CProxy_AF::ckNew();
+    a[CkArrayIndexFoo(f)].insert();
+    ...
 
 Note that since our CkArrayIndexFoo constructor is not declared with the
 explicit keyword, we can equivalently write the last line as:
 
-::
+.. code-block:: c++
 
-       a[f].insert();
+    a[f].insert();
 
-When you implement your array element class, as shown above you can
-inherit from CBase_ClassName, a class templated by the index type Foo.
-In the old syntax, you could also inherit directly from ArrayElementT.
-The array index (an object of type Foo) is then accessible as
-“thisIndex”. For example:
+The array index (an object of type Foo) is then accessible as “thisIndex”. For
+example:
 
-::
+.. code-block:: c++
 
-
-   //in the .C file:
-   AF::AF()
-   {
-       Foo myF=thisIndex;
-       functionTakingFoo(myF);
-   }
+    // in the .C file:
+    AF::AF() {
+      Foo myF=thisIndex;
+      functionTakingFoo(myF);
+    }
 
 A demonstration of user defined indices can be seen in
-``examples/charm++/hello/fancyarray``
+``examples/charm++/hello/fancyarray``.
 
 .. _array section:
 
@@ -6036,7 +6427,7 @@ Charm++ also supports sections which are a subset of elements of
 multiple chare arrays/groups of the same type (see
 :numref:`cross array section`).
 
-Multicast operations, a broadcast to all members of a section, are
+Multicast operations (a broadcast to all members of a section) are
 directly supported by the section proxy. For array sections, multicast
 operations by default use optimized spanning trees via the CkMulticast
 library in Charm++. For group sections, multicast operations by default
@@ -6046,8 +6437,8 @@ group sections need to be manually delegated to CkMulticast (see
 arrays and group sections via the CkMulticast library.
 
 Array and group sections work in mostly the same way. Check
-examples/charm++/groupsection for a group section example and
-examples/charm++/arraysection for an array section example.
+``examples/charm++/groupsection`` for a group section example and
+``examples/charm++/arraysection`` for an array section example.
 
 .. _section creation:
 
@@ -6064,7 +6455,7 @@ ckNew() function of the CProxySection. The user will need to provide
 array indexes of all the array section members through either explicit
 enumeration, or an index range expression. For example, for a 3D array:
 
-::
+.. code-block:: c++
 
      std::vector<CkArrayIndex3D> elems;  // add array indices
      for (int i=0; i<10; i++)
@@ -6076,7 +6467,7 @@ enumeration, or an index range expression. For example, for a 3D array:
 Alternatively, one can do the same thing by providing the index range
 [lbound:ubound:stride] for each dimension:
 
-::
+.. code-block:: c++
 
      CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, 0, 9, 1, 0, 19, 2, 0, 29, 2);
 
@@ -6087,7 +6478,7 @@ For user-defined array index other than CkArrayIndex1D to
 CkArrayIndex6D, one needs to use the generic array index type:
 CkArrayIndex.
 
-::
+.. code-block:: c++
 
      std::vector<CkArrayIndex> elems;  // add array indices
      CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems);
@@ -6097,22 +6488,24 @@ Group sections
 
 Group sections are created in the same way as array sections. A group
 “A” will have an associated “CProxySection_A” type which is used to
-create a section and obtain a proxy. In this case, ckNew() will receive
+create a section and obtain a proxy. In this case, ``ckNew()`` will receive
 the list of PE IDs which will form the section. See
-examples/charm++/groupsection for an example.
+``examples/charm++/groupsection`` for an example.
 
-It is important to note that Charm++ does not automatically delegate
-group sections to the internal CkMulticast library, and instead defaults
-to a point-to-point implementation of multicasts. To use CkMulticast
-with group sections, the user must manually delegate after invoking
-group creation. See :numref:`Manual Delegation` for information on how
-to do this.
+.. important::
+    It is important to note that Charm++ does not automatically delegate
+    group sections to the internal CkMulticast library, and instead defaults
+    to a point-to-point implementation of multicasts. To use CkMulticast
+    with group sections, the user must manually delegate after invoking
+    group creation. See :numref:`Manual Delegation` for information on how
+    to do this.
 
 Creation order restrictions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Important: Array sections should be created in post-constructor entry
-methods to avoid race conditions.
+.. attention::
+    Array sections should be created in post-constructor entry
+    methods to avoid race conditions.
 
 If the user wants to invoke section creation from a group, special care
 must be taken that the collection for which we are creating a section
@@ -6137,12 +6530,12 @@ Section Multicasts
 Once the proxy is obtained at section creation time, the user can
 broadcast to all the section members, like this:
 
-::
+.. code-block:: c++
 
      CProxySection_Hello proxy;
-     proxy.someEntry(...)          // section broadcast
+     proxy.someEntry(...); // section broadcast
 
-See examples/charm++/arraysection for examples on how sections are used.
+See ``examples/charm++/arraysection`` for examples on how sections are used.
 
 You can send the section proxy in a message to another processor, and
 still safely invoke the entry functions on the section proxy.
@@ -6160,22 +6553,24 @@ By default, CkMulticast builds a spanning tree for multicast/reduction
 with a factor of 2 (binary tree). One can specify a different branching
 factor when creating the section.
 
-::
+.. code-block:: c++
 
      CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(..., 3); // factor is 3
 
-Note, to use CkMulticast library, all multicast messages must inherit
-from CkMcastBaseMsg, as the following example shows. Note that
-CkMcastBaseMsg must come first, this is IMPORTANT for CkMulticast
-library to retrieve section information out of the message.
+Note that, to use CkMulticast library, all multicast messages must inherit
+from CkMcastBaseMsg, as the following example shows.
 
-::
+.. code-block:: c++
 
    class HiMsg : public CkMcastBaseMsg, public CMessage_HiMsg
    {
    public:
      int *data;
    };
+
+.. attention::
+    CkMcastBaseMsg must come first, this is important for CkMulticast
+    library to retrieve section information from the message.
 
 Due to this restriction, when using CkMulticast you must define messages
 explicitly for multicast entry functions and no parameter marshalling
@@ -6192,20 +6587,20 @@ default case for array sections), or manually for group sections.
 Since an array element can be a member of multiple array sections, it is
 necessary to disambiguate between which array section reduction it is
 participating in each time it contributes to one. For this purpose, a
-data structure called “CkSectionInfo” is created by CkMulticast library
+data structure called ``CkSectionInfo`` is created by CkMulticast library
 for each array section that the array element belongs to. During a
 section reduction, the array element must pass the CkSectionInfo as a
-parameter in the contribute(). The CkSectionInfo for a section can be
+parameter in the ``contribute()``. The CkSectionInfo for a section can be
 retrieved from a message in a multicast entry point using function call
-CkGetSectionInfo:
+``CkGetSectionInfo()``:
 
-::
+.. code-block:: c++
 
      CkSectionInfo cookie;
 
      void SayHi(HiMsg *msg)
      {
-       CkGetSectionInfo(cookie, msg);     // update section cookie every time
+       CkGetSectionInfo(cookie, msg); // update section cookie every time
        int data = thisIndex;
        CProxySection_Hello::contribute(sizeof(int), &data, CkReduction::sum_int, cookie, cb);
      }
@@ -6226,7 +6621,7 @@ use.
 
 See the following example:
 
-::
+.. code-block:: c++
 
        CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL),thisProxy);
        CProxySection_Hello::contribute(sizeof(int), &data, CkReduction::sum_int, cookie, cb);
@@ -6235,15 +6630,15 @@ As in an array reduction, users can use built-in reduction types
 (Section :numref:`builtin_reduction`) or define his/her own reducer
 functions (Section :numref:`new_type_reduction`).
 
-Section Operations and Migration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Section Operations with Migrating Elements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When using a section reduction, you don’t need to worry about migrations
 of array elements. When migration happens, an array element in the array
 section can still use the CkSectionInfo it stored previously for doing a
 reduction. Reduction messages will be correctly delivered but may not be
 as efficient until a new multicast spanning tree is rebuilt internally
-in the CkMulticastMgr library. When a new spanning tree is rebuilt, an
+in the CkMulticast library. When a new spanning tree is rebuilt, an
 updated CkSectionInfo is passed along with a multicast message, so it is
 recommended that CkGetSectionInfo() function is always called when a
 multicast message arrives (as shown in the above SayHi example).
@@ -6255,14 +6650,15 @@ not optimized after multicast root migrated.” In the current
 implementation, the user needs to initiate the rebuilding process using
 resetSection.
 
-::
+.. code-block:: c++
 
    void Foo::pup(PUP::er & p) {
        // if I am multicast root and it is unpacking
       if (ismcastroot && p.isUnpacking()) {
-         CProxySection_Foo   fooProxy;    // proxy for the section
+         CProxySection_Foo fooProxy; // proxy for the section
          fooProxy.resetSection(fooProxy);
-           // you may want to reset reduction client to root
+
+         // you may want to reset reduction client to root
          CkCallback *cb = new CkCallback(...);
       }
    }
@@ -6287,33 +6683,31 @@ characteristics.
 
 Given three arrays declared thusly:
 
-::
+.. code-block:: c++
 
-   	  std::vector<CkArrayID> aidArr(3);
-   	  for (int i=0; i<3; i++)
-   	    {
-   	      CProxy_multisectiontest_array1d Aproxy = CProxy_multisectiontest_array1d::ckNew(masterproxy.ckGetGroupID(), ArraySize);
-   	      aidArr[i] = Aproxy.ckGetArrayID();
-   	    }
+  std::vector<CkArrayID> aidArr(3);
+  for (int i=0; i<3; i++) {
+    CProxy_multisectiontest_array1d Aproxy = CProxy_multisectiontest_array1d::ckNew(masterproxy.ckGetGroupID(), ArraySize);
+    aidArr[i] = Aproxy.ckGetArrayID();
+  }
 
 One can make a section including the lower half elements of all three
 arrays as follows:
 
-::
+.. code-block:: c++
 
-   	  int aboundary = ArraySize/2;
-   	  int afloor = aboundary;
-   	  int aceiling = ArraySize-1;
-   	  int asectionSize = aceiling-afloor+1;
-   	  // cross section lower half of each array
-   	  std::vector<std::vector<CkArrayIndex> > aelems(3);
-   	  for (int k=0; k<3; k++)
-   	    {
-   	      aelems[k].resize(asectionSize);
-   	      for (int i=afloor,j=0; i<=aceiling; i++,j++)
-   	        aelems[k][j] = CkArrayIndex1D(i);
-   	    }
-   	  CProxySection_multisectiontest_array1d arrayLowProxy(aidArr, aelems);
+  int aboundary = ArraySize/2;
+  int afloor = aboundary;
+  int aceiling = ArraySize-1;
+  int asectionSize = aceiling-afloor+1;
+  // cross section lower half of each array
+  std::vector<std::vector<CkArrayIndex> > aelems(3);
+  for (int k=0; k<3; k++) {
+    aelems[k].resize(asectionSize);
+    for (int i=afloor,j=0; i<=aceiling; i++,j++)
+      aelems[k][j] = CkArrayIndex1D(i);
+  }
+  CProxySection_multisectiontest_array1d arrayLowProxy(aidArr, aelems);
 
 The resulting cross section proxy, as in the example arrayLowProxy, can
 then be used for multicasts in the same way as a normal array section.
@@ -6335,11 +6729,11 @@ to delegate [13]_ sections to custom libraries (called delegation
 managers). Note that group sections are not automatically delegated to
 CkMulticast and hence must be manually delegated to this library to
 benefit from the optimized multicast tree implementation. This is
-explained in this section, and see examples/charm++/groupsection for an
+explained here, and see ``examples/charm++/groupsection`` for an
 example.
 
 While creating a chare array one can set the auto delegation flag to
-false in CkArrayOptions and the runtime system will not use the default
+``false`` in CkArrayOptions and the runtime system will not use the default
 CkMulticast library. A CkMulticastMgr (or any other delegation manager)
 group can then be created by the user, and any section delegated to it.
 
@@ -6349,7 +6743,7 @@ in an application. In the following we show a manual delegation example
 using CkMulticast (the same can be applied to custom delegation
 managers):
 
-::
+.. code-block:: c++
 
      CkArrayOptions opts(...);
      opts.setSectionAutoDelegate(false); // manual delegation
@@ -6358,27 +6752,27 @@ managers):
      CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew();
      CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
-     sectProxy.ckSectionDelegate(mCastGrp);  // initialize section proxy
+     sectProxy.ckSectionDelegate(mCastGrp); // initialize section proxy
 
-     sectProxy.someEntry(...)           // multicast via delegation library as before
+     sectProxy.someEntry(...); // multicast via delegation library as before
 
 One can also set the default branching factor when creating a
 CkMulticastMgr group. Sections created via this manager will use the
-specified branching factor for their multicast tree. For example,
+specified branching factor for their multicast tree. For example:
 
-::
+.. code-block:: c++
 
-     CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew(3);   // factor is 3
+     CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew(3); // factor is 3
 
 Contributing using a custom CkMulticastMgr group:
 
-::
+.. code-block:: c++
 
      CkSectionInfo cookie;
 
      void SayHi(HiMsg *msg)
      {
-       CkGetSectionInfo(cookie, msg);     // update section cookie every time
+       CkGetSectionInfo(cookie, msg); // update section cookie every time
        int data = thisIndex;
        CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL),thisProxy);
        mcastGrp->contribute(sizeof(int), &data, CkReduction::sum_int, cookie, cb);
@@ -6387,7 +6781,7 @@ Contributing using a custom CkMulticastMgr group:
 Setting default reduction client for a section when using manual
 delegation:
 
-::
+.. code-block:: c++
 
      CProxySection_Hello sectProxy;
      CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
@@ -6395,19 +6789,20 @@ delegation:
 
 Writing the pup method:
 
-::
+.. code-block:: c++
 
-   void Foo::pup(PUP::er & p) {
-       // if I am multicast root and it is unpacking
+    void Foo::pup(PUP::er & p) {
+      // if I am multicast root and it is unpacking
       if (ismcastroot && p.isUnpacking()) {
-         CProxySection_Foo   fooProxy;    // proxy for the section
-         CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-         mg->resetSection(fooProxy);
-           // you may want to reset reduction client to root
-         CkCallback *cb = new CkCallback(...);
-         mg->setReductionClient(mcp, cb);
+        CProxySection_Foo fooProxy; // proxy for the section
+        CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+        mg->resetSection(fooProxy);
+
+        // you may want to reset reduction client to root
+        CkCallback *cb = new CkCallback(...);
+        mg->setReductionClient(mcp, cb);
       }
-   }
+    }
 
 .. _inheritance:
 
@@ -6427,7 +6822,7 @@ BaseChare, then the derived chare of type DerivedChare needs to be
 declared in the Charm++ interface file to be explicitly derived from
 BaseChare. Thus, the constructs in the ``.ci`` file should look like:
 
-::
+.. code-block:: charmci
 
      chare BaseChare {
        entry BaseChare(someMessage *);
@@ -6449,7 +6844,7 @@ to remotely invoke only public methods.
 
 The class definitions of these chares should look like:
 
-::
+.. code-block:: c++
 
      class BaseChare : public CBase_BaseChare {
        // private or protected data
@@ -6468,7 +6863,7 @@ It is possible to create a derived chare, and invoke methods of base
 chare from it, or to assign a derived chare proxy to a base chare proxy
 as shown below:
 
-::
+.. code-block:: c++
 
      ...
      otherMessage *msg = new otherMessage();
@@ -6485,7 +6880,7 @@ DerivedChare::DerivedChare(someMessage*) to
 BaseChare::BaseChare(someMessage*), they can be forwarded through the
 CBase type constructor as follows:
 
-::
+.. code-block:: c++
 
    DerivedChare::DerivedChare(someMessage *msg)
    : CBase_DerivedChare(msg) // Will forward all arguments to BaseChare::BaseChare
@@ -6507,22 +6902,22 @@ Inheritance for Messages
 Messages cannot inherit from other messages. A message can, however,
 inherit from a regular C++ class. For example:
 
-::
+.. code-block:: charmci
 
-   //In the .ci file:
-     message BaseMessage1;
-     message BaseMessage2;
+    // In the .ci file:
+    message BaseMessage1;
+    message BaseMessage2;
 
-   //In the .h file:
-     class Base {
-       // ...
-     };
-     class BaseMessage1 : public Base, public CMessage_BaseMessage1 {
-       // ...
-     };
-     class BaseMessage2 : public Base, public CMessage_BaseMessage2 {
-       // ...
-     };
+    // In the .h file:
+    class Base {
+      // ...
+    };
+    class BaseMessage1 : public Base, public CMessage_BaseMessage1 {
+      // ...
+    };
+    class BaseMessage2 : public Base, public CMessage_BaseMessage2 {
+      // ...
+    };
 
 Messages cannot contain virtual methods or virtual base classes unless
 you use a packed message. Parameter marshalling has complete support for
@@ -6556,7 +6951,7 @@ described below.
 
 A message template might be declared as follows:
 
-::
+.. code-block:: charmci
 
    module A {
      template <class DType, int N=3>
@@ -6568,7 +6963,7 @@ Note that default template parameters are supported.
 If one wished to include variable-length arrays in a message template,
 those can be accomodated as well:
 
-::
+.. code-block:: c++
 
    module B {
      template <class DType>
@@ -6580,7 +6975,7 @@ those can be accomodated as well:
 Similarly, chare class templates (for various kinds of chares) would be
 written:
 
-::
+.. code-block:: c++
 
    module C {
      template <typename T>
@@ -6609,7 +7004,7 @@ written:
 
 Entry method templates are declared like so:
 
-::
+.. code-block:: c++
 
    module D {
        array [1D] libArray {
@@ -6623,10 +7018,10 @@ The definition of templated Charm++ entities works almost identically to
 the definition of non-template entities, with the addition of the
 expected template signature:
 
-::
+.. code-block:: c++
 
    // A.h
-   #include ``A.decl.h''
+   #include "A.decl.h"
 
    template <class DType, int N=3>
    struct TMessage : public CMessage_TMessage<DType, N> {
@@ -6634,7 +7029,7 @@ expected template signature:
    };
 
    #define CK_TEMPLATES_ONLY
-   #include ``A.def.h''
+   #include "A.def.h"
    #undef CK_TEMPLATES_ONLY
 
 The distinguishing change is the additional requirement to include parts
@@ -6657,7 +7052,7 @@ instantiation is desired.
 For the message and chare templates described above, a few
 instantiations might look like
 
-::
+.. code-block:: charmci
 
    module D {
      extern module A;
@@ -6675,7 +7070,7 @@ because they must specify the chare class containing them. The template
 arguments are also specified directly in the method’s parameters, rather
 than as distinct template arguments.
 
-::
+.. code-block:: charmci
 
    module E {
      extern module D;
@@ -6688,7 +7083,7 @@ To enable generic programming using Charm++ entities, we define a number
 of type trait utilities. These can be used to determine at compile-time
 if a type is a certain kind of Charm++ type:
 
-::
+.. code-block:: c++
 
    #include "charm++_type_traits.h"
 
@@ -6732,24 +7127,24 @@ as an additional parameter to contribute. It is an error for chare array
 elements to specify different callbacks to the same reduction
 contribution.
 
-::
+.. code-block:: c++
 
        double forces[2]=get_my_forces();
-       // When done, broadcast the CkReductionMsg to ``myReductionEntry''
+       // When done, broadcast the CkReductionMsg to "myReductionEntry"
        CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL), thisProxy);
        contribute(2*sizeof(double), forces,CkReduction::sum_double, cb);
 
 In the case of the reduced version used for synchronization purposes,
 the callback parameter will be the only input parameter:
 
-::
+.. code-block:: c++
 
        CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL), thisProxy);
        contribute(cb);
 
 and the corresponding callback function:
 
-::
+.. code-block:: c++
 
    void myReductionEntry(CkReductionMsg *msg)
    {
@@ -6769,10 +7164,10 @@ and the corresponding callback function:
 example).
 
 If the target of a reduction is an entry method defined by a *when*
-clause in SDAG(Section :numref:`sec:sdag`), one may wish to set a
+clause in SDAG (Section :numref:`sec:sdag`), one may wish to set a
 reference number (or tag) that SDAG can use to match the resulting
 reduction message. To set the tag on a reduction message, call the
-CkCallback::setRefNum(CMK_REFNUM_TYPE refnum) method on the callback
+``CkCallback::setRefNum(CMK_REFNUM_TYPE refnum)`` method on the callback
 passed to the ``contribute()`` call.
 
 .. _new_type_reduction:
@@ -6793,23 +7188,23 @@ CkReductionMsg::buildNew(int nBytes,const void \*data) method.
 
 Thus every reduction function has the prototype:
 
-::
+.. code-block:: c++
 
    CkReductionMsg *reductionFn(int nMsg,CkReductionMsg **msgs);
 
 For example, a reduction function to add up contributions consisting of
 two machine ``short int``\ s would be:
 
-::
+.. code-block:: c++
 
    CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
    {
-     //Sum starts off at zero
+     // Sum starts off at zero
      short ret[2]={0,0};
      for (int i=0;i<nMsg;i++) {
-       //Sanity check:
+       // Sanity check:
        CkAssert(msgs[i]->getSize()==2*sizeof(short));
-       //Extract this message's data
+       // Extract this message's data
        short *m=(short *)msgs[i]->getData();
        ret[0]+=m[0];
        ret[1]+=m[1];
@@ -6831,21 +7226,21 @@ every node, you can safely store the CkReduction::reducerType in a
 global or class-static variable. For the example above, the reduction
 function is registered and used in the following manner:
 
-::
+.. code-block:: charmci
 
-   //In the .ci file:
-     initnode void registerSumTwoShorts(void);
+   // In the .ci file:
+   initnode void registerSumTwoShorts(void);
 
-   //In some .C file:
+   // In some .C file:
    /*global*/ CkReduction::reducerType sumTwoShortsType;
    /*initnode*/ void registerSumTwoShorts(void)
    {
      sumTwoShortsType=CkReduction::addReducer(sumTwoShorts);
    }
 
-   //In some member function, contribute data to the customized reduction:
-     short data[2]=...;
-     contribute(2*sizeof(short),data,sumTwoShortsType);
+   // In some member function, contribute data to the customized reduction:
+   short data[2]=...;
+   contribute(2*sizeof(short),data,sumTwoShortsType);
 
 | Note that typed reductions briefed in Section :numref:`reductions`
   can also be used for custom reductions. The target reduction client
@@ -6873,16 +7268,16 @@ own custom streamable reducers by reusing the message memory of the
 zeroth message in their reducer function by passing it as the last
 argument to CkReduction::buildNew:
 
-::
+.. code-block:: c++
 
    CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
    {
      // reuse msgs[0]'s memory:
      short *retData = (short*)msgs[0]->getData();
      for (int i=1;i<nMsg;i++) {
-       //Sanity check:
+       // Sanity check:
        CkAssert(msgs[i]->getSize()==2*sizeof(short));
-       //Extract this message's data
+       // Extract this message's data
        short *m=(short *)msgs[i]->getData();
        retData[0]+=m[0];
        retData[1]+=m[1];
@@ -6898,7 +7293,7 @@ when calling CkReduction::addReducer by specifying an optional boolean
 parameter (default is false). They can also provide a name string for
 their reducer to aid in debugging (default is NULL).
 
-::
+.. code-block:: c++
 
    static void initNodeFn(void) {
        sumTwoShorts = CkReduction::addReducer(sumTwoShorts, /* streamable = */ true, /* name = */ "sumTwoShorts");
@@ -6908,11 +7303,11 @@ Serializing Complex Types
 -------------------------
 
 This section describes advanced functionality in the PUP framework. The
-first subsections describes features supporting complex objects, with
+first subsections describe features supporting complex objects, with
 multiple levels of inheritance, or with dynamic changes in heap usage.
 The latter subsections describe additional language bindings, and
 features supporting PUP modes which can be used to copy object state
-from and to long term storage for checkpointing, or other application
+from and to long-term storage for checkpointing, or other application
 level purposes.
 
 .. _sec:pupdynalloc:
@@ -6920,20 +7315,20 @@ level purposes.
 Dynamic Allocation
 ~~~~~~~~~~~~~~~~~~
 
-If your class has fields that are dynamically allocated, when unpacking
-these need to be allocated (in the usual way) before you pup them.
+If your class has fields that are dynamically allocated, when unpacking,
+these need to be allocated in the usual way before you pup them.
 Deallocation should be left to the class destructor as usual.
 
 No allocation
 ^^^^^^^^^^^^^
 
-The simplest case is when there is no dynamic allocation.
+The simplest case is when there is no dynamic allocation. Example:
 
-::
+.. code-block:: c++
 
    class keepsFoo : public mySuperclass {
    private:
-       foo f; /* simple foo object*/
+       foo f; /* simple foo object */
    public:
        keepsFoo(void) { }
        void pup(PUP::er &p) {
@@ -6950,11 +7345,11 @@ The next simplest case is when we contain a class that is always
 allocated during our constructor, and deallocated during our destructor.
 Then no allocation is needed within the pup routine.
 
-::
+.. code-block:: c++
 
    class keepsHeapFoo : public mySuperclass {
    private:
-       foo *f; /*Heap-allocated foo object*/
+       foo *f; /* Heap-allocated foo object */
    public:
        keepsHeapFoo(void) {
          f=new foo;
@@ -6963,7 +7358,7 @@ Then no allocation is needed within the pup routine.
          mySuperclass::pup(p);
          p|*f; // pup f's fields (calls f->pup(p))
        }
-       ~keepsHeapFoo() {delete f;}
+       ~keepsHeapFoo() { delete f; }
    };
 
 Allocation during pup
@@ -6971,24 +7366,24 @@ Allocation during pup
 
 If we need values obtained during the pup routine before we can allocate
 the class, we must allocate the class inside the pup routine. Be sure to
-protect the allocation with “if (p.isUnpacking())”.
+protect the allocation with ``if (p.isUnpacking())``.
 
-::
+.. code-block:: c++
 
    class keepsOneFoo : public mySuperclass {
    private:
-       foo *f; /*Heap-allocated foo object*/
+       foo *f; /* Heap-allocated foo object */
    public:
-       keepsOneFoo(...) {f=new foo(...);}
-       keepsOneFoo() {f=NULL;} /* pup constructor */
+       keepsOneFoo(...) { f=new foo(...); }
+       keepsOneFoo() { f=NULL; } /* pup constructor */
        void pup(PUP::er &p) {
          mySuperclass::pup(p);
-         ...
+         // ...
          if (p.isUnpacking()) /* must allocate foo now */
             f=new foo(...);
-         p|*f;//pup f's fields
+         p|*f; // pup f's fields
        }
-       ~keepsOneFoo() {delete f;}
+       ~keepsOneFoo() { delete f; }
    };
 
 Allocatable array
@@ -7000,12 +7395,12 @@ pup the array length, do our allocation, and then pup the array data. We
 could allocate memory using malloc/free or other allocators in exactly
 the same way.
 
-::
+.. code-block:: c++
 
    class keepsDoubles : public mySuperclass {
    private:
        int n;
-       double *arr;/*new'd array of n doubles*/
+       double *arr; /* new'd array of n doubles */
    public:
        keepsDoubles(int n_) {
          n=n_;
@@ -7015,32 +7410,32 @@ the same way.
 
        void pup(PUP::er &p) {
          mySuperclass::pup(p);
-         p|n;//pup the array length n
-         if (p.isUnpacking())  arr=new double[n];
-         PUParray(p,arr,n); //pup data in the array
+         p|n; // pup the array length n
+         if (p.isUnpacking()) arr=new double[n];
+         PUParray(p,arr,n); // pup data in the array
        }
 
-       ~keepsDoubles() {delete[] arr;}
+       ~keepsDoubles() { delete[] arr; }
    };
 
 NULL object pointer
 ^^^^^^^^^^^^^^^^^^^
 
-If our allocated object may be NULL, our allocation becomes much more
+If our allocated object may be ``NULL``, our allocation becomes much more
 complicated. We must first check and pup a flag to indicate whether the
 object exists, then depending on the flag, pup the object.
 
-::
+.. code-block:: c++
 
    class keepsNullFoo : public mySuperclass {
    private:
        foo *f; /*Heap-allocated foo object, or NULL*/
    public:
-       keepsNullFoo(...) { if (...) f=new foo(...);}
-       keepsNullFoo() {f=NULL;}
+       keepsNullFoo(...) { if (...) f=new foo(...); }
+       keepsNullFoo() { f=NULL; }
        void pup(PUP::er &p) {
          mySuperclass::pup(p);
-         int has_f=(f!=NULL);
+         int has_f = (f!=NULL);
          p|has_f;
          if (has_f) {
            if (p.isUnpacking()) f=new foo;
@@ -7049,7 +7444,7 @@ object exists, then depending on the flag, pup the object.
            f=NULL;
          }
        }
-       ~keepsNullFoo() {delete f;}
+       ~keepsNullFoo() { delete f; }
    };
 
 This sort of code is normally much longer and more error-prone if split
@@ -7059,15 +7454,15 @@ Array of classes
 ^^^^^^^^^^^^^^^^
 
 An array of actual classes can be treated exactly the same way as an
-array of basic types. PUParray will pup each element of the array
+array of basic types. ``PUParray`` will pup each element of the array
 properly, calling the appropriate ``operator|``.
 
-::
+.. code-block:: c++
 
    class keepsFoos : public mySuperclass {
    private:
        int n;
-       foo *arr;/*new'd array of n foos*/
+       foo *arr; /* new'd array of n foos */
    public:
        keepsFoos(int n_) {
          n=n_;
@@ -7077,55 +7472,55 @@ properly, calling the appropriate ``operator|``.
 
        void pup(PUP::er &p) {
          mySuperclass::pup(p);
-         p|n;//pup the array length n
+         p|n; // pup the array length n
          if (p.isUnpacking())  arr=new foo[n];
-         PUParray(p,arr,n); //pup each foo in the array
+         PUParray(p,arr,n); // pup each foo in the array
        }
 
-       ~keepsFoos() {delete[] arr;}
+       ~keepsFoos() { delete[] arr; }
    };
 
 Array of pointers to classes
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 An array of pointers to classes must handle each element separately,
-since the PUParray routine does not work with pointers. An “allocate”
+since the PUParray routine does not work with pointers. An "allocate"
 routine to set up the array could simplify this code. More ambitious is
-to construct a “smart pointer” class that includes a pup routine.
+to construct a "smart pointer" class that includes a pup routine.
 
-::
+.. code-block:: c++
 
    class keepsFooPtrs : public mySuperclass {
    private:
        int n;
-       foo **arr;/*new'd array of n pointer-to-foos*/
+       foo **arr; /* new'd array of n pointer-to-foos */
    public:
        keepsFooPtrs(int n_) {
          n=n_;
          arr=new foo*[n]; // allocate array
-         for (int i=0;i<n;i++) arr[i]=new foo(...); // allocate i'th foo
+         for (int i=0; i<n; i++) arr[i]=new foo(...); // allocate i'th foo
        }
        keepsFooPtrs() { arr=NULL; }
 
        void pup(PUP::er &p) {
          mySuperclass::pup(p);
-         p|n;//pup the array length n
+         p|n; // pup the array length n
          if (p.isUnpacking()) arr=new foo*[n]; // allocate array
-         for (int i=0;i<n;i++) {
+         for (int i=0; i<n; i++) {
            if (p.isUnpacking()) arr[i]=new foo(...); // allocate i'th foo
-           p|*arr[i];  //pup the i'th foo
+           p|*arr[i];  // pup the i'th foo
          }
        }
 
        ~keepsFooPtrs() {
-          for (int i=0;i<n;i++) delete arr[i];
+          for (int i=0; i<n; i++) delete arr[i];
           delete[] arr;
         }
    };
 
 Note that this will not properly handle the case where some elements of
 the array are actually subclasses of foo, with virtual methods. The
-PUP::able framework described in the next section can be helpful in this
+``PUP::able`` framework described in the next section can be helpful in this
 case.
 
 .. _sec:pup::able:
@@ -7133,85 +7528,124 @@ case.
 Subclass allocation via PUP::able
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If the class foo above might have been a subclass, instead of simply
-using new foo above we would have had to allocate an object of the
+If the class *foo* above might have been a subclass, instead of simply
+using ``new foo`` above we would have had to allocate an object of the
 appropriate subclass. Since determining the proper subclass and calling
 the appropriate constructor yourself can be difficult, the PUP framework
 provides a scheme for automatically determining and dynamically
 allocating subobjects of the appropriate type.
 
-Your superclass must inherit from PUP::able, which provides the basic
+Your superclass must inherit from ``PUP::able``, which provides the basic
 machinery used to move the class. A concrete superclass and all its
 concrete subclasses require these four features:
 
--  A line declaring PUPable className; in the .ci file. This registers
-   the class’s constructor.
+-  A line declaring ``PUPable className;`` in the .ci file. This registers
+   the class' constructor. If ``className`` is a templated class, each concrete
+   instantiation should have its own fully specified ``PUPable`` declaration in
+   the .ci file.
 
--  A call to the macro PUPable_decl(className) in the class’s
+-  A call to the macro ``PUPable_decl(className)`` in the class'
    declaration, in the header file. This adds a virtual method to your
-   class to allow PUP::able to determine your class’s type.
+   class to allow PUP::able to determine your class' type. If ``className`` is a
+   templated class, instead use ``PUPable_decl_base_template(baseClassName,
+   className)``, where ``baseClassName`` is the name of the base class. Both
+   class names should include template specifications if necessary.
 
--  A migration constructor—a constructor that takes CkMigrateMessage \*.
+-  A migration constructor — a constructor that takes ``CkMigrateMessage *``.
    This is used to create the new object on the receive side,
-   immediately before calling the new object’s pup routine.
+   immediately before calling the new object's pup routine. Users should not free
+   the CkMigrateMessage.
 
--  A working, virtual pup method. You can omit this if your class has no
+-  A working, virtual ``pup`` method. You can omit this if your class has no
    data that needs to be packed.
 
-An abstract superclass—a superclass that will never actually be
-packed—only needs to inherit from PUP::able and include a
-PUPable_abstract(className) macro in their body. For these abstract
-classes, the .ci file, PUPable_decl macro, and constructor are not
+As an added note for ``PUP::able`` classes which are templated: just as with
+templated chares, you will also need to include the .def.h surrounded by
+``CK_TEMPLATES_ONLY`` preprocessor guards in an appropriate location, as
+described in Section :numref:`templates`.
+
+An abstract superclass — a superclass that will never actually be
+packed — only needs to inherit from ``PUP::able`` and include a
+``PUPable_abstract(className)`` macro in their body. For these abstract
+classes, the .ci file, ``PUPable_decl`` macro, and constructor are not
 needed.
 
-For example, if parent is a concrete superclass and child its subclass,
+For example, if *parent* is a concrete superclass, and *child* and *tchild* are
+its subclasses:
 
-::
+.. code-block:: charmci
 
-   //In the .ci file:
-      PUPable parent;
-      PUPable child; //Could also have said ``PUPable parent, child;''
+   // --------- In the .ci file ---------
+   PUPable parent;
+   PUPable child; // Could also have said `PUPable parent, child;`
+   // One PUPable declaration per concrete intantiantion of tchild
+   PUPable tchild<int, double>;
+   PUPable tchild<char, Foo>;
 
-   //In the .h file:
+   // --------- In the .h file ---------
    class parent : public PUP::able {
-       ... data members ...
+       // ... data members ...
    public:
-       ... other methods ...
+       // ... other methods ...
        parent() {...}
 
-       //PUP::able support: decl, migration constructor, and pup
+       // PUP::able support: decl, migration constructor, and pup
        PUPable_decl(parent);
        parent(CkMigrateMessage *m) : PUP::able(m) {}
        virtual void pup(PUP::er &p) {
-           PUP::able::pup(p);//Call base class
-           ... pup data members as usual ...
+           PUP::able::pup(p); // Call base class
+           // ... pup data members as usual ...
        }
    };
+
    class child : public parent {
-       ... more data members ...
-   public:    ... more methods, possibly virtual ...
+       // ... more data members ...
+   public:
+       // ... more methods, possibly virtual ...
        child() {...}
 
-       //PUP::able support: decl, migration constructor, and pup
+       // PUP::able support: decl, migration constructor, and pup
        PUPable_decl(child);
        child(CkMigrateMessage *m) : parent(m) {}
        virtual void pup(PUP::er &p) {
-           parent::pup(p);//Call base class
+           parent::pup(p); // Call base class
            // ... pup child's data members as usual ...
        }
    };
 
-With these declarations, then, we can automatically allocate and pup a
-pointer to a parent or child using the vertical bar PUP::er syntax,
+   template <typename T1, typename T2>
+   class tchild : public parent {
+       // ... more data members ...
+   public:
+       // ... more methods, possibly virtual ...
+       tchild() { ... }
+
+       // PUP::able support for templated classes
+       // If parent were templated, we'd also include template args for parent
+       PUPable_decl_base_template(parent, tchild<T1,T2>);
+       tchild(CkMigrateMessage* m) : parent(m) {}
+       virtual void pup(PUP::er &p) {
+           parent::pup(p); // Call base class
+           // ... pup tchild's data memebers as usual ...
+       }
+   };
+
+   // Because tchild is a templated class with PUPable decls in the .ci file ...
+   #define CK_TEMPLATES_ONLY
+   #include "module_name.def.h"
+   #undef CK_TEMPLATES_ONLY
+
+With these declarations, we can automatically allocate and pup a
+pointer to a parent or child using the vertical bar ``PUP::er`` syntax,
 which on the receive side will create a new object of the appropriate
 type:
 
-::
+.. code-block:: c++
 
    class keepsParent {
-       parent *obj; //May actually point to a child class (or be NULL)
+       parent *obj; // May actually point to a child class (or be NULL)
    public:
-       ...
+       // ...
        ~keepsParent() {
            delete obj;
        }
@@ -7221,178 +7655,177 @@ type:
        }
    };
 
-This will properly pack, allocate, and unpack obj whether it is actually
+This will properly pack, allocate, and unpack ``obj`` whether it is actually
 a parent or child object. The child class can use all the usual
 C++ features, such as virtual functions and extra private data.
 
-If obj is NULL when packed, it will be restored to NULL when unpacked.
+If ``obj`` is ``NULL`` when packed, it will be restored to ``NULL`` when unpacked.
 For example, if the nodes of a binary tree are PUP::able, one may write
 a recursive pup routine for the tree quite easily:
 
-::
+.. code-block:: c++
 
-   // In the .ci file:
-       PUPable treeNode;
+   // --------- In the .ci file ---------
+   PUPable treeNode;
 
-   // In the .h file
+   // --------- In the .h file ---------
    class treeNode : public PUP::able {
-       treeNode *left;//Left subtree
-       treeNode *right;//Right subtree
-       ... other fields ...
+       treeNode *left; // Left subtree
+       treeNode *right; // Right subtree
+       // ... other fields ...
    public:
        treeNode(treeNode *l=NULL, treeNode *r=NULL);
-       ~treeNode() {delete left; delete right;}
+       ~treeNode() { delete left; delete right; }
 
        // The usual PUP::able support:
        PUPable_decl(treeNode);
-       treeNode(CkMigrateMessage *m) : PUP::able(m) { left=right=NULL; }
+       treeNode(CkMigrateMessage *m) : PUP::able(m) { left = right = NULL; }
        void pup(PUP::er &p) {
-           PUP::able::pup(p);//Call base class
+           PUP::able::pup(p); // Call base class
            p|left;
            p|right;
-           ... pup other fields as usual ...
+           // ... pup other fields as usual ...
        }
    };
 
-This same implementation will also work properly even if the tree’s
-internal nodes are actually subclasses of treeNode.
+This same implementation will also work properly even if the tree's
+internal nodes are actually subclasses of ``treeNode``.
 
-You may prefer to use the macros PUPable_def(className) and
-PUPable_reg(className) rather than using PUPable in the .ci file.
-PUPable_def provides routine definitions used by the PUP::able
+You may prefer to use the macros ``PUPable_def(className)`` and
+``PUPable_reg(className)`` rather than using ``PUPable`` in the .ci file.
+``PUPable_def`` provides routine definitions used by the PUP::able
 machinery, and should be included in exactly one source file at file
-scope. PUPable_reg registers this class with the runtime system, and
+scope. ``PUPable_reg`` registers this class with the runtime system, and
 should be executed exactly once per node during program startup.
 
-Finally, a PUP::able superclass like parent above must normally be
+Finally, a ``PUP::able`` superclass like *parent* above must normally be
 passed around via a pointer or reference, because the object might
-actually be some subclass like child. Because pointers and references
+actually be some subclass like *child*. Because pointers and references
 cannot be passed across processors, for parameter marshalling you must
-use the special templated smart pointer classes CkPointer and
-CkReference, which only need to be listed in the .ci file.
+use the special templated smart pointer classes ``CkPointer`` and
+``CkReference``, which only need to be listed in the .ci file.
 
-A CkReference is a read-only reference to a PUP::able object—it is only
-valid for the duration of the method call. A CkPointer transfers
-ownership of the unmarshalled PUP::able to the method, so the pointer
+A ``CkReference`` is a read-only reference to a ``PUP::able`` object — it is only
+valid for the duration of the method call. A ``CkPointer`` transfers
+ownership of the unmarshalled ``PUP::able`` to the method, so the pointer
 can be kept and the object used indefinitely.
 
-For example, if the entry method bar needs a PUP::able parent object for
-in-call processing, you would use a CkReference like this:
+For example, if the entry method bar needs a ``PUP::able`` parent object for
+in-call processing, you would use a ``CkReference`` like this:
 
-::
+.. code-block:: charmci
 
-   // In the .ci file:
-       entry void barRef(int x,CkReference<parent> p);
+   // --------- In the .ci file ---------
+   entry void barRef(int x, CkReference<parent> p);
 
-   // In the .h file:
-       void barRef(int x,parent &p) {
-         // can use p here, but only during this method invocation
-       }
+   // --------- In the .h file ---------
+   void barRef(int x, parent &p) {
+     // can use p here, but only during this method invocation
+   }
 
-If the entry method needs to keep its parameter, use a CkPointer like
+If the entry method needs to keep its parameter, use a ``CkPointer`` like
 this:
 
-::
+.. code-block:: charmci
 
-   // In the .ci file:
-       entry void barPtr(int x,CkPointer<parent> p);
+   // --------- In the .ci file ---------
+   entry void barPtr(int x, CkPointer<parent> p);
 
-   // In the .h file:
-       void barPtr(int x,parent *p) {
-         // can keep this pointer indefinitely, but must eventually delete it
-       }
+   // --------- In the .h file ---------
+   void barPtr(int x, parent *p) {
+     // can keep this pointer indefinitely, but must eventually delete it
+   }
 
-Both CkReference and CkPointer are read-only from the send side—unlike
+Both ``CkReference`` and ``CkPointer`` are read-only from the send side — unlike
 messages, which are consumed when sent, the same object can be passed to
 several parameter marshalled entry methods. In the example above, we
 could do:
 
-::
+.. code-block:: c++
 
-      parent *p=new child;
-      someProxy.barRef(x,*p);
-      someProxy.barPtr(x,p); // Makes a copy of p
+      parent *p = new child;
+      someProxy.barRef(x, *p);
+      someProxy.barPtr(x, p); // Makes a copy of p
       delete p; // We allocated p, so we destroy it.
 
 C and Fortran bindings
 ~~~~~~~~~~~~~~~~~~~~~~
 
-C and Fortran programmers can use a limited subset of the PUP::er
-capability. The routines all take a handle named pup_er. The routines
+C and Fortran programmers can use a limited subset of the ``PUP::er``
+capability. The routines all take a handle named ``pup_er``. The routines
 have the prototype:
 
-::
+.. code-block:: c++
 
-   void pup_type(pup_er p,type *val);
-   void pup_types(pup_er p,type *vals,int nVals);
+   void pup_type(pup_er p, type *val);
+   void pup_types(pup_er p, type *vals, int nVals);
 
 The first call is for use with a single element; the second call is for
-use with an array. The supported types are char, short, int, long,
-uchar, ushort, uint, ulong, float, and double, which all have the usual
+use with an array. The supported types are ``char``, ``short``, ``int``, ``long``,
+``uchar``, ``ushort``, ``uint``, ``ulong``, ``float``, and ``double``, which all have the usual
 C meanings.
 
 A byte-packing routine
 
-::
+.. code-block:: c++
 
-   void pup_bytes(pup_er p,void *data,int nBytes);
+   void pup_bytes(pup_er p, void *data, int nBytes);
 
 is also provided, but its use is discouraged for cross-platform puping.
 
-pup_isSizing, pup_isPacking, pup_isUnpacking, and pup_isDeleting calls
+``pup_isSizing``, ``pup_isPacking``, ``pup_isUnpacking``, and ``pup_isDeleting`` calls
 are also available. Since C and Fortran have no destructors, you should
-actually deallocate all data when passed a deleting pup_er.
+actually deallocate all data when passed a deleting ``pup_er``.
 
-C and Fortran users cannot use PUP::able objects, seeking, or write
-custom PUP::ers. Using the C++ interface is recommended.
+C and Fortran users cannot use ``PUP::able`` objects, seeking, or write
+custom ``PUP::ers``. Using the C++ interface is recommended.
 
 .. _sec:PUP:CommonPUPers:
 
 Common PUP::ers
 ~~~~~~~~~~~~~~~
 
-The most common PUP::ers used are PUP::sizer, PUP::toMem, and
-PUP::fromMem. These are sizing, packing, and unpacking PUP::ers,
+The most common *PUP::ers* used are ``PUP::sizer``, ``PUP::toMem``, and
+``PUP::fromMem``. These are sizing, packing, and unpacking PUP::ers,
 respectively.
 
-PUP::sizer simply sums up the sizes of the native binary representation
-of the objects it is passed. PUP::toMem copies the binary representation
+``PUP::sizer`` simply sums up the sizes of the native binary representation
+of the objects it is passed. ``PUP::toMem`` copies the binary representation
 of the objects passed into a preallocated contiguous memory buffer.
-PUP::fromMem copies binary data from a contiguous memory buffer into the
+``PUP::fromMem`` copies binary data from a contiguous memory buffer into the
 objects passed. All three support the size method, which returns the
 number of bytes used by the objects seen so far.
 
-Other common PUP::ers are PUP::toDisk, PUP::fromDisk, and PUP::xlater.
-The first two are simple filesystem variants of the PUP::toMem and
-PUP::fromMem classes; PUP::xlater translates binary data from an
-unpacking PUP::er into the machine’s native binary format, based on a
-machineInfo structure that describes the format used by the source
+Other common PUP::ers are ``PUP::toDisk``, ``PUP::fromDisk``, and ``PUP::xlater``.
+The first two are simple filesystem variants of the ``PUP::toMem`` and
+``PUP::fromMem`` classes; ``PUP::xlater`` translates binary data from an
+unpacking PUP::er into the machine's native binary format, based on a
+``machineInfo`` structure that describes the format used by the source
 machine.
 
-An example of PUP::toDisk is available in
-``examples/charm++/PUP/pupDisk``
+An example of ``PUP::toDisk`` is available in ``examples/charm++/PUP/pupDisk``.
 
 PUP::seekBlock
 ~~~~~~~~~~~~~~
 
 It may rarely occur that you require items to be unpacked in a different
 order than they are packed. That is, you want a seek capability.
-PUP::ers support a limited form of seeking.
+*PUP::ers* support a limited form of seeking.
 
-To begin a seek block, create a PUP::seekBlock object with your current
-PUP::er and the number of “sections” to create. Seek to a (0-based)
-section number with the seek method, and end the seeking with the
-endBlock method. For example, if we have two objects A and B, where A’s
+To begin a seek block, create a ``PUP::seekBlock`` object with your current
+``PUP::er`` and the number of "sections" to create. Seek to a (0-based)
+section number with the ``seek`` method, and end the seeking with the
+``endBlock`` method. For example, if we have two objects A and B, where A's
 pup depends on and affects some object B, we can pup the two with:
 
-::
+.. code-block:: c++
 
    void pupAB(PUP::er &p)
    {
-     ... other fields ...
-     PUP::seekBlock s(p,2); //2 seek sections
+     // ... other fields ...
+     PUP::seekBlock s(p,2); // 2 seek sections
      if (p.isUnpacking())
-     {//In this case, pup B first
+     { // In this case, pup B first
        s.seek(1);
        B.pup(p);
      }
@@ -7400,35 +7833,35 @@ pup depends on and affects some object B, we can pup the two with:
      A.pup(p,B);
 
      if (!p.isUnpacking())
-     {//In this case, pup B last
+     { // In this case, pup B last
        s.seek(1);
        B.pup(p);
      }
-     s.endBlock(); //End of seeking block
-     ... other fields ...
+     s.endBlock(); // End of seeking block
+     // ... other fields ...
    };
 
 Note that without the seek block, A’s fields would be unpacked over B’s
-memory, with disastrous consequences. The packing or sizing path must
+memory, with *disastrous* consequences. The packing or sizing path must
 traverse the seek sections in numerical order; the unpack path may
-traverse them in any order. There is currently a small fixed limit of 3
+traverse them in any order. There is currently a small fixed limit of **3**
 on the maximum number of seek sections.
 
 Writing a PUP::er
 ~~~~~~~~~~~~~~~~~
 
 System-level programmers may occasionally find it useful to define their
-own PUP::er objects. The system PUP::er class is an abstract base class
+own ``PUP::er`` objects. The system ``PUP::er`` class is an abstract base class
 that funnels all incoming pup requests to a single subroutine:
 
-::
+.. code-block:: c++
 
-       virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+       virtual void bytes(void *p, int n, size_t itemSize, dataType t);
 
 The parameters are, in order, the field address, the number of items,
 the size of each item, and the type of the items. The PUP::er is allowed
-to use these fields in any way. However, an isSizing or isPacking
-PUP::er may not modify the referenced user data; while an isUnpacking
+to use these fields in any way. However, an ``isSizing`` or ``isPacking``
+PUP::er may not modify the referenced user data; while an ``isUnpacking``
 PUP::er may not read the original values of the user data. If your
 PUP::er is not clearly packing (saving values to some format) or
 unpacking (restoring values), declare it as sizing PUP::er.
@@ -7444,16 +7877,12 @@ mapping and scheduling, which takes the form of an OS thread in SMP mode
 and an OS process in non-SMP mode. A node (specifically, a logical node)
 refers to an OS process: a set of one or more PEs that share memory
 (i.e. an address space). PEs and nodes are ranked separately starting
-from zero: PEs are ranked from 0 to *CmiNumPes()*, and nodes are ranked
-from 0 to *CmiNumNodes()*.
+from zero: PEs are ranked from ``0`` to ``CmiNumPes()``, and nodes are ranked
+from ``0`` to ``CmiNumNodes()``.
 
-Charm++ provides a unified abstraction for querying topology of IBM’s
-BG/L, BG/P and BG/Q, and Cray’s XT4, XT5 and XE6. Class TopoManager,
-which can be used by including TopoManager.h, contains following member
-functions:
-
-TopoManager():
-   Default constructor.
+Charm++ provides a unified abstraction for querying topology information of
+IBM's BG/Q and Cray's XE6. The ``TopoManager`` singleton object, which can be
+used by including ``TopoManager.h``, contains the following methods:
 
 getDimNX(), getDimNY(), getDimNZ():
    Returns the length of X, Y and Z dimensions (except BG/Q).
@@ -7462,7 +7891,7 @@ getDimNA(), getDimNB(), getDimNC(), getDimND(), getDimNE():
    Returns the length of A, B, C, D and E dimensions on BG/Q.
 
 getDimNT():
-   Returns the length of T dimension. TopoManager uses T dimension to
+   Returns the length of T dimension. TopoManager uses the T dimension to
    represent different cores that reside within a physical node.
 
 rankToCoordinates(int pe, int &x, int &y, int &z, int &t):
@@ -7484,17 +7913,17 @@ getHopsBetweenRanks(int pe1, int pe2):
 printAllocation(FILE \*fp):
    Outputs the allocation for a particular execution to the given file.
 
-For example, one can obtain rank of a processor, whose coordinates are
-known, on BG/P as well as on Cray XE6 using the following code:
+For example, one can obtain the rank of a processor, whose coordinates are
+known, on Cray XE6 using the following code:
 
-::
+.. code-block:: c++
 
-   TopoManager tmgr;
-   int rank,x,y,z,t;
+   TopoManager *tmgr = TopoManager::getTopoManager();
+   int rank, x, y, z, t;
    x = y = z = t = 2;
-   rank = tmgr.coordinatesToRank(x,y,z,t);
+   rank = tmgr->coordinatesToRank(x, y, z, t);
 
-For more examples, please refer to examples/charm++/topology.
+For more examples, please refer to ``examples/charm++/topology``.
 
 .. _physical:
 
@@ -7505,10 +7934,10 @@ The following calls provide information about the division and mapping
 of physical hardware in Charm++. A processing element (PE) is a unit of
 mapping and scheduling, which takes the form of an OS thread in SMP mode
 and an OS process in non-SMP mode. A logical node (often shortened to
-“node”) refers to an OS process: a set of one or more PEs that share
+*node*) refers to an OS process: a set of one or more PEs that share
 memory (i.e. an address space). A physical node refers to an individual
 hardware machine (or, more precisely, an operating system instance on
-which Charm++ processes execute, or, in networking terminology, a host).
+which Charm++ processes execute, or, in networking terminology, a *host*).
 
 Communication between PEs on the same logical node is faster than
 communication between different logical nodes because OS threads share
@@ -7519,32 +7948,32 @@ OS features such as POSIX shared memory and Cross Memory Attach, the
 abilities of the network interconnect in use, and the speed of network
 loopback.
 
-PEs are ranked in the range 0 to *CmiNumPes()*. Likewise, logical nodes
-are ranked from 0 to *CmiNumNodes()*, and physical nodes are ranked from
-0 to *CmiNumPhysicalNodes()*.
+PEs are ranked in the range ``0`` to ``CmiNumPes()``. Likewise, logical nodes
+are ranked from ``0`` to ``CmiNumNodes()``, and physical nodes are ranked from
+``0`` to ``CmiNumPhysicalNodes()``.
 
 Charm++ provides a set of functions for querying information about the
-mapping of PE’s to physical nodes. Class cputopology.C, contains the
-following member functions:
+mapping of PE's to physical nodes. The ``cputopology.C`` module, contains the
+following globally accessible functions:
 
 int CmiPeOnSamePhysicalNode(int pe1, int pe2)
-   Returns 1 if PE’s pe1 and pe2 are on the same physical node and 0
+   Returns 1 if PEs ``pe1`` and ``pe2`` are on the same physical node and 0
    otherwise.
 
 int CmiNumPhysicalNodes()
    Returns the number of physical nodes that the program is running on.
 
 int CmiNumPesOnPhysicalNode(int node)
-   Returns the number of PE’s that reside within a physical node.
+   Returns the number of PEs that reside within a physical node.
 
 void CmiGetPesOnPhysicalNode(int node, int \**pelist, int \*num)
-   After execution pelist will point to a list of all PE’s that reside
-   within a physical node and num will point to the length of the list.
-   One should be careful to not free or alter pelist since it points to
-   system memory.
+   After execution ``pelist`` will point to a list of all PEs that reside
+   within a physical ``node`` and ``num`` will point to the length of the list.
+   One should be careful to not free or alter ``pelist`` since it points to
+   reserved memory.
 
 int CmiPhysicalRank(int pe)
-   Returns the rank of a PE among all PE’s running on the same physical
+   Returns the rank of a PE among all PEs running on the same physical
    node.
 
 int CmiPhysicalNodeID(int pe)
@@ -7558,7 +7987,7 @@ int CmiGetFirstPeOnPhysicalNode(int node)
 Checkpoint/Restart-Based Fault Tolerance
 ----------------------------------------
 
-Charm++ offers a couple of checkpoint/restart mechanisms. Each of these
+Charm++ offers two checkpoint/restart mechanisms. Each of these
 targets a specific need in parallel programming. However, both of them
 are based on the same infrastructure.
 
@@ -7586,7 +8015,7 @@ Split Execution
 
 There are several reasons for having to split the execution of an
 application. These include protection against job failure, a single
-execution needing to run beyond a machine’s job time limit, and resuming
+execution needing to run beyond a machine's job time limit, and resuming
 execution from an intermediate point with different parameters. All of
 these scenarios are supported by a mechanism to record execution state,
 and resume execution from it later.
@@ -7605,7 +8034,7 @@ allocation time expires and then restart from the checkpoint in a
 subsequent allocation.
 
 A third reason for having a split execution is when an application
-consists in *phases* and each phase may be run a different number of
+consists of *phases* and each phase may be run a different number of
 times with varying parameters. Consider, for instance, an application
 with two phases where the first phase only has a possible configuration
 (it is run only once). The second phase may have several configuration
@@ -7613,7 +8042,7 @@ with two phases where the first phase only has a possible configuration
 complete, the application checkpoints the result. Further executions of
 the second phase may just resume from that checkpoint.
 
-An example of Charm++’s support for split execution can be seen in
+An example of Charm++'s support for split execution can be seen in
 ``tests/charm++/chkpt/hello``.
 
 .. _sec:diskcheckpoint:
@@ -7623,19 +8052,19 @@ Checkpointing
 
 The API to checkpoint the application is:
 
-::
+.. code-block:: c++
 
-     void CkStartCheckpoint(char* dirname,const CkCallback& cb);
+     void CkStartCheckpoint(char* dirname, const CkCallback& cb);
 
-The string *dirname* is the destination directory where the checkpoint
-files will be stored, and *cb* is the callback function which will be
+The string ``dirname`` is the destination directory where the checkpoint
+files will be stored, and ``cb`` is the callback function which will be
 invoked after the checkpoint is done, as well as when the restart is
 complete. Here is an example of a typical use:
 
-::
+.. code-block:: c++
 
-     . . .  CkCallback cb(CkIndex_Hello::SayHi(),helloProxy);
-     CkStartCheckpoint("log",cb);
+     /* ... */ CkCallback cb(CkIndex_Hello::SayHi(), helloProxy);
+     CkStartCheckpoint("log", cb);
 
 A chare array usually has a PUP routine for the sake of migration. The
 PUP routine is also used in the checkpointing and restarting process.
@@ -7675,9 +8104,9 @@ i.e., restarting execution from a previously-created checkpoint. The
 command line option ``+restart DIRNAME`` is required to invoke this
 mode. For example:
 
-::
+.. code-block:: bash
 
-     > ./charmrun hello +p4 +restart log
+     $ ./charmrun hello +p4 +restart log
 
 Restarting is the reverse process of checkpointing. Charm++ allows
 restarting the old checkpoint on a different number of physical
@@ -7760,24 +8189,24 @@ Checkpointing
 The function that application developers can call to record a checkpoint
 in a chare-array-based application is:
 
-::
+.. code-block:: c++
 
          void CkStartMemCheckpoint(CkCallback &cb)
 
-where *cb* has the same meaning as in
+where ``cb`` has the same meaning as in
 section :numref:`sec:diskcheckpoint`. Just like the above disk
 checkpoint described, it is up to the programmer to decide what to save.
 The programmer is responsible for choosing when to activate
 checkpointing so that the size of a global checkpoint state, and
 consequently the time to record it, is minimized.
 
-In AMPI applications, the user just needs to create an MPI_Info object
-with the key “ampi_checkpoint” and a value of either “in_memory” (for a
-double in-memory checkpoint) or “to_file=file_name” (to checkpoint to
-disk), and pass that object to the function AMPI_Migrate() as in the
+In AMPI applications, the user just needs to create an ``MPI_Info`` object
+with the key ``"ampi_checkpoint"`` and a value of either ``"in_memory"`` (for a
+double in-memory checkpoint) or ``"to_file=file_name"`` (to checkpoint to
+disk), and pass that object to the function ``AMPI_Migrate()`` as in the
 following:
 
-::
+.. code-block:: c++
 
    // Setup
    MPI_Info in_memory, to_file;
@@ -7814,7 +8243,7 @@ However, if there are a pool of extra processors to replace the crashed
 ones, the fault-tolerance protocol can also take advantage of this to
 grab one free processor and let the program run on the same number of
 processors as before the crash. In order to achieve this, Charm++ needs
-to be compiled with the macro option *CK_NO_PROC_POOL* turned on.
+to be compiled with the macro option ``CK_NO_PROC_POOL`` turned on.
 
 Double in-disk checkpoint/restart
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -7823,12 +8252,12 @@ A variant of double memory checkpoint/restart, *double in-disk
 checkpoint/restart*, can be applied to applications with large memory
 footprint. In this scheme, instead of storing checkpoints in the memory,
 it stores them in the local disk. The checkpoint files are named
-“ckpt[CkMyPe]-[idx]-XXXXX” and are stored under the /tmp directory.
+``ckpt[CkMyPe]-[idx]-XXXXX`` and are stored under the ``/tmp`` directory.
 
-Users can pass the runtime option *+ftc_disk* to activate this mode. For
+Users can pass the runtime option ``+ftc_disk`` to activate this mode. For
 example:
 
-::
+.. code-block:: c++
 
       ./charmrun hello +p8 +ftc_disk
 
@@ -7836,10 +8265,10 @@ Building Instructions
 ^^^^^^^^^^^^^^^^^^^^^
 
 In order to have the double local-storage checkpoint/restart
-functionality available, the parameter *syncft* must be provided at
+functionality available, the parameter ``syncft`` must be provided at
 build time:
 
-::
+.. code-block:: c++
 
       ./build charm++ netlrts-linux-x86_64 syncft
 
@@ -7861,12 +8290,12 @@ point in time. You must create a text file with two columns. The first
 colum will store the PEs that will fail. The second column will store
 the time at which the corresponding PE will fail. Make sure all the
 failures occur after the first checkpoint. The runtime parameter
-*kill_file* has to be added to the command line along with the file
+``kill_file`` has to be added to the command line along with the file
 name:
 
-::
+.. code-block:: bash
 
-      ./charmrun hello +p8 +kill_file <file>
+   $ ./charmrun hello +p8 +kill_file <file>
 
 An example of this usage can be found in the ``syncfttest`` targets in
 ``tests/charm++/jacobi3d``.
@@ -7883,7 +8312,7 @@ place in the code. When it is called by a processor, the processor will
 hang and stop responding to any communication. A spare processor will
 replace the crashed processor and continue execution after getting the
 checkpoint of the crashed processor. To make it work, you need to add
-the command line option *+wp*, the number following that option is the
+the command line option ``+wp``, the number following that option is the
 working processors and the remaining are the spare processors in the
 system.
 
@@ -7905,7 +8334,7 @@ a MPI+OpenMP hybrid program, Charm++ will work perfectly with any
 shared-memory parallel programming languages (e.g. OpenMP). As with
 ordinary OpenMP applications, the number of threads used in the OpenMP
 parts of the program can be controlled with the ``OMP_NUM_THREADS``
-environment variable. See Sec. :numref:`charmrun` for details on how
+environment variable. See Section :numref:`charmrun` for details on how
 to propagate such environment variables.
 
 If there are no spare cores allocated, to avoid resource contention, a
@@ -7918,7 +8347,7 @@ critical computation may also reduce the communication cost, thus
 leading to more performance improvement), dedicating physical cores on
 every node to the shared-memory multithreading runtime will waste
 computational power because those dedicated cores are not utilized at
-all during most of the application’s execution time. This case indicates
+all during most of the application's execution time. This case indicates
 the necessity of a unified runtime supporting both types of parallelism.
 
 CkLoop library
@@ -7931,26 +8360,26 @@ tasks spawned by the multithreading runtime. This library targets the
 SMP mode of Charm++.
 
 The *CkLoop* library is built in
-$CHARM_DIR/$MACH_LAYER/tmp/libs/ck-libs/ckloop by executing “make”. To
-use it for user applications, one has to include “CkLoopAPI.h” in the
+``$CHARM_DIR/$MACH_LAYER/tmp/libs/ck-libs/ckloop`` by executing ``make``. To
+use it for user applications, one has to include ``CkLoopAPI.h`` in the
 source code. The interface functions of this library are as follows:
 
 -  CProxy_FuncCkLoop **CkLoop_Init**\ (int numThreads=0): This function
    initializes the CkLoop library, and it only needs to be called once
    on a single PE during the initialization phase of the application.
-   The argument “numThreads” is only used in non-SMP mode, specifying
+   The argument ``numThreads`` is only used in non-SMP mode, specifying
    the number of threads to be created for the single-node shared-memory
    parallelism. It will be ignored in SMP mode.
 
 -  void **CkLoop_SetSchedPolicy**\ (CkLoop_sched
    schedPolicy=CKLOOP_NODE_QUEUE) : This function sets the scheduling
-   policy of CkLoop work, three options available: CKLOOP_NODE_QUEUE,
-   CKLOOP_TREE and CKLOOP_LIST. The default policy, CKLOOP_NODE_QUEUE on
+   policy of CkLoop work, three options available: ``CKLOOP_NODE_QUEUE``,
+   ``CKLOOP_TREE`` and ``CKLOOP_LIST``. The default policy, ``CKLOOP_NODE_QUEUE`` on
    supported environments is to use node_queue message so that master or
    another idle PE delievers the CkLoop work to all other PEs.
-   CKLOOP_TREE policy is set by default for builds not supporting a node
+   ``CKLOOP_TREE`` policy is set by default for builds not supporting a node
    queue. This policy delivers CkLoop messages on the implicit tree.
-   CKLOOP_LIST uses list to deliver the messages.
+   ``CKLOOP_LIST`` uses list to deliver the messages.
 
 -  void **CkLoop_Exit**\ (CProxy_FuncCkLoop ckLoop): This function is
    intended to be used in non-SMP mode, as it frees the resources (e.g.
@@ -7978,16 +8407,16 @@ source code. The interface functions of this library are as follows:
    | int cparamNum=0, void \*cparam=NULL /\* the input parameters to the
      above function \*/
    | )
-   | The “HelperFn” is defined as “typedef void (\*HelperFn)(int
-     first,int last, void \*result, int paramNum, void \*param);” and
-     the “result” is the buffer for reduction result on a single
-     simple-type variable. The “CallerFn” is defined as “typedef void
-     (\*CallerFn)(int paramNum, void \*param);”
+   | The "HelperFn" is defined as "typedef void (\*HelperFn)(int
+     first,int last, void \*result, int paramNum, void \*param);" and
+     the "result" is the buffer for reduction result on a single
+     simple-type variable. The "CallerFn" is defined as "typedef void
+     (\*CallerFn)(int paramNum, void \*param);"
 
 Lambda syntax for *CkLoop* is also supported. The interface for using
 lambda syntax is as follows:
 
--  ::
+.. code-block:: c++
 
       void CkLoop_Parallelize(
       int numChunks, int lowerRange, int upperRange,
@@ -8014,17 +8443,17 @@ Charm++ where all chares are placed on core 0 of each node (called the
 drone-mode, or all-drones-mode). It incorporates a strategy called
 staggered static-dynamic scheduling (from dissertation work of Vivek
 Kale). The iteration space is first tentatively divided approximately
-equally to all available PEs. Each PE’s share of the iteration space is
+equally to all available PEs. Each PE's share of the iteration space is
 divided into a static portion, specified by the staticFraction parameter
 below, and the remaining dynamic portion. The dynamic portion of a PE is
 divided into chunks of specified chunksize, and enqueued in the
 task-queue associated with that PE. Each PE works on its static portion,
 and then on its own task queue (thus preserving spatial locality, as
 well as persistence of allocations across outer iterations), and after
-finishing that, steals work from other PE’s task queues.
+finishing that, steals work from other PE's task queues.
 
 CkLoopHybrid support requires the SMP mode of Charm++ and the additional
-flags -enable-drone-mode and -enable-task-queue to be passed as build
+flags ``-enable-drone-mode`` and ``-enable-task-queue`` to be passed as build
 options when Charm++ is built.
 
 The changes to the CkLoop API call are the following:
@@ -8039,7 +8468,7 @@ The changes to the CkLoop API call are the following:
    additional variable that provides the fraction of iterations that are
    statically scheduled:
 
-   ::
+   .. code-block:: c++
 
       void CkLoop_ParallelizeHybrid(
       float staticFraction,
@@ -8056,8 +8485,8 @@ The changes to the CkLoop API call are the following:
       int cparamNum=0, void *cparam=NULL /* the input parameters to the above function */
       )
 
-Reduction is supported for type CKLOOP_INT_SUM, CKLOOP_FLOAT_SUM,
-CKLOOP_DOUBLE_SUM. It is recommended to use this mode without reduction.
+Reduction is supported for type ``CKLOOP_INT_SUM``, ``CKLOOP_FLOAT_SUM``,
+``CKLOOP_DOUBLE_SUM``. It is recommended to use this mode without reduction.
 
 Charm++/Converse Runtime Scheduler Integrated OpenMP
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -8078,17 +8507,17 @@ Instructions to build and use the integrated OpenMP library
 Instructions to build
 '''''''''''''''''''''
 
-| The OpenMP library can be built with ‘omp’ keyword and any smp version
-  of Charm++ including multicore build when you build Charm++ or AMPI.
+The OpenMP library can be built with ``omp`` keyword on any smp version
+of Charm++ including multicore build when you build Charm++ or AMPI,
+for example:
 
-.. code-block:: none
+.. code-block:: bash
 
-   e.g.) $CHARM_DIR/build charm++ multicore-linux64 omp
-         $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
+   $ $CHARM_DIR/build charm++ multicore-linux64 omp
+   $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
 
 This library is based on the LLVM OpenMP runtime library. So it supports
 the ABI used by clang, intel and gcc compilers.
-
 The following is the list of compilers which are verified to support
 this integrated library on Linux.
 
@@ -8098,9 +8527,9 @@ this integrated library on Linux.
 
 -  Clang: 3.7 or newer
 
-You can use this integrated OpenMP with clang on IBM Bluegene machines
-without special compilation flags. (Don’t need to add -fopenmp or
--openmp on Bluegene clang)
+You can use this integrated OpenMP with *clang* on IBM Blue Gene machines
+without special compilation flags (don't need to add -fopenmp or
+-openmp on Blue Gene clang).
 
 On Linux, the OpenMP supported version of clang has been installed in
 default recently. For example, Ubuntu has been released with clang
@@ -8112,29 +8541,29 @@ than 3.7. If you want to use clang on other Linux distributions, you can
 use package managers on those Linux distributions to install clang and
 OpenMP library. This installation of clang will add headers for OpenMP
 environmental routines and allow you to parse the OpenMP directives.
-However, on Ubuntu, the installation of clang doesn’t come with its
+However, on Ubuntu, the installation of clang doesn't come with its
 OpenMP runtime library so it results in an error message saying that it
 fails to link the compiler provided OpenMP library. This library is not
 needed to use the integrated OpenMP runtime but you need to avoid this
-error to succeed compiling your codes. The following is the instruction
-to avoid the error.
+error to succeed compiling your codes. The following are the instructions
+to avoid the error:
 
-.. code-block:: none
+.. code-block:: bash
 
-   /* When you want to compile Integrated OpenMP on Ubuntu where the pre-installed clang
-   is older than 3.7, you can use integrated openmp with the following instructions.
-   e.g.) Ubuntu 14.04, the version of default clang is 3.4.  */
-   sudo apt-get install clang-3.8 //you can use any version of clang higher than 3.8
-   sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
-   sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
+   # When you want to compile Integrated OpenMP on Ubuntu where the pre-installed clang
+   # is older than 3.7, you can use integrated openmp with the following instructions.
+   # e.g.) Ubuntu 14.04, the version of default clang is 3.4.
+   $ sudo apt-get install clang-3.8 //you can use any version of clang higher than 3.8
+   $ sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
+   $ sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
-   $(CHARM_DIR)/build charm++ multicore-linux64 clang omp --with-production -j8
-   echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a //Dummy library. This will make you avoid the error message.
+   $ $CHARM_DIR/build charm++ multicore-linux64 clang omp --with-production -j8
+   $ echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
 
 On Mac, the Apple-provided clang installed in default doesn’t have
-OpenMP feature. We’re working on the support of this library on Mac
+OpenMP feature. We're working on the support of this library on Mac
 with OpenMP enabled clang which can be downloaded and installed
-through ‘Homebrew or MacPorts‘. Currently, this integrated library is
+through Homebrew or MacPorts. Currently, this integrated library is
 built and compiled on Mac with the normal GCC which can be downloaded
 and installed via Homebrew and MacPorts. If installed globally, GCC
 will be accessible by appending the major version number and adding it
@@ -8142,31 +8571,32 @@ to the invocation of the Charm++ build script. For example:
 
 .. code-block:: bash
 
-   $CHARM_DIR/build charm++ multicore-linux64 omp gcc-7
-   $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
+   $ $CHARM_DIR/build charm++ multicore-linux64 omp gcc-7
+   $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
 
 If this does not work, you should set environment variables so that the
 Charm++ build script uses the normal gcc installed from Homebrew or
 MacPorts. The following is an example using Homebrew on Mac OS X
-10.12.5.
+10.12.5:
 
-::
+.. code-block:: bash
 
-   /* Install Homebrew at https://brew.sh
-    * Install gcc using 'brew' */
-   brew install gcc
-   /* gcc, g++ and other binaries are installed at /usr/local/Cellar/gcc/<version>/bin
-    * You need to make symbolic links to the gcc binaries at /usr/local/bin
-    * In this example, gcc 7.1.0 is installed at the directory.
-    */
-   cd /usr/local/bin
-   ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-7 gcc
-   ln -sv /usr/local/Cellar/gcc/7.1.0/bin/g++-7 g++
-   ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-nm-7 gcc-nm
-   ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-ranlib-7 gcc-ranlib
-   ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-ar-7 gcc-ar
-   /* Finally, you should set PATH variable so that these binaries are accessed first in the build script.
-      export PATH=/usr/local/bin:$PATH
+   # Install Homebrew from https://brew.sh
+   # Install gcc using 'brew' */
+   $ brew install gcc
+
+   # gcc, g++ and other binaries are installed at /usr/local/Cellar/gcc/<version>/bin
+   # You need to make symbolic links to the gcc binaries at /usr/local/bin
+   # In this example, gcc 7.1.0 is installed at the directory.
+   $ cd /usr/local/bin
+   $ ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-7 gcc
+   $ ln -sv /usr/local/Cellar/gcc/7.1.0/bin/g++-7 g++
+   $ ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-nm-7 gcc-nm
+   $ ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-ranlib-7 gcc-ranlib
+   $ ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-ar-7 gcc-ar
+
+   # Finally, you should set PATH variable so that these binaries are accessed first in the build script.
+   $ export PATH=/usr/local/bin:$PATH
 
 In addition, this library will be supported on Windows in the next
 release of Charm++.
@@ -8174,29 +8604,29 @@ release of Charm++.
 How to use the integrated OpenMP on Charm++
 '''''''''''''''''''''''''''''''''''''''''''
 
-To use this library on your applications, you have to add ‘-module
-OmpCharm’ in compile flags to link this library instead of the
-compiler-provided library in compilers. Without ‘-module OmpCharm’, your
+To use this library on your applications, you have to add ``-module OmpCharm``
+in compile flags to link this library instead of the
+compiler-provided library in compilers. Without ``-module OmpCharm``, your
 application will use the compiler-provided OpenMP library which running
-on its own separate runtime. (You don’t need to add ‘-fopenmp or
--openmp’ with gcc and icc. These flags are included in the predefined
-compile options when you build Charm++ with ‘omp’)
+on its own separate runtime (you don't need to add ``-fopenmp`` or ``-openmp``
+with gcc and icc. These flags are included in the predefined
+compile options when you build Charm++ with ``omp``).
 
 This integrated OpenMP adjusts the number of OpenMP instances on each
 chare so the number of OpenMP instances can be changed for each OpenMP
 region over execution. If your code shares some data structures among
 OpenMP instances in a parallel region, you can set the size of the data
 structures before the start of the OpenMP region with
-“omp_get_max_threads()” and use the data structure within each OpenMP
-instance with “omp_get_thread_num()”. After the OpenMP region, you can
+``omp_get_max_threads()`` and use the data structure within each OpenMP
+instance with ``omp_get_thread_num()``. After the OpenMP region, you can
 iterate over the data structure to combine partial results with
-“CmiGetCurKnownOmpThreads()”. “CmiGetCurKnownOmpThreads() returns the
+``CmiGetCurKnownOmpThreads()``. ``CmiGetCurKnownOmpThreads()`` returns the
 number of OpenMP threads for the latest OpenMP region on the PE where a
-chare is running.” The following is an example to describe how you can
+chare is running. The following is an example to describe how you can
 use shared data structures for OpenMP regions on the integrated OpenMP
-with Charm++.
+with Charm++:
 
-::
+.. code-block:: c++
 
    /* Maximum possible number of OpenMP threads in the upcoming OpenMP region.
       Users can restrict this number with 'omp_set_num_threads()' for each chare
@@ -8226,12 +8656,12 @@ The list of supported pragmas
 This library is forked from LLVM OpenMP Library supporting OpenMP 4.0.
 Among many number of directives specified in OpenMP 4.0, limited set of
 directives are supported. The following list of supported pragmas is
-verified from the openmp conformance test suite which forked from LLVM
+verified from the OpenMP conformance test suite which forked from LLVM
 OpenMP library and ported to Charm++ program running multiple OpenMP
 instances on chares. The test suite can be found in
-*tests/converse/openmp_test*.
+``tests/converse/openmp_test``.
 
-::
+.. code-block:: c++
 
    /* omp_<directive>_<clauses> */
    omp_atomic
@@ -8286,7 +8716,7 @@ The other directives in OpenMP standard will be supported in the next
 version.
 
 A simple example using this library can be found in
-``examples/charm++/openmp``. You can compare ckloop and the integrated
+``examples/charm++/openmp``. You can compare CkLoop and the integrated
 OpenMP with this example. You can see that the total execution time of
 this example with enough big size of problem is faster with OpenMP than
 CkLoop thanks to load balancing through work-stealing between threads
@@ -8299,7 +8729,7 @@ API to control which PEs participating in CkLoop/OpenMP work
 User may want certain PE not to be involved in other PE’s loop-level
 parallelization for some cases because it may add latency to works in
 the PE by helping other PEs. User can enable or disable each PE to
-participate in the loop-level parallelization through the following API.
+participate in the loop-level parallelization through the following API:
 
 void **CkSetPeHelpsOtherThreads** (int value)
 
@@ -8311,7 +8741,7 @@ PE again by calling this API with value 1 after they disable it during
 certain procedure so that the PE can help others after that. The
 following example shows how this API can be used.
 
-::
+.. code-block:: c++
 
    CkSetPeHelpsOtherThreads(0);
 
@@ -8320,7 +8750,7 @@ following example shows how this API can be used.
 
    CkSetPeHelpsOtherThreads(1);
 
-.. _sec:interop:
+.. _sec:mpiinterop:
 
 Charm-MPI Interoperation
 ------------------------
@@ -8329,39 +8759,41 @@ Codes and libraries written in Charm++ and MPI can also be used in an
 interoperable manner. Currently, this functionality is supported only if
 Charm++ is built using MPI, PAMILRTS, or GNI as the network layer (e.g.
 mpi-linux-x86_64 build). An example program to demonstrate the
-interoperation is available in examples/charm++/mpi-coexist. In the
+interoperation is available in ``examples/charm++/mpi-coexist``. In the
 following text, we will refer to this example program for the ease of
 understanding.
 
 Control Flow and Memory Structure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-| The control flow and memory structure of a Charm++-MPI interoperable
-  program is similar to that of a pure MPI program that uses external
-  MPI libraries. The execution of program begins with pure MPI code’s
-  *main*. At some point after MPI_Init() has been invoked, the following
-  function call should be made to initialize Charm++:
-| **void CharmLibInit(MPI_Comm newComm, int argc, char \**argv)**
-| If Charm++ is build on top of MPI, *newComm* is the MPI communicator
-  that Charm++ will use for the setup and communication. All the MPI
-  ranks that belong to *newComm* should call this function collectively.
-  A collection of MPI ranks that make the CharmLibInit call defines a
-  new Charm++ instance. Different MPI ranks that belong to different
-  communicators can make this call independently, and separate Charm++
-  instances that are not aware of each other will be created. This
-  results in a space division. As of now, a particular MPI rank can only
-  be part of one unique Charm++ instance. For PAMILRTS and GNI, the
-  newComm argument is ignored. These layers do not support the space
-  division of given processors, but require all processors to make the
-  CharmLibInit call. The mode of interoperating here is called time
-  division, and can be used with MPI-based Charm++ also if the size of
-  newComm is same as MPI_COMM_WORLD. Arguments *argc and argv* should
-  contain the information required by Charm++ such as the load balancing
-  strategy etc.
+The control flow and memory structure of a Charm++-MPI interoperable
+program is similar to that of a pure MPI program that uses external
+MPI libraries. The execution of program begins with pure MPI code’s
+*main*. At some point after MPI_Init() has been invoked, the following
+function call should be made to initialize Charm++:
 
-During the initialization, the control is transferred from MPI to
+**void CharmLibInit(MPI_Comm newComm, int argc, char \**argv)**
+
+If Charm++ is build on top of MPI, ``newComm`` is the MPI communicator
+that Charm++ will use for the setup and communication. All the MPI
+ranks that belong to ``newComm`` should call this function collectively.
+A collection of MPI ranks that make the ``CharmLibInit`` call defines a
+new Charm++ instance. Different MPI ranks that belong to different
+communicators can make this call independently, and separate Charm++
+instances that are not aware of each other will be created. This
+results in a space division. As of now, a particular MPI rank can only
+be part of one unique Charm++ instance. For PAMILRTS and GNI, the
+``newComm`` argument is ignored. These layers do not support the space
+division of given processors, but require all processors to make the
+``CharmLibInit`` call. The mode of interoperating here is called time
+division, and can be used with MPI-based Charm++ also if the size of
+``newComm`` is same as ``MPI_COMM_WORLD``. Arguments ``argc`` and ``argv``
+should contain the information required by Charm++ such as the load balancing
+strategy, etc.
+
+During initialization, control is transferred from MPI to the
 Charm++ RTS on the MPI ranks that made the call. Along with basic setup,
-Charm++ RTS also invokes the constructors of all mainchares during
+the Charm++ RTS also invokes the constructors of all mainchares during
 initialization. Once the initial set up is done, control is transferred
 back to MPI as if returning from a function call. Since Charm++
 initialization is made via a function call from the pure MPI program,
@@ -8378,37 +8810,37 @@ with a pure MPI program:
 -  If the interoperable Charm++ library does not contain a main module,
    the Charm++ RTS provides a main module and the control is returned
    back to MPI after the initialization is complete. In the other case,
-   the library should explicitly call CkExit to mark the end of
-   initialization and the user should provide *-nomain-module* link time
+   the library should explicitly call ``CkExit`` to mark the end of
+   initialization and the user should provide ``-nomain-module`` link time
    flag when building the final executable.
 
--  *CkExit* should be used the same way *return* statement is used for
-   returning back from a function call. *CkExit* should be called only
+-  ``CkExit`` should be used the same way a *return* statement is used for
+   returning back from a function call. ``CkExit`` should be called only
    once from one of the processors. This unique call marks the transfer
    of control from Charm++ RTS to MPI.
 
--  Include *mpi-interoperate.h* - if not included in the files that call
-   *CkExit*, invoking *CkExit* will result in unspecified behavior.
+-  Include ``mpi-interoperate.h`` - if not included in the files that call
+   ``CkExit``, invoking ``CkExit`` will result in unspecified behavior.
 
--  Since the CharmLibInit call invokes the constructors of mainchares,
+-  Since the ``CharmLibInit`` call invokes the constructors of mainchares,
    the constructors of mainchares should only perform basic set up such
    as creation of chare arrays etc, i.e. the set up should not result in
    invocation of actual work, which should be done using interface
    functions (when desired from the pure MPI program). However, if the
-   main module is provided by the library, CharmLibInit behaves like a
-   regular Charm++ startup and execution which is stopped when CkExit is
+   main module is provided by the library, ``CharmLibInit`` behaves like a
+   regular Charm++ startup and execution which is stopped when ``CkExit`` is
    explicitly called by the library. One can also avoid use of
    mainchares, and perform the necessary initializations in an interface
    function as demonstrated in the interoperable library
-   examples/charm++/mpi-coexist/libs/hello.
+   ``examples/charm++/mpi-coexist/libs/hello``.
 
--  Interface functions - Every library needs to define interface
+-  *Interface functions* - Every library needs to define interface
    function(s) that can be invoked from pure MPI programs, and transfers
    the control to the Charm++ RTS. The interface functions are simple
    functions whose task is to start work for the Charm++ libraries. Here
    is an example interface function for the *hello* library.
 
-   ::
+   .. code-block:: c++
 
       void HelloStart(int elems)
       {
@@ -8419,27 +8851,27 @@ with a pure MPI program:
         StartCharmScheduler(-1);
       }
 
-   This function creates a new chare (mainHello) defined in the *hello*
+   This function creates a new chare (``mainHello``) defined in the *hello*
    library which subsequently results in work being done in *hello*
    library. More examples of such interface functions can be found in hi
    (HiStart) and kNeighbor (kNeighbor) directories in
-   examples/charm++/mpi-coexist/libs. Note that a scheduler call
-   *StartCharmScheduler()* should be made from the interface functions
+   ``examples/charm++/mpi-coexist/libs``. Note that a scheduler call
+   ``StartCharmScheduler()`` should be made from the interface functions
    to start the message reception by Charm++ RTS.
 
 Writing Interoperable MPI Programs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 An MPI program that invokes Charm++ libraries should include
-*mpi-interoperate.h*. As mentioned earlier, an initialization call,
-*CharmLibInit* is required after invoking MPI_Init to perform the
-initial set up of Charm++. It is advisable to call an MPI_Barrier after
+``mpi-interoperate.h``. As mentioned earlier, an initialization call,
+``CharmLibInit`` is required after invoking ``MPI_Init`` to perform the
+initial set up of Charm++. It is advisable to call an ``MPI_Barrier`` after
 a control transfer between Charm++ and MPI to avoid any side effects.
 Thereafter, a Charm++ library can be invoked at any point using the
 interface functions. One may look at
-examples/charm++/mpi-coexist/multirun.cpp for a working example. Based
+``examples/charm++/mpi-coexist/multirun.cpp`` for a working example. Based
 on the way interfaces are defined, a library can be invoked multiple
-times. In the end, one should call *CharmLibExit* to free resources
+times. In the end, one should call ``CharmLibExit`` to free resources
 reserved by Charm++.
 
 Compilation and Execution
@@ -8447,19 +8879,19 @@ Compilation and Execution
 
 An interoperable Charm++ library can be compiled as usual using
 *charmc*. Instead of producing an executable in the end, one should
-create a library (*.a) as shown in
-examples/charm++/mpi-coexist/libs/hi/Makefile. The compilation process
+create a library (\*.a) as shown in
+``examples/charm++/mpi-coexist/libs/hi/Makefile``. The compilation process
 of the MPI program, however, needs modification. One has to include the
-charm directory (-I$(CHARMDIR)/include) to help the compiler find the
-location of included *mpi-interoperate.h*. The linking step to create
-the executable should be done using *charmc*, which in turn uses the
+charm directory (``-I$(CHARMDIR)/include``) to help the compiler find the
+location of included ``mpi-interoperate.h``. The linking step to create
+the executable should be done using ``charmc``, which in turn uses the
 compiler used to build charm. In the linking step, it is required to
-pass *-mpi* as an argument because of which *charmc* performs the
+pass ``-mpi`` as an argument because of which *charmc* performs the
 linking for interoperation. The charm libraries, which one wants to be
-linked, should be passed using *-module* option. Refer to
-examples/charm++/mpi-coexist/Makefile to view a working example. For
+linked, should be passed using ``-module`` option. Refer to
+``examples/charm++/mpi-coexist/Makefile`` to view a working example. For
 execution on BG/Q systems, the following additional argument should be
-added to the launch command: *-envs PAMI_CLIENTS=MPI,Converse*.
+added to the launch command: ``-envs PAMI_CLIENTS=MPI,Converse``.
 
 User Driven Mode
 ~~~~~~~~~~~~~~~~
@@ -8470,47 +8902,184 @@ intended for cases where the developer has direct control over the both
 the Charm++ code and the non-Charm++ code, and would like a more tightly
 coupled relation between the two. When executing in user driven mode,
 *main* is called on every rank as in the above example. To initialize
-the Charm++ runtime, a call to *CharmInit* should be called on every
+the Charm++ runtime, a call to ``CharmInit`` should be called on every
 rank:
 
-``void CharmInit(int argc, char **argv)``
+**void CharmInit(int argc, char **argv)**
 
-*CharmInit* starts the Charm++ runtime in user driven mode, and
-executes the constructor of the main chare. Control returns to user
-code when a call to *CkExit* is made. Once control is returned, user
+``CharmInit`` starts the Charm++ runtime in user driven mode, and
+executes the constructor of any main chares, and sends out messages for
+readonly variables and group creation. Control returns to user
+code after this initialization completes. Once control is returned, user
 code can do other work as needed, including creating chares, and
 invoking entry methods on proxies. Any messages created by the user
 code will be sent/received the next time the user calls
-*StartCharmScheduler*. Calls to *StartCharmScheduler* allow the
+``StartCharmScheduler``. Calls to ``StartCharmScheduler`` allow the
 Charm++ runtime to resume sending and processing messages, and control
-returns to user code when *CkExit* is called. The Charm++ scheduler
+returns to user code when ``CkExit`` is called. The Charm++ scheduler
 can be started and stopped in this fashion as many times as necessary.
-*CharmLibExit* should be called by the user code at the end of
-execution.
+``CharmLibExit`` should be called by the user code at the end of
+execution to exit the entire application.
+
+Applications which wish to use readonlies, and/or create groups before
+the rest of the application runs without using a mainchare can do a split
+initialization. ``CharmBeginInit`` initializes the runtime system and
+immediately returns control to the user after any mainchares are created.
+At this point, user code can create groups, and set readonly variables on
+PE 0. Then, a call to ``CharmFinishInit`` does the rest of the initialization
+by sending out messages from PE 0 to the rest of the PEs for creating groups
+and setting readonlies. ``CharmInit`` is just a shortcut for calling these
+two functions one after another.
+
+**void CharmBeginInit(int argc, char **argv)**
+**void CharmFinishInit()**
 
 A small example of user driven interoperation can be found in
-examples/charm++/user-driven-interop.
+``examples/charm++/user-driven-interop``.
+
+.. _sec:kokkosinterop:
+
+Interoperation with Kokkos
+--------------------------
+
+Kokkos is a shared-memory parallel programming model in C++ developed by
+Sandia National Laboratories (https://github.com/kokkos/kokkos). It aims
+to provide 'performance portability' to HPC applications through
+abstractions for parallel execution and data management. For execution in
+distributed memory environments, however, other frameworks such as MPI
+must be used in conjunction, to enable multiple Kokkos processes running
+on potentially different physical nodes to communicate with each other.
+
+In this section, we explore the basic interoperability of Kokkos with
+Charm++. Currently there is no sophisticated integration scheme, Charm++
+only manages the communication between different Kokkos instances with
+each instance individually managing the parallel execution underneath.
+Example programs can be found in ``examples/charm++/shared_runtimes/kokkos/hello``
+and ``examples/charm++/shared_runtimes/kokkos/vecadd``.
+
+Compiling the Kokkos Library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Kokkos supports multiple backends for parallel execution. We recommend
+OpenMP for multicore CPUs and CUDA for machines with GPUs. Because Kokkos
+can be built with more than one backend, it is preferrable to build both
+OpenMP and CUDA backends on GPU machines.
+
+To build Kokkos with the OpenMP backend, run the following commands from
+the Kokkos source folder:
+
+.. code-block:: bash
+
+   $ mkdir build-omp
+   $ cd build-omp
+   $ ../generate_makefile.bash --prefix=<absolute path to build-omp> --with-openmp
+                               --arch=<CPU architecture>
+   $ make -j kokkoslib
+   $ make install
+
+To build Kokkos with both OpenMP and CUDA backends (required for ``vecadd``
+example), use the following commands:
+
+.. code-block:: bash
+
+   $ mkdir build-cuda
+   $ cd build-cuda
+   $ generate_makefile.bash --prefix=<absolute path to build-cuda>
+                            --with-cuda=<path to CUDA toolkit>
+                            --with-cuda-options=enable_lambda
+                            --with-openmp --arch=<CPU arch>,<GPU arch>
+                            --compiler=<path to included NVCC wrapper>
+   $ make -j kokkoslib
+   $ make install
+
+For more compilation options, please refer to
+https://github.com/kokkos/kokkos/wiki/Compiling.
+
+Program Structure and Flow
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The basic programming pattern using Kokkos and Charm++ together for
+parallel execution in distributed memory environments is the following.
+We use a Charm++ nodegroup (which corresponds to a OS process) to
+encapsulate a Kokkos instance that will manage the parallel execution
+underneath. We initialize Kokkos using ``Kokkos::initialize()`` in the
+constructor of the nodegroup, and finalize it using ``Kokkos::finalize()``.
+Calls to the Kokkos parallel API such as ``Kokkos::parallel_for()`` can
+be made between these calls. Communication between the different Kokkos
+instances can be done via messages and entry method invocation among
+the nodegroup chares as in regular Charm++.
+
+.. _sec:rajainterop:
+
+Interoperation with RAJA
+------------------------
+
+RAJA is a shared-memory parallel programming model in C++ developed by
+Lawrence Livermore National Laboratory (https://github.com/LLNL/RAJA).
+RAJA shares similar goals and concepts with Kokkos (Section :numref:`sec:kokkosinterop`).
+
+In this section, we explore the basic interoperability of RAJA with
+Charm++. Currently there is no sophisticated integration scheme, Charm++
+only manages the communication between different RAJA instances with
+each instance individually managing the parallel execution underneath.
+Example programs can be found in ``examples/charm++/shared_runtimes/raja/hello``
+and ``examples/charm++/shared_runtimes/raja/vecadd``.
+
+Compiling the RAJA Library
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+RAJA supports multiple backends for parallel execution. We recommend
+OpenMP for multicore CPUs and CUDA for machines with GPUs. Because RAJA
+can be built with more than one backend, it is preferable to build both
+OpenMP and CUDA backends on GPU machines.
+
+To build RAJA with both OpenMP and CUDA backends (required for ``vecadd``
+example), use the following commands:
+
+.. code-block:: bash
+
+   $ mkdir build && install
+   $ cd build
+   $ cmake -DENABLE_CUDA=On -DCMAKE_INSTALL_PREFIX=<path to RAJA install folder> ../
+   $ make -j
+   $ make install
+
+For more compilation options and assistance, please refer to the `RAJA User Guide
+<https://raja.readthedocs.io/en/master/>`_.
+
+Program Structure and Flow
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The basic programming pattern using RAJA and Charm++ together for
+parallel execution in distributed memory environments is the following.
+We use a Charm++ nodegroup (which corresponds to a OS process) to
+encapsulate a RAJA instance that will manage the parallel execution
+underneath. Calls to the RAJA parallel API such as ``RAJA::forall()`` can
+be made in a method of the nodegroup to perform parallel computation in
+shared memory. Communication between the different RAJA instances can be
+performed via messages and entry method invocation among the nodegroup
+chares as in regular Charm++.
 
 .. _sec:partition:
 
 Partitioning in Charm++
 -----------------------
 
-With the latest 6.5.0 release, Charm++ has been augmented with support
+Starting with the 6.5.0 release, Charm++ was augmented with support
 for partitioning. The key idea is to divide the allocated set of nodes
 into subsets that run independent Charm++ instances. These Charm++
-instances (called partitions from now on) have a unique identifier, can
+instances (called *partitions* from now on) have a unique identifier, can
 be programmed to do different tasks, and can interact with each other.
 Addition of the partitioning scheme does not affect the existing code
 base or codes that do not want to use partitioning. Some of the use
-cases of partitioning are replicated NAMD, replica based fault
+cases of partitioning are replicated NAMD, replica-based fault
 tolerance, studying mapping performance etc. In some aspects,
 partitioning is similar to disjoint communicator creation in MPI.
 
 Overview
 ~~~~~~~~
 
-Charm++ stack has three components - Charm++, Converse and machine
+The Charm++ stack has three components - Charm++, Converse and a machine
 layer. In general, machine layer handles the exchange of messages among
 nodes, and interacts with the next layer in the stack - Converse.
 Converse is responsible for scheduling of tasks (including user code)
@@ -8528,21 +9097,21 @@ Converse API described later.
 Ranking
 ~~~~~~~
 
-Charm++ stack assigns a rank to every processing element (PE). In the
-non-partitioned version, a rank assigned to a PE is same at all three
-layers of Charm++ stack. This rank also (generally) coincides with the
+The Charm++ stack assigns a rank to every processing element (PE). In the
+non-partitioned version, a rank assigned to a PE is the same at all three
+layers of the Charm++ stack. This rank also generally coincides with the
 rank provided to processors/cores by the underlying job scheduler. The
 importance of these ranks derive from the fact that they are used for
 multiple purposes. Partitioning leads to segregation of the notion of
 ranks at different levels of Charm++ stack. What used to be the PE is
 now a local rank within a partition running a Charm++ instance. Existing
-methods such as ``CkMyPe()``, ``CkMyNode()``, ``CmiMyPe()``, etc
+methods such as ``CkMyPe()``, ``CkMyNode()``, ``CmiMyPe()``, etc.
 continue to provide these local ranks. Hence, existing codes do not
 require any change as long as inter-partition interaction is not
 required.
 
 On the other hand, machine layer is provided with the target ranks that
-are globally unique. These ranks can be obtained using functions with
+are globally unique. These ranks can be obtained using functions with the
 *Global* suffix such as ``CmiNumNodesGlobal()``, ``CmiMyNodeGlobal()``,
 ``CmiMyPeGlobal()`` etc.
 
@@ -8601,25 +9170,24 @@ who want to run multiple partitions in one single job.
    by plane during partitioning. A hilbert curve based traversal is used
    with scheme 2.
 
--  | Compilation parameter: ``-custom-part``, runtime parameter:
-     ``+use_custom_partition`` - enables use of user defined
-     partitioning. In order to implement a new partitioning scheme, a
-     user must link an object exporting a C function with following
-     prototype:
-   | extern “C” void createCustomPartitions(int numparts, int
-     \*partitionSize, int \*nodeMap);
+-  Compilation parameter: ``-custom-part``, runtime parameter:
+   ``+use_custom_partition`` - enables use of user defined
+   partitioning. In order to implement a new partitioning scheme, a
+   user must link an object exporting a C function with following
+   prototype:
+
+   | ``extern "C" void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);``
    | ``numparts`` (input) - number of partitions to be created.
-   | ``partitionSize`` (input) - an array that contains size of each
-     partition.
-   | ``nodeMap`` (output, preallocated) - a preallocated array of length
-     ``CmiNumNodesGlobal()``. Entry *i* in this array specifies the new
+   | ``partitionSize`` (input) - an array that contains the size of each partition.
+   | ``nodeMap`` (output, preallocated) - a preallocated array of length ``CmiNumNodesGlobal()``.
+     Entry *i* in this array specifies the new
      global node rank of a node with default node rank *i*. The entries
-     in this array are block wise divided to create partitions, i.e
+     in this array are block-wise divided to create partitions, i.e.
      entries 0 to partitionSize[0]-1 belong to partition 1,
      partitionSize[0] to partitionSize[0]+partitionSize[1]-1 to
      partition 2 and so on.
    | When this function is invoked to create partitions, TopoManager is
-     configured to view all the allocated node as one partition.
+     configured to view all the allocated nodes as one partition.
      Partition based API is yet to be initialized, and should not be
      used. A link time parameter ``-custom-part`` is required to be
      passed to ``charmc`` for successful compilation.
@@ -8630,8 +9198,8 @@ Redirecting output from individual partitions
 Output to standard output (stdout) from various partitions can be
 directed to separate files by passing the target path as a command line
 option. The run time parameter ``+stdout <path>`` is to be used for this
-purpose. The ``<path>`` may contain the C format specifier *%d*, which
-will be replaced by the partition number. In case, *%d* is specified
+purpose. The ``<path>`` may contain the C format specifier ``%d``, which
+will be replaced by the partition number. In case, ``%d`` is specified
 multiple times, only the first three instances from the left will be
 replaced by the partition number (other or additional format specifiers
 will result in undefined behavior). If a format specifier is not
@@ -8650,28 +9218,27 @@ Inter-partition Communication
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A new API was added to Converse to enable sending messages from one
-replica to another. Currently, following functions are available for the
-same
+replica to another. Currently, the following functions are available:
 
--  CmiInterSyncSend(local_rank, partition, size, message)
+-  **CmiInterSyncSend(local_rank, partition, size, message)**
 
--  CmiInterSyncSendAndFree(local_rank, partition, size, message)
+-  **CmiInterSyncSendAndFree(local_rank, partition, size, message)**
 
--  CmiInterSyncNodeSend(local_node, partition, size, message)
+-  **CmiInterSyncNodeSend(local_node, partition, size, message)**
 
--  CmiInterSyncNodeSendAndFree(local_node, partition, size, message)
+-  **CmiInterSyncNodeSendAndFree(local_node, partition, size, message)**
 
 Users who have coded in Converse will find these functions to be very
-similar to basic Converse functions for send - CmiSyncSend and
-CmiSyncSendAndFree. Given the local rank of a PE and the partition it
+similar to basic Converse functions for send - ``CmiSyncSend`` and
+``CmiSyncSendAndFree``. Given the local rank of a PE and the partition it
 belongs to, these two functions will pass the message to the machine
-layer. CmiInterSyncSend does not return till “message” is ready for
-reuse. CmiInterSyncSendAndFree passes the ownership of “message” to
-Charm++ RTS, which will free the message when the send is complete. Each
+layer. ``CmiInterSyncSend`` does not return until ``message`` is ready for
+reuse. ``CmiInterSyncSendAndFree`` passes the ownership of ``message`` to
+the Charm++ RTS, which will free the message when the send is complete. Each
 converse message contains a message header, which makes those messages
 active - they contain information about their handlers. These handlers
-can be registered using existing API in Charm++ - CmiRegisterHandler.
-CmiInterNodeSend and CmiInterNodeSendAndFree are counterparts to these
+can be registered using existing API in Charm++ - ``CmiRegisterHandler``.
+``CmiInterNodeSend`` and ``CmiInterNodeSendAndFree`` are counterparts to these
 functions that allow sending of a message to a node (in SMP mode).
 
 Expert-Level Functionality
@@ -8744,20 +9311,20 @@ options:
 Here is an example which collects the data for a 1000 processor run of a
 program
 
-::
+.. code-block:: bash
 
-   ./charmrun pgm +p1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile lbsim.dat
+   $ ./charmrun pgm +p1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile lbsim.dat
 
 This will collect data on files lbsim.dat.2,3,4,5. We can use this data
 to analyze the performance of various centralized strategies using:
 
-::
+.. code-block:: bash
 
-   ./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile lbsim.dat
+   $ ./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile lbsim.dat
    [+LBSimProcs 900]
 
 Please note that this does not invoke the real application. In fact,
-”pgm” can be replaced with any generic application which calls
+"pgm" can be replaced with any generic application which calls
 centralized load balancer. An example can be found in
 ``tests/charm++/load_balancing/lb_test``.
 
@@ -8773,7 +9340,7 @@ user can provide a specific class which inherits from
 ``LBPredictorFunction`` and implement the appropriate functions. Here is
 the abstract class:
 
-::
+.. code-block:: c++
 
    class LBPredictorFunction {
    public:
@@ -8794,7 +9361,7 @@ the abstract class:
    the function parameters. An example for the *predict* function is
    given below.
 
-   ::
+   .. code-block:: c++
 
       double predict(double x, double *param) {return (param[0]*x + param[1]);}
 
@@ -8807,7 +9374,7 @@ the abstract class:
    parameters, respectively). For the function in the example should
    look like:
 
-   ::
+   .. code-block:: c++
 
       void function(double x, double *param, double &y, double *dyda) {
         y = predict(x, param);
@@ -8870,7 +9437,7 @@ strategies).
 In an array element, the following function can be invoked to overwrite
 the CPU load that is measured by the load balancing framework.
 
-::
+.. code-block:: c++
 
       double newTiming;
       setObjTime(newTiming);
@@ -8881,7 +9448,7 @@ the superclass of all array elements.
 The users can also retrieve the current timing that the load balancing
 runtime has measured for the current array element using *getObjTime()*.
 
-::
+.. code-block:: c++
 
       double measuredTiming;
       measuredTiming = getObjTime();
@@ -8898,14 +9465,14 @@ each Chare based on certain computational model of the applications.
 To do so, in the array element’s constructor, the user first needs to
 turn off automatic CPU load measurement completely by setting
 
-::
+.. code-block:: c++
 
       usesAutoMeasure = false;
 
 The user must also implement the following function to the chare array
 classes:
 
-::
+.. code-block:: c++
 
       virtual void CkMigratable::UserSetLBLoad();      // defined in base class
 
@@ -8931,7 +9498,7 @@ their strategy for load balancing based on the instrumented ProcArray
 and ObjGraph provided by the load balancing framework. This strategy is
 implemented within this function:
 
-::
+.. code-block:: c++
 
    void FooLB::work(LDStats *stats) {
      /** ========================== INITIALIZATION ============================= */
@@ -8990,8 +9557,8 @@ to the Charm++ build system:
    libmoduleFooLB.dep. Run the script in charm/tmp, which creates the
    new Makefile named “Make.lb”.
 
-#. Run “make depends” to update dependence rule of Charm++ files. And
-   run “make charm++” to compile Charm++ which includes the new load
+#. Run ``make depends`` to update dependence rule of Charm++ files. And
+   run ``make charm++`` to compile Charm++ which includes the new load
    balancing strategy files.
 
 .. _lbdatabase:
@@ -9010,7 +9577,7 @@ information .
 
 The database data structure named LDStats is defined in *CentralLB.h*:
 
-::
+.. code-block:: c++
 
 
      struct ProcStats {  // per processor
@@ -9143,7 +9710,7 @@ char \*pack();
 A typical invocation to send a request from the client to the server has
 the following format:
 
-::
+.. code-block:: c++
 
    CcsSendRequest (&server, "pyCode", 0, request.size(), request.pack());
 
@@ -9156,7 +9723,7 @@ To execute a Python script on a running server, the client has to create
 an instance of ``PythonExecute``, the two constructors have the
 following signature (java has a corresponding functionality):
 
-::
+.. code-block:: c++
 
    PythonExecute(char *code, bool persistent=false, bool highlevel=false, CmiUInt4 interpreter=0);
    PythonExecute(char *code, char *method, PythonIterator *info, bool persistent=false,
@@ -9210,7 +9777,7 @@ busy waiting
 These flags can be set and checked with the following routines (CmiUInt4
 represent a 4 byte unsigned integer):
 
-::
+.. code-block:: c++
 
    void setCode(char *set);
    void setPersistent(bool set);
@@ -9284,7 +9851,7 @@ read
    to the Charm++ object connected to the Python script, and return an
    object containing the data read (see :numref:`pythonServerRW` for a
    description of this functionality). An example of a call can be:
-   value = ck.read((number, param, var2, var3)) where the double
+   *value = ck.read((number, param, var2, var3))* where the double
    parenthesis are needed to create a single tuple object containing
    four values passed as a single paramter, instead of four different
    parameters.
@@ -9337,7 +9904,7 @@ invoked. These values can be specified either while constructing the
 PythonExecute variable (see the second constructor in
 section :numref:`pythonExecute`), or with the following methods:
 
-::
+.. code-block:: c++
 
    void setMethodName(char *name);
    void setIterator(PythonIterator *iter);
@@ -9353,7 +9920,7 @@ because it is trivial to serialize such objects.
 If instead pointers or dynamic memory allocation are used, the following
 methods have to be reimplemented to support correct serialization:
 
-::
+.. code-block:: c++
 
    int size();
    char * pack();
@@ -9375,7 +9942,7 @@ PythonPrint
 In order to receive the output printed by the Python script, the client
 needs to send a PythonPrint request to the server. The constructor is:
 
-PythonPrint(CmiUInt4 interpreter, bool Wait=true, bool Kill=false);
+*PythonPrint(CmiUInt4 interpreter, bool Wait=true, bool Kill=false);*
 
 The interpreter for which the request is made is mandatory. The other
 parameters are optional. The wait parameter represents whether a reply
@@ -9404,7 +9971,7 @@ safe to call ``CcsNoResponse(server)``.
 
 The two options can also be dynamically set with the following methods:
 
-::
+.. code-block:: c++
 
    void setWait(bool set);
    bool isWait();
@@ -9422,7 +9989,7 @@ when using persistent interpreters, and a serialization of the scripts
 is needed, a PythonFinished request is available. The constructor is the
 following:
 
-PythonFinished(CmiUInt4 interpreter, bool Wait=true);
+*PythonFinished(CmiUInt4 interpreter, bool Wait=true);*
 
 The interpreter corresponds to the handle for which the request was
 sent, while the wait option refers to a blocking call (true), or
@@ -9430,7 +9997,7 @@ immediate return (false).
 
 The wait option can be dynamically modified with the two methods:
 
-::
+.. code-block:: c++
 
    void setWait(bool set);
    bool isWait();
@@ -9450,7 +10017,7 @@ python-compliant. This is done through the keyword python placed in
 square brackets before the object name in the .ci file. Some examples
 follow:
 
-::
+.. code-block:: charmci
 
    mainchare [python] main {...}
    array [1D] [python] myArray {...}
@@ -9463,7 +10030,7 @@ registers it to receive scripts directed to “pycode”. The argument of
 ``registerPython`` is the string that CCS will use to address the Python
 scripting capability of the object.
 
-::
+.. code-block:: c++
 
    Cproxy_myArray localVar = CProxy_myArray::ckNew(10);
    localVar.registerPython("pycode");
@@ -9479,7 +10046,7 @@ the *ck* module. Two of these, **read** and **write** are only available
 if redefined by the object. The signatures of the two methods to
 redefine are:
 
-::
+.. code-block:: c++
 
    PyObject* read(PyObject* where);
    void write(PyObject* where, PyObject* what);
@@ -9503,7 +10070,7 @@ subsection :numref:`pythonIterator`, it is necessary to implement two
 functions which will be called by the system. These two functions have
 the following signatures:
 
-::
+.. code-block:: c++
 
    int buildIterator(PyObject*, void*);
    int nextIteratorUpdate(PyObject*, PyObject*, void*);
@@ -9559,7 +10126,7 @@ The name of the function identifies the type of Python object stored
 inside the PyObject container (i.e String, Int, Long, Float, Complex),
 while the parameter of the functions identifies the C++ object type.
 
-::
+.. code-block:: c++
 
    void pythonSetString(PyObject*, char*, char*);
    void pythonSetString(PyObject*, char*, char*, int);
@@ -9590,13 +10157,13 @@ When in addition to the definition of the Charm++ object as python, an
 entry method is also defined as python, this entry method can be
 accessed directly by a Python script through the *charm* module. For
 example, the following definition will be accessible with the python
-call: result = charm.highMethod(var1, var2, var3) It can accept any
+call: *result = charm.highMethod(var1, var2, var3)* It can accept any
 number of parameters (even complex like tuples or dictionaries), and it
 can return an object as complex as needed.
 
 The method must have the following signature:
 
-::
+.. code-block:: charmci
 
    entry [python] void highMethod(int handle);
 
@@ -9606,7 +10173,7 @@ in subsequent calls to return values to the Python code.
 The arguments passed by the Python caller can be retrieved using the
 function:
 
-PyObject \*pythonGetArg(int handle);
+*PyObject \*pythonGetArg(int handle);*
 
 which returns a PyObject. This object is a Tuple containing a vector of
 all parameters. It can be parsed using ``PyArg_ParseTuple`` to extract
@@ -9628,7 +10195,7 @@ one, except that it correctly handles Python internal locks.
 At the end of the computation, the following special function will
 return a value to the Python script:
 
-void pythonReturn(int handle, PyObject\* result);
+*void pythonReturn(int handle, PyObject\* result);*
 
 where the second parameter is the Python object representing the
 returned value. The function ``Py_BuildValue`` can be used to create
@@ -9652,7 +10219,7 @@ Intercepting Messages via Delegation
 *Delegation* is a means by which a library writer can intercept messages
 sent via a proxy. This is typically used to construct communication
 libraries. A library creates a special kind of Group called a
-DelegationManager, which receives the messages sent via a delegated
+*DelegationManager*, which receives the messages sent via a delegated
 proxy.
 
 There are two parts to the delegation interface- a very small
@@ -9679,7 +10246,7 @@ proxy. This restores the proxy to normal operation.
 
 One use of these routines might be:
 
-::
+.. code-block:: c++
 
      CkGroupID mgr=somebodyElsesCommLib(...);
      CProxy_foo p=...;
@@ -9694,7 +10261,7 @@ The client interface is very simple; but it is often not called by users
 directly. Often the delegate manager library needs some other
 initialization, so a more typical use would be:
 
-::
+.. code-block:: c++
 
      CProxy_foo p=...;
      p.someEntry1(...); //Sent to foo normally
@@ -9712,18 +10279,18 @@ proxy is delegated.
 Manager Interface
 ~~~~~~~~~~~~~~~~~
 
-A delegation manager is a group which inherits from CkDelegateMgr and
-overrides certain virtual methods. Since CkDelegateMgr does not do any
+A delegation manager is a group which inherits from *CkDelegateMgr* and
+overrides certain virtual methods. Since *CkDelegateMgr* does not do any
 communication itself, it need not be mentioned in the .ci file; you can
 simply declare a group as usual and inherit the C++ implementation from
-CkDelegateMgr.
+*CkDelegateMgr*.
 
 Your delegation manager will be called by Charm++ any time a proxy
 delegated to it is used. Since any kind of proxy can be delegated, there
 are separate virtual methods for delegated Chares, Groups, NodeGroups,
 and Arrays.
 
-::
+.. code-block:: c++
 
    class CkDelegateMgr : public Group {
    public:
@@ -9745,38 +10312,38 @@ These routines are called on the send side only. They are called after
 parameter marshalling; but before the messages are packed. The
 parameters passed in have the following descriptions.
 
-#. ep The entry point begin called, passed as an index into the Charm++
+#. **ep** The entry point begin called, passed as an index into the Charm++
    entry table. This information is also stored in the message’s header;
    it is duplicated here for convenience.
 
-#. m The Charm++ message. This is a pointer to the start of the user
+#. **m** The Charm++ message. This is a pointer to the start of the user
    data; use the system routine UsrToEnv to get the corresponding
    envelope. The messages are not necessarily packed; be sure to use
    CkPackMessage.
 
-#. c The destination CkChareID. This information is already stored in
+#. **c** The destination CkChareID. This information is already stored in
    the message header.
 
-#. onPE The destination processor number. For chare messages, this
+#. **onPE** The destination processor number. For chare messages, this
    indicates the processor the chare lives on. For group messages, this
    indicates the destination processor. For array create messages, this
    indicates the desired processor.
 
-#. g The destination CkGroupID. This is also stored in the message
+#. **g** The destination CkGroupID. This is also stored in the message
    header.
 
-#. onNode The destination node.
+#. **onNode** The destination node.
 
 #. **idx** The destination array index. This may be looked up using the
    lastKnown method of the array manager, e.g., using:
 
-   ::
+   .. code-block:: c++
 
      int lastPE=CProxy_CkArray(a).ckLocalBranch()->lastKnown(idx);
 
-#. s The destination array section.
+#. **s** The destination array section.
 
-The CkDelegateMgr superclass implements all these methods; so you only
+The *CkDelegateMgr* superclass implements all these methods; so you only
 need to implement those you wish to optimize. You can also call the
 superclass to do the final delivery after you’ve sent your messages.
 
@@ -9806,7 +10373,7 @@ Exposing Control Points in a Charm++ Program
 The program should include a header file before any of its ``*.decl.h``
 files:
 
-::
+.. code-block:: c++
 
        #include <controlPoints.h>
 
@@ -9816,7 +10383,7 @@ made at startup in the program.
 The program will request the values for each control point on PE 0.
 Control point values are non-negative integers:
 
-::
+.. code-block:: c++
 
        my_var = controlPoint("any_name", 5, 10);
        my_var2 = controlPoint("another_name", 100,101);
@@ -9825,7 +10392,7 @@ To specify information about the effects of each control point, make
 calls such as these once on PE 0 before accessing any control point
 values:
 
-::
+.. code-block:: c++
 
        ControlPoint::EffectDecrease::Granularity("num_chare_rows");
        ControlPoint::EffectDecrease::Granularity("num_chare_cols");
@@ -9842,7 +10409,7 @@ For a complete list of these functions, see ``cp_effects.h`` in
 ``charm/include``.
 
 The program, of course, has to adapt its behavior to use these new
-control point values. There are two ways for a the control point values
+control point values. There are two ways for the control point values
 to change over time. The program can request that a new phase (with its
 own control point values) be used whenever it wants, or the control
 point framework can automatically advance to a new phase periodically.
@@ -9859,7 +10426,7 @@ Control Point Framework Advances Phases
 The program provides a callback to the control point framework in a
 manner such as this:
 
-::
+.. code-block:: c++
 
        // Once early on in program, create a callback, and register it
        CkCallback cb(CkIndex_Main::granularityChange(NULL),thisProxy);
@@ -9874,7 +10441,7 @@ Alternatively, the program can specify that it wants to call
 to delay its adaptation for a while. To do this, it specifies ``false``
 as the final parameter to ``registerCPChangeCallback`` as follows:
 
-::
+.. code-block:: c++
 
       registerCPChangeCallback(cb, false);
 
@@ -9883,7 +10450,7 @@ as the final parameter to ``registerCPChangeCallback`` as follows:
 Program Advances Phases
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-::
+.. code-block:: c++
 
         registerControlPointTiming(duration); // called after each program iteration on PE 0
         gotoNextPhase(); // called after some number of iterations on PE 0
@@ -9910,7 +10477,7 @@ experimental framework, these are subject to change.
 The scheme used for tuning can be selected at runtime by the use of one
 of the following options:
 
-::
+.. code-block:: none
 
         +CPSchemeRandom            Randomly Select Control Point Values
     +CPExhaustiveSearch            Exhaustive Search of Control Point Values
@@ -9928,14 +10495,14 @@ so is not enabled by default. To use any type of measurement based
 steering scheme, it is necessary to add a runtime command line argument
 to the user program to enable the tracing module:
 
-::
+.. code-block:: none
 
        +CPEnableMeasurements
 
 The following flags enable the gathering of the different types of
 available measurements.
 
-::
+.. code-block:: none
 
            +CPGatherAll            Gather all types of measurements for each phase
    +CPGatherMemoryUsage            Gather memory usage after each phase
@@ -9945,7 +10512,7 @@ The control point framework will periodically adapt the control point
 values. The following command line flag determines the frequency at
 which the control point framework will attempt to adjust things.
 
-::
+.. code-block:: none
 
         +CPSamplePeriod     number The time between Control Point Framework samples (in seconds)
 
@@ -9955,7 +10522,7 @@ runs. The following command line arguments specify that a file named
 measurements for each phase as well as the control point values used in
 each phase.
 
-::
+.. code-block:: none
 
             +CPSaveData            Save Control Point timings & configurations at completion
             +CPLoadData            Load Control Point timings & configurations at startup
@@ -9995,34 +10562,34 @@ be found in ``examples/charm++/shrink_expand`` in the charm
 distribution.
 
 To enable shrink expand, Charm++ needs to be built with the
-``-enable-shrinkexpand`` option:
+``--enable-shrinkexpand`` option:
 
-::
+.. code-block:: bash
 
-   	./build charm++ netlrts-linux-x86_64 --enable-shrinkexpand
+   	$ ./build charm++ netlrts-linux-x86_64 --enable-shrinkexpand
 
 An example application launch command needs to include a load balancer,
 a nodelist file that contains all of the nodes that are going to be
 used, and a port number to listen the shrink/expand commands:
 
-::
+.. code-block:: bash
 
-   	./charmrun +p4 ./jacobi2d 200 20 +balancer GreedyLB ++nodelist ./mynodelistfile ++server ++server-port 1234
+   	$ ./charmrun +p4 ./jacobi2d 200 20 +balancer GreedyLB ++nodelist ./mynodelistfile ++server ++server-port 1234
 
 The CCS client to send shrink/expand commands needs to specify the
 hostname, port number, the old(current) number of processor and the
 new(future) number of processors:
 
-::
+.. code-block:: bash
 
-   	./client <hostname> <port> <oldprocs> <newprocs>
+   	$ ./client <hostname> <port> <oldprocs> <newprocs>
    	(./client valor 1234 4 8 //This will increase from 4 to 8 processors.)
 
 To make a Charm++ application malleable, first, pup routines for all of
 the constructs in the application need to be written. This includes
 writing a pup routine for the ``mainchare`` and marking it migratable:
 
-::
+.. code-block:: charmci
 
    	mainchare [migratable]  Main { ... }
 
@@ -10040,14 +10607,14 @@ four cores from each node, whereas what you likely want is to use eight
 cores on only one of the physical nodes after shrinking. For example,
 instead of having a nodelist like this:
 
-::
+.. code-block:: none
 
    	host a
    	host b
 
 the nodelist should be like this:
 
-::
+.. code-block:: none
 
    	host a
    	host a
@@ -10101,12 +10668,12 @@ Charm++ can be downloaded using one of the following methods:
 
 -  From source archive - The latest development version of Charm++ can
    be downloaded from our source archive using *git clone
-   http://charm.cs.illinois.edu/gerrit/charm*.
+   https://github.com/UIUC-PPL/charm*.
 
 If you download the source code from the website, you will have to
 unpack it using a tool capable of extracting gzip’d tar files, such as
 tar (on Unix) or WinZIP (under Windows). Charm++ will be extracted to a
-directory called “charm”.
+directory called ``charm``.
 
 .. _sec:manualinstall:
 
@@ -10162,6 +10729,8 @@ appropriate choices for the build one wants to perform.
    MPI with 64 bit Linux (mpicxx wrappers)                          ``./build charm++ mpi-linux-x86_64 mpicxx --with-production -j8``
    IBVERBS with 64 bit Linux                                        ``./build charm++ verbs-linux-x86_64 --with-production -j8``
    OFI with 64 bit Linux                                            ``./build charm++ ofi-linux-x86_64 --with-production -j8``
+   UCX with 64 bit Linux                                            ``./build charm++ ucx-linux-x86_64 --with-production -j8``
+   UCX with 64 bit Linux (Armv8)                                    ``./build charm++ ucx-linux-arm8 --with-production -j8``
    Net with 64 bit Windows                                          ``./build charm++ netlrts-win-x86_64 --with-production -j8``
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
    Net with 64 bit Mac                                              ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
@@ -10190,6 +10759,8 @@ the command line while configuring from a blank slate. To build with all
 defaults, ``cmake .`` is sufficient, though invoking CMake from a
 separate location (ex:
 ``mkdir mybuild && cd mybuild && cmake ../charm``) is recommended.
+Please see Section :numref:`sec:cmakeinstall` for building Charm++
+directly with CMake.
 
 Installation through the Spack package manager
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10207,7 +10778,7 @@ By default, the netlrts network backend with SMP support is built. You
 can specify other backends by providing the ``backend`` parameter to
 spack. It is also possible to specify other options, as listed in
 Section :numref:`sec:manualinstall`, by adding them to the Spack
-command prepended by a ’\ ``+``\ ’. For example, to build the MPI
+command prepended by a ``+``. For example, to build the MPI
 version of Charm++ with the integrated OpenMP support, you can use the
 following command:
 
@@ -10215,7 +10786,7 @@ following command:
 
    	$ spack install charmpp backend=mpi +omp
 
-To disable an option, prepend it with a ’\ ``~``\ ’. For example, to
+To disable an option, prepend it with a ``~``. For example, to
 build Charm++ with SMP support disabled, you can use the following
 command:
 
@@ -10224,13 +10795,49 @@ command:
    	$ spack install charmpp ~smp
 
 By default, the newest released version of Charm++ is built. You can
-select another version with the ’\ ``@``\ ’ option (for example,
+select another version with the ``@`` option (for example,
 ``@6.8.1``). To build the current git version of Charm++, specify the
 ``@develop`` version:
 
 .. code-block:: bash
 
    	$ spack install charmpp@develop
+
+
+.. _sec:cmakeinstall:
+
+Installation with CMake
+~~~~~~~~~~~~~~~~~~~~~~~
+
+As an experimental feature, Charm++ can be installed with the CMake tool,
+version 3.4 or newer (3.11 if you need Fortran support).
+This is currently supported on Linux and Darwin, but not on Windows.
+
+After downloading and unpacking Charm++, it can be installed in the following way:
+
+.. code-block:: bash
+
+   $ cd charm
+   $ mkdir build-cmake
+   $ cd build-cmake
+   $ cmake ..
+   $ make -j4
+
+
+By default, CMake builds the netlrts version. 
+Other configuration options can be specified in the cmake command above.
+For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the following command can be used:
+
+.. code-block:: bash
+
+   $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
+
+To simplify building with CMake, the `buildcmake` command is a simple wrapper around cmake
+that supports many of the options that `build` supports.
+
+.. code-block:: bash
+
+   $ ./buildcmake AMPI netlrts-linux-x86_64 smp --with-production
 
 Charm++ installation directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10274,6 +10881,83 @@ The charm directory contains a collection of example-programs and
 test-programs. These may be deleted with no other effects. You may also
 ``strip`` all the binaries in ``charm/bin``.
 
+Installation for Specific Builds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+UCX
+^^^
+UCX stands for Unified Communication X and is a high performance communication
+library that can be used as a backend networking layer for Charm++ builds on
+supported transports like Infiniband, Omni-Path, gni, TCP/IP, etc.
+
+In order to install Charm++ with UCX backend, you require UCX or HPC-X modules
+in your environment. In case UCX or HPC-X is not available in your environment,
+you can build UCX from scratch using the following steps:
+
+.. code-block:: bash
+
+   $ git clone https://github.com/openucx/ucx.git
+   $ cd ucx
+   $ ./autogen.sh
+   $ ./contrib/configure-release --prefix=$HOME/ucx/build
+   $ make -j8
+   $ make install
+
+After installing UCX, there are several supported process management interfaces (PMI)
+that can be specified as options in order to build Charm++ with UCX. These include
+Simple PMI, Slurm PMI, Slurm PMI 2 and PMIx (using OpenMPI). Currently, in order to
+use PMIx for process management, it is required to have OpenMPI installed on the system.
+Additionally, in order to use the other supported process management interfaces, it is
+required to have a non-OpenMPI based MPI implementation installed on the system (e.g.
+Intel MPI, MVAPICH, MPICH, etc.).
+
+The following section shows examples of build commands that can be used to build targets
+with the UCX backend using different process management interfaces. It should be noted that
+unless UCX is installed in a system directory, in order for Charm++ to find the UCX installation,
+it is required to pass the UCX build directory as ``--basedir``.
+
+To build the Charm++ target with Simple PMI, do not specify any additional option as shown
+in the build command.
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+
+To build the Charm++ target with Slurm PMI, specify ``slurmpmi`` in the build command.
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 slurmpmi --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+
+Similarly, to build the Charm++ target with Slurm PMI 2, specify ``slurmpmi2`` in the build command.
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 slurmpmi2 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+
+To build the Charm++ target with PMIx, you would require an OpenMPI implementation with PMIx
+enabled to be installed on your system. In case OpenMPI is not available in your environment,
+you can build OpenMPI from scratch using the following steps:
+
+.. code-block:: bash
+
+  $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
+  $ tar -xvf openmpi-4.0.1.tar.gz
+  $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
+  $ make -j24
+  $ make install all
+
+After installing OpenMPI or using the pre-installed OpenMPI, you can build the Charm++ target with
+the UCX backend by specifying ``ompipmix`` in the build command and passing the OpenMPI installation
+path as ``--basedir`` (in addition to passing the UCX build directory)
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 ompipmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/openmpi-4.0.1/build -j16
+
+It should be noted that the pmix version is the most stable version of using the UCX backend. We're in the
+process of debugging some recent issues with Simple PMI, Slurm PMI and Slurm PMI2.
+
 .. _sec:compile:
 
 Compiling Charm++ Programs
@@ -10289,7 +10973,7 @@ of these modes is shown. Caution: in reality, one almost always has to
 add some command-line options in addition to the simplified syntax shown
 below. The options are described next.
 
-::
+.. code-block:: none
 
     * Compile C                            charmc -o pgm.o pgm.c
     * Compile C++                          charmc -o pgm.o pgm.C
@@ -10478,14 +11162,14 @@ load the executable onto the parallel machine.
 
 To run a Charm++ program named “pgm” on four processors, type:
 
-::
+.. code-block:: bash
 
-   charmrun pgm +p4
+   $ charmrun pgm +p4
 
 Execution on platforms which use platform specific launchers, (i.e.,
 **aprun**, **ibrun**), can proceed without charmrun, or charmrun can be
 used in coordination with those launchers via the ``++mpiexec`` (see
-:numref:`mpiexec` parameter.
+Section :numref:`mpiexec`) parameter.
 
 Programs built using the network version of Charm++ can be run alone,
 without charmrun. This restricts you to using the processors on the
@@ -10493,9 +11177,9 @@ local machine, but it is convenient and often useful for debugging. For
 example, a Charm++ program can be run on one processor in the debugger
 using:
 
-::
+.. code-block:: bash
 
-   gdb pgm
+   $ gdb pgm
 
 If the program needs some environment variables to be set for its
 execution on compute nodes (such as library paths), they can be set in
@@ -10507,6 +11191,10 @@ minimal level to avoid flooding the terminal with unimportant
 information. However, if you encounter trouble launching a job, try
 using the ``++verbose`` option to help diagnose the issue. (See the
 ``++quiet`` option to suppress output entirely.)
+
+Parameters that function as boolean flags within Charmrun (taking no
+other parameters) can be prefixed with "no-" to negate their effect.
+For example, ``++no-scalable-start``.
 
 .. _command line options:
 
@@ -10633,9 +11321,9 @@ The remaining options cover details of process launch and connectivity:
    ``++remote-shell`` and list them as part of the value after the
    executable name as follows:
 
-   ::
+   .. code-block:: bash
 
-      ./charmrun ++mpiexec ++remote-shell "mpiexec --YourArgumentsHere" ./pgm
+      $ ./charmrun ++mpiexec ++remote-shell "mpiexec --YourArgumentsHere" ./pgm
 
    Use of this option can potentially provide a few benefits:
 
@@ -10708,9 +11396,9 @@ The remaining options cover details of process launch and connectivity:
    Script to run node-program with. The specified run script is invoked
    with the node program and parameter. For example:
 
-   ::
+   .. code-block:: bash
 
-      ./charmrun +p4 ./pgm 100 2 3 ++runscript ./set_env_script
+      $ ./charmrun +p4 ./pgm 100 2 3 ++runscript ./set_env_script
 
    In this case, the ``set_env_script`` is invoked on each node before
    launching ``pgm``.
@@ -10783,9 +11471,9 @@ process there are two types of threads:
   schedules them on worker threads.
 | To use SMP mode in Charm++, build charm with the ``smp`` option, e.g.:
 
-::
+.. code-block:: bash
 
-   ./build charm++ netlrts-linux-x86_64 smp
+   $ ./build charm++ netlrts-linux-x86_64 smp
 
 There are various trade-offs associated with SMP mode. For instance,
 when using SMP mode there is no waiting to receive messages due to long
@@ -10866,9 +11554,9 @@ necessary to spawn one thread less than the number of cores in order to
 leave one free for the OS to run on. An example run command might look
 like:
 
-::
+.. code-block:: bash
 
-   ./charmrun ++ppn 3 +p6 +pemap 1-3,5-7 +commap 0,4 ./app <args>
+   $ ./charmrun ++ppn 3 +p6 +pemap 1-3,5-7 +commap 0,4 ./app <args>
 
 This will create two logical nodes/OS processes (2 = 6 PEs/3 PEs per
 node), each with three worker threads/PEs (``++ppn 3``). The worker
@@ -10939,7 +11627,7 @@ The format of this file allows you to define groups of machines, giving
 each group a name. Each line of the nodes file is a command. The most
 important command is:
 
-::
+.. code-block:: none
 
    host <hostname> <qualifiers>
 
@@ -10967,7 +11655,7 @@ All qualifiers accept “\*” as an argument, this resets the modifier to
 its default value. Note that currently, the passwd, cpus, and speed
 factors are ignored. Inline qualifiers are also allowed:
 
-::
+.. code-block:: none
 
    host beauty ++cpus 2 ++shell ssh
 
@@ -10977,7 +11665,7 @@ last qualifier on the “host” or “group” statement line.
 
 Here is a simple nodes file:
 
-::
+.. code-block:: none
 
            group kale-sun ++cpus 1
              host charm.cs.illinois.edu ++shell ssh
@@ -10994,9 +11682,9 @@ and group main. The ++nodegroup option is used to specify which group of
 machines to use. Note that there is wraparound: if you specify more
 nodes than there are hosts in the group, it will reuse hosts. Thus,
 
-::
+.. code-block:: bash
 
-           charmrun pgm ++nodegroup kale-sun +p6
+   $ charmrun pgm ++nodegroup kale-sun +p6
 
 uses hosts (charm, dp, grace, dagger, charm, dp) respectively as nodes
 (0, 1, 2, 3, 4, 5).
@@ -11004,9 +11692,9 @@ uses hosts (charm, dp, grace, dagger, charm, dp) respectively as nodes
 If you don’t specify a ++nodegroup, the default is ++nodegroup main.
 Thus, if one specifies
 
-::
+.. code-block:: bash
 
-           charmrun pgm +p4
+   $ charmrun pgm +p4
 
 it will use “localhost” four times. “localhost” is a Unix trick; it
 always find a name for whatever machine you’re on.
@@ -11035,6 +11723,23 @@ directory. Pathname resolution is performed as follows:
 
 #. The system tries to locate this program (with modified pathname and
    appended extension if specified) on all nodes.
+
+
+Instructions to run Charm++ programs for Specific Builds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+UCX
+^^^
+When Charm++ is built with UCX using Simple PMI, Slurm PMI or Slurm PMI2, ensure that
+an MPI implementation which is not OpenMPI is loaded in the environment. Use the mpirun
+launcher provided by the non-OpenMPI implementation to launch programs. Alternatively, you
+can also use any system provided launchers.
+
+When Charm++ is built with UCX using PMIx, ensure that an OpenMPI implementation is loaded
+in the environment. Use the mpiexec/mpirun launcher provided with OpenMPI to launch programs.
+
+Note that due to bug #2477, binaries built with UCX cannot be run in standalone mode i.e without
+a launcher.
 
 .. _sec:keywords:
 
@@ -11531,7 +12236,7 @@ The calls for recording user events are the following:
 
    Eg.
 
-   ::
+   .. code-block:: c++
 
          traceRegisterUserEvent("Critical Code", 20); // on PE 0
          double critStart = CmiWallTimer();;  // start time
@@ -11657,8 +12362,8 @@ bear, without worrying that they will perturb execution to avoid the
 bug.
 
 Support for record-replay is enabled in common builds of Charm++. Builds
-with the ``--with-production`` option disable this support to reduce
-overhead. To record traces, simply run the program with an additional
+with either of the ``--with-production`` or ``--disable-tracing`` options
+disable record-replay support. To record traces, simply run the program with an additional
 command line-flag ``+record``. The generated traces can be repeated with
 the command-line flag ``+replay``. The full range of parallel and
 sequential debugging techniques are available to apply during
@@ -11681,15 +12386,15 @@ single-process runs, it can be used directly:
 
 .. code-block:: bash
 
-   valgrind ...valgrind options... ./application_name ...application arguments...
+   $ valgrind ...valgrind options... ./application_name ...application arguments...
 
 When running in parallel, it is helpful to note a few useful adaptations
 of the above incantation, for various kinds of process launchers:
 
 .. code-block:: bash
 
-   ./charmrun +p2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
-   aprun -n 2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
+   $ ./charmrun +p2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
+   $ aprun -n 2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
 
 The first adaptation is to use :literal:`\`which valgrind\`` to obtain a
 full path to the valgrind binary, since parallel process launchers
@@ -11791,6 +12496,8 @@ Acknowledgements
 
 -  Esteban Pauli
 
+-  Evan Ramos
+
 -  Filippo Gioachin
 
 -  Gengbin Zheng
@@ -11806,6 +12513,8 @@ Acknowledgements
 -  Harshitha Menon
 
 -  Isaac Dooley
+
+-  Jaemin Choi
 
 -  Jayant DeSouza
 
@@ -11832,6 +12541,8 @@ Acknowledgements
 -  Lukasz Wesolowski
 
 -  Mani Srinivas Potnuru
+
+-  Matthias Diener
 
 -  Michael Robson
 
@@ -11864,6 +12575,8 @@ Acknowledgements
 -  Pritish Jetley
 
 -  Puneet Narula
+
+-  Raghavendra Kanakagiri
 
 -  Rahul Joshi
 
@@ -11908,6 +12621,8 @@ Acknowledgements
 -  Tim Hinrichs
 
 -  Timothy Knauff
+
+-  Venkatasubrahmanian Narayanan
 
 -  Vikas Mehta
 

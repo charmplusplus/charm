@@ -1,6 +1,5 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -17,6 +16,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_write_at_all_end as PMPI_File_write_at_all_end
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_write_at_all_end(MPI_File fh, const void *buf, MPI_Status *status) __attribute__((weak,alias("PMPI_File_write_at_all_end")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -25,7 +26,7 @@
 #endif
 
 /*@
-    MPI_File_write_at_all_end - Complete a split collective write using explict offset
+    MPI_File_write_at_all_end - Complete a split collective write using explicit offset
 
 Input Parameters:
 . fh - file handle (handle)
@@ -36,34 +37,12 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPI_File_write_at_all_end(MPI_File fh, void *buf, MPI_Status *status)
+int MPI_File_write_at_all_end(MPI_File fh, ROMIO_CONST void *buf, MPI_Status *status)
 {
-#ifndef PRINT_ERR_MSG
     int error_code;
     static char myname[] = "MPI_FILE_WRITE_AT_ALL_END";
-#endif
 
-#ifdef PRINT_ERR_MSG
-    if ((fh <= (MPI_File) 0) || (fh->cookie != ADIOI_FILE_COOKIE)) {
-	FPRINTF(stderr, "MPI_File_write_at_all_end: Invalid file handle\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-#else
-    ADIOI_TEST_FILE_HANDLE(fh, myname);
-#endif
+    error_code = MPIOI_File_write_all_end(fh, buf, myname, status);
 
-    if (!(fh->split_coll_count)) {
-#ifdef PRINT_ERR_MSG
-        FPRINTF(stderr, "MPI_File_write_at_all_end: Does not match a previous MPI_File_write_at_all_begin\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_IO, MPIR_ERR_NO_SPLIT_COLL,
-                              myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);
-#endif
-    }
-
-    fh->split_coll_count = 0;
-
-    return MPI_SUCCESS;
+    return error_code;
 }

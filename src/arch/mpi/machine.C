@@ -9,6 +9,7 @@
 #include <errno.h>
 #include "converse.h"
 #include <mpi.h>
+#include <algorithm>
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
@@ -50,7 +51,7 @@ static char* strsignal(int sig) {
  * POST_DIRECT_SEND            - Metadata message with Direct Send buffer information
  * */
 
-#define CMI_MSGTYPE(msg)            ((CmiMsgHeaderBasic *)msg)->msgType
+#define CMI_MSGTYPE(msg)            ((CmiMsgHeaderBasic *)msg)->mpiMsgType
 enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER_SEND, ONESIDED_BUFFER_RECV, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND};
 
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
@@ -283,7 +284,6 @@ static void reportMsgHistogramInfo(void);
 #define CHARM_MAGIC_NUMBER		 126
 
 #if CMK_ERROR_CHECKING
-CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len);
 static int checksum_flag = 0;
 #define CMI_SET_CHECKSUM(msg, len)	\
@@ -321,6 +321,7 @@ CpvDeclare(crashedRankList *, crashedRankPtr);
 int isRankDie(int rank);
 #endif
 
+#include "machine-rdma.h"
 #if CMK_ONESIDED_IMPL
 int srcRank;
 #if CMK_SMP
@@ -331,7 +332,6 @@ static CmiNodeLock rdmaTagLock = 0;
 #define RDMA_BASE_TAG     TAG+2
 #define RDMA_ACK_TAG      TAG-2
 int rdmaTag=RDMA_BASE_TAG;
-#include "machine-rdma.h"
 #include "machine-onesided.h"
 #endif //end of CMK_ONESIDED_IMPL
 
@@ -420,7 +420,7 @@ void CmiNotifyIdleForMPI(void);
 #include "machine-common-core.C"
 
 #if USE_MPI_CTRLMSG_SCHEME
-#include "machine-ctrlmsg.c"
+#include "machine-ctrlmsg.C"
 #endif
 
 SMSG_LIST *allocateSmsgList(char *msg, int destNode, int size, int mode, int type, void *ref) {
@@ -602,7 +602,7 @@ int CheckAsyncMsgSent(CmiCommHandle c) {
 }
 
 #if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
+#include "machine-onesided.C"
 #endif
 
 /* ######Beginning of functions related with communication progress ###### */
@@ -851,7 +851,9 @@ static int PumpMsgs(void) {
 	#endif
             if(CMI_MSGTYPE(msg) == REGULAR) {
               handleOneRecvedMsg(nbytes, msg);
-            } else if(CMI_MSGTYPE(msg) == POST_DIRECT_RECV || CMI_MSGTYPE(msg) == POST_DIRECT_SEND) {
+            }
+#if CMK_ONESIDED_IMPL
+            else if(CMI_MSGTYPE(msg) == POST_DIRECT_RECV || CMI_MSGTYPE(msg) == POST_DIRECT_SEND) {
 
               NcpyOperationInfo *ncpyOpInfoMsg = (NcpyOperationInfo *)msg;
               resetNcpyOpInfoPointers(ncpyOpInfoMsg);
@@ -875,12 +877,14 @@ static int PumpMsgs(void) {
 
               MPIPostOneBuffer(myBuffer,
                                ncpyOpInfoMsg,
-                               ncpyOpInfoMsg->srcSize,
+                               std::min(ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->destSize),
                                otherPe,
                                ncpyOpInfoMsg->tag,
                                postMsgType);
 
-            } else {
+            }
+#endif
+            else {
               CmiAbort("Invalid Type of message\n");
             }
         }
@@ -1217,7 +1221,6 @@ void CmiNotifyIdleForMPI(void) {
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some  implementations*/
 #if CMK_MACHINE_PROGRESS_DEFINED
-CMI_EXTERNC
 void CommunicationServerThread(int);
 
 void CmiMachineProgressImpl(void) {
@@ -1318,6 +1321,8 @@ void LrtsExit(int exitcode) {
     }
 }
 
+static int Cmi_truecrash;
+
 static void KillOnAllSigs(int sigNo) {
     static int already_in_signal_handler = 0;
     char *m;
@@ -1367,7 +1372,7 @@ static const char *thread_level_tostring(int thread_level) {
 #endif
 }
 
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietMode;
 
 /**
  *  Obtain the number of nodes, my node id, and consuming machine layer
@@ -1452,7 +1457,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #endif
 
     {
+#if CMK_OPTIMIZE
+        Cmi_truecrash = 0;
+#else
+        Cmi_truecrash = 1;
+#endif
         int debug = CmiGetArgFlag(largv,"++debug");
+        if (CmiGetArgFlagDesc(*argv,"+truecrash","Do not install signal handlers") || debug ||
+            CmiNumNodes()<=32) Cmi_truecrash = 1;
         int debug_no_pause = CmiGetArgFlag(largv,"++debug-no-pause");
         if (debug || debug_no_pause) {  /*Pause so user has a chance to start and attach debugger*/
 #if CMK_HAS_GETPID
@@ -1538,8 +1550,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
         printf("Charm++: Running in idle blocking mode.\n");
     }
 
-#if CMK_CHARMDEBUG
     /* setup signal handlers */
+  if(!Cmi_truecrash) {
 #if !defined(_WIN32)
     struct sigaction sa;
     sa.sa_handler = KillOnAllSigs;
@@ -1564,7 +1576,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     sigaction(SIGQUIT, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);
 #endif /*UNIX*/
-#endif
+  }
 
 #if CMK_NO_OUTSTANDING_SENDS
     no_outstanding_sends=1;

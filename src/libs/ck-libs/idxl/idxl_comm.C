@@ -361,7 +361,7 @@ void IDXL_Side::print(const IDXL_Print_Map *idxmap) const
   CkPrintf("Communication list: %d chunks, %d total entries\n",size(),total());
   for (int p=0;p<size();p++) {
     const IDXL_List &l=getLocalList(p);
-    CkPrintf("     With %d:",l.getDest(),l.size());
+    CkPrintf("     With %d, %d:",l.getDest(),l.size());
     for (int n=0;n<l.size();n++)
       idxmap->map(l[n]);
     CkPrintf("\n");

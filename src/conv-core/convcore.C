@@ -52,7 +52,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include "hrctimer.h"
 #ifndef __STDC_FORMAT_MACROS
 # define __STDC_FORMAT_MACROS
 #endif
@@ -85,10 +85,10 @@
 #include "machineEvents.h"     /* projector */
 #endif
 
-CMI_EXTERNC_VARIABLE const char * const CmiCommitID;
+extern const char * const CmiCommitID;
 
 #if CMI_QD
-CMI_EXTERNC void initQd(char **argv);
+void initQd(char **argv);
 #endif
 
 #if CMK_OUT_OF_CORE
@@ -106,10 +106,9 @@ CmiSwitchToPEFnPtr CmiSwitchToPE;
 #endif
 
 CpvExtern(int, _traceCoreOn);   /* projector */
-CMI_EXTERNC void CcdModuleInit(char **);
-CMI_EXTERNC
+void CcdModuleInit(char **);
 void CmiMemoryInit(char **);
-CMI_EXTERNC void CldModuleInit(char **);
+void CldModuleInit(char **);
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
@@ -153,13 +152,21 @@ CMI_EXTERNC void CldModuleInit(char **);
 #include <mpi.h>
 #endif
 
+#ifndef _WIN32
+void * CmiAlignedAlloc(size_t alignment, size_t size)
+{
+  void * ptr = nullptr;
+  errno = posix_memalign(&ptr, alignment, size);
+  return ptr;
+}
+#endif
+
 #if CMK_TRACE_ENABLED
 struct envelope;
 void traceAddThreadListeners(CthThread tid, struct envelope *env);
 #endif
 
-CMI_EXTERNC void seedBalancerExit(void);
-CMI_EXTERNC
+void seedBalancerExit(void);
 void EmergencyExit(void);
 
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
@@ -180,10 +187,8 @@ CpvDeclare(char *, _validProcessors);
 
 #if CMK_CUDA
 CpvExtern(int, n_hapi_events);
-CMI_EXTERNC
-void hapiPollEvents();
-CMI_EXTERNC
-void exitHybridAPI();
+extern "C" void hapiPollEvents();
+extern "C" void exitHybridAPI();
 #endif
 
 /*****************************************************************************
@@ -214,7 +219,6 @@ CpvDeclare(int,expIOBufferSize);
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
-CMI_EXTERNC
 void  *CmiGetNonLocalNodeQ();
 #endif
 
@@ -238,23 +242,20 @@ CpvDeclare(int,   _urgentSend);
 CmiNodeLock _smp_mutex;               /* for smp */
 
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
-CMI_EXTERNC
 void *infi_CmiAlloc(int size);
-CMI_EXTERNC
 void infi_CmiFree(void *ptr);
 void infi_freeMultipleSend(void *ptr);
-CMI_EXTERNC
 void infi_unregAndFreeMeta(void *ch);
 #endif
 
 #if CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
-CMI_EXTERNC void * CmiAlloc_bgq (int     size);
-CMI_EXTERNC void   CmiFree_bgq  (void  * buf);
+void * CmiAlloc_bgq (int     size);
+void   CmiFree_bgq  (void  * buf);
 #endif
 
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-CMI_EXTERNC void * CmiAlloc_ppcq (int     size);
-CMI_EXTERNC void   CmiFree_ppcq  (void  * buf);
+void * CmiAlloc_ppcq (int     size);
+void   CmiFree_ppcq  (void  * buf);
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -263,10 +264,10 @@ CpvDeclare(Queue, CsdGridQueue);
 #endif
 
 #if CMK_CRAYXE || CMK_CRAYXC || CMK_OFI
-CMI_EXTERNC void* LrtsAlloc(int, int);
-CMI_EXTERNC void* LrtsRdmaAlloc(int, int);
-CMI_EXTERNC void  LrtsFree(void*);
-CMI_EXTERNC void  LrtsRdmaFree(void*);
+void* LrtsAlloc(int, int);
+void* LrtsRdmaAlloc(int, int);
+void  LrtsFree(void*);
+void  LrtsRdmaFree(void*);
 #endif
 
 CpvStaticDeclare(int, cmiMyPeIdle);
@@ -278,8 +279,7 @@ CpvDeclare(void *, CmiSuspendedTaskQueue);
 
 CpvDeclare(int, isHelperOn);
 
-CMI_EXTERNC_VARIABLE int CmiMyLocalRank;
-
+extern int CmiMyLocalRank;
 int    CmiMyLocalRank;        /* local rank only for scalable startup */
 
 #if CMK_LOCKLESS_QUEUE
@@ -593,7 +593,7 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
   int dummy = 0, found = CmiGetArgIntDesc(argv, arg, &dummy, desc);
 
   if (found)
-    CmiPrintf(warning);
+    CmiPrintf("%s", warning);
 }
 
 /*****************************************************************************
@@ -601,7 +601,13 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
  * Stack tracing routines.
  *
  *****************************************************************************/
-#include "cmibacktrace.c"
+#include "cmibacktrace.C"
+#include "cmidemangle.h"
+
+#if CMK_USE_BACKTRACE
+#include <dlfcn.h> // for dladdr()
+#include <libgen.h> // for basename()
+#endif
 
 /*
 Convert "X(Y) Z" to "Y Z"-- remove text prior to first '(', and supress
@@ -645,27 +651,27 @@ static const char* _implGetBacktraceSys(const char *name) {
 
 /** Print out the names of these function pointers. */
 void CmiBacktracePrint(void **retPtrs,int nLevels) {
-  if (nLevels>0) {
-    int i;
-    char **names=CmiBacktraceLookup(retPtrs,nLevels);
-    if (names==NULL) return;
+#if CMK_USE_BACKTRACE
+  if (nLevels > 0) {
     CmiPrintf("[%d] Stack Traceback:\n", CmiMyPe());
-    for (i=0;i<nLevels;i++) {
-      if (names[i] == NULL) continue;
-      {
-      const char *trimmed=_implTrimParenthesis(names[i], 0);
-      const char *print=trimmed;
-      const char *sys=_implGetBacktraceSys(print);
-      if (sys) {
-          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n",i,sys,print);
+    for (int i = 0; i < nLevels; ++i) {
+      Dl_info info;
+      int res = dladdr(retPtrs[i], &info);
+      if (res) { /* dladdr() succeeded, print the address, filename, and function name */
+        const char *filename = basename((char*)info.dli_fname);
+        const std::string demangled_symbol_name = CmiDemangle(info.dli_sname);
+        const char *sys=_implGetBacktraceSys(demangled_symbol_name.c_str());
+        if (sys) {
+          CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n", i, sys, demangled_symbol_name.c_str());
           break; /*Stop when we hit Charm++ runtime.*/
-      } else {
-          CmiPrintf("  [%d:%d] %s\n",CmiMyPe(),i,print);
+        }
+        CmiPrintf("  [%d:%d] %s %p %s\n", CmiMyPe(), i, filename, retPtrs[i], demangled_symbol_name.c_str());
+      } else { /* dladdr() failed, just print the address */
+        CmiPrintf("  [%d:%d] %p\n", CmiMyPe(), i, retPtrs[i]);
       }
-     }
     }
-    free(names);
   }
+#endif
 }
 
 /* Print (to stdout) the names of the functions that have been 
@@ -1035,7 +1041,6 @@ double CmiInitTime(void)
 
 void CmiTimerInit(char **argv)
 {
-  struct timeval tv;
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
 
@@ -1043,12 +1048,15 @@ void CmiTimerInit(char **argv)
   if(CmiMyRank() == 0) _absoluteTime = tmptime;   /* initialize only  once */
 #if !(__FAULT__)
   /* try to synchronize calling barrier */
-  CmiBarrier();
+
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    {
+      CmiBarrier();
+    }
 #endif
 if(CmiMyRank() == 0) /* initialize only  once */
   {
-    gettimeofday(&tv,0);
-    inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
+    inittime_wallclock = inithrc();
 #ifndef RUSAGE_WHO
     CpvAccess(inittime_virtual) = inittime_wallclock;
 #else
@@ -1060,7 +1068,8 @@ if(CmiMyRank() == 0) /* initialize only  once */
   }
 
 #if !(__FAULT__)
-  CmiBarrier();
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    CmiBarrier();
 /*  CmiBarrierZero(); */
 #endif
 }
@@ -1086,18 +1095,9 @@ static double lastT = -1.0;
 
 double CmiWallTimer(void)
 {
-  struct timeval tv;
   double currenttime;
-
-  gettimeofday(&tv,0);
-  currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
-#if CMK_ERROR_CHECKING
-  if (lastT > 0.0 && currenttime < lastT) {
-    currenttime = lastT;
-  }
-  lastT = currenttime;
-#endif
-  return _absoluteTime?currenttime:currenttime - inittime_wallclock;
+  currenttime = gethrctime();
+  return _absoluteTime?currenttime+inittime_wallclock:currenttime;
 }
 
 double CmiTimer(void)
@@ -1151,8 +1151,12 @@ void CmiTimerInit(char **argv)
 {
   struct rusage ru;
 
-  CmiBarrier();
-
+#if !(__FAULT__)
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    {
+      CmiBarrier();
+    }
+#endif
   _cpu_speed_factor = 1.0/(readMHz()*1.0e6); 
   rdtsc(); rdtsc(); rdtsc(); rdtsc(); rdtsc();
   CpvInitialize(double, inittime_walltime);
@@ -1162,8 +1166,10 @@ void CmiTimerInit(char **argv)
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
-
-  CmiBarrierZero();
+#if !(__FAULT__)
+  if(CpvAccess(cmiArgDebugFlag)==0)
+    CmiBarrierZero();
+#endif  
 }
 
 double CmiCpuTimer(void)
@@ -1222,7 +1228,9 @@ void CmiTimerInit(char **argv)
 
   /* try to synchronize calling barrier */
 #if !(__FAULT__)
-  CmiBarrier();
+  if(CpvAccess(cmiArgDebugFlag)==0){
+    CmiBarrier();
+  }
 #endif
   CpvAccess(inittime) = GetTimeBase (); 
 }
@@ -1249,7 +1257,6 @@ double CmiTimer(void)
 
 #if CMK_TIMER_USE_PPC64
 
-#include <sys/time.h>
 #include <sys/time.h>
 #include <sys/platform/ppc.h>
 
@@ -1290,12 +1297,6 @@ static inline uint64_t PPC64_TimeBase(void)
   return result;
 }
 
-uint64_t __micro_timer (void) {
-  struct timeval tv;
-  gettimeofday( &tv, 0 );
-  return tv.tv_sec * 1000000ULL + tv.tv_usec;
-}
-
 void CmiTimerInit(char **argv)
 {
   CpvInitialize(double, clocktick);
@@ -1303,7 +1304,7 @@ void CmiTimerInit(char **argv)
   CpvAccess(clocktick) =  1.0 / ((double) __ppc_get_timebase_freq());
 
   /* try to synchronize calling barrier */
-#if !(__FAULT__)
+#if !(__FAULT__) && !CMK_CHARMDEBUG
   CmiBarrier();
 #endif
   CpvAccess(inittime) = PPC64_TimeBase ();
@@ -1525,7 +1526,6 @@ int CmiLongSendQueue(int forNode,int longerThanBytes) {
 
 #if CMK_SIGNAL_USE_SIGACTION
 #include <signal.h>
-CMI_EXTERNC
 void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 {
   struct sigaction in, out ;
@@ -1543,7 +1543,6 @@ void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 
 #if CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
 #include <signal.h>
-CMI_EXTERNC
 void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 {
   struct sigaction in, out ;
@@ -1883,6 +1882,9 @@ int CsdScheduler(int maxmsgs)
       if (*CsdStopFlag_ptr != cycle) break;
 
 /*No message available-- go (or remain) idle*/
+#if CSD_NO_IDLE_TRACING
+#define SCHEDULE_IDLE /* do nothing */
+#else
 #define SCHEDULE_IDLE \
       if (!isIdle) {isIdle=1;CsdBeginIdle();}\
       else CsdStillIdle();\
@@ -1890,11 +1892,11 @@ int CsdScheduler(int maxmsgs)
 	CsdEndIdle();\
 	break;\
       }
+#endif
 
 /*
 	EVAC
 */
-extern void CkClearAllArrayElements(void);
 
 
 extern void machine_OffloadAPIProgress(void);
@@ -1902,14 +1904,10 @@ extern void machine_OffloadAPIProgress(void);
 /** The main scheduler loop that repeatedly executes messages from a queue, forever. */
 void CsdScheduleForever(void)
 {
-  #if CMK_CELL
-    #define CMK_CELL_PROGRESS_FREQ  96  /* (MSG-Q Entries x1.5) */
-    int progressCount = CMK_CELL_PROGRESS_FREQ;
-  #endif
-
   int isIdle=0;
   SCHEDULE_TOP
   while (1) {
+#if !CMK_NO_INTEROP
     /* The interoperation will cost this little overhead in scheduling */
     if(CharmLibInterOperate) {
       if(CpvAccess(interopExitFlag)) {
@@ -1917,6 +1915,7 @@ void CsdScheduleForever(void)
         break;
       }
     }
+#endif
     #if CMK_CUDA
     // check if any GPU work needs to be processed
     if (CpvAccess(n_hapi_events) > 0) {
@@ -1925,27 +1924,16 @@ void CsdScheduleForever(void)
     #endif
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
+#if !CSD_NO_IDLE_TRACING
       if (isIdle) {isIdle=0;CsdEndIdle();}
+#endif
       SCHEDULE_MESSAGE
-
-      #if CMK_CELL
-        if (progressCount <= 0) {
-          /*OffloadAPIProgress();*/
-          machine_OffloadAPIProgress();
-          progressCount = CMK_CELL_PROGRESS_FREQ;
-	}
-        progressCount--;
-      #endif
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
-
-      #if CMK_CELL
-        /*OffloadAPIProgress();*/
-        machine_OffloadAPIProgress();
-        progressCount = CMK_CELL_PROGRESS_FREQ;
-      #endif
     }
+#if !CSD_NO_PERIODIC
     CsdPeriodic();
+#endif
   }
 }
 int CsdScheduleCount(int maxmsgs)
@@ -1955,14 +1943,18 @@ int CsdScheduleCount(int maxmsgs)
   while (1) {
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
+#if !CSD_NO_IDLE_TRACING
       if (isIdle) {isIdle=0;CsdEndIdle();}
+#endif
       maxmsgs--; 
       SCHEDULE_MESSAGE
       if (maxmsgs==0) break;
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
     }
+#if !CSD_NO_PERIODIC
     CsdPeriodic();
+#endif
   }
   return maxmsgs;
 }
@@ -1972,7 +1964,9 @@ void CsdSchedulePoll(void)
   SCHEDULE_TOP
   while (1)
   {
+#if !CSD_NO_PERIODIC
 	CsdPeriodic();
+#endif
         /*CmiMachineProgressImpl(); ??? */
 	if (NULL!=(msg = CsdNextMessage(&state)))
 	{
@@ -2004,7 +1998,9 @@ void CmiDeliverSpecificMsg(int handler)
  
   side = 0;
   while (1) {
+#if !CSD_NO_PERIODIC
     CsdPeriodic();
+#endif
     side ^= 1;
     if (side) msg = (int *)CmiGetNonLocal();
     else      msg = (int *)CdsFifo_Dequeue(localqueue);
@@ -2090,7 +2086,6 @@ CthThread CthSuspendSchedulingThread(void)
 }
 
 /* Notice: For changes to the following function, make sure the function CthResumeNormalThreadDebug is also kept updated. */
-CMI_EXTERNC
 void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
@@ -2849,42 +2844,23 @@ void CmiGroupInit(void)
 
 #if CMK_MULTICAST_LIST_USE_COMMON_CODE
 
-void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
+void CmiSyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   int i;
-#if CMK_BROADCAST_USE_CMIREFERENCE
-  for(i=0;i<npes;i++) {
-    if (pes[i] == CmiMyPe())
-      CmiSyncSend(pes[i], len, msg);
-    else {
-      CmiReference(msg);
-      CmiSyncSendAndFree(pes[i], len, msg);
-    }
-  }
-#else
   for(i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
-#endif
 }
 
-CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
+CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   /* A better asynchronous implementation may be wanted, but at least it works */
   CmiSyncListSendFn(npes, pes, len, msg);
   return (CmiCommHandle) 0;
 }
 
-void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
+void CmiFreeListSendFn(int npes, const int *pes, int len, char *msg)
 {
-#if CMK_BROADCAST_USE_CMIREFERENCE
-  if (npes == 1) {
-    CmiSyncSendAndFree(pes[0], len, msg);
-    return;
-  }
-  CmiSyncListSendFn(npes, pes, len, msg);
-  CmiFree(msg);
-#else
   int i;
   for(i=0;i<npes-1;i++) {
     CmiSyncSend(pes[i], len, msg);
@@ -2893,7 +2869,6 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
     CmiSyncSendAndFree(pes[npes-1], len, msg);
   else 
     CmiFree(msg);
-#endif
 }
 
 #endif
@@ -3072,6 +3047,8 @@ void *CmiAlloc(int size)
   res+=sizeof(CmiChunkHeader);
   CmiAssert((intptr_t)res % ALIGN_BYTES == 0);
 
+  CmiInitMsgHeader(res, size);
+
   SIZEFIELD(res)=size;
   REFFIELDSET(res, 1);
   return (void *)res;
@@ -3094,6 +3071,7 @@ void *CmiRdmaAlloc(int size) {
   res+=sizeof(CmiChunkHeader);
   CmiAssert((intptr_t)res % ALIGN_BYTES == 0);
 
+  CmiInitMsgHeader(res, size);
   SIZEFIELD(res)=size;
   REFFIELDSET(res, 1);
   return (void *)res;
@@ -3108,6 +3086,16 @@ static void *CmiAllocFindEnclosing(void *blk) {
     refCount = REFFIELD(blk);
   }
   return blk;
+}
+
+void CmiInitMsgHeader(void *msg, int size) {
+  if(size >= CmiMsgHeaderSizeBytes) {
+#if CMK_ONESIDED_IMPL
+    // Set zcMsgType in the converse message header to CMK_REG_NO_ZC_MSG
+    CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
+#endif
+    CMI_MSG_NOKEEP(msg) = 0;
+  }
 }
 
 int CmiGetReference(void *blk)
@@ -3382,6 +3370,7 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
   CmiMultipleSendHeader header;
   int m; /* Outgoing message */
 
+  CmiInitMsgHeader(header.convHeader, sizeof(CmiMultipleSendHeader));
 #if CMK_USE_IBVERBS
   infiCmiChunkHeader *msgHdr;
 #else
@@ -3629,14 +3618,14 @@ static void CIdleTimeoutInit(char **argv)
  *
  *****************************************************************************/
 
-CMI_EXTERNC void CrnInit(void);
-CMI_EXTERNC void CmiIsomallocInit(char **argv);
+void CrnInit(void);
+void CmiIsomallocInit(char **argv);
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
 void CmiIOInit(char **argv);
 #endif
 
-/* defined in cpuaffinity.c */
-CMI_EXTERNC void CmiInitCPUAffinityUtil(void);
+/* defined in cpuaffinity.C */
+void CmiInitCPUAffinityUtil(void);
 
 static void CmiProcessPriority(char **argv)
 {
@@ -3657,7 +3646,7 @@ static void CmiProcessPriority(char **argv)
 #else
     HANDLE hProcess = GetCurrentProcess();
     DWORD dwPriorityClass = NORMAL_PRIORITY_CLASS;
-    char *prio_str = "NORMAL_PRIORITY_CLASS";
+    const char *prio_str = "NORMAL_PRIORITY_CLASS";
     BOOL status;
     /*
        <-20:      real time
@@ -3754,13 +3743,13 @@ static void checkTSanOptions(void)
 #endif
 
 #if CMK_CCS_AVAILABLE
-CMI_EXTERNC_VARIABLE int ccsRunning;
+extern int ccsRunning;
 int ccsRunning;
 #endif
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 int quietModeRequested;  // user has requested quiet mode
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietMode;
 int quietMode; // quiet mode active (CmiPrintf's are disabled)
 CmiSpanningTreeInfo* _topoTree = NULL;
 
@@ -3789,7 +3778,6 @@ CmiSpanningTreeInfo* _topoTree = NULL;
   won't work properly until they're initialized.  For example,
   nobody can register handlers before calling CmiHandlerInit.
 */
-CMI_EXTERNC
 void ConverseCommonInit(char **argv)
 {
   CpvInitialize(int, _urgentSend);
@@ -3805,19 +3793,21 @@ void ConverseCommonInit(char **argv)
   CmiIOInit(argv);
 #endif
   if (CmiMyPe() == 0)
-      CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
+    CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
 
   CpvInitialize(int, cmiMyPeIdle);
   CpvAccess(cmiMyPeIdle) = 0;
-
 #if CONVERSE_POOL
   CmiPoolAllocInit(30);  
 #endif
   CmiTmpInit(argv);
+  if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
+    {
+      CpvAccess(cmiArgDebugFlag) = 1;
+    }
   CmiTimerInit(argv);
   CstatsInit(argv);
   CmiInitCPUAffinityUtil();
-
   CcdModuleInit(argv);
   CmiHandlerInit();
   CmiReductionsInit();
@@ -3840,7 +3830,7 @@ void ConverseCommonInit(char **argv)
     if(CmiMyRank() == 0) CmiAbort("The option +CmiSpinOnIdle is mutually exclusive with the options +CmiSleepOnIdle and +CmiNoProcForComThread");
   }
 #endif
-	
+
 #if CMK_TRACE_ENABLED
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
@@ -3853,14 +3843,20 @@ void ConverseCommonInit(char **argv)
 
   CmiPersistentInit();
   CmiIsomallocInit(argv);
+
+#if !CMK_ONESIDED_IMPL
   // Initialize converse handlers for supporting generic Direct Nocopy API
   CmiOnesidedDirectInit();
+#endif
+
   CmiDeliversInit();
   CsdInit(argv);
+
 #if CMK_CCS_AVAILABLE
   ccsRunning = 0;
   CcsInit(argv);
 #endif
+
   CpdInit();
   CthSchedInit();
   CmiGroupInit();
@@ -3874,11 +3870,6 @@ void ConverseCommonInit(char **argv)
   CmiInitImmediateMsg();
   CldModuleInit(argv);
   
-#if CMK_CELL
-  void CmiInitCell();
-  CmiInitCell();
-#endif
-
   /* main thread is suspendable */
 /*
   CthSetSuspendable(CthSelf(), 0);
@@ -3890,7 +3881,6 @@ void ConverseCommonInit(char **argv)
 #endif
 }
 
-CMI_EXTERNC
 void ConverseCommonExit(void)
 {
   CcsImpl_kill();
@@ -3902,10 +3892,6 @@ void ConverseCommonExit(void)
 
 #if CMI_IO_BUFFER_EXPLICIT
   CmiFlush(stdout);  /* end of program, always flush */
-#endif
-
-#if CMK_CELL
-  CloseOffloadAPI();
 #endif
 
 #if CMK_CUDA
@@ -3921,31 +3907,6 @@ void ConverseCommonExit(void)
   EmergencyExit();
 }
 
-
-#if CMK_CELL != 0
-
-extern void register_accel_spe_funcs(void);
-
-void CmiInitCell(void)
-{
-  // Create a unique string for each PPE to use for the timing
-  //   data file's name
-  char fileNameBuf[64];
-  sprintf(fileNameBuf, "speTiming.%d", CmiMyPe());
-
-  InitOffloadAPI(offloadCallback, NULL, NULL, fileNameBuf);
-  //CcdCallOnConditionKeep(CcdPERIODIC, 
-  //      (CcdVoidFn) OffloadAPIProgress, NULL);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) OffloadAPIProgress, NULL);
-
-  // Register accelerated entry methods on the PPE
-  register_accel_spe_funcs();
-}
-
-#include "cell-api.c"
-
-#endif
 
 /****
  * CW Lee - 9/14/2005
@@ -4015,7 +3976,7 @@ void CmiPrintf(const char *format, ...)
   }
   va_end(args);
 #if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);
@@ -4035,7 +3996,7 @@ void CmiError(const char *format, ...)
   CmiFlush(stderr);  /* stderr is always flushed */
   va_end(args);
 #if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);
@@ -4049,8 +4010,7 @@ void CmiError(const char *format, ...)
 
 void __cmi_assert(const char *errmsg)
 {
-  CmiError("[%d] %s\n", CmiMyPe(), errmsg);
-  CmiAbort(errmsg);
+  CmiAbort("[%d] %s\n", CmiMyPe(), errmsg);
 }
 
 char *CmiCopyMsg(char *msg, int len)
@@ -4061,7 +4021,6 @@ char *CmiCopyMsg(char *msg, int len)
   return copy;
 }
 
-CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len)
 {
   int i;

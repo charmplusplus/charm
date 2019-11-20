@@ -29,12 +29,6 @@
 #define CkMsgAlignOffset(x)     (CkMsgAlignLength(x)-(x))
 #define CkPriobitsToInts(nBits)    ((nBits+CkIntbits-1)/CkIntbits)
 
-#if CMK_MESSAGE_LOGGING
-#define CK_FREE_MSG_MLOG 	0x1
-#define CK_BYPASS_DET_MLOG 	0x2
-#define CK_MULTICAST_MSG_MLOG 	0x4
-#define CK_REDUCTION_MSG_MLOG 	0x8
-#endif
 
 /**
     \addtogroup CriticalPathFramework 
@@ -91,9 +85,6 @@ typedef unsigned short UShort;
 typedef unsigned char  UChar;
 
 #include "charm.h" // for CkGroupID, and CkEnvelopeType
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#include "ckobjid.h" //for the ckobjId
-#endif
 
 /**
 @addtogroup CkEnvelope
@@ -180,33 +171,13 @@ namespace ck {
       UChar queueing:4; ///< Queueing strategy (FIFO, LIFO, PFIFO, ...)
       UChar isPacked:1; ///< If true, message must be unpacked before use
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
-      UChar isRdma:1;   ///< True if msg has Rdma parameters
       UChar isVarSysMsg:1; ///< True if msg is a variable sized sys message that doesn't use a pool
     };
 
   }
 }
 
-#if (defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-#define CMK_ENVELOPE_FT_FIELDS                           \
-  CkObjID sender;                                        \
-  CkObjID recver;                                        \
-  MCount SN;                                             \
-  int incarnation;                                       \
-  int flags;                                             \
-  UInt piggyBcastIdx;
-#elif defined(_FAULT_CAUSAL_)
-#define CMK_ENVELOPE_FT_FIELDS                           \
-  CkObjID sender;                                        \
-  CkObjID recver;                                        \
-  MCount SN;                                             \
-  MCount TN;                                             \
-  int incarnation;                                       \
-  int flags;                                             \
-  UInt piggyBcastIdx;
-#else
 #define CMK_ENVELOPE_FT_FIELDS
-#endif
 
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
 #define CMK_ENVELOPE_OPTIONAL_FIELDS                                           \
@@ -306,9 +277,7 @@ public:
     }
 
     UChar  isPacked(void) const { return attribs.isPacked; }
-    UChar  isRdma(void) const { return attribs.isRdma; }
     void   setPacked(const UChar p) { attribs.isPacked = p; }
-    void   setRdma(const UChar b) { attribs.isRdma = b; }
     UChar  isVarSysMsg(void) const { return attribs.isVarSysMsg; }
     void   setIsVarSysMsg(const UChar d) { attribs.isVarSysMsg = d; }
     UShort getPriobits(void) const { return priobits; }
@@ -321,7 +290,7 @@ public:
     void* getGroupDepPtr(void) const {
       return (void *)((char *)this + totalsize - getGroupDepSize());
     }
-    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0, const GroupDepNum groupDepNumRequest=GroupDepNum{})
+    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0, const GroupDepNum groupDepNumRequest=GroupDepNum{}, const bool incEvent=true)
     {
 #if CMK_LOCKLESS_QUEUE
       CkAssert(type>=NewChareMsg && type<LAST_CK_ENVELOPE_TYPE);
@@ -344,16 +313,17 @@ public:
 #if CMK_REPLAYSYSTEM
       //for record-replay
       memset(env, 0, sizeof(envelope));
-      env->setEvent(++CkpvAccess(envelopeEventID));
+      if(incEvent)
+	env->setEvent(++CkpvAccess(envelopeEventID));
+      else
+	env->setEvent(CkpvAccess(envelopeEventID));
 #endif
       env->setMsgtype(type);
       env->totalsize = tsize;
       env->priobits = prio;
       env->setPacked(0);
-      env->setRdma(0);
       env->setGroupDepNum((int)groupDepNumRequest);
       _SET_USED(env, 0);
-      env->setRef(0);
       env->setEpIdx(0);
       env->setIsVarSysMsg(0);
 
@@ -361,16 +331,6 @@ public:
       env->pathHistory.reset();
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-      env->sender.type = TypeInvalid;
-      env->recver.type = TypeInvalid;
-      env->SN = 0;
-      env->flags = 0;
-#if defined(_FAULT_CAUSAL_)
-      env->TN = 0;
-#endif
-	  env->incarnation = -1;
-#endif
 
       return env;
     }
@@ -518,6 +478,12 @@ inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0
   return envelope::alloc(msgtype,size,prio,groupDepNum);
 }
 
+#if CMK_REPLAYSYSTEM
+inline envelope *_allocEnvNoIncEvent(const int msgtype, const int size=0, const int prio=0, const GroupDepNum groupDepNum=GroupDepNum{}) {
+  return envelope::alloc(msgtype,size,prio,groupDepNum,false);
+}
+#endif
+
 inline void *_allocMsg(const int msgtype, const int size, const int prio=0, const GroupDepNum groupDepNum=GroupDepNum{}) {
   return EnvToUsr(envelope::alloc(msgtype,size,prio,groupDepNum));
 }
@@ -554,13 +520,6 @@ private:
     }
 public:
     MsgPool():SafePool<void*>(_alloc, CkFreeMsg, _reset) {}
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        void *get(void){
-            return allocfn();
-        }
-        void put(void *m){
-        }
-#endif
 };
 
 CkpvExtern(MsgPool*, _msgPool);

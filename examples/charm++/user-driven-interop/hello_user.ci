@@ -1,11 +1,17 @@
+/* Using the preprocessor in this way is non-idiomatic, but it is here
+ * to keep the test case compact while allowing parallel building. */
+#ifdef HELLO_USE_MAINCHARE
+mainmodule hello_user_with_main {
+#else
 mainmodule hello_user {
-  readonly CProxy_Main main_proxy;
-  readonly CProxy_Hello hello_array; 
+#endif
+  readonly CProxy_Hello helloProxy;
 
+#ifdef HELLO_USE_MAINCHARE
   mainchare Main {
     entry Main(CkArgMsg*);
-    entry [reductiontarget] void done();
   };
+#endif
 
   array[1D] Hello {
     entry Hello();

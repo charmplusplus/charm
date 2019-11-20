@@ -3,7 +3,7 @@ CHARMDIR=../..
 
 CUDA_PATH := $(CUDA_DIR)
 CHARMC    := $(CHARMDIR)/bin/charmc
-FLAGS     := $(OPTSATBUILDTIME) -DHAPI_MEMPOOL
+FLAGS     := $(OPTSATBUILDTIME)
 INC       := -I$(CUDA_PATH)/include -I..
 
 all: libs
