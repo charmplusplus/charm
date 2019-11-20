@@ -2155,8 +2155,6 @@ void CkLocMgr::pup(PUP::er &p){
             p | pe;
   //          CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe);
             inform(lookupIdx(id), id, pe);
-            CkLocRec *rec = elementNrec(id);
-            CmiAssert(rec!=NULL);
             CmiAssert(lastKnown(id) == pe);
         }
 #endif
