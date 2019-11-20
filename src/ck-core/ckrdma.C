@@ -854,11 +854,10 @@ int getSrcPe(envelope *env) {
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   up|numops;
   up|rootNode;
-  for(int i=0; i<numops; i++){
-    CkNcpyBuffer w;
-    up|w;
-    return w.pe;
-  }
+  CmiEnforce(numops > 0);
+  CkNcpyBuffer w;
+  up|w;
+  return w.pe;
 }
 
 int getRootNode(envelope *env) {
