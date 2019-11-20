@@ -1048,7 +1048,6 @@ void CmiTimerInit(char **argv)
   if(CmiMyRank() == 0) _absoluteTime = tmptime;   /* initialize only  once */
 #if !(__FAULT__)
   /* try to synchronize calling barrier */
-
   if(CpvAccess(cmiArgDebugFlag)==0)
     {
       CmiBarrier();
@@ -1150,7 +1149,6 @@ double CmiInitTime(void)
 void CmiTimerInit(char **argv)
 {
   struct rusage ru;
-
 #if !(__FAULT__)
   if(CpvAccess(cmiArgDebugFlag)==0)
     {
