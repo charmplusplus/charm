@@ -875,6 +875,7 @@ static void CmiIsomallocInitExtent()
     }   /* end of rank 0 */
     else
     {
+      // Match the 4 CmiBarrier() calls of rank 0 in the if above
       CmiBarrier();
       CmiBarrier();
       CmiBarrier();
