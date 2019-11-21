@@ -1495,6 +1495,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     if (*myNodeID >= num_workpes) {    /* is spare processor */
       if(CmiGetArgFlag(largv,"+isomalloc_sync")){
+          // Match the 4 CmiBarrier() calls in isomalloc.C:CmiIsomallocInitExtent()
           MPI_Barrier(charmComm);
           MPI_Barrier(charmComm);
           MPI_Barrier(charmComm);
