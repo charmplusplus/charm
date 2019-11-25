@@ -337,17 +337,16 @@ static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
                                        ucp_tag_message_h msg)
 {
     UcxRequest *req = UcxPostRxReqInternal(tag, size, msg);
+    int idx = req->idx;
 
     do {
         if (req->completed) {
-            int idx = req->idx;
-
             UCX_REQUEST_FREE(req);
 
             if (tag & UCX_MSG_TAG_EAGER) {
                 req = UcxPostRxReqInternal(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
-                req->idx = idx;
                 ucxCtx.rxReqs[idx] = req;
+                std::swap(req->idx, idx);
             } else {
                 return NULL;
             }
