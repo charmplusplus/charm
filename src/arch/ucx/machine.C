@@ -36,7 +36,7 @@
 #define UCX_MSG_NUM_RX_REQS_MAX         1024
 #define UCX_TAG_MSG_BITS                4
 #define UCX_TAG_RMA_BITS                4
-#define UCX_MSG_TAG_DIRECT              UCS_BIT(0)
+#define UCX_MSG_TAG_EAGER               UCS_BIT(0)
 #define UCX_MSG_TAG_PROBE               UCS_BIT(1)
 #define UCX_RMA_TAG_GET                 UCS_BIT(UCX_TAG_MSG_BITS + 1)
 #define UCX_RMA_TAG_REG_AND_SEND_BACK   UCS_BIT(UCX_TAG_MSG_BITS + 2)
@@ -298,13 +298,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
             ucxCtx.numRxReqs, ucxCtx.eagerSize);
 }
 
-static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
-                                       ucp_tag_message_h msg)
+static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
+                                               ucp_tag_message_h msg)
 {
     void *buf = CmiAlloc(size);
     UcxRequest *req;
 
-    if (tag == UCX_MSG_TAG_DIRECT) {
+    if (tag == UCX_MSG_TAG_EAGER) {
         req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, buf,
                                            ucxCtx.eagerSize,
                                            ucp_dt_make_contig(1), tag,
@@ -323,26 +323,40 @@ static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
 
     // Request completed immediately
     if (req->completed) {
-        int idx = req->idx;
-
         if (!(tag & UCX_RMA_TAG_MASK)) {
             handleOneRecvedMsg(size, (char*)buf);
-        }
-
-        UCX_REQUEST_FREE(req);
-
-        if (tag & UCX_MSG_TAG_DIRECT) {
-            ucxCtx.rxReqs[idx] = UcxPostRxReq(UCX_MSG_TAG_DIRECT, ucxCtx.eagerSize, NULL);
-            ucxCtx.rxReqs[idx]->idx = idx;
-            req = ucxCtx.rxReqs[idx];
-        } else {
-            return NULL;
         }
     } else {
         req->msgBuf = buf;
     }
 
     return req;
+}
+
+static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
+                                       ucp_tag_message_h msg)
+{
+    UcxRequest *req = UcxPostRxReqInternal(tag, size, msg);
+
+    do {
+        if (req->completed) {
+            int idx = req->idx;
+
+            UCX_REQUEST_FREE(req);
+
+            if (tag & UCX_MSG_TAG_EAGER) {
+                req = UcxPostRxReqInternal(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
+                req->idx = idx;
+                ucxCtx.rxReqs[idx] = req;
+            } else {
+                return NULL;
+            }
+        }
+        else {
+            return req;
+        }
+    }
+    while (1);
 }
 
 static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, char *rxBuf,
@@ -354,8 +368,8 @@ static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, char *rxBuf,
 
     UCX_REQUEST_FREE(request);
 
-    if (tag & UCX_MSG_TAG_DIRECT) {
-        ucxCtx.rxReqs[idx]      = UcxPostRxReq(UCX_MSG_TAG_DIRECT,
+    if (tag & UCX_MSG_TAG_EAGER) {
+        ucxCtx.rxReqs[idx]      = UcxPostRxReq(UCX_MSG_TAG_EAGER,
                                                ucxCtx.eagerSize, NULL);
         ucxCtx.rxReqs[idx]->idx = idx;
         return ucxCtx.rxReqs[idx];
@@ -447,7 +461,7 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
 #endif
 
     if (req->msgBuf != NULL) {
-        // Request is not completed immideately
+        // Request is not completed immediately
         UcxHandleRxReq(req, (char*)req->msgBuf, info->length, info->sender_tag, req->idx);
     } else {
         req->completed = 1;
@@ -461,7 +475,7 @@ static void UcxPrepostRxBuffers()
     ucxCtx.rxReqs = (UcxRequest**)CmiAlloc(sizeof(UcxRequest*) * ucxCtx.numRxReqs);
 
     for (i = 0; i < ucxCtx.numRxReqs; i++) {
-        ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_DIRECT, ucxCtx.eagerSize, NULL);
+        ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
         ucxCtx.rxReqs[i]->idx = i;
     }
     UCX_LOG(3, "UCX: preposted %d rx requests", ucxCtx.numRxReqs);
@@ -487,7 +501,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size,
     ucp_tag_t sTag;
 
     // Combine tag and sTag: sTag defines msg protocol, tag may indicate RMA requests
-    sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_DIRECT;
+    sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_EAGER;
     sTag |= tag;
 
     UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
