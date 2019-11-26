@@ -187,7 +187,7 @@ target_include_directories(threads-uJcontext-memoryalias PRIVATE ../QuickThreads
 add_library(conv-static OBJECT conv-static.c)
 add_custom_command(TARGET conv-core
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:conv-static> ${CMAKE_BINARY_DIR}/lib/conv-static.o
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
     VERBATIM
 )
 add_dependencies(conv-core conv-static)
