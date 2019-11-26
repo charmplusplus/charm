@@ -1,4 +1,4 @@
-name: NetLRTS Linux CMake
+name: NetLRTS Linux buildold
 
 on: [push]
 
