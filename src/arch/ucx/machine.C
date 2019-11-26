@@ -141,18 +141,17 @@ void UcxRequestInit(void *request)
 
 static void UcxInitEps(int numNodes, int myId)
 {
-    size_t maxval = 0, addrlen = 0;
-    size_t len, partLen;
+    size_t addrlen;
     ucp_address_t *address;
     ucs_status_t status;
     ucp_ep_params_t eParams;
     ucp_ep_h ep;
-    int i, j, ret, peer, maxkey, parts;
+    int i, j, ret, peer, maxkey, maxval, parts, len, partLen;
     char *keys, *addrp, *remoteAddr;
 
     ret = runtime_get_max_keylen(&maxkey);
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_get_max_keylen error");
-    ret = runtime_get_max_vallen((int*)&maxval);
+    ret = runtime_get_max_vallen(&maxval);
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_get_max_vallen error");
 
     // Reduce maxval value, because with PMI1 it has to fit cmd + key + value
@@ -167,6 +166,7 @@ static void UcxInitEps(int numNodes, int myId)
 
     status = ucp_worker_get_address(ucxCtx.worker, &address, &addrlen);
     UCX_CHECK_STATUS(status, "UcxInitEps: ucp_worker_get_address error");
+    CmiEnforce(addrlen < std::numeric_limits<int>::max()); //address should fit to int
 
     parts = (addrlen / maxval) + 1;
 
@@ -177,7 +177,7 @@ static void UcxInitEps(int numNodes, int myId)
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
 
     addrp = (char*)address;
-    len   = addrlen;
+    len   = (int)addrlen;
     for (i = 0; i < parts; ++i) {
         partLen = std::min(maxval, len);
         ret = snprintf(keys, maxkey, "UCX-%d-%d", myId, i);
@@ -188,10 +188,9 @@ static void UcxInitEps(int numNodes, int myId)
         len   -= partLen;
     }
 
-    /* Ensure that all nodes published their worker addresses */
+    // Ensure that all nodes published their worker addresses
     ret = runtime_barrier();
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_barrier");
-
 
     ucp_worker_release_address(ucxCtx.worker, address);
 
