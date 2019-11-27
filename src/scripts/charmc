@@ -735,6 +735,10 @@ do
 		OPTS_CPP="$OPTS_CPP -I$1"
 		shift
 		;;
+	-isystem|-iquote|-idirafter)
+		OPTS_CPP="$OPTS_CPP $arg $1"
+		shift
+		;;
 
 	-D*|-I*)
 		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null
