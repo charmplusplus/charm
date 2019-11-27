@@ -345,8 +345,8 @@ static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
 
             if (tag & UCX_MSG_TAG_EAGER) {
                 req = UcxPostRxReqInternal(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
+                req->idx = idx;
                 ucxCtx.rxReqs[idx] = req;
-                std::swap(req->idx, idx);
             } else {
                 return NULL;
             }
