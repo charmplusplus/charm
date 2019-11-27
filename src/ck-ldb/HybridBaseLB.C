@@ -6,8 +6,6 @@
 #include "HybridBaseLB.h"
 #include "LBDBManager.h"
 #include "GreedyLB.h"
-#include "GreedyCommLB.h"
-#include "RefineCommLB.h"
 #include "RefineLB.h"
 
 #define  DEBUGF(x)     // CmiPrintf x;
