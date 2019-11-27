@@ -4509,7 +4509,7 @@ struct local_nodestart
 
     int ret;
     ret = CreateProcess(NULL,          /* application name */
-                        cmdLine.c_str(), /* command line */
+                        const_cast<char*>(cmdLine.c_str()), /* command line */
                         NULL, /*&sa,*/ /* process SA */
                         NULL, /*&sa,*/ /* thread SA */
                         FALSE,         /* inherit flag */
