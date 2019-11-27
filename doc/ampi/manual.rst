@@ -3,7 +3,7 @@ Adaptive MPI (AMPI)
 ===================
 
 .. contents::
-   :depth: 3
+   :depth: 2
 
 
 Introduction
@@ -155,7 +155,7 @@ infrastructure for defining and migrating computational load, and is
 interoperable with other programming paradigms.
 
 Charm++
-=======
+-------
 
 Charm++ is an object-oriented parallel programming library for C. It
 differs from traditional message passing programming libraries (such as
@@ -190,7 +190,7 @@ feature, we developed AMPI, which is described in more detail in the
 next section.
 
 AMPI
-====
+----
 
 AMPI utilizes the dynamic load balancing and other capabilities of
 Charm++ by associating a "user-level" thread with each Charm++
@@ -202,8 +202,8 @@ loads of each thread as well as the communication graph between AMPI
 threads, and can migrate these threads in order to balance the overall
 load while simultaneously minimizing communication overhead.
 
-AMPI Compliance to MPI Standards
---------------------------------
+MPI Standards Compliance
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Currently AMPI supports the MPI-2.2 standard, with preliminary support
 for most MPI-3.1 features and a collection of extensions explained in
@@ -213,78 +213,197 @@ Non-blocking collectives have been defined in AMPI since before
 MPI-3.0’s adoption of them. Also ROMIO [2]_ has been integrated into
 AMPI to support parallel I/O features.
 
-AMPI Extensions to MPI Standards
---------------------------------
+Building and Running AMPI Programs
+==================================
 
-The following are AMPI extensions to the MPI standard, which will be
-explained in detail in this manual. All AMPI extensions to the MPI
-standard are prefixed with ``AMPI_`` rather than ``MPI_``. All
-extensions are available in C, C++, and Fortran, with the exception of
-``AMPI_Command_argument_count`` and ``AMPI_Get_command_argument`` which
-are only available in Fortran.
+Installing AMPI
+---------------
 
-.. code-block:: none
+AMPI is included in the source distribution of Charm++. To get the
+latest sources from PPL, visit: http://charm.cs.illinois.edu/software
 
-   AMPI_Migrate          AMPI_Register_pup            AMPI_Get_pup_data
-   AMPI_Migrate_to_pe    AMPI_Set_migratable          AMPI_Evacuate
-   AMPI_Load_set_value   AMPI_Load_start_measure      AMPI_Load_stop_measure
-   AMPI_Iget             AMPI_Iget_wait               AMPI_Iget_data
-   AMPI_Iget_free        AMPI_Type_is_contiguous
-   AMPI_Yield            AMPI_Suspend                 AMPI_Resume
-   AMPI_Alltoall_medium  AMPI_Alltoall_long
-   AMPI_Register_just_migrated         AMPI_Register_about_to_migrate
-   AMPI_Command_argument_count         AMPI_Get_command_argument
+and follow the download links. Then build Charm++ and AMPI from source.
 
-AMPI provides a set of built-in attributes on all communicators and
-windows to find the number of the worker thread, process, or host that a
-rank is currently running on, as well as the total number of worker
-threads, processes, and hosts in the job. We define a worker thread to
-be a thread on which one of more AMPI ranks are scheduled. We define a
-process here as an operating system process, which may contain one or
-more worker threads. The built-in attributes are ``AMPI_MY_WTH``,
-``AMPI_MY_PROCESS``, ``AMPI_NUM_WTHS``, and ``AMPI_NUM_PROCESSES``.
-These attributes are accessible from any rank by calling
-``MPI_Comm_get_attr``, such as:
+The build script for Charm++ is called ``build``. The syntax for this
+script is:
 
-.. code-block:: fortran
+.. code-block:: bash
 
-   ! Fortran:
-   integer :: my_wth, flag, ierr
-   call MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, my_wth, flag, ierr)
+   $ ./build <target> <version> <opts>
 
+For building AMPI (which also includes building Charm++ and other
+libraries needed by AMPI), specify ``<target>`` to be ``AMPI``. And
+``<opts>`` are command line options passed to the ``charmc`` compile
+script. Common compile time options such as
+``-g, -O, -Ipath, -Lpath, -llib`` are accepted.
 
-.. code-block:: c++
+To build a debugging version of AMPI, use the option: ``-g``. To build a
+production version of AMPI, use the option: ``--with-production``.
 
-   // C/C++:
-   int my_wth, flag;
-   MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &my_wth, &flag);
+``<version>`` depends on the machine, operating system, and the
+underlying communication library one wants to use for running AMPI
+programs. See the charm/README file for details on picking the proper
+version. Here is an example of how to build a debug version of AMPI in a
+linux and ethernet environment:
 
-AMPI also provides extra communicator types that users can pass to
-``MPI_Comm_split_type``: ``AMPI_COMM_TYPE_HOST`` for splitting a
-communicator into disjoint sets of ranks that share the same physical
-host, ``AMPI_COMM_TYPE_PROCESS`` for splitting a communicator into
-disjoint sets of ranks that share the same operating system process, and
-``AMPI_COMM_TYPE_WTH``, for splitting a communicator into disjoint sets
-of ranks that share the same worker thread.
+.. code-block:: bash
 
-For parsing Fortran command line arguments, AMPI Fortran programs should
-use our extension APIs, which are similar to Fortran 2003’s standard
-APIs. For example:
+   $ ./build AMPI netlrts-linux-x86_64 -g
 
-.. code-block:: fortran
+And the following is an example of how to build a production version of
+AMPI on a Cray XC system, with MPI-level error checking in AMPI turned
+off:
 
-   integer :: i, argc, ierr
-   integer, parameter :: arg_len = 128
-   character(len=arg_len), dimension(:), allocatable :: raw_arguments
+.. code-block:: bash
 
-   call AMPI_Command_argument_count(argc)
-   allocate(raw_arguments(argc))
-   do i = 1, size(raw_arguments)
-       call AMPI_Get_command_argument(i, raw_arguments(i), arg_len, ierr)
-   end do
+   $ ./build AMPI gni-crayxc --with-production --disable-ampi-error-checking
 
-Name for Main Program
+AMPI can also be built with support for multithreaded parallelism on any
+communication layer by adding "smp" as an option after the build target.
+For example, on an Infiniband Linux cluster:
+
+.. code-block:: bash
+
+   $ ./build AMPI verbs-linux-x86_64 smp --with-production
+
+AMPI ranks are implemented as user-level threads with a stack size
+default of 1MB. If the default is not correct for your program, you can
+specify a different default stack size (in bytes) at build time. The
+following build command illustrates this for an Intel Omni-Path system:
+
+.. code-block:: bash
+
+   $ ./build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
+
+The same can be done for AMPI’s RDMA messaging threshold using
+``AMPI_RDMA_THRESHOLD_DEFAULT`` and, for messages sent within the same
+address space (ranks on the same worker thread or ranks on different
+worker threads in the same process in SMP builds), using
+``AMPI_SMP_RDMA_THRESHOLD_DEFAULT``. Contiguous messages with sizes
+larger than the threshold are sent via RDMA on communication layers that
+support this capability. You can also set the environment variables
+``AMPI_RDMA_THRESHOLD`` and ``AMPI_SMP_RDMA_THRESHOLD`` before running a
+job to override the default specified at build time.
+
+Building AMPI Programs
+----------------------
+
+AMPI provides compiler wrappers such as ``ampicc``, ``ampif90``, and
+``ampicxx`` in the ``bin`` subdirectory of Charm++ installations. You can
+use them to build your AMPI program using the same syntax as other
+compilers like ``gcc``. These scripts automatically handle the details of
+linking against AMPI and the Charm++ runtime system. They are intended as
+drop-in replacements for ``mpicc`` wrappers provided by most conventional
+MPI implementations. All command line flags that you would use
+for other compilers can be used with the AMPI compilers the same way.
+For example:
+
+.. code-block:: bash
+
+   $ ampicc -c pgm.c -O3
+   $ ampif90 -c pgm.f90 -O0 -g
+   $ ampicc -o pgm pgm.o -lm -O3
+
+These wrappers also allow the user to configure AMPI and Charm++-specific
+functionality.
+To use Isomalloc for transparently migrating user heap data, link with
+*-memory isomalloc*. To use a Charm++ load balancer, link a strategy or
+a suite of strategies in with *-module <LB>*. For example:
+
+.. code-block:: bash
+
+   $ ampicc pgm.c -o pgm -O3 -memory isomalloc -module CommonLBs
+
+Running AMPI Programs
 ---------------------
+
+AMPI offers two options to execute an AMPI program, ``charmrun`` and
+``ampirun``.
+
+Running with charmrun
+~~~~~~~~~~~~~~~~~~~~~
+
+The Charm++ distribution contains a script called ``charmrun`` that
+makes the job of running AMPI programs portable and easier across all
+parallel machines supported by Charm++. ``charmrun`` is copied to a
+directory where an AMPI program is built using ``ampicc``. It takes a
+command line parameter specifying number of processors, and the name of
+the program followed by AMPI options (such as number of ranks to create,
+and the stack size of every user-level thread) and the program
+arguments. A typical invocation of an AMPI program ``pgm`` with
+``charmrun`` is:
+
+.. code-block:: bash
+
+   $ ./charmrun +p16 ./pgm +vp64
+
+Here, the AMPI program ``pgm`` is run on 16 physical processors with 64
+total virtual ranks (which will be mapped 4 per processor initially).
+
+To run with load balancing, specify a load balancing strategy. If
+Address Space Layout Randomization is enabled on your target system, you
+may need to add the flag ``+isomalloc_sync`` when running with
+migration. You can also specify the size of user-level thread’s stack
+using the ``+tcharm_stacksize`` option, which can be used to decrease
+the size of the stack that must be migrated, as in the following
+example:
+
+.. code-block:: bash
+
+   $ ./charmrun +p16 ./pgm +vp128 +tcharm_stacksize 32K +balancer RefineLB
+
+Running with ampirun
+~~~~~~~~~~~~~~~~~~~~
+
+For compliance with the MPI standard and simpler execution, AMPI ships
+with the ``ampirun`` script that is similar to ``mpirun`` provided by
+other MPI runtimes. As with ``charmrun``, ``ampirun`` is copied
+automatically to the program directory when compiling an application
+with ``ampicc``. Users with prior MPI experience may find ``ampirun`` the
+simplest way to run AMPI programs.
+
+The basic usage of ampirun is as follows:
+
+.. code-block:: bash
+
+   $ ./ampirun -np 16 --host h1,h2,h3,h4 ./pgm
+
+This command will create 16 (non-virtualized) ranks and distribute them
+on the hosts h1-h4.
+
+When using the ``-vr`` option, AMPI will create the number of ranks
+specified by the ``-np`` parameter as virtual ranks, and will create
+only one process per host:
+
+.. code-block:: bash
+
+   $ ./ampirun -np 16 --host h1,h2,h3,h4 -vr ./pgm
+
+Other options (such as the load balancing strategy), can be specified in
+the same way as for charmrun:
+
+.. code-block:: bash
+
+   $ ./ampirun -np 16 ./pgm +balancer RefineLB
+
+Other options
+~~~~~~~~~~~~~
+
+Note that for AMPI programs compiled with gfortran, users may need to
+set the following environment variable to see program output on stdout:
+
+.. code-block:: bash
+
+   $ export GFORTRAN_UNBUFFERED_ALL=1
+
+Using Existing MPI Codes with AMPI
+==================================
+
+Due to the nature of AMPI's virtualized ranks, some changes to existing
+MPI codes may be necessary for them to function correctly with AMPI.
+
+Entry Point
+-----------
 
 To convert an existing program to use AMPI, the main function or program
 may need to be renamed. The changes should be made as follows:
@@ -307,8 +426,36 @@ C or C++
 
 The main function can be left as is, if ``mpi.h`` is included before the
 main function. This header file has a preprocessor macro that renames
-main, and the renamed version is called by the AMPI runtime by each
-thread.
+main, and the renamed version is called by the AMPI runtime for each
+rank.
+
+Command Line Argument Parsing
+-----------------------------
+
+Fortran
+~~~~~~~
+
+For parsing Fortran command line arguments, AMPI Fortran programs should
+use our extension APIs, which are similar to Fortran 2003’s standard
+APIs. For example:
+
+.. code-block:: fortran
+
+   integer :: i, argc, ierr
+   integer, parameter :: arg_len = 128
+   character(len=arg_len), dimension(:), allocatable :: raw_arguments
+
+   call AMPI_Command_argument_count(argc)
+   allocate(raw_arguments(argc))
+   do i = 1, size(raw_arguments)
+       call AMPI_Get_command_argument(i, raw_arguments(i), arg_len, ierr)
+   end do
+
+C or C++
+~~~~~~~~
+
+Existing code for parsing ``argc`` and ``argv`` should be sufficient,
+provided that it takes place *after* ``MPI_Init``.
 
 Global Variable Privatization
 -----------------------------
@@ -453,7 +600,7 @@ namespace index.
 
 Optionally, the first step in using PiP-Globals is to build PiP-glibc to
 overcome the limitation on rank count per process. Use the instructions
-at https://github.com/RIKEN-SysSoft/PiP/blob/pip-1/INSTALL to download
+at https://github.com/RIKEN-SysSoft/PiP/blob/pip-1/INSTALL.md to download
 an installable PiP package or build PiP-glibc from source by following
 the ``Patched GLIBC`` section. AMPI may be able to automatically detect
 PiP's location if installed as a package, but otherwise set and export
@@ -554,8 +701,8 @@ fully support ELF, and it requires ld version 2.23 or older, or else a
 patched version of ld 2.24+ that we provide here:
 https://charm.cs.illinois.edu/gerrit/gitweb?p=libbfd-patches.git;a=tree;f=swapglobals
 
-Manual Change
-~~~~~~~~~~~~~
+Manual Code Editing
+~~~~~~~~~~~~~~~~~~~
 
 We have employed a strategy of argument passing to do this privatization
 transformation. That is, the global variables are bunched together in a
@@ -713,7 +860,7 @@ heap allocation because in AMPI, the stack sizes are fixed at the
 beginning (and can be specified from the command line) and stacks do not
 grow dynamically.
 
-Source-to-source Transformation
+Source-to-Source Transformation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Another approach is to do the changes described in the previous scheme
@@ -737,23 +884,48 @@ different schemes.
 .. _tab:portability:
 .. table:: Portability of current implementations of three privatization schemes. "Yes" means we have implemented this technique. "Maybe" indicates there are no theoretical problems, but no implementation exists. "No" indicates the technique is impossible on this platform.
 
-   ==================== === ====== ====== ==== ======= ===== =====
-   Privatization Scheme x86 x86_64 Mac OS BG/Q Windows PPC   ARM7
-   ==================== === ====== ====== ==== ======= ===== =====
-   Transformation       Yes Yes    Yes    Yes  Yes     Yes   Yes
-   GOT-Globals          Yes Yes    No     No   No      Yes   Yes
-   TLS-Globals          Yes Yes    Yes    No   Maybe   Maybe Maybe
-   PiP-Globals          Yes Yes    No     No   No      Yes   Yes
-   FS-Globals           Yes Yes    Yes    No   Maybe   Yes   Yes
-   ==================== === ====== ====== ==== ======= ===== =====
+   ==================== ===== ====== ==== ======= === ====== ===== =====
+   Privatization Scheme Linux Mac OS BG/Q Windows x86 x86_64 PPC   ARM7
+   ==================== ===== ====== ==== ======= === ====== ===== =====
+   TLS-Globals          Yes   Yes    No   Maybe   Yes Yes    Maybe Maybe
+   PiP-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
+   FS-Globals           Yes   Yes    No   Maybe   Yes Yes    Yes   Yes
+   GOT-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
+   Manual Code Editing  Yes   Yes    Yes  Yes     Yes Yes    Yes   Yes
+   ==================== ===== ====== ==== ======= === ====== ===== =====
 
-Extensions for Migrations
--------------------------
+Extensions
+==========
 
-AMPI provides fully automated support for migrating MPI ranks between
-nodes of a system without any application-specific code at all. We do so
-using a memory allocator, Isomalloc, that allocates memory per
-user-level thread to globally unique virtual memory addresses. This
+The following are AMPI extensions to the MPI standard, which will be
+explained in detail in this manual. All AMPI extensions to the MPI
+standard are prefixed with ``AMPI_`` rather than ``MPI_``. All
+extensions are available in C, C++, and Fortran, with the exception of
+``AMPI_Command_argument_count`` and ``AMPI_Get_command_argument`` which
+are only available in Fortran.
+
+.. code-block:: none
+
+   AMPI_Migrate          AMPI_Register_pup            AMPI_Get_pup_data
+   AMPI_Migrate_to_pe    AMPI_Set_migratable          AMPI_Evacuate
+   AMPI_Load_set_value   AMPI_Load_start_measure      AMPI_Load_stop_measure
+   AMPI_Iget             AMPI_Iget_wait               AMPI_Iget_data
+   AMPI_Iget_free        AMPI_Type_is_contiguous
+   AMPI_Yield            AMPI_Suspend                 AMPI_Resume
+   AMPI_Alltoall_medium  AMPI_Alltoall_long
+   AMPI_Register_just_migrated         AMPI_Register_about_to_migrate
+   AMPI_Command_argument_count         AMPI_Get_command_argument
+
+Serialization
+-------------
+
+Some of AMPI's primary benefits are made possible by the ability to pack
+and unpack the entire state of a program and transmit it over the network
+or write a snapshot of it to the filesystem.
+
+In the vast majority of cases, this serialization is fully automated
+using a custom memory allocator, Isomalloc, which returns virtual memory
+addresses that are globally unique across an entire job. This
 means that every worker thread in the system reserves slices of virtual
 memory for all user-level threads, allowing transparent migration of
 stacks and pointers into memory (Isomalloc requires 64-bit virtual
@@ -766,118 +938,30 @@ For systems that do not support Isomalloc and for users that wish to
 have more fine-grain control over which application data structures will
 be copied at migration time, we have added a few calls to AMPI. These
 include the ability to register thread-specific data with the run-time
-system, to pack and unpack all of the thread’s data, and to express
-willingness to migrate.
+system, and the means to pack and unpack all of the thread’s data.
 
-Registering User Data
-~~~~~~~~~~~~~~~~~~~~~
+.. warning::
 
-When the AMPI runtime system decides that load imbalance exists within
-the application, it will invoke one of its internal load balancing
-strategies, which determines the new mapping of AMPI ranks so as to
-balance the load. Then the AMPI runtime packs up the rank’s state and
-moves it to its new home processor. AMPI packs up any internal data in
-use by the rank, including the thread’s stack in use. This means that
-the local variables declared in subroutines in a rank, which are created
-on stack, are automatically packed up by the AMPI runtime system.
-However, it has no way of knowing what other data are in use by the
+   Most users may skip this section unless you have specific needs.
+
+AMPI packs up any data internal to the runtime in use by the rank,
+including the thread’s stack. This means that the local variables
+declared in subroutines in a rank, which are created on the stack, are
+automatically packed by the runtime system. However, without Isomalloc,
+the runtime has no way of knowing what other data are in use by the
 rank. Thus upon starting execution, a rank needs to notify the system
 about the data that it is going to use (apart from local variables).
 Even with the data registration, AMPI cannot determine what size the
 data is, or whether the registered data contains pointers to other
 places in memory. For this purpose, a packing subroutine also needs to
-be provided to the AMPI runtime system along with registered data. (See
-next section for writing packing subroutines.) The call provided by AMPI
+be provided to the AMPI runtime system along with registered data.
+The call provided by AMPI
 for doing this is ``AMPI_Register_pup``. This function takes three
 arguments: a data item to be transported along with the rank, the pack
 subroutine, and a pointer to an integer which denotes the registration
 identifier. In C/C++ programs, it may be necessary to use this integer
 value after migration completes and control returns to the rank with the
 function ``AMPI_Get_pup_data``.
-
-Migration
-~~~~~~~~~
-
-The AMPI runtime system could detect load imbalance by itself and invoke
-the load balancing strategy. However, since the application code is
-going to pack/unpack the rank’s data, writing the pack subroutine will
-be complicated if migrations occur at a stage unknown to the
-application. For example, if the system decides to migrate a rank while
-it is in initialization stage (say, reading input files), application
-code will have to keep track of how much data it has read, what files
-are open etc. Typically, since initialization occurs only once in the
-beginning, load imbalance at that stage would not matter much.
-Therefore, we want the demand to perform load balance check to be
-initiated by the application.
-
-AMPI provides a subroutine ``AMPI_Migrate(MPI_Info hints);`` for this
-purpose. Each rank periodically calls ``AMPI_Migrate``. Typical CSE
-applications are iterative and perform multiple time-steps. One should
-call ``AMPI_Migrate`` in each rank at the end of some fixed number of
-timesteps. The frequency of ``AMPI_Migrate`` should be determined by a
-tradeoff between conflicting factors such as the load balancing
-overhead, and performance degradation caused by load imbalance. In some
-other applications, where application suspects that load imbalance may
-have occurred, as in the case of adaptive mesh refinement; it would be
-more effective if it performs a couple of timesteps before telling the
-system to re-map ranks. This will give the AMPI runtime system some time
-to collect the new load and communication statistics upon which it bases
-its migration decisions. Note that ``AMPI_Migrate`` does NOT tell the
-system to migrate the rank, but merely tells the system to check the
-load balance after all the ranks call ``AMPI_Migrate``. To migrate the
-rank or not is decided only by the system’s load balancing strategy.
-
-Essentially, a call to ``AMPI_Migrate`` signifies to the runtime system
-that the application has reached a point at which it is safe to
-serialize the local state. Knowing this, the runtime system can act in
-several ways.
-
-The MPI_Info object taken as a parameter by ``AMPI_Migrate`` gives users
-a way to influence the runtime system’s decision-making and behavior.
-AMPI provides two built-in MPI_Info objects for this, called
-``AMPI_INFO_LB_SYNC`` and ``AMPI_INFO_LB_ASYNC``. Synchronous load
-balancing assumes that the application is already at a synchronization
-point. Asynchronous load balancing does not assume this.
-
-Calling ``AMPI_Migrate`` on a rank with pending send requests (i.e. from
-MPI_Isend) is currently not supported, therefore users should always
-wait on any outstanding send requests before calling ``AMPI_Migrate``.
-
-.. code-block:: c++
-
-   // Main time-stepping loop
-   for (int iter=0; iter < max_iters; iter++) {
-
-     // Time step work ...
-
-     if (iter % lb_freq == 0)
-       AMPI_Migrate(AMPI_INFO_LB_SYNC);
-   }
-
-Note that migrating ranks around the cores and nodes of a system can
-change which ranks share physical resources, such as memory. A
-consequence of this is that communicators created via
-``MPI_Comm_split_type`` are invalidated by calls to ``AMPI_Migrate``
-that result in migration which breaks the semantics of that communicator
-type. The only valid routine to call on such communicators is
-``MPI_Comm_free``.
-
-We also provide callbacks that user code can register with the runtime
-system to be invoked just before and right after migration:
-``AMPI_Register_about_to_migrate`` and ``AMPI_Register_just_migrated``
-respectively. Note that the callbacks are only invoked on those ranks
-that are about to actually migrate or have just actually migrated.
-
-AMPI provide routines for starting and stopping load measurements, and
-for users to explicitly set the load value of a rank using the
-following: ``AMPI_Load_start_measure``, ``AMPI_Load_stop_measure``,
-``AMPI_Load_reset_measure``, and ``AMPI_Load_set_value``. And since AMPI
-builds on top of Charm++, users can experiment with the suite of load
-balancing strategies included with Charm++, as well as write their own
-strategies based on user-level information and heuristics.
-
-Packing/Unpacking Thread Data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once the AMPI runtime system decides which ranks to send to which
 processors, it calls the specified pack subroutine for that rank, with
@@ -1099,20 +1183,103 @@ routine is currently not allowed in AMPI. Users can store MPI-related
 information like communicator rank and size in data structures to be be
 packed and unpacked before they are needed inside a PUP routine.
 
-Extensions for Checkpointing
+Load Balancing and Migration
 ----------------------------
 
-The pack-unpack subroutines written for migrations make sure that the
-current state of the program is correctly packed (serialized) so that it
-can be restarted on a different processor. Using the *same* subroutines,
+AMPI provides support for migrating MPI ranks between nodes of a system.
+If the AMPI runtime system is prompted to examine the distribution of
+work throughout the job and decides that load imbalance exists within
+the application, it will invoke one of its internal load balancing
+strategies, which determines the new mapping of AMPI ranks so as to
+balance the load. Then the AMPI runtime serializes the rank’s state as
+described above and moves it to its new home processor.
+
+AMPI provides a subroutine ``AMPI_Migrate(MPI_Info hints);`` for this
+purpose. Each rank periodically calls ``AMPI_Migrate``. Typical CSE
+applications are iterative and perform multiple time-steps. One should
+call ``AMPI_Migrate`` in each rank at the end of some fixed number of
+timesteps. The frequency of ``AMPI_Migrate`` should be determined by a
+tradeoff between conflicting factors such as the load balancing
+overhead, and performance degradation caused by load imbalance. In some
+other applications, where application suspects that load imbalance may
+have occurred, as in the case of adaptive mesh refinement; it would be
+more effective if it performs a couple of timesteps before telling the
+system to re-map ranks. This will give the AMPI runtime system some time
+to collect the new load and communication statistics upon which it bases
+its migration decisions. Note that ``AMPI_Migrate`` does NOT tell the
+system to migrate the rank, but merely tells the system to check the
+load balance after all the ranks call ``AMPI_Migrate``. To migrate the
+rank or not is decided only by the system’s load balancing strategy.
+
+The AMPI runtime system could detect load imbalance by itself and invoke
+the load balancing strategy. However, if the application code is
+going to pack/unpack the rank’s data, writing the pack subroutine will
+be complicated if migrations occur at a stage unknown to the
+application. For example, if the system decides to migrate a rank while
+it is in initialization stage (say, reading input files), application
+code will have to keep track of how much data it has read, what files
+are open etc. Typically, since initialization occurs only once in the
+beginning, load imbalance at that stage would not matter much.
+Therefore, we want the demand to perform a load balance check to be
+initiated by the application.
+
+Essentially, a call to ``AMPI_Migrate`` signifies to the runtime system
+that the application has reached a point at which it is safe to
+serialize the local state. Knowing this, the runtime system can act in
+several ways.
+
+The MPI_Info object taken as a parameter by ``AMPI_Migrate`` gives users
+a way to influence the runtime system’s decision-making and behavior.
+AMPI provides two built-in MPI_Info objects for this, called
+``AMPI_INFO_LB_SYNC`` and ``AMPI_INFO_LB_ASYNC``. Synchronous load
+balancing assumes that the application is already at a synchronization
+point. Asynchronous load balancing does not assume this.
+
+Calling ``AMPI_Migrate`` on a rank with pending send requests (i.e. from
+MPI_Isend) is currently not supported, therefore users should always
+wait on any outstanding send requests before calling ``AMPI_Migrate``.
+
+.. code-block:: c++
+
+   // Main time-stepping loop
+   for (int iter=0; iter < max_iters; iter++) {
+
+     // Time step work ...
+
+     if (iter % lb_freq == 0)
+       AMPI_Migrate(AMPI_INFO_LB_SYNC);
+   }
+
+Note that migrating ranks around the cores and nodes of a system can
+change which ranks share physical resources, such as memory. A
+consequence of this is that communicators created via
+``MPI_Comm_split_type`` are invalidated by calls to ``AMPI_Migrate``
+that result in migration which breaks the semantics of that communicator
+type. The only valid routine to call on such communicators is
+``MPI_Comm_free``.
+
+We also provide callbacks that user code can register with the runtime
+system to be invoked just before and right after migration:
+``AMPI_Register_about_to_migrate`` and ``AMPI_Register_just_migrated``
+respectively. Note that the callbacks are only invoked on those ranks
+that are about to actually migrate or have just actually migrated.
+
+AMPI provide routines for starting and stopping load measurements, and
+for users to explicitly set the load value of a rank using the
+following: ``AMPI_Load_start_measure``, ``AMPI_Load_stop_measure``,
+``AMPI_Load_reset_measure``, and ``AMPI_Load_set_value``. And since AMPI
+builds on top of Charm++, users can experiment with the suite of load
+balancing strategies included with Charm++, as well as write their own
+strategies based on user-level information and heuristics.
+
+Checkpointing and Fault Tolerance
+---------------------------------
+
+Using the same serialization functionality as AMPI's migration support,
 it is also possible to save the state of the program to disk, so that if
 the program were to crash abruptly, or if the allocated time for the
 program expires before completing execution, the program can be
-restarted from the previously checkpointed state. Thus, the pack-unpack
-subroutines act as the key facility for checkpointing in addition to
-their usual role for migration. Just as in load balancing, no
-application specific code is required when using Isomalloc: the AMPI
-runtime takes care of all the details involved in migrating data.
+restarted from the previously checkpointed state.
 
 To perform a checkpoint in an AMPI program, all you have to do is make a
 call to ``int AMPI_Migrate(MPI_Info hints)`` with an ``MPI_Info`` object
@@ -1163,8 +1330,8 @@ by the Charm++ runtime system. For more information about
 checkpoint/restart mechanisms please refer to the Charm++
 manual: :numref:`sec:checkpoint`.
 
-Extensions for Memory Efficiency
---------------------------------
+Memory Efficiency
+-----------------
 
 MPI functions usually require the user to preallocate the data buffers
 needed before the functions being called. For unblocking communication
@@ -1194,8 +1361,43 @@ for this get request including the data buffer. Finally,
 
    int AMPI_Iget_data(void *data, MPI_Status status);
 
-Charm++ Interoperability
-------------------------
+Compute Resource Awareness
+--------------------------
+
+AMPI provides a set of built-in attributes on all communicators and
+windows to find the number of the worker thread, process, or host that a
+rank is currently running on, as well as the total number of worker
+threads, processes, and hosts in the job. We define a worker thread to
+be a thread on which one of more AMPI ranks are scheduled. We define a
+process here as an operating system process, which may contain one or
+more worker threads. The built-in attributes are ``AMPI_MY_WTH``,
+``AMPI_MY_PROCESS``, ``AMPI_NUM_WTHS``, and ``AMPI_NUM_PROCESSES``.
+These attributes are accessible from any rank by calling
+``MPI_Comm_get_attr``, such as:
+
+.. code-block:: fortran
+
+   ! Fortran:
+   integer :: my_wth, flag, ierr
+   call MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, my_wth, flag, ierr)
+
+
+.. code-block:: c++
+
+   // C/C++:
+   int my_wth, flag;
+   MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &my_wth, &flag);
+
+AMPI also provides extra communicator types that users can pass to
+``MPI_Comm_split_type``: ``AMPI_COMM_TYPE_HOST`` for splitting a
+communicator into disjoint sets of ranks that share the same physical
+host, ``AMPI_COMM_TYPE_PROCESS`` for splitting a communicator into
+disjoint sets of ranks that share the same operating system process, and
+``AMPI_COMM_TYPE_WTH``, for splitting a communicator into disjoint sets
+of ranks that share the same worker thread.
+
+Charm++ Interoperation
+----------------------
 
 There is preliminary support for interoperating AMPI programs with Charm++
 programs. This allows users to launch an AMPI program with an arbitrary number
@@ -1205,8 +1407,8 @@ by the runtime system. We also provide an entry method ``void injectMsg(int n, c
 for chares to communicate with AMPI ranks. An example program can be found in
 ``examples/charm++/AMPI-interop``.
 
-Extensions for Sequential Re-run of a Parallel Node
----------------------------------------------------
+Sequential Re-run of a Parallel Node
+------------------------------------
 
 In some scenarios, a sequential re-run of a parallel node is desired.
 One example is instruction-level accurate architecture simulations, in
@@ -1320,32 +1522,10 @@ AMPI users can also use any tracing libraries or tools that rely on
 MPI’s PMPI profiling interface, though such tools may not be aware of
 AMPI process virtualization.
 
-Compiling AMPI Programs
------------------------
-
-AMPI provides a cross-platform compile-and-link script called *ampicc*
-to compile C, C++, and Fortran AMPI programs. This script resides in the
-``bin`` subdirectory in the Charm++ installation directory. The main
-purpose of this script is to deal with the differences of various
-compiler names and command-line options across various machines on which
-AMPI runs. It is recommended that the AMPI compiler scripts be used to
-compile and link AMPI programs. One major advantage of using these is
-that one does not have to specify which libraries are to be linked for
-ensuring that C++ and Fortran90 codes are linked together correctly.
-Appropriate libraries required for linking such modules together are
-known to *ampicc* for various machines.
-
-In spite of the platform-neutral syntax of *ampicc*, one may have to
-specify some platform-specific options for compiling and building AMPI
-codes. Fortunately, if *ampicc* does not recognize any particular
-options on its command line, it promptly passes it to all the individual
-compilers and linkers it invokes to compile the program. See the
-appendix for more details on building and running AMPI programs.
-
 .. _adaptive-mpi-ampi-codes:
 
-AMPI Example Applications
--------------------------
+Example Applications
+====================
 
 | This section contains a list of applications that have been written or
   adapted to work with AMPI. Most applications are available on git:
@@ -1360,13 +1540,13 @@ Most benchmarks can be compiled with the provided top-level Makefile:
        $ make -f Makefile.ampi
 
 Mantevo project v3.0
-~~~~~~~~~~~~~~~~~~~~
+--------------------
 
 Set of mini-apps from the Mantevo project. Download at
 https://mantevo.org/download/.
 
 MiniFE
-^^^^^^
+~~~~~~
 
 -  Mantevo mini-app for unstructured implicit Finite Element
    computations.
@@ -1380,7 +1560,7 @@ MiniFE
    ``./charmrun +p4 ./miniFE.x nx=30 ny=30 nz=30 +vp32``
 
 MiniMD v2.0
-^^^^^^^^^^^
+~~~~~~~~~~~
 
 -  Mantevo mini-app for particle interaction in a Lennard-Jones system,
    as in the LAMMPS MD code.
@@ -1393,7 +1573,7 @@ MiniMD v2.0
    ``./charmrun +p4 ./miniMD_ampi +vp32``
 
 CoMD v1.1
-^^^^^^^^^
+~~~~~~~~~
 
 -  Mantevo mini-app for molecular dynamics codes:
    https://github.com/exmatex/CoMD
@@ -1407,7 +1587,7 @@ CoMD v1.1
    provided run scripts.
 
 MiniXYCE v1.0
-^^^^^^^^^^^^^
+~~~~~~~~~~~~~
 
 -  Mantevo mini-app for discrete analog circuit simulation, version 1.0,
    with serial, MPI, OpenMP, and MPI+OpenMP versions.
@@ -1421,7 +1601,7 @@ MiniXYCE v1.0
    ``./charmrun +p3 ./miniXyce.x +vp3 -circuit ../tests/cir1.net -t_start 1e-6 -pf params.txt``
 
 HPCCG v1.0
-^^^^^^^^^^
+~~~~~~~~~~
 
 -  Mantevo mini-app for sparse iterative solves using the Conjugate
    Gradient method for a problem similar to that of MiniFE.
@@ -1433,7 +1613,7 @@ HPCCG v1.0
    ``./charmrun +p2 ./test_HPCCG 20 30 10 +vp16``
 
 MiniAMR v1.0
-^^^^^^^^^^^^
+~~~~~~~~~~~~
 
 -  miniAMR applies a stencil calculation on a unit cube computational
    domain, which is refined over time.
@@ -1441,18 +1621,18 @@ MiniAMR v1.0
 -  No changes if using swap-globals. Explicitly extern global variables
    if using TLS.
 
-Not yet AMPI-zed (reason):
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+Not yet AMPI-zed (reason)
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 MiniAero v1.0 (build issues), MiniGhost v1.0.1 (globals), MiniSMAC2D
 v2.0 (globals), TeaLeaf v1.0 (globals), CloverLeaf v1.1 (globals),
 CloverLeaf3D v1.0 (globals).
 
 LLNL ASC Proxy Apps
-~~~~~~~~~~~~~~~~~~~
+-------------------
 
 LULESH v2.0
-^^^^^^^^^^^
+~~~~~~~~~~~
 
 -  LLNL Unstructured Lagrangian-Eulerian Shock Hydrodynamics proxy app:
    https://codesign.llnl.gov/lulesh.php
@@ -1464,7 +1644,7 @@ LULESH v2.0
    routines in subdirectory ``pup_lulesh202/``.
 
 AMG 2013
-^^^^^^^^
+~~~~~~~~
 
 -  LLNL ASC proxy app: Algebraic Multi-Grid solver for linear systems
    arising from unstructured meshes:
@@ -1478,7 +1658,7 @@ AMG 2013
    wrapper script and ``make``. Executable is ``test/amg2013``.
 
 Lassen v1.0
-^^^^^^^^^^^
+~~~~~~~~~~~
 
 -  LLNL ASC mini-app for wave-tracking applications with dynamic load
    imbalance. Reference versions are serial, MPI, Charm++, and
@@ -1489,7 +1669,7 @@ Lassen v1.0
    ``./charmrun +p4 ./lassen_mpi +vp8 default 2 2 2 50 50 50``
 
 Kripke v1.1
-^^^^^^^^^^^
+~~~~~~~~~~~
 
 -  LLNL ASC proxy app for ARDRA, a full Sn deterministic particle
    transport application: https://codesign.llnl.gov/kripke.php
@@ -1516,7 +1696,7 @@ Kripke v1.1
       $ ./charmrun +p8 ./src/tools/kripke +vp8 --zones 64,64,64 --procs 2,2,2 --nest ZDG
 
 MCB v1.0.3 (2013)
-^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~
 
 -  LLNL ASC proxy app for Monte Carlo particle transport codes:
    https://codesign.llnl.gov/mcb.php
@@ -1533,15 +1713,15 @@ MCB v1.0.3 (2013)
 .. _not-yet-ampi-zed-reason-1:
 
 Not yet AMPI-zed (reason)
-^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 : UMT 2013 (global variables).
 
 Other Applications
-~~~~~~~~~~~~~~~~~~
+------------------
 
 MILC 7.0
-^^^^^^^^
+~~~~~~~~
 
 -  MILC is a code to study quantum chromodynamics (QCD) physics.
    http://www.nersc.gov/users/computational-systems/cori/nersc-8-procurement/trinity-nersc-8-rfp/nersc-8-trinity-benchmarks/milc/
@@ -1556,7 +1736,7 @@ MILC 7.0
 -  Run with: ``./su3_rmd +vp8 ../benchmark_n8/single_node/n8_single.in``
 
 SNAP v1.01 (C version)
-^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~
 
 -  LANL proxy app for PARTISN, an Sn deterministic particle transport
    application: https://github.com/losalamos/SNAP
@@ -1577,7 +1757,7 @@ SNAP v1.01 (C version)
    ``./charmrun +p4 ./snap +vp4 --fi center_src/fin01 --fo center_src/fout01``
 
 Sweep3D
-^^^^^^^
+~~~~~~~
 
 -  Sweep3D is a *particle transport* program that analyzes the flux of
    particles along a space. It solves a three-dimensional particle
@@ -1597,7 +1777,7 @@ Sweep3D
       ``./charmrun ./sweep3d.mpi +p8 +vp16``
 
 PENNANT v0.8
-^^^^^^^^^^^^
+~~~~~~~~~~~~
 
 -  Unstructured mesh Rad-Hydro mini-app for a full application at LANL
    called FLAG. https://github.com/losalamos/PENNANT
@@ -1613,22 +1793,22 @@ PENNANT v0.8
    ``./charmrun +p2 ./build/pennant +vp8 test/noh/noh.pnt``
 
 Benchmarks
-~~~~~~~~~~
+----------
 
 Jacobi-2D (Fortran)
-^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~
 
 -  Jacobi-2D with 1D decomposition. Problem size and number of
    iterations are defined in the source code. Manually privatized.
 
 Jacobi-3D (C)
-^^^^^^^^^^^^^
+~~~~~~~~~~~~~
 
 -  Jacobi-3D with 3D decomposition. Manually privatized. Includes
    multiple versions: Isomalloc, PUP, FT, LB, Isend/Irecv, Iput/Iget.
 
 NAS Parallel Benchmarks (NPB 3.3)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -  A collection of kernels used in different scientific applications.
    They are mainly implementations of various linear algebra methods.
@@ -1656,7 +1836,7 @@ NAS Parallel Benchmarks (NPB 3.3)
       ``./charmrun ./cg.C.256 +p64 +vp256 ++nodelist nodelist +isomalloc_sync``
 
 NAS PB Multi-Zone Version (NPB-MZ 3.3)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -  A multi-zone version of BT, SP and LU NPB benchmarks. The multi-zone
    intentionally divides the space unevenly among ranks and causes load
@@ -1689,7 +1869,7 @@ NAS PB Multi-Zone Version (NPB-MZ 3.3)
       ``./charmrun ./bt-mz.C.256 +p64 +vp256 ++nodelist nodelist +isomalloc_sync``
 
 HPCG v3.0
-^^^^^^^^^
+~~~~~~~~~
 
 -  High Performance Conjugate Gradient benchmark, version 3.0. Companion
    metric to Linpack, with many vendor-optimized implementations
@@ -1701,7 +1881,7 @@ HPCG v3.0
    To run, do ``./charmrun +p16 ./bin/xhpcg +vp64``
 
 Intel Parallel Research Kernels (PRK) v2.16
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -  A variety of kernels (Branch, DGEMM, Nstream, Random, Reduce, Sparse,
    Stencil, Synch_global, Synch_p2p, and Transpose) implemented for a
@@ -1713,7 +1893,7 @@ Intel Parallel Research Kernels (PRK) v2.16
    run scripts included.
 
 OSU Microbenchmarks
-^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~
 
 MPI collectives performance testing suite.
 https://charm.cs.illinois.edu/gerrit/#/admin/projects/benchmarks/osu-collectives-benchmarking
@@ -1721,10 +1901,10 @@ https://charm.cs.illinois.edu/gerrit/#/admin/projects/benchmarks/osu-collectives
 -  Build with: ``./configure CC=~/charm/bin/ampicc && make``
 
 Third Party Open Source Libraries
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------------
 
 HYPRE-2.11.1
-^^^^^^^^^^^^
+~~~~~~~~~~~~
 
 -  High Performance Preconditioners and solvers library from LLNL.
    https://computation.llnl.gov/project/linear_solvers/software.php
@@ -1757,7 +1937,7 @@ HYPRE-2.11.1
    ``./charmrun +p64 ./new_ij -n 128 128 128 -P 4 4 4 -intertype 6 -tol 1e-8 -CF 0 -solver 61 -agg_nl 1 27pt -Pmx 6 -ns 4 -mu 1 -hmis -rlx 13 +vp64``
 
 MFEM-3.2
-^^^^^^^^
+~~~~~~~~
 
 -  MFEM is a scalable library for Finite Element Methods developed at
    LLNL. http://mfem.org/
@@ -1794,7 +1974,7 @@ MFEM-3.2
    migration if added.
 
 XBraid-1.1
-^^^^^^^^^^
+~~~~~~~~~~
 
 -  XBraid is a scalable library for parallel time integration using
    MultiGrid, developed at LLNL.
@@ -1816,7 +1996,7 @@ XBraid-1.1
    ``./charmrun +p4 ./drive-03 -pgrid 2 2 2 2 -nl 32 32 32 -nt 16 -ml 15 +vp16 ++local``
 
 Other AMPI codes
-~~~~~~~~~~~~~~~~
+----------------
 
 -  FLASH
 
@@ -1833,182 +2013,6 @@ Other AMPI codes
 -  PlasCom2 (XPACC)
 
 -  Harm3D
-
-Installing AMPI
-===============
-
-AMPI is included in the source distribution of Charm++. To get the
-latest sources from PPL, visit: http://charm.cs.illinois.edu/software
-
-and follow the download links. Then build Charm++ and AMPI from source.
-
-The build script for Charm++ is called ``build``. The syntax for this
-script is:
-
-.. code-block:: bash
-
-   $ build <target> <version> <opts>
-
-For building AMPI (which also includes building Charm++ and other
-libraries needed by AMPI), specify ``<target>`` to be ``AMPI``. And
-``<opts>`` are command line options passed to the ``charmc`` compile
-script. Common compile time options such as
-``-g, -O, -Ipath, -Lpath, -llib`` are accepted.
-
-To build a debugging version of AMPI, use the option: ``-g``. To build a
-production version of AMPI, use the option: ``-with-production``.
-
-``<version>`` depends on the machine, operating system, and the
-underlying communication library one wants to use for running AMPI
-programs. See the charm/README file for details on picking the proper
-version. Here is an example of how to build a debug version of AMPI in a
-linux and ethernet environment:
-
-.. code-block:: bash
-
-   $ ./build AMPI netlrts-linux-x86_64 -g
-
-And the following is an example of how to build a production version of
-AMPI on a Cray XC system, with MPI-level error checking in AMPI turned
-off:
-
-.. code-block:: bash
-
-   $ ./build AMPI gni-crayxc --with-production --disable-ampi-error-checking
-
-AMPI can also be built with support for shared memory on any
-communication layer by adding "smp" as an option after the build target.
-For example, on an Infiniband Linux cluster:
-
-.. code-block:: bash
-
-   $ ./build AMPI verbs-linux-x86_64 smp --with-production
-
-AMPI ranks are implemented as user-level threads with a stack size
-default of 1MB. If the default is not correct for your program, you can
-specify a different default stack size (in bytes) at build time. The
-following build command illustrates this for an Intel Omni-Path system:
-
-.. code-block:: bash
-
-   $ ./build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
-
-The same can be done for AMPI’s RDMA messaging threshold using
-``AMPI_RDMA_THRESHOLD_DEFAULT`` and, for messages sent within the same
-address space (ranks on the same worker thread or ranks on different
-worker threads in the same process in SMP builds), using
-``AMPI_SMP_RDMA_THRESHOLD_DEFAULT``. Contiguous messages with sizes
-larger than the threshold are sent via RDMA on communication layers that
-support this capability. You can also set the environment variables
-``AMPI_RDMA_THRESHOLD`` and ``AMPI_SMP_RDMA_THRESHOLD`` before running a
-job to override the default specified at build time.
-
-Building and Running AMPI Programs
-==================================
-
-Building AMPI Programs
-----------------------
-
-AMPI provides a compiler called *ampicc* in your charm/bin/ directory.
-You can use this compiler to build your AMPI program the same way as
-other compilers like cc. All the command line flags that you would use
-for other compilers can be used with the AMPI compilers the same way.
-For example:
-
-.. code-block:: bash
-
-   $ ampicc -c pgm.c -O3
-   $ ampif90 -c pgm.f90 -O0 -g
-   $ ampicc -o pgm pgm.o -lm -O3
-
-To use Isomalloc for transparently migrating user heap data, link with
-*-memory isomalloc*. To use a Charm++ load balancer, link a strategy or
-a suite of strategies in with *-module <LB>*. For example:
-
-.. code-block:: bash
-
-   $ ampicc pgm.c -o pgm -O3 -memory isomalloc -module CommonLBs
-
-Running AMPI programs
----------------------
-
-AMPI offers two options to execute an AMPI program, ``charmrun`` and
-``ampirun``.
-
-Running with charmrun
-~~~~~~~~~~~~~~~~~~~~~
-
-The Charm++ distribution contains a script called ``charmrun`` that
-makes the job of running AMPI programs portable and easier across all
-parallel machines supported by Charm++. ``charmrun`` is copied to a
-directory where an AMPI program is built using ``ampicc``. It takes a
-command line parameter specifying number of processors, and the name of
-the program followed by AMPI options (such as number of ranks to create,
-and the stack size of every user-level thread) and the program
-arguments. A typical invocation of an AMPI program ``pgm`` with
-``charmrun`` is:
-
-.. code-block:: bash
-
-   $ ./charmrun +p16 ./pgm +vp64
-
-Here, the AMPI program ``pgm`` is run on 16 physical processors with 64
-total virtual ranks (which will be mapped 4 per processor initially).
-
-To run with load balancing, specify a load balancing strategy. If
-Address Space Layout Randomization is enabled on your target system, you
-may need to add the flag ``+isomalloc_sync`` when running with
-migration. You can also specify the size of user-level thread’s stack
-using the ``+tcharm_stacksize`` option, which can be used to decrease
-the size of the stack that must be migrated, as in the following
-example:
-
-.. code-block:: bash
-
-   $ ./charmrun +p16 ./pgm +vp128 +tcharm_stacksize 32K +balancer RefineLB
-
-Running with ampirun
-~~~~~~~~~~~~~~~~~~~~
-
-For compliance with the MPI standard and simpler execution, AMPI ships
-with the ``ampirun`` script that is similar to ``mpirun`` provided by
-other MPI runtimes. As with ``charmrun``, ``ampirun`` is copied
-automatically to the program directory when compiling an application
-with ``ampicc``.
-
-The basic usage of ampirun is as follows:
-
-.. code-block:: bash
-
-   $ ./ampirun -np 16 --host h1,h2,h3,h4 ./pgm
-
-This command will create 16 (non-virtualized) ranks and distribute them
-on the hosts h1-h4.
-
-When using the ``-vr`` option, AMPI will create the number of ranks
-specified by the ``-np`` parameter as virtual ranks, and will create
-only one process per host:
-
-.. code-block:: bash
-
-   $ ./ampirun -np 16 --host h1,h2,h3,h4 -vr ./pgm
-
-Other options (such as the load balancing strategy), can be specified in
-the same way as for charmrun:
-
-.. code-block:: bash
-
-   $ ./ampirun -np 16 ./pgm +balancer RefineLB
-
-Other options
-~~~~~~~~~~~~~
-
-Note that for AMPI programs compiled with gfortran, users may need to
-set the following environment variable to see program output to stdout:
-
-.. code-block:: bash
-
-   $ export GFORTRAN_UNBUFFERED_ALL=1
 
 .. [1]
    Currently, AMPI supports the MPI-2.2 standard, and the MPI-3.1
