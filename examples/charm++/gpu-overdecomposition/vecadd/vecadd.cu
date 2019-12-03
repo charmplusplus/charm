@@ -1,6 +1,15 @@
 #include "hapi.h"
+#include <stdio.h>
 
 #define BLOCK_SIZE 256
+
+__device__ unsigned mySmId() {
+  unsigned sm_id;
+
+  asm volatile("mov.u32 %0, %%smid;" : "=r"(sm_id));
+
+  return sm_id;
+}
 
 __global__ void vecAdd(double* C, double* A, double* B, int n) {
   // Get our global thread ID
@@ -10,6 +19,9 @@ __global__ void vecAdd(double* C, double* A, double* B, int n) {
   if (id < n) {
     C[id] = A[id] + B[id];
   }
+
+  // Print which SM this thread block is running on
+  if (threadIdx.x == 0) printf("Block %d, SM %d\n", blockIdx.x, mySmId());
 }
 
 void cudaVecAdd(int n, double* h_A, double* h_B, double* h_C, double* d_A,
