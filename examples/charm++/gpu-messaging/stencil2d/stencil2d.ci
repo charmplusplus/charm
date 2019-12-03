@@ -1,0 +1,124 @@
+mainmodule stencil2d {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_GPUHandler gpuhandler_proxy;
+  readonly CProxy_Block block_proxy;
+  readonly int grid_dim;
+  readonly int block_x;
+  readonly int block_y;
+  readonly int n_chares_x;
+  readonly int n_chares_y;
+  readonly int n_iters;
+  readonly int thread_coarsening;
+  readonly bool unified_memory;
+  readonly bool direct;
+  readonly bool print_block;
+
+  message DirMsg;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void ready();
+    entry [reductiontarget] void finalize();
+    entry void terminate();
+  };
+
+  group GPUHandler {
+    entry GPUHandler();
+    entry void setGPU();
+  };
+
+  array [2D] Block {
+    entry Block();
+    entry void init();
+    entry void receivePointer(int ref, int dir, uint64_t pt);
+    entry void ghostReceived(DirMsg* msg);
+    entry void receiveAck(int ref);
+    entry void prepareGhostsDone(CkMessage* msg);
+    entry void receiveGhosts(int ref, int dir, int w, double gh[w]);
+    entry void updateDone(CkMessage* msg);
+    entry void validate();
+
+    entry void iterate() {
+      serial {
+        iter_start_time = CkWallTimer();
+
+        if (direct) {
+          // Send data pointer for peer transfer between GPUs
+          sendPointers();
+        }
+        else {
+          // Prepare ghost regions for sending
+          prepareGhosts();
+        }
+      }
+
+      if (direct) {
+        // Receive peer-accessible data pointers from neighbors
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when receivePointer[my_iter](int ref, int dir, uint64_t pt) serial {
+            processPointer(dir, pt);
+          }
+        }
+
+        // Send ACK to sender once peer transfer is complete
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when ghostReceived[my_iter](const DirMsg* msg) serial {
+            int dir = msg->dir;
+            delete msg;
+            sendAck(dir);
+          }
+        }
+
+        // TODO: overlap with sending ACKs?
+        // Receive ACKs from neighbors
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when receiveAck[my_iter](int ref) serial {
+            // Don't need to do anything
+          }
+        }
+      }
+      else {
+        // Send ghosts once they are prepared
+        when prepareGhostsDone[my_iter](const CkMessage* msg) serial {
+          delete msg;
+          sendGhosts();
+        }
+
+        // Receive ghost data from neighbors
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when receiveGhosts[my_iter](int ref, int dir, int w, double buf[w]) serial {
+            processGhosts(dir, w, buf);
+          }
+        }
+      }
+
+      // Perform stencil computation once the ghost data are integrated
+      serial {
+        update();
+      }
+
+      when updateDone[my_iter](const CkMessage* msg) serial {
+        delete msg;
+
+        // Add iteration time
+        total_time += CkWallTimer() - iter_start_time;
+
+        if (my_iter == n_iters-1) {
+          // Last iteration, reduce back to main for validation
+          contribute(CkCallback(CkReductionTarget(Main, finalize), main_proxy));
+        }
+        else {
+          // Swap pointers
+          double* tmp;
+          tmp = temperature;
+          temperature = new_temperature;
+          new_temperature = tmp;
+
+          // Move on to next iteration
+          my_iter++;
+          thisProxy[thisIndex].iterate();
+        }
+      }
+    };
+  };
+};
