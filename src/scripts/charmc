@@ -734,11 +734,11 @@ do
 		shift
 		;;
 
-	-I)
+	-I|--include-path)
 		OPTS_CPP="$OPTS_CPP -I$1"
 		shift
 		;;
-	-isystem|-iquote|-idirafter)
+	--pre-include|-include|--system-include|-isystem|-iquote|-idirafter)
 		OPTS_CPP="$OPTS_CPP $arg $1"
 		shift
 		;;
