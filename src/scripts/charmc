@@ -120,6 +120,9 @@ PREPROCESS_CI="yes"
 INPUT_GIVEN=""
 PASSTHROUGH_COMPILER_OPTIONS=""
 
+# protect rpath arguments from disappearing due to variable expansion
+ORIGIN='\$ORIGIN'
+
 ####################################################################
 #
 #  Utility routines used below
