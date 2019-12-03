@@ -1,0 +1,57 @@
+mainmodule matmul {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Block a, b, c;
+  readonly double alpha;
+  readonly int block_size;
+  readonly int n_blocks;
+  readonly bool direct;
+  readonly bool print_block;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void ready();
+    entry [reductiontarget] void initDone();
+    entry [reductiontarget] void done();
+  };
+
+  group GPUHandler {
+    entry GPUHandler();
+    entry void setGPU();
+  };
+
+  array [2D] Block {
+    entry Block();
+    entry void init(bool rand_init):
+    entry void sendInput(bool is_a);
+
+    entry void run(CkCallback done) {
+      forall [block] (0:n_blocks-1,1) {
+        when
+          inputA[block](int blockIdA, double blockA[M*KA], unsigned int M, unsigned int KA),
+          inputB[block](int blockIdB, double blockB[KB*N], unsigned int KB, unsigned int N)
+          serial {
+            CkAssert(KA == KB);
+
+            invokeDgemm(M, N, KA, alpha, blockA, blockB, data);
+
+            if (blockIdA != n_blocks) {
+              int destX = (thisIndex.x + 1) % n_blocks;
+              int destY = thisIndex.y;
+              thisProxy(destX, destY).inputA(blockIdA+1, blockA, M, KA);
+            }
+            if (blockIdB != n_blocks) {
+              int destX = thisIndex.x;
+              int destY = (thisIndex.y + 1) % n_blocks;
+              thisProxy(destX, destY).inputB(blockIdB+1, blockB, KB, N);
+            }
+          }
+      }
+      serial {
+        contribute(done);
+      }
+    };
+
+    entry void inputA(int blockIdA, double blockA[M*KA], unsigned int M, unsigned int KA);
+    entry void inputB(int blockIdB, double blockB[KB*N], unsigned int KB, unsigned int N);
+  };
+};
