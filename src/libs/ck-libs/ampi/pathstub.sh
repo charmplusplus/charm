@@ -5,7 +5,7 @@ FN=$(basename $0)
 # detect and handle circular calls when:
 # * building with the MPI machine layer
 # * using Charmrun's ++mpiexec
-if [[ "$FROM_CHARMC" = '1' ]] || [[ "$FROM_CHARMRUN" = '1' ]]; then
+if [[ "$FROM_CHARMC" = '1' || "$FROM_CHARMRUN" = '1' ]]; then
   # remove this stub's location from PATH
   IFS=: read -r -d '' -a path_array < <(printf '%s:\0' "$PATH")
   new_path_array=( )
