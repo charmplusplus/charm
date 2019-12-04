@@ -742,8 +742,7 @@ do
 	@*.rsp)
 		# Pass through response files (*.rsp) to the compiler.
 		# See https://github.com/UIUC-PPL/charm/issues/2617 for details.
-		OPTS_CPP="$OPTS_CPP $arg"
-		OPTS_LD="$OPTS_LD $arg"
+		OPTS="$OPTS $arg"
 		;;
 
 	-D*|-I*)
