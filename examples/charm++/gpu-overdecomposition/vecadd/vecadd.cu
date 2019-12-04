@@ -21,7 +21,7 @@ __global__ void vecAdd(double* C, double* A, double* B, int n) {
   }
 
   // Print which SM this thread block is running on
-  if (threadIdx.x == 0) printf("Block %d, SM %d\n", blockIdx.x, mySmId());
+  //if (threadIdx.x == 0) printf("Block %d, SM %d\n", blockIdx.x, mySmId());
 }
 
 void cudaVecAdd(int n, double* h_A, double* h_B, double* h_C, double* d_A,
