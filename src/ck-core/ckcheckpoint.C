@@ -168,21 +168,32 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 
 static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatus);
 
-static void addPartitionDirectory(ostringstream &path) {
-  if (CmiNumPartitions() > 1) {
-    path << "/part-" << CmiMyPartition();
+static void createSubDirs(const std::string &path) {
+  int subdirs = CkNumPes() / SUBDIR_SIZE;
+  for (int i = 0; i < subdirs; i++) {
+    CmiMkdir((path + "/sub" + std::to_string(i)).c_str());
   }
 }
 
 static FILE* openCheckpointFile(const char *dirname, const char *basename,
     const char *mode, int id = -1) {
   ostringstream out;
+
+  // Add base directory to path
   out << dirname;
-  addPartitionDirectory(out);
+
+  // Add partition to path (if applicable)
+  if (CmiNumPartitions() > 1) {
+    out << "/part" << CmiMyPartition();
+  }
+
+  // Add subdirectory to path
   if (id != -1) {
     int subdir_id = id / SUBDIR_SIZE;
     out << "/sub" << subdir_id;
   }
+
+  // Add chare type and ID as filename
   out << "/" << basename;
   if (id != -1) {
     out << "_" << id;
@@ -218,23 +229,29 @@ public:
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _requestStatus){
 	chkptStartTimer = CmiWallTimer();
 	requestStatus = _requestStatus;
-	// make dir on all PEs in case it is a local directory
+
+	// FIXME: All PEs create directories for all partitions and subdirectories.
+	// If we can assume a shared filesystem, this could become much simpler
+	// by only having PE 0 create them.
+
+	// Create top level directory
 	CmiMkdir(dirname);
 
-	// Create partition directories (if applicable)
-	ostringstream dirPath;
-	dirPath << dirname;
+	// Create partition directories (if applicable) and subdirectories.
+	// Subdirectories were introduced due to file system issues we have observed,
+	// and splits up checkpoint files to avoid having too many files in a single
+	// directory.
+  std::string dirPath(dirname);
 	if (CmiNumPartitions() > 1) {
-		addPartitionDirectory(dirPath);
-		CmiMkdir(dirPath.str().c_str());
+	  for (int i = 0; i < CmiNumPartitions(); i++) {
+      std::string partPath = dirPath + "/part" + std::to_string(i);
+	    CmiMkdir(partPath.c_str());
+	    createSubDirs(partPath);
+	  }
 	}
-
-	// Due to file system issues we have observed, divide checkpoints
-	// into subdirectories to avoid having too many files in a single directory
-	// Nodegroups are fine since # of logical nodes <= # of PEs
-	int mySubDir = CkMyPe() / SUBDIR_SIZE;
-	dirPath << "/sub" << mySubDir;
-	CmiMkdir(dirPath.str().c_str());
+	else {
+	  createSubDirs(dirPath);
+	}
 
 	bool success = true;
 	if (CkMyPe() == 0) {
