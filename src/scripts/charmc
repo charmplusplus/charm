@@ -735,6 +735,15 @@ do
 		OPTS_CPP="$OPTS_CPP -I$1"
 		shift
 		;;
+	-isystem|-iquote|-idirafter)
+		OPTS_CPP="$OPTS_CPP $arg $1"
+		shift
+		;;
+	@*.rsp)
+		# Pass through response files (*.rsp) to the compiler.
+		# See https://github.com/UIUC-PPL/charm/issues/2617 for details.
+		OPTS="$OPTS $arg"
+		;;
 
 	-D*|-I*)
 		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null
