@@ -32,7 +32,7 @@
 #define CmiSetMsgSize(msg, sz)    ((((CmiMsgHeaderBasic *)msg)->size) = (sz))
 
 #define UCX_MSG_PROBE_THRESH            32768
-#define UCX_MSG_NUM_RX_REQS             16
+#define UCX_MSG_NUM_RX_REQS             64
 #define UCX_MSG_NUM_RX_REQS_MAX         1024
 #define UCX_TAG_MSG_BITS                4
 #define UCX_TAG_RMA_BITS                4
@@ -70,8 +70,8 @@ enum {
 typedef struct UcxRequest
 {
     void           *msgBuf;
+    int            idx;
     int            completed;
-    ucp_tag_t      tag;
 #if CMK_ONESIDED_IMPL
     void           *ncpyAck;
     ucp_rkey_h     rkey;
@@ -89,8 +89,6 @@ typedef struct UcxContext
 #endif
     int               eagerSize;
     int               numRxReqs;
-    int               numFreeRxReqs;
-    int               rxReqsBatch;
 } UcxContext;
 
 #ifdef CMK_SMP
@@ -111,6 +109,7 @@ static UcxContext ucxCtx;
 
 static void UcxRxReqCompleted(void *request, ucs_status_t status,
                               ucp_tag_recv_info_t *info);
+static void UcxPrepostRxBuffers();
 
 #if CMK_ONESIDED_IMPL
 #include "machine-onesided.h"
@@ -136,138 +135,23 @@ void UcxRequestInit(void *request)
 {
     UcxRequest *req = (UcxRequest*)request;
     req->msgBuf     = NULL;
+    req->idx        = -1;
     req->completed  = 0;
-}
-
-static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, void *rxBuf,
-                                         size_t size, ucp_tag_t tag)
-{
-
-#if CMK_ONESIDED_IMPL
-    if (tag & UCX_RMA_TAG_REG_AND_SEND_BACK) {
-        // Register the source buffer and send back to destination to perform GET
-        NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(rxBuf);
-        UCX_LOG(4, "Got ncpy size %d (meta size %d)", ncpyOpInfo->srcSize, ncpyOpInfo->ncpyOpInfoSize);
-        resetNcpyOpInfoPointers(ncpyOpInfo);
-
-        UcxRdmaInfo *info = (UcxRdmaInfo *)(ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize());
-
-        UcxMemMap(info, (void *)ncpyOpInfo->srcPtr, ncpyOpInfo->srcSize);
-
-        ncpyOpInfo->isSrcRegistered = 1;
-
-        ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO; // It's a message, not a realy ncpy Obj
-        UCX_LOG(4, "Reset ncpy size %d (meta size %d)", ncpyOpInfo->destSize, ncpyOpInfo->ncpyOpInfoSize);
-
-        // send back to destination process to perform GET
-        UcxSendMsg(CmiNodeOf(ncpyOpInfo->destPe), ncpyOpInfo->destPe,
-                   ncpyOpInfo->ncpyOpInfoSize, (char*)ncpyOpInfo,
-                   UCX_RMA_TAG_GET, UcxRmaSendCompletedAndFree);
-
-    } else if (tag & UCX_RMA_TAG_GET) {
-        NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(rxBuf);
-        resetNcpyOpInfoPointers(ncpyOpInfo);
-
-        ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO; // It's a message, not a real ncpy Obj
-        UcxRmaOp(ncpyOpInfo, UCX_RMA_OP_GET);
-
-    } else if (tag & UCX_RMA_TAG_DEREG_AND_ACK) {
-        NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(rxBuf);
-        resetNcpyOpInfoPointers(ncpyOpInfo);
-        ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
-
-        if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->srcPe)) { // source node
-            LrtsDeregisterMem(ncpyOpInfo->srcPtr,
-                              ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
-                              ncpyOpInfo->srcPe,
-                              ncpyOpInfo->srcRegMode);
-
-            ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
-
-            // Invoke source ack
-            if(ncpyOpInfo->opMode != CMK_BCAST_EM_API) {
-                ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
-                CmiInvokeNcpyAck(ncpyOpInfo);
-            }
-
-        } else if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->destPe)) { // destination node
-
-            LrtsDeregisterMem(ncpyOpInfo->destPtr,
-                              ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(),
-                              ncpyOpInfo->destPe,
-                              ncpyOpInfo->destRegMode);
-
-            ncpyOpInfo->isDestRegistered = 0; // Set isDestRegistered to 0 after de-registration
-
-            // Invoke destination ack
-            ncpyOpInfo->opMode = CMK_EM_API_DEST_ACK_INVOKE;
-            CmiInvokeNcpyAck(ncpyOpInfo);
-
-        } else {
-            CmiAbort(" Cannot de-register on a different node than the source or destinaton");
-        }
-    }
-#endif
-
-    if (!(tag & UCX_RMA_TAG_MASK)) {
-        handleOneRecvedMsg(size, (char*)rxBuf);
-    }
-
-    if (tag & UCX_MSG_TAG_EAGER) {
-        // Preposted RX request will be released in UcxPostRxBuffers
-        ++ucxCtx.numFreeRxReqs;
-    } else {
-        UCX_REQUEST_FREE(request);
-    }
-}
-
-
-static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
-                                       ucp_tag_message_h msg)
-{
-    void *buf = CmiAlloc(size);
-    UcxRequest *req;
-
-    if (tag == UCX_MSG_TAG_EAGER) {
-        req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, buf,
-                                           ucxCtx.eagerSize,
-                                           ucp_dt_make_contig(1), tag,
-                                           UCX_MSG_TAG_MASK,
-                                           UcxRxReqCompleted);
-    } else {
-        CmiEnforce(tag == UCX_MSG_TAG_PROBE);
-        req = (UcxRequest*)ucp_tag_msg_recv_nb(ucxCtx.worker, buf, size,
-                                               ucp_dt_make_contig(1), msg,
-                                               UcxRxReqCompleted);
-    }
-
-    CmiEnforce(!UCS_PTR_IS_ERR(req));
-    UCX_LOG(3, "Posted RX buf %p size %zu, req %p, tag %zu, comp %d\n",
-            req->msgBuf, size, req, tag, req->completed);
-
-    // Request completed immediately
-    if (req->completed) {
-        UcxHandleRxReq(req, buf, size, req->tag);
-    } else {
-        req->msgBuf = buf;
-    }
-
-    return req;
 }
 
 static void UcxInitEps(int numNodes, int myId)
 {
+    size_t addrlen;
     ucp_address_t *address;
     ucs_status_t status;
     ucp_ep_params_t eParams;
-    size_t addrlen, maxval, len, partLen;
     ucp_ep_h ep;
-    int i, j, ret, peer, maxkey, parts;
+    int i, j, ret, peer, maxkey, maxval, parts, len, partLen;
     char *keys, *addrp, *remoteAddr;
 
     ret = runtime_get_max_keylen(&maxkey);
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_get_max_keylen error");
-    ret = runtime_get_max_vallen((int*)&maxval);
+    ret = runtime_get_max_vallen(&maxval);
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_get_max_vallen error");
 
     // Reduce maxval value, because with PMI1 it has to fit cmd + key + value
@@ -282,6 +166,7 @@ static void UcxInitEps(int numNodes, int myId)
 
     status = ucp_worker_get_address(ucxCtx.worker, &address, &addrlen);
     UCX_CHECK_STATUS(status, "UcxInitEps: ucp_worker_get_address error");
+    CmiEnforce(addrlen < std::numeric_limits<int>::max()); //address should fit to int
 
     parts = (addrlen / maxval) + 1;
 
@@ -292,7 +177,7 @@ static void UcxInitEps(int numNodes, int myId)
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
 
     addrp = (char*)address;
-    len   = addrlen;
+    len   = (int)addrlen;
     for (i = 0; i < parts; ++i) {
         partLen = std::min(maxval, len);
         ret = snprintf(keys, maxkey, "UCX-%d-%d", myId, i);
@@ -303,10 +188,9 @@ static void UcxInitEps(int numNodes, int myId)
         len   -= partLen;
     }
 
-    /* Ensure that all nodes published their worker addresses */
+    // Ensure that all nodes published their worker addresses
     ret = runtime_barrier();
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_barrier");
-
 
     ucp_worker_release_address(ucxCtx.worker, address);
 
@@ -398,25 +282,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         ucxCtx.eagerSize = UCX_MSG_PROBE_THRESH;
     }
 
-    // We wait for rxReqsBatch requests to complete, before reposting new ones
-    ucxCtx.rxReqsBatch = std::max(1, ucxCtx.numRxReqs / 4);
-    if (CmiGetArgInt(*argv, "+ucx_rx_reqs_batch", &ucxCtx.rxReqsBatch)) {
-        if ((ucxCtx.rxReqsBatch > ucxCtx.numRxReqs) || (ucxCtx.rxReqsBatch <= 0)) {
-            CmiPrintf("UCX: Invalid value of RX reqs batch: %d\n", ucxCtx.rxReqsBatch);
-            CmiAbort(__func__);
-        }
-    }
-
     UcxInitEps(*numNodes, *myNodeID);
 
-    ucxCtx.rxReqs = (UcxRequest**)CmiAlloc(sizeof(UcxRequest*) * ucxCtx.numRxReqs);
-    CmiEnforce(ucxCtx.rxReqs);
-
-    // Post RX requests for eager protocol
-    ucxCtx.numFreeRxReqs = 0;
-    for (int i = 0; i < ucxCtx.numRxReqs; i++) {
-        ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
-    }
+    UcxPrepostRxBuffers();
 
     // Ensure connects completion
     status = ucp_worker_flush(ucxCtx.worker);
@@ -430,6 +298,85 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
             ucxCtx.numRxReqs, ucxCtx.eagerSize);
 }
 
+static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
+                                               ucp_tag_message_h msg)
+{
+    void *buf = CmiAlloc(size);
+    UcxRequest *req;
+
+    if (tag == UCX_MSG_TAG_EAGER) {
+        req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, buf,
+                                           ucxCtx.eagerSize,
+                                           ucp_dt_make_contig(1), tag,
+                                           UCX_MSG_TAG_MASK,
+                                           UcxRxReqCompleted);
+    } else {
+        CmiEnforce(tag == UCX_MSG_TAG_PROBE);
+        req = (UcxRequest*)ucp_tag_msg_recv_nb(ucxCtx.worker, buf, size,
+                                               ucp_dt_make_contig(1), msg,
+                                               UcxRxReqCompleted);
+    }
+
+    CmiEnforce(!UCS_PTR_IS_ERR(req));
+    UCX_LOG(3, "Posted RX buf %p size %zu, req %p, tag %zu, comp %d\n",
+            req->msgBuf, size, req, tag, req->completed);
+
+    // Request completed immediately
+    if (req->completed) {
+        if (!(tag & UCX_RMA_TAG_MASK)) {
+            handleOneRecvedMsg(size, (char*)buf);
+        }
+    } else {
+        req->msgBuf = buf;
+    }
+
+    return req;
+}
+
+static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
+                                       ucp_tag_message_h msg)
+{
+    UcxRequest *req = UcxPostRxReqInternal(tag, size, msg);
+    int idx = req->idx;
+
+    do {
+        if (req->completed) {
+            UCX_REQUEST_FREE(req);
+
+            if (tag & UCX_MSG_TAG_EAGER) {
+                req = UcxPostRxReqInternal(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
+                req->idx = idx;
+                ucxCtx.rxReqs[idx] = req;
+            } else {
+                return NULL;
+            }
+        }
+        else {
+            return req;
+        }
+    }
+    while (1);
+}
+
+static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, char *rxBuf,
+                                         size_t size, ucp_tag_t tag, int idx)
+{
+    if (!(tag & UCX_RMA_TAG_MASK)) {
+        handleOneRecvedMsg(size, rxBuf);
+    }
+
+    UCX_REQUEST_FREE(request);
+
+    if (tag & UCX_MSG_TAG_EAGER) {
+        ucxCtx.rxReqs[idx]      = UcxPostRxReq(UCX_MSG_TAG_EAGER,
+                                               ucxCtx.eagerSize, NULL);
+        ucxCtx.rxReqs[idx]->idx = idx;
+        return ucxCtx.rxReqs[idx];
+    }
+
+    return NULL;
+}
+
 static void UcxRxReqCompleted(void *request, ucs_status_t status,
                               ucp_tag_recv_info_t *info)
 {
@@ -438,37 +385,99 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
     UCX_LOG(3, "status %d len %zu, buf %p, req %p, tag %zu\n",
             status,  info->length, req->msgBuf, request, info->sender_tag);
 
-    req->completed = 1;
-
     if (ucs_unlikely(status == UCS_ERR_CANCELED)) {
         return;
     }
 
+#if CMK_ONESIDED_IMPL
+    if (info->sender_tag & UCX_RMA_TAG_REG_AND_SEND_BACK) {
+
+        // Register the source buffer and send back to destination to perform GET
+
+        NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(req->msgBuf);
+        UCX_LOG(4, "Got ncpy size %d (meta size %d)", ncpyOpInfo->srcSize, ncpyOpInfo->ncpyOpInfoSize);
+        resetNcpyOpInfoPointers(ncpyOpInfo);
+
+        UcxRdmaInfo *info = (UcxRdmaInfo *)(ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize());
+
+        UcxMemMap(info,
+                  (void *)ncpyOpInfo->srcPtr,
+                  ncpyOpInfo->srcSize);
+
+        ncpyOpInfo->isSrcRegistered = 1;
+
+        ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO; // It's a message, not a realy ncpy Obj
+        UCX_LOG(4, "Reset ncpy size %d (meta size %d)", ncpyOpInfo->destSize, ncpyOpInfo->ncpyOpInfoSize);
+
+        // send back to destination process to perform GET
+        UcxSendMsg(CmiNodeOf(ncpyOpInfo->destPe), ncpyOpInfo->destPe,
+                   ncpyOpInfo->ncpyOpInfoSize, (char*)ncpyOpInfo,
+                   UCX_RMA_TAG_GET, UcxRmaSendCompletedAndFree);
+
+    } else if (info->sender_tag & UCX_RMA_TAG_GET) {
+        NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(req->msgBuf);
+        resetNcpyOpInfoPointers(ncpyOpInfo);
+
+        ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO; // It's a message, not a real ncpy Obj
+        UcxRmaOp(ncpyOpInfo, UCX_RMA_OP_GET);
+
+    } else if (info->sender_tag & UCX_RMA_TAG_DEREG_AND_ACK) {
+        NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(req->msgBuf);
+        resetNcpyOpInfoPointers(ncpyOpInfo);
+        ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
+
+        if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->srcPe)) { // source node
+            LrtsDeregisterMem(ncpyOpInfo->srcPtr,
+                              ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
+                              ncpyOpInfo->srcPe,
+                              ncpyOpInfo->srcRegMode);
+
+            ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+
+            // Invoke source ack
+            if(ncpyOpInfo->opMode != CMK_BCAST_EM_API) {
+                ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+                CmiInvokeNcpyAck(ncpyOpInfo);
+            }
+
+        } else if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->destPe)) { // destination node
+
+            LrtsDeregisterMem(ncpyOpInfo->destPtr,
+                              ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(),
+                              ncpyOpInfo->destPe,
+                              ncpyOpInfo->destRegMode);
+
+            ncpyOpInfo->isDestRegistered = 0; // Set isDestRegistered to 0 after de-registration
+
+            // Invoke destination ack
+            ncpyOpInfo->opMode = CMK_EM_API_DEST_ACK_INVOKE;
+            CmiInvokeNcpyAck(ncpyOpInfo);
+
+        } else {
+            CmiAbort(" Cannot de-register on a different node than the source or destinaton");
+        }
+    }
+#endif
+
     if (req->msgBuf != NULL) {
         // Request is not completed immediately
-        UcxHandleRxReq(req, req->msgBuf, info->length, info->sender_tag);
+        UcxHandleRxReq(req, (char*)req->msgBuf, info->length, info->sender_tag, req->idx);
     } else {
-        // Request completed immediately, save real sender tag
-        req->tag = info->sender_tag;
+        req->completed = 1;
     }
 }
 
-static void UcxPostRxBuffers()
+static void UcxPrepostRxBuffers()
 {
-    int i, numPosted;
+    int i;
 
-    for (i = 0, numPosted = 0; i < ucxCtx.numRxReqs; i++) {
-        if (ucxCtx.rxReqs[i]->completed) {
-            UCX_REQUEST_FREE(ucxCtx.rxReqs[i]);
-            ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_EAGER,
-                                            ucxCtx.eagerSize, NULL);
-            ++numPosted;
-            CmiAssert(!ucxCtx.rxReqs[i]->completed);
-        }
+    ucxCtx.rxReqs = (UcxRequest**)CmiAlloc(sizeof(UcxRequest*) * ucxCtx.numRxReqs);
+
+    for (i = 0; i < ucxCtx.numRxReqs; i++) {
+        ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
+        ucxCtx.rxReqs[i]->idx = i;
     }
-    UCX_LOG(3, "UCX: posted %d of %d rx requests (free reqs %d)",
-            numPosted, ucxCtx.numRxReqs, ucxCtx.numFreeRxReqs);
-    ucxCtx.numFreeRxReqs = 0;
+    UCX_LOG(3, "UCX: preposted %d rx requests", ucxCtx.numRxReqs);
 }
 
 void UcxTxReqCompleted(void *request, ucs_status_t status)
@@ -614,9 +623,6 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP
        cnt += ProcessTxQueue();
 #endif
-       if (ucxCtx.numFreeRxReqs >= ucxCtx.rxReqsBatch) {
-           UcxPostRxBuffers();
-       }
     } while (cnt);
 }
 
@@ -641,11 +647,9 @@ void LrtsExit(int exitcode)
 
     for (i = 0; i < ucxCtx.numRxReqs; ++i) {
         req = ucxCtx.rxReqs[i];
-        if (!req->completed) {
-            CmiFree(req->msgBuf);
-            ucp_request_cancel(ucxCtx.worker, req);
-        }
-        UCX_REQUEST_FREE(req);
+        CmiFree(req->msgBuf);
+        ucp_request_cancel(ucxCtx.worker, req);
+        ucp_request_free(req);
     }
 
     ucp_worker_destroy(ucxCtx.worker);
