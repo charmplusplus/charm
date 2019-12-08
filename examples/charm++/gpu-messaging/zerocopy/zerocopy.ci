@@ -1,0 +1,41 @@
+mainmodule zerocopy {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Block block_proxy;
+  readonly int block_size;
+  readonly int n_iters;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void terminate();
+  };
+
+  group Block {
+    entry Block();
+    entry void init();
+    entry void receive(int ref, int size, nocopypost double arr[size]);
+
+    entry void iterate() {
+      serial {
+        // Send device data to peer
+        thisProxy[peer].receive(iter, block_size, CkSendBuffer(d_local_data));
+      }
+
+      // Receive device data from peer
+      // This is the second receive(), invoked after the data transfer is
+      // complete
+      when receive[iter](int ref, int size, nocopypost double arr[size])
+      serial {
+        // Validate received data
+        validateData();
+
+        // Continue next iteration or return to Main for termination
+        if (iter++ < n_iters) {
+          thisProxy[thisIndex].iterate();
+        }
+        else {
+          contribute(CkCallback(CkReductionTarget(Main, terminate), main_proxy));
+        }
+      }
+    }
+  };
+};
