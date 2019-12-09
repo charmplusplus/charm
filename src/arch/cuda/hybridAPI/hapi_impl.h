@@ -7,7 +7,7 @@ extern "C" {
 
 // Initialize & exit hybrid API.
 void initHybridAPI();
-void setHybridAPIDevice();
+void initDeviceMapping(char** argv);
 void exitHybridAPI();
 
 // Initializes event queues used for polling.
