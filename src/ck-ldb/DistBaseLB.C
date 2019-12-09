@@ -178,7 +178,11 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
   // Migrate messages from me to elsewhere
   for(int i=0; i < migrateMsg->n_moves; i++) {
     MigrateInfo& move = migrateMsg->moves[i];
-    if (move.from_pe == me && move.to_pe != me) {
+    if (move.from_pe == me) {
+      if (move.to_pe == me) {
+        CkAbort("[%i] Error, attempting to migrate object myself to myself\n",
+            CkMyPe());
+      }
       theLbdb->Migrate(move.obj,move.to_pe);
     } else if (move.from_pe != me) {
       CkPrintf("[%d] Error, strategy wants to move from %d to  %d\n",
