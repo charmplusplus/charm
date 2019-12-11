@@ -106,8 +106,9 @@ class Block : public CBase_Block {
     // Inform the runtime where the incoming data should be stored
     arr = d_remote_data;
 
-    // TODO: Set flag in CkNcpyBufferPost to let the runtime know that it is
-    // a device-to-device transfer, or use UVA to determine automatically
+    // Set flag in CkNcpyBufferPost to let the runtime know that it is
+    // a device-to-device transfer
+    ncpyPost->device = true;
   }
 
   void validateData() {

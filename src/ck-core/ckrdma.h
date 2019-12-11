@@ -63,6 +63,11 @@ struct CkNcpyBufferPost {
 
   // deregMode
   unsigned short int deregMode;
+
+  // Set if device-to-device transfer
+  bool device;
+
+  CkNcpyBufferPost() : regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), device(false) {}
 };
 
 // Class to represent an Zerocopy buffer

@@ -1058,7 +1058,17 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
  * the destination to perform zerocopy operations as a part of the Zerocopy Entry Method
  * API
  */
+static void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
+    void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs) {
+  CkPrintf("CkRdmaIssueRgetsDevice from receiver, PE %d\n", CkMyPe());
+}
+
 void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs){
+
+  if(postStructs.device) {
+    CkRdmaIssueRgetsDevice(env, emMode, numops, arrPtrs, arrSizes, postStructs);
+    return;
+  }
 
   if(emMode == ncpyEmApiMode::BCAST_SEND)
     CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
