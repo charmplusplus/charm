@@ -14,6 +14,9 @@ cpu affinity.
 #define _GNU_SOURCE
 #endif
 
+#include <map>
+#include <algorithm>
+
 #include "converse.h"
 #include "sockRoutines.h"
 #include "charm-api.h"
@@ -415,8 +418,13 @@ typedef struct _affMsg {
 #endif
 } affMsg;
 
+static inline bool operator< (const skt_ip_t & a, const skt_ip_t & b)
+{
+  return memcmp(&a, &b, sizeof(a)) < 0;
+}
+
 static rankMsg *rankmsg = NULL;
-static CmmTable hostTable;
+static std::map<skt_ip_t, hostnameMsg *> hostTable;
 static CmiNodeLock affLock = 0;
 
 /* called on PE 0 */
@@ -427,7 +435,7 @@ static void cpuAffinityHandler(void *m)
   hostnameMsg *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
   void *tmpm;
-  int tag, tag1, pe, myrank;
+  int pe, myrank;
   int npes = CmiNumPes();
 
 /*   for debug
@@ -436,16 +444,18 @@ static void cpuAffinityHandler(void *m)
   printf("hostname: %d %s\n", msg->pe, str);
 */
   CmiAssert(CmiMyPe()==0 && rankmsg != NULL);
-  tag = *(int*)&msg->ip;
+  skt_ip_t & ip = msg->ip;
   pe = msg->pe;
-  if ((rec = (hostnameMsg *)CmmProbe(hostTable, 1, &tag, &tag1)) != NULL) {
+  auto iter = hostTable.find(ip);
+  if (iter != hostTable.end()) {
+    rec = iter->second;
     CmiFree(msg);
   }
   else {
     rec = msg;
     rec->seq = nodecount;
     nodecount++;                          /* a new node record */
-    CmmPut(hostTable, 1, &tag, msg);
+    hostTable.emplace(ip, msg);
   }
   myrank = rec->rank%rec->ncores;
   while (in_exclude(myrank)) {             /* skip excluded core */
@@ -457,10 +467,10 @@ static void cpuAffinityHandler(void *m)
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
-    DEBUGP(("Cpuaffinity> %d unique compute nodes detected! \n", CmmEntries(hostTable)));
-    tag = CmmWildCard;
-    while ((tmpm = CmmGet(hostTable, 1, &tag, &tag1))) CmiFree(tmpm);
-    CmmFree(hostTable);
+    DEBUGP(("Cpuaffinity> %zu unique compute nodes detected!\n", hostTable.size()));
+    for (const auto & pair : hostTable)
+      CmiFree(pair.second);
+    hostTable.clear();
 #if 1
     /* bubble sort ranks on each node according to the PE number */
     {
@@ -469,11 +479,7 @@ static void cpuAffinityHandler(void *m)
       for(j=i+1; j<npes; j++) {
         if (rankmsg->nodes[i] == rankmsg->nodes[j] && 
               rankmsg->ranks[i] > rankmsg->ranks[j]) 
-        {
-          int tmp = rankmsg->ranks[i];
-          rankmsg->ranks[i] = rankmsg->ranks[j];
-          rankmsg->ranks[j] = tmp;
-        }
+          std::swap(rankmsg->ranks[i], rankmsg->ranks[j]);
       }
     }
 #endif
@@ -1000,7 +1006,6 @@ void CmiInitCPUAffinity(char **argv)
 
   if (CmiMyPe() == 0) {
     int i;
-    hostTable = CmmNew();
     rankmsg = (rankMsg *)CmiAlloc(sizeof(rankMsg)+CmiNumPes()*sizeof(int)*2);
     CmiSetHandler((char *)rankmsg, cpuAffinityRecvHandlerIdx);
     rankmsg->ranks = (int *)((char*)rankmsg + sizeof(rankMsg));

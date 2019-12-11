@@ -167,10 +167,15 @@ int CpuTopology::numNodes = 0;
 std::vector<int> *CpuTopology::bynodes = NULL;
 int CpuTopology::supported = 0;
 
+static inline bool operator< (const skt_ip_t & a, const skt_ip_t & b)
+{
+  return memcmp(&a, &b, sizeof(a)) < 0;
+}
+
 namespace CpuTopoDetails {
 
 static nodeTopoMsg *topomsg = NULL;
-static CmmTable hostTable;
+static std::map<skt_ip_t, _procInfo *> hostTable;
 
 CpvStaticDeclare(int, cpuTopoHandlerIdx);
 CpvStaticDeclare(int, cpuTopoRecvHandlerIdx);
@@ -205,11 +210,10 @@ static void cpuTopoHandler(void *m)
 {
   _procInfo *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
-  int tag, tag1, pe;
+  int pe;
 
   if (topomsg == NULL) {
     int i;
-    hostTable = CmmNew();
     topomsg = (nodeTopoMsg *)CmiAlloc(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int));
     CmiSetHandler((char *)topomsg, CpvAccess(cpuTopoRecvHandlerIdx));
     topomsg->nodes = (int *)((char*)topomsg + sizeof(nodeTopoMsg));
@@ -227,26 +231,25 @@ static void cpuTopoHandler(void *m)
   skt_print_ip(str, msg->ip);
   printf("hostname: %d %s\n", msg->pe, str);
 */
-    tag = *(int*)&proc->ip;
+    skt_ip_t & ip = proc->ip;
     pe = proc->pe;
-    if ((rec = (_procInfo *)CmmProbe(hostTable, 1, &tag, &tag1)) != NULL) {
+    auto iter = hostTable.find(ip);
+    if (iter != hostTable.end()) {
+      rec = iter->second;
     }
     else {
       proc->nodeID = pe;           // we will compact the node ID later
       rec = proc;
-      CmmPut(hostTable, 1, &tag, proc);
+      hostTable.emplace(ip, proc);
     }
     topomsg->nodes[pe] = rec->nodeID;
     rec->rank ++;
   }
 
-  printTopology(CmmEntries(hostTable));
+  printTopology(hostTable.size());
 
     // clean up CmmTable
-  hostnameMsg *tmpm;
-  tag = CmmWildCard;
-  while ((tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)));
-  CmmFree(hostTable);
+  hostTable.clear();
   CmiFree(msg);
 
   CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
