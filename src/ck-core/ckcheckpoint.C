@@ -230,11 +230,27 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	}
 
 	// Due to file system issues we have observed, divide checkpoints
-	// into subdirectories to avoid having too many files in a single directory
-	// Nodegroups are fine since # of logical nodes <= # of PEs
+	// into subdirectories to avoid having too many files in a single directory.
+	// Nodegroups should be checked separately since they could go into
+	// different subdirectory.
+
+	// Save current path for later use with nodegroups
+	ostringstream dirPathNode;
+	dirPathNode << dirPath.str();
+
+	// Create subdirectories
 	int mySubDir = CkMyPe() / SUBDIR_SIZE;
 	dirPath << "/sub" << mySubDir;
 	CmiMkdir(dirPath.str().c_str());
+
+	// Create Nodegroup subdirectory if needed
+	if (CkMyRank() == 0) {
+		int mySubDirNode = CkMyNode() / SUBDIR_SIZE;
+		if (mySubDirNode != mySubDir) {
+			dirPathNode << "/sub" << mySubDirNode;
+			CmiMkdir(dirPathNode.str().c_str());
+		}
+	}
 
 	bool success = true;
 	if (CkMyPe() == 0) {
