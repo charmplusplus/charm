@@ -281,7 +281,7 @@ void DistributedLB::DoneGossip() {
   // high so that load is initially only transferred from the most loaded PEs.
   // In subsequent phases it gets relaxed to allow less overloaded PEs to
   // transfer load as well.
-  transfer_threshold = (max_load + avg_load) / 2;
+  transfer_threshold = fmax(kTargetRatio * avg_load, (max_load + avg_load) / 2);
   lb_started = true;
   underloaded_pe_count = pe_no.size();
   Setup();
@@ -344,11 +344,13 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
     if (std::abs(load_ratio - old_ratio) < 0.01) {
       // The previous phase didn't meaningfully reduce the max load, so relax
       // the transfer threshold.
-      transfer_threshold = (transfer_threshold + avg_load) / 2;
+      transfer_threshold = fmax(kTargetRatio * avg_load,
+          (transfer_threshold + avg_load) / 2);
     } else {
       // The previous phase did reduce the max load, so update the transfer
       // threshold based on the new max load.
-      transfer_threshold = (max_load + avg_load) / 2;
+      transfer_threshold = fmax(kTargetRatio * avg_load,
+          (max_load + avg_load) / 2);
     }
     StartNextLBPhase();
   } else {
