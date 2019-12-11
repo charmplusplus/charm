@@ -1052,6 +1052,10 @@ void CentralLB::ProcessMigrationDecision() {
     MigrateDecision& move = m->moves[i];
     const int me = CkMyPe();
     if (move.fromPe == me) {
+      if (move.toPe == me) {
+        CkAbort("[%d] Error, attempting to migrate from myself to myself\n",
+            CkMyPe());
+      }
       DEBUGF(("[%d] migrating object to %d\n", move.fromPe, move.toPe));
       // migrate object, in case it is already gone, inform toPe
       LDObjHandle objInfo = theLbdb->GetObjHandle(move.dbIndex);
