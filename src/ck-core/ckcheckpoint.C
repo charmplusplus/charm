@@ -236,7 +236,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 
 	// Save current path for later use with nodegroups
 	ostringstream dirPathNode;
-	dirPathNode << dirPath.rdbuf();
+	dirPathNode << dirPath.str();
 
 	// Create subdirectories
 	int mySubDir = CkMyPe() / SUBDIR_SIZE;
