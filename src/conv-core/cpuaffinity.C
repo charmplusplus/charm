@@ -493,7 +493,7 @@ static void cpuAffinityRecvHandler(void *msg)
 
   DEBUGP(("[%d %d] set to core #: %d\n", CmiMyNode(), CmiMyPe(), myrank));
 
-  if (-1 != CmiSetCPUAffinityLogical(myrank)) {
+  if (-1 != CmiSetCPUAffinity(myrank)) {
     DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
   }
   else{
