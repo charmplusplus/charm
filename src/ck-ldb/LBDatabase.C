@@ -3,6 +3,7 @@
 */
 /*@{*/
 
+#include <charm++.h>
 #include "converse.h"
 
 /*
@@ -408,19 +409,511 @@ void LBDatabase::initnodeFn()
   _registerCommandLineOpt("+LBBeta");
 }
 
-// called my constructor
+/*************************************************************
+ * Set up the builtin barrier-- the load balancer needs somebody
+ * to call AtSync on each PE in case there are no atSync array
+ * elements.  The builtin-atSync caller (batsyncer) does this.
+ */
+
+//Called periodically-- starts next load balancing cycle
+void LBDatabase::batsyncer::gotoSync(void *bs)
+{
+  LBDatabase::batsyncer *s = (LBDatabase::batsyncer *)bs;
+  s->gotoSyncCalled = true;
+  s->db->AtLocalBarrier(s->BH);
+}
+//Called at end of each load balancing cycle
+void LBDatabase::batsyncer::resumeFromSync(void *bs)
+{
+  LBDatabase::batsyncer *s = (LBDatabase::batsyncer *)bs;
+
+#if 0
+  double curT = CmiWallTimer();
+  if (s->nextT<curT)  s->period *= 2;
+  s->nextT = curT + s->period;
+#endif
+
+  if (s->gotoSyncCalled) {
+    CcdCallFnAfterOnPE((CcdVoidFn)gotoSync, (void *)s, 1000*s->period, CkMyPe());
+    s->gotoSyncCalled = false;
+  }
+}
+
+// initPeriod in seconds
+void LBDatabase::batsyncer::init(LBDatabase *_db, double initPeriod)
+{
+  db = _db;
+  period = initPeriod;
+  nextT = CmiWallTimer() + period;
+  BH = db->AddLocalBarrierClient((LDResumeFn)resumeFromSync, (void*)(this));
+  gotoSyncCalled = true;
+  //This just does a CcdCallFnAfter
+  resumeFromSync((void *)this);
+}
+
+
+
+// called by constructor
 void LBDatabase::init(void)
 {
-  myLDHandle = LDCreate();
   mystep = 0;
   nloadbalancers = 0;
   new_ld_balancer = 0;
-	metabalancer = NULL;
+  metabalancer = nullptr;
+  objsEmptyHead = -1;
+  omCount = omsRegistering = 0;
+
+  obj_walltime = 0;
+#if CMK_LB_CPUTIMER
+  obj_cputime = 0;
+#endif
+  useBarrier = true;
+  statsAreOn = false;
+  obj_running = false;
+  predictCBFn = nullptr;
+  batsync.init(this, _lb_args.lbperiod());	    // original 1.0 second
+  commTable = new LBCommTable;
+  startLBFn_count = 0;
 
   CkpvAccess(lbdatabaseInited) = true;
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
 #endif
+}
+
+LDOMHandle LBDatabase::RegisterOM(LDOMid userID, void* userPtr, LDCallbacks cb) {
+  LDOMHandle newHandle;
+  newHandle.id = userID;
+
+  LBOM* om = new LBOM(this, userID, userPtr, cb);
+  if (om != nullptr) {
+    newHandle.handle = oms.size();
+    oms.push_back(om);
+  } else newHandle.handle = -1;
+  om->DepositHandle(newHandle);
+  omCount++;
+  return newHandle;
+}
+
+void LBDatabase::UnregisterOM(LDOMHandle omh) {
+  delete oms[omh.handle];
+  oms[omh.handle] = nullptr;
+  omCount--;
+}
+
+void LBDatabase::RegisteringObjects(LDOMHandle omh) {
+  // for an unregistered anonymous OM to join and control the barrier
+  if (omh.id.id.idx == 0) {
+    if (omsRegistering == 0)
+      LocalBarrierOff();
+    omsRegistering++;
+  }
+  else {
+    LBOM* om = oms[omh.handle];
+    if (!om->RegisteringObjs()) {
+      if (omsRegistering == 0)
+        LocalBarrierOff();
+      omsRegistering++;
+      om->SetRegisteringObjs(true);
+    }
+  }
+}
+
+void LBDatabase::DoneRegisteringObjects(LDOMHandle omh)
+{
+  // for an unregistered anonymous OM to join and control the barrier
+  if (omh.id.id.idx == 0) {
+    omsRegistering--;
+    if (omsRegistering == 0)
+      LocalBarrierOn();
+  }
+  else {
+    LBOM* om = oms[omh.handle];
+    if (om->RegisteringObjs()) {
+      omsRegistering--;
+      if (omsRegistering == 0)
+        LocalBarrierOn();
+      om->SetRegisteringObjs(false);
+    }
+  }
+}
+
+#if CMK_BIGSIM_CHARM
+#define LBOBJ_OOC_IDX 0x1
+#endif
+
+LDObjHandle LBDatabase::RegisterObj(LDOMHandle omh, CmiUInt8 id,
+                                    void* userPtr, int migratable) {
+  LDObjHandle newhandle;
+
+  newhandle.omhandle = omh;
+  newhandle.id = id;
+
+#if CMK_BIGSIM_CHARM
+  if (_BgOutOfCoreFlag==2){ //taking object into memory
+    //first find the first (LBOBJ_OOC_IDX) in objs and insert the object at that position
+    int newpos = -1;
+    for (int i = 0; i < objs.size(); i++) {
+      if (objs[i].obj == (LBObj *)LBOBJ_OOC_IDX) {
+        newpos = i;
+        break;
+      }
+    }
+    if (newpos == -1) newpos = objs.size();
+    newhandle.handle = newpos;
+    LBObj *obj = new LBObj(newhandle, userPtr, migratable);
+    if (newpos == objs.size()) {
+      objs.emplace_back(obj);
+    } else {
+      objs[newpos].obj = obj;
+    }
+    //objCount is not increased since it's the original object which is pupped
+    //through out-of-core emulation.
+    //objCount++;
+  } else
+#endif
+  {
+    // objsEmptyHead maintains a linked list of empty positions within the objs array
+    // If objsEmptyHead == -1, there are no vacant positions, so add to the back
+    // If objsEmptyHead > -1, we place the new object at index objsEmptyHead and advance
+    // objsEmptyHead to the next empty position.
+    if (objsEmptyHead == -1) {
+      newhandle.handle = objs.size();
+      LBObj *obj = new LBObj(newhandle, userPtr, migratable);
+      objs.emplace_back(obj);
+    } else {
+      newhandle.handle = objsEmptyHead;
+      LBObj *obj = new LBObj(newhandle, userPtr, migratable);
+      objs[objsEmptyHead].obj = obj;
+
+      objsEmptyHead = objs[objsEmptyHead].next;
+    }
+  }
+
+  return newhandle;
+}
+
+void LBDatabase::UnregisterObj(LDObjHandle h)
+{
+  delete objs[h.handle].obj;
+
+#if CMK_BIGSIM_CHARM
+  //hack for BigSim out-of-core emulation.
+  //we want the chare array object to keep at the same
+  //position even going through the pupping routine.
+  if (_BgOutOfCoreFlag == 1) { //in taking object out of memory
+    objs[h.handle].obj = (LBObj *)(LBOBJ_OOC_IDX);
+  } else
+#endif
+  {
+    objs[h.handle].obj = NULL;
+    // Maintain the linked list of empty positions by adding the newly removed
+    // index as the new objsEmptyHead
+    objs[h.handle].next = objsEmptyHead;
+    objsEmptyHead = h.handle;
+  }
+}
+
+void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force)
+{
+  if (force || (StatsOn() && _lb_args.traceComm())) {
+    LBCommData* item_ptr;
+
+    if (obj_running) {
+      const LDObjHandle &runObj = RunningObj();
+
+      // Don't record self-messages from an object to an object
+      if (runObj.omhandle.id == destOM.id
+          && runObj.id == destID )
+        return;
+
+      // In the future, we'll have to eliminate processor to same
+      // processor messages as well
+
+      LBCommData item(runObj, destOM.id, destID, destObjProc);
+      item_ptr = commTable->HashInsertUnique(item);
+    } else {
+      LBCommData item(CkMyPe(), destOM.id, destID, destObjProc);
+      item_ptr = commTable->HashInsertUnique(item);
+    }
+    item_ptr->addMessage(bytes);
+  }
+}
+
+void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int nDests, unsigned int bytes, int nMsgs)
+{
+  if (StatsOn() && _lb_args.traceComm()) {
+    LBCommData* item_ptr;
+    if (obj_running) {
+      const LDObjHandle &runObj = RunningObj();
+
+      LBCommData item(runObj, destOM.id, destIDs, nDests);
+      item_ptr = commTable->HashInsertUnique(item);
+      item_ptr->addMessage(bytes, nMsgs);
+    }
+  }
+}
+
+void LBDatabase::DumpDatabase()
+{
+#ifdef DEBUG
+  CmiPrintf("Database contains %d object managers\n",omCount);
+  CmiPrintf("Database contains %d objects\n",objs.size());
+#endif
+}
+
+int LBDatabase::NotifyMigrated(LDMigratedFn fn, void* data)
+{
+  // Save migration function
+  MigrateCB* callbk = new MigrateCB;
+
+  callbk->fn = fn;
+  callbk->data = data;
+  callbk->on = 1;
+  migrateCBList.push_back(callbk);
+  return migrateCBList.size()-1;
+}
+
+void LBDatabase::RemoveNotifyMigrated(int handle)
+{
+  MigrateCB* callbk = migrateCBList[handle];
+  migrateCBList[handle] = NULL;
+  delete callbk;
+}
+
+int LBDatabase::AddStartLBFn(LDStartLBFn fn, void* data)
+{
+  // Save startLB function
+  StartLBCB* callbk = new StartLBCB;
+
+  callbk->fn = fn;
+  callbk->data = data;
+  callbk->on = 1;
+  startLBFnList.push_back(callbk);
+  startLBFn_count++;
+  return startLBFnList.size()-1;
+}
+
+void LBDatabase::RemoveStartLBFn(LDStartLBFn fn)
+{
+  for (int i = 0; i < startLBFnList.size(); i++) {
+    StartLBCB* callbk = startLBFnList[i];
+    if (callbk && callbk->fn == fn) {
+      delete callbk;
+      startLBFnList[i] = 0;
+      startLBFn_count--;
+      break;
+    }
+  }
+}
+
+void LBDatabase::StartLB()
+{
+  if (startLBFn_count == 0) {
+    CmiAbort("StartLB is not supported in this LB");
+  }
+  for (int i = 0; i < startLBFnList.size(); i++) {
+    StartLBCB *startLBFn = startLBFnList[i];
+    if (startLBFn && startLBFn->on) startLBFn->fn(startLBFn->data);
+  }
+}
+
+int LBDatabase::AddMigrationDoneFn(LDMigrationDoneFn fn, void* data) {
+  // Save migrationDone callback function
+  MigrationDoneCB* callbk = new MigrationDoneCB;
+
+  callbk->fn = fn;
+  callbk->data = data;
+  migrationDoneCBList.push_back(callbk);
+  return migrationDoneCBList.size()-1;
+}
+
+void LBDatabase::RemoveMigrationDoneFn(LDMigrationDoneFn fn) {
+  for (int i = 0; i < migrationDoneCBList.size(); i++) {
+    MigrationDoneCB* callbk = migrationDoneCBList[i];
+    if (callbk && callbk->fn == fn) {
+      delete callbk;
+      migrationDoneCBList[i] = 0;
+      break;
+    }
+  }
+}
+
+void LBDatabase::MigrationDone() {
+  for (int i = 0; i < migrationDoneCBList.size(); i++) {
+    MigrationDoneCB *callbk = migrationDoneCBList[i];
+    if (callbk) callbk->fn(callbk->data);
+  }
+}
+
+void LBDatabase::SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off, LDPredictModelFn change, void* data)
+{
+  if (predictCBFn == NULL) predictCBFn = new PredictCB;
+  predictCBFn->on = on;
+  predictCBFn->onWin = onWin;
+  predictCBFn->off = off;
+  predictCBFn->change = change;
+  predictCBFn->data = data;
+}
+
+int LBDatabase::GetObjDataSz()
+{
+  int nitems = 0;
+  int i;
+  if (_lb_args.migObjOnly()) {
+  for(i = 0; i < objs.size(); i++)
+    if (objs[i].obj && (objs[i].obj)->data.migratable)
+      nitems++;
+  } else {
+  for(i = 0; i < objs.size(); i++)
+    if (objs[i].obj)
+      nitems++;
+  }
+  return nitems;
+}
+
+void LBDatabase::GetObjData(LDObjData *dp)
+{
+  if (_lb_args.migObjOnly()) {
+    for (int i = 0; i < objs.size(); i++) {
+      LBObj* obj = objs[i].obj;
+      if (obj && obj->data.migratable)
+        *dp++ = obj->ObjData();
+    }
+  } else {
+    for (int i = 0; i < objs.size(); i++) {
+      LBObj* obj = objs[i].obj;
+      if (obj)
+        *dp++ = obj->ObjData();
+    }
+  }
+}
+
+void LBDatabase::BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
+{
+  LBRealType total_walltime;
+  LBRealType total_cputime;
+  TotalTime(&total_walltime, &total_cputime);
+
+  LBRealType idletime;
+  IdleTime(&idletime);
+
+  *walltime = total_walltime - idletime - obj_walltime;
+  if (*walltime < 0) *walltime = 0.;
+#if CMK_LB_CPUTIMER
+  *cputime = total_cputime - obj_cputime;
+#else
+  *cputime = *walltime;
+#endif
+}
+
+void LBDatabase::GetTime(LBRealType *total_walltime, LBRealType *total_cputime,
+                         LBRealType *idletime, LBRealType *bg_walltime,
+                         LBRealType *bg_cputime)
+{
+  TotalTime(total_walltime,total_cputime);
+
+  IdleTime(idletime);
+
+  *bg_walltime = *total_walltime - *idletime - obj_walltime;
+  if (*bg_walltime < 0) *bg_walltime = 0.;
+#if CMK_LB_CPUTIMER
+  *bg_cputime = *total_cputime - obj_cputime;
+#else
+  *bg_cputime = *bg_walltime;
+#endif
+  //CkPrintf("HERE [%d] total: %f %f obj: %f %f idle: %f bg: %f\n", CkMyPe(), *total_walltime, *total_cputime, obj_walltime, obj_cputime, *idletime, *bg_walltime);
+}
+
+void LBDatabase::ClearLoads(void)
+{
+  int i;
+  for (i = 0; i < objs.size(); i++) {
+    LBObj *obj = objs[i].obj;
+    if (obj)
+    {
+      if (obj->data.wallTime > 0.0) {
+        obj->lastWallTime = obj->data.wallTime;
+#if CMK_LB_CPUTIMER
+        obj->lastCpuTime = obj->data.cpuTime;
+#endif
+      }
+      obj->data.wallTime = 0.0;
+#if CMK_LB_CPUTIMER
+      obj->data.cpuTime = 0.0;
+#endif
+    }
+  }
+  delete commTable;
+  commTable = new LBCommTable;
+  machineUtil.Clear();
+  obj_walltime = 0;
+#if CMK_LB_CPUTIMER
+  obj_cputime = 0;
+#endif
+}
+
+int LBDatabase::Migrate(LDObjHandle h, int dest)
+{
+  if (h.handle >= objs.size()) {
+    CmiAbort("[%d] LBDB::Migrate: Handle %d out of range 0-%zu\n",CkMyPe(),h.handle,objs.size());
+  }
+  else if (!(objs[h.handle].obj)) {
+    CmiAbort("[%d] LBDB::Migrate: Handle %d no longer registered, range 0-%zu\n", CkMyPe(),h.handle,objs.size());
+  }
+
+  LBOM *const om = oms[(objs[h.handle].obj)->parentOM().handle];
+  om->Migrate(h, dest);
+  return 1;
+}
+
+void LBDatabase::Migrated(LDObjHandle h, int waitBarrier)
+{
+  // Object migrated, inform load balancers
+
+  // subtle: callback may change (on) when switching LBs
+  // call in reverse order
+  //for(int i=0; i < migrateCBList.length(); i++) {
+  for(int i = migrateCBList.size()-1; i >= 0; i--) {
+    MigrateCB* cb = (MigrateCB*)migrateCBList[i];
+    if (cb && cb->on) (cb->fn)(cb->data, h, waitBarrier);
+  }
+}
+
+void LBDatabase::MetaLBResumeWaitingChares(int lb_ideal_period) {
+#if CMK_LBDB_ON
+  for (int i = 0; i < objs.size(); i++) {
+    LBObj* obj = objs[i].obj;
+    if (obj) {
+      LBOM *om = oms[obj->parentOM().handle];
+      LDObjHandle h = obj->GetLDObjHandle();
+      om->MetaLBResumeWaitingChares(h, lb_ideal_period);
+    }
+  }
+#endif
+}
+
+void LBDatabase::MetaLBCallLBOnChares() {
+#ifdef CMK_LBDB_ON
+  for (int i = 0; i < objs.size(); i++) {
+    LBObj* obj = objs[i].obj;
+    if (obj) {
+      LBOM *om = oms[obj->parentOM().handle];
+      LDObjHandle h = obj->GetLDObjHandle();
+      om->MetaLBCallLBOnChares(h);
+    }
+  }
+#endif
+}
+
+int LBDatabase::useMem() {
+  int size = sizeof(LBDatabase);
+  size += oms.size() * sizeof(LBOM);
+  size += GetObjDataSz() * sizeof(LBObj);
+  size += migrateCBList.size() * sizeof(MigrateCB);
+  size += startLBFnList.size() * sizeof(StartLBCB);
+  size += commTable->useMem();
+  return size;
 }
 
 LBDatabase::LastLBInfo::LastLBInfo()
@@ -568,8 +1061,7 @@ void LBDatabase::pup(PUP::er& p)
 void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 {
 #if CMK_LBDB_ON
-  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
-  LBObj *const obj = db->LbObj(_h);
+  LBObj *const obj = LbObj(_h);
 
   CmiAssert(obj != NULL);
   obj->setTiming(cputime);
@@ -599,7 +1091,7 @@ void LBDatabase::ResumeClients() {
 			metabalancer->ResumeClients();
 		}
 	}
-  LDResumeClients(myLDHandle);
+  localBarrier.ResumeClients();
 #endif
 }
 
@@ -641,6 +1133,73 @@ void LBDatabase::UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad
 	}
 #endif
 }
+
+#if CMK_LBDB_ON
+static void work(int iter_block, volatile int* result) {
+  int i;
+  *result = 1;
+  for(i=0; i < iter_block; i++) {
+    double b=0.1 + 0.1 * *result;
+    *result=(int)(sqrt(1+cos(b * 1.57)));
+  }
+}
+
+int LBDatabase::ProcessorSpeed() {
+  // for SMP version, if one processor have done this testing,
+  // we can skip the other processors by remember the number here
+  static int thisProcessorSpeed = -1;
+
+  if (_lb_args.samePeSpeed() || CkNumPes() == 1)  // I think it is safe to assume that we can
+    return 1;            // skip this if we are only using 1 PE
+
+  if (thisProcessorSpeed != -1) return thisProcessorSpeed;
+
+  //if (CkMyPe()==0) CkPrintf("Measuring processor speeds...");
+
+  volatile static int result=0;  // I don't care what this is, its just for
+			// timing, so this is thread safe.
+  int wps = 0;
+  const double elapse = 0.4;
+  // First, count how many iterations for .2 second.
+  // Since we are doing lots of function calls, this will be rough
+  const double end_time = CmiCpuTimer()+elapse;
+  wps = 0;
+  while(CmiCpuTimer() < end_time) {
+    work(1000,&result);
+    wps+=1000;
+  }
+
+  // Now we have a rough idea of how many iterations there are per
+  // second, so just perform a few cycles of correction by
+  // running for what we think is 1 second.  Then correct
+  // the number of iterations per second to make it closer
+  // to the correct value
+
+  for(int i=0; i < 2; i++) {
+    const double start_time = CmiCpuTimer();
+    work(wps,&result);
+    const double end_time = CmiCpuTimer();
+    const double correction = elapse / (end_time-start_time);
+    wps = (int)((double)wps * correction + 0.5);
+  }
+
+  // If necessary, do a check now
+  //    const double start_time3 = CmiWallTimer();
+  //    work(msec * 1e-3 * wps);
+  //    const double end_time3 = CmiWallTimer();
+  //    CkPrintf("[%d] Work block size is %d %d %f\n",
+  //	     thisIndex,wps,msec,1.e3*(end_time3-start_time3));
+  thisProcessorSpeed = wps;
+
+  //if (CkMyPe()==0) CkPrintf(" Done.\n");
+
+  return wps;
+}
+
+#else
+int LBDatabase::ProcessorSpeed() { return 1; }
+#endif // CMK_LBDB_ON
+
 /*
   callable from user's code
 */
@@ -742,6 +1301,149 @@ void LBSetPeriod(double second) {
 int LBRegisterObjUserData(int size)
 {
   return CkpvAccess(lbobjdatalayout).claim(size);
+}
+
+
+class client {
+  friend class LocalBarrier;
+  void* data;
+  LDResumeFn fn;
+  int refcount;
+};
+class receiver {
+  friend class LocalBarrier;
+  void* data;
+  LDBarrierFn fn;
+  int on;
+};
+
+LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
+{
+  client* new_client = new client;
+  new_client->fn = fn;
+  new_client->data = data;
+  new_client->refcount = cur_refcount;
+
+#if CMK_BIGSIM_CHARM
+  if(_BgOutOfCoreFlag!=2){
+    //during out-of-core emualtion for BigSim, if taking procs from disk to mem,
+    //client_count should not be increased
+    client_count++;
+  }
+#else
+  client_count++;
+#endif
+
+  return LDBarrierClient(clients.insert(clients.end(), new_client));
+}
+
+void LocalBarrier::RemoveClient(LDBarrierClient c)
+{
+  delete *(c.i);
+  clients.erase(c.i);
+
+#if CMK_BIGSIM_CHARM
+  //during out-of-core emulation for BigSim, if taking procs from mem to disk,
+  //client_count should not be increased
+  if(_BgOutOfCoreFlag!=1)
+  {
+    client_count--;
+  }
+#else
+  client_count--;
+#endif
+}
+
+LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
+{
+  receiver* new_receiver = new receiver;
+  new_receiver->fn = fn;
+  new_receiver->data = data;
+  new_receiver->on = 1;
+
+  return LDBarrierReceiver(receivers.insert(receivers.end(), new_receiver));
+}
+
+void LocalBarrier::RemoveReceiver(LDBarrierReceiver c)
+{
+  delete *(c.i);
+  receivers.erase(c.i);
+}
+
+void LocalBarrier::TurnOnReceiver(LDBarrierReceiver c)
+{
+  (*c.i)->on = 1;
+}
+
+void LocalBarrier::TurnOffReceiver(LDBarrierReceiver c)
+{
+  (*c.i)->on = 0;
+}
+
+void LocalBarrier::AtBarrier(LDBarrierClient h)
+{
+  (*h.i)->refcount++;
+  at_count++;
+  CheckBarrier();
+}
+
+void LocalBarrier::DecreaseBarrier(LDBarrierClient h, int c)
+{
+  at_count-=c;
+}
+
+void LocalBarrier::CheckBarrier()
+{
+  if (!on) return;
+
+  // If there are no clients, resume as soon as we're turned on
+  if (client_count == 0) {
+    cur_refcount++;
+    CallReceivers();
+  }
+
+  // If there have been enough AtBarrier calls, check to see if all clients have
+  // made it to the barrier. It's possible to have gotten multiple AtSync calls
+  // from a single client, which is why this check is necessary.
+  if (at_count >= client_count) {
+    bool at_barrier = true;
+
+    for (auto& c : clients) {
+      if (c->refcount < cur_refcount) {
+        at_barrier = false;
+        break;
+      }
+    }
+
+    if (at_barrier) {
+      at_count -= client_count;
+      cur_refcount++;
+      CallReceivers();
+    }
+  }
+}
+
+void LocalBarrier::CallReceivers(void)
+{
+  bool called_receiver=false;
+
+  for (std::list<receiver *>::iterator i = receivers.begin();
+       i != receivers.end(); ++i) {
+    receiver *recv = *i;
+    if (recv->on) {
+      recv->fn(recv->data);
+      called_receiver = true;
+    }
+  }
+
+  if (!called_receiver)
+    ResumeClients();
+}
+
+void LocalBarrier::ResumeClients(void)
+{
+  for (std::list<client *>::iterator i = clients.begin(); i != clients.end(); ++i)
+    (*i)->fn((*i)->data);
 }
 
 #include "LBDatabase.def.h"

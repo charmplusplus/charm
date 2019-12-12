@@ -719,7 +719,7 @@ static void CmiIsomallocInitExtent()
         freeRegion.len = (uint8_t *)ee - (uint8_t *)ss;
       }
       CmiPrintf(
-          "Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%d MB).\n",
+          "Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%zu MB).\n",
           freeRegion.start, freeRegion.start + freeRegion.len, freeRegion.len / meg);
       goto AFTER_SYNC;
     }

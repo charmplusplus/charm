@@ -5,7 +5,6 @@
 
 #include "BaseLB.h"
 #include "DistBaseLB.h"
-#include "LBDBManager.h"
 #include "DistBaseLB.def.h"
 
 #define  DEBUGF(x)      // CmiPrintf x;
@@ -41,9 +40,9 @@ DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
   thisProxy = CProxy_DistBaseLB(thisgroup);
   receiver = theLbdb->AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
       (void*)(this));
-  notifier = theLbdb->getLBDB()->NotifyMigrated((LDMigratedFn)(staticMigrated),
+  notifier = theLbdb->NotifyMigrated((LDMigratedFn)(staticMigrated),
       (void*)(this));
-  startLbFnHdl = theLbdb->getLBDB()->AddStartLBFn((LDStartLBFn)(staticStartLB),
+  startLbFnHdl = theLbdb->AddStartLBFn((LDStartLBFn)(staticStartLB),
       (void*)(this));
   theLbdb->AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)this);
 
@@ -69,7 +68,7 @@ DistBaseLB::~DistBaseLB() {
 #if CMK_LBDB_ON
   theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
   if (theLbdb) {
-    theLbdb->getLBDB()->RemoveNotifyMigrated(notifier);
+    theLbdb->RemoveNotifyMigrated(notifier);
     theLbdb-> RemoveStartLBFn((LDStartLBFn)(staticStartLB));
   }
   if (mig_msgs) {
@@ -178,7 +177,11 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
   // Migrate messages from me to elsewhere
   for(int i=0; i < migrateMsg->n_moves; i++) {
     MigrateInfo& move = migrateMsg->moves[i];
-    if (move.from_pe == me && move.to_pe != me) {
+    if (move.from_pe == me) {
+      if (move.to_pe == me) {
+        CkAbort("[%i] Error, attempting to migrate object myself to myself\n",
+            CkMyPe());
+      }
       theLbdb->Migrate(move.obj,move.to_pe);
     } else if (move.from_pe != me) {
       CkPrintf("[%d] Error, strategy wants to move from %d to  %d\n",
