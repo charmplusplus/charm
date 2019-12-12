@@ -230,7 +230,7 @@ void GPUManager::init() {
 
   // set up mempool metadata
   mempool_initialized_ = false;
-  mempool_boundaries_.reserve(HAPI_MEMPOOL_NUM_SLOTS);
+  mempool_boundaries_.resize(HAPI_MEMPOOL_NUM_SLOTS);
 
   size_t buf_size = HAPI_MEMPOOL_MIN_BUFFER_SIZE;
   for(int i = 0; i < HAPI_MEMPOOL_NUM_SLOTS; i++){
@@ -915,7 +915,7 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
   std::vector<size_t>& mempool_boundaries = CsvAccess(gpu_manager).mempool_boundaries_;
 
   // initialize pools
-  pools.reserve(n_slots);
+  pools.resize(n_slots);
   for (int i = 0; i < n_slots; i++) {
     pools[i].size = mempool_boundaries[i];
     pools[i].head = NULL;
