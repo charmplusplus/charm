@@ -1686,11 +1686,9 @@ void _initCharm(int unused_argc, char **argv)
     }
 
 #if CMK_CUDA
+    initDeviceMapping(argv);
     if (CmiMyRank() == 0) {
       initHybridAPI();
-    }
-    else /* CmiMyRank() != 0 */ {
-      setHybridAPIDevice();
     }
     initEventQueues();
 
