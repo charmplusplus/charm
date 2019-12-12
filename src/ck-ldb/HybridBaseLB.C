@@ -4,7 +4,6 @@
 /*@{*/
 
 #include "HybridBaseLB.h"
-#include "LBDBManager.h"
 #include "GreedyLB.h"
 #include "RefineLB.h"
 
@@ -43,7 +42,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
   receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
 			    (void*)(this));
-  notifier = theLbdb->getLBDB()->
+  notifier = theLbdb->
     NotifyMigrated((LDMigratedFn)(staticMigrated), (void*)(this));
 
   statsStrategy = FULL;
@@ -109,7 +108,7 @@ HybridBaseLB::~HybridBaseLB()
 #if CMK_LBDB_ON
   theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
   if (theLbdb) {
-    theLbdb->getLBDB()->
+    theLbdb->
       RemoveNotifyMigrated(notifier);
     //theLbdb->
     //  RemoveStartLBFn((LDStartLBFn)(staticStartLB));
