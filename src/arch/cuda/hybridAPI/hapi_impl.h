@@ -37,6 +37,13 @@ typedef struct _bufferPool {
 #endif
 } BufferPool;
 
+// PE-GPU mapping types
+enum class Mapping {
+  None, // Mapping is explicitly performed by the user
+  Block,
+  RoundRobin
+};
+
 #ifdef __cplusplus
 }
 #endif
