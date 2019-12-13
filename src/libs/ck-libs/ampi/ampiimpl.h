@@ -2983,6 +2983,15 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 
 #endif // CMK_TRACE_ENABLED
 
+extern bool ampi_nodeinit_has_been_called;
+inline void ampiVerifyNodeinit(const char * routineName)
+{
+  if (!ampi_nodeinit_has_been_called)
+  { /* Charm hasn't been started yet! */
+    CkAbort("%s> AMPI has not been initialized! Possibly due to AMPI requiring '#include \"mpi.h\" be in the same file as main() in C/C++ programs and \'program main\' be renamed to \'subroutine mpi_main\' in Fortran programs!", routineName);
+  }
+}
+
 //Use this to mark the start of AMPI interface routines that can only be called on AMPI threads:
 #if CMK_ERROR_CHECKING
 #define AMPI_API(routineName, ...) \
@@ -2994,7 +3003,8 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 #endif
 
 //Use this for MPI_Init and routines than can be called before AMPI threads have been initialized:
-#define AMPI_API_INIT(routineName, ...) TCHARM_API_TRACE(routineName, "ampi"); \
+#define AMPI_API_INIT(routineName, ...) ampiVerifyNodeinit(routineName); \
+  TCHARM_API_TRACE(routineName, "ampi"); \
   AMPI_DEBUG_ARGS(routineName, __VA_ARGS__)
 
 #endif // _AMPIIMPL_H

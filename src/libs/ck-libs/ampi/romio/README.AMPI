@@ -28,6 +28,8 @@ ROMIO integrated into AMPI:
   adio/common/ad_i{read,write}_coll.c.
 * PMPI_File_set_errhandler has been corrected to MPI_File_set_errhandler
   in adio/common/ad_end.c and mpi-io/close.c.
+* MPIO_Request_{c2f,f2c} are declared regardless of HAVE_MPI_GREQUEST
+  and mpi-io/ioreq_{c2f,f2c}.c are always built.
 
 
 Variable privatization
