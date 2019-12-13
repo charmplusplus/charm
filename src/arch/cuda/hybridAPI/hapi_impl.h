@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 // Initialize & exit hybrid API.
-void initHybridAPI();
+void initHybridAPI(char** argv);
 void initDeviceMapping(char** argv);
 void exitHybridAPI();
 

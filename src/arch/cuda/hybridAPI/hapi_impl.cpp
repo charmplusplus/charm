@@ -14,6 +14,9 @@
 #include "hapi_nvtx.h"
 #endif
 
+#include "concurrentqueue.h"
+using namespace moodycamel;
+
 #if defined HAPI_TRACE || defined HAPI_INSTRUMENT_WRS
 extern "C" double CmiWallTimer();
 #endif
@@ -128,6 +131,12 @@ public:
   int data_setup_idx_;
   int data_cleanup_idx_;
 
+  // Concurrent queue of pre-allocated CUDA Events
+  ConcurrentQueue<cudaEvent_t> event_pool;
+  int event_pool_size;
+  int event_pool_inc;
+  bool use_event_pool;
+
 #ifdef HAPI_TRACE
   gpuEventTimer gpu_events_[QUEUE_SIZE_INIT * 3];
   std::atomic<int> time_idx_;
@@ -151,7 +160,9 @@ public:
   bool cb_support;
 #endif
 
-  void init();
+  void init(char**);
+  void createEventPool(char**);
+  void destroyEventPool();
   int createStreams();
   int createNStreams(int);
   void destroyStreams();
@@ -168,7 +179,7 @@ public:
 // Declare GPU Manager as a process-shared object.
 CsvDeclare(GPUManager, gpu_manager);
 
-void GPUManager::init() {
+void GPUManager::init(char** argv) {
   next_buffer_ = NUM_BUFFERS;
   streams_ = NULL;
   n_streams_ = 0;
@@ -229,9 +240,46 @@ void GPUManager::init() {
     buf_size = buf_size << 1;
   }
 
+  // Create pool of CUDA Events unless specified otherwise
+  if (CmiGetArgFlagDesc(argv, "+gpueventpooloff", "Turn off CUDA Event pool")) {
+    use_event_pool = false;
+  }
+  else {
+    use_event_pool = true;
+    createEventPool(argv);
+  }
+
 #ifdef HAPI_INSTRUMENT_WRS
   init_instr_ = false;
 #endif
+}
+
+void GPUManager::createEventPool(char** argv) {
+  event_pool_inc = event_pool_size = 128;
+
+  // CUDA Event pool options
+  CmiGetArgIntDesc(argv, "+gpueventpoolsize", &event_pool_size,
+      "Initial size of CUDA Event pool");
+  CmiGetArgIntDesc(argv, "+gpueventpoolinc", &event_pool_inc,
+      "Increment size of CUDA Event pool");
+
+  if (CmiMyPe() == 0) {
+    CmiPrintf("HAPI> Creating CUDA Event pool with size %d, inc %d\n",
+        event_pool_size, event_pool_inc);
+  }
+
+  for (int i = 0; i < event_pool_size; i++) {
+    cudaEvent_t ev;
+    cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
+    event_pool.enqueue(ev);
+  }
+}
+
+void GPUManager::destroyEventPool() {
+  cudaEvent_t ev;
+  while (event_pool.try_dequeue(ev)) {
+    cudaEventDestroy(ev);
+  }
 }
 
 // Creates streams equal to the maximum number of concurrent kernels,
@@ -396,9 +444,17 @@ void GPUManager::allocateBuffers(hapiWorkRequest* wr) {
 
 #ifndef HAPI_CUDA_CALLBACK
 void recordEvent(cudaStream_t stream, void* cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
-  // create CUDA event and insert into stream
   cudaEvent_t ev;
-  cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
+
+  if (CsvAccess(gpu_manager).use_event_pool) {
+    if (!CsvAccess(gpu_manager).event_pool.try_dequeue(ev)) {
+      // TODO: Pool empty, create new CUDA Events
+      CmiAbort("[HAPI] CUDA Event pool empty!");
+    }
+  }
+  else {
+    cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
+  }
   cudaEventRecord(ev, stream);
 
   hapiEvent hev(ev, cb, cb_msg, wr);
@@ -756,10 +812,10 @@ static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pool
 static void releasePool(std::vector<BufferPool> &pools);
 
 // Initialization of HAPI functionalities.
-void initHybridAPI() {
+void initHybridAPI(char** argv) {
   // create and initialize GPU Manager object
   CsvInitialize(GPUManager, gpu_manager);
-  CsvAccess(gpu_manager).init();
+  CsvAccess(gpu_manager).init(argv);
 }
 
 // Set up PE to GPU mapping, invoked from all PEs
@@ -852,6 +908,11 @@ void exitHybridAPI() {
   // release memory pool if it was used
   if (CsvAccess(gpu_manager).mempool_initialized_) {
     releasePool(CsvAccess(gpu_manager).mempool_free_bufs_);
+  }
+
+  // Destroy CUDA Event pool
+  if (CsvAccess(gpu_manager).use_event_pool) {
+    CsvAccess(gpu_manager).destroyEventPool();
   }
 
 #ifdef HAPI_TRACE
@@ -1280,8 +1341,17 @@ void hapiPollEvents() {
       if (hev.wr) {
         hapiWorkRequestCleanup(hev.wr);
       }
-      cudaEventDestroy(hev.event);
+
+      // Return CUDA Event back to pool or destroy it
+      if (CsvAccess(gpu_manager).use_event_pool) {
+        CsvAccess(gpu_manager).event_pool.enqueue(hev.event);
+      }
+      else {
+        cudaEventDestroy(hev.event);
+      }
+
       queue.pop();
+
       CpvAccess(n_hapi_events)--;
 
       // inform QD that an event was processed
