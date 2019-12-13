@@ -6,12 +6,13 @@ extern "C" {
 #endif
 
 // Initialize & exit hybrid API.
-void initHybridAPI(char** argv);
+void initHybridAPI();
 void initDeviceMapping(char** argv);
 void exitHybridAPI();
 
-// Initializes event queues used for polling.
-void initEventQueues();
+// Manages event queues used for polling.
+void initEventQueues(char** argv);
+void destroyEventQueues();
 
 // Registers callback handler functions.
 void hapiRegisterCallbacks();
