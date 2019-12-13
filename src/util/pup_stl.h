@@ -237,6 +237,7 @@ namespace PUP {
   template<>
   inline void PUP_stl_container_items<std::vector<bool>, bool>(er &p, std::vector<bool> &c, size_t nElem)
   {
+    // iterators of std::vector<bool> are read-only temporaries so we need special handling for unpacking
     if (p.isUnpacking()) {
       c.resize(nElem);
       for (size_t i = 0; i < nElem; ++i)
@@ -248,11 +249,10 @@ namespace PUP {
       }
     }
     else {
-      std::deque<bool> q(c.begin(), c.end());
-      for (std::deque<bool>::iterator it = q.begin(); it != q.end(); it++)
+      for (bool n : c)
       {
         p.syncComment(sync_item);
-        p|*it;
+        p|n;
       }
     }
   }
