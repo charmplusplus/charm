@@ -514,6 +514,8 @@ extern void         CmiUnlock(CmiNodeLock lock);
 extern int          CmiTryLock(CmiNodeLock lock);
 extern void         CmiDestroyLock(CmiNodeLock lock);
 
+#define CmiInCommThread() (0)
+
 #endif
 
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
