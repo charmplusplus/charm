@@ -7,13 +7,60 @@
 #define LBDATABASE_H
 
 #include "lbdb.h"
-#include "LBDBManager.h"
-#include "lbdb++.h"
+
+#include "LBObj.h"
+#include "LBOM.h"
+#include "LBComm.h"
+#include "LBMachineUtil.h"
 
 #define LB_FORMAT_VERSION     3
 
 class MetaBalancer;
 extern int _lb_version;
+
+class client;
+class receiver;
+
+class LocalBarrier {
+friend class LBDatabase;
+public:
+  LocalBarrier() { cur_refcount = 1; client_count = 0;
+                   max_receiver= 0; at_count = 0; on = false;
+	#if CMK_BIGSIM_CHARM
+	first_free_client_slot = 0;
+	#endif
+    };
+  ~LocalBarrier() { };
+
+  LDBarrierClient AddClient(LDResumeFn fn, void* data);
+  void RemoveClient(LDBarrierClient h);
+  LDBarrierReceiver AddReceiver(LDBarrierFn fn, void* data);
+  void RemoveReceiver(LDBarrierReceiver h);
+  void TurnOnReceiver(LDBarrierReceiver h);
+  void TurnOffReceiver(LDBarrierReceiver h);
+  void AtBarrier(LDBarrierClient h);
+  void DecreaseBarrier(LDBarrierClient h, int c);
+  void TurnOn() { on = true; CheckBarrier(); };
+  void TurnOff() { on = false; };
+
+private:
+  void CallReceivers(void);
+  void CheckBarrier();
+  void ResumeClients(void);
+
+  std::list<client*> clients;
+  std::list<receiver*> receivers;
+
+  int cur_refcount;
+  int client_count;
+  int max_receiver;
+  int at_count;
+  bool on;
+
+  #if CMK_BIGSIM_CHARM
+  int first_free_client_slot;
+  #endif
+};
 
 // command line options
 class CkLBArgs
@@ -111,8 +158,6 @@ PUPbytes(CkLBOptions)
 
 extern CkGroupID _lbdb;
 
-class LBDB;
-
 CkpvExtern(int, numLoadBalancers);
 CkpvExtern(bool, hasNullLB);
 CkpvExtern(bool, lbdatabaseInited);
@@ -176,19 +221,144 @@ class DefaultFunction : public LBPredictorFunction {
 };
 
 
-class LBDatabase : public IrrGroup {
+class LBDatabase : public CBase_LBDatabase {
+public:
+  class batsyncer {
+  private:
+    LBDatabase *db; //Enclosing LBDB object
+    double period; //Time (seconds) between builtin-atsyncs
+    double nextT;
+    LDBarrierClient BH; //Handle for the builtin-atsync barrier
+    bool gotoSyncCalled;
+    static void gotoSync(void *bs);
+    static void resumeFromSync(void *bs);
+  public:
+    void init(LBDatabase *_db, double initPeriod);
+    void setPeriod(double p) { period = p; }
+    double getPeriod() { return period; }
+  };
+
+private:
+  struct LBObjEntry {
+    LBObj* obj;
+    LDObjIndex next;
+
+    LBObjEntry(LBObj* obj, LDObjIndex next = -1) : obj(obj), next(next) {}
+  };
+
+  struct MigrateCB {
+    LDMigratedFn fn;
+    void* data;
+    int on;
+  };
+
+  struct StartLBCB {
+    LDStartLBFn fn;
+    void* data;
+    int on;
+  };
+
+  struct MigrationDoneCB {
+    LDMigrationDoneFn fn;
+    void* data;
+  };
+
+  struct PredictCB {
+    LDPredictModelFn on;
+    LDPredictWindowFn onWin;
+    LDPredictFn off;
+    LDPredictModelFn change;
+    void* data;
+  };
+
+  LBCommTable* commTable;
+  std::vector<LBOM*> oms;
+  int omCount;
+  int omsRegistering;
+
+  LDObjIndex objsEmptyHead;
+  std::vector<LBObjEntry> objs;
+
+  bool obj_running;
+  LDObjIndex runningObj; // index of the runningObj in objs
+
+  double obj_walltime;
+#if CMK_LB_CPUTIMER
+  double obj_cputime;
+#endif
+
+  bool statsAreOn;
+
+  std::vector<MigrateCB*> migrateCBList;
+  std::vector<StartLBCB*> startLBFnList;
+  std::vector<MigrationDoneCB*> migrationDoneCBList;
+
+  LBMachineUtil machineUtil;
+
+  LocalBarrier localBarrier;    // local barrier to trigger LB automatically
+  bool useBarrier;           // use barrier or not
+
+  PredictCB* predictCBFn;
+
+  batsyncer batsync;
+
+  int startLBFn_count;
+
 public:
   LBDatabase(void)  { init(); }
-  LBDatabase(CkMigrateMessage *m)  { (void)m; init(); }
+  LBDatabase(CkMigrateMessage *m) : CBase_LBDatabase(m)  { init(); }
   ~LBDatabase()  { if (avail_vector) delete [] avail_vector; }
   
 private:
   void init();
 public:
   inline static LBDatabase * Object() { return CkpvAccess(lbdatabaseInited)?(LBDatabase *)CkLocalBranch(_lbdb):NULL; }
-#if CMK_LBDB_ON
-  inline LBDB *getLBDB() {return (LBDB*)(myLDHandle.handle);}
+  inline LBOM* LbOM(LDOMHandle h) {
+    return oms[h.handle];
+  }
+  inline LBObj *LbObj(const LDObjHandle &h) const {
+    return objs[h.handle].obj;
+  }
+  inline LBObj *LbObjIdx(int h) const {
+    return objs[h].obj;
+  }
+
+  inline void TurnStatsOn(void)
+       {statsAreOn = true; machineUtil.StatsOn();}
+  inline void TurnStatsOff(void)
+       {statsAreOn = false; machineUtil.StatsOff();}
+  inline bool StatsOn(void) const
+       { return statsAreOn; };
+
+
+  /**
+     runningObj records the obj handler index so that load balancer
+     knows if an event(e.g. Send) is in an entry function or not.
+     An index is enough here because LDObjHandle can be retrieved from
+     objs array. Copying LDObjHandle is expensive.
+  */
+  inline void SetRunningObj(const LDObjHandle &_h) {
+    runningObj = _h.handle;
+    obj_running = true;
+  }
+  inline const LDObjHandle &RunningObj() const {
+    return objs[runningObj].obj->GetLDObjHandle();
+  }
+  inline void NoRunningObj() {
+    obj_running = false;
+  }
+  inline bool ObjIsRunning() const {
+    return obj_running;
+  }
+
+  inline void MeasuredObjTime(double wtime, double ctime) {
+    if (statsAreOn) {
+      obj_walltime += wtime;
+#if CMK_LB_CPUTIMER
+      obj_cputime += ctime;
 #endif
+    }
+  }
 
   static void initnodeFn(void);
 
@@ -197,215 +367,244 @@ public:
   /*
    * Calls from object managers to load database
    */
-  inline LDOMHandle RegisterOM(LDOMid userID, void *userptr, LDCallbacks cb) {
-    return LDRegisterOM(myLDHandle,userID, userptr, cb);
-  };
+  LDOMHandle RegisterOM(LDOMid userID, void *userptr, LDCallbacks cb);
+  void UnregisterOM(LDOMHandle omh);
 
-  inline void UnregisterOM(LDOMHandle omHandle) {
-    return LDUnregisterOM(myLDHandle, omHandle);
-  };
-
-  inline void RegisteringObjects(LDOMHandle _om) {
-    LDRegisteringObjects(_om);
-  };
-
-  inline void DoneRegisteringObjects(LDOMHandle _om) {
-    LDDoneRegisteringObjects(_om);
-  };
+  void RegisteringObjects(LDOMHandle omh);
+  void DoneRegisteringObjects(LDOMHandle omh);
 
   void ResetAdaptive();
 
-  inline LDObjHandle RegisterObj(LDOMHandle h, CmiUInt8 id,
-			  void *userptr,int migratable) {
-    return LDRegisterObj(h,id,userptr,migratable);
-  };
-
-  inline void UnregisterObj(LDObjHandle h) { LDUnregisterObj(h); };
+  LDObjHandle RegisterObj(LDOMHandle omh, CmiUInt8 id, void* userPtr,
+                          int migratable);
+  void UnregisterObj(LDObjHandle h);
 
   inline void ObjTime(LDObjHandle h, double walltime, double cputime) {
-    LDObjTime(h,walltime,cputime);
+    LbObj(h)->IncrementTime(walltime, cputime);
+    MeasuredObjTime(walltime, cputime);
   };
 
   inline void GetObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
-    LDGetObjLoad(h,&walltime,&cputime);
+    LbObj(h)->getTime(&walltime, &cputime);
   };
 
+  inline void* GetObjUserData(LDObjHandle &h) {
+    return LbObj(h)->getLocalUserData();
+  }
+
 #if CMK_LB_USER_DATA
-  inline void *GetDBObjUserData(LDObjHandle &h, int idx)
+  inline void* GetDBObjUserData(LDObjHandle &h, int idx)
   {
-    return LDDBObjUserData(h, idx);
+    return LbObj(h)->getDBUserData(idx);
   }
 #endif
 
   inline void QueryKnownObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
-    LDQueryKnownObjLoad(h,&walltime,&cputime);
+    LbObj(h)->lastKnownLoad(&walltime, &cputime);
   };
 
   inline int RunningObject(LDObjHandle* _o) const { 
 #if CMK_LBDB_ON
-      LBDB *const db = (LBDB*)(myLDHandle.handle);
-      if (db->ObjIsRunning()) {
-        *_o = db->RunningObj();
+      if (ObjIsRunning()) {
+        *_o = RunningObj();
         return 1;
       } 
 #endif
       return 0;
-      //return LDRunningObject(myLDHandle,_o);
   };
   inline const LDObjHandle *RunningObject() const { 
 #if CMK_LBDB_ON
-      LBDB *const db = (LBDB*)(myLDHandle.handle);
-      if (db->ObjIsRunning()) {
-        return &db->RunningObj();
+      if (ObjIsRunning()) {
+        return &(RunningObj());
       } 
 #endif
       return NULL;
   };
-  inline const LDObjHandle &GetObjHandle(int idx) { return LDGetObjHandle(myLDHandle, idx);}
-  inline void ObjectStart(const LDObjHandle &_h) { LDObjectStart(_h); };
-  inline void ObjectStop(const LDObjHandle &_h) { LDObjectStop(_h); };
-  inline void Send(const LDOMHandle &_om, const CmiUInt8 _id, unsigned int _b, int _p, int force = 0) {
-    LDSend(_om, _id, _b, _p, force);
+  inline const LDObjHandle &GetObjHandle(int idx) {
+    return LbObjIdx(idx)->GetLDObjHandle();
+  }
+  inline void ObjectStart(const LDObjHandle &h) {
+    if (ObjIsRunning()) {
+      ObjectStop(*RunningObject());
+    }
+
+    SetRunningObj(h);
+
+    if (StatsOn()) {
+      LbObj(h)->StartTimer();
+    }
   };
-  inline void MulticastSend(const LDOMHandle &_om, CmiUInt8 *_ids, int _n, unsigned int _b, int _nMsgs=1) {
-    LDMulticastSend(_om, _ids, _n, _b, _nMsgs);
+  inline void ObjectStop(const LDObjHandle &h) {
+    LBObj* const obj = LbObj(h);
+
+    if (StatsOn()) {
+      LBRealType walltime, cputime;
+      obj->StopTimer(&walltime, &cputime);
+      obj->IncrementTime(walltime, cputime);
+      MeasuredObjTime(walltime, cputime);
+    }
+
+    NoRunningObj();
   };
+  void Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force = 0);
+  void MulticastSend(const LDOMHandle &_om, CmiUInt8 *_ids, int _n, unsigned int _b, int _nMsgs=1);
 
   void EstObjLoad(const LDObjHandle &h, double cpuload);
-  inline void NonMigratable(LDObjHandle h) { LDNonMigratable(h); };
-  inline void Migratable(LDObjHandle h) { LDMigratable(h); };
-  inline void setPupSize(LDObjHandle h, size_t pup_size) {LDSetPupSize(h, pup_size);};
-  inline void UseAsyncMigrate(LDObjHandle h, bool flag) { LDAsyncMigrate(h, flag); };
-  inline void DumpDatabase(void) { LDDumpDatabase(myLDHandle); };
+  inline void NonMigratable(LDObjHandle h) { LbObj(h)->SetMigratable(false); };
+  inline void Migratable(LDObjHandle h) { LbObj(h)->SetMigratable(true); };
+  inline void setPupSize(LDObjHandle h, size_t pup_size) { LbObj(h)->setPupSize(pup_size);};
+  inline void UseAsyncMigrate(LDObjHandle h, bool flag) { LbObj(h)->UseAsyncMigrate(flag); };
+  void DumpDatabase(void);
 
   /*
    * Calls from load balancer to load database
    */  
-  inline void NotifyMigrated(LDMigratedFn fn, void *data) 
-  {
-    LDNotifyMigrated(myLDHandle,fn,data);
-  };
- 
-  inline void AddStartLBFn(LDStartLBFn fn, void *data) 
-  {
-    LDAddStartLBFn(myLDHandle,fn,data);
-  };
+  int NotifyMigrated(LDMigratedFn fn, void* data);
+  inline void TurnOnNotifyMigrated(int handle)
+       { migrateCBList[handle]->on = 1; }
+  inline void TurnOffNotifyMigrated(int handle)
+       { migrateCBList[handle]->on = 0; }
+  void RemoveNotifyMigrated(int handle);
 
-  inline void RemoveStartLBFn(LDStartLBFn fn) 
-  {
-    LDRemoveStartLBFn(myLDHandle,fn);
-  };
 
-  inline void StartLB() { LDStartLB(myLDHandle); }
+  int AddStartLBFn(LDStartLBFn fn, void *data);
+  void TurnOnStartLBFn(int handle)
+       { startLBFnList[handle]->on = 1; }
+  void TurnOffStartLBFn(int handle)
+       { startLBFnList[handle]->on = 0; }
+  void RemoveStartLBFn(LDStartLBFn fn);
 
-  inline void AddMigrationDoneFn(LDMigrationDoneFn fn, void *data) 
-  {
-    LDAddMigrationDoneFn(myLDHandle,fn,data);
-  };
+  void StartLB();
 
-  inline void RemoveMigrationDoneFn(LDMigrationDoneFn fn) 
-  {
-    LDRemoveMigrationDoneFn(myLDHandle,fn);
-  };
-
-  inline void MigrationDone() { LDMigrationDone(myLDHandle); }
+  int AddMigrationDoneFn(LDMigrationDoneFn fn, void *data);
+  void RemoveMigrationDoneFn(LDMigrationDoneFn fn);
+  void MigrationDone();
 
 public:
-  inline void TurnManualLBOn() { LDTurnManualLBOn(myLDHandle); }
-  inline void TurnManualLBOff() { LDTurnManualLBOff(myLDHandle); }
- 
-  inline void PredictorOn(LBPredictorFunction *model) { LDTurnPredictorOn(myLDHandle,model); }
-  inline void PredictorOn(LBPredictorFunction *model,int wind) { LDTurnPredictorOnWin(myLDHandle,model,wind); }
-  inline void PredictorOff() { LDTurnPredictorOff(myLDHandle); }
-  inline void ChangePredictor(LBPredictorFunction *model) { LDTurnPredictorOn(myLDHandle,model); }
-
-  inline void CollectStatsOn(void) { LDCollectStatsOn(myLDHandle); };
-  inline void CollectStatsOff(void) { LDCollectStatsOff(myLDHandle); };
-  inline int  CollectingStats(void) { return LDCollectingStats(myLDHandle); };
-  inline int  CollectingCommStats(void) { return LDCollectingStats(myLDHandle) && _lb_args.traceComm(); };
-  inline void QueryEstLoad(void) { LDQueryEstLoad(myLDHandle); };
-
-  inline int GetObjDataSz(void) { return LDGetObjDataSz(myLDHandle); };
-  inline void GetObjData(LDObjData *data) { LDGetObjData(myLDHandle,data); };
-  inline int GetCommDataSz(void) { return LDGetCommDataSz(myLDHandle); };
-  inline void GetCommData(LDCommData *data) { LDGetCommData(myLDHandle,data); };
-  
-  inline void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& num_ngh, int& hops, int& hopbytes) {
-    return LDGetCommInfo(myLDHandle, bytes, msgs, withinbytes, outsidebytes, num_ngh, hops, hopbytes);
-  };
-
-  inline void BackgroundLoad(LBRealType *walltime, LBRealType *cputime) {
-    LDBackgroundLoad(myLDHandle,walltime,cputime);
+  inline void TurnManualLBOn() {
+    useBarrier = false;
+    LocalBarrierOff();
   }
+  inline void TurnManualLBOff() {
+    useBarrier = true;
+    if (omsRegistering == 0) {
+      LocalBarrierOn();
+    }
+  }
+ 
+  inline void PredictorOn(LBPredictorFunction *model) {
+    if (predictCBFn!=NULL) predictCBFn->on(predictCBFn->data, model);
+    else CmiPrintf("Predictor not supported in this load balancer\n");
+  }
+  inline void PredictorOn(LBPredictorFunction *model, int wind) {
+    if (predictCBFn!=NULL) predictCBFn->onWin(predictCBFn->data, model, wind);
+    else CmiPrintf("Predictor not supported in this load balancer\n");
+  }
+  inline void PredictorOff() {
+    if (predictCBFn!=NULL) predictCBFn->off(predictCBFn->data);
+    else CmiPrintf("Predictor not supported in this load balancer\n");
+  }
+  inline void ChangePredictor(LBPredictorFunction *model) {
+    if (predictCBFn!=NULL) predictCBFn->change(predictCBFn->data, model);
+    else CmiPrintf("Predictor not supported in this load balancer");
+  }
+
+  void SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off, LDPredictModelFn change, void* data);
+
+  inline void CollectStatsOn(void) {
+    if (!StatsOn()) {
+      if (ObjIsRunning()) {
+        LbObj(*RunningObject())->StartTimer();
+      }
+      TurnStatsOn();
+    }
+  };
+  inline void CollectStatsOff(void) { TurnStatsOff(); };
+  inline int  CollectingStats(void) {
+  #if CMK_LBDB_ON
+    return StatsOn();
+  #else
+    return 0;
+  #endif
+  };
+  inline int CollectingCommStats(void) { return CollectingStats() && _lb_args.traceComm(); };
+
+  int GetObjDataSz(void);
+  void GetObjData(LDObjData *data);
+  inline int GetCommDataSz(void) {
+    if (commTable)
+      return commTable->CommCount();
+    else return 0;
+  }
+
+  inline void GetCommData(LDCommData *data) {
+    if (commTable) commTable->GetCommData(data);
+  }
+
+  inline void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& num_nghbors, int& hops, int& hopbytes) {
+    if (commTable)
+      commTable->GetCommInfo(bytes, msgs, withinbytes, outsidebytes, num_nghbors, hops, hopbytes);
+  }
+
+  void BackgroundLoad(LBRealType *walltime, LBRealType *cputime);
 
   inline void IdleTime(LBRealType *walltime) {
-    LDIdleTime(myLDHandle,walltime);
-  };
-
+    machineUtil.IdleTime(walltime);
+  }
   inline void TotalTime(LBRealType *walltime, LBRealType *cputime) {
-    LDTotalTime(myLDHandle,walltime,cputime);
+    machineUtil.TotalTime(walltime, cputime);
   }
 
-  inline void GetTime(LBRealType *total_walltime,LBRealType *total_cputime,
-                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime) {
-    LDGetTime(myLDHandle, total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);
-  }
+  void GetTime(LBRealType *total_walltime, LBRealType *total_cputime,
+               LBRealType *idletime, LBRealType *bg_walltime,
+               LBRealType *bg_cputime);
 
-  inline void ClearLoads(void) { LDClearLoads(myLDHandle); };
-  inline int Migrate(LDObjHandle h, int dest) { return LDMigrate(h,dest); };
+  void ClearLoads(void);
 
-  inline void Migrated(LDObjHandle h, int waitBarrier=1) {
-    LDMigrated(h, waitBarrier);
-  };
+  int Migrate(LDObjHandle h, int dest);
+  void Migrated(LDObjHandle h, int waitBarrier=1);
 
   inline LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) {
-    return LDAddLocalBarrierClient(myLDHandle,fn,data);
-  };
-
+    return localBarrier.AddClient(fn,data);
+  }
   inline void RemoveLocalBarrierClient(LDBarrierClient h) {
-    LDRemoveLocalBarrierClient(myLDHandle, h);
-  };
-
-  inline LDBarrierReceiver AddLocalBarrierReceiver(LDBarrierFn fn, void *data) {
-    return LDAddLocalBarrierReceiver(myLDHandle,fn,data);
-  };
-
+    localBarrier.RemoveClient(h);
+  }
+  inline LDBarrierReceiver AddLocalBarrierReceiver(LDBarrierFn fn, void* data) {
+    return localBarrier.AddReceiver(fn,data);
+  }
   inline void RemoveLocalBarrierReceiver(LDBarrierReceiver h) {
-    LDRemoveLocalBarrierReceiver(myLDHandle,h);
-  };
-
+    localBarrier.RemoveReceiver(h);
+  }
   inline void AtLocalBarrier(LDBarrierClient h) {
-    LDAtLocalBarrier(myLDHandle,h);
+    localBarrier.AtBarrier(h);
   }
   inline void DecreaseLocalBarrier(LDBarrierClient h, int c) {
-    LDDecreaseLocalBarrier(myLDHandle,h,c);
+    localBarrier.DecreaseBarrier(h, c);
   }
-  inline void LocalBarrierOn(void) { LDLocalBarrierOn(myLDHandle); };
-  inline void LocalBarrierOff(void) { LDLocalBarrierOn(myLDHandle); };
+  inline void TurnOnBarrierReceiver(LDBarrierReceiver h) {
+    localBarrier.TurnOnReceiver(h);
+  }
+  inline void TurnOffBarrierReceiver(LDBarrierReceiver h) {
+    localBarrier.TurnOffReceiver(h);
+  }
+
+  inline void LocalBarrierOn(void) { localBarrier.TurnOn(); };
+  inline void LocalBarrierOff(void) { localBarrier.TurnOff(); };
   void ResumeClients();
-  inline int ProcessorSpeed() { return LDProcessorSpeed(); };
-  inline void SetLBPeriod(double s) { LDSetLBPeriod(myLDHandle, s);}
-  inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
+  static int ProcessorSpeed();
+  inline void SetLBPeriod(double s) { batsync.setPeriod(s);} // s in seconds
+  inline double GetLBPeriod() { return batsync.getPeriod();}
 
-  inline void MetaLBResumeWaitingChares(int lb_period) {
-#if CMK_LBDB_ON
-    LDOMMetaLBResumeWaitingChares(myLDHandle, lb_period);
-#endif
-  }
-
-  inline void MetaLBCallLBOnChares() {
-#if CMK_LBDB_ON
-    LDOMMetaLBCallLBOnChares(myLDHandle);
-#endif
-  }
+  void MetaLBResumeWaitingChares(int lb_period);
+  void MetaLBCallLBOnChares();
 
   void SetMigrationCost(double cost);
   void SetStrategyCost(double cost);
-	void UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad);
+  void UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad);
 
 private:
   int mystep;
-  LDHandle myLDHandle;
   static char *avail_vector;	// processor bit vector
   static bool avail_vector_set;
   int new_ld_balancer;		// for Node 0
@@ -419,7 +618,6 @@ public:
 
 public:
   static bool manualOn;
-
 public:
   char *availVector() { return avail_vector; }
   void get_avail_vector(char * bitmap);
@@ -433,7 +631,7 @@ public:
   LastLBInfo lastLBInfo;
   inline LBRealType myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
   inline LBRealType* expectedLoad() { return lastLBInfo.expectedLoad; }
-  inline int useMem() { return LDMemusage(myLDHandle); }
+  int useMem();
 
   int getLoadbalancerTicket();
   void addLoadbalancer(BaseLB *lb, int seq);
@@ -443,6 +641,8 @@ public:
 
   inline int step() { return mystep; }
   inline void incStep() { mystep++; }
+
+  const std::vector<LBObjEntry>& getObjs() {return objs;}
 };
 
 void TurnManualLBOn();
