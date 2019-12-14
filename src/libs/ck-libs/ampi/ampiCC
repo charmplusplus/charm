@@ -19,6 +19,9 @@ PASSTHROUGH_COMPILER_OPTIONS=''
 ARGS=''
 OBJECT=''
 
+# protect rpath arguments from disappearing due to variable expansion
+ORIGIN='\$ORIGIN'
+
 processArgs() {
 while [ ! $# -eq 0 ]
 do
