@@ -562,6 +562,8 @@ extern CmiNodeLock CmiMemLock_lock;
 
 #if CMK_SMP
 #define CmiInCommThread()  (CmiMyRank() == CmiMyNodeSize())
+#else
+#define CmiInCommThread()  (0)
 #endif
 
 #endif /* CMK_SHARED_VARS_NT_THREADS */
