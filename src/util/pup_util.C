@@ -381,12 +381,12 @@ void PUP::toDisk::bytes(void *p,size_t n,size_t itemSize,dataType /*t*/)
 
 void PUP::toDisk::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
   bytes(p, n, itemSize, t);
-  if(isPacking()) free(p);
+  if(isDeleting()) free(p);
 }
 
 void PUP::toDisk::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
   bytes(p, n, itemSize, t);
-  if(isPacking()) deallocate(p);
+  if(isDeleting()) deallocate(p);
 }
 
 void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType /*t*/)
