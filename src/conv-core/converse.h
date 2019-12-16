@@ -506,6 +506,8 @@ extern void         CmiUnlock(CmiNodeLock lock);
 extern int          CmiTryLock(CmiNodeLock lock);
 extern void         CmiDestroyLock(CmiNodeLock lock);
 
+#define CmiInCommThread() (0)
+
 #endif
 
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
@@ -552,7 +554,13 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
 
+#if CMK_SMP
+#define CmiInCommThread()  (CmiMyRank() == CmiMyNodeSize())
+#else
+#define CmiInCommThread()  (0)
 #endif
+
+#endif /* CMK_SHARED_VARS_NT_THREADS */
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* non-SMP version */
 
