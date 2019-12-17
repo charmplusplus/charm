@@ -3,7 +3,7 @@ Adaptive MPI (AMPI)
 ===================
 
 .. contents::
-   :depth: 2
+   :depth: 3
 
 
 Introduction
