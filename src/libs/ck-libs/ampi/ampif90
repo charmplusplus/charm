@@ -1,5 +1,5 @@
 #!/bin/bash
-CHARMBIN=`dirname $0`
+CHARMBIN=$(dirname $0)
 
 # protect rpath arguments from disappearing due to variable expansion
 ORIGIN='\$ORIGIN'
@@ -7,7 +7,7 @@ ORIGIN='\$ORIGIN'
 export AMPICC_MODE='ampif'
 
 cp -n $CHARMBIN/../include/mpif.h .
-$CHARMBIN/ampiCC $@
+$CHARMBIN/ampiCC "$@"
 status=$?
 /bin/rm -f mpif.h
 exit $status

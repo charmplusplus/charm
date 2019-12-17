@@ -4128,6 +4128,8 @@ static char **main_envp;
 
 int main(int argc, const char **argv, char **envp)
 {
+  setenv("FROM_CHARMRUN", "1", 1);
+
   srand(time(0));
   skt_init();
   skt_set_idle(fast_idleFn);
@@ -5566,12 +5568,13 @@ struct local_nodestart
     extra += onewth_active;
 #endif
 
-    envp = (char **) malloc((envc + 2 + extra + 1) * sizeof(void *));
+    envp = (char **) malloc((envc + 3 + extra + 1) * sizeof(void *));
     for (int i = 0; i < envc; i++)
       envp[i] = env[i];
     envp[envc] = (char *) malloc(256);
     envp[envc + 1] = (char *) malloc(256);
-    n = 2;
+    envp[envc + 2] = strdup("FROM_CHARMRUN=1");
+    n = 3;
     // cpu affinity hints
     using Unit = typename TopologyRequest::Unit;
     if (proc_active)
