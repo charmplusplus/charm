@@ -688,34 +688,6 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
       }
     }
 
-
-
-#if CMK_LBDB_ON && 0
-    LBDatabase * myLBdatabase = LBDatabaseObj();
-    LBDB * myLBDB = myLBdatabase->getLBDB();       // LBDB is Defined in LBDBManager.h
-    const CkVec<LBObj*> objs = myLBDB->getObjs();
-    
-    LBRealType maxObjWallTime = -1.0;
-    
-    for(int i=0;i<objs.length();i++){
-      LBObj* o = objs[i];
-      const LDObjData d = o->ObjData();
-      LBRealType cpuTime = d.cpuTime;
-      LBRealType wallTime = d.wallTime;
-      // can also get object handles from the LDObjData struct
-      CkPrintf("[%d] LBDB Object[%d]: cpuTime=%f wallTime=%f\n", CkMyPe(), i, cpuTime, wallTime);
-      if(wallTime > maxObjWallTime){
-
-      }
-      
-    }
-
-    myLBDB->ClearLoads(); // BUG: Probably very dangerous if we are actually using load balancing
-    
-#endif    
-
-
-    
     // increment phase id
     phase_id++;
     

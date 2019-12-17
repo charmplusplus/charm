@@ -1,6 +1,6 @@
 #!/bin/bash
 AMPICC="$0"
-CHARMBIN=`dirname $0`
+CHARMBIN=$(dirname $0)
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
 . "$CHARMINC/conv-mach-opt.sh"
@@ -18,6 +18,9 @@ PASSTHROUGH_COMPILER_OPTIONS=''
 
 ARGS=''
 OBJECT=''
+
+# protect rpath arguments from disappearing due to variable expansion
+ORIGIN='\$ORIGIN'
 
 processArgs() {
 while [ ! $# -eq 0 ]
