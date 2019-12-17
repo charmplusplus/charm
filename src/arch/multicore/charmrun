@@ -1,5 +1,7 @@
 #! /bin/sh
 
+export FROM_CHARMRUN='1'
+
 cmd=""
 args=""
 QUIET=0
