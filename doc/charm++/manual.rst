@@ -11541,6 +11541,11 @@ are available:
    ``0-15:4.3``. ``++ppn 10 +pemap 0-11:6.5+12`` equals
    ``++ppn 10 +pemap 0,12,1,13,2,14,3,15,4,16,6,18,7,19,8,20,9,21,10,22``
 
+   By default, this option accepts PU indices assigned by the OS. To
+   provide logical PU indices, prepend the sequence with an alphabet L
+   (case-insensitive). For instance, ``+pemap L0-3`` will instruct the
+   runtime to bind threads to PUs with logical indices 0-3.
+
 ``+commap p[,q,...]``
    Bind communication threads to the listed cores, one per process.
 
