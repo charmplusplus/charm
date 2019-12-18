@@ -248,7 +248,6 @@ static void cpuTopoHandler(void *m)
 
   printTopology(hostTable.size());
 
-    // clean up CmmTable
   hostTable.clear();
   CmiFree(msg);
 
