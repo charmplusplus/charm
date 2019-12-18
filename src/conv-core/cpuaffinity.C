@@ -203,6 +203,7 @@ static int set_thread_affinity(hwloc_cpuset_t cpuset)
 #endif
 
 
+// Uses PU indices assigned by the OS
 int CmiSetCPUAffinity(int mycore)
 {
   int core = mycore;
@@ -228,11 +229,12 @@ int CmiSetCPUAffinity(int mycore)
 #endif
 
   if (result == -1)
-    CmiError("Error: CmiSetCPUAffinity failed to bind PE #%d to PU #%d.\n", CmiMyPe(), mycore);
+    CmiError("Error: CmiSetCPUAffinity failed to bind PE #%d to PU P#%d.\n", CmiMyPe(), mycore);
 
   return result;
 }
 
+// Uses logical PU indices as determined by hwloc
 int CmiSetCPUAffinityLogical(int mycore)
 {
   int core = mycore;
@@ -263,7 +265,7 @@ int CmiSetCPUAffinityLogical(int mycore)
   }
 
   if (result == -1)
-    CmiError("Error: CmiSetCPUAffinityLogical failed to bind PE #%d to PU #%d.\n", CmiMyPe(), mycore);
+    CmiError("Error: CmiSetCPUAffinityLogical failed to bind PE #%d to PU L#%d.\n", CmiMyPe(), mycore);
 
   return result;
 }
@@ -779,6 +781,18 @@ static int set_default_affinity(void)
   return n != -1;
 }
 
+// Check if provided mapping string uses logical indices as assigned by hwloc.
+// Logical indices are used if the first character of the map string is an L
+// (case-insensitive).
+static int check_logical_indices(char **mapptr) {
+  if ((*mapptr)[0] == 'l' || (*mapptr)[0] == 'L') {
+    (*mapptr)++; // Exclude the L character from the string
+    return 1;
+  }
+
+  return 0;
+}
+
 void CmiInitCPUAffinity(char **argv)
 {
   static skt_ip_t myip;
@@ -792,6 +806,8 @@ void CmiInitCPUAffinity(char **argv)
 
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
                                                "set cpu affinity");
+  int pemap_logical_flag = 0;
+  int commap_logical_flag = 0;
 
   while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity"))  {
     if (CmiMyRank() == 0) add_exclude(exclude);
@@ -821,6 +837,17 @@ void CmiInitCPUAffinity(char **argv)
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
 
   if (pemap!=NULL || commap!=NULL) affinity_flag = 1;
+
+  // Check if provided pemap and/or commap use OS indices or logical indices
+  if (pemap != NULL) pemap_logical_flag = check_logical_indices(&pemap);
+  if (commap != NULL) commap_logical_flag = check_logical_indices(&commap);
+
+  // Issue warning if pemap and commap do not use the same type of indices
+  if (pemap != NULL && commap != NULL && pemap_logical_flag != commap_logical_flag) {
+    if (CmiMyPe() == 0) {
+      CmiPrintf("WARNING: Different types of indices are used for +pemap and +commap.\n");
+    }
+  }
 
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity", "print cpu affinity");
 
@@ -886,7 +913,8 @@ void CmiInitCPUAffinity(char **argv)
        CmiPrintf(".\n");
      }
      if (pemap!=NULL)
-       CmiPrintf("Charm++> cpuaffinity PE-core map : %s\n", pemap);
+       CmiPrintf("Charm++> cpuaffinity PE-core map (%s): %s\n",
+           pemap_logical_flag ? "logical indices" : "OS indices", pemap);
   }
 
   if (CmiMyPe() >= CmiNumPes()) {         /* this is comm thread */
@@ -895,9 +923,18 @@ void CmiInitCPUAffinity(char **argv)
     CmiNodeAllBarrier();
     if (commap != NULL) {
       int mycore = search_pemap(commap, CmiMyPeGlobal()-CmiNumPesGlobal());
-      if (CmiPhysicalNodeID(CmiMyPe()) == 0) CmiPrintf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore);
-      if (-1 == CmiSetCPUAffinity(mycore))
-        CmiAbort("CmiSetCPUAffinity failed!");
+      if (commap_logical_flag) {
+        if (-1 == CmiSetCPUAffinityLogical(mycore))
+          CmiAbort("CmiSetCPUAffinityLogical failed!");
+      }
+      else {
+        if (-1 == CmiSetCPUAffinity(mycore))
+          CmiAbort("CmiSetCPUAffinity failed!");
+      }
+      if (CmiPhysicalNodeID(CmiMyPe()) == 0) {
+        CmiPrintf("Charm++> set comm %d on node %d to PU %c#%d\n",
+            CmiMyPe()-CmiNumPes(), CmiMyNode(), commap_logical_flag ? 'L' : 'P', mycore);
+      }
       CmiNodeAllBarrier();
       if (show_affinity_flag) CmiPrintCPUAffinity();
       return;    /* comm thread return */
@@ -929,8 +966,16 @@ void CmiInitCPUAffinity(char **argv)
 
   if (pemap != NULL && CmiMyPe()<CmiNumPes()) {    /* work thread */
     int mycore = search_pemap(pemap, CmiMyPeGlobal());
-    if(show_affinity_flag) CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore);
-    if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("CmiSetCPUAffinity failed!");
+    if (pemap_logical_flag) {
+      if (CmiSetCPUAffinityLogical(mycore) == -1) CmiAbort("CmiSetCPUAffinityLogical failed");
+    }
+    else {
+      if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("CmiSetCPUAffinity failed!");
+    }
+    if (show_affinity_flag) {
+      CmiPrintf("Charm++> set PE %d on node %d to PU %c#%d\n", CmiMyPe(), CmiMyNode(),
+          pemap_logical_flag ? 'L' : 'P', mycore);
+    }
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
     /* if (show_affinity_flag) CmiPrintCPUAffinity(); */
