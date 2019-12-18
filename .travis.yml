@@ -33,30 +33,20 @@ cache:
     - $HOME/AppData/Local/Temp/chocolatey
     - /C/tools/msys64
 
-
-# Disable ccache on darwin since the brew install step fails.
-#install:
-#  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install ccache; fi
-#  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then export PATH="/usr/local/opt/ccache/libexec:$PATH"; fi
-
 matrix:
   include:
-  #- os: linux
-  #  name: "MPI-Linux SMP"
-  #  dist: xenial
-  #  env: CACHE_NAME=mpi-linux-smp
-  #  script:
-  #  - sudo apt-get install -y mpich libmpich-dev
-  #  - ./build LIBS mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-  #  - make -C mpi-linux-x86_64-smp/tmp -j3 all-test-tests all-test-examples OPTS="-g"
-  #  - make -C mpi-linux-x86_64-smp/tmp test-tests test-examples TESTOPTS="+setcpuaffinity"
-  #- os: osx
-  #  name: "NetLRTS-Darwin"
-  #  env: CACHE_NAME=netlrts-darwin
-  #  script:
-  #  - ./build LIBS netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-  #  - make -C netlrts-darwin-x86_64/tmp -j3 all-test-tests all-test-examples OPTS="-g"
-  #  - make -C netlrts-darwin-x86_64/tmp test-tests test-examples TESTOPTS="++local"
+  - os: linux
+    name: "MPI-Linux SMP"
+    dist: xenial
+    env: CACHE_NAME=mpi-linux-smp
+    script:
+    - sudo apt-get install -y mpich libmpich-dev
+    - ./build LIBS mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C mpi-linux-x86_64-smp/tmp -j3 all-test-tests all-test-examples OPTS="-g"
+    - make -C mpi-linux-x86_64-smp/tmp test-tests test-examples TESTOPTS="+setcpuaffinity"
+  - os: osx
+    name: "NetLRTS-Darwin"
+    env: CACHE_NAME=netlrts-darwin
 
   - os: windows
     name: "NetLRTS-Win"
