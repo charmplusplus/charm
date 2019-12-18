@@ -503,9 +503,7 @@ execute_process(COMMAND ${command} COMMAND grep CHARM_CC= COMMAND cut -c10- COMM
 include(ExternalProject)
 ExternalProject_Add(hwloc
     URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
-    CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc && autoreconf -ivf 2> /dev/null 1> /dev/null
-    COMMAND
-        ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/configure
+    CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/configure
         --disable-cairo
         --disable-cuda
         --disable-gl

@@ -109,5 +109,5 @@ popd > /dev/null
 
 echo 'Done. Please:'
 echo '1. Review the git history to see if there are any patches that should be cherry-picked and squashed.'
-echo '2. Verify that autoreconf completes successfully in the hwloc directory.'
+echo '2. autoreconf -ivf && rm -rf autom4te.cache/ && git add -f .'
 echo '3. Verify that an all-test build with --build-shared -charm-shared completes successfully.'
