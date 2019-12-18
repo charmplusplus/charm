@@ -45,6 +45,15 @@ matrix:
     #- cmake ..
     - PATH=$PATH:/c/tools/msys64/usr/bin/
     - powershell -executionpolicy bypass "pacman -Syu --noconfirm autoconf libtool automake make autoconf-archive pkg-config"
+    - ln -s /c/tools/msys64/usr/share/autoconf* /usr/share/
+    - ln -s /c/tools/msys64/usr/share/automake* /usr/share/
+    - ln -s /c/tools/msys64/usr/share/aclocal* /usr/share/
+    - ln -s /c/tools/msys64/usr/share/libtool* /usr/share/
+    - ln -s /c/tools/msys64/usr/share/pkgconfig /usr/share/
+    - ln -s /c/tools/msys64/usr/bin/autom4te /usr/bin/
+    - ln -s /c/tools/msys64/usr/bin/autoconf /usr/bin/
+    - ln -s /c/tools/msys64/usr/bin/autoheader /usr/bin/
+    - ln -s /c/tools/msys64/usr/bin/m4 /usr/bin/
     - ./build AMPI netlrts-win-x86_64 gcc -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
     #- make -C netlrts-win-x86_64/tmp -k -j2 all-test-tests all-test-examples OPTS="-g"
     #- make -C netlrts-win-x86_64/tmp -k test-tests test-examples TESTOPTS="++local"
