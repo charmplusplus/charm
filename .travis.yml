@@ -52,7 +52,7 @@ matrix:
     - make -C netlrts-darwin-x86_64/tmp test-tests test-examples TESTOPTS="++local"
 
   - os: windows
-    name: "NetLRTS-Win"
+    name: "NetLRTS-Win GCC"
     script:
     - $msys2 ./build LIBS netlrts-win-x86_64 gcc -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
     - $msys2 make -C netlrts-win-x86_64-gcc/tmp -j3 all-test-tests all-test-examples OPTS="-g"
