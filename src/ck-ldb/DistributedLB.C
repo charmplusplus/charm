@@ -34,11 +34,11 @@ void DistributedLB::initnodeFn()
 void DistributedLB::turnOn()
 {
 #if CMK_LBDB_ON
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOnBarrierReceiver(receiver);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOnNotifyMigrated(notifier);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOnStartLBFn(startLbFnHdl);
 #endif
 }
@@ -46,11 +46,11 @@ void DistributedLB::turnOn()
 void DistributedLB::turnOff()
 {
 #if CMK_LBDB_ON
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOffBarrierReceiver(receiver);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOffNotifyMigrated(notifier);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOffStartLBFn(startLbFnHdl);
 #endif
 }
