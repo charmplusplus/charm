@@ -9,6 +9,8 @@
 #
 ##############################################################################
 
+export FROM_CHARMC='1'
+
 # Filter extra cmake arguments
 # This has no effect when building Charm++ without cmake
 if [ "$1" = "@CMAKE_C_COMPILER@" ]; then shift; fi
@@ -102,6 +104,7 @@ USE_BUILD_OPTIONS=0
 COPY_EXIT="true"
 CHARM_SHARED="0"
 BUILD_SHARE="0"
+USER_INITIATED_SHARED='0'
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
 ROSE_OMP_TLS_GLOBALS="no"
@@ -119,6 +122,9 @@ CUSTOM_PARTITION=""
 PREPROCESS_CI="yes"
 INPUT_GIVEN=""
 PASSTHROUGH_COMPILER_OPTIONS=""
+
+# protect rpath arguments from disappearing due to variable expansion
+ORIGIN='\$ORIGIN'
 
 ####################################################################
 #
@@ -731,11 +737,11 @@ do
 		shift
 		;;
 
-	-I)
+	-I|--include-path)
 		OPTS_CPP="$OPTS_CPP -I$1"
 		shift
 		;;
-	-isystem|-iquote|-idirafter)
+	--pre-include|-include|--system-include|-isystem|-iquote|-idirafter)
 		OPTS_CPP="$OPTS_CPP $arg $1"
 		shift
 		;;
@@ -775,9 +781,10 @@ do
 		OPTS="$OPTS $arg"
 		;;
 	-shared|-G)
-		BUILD_SHARE="1"
+		USER_INITIATED_SHARED='1'
+		OPTS_LD="$OPTS_LD $arg"
 		;;
-	-L*|-shared|-G) # note that this is not executed if $arg == -shared|-G, due to the case above; might be a bug
+	-L*)
 		OPTS_LD="$OPTS_LD $arg"
 		;;
 	-charm-shared|-cs)
@@ -1123,12 +1130,7 @@ Debugf "----------- Module dependency search complete ------------"
 ##############################################################################
 
 
-if [ x"$CMK_NO_BUILD_SHARED" = "xfalse" ]
-then
- 	BUILD_SHARE="1"
-fi
-
-if [ "$BUILD_SHARE" = "1" ]
+if [ "$BUILD_SHARE" = '1' -o "$USER_INITIATED_SHARED" = '1' ]
 then
 	USE_PIC="1"
 fi
@@ -1599,7 +1601,7 @@ then
 fi
 # done getting TAU variables
 
-if [ "$BUILD_SHARE" = "0" ]
+if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
 then
        MIDDLE_LIBS="$MEM_OBJ $THREAD_OBJ $MIDDLE_LIBS"
 fi
@@ -1654,7 +1656,7 @@ case "$PARADIGM" in
 	;;
 esac
 
-if [ "$BUILD_SHARE" = "0" ]
+if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
 then
 	MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
 fi
@@ -1688,7 +1690,7 @@ else
   ALL_LIBS="$ALL_LIBS $CMK_SYSLIBS"
 fi
 
-if [ "$BUILD_SHARE" = "0" ]
+if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
 then
   ALL_LIBS="$ALL_LIBS $CHARMLIB/conv-static.o"
 fi
@@ -1707,7 +1709,7 @@ Debugf "All libraries are: $ALL_LIBS"
 
 # preserve this variable in its state here for use later
 CHARM_ALL_LIBS="$ALL_LIBS"
-if [ "$BUILD_SHARE" = "1" -o -n "$SKIP_MODULEINIT" ]
+if [ "$BUILD_SHARE" = '1' -o "$USER_INITIATED_SHARED" = '1' -o -n "$SKIP_MODULEINIT" ]
 then
   ALL_LIBS="$OBJECTFILES $ALL_LIBS"
 else
@@ -2077,12 +2079,7 @@ case "$OBJECT" in
 	;;
 *.so|*.so.*|*.sl|*.dylib)
 # Make shared library
-	# If building shared is not supported and this object is not standalone, exit.
-	if [ "$BUILD_SHARE" = 0 -a -z "$STANDALONE" ]
-	then
-		Warning "Warning: building shared library is not supported, recompile charm++ with '--build-shared'."
-		End 1
-	elif [ "$CHARM_SHARED" = "0" ]
+	if [ "$BUILD_SHARE" = '1' ]
 	then
 	  	MakeSO
 	fi
@@ -2346,20 +2343,8 @@ case "$OBJECT" in
 esac
 fi
 
-if [ "$BUILD_SHARE" = "1" -a "$CHARM_SHARED" = "1" ]
-then
-  # build an application .so linking with charm .so
-  OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
-  Debugf "Running ldro..."
-  DoNoErrCheck $RM $OBJECT
-  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD -o $OBJECT $ALL_LIBS
-  [ "$MAKE_LD" = "1" ] && Do $CMK_LD $CMK_LD_FLAGS $CMK_LIBDIR $OPTS_LD -o $OBJECT $ALL_LIBS
-  Copyobj
-else
-# Make a regular executable: call the appropriate linker
-  [ "$MAKE_LDXX" = "1" ] && Do $CHARM_LDXX $CHARM_LDXX_FLAGS -o $OBJECT
-  [ "$MAKE_LD" = "1" ] && Do $CHARM_LD $CHARM_LD_FLAGS -o $OBJECT
-fi
+[ "$MAKE_LDXX" = "1" ] && Do $CHARM_LDXX $CHARM_LDXX_FLAGS -o $OBJECT
+[ "$MAKE_LD" = "1" ] && Do $CHARM_LD $CHARM_LD_FLAGS -o $OBJECT
 
 ########################################################################
 #
