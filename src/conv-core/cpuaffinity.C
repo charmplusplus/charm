@@ -231,7 +231,7 @@ int CmiSetCPUAffinity(int mycore)
   return result;
 }
 
-// Uses logical PU indices
+// Uses logical PU indices as determined by hwloc
 int CmiSetCPUAffinityLogical(int mycore)
 {
   int core = mycore;
