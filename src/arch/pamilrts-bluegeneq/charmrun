@@ -1,7 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 #
 # good for job less than 30 minutes
 # have to pass bank using -A or set PROJECT environment variable
+
+export FROM_CHARMRUN='1'
 
 args=""
 pes=1

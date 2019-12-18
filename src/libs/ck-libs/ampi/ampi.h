@@ -87,8 +87,6 @@ extern "C" {
 int AMPI_Main(); /* declaration for C main routine (not a strict prototype!) */
 int AMPI_Main_c(int argc,char **argv); /* C wrapper for calling AMPI_Main() from C++ */
 
-typedef void (*MPI_MainFn) (int,char**);
-
 typedef int MPI_Datatype;
 typedef intptr_t MPI_Aint;
 #define MPI_AINT_FMT_HEX_SPEC "%z"
@@ -335,8 +333,6 @@ typedef int MPI_Info;
 #define MPI_COMM_FIRST_INTRA        AMPI_API_STATIC_CAST(MPI_Comm, 7000000) /*Communicator from MPI_Intercomm_merge*/
 #define MPI_COMM_FIRST_RESVD        AMPI_API_STATIC_CAST(MPI_Comm, 8000000) /*Communicator reserved for now*/
 #define MPI_COMM_WORLD              AMPI_API_STATIC_CAST(MPI_Comm, 9000000) /*Start of universe*/
-#define MPI_MAX_COMM_WORLDS  8
-extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
 #define MPI_INFO_ENV                AMPI_API_STATIC_CAST(MPI_Info, 0)
 #define AMPI_INFO_LB_SYNC           AMPI_API_STATIC_CAST(MPI_Info, 1)
@@ -891,6 +887,8 @@ typedef void (*MPI_MigrateFn)(void);
 /***windows/rma***/
 #define  MPI_Win_create  AMPI_Win_create
 #define PMPI_Win_create APMPI_Win_create
+#define  MPI_Win_allocate  AMPI_Win_allocate
+#define PMPI_Win_allocate APMPI_Win_allocate
 #define  MPI_Win_free  AMPI_Win_free
 #define PMPI_Win_free APMPI_Win_free
 #define  MPI_Win_create_errhandler  AMPI_Win_create_errhandler
@@ -1031,8 +1029,6 @@ typedef void (*MPI_MigrateFn)(void);
 #define  MPI_Comm_spawn  AMPI_Comm_spawn
 #define PMPI_Comm_spawn APMPI_Comm_spawn
 
-#define  MPI_Win_allocate  AMPI_Win_allocate
-#define PMPI_Win_allocate APMPI_Win_allocate
 #define  MPI_Win_allocate_shared  AMPI_Win_allocate_shared
 #define PMPI_Win_allocate_shared APMPI_Win_allocate_shared
 #define  MPI_Win_attach  AMPI_Win_attach

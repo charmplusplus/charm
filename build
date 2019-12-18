@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Silly shorthand, used for source reorganization
 if [ $(dirname $0) = "." ]
@@ -474,21 +474,29 @@ do
 done
 
 if [ $BUILD_CUDA -eq 1 ]; then
-  HAVE_CUDA="no"
-  echo "checking for CUDA toolkit directory"
-  CUDA_PRESET_DIRS="/usr/local/cuda /usr/lib/nvidia-cuda-toolkit"
-  CUDA_CANDIDATE_DIRS="$CUDATOOLKIT_HOME $CUDA_PRESET_DIRS"
-  for dir in $CUDA_CANDIDATE_DIRS; do
-    if test -d "$dir"; then
-      CUDA_DIR="$dir"
-      HAVE_CUDA="yes"
-      echo "CUDA_DIR=$CUDA_DIR"
-      break
+  echo "Checking if NVCC is in your path..."
+  which nvcc &> /dev/null
+  if [ $? -eq 0 ]; then
+    NVCC_PATH=$(which nvcc)
+    CUDA_DIR=${NVCC_PATH%"/bin/nvcc"}
+    echo "NVCC found, using CUDA in $CUDA_DIR"
+  else
+    echo "NVCC not found, checking candidate CUDA directories..."
+    HAVE_CUDA="no"
+    CUDA_PRESET_DIRS="/usr/local/cuda /usr/lib/nvidia-cuda-toolkit"
+    CUDA_CANDIDATE_DIRS="$CUDATOOLKIT_HOME $CUDA_DIR $CUDA_HOME $CUDA_PRESET_DIRS"
+    for dir in $CUDA_CANDIDATE_DIRS; do
+      if test -d $dir && test -e "$dir/bin/nvcc"; then
+        echo "CUDA found in $dir"
+        CUDA_DIR=$dir
+        HAVE_CUDA="yes"
+        break
+      fi
+    done
+    if [ $HAVE_CUDA = "no" ]; then
+      echo "Error> CUDA not found, searched $\CUDATOOLKIT_HOME \$CUDA_DIR \$CUDA_HOME $CUDA_PRESET_DIRS"
+      exit 1
     fi
-  done
-  if [ "$HAVE_CUDA" = "no" ]; then
-    echo "Error> no CUDA toolkit found, searched \$CUDATOOLKIT_HOME $CUDA_PRESET_DIRS"
-    exit 1
   fi
 fi
 
@@ -883,8 +891,13 @@ fi
 
 if test  -n "$WITH_ROMIO" 
 then
-    echo "CMK_AMPI_WITH_ROMIO=\"true\"" >> $ConvSh
-    echo "CMK_AMPI_WITH_ROMIO:=true" >> $ConvMak
+    echo "CMK_AMPI_WITH_ROMIO=\"1\"" >> $ConvSh
+    echo "CMK_AMPI_WITH_ROMIO:=1" >> $ConvMak
+    echo '#define CMK_AMPI_WITH_ROMIO 1' >> $ConvHeader
+else
+    echo "CMK_AMPI_WITH_ROMIO=\"0\"" >> $ConvSh
+    echo "CMK_AMPI_WITH_ROMIO:=0" >> $ConvMak
+    echo '#define CMK_AMPI_WITH_ROMIO 0' >> $ConvHeader
 fi
 
 if test -n "$WITH_PRODUCTION"

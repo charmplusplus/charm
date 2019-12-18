@@ -316,21 +316,21 @@ void ampiParent::defineInfoMigration() noexcept {
 
 AMPI_API_IMPL(int, MPI_Info_create, MPI_Info *info)
 {
-  AMPI_API("AMPI_Info_create");
+  AMPI_API("AMPI_Info_create", info);
   int ret = getAmpiParent()->createInfo(info);
   return ampiErrhandler("AMPI_Info_create", ret);
 }
 
 AMPI_API_IMPL(int, MPI_Info_set, MPI_Info info, const char *key, const char *value)
 {
-  AMPI_API("AMPI_Info_set");
+  AMPI_API("AMPI_Info_set", info, key, value);
   int ret = getAmpiParent()->setInfo(info, key, value);
   return ampiErrhandler("AMPI_Info_set", ret);
 }
 
 AMPI_API_IMPL(int, MPI_Info_delete, MPI_Info info, const char *key)
 {
-  AMPI_API("AMPI_Info_delete");
+  AMPI_API("AMPI_Info_delete", info, key);
   int ret = getAmpiParent()->deleteInfo(info, key);
   return ampiErrhandler("AMPI_Info_delete", ret);
 }
@@ -338,7 +338,7 @@ AMPI_API_IMPL(int, MPI_Info_delete, MPI_Info info, const char *key)
 AMPI_API_IMPL(int, MPI_Info_get, MPI_Info info, const char *key, int valuelen,
                                  char *value, int *flag)
 {
-  AMPI_API("AMPI_Info_get");
+  AMPI_API("AMPI_Info_get", info, key, valuelen, value, flag);
   getAmpiParent()->getInfo(info, key, valuelen, value, flag);
   return MPI_SUCCESS; // It is not an error if the requested key does not exist
 }
@@ -346,35 +346,35 @@ AMPI_API_IMPL(int, MPI_Info_get, MPI_Info info, const char *key, int valuelen,
 AMPI_API_IMPL(int, MPI_Info_get_valuelen, MPI_Info info, const char *key,
                                           int *valuelen, int *flag)
 {
-  AMPI_API("AMPI_Info_get_valuelen");
+  AMPI_API("AMPI_Info_get_valuelen", info, key, valuelen, flag);
   getAmpiParent()->getInfoValuelen(info, key, valuelen, flag);
   return MPI_SUCCESS; // It is not an error if the requested key does not exist
 }
 
 AMPI_API_IMPL(int, MPI_Info_get_nkeys, MPI_Info info, int *nkeys)
 {
-  AMPI_API("AMPI_Info_get_nkeys");
+  AMPI_API("AMPI_Info_get_nkeys", info, nkeys);
   int ret = getAmpiParent()->getInfoNkeys(info, nkeys);
   return ampiErrhandler("AMPI_Info_get_nkeys", ret);
 }
 
 AMPI_API_IMPL(int, MPI_Info_get_nthkey, MPI_Info info, int n, char *key)
 {
-  AMPI_API("AMPI_Info_get_nthkey");
+  AMPI_API("AMPI_Info_get_nthkey", info, n, key);
   int ret = getAmpiParent()->getInfoNthkey(info, n, key);
   return ampiErrhandler("AMPI_Info_get_nthkey", ret);
 }
 
 AMPI_API_IMPL(int, MPI_Info_dup, MPI_Info info, MPI_Info *newinfo)
 {
-  AMPI_API("AMPI_Info_dup");
+  AMPI_API("AMPI_Info_dup", info, newinfo);
   int ret = getAmpiParent()->dupInfo(info, newinfo);
   return ampiErrhandler("AMPI_Info_dup", ret);
 }
 
 AMPI_API_IMPL(int, MPI_Info_free, MPI_Info *info)
 {
-  AMPI_API("AMPI_Info_free");
+  AMPI_API("AMPI_Info_free", info);
   int ret = getAmpiParent()->freeInfo(*info);
   *info = MPI_INFO_NULL;
   return ampiErrhandler("AMPI_Info_free", ret);

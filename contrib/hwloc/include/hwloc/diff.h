@@ -43,7 +43,8 @@ extern "C" {
  * More complex differences such as adding or removing objects cannot
  * be represented in the difference structures and therefore return
  * errors.
- * Differences between object sets cannot be represented either.
+ * Differences between object sets or topology-wide allowed sets,
+ * cannot be represented either.
  *
  * It means that there is no need to apply the difference when
  * looking at the tree organization (how many levels, how many
@@ -137,7 +138,7 @@ typedef union hwloc_topology_diff_u {
     hwloc_topology_diff_type_t type; /* must be ::HWLOC_TOPOLOGY_DIFF_OBJ_ATTR */
     union hwloc_topology_diff_u * next;
     /* List of attribute differences for a single object */
-    unsigned obj_depth;
+    int obj_depth;
     unsigned obj_index;
     union hwloc_topology_diff_obj_attr_u diff;
   } obj_attr;
@@ -147,7 +148,7 @@ typedef union hwloc_topology_diff_u {
     hwloc_topology_diff_type_t type; /* must be ::HWLOC_TOPOLOGY_DIFF_TOO_COMPLEX */
     union hwloc_topology_diff_u * next;
     /* Where we had to stop computing the diff in the first topology */
-    unsigned obj_depth;
+    int obj_depth;
     unsigned obj_index;
   } too_complex;
 } * hwloc_topology_diff_t;
@@ -221,11 +222,8 @@ enum hwloc_topology_diff_apply_flags_e {
 HWLOC_DECLSPEC int hwloc_topology_diff_apply(hwloc_topology_t topology, hwloc_topology_diff_t diff, unsigned long flags);
 
 /** \brief Destroy a list of topology differences.
- *
- * \note The \p topology parameter must be a valid topology
- * but it is not required that it is related to \p diff.
  */
-HWLOC_DECLSPEC int hwloc_topology_diff_destroy(hwloc_topology_t topology, hwloc_topology_diff_t diff);
+HWLOC_DECLSPEC int hwloc_topology_diff_destroy(hwloc_topology_diff_t diff);
 
 /** \brief Load a list of topology differences from a XML file.
  *
@@ -235,13 +233,10 @@ HWLOC_DECLSPEC int hwloc_topology_diff_destroy(hwloc_topology_t topology, hwloc_
  * This identifier is usually the name of the other XML file
  * that contains the reference topology.
  *
- * \note The \p topology parameter must be a valid topology
- * but it is not required that it is related to \p diff.
- *
  * \note the pointer returned in refname should later be freed
  * by the caller.
  */
-HWLOC_DECLSPEC int hwloc_topology_diff_load_xml(hwloc_topology_t topology, const char *xmlpath, hwloc_topology_diff_t *diff, char **refname);
+HWLOC_DECLSPEC int hwloc_topology_diff_load_xml(const char *xmlpath, hwloc_topology_diff_t *diff, char **refname);
 
 /** \brief Export a list of topology differences to a XML file.
  *
@@ -251,11 +246,8 @@ HWLOC_DECLSPEC int hwloc_topology_diff_load_xml(hwloc_topology_t topology, const
  * This identifier is usually the name of the other XML file
  * that contains the reference topology.
  * This attribute is given back when reading the diff from XML.
- *
- * \note The \p topology parameter must be a valid topology
- * but it is not required that it is related to \p diff.
  */
-HWLOC_DECLSPEC int hwloc_topology_diff_export_xml(hwloc_topology_t topology, hwloc_topology_diff_t diff, const char *refname, const char *xmlpath);
+HWLOC_DECLSPEC int hwloc_topology_diff_export_xml(hwloc_topology_diff_t diff, const char *refname, const char *xmlpath);
 
 /** \brief Load a list of topology differences from a XML buffer.
  *
@@ -265,13 +257,10 @@ HWLOC_DECLSPEC int hwloc_topology_diff_export_xml(hwloc_topology_t topology, hwl
  * This identifier is usually the name of the other XML file
  * that contains the reference topology.
  *
- * \note The \p topology parameter must be a valid topology
- * but it is not required that it is related to \p diff.
- *
  * \note the pointer returned in refname should later be freed
  * by the caller.
   */
-HWLOC_DECLSPEC int hwloc_topology_diff_load_xmlbuffer(hwloc_topology_t topology, const char *xmlbuffer, int buflen, hwloc_topology_diff_t *diff, char **refname);
+HWLOC_DECLSPEC int hwloc_topology_diff_load_xmlbuffer(const char *xmlbuffer, int buflen, hwloc_topology_diff_t *diff, char **refname);
 
 /** \brief Export a list of topology differences to a XML buffer.
  *
@@ -286,11 +275,8 @@ HWLOC_DECLSPEC int hwloc_topology_diff_load_xmlbuffer(hwloc_topology_t topology,
  * length.
  *
  * \note The XML buffer should later be freed with hwloc_free_xmlbuffer().
- *
- * \note The \p topology parameter must be a valid topology
- * but it is not required that it is related to \p diff.
  */
-HWLOC_DECLSPEC int hwloc_topology_diff_export_xmlbuffer(hwloc_topology_t topology, hwloc_topology_diff_t diff, const char *refname, char **xmlbuffer, int *buflen);
+HWLOC_DECLSPEC int hwloc_topology_diff_export_xmlbuffer(hwloc_topology_diff_t diff, const char *refname, char **xmlbuffer, int *buflen);
 
 /** @} */
 

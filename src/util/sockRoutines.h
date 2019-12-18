@@ -285,9 +285,6 @@ typedef struct {
   ChMessageInt_t nPE; /* Number of worker threads in this OS process */
   ChMessageInt_t dataport; /* node's data port (UDP or GM) */
   ChMessageInt_t mach_id;  /* node's hardware address (GM-only) */
-#if CMK_USE_MX
-  ChMessageLong_t nic_id; /* node's NIC hardware address (MX-only) */
-#endif
   skt_ip_t IP; /* node's IP address */
 } ChNodeinfo;
 

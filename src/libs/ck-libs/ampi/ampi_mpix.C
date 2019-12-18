@@ -11,7 +11,7 @@ AMPI_API_IMPL(int, MPIX_Grequest_start, MPI_Grequest_query_function *query_fn,
   MPI_Grequest_free_function *free_fn, MPI_Grequest_cancel_function *cancel_fn,
   MPIX_Grequest_poll_function *poll_fn, void *extra_state, MPI_Request *request)
 {
-  AMPI_API("AMPIX_Grequest_start");
+  AMPI_API("AMPIX_Grequest_start", query_fn, free_fn, cancel_fn, poll_fn, extra_state, request);
 
   ampi* ptr = getAmpiInstance(MPI_COMM_SELF); // All GReq's are posted to MPI_COMM_SELF
   GReq *newreq = new GReq(query_fn, free_fn, cancel_fn, poll_fn, extra_state);
@@ -26,7 +26,7 @@ AMPI_API_IMPL(int, MPIX_Grequest_class_create, MPI_Grequest_query_function *quer
   MPIX_Grequest_poll_function *poll_fn, MPIX_Grequest_wait_function *wait_fn,
   MPIX_Grequest_class *greq_class)
 {
-  AMPI_API("AMPIX_Grequest_class_create");
+  AMPI_API("AMPIX_Grequest_class_create", query_fn, free_fn, cancel_fn, poll_fn, wait_fn, greq_class);
 
   greq_class_desc g;
   g.query_fn = query_fn;
@@ -47,7 +47,7 @@ AMPI_API_IMPL(int, MPIX_Grequest_class_create, MPI_Grequest_query_function *quer
 AMPI_API_IMPL(int, MPIX_Grequest_class_allocate, MPIX_Grequest_class greq_class,
   void *extra_state, MPI_Request *request)
 {
-  AMPI_API("AMPIX_Grequest_class_allocate");
+  AMPI_API("AMPIX_Grequest_class_allocate", greq_class, extra_state, request);
 
   ampi* ptr = getAmpiInstance(MPI_COMM_SELF); // All GReq's are posted to MPI_COMM_SELF
 

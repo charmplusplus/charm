@@ -156,7 +156,7 @@ public:
     p|data;
     if(p.isUnpacking())
     {
-      CkPrintf("[%d] data on NOdeGroup %d\n", CkMyNode(), data);
+      CkPrintf("[%d] data on NodeGroup %d\n", CkMyNode(), data);
       if(chkpNodeNum == CkNumNodes())
       {
         if(data!=CkMyNode())

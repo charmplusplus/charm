@@ -20,6 +20,7 @@
 #include <sstream>
 #include <limits>
 #include "pup_stl.h"
+#include <stdarg.h>
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
@@ -1280,7 +1281,7 @@ void _propMapInit(void)
   speeds = new int[CkNumPes()];
   int hdlr = CkRegisterHandler(_speedHdlr);
   CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CkMyPe());
-  int s = LDProcessorSpeed();
+  int s = LBDatabase::ProcessorSpeed();
   speedMsg msg;
   CmiSetHandler(&msg, hdlr);
   msg.node = CkMyNode();
@@ -1552,8 +1553,14 @@ CkMigratable::~CkMigratable() {
 	thisIndexMax.dimension=0;
 }
 
-void CkMigratable::CkAbort(const char *why) const {
-	::CkAbort("CkMigratable '%s' aborting: %s",_chareTable[thisChareType]->name, why);
+void CkMigratable::CkAbort(const char *format, ...) const {
+	char newmsg[256];
+	va_list args;
+	va_start(args, format);
+	vsnprintf(newmsg, sizeof(newmsg), format, args);
+	va_end(args);
+
+	::CkAbort("CkMigratable '%s' aborting: %s", _chareTable[thisChareType]->name, newmsg);
 }
 
 void CkMigratable::ResumeFromSync(void)
@@ -1984,20 +1991,20 @@ bool CkLocRec::invokeEntry(CkMigratable *obj,void *msg,
 #if CMK_LBDB_ON
 
 void CkLocRec::staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period) {
-	CkLocRec *el=(CkLocRec *)LDObjUserData(h);
+	CkLocRec *el = (CkLocRec*)(LBDatabase::Object()->GetObjUserData(h));
 	DEBL((AA "MetaBalancer wants to resume waiting chare %s\n" AB,idx2str(el->idx)));
 	el->myLocMgr->informLBPeriod(el, lb_ideal_period);
 }
 
 void CkLocRec::staticMetaLBCallLBOnChares(LDObjHandle h) {
-	CkLocRec *el=(CkLocRec *)LDObjUserData(h);
+	CkLocRec *el = (CkLocRec*)(LBDatabase::Object()->GetObjUserData(h));
 	DEBL((AA "MetaBalancer wants to call LoadBalance on chare %s\n" AB,idx2str(el->idx)));
 	el->myLocMgr->metaLBCallLB(el);
 }
 
 void CkLocRec::staticMigrate(LDObjHandle h, int dest)
 {
-	CkLocRec *el=(CkLocRec *)LDObjUserData(h);
+	CkLocRec *el = (CkLocRec*)(LBDatabase::Object()->GetObjUserData(h));
 	DEBL((AA "Load balancer wants to migrate %s to %d\n" AB,idx2str(el->idx),dest));
 	el->recvMigrate(dest);
 }
@@ -2057,12 +2064,10 @@ void CkLocRec::setPupSize(size_t obj_pup_size) {
 // removes it from the hash table, which would invalidate an iterator.
 void CkLocMgr::flushLocalRecs(void)
 {
-  CmiImmediateLock(hashImmLock);
   while (hash.size()) {
     CkLocRec* rec = hash.begin()->second;
     callMethod(rec, &CkMigratable::ckDestroy);
   }
-  CmiImmediateUnlock(hashImmLock);
 }
 
 // All records are local records after the 64bit ID update
@@ -2100,14 +2105,12 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
         metalbID = _metalb;
 #endif
         initLB(lbdbID, metalbID);
-	hashImmLock = CmiCreateImmediateLock();
 }
 
 CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	:IrrGroup(m),thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe())
 {
 	duringMigration = false;
-	hashImmLock = CmiCreateImmediateLock();
 }
 
 CkLocMgr::~CkLocMgr() {
@@ -2118,10 +2121,12 @@ CkLocMgr::~CkLocMgr() {
   the_lbdb->UnregisterOM(myLBHandle);
 #endif
   map->unregisterArray(mapHandle);
-  CmiDestroyLock(hashImmLock);
 }
 
 void CkLocMgr::pup(PUP::er &p){
+  if (p.isPacking() && pendingImmigrate.size() > 0)
+    CkAbort("Attempting to pup location manager with buffered migration messages."
+            " Likely cause is checkpointing before array creation has fully completed\n");
 	IrrGroup::pup(p);
 	p|mapID;
 	p|mapHandle;
@@ -2194,9 +2199,19 @@ void CkLocMgr::pup(PUP::er &p){
 /// Add a new local array manager to our list.
 void CkLocMgr::addManager(CkArrayID id,CkArray *mgr)
 {
-	CK_MAGICNUMBER_CHECK
-	DEBC((AA "Adding new array manager\n" AB));
-	managers[id] = mgr;
+  CK_MAGICNUMBER_CHECK
+  DEBC((AA "Adding new array manager\n" AB));
+  managers[id] = mgr;
+  auto i = pendingImmigrate.begin();
+  while (i != pendingImmigrate.end()) {
+    auto msg = *i;
+    if (msg->nManagers <= managers.size()) {
+      i = pendingImmigrate.erase(i);
+      immigrate(msg);
+    } else {
+      i++;
+    }
+  }
 }
 
 void CkLocMgr::deleteManager(CkArrayID id, CkArray *mgr) {
@@ -2507,9 +2522,7 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id) {
 	if (NULL==elementNrec(id))
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
-		CmiImmediateLock(hashImmLock);
 		hash.erase(id);
-		CmiImmediateUnlock(hashImmLock);
 #if CMK_ERROR_CHECKING
 	//Make sure it's really gone
 	if (NULL!=elementNrec(id))
@@ -2799,12 +2812,10 @@ CkLocIterator::~CkLocIterator() {}
 /// Iterate over our local elements:
 void CkLocMgr::iterate(CkLocIterator &dest) {
   //Poke through the hash table for local ArrayRecs.
-  CmiImmediateLock(hashImmLock);
   for (LocRecHash::iterator it = hash.begin(); it != hash.end(); it++) {
     CkLocation loc(this,it->second);
     dest.addLocation(loc);
   }
-  CmiImmediateUnlock(hashImmLock);
 }
 
 
@@ -3015,9 +3026,9 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	if (msg->nManagers < managers.size())
 		CkAbort("Array element arrived from location with fewer managers!\n");
 	if (msg->nManagers > managers.size()) {
-		//Some array managers haven't registered yet-- throw it back
-		DEBM((AA "Busy-waiting for array registration on migrating %s\n" AB,idx2str(idx)));
-		thisProxy[CkMyPe()].immigrate(msg);
+		//Some array managers haven't registered yet -- buffer the message
+		DEBM((AA "Buffering %s immigrate msg waiting for array registration\n" AB,idx2str(idx)));
+		pendingImmigrate.push_back(msg);
 		return;
 	}
 
@@ -3194,9 +3205,7 @@ void CkLocMgr::setDuringDestruction(bool _duringDestruction) {
 //Add given element array record at idx, replacing the existing record
 void CkLocMgr::insertRec(CkLocRec *rec, const CmiUInt8 &id) {
     CkLocRec *old_rec = elementNrec(id);
-    CmiImmediateLock(hashImmLock);
     hash[id] = rec;
-    CmiImmediateUnlock(hashImmLock);
     delete old_rec;
 }
 

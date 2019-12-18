@@ -5,31 +5,38 @@
  *   See COPYRIGHT notice in top-level directory.
  */
 
-#include "converse.h"
+#include "mpio_globals.h"
 
-CtvExtern(ADIOI_Flatlist_node*, ADIOI_Flatlist);
+#define ADIOI_Flatlist (ADIO_Globals()->ADIOI_Flatlist)
 
-CtvExtern(ADIOI_Datarep *, ADIOI_Datarep_head);
+#define ADIOI_Datarep_head (ADIO_Globals()->ADIOI_Datarep_head)
 
 /* for f2c and c2f conversion */
-CtvExtern(ADIO_File *, ADIOI_Ftable);
-CtvExtern(int, ADIOI_Ftable_ptr);
-CtvExtern(int, ADIOI_Ftable_max);
-CtvExtern(ADIO_Request *, ADIOI_Reqtable);
-CtvExtern(int, ADIOI_Reqtable_ptr);
-CtvExtern(int, ADIOI_Reqtable_max);
+#define ADIOI_Ftable (ADIO_Globals()->ADIOI_Ftable)
+#define ADIOI_Ftable_ptr (ADIO_Globals()->ADIOI_Ftable_ptr)
+#define ADIOI_Ftable_max (ADIO_Globals()->ADIOI_Ftable_max)
+#define ADIOI_Reqtable (ADIO_Globals()->ADIOI_Reqtable)
+#define ADIOI_Reqtable_ptr (ADIO_Globals()->ADIOI_Reqtable_ptr)
+#define ADIOI_Reqtable_max (ADIO_Globals()->ADIOI_Reqtable_max)
 #ifndef HAVE_MPI_INFO
-extern MPI_Info *MPIR_Infotable;
-extern int MPIR_Infotable_ptr, MPIR_Infotable_max;
+#define MPIR_Infotable (ADIO_Globals()->MPIR_Infotable)
+#define MPIR_Infotable_ptr (ADIO_Globals()->MPIR_Infotable_ptr)
+#define MPIR_Infotable_max (ADIO_Globals()->MPIR_Infotable_max)
 #endif
-#if defined(ROMIO_XFS) || defined(ROMIO_LUSTRE)
-extern int ADIOI_Direct_read, ADIOI_Direct_write;
+#if defined(ROMIO_XFS) || defined(ROMIO_LUSTRE) || 1
+#define ADIOI_Direct_read (ADIO_Globals()->ADIOI_Direct_read)
+#define ADIOI_Direct_write (ADIO_Globals()->ADIOI_Direct_write)
 #endif
 
-CtvExtern(MPI_Errhandler, ADIOI_DFLT_ERR_HANDLER);
+#define ADIO_Init_keyval (ADIO_Globals()->ADIO_Init_keyval)
 
-CtvExtern(MPI_Info, ADIOI_syshints);
+#define ADIOI_DFLT_ERR_HANDLER (ADIO_Globals()->ADIOI_DFLT_ERR_HANDLER)
 
-CtvExtern(MPI_Op, ADIO_same_amode);
+#define ADIOI_syshints (ADIO_Globals()->ADIOI_syshints)
 
-CtvExtern(int, ADIOI_cb_config_list_keyval);
+#define ADIO_same_amode (ADIO_Globals()->ADIO_same_amode)
+
+#define ADIOI_cb_config_list_keyval (ADIO_Globals()->ADIOI_cb_config_list_keyval)
+
+#define yylval (ADIO_Globals()->yylval)
+#define token_ptr (ADIO_Globals()->token_ptr)

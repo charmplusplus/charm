@@ -12,8 +12,5 @@ datatype.o: datatype.C
 test: datatype
 	$(call run, ./datatype +p1 +vp4)
 
-bgtest: datatype
-	$(call run, ./datatype +p1 +vp4 +x1 +y1 +z1 )
-
 clean:
 	rm -f *.o *.mod datatype *~ conv-host charmrun ampirun datatype.o charmrun.exe datatype.exe datatype.pdb datatype.ilk

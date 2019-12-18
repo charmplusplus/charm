@@ -35,7 +35,9 @@ configure_file(${conv-util-h-sources} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 add_library(conv-util ${conv-util-c-sources} ${conv-util-cxx-sources} ${conv-util-h-sources})
 add_dependencies(conv-util ck)
 
-add_library(conv-utilf pup_f.f90)
+if(${CMK_CAN_LINK_FORTRAN})
+    add_library(conv-utilf pup_f.f90)
+endif()
 
 add_custom_command(OUTPUT pup_f.f90 COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/pup_f.f90.sh > /dev/null)
 

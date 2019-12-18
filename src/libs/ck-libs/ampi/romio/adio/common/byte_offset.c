@@ -26,7 +26,7 @@ void ADIOI_Get_byte_offset(ADIO_File fd, ADIO_Offset offset, ADIO_Offset *disp)
     if (filetype_is_contig) *disp = fd->disp + etype_size * offset;
     else {
 /* filetype already flattened in ADIO_Open */
-        flat_file = CtvAccess(ADIOI_Flatlist);
+        flat_file = ADIOI_Flatlist;
         while (flat_file->type != fd->filetype) flat_file = flat_file->next;
 
 	MPI_Type_size_x(fd->filetype, &filetype_size);

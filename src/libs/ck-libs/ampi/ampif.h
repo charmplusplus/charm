@@ -177,7 +177,6 @@
 
        integer, parameter :: MPI_TAG         = 1
        integer, parameter :: MPI_SOURCE      = 2
-       integer, parameter :: MPI_COMM        = 3
        integer, parameter :: MPI_ERROR       = 5
 
        integer, dimension(MPI_STATUS_SIZE) :: MPI_STATUS_IGNORE
@@ -194,8 +193,6 @@
        integer, parameter :: MPI_COMM_FIRST_INTRA = 6000000
        integer, parameter :: MPI_COMM_FIRST_RESVD = 7000000
        integer, parameter :: MPI_COMM_WORLD       = 9000000
-       integer, parameter :: MPI_MAX_COMM_WORLDS  = 8
-       integer :: MPI_COMM_UNIVERSE(1:MPI_MAX_COMM_WORLDS)
 
        integer, parameter :: MPI_INFO_ENV              = 0
        integer, parameter :: AMPI_INFO_LB_SYNC         = 1

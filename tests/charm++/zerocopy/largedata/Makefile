@@ -1,4 +1,5 @@
 -include ../../../common.mk
+-include ../../../../include/conv-mach-opt.mak
 SRC=../../../../src
 CHARMC=../../../../bin/charmc $(OPTS)
 
@@ -27,14 +28,18 @@ $(NAME).o: $(NAME).C cifiles
 test: all
 	$(call run, ./pgm +p4 200000 10)
 	$(call run, ./pgm +p6 200000 10)
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, ./pgm +p4 200000 10 +noCMAForZC)
 	$(call run, ./pgm +p6 200000 10 +noCMAForZC)
+endif
 
 smptest: all
 	$(call run, ./pgm +p4 200000 10 ++ppn 2)
 	$(call run, ./pgm +p4 200000 10 ++ppn 4)
+ifeq ($(CMK_USE_CMA),1)
 	$(call run, ./pgm +p4 200000 10 +noCMAForZC ++ppn 2)
 	$(call run, ./pgm +p4 200000 10 +noCMAForZC ++ppn 4)
+endif
 
 test-bench: all
 	$(call run, ./pgm +p10)

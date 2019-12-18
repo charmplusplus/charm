@@ -142,6 +142,7 @@ public:
   virtual ~CkMemCheckPT();
   void pup(PUP::er& p);
   inline int BuddyPE(int pe);
+  inline int ReverseBuddyPE(int pe);
   void doItNow(int sp, CkCallback &&);
   void restart(int diePe);
   void removeArrayElements();

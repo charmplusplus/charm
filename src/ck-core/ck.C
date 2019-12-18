@@ -437,13 +437,11 @@ void CkSectionID::pup(PUP::er &p) {
 /**** Tiny random API routines */
 
 #if CMK_CUDA
-void CUDACallbackManager(void *fn) {
-  if (fn != NULL) {
-    CkCallback *cb = (CkCallback*) fn;
-    cb->send();
+void CUDACallbackManager(void *fn, void *msg) {
+  if (fn) {
+    ((CkCallback*)fn)->send(msg);
   }
 }
-
 #endif
 
 void QdCreate(int n) {
@@ -1524,6 +1522,10 @@ void _noCldNodeEnqueue(int node, envelope *env)
   }
 }
 
+#if CMK_REPLAYSYSTEM && !CMK_TRACE_ENABLED
+#error "Building with Record/Replay support requires tracing support!"
+#endif
+
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
   envelope *env = UsrToEnv(msg);
@@ -2165,6 +2167,11 @@ void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int)) {
 void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int) = NULL;
 void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int)) {
   ArrayMsgRecvExtCallback = cb;
+}
+
+void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int) = NULL;
+void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int *, int, int, char *, int)) {
+  ArrayBcastRecvExtCallback = cb;
 }
 
 int (*ArrayElemLeaveExt)(int, int, int *, char**, int) = NULL;

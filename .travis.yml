@@ -9,9 +9,11 @@ before_install:
           exit
         }
       fi
-install:
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install ccache; fi
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then export PATH="/usr/local/opt/ccache/libexec:$PATH"; fi
+
+# Disable ccache on darwin since the brew install step fails.
+#install:
+#  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install ccache; fi
+#  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then export PATH="/usr/local/opt/ccache/libexec:$PATH"; fi
 
 matrix:
   include:

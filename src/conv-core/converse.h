@@ -176,6 +176,14 @@
 extern "C" {
 #endif
 
+#ifdef _WIN32
+# define CmiAlignedAlloc(alignment, size) _aligned_malloc((size), (alignment))
+# define CmiAlignedFree(ptr) _aligned_free(ptr)
+#else
+void * CmiAlignedAlloc(size_t alignment, size_t size);
+# define CmiAlignedFree(ptr) free(ptr)
+#endif
+
 /* Global variables used by charmdebug to maintain information */
 extern void CpdSetInitializeMemory(int v);
 extern void CpdSystemEnter(void);
@@ -506,6 +514,8 @@ extern void         CmiUnlock(CmiNodeLock lock);
 extern int          CmiTryLock(CmiNodeLock lock);
 extern void         CmiDestroyLock(CmiNodeLock lock);
 
+#define CmiInCommThread() (0)
+
 #endif
 
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
@@ -552,7 +562,13 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
 
+#if CMK_SMP
+#define CmiInCommThread()  (CmiMyRank() == CmiMyNodeSize())
+#else
+#define CmiInCommThread()  (0)
 #endif
+
+#endif /* CMK_SHARED_VARS_NT_THREADS */
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* non-SMP version */
 
@@ -684,6 +700,7 @@ extern int CmiPhysicalRank(int pe);
 extern void CmiInitCPUAffinity(char **argv);
 extern int CmiPrintCPUAffinity(void);
 extern int CmiSetCPUAffinity(int core);
+extern int CmiSetCPUAffinityLogical(int core);
 extern void CmiInitCPUTopology(char **argv);
 extern int CmiOnCore(void);
 
@@ -1528,12 +1545,8 @@ typedef CthThread   (*CthThFn)(void);
 void       CthSetSerialNo(CthThread t, int no);
 int        CthImplemented(void);
 
-int        CthMigratable(void);
-CthThread  CthPup(pup_er, CthThread);
-
 CthThread  CthSelf(void);
 CthThread  CthCreate(CthVoidFn, void *, int);
-CthThread  CthCreateMigratable(CthVoidFn, void *, int);
 void       CthResume(CthThread);
 void       CthFree(CthThread);
 
@@ -1578,7 +1591,10 @@ void       CthAutoYieldBlock(void);
 void       CthAutoYieldUnblock(void);
 
 /* Converse Thread Global (Ctg) global variable manipulation */
-typedef struct CtgGlobalStruct *CtgGlobals;
+typedef struct CtgGlobalStruct {
+  /* Pointer to our global data segment. */
+  void * data_seg;
+} CtgGlobals;
 
 /** Initialize the globals support (called on each processor). */
 void CtgInit(void);
@@ -1589,22 +1605,18 @@ void CtgInit(void);
 CpvExtern(int, CmiPICMethod);
 
 /** Copy the current globals into this new set */
-CtgGlobals CtgCreate(CthThread tid);
-/** Install this set of globals. If g==NULL, returns to original globals. */
+size_t CtgGetSize(void);
+CtgGlobals CtgCreate(void * buf);
+/** Install this set of globals. */
 void CtgInstall(CtgGlobals g);
-/** PUP this (not currently installed) globals set */
-CtgGlobals CtgPup(pup_er, CtgGlobals g);
-/** Delete this (not currently installed) set of globals. */
-void CtgFree(CtgGlobals g);
+void CtgUninstall(void);
 /** Return the current global list */
 CtgGlobals CtgCurrentGlobals(void);
 
-/** for TLS globals */
-void CtgInstallTLS(void *cur, void *next);
-void CtgInstallMainThreadTLS(void *cur);
-void CtgInstallCthTLS(void *cur, void *next);
-void CmiEnableTLS(void);
-void CmiDisableTLS(void);
+void CthInterceptionsImmediateActivate(CthThread th);
+void CthInterceptionsImmediateDeactivate(CthThread th);
+void CthInterceptionsDeactivatePush(CthThread th);
+void CthInterceptionsDeactivatePop(CthThread th);
 
 /* The thread listener structure. The user must register one such listener
 	if he wants to find out when a thread is suspended or when it starts running
@@ -2202,9 +2214,6 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "conv-lists.h"
 #include "conv-trace.h"
 #include "persistent.h"
-#if CMK_CELL
-#include "cell-api.h"
-#endif
 
 #include "conv-rdma.h"
 

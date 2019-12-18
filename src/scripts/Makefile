@@ -285,13 +285,12 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           ckobjid.h\
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
-	  waitqd.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h lbdb++.h LBProfit.h $(LBHEADERS) \
-          LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
-	  RefinerTemp.h Refiner.h RefinerApprox.h RefinerComm.h ckgraphTemp.h ckgraph.h ckheap.h \
-          elements.h CommLBHeap.h topology.h manager.h \
+	  waitqd.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
+          LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
+	  RefinerTemp.h Refiner.h ckgraph.h ckheap.h \
+          elements.h topology.h manager.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h \
-	  NborBaseLB.h DistBaseLB.h HybridBaseLB.h HybridLBMsg.h \
-	  NeighborLBMsg.h \
+	  DistBaseLB.h HybridBaseLB.h HybridLBMsg.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkMulticast.decl.h	\
           CkReduction.decl.h \
@@ -299,7 +298,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkCheckpointStatus.decl.h CkMemCheckpoint.decl.h \
           LBDatabase.decl.h MetaBalancer.decl.h CentralLB.decl.h NullLB.decl.h \
           BaseLB.decl.h \
-	  NborBaseLB.decl.h DistBaseLB.decl.h \
+	  DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
           TraceSummary.decl.h TraceAutoPerf.decl.h TraceProjections.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
@@ -319,7 +318,7 @@ BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blu
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \
-	bitvecset.h ckset.h LBSimulation.h  \
+	ckset.h LBSimulation.h  \
 	$(BLUE_HEADERS)
 
 basics: headers
@@ -563,12 +562,12 @@ cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/confi
 
 hwloc-target:  conv-autoconfig.h
 	( $(MAKE) -C hwloc )
-	( test -e hwloc/src/.libs/libhwloc_embedded.lib && cp -f hwloc/src/.libs/libhwloc_embedded.lib hwloc/src/.libs/libhwloc_embedded.a ) || true
-	( cp -f hwloc/src/.libs/libhwloc_embedded.a $(L) )
+	( test -e hwloc/hwloc/.libs/libhwloc_embedded.lib && cp -f hwloc/hwloc/.libs/libhwloc_embedded.lib hwloc/hwloc/.libs/libhwloc_embedded.a ) || true
+	( cp -f hwloc/hwloc/.libs/libhwloc_embedded.a $(L) )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
 ifeq (false,$(CMK_NO_BUILD_SHARED))
-	( test -d ../lib_so && cp -f hwloc/src/.libs/libhwloc_embedded.*$(CMK_SHARED_SUF)* ../lib_so/ ) || true
+	( test -d ../lib_so && cp -f hwloc/hwloc/.libs/libhwloc_embedded.*$(CMK_SHARED_SUF)* ../lib_so/ ) || true
 endif
 	touch $@
 
@@ -661,9 +660,9 @@ MEM_DEPS=memory-gnu.C memory-gnu-internal.C converse.h conv-mach.h $(CVHEADERS)
 
 # $1 is the name of the module, $2 is any additional dependency beyond memory.C and $(MEM_DEPS), $3 is extra arguments to charmc
 define libmem
-$(L)/libmemory-$1.a: memory.C $(MEM_DEPS) $2
-	$(CHARMC) -I. -o libmemory-$1.o $3 $$<
-	$(CHARMC) -I. -o $$@ $3 libmemory-$1.o
+$(L)/libmemory-$1.a: memory.C $$(MEM_DEPS) $2
+	$$(CHARMC) -I. -o libmemory-$1.o $3 $$<
+	$$(CHARMC) -I. -o $$@ $3 libmemory-$1.o
 endef
 
 $(eval $(call libmem,default,                           ,-DCMK_MEMORY_BUILD_DEFAULT))
@@ -697,12 +696,12 @@ LIBTHREADSDEPS = $(CVHEADERS) QUICK_THREADS
 
 # $1 is the name of the module, $2 is any additional dependency beyond threads.C and $(LIBTHREADSDEPS), $3 is extra arguments to charmc, $4 is an option to include 'boost-context'
 define libthreads
-$(L)/libthreads-$1.a: threads.C $(LIBTHREADSDEPS) $2
-	$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 $$<
+$(L)/libthreads-$1.a: threads.C $$(LIBTHREADSDEPS) $2
+	$$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 $$<
 ifeq (1,$$(strip $4))
-	$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$(wildcard boost-context/*.o) libthreads-$1.o
+	$$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$(wildcard boost-context/*.o) libthreads-$1.o
 else
-	$(CHARMC) -IQuickThreads -I. -o $$@ $3 libthreads-$1.o
+	$$(CHARMC) -IQuickThreads -I. -o $$@ $3 libthreads-$1.o
 endif
 endef
 
@@ -745,12 +744,12 @@ CK_LIBS_CORE=$(L)/libck.a
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o\
-           waitqd.o LBDatabase.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdb.o lbdbf.o ckobjQ.o  \
-	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckobjid.o\
-           LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
-	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o DistBaseLB.o \
-           ckgraphTemp.o ckgraph.o LButil.o RefinerTemp.o Refiner.o RefinerApprox.o  \
-           manager.o RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
+           waitqd.o LBDatabase.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
+	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckobjid.o\
+           LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
+	   BaseLB.o CentralLB.o HybridBaseLB.o DistBaseLB.o \
+           ckgraph.o LButil.o RefinerTemp.o Refiner.o \
+           manager.o ckset.o ckheap.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
@@ -819,8 +818,8 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
   CkReduction.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
-  cklocation.h ckmulticast.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
-  LBMachineUtil.h lbdb++.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
+  cklocation.h ckmulticast.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h LBObj.h LBOM.h LBComm.h \
+  LBMachineUtil.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
