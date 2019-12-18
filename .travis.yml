@@ -61,12 +61,6 @@ matrix:
   - os: windows
     name: "NetLRTS-Win"
     script:
-    #- choco install -y msys2
-    #- pacman -S autoconf automake
-    #- choco install -y make msys2
-    #- mkdir build-cmake
-    #- cd build-cmake
-    #- cmake ..
-    - $msys2 ./build AMPI netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
-    #- make -C netlrts-win-x86_64/tmp -k -j2 all-test-tests all-test-examples OPTS="-g"
-    #- make -C netlrts-win-x86_64/tmp -k test-tests test-examples TESTOPTS="++local"
+    - $msys2 ./build AMPI netlrts-win-x86_64 gcc -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
+    - $msys2 make -C netlrts-darwin-x86_64/tmp -j3 all-test-tests all-test-examples OPTS="-g"
+    - $msys2 make -C netlrts-darwin-x86_64/tmp test-tests test-examples TESTOPTS="++local"
