@@ -19,7 +19,7 @@ $(TARGET): $(OBJS)
 $(TARGET).decl.h: $(TARGET).ci
 	$(CHARMC) $<
 
-$(TARGET).o: $(TARGET).C $(TARGET).decl.h
+$(TARGET).o: $(TARGET).C $(TARGET).decl.h $(TARGET).def.h
 	$(CHARMC) -c $<
 
 $(TARGET)CUDA.o: $(TARGET).cu

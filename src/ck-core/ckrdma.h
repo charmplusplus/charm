@@ -64,7 +64,7 @@ struct CkNcpyBufferPost {
   // deregMode
   unsigned short int deregMode;
 
-  // Set if device-to-device transfer
+  // set if device-to-device transfer
   bool device;
 
   CkNcpyBufferPost() : regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), device(false) {}
@@ -118,6 +118,9 @@ class CkNcpyBuffer{
   // deregMode
   unsigned short int deregMode;
 
+  // set if device pointer
+  bool device;
+
   // reference pointer
   const void *ref;
 
@@ -134,6 +137,10 @@ class CkNcpyBuffer{
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
     init(ptr_, cnt_, cb_, regMode_, deregMode_);
   }
+
+  explicit CkNcpyBuffer(const void* ptr_, bool device_) : ptr(ptr_), cb(CkCallback(CkCallback::ignore)), device(device_) {}
+
+  explicit CkNcpyBuffer(const void* ptr_, CkCallback& cb_, bool device_) : ptr(ptr_), cb(cb_), device(device_) {}
 
   void print() {
     CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%zu, pe:%d, regMode=%d, deregMode=%d, ref:%p, refAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, regMode, deregMode, ref, refAckInfo);
@@ -305,6 +312,14 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, CkCallback &cb_, unsig
 
 static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
   return CkNcpyBuffer(ptr_, 0, regMode_, deregMode_);
+}
+
+static inline CkNcpyBuffer CkSendDeviceBuffer(const void *ptr_, CkCallback &cb_) {
+  return CkNcpyBuffer(ptr_, cb_, true);
+}
+
+static inline CkNcpyBuffer CkSendDeviceBuffer(const void *ptr_) {
+  return CkNcpyBuffer(ptr_, true);
 }
 
 #if CMK_ONESIDED_IMPL
