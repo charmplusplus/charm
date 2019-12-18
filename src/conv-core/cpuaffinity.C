@@ -784,7 +784,7 @@ static int set_default_affinity(void)
 // Logical indices are used if the first character of the map string is an L
 // (case-insensitive).
 static int check_logical_indices(char **mapptr) {
-  if ((*mapptr)[0] == 'l' || (*mapptr)[1] == 'L') {
+  if ((*mapptr)[0] == 'l' || (*mapptr)[0] == 'L') {
     (*mapptr)++; // Exclude the L character from the string
     return 1;
   }
