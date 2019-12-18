@@ -4,8 +4,8 @@ Editing and building the Charm++ manuals
 
 The Charm++ manuals in this directory are written in reStructuredText (RST,
 http://docutils.sourceforge.net/rst.html) and meant to be built with the
-sphinx documentation generator (http://www.sphinx-doc.org/). Pre-built
-versions are available on readthedocs.io (https://charm.readthedocs.io).
+sphinx documentation generator (http://www.sphinx-doc.org/), version 2.4.0 or higher.
+Pre-built versions are available on readthedocs.io (https://charm.readthedocs.io).
 
 This file describes how the documentation can be edited and built locally.
 
