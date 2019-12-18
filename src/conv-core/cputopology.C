@@ -167,11 +167,6 @@ int CpuTopology::numNodes = 0;
 std::vector<int> *CpuTopology::bynodes = NULL;
 int CpuTopology::supported = 0;
 
-static inline bool operator< (const skt_ip_t & a, const skt_ip_t & b)
-{
-  return memcmp(&a, &b, sizeof(a)) < 0;
-}
-
 namespace CpuTopoDetails {
 
 static nodeTopoMsg *topomsg = NULL;

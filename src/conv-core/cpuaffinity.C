@@ -418,11 +418,6 @@ typedef struct _affMsg {
 #endif
 } affMsg;
 
-static inline bool operator< (const skt_ip_t & a, const skt_ip_t & b)
-{
-  return memcmp(&a, &b, sizeof(a)) < 0;
-}
-
 static rankMsg *rankmsg = NULL;
 static std::map<skt_ip_t, hostnameMsg *> hostTable;
 static CmiNodeLock affLock = 0;
