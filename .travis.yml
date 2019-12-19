@@ -15,7 +15,7 @@ before_install:
         $msys2 pacman --sync --noconfirm --needed mingw-w64-x86_64-toolchain autoconf libtool automake make autoconf-archive pkg-config gcc
         ## Install more MSYS2 packages from https://packages.msys2.org/base here
         taskkill //IM gpg-agent.exe //F  # https://travis-ci.community/t/4967
-        export PATH=/C/tools/msys64/mingw64/bin:$PATH
+        export PATH=/C/tools/msys64/mingw64/bin:/C/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio\ 14.0/VC/bin/:$PATH
         ;;
     esac
 
@@ -54,6 +54,6 @@ matrix:
   - os: windows
     name: "NetLRTS-Win GCC"
     script:
-    - $mingw64 ./build all-test netlrts-win-x86_64 gcc -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
+    - $mingw64 ./build all-test netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
     - $mingw64 make -C netlrts-win-x86_64-gcc/tmp -j3 all-test-tests all-test-examples OPTS="-g"
     - $mingw64 make -C netlrts-win-x86_64-gcc/tmp test-tests test-examples TESTOPTS="++local"
