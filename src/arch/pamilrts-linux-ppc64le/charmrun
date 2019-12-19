@@ -4,6 +4,8 @@
 #  Translates +pN-style conv-host options into
 # mpirun -npN options.
 
+export FROM_CHARMRUN='1'
+
 args=""
 pes=1
 ppn=1
