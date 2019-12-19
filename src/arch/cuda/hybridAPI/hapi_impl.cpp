@@ -787,7 +787,8 @@ void initDeviceMapping(char** argv) {
       map_type = Mapping::RoundRobin;
     }
     else {
-      CmiAbort("Unsupported mapping type!");
+      CmiAbort("Unsupported mapping type: %s, use one of \"none\", \"block\", "
+          "\"roundrobin\"", gpumap);
     }
   }
 
