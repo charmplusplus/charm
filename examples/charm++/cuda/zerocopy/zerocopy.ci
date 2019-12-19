@@ -12,18 +12,18 @@ mainmodule zerocopy {
   group Block {
     entry Block();
     entry void init();
-    entry void receive(int ref, int size, nocopypost double arr[size]);
+    entry void receive(int ref, int size1, nocopypost double arr1[size1], int size2, double arr2[size2]);
 
     entry void iterate() {
       serial {
         // Send device data to peer
-        thisProxy[peer].receive(iter, block_size, CkSendDeviceBuffer(d_local_data));
+        thisProxy[peer].receive(iter, block_size, CkSendDeviceBuffer(d_local_data), block_size, h_local_data);
       }
 
       // Receive device data from peer
       // This is the second receive(), invoked after the data transfer is
       // complete
-      when receive[iter](int ref, int size, nocopypost double arr[size])
+      when receive[iter](int ref, int size1, nocopypost double arr1[size1], int size2, double arr2[size2])
       serial {
         // Validate received data
         validateData();

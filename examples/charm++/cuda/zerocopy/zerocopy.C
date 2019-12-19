@@ -102,9 +102,10 @@ class Block : public CBase_Block {
     hapiAddCallback(stream, cb);
   }
 
-  void receive(int ref, int &size, double *&arr, CkNcpyBufferPost *ncpyPost) {
+  void receive(int ref, int &size1, double *&arr1, int size2, double *arr2, CkNcpyBufferPost *ncpyPost) {
+    CkPrintf("PE %d: receive function with CkNcpyBufferPost\n", CkMyPe());
     // Inform the runtime where the incoming data should be stored
-    arr = d_remote_data;
+    arr1 = d_remote_data;
 
     // Set flag in CkNcpyBufferPost to let the runtime know that it is
     // a device-to-device transfer
