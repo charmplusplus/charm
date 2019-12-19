@@ -1,6 +1,6 @@
 #!/bin/bash
 AMPICC="$0"
-CHARMBIN=`dirname $0`
+CHARMBIN=$(dirname $0)
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
 . "$CHARMINC/conv-mach-opt.sh"
