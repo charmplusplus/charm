@@ -13,6 +13,7 @@ before_install:
         export msys2+=" -msys2 -c \$\* --"
         $msys2 pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config
         taskkill //IM gpg-agent.exe //F  # https://travis-ci.community/t/4967
+        export PATH=/C/tools/msys64/mingw64/bin:$PATH
         ;;
     esac
 
