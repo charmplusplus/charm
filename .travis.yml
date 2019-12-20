@@ -61,4 +61,10 @@ matrix:
     - export PATH="/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64:$PATH"
     - cl.exe
     - autoconf --version
+    - $mingw64 echo \$PATH
+    - $mingw64 cl.exe
+    - sleep 10
+    - $mingw64 ./build all-test netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
+    - $mingw64 make -C netlrts-win-x86_64-gcc/tmp -j3 all-test-tests all-test-examples OPTS="-g"
+    - $mingw64 make -C netlrts-win-x86_64-gcc/tmp test-tests test-examples TESTOPTS="++local"
 
