@@ -148,7 +148,7 @@ getExtention() {
 ##############################################################################
 
 #Program state:
-VERBOSE="no"
+VERBOSE="yes"
 DEBUG_SCRIPT=""
 SAVE=""
 
