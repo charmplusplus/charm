@@ -1,38 +1,5 @@
 language: cpp
 
-before_install:
-- |-
-    case $TRAVIS_OS_NAME in
-      windows)
-        [[ ! -f C:/tools/msys64/msys2_shell.cmd ]] && rm -rf C:/tools/msys64
-        choco uninstall -y mingw
-        choco upgrade --no-progress -y msys2
-        export msys2='cmd //C RefreshEnv.cmd '
-        export msys2+='& set MSYS=winsymlinks:nativestrict '
-        export msys2+='& C:\\tools\\msys64\\msys2_shell.cmd -defterm -no-start'
-        export mingw64="$msys2 -mingw64 -full-path -here -c \$\* --"
-        export msys2+=" -msys2 -c \$\* --"
-        $msys2 pacman --sync --noconfirm --needed mingw-w64-x86_64-toolchain autoconf libtool automake make autoconf-archive pkg-config gcc
-        ## Install more MSYS2 packages from https://packages.msys2.org/base here
-        taskkill //IM gpg-agent.exe //F  # https://travis-ci.community/t/4967
-        export PATH=/C/tools/msys64/mingw64/bin:/C/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio\ 14.0/VC/bin/:$PATH
-        ;;
-    esac
-
-before_cache:
-- |-
-    case $TRAVIS_OS_NAME in
-      windows)
-        # https://unix.stackexchange.com/a/137322/107554
-        $msys2 pacman --sync --clean --noconfirm
-        ;;
-    esac
-
-cache:
-    directories:
-    - $HOME/AppData/Local/Temp/chocolatey
-    - /C/tools/msys64
-
 matrix:
   include:
   - os: linux
@@ -54,6 +21,7 @@ matrix:
   - os: windows
     name: "NetLRTS-Win GCC"
     script:
+    - ls "/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/"
     - export VCINSTALLDIR="/cygdrive/C/Program Files (x86)/Microsoft Visual Studio 14.0/VC"
     - $mingw64 ./build all-test netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
     - $mingw64 make -C netlrts-win-x86_64-gcc/tmp -j3 all-test-tests all-test-examples OPTS="-g"
