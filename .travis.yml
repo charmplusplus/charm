@@ -11,7 +11,7 @@ before_install:
         export msys2+='& C:\\tools\\msys64\\msys2_shell.cmd -defterm -no-start'
         export mingw64="$msys2 -mingw64 -full-path -here -c \$\* --"
         export msys2+=" -msys2 -c \$\* --"
-        $msys2 pacman --sync --noconfirm --needed mingw-w64-x86_64-toolchain autoconf libtool automake make autoconf-archive pkg-config
+        $msys2 pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config
         ## Install more MSYS2 packages from https://packages.msys2.org/base here
         taskkill //IM gpg-agent.exe //F  # https://travis-ci.community/t/4967
         export PATH=/C/tools/msys64/mingw64/bin:/C/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio\ 14.0/VC/bin/:$PATH
