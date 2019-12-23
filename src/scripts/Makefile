@@ -285,13 +285,12 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           ckobjid.h\
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
-	  waitqd.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h lbdb++.h LBProfit.h $(LBHEADERS) \
-          LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
-	  RefinerTemp.h Refiner.h RefinerApprox.h RefinerComm.h ckgraphTemp.h ckgraph.h ckheap.h \
-          elements.h CommLBHeap.h topology.h manager.h \
+	  waitqd.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
+          LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
+	  RefinerTemp.h Refiner.h ckgraph.h ckheap.h \
+          elements.h topology.h manager.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h \
-	  NborBaseLB.h DistBaseLB.h HybridBaseLB.h HybridLBMsg.h \
-	  NeighborLBMsg.h \
+	  DistBaseLB.h HybridBaseLB.h HybridLBMsg.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkMulticast.decl.h	\
           CkReduction.decl.h \
@@ -299,7 +298,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkCheckpointStatus.decl.h CkMemCheckpoint.decl.h \
           LBDatabase.decl.h MetaBalancer.decl.h CentralLB.decl.h NullLB.decl.h \
           BaseLB.decl.h \
-	  NborBaseLB.decl.h DistBaseLB.decl.h \
+	  DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
           TraceSummary.decl.h TraceAutoPerf.decl.h TraceProjections.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
@@ -319,7 +318,7 @@ BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blu
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \
-	bitvecset.h ckset.h LBSimulation.h  \
+	ckset.h LBSimulation.h  \
 	$(BLUE_HEADERS)
 
 basics: headers
@@ -745,12 +744,12 @@ CK_LIBS_CORE=$(L)/libck.a
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o\
-           waitqd.o LBDatabase.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdb.o lbdbf.o ckobjQ.o  \
-	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckobjid.o\
-           LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
-	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o DistBaseLB.o \
-           ckgraphTemp.o ckgraph.o LButil.o RefinerTemp.o Refiner.o RefinerApprox.o  \
-           manager.o RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
+           waitqd.o LBDatabase.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
+	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckobjid.o\
+           LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
+	   BaseLB.o CentralLB.o HybridBaseLB.o DistBaseLB.o \
+           ckgraph.o LButil.o RefinerTemp.o Refiner.o \
+           manager.o ckset.o ckheap.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
@@ -819,8 +818,8 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
   CkReduction.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
-  cklocation.h ckmulticast.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
-  LBMachineUtil.h lbdb++.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
+  cklocation.h ckmulticast.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h LBObj.h LBOM.h LBComm.h \
+  LBMachineUtil.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \

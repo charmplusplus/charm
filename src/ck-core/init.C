@@ -310,16 +310,16 @@ static inline void _parseCommandLineOpts(char **argv)
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
-      CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
+      if (!quietModeRequested)
+        CkPrintf("CharmFT> Restarting node %d after crash...\n", CmiMyNode());
   }
   // reading the killFile
   if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
     if(faultFunc == NULL){
       //do not read the killfile if this is a restarting processor
       killFlag = true;
-      if(CmiMyPe() == 0){
-        printf("[%d] killFlag set to true for file %s\n",CkMyPe(),killFile);
-      }
+      if (CmiMyPe() == 0 && !quietModeRequested)
+        CkPrintf("CharmFT> Using diagnostic kill file: %s\n", killFile);
     }
   }
 #endif
@@ -1686,11 +1686,9 @@ void _initCharm(int unused_argc, char **argv)
     }
 
 #if CMK_CUDA
+    initDeviceMapping(argv);
     if (CmiMyRank() == 0) {
       initHybridAPI();
-    }
-    else /* CmiMyRank() != 0 */ {
-      setHybridAPIDevice();
     }
     initEventQueues();
 

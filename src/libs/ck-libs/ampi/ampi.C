@@ -792,7 +792,7 @@ int AMPI_NODE_LOCAL_THRESHOLD = AMPI_NODE_LOCAL_THRESHOLD_DEFAULT;
 int AMPI_RDMA_THRESHOLD = AMPI_RDMA_THRESHOLD_DEFAULT;
 int AMPI_SSEND_THRESHOLD = AMPI_SSEND_THRESHOLD_DEFAULT;
 
-static bool nodeinit_has_been_called=false;
+bool ampi_nodeinit_has_been_called=false;
 CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(bool, ampiInitDone);
 CtvDeclare(void*,stackBottom);
@@ -1007,7 +1007,7 @@ static void ampiNodeInit() noexcept
   CkAssert(AMPI_threadstart_idx == -1);    // only initialize once
   AMPI_threadstart_idx = TCHARM_Register_thread_function(AMPI_threadstart);
 
-  nodeinit_has_been_called=true;
+  ampi_nodeinit_has_been_called=true;
 
    // ASSUME NO ANYTIME MIGRATION and STATIC INSERTON
   _isAnytimeMigration = false;
@@ -2982,7 +2982,7 @@ AmpiMsg* ampi::makeNcpyMsg(int t, int sRank, const void* buf, int count,
     char* sbuf = new char[len];
     ddt->serialize((char*)buf, sbuf, count, len, PACK);
     srcInfo = CkNcpyBuffer(sbuf, len, sendCB);
-    req.setSystemBuf(sbuf); // completedSend will need to free this
+    req.setSystemBuf(sbuf, len); // completedSend will need to free this
     // NOTE: We could set 'req.complete = true' here, but then we'd
     //       have to make sure req.systemBuf gets freed by someone else
     //       in case 'req' is freed before the put() actually completes...
@@ -3252,7 +3252,7 @@ void ampi::requestPut(MPI_Request reqIdx, CkNcpyBuffer targetInfo) noexcept {
     char* sbuf = new char[len];
     sddt->serialize((char*)req.buf, sbuf, req.count, len, PACK);
     srcInfo = CkNcpyBuffer(sbuf, len, sendCB);
-    req.setSystemBuf(sbuf); // completedSend will need to free this
+    req.setSystemBuf(sbuf, len); // completedSend will need to free this
     // NOTE: We could set 'req.statusIreq = true' here, but then we'd
     // have to make sure systemBuf gets freed by someone in case the
     // user tries to free 'req' before the put() actually completes...
@@ -3371,7 +3371,7 @@ bool ampi::processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
   }
   else {
     char* sbuf = new char[len];
-    ireq.setSystemBuf(sbuf);
+    ireq.setSystemBuf(sbuf, len);
     targetInfo = CkNcpyBuffer(sbuf, len, recvCB);
   }
   targetInfo.get(srcInfo);
@@ -4201,66 +4201,48 @@ AMPI_API_IMPL(int, MPI_Query_thread, int *provided)
 
 AMPI_API_IMPL(int, MPI_Init_thread, int *p_argc, char*** p_argv, int required, int *provided)
 {
-  if (nodeinit_has_been_called) {
-    AMPI_API_INIT("AMPI_Init_thread", p_argc, p_argv, required, provided);
+  AMPI_API_INIT("AMPI_Init_thread", p_argc, p_argv, required, provided);
 
 #if AMPI_ERROR_CHECKING
-    if (required < MPI_THREAD_SINGLE || required > MPI_THREAD_MULTIPLE) {
-      return ampiErrhandler("AMPI_Init_thread", MPI_ERR_ARG);
-    }
+  if (required < MPI_THREAD_SINGLE || required > MPI_THREAD_MULTIPLE) {
+    return ampiErrhandler("AMPI_Init_thread", MPI_ERR_ARG);
+  }
 #endif
 
-    if (required == MPI_THREAD_SINGLE) {
-      CkpvAccess(ampiThreadLevel) = MPI_THREAD_SINGLE;
-    }
-    else {
-      CkpvAccess(ampiThreadLevel) = MPI_THREAD_FUNNELED;
-    }
-    // AMPI does not support MPI_THREAD_SERIALIZED or MPI_THREAD_MULTIPLE
+  if (required == MPI_THREAD_SINGLE) {
+    CkpvAccess(ampiThreadLevel) = MPI_THREAD_SINGLE;
+  }
+  else {
+    CkpvAccess(ampiThreadLevel) = MPI_THREAD_FUNNELED;
+  }
+  // AMPI does not support MPI_THREAD_SERIALIZED or MPI_THREAD_MULTIPLE
 
-    *provided = CkpvAccess(ampiThreadLevel);
-    return MPI_Init(p_argc, p_argv);
-  }
-  else
-  { /* Charm hasn't been started yet! */
-    CkAbort("MPI_Init_thread> AMPI has not been initialized! Possibly due to AMPI requiring '#include \"mpi.h\" be in the same file as main() in C/C++ programs and \'program main\' be renamed to \'subroutine mpi_main\' in Fortran programs!");
-    return MPI_SUCCESS;
-  }
+  *provided = CkpvAccess(ampiThreadLevel);
+  return MPI_Init(p_argc, p_argv);
 }
 
 AMPI_API_IMPL(int, MPI_Init, int *p_argc, char*** p_argv)
 {
-  if (nodeinit_has_been_called) {
-    AMPI_API_INIT("AMPI_Init", p_argc, p_argv);
-    char **argv;
-    if (p_argv) argv=*p_argv;
-    else argv=CkGetArgv();
-    ampiInit(argv);
-    if (p_argc) *p_argc=CmiGetArgc(argv);
-  }
-  else
-  { /* Charm hasn't been started yet! */
-    CkAbort("MPI_Init> AMPI has not been initialized! Possibly due to AMPI requiring '#include \"mpi.h\" be in the same file as main() in C/C++ programs and \'program main\' be renamed to \'subroutine mpi_main\' in Fortran programs!");
-  }
+  AMPI_API_INIT("AMPI_Init", p_argc, p_argv);
+  char **argv;
+  if (p_argv) argv=*p_argv;
+  else argv=CkGetArgv();
+  ampiInit(argv);
+  if (p_argc) *p_argc=CmiGetArgc(argv);
 
   return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Initialized, int *isInit)
 {
-  if (nodeinit_has_been_called) {
-    AMPI_API_INIT("AMPI_Initialized", isInit);     /* in case charm init not called */
-    *isInit=CtvAccess(ampiInitDone);
-  }
-  else {
-    *isInit=0;
-  }
+  AMPI_API_INIT("AMPI_Initialized", isInit);
+  *isInit=CtvAccess(ampiInitDone);
   return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Finalized, int *isFinalized)
 {
-  AMPI_API_INIT("AMPI_Finalized", isFinalized);     /* in case charm init not called */
+  AMPI_API_INIT("AMPI_Finalized", isFinalized);
   *isFinalized=(CtvAccess(ampiFinalized)) ? 1 : 0;
   return MPI_SUCCESS;
 }

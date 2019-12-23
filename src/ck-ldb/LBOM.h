@@ -9,11 +9,11 @@
 #include "lbdb.h"
 #include "LBObj.h"
 
-class LBDB;
+class LBDatabase;
 
 class LBOM
 {
-friend class LBDB;
+friend class LBDatabase;
 
 public:
   LDOMid id() { return myid; };
@@ -23,7 +23,7 @@ public:
 private:
   LBOM() { };
 
-  LBOM(LBDB *_parent, LDOMid _id,
+  LBOM(LBDatabase *_parent, LDOMid _id,
        void *_userData, LDCallbacks _callbacks)  {
     parent = _parent;
     myid = _id;
@@ -46,7 +46,7 @@ private:
   bool RegisteringObjs() { return registering_objs; };
   void SetRegisteringObjs(bool _set) { registering_objs = _set; };
 
-  LBDB *parent;
+  LBDatabase *parent;
   LDOMid myid;
   LDOMHandle myhandle;
   void *userData;

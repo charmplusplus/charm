@@ -7,7 +7,7 @@ extern "C" {
 
 // Initialize & exit hybrid API.
 void initHybridAPI();
-void setHybridAPIDevice();
+void initDeviceMapping(char** argv);
 void exitHybridAPI();
 
 // Initializes event queues used for polling.
@@ -36,6 +36,13 @@ typedef struct _bufferPool {
   int num;
 #endif
 } BufferPool;
+
+// PE-GPU mapping types
+enum class Mapping {
+  None, // Mapping is explicitly performed by the user
+  Block,
+  RoundRobin
+};
 
 #ifdef __cplusplus
 }

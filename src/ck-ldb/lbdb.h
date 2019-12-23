@@ -32,13 +32,6 @@ typedef CMK_LBTIME_TYPE LBRealType;
 
 extern int _lb_version;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef void* cvoid; /* To eliminate warnings, because a C void* is not
-			the same as a C++ void* */
-
   /*  User-defined object ID is 4 ints long (as defined in converse.h) */
   /*  as OBJ_ID_SZ */
 
@@ -65,7 +58,6 @@ typedef struct _LDOMid {
 } LDOMid;
 
 typedef struct {
-  LDHandle ldb;
 //  void *user_ptr;
   LDOMid id;
   int handle;		// index to LBOM
@@ -290,97 +282,17 @@ typedef struct {
 } LDCallbacks;
 
 /*
- * Calls from object managers to load database
- */
-#if CMK_LBDB_ON
-LDHandle LDCreate(void);
-#else
-#define LDCreate() 0
-#endif
-
-LDOMHandle LDRegisterOM(LDHandle _lbdb, LDOMid userID, 
-			void *userptr, LDCallbacks cb);
-void LDUnregisterOM(LDHandle _db, LDOMHandle handle);
-
-void LDOMMetaLBResumeWaitingChares(LDHandle _h, int lb_ideal_period);
-void LDOMMetaLBCallLBOnChares(LDHandle _h);
-void * LDOMUserData(LDOMHandle &_h);
-void LDRegisteringObjects(LDOMHandle _h);
-void LDDoneRegisteringObjects(LDOMHandle _h);
-
-LDObjHandle LDRegisterObj(LDOMHandle h, CmiUInt8 id, void *userptr,
-			  bool migratable);
-void LDUnregisterObj(LDObjHandle h);
-
-void *LDObjUserData(LDObjHandle &_h);
-#if CMK_LB_USER_DATA
-void *LDDBObjUserData(LDObjHandle &_h, int idx);
-#endif
-void LDObjTime(LDObjHandle &h, LBRealType walltime, LBRealType cputime);
-int  CLDRunningObject(LDHandle _h, LDObjHandle* _o );
-void LDObjectStart(const LDObjHandle &_h);
-void LDObjectStop(const LDObjHandle &_h);
-void LDSend(const LDOMHandle &destOM, const CmiUInt8 &destid, unsigned int bytes, int destObjProc, int force);
-void LDMulticastSend(const LDOMHandle &destOM, CmiUInt8 *destids, int ndests, unsigned int bytes, int nMsgs);
-
-void LDMessage(LDObjHandle from, 
-	       LDOMid toOM, CmiUInt8 *toID, int bytes);
-
-void LDEstObjLoad(LDObjHandle h, double load);
-void LDNonMigratable(const LDObjHandle &h);
-void LDMigratable(const LDObjHandle &h);
-void LDSetPupSize(const LDObjHandle &h, size_t);
-void LDAsyncMigrate(const LDObjHandle &h, bool);
-void LDDumpDatabase(LDHandle _lbdb);
-
-/*
  * Calls from load balancer to load database
  */  
 typedef void (*LDMigratedFn)(void* data, LDObjHandle handle, int waitBarrier);
-void LDNotifyMigrated(LDHandle _lbdb, LDMigratedFn fn, void* data);
 
 typedef void (*LDStartLBFn)(void *user_ptr);
-void LDAddStartLBFn(LDHandle _lbdb, LDStartLBFn fn, void* data);
-void LDRemoveStartLBFn(LDHandle _lbdb, LDStartLBFn fn);
-void LDStartLB(LDHandle _db);
-void LDTurnManualLBOn(LDHandle _lbdb);
-void LDTurnManualLBOff(LDHandle _lbdb);
 
 typedef void (*LDMigrationDoneFn)(void *user_ptr);
-int LDAddMigrationDoneFn(LDHandle _lbdb, LDMigrationDoneFn fn,  void* data);
-void  LDRemoveMigrationDoneFn(LDHandle _lbdb, LDMigrationDoneFn fn);
-void LDMigrationDone(LDHandle _lbdb);
 
 typedef void (*LDPredictFn)(void* user_ptr);
 typedef void (*LDPredictModelFn)(void* user_ptr, void* model);
 typedef void (*LDPredictWindowFn)(void* user_ptr, void* model, int wind);
-void LDTurnPredictorOn(LDHandle _lbdb, void *model);
-void LDTurnPredictorOnWin(LDHandle _lbdb, void *model, int wind);
-void LDTurnPredictorOff(LDHandle _lbdb);
-void LDChangePredictor(LDHandle _lbdb, void *model);
-void LDCollectStatsOn(LDHandle _lbdb);
-void LDCollectStatsOff(LDHandle _lbdb);
-int  CLDCollectingStats(LDHandle _lbdb);
-void LDQueryEstLoad(LDHandle bdb);
-void LDGetObjLoad(LDObjHandle &h, LBRealType *wallT, LBRealType *cpuT);
-void LDQueryKnownObjLoad(LDObjHandle &h, LBRealType *wallT, LBRealType *cpuT);
-
-int LDGetObjDataSz(LDHandle _lbdb);
-void LDGetObjData(LDHandle _lbdb, LDObjData *data);
-
-int LDGetCommDataSz(LDHandle _lbdb);
-void LDGetCommData(LDHandle _lbdb, LDCommData *data);
-void LDGetCommInfo(LDHandle _lbdb, int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& num_nghbors, int& hops, int& hopbytes);
-
-void LDBackgroundLoad(LDHandle _lbdb, LBRealType *walltime, LBRealType *cputime);
-void LDIdleTime(LDHandle _lbdb, LBRealType *walltime);
-void LDTotalTime(LDHandle _lbdb, LBRealType *walltime, LBRealType *cputime);
-void LDGetTime(LDHandle _db, LBRealType *total_walltime,LBRealType *total_cputime,
-                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime);
-
-void LDClearLoads(LDHandle _lbdb);
-int  LDMigrate(LDObjHandle h, int dest);
-void LDMigrated(LDObjHandle h, int waitBarrier);
 
 /*
  * Local Barrier calls
@@ -404,33 +316,10 @@ struct LDBarrierReceiver {
   : i(in) { }
 };
 
-void LDAtLocalBarrier(LDHandle _lbdb, LDBarrierClient h);
-void LDDecreaseLocalBarrier(LDHandle _lbdb, LDBarrierClient h, int c);
-void LDLocalBarrierOn(LDHandle _db);
-void LDLocalBarrierOff(LDHandle _db);
-void LDResumeClients(LDHandle _lbdb);
-int LDProcessorSpeed();
-bool LDOMidEqual(const LDOMid &i1, const LDOMid &i2);
-
 /*
  *  LBDB Configuration calls
  */
-void LDSetLBPeriod(LDHandle _db, double s);
-double LDGetLBPeriod(LDHandle _db);
 
-int LDMemusage(LDHandle _db);
-
-#ifdef __cplusplus
-}
-#endif /* _cplusplus */
-
-const LDObjHandle &LDGetObjHandle(LDHandle h, int idx);
-LDBarrierClient LDAddLocalBarrierClient(LDHandle _lbdb,LDResumeFn fn,
-					void* data);
-void LDRemoveLocalBarrierClient(LDHandle _lbdb, LDBarrierClient h);
-LDBarrierReceiver LDAddLocalBarrierReceiver(LDHandle _lbdb,LDBarrierFn fn,
-					    void* data);
-void LDRemoveLocalBarrierReceiver(LDHandle _lbdb,LDBarrierReceiver h);
 
 #if CMK_LBDB_ON
 PUPbytes(LDHandle)
@@ -455,17 +344,6 @@ inline void LDObjStats::pup(PUP::er &p) {
 }
 PUPmarshall(LDObjStats)
 inline void LDOMHandle::pup(PUP::er &p) {
-  // skip ldb since it is a pointer
-  int ptrSize = sizeof(void *);
-  p|ptrSize;
-  // if pointer size is not expected, must be in simulation mode
-  // ignore this field
-  if (p.isUnpacking() && ptrSize != sizeof(void *)) {  
-    char dummy;
-    for (int i=0; i<ptrSize; i++) p|dummy;
-  }
-  else
-    p|ldb;
   p|id;
   p|handle;
 }

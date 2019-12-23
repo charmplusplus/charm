@@ -97,6 +97,8 @@
 
 #include "conv-config.h" /*<- for CMK_NO_SOCKETS*/
 
+#include <string.h> /* for memcmp */
+
 #ifdef CMK_NO_SOCKETS
 #define SOCKET int
 #define SOCKET_ERROR (-1)
@@ -312,6 +314,11 @@ typedef struct {
 } CcsMessageHeader;
 
 #ifdef __cplusplus
+}
+
+static inline bool operator< (const skt_ip_t & a, const skt_ip_t & b)
+{
+  return memcmp(&a, &b, sizeof(a)) < 0;
 }
 #endif
 
