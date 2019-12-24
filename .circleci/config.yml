@@ -38,7 +38,7 @@ jobs:
       - checkout
       - run:
           name: automake
-          command: perl --version && m4 --version
+          command: wget https://ftp.gnu.org/gnu/m4/m4-1.4.18.tar.gz && tar xf m4-1.4.18.tar.gz && cd m4-1.4.18/ && ./configure && make install
           shell: bash.exe
     
 workflows:
