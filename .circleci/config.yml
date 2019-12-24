@@ -37,9 +37,10 @@ jobs:
     steps:
       - checkout
       - run: choco upgrade --no-progress -y msys2
-      - run: 
-        command: pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config
-        shell: bash.exe
+      - run:
+          name: automake
+          command: pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config
+          shell: bash.exe
     
 workflows:
   version: 2
