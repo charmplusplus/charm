@@ -36,7 +36,6 @@ jobs:
       name: win/default
     steps:
       - checkout
-      - run: choco upgrade --no-progress -y msys2
       - run:
           name: automake
           command: autoconf --version
