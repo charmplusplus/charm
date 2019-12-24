@@ -38,7 +38,7 @@ jobs:
       - checkout
       - run:
           name: automake
-          command: autoconf --version
+          command: perl --version && m4 --version
           shell: bash.exe
     
 workflows:
