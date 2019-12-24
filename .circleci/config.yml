@@ -39,7 +39,7 @@ jobs:
       - run: choco upgrade --no-progress -y msys2
       - run:
           name: automake
-          command: pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config
+          command: autoconf --version
           shell: bash.exe
     
 workflows:
