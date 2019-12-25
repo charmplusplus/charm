@@ -56,6 +56,6 @@ matrix:
     name: "NetLRTS-Win"
     script:
     - df -h
-    - $mingw64 src/arch/win/travis.sh ./build charm++ netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking -g
+    - $mingw64 src/arch/win/travis.sh ./build charm++ netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking
     - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp -j3 all-test-tests all-test-examples OPTS="-g"
     - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp test-tests test-examples TESTOPTS="++local"
