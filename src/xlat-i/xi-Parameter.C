@@ -219,6 +219,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     }
     bool hasrdma = hasRdma();
     bool hasrecvrdma = hasRecvRdma();
+    bool hasdevice = hasDeviceRdma();
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
@@ -983,6 +984,8 @@ int Parameter::isConditional(void) const { return conditional; }
 int Parameter::isRdma(void) const { return (rdma != CMK_REG_NO_ZC_MSG); }
 int Parameter::isSendRdma(void) const { return (rdma == CMK_ZC_P2P_SEND_MSG); }
 int Parameter::isRecvRdma(void) const { return (rdma == CMK_ZC_P2P_RECV_MSG); }
+int Parameter::isDeviceRdma(void) const { return isRecvDeviceRdma(); }
+int Parameter::isRecvDeviceRdma(void) const { return (rdma == CMK_ZC_P2P_RECV_DEVICE_MSG); }
 int Parameter::getRdma(void) const { return rdma; }
 int Parameter::isFirstRdma(void) const { return firstRdma; }
 
@@ -1020,6 +1023,8 @@ int ParamList::isMessage(void) const { return (next == NULL) && param->isMessage
 int ParamList::hasRdma(void) { return orEach(&Parameter::isRdma); }
 int ParamList::hasSendRdma(void) { return orEach(&Parameter::isSendRdma); }
 int ParamList::hasRecvRdma(void) { return orEach(&Parameter::isRecvRdma); }
+int ParamList::hasDeviceRdma(void) { return hasRecvDeviceRdma(); }
+int ParamList::hasRecvDeviceRdma(void) { return orEach(&Parameter::isRecvDeviceRdma); }
 int ParamList::isRdma(void) { return param->isRdma(); }
 int ParamList::getRdma(void) { return param->getRdma(); }
 int ParamList::isFirstRdma(void) { return param->isFirstRdma(); }

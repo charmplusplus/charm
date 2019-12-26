@@ -78,6 +78,8 @@ class Parameter {
   int isRdma(void) const;
   int isSendRdma(void) const;
   int isRecvRdma(void) const;
+  int isDeviceRdma(void) const;
+  int isRecvDeviceRdma(void) const;
   int getRdma(void) const;
   int isFirstRdma(void) const;
   int isConditional(void) const;
@@ -141,6 +143,8 @@ class ParamList {
   int hasRdma(void);
   int hasSendRdma(void);
   int hasRecvRdma(void);
+  int hasDeviceRdma(void);
+  int hasRecvDeviceRdma(void);
   int isRdma(void);
   int getRdma(void);
   int isFirstRdma(void);
