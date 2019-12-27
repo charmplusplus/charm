@@ -219,7 +219,10 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     }
     bool hasrdma = hasRdma();
     bool hasrecvrdma = hasRecvRdma();
-    bool hasdevice = hasDeviceRdma();
+    if (hasDeviceRdma()) {
+      str << "  int impl_num_device_rdma_fields = " << entry->numRdmaRecvDeviceParams << ";\n";
+      callEach(&Parameter::marshallDeviceRdmaParameters, str);
+    }
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
@@ -234,10 +237,14 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     str << "  { //Find the size of the PUP'd data\n";
     str << "    PUP::sizer implP;\n";
     callEach(&Parameter::pup, str);
+    if (hasDeviceRdma()) {
+      str << "    implP|impl_num_device_rdma_fields;\n";
+      callEach(&Parameter::pupDeviceRdma, str);
+    }
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "    implP|impl_num_rdma_fields;\n";
-      str << "  implP|impl_num_root_node;\n";
+      str << "    implP|impl_num_root_node;\n";
       // All rdma parameters have to be pupped at the start
       callEach(&Parameter::pupRdma, str, true);
       str << "#else\n";
@@ -263,10 +270,14 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     // Second pass: write the data
     str << "  { //Copy over the PUP'd data\n";
     str << "    PUP::toMem implP((void *)impl_msg->msgBuf);\n";
+    if (hasDeviceRdma()) {
+      str << "    implP|impl_num_device_rdma_fields;\n";
+      callEach(&Parameter::pupDeviceRdma, str);
+    }
     if (hasRdma()) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "    implP|impl_num_rdma_fields;\n";
-      str << "  implP|impl_num_root_node;\n";
+      str << "    implP|impl_num_root_node;\n";
       callEach(&Parameter::pupRdma, str, true);
       str << "#else\n";
       callEach(&Parameter::pupRdma, str, false);
@@ -278,6 +289,15 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     if (hasArrays) {  // Marshall each array
       str << "  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
       callEach(&Parameter::marshallArrayData, str);
+    }
+    if (hasDeviceRdma()) {
+      Chare *container = entry->getContainer();
+      if (container->isChare() || container->isForElement()) {
+        // TODO: Currently only recv API is suppported for device buffers
+        if (hasRecvDeviceRdma()) {
+          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_DEVICE_MSG;\n";
+        }
+      }
     }
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
@@ -327,24 +347,40 @@ void Parameter::marshallRegArraySizes(XStr& str) {
 }
 
 void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
-  if (isRdma()) {
+  if (isRdma() && !isDeviceRdma()) {
     Type* dt = type->deref();  // Type, without &
     if (genRdma) {
       str << "  ncpyBuffer_" << name << ".cnt=sizeof(" << dt << ")*(" << arrLen
           << ");\n";
       str << "  ncpyBuffer_" << name << ".registerMem()" << ";\n";
+      str << "  ncpyBuffer_" << name << ".device = false;\n";
     } else {
       marshallArraySizes(str, dt);
     }
   }
 }
 
+void Parameter::marshallDeviceRdmaParameters(XStr& str) {
+  if (isDeviceRdma()) {
+    Type* dt = type->deref();
+    str << "  ncpyBuffer_" << name << ".cnt = sizeof(" << dt << ")*(" << arrLen
+      << ");\n";
+    str << "  ncpyBuffer_" << name << ".device = true;\n";
+  }
+}
+
 void Parameter::pupRdma(XStr& str, bool genRdma) {
-  if (isRdma()) {
+  if (isRdma() && !isDeviceRdma()) {
     if (genRdma)
       str << "    implP|ncpyBuffer_" << name << ";\n";
     else
       pupArray(str);
+  }
+}
+
+void Parameter::pupDeviceRdma(XStr& str) {
+  if (isDeviceRdma()) {
+    str << "    implP|ncpyBuffer_" << name << ";\n";
   }
 }
 

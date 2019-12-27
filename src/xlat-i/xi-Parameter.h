@@ -36,12 +36,14 @@ class Parameter {
   void pup(XStr& str);
   void pupArray(XStr& str);
   void pupRdma(XStr& str, bool genRdma);
+  void pupDeviceRdma(XStr& str);
   void copyPtr(XStr& str);
   void check();
   void checkPointer(Type* dt);
   void marshallArraySizes(XStr& str, Type* dt);
   void marshallRegArraySizes(XStr& str);
   void marshallRdmaParameters(XStr& str, bool genRdma);
+  void marshallDeviceRdmaParameters(XStr& str);
   void marshallArrayData(XStr& str);
   void marshallRdmaArrayData(XStr& str);
   void beginUnmarshall(XStr& str);
