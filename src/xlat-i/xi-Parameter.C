@@ -407,7 +407,7 @@ void Parameter::pup(XStr& str) {
 }
 
 void Parameter::marshallRdmaArrayData(XStr& str) {
-  if (isRdma()) {
+  if (isRdma() && !isDevice()) {
     str << "  memcpy(impl_buf+impl_off_" << name << ","
         << "ncpyBuffer_" << name << ".ptr"
         << ",impl_cnt_" << name << ");\n";
