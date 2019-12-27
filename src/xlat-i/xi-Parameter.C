@@ -366,7 +366,7 @@ void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
 }
 
 void Parameter::marshallDeviceRdmaParameters(XStr& str) {
-  if (isDevice()) {
+  if (isRdma() && isDevice()) {
     Type* dt = type->deref();
     str << "  ncpyBuffer_" << name << ".cnt = sizeof(" << dt << ")*(" << arrLen
       << ");\n";
@@ -384,7 +384,7 @@ void Parameter::pupRdma(XStr& str, bool genRdma) {
 }
 
 void Parameter::pupDeviceRdma(XStr& str) {
-  if (isDevice()) {
+  if (isRdma() && isDevice()) {
     str << "    implP|ncpyBuffer_" << name << ";\n";
   }
 }
