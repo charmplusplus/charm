@@ -83,7 +83,7 @@ extern int yydebug;
     CONST = 293,
     NOCOPY = 294,
     NOCOPYPOST = 295,
-    NOCOPYPOSTDEVICE = 296,
+    NOCOPYDEVICE = 296,
     PACKED = 297,
     VARSIZE = 298,
     ENTRY = 299,
@@ -161,7 +161,7 @@ extern int yydebug;
 #define CONST 293
 #define NOCOPY 294
 #define NOCOPYPOST 295
-#define NOCOPYPOSTDEVICE 296
+#define NOCOPYDEVICE 296
 #define PACKED 297
 #define VARSIZE 298
 #define ENTRY 299

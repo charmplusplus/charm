@@ -13,6 +13,7 @@ class Value;
 class Parameter {
   int rdma;
   bool firstRdma;
+  bool device; // This is a device pointer
 
  public:
   Type* type;
@@ -69,6 +70,7 @@ class Parameter {
   void setConditional(int c);
   void setRdma(int r);
   void setFirstRdma(bool fr);
+  void setDevice(bool d);
   int print(XStr& str, int withDefaultValues = 0, int useConst = 1, int fwdNum = 0);
   void printAddress(XStr& str);
   void printValue(XStr& str);
@@ -80,8 +82,7 @@ class Parameter {
   int isRdma(void) const;
   int isSendRdma(void) const;
   int isRecvRdma(void) const;
-  int isDeviceRdma(void) const;
-  int isRecvDeviceRdma(void) const;
+  int isDevice(void) const;
   int getRdma(void) const;
   int isFirstRdma(void) const;
   int isConditional(void) const;
@@ -145,8 +146,7 @@ class ParamList {
   int hasRdma(void);
   int hasSendRdma(void);
   int hasRecvRdma(void);
-  int hasDeviceRdma(void);
-  int hasRecvDeviceRdma(void);
+  int hasDevice(void);
   int isRdma(void);
   int getRdma(void);
   int isFirstRdma(void);

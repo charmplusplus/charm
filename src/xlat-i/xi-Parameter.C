@@ -219,8 +219,8 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     }
     bool hasrdma = hasRdma();
     bool hasrecvrdma = hasRecvRdma();
-    if (hasDeviceRdma()) {
-      str << "  int impl_num_device_rdma_fields = " << entry->numRdmaRecvDeviceParams << ";\n";
+    if (hasDevice()) {
+      str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams << ";\n";
       callEach(&Parameter::marshallDeviceRdmaParameters, str);
     }
     if (hasrdma) {
@@ -237,7 +237,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     str << "  { //Find the size of the PUP'd data\n";
     str << "    PUP::sizer implP;\n";
     callEach(&Parameter::pup, str);
-    if (hasDeviceRdma()) {
+    if (hasDevice()) {
       str << "    implP|impl_num_device_rdma_fields;\n";
       callEach(&Parameter::pupDeviceRdma, str);
     }
@@ -270,7 +270,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     // Second pass: write the data
     str << "  { //Copy over the PUP'd data\n";
     str << "    PUP::toMem implP((void *)impl_msg->msgBuf);\n";
-    if (hasDeviceRdma()) {
+    if (hasDevice()) {
       str << "    implP|impl_num_device_rdma_fields;\n";
       callEach(&Parameter::pupDeviceRdma, str);
     }
@@ -290,13 +290,18 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
       str << "  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
       callEach(&Parameter::marshallArrayData, str);
     }
-    if (hasDeviceRdma()) {
+    // Currently only P2P & recv API is suppported for device buffers
+    if (hasDevice()) {
       Chare *container = entry->getContainer();
       if (container->isChare() || container->isForElement()) {
-        // TODO: Currently only recv API is suppported for device buffers
-        if (hasRecvDeviceRdma()) {
-          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_DEVICE_MSG;\n";
-        }
+        str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_MSG;\n";
+      }
+      else {
+        str << "  CkAbort(\"Broadcast not supported with device buffers!\");\n";
+      }
+
+      if (hasSendRdma()) {
+        str << "  CkAbort(\"Send RDMA cannot be used along with device RDMA!\");\n";
       }
     }
     if (hasrdma) {
@@ -347,7 +352,7 @@ void Parameter::marshallRegArraySizes(XStr& str) {
 }
 
 void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
-  if (isRdma() && !isDeviceRdma()) {
+  if (isRdma() && !isDevice()) {
     Type* dt = type->deref();  // Type, without &
     if (genRdma) {
       str << "  ncpyBuffer_" << name << ".cnt=sizeof(" << dt << ")*(" << arrLen
@@ -361,7 +366,7 @@ void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
 }
 
 void Parameter::marshallDeviceRdmaParameters(XStr& str) {
-  if (isDeviceRdma()) {
+  if (isDevice()) {
     Type* dt = type->deref();
     str << "  ncpyBuffer_" << name << ".cnt = sizeof(" << dt << ")*(" << arrLen
       << ");\n";
@@ -370,7 +375,7 @@ void Parameter::marshallDeviceRdmaParameters(XStr& str) {
 }
 
 void Parameter::pupRdma(XStr& str, bool genRdma) {
-  if (isRdma() && !isDeviceRdma()) {
+  if (isRdma() && !isDevice()) {
     if (genRdma)
       str << "    implP|ncpyBuffer_" << name << ";\n";
     else
@@ -379,7 +384,7 @@ void Parameter::pupRdma(XStr& str, bool genRdma) {
 }
 
 void Parameter::pupDeviceRdma(XStr& str) {
-  if (isDeviceRdma()) {
+  if (isDevice()) {
     str << "    implP|ncpyBuffer_" << name << ";\n";
   }
 }
@@ -1020,8 +1025,7 @@ int Parameter::isConditional(void) const { return conditional; }
 int Parameter::isRdma(void) const { return (rdma != CMK_REG_NO_ZC_MSG); }
 int Parameter::isSendRdma(void) const { return (rdma == CMK_ZC_P2P_SEND_MSG); }
 int Parameter::isRecvRdma(void) const { return (rdma == CMK_ZC_P2P_RECV_MSG); }
-int Parameter::isDeviceRdma(void) const { return isRecvDeviceRdma(); }
-int Parameter::isRecvDeviceRdma(void) const { return (rdma == CMK_ZC_P2P_RECV_DEVICE_MSG); }
+int Parameter::isDevice(void) const { return device; }
 int Parameter::getRdma(void) const { return rdma; }
 int Parameter::isFirstRdma(void) const { return firstRdma; }
 
@@ -1035,6 +1039,8 @@ void Parameter::setConditional(int c) {
 void Parameter::setRdma(int r) { rdma = r; }
 
 void Parameter::setFirstRdma(bool fr) { firstRdma = fr; }
+
+void Parameter::setDevice(bool d) { device = d; }
 
 void Parameter::setAccelBufferType(int abt) {
   accelBufferType = ((abt < ACCEL_BUFFER_TYPE_MIN || abt > ACCEL_BUFFER_TYPE_MAX)
@@ -1059,8 +1065,7 @@ int ParamList::isMessage(void) const { return (next == NULL) && param->isMessage
 int ParamList::hasRdma(void) { return orEach(&Parameter::isRdma); }
 int ParamList::hasSendRdma(void) { return orEach(&Parameter::isSendRdma); }
 int ParamList::hasRecvRdma(void) { return orEach(&Parameter::isRecvRdma); }
-int ParamList::hasDeviceRdma(void) { return hasRecvDeviceRdma(); }
-int ParamList::hasRecvDeviceRdma(void) { return orEach(&Parameter::isRecvDeviceRdma); }
+int ParamList::hasDevice(void) { return orEach(&Parameter::isDevice); }
 int ParamList::isRdma(void) { return param->isRdma(); }
 int ParamList::getRdma(void) { return param->getRdma(); }
 int ParamList::isFirstRdma(void) { return param->isFirstRdma(); }

@@ -2214,7 +2214,7 @@ struct rwentry rwtable[] = {
 {  "aggregate", AGGREGATE },
 {  "nocopy",  NOCOPY },
 {  "nocopypost",  NOCOPYPOST },
-{  "nocopypostdevice",  NOCOPYPOSTDEVICE },
+{  "nocopydevice",  NOCOPYDEVICE },
 {  "inline",  	INLINE },
 {  "local",      LOCAL },
 {  "virtual",    VIRTUAL },

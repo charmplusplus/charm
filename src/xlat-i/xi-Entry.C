@@ -157,7 +157,7 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
       last_line_(ll),
       numRdmaSendParams(0),
       numRdmaRecvParams(0),
-      numRdmaRecvDeviceParams(0) {
+      numRdmaDeviceParams(0) {
   line = l;
   container = NULL;
   entryCount = -1;
@@ -173,10 +173,14 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
       plist->param->entry = this;
       if (plist->param->getRdma() == CMK_ZC_P2P_SEND_MSG)
         numRdmaSendParams++; // increment send 'rdma' param count
-      if (plist->param->getRdma() == CMK_ZC_P2P_RECV_MSG)
-        numRdmaRecvParams++; // increment recv 'rdma' param count
-      if (plist->param->getRdma() == CMK_ZC_P2P_RECV_DEVICE_MSG)
-        numRdmaRecvDeviceParams++; // increment recv 'rdma' device param count
+      if (plist->param->getRdma() == CMK_ZC_P2P_RECV_MSG) {
+        if (plist->param->isDevice()) {
+          numRdmaDeviceParams++; // increment 'rdma' device param count
+        }
+        else {
+          numRdmaRecvParams++; // increment recv 'rdma' param count
+        }
+      }
     }
     plist = plist->next;
   }
