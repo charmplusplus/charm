@@ -57,7 +57,8 @@ Parameter::Parameter(int Nline, Type* Ntype, const char* Nname, const char* Narr
       given_name(Nname),
       podType(false),
       rdma(CMK_REG_NO_ZC_MSG),
-      firstRdma(false) {
+      firstRdma(false),
+      device(false) {
   if (isMessage()) {
     name = "impl_msg";
   }
@@ -219,11 +220,11 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     }
     bool hasrdma = hasRdma();
     bool hasrecvrdma = hasRecvRdma();
-    if (hasDevice()) {
-      str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams << ";\n";
-      callEach(&Parameter::marshallDeviceRdmaParameters, str);
-    }
     if (hasrdma) {
+      if (hasDevice()) {
+        str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams << ";\n";
+        callEach(&Parameter::marshallDeviceRdmaParameters, str);
+      }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
       // Root node is pupped on the source as it is required for ZC Bcast when the source is non-zero
@@ -237,11 +238,11 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     str << "  { //Find the size of the PUP'd data\n";
     str << "    PUP::sizer implP;\n";
     callEach(&Parameter::pup, str);
-    if (hasDevice()) {
-      str << "    implP|impl_num_device_rdma_fields;\n";
-      callEach(&Parameter::pupDeviceRdma, str);
-    }
     if (hasrdma) {
+      if (hasDevice()) {
+        str << "    implP|impl_num_device_rdma_fields;\n";
+        callEach(&Parameter::pupDeviceRdma, str);
+      }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "    implP|impl_num_rdma_fields;\n";
       str << "    implP|impl_num_root_node;\n";
@@ -270,11 +271,11 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     // Second pass: write the data
     str << "  { //Copy over the PUP'd data\n";
     str << "    PUP::toMem implP((void *)impl_msg->msgBuf);\n";
-    if (hasDevice()) {
-      str << "    implP|impl_num_device_rdma_fields;\n";
-      callEach(&Parameter::pupDeviceRdma, str);
-    }
     if (hasRdma()) {
+      if (hasDevice()) {
+        str << "    implP|impl_num_device_rdma_fields;\n";
+        callEach(&Parameter::pupDeviceRdma, str);
+      }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "    implP|impl_num_rdma_fields;\n";
       str << "    implP|impl_num_root_node;\n";
@@ -290,33 +291,35 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
       str << "  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
       callEach(&Parameter::marshallArrayData, str);
     }
-    // Currently only P2P & recv API is suppported for device buffers
-    if (hasDevice()) {
-      Chare *container = entry->getContainer();
-      if (container->isChare() || container->isForElement()) {
-        str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_MSG;\n";
-      }
-      else {
-        str << "  CkAbort(\"Broadcast not supported with device buffers!\");\n";
-      }
-
-      if (hasSendRdma()) {
-        str << "  CkAbort(\"Send RDMA cannot be used along with device RDMA!\");\n";
-      }
-    }
     if (hasrdma) {
-      str << "#if CMK_ONESIDED_IMPL\n";
       Chare *container = entry->getContainer();
-      if(container->isChare() || container->isForElement()) {
-        if(hasSendRdma())
-          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_SEND_MSG;\n";
-        else if(hasrecvrdma)
+      if (hasDevice()) {
+        // Currently only P2P & recv API is suppported for device buffers
+        if (container->isChare() || container->isForElement()) {
           str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_MSG;\n";
-      } else { // Mark a Ncpy Bcast message to intercept it in the send code path
-        if(hasSendRdma())
-          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_SEND_MSG;\n";
-        else if(hasrecvrdma)
-          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_RECV_MSG;\n";
+        }
+        else {
+          str << "  CkAbort(\"Broadcast not supported with device buffers!\");\n";
+        }
+
+        if (hasSendRdma()) {
+          str << "  CkAbort(\"Send RDMA cannot be used along with device RDMA!\");\n";
+        }
+      }
+      str << "#if CMK_ONESIDED_IMPL\n";
+      if (!hasDevice()) {
+        // Only need to set message header when there is no device buffer involved
+        if(container->isChare() || container->isForElement()) {
+          if(hasSendRdma())
+            str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_SEND_MSG;\n";
+          else if(hasrecvrdma)
+            str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_MSG;\n";
+        } else { // Mark a Ncpy Bcast message to intercept it in the send code path
+          if(hasSendRdma())
+            str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_SEND_MSG;\n";
+          else if(hasrecvrdma)
+            str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_RECV_MSG;\n";
+        }
       }
       str << "#else\n";
       if (!hasArrays) str << "  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
