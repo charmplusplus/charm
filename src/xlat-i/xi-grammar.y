@@ -37,6 +37,7 @@ namespace xi {
 const int MAX_NUM_ERRORS = 10;
 int num_errors = 0;
 bool firstRdma = true;
+bool firstDeviceRdma = true;
 
 bool enable_warnings = true;
 
@@ -347,6 +348,7 @@ ConstructSemi   : USING NAMESPACE QualName
                   $5->print(*e->label);
                   $$ = e;
                   firstRdma = true;
+                  firstDeviceRdma = true;
                 }
                 ;
 
@@ -915,6 +917,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                     $7->param = new ParamList($5);
                   }
                   firstRdma = true;
+                  firstDeviceRdma = true;
 		}
 		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
 		{ 
@@ -925,6 +928,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                     $5->param = new ParamList($4);
                   }
                   firstRdma = true;
+                  firstDeviceRdma = true;
 		  if (e->param && e->param->isCkMigMsgPtr()) {
 		    WARNING("CkMigrateMsg chare constructor is taken for granted",
 		            @$.first_column, @$.last_column);
@@ -947,6 +951,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                   $$->setAccelCodeBody(codeBody);
                   $$->setAccelCallbackName(new XStr(callbackName));
                   firstRdma = true;
+                  firstDeviceRdma = true;
                 }
 		;
 
@@ -1110,7 +1115,6 @@ Parameter	: Type
 			in_bracket=0;
 			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
 			$$->setRdma(CMK_ZC_P2P_SEND_MSG);
-			$$->setDevice(false);
 			if(firstRdma) {
 				$$->setFirstRdma(true);
 				firstRdma = false;
@@ -1121,7 +1125,6 @@ Parameter	: Type
 			in_bracket=0;
 			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
 			$$->setRdma(CMK_ZC_P2P_RECV_MSG);
-			$$->setDevice(false);
 			if(firstRdma) {
 				$$->setFirstRdma(true);
 				firstRdma = false;
@@ -1133,9 +1136,9 @@ Parameter	: Type
 			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
 			$$->setRdma(CMK_ZC_P2P_RECV_MSG);
 			$$->setDevice(true);
-			if(firstRdma) {
-				$$->setFirstRdma(true);
-				firstRdma = false;
+			if (firstDeviceRdma) {
+				$$->setFirstDeviceRdma(true);
+				firstDeviceRdma = false;
 			}
 		}
 		;
@@ -1361,11 +1364,13 @@ SEntry		: IDENT EParameters
 		{
 		  $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, @$.first_line, @$.last_line);
 		  firstRdma = true;
+		  firstDeviceRdma = true;
 		}
 		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
 		{
 		  $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, @$.first_line, @$.last_line);
 		  firstRdma = true;
+		  firstDeviceRdma = true;
 		}
 		;
 

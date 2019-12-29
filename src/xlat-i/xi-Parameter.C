@@ -58,7 +58,8 @@ Parameter::Parameter(int Nline, Type* Ntype, const char* Nname, const char* Narr
       podType(false),
       rdma(CMK_REG_NO_ZC_MSG),
       firstRdma(false),
-      device(false) {
+      device(false),
+      firstDeviceRdma(false) {
   if (isMessage()) {
     name = "impl_msg";
   }
@@ -683,7 +684,7 @@ void Parameter::beginUnmarshallArray(XStr& str) {
 void Parameter::beginUnmarshallRdma(XStr& str,
                                     bool genRdma) {  // First pass: unpack pup'd entries
   Type* dt = type->deref();                          // Type, without &
-  if (isRdma()) {
+  if (isRdma() && !isDevice()) {
     if (genRdma) {
       str << "  CkNcpyBuffer ncpyBuffer_" << name << ";\n";
       str << "  implP|ncpyBuffer_" << name << ";\n";
@@ -692,6 +693,17 @@ void Parameter::beginUnmarshallRdma(XStr& str,
       str << "("<<dt<< " *)" << " ncpyBuffer_" << name <<".ptr;\n";
     } else
       beginUnmarshallArray(str);
+  }
+}
+
+void Parameter::beginUnmarshallDeviceRdma(XStr& str) {
+  Type* dt = type->deref(); // Type, without &
+  if (isRdma() && isDevice()) {
+    str << "  CkNcpyBuffer ncpyBuffer_" << name << ";\n";
+    str << "  implP|ncpyBuffer_" << name << ";\n";
+
+    str << "  " << dt << " *ncpyBuffer_" << name <<"_ptr = ";
+    str << "("<<dt<< " *)" << " ncpyBuffer_" << name <<".ptr;\n";
   }
 }
 
@@ -708,7 +720,7 @@ void Parameter::beginUnmarshall(XStr& str) {  // First pass: unpack pup'd entrie
 }
 
 void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma) {
-  if (isRdma()) {
+  if (isRdma() && !isDevice()) {
     if (genRdma) {
       if (isFirstRdma()) {
         str << "  implP|genClosure->num_rdma_fields;\n";
@@ -723,6 +735,15 @@ void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma) {
     } else {
       beginUnmarshallArray(str);
     }
+  }
+}
+
+void Parameter::beginUnmarshallSDAGCallDeviceRdma(XStr& str) {
+  if (isRdma() && isDevice()) {
+    if (isFirstRdma()) {
+      str << "  implP|genClosure->num_device_rdma_fields;\n";
+    }
+    //TODO
   }
 }
 
@@ -751,7 +772,7 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
         << ";\n";
     if (hasRdma()) {
       if(hasRecvRdma()) {
-        str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
+        str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams + entry->numRdmaDeviceParams << "];\n";
       }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  char *impl_buf_begin = impl_buf;\n";
@@ -787,6 +808,11 @@ void ParamList::beginUnmarshallSDAG(XStr& str) {
   if (isMarshalled()) {
     str << "          PUP::fromMem implP(impl_buf);\n";
     if (hasRdma()) {
+      if (hasDevice()) {
+        callEach(&Parameter::adjustUnmarshalledDeviceRdmaPtrsSDAG, str);
+        str << "  implP|num_device_rdma_fields;\n";
+        callEach(&Parameter::beginUnmarshallDeviceRdma, str);
+      }
       str << "#if CMK_ONESIDED_IMPL\n";
       /* Before migration of the closure structure, Rdmawrapper pointers
        * store the offset to the actual buffer from the msgBuf
@@ -822,14 +848,22 @@ void Parameter::unmarshallRegArrayDataSDAG(XStr& str) {
 }
 
 void Parameter::adjustUnmarshalledRdmaPtrsSDAG(XStr& str) {
-  if (isRdma()) {
+  if (isRdma() && !isDevice()) {
     str << "  ncpyBuffer_" << name << ".ptr = ";
     str << "(void *)(impl_buf + (size_t)(ncpyBuffer_" << name << ".ptr));\n";
   }
 }
 
+void Parameter::adjustUnmarshalledDeviceRdmaPtrsSDAG(XStr& str) {
+  if (isRdma() && isDevice()) {
+    str << "  ncpyBuffer_" << name << ".ptr = ";
+    str << "(void *)(impl_buf + (size_t)(ncpyBuffer_" << name << ".ptr));\n";
+  }
+}
+
+
 void Parameter::unmarshallRdmaArrayDataSDAG(XStr& str) {
-  if (isRdma()) {
+  if (isRdma() && !isDevice()) {
     Type* dt = type->deref();  // Type, without &
     str << "          " << name << " = (" << dt << " *)(impl_buf+impl_off_" << name
         << ");\n";
@@ -1031,6 +1065,7 @@ int Parameter::isRecvRdma(void) const { return (rdma == CMK_ZC_P2P_RECV_MSG); }
 int Parameter::isDevice(void) const { return device; }
 int Parameter::getRdma(void) const { return rdma; }
 int Parameter::isFirstRdma(void) const { return firstRdma; }
+int Parameter::isFirstDeviceRdma(void) const { return firstDeviceRdma; }
 
 int Parameter::operator==(const Parameter& parm) const { return *type == *parm.type; }
 
@@ -1044,6 +1079,8 @@ void Parameter::setRdma(int r) { rdma = r; }
 void Parameter::setFirstRdma(bool fr) { firstRdma = fr; }
 
 void Parameter::setDevice(bool d) { device = d; }
+
+void Parameter::setFirstDeviceRdma(bool fr) { firstDeviceRdma = fr; }
 
 void Parameter::setAccelBufferType(int abt) {
   accelBufferType = ((abt < ACCEL_BUFFER_TYPE_MIN || abt > ACCEL_BUFFER_TYPE_MAX)
@@ -1072,6 +1109,7 @@ int ParamList::hasDevice(void) { return orEach(&Parameter::isDevice); }
 int ParamList::isRdma(void) { return param->isRdma(); }
 int ParamList::getRdma(void) { return param->getRdma(); }
 int ParamList::isFirstRdma(void) { return param->isFirstRdma(); }
+int ParamList::isFirstDeviceRdma(void) { return param->isFirstDeviceRdma(); }
 int ParamList::isRecvRdma(void) { return param->isRecvRdma(); }
 const char* ParamList::getArrayLen(void) const { return param->getArrayLen(); }
 int ParamList::isArray(void) const { return param->isArray(); }

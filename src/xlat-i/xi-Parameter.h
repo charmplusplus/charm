@@ -14,6 +14,7 @@ class Parameter {
   int rdma;
   bool firstRdma;
   bool device; // This is a device pointer
+  bool firstDeviceRdma;
 
  public:
   Type* type;
@@ -50,13 +51,16 @@ class Parameter {
   void beginUnmarshall(XStr& str);
   void beginUnmarshallArray(XStr& str);
   void beginUnmarshallRdma(XStr& str, bool genRdma);
+  void beginUnmarshallDeviceRdma(XStr& str);
   void beginUnmarshallSDAGRdma(XStr& str);
   void beginUnmarshallSDAGCall(XStr& str);
   void beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma);
+  void beginUnmarshallSDAGCallDeviceRdma(XStr& str);
   void unmarshallArrayData(XStr& str);
   void unmarshallRegArrayData(XStr& str);
   void unmarshallRdmaArrayData(XStr& str, bool genRegArray);
   void adjustUnmarshalledRdmaPtrsSDAG(XStr& str);
+  void adjustUnmarshalledDeviceRdmaPtrsSDAG(XStr& str);
   void unmarshallRegArrayDataSDAG(XStr& str);
   void unmarshallRdmaArrayDataSDAG(XStr& str);
   void unmarshallRegArrayDataSDAGCall(XStr& str);
@@ -71,6 +75,7 @@ class Parameter {
   void setRdma(int r);
   void setFirstRdma(bool fr);
   void setDevice(bool d);
+  void setFirstDeviceRdma(bool fr);
   int print(XStr& str, int withDefaultValues = 0, int useConst = 1, int fwdNum = 0);
   void printAddress(XStr& str);
   void printValue(XStr& str);
@@ -85,6 +90,7 @@ class Parameter {
   int isDevice(void) const;
   int getRdma(void) const;
   int isFirstRdma(void) const;
+  int isFirstDeviceRdma(void) const;
   int isConditional(void) const;
   Type* getType(void) { return type; }
   const char* getArrayLen(void) const { return arrLen; }
@@ -150,6 +156,7 @@ class ParamList {
   int isRdma(void);
   int getRdma(void);
   int isFirstRdma(void);
+  int isFirstDeviceRdma(void);
   int isRecvRdma(void);
   const char* getGivenName(void) const;
   void setGivenName(const char* s);
