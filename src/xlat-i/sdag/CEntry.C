@@ -14,10 +14,13 @@ void CEntry::generateDeps(XStr& op) {
 
 void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
                           Entry* entry, std::list<CStateVar*>* params, XStr* next, bool isDummy) {
-  int numRdmaParams = 0;
+  int numRdmaParams = 0, numDeviceRdmaParams = 0;
   for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end(); ++it) {
     CStateVar& var = **it;
-    if (var.isRdma) numRdmaParams++;
+    if (var.isRdma) {
+      if (var.isDevice) numDeviceRdmaParams++;
+      else numRdmaParams++;
+    }
   }
   // generate wrapper for local calls to the function
   templateGuardBegin(false, defs);
@@ -41,21 +44,30 @@ void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
         CStateVar& var = **it;
         if (var.name) {
           if (var.isRdma) {
-            defs << "#if CMK_ONESIDED_IMPL\n";
-            if (var.isFirstRdma) {
-              defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams << ";\n";
-              // Root node is used for ZC Bcast and since this is a direct sdag call
-              // CkMyNode() is the root source node for the broadcast
-              defs << "  genClosure->getP" << i++ << "() = " << "CkMyNode()" << ";\n";
+            if (var.isDevice) {
+              if (var.isFirstDeviceRdma) {
+                defs << "  genClosure->getP" << i++ << "() = " << numDeviceRdmaParams << ";\n";
+              }
+              defs << "  genClosure->getP" << i << "() = "
+                   << "ncpyBuffer_" << var.name << ";\n";
             }
-            defs << "  genClosure->getP" << i << "() = "
-                 << "ncpyBuffer_" << var.name << ";\n";
-            defs << "#else\n";
-            defs << "  genClosure->getP" << i << "() = "
-                 << "(" << var.type << "*)"
-                 << "ncpyBuffer_" << var.name << ".ptr"
-                 << ";\n";
-            defs << "#endif\n";
+            else {
+              defs << "#if CMK_ONESIDED_IMPL\n";
+              if (var.isFirstRdma) {
+                defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams << ";\n";
+                // Root node is used for ZC Bcast and since this is a direct sdag call
+                // CkMyNode() is the root source node for the broadcast
+                defs << "  genClosure->getP" << i++ << "() = " << "CkMyNode()" << ";\n";
+              }
+              defs << "  genClosure->getP" << i << "() = "
+                   << "ncpyBuffer_" << var.name << ";\n";
+              defs << "#else\n";
+              defs << "  genClosure->getP" << i << "() = "
+                   << "(" << var.type << "*)"
+                   << "ncpyBuffer_" << var.name << ".ptr"
+                   << ";\n";
+              defs << "#endif\n";
+            }
           } else
             defs << "  genClosure->getP" << i << "() = " << var.name << ";\n";
         }

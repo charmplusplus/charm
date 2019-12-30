@@ -21,6 +21,8 @@ struct CStateVar {
   bool isRdma;
   bool isFirstRdma;
   bool isRecvRdma;
+  bool isDevice;
+  bool isFirstDeviceRdma;
   bool isCounter, isSpeculator, isBgParentLog;
 
   CStateVar(int v, const char* t, int np, const char* n, XStr* r, const char* a, int m);

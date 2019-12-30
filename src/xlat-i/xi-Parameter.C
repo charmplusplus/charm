@@ -1145,6 +1145,7 @@ int ParamList::hasSendRdma(void) { return orEach(&Parameter::isSendRdma); }
 int ParamList::hasRecvRdma(void) { return orEach(&Parameter::isRecvRdma); }
 int ParamList::hasDevice(void) { return orEach(&Parameter::isDevice); }
 int ParamList::isRdma(void) { return param->isRdma(); }
+int ParamList::isDevice(void) { return param->isDevice(); }
 int ParamList::getRdma(void) { return param->getRdma(); }
 int ParamList::isFirstRdma(void) { return param->isFirstRdma(); }
 int ParamList::isFirstDeviceRdma(void) { return param->isFirstDeviceRdma(); }

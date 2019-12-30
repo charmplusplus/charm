@@ -156,6 +156,7 @@ class ParamList {
   int hasRecvRdma(void);
   int hasDevice(void);
   int isRdma(void);
+  int isDevice(void);
   int getRdma(void);
   int isFirstRdma(void);
   int isFirstDeviceRdma(void);
