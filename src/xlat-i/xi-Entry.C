@@ -1816,11 +1816,9 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
 
   else {  // Normal case: call regular method
     if(param->hasRecvRdma()) {
-      if (!param->hasDevice()) {
-        str << "#if CMK_ONESIDED_IMPL\n";
-        str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
-        str << "#endif\n";
-      }
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+      str << "#endif\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";

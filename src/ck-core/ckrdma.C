@@ -2255,4 +2255,6 @@ void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int 
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     void **arrPtrs, int *arrSizes) {
   CkPrintf("CkRdmaIssueRgetsDevice from receiver with %d ops, PE %d\n", numops, CkMyPe());
+
+  // TODO
 }
