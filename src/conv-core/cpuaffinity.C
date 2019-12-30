@@ -400,7 +400,7 @@ static int cpuAffinityHandlerIdx;
 static int cpuAffinityRecvHandlerIdx;
 static int cpuPhyNodeAffinityRecvHandlerIdx;
 
-typedef struct _hostnameMsg {
+struct hostnameMsg {
   char core[CmiMsgHeaderSizeBytes];
   int node;
   int pe;
@@ -408,23 +408,28 @@ typedef struct _hostnameMsg {
   int node_rank;
   int pe_rank;
   int seq;
-} hostnameMsg;
+};
 
-typedef struct _rankMsg {
+struct rankMsg {
   char core[CmiMsgHeaderSizeBytes];
-  int *node_ranks;                /* node => core rank mapping */
+  int *node_ranks_on_host;        /* node => core rank mapping */
   int *node_hosts;                /* node => host number mapping */
-  int *pe_ranks;                  /* PE => core rank mapping */
+  int *node_numpes;               /* node => number of PEs on node */
+  int *pe_ranks_on_host;          /* PE => core rank mapping */
   int *pe_hosts;                  /* PE => host number mapping */
-} rankMsg;
-#define RANKMSG_SIZE(numnodes, numpes) (sizeof(rankMsg) + (numnodes)*sizeof(int)*2 + (numpes)*sizeof(int)*2)
 
-typedef struct _affMsg {
+  static constexpr size_t size(int numnodes, int numpes)
+  {
+    return sizeof(rankMsg) + numnodes*sizeof(int)*3 + numpes*sizeof(int)*2;
+  }
+};
+
+struct affMsg {
   char core[CmiMsgHeaderSizeBytes];
 #ifndef _WIN32
   cpu_set_t affinity;
 #endif
-} affMsg;
+};
 
 static rankMsg *rankmsg = NULL;
 static std::map<skt_ip_t, hostnameMsg *> hostTable;
@@ -464,10 +469,11 @@ static void cpuAffinityHandler(void *m)
   int & node_host = rankmsg->node_hosts[node];
   if (node_host == -1)
   {
-    rankmsg->node_ranks[node] = rec->node_rank++;
+    rankmsg->node_ranks_on_host[node] = rec->node_rank++;
     node_host = rec->seq;
   }
-  rankmsg->pe_ranks[pe] = rec->pe_rank++;
+  rankmsg->node_numpes[node]++;
+  rankmsg->pe_ranks_on_host[pe] = rec->pe_rank++;
   rankmsg->pe_hosts[pe] = rec->seq;
 
   if (++count == npes) {
@@ -475,63 +481,97 @@ static void cpuAffinityHandler(void *m)
     for (const auto & pair : hostTable)
       CmiFree(pair.second);
     hostTable.clear();
-#if 1
+
     /* bubble sort ranks on each node according to the PE number */
-    {
     int i,j;
     for (i=0; i<nnodes-1; i++)
       for(j=i+1; j<nnodes; j++) {
         if (rankmsg->node_hosts[i] == rankmsg->node_hosts[j] &&
-              rankmsg->node_ranks[i] > rankmsg->node_ranks[j])
-          std::swap(rankmsg->node_ranks[i], rankmsg->node_ranks[j]);
+              rankmsg->node_ranks_on_host[i] > rankmsg->node_ranks_on_host[j])
+          std::swap(rankmsg->node_ranks_on_host[i], rankmsg->node_ranks_on_host[j]);
       }
     for (i=0; i<npes-1; i++)
       for(j=i+1; j<npes; j++) {
         if (rankmsg->pe_hosts[i] == rankmsg->pe_hosts[j] &&
-              rankmsg->pe_ranks[i] > rankmsg->pe_ranks[j])
-          std::swap(rankmsg->pe_ranks[i], rankmsg->pe_ranks[j]);
+              rankmsg->pe_ranks_on_host[i] > rankmsg->pe_ranks_on_host[j])
+          std::swap(rankmsg->pe_ranks_on_host[i], rankmsg->pe_ranks_on_host[j]);
       }
-    }
-#endif
-    CmiSyncBroadcastAllAndFree(RANKMSG_SIZE(nnodes, npes), (void *)rankmsg);
+
+    CmiSyncBroadcastAllAndFree(rankMsg::size(nnodes, npes), (void *)rankmsg);
   }
 }
 
-static inline std::vector<hwloc_obj_t> getPUListForAutoAffinity(hwloc_obj_t container, unsigned int nodesize)
+/*
+ * Distributes PUs among PEs in a multi-level round robin fashion.
+ *
+ * For example, a machine with two sockets x two cores x two PUs,
+ *           M0
+ *     S0          S1
+ *  C0    C1    C2    C3
+ * 0  1  2  3  4  5  6  7
+ * will result in: 0 4 2 6 1 5 3 7
+ *
+ * With a single socket containing four cores instead,
+ *           M0
+ *           S0
+ *  C0    C1    C2    C3
+ * 0  1  2  3  4  5  6  7
+ * the output is: 0 2 4 6 1 3 5 7
+ *
+ * The function takes a parameter to limit the count of PUs returned.
+ * With the single socket example and +p5 in argv, the function returns: 0 2 4 6 1
+ * The caller then sorts this list so that PE number locality implies PU locality,
+ * while still spreading the work units as much as possible: 0 1 2 4 6
+ * With +p8, the result would be: 0 1 2 3 4 5 6 7
+ *
+ * The +excludecore command line parameter is also respected.
+ */
+static inline std::vector<hwloc_obj_t> getPUListForAutoAffinity(hwloc_obj_t container, unsigned int numranks)
 {
   std::vector<hwloc_obj_t> pu_list;
-  std::queue<std::pair<hwloc_obj_t, unsigned int>> thisqueue, nextqueue;
+  std::map<int, std::queue<std::pair<hwloc_obj_t, unsigned int>>> depthqueues;
 
-  nextqueue.emplace(container, 0);
+  depthqueues[container->depth].emplace(container, 0);
 
   do
   {
-    std::swap(thisqueue, nextqueue);
+    auto & thisqueue = depthqueues.begin()->second;
 
+    // Loop through the current depth level, pushing children into queues for their depth level.
     do
     {
       auto entry = thisqueue.front();
       thisqueue.pop();
 
-      if (entry.first->type == HWLOC_OBJ_PU && !in_exclude(entry.first->os_index))
-      {
-        pu_list.push_back(entry.first);
+      hwloc_obj_t obj = entry.first;
+      unsigned int childindex = entry.second;
 
-        if (pu_list.size() == nodesize)
+      if (obj->type == HWLOC_OBJ_PU && !in_exclude(obj->os_index))
+      {
+        // Add this PU to the list.
+        pu_list.push_back(obj);
+
+        // Not just an optimization, the algorithm is pointless without this check and return.
+        if (pu_list.size() == numranks)
           return pu_list;
       }
 
-      if (entry.second < entry.first->arity)
+      if (childindex < obj->arity)
       {
-        nextqueue.emplace(entry.first->children[entry.second++], 0);
+        // Push one child at a time into its queue.
+        depthqueues[obj->depth].emplace(obj->children[childindex++], 0);
 
-        if (entry.second < entry.first->arity)
-          thisqueue.emplace(entry);
+        // If this node has more children, re-add it to the end of the current queue.
+        if (childindex < obj->arity)
+          thisqueue.emplace(obj, childindex);
       }
     }
     while (!thisqueue.empty());
+
+    // Proceed to the next depth level.
+    depthqueues.erase(depthqueues.begin());
   }
-  while (!nextqueue.empty());
+  while (!depthqueues.empty());
 
   return pu_list;
 }
@@ -546,38 +586,80 @@ static void cpuAffinityRecvHandler(void *msg)
 
   rankMsg *m = (rankMsg *)msg;
   size_t siz = sizeof(rankMsg);
-  m->node_ranks = (int *)((char*)m + siz);
-  siz += CmiNumNodes()*sizeof(int);
+  m->node_ranks_on_host = (int *)((char*)m + siz);
+  siz += numnodes*sizeof(int);
   m->node_hosts = (int *)((char*)m + siz);
-  siz += CmiNumNodes()*sizeof(int);
-  m->pe_ranks = (int *)((char*)m + siz);
-  siz += CmiNumPes()*sizeof(int);
+  siz += numnodes*sizeof(int);
+  m->node_numpes = (int *)((char*)m + siz);
+  siz += numnodes*sizeof(int);
+  m->pe_ranks_on_host = (int *)((char*)m + siz);
+  siz += numpes*sizeof(int);
   m->pe_hosts = (int *)((char*)m + siz);
-  siz += CmiNumPes()*sizeof(int);
-  CmiAssert(siz == RANKMSG_SIZE(numnodes, numpes));
+  siz += numpes*sizeof(int);
+  CmiAssert(siz == rankMsg::size(numnodes, numpes));
 
-  int node_rank = m->node_ranks[mynode];
-  int pe_rank = m->pe_ranks[mype];
+  int node_rank = m->node_ranks_on_host[mynode];
+  int pe_rank = m->pe_ranks_on_host[mype];
   int myhost = m->pe_hosts[mype];
 
-  int nodesOnHost = 0;
+  int nodes_on_host = 0;
   for (int i = 0; i < numnodes; ++i)
     if (m->node_hosts[i] == myhost)
-      ++nodesOnHost;
+      ++nodes_on_host;
+
+  const int package_count = cmi_hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PACKAGE);
 
   hwloc_obj_t obj;
-  const int package_count = cmi_hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PACKAGE);
-  if (nodesOnHost > 1 && package_count > 1)
+  int numranks, myrank;
+
+  if (nodes_on_host > 1 && package_count > 1)
   {
-    obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PACKAGE, node_rank % package_count);
-    set_process_affinity(obj->cpuset);
+    // If multiple processes are running on a machine with multiple packages, divide the
+    // packages among the processes, and bind each process to its package.
+
+    const int mypackage = node_rank % package_count;
+
+    // Count the number of PEs across all logical nodes sharing a package (node_count > package_count).
+    int my_first_pe_rank_on_package = 0;
+    int pes_on_package = 0;
+    for (int i = 0; i < numnodes; ++i)
+    {
+      if (m->node_hosts[i] == myhost && m->node_ranks_on_host[i] % package_count == mypackage)
+      {
+        if (i == mynode)
+          my_first_pe_rank_on_package = pes_on_package;
+        pes_on_package += m->node_numpes[i];
+      }
+    }
+
+    obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PACKAGE, mypackage);
+    numranks = pes_on_package;
+    myrank = my_first_pe_rank_on_package + CmiMyRank();
+
+    // Set the process binding to be safe.
+    // Also binds the comm thread at least to the package, since it does not execute cpuAffinityRecvHandler.
+    if (CmiMyRank() == 0)
+      set_process_affinity(obj->cpuset);
+
+    // Ensure no thread sets affinity before the process call, or else the thread call will be overwritten.
+    CmiNodeBarrier();
   }
   else
   {
+    // Otherwise spread out among the entire machine.
+
+    // Count the number of PEs sharing the machine.
+    int pes_on_host = 0;
+    for (int i = 0; i < numpes; ++i)
+      if (m->pe_hosts[i] == myhost)
+        ++pes_on_host;
+
     obj = cmi_hwloc_get_root_obj(topology);
+    numranks = pes_on_host;
+    myrank = pe_rank;
   }
 
-  std::vector<hwloc_obj_t> pu_list = getPUListForAutoAffinity(obj, CmiMyNodeSize());
+  std::vector<hwloc_obj_t> pu_list = getPUListForAutoAffinity(obj, numranks);
 
   if (pu_list.size() == 0)
     CmiAbort("All eligible PUs have been excluded!");
@@ -585,9 +667,9 @@ static void cpuAffinityRecvHandler(void *msg)
   std::sort(pu_list.begin(), pu_list.end(),
             [](hwloc_obj_t a, hwloc_obj_t b) -> bool { return a->logical_index < b->logical_index; });
 
-  const int pu = pu_list[pe_rank % pu_list.size()]->logical_index;
+  const int pu = pu_list[myrank % pu_list.size()]->logical_index;
 
-  DEBUGP(("[%d %d] (%d %d) assigning to PU L#: %d\n", mynode, mype, node_rank, pe_rank, pu));
+  DEBUGP(("[%d %d] (%d %d) assigning to PU L#%d\n", mynode, mype, node_rank, pe_rank, pu));
 
   if (-1 != CmiSetCPUAffinityLogical(pu)) {
     DEBUGP(("Processor %d is bound to PU L#%d on host #%d\n", mype, pu, myhost));
@@ -1142,24 +1224,27 @@ void CmiInitCPUAffinity(char **argv)
 
   if (CmiMyPe() == 0) {
     int i;
-    rankmsg = (rankMsg *)CmiAlloc(RANKMSG_SIZE(numnodes, numpes));
+    rankmsg = (rankMsg *)CmiAlloc(rankMsg::size(numnodes, numpes));
     CmiSetHandler((char *)rankmsg, cpuAffinityRecvHandlerIdx);
     size_t siz = sizeof(rankMsg);
-    rankmsg->node_ranks = (int *)((char*)rankmsg + siz);
+    rankmsg->node_ranks_on_host = (int *)((char*)rankmsg + siz);
     siz += numnodes*sizeof(int);
     rankmsg->node_hosts = (int *)((char*)rankmsg + siz);
     siz += numnodes*sizeof(int);
-    rankmsg->pe_ranks = (int *)((char*)rankmsg + siz);
+    rankmsg->node_numpes = (int *)((char*)rankmsg + siz);
+    siz += numnodes*sizeof(int);
+    rankmsg->pe_ranks_on_host = (int *)((char*)rankmsg + siz);
     siz += numpes*sizeof(int);
     rankmsg->pe_hosts = (int *)((char*)rankmsg + siz);
     siz += numpes*sizeof(int);
-    CmiAssert(siz == RANKMSG_SIZE(numnodes, numpes));
+    CmiAssert(siz == rankMsg::size(numnodes, numpes));
     for (i=0; i<numnodes; i++) {
-      rankmsg->node_ranks[i] = 0;
+      rankmsg->node_ranks_on_host[i] = 0;
       rankmsg->node_hosts[i] = -1;
+      rankmsg->node_numpes[i] = 0;
     }
     for (i=0; i<numpes; i++) {
-      rankmsg->pe_ranks[i] = 0;
+      rankmsg->pe_ranks_on_host[i] = 0;
       rankmsg->pe_hosts[i] = -1;
     }
 
