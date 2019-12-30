@@ -576,6 +576,10 @@ void ParamList::beginUnmarshall(XStr& str) {
     str << "*/\n";
     str << "  PUP::fromMem implP(impl_buf);\n";
     if (hasRdma()) {
+      if (hasDevice()) {
+        str << "  int impl_num_device_rdma_fields; implP|impl_num_device_rdma_fields;\n";
+        callEach(&Parameter::beginUnmarshallDeviceRdma, str);
+      }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  char *impl_buf_begin = impl_buf;\n";
       if(hasRecvRdma())
@@ -583,14 +587,14 @@ void ParamList::beginUnmarshall(XStr& str) {
         //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
         str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
       str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
-      str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
+      str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
       str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
       callEach(&Parameter::beginUnmarshallRdma, str, true);
       str << "#else\n";
       callEach(&Parameter::beginUnmarshallRdma, str, false);
       str << "#endif\n";
       if (hasRecvRdma()) {
-        str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
+        str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams + entry->numRdmaDeviceParams << "];\n";
       }
     }
     callEach(&Parameter::beginUnmarshall, str);
@@ -935,7 +939,7 @@ void Parameter::unmarshallArrayData(XStr& str) {
 }
 
 void Parameter::unmarshallRdmaArrayData(XStr& str, bool genRegArray) {
-  if (isRdma() && genRegArray) unmarshallArrayData(str);
+  if (isRdma() && genRegArray && !isDevice()) unmarshallArrayData(str);
 }
 
 void Parameter::unmarshallRegArrayData(
@@ -1036,20 +1040,25 @@ void Parameter::pupAllValues(XStr& str) {
            "  }\n"
            "  implDestP.synchronize(PUP::sync_end_array);\n";
   } else if (isRdma()) {
-    str << "#if CMK_ONESIDED_IMPL\n";
-    str << "  implDestP|ncpyBuffer_" << name << ";\n";
-    str << "#else\n";
-    str << "  implDestP.synchronize(PUP::sync_begin_array);\n"
-           "  { for (int impl_i=0;impl_i*(sizeof(*"
-        << name << "))<impl_cnt_" << name
-        << ";impl_i++) { \n"
-           "      implDestP.synchronize(PUP::sync_item);\n"
-           "      implDestP|"
-        << name
-        << "[impl_i];\n"
-           "  } } \n"
-           "  implDestP.synchronize(PUP::sync_end_array);\n";
-    str << "#endif\n";
+    if (isDevice()) {
+      str << "  implDestP|ncpyBuffer_" << name << ";\n";
+    }
+    else {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  implDestP|ncpyBuffer_" << name << ";\n";
+      str << "#else\n";
+      str << "  implDestP.synchronize(PUP::sync_begin_array);\n"
+             "  { for (int impl_i=0;impl_i*(sizeof(*"
+          << name << "))<impl_cnt_" << name
+          << ";impl_i++) { \n"
+             "      implDestP.synchronize(PUP::sync_item);\n"
+             "      implDestP|"
+          << name
+          << "[impl_i];\n"
+             "  } } \n"
+             "  implDestP.synchronize(PUP::sync_end_array);\n";
+      str << "#endif\n";
+    }
   } else /* not an array */ {
     if (isConditional())
       str << "  pup_pointer(&implDestP, (void**)&" << name << ");\n";

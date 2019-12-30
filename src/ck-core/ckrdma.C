@@ -1061,7 +1061,6 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
 void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, int numDeviceOps, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs){
 
   if (numDeviceOps > 0) {
-    CkAssert(numops >= numDeviceOps);
     // Only pass device-related metadata
     CkRdmaIssueRgetsDevice(env, emMode, numDeviceOps, arrPtrs, arrSizes);
 
