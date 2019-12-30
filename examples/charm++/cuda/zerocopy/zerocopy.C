@@ -108,6 +108,7 @@ class Block : public CBase_Block {
 
     // Initialize data
     invokeInitKernel(d_local_data, block_size, (double)thisIndex, stream);
+    invokeInitKernel(d_remote_data, block_size, (double)thisIndex, stream);
     for (int i = 0; i < block_size; i++) rdma_local_data[i] = thisIndex;
     for (int i = 0; i < block_size; i++) reg_local_data[i] = thisIndex;
 
@@ -155,7 +156,7 @@ class Block : public CBase_Block {
     }
 
     if (!validated) {
-      CkPrintf("PE %d: Validation failed", CkMyPe());
+      CkPrintf("PE %d: Validation failed\n", CkMyPe());
     }
   }
 };
