@@ -99,6 +99,7 @@ class Parameter {
   const char* getName(void) const { return name; }
   void printMsg(XStr& str);
   void storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count);
+  void storePostedDeviceRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count);
   int operator==(const Parameter& parm) const;
 
   // DMK - Added for accelerator options
@@ -126,6 +127,7 @@ class ParamList {
   void callEach(fn_t f, XStr& str);
   void callEach(rdmafn_t f, XStr& str, bool genRegArray);
   void callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen);
+  void callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen, int &count);
   void encloseFlag(XStr& str);
   bool manyPointers;
 

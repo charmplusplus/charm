@@ -202,6 +202,13 @@ void ParamList::callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen
   } while (NULL != (cur = cur->next));
 }
 
+void ParamList::callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen, int &count) {
+  ParamList* cur = this;
+  do {
+    ((cur->param)->*f)(str, genRdma, isSDAGGen, count);
+  } while (NULL != (cur = cur->next));
+}
+
 int ParamList::hasConditional() { return orEach(&Parameter::isConditional); }
 
 /** marshalling: pack fields into flat byte buffer **/
@@ -599,15 +606,28 @@ void ParamList::beginUnmarshall(XStr& str) {
 }
 
 void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
-  str << "#if CMK_ONESIDED_IMPL\n";
-  callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen);
-  str << "#else\n";
-  callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen);
-  str << "#endif\n";
+  // First pointers are CPU pointers, followed by device pointers (if any)
+  if (hasDevice()) {
+    // TODO: device function should only use either of the two counts
+    int count1 = 0, count2 = 0; // Used to keep track of indices
+    str << "#if CMK_ONESIDED_IMPL\n";
+    callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen, count);
+    str << "#else\n";
+    callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen);
+    str << "#endif\n";
+    callEach(&Parameter::storePostedDeviceRdmaPtrs, str, true, isSDAGGen, count);
+  }
+  else {
+    str << "#if CMK_ONESIDED_IMPL\n";
+    callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen);
+    str << "#else\n";
+    callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen);
+    str << "#endif\n";
+  }
 }
 
 void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count) {
-  if(isRdma()) {
+  if(isRdma() && !isDevice()) {
     if(genRdma) {
       Type* dt = type->deref();
       str << "  if(CMI_IS_ZC_RECV(env)) {\n";
@@ -667,6 +687,21 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int
       else
         str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
     }
+  }
+}
+
+void Parameter::storePostedDeviceRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count) {
+  (void)genRdma; // Unused
+  if (isRdma() && isDevice()) {
+    Type* dt = type->deref();
+    str << "  if (CMI_IS_ZC_RECV(env)) {\n";
+    str << "    buffPtrs["<< count <<"] = (void *)" << "ncpyBuffer_";
+    str << name << "_ptr;\n";
+    if(isSDAGGen)
+      str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
+    else
+      str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * "<< arrLen << ".t;\n";
+    str <<  "  }\n";
   }
 }
 
@@ -740,10 +775,13 @@ void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma) {
 
 void Parameter::beginUnmarshallSDAGCallDeviceRdma(XStr& str) {
   if (isRdma() && isDevice()) {
-    if (isFirstRdma()) {
+    if (isFirstDeviceRdma()) {
       str << "  implP|genClosure->num_device_rdma_fields;\n";
     }
-    //TODO
+    str << "  implP|genClosure->ncpyBuffer_" << name << ";\n";
+    Type* dt = type->deref();
+    str << "  " << dt << " *ncpyBuffer_" << name <<"_ptr = ";
+    str << "("<<dt<< " *)" << " (genClosure->ncpyBuffer_" << name <<").ptr;\n";
   }
 }
 
@@ -774,6 +812,7 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
       if(hasRecvRdma()) {
         str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams + entry->numRdmaDeviceParams << "];\n";
       }
+      callEach(&Parameter::beginUnmarshallSDAGCallDeviceRdma, str);
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  char *impl_buf_begin = impl_buf;\n";
       if(hasRecvRdma())
@@ -879,7 +918,7 @@ void Parameter::unmarshallRegArrayDataSDAGCall(XStr& str) {
 }
 
 void Parameter::unmarshallRdmaArrayDataSDAGCall(XStr& str) {
-  if (isRdma()) {
+  if (isRdma() && !isDevice()) {
     Type* dt = type->deref();  // Type, without &
     str << "  genClosure->" << name << " = (" << dt << " *)(impl_buf+impl_off_" << name
         << ");\n";

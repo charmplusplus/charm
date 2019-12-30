@@ -1058,16 +1058,13 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
  * the destination to perform zerocopy operations as a part of the Zerocopy Entry Method
  * API
  */
-static void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
-    void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs) {
-  CkPrintf("CkRdmaIssueRgetsDevice from receiver, PE %d\n", CkMyPe());
-}
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, int numDeviceOps, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs){
 
-void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs){
-
-  if(postStructs.device) {
-    CkRdmaIssueRgetsDevice(env, emMode, numops, arrPtrs, arrSizes, postStructs);
-    return;
+  if (numDeviceOps > 0) {
+    CkAssert(numops >= numDeviceOps);
+    // Only pass device-related metadata
+    CkRdmaIssueRgetsDevice(env, emMode, numDeviceOps,
+        arrPtrs+(numops-numDeviceOps), arrSizes+(numops-numDeviceOps));
   }
 
   if(emMode == ncpyEmApiMode::BCAST_SEND)
@@ -2246,5 +2243,13 @@ void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int 
   CmiBecomeImmediate(bcastNoMsg);
   CmiSyncNodeSendAndFree(CmiNodeOf(serializerPe), msgSize, (char *)bcastNoMsg);
 }
+
 #endif
 /* End of CMK_ONESIDED_IMPL */
+
+// Should always be available regardless of whether or not CPU-side RDMA is supported
+// (i.e. CMK_ONESIDED_IMPL)
+void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
+    void **arrPtrs, int *arrSizes) {
+  CkPrintf("CkRdmaIssueRgetsDevice from receiver with %d ops, PE %d\n", numops, CkMyPe());
+}
