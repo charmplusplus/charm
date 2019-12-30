@@ -1063,8 +1063,11 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
   if (numDeviceOps > 0) {
     CkAssert(numops >= numDeviceOps);
     // Only pass device-related metadata
-    CkRdmaIssueRgetsDevice(env, emMode, numDeviceOps,
-        arrPtrs+(numops-numDeviceOps), arrSizes+(numops-numDeviceOps));
+    CkRdmaIssueRgetsDevice(env, emMode, numDeviceOps, arrPtrs, arrSizes);
+
+    // Move pointers to the start of host RDMA pointers
+    arrPtrs += numDeviceOps;
+    arrSizes += numDeviceOps;
   }
 
   if(emMode == ncpyEmApiMode::BCAST_SEND)

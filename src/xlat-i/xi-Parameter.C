@@ -606,24 +606,14 @@ void ParamList::beginUnmarshall(XStr& str) {
 }
 
 void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
-  // First pointers are CPU pointers, followed by device pointers (if any)
-  if (hasDevice()) {
-    // TODO: device function should only use either of the two counts
-    int count1 = 0, count2 = 0; // Used to keep track of indices
-    str << "#if CMK_ONESIDED_IMPL\n";
-    callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen, count);
-    str << "#else\n";
-    callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen);
-    str << "#endif\n";
-    callEach(&Parameter::storePostedDeviceRdmaPtrs, str, true, isSDAGGen, count);
-  }
-  else {
-    str << "#if CMK_ONESIDED_IMPL\n";
-    callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen);
-    str << "#else\n";
-    callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen);
-    str << "#endif\n";
-  }
+  // First pointers are device pointers (if any), followed by CPU pointers
+  int count = 0; // Used to keep track of indices
+  callEach(&Parameter::storePostedDeviceRdmaPtrs, str, true, isSDAGGen, count);
+  str << "#if CMK_ONESIDED_IMPL\n";
+  callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen, count);
+  str << "#else\n";
+  callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen);
+  str << "#endif\n";
 }
 
 void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count) {

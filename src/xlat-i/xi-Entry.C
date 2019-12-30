@@ -1919,7 +1919,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         if (param->hasDevice()) {
           str << "#if CMK_ONESIDED_IMPL\n";
           // Both CPU & device RDMA
-          str << "  if(CMI_IS_ZC_RECV(env)) \n";
+          str << "  if(CMI_IS_ZC_RECV(env))\n";
           str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), NULL, ";
           if (isSDAGGen)
             str << "genClosure->num_rdma_fields, genClosure->num_root_node, genClosure->num_device_rdma_fields, ";
@@ -1928,7 +1928,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           str << "buffPtrs, buffSizes, ncpyPost);\n";
           str << "#else\n";
           // Only device RDMA
-          str << "  if(CMI_IS_ZC_RECV(env)) \n";
+          str << "  if(CMI_IS_ZC_RECV(env))\n";
           str << "    CkRdmaIssueRgetsDevice(env, ncpyEmApiMode::P2P_RECV, ";
           if (isSDAGGen)
             str << "genClosure->num_device_rdma_fields, ";
