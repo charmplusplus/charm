@@ -1932,7 +1932,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
             str << "genClosure->num_device_rdma_fields, ";
           else
             str << "impl_num_device_rdma_fields, ";
-          str << "buffPtrs, buffSizes);\n";
+          str << "buffPtrs, buffSizes, true);\n";
           str << "#endif\n";
         }
         else {

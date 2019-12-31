@@ -46,11 +46,10 @@
 enum class CkNcpyMode : char { MEMCPY, CMA, RDMA };
 
 // Represents the mode of device-to-device zerocopy transfer
-// SAME indicates that the PEs are mapped to the same GPU
-// PEER indicates that the PEs are on the same logical node and mapped to GPUs with peer-to-peer transfer enabled
-// IPC indicates that the PEs are on the same physical node and CUDA IPC can be used
+// MEMCPY indicates that the PEs are on the same logical node and cudaMemcpyDeviceToDevice can be used
+// IPC indicates that the PEs are on different logical nodes within the same physical node and CUDA IPC can be used
 // RDMA indicates that the PEs are on different physical nodes and requires GPUDirect RDMA
-enum class CkNcpyModeDevice : char { SAME, PEER, IPC, RDMA };
+enum class CkNcpyModeDevice : char { MEMCPY, IPC, RDMA };
 
 // Represents the completion status of the zerocopy transfer (used as a return value for CkNcpyBuffer::get & CkNcpyBuffer:::put)
 // CMA and MEMCPY transfers complete instantly and return CkNcpyStatus::complete
@@ -122,9 +121,6 @@ class CkNcpyBuffer{
   // deregMode
   unsigned short int deregMode;
 
-  // set if device pointer
-  bool device;
-
   // reference pointer
   const void *ref;
 
@@ -141,10 +137,6 @@ class CkNcpyBuffer{
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
     init(ptr_, cnt_, cb_, regMode_, deregMode_);
   }
-
-  explicit CkNcpyBuffer(const void* ptr_, bool device_) : ptr(ptr_), cb(CkCallback(CkCallback::ignore)), device(device_) {}
-
-  explicit CkNcpyBuffer(const void* ptr_, CkCallback& cb_, bool device_) : ptr(ptr_), cb(cb_), device(device_) {}
 
   void print() {
     CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%zu, pe:%d, regMode=%d, deregMode=%d, ref:%p, refAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, regMode, deregMode, ref, refAckInfo);
@@ -316,14 +308,6 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, CkCallback &cb_, unsig
 
 static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
   return CkNcpyBuffer(ptr_, 0, regMode_, deregMode_);
-}
-
-static inline CkNcpyBuffer CkSendDeviceBuffer(const void *ptr_, CkCallback &cb_) {
-  return CkNcpyBuffer(ptr_, cb_, true);
-}
-
-static inline CkNcpyBuffer CkSendDeviceBuffer(const void *ptr_) {
-  return CkNcpyBuffer(ptr_, true);
 }
 
 #if CMK_ONESIDED_IMPL
@@ -620,6 +604,6 @@ int getRootNode(envelope *env);
 #endif /* End of CMK_ONESIDED_IMPL */
 
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
-    void **arrPtrs, int *arrSizes);
+    void **arrPtrs, int *arrSizes, bool onlyDevice);
 
 #endif

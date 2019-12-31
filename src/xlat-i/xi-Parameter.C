@@ -369,7 +369,6 @@ void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
       str << "  ncpyBuffer_" << name << ".cnt=sizeof(" << dt << ")*(" << arrLen
           << ");\n";
       str << "  ncpyBuffer_" << name << ".registerMem()" << ";\n";
-      str << "  ncpyBuffer_" << name << ".device = false;\n";
     } else {
       marshallArraySizes(str, dt);
     }
@@ -381,7 +380,6 @@ void Parameter::marshallDeviceRdmaParameters(XStr& str) {
     Type* dt = type->deref();
     str << "  ncpyBuffer_" << name << ".cnt = sizeof(" << dt << ")*(" << arrLen
       << ");\n";
-    str << "  ncpyBuffer_" << name << ".device = true;\n";
   }
 }
 

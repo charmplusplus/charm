@@ -10,6 +10,10 @@
 #include <algorithm>
 #include "ckarray.h"
 
+#if CMK_CUDA
+#include "hapi.h" // For device-side zero-copy operations
+#endif
+
 #if CMK_SMP
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
 #endif
@@ -498,16 +502,18 @@ CkNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
     return CkNcpyMode::RDMA;
 }
 
-CkNcpyMode findTransferModeDevice(int srcPe, int destPe) {
+CkNcpyModeDevice findTransferModeDevice(int srcPe, int destPe) {
   if (CmiNodeOf(srcPe) == CmiNodeOf(destPe)) {
     // Same logical node
+    return CkNcpyModeDevice::MEMCPY;
   }
   else if (CmiPeOnSamePhysicalNode(srcPe, destPe)) {
-    // Same physical node
+    // Different logical nodes, same physical node
+    return CkNcpyModeDevice::IPC;
   }
   else {
     // Different physical nodes, requires GPUDirect RDMA
-    CkAbort("Device-to-device transfer between different physical nodes is not yet supported");
+    return CkNcpyModeDevice::RDMA;
   }
 }
 
@@ -1072,49 +1078,41 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
  * API
  */
 void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, int numDeviceOps, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs){
+  // Check if there are device-side RDMA operations
+  bool hasDevice = numDeviceOps > 0;
 
-  if (numDeviceOps > 0) {
+  if (hasDevice) {
     // Only pass device-related metadata
-    CkRdmaIssueRgetsDevice(env, emMode, numDeviceOps, arrPtrs, arrSizes);
+    CkRdmaIssueRgetsDevice(env, emMode, numDeviceOps, arrPtrs, arrSizes, false);
 
     // Move pointers to the start of host RDMA pointers
     arrPtrs += numDeviceOps;
     arrSizes += numDeviceOps;
   }
 
-  if(emMode == ncpyEmApiMode::BCAST_SEND)
+  if (emMode == ncpyEmApiMode::BCAST_SEND || _topoTree == NULL)
     CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
 
-  // Iterate over the ncpy buffer and either perform the operations
-  int msgsize = env->getTotalsize();
-
-  int refSize = 0;
-  char *ref;
-  int layerInfoSize, ncpyObjSize, extraSize;
-
-  CkNcpyMode ncpyMode = findTransferMode(getSrcPe(env), CkMyPe());
   CmiSpanningTreeInfo *t = NULL;
-  if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
-
-
-  if(emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
+  if (emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
     t = getSpanningTreeInfo(rootNode);
   }
 
-  layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
-
-  if(ncpyMode == CkNcpyMode::RDMA) {
-    preprocessRdmaCaseForRgets(layerInfoSize, ncpyObjSize, extraSize, refSize, numops);
-    ref = (char *)CmiAlloc(refSize);
-  }
+  CkNcpyMode ncpyMode = findTransferMode(getSrcPe(env), CkMyPe());
 
   // Make the message a regular message to prevent message handler on the receiver
   // from intercepting it
-  if(emMode == ncpyEmApiMode::P2P_RECV)
+  if (emMode == ncpyEmApiMode::P2P_RECV)
     CMI_ZC_MSGTYPE(env) = CMK_ZC_P2P_RECV_DONE_MSG;
 
-  if(ncpyMode == CkNcpyMode::RDMA) {
-    setNcpyEmInfo(ref, env, msgsize, numops, forwardMsg, emMode);
+  char *ref;
+  int refSize = 0;
+  int layerInfoSize, ncpyObjSize, extraSize;
+  layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+  if (ncpyMode == CkNcpyMode::RDMA) {
+    preprocessRdmaCaseForRgets(layerInfoSize, ncpyObjSize, extraSize, refSize, numops);
+    ref = (char *)CmiAlloc(refSize);
+    setNcpyEmInfo(ref, env, env->getTotalsize(), numops, forwardMsg, emMode);
   }
 
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
@@ -1129,7 +1127,8 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
 
   bool sendBackToSourceForDereg = false;
 
-  for(int i=0; i<numops; i++){
+  // Iterate over the ncpy buffer and either perform the operations
+  for (int i=0; i<numops; i++) {
     up|source;
 
     if(source.cnt < arrSizes[i])
@@ -1159,9 +1158,10 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
     p|source;
   }
 
-
-  if(emMode == ncpyEmApiMode::P2P_RECV) {
-    switch(ncpyMode) {
+  // TODO: Handle the case when different types of transfer modes are used
+  // between the CPU and device operations
+  if (emMode == ncpyEmApiMode::P2P_RECV) {
+    switch (ncpyMode) {
       case CkNcpyMode::MEMCPY:  QdCreate(1);
                                 enqueueNcpyMessage(CkMyPe(), env);
                                 break;
@@ -1179,8 +1179,9 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
       default                :  CmiAbort("Invalid transfer mode\n");
                                 break;
     }
-  } else if(emMode == ncpyEmApiMode::BCAST_RECV) {
-    switch(ncpyMode) {
+  }
+  else if (emMode == ncpyEmApiMode::BCAST_RECV) {
+    switch (ncpyMode) {
       case CkNcpyMode::MEMCPY:  // Invoke the bcast Ack Handler after 'numops' memcpy operations are complete
                                 CkAssert(source.refAckInfo != NULL);
                                 CkRdmaEMBcastAckHandler((void *)source.refAckInfo);
@@ -1203,7 +1204,8 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
       default                :  CmiAbort("Invalid transfer mode\n");
                                 break;
     }
-  } else {
+  }
+  else {
     CmiAbort("Invalid operation mode\n");
   }
 }
@@ -2265,11 +2267,84 @@ void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int 
 // Should always be available regardless of whether or not CPU-side RDMA is supported
 // (i.e. CMK_ONESIDED_IMPL)
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
-    void **arrPtrs, int *arrSizes) {
-#if CMK_CUDA
-  CkPrintf("CkRdmaIssueRgetsDevice from receiver with %d ops, PE %d\n", numops, CkMyPe());
-
+    void **arrPtrs, int *arrSizes, bool onlyDevice) {
+#if !CMK_CUDA
+  CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
 #else
-  CkAbort("Device-to-device zero-copy is only enabled with the CUDA build of Charm++");
+  CkPrintf("CkRdmaIssueRgetsDevice PE %d -> %d, %d ops\n", env->getSrcPe(), CkMyPe(), numops);
+
+  // Only P2P RECV API is supported
+  CkAssert(emMode == ncpyEmApiMode::P2P_RECV);
+
+  // Find which mode of transfer should be used
+  CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
+  // TODO: Support other modes
+  if (mode != CkNcpyModeDevice::MEMCPY) {
+    CkAbort("Only MEMCPY mode is supported");
+  }
+
+  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
+  up|numops;
+  int rootNode;
+  up|rootNode;
+  CkPrintf("Unpacked numops: %d, rootNode: %d\n", numops, rootNode);
+  CkNcpyBuffer source;
+
+  for (int i = 0; i < numops; i++) {
+    // Unpack source buffer (from sender)
+    up|source;
+
+    if (arrSizes[i] > source.cnt) {
+      CkAbort("CkRdmaIssueRgetsDevice: posted data size is larger than source data size!");
+    }
+
+    // Destination buffer (on this receiver)
+    CkNcpyBuffer dest((const void *)arrPtrs[i], arrSizes[i]);
+
+    // Perform data transfers
+    switch (mode) {
+      case CkNcpyModeDevice::MEMCPY:
+        // TODO: Incorporate CUDA streams to make this asynchronous, so that
+        // the user can wait for the transfer or submit subsequent work in the
+        // regular entry method
+        CkPrintf("Performing memcpy (PE %d -> %d), src.ptr: %p, src.size: %lu, dest.ptr: %p, dest.size: %lu\n",
+            env->getSrcPe(), CkMyPe(), source.ptr, source.cnt, dest.ptr, dest.cnt);
+        hapiCheck(cudaMemcpy((void*)dest.ptr, source.ptr, std::min(source.cnt, dest.cnt),
+              cudaMemcpyDeviceToDevice));
+        break;
+      case CkNcpyModeDevice::IPC:
+        // TODO
+        break;
+      case CkNcpyModeDevice::RDMA:
+        // TODO
+        break;
+      default:
+        CkAbort("Invalid mode");
+        break;
+    }
+  }
+
+  if (onlyDevice) {
+    // There are no CPU-side RDMA calls, need to handle later process as well
+
+    // Reuse the message as a done msg
+    CMI_ZC_MSGTYPE(env) = CMK_ZC_P2P_RECV_DONE_MSG;
+
+    switch (mode) {
+      case CkNcpyModeDevice::MEMCPY:
+        QdCreate(1);
+        enqueueNcpyMessage(CkMyPe(), env);
+        break;
+      case CkNcpyModeDevice::IPC:
+        // TODO
+        break;
+      case CkNcpyModeDevice::RDMA:
+        // TODO
+        break;
+      default:
+        CkAbort("Invalid mode");
+        break;
+    }
+  }
 #endif
 }
