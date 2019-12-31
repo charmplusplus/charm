@@ -45,6 +45,13 @@
 // CkNcpyMode::RDMA indicates that the neither MEMCPY or CMA can be used and REMOTE Direct Memory Access needs to be used
 enum class CkNcpyMode : char { MEMCPY, CMA, RDMA };
 
+// Represents the mode of device-to-device zerocopy transfer
+// SAME indicates that the PEs are mapped to the same GPU
+// PEER indicates that the PEs are on the same logical node and mapped to GPUs with peer-to-peer transfer enabled
+// IPC indicates that the PEs are on the same physical node and CUDA IPC can be used
+// RDMA indicates that the PEs are on different physical nodes and requires GPUDirect RDMA
+enum class CkNcpyModeDevice : char { SAME, PEER, IPC, RDMA };
+
 // Represents the completion status of the zerocopy transfer (used as a return value for CkNcpyBuffer::get & CkNcpyBuffer:::put)
 // CMA and MEMCPY transfers complete instantly and return CkNcpyStatus::complete
 // RDMA transfers use a remote asynchronous call and hence return CkNcpyStatus::incomplete

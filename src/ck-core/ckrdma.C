@@ -498,6 +498,19 @@ CkNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
     return CkNcpyMode::RDMA;
 }
 
+CkNcpyMode findTransferModeDevice(int srcPe, int destPe) {
+  if (CmiNodeOf(srcPe) == CmiNodeOf(destPe)) {
+    // Same logical node
+  }
+  else if (CmiPeOnSamePhysicalNode(srcPe, destPe)) {
+    // Same physical node
+  }
+  else {
+    // Different physical nodes, requires GPUDirect RDMA
+    CkAbort("Device-to-device transfer between different physical nodes is not yet supported");
+  }
+}
+
 void enqueueNcpyMessage(int destPe, void *msg){
   // invoke the charm message handler to enqueue the messsage
 #if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRES
@@ -2253,7 +2266,10 @@ void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int 
 // (i.e. CMK_ONESIDED_IMPL)
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     void **arrPtrs, int *arrSizes) {
+#if CMK_CUDA
   CkPrintf("CkRdmaIssueRgetsDevice from receiver with %d ops, PE %d\n", numops, CkMyPe());
 
-  // TODO
+#else
+  CkAbort("Device-to-device zero-copy is only enabled with the CUDA build of Charm++");
+#endif
 }
