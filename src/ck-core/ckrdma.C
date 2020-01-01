@@ -1115,8 +1115,20 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
     setNcpyEmInfo(ref, env, env->getTotalsize(), numops, forwardMsg, emMode);
   }
 
+  // FIXME: Is p necessary here?
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
+  if (hasDevice) {
+    // Discard all device RDMA related fields
+    int numdeviceops_tmp;
+    up|numdeviceops_tmp;
+    p|numdeviceops_tmp;
+    CkNcpyBuffer device_source_tmp;
+    for (int i = 0; i < numDeviceOps; i++) {
+      up|device_source_tmp;
+      p|device_source_tmp;
+    }
+  }
   up|numops;
   up|rootNode;
   p|numops;
@@ -2271,8 +2283,6 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
 #if !CMK_CUDA
   CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
 #else
-  CkPrintf("CkRdmaIssueRgetsDevice PE %d -> %d, %d ops\n", env->getSrcPe(), CkMyPe(), numops);
-
   // Only P2P RECV API is supported
   CkAssert(emMode == ncpyEmApiMode::P2P_RECV);
 
@@ -2283,11 +2293,12 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     CkAbort("Only MEMCPY mode is supported");
   }
 
+  // Start unpacking marshalled message
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
-  up|numops;
-  int rootNode;
-  up|rootNode;
-  CkPrintf("Unpacked numops: %d, rootNode: %d\n", numops, rootNode);
+  int received_numops;
+  up|received_numops;
+  CkAssert(numops == received_numops);
+
   CkNcpyBuffer source;
 
   for (int i = 0; i < numops; i++) {
@@ -2307,8 +2318,6 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
         // TODO: Incorporate CUDA streams to make this asynchronous, so that
         // the user can wait for the transfer or submit subsequent work in the
         // regular entry method
-        CkPrintf("Performing memcpy (PE %d -> %d), src.ptr: %p, src.size: %lu, dest.ptr: %p, dest.size: %lu\n",
-            env->getSrcPe(), CkMyPe(), source.ptr, source.cnt, dest.ptr, dest.cnt);
         hapiCheck(cudaMemcpy((void*)dest.ptr, source.ptr, std::min(source.cnt, dest.cnt),
               cudaMemcpyDeviceToDevice));
         break;
