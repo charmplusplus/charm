@@ -16,7 +16,7 @@ class Main : public CBase_Main {
   Main(CkArgMsg* m) {
     main_proxy = thisProxy;
     block_size = 128;
-    n_iters = 100;
+    n_iters = 1;
 
     // Check if number of PEs is even
     if (CkNumPes() % 2 != 0) {
