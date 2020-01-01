@@ -118,7 +118,6 @@ class Block : public CBase_Block {
   }
 
   void send() {
-    CkPrintf("Send, iter %d, PE %d\n", iter, CkMyPe());
     thisProxy[peer].receive(block_size, CkSendBuffer(d_local_data), block_size,
         CkSendBuffer(rdma_local_data), block_size, reg_local_data);
   }
@@ -126,7 +125,6 @@ class Block : public CBase_Block {
   // First receive, user should set the destination buffer
   void receive(int &size1, double *&arr1, int &size2, double *&arr2, int size3,
       int *arr3, CkNcpyBufferPost *ncpyPost) {
-    CkPrintf("1st receive, iter %d, PE %d\n", iter, CkMyPe());
     // Inform the runtime where the incoming data should be stored
     arr1 = d_remote_data;
     arr2 = rdma_remote_data;
@@ -140,7 +138,6 @@ class Block : public CBase_Block {
   // Second receive, invoked after the data transfer is complete
   void receive(int size1, double *arr1, int size2, double *arr2, int size3,
       int *arr3) {
-    CkPrintf("2nd receive, iter %d, PE %d\n", iter, CkMyPe());
     // Validate received data
     validateData();
 
@@ -149,7 +146,6 @@ class Block : public CBase_Block {
       thisProxy[thisIndex].send();
     }
     else {
-      CkPrintf("Before reduction, iter %d, PE %d\n", iter, CkMyPe());
       contribute(CkCallback(CkReductionTarget(Main, terminate), main_proxy));
     }
   }
