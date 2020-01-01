@@ -2341,8 +2341,12 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
 
     switch (mode) {
       case CkNcpyModeDevice::MEMCPY:
+        // The following code causes a duplicate call of the receiver function.
+        // Is there a need for another message to be enqueued?
+        /*
         QdCreate(1);
         enqueueNcpyMessage(CkMyPe(), env);
+        */
         break;
       case CkNcpyModeDevice::IPC:
         // TODO
