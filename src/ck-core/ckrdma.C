@@ -1098,7 +1098,7 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
     t = getSpanningTreeInfo(rootNode);
   }
 
-  CkNcpyMode ncpyMode = findTransferMode(getSrcPe(env), CkMyPe());
+  CkNcpyMode ncpyMode = findTransferMode(env->getSrcPe(), CkMyPe());
 
   // Make the message a regular message to prevent message handler on the receiver
   // from intercepting it
