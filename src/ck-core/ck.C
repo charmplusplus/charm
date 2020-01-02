@@ -593,6 +593,11 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
      CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_DONE_MSG)
     CkDeliverMessageReadonly(epIdx,msg,obj); // Do not free a P2P_RECV_MSG or BCAST_RECV_MSG or a BCAST_RECV_DONE_MSG
   else
+#else
+  // Shouldn't free message if device-side zero-copy
+  if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_P2P_RECV_MSG)
+    CkDeliverMessageReadonly(epIdx,msg,obj);
+  else
 #endif
     CkDeliverMessageFree(epIdx,msg,obj);
 }
