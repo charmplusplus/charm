@@ -1816,24 +1816,43 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
 
   else {  // Normal case: call regular method
     if(param->hasRecvRdma()) {
-      str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
-      str << "#endif\n";
-      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
-      //str << "#endif\n";
-      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
-      //str << "#if CMK_ONESIDED_IMPL\n";
-      str << "    }\n";
-      str << "  } else {\n";
-      str << "#endif\n";
+      if (param->hasDevice()) {
+        // With device-side RDMA, only P2P Recv API is supported
+        str << "  if (CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) {\n";
+        genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+        // The following line is always needed when device-side zerocopy is present,
+        // since a recv done message is enqueued regardless of CMK_ONESIDED_IMPL.
+        str << "  }\n";
+        str << "  else if (CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_DONE_MSG) {\n";
+      }
+      else {
+        str << "#if CMK_ONESIDED_IMPL\n";
+        str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+        str << "#endif\n";
+        genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+        str << "#if CMK_ONESIDED_IMPL\n";
+        str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+        //str << "#endif\n";
+        genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
+        //str << "#if CMK_ONESIDED_IMPL\n";
+        str << "    }\n";
+        str << "  } else {\n";
+        str << "#endif\n";
+      }
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
     if(param->hasRecvRdma()) {
-      str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  }\n";
-      str << "#endif\n";
+      if (param->hasDevice()) {
+        str << "  }\n";
+        str << "  else {\n";
+        str << "    CkAbort(\"Only P2P Recv API is supported with device-side zero-copy!\");\n";
+        str << "  }\n";
+      }
+      else {
+        str << "#if CMK_ONESIDED_IMPL\n";
+        str << "  }\n";
+        str << "#endif\n";
+      }
     }
   }
 }

@@ -2295,9 +2295,11 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
   }
 
   // Start unpacking marshalled message
+  PUP::toMem p((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   int received_numops;
   up|received_numops;
+  p|received_numops;
   CkAssert(numops == received_numops);
 
   CkNcpyBuffer source;
@@ -2332,6 +2334,8 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
         CkAbort("Invalid mode");
         break;
     }
+
+    p|source;
   }
 
   if (onlyDevice) {
@@ -2344,10 +2348,8 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
       case CkNcpyModeDevice::MEMCPY:
         // The following code causes a duplicate call of the receiver function.
         // Is there a need for another message to be enqueued?
-        /*
         QdCreate(1);
         enqueueNcpyMessage(CkMyPe(), env);
-        */
         break;
       case CkNcpyModeDevice::IPC:
         // TODO
