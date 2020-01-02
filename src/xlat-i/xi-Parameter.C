@@ -491,6 +491,10 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
       } else {
         if (!needsClosure) {
           if (hasRdma()) {
+            if (hasDevice()) {
+              str << "  int impl_num_device_rdma_fields; implP|impl_num_rdma_fields;\n";
+              callEach(&Parameter::beginUnmarshallDeviceRdma, str);
+            }
             str << "#if CMK_ONESIDED_IMPL\n";
             str << "  char *impl_buf_begin = impl_buf;\n";
             if(hasRecvRdma())
@@ -508,6 +512,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
           callEach(&Parameter::beginUnmarshall, str);
         } else {
           if (hasRdma()) {
+            callEach(&Parameter::beginUnmarshallSDAGCallDeviceRdma, str);
             str << "#if CMK_ONESIDED_IMPL\n";
             str << "  char *impl_buf_begin = impl_buf;\n";
             if(hasRecvRdma())
@@ -536,6 +541,10 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
       str << "  /* non two-param case */\n";
       if (!needsClosure) {
         if (hasRdma()) {
+          if (hasDevice()) {
+            str << "  int impl_num_device_rdma_fields; implP|impl_num_rdma_fields;\n";
+            callEach(&Parameter::beginUnmarshallDeviceRdma, str);
+          }
           str << "#if CMK_ONESIDED_IMPL\n";
           str << "  char *impl_buf_begin = impl_buf;\n";
           if(hasRecvRdma())
