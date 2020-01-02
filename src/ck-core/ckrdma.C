@@ -1108,11 +1108,12 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
   char *ref;
   int refSize = 0;
   int layerInfoSize, ncpyObjSize, extraSize;
+  int msgsize = env->getTotalsize();
   layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
   if (ncpyMode == CkNcpyMode::RDMA) {
     preprocessRdmaCaseForRgets(layerInfoSize, ncpyObjSize, extraSize, refSize, numops);
     ref = (char *)CmiAlloc(refSize);
-    setNcpyEmInfo(ref, env, env->getTotalsize(), numops, forwardMsg, emMode);
+    setNcpyEmInfo(ref, env, msgsize, numops, forwardMsg, emMode);
   }
 
   // FIXME: Is p necessary here?
