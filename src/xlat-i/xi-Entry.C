@@ -1891,14 +1891,6 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         // pack rdma pointers for broadcast unmarshall
         // this is done to support broadcasts before all chare array elements are
         // finished with their EM execution using the same msg
-        str << "#if CMK_ONESIDED_IMPL\n";
-        if(param->hasRecvRdma())
-          //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-          //str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
-          //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
-          str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-        str << "    CkPackRdmaPtrs(impl_buf_begin);\n";
-        str << "#endif\n";
       }
     }
 }
