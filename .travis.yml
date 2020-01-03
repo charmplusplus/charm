@@ -4,7 +4,6 @@ before_install:
 - |-
     case $TRAVIS_OS_NAME in
       windows)
-        df -h
         [[ ! -f C:/tools/msys64/msys2_shell.cmd ]] && rm -rf C:/tools/msys64
         choco upgrade --no-progress -y msys2
         export msys2='cmd //C RefreshEnv.cmd '
@@ -12,9 +11,7 @@ before_install:
         export msys2+='& C:\\tools\\msys64\\msys2_shell.cmd -defterm -no-start'
         export mingw64="$msys2 -mingw64 -full-path -here -c \$\* --"
         export msys2+=" -msys2 -c \$\* --"
-        df -h
         $msys2 pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config
-        df -h
         taskkill //IM gpg-agent.exe //F  # https://travis-ci.community/t/4967
         export PATH=/C/tools/msys64/mingw64/bin:$PATH
         ;;
@@ -55,7 +52,6 @@ matrix:
   - os: windows
     name: "NetLRTS-Win"
     script:
-    - df -h
-    - $mingw64 src/arch/win/travis.sh ./build charm++ netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking
-    - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp -j3 all-test-tests all-test-examples OPTS="-g"
+    - $mingw64 src/arch/win/travis.sh ./build all-test netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata
+    - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp -j3 all-test-tests all-test-examples
     - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp test-tests test-examples TESTOPTS="++local"
