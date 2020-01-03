@@ -2328,6 +2328,7 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
         hapiCheck(cudaIpcOpenMemHandle(&source_ptr, source.memHandle, cudaIpcMemLazyEnablePeerAccess));
         hapiCheck(cudaMemcpy((void*)dest.ptr, source_ptr, std::min(source.cnt, dest.cnt),
               cudaMemcpyDeviceToDevice));
+        hapiCheck(cudaIpcCloseMemHandle(source_ptr));
         break;
       case CkNcpyModeDevice::RDMA:
         // TODO
