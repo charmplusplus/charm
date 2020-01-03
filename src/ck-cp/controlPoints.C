@@ -688,34 +688,6 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
       }
     }
 
-
-
-#if CMK_LBDB_ON && 0
-    LBDatabase * myLBdatabase = LBDatabaseObj();
-    LBDB * myLBDB = myLBdatabase->getLBDB();       // LBDB is Defined in LBDBManager.h
-    const CkVec<LBObj*> objs = myLBDB->getObjs();
-    
-    LBRealType maxObjWallTime = -1.0;
-    
-    for(int i=0;i<objs.length();i++){
-      LBObj* o = objs[i];
-      const LDObjData d = o->ObjData();
-      LBRealType cpuTime = d.cpuTime;
-      LBRealType wallTime = d.wallTime;
-      // can also get object handles from the LDObjData struct
-      CkPrintf("[%d] LBDB Object[%d]: cpuTime=%f wallTime=%f\n", CkMyPe(), i, cpuTime, wallTime);
-      if(wallTime > maxObjWallTime){
-
-      }
-      
-    }
-
-    myLBDB->ClearLoads(); // BUG: Probably very dangerous if we are actually using load balancing
-    
-#endif    
-
-
-    
     // increment phase id
     phase_id++;
     
@@ -724,7 +696,7 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
     instrumentedPhase * newPhase = new instrumentedPhase();
     allData.phases.push_back(newPhase);
     
-    CkPrintf("Now in phase %d allData.phases.size()=%d\n", phase_id, allData.phases.size());
+    CkPrintf("Now in phase %d allData.phases.size()=%zu\n", phase_id, allData.phases.size());
 
   }
 
@@ -1327,7 +1299,7 @@ void controlPointManager::generatePlan() {
       fflush(stdout);
       if(memUsage < 1100.0 && memUsage > 0.0){ // Kraken has about 16GB and 12 cores per node
 	CkPrintf("Steering (memory based) encountered low memory usage (%f) < 1200 \n", memUsage);
-	CkPrintf("Steering (memory based) controlPointSpace.size()=\n", controlPointSpace.size());
+	CkPrintf("Steering (memory based) controlPointSpace.size()=%zu\n", controlPointSpace.size());
 	
 	// Initialize plan to be the values from two phases ago (later we'll adjust this)
 	newControlPoints = twoAgoPhase->controlPoints;
@@ -1773,7 +1745,7 @@ void controlPointManager::generatePlan() {
 			  fflush(stdout);
 			  if(idleTime > 0.10){
 				  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
-				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+				  CkPrintf("Steering controlPointSpace.size()=%zu\n", controlPointSpace.size());
 
 				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
 
@@ -1819,7 +1791,7 @@ void controlPointManager::generatePlan() {
 			  fflush(stdout);
 			  if(overheadTime > 0.10){
 				  CkPrintf("Steering encountered high overhead time(%f) > 10%%\n", overheadTime);
-				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+				  CkPrintf("Steering controlPointSpace.size()=%zu\n", controlPointSpace.size());
 
 				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GrainSize"];
 
@@ -1867,7 +1839,7 @@ void controlPointManager::generatePlan() {
 			  fflush(stdout);
 			  if(idleTime > 0.10){
 				  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
-				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+				  CkPrintf("Steering controlPointSpace.size()=%zu\n", controlPointSpace.size());
 
 				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GPUOffloadedWork"];
 
@@ -2001,7 +1973,7 @@ void controlPointManager::generatePlan() {
 			  fflush(stdout);
 			  if(idleTime+overheadTime > 0.10){
 				  CkPrintf("Steering encountered high idle+overheadTime time(%f) > 10%%\n", idleTime+overheadTime);
-				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+				  CkPrintf("Steering controlPointSpace.size()=%zu\n", controlPointSpace.size());
 
 				  int direction = -1;
 				  if (idleTime>overheadTime){
@@ -2049,7 +2021,7 @@ void controlPointManager::generatePlan() {
 		  }
 
 		  if(possibleNextStepPlans.size() > 0){
-		    CkPrintf("Divide & Conquer Steering found %d possible next phases, using first one\n", possibleNextStepPlans.size());
+		    CkPrintf("Divide & Conquer Steering found %zu possible next phases, using first one\n", possibleNextStepPlans.size());
 		    newControlPoints = possibleNextStepPlans[0];
 		  } else {
 		    CkPrintf("Divide & Conquer Steering found no possible next phases\n");
@@ -2412,7 +2384,7 @@ void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPo
 		}
 
 	} else if (simplexState == stillContracting){
-		CkPrintf("Simplex Tuning: stillContracting found %d configurations left to try\n", stillMustContractList.size());
+		CkPrintf("Simplex Tuning: stillContracting found %zu configurations left to try\n", stillMustContractList.size());
 
 		if(stillMustContractList.size()>0){
 			int c = *stillMustContractList.begin();

@@ -343,7 +343,11 @@ protected:
   CkArrayID thisArrayID;//My source array's ID
 
   //More verbose form of abort
-  virtual void CkAbort(const char *str) const;
+  CMK_NORETURN
+#if defined __GNUC__ || defined __clang__
+  __attribute__ ((format (printf, 2, 3)))
+#endif
+  virtual void CkAbort(const char *format, ...) const;
 
 private:
 //Array implementation methods:
@@ -787,6 +791,9 @@ public:
   int incrementBcastNo();
 
   bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
+#if CMK_CHARMPY
+  void deliver(CkArrayMessage *bcast, std::vector<CkMigratable*> &elements, int arrayId, bool doFree);
+#endif
 
   void springCleaning(void);
 

@@ -179,20 +179,14 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     if (tcharm_nomig) { /*Nonmigratable version, for debugging*/
       tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
     } else {
-      /* HACK: Isomalloc gets memory from the mempool, which allocates chunks of memory in sizes
-       * that are powers of two only. Isomalloc & mempool also add their own metadata to every allocation,
-       * so we try to play nice with that here (since the stacksize is often already a power of two): */
-      int isomalloc_offset=64;
-      tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize-isomalloc_offset);
+      CmiIsomallocContext * heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
+      tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
     }
 #if CMK_BIGSIM_CHARM
     BgAttach(tid);
     BgUnsetStartOutOfCore();
 #endif
   }
-#if CMI_SWAPGLOBALS
-  threadGlobals=CtgCreate(tid);
-#endif
   CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
   isStopped=true;
@@ -204,11 +198,6 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
-  if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) {
-    heapBlocks = CmiIsomallocBlockListNew();
-  } else {
-    heapBlocks = 0;
-  }
   nUd=0;
   usesAtSync=true;
   run();
@@ -219,11 +208,7 @@ TCharm::TCharm(CkMigrateMessage *msg)
 {
   initMsg=NULL;
   tid=NULL;
-#if CMI_SWAPGLOBALS
-  threadGlobals=NULL;
-#endif
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
-  heapBlocks=0;
 
 #if CMK_FAULT_EVAC
 	AsyncEvacuate(true);
@@ -335,9 +320,6 @@ void TCharm::pupThread(PUP::er &pc) {
     pup_er p=(pup_er)&pc;
     checkPupMismatch(pc,5138,"before TCHARM thread"); 
 
-    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-      CmiIsomallocBlockListPup(p,&heapBlocks);
-
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
@@ -345,9 +327,6 @@ void TCharm::pupThread(PUP::er &pc) {
       BgAttach(tid);
 #endif
     }
-#if CMI_SWAPGLOBALS
-    threadGlobals=CtgPup(p,threadGlobals);
-#endif
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
 
@@ -386,14 +365,8 @@ void TCharm::UserData::pup(PUP::er &p)
 TCharm::~TCharm()
 {
   //BIGSIM_OOC DEBUGGING
-  //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
-
-  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
 
   CthFree(tid);
-#if CMI_SWAPGLOBALS
-  CtgFree(threadGlobals);
-#endif
 
   delete initMsg;
 }
@@ -430,7 +403,6 @@ void TCharm::ckAboutToMigrate(){
 // clear the data before restarting from disk
 void TCharm::clear()
 {
-  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
   delete initMsg;
 }

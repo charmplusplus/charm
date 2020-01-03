@@ -64,7 +64,7 @@ IDXL_Shift(IDXL_t l_t,int startSend,int startRecv) {
 	IDXL &l=c->lookup(l_t,caller);
 	if (l.isSingle()) {
 		if (startSend!=startRecv) //FIXME: handle this case, instead of aborting
-			IDXL_Abort(caller,"Cannot independently shift send and recv for this IDXL_t");
+			IDXL_Abort("Cannot independently shift send and recv for this IDXL_t", caller);
 		shiftSide(l.getSend(),startSend);
 	}
 	else /* l has separate send and recv */ {
@@ -105,12 +105,12 @@ IDXL_Combine(IDXL_t dest_t,IDXL_t src_t,int startSend,int startRecv)
 	const IDXL &src=c->lookup(src_t,caller);
 	IDXL &dest=c->lookup(dest_t,caller);
 	if (src.isSingle()!=dest.isSingle()) //FIXME: handle this case instead of aborting
-		IDXL_Abort(caller,"Cannot combine IDXL_t's %d and %d,"
-			"because one is single and the other is double.",src_t,dest_t);
+		IDXL_Abort("Cannot combine IDXL_t's %d and %d,"
+			"because one is single and the other is double.", caller, src_t, dest_t);
 	if (dest.isSingle()) 
 	{ /* A single send and recv list: just copy once */
 		if (startSend!=startRecv) //FIXME: handle this case instead of aborting
-			IDXL_Abort(caller,"Cannot independently shift send and recv for this IDXL_t");
+			IDXL_Abort("Cannot independently shift send and recv for this IDXL_t", caller);
 		combineSide(dest.getSend(),src.getSend(),startSend);
 	}
 	else { /* Separate send and recv lists: copy each list */
@@ -225,7 +225,7 @@ const IDXL_Side &lookupSide(IDXL_Side_t s,const char *caller) {
 		return c->lookup(l,caller).getSend();
 	}
 	else /* unknown side_t s */
-		IDXL_Abort(caller,"Unrecognized IDXL_Side_t %d\n",s);
+		IDXL_Abort("Unrecognized IDXL_Side_t %d\n", caller, s);
 	return *new IDXL_Side(); /* LIE: for whining compilers only */
 }
 

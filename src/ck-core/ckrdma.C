@@ -80,6 +80,7 @@ void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
                 isRegistered,
                 pe,
                 ref,
+                -1,  // -1 is the rootNode for p2p operations
                 ncpyOpInfo);
 
   CmiIssueRget(ncpyOpInfo);
@@ -226,6 +227,7 @@ void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
                 destination.isRegistered,
                 destination.pe,
                 destination.ref,
+                -1,  // -1 is the rootNode for p2p operations
                 ncpyOpInfo);
 
   CmiIssueRput(ncpyOpInfo);
@@ -439,6 +441,7 @@ void CkRdmaDirectAckHandler(void *ack) {
 
     case CMK_BCAST_EM_API_REVERSE   : handleBcastReverseEntryMethodApiCompletion(info); // Ncpy EM Bcast API invoked through a PUT
                                       break;
+
     case CMK_READONLY_BCAST         : readonlyGetCompleted(info);
                                       break;
 #endif
@@ -691,7 +694,7 @@ void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, CmiSpanni
 }
 #endif
 
-void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, char *ref, int extraSize, ncpyEmApiMode emMode) {
+void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, char *ref, int extraSize, int rootNode, ncpyEmApiMode emMode) {
 
   int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
   if(dest.regMode == CK_BUFFER_UNREG) {
@@ -727,6 +730,7 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, cha
                 dest.isRegistered,
                 dest.pe,
                 (char *)(ncpyEmBufferInfo), // destRef
+                rootNode,
                 ncpyOpInfo);
 
   // set opMode
@@ -746,7 +750,7 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, cha
   // on the comm. thread as the message is being inside this for loop on the worker thread
 }
 
-void performEmApiNcpyTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, CmiSpanningTreeInfo *t, char *ref, int extraSize, CkNcpyMode ncpyMode, ncpyEmApiMode emMode){
+void performEmApiNcpyTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, CmiSpanningTreeInfo *t, char *ref, int extraSize, CkNcpyMode ncpyMode, int rootNode, ncpyEmApiMode emMode){
 
   switch(ncpyMode) {
     case CkNcpyMode::MEMCPY: performEmApiMemcpy(source, dest, emMode);
@@ -755,7 +759,7 @@ void performEmApiNcpyTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIn
     case CkNcpyMode::CMA   : performEmApiCmaTransfer(source, dest, t, emMode);
                                    break;
 #endif
-    case CkNcpyMode::RDMA  : performEmApiRget(source, dest, opIndex, ref, extraSize, emMode);
+    case CkNcpyMode::RDMA  : performEmApiRget(source, dest, opIndex, ref, extraSize, rootNode, emMode);
                                    break;
 
     default                      : CkAbort("Invalid Mode");
@@ -850,11 +854,10 @@ int getSrcPe(envelope *env) {
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   up|numops;
   up|rootNode;
-  for(int i=0; i<numops; i++){
-    CkNcpyBuffer w;
-    up|w;
-    return w.pe;
-  }
+  CmiEnforce(numops > 0);
+  CkNcpyBuffer w;
+  up|w;
+  return w.pe;
 }
 
 int getRootNode(envelope *env) {
@@ -948,10 +951,6 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
    */
   copyenv->setTotalsize(totalMsgSize);
 
-  // Make the message a regular message to prevent message handler on the receiver
-  // from intercepting it
-  CMI_ZC_MSGTYPE(copyenv) = CMK_REG_NO_ZC_MSG;
-
   if(ncpyMode == CkNcpyMode::RDMA) {
     ref = (char *)copyenv + CK_ALIGN(msgsize, 16) + bufsize;
     setNcpyEmInfo(ref, copyenv, msgsize, numops, forwardMsg, emMode);
@@ -960,6 +959,11 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
   char *buf = (char *)copyenv + CK_ALIGN(msgsize, 16);
 
   CkUnpackMessage(&copyenv);
+
+  // Mark the message to be a SEND_DONE message to prevent message handler on the receiver
+  // from intercepting it and pack pointers when forwarded to peers/children
+  CMI_ZC_MSGTYPE(copyenv) = CMK_ZC_SEND_DONE_MSG;
+
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
   up|numops;
@@ -983,7 +987,7 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
     // destination buffer
     CkNcpyBuffer dest((const void *)buf, source.cnt, CK_BUFFER_UNREG);
 
-    performEmApiNcpyTransfer(source, dest, i, t, ref, extraSize, ncpyMode, emMode);
+    performEmApiNcpyTransfer(source, dest, i, t, ref, extraSize, ncpyMode, rootNode, emMode);
 
     //Update the CkRdmaWrapper pointer of the new message
     source.ptr = buf;
@@ -1001,8 +1005,6 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
     p|source;
   }
 
-  // Substitute buffer pointers by their offsets from msgBuf to handle migration
-  CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
 
   if(emMode == ncpyEmApiMode::P2P_SEND) {
     switch(ncpyMode) {
@@ -1086,7 +1088,7 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
   // Make the message a regular message to prevent message handler on the receiver
   // from intercepting it
   if(emMode == ncpyEmApiMode::P2P_RECV)
-    CMI_ZC_MSGTYPE(env) = CMK_ZC_P2P_RECV_DONE_MSG;
+    CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
 
   if(ncpyMode == CkNcpyMode::RDMA) {
     setNcpyEmInfo(ref, env, msgsize, numops, forwardMsg, emMode);
@@ -1118,7 +1120,7 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
     // destination buffer
     CkNcpyBuffer dest((const void *)arrPtrs[i], arrSizes[i], postStructs[i].regMode, postStructs[i].deregMode);
 
-    performEmApiNcpyTransfer(source, dest, i, t, ref, extraSize, ncpyMode, emMode);
+    performEmApiNcpyTransfer(source, dest, i, t, ref, extraSize, ncpyMode, rootNode, emMode);
 
     //Update the CkRdmaWrapper pointer of the new message
     source.ptr = arrPtrs[i];
@@ -1498,9 +1500,14 @@ void forwardMessageToChildNodes(envelope *myChildrenMsg, UChar msgType) {
 void forwardMessageToPeerNodes(envelope *myMsg, UChar msgType) {
 #if CMK_SMP
 #if CMK_NODE_QUEUE_AVAILABLE
-  if(msgType == ForBocMsg)
+  if(msgType == ForBocMsg) {
 #endif // CMK_NODE_QUEUE_AVAILABLE
+    if(CMI_ZC_MSGTYPE(myMsg) == CMK_ZC_SEND_DONE_MSG)
+      CkPackMessage(&myMsg);
     CmiForwardMsgToPeers(myMsg->getTotalsize(), (char *)myMsg);
+#if CMK_NODE_QUEUE_AVAILABLE
+  }
+#endif // CMK_NODE_QUEUE_AVAILABLE
 #endif
 }
 
@@ -1555,9 +1562,10 @@ void handleBcastReverseEntryMethodApiCompletion(NcpyOperationInfo *info) {
     invokeRemoteNcpyAckHandler(info->destPe, info->refPtr, ncpyHandlerIdx::EM_ACK);
   }
 #if CMK_REG_REQUIRED
-  // De-register source for reverse operations when regMode == UNREG and deregMode == DEREG
-  if(info->isSrcRegistered == 1 && info->srcRegMode == CK_BUFFER_UNREG && info->srcDeregMode == CK_BUFFER_DEREG)
-    deregisterSrcBuffer(info);
+  // De-register source for reverse operations when regMode == UNREG and deregMode == DEREG on the root node
+  if(info->rootNode == CkMyNode())
+    if(info->isSrcRegistered == 1 && info->srcRegMode == CK_BUFFER_UNREG && info->srcDeregMode == CK_BUFFER_DEREG)
+      deregisterSrcBuffer(info);
 #endif
 
   if(info->freeMe == CMK_FREE_NCPYOPINFO)
@@ -1663,7 +1671,6 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *prevEnv, envelope *env, void *bcast
   PUP::fromMem up_prev((void *)((CkMarshallMsg *)EnvToUsr(prevEnv))->msgBuf);
 
   CkUnpackMessage(&env);
-  CkUnpackRdmaPtrs((((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
 
@@ -1707,7 +1714,6 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *prevEnv, envelope *env, void *bcast
 
   CkPackMessage(&prevEnv);
 
-  CkPackRdmaPtrs((((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   CkPackMessage(&env);
 }
 
@@ -2088,6 +2094,7 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
                   dest.isRegistered,
                   dest.pe,
                   dest.ref,
+                  0, // Root Node is always 0 for Readonly bcast (the spanning tree is rooted at Node 0)
                   ncpyOpInfo);
 
     ncpyOpInfo->opMode = CMK_READONLY_BCAST;

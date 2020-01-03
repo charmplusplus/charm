@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 AMPICC="$0"
-CHARMBIN=`dirname $0`
+CHARMBIN=$(dirname $0)
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
 . "$CHARMINC/conv-mach-opt.sh"
@@ -14,9 +14,13 @@ FSGLOBALS=''
 PIPGLOBALS=''
 EXPLICIT_COMPILATION=''
 BUILD_SHARE=''
+PASSTHROUGH_COMPILER_OPTIONS=''
 
 ARGS=''
 OBJECT=''
+
+# protect rpath arguments from disappearing due to variable expansion
+ORIGIN='\$ORIGIN'
 
 processArgs() {
 while [ ! $# -eq 0 ]
@@ -26,6 +30,9 @@ do
   -show)
      echo "charmc"
      exit 0
+     ;;
+  -v|--version|-print-search-dirs)
+     PASSTHROUGH_COMPILER_OPTIONS+=" $arg"
      ;;
   -verbose)
      VERBOSE='true'
@@ -75,6 +82,16 @@ done
 
 eval processArgs "$@"
 
+# If there are no filename arguments specified, just pass through
+# compiler options to charmc. Helps with configure scripts that
+# parse the output to detect compiler versions, search paths, etc.
+if [[ -z "$ARGS" && -n "$PASSTHROUGH_COMPILER_OPTIONS" ]]; then
+  $CHARMBIN/charmc $PASSTHROUGH_COMPILER_OPTIONS
+  exit $?
+fi
+
+ARGS+=" $PASSTHROUGH_COMPILER_OPTIONS"
+
 Do() {
   [ -n "$VERBOSE" ] && echo "$AMPICC: Executing $@" 1>&2
   eval "$@"
@@ -104,7 +121,7 @@ AMPICC_POST_OPTS=''
 
 [ -n "$STANDALONE" ] && ARGS="$ARGS -standalone"
 
-[ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" -a -z "$ROMIO_CONFIGURE" ] && ROMIO='-lampiromio'
+[ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" -a -z "$ROMIO_CONFIGURE" ] && ROMIO='-lampiromio -pthread'
 
 FUNCPTR_SHIM_SUFFIX='.user'
 

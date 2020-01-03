@@ -14,6 +14,9 @@ cpu affinity.
 #define _GNU_SOURCE
 #endif
 
+#include <map>
+#include <algorithm>
+
 #include "converse.h"
 #include "sockRoutines.h"
 #include "charm-api.h"
@@ -37,14 +40,15 @@ CpvDeclare(void *, myProcStatFP);
 
 CmiHwlocTopology CmiHwlocTopologyLocal;
 
+// topology is the set of resources available to this process
+// legacy_topology includes resources disallowed by the system, to implement CmiNumCores
+static hwloc_topology_t topology, legacy_topology;
+
 void CmiInitHwlocTopology(void)
 {
-    hwloc_topology_t topology;
     int depth;
 
-    /* Allocate and initialize topology object. */
     cmi_hwloc_topology_init(&topology);
-    /* Perform the topology detection. */
     cmi_hwloc_topology_load(topology);
 
     // packages == sockets
@@ -64,19 +68,16 @@ void CmiInitHwlocTopology(void)
     depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
     CmiHwlocTopologyLocal.num_pus = depth != HWLOC_TYPE_DEPTH_UNKNOWN ? cmi_hwloc_get_nbobjs_by_depth(topology, depth) : 1;
 
-    cmi_hwloc_topology_destroy(topology);
-
 
     // Legacy: Determine the system's total PU count
 
-    cmi_hwloc_topology_init(&topology);
-    cmi_hwloc_topology_set_flags(topology, cmi_hwloc_topology_get_flags(topology) | HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM);
-    cmi_hwloc_topology_load(topology);
+    cmi_hwloc_topology_init(&legacy_topology);
+    cmi_hwloc_topology_set_flags(legacy_topology, cmi_hwloc_topology_get_flags(legacy_topology) | HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED);
+    cmi_hwloc_topology_load(legacy_topology);
 
-    depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
-    CmiHwlocTopologyLocal.total_num_pus = depth != HWLOC_TYPE_DEPTH_UNKNOWN ? cmi_hwloc_get_nbobjs_by_depth(topology, depth) : 1;
-
-    cmi_hwloc_topology_destroy(topology);
+    depth = cmi_hwloc_get_type_depth(legacy_topology, HWLOC_OBJ_PU);
+    CmiHwlocTopologyLocal.total_num_pus =
+      depth != HWLOC_TYPE_DEPTH_UNKNOWN ? cmi_hwloc_get_nbobjs_by_depth(legacy_topology, depth) : 1;
 }
 
 #if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_HAS_BINDPROCESSOR
@@ -133,12 +134,14 @@ static void add_exclude(int core)
 #include <sys/processor.h>
 #endif
 
-static int set_process_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset)
+static int set_process_affinity(hwloc_cpuset_t cpuset)
 {
 #ifdef _WIN32
   HANDLE process = GetCurrentProcess();
+# define PRINTF_PROCESS "%p"
 #else
   pid_t process = getpid();
+# define PRINTF_PROCESS "%d"
 #endif
 
   if (cmi_hwloc_set_proc_cpubind(topology, process, cpuset, HWLOC_CPUBIND_PROCESS|HWLOC_CPUBIND_STRICT))
@@ -156,16 +159,18 @@ static int set_process_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset
   {
     char *str;
     cmi_hwloc_bitmap_asprintf(&str, cpuset);
-    CmiPrintf("HWLOC> [%d] Process %p bound to cpuset: %s\n", CmiMyPe(), process, str);
+    CmiPrintf("HWLOC> [%d] Process " PRINTF_PROCESS " bound to cpuset: %s\n", CmiMyPe(), process, str);
     free(str);
   }
 #endif
 
   return 0;
+
+#undef PRINTF_PROCESS
 }
 
 #if CMK_SMP
-static int set_thread_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset)
+static int set_thread_affinity(hwloc_cpuset_t cpuset)
 {
 #ifdef _WIN32
   HANDLE thread = GetCurrentThread();
@@ -188,7 +193,7 @@ static int set_thread_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset)
   {
     char *str;
     cmi_hwloc_bitmap_asprintf(&str, cpuset);
-    CmiPrintf("HWLOC> [%d] Thread %p bound to cpuset: %s\n", CmiMyPe(), thread, str);
+    CmiPrintf("HWLOC> [%d] Thread %p bound to cpuset: %s\n", CmiMyPe(), (const void *)thread, str);
     free(str);
   }
 #endif
@@ -198,6 +203,7 @@ static int set_thread_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset)
 #endif
 
 
+// Uses PU indices assigned by the OS
 int CmiSetCPUAffinity(int mycore)
 {
   int core = mycore;
@@ -211,26 +217,55 @@ int CmiSetCPUAffinity(int mycore)
 
   CpvAccess(myCPUAffToCore) = core;
 
-  hwloc_topology_t topology;
-
-  cmi_hwloc_topology_init(&topology);
-  cmi_hwloc_topology_load(topology);
-
   hwloc_obj_t thread_obj = cmi_hwloc_get_pu_obj_by_os_index(topology, core);
 
   int result = -1;
 
   if (thread_obj != nullptr)
 #if CMK_SMP
-    result = set_thread_affinity(topology, thread_obj->cpuset);
+    result = set_thread_affinity(thread_obj->cpuset);
 #else
-    result = set_process_affinity(topology, thread_obj->cpuset);
+    result = set_process_affinity(thread_obj->cpuset);
 #endif
 
-  cmi_hwloc_topology_destroy(topology);
+  if (result == -1)
+    CmiError("Error: CmiSetCPUAffinity failed to bind PE #%d to PU P#%d.\n", CmiMyPe(), mycore);
+
+  return result;
+}
+
+// Uses logical PU indices as determined by hwloc
+int CmiSetCPUAffinityLogical(int mycore)
+{
+  int core = mycore;
+  if (core < 0) {
+    core = CmiHwlocTopologyLocal.num_pus + core;
+  }
+  if (core < 0) {
+    CmiError("Error: Invalid parameter to CmiSetCPUAffinityLogical: %d\n", mycore);
+    CmiAbort("CmiSetCPUAffinityLogical failed!");
+  }
+
+  int thread_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PU);
+  int thread_assignment = core % thread_unitcount;
+
+  hwloc_obj_t thread_obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PU, thread_assignment);
+
+  int result = -1;
+
+  if (thread_obj != nullptr)
+  {
+#if CMK_SMP
+    result = set_thread_affinity(thread_obj->cpuset);
+#else
+    result = set_process_affinity(thread_obj->cpuset);
+#endif
+
+    CpvAccess(myCPUAffToCore) = thread_obj->os_index;
+  }
 
   if (result == -1)
-    CmiError("Error: CmiSetCPUAffinity failed to bind PE #%d to PU #%d.\n", CmiMyPe(), mycore);
+    CmiError("Error: CmiSetCPUAffinityLogical failed to bind PE #%d to PU L#%d.\n", CmiMyPe(), mycore);
 
   return result;
 }
@@ -239,19 +274,12 @@ int CmiSetCPUAffinity(int mycore)
 /* For a large SMP machine, this code should be changed to use a variable sized   */
 /* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
 int print_cpu_affinity(void) {
-  hwloc_topology_t topology;
-  // Allocate and initialize topology object.
-  cmi_hwloc_topology_init(&topology);
-  // Perform the topology detection.
-  cmi_hwloc_topology_load(topology);
-
   hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
   // And try to bind ourself there. */
   if (cmi_hwloc_get_cpubind(topology, cpuset, 0)) {
     int error = errno;
     CmiPrintf("[%d] CPU affinity mask is unknown %s\n", CmiMyPe(), strerror(error));
     cmi_hwloc_bitmap_free(cpuset);
-    cmi_hwloc_topology_destroy(topology);
     return -1;
   }
 
@@ -260,18 +288,11 @@ int print_cpu_affinity(void) {
   CmiPrintf("[%d] CPU affinity mask is %s\n", CmiMyPe(), str);
   free(str);
   cmi_hwloc_bitmap_free(cpuset);
-  cmi_hwloc_topology_destroy(topology);
   return 0;
 }
 
 #if CMK_SMP
 int print_thread_affinity(void) {
-  hwloc_topology_t topology;
-  // Allocate and initialize topology object.
-  cmi_hwloc_topology_init(&topology);
-  // Perform the topology detection.
-  cmi_hwloc_topology_load(topology);
-
 #ifdef _WIN32
   HANDLE thread = GetCurrentThread();
 #else
@@ -285,7 +306,6 @@ int print_thread_affinity(void) {
     int error = errno;
     CmiPrintf("[%d] thread CPU affinity mask is unknown %s\n", CmiMyPe(), strerror(error));
     cmi_hwloc_bitmap_free(cpuset);
-    cmi_hwloc_topology_destroy(topology);
     return -1;
   }
 
@@ -294,7 +314,6 @@ int print_thread_affinity(void) {
   CmiPrintf("[%d] thread CPU affinity mask is %s\n", CmiMyPe(), str);
   free(str);
   cmi_hwloc_bitmap_free(cpuset);
-  cmi_hwloc_topology_destroy(topology);
   return 0;
 
 }
@@ -402,7 +421,7 @@ typedef struct _affMsg {
 } affMsg;
 
 static rankMsg *rankmsg = NULL;
-static CmmTable hostTable;
+static std::map<skt_ip_t, hostnameMsg *> hostTable;
 static CmiNodeLock affLock = 0;
 
 /* called on PE 0 */
@@ -413,7 +432,7 @@ static void cpuAffinityHandler(void *m)
   hostnameMsg *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
   void *tmpm;
-  int tag, tag1, pe, myrank;
+  int pe, myrank;
   int npes = CmiNumPes();
 
 /*   for debug
@@ -422,16 +441,18 @@ static void cpuAffinityHandler(void *m)
   printf("hostname: %d %s\n", msg->pe, str);
 */
   CmiAssert(CmiMyPe()==0 && rankmsg != NULL);
-  tag = *(int*)&msg->ip;
+  skt_ip_t & ip = msg->ip;
   pe = msg->pe;
-  if ((rec = (hostnameMsg *)CmmProbe(hostTable, 1, &tag, &tag1)) != NULL) {
+  auto iter = hostTable.find(ip);
+  if (iter != hostTable.end()) {
+    rec = iter->second;
     CmiFree(msg);
   }
   else {
     rec = msg;
     rec->seq = nodecount;
     nodecount++;                          /* a new node record */
-    CmmPut(hostTable, 1, &tag, msg);
+    hostTable.emplace(ip, msg);
   }
   myrank = rec->rank%rec->ncores;
   while (in_exclude(myrank)) {             /* skip excluded core */
@@ -443,10 +464,10 @@ static void cpuAffinityHandler(void *m)
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
-    DEBUGP(("Cpuaffinity> %d unique compute nodes detected! \n", CmmEntries(hostTable)));
-    tag = CmmWildCard;
-    while ((tmpm = CmmGet(hostTable, 1, &tag, &tag1))) CmiFree(tmpm);
-    CmmFree(hostTable);
+    DEBUGP(("Cpuaffinity> %zu unique compute nodes detected!\n", hostTable.size()));
+    for (const auto & pair : hostTable)
+      CmiFree(pair.second);
+    hostTable.clear();
 #if 1
     /* bubble sort ranks on each node according to the PE number */
     {
@@ -455,11 +476,7 @@ static void cpuAffinityHandler(void *m)
       for(j=i+1; j<npes; j++) {
         if (rankmsg->nodes[i] == rankmsg->nodes[j] && 
               rankmsg->ranks[i] > rankmsg->ranks[j]) 
-        {
-          int tmp = rankmsg->ranks[i];
-          rankmsg->ranks[i] = rankmsg->ranks[j];
-          rankmsg->ranks[j] = tmp;
-        }
+          std::swap(rankmsg->ranks[i], rankmsg->ranks[j]);
       }
     }
 #endif
@@ -479,7 +496,7 @@ static void cpuAffinityRecvHandler(void *msg)
 
   DEBUGP(("[%d %d] set to core #: %d\n", CmiMyNode(), CmiMyPe(), myrank));
 
-  if (-1 != CmiSetCPUAffinity(myrank)) {
+  if (-1 != CmiSetCPUAffinityLogical(myrank)) {
     DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
   }
   else{
@@ -649,11 +666,7 @@ extern int CmiMyLocalRank;
 
 static void bind_process_only(hwloc_obj_type_t process_unit)
 {
-  hwloc_topology_t topology;
   hwloc_cpuset_t cpuset;
-  cmi_hwloc_topology_init(&topology);
-  cmi_hwloc_topology_load(topology);
-
 
   int process_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, process_unit);
 #if CMK_BLUEGENEQ
@@ -665,20 +678,13 @@ static void bind_process_only(hwloc_obj_type_t process_unit)
   int process_assignment = CmiMyLocalRank % process_unitcount;
 
   hwloc_obj_t process_obj = cmi_hwloc_get_obj_by_type(topology, process_unit, process_assignment);
-  set_process_affinity(topology, process_obj->cpuset);
-
-
-  cmi_hwloc_topology_destroy(topology);
+  set_process_affinity(process_obj->cpuset);
 }
 
 #if CMK_SMP
 static void bind_threads_only(hwloc_obj_type_t thread_unit)
 {
-  hwloc_topology_t topology;
   hwloc_cpuset_t cpuset;
-  cmi_hwloc_topology_init(&topology);
-  cmi_hwloc_topology_load(topology);
-
 
   int thread_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, thread_unit);
 #if CMK_BLUEGENEQ
@@ -692,27 +698,20 @@ static void bind_threads_only(hwloc_obj_type_t thread_unit)
   hwloc_obj_t thread_obj = cmi_hwloc_get_obj_by_type(topology, thread_unit, thread_assignment);
   hwloc_cpuset_t thread_cpuset = cmi_hwloc_bitmap_dup(thread_obj->cpuset);
   cmi_hwloc_bitmap_singlify(thread_cpuset);
-  set_thread_affinity(topology, thread_cpuset);
+  set_thread_affinity(thread_cpuset);
   cmi_hwloc_bitmap_free(thread_cpuset);
-
-
-  cmi_hwloc_topology_destroy(topology);
 }
 
 static void bind_process_and_threads(hwloc_obj_type_t process_unit, hwloc_obj_type_t thread_unit)
 {
-  hwloc_topology_t topology;
   hwloc_cpuset_t cpuset;
-  cmi_hwloc_topology_init(&topology);
-  cmi_hwloc_topology_load(topology);
-
 
   int process_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, process_unit);
 
   int process_assignment = CmiMyLocalRank % process_unitcount;
 
   hwloc_obj_t process_obj = cmi_hwloc_get_obj_by_type(topology, process_unit, process_assignment);
-  set_process_affinity(topology, process_obj->cpuset);
+  set_process_affinity(process_obj->cpuset);
 
   int thread_unitcount = cmi_hwloc_get_nbobjs_inside_cpuset_by_type(topology, process_obj->cpuset, thread_unit);
 
@@ -721,11 +720,8 @@ static void bind_process_and_threads(hwloc_obj_type_t process_unit, hwloc_obj_ty
   hwloc_obj_t thread_obj = cmi_hwloc_get_obj_inside_cpuset_by_type(topology, process_obj->cpuset, thread_unit, thread_assignment);
   hwloc_cpuset_t thread_cpuset = cmi_hwloc_bitmap_dup(thread_obj->cpuset);
   cmi_hwloc_bitmap_singlify(thread_cpuset);
-  set_thread_affinity(topology, thread_cpuset);
+  set_thread_affinity(thread_cpuset);
   cmi_hwloc_bitmap_free(thread_cpuset);
-
-
-  cmi_hwloc_topology_destroy(topology);
 }
 #endif
 
@@ -785,6 +781,18 @@ static int set_default_affinity(void)
   return n != -1;
 }
 
+// Check if provided mapping string uses logical indices as assigned by hwloc.
+// Logical indices are used if the first character of the map string is an L
+// (case-insensitive).
+static int check_logical_indices(char **mapptr) {
+  if ((*mapptr)[0] == 'l' || (*mapptr)[0] == 'L') {
+    (*mapptr)++; // Exclude the L character from the string
+    return 1;
+  }
+
+  return 0;
+}
+
 void CmiInitCPUAffinity(char **argv)
 {
   static skt_ip_t myip;
@@ -798,6 +806,8 @@ void CmiInitCPUAffinity(char **argv)
 
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
                                                "set cpu affinity");
+  int pemap_logical_flag = 0;
+  int commap_logical_flag = 0;
 
   while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity"))  {
     if (CmiMyRank() == 0) add_exclude(exclude);
@@ -827,6 +837,17 @@ void CmiInitCPUAffinity(char **argv)
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
 
   if (pemap!=NULL || commap!=NULL) affinity_flag = 1;
+
+  // Check if provided pemap and/or commap use OS indices or logical indices
+  if (pemap != NULL) pemap_logical_flag = check_logical_indices(&pemap);
+  if (commap != NULL) commap_logical_flag = check_logical_indices(&commap);
+
+  // Issue warning if pemap and commap do not use the same type of indices
+  if (pemap != NULL && commap != NULL && pemap_logical_flag != commap_logical_flag) {
+    if (CmiMyPe() == 0) {
+      CmiPrintf("WARNING: Different types of indices are used for +pemap and +commap.\n");
+    }
+  }
 
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity", "print cpu affinity");
 
@@ -892,7 +913,8 @@ void CmiInitCPUAffinity(char **argv)
        CmiPrintf(".\n");
      }
      if (pemap!=NULL)
-       CmiPrintf("Charm++> cpuaffinity PE-core map : %s\n", pemap);
+       CmiPrintf("Charm++> cpuaffinity PE-core map (%s): %s\n",
+           pemap_logical_flag ? "logical indices" : "OS indices", pemap);
   }
 
   if (CmiMyPe() >= CmiNumPes()) {         /* this is comm thread */
@@ -901,9 +923,18 @@ void CmiInitCPUAffinity(char **argv)
     CmiNodeAllBarrier();
     if (commap != NULL) {
       int mycore = search_pemap(commap, CmiMyPeGlobal()-CmiNumPesGlobal());
-      if (CmiPhysicalNodeID(CmiMyPe()) == 0) CmiPrintf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore);
-      if (-1 == CmiSetCPUAffinity(mycore))
-        CmiAbort("CmiSetCPUAffinity failed!");
+      if (commap_logical_flag) {
+        if (-1 == CmiSetCPUAffinityLogical(mycore))
+          CmiAbort("CmiSetCPUAffinityLogical failed!");
+      }
+      else {
+        if (-1 == CmiSetCPUAffinity(mycore))
+          CmiAbort("CmiSetCPUAffinity failed!");
+      }
+      if (CmiPhysicalNodeID(CmiMyPe()) == 0) {
+        CmiPrintf("Charm++> set comm %d on node %d to PU %c#%d\n",
+            CmiMyPe()-CmiNumPes(), CmiMyNode(), commap_logical_flag ? 'L' : 'P', mycore);
+      }
       CmiNodeAllBarrier();
       if (show_affinity_flag) CmiPrintCPUAffinity();
       return;    /* comm thread return */
@@ -935,8 +966,16 @@ void CmiInitCPUAffinity(char **argv)
 
   if (pemap != NULL && CmiMyPe()<CmiNumPes()) {    /* work thread */
     int mycore = search_pemap(pemap, CmiMyPeGlobal());
-    if(show_affinity_flag) CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore);
-    if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("CmiSetCPUAffinity failed!");
+    if (pemap_logical_flag) {
+      if (CmiSetCPUAffinityLogical(mycore) == -1) CmiAbort("CmiSetCPUAffinityLogical failed");
+    }
+    else {
+      if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("CmiSetCPUAffinity failed!");
+    }
+    if (show_affinity_flag) {
+      CmiPrintf("Charm++> set PE %d on node %d to PU %c#%d\n", CmiMyPe(), CmiMyNode(),
+          pemap_logical_flag ? 'L' : 'P', mycore);
+    }
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
     /* if (show_affinity_flag) CmiPrintCPUAffinity(); */
@@ -1007,7 +1046,6 @@ void CmiInitCPUAffinity(char **argv)
 
   if (CmiMyPe() == 0) {
     int i;
-    hostTable = CmmNew();
     rankmsg = (rankMsg *)CmiAlloc(sizeof(rankMsg)+CmiNumPes()*sizeof(int)*2);
     CmiSetHandler((char *)rankmsg, cpuAffinityRecvHandlerIdx);
     rankmsg->ranks = (int *)((char*)rankmsg + sizeof(rankMsg));

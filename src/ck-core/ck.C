@@ -437,13 +437,11 @@ void CkSectionID::pup(PUP::er &p) {
 /**** Tiny random API routines */
 
 #if CMK_CUDA
-void CUDACallbackManager(void *fn) {
-  if (fn != NULL) {
-    CkCallback *cb = (CkCallback*) fn;
-    cb->send();
+void CUDACallbackManager(void *fn, void *msg) {
+  if (fn) {
+    ((CkCallback*)fn)->send(msg);
   }
 }
-
 #endif
 
 void QdCreate(int n) {
@@ -1328,6 +1326,11 @@ void CkPackMessage(envelope **pEnv)
   envelope *env = *pEnv;
   if(!env->isPacked() && _msgTable[env->getMsgIdx()]->pack) {
     void *msg = EnvToUsr(env);
+#if CMK_ONESIDED_IMPL
+    short int zcMsgType = CMI_ZC_MSGTYPE(env);
+    if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Store buffer pointers as offsets
+      CkPackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
+#endif
     _TRACE_BEGIN_PACK();
     msg = _msgTable[env->getMsgIdx()]->pack(msg);
     _TRACE_END_PACK();
@@ -1346,6 +1349,11 @@ void CkUnpackMessage(envelope **pEnv)
     _TRACE_BEGIN_UNPACK();
     msg = _msgTable[msgIdx]->unpack(msg);
     _TRACE_END_UNPACK();
+#if CMK_ONESIDED_IMPL
+    short int zcMsgType = CMI_ZC_MSGTYPE(env);
+    if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Convert offsets back into buffer pointers
+      CkUnpackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
+#endif
     env=UsrToEnv(msg);
     env->setPacked(0);
     *pEnv = env;
@@ -1527,6 +1535,10 @@ void _noCldNodeEnqueue(int node, envelope *env)
 	CmiSyncNodeSendAndFree(node, len, (char *)env);
   }
 }
+
+#if CMK_REPLAYSYSTEM && !CMK_TRACE_ENABLED
+#error "Building with Record/Replay support requires tracing support!"
+#endif
 
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
@@ -2180,6 +2192,11 @@ void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char 
   ArrayMsgRecvExtCallback = cb;
 }
 
+void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int) = NULL;
+void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int *, int, int, char *, int)) {
+  ArrayBcastRecvExtCallback = cb;
+}
+
 int (*ArrayElemLeaveExt)(int, int, int *, char**, int) = NULL;
 void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int)) {
   ArrayElemLeaveExt = cb;
@@ -2560,7 +2577,7 @@ static FILE *openReplayFile(const char *prefix, const char *suffix, const char *
   FILE *f = fopen(fName.c_str(), permissions);
   REPLAYDEBUG("openReplayfile " << fName.c_str());
   if (f==NULL) {
-    CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
+    CkPrintf("[%d] Could not open replay file '%s' with permissions '%s'\n",
              CkMyPe(), fName.c_str(), permissions);
     CkAbort("openReplayFile> Could not open replay file");
   }
@@ -2866,14 +2883,12 @@ class CkMessageDetailReplay : public CkMessageWatcher {
     CmiUInt4 size; size_t nread;
     if ((nread=fread(&size, 4, 1, f)) < 1) {
       if (feof(f)) return NULL;
-      CkPrintf("Broken record file (metadata) got %d\n",nread);
-      CkAbort("");
+      CkAbort("Broken record file (metadata) got %zu\n",nread);
     }
     void *env = CmiAlloc(size);
     long tell = ftell(f);
     if ((nread=fread(env, size, 1, f)) < 1) {
-      CkPrintf("Broken record file (data) expecting %d, got %d (file position %lld)\n",size,nread,tell);
-      CkAbort("");
+      CkAbort("Broken record file (data) expecting %d, got %zu (file position %ld)\n",size,nread,tell);
     }
     //*(int*)env = 0x34567890; // set first integer as magic
     return env;

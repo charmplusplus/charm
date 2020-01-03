@@ -246,6 +246,7 @@ FLINKAGE {
 #define mpi_type_get_contents FTN_NAME ( MPI_TYPE_GET_CONTENTS , mpi_type_get_contents )
 
 #define mpi_win_create FTN_NAME ( MPI_WIN_CREATE , mpi_win_create )
+#define mpi_win_allocate FTN_NAME ( MPI_WIN_ALLOCATE , mpi_win_allocate )
 #define mpi_win_free  FTN_NAME ( MPI_WIN_FREE  , mpi_win_free )
 #define mpi_win_create_errhandler FTN_NAME ( MPI_WIN_CREATE_ERRHANDLER , mpi_win_create_errhandler )
 #define mpi_win_call_errhandler FTN_NAME ( MPI_WIN_CALL_ERRHANDLER , mpi_win_call_errhandler )
@@ -320,8 +321,6 @@ FLINKAGE {
 #define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
 #define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
 #define ampi_set_migratable FTN_NAME ( AMPI_SET_MIGRATABLE , ampi_set_migratable )
-#define ampi_init_universe FTN_NAME( AMPI_INIT_UNIVERSE , ampi_init_universe )
-#define ampi_register_main FTN_NAME( AMPI_REGISTER_MAIN , ampi_register_main )
 #define ampi_register_pup FTN_NAME( AMPI_REGISTER_PUP , ampi_register_pup )
 #define ampi_register_about_to_migrate FTN_NAME ( AMPI_REGISTER_ABOUT_TO_MIGRATE , ampi_register_about_to_migrate )
 #define ampi_register_just_migrated FTN_NAME ( AMPI_REGISTER_JUST_MIGRATED , ampi_register_just_migrated )
@@ -1835,6 +1834,12 @@ void mpi_win_create(void *base, MPI_Aint *size, int *disp_unit,
   *ierr = MPI_Win_create(base, *size, *disp_unit, *info, *comm, newwin);
 }
 
+void mpi_win_allocate(MPI_Aint *size, int *disp_unit,
+                      int *info, int *comm, void *base, MPI_Win *win, int *ierr) noexcept
+{
+  *ierr = MPI_Win_allocate(*size, *disp_unit, *info, *comm, base, win);
+}
+
 void mpi_win_free(int *win, int *ierr) noexcept
 {
   *ierr = MPI_Win_free(win);
@@ -2184,11 +2189,6 @@ void ampi_set_migratable(int *mig, int *ierr) noexcept
   *ierr = AMPI_Set_migratable(*mig);
 }
 
-void ampi_register_main(MPI_MainFn fn, const char *name, int *ierr) noexcept
-{
-  *ierr = AMPI_Register_main(fn, name);
-}
-
 void ampi_register_pup(MPI_PupFn fn, void *data, int *idx, int *ierr) noexcept
 {
   *ierr = AMPI_Register_pup(fn, data, idx);
@@ -2344,11 +2344,6 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
     memset(str, ' ', *len);
     *ierr = 1;
   }
-}
-
-void ampi_init_universe(int *unicomm, int *ierr) noexcept
-{
-  *ierr = AMPI_Init_universe(unicomm);
 }
 
 } // extern "C"

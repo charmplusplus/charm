@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Generic converse configuration script:
 #   Reads various configuration scripts and sets defaults.
@@ -116,8 +116,6 @@ CMK_SEQ_CC_FLAGS="$CMK_SEQ_CC_FLAGS $CMK_SEQ_DEFS"
 CMK_SEQ_CXX_FLAGS="$CMK_SEQ_CXX_FLAGS $CMK_SEQ_DEFS"
 CMK_SEQ_LD_FLAGS="$CMK_SEQ_LD_FLAGS $CMK_SEQ_DEFS"
 CMK_SEQ_LDXX_FLAGS="$CMK_SEQ_LDXX_FLAGS $CMK_SEQ_DEFS"
-
-[ -z "$CMK_CELL" ] && CMK_CELL=0
 
 [ -z "$CMK_C_OPENMP" ] && CMK_C_OPENMP="-fopenmp"
 [ -z "$CMK_F_OPENMP" ] && CMK_F_OPENMP="$CMK_C_OPENMP"

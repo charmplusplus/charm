@@ -29,8 +29,7 @@ void CmiAbort(const char *message, ...)
   va_start(args, message);
   vsnprintf(newmsg, sizeof(newmsg), message, args);
   va_end(args);
-  CmiError(newmsg);
-  CmiError("\n");
+  CmiError("%s\n", newmsg);
   exit(1);
   CMI_NORETURN_FUNCTION_END
 }
@@ -72,6 +71,7 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 }
 
 /********************* CONTEXT-SWITCHING FUNCTIONS ******************/
+static int _exitcode = 0;
 
 static void CmiNext(void)
 {
@@ -82,7 +82,7 @@ static void CmiNext(void)
     t = CmiThreads[index];
     if ((t)&&(!CmiBarred[index])) break;
     index = (index+1) % CmiNumPes();
-    if (index == orig) exit(0);
+    if (index == orig) exit(_exitcode);
   }
   _Cmi_mype = index;
   CthResume(t);
@@ -287,8 +287,7 @@ static void CmiParseArgs(char **argv)
   _Cmi_numpes=1;
   CmiGetArgInt(argv,"+p",&_Cmi_numpes);
   if (CmiNumPes()<1) {
-    printf("Error: must specify number of processors to simulate with +pXXX\n",CmiNumPes());
-    exit(1);
+    CmiAbort("Error: must specify number of processors to simulate with +pXXX");
   }
 }
 
@@ -316,6 +315,7 @@ void ConverseExit(int exitcode)
 {
   ConverseCommonExit();
   CmiThreads[CmiMyPe()] = 0;
+  _exitcode = exitcode; // Used in CmiNext()
   CmiNext();
 }
 

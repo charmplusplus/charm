@@ -6,8 +6,8 @@ void check_size_approx(size_t s) {
   size_t enc = pup_decodeSize(pup_encodeSize(s));
   double diff = s > enc ? s - enc : enc - s;
   if (diff / s > 0.005) {
-    CmiPrintf("Failed to accurately encode size %lu as %lu: difference was %f\n",
-              (unsigned long)s, enc, diff);
+    CmiPrintf("Failed to accurately encode size %zu as %zu: difference was %f\n",
+              s, enc, diff);
     exit(2);
   }
 }
@@ -48,44 +48,42 @@ void check_test(int argc, char** argv) {
   if (argc > 1) {
     const int expected_pes = atoi(argv[1]);
     if (CmiNumPes() != expected_pes) {
-      char message[1000];
-      sprintf(message, "PE count %d doesn't match expectation %d", CmiNumPes(), expected_pes);
-      CmiAbort(message);
+      CmiAbort("PE count %d doesn't match expectation %d", CmiNumPes(), expected_pes);
     }
   }
 
   if (sizeof(int2) != 2) {
-    CmiPrintf("Error: sizeof(CmiInt2) is %d!\n",sizeof(int2));
+    CmiPrintf("Error: sizeof(CmiInt2) is %zu!\n",sizeof(int2));
     exit(1);
   }
   if (sizeof(int4) != 4) {
-    CmiPrintf("Error: sizeof(CmiInt4) is %d!\n",sizeof(int4));
+    CmiPrintf("Error: sizeof(CmiInt4) is %zu!\n",sizeof(int4));
     exit(1);
   }
   if (sizeof(int8) != 8) {
-    CmiPrintf("Error: sizeof(CmiInt8) is %d!\n",sizeof(int8));
+    CmiPrintf("Error: sizeof(CmiInt8) is %zu!\n",sizeof(int8));
     exit(1);
   }
 
   if (sizeof(uint2) != 2) {
-    CmiPrintf("Error: sizeof(CmiUInt2) is %d!\n",sizeof(uint2));
+    CmiPrintf("Error: sizeof(CmiUInt2) is %zu!\n",sizeof(uint2));
     exit(1);
   }
   if (sizeof(uint4) != 4) {
-    CmiPrintf("Error: sizeof(CmiUInt4) is %d!\n",sizeof(uint4));
+    CmiPrintf("Error: sizeof(CmiUInt4) is %zu!\n",sizeof(uint4));
     exit(1);
   }
   if (sizeof(uint8) != 8) {
-    CmiPrintf("Error: sizeof(CmiUInt8) is %d!\n",sizeof(uint8));
+    CmiPrintf("Error: sizeof(CmiUInt8) is %zu!\n",sizeof(uint8));
     exit(1);
   }
 
   if (sizeof(float4) != 4) {
-    CmiPrintf("Error: sizeof(CmiFloat4) is %d!\n",sizeof(float4));
+    CmiPrintf("Error: sizeof(CmiFloat4) is %zu!\n",sizeof(float4));
     exit(1);
   }
   if (sizeof(float8) != 8) {
-    CmiPrintf("Error: sizeof(CmiFloat8) is %d!\n",sizeof(float8));
+    CmiPrintf("Error: sizeof(CmiFloat8) is %zu!\n",sizeof(float8));
     exit(1);
   }
 
@@ -116,12 +114,12 @@ void check_test(int argc, char** argv) {
   CmiFree(buf1);
   CmiPrintf("CmiMemoryUsage() reported %fMB (before) vs %fMB (after)!\n", mem_before/1E6, mem_after/1E6);
   if (mem_after - mem_before < s) {
-    CmiPrintf("Error: CmiMemoryUsage() does not work %lld %lld!\n", mem_before, mem_after);
+    CmiPrintf("Error: CmiMemoryUsage() does not work %" PRIu64 " %" PRIu64 "!\n", mem_before, mem_after);
     //CmiAbort("CmiMemoryUsage failed");
   }
 #endif
 
-  CmiPrintf("Info: converse header: %d envelope: %d\n", CmiReservedHeaderSize, sizeof(envelope));
+  CmiPrintf("Info: converse header: %zu envelope: %zu\n", CmiReservedHeaderSize, sizeof(envelope));
   if (sizeof(envelope) % 8 != 0) {
     CmiPrintf("Error: size of envelope can not divide 8. \n");
     exit(1);

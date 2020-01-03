@@ -79,6 +79,14 @@ never be excluded...
 
 #if CMK_CUDA
 #include "hapi_impl.h"
+
+extern void (*hapiInvokeCallback)(void*, void*);
+extern void CUDACallbackManager(void*, void*);
+
+extern void (*hapiQdCreate)(int);
+extern void (*hapiQdProcess)(int);
+extern void QdCreate(int);
+extern void QdProcess(int);
 #endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
@@ -302,16 +310,16 @@ static inline void _parseCommandLineOpts(char **argv)
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
-      CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
+      if (!quietModeRequested)
+        CkPrintf("CharmFT> Restarting node %d after crash...\n", CmiMyNode());
   }
   // reading the killFile
   if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
     if(faultFunc == NULL){
       //do not read the killfile if this is a restarting processor
       killFlag = true;
-      if(CmiMyPe() == 0){
-        printf("[%d] killFlag set to true for file %s\n",CkMyPe(),killFile);
-      }
+      if (CmiMyPe() == 0 && !quietModeRequested)
+        CkPrintf("CharmFT> Using diagnostic kill file: %s\n", killFile);
     }
   }
 #endif
@@ -1097,6 +1105,7 @@ CkQ<CkExitFn> _CkExitFnVec;
 // Trigger exit on PE 0,
 // which traverses _CkExitFnVec to call every registered user exit function.
 // Every user exit function should end with CkExit() to continue the chain.
+// When compiled, #defines in charm.h rename this function to "realCkExit".
 void CkExit(int exitcode)
 {
   DEBUGF(("[%d] CkExit called \n",CkMyPe()));
@@ -1557,9 +1566,8 @@ void _initCharm(int unused_argc, char **argv)
 	}
 
 	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */
-	if (CkMyRank() == 0) {
-	  CpdBreakPointInit();
-	}
+	CpdBreakPointInit();
+	
 	CmiNodeAllBarrier();
 
 	// Execute the initcalls registered in modules
@@ -1568,8 +1576,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CHARMDEBUG
 	CpdFinishInitialization();
 #endif
-	if (CkMyRank() == 0)
-	  _registerDone();
+	_registerDone();
 	CmiNodeAllBarrier();
 
 	CkpvAccess(_myStats) = new Stats();
@@ -1679,11 +1686,9 @@ void _initCharm(int unused_argc, char **argv)
     }
 
 #if CMK_CUDA
+    initDeviceMapping(argv);
     if (CmiMyRank() == 0) {
       initHybridAPI();
-    }
-    else /* CmiMyRank() != 0 */ {
-      setHybridAPIDevice();
     }
     initEventQueues();
 
@@ -1692,6 +1697,9 @@ void _initCharm(int unused_argc, char **argv)
       CmiNodeBarrier();
     }
     hapiRegisterCallbacks();
+    hapiInvokeCallback = CUDACallbackManager;
+    hapiQdCreate = QdCreate;
+    hapiQdProcess = QdProcess;
 #endif
 
     if(CmiMyPe() == 0) {
@@ -1817,7 +1825,7 @@ void _initCharm(int unused_argc, char **argv)
         // Should not use CpdFreeze inside a thread (since this processor is really a user-level thread)
        if (CpvAccess(cpdSuspendStartup))
        { 
-          //CmiPrintf("In Parallel Debugging mode .....\n");
+	 if(CkMyPe()==0) CmiPrintf("In Parallel Debugging mode .....\n");
           CpdFreeze();
        }
 #endif

@@ -459,7 +459,7 @@ void printNetStatistics(void)
   strcat(statstr, tmpstr);
   sprintf(tmpstr, "***********************************\n");
   strcat(statstr, tmpstr);
-  CmiPrintf(statstr);
+  CmiPrintf("%s", statstr);
 }
 
 

@@ -32,10 +32,4 @@ void AccelBlock::print(XStr& str) { (void)str; }
 /// Construct Methods ///
 void AccelBlock::genDefs(XStr& str) { outputCode(str); }
 
-/// Construct Accel Support Methods ///
-int AccelBlock::genAccels_spe_c_funcBodies(XStr& str) {
-  outputCode(str);
-  return 0;
-}
-
 }  // namespace xi

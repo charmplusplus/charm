@@ -26,6 +26,10 @@ ROMIO integrated into AMPI:
 * HAVE_MPI_OFFSET is unconditionally defined to 1.
 * MPIR_Ext_cs_yield has been corrected to ROMIO_THREAD_CS_YIELD in
   adio/common/ad_i{read,write}_coll.c.
+* PMPI_File_set_errhandler has been corrected to MPI_File_set_errhandler
+  in adio/common/ad_end.c and mpi-io/close.c.
+* MPIO_Request_{c2f,f2c} are declared regardless of HAVE_MPI_GREQUEST
+  and mpi-io/ioreq_{c2f,f2c}.c are always built.
 
 
 Variable privatization
@@ -33,8 +37,8 @@ Variable privatization
 
 ROMIO has several global variables that need to be privatized for AMPI.
 The following table contains the currently known global variables and how they
-are handled in this integrated version of ROMIO. Privatization is done with
-the Ctv* functions of Charm++.
+are handled in this integrated version of ROMIO. Privatization is done manually
+by including the globals in the ampiParent class.
 
 ================ ========= =========================== ==================================
 Defined in       Type (nm) Variable name               Status
