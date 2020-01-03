@@ -380,6 +380,7 @@ void Parameter::marshallDeviceRdmaParameters(XStr& str) {
     Type* dt = type->deref();
     str << "  ncpyBuffer_" << name << ".cnt = sizeof(" << dt << ")*(" << arrLen
       << ");\n";
+    str << "  ncpyBuffer_" << name << ".setMemHandle();\n";
   }
 }
 

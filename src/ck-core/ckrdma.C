@@ -10,10 +10,6 @@
 #include <algorithm>
 #include "ckarray.h"
 
-#if CMK_CUDA
-#include "hapi.h" // For device-side zero-copy operations
-#endif
-
 #if CMK_SMP
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
 #endif
@@ -313,6 +309,15 @@ CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
   } else {
     CkAbort("CkNcpyBuffer::put : Invalid CkNcpyMode");
   }
+}
+
+// Set up the CUDA IPC memory handle to be passed to the receiver
+void CkNcpyBuffer::setMemHandle() {
+#if CMK_CUDA
+  hapiCheck(cudaIpcGetMemHandle(&memHandle, (void*)ptr));
+#else
+  CkAbort("CUDA IPC is only supported in the CUDA build of Charm++");
+#endif
 }
 
 // reconstruct the CkNcpyBuffer object for the source
@@ -2281,18 +2286,12 @@ void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int 
 // (i.e. CMK_ONESIDED_IMPL)
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     void **arrPtrs, int *arrSizes, bool onlyDevice) {
-#if !CMK_CUDA
-  CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
-#else
+#if CMK_CUDA
   // Only P2P RECV API is supported
   CkAssert(emMode == ncpyEmApiMode::P2P_RECV);
 
   // Find which mode of transfer should be used
   CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
-  // TODO: Support other modes
-  if (mode != CkNcpyModeDevice::MEMCPY) {
-    CkAbort("Only MEMCPY mode is supported");
-  }
 
   // Start unpacking marshalled message
   PUP::toMem p((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
@@ -2325,10 +2324,14 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
               cudaMemcpyDeviceToDevice));
         break;
       case CkNcpyModeDevice::IPC:
-        // TODO
+        void* source_ptr;
+        hapiCheck(cudaIpcOpenMemHandle(&source_ptr, source.memHandle, cudaIpcMemLazyEnablePeerAccess));
+        hapiCheck(cudaMemcpy((void*)dest.ptr, source_ptr, std::min(source.cnt, dest.cnt),
+              cudaMemcpyDeviceToDevice));
         break;
       case CkNcpyModeDevice::RDMA:
         // TODO
+        CkAbort("GPU direct messaging between different physical nodes is not yet supported");
         break;
       default:
         CkAbort("Invalid mode");
@@ -2352,7 +2355,9 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
         enqueueNcpyMessage(CkMyPe(), env);
         break;
       case CkNcpyModeDevice::IPC:
-        // TODO
+        // FIXME: Send back to sender to close IPC handle
+        QdCreate(1);
+        enqueueNcpyMessage(CkMyPe(), env);
         break;
       case CkNcpyModeDevice::RDMA:
         // TODO
@@ -2362,5 +2367,7 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
         break;
     }
   }
+#else
+  CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
 #endif
 }
