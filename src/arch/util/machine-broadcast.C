@@ -392,7 +392,10 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
 
 void CmiWithinNodeBroadcastFn(int size, char* msg) {
   CMI_DEST_RANK(msg) = CmiMyRank();
-  SendToPeers(size, msg);
+#if CMK_ONESIDED_IMPL
+  if(CMI_ZC_MSGTYPE(msg) != CMK_ZC_BCAST_RECV_MSG)
+    SendToPeers(size, msg);
+#endif
   CmiSendSelf(msg);
 }
 

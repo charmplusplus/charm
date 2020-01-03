@@ -1721,11 +1721,12 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     }else
     {
-        if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL) {
+#if CMK_SMP
+        if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL)
           env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
-        } else {
+        else
+#endif
           env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
-        }
     }
 
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
