@@ -96,7 +96,7 @@ public:
   int peer;
 
   double pingpong_start_time;
-  double pingpong_time_sum;
+  double* pingpong_times;
 
   double* h_local_data;
   double* h_remote_data;
@@ -119,7 +119,9 @@ public:
   void init() {
     iter = 1;
 
-    pingpong_time_sum = 0;
+    if (CkMyPe() == 0) {
+      pingpong_times = (double*)malloc(n_iters * sizeof(double));
+    }
 
     // Determine the peer index
     peer = (thisIndex < CkNumPes() / 2) ? (thisIndex + CkNumPes() / 2) :
@@ -193,14 +195,32 @@ public:
     }
     else {
       // Received pong
-      double pingpong_time = CkWallTimer() - pingpong_start_time;
-      pingpong_time_sum += pingpong_time;
+      pingpong_times[iter-1] = CkWallTimer() - pingpong_start_time;
 
       // Start next iteration or end test for current count
       if (iter++ == n_iters) {
+        // Reset iteration
         iter = 1;
-        CkPrintf("Average roundtrip time for %d doubles (%lu B): %.3lf us\n",
-            count, count * sizeof(double), (pingpong_time_sum / n_iters) * 1000000);
+
+        // Calculate average/mean pingpong time
+        double pingpong_times_sum = 0;
+        for (int i = 0; i < n_iters; i++) {
+          pingpong_times_sum += pingpong_times[i];
+        }
+        double pingpong_times_mean = pingpong_times_sum / n_iters;
+
+        // Calculate standard deviation
+        double stdev = 0;
+        for (int i = 0; i < n_iters; i++) {
+          stdev += (pingpong_times[i] - pingpong_times_mean) * (pingpong_times[i] - pingpong_times_mean);
+        }
+        stdev = sqrt(stdev / n_iters);
+
+        // Calculate confidence interval
+        double stderror = stdev / sqrt(n_iters);
+
+        CkPrintf("Roundtrip time for %d doubles (%lu B): %.3lf += %.3lf us (95%% confidence)\n",
+            count, count * sizeof(double), pingpong_times_mean * 1000000, 2 * stderror * 1000000);
         main_proxy.testEnd();
       }
       else {
