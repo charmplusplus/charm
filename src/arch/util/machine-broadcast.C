@@ -394,8 +394,8 @@ void CmiWithinNodeBroadcastFn(int size, char* msg) {
   CMI_DEST_RANK(msg) = CmiMyRank();
 #if CMK_ONESIDED_IMPL
   if(CMI_ZC_MSGTYPE(msg) != CMK_ZC_BCAST_RECV_MSG)
-    SendToPeers(size, msg);
 #endif
+    SendToPeers(size, msg);
   CmiSendSelf(msg);
 }
 
