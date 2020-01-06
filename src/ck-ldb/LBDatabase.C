@@ -894,7 +894,7 @@ void LBDatabase::MetaLBResumeWaitingChares(int lb_ideal_period) {
 }
 
 void LBDatabase::MetaLBCallLBOnChares() {
-#ifdef CMK_LBDB_ON
+#if CMK_LBDB_ON
   for (int i = 0; i < objs.size(); i++) {
     LBObj* obj = objs[i].obj;
     if (obj) {

@@ -1335,6 +1335,11 @@ void CkPackMessage(envelope **pEnv)
   envelope *env = *pEnv;
   if(!env->isPacked() && _msgTable[env->getMsgIdx()]->pack) {
     void *msg = EnvToUsr(env);
+#if CMK_ONESIDED_IMPL
+    short int zcMsgType = CMI_ZC_MSGTYPE(env);
+    if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Store buffer pointers as offsets
+      CkPackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
+#endif
     _TRACE_BEGIN_PACK();
     msg = _msgTable[env->getMsgIdx()]->pack(msg);
     _TRACE_END_PACK();
@@ -1353,6 +1358,11 @@ void CkUnpackMessage(envelope **pEnv)
     _TRACE_BEGIN_UNPACK();
     msg = _msgTable[msgIdx]->unpack(msg);
     _TRACE_END_UNPACK();
+#if CMK_ONESIDED_IMPL
+    short int zcMsgType = CMI_ZC_MSGTYPE(env);
+    if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Convert offsets back into buffer pointers
+      CkUnpackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
+#endif
     env=UsrToEnv(msg);
     env->setPacked(0);
     *pEnv = env;
