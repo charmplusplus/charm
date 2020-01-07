@@ -16,14 +16,6 @@
 #include "register.h" // for _chareTable, _entryTable
 #endif
 
-// Default is to abort on error, but users can build
-// AMPI with -DAMPI_ERRHANDLER_RETURN=1 to change it:
-#if AMPI_ERRHANDLER_RETURN
-#define AMPI_ERRHANDLER MPI_ERRORS_RETURN
-#else
-#define AMPI_ERRHANDLER MPI_ERRORS_ARE_FATAL
-#endif
-
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) //x /* empty */
 /* change this define to "x" to trace user calls */
@@ -34,25 +26,9 @@
 /* For MPI_Get_library_version */
 extern const char * const CmiCommitID;
 
-static CkDDT *getDDT() noexcept {
+static inline CkDDT *getDDT() noexcept {
   return &getAmpiParent()->myDDT;
 }
-
-/* if error checking is disabled, ampiErrhandler is defined as a macro in ampiimpl.h */
-#if AMPI_ERROR_CHECKING
-int ampiErrhandler(const char* func, int errcode) noexcept {
-  if (AMPI_ERRHANDLER == MPI_ERRORS_ARE_FATAL && errcode != MPI_SUCCESS) {
-    // Abort with a nice message of the form: 'func' failed with error code 'errstr'.
-    //  where 'func' is the name of the failed AMPI_ function and 'errstr'
-    //  is the string returned by AMPI_Error_string for errcode.
-    int errstrlen;
-    char errstr[MPI_MAX_ERROR_STRING];
-    MPI_Error_string(errcode, errstr, &errstrlen);
-    CkAbort("%s failed with error code %s", func, errstr);
-  }
-  return errcode;
-}
-#endif
 
 #if AMPI_PRINT_MSG_SIZES
 #if !AMPI_ERROR_CHECKING
@@ -134,7 +110,7 @@ inline int checkBuf(const char* func, const void *buf, int count, bool isAbsolut
   return MPI_SUCCESS;
 }
 
-int errorCheck(const char* func, MPI_Comm comm, bool ifComm, int count,
+static inline int errorCheck(const char* func, MPI_Comm comm, bool ifComm, int count,
                bool ifCount, MPI_Datatype data, bool ifData, int tag,
                bool ifTag, int rank, bool ifRank, const void *buf1,
                bool ifBuf1, const void *buf2=nullptr, bool ifBuf2=false) noexcept {
@@ -4106,43 +4082,7 @@ void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool* pool) noexcept {
 }
 
 //------------------ External Interface -----------------
-CMI_WARN_UNUSED_RESULT ampiParent *getAmpiParent() noexcept {
-  ampiParent *p = CtvAccess(ampiPtr);
-#if CMK_ERROR_CHECKING
-  if (p==NULL) CkAbort("Cannot call MPI routines before AMPI is initialized.\n");
-#endif
-  return p;
-}
-
-CMI_WARN_UNUSED_RESULT ampi *getAmpiInstance(MPI_Comm comm) noexcept {
-  ampi *ptr=getAmpiParent()->comm2ampi(comm);
-#if CMK_ERROR_CHECKING
-  if (ptr==NULL) CkAbort("AMPI's getAmpiInstance> null pointer\n");
-#endif
-  return ptr;
-}
-
-bool isAmpiThread() noexcept {
-  return (CtvAccess(ampiPtr) != NULL);
-}
-
-inline static AmpiRequestList &getReqs() noexcept {
-  return getAmpiParent()->ampiReqs;
-}
-
-inline void checkComm(MPI_Comm comm) noexcept {
-#if AMPI_ERROR_CHECKING
-  getAmpiParent()->checkComm(comm);
-#endif
-}
-
-inline void checkRequest(MPI_Request req) noexcept {
-#if AMPI_ERROR_CHECKING
-  getReqs().checkRequest(req);
-#endif
-}
-
-inline void checkRequests(int n, MPI_Request* reqs) noexcept {
+static inline void checkRequests(int n, MPI_Request* reqs) noexcept {
 #if AMPI_ERROR_CHECKING
   AmpiRequestList& reqlist = getReqs();
   for(int i=0;i<n;i++)

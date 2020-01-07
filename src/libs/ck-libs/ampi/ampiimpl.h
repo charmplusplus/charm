@@ -2899,16 +2899,68 @@ class ampi final : public CBase_ampi {
                           MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request) noexcept;
 };
 
-CMI_WARN_UNUSED_RESULT ampiParent *getAmpiParent() noexcept;
-bool isAmpiThread() noexcept;
-CMI_WARN_UNUSED_RESULT ampi *getAmpiInstance(MPI_Comm comm) noexcept;
-void checkComm(MPI_Comm comm) noexcept;
-void checkRequest(MPI_Request req) noexcept;
+CtvExtern(ampiParent*, ampiPtr);
+
+static inline CMI_WARN_UNUSED_RESULT ampiParent *getAmpiParent() noexcept {
+  ampiParent *p = CtvAccess(ampiPtr);
+#if CMK_ERROR_CHECKING
+  if (p==NULL) CkAbort("Cannot call MPI routines before AMPI is initialized.\n");
+#endif
+  return p;
+}
+
+static inline CMI_WARN_UNUSED_RESULT ampi *getAmpiInstance(MPI_Comm comm) noexcept {
+  ampi *ptr=getAmpiParent()->comm2ampi(comm);
+#if CMK_ERROR_CHECKING
+  if (ptr==NULL) CkAbort("AMPI's getAmpiInstance> null pointer\n");
+#endif
+  return ptr;
+}
+
+static inline bool isAmpiThread() noexcept {
+  return (CtvAccess(ampiPtr) != NULL);
+}
+
+static inline AmpiRequestList &getReqs() noexcept {
+  return getAmpiParent()->ampiReqs;
+}
+
+static inline void checkComm(MPI_Comm comm) noexcept {
+#if AMPI_ERROR_CHECKING
+  getAmpiParent()->checkComm(comm);
+#endif
+}
+
+static inline void checkRequest(MPI_Request req) noexcept {
+#if AMPI_ERROR_CHECKING
+  getReqs().checkRequest(req);
+#endif
+}
+
 void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type) noexcept;
 void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatype type2) noexcept;
 
+// Default is to abort on error, but users can build
+// AMPI with -DAMPI_ERRHANDLER_RETURN=1 to change it:
+#if AMPI_ERRHANDLER_RETURN
+#define AMPI_ERRHANDLER MPI_ERRORS_RETURN
+#else
+#define AMPI_ERRHANDLER MPI_ERRORS_ARE_FATAL
+#endif
+
 #if AMPI_ERROR_CHECKING
-int ampiErrhandler(const char* func, int errcode) noexcept;
+static inline int ampiErrhandler(const char* func, int errcode) noexcept {
+  if (AMPI_ERRHANDLER == MPI_ERRORS_ARE_FATAL && errcode != MPI_SUCCESS) {
+    // Abort with a nice message of the form: 'func' failed with error code 'errstr'.
+    //  where 'func' is the name of the failed AMPI_ function and 'errstr'
+    //  is the string returned by AMPI_Error_string for errcode.
+    int errstrlen;
+    char errstr[MPI_MAX_ERROR_STRING];
+    MPI_Error_string(errcode, errstr, &errstrlen);
+    CkAbort("%s failed with error code %s", func, errstr);
+  }
+  return errcode;
+}
 #else
 #define ampiErrhandler(func, errcode) (errcode)
 #endif

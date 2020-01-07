@@ -455,9 +455,6 @@ void ArrayElement::CkAbort(const char *format, ...) const
 	CkMigratable::CkAbort("[%d] Array element at index %s aborting:\n%s", CkMyPe(), idx2str(thisIndexMax), newmsg);
 }
 
-void ArrayElement::recvBroadcast(CkMessage *m){
-}
-
 #if CMK_CHARMPY
 
 ArrayElemExt::ArrayElemExt(void *impl_msg)
@@ -919,12 +916,6 @@ void CkArray::stampListenerData(CkMigratable *elt)
 {
   ArrayElement *elt2 = (ArrayElement *)elt;
   CK_ARRAYLISTENER_STAMP_LOOP(elt2->listenerData);
-}
-
-CkMigratable *CkArray::allocateMigrated(int elChareType, CkElementCreation_t type)
-{
-	ArrayElement *ret=allocate(elChareType, NULL, true, NULL);
-	return ret;
 }
 
 ArrayElement *CkArray::allocate(int elChareType, CkMessage *msg, bool fromMigration, int *listenerData)
@@ -1481,9 +1472,6 @@ void CkArray::sendExpeditedBroadcast(CkMessage *msg)
 	CK_MAGICNUMBER_CHECK
 	//Broadcast the message to all processors
 	thisProxy.recvExpeditedBroadcast(msg);
-}
-
-void CkArray::recvBroadcastViaTree(CkMessage *msg){
 }
 
 

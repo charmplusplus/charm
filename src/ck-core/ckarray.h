@@ -363,7 +363,7 @@ private:
 #endif
 public:
 	void inmem_checkpoint(CkArrayCheckPTReqMessage *m);
-	void recvBroadcast(CkMessage *);
+	void recvBroadcast(CkMessage *) { }
 
 #if CMK_GRID_QUEUE_AVAILABLE
 public:
@@ -611,16 +611,16 @@ public:
     }
   }
 
-  virtual CkMigratable* getEltFromArrMgr(const CmiUInt8 id) {
+  CkMigratable* getEltFromArrMgr(const CmiUInt8 id) {
     const auto itr = localElems.find(id);
     return ( itr == localElems.end() ? NULL : localElemVec[itr->second] );
   }
-  virtual void putEltInArrMgr(const CmiUInt8 id, CkMigratable* elt)
+  void putEltInArrMgr(const CmiUInt8 id, CkMigratable* elt)
   {
     localElems[id] = localElemVec.size();
     localElemVec.push_back(elt);
   }
-  virtual void eraseEltFromArrMgr(const CmiUInt8 id)
+  void eraseEltFromArrMgr(const CmiUInt8 id)
   {
     auto itr = localElems.find(id);
     if (itr != localElems.end()) {
@@ -659,7 +659,11 @@ public:
   /// Create-after-migrate:
   /// Create an uninitialized element after migration
   ///  The element's constructor will be called immediately after.
-  virtual CkMigratable *allocateMigrated(int elChareType, CkElementCreation_t type);
+  CkMigratable *allocateMigrated(int elChareType, CkElementCreation_t type)
+  {
+    ArrayElement *ret=allocate(elChareType, NULL, true, NULL);
+    return ret;
+  }
   void stampListenerData(CkMigratable *elt);
 
   /// Prepare creation message:
@@ -688,7 +692,7 @@ public:
   void recvBroadcast(CkMessage *msg);
   void sendExpeditedBroadcast(CkMessage *msg);
   void recvExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
-  void recvBroadcastViaTree(CkMessage *msg);
+  void recvBroadcastViaTree(CkMessage *msg) { }
 
   void sendZCBroadcast(MsgPointerWrapper w);
 
