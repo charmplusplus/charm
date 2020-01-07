@@ -20,7 +20,6 @@ public:
     }
     int size = atoi(m->argv[1]);
     mainProxy = thisProxy;
-    delete m;
     arr1 = CProxy_Ping1::ckNew(size, 2);
     count = 0;
     arr1[0].start();

@@ -54,7 +54,6 @@ public:
     CkPrintf("ping with payload: %d workload:%d maxIter: %d\n", payload, workLoad, maxIter);
     mainProxy = thishandle;
     arr1 = CProxy_Ping1::ckNew(2);
-    delete m;
     thisProxy.prepare();
   };
 

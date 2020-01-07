@@ -15,7 +15,6 @@ public:
     //Process command-line arguments
     nElements=5;
     if(m->argc >1 ) nElements=atoi(m->argv[1]);
-    delete m;
 
     //Start the computation
     CkPrintf("Running Hello on %d processors for %d elements\n",

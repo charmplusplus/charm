@@ -183,7 +183,6 @@ main::main(CkArgMsg *msg)
   int argc = msg->argc;
   char **argv = msg->argv;
   int numtests, i;
-  delete msg;
   mainhandle = thishandle;
   if (nTests<=0)
     CkAbort("Megatest: No tests registered-- is MEGATEST_REGISTER_TEST malfunctioning?");

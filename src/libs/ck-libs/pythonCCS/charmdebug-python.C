@@ -4,7 +4,6 @@
 class CpdPython : public CBase_CpdPython {
 public:
   CpdPython (CkArgMsg *msg) {
-    delete msg;
     //((CProxy_CpdPython)thishandle).registerPython("CpdPython");
     //CkCallback cb(CkIndex_CpdPython::pyRequest(0),thishandle);
     //CcsRegisterHandler("pycode", cb);

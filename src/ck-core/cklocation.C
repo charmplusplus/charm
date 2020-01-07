@@ -1353,7 +1353,6 @@ public:
 		//_defaultArrayMapID = CProxy_HilbertArrayMap::ckNew();
 		_defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
 		_fastArrayMapID = CProxy_FastArrayMap::ckNew();
-		delete msg;
 	}
 
 	CkMapsInit(CkMigrateMessage *m) {}

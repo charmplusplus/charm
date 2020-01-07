@@ -30,8 +30,6 @@ struct Main : public CBase_Main {
             numChares = atoi(m->argv[2]);
         }
         
-        delete m;
-
         iter = 0;
 		mainProxy = thisProxy;
 		// Construct an array of manyToMany chares to do the calculation

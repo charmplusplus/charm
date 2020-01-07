@@ -18,7 +18,6 @@ class nodering_message : public CMessage_nodering_message {
 class nodering_main : public CBase_nodering_main {
   public:
     nodering_main(CkArgMsg *m) {
-      delete m;
       nodering_thisgroup = CProxy_nodering_group::ckNew();
     }
     nodering_main(CkMigrateMessage *m) {}

@@ -4,7 +4,6 @@
 #include "headerpad.h"
 /*readonly*/ CProxy_main mainProxy;
 main::main(CkArgMsg *m) {
-    delete m;
     mainProxy=thishandle;
     CmiPrintf("Info: converse header: %d envelope: %d\n", CmiReservedHeaderSize, sizeof(envelope));
     // make a message with 1 payload

@@ -4,7 +4,6 @@
 Driver::Driver(CkArgMsg* args) {
     int value = 10;
     if (args->argc > 1) value = strtol(args->argv[1], NULL, 10);
-    delete args;
     s = CProxy_Squarer::ckNew();
     sarr = CProxy_SquarerArr::ckNew(2);
     sgrp = CProxy_SquarerGrp::ckNew();

@@ -24,7 +24,6 @@ Main::Main(CkArgMsg *m)
 	arrayDimensionY = atoi(m->argv[2]);
 	vectorSize = atoi(m->argv[3]);
 
-	delete m;
 	mainProxy = thisProxy;
 	mainhandle = thishandle;
 	testProxy2D = CProxy_Test2D::ckNew(arrayDimensionX, arrayDimensionY);

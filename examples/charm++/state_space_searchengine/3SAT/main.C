@@ -13,7 +13,6 @@ public:
         {
             initial_grainsize = atoi(msg->argv[2]);
         }
-        delete msg;
 
         CkPrintf("\nInstance file:%s\ngrainsize:t%d\nprocessor number:%d\n", msg->argv[1], initial_grainsize, CkNumPes()); 
         strcpy(inputfile, msg->argv[1]);

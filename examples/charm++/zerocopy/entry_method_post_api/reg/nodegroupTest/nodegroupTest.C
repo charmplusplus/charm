@@ -12,7 +12,6 @@ class Main : public CBase_Main{
         ckout<<"Run it on even number of processes"<<endl;
         CkExit(1);
       }
-      delete m;
 
       numElements = CkNumNodes();
       mProxy = thisProxy;

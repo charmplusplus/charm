@@ -59,7 +59,6 @@ protected:
 public:
     Test(CkArgMsg* m) : doneCnt(0)
     {
-        delete m;
         mainFn();
 
         // now create a distributed array

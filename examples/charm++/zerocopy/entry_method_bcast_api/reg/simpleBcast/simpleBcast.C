@@ -31,8 +31,6 @@ class Main : public CBase_Main{
       size = CkNumPes() * 10; // default with 10 chare array elements per pe
     }
 
-    delete m;
-
     counter = 0;
     mainProxy = thisProxy;
 

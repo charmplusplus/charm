@@ -41,7 +41,6 @@ class pgm : public CBase_pgm
             // Create the library chare array
             arrProxy = CProxy_libArray::ckNew(nDatumsPerChare, nElements);
             thisProxy.startTest();
-            delete m;
         }
         
         void startTest() {

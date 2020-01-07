@@ -40,8 +40,6 @@ public:
     updater_group   = CProxy_Updater::ckNew();
     int dims[2] = {CkNumNodes(), CkNumPes() / CkNumNodes()};
     CkPrintf("Aggregation topology: %d %d\n", dims[0], dims[1]);
-
-    delete args;
   }
 
   void start() {

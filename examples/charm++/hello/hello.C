@@ -14,7 +14,6 @@
 main::main(CkArgMsg *m)
 {
   CkPrintf("Hello World \n");
-  delete m;
   CkExit();
 }
 

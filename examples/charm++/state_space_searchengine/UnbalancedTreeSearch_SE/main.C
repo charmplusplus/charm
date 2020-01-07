@@ -12,7 +12,6 @@ public:
     {
         uts_parseParams(msg->argc, msg->argv);                                                              
         initial_grainsize = atoi(msg->argv[1]);                 
-        delete msg;
         uts_printParams();                                                                                
         searchEngineProxy.start();
     }

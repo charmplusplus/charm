@@ -46,7 +46,6 @@ class Main: public CBase_Main {
       }
       CkPrintf("Test passed!!\n");
 
-      delete m;
       CkExit();
     };
 

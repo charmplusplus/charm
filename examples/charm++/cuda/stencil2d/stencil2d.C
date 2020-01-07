@@ -195,7 +195,6 @@ class Main : public CBase_Main {
     CkPrintf("Higher priority for GPU methods and callbacks: %s\n",
              (gpu_prio) ? "ON" : "OFF");
     CkPrintf("GPU handler PEs: %d\n\n", gpu_pes);
-    delete m;
 
     // Create 2D chare array
 #if USE_CUSTOM_MAP

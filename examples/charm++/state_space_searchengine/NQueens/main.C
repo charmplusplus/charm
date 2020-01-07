@@ -15,7 +15,6 @@ public:
             numQueens = atoi(msg->argv[1]);
             initial_grainsize = atoi(msg->argv[2]);
         }
-        delete msg;
 
         searchEngineProxy.start();
     }

@@ -10,8 +10,6 @@ struct Main : CBase_Main {
   Main(CkArgMsg* m)
     : numToSend(40)
   {
-    delete m;
-
     mainProxy = thisProxy;
 
     CProxy_Chare1 c1 = CProxy_Chare1::ckNew();

@@ -254,7 +254,6 @@ class  FutureMain : public Chare {
   public:
     FutureMain(CkArgMsg *m) {
       _fbocID = CProxy_FutureBOC::ckNew(new FutureInitMsg);
-      delete m;
     }
     FutureMain(CkMigrateMessage *m) {}
 };

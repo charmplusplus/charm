@@ -64,7 +64,6 @@ public:
         if(m->argc >5 ) COLS2=atoi(m->argv[5]);
         if(m->argc >6 ) DECOMPOSITION=atoi(m->argv[6]); // 1D, 2D, 3D
         if(m->argc >7 ) detailedTimings= ((atoi(m->argv[7])!=0)?true:false);
-        delete m;
         reallyDone = 0;
 
         MSA2DRowMjr arr1(ROWS1, COLS1, NUM_WORKERS, bytes);        // row major

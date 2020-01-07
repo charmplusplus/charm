@@ -14,7 +14,6 @@ class Main : public CBase_Main{
       }
       numElements = CkNumNodes();
       mProxy = thisProxy;
-      delete m;
 
       CProxy_zerocopyObject zerocopyObj = CProxy_zerocopyObject::ckNew();
       zerocopyObj.testZeroCopy();

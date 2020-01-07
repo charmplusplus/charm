@@ -23,7 +23,6 @@ Main::Main(CkArgMsg* msg)
         numQueens = atoi(msg->argv[1]);
         grainsize = atoi(msg->argv[2]);   
     }
-    delete msg;
 
     CkPrintf(" Usage: nqueen numQueen grainsize (%d, g=%d, np=%d)\n", numQueens, grainsize, CkNumPes());
 

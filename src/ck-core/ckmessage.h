@@ -35,6 +35,10 @@ class CkArgMsg : public CkMessage {
 public:
   int argc;
   char **argv;
+
+  ~CkArgMsg() {
+    CkAbort("CkArgMsg deleted! These are owned and freed by the RTS.\n");
+  }
 };
 
 #endif

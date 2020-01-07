@@ -28,7 +28,6 @@ public:
     if(m->argc >1 ) nElements=atoi(m->argv[1]);
     if(m->argc >2 ) msgSize =atoi(m->argv[2]);
     if(m->argc >3 ) maxIter=atoi(m->argv[3]);
-    delete m;
 
     //Start the computation
     CkPrintf("Running Hello on %d processors for %d elements\n",

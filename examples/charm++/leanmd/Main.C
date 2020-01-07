@@ -59,7 +59,6 @@ Main::Main(CkArgMsg* m) {
         cellArray(x, y, z).createComputes();
 
   thisProxy.run();
-  delete m;
 }
 
 //constructor for chare object migration

@@ -51,8 +51,6 @@ public:
     aggregator =
       CProxy_ArrayMeshStreamer<dtype, CkArrayIndex1D, Updater, SimpleMeshRouter>
       ::ckNew(numMsgsBuffered, 2, dims, updater_array, 1);
-
-    delete args;
   }
 
   void start() {

@@ -9,9 +9,6 @@ class Main : public CBase_Main
 public:
   Main(CkArgMsg* m)
   {
-    //Process command-line arguments
-    delete m;
-
     //Start the computation
     CkPrintf("Running Hello on %d processors\n",
 	     CkNumPes());

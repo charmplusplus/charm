@@ -93,7 +93,6 @@ public:
             CkPrintf("exec inputfile grainsize\n");
             CkExit();
         }
-        delete msg;
         
         readinput(inputfile);
         searchEngineProxy.start();

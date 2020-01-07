@@ -7,7 +7,6 @@ struct Main : public CBase_Main {
 
   Main(CkArgMsg* msg)
     : num(10) {
-    delete msg;
     detector = CProxy_CompletionDetector::ckNew();
     detector.start_detection(num,
                              CkCallback(CkIndex_Main::startTest(), thisProxy),

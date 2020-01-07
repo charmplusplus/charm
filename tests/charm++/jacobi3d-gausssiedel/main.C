@@ -112,7 +112,6 @@ public:
         iterations = 0;
         mainProxy = thisProxy;
         processCommandlines(m->argc, m->argv);
-        delete m;
 #if USE_TOPOMAP
         CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y, num_chare_z);
         CkPrintf("Topology Mapping is being done ... \n");

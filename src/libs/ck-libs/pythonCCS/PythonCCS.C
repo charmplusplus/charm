@@ -860,7 +860,6 @@ void PythonObject::pythonSleep(int handle) {
 
 PythonCCS::PythonCCS(CkArgMsg *arg) {
   pythonCcsProxy = thishandle;
-  delete arg;
 }
 
 CkReductionMsg *pythonCombinePrint(int nMsg, CkReductionMsg **msgs) {

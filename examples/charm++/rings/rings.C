@@ -37,7 +37,6 @@ main::main(CkArgMsg *m) {
   }
 
   mainhandle = thishandle;
-  delete m;
 }
 
 void main::ringDone(NotifyDone *m) {
