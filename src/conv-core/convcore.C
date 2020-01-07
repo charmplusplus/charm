@@ -3900,12 +3900,14 @@ void ConverseCommonExit(void)
 #endif
 
 #if CMK_CUDA
-  // ensure all PEs have finished GPU work before destructing
-  if(CmiMyRank() < CmiMyNodeSize()) {
+  // Only worker threads execute the following
+  if (!CmiInCommThread()) {
+    // Ensure all PEs have finished GPU work before destructing
     CmiNodeBarrier();
-  }
-  if (CmiMyRank() == 0) {
-    exitHybridAPI();
+
+    if (CmiMyRank() == 0) {
+      exitHybridAPI();
+    }
   }
 #endif
   seedBalancerExit();

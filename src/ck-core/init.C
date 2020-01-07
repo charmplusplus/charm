@@ -1686,20 +1686,22 @@ void _initCharm(int unused_argc, char **argv)
     }
 
 #if CMK_CUDA
-    initDeviceMapping(argv);
-    if (CmiMyRank() == 0) {
-      initHybridAPI();
-    }
-    initEventQueues();
+    // Only worker threads execute the following
+    if (!CmiInCommThread()) {
+      initDeviceMapping(argv);
+      if (CmiMyRank() == 0) {
+        initHybridAPI();
+      }
+      initEventQueues();
 
-    // ensure HAPI is initialized before registering callback functions
-    if (CmiMyRank() < CmiMyNodeSize()) {
+      // ensure HAPI is initialized before registering callback functions
       CmiNodeBarrier();
+
+      hapiRegisterCallbacks();
+      hapiInvokeCallback = CUDACallbackManager;
+      hapiQdCreate = QdCreate;
+      hapiQdProcess = QdProcess;
     }
-    hapiRegisterCallbacks();
-    hapiInvokeCallback = CUDACallbackManager;
-    hapiQdCreate = QdCreate;
-    hapiQdProcess = QdProcess;
 #endif
 
     if(CmiMyPe() == 0) {
