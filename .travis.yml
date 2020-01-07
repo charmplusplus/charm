@@ -52,7 +52,7 @@ matrix:
   - os: windows
     name: "NetLRTS-Win"
     script:
-    - [[ ! -f C:/tools/msys64/msys2_shell.cmd ]] && rm -rf C:/tools/msys64
+    - rm -rf C:/tools/msys64
     - choco upgrade -y msys2
     - $mingw64 src/arch/win/travis.sh ./build all-test netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata
     - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp -j3 all-test-tests all-test-examples
