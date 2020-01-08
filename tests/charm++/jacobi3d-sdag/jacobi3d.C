@@ -171,25 +171,30 @@ class Main : public CBase_Main {
 
       TopoManager tmgr;
       CkArray *jarr = array.ckLocalBranch();
-      std::vector<std::vector<std::vector<int>>> jmap(num_chare_x, std::vector<std::vector<int> >(num_chare_y,std::vector <int>(num_chare_z)));
+      std::vector<int> jmap(num_chare_x * num_chare_y * num_chare_z);
+#define jmap_3d(x, y, z) (jmap[(x) * num_chare_y * num_chare_z + (y) * num_chare_z + (z)])
 
       int hops=0, p;
-      for(int i=0; i<num_chare_x; i++)
+      int idx = 0;
+      for(int i=0, idx=0; i<num_chare_x; i++)
 	for(int j=0; j<num_chare_y; j++)
 	  for(int k=0; k<num_chare_z; k++) {
-	    jmap[i][j][k] = jarr->procNum(CkArrayIndex3D(i, j, k));
+	    jmap[idx] = jarr->procNum(CkArrayIndex3D(i, j, k));
+	    ++idx;
 	  }
 
+      idx = 0;
       for(int i=0; i<num_chare_x; i++)
 	for(int j=0; j<num_chare_y; j++)
 	  for(int k=0; k<num_chare_z; k++) {
-	    p = jmap[i][j][k];
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[wrap_x(i+1)][j][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[wrap_x(i-1)][j][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][wrap_y(j+1)][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][wrap_y(j-1)][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][j][wrap_z(k+1)]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][j][wrap_z(k-1)]);
+	    p = jmap[idx];
+	    hops += tmgr.getHopsBetweenRanks(p, jmap_3d(wrap_x(i+1), j, k));
+	    hops += tmgr.getHopsBetweenRanks(p, jmap_3d(wrap_x(i-1), j, k));
+	    hops += tmgr.getHopsBetweenRanks(p, jmap_3d(i, wrap_y(j+1), k));
+	    hops += tmgr.getHopsBetweenRanks(p, jmap_3d(i, wrap_y(j-1), k));
+	    hops += tmgr.getHopsBetweenRanks(p, jmap_3d(i, j, wrap_z(k+1)));
+	    hops += tmgr.getHopsBetweenRanks(p, jmap_3d(i, j, wrap_z(k-1)));
+	    ++idx;
 	  }
       CkPrintf("Total Hops: %d\n", hops);
 	
