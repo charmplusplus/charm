@@ -176,7 +176,7 @@ class Main : public CBase_Main {
 
       int hops=0, p;
       int idx = 0;
-      for(int i=0, idx=0; i<num_chare_x; i++)
+      for(int i=0; i<num_chare_x; i++)
 	for(int j=0; j<num_chare_y; j++)
 	  for(int k=0; k<num_chare_z; k++) {
 	    jmap[idx] = jarr->procNum(CkArrayIndex3D(i, j, k));
