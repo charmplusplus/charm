@@ -33,4 +33,4 @@ matrix:
     - export PATH=/C/tools/msys64/mingw64/bin:$PATH
     - $mingw64 src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata
     - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp -j3 all-test-tests
-    - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tests/charm++ test TESTOPTS="++local"
+    - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tests/charm++ test
