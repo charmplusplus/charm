@@ -1,7 +1,7 @@
 /*
 This version of ptmalloc3 is hacked in following ways:
    - Renamed to file memory-gnu.C
-   - Use mm_* routine names, as defined below.
+   - Use mm_impl_* routine names, as defined below.
    - Add UPDATE_MEMUSAGE
    - Add definitions for ONLY_MSPACES, MSPACES, USE_LOCKS
    - Rename malloc.c to memory-gnu-internal.C and include here
@@ -10,16 +10,16 @@ This version of ptmalloc3 is hacked in following ways:
 
 #define CMI_MEMORY_GNU
 
-#define malloc   mm_malloc
-#define free	 mm_free
-#define calloc   mm_calloc
-#define cfree	 mm_cfree
-#define realloc  mm_realloc
-#define memalign mm_memalign
-#define posix_memalign mm_posix_memalign
-#define aligned_alloc mm_aligned_alloc
-#define valloc   mm_valloc
-#define pvalloc  mm_pvalloc
+#define malloc   mm_impl_malloc
+#define free	 mm_impl_free
+#define calloc   mm_impl_calloc
+#define cfree	 mm_impl_cfree
+#define realloc  mm_impl_realloc
+#define memalign mm_impl_memalign
+#define posix_memalign mm_impl_posix_memalign
+#define aligned_alloc mm_impl_aligned_alloc
+#define valloc   mm_impl_valloc
+#define pvalloc  mm_impl_pvalloc
 
 extern CMK_TYPEDEF_UINT8 _memory_allocated;
 extern CMK_TYPEDEF_UINT8 _memory_allocated_max;
