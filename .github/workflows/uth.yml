@@ -12,4 +12,4 @@ jobs:
     - name: build
       run: ./build all-test uth-linux-x86_64 -g -j4 --with-production
     - name: test
-      run: make -C uth-linux-x86_64/tmp test-tests test-examples TESTOPTS="++local"
+      run: make -C uth-linux-x86_64/tmp test-tests test-examples
