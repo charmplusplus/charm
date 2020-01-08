@@ -8,11 +8,6 @@ NOTE: isomalloc is threadsafe, so the isomallocs are not wrapped in CmiMemLock.
 
 #define CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS   0
 
-#if ! CMK_MEMORY_BUILD_OS
-/* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.C"
-#endif
-
 #include "memory-isomalloc.h"
 
 struct CmiMemoryIsomallocState {
@@ -224,18 +219,12 @@ static void *meta_pvalloc(size_t size)
 #define CMK_MEMORY_HAS_NOMIGRATE
 /*Allocate non-migratable memory:*/
 void *malloc_nomigrate(size_t size) { 
-  void *result;
-  CmiMemLock();
-  result = mm_malloc(size);
-  CmiMemUnlock();
-  return result;
+  return mm_malloc(size);
 }
 
 void free_nomigrate(void *mem)
 {
-  CmiMemLock();
   mm_free(mem);
-  CmiMemUnlock();
 }
 
 #define CMK_MEMORY_HAS_ISOMALLOC

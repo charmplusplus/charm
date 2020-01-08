@@ -70,6 +70,12 @@
 #include "converse.h"
 #include "charm-api.h"
 
+/* Wrap a CmiMemLock around this code */
+#define MEM_LOCK_AROUND(code) \
+  CmiMemLock(); \
+  code; \
+  CmiMemUnlock();
+
 void * memory_stack_top; /*The higher end of the stack (approximation)*/
 int cpdInSystem=1; /*Start inside the system (until we start executing user code)*/
 
@@ -113,17 +119,17 @@ void * initialize_memory_wrapper_pvalloc(size_t size);
 void initialize_memory_wrapper_free(void *ptr);
 void initialize_memory_wrapper_cfree(void *ptr);
 
-void * (*mm_malloc)(size_t) = initialize_memory_wrapper_malloc;
-void * (*mm_calloc)(size_t,size_t) = initialize_memory_wrapper_calloc;
-void * (*mm_realloc)(void*,size_t) = initialize_memory_wrapper_realloc;
-void * (*mm_memalign)(size_t,size_t) = initialize_memory_wrapper_memalign;
-int (*mm_posix_memalign)(void **,size_t,size_t) = initialize_memory_wrapper_posix_memalign;
-void * (*mm_aligned_alloc)(size_t,size_t) = initialize_memory_wrapper_aligned_alloc;
-void * (*mm_valloc)(size_t) = initialize_memory_wrapper_valloc;
-void * (*mm_pvalloc)(size_t) = initialize_memory_wrapper_pvalloc;
-void (*mm_free)(void*) = initialize_memory_wrapper_free;
-void (*mm_cfree)(void*) = initialize_memory_wrapper_cfree;
-struct mallinfo (*mm_mallinfo)(void) = NULL;
+void * (*mm_impl_malloc)(size_t) = initialize_memory_wrapper_malloc;
+void * (*mm_impl_calloc)(size_t,size_t) = initialize_memory_wrapper_calloc;
+void * (*mm_impl_realloc)(void*,size_t) = initialize_memory_wrapper_realloc;
+void * (*mm_impl_memalign)(size_t,size_t) = initialize_memory_wrapper_memalign;
+int (*mm_impl_posix_memalign)(void **,size_t,size_t) = initialize_memory_wrapper_posix_memalign;
+void * (*mm_impl_aligned_alloc)(size_t,size_t) = initialize_memory_wrapper_aligned_alloc;
+void * (*mm_impl_valloc)(size_t) = initialize_memory_wrapper_valloc;
+void * (*mm_impl_pvalloc)(size_t) = initialize_memory_wrapper_pvalloc;
+void (*mm_impl_free)(void*) = initialize_memory_wrapper_free;
+void (*mm_impl_cfree)(void*) = initialize_memory_wrapper_cfree;
+struct mallinfo (*mm_impl_mallinfo)(void) = NULL;
 
 static char fake_malloc_buffer[1024];
 static char* fake_malloc_buffer_pos = fake_malloc_buffer;
@@ -165,80 +171,68 @@ void * initialize_memory_wrapper_calloc(size_t nelem, size_t size) {
   if (initialize_memory_wrapper_status)
     return fake_calloc(nelem, size);
   initialize_memory_wrapper();
-  return (*mm_calloc)(nelem,size);
+  return (*mm_impl_calloc)(nelem,size);
 }
 
 void * initialize_memory_wrapper_malloc(size_t size) {
   if (initialize_memory_wrapper_status)
     return fake_malloc(size);
   initialize_memory_wrapper();
-  return (*mm_malloc)(size);
+  return (*mm_impl_malloc)(size);
 }
 
 void * initialize_memory_wrapper_realloc(void *ptr, size_t size) {
   initialize_memory_wrapper();
-  return (*mm_realloc)(ptr,size);
+  return (*mm_impl_realloc)(ptr,size);
 }
 
 void * initialize_memory_wrapper_memalign(size_t align, size_t size) {
   initialize_memory_wrapper();
-  return (*mm_memalign)(align,size);
+  return (*mm_impl_memalign)(align,size);
 }
 
 int initialize_memory_wrapper_posix_memalign(void **memptr, size_t align, size_t size) {
   initialize_memory_wrapper();
-  return (*mm_posix_memalign)(memptr,align,size);
+  return (*mm_impl_posix_memalign)(memptr,align,size);
 }
 
 void * initialize_memory_wrapper_aligned_alloc(size_t align, size_t size) {
   initialize_memory_wrapper();
-  return (*mm_aligned_alloc)(align,size);
+  return (*mm_impl_aligned_alloc)(align,size);
 }
 
 void * initialize_memory_wrapper_valloc(size_t size) {
   initialize_memory_wrapper();
-  return (*mm_valloc)(size);
+  return (*mm_impl_valloc)(size);
 }
 
 void * initialize_memory_wrapper_pvalloc(size_t size) {
   initialize_memory_wrapper();
-  return (*mm_pvalloc)(size);
+  return (*mm_impl_pvalloc)(size);
 }
 
 void initialize_memory_wrapper_free(void *ptr) {
   if (initialize_memory_wrapper_status)
     return;
   initialize_memory_wrapper();
-  (*mm_free)(ptr);
+  (*mm_impl_free)(ptr);
 }
 
 void initialize_memory_wrapper_cfree(void *ptr) {
   initialize_memory_wrapper();
-  (*mm_cfree)(ptr);
+  (*mm_impl_cfree)(ptr);
 }
 
-#define mm_malloc   (*mm_malloc)
-#define mm_free     (*mm_free)
-#define mm_calloc   (*mm_calloc)
-#define mm_cfree    (*mm_cfree)
-#define mm_realloc  (*mm_realloc)
-#define mm_memalign (*mm_memalign)
-#define mm_posix_memalign (*mm_posix_memalign)
-#define mm_aligned_alloc (*mm_aligned_alloc)
-#define mm_valloc   (*mm_valloc)
-#define mm_pvalloc  (*mm_pvalloc)
-
-#else /* CMK_MEMORY_BUILD_OS_WRAPPED */
-#define mm_malloc   malloc
-#define mm_calloc   calloc
-#define mm_memalign memalign
-#define mm_posix_memalign posix_memalign
-#if (defined __cplusplus && __cplusplus >= 201703L) || (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L)
-#define mm_aligned_alloc aligned_alloc
-#else
-#define mm_aligned_alloc memalign
-#endif
-#define mm_free     free
+#define mm_impl_malloc   (*mm_impl_malloc)
+#define mm_impl_free     (*mm_impl_free)
+#define mm_impl_calloc   (*mm_impl_calloc)
+#define mm_impl_cfree    (*mm_impl_cfree)
+#define mm_impl_realloc  (*mm_impl_realloc)
+#define mm_impl_memalign (*mm_impl_memalign)
+#define mm_impl_posix_memalign (*mm_impl_posix_memalign)
+#define mm_impl_aligned_alloc (*mm_impl_aligned_alloc)
+#define mm_impl_valloc   (*mm_impl_valloc)
+#define mm_impl_pvalloc  (*mm_impl_pvalloc)
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED */
 #endif /* CMK_MEMORY_BUILD_OS */
 
@@ -278,14 +272,18 @@ int memory_chare_id=0;
 /* Just use the OS's built-in malloc.  All we provide is CmiMemoryInit.
 */
 
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-#ifdef __INTEL_COMPILER
-#pragma warning push
-#pragma warning disable 1478
-#endif
+// The OS allocator doesn't need locking,
+// so point the meta-meta calls directly to their implementations.
+#define mm_malloc   mm_impl_malloc
+#define mm_free     mm_impl_free
+#define mm_calloc   mm_impl_calloc
+#define mm_cfree    mm_impl_cfree
+#define mm_realloc  mm_impl_realloc
+#define mm_memalign mm_impl_memalign
+#define mm_posix_memalign mm_impl_posix_memalign
+#define mm_aligned_alloc mm_impl_aligned_alloc
+#define mm_valloc   mm_impl_valloc
+#define mm_pvalloc  mm_impl_pvalloc
 
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
 
@@ -300,21 +298,6 @@ static void *meta_realloc_hook(void* p,size_t s, const void* c) {return meta_rea
 static void *meta_memalign_hook(size_t s1,size_t s2, const void* c) {return meta_memalign(s1,s2);}
 static void meta_free_hook(void* p, const void* c) {meta_free(p);}
 
-#define BEFORE_MALLOC_CALL \
-  __malloc_hook = old_malloc_hook; \
-  __realloc_hook = old_realloc_hook; \
-  __memalign_hook = old_memalign_hook; \
-  __free_hook = old_free_hook;
-#define AFTER_MALLOC_CALL \
-  old_malloc_hook = __malloc_hook; \
-  old_realloc_hook = __realloc_hook; \
-  old_memalign_hook = __memalign_hook; \
-  old_free_hook = __free_hook; \
-  __malloc_hook = meta_malloc_hook; \
-  __realloc_hook = meta_realloc_hook; \
-  __memalign_hook = meta_memalign_hook; \
-  __free_hook = meta_free_hook;
-
 #if CMK_HAS_MALLOC_H
 #include <malloc.h>
 #endif
@@ -323,10 +306,139 @@ static void *(*old_realloc_hook) (void*,size_t, const void*);
 static void *(*old_memalign_hook) (size_t,size_t, const void*);
 static void (*old_free_hook) (void*, const void*);
 
-#else /* CMK_MEMORY_BUILD_GNU_HOOKS */
-#define BEFORE_MALLOC_CALL   /*empty*/
-#define AFTER_MALLOC_CALL    /*empty*/
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#ifdef __INTEL_COMPILER
+#pragma warning push
+#pragma warning disable 1478
+#endif
+
+#define BEFORE_MALLOC_CALL \
+  __malloc_hook = old_malloc_hook; \
+  __realloc_hook = old_realloc_hook; \
+  __memalign_hook = old_memalign_hook; \
+  __free_hook = old_free_hook
+#define AFTER_MALLOC_CALL \
+  old_malloc_hook = __malloc_hook; \
+  old_realloc_hook = __realloc_hook; \
+  old_memalign_hook = __memalign_hook; \
+  old_free_hook = __free_hook; \
+  __malloc_hook = meta_malloc_hook; \
+  __realloc_hook = meta_realloc_hook; \
+  __memalign_hook = meta_memalign_hook; \
+  __free_hook = meta_free_hook
+
+static void my_init_hook()
+{
+  AFTER_MALLOC_CALL;
+}
+/* Override initializing hook from the C library. */
+#if defined(__MALLOC_HOOK_VOLATILE)
+void (* __MALLOC_HOOK_VOLATILE __malloc_initialize_hook) (void) = my_init_hook;
+#else
+void (* __malloc_initialize_hook) (void) = my_init_hook;
+#endif
+
+static inline void *mm_impl_malloc(size_t size)
+{
+  void *result;
+  BEFORE_MALLOC_CALL;
+  result = malloc(size);
+  AFTER_MALLOC_CALL;
+  return result;
+}
+static inline void mm_impl_free(void *mem)
+{
+  BEFORE_MALLOC_CALL;
+  free(mem);
+  AFTER_MALLOC_CALL;
+}
+static inline void *mm_impl_calloc(size_t nelem, size_t size)
+{
+  void *result;
+  BEFORE_MALLOC_CALL;
+  result = calloc(nelem, size);
+  AFTER_MALLOC_CALL;
+  return result;
+}
+#if 0
+static inline void mm_impl_cfree(void *mem)
+{
+  BEFORE_MALLOC_CALL;
+  cfree(mem);
+  AFTER_MALLOC_CALL;
+}
+#endif
+static inline void *mm_impl_realloc(void *mem, size_t size)
+{
+  void *result;
+  BEFORE_MALLOC_CALL;
+  result = realloc(mem, size);
+  AFTER_MALLOC_CALL;
+  return result;
+}
+static inline void *mm_impl_memalign(size_t align, size_t size)
+{
+  void *result;
+  BEFORE_MALLOC_CALL;
+  result = memalign(align, size);
+  AFTER_MALLOC_CALL;
+  return result;
+}
+static inline int mm_impl_posix_memalign(void **outptr, size_t align, size_t size)
+{
+  int result;
+  BEFORE_MALLOC_CALL;
+  result = posix_memalign(outptr, align, size);
+  AFTER_MALLOC_CALL;
+  return result;
+}
+static inline void *mm_impl_aligned_alloc(size_t align, size_t size)
+{
+  void *result;
+  BEFORE_MALLOC_CALL;
+#if (defined __cplusplus && __cplusplus >= 201703L) || (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L)
+  result = aligned_alloc(align, size);
+#else
+  result = memalign(align, size);
+#endif
+  AFTER_MALLOC_CALL;
+  return result;
+}
+#if 0
+static inline void *mm_impl_valloc(size_t size)
+{
+  void *result;
+  BEFORE_MALLOC_CALL;
+  result = valloc(size);
+  AFTER_MALLOC_CALL;
+  return result;
+}
+static inline void *mm_impl_pvalloc(size_t size)
+{
+  void *result;
+  BEFORE_MALLOC_CALL;
+  result = pvalloc(size);
+  AFTER_MALLOC_CALL;
+  return result;
+}
+#endif
+
+#undef BEFORE_MALLOC_CALL
+#undef AFTER_MALLOC_CALL
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+#ifdef __INTEL_COMPILER
+#pragma warning pop
+#endif
+
 #endif /* CMK_MEMORY_BUILD_GNU_HOOKS */
+
+// Pick which Converse memory layer we want:
 
 #if CMK_MEMORY_BUILD_VERBOSE
 #include "memory-verbose.C"
@@ -352,27 +464,8 @@ static void (*old_free_hook) (void*, const void*);
 #include "memory-charmdebug.C"
 #endif
 
-#if CMK_MEMORY_BUILD_GNU_HOOKS
-
-static void
-my_init_hook (void)
-{
-  old_malloc_hook = __malloc_hook;
-  old_realloc_hook = __realloc_hook;
-  old_memalign_hook = __memalign_hook;
-  old_free_hook = __free_hook;
-  __malloc_hook = meta_malloc_hook;
-  __realloc_hook = meta_realloc_hook;
-  __memalign_hook = meta_memalign_hook;
-  __free_hook = meta_free_hook;
-}
-/* Override initializing hook from the C library. */
-#if defined(__MALLOC_HOOK_VOLATILE)
-void (* __MALLOC_HOOK_VOLATILE __malloc_initialize_hook) (void) = my_init_hook;
-#else
-void (* __malloc_initialize_hook) (void) = my_init_hook;
-#endif
-#else /* CMK_MEMORY_BUILD_GNU_HOOKS */
+#if ! CMK_MEMORY_BUILD_GNU_HOOKS
+// Define our own symbols replacing malloc et al.
 void *malloc(size_t size) CMK_THROW { return meta_malloc(size); }
 void free(void *ptr) CMK_THROW { meta_free(ptr); }
 void *calloc(size_t nelem, size_t size) CMK_THROW { return meta_calloc(nelem,size); }
@@ -383,16 +476,25 @@ CLINKAGE int posix_memalign(void **outptr, size_t align, size_t size) CMK_THROW 
 CLINKAGE void *aligned_alloc(size_t align, size_t size) CMK_THROW { return meta_aligned_alloc(align,size); }
 void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
 CLINKAGE void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
-#endif /* CMK_MEMORY_BUILD_GNU_HOOKS */
+#endif /* ! CMK_MEMORY_BUILD_GNU_HOOKS */
+
+#else
+
+#define mm_impl_malloc   malloc
+#define mm_impl_free     free
+#define mm_impl_calloc   calloc
+#define mm_impl_cfree    cfree
+#define mm_impl_memalign memalign
+#define mm_impl_posix_memalign posix_memalign
+#if (defined __cplusplus && __cplusplus >= 201703L) || (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L)
+#define mm_impl_aligned_alloc aligned_alloc
+#else
+#define mm_impl_aligned_alloc memalign
+#endif
+#define mm_impl_valloc   valloc
+#define mm_impl_pvalloc  pvalloc
 
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS */
-
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-#ifdef __INTEL_COMPILER
-#pragma warning pop
-#endif
 
 static int skip_mallinfo = 0;
 
@@ -483,9 +585,9 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){
     else {
     struct mallinfo mi;
 #if CMK_MEMORY_BUILD_OS_WRAPPED && !CMK_MEMORY_BUILD_GNU_HOOKS
-    if (mm_mallinfo == NULL)
+    if (mm_impl_mallinfo == NULL)
       initialize_memory_wrapper();
-    mi = (*mm_mallinfo)();
+    mi = (*mm_impl_mallinfo)();
 #else
     mi = mallinfo();
 #endif
@@ -609,16 +711,74 @@ void CmiResetMaxMemory(void) {}
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage(void) { return 0; }
 void CmiResetMinMemory(void) {}
 
-#undef MEM_LOCK_AROUND
-#define MEM_LOCK_AROUND(code)   code
-
 #else /* CMK_MEMORY_BUILD_OS */
 
-/*************************************************************
-*Not* using the system malloc-- first pick the implementation:
-*/
+// Use ptmalloc3 as meta-meta malloc fallbacks (mm_*)
+#include "memory-gnu.C"
+
+// ptmalloc3 needs locking around it
+static inline void *mm_malloc(size_t size)
+{
+  void *result;
+  MEM_LOCK_AROUND( result = mm_impl_malloc(size); )
+  return result;
+}
+static inline void mm_free(void *mem)
+{
+  MEM_LOCK_AROUND( mm_impl_free(mem); )
+}
+static inline void *mm_calloc(size_t nelem, size_t size)
+{
+  void *result;
+  MEM_LOCK_AROUND( result = mm_impl_calloc(nelem, size); )
+  return result;
+}
+static inline void mm_cfree(void *mem)
+{
+  MEM_LOCK_AROUND( mm_impl_cfree(mem); )
+}
+static inline void *mm_realloc(void *mem, size_t size)
+{
+  void *result;
+  MEM_LOCK_AROUND( result = mm_impl_realloc(mem, size); )
+  return result;
+}
+static inline void *mm_memalign(size_t align, size_t size)
+{
+  void *result;
+  MEM_LOCK_AROUND( result = mm_impl_memalign(align, size); )
+  return result;
+}
+static inline int mm_posix_memalign(void **outptr, size_t align, size_t size)
+{
+  int result;
+  MEM_LOCK_AROUND( result = mm_impl_posix_memalign(outptr, align, size); )
+  return result;
+}
+static inline void *mm_aligned_alloc(size_t align, size_t size)
+{
+  void *result;
+  MEM_LOCK_AROUND( result = mm_impl_aligned_alloc(align, size); )
+  return result;
+}
+static inline void *mm_valloc(size_t size)
+{
+  void *result;
+  MEM_LOCK_AROUND( result = mm_impl_valloc(size); )
+  return result;
+}
+static inline void *mm_pvalloc(size_t size)
+{
+  void *result;
+  MEM_LOCK_AROUND( result = mm_impl_pvalloc(size); )
+  return result;
+}
+
+// Pick which Converse meta memory layer we want:
 
 #if CMK_MEMORY_BUILD_GNU 
+// We're just using ptmalloc3 without Converse doing anything in between,
+// so point the meta calls directly to the meta-meta calls.
 #define meta_malloc   mm_malloc
 #define meta_free     mm_free
 #define meta_calloc   mm_calloc
@@ -630,15 +790,10 @@ void CmiResetMinMemory(void) {}
 #define meta_valloc   mm_valloc
 #define meta_pvalloc  mm_pvalloc
 
-#include "memory-gnu.C"
 static void meta_init(char **argv) {
   if (CmiMyRank()==0) CmiMemoryIs_flag |= CMI_MEMORY_IS_GNU;
 }
-
 #endif /* CMK_MEMORY_BUILD_GNU */
-
-#define BEFORE_MALLOC_CALL   /*empty*/
-#define AFTER_MALLOC_CALL    /*empty*/
 
 #if CMK_MEMORY_BUILD_VERBOSE
 #include "memory-verbose.C"
@@ -662,8 +817,6 @@ static void meta_init(char **argv) {
 
 /*A trivial sample implementation of the meta_* calls:*/
 #if 0
-/* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.C"
 static void meta_init(char **argv)
 {
 
@@ -725,49 +878,48 @@ void CmiMemoryInit(char **argv)
   CmiNodeAllBarrier();
 }
 
-/* Wrap a CmiMemLock around this code */
-#define MEM_LOCK_AROUND(code) \
-  if (CmiMemoryInited && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) CmiMemLock(); \
-  code; \
-  if (CmiMemoryInited && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) CmiMemUnlock();
+// Define our own symbols replacing malloc et al.
+
+// These could be factored into !CMK_MEMORY_BUILD_GNU_HOOKS,
+// if not for the CmiOutOfMemory checks.
 
 void *malloc(size_t size) CMK_THROW
 {
   void *result;
-  MEM_LOCK_AROUND( result = meta_malloc(size); )
+  result = meta_malloc(size);
   if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
 
 void free(void *mem) CMK_THROW
 {
-  MEM_LOCK_AROUND( meta_free(mem); )
+  meta_free(mem);
 }
 
 void *calloc(size_t nelem, size_t size) CMK_THROW
 {
   void *result;
-  MEM_LOCK_AROUND( result = meta_calloc(nelem, size); )
+  result = meta_calloc(nelem, size);
   if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
 
 void cfree(void *mem) CMK_THROW
 {
-  MEM_LOCK_AROUND( meta_cfree(mem); )
+  meta_cfree(mem);
 }
 
 void *realloc(void *mem, size_t size) CMK_THROW
 {
   void *result;
-  MEM_LOCK_AROUND( result = meta_realloc(mem, size); )
+  result = meta_realloc(mem, size);
   return result;
 }
 
 CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW
 {
   void *result;
-  MEM_LOCK_AROUND( result = meta_memalign(align, size); )
+  result = meta_memalign(align, size);
   if (result==NULL) CmiOutOfMemory(align*size);
   return result;
 }
@@ -775,7 +927,7 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW
 CLINKAGE int posix_memalign (void **outptr, size_t align, size_t size) CMK_THROW
 {
   int result;
-  MEM_LOCK_AROUND( result = meta_posix_memalign(outptr, align, size); )
+  result = meta_posix_memalign(outptr, align, size);
   if (result!=0) CmiOutOfMemory(align*size);
   return result;
 }
@@ -783,7 +935,7 @@ CLINKAGE int posix_memalign (void **outptr, size_t align, size_t size) CMK_THROW
 CLINKAGE void *aligned_alloc(size_t align, size_t size) CMK_THROW
 {
   void *result;
-  MEM_LOCK_AROUND( result = meta_aligned_alloc(align, size); )
+  result = meta_aligned_alloc(align, size);
   if (result==NULL) CmiOutOfMemory(align*size);
   return result;
 }
@@ -791,7 +943,7 @@ CLINKAGE void *aligned_alloc(size_t align, size_t size) CMK_THROW
 void *valloc(size_t size) CMK_THROW
 {
   void *result;
-  MEM_LOCK_AROUND( result = meta_valloc(size); )
+  result = meta_valloc(size);
   if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
@@ -799,7 +951,7 @@ void *valloc(size_t size) CMK_THROW
 void *pvalloc(size_t size) CMK_THROW
 {
   void *result;
-  MEM_LOCK_AROUND( result = meta_pvalloc(size); )
+  result = meta_pvalloc(size);
   if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
@@ -961,7 +1113,7 @@ void CmiOutOfMemoryInit(void) {
 #if CMK_MEMORY_PREALLOCATE_HACK
   memory_preallocate_hack();
 #endif
-  MEM_LOCK_AROUND( memory_lifeRaft=(char *)mm_malloc(16384); )
+  memory_lifeRaft=(char *)mm_malloc(16384);
   }
 }
 
