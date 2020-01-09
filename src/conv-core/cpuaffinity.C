@@ -405,8 +405,6 @@ struct hostnameMsg {
   int node;
   int pe;
   skt_ip_t ip;
-  int node_rank;
-  int pe_rank;
   int seq;
 };
 
@@ -469,11 +467,9 @@ static void cpuAffinityHandler(void *m)
   int & node_host = rankmsg->node_hosts[node];
   if (node_host == -1)
   {
-    rankmsg->node_ranks_on_host[node] = rec->node_rank++;
     node_host = rec->seq;
   }
   rankmsg->node_numpes[node]++;
-  rankmsg->pe_ranks_on_host[pe] = rec->pe_rank++;
   rankmsg->pe_hosts[pe] = rec->seq;
 
   if (++count == npes) {
@@ -482,20 +478,19 @@ static void cpuAffinityHandler(void *m)
       CmiFree(pair.second);
     hostTable.clear();
 
-    /* bubble sort ranks on each node according to the PE number */
-    int i,j;
-    for (i=0; i<nnodes-1; i++)
-      for(j=i+1; j<nnodes; j++) {
-        if (rankmsg->node_hosts[i] == rankmsg->node_hosts[j] &&
-              rankmsg->node_ranks_on_host[i] > rankmsg->node_ranks_on_host[j])
-          std::swap(rankmsg->node_ranks_on_host[i], rankmsg->node_ranks_on_host[j]);
-      }
-    for (i=0; i<npes-1; i++)
-      for(j=i+1; j<npes; j++) {
-        if (rankmsg->pe_hosts[i] == rankmsg->pe_hosts[j] &&
-              rankmsg->pe_ranks_on_host[i] > rankmsg->pe_ranks_on_host[j])
-          std::swap(rankmsg->pe_ranks_on_host[i], rankmsg->pe_ranks_on_host[j]);
-      }
+    int* ranks_on_host = new int[hostcount];
+
+    memset(ranks_on_host, 0, hostcount*sizeof(int));
+    for (int i = 0; i < nnodes; i++) {
+      rankmsg->node_ranks_on_host[i] = ranks_on_host[rankmsg->node_hosts[i]]++;
+    }
+
+    memset(ranks_on_host, 0, hostcount*sizeof(int));
+    for (int i = 0; i < npes; i++) {
+      rankmsg->pe_ranks_on_host[i] = ranks_on_host[rankmsg->pe_hosts[i]]++;
+    }
+
+    delete [] ranks_on_host;
 
     CmiSyncBroadcastAllAndFree(rankMsg::size(nnodes, npes), (void *)rankmsg);
   }
@@ -1218,8 +1213,6 @@ void CmiInitCPUAffinity(char **argv)
   msg->node = CmiMyNode();
   msg->pe = CmiMyPe();
   msg->ip = myip;
-  msg->node_rank = 0;
-  msg->pe_rank = 0;
   CmiSyncSendAndFree(0, sizeof(hostnameMsg), (void *)msg);
 
   if (CmiMyPe() == 0) {
