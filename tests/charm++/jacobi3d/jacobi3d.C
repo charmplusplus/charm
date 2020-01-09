@@ -160,16 +160,13 @@ class Main : public CBase_Main {
       array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y, num_chare_z);
 
       CkArray *jarr = array.ckLocalBranch();
-      std::vector<int> jmap(num_chare_x * num_chare_y * num_chare_z);
-#define jmap_3d(x, y, z) (jmap[(x) * num_chare_y * num_chare_z + (y) * num_chare_z + (z)])
+      std::vector<std::vector<std::vector<int>>> jmap(num_chare_x, std::vector<std::vector<int> >(num_chare_y,std::vector <int>(num_chare_z)));
 
       int hops=0, p;
-      int idx = 0;
       for(int i=0; i<num_chare_x; i++)
 	for(int j=0; j<num_chare_y; j++)
 	  for(int k=0; k<num_chare_z; k++) {
-	    jmap[idx] = jarr->procNum(CkArrayIndex3D(i, j, k));
-	    ++idx;
+	    jmap[i][j][k] = jarr->procNum(CkArrayIndex3D(i, j, k));
 	  }
 
 		//Start the computation
