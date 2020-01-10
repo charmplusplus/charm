@@ -1721,11 +1721,9 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     }else
     {
-#if CMK_SMP
         if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL)
           env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
         else
-#endif
           env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
     }
 

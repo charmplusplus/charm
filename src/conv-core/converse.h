@@ -61,6 +61,14 @@
 
 #include "conv-header.h"
 
+/* Root of broadcast:
+ * non-bcast msg: root = 0;
+ * proc-level bcast msg: root >=1; (CmiMyPe()+1)
+ * node-level bcast msg: root <=-1; (-CmiMyNode()-1)
+ */
+#define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
+#define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
+
 #if CMK_ONESIDED_IMPL
 #define CMI_ZC_MSGTYPE(msg)                  ((CmiMsgHeaderBasic *)msg)->zcMsgType
 #define CMI_IS_ZC_P2P(msg)                   (CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_SEND_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_RECV_MSG)

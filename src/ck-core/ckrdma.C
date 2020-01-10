@@ -1792,6 +1792,10 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *env, NcpyBcastInterimAckInfo *bcast
 
   // CkPackRdmaPtrs((((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   CkPackMessage(&env);
+
+#if !CMK_SMP || !CMK_NODE_QUEUE_AVAILABLE
+  CMI_SET_BROADCAST_ROOT(env, rootNode+1);
+#endif
 }
 
 #if CMK_SMP

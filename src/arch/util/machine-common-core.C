@@ -29,14 +29,6 @@ FILE *debugLog = NULL;
 /* The number of children used when a msg is broadcast inside a node */
 #define BROADCAST_SPANNING_INTRA_FACTOR  8
 
-/* Root of broadcast:
- * non-bcast msg: root = 0;
- * proc-level bcast msg: root >=1; (CmiMyPe()+1)
- * node-level bcast msg: root <=-1; (-CmiMyNode()-1)
- */
-#define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
-#define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
-
 /**
  * For some machine layers such as on Active Message framework,
  * the receiver callback is usally executed on an internal
