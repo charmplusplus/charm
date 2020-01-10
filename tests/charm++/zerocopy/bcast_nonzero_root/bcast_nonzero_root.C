@@ -1,5 +1,5 @@
 #include "bcast_nonzero_root.decl.h"
-#define NUM_ELEMENTS_PER_PE 1
+#define NUM_ELEMENTS_PER_PE 10
 #define SIZE 129
 #define DEBUG(x) //x
 
