@@ -1401,52 +1401,60 @@ void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID, int opts)
 	ap.ckBroadcast((CkArrayMessage *)msg,entryIndex,opts);
 }
 
-void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
+void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
 {
-	envelope *env = UsrToEnv(msg);
-	env->setMsgtype(ForBocMsg);
-	msg->array_ep_bcast()=ep;
-	if (ckIsDelegated()) //Just call our delegateMgr
-	  ckDelegatedTo()->ArrayBroadcast(ckDelegatedPtr(),ep,msg,_aid);
-	else 
-	{ //Broadcast message via serializer node
-	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
- 	  int skipsched = opts & CK_MSG_EXPEDITED; 
-	  //int serializer=0;//1623802937%CkNumPes();
-	  if (CkMyPe()==CpvAccess(serializer))
-	  {
-		DEBB((AA "Sending array broadcast\n" AB));
-		if (skipsched)
-			CProxy_CkArray(_aid).recvExpeditedBroadcast(msg);
-		else
-			CProxy_CkArray(_aid).recvBroadcast(msg);
-	  } else {
-			DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,CpvAccess(serializer)));
-			CProxy_CkArray ap(_aid);
+  envelope* env = UsrToEnv(msg);
+  env->setMsgtype(ForBocMsg);
+  msg->array_ep_bcast() = ep;
+  if (ckIsDelegated()) {
+    //Just call our delegateMgr
+    ckDelegatedTo()->ArrayBroadcast(ckDelegatedPtr(), ep, msg, _aid);
+  } else {
+    //Broadcast message via serializer node
+    _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
+    int skipsched = opts & CK_MSG_EXPEDITED;
+    if (CkMyPe() == CpvAccess(serializer)) {
+      DEBB((AA "Sending array broadcast\n" AB));
+      // TODO: What if we have a message thats nokeep AND expedited?
+      if (skipsched) {
+        CProxy_CkArray(_aid).recvExpeditedBroadcast(msg);
+      } else {
+        CProxy_CkArray(_aid).recvBroadcast(msg);
+      }
+    } else {
+      DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,
+          CpvAccess(serializer)));
+      CProxy_CkArray ap(_aid);
 #if CMK_ONESIDED_IMPL
-			if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG ||
-				CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) {
-				
-				// ZC Bcast is implemented on non-zero root nodes by sending a small message to Node 0 (through comm thread)
-				// to increment bcastNo on PE 0 i.e. the serializerPe (implemented as an atomic). After incrementing, an ack message is sent back to
-				// this PE (which is the root node pe) to perform a broadcast
-				MsgPointerWrapper w;
-				w.msg = msg;
-				ap[CpvAccess(serializer)].incrementBcastNoAndSendBack(CkMyPe(), w);
-			} else
+      if (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG ||
+          CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) {
+        // ZC Bcast is implemented on non-zero root nodes by sending a small
+        // message to Node 0 (through comm thread) to increment bcastNo on PE 0
+        // i.e. the serializerPe (implemented as an atomic). After
+        // incrementing, an ack message is sent back to this PE (which is the
+        // root node pe) to perform a broadcast
+        MsgPointerWrapper w;
+        w.msg = msg;
+        ap[CpvAccess(serializer)].incrementBcastNoAndSendBack(CkMyPe(), w);
+      } else
 #endif
-			{
-				// Regular Bcast (non ZC) is implemented on non-zero root nodes by forwarding the message to PE 0 and
-				// then having PE 0 perform the broadcast rooted at Node 0. This is done to ensure single delivery (and avoid
-				// multiple delivery or no delivery of the message) when load balancing occurs during a broadcast
-				DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,CpvAccess(serializer)));
-				if (skipsched)
-					ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
-				else
-					ap[CpvAccess(serializer)].sendBroadcast(msg);
-			}
-		}
-	}
+      {
+        // Regular Bcast (non ZC) is implemented on non-zero root nodes by
+        // forwarding the message to PE 0 and then having PE 0 perform the
+        // broadcast rooted at Node 0. This is done to ensure single delivery
+        // (and avoid multiple delivery or no delivery of the message) when
+        // load balancing occurs during a broadcast
+        DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,
+            CpvAccess(serializer)));
+        // TODO: What if we have a message thats nokeep AND expedited?
+        if (skipsched) {
+          ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
+        } else {
+          ap[CpvAccess(serializer)].sendBroadcast(msg);
+        }
+      }
+    }
+  }
 }
 
 void CkArray::incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper w){
@@ -1466,21 +1474,20 @@ void CkArray::sendZCBroadcast(MsgPointerWrapper w) {
 }
 
 /// Reflect a broadcast off this Pe:
-void CkArray::sendBroadcast(CkMessage *msg)
-{
-	CK_MAGICNUMBER_CHECK
-	if(CkMyPe() == CpvAccess(serializer)){
-		//Broadcast the message to all processors
-		thisProxy.recvBroadcast(msg);
-	}else{
-		thisProxy[CpvAccess(serializer)].sendBroadcast(msg);
-	}
+void CkArray::sendBroadcast(CkMessage* msg) {
+  CK_MAGICNUMBER_CHECK
+  if (CkMyPe() == CpvAccess(serializer)) {
+    //Broadcast the message to all processors
+    thisProxy.recvBroadcast(msg);
+  } else {
+    thisProxy[CpvAccess(serializer)].sendBroadcast(msg);
+  }
 }
-void CkArray::sendExpeditedBroadcast(CkMessage *msg)
-{
-	CK_MAGICNUMBER_CHECK
-	//Broadcast the message to all processors
-	thisProxy.recvExpeditedBroadcast(msg);
+
+void CkArray::sendExpeditedBroadcast(CkMessage* msg) {
+  CK_MAGICNUMBER_CHECK
+  //Broadcast the message to all processors
+  thisProxy.recvExpeditedBroadcast(msg);
 }
 
 void CkArray::recvBroadcastViaTree(CkMessage *msg){
@@ -1488,82 +1495,85 @@ void CkArray::recvBroadcastViaTree(CkMessage *msg){
 
 
 /// Increment broadcast count; deliver to all local elements
-void CkArray::recvBroadcast(CkMessage *m)
-{
-	CK_MAGICNUMBER_CHECK
-	CkArrayMessage *msg=(CkArrayMessage *)m;
+void CkArray::recvBroadcast(CkMessage* m) {
+  CK_MAGICNUMBER_CHECK
+  CkArrayMessage* msg = (CkArrayMessage *)m;
+  envelope* env = UsrToEnv(msg);
 
-        envelope *env = UsrToEnv(msg);
+  // Turn the message into a real single-element message
+  unsigned short ep = msg->array_ep_bcast();
+  CkAssert(UsrToEnv(msg)->getGroupNum() == thisgroup);
 
-        // Turn the message into a real single-element message
-        unsigned short ep = msg->array_ep_bcast();
-        CkAssert(UsrToEnv(msg)->getGroupNum() == thisgroup);
+  recvBroadcastEpIdx = UsrToEnv(msg)->getEpIdx(); // store the previous EpIx in recvBroadcastEpIdx
 
-        recvBroadcastEpIdx = UsrToEnv(msg)->getEpIdx(); // store the previous EpIx in recvBroadcastEpIdx
+  UsrToEnv(msg)->setMsgtype(ForArrayEltMsg);
+  UsrToEnv(msg)->setArrayMgr(thisgroup);
+  UsrToEnv(msg)->getsetArrayEp() = ep;
 
-        UsrToEnv(msg)->setMsgtype(ForArrayEltMsg);
-        UsrToEnv(msg)->setArrayMgr(thisgroup);
-        UsrToEnv(msg)->getsetArrayEp() = ep;
-
-	broadcaster->incoming(msg);
+  broadcaster->incoming(msg);
 
 #if CMK_BIGSIM_CHARM
-        void *root;
-        _TRACE_BG_TLINE_END(&root);
-	BgSetEntryName("start-broadcast", &root);
-        std::vector<void *> logs;    // store all logs for each delivery
-	extern void stopVTimer();
-	extern void startVTimer();
+  void* root;
+  _TRACE_BG_TLINE_END(&root);
+  BgSetEntryName("start-broadcast", &root);
+  std::vector<void *> logs; // store all logs for each delivery
+  extern void stopVTimer();
+  extern void startVTimer();
 #endif
-    int len = localElemVec.size();
 
+  int len = localElemVec.size();
 #if CMK_ONESIDED_IMPL
-    // extract this field here so we can still check it even if msg is freed
-    const auto zc_msgtype = CMI_ZC_MSGTYPE(UsrToEnv(msg));
+  // extract this field here so we can still check it even if msg is freed
+  const auto zc_msgtype = CMI_ZC_MSGTYPE(env);
 
-    if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG && len > 0 ) { // message contains pointers to the posted buffer, which contains the data received
-      // All operations done, already consumed by other array elements, now deliver to the first element
+  if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG && len > 0 ) {
+    // Message contains pointers to the posted buffer, which contains the data
+    // received
+    // All operations done, already consumed by other array elements, now
+    // deliver to the first element
 
-      bool doFree = true; // free it since all ops are done
-      broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
+    bool doFree = true; // free it since all ops are done
+    broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
+  } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG && len > 0 ) {
+    // Message is used by the receiver to post the receiver buffer
+    // Initial metadata message, send only to the first element, other elements
+    // are sent CMK_ZC_BCAST_RECV_DONE_MSG after rget completion
 
-    } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG && len > 0 ) { // message is used by the receiver to post the receiver buffer
-      // Initial metadata message, send only to the first element, other elements are sent CMK_ZC_BCAST_RECV_DONE_MSG after rget completion
-
-      bool doFree = false; // do not free since msg will be reused to send buffers to peers,
-                           // msg will be finally freed by the first element in the CMK_ZC_BCAST_RECV_ALL_DONE_MSG branch
-      broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
-
-    } else
+    // do not free since msg will be reused to send buffers to peers, msg will
+    // be finally freed by the first element in the
+    // CMK_ZC_BCAST_RECV_ALL_DONE_MSG branch
+    bool doFree = false;
+    broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
+  } else
 #endif
-
-    {
+  {
 #if CMK_CHARMPY
-      broadcaster->deliver(msg, localElemVec, thisgroup.idx, stableLocations);
+    broadcaster->deliver(msg, localElemVec, thisgroup.idx, stableLocations);
 #else
-      for (unsigned int i = 0; i < len; ++i) {
+    for (unsigned int i = 0; i < len; ++i) {
 #if CMK_BIGSIM_CHARM
-                //BgEntrySplit("split-broadcast");
-  		stopVTimer();
-                void *curlog = BgSplitEntry("split-broadcast", &root, 1);
-                logs.push_back(curlog);
-  		startVTimer();
+      stopVTimer();
+      void *curlog = BgSplitEntry("split-broadcast", &root, 1);
+      logs.push_back(curlog);
+      startVTimer();
 #endif
-		bool doFree = false;
-		if (stableLocations && i == len-1) doFree = true;
+      bool doFree = false;
+      if (stableLocations && i == len-1) doFree = true;
 #if CMK_ONESIDED_IMPL
-		if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;  // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the first element
-                                                                   // during CMK_ZC_BCAST_ALL_DONE_MSG
+      // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
+      // first element during CMK_ZC_BCAST_ALL_DONE_MSG
+      if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
 #endif
-		CmiAssert(i < localElemVec.size());
-		broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
-	}
+      CmiAssert(i < localElemVec.size());
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
+    }
 
 #if CMK_ONESIDED_IMPL
     if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
-      CkArray *mgr = getArrayMgrFromMsg(env);
+      CkArray* mgr = getArrayMgrFromMsg(env);
 
-      // Reset back message to be ForBocMsg with the prevEpIdx that targets CkArray group
+      // Reset back message to be ForBocMsg with the prevEpIdx that targets
+      // CkArray group
       env->setMsgtype(ForBocMsg);
       env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
     }
@@ -1572,16 +1582,16 @@ void CkArray::recvBroadcast(CkMessage *m)
   }
 
 #if CMK_BIGSIM_CHARM
-	//BgEntrySplit("end-broadcast");
-	stopVTimer();
-	BgSplitEntry("end-broadcast", logs.data(), logs.size());
-	startVTimer();
+  stopVTimer();
+  BgSplitEntry("end-broadcast", logs.data(), logs.size());
+  startVTimer();
 #endif
 
-	// CkArrayBroadcaster doesn't have msg buffered, and there was
-	// no last delivery to transfer ownership
-	if (stableLocations && len == 0)
-	  delete msg;
+  // CkArrayBroadcaster doesn't have msg buffered, and there was no last
+  // delivery to transfer ownership
+  if (stableLocations && len == 0) {
+    delete msg;
+  }
 }
 
 #if CMK_ONESIDED_IMPL
