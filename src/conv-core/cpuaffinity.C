@@ -602,7 +602,16 @@ static void cpuAffinityRecvHandler(void *msg)
     if (m->node_hosts[i] == myhost)
       ++nodes_on_host;
 
-  const int package_count = cmi_hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PACKAGE);
+  // Filter out packages with null cpusets, caused by system resource management
+  const int total_package_count = cmi_hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PACKAGE);
+  std::vector<hwloc_obj_t> packages;
+  for (int i = 0; i < total_package_count; ++i)
+  {
+    hwloc_obj_t obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PACKAGE, i);
+    if (obj->cpuset)
+      packages.push_back(obj);
+  }
+  const int package_count = packages.size();
 
   hwloc_obj_t obj;
   int numranks, myrank;
@@ -627,7 +636,7 @@ static void cpuAffinityRecvHandler(void *msg)
       }
     }
 
-    obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PACKAGE, mypackage);
+    obj = packages[mypackage];
     numranks = pes_on_package;
     myrank = my_first_pe_rank_on_package + CmiMyRank();
 
