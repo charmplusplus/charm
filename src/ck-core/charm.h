@@ -342,12 +342,14 @@ typedef enum {
   ForArrayEltMsg       =21,              // Array Element entry method message
   ForIDedObjMsg        =22,
   BocBcastMsg          =23,
+  ArrayBcastMsg        =24,
+  ArrayBcastFwdMsg     =25,
 #if CMK_LOCKLESS_QUEUE
-  WarnMsg              =24,              // Warning data message (Reduction)
-  WarnDoneMsg          =25,              // Signal completion of warnings reduction (Broadcast)
-  LAST_CK_ENVELOPE_TYPE =26              // Used for error-checking
+  WarnMsg              =26,              // Warning data message (Reduction)
+  WarnDoneMsg          =27,              // Signal completion of warnings reduction (Broadcast)
+  LAST_CK_ENVELOPE_TYPE =28              // Used for error-checking
 #else
-  LAST_CK_ENVELOPE_TYPE =24              // Used for error-checking
+  LAST_CK_ENVELOPE_TYPE =26              // Used for error-checking
 #endif
 } CkEnvelopeType;
 

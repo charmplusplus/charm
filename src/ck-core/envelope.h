@@ -398,13 +398,15 @@ public:
     CkGroupID   getGroupNum(void) const {
       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==BocBcastMsg || getMsgtype()==NodeBocInitMsg
-          || getMsgtype()==ForNodeBocMsg);
+          || getMsgtype()==ForNodeBocMsg || getMsgtype()==ArrayBcastMsg
+          || getMsgtype() == ArrayBcastFwdMsg);
       return type.group.g;
     }
     void   setGroupNum(const CkGroupID g) {
       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==BocBcastMsg || getMsgtype()==NodeBocInitMsg
-          || getMsgtype()==ForNodeBocMsg);
+          || getMsgtype()==ForNodeBocMsg || getMsgtype()==ArrayBcastMsg
+          || getMsgtype() == ArrayBcastFwdMsg);
       type.group.g = g;
     }
     void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.epoch=epoch; }

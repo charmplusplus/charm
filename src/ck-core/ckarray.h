@@ -689,6 +689,8 @@ public:
   void sendExpeditedBroadcast(CkMessage *msg);
   void recvExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
   void recvBroadcastViaTree(CkMessage *msg);
+  void recvNoKeepBroadcast(CkMessage *msg) { recvBroadcast(msg); }
+  void sendNoKeepBroadcast(CkMessage *msg);
 
   void sendZCBroadcast(MsgPointerWrapper w);
 

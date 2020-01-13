@@ -1281,10 +1281,10 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
   elBcastNo++;
   DEBB((AA "Delivering broadcast %d to element %s\n" AB,elBcastNo,idx2str(el)));
 
-  CkAssert(UsrToEnv(bcast)->getMsgtype() == ForArrayEltMsg);
+  CkAssert(UsrToEnv(bcast)->getMsgtype() == ArrayBcastFwdMsg);
 
   if (!broadcastViaScheduler)
-    return el->ckInvokeEntry(bcast->array_ep(), bcast, doFree);
+    return el->ckInvokeEntry(bcast->array_ep_bcast(), bcast, doFree);
   else {
     if (!doFree) {
       CkArrayMessage *newMsg = (CkArrayMessage *)CkCopyMsg((void **)&bcast);
@@ -1404,7 +1404,7 @@ void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID, int opts)
 void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
 {
   envelope* env = UsrToEnv(msg);
-  env->setMsgtype(ForBocMsg);
+  env->setMsgtype(ArrayBcastMsg);
   msg->array_ep_bcast() = ep;
   if (ckIsDelegated()) {
     //Just call our delegateMgr
@@ -1418,6 +1418,8 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
       // TODO: What if we have a message thats nokeep AND expedited?
       if (skipsched) {
         CProxy_CkArray(_aid).recvExpeditedBroadcast(msg);
+      } else if (_entryTable[ep]->noKeep) {
+        CProxy_CkArray(_aid).recvNoKeepBroadcast(msg);
       } else {
         CProxy_CkArray(_aid).recvBroadcast(msg);
       }
@@ -1449,6 +1451,8 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
         // TODO: What if we have a message thats nokeep AND expedited?
         if (skipsched) {
           ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
+        } else if (_entryTable[ep]->noKeep) {
+          ap[CpvAccess(serializer)].sendNoKeepBroadcast(msg);
         } else {
           ap[CpvAccess(serializer)].sendBroadcast(msg);
         }
@@ -1476,8 +1480,10 @@ void CkArray::sendZCBroadcast(MsgPointerWrapper w) {
 /// Reflect a broadcast off this Pe:
 void CkArray::sendBroadcast(CkMessage* msg) {
   CK_MAGICNUMBER_CHECK
+  // TODO: is this recheck necessary? If so, it's necessary in the others too
   if (CkMyPe() == CpvAccess(serializer)) {
     //Broadcast the message to all processors
+    UsrToEnv(msg)->setMsgtype(ArrayBcastMsg);
     thisProxy.recvBroadcast(msg);
   } else {
     thisProxy[CpvAccess(serializer)].sendBroadcast(msg);
@@ -1487,7 +1493,15 @@ void CkArray::sendBroadcast(CkMessage* msg) {
 void CkArray::sendExpeditedBroadcast(CkMessage* msg) {
   CK_MAGICNUMBER_CHECK
   //Broadcast the message to all processors
+  UsrToEnv(msg)->setMsgtype(ArrayBcastMsg);
   thisProxy.recvExpeditedBroadcast(msg);
+}
+
+void CkArray::sendNoKeepBroadcast(CkMessage* msg) {
+  CK_MAGICNUMBER_CHECK
+  //Broadcast the message to all processors
+  UsrToEnv(msg)->setMsgtype(ArrayBcastMsg);
+  thisProxy.recvNoKeepBroadcast(msg);
 }
 
 void CkArray::recvBroadcastViaTree(CkMessage *msg){
@@ -1499,16 +1513,6 @@ void CkArray::recvBroadcast(CkMessage* m) {
   CK_MAGICNUMBER_CHECK
   CkArrayMessage* msg = (CkArrayMessage *)m;
   envelope* env = UsrToEnv(msg);
-
-  // Turn the message into a real single-element message
-  unsigned short ep = msg->array_ep_bcast();
-  CkAssert(UsrToEnv(msg)->getGroupNum() == thisgroup);
-
-  recvBroadcastEpIdx = UsrToEnv(msg)->getEpIdx(); // store the previous EpIx in recvBroadcastEpIdx
-
-  UsrToEnv(msg)->setMsgtype(ForArrayEltMsg);
-  UsrToEnv(msg)->setArrayMgr(thisgroup);
-  UsrToEnv(msg)->getsetArrayEp() = ep;
 
   broadcaster->incoming(msg);
 
