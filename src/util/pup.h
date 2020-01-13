@@ -127,35 +127,31 @@ typedef enum {
   dataType_last //<- for setting table lengths, etc.
 } dataType;
 
-template <class T>
-dataType getXlateDataType(T *a) {
-  if(std::is_same<T, signed char>::value) return Tchar;
+static inline dataType getXlateDataType(signed char *a) { return Tchar; }
 #if CMK_SIGNEDCHAR_DIFF_CHAR
-  else if(std::is_same<T, char>::value) return Tchar;
+static inline dataType getXlateDataType(char *a) { return Tchar; }
 #endif
-  else if(std::is_same<T, short>::value) return Tshort;
-  else if(std::is_same<T, int>::value) return Tint;
-  else if(std::is_same<T, long>::value) return Tlong;
-  else if(std::is_same<T, unsigned char>::value) return Tuchar;
-  else if(std::is_same<T, unsigned short>::value) return Tushort;
-  else if(std::is_same<T, unsigned int>::value) return Tuint;
-  else if(std::is_same<T, unsigned long>::value) return Tulong;
-  else if(std::is_same<T, float>::value) return Tfloat;
-  else if(std::is_same<T, double>::value) return Tdouble;
+static inline dataType getXlateDataType(short *a) { return Tshort; }
+static inline dataType getXlateDataType(int *a) { return Tint; }
+static inline dataType getXlateDataType(long *a) { return Tlong; }
+static inline dataType getXlateDataType(unsigned char *a) { return Tuchar; }
+static inline dataType getXlateDataType(unsigned short *a) { return Tushort; }
+static inline dataType getXlateDataType(unsigned int *a) { return Tuint; }
+static inline dataType getXlateDataType(unsigned long *a) { return Tulong; }
+static inline dataType getXlateDataType(float *a) { return Tfloat; }
+static inline dataType getXlateDataType(double *a) { return Tdouble; }
 #if CMK_LONG_DOUBLE_DEFINED
-  else if(std::is_same<T, long double>::value) return Tlongdouble;
+static inline dataType getXlateDataType(long double *a) { return Tlongdouble; }
 #endif
-  else if(std::is_same<T, bool>::value) return Tbool;
+static inline dataType getXlateDataType(bool *a) { return Tbool; }
 #ifdef CMK_PUP_LONG_LONG
-  else if(std::is_same<T, CMK_PUP_LONG_LONG>::value) return Tlonglong;
-  else if(std::is_same<T, unsigned CMK_PUP_LONG_LONG>::value) return Tulonglong;
+static inline dataType getXlateDataType(CMK_PUP_LONG_LONG *a) { return Tlonglong; }
+static inline dataType getXlateDataType(unsigned CMK_PUP_LONG_LONG *a) { return Tulonglong; }
 #endif
 #if CMK_HAS_INT16
-  else if(std::is_same<T, CmiInt16>::value) return Tint128;
-  else if(std::is_same<T, CmiUInt16>::value) return Tuint128;
+static inline dataType getXlateDataType(CmiInt16 *a) { return Tint128; }
+static inline dataType getXlateDataType(CmiUInt16 *a) { return Tuint128; }
 #endif
-  CmiAbort("getXlateDataType: Matching primitive data type not found in dataType enum for type - %s", typeid(*a).name());
-}
 
 
 //This should be a 1-byte unsigned type
