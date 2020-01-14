@@ -12,6 +12,6 @@ mainmodule pup_buffer
   array [1D] arr{
     entry arr();
     entry void run();
-    entry void verify();
+    entry void verify(int mode);
   };
 }
