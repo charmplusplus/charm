@@ -609,7 +609,7 @@ static void cpuAffinityRecvHandler(void *msg)
   for (int i = 0; i < total_package_count; ++i)
   {
     hwloc_obj_t obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PACKAGE, i);
-    if (obj->cpuset)
+    if (cmi_hwloc_get_nbobjs_inside_cpuset_by_type(topology, obj->cpuset, HWLOC_OBJ_PU) > 0)
       packages.emplace_back(obj);
   }
   const int package_count = packages.size();
