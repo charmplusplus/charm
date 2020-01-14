@@ -43,7 +43,9 @@ This file in metis was modified by Kavitha Chandrasekar at UIUC
 #endif
   #include <inttypes.h>
   #include <sys/types.h>
-  #include <sys/resource.h>
+  #ifndef __MINGW32__
+    #include <sys/resource.h>
+  #endif
   #include <sys/time.h>
 #endif
 
