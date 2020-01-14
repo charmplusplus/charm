@@ -605,11 +605,12 @@ static void cpuAffinityRecvHandler(void *msg)
   // Filter out packages with null cpusets, caused by system resource management
   const int total_package_count = cmi_hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PACKAGE);
   std::vector<hwloc_obj_t> packages;
+  packages.reserve(total_package_count);
   for (int i = 0; i < total_package_count; ++i)
   {
     hwloc_obj_t obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PACKAGE, i);
     if (obj->cpuset)
-      packages.push_back(obj);
+      packages.emplace_back(obj);
   }
   const int package_count = packages.size();
 
