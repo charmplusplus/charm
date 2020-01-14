@@ -1048,7 +1048,9 @@ void CmiTimerInit(char **argv)
   if(CmiMyRank() == 0) _absoluteTime = tmptime;   /* initialize only  once */
 #if !(__FAULT__)
   /* try to synchronize calling barrier */
+#if CMK_CCS_AVAILABLE
   if(CpvAccess(cmiArgDebugFlag)==0)
+#endif
     {
       CmiBarrier();
       CmiBarrier();
@@ -1069,7 +1071,9 @@ if(CmiMyRank() == 0) /* initialize only  once */
   }
 
 #if !(__FAULT__)
+#if CMK_CCS_AVAILABLE
   if(CpvAccess(cmiArgDebugFlag)==0)
+#endif
     CmiBarrier();
 /*  CmiBarrierZero(); */
 #endif
@@ -3808,7 +3812,9 @@ void ConverseCommonInit(char **argv)
   CmiTmpInit(argv);
   if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
     {
+#if CMK_CCS_AVAILABLE
       CpvAccess(cmiArgDebugFlag) = 1;
+#endif
     }
   CmiTimerInit(argv);
   CstatsInit(argv);
@@ -3900,12 +3906,14 @@ void ConverseCommonExit(void)
 #endif
 
 #if CMK_CUDA
-  // ensure all PEs have finished GPU work before destructing
-  if(CmiMyRank() < CmiMyNodeSize()) {
+  // Only worker threads execute the following
+  if (!CmiInCommThread()) {
+    // Ensure all PEs have finished GPU work before destructing
     CmiNodeBarrier();
-  }
-  if (CmiMyRank() == 0) {
-    exitHybridAPI();
+
+    if (CmiMyRank() == 0) {
+      exitHybridAPI();
+    }
   }
 #endif
   seedBalancerExit();

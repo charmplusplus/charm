@@ -544,6 +544,7 @@ void LBDatabase::DoneRegisteringObjects(LDOMHandle omh)
 
 LDObjHandle LBDatabase::RegisterObj(LDOMHandle omh, CmiUInt8 id,
                                     void* userPtr, int migratable) {
+#if CMK_LBDB_ON
   LDObjHandle newhandle;
 
   newhandle.omhandle = omh;
@@ -591,6 +592,7 @@ LDObjHandle LBDatabase::RegisterObj(LDOMHandle omh, CmiUInt8 id,
   }
 
   return newhandle;
+#endif
 }
 
 void LBDatabase::UnregisterObj(LDObjHandle h)
@@ -616,6 +618,7 @@ void LBDatabase::UnregisterObj(LDObjHandle h)
 
 void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force)
 {
+#if CMK_LBDB_ON
   if (force || (StatsOn() && _lb_args.traceComm())) {
     LBCommData* item_ptr;
 
@@ -638,10 +641,12 @@ void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned
     }
     item_ptr->addMessage(bytes);
   }
+#endif
 }
 
 void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int nDests, unsigned int bytes, int nMsgs)
 {
+#if CMK_LBDB_ON
   if (StatsOn() && _lb_args.traceComm()) {
     LBCommData* item_ptr;
     if (obj_running) {
@@ -652,6 +657,7 @@ void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int 
       item_ptr->addMessage(bytes, nMsgs);
     }
   }
+#endif
 }
 
 void LBDatabase::DumpDatabase()
@@ -894,7 +900,7 @@ void LBDatabase::MetaLBResumeWaitingChares(int lb_ideal_period) {
 }
 
 void LBDatabase::MetaLBCallLBOnChares() {
-#ifdef CMK_LBDB_ON
+#if CMK_LBDB_ON
   for (int i = 0; i < objs.size(); i++) {
     LBObj* obj = objs[i].obj;
     if (obj) {
