@@ -7,9 +7,6 @@
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  1
 
-#undef CMK_THREADS_USE_JCONTEXT
-#define CMK_THREADS_USE_JCONTEXT                           1
-
 #undef CMK_USE_POLL
 #define CMK_USE_POLL                                       1
 #undef CMK_USE_KQUEUE
