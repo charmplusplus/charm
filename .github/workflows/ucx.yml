@@ -11,7 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build-ucx
-      run: git clone https://github.com/openucx/ucx.git && cd ucx && ./autogen.sh && ./contrib/configure-release --prefix=$HOME/ucx/build && make -j8 && make install
+      run: git clone https://github.com/openucx/ucx.git && cd ucx && ./autogen.sh && ./contrib/configure-release --prefix=$HOME/ucx/build --disable-numa && make -j8 && make install
     - name: build
       run: ./build all-test ucx-linux-x86_64 -g -j4 --with-production --basedir=$HOME/ucx/build
     - name: test
