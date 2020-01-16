@@ -11,10 +11,10 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build-ucx
-      run: git clone https://github.com/openucx/ucx.git && cd ucx && ./autogen.sh && ./contrib/configure-release --prefix=$HOME/ucx/build --disable-numa && make -j4 && make install
+      run: git clone https://github.com/openucx/ucx.git && cd ucx && ./autogen.sh && ./contrib/configure-release --disable-numa && make -j4 && sudo make install
     - name: build-ompi
       run: wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz && tar -xf openmpi-4.0.1.tar.gz && cd openmpi-4.0.1/ && ./configure --enable-install-libpmix && make -j 4 && sudo make install
     - name: build
-      run: ./build all-test ucx-linux-x86_64 ompipmix -g -j4 --with-production --basedir=$HOME/ucx/build
+      run: ./build all-test ucx-linux-x86_64 ompipmix -g -j4 --with-production
     - name: test
-      run: ls $HOME/ucx/build/ && LD_LIBRARY_PATH=$HOME/ucx/build/lib:$LD_LIBRARY_PATH make -C ucx-linux-x86_64/tmp test-tests test-examples TESTOPTS=++local
+      run: make -C ucx-linux-x86_64/tmp test-tests test-examples TESTOPTS=++local
