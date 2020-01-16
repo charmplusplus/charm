@@ -1209,7 +1209,7 @@ CkReductionMsg::alloc(int msgnum,size_t size,int *sz,int priobits,GroupDepNum gr
   DEBR(("CkReductionMsg::Allocating %d store; %d bytes total\n",*sz,totalsize));
   CkReductionMsg *ret = (CkReductionMsg *)
     CkAllocMsg(msgnum,totalsize,priobits,groupDepNum);
-  ret->data=(void *)(&ret->dataStorage);
+  ret->refreshDataPtr();
   return (void *) ret;
 }
 
@@ -1227,7 +1227,7 @@ CkReductionMsg* CkReductionMsg::unpack(void *in)
   CkReductionMsg *ret = (CkReductionMsg *)in;
   DEBR(("CkReductionMsg::unpack %d %d %d %d\n",ret->sourceFlag,ret->redNo,ret->gcount,ret->dataSize));
   //CkPrintf("CkReductionMsg::unpack %d %d %d %d\n",ret->sourceFlag,ret->redNo,ret->gcount,ret->dataSize);
-  ret->data=(void *)(&ret->dataStorage);
+  ret->refreshDataPtr();
   return ret;
 }
 

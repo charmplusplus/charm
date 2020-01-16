@@ -776,6 +776,7 @@ CtvDeclare(bool, ampiFinalized);
 CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int, ampiThreadLevel);
 CkpvDeclare(AmpiMsgPool, msgPool);
+CkpvDeclare(AmpiRednMsgPool, rednMsgPool);
 
 CLINKAGE
 long ampiCurrentStackUsage(void){
@@ -1017,6 +1018,7 @@ static void ampiProcInit() noexcept {
 
   CkpvInitialize(AmpiMsgPool, msgPool); // pool of small AmpiMsg's, big enough for rendezvous messages
   CkpvAccess(msgPool) = AmpiMsgPool(AMPI_MSG_POOL_SIZE, AMPI_POOLED_MSG_SIZE);
+  CkpvInitialize(AmpiRednMsgPool, rednMsgPool);
 
 #if AMPIMSGLOG
   char **argv=CkGetArgv();
@@ -4304,6 +4306,7 @@ void AMPI_Exit(int exitCode)
   // application with ampicc), exit cleanly when the application calls exit().
   AMPI_API_INIT("AMPI_Exit", exitCode);
   CkpvAccess(msgPool).clear();
+  CkpvAccess(rednMsgPool).clear();
 
   if (!atexit_called)
     TCHARM_Done(exitCode);
@@ -4817,7 +4820,9 @@ CMI_WARN_UNUSED_RESULT ampi * ampi::barrier() noexcept
   CkAssert(parent->resumeOnColl == false);
   parent->resumeOnColl = true;
   CkCallback barrierCB(CkReductionTarget(ampi, barrierResult), getProxy());
-  contribute(barrierCB);
+  CkReductionMsg * msg = CkpvAccess(rednMsgPool).newAmpiRednMsg(0, NULL, CkReduction::nop);
+  msg->setCallback(barrierCB);
+  contribute(msg);
   ampi * dis = block(); //Resumed by ampi::barrierResult
   dis->parent->resumeOnColl = false;
   return dis;
@@ -4887,7 +4892,9 @@ void ampi::ibarrier(MPI_Request *request) noexcept
 {
   *request = postReq(parent->reqPool.newReq<IReq>(nullptr, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, myComm.getComm(), getDDT()));
   CkCallback ibarrierCB(CkReductionTarget(ampi, ibarrierResult), getProxy());
-  contribute(ibarrierCB);
+  CkReductionMsg * msg = CkpvAccess(rednMsgPool).newAmpiRednMsg(0, NULL, CkReduction::nop);
+  msg->setCallback(ibarrierCB);
+  contribute(msg);
 }
 
 void ampi::ibarrierResult() noexcept
@@ -5106,7 +5113,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt, const void *inbuf, int c
   if (reducer != CkReduction::invalid) {
     // MPI predefined op matches a Charm++ builtin reducer type
     AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type for a predefined op\n", parent->thisIndex);
-    msg = CkReductionMsg::buildNew(szdata, NULL, reducer);
+    msg = CkpvAccess(rednMsgPool).newAmpiRednMsg(szdata, NULL, reducer);
     ddt->serialize((char*)inbuf, (char*)msg->getData(), count, msg->getLength(), PACK);
   }
   else if (parent->opIsCommutative(op) && ddt->isContig()) {
@@ -5115,7 +5122,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt, const void *inbuf, int c
     AMPI_DEBUG("[%d] In makeRednMsg, using custom AmpiReducer type for a commutative op\n", parent->thisIndex);
     AmpiOpHeader newhdr = parent->op2AmpiOpHeader(op, type, count);
     int szhdr = sizeof(AmpiOpHeader);
-    msg = CkReductionMsg::buildNew(szdata+szhdr, NULL, AmpiReducer);
+    msg = CkpvAccess(rednMsgPool).newAmpiRednMsg(szdata+szhdr, NULL, AmpiReducer);
     memcpy(msg->getData(), &newhdr, szhdr);
     ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, msg->getLength()-szhdr, PACK);
   }

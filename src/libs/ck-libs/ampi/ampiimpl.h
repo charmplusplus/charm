@@ -1921,6 +1921,61 @@ class AmpiMsgPool {
   }
 };
 
+class AmpiRednMsgPool {
+ private:
+  std::vector<CkReductionMsg *> msgs; // list of free msgs
+  int maxMsgs;
+  int currMsgs; // current # of msgs in the pool
+
+ public:
+  AmpiRednMsgPool() noexcept
+    : msgs{AMPI_MSG_POOL_SIZE}, maxMsgs{AMPI_MSG_POOL_SIZE}, currMsgs{0} { }
+  ~AmpiRednMsgPool()
+  {
+    for (int i = 0; i < currMsgs; ++i)
+      delete msgs[i];
+  }
+  inline void clear() noexcept
+  {
+    for (int i = 0; i < currMsgs; ++i)
+    {
+      CkReductionMsg *& msg = msgs[i];
+      delete msg;
+      msg = nullptr;
+    }
+    currMsgs = 0;
+  }
+  inline CkReductionMsg* newAmpiRednMsg(int NdataSize, const void *srcData, CkReduction::reducerType reducer) noexcept
+  {
+    for (int i = 0; i < currMsgs; ++i)
+    {
+      CkReductionMsg * msg = msgs[i];
+      if (msg->getSize() != NdataSize)
+        continue;
+
+      envelope * env = UsrToEnv(msg);
+      if (CmiGetReference(env) != 1)
+        continue;
+
+      CkReductionMsg * newmsg = CkReductionMsg::buildNew(NdataSize, srcData, reducer, msg);
+      CkAssert(newmsg == msg);
+      CmiReference(env);
+      newmsg->refreshDataPtr();
+      _SET_USED(env, 0);
+      return newmsg;
+    }
+
+    CkReductionMsg * msg = CkReductionMsg::buildNew(NdataSize, srcData, reducer);
+    if (currMsgs != maxMsgs)
+    {
+      CmiReference(UsrToEnv(msg));
+      msgs[currMsgs] = msg;
+      currMsgs++;
+    }
+    return msg;
+  }
+};
+
 // Number of requests in the pool
 #ifndef AMPI_REQ_POOL_SIZE
 #define AMPI_REQ_POOL_SIZE 64

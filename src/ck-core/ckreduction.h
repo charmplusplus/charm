@@ -404,6 +404,8 @@ public:
 	static void *pack(CkReductionMsg *);
 	static CkReductionMsg *unpack(void *in);
 
+  void refreshDataPtr() noexcept { data = (void *)&dataStorage; }
+
 private:
 	inline int nSources() const {return std::abs(sourceFlag);}
 
