@@ -3,9 +3,9 @@ name: UTH Linux
 on: [push]
 
 jobs:
-  timeout-minutes: 45
 
   build:
+    timeout-minutes: 45
 
     runs-on: ubuntu-latest
 
