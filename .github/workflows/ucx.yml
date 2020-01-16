@@ -1,0 +1,18 @@
+name: UCX Linux
+
+on: [push]
+
+jobs:
+  build:
+    timeout-minutes: 45
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: build-ucx
+      run: git clone https://github.com/openucx/ucx.git && cd ucx && ./autogen.sh && ./contrib/configure-release --prefix=$HOME/ucx/build && make -j8 && make install
+    - name: build
+      run: ./build all-test ucx-linux-x86_64 -g -j4 --with-production --basedir=$HOME/ucx/build
+    - name: test
+      run: make -C ucx-linux-x86_64/tmp test-tests test-examples
