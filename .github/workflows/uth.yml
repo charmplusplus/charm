@@ -3,7 +3,6 @@ name: UTH Linux
 on: [push]
 
 jobs:
-
   build:
     timeout-minutes: 45
 
