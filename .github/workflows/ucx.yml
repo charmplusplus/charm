@@ -17,4 +17,4 @@ jobs:
     - name: build
       run: ./build all-test ucx-linux-x86_64 ompipmix -g -j4 --with-production
     - name: test
-      run: LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH OMPI_MCA_rmaps_base_oversubscribe=1 make -C ucx-linux-x86_64-ompipmix/tmp test-tests test-examples TESTOPTS=--oversubscribe
+      run: LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH OMPI_MCA_rmaps_base_oversubscribe=1 make -C ucx-linux-x86_64-ompipmix/tmp test-tests test-examples
