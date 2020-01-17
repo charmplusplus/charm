@@ -17,4 +17,4 @@ jobs:
     - name: build
       run: ./build all-test ucx-linux-x86_64 ompipmix -g -j4 --with-production
     - name: test
-      run: make -C ucx-linux-x86_64/tmp test-tests test-examples TESTOPTS=++local
+      run: make -C ucx-linux-x86_64-ompipmix/tmp test-tests test-examples TESTOPTS=++local
