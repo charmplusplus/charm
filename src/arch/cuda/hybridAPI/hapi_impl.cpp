@@ -835,6 +835,35 @@ void initDeviceMapping(char** argv) {
   }
 
   hapiCheck(cudaSetDevice(my_gpu));
+
+  // Process +nogpupeer
+  bool enable_peer = true; // P2P access is enabled by default
+  if (CmiGetArgFlagDesc(argv, "+nogpupeer",
+        "do not enable P2P access between visible GPU pairs")) {
+    enable_peer = false;
+  }
+
+  // Enable P2P access to other visible devices
+  if (enable_peer) {
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> Enabling P2P access between devices\n");
+    }
+    for (int i = 0; i < gpu_count; i++) {
+      if (i != my_gpu) {
+        int can_access_peer;
+
+        hapiCheck(cudaDeviceCanAccessPeer(&can_access_peer, my_gpu, i));
+        if (can_access_peer) {
+          cudaDeviceEnablePeerAccess(i, 0);
+        }
+      }
+    }
+  }
+  else {
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> P2P access between devices not enabled\n");
+    }
+  }
 }
 
 // Clean up and delete memory used by HAPI.
