@@ -1688,13 +1688,15 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CUDA
     // Only worker threads execute the following
     if (!CmiInCommThread()) {
-      initDeviceMapping(argv);
       if (CmiMyRank() == 0) {
         initHybridAPI();
       }
+
+      CmiNodeBarrier();
+
+      initDeviceMapping(argv);
       initEventQueues();
 
-      // ensure HAPI is initialized before registering callback functions
       CmiNodeBarrier();
 
       hapiRegisterCallbacks();

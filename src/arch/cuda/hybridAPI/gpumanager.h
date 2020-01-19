@@ -3,9 +3,12 @@
 
 #include <cuda_runtime.h>
 #include <vector>
+#include <unordered_map>
+
 #include "converse.h"
 #include "hapi.h"
 #include "hapi_impl.h"
+#include "devicemanager.h"
 
 // Initial size of the user-addressed portion of host/device buffer arrays;
 // the system-addressed portion of host/device buffer arrays (used when there
@@ -67,10 +70,11 @@ public:
   CmiNodeLock inst_lock_;
 #endif
 
-  cudaDeviceProp device_prop_;
 #ifdef HAPI_CUDA_CALLBACK
-  bool cb_support;
 #endif
+
+  // PE-device(manager) mapping
+  std::unordered_map<int, DeviceManager> device_map;
 
   void init();
   int createStreams();
@@ -108,20 +112,6 @@ void GPUManager::init() {
   time_idx_ = 0;
 #endif
 
-  // store CUDA device properties
-  int device;
-  hapiCheck(cudaGetDevice(&device));
-  hapiCheck(cudaGetDeviceProperties(&device_prop_, device));
-
-#ifdef HAPI_CUDA_CALLBACK
-  // check if CUDA callback is supported
-  // CUDA 5.0 (compute capability 3.0) or newer
-  cb_support = (device_prop_.major >= 3);
-  if (!cb_support) {
-    CmiAbort("[HAPI] CUDA callback is not supported on this device");
-  }
-#endif
-
   // allocate host/device buffers array (both user and system-addressed)
   host_buffers_ = new void*[NUM_BUFFERS*2];
   device_buffers_ = new void*[NUM_BUFFERS*2];
@@ -156,26 +146,31 @@ void GPUManager::init() {
 // which depends on the compute capability of the device.
 // Returns the number of created streams.
 int GPUManager::createStreams() {
+  int device;
+  cudaDeviceProp device_prop;
+  hapiCheck(cudaGetDevice(&device));
+  hapiCheck(cudaGetDeviceProperties(&device_prop, device));
+
   int new_n_streams = 0;
 
-  if (device_prop_.major == 3) {
-    if (device_prop_.minor == 0)
+  if (device_prop.major == 3) {
+    if (device_prop.minor == 0)
       new_n_streams = 16;
-    else if (device_prop_.minor == 2)
+    else if (device_prop.minor == 2)
       new_n_streams = 4;
     else // 3.5, 3.7 or unknown 3.x
       new_n_streams = 32;
   }
-  else if (device_prop_.major == 5) {
-    if (device_prop_.minor == 3)
+  else if (device_prop.major == 5) {
+    if (device_prop.minor == 3)
       new_n_streams = 16;
     else // 5.0, 5.2 or unknown 5.x
       new_n_streams = 32;
   }
-  else if (device_prop_.major == 6) {
-    if (device_prop_.minor == 1)
+  else if (device_prop.major == 6) {
+    if (device_prop.minor == 1)
       new_n_streams = 32;
-    else if (device_prop_.minor == 2)
+    else if (device_prop.minor == 2)
       new_n_streams = 16;
     else // 6.0 or unknown 6.x
       new_n_streams = 128;

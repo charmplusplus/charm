@@ -631,8 +631,13 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
     pools[i].head = NULL;
   }
 
+  int device;
+  cudaDeviceProp device_prop;
+  hapiCheck(cudaGetDevice(&device));
+  hapiCheck(cudaGetDeviceProperties(&device_prop, device));
+
   // divide by # of PEs on physical node and multiply by # of PEs in logical node
-  size_t available_memory = CsvAccess(gpu_manager).device_prop_.totalGlobalMem /
+  size_t available_memory = device_prop.totalGlobalMem /
                            CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()))
                            * CmiMyNodeSize() * HAPI_MEMPOOL_SCALE;
 
