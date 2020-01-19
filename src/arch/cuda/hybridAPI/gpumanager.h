@@ -76,10 +76,11 @@ public:
 
   // GPU devices accessible to this process
   int device_count;
-  std::vector<DeviceManager> device_managers;
+  DeviceManager *device_managers;
   std::unordered_map<int, DeviceManager*> device_map;
 
-  void init();
+  GPUManager();
+  ~GPUManager();
   int createStreams();
   int createNStreams(int);
   void destroyStreams();
@@ -93,7 +94,7 @@ public:
   void runKernel(hapiWorkRequest*);
 };
 
-void GPUManager::init() {
+GPUManager::GPUManager() {
   next_buffer_ = NUM_BUFFERS;
   streams_ = NULL;
   n_streams_ = 0;
@@ -120,9 +121,7 @@ void GPUManager::init() {
   hapiCheck(cudaGetDeviceCount(&device_count));
 
   // Create a DeviceManager for each GPU
-  for (int i = 0; i < device_count; i++) {
-    device_managers.emplace_back(i);
-  }
+  device_managers = new DeviceManager[device_count];
 
   // allocate host/device buffers array (both user and system-addressed)
   host_buffers_ = new void*[NUM_BUFFERS*2];
@@ -152,6 +151,22 @@ void GPUManager::init() {
 #ifdef HAPI_INSTRUMENT_WRS
   init_instr_ = false;
 #endif
+}
+
+GPUManager::~GPUManager() {
+#if CMK_SMP
+  // Destroy mutex locks
+  CmiDestroyLock(queue_lock_);
+  CmiDestroyLock(progress_lock_);
+  CmiDestroyLock(stream_lock_);
+  CmiDestroyLock(mempool_lock_);
+  CmiDestroyLock(inst_lock_);
+  CmiDestroyLock(device_map_lock);
+#endif
+
+  delete[] device_managers;
+  delete[] host_buffers_;
+  delete[] device_buffers_;
 }
 
 // Creates streams equal to the maximum number of concurrent kernels,
