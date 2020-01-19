@@ -68,13 +68,16 @@ public:
   CmiNodeLock stream_lock_;
   CmiNodeLock mempool_lock_;
   CmiNodeLock inst_lock_;
+  CmiNodeLock device_map_lock;
 #endif
 
 #ifdef HAPI_CUDA_CALLBACK
 #endif
 
-  // PE-device(manager) mapping
-  std::unordered_map<int, DeviceManager> device_map;
+  // GPU devices accessible to this process
+  int device_count;
+  std::vector<DeviceManager> device_managers;
+  std::unordered_map<int, DeviceManager*> device_map;
 
   void init();
   int createStreams();
@@ -106,11 +109,20 @@ void GPUManager::init() {
   stream_lock_ = CmiCreateLock();
   mempool_lock_ = CmiCreateLock();
   inst_lock_ = CmiCreateLock();
+  device_map_lock = CmiCreateLock();
 #endif
 
 #ifdef HAPI_TRACE
   time_idx_ = 0;
 #endif
+
+  // How many GPUs are available to this process?
+  hapiCheck(cudaGetDeviceCount(&device_count));
+
+  // Create a DeviceManager for each GPU
+  for (int i = 0; i < device_count; i++) {
+    device_managers.emplace_back(i);
+  }
 
   // allocate host/device buffers array (both user and system-addressed)
   host_buffers_ = new void*[NUM_BUFFERS*2];

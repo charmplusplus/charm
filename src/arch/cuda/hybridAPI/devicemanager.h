@@ -3,8 +3,10 @@
 
 // Manages a GPU device - accessible through GPUManager.
 class DeviceManager {
+  int device;
+
 public:
-  DeviceManager() {}
+  DeviceManager(int device_ = 0) : device(device_) {}
   ~DeviceManager() {}
 };
 

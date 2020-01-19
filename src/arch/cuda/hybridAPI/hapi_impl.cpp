@@ -426,36 +426,43 @@ void initDeviceMapping(char** argv) {
   if (map_type == Mapping::None) {
     if (CmiMyPe() == 0) {
       CmiPrintf("HAPI> User should explicitly select devices for PEs/chares\n");
+      CmiPrintf("WARNING: Direct GPU messaging may not work correctly without a specified mapping\n");
     }
     return;
   }
 
   CmiAssert(map_type != Mapping::None);
 
-  // Get number of GPUs (visible to each process)
-  int gpu_count;
-  hapiCheck(cudaGetDeviceCount(&gpu_count));
-  if (gpu_count <= 0) {
+  if (CsvAccess(gpu_manager).device_count <= 0) {
     CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
   }
 
   // Perform mapping
-  int my_gpu = 0;
-  int pes_per_gpu = (all_gpus ? CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe())) :
-      CmiNodeSize(CmiMyNode())) / gpu_count;
+  int my_device = 0;
+  int pes_per_device = (all_gpus ? CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe())) :
+      CmiNodeSize(CmiMyNode())) / CsvAccess(gpu_manager).device_count;
 
   switch (map_type) {
     case Mapping::Block:
-      my_gpu = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) / pes_per_gpu;
+      my_device = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) / pes_per_device;
       break;
     case Mapping::RoundRobin:
-      my_gpu = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) % gpu_count;
+      my_device = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) % CsvAccess(gpu_manager).device_count;
       break;
     default:
       CmiAbort("Unsupported mapping type!");
   }
 
-  hapiCheck(cudaSetDevice(my_gpu));
+  // Set device and store PE-device mapping
+  hapiCheck(cudaSetDevice(my_device));
+#if CMK_SMP
+  CmiLock(CsvAccess(gpu_manager).device_map_lock);
+#endif
+  CsvAccess(gpu_manager).device_map.emplace(CmiMyPe(),
+      &(CsvAccess(gpu_manager).device_managers[my_device]));
+#if CMK_SMP
+  CmiUnlock(CsvAccess(gpu_manager).device_map_lock);
+#endif
 
   // Process +nogpupeer
   bool enable_peer = true; // P2P access is enabled by default
@@ -469,11 +476,11 @@ void initDeviceMapping(char** argv) {
     if (CmiMyPe() == 0) {
       CmiPrintf("HAPI> Enabling P2P access between devices\n");
     }
-    for (int i = 0; i < gpu_count; i++) {
-      if (i != my_gpu) {
+    for (int i = 0; i < CsvAccess(gpu_manager).device_count; i++) {
+      if (i != my_device) {
         int can_access_peer;
 
-        hapiCheck(cudaDeviceCanAccessPeer(&can_access_peer, my_gpu, i));
+        hapiCheck(cudaDeviceCanAccessPeer(&can_access_peer, my_device, i));
         if (can_access_peer) {
           cudaDeviceEnablePeerAccess(i, 0);
         }
