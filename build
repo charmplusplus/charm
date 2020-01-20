@@ -23,6 +23,7 @@ syntax() {
   echo ''
   echo '  charm++         compile Charm++ core only'
   echo '  AMPI            compile Adaptive MPI on top of Charm++'
+  echo '  AMPI-only       compile Adaptive MPI with Charm++ built exclusively for it'
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
   echo '  charm4py        compile shared library version of Charm++ for charm4py'
   echo '  bigemulator     build additional BigSim libraries'
@@ -235,6 +236,7 @@ TAU_MAKEFILE=""
 QUIET=""
 BUILD_OMP=0
 ONLY_CONFIGURE=
+AMPI_ONLY=
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | ( less || more ) && exit 1
 [ $# -lt 2 ] && $(dirname "$0")/smart-build.pl && exit 1
@@ -364,6 +366,9 @@ do
     --build-shared)
 		BUILD_SHARED="-build-shared"; 
 		shift
+		;;
+    --ampi-only)
+		AMPI_ONLY='1'; shift
 		;;
     --with-romio)
 		WITH_ROMIO="true"; shift
@@ -898,6 +903,20 @@ else
     echo "CMK_AMPI_WITH_ROMIO=\"0\"" >> $ConvSh
     echo "CMK_AMPI_WITH_ROMIO:=0" >> $ConvMak
     echo '#define CMK_AMPI_WITH_ROMIO 0' >> $ConvHeader
+fi
+
+if [[ -n "$AMPI_ONLY" || "$PROGRAM" = "${PROGRAM%AMPI-only}AMPI-only" ]]
+then
+    echo "CMK_AMPI_ONLY=\"1\"" >> $ConvSh
+    echo "CMK_AMPI_ONLY:=1" >> $ConvMak
+    echo '#define CMK_AMPI_ONLY 1' >> $ConvHeader
+
+    # strip "-only" suffix from AMPI target
+    PROGRAM="${PROGRAM%AMPI-only}AMPI"
+else
+    echo "CMK_AMPI_ONLY=\"0\"" >> $ConvSh
+    echo "CMK_AMPI_ONLY:=0" >> $ConvMak
+    echo '#define CMK_AMPI_ONLY 0' >> $ConvHeader
 fi
 
 if test -n "$WITH_PRODUCTION"

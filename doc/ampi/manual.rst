@@ -231,8 +231,13 @@ script is:
 
    $ ./build <target> <version> <opts>
 
-For building AMPI (which also includes building Charm++ and other
-libraries needed by AMPI), specify ``<target>`` to be ``AMPI``. And
+Users who are interested only in AMPI and not any other component of
+Charm++ should specify ``<target>`` to be ``AMPI-only``. This will build
+Charm++ and other libraries needed by AMPI in a mode configured and
+tuned exclusively for AMPI. To fully build Charm++ underneath AMPI for
+use with either paradigm, or for interoperation between the two, specify
+``<target>`` to be ``AMPI``.
+
 ``<opts>`` are command line options passed to the ``charmc`` compile
 script. Common compile time options such as
 ``-g, -O, -Ipath, -Lpath, -llib`` are accepted.
@@ -256,7 +261,7 @@ off:
 
 .. code-block:: bash
 
-   $ ./build AMPI gni-crayxc --with-production --disable-ampi-error-checking
+   $ ./build AMPI-only gni-crayxc --with-production --disable-ampi-error-checking
 
 AMPI can also be built with support for multithreaded parallelism on any
 communication layer by adding "smp" as an option after the build target.
@@ -264,7 +269,7 @@ For example, on an Infiniband Linux cluster:
 
 .. code-block:: bash
 
-   $ ./build AMPI verbs-linux-x86_64 smp --with-production
+   $ ./build AMPI-only verbs-linux-x86_64 smp --with-production
 
 AMPI ranks are implemented as user-level threads with a stack size
 default of 1MB. If the default is not correct for your program, you can
@@ -273,7 +278,7 @@ following build command illustrates this for an Intel Omni-Path system:
 
 .. code-block:: bash
 
-   $ ./build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
+   $ ./build AMPI-only ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
 
 The same can be done for AMPI’s RDMA messaging threshold using
 ``AMPI_RDMA_THRESHOLD_DEFAULT`` and, for messages sent within the same

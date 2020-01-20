@@ -40,3 +40,6 @@ $(foreach i,$(DIRS),bgtest-$i):
 
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'
+
+test-AMPI: test-ampi
+test-charm: test-charm++
