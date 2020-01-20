@@ -1,6 +1,7 @@
 #ifndef __DEVICEMANAGER_H_
 #define __DEVICEMANAGER_H_
 
+#include <cuda_runtime.h>
 #include "buggy.h"
 
 // Manages a GPU device - accessible through GPUManager
@@ -12,6 +13,9 @@ struct DeviceManager {
 
   // Buddy allocator for eager communication buffer
   buggy::allocator* eager_comm_buffer;
+
+  // CUDA IPC handle of eager communication buffer
+  cudaIpcMemHandle_t eager_ipc_handle;
 
   DeviceManager(int device_ = 0) : device(device_), eager_comm_buffer(nullptr) {}
 

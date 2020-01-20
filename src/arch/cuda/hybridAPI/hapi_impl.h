@@ -15,11 +15,16 @@ extern "C" {
 
 // Initialize & exit hybrid API.
 void initHybridAPI();
-void initDeviceMapping(char** argv);
 void exitHybridAPI();
 
 // Initializes event queues used for polling.
 void initEventQueues();
+
+// Maps PEs to devices
+void initDeviceMapping(char** argv);
+
+// Creates CUDA IPC handles to be shared between processes on the same host
+void createIPCHandles();
 
 // Registers callback handler functions.
 void hapiRegisterCallbacks();

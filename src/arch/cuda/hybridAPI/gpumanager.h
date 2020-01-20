@@ -84,6 +84,9 @@ public:
   bool use_eager_comm_buffer;
   size_t eager_comm_buffer_size;
 
+  // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
+  int shm_file;
+
   GPUManager();
   int createStreams();
   int createNStreams(int);

@@ -1691,13 +1691,17 @@ void _initCharm(int unused_argc, char **argv)
       if (CmiMyRank() == 0) {
         initHybridAPI();
       }
+      initEventQueues();
 
       CmiNodeBarrier();
 
       initDeviceMapping(argv);
-      initEventQueues();
 
       CmiNodeBarrier();
+
+      if (CmiMyRank() == 0) {
+        createIPCHandles();
+      }
 
       hapiRegisterCallbacks();
       hapiInvokeCallback = CUDACallbackManager;

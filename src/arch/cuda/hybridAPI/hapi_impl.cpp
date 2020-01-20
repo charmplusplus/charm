@@ -535,6 +535,11 @@ void initDeviceMapping(char** argv) {
   }
 }
 
+// Create CUDA IPC handles to be shared between processes on the same host
+void createIPCHandles() {
+  // TODO
+}
+
 // Clean up and delete memory used by HAPI.
 void exitHybridAPI() {
 #if CMK_SMP
