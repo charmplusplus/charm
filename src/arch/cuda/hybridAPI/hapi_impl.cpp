@@ -380,7 +380,6 @@ static void releasePool(std::vector<BufferPool> &pools);
 void initHybridAPI() {
   // create and initialize GPU Manager object
   CsvInitialize(GPUManager, gpu_manager);
-  CsvAccess(gpu_manager).init();
 }
 
 // Set up PE to GPU mapping, invoked from all PEs
@@ -456,13 +455,51 @@ void initDeviceMapping(char** argv) {
   // Set device and store PE-device mapping
   hapiCheck(cudaSetDevice(my_device));
 #if CMK_SMP
-  CmiLock(CsvAccess(gpu_manager).device_map_lock);
+  CmiLock(CsvAccess(gpu_manager).device_mapping_lock);
 #endif
   CsvAccess(gpu_manager).device_map.emplace(CmiMyPe(),
       &(CsvAccess(gpu_manager).device_managers[my_device]));
 #if CMK_SMP
-  CmiUnlock(CsvAccess(gpu_manager).device_map_lock);
+  CmiUnlock(CsvAccess(gpu_manager).device_mapping_lock);
 #endif
+
+  // Process eager communication buffer parameters
+  int input_eager_buffer_size;
+  if (CmiGetArgIntDesc(argv, "+gpueagerbuffer", &input_eager_buffer_size,
+        "GPU eager communication buffer size")) {
+    if (CmiMyRank() == 0) {
+      if (input_eager_buffer_size <= 0) {
+        CsvAccess(gpu_manager).use_eager_comm_buffer = false;
+      }
+      else {
+        CsvAccess(gpu_manager).eager_comm_buffer_size = (size_t)input_eager_buffer_size;
+      }
+    }
+  }
+
+  if (CmiMyPe() == 0) {
+    if (CsvAccess(gpu_manager).use_eager_comm_buffer) {
+      CmiPrintf("HAPI> GPU eager communication buffer size: %lu bytes\n",
+          CsvAccess(gpu_manager).eager_comm_buffer_size);
+    }
+    else {
+      CmiPrintf("HAPI> Not using GPU eager communication buffer\n");
+    }
+  }
+
+  CmiNodeBarrier();
+
+  // Create eager communication buffers
+  if (CsvAccess(gpu_manager).use_eager_comm_buffer) {
+#if CMK_SMP
+    CmiLock(CsvAccess(gpu_manager).device_mapping_lock);
+#endif
+    DeviceManager* dm = CsvAccess(gpu_manager).device_map[CmiMyPe()];
+    dm->create_eager_comm_buffer(CsvAccess(gpu_manager).eager_comm_buffer_size);
+#if CMK_SMP
+    CmiUnlock(CsvAccess(gpu_manager).device_mapping_lock);
+#endif
+  }
 
   // Process +nogpupeer
   bool enable_peer = true; // P2P access is enabled by default
@@ -502,7 +539,14 @@ void exitHybridAPI() {
   CmiDestroyLock(CsvAccess(gpu_manager).progress_lock_);
   CmiDestroyLock(CsvAccess(gpu_manager).stream_lock_);
   CmiDestroyLock(CsvAccess(gpu_manager).mempool_lock_);
+  CmiDestroyLock(CsvAccess(gpu_manager).inst_lock_);
+  CmiDestroyLock(CsvAccess(gpu_manager).device_mapping_lock);
 #endif
+
+  // Delete data structures
+  delete[] CsvAccess(gpu_manager).device_managers;
+  delete[] CsvAccess(gpu_manager).host_buffers_;
+  delete[] CsvAccess(gpu_manager).device_buffers_;
 
   // destroy streams (if they were created)
   CsvAccess(gpu_manager).destroyStreams();

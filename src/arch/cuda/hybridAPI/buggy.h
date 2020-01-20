@@ -10,6 +10,8 @@
 
 namespace buggy {
 
+#define DEBUG 1
+
 #ifdef DEBUG
 #define DEBUG_PRINT(...) printf("[Buggy] " __VA_ARGS__)
 #else
@@ -97,7 +99,12 @@ namespace buggy {
     /* | Allocation functions | */
     /* ------------------------ */
 
-    allocator(size_t size = 1 << 26) : min_alloc(4), base_ptr(NULL) {
+    allocator(size_t size) : min_alloc(4), base_ptr(NULL) {
+      if (size <= 0) {
+        fprintf(stderr, "Allocator size has to be larger than 0 bytes\n");
+        abort();
+      }
+
       // Request GPU memory (closest power of 2)
       int limit_log2 = std::ceil(std::log2((double)size));
       limit = (size_t)std::pow(2, limit_log2);

@@ -22,6 +22,7 @@
 
 // Contains per-process data and methods needed by HAPI.
 class GPUManager {
+
 public:
   std::vector<BufferPool> mempool_free_bufs_;
   std::vector<size_t> mempool_boundaries_;
@@ -68,7 +69,7 @@ public:
   CmiNodeLock stream_lock_;
   CmiNodeLock mempool_lock_;
   CmiNodeLock inst_lock_;
-  CmiNodeLock device_map_lock;
+  CmiNodeLock device_mapping_lock;
 #endif
 
 #ifdef HAPI_CUDA_CALLBACK
@@ -79,8 +80,11 @@ public:
   DeviceManager *device_managers;
   std::unordered_map<int, DeviceManager*> device_map;
 
+  // Eager communication buffer
+  bool use_eager_comm_buffer;
+  size_t eager_comm_buffer_size;
+
   GPUManager();
-  ~GPUManager();
   int createStreams();
   int createNStreams(int);
   void destroyStreams();
@@ -92,6 +96,7 @@ public:
   void deviceToHostTransfer(hapiWorkRequest*);
   void freeBuffers(hapiWorkRequest*);
   void runKernel(hapiWorkRequest*);
+
 };
 
 GPUManager::GPUManager() {
@@ -110,7 +115,7 @@ GPUManager::GPUManager() {
   stream_lock_ = CmiCreateLock();
   mempool_lock_ = CmiCreateLock();
   inst_lock_ = CmiCreateLock();
-  device_map_lock = CmiCreateLock();
+  device_mapping_lock = CmiCreateLock();
 #endif
 
 #ifdef HAPI_TRACE
@@ -122,6 +127,10 @@ GPUManager::GPUManager() {
 
   // Create a DeviceManager for each GPU
   device_managers = new DeviceManager[device_count];
+
+  // Eager communication buffer
+  use_eager_comm_buffer = true;
+  eager_comm_buffer_size = 1 << 26; // 64MB by default
 
   // allocate host/device buffers array (both user and system-addressed)
   host_buffers_ = new void*[NUM_BUFFERS*2];
@@ -151,22 +160,6 @@ GPUManager::GPUManager() {
 #ifdef HAPI_INSTRUMENT_WRS
   init_instr_ = false;
 #endif
-}
-
-GPUManager::~GPUManager() {
-#if CMK_SMP
-  // Destroy mutex locks
-  CmiDestroyLock(queue_lock_);
-  CmiDestroyLock(progress_lock_);
-  CmiDestroyLock(stream_lock_);
-  CmiDestroyLock(mempool_lock_);
-  CmiDestroyLock(inst_lock_);
-  CmiDestroyLock(device_map_lock);
-#endif
-
-  delete[] device_managers;
-  delete[] host_buffers_;
-  delete[] device_buffers_;
 }
 
 // Creates streams equal to the maximum number of concurrent kernels,
