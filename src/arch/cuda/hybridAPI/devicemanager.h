@@ -14,9 +14,6 @@ struct DeviceManager {
   // Buddy allocator for eager communication buffer
   buggy::allocator* eager_comm_buffer;
 
-  // CUDA IPC handle of eager communication buffer
-  cudaIpcMemHandle_t eager_ipc_handle;
-
   DeviceManager(int device_ = 0) : device(device_), eager_comm_buffer(nullptr) {}
 
   ~DeviceManager() { destroy_eager_comm_buffer(); }

@@ -188,6 +188,7 @@ CpvDeclare(char *, _validProcessors);
 #if CMK_CUDA
 CpvExtern(int, n_hapi_events);
 extern "C" void hapiPollEvents();
+extern "C" void shmCleanup();
 extern "C" void exitHybridAPI();
 #endif
 
@@ -3906,6 +3907,7 @@ void ConverseCommonExit(void)
     CmiNodeBarrier();
 
     if (CmiMyRank() == 0) {
+      shmCleanup();
       exitHybridAPI();
     }
   }

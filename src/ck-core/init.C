@@ -1691,7 +1691,7 @@ void _initCharm(int unused_argc, char **argv)
       if (CmiMyRank() == 0) {
         initHybridAPI();
       }
-      initEventQueues();
+      initCpvs();
 
       CmiNodeBarrier();
 
@@ -1700,8 +1700,16 @@ void _initCharm(int unused_argc, char **argv)
       CmiNodeBarrier();
 
       if (CmiMyRank() == 0) {
-        createIPCHandles();
+        shmCreate();
       }
+    }
+
+    // Ensure CUDA IPC handles have been created across all processes
+    // FIXME: This only needs to be a host-wide synchronization
+    CmiBarrier();
+
+    if (!CmiInCommThread()) {
+      ipcHandleCreate();
 
       hapiRegisterCallbacks();
       hapiInvokeCallback = CUDACallbackManager;

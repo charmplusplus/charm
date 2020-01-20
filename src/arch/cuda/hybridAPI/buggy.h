@@ -13,7 +13,7 @@ namespace buggy {
 #define DEBUG 1
 
 #ifdef DEBUG
-#define DEBUG_PRINT(...) printf("[Buggy] " __VA_ARGS__)
+#define DEBUG_PRINT(...) printf("Buggy> " __VA_ARGS__)
 #else
 #define DEBUG_PRINT(...) do {} while (0)
 #endif

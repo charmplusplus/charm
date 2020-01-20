@@ -4,6 +4,9 @@
 #include <queue>
 #include <atomic>
 #include <vector>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <cuda_runtime.h>
 
@@ -61,14 +64,6 @@ CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
 #endif
 CpvDeclare(int, n_hapi_events);
 
-void initEventQueues() {
-#ifndef HAPI_CUDA_CALLBACK
-  CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
-#endif
-  CpvInitialize(int, n_hapi_events);
-  CpvAccess(n_hapi_events) = 0;
-}
-
 // Used to invoke user's Charm++ callback function
 void (*hapiInvokeCallback)(void*, void*) = NULL;
 
@@ -81,6 +76,24 @@ void (*hapiQdProcess)(int) = NULL;
 
 // Declare GPU Manager as a process-shared object.
 CsvDeclare(GPUManager, gpu_manager);
+
+CpvDeclare(int, my_device); // GPU device that this thread is mapped to
+CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
+
+void initCpvs() {
+  // HAPI event-related
+#ifndef HAPI_CUDA_CALLBACK
+  CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
+#endif
+  CpvInitialize(int, n_hapi_events);
+  CpvAccess(n_hapi_events) = 0;
+
+  // Device mapping
+  CpvInitialize(int, my_device);
+  CpvAccess(my_device) = 0;
+  CpvInitialize(bool, device_rep);
+  CpvAccess(device_rep) = false;
+}
 
 #ifndef HAPI_CUDA_CALLBACK
 void recordEvent(cudaStream_t stream, void* cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
@@ -437,28 +450,27 @@ void initDeviceMapping(char** argv) {
   }
 
   // Perform mapping
-  int my_device = 0;
   int pes_per_device = (all_gpus ? CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe())) :
       CmiNodeSize(CmiMyNode())) / CsvAccess(gpu_manager).device_count;
 
   switch (map_type) {
     case Mapping::Block:
-      my_device = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) / pes_per_device;
+      CpvAccess(my_device) = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) / pes_per_device;
       break;
     case Mapping::RoundRobin:
-      my_device = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) % CsvAccess(gpu_manager).device_count;
+      CpvAccess(my_device) = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) % CsvAccess(gpu_manager).device_count;
       break;
     default:
       CmiAbort("Unsupported mapping type!");
   }
 
   // Set device and store PE-device mapping
-  hapiCheck(cudaSetDevice(my_device));
+  hapiCheck(cudaSetDevice(CpvAccess(my_device)));
 #if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).device_mapping_lock);
 #endif
   CsvAccess(gpu_manager).device_map.emplace(CmiMyPe(),
-      &(CsvAccess(gpu_manager).device_managers[my_device]));
+      &(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)]));
 #if CMK_SMP
   CmiUnlock(CsvAccess(gpu_manager).device_mapping_lock);
 #endif
@@ -518,10 +530,10 @@ void initDeviceMapping(char** argv) {
       CmiPrintf("HAPI> Enabling P2P access between devices\n");
     }
     for (int i = 0; i < CsvAccess(gpu_manager).device_count; i++) {
-      if (i != my_device) {
+      if (i != CpvAccess(my_device)) {
         int can_access_peer;
 
-        hapiCheck(cudaDeviceCanAccessPeer(&can_access_peer, my_device, i));
+        hapiCheck(cudaDeviceCanAccessPeer(&can_access_peer, CpvAccess(my_device), i));
         if (can_access_peer) {
           cudaDeviceEnablePeerAccess(i, 0);
         }
@@ -535,9 +547,120 @@ void initDeviceMapping(char** argv) {
   }
 }
 
-// Create CUDA IPC handles to be shared between processes on the same host
-void createIPCHandles() {
-  // TODO
+struct cuda_ipc_shm_info {
+  volatile int sync_flag;
+  cudaIpcEventHandle_t event_handle;
+  cudaIpcMemHandle_t mem_handle;
+};
+
+struct cuda_ipc_local_info {
+  cudaEvent_t event;
+  void* buffer;
+};
+
+// Returns the local rank of the logical node (process) that the given PE belongs to
+static inline int CmiNodeRankLocal(int pe) {
+  // Logical node index % Number of logical nodes per physical node
+  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
+}
+
+// Returns the local rank of the logical node that I belong to
+static inline int CmiMyNodeRankLocal() {
+  return CmiNodeRankLocal(CmiMyPe());
+}
+
+// Create POSIX shared memory region accessible to all processes on the same host
+// Invoked by PE rank 0 of each process (no locking needed for SMP)
+void shmemCreate() {
+  if (!CsvAccess(gpu_manager).use_eager_comm_buffer) return;
+
+  struct stat shm_file_stat;
+
+  // Create the shared memory file
+  CsvAccess(gpu_manager).shm_name = new char[16];
+  sprintf(CsvAccess(gpu_manager).shm_name, "cudaipc_shmem-%d", CmiPhysicalNodeID(CmiMyPe()));
+  CsvAccess(gpu_manager).shm_file = shm_open(CsvAccess(gpu_manager).shm_name,
+      O_CREAT | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
+  if (CsvAccess(gpu_manager).shm_file < 0) {
+    CmiError("Failure at shm_open");
+    goto shm_cleanup;
+  }
+
+  // Calculate shared memory region size
+  // FIXME: Assumes GPU count is the same across all processes
+  CsvAccess(gpu_manager).shm_size = sizeof(cuda_ipc_shm_info) * CsvAccess(gpu_manager).device_count *
+    (CmiNumNodes() / CmiNumPhysicalNodes());
+
+  // Set it to the appropriate size
+  // Only done by the first process on each physical node
+  if (CmiMyNodeRankLocal() == 0) {
+    if (ftruncate(CsvAccess(gpu_manager).shm_file, 0) != 0) {
+      CmiError("Failure at ftruncate");
+      goto shm_cleanup;
+    }
+
+    if (ftruncate(CsvAccess(gpu_manager).shm_file, CsvAccess(gpu_manager).shm_size) != 0) {
+      CmiError("Failure at ftruncate");
+      goto shm_cleanup;
+    }
+  }
+
+  // Busywait until file is properly sized
+  do {
+    if (fstat(CsvAccess(gpu_manager).shm_file, &shm_file_stat) != 0) {
+      CmiError("Failure at fstat");
+      goto shm_cleanup;
+    }
+  } while (shm_file_stat.st_size != CsvAccess(gpu_manager).shm_size);
+
+  // Load into memory
+  CsvAccess(gpu_manager).shm_ptr = mmap(0, CsvAccess(gpu_manager).shm_size,
+      PROT_READ | PROT_WRITE, MAP_SHARED, CsvAccess(gpu_manager).shm_file, 0);
+  if (CsvAccess(gpu_manager).shm_ptr == (void*)-1) {
+    CmiError("Failure at mmap");
+    goto shm_cleanup;
+  }
+
+  // Store per-process start index of the shared memory region
+  CsvAccess(gpu_manager).shm_my_index = CsvAccess(gpu_manager).device_count * CmiMyNodeRankLocal();
+
+  return;
+
+shm_cleanup:
+  shmCleanup();
+  CmiAbort("Failure in shared memory region creation");
+}
+
+// Clean up shared memory region
+void shmCleanup() {
+  if (CsvAccess(gpu_manager).shm_ptr != NULL) {
+    munmap(CsvAccess(gpu_manager).shm_ptr, CsvAccess(gpu_manager).shm_size);
+  }
+
+  if (CsvAccess(gpu_manager).shm_file != -1) {
+    close(CsvAccess(gpu_manager).shm_file);
+  }
+
+  if (CsvAccess(gpu_manager).shm_name != NULL) {
+    shm_unlink(CsvAccess(gpu_manager).shm_name);
+    delete CsvAccess(gpu_manager).shm_name;
+    CsvAccess(gpu_manager).shm_name = NULL;
+  }
+}
+
+// Create CUDA IPC handles and populate shared memory region
+// Invoked by all PEs
+void ipcHandleCreate() {
+  for (int i = 0; i < CsvAccess(gpu_manager).device_count; i++) {
+    cuda_ipc_shm_info* shm_info_ptr = (cuda_ipc_shm_info*)CsvAccess(gpu_manager).shm_ptr +
+      (CsvAccess(gpu_manager).shm_my_index + i);
+    CmiAssert(CsvAccess(gpu_manager).device_managers[i].eager_comm_buffer);
+    void* device_ptr = (void*)(CsvAccess(gpu_manager).device_managers[i].eager_comm_buffer->base_ptr);
+
+    CmiPrintf("Before: handle addr: %p, device ptr: %p\n", &shm_info_ptr->mem_handle, device_ptr);
+    hapiCheck(cudaIpcGetMemHandle(&shm_info_ptr->mem_handle, device_ptr));
+    CmiPrintf("After: handle addr: %p, device ptr: %p\n", &shm_info_ptr->mem_handle, device_ptr);
+  }
 }
 
 // Clean up and delete memory used by HAPI.

@@ -85,7 +85,11 @@ public:
   size_t eager_comm_buffer_size;
 
   // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
+  void* shm_ptr;
+  char* shm_name;
   int shm_file;
+  size_t shm_size;
+  int shm_my_index;
 
   GPUManager();
   int createStreams();
@@ -128,12 +132,24 @@ GPUManager::GPUManager() {
   // How many GPUs are available to this process?
   hapiCheck(cudaGetDeviceCount(&device_count));
 
+  // If there are more devices than threads, reduce the number of devices
+  if (device_count > CmiNodeSize(CmiMyNode())) {
+    device_count = CmiNodeSize(CmiMyNode());
+  }
+
   // Create a DeviceManager for each GPU
   device_managers = new DeviceManager[device_count];
 
   // Eager communication buffer
   use_eager_comm_buffer = true;
   eager_comm_buffer_size = 1 << 26; // 64MB by default
+
+  // Shared memory region for CUDA IPC
+  shm_ptr = NULL;
+  shm_name = NULL;
+  shm_file = -1;
+  shm_size = 0;
+  shm_my_index = -1;
 
   // allocate host/device buffers array (both user and system-addressed)
   host_buffers_ = new void*[NUM_BUFFERS*2];
