@@ -471,6 +471,9 @@ void initDeviceMapping(char** argv) {
       if (input_eager_buffer_size <= 0) {
         CsvAccess(gpu_manager).use_eager_comm_buffer = false;
       }
+      else if (input_eager_buffer_size < 4) {
+        CsvAccess(gpu_manager).eager_comm_buffer_size = 4; // Buffer size should be at least 4 bytes
+      }
       else {
         CsvAccess(gpu_manager).eager_comm_buffer_size = (size_t)input_eager_buffer_size;
       }
@@ -479,7 +482,8 @@ void initDeviceMapping(char** argv) {
 
   if (CmiMyPe() == 0) {
     if (CsvAccess(gpu_manager).use_eager_comm_buffer) {
-      CmiPrintf("HAPI> GPU eager communication buffer size: %lu bytes\n",
+      CmiPrintf("HAPI> GPU eager communication buffer size: %lu bytes "
+          "(will be rounded up to the nearest power of two)\n",
           CsvAccess(gpu_manager).eager_comm_buffer_size);
     }
     else {
