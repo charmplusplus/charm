@@ -1689,32 +1689,35 @@ void _initCharm(int unused_argc, char **argv)
     // Only worker threads execute the following
     if (!CmiInCommThread()) {
       if (CmiMyRank() == 0) {
-        initHybridAPI();
+        initHybridAPI(); // Initialize per-process variables (GPUManager)
       }
-      initCpvs();
+      initCpvs(); // Initialize per-PE variables
 
       CmiNodeBarrier();
 
-      initDeviceMapping(argv);
+      initDeviceMapping(argv); // Perform PE-device mapping
 
       CmiNodeBarrier();
 
       if (CmiMyRank() == 0) {
-        shmCreate();
+        shmCreate(); // Create shared memory region to be shared across processes on the same host
       }
 
       CmiNodeBarrier();
 
-      ipcHandleCreate();
+      ipcHandleCreate(); // Create CUDA IPC handles
     }
 
     // Ensure CUDA IPC handles are available for all processes
     // FIXME: This only needs to be a host-wide synchronization
     CmiBarrier();
 
-    // TODO: Open CUDA IPC handles
-
     if (!CmiInCommThread()) {
+      if (CmiMyRank() == 0) {
+        ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
+      }
+
+      // Register callback functions and initialize Charm++ layer functions
       hapiRegisterCallbacks();
       hapiInvokeCallback = CUDACallbackManager;
       hapiQdCreate = QdCreate;

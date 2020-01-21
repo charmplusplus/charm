@@ -27,6 +27,7 @@ void initDeviceMapping(char** argv);
 void shmCreate();
 void shmCleanup();
 void ipcHandleCreate();
+void ipcHandleOpen();
 
 // Registers callback handler functions.
 void hapiRegisterCallbacks();

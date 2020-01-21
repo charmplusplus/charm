@@ -20,10 +20,21 @@
 #define NUM_BUFFERS 256
 #endif
 
-// Contains per-process data and methods needed by HAPI.
-class GPUManager {
+// Shared memory information for CUDA IPC
+struct cuda_ipc_shm_info {
+  volatile int sync_flag;
+  cudaIpcEventHandle_t event_handle;
+  cudaIpcMemHandle_t mem_handle;
+};
 
-public:
+// Per-process struct containing local data for CUDA IPC
+struct cuda_ipc_local_info {
+  cudaEvent_t event;
+  void* buffer;
+};
+
+// Contains per-process data and methods needed by HAPI.
+struct GPUManager {
   std::vector<BufferPool> mempool_free_bufs_;
   std::vector<size_t> mempool_boundaries_;
   bool mempool_initialized_;
@@ -77,6 +88,7 @@ public:
 
   // GPU devices accessible to this process
   int device_count;
+  int device_count_on_physical_node;
   DeviceManager *device_managers;
   std::unordered_map<int, DeviceManager*> device_map;
 
@@ -90,6 +102,9 @@ public:
   int shm_file;
   size_t shm_size;
   int shm_my_index;
+
+  // CUDA IPC handles opened for processes on the same node
+  cuda_ipc_local_info* cuda_ipc_local_infos;
 
   void init();
   int createStreams();
@@ -137,6 +152,9 @@ void GPUManager::init() {
     device_count = CmiNodeSize(CmiMyNode());
   }
 
+  // FIXME: Assumes GPU count is the same across all processes
+  device_count_on_physical_node = device_count * (CmiNumNodes() / CmiNumPhysicalNodes());
+
   // Create a DeviceManager for each GPU
   device_managers = new DeviceManager[device_count];
 
@@ -150,6 +168,9 @@ void GPUManager::init() {
   shm_file = -1;
   shm_size = 0;
   shm_my_index = -1;
+
+  // Local information on opened CUDA IPC event and buffer
+  cuda_ipc_local_infos = NULL;
 
   // allocate host/device buffers array (both user and system-addressed)
   host_buffers_ = new void*[NUM_BUFFERS*2];
