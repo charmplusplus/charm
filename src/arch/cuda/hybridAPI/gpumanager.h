@@ -91,7 +91,7 @@ public:
   size_t shm_size;
   int shm_my_index;
 
-  GPUManager();
+  void init();
   int createStreams();
   int createNStreams(int);
   void destroyStreams();
@@ -106,7 +106,7 @@ public:
 
 };
 
-GPUManager::GPUManager() {
+void GPUManager::init() {
   next_buffer_ = NUM_BUFFERS;
   streams_ = NULL;
   n_streams_ = 0;

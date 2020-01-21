@@ -393,6 +393,7 @@ static void releasePool(std::vector<BufferPool> &pools);
 void initHybridAPI() {
   // create and initialize GPU Manager object
   CsvInitialize(GPUManager, gpu_manager);
+  CsvAccess(gpu_manager).init();
 }
 
 // Set up PE to GPU mapping, invoked from all PEs
@@ -571,7 +572,7 @@ static inline int CmiMyNodeRankLocal() {
 
 // Create POSIX shared memory region accessible to all processes on the same host
 // Invoked by PE rank 0 of each process (no locking needed for SMP)
-void shmemCreate() {
+void shmCreate() {
   if (!CsvAccess(gpu_manager).use_eager_comm_buffer) return;
 
   struct stat shm_file_stat;
