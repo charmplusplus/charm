@@ -450,16 +450,19 @@ void initDeviceMapping(char** argv) {
     CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
   }
 
-  // Perform mapping
+  // Perform mapping and set device representative PE
   int pes_per_device = (all_gpus ? CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe())) :
       CmiNodeSize(CmiMyNode())) / CsvAccess(gpu_manager).device_count;
+  int my_rank = all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank();
 
   switch (map_type) {
     case Mapping::Block:
-      CpvAccess(my_device) = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) / pes_per_device;
+      CpvAccess(my_device) = my_rank / pes_per_device;
+      if (my_rank % pes_per_device == 0) CpvAccess(device_rep) = true;
       break;
     case Mapping::RoundRobin:
-      CpvAccess(my_device) = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) % CsvAccess(gpu_manager).device_count;
+      CpvAccess(my_device) = my_rank % CsvAccess(gpu_manager).device_count;
+      if (my_rank < CsvAccess(gpu_manager).device_count) CpvAccess(device_rep) = true;
       break;
     default:
       CmiAbort("Unsupported mapping type!");
@@ -652,16 +655,16 @@ void shmCleanup() {
 // Create CUDA IPC handles and populate shared memory region
 // Invoked by all PEs
 void ipcHandleCreate() {
-  for (int i = 0; i < CsvAccess(gpu_manager).device_count; i++) {
-    cuda_ipc_shm_info* shm_info_ptr = (cuda_ipc_shm_info*)CsvAccess(gpu_manager).shm_ptr +
-      (CsvAccess(gpu_manager).shm_my_index + i);
-    CmiAssert(CsvAccess(gpu_manager).device_managers[i].eager_comm_buffer);
-    void* device_ptr = (void*)(CsvAccess(gpu_manager).device_managers[i].eager_comm_buffer->base_ptr);
+  // Only device reps should continue to perform the following operations
+  // so that they are done only once per device
+  if (!CpvAccess(device_rep)) return;
 
-    CmiPrintf("Before: handle addr: %p, device ptr: %p\n", &shm_info_ptr->mem_handle, device_ptr);
-    hapiCheck(cudaIpcGetMemHandle(&shm_info_ptr->mem_handle, device_ptr));
-    CmiPrintf("After: handle addr: %p, device ptr: %p\n", &shm_info_ptr->mem_handle, device_ptr);
-  }
+  cuda_ipc_shm_info* shm_info_ptr = (cuda_ipc_shm_info*)CsvAccess(gpu_manager).shm_ptr +
+    (CsvAccess(gpu_manager).shm_my_index + CpvAccess(my_device));
+  CmiAssert(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].eager_comm_buffer);
+  void* device_ptr = (void*)(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].eager_comm_buffer->base_ptr);
+
+  hapiCheck(cudaIpcGetMemHandle(&shm_info_ptr->mem_handle, device_ptr));
 }
 
 // Clean up and delete memory used by HAPI.

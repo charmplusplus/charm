@@ -1702,15 +1702,19 @@ void _initCharm(int unused_argc, char **argv)
       if (CmiMyRank() == 0) {
         shmCreate();
       }
+
+      CmiNodeBarrier();
+
+      ipcHandleCreate();
     }
 
-    // Ensure CUDA IPC handles have been created across all processes
+    // Ensure CUDA IPC handles are available for all processes
     // FIXME: This only needs to be a host-wide synchronization
     CmiBarrier();
 
-    if (!CmiInCommThread()) {
-      ipcHandleCreate();
+    // TODO: Open CUDA IPC handles
 
+    if (!CmiInCommThread()) {
       hapiRegisterCallbacks();
       hapiInvokeCallback = CUDACallbackManager;
       hapiQdCreate = QdCreate;
