@@ -1,5 +1,9 @@
 . $CHARMINC/cc-gcc.sh
-. $CHARMINC/conv-mach-gfortran.sh
+
+if command -v gfortran >/dev/null 2>&1
+then
+  . $CHARMINC/conv-mach-gfortran.sh
+fi
 
 CMK_CXX_FLAGS="$CMK_CXX_FLAGS -Wno-deprecated"
 CMK_QT='generic64-light'
