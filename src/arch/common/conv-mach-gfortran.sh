@@ -13,7 +13,7 @@ CMK_FPP="$CMK_CPP_C -P -CC"
 # (presumably the most modern).
 CMK_CF90=$(which gfortran gfortran-{4..19} gfortran-mp-{4..19} 2>/dev/null | tail -1)
 
-[ -z $CMK_CF90 ] && { echo 'No gfortran found, exiting'; exit 1; }
+[ -z $CMK_CF90 ] && { echo 'Warning: No gfortran found'; exit 0; }
 
 # Find libgfortran, which we need to link to manually as the C++ compiler does
 # the linking.
