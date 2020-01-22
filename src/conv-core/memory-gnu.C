@@ -6,6 +6,7 @@ This version of ptmalloc3 is hacked in following ways:
    - Add definitions for ONLY_MSPACES, MSPACES, USE_LOCKS
    - Rename malloc.c to memory-gnu-internal.C and include here
    - Merge thread files to generate  memory-gnu-threads.h
+   - Updated dlmalloc to 2.8.6
 */
 
 #define CMI_MEMORY_GNU
@@ -94,7 +95,7 @@ the chunk to the user, if necessary.  */
 /* end of definitions replicated from malloc.c */
 
 #define munmap_chunk(mst, p) do {                         \
-  size_t prevsize = (p)->prev_foot & ~IS_MMAPPED_BIT;     \
+  size_t prevsize = (p)->prev_foot;                       \
   size_t psize = chunksize(p) + prevsize + MMAP_FOOT_PAD; \
   if (CALL_MUNMAP((char*)(p) - prevsize, psize) == 0)     \
     ((struct malloc_state*)(mst))->footprint -= psize;    \
