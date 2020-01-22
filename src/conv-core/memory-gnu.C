@@ -32,9 +32,6 @@ extern CMK_TYPEDEF_UINT8 _memory_allocated_min;
   if(_memory_allocated < _memory_allocated_min) \
     _memory_allocated_min=_memory_allocated;
 
-#define ONLY_MSPACES 1
-#define MSPACES 1
-#define USE_LOCKS 0
 /*
  * $Id: ptmalloc3.c,v 1.8 2006/03/31 15:57:28 wg Exp $
  * 
@@ -254,6 +251,11 @@ void public_mSTATs(void);
 
 /*----------------------------------------------------------------------*/
 
+// constructor is called manually in ptmalloc_init to avoid global initialization races
+using dlmalloc_impl_storage = typename std::aligned_storage<sizeof(dlmalloc_impl), alignof(dlmalloc_impl)>::type;
+static dlmalloc_impl_storage global_malloc_instance_storage;
+#define global_malloc_instance (*reinterpret_cast<dlmalloc_impl *>(&global_malloc_instance_storage))
+
 /* Arenas */
 static tsd_key_t arena_key;
 static mutex_t list_lock;
@@ -414,7 +416,7 @@ _int_new_arena(size_t size)
   if ((char*)a == (char*)-1)
     return 0;
 
-  m = create_mspace_with_base((char*)a + MSPACE_OFFSET,
+  m = global_malloc_instance.create_mspace_with_base((char*)a + MSPACE_OFFSET,
 			      mmap_sz - MSPACE_OFFSET,
 			      0);
 
@@ -529,7 +531,7 @@ malloc_starter(size_t sz, const void *caller)
   void* victim;
 
   /*ptmalloc_init_minimal();*/
-  victim = mspace_malloc(arena_to_mspace(&main_arena), sz);
+  victim = global_malloc_instance.mspace_malloc(arena_to_mspace(&main_arena), sz);
   THREAD_STAT(++main_arena.stat_starter);
 
   return victim;
@@ -541,7 +543,7 @@ memalign_starter(size_t align, size_t sz, const void *caller)
   void* victim;
 
   /*ptmalloc_init_minimal();*/
-  victim = mspace_memalign(arena_to_mspace(&main_arena), align, sz);
+  victim = global_malloc_instance.mspace_memalign(arena_to_mspace(&main_arena), align, sz);
   THREAD_STAT(++main_arena.stat_starter);
 
   return victim;
@@ -556,7 +558,7 @@ free_starter(void* mem, const void *caller)
     if (is_mmapped(p))
       munmap_chunk(msp, p);
     else
-      mspace_free(msp, mem);
+      global_malloc_instance.mspace_free(msp, mem);
   }
   THREAD_STAT(++main_arena.stat_starter);
 }
@@ -593,7 +595,7 @@ malloc_atfork(size_t sz, const void *caller)
   tsd_getspecific(arena_key, vptr);
   if(vptr == ATFORK_ARENA_PTR) {
     /* We are the only thread that may allocate at all.  */
-    return mspace_malloc(arena_to_mspace(&main_arena), sz);
+    return global_malloc_instance.mspace_malloc(arena_to_mspace(&main_arena), sz);
   } else {
     /* Suspend the thread until the `atfork' handlers have completed.
        By that time, the hooks will have been reset as well, so that
@@ -626,7 +628,7 @@ free_atfork(void* mem, const void *caller)
   tsd_getspecific(arena_key, vptr);
   if(vptr != ATFORK_ARENA_PTR)
     (void)mutex_lock(&ar_ptr->mutex);
-  mspace_free(arena_to_mspace(ar_ptr), mem);
+  global_malloc_instance.mspace_free(arena_to_mspace(ar_ptr), mem);
   if(vptr != ATFORK_ARENA_PTR)
     (void)mutex_unlock(&ar_ptr->mutex);
 }
@@ -728,6 +730,8 @@ ptmalloc_init(void)
   if(__malloc_initialized >= 0) return;
   __malloc_initialized = 0;
 
+  new (&global_malloc_instance_storage) dlmalloc_impl{};
+
   /*if (mp_.pagesize == 0)
     ptmalloc_init_minimal();*/
 
@@ -751,7 +755,7 @@ ptmalloc_init(void)
 #endif /* !defined NO_THREADS */
   mutex_init(&main_arena.mutex);
   main_arena.next = &main_arena;
-  mspace = create_mspace_with_base((char*)&main_arena + MSPACE_OFFSET,
+  mspace = global_malloc_instance.create_mspace_with_base((char*)&main_arena + MSPACE_OFFSET,
 				   sizeof(main_arena) - MSPACE_OFFSET,
 				   0);
   assert(mspace == arena_to_mspace(&main_arena));
@@ -813,7 +817,7 @@ public_mALLOc(size_t bytes)
     return 0;
   if (ar_ptr != &main_arena)
     bytes += FOOTER_OVERHEAD;
-  victim = mspace_malloc(arena_to_mspace(ar_ptr), bytes);
+  victim = global_malloc_instance.mspace_malloc(arena_to_mspace(ar_ptr), bytes);
   if (victim && ar_ptr != &main_arena)
     set_non_main_arena(victim, ar_ptr);
   (void)mutex_unlock(&ar_ptr->mutex);
@@ -867,7 +871,7 @@ public_fREe(void* mem)
 #else
   (void)mutex_lock(&ar_ptr->mutex);
 #endif
-  mspace_free(arena_to_mspace(ar_ptr), mem);
+  global_malloc_instance.mspace_free(arena_to_mspace(ar_ptr), mem);
   (void)mutex_unlock(&ar_ptr->mutex);
 }
 #ifdef libc_hidden_def
@@ -923,7 +927,7 @@ public_rEALLOc(void* oldmem, size_t bytes)
 
   if (ar_ptr != &main_arena)
     bytes += FOOTER_OVERHEAD;
-  newp = mspace_realloc(arena_to_mspace(ar_ptr), oldmem, bytes);
+  newp = global_malloc_instance.mspace_realloc(arena_to_mspace(ar_ptr), oldmem, bytes);
 
   if (newp && ar_ptr != &main_arena)
     set_non_main_arena(newp, ar_ptr);
@@ -970,7 +974,7 @@ public_mEMALIGn(size_t alignment, size_t bytes)
 
   if (ar_ptr != &main_arena)
     bytes += FOOTER_OVERHEAD;
-  p = mspace_memalign(arena_to_mspace(ar_ptr), alignment, bytes);
+  p = global_malloc_instance.mspace_memalign(arena_to_mspace(ar_ptr), alignment, bytes);
 
   if (p && ar_ptr != &main_arena)
     set_non_main_arena(p, ar_ptr);
@@ -1015,7 +1019,7 @@ public_vALLOc(size_t bytes)
     return 0;
   if (ar_ptr != &main_arena)
     bytes += FOOTER_OVERHEAD;
-  p = mspace_memalign(arena_to_mspace(ar_ptr), CmiGetPageSize(), bytes);
+  p = global_malloc_instance.mspace_memalign(arena_to_mspace(ar_ptr), CmiGetPageSize(), bytes);
 
   if (p && ar_ptr != &main_arena)
     set_non_main_arena(p, ar_ptr);
@@ -1047,7 +1051,7 @@ public_pVALLOc(size_t bytes)
   if (ar_ptr != &main_arena)
     bytes += FOOTER_OVERHEAD;
   pagesize = CmiGetPageSize();
-  p = mspace_memalign(arena_to_mspace(ar_ptr), pagesize, (bytes + pagesize - 1) & ~(pagesize - 1));
+  p = global_malloc_instance.mspace_memalign(arena_to_mspace(ar_ptr), pagesize, (bytes + pagesize - 1) & ~(pagesize - 1));
 
   if (p && ar_ptr != &main_arena)
     set_non_main_arena(p, ar_ptr);
@@ -1124,7 +1128,7 @@ public_cALLOc(size_t n_elements, size_t elem_size)
 
   if (ar_ptr != &main_arena)
     bytes += FOOTER_OVERHEAD;
-  mem = mspace_calloc(arena_to_mspace(ar_ptr), bytes, 1);
+  mem = global_malloc_instance.mspace_calloc(arena_to_mspace(ar_ptr), bytes, 1);
 
   if (mem && ar_ptr != &main_arena)
     set_non_main_arena(mem, ar_ptr);
@@ -1156,7 +1160,7 @@ public_iCALLOc(size_t n, size_t elem_size, void* chunks[])
 
   if (ar_ptr != &main_arena)
     elem_size += FOOTER_OVERHEAD;
-  m = mspace_independent_calloc(arena_to_mspace(ar_ptr), n, elem_size, chunks);
+  m = global_malloc_instance.mspace_independent_calloc(arena_to_mspace(ar_ptr), n, elem_size, chunks);
 
   if (m && ar_ptr != &main_arena) {
     while (n > 0)
@@ -1190,7 +1194,7 @@ public_iCOMALLOc(size_t n, size_t sizes[], void* chunks[])
   if (ar_ptr != &main_arena) {
     /* Temporary m_sizes[] array is ugly but it would be surprising to
        change the original sizes[]... */
-    m_sizes = (size_t *)mspace_malloc(arena_to_mspace(ar_ptr), n*sizeof(size_t));
+    m_sizes = (size_t *)global_malloc_instance.mspace_malloc(arena_to_mspace(ar_ptr), n*sizeof(size_t));
     if (!m_sizes) {
       (void)mutex_unlock(&ar_ptr->mutex);
       return 0;
@@ -1198,10 +1202,10 @@ public_iCOMALLOc(size_t n, size_t sizes[], void* chunks[])
     for (i=0; i<n; ++i)
       m_sizes[i] = sizes[i] + FOOTER_OVERHEAD;
     if (!chunks) {
-      chunks = (void **)mspace_malloc(arena_to_mspace(ar_ptr),
+      chunks = (void **)global_malloc_instance.mspace_malloc(arena_to_mspace(ar_ptr),
 			     n*sizeof(void*)+FOOTER_OVERHEAD);
       if (!chunks) {
-	mspace_free(arena_to_mspace(ar_ptr), m_sizes);
+	global_malloc_instance.mspace_free(arena_to_mspace(ar_ptr), m_sizes);
 	(void)mutex_unlock(&ar_ptr->mutex);
 	return 0;
       }
@@ -1210,10 +1214,10 @@ public_iCOMALLOc(size_t n, size_t sizes[], void* chunks[])
   } else
     m_sizes = sizes;
 
-  m = mspace_independent_comalloc(arena_to_mspace(ar_ptr), n, m_sizes, chunks);
+  m = global_malloc_instance.mspace_independent_comalloc(arena_to_mspace(ar_ptr), n, m_sizes, chunks);
 
   if (ar_ptr != &main_arena) {
-    mspace_free(arena_to_mspace(ar_ptr), m_sizes);
+    global_malloc_instance.mspace_free(arena_to_mspace(ar_ptr), m_sizes);
     if (m)
       for (i=0; i<n; ++i)
 	set_non_main_arena(m[i], ar_ptr);
@@ -1243,7 +1247,7 @@ public_mTRIm(size_t s)
   int result;
 
   (void)mutex_lock(&main_arena.mutex);
-  result = mspace_trim(arena_to_mspace(&main_arena), s);
+  result = global_malloc_instance.mspace_trim(arena_to_mspace(&main_arena), s);
   (void)mutex_unlock(&main_arena.mutex);
   return result;
 }
@@ -1263,7 +1267,7 @@ int
 public_mALLOPt(int p, int v)
 {
   int result;
-  result = mspace_mallopt(p, v);
+  result = global_malloc_instance.mspace_mallopt(p, v);
   return result;
 }
 
@@ -1283,7 +1287,7 @@ public_mSTATs(void)
     struct malloc_state* msp = (struct malloc_state *)arena_to_mspace(ar_ptr);
 
     fprintf(stderr, "Arena %d:\n", i);
-    mspace_malloc_stats(msp);
+    global_malloc_instance.mspace_malloc_stats(msp);
 #if THREAD_STATS
     stat_lock_direct += ar_ptr->stat_lock_direct;
     stat_lock_loop += ar_ptr->stat_lock_loop;
