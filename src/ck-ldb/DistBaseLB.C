@@ -175,7 +175,7 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
         CkAbort("[%i] Error, attempting to migrate object myself to myself\n",
             CkMyPe());
       }
-      theLbdb->Migrate(move.obj,move.to_pe);
+      lbmgr->Migrate(move.obj,move.to_pe);
     } else if (move.from_pe != me) {
       CkPrintf("[%d] Error, strategy wants to move from %d to  %d\n",
           me,move.from_pe,move.to_pe);

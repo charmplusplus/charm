@@ -2124,7 +2124,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
         lbmgrID = _lbmgr;
         metalbID = _metalb;
 #endif
-        initLB(lbdbID, metalbID);
+        initLB(lbmgrID, metalbID);
 }
 
 CkLocMgr::CkLocMgr(CkMigrateMessage* m)
