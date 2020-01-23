@@ -4128,7 +4128,8 @@ static char **main_envp;
 
 int main(int argc, const char **argv, char **envp)
 {
-  putenv("FROM_CHARMRUN=1");
+  static char s_FROM_CHARMRUN_1[] = "FROM_CHARMRUN=1";
+  putenv(s_FROM_CHARMRUN_1);
 
   srand(time(0));
   skt_init();
