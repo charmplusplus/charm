@@ -3,6 +3,8 @@ CHARMBASE=../../../
 CHARMC=../../../bin/ampicxx $(OPTS)
 TOKENS=6
 
+-include $(CHARMBASE)/include/conv-mach-opt.mak
+
 all: ampi
 
 ampi: jacobi jacobi.iso jacobi.tls jacobi-get
@@ -23,8 +25,12 @@ jacobi.iso: jacobi.C
 	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module CommonLBs -memory isomalloc
 
 jacobi.tls: jacobi.C
-	-$(CHARMC) -c -tlsglobal jacobi.C -o jacobi.tls.o 
-	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobal -module CommonLBs #-memory isomalloc
+ifeq ($(CMK_UTH),1)
+	@echo "Skipping jacobi.tls test on UTH (tlsglobals not supported)."
+else
+	-$(CHARMC) -c -tlsglobals jacobi.C -o jacobi.tls.o
+	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobals -module CommonLBs #-memory isomalloc
+endif
 
 jacobi.rose: jacobi.C
 	$(CHARMC) -roseomptlsglobals -o jacobi.rose.o -c $<
