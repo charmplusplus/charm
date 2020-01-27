@@ -1,4 +1,4 @@
--include ../../../include/conv-mach-opt.mak
+include ../../include/conv-mach-opt.mak
 
 DIRS = \
 # Disabled due to host/target incompatibility described in bug #89
