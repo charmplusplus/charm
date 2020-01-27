@@ -2116,6 +2116,31 @@ public:
       clear();
     }
   }
+
+  void * calloc(size_t nelem, size_t size)
+  {
+    const size_t bytesize = nelem * size;
+    void * ret = alloc(bytesize);
+    if (ret != nullptr)
+      memset(ret, 0, bytesize);
+    return ret;
+  }
+
+  void * realloc(void * ptr, size_t size)
+  {
+    void *ret = alloc(size);
+    if (ret != nullptr && ptr != nullptr)
+    {
+      size_t copysize = length(ptr);
+      if (copysize > size)
+        copysize = size;
+      if (copysize > 0)
+        memcpy(ret, ptr, copysize);
+    }
+    if (ptr)
+      free(ptr);
+    return ret;
+  }
 };
 
 /************** External interface ***************/
@@ -2248,6 +2273,16 @@ void * CmiIsomallocContextMalloc(CmiIsomallocContext * ctx, size_t size)
 void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * ctx, size_t align, size_t size)
 {
   return ctx->alloc(size, isomalloc_internal_validate_align(align));
+}
+
+void * CmiIsomallocContextCalloc(CmiIsomallocContext * ctx, size_t nelem, size_t size)
+{
+  return ctx->calloc(nelem, size);
+}
+
+void * CmiIsomallocContextRealloc(CmiIsomallocContext * ctx, void * ptr, size_t size)
+{
+  return ctx->realloc(ptr, size);
 }
 
 void CmiIsomallocContextFree(CmiIsomallocContext * ctx, void * ptr)

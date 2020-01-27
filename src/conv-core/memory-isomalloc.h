@@ -29,6 +29,8 @@ void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext ** ctxptr);
 /*Allocate/free from this context*/
 void * CmiIsomallocContextMalloc(CmiIsomallocContext * ctx, size_t size);
 void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * ctx, size_t align, size_t size);
+void * CmiIsomallocContextCalloc(CmiIsomallocContext * ctx, size_t nelem, size_t size);
+void * CmiIsomallocContextRealloc(CmiIsomallocContext * ctx, void * ptr, size_t size);
 void CmiIsomallocContextFree(CmiIsomallocContext * ctx, void * ptr);
 size_t CmiIsomallocContextGetLength(CmiIsomallocContext * ctx, void * ptr);
 
