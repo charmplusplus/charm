@@ -1528,6 +1528,20 @@ of two.
 
 .. code-block:: c++
 
+  void * CmiIsomallocContextCalloc(CmiIsomallocContext * ctx, size_t nelem, size_t size)
+
+Same as ``CmiIsomallocContextMalloc``, but ``calloc`` instead of
+``malloc``.
+
+.. code-block:: c++
+
+  void * CmiIsomallocContextRealloc(CmiIsomallocContext * ctx, void * ptr, size_t size)
+
+Same as ``CmiIsomallocContextMalloc``, but ``realloc`` instead of
+``malloc``.
+
+.. code-block:: c++
+
   void CmiIsomallocContextFree(CmiIsomallocContext * ctx, void * ptr)
 
 Release the given block, which must have been previously allocated by
