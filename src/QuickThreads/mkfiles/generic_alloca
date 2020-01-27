@@ -6,7 +6,7 @@ all: qt stp testpgm
 
 qt: md/setjmp_d.h qt.c md/setjmp.c
 	rm -f qtmd.h
-	../system_ln md/setjmp_d.h qtmd.h
+	ln -sf md/setjmp_d.h qtmd.h
 	$(CHARMC) -pedantic -c -o qt.o qt.c
 	$(CHARMC) -c -o qtmds.o md/setjmp.c
 	$(CHARMC) -o libckqt.a qt.o qtmds.o 
