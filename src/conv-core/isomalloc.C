@@ -896,6 +896,80 @@ static void CmiIsomallocInitExtent()
   CmiNodeAllBarrier();
 }
 
+struct isommap
+{
+  isommap(uint8_t * s, uint8_t * e)
+    : start{s}, end{e}, allocated_extent{s}, lock{CmiCreateLock()}
+  {
+    IMP_DBG("[%d][%p] isommap::isommap(%p, %p)\n", CmiMyPe(), this, s, e);
+  }
+  isommap(PUP::reconstruct pr)
+    : lock{CmiCreateLock()}
+  {
+    IMP_DBG("[%d][%p] isommap::isommap(PUP::reconstruct)\n", CmiMyPe(), this);
+  }
+  ~isommap()
+  {
+    IMP_DBG("[%d][%p] isommap::~isommap()\n", CmiMyPe(), this);
+    clear();
+    CmiDestroyLock(lock);
+  }
+
+  void print() const
+  {
+    CmiPrintf("[%d][%p] isommap::print(): %p-%p %zu\n", CmiMyPe(), this, start, allocated_extent, allocated_extent - start);
+  }
+
+  bool isInRange(void * user_ptr) const
+  {
+    return start <= (const uint8_t *)user_ptr && (const uint8_t *)user_ptr < end;
+  }
+  bool isMapped(void * user_ptr) const
+  {
+    return start <= (const uint8_t *)user_ptr && (const uint8_t *)user_ptr < allocated_extent;
+  }
+
+  void pup(PUP::er & p)
+  {
+    IMP_DBG("[%d][%p] isommap::pup()%s%s%s%s\n", CmiMyPe(), this, p.isSizing() ? " sizing" : "",
+            p.isPacking() ? " packing" : "", p.isUnpacking() ? " unpacking" : "", p.isDeleting() ? " deleting" : "");
+
+    pup_raw_pointer(p, start);
+    pup_raw_pointer(p, end);
+    pup_raw_pointer(p, allocated_extent);
+
+    const size_t totalsize = allocated_extent - start;
+
+    if (p.isUnpacking())
+    {
+      void * const mapped = map_global_memory(start, totalsize);
+      if (mapped == nullptr)
+        CmiAbort("Failed to unpack Isomalloc memory region!");
+    }
+
+    p(start, totalsize);
+
+    if (p.isDeleting())
+    {
+      clear();
+    }
+  }
+
+  void clear()
+  {
+    if (allocated_extent == start)
+      return;
+    unmap_global_memory(start, allocated_extent - start);
+    allocated_extent = start;
+  }
+
+  // canonical data
+  uint8_t * start, * end, * allocated_extent;
+
+  // local data
+  CmiNodeLock lock;
+};
+
 /************** Isomempool ***************/
 
 #if ISOMEMPOOL_DEBUG
@@ -1591,12 +1665,12 @@ struct Isomempool
   static_assert(minimum_empty_region_size >= sizeof(RegionHeader), "regions must allow space for a header");
 
   Isomempool(uint8_t * s, uint8_t * e)
-    : start{s}, end{e}, allocated_extent{s}, first_region{}, last_region{}, empty_tree{}, lock{CmiCreateLock()}
+    : empty_tree{}, first_region{}, last_region{}, backend{s, e}
   {
     IMP_DBG("[%d][%p] Isomempool::Isomempool(%p, %p)\n", CmiMyPe(), this, s, e);
   }
   Isomempool(PUP::reconstruct pr)
-    : empty_tree{pr}, lock{CmiCreateLock()}
+    : empty_tree{pr}, backend{pr}
   {
     IMP_DBG("[%d][%p] Isomempool::Isomempool(PUP::reconstruct)\n", CmiMyPe(), this);
   }
@@ -1604,14 +1678,13 @@ struct Isomempool
   ~Isomempool()
   {
     IMP_DBG("[%d][%p] Isomempool::~Isomempool()\n", CmiMyPe(), this);
-
-    CmiDestroyLock(lock);
-    clear();
   }
 
   void print_contents() const
   {
-    CmiPrintf("[%d][%p] Isomempool::print_contents(): %p-%p %zu\n", CmiMyPe(), this, start, allocated_extent, allocated_extent - start);
+    CmiPrintf("[%d][%p] Isomempool::print_contents()\n", CmiMyPe(), this);
+
+    backend.print();
 
     if (first_region == nullptr)
       return;
@@ -1628,8 +1701,8 @@ struct Isomempool
       next = node->next();
     }
 
-    const size_t size = (const uint8_t *)allocated_extent - (const uint8_t *)node;
-    CmiPrintf("  %d %p-%p %zu %zu\n", (int)node->occupied(), node, allocated_extent, size, node->size());
+    const size_t size = (const uint8_t *)backend.allocated_extent - (const uint8_t *)node;
+    CmiPrintf("  %d %p-%p %zu %zu\n", (int)node->occupied(), node, backend.allocated_extent, size, node->size());
   }
 
   static size_t get_alignment_filler(const void * ptr, size_t alignment)
@@ -1644,25 +1717,12 @@ struct Isomempool
     return get_alignment_filler(ptr, minimum_alignment);
   }
 
-  bool isInRange(void * user_ptr) const
-  {
-    return start <= (const uint8_t *)user_ptr && (const uint8_t *)user_ptr < end;
-  }
-
-  bool isMapped(void * user_ptr) const
-  {
-    return start <= (const uint8_t *)user_ptr && (const uint8_t *)user_ptr < allocated_extent;
-  }
-
 private:
 
   // canonical data
-  uint8_t * start, * end, * allocated_extent;
-  RegionHeader * first_region, * last_region;
+  isommap backend;
   RBTree empty_tree;
-
-  // local data
-  CmiNodeLock lock;
+  RegionHeader * first_region, * last_region;
 
   void setFirstRegion(RegionHeader * p)
   {
@@ -1686,7 +1746,7 @@ private:
     auto empty_region = new (header + 1) EmptyRegion{};
     empty_tree.insert(empty_region);
 
-    CmiAssert((const uint8_t *)header + header->size() <= allocated_extent);
+    CmiAssert((const uint8_t *)header + header->size() <= backend.allocated_extent);
     CmiAssert(header == last_region || (const uint8_t *)header + header->size() == (const uint8_t *)header->next());
   }
 
@@ -1814,7 +1874,7 @@ private:
     {
       CmiAssert(first_region == nullptr);
 
-      used_extent = start;
+      used_extent = backend.start;
       header_prev = nullptr;
     }
     else if (last_region->isEmpty())
@@ -1838,18 +1898,18 @@ private:
     const size_t alignment_filler = get_alignment_filler(used_extent + alignment_offset, alignment);
     const auto header_ptr = (RegionHeader *)(used_extent + alignment_filler);
 
-    const size_t allocated_free_space = allocated_extent - used_extent;
+    const size_t allocated_free_space = backend.allocated_extent - used_extent;
     CmiAssert(allocated_free_space < size); // should not be in this function if this fails
     const size_t space_needed = size - allocated_free_space;
     const size_t alloc_size = CMIALIGN(space_needed, slotsize);
-    const size_t space_remaining = end - used_extent;
+    const size_t space_remaining = backend.end - used_extent;
     if (space_remaining < alloc_size)
       return nullptr;
 
-    void * const mapped = map_global_memory(allocated_extent, alloc_size);
+    void * const mapped = map_global_memory(backend.allocated_extent, alloc_size);
     if (mapped == nullptr)
       return nullptr;
-    allocated_extent += alloc_size;
+    backend.allocated_extent += alloc_size;
 
     // Manage our left neighbor, if any.
 
@@ -1891,7 +1951,7 @@ private:
     auto follow_ptr = (uint8_t *)header_ptr + size;
     const size_t follow_alignment_filler = minimum_alignment_filler(follow_ptr);
     follow_ptr += follow_alignment_filler;
-    size_t size_difference = (const uint8_t *)allocated_extent - (const uint8_t *)follow_ptr;
+    size_t size_difference = (const uint8_t *)backend.allocated_extent - (const uint8_t *)follow_ptr;
 
     RegionHeader * header_next;
 
@@ -1922,19 +1982,11 @@ private:
     return header + 1;
   }
 
-  void clear()
-  {
-    if (allocated_extent == start)
-      return;
-    unmap_global_memory(start, allocated_extent - start);
-    allocated_extent = start;
-  }
-
 public:
 
   void * alloc(const size_t size, const size_t alignment = minimum_alignment, const size_t alignment_offset = 0)
   {
-    CmiLock(lock);
+    CmiLock(backend.lock);
 
     IMP_DBG("[%d][%p] Isomempool::alloc(%zu, %zu, %zu)...\n", CmiMyPe(), this, size, alignment, alignment_offset);
 
@@ -1952,7 +2004,7 @@ public:
     IMP_DBG("[%d][%p] Isomempool::alloc(%zu, %zu, %zu) returning %p {header = %p}\n",
             CmiMyPe(), this, size, alignment, alignment_offset, ret, (const uint8_t *)ret - sizeof(RegionHeader));
 
-    CmiUnlock(lock);
+    CmiUnlock(backend.lock);
 
     return ret;
   }
@@ -1965,10 +2017,10 @@ public:
 
   void free(void * user_ptr)
   {
-    CmiLock(lock);
+    CmiLock(backend.lock);
 
-    CmiAssert(isInRange(user_ptr));
-    CmiAssert(isMapped(user_ptr));
+    CmiAssert(backend.isInRange(user_ptr));
+    CmiAssert(backend.isMapped(user_ptr));
 
     const auto orig_header = (RegionHeader *)user_ptr - 1;
     CmiAssert(!orig_header->isEmpty());
@@ -1981,7 +2033,10 @@ public:
     RegionHeader * header = orig_header;
     RegionHeader * header_prev;
     RegionHeader * header_next;
-    size_t header_size = (orig_header_next != nullptr ? (const uint8_t *)orig_header_next : allocated_extent) - (const uint8_t *)orig_header;
+    size_t header_size = (orig_header_next != nullptr
+                           ? (const uint8_t *)orig_header_next
+                           : backend.allocated_extent)
+                           - (const uint8_t *)orig_header;
 
     if (orig_header->nextIsEmpty())
     {
@@ -2035,7 +2090,7 @@ public:
       }
       else
       {
-        available_ptr = start;
+        available_ptr = backend.start;
         CmiAssert(minimum_alignment_filler(available_ptr) == 0);
       }
 
@@ -2088,36 +2143,16 @@ public:
       insertEmptyRegion(header);
     }
 
-    CmiUnlock(lock);
+    CmiUnlock(backend.lock);
   }
 
   void pup(PUP::er & p)
   {
-    IMP_DBG("[%d][%p] Isomempool::pup()%s%s%s%s\n", CmiMyPe(), this, p.isSizing() ? " sizing" : "",
-            p.isPacking() ? " packing" : "", p.isUnpacking() ? " unpacking" : "", p.isDeleting() ? " deleting" : "");
+    p | backend;
 
-    pup_raw_pointer(p, start);
-    pup_raw_pointer(p, end);
-    pup_raw_pointer(p, allocated_extent);
     pup_raw_pointer(p, first_region);
     pup_raw_pointer(p, last_region);
     p | empty_tree;
-
-    const size_t totalsize = allocated_extent - start;
-
-    if (p.isUnpacking())
-    {
-      void * const mapped = map_global_memory(start, totalsize);
-      if (mapped == nullptr)
-        CmiAbort("Failed to unpack Isomempool!");
-    }
-
-    p(start, totalsize);
-
-    if (p.isDeleting())
-    {
-      clear();
-    }
   }
 
   void * calloc(size_t nelem, size_t size)
