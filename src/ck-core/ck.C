@@ -1721,6 +1721,9 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     }else
     {
+// This is currently a workaround to prevent BIGSIM tests from breaking. It
+// prevents BIGSIM from working with node aware group broadcasts.
+// More info can be found here: https://github.com/UIUC-PPL/charm/pull/2440
 #if !CMK_BIGSIM_CHARM
         if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL)
           env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
