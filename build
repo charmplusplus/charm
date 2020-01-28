@@ -774,7 +774,7 @@ done
 rm -f VERSION
 ln -sf $DESTINATION/include/VERSION VERSION
 
-[[ $BASEVERSION == *"-dwin"* ]] && cp $src/win/unistd.h $DESTINATION/tmp
+[[ $BASEVERSION == *"-win"* ]] && cp $src/win/unistd.h $DESTINATION/tmp
 
 
 Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
