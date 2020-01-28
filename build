@@ -774,6 +774,8 @@ done
 rm -f VERSION
 ln -sf $DESTINATION/include/VERSION VERSION
 
+[[ $BASEVERSION == *"-dwin"* ]] && cp $src/win/unistd.h $DESTINATION/tmp
+
 
 Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
 ln -sf "$srcbase/scripts/Make.depends" $DESTINATION/tmp/Make.depends
