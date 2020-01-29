@@ -12,7 +12,7 @@ NOTE: isomalloc is threadsafe, so the isomallocs are not wrapped in CmiMemLock.
 #include <errno.h>
 
 struct CmiMemoryIsomallocState {
-  CmiIsomallocContext * context;
+  CmiIsomallocContext context;
   unsigned char disabled;
 };
 
@@ -55,7 +55,7 @@ static void meta_init(char **argv)
 {
    if (CmiMyRank()==0) CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
    CpvInitialize(struct CmiMemoryIsomallocState, isomalloc_state);
-   CpvAccess(isomalloc_state).context = NULL;
+   CpvAccess(isomalloc_state).context.opaque = nullptr;
    CpvAccess(isomalloc_state).disabled = 0;
 #if CMK_HAS_TLS_VARIABLES
    isomalloc_thread = 1;         /* isomalloc is allowed in this pthread */
@@ -73,7 +73,7 @@ static bool meta_active()
 {
   return meta_inited
     && CpvInitialized(isomalloc_state)
-    && CpvAccess(isomalloc_state).context
+    && CpvAccess(isomalloc_state).context.opaque
     && !CpvAccess(isomalloc_state).disabled
 #if CMK_HAS_TLS_VARIABLES
     && (isomalloc_thread || CmiThreadIs(CMI_THREAD_IS_TLS))
@@ -219,7 +219,7 @@ void free_nomigrate(void *mem)
 #define CMK_MEMORY_HAS_ISOMALLOC
 
 /*Make this context "active"-- the recipient of incoming mallocs.*/
-void CmiMemoryIsomallocContextActivate(CmiIsomallocContext *l)
+void CmiMemoryIsomallocContextActivate(CmiIsomallocContext l)
 {
 	CpvAccess(isomalloc_state).context = l;
 }

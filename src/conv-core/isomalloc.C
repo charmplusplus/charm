@@ -902,7 +902,7 @@ static void CmiIsomallocInitExtent()
 # define VERIFY_RBTREE
 #endif
 
-struct CmiIsomallocContext
+struct Isomempool
 {
   /* Isomempool
    *
@@ -1590,20 +1590,20 @@ struct CmiIsomallocContext
   static_assert(minimum_empty_region_size > 0, "region sizes cannot be zero");
   static_assert(minimum_empty_region_size >= sizeof(RegionHeader), "regions must allow space for a header");
 
-  CmiIsomallocContext(uint8_t * s, uint8_t * e)
+  Isomempool(uint8_t * s, uint8_t * e)
     : start{s}, end{e}, allocated_extent{s}, first_region{}, last_region{}, empty_tree{}, lock{CmiCreateLock()}
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::CmiIsomallocContext(%p, %p)\n", CmiMyPe(), this, s, e);
+    IMP_DBG("[%d][%p] Isomempool::Isomempool(%p, %p)\n", CmiMyPe(), this, s, e);
   }
-  CmiIsomallocContext(PUP::reconstruct pr)
+  Isomempool(PUP::reconstruct pr)
     : empty_tree{pr}, lock{CmiCreateLock()}
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::CmiIsomallocContext(PUP::reconstruct)\n", CmiMyPe(), this);
+    IMP_DBG("[%d][%p] Isomempool::Isomempool(PUP::reconstruct)\n", CmiMyPe(), this);
   }
 
-  ~CmiIsomallocContext()
+  ~Isomempool()
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::~CmiIsomallocContext()\n", CmiMyPe(), this);
+    IMP_DBG("[%d][%p] Isomempool::~Isomempool()\n", CmiMyPe(), this);
 
     CmiDestroyLock(lock);
     clear();
@@ -1611,7 +1611,7 @@ struct CmiIsomallocContext
 
   void print_contents() const
   {
-    CmiPrintf("[%d][%p] CmiIsomallocContext::print_contents(): %p-%p %zu\n", CmiMyPe(), this, start, allocated_extent, allocated_extent - start);
+    CmiPrintf("[%d][%p] Isomempool::print_contents(): %p-%p %zu\n", CmiMyPe(), this, start, allocated_extent, allocated_extent - start);
 
     if (first_region == nullptr)
       return;
@@ -1666,14 +1666,14 @@ private:
 
   void setFirstRegion(RegionHeader * p)
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::setFirstRegion(%p)\n", CmiMyPe(), this, p);
+    IMP_DBG("[%d][%p] Isomempool::setFirstRegion(%p)\n", CmiMyPe(), this, p);
 
     CmiAssert(p->prev() == nullptr);
     first_region = p;
   }
   void setLastRegion(RegionHeader * p)
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::setLastRegion(%p)\n", CmiMyPe(), this, p);
+    IMP_DBG("[%d][%p] Isomempool::setLastRegion(%p)\n", CmiMyPe(), this, p);
 
     CmiAssert(p->next() == nullptr);
     last_region = p;
@@ -1712,7 +1712,7 @@ private:
     RegionHeader * const empty_header = empty_region->header();
     empty_tree.remove(empty_region);
 
-    IMP_DBG("[%d][%p] CmiIsomallocContext::allocFromEmptyRegion(%zu, %p, %zu) by erasing and filling {%p, %zu}\n",
+    IMP_DBG("[%d][%p] Isomempool::allocFromEmptyRegion(%zu, %p, %zu) by erasing and filling {%p, %zu}\n",
             CmiMyPe(), this, size, empty_region, alignment_filler, empty_header, region_size);
 
     CmiAssert(!empty_header->prevIsEmpty());
@@ -1731,7 +1731,7 @@ private:
     {
       // Record a new empty region preceding the new occupied region.
 
-      IMP_DBG("[%d][%p] CmiIsomallocContext::allocFromEmptyRegion(%zu, %p, %zu) inserting empty region {%p, %zu} (left)\n",
+      IMP_DBG("[%d][%p] Isomempool::allocFromEmptyRegion(%zu, %p, %zu) inserting empty region {%p, %zu} (left)\n",
               CmiMyPe(), this, size, empty_header, alignment_filler, empty_header, alignment_filler);
 
       header_prev = new (empty_header) RegionHeader{empty_header_prev, header_ptr, alignment_filler, Occupied{false}};
@@ -1769,7 +1769,7 @@ private:
 
       size_difference -= follow_alignment_filler;
 
-      IMP_DBG("[%d][%p] CmiIsomallocContext::allocFromEmptyRegion(%zu, %p, %zu) inserting empty region {%p, %zu} (right)\n",
+      IMP_DBG("[%d][%p] Isomempool::allocFromEmptyRegion(%zu, %p, %zu) inserting empty region {%p, %zu} (right)\n",
               CmiMyPe(), this, size, empty_region, alignment_filler, follow_ptr, size_difference);
 
       header_next = new (follow_ptr) RegionHeader{header_ptr, empty_header_next, size_difference, Occupied{false}};
@@ -1803,7 +1803,7 @@ private:
 
   void * allocByExtending(const size_t size, const size_t alignment, const size_t alignment_offset)
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::allocByExtending(%zu, %zu, %zu)\n", CmiMyPe(), this, size, alignment, alignment_offset);
+    IMP_DBG("[%d][%p] Isomempool::allocByExtending(%zu, %zu, %zu)\n", CmiMyPe(), this, size, alignment, alignment_offset);
 
     // Find the left bound of where we can place the new region.
 
@@ -1823,7 +1823,7 @@ private:
       header_prev = last_region->prev();
 
       auto empty_region = (EmptyRegion *)(last_region + 1);
-      IMP_DBG("[%d][%p] CmiIsomallocContext::allocByExtending(%zu, %zu, %zu) erasing empty region {%p, %zu} (left)\n",
+      IMP_DBG("[%d][%p] Isomempool::allocByExtending(%zu, %zu, %zu) erasing empty region {%p, %zu} (left)\n",
               CmiMyPe(), this, size, alignment, alignment_offset, last_region, empty_region->size());
       empty_tree.remove(empty_region);
     }
@@ -1861,7 +1861,7 @@ private:
       const size_t empty_size = alignment_filler - used_extent_alignment_filler;
       uint8_t * const empty_header_ptr = used_extent + used_extent_alignment_filler;
 
-      IMP_DBG("[%d][%p] CmiIsomallocContext::allocByExtending(%zu, %zu, %zu) inserting empty region {%p, %zu} (left)\n",
+      IMP_DBG("[%d][%p] Isomempool::allocByExtending(%zu, %zu, %zu) inserting empty region {%p, %zu} (left)\n",
               CmiMyPe(), this, size, alignment, alignment_offset, empty_header_ptr, empty_size);
 
       auto empty_header = new (empty_header_ptr) RegionHeader{header_prev, header_ptr, empty_size, Occupied{false}};
@@ -1899,7 +1899,7 @@ private:
     {
       // Record a new empty region following the new occupied region.
 
-      IMP_DBG("[%d][%p] CmiIsomallocContext::allocByExtending(%zu, %zu, %zu) inserting empty region {%p, %zu} (right)\n",
+      IMP_DBG("[%d][%p] Isomempool::allocByExtending(%zu, %zu, %zu) inserting empty region {%p, %zu} (right)\n",
               CmiMyPe(), this, size, alignment, alignment_offset, follow_ptr, size_difference);
 
       header_next = new (follow_ptr) RegionHeader{header_ptr, nullptr, size_difference, Occupied{false}};
@@ -1936,7 +1936,7 @@ public:
   {
     CmiLock(lock);
 
-    IMP_DBG("[%d][%p] CmiIsomallocContext::alloc(%zu, %zu, %zu)...\n", CmiMyPe(), this, size, alignment, alignment_offset);
+    IMP_DBG("[%d][%p] Isomempool::alloc(%zu, %zu, %zu)...\n", CmiMyPe(), this, size, alignment, alignment_offset);
 
     const size_t practical_size = size + sizeof(RegionHeader);
     const size_t practical_alignment_offset = alignment_offset + sizeof(RegionHeader);
@@ -1949,7 +1949,7 @@ public:
                  ? allocFromEmptyRegion(practical_size, node, get_alignment_filler(node->ptr() + practical_alignment_offset, alignment))
                  : allocByExtending(practical_size, alignment, practical_alignment_offset);
 
-    IMP_DBG("[%d][%p] CmiIsomallocContext::alloc(%zu, %zu, %zu) returning %p {header = %p}\n",
+    IMP_DBG("[%d][%p] Isomempool::alloc(%zu, %zu, %zu) returning %p {header = %p}\n",
             CmiMyPe(), this, size, alignment, alignment_offset, ret, (const uint8_t *)ret - sizeof(RegionHeader));
 
     CmiUnlock(lock);
@@ -1973,7 +1973,7 @@ public:
     const auto orig_header = (RegionHeader *)user_ptr - 1;
     CmiAssert(!orig_header->isEmpty());
 
-    IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p)... {header = %p}\n", CmiMyPe(), this, user_ptr, orig_header);
+    IMP_DBG("[%d][%p] Isomempool::free(%p)... {header = %p}\n", CmiMyPe(), this, user_ptr, orig_header);
 
     RegionHeader * const orig_header_prev = orig_header->prev();
     RegionHeader * const orig_header_next = orig_header->next();
@@ -1990,7 +1990,7 @@ public:
       RegionHeader * const orig_header_next_next = orig_header_next->next();
 
       const auto empty_region = (EmptyRegion *)(orig_header_next + 1);
-      IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) erasing empty region {%p, %zu} (right)\n",
+      IMP_DBG("[%d][%p] Isomempool::free(%p) erasing empty region {%p, %zu} (right)\n",
               CmiMyPe(), this, user_ptr, orig_header_next, empty_region->size());
       empty_tree.remove(empty_region);
 
@@ -2012,7 +2012,7 @@ public:
       const size_t orig_header_prev_size = orig_header_prev->size();
 
       auto empty_region = (EmptyRegion *)(orig_header_prev + 1);
-      IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) erasing empty region {%p, %zu} (left)\n",
+      IMP_DBG("[%d][%p] Isomempool::free(%p) erasing empty region {%p, %zu} (left)\n",
               CmiMyPe(), this, user_ptr, orig_header_prev, empty_region->size());
       empty_tree.remove(empty_region);
 
@@ -2050,7 +2050,7 @@ public:
       // There is not enough space for a new empty region.
       // Append it as slop to the previous occupied region.
 
-      IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) remnant too small {%p, %zu}, appending to %p on left (%p on right)\n",
+      IMP_DBG("[%d][%p] Isomempool::free(%p) remnant too small {%p, %zu}, appending to %p on left (%p on right)\n",
               CmiMyPe(), this, user_ptr, header, header_size, header_prev, header_next);
 
       if (header_prev == nullptr)
@@ -2067,7 +2067,7 @@ public:
     {
       // Add a new empty region containing the space from the freed region and any surrounding free space.
 
-      IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) inserting empty region {%p, %zu}\n",
+      IMP_DBG("[%d][%p] Isomempool::free(%p) inserting empty region {%p, %zu}\n",
               CmiMyPe(), this, user_ptr, header, header_size);
 
       header = new (header) RegionHeader{header_prev, header_next, header_size, Occupied{false}};
@@ -2093,7 +2093,7 @@ public:
 
   void pup(PUP::er & p)
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::pup()%s%s%s%s\n", CmiMyPe(), this, p.isSizing() ? " sizing" : "",
+    IMP_DBG("[%d][%p] Isomempool::pup()%s%s%s%s\n", CmiMyPe(), this, p.isSizing() ? " sizing" : "",
             p.isPacking() ? " packing" : "", p.isUnpacking() ? " unpacking" : "", p.isDeleting() ? " deleting" : "");
 
     pup_raw_pointer(p, start);
@@ -2109,7 +2109,7 @@ public:
     {
       void * const mapped = map_global_memory(start, totalsize);
       if (mapped == nullptr)
-        CmiAbort("Failed to unpack CmiIsomallocContext!");
+        CmiAbort("Failed to unpack Isomempool!");
     }
 
     p(start, totalsize);
@@ -2145,6 +2145,8 @@ public:
     return ret;
   }
 };
+
+using Mempool = Isomempool;
 
 /************** External interface ***************/
 
@@ -2231,7 +2233,7 @@ void CmiIsomallocInit(char ** argv)
 
 /* Contexts */
 
-CmiIsomallocContext * CmiIsomallocContextCreate(int myunit, int numunits)
+CmiIsomallocContext CmiIsomallocContextCreate(int myunit, int numunits)
 {
   if (isomallocStart == nullptr)
     return { nullptr };
@@ -2240,66 +2242,73 @@ CmiIsomallocContext * CmiIsomallocContextCreate(int myunit, int numunits)
   uint8_t * unrounded_end = get_space_partition(isomallocStart, isomallocEnd, myunit+1, numunits);
   auto start = (uint8_t *)CMIALIGN((uintptr_t)unrounded_start, pagesize);
   auto end = (uint8_t *)CMIALIGN((uintptr_t)unrounded_end - (pagesize-1), pagesize);
-  auto ctx = new CmiIsomallocContext{start, end};
-
-  return ctx;
+  return { new Mempool{start, end} };
 }
 
-void CmiIsomallocContextDelete(CmiIsomallocContext * ctx)
+void CmiIsomallocContextDelete(CmiIsomallocContext ctx)
 {
+  auto pool = (Mempool *)ctx.opaque;
 #if ISOMEMPOOL_DEBUG
-  ctx->print_contents();
+  pool->print_contents();
 #endif
-  delete ctx;
+  delete pool;
 }
 
-void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext ** ctxptr)
+void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext * ctxptr)
 {
   PUP::er & p = *(PUP::er *)cpup;
 
   if (p.isUnpacking())
   {
-    *ctxptr = new CmiIsomallocContext{PUP::reconstruct{}};
+    ctxptr->opaque = new Mempool{PUP::reconstruct{}};
   }
 
-  p | **ctxptr;
+  auto pool = (Mempool *)ctxptr->opaque;
+
+  p | *pool;
 
   if (p.isDeleting())
   {
-    delete *ctxptr;
-    *ctxptr = nullptr;
+    delete pool;
+    ctxptr->opaque = nullptr;
   }
 }
 
-void * CmiIsomallocContextMalloc(CmiIsomallocContext * ctx, size_t size)
+void * CmiIsomallocContextMalloc(CmiIsomallocContext ctx, size_t size)
 {
-  return ctx->alloc(size);
+  auto pool = (Mempool *)ctx.opaque;
+  return pool->alloc(size);
 }
 
-void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * ctx, size_t align, size_t size)
+void * CmiIsomallocContextMallocAlign(CmiIsomallocContext ctx, size_t align, size_t size)
 {
-  return ctx->alloc(size, isomalloc_internal_validate_align(align));
+  auto pool = (Mempool *)ctx.opaque;
+  return pool->alloc(size, isomalloc_internal_validate_align(align));
 }
 
-void * CmiIsomallocContextCalloc(CmiIsomallocContext * ctx, size_t nelem, size_t size)
+void * CmiIsomallocContextCalloc(CmiIsomallocContext ctx, size_t nelem, size_t size)
 {
-  return ctx->calloc(nelem, size);
+  auto pool = (Mempool *)ctx.opaque;
+  return pool->calloc(nelem, size);
 }
 
-void * CmiIsomallocContextRealloc(CmiIsomallocContext * ctx, void * ptr, size_t size)
+void * CmiIsomallocContextRealloc(CmiIsomallocContext ctx, void * ptr, size_t size)
 {
-  return ctx->realloc(ptr, size);
+  auto pool = (Mempool *)ctx.opaque;
+  return pool->realloc(ptr, size);
 }
 
-void CmiIsomallocContextFree(CmiIsomallocContext * ctx, void * ptr)
+void CmiIsomallocContextFree(CmiIsomallocContext ctx, void * ptr)
 {
   if (ptr == nullptr)
     return;
 
-  ctx->free(ptr);
+  auto pool = (Mempool *)ctx.opaque;
+  pool->free(ptr);
 }
 
-size_t CmiIsomallocContextGetLength(CmiIsomallocContext * ctx, void * ptr)
+size_t CmiIsomallocContextGetLength(CmiIsomallocContext ctx, void * ptr)
 {
-  return ctx->length(ptr);
+  auto pool = (Mempool *)ctx.opaque;
+  return pool->length(ptr);
 }
