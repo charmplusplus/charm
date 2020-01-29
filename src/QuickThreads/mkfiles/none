@@ -2,7 +2,7 @@
 
 qt: 
 	rm -f qtmd.h
-	../system_ln md/setjmp_d.h qtmd.h
+	ln -sf md/setjmp_d.h qtmd.h
 	touch libckqt.so
 	touch libckqt.a
 

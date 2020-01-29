@@ -352,7 +352,7 @@ commitid.o: CC=$(CHARMC)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."
-	-for hdr in $(filter-out dirs+sources Makefile,$(sort $^)) ; do test ! -f "../include/`basename $$hdr`" && ./system_ln "../tmp/$$hdr" ../include ; done
+	-for hdr in $(filter-out dirs+sources Makefile,$(sort $^)) ; do test ! -f "../include/`basename $$hdr`" && ln -sf "../tmp/$$hdr" ../include ; done
 	touch headerlinks
 
 dirs+sources:
@@ -364,7 +364,6 @@ dirs+sources:
 	rm -rf ../bin ; mkdir ../bin
 	if case $(CMK_VDIR) in *win64*) true;; *-win-*) true;; *) false;; esac; then \
 		cp -f $(SRCBASE)/arch/win/unix2nt* ../bin; \
-		cp -f $(SRCBASE)/arch/win/createlink.exe ../bin; \
 	fi
 	rm -rf ../lib ; mkdir ../lib
 ifeq (false,$(CMK_NO_BUILD_SHARED))
@@ -405,19 +404,15 @@ endif
 	./gathertree $(SRCBASE)/../tests                         ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
-	-./system_ln  ../tmp/charmc ../bin/
-	-./system_ln  $(SRCBASE)/scripts/testrun ../bin/
-	-./system_ln  ../tmp/tree.txt ../bin/
-	-./system_ln  ../tmp/fuzzytree.txt ../bin/
-#	-ln -s ../../java/bin charmjavabin
-#	-ln -s ../../java/bin ../bin/charmjavabin
-#	-ln -s charmjavabin/* ../bin/
-#	-ln -s ../java ..
+	-ln -sf  ../tmp/charmc ../bin/
+	-ln -sf  $(SRCBASE)/scripts/testrun ../bin/
+	-ln -sf  ../tmp/tree.txt ../bin/
+	-ln -sf  ../tmp/fuzzytree.txt ../bin/
 	rm -rf ../include ; mkdir ../include
-	-./system_ln  ../tmp/conv-*.*h ../include
-	-./system_ln  ../tmp/cc-*.*h ../include
-	-./system_ln  ../tmp/conv-mach-opt.sh ../include
-	-./system_ln  ../tmp/conv-mach-opt.mak ../include
+	-ln -sf  ../tmp/conv-*.*h ../include
+	-ln -sf  ../tmp/cc-*.*h ../include
+	-ln -sf  ../tmp/conv-mach-opt.sh ../include
+	-ln -sf  ../tmp/conv-mach-opt.mak ../include
 	if [ -x ./special.sh ] ; then SRCBASE=$(SRCBASE) ./special.sh ; fi
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources

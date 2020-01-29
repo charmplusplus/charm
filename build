@@ -760,66 +760,35 @@ mkdir -p "$DESTINATION/tmp"
 echo "TARGET=${UFCONTEXT_HEADER_NAME}" > $DESTINATION/tmp/uFcontext.mk
 
 # Create the bin, lib, include, etc. links:
-WINNAME=`echo $VERSION | awk -F- '{print $2}'`
-if [ "x_$WINNAME" = "x_win64" -o "x_$WINNAME" = "x_win" ]
-then
-#Win64 version needs special compilers and *copied* (not linked)
-# source files.
-	cp $src/win/system_ln $DESTINATION/tmp
-	cp $src/win/unistd.h $DESTINATION/tmp
-	echo "Compiling createlink.cpp ..."
-	case "$COMPILER" in
-		gcc*|clang*)
-			createlinkcc="$COMPILER"
-			;;
-		*)
-			createlinkcc="./unix2nt_cc"
-			;;
-	esac
-	(cd $src/win; $createlinkcc -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500; $createlinkcc createlink.o -o createlink.exe)
+newdirlist='bin lib'
+[ -n "$BUILD_SHARED" ] && newdirlist="$newdirlist lib_so"
+newdirlist="$newdirlist include tmp"
+for newdir in $newdirlist
+do
+  Echo "Soft-linking over $newdir"
 
-	if test ! -x $src/win/createlink.exe
-	then
-		echo "VC++ is not properly installed!"
-		exit 1
-	fi
-	chmod +x $DESTINATION/tmp/system_ln
-	cp $src/win/gathertree.local   $DESTINATION/tmp
-	cp $src/win/gatherflat.local   $DESTINATION/tmp
-else
-	cat > $DESTINATION/tmp/system_ln <<EOF
-#!/bin/sh
-ln -f -s \$@
-EOF
-  chmod +x $DESTINATION/tmp/system_ln
-  newdirlist='bin lib'
-  [ -n "$BUILD_SHARED" ] && newdirlist="$newdirlist lib_so"
-  newdirlist="$newdirlist include tmp"
-  for newdir in $newdirlist
-  do
-    Echo "Soft-linking over $newdir"
-    if [ -r $newdir ]
-    then
-      rm -fr $newdir || exit 1
-    fi
-    $DESTINATION/tmp/system_ln $DESTINATION/$newdir $newdir
-  done
-  rm -f VERSION
-  $DESTINATION/tmp/system_ln $DESTINATION/include/VERSION VERSION
-fi
+  rm -rf $newdir
+
+  ln -sf $DESTINATION/$newdir $newdir
+done
+rm -f VERSION
+ln -sf $DESTINATION/include/VERSION VERSION
+
+[[ $BASEVERSION == *"-win"* ]] && cp $src/win/unistd.h $DESTINATION/tmp
+
 
 Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
-$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.depends" $DESTINATION/tmp/Make.depends
-$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
+ln -sf "$srcbase/scripts/Make.depends" $DESTINATION/tmp/Make.depends
+ln -sf "$srcbase/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
 if test -f "$srcbaseabs/ck-ldb/Make.lb"
 then
-$DESTINATION/tmp/system_ln "$srcbase/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
+  ln -sf "$srcbase/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
 else
-touch $DESTINATION/tmp/Make.lb
+  touch $DESTINATION/tmp/Make.lb
 fi
-$DESTINATION/tmp/system_ln "$srcbase/scripts/Makefile" $DESTINATION/tmp/Makefile
-$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.tau" $DESTINATION/tmp/Make.tau
-$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.gpu" $DESTINATION/tmp/Make.gpu
+ln -sf "$srcbase/scripts/Makefile" $DESTINATION/tmp/Makefile
+ln -sf "$srcbase/scripts/Make.tau" $DESTINATION/tmp/Make.tau
+ln -sf "$srcbase/scripts/Make.gpu" $DESTINATION/tmp/Make.gpu
 touch $DESTINATION/tmp/Makefile.machine
 touch $DESTINATION/tmp/Make.extlib
 
