@@ -970,6 +970,116 @@ struct isommap
   CmiNodeLock lock;
 };
 
+/************** dlmalloc mempool ***************/
+
+#include "memory-gnu-internal.C"
+
+struct isomalloc_dlmalloc : dlmalloc_impl
+{
+  isomalloc_dlmalloc(uint8_t * s, uint8_t * e)
+    : backend{s, e}, arena{create_mspace(0, 0)}
+  {
+    IMP_DBG("[%d][%p] isomalloc_dlmalloc::isomalloc_dlmalloc(%p, %p)\n", CmiMyPe(), this, s, e);
+  }
+  isomalloc_dlmalloc(PUP::reconstruct pr)
+    : backend{pr}
+  {
+    IMP_DBG("[%d][%p] isomalloc_dlmalloc::isomalloc_dlmalloc(PUP::reconstruct)\n", CmiMyPe(), this);
+  }
+
+  void pup(PUP::er & p)
+  {
+    p | backend;
+    pup_raw_pointer(p, arena);
+  }
+
+  isommap backend;
+  mspace arena;
+
+  virtual void * call_mmap(size_t length) override final
+  {
+    void * const mapped = map_global_memory(backend.allocated_extent, length);
+    if (mapped == nullptr)
+      return nullptr;
+    backend.allocated_extent += length;
+    return mapped;
+  }
+  virtual void * call_direct_mmap(size_t length) override final
+  {
+    return this->isomalloc_dlmalloc::call_mmap(length); // call call_mmap without the vtable lookup
+  }
+  virtual int call_munmap(void * addr, size_t length) override final
+  {
+    /*
+     * TODO: Unmap regions in the middle when requested and maintain a record of what is
+     * still mapped so that migration can skip the gaps. Complexity arises when
+     * considering RDMA transfers. We would need to determine when it is better to leave
+     * small gaps mapped and combine transfers instead of requesting multiple transfers.
+     */
+    if ((const uint8_t *)addr + length == backend.allocated_extent)
+    {
+      unmap_global_memory(addr, length);
+      backend.allocated_extent = (uint8_t *)addr;
+    }
+    return 0;
+  }
+  virtual void * call_mremap(void *old_address, size_t old_size, size_t new_size, int flags) override final
+  {
+    return MFAIL;
+  }
+
+  void * alloc(size_t size)
+  {
+    CmiLock(backend.lock);
+    void * ret = mspace_malloc(arena, size);
+    CmiUnlock(backend.lock);
+    return ret;
+  }
+  void * alloc(size_t size, size_t align)
+  {
+    CmiLock(backend.lock);
+    void * ret = mspace_memalign(arena, align, size);
+    CmiUnlock(backend.lock);
+    return ret;
+  }
+  void * calloc(size_t nelem, size_t size)
+  {
+    CmiLock(backend.lock);
+    void * ret = mspace_calloc(arena, nelem, size);
+    CmiUnlock(backend.lock);
+    return ret;
+  }
+  void * realloc(void * ptr, size_t size)
+  {
+    CmiLock(backend.lock);
+    void * ret = mspace_realloc(arena, ptr, size);
+    CmiUnlock(backend.lock);
+    return ret;
+  }
+  void free(void * ptr)
+  {
+    CmiLock(backend.lock);
+
+    CmiAssert(backend.isInRange(ptr));
+    CmiAssert(backend.isMapped(ptr));
+
+    mspace_free(arena, ptr);
+
+    CmiUnlock(backend.lock);
+  }
+  size_t length(void * ptr)
+  {
+    CmiLock(backend.lock);
+
+    mchunkptr oldp = mem2chunk(ptr);
+    size_t oc = chunksize(oldp) - overhead_for(oldp);
+
+    CmiUnlock(backend.lock);
+
+    return oc;
+  }
+};
+
 /************** Isomempool ***************/
 
 #if ISOMEMPOOL_DEBUG
@@ -2181,11 +2291,13 @@ public:
   }
 };
 
-using Mempool = Isomempool;
+using Mempool = isomalloc_dlmalloc;
 
 /************** External interface ***************/
 
+#ifndef MALLOC_ALIGNMENT
 #define MALLOC_ALIGNMENT ALIGN_BYTES
+#endif
 
 static inline size_t isomalloc_internal_validate_align(size_t align)
 {
