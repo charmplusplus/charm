@@ -909,6 +909,18 @@ struct CmiIsomallocContext
    * This class is a wholly self-contained allocator, depending only on mmap/munmap.
    * It batches allocations of all sizes into a slab region that can expand as needed.
    *
+   * Advantages:
+   * This mempool provides space-efficient memory management. It has been thoroughly
+   * verified for correctness. It contains robust assertions to pinpoint problems in the
+   * event of future modifications. The code is clean, self-documenting, modular, short
+   * in length, and well-optimized (for the approach it takes).
+   *
+   * Disadvantages:
+   * Performance is poor in programs that behave poorly with regard to the heap, as well
+   * as in certain circumstances in all programs. Problems with this mempool include lack
+   * of a special approach for very small allocations, and a cache-inefficient tree node
+   * layout.
+   *
    * Definitions:
    * Regions are divisions within the pool, either allocated space or empty space between
    * allocations.
