@@ -1967,6 +1967,9 @@ public:
   {
     CmiLock(lock);
 
+    CmiAssert(isInRange(user_ptr));
+    CmiAssert(isMapped(user_ptr));
+
     const auto orig_header = (RegionHeader *)user_ptr - 1;
     CmiAssert(!orig_header->isEmpty());
 
