@@ -9,6 +9,7 @@ mainmodule within_node_bcast {
 
   mainchare Main {
     entry Main(CkArgMsg* msg);
+    entry void allComplete();
     entry [reductiontarget] void testDone(int result);
     entry void runTests() {
       serial { CkPrintf("Testing within-node broadcast\n"); }
@@ -17,17 +18,18 @@ mainmodule within_node_bcast {
           CkCallback cb(CkReductionTarget(Main, testDone), thisProxy);
           TestMessage* msg = new (DATA_SIZE) TestMessage(test_num, cb);
           std::fill(msg->data, msg->data + DATA_SIZE, test_num);
+          msg->counter.store(msg->test_num);
           ngProxy.recvCopy(msg);
         }
 
         when testDone(int result1), testDone(int result2) serial {
           if (result1 != result2) {
-            CkPrintf("Results for test %i do not match! (%i, %i)\n",
-                test_num, result1, result2);
-            CkAbort("Test failed in results checking!!\n");
+            CkAbort("Results for test %i/%i do not match! (%i, %i)\n",
+                test_num+1, ITERATIONS, result1, result2);
           }
         }
       }
+      serial { tests_completed++; }
 
       serial { CkPrintf("Testing [nokeep] within-node broadcast\n"); }
       for (test_num = 0; test_num < ITERATIONS; test_num++) {
@@ -40,12 +42,59 @@ mainmodule within_node_bcast {
 
         when testDone(int result1), testDone(int result2) serial {
           if (result1 != result2) {
-            CkPrintf("Results for test %i do not match! (%i, %i)\n",
-                test_num, result1, result2);
-            CkAbort("Test failed in results checking!!\n");
+            CkAbort("Results for test %i/%i do not match! (%i, %i)\n",
+                test_num+1, ITERATIONS, result1, result2);
           }
         }
       }
+      serial { tests_completed++; }
+
+      serial { CkPrintf("Testing group broadcast\n"); }
+      for (test_num = 0; test_num < ITERATIONS; test_num++) {
+        serial {
+          CkCallback cb(CkReductionTarget(Main, testDone), thisProxy);
+          TestMessage* msg1 = new (DATA_SIZE) TestMessage(test_num, cb);
+          std::fill(msg1->data, msg1->data + DATA_SIZE, test_num);
+          msg1->counter.store(msg1->test_num);
+          ngProxy.recvCopyNoFwd(msg1);
+
+          TestMessage* msg2 = new (DATA_SIZE) TestMessage(test_num, cb);
+          std::fill(msg2->data, msg2->data + DATA_SIZE, test_num);
+          msg2->counter.store(msg2->test_num);
+          gProxy.recvCopy(msg2);
+        }
+
+        when testDone(int result1), testDone(int result2) serial {
+          if (result1 != result2) {
+            CkAbort("Results for test %i/%i do not match! (%i, %i)\n",
+                test_num+1, ITERATIONS, result1, result2);
+          }
+        }
+      }
+      serial { tests_completed++; }
+
+      serial { CkPrintf("Testing [nokeep] group broadcast\n"); }
+      for (test_num = 0; test_num < ITERATIONS; test_num++) {
+        serial {
+          CkCallback cb(CkReductionTarget(Main, testDone), thisProxy);
+
+          TestMessage* msg1 = new (DATA_SIZE) TestMessage(test_num, cb);
+          std::fill(msg1->data, msg1->data + DATA_SIZE, test_num);
+          ngProxy.recvNoFwd(msg1);
+
+          TestMessage* msg2 = new (DATA_SIZE) TestMessage(test_num, cb);
+          std::fill(msg2->data, msg2->data + DATA_SIZE, test_num);
+          gProxy.recv(msg2);
+        }
+
+        when testDone(int result1), testDone(int result2) serial {
+          if (result1 != result2) {
+            CkAbort("Results for test %i/%i do not match! (%i, %i)\n",
+                test_num+1, ITERATIONS, result1, result2);
+          }
+        }
+      }
+      serial { tests_completed++; }
     }
   };
 
@@ -53,6 +102,8 @@ mainmodule within_node_bcast {
     entry TestNodeGroup();
     entry void recv(TestMessage* msg);
     entry void recvCopy(TestMessage* msg);
+    entry void recvNoFwd(TestMessage* msg);
+    entry void recvCopyNoFwd(TestMessage* msg);
   };
 
   group TestGroup {

@@ -397,12 +397,14 @@ public:
 // Group-specific fields
     CkGroupID   getGroupNum(void) const {
       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+          || getMsgtype()==BocBcastMsg || getMsgtype()==NodeBocInitMsg
+          || getMsgtype()==ForNodeBocMsg);
       return type.group.g;
     }
     void   setGroupNum(const CkGroupID g) {
       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+          || getMsgtype()==BocBcastMsg || getMsgtype()==NodeBocInitMsg
+          || getMsgtype()==ForNodeBocMsg);
       type.group.g = g;
     }
     void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.epoch=epoch; }
