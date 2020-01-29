@@ -29,14 +29,6 @@ FILE *debugLog = NULL;
 /* The number of children used when a msg is broadcast inside a node */
 #define BROADCAST_SPANNING_INTRA_FACTOR  8
 
-/* Root of broadcast:
- * non-bcast msg: root = 0;
- * proc-level bcast msg: root >=1; (CmiMyPe()+1)
- * node-level bcast msg: root <=-1; (-CmiMyNode()-1)
- */
-#define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
-#define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
-
 /**
  * For some machine layers such as on Active Message framework,
  * the receiver callback is usally executed on an internal
@@ -563,17 +555,28 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
 
 
 static void SendToPeers(int size, char *msg) {
-    /* FIXME: now it's just a flat p2p send!! When node size is large,
-    * it should also be sent in a tree
-    */
-    int exceptRank = CMI_DEST_RANK(msg);
-    int i;
-    for (i=0; i<exceptRank; i++) {
-        CmiPushPE(i, CopyMsg(msg, size));
+  /* FIXME: now it's just a flat p2p send!! When node size is large,
+  * it should also be sent in a tree
+  */
+
+  int exceptRank = CMI_DEST_RANK(msg);
+  if (CMI_MSG_NOKEEP(msg)) {
+    for (int i = 0; i < exceptRank; i++) {
+      CmiReference(msg);
+      CmiPushPE(i, msg);
     }
-    for (i=exceptRank+1; i<CmiMyNodeSize(); i++) {
-        CmiPushPE(i, CopyMsg(msg, size));
+    for (int i = exceptRank + 1; i < CmiMyNodeSize(); i++) {
+      CmiReference(msg);
+      CmiPushPE(i, msg);
     }
+  } else {
+    for (int i = 0; i < exceptRank; i++) {
+      CmiPushPE(i, CopyMsg(msg, size));
+    }
+    for (int i = exceptRank + 1; i < CmiMyNodeSize(); i++) {
+      CmiPushPE(i, CopyMsg(msg, size));
+    }
+  }
 }
 
 
