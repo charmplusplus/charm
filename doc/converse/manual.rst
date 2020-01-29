@@ -1491,7 +1491,7 @@ This API may evolve as new use cases emerge.
 
 .. code-block:: c++
 
-  CmiIsomallocContext * CmiIsomallocContextCreate(int myunit, int numunits)
+  CmiIsomallocContext CmiIsomallocContextCreate(int myunit, int numunits)
 
 Construct a context for a given unit of work, out of a total number of
 slots available. Successive calls to this function must always pass
@@ -1507,42 +1507,42 @@ interoperability between multiple simultaneous uses.
 
 .. code-block:: c++
 
-  void CmiIsomallocContextDelete(CmiIsomallocContext * ctx)
+  void CmiIsomallocContextDelete(CmiIsomallocContext ctx)
 
 Destroy a given context, releasing all allocations owned by it and all
 virtual address space used by it.
 
 .. code-block:: c++
 
-  void * CmiIsomallocContextMalloc(CmiIsomallocContext * ctx, size_t size)
+  void * CmiIsomallocContextMalloc(CmiIsomallocContext ctx, size_t size)
 
 Allocate ``size`` bytes at a unique virtual address. Returns a pointer
 to the allocated region.
 
 .. code-block:: c++
 
-  void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * ctx, size_t align, size_t size)
+  void * CmiIsomallocContextMallocAlign(CmiIsomallocContext ctx, size_t align, size_t size)
 
 Same as above, but with the alignment also specified. It must be a power
 of two.
 
 .. code-block:: c++
 
-  void * CmiIsomallocContextCalloc(CmiIsomallocContext * ctx, size_t nelem, size_t size)
+  void * CmiIsomallocContextCalloc(CmiIsomallocContext ctx, size_t nelem, size_t size)
 
 Same as ``CmiIsomallocContextMalloc``, but ``calloc`` instead of
 ``malloc``.
 
 .. code-block:: c++
 
-  void * CmiIsomallocContextRealloc(CmiIsomallocContext * ctx, void * ptr, size_t size)
+  void * CmiIsomallocContextRealloc(CmiIsomallocContext ctx, void * ptr, size_t size)
 
 Same as ``CmiIsomallocContextMalloc``, but ``realloc`` instead of
 ``malloc``.
 
 .. code-block:: c++
 
-  void CmiIsomallocContextFree(CmiIsomallocContext * ctx, void * ptr)
+  void CmiIsomallocContextFree(CmiIsomallocContext ctx, void * ptr)
 
 Release the given block, which must have been previously allocated by
 the given Isomalloc context. It may also release the underlying virtual
@@ -1554,7 +1554,7 @@ block more than once.
 
 .. code-block:: c++
 
-  void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext ** ctxptr)
+  void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext * ctxptr)
 
 Pack/Unpack the given context. This routine can be used to move contexts
 across processors, save them to disk, or checkpoint them.
@@ -1636,7 +1636,7 @@ other ``CthThread``.
 
 .. code-block:: c++
 
-  CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext *ctx)
+  CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContextctx)
 
 Create a thread that can later be moved to other processors. Otherwise
 identical to CthCreate. An Isomalloc context is required for organized

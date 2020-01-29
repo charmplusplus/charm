@@ -1072,7 +1072,7 @@ void free_nomigrate(void *mem) { free(mem); }
 
 #ifndef CMK_MEMORY_HAS_ISOMALLOC
 #include "memory-isomalloc.h"
-void CmiMemoryIsomallocContextActivate(CmiIsomallocContext *l) {}
+void CmiMemoryIsomallocContextActivate(CmiIsomallocContext l) {}
 void CmiMemoryIsomallocDisablePush() {}
 void CmiMemoryIsomallocDisablePop() {}
 #endif
