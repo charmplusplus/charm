@@ -1632,12 +1632,6 @@ struct CmiIsomallocContext
     return get_alignment_filler(ptr, minimum_alignment);
   }
 
-  void * alloc(size_t size, const size_t alignment = minimum_alignment, size_t alignment_offset = 0);
-  void free(void * user_ptr);
-  size_t length(void * user_ptr) const;
-
-  void pup(PUP::er & p);
-
   bool isInRange(void * user_ptr) const
   {
     return start <= (const uint8_t *)user_ptr && (const uint8_t *)user_ptr < end;
@@ -1923,198 +1917,200 @@ private:
     unmap_global_memory(start, allocated_extent - start);
     allocated_extent = start;
   }
+
+public:
+
+  void * alloc(const size_t size, const size_t alignment = minimum_alignment, const size_t alignment_offset = 0)
+  {
+    CmiLock(lock);
+
+    IMP_DBG("[%d][%p] CmiIsomallocContext::alloc(%zu, %zu, %zu)...\n", CmiMyPe(), this, size, alignment, alignment_offset);
+
+    const size_t practical_size = size + sizeof(RegionHeader);
+    const size_t practical_alignment_offset = alignment_offset + sizeof(RegionHeader);
+
+    // Find the smallest empty region that can fit the data.
+    EmptyRegion * node = empty_tree.lookup_region(practical_size, alignment, practical_alignment_offset);
+
+    // Perform the allocation.
+    void * ret = node != nullptr
+                 ? allocFromEmptyRegion(practical_size, node, get_alignment_filler(node->ptr() + practical_alignment_offset, alignment))
+                 : allocByExtending(practical_size, alignment, practical_alignment_offset);
+
+    IMP_DBG("[%d][%p] CmiIsomallocContext::alloc(%zu, %zu, %zu) returning %p {header = %p}\n",
+            CmiMyPe(), this, size, alignment, alignment_offset, ret, (const uint8_t *)ret - sizeof(RegionHeader));
+
+    CmiUnlock(lock);
+
+    return ret;
+  }
+
+  size_t length(void * user_ptr) const
+  {
+    const auto header = (const RegionHeader *)user_ptr - 1;
+    return header->usersize();
+  }
+
+  void free(void * user_ptr)
+  {
+    CmiLock(lock);
+
+    const auto orig_header = (RegionHeader *)user_ptr - 1;
+    CmiAssert(!orig_header->isEmpty());
+
+    IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p)... {header = %p}\n", CmiMyPe(), this, user_ptr, orig_header);
+
+    RegionHeader * const orig_header_prev = orig_header->prev();
+    RegionHeader * const orig_header_next = orig_header->next();
+
+    RegionHeader * header = orig_header;
+    RegionHeader * header_prev;
+    RegionHeader * header_next;
+    size_t header_size = (orig_header_next != nullptr ? (const uint8_t *)orig_header_next : allocated_extent) - (const uint8_t *)orig_header;
+
+    if (orig_header->nextIsEmpty())
+    {
+      // Merge with the free region to the right.
+
+      RegionHeader * const orig_header_next_next = orig_header_next->next();
+
+      const auto empty_region = (EmptyRegion *)(orig_header_next + 1);
+      IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) erasing empty region {%p, %zu} (right)\n",
+              CmiMyPe(), this, user_ptr, orig_header_next, empty_region->size());
+      empty_tree.remove(empty_region);
+
+      header_next = orig_header_next_next;
+      header_size += orig_header_next->size();
+    }
+    else
+    {
+      // Directly link to the occupied region to the right.
+
+      header_next = orig_header_next;
+    }
+
+    if (orig_header->prevIsEmpty())
+    {
+      // Merge with the free region to the left.
+
+      RegionHeader * const orig_header_prev_prev = orig_header_prev->prev();
+      const size_t orig_header_prev_size = orig_header_prev->size();
+
+      auto empty_region = (EmptyRegion *)(orig_header_prev + 1);
+      IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) erasing empty region {%p, %zu} (left)\n",
+              CmiMyPe(), this, user_ptr, orig_header_prev, empty_region->size());
+      empty_tree.remove(empty_region);
+
+      header = orig_header_prev;
+      header_prev = orig_header_prev_prev;
+      header_size += orig_header_prev_size;
+    }
+    else
+    {
+      // Try reclaiming slop space to the left.
+
+      header_prev = orig_header_prev;
+
+      uint8_t * available_ptr;
+      if (orig_header_prev != nullptr)
+      {
+        CmiAssert(!orig_header_prev->isEmpty());
+        available_ptr = (uint8_t *)orig_header_prev + orig_header_prev->size();
+        available_ptr += minimum_alignment_filler(available_ptr);
+      }
+      else
+      {
+        available_ptr = start;
+        CmiAssert(minimum_alignment_filler(available_ptr) == 0);
+      }
+
+      CmiAssert(available_ptr <= (const uint8_t *)header);
+
+      header_size += (const uint8_t *)header - available_ptr;
+      header = (RegionHeader *)available_ptr;
+    }
+
+    if (header_size < minimum_empty_region_size)
+    {
+      // There is not enough space for a new empty region.
+      // Append it as slop to the previous occupied region.
+
+      IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) remnant too small {%p, %zu}, appending to %p on left (%p on right)\n",
+              CmiMyPe(), this, user_ptr, header, header_size, header_prev, header_next);
+
+      if (header_prev == nullptr)
+        setFirstRegion(header_next);
+      else
+        header_prev->setNext(header_next);
+
+      if (header_next == nullptr)
+        setLastRegion(header_prev);
+      else
+        header_next->setPrev(header_prev);
+    }
+    else
+    {
+      // Add a new empty region containing the space from the freed region and any surrounding free space.
+
+      IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) inserting empty region {%p, %zu}\n",
+              CmiMyPe(), this, user_ptr, header, header_size);
+
+      header = new (header) RegionHeader{header_prev, header_next, header_size, Occupied{false}};
+
+      if (header_prev == nullptr)
+        setFirstRegion(header);
+      else
+        setRegionNext(header_prev, header);
+
+      if (header_next == nullptr)
+        setLastRegion(header);
+      else
+        header_next->setPrev(header);
+
+      // Record the new empty region.
+      CmiAssert(!header->prevIsEmpty() && !header->nextIsEmpty());
+
+      insertEmptyRegion(header);
+    }
+
+    CmiUnlock(lock);
+  }
+
+  void pup(PUP::er & p)
+  {
+    IMP_DBG("[%d][%p] CmiIsomallocContext::pup()%s%s%s%s\n", CmiMyPe(), this, p.isSizing() ? " sizing" : "",
+            p.isPacking() ? " packing" : "", p.isUnpacking() ? " unpacking" : "", p.isDeleting() ? " deleting" : "");
+
+    pup_raw_pointer(p, start);
+    pup_raw_pointer(p, end);
+    pup_raw_pointer(p, allocated_extent);
+    pup_raw_pointer(p, first_region);
+    pup_raw_pointer(p, last_region);
+    p | empty_tree;
+
+    const size_t totalsize = allocated_extent - start;
+
+    if (p.isUnpacking())
+    {
+      void * const mapped = map_global_memory(start, totalsize);
+      if (mapped == nullptr)
+        CmiAbort("Failed to unpack CmiIsomallocContext!");
+    }
+
+    p(start, totalsize);
+
+    if (p.isDeleting())
+    {
+      clear();
+    }
+  }
 };
-
-void * CmiIsomallocContext::alloc(const size_t size, const size_t alignment, const size_t alignment_offset)
-{
-  CmiLock(lock);
-
-  IMP_DBG("[%d][%p] CmiIsomallocContext::alloc(%zu, %zu, %zu)...\n", CmiMyPe(), this, size, alignment, alignment_offset);
-
-  const size_t practical_size = size + sizeof(RegionHeader);
-  const size_t practical_alignment_offset = alignment_offset + sizeof(RegionHeader);
-
-  // Find the smallest empty region that can fit the data.
-  EmptyRegion * node = empty_tree.lookup_region(practical_size, alignment, practical_alignment_offset);
-
-  // Perform the allocation.
-  void * ret = node != nullptr
-               ? allocFromEmptyRegion(practical_size, node, get_alignment_filler(node->ptr() + practical_alignment_offset, alignment))
-               : allocByExtending(practical_size, alignment, practical_alignment_offset);
-
-  IMP_DBG("[%d][%p] CmiIsomallocContext::alloc(%zu, %zu, %zu) returning %p {header = %p}\n",
-          CmiMyPe(), this, size, alignment, alignment_offset, ret, (const uint8_t *)ret - sizeof(RegionHeader));
-
-  CmiUnlock(lock);
-
-  return ret;
-}
-
-size_t CmiIsomallocContext::length(void * user_ptr) const
-{
-  const auto header = (const RegionHeader *)user_ptr - 1;
-  return header->usersize();
-}
-
-void CmiIsomallocContext::free(void * user_ptr)
-{
-  CmiLock(lock);
-
-  const auto orig_header = (RegionHeader *)user_ptr - 1;
-  CmiAssert(!orig_header->isEmpty());
-
-  IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p)... {header = %p}\n", CmiMyPe(), this, user_ptr, orig_header);
-
-  RegionHeader * const orig_header_prev = orig_header->prev();
-  RegionHeader * const orig_header_next = orig_header->next();
-
-  RegionHeader * header = orig_header;
-  RegionHeader * header_prev;
-  RegionHeader * header_next;
-  size_t header_size = (orig_header_next != nullptr ? (const uint8_t *)orig_header_next : allocated_extent) - (const uint8_t *)orig_header;
-
-  if (orig_header->nextIsEmpty())
-  {
-    // Merge with the free region to the right.
-
-    RegionHeader * const orig_header_next_next = orig_header_next->next();
-
-    const auto empty_region = (EmptyRegion *)(orig_header_next + 1);
-    IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) erasing empty region {%p, %zu} (right)\n",
-            CmiMyPe(), this, user_ptr, orig_header_next, empty_region->size());
-    empty_tree.remove(empty_region);
-
-    header_next = orig_header_next_next;
-    header_size += orig_header_next->size();
-  }
-  else
-  {
-    // Directly link to the occupied region to the right.
-
-    header_next = orig_header_next;
-  }
-
-  if (orig_header->prevIsEmpty())
-  {
-    // Merge with the free region to the left.
-
-    RegionHeader * const orig_header_prev_prev = orig_header_prev->prev();
-    const size_t orig_header_prev_size = orig_header_prev->size();
-
-    auto empty_region = (EmptyRegion *)(orig_header_prev + 1);
-    IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) erasing empty region {%p, %zu} (left)\n",
-            CmiMyPe(), this, user_ptr, orig_header_prev, empty_region->size());
-    empty_tree.remove(empty_region);
-
-    header = orig_header_prev;
-    header_prev = orig_header_prev_prev;
-    header_size += orig_header_prev_size;
-  }
-  else
-  {
-    // Try reclaiming slop space to the left.
-
-    header_prev = orig_header_prev;
-
-    uint8_t * available_ptr;
-    if (orig_header_prev != nullptr)
-    {
-      CmiAssert(!orig_header_prev->isEmpty());
-      available_ptr = (uint8_t *)orig_header_prev + orig_header_prev->size();
-      available_ptr += minimum_alignment_filler(available_ptr);
-    }
-    else
-    {
-      available_ptr = start;
-      CmiAssert(minimum_alignment_filler(available_ptr) == 0);
-    }
-
-    CmiAssert(available_ptr <= (const uint8_t *)header);
-
-    header_size += (const uint8_t *)header - available_ptr;
-    header = (RegionHeader *)available_ptr;
-  }
-
-  if (header_size < minimum_empty_region_size)
-  {
-    // There is not enough space for a new empty region.
-    // Append it as slop to the previous occupied region.
-
-    IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) remnant too small {%p, %zu}, appending to %p on left (%p on right)\n",
-            CmiMyPe(), this, user_ptr, header, header_size, header_prev, header_next);
-
-    if (header_prev == nullptr)
-      setFirstRegion(header_next);
-    else
-      header_prev->setNext(header_next);
-
-    if (header_next == nullptr)
-      setLastRegion(header_prev);
-    else
-      header_next->setPrev(header_prev);
-  }
-  else
-  {
-    // Add a new empty region containing the space from the freed region and any surrounding free space.
-
-    IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) inserting empty region {%p, %zu}\n",
-            CmiMyPe(), this, user_ptr, header, header_size);
-
-    header = new (header) RegionHeader{header_prev, header_next, header_size, Occupied{false}};
-
-    if (header_prev == nullptr)
-      setFirstRegion(header);
-    else
-      setRegionNext(header_prev, header);
-
-    if (header_next == nullptr)
-      setLastRegion(header);
-    else
-      header_next->setPrev(header);
-
-    // Record the new empty region.
-    CmiAssert(!header->prevIsEmpty() && !header->nextIsEmpty());
-
-    insertEmptyRegion(header);
-  }
-
-  CmiUnlock(lock);
-}
-
-void CmiIsomallocContext::pup(PUP::er & p)
-{
-  IMP_DBG("[%d][%p] CmiIsomallocContext::pup()%s%s%s%s\n", CmiMyPe(), this, p.isSizing() ? " sizing" : "",
-          p.isPacking() ? " packing" : "", p.isUnpacking() ? " unpacking" : "", p.isDeleting() ? " deleting" : "");
-
-  pup_raw_pointer(p, start);
-  pup_raw_pointer(p, end);
-  pup_raw_pointer(p, allocated_extent);
-  pup_raw_pointer(p, first_region);
-  pup_raw_pointer(p, last_region);
-  p | empty_tree;
-
-  const size_t totalsize = allocated_extent - start;
-
-  if (p.isUnpacking())
-  {
-    void * const mapped = map_global_memory(start, totalsize);
-    if (mapped == nullptr)
-      CmiAbort("Failed to unpack CmiIsomallocContext!");
-  }
-
-  p(start, totalsize);
-
-  if (p.isDeleting())
-  {
-    clear();
-  }
-}
 
 /************** External interface ***************/
 
 #define MALLOC_ALIGNMENT ALIGN_BYTES
 
-static size_t isomalloc_internal_validate_align(size_t align)
+static inline size_t isomalloc_internal_validate_align(size_t align)
 {
   /* make sure alignment is power of 2 */
   if ((align & (align - 1)) != 0)
