@@ -11,7 +11,7 @@
 #include "blue.h"
 #include "bgMD.h"
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #define erand48(x) CrnDrand()
 #endif
 
