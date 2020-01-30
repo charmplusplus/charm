@@ -102,7 +102,7 @@ static void meta_free(void *mem)
   {
     mm_free(mem);
   }
-  else if (mem != nullptr)
+  else if (mem != nullptr && CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context.opaque)
   {
     CmiMemoryIsomallocDisablePush();
     CmiIsomallocContextFree(CpvAccess(isomalloc_state).context, mem);
