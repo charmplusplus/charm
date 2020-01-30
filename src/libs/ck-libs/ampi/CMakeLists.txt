@@ -1,4 +1,4 @@
-set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoall.C ampi_mpix.C)
+set(ampi-cxx-sources ampi.C ampif.C ddt.C)
 
 set(ampi-f90-sources ampifimpl.f90 ampimod.f90)
 

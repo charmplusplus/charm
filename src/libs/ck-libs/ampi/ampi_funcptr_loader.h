@@ -10,7 +10,10 @@
 #include <inttypes.h>
 #include <limits.h>
 
-#include "ampiimpl.h"
+/* avoid including ampiimpl.h */
+#include "charm.h"
+extern char * ampi_binary_path;
+
 #include "ampi_funcptr.h"
 
 #define STRINGIZE_INTERNAL(x) #x

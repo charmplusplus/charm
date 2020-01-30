@@ -11,8 +11,7 @@ HEADDEP=$(HEADERS) ampiimpl.h ddt.h \
 COMPAT=compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
 	   compat_ampicpp.o
-OBJS=ampi.o ampif.o ampiOneSided.o \
-     ampiMisc.o ddt.o mpich-alltoall.o ampi_mpix.o ampi_noimpl.o
+OBJS=ampi.o ampif.o ddt.o
 
 AMPI_LIB=libmoduleampi
 AMPI_LIBDIR=$(CDIR)/lib
@@ -160,27 +159,14 @@ compat_ampicm.o: compat_ampicm.C
 compat_ampi.o: compat_ampi.c
 	$(CHARMC) -c compat_ampi.c
 
-ampi_mpix.o: ampi_mpix.C $(HEADDEP)
-
-ampi_noimpl.o: ampi_noimpl.C $(HEADDEP)
-
 compat_ampicpp.o: compat_ampicpp.C
 	$(CHARMC) -c compat_ampicpp.C
 
-ampi.o: ampi.C $(HEADDEP)
-	$(CHARMC) -c ampi.C
+ampi.o: ampi.C ampiMisc.C mpich-alltoall.C ampiOneSided.C ampi_noimpl.C ampi_mpix.C $(HEADDEP)
+	$(CHARMC) -c $<
 
 ampif.o: ampif.C $(HEADDEP)
 	$(CHARMC) -c ampif.C
-
-ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP)
-	$(CHARMC) -c ampiOneSided.C
-
-ampiMisc.o: ampiMisc.C ampiimpl.h $(HEADDEP)
-	$(CHARMC) -c ampiMisc.C
-
-mpich-alltoall.o: mpich-alltoall.C $(HEADDEP)
-	$(CHARMC) -c mpich-alltoall.C
 
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
@@ -193,13 +179,13 @@ $(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP)
 $(FUNCPTR_FORTRAN_OBJ): ampif.C $(HEADDEP)
 	-$(CHARMC) -ampi-funcptr-shim -c $< -o $@
 
-$(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP)
+$(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C ampi_funcptr_loader.h $(HEADDEP)
 	$(CHARMC) -c $< -o $@
 
-$(FUNCPTR_FSGLOBALS_OBJ): ampi_funcptr_fsglobals.C $(HEADDEP)
+$(FUNCPTR_FSGLOBALS_OBJ): ampi_funcptr_fsglobals.C ampi_funcptr_loader.h $(HEADDEP)
 	$(CHARMC) -c $< -o $@
 
-$(FUNCPTR_PIPGLOBALS_OBJ): ampi_funcptr_pipglobals.C $(HEADDEP)
+$(FUNCPTR_PIPGLOBALS_OBJ): ampi_funcptr_pipglobals.C ampi_funcptr_loader.h $(HEADDEP)
 	$(CHARMC) -c $< -o $@
 
 clean:

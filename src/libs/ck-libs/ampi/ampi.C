@@ -11996,3 +11996,9 @@ int AMPI_GPU_Invoke(cudaStream_t stream)
 #endif // CMK_CUDA
 
 #include "ampi.def.h"
+
+#include "ampiMisc.C"
+#include "mpich-alltoall.C"
+#include "ampiOneSided.C"
+#include "ampi_noimpl.C"
+#include "ampi_mpix.C"
