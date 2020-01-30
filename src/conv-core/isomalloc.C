@@ -2233,6 +2233,9 @@ void CmiIsomallocInit(char ** argv)
 
 CmiIsomallocContext * CmiIsomallocContextCreate(int myunit, int numunits)
 {
+  if (isomallocStart == nullptr)
+    return { nullptr };
+
   uint8_t * unrounded_start = get_space_partition(isomallocStart, isomallocEnd, myunit, numunits);
   uint8_t * unrounded_end = get_space_partition(isomallocStart, isomallocEnd, myunit+1, numunits);
   auto start = (uint8_t *)CMIALIGN((uintptr_t)unrounded_start, pagesize);
