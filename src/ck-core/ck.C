@@ -3093,11 +3093,11 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 
 int CkMessageToEpIdx(void *msg) {
         envelope *env=UsrToEnv(msg);
-	int ep=env->getEpIdx();
-	if (ep==CkIndex_CkArray::recvBroadcast(0))
+	int type=env->getMsgtype();
+	if (type == ArrayBcastMsg || type == ArrayBcastFwdMsg)
 		return env->getsetArrayBcastEp();
 	else
-		return ep;
+		return env->getEpIdx();
 }
 
 int getCharmEnvelopeSize() {
