@@ -339,7 +339,8 @@ void CmiTLSInit()
     }
 
     CmiTLSStatsInit();
-    CmiTLSDescription.size = CMIALIGN(CmiTLSDescription.size, CmiTLSDescription.align);
+    // add an extra alignment width to work around an odd issue seen with f90-tlsglobals on 32-bit netlrts-linux
+    CmiTLSDescription.size = CMIALIGN(CmiTLSDescription.size + CmiTLSDescription.align, CmiTLSDescription.align);
     CmiTLSPrimarySegment.memseg = (Addr)getTLS();
   }
 #endif

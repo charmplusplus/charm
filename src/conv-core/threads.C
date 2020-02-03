@@ -191,7 +191,7 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW;
 #endif
 
   int interceptionDeactivations;
-  CmiIsomallocContext *isomallocContext;
+  CmiIsomallocContext isomallocContext;
 #if CMI_SWAPGLOBALS
   CtgGlobals threadGlobals;
 #endif
@@ -435,7 +435,7 @@ static void CthThreadBaseInit(CthThreadBase *th)
 #if CMK_THREADS_ALIAS_STACK
   th->aliasStackHandle=0;
 #endif
-  th->isomallocContext = NULL;
+  th->isomallocContext.opaque = nullptr;
   th->interceptionDeactivations = 1;
 
   th->stack=NULL;
@@ -454,7 +454,7 @@ static void CthThreadBaseInit(CthThreadBase *th)
   th->magic = THD_MAGIC_NUM;
 }
 
-static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratable, CmiIsomallocContext * ctx)
+static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratable, CmiIsomallocContext ctx)
 {
   void *ret=NULL;
   if (*stackSize==0) *stackSize=CthCpvAccess(_defaultStackSize);
@@ -506,7 +506,7 @@ static void CthThreadBaseFree(CthThreadBase *th)
   void * tlsptr = CmiTLSGetBuffer(&th->tlsseg);
   if (th->isMigratable)
   {
-    if (th->isomallocContext != nullptr)
+    if (th->isomallocContext.opaque != nullptr)
       CmiIsomallocContextFree(th->isomallocContext, tlsptr);
   }
   else
@@ -517,7 +517,7 @@ static void CthThreadBaseFree(CthThreadBase *th)
   void * globalptr = th->threadGlobals.data_seg;
   if (th->isMigratable)
   {
-    if (th->isomallocContext != nullptr)
+    if (th->isomallocContext.opaque != nullptr)
       CmiIsomallocContextFree(th->isomallocContext, globalptr);
   }
   else
@@ -528,10 +528,10 @@ static void CthThreadBaseFree(CthThreadBase *th)
 #if CMK_THREADS_ALIAS_STACK
     CthAliasFree(th->aliasStackHandle);
 #endif
-    if (th->isomallocContext)
+    if (th->isomallocContext.opaque)
     {
       CmiIsomallocContextDelete(th->isomallocContext);
-      th->isomallocContext = nullptr;
+      th->isomallocContext.opaque = nullptr;
     }
   }
   else if (th->stack!=NULL) {
@@ -573,7 +573,7 @@ void CthInterceptionsImmediateDeactivate(CthThread th)
     CmiTLSSegmentSet(&CpvAccess(Cth_PE_TLS));
 #endif
 
-  CmiMemoryIsomallocContextActivate(nullptr);
+  CmiMemoryIsomallocContextActivate(CmiIsomallocContext{});
 }
 
 void CthInterceptionsDeactivatePush(CthThread th)
@@ -744,7 +744,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
   if (t->isMigratable) {
 #if CMK_THREADS_ALIAS_STACK
     if (pup_isUnpacking(p)) { 
-      CthAllocateStack(t, &t->stacksize, 1, nullptr);
+      CthAllocateStack(t, &t->stacksize, 1, CmiIsomallocContext{});
     }
     CthAliasEnable(t);
     pup_bytes(p,t->stack,t->stacksize);
@@ -1264,7 +1264,7 @@ CthThread CthCreate(CthVoidFn fn,void *arg,int size)
   CthThreadInit(result, fn, arg);
   return result;
 }
-CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext * ctx)
+CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext ctx)
 {
   /*All threads are migratable under stack copying*/
   return CthCreate(fn,arg,size);
@@ -1468,7 +1468,7 @@ CthThread CthPup(pup_er p, CthThread t)
   CmiAbort("CthPup not implemented.\n");
   return 0;
 }
-CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext * ctx)
+CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext ctx)
 {
   /*Fibers are never migratable, unless we can figure out how to set their stacks*/
   return CthCreate(fn,arg,size);
@@ -1639,7 +1639,7 @@ CthThread CthPup(pup_er p, CthThread t)
   CmiAbort("CthPup not implemented.\n");
   return 0;
 }
-CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext * ctx)
+CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext ctx)
 {
   /*Pthreads are never migratable, unless we can figure out how to set their stacks*/
   return CthCreate(fn,arg,size);
@@ -1866,7 +1866,7 @@ int ptrDiffLen(const void *a,const void *b) {
   return ret;
 }
 
-static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int migratable, CmiIsomallocContext * ctx)
+static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int migratable, CmiIsomallocContext ctx)
 {
   CthThread result;
   char *stack, *ss_sp, *ss_end;
@@ -1961,9 +1961,9 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int migratabl
 
 CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 {
-  return CthCreateInner(fn, arg, size, 0, nullptr);
+  return CthCreateInner(fn, arg, size, 0, CmiIsomallocContext{});
 }
-CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext * ctx)
+CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext ctx)
 {
   return CthCreateInner(fn, arg, size, 1, ctx);
 }
@@ -2154,7 +2154,7 @@ static void CthOnly(void *arg, void *vt, qt_userf_t fn)
   CthThreadFinished(CthSelf());
 }
 
-static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int Migratable, CmiIsomallocContext * ctx)
+static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int Migratable, CmiIsomallocContext ctx)
 {
   CthThread result; qt_t *stack, *stackbase, *stackp;
   const size_t pagesize = CmiGetPageSize();
@@ -2195,9 +2195,9 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int Migratabl
 
 CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 {
-  return CthCreateInner(fn, arg, size, 0, nullptr);
+  return CthCreateInner(fn, arg, size, 0, CmiIsomallocContext{});
 }
-CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext * ctx)
+CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext ctx)
 {
   return CthCreateInner(fn, arg, size, 1, ctx);
 }
@@ -2277,7 +2277,7 @@ void CthPrintThdMagic(CthThread t){
   CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
 }
 
-CmiIsomallocContext * CmiIsomallocGetThreadContext(CthThread th)
+CmiIsomallocContext CmiIsomallocGetThreadContext(CthThread th)
 {
   return B(th)->isomallocContext;
 }

@@ -179,7 +179,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     if (tcharm_nomig) { /*Nonmigratable version, for debugging*/
       tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
     } else {
-      CmiIsomallocContext * heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
+      CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
       tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
     }
 #if CMK_BIGSIM_CHARM
