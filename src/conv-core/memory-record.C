@@ -1,6 +1,11 @@
-// Heap Record-Replay
-// By Evan Ramos
-// Generates an MPI program that repeats the exact sequence of heap operations observed on each PE.
+/*
+ * Heap Record-Replay
+ * By Evan Ramos
+ *
+ * Generates an MPI program that repeats the exact sequence of heap operations observed
+ * on each PE. Can be used for debugging and performance analysis of memory allocators
+ * as well as heap behavior of user codes.
+ */
 
 #include <cstdint>
 #include <cstdio>
