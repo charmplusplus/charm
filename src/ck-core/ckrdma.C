@@ -311,15 +311,6 @@ CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
   }
 }
 
-// Set up the CUDA IPC memory handle to be passed to the receiver
-void CkNcpyBuffer::setMemHandle() {
-#if CMK_CUDA
-  hapiCheck(cudaIpcGetMemHandle(&memHandle, (void*)ptr));
-#else
-  CkAbort("CUDA IPC is only supported in the CUDA build of Charm++");
-#endif
-}
-
 // reconstruct the CkNcpyBuffer object for the source
 void constructSourceBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &src) {
   src.ptr = info->srcPtr;
@@ -2324,11 +2315,8 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
               cudaMemcpyDeviceToDevice));
         break;
       case CkNcpyModeDevice::IPC:
-        void* source_ptr;
-        hapiCheck(cudaIpcOpenMemHandle(&source_ptr, source.memHandle, cudaIpcMemLazyEnablePeerAccess));
-        hapiCheck(cudaMemcpy((void*)dest.ptr, source_ptr, std::min(source.cnt, dest.cnt),
-              cudaMemcpyDeviceToDevice));
-        hapiCheck(cudaIpcCloseMemHandle(source_ptr));
+        // TODO
+        CkAbort("GPU direct messaging between different logical nodes is not yet supported");
         break;
       case CkNcpyModeDevice::RDMA:
         // TODO
@@ -2356,9 +2344,7 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
         enqueueNcpyMessage(CkMyPe(), env);
         break;
       case CkNcpyModeDevice::IPC:
-        // FIXME: Send back to sender to close IPC handle
-        QdCreate(1);
-        enqueueNcpyMessage(CkMyPe(), env);
+        // TODO
         break;
       case CkNcpyModeDevice::RDMA:
         // TODO

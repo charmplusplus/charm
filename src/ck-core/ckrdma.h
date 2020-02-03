@@ -131,11 +131,6 @@ class CkNcpyBuffer{
   // ack handling pointer used for bcast and CMA p2p transfers
   const void *refAckInfo;
 
-#if CMK_CUDA
-  // CUDA IPC handle
-  cudaIpcMemHandle_t memHandle;
-#endif
-
   CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), ref(NULL), refAckInfo(NULL) {}
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
@@ -228,8 +223,6 @@ class CkNcpyBuffer{
   CkNcpyStatus get(CkNcpyBuffer &source);
   CkNcpyStatus put(CkNcpyBuffer &destination);
 
-  void setMemHandle();
-
   // Deregister(Unpin) the memory that is registered for the buffer
   void deregisterMem() {
     // Check that this object is local when deregisterMem is called
@@ -250,9 +243,6 @@ class CkNcpyBuffer{
     p((char *)&ptr, sizeof(ptr));
     p((char *)&ref, sizeof(ref));
     p((char *)&refAckInfo, sizeof(refAckInfo));
-#if CMK_CUDA
-    p((char *)&memHandle, sizeof(cudaIpcMemHandle_t));
-#endif
     p|cnt;
     p|cb;
     p|pe;
