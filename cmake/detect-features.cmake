@@ -252,6 +252,16 @@ int main() {
 " CMK_HAS_ADDR_NO_RANDOMIZE)
 
 check_cxx_source_compiles("
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <spawn.h>
+int main() {
+    return posix_spawn(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+}
+" CMK_HAS_POSIX_SPAWN)
+
+check_cxx_source_compiles("
 #include <type_traits>
 int main()
 {
