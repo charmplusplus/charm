@@ -70,7 +70,7 @@ static void meta_init(char **argv)
 
   char outputname[64];
   sprintf(outputname, "heap-replay-%d.cpp", mype);
-  FILE * output = fopen(outputname, "wb");
+  FILE * output = fopen(outputname, "w");
   if (output == nullptr)
     CmiAbort("Could not open heap-replay-%d.cpp!", mype);
   CpvAccess(state).output = output;
@@ -84,7 +84,7 @@ static void meta_init(char **argv)
   {
     const int numpes = CmiNumPes();
 
-    FILE * mainsrc = fopen("heap-replay.cpp", "wb");
+    FILE * mainsrc = fopen("heap-replay.cpp", "w");
     if (mainsrc == nullptr)
       CmiAbort("Could not open heap-replay.cpp!");
     fprintf(mainsrc, prologue, numpes, numpes);
