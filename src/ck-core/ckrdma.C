@@ -966,10 +966,6 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
    */
   copyenv->setTotalsize(totalMsgSize);
 
-  // Make the message a regular message to prevent message handler on the receiver
-  // from intercepting it
-  CMI_ZC_MSGTYPE(copyenv) = CMK_REG_NO_ZC_MSG;
-
   if(ncpyMode == CkNcpyMode::RDMA) {
     ref = (char *)copyenv + CK_ALIGN(msgsize, 16) + bufsize;
     setNcpyEmInfo(ref, copyenv, msgsize, numops, forwardMsg, emMode);
@@ -978,6 +974,11 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
   char *buf = (char *)copyenv + CK_ALIGN(msgsize, 16);
 
   CkUnpackMessage(&copyenv);
+
+  // Mark the message to be a SEND_DONE message to prevent message handler on the receiver
+  // from intercepting it and pack pointers when forwarded to peers/children
+  CMI_ZC_MSGTYPE(copyenv) = CMK_ZC_SEND_DONE_MSG;
+
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
   up|numops;
@@ -1019,8 +1020,6 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
     p|source;
   }
 
-  // Substitute buffer pointers by their offsets from msgBuf to handle migration
-  CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
 
   if(emMode == ncpyEmApiMode::P2P_SEND) {
     switch(ncpyMode) {
@@ -1044,7 +1043,6 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
       case CkNcpyMode::MEMCPY:  // Invoke the bcast Ack Handler after 'numops' memcpy operations are complete
                                 CkAssert(source.refAckInfo != NULL);
                                 CkRdmaEMBcastAckHandler((void *)source.refAckInfo);
-                                CkPackMessage(&copyenv); // Pack message as it will be forwarded to peers
                                 forwardMessageToPeerNodes(copyenv, copyenv->getMsgtype());
                                 return copyenv;
                                 break;
@@ -1098,8 +1096,8 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
 
   // Make the message a regular message to prevent message handler on the receiver
   // from intercepting it
-  if (emMode == ncpyEmApiMode::P2P_RECV)
-    CMI_ZC_MSGTYPE(env) = CMK_ZC_P2P_RECV_DONE_MSG;
+  if(emMode == ncpyEmApiMode::P2P_RECV)
+    CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
 
   char *ref;
   int refSize = 0;
@@ -1521,22 +1519,26 @@ void CkRdmaEMBcastAckHandler(void *ack) {
 // Method forwards a message to all the children
 void forwardMessageToChildNodes(envelope *myChildrenMsg, UChar msgType) {
 #if CMK_SMP && CMK_NODE_QUEUE_AVAILABLE
-  if(msgType == ForNodeBocMsg) {
-    // Node level forwarding for nodegroup bcasts
-    CmiForwardNodeBcastMsg(myChildrenMsg->getTotalsize(), (char *)myChildrenMsg);
-  } else
-#endif
+  // Node level forwarding for nodegroup bcasts
+  CmiForwardNodeBcastMsg(myChildrenMsg->getTotalsize(), (char *)myChildrenMsg);
+#else
   // Proc level forwarding
   CmiForwardProcBcastMsg(myChildrenMsg->getTotalsize(), (char *)myChildrenMsg);
+#endif
 }
 
 // Method forwards a message to all the peer nodes
 void forwardMessageToPeerNodes(envelope *myMsg, UChar msgType) {
 #if CMK_SMP
 #if CMK_NODE_QUEUE_AVAILABLE
-  if(msgType == ForBocMsg)
+  if(msgType == ForBocMsg) {
 #endif // CMK_NODE_QUEUE_AVAILABLE
+    if(CMI_ZC_MSGTYPE(myMsg) == CMK_ZC_SEND_DONE_MSG)
+      CkPackMessage(&myMsg);
     CmiForwardMsgToPeers(myMsg->getTotalsize(), (char *)myMsg);
+#if CMK_NODE_QUEUE_AVAILABLE
+  }
+#endif // CMK_NODE_QUEUE_AVAILABLE
 #endif
 }
 
@@ -1700,7 +1702,6 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *prevEnv, envelope *env, void *bcast
   PUP::fromMem up_prev((void *)((CkMarshallMsg *)EnvToUsr(prevEnv))->msgBuf);
 
   CkUnpackMessage(&env);
-  CkUnpackRdmaPtrs((((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
 
@@ -1744,7 +1745,6 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *prevEnv, envelope *env, void *bcast
 
   CkPackMessage(&prevEnv);
 
-  CkPackRdmaPtrs((((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   CkPackMessage(&env);
 }
 
@@ -1825,6 +1825,10 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *env, NcpyBcastInterimAckInfo *bcast
 
   // CkPackRdmaPtrs((((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   CkPackMessage(&env);
+
+#if !CMK_SMP || !CMK_NODE_QUEUE_AVAILABLE
+  CMI_SET_BROADCAST_ROOT(env, rootNode+1);
+#endif
 }
 
 #if CMK_SMP
@@ -1832,7 +1836,6 @@ void updatePeerCounterAndPush(envelope *env) {
   int pe;
   int numops, rootNode;
 
-  CkUnpackMessage(&env);
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
 
@@ -1849,14 +1852,12 @@ void updatePeerCounterAndPush(envelope *env) {
 
   void *ref = (void *)source.refAckInfo;
   NcpyBcastRecvPeerAckInfo *peerAckInfo = (NcpyBcastRecvPeerAckInfo *)ref;
-  source.refAckInfo = peerAckInfo->bcastAckInfo;
 
   p|source;
-  CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(getRootNode(env)));
-  CkPackMessage(&env);
-  CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+  CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(rootNode));
   if(peerAckInfo->decNumPeers() - 1 == 0) {
     QdCreate(1);
+    CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
     CmiPushPE(CmiRankOf(peerAckInfo->peerParentPe), env);
   }
 }
@@ -1876,7 +1877,6 @@ void sendRecvDoneMsgToPeers(envelope *env, CkArray *mgr) {
   int numops, rootNode;
 
   // Replace bcastAckInfo with peerAckInfo
-  CkUnpackMessage(&env);
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
 
@@ -1894,11 +1894,11 @@ void sendRecvDoneMsgToPeers(envelope *env, CkArray *mgr) {
 
   p|source;
 
-  CkPackMessage(&env);
-
   if(env->getMsgtype() == ForArrayEltMsg) {
     env->setMsgtype(ForBocMsg);
     env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
+
+    CkPackMessage(&env); // Array messages will be copied, so pack it
   }
   CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
 }

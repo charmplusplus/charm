@@ -19,9 +19,9 @@ public:
 class Main : public CBase_Main {
 private:
   Main_SDAG_CODE
-  int test_num;
+  int test_num, tests_completed;
 public:
-  Main(CkArgMsg* msg) {
+  Main(CkArgMsg* msg) : tests_completed(0) {
     delete msg;
 
     ngProxy = CProxy_TestNodeGroup::ckNew();
@@ -31,7 +31,12 @@ public:
     thisProxy.runTests();
 
     // Make sure QD counters are correctly updated for WNB
-    CkStartQD(CkCallback(CkCallback::ckExit));
+    CkStartQD(CkCallback(CkIndex_Main::allComplete(), thisProxy));
+  }
+
+  void allComplete() {
+    CkAssert(tests_completed == 4);
+    CkExit();
   }
 };
 
@@ -51,11 +56,26 @@ public:
   void recvCopy(TestMessage* msg) {
     // Here, there will be one copy of the message per PE, so each PE will
     // contribute msg->test_num, and my sum is therefor my size * msg->test_num.
-    msg->counter.store(msg->test_num);
+    CkAssert(msg->counter.load() == msg->test_num);
     int myExpectation = msg->test_num * CkMyNodeSize();
     contribute(sizeof(int), &myExpectation, CkReduction::sum_int, msg->cb);
 
     CkBroadcastWithinNode(CkIndex_TestGroup::recvCopy(NULL), msg, gProxy);
+  }
+
+  void recvNoFwd(TestMessage* msg) {
+    // Here the expectation is that the counter is incremented once by each PE
+    // and starts at 0. So my nodes sum will be n * (n - 1) / 2.
+    int myExpectation = (CmiMyNodeSize() * (CmiMyNodeSize() - 1)) / 2;
+    contribute(sizeof(int), &myExpectation, CkReduction::sum_int, msg->cb);
+  }
+
+  void recvCopyNoFwd(TestMessage* msg) {
+    // Here, there will be one copy of the message per PE, so each PE will
+    // contribute msg->test_num, and my sum is therefor my size * msg->test_num.
+    CkAssert(msg->counter.load() == msg->test_num);
+    int myExpectation = msg->test_num * CkMyNodeSize();
+    contribute(sizeof(int), &myExpectation, CkReduction::sum_int, msg->cb);
   }
 };
 

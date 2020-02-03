@@ -500,12 +500,13 @@ execute_process(COMMAND ${command} COMMAND grep CHARM_CC_FLAGS= COMMAND cut -c16
 execute_process(COMMAND ${command} COMMAND grep CHARM_CC= COMMAND cut -c10- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC)
 
 # FIXME: copy .so
+set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
 include(ExternalProject)
 ExternalProject_Add(hwloc
     URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
-    CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc && autoreconf -ivf 2> /dev/null 1> /dev/null
-    COMMAND
-        ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/configure
+    # touch: update timestamps on these files so that hwloc's Makefile does not invoke automake
+    CONFIGURE_COMMAND touch ${hwloc_dir}/aclocal.m4 ${hwloc_dir}/Makefile.in ${hwloc_dir}/configure &&
+        ${hwloc_dir}/configure
         --disable-cairo
         --disable-cuda
         --disable-gl

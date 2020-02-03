@@ -481,6 +481,7 @@ void *CkLocalBranch(CkGroupID gID) {
 void *CkLocalBranchOther(CkGroupID gID, int rank) {
   return _localBranchOther(gID, rank);
 }
+static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env);
 
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
@@ -1257,6 +1258,10 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       _processForNodeBocMsg(ck,env);
       // stats record moved to _processForNodeBocMsg because it is conditional
       break;
+    case BocBcastMsg : // Broadcast that needs to be forwarded
+      if (env->isPacked()) CkUnpackMessage(&env);
+      _processBocBcastMsg(ck,env);
+      break;
 
 // Array support
     case ForArrayEltMsg: // Array element entry method message
@@ -1326,6 +1331,11 @@ void CkPackMessage(envelope **pEnv)
   envelope *env = *pEnv;
   if(!env->isPacked() && _msgTable[env->getMsgIdx()]->pack) {
     void *msg = EnvToUsr(env);
+#if CMK_ONESIDED_IMPL
+    short int zcMsgType = CMI_ZC_MSGTYPE(env);
+    if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Store buffer pointers as offsets
+      CkPackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
+#endif
     _TRACE_BEGIN_PACK();
     msg = _msgTable[env->getMsgIdx()]->pack(msg);
     _TRACE_END_PACK();
@@ -1344,6 +1354,11 @@ void CkUnpackMessage(envelope **pEnv)
     _TRACE_BEGIN_UNPACK();
     msg = _msgTable[msgIdx]->unpack(msg);
     _TRACE_END_UNPACK();
+#if CMK_ONESIDED_IMPL
+    short int zcMsgType = CMI_ZC_MSGTYPE(env);
+    if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Convert offsets back into buffer pointers
+      CkUnpackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
+#endif
     env=UsrToEnv(msg);
     env->setPacked(0);
     *pEnv = env;
@@ -1394,15 +1409,16 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 
 #if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC(env))
+  if (CMI_IS_ZC(env)) {
     CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
+  }
 #endif
 
 #if CMK_FAULT_EVAC
-  if(pe == CkMyPe() ){
-    if(!CmiNodeAlive(CkMyPe())){
-	printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
-//	return;
+  if (pe == CkMyPe()) {
+    if (!CmiNodeAlive(CkMyPe())) {
+      printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
+      //return;
     }
   }
 #endif
@@ -1414,15 +1430,18 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     }
     else
 #endif
-    CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
-  	env, env->getQueueing(),env->getPriobits(),
-  	(unsigned int *)env->getPrioPtr());
+    {
+      CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
+          env, env->getQueueing(),env->getPriobits(),
+          (unsigned int *)env->getPrioPtr());
+    }
 #if CMK_PERSISTENT_COMM
     CmiPersistentOneSend();
 #endif
   } else {
-    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode())
+    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode()) {
       CkPackMessage(&env);
+    }
     int len=env->getTotalsize();
     CmiSetXHandler(env,CmiGetHandler(env));
 #if CMK_OBJECT_QUEUE_AVAILABLE
@@ -1432,17 +1451,12 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
- 			CmiSyncBroadcastAndFree(len, (char *)env); 
-
-}
-    else if (pe==CLD_BROADCAST_ALL) { 
-                        CmiSyncBroadcastAllAndFree(len, (char *)env);
-
-}
-    else{
-                        CmiSyncSendAndFree(pe, len, (char *)env);
-
-		}
+      CmiSyncNodeBroadcastAndFree(len, (char *)env);
+    } else if (pe==CLD_BROADCAST_ALL) {
+      CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
+    } else {
+      CmiSyncSendAndFree(pe, len, (char *)env);
+    }
   }
 }
 
@@ -1486,8 +1500,8 @@ static void _noCldEnqueue(int pe, envelope *env)
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
-  else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
+  if (pe==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
+  else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
   else CmiSyncSendAndFree(pe, len, (char *)env);
 }
 
@@ -1712,7 +1726,15 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     }else
     {
-        env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+// This is currently a workaround to prevent BIGSIM tests from breaking. It
+// prevents BIGSIM from working with node aware group broadcasts.
+// More info can be found here: https://github.com/UIUC-PPL/charm/pull/2440
+#if !CMK_BIGSIM_CHARM
+        if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL)
+          env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
+        else
+#endif
+          env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
     }
 
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
@@ -1730,6 +1752,11 @@ static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
   _TRACE_CREATION_N(env, CmiMyNodeSize());
   _CldEnqueueWithinNode(env, _infoIdx);
   _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
+}
+
+static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env) {
+  _SET_USED(env, 0);
+  _sendMsgBranchWithinNode(env->getEpIdx(), EnvToUsr(env), env->getGroupNum());
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,

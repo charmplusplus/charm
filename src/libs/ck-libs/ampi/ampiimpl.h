@@ -4,7 +4,6 @@
 #include <string.h> /* for strlen */
 #include <algorithm>
 #include <numeric>
-#include <forward_list>
 #include <bitset>
 #include <complex>
 #include <iostream>
@@ -1862,32 +1861,39 @@ class AmpiMsg final : public CMessage_AmpiMsg {
 
 class AmpiMsgPool {
  private:
-  std::forward_list<AmpiMsg *> msgs; // list of free msgs
+  std::vector<AmpiMsg *> msgs; // list of free msgs
   int msgLength; // AmpiMsg::length of messages in the pool
   int maxMsgs; // max # of msgs in the pool
   int currMsgs; // current # of msgs in the pool
 
  public:
   AmpiMsgPool(int _numMsgs = 0, int _msgLength = 0) noexcept
-    : msgLength(_msgLength), maxMsgs(_numMsgs), currMsgs(0) {}
-  ~AmpiMsgPool() =default;
+    : msgs(_numMsgs), msgLength{_msgLength}, maxMsgs{_numMsgs}, currMsgs{0} {}
+  AmpiMsgPool(PUP::reconstruct) noexcept
+    : currMsgs{0} {}
+  ~AmpiMsgPool() {
+    for (int i = 0; i < currMsgs; ++i)
+      delete msgs[i];
+  }
   inline void clear() noexcept {
-    while (!msgs.empty()) {
-      delete msgs.front();
-      msgs.pop_front();
+    for (int i = 0; i < currMsgs; ++i) {
+      AmpiMsg *& msg = msgs[i];
+      delete msg;
+      msg = nullptr;
     }
     currMsgs = 0;
   }
   inline AmpiMsg* newAmpiMsg(CMK_REFNUM_TYPE seq, int ssendReq, int tag, int srcRank, int len) noexcept {
-    if (msgs.empty() || msgs.front()->origLength < len) {
+    if (currMsgs == 0 || msgs[currMsgs-1]->origLength < len) {
       int newlen = std::max(msgLength, len);
       AmpiMsg* msg = new (newlen, 0) AmpiMsg(seq, ssendReq, tag, srcRank, newlen);
       msg->setLength(len);
       return msg;
     } else {
-      AmpiMsg* msg = msgs.front();
-      msgs.pop_front();
+      AmpiMsg *& front = msgs[currMsgs-1];
+      AmpiMsg * msg = front;
       currMsgs--;
+      front = nullptr;
       msg->setSeq(seq);
       msg->setSsendReq(ssendReq);
       msg->setTag(tag);
@@ -1900,7 +1906,7 @@ class AmpiMsgPool {
     /* msg->origLength is the true size of the message's data buffer, while
      * msg->length is the space taken by the payload within it. */
     if (currMsgs != maxMsgs && msg->origLength >= msgLength && msg->origLength < 2*msgLength) {
-      msgs.push_front(msg);
+      msgs[currMsgs] = msg;
       currMsgs++;
     } else {
       delete msg;
@@ -1909,6 +1915,8 @@ class AmpiMsgPool {
   void pup(PUP::er& p) {
     p|msgLength;
     p|maxMsgs;
+    if (p.isUnpacking())
+      msgs.resize(maxMsgs);
     // Don't PUP the msgs in the free list or currMsgs, let the pool fill lazily
   }
 };
