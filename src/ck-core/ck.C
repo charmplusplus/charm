@@ -555,6 +555,11 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   { /* Method doesn't keep/delete the message, so we have to: */
     if (UsrToEnv(msg)->getMsgtype() != ArrayBcastFwdMsg) {
       _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
+    } else if (_entryTable[epIdx]->msgIdx != -1) {
+      // For array broadcasts, the first time they show up here the msgIdx is
+      // -1, and they are just messages for CkArray::recvBroadcastNoKeep, so we
+      // don't want to delete them yet.
+      _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
     }
   }
 }
