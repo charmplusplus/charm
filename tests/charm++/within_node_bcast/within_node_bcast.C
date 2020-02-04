@@ -88,9 +88,8 @@ public:
   void recv(TestMessage* msg) {
     for (int i = 0; i < DATA_SIZE; i++) {
       if (msg->data[i] != msg->test_num) {
-        CkPrintf("msg->data incorrect for [nokeep] test %i[%i]! (%i)\n",
-            msg->test_num, i, msg->data[i]);
-        CkAbort("Test failed in data transmission!\n");
+        CkAbort("Bad msg->data on element %i for [nokeep] msg: %i[%i] != %i\n",
+            thisIndex, msg->test_num, i, msg->data[i]);
       }
     }
 
@@ -103,9 +102,8 @@ public:
   void recvCopy(TestMessage* msg) {
     for (int i = 0; i < DATA_SIZE; i++) {
       if (msg->data[i] != msg->test_num) {
-        CkPrintf("msg->data incorrect for copy test %i[%i]! (%i)\n",
-            msg->test_num, i, msg->data[i]);
-        CkAbort("Test failed in data transmission!\n");
+        CkAbort("Bad msg->data on element %i for copy msg: %i[%i] != %i\n",
+            thisIndex, msg->test_num, i, msg->data[i]);
       }
     }
 
