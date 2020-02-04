@@ -451,14 +451,19 @@ void initDeviceMapping(char** argv) {
   }
 
   // Perform mapping and set device representative PE
-  int pes_per_device = (all_gpus ? CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe())) :
-      CmiNodeSize(CmiMyNode())) / CsvAccess(gpu_manager).device_count;
+  if (CmiMyRank() == 0) {
+    CsvAccess(gpu_manager).pes_per_device = (all_gpus ? CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe())) :
+        CmiNodeSize(CmiMyNode())) / CsvAccess(gpu_manager).device_count;
+  }
+
+  CmiNodeBarrier();
+
   int my_rank = all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank();
 
   switch (map_type) {
     case Mapping::Block:
-      CpvAccess(my_device) = my_rank / pes_per_device;
-      if (my_rank % pes_per_device == 0) CpvAccess(device_rep) = true;
+      CpvAccess(my_device) = my_rank / CsvAccess(gpu_manager).pes_per_device;
+      if (my_rank % CsvAccess(gpu_manager).pes_per_device == 0) CpvAccess(device_rep) = true;
       break;
     case Mapping::RoundRobin:
       CpvAccess(my_device) = my_rank % CsvAccess(gpu_manager).device_count;
@@ -521,6 +526,22 @@ void initDeviceMapping(char** argv) {
 #endif
   }
 
+  // Process +gpuipceventpool
+  int input_ipc_event_pool_size;
+  if (!CmiGetArgIntDesc(argv, "+gpuipceventpool", &input_ipc_event_pool_size,
+        "GPU IPC event pool size per PE")) {
+    input_ipc_event_pool_size = 16;
+  }
+
+  if (CmiMyRank() == 0) {
+    CsvAccess(gpu_manager).ipc_event_pool_size = input_ipc_event_pool_size * CsvAccess(gpu_manager).pes_per_device;
+  }
+
+  if (CmiMyPe() == 0) {
+    CmiPrintf("HAPI> CUDA IPC event pool size - %d per PE, %d per device\n",
+        input_ipc_event_pool_size, CsvAccess(gpu_manager).ipc_event_pool_size);
+  }
+
   // Process +nogpupeer
   bool enable_peer = true; // P2P access is enabled by default
   if (CmiGetArgFlagDesc(argv, "+nogpupeer",
@@ -580,7 +601,10 @@ void shmCreate() {
   }
 
   // Calculate shared memory region size
-  CsvAccess(gpu_manager).shm_size = sizeof(cuda_ipc_shm_info) * CsvAccess(gpu_manager).device_count_on_physical_node;
+  CsvAccess(gpu_manager).shm_chunk_size = sizeof(cudaIpcMemHandle_t) +
+      sizeof(cudaIpcEventHandle_t) * CsvAccess(gpu_manager).ipc_event_pool_size;
+  CsvAccess(gpu_manager).shm_size = CsvAccess(gpu_manager).shm_chunk_size *
+    CsvAccess(gpu_manager).device_count_on_physical_node;
 
   // Set it to the appropriate size
   // Only done by the first process on each physical node
@@ -612,8 +636,10 @@ void shmCreate() {
     goto shm_cleanup;
   }
 
-  // Store per-process start index of the shared memory region
-  CsvAccess(gpu_manager).shm_my_index = CsvAccess(gpu_manager).device_count * CmiMyNodeRankLocal();
+  // Store pointer to my process' portion of the shared memory region
+  CsvAccess(gpu_manager).shm_my_ptr = (void*)((char*)CsvAccess(gpu_manager).shm_ptr +
+      CsvAccess(gpu_manager).shm_chunk_size * CsvAccess(gpu_manager).device_count *
+      CmiMyNodeRankLocal());
 
   // Allocate memory for local storage
   CsvAccess(gpu_manager).cuda_ipc_local_infos = new cuda_ipc_local_info[CsvAccess(gpu_manager).device_count_on_physical_node];
@@ -649,21 +675,23 @@ void ipcHandleCreate() {
   // so that they are done only once per device
   if (!CpvAccess(device_rep)) return;
 
-  cuda_ipc_shm_info* shm_info_ptr = (cuda_ipc_shm_info*)CsvAccess(gpu_manager).shm_ptr +
-    (CsvAccess(gpu_manager).shm_my_index + CpvAccess(my_device));
+  cudaIpcMemHandle_t* shm_mem_handle = (cudaIpcMemHandle_t*)((char*)CsvAccess(gpu_manager).shm_my_ptr +
+      CsvAccess(gpu_manager).shm_chunk_size * CpvAccess(my_device));
+  cudaIpcEventHandle_t* shm_event_pool = (cudaIpcEventHandle_t*)((char*)shm_mem_handle + sizeof(cudaIpcMemHandle_t));
   cuda_ipc_local_info* local_info_ptr = CsvAccess(gpu_manager).cuda_ipc_local_infos;
-  cuda_ipc_local_info& my_local_info = local_info_ptr[CsvAccess(gpu_manager).shm_my_index + CpvAccess(my_device)];
+  cuda_ipc_local_info& my_local_info = local_info_ptr[CsvAccess(gpu_manager).device_count * CmiMyNodeRankLocal() + CpvAccess(my_device)];
 
-  // Create CUDA IPC event
-  hapiCheck(cudaEventCreateWithFlags(&my_local_info.event, cudaEventDisableTiming | cudaEventInterprocess));
-
-  // Create CUDA IPC event handle
-  hapiCheck(cudaIpcGetEventHandle(&shm_info_ptr->event_handle, my_local_info.event));
+  // Create CUDA IPC events and corresponding handles
+  for (int i = 0; i < CsvAccess(gpu_manager).ipc_event_pool_size; i++) {
+    my_local_info.event_pool.emplace_back();
+    hapiCheck(cudaEventCreateWithFlags(&my_local_info.event_pool[i], cudaEventDisableTiming | cudaEventInterprocess));
+    hapiCheck(cudaIpcGetEventHandle(&shm_event_pool[i], my_local_info.event_pool[i]));
+  }
 
   // Create CUDA IPC memory handle
   CmiAssert(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].eager_comm_buffer);
   void* device_ptr = (void*)(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].eager_comm_buffer->base_ptr);
-  hapiCheck(cudaIpcGetMemHandle(&shm_info_ptr->mem_handle, device_ptr));
+  hapiCheck(cudaIpcGetMemHandle(shm_mem_handle, device_ptr));
 
   // Store eager comm buffer ptr in local info (just in case)
   my_local_info.buffer = device_ptr;
@@ -676,13 +704,16 @@ void ipcHandleOpen() {
     if (i == CmiMyNodeRankLocal()) continue;
 
     for (int j = 0; j < CsvAccess(gpu_manager).device_count; j++) {
-      int index = CsvAccess(gpu_manager).device_count * i + j;
+      int device_index = CsvAccess(gpu_manager).device_count * i + j;
 
-      cuda_ipc_shm_info& cur_shm_info = *((cuda_ipc_shm_info*)CsvAccess(gpu_manager).shm_ptr + index);
-      cuda_ipc_local_info& cur_local_info = CsvAccess(gpu_manager).cuda_ipc_local_infos[index];
+      cudaIpcMemHandle_t* cur_shm_mem_handle = (cudaIpcMemHandle_t*)((char*)CsvAccess(gpu_manager).shm_ptr + CsvAccess(gpu_manager).shm_chunk_size * device_index);
+      cudaIpcEventHandle_t* cur_shm_event_pool = (cudaIpcEventHandle_t*)((char*)cur_shm_mem_handle + sizeof(cudaIpcMemHandle_t));
+      cuda_ipc_local_info& cur_local_info = CsvAccess(gpu_manager).cuda_ipc_local_infos[device_index];
 
-      hapiCheck(cudaIpcOpenEventHandle(&cur_local_info.event, cur_shm_info.event_handle));
-      hapiCheck(cudaIpcOpenMemHandle(&cur_local_info.buffer, cur_shm_info.mem_handle,
+      for (int k = 0; k < CsvAccess(gpu_manager).ipc_event_pool_size; k++) {
+        hapiCheck(cudaIpcOpenEventHandle(&cur_local_info.event_pool[k], cur_shm_event_pool[k]));
+      }
+      hapiCheck(cudaIpcOpenMemHandle(&cur_local_info.buffer, *cur_shm_mem_handle,
             cudaIpcMemLazyEnablePeerAccess));
     }
   }

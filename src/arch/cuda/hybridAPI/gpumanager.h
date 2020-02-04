@@ -20,16 +20,10 @@
 #define NUM_BUFFERS 256
 #endif
 
-// Shared memory information for CUDA IPC
-struct cuda_ipc_shm_info {
-  volatile int sync_flag;
-  cudaIpcEventHandle_t event_handle;
-  cudaIpcMemHandle_t mem_handle;
-};
-
-// Per-process struct containing local data for CUDA IPC
+// Per-device struct containing local data for CUDA IPC
 struct cuda_ipc_local_info {
-  cudaEvent_t event;
+  int event_pool_size;
+  std::vector<cudaEvent_t> event_pool;
   void* buffer;
 };
 
@@ -91,6 +85,7 @@ struct GPUManager {
   int device_count_on_physical_node;
   DeviceManager *device_managers;
   std::unordered_map<int, DeviceManager*> device_map;
+  int pes_per_device; // Set in initDeviceMapping()
 
   // Eager communication buffer
   bool use_eager_comm_buffer;
@@ -100,8 +95,12 @@ struct GPUManager {
   void* shm_ptr;
   char* shm_name;
   int shm_file;
+  size_t shm_chunk_size;
   size_t shm_size;
-  int shm_my_index;
+  void* shm_my_ptr;
+
+  // CUDA IPC event pool size (per PE)
+  int ipc_event_pool_size;
 
   // CUDA IPC handles opened for processes on the same node
   cuda_ipc_local_info* cuda_ipc_local_infos;
@@ -158,6 +157,9 @@ void GPUManager::init() {
   // Create a DeviceManager for each GPU
   device_managers = new DeviceManager[device_count];
 
+  // Number of PEs mapped to each device
+  pes_per_device = -1;
+
   // Eager communication buffer
   use_eager_comm_buffer = true;
   eager_comm_buffer_size = 1 << 26; // 64MB by default
@@ -166,8 +168,12 @@ void GPUManager::init() {
   shm_ptr = NULL;
   shm_name = NULL;
   shm_file = -1;
+  shm_chunk_size = 0;
   shm_size = 0;
-  shm_my_index = -1;
+  shm_my_ptr = NULL;
+
+  // Number of CUDA IPC events per PE
+  ipc_event_pool_size = -1;
 
   // Local information on opened CUDA IPC event and buffer
   cuda_ipc_local_infos = NULL;
@@ -240,8 +246,6 @@ int GPUManager::createStreams() {
 #if !CMK_SMP
   // Allocate total physical streams between GPU managers sharing a device...
   // i.e. PEs / num devices
-  int device_count;
-  hapiCheck(cudaGetDeviceCount(&device_count));
   int pes_per_device = CmiNumPesOnPhysicalNode(0) / device_count;
   pes_per_device = pes_per_device > 0 ? pes_per_device : 1;
   new_n_streams =  (new_n_streams + pes_per_device - 1) / pes_per_device;
