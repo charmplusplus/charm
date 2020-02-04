@@ -2334,7 +2334,7 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     // There are no CPU-side RDMA calls, need to handle later process as well
 
     // Reuse the message as a done msg
-    CMI_ZC_MSGTYPE(env) = CMK_ZC_P2P_RECV_DONE_MSG;
+    CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
 
     switch (mode) {
       case CkNcpyModeDevice::MEMCPY:
