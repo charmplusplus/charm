@@ -19,7 +19,9 @@ main::main(CkArgMsg* m)
       }
     units=atoi(m->argv[1]);
     int allredSize=atoi(m->argv[2]);
-    
+
+    delete m;
+
     arr = CProxy_AllReduce::ckNew(thisProxy, allredSize, units, units);
 
     CkPrintf("AllReduce for %d pes on %d units for %d size\n",
