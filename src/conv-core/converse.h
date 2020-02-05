@@ -1363,17 +1363,25 @@ void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn,
 void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
                      CmiReduceDeleteFn deleteFn, CmiReductionID id);
-void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn, int, int, int);
+void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
 void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
                          CmiReduceMergeFn mergeFn, CmiHandler dest,
                          CmiReduceDeleteFn deleteFn);
+void CmiNodeReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id);
+void CmiNodeReduceStructID(void *data, CmiReducePupFn pupFn,
+                           CmiReduceMergeFn mergeFn, CmiHandler dest,
+                           CmiReduceDeleteFn deleteFn, CmiReductionID id);
 int CmiGetReductionHandler(void);
 CmiHandler CmiGetReductionDestination(void);
 CmiReductionID CmiGetGlobalReduction(void);
+CmiReductionID CmiGetGlobalNodeReduction(void);
 CmiReductionID CmiGetDynamicReduction(void);
+CmiReductionID CmiGetDynamicNodeReduction(void);
 void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data);
+void CmiGetDynamicNodeReductionRemote(int handlerIdx, int node, int dataSize, void *data);
 
 void CmiResetGlobalReduceSeqID(void);
+void CmiResetGlobalNodeReduceSeqID(void);
 
 /* If the second parameter (the number of chunks to send) is negative, then
  * every message will be started aligned with 8 bytes, and a message header will
