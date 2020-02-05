@@ -22,7 +22,6 @@
 
 // Per-device struct containing local data for CUDA IPC
 struct cuda_ipc_local_info {
-  int event_pool_size;
   std::vector<cudaEvent_t> event_pool;
   void* buffer;
 };
@@ -80,12 +79,11 @@ struct GPUManager {
 #ifdef HAPI_CUDA_CALLBACK
 #endif
 
-  // GPU devices accessible to this process
-  int device_count;
+  int device_count; // GPU devices usable by this process (could be less than the number of visible devices)
   int device_count_on_physical_node;
-  DeviceManager *device_managers;
+  int pes_per_device;
+  std::vector<DeviceManager> device_managers;
   std::unordered_map<int, DeviceManager*> device_map;
-  int pes_per_device; // Set in initDeviceMapping()
 
   // Eager communication buffer
   bool use_eager_comm_buffer;
@@ -103,7 +101,7 @@ struct GPUManager {
   int ipc_event_pool_size;
 
   // CUDA IPC handles opened for processes on the same node
-  cuda_ipc_local_info* cuda_ipc_local_infos;
+  std::vector<cuda_ipc_local_info> cuda_ipc_local_infos;
 
   void init();
   int createStreams();
@@ -143,20 +141,6 @@ void GPUManager::init() {
   time_idx_ = 0;
 #endif
 
-  // How many GPUs are available to this process?
-  hapiCheck(cudaGetDeviceCount(&device_count));
-
-  // If there are more devices than threads, reduce the number of devices
-  if (device_count > CmiNodeSize(CmiMyNode())) {
-    device_count = CmiNodeSize(CmiMyNode());
-  }
-
-  // FIXME: Assumes GPU count is the same across all processes
-  device_count_on_physical_node = device_count * (CmiNumNodes() / CmiNumPhysicalNodes());
-
-  // Create a DeviceManager for each GPU
-  device_managers = new DeviceManager[device_count];
-
   // Number of PEs mapped to each device
   pes_per_device = -1;
 
@@ -174,9 +158,6 @@ void GPUManager::init() {
 
   // Number of CUDA IPC events per PE
   ipc_event_pool_size = -1;
-
-  // Local information on opened CUDA IPC event and buffer
-  cuda_ipc_local_infos = NULL;
 
   // allocate host/device buffers array (both user and system-addressed)
   host_buffers_ = new void*[NUM_BUFFERS*2];
@@ -246,6 +227,8 @@ int GPUManager::createStreams() {
 #if !CMK_SMP
   // Allocate total physical streams between GPU managers sharing a device...
   // i.e. PEs / num devices
+  int device_count;
+  hapiCheck(cudaGetDeviceCount(&device_count));
   int pes_per_device = CmiNumPesOnPhysicalNode(0) / device_count;
   pes_per_device = pes_per_device > 0 ? pes_per_device : 1;
   new_n_streams =  (new_n_streams + pes_per_device - 1) / pes_per_device;

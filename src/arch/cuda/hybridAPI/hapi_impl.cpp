@@ -446,18 +446,42 @@ void initDeviceMapping(char** argv) {
 
   CmiAssert(map_type != Mapping::None);
 
-  if (CsvAccess(gpu_manager).device_count <= 0) {
-    CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
+  if (CmiMyRank() == 0) {
+    // Count number of GPU devices used by each process
+    int visible_device_count;
+    hapiCheck(cudaGetDeviceCount(&visible_device_count));
+    if (visible_device_count <= 0) {
+      CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
+    }
+
+    if (all_gpus) {
+      CsvAccess(gpu_manager).device_count = visible_device_count / (CmiNumNodes() / CmiNumPhysicalNodes());
+    }
+    else {
+      CsvAccess(gpu_manager).device_count = visible_device_count;
+    }
+
+    // Create DeviceManagers in GPUManager
+    for (int i = 0; i < CsvAccess(gpu_manager).device_count; i++) {
+      CsvAccess(gpu_manager).device_managers.emplace_back(i);
+    }
+
+    // Count number of PEs per device
+    CsvAccess(gpu_manager).pes_per_device = CmiNodeSize(CmiMyNode()) / CsvAccess(gpu_manager).device_count;
+
+    // Count number of devices on a physical node
+    CsvAccess(gpu_manager).device_count_on_physical_node = CsvAccess(gpu_manager).device_count * (CmiNumNodes() / CmiNumPhysicalNodes());
   }
 
-  // Perform mapping and set device representative PE
-  if (CmiMyRank() == 0) {
-    CsvAccess(gpu_manager).pes_per_device = (all_gpus ? CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe())) :
-        CmiNodeSize(CmiMyNode())) / CsvAccess(gpu_manager).device_count;
+  if (CmiMyPe() == 0) {
+    CmiPrintf("HAPI> %d device(s) per process, %d PE(s) per device, %d device(s) per host\n",
+        CsvAccess(gpu_manager).device_count, CsvAccess(gpu_manager).pes_per_device,
+        CsvAccess(gpu_manager).device_count_on_physical_node);
   }
 
   CmiNodeBarrier();
 
+  // Perform mapping and set device representative PE
   int my_rank = all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank();
 
   switch (map_type) {
@@ -642,7 +666,9 @@ void shmCreate() {
       CmiMyNodeRankLocal());
 
   // Allocate memory for local storage
-  CsvAccess(gpu_manager).cuda_ipc_local_infos = new cuda_ipc_local_info[CsvAccess(gpu_manager).device_count_on_physical_node];
+  for (int i = 0; i < CsvAccess(gpu_manager).device_count_on_physical_node; i++) {
+    CsvAccess(gpu_manager).cuda_ipc_local_infos.emplace_back();
+  }
 
   return;
 
@@ -678,8 +704,8 @@ void ipcHandleCreate() {
   cudaIpcMemHandle_t* shm_mem_handle = (cudaIpcMemHandle_t*)((char*)CsvAccess(gpu_manager).shm_my_ptr +
       CsvAccess(gpu_manager).shm_chunk_size * CpvAccess(my_device));
   cudaIpcEventHandle_t* shm_event_pool = (cudaIpcEventHandle_t*)((char*)shm_mem_handle + sizeof(cudaIpcMemHandle_t));
-  cuda_ipc_local_info* local_info_ptr = CsvAccess(gpu_manager).cuda_ipc_local_infos;
-  cuda_ipc_local_info& my_local_info = local_info_ptr[CsvAccess(gpu_manager).device_count * CmiMyNodeRankLocal() + CpvAccess(my_device)];
+  int device_index = CsvAccess(gpu_manager).device_count * CmiMyNodeRankLocal() + CpvAccess(my_device);
+  cuda_ipc_local_info& my_local_info = CsvAccess(gpu_manager).cuda_ipc_local_infos[device_index];
 
   // Create CUDA IPC events and corresponding handles
   for (int i = 0; i < CsvAccess(gpu_manager).ipc_event_pool_size; i++) {
@@ -711,6 +737,7 @@ void ipcHandleOpen() {
       cuda_ipc_local_info& cur_local_info = CsvAccess(gpu_manager).cuda_ipc_local_infos[device_index];
 
       for (int k = 0; k < CsvAccess(gpu_manager).ipc_event_pool_size; k++) {
+        cur_local_info.event_pool.emplace_back();
         hapiCheck(cudaIpcOpenEventHandle(&cur_local_info.event_pool[k], cur_shm_event_pool[k]));
       }
       hapiCheck(cudaIpcOpenMemHandle(&cur_local_info.buffer, *cur_shm_mem_handle,
@@ -732,7 +759,6 @@ void exitHybridAPI() {
 #endif
 
   // Delete data structures
-  delete[] CsvAccess(gpu_manager).device_managers;
   delete[] CsvAccess(gpu_manager).host_buffers_;
   delete[] CsvAccess(gpu_manager).device_buffers_;
 
