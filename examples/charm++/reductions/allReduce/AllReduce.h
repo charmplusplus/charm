@@ -6,6 +6,7 @@ class main : public CBase_main
 private:
   CProxy_AllReduce arr;
 	double startTime;
+	int units;
 public:
 
   main(CkArgMsg* m);
@@ -30,14 +31,14 @@ class AllReduce : public CBase_AllReduce
 {
  private:
 	CProxy_main mainProxy;
+	int allredSize, units;
 	double* myData;
  public:
 
-	AllReduce(CProxy_main ma)   { mainProxy=ma;  }
-
   AllReduce(CkMigrateMessage *m) {};
 
-	void init()
+	AllReduce(CProxy_main ma, int s, int u)
+		: mainProxy{ma}, allredSize{s}, units{u}
 	{
 		                myData = new double[allredSize/(sizeof(double))];
 				                for (int i=0; i<allredSize/sizeof(double); i++) {
