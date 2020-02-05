@@ -47,7 +47,7 @@ class TestNodeGroup : public CBase_TestNodeGroup {
 private:
   std::atomic<int> num_elements;
 public:
-  TestNodeGroup() {}
+  TestNodeGroup() : num_elements(0) {}
 
   void addElement() {
     num_elements++;
