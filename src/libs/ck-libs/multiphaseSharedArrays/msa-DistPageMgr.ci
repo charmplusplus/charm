@@ -10,7 +10,7 @@ module msa
                          unsigned int max_bytes, unsigned int nEntries, unsigned int numberOfWorkerThreads);
         entry void AckPage(unsigned int page);
         entry void ReceivePage(unsigned int page, ENTRY_TYPE pageData[size], int size);
-        entry void ReceivePageWithPUP(unsigned int page, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> pageData, int size);
+        entry void ReceivePageWithPUP(unsigned int page, const MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> &pageData, int size);
         entry void enroll();
         entry void enroll(unsigned int numberOfWorkerThreads);
         entry void enrollAck(int originator);  // internal method
@@ -30,12 +30,12 @@ module msa
     template<class ENTRY_TYPE, class ENTRY_OPS_CLASS,unsigned int ENTRIES_PER_PAGE> array[1D] MSA_PageArray
     {
         entry MSA_PageArray(void);
-	entry void setCacheProxy(CProxy_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> cache);
+	entry void setCacheProxy(const CProxy_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> &cache);
 	
         entry void GetPage(int pe);
         entry void PAReceivePage(ENTRY_TYPE page[ENTRIES_PER_PAGE], int pe, MSA_Page_Fault_t pageState);
         entry void PAReceiveRLEPage(MSA_WriteSpan_t spans[nSpans], unsigned int nSpans, ENTRY_TYPE entries[nEntries], unsigned int nEntries, int pe, MSA_Page_Fault_t pageState);
-        entry void PAReceiveRLEPageWithPup(MSA_WriteSpan_t spans[nSpans], unsigned int nSpans, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> entries, unsigned int nEntries, int pe, MSA_Page_Fault_t pageState);
+        entry void PAReceiveRLEPageWithPup(MSA_WriteSpan_t spans[nSpans], unsigned int nSpans, const MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> &entries, unsigned int nEntries, int pe, MSA_Page_Fault_t pageState);
         entry void Sync(bool clear);
 	
         // for debugging purposes only
