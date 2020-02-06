@@ -1531,7 +1531,7 @@ BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
 
 # Set the default expansions of unprefixed variants
 case "$MEMORY" in
-  'verbose'|'paranoid'|'leak'|'isomalloc')
+  'verbose'|'record'|'paranoid'|'leak'|'isomalloc')
     MEMORY="os-$MEMORY"
     ;;
   charmdebug*)
