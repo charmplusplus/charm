@@ -1,3 +1,27 @@
+#ifndef MEMORY_GNU_INTERNAL
+#define MEMORY_GNU_INTERNAL
+
+/* Change this to #if 0 to test encapsulation in ways we don't use. */
+#if 1
+
+#define ONLY_MSPACES 1
+#define USE_LOCKS 0
+
+#else
+
+#define MSPACES 1
+#define USE_LOCKS 1
+#define PROCEED_ON_ERROR 1
+#define MALLOC_INSPECT_ALL 1
+#define DEBUG 1
+
+#endif
+
+/* Will be redefined later. */
+#ifdef _GNU_SOURCE
+#undef _GNU_SOURCE
+#endif
+
 /*
   This version of ptmalloc3 has been updated to use the latest dlmalloc
   version, 2.8.6. It appears that all malloc.c changes in ptmalloc3 were
@@ -855,6 +879,8 @@ extern "C" {
 #define dlbulk_free            bulk_free
 #endif /* USE_DL_PREFIX */
 
+#ifdef DISABLED_DUE_TO_ENCAPSULATION
+
 /*
   malloc(size_t n)
   Returns a pointer to a newly allocated chunk of at least n bytes, or
@@ -1277,6 +1303,8 @@ DLMALLOC_EXPORT void  dlmalloc_stats(void);
 */
 size_t dlmalloc_usable_size(void*);
 
+#endif
+
 #endif /* ONLY_MSPACES */
 
 #if MSPACES
@@ -1286,6 +1314,8 @@ size_t dlmalloc_usable_size(void*);
   region of space that supports mspace_malloc, etc.
 */
 typedef void* mspace;
+
+#ifdef DISABLED_DUE_TO_ENCAPSULATION
 
 /*
   create_mspace creates and returns a new independent space with the
@@ -1428,6 +1458,8 @@ DLMALLOC_EXPORT int mspace_trim(mspace msp, size_t pad);
   An alias for mallopt.
 */
 DLMALLOC_EXPORT int mspace_mallopt(int, int);
+
+#endif
 
 #endif /* MSPACES */
 
@@ -2639,15 +2671,42 @@ struct malloc_params {
   flag_t default_mflags;
 };
 
-static struct malloc_params mparams;
+struct dlmalloc_impl {
+
+struct malloc_params mparams{};
 
 /* Ensure mparams initialized */
 #define ensure_initialization() (void)(mparams.magic != 0 || init_mparams())
 
+virtual void * call_mmap(size_t length)
+{
+  return CALL_MMAP(length);
+}
+virtual void * call_direct_mmap(size_t length)
+{
+  return CALL_DIRECT_MMAP(length);
+}
+virtual int call_munmap(void * addr, size_t length)
+{
+  return CALL_MUNMAP(addr, length);
+}
+virtual void * call_mremap(void *old_address, size_t old_size, size_t new_size, int flags)
+{
+  return CALL_MREMAP(old_address, old_size, new_size, flags);
+}
+#if HAVE_MORECORE
+virtual void * call_morecore(intptr_t increment)
+{
+  return CALL_MORECORE(increment);
+}
+#else
+#define call_morecore CALL_MORECORE
+#endif
+
 #if !ONLY_MSPACES
 
 /* The global malloc_state used for all non-"mspace" calls */
-static struct malloc_state _gm_;
+/* static */ struct malloc_state _gm_{};
 #define gm                 (&_gm_)
 #define is_global(M)       ((M) == &_gm_)
 
@@ -2783,10 +2842,12 @@ static int has_segment_link(mstate m, msegmentptr ss) {
 #if PROCEED_ON_ERROR
 
 /* A count of the number of corruption errors causing resets */
-int malloc_corruption_error_count;
+int malloc_corruption_error_count{};
 
+#ifdef DISABLED_DUE_TO_ENCAPSULATION
 /* default corruption action */
 static void reset_on_error(mstate m);
+#endif
 
 #define CORRUPTION_ERROR_ACTION(m)  reset_on_error(m)
 #define USAGE_ERROR_ACTION(m, p)
@@ -2823,6 +2884,9 @@ static void reset_on_error(mstate m);
 #define check_mmapped_chunk(M,P)    do_check_mmapped_chunk(M,P)
 #define check_malloc_state(M)       do_check_malloc_state(M)
 
+#define DLMALLOC_DEBUG
+
+#ifdef DISABLED_DUE_TO_ENCAPSULATION
 static void   do_check_any_chunk(mstate m, mchunkptr p);
 static void   do_check_top_chunk(mstate m, mchunkptr p);
 static void   do_check_mmapped_chunk(mstate m, mchunkptr p);
@@ -2835,6 +2899,7 @@ static void   do_check_smallbin(mstate m, bindex_t i);
 static void   do_check_malloc_state(mstate m);
 static int    bin_find(mstate m, mchunkptr x);
 static size_t traverse_and_check(mstate m);
+#endif
 #endif /* DEBUG */
 
 /* ---------------------------- Indexing Bins ---------------------------- */
@@ -3114,7 +3179,7 @@ static void post_fork_child(void)  { INITIAL_LOCK(&(gm)->mutex); }
 #endif /* LOCK_AT_FORK */
 
 /* Initialize mparams */
-static int init_mparams(void) {
+/* static */ int init_mparams(void) {
 #ifdef NEED_GLOBAL_LOCK_INIT
   if (malloc_global_mutex_status <= 0)
     init_malloc_global_mutex();
@@ -3204,7 +3269,7 @@ static int init_mparams(void) {
 }
 
 /* support for mallopt */
-static int change_mparam(int param_number, int value) {
+/* static */ int change_mparam(int param_number, int value) {
   size_t val;
   ensure_initialization();
   val = (value == -1)? MAX_SIZE_T : (size_t)value;
@@ -3251,7 +3316,7 @@ static void do_check_top_chunk(mstate m, mchunkptr p) {
 }
 
 /* Check properties of (inuse) mmapped chunks */
-static void do_check_mmapped_chunk(mstate m, mchunkptr p) {
+/* static */ void do_check_mmapped_chunk(mstate m, mchunkptr p) {
   size_t  sz = chunksize(p);
   size_t len = (sz + (p->prev_foot) + MMAP_FOOT_PAD);
   assert(is_mmapped(p));
@@ -3265,7 +3330,7 @@ static void do_check_mmapped_chunk(mstate m, mchunkptr p) {
 }
 
 /* Check properties of inuse chunks */
-static void do_check_inuse_chunk(mstate m, mchunkptr p) {
+/* static */ void do_check_inuse_chunk(mstate m, mchunkptr p) {
   do_check_any_chunk(m, p);
   assert(is_inuse(p));
   assert(next_pinuse(p));
@@ -3299,7 +3364,7 @@ static void do_check_free_chunk(mstate m, mchunkptr p) {
 }
 
 /* Check properties of malloced chunks at the point they are malloced */
-static void do_check_malloced_chunk(mstate m, void* mem, size_t s) {
+/* static */ void do_check_malloced_chunk(mstate m, void* mem, size_t s) {
   if (mem != 0) {
     mchunkptr p = mem2chunk(mem);
     size_t sz = p->head & ~INUSE_BITS;
@@ -3375,7 +3440,7 @@ static void do_check_treebin(mstate m, bindex_t i) {
 }
 
 /*  Check all the chunks in a smallbin.  */
-static void do_check_smallbin(mstate m, bindex_t i) {
+/* static */ void do_check_smallbin(mstate m, bindex_t i) {
   sbinptr b = smallbin_at(m, i);
   mchunkptr p = b->bk;
   unsigned int empty = (m->smallmap & (1U << i)) == 0;
@@ -3435,7 +3500,7 @@ static int bin_find(mstate m, mchunkptr x) {
 }
 
 /* Traverse each chunk and check it; return total */
-static size_t traverse_and_check(mstate m) {
+/* static */ size_t traverse_and_check(mstate m) {
   size_t sum = 0;
   if (is_initialized(m)) {
     msegmentptr s = &m->seg;
@@ -3467,7 +3532,7 @@ static size_t traverse_and_check(mstate m) {
 
 
 /* Check all properties of malloc_state. */
-static void do_check_malloc_state(mstate m) {
+/* static */ void do_check_malloc_state(mstate m) {
   bindex_t i;
   size_t total;
   /* check bins */
@@ -3499,7 +3564,7 @@ static void do_check_malloc_state(mstate m) {
 /* ----------------------------- statistics ------------------------------ */
 
 #if !NO_MALLINFO
-static struct mallinfo internal_mallinfo(mstate m) {
+/* static */ struct mallinfo internal_mallinfo(mstate m) {
   struct mallinfo nm = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
   ensure_initialization();
   if (!PREACTION(m)) {
@@ -3540,7 +3605,7 @@ static struct mallinfo internal_mallinfo(mstate m) {
 #endif /* !NO_MALLINFO */
 
 #if !NO_MALLOC_STATS
-static void internal_malloc_stats(mstate m) {
+/* static */ void internal_malloc_stats(mstate m) {
   ensure_initialization();
   if (!PREACTION(m)) {
     size_t maxfp = 0;
@@ -3838,7 +3903,7 @@ static void internal_malloc_stats(mstate m) {
 */
 
 /* Malloc using mmap */
-static void* mmap_alloc(mstate m, size_t nb) {
+/* static */ void* mmap_alloc(mstate m, size_t nb) {
   size_t mmsize = mmap_align(nb + SIX_SIZE_T_SIZES + CHUNK_ALIGN_MASK);
   if (m->footprint_limit != 0) {
     size_t fp = m->footprint + mmsize;
@@ -3846,7 +3911,7 @@ static void* mmap_alloc(mstate m, size_t nb) {
       return 0;
   }
   if (mmsize > nb) {     /* Check for wrap around 0 */
-    char* mm = (char*)(CALL_DIRECT_MMAP(mmsize));
+    char* mm = (char*)(call_direct_mmap(mmsize));
     if (mm != CMFAIL) {
       size_t offset = align_offset(chunk2mem(mm));
       size_t psize = mmsize - offset - MMAP_FOOT_PAD;
@@ -3870,7 +3935,7 @@ static void* mmap_alloc(mstate m, size_t nb) {
 }
 
 /* Realloc using mmap */
-static mchunkptr mmap_resize(mstate m, mchunkptr oldp, size_t nb, int flags) {
+/* static */ mchunkptr mmap_resize(mstate m, mchunkptr oldp, size_t nb, int flags) {
   size_t oldsize = chunksize(oldp);
   (void)flags; /* placate people compiling -Wunused */
   if (is_small(nb)) /* Can't shrink mmap regions below small size */
@@ -3883,7 +3948,7 @@ static mchunkptr mmap_resize(mstate m, mchunkptr oldp, size_t nb, int flags) {
     size_t offset = oldp->prev_foot;
     size_t oldmmsize = oldsize + offset + MMAP_FOOT_PAD;
     size_t newmmsize = mmap_align(nb + SIX_SIZE_T_SIZES + CHUNK_ALIGN_MASK);
-    char* cp = (char*)CALL_MREMAP((char*)oldp - offset,
+    char* cp = (char*)call_mremap((char*)oldp - offset,
                                   oldmmsize, newmmsize, flags);
     if (cp != CMFAIL) {
       mchunkptr newp = (mchunkptr)(cp + offset);
@@ -3908,7 +3973,7 @@ static mchunkptr mmap_resize(mstate m, mchunkptr oldp, size_t nb, int flags) {
 /* -------------------------- mspace management -------------------------- */
 
 /* Initialize top chunk and its size */
-static void init_top(mstate m, mchunkptr p, size_t psize) {
+/* static */ void init_top(mstate m, mchunkptr p, size_t psize) {
   /* Ensure alignment */
   size_t offset = align_offset(chunk2mem(p));
   p = (mchunkptr)((char*)p + offset);
@@ -3935,7 +4000,7 @@ static void init_bins(mstate m) {
 #if PROCEED_ON_ERROR
 
 /* default corruption action */
-static void reset_on_error(mstate m) {
+/* static */ void reset_on_error(mstate m) {
   int i;
   ++malloc_corruption_error_count;
   /* Reinitialize fields to forget about all memory */
@@ -3952,7 +4017,7 @@ static void reset_on_error(mstate m) {
 #endif /* PROCEED_ON_ERROR */
 
 /* Allocate chunk and prepend remainder with chunk in successor base. */
-static void* prepend_alloc(mstate m, char* newbase, char* oldbase,
+/* static */ void* prepend_alloc(mstate m, char* newbase, char* oldbase,
                            size_t nb) {
   mchunkptr p = align_as_chunk(newbase);
   mchunkptr oldfirst = align_as_chunk(oldbase);
@@ -3994,7 +4059,7 @@ static void* prepend_alloc(mstate m, char* newbase, char* oldbase,
 }
 
 /* Add a segment to hold a new noncontiguous region */
-static void add_segment(mstate m, char* tbase, size_t tsize, flag_t mmapped) {
+/* static */ void add_segment(mstate m, char* tbase, size_t tsize, flag_t mmapped) {
   /* Determine locations and sizes of segment, fenceposts, old top */
   char* old_top = (char*)m->top;
   msegmentptr oldsp = segment_holding(m, old_top);
@@ -4049,7 +4114,7 @@ static void add_segment(mstate m, char* tbase, size_t tsize, flag_t mmapped) {
 /* -------------------------- System allocation -------------------------- */
 
 /* Get memory from system using MORECORE or MMAP */
-static void* sys_alloc(mstate m, size_t nb) {
+/* static */ void* sys_alloc(mstate m, size_t nb) {
   char* tbase = CMFAIL;
   size_t tsize = 0;
   flag_t mmap_flag = 0;
@@ -4102,7 +4167,7 @@ static void* sys_alloc(mstate m, size_t nb) {
     ACQUIRE_MALLOC_GLOBAL_LOCK();
 
     if (ss == 0) {  /* First time through or recovery */
-      char* base = (char*)CALL_MORECORE(0);
+      char* base = (char*)call_morecore(0);
       if (base != CMFAIL) {
         size_t fp;
         /* Adjust to end on a page boundary */
@@ -4112,7 +4177,7 @@ static void* sys_alloc(mstate m, size_t nb) {
         if (ssize > nb && ssize < HALF_MAX_SIZE_T &&
             (m->footprint_limit == 0 ||
              (fp > m->footprint && fp <= m->footprint_limit)) &&
-            (br = (char*)(CALL_MORECORE(ssize))) == base) {
+            (br = (char*)(call_morecore(ssize))) == base) {
           tbase = base;
           tsize = ssize;
         }
@@ -4123,7 +4188,7 @@ static void* sys_alloc(mstate m, size_t nb) {
       ssize = granularity_align(nb - m->topsize + SYS_ALLOC_PADDING);
       /* Use mem here only if it did continuously extend old space */
       if (ssize < HALF_MAX_SIZE_T &&
-          (br = (char*)(CALL_MORECORE(ssize))) == ss->base+ss->size) {
+          (br = (char*)(call_morecore(ssize))) == ss->base+ss->size) {
         tbase = br;
         tsize = ssize;
       }
@@ -4135,11 +4200,11 @@ static void* sys_alloc(mstate m, size_t nb) {
             ssize < nb + SYS_ALLOC_PADDING) {
           size_t esize = granularity_align(nb + SYS_ALLOC_PADDING - ssize);
           if (esize < HALF_MAX_SIZE_T) {
-            char* end = (char*)CALL_MORECORE(esize);
+            char* end = (char*)call_morecore(esize);
             if (end != CMFAIL)
               ssize += esize;
             else {            /* Can't use; try to release */
-              (void) CALL_MORECORE(-ssize);
+              (void) call_morecore(-ssize);
               br = CMFAIL;
             }
           }
@@ -4157,7 +4222,7 @@ static void* sys_alloc(mstate m, size_t nb) {
   }
 
   if (HAVE_MMAP && tbase == CMFAIL) {  /* Try MMAP */
-    char* mp = (char*)(CALL_MMAP(asize));
+    char* mp = (char*)(call_mmap(asize));
     if (mp != CMFAIL) {
       tbase = mp;
       tsize = asize;
@@ -4170,8 +4235,8 @@ static void* sys_alloc(mstate m, size_t nb) {
       char* br = CMFAIL;
       char* end = CMFAIL;
       ACQUIRE_MALLOC_GLOBAL_LOCK();
-      br = (char*)(CALL_MORECORE(asize));
-      end = (char*)(CALL_MORECORE(0));
+      br = (char*)(call_morecore(asize));
+      end = (char*)(call_morecore(0));
       RELEASE_MALLOC_GLOBAL_LOCK();
       if (br != CMFAIL && end != CMFAIL && br < end) {
         size_t ssize = end - br;
@@ -4260,7 +4325,7 @@ static void* sys_alloc(mstate m, size_t nb) {
 /* -----------------------  system deallocation -------------------------- */
 
 /* Unmap and unlink any mmapped segments that don't contain used chunks */
-static size_t release_unused_segments(mstate m) {
+/* static */ size_t release_unused_segments(mstate m) {
   size_t released = 0;
   int nsegs = 0;
   msegmentptr pred = &m->seg;
@@ -4284,7 +4349,7 @@ static size_t release_unused_segments(mstate m) {
         else {
           unlink_large_chunk(m, tp);
         }
-        if (CALL_MUNMAP(base, size) == 0) {
+        if (call_munmap(base, size) == 0) {
           released += size;
           m->footprint -= size;
           /* unlink obsoleted record */
@@ -4307,7 +4372,7 @@ static size_t release_unused_segments(mstate m) {
   return released;
 }
 
-static int sys_trim(mstate m, size_t pad) {
+/* static */ int sys_trim(mstate m, size_t pad) {
   size_t released = 0;
   ensure_initialization();
   if (pad < MAX_REQUEST && is_initialized(m)) {
@@ -4328,8 +4393,8 @@ static int sys_trim(mstate m, size_t pad) {
             size_t newsize = sp->size - extra;
             (void)newsize; /* placate people compiling -Wunused-variable */
             /* Prefer mremap, fall back to munmap */
-            if ((CALL_MREMAP(sp->base, sp->size, newsize, 0) != MFAIL) ||
-                (CALL_MUNMAP(sp->base + newsize, extra) == 0)) {
+            if ((call_mremap(sp->base, sp->size, newsize, 0) != MFAIL) ||
+                (call_munmap(sp->base + newsize, extra) == 0)) {
               released = extra;
             }
           }
@@ -4340,10 +4405,10 @@ static int sys_trim(mstate m, size_t pad) {
           ACQUIRE_MALLOC_GLOBAL_LOCK();
           {
             /* Make sure end of memory is where we last set it. */
-            char* old_br = (char*)(CALL_MORECORE(0));
+            char* old_br = (char*)(call_morecore(0));
             if (old_br == sp->base + sp->size) {
-              char* rel_br = (char*)(CALL_MORECORE(-extra));
-              char* new_br = (char*)(CALL_MORECORE(0));
+              char* rel_br = (char*)(call_morecore(-extra));
+              char* new_br = (char*)(call_morecore(0));
               if (rel_br != CMFAIL && new_br < old_br)
                 released = old_br - new_br;
             }
@@ -4375,14 +4440,14 @@ static int sys_trim(mstate m, size_t pad) {
 /* Consolidate and bin a chunk. Differs from exported versions
    of free mainly in that the chunk need not be marked as inuse.
 */
-static void dispose_chunk(mstate m, mchunkptr p, size_t psize) {
+/* static */ void dispose_chunk(mstate m, mchunkptr p, size_t psize) {
   mchunkptr next = chunk_plus_offset(p, psize);
   if (!pinuse(p)) {
     mchunkptr prev;
     size_t prevsize = p->prev_foot;
     if (is_mmapped(p)) {
       psize += prevsize + MMAP_FOOT_PAD;
-      if (CALL_MUNMAP((char*)p - prevsize, psize) == 0)
+      if (call_munmap((char*)p - prevsize, psize) == 0)
         m->footprint -= psize;
       return;
     }
@@ -4446,7 +4511,7 @@ static void dispose_chunk(mstate m, mchunkptr p, size_t psize) {
 /* ---------------------------- malloc --------------------------- */
 
 /* allocate a large request from the best fitting chunk in a treebin */
-static void* tmalloc_large(mstate m, size_t nb) {
+/* static */ void* tmalloc_large(mstate m, size_t nb) {
   tchunkptr v = 0;
   size_t rsize = -nb; /* Unsigned negation */
   tchunkptr t;
@@ -4517,7 +4582,7 @@ static void* tmalloc_large(mstate m, size_t nb) {
 }
 
 /* allocate a small request from the best fitting chunk in a treebin */
-static void* tmalloc_small(mstate m, size_t nb) {
+/* static */ void* tmalloc_small(mstate m, size_t nb) {
   tchunkptr t, v;
   size_t rsize;
   bindex_t i;
@@ -4721,7 +4786,7 @@ void dlfree(void* mem) {
           size_t prevsize = p->prev_foot;
           if (is_mmapped(p)) {
             psize += prevsize + MMAP_FOOT_PAD;
-            if (CALL_MUNMAP((char*)p - prevsize, psize) == 0)
+            if (call_munmap((char*)p - prevsize, psize) == 0)
               fm->footprint -= psize;
             goto postaction;
           }
@@ -4823,7 +4888,7 @@ void* dlcalloc(size_t n_elements, size_t elem_size) {
 /* ------------ Internal support for realloc, memalign, etc -------------- */
 
 /* Try to realloc; only in-place unless can_move true */
-static mchunkptr try_realloc_chunk(mstate m, mchunkptr p, size_t nb,
+/* static */ mchunkptr try_realloc_chunk(mstate m, mchunkptr p, size_t nb,
                                    int can_move) {
   mchunkptr newp = 0;
   size_t oldsize = chunksize(p);
@@ -4902,7 +4967,7 @@ static mchunkptr try_realloc_chunk(mstate m, mchunkptr p, size_t nb,
   return newp;
 }
 
-static void* internal_memalign(mstate m, size_t alignment, size_t bytes) {
+/* static */ void* internal_memalign(mstate m, size_t alignment, size_t bytes) {
   void* mem = 0;
   if (alignment <  MIN_CHUNK_SIZE) /* must be at least a minimum chunk size */
     alignment = MIN_CHUNK_SIZE;
@@ -4983,7 +5048,7 @@ static void* internal_memalign(mstate m, size_t alignment, size_t bytes) {
     bit 0 set if all elements are same size (using sizes[0])
     bit 1 set if elements should be zeroed
 */
-static void** ialloc(mstate m,
+/* static */ void** ialloc(mstate m,
                      size_t n_elements,
                      size_t* sizes,
                      int opts,
@@ -5109,7 +5174,7 @@ static void** ialloc(mstate m,
    chunks before freeing, which will occur often if allocated
    with ialloc or the array is sorted.
 */
-static size_t internal_bulk_free(mstate m, void* array[], size_t nelem) {
+/* static */ size_t internal_bulk_free(mstate m, void* array[], size_t nelem) {
   size_t unfreed = 0;
   if (!PREACTION(m)) {
     void** a;
@@ -5411,7 +5476,7 @@ size_t dlmalloc_usable_size(void* mem) {
 
 #if MSPACES
 
-static mstate init_user_mstate(char* tbase, size_t tsize) {
+/* static */ mstate init_user_mstate(char* tbase, size_t tsize) {
   size_t msize = pad_request(sizeof(struct malloc_state));
   mchunkptr mn;
   mchunkptr msp = align_as_chunk(tbase);
@@ -5443,7 +5508,7 @@ mspace create_mspace(size_t capacity, int locked) {
     size_t rs = ((capacity == 0)? mparams.granularity :
                  (capacity + TOP_FOOT_SIZE + msize));
     size_t tsize = granularity_align(rs);
-    char* tbase = (char*)(CALL_MMAP(tsize));
+    char* tbase = (char*)(call_mmap(tsize));
     if (tbase != CMFAIL) {
       m = init_user_mstate(tbase, tsize);
       m->seg.sflags = USE_MMAP_BIT;
@@ -5497,7 +5562,7 @@ size_t destroy_mspace(mspace msp) {
       (void)base; /* placate people compiling -Wunused-variable */
       sp = sp->next;
       if ((flag & USE_MMAP_BIT) && !(flag & EXTERN_BIT) &&
-          CALL_MUNMAP(base, size) == 0)
+          call_munmap(base, size) == 0)
         freed += size;
     }
   }
@@ -5648,7 +5713,7 @@ void mspace_free(mspace msp, void* mem) {
           size_t prevsize = p->prev_foot;
           if (is_mmapped(p)) {
             psize += prevsize + MMAP_FOOT_PAD;
-            if (CALL_MUNMAP((char*)p - prevsize, psize) == 0)
+            if (call_munmap((char*)p - prevsize, psize) == 0)
               fm->footprint -= psize;
             goto postaction;
           }
@@ -5987,6 +6052,8 @@ int mspace_mallopt(int param_number, int value) {
 
 #endif /* MSPACES */
 
+}; /* struct dlmalloc_impl */
+
 
 /* -------------------- Alternative MORECORE functions ------------------- */
 
@@ -6298,3 +6365,5 @@ History:
          structure of old version,  but most details differ.)
 
 */
+
+#endif

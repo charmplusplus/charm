@@ -53,6 +53,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> /*For memset, memcpy*/
+#include <type_traits>
+#include <new>
 
 #ifndef __STDC_FORMAT_MACROS
 # define __STDC_FORMAT_MACROS
@@ -986,7 +988,9 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage(void)
     mstate m = ms;
 
     if (!PREACTION(m)) {
-      check_malloc_state(m);
+#ifdef DLMALLOC_DEBUG
+      global_malloc_instance.do_check_malloc_state(m);
+#endif
       if (is_initialized(m)) {
         size_t mfree = m->topsize + TOP_FOOT_SIZE;
         msegmentptr s = &m->seg;
@@ -1039,7 +1043,9 @@ CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage(void)
     mstate m = ms;
 
     if (!PREACTION(m)) {
-      check_malloc_state(m);
+#ifdef DLMALLOC_DEBUG
+      global_malloc_instance.do_check_malloc_state(m);
+#endif
       if (is_initialized(m)) {
         usmblks += m->max_footprint;
       }
@@ -1080,7 +1086,7 @@ void free_nomigrate(void *mem) { free(mem); }
 
 #ifndef CMK_MEMORY_HAS_ISOMALLOC
 #include "memory-isomalloc.h"
-void CmiMemoryIsomallocContextActivate(CmiIsomallocContext *l) {}
+void CmiMemoryIsomallocContextActivate(CmiIsomallocContext l) {}
 void CmiMemoryIsomallocDisablePush() {}
 void CmiMemoryIsomallocDisablePop() {}
 #endif
