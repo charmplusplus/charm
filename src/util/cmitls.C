@@ -106,9 +106,10 @@ static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
     const ElfW(Phdr) * hdr = &info->dlpi_phdr[i];
     if (hdr->p_type == PT_TLS)
     {
-      t->size += hdr->p_memsz;
-      if (t->align < hdr->p_align)
-        t->align = hdr->p_align;
+      const size_t align = hdr->p_align;
+      t->size += CMIALIGN(hdr->p_memsz, align);
+      if (t->align < align)
+        t->align = align;
     }
   }
 
@@ -331,8 +332,8 @@ static void populateTLSSegStats(tlsseg_t * t)
   Phdr* phdr = getTLSPhdrEntry();
   if (phdr != NULL)
   {
-    t->align = phdr->p_align;
-    t->size = phdr->p_memsz;
+    const size_t align = t->align = phdr->p_align;
+    t->size = CMIALIGN(phdr->p_memsz, align);
   }
   else
   {
@@ -383,7 +384,6 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th)
 
   if (t->size > 0)
   {
-    t->size = CMIALIGN(t->size, t->align);
     t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size);
     memcpy((void*)t->memseg, (char *)getTLS() - t->size, t->size);
     t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
