@@ -18,6 +18,3 @@ clean:
 test: pgm
 	$(call run, ./pgm +p2 1000000 100 )
 
-bgtest: pgm
-	$(call run, ./pgm +p2 1000000 100 +x2 +y2 +z1 )
-

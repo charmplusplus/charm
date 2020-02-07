@@ -364,12 +364,7 @@ public:
 CkpvExtern(TraceArray*, _traces);
 
 #if CMK_TRACE_ENABLED
-#if CMK_BIGSIM_CHARM
-extern void    resetVTime();
-#  define _TRACE_ONLY(code) do{ BgGetTime(); if(CpvAccess(traceOn) && CkpvAccess(_traces)->length()>0) { code; }  resetVTime(); } while(0)
-#else
 #  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn) && CkpvAccess(_traces)->length()>0) { code; }} while(0)
-#endif
 #  define _TRACE_ALWAYS(code) do{ code; } while(0)
 #else
 #  define _TRACE_ONLY(code) /*empty*/
@@ -415,8 +410,6 @@ extern "C" {
 /* Memory tracing */
 #define _TRACE_MALLOC(where, size, stack, stackSize) _TRACE_ONLY(CkpvAccess(_traces)->malloc(where,size,stack,stackSize))
 #define _TRACE_FREE(where, size) _TRACE_ONLY(CkpvAccess(_traces)->free(where, size))
-
-#include "trace-bluegene.h"
 
 #endif
 

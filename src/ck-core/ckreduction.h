@@ -433,14 +433,6 @@ private:
                          // value = 0 to nFrags-1
         CkSectionInfo sid;   // section cookie for multicast
 	CkCallback callback; //What to do when done
-#if CMK_BIGSIM_CHARM
-public:
-	/* AMPI reductions use bare CkReductionMsg's instead of AmpiMsg's */
-	void *event; // the event point that corresponds to this message
-	int eventPe; // the PE that the event is located on
-private:
-        void *log;
-#endif
 	void *data;//Reduction data
 	double dataStorage;//Start of data array (so it's double-aligned)
 };

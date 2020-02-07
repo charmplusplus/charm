@@ -44,10 +44,6 @@
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
-#if CMK_BIGSIM_CHARM
-#include "middle-blue.h"
-using namespace BGConverse;
-#endif
 
 extern "C" int CmiNumCores(void) {
   // PU count is the intended output here rather than literal cores
@@ -400,9 +396,6 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 					   "Show cpu topology info"))
     show_flag = 1;
 
-#if CMK_BIGSIM_CHARM
-  if (BgNodeRank() == 0)
-#endif
     {
       CpvInitialize(int, cpuTopoHandlerIdx);
       CpvInitialize(int, cpuTopoRecvHandlerIdx);
@@ -422,28 +415,9 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   }
 
   if (CmiMyPe() == 0) {
-#if CMK_BIGSIM_CHARM
-    if (BgNodeRank() == 0)
-#endif
       startT = CmiWallTimer();
   }
 
-#if CMK_BIGSIM_CHARM
-  if (BgNodeRank() == 0)
-  {
-    //int numPes = BgNumNodes()*BgGetNumWorkThread();
-    int numPes = cpuTopo.numPes = CkNumPes();
-    cpuTopo.nodeIDs = new int[numPes];
-    CpuTopology::supported = 1;
-    int wth = BgGetNumWorkThread();
-    for (int i=0; i<numPes; i++) {
-      int nid = i / wth;
-      cpuTopo.nodeIDs[i] = nid;
-    }
-    cpuTopo.sort();
-  }
-  return;
-#else
 
 
 
@@ -579,14 +553,10 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   }
 
   if (CmiMyPe() == 0) {
-#if CMK_BIGSIM_CHARM
-    if (BgNodeRank() == 0)
-#endif
       CmiPrintf("Charm++> cpu topology info is gathered in %.3f seconds.\n", CmiWallTimer()-startT);
   }
 #endif
 
-#endif   /* __BIGSIM__ */
 
   // now every one should have the node info
   CcdRaiseCondition(CcdTOPOLOGY_AVAIL);      // call callbacks

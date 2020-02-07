@@ -370,10 +370,8 @@ int ArrayElement::getRedNo(void) const
 // cleanup of the associated location record from CkLocMgr.
 void ArrayElement::ckDestroy(void)
 {
-	if(_BgOutOfCoreFlag!=1){ //in case of taking core out of memory
 	    CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			   l->ckElementDied(this));
-	}
 	thisArray->deleteElt(CkMigratable::ckGetID());
 }
 
@@ -1054,9 +1052,6 @@ void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg)
 	CkArrayMessage *m=(CkArrayMessage *)ctorMsg;
         int listenerData[CK_ARRAYLISTENER_MAXLEN];
 	prepareCtorMsg(m, listenerData);
-#if CMK_BIGSIM_CHARM
-        BgEntrySplit("split-array-new");
-#endif
         insertElement(m, idx, listenerData);
 }
 
@@ -1507,14 +1502,6 @@ void CkArray::recvBroadcast(CkMessage *m)
 
 	broadcaster->incoming(msg);
 
-#if CMK_BIGSIM_CHARM
-        void *root;
-        _TRACE_BG_TLINE_END(&root);
-	BgSetEntryName("start-broadcast", &root);
-        std::vector<void *> logs;    // store all logs for each delivery
-	extern void stopVTimer();
-	extern void startVTimer();
-#endif
     int len = localElemVec.size();
 
 #if CMK_ONESIDED_IMPL
@@ -1542,13 +1529,6 @@ void CkArray::recvBroadcast(CkMessage *m)
       broadcaster->deliver(msg, localElemVec, thisgroup.idx, stableLocations);
 #else
       for (unsigned int i = 0; i < len; ++i) {
-#if CMK_BIGSIM_CHARM
-                //BgEntrySplit("split-broadcast");
-  		stopVTimer();
-                void *curlog = BgSplitEntry("split-broadcast", &root, 1);
-                logs.push_back(curlog);
-  		startVTimer();
-#endif
 		bool doFree = false;
 		if (stableLocations && i == len-1) doFree = true;
 #if CMK_ONESIDED_IMPL
@@ -1571,12 +1551,6 @@ void CkArray::recvBroadcast(CkMessage *m)
 #endif // CMK_CHARMPY
   }
 
-#if CMK_BIGSIM_CHARM
-	//BgEntrySplit("end-broadcast");
-	stopVTimer();
-	BgSplitEntry("end-broadcast", logs.data(), logs.size());
-	startVTimer();
-#endif
 
 	// CkArrayBroadcaster doesn't have msg buffered, and there was
 	// no last delivery to transfer ownership

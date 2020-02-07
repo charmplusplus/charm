@@ -48,10 +48,6 @@ test: ampi
 	$(call run, +p3 ./jacobi 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1 )
 	[ ! -s "jacobi.iso" ] || $(call run, +p3 ./jacobi.iso 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1)
 
-bgtest: jacobi
-	$(call run, +p2 ./jacobi 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1 )
-	[ ! -s "jacobi.iso" ] || $(call run, +p2 ./jacobi.iso 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1 )
-
 clean:
 	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls ampirun
 	rm -rf 40 80 120

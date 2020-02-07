@@ -31,10 +31,6 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p2 ./pgm 16 1048576 100 10 1 +vp2 +noCMAForZC)
 endif
 
-bgtest: all
-	$(call run, +p1 ./pgm 16 1024 +vp2 +x1 +y1 +z1 )
-	$(call run, +p2 ./pgm 16 1024 +vp2 +x2 +y1 +z1 )
-
 test-bench: all
 	$(call run, +p1 ./pgm 16 67108864 10000 1000 0 +vp2)
 	$(call run, +p2 ./pgm 16 67108674 10000 1000 0 +vp2)
