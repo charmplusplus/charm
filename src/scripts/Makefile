@@ -454,6 +454,7 @@ MEMLIBS = \
   $(L)/libmemory-default.a \
   $(L)/libmemory-os.a \
   $(L)/libmemory-os-verbose.a \
+  $(L)/libmemory-os-record.a \
   $(L)/libmemory-os-isomalloc.a \
   $(L)/libmemory-os-leak.a \
   $(L)/libmemory-os-paranoid.a \
@@ -465,6 +466,7 @@ ifneq ($(CMK_HAS_MMAP),0)
 MEMLIBS += \
   $(L)/libmemory-gnu.a \
   $(L)/libmemory-gnu-verbose.a \
+  $(L)/libmemory-gnu-record.a \
   $(L)/libmemory-gnu-paranoid.a \
   $(L)/libmemory-gnu-leak.a \
   $(L)/libmemory-gnu-isomalloc.a \
@@ -668,6 +670,7 @@ endef
 $(eval $(call libmem,default,                           ,-DCMK_MEMORY_BUILD_DEFAULT))
 $(eval $(call libmem,os,                                ,-DCMK_MEMORY_BUILD_OS))
 $(eval $(call libmem,os-verbose,    memory-verbose.C,    -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_VERBOSE    -touch-on-failure))
+$(eval $(call libmem,os-record,     memory-record.C,     -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_RECORD     -touch-on-failure))
 $(eval $(call libmem,os-paranoid,   memory-paranoid.C,   -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_PARANOID   -touch-on-failure))
 $(eval $(call libmem,os-leak,       memory-leak.C,       -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_LEAK       -touch-on-failure))
 $(eval $(call libmem,os-isomalloc,  memory-isomalloc.C,  -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_ISOMALLOC  -touch-on-failure))
@@ -682,6 +685,7 @@ $(eval $(call libmem,hooks-charmdebug,,-DCMK_MEMORY_BUILD_GNU_HOOKS -DCMK_MEMORY
 #  This is OK, but then we can't use "-memory gnu" or friends.
 $(eval $(call libmem,gnu,                                        ,-DCMK_MEMORY_BUILD_GNU -touch-on-failure))
 $(eval $(call libmem,gnu-verbose,             memory-verbose.C   ,-DCMK_MEMORY_BUILD_VERBOSE -touch-on-failure))
+$(eval $(call libmem,gnu-record,              memory-record.C    ,-DCMK_MEMORY_BUILD_RECORD -touch-on-failure))
 $(eval $(call libmem,gnu-paranoid,            memory-paranoid.C  ,-DCMK_MEMORY_BUILD_PARANOID -touch-on-failure))
 $(eval $(call libmem,gnu-leak,                memory-leak.C      ,-DCMK_MEMORY_BUILD_LEAK -touch-on-failure))
 $(eval $(call libmem,gnu-isomalloc,           memory-isomalloc.C ,-DCMK_MEMORY_BUILD_ISOMALLOC -touch-on-failure))

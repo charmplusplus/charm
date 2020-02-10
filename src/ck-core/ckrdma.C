@@ -868,7 +868,6 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
       case CkNcpyMode::MEMCPY:  // Invoke the bcast Ack Handler after 'numops' memcpy operations are complete
                                 CkAssert(source.refAckInfo != NULL);
                                 CkRdmaEMBcastAckHandler((void *)source.refAckInfo);
-                                CkPackMessage(&copyenv); // Pack message as it will be forwarded to peers
                                 forwardMessageToPeerNodes(copyenv, copyenv->getMsgtype());
                                 return copyenv;
                                 break;
@@ -1327,13 +1326,12 @@ void CkRdmaEMBcastAckHandler(void *ack) {
 // Method forwards a message to all the children
 void forwardMessageToChildNodes(envelope *myChildrenMsg, UChar msgType) {
 #if CMK_SMP && CMK_NODE_QUEUE_AVAILABLE
-  if(msgType == ForNodeBocMsg) {
-    // Node level forwarding for nodegroup bcasts
-    CmiForwardNodeBcastMsg(myChildrenMsg->getTotalsize(), (char *)myChildrenMsg);
-  } else
-#endif
+  // Node level forwarding for nodegroup bcasts
+  CmiForwardNodeBcastMsg(myChildrenMsg->getTotalsize(), (char *)myChildrenMsg);
+#else
   // Proc level forwarding
   CmiForwardProcBcastMsg(myChildrenMsg->getTotalsize(), (char *)myChildrenMsg);
+#endif
 }
 
 // Method forwards a message to all the peer nodes
@@ -1634,6 +1632,10 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *env, NcpyBcastInterimAckInfo *bcast
 
   // CkPackRdmaPtrs((((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   CkPackMessage(&env);
+
+#if !CMK_SMP || !CMK_NODE_QUEUE_AVAILABLE
+  CMI_SET_BROADCAST_ROOT(env, rootNode+1);
+#endif
 }
 
 #if CMK_SMP
@@ -1641,7 +1643,6 @@ void updatePeerCounterAndPush(envelope *env) {
   int pe;
   int numops, rootNode;
 
-  CkUnpackMessage(&env);
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
 
@@ -1658,14 +1659,12 @@ void updatePeerCounterAndPush(envelope *env) {
 
   void *ref = (void *)source.refAckInfo;
   NcpyBcastRecvPeerAckInfo *peerAckInfo = (NcpyBcastRecvPeerAckInfo *)ref;
-  source.refAckInfo = peerAckInfo->bcastAckInfo;
 
   p|source;
-  CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(getRootNode(env)));
-  CkPackMessage(&env);
-  CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+  CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(rootNode));
   if(peerAckInfo->decNumPeers() - 1 == 0) {
     QdCreate(1);
+    CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
     CmiPushPE(CmiRankOf(peerAckInfo->peerParentPe), env);
   }
 }
@@ -1685,7 +1684,6 @@ void sendRecvDoneMsgToPeers(envelope *env, CkArray *mgr) {
   int numops, rootNode;
 
   // Replace bcastAckInfo with peerAckInfo
-  CkUnpackMessage(&env);
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
 
@@ -1703,11 +1701,11 @@ void sendRecvDoneMsgToPeers(envelope *env, CkArray *mgr) {
 
   p|source;
 
-  CkPackMessage(&env);
-
   if(env->getMsgtype() == ForArrayEltMsg) {
     env->setMsgtype(ForBocMsg);
     env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
+
+    CkPackMessage(&env); // Array messages will be copied, so pack it
   }
   CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
 }
