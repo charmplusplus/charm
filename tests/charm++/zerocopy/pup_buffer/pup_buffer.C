@@ -101,11 +101,12 @@ class arr : public CBase_arr {
       res2 = (counts[2] == numAtSync);
       res3 = (counts[3] == numAtSync);
 
-      if(CkNumPes() == 1) {
-        res4  = (counts[1] == 0);
-      } else {
+      res4  = (counts[1] == 0); // Default, if CMK_LBDB_ON is 0 or CkNumPes() == 1
+#if CMK_LBDB_ON
+      if(CkNumPes() > 1) {
         res4 = (counts[1] == numAtSync);
       }
+#endif
 
       if(res1 && res2 && res3 && res4) {
         free(buffer);
