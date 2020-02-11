@@ -61,6 +61,14 @@
 
 #include "conv-header.h"
 
+/* Root of broadcast:
+ * non-bcast msg: root = 0;
+ * proc-level bcast msg: root >=1; (CmiMyPe()+1)
+ * node-level bcast msg: root <=-1; (-CmiMyNode()-1)
+ */
+#define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
+#define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
+
 #if CMK_ONESIDED_IMPL
 #define CMI_ZC_MSGTYPE(msg)                  ((CmiMsgHeaderBasic *)msg)->zcMsgType
 #define CMI_IS_ZC_P2P(msg)                   (CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_SEND_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_RECV_MSG)
@@ -2189,12 +2197,8 @@ void CthSetThreadID(CthThread th, int a, int b, int c);
 void CthTraceResume(CthThread t);
 
 #if CMK_FAULT_EVAC
-#if CMK_BIGSIM_CHARM
-#define CmiNodeAlive(x) (1)
-#else
 CpvExtern(char *,_validProcessors);
 #define CmiNodeAlive(x)  (CpvAccess(_validProcessors)[x])
-#endif
 #endif
 
 int CmiEndianness(void);
@@ -2216,10 +2220,6 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "persistent.h"
 
 #include "conv-rdma.h"
-
-/* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
-extern int _BgOutOfCoreFlag;
-extern int _BgInOutOfCoreMode;
 
 #ifdef ADAPT_SCHED_MEM
 extern int numMemCriticalEntries;

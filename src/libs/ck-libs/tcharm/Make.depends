@@ -54,7 +54,7 @@ tcharm.o: tcharm.C tcharm_impl.h ../../../../include/pup.h \
  ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
  ../../../../include/CkCheckpointStatus.decl.h \
  ../../../../include/ckevacuation.h ../../../../include/trace.h \
- ../../../../include/trace-bluegene.h ../../../../include/pathHistory.h \
+ ../../../../include/pathHistory.h \
  ../../../../include/PathHistory.decl.h \
  ../../../../include/ckcallback-ccs.h \
  ../../../../include/CkCallback.decl.h ../../../../include/sdag.h \
@@ -116,7 +116,7 @@ tcharmmain.o: tcharmmain.C tcharm_impl.h ../../../../include/pup.h \
  ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
  ../../../../include/CkCheckpointStatus.decl.h \
  ../../../../include/ckevacuation.h ../../../../include/trace.h \
- ../../../../include/trace-bluegene.h ../../../../include/pathHistory.h \
+ ../../../../include/pathHistory.h \
  ../../../../include/PathHistory.decl.h \
  ../../../../include/ckcallback-ccs.h \
  ../../../../include/CkCallback.decl.h ../../../../include/sdag.h \

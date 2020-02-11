@@ -240,10 +240,17 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   ~ArmciVirtualProcessor();
  
   pointer BlockMalloc(int bytes) { 
-    return CmiIsomallocContextMalloc(CmiIsomallocGetThreadContext(thread->getThread()), bytes);
+    CmiIsomallocContext ctx = CmiIsomallocGetThreadContext(thread->getThread());
+    if (ctx.opaque == nullptr)
+      return malloc(bytes);
+    return CmiIsomallocContextMalloc(ctx, bytes);
   }
   void BlockFree(void * ptr) {
-    CmiIsomallocContextFree(CmiIsomallocGetThreadContext(thread->getThread()), ptr);
+    CmiIsomallocContext ctx = CmiIsomallocGetThreadContext(thread->getThread());
+    if (ctx.opaque == nullptr)
+      free(ptr);
+    else
+      CmiIsomallocContextFree(ctx, ptr);
   }
   void getAddresses(AddressMsg *msg);
 

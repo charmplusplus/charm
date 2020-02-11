@@ -1490,10 +1490,12 @@ and additional command line options are required as well.
 User Defined Initial Mapping
 ----------------------------
 
-You can define the initial mapping of virtual processors (vp) to
-physical processors (p) as a runtime option. You can choose from
-predefined initial mappings or define your own mappings. The following
-predefined mappings are available:
+By default AMPI maps virtual processes to processing elements in a
+blocked fashion. This maximizes communication locality in the common
+case, but may not be ideal for all applications. With AMPI, users can
+define the initial mapping of virtual processors to physical processors
+at runtime, either choosing from the predefined initial mappings below
+or defining their own mapping in a file.
 
 Round Robin
    This mapping scheme maps virtual processor to physical processor in
@@ -1531,8 +1533,34 @@ Proportional Mapping
       $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP
       $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
 
-If you want to define your own mapping scheme, please contact us for
-assistance.
+Custom Mapping
+   To define your own mapping scheme, create a file named "mapfile"
+   which contains on each line the PE number you'd like that virtual
+   process to start on. This file is read when specifying the ``+mapping
+   MAPFILE`` option. The following mapfile will result in VPs 0, 2, 4,
+   and 6 being created on PE 0 and VPs 1, 3, 5, and 7 being created on
+   PE 1:
+
+   .. code-block:: none
+
+      0
+      1
+      0
+      1
+      0
+      1
+      0
+      1
+
+   .. code-block:: bash
+
+      $ ./charmrun ./hello +p2 +vp8 +mapping MAPFILE
+
+   Note that users can find the current mapping of ranks to PEs (after
+   dynamic load balancing) by calling ``AMPI_Comm_get_attr`` on
+   ``MPI_COMM_WORLD`` with the predefined ``AMPI_MY_WTH`` attribute.
+   This information can be gathered and dumped to a file for use in
+   future runs as the mapfile.
 
 Performance Visualization
 -------------------------

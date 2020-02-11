@@ -481,6 +481,7 @@ void *CkLocalBranch(CkGroupID gID) {
 void *CkLocalBranchOther(CkGroupID gID, int rank) {
   return _localBranchOther(gID, rank);
 }
+static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env);
 
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
@@ -669,13 +670,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0) {
-#if CMK_BIGSIM_CHARM
-      //In BigSim, CpvAccess(CsdSchedQueue) is not used. _CldEnqueue resets the
-      //handler to converse-level BigSim handler.
-      _CldEnqueue(CkMyPe(), pending, _infoIdx);
-#else
       CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
-#endif
     }
     CkpvAccess(_groupTable)->find(groupID).clearPending();
   }
@@ -1252,6 +1247,10 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       _processForNodeBocMsg(ck,env);
       // stats record moved to _processForNodeBocMsg because it is conditional
       break;
+    case BocBcastMsg : // Broadcast that needs to be forwarded
+      if (env->isPacked()) CkUnpackMessage(&env);
+      _processBocBcastMsg(ck,env);
+      break;
 
 // Array support
     case ForArrayEltMsg: // Array element entry method message
@@ -1399,15 +1398,16 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 
 #if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC(env))
+  if (CMI_IS_ZC(env)) {
     CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
+  }
 #endif
 
 #if CMK_FAULT_EVAC
-  if(pe == CkMyPe() ){
-    if(!CmiNodeAlive(CkMyPe())){
-	printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
-//	return;
+  if (pe == CkMyPe()) {
+    if (!CmiNodeAlive(CkMyPe())) {
+      printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
+      //return;
     }
   }
 #endif
@@ -1419,15 +1419,18 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     }
     else
 #endif
-    CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
-  	env, env->getQueueing(),env->getPriobits(),
-  	(unsigned int *)env->getPrioPtr());
+    {
+      CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
+          env, env->getQueueing(),env->getPriobits(),
+          (unsigned int *)env->getPrioPtr());
+    }
 #if CMK_PERSISTENT_COMM
     CmiPersistentOneSend();
 #endif
   } else {
-    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode())
+    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode()) {
       CkPackMessage(&env);
+    }
     int len=env->getTotalsize();
     CmiSetXHandler(env,CmiGetHandler(env));
 #if CMK_OBJECT_QUEUE_AVAILABLE
@@ -1437,23 +1440,15 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
- 			CmiSyncBroadcastAndFree(len, (char *)env); 
-
-}
-    else if (pe==CLD_BROADCAST_ALL) { 
-                        CmiSyncBroadcastAllAndFree(len, (char *)env);
-
-}
-    else{
-                        CmiSyncSendAndFree(pe, len, (char *)env);
-
-		}
+      CmiSyncNodeBroadcastAndFree(len, (char *)env);
+    } else if (pe==CLD_BROADCAST_ALL) {
+      CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
+    } else {
+      CmiSyncSendAndFree(pe, len, (char *)env);
+    }
   }
 }
 
-#if CMK_BIGSIM_CHARM
-#   define  _skipCldEnqueue   _CldEnqueue
-#endif
 
 // by pass Charm++ priority queue, send as Converse message
 static void _noCldEnqueueMulti(int npes, const int *pes, envelope *env)
@@ -1491,8 +1486,8 @@ static void _noCldEnqueue(int pe, envelope *env)
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
-  else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
+  if (pe==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
+  else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
   else CmiSyncSendAndFree(pe, len, (char *)env);
 }
 
@@ -1717,7 +1712,10 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     }else
     {
-        env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+        if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL)
+          env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
+        else
+          env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
     }
 
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
@@ -1735,6 +1733,11 @@ static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
   _TRACE_CREATION_N(env, CmiMyNodeSize());
   _CldEnqueueWithinNode(env, _infoIdx);
   _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
+}
+
+static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env) {
+  _SET_USED(env, 0);
+  _sendMsgBranchWithinNode(env->getEpIdx(), EnvToUsr(env), env->getGroupNum());
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
@@ -2107,10 +2110,6 @@ void CkDeleteChares() {
   }
 }
 
-#if CMK_BIGSIM_CHARM
-void CthEnqueueBigSimThread(CthThreadToken* token, int s,
-                                   int pb,unsigned int *prio);
-#endif
 
 //------------------- External client support (e.g. Charm4py) ----------------
 #if CMK_CHARMPY
@@ -2706,7 +2705,6 @@ class CkMessageReplay : public CkMessageWatcher {
 			return false;
 		}
 #endif
-#if ! CMK_BIGSIM_CHARM
 		if (nextSize!=env->getTotalsize())
                 {
 			CkPrintf("[%d] CkMessageReplay> Message size changed during replay org: [%d %d %d %d] got: [%d %d %d %d]\n", CkMyPe(), nextPE, nextSize, nextEvent, nextEP, env->getSrcPe(), env->getTotalsize(), env->getEvent(), env->getEpIdx());
@@ -2737,7 +2735,6 @@ class CkMessageReplay : public CkMessageWatcher {
 		  }
 		  if (!wasPacked) CkUnpackMessage(&env);
 		}
-#endif
 		return true;
 	}
 	bool isNext(CthThreadToken *token) {
@@ -2774,11 +2771,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	      CthThreadToken *token=delayedTokens.deq();
 	      if (isNext(token)) {
             REPLAYDEBUG("Dequeueing token: "<<token->serialNo)
-#if ! CMK_BIGSIM_CHARM
 	        CsdEnqueueLifo((void*)token);
-#else
-		CthEnqueueBigSimThread(token,0,0,NULL);
-#endif
 	        return;
 	      } else {
             REPLAYDEBUG("requeueing delayed token: "<<token->serialNo)
@@ -2904,9 +2897,7 @@ public:
 };
 
 void CkMessageReplayQuiescence(void *rep, double time) {
-#if ! CMK_BIGSIM_CHARM
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
-#endif
   CkMessageReplay *replay = (CkMessageReplay*)rep;
   //CmiStartQD(CkMessageReplayQuiescence, replay);
 }
@@ -2963,9 +2954,6 @@ void CpdHandleLBMessage(LBMigrateMsg **msg) {
   }
 }
 
-#if CMK_BIGSIM_CHARM
-CpvExtern(int      , CthResumeBigSimThreadIdx);
-#endif
 
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
@@ -3042,11 +3030,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    }
 	  }
 	  CpdSetInitializeMemory(1);
-#if ! CMK_BIGSIM_CHARM
 	  CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
-#else
-	  CkNumberHandler(CpvAccess(CthResumeBigSimThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
-#endif
 	  ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
 #else
           CkAbort("Option `+replay' requires that record-replay support be enabled at configure time (--enable-replay)");

@@ -23,6 +23,3 @@ test: all
 smptest: all
 	$(call run, ./hello 10 +p2 ++ppn 2 )
 	$(call run, ./hello 10 +p4 ++ppn 2 )
-
-bgtest: all
-	$(call run, ./hello +p4 10 +x2 +y2 +z2 +cth1 +wth1 )
