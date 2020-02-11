@@ -95,9 +95,10 @@ static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
     const ElfW(Phdr) * hdr = &info->dlpi_phdr[i];
     if (hdr->p_type == PT_TLS)
     {
-      t->size += hdr->p_memsz;
-      if (t->align < hdr->p_align)
-        t->align = hdr->p_align;
+      const size_t align = hdr->p_align;
+      t->size += CMIALIGN(hdr->p_memsz, align);
+      if (t->align < align)
+        t->align = align;
     }
   }
 
@@ -307,8 +308,8 @@ static void CmiTLSStatsInit()
   Phdr* phdr = getTLSPhdrEntry();
   if (phdr != NULL)
   {
-    CmiTLSDescription.align = phdr->p_align;
-    CmiTLSDescription.size = phdr->p_memsz;
+    const size_t align = CmiTLSDescription.align = phdr->p_align;
+    CmiTLSDescription.size = CMIALIGN(phdr->p_memsz, align);
   }
 }
 
@@ -339,8 +340,6 @@ void CmiTLSInit()
     }
 
     CmiTLSStatsInit();
-    // add an extra alignment width to work around an odd issue seen with f90-tlsglobals on 32-bit netlrts-linux
-    CmiTLSDescription.size = CMIALIGN(CmiTLSDescription.size + CmiTLSDescription.align, CmiTLSDescription.align);
     CmiTLSPrimarySegment.memseg = (Addr)getTLS();
   }
 #endif
