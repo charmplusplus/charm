@@ -66,7 +66,7 @@ endif()
 
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,verbs")
-set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,AMPI-only,LIBS")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS")
 
 # Platform specific options (choose multiple if desired):
 option(SMP "Enable shared-memory communication within a single multi-processor machine instead of message passing." ON)

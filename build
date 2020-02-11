@@ -891,8 +891,11 @@ then
     echo "CMK_AMPI_ONLY:=1" >> $ConvMak
     echo '#define CMK_AMPI_ONLY 1' >> $ConvHeader
 
-    # strip "-only" suffix from AMPI target
-    PROGRAM="${PROGRAM%AMPI-only}AMPI"
+    if [[ "$PROGRAM" = "${PROGRAM%AMPI-only}AMPI-only" ]]
+    then
+      # strip "-only" suffix from AMPI target
+      PROGRAM="${PROGRAM%-only}"
+    fi
 else
     echo "CMK_AMPI_ONLY=\"0\"" >> $ConvSh
     echo "CMK_AMPI_ONLY:=0" >> $ConvMak
