@@ -476,7 +476,7 @@ do
 		"mblock") AddModules tcharmmain mblock ;;
 		"mblockf") AddModules tcharmmain mblock ; USE_F90_LIBRARIES="1" ;;
 
-		"charm"|"charm++"|"charm++f"|"f90charm"|"converse"|"converse++"|"bgcharm++"|"bgconverse++"|"bluegene"|"ckbluegene"|"bigsim")
+		"charm"|"charm++"|"charm++f"|"f90charm"|"converse"|"converse++")
 			PARADIGM="$1"
 			POST_LANGUAGE=1
 			;;
@@ -1348,12 +1348,6 @@ case "$LANGUAGE" in
 	;;
 esac
 
-# update charm to bgcharm
-[ "$PARADIGM" = "charm++" -a -n "$CMK_BIGSIM" ] && PARADIGM="bgcharm++"
-[ "$PARADIGM" = "converse++" -a -n "$CMK_BIGSIM" ] && PARADIGM="bgconverse++"
-
-[ "$PARADIGM" = "bgcharm++" ] && TRACEMODE=`AddList $TRACEMODE bluegene`
-
 if [ $USE_F77_LIBRARIES = "1" ]
 then
 	POST_LIBRARIES="$POST_LIBRARIES $CMK_F77LIBS"
@@ -1389,18 +1383,6 @@ case "$PARADIGM" in
 "f90charm")
         PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm -lckf"
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
-	;;
-"bluegene"|"bigsim")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bigsim -lconv-bigsim-logs"
-	;;
-"ckbluegene")
-        POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
-	;;
-"bgcharm++")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bigsim -lconv-bigsim-logs -lconv-bluegene-stub"
-	;;
-"bgconverse++")
-        MIDDLE_LIBS="$MIDDLE_LIBS -lconv-bigsim -lconv-bigsim-logs"
 	;;
 esac
 
@@ -1502,7 +1484,7 @@ if [ x"$TRACEMODE" != x ]
 then
 for trace in $TRACEMODE; do
     case "$PARADIGM" in
-        "converse"|"converse++"|"bgconverse++"|"bigsim"|"bluegene")
+        "converse"|"converse++")
             if [ "$trace" != "counter" ]; then
                 Warning "Tracemode $trace isn't supported in Converse-level programs; Dropping it"
                 TRACEMODE=`DropList $trace $TRACEMODE`
@@ -1516,11 +1498,6 @@ for trace in $TRACEMODE; do
     TRACE_OBJ="$TRACE_OBJ -ltrace-$trace"
 done
 
-fi
-
-if test x$PARADIGM = x"bgcharm++"
-then
-    BALANCE=bluegene
 fi
 
 Debug "Finished with TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
@@ -1624,7 +1601,7 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
+"charm"|"charm++"|"f90charm")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-machine $CORE_LIBS "
 	if [ -z "$NO_MAIN" ]
@@ -1645,7 +1622,7 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
+"converse"|"converse++")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lconv-core $MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
@@ -1675,7 +1652,7 @@ if [ -z "$STANDALONE" ]
 then
   ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES"
   case "$PARADIGM" in
-  "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
+  "charm"|"charm++"|"f90charm")
     ALL_LIBS="$ALL_LIBS -lmoduleNDMeshStreamer -lmodulecompletion"
     ;;
   esac

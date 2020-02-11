@@ -36,14 +36,6 @@ Charm++ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: BigSim (Blue Gene) Simulator
-   :numbered:
-
-   bigsim/manual
-   bignetsim/manual
-
-.. toctree::
-   :maxdepth: 1
    :caption: Converse
    :numbered:
 

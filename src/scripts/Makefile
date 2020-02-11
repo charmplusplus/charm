@@ -32,17 +32,17 @@ CXX=$(CHARMC)
 CFLAGS=-I.
 CXXFLAGS=-I.
 
-all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM everylb
+all: charm++ LIBS AMPI f90charm TSM SM PVM everylb
 
 all-test: all-test-tests all-test-examples all-test-benchmarks
 
-all-test-tests: bigsim LIBS
+all-test-tests: LIBS
 	$(MAKE) -C ../tests all
 
-all-test-examples: bigsim LIBS
+all-test-examples: LIBS
 	$(MAKE) -C ../examples all
 
-all-test-benchmarks: bigsim LIBS
+all-test-benchmarks: LIBS
 	$(MAKE) -C ../benchmarks all
 
 all-zc: charm++
@@ -53,8 +53,6 @@ all-zc: charm++
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
 	touch charm++
-
-bgampi: bigsim AMPI
 
 TSM: converse $(L)/libtsm.a
 
@@ -76,7 +74,7 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC
 
-AMPI:  charm++ $(BIGSIM)
+AMPI:  charm++
 	$(MAKE) -C libs/ck-libs/ ampi
 
 AMPIC AMPIF: AMPI
@@ -164,26 +162,21 @@ Tau:
 LIBS: CONVLIBS CHARMLIBS everylb
 	echo "Built LIBS Successfully"
 
-bgtest: bigsim LIBS
-	$(MAKE) -C ../tests bgtest
-	$(MAKE) -C ../examples bgtest
-	$(MAKE) -C ../benchmarks bgtest
-
 syncfttest mpisyncfttest : charm++ LIBS
 	$(MAKE) -C ../tests $@
 
-test: bigsim LIBS
+test: LIBS
 	$(MAKE) -C ../tests test
 	$(MAKE) -C ../examples test
 	$(MAKE) -C ../benchmarks test
 
-test-tests: bigsim LIBS
+test-tests: LIBS
 	$(MAKE) -C ../tests test
 
-test-examples: bigsim LIBS
+test-examples: LIBS
 	$(MAKE) -C ../examples test
 
-test-benchmarks: bigsim LIBS
+test-benchmarks: LIBS
 	$(MAKE) -C ../benchmarks test
 
 test-zc: charm++
@@ -258,13 +251,13 @@ include Make.gpu
 
 CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       msgq.h queueing.h conv-taskQ.h taskqueue.h conv-cpath.h conv-cpm.h persistent.h\
-      trace.h trace-common.h trace-bluegene.h trace-projections.h  \
+      trace.h trace-common.h trace-projections.h  \
       trace-simple.h trace-controlPoints.h charm-api.h \
       conv-ccs.h ccs-client.C ccs-client.h \
       ccs-server.h ccs-auth.C ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh conv-mach-common.h \
-      blue.h blue-conv.h bgconverse.h cmipool.h mempool.h cmiqueue.h \
+      cmipool.h mempool.h cmiqueue.h \
       cmitls.h lrtslock.h conv-rdma.h lrts-common.h conv-header.h
 
 # The .c files are there to be #included by clients whole
@@ -277,7 +270,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h cmirdmautils.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
-	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
+	  ckfutures.h ckIgetControl.h debug-charm.h\
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
@@ -291,7 +284,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           elements.h topology.h manager.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h \
 	  DistBaseLB.h HybridBaseLB.h HybridLBMsg.h \
-	  BlueGene.h middle.h middle-conv.h middle-blue.h \
+	  middle.h middle-conv.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkMulticast.decl.h	\
           CkReduction.decl.h \
           waitqd.decl.h \
@@ -302,7 +295,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
           TraceSummary.decl.h TraceAutoPerf.decl.h TraceProjections.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
-	  TraceUtilization.decl.h BlueGene.decl.h \
+	  TraceUtilization.decl.h \
 	  ControlPoints.decl.h PathHistory.decl.h \
 	  pathHistory.h envelope-path.h \
 	  XArraySectionReducer.h \
@@ -314,12 +307,9 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	    picsautoperfAPI.h picsautoperfAPIC.h \
 	  $(CVHEADERS)
 
-BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h
-
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \
 	ckset.h LBSimulation.h  \
-	$(BLUE_HEADERS)
 
 basics: headers
 	touch basics
@@ -385,7 +375,6 @@ endif
 	./gatherflat $(SRCBASE)/ck-cp                            .
 	./gatherflat $(SRCBASE)/langs/simplemsg                  .
 	./gatherflat $(SRCBASE)/langs/pvmc                       .
-	./gatherflat $(SRCBASE)/langs/bluegene                   .
 	./gatherflat $(SRCBASE)/langs/f90charm                   .
 	./gatherflat $(SRCBASE)/xlatcpm                          .
 	./gathertree $(SRCBASE)/QuickThreads                     QuickThreads
@@ -427,7 +416,7 @@ endif
 # Converse Libraries
 # 
 ###############################################################################
-CLBLIBS=$(L)/libldb-rand.a $(L)/libldb-spray.a   $(L)/libldb-workstealing.a  $(L)/libldb-neighbor.a $(L)/libldb-none.a $(L)/libldb-test.a $(L)/libldb-bluegene.a
+CLBLIBS=$(L)/libldb-rand.a $(L)/libldb-spray.a   $(L)/libldb-workstealing.a  $(L)/libldb-neighbor.a $(L)/libldb-none.a $(L)/libldb-test.a
 
 TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a 
 
@@ -442,7 +431,6 @@ TRACELIBS += \
   $(L)/libtrace-utilization.a \
   $(L)/libtrace-simple.a \
   $(L)/libtrace-counter.a \
-  $(L)/libtrace-bluegene.a \
   $(L)/libtrace-projector.a \
   $(L)/libtrace-all.a \
   $(L)/libtrace-memory.a \
@@ -654,9 +642,6 @@ $(L)/libldb-spray.a: cldb.spray.C $(CVHEADERS)
 $(L)/libldb-test.a: cldb.test.C $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.test.C
 
-$(L)/libldb-bluegene.a: cldb.bluegene.C $(CVHEADERS)
-	$(CHARMC) -o $@ cldb.bluegene.C
-
 ## Memory allocation libraries (-memory)
 MEM_DEPS=memory-gnu.C memory-gnu-internal.C converse.h conv-mach.h $(CVHEADERS)
 
@@ -755,14 +740,14 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
            ckgraph.o LButil.o RefinerTemp.o Refiner.o \
            manager.o ckset.o ckheap.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
-	   charmProjections.o cktiming.o ckbitvector.o \
+	   charmProjections.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
            trace-controlPoints.o mpi-interoperate.o ckregex.o sdag.o \
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a $(L)/libckmainf.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr
 
-CHARMLIBS: charm++ CONVLIBS $(BIGSIM)
+CHARMLIBS: charm++ CONVLIBS
 	$(MAKE) -C libs charmlibs
 
 $(L)/libck.a: $(LIBCK_CORE) 
@@ -827,7 +812,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  trace.h trace-bluegene.h trace-simple.h \
+  trace.h trace-simple.h \
   register.h trace-common.h trace-simpleBOC.h TraceSimple.decl.h \
   TraceSimple.def.h ckregex.h
 	$(CHARMC) -c -I. $(TAU_INCLUDE) $(TAU_DEFS) trace-Tau.C -o libtrace-Tau.o
@@ -841,10 +826,6 @@ $(L)/libtrace-Tau.a: $(TAU_TRACE_OBJ) tau_selective.o
 LIBTRACE_COUNT=trace-counter.o
 $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
-
-LIBTRACE_BG=trace-bluegene.o
-$(L)/libtrace-bluegene.a:$(LIBTRACE_BG)
-	$(CHARMC) -o $@ $(LIBTRACE_BG)
 
 LIBTRACE_MEMORY=trace-memory.o
 $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
@@ -874,7 +855,7 @@ tracef_f.o: tracef_f.f90
 # used for make depends
 TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o trace-perf.o picsautoperfAPI.o picsautoperf.o trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-utilization.o	\
-	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
+	      trace-projector.o trace-converse.o trace-all.o \
           trace-memory.o 
 
 ###############################################################################
@@ -896,39 +877,6 @@ $(L)/libmodule%LB.a: %LB.o
 $(L)/libmoduleCommonLBs.a:
 	$(CHARMC) -o $@ $^
 	( [ -r libmoduleCommonLBs.dep ] && cp -f libmoduleCommonLBs.dep $(L)/ ) || true
-
-###############################################################################
-#
-# BlueGene Emulator
-#
-###############################################################################
-
-bigsim:  bigsim-target
-
-bigemulator: bigsim
-
-bigsim-target: charm++ $(L)/libconv-bigsim.a $(L)/libconv-bigsim-logs.a $(L)/libconv-bluegene-stub.a $(L)/libblue-standalone.a
-
-$(L)/libbluegene.a: BlueGene.o
-	$(CHARMC) -o $@ $^
-
-# (Converse) Blue Gene emulator
-BLUE_OBJS = blue.o bigsim_node.o bigsim_proc.o bigsim_init.o bigsim_timing.o bigsim_record.o bigsim_ooc.o shared_alloc.o
-BIGSIM_IO_OBJS = bigsim_read.o bigsim_logs.o bigsim_api.o
-
-LIBBLUE_OBJS = $(BLUE_OBJS) $(BIGSIM_IO_OBJS) blue_stub.o blue_standalone.o
-
-$(L)/libconv-bigsim.a: $(BLUE_OBJS)
-	$(CHARMC) -o $@ $^
-
-$(L)/libconv-bigsim-logs.a: $(BIGSIM_IO_OBJS)
-	$(CHARMC) -o $@ $^
-
-$(L)/libconv-bluegene-stub.a:  blue_stub.o
-	$(CHARMC) -o $@ $^
-
-$(L)/libblue-standalone.a: blue_standalone.o
-	$(CHARMC) -o $@ $^
 
 ###############################################################################
 #
@@ -1016,7 +964,7 @@ $(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C
 ##############################################################################
 # adding this entry for files which do not belong to any of other locations
 
-OTHER_OBJS= mpi-mainmodule.o main.o custom_partitioner.o BlueGene.o set_partition_params.o
+OTHER_OBJS= mpi-mainmodule.o main.o custom_partitioner.o set_partition_params.o
 
 ##############################################################################
 
@@ -1089,7 +1037,7 @@ depends: cidepends commitid.C
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
 	processFiles=''; 	\
-        for i in $(sort $(LIBCONV_CORE) $(LIBCONV_LDB) $(LIBCONV_UTIL) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(OTHER_OBJS)) ; do \
+        for i in $(sort $(LIBCONV_CORE) $(LIBCONV_LDB) $(LIBCONV_UTIL) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(OTHER_OBJS)) ; do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\
@@ -1113,7 +1061,7 @@ dependsCaseSensitive: cidepends
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
 	processFiles=''; 	\
-        for i in $(sort $(LIBCONV_CORE) $(LIBCONV_UTIL) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(OTHER_OBJS)); do \
+        for i in $(sort $(LIBCONV_CORE) $(LIBCONV_UTIL) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(OTHER_OBJS)); do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\

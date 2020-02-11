@@ -25,6 +25,3 @@ test: all
 smptest: all
 	$(call run, ./startupTest 200 10 0.0001 1  +p2 ++ppn 2)
 	$(call run, ./startupTest 200 10 0.0001 1  +p4 ++ppn 2)
-
-bgtest: all
-	$(call run, ./startupTest 20 10 0.01 1 +p4 +x2 +y2 +z2)

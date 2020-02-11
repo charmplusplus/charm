@@ -19,6 +19,3 @@ pgm.o: pgm.C pgm.decl.h
 
 test: all
 	$(call run, ./pgm +p4 )
-
-bgtest: all
-	$(call run, ./pgm +p4 +x2 +y2 +z1 )
