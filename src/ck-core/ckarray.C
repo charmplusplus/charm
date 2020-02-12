@@ -1437,6 +1437,8 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
         // root node pe) to perform a broadcast
         MsgPointerWrapper w;
         w.msg = msg;
+        w.ep = ep;
+        w.opts = opts;
         ap[CpvAccess(serializer)].incrementBcastNoAndSendBack(CkMyPe(), w);
       } else
 #endif
@@ -1474,7 +1476,14 @@ void CkArray::incrementBcastNo(){
 }
 
 void CkArray::sendZCBroadcast(MsgPointerWrapper w) {
-  thisProxy.recvBroadcast((CkArrayMessage *)(w.msg));
+  int skipsched = w.opts & CK_MSG_EXPEDITED;
+  if (skipsched) {
+    thisProxy.recvExpeditedBroadcast((CkArrayMessage *)(w.msg));
+  } else if (_entryTable[w.ep]->noKeep) {
+    thisProxy.recvNoKeepBroadcast((CkArrayMessage *)(w.msg));
+  } else {
+    thisProxy.recvBroadcast((CkArrayMessage *)(w.msg));
+  }
 }
 
 /// Reflect a broadcast off this Pe:
@@ -1539,6 +1548,12 @@ void CkArray::recvBroadcast(CkMessage* m) {
     bool doFree = true; // free it since all ops are done
     broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
   } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG && len > 0 ) {
+
+    // Set Array manager for this message as it is required for ZC Post API
+    env->setMsgtype(ForArrayEltMsg);
+    UsrToEnv(msg)->setArrayMgr(thisgroup);
+    env->setMsgtype(ArrayBcastFwdMsg);
+
     // Message is used by the receiver to post the receiver buffer
     // Initial metadata message, send only to the first element, other elements
     // are sent CMK_ZC_BCAST_RECV_DONE_MSG after rget completion
@@ -1572,16 +1587,6 @@ void CkArray::recvBroadcast(CkMessage* m) {
       broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
     }
 
-#if CMK_ONESIDED_IMPL
-    if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
-      CkArray* mgr = getArrayMgrFromMsg(env);
-
-      // Reset back message to be ForBocMsg with the prevEpIdx that targets
-      // CkArray group
-      env->setMsgtype(ForBocMsg);
-      env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
-    }
-#endif
 #endif // CMK_CHARMPY
   }
 
@@ -1600,21 +1605,16 @@ void CkArray::recvBroadcast(CkMessage* m) {
 
 #if CMK_ONESIDED_IMPL
 void CkArray::forwardZCMsgToOtherElems(envelope *env) {
-  CkArrayMessage *msg=(CkArrayMessage *)(EnvToUsr(env));
-
-  // Set the array to array element endpoint
-  unsigned short ep = msg->array_ep_bcast();
-  env->getsetArrayEp() = ep;
 
   CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_DONE_MSG;
 
-   int len = localElemVec.size();
+  int len = localElemVec.size();
 
-   for (unsigned int i = 1; i < len; ++i) { // Send to all elements except the first element
-     bool doFree = false;
-     if (stableLocations && i == len-1 && CMI_ZC_MSGTYPE(env)!=CMK_ZC_BCAST_RECV_DONE_MSG) doFree = true;
-     broadcaster->deliver((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[i], doFree);
-   }
+  for (unsigned int i = 1; i < len; ++i) { // Send to all elements except the first element
+    bool doFree = false;
+    if (stableLocations && i == len-1 && CMI_ZC_MSGTYPE(env)!=CMK_ZC_BCAST_RECV_DONE_MSG) doFree = true;
+    broadcaster->deliver((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[i], doFree);
+  }
 }
 #endif
 

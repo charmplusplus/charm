@@ -547,8 +547,12 @@ void _ckArrayInit(void);
 class MsgPointerWrapper {
   public:
     void *msg;
+    int ep;
+    int opts;
     void pup(PUP::er &p) {
       pup_pointer(&p, &msg);
+      p|ep;
+      p|opts;
     }
 };
 
