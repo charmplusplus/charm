@@ -10,9 +10,9 @@
 
 namespace buggy {
 
-#define DEBUG 1
+#define BUGGY_DEBUG 0
 
-#ifdef DEBUG
+#if BUGGY_DEBUG
 #define DEBUG_PRINT(...) printf("Buggy> " __VA_ARGS__)
 #else
 #define DEBUG_PRINT(...) do {} while (0)
@@ -171,7 +171,7 @@ namespace buggy {
       DEBUG_PRINT("Allocated ptr %p (base_ptr + %lu) with %lu bytes, requested was %lu bytes\n",
           (void*)ptr, (size_t)(ptr - base_ptr), size, request);
 
-#ifdef DEBUG
+#if BUGGY_DEBUG
       print_status();
 #endif
 
@@ -232,7 +232,7 @@ namespace buggy {
 merge_done:
       DEBUG_PRINT("Freed ptr %p with %lu bytes, requested was %lu bytes\n", ptr, size, requested);
 
-#ifdef DEBUG
+#if BUGGY_DEBUG
       print_status();
 #endif
     }
