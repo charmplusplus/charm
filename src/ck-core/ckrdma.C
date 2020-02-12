@@ -2358,3 +2358,7 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
   CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
 #endif
 }
+
+void CkRdmaToDeviceCommBuffer(int target_pe, int numops, void** ptrs, int* sizes) {
+  CkPrintf("PE %d, target %d, numops %d, ptrs: %p, sizes: %p\n", CkMyPe(), target_pe, numops, ptrs, sizes);
+}

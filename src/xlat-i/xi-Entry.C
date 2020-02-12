@@ -589,6 +589,11 @@ void Entry::genArrayDefs(XStr& str) {
     prepareMsg << "  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);\n";
     prepareMsg << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
     prepareMsg << "  impl_amsg->array_setIfNotThere(" << ifNot << ");\n";
+    if (param->hasDevice()) {
+      prepareMsg << "  int target_pe = ckLocMgr()->whichPE(impl_amsg->array_element_id());\n";
+      prepareMsg << "  CkRdmaToDeviceCommBuffer(target_pe, impl_num_device_rdma_fields,"
+                 << "  device_rdma_ptrs, device_rdma_sizes);\n";
+    }
 
     if (!isLocal()) {
       if (isInline() && container->isForElement()) {

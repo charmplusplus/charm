@@ -45,7 +45,7 @@ class Parameter {
   void marshallArraySizes(XStr& str, Type* dt);
   void marshallRegArraySizes(XStr& str);
   void marshallRdmaParameters(XStr& str, bool genRdma);
-  void marshallDeviceRdmaParameters(XStr& str);
+  void marshallDeviceRdmaParameters(XStr& str, int& index);
   void marshallArrayData(XStr& str);
   void marshallRdmaArrayData(XStr& str);
   void beginUnmarshall(XStr& str);
@@ -124,10 +124,12 @@ class ParamList {
   typedef void (Parameter::*fn_t)(XStr& str);
   typedef void (Parameter::*rdmafn_t)(XStr& str, bool genRegArray);
   typedef void (Parameter::*rdmarecvfn_t)(XStr& str, bool genRdma, bool isSDAGGen, int &count);
+  typedef void (Parameter::*rdmadevicefn_t)(XStr& str, int& index);
   void callEach(fn_t f, XStr& str);
   void callEach(rdmafn_t f, XStr& str, bool genRegArray);
   void callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen);
   void callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen, int &count);
+  void callEach(rdmadevicefn_t f, XStr& str, int& index);
   void encloseFlag(XStr& str);
   bool manyPointers;
 

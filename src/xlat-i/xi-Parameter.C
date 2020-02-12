@@ -209,6 +209,13 @@ void ParamList::callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen
   } while (NULL != (cur = cur->next));
 }
 
+void ParamList::callEach(rdmadevicefn_t f, XStr& str, int& index) {
+  ParamList* cur = this;
+  do {
+    ((cur->param)->*f)(str, index);
+  } while (NULL != (cur = cur->next));
+}
+
 int ParamList::hasConditional() { return orEach(&Parameter::isConditional); }
 
 /** marshalling: pack fields into flat byte buffer **/
@@ -231,7 +238,10 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     if (hasrdma) {
       if (hasDevice()) {
         str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams << ";\n";
-        callEach(&Parameter::marshallDeviceRdmaParameters, str);
+        str << "  void* device_rdma_ptrs[" << entry->numRdmaDeviceParams << "];\n";
+        str << "  int device_rdma_sizes[" << entry->numRdmaDeviceParams << "];\n";
+        int device_rdma_index = 0;
+        callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
       }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
@@ -375,11 +385,14 @@ void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
   }
 }
 
-void Parameter::marshallDeviceRdmaParameters(XStr& str) {
+void Parameter::marshallDeviceRdmaParameters(XStr& str, int& index) {
   if (isRdma() && isDevice()) {
     Type* dt = type->deref();
     str << "  ncpyBuffer_" << name << ".cnt = sizeof(" << dt << ")*(" << arrLen
       << ");\n";
+    str << "  device_rdma_ptrs[" << index << "] = (void*)ncpyBuffer_" << name << ".ptr;\n";
+    str << "  device_rdma_sizes[" << index << "] = ncpyBuffer_" << name << ".cnt;\n";
+    index++;
   }
 }
 
