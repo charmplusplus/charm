@@ -8,9 +8,6 @@
 #include "ampiimpl.h"
 #include "tcharm.h"
 
-#if CMK_BIGSIM_CHARM
-#include "bigsim_logs.h"
-#endif
 
 #if CMK_TRACE_ENABLED
 #include "register.h" // for _chareTable, _entryTable
@@ -1192,10 +1189,6 @@ static ampi *ampiInit(char **argv) noexcept
   CtvAccess(ampiInitDone)=true;
   CtvAccess(ampiFinalized)=false;
   STARTUP_DEBUG("ampiInit> complete")
-#if CMK_BIGSIM_CHARM
-    //  TRACE_BG_AMPI_START(ptr->getThread(), "AMPI_START");
-    TRACE_BG_ADD_TAG("AMPI_START");
-#endif
 
   ampiParent* pptr = getAmpiParent();
   auto & attributes = pptr->getAttributes(MPI_COMM_WORLD);
@@ -1216,9 +1209,6 @@ static ampi *ampiInit(char **argv) noexcept
 
   removeUnimportantArrayObjsfromPeCache();
 
-#if CMK_BIGSIM_CHARM
-  BgSetStartOutOfCore();
-#endif
 
   return ptr;
 }
@@ -1592,9 +1582,6 @@ void ampiParent::startCheckpoint(const char* dname) noexcept {
 
   ampiParent* unused = block();
 
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_ADD_TAG("CHECKPOINT_RESUME");
-#endif
 }
 
 void ampiParent::Checkpoint(int len, const char* dname) noexcept {
@@ -2099,7 +2086,7 @@ void ampi::pup(PUP::er &p) noexcept
 
 ampi::~ampi() noexcept
 {
-  if (CkInRestarting() || _BgOutOfCoreFlag==1) {
+  if (CkInRestarting()) {
     // in restarting, we need to flush messages
     unexpectedMsgs.flushMsgs();
     postedReqs.freeAll();
@@ -2125,10 +2112,6 @@ class ampiSplitKey {
 /* "type" may indicate whether call is for a cartesian topology etc. */
 void ampi::split(int color,int key,MPI_Comm *dest, int type) noexcept
 {
-#if CMK_BIGSIM_CHARM
-  void *curLog; // store current log in timeline
-  _TRACE_BG_TLINE_END(&curLog);
-#endif
   if (type == MPI_CART) {
     ampiSplitKey splitKey(parent->getNextCart(),color,key,myRank);
     int rootIdx=myComm.getIndexForRank(0);
@@ -2179,9 +2162,6 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type) noexcept
     MPI_Comm newComm = dis->parent->getNextSplit()-1;
     *dest=newComm;
   }
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_SET_INFO(NULL, "SPLIT_RESUME", NULL, 0);
-#endif
 }
 
 CLINKAGE
@@ -2602,25 +2582,11 @@ void ampi::setBlockingReq(AmpiRequest *req) noexcept {
 
 // block on (All)Reduce or (All)Gather(v)
 CMI_WARN_UNUSED_RESULT ampi* ampi::static_blockOnColl(ampi *dis) noexcept {
-#if CMK_BIGSIM_CHARM
-  void *curLog; // store current log in timeline
-  _TRACE_BG_TLINE_END(&curLog);
-#if CMK_TRACE_IN_CHARM
-  if(CpvAccess(traceOn)) traceSuspend();
-#endif
-#endif
 
   CkAssert(dis->parent->resumeOnColl == true);
   dis = dis->block();
   dis->parent->resumeOnColl = false;
 
-#if CMK_BIGSIM_CHARM
-#if CMK_TRACE_IN_CHARM
-  if(CpvAccess(traceOn)) CthTraceResume(dis->thread->getThread());
-#endif
-  TRACE_BG_AMPI_BREAK(dis->thread->getThread(), "RECV_RESUME", NULL, 0, 0);
-  if (dis->parent->blockingReq->eventPe == CkMyPe()) _TRACE_BG_ADD_BACKWARD_DEP(dis->parent->blockingReq->event);
-#endif
 
   delete dis->parent->blockingReq; dis->parent->blockingReq = NULL;
   return dis;
@@ -2646,10 +2612,6 @@ void ampi::generic(AmpiMsg* msg) noexcept
              thisIndex, (msg->isSsend()) ? "sync" : " ", msg->getTag(), msg->getSrcRank(),
              getComm(), msg->getSeq(), parent->resumeOnRecv);
   )
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_ADD_TAG("AMPI_generic");
-  msg->event = NULL;
-#endif
 
   if(msg->getSeq() != 0) {
     int seqIdx = msg->getSeqIdx();
@@ -2675,10 +2637,6 @@ void ampi::bcastResult(AmpiMsg* msg) noexcept
     CkPrintf("AMPI vp %d bcast arrival: tag=%d, src=%d, comm=%d (seq %d) resumeOnRecv %d\n",
              thisIndex, msg->getTag(), msg->getSrcRank(), getComm(), msg->getSeq(), parent->resumeOnRecv);
   )
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_ADD_TAG("AMPI_generic");
-  msg->event = NULL;
-#endif
 
   CkAssert(msg->getSeq() != 0);
   int seqIdx = msg->getSeqIdx();
@@ -2720,10 +2678,6 @@ bool ampi::inorder(AmpiMsg* msg) noexcept
              thisIndex, msg->getTag(), msg->getSrcRank(), getComm(), msg->getSeq());
   )
 
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&msg->event); // store current log
-  msg->eventPe = CkMyPe();
-#endif
 
   //Check posted recvs:
   int tag = msg->getTag();
@@ -2752,10 +2706,6 @@ void ampi::inorderBcast(AmpiMsg* msg, bool deleteMsg) noexcept
              thisIndex, msg->getTag(), msg->getSrcRank(), getComm(), msg->getSeq());
   )
 
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&msg->event); // store current log
-  msg->eventPe = CkMyPe();
-#endif
 
   //Check posted recvs:
   int tag = msg->getTag();
@@ -3612,10 +3562,6 @@ void ampi::static_probe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts)
   if (handle_MPI_PROC_NULL(s, sts)) 
     return;
 
-#if CMK_BIGSIM_CHARM
-  void *curLog; // store current log in timeline
-  _TRACE_BG_TLINE_END(&curLog);
-#endif
 
   AmpiMsg *msg = NULL;
   while(1) {
@@ -3634,9 +3580,6 @@ void ampi::static_probe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts)
     sts->MPI_CANCEL = 0;
   }
 
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_SET_INFO((char *)msg, "PROBE_RESUME",  &curLog, 1);
-#endif
 }
 
 void ampi::static_mprobe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept
@@ -3646,10 +3589,6 @@ void ampi::static_mprobe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts
     return;
   }
 
-#if CMK_BIGSIM_CHARM
-  void *curLog; // store current log in timeline
-  _TRACE_BG_TLINE_END(&curLog);
-#endif
 
   AmpiMsg *msg = NULL;
   while(1) {
@@ -3674,9 +3613,6 @@ void ampi::static_mprobe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts
     sts->MPI_CANCEL = 0;
   }
 
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_SET_INFO((char *)msg, "MPROBE_RESUME",  &curLog, 1);
-#endif
 }
 
 // Returns whether there is a message that can be received (return 1) or not (return 0) 
@@ -3698,14 +3634,7 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts) noexcept
     }
     return 1;
   }
-#if CMK_BIGSIM_CHARM
-  void *curLog; // store current log in timeline
-  _TRACE_BG_TLINE_END(&curLog);
-#endif
   ampi* unused = yield();
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_SET_INFO(NULL, "IPROBE_RESUME",  &curLog, 1);
-#endif
   return 0;
 }
 
@@ -3735,14 +3664,7 @@ int ampi::improbe(int tag, int source, MPI_Comm comm, MPI_Status *sts,
     return 1;
   }
 
-#if CMK_BIGSIM_CHARM
-  void *curLog; // store current log in timeline
-  _TRACE_BG_TLINE_END(&curLog);
-#endif
   ampi* unused = yield();
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_SET_INFO(NULL, "IMPROBE_RESUME",  &curLog, 1);
-#endif
   return 0;
 }
 
@@ -4398,9 +4320,6 @@ AMPI_API_IMPL(int, MPI_Finalize, void)
   getAmpiParent()->printMsgSizes();
 #endif
 
-#if CMK_BIGSIM_CHARM && CMK_TRACE_IN_CHARM
-  if(CpvAccess(traceOn)) traceSuspend();
-#endif
   }
 
   AMPI_Exit(0); // Never returns
@@ -4926,9 +4845,6 @@ AMPI_API_IMPL(int, MPI_Barrier, MPI_Comm comm)
     return ret;
 #endif
 
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_LOG(MPI_BARRIER, 0);
-#endif
 
   ampi *ptr = getAmpiInstance(comm);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Barrier called on comm %d\n", ptr->thisIndex, comm));
@@ -4978,9 +4894,6 @@ AMPI_API_IMPL(int, MPI_Ibarrier, MPI_Comm comm, MPI_Request *request)
 
   // implementation of intercomm ibarrier is equivalent to that for intracomm ibarrier
 
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_LOG(MPI_BARRIER, 0);
-#endif
 
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Ibarrier called on comm %d\n", ptr->thisIndex, comm));
 
@@ -5104,12 +5017,6 @@ void ampi::rednResult(CkReductionMsg *msg) noexcept
   }
 #endif
 
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_ADD_TAG("AMPI_generic");
-  msg->event = NULL;
-  _TRACE_BG_TLINE_END(&msg->event); // store current log
-  msg->eventPe = CkMyPe();
-#endif
 
   parent->blockingReq->receive(this, msg);
 
@@ -5127,12 +5034,6 @@ void ampi::irednResult(CkReductionMsg *msg) noexcept
   if (req == NULL)
     CkAbort("AMPI> recv'ed a non-blocking reduction unexpectedly!\n");
 
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_ADD_TAG("AMPI_generic");
-  msg->event = NULL;
-  _TRACE_BG_TLINE_END(&msg->event); // store current log
-  msg->eventPe = CkMyPe();
-#endif
 #if AMPIMSGLOG
   if(msgLogRead){
     PUParray(*(getAmpiParent()->fromPUPer), (char *)req, sizeof(int));
@@ -5416,9 +5317,6 @@ AMPI_API_IMPL(int, MPI_Allreduce, const void *inbuf, void *outbuf, int count, MP
   if(size == 1)
     return copyDatatype(type,count,type,count,inbuf,outbuf);
 
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_LOG(MPI_ALLREDUCE, getAmpiInstance(comm)->getDDT()->getType(type)->getSize(count));
-#endif
 
 #if AMPIMSGLOG
   if(msgLogRead){
@@ -5777,11 +5675,7 @@ AMPI_API_IMPL(double, MPI_Wtime, void)
   }
 #endif
 
-#if CMK_BIGSIM_CHARM
-  return BgGetTime();
-#else
   return TCHARM_Wall_timer();
-#endif
 }
 
 AMPI_API_IMPL(double, MPI_Wtick, void)
@@ -5861,21 +5755,9 @@ CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *st
       if (sts != MPI_STATUS_IGNORE) sts->MPI_CANCEL = 1;
       complete = true;
       parent->resumeOnRecv = false;
-#if CMK_BIGSIM_CHARM
-      if (result) *result = 0;
-#endif
       return parent;
     }
 
-#if CMK_BIGSIM_CHARM
-    //Because of the out-of-core emulation, this pointer is changed after in-out
-    //memory operation. So we need to return from this function and do the while loop
-    //in the outer function call.
-    if (_BgInOutOfCoreMode) {
-      if (result) *result = -1;
-      return parent;
-    }
-#endif
   } // end of while
   parent->resumeOnRecv = false;
 
@@ -5890,9 +5772,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *st
     sts->MPI_CANCEL = 0;
   }
 
-#if CMK_BIGSIM_CHARM
-  if (result) *result = 0;
-#endif
   return parent;
 }
 
@@ -5906,15 +5785,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status 
     parent = parent->block();
     setBlocked(false);
 
-#if CMK_BIGSIM_CHARM
-    //Because of the out-of-core emulation, this pointer is changed after in-out
-    //memory operation. So we need to return from this function and do the while loop
-    //in the outer function call.
-    if (_BgInOutOfCoreMode) {
-      if (result) *result = -1;
-      return parent;
-    }
-#endif
   }
   parent->resumeOnColl = false;
 
@@ -5927,9 +5797,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status 
     sts->MPI_CANCEL = 0;
   }
 
-#if CMK_BIGSIM_CHARM
-  if (result) *result = 0;
-#endif
   return parent;
 }
 
@@ -5943,15 +5810,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* GatherReq::wait(ampiParent* parent, MPI_Statu
     parent = parent->block();
     setBlocked(false);
 
-#if CMK_BIGSIM_CHARM
-    //Because of the out-of-core emulation, this pointer is changed after in-out
-    //memory operation. So we need to return from this function and do the while loop
-    //in the outer function call.
-    if (_BgInOutOfCoreMode) {
-      if (result) *result = -1;
-      return parent;
-    }
-#endif
   }
   parent->resumeOnColl = false;
 
@@ -5964,9 +5822,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* GatherReq::wait(ampiParent* parent, MPI_Statu
     sts->MPI_CANCEL = 0;
   }
 
-#if CMK_BIGSIM_CHARM
-  if (result) *result = 0;
-#endif
   return parent;
 }
 
@@ -5980,15 +5835,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* GathervReq::wait(ampiParent* parent, MPI_Stat
     parent = parent->block();
     setBlocked(false);
 
-#if CMK_BIGSIM_CHARM
-    //Because of the out-of-core emulation, this pointer is changed after in-out
-    //memory operation. So we need to return from this function and do the while loop
-    //in the outer function call.
-    if (_BgInOutOfCoreMode) {
-      if (result) *result = -1;
-      return parent;
-    }
-#endif
   }
   parent->resumeOnColl = false;
 
@@ -6001,9 +5847,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* GathervReq::wait(ampiParent* parent, MPI_Stat
     sts->MPI_CANCEL = 0;
   }
 
-#if CMK_BIGSIM_CHARM
-  if (result) *result = 0;
-#endif
   return parent;
 }
 
@@ -6082,27 +5925,14 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_St
   }
 #endif
 
-#if CMK_BIGSIM_CHARM
-  void *curLog; // store current log in timeline
-  _TRACE_BG_TLINE_END(&curLog);
-#endif
 
   AMPI_DEBUG("AMPI_Wait request=%d reqs[*request]=%p reqs[*request]->tag=%d &reqs=%p\n",
              *request, reqs[*request], (int)(reqs[*request]->tag), &reqs);
   CkAssert(pptr->numBlockedReqs == 0);
 
   int waitResult = -1;
-#if CMK_BIGSIM_CHARM
-  do{
-#endif
     AmpiRequest& waitReq = *reqs[*request];
     pptr = waitReq.wait(pptr, sts, &waitResult);
-#if CMK_BIGSIM_CHARM
-    if(_BgInOutOfCoreMode){
-      reqs = getReqs();
-    }
-  }while(waitResult==-1);
-#endif
   reqs = pptr->getReqs();
 
   CkAssert(pptr->numBlockedReqs == 0);
@@ -6118,9 +5948,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_St
   }
 #endif
 
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_WAIT(&reqs); // setup forward and backward dependence
-#endif
 
   reqs.freeNonPersReq(pptr, *request);
 
@@ -6149,10 +5976,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
     }
     return pptr;
   }
-#endif
-#if CMK_BIGSIM_CHARM
-  void *curLog; // store current log in timeline
-  _TRACE_BG_TLINE_END(&curLog);
 #endif
 
   // First check for any incomplete requests
@@ -6211,9 +6034,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
 
   CkAssert(pptr->numBlockedReqs == 0);
 
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_WAITALL(&reqs); // setup forward and backward dependence
-#endif
 
   return pptr;
 }
@@ -6458,10 +6278,6 @@ bool IReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
   src = msg->getSrcRank();   // Although not required, we also extract src from msg
   comm = ptr->getComm();
   AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", tag, this);
-#if CMK_BIGSIM_CHARM
-  event = msg->event;
-  eventPe = msg->eventPe;
-#endif
   // in case of an inorder bcast, msg is [nokeep] and shouldn't be freed
   if (deleteMsg) {
     CkpvAccess(msgPool).deleteAmpiMsg(msg);
@@ -6488,10 +6304,6 @@ void RednReq::receive(ampi *ptr, CkReductionMsg *msg) noexcept
   }
   complete = true;
   comm = ptr->getComm();
-#if CMK_BIGSIM_CHARM
-  event = msg->event;
-  eventPe = msg->eventPe;
-#endif
   // ampi::rednResult is a [nokeep] entry method, so do not delete msg
 }
 
@@ -6500,10 +6312,6 @@ void GatherReq::receive(ampi *ptr, CkReductionMsg *msg) noexcept
   ptr->processGatherMsg(msg, buf, type, count);
   complete = true;
   comm = ptr->getComm();
-#if CMK_BIGSIM_CHARM
-  event = msg->event;
-  eventPe = msg->eventPe;
-#endif
   // ampi::rednResult is a [nokeep] entry method, so do not delete msg
 }
 
@@ -6512,10 +6320,6 @@ void GathervReq::receive(ampi *ptr, CkReductionMsg *msg) noexcept
   ptr->processGathervMsg(msg, buf, type, recvCounts.data(), displs.data());
   complete = true;
   comm = ptr->getComm();
-#if CMK_BIGSIM_CHARM
-  event = msg->event;
-  eventPe = msg->eventPe;
-#endif
   // ampi::rednResult is a [nokeep] entry method, so do not delete msg
 }
 
@@ -8738,9 +8542,6 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
   int size = ptr->getSize();
   int rank = ptr->getRank();
 
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_LOG(MPI_ALLTOALL, itemextent);
-#endif
 
   /* For MPI_IN_PLACE (sendbuf==recvbuf), prevent using the algorithm for
    * large message sizes, since it might lead to overwriting data before
@@ -11653,9 +11454,6 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
   }
 
 
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_ADD_TAG("AMPI_MIGRATE");
-#endif
   return MPI_SUCCESS;
 }
 
@@ -11674,9 +11472,6 @@ int AMPI_Migrate_to_pe(int dest)
 {
   AMPI_API("AMPI_Migrate_to_pe", dest);
   TCHARM_Migrate_to(dest);
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_ADD_TAG("AMPI_MIGRATE_TO_PE");
-#endif
   return MPI_SUCCESS;
 }
 
@@ -11842,48 +11637,6 @@ int AMPI_Uninstall_idle_timer(void)
   return MPI_SUCCESS;
 }
 
-#if CMK_BIGSIM_CHARM
-extern "C" void startCFnCall(void *param,void *msg)
-{
-  BgSetStartEvent();
-  ampi *ptr = (ampi*)param;
-  ampi::bcastraw(NULL, 0, ptr->getProxy());
-  delete (CkReductionMsg*)msg;
-}
-
-CLINKAGE
-int AMPI_Set_start_event(MPI_Comm comm)
-{
-  AMPI_API("AMPI_Set_start_event", comm);
-  CkAssert(comm == MPI_COMM_WORLD);
-
-  ampi *ptr = getAmpiInstance(comm);
-  int rank = ptr->getRank();
-  int size = ptr->getSize();
-
-  CkDDT_DataType *ddt_type = ptr->getDDT()->getType(MPI_INT);
-
-  CkReductionMsg *msg=makeRednMsg(ddt_type, NULL, 0, MPI_INT, rank, size, MPI_SUM);
-  if (CkMyPe() == 0) {
-    CkCallback allreduceCB(startCFnCall, ptr);
-    msg->setCallback(allreduceCB);
-  }
-  ptr->contribute(msg);
-
-  /*HACK: Use recv() to block until the reduction data comes back*/
-  if(-1==ptr->recv(MPI_BCAST_TAG, -1, NULL, 0, MPI_INT, MPI_COMM_WORLD))
-    CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
-
-  return MPI_SUCCESS;
-}
-
-CLINKAGE
-int AMPI_Set_end_event(void)
-{
-  AMPI_API("AMPI_Set_end_event", "");
-  return MPI_SUCCESS;
-}
-#endif // CMK_BIGSIM_CHARM
 
 #if CMK_CUDA
 GPUReq::GPUReq() noexcept

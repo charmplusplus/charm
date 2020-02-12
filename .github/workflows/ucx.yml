@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   build:
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     runs-on: ubuntu-latest
 

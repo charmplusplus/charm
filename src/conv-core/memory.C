@@ -53,6 +53,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> /*For memset, memcpy*/
+#include <type_traits>
+#include <new>
 
 #ifndef __STDC_FORMAT_MACROS
 # define __STDC_FORMAT_MACROS
@@ -444,6 +446,10 @@ static inline void *mm_impl_pvalloc(size_t size)
 #include "memory-verbose.C"
 #endif
 
+#if CMK_MEMORY_BUILD_RECORD
+#include "memory-record.C"
+#endif
+
 #if CMK_MEMORY_BUILD_PARANOID
 #include "memory-paranoid.C"
 #endif
@@ -799,6 +805,10 @@ static void meta_init(char **argv) {
 #include "memory-verbose.C"
 #endif
 
+#if CMK_MEMORY_BUILD_RECORD
+#include "memory-record.C"
+#endif
+
 #if CMK_MEMORY_BUILD_PARANOID
 #include "memory-paranoid.C"
 #endif
@@ -978,7 +988,9 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage(void)
     mstate m = ms;
 
     if (!PREACTION(m)) {
-      check_malloc_state(m);
+#ifdef DLMALLOC_DEBUG
+      global_malloc_instance.do_check_malloc_state(m);
+#endif
       if (is_initialized(m)) {
         size_t mfree = m->topsize + TOP_FOOT_SIZE;
         msegmentptr s = &m->seg;
@@ -1031,7 +1043,9 @@ CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage(void)
     mstate m = ms;
 
     if (!PREACTION(m)) {
-      check_malloc_state(m);
+#ifdef DLMALLOC_DEBUG
+      global_malloc_instance.do_check_malloc_state(m);
+#endif
       if (is_initialized(m)) {
         usmblks += m->max_footprint;
       }
@@ -1072,7 +1086,7 @@ void free_nomigrate(void *mem) { free(mem); }
 
 #ifndef CMK_MEMORY_HAS_ISOMALLOC
 #include "memory-isomalloc.h"
-void CmiMemoryIsomallocContextActivate(CmiIsomallocContext *l) {}
+void CmiMemoryIsomallocContextActivate(CmiIsomallocContext l) {}
 void CmiMemoryIsomallocDisablePush() {}
 void CmiMemoryIsomallocDisablePop() {}
 #endif

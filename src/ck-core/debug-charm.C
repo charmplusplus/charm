@@ -27,9 +27,6 @@
 //#include "queueing.h"
 #include <unistd.h>
 
-#if CMK_BIGSIM_CHARM
-#include "blue_impl.h"
-#endif
 
 
 #if CMK_CHARMDEBUG && CMK_CCS_AVAILABLE && !defined(_WIN32)
@@ -497,12 +494,8 @@ public:
       p((char*)type, strlen(type));
       return;
     }
-#if ! CMK_BIGSIM_CHARM
     if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
     if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
-#else
-    isCharm=1; type="BG";
-#endif
     if (curObj < 0) type="Conditional";
     sprintf(name,"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
     p(name, strlen(name));
@@ -553,13 +546,7 @@ static void CpdDeliverMessageInt(int msgNum) {
     CmiReference(queuedMsg);
     CdsFifo_Enqueue(CpvAccess(conditionalQueue), queuedMsg);
   }  
-#if CMK_BIGSIM_CHARM
-  stopVTimer();
-  BgProcessMessageDefault(cta(threadinfo), queuedMsg);
-  startVTimer();
-#else
   CmiHandleMessage(queuedMsg);
-#endif
   CkpvAccess(skipBreakpoint) = 0;
   while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);  
 }
@@ -804,10 +791,6 @@ static void _call_freeze_on_break_point(void * msg, void * object)
       //      CkPrintf("[%d] notify for bp %s m %p o %p idx %d\n",CkMyPe(), breakPointEntryInfo->name, msg, object,CkpvAccess(lastBreakPointIndex));
       CpdNotify(CPD_BREAKPOINT,breakPointEntryInfo->name);
       CpdFreeze();
-#if CMK_BIGSIM_CHARM
-      stopVTimer();
-      ((workThreadInfo*)cta(threadinfo))->scheduler(-1);
-#endif
   }
 }
 
@@ -827,9 +810,6 @@ void CpdDeliverSingleMessage () {
     }
     CkpvAccess(lastBreakPointMsg) = NULL;
     CkpvAccess(lastBreakPointObject) = NULL;
-#if CMK_BIGSIM_CHARM
-    ((workThreadInfo*)cta(threadinfo))->stopScheduler();
-#endif
   }
   else {
     // we were not stopped at a breakpoint, then deliver the first message in the debug queue
@@ -841,13 +821,7 @@ void CpdDeliverSingleMessage () {
         CmiReference(queuedMsg);
         CdsFifo_Enqueue(CpvAccess(conditionalQueue),queuedMsg);
       }
-#if CMK_BIGSIM_CHARM
-      stopVTimer();
-      BgProcessMessageDefault(cta(threadinfo), queuedMsg);
-      startVTimer();
-#else
       CmiHandleMessage(queuedMsg);
-#endif
       CkpvAccess(skipBreakpoint) = 0;
     }
   }
@@ -866,9 +840,6 @@ void CpdContinueFromBreakPoint ()
         if (breakPointEntryInfo != NULL) {
 	  //	  CkPrintf("[%d] Continue found calling lastBreakPoint\n",CkMyPe());
            breakPointEntryInfo->call(CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject));
-#if CMK_BIGSIM_CHARM
-           ((workThreadInfo*)cta(threadinfo))->stopScheduler();
-#endif
         } else {
           // This means that the breakpoint got deleted in the meanwhile
           
@@ -1007,22 +978,6 @@ int CpdIsCharmDebugMessage(void *msg) {
          env->getMsgtype() == FillVidMsg || _entryTable[env->getEpIdx()]->inCharm;
 }
 
-#if CMK_BIGSIM_CHARM
-CpvExtern(int, _bgCcsHandlerIdx);
-int CpdIsBgCharmDebugMessage(void *msg) {
-  envelope *env = (envelope*)msg;
-  if (CmiBgMsgFlag(msg) == BG_CLONE) {
-    env=*(envelope**)(((char*)msg)+CmiBlueGeneMsgHeaderSizeBytes);
-  }
-  if  ((((CmiBlueGeneMsgHeader*)env)->hID) == CpvAccess(_bgCcsHandlerIdx)) return 1;
-    // make sure it indeed is a charm message
-  if (CmiBgMsgHandle(env) == _charmHandlerIdx) {
-    return env->getMsgtype() == ForVidMsg || env->getMsgtype() == FillVidMsg ||
-         _entryTable[env->getEpIdx()]->inCharm;
-  }
-  return 1;
-}
-#endif
 
 CpvExtern(char *, displayArgument);
 
@@ -1111,48 +1066,13 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_msgStack());
   CpdGetNextMessage = CsdNextMessage;
   CpdIsDebugMessage = CpdIsCharmDebugMessage;
-#if CMK_BIGSIM_CHARM
-  CpdIsDebugMessage = CpdIsBgCharmDebugMessage;
-#endif
 }
 
-#if CMK_BIGSIM_CHARM
-CpvExtern(int, _bgCcsHandlerIdx);
-CpvExtern(int, _bgCcsAck);
-void req_fw_handler(char*);
-CkpvExtern(void *, debugQueue);
-CkpvExtern(int, freezeModeFlag);
-#include "blue_impl.h"
-extern void BgProcessMessageFreezeMode(threadInfo *, char *);
-
-void CpdBgInit()
-{
-        // Register the BG handler for CCS. Notice that this is put into a variable shared by
-        // the whole real processor. This because converse needs to find it. We check that all
-        // virtual processors register the same index for this handler.
-        int bgCcsHandlerIdx = CkRegisterHandler(req_fw_handler);
-        if (CpvAccess(_bgCcsHandlerIdx) == 0) CpvAccess(_bgCcsHandlerIdx) = bgCcsHandlerIdx;
-        CkAssert(CpvAccess(_bgCcsHandlerIdx)==bgCcsHandlerIdx);
-        CpvAccess(_bgCcsAck) ++;
-        CcsReleaseMessages();
-        
-        CkpvInitialize(int, freezeModeFlag);
-        CkpvAccess(freezeModeFlag) = 0;
-
-        CkpvInitialize(void *, debugQueue);
-        CkpvAccess(debugQueue) = CdsFifo_Create();
-        
-        BgProcessMessage = BgProcessMessageFreezeMode;
-}
-#endif
 
 #else
 
 void CpdBreakPointInit() {}
 void CpdCharmInit() {}
-#if CMK_BIGSIM_CHARM
-void CpdBgInit() {}
-#endif
 
 void CpdFinishInitialization() {}
 

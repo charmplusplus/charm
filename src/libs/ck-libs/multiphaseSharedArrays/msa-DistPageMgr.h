@@ -453,6 +453,7 @@ public:
  	inline ENTRY &operator[](int i) {return data[i];}
  	inline const ENTRY &operator[](int i) const {return data[i];}
     inline ENTRY *getData() { return data; }
+	inline const ENTRY *getData() const { return (const ENTRY*) data; }
 };
 
 //=============================== Cache Manager =================================
@@ -838,12 +839,12 @@ public:
 
     /// A requested page has arrived from the network.
     ///  nEntriesInPage_ = num entries being sent (0 for empty page, num entries otherwise)
-    inline void ReceivePageWithPUP(unsigned int page, page_t &pageData, int size)
+    inline void ReceivePageWithPUP(unsigned int page, const page_t &pageData, int size)
 		{
 			ReceivePage(page, pageData.getData(), size);
 		}
 
-    inline void ReceivePage(unsigned int page, ENTRY_TYPE* pageData, int size)
+    inline void ReceivePage(unsigned int page, const ENTRY_TYPE* pageData, int size)
 		{
 			CkAssert(0==size || ENTRIES_PER_PAGE == size);
 			// the page we requested has been received
@@ -1308,7 +1309,7 @@ public:
     inline MSA_PageArray() : epage(NULL) { }
     inline MSA_PageArray(CkMigrateMessage* m) { delete m; }
     
-    void setCacheProxy(CProxy_CacheGroup_t &cache_)
+    void setCacheProxy(const CProxy_CacheGroup_t &cache_)
 		{
 			cache=cache_;
 		}
@@ -1369,7 +1370,7 @@ public:
     /// Receive a runlength encoded page from the network:
     inline void PAReceiveRLEPageWithPup(
     	const MSA_WriteSpan_t *spans, unsigned int nSpans, 
-        page_t &entries, unsigned int nEntries, 
+        const page_t &entries, unsigned int nEntries,
         int pe, MSA_Page_Fault_t pageState)
 		{
 			PAReceiveRLEPage(spans, nSpans, entries.getData(), nEntries, pe, pageState);

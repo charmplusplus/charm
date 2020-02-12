@@ -21,7 +21,7 @@ struct CStateVar {
   bool isRdma;
   bool isFirstRdma;
   bool isRecvRdma;
-  bool isCounter, isSpeculator, isBgParentLog;
+  bool isCounter, isSpeculator;
 
   CStateVar(int v, const char* t, int np, const char* n, XStr* r, const char* a, int m);
   CStateVar(ParamList* pl);
@@ -33,7 +33,6 @@ struct EncapState {
   XStr* name;
   bool isMessage;
   bool isForall;
-  bool isBgParentLog;
   std::list<CStateVar*> vars;
 
   EncapState(Entry* entry, std::list<CStateVar*>& vars);

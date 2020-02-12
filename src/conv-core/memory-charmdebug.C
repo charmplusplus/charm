@@ -1447,9 +1447,7 @@ static void *meta_malloc(size_t size) {
     if (s!=NULL) {
       user = (char*)setSlot(&s,size);
       memory_allocated_user_total += size;
-#if ! CMK_BIGSIM_CHARM
       traceMalloc_c(user, size, s->from, s->stackLen);
-#endif
     }
     if (disableVerbosity == 0) {
       disableVerbosity = 1;
@@ -1501,9 +1499,7 @@ static void meta_free(void *mem) {
     memSize = 0;
     if (mem!=NULL) memSize = s->userSize;
     memory_allocated_user_total -= memSize;
-#if ! CMK_BIGSIM_CHARM
     traceFree_c(mem, memSize);
-#endif
 
     if (disableVerbosity == 0) {
       disableVerbosity = 1;
@@ -1597,9 +1593,7 @@ static void *meta_memalign(size_t align, size_t size) {
   s->extraStack->protectedMemoryLength = 0;
   memory_allocated_user_total += size;
   CmiMemUnlock();
-#if ! CMK_BIGSIM_CHARM
   traceMalloc_c(user, size, s->from, s->stackLen);
-#endif
   return user;
 }
 
@@ -1631,9 +1625,7 @@ static int meta_posix_memalign(void **outptr, size_t align, size_t size) {
   s->extraStack->protectedMemoryLength = 0;
   memory_allocated_user_total += size;
   CmiMemUnlock();
-#if ! CMK_BIGSIM_CHARM
   traceMalloc_c(user, size, s->from, s->stackLen);
-#endif
   *outptr = user;
   return 0;
 }
@@ -1659,9 +1651,7 @@ static void *meta_aligned_alloc(size_t align, size_t size) {
   s->extraStack->protectedMemoryLength = 0;
   memory_allocated_user_total += size;
   CmiMemUnlock();
-#if ! CMK_BIGSIM_CHARM
   traceMalloc_c(user, size, s->from, s->stackLen);
-#endif
   return user;
 }
 

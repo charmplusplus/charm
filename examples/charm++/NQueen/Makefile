@@ -52,9 +52,6 @@ Counter.decl.h Counter.def.h : counter.ci.stamp
 test: nqueen
 	$(call run, +p 4 ./nqueen 16 4 )
 
-bgtest: all
-	$(call run, +p 4 ./nqueen 16 4 +x2 +y2 +z2 +bgstacksize 102400 )
-
 clean:
 	rm -f main.decl.h main.def.h main.o
 	rm -f Counter.decl.h Counter.def.h nqueen.o

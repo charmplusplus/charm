@@ -9,9 +9,10 @@ NOTE: isomalloc is threadsafe, so the isomallocs are not wrapped in CmiMemLock.
 #define CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS   0
 
 #include "memory-isomalloc.h"
+#include <errno.h>
 
 struct CmiMemoryIsomallocState {
-  CmiIsomallocContext * context;
+  CmiIsomallocContext context;
   unsigned char disabled;
 };
 
@@ -40,10 +41,6 @@ void CmiMemoryIsomallocDisablePop()
  * when set to 1, the current pthreads is allowed to call isomalloc.
  */
 static CMK_THREADLOCAL int isomalloc_thread = 0;
-#else
-#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
-#error TLS support is required for bigsim out-of-core prefetch optimization
-#endif
 #endif
 
 static int meta_inited = 0;
@@ -54,7 +51,7 @@ static void meta_init(char **argv)
 {
    if (CmiMyRank()==0) CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
    CpvInitialize(struct CmiMemoryIsomallocState, isomalloc_state);
-   CpvAccess(isomalloc_state).context = NULL;
+   CpvAccess(isomalloc_state).context.opaque = nullptr;
    CpvAccess(isomalloc_state).disabled = 0;
 #if CMK_HAS_TLS_VARIABLES
    isomalloc_thread = 1;         /* isomalloc is allowed in this pthread */
@@ -72,7 +69,7 @@ static bool meta_active()
 {
   return meta_inited
     && CpvInitialized(isomalloc_state)
-    && CpvAccess(isomalloc_state).context
+    && CpvAccess(isomalloc_state).context.opaque
     && !CpvAccess(isomalloc_state).disabled
 #if CMK_HAS_TLS_VARIABLES
     && (isomalloc_thread || CmiThreadIs(CMI_THREAD_IS_TLS))
@@ -82,41 +79,46 @@ static bool meta_active()
 
 static void *meta_malloc(size_t size)
 {
-	void *ret=NULL;
-	if (meta_active())
-	{ /*Isomalloc a new block and link it in*/
-		CmiMemoryIsomallocDisablePush();
+  if (!meta_active())
+    return mm_malloc(size);
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
-		if (CmiIsFortranLibraryCall()==1) {
-		  ret=mm_malloc(size);
-		}
-		else
+  else if (CmiIsFortranLibraryCall() == 1)
+    return mm_malloc(size);
 #endif
-		ret = CmiIsomallocContextMalloc(CpvAccess(isomalloc_state).context, size);
-		CmiMemoryIsomallocDisablePop();
-	}
-	else /*Just use regular malloc*/
-		ret=mm_malloc(size);
-	return ret;
+
+  CmiMemoryIsomallocDisablePush();
+  void * ret = CmiIsomallocContextMalloc(CpvAccess(isomalloc_state).context, size);
+  CmiMemoryIsomallocDisablePop();
+  return ret;
 }
 
 static void meta_free(void *mem)
-{	
-	if (mem != NULL && CmiIsomallocInRange(mem))
-	{ /*Unlink this slot and isofree*/
-		CmiMemoryIsomallocDisablePush();
-		CmiIsomallocContextFree(CpvAccess(isomalloc_state).context, mem);
-		CmiMemoryIsomallocDisablePop();
-	}
-	else /*Just use regular malloc*/
-		mm_free(mem);
+{
+  if (!CmiIsomallocInRange(mem))
+  {
+    mm_free(mem);
+  }
+  else if (mem != nullptr && CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context.opaque)
+  {
+    CmiMemoryIsomallocDisablePush();
+    CmiIsomallocContextFree(CpvAccess(isomalloc_state).context, mem);
+    CmiMemoryIsomallocDisablePop();
+  }
 }
 
 static void *meta_calloc(size_t nelem, size_t size)
 {
-	void *ret=meta_malloc(nelem*size);
-	if (ret != NULL) memset(ret,0,nelem*size);
-	return ret;
+  if (!meta_active())
+    return mm_calloc(nelem, size);
+#if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
+  else if (CmiIsFortranLibraryCall() == 1)
+    return mm_calloc(nelem, size);
+#endif
+
+  CmiMemoryIsomallocDisablePush();
+  void * ret = CmiIsomallocContextCalloc(CpvAccess(isomalloc_state).context, nelem, size);
+  CmiMemoryIsomallocDisablePop();
+  return ret;
 }
 
 static void meta_cfree(void *mem)
@@ -126,83 +128,66 @@ static void meta_cfree(void *mem)
 
 static void *meta_realloc(void *oldBuffer, size_t newSize)
 {
-	void *newBuffer;
-	/*Just forget it for regular malloc's:*/
-	if (!CmiIsomallocInRange(oldBuffer))
-		return mm_realloc(oldBuffer,newSize);
-	
-	newBuffer = meta_malloc(newSize);
-	if ( newBuffer && oldBuffer ) {
-		/*Must preserve old buffer contents, so we need the size of the
-		  buffer.  SILLY HACK: muck with internals of context header.*/
-		size_t size=CmiIsomallocContextGetLength(CpvAccess(isomalloc_state).context, oldBuffer);
-		if (size>newSize) size=newSize;
-		if (size > 0)
-			memcpy(newBuffer, oldBuffer, size);
-	}
-	if (oldBuffer)
-		meta_free(oldBuffer);
-	return newBuffer;
+  /*Just forget it for regular malloc's:*/
+  if (!CmiIsomallocInRange(oldBuffer) || !meta_active())
+    return mm_realloc(oldBuffer, newSize);
+#if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
+  else if (CmiIsFortranLibraryCall() == 1)
+    return mm_realloc(oldBuffer, newSize);
+#endif
+
+  CmiMemoryIsomallocDisablePush();
+  void * ret = CmiIsomallocContextRealloc(CpvAccess(isomalloc_state).context, oldBuffer, newSize);
+  CmiMemoryIsomallocDisablePop();
+  return ret;
 }
 
 static void *meta_memalign(size_t align, size_t size)
 {
-	void *ret=NULL;
-	if (meta_active())
-	{ /*Isomalloc a new block and link it in*/
-		CmiMemoryIsomallocDisablePush();
+  if (!meta_active())
+    return mm_memalign(align, size);
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
-		if (CmiIsFortranLibraryCall()==1) {
-		  ret=mm_memalign(align, size);
-		}
-		else
+  else if (CmiIsFortranLibraryCall() == 1)
+    return mm_memalign(align, size);
 #endif
-		  ret = CmiIsomallocContextMallocAlign(CpvAccess(isomalloc_state).context, align, size);
-		CmiMemoryIsomallocDisablePop();
-	}
-	else /*Just use regular memalign*/
-		ret=mm_memalign(align, size);
-	return ret;
+
+  CmiMemoryIsomallocDisablePush();
+  void * ret = CmiIsomallocContextMallocAlign(CpvAccess(isomalloc_state).context, align, size);
+  CmiMemoryIsomallocDisablePop();
+  return ret;
 }
 
 static int meta_posix_memalign(void **outptr, size_t align, size_t size)
 {
-	int ret = 0;
-	if (meta_active())
-	{ /*Isomalloc a new block and link it in*/
-		CmiMemoryIsomallocDisablePush();
+  if (!meta_active())
+    return mm_posix_memalign(outptr, align, size);
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
-		if (CmiIsFortranLibraryCall()==1) {
-		  ret=mm_posix_memalign(outptr, align, size);
-		}
-		else
+  else if (CmiIsFortranLibraryCall() == 1)
+    return mm_posix_memalign(outptr, align, size);
 #endif
-		  *outptr = CmiIsomallocContextMallocAlign(CpvAccess(isomalloc_state).context, align, size);
-		CmiMemoryIsomallocDisablePop();
-	}
-	else /*Just use regular posix_memalign*/
-		ret=mm_posix_memalign(outptr, align, size);
-	return ret;
+
+  CmiMemoryIsomallocDisablePush();
+  void * ret = CmiIsomallocContextMallocAlign(CpvAccess(isomalloc_state).context, align, size);
+  CmiMemoryIsomallocDisablePop();
+  if (ret == nullptr)
+    return ENOMEM;
+  *outptr = ret;
+  return 0;
 }
 
 static void *meta_aligned_alloc(size_t align, size_t size)
 {
-	void *ret=NULL;
-	if (meta_active())
-	{ /*Isomalloc a new block and link it in*/
-		CmiMemoryIsomallocDisablePush();
+  if (!meta_active())
+    return mm_aligned_alloc(align, size);
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
-		if (CmiIsFortranLibraryCall()==1) {
-		  ret=mm_aligned_alloc(align, size);
-		}
-		else
+  else if (CmiIsFortranLibraryCall() == 1)
+    return mm_aligned_alloc(align, size);
 #endif
-		  ret = CmiIsomallocContextMallocAlign(CpvAccess(isomalloc_state).context, align, size);
-		CmiMemoryIsomallocDisablePop();
-	}
-	else /*Just use regular aligned_alloc*/
-		ret=mm_aligned_alloc(align, size);
-	return ret;
+
+  CmiMemoryIsomallocDisablePush();
+  void * ret = CmiIsomallocContextMallocAlign(CpvAccess(isomalloc_state).context, align, size);
+  CmiMemoryIsomallocDisablePop();
+  return ret;
 }
 
 static void *meta_valloc(size_t size)
@@ -230,7 +215,7 @@ void free_nomigrate(void *mem)
 #define CMK_MEMORY_HAS_ISOMALLOC
 
 /*Make this context "active"-- the recipient of incoming mallocs.*/
-void CmiMemoryIsomallocContextActivate(CmiIsomallocContext *l)
+void CmiMemoryIsomallocContextActivate(CmiIsomallocContext l)
 {
 	CpvAccess(isomalloc_state).context = l;
 }
