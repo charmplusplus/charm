@@ -364,13 +364,9 @@ static void KillOnAllSigs(int sigNo)
   if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
     int reply = 0;
     CpdNotify(CPD_SIGNAL,sigNo);
-#if ! CMK_BIGSIM_CHARM
     CcsSendReplyNoError(4,&reply);/*Send an empty reply if not*/
     CpvAccess(freezeModeFlag) = 1;
     CpdFreezeModeScheduler();
-#else
-    CpdFreeze();
-#endif
   }
 #endif
   

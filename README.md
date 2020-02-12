@@ -167,7 +167,6 @@ for more information:
 * `tsan` - Compile Charm++ with support for Thread Sanitizer.
 * `papi` - Enable PAPI performance counters.
 * `ooc` - Build Charm++ with out-of-core execution features.
-* `bigsim` - Compile Charm++ as running on the BigSim emulator.
 * `help` - show supported options for a version. For example, for `netlrts-linux`, running:
          
          $ ./build charm++ netlrts-linux help
@@ -175,7 +174,7 @@ for more information:
      will give:
     
       Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64
-      Supported options: bigemulator bigsim clustermatic common cuda flang gfortran ifort local nolb omp ooc papi pedantic perftools persistent pgf90 pxshm scyld smp syncft sysvshm tcp tsan
+      Supported options: clustermatic common cuda flang gfortran ifort local nolb omp ooc papi pedantic perftools persistent pgf90 pxshm scyld smp syncft sysvshm tcp tsan
 
 
 ## Building the Source
