@@ -7,10 +7,6 @@
 
 #include "envelope.h"
 
-#if CMK_CUDA
-#include "hapi.h" // For device-side zero-copy operations
-#endif
-
 /*********************************** Zerocopy Direct API **********************************/
 
 #define CK_BUFFER_REG     CMK_BUFFER_REG

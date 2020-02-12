@@ -14,6 +14,14 @@
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
 #endif
 
+#if CMK_CUDA
+// For device-side zero-copy operations
+#include "hapi.h"
+#include "gpumanager.h"
+
+CsvExtern(GPUManager, gpu_manager);
+#endif
+
 // Integer used to store the ncpy ack handler idx
 bool useCMAForZC;
 static int ncpy_handler_idx, ncpy_bcastNo_handler_idx;
@@ -2359,6 +2367,23 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
 #endif
 }
 
-void CkRdmaToDeviceCommBuffer(int target_pe, int numops, void** ptrs, int* sizes) {
-  CkPrintf("PE %d, target %d, numops %d, ptrs: %p, sizes: %p\n", CkMyPe(), target_pe, numops, ptrs, sizes);
+void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, void** ptrs, int* sizes) {
+#if CMK_CUDA
+  // Only continue if we need to use device communication buffer (CUDA IPC)
+  // TODO: Currently dest_pe is sometimes -1 at the beginning, so always use device comm buffer
+  //if (findTransferModeDevice(CkMyPe(), dest_pe) != CkNcpyModeDevice::IPC) return;
+
+  DeviceManager* dm = CsvAccess(gpu_manager).device_map[CkMyPe()];
+
+  void* alloc_comm_buffers[numops];
+
+  for (int i = 0; i < numops; i++) {
+    alloc_comm_buffers[i] = dm->alloc_comm_buffer(sizes[i]);
+  }
+
+  // TODO
+
+#else
+  CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
+#endif
 }

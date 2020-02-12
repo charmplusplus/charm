@@ -508,43 +508,43 @@ void initDeviceMapping(char** argv) {
   CmiUnlock(CsvAccess(gpu_manager).device_mapping_lock);
 #endif
 
-  // Process eager communication buffer parameters
-  int input_eager_buffer_size;
-  if (CmiGetArgIntDesc(argv, "+gpueagerbuffer", &input_eager_buffer_size,
-        "GPU eager communication buffer size")) {
+  // Process device communication buffer parameters
+  int input_comm_buffer_size;
+  if (CmiGetArgIntDesc(argv, "+gpucommbuffer", &input_comm_buffer_size,
+        "GPU communication buffer size")) {
     if (CmiMyRank() == 0) {
-      if (input_eager_buffer_size <= 0) {
-        CsvAccess(gpu_manager).use_eager_comm_buffer = false;
+      if (input_comm_buffer_size <= 0) {
+        CsvAccess(gpu_manager).use_comm_buffer = false;
       }
-      else if (input_eager_buffer_size < 4) {
-        CsvAccess(gpu_manager).eager_comm_buffer_size = 4; // Buffer size should be at least 4 bytes
+      else if (input_comm_buffer_size < 4) {
+        CsvAccess(gpu_manager).comm_buffer_size = 4; // Buffer size should be at least 4 bytes
       }
       else {
-        CsvAccess(gpu_manager).eager_comm_buffer_size = (size_t)input_eager_buffer_size;
+        CsvAccess(gpu_manager).comm_buffer_size = (size_t)input_comm_buffer_size;
       }
     }
   }
 
   if (CmiMyPe() == 0) {
-    if (CsvAccess(gpu_manager).use_eager_comm_buffer) {
-      CmiPrintf("HAPI> GPU eager communication buffer size: %lu bytes "
+    if (CsvAccess(gpu_manager).use_comm_buffer) {
+      CmiPrintf("HAPI> GPU communication buffer size: %lu bytes "
           "(will be rounded up to the nearest power of two)\n",
-          CsvAccess(gpu_manager).eager_comm_buffer_size);
+          CsvAccess(gpu_manager).comm_buffer_size);
     }
     else {
-      CmiPrintf("HAPI> Not using GPU eager communication buffer\n");
+      CmiPrintf("HAPI> Not using GPU communication buffer\n");
     }
   }
 
   CmiNodeBarrier();
 
-  // Create eager communication buffers
-  if (CsvAccess(gpu_manager).use_eager_comm_buffer) {
+  // Create device communication buffers
+  if (CsvAccess(gpu_manager).use_comm_buffer) {
 #if CMK_SMP
     CmiLock(CsvAccess(gpu_manager).device_mapping_lock);
 #endif
     DeviceManager* dm = CsvAccess(gpu_manager).device_map[CmiMyPe()];
-    dm->create_eager_comm_buffer(CsvAccess(gpu_manager).eager_comm_buffer_size);
+    dm->create_comm_buffer(CsvAccess(gpu_manager).comm_buffer_size);
 #if CMK_SMP
     CmiUnlock(CsvAccess(gpu_manager).device_mapping_lock);
 #endif
@@ -610,7 +610,7 @@ static inline int CmiMyNodeRankLocal() {
 // Create POSIX shared memory region accessible to all processes on the same host
 // Invoked by PE rank 0 of each process (no locking needed for SMP)
 void shmCreate() {
-  if (!CsvAccess(gpu_manager).use_eager_comm_buffer) return;
+  if (!CsvAccess(gpu_manager).use_comm_buffer) return;
 
   struct stat shm_file_stat;
 
@@ -715,11 +715,11 @@ void ipcHandleCreate() {
   }
 
   // Create CUDA IPC memory handle
-  CmiAssert(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].eager_comm_buffer);
-  void* device_ptr = (void*)(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].eager_comm_buffer->base_ptr);
+  CmiAssert(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].comm_buffer);
+  void* device_ptr = (void*)(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].comm_buffer->base_ptr);
   hapiCheck(cudaIpcGetMemHandle(shm_mem_handle, device_ptr));
 
-  // Store eager comm buffer ptr in local info (just in case)
+  // Store device comm buffer ptr in local info (just in case)
   my_local_info.buffer = device_ptr;
 }
 

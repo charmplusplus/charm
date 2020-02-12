@@ -5,28 +5,36 @@
 #include "buggy.h"
 
 // Manages a GPU device - accessible through GPUManager
-// With SMP, locks should be acquired before access and released after
 struct DeviceManager {
 
   // Device ordinal
   int device;
 
-  // Buddy allocator for eager communication buffer
-  buggy::allocator* eager_comm_buffer;
+  // Buddy allocator for communication buffer
+  // Locks should be used with SMP for creation
+  buggy::allocator* comm_buffer;
 
-  DeviceManager(int device_ = 0) : device(device_), eager_comm_buffer(nullptr) {}
+  DeviceManager(int device_ = 0) : device(device_), comm_buffer(nullptr) {}
 
-  ~DeviceManager() { destroy_eager_comm_buffer(); }
+  ~DeviceManager() { destroy_comm_buffer(); }
 
-  void create_eager_comm_buffer(size_t size) {
-    if (eager_comm_buffer == nullptr)
-      eager_comm_buffer = new buggy::allocator(size);
+  void create_comm_buffer(size_t size) {
+    if (comm_buffer == nullptr)
+      comm_buffer = new buggy::allocator(size);
   }
 
-  void destroy_eager_comm_buffer() {
-    if (eager_comm_buffer) {
-      delete eager_comm_buffer;
-      eager_comm_buffer = nullptr;
+  void* alloc_comm_buffer(size_t size) {
+    return comm_buffer->malloc(size);
+  }
+
+  void free_comm_buffer(void* ptr) {
+    comm_buffer->free(ptr);
+  }
+
+  void destroy_comm_buffer() {
+    if (comm_buffer) {
+      delete comm_buffer;
+      comm_buffer = nullptr;
     }
   }
 
