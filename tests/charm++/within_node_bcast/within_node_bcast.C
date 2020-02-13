@@ -2,9 +2,11 @@
 
 #define ITERATIONS 100
 #define DATA_SIZE 1024
+#define TOTAL_ELEMENTS 128
 
 CProxy_TestGroup gProxy;
 CProxy_TestNodeGroup ngProxy;
+CProxy_TestArray aProxy;
 
 class TestMessage : public CMessage_TestMessage {
 public:
@@ -26,6 +28,7 @@ public:
 
     ngProxy = CProxy_TestNodeGroup::ckNew();
     gProxy = CProxy_TestGroup::ckNew();
+    aProxy = CProxy_TestArray::ckNew(TOTAL_ELEMENTS);
 
     // Defined as an SDAG method in the .ci file
     thisProxy.runTests();
@@ -35,14 +38,20 @@ public:
   }
 
   void allComplete() {
-    CkAssert(tests_completed == 4);
+    CkAssert(tests_completed == 6);
     CkExit();
   }
 };
 
 class TestNodeGroup : public CBase_TestNodeGroup {
+private:
+  std::atomic<int> num_elements;
 public:
-  TestNodeGroup() {}
+  TestNodeGroup() : num_elements(0) {}
+
+  void addElement() {
+    num_elements++;
+  }
 
   void recv(TestMessage* msg) {
     // Here the expectation is that the counter is incremented once by each PE
@@ -77,6 +86,22 @@ public:
     int myExpectation = msg->test_num * CkMyNodeSize();
     contribute(sizeof(int), &myExpectation, CkReduction::sum_int, msg->cb);
   }
+
+  void recvForArray(TestMessage* msg) {
+    // Here the expectation is that the counter is incremented once by each
+    // array element and starts at 0. So my nodes sum will be n * (n - 1) / 2.
+    int myExpectation = (num_elements * (num_elements - 1)) / 2;
+    contribute(sizeof(int), &myExpectation, CkReduction::sum_int, msg->cb);
+  }
+
+  void recvCopyForArray(TestMessage* msg) {
+    // Here, there will be one copy of the message per array element, so each
+    // array element will contribute msg->test_num, and my sum is therefor my
+    // num_elements * msg->test_num.
+    CkAssert(msg->counter.load() == msg->test_num);
+    int myExpectation = msg->test_num * num_elements;
+    contribute(sizeof(int), &myExpectation, CkReduction::sum_int, msg->cb);
+  }
 };
 
 class TestGroup : public CBase_TestGroup {
@@ -88,9 +113,8 @@ public:
   void recv(TestMessage* msg) {
     for (int i = 0; i < DATA_SIZE; i++) {
       if (msg->data[i] != msg->test_num) {
-        CkPrintf("msg->data incorrect for [nokeep] test %i[%i]! (%i)\n",
-            msg->test_num, i, msg->data[i]);
-        CkAbort("Test failed in data transmission!\n");
+        CkAbort("Bad msg->data on element %i for [nokeep] msg: %i[%i] != %i\n",
+            thisIndex, msg->test_num, i, msg->data[i]);
       }
     }
 
@@ -103,9 +127,44 @@ public:
   void recvCopy(TestMessage* msg) {
     for (int i = 0; i < DATA_SIZE; i++) {
       if (msg->data[i] != msg->test_num) {
-        CkPrintf("msg->data incorrect for copy test %i[%i]! (%i)\n",
-            msg->test_num, i, msg->data[i]);
-        CkAbort("Test failed in data transmission!\n");
+        CkAbort("Bad msg->data on element %i for copy msg: %i[%i] != %i\n",
+            thisIndex, msg->test_num, i, msg->data[i]);
+      }
+    }
+
+    int val = msg->counter.fetch_add(1);
+    // The value of what I received should always be the message test_num since
+    // I get my own copy of the message.
+    CkAssert(val == msg->test_num);
+
+    contribute(sizeof(int), &val, CkReduction::sum_int, msg->cb);
+    delete msg;
+  }
+};
+
+class TestArray : public CBase_TestArray {
+public:
+  TestArray() {
+    ngProxy.ckLocalBranch()->addElement();
+  }
+
+  void recv(TestMessage* msg) {
+    for (int i = 0; i < DATA_SIZE; i++) {
+      if (msg->data[i] != msg->test_num) {
+        CkAbort("Bad msg->data on element %i for [nokeep] msg: %i[%i] != %i\n",
+            thisIndex, msg->test_num, i, msg->data[i]);
+      }
+    }
+
+    int val = msg->counter.fetch_add(1);
+    contribute(sizeof(int), &val, CkReduction::sum_int, msg->cb);
+  }
+
+  void recvCopy(TestMessage* msg) {
+    for (int i = 0; i < DATA_SIZE; i++) {
+      if (msg->data[i] != msg->test_num) {
+        CkAbort("Bad msg->data on element %i for copy msg: %i[%i] != %i\n",
+            thisIndex, msg->test_num, i, msg->data[i]);
       }
     }
 

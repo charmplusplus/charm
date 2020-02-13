@@ -554,7 +554,14 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 #endif
   if (_entryTable[epIdx]->noKeep)
   { /* Method doesn't keep/delete the message, so we have to: */
-    _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
+    if (UsrToEnv(msg)->getMsgtype() != ArrayBcastFwdMsg) {
+      _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
+    } else if (_entryTable[epIdx]->msgIdx != -1) {
+      // For array broadcasts, the first time they show up here the msgIdx is
+      // -1, and they are just messages for CkArray::recvBroadcastNoKeep, so we
+      // don't want to delete them yet.
+      _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
+    }
   }
 }
 void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
@@ -1248,6 +1255,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       _processNodeBocInitMsg(ck,env);
       break;
     case ForBocMsg : // Group entry method message (non creation)
+    case ArrayBcastFwdMsg :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForBocMsg\n", CkMyPe());)
       // QD processing moved inside _processForBocMsg because it is conditional
       if(env->isPacked()) CkUnpackMessage(&env);
@@ -1262,6 +1270,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       // stats record moved to _processForNodeBocMsg because it is conditional
       break;
     case BocBcastMsg : // Broadcast that needs to be forwarded
+    case ArrayBcastMsg :
       if (env->isPacked()) CkUnpackMessage(&env);
       _processBocBcastMsg(ck,env);
       break;
@@ -1727,7 +1736,11 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
     }else
     {
         if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL)
-          env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
+          if (UsrToEnv(msg)->getMsgtype() == ArrayBcastMsg) {
+            env = _prepareMsgBranch(eIdx,msg,gID,ArrayBcastMsg);
+          } else {
+            env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
+          }
         else
           env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
     }
@@ -1743,7 +1756,16 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
 
 static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
 {
-  envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  envelope* env;
+  if (UsrToEnv(msg)->getMsgtype() == ArrayBcastMsg) {
+    env = _prepareMsgBranch(eIdx,msg,gID,ArrayBcastFwdMsg);
+  } else if (UsrToEnv(msg)->getMsgtype() == BocBcastMsg
+      || UsrToEnv(msg)->getMsgtype() == ForNodeBocMsg) {
+    // TODO: Does this make sense when its a ForNode? Should ForNode even hit?
+    env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  } else {
+    CkAbort("Bad message type %i\n", UsrToEnv(msg)->getMsgtype());
+  }
   _TRACE_CREATION_N(env, CmiMyNodeSize());
   _CldEnqueueWithinNode(env, _infoIdx);
   _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
@@ -3055,13 +3077,13 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	}
 }
 
-int CkMessageToEpIdx(void *msg) {
-        envelope *env=UsrToEnv(msg);
-	int ep=env->getEpIdx();
-	if (ep==CkIndex_CkArray::recvBroadcast(0))
-		return env->getsetArrayBcastEp();
-	else
-		return ep;
+int CkMessageToEpIdx(void* msg) {
+  envelope* env = UsrToEnv(msg);
+  int type = env->getMsgtype();
+  if (type == ArrayBcastMsg || type == ArrayBcastFwdMsg)
+    return env->getsetArrayBcastEp();
+  else
+    return env->getEpIdx();
 }
 
 int getCharmEnvelopeSize() {

@@ -1198,7 +1198,7 @@ NcpyBcastInterimAckInfo *allocateInterimNodeAckObj(envelope *myEnv, envelope *my
 
   // Recv Bcast API uses myEnv as myChildEnv (and myChildEnv is NULL)
   bcastAckInfo->isRecv = (myChildEnv == NULL);
-  bcastAckInfo->isArray = (myEnv->getMsgtype() == ForArrayEltMsg);
+  bcastAckInfo->isArray = (myEnv->getMsgtype() == ArrayBcastFwdMsg);
 
   // initialize derived calss NcpyBcastInterimAckInfo fields
   bcastAckInfo->msg = myEnv; // this message will be enqueued after the completion of all operations
@@ -1268,8 +1268,6 @@ void CkRdmaEMBcastAckHandler(void *ack) {
         CkUnpackMessage(&myMsg); // DO NOT REMOVE THIS
 
         if(bcastInterimAckInfo->isArray) {
-          myMsg->setMsgtype(ForArrayEltMsg);
-
           mgr = getArrayMgrFromMsg(myMsg);
           mgr->forwardZCMsgToOtherElems(myMsg);
         }
@@ -1280,10 +1278,6 @@ void CkRdmaEMBcastAckHandler(void *ack) {
           // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
           // that this is the final message containing the posted pointers
           CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
-          if(myMsg->getMsgtype() == ForArrayEltMsg) {
-            myMsg->setMsgtype(ForBocMsg);
-            myMsg->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
-          }
           QdCreate(1);
           enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
         }
@@ -1292,10 +1286,6 @@ void CkRdmaEMBcastAckHandler(void *ack) {
         // that this is the final message containing the posted pointers
         CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
 
-        if(myMsg->getMsgtype() == ForArrayEltMsg) {
-          myMsg->setMsgtype(ForBocMsg);
-          myMsg->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
-        }
         QdCreate(1);
         enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
 #endif
@@ -1701,12 +1691,6 @@ void sendRecvDoneMsgToPeers(envelope *env, CkArray *mgr) {
 
   p|source;
 
-  if(env->getMsgtype() == ForArrayEltMsg) {
-    env->setMsgtype(ForBocMsg);
-    env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
-
-    CkPackMessage(&env); // Array messages will be copied, so pack it
-  }
   CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
 }
 #endif
@@ -1723,8 +1707,9 @@ void sendAckMsgToParent(envelope *env)  {
 }
 
 CkArray* getArrayMgrFromMsg(envelope *env) {
+
   CkArray *mgr = NULL;
-  CkGroupID gId = env->getArrayMgr();
+  CkGroupID gId = env->getGroupNum();
   IrrGroup *obj = _getCkLocalBranchFromGroupID(gId);
   CkAssert(obj!=NULL);
   mgr = (CkArray *)obj;
@@ -1732,6 +1717,8 @@ CkArray* getArrayMgrFromMsg(envelope *env) {
 }
 
 void handleArrayMsgOnChildPostCompletionForRecvBcast(envelope *env) {
+
+  CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_DONE_MSG;
   CkArray *mgr = getArrayMgrFromMsg(env);
   mgr->forwardZCMsgToOtherElems(env);
 
@@ -1742,8 +1729,6 @@ void handleArrayMsgOnChildPostCompletionForRecvBcast(envelope *env) {
 #endif
   {
     CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
-    env->setMsgtype(ForBocMsg);
-    env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
     QdCreate(1);
     CmiHandleMessage(env);
   }
@@ -1772,14 +1757,14 @@ void handleNGMsgOnChildPostCompletionForRecvBcast(envelope *env) {
 void handleMsgOnChildPostCompletionForRecvBcast(envelope *env) {
   switch(env->getMsgtype()) {
 
-    case ForArrayEltMsg : handleArrayMsgOnChildPostCompletionForRecvBcast(env);
-                          break;
-    case ForBocMsg      : handleGroupMsgOnChildPostCompletionForRecvBcast(env);
-                          break;
-    case ForNodeBocMsg  : handleNGMsgOnChildPostCompletionForRecvBcast(env);
-                          break;
-    default             : CmiAbort("Type of message currently not supported\n");
-                          break;
+    case ArrayBcastFwdMsg : handleArrayMsgOnChildPostCompletionForRecvBcast(env);
+                            break;
+    case ForBocMsg        : handleGroupMsgOnChildPostCompletionForRecvBcast(env);
+                            break;
+    case ForNodeBocMsg    : handleNGMsgOnChildPostCompletionForRecvBcast(env);
+                            break;
+    default               : CmiAbort("Type of message currently not supported\n");
+                            break;
   }
 }
 
@@ -1789,11 +1774,6 @@ void handleMsgOnInterimPostCompletionForRecvBcast(envelope *env, NcpyBcastInteri
 
   CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_MSG;
 
-  if(env->getMsgtype() == ForArrayEltMsg) {
-    CkArray *mgr = getArrayMgrFromMsg(env);
-    env->setMsgtype(ForBocMsg);
-    env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
-  }
 
   // Send message to children for them to Rget from me
   forwardMessageToChildNodes(env, env->getMsgtype());
