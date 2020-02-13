@@ -1868,13 +1868,11 @@ void sendAckMsgToParent(envelope *env)  {
 
 CkArray* getArrayMgrFromMsg(envelope *env) {
 
-  env->setMsgtype(ForArrayEltMsg); // Used to bypass assertion in getArrayMgr
   CkArray *mgr = NULL;
-  CkGroupID gId = env->getArrayMgr();
+  CkGroupID gId = env->getGroupNum();
   IrrGroup *obj = _getCkLocalBranchFromGroupID(gId);
   CkAssert(obj!=NULL);
   mgr = (CkArray *)obj;
-  env->setMsgtype(ArrayBcastFwdMsg);
   return mgr;
 }
 

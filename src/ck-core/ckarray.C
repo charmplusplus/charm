@@ -1535,10 +1535,6 @@ void CkArray::recvBroadcast(CkMessage* m) {
     broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
   } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG && len > 0 ) {
 
-    // Set Array manager for this message as it is required for ZC Post API
-    env->setMsgtype(ForArrayEltMsg);
-    UsrToEnv(msg)->setArrayMgr(thisgroup);
-    env->setMsgtype(ArrayBcastFwdMsg);
 
     // Message is used by the receiver to post the receiver buffer
     // Initial metadata message, send only to the first element, other elements
