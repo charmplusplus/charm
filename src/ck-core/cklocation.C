@@ -32,6 +32,7 @@
 CkpvExtern(int, _lb_obj_index);                // for lbdb user data for obj index
 #endif // CMK_LBDB_ON
 
+CpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets); // used for ZC Pup
 #ifndef CMK_CHARE_USE_PTR
 CkpvExtern(int, currentChareIdx);
 #endif
@@ -1750,7 +1751,15 @@ void CkMigratable::staticResumeFromSync(void* data)
   if (_lb_args.metaLbOn()) {
   	el->clearMetaLBData();
 	}
-	el->ResumeFromSync();
+
+  CkLocMgr *localLocMgr = el->myRec->getLocMgr();
+  auto iter = localLocMgr->bufferedActiveRgetMsgs.find(el->ckGetID());
+  if(iter != localLocMgr->bufferedActiveRgetMsgs.end()) {
+    std::pair<CmiUInt8, CkMigratable*> idElemPair(el->ckGetID(), el);
+    localLocMgr->toBeResumeFromSynced.insert(idElemPair);
+  } else {
+    el->ResumeFromSync();
+  }
 }
 
 void CkMigratable::setMigratable(int migratable) 
@@ -2243,6 +2252,31 @@ CkLocRec *CkLocMgr::createLocal(const CkArrayIndex &idx,
 
 	if (notifyHome) { informHome(idx,CkMyPe()); }
 	return rec;
+}
+
+// Used to handle messages that were buffered because of active rgets in progress
+void CkLocMgr::processAfterActiveRgetsCompleted(CmiUInt8 id) {
+
+    // Call ckJustMigrated
+    CkLocRec *myLocRec = elementNrec(id);
+    callMethod(myLocRec, &CkMigratable::ckJustMigrated);
+
+    // Call ResumeFromSync on elements that were waiting for rgets
+    auto iter2 = toBeResumeFromSynced.find(id);
+    if(iter2 != toBeResumeFromSynced.end()) {
+      iter2->second->ResumeFromSync();
+      toBeResumeFromSynced.erase(iter2);
+    }
+
+    // Deliver buffered messages to the elements that were waiting on rgets
+    auto iter = bufferedActiveRgetMsgs.find(id);
+    if(iter != bufferedActiveRgetMsgs.end()) {
+      std::vector<CkArrayMessage *> bufferedMsgs = iter->second;
+      bufferedActiveRgetMsgs.erase(iter);
+      for(auto msg : bufferedMsgs) {
+        CmiHandleMessage(UsrToEnv(msg));
+      }
+    }
 }
 
 
@@ -3024,8 +3058,18 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	//Create a record for this element
 	CkLocRec *rec=createLocal(idx,true,msg->ignoreArrival,false /* home told on departure */ );
 	
+	envelope *env = UsrToEnv(msg);
+	CmiAssert(CpvAccess(newZCPupGets).empty()); // Ensure that vector is empty
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_migrate);
+	bool zcRgetsActive = !CpvAccess(newZCPupGets).empty();
+	if(zcRgetsActive) {
+		// newZCPupGets is not empty, rgets need to be launched
+		// newZCPupGets is populated with NcpyOperationInfo during pupElementsFor by pup_buffer calls that require Rgets
+		// Issue Rgets using the populated newZCPupGets vector
+		zcPupIssueRgets(msg->id, this);
+	}
+	CpvAccess(newZCPupGets).clear(); // Clear this to reuse the vector
 	if (p.size()!=msg->length) {
 		CkError("ERROR! Array element claimed it was %d bytes to a"
 			"packing PUP::er, but %zu bytes in the unpacking PUP::er!\n",
@@ -3047,8 +3091,10 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	}
 #endif
 
-	//Let all the elements know we've arrived
-	callMethod(rec,&CkMigratable::ckJustMigrated);
+	if(!zcRgetsActive) {
+		//Let all the elements know we've arrived
+		callMethod(rec,&CkMigratable::ckJustMigrated);
+	}
 
 #if CMK_FAULT_EVAC
 	/*

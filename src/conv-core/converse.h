@@ -2219,7 +2219,7 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "conv-trace.h"
 #include "persistent.h"
 
-#include "conv-rdma.h"
+#include "cmirdmautils.h"
 
 #ifdef ADAPT_SCHED_MEM
 extern int numMemCriticalEntries;

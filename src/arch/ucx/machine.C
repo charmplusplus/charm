@@ -10,6 +10,7 @@
 #include <string>
 
 #include "converse.h"
+#include "cmirdmautils.h"
 #include "machine.h"
 #include "pcqueue.h"
 #include "machine-lrts.h"

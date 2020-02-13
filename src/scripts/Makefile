@@ -1029,6 +1029,10 @@ veryclean:
 	mv .Make.depends Make.depends
 	rm -rf .[a-z]* .[A-Z]*
 
+clean-zc:
+	$(MAKE) -C ../tests/charm++/zerocopy clean
+	$(MAKE) -C ../examples/charm++/zerocopy clean
+	$(MAKE) -C ../benchmarks/charm++/zerocopy clean
 
 config: configure conv-autoconfig.h.in
 

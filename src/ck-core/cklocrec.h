@@ -55,6 +55,7 @@ public:
 #endif
   inline const CkArrayIndex &getIndex(void) const {return idx;}
   inline CmiUInt8 getID() const { return id; }
+  inline CkLocMgr *getLocMgr() const {return myLocMgr; }
 
 #if CMK_LBDB_ON
 public:

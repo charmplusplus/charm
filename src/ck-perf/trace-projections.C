@@ -1668,6 +1668,14 @@ void toProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
     };
 }
 
+void toProjectionsFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void toProjectionsFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
@@ -1698,6 +1706,14 @@ void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
     };
 }
 
+void fromProjectionsFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void fromProjectionsFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 #if CMK_USE_ZLIB
 void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
@@ -1720,6 +1736,14 @@ void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 #endif
     default: CmiAbort("Unrecognized pup type code!");
     };
+}
+
+void toProjectionsGZFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void toProjectionsGZFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
 }
 #endif
 
