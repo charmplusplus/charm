@@ -671,13 +671,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0) {
-#if CMK_BIGSIM_CHARM
-      //In BigSim, CpvAccess(CsdSchedQueue) is not used. _CldEnqueue resets the
-      //handler to converse-level BigSim handler.
-      _CldEnqueue(CkMyPe(), pending, _infoIdx);
-#else
       CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
-#endif
     }
     CkpvAccess(_groupTable)->find(groupID).clearPending();
   }
@@ -1469,9 +1463,6 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   }
 }
 
-#if CMK_BIGSIM_CHARM
-#   define  _skipCldEnqueue   _CldEnqueue
-#endif
 
 // by pass Charm++ priority queue, send as Converse message
 static void _noCldEnqueueMulti(int npes, const int *pes, envelope *env)
@@ -1735,14 +1726,9 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     }else
     {
-// This is currently a workaround to prevent BIGSIM tests from breaking. It
-// prevents BIGSIM from working with node aware group broadcasts.
-// More info can be found here: https://github.com/UIUC-PPL/charm/pull/2440
-#if !CMK_BIGSIM_CHARM
         if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL)
           env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
         else
-#endif
           env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
     }
 
@@ -2138,10 +2124,6 @@ void CkDeleteChares() {
   }
 }
 
-#if CMK_BIGSIM_CHARM
-void CthEnqueueBigSimThread(CthThreadToken* token, int s,
-                                   int pb,unsigned int *prio);
-#endif
 
 //------------------- External client support (e.g. Charm4py) ----------------
 #if CMK_CHARMPY
@@ -2737,7 +2719,6 @@ class CkMessageReplay : public CkMessageWatcher {
 			return false;
 		}
 #endif
-#if ! CMK_BIGSIM_CHARM
 		if (nextSize!=env->getTotalsize())
                 {
 			CkPrintf("[%d] CkMessageReplay> Message size changed during replay org: [%d %d %d %d] got: [%d %d %d %d]\n", CkMyPe(), nextPE, nextSize, nextEvent, nextEP, env->getSrcPe(), env->getTotalsize(), env->getEvent(), env->getEpIdx());
@@ -2768,7 +2749,6 @@ class CkMessageReplay : public CkMessageWatcher {
 		  }
 		  if (!wasPacked) CkUnpackMessage(&env);
 		}
-#endif
 		return true;
 	}
 	bool isNext(CthThreadToken *token) {
@@ -2805,11 +2785,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	      CthThreadToken *token=delayedTokens.deq();
 	      if (isNext(token)) {
             REPLAYDEBUG("Dequeueing token: "<<token->serialNo)
-#if ! CMK_BIGSIM_CHARM
 	        CsdEnqueueLifo((void*)token);
-#else
-		CthEnqueueBigSimThread(token,0,0,NULL);
-#endif
 	        return;
 	      } else {
             REPLAYDEBUG("requeueing delayed token: "<<token->serialNo)
@@ -2935,9 +2911,7 @@ public:
 };
 
 void CkMessageReplayQuiescence(void *rep, double time) {
-#if ! CMK_BIGSIM_CHARM
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
-#endif
   CkMessageReplay *replay = (CkMessageReplay*)rep;
   //CmiStartQD(CkMessageReplayQuiescence, replay);
 }
@@ -2994,9 +2968,6 @@ void CpdHandleLBMessage(LBMigrateMsg **msg) {
   }
 }
 
-#if CMK_BIGSIM_CHARM
-CpvExtern(int      , CthResumeBigSimThreadIdx);
-#endif
 
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
@@ -3073,11 +3044,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    }
 	  }
 	  CpdSetInitializeMemory(1);
-#if ! CMK_BIGSIM_CHARM
 	  CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
-#else
-	  CkNumberHandler(CpvAccess(CthResumeBigSimThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
-#endif
 	  ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
 #else
           CkAbort("Option `+replay' requires that record-replay support be enabled at configure time (--enable-replay)");

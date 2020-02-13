@@ -41,10 +41,6 @@ void CmiMemoryIsomallocDisablePop()
  * when set to 1, the current pthreads is allowed to call isomalloc.
  */
 static CMK_THREADLOCAL int isomalloc_thread = 0;
-#else
-#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
-#error TLS support is required for bigsim out-of-core prefetch optimization
-#endif
 #endif
 
 static int meta_inited = 0;

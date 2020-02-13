@@ -608,7 +608,6 @@ static void _exitHandler(envelope *env)
 
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
-#if !CMK_BIGSIM_THREAD
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -624,10 +623,6 @@ static void _exitHandler(envelope *env)
       }else{
 	CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
       }
-#else
-      CmiFree(env);
-      ConverseExit(_exitcode);
-#endif
       break;
     case ReqStatMsg: // Request stats and warnings message
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
@@ -1113,12 +1108,10 @@ void CkExit(int exitcode)
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 
-#if ! CMK_BIGSIM_THREAD
   _TRACE_END_EXECUTE();
   //Wait for stats, which will call ConverseExit when finished:
 	if(!CharmLibInterOperate)
   CsdScheduler(-1);
-#endif
 }
 
 void CkContinueExit()
@@ -1134,13 +1127,11 @@ void CkContinueExit()
    It is called by the machine layer whenever some problem occurs (it is thus up
    to the machine layer to call this function). */
 void EmergencyExit(void) {
-#ifndef __BIGSIM__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
   if (CkpvAccess(_coreState) != NULL) {
     delete CkpvAccess(_coreState);
     CkpvAccess(_coreState) = NULL;
   }
-#endif
 }
 
 static void _nullFn(void *, void *)
@@ -1186,11 +1177,7 @@ void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 void InitCallTable::enumerateInitCalls()
 {
   int i;
-#ifdef __BIGSIM__
-  if(BgNodeRank()==0)        // called only once on an emulating node
-#else
   if(CkMyRank()==0) 
-#endif
   {
     for (i=0; i<initNodeCalls.length(); i++) initNodeCalls[i]();
   }
@@ -1221,9 +1208,6 @@ void initQd(char **argv)
         }
 }
 
-#if CMK_BIGSIM_CHARM && CMK_CHARMDEBUG
-void CpdBgInit();
-#endif
 void CpdBreakPointInit();
 
 extern void (*CkRegisterMainModuleCallback)();
@@ -1338,9 +1322,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(CkCoreState *, _coreState);
 
 #if CMK_FAULT_EVAC
-#ifndef __BIGSIM__
 	CpvInitialize(char *,_validProcessors);
-#endif
 	CkpvInitialize(char ,startedEvac);
 #endif
 	CpvInitialize(int,serializer);
@@ -1402,9 +1384,7 @@ void _initCharm(int unused_argc, char **argv)
 	
 	CmiNodeAllBarrier();
 
-#if ! CMK_BIGSIM_CHARM
-	initQd(argv);         // bigsim calls it in ConverseCommonInit
-#endif
+	initQd(argv);
 
 	CkpvAccess(_coreState)=new CkCoreState();
 
@@ -1431,9 +1411,6 @@ void _initCharm(int unused_argc, char **argv)
 	CmiAssignOnce(&_ROGroupRestartHandlerIdx, CkRegisterHandler(_ROGroupRestartHandler));
 #endif
 
-#ifdef __BIGSIM__
-	if(BgNodeRank()==0) 
-#endif
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 
 	CmiAssignOnce(&_triggerHandlerIdx, CkRegisterHandler(_triggerHandler));
@@ -1482,11 +1459,7 @@ void _initCharm(int unused_argc, char **argv)
 	  same order on every node, and *must not* be called by 
 	  multiple threads simultaniously.
 	*/
-#ifdef __BIGSIM__
-	if(BgNodeRank()==0) 
-#else
 	if(CkMyRank()==0)
-#endif
 	{
 		SDAG::registerPUPables();
 		CmiArgGroup("Charm++",NULL);
@@ -1609,14 +1582,12 @@ void _initCharm(int unused_argc, char **argv)
 
 
 #if CMK_FAULT_EVAC
-#ifndef __BIGSIM__
 	CpvAccess(_validProcessors) = new char[CkNumPes()];
 	for(int vProc=0;vProc<CkNumPes();vProc++){
 		CpvAccess(_validProcessors)[vProc]=1;
 	}
 	CmiAssignOnce(&_ckEvacBcastIdx, CkRegisterHandler(_ckEvacBcast));
 	CmiAssignOnce(&_ckAckEvacIdx, CkRegisterHandler(_ckAckEvac));
-#endif
 
 	CkpvAccess(startedEvac) = 0;
 	evacuate = 0;
@@ -1648,17 +1619,13 @@ void _initCharm(int unused_argc, char **argv)
         CkFtFn  faultFunc_restart = CkRestartMain;
         if (faultFunc == NULL || faultFunc == faultFunc_restart) {         // this is not restart from memory
             // these two are blocking calls for non-bigsim
-#if ! CMK_BIGSIM_CHARM
 	  CmiInitCPUAffinity(argv);
           CmiInitMemAffinity(argv);
-#endif
         }
         CmiInitCPUTopology(argv);
         if (CkMyRank() == 0) {
           TopoManager_reset(); // initialize TopoManager singleton
-#if !CMK_BIGSIM_CHARM
           _topoTree = ST_RecursivePartition_getTreeInfo(0);
-#endif
         }
         CmiNodeAllBarrier(); // threads wait until _topoTree has been generated
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
@@ -1730,12 +1697,6 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 
     //CldCallback();
-#if CMK_BIGSIM_CHARM && CMK_CHARMDEBUG
-      // Register the BG handler for CCS. Notice that this is put into a variable shared by
-      // the whole real processor. This because converse needs to find it. We check that all
-      // virtual processors register the same index for this handler.
-    CpdBgInit();
-#endif
 
 	if (faultFunc) {
 #if CMK_WITH_STATS

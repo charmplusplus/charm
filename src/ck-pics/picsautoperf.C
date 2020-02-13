@@ -777,11 +777,7 @@ void _initTraceAutoPerfBOC()
   CkpvAccess(cntAfterLdb) = 4;
   CkpvInitialize(FILE*, fpSummary);
   CkpvAccess(fpSummary) = NULL;
-  #ifdef __BIGSIM__
-  if (BgNodeRank()==0) {
-#else               
     if (CkMyRank() == 0) {
-#endif
       registerExitFn(traceAutoPerfExitFunction);
     }
     CkpvInitialize(SavedPerfDatabase*, perfDatabase);

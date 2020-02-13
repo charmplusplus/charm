@@ -307,9 +307,6 @@ int getNextSerializer(){
 }
 
 int CkNumValidPes(){
-#if CMK_BIGSIM_CHARM
-        return CkNumPes();
-#else
 	int count=0;
 	for(int i=0;i<CkNumPes();i++){
 		if(CpvAccess(_validProcessors)[i]){
@@ -317,7 +314,6 @@ int CkNumValidPes(){
 		}
 	}
 	return count;
-#endif
 }
 
 

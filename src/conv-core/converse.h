@@ -2197,12 +2197,8 @@ void CthSetThreadID(CthThread th, int a, int b, int c);
 void CthTraceResume(CthThread t);
 
 #if CMK_FAULT_EVAC
-#if CMK_BIGSIM_CHARM
-#define CmiNodeAlive(x) (1)
-#else
 CpvExtern(char *,_validProcessors);
 #define CmiNodeAlive(x)  (CpvAccess(_validProcessors)[x])
-#endif
 #endif
 
 int CmiEndianness(void);
@@ -2224,10 +2220,6 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "persistent.h"
 
 #include "cmirdmautils.h"
-
-/* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
-extern int _BgOutOfCoreFlag;
-extern int _BgInOutOfCoreMode;
 
 #ifdef ADAPT_SCHED_MEM
 extern int numMemCriticalEntries;

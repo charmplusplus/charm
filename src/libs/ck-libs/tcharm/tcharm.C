@@ -182,10 +182,6 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
       CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
       tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
     }
-#if CMK_BIGSIM_CHARM
-    BgAttach(tid);
-    BgUnsetStartOutOfCore();
-#endif
   }
   CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
@@ -244,7 +240,6 @@ void TCharm::pup(PUP::er &p) {
   DBG("Packing thread");
 #if CMK_ERROR_CHECKING
   if (!p.isSizing() && !isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
-    if(_BgOutOfCoreFlag==0) //not doing out-of-core scheduling
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
   }	
   if (tcharm_nomig && !p.isSizing()) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
@@ -323,9 +318,6 @@ void TCharm::pupThread(PUP::er &pc) {
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
-#if CMK_BIGSIM_CHARM
-      BgAttach(tid);
-#endif
     }
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
@@ -520,15 +512,7 @@ CkArrayID TCHARM_Get_threads() {
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::barrier() noexcept {
 	//Contribute to a synchronizing reduction
 	contribute(CkCallback(CkReductionTarget(TCharm, atBarrier), thisProxy[0]));
-#if CMK_BIGSIM_CHARM
-        void *curLog;		// store current log in timeline
-        _TRACE_BG_TLINE_END(&curLog);
-	TRACE_BG_AMPI_BREAK(NULL, "TCharm_Barrier_START", NULL, 0, 1);
-#endif
 	TCharm * dis = stop();
-#if CMK_BIGSIM_CHARM
-	 _TRACE_BG_SET_INFO(NULL, "TCHARM_Barrier_END",  &curLog, 1);
-#endif
 	return dis;
 }
 
@@ -677,12 +661,7 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     mapID=CProxy_ConfigurableRRMap::ckNew();
     opts.setMap(mapID);
   } else if(mapping==NULL){
-#if CMK_BIGSIM_CHARM
-    mapID=CProxy_BlockMap::ckNew();
-    opts.setMap(mapID);
-#else
     /* do nothing: use the default map */
-#endif
   } else if(0 == strcmp(mapping,"BLOCK_MAP")) {
     CkPrintf("TCharm> using BLOCK_MAP\n");
     mapID = CProxy_BlockMap::ckNew();

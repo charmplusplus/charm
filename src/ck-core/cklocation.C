@@ -221,9 +221,6 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayOptions& options,void *ctor
            how many of them are used */
         CKARRAYMAP_POPULATE_INITIAL(CMK_RANK_0(procNum(arrayHdl,idx))==thisPe);
 
-#if CMK_BIGSIM_CHARM
-        BgEntrySplit("split-array-new-end");
-#endif
 
 	mgr->doneInserting();
 	CkFreeMsg(ctorMsg);
@@ -2509,16 +2506,6 @@ void CkLocMgr::reclaim(CkLocRec* rec) {
 	DEBC((AA "Destroying record for element %s\n" AB,idx2str(rec->getIndex())));
 	if (!duringMigration) 
 	{ //This is a local element dying a natural death
-#if CMK_BIGSIM_CHARM
-		//After migration, reclaimRemote will be called through 
-		//the CkRemoveArrayElement in the pupping routines for those 
-		//objects that are not on the home processors. However,
-		//those remote records should not be deleted since the corresponding
-		//objects are not actually deleted but on disk. If deleted, msgs
-		//that seeking where is the object will be accumulated (a circular
-		//msg chain) and causes the program no progress
-		if(_BgOutOfCoreFlag==1) return; 
-#endif
 		int home=homePe(rec->getIndex());
 		if (home!=CkMyPe())
 #if CMK_MEM_CHECKPOINT
@@ -3139,7 +3126,6 @@ void CkLocMgr::restore(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p)
 	//informHome should not be called since such information is already
 	//immediately updated real migration
 #if CMK_ERROR_CHECKING
-	if(_BgOutOfCoreFlag!=2)
 	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
 #endif
 	CkLocRec *rec=createLocal(idx,false,false,false);

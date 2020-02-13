@@ -412,11 +412,7 @@ static void CthThreadBaseInit(CthThreadBase *th)
   static int serialno = 1;
   th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
   th->token->thread = S(th);
-#if CMK_BIGSIM_CHARM
-  th->token->serialNo = -1;
-#else
   th->token->serialNo = CpvAccess(Cth_serialNo)++;
-#endif
   th->scheduled = 0;
 
   th->awakenfn = 0;
@@ -687,15 +683,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
    * When unpacking, reset the thread pointer in token to this thread.
    */
 
-  if(_BgOutOfCoreFlag!=0){
-    pup_bytes(p, &t->token, sizeof(void *));
-    if(!pup_isUnpacking(p)){
-      t->token->thread = NULL;
-    }
-    pup_int(p, &t->scheduled);
-  }
   if(pup_isUnpacking(p)){
-    if(_BgOutOfCoreFlag==0){
       t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
       t->token->thread = S(t);
       t->token->serialNo = CpvAccess(Cth_serialNo)++;
@@ -703,30 +691,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
         set scheduled to 0 in the unpacking period since the thread has
         not been scheduled */
       t->scheduled = 0;
-    }else{
-      /* During out-of-core emulation */
-      /* 
-       * When t->scheduled is set, the thread is in the queue so the token
-       * should be kept. Otherwise, allocate a new space for the token
-       */
-      if(t->scheduled==0){
-        /*CmiPrintf("Creating a new token for %p!\n", t->token);*/
-        t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
-      }
-      t->token->thread = S(t);
-      t->token->serialNo = CpvAccess(Cth_serialNo)++;
-    }
   }
-
-  /*BIGSIM_OOC DEBUGGING */
-  /*if(_BgOutOfCoreFlag!=0){
-    if(pup_isUnpacking(p)){
-    CmiPrintf("Unpacking: ");
-    }else{
-    CmiPrintf("Packing: ");
-    }	
-    CmiPrintf("thd=%p, its token=%p, token's thd=%p\n", t, t->token, t->token->thread); 
-    } */
 
   /*Really need a pup_functionPtr here:*/
   pup_bytes(p,&t->awakenfn,sizeof(t->awakenfn));
