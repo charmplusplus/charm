@@ -200,6 +200,7 @@ int printf(const char *fmt, ...) {
 
 
 #include "converse.h"
+#include "cmirdmautils.h"
 #include "memory-isomalloc.h"
 
 #include <stdio.h>

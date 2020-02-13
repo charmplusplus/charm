@@ -21,6 +21,7 @@ clients, including the rest of Charm++, are actually C++.
 CkpvDeclare(std::vector<void *>, chare_objs);
 CkpvDeclare(std::vector<int>, chare_types);
 CkpvDeclare(std::vector<VidBlock *>, vidblocks);
+CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
 
 typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
@@ -1157,11 +1158,24 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   ArrayObjMap& object_map = CkpvAccess(array_objs);
   auto iter = object_map.find(env->getRecipientID());
   if (iter != object_map.end()) {
+
+    CkArrayMessage* msg = (CkArrayMessage*)EnvToUsr(env);
+
+    CkLocMgr *localLocMgr  = CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr();
+
+    // Check if the array element has active Rgets (because of ZC Pup)
+    auto iter2 = localLocMgr->bufferedActiveRgetMsgs.find(msg->array_element_id());
+
+    if(iter2 != localLocMgr->bufferedActiveRgetMsgs.end()) {
+      // array element has active rgets
+      iter2->second.push_back(msg); // Buffer msg for now and handle it after rgets complete
+      return;
+    }
+
     // First see if we already have a direct pointer to the object
     _SET_USED(env, 0);
     ck->process(); // ck->process() updates mProcessed count used in QD
     int opts = 0;
-    CkArrayMessage* msg = (CkArrayMessage*)EnvToUsr(env);
     if (msg->array_hops()>1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }

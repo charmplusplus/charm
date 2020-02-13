@@ -50,6 +50,17 @@ all-zc: charm++
 	$(MAKE) -C ../examples/charm++/zerocopy all
 	$(MAKE) -C ../benchmarks/charm++/zerocopy all
 
+all-test-AMPI: all-test-AMPI-tests all-test-AMPI-examples all-test-AMPI-benchmarks
+
+all-test-AMPI-tests: AMPI
+	$(MAKE) -C ../tests/ampi all
+
+all-test-AMPI-examples: AMPI
+	$(MAKE) -C ../examples/ampi all
+
+all-test-AMPI-benchmarks: AMPI
+	$(MAKE) -C ../benchmarks/ampi all
+
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
 	touch charm++
@@ -184,17 +195,11 @@ test-zc: charm++
 	$(MAKE) -C ../examples/charm++/zerocopy test
 	$(MAKE) -C ../benchmarks/charm++/zerocopy test
 
-test-converse: converse
-	$(MAKE) -C ../tests test-converse
-	$(MAKE) -C ../benchmarks test-converse
+test-converse: converse test-tests-converse test-examples-converse test-benchmarks-converse
 
-test-charm: charm++
-	$(MAKE) -C ../tests test-charm
-	$(MAKE) -C ../benchmarks test-charm
+test-charm: charm++ test-tests-charm test-tests-charm test-tests-charm
 
-test-AMPI: AMPI
-	$(MAKE) -C ../tests test-AMPI
-	$(MAKE) -C ../benchmarks test-AMPI
+test-AMPI: AMPI test-tests-AMPI test-examples-AMPI test-benchmarks-AMPI
 
 test-tests-converse: converse
 	$(MAKE) -C ../tests test-converse
@@ -204,6 +209,15 @@ test-tests-charm: charm++
 
 test-tests-AMPI: AMPI
 	$(MAKE) -C ../tests test-AMPI
+
+test-examples-converse: converse
+	$(MAKE) -C ../examples test-converse
+
+test-examples-charm: charm++
+	$(MAKE) -C ../examples test-charm
+
+test-examples-AMPI: AMPI
+	$(MAKE) -C ../examples test-AMPI
 
 test-benchmarks-converse: converse
 	$(MAKE) -C ../benchmarks test-converse
@@ -1015,6 +1029,10 @@ veryclean:
 	mv .Make.depends Make.depends
 	rm -rf .[a-z]* .[A-Z]*
 
+clean-zc:
+	$(MAKE) -C ../tests/charm++/zerocopy clean
+	$(MAKE) -C ../examples/charm++/zerocopy clean
+	$(MAKE) -C ../benchmarks/charm++/zerocopy clean
 
 config: configure conv-autoconfig.h.in
 

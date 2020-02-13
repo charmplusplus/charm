@@ -168,12 +168,13 @@ CksvDeclare(GroupTable*, _nodeGroupTable);
 CksvDeclare(GroupIDTable, _nodeGroupIDTable);
 CksvDeclare(CmiImmediateLockType, _nodeGroupTableImmLock);
 CksvDeclare(CmiNodeLock, _nodeLock);
+CksvDeclare(CmiNodeLock, _nodeZCPendingLock);
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 CkpvDeclare(int, _charmEpoch);
 
 CkpvDeclare(bool, _destroyingNodeGroup);
 
-
+CksvDeclare(ObjNumRdmaOpsMap, pendingZCOps);
 CkpvDeclare(Stats*, _myStats);
 CkpvDeclare(MsgPool*, _msgPool);
 
@@ -245,7 +246,6 @@ void processRaiseEvacFile(char *raiseEvacFile);
 #endif
 
 extern bool useNodeBlkMapping;
-extern bool useCMAForZC;
 
 extern int quietMode;
 extern int quietModeRequested;
@@ -365,11 +365,6 @@ static inline void _parseCommandLineOpts(char **argv)
         if (CmiGetArgFlagDesc(argv,"+useNodeBlkMapping","Array elements are block-mapped in SMP-node level")) {
           useNodeBlkMapping = true;
         }
-
-  useCMAForZC = true;
-  if (CmiGetArgFlagDesc(argv, "+noCMAForZC", "When Cross Memory Attach (CMA) is supported, the program does not use CMA when using the Zerocopy API")) {
-    useCMAForZC = false;
-  }
 
 #if ! CMK_WITH_CONTROLPOINT
 	// Display a warning if charm++ wasn't compiled with control point support but user is expecting it
@@ -1339,12 +1334,15 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(GroupIDTable, _nodeGroupIDTable);
 	CksvInitialize(CmiImmediateLockType, _nodeGroupTableImmLock);
 	CksvInitialize(CmiNodeLock, _nodeLock);
+	CksvInitialize(CmiNodeLock, _nodeZCPendingLock);
 	CksvInitialize(PtrVec*,_nodeBocInitVec);
 	CksvInitialize(UInt,_numInitNodeMsgs);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
 	CksvInitialize(bool, _triggersSent);
 	CksvAccess(_triggersSent) = false;
+
+	CksvInitialize(objNumRdmaOpsMap, pendingZCOps);
 
 #if CMK_ONESIDED_IMPL
 	CksvInitialize(int, _numPendingRORdmaTransfers);
@@ -1378,7 +1376,9 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTable)->init();
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
+		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
 	}
+
 
 	CkCallbackInit();
 	
@@ -1444,10 +1444,8 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
-#if CMK_ONESIDED_IMPL
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
 	initEMNcpyAckHandler();
-#endif
 	/**
 	  The rank-0 processor of each node calls the 
 	  translator-generated "_register" routines. 

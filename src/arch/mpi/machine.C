@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include "converse.h"
+#include "cmirdmautils.h"
 #include <mpi.h>
 #include <algorithm>
 
@@ -1494,12 +1495,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     nextrank = num_workpes;
 
     if (*myNodeID >= num_workpes) {    /* is spare processor */
-      if(CmiGetArgFlag(largv,"+isomalloc_sync")){
-          MPI_Barrier(charmComm);
-          MPI_Barrier(charmComm);
-          MPI_Barrier(charmComm);
-          MPI_Barrier(charmComm);
-      }
+      // Previously, the code issued barriers here to bypass the isomalloc_sync sequence.
+      // This fails to actually sync spare processors with the rest of the job.
+      // Attempting to sync here fails because it cannot take place independently of the rest of ConverseCommonInit.
+      // TODO: Refactor spare processor code to initialize more completely and only then wait.
+
       MPI_Status sts;
       int vals[2];
       MPI_Recv(vals,2,MPI_INT,MPI_ANY_SOURCE,FAIL_TAG, charmComm,&sts);
@@ -1787,10 +1787,6 @@ void LrtsPreCommonInit(int everReturn) {
     CpvAccess(crashedRankHdr) = NULL;
     CpvAccess(crashedRankPtr) = NULL;
 #endif
-}
-
-void LrtsPostCommonInit(int everReturn) {
-
 
     CpvInitialize(SMSG_LIST *, sent_msgs);
     CpvInitialize(SMSG_LIST *, end_sent);
@@ -1798,6 +1794,9 @@ void LrtsPostCommonInit(int everReturn) {
     CpvAccess(sent_msgs) = NULL;
     CpvAccess(end_sent) = NULL;
     CpvAccess(MsgQueueLen) = 0;
+}
+
+void LrtsPostCommonInit(int everReturn) {
 
 #if CMI_MACH_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     CpvInitialize(double, projTraceStart);
