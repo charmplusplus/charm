@@ -415,9 +415,6 @@ void CentralLB::SendStats()
 
   statsMsg = NULL;
 
-#ifdef __BIGSIM__
-  BgEndStreaming();
-#endif
 
   {
   // enfore the barrier to wait until centralLB says no

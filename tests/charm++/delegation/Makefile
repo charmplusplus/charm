@@ -9,8 +9,6 @@ test: $(foreach i,$(TESTDIRS),test-$i)
 
 smptest: $(foreach i,$(TESTDIRS),smptest-$i)
 
-bgtest: $(foreach i,$(TESTDIRS),bgtest-$i)
-
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
 	rm -f core *~
@@ -23,9 +21,6 @@ $(foreach i,$(DIRS),test-$i):
 
 $(foreach i,$(DIRS),smptest-$i):
 	$(MAKE) -C $(subst smptest-,,$@) smptest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
-
-$(foreach i,$(DIRS),bgtest-$i):
-	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

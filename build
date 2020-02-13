@@ -17,15 +17,15 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ LIBS AMPI charm4py bigemulator msa'
+  echo '<targets>: converse charm++ LIBS AMPI charm4py msa'
   if test $more = 1
   then
   echo ''
   echo '  charm++         compile Charm++ core only'
   echo '  AMPI            compile Adaptive MPI on top of Charm++'
+  echo '  AMPI-only       compile Adaptive MPI with Charm++ built exclusively for it'
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
   echo '  charm4py        compile shared library version of Charm++ for charm4py'
-  echo '  bigemulator     build additional BigSim libraries'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
   echo '  Tau             build the TAU tracing library for generating TAU performance data' 
   echo '  ChaNGa          compile Charm++ core and necessary libraries for ChaNGa'
@@ -37,7 +37,7 @@ syntax() {
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
-  echo 'help smp omp tcp bigemulator ooc syncft papi pthreads'
+  echo 'help smp omp tcp ooc syncft papi pthreads'
   echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
   if test $more = 1
   then
@@ -66,7 +66,6 @@ syntax() {
   echo '  pthreads        compile with pthreads Converse threads'
   echo ''
   echo 'Advanced options:'
-  echo '  bigemulator	  compile for BigSim simulator'
   echo '  ooc		  compile with out of core support'
   echo '  syncft	  compile with Charm++ fault tolerance support'
   echo '  papi            compile with PAPI performance counter support (if any)'
@@ -228,13 +227,13 @@ ARCH=
 BUILD_SHARED=""             # default no shared lib
 WITH_ROMIO="true"           # default to building ROMIO on AMPI
 WITH_PRODUCTION=
-BUILD_EMULATOR=0
 DESTINATION=""
 DESTINATION_SUFFIX=""
 TAU_MAKEFILE=""
 QUIET=""
 BUILD_OMP=0
 ONLY_CONFIGURE=
+AMPI_ONLY=
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | ( less || more ) && exit 1
 [ $# -lt 2 ] && $(dirname "$0")/smart-build.pl && exit 1
@@ -294,8 +293,6 @@ for w in $VERSOPTS; do
   # It specifies some other option:
           TestIfOption $w
           BOPTS="$BOPTS $w"
-          [ $w =  "bigemulator" ] && BUILD_EMULATOR=1
-          [ $w =  "bigsim" ] && BUILD_EMULATOR=1
           [ $w =  "cuda"   ] && BUILD_CUDA=1
         fi
 done
@@ -364,6 +361,9 @@ do
     --build-shared)
 		BUILD_SHARED="-build-shared"; 
 		shift
+		;;
+    --ampi-only)
+		AMPI_ONLY='1'; shift
 		;;
     --with-romio)
 		WITH_ROMIO="true"; shift
@@ -464,8 +464,6 @@ do
 # It specifies some other option:
           TestIfOption $1
           BOPTS="$BOPTS $1"
-          [ $1 =  "bigemulator" ] && BUILD_EMULATOR=1
-          [ $1 =  "bigsim" ] && BUILD_EMULATOR=1
           [ $1 =  "cuda"   ] && BUILD_CUDA=1
         fi
         shift
@@ -512,12 +510,6 @@ if [ "x_$ARCH" = "x_verbs" ] && type /usr/sbin/opafabricinfo >/dev/null 2>&1; th
   echo "WARNING: Detected Omni-Path diagnostic tools.";
   echo "Verbs on Omni-Path architectures is not well supported: please use an OFI build instead.";
 fi 
-
-if test -n "$WITH_PRODUCTION" -a $BUILD_EMULATOR -eq 1 -a -z "$ENABLE_TRACING"
-then
-  echo "Error: bigemulator requires tracing modules, --with-production must be used with --enable-tracing"
-  exit 1
-fi
 
 if [ -z "$MAKE" ] 
 then
@@ -720,13 +712,6 @@ then
   CONFIG_OPTS="--enable-lbuserdata $CONFIG_OPTS"
 fi
 
-if test $BUILD_EMULATOR = 1
-then
-  # export BIGSIM so that make targets can depend on it
-  MAKEOPTS="$MAKEOPTS BIGSIM=bigsim"
-  PROGRAM="$PROGRAM bigsim"
-fi
-
 if [ $BUILD_OMP = 2 ]
 then
   case $DESTINATION in
@@ -898,6 +883,23 @@ else
     echo "CMK_AMPI_WITH_ROMIO=\"0\"" >> $ConvSh
     echo "CMK_AMPI_WITH_ROMIO:=0" >> $ConvMak
     echo '#define CMK_AMPI_WITH_ROMIO 0' >> $ConvHeader
+fi
+
+if [[ -n "$AMPI_ONLY" || "$PROGRAM" = "${PROGRAM%AMPI-only}AMPI-only" ]]
+then
+    echo "CMK_AMPI_ONLY=\"1\"" >> $ConvSh
+    echo "CMK_AMPI_ONLY:=1" >> $ConvMak
+    echo '#define CMK_AMPI_ONLY 1' >> $ConvHeader
+
+    if [[ "$PROGRAM" = "${PROGRAM%AMPI-only}AMPI-only" ]]
+    then
+      # strip "-only" suffix from AMPI target
+      PROGRAM="${PROGRAM%-only}"
+    fi
+else
+    echo "CMK_AMPI_ONLY=\"0\"" >> $ConvSh
+    echo "CMK_AMPI_ONLY:=0" >> $ConvMak
+    echo '#define CMK_AMPI_ONLY 0' >> $ConvHeader
 fi
 
 if test -n "$WITH_PRODUCTION"

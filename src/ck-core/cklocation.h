@@ -289,6 +289,7 @@ typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHas
 typedef std::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
 typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
 typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
+typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
 
 	CkLocMgr(CkArrayOptions opts);
 	CkLocMgr(CkMigrateMessage *m);
@@ -492,6 +493,14 @@ private:
 public:
 	void callMethod(CkLocRec *rec,CkMigratable_voidfn_t fn);
 
+	// Deliver buffered msgs that were buffered because of active rdma gets
+	void deliverAnyBufferedRdmaMsgs(CmiUInt8);
+
+	// Take all those actions that were waiting for the rgets launched from pup_buffer to complete
+	// These actions include: calling ckJustMigrated, calling ResumeFromSync and delivering any buffered messages
+	// that were sent for the element (which was still carrying out rgets)
+	void processAfterActiveRgetsCompleted(CmiUInt8 id);
+
 //Data Members:
     //Map array ID to manager and elements
     ArrayIdMap managers;
@@ -511,8 +520,13 @@ public:
     MsgBuffer bufferedMsgs;
     MsgBuffer bufferedRemoteMsgs;
     MsgBuffer bufferedShadowElemMsgs;
+    MsgBuffer bufferedActiveRgetMsgs;
 
     IndexMsgBuffer bufferedIndexMsgs;
+
+    // Map stores the CkMigratable elements that have active Rgets
+    // ResumeFromSync is not called for these elements until the Rgets have completed
+    ElemMap toBeResumeFromSynced;
 
 	bool addElementToRec(CkLocRec *rec,CkArray *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);

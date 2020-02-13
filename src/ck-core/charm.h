@@ -9,6 +9,7 @@
 #include <sys/types.h> /* for size_t */
 
 #ifdef __cplusplus
+#include "conv-rdma.h"
 #include "pup.h"
 extern "C" {
 #endif

@@ -37,12 +37,6 @@ smptest: lb_test
 test_every:  lb_test.every
 	$(call run, +p4 ./lb_test.every 100 100 10 40 10 1000 ring +balancer RecBipartLB +LBDebug 1 )
 
-bgtest:  lb_test
-	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 +x2 +y2 +z1 +cth1 +wth1 )
-
-bgdump:
-	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 mesh2d +balancer DummyLB +LBDebug 1 +LBSameCpus +LBNoBackground +bgconfig ./bg_config +LBDump 1 +LBDumpFile lb_test.dump)
-
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o lb_test charmrun lb_test.exe lb_test.pdb lb_test.ilk lb_test.every
 

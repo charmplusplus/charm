@@ -298,15 +298,16 @@ static const constexpr CmiUInt8 vm_limit = tb * 256ull;
 
 static const constexpr memRange_t other_libs = 16ul * gig; /* space for other libraries to use */
 
-/* the smallest size used when describing unavailable regions,
-   also used for alignment of region assignment to avoid cache contention */
+/* the smallest size used when describing unavailable regions */
 static const constexpr memRange_t division_size = 256u * meg;
 
 /* Maybe write a new function that distributes start points as
  * 0, 1/2, 1/4, 3/4, 1/8, 3/8, 5/8, 7/8, 1/16, ... */
 static uint8_t * get_space_partition(uint8_t * start, uint8_t * end, int myunit, int numunits)
 {
-  return start + ((end - start) / division_size * myunit / numunits * division_size);
+  const uintptr_t available_slots = ((uintptr_t)end - (uintptr_t)start) / slotsize;
+  CmiEnforce(available_slots >= numunits);
+  return start + (available_slots * myunit / numunits * slotsize);
 }
 
 /*Check if this memory location is usable.

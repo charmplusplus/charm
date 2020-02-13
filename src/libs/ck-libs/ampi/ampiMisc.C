@@ -397,6 +397,3 @@ void PUP::zdisk::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
   {gzseek(F,s.data.loff+off,0);}
 #endif
 #endif
-
-void beginTraceBigSim(char* msg){}
-void endTraceBigSim(char* msg, char* param){}

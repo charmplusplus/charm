@@ -6,6 +6,7 @@
 #include <string.h>
 #include "machine.h"
 #include "converse.h"
+#include "cmirdmautils.h"
 #include "pcqueue.h"
 #include "assert.h"
 #include "malloc.h"
