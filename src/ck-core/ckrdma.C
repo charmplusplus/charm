@@ -2367,18 +2367,24 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
 #endif
 }
 
-void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, void** ptrs, int* sizes) {
+void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes) {
 #if CMK_CUDA
   // Only continue if we need to use device communication buffer (CUDA IPC)
   // TODO: Currently dest_pe is sometimes -1 at the beginning, so always use device comm buffer
   //if (findTransferModeDevice(CkMyPe(), dest_pe) != CkNcpyModeDevice::IPC) return;
 
+  // Allocate blocks on device comm buffer
   DeviceManager* dm = CsvAccess(gpu_manager).device_map[CkMyPe()];
-
   void* alloc_comm_buffers[numops];
 
   for (int i = 0; i < numops; i++) {
+#if CMK_SMP
+    CmiLock(dm->lock);
+#endif
     alloc_comm_buffers[i] = dm->alloc_comm_buffer(sizes[i]);
+#if CMK_SMP
+    CmiUnlock(dm->lock);
+#endif
   }
 
   // TODO

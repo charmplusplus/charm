@@ -242,6 +242,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
         str << "  int device_rdma_sizes[" << entry->numRdmaDeviceParams << "];\n";
         int device_rdma_index = 0;
         callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
+        str << "  CkRdmaToDeviceCommBuffer(impl_num_device_rdma_fields, device_rdma_ptrs, device_rdma_sizes);\n";
       }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
