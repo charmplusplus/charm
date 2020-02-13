@@ -540,13 +540,13 @@ void initDeviceMapping(char** argv) {
 
   // Create device communication buffers
   if (CsvAccess(gpu_manager).use_comm_buffer) {
-#if CMK_SMP
-    CmiLock(CsvAccess(gpu_manager).device_mapping_lock);
-#endif
     DeviceManager* dm = CsvAccess(gpu_manager).device_map[CmiMyPe()];
+#if CMK_SMP
+    CmiLock(dm->lock);
+#endif
     dm->create_comm_buffer(CsvAccess(gpu_manager).comm_buffer_size);
 #if CMK_SMP
-    CmiUnlock(CsvAccess(gpu_manager).device_mapping_lock);
+    CmiUnlock(dm->lock);
 #endif
   }
 

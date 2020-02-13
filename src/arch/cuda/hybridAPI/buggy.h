@@ -6,7 +6,6 @@
 #include <cmath>
 #include <unordered_map>
 #include <algorithm>
-#include <mutex>
 
 namespace buggy {
 
@@ -47,9 +46,6 @@ namespace buggy {
 
     // Base pointer of the initial allocation
     uint8_t* base_ptr;
-
-    // Mutex for thread-safe access
-    std::mutex mutex;
 
     // Buckets each with a free list
     std::list<FreeBlock>* buckets;
@@ -124,8 +120,6 @@ namespace buggy {
     }
 
     void* malloc(size_t request) {
-      const std::lock_guard<std::mutex> lock(mutex);
-
       // Cannot satisfy request larger than limit
       if (request > limit) return nullptr;
 
@@ -179,8 +173,6 @@ namespace buggy {
     }
 
     void free(void* ptr) {
-      const std::lock_guard<std::mutex> lock(mutex);
-
       // Find pointer in allocation map
       auto alloc_it = alloc_map.find((uint8_t*)ptr);
       if (alloc_it == alloc_map.end()) {
