@@ -21,8 +21,10 @@
 #endif
 
 // Per-device struct containing local data for CUDA IPC
+// Use SMP lock in DeviceManager if needed
 struct cuda_ipc_local_info {
   std::vector<cudaEvent_t> event_pool;
+  int* event_pool_flags; // Flag per event - 0: free, 1: used
   void* buffer;
 };
 

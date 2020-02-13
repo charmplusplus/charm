@@ -2367,7 +2367,23 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
 #endif
 }
 
-void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes) {
+static int findFreeIpcEvent(DeviceManager* dm) {
+  int device_index = dm->global_index;
+  cuda_ipc_local_info& my_local_info = CsvAccess(gpu_manager).cuda_ipc_local_infos[device_index];
+  for (int i = 0; i < CsvAccess(gpu_manager).ipc_event_pool_size; i++) {
+    if (my_local_info.event_pool_flags[i] == 0) {
+      my_local_info.event_pool_flags[i] = 1;
+
+      return i;
+    }
+  }
+
+  CkAbort("CUDA IPC event pool is empty");
+
+  return -1;
+}
+
+void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, int* event_indices) {
 #if CMK_CUDA
   // Only continue if we need to use device communication buffer (CUDA IPC)
   // TODO: Currently dest_pe is sometimes -1 at the beginning, so always use device comm buffer
@@ -2382,6 +2398,8 @@ void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes) {
     CmiLock(dm->lock);
 #endif
     alloc_comm_buffers[i] = dm->alloc_comm_buffer(sizes[i]);
+    event_indices[i] = findFreeIpcEvent(dm);
+    CkPrintf("PE %d, Free event at index %d\n", CkMyPe(), event_indices[i]);
 #if CMK_SMP
     CmiUnlock(dm->lock);
 #endif

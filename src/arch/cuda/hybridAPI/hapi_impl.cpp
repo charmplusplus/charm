@@ -80,6 +80,17 @@ CsvDeclare(GPUManager, gpu_manager);
 CpvDeclare(int, my_device); // GPU device that this thread is mapped to
 CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
 
+// Returns the local rank of the logical node (process) that the given PE belongs to
+static inline int CmiNodeRankLocal(int pe) {
+  // Logical node index % Number of logical nodes per physical node
+  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
+}
+
+// Returns the local rank of the logical node that I belong to
+static inline int CmiMyNodeRankLocal() {
+  return CmiNodeRankLocal(CmiMyPe());
+}
+
 void initCpvs() {
   // HAPI event-related
 #ifndef HAPI_CUDA_CALLBACK
@@ -463,7 +474,8 @@ void initDeviceMapping(char** argv) {
 
     // Create DeviceManagers in GPUManager
     for (int i = 0; i < CsvAccess(gpu_manager).device_count; i++) {
-      CsvAccess(gpu_manager).device_managers.emplace_back(i);
+      CsvAccess(gpu_manager).device_managers.emplace_back(i,
+          CsvAccess(gpu_manager).device_count * CmiMyNodeRankLocal() + i);
     }
 
     // Count number of PEs per device
@@ -596,17 +608,6 @@ void initDeviceMapping(char** argv) {
   }
 }
 
-// Returns the local rank of the logical node (process) that the given PE belongs to
-static inline int CmiNodeRankLocal(int pe) {
-  // Logical node index % Number of logical nodes per physical node
-  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
-}
-
-// Returns the local rank of the logical node that I belong to
-static inline int CmiMyNodeRankLocal() {
-  return CmiNodeRankLocal(CmiMyPe());
-}
-
 // Create POSIX shared memory region accessible to all processes on the same host
 // Invoked by PE rank 0 of each process (no locking needed for SMP)
 void shmCreate() {
@@ -708,7 +709,9 @@ void ipcHandleCreate() {
   cuda_ipc_local_info& my_local_info = CsvAccess(gpu_manager).cuda_ipc_local_infos[device_index];
 
   // Create CUDA IPC events and corresponding handles
+  my_local_info.event_pool_flags = new int[CsvAccess(gpu_manager).ipc_event_pool_size];
   for (int i = 0; i < CsvAccess(gpu_manager).ipc_event_pool_size; i++) {
+    my_local_info.event_pool_flags[i] = 0;
     my_local_info.event_pool.emplace_back();
     hapiCheck(cudaEventCreateWithFlags(&my_local_info.event_pool[i], cudaEventDisableTiming | cudaEventInterprocess));
     hapiCheck(cudaIpcGetEventHandle(&shm_event_pool[i], my_local_info.event_pool[i]));
@@ -736,6 +739,7 @@ void ipcHandleOpen() {
       cudaIpcEventHandle_t* cur_shm_event_pool = (cudaIpcEventHandle_t*)((char*)cur_shm_mem_handle + sizeof(cudaIpcMemHandle_t));
       cuda_ipc_local_info& cur_local_info = CsvAccess(gpu_manager).cuda_ipc_local_infos[device_index];
 
+      cur_local_info.event_pool_flags = NULL;
       for (int k = 0; k < CsvAccess(gpu_manager).ipc_event_pool_size; k++) {
         cur_local_info.event_pool.emplace_back();
         hapiCheck(cudaIpcOpenEventHandle(&cur_local_info.event_pool[k], cur_shm_event_pool[k]));

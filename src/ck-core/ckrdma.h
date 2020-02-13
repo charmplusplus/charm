@@ -606,6 +606,6 @@ int getRootNode(envelope *env);
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     void **arrPtrs, int *arrSizes, bool onlyDevice);
 
-void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes);
+void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, int* event_indices);
 
 #endif

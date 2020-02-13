@@ -12,13 +12,15 @@ struct DeviceManager {
   CmiNodeLock lock;
 #endif
 
-  // Device ordinal
-  int device;
+  // Device ordinals
+  int local_index; // Within process
+  int global_index; // Within physical node
 
   // Buddy allocator for communication buffer
   buggy::allocator* comm_buffer;
 
-  DeviceManager(int device_ = 0) : device(device_), comm_buffer(nullptr) {
+  DeviceManager(int local_index_, int global_index_) :
+    local_index(local_index_), global_index(global_index_), comm_buffer(nullptr) {
 #if CMK_SMP
     lock = CmiCreateLock();
 #endif
