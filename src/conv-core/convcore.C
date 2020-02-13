@@ -3858,7 +3858,6 @@ void ConverseCommonInit(char **argv)
 #endif
 
   CmiPersistentInit();
-  CmiIsomallocInit(argv);
 
   // Initialize converse handlers for supporting generic Direct Nocopy API
   CmiOnesidedDirectInit();
@@ -3888,7 +3887,9 @@ void ConverseCommonInit(char **argv)
   CrnInit();
   CmiInitImmediateMsg();
   CldModuleInit(argv);
-  
+
+  CmiIsomallocInit(argv);
+
   /* main thread is suspendable */
 /*
   CthSetSuspendable(CthSelf(), 0);
