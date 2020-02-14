@@ -55,6 +55,9 @@ rm hwloc
 # Done with build scripts
 popd
 
+# Add requisite hwloc Makefile.in
+git add -f contrib/hwloc/{,src/,include/}Makefile.in
+
 # Stage all of the modified files
 git add -u
 
