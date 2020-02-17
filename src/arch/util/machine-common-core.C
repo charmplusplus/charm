@@ -1474,11 +1474,6 @@ if (  MSG_STATISTIC)
     if (CmiNumNodes()==1) CmiNodesDim=1;
 #endif
 
-#if CMK_CCS_AVAILABLE
-    // Default value of cmiArgDebugFlag
-    cmiArgDebugFlag = 0;
-#endif
-
     CsvInitialize(CmiNodeState, NodeState);
     CmiNodeStateInit(&CsvAccess(NodeState));
 

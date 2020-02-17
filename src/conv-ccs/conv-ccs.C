@@ -498,7 +498,7 @@ int _isCcsHandlerIdx(int hIdx) {
 
 void CcsBuiltinsInit(char **argv);
 
-int cmiArgDebugFlag;
+int cmiArgDebugFlag; // Value is 0, unless reset in ConverseCommonInit
 CpvDeclare(char *, displayArgument);
 CpvCExtern(int, cpdSuspendStartup);
 CpvDeclare(int, cpdSuspendStartup);
