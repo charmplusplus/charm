@@ -45,6 +45,7 @@ class Parameter {
   void marshallArraySizes(XStr& str, Type* dt);
   void marshallRegArraySizes(XStr& str);
   void marshallRdmaParameters(XStr& str, bool genRdma);
+  void prepareToDeviceCommBuffer(XStr& str, int& index);
   void marshallDeviceRdmaParameters(XStr& str, int& index);
   void marshallArrayData(XStr& str);
   void marshallRdmaArrayData(XStr& str);

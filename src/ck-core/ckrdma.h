@@ -127,6 +127,10 @@ class CkNcpyBuffer{
   // ack handling pointer used for bcast and CMA p2p transfers
   const void *refAckInfo;
 
+  // CUDA IPC
+  size_t comm_offset;
+  int event_idx;
+
   CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), ref(NULL), refAckInfo(NULL) {}
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
@@ -246,6 +250,8 @@ class CkNcpyBuffer{
     p|deregMode;
     p|isRegistered;
     PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
+    p|comm_offset;
+    p|event_idx;
   }
 
   friend void CkRdmaDirectAckHandler(void *ack);
@@ -606,6 +612,6 @@ int getRootNode(envelope *env);
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     void **arrPtrs, int *arrSizes, bool onlyDevice);
 
-void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, int* event_indices);
+void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, size_t* comm_offsets, int* event_indices);
 
 #endif

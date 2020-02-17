@@ -240,9 +240,14 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
         str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams << ";\n";
         str << "  void* device_rdma_ptrs[" << entry->numRdmaDeviceParams << "];\n";
         str << "  int device_rdma_sizes[" << entry->numRdmaDeviceParams << "];\n";
+        str << "  size_t comm_offsets[" << entry->numRdmaDeviceParams << "];\n";
+        str << "  int event_indices[" << entry->numRdmaDeviceParams << "];\n";
         int device_rdma_index = 0;
+        callEach(&Parameter::prepareToDeviceCommBuffer, str, device_rdma_index);
+        str << "  CkRdmaToDeviceCommBuffer(impl_num_device_rdma_fields, device_rdma_ptrs, "
+          << "device_rdma_sizes, comm_offsets, event_indices);\n";
+        device_rdma_index = 0;
         callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
-        str << "  CkRdmaToDeviceCommBuffer(impl_num_device_rdma_fields, device_rdma_ptrs, device_rdma_sizes);\n";
       }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
@@ -386,14 +391,28 @@ void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
   }
 }
 
+void Parameter::prepareToDeviceCommBuffer(XStr& str, int& index) {
+  if (isRdma() && isDevice()) {
+    Type* dt = type->deref();
+    str << "  device_rdma_ptrs[" << index << "] = (void*)ncpyBuffer_" << name
+      << ".ptr;\n";
+    str << "  device_rdma_sizes[" << index << "] = sizeof(" << dt << ")*("
+      << arrLen << ");\n";
+    index++;
+  }
+}
+
 void Parameter::marshallDeviceRdmaParameters(XStr& str, int& index) {
   if (isRdma() && isDevice()) {
     Type* dt = type->deref();
     str << "  ncpyBuffer_" << name << ".cnt = sizeof(" << dt << ")*(" << arrLen
       << ");\n";
-    str << "  device_rdma_ptrs[" << index << "] = (void*)ncpyBuffer_" << name << ".ptr;\n";
-    str << "  device_rdma_sizes[" << index << "] = ncpyBuffer_" << name << ".cnt;\n";
+    str << "  ncpyBuffer_" << name << ".comm_offset = comm_offsets[" << index
+      << "];\n";
+    str << "  ncpyBuffer_" << name << ".event_idx = event_indices[" << index
+      << "];\n";
     index++;
+
   }
 }
 

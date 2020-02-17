@@ -562,6 +562,16 @@ void initDeviceMapping(char** argv) {
 #endif
   }
 
+  // Allocate space for per-PE streams used for transfer to device comm buffer
+  if (CmiMyRank() == 0) {
+    CsvAccess(gpu_manager).comm_streams = new cudaStream_t[CmiNodeSize(CmiMyNode())];
+  }
+
+  CmiNodeBarrier();
+
+  // Create stream for device comm buffer
+  hapiCheck(cudaStreamCreateWithFlags(&CsvAccess(gpu_manager).comm_streams[CmiMyRank()], cudaStreamNonBlocking));
+
   // Process +gpuipceventpool
   int input_ipc_event_pool_size;
   if (!CmiGetArgIntDesc(argv, "+gpuipceventpool", &input_ipc_event_pool_size,

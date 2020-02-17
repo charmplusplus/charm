@@ -90,6 +90,7 @@ struct GPUManager {
   // Device communication buffer
   bool use_comm_buffer;
   size_t comm_buffer_size;
+  cudaStream_t* comm_streams; // Per-PE stream used for transfer from source buffer to comm buffer
 
   // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
   void* shm_ptr;

@@ -2383,7 +2383,7 @@ static int findFreeIpcEvent(DeviceManager* dm) {
   return -1;
 }
 
-void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, int* event_indices) {
+void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, size_t* comm_offsets, int* event_indices) {
 #if CMK_CUDA
   // Only continue if we need to use device communication buffer (CUDA IPC)
   // TODO: Currently dest_pe is sometimes -1 at the beginning, so always use device comm buffer
@@ -2398,15 +2398,22 @@ void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, int* event_in
     CmiLock(dm->lock);
 #endif
     alloc_comm_buffers[i] = dm->alloc_comm_buffer(sizes[i]);
+    comm_offsets[i] = (char*)alloc_comm_buffers[i] - (char*)dm->comm_buffer->base_ptr;
     event_indices[i] = findFreeIpcEvent(dm);
-    CkPrintf("PE %d, Free event at index %d\n", CkMyPe(), event_indices[i]);
 #if CMK_SMP
     CmiUnlock(dm->lock);
 #endif
+
+    cudaStream_t comm_stream = CsvAccess(gpu_manager).comm_streams[CmiMyRank()];
+
+    // Initiate transfer from source buffer to device comm buffer
+    hapiCheck(cudaMemcpyAsync(alloc_comm_buffers[i], ptrs[i], sizes[i],
+          cudaMemcpyDefault, comm_stream));
+
+    // Record event
+    cuda_ipc_local_info& my_local_info = CsvAccess(gpu_manager).cuda_ipc_local_infos[dm->global_index];
+    hapiCheck(cudaEventRecord(my_local_info.event_pool[event_indices[i]], comm_stream));
   }
-
-  // TODO
-
 #else
   CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
 #endif
