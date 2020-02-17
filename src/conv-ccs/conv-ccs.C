@@ -498,7 +498,7 @@ int _isCcsHandlerIdx(int hIdx) {
 
 void CcsBuiltinsInit(char **argv);
 
-CpvDeclare(int, cmiArgDebugFlag);
+int cmiArgDebugFlag;
 CpvDeclare(char *, displayArgument);
 CpvCExtern(int, cpdSuspendStartup);
 CpvDeclare(int, cpdSuspendStartup);
@@ -537,7 +537,7 @@ void CcsInit(char **argv)
   }
 #endif
   /* if in parallel debug mode i.e ++cpd, freeze */
-  if (CpvAccess(cmiArgDebugFlag))
+  if (cmiArgDebugFlag)
   {
      if (CmiGetArgStringDesc(argv, "+DebugDisplay",&(CpvAccess(displayArgument)), "X display for gdb used only in cpd mode"))
      {

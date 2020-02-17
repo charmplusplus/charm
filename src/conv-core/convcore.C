@@ -1053,7 +1053,7 @@ void CmiTimerInit(char **argv)
 #if !(__FAULT__)
   /* try to synchronize calling barrier */
 #if CMK_CCS_AVAILABLE
-  if(CpvAccess(cmiArgDebugFlag)==0)
+  if(cmiArgDebugFlag == 0)
 #endif
     {
       CmiBarrier();
@@ -1076,7 +1076,7 @@ if(CmiMyRank() == 0) /* initialize only  once */
 
 #if !(__FAULT__)
 #if CMK_CCS_AVAILABLE
-  if(CpvAccess(cmiArgDebugFlag)==0)
+  if(cmiArgDebugFlag == 0)
 #endif
     CmiBarrier();
 /*  CmiBarrierZero(); */
@@ -1160,7 +1160,7 @@ void CmiTimerInit(char **argv)
 {
   struct rusage ru;
 #if !(__FAULT__)
-  if(CpvAccess(cmiArgDebugFlag)==0)
+  if(cmiArgDebugFlag == 0)
     {
       CmiBarrier();
       CmiBarrier();
@@ -1176,7 +1176,7 @@ void CmiTimerInit(char **argv)
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 #if !(__FAULT__)
-  if(CpvAccess(cmiArgDebugFlag)==0)
+  if(cmiArgDebugFlag == 0)
     CmiBarrierZero();
 #endif  
 }
@@ -1237,7 +1237,7 @@ void CmiTimerInit(char **argv)
 
   /* try to synchronize calling barrier */
 #if !(__FAULT__)
-  if(CpvAccess(cmiArgDebugFlag)==0){
+  if(cmiArgDebugFlag == 0) {
     CmiBarrier();
     CmiBarrier();
     CmiBarrier();
@@ -3818,7 +3818,7 @@ void ConverseCommonInit(char **argv)
   if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
     {
 #if CMK_CCS_AVAILABLE
-      CpvAccess(cmiArgDebugFlag) = 1;
+      cmiArgDebugFlag = 1;
 #endif
     }
   CmiTimerInit(argv);
@@ -3994,7 +3994,7 @@ void CmiPrintf(const char *format, ...)
   }
   va_end(args);
 #if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
-  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
+  if (cmiArgDebugFlag && CmiMyRank()==0) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);
@@ -4014,7 +4014,7 @@ void CmiError(const char *format, ...)
   CmiFlush(stderr);  /* stderr is always flushed */
   va_end(args);
 #if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
-  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
+  if (cmiArgDebugFlag && CmiMyRank()==0) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);
