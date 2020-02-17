@@ -1932,6 +1932,11 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           str << "  int buffSizes["<< numRdmaRecvParams <<"];\n";
         }
         str << "#endif\n";
+        // CUDA IPC related info
+        if (param->hasDevice()) {
+          str << "  size_t buffCommOffsets[" << numRdmaDeviceParams << "];\n";
+          str << "  int buffEventIndices[" << numRdmaDeviceParams << "];\n";
+        }
         param->storePostedRdmaPtrs(str, isSDAGGen);
         if (param->hasDevice()) {
           str << "#if CMK_ONESIDED_IMPL\n";
@@ -1942,7 +1947,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
             str << "genClosure->num_rdma_fields, genClosure->num_root_node, genClosure->num_device_rdma_fields, ";
           else
             str << "impl_num_rdma_fields, impl_num_root_node, impl_num_device_rdma_fields, ";
-          str << "buffPtrs, buffSizes, ncpyPost);\n";
+          str << "buffPtrs, buffSizes, buffCommOffsets, buffEventIndices, ncpyPost);\n";
           str << "#else\n";
           // Only device RDMA
           str << "  if(CMI_IS_ZC_RECV(env))\n";
@@ -1951,7 +1956,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
             str << "genClosure->num_device_rdma_fields, ";
           else
             str << "impl_num_device_rdma_fields, ";
-          str << "buffPtrs, buffSizes, true);\n";
+          str << "buffPtrs, buffSizes, buffCommOffsets, buffEventIndices, true);\n";
           str << "#endif\n";
         }
         else {
@@ -1962,7 +1967,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
             str << "genClosure->num_rdma_fields, genClosure->num_root_node, 0, ";
           else
             str << "impl_num_rdma_fields, impl_num_root_node, 0, ";
-          str << "buffPtrs, buffSizes, ncpyPost);\n";
+          str << "buffPtrs, buffSizes, NULL, NULL, ncpyPost);\n";
           str << "#endif\n";
         }
       }

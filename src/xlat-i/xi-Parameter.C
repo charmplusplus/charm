@@ -712,10 +712,13 @@ void Parameter::storePostedDeviceRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGe
     str << "    buffPtrs["<< count <<"] = (void *)" << "ncpyBuffer_";
     str << name << "_ptr;\n";
     if(isSDAGGen)
-      str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
+      str << "    buffSizes["<< count <<"] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
     else
-      str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * "<< arrLen << ".t;\n";
+      str << "    buffSizes["<< count <<"] = sizeof(" << dt << ") * "<< arrLen << ".t;\n";
+    str << "    buffCommOffsets[" << count << "] = ncpyBuffer_" << name << ".comm_offset;\n";
+    str << "    buffEventIndices[" << count << "] = ncpyBuffer_" << name << ".event_idx;\n";
     str <<  "  }\n";
+    count++;
   }
 }
 

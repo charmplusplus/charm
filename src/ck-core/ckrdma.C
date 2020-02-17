@@ -1079,13 +1079,16 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
  * the destination to perform zerocopy operations as a part of the Zerocopy Entry Method
  * API
  */
-void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, int numDeviceOps, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs){
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg,
+    int numops, int rootNode, int numDeviceOps, void **arrPtrs, int *arrSizes,
+    size_t *arrCommOffsets, int *arrEventIndices, CkNcpyBufferPost *postStructs){
   // Check if there are device-side RDMA operations
   bool hasDevice = numDeviceOps > 0;
 
   if (hasDevice) {
     // Only pass device-related metadata
-    CkRdmaIssueRgetsDevice(env, emMode, numDeviceOps, arrPtrs, arrSizes, false);
+    CkRdmaIssueRgetsDevice(env, emMode, numDeviceOps, arrPtrs, arrSizes,
+        arrCommOffsets, arrEventIndices, false);
 
     // Move pointers to the start of host RDMA pointers
     arrPtrs += numDeviceOps;
@@ -2284,7 +2287,8 @@ void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int 
 // Should always be available regardless of whether or not CPU-side RDMA is supported
 // (i.e. CMK_ONESIDED_IMPL)
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
-    void **arrPtrs, int *arrSizes, bool onlyDevice) {
+    void **arrPtrs, int *arrSizes, size_t *arrCommOffsets, int *arrEventIndices,
+    bool onlyDevice) {
 #if CMK_CUDA
   // Only P2P RECV API is supported
   CkAssert(emMode == ncpyEmApiMode::P2P_RECV);
