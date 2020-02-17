@@ -525,7 +525,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
         if (!needsClosure) {
           if (hasRdma()) {
             if (hasDevice()) {
-              str << "  int impl_num_device_rdma_fields; implP|impl_num_rdma_fields;\n";
+              str << "  int impl_num_device_rdma_fields; implP|impl_num_device_rdma_fields;\n";
               callEach(&Parameter::beginUnmarshallDeviceRdma, str);
             }
             str << "#if CMK_ONESIDED_IMPL\n";
@@ -565,7 +565,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
       if (!needsClosure) {
         if (hasRdma()) {
           if (hasDevice()) {
-            str << "  int impl_num_device_rdma_fields; implP|impl_num_rdma_fields;\n";
+            str << "  int impl_num_device_rdma_fields; implP|impl_num_device_rdma_fields;\n";
             callEach(&Parameter::beginUnmarshallDeviceRdma, str);
           }
           str << "#if CMK_ONESIDED_IMPL\n";
