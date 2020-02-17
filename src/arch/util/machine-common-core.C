@@ -1474,6 +1474,11 @@ if (  MSG_STATISTIC)
     if (CmiNumNodes()==1) CmiNodesDim=1;
 #endif
 
+#if CMK_CCS_AVAILABLE
+    // Default value of cmiArgDebugFlag
+    cmiArgDebugFlag = 0;
+#endif
+
     CsvInitialize(CmiNodeState, NodeState);
     CmiNodeStateInit(&CsvAccess(NodeState));
 
@@ -1499,16 +1504,6 @@ void CthInit(char **argv);
 static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
-
-#if CMK_CCS_AVAILABLE
-/**
- * The reason to initialize this variable here:
- * cmiArgDebugFlag is possibly accessed in CmiPrintf/CmiError etc.,
- * therefore, we have to initialize this variable before any calls
- * to those functions (such as CmiPrintf).
- */
-  cmiArgDebugFlag = 0;
-#endif
 
     LrtsPreCommonInit(everReturn);
 
