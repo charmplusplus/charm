@@ -1462,6 +1462,12 @@ if (  MSG_STATISTIC)
     }
 #endif
 
+    if(CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger")) {
+#if CMK_CCS_AVAILABLE
+        cmiArgDebugFlag = 1;
+#endif
+    }
+
     /* CmiTimerInit(); */
 #if CMK_BROADCAST_HYPERCUBE
     /* CmiNodesDim = ceil(log2(CmiNumNodes)) except when #nodes is 1*/

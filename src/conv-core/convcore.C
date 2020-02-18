@@ -3815,12 +3815,6 @@ void ConverseCommonInit(char **argv)
   CmiPoolAllocInit(30);  
 #endif
   CmiTmpInit(argv);
-  if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
-    {
-#if CMK_CCS_AVAILABLE
-      cmiArgDebugFlag = 1;
-#endif
-    }
   CmiTimerInit(argv);
   CstatsInit(argv);
   CmiInitCPUAffinityUtil();
