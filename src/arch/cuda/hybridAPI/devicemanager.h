@@ -26,7 +26,7 @@ struct DeviceManager {
 #endif
   }
 
-  ~DeviceManager() {
+  void destroy() {
 #if CMK_SMP
     CmiDestroyLock(lock);
 #endif

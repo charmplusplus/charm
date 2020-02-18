@@ -20,9 +20,9 @@
 #define NUM_BUFFERS 256
 #endif
 
-// Per-device struct containing local data for CUDA IPC
+// Per-device struct containing data for CUDA IPC
 // Use SMP lock in DeviceManager if needed
-struct cuda_ipc_local_info {
+struct cuda_ipc_device_info {
   std::vector<cudaEvent_t> event_pool;
   int* event_pool_flags; // Flag per event - 0: free, 1: used
   void* buffer;
@@ -104,7 +104,8 @@ struct GPUManager {
   int ipc_event_pool_size;
 
   // CUDA IPC handles opened for processes on the same node
-  std::vector<cuda_ipc_local_info> cuda_ipc_local_infos;
+  // Vector size is equal to the number of devices on the physical node
+  std::vector<cuda_ipc_device_info> cuda_ipc_device_infos;
 
   void init() {
     next_buffer_ = NUM_BUFFERS;

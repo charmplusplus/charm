@@ -14,7 +14,8 @@ mainmodule zerocopy {
     entry [reductiontarget] void terminate();
   };
 
-  group Block {
+  //group Block {
+  array [1d] Block {
     entry Block();
     entry void init();
     entry void send(int count);

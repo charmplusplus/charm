@@ -1081,18 +1081,18 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
  */
 void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg,
     int numops, int rootNode, int numDeviceOps, void **arrPtrs, int *arrSizes,
-    size_t *arrCommOffsets, int *arrEventIndices, CkNcpyBufferPost *postStructs){
+    CkNcpyBufferPost *postStructs){
   // Check if there are device-side RDMA operations
   bool hasDevice = numDeviceOps > 0;
 
   if (hasDevice) {
     // Only pass device-related metadata
-    CkRdmaIssueRgetsDevice(env, emMode, numDeviceOps, arrPtrs, arrSizes,
-        arrCommOffsets, arrEventIndices, false);
+    CkRdmaIssueRgetsDevice(env, emMode, numDeviceOps, arrPtrs, arrSizes, postStructs, false);
 
     // Move pointers to the start of host RDMA pointers
     arrPtrs += numDeviceOps;
     arrSizes += numDeviceOps;
+    postStructs += numDeviceOps;
   }
 
   if (emMode == ncpyEmApiMode::BCAST_SEND || _topoTree == NULL)
@@ -2287,8 +2287,7 @@ void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int 
 // Should always be available regardless of whether or not CPU-side RDMA is supported
 // (i.e. CMK_ONESIDED_IMPL)
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
-    void **arrPtrs, int *arrSizes, size_t *arrCommOffsets, int *arrEventIndices,
-    bool onlyDevice) {
+    void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs, bool onlyDevice) {
 #if CMK_CUDA
   // Only P2P RECV API is supported
   CkAssert(emMode == ncpyEmApiMode::P2P_RECV);
@@ -2320,23 +2319,34 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     // Perform data transfers
     switch (mode) {
       case CkNcpyModeDevice::MEMCPY:
-        // TODO: Incorporate CUDA streams to make this asynchronous, so that
-        // the user can wait for the transfer or submit subsequent work in the
-        // regular entry method
-        hapiCheck(cudaMemcpy((void*)dest.ptr, source.ptr, std::min(source.cnt, dest.cnt),
-              cudaMemcpyDeviceToDevice));
-        break;
+        {
+          // Directly invoke memcpy from source buffer to destination buffer
+          hapiCheck(cudaMemcpyAsync((void*)dest.ptr, source.ptr, std::min(source.cnt, dest.cnt),
+                cudaMemcpyDefault, postStructs[i].cuda_stream));
+          break;
+        }
       case CkNcpyModeDevice::IPC:
-        // TODO
-        CkAbort("GPU direct messaging between different logical nodes is not yet supported");
-        break;
+        {
+          cuda_ipc_device_info& device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[source.device_idx];
+          // 1. Make user-provided stream wait for IPC event using cudaStreamWaitEvent
+          //    (source buffer to device comm buffer on source)
+          hapiCheck(cudaStreamWaitEvent(postStructs[i].cuda_stream, device_info.event_pool[source.event_idx], 0));
+          // 2. Invoke cudaMemcpyAsync (from source device comm buffer to destination buffer)
+          hapiCheck(cudaMemcpyAsync((void*)dest.ptr, (void*)((char*)device_info.buffer + source.comm_offset),
+                std::min(source.cnt, dest.cnt), cudaMemcpyDefault, postStructs[i].cuda_stream));
+          break;
+        }
       case CkNcpyModeDevice::RDMA:
-        // TODO
-        CkAbort("GPU direct messaging between different physical nodes is not yet supported");
-        break;
+        {
+          // TODO
+          CkAbort("GPU direct messaging between different physical nodes is not yet supported");
+          break;
+        }
       default:
-        CkAbort("Invalid mode");
-        break;
+        {
+          CkAbort("Invalid mode");
+          break;
+        }
     }
 
     p|source;
@@ -2350,13 +2360,12 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
 
     switch (mode) {
       case CkNcpyModeDevice::MEMCPY:
-        // The following code causes a duplicate call of the receiver function.
-        // Is there a need for another message to be enqueued?
         QdCreate(1);
         enqueueNcpyMessage(CkMyPe(), env);
         break;
       case CkNcpyModeDevice::IPC:
-        // TODO
+        QdCreate(1);
+        enqueueNcpyMessage(CkMyPe(), env);
         break;
       case CkNcpyModeDevice::RDMA:
         // TODO
@@ -2373,10 +2382,10 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
 
 static int findFreeIpcEvent(DeviceManager* dm) {
   int device_index = dm->global_index;
-  cuda_ipc_local_info& my_local_info = CsvAccess(gpu_manager).cuda_ipc_local_infos[device_index];
+  cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[device_index];
   for (int i = 0; i < CsvAccess(gpu_manager).ipc_event_pool_size; i++) {
-    if (my_local_info.event_pool_flags[i] == 0) {
-      my_local_info.event_pool_flags[i] = 1;
+    if (my_device_info.event_pool_flags[i] == 0) {
+      my_device_info.event_pool_flags[i] = 1;
 
       return i;
     }
@@ -2387,7 +2396,8 @@ static int findFreeIpcEvent(DeviceManager* dm) {
   return -1;
 }
 
-void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, size_t* comm_offsets, int* event_indices) {
+void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, int* device_indices,
+    size_t* comm_offsets, int* event_indices) {
 #if CMK_CUDA
   // Only continue if we need to use device communication buffer (CUDA IPC)
   // TODO: Currently dest_pe is sometimes -1 at the beginning, so always use device comm buffer
@@ -2402,6 +2412,7 @@ void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, size_t* comm_
     CmiLock(dm->lock);
 #endif
     alloc_comm_buffers[i] = dm->alloc_comm_buffer(sizes[i]);
+    device_indices[i] = dm->global_index;
     comm_offsets[i] = (char*)alloc_comm_buffers[i] - (char*)dm->comm_buffer->base_ptr;
     event_indices[i] = findFreeIpcEvent(dm);
 #if CMK_SMP
@@ -2415,8 +2426,8 @@ void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, size_t* comm_
           cudaMemcpyDefault, comm_stream));
 
     // Record event
-    cuda_ipc_local_info& my_local_info = CsvAccess(gpu_manager).cuda_ipc_local_infos[dm->global_index];
-    hapiCheck(cudaEventRecord(my_local_info.event_pool[event_indices[i]], comm_stream));
+    cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[dm->global_index];
+    hapiCheck(cudaEventRecord(my_device_info.event_pool[event_indices[i]], comm_stream));
   }
 #else
   CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");

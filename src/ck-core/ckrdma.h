@@ -7,6 +7,10 @@
 
 #include "envelope.h"
 
+#if CMK_CUDA
+#include <cuda_runtime.h>
+#endif
+
 /*********************************** Zerocopy Direct API **********************************/
 
 #define CK_BUFFER_REG     CMK_BUFFER_REG
@@ -70,6 +74,11 @@ struct CkNcpyBufferPost {
   // deregMode
   unsigned short int deregMode;
 
+#if CMK_CUDA
+  // CUDA stream for device transfers
+  cudaStream_t cuda_stream;
+#endif
+
   CkNcpyBufferPost() : regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG) {}
 };
 
@@ -128,6 +137,7 @@ class CkNcpyBuffer{
   const void *refAckInfo;
 
   // CUDA IPC
+  int device_idx;
   size_t comm_offset;
   int event_idx;
 
@@ -250,6 +260,7 @@ class CkNcpyBuffer{
     p|deregMode;
     p|isRegistered;
     PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
+    p|device_idx;
     p|comm_offset;
     p|event_idx;
   }
@@ -264,7 +275,7 @@ class CkNcpyBuffer{
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
   friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg,
       int numops, int rootNode, int numDeviceOps, void **arrPtrs, int *arrSizes,
-      size_t *arrCommOffsets, int *arrEventIndices, CkNcpyBufferPost *postStructs);
+      CkNcpyBufferPost *postStructs);
 
   friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
@@ -612,8 +623,9 @@ int getRootNode(envelope *env);
 #endif /* End of CMK_ONESIDED_IMPL */
 
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
-    void **arrPtrs, int *arrSizes, size_t *arrCommOffsets, int *arrEventIndices, bool onlyDevice);
+    void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs, bool onlyDevice);
 
-void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, size_t* comm_offsets, int* event_indices);
+void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, int* device_indices,
+    size_t* comm_offsets, int* event_indices);
 
 #endif

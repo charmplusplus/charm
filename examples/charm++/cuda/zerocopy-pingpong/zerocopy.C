@@ -1,7 +1,7 @@
 #include "zerocopy.decl.h"
 #include "hapi.h"
 
-#define VALIDATE 0
+#define VALIDATE 1
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
@@ -58,7 +58,7 @@ class Main : public CBase_Main {
         n_iters, use_zerocopy);
 
     // Create block group chare
-    block_proxy = CProxy_Block::ckNew();
+    block_proxy = CProxy_Block::ckNew(CkNumPes());
     start_time = CkWallTimer();
     block_proxy.init();
   }
@@ -176,11 +176,16 @@ public:
   // First receive, user should set the destination buffer
   void receive_zc(int &count, double *&data, CkNcpyBufferPost *ncpyPost) {
     // Inform the runtime where the incoming data should be stored
+    // and which CUDA stream should be used for the transfer
     data = d_remote_data;
+    ncpyPost[0].cuda_stream = stream;
   }
 
   // Second receive, invoked after the data transfer is complete
   void receive_zc(int count, double *data) {
+    // Wait for data transfer to complete
+    cudaStreamSynchronize(stream);
+
 #if VALIDATE
     validateData(count);
 #endif

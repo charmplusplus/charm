@@ -240,12 +240,13 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
         str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams << ";\n";
         str << "  void* device_rdma_ptrs[" << entry->numRdmaDeviceParams << "];\n";
         str << "  int device_rdma_sizes[" << entry->numRdmaDeviceParams << "];\n";
+        str << "  int device_indices[" << entry->numRdmaDeviceParams << "];\n";
         str << "  size_t comm_offsets[" << entry->numRdmaDeviceParams << "];\n";
         str << "  int event_indices[" << entry->numRdmaDeviceParams << "];\n";
         int device_rdma_index = 0;
         callEach(&Parameter::prepareToDeviceCommBuffer, str, device_rdma_index);
         str << "  CkRdmaToDeviceCommBuffer(impl_num_device_rdma_fields, device_rdma_ptrs, "
-          << "device_rdma_sizes, comm_offsets, event_indices);\n";
+          << "device_rdma_sizes, device_indices, comm_offsets, event_indices);\n";
         device_rdma_index = 0;
         callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
       }
@@ -407,6 +408,8 @@ void Parameter::marshallDeviceRdmaParameters(XStr& str, int& index) {
     Type* dt = type->deref();
     str << "  ncpyBuffer_" << name << ".cnt = sizeof(" << dt << ")*(" << arrLen
       << ");\n";
+    str << "  ncpyBuffer_" << name << ".device_idx = device_indices[" << index
+      << "];\n";
     str << "  ncpyBuffer_" << name << ".comm_offset = comm_offsets[" << index
       << "];\n";
     str << "  ncpyBuffer_" << name << ".event_idx = event_indices[" << index
@@ -715,8 +718,6 @@ void Parameter::storePostedDeviceRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGe
       str << "    buffSizes["<< count <<"] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
     else
       str << "    buffSizes["<< count <<"] = sizeof(" << dt << ") * "<< arrLen << ".t;\n";
-    str << "    buffCommOffsets[" << count << "] = ncpyBuffer_" << name << ".comm_offset;\n";
-    str << "    buffEventIndices[" << count << "] = ncpyBuffer_" << name << ".event_idx;\n";
     str <<  "  }\n";
     count++;
   }
