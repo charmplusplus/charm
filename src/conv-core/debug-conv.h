@@ -26,7 +26,7 @@ extern void (*CpdDebug_pupMemStat)(pup_er p, void *data);
 extern void (*CpdDebug_deleteMemStat)(void *ptr);
 extern void * (*CpdDebug_mergeMemStat)(int *size, void *data, void **remoteData, int numRemote);
 
-CpvExtern(int, cmiArgDebugFlag);
+extern int cmiArgDebugFlag; // Value is 0, unless reset in ConverseCommonInit
 extern char ** memoryBackup;
 extern void CpdCheckMemory(void);
 extern void CpdResetMemory(void);
