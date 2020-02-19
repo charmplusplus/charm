@@ -1556,10 +1556,6 @@ static void ConverseRunPE(int everReturn) {
     CpvAccess(networkProgressCount) = 0;
 
     ConverseCommonInit(CmiMyArgv);
-#if CMK_OMP
-    CpvAccess(CmiSuspendedTaskQueue) = (void *)CMIQueueCreate();
-    CmiNodeAllBarrier();
-#endif
    
     // register idle events
 

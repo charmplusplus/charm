@@ -75,6 +75,9 @@
 #if CMK_SMP && CMK_TASKQUEUE
 #include "taskqueue.h"
 #include "conv-taskQ.h"
+#if CMK_OMP
+#include "pcqueue.h"
+#endif
 #endif
 #include "conv-ccs.h"
 #include "ccs-server.h"
@@ -2295,6 +2298,10 @@ void CsdInit(char **argv)
   CpvInitialize(Queue, CsdTaskQueue);
   CpvInitialize(void *, CmiSuspendedTaskQueue);
   CpvAccess(CsdTaskQueue) = (Queue)TaskQueueCreate();
+#if CMK_OMP
+  CpvAccess(CmiSuspendedTaskQueue) = CMIQueueCreate();
+  CmiNodeAllBarrier();
+#endif
 #endif
   CpvAccess(CsdStopFlag)  = 0;
   CpvInitialize(int, isHelperOn);
