@@ -1302,7 +1302,7 @@ void CkArrayBroadcaster::deliver(CkArrayMessage *bcast,
 {
   if (elements.size() == 0)
     return;
-  CkAssert(UsrToEnv(bcast)->getMsgtype() == ForArrayEltMsg);
+  CkAssert(UsrToEnv(bcast)->getMsgtype() == ArrayBcastFwdMsg);
 
   ArrayElement *el = (ArrayElement*)elements[0];
   // get number of dimensions and number of ints used by CkArrayIndex of this array
