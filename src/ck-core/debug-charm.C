@@ -69,7 +69,7 @@ int CpdInUserCode() {return cpdInSystem==0 && _debugData.length()>0 && _debugDat
 // Function called right before an entry method
 void CpdBeforeEp(int ep, void *obj, void *msg) {
 #if CMK_CHARMDEBUG
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag && CmiMyRank() == 0) {
     DebugRecursiveEntry entry;
     entry.previousChareID = setMemoryChareIDFromPtr(obj);
     entry.alreadyUserCode = _entryTable[ep]->inCharm ? 0 : 1;
@@ -99,7 +99,7 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
 // Function called right after an entry method
 void CpdAfterEp(int ep) {
 #if CMK_CHARMDEBUG
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag && CmiMyRank() == 0) {
     DebugRecursiveEntry entry = _debugData.peek();
     std::vector<DebugPersistentCheck> &postExecutes = CkpvAccess(_debugEntryTable)[ep].postProcess;
     for (int i=0; i<postExecutes.size(); ++i) {

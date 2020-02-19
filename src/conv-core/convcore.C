@@ -3964,7 +3964,7 @@ void CmiPrintf(const char *format, ...)
   }
   va_end(args);
 #if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag && CmiMyRank() == 0) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);
@@ -3984,7 +3984,7 @@ void CmiError(const char *format, ...)
   CmiFlush(stderr);  /* stderr is always flushed */
   va_end(args);
 #if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag && CmiMyRank() == 0) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);

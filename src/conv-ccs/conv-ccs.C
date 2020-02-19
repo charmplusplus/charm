@@ -538,7 +538,7 @@ int _isCcsHandlerIdx(int hIdx) {
 
 void CcsBuiltinsInit(char **argv);
 
-CpvDeclare(int, cmiArgDebugFlag);
+int cmiArgDebugFlag; // Value is 0, unless reset in ConverseCommonInit
 CpvDeclare(char *, displayArgument);
 CpvCExtern(int, cpdSuspendStartup);
 CpvDeclare(int, cpdSuspendStartup);
@@ -583,9 +583,8 @@ void CcsInit(char **argv)
   }
 #endif
   /* if in parallel debug mode i.e ++cpd, freeze */
-  if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
+  if (cmiArgDebugFlag && CmiMyRank() == 0)
   {
-    if(CmiMyRank() == 0) CpvAccess(cmiArgDebugFlag) = 1;
      if (CmiGetArgStringDesc(argv, "+DebugDisplay",&(CpvAccess(displayArgument)), "X display for gdb used only in cpd mode"))
      {
         if (CpvAccess(displayArgument) == NULL)
