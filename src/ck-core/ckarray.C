@@ -1411,7 +1411,9 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
     if (CkMyPe() == CpvAccess(serializer)) {
       DEBB((AA "Sending array broadcast\n" AB));
       // TODO: What if we have a message thats nokeep AND expedited?
-      if (skipsched) {
+      if (skipsched && _entryTable[ep]->noKeep) {
+        CProxy_CkArray(_aid).recvNoKeepExpeditedBroadcast(msg);
+      } else if (skipsched) {
         CProxy_CkArray(_aid).recvExpeditedBroadcast(msg);
       } else if (_entryTable[ep]->noKeep) {
         CProxy_CkArray(_aid).recvNoKeepBroadcast(msg);
@@ -1445,8 +1447,9 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
         // load balancing occurs during a broadcast
         DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,
             CpvAccess(serializer)));
-        // TODO: What if we have a message thats nokeep AND expedited?
-        if (skipsched) {
+        if (skipsched && _entryTable[ep]->noKeep) {
+          CProxy_CkArray(_aid).sendNoKeepExpeditedBroadcast(msg);
+        } else if (skipsched) {
           ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
         } else if (_entryTable[ep]->noKeep) {
           ap[CpvAccess(serializer)].sendNoKeepBroadcast(msg);
@@ -1492,6 +1495,13 @@ void CkArray::sendBroadcast(CkMessage* msg) {
   } else {
     thisProxy[CpvAccess(serializer)].sendBroadcast(msg);
   }
+}
+
+void CkArray::sendNoKeepExpeditedBroadcast(CkMessage* msg) {
+  CK_MAGICNUMBER_CHECK
+  //Broadcast the message to all processors
+  UsrToEnv(msg)->setMsgtype(ArrayBcastMsg);
+  thisProxy.recvNoKeepExpeditedBroadcast(msg);
 }
 
 void CkArray::sendExpeditedBroadcast(CkMessage* msg) {
