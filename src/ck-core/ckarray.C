@@ -1410,7 +1410,6 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
     int skipsched = opts & CK_MSG_EXPEDITED;
     if (CkMyPe() == CpvAccess(serializer)) {
       DEBB((AA "Sending array broadcast\n" AB));
-      // TODO: What if we have a message thats nokeep AND expedited?
       if (skipsched && _entryTable[ep]->noKeep) {
         CProxy_CkArray(_aid).recvNoKeepExpeditedBroadcast(msg);
       } else if (skipsched) {
