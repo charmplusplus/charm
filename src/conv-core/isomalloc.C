@@ -615,6 +615,32 @@ struct CmiAddressSpaceRegion
 
 CmiAddressSpaceRegion IsoRegion;
 
+static void CmiAddressSpaceRegionPup(pup_er cpup, void * data)
+{
+  auto region = (CmiAddressSpaceRegion *)data;
+  PUP::er & p = *(PUP::er *)cpup;
+
+  p | region->s;
+  p | region->e;
+}
+
+static void * CmiAddressSpaceRegionMerge(int * size, void * data, void ** contributions, int count)
+{
+  auto local = (CmiAddressSpaceRegion *)data;
+
+  for (int i = 0; i < count; ++i)
+  {
+    auto remote = (CmiAddressSpaceRegion *)contributions[i];
+
+    if (remote->s > local->s)
+      local->s = remote->s;
+    if (remote->e < local->e)
+      local->e = remote->e;
+  }
+
+  return local;
+}
+
 struct CmiAddressSpaceRegionMsg
 {
   char converseHeader[CmiMsgHeaderSizeBytes];
@@ -647,27 +673,16 @@ static void CmiIsomallocSyncWait()
   CsdSchedulePoll();
 }
 
-static int CmiIsomallocSyncHandlerNode0Idx;
-static int CmiIsomallocSyncHandlerOtherNodesIdx;
+static int CmiIsomallocSyncBroadcastHandlerIdx;
 
-static void CmiIsomallocSyncHandlerNode0(void * msg)
+static void CmiIsomallocSyncReductionHandler(void * data)
 {
-  CmiAddressSpaceRegion & region = ((CmiAddressSpaceRegionMsg *)msg)->region;
-  DEBUG_PRINT("Isomalloc> Node %d received region for comparison: %" PRIx64 " %" PRIx64 "\n",
-              CmiMyNode(), region.s, region.e);
+  auto region = (CmiAddressSpaceRegion *)data;
+  CmiAssert(region == &IsoRegion);
 
-  if (region.s > IsoRegion.s)
-    IsoRegion.s = region.s;
-  if (region.e < IsoRegion.e)
-    IsoRegion.e = region.e;
-
-  CmiFree(msg);
-
-  static int received = 1;
-  if (++received == CmiNumNodes())
-    CmiIsomallocSyncHandlerDone = 1;
+  CmiIsomallocSyncHandlerDone = 1;
 }
-static void CmiIsomallocSyncHandlerOtherNodes(void * msg)
+static void CmiIsomallocSyncBroadcastHandler(void * msg)
 {
   const CmiAddressSpaceRegion region = ((CmiAddressSpaceRegionMsg *)msg)->region;
   DEBUG_PRINT("Isomalloc> Node %d received region for assignment: %" PRIx64 " %" PRIx64 "\n",
@@ -746,8 +761,7 @@ static void CmiIsomallocInitExtent()
    * Calculate the intersection of all memory regions on all nodes.
    */
 
-  CmiAssignOnce(&CmiIsomallocSyncHandlerNode0Idx, CmiRegisterHandler(CmiIsomallocSyncHandlerNode0));
-  CmiAssignOnce(&CmiIsomallocSyncHandlerOtherNodesIdx, CmiRegisterHandler(CmiIsomallocSyncHandlerOtherNodes));
+  CmiAssignOnce(&CmiIsomallocSyncBroadcastHandlerIdx, CmiRegisterHandler(CmiIsomallocSyncBroadcastHandler));
 
 #if __FAULT__
   if (CmiIsomallocRestart)
@@ -786,19 +800,29 @@ static void CmiIsomallocInitExtent()
   {
     if (CmiMyRank() == 0)
     {
-      auto msg = (CmiAddressSpaceRegionMsg *)CmiAlloc(sizeof(CmiAddressSpaceRegionMsg));
-
       if (CmiMyNode() == 0)
       {
         DEBUG_PRINT("Charm++> Synchronizing Isomalloc memory region...\n");
+      }
 
-        CmiIsomallocSyncWait();
+      DEBUG_PRINT("Isomalloc> Node %d sending region for comparison: %" PRIx64 " %" PRIx64 "\n",
+                  CmiMyNode(), IsoRegion.s, IsoRegion.e);
 
+      CmiNodeReduceStruct(&IsoRegion, CmiAddressSpaceRegionPup, CmiAddressSpaceRegionMerge,
+                          CmiIsomallocSyncReductionHandler, nullptr);
+
+      CmiIsomallocSyncWait();
+
+      if (CmiMyNode() == 0)
+      {
         DEBUG_PRINT("Isomalloc> Node %d sending region for assignment: %" PRIx64 " %" PRIx64 "\n",
                     CmiMyNode(), IsoRegion.s, IsoRegion.e);
-        msg->region = IsoRegion;
-        CmiSetHandler((char *)msg, CmiIsomallocSyncHandlerOtherNodesIdx);
-        CmiSyncNodeBroadcastAndFree(sizeof(CmiAddressSpaceRegionMsg), msg);
+
+        CmiAddressSpaceRegionMsg msg;
+        CmiInitMsgHeader(msg.converseHeader, sizeof(CmiAddressSpaceRegionMsg));
+        msg.region = IsoRegion;
+        CmiSetHandler((char *)&msg, CmiIsomallocSyncBroadcastHandlerIdx);
+        CmiSyncNodeBroadcast(sizeof(CmiAddressSpaceRegionMsg), &msg);
 
         CsdSchedulePoll();
 
@@ -811,17 +835,6 @@ static void CmiIsomallocInitExtent()
 
         DEBUG_PRINT("Charm++> Consolidated Isomalloc memory region: %p - %p (%" PRId64 " MB).\n",
                     (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
-      }
-      else
-      {
-        DEBUG_PRINT("Isomalloc> Node %d sending region for comparison: %" PRIx64 " %" PRIx64 "\n",
-                    CmiMyNode(), IsoRegion.s, IsoRegion.e);
-
-        msg->region = IsoRegion;
-        CmiSetHandler((char *)msg, CmiIsomallocSyncHandlerNode0Idx);
-        CmiSyncNodeSendAndFree(0, sizeof(CmiAddressSpaceRegionMsg), msg);
-
-        CmiIsomallocSyncWait();
       }
 
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
