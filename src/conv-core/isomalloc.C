@@ -65,7 +65,6 @@ static inline typename std::enable_if<std::is_pointer<T>::value>::type pup_raw_p
   p((uint8_t *)&ptr, sizeof(T));
 }
 
-int _sync_iso = 0;
 #if __FAULT__
 static char CmiIsomallocRestart;
 #endif
@@ -695,7 +694,7 @@ static void CmiIsomallocSyncBroadcastHandler(void * msg)
   CmiIsomallocSyncHandlerDone = 1;
 }
 
-static void CmiIsomallocInitExtent()
+static void CmiIsomallocInitExtent(char ** argv)
 {
 #if 0
   /*Largest value a signed int can hold*/
@@ -726,7 +725,7 @@ static void CmiIsomallocInitExtent()
     {
       if (_mmap_probe == 1)
       {
-        if (try_largest_mmap_region(&freeRegion)) _sync_iso = 1;
+        try_largest_mmap_region(&freeRegion);
       }
       else
       {
@@ -761,6 +760,7 @@ static void CmiIsomallocInitExtent()
    * Calculate the intersection of all memory regions on all nodes.
    */
 
+  auto nosync = CmiGetArgFlagDesc(argv, "+no_isomalloc_sync", "disable global synchronization of isomalloc region");
   CmiAssignOnce(&CmiIsomallocSyncBroadcastHandlerIdx, CmiRegisterHandler(CmiIsomallocSyncBroadcastHandler));
 
 #if __FAULT__
@@ -796,7 +796,12 @@ static void CmiIsomallocInitExtent()
   }
   else
 #endif
-  if (_sync_iso && CmiNumNodes() > 1)
+  if (nosync)
+  {
+    if (CmiMyPe() == 0)
+      CmiPrintf("Isomalloc> Disabling global synchronization of address space.\n");
+  }
+  else if (CmiNumNodes() > 1)
   {
     if (CmiMyRank() == 0)
     {
@@ -827,7 +832,8 @@ static void CmiIsomallocInitExtent()
         CsdSchedulePoll();
 
         if (IsoRegion.s >= IsoRegion.e)
-          CmiAbort("Isomalloc> failed to find consolidated region: %" PRIx64 " - %" PRIx64 ".\n",
+          CmiAbort("Isomalloc> failed to find consolidated region: %" PRIx64 " - %" PRIx64 ".\n"
+                   "Try running with +no_isomalloc_sync if you do not need this functionality.\n",
                    IsoRegion.s, IsoRegion.e);
 
         if (CmiMyPe() == 0)
@@ -2317,7 +2323,6 @@ int CmiIsomallocInRange(void * addr)
                             pointer_lt((uint8_t *)addr, isomallocEnd));
 }
 
-int _sync_iso_warned = 0;
 #if CMK_CONVERSE_MPI && (CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING)
 extern int num_workpes, total_pes;
 #endif
@@ -2352,8 +2357,6 @@ void CmiIsomallocInit(char ** argv)
           argv, "+isomalloc_test",
           "mmap test common areas for the largest available isomalloc region"))
     _mmap_probe = 0;
-  if (CmiGetArgFlagDesc(argv, "+isomalloc_sync", "synchronize isomalloc region globally"))
-    _sync_iso = 1;
 #if __FAULT__
   if (CmiGetArgFlagDesc(argv, "+restartisomalloc",
                         "restarting isomalloc on this processor after a crash"))
@@ -2365,19 +2368,7 @@ void CmiIsomallocInit(char ** argv)
   }
   else
   {
-    /* Warn user if ASLR is enabled and '+isomalloc_sync' is missing */
-    if (CmiMyPe() == 0 && read_randomflag() == 1 && _sync_iso == 0 &&
-        _sync_iso_warned == 0)
-    {
-      _sync_iso_warned = 1;
-      CmiPrintf(
-          "Warning> Randomization of virtual memory (ASLR) is turned "
-          "on in the kernel, thread migration may not work! Run 'echo 0 > "
-          "/proc/sys/kernel/randomize_va_space' as root to disable it, "
-          "or try running with '+isomalloc_sync'.\n");
-    }
-
-    CmiIsomallocInitExtent();
+    CmiIsomallocInitExtent(argv);
   }
 #endif
 }
