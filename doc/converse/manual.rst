@@ -1516,6 +1516,12 @@ the correct locations, even on a new processor. This is especially
 useful when the format of the data structure is complex or unknown, as
 with thread stacks.
 
+During Converse startup, a global reduction and broadcast takes place in
+order to find the intersection of available virtual address space across
+all logical nodes. If this operation causes an unwanted delay at startup
+or fails entirely for a system-specific reason, it can be disabled with
+the command line option ``+no_isomalloc_sync``.
+
 Effective management of the virtual address space across a distributed
 machine is a complex task that requires a certain level of organization.
 Therefore, Isomalloc is not well-suited to a fully dynamic API for
