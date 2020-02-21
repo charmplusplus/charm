@@ -2322,7 +2322,7 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
         {
           // Directly invoke memcpy from source buffer to destination buffer
           hapiCheck(cudaMemcpyAsync((void*)dest.ptr, source.ptr, std::min(source.cnt, dest.cnt),
-                cudaMemcpyDefault, postStructs[i].cuda_stream));
+                cudaMemcpyDeviceToDevice, postStructs[i].cuda_stream));
           break;
         }
       case CkNcpyModeDevice::IPC:
@@ -2333,7 +2333,7 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
           hapiCheck(cudaStreamWaitEvent(postStructs[i].cuda_stream, device_info.event_pool[source.event_idx], 0));
           // 2. Invoke cudaMemcpyAsync (from source device comm buffer to destination buffer)
           hapiCheck(cudaMemcpyAsync((void*)dest.ptr, (void*)((char*)device_info.buffer + source.comm_offset),
-                std::min(source.cnt, dest.cnt), cudaMemcpyDefault, postStructs[i].cuda_stream));
+                std::min(source.cnt, dest.cnt), cudaMemcpyDeviceToDevice, postStructs[i].cuda_stream));
           break;
         }
       case CkNcpyModeDevice::RDMA:
@@ -2426,7 +2426,7 @@ void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, void** ptrs, int* sizes,
 
     // Initiate transfer from source buffer to device comm buffer
     hapiCheck(cudaMemcpyAsync(alloc_comm_buffers[i], ptrs[i], sizes[i],
-          cudaMemcpyDefault, comm_stream));
+          cudaMemcpyDeviceToDevice, comm_stream));
 
     // Record event
     cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[dm->global_index];
