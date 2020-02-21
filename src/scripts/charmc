@@ -948,7 +948,7 @@ do
 	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
-	*.c|*.s|*.S|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
+	*.c|*.s|*.S|*.asm|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
 		BASE=`stripExtention \`basename $FILE\``
 		BASEO="$BASE.o"
 
@@ -1859,7 +1859,7 @@ do
 #	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
 #	then
         case "$FILE_EXT" in
-        .c|.s|.S|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
+        .c|.s|.S|.asm|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASEO `stripExtention $BASEO`.f.o
         esac
@@ -1903,7 +1903,7 @@ do
 		  Do $CHARMBIN/charmxi $XIOPTS $FILE
                 fi
 		;;
-	*.c|*.s|*.S)
+	*.c|*.s|*.S|*.asm)
 		Do $CHARM_CC $CHARM_CC_FLAGS -c $FILE $DESTO
 		if [ "$Do_res" -ne 0 ]
 		then

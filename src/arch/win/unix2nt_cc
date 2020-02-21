@@ -47,6 +47,10 @@ CL_COMMON=' -nologo -W1 -EHsc -D_WINDOWS -DNOMINMAX'
 CL_MT='-MT'
 CL_DLL="-LD"
 
+# assembler
+ML_CMD="ML64.EXE"
+ML_COMMON='-nologo -W1 -D_WINDOWS -DNOMINMAX'
+
 #LINK command-line options for -O and -g mode
 #only for the environment that has set corresponding environmental variables
 #Here, the full path to "link.exe" has to be added because, in cygwin, there
@@ -153,10 +157,12 @@ DEBUG_SCRIPT=""
 SAVE=""
 
 DOCOMPILE="no"
+DOASSEMBLE="no"
 DOLINK="no"
 DODEPS="no"
 OUTPUT=""
 CL_OPTS="$CL_COMMON"
+ML_OPTS="$ML_COMMON"
 LINK_OPTS="$LINK_COMMON"
 LIBDIR=""
 LIBDIRS=""
@@ -164,6 +170,7 @@ LIBDIRS=""
 #NT CL and LINK command-line arguments:
 LINK=""
 CL=""
+ML=""
 
 [ $# -eq 0 ] && printUsage "Error: No arguments given."
 
@@ -178,52 +185,68 @@ do
 		;;
 	-E)
 		CL="$CL -E"
+		ML="$ML -EP"
 		;;
 	-O0)
 		CL_OPTS="$CL_OPTS -Od"
 		;;
 	-Og)
 		CL_OPTS="$CL_OPTS -DNDEBUG -Od"
+		ML_OPTS="$ML_OPTS -DNDEBUG"
 		;;
 	-O|-O1|-Os)
 		CL_OPTS="$CL_OPTS -DNDEBUG -O1"
+		ML_OPTS="$ML_OPTS -DNDEBUG"
 		;;
 	-O2)
 		CL_OPTS="$CL_OPTS -DNDEBUG -O2"
+		ML_OPTS="$ML_OPTS -DNDEBUG"
 		;;
 	-O3|-Ofast)
 		CL_OPTS="$CL_OPTS -DNDEBUG -Ox"
+		ML_OPTS="$ML_OPTS -DNDEBUG"
 		;;
 	-g)
-		CL_OPTS="$CL_OPTS -Z7"
+		CL_OPTS="$CL_OPTS -Z7 -GS-"
+		ML_OPTS="$ML_OPTS -Zi -Zd"
 		LINK_OPTS="$LINK_OPTS -DEBUG"
 		CL_MT='-MTd'
 		;;
 	-c) 
-		CL="$CL -c";;
+		CL="$CL -c"
+		ML="$ML -c"
+        ;;
 	-D)
 		CL="$CL -D$1"
+		ML="$ML -D$1"
 		shift
 		;;
 	-U)
 		CL="$CL -U$1"
+		ML="$ML -U$1"
 		shift
 		;;
 	-D*)
 		def=`echo $arg | awk -F@ '{print substr($1,3)}'`
 		CL="$CL -D$def"
+		ML="$ML -D$def"
 		;;
 	-U*)
 		def=`echo $arg | awk -F@ '{print substr($1,3)}'`
 		CL="$CL -U$def"
+		ML="$ML -U$def"
 		;;
 	-I)
-		CL="$CL -I`cygpath -w $1`"
+		path="`cygpath -w $1`"
+		CL="$CL -I$path"
+		ML="$CL -I$path"
 		shift
 		;;
 	-I*)
 		path=`echo $arg | awk -F@ '{print substr($1,3)}'`
-		CL="$CL -I`cygpath -w $path`"
+		path="`cygpath -w $path`"
+		CL="$CL -I$path"
+		ML="$CL -I$path"
 		;;
 	-MM|-M)
 		DODEPS="yes"
@@ -308,6 +331,15 @@ do
 		LINK="$LINK $base.o"
 		DOCOMPILE="yes"
 		;;
+#ASM source file
+	*.asm)
+		base=`stripExtention $arg`
+		source="$arg"
+		ML="$ML -Ta`cygpath -w $arg`"
+#		OUTPUT="-Fo$base.o"
+		LINK="$LINK $base.o"
+		DOASSEMBLE="yes"
+		;;
 #C++ source file
 	*.C|*.cxx|*.cpp)
 		base=`stripExtention $arg`
@@ -354,6 +386,18 @@ then
 	if [ $? != 0 ]
 	then
 		Abort "Error executing" "$CL_CMD" $OPTS
+	fi
+fi
+
+if [[ "$DOASSEMBLE" = 'yes' ]]
+then
+	OPTS="$ML_OPTS $OUTPUT $ML"
+	[[ "$DOLINK" = 'yes' && -z "$OUTPUT" ]] && OPTS="$OPTS $OBJ_OUTPUT"
+	[[ "$VERBOSE" = 'yes' ]] && echo "unix2nt_cc> $ML_CMD" $OPTS
+	"$ML_CMD" $OPTS
+	if [[ "$?" != '0' ]]
+	then
+		Abort "Error executing" "$ML_CMD" $OPTS
 	fi
 fi
 
