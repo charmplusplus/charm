@@ -233,10 +233,18 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
       str << "  int impl_arrstart=0;\n";
       callEach(&Parameter::marshallRegArraySizes, str);
     }
+
     bool hasrdma = hasRdma();
     bool hasrecvrdma = hasRecvRdma();
+
+    Chare *container = entry->getContainer();
+    bool isP2P = (container->isChare() || container->isForElement());
+
+    // Generate device-related code only when this condition is met
+    bool dodevice = (hasDevice() && isP2P && !hasSendRdma());
+
     if (hasrdma) {
-      if (hasDevice()) {
+      if (dodevice) {
         str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams << ";\n";
         str << "  void* device_rdma_ptrs[" << entry->numRdmaDeviceParams << "];\n";
         str << "  int device_rdma_sizes[" << entry->numRdmaDeviceParams << "];\n";
@@ -245,10 +253,20 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
         str << "  int event_indices[" << entry->numRdmaDeviceParams << "];\n";
         int device_rdma_index = 0;
         callEach(&Parameter::prepareToDeviceCommBuffer, str, device_rdma_index);
-        str << "  CkRdmaToDeviceCommBuffer(impl_num_device_rdma_fields, device_rdma_ptrs, "
-          << "device_rdma_sizes, device_indices, comm_offsets, event_indices);\n";
+        str << "  int dest_pe = ckLocMgr()->lastKnown(ckGetIndex());\n";
+        str << "  CkRdmaToDeviceCommBuffer(dest_pe, impl_num_device_rdma_fields, "
+          << "device_rdma_ptrs, device_rdma_sizes, device_indices, comm_offsets, event_indices);\n";
         device_rdma_index = 0;
         callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
+      }
+      else {
+        // Abort ASAP if broadcast or has send API zero-copy
+        if (!isP2P) {
+          str << "  CkAbort(\"Broadcast not supported with device buffers!\");\n";
+        }
+        if (hasSendRdma()) {
+          str << "  CkAbort(\"Send RDMA cannot be used along with device RDMA!\");\n";
+        }
       }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
@@ -264,7 +282,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     str << "    PUP::sizer implP;\n";
     callEach(&Parameter::pup, str);
     if (hasrdma) {
-      if (hasDevice()) {
+      if (dodevice) {
         str << "    implP|impl_num_device_rdma_fields;\n";
         callEach(&Parameter::pupDeviceRdma, str);
       }
@@ -297,7 +315,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     str << "  { //Copy over the PUP'd data\n";
     str << "    PUP::toMem implP((void *)impl_msg->msgBuf);\n";
     if (hasRdma()) {
-      if (hasDevice()) {
+      if (dodevice) {
         str << "    implP|impl_num_device_rdma_fields;\n";
         callEach(&Parameter::pupDeviceRdma, str);
       }
@@ -317,24 +335,14 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
       callEach(&Parameter::marshallArrayData, str);
     }
     if (hasrdma) {
-      Chare *container = entry->getContainer();
-      if (hasDevice()) {
+      if (dodevice) {
         // Currently only P2P & recv API is suppported for device buffers
-        if (container->isChare() || container->isForElement()) {
-          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_MSG;\n";
-        }
-        else {
-          str << "  CkAbort(\"Broadcast not supported with device buffers!\");\n";
-        }
-
-        if (hasSendRdma()) {
-          str << "  CkAbort(\"Send RDMA cannot be used along with device RDMA!\");\n";
-        }
+        str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_MSG;\n";
       }
       str << "#if CMK_ONESIDED_IMPL\n";
       if (!hasDevice()) {
         // Only need to set message header when there is no device buffer involved
-        if(container->isChare() || container->isForElement()) {
+        if (isP2P) {
           if(hasSendRdma())
             str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_SEND_MSG;\n";
           else if(hasrecvrdma)
