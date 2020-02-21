@@ -182,7 +182,7 @@ static inline int init_map() { return 1; /* No init necessary */ }
 CpvStaticDeclare(int, zerofd); /*File descriptor for /dev/zero, for mmap*/
 #endif
 
-static constexpr void * const mmap_fail = (void *)~(uintptr_t)0;
+#define mmap_fail ((void *)~(uintptr_t)0)
 
 /**
  * Maps this address with these flags.
