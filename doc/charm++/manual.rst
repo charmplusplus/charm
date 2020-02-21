@@ -11812,6 +11812,8 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  migratable
 
+-  python
+
 -  Entry method attributes
 
    -  stacksize
@@ -11841,8 +11843,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
    -  nokeep
 
    -  notrace
-
-   -  python
 
    -  accel
 
