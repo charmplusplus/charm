@@ -2380,6 +2380,7 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
 #endif
 }
 
+#if CMK_CUDA
 static int findFreeIpcEvent(DeviceManager* dm) {
   int device_index = dm->global_index;
   cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[device_index];
@@ -2395,6 +2396,7 @@ static int findFreeIpcEvent(DeviceManager* dm) {
 
   return -1;
 }
+#endif
 
 void CkRdmaToDeviceCommBuffer(int numops, void** ptrs, int* sizes, int* device_indices,
     size_t* comm_offsets, int* event_indices) {
