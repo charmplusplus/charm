@@ -1,7 +1,7 @@
 #include "zerocopy.decl.h"
 #include "hapi.h"
 
-#define VALIDATE 1
+#define VALIDATE 0
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
@@ -156,7 +156,8 @@ public:
       thisProxy[peer].receive_zc(count, CkSendBuffer(d_local_data));
     }
     else {
-      hapiCheck(cudaMemcpy(h_local_data, d_local_data, count * sizeof(double), cudaMemcpyDeviceToHost));
+      hapiCheck(cudaMemcpyAsync(h_local_data, d_local_data, count * sizeof(double), cudaMemcpyDeviceToHost, stream));
+      cudaStreamSynchronize(stream);
       thisProxy[peer].receive_reg(count, h_local_data);
     }
   }
@@ -164,7 +165,8 @@ public:
   void receive_reg(int count, double *data) {
     // XXX: Do cudaMemcpy straight from data?
     memcpy(h_remote_data, data, count * sizeof(double));
-    hapiCheck(cudaMemcpy(d_remote_data, h_remote_data, count * sizeof(double), cudaMemcpyHostToDevice));
+    hapiCheck(cudaMemcpyAsync(d_remote_data, h_remote_data, count * sizeof(double), cudaMemcpyHostToDevice, stream));
+    cudaStreamSynchronize(stream);
 
 #if VALIDATE
     validateData(count);
@@ -181,7 +183,9 @@ public:
     ncpyPost[0].cuda_stream = stream;
   }
 
-  // Second receive, invoked after the data transfer is complete
+  // Second receive, invoked after the data transfer is initiated
+  // The user can either wait for it to complete or offload other operations
+  // into the stream (that may be dependent on the arriving data)
   void receive_zc(int count, double *data) {
     // Wait for data transfer to complete
     cudaStreamSynchronize(stream);
@@ -196,7 +200,7 @@ public:
   void afterReceive(int count) {
     if (CkMyPe() == 1) {
       // Send pong
-      thisProxy[thisIndex].send(count);
+      send(count);
     }
     else {
       // Received pong
@@ -229,7 +233,7 @@ public:
         main_proxy.testEnd();
       }
       else {
-        thisProxy[thisIndex].send(count);
+        send(count);
       }
     }
   }
