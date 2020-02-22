@@ -24,7 +24,11 @@
 // Use SMP lock in DeviceManager if needed
 struct cuda_ipc_device_info {
   std::vector<cudaEvent_t> event_pool;
-  int* event_pool_flags; // Flag per event - 0: free, 1: used
+  // Flag per event
+  // 0: free, 1: used by source, 2: used by destination
+  int* event_pool_flags;
+  // Offset in device comm buffer (per event)
+  size_t* event_pool_buff_offsets;
   void* buffer;
 };
 

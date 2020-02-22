@@ -720,8 +720,10 @@ void ipcHandleCreate() {
 
   // Create CUDA IPC events and corresponding handles
   my_device_info.event_pool_flags = new int[CsvAccess(gpu_manager).ipc_event_pool_size];
+  my_device_info.event_pool_buff_offsets = new size_t[CsvAccess(gpu_manager).ipc_event_pool_size];
   for (int i = 0; i < CsvAccess(gpu_manager).ipc_event_pool_size; i++) {
     my_device_info.event_pool_flags[i] = 0;
+    my_device_info.event_pool_buff_offsets[i] = 0;
     my_device_info.event_pool.emplace_back();
     hapiCheck(cudaEventCreateWithFlags(&my_device_info.event_pool[i], cudaEventDisableTiming | cudaEventInterprocess));
     hapiCheck(cudaIpcGetEventHandle(&shm_event_pool[i], my_device_info.event_pool[i]));
@@ -750,6 +752,7 @@ void ipcHandleOpen() {
       cuda_ipc_device_info& cur_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[device_index];
 
       cur_device_info.event_pool_flags = NULL;
+      cur_device_info.event_pool_buff_offsets = NULL;
       for (int k = 0; k < CsvAccess(gpu_manager).ipc_event_pool_size; k++) {
         cur_device_info.event_pool.emplace_back();
         hapiCheck(cudaIpcOpenEventHandle(&cur_device_info.event_pool[k], cur_shm_event_pool[k]));

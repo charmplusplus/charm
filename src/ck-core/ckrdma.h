@@ -139,7 +139,8 @@ class CkNcpyBuffer{
   // CUDA IPC
   int device_idx;
   size_t comm_offset;
-  int event_idx;
+  int src_event_idx;
+  int dst_event_idx;
 
   CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), ref(NULL), refAckInfo(NULL) {}
 
@@ -262,7 +263,8 @@ class CkNcpyBuffer{
     PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
     p|device_idx;
     p|comm_offset;
-    p|event_idx;
+    p|src_event_idx;
+    p|dst_event_idx;
   }
 
   friend void CkRdmaDirectAckHandler(void *ack);
@@ -626,6 +628,6 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs, bool onlyDevice);
 
 void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, void** ptrs, int* sizes,
-    int* device_indices, size_t* comm_offsets, int* event_indices);
+    int* device_indices, size_t* comm_offsets, int* src_event_indices, int* dst_event_indices);
 
 #endif
