@@ -83,6 +83,17 @@ namespace buggy {
       printf("(fragmentation) free: %lu, allocated: %lu, used: %lu\n", free, allocated, used);
     }
 
+    size_t get_free_size() {
+      size_t free = 0;
+      for (int i = 0; i < bucket_count; i++) {
+        for (const auto& block : buckets[i]) {
+          free += block.size;
+        }
+      }
+
+      return free;
+    }
+
     int get_bucket(size_t size) {
       return (int)std::ceil(std::log2((double)size)) - 2;
     }

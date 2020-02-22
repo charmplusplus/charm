@@ -42,8 +42,12 @@ struct DeviceManager {
     return comm_buffer->malloc(size);
   }
 
-  void free_comm_buffer(void* ptr) {
-    comm_buffer->free(ptr);
+  void free_comm_buffer(size_t offset) {
+    comm_buffer->free((void*)(comm_buffer->base_ptr + offset));
+  }
+
+  size_t comm_buffer_free_size() {
+    return comm_buffer->get_free_size();
   }
 
   void destroy_comm_buffer() {
