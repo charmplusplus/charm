@@ -250,14 +250,13 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
         str << "  int device_rdma_sizes[" << entry->numRdmaDeviceParams << "];\n";
         str << "  int device_indices[" << entry->numRdmaDeviceParams << "];\n";
         str << "  size_t comm_offsets[" << entry->numRdmaDeviceParams << "];\n";
-        str << "  int src_event_indices[" << entry->numRdmaDeviceParams << "];\n";
-        str << "  int dst_event_indices[" << entry->numRdmaDeviceParams << "];\n";
+        str << "  int event_indices[" << entry->numRdmaDeviceParams << "];\n";
         int device_rdma_index = 0;
         callEach(&Parameter::prepareToDeviceCommBuffer, str, device_rdma_index);
         str << "  int dest_pe = ckLocMgr()->lastKnown(ckGetIndex());\n";
         str << "  CkRdmaToDeviceCommBuffer(dest_pe, impl_num_device_rdma_fields, "
           << "device_rdma_ptrs, device_rdma_sizes, device_indices, comm_offsets, "
-          << "src_event_indices, dst_event_indices);\n";
+          << "event_indices);\n";
         device_rdma_index = 0;
         callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
       }
@@ -422,9 +421,7 @@ void Parameter::marshallDeviceRdmaParameters(XStr& str, int& index) {
       << "];\n";
     str << "  ncpyBuffer_" << name << ".comm_offset = comm_offsets[" << index
       << "];\n";
-    str << "  ncpyBuffer_" << name << ".src_event_idx = src_event_indices[" << index
-      << "];\n";
-    str << "  ncpyBuffer_" << name << ".dst_event_idx = dst_event_indices[" << index
+    str << "  ncpyBuffer_" << name << ".event_idx = event_indices[" << index
       << "];\n";
     index++;
 

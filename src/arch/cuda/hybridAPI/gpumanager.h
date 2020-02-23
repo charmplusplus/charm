@@ -20,11 +20,23 @@
 #define NUM_BUFFERS 256
 #endif
 
+// CUDA IPC Event related struct, stored in shared memory.
+// A struct is used in each interaction/message between sender and receiver.
+// Number of struct objects per device will be equal to the CUDA IPC event pool size.
+struct cuda_ipc_event_shared {
+  cudaIpcEventHandle_t src_event_handle;
+  cudaIpcEventHandle_t dst_event_handle;
+  bool src_flag; // Unused for now
+  bool dst_flag;
+  pthread_mutex_t lock;
+};
+
 // Per-device struct containing data for CUDA IPC
 // Use SMP lock in DeviceManager if needed
 struct cuda_ipc_device_info {
-  std::vector<cudaEvent_t> event_pool;
-  // Flag per event
+  std::vector<cudaEvent_t> src_event_pool;
+  std::vector<cudaEvent_t> dst_event_pool;
+  // Flag per event pair
   // 0: free, 1: used by source, 2: used by destination
   int* event_pool_flags;
   // Offset in device comm buffer (per event)

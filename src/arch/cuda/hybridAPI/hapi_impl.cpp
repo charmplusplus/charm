@@ -650,7 +650,7 @@ void shmCreate() {
 
   // Calculate shared memory region size
   CsvAccess(gpu_manager).shm_chunk_size = sizeof(cudaIpcMemHandle_t) +
-      sizeof(cudaIpcEventHandle_t) * CsvAccess(gpu_manager).ipc_event_pool_size;
+      sizeof(cuda_ipc_event_shared) * CsvAccess(gpu_manager).ipc_event_pool_size;
   CsvAccess(gpu_manager).shm_size = CsvAccess(gpu_manager).shm_chunk_size *
     CsvAccess(gpu_manager).device_count_on_physical_node;
 
@@ -725,27 +725,37 @@ void ipcHandleCreate() {
   // so that they are done only once per device
   if (!CpvAccess(device_rep)) return;
 
+  // Create CUDA IPC memory handle
+  CmiAssert(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].comm_buffer);
   cudaIpcMemHandle_t* shm_mem_handle = (cudaIpcMemHandle_t*)((char*)CsvAccess(gpu_manager).shm_my_ptr +
       CsvAccess(gpu_manager).shm_chunk_size * CpvAccess(my_device));
-  cudaIpcEventHandle_t* shm_event_pool = (cudaIpcEventHandle_t*)((char*)shm_mem_handle + sizeof(cudaIpcMemHandle_t));
+  void* device_ptr = (void*)(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].comm_buffer->base_ptr);
+  hapiCheck(cudaIpcGetMemHandle(shm_mem_handle, device_ptr));
+
+  // Create CUDA IPC events and corresponding handles
+  cuda_ipc_event_shared* shm_event_shared = (cuda_ipc_event_shared*)((char*)shm_mem_handle + sizeof(cudaIpcMemHandle_t));
   int device_index = CsvAccess(gpu_manager).device_count * CmiMyNodeRankLocal() + CpvAccess(my_device);
   cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[device_index];
 
-  // Create CUDA IPC events and corresponding handles
   my_device_info.event_pool_flags = new int[CsvAccess(gpu_manager).ipc_event_pool_size];
   my_device_info.event_pool_buff_offsets = new size_t[CsvAccess(gpu_manager).ipc_event_pool_size];
+
   for (int i = 0; i < CsvAccess(gpu_manager).ipc_event_pool_size; i++) {
+    cuda_ipc_event_shared* cur_shm_event_shared = shm_event_shared + i;
+
     my_device_info.event_pool_flags[i] = 0;
     my_device_info.event_pool_buff_offsets[i] = 0;
-    my_device_info.event_pool.emplace_back();
-    hapiCheck(cudaEventCreateWithFlags(&my_device_info.event_pool[i], cudaEventDisableTiming | cudaEventInterprocess));
-    hapiCheck(cudaIpcGetEventHandle(&shm_event_pool[i], my_device_info.event_pool[i]));
+    my_device_info.src_event_pool.emplace_back();
+    my_device_info.dst_event_pool.emplace_back();
+    hapiCheck(cudaEventCreateWithFlags(&my_device_info.src_event_pool[i],
+          cudaEventDisableTiming | cudaEventInterprocess));
+    hapiCheck(cudaEventCreateWithFlags(&my_device_info.dst_event_pool[i],
+          cudaEventDisableTiming | cudaEventInterprocess));
+    hapiCheck(cudaIpcGetEventHandle(&cur_shm_event_shared->src_event_handle,
+          my_device_info.src_event_pool[i]));
+    hapiCheck(cudaIpcGetEventHandle(&cur_shm_event_shared->dst_event_handle,
+          my_device_info.dst_event_pool[i]));
   }
-
-  // Create CUDA IPC memory handle
-  CmiAssert(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].comm_buffer);
-  void* device_ptr = (void*)(CsvAccess(gpu_manager).device_managers[CpvAccess(my_device)].comm_buffer->base_ptr);
-  hapiCheck(cudaIpcGetMemHandle(shm_mem_handle, device_ptr));
 
   // Store device comm buffer ptr in local info (just in case)
   my_device_info.buffer = device_ptr;
@@ -757,21 +767,34 @@ void ipcHandleOpen() {
   for (int i = 0; i < CmiNumNodes() / CmiNumPhysicalNodes(); i++) {
     if (i == CmiMyNodeRankLocal()) continue;
 
+
     for (int j = 0; j < CsvAccess(gpu_manager).device_count; j++) {
       int device_index = CsvAccess(gpu_manager).device_count * i + j;
-
-      cudaIpcMemHandle_t* cur_shm_mem_handle = (cudaIpcMemHandle_t*)((char*)CsvAccess(gpu_manager).shm_ptr + CsvAccess(gpu_manager).shm_chunk_size * device_index);
-      cudaIpcEventHandle_t* cur_shm_event_pool = (cudaIpcEventHandle_t*)((char*)cur_shm_mem_handle + sizeof(cudaIpcMemHandle_t));
       cuda_ipc_device_info& cur_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[device_index];
+
+      // Open memory handle
+      cudaIpcMemHandle_t* shm_mem_handle = (cudaIpcMemHandle_t*)((char*)CsvAccess(gpu_manager).shm_ptr
+          + CsvAccess(gpu_manager).shm_chunk_size * device_index);
+      hapiCheck(cudaIpcOpenMemHandle(&cur_device_info.buffer, *shm_mem_handle,
+            cudaIpcMemLazyEnablePeerAccess));
+
+      // Open event handles
+      cuda_ipc_event_shared* shm_event_shared =
+        (cuda_ipc_event_shared*)((char*)shm_mem_handle + sizeof(cudaIpcMemHandle_t));
 
       cur_device_info.event_pool_flags = NULL;
       cur_device_info.event_pool_buff_offsets = NULL;
+
       for (int k = 0; k < CsvAccess(gpu_manager).ipc_event_pool_size; k++) {
-        cur_device_info.event_pool.emplace_back();
-        hapiCheck(cudaIpcOpenEventHandle(&cur_device_info.event_pool[k], cur_shm_event_pool[k]));
+        cuda_ipc_event_shared* cur_shm_event_shared = shm_event_shared + k;
+
+        cur_device_info.src_event_pool.emplace_back();
+        cur_device_info.dst_event_pool.emplace_back();
+        hapiCheck(cudaIpcOpenEventHandle(&cur_device_info.src_event_pool[k],
+              cur_shm_event_shared->src_event_handle));
+        hapiCheck(cudaIpcOpenEventHandle(&cur_device_info.dst_event_pool[k],
+              cur_shm_event_shared->dst_event_handle));
       }
-      hapiCheck(cudaIpcOpenMemHandle(&cur_device_info.buffer, *cur_shm_mem_handle,
-            cudaIpcMemLazyEnablePeerAccess));
     }
   }
 }
