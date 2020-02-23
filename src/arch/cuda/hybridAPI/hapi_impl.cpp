@@ -465,28 +465,41 @@ void initDeviceMapping(char** argv) {
       CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
     }
 
+    int& device_count = CsvAccess(gpu_manager).device_count;
     if (all_gpus) {
-      CsvAccess(gpu_manager).device_count = visible_device_count / (CmiNumNodes() / CmiNumPhysicalNodes());
+      device_count = visible_device_count / (CmiNumNodes() / CmiNumPhysicalNodes());
     }
     else {
-      CsvAccess(gpu_manager).device_count = visible_device_count;
+      device_count = visible_device_count;
+    }
+
+    // Handle the case where the number of GPUs per process are larger than
+    // the number of PEs per process. This is needed because we currently don't
+    // support each PE using more than one device.
+    if (device_count > CmiNodeSize(CmiMyNode())) {
+      if (CmiMyPe() == 0) {
+        CmiPrintf("HAPI> Found more GPU devices (%d) than PEs (%d) per process, "
+            "limiting to %d device(s) per process\n", device_count,
+            CmiNodeSize(CmiMyNode()), CmiNodeSize(CmiMyNode()));
+      }
+      device_count = CmiNodeSize(CmiMyNode());
     }
 
     // Create DeviceManagers in GPUManager
-    for (int i = 0; i < CsvAccess(gpu_manager).device_count; i++) {
-      CsvAccess(gpu_manager).device_managers.emplace_back(i,
-          CsvAccess(gpu_manager).device_count * CmiMyNodeRankLocal() + i);
+    std::vector<DeviceManager>& device_managers = CsvAccess(gpu_manager).device_managers;
+    for (int i = 0; i < device_count; i++) {
+      device_managers.emplace_back(i, device_count * CmiMyNodeRankLocal() + i);
     }
 
     // Count number of PEs per device
-    CsvAccess(gpu_manager).pes_per_device = CmiNodeSize(CmiMyNode()) / CsvAccess(gpu_manager).device_count;
+    CsvAccess(gpu_manager).pes_per_device = CmiNodeSize(CmiMyNode()) / device_count;
 
     // Count number of devices on a physical node
-    CsvAccess(gpu_manager).device_count_on_physical_node = CsvAccess(gpu_manager).device_count * (CmiNumNodes() / CmiNumPhysicalNodes());
+    CsvAccess(gpu_manager).device_count_on_physical_node = device_count * (CmiNumNodes() / CmiNumPhysicalNodes());
   }
 
   if (CmiMyPe() == 0) {
-    CmiPrintf("HAPI> %d device(s) per process, %d PE(s) per device, %d device(s) per host\n",
+    CmiPrintf("HAPI> Config: %d device(s) per process, %d PE(s) per device, %d device(s) per host\n",
         CsvAccess(gpu_manager).device_count, CsvAccess(gpu_manager).pes_per_device,
         CsvAccess(gpu_manager).device_count_on_physical_node);
   }
