@@ -5742,6 +5742,9 @@ struct local_nodestart
     sprintf(envp[envc + 1], "CmiNumNodes=%d", 0);
 
 #if CMK_HAS_POSIX_SPAWN
+    // We need posix_spawn on macOS because it is the only way to disable ASLR at runtime.
+    // There is no harm in using it on any other platform that supports it.
+
     posix_spawn_file_actions_t file_actions;
     posix_spawn_file_actions_init(&file_actions);
 #if CMK_CHARMPY
