@@ -104,7 +104,6 @@ struct GPUManager {
   std::unordered_map<int, DeviceManager*> device_map;
 
   // Device communication buffer
-  bool use_comm_buffer;
   size_t comm_buffer_size;
   cudaStream_t* comm_streams; // Per-PE stream used for transfer from source buffer to comm buffer
 
@@ -150,7 +149,6 @@ struct GPUManager {
     pes_per_device = -1;
 
     // Device communication buffer
-    use_comm_buffer = true;
     comm_buffer_size = 1 << 26; // 64MB by default
 
     // Shared memory region for CUDA IPC

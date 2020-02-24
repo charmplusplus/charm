@@ -2329,15 +2329,19 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
       case CkNcpyModeDevice::IPC:
         {
           cuda_ipc_device_info& device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[source.device_idx];
+
           // 1. Make user-provided stream wait for IPC event using cudaStreamWaitEvent
           //    (source buffer to device comm buffer on source)
           hapiCheck(cudaStreamWaitEvent(postStructs[i].cuda_stream, device_info.src_event_pool[source.event_idx], 0));
+
           // 2. Invoke cudaMemcpyAsync (from source device comm buffer to destination buffer)
           hapiCheck(cudaMemcpyAsync((void*)dest.ptr, (void*)((char*)device_info.buffer + source.comm_offset),
                 std::min(source.cnt, dest.cnt), cudaMemcpyDeviceToDevice, postStructs[i].cuda_stream));
+
           // 3. Record IPC event so that the sender can query it for freeing
           //    device comm buffer and corresponding pair of CUDA IPC events
           hapiCheck(cudaEventRecord(device_info.dst_event_pool[source.event_idx], postStructs[i].cuda_stream));
+
           // 4. Set flag in shared memory so that the sender can start querying
           //    completion of the IPC event
           cuda_ipc_event_shared* shm_event_shared = (cuda_ipc_event_shared*)((char*)CsvAccess(gpu_manager).shm_ptr

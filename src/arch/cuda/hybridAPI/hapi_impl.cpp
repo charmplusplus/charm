@@ -538,10 +538,7 @@ void initDeviceMapping(char** argv) {
   if (CmiGetArgIntDesc(argv, "+gpucommbuffer", &input_comm_buffer_size,
         "GPU communication buffer size")) {
     if (CmiMyRank() == 0) {
-      if (input_comm_buffer_size <= 0) {
-        CsvAccess(gpu_manager).use_comm_buffer = false;
-      }
-      else if (input_comm_buffer_size < 4) {
+      if (input_comm_buffer_size < 4) {
         CsvAccess(gpu_manager).comm_buffer_size = 4; // Buffer size should be at least 4 bytes
       }
       else {
@@ -551,29 +548,22 @@ void initDeviceMapping(char** argv) {
   }
 
   if (CmiMyPe() == 0) {
-    if (CsvAccess(gpu_manager).use_comm_buffer) {
-      CmiPrintf("HAPI> GPU communication buffer size: %lu bytes "
-          "(will be rounded up to the nearest power of two)\n",
-          CsvAccess(gpu_manager).comm_buffer_size);
-    }
-    else {
-      CmiPrintf("HAPI> Not using GPU communication buffer\n");
-    }
+    CmiPrintf("HAPI> GPU communication buffer size: %lu bytes "
+        "(will be rounded up to the nearest power of two)\n",
+        CsvAccess(gpu_manager).comm_buffer_size);
   }
 
   CmiNodeBarrier();
 
   // Create device communication buffers
-  if (CsvAccess(gpu_manager).use_comm_buffer) {
-    DeviceManager* dm = CsvAccess(gpu_manager).device_map[CmiMyPe()];
+  DeviceManager* dm = CsvAccess(gpu_manager).device_map[CmiMyPe()];
 #if CMK_SMP
-    CmiLock(dm->lock);
+  CmiLock(dm->lock);
 #endif
-    dm->create_comm_buffer(CsvAccess(gpu_manager).comm_buffer_size);
+  dm->create_comm_buffer(CsvAccess(gpu_manager).comm_buffer_size);
 #if CMK_SMP
-    CmiUnlock(dm->lock);
+  CmiUnlock(dm->lock);
 #endif
-  }
 
   // Allocate space for per-PE streams used for transfer to device comm buffer
   if (CmiMyRank() == 0) {
@@ -634,8 +624,6 @@ void initDeviceMapping(char** argv) {
 // Create POSIX shared memory region accessible to all processes on the same host
 // Invoked by PE rank 0 of each process (no locking needed for SMP)
 void shmCreate() {
-  if (!CsvAccess(gpu_manager).use_comm_buffer) return;
-
   struct stat shm_file_stat;
 
   // Create the shared memory file
@@ -702,6 +690,7 @@ shm_cleanup:
 }
 
 // Clean up shared memory region
+// Invoked by PE rank 0 of each process
 void shmCleanup() {
   if (CsvAccess(gpu_manager).shm_ptr != NULL) {
     munmap(CsvAccess(gpu_manager).shm_ptr, CsvAccess(gpu_manager).shm_size);
