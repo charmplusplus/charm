@@ -2368,29 +2368,6 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     p|source;
   }
 
-  if (onlyDevice) {
-    // There are no CPU-side RDMA calls, need to handle later process as well
-
-    // Reuse the message as a done msg
-    CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
-
-    switch (mode) {
-      case CkNcpyModeDevice::MEMCPY:
-        QdCreate(1);
-        enqueueNcpyMessage(CkMyPe(), env);
-        break;
-      case CkNcpyModeDevice::IPC:
-        QdCreate(1);
-        enqueueNcpyMessage(CkMyPe(), env);
-        break;
-      case CkNcpyModeDevice::RDMA:
-        // TODO
-        break;
-      default:
-        CkAbort("Invalid mode");
-        break;
-    }
-  }
 #else
   CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
 #endif
