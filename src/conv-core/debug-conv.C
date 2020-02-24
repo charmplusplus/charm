@@ -371,7 +371,7 @@ void CpdInit(void)
 /* If CharmDebug is attached, try to send it a message and wait */
 void CpdAborting(const char *message) {
 #if CMK_CCS_AVAILABLE
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag && CmiMyRank() == 0) {
     CpdNotify(CPD_ABORT, message);
     CpdFreeze();
   }
