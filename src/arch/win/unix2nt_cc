@@ -64,7 +64,7 @@ LINK_CMD="$VCC_DIR/BIN/amd64/LINK.EXE"
 else
 LINK_CMD="$VCC_DIR/BIN/LINK.EXE"
 fi
-LINK_COMMON='-nologo -subsystem:console '
+LINK_COMMON='-nologo -subsystem:console -DYNAMICBASE:NO'
 #if test -d "`cygpath -u \"$SDK_DIR/Lib/x64\"`"
 #then
 #LINK_COMMON="$LINK_COMMON -LIBPATH:`cygpath -d \"$SDK_DIR/Lib/x64\"`"
