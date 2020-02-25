@@ -11808,13 +11808,17 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  nocopy
 
+-  nocopypost
+
+-  migratable
+
+-  python
+
 -  Entry method attributes
 
    -  stacksize
 
    -  threaded
-
-   -  migratable
 
    -  createhere
 
@@ -11839,8 +11843,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
    -  nokeep
 
    -  notrace
-
-   -  python
 
    -  accel (reserved for future/experimental use)
 
@@ -11880,8 +11882,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
    -  serial
 
-   -  forward
-
    -  when
 
    -  while
@@ -11895,10 +11895,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
    -  else
 
    -  overlap
-
-   -  connect
-
-   -  publishes
 
 .. _sec:trace-projections:
 
