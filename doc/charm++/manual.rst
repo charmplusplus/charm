@@ -11844,13 +11844,13 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
    -  notrace
 
-   -  accel
+   -  accel (reserved for future/experimental use)
 
-   -  readwrite
+   -  readwrite (reserved for future/experimental use)
 
-   -  writeonly
+   -  writeonly (reserved for future/experimental use)
 
-   -  accelblock
+   -  accelblock (reserved for future/experimental use)
 
    -  memcritical
 

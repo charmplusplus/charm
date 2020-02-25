@@ -51,12 +51,6 @@ void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c, CkArrayOpt
 }
 
 
-//Called by reduction handler once every processor has the lv_config object
-void liveVizInitComplete(void *rednMessage) {
-  delete (CkReductionMsg *)rednMessage;
-  liveViz0Init(lv_config);
-}
-
 liveVizRequestMsg *liveVizRequestMsg::buildNew(const liveVizRequest &req,const void *data,int dataLen)
 {
 	liveVizRequestMsg *m=new (dataLen,0) liveVizRequestMsg();
@@ -114,7 +108,7 @@ void liveVizDeposit(const liveVizRequest &req,
   imageData.AddImage (req.wid, (byte*)(msg->getData()));
 
   //Contribute this image to the reduction
-  msg->setCallback(CkCallback(vizReductionHandler));
+  msg->setCallback(CkCallback(CkReductionTarget(liveVizGroup, combine), lvG[0]));
  
   if(usingBoundArray){
     lvBoundArray[client->thisIndexMax].deposit(msg);
@@ -155,9 +149,8 @@ CkReductionMsg *imageCombineReducer(int nMsg,CkReductionMsg **msgs)
 
 /* Called once at end of reduction:
    Unpacks images, combines them to form one image and passes it on to layer 0. */
-void vizReductionHandler(void *r_msg)
+void vizReductionHandler(CkReductionMsg * msg)
 {
-  CkReductionMsg *msg = (CkReductionMsg*)r_msg;
   ImageData imageData (lv_config.getBytesPerPixel ());
   liveVizRequest req;
   byte *image = imageData.ConstructImage ((byte*)(msg->getData ()), req);
@@ -179,7 +172,6 @@ void vizReductionHandler(void *r_msg)
   liveViz0Deposit(req,image);
 
   delete[] image;
-  delete msg;
 }
 
 static void liveVizNodeInit(void) {
@@ -242,7 +234,7 @@ void liveVizDeposit(const liveVizRequest &req,
   }
 
 //Contribute this image to the reduction
-  msg->setCallback(CkCallback(vizReductionHandler));
+  msg->setCallback(CkCallback(CkReductionTarget(liveVizGroup, combine), lvG[0]));
 
   client->contribute(msg);
 }
@@ -294,9 +286,8 @@ CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 Called once final image has been assembled (reduction handler).
 Unpacks image, and passes it on to layer 0.
 */
-void vizReductionHandler(void *r_msg)
+void vizReductionHandler(CkReductionMsg * msg)
 {
-  CkReductionMsg *msg = (CkReductionMsg*)r_msg;
   imageHeader *hdr=(imageHeader *)msg->getData();
   byte *srcData=sizeof(imageHeader)+(byte *)msg->getData();
   int bpp=lv_config.getBytesPerPixel();
@@ -312,7 +303,6 @@ void vizReductionHandler(void *r_msg)
     dest.put(hdr->r.l,hdr->r.t,src);
     liveViz0Deposit(hdr->req,dest.getData());
   }
-  delete msg;
 }
 #endif
 

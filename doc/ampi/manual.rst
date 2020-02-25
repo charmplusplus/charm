@@ -382,10 +382,9 @@ arguments. A typical invocation of an AMPI program ``pgm`` with
 Here, the AMPI program ``pgm`` is run on 16 physical processors with 64
 total virtual ranks (which will be mapped 4 per processor initially).
 
-To run with load balancing, specify a load balancing strategy. If
-Address Space Layout Randomization is enabled on your target system, you
-may need to add the flag ``+isomalloc_sync`` when running with
-migration. You can also specify the size of user-level thread’s stack
+To run with load balancing, specify a load balancing strategy.
+
+You can also specify the size of user-level thread’s stack
 using the ``+tcharm_stacksize`` option, which can be used to decrease
 the size of the stack that must be migrated, as in the following
 example:
@@ -1903,7 +1902,7 @@ NAS Parallel Benchmarks (NPB 3.3)
       *cg.256.C* will appear in the *CG* and ``bin/`` directories. To
       run the particular benchmark, you must follow the standard
       procedure of running AMPI programs:
-      ``./charmrun ./cg.C.256 +p64 +vp256 ++nodelist nodelist +isomalloc_sync``
+      ``./charmrun ./cg.C.256 +p64 +vp256 ++nodelist nodelist``
 
 NAS PB Multi-Zone Version (NPB-MZ 3.3)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1936,7 +1935,7 @@ NAS PB Multi-Zone Version (NPB-MZ 3.3)
       directory. In the previous example, a file *bt-mz.256.C* will be
       created in the ``bin`` directory. To run the particular benchmark,
       you must follow the standard procedure of running AMPI programs:
-      ``./charmrun ./bt-mz.C.256 +p64 +vp256 ++nodelist nodelist +isomalloc_sync``
+      ``./charmrun ./bt-mz.C.256 +p64 +vp256 ++nodelist nodelist``
 
 HPCG v3.0
 ~~~~~~~~~
