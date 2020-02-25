@@ -5,6 +5,7 @@ DIRS = \
   zc_post_modify_size \
   dereg_and_nodereg \
   bcast_nonzero_root \
+  pup_buffer \
 
 TESTDIRS = $(DIRS)
 

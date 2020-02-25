@@ -297,6 +297,14 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 	convertSize[Tpointer]=src.pointerBytes;
 }
 
+void PUP::xlater::pup_buffer(void *&ptr,size_t n,size_t itemSize,dataType t) {
+  bytes(ptr, n, itemSize, t);
+}
+
+void PUP::xlater::pup_buffer(void *&ptr,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(ptr, n, itemSize, t);
+}
+
 //Generic bottleneck: unpack n items of size itemSize from p.
 void PUP::xlater::bytes(void *ptr,size_t n,size_t itemSize,dataType t)
 {

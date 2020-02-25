@@ -187,8 +187,6 @@ CkReductionMgr::CkReductionMgr()
 { 
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
-#elif CMK_BIGSIM_CHARM
-  init_BinaryTree();
 #else
   init_TopoTree();
 #endif
@@ -401,9 +399,6 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
 // Each contributor must contribute exactly once to the each reduction.
 void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&(m->log));
-#endif
   DEBR((AA "Contributor %p contributed for %d in grp %d ismigratable %d \n" AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
@@ -549,9 +544,6 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 // of migrants that missed the main reduction.
 void CkReductionMgr::LateMigrantMsg(CkReductionMsg *m)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&(m->log));
-#endif
   addContribution(m);
 }
 
@@ -663,11 +655,6 @@ void CkReductionMgr::finishReduction(void)
 	
  
   DEBR((AA "Reducing data... %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_END_EXECUTE(1);
-  void* _bgParentLog = NULL;
-  _TRACE_BG_BEGIN_EXECUTE_NOMSG("GroupReduce", &_bgParentLog, 0);
-#endif
   CkReductionMsg *result=reduceMessages(msgs);
   result->fromPE = CkMyPe();
   result->redNo=redNo;
@@ -752,9 +739,6 @@ void CkReductionMgr::finishReduction(void)
 //Sent up the reduction tree with reduced data
   void CkReductionMgr::RecvMsg(CkReductionMsg *m)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&m->log);
-#endif
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
     DEBR((AA "Recv'd remote contribution %d for #%d\n" AB,nRemote,m->redNo));
     // If the remote contribution is real, then check whether we can remove the
@@ -827,9 +811,6 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
       msgs_nSources+=m->nSources();
-#if CMK_BIGSIM_CHARM
-      _TRACE_BG_ADD_BACKWARD_DEP(m->log);
-#endif
 
       // for "nop" reducer type, only need to accept one message
       if (nMsgs == 0 || m->reducer != CkReduction::nop) {
@@ -978,8 +959,6 @@ void CkReductionMgr::pup(PUP::er &p)
     maxStartRequest=0;
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
-#elif CMK_BIGSIM_CHARM
-    init_BinaryTree();
 #else
     init_TopoTree();
 #endif
@@ -1195,9 +1174,6 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
   ret->sourceFlag=std::numeric_limits<int>::min();
   ret->gcount=0;
   ret->migratableContributor = true;
-#if CMK_BIGSIM_CHARM
-  ret->log = NULL;
-#endif
   return ret;
 }
 
@@ -1675,9 +1651,6 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
       simulated_message.userFlag = messages[message_idx]->userFlag;
       simulated_message.gcount = messages[message_idx]->gcount;
       simulated_message.migratableContributor = messages[message_idx]->migratableContributor;
-#if CMK_BIGSIM_CHARM
-      simulated_message.log = NULL;
-#endif
       simulated_messages[message_idx] = &simulated_message;
     }
 
@@ -2050,8 +2023,6 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 {
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
-#elif CMK_BIGSIM_CHARM
-  init_BinaryTree();
 #else
   init_TopoTree();
 #endif
@@ -2137,9 +2108,6 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 
 void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&m->log);
-#endif
   m->redNo=ci->redNo++;
   m->gcount=count;
   DEBR(("[%d,%d] contributewithCounter started for %d at %0.6f{{{\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer()));
@@ -2183,9 +2151,6 @@ void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 //Sent up the reduction tree with reduced data
 void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&m->log);
-#endif
 #ifndef CMK_CPV_IS_SMP
 #if CMK_IMMEDIATE_MSG
 	if(interrupt == true){
@@ -2326,17 +2291,9 @@ void CkNodeReductionMgr::finishReduction(void)
   DEBR((AA "Reducing node data...\n" AB));
 
   /**reduce all messages received at this node **/
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_END_EXECUTE(1);
-  void* _bgParentLog = NULL;
-  _TRACE_BG_BEGIN_EXECUTE_NOMSG("NodeReduce", &_bgParentLog, 0);
-#endif
   CkReductionMsg *result=CkReductionMgr::reduceMessages(msgs);
   result->redNo=redNo;
   DEBR((AA "Node Reduced gcount=%d; sourceFlag=%d\n" AB,result->gcount,result->sourceFlag));
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&result->log);
-#endif
 
   if (partialReduction) {
     msgs.enq(result);
@@ -2575,8 +2532,6 @@ void CkNodeReductionMgr::pup(PUP::er &p)
     lockEverything = CmiCreateLock();
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
-#elif CMK_BIGSIM_CHARM
-    init_BinaryTree();
 #else
     init_TopoTree();
 #endif		

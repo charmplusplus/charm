@@ -32,6 +32,7 @@
 CkpvExtern(int, _lb_obj_index);                // for lbdb user data for obj index
 #endif // CMK_LBDB_ON
 
+CpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets); // used for ZC Pup
 #ifndef CMK_CHARE_USE_PTR
 CkpvExtern(int, currentChareIdx);
 #endif
@@ -220,9 +221,6 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayOptions& options,void *ctor
            how many of them are used */
         CKARRAYMAP_POPULATE_INITIAL(CMK_RANK_0(procNum(arrayHdl,idx))==thisPe);
 
-#if CMK_BIGSIM_CHARM
-        BgEntrySplit("split-array-new-end");
-#endif
 
 	mgr->doneInserting();
 	CkFreeMsg(ctorMsg);
@@ -1753,7 +1751,15 @@ void CkMigratable::staticResumeFromSync(void* data)
   if (_lb_args.metaLbOn()) {
   	el->clearMetaLBData();
 	}
-	el->ResumeFromSync();
+
+  CkLocMgr *localLocMgr = el->myRec->getLocMgr();
+  auto iter = localLocMgr->bufferedActiveRgetMsgs.find(el->ckGetID());
+  if(iter != localLocMgr->bufferedActiveRgetMsgs.end()) {
+    std::pair<CmiUInt8, CkMigratable*> idElemPair(el->ckGetID(), el);
+    localLocMgr->toBeResumeFromSynced.insert(idElemPair);
+  } else {
+    el->ResumeFromSync();
+  }
 }
 
 void CkMigratable::setMigratable(int migratable) 
@@ -2248,6 +2254,31 @@ CkLocRec *CkLocMgr::createLocal(const CkArrayIndex &idx,
 	return rec;
 }
 
+// Used to handle messages that were buffered because of active rgets in progress
+void CkLocMgr::processAfterActiveRgetsCompleted(CmiUInt8 id) {
+
+    // Call ckJustMigrated
+    CkLocRec *myLocRec = elementNrec(id);
+    callMethod(myLocRec, &CkMigratable::ckJustMigrated);
+
+    // Call ResumeFromSync on elements that were waiting for rgets
+    auto iter2 = toBeResumeFromSynced.find(id);
+    if(iter2 != toBeResumeFromSynced.end()) {
+      iter2->second->ResumeFromSync();
+      toBeResumeFromSynced.erase(iter2);
+    }
+
+    // Deliver buffered messages to the elements that were waiting on rgets
+    auto iter = bufferedActiveRgetMsgs.find(id);
+    if(iter != bufferedActiveRgetMsgs.end()) {
+      std::vector<CkArrayMessage *> bufferedMsgs = iter->second;
+      bufferedActiveRgetMsgs.erase(iter);
+      for(auto msg : bufferedMsgs) {
+        CmiHandleMessage(UsrToEnv(msg));
+      }
+    }
+}
+
 
 void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer &buffer)
 {
@@ -2475,16 +2506,6 @@ void CkLocMgr::reclaim(CkLocRec* rec) {
 	DEBC((AA "Destroying record for element %s\n" AB,idx2str(rec->getIndex())));
 	if (!duringMigration) 
 	{ //This is a local element dying a natural death
-#if CMK_BIGSIM_CHARM
-		//After migration, reclaimRemote will be called through 
-		//the CkRemoveArrayElement in the pupping routines for those 
-		//objects that are not on the home processors. However,
-		//those remote records should not be deleted since the corresponding
-		//objects are not actually deleted but on disk. If deleted, msgs
-		//that seeking where is the object will be accumulated (a circular
-		//msg chain) and causes the program no progress
-		if(_BgOutOfCoreFlag==1) return; 
-#endif
 		int home=homePe(rec->getIndex());
 		if (home!=CkMyPe())
 #if CMK_MEM_CHECKPOINT
@@ -3037,8 +3058,18 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	//Create a record for this element
 	CkLocRec *rec=createLocal(idx,true,msg->ignoreArrival,false /* home told on departure */ );
 	
+	envelope *env = UsrToEnv(msg);
+	CmiAssert(CpvAccess(newZCPupGets).empty()); // Ensure that vector is empty
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_migrate);
+	bool zcRgetsActive = !CpvAccess(newZCPupGets).empty();
+	if(zcRgetsActive) {
+		// newZCPupGets is not empty, rgets need to be launched
+		// newZCPupGets is populated with NcpyOperationInfo during pupElementsFor by pup_buffer calls that require Rgets
+		// Issue Rgets using the populated newZCPupGets vector
+		zcPupIssueRgets(msg->id, this);
+	}
+	CpvAccess(newZCPupGets).clear(); // Clear this to reuse the vector
 	if (p.size()!=msg->length) {
 		CkError("ERROR! Array element claimed it was %d bytes to a"
 			"packing PUP::er, but %zu bytes in the unpacking PUP::er!\n",
@@ -3060,8 +3091,10 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	}
 #endif
 
-	//Let all the elements know we've arrived
-	callMethod(rec,&CkMigratable::ckJustMigrated);
+	if(!zcRgetsActive) {
+		//Let all the elements know we've arrived
+		callMethod(rec,&CkMigratable::ckJustMigrated);
+	}
 
 #if CMK_FAULT_EVAC
 	/*
@@ -3093,7 +3126,6 @@ void CkLocMgr::restore(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p)
 	//informHome should not be called since such information is already
 	//immediately updated real migration
 #if CMK_ERROR_CHECKING
-	if(_BgOutOfCoreFlag!=2)
 	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
 #endif
 	CkLocRec *rec=createLocal(idx,false,false,false);

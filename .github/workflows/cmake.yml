@@ -4,6 +4,7 @@ on: [push]
 
 jobs:
   build:
+    timeout-minutes: 45
 
     runs-on: ubuntu-latest
 
@@ -12,4 +13,4 @@ jobs:
     - name: build
       run: ./buildcmake LIBS netlrts-linux-x86_64 -g -j4 --with-production
     - name: test
-      run: make -C netlrts-linux-x86_64/tests all OPTS="-g" -j4 && make -C netlrts-linux-x86_64/tests test TESTOPTS="++local +isomalloc_sync"
+      run: make -C netlrts-linux-x86_64/tests all OPTS="-g" -j4 && make -C netlrts-linux-x86_64/tests test TESTOPTS="++local"

@@ -26,9 +26,6 @@ clean:
 test: all
 	$(call run, ./hello +p4 10)
 
-bgtest: all
-	$(call run, ./hello +p4 10 +x2 +y2 +z2 +cth1 +wth1)
-
 module: $(CHARMLIB)/libmoduleCkLoop.a
 
 $(CHARMLIB)/libmoduleCkLoop.a: CkLoop.o

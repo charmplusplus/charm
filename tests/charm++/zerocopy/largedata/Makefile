@@ -43,6 +43,3 @@ endif
 
 test-bench: all
 	$(call run, ./pgm +p10)
-
-bgtest: all
-	$(call run, ./pgm +p2 +x2 +y1 +z1 )
