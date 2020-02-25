@@ -1516,10 +1516,10 @@ case "$MEMORY" in
     ;;
 esac
 
-# Isomalloc does not work on BGQ or Windows:
+# -memory isomalloc does not work on BGQ or Windows:
 if [[ "$CMK_BLUEGENEQ" = '1' || "$CMK_WINDOWS" = '1' ]] && [[ "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]]
 then
-  Abort "Error: Isomalloc is not supported on BlueGene/Q or Windows."
+  Abort "Error: -memory isomalloc is not supported on BlueGene/Q or Windows."
 fi
 
 MEM_OBJ="-lmemory-${MEMORY}"
