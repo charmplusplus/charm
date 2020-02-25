@@ -139,25 +139,39 @@ static void disable_isomalloc(const char * why)
     CmiPrintf("Converse> Disabling Isomalloc: %s.\n", why);
 }
 
-#if !CMK_HAS_MMAP
-/****************** Manipulate memory map (Win32 non-version) *****************/
-static void * call_mmap_fixed(void * addr, size_t len)
+#ifdef _WIN32
+/****************** Manipulate memory map (Win32 version) *****************/
+#include <windows.h>
+
+static constexpr void * const mmap_fail = nullptr;
+
+static inline void * call_mmap_fixed(void * addr, size_t len)
 {
-  CmiAbort("isomalloc.C: mmap_fixed should never be called here.");
-  return NULL;
+  return VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 }
-static void * call_mmap_anywhere(size_t len)
+static inline void * call_mmap_anywhere(size_t len)
 {
-  CmiAbort("isomalloc.C: mmap_anywhere should never be called here.");
-  return NULL;
+  return call_mmap_fixed(nullptr, len);
 }
 static void call_munmap(void * addr, size_t len)
 {
-  CmiAbort("isomalloc.C: munmap should never be called here.");
+  auto ptr = (char *)addr;
+  MEMORY_BASIC_INFORMATION minfo;
+  while (len)
+  {
+    if (VirtualQuery(ptr, &minfo, sizeof(minfo)) == 0)
+      return;
+    if (minfo.BaseAddress != ptr || minfo.AllocationBase != ptr ||
+        minfo.State != MEM_COMMIT || minfo.RegionSize > len)
+      return;
+    if (VirtualFree(ptr, 0, MEM_RELEASE) == 0)
+      return;
+    ptr += minfo.RegionSize;
+    len -= minfo.RegionSize;
+  }
 }
-
-static int init_map() { return 0; /*Isomalloc never works without mmap*/ }
-#else /* CMK_HAS_MMAP */
+static inline int init_map() { return 1; /* No init necessary */ }
+#elif CMK_HAS_MMAP
 /****************** Manipulate memory map (UNIX version) *****************/
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -167,6 +181,9 @@ static int init_map() { return 0; /*Isomalloc never works without mmap*/ }
 #if !CMK_HAS_MMAP_ANON
 CpvStaticDeclare(int, zerofd); /*File descriptor for /dev/zero, for mmap*/
 #endif
+
+// Unlike VirtualAlloc, mmap returns -1 as a sentinel.
+#define mmap_fail (MAP_FAILED)
 
 /**
  * Maps this address with these flags.
@@ -214,8 +231,27 @@ static int init_map()
 #endif
   return 1;
 }
+#else /* CMK_HAS_MMAP */
+/****************** Manipulate memory map (stub non-version) *****************/
+static constexpr void * const mmap_fail = nullptr;
 
-#endif /* UNIX memory map */
+static void * call_mmap_fixed(void * addr, size_t len)
+{
+  CmiAbort("isomalloc.C: mmap_fixed should never be called here.");
+  return nullptr;
+}
+static void * call_mmap_anywhere(size_t len)
+{
+  CmiAbort("isomalloc.C: mmap_anywhere should never be called here.");
+  return nullptr;
+}
+static void call_munmap(void * addr, size_t len)
+{
+  CmiAbort("isomalloc.C: munmap should never be called here.");
+}
+
+static int init_map() { return 0; /*Isomalloc never works without mmap*/ }
+#endif
 
 /**
  * maps the virtual memory associated with slot using mmap
@@ -224,7 +260,7 @@ static void * map_global_memory(void * addr, size_t len)
 {
   void * pa = call_mmap_fixed(addr, len);
 
-  if (pa == (void *)~(uintptr_t)0)
+  if (pa == mmap_fail)
   { /*Map just failed completely*/
     auto err = errno;
     CmiError("Charm++> [%d] Isomalloc tried to mmap(%p, %zu), but encountered error %d\n", CmiMyPe(), addr, len, err);
@@ -315,7 +351,7 @@ static uint8_t * get_space_partition(uint8_t * start, uint8_t * end, int myunit,
 static int bad_location(uint8_t * loc)
 {
   void * addr = call_mmap_fixed(loc, slotsize);
-  if (addr == (void *)~(uintptr_t)0 || addr != loc)
+  if (addr == mmap_fail || addr != loc)
   {
     DEBUG_PRINT("[%d] Skipping unmappable space at %p\n", CmiMyPe(), loc);
     return 1; /*No good*/
@@ -492,7 +528,7 @@ static int find_largest_free_region(memRegion_t * destRegion)
   regions[nRegions].start = codeDll;
   regions[nRegions++].len = division_size;
 
-  if (mmapAny != (void *)~(uintptr_t)0)
+  if (mmapAny != mmap_fail)
   {
     regions[nRegions].type = "Result of a non-fixed call to mmap";
     regions[nRegions].start = (uint8_t *)mmapAny;
@@ -541,7 +577,6 @@ static int find_largest_free_region(memRegion_t * destRegion)
 
 static int try_largest_mmap_region(memRegion_t * destRegion)
 {
-  void * bad_alloc = (void *)(-1); /* mmap error return address */
   void * range, * good_range = NULL;
   double shrink = 1.5;
   size_t size = ((size_t)(-1l)), good_size = 0;
@@ -549,7 +584,9 @@ static int try_largest_mmap_region(memRegion_t * destRegion)
   if (sizeof(size_t) >= 8) size = size >> 2; /* 25% of machine address space! */
   while (1)
   { /* test out an allocation of this size */
-#if CMK_HAS_MMAP
+#ifdef _WIN32
+    range = VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_READWRITE);
+#elif CMK_HAS_MMAP
     range = mmap(NULL, size, PROT_READ | PROT_WRITE,
                  MAP_PRIVATE
 #if CMK_HAS_MMAP_ANON
@@ -561,9 +598,9 @@ static int try_largest_mmap_region(memRegion_t * destRegion)
                  ,
                  -1, 0);
 #else
-    range = bad_alloc;
+    range = mmap_fail;
 #endif
-    if (range == bad_alloc)
+    if (range == mmap_fail)
     { /* mmap failed */
 #if CMK_HAS_USLEEP
       if (retry++ < 5)
@@ -595,12 +632,14 @@ static int try_largest_mmap_region(memRegion_t * destRegion)
   destRegion->start = (uint8_t *)good_range;
   destRegion->len = good_size;
 #if ISOMALLOC_DEBUG
+#ifndef _WIN32
   pid_t pid = getpid();
   {
     char s[128];
     sprintf(s, "cat /proc/%d/maps", pid);
     system(s);
   }
+#endif
   DEBUG_PRINT("[%d] try_largest_mmap_region: %p, %zu\n", CmiMyPe(), good_range,
               good_size);
 #endif
