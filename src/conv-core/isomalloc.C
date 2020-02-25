@@ -182,7 +182,8 @@ static inline int init_map() { return 1; /* No init necessary */ }
 CpvStaticDeclare(int, zerofd); /*File descriptor for /dev/zero, for mmap*/
 #endif
 
-#define mmap_fail ((void *)~(uintptr_t)0)
+// Unlike VirtualAlloc, mmap returns -1 as a sentinel.
+#define mmap_fail (MAP_FAILED)
 
 /**
  * Maps this address with these flags.
