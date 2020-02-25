@@ -2419,6 +2419,19 @@ EOT
 test_cxx "whether personality() and ADDR_NO_RANDOMIZE exist" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ADDR_NO_RANDOMIZE, $pass, [whether personality() and ADDR_NO_RANDOMIZE exist])
 
+#### test posix_spawn() ####
+cat > $t <<EOT
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <spawn.h>
+int main() {
+    return posix_spawn(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+}
+EOT
+test_cxx "whether posix_spawn() exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_POSIX_SPAWN, $pass, [whether posix_spawn() exists])
+
 
 # enable/disable zlib
 AC_ARG_ENABLE([zlib],
