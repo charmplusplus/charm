@@ -30,6 +30,7 @@
 /*readonly*/ CProxy_liveVizPollArray myGroupProxy;
 CkReduction::reducerType poll_image_combine_reducer;
 extern CkCallback clientGetImageCallback;
+static void vizPollReductionHandler(CkReductionMsg * msg);
 
 
 // A node group which handles enqueuing images on processor 0
@@ -47,6 +48,10 @@ private:
 public:
 
   liveVizPollArray() {init();}
+
+  void combine(CkReductionMsg * msg) {
+    vizPollReductionHandler(msg);
+  }
 
   // Handle incoming request
   void request(liveVizRequestMsg *msg) {
@@ -121,9 +126,8 @@ CkReductionMsg *imagePollCombineReducer(int nMsg,CkReductionMsg **msgs)
   Reduction handles an "image" from each processor. The result ends up here.
   Unpacks image, and passes it on to layer 0.
 */
-void vizPollReductionHandler(void *r_msg)
+static void vizPollReductionHandler(CkReductionMsg * msg)
 {
-  CkReductionMsg *msg = (CkReductionMsg*)r_msg;
   imageHeader *hdr=(imageHeader *)msg->getData();
   byte *srcData=sizeof(imageHeader)+(byte *)msg->getData();
   CkPrintf("Using hard-coded bpp=3\n");
@@ -140,7 +144,6 @@ void vizPollReductionHandler(void *r_msg)
 	dest.put(hdr->r.l,hdr->r.t,src);
 	myGroupProxy[0].liveVizPoll0Deposit(hdr->r.wid(), hdr->r.ht(), bpp, len, dest.getData());
   }
-  delete msg;
 }
 
 
@@ -175,7 +178,7 @@ void liveVizPollDeposit(ArrayElement *client,
   imageData.AddImage (imagewidth, (byte*)(msg->getData()));
   
   //Contribute this processor's images to the global reduction
-  msg->setCallback(CkCallback(vizPollReductionHandler));
+  msg->setCallback(CkCallback(CkReductionTarget(liveVizPollArray, combine), myGroupProxy[0]));
   client->contribute(msg);
 }
 
