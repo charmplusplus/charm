@@ -1,0 +1,57 @@
+mainmodule jacobi2d {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Block block_proxy;
+  readonly int grid_size;
+  readonly int block_size;
+  readonly int n_chares;
+  readonly int n_iters;
+  readonly int thread_size;
+  readonly bool gpu_prio;
+
+  message CallbackMsg;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void initDone();
+    entry [reductiontarget] void done(double time);
+  };
+
+  array [2D] Block {
+    entry Block(void);
+    entry void init();
+    entry void receiveGhosts(int ref, int dir, int w, double gh[w]);
+
+    entry void iterate() {
+      serial {
+        // Measure iteration time
+        iter_start_time = CkWallTimer();
+
+
+        // Send ghost data to neighbors
+        sendGhosts();
+      }
+
+      // Receive ghost data from neighbors
+      for (remote_count = 0; remote_count < neighbors; remote_count++) {
+        when receiveGhosts[my_iter](int ref, int dir, int w, double buf[w]) serial {
+          processGhosts(dir, w, buf);
+        }
+      }
+
+      serial {
+        // Perform stencil computation
+        update();
+
+        agg_time += CkWallTimer() - iter_start_time;
+
+        // Terminate if all iterations are complete
+        if (my_iter++ == n_iters) {
+          CkPrintf("[%d,%d] Average time per iteration: %lf\n", thisIndex.x,
+              thisIndex.y, agg_time / n_iters);
+          CkCallback cb(CkReductionTarget(Main, done), main_proxy);
+          contribute(sizeof(double), &agg_time, CkReduction::sum_double, cb);
+        }
+      }
+    };
+  };
+};
