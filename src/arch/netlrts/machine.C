@@ -2156,8 +2156,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   Cmi_truecrash = 1;
 #endif
   if (CmiGetArgFlagDesc(*argv,"+truecrash","Do not install signal handlers") ||
-      CmiGetArgFlagDesc(*argv,"++debug",NULL /*meaning: don't show this*/) ||
-      CmiNumNodes()<=32) Cmi_truecrash = 1;
+      CmiGetArgFlagDesc(*argv,"++debug",NULL /*meaning: don't show this*/) ) Cmi_truecrash = 1;
     /* netpoll disable signal */
   if (CmiGetArgFlagDesc(*argv,"+netpoll","Do not use SIGIO--poll instead")) Cmi_netpoll = 1;
   if (CmiGetArgFlagDesc(*argv,"+netint","Use SIGIO")) Cmi_netpoll = 0;
