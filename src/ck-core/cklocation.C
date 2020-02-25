@@ -1535,9 +1535,9 @@ CkMigratable::~CkMigratable() {
 #if CMK_LBDB_ON 
 	if (barrierRegistered) {
 	  DEBL((AA "Removing barrier for element %s\n" AB,idx2str(thisIndexMax)));
-	  if (usesAtSync) {
-      myRec->getLBMgr()->RemoveClients(this);
-	  } else
+	  if (usesAtSync)
+		myRec->getLBMgr()->RemoveClients(this);
+	  else
 		myRec->getLBMgr()->RemoveLocalBarrierReceiver(ldBarrierRecvHandle);
 	}
 
@@ -1660,18 +1660,17 @@ void CkMigratable::metaLBCallLB() {
 void CkMigratable::ckFinishConstruction(void)
 {
 //	if ((!usesAtSync) || barrierRegistered) return;
-  if (usesAtSync && _lb_args.lbperiod() != -1.0)
-    CkAbort("You must use AtSync or Periodic LB separately!\n");
+	if (usesAtSync && _lb_args.lbperiod() != -1.0)
+          CkAbort("You must use AtSync or Periodic LB separately!\n");
 
 	myRec->setMeasure(usesAutoMeasure);
 	if (barrierRegistered) return;
 	DEBL((AA "Registering barrier client for %s\n" AB,idx2str(thisIndexMax)));
-  if (usesAtSync)
-    myRec->getLBMgr()->AddClients(this, true, false);
-  else
-    ldBarrierRecvHandle = myRec->getLBMgr()->AddLocalBarrierReceiver(
-    (LDBarrierFn)staticResumeFromSync,(void*)(this));
-
+	if (usesAtSync)
+	  myRec->getLBMgr()->AddClients(this, true, false);
+	else
+	  ldBarrierRecvHandle = myRec->getLBMgr()->AddLocalBarrierReceiver(
+            (LDBarrierFn)staticResumeFromSync,(void*)(this));
 	barrierRegistered=true;
 }
 

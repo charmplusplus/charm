@@ -1079,9 +1079,10 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
       propagate_atsync();
       at_count -= client_count;
       cur_refcount++;
-      for (std::list<Chare *>::iterator i = _mgr->chares.begin(); i != _mgr->chares.end(); ++i)
-        if((*i)->atsync_notify)
-        (*i)->AtSyncBarrierReached();
+      for (std::list<Chare *>::iterator i = _mgr->chares.begin(); i != _mgr->chares.end(); ++i) {
+        if ((*i)->atsync_notify)
+          (*i)->AtSyncBarrierReached();
+      }
       if(_mgr->nloadbalancers > 0) _mgr->loadbalancers[0]->InvokeLB();
     }
   }
