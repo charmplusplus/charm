@@ -56,7 +56,6 @@
 
 #define CMK_COMPILEMODE_ANSI				   1
 
-#define CMK_NO_ISO_MALLOC                                  1
 
 #endif
 

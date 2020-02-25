@@ -58,8 +58,6 @@
 
 #define CMK_PCQUEUE_LOCK                                   1
 
-#define CMK_NO_ISO_MALLOC                                  1
-
 #define CMK_CONVERSE_MPI                                   0
 
 #endif
