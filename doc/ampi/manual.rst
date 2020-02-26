@@ -296,10 +296,15 @@ Building AMPI Programs
 AMPI provides compiler wrappers such as ``ampicc``, ``ampif90``, and
 ``ampicxx`` in the ``bin`` subdirectory of Charm++ installations. You can
 use them to build your AMPI program using the same syntax as other
-compilers like ``gcc``. These scripts automatically handle the details of
-linking against AMPI and the Charm++ runtime system. They are intended as
-drop-in replacements for ``mpicc`` wrappers provided by most conventional
-MPI implementations.
+compilers like ``gcc``. They are intended as drop-in replacements for
+``mpicc`` wrappers provided by most conventional MPI implementations.
+These scripts automatically handle the details of building and linking
+against AMPI and the Charm++ runtime system. This includes launching the
+compiler selected during the Charm++ build process, passing any toolchain
+parameters important for proper function on the selected build target,
+supplying the include and link paths for the runtime system, and linking
+with Charm++ components important for AMPI, including Isomalloc heap
+interception and commonly used load balancers.
 
 .. _tab:toolchain:
 .. table:: Full list of AMPI toolchain wrappers.
@@ -348,13 +353,13 @@ adding this directory to the ``$PATH`` environment variable:
 
 These wrappers also allow the user to configure AMPI and Charm++-specific
 functionality.
-To use Isomalloc for transparently migrating user heap data, link with
-*-memory isomalloc*. To use a Charm++ load balancer, link a strategy or
-a suite of strategies in with *-module <LB>*. For example:
+For example, to automatically select a Charm++ load balancer at program
+launch without passing the ``+balancer`` runtime parameter, specify a
+strategy at link time with ``-balancer <LB>``:
 
 .. code-block:: bash
 
-   $ ampicc pgm.c -o pgm -O3 -memory isomalloc -module CommonLBs
+   $ ampicc pgm.c -o pgm -O3 -balancer GreedyRefineLB
 
 Running AMPI Programs
 ---------------------
