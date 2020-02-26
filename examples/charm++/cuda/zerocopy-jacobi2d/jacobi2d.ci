@@ -5,7 +5,6 @@ mainmodule jacobi2d {
   readonly int block_size;
   readonly int n_chares;
   readonly int n_iters;
-  readonly int thread_size;
   readonly bool gpu_prio;
 
   message CallbackMsg;
@@ -14,6 +13,7 @@ mainmodule jacobi2d {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void initDone();
     entry [reductiontarget] void done(double time);
+    entry void printDone();
   };
 
   array [2D] Block {
@@ -23,9 +23,7 @@ mainmodule jacobi2d {
 
     entry void iterate() {
       serial {
-        // Measure iteration time
         iter_start_time = CkWallTimer();
-
 
         // Send ghost data to neighbors
         sendGhosts();
@@ -44,14 +42,19 @@ mainmodule jacobi2d {
 
         agg_time += CkWallTimer() - iter_start_time;
 
-        // Terminate if all iterations are complete
+        // Terminate if all iterations are complete, otherwise continue
         if (my_iter++ == n_iters) {
           CkPrintf("[%d,%d] Average time per iteration: %lf\n", thisIndex.x,
               thisIndex.y, agg_time / n_iters);
           CkCallback cb(CkReductionTarget(Main, done), main_proxy);
           contribute(sizeof(double), &agg_time, CkReduction::sum_double, cb);
         }
+        else {
+          thisProxy(thisIndex.x, thisIndex.y).iterate();
+        }
       }
     };
+
+    entry void print();
   };
 };

@@ -1,6 +1,8 @@
 #include "hapi.h"
 #include "jacobi2d.decl.h"
-#include <string>
+#include <utility>
+
+#define PRINT 0
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
@@ -8,11 +10,18 @@
 /* readonly */ int block_size;
 /* readonly */ int n_chares;
 /* readonly */ int n_iters;
-/* readonly */ int thread_size;
 /* readonly */ bool gpu_prio;
 
-extern void invokeKernel(cudaStream_t stream, double* d_temperature,
-    double* d_new_temperature, int block_size, int thread_size);
+extern void invokeInitKernel(double* d_temperature, int block_size, cudaStream_t stream);
+extern void invokeBoundaryKernels(double* d_temperature, int block_size, bool left_bound,
+    bool right_bound, bool top_bound, bool bottom_bound, cudaStream_t stream);
+extern void invokePackingKernels(double* d_temperature, double* d_left_ghost,
+    double* d_right_ghost, bool left_bound, bool right_bound, int block_size,
+    cudaStream_t stream);
+extern void invokeUnpackingKernel(double* d_temperature, double* d_ghost,
+    bool is_left, int block_size, cudaStream_t stream);
+extern void invokeJacobiKernel(double* d_temperature, double* d_new_temperature,
+    int block_size, cudaStream_t stream);
 
 enum Direction { LEFT = 1, RIGHT, TOP, BOTTOM };
 
@@ -30,15 +39,14 @@ public:
   Main(CkArgMsg* m) {
     // Set default values
     main_proxy = thisProxy;
-    grid_size = 1024;
-    block_size = 128;
+    grid_size = 16384;
+    block_size = 4096;
     n_iters = 100;
-    thread_size = 1;
     gpu_prio = false;
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:b:i:t:p")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:b:i:p")) != -1) {
       switch (c) {
         case 's':
           grid_size = atoi(optarg);
@@ -48,9 +56,6 @@ public:
           break;
         case 'i':
           n_iters = atoi(optarg);
-          break;
-        case 't':
-          thread_size = atoi(optarg);
           break;
         case 'p':
           gpu_prio = true;
@@ -77,7 +82,6 @@ public:
     CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d\n", grid_size, grid_size,
         block_size, block_size, n_chares, n_chares);
     CkPrintf("Iterations: %d\n", n_iters);
-    CkPrintf("Thread coarsening size: %d x %d\n", thread_size, thread_size);
     CkPrintf("Higher priority for GPU methods and callbacks: %s\n\n",
              (gpu_prio) ? "ON" : "OFF");
 
@@ -99,6 +103,15 @@ public:
              time / ((n_chares * n_chares) * n_iters));
     CkPrintf("Finished due to max iterations %d, total time %lf seconds\n",
              n_iters, CkWallTimer() - start_time);
+#if PRINT
+    sleep(1);
+    block_proxy(0,0).print();
+#else
+    CkExit();
+#endif
+  }
+
+  void printDone() {
     CkExit();
   }
 };
@@ -114,10 +127,12 @@ class Block : public CBase_Block {
   double* __restrict__ h_temperature;
   double* __restrict__ d_temperature;
   double* __restrict__ d_new_temperature;
-  double* __restrict__ left_ghost;
-  double* __restrict__ right_ghost;
-  double* __restrict__ bottom_ghost;
-  double* __restrict__ top_ghost;
+  double* __restrict__ h_left_ghost;
+  double* __restrict__ h_right_ghost;
+  double* __restrict__ h_bottom_ghost;
+  double* __restrict__ h_top_ghost;
+  double* __restrict__ d_left_ghost;
+  double* __restrict__ d_right_ghost;
 
   cudaStream_t stream;
 
@@ -132,10 +147,12 @@ class Block : public CBase_Block {
     hapiCheck(cudaFreeHost(h_temperature));
     hapiCheck(cudaFree(d_temperature));
     hapiCheck(cudaFree(d_new_temperature));
-    hapiCheck(cudaFreeHost(left_ghost));
-    hapiCheck(cudaFreeHost(right_ghost));
-    hapiCheck(cudaFreeHost(top_ghost));
-    hapiCheck(cudaFreeHost(bottom_ghost));
+    hapiCheck(cudaFreeHost(h_left_ghost));
+    hapiCheck(cudaFreeHost(h_right_ghost));
+    hapiCheck(cudaFreeHost(h_top_ghost));
+    hapiCheck(cudaFreeHost(h_bottom_ghost));
+    hapiCheck(cudaFree(d_left_ghost));
+    hapiCheck(cudaFree(d_right_ghost));
     cudaStreamDestroy(stream);
   }
 
@@ -156,11 +173,11 @@ class Block : public CBase_Block {
     else
       neighbors++;
     if (thisIndex.y == 0)
-      bottom_bound = true;
+      top_bound = true;
     else
       neighbors++;
     if (thisIndex.y == n_chares - 1)
-      top_bound = true;
+      bottom_bound = true;
     else
       neighbors++;
 
@@ -171,72 +188,72 @@ class Block : public CBase_Block {
           sizeof(double) * (block_size + 2) * (block_size + 2)));
     hapiCheck(cudaMalloc((void**)&d_new_temperature,
           sizeof(double) * (block_size + 2) * (block_size + 2)));
-    hapiCheck(cudaMallocHost((void**)&left_ghost, sizeof(double) * block_size));
-    hapiCheck(cudaMallocHost((void**)&right_ghost, sizeof(double) * block_size));
-    hapiCheck(cudaMallocHost((void**)&bottom_ghost, sizeof(double) * block_size));
-    hapiCheck(cudaMallocHost((void**)&top_ghost, sizeof(double) * block_size));
+    hapiCheck(cudaMallocHost((void**)&h_left_ghost, sizeof(double) * block_size));
+    hapiCheck(cudaMallocHost((void**)&h_right_ghost, sizeof(double) * block_size));
+    hapiCheck(cudaMallocHost((void**)&h_bottom_ghost, sizeof(double) * block_size));
+    hapiCheck(cudaMallocHost((void**)&h_top_ghost, sizeof(double) * block_size));
+    hapiCheck(cudaMalloc((void**)&d_left_ghost, sizeof(double) * block_size));
+    hapiCheck(cudaMalloc((void**)&d_right_ghost, sizeof(double) * block_size));
     cudaStreamCreate(&stream);
 
     // Initialize temperature data
-    // FIXME: Do this on the device
-    for (int j = 0; j < block_size + 2; j++) {
-      for (int i = 0; i < block_size + 2; i++) {
-        h_temperature[(block_size + 2) * j + i] = 0.0;
-      }
-    }
-
-    // Enforce boundary conditions
-    constrainBC();
+    invokeInitKernel(d_temperature, block_size, stream);
 
     CkCallback cb(CkReductionTarget(Main, initDone), main_proxy);
     contribute(cb);
   }
 
   void sendGhosts(void) {
-    // Copy temperature data to the GPU on first iteration
-    if (my_iter == 1) {
-      hapiCheck(cudaMemcpyAsync(d_temperature, h_temperature,
-                          sizeof(double) * (block_size + 2) * (block_size + 2),
-                          cudaMemcpyHostToDevice, stream));
-    }
+    // Pack non-contiguous ghosts to temporary contiguous buffers on device
+    invokePackingKernels(d_temperature, d_left_ghost, d_right_ghost, left_bound,
+        right_bound, block_size, stream);
 
+    // Transfer ghosts from device to host
+    hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(double),
+          cudaMemcpyDeviceToHost, stream));
+    hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost, block_size * sizeof(double),
+          cudaMemcpyDeviceToHost, stream));
+    hapiCheck(cudaMemcpyAsync(h_top_ghost, d_temperature + (block_size + 2) + 1,
+          block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
+    hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size  + 1,
+          block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
+    cudaStreamSynchronize(stream);
+
+    // Send ghosts to neighboring chares
     int x = thisIndex.x, y = thisIndex.y;
     if (!left_bound)
-      thisProxy(x - 1, y).receiveGhosts(my_iter, RIGHT, block_size, left_ghost);
+      thisProxy(x - 1, y).receiveGhosts(my_iter, RIGHT, block_size, h_left_ghost);
     if (!right_bound)
-      thisProxy(x + 1, y).receiveGhosts(my_iter, LEFT, block_size, right_ghost);
+      thisProxy(x + 1, y).receiveGhosts(my_iter, LEFT, block_size, h_right_ghost);
     if (!top_bound)
-      thisProxy(x, y + 1).receiveGhosts(my_iter, BOTTOM, block_size, top_ghost);
+      thisProxy(x, y - 1).receiveGhosts(my_iter, BOTTOM, block_size, h_top_ghost);
     if (!bottom_bound)
-      thisProxy(x, y - 1).receiveGhosts(my_iter, TOP, block_size, bottom_ghost);
+      thisProxy(x, y + 1).receiveGhosts(my_iter, TOP, block_size, h_bottom_ghost);
   }
 
   void processGhosts(int dir, int width, double* gh) {
-    // TODO: Don't use cudaMemcpy2DAsync, use kernel instead
     switch (dir) {
       case LEFT:
-        memcpy(left_ghost, gh, width * sizeof(double));
-        hapiCheck(cudaMemcpy2DAsync(
-            d_temperature + (block_size + 2), (block_size + 2) * sizeof(double),
-            left_ghost, sizeof(double), sizeof(double), block_size,
-            cudaMemcpyHostToDevice, stream));
+        memcpy(h_left_ghost, gh, width * sizeof(double));
+        hapiCheck(cudaMemcpyAsync(d_left_ghost, h_left_ghost, block_size * sizeof(double),
+              cudaMemcpyHostToDevice, stream));
+        invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
         break;
       case RIGHT:
-        memcpy(right_ghost, gh, width * sizeof(double));
-        hapiCheck(cudaMemcpy2DAsync(
-            d_temperature + (block_size + 2) + (block_size + 1),
-            (block_size + 2) * sizeof(double), right_ghost, sizeof(double),
-            sizeof(double), block_size, cudaMemcpyHostToDevice, stream));
-        break;
-      case BOTTOM:
-        memcpy(bottom_ghost, gh, width * sizeof(double));
-        hapiCheck(cudaMemcpyAsync(d_temperature + 1, bottom_ghost,
-              block_size * sizeof(double), cudaMemcpyHostToDevice, stream));
+        memcpy(h_right_ghost, gh, width * sizeof(double));
+        hapiCheck(cudaMemcpyAsync(d_right_ghost, h_right_ghost, block_size * sizeof(double),
+              cudaMemcpyHostToDevice, stream));
+        invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
         break;
       case TOP:
-        memcpy(top_ghost, gh, width * sizeof(double));
-        hapiCheck(cudaMemcpyAsync(d_temperature + (block_size + 2) * (block_size + 1) + 1,
-              top_ghost, block_size * sizeof(double), cudaMemcpyHostToDevice, stream));
+        memcpy(h_top_ghost, gh, width * sizeof(double));
+        hapiCheck(cudaMemcpyAsync(d_temperature + (block_size + 2) + 1, h_top_ghost,
+              block_size * sizeof(double), cudaMemcpyHostToDevice, stream));
+        break;
+      case BOTTOM:
+        memcpy(h_bottom_ghost, gh, width * sizeof(double));
+        hapiCheck(cudaMemcpyAsync(d_temperature + (block_size + 2) * block_size + 1,
+              h_bottom_ghost, block_size * sizeof(double), cudaMemcpyHostToDevice, stream));
         break;
       default:
         CkAbort("Error: invalid direction");
@@ -244,34 +261,24 @@ class Block : public CBase_Block {
   }
 
   void update() {
-    // Invoke GPU kernel
-    invokeKernel(stream, d_temperature, d_new_temperature, block_size, thread_size);
+    // Enforce boundary conditions
+    invokeBoundaryKernels(d_temperature, block_size, left_bound, right_bound,
+        top_bound, bottom_bound, stream);
 
-    // Transfer left ghost
-    hapiCheck(cudaMemcpy2DAsync(left_ghost, sizeof(double), d_new_temperature + (block_size + 2),
-          (block_size + 2) * sizeof(double), sizeof(double), block_size, cudaMemcpyDeviceToHost, stream));
-
-    // Transfer right ghost
-    hapiCheck(cudaMemcpy2DAsync(right_ghost, sizeof(double), d_new_temperature + (block_size + 2) + (block_size + 1),
-          (block_size + 2) * sizeof(double), sizeof(double), block_size, cudaMemcpyDeviceToHost, stream));
-
-    // Transfer bottom ghost
-    hapiCheck(cudaMemcpyAsync(bottom_ghost, d_new_temperature + 1, block_size * sizeof(double),
-          cudaMemcpyDeviceToHost, stream));
-
-    // Transfer top ghost
-    hapiCheck(cudaMemcpyAsync(top_ghost, d_new_temperature + (block_size + 2) * (block_size + 1) + 1,
-          block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
+    // Invoke GPU kernel for Jacobi computation
+    invokeJacobiKernel(d_temperature, d_new_temperature, block_size, stream);
 
     // Copy final temperature data back to host
     if (my_iter == n_iters) {
-      hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature, sizeof(double) * (block_size + 2) * (block_size + 2),
+      hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
+            sizeof(double) * (block_size + 2) * (block_size + 2),
             cudaMemcpyDeviceToHost, stream));
     }
 
     cudaStreamSynchronize(stream);
 
-    thisProxy(thisIndex.x, thisIndex.y).iterate();
+    // Swap pointers
+    std::swap(d_temperature, d_new_temperature);
 
     /*
     CallbackMsg* m = new CallbackMsg();
@@ -284,27 +291,25 @@ class Block : public CBase_Block {
     */
   }
 
-  void constrainBC() {
-    // FIXME: Do this on the device
-    if (left_bound) {
-      for (int j = 0; j < block_size + 2; ++j) {
-        h_temperature[j * (block_size + 2)] = 1.0;
+  void print() {
+    CkPrintf("[%d,%d]\n", thisIndex.x, thisIndex.y);
+    for (int j = 0; j < block_size + 2; j++) {
+      for (int i = 0; i < block_size + 2; i++) {
+        CkPrintf("%.3lf ", h_temperature[(block_size + 2) * j + i]);
+      }
+      CkPrintf("\n");
+    }
+
+    if (!(thisIndex.x == n_chares-1 && thisIndex.y == n_chares-1)) {
+      if (thisIndex.x == n_chares-1) {
+        thisProxy(0,thisIndex.y+1).print();
+      }
+      else {
+        thisProxy(thisIndex.x+1,thisIndex.y).print();
       }
     }
-    if (right_bound) {
-      for (int j = 0; j < block_size + 2; ++j) {
-        h_temperature[j * (block_size + 2) + (block_size + 1)] = 1.0;
-      }
-    }
-    if (top_bound) {
-      for (int i = 0; i < block_size + 2; ++i) {
-        h_temperature[(block_size + 1) * (block_size + 2) + i] = 1.0;
-      }
-    }
-    if (bottom_bound) {
-      for (int i = 0; i < block_size + 2; ++i) {
-        h_temperature[i] = 1.0;
-      }
+    else {
+      main_proxy.printDone();
     }
   }
 };
