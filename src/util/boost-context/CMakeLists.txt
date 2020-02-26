@@ -13,7 +13,7 @@ elseif(${CHARM_OS} STREQUAL "win")
     if(MSVC)
         set(ufcontext_sources ontop_x86_64_ms_pe_masm.asm jump_x86_64_ms_pe_masm.asm make_x86_64_ms_pe_masm.asm)
     else()
-        set(ufcontext_sources ontop_x86_64_sysv_windows.S jump_x86_64_sysv_windows.S make_x86_64_sysv_windows.S)
+        set(ufcontext_sources ontop_x86_64_ms_pe_gas.S jump_x86_64_ms_pe_gas.S make_x86_64_ms_pe_gas.S)
     endif()
 endif()
 
