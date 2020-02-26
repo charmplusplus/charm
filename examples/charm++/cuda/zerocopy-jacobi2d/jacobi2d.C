@@ -3,6 +3,7 @@
 #include <utility>
 
 #define PRINT 0
+#define MEASURE_COMM 0
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
@@ -138,6 +139,11 @@ class Block : public CBase_Block {
   double iter_start_time;
   double agg_time;
 
+#if MEASURE_COMM
+  double comm_start_time;
+  double comm_agg_time;
+#endif
+
   Block() {}
 
   ~Block() {
@@ -202,6 +208,7 @@ class Block : public CBase_Block {
   }
 
   void sendGhosts(void) {
+
     // Pack non-contiguous ghosts to temporary contiguous buffers on device
     invokePackingKernels(d_temperature, d_left_ghost, d_right_ghost, left_bound,
         right_bound, block_size, stream);
@@ -210,6 +217,10 @@ class Block : public CBase_Block {
     if (use_zerocopy) {
       // TODO: Allow the user to provide the CUDA stream to the runtime
       cudaStreamSynchronize(stream);
+
+#if MEASURE_COMM
+      comm_start_time = CkWallTimer();
+#endif
 
       // Send ghosts to neighboring chares
       if (!left_bound)
@@ -226,6 +237,10 @@ class Block : public CBase_Block {
             CkSendBuffer(d_temperature + (block_size + 2) * block_size + 1));
     }
     else {
+#if MEASURE_COMM
+      comm_start_time = CkWallTimer();
+#endif
+
       // Transfer ghosts from device to host
       hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(double),
             cudaMemcpyDeviceToHost, stream));
@@ -272,10 +287,14 @@ class Block : public CBase_Block {
   void processGhostsZC(int dir, int width, double* gh) {
     switch (dir) {
       case LEFT:
+#if !MEASURE_COMM
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
+#endif
         break;
       case RIGHT:
+#if !MEASURE_COMM
         invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
+#endif
         break;
       case TOP:
       case BOTTOM:
@@ -291,13 +310,17 @@ class Block : public CBase_Block {
         memcpy(h_left_ghost, gh, width * sizeof(double));
         hapiCheck(cudaMemcpyAsync(d_left_ghost, h_left_ghost, block_size * sizeof(double),
               cudaMemcpyHostToDevice, stream));
+#if !MEASURE_COMM
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
+#endif
         break;
       case RIGHT:
         memcpy(h_right_ghost, gh, width * sizeof(double));
         hapiCheck(cudaMemcpyAsync(d_right_ghost, h_right_ghost, block_size * sizeof(double),
               cudaMemcpyHostToDevice, stream));
+#if !MEASURE_COMM
         invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
+#endif
         break;
       case TOP:
         memcpy(h_top_ghost, gh, width * sizeof(double));
@@ -315,6 +338,16 @@ class Block : public CBase_Block {
   }
 
   void update() {
+#if MEASURE_COMM
+    cudaStreamSynchronize(stream);
+    comm_agg_time += CkWallTimer() - comm_start_time;
+
+    if (my_iter == n_iters) {
+      CkPrintf("[%d,%d] Average comm time per iteration: %.3lf us\n",
+          thisIndex.x, thisIndex.y, (comm_agg_time / n_iters) * 1000000);
+    }
+#endif
+
     // Enforce boundary conditions
     invokeBoundaryKernels(d_temperature, block_size, left_bound, right_bound,
         top_bound, bottom_bound, stream);
