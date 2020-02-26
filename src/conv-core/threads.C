@@ -878,8 +878,9 @@ void CthSuspend(void)
   for(l=cur->listener;l!=NULL;l=l->next){
     if (l->suspend) l->suspend(l);
   }
-  if (cur->choosefn == 0) CthNoStrategy();
-  next = cur->choosefn();
+  CthThFn choosefn = cur->choosefn;
+  if (choosefn == 0) CthNoStrategy();
+  next = choosefn(); // If this crashes, disable ASLR.
 #if CMK_OMP
   cur->tid.id[2] = CmiMyRank();
 #else
@@ -919,7 +920,8 @@ void CthSuspend(void)
 
 void CthAwaken(CthThread th)
 {
-  if (B(th)->awakenfn == 0) CthNoStrategy();
+  CthAwkFn awakenfn = B(th)->awakenfn;
+  if (awakenfn == 0) CthNoStrategy();
 
   /*BIGSIM_OOC DEBUGGING
     if(B(th)->scheduled==1){
@@ -935,7 +937,9 @@ void CthAwaken(CthThread th)
 #endif
 
   B(th)->scheduled++;
-  B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
+  CthThreadToken * token = B(th)->token;
+  constexpr int strategy = CQS_QUEUEING_FIFO;
+  awakenfn(token, strategy, 0, 0); // If this crashes, disable ASLR.
   /*B(th)->scheduled = 1; */
   /*changed due to out-of-core emulation in BigSim */
 
@@ -952,14 +956,16 @@ void CthYield(void)
 
 void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
-  if (B(th)->awakenfn == 0) CthNoStrategy();
+  CthAwkFn awakenfn = B(th)->awakenfn;
+  if (awakenfn == 0) CthNoStrategy();
 #if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
 #endif
 #endif
-  B(th)->awakenfn(B(th)->token, s, pb, prio);
+  CthThreadToken * token = B(th)->token;
+  awakenfn(token, s, pb, prio); // If this crashes, disable ASLR.
   /*B(th)->scheduled = 1; */
   /*changed due to out-of-core emulation in BigSim */
   B(th)->scheduled++;
