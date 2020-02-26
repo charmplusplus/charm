@@ -10,45 +10,45 @@
 ##############################################################################
 
 # Configurable option: Location of MSDEV
-if test -z "$VCINSTALLDIR"
+if [[ -z "$VCINSTALLDIR" ]]
 then
-  VCC_DIR="C:/Program Files (x86)/Microsoft Visual Studio 10.0/VC"
+  VCC_DIR='C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC'
 else
-  VCC_DIR=$VCINSTALLDIR
+  VCC_DIR="$VCINSTALLDIR"
 fi
-if test ! -d "`cygpath -u "$VCC_DIR"`"
+if [[ ! -d "`cygpath -u "$VCC_DIR"`" ]]
 then
-  echo VCC_DIR: $VCC_DIR is not set properly!
+  echo "VCC_DIR: $VCC_DIR is not set properly!"
   exit 1
 fi
-if test -n "$WINDOWSSDKDIR"
+if [[ -n "$WINDOWSSDKDIR" ]]
 then
-  SDK_DIR=$WINDOWSSDKDIR
-elif test -n "$WindowsSdkDir"
+  SDK_DIR="$WINDOWSSDKDIR"
+elif [[ -n "$WindowsSdkDir" ]]
 then
-  SDK_DIR=$WindowsSdkDir
+  SDK_DIR="$WindowsSdkDir"
 else
-  SDK_DIR="C:/Program Files/Microsoft SDKs/Windows/v6.0A"
+  SDK_DIR='C:/Program Files/Windows Kits/10'
 fi
-if test ! -d "`cygpath -u "$SDK_DIR"`"
+if [[ ! -d "`cygpath -u "$SDK_DIR"`" ]]
 then
-  echo SDK_DIR: $SDK_DIR is not set properly!
+  echo "SDK_DIR: $SDK_DIR is not set properly!"
   exit 1
 fi
 
 #CL command-line options for -O and -g mode
 #only for the environment that has set corresponding environmental variables
-CL_CMD="CL.EXE"
+CL_CMD='CL.EXE'
 # Define NOMINMAX to avoid definition of unexpected min(a,b) and max(a,b)
 # macros,per http://support.microsoft.com/kb/143208
 CL_COMMON='-nologo -W1 -EHsc -D_WINDOWS -DNOMINMAX -GS-'
 # CL_COMMON="$CL_COMMON -I`cygpath -d \"$SDK_DIR/Include\"`"
 # CL_COMMON="$CL_COMMON -I`cygpath -d \"$VCC_DIR/Include\"`"
 CL_MT='-MT'
-CL_DLL="-LD"
+CL_DLL='-LD'
 
 # assembler
-ML_CMD="ML64.EXE"
+ML_CMD='ML64.EXE'
 ML_COMMON='-nologo -W1 -D_WINDOWS -DNOMINMAX'
 
 #LINK command-line options for -O and -g mode
@@ -56,20 +56,20 @@ ML_COMMON='-nologo -W1 -D_WINDOWS -DNOMINMAX'
 #Here, the full path to "link.exe" has to be added because, in cygwin, there
 #is a file "/usr/bin/link" which has the same name, and takes higher precedence
 #than the microsoft one.
-if [ "`which link`" != "/usr/bin/link" ]
+if [[ "`command -v link`" != '/usr/bin/link' ]]
 then
-LINK_CMD="link.exe"
-elif test -d "`cygpath -u \"$VCC_DIR/bin/HostX64/x64\"`"
+LINK_CMD='link.exe'
+elif [[ -d "`cygpath -u \"$VCC_DIR/bin/HostX64/x64\"`" ]]
 then
 LINK_CMD="$VCC_DIR/bin/HostX64/x64/link.exe"
-elif test -d "`cygpath -u \"$VCC_DIR/BIN/amd64\"`"
+elif [[ -d "`cygpath -u \"$VCC_DIR/BIN/amd64\"`" ]]
 then
 LINK_CMD="$VCC_DIR/BIN/amd64/LINK.EXE"
 else
 LINK_CMD="$VCC_DIR/BIN/LINK.EXE"
 fi
 LINK_COMMON='-nologo -subsystem:console -DYNAMICBASE:NO'
-#if test -d "`cygpath -u \"$SDK_DIR/Lib/x64\"`"
+#if [[ -d "`cygpath -u \"$SDK_DIR/Lib/x64\"`" ]]
 #then
 #LINK_COMMON="$LINK_COMMON -LIBPATH:`cygpath -d \"$SDK_DIR/Lib/x64\"`"
 #else
@@ -80,7 +80,7 @@ LINK_COMMON='-nologo -subsystem:console -DYNAMICBASE:NO'
 #  odbc32.lib odbccp32.lib -SUBSYSTEM:CONSOLE -INCREMENTAL:NO -MACHINE:IX86 '
 LINK_POST='ws2_32.lib kernel32.lib user32.lib psapi.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib -MACHINE:X64 -ERRORREPORT:PROMPT '
 
-if [ "x$LIB" = "x" ]
+if [[ -z "$LIB" ]]
 then
 	echo "Variables already set!"
 #	export INCLUDE="$VCC_DIR/include"
@@ -125,21 +125,21 @@ Abort() {
 	End 1
 }
 
-# This procedure removes the extention (the ".c" in "./main.c") from
+# This procedure removes the extension (the ".c" in "./main.c") from
 # its first argument, and prints the result. Unlike the builtin command
 # basename, it keeps the directory path.
 # Args: <name to strip>
-stripExtention() {
+stripExtension() {
 	se_base=`echo $1 | awk -F/ '{print $NF}'`
 	se_strip=`echo $se_base | awk -F. '{ORS="";print $1;for (i=2;i<NF;i++) print "."$i}'`
 	se_ret=`echo $1 | awk -F/ '{ORS="";for (i=1;i<NF;i++) print $i"/"}'`"$se_strip"
 	echo $se_ret
 }
 
-# GetExtention returns the extention on the given file name
+# GetExtension returns the extension on the given file name
 # or "" if none.  (e.g. "./bob/snack.c" returns ".c")
-# Args: <name to find extention of>
-getExtention() {
+# Args: <name to find extension of>
+getExtension() {
 	se_base=`echo $1 | awk -F/ '{print $NF}'`
         se_ret=`echo $se_base | awk -F. '{if (NF<=1) print ""; else print "."$NF}'`
 	echo $se_ret
@@ -152,36 +152,36 @@ getExtention() {
 ##############################################################################
 
 #Program state:
-VERBOSE="no"
-DEBUG_SCRIPT=""
-SAVE=""
+VERBOSE=''
+DEBUG_SCRIPT=''
+SAVE=''
 
-DOCOMPILE="no"
-DOASSEMBLE="no"
-DOLINK="no"
-DODEPS="no"
-OUTPUT=""
+DOCOMPILE=''
+DOASSEMBLE=''
+DOLINK=''
+DODEPS=''
+OUTPUT=''
 CL_OPTS="$CL_COMMON"
 ML_OPTS="$ML_COMMON"
 LINK_OPTS="$LINK_COMMON"
-LIBDIR=""
-LIBDIRS=""
+LIBDIR=''
+LIBDIRS=''
 
 #NT CL and LINK command-line arguments:
-LINK=""
-CL=""
-ML=""
+LINK=''
+CL=''
+ML=''
 
-[ $# -eq 0 ] && printUsage "Error: No arguments given."
+[[ $# -eq 0 ]] && printUsage "Error: No arguments given."
 
-while [ ! $# -eq 0 ]
+while [[ ! $# -eq 0 ]]
 do
 	arg="$1"
 	shift
 
 	case "$arg" in
 	-verbose)
-		VERBOSE="yes"
+		VERBOSE='1'
 		;;
 	-E)
 		CL="$CL -E"
@@ -249,7 +249,7 @@ do
 		ML="$ML -I$path"
 		;;
 	-MM|-M)
-		DODEPS="yes"
+		DODEPS='1'
 		;;
 	-MG|-MP)
 		;;
@@ -266,88 +266,88 @@ do
 		LINK=$LINK"	-LIBPATH:$LIBDIR"
 		;;
 	-l*)
-		if [ "$arg" != "-lm" ]
+		if [[ "$arg" != '-lm' ]]
 		then
 #Convert -lfoo to path-to-foo.a
 			L=`echo $arg | awk -F@ '{print substr($1,3)}'`
-			D="no"
-			[ -r "$L" ] && D="$L"
-			[ -r "$L.a" ] && D="$L.a"
-			[ -r "$L.lib" ] && D="$L.lib"
-			[ -r "lib$L.a" ] && D="lib$L.a"
-			[ -r "lib$L.lib" ] && D="lib$L.lib"
-			test -n "$LIBDIRS" &&	\
+			D=''
+			[[ -r "$L" ]] && D="$L"
+			[[ -r "$L.a" ]] && D="$L.a"
+			[[ -r "$L.lib" ]] && D="$L.lib"
+			[[ -r "lib$L.a" ]] && D="lib$L.a"
+			[[ -r "lib$L.lib" ]] && D="lib$L.lib"
+			[[ -n "$LIBDIRS" ]] &&	\
 			for dir in $LIBDIRS
 			do
-			  [ -r "$dir/lib$L" ] && D="$dir/lib$L"
-			  [ -r "$dir/lib$L.a" ] && D="$dir/lib$L.a"
-			  [ -r "$dir/$L.lib" ] && D="$dir/$L.lib"
-			  [ -r "$dir/lib$L.lib" ] && D="$dir/lib$L.lib"
+			  [[ -r "$dir/lib$L" ]] && D="$dir/lib$L"
+			  [[ -r "$dir/lib$L.a" ]] && D="$dir/lib$L.a"
+			  [[ -r "$dir/$L.lib" ]] && D="$dir/$L.lib"
+			  [[ -r "$dir/lib$L.lib" ]] && D="$dir/lib$L.lib"
 			done
-			[ $D = no ] && Abort "Couldn't find library $L in . or $LIBDIRS"
+			[[ -z "$D" ]] && Abort "Couldn't find library $L in . or $LIBDIRS"
 			LINK="$LINK `cygpath -w $D`"
 		fi
 		;;
 	-o)
 		out=$1
 		shift
-		if [ "x`getExtention $out`" = "x.o" ]
+		if [[ "x`getExtension $out`" = "x.o" ]]
 		then
 #It's a .o output filename-- tell CL
 			OUTPUT="-Fo`cygpath -w $out`"
-		elif [ "x`getExtention $out`" = "x.obj" ]
+		elif [[ "x`getExtension $out`" = "x.obj" ]]
 		then
 			OUTPUT="-Fo`cygpath -w $out`"
-		elif [ "x`getExtention $out`" = "x.so" ]
+		elif [[ "x`getExtension $out`" = "x.so" ]]
 		then
 			OUTPUT="-Fo`cygpath -w $out`"
-		elif [ "x`getExtention $out`" = "x.exe" ]
+		elif [[ "x`getExtension $out`" = "x.exe" ]]
 		then
 			LINK="$LINK -out:$out"
-			DOLINK="yes"
+			DOLINK='1'
 		else
 #It's an exe filename-- tell LINK
 			LINK="$LINK -out:$out.exe"
-			DOLINK="yes"
+			DOLINK='1'
 		fi
 		;;
 	
 #Object file or library-- add to link
 	*.o|*.a|*.lib|*.obj)
-		if [ "$DOCOMPILE" = "yes" ]
+		if [[ -n "$DOCOMPILE" ]]
 		then
 		  CL="$CL `cygpath -w $arg`"
 		else
 		  LINK="$LINK `cygpath -w $arg`"
-		  DOLINK="yes"
+		  DOLINK='1'
 		fi
 		;;
 #C source file
 	*.c)
-		base=`stripExtention $arg`
+		base=`stripExtension $arg`
 		source="$arg"
 		CL="$CL -Tc`cygpath -w $arg`"
 		OBJ_OUTPUT="-Fo$base.o"
 		LINK="$LINK $base.o"
-		DOCOMPILE="yes"
+		DOCOMPILE='1'
 		;;
 #ASM source file
 	*.asm)
-		base=`stripExtention $arg`
+		base=`stripExtension $arg`
 		source="$arg"
 		ML="$ML -Ta`cygpath -w $arg`"
 #		OUTPUT="-Fo$base.o"
 		LINK="$LINK $base.o"
-		DOASSEMBLE="yes"
+		DOASSEMBLE='1'
 		;;
 #C++ source file
 	*.C|*.cxx|*.cpp)
-		base=`stripExtention $arg`
+		base=`stripExtension $arg`
 		source="$arg"
 		CL="$CL -Tp`cygpath -w $arg`"
 #		OUTPUT="-Fo$base.o"
 		LINK="$LINK $base.o"
-		DOCOMPILE="yes"
+		DOCOMPILE='1'
 		;;
 	'-fno-lifetime-dse'|'-rdynamic'|'-Wl,--export-dynamic')
 		# Error out so configure knows not to pass us these arguments, avoiding the below warning.
@@ -363,7 +363,7 @@ done
 
 CL_OPTS="$CL_OPTS $CL_MT"
 
-if [ $DODEPS = yes ]
+if [[ -n "$DODEPS" ]]
 then
 	OPTS="$CL_OPTS $CL -showIncludes"
 	echo "$base.o: $source \\"
@@ -376,37 +376,37 @@ then
 	exit 0
 fi
 
-#if [ "x$CL" != "x" ]
-if [ $DOCOMPILE = yes ]
+#if [[ -n "$CL" ]]
+if [[ -n "$DOCOMPILE" ]]
 then
 	OPTS="$CL_OPTS $OUTPUT $CL"
-        [ "$DOLINK" = yes -a -z "$OUTPUT" ] && OPTS="$OPTS $OBJ_OUTPUT"
-	[ $VERBOSE = yes ] && echo "unix2nt_cc> $CL_CMD" $OPTS
+	[[ -n "$DOLINK" && -z "$OUTPUT" ]] && OPTS="$OPTS $OBJ_OUTPUT"
+	[[ -n "$VERBOSE" ]] && echo "unix2nt_cc> $CL_CMD" $OPTS
 	"$CL_CMD" $OPTS
-	if [ $? != 0 ]
+	if [[ $? -ne 0 ]]
 	then
 		Abort "Error executing" "$CL_CMD" $OPTS
 	fi
 fi
 
-if [[ "$DOASSEMBLE" = 'yes' ]]
+if [[ -n "$DOASSEMBLE" ]]
 then
 	OPTS="$ML_OPTS $OUTPUT $ML"
-	[[ "$DOLINK" = 'yes' && -z "$OUTPUT" ]] && OPTS="$OPTS $OBJ_OUTPUT"
-	[[ "$VERBOSE" = 'yes' ]] && echo "unix2nt_cc> $ML_CMD" $OPTS
+	[[ -n "$DOLINK" && -z "$OUTPUT" ]] && OPTS="$OPTS $OBJ_OUTPUT"
+	[[ -n "$VERBOSE" ]] && echo "unix2nt_cc> $ML_CMD" $OPTS
 	"$ML_CMD" $OPTS
-	if [[ "$?" != '0' ]]
+	if [[ $? -ne 0 ]]
 	then
 		Abort "Error executing" "$ML_CMD" $OPTS
 	fi
 fi
 
-if [ $DOLINK = yes ]
+if [[ -n "$DOLINK" ]]
 then
 	OPTS="$LINK_OPTS $LINK $LINK_POST"
-	[ $VERBOSE = yes ] && echo "unix2nt_cc> $LINK_CMD" $OPTS
+	[[ -n "$VERBOSE" ]] && echo "unix2nt_cc> $LINK_CMD" $OPTS
 	"$LINK_CMD" $OPTS
-	if [ $? != 0 ]
+	if [[ $? -ne 0 ]]
 	then
 		Abort "Error executing" "$LINK_CMD" $OPTS 
 	fi	
