@@ -10,7 +10,7 @@
 /* readonly */ int block_size;
 /* readonly */ int n_chares;
 /* readonly */ int n_iters;
-/* readonly */ bool gpu_prio;
+/* readonly */ bool use_zerocopy;
 
 extern void invokeInitKernel(double* d_temperature, int block_size, cudaStream_t stream);
 extern void invokeBoundaryKernels(double* d_temperature, int block_size, bool left_bound,
@@ -42,11 +42,11 @@ public:
     grid_size = 16384;
     block_size = 4096;
     n_iters = 100;
-    gpu_prio = false;
+    use_zerocopy = false;
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:b:i:p")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:b:i:z")) != -1) {
       switch (c) {
         case 's':
           grid_size = atoi(optarg);
@@ -57,13 +57,12 @@ public:
         case 'i':
           n_iters = atoi(optarg);
           break;
-        case 'p':
-          gpu_prio = true;
+        case 'z':
+          use_zerocopy = true;
           break;
         default:
           CkPrintf(
-              "Usage: %s -s [grid size] -b [block size] -i [iterations] "
-              "-t [thread coarsening factor] -p (higher priority for GPU)\n",
+              "Usage: %s -s [grid size] -b [block size] -i [iterations] -z (use GPU zerocopy)\n",
               m->argv[0]);
           CkExit();
       }
@@ -82,8 +81,7 @@ public:
     CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d\n", grid_size, grid_size,
         block_size, block_size, n_chares, n_chares);
     CkPrintf("Iterations: %d\n", n_iters);
-    CkPrintf("Higher priority for GPU methods and callbacks: %s\n\n",
-             (gpu_prio) ? "ON" : "OFF");
+    CkPrintf("Zerocopy: %d\n", use_zerocopy);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares, n_chares);
@@ -208,30 +206,86 @@ class Block : public CBase_Block {
     invokePackingKernels(d_temperature, d_left_ghost, d_right_ghost, left_bound,
         right_bound, block_size, stream);
 
-    // Transfer ghosts from device to host
-    hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(double),
-          cudaMemcpyDeviceToHost, stream));
-    hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost, block_size * sizeof(double),
-          cudaMemcpyDeviceToHost, stream));
-    hapiCheck(cudaMemcpyAsync(h_top_ghost, d_temperature + (block_size + 2) + 1,
-          block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
-    hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size  + 1,
-          block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
-    cudaStreamSynchronize(stream);
-
-    // Send ghosts to neighboring chares
     int x = thisIndex.x, y = thisIndex.y;
-    if (!left_bound)
-      thisProxy(x - 1, y).receiveGhosts(my_iter, RIGHT, block_size, h_left_ghost);
-    if (!right_bound)
-      thisProxy(x + 1, y).receiveGhosts(my_iter, LEFT, block_size, h_right_ghost);
-    if (!top_bound)
-      thisProxy(x, y - 1).receiveGhosts(my_iter, BOTTOM, block_size, h_top_ghost);
-    if (!bottom_bound)
-      thisProxy(x, y + 1).receiveGhosts(my_iter, TOP, block_size, h_bottom_ghost);
+    if (use_zerocopy) {
+      // TODO: Allow the user to provide the CUDA stream to the runtime
+      cudaStreamSynchronize(stream);
+
+      // Send ghosts to neighboring chares
+      if (!left_bound)
+        thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_size,
+            CkSendBuffer(d_left_ghost));
+      if (!right_bound)
+        thisProxy(x + 1, y).receiveGhostsZC(my_iter, LEFT, block_size,
+            CkSendBuffer(d_right_ghost));
+      if (!top_bound)
+        thisProxy(x, y - 1).receiveGhostsZC(my_iter, BOTTOM, block_size,
+            CkSendBuffer(d_temperature + (block_size + 2) + 1));
+      if (!bottom_bound)
+        thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_size,
+            CkSendBuffer(d_temperature + (block_size + 2) * block_size + 1));
+    }
+    else {
+      // Transfer ghosts from device to host
+      hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(double),
+            cudaMemcpyDeviceToHost, stream));
+      hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost, block_size * sizeof(double),
+            cudaMemcpyDeviceToHost, stream));
+      hapiCheck(cudaMemcpyAsync(h_top_ghost, d_temperature + (block_size + 2) + 1,
+            block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
+      hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size + 1,
+            block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
+      cudaStreamSynchronize(stream);
+
+      // Send ghosts to neighboring chares
+      if (!left_bound)
+        thisProxy(x - 1, y).receiveGhostsReg(my_iter, RIGHT, block_size, h_left_ghost);
+      if (!right_bound)
+        thisProxy(x + 1, y).receiveGhostsReg(my_iter, LEFT, block_size, h_right_ghost);
+      if (!top_bound)
+        thisProxy(x, y - 1).receiveGhostsReg(my_iter, BOTTOM, block_size, h_top_ghost);
+      if (!bottom_bound)
+        thisProxy(x, y + 1).receiveGhostsReg(my_iter, TOP, block_size, h_bottom_ghost);
+    }
   }
 
-  void processGhosts(int dir, int width, double* gh) {
+  void receiveGhostsZC(int ref, int dir, int &w, double *&buf, CkNcpyBufferPost *ncpyPost) {
+    switch (dir) {
+      case LEFT:
+        buf = d_left_ghost;
+        break;
+      case RIGHT:
+        buf = d_right_ghost;
+        break;
+      case TOP:
+        buf = d_temperature + (block_size + 2) + 1;
+        break;
+      case BOTTOM:
+        buf = d_temperature + (block_size + 2) * block_size + 1;
+        break;
+      default:
+        CkAbort("Error: invalid direction");
+    }
+    ncpyPost[0].cuda_stream = stream;
+  }
+
+  void processGhostsZC(int dir, int width, double* gh) {
+    switch (dir) {
+      case LEFT:
+        invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
+        break;
+      case RIGHT:
+        invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
+        break;
+      case TOP:
+      case BOTTOM:
+        break;
+      default:
+        CkAbort("Error: invalid direction");
+    }
+  }
+
+  void processGhostsReg(int dir, int width, double* gh) {
     switch (dir) {
       case LEFT:
         memcpy(h_left_ghost, gh, width * sizeof(double));
@@ -279,16 +333,6 @@ class Block : public CBase_Block {
 
     // Swap pointers
     std::swap(d_temperature, d_new_temperature);
-
-    /*
-    CallbackMsg* m = new CallbackMsg();
-    CkArrayIndex2D myIndex = CkArrayIndex2D(thisIndex);
-    CkCallback* cb =
-        new CkCallback(CkIndex_Stencil::iterate(NULL), myIndex, thisProxy);
-    if (gpu_prio)
-      CkSetQueueing(m, CK_QUEUEING_LIFO);
-    hapiAddCallback(stream, cb, m);
-    */
   }
 
   void print() {

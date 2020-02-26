@@ -5,7 +5,7 @@ mainmodule jacobi2d {
   readonly int block_size;
   readonly int n_chares;
   readonly int n_iters;
-  readonly bool gpu_prio;
+  readonly bool use_zerocopy;
 
   message CallbackMsg;
 
@@ -19,7 +19,8 @@ mainmodule jacobi2d {
   array [2D] Block {
     entry Block(void);
     entry void init();
-    entry void receiveGhosts(int ref, int dir, int w, double gh[w]);
+    entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice double gh[w]);
+    entry void receiveGhostsReg(int ref, int dir, int w, double gh[w]);
 
     entry void iterate() {
       serial {
@@ -31,8 +32,19 @@ mainmodule jacobi2d {
 
       // Receive ghost data from neighbors
       for (remote_count = 0; remote_count < neighbors; remote_count++) {
-        when receiveGhosts[my_iter](int ref, int dir, int w, double buf[w]) serial {
-          processGhosts(dir, w, buf);
+        if (use_zerocopy) {
+          when receiveGhostsZC[my_iter](int ref, int dir, int w, nocopydevice double buf[w]) {
+            serial {
+              processGhostsZC(dir, w, buf);
+            }
+          }
+        }
+        else {
+          when receiveGhostsReg[my_iter](int ref, int dir, int w, double buf[w]) {
+            serial {
+              processGhostsReg(dir, w, buf);
+            }
+          }
         }
       }
 
