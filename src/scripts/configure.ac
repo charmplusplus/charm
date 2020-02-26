@@ -109,6 +109,8 @@ remove_make_flag() {
 
 add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
 add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
+add_flag "CMK_WINDOWS='$CMK_WINDOWS'" 'basic setup'
+add_flag "CMK_BLUEGENEQ='$CMK_BLUEGENEQ'" 'basic setup'
 add_make_flag "CMK_COMPILER:=$CMK_COMPILER" 'basic setup'
 add_make_flag "CMK_SMP:=$CMK_SMP" 'basic setup'
 add_make_flag "CMK_SHARED_SUF:=$CMK_SHARED_SUF" 'basic setup'
