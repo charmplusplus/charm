@@ -126,7 +126,7 @@ then
   [ -f "$CHARMBIN/../lib/libampiromio.a" ] && ROMIO='-lampiromio -pthread'
 
   [ "$CMK_BLUEGENEQ" != '1' -a "$CMK_WINDOWS" != '1' ] && ARGS="-memory isomalloc $ARGS"
-  ARGS="-module CommonLBs -balancer GreedyRefineLB $ARGS"
+  ARGS="-module CommonLBs $ARGS"
 fi
 
 FUNCPTR_SHIM_SUFFIX='.user'
