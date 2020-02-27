@@ -1495,9 +1495,13 @@ void ampiParent::ckJustMigrated() noexcept {
 
 void ampiParent::resumingAfterMigration() noexcept {
   if (userJustMigratedFn) {
+    CtvAccess(_curTCharm) = thread;
+    CtvAccess(ampiPtr) = this;
     const int old = CthInterceptionsTemporarilyActivateStart(thread->getThread());
     (*userJustMigratedFn)();
     CthInterceptionsTemporarilyActivateEnd(thread->getThread(), old);
+    CtvAccess(_curTCharm) = nullptr;
+    CtvAccess(ampiPtr) = nullptr;
   }
 
   thread->start();
