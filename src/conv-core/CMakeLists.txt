@@ -44,6 +44,9 @@ target_compile_definitions(memory-os PRIVATE -DCMK_MEMORY_BUILD_OS)
 add_library(memory-os-verbose memory.C)
 target_compile_definitions(memory-os-verbose PRIVATE -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_VERBOSE)
 
+add_library(memory-os-record memory.C)
+target_compile_definitions(memory-os-record PRIVATE -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_RECORD)
+
 add_library(memory-os-paranoid memory.C)
 target_compile_definitions(memory-os-paranoid PRIVATE -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_PARANOID)
 
@@ -64,6 +67,9 @@ if(${CMK_HAS_MMAP})
 
     add_library(memory-verbose memory.C)
     target_compile_definitions(memory-verbose PRIVATE -DCMK_MEMORY_BUILD_VERBOSE)
+
+    add_library(memory-record memory.C)
+    target_compile_definitions(memory-record PRIVATE -DCMK_MEMORY_BUILD_RECORD)
 
     add_library(memory-paranoid memory.C)
     target_compile_definitions(memory-paranoid PRIVATE -DCMK_MEMORY_BUILD_PARANOID)

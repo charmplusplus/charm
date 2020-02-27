@@ -298,9 +298,6 @@ void _loadbalancerInit()
   // to ignore baclground load
   _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBNoBackground",
                       "Load balancer ignores the background load.");
-#ifdef __BIGSIM__
-  _lb_args.ignoreBgLoad() = 1;
-#endif
   _lb_args.migObjOnly() = CmiGetArgFlagDesc(argv, "+LBObjOnly",
                       "Only load balancing migratable objects, ignoring all others.");
   if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = 1;
@@ -538,40 +535,15 @@ void LBDatabase::DoneRegisteringObjects(LDOMHandle omh)
   }
 }
 
-#if CMK_BIGSIM_CHARM
-#define LBOBJ_OOC_IDX 0x1
-#endif
 
 LDObjHandle LBDatabase::RegisterObj(LDOMHandle omh, CmiUInt8 id,
                                     void* userPtr, int migratable) {
+#if CMK_LBDB_ON
   LDObjHandle newhandle;
 
   newhandle.omhandle = omh;
   newhandle.id = id;
 
-#if CMK_BIGSIM_CHARM
-  if (_BgOutOfCoreFlag==2){ //taking object into memory
-    //first find the first (LBOBJ_OOC_IDX) in objs and insert the object at that position
-    int newpos = -1;
-    for (int i = 0; i < objs.size(); i++) {
-      if (objs[i].obj == (LBObj *)LBOBJ_OOC_IDX) {
-        newpos = i;
-        break;
-      }
-    }
-    if (newpos == -1) newpos = objs.size();
-    newhandle.handle = newpos;
-    LBObj *obj = new LBObj(newhandle, userPtr, migratable);
-    if (newpos == objs.size()) {
-      objs.emplace_back(obj);
-    } else {
-      objs[newpos].obj = obj;
-    }
-    //objCount is not increased since it's the original object which is pupped
-    //through out-of-core emulation.
-    //objCount++;
-  } else
-#endif
   {
     // objsEmptyHead maintains a linked list of empty positions within the objs array
     // If objsEmptyHead == -1, there are no vacant positions, so add to the back
@@ -591,20 +563,13 @@ LDObjHandle LBDatabase::RegisterObj(LDOMHandle omh, CmiUInt8 id,
   }
 
   return newhandle;
+#endif
 }
 
 void LBDatabase::UnregisterObj(LDObjHandle h)
 {
   delete objs[h.handle].obj;
 
-#if CMK_BIGSIM_CHARM
-  //hack for BigSim out-of-core emulation.
-  //we want the chare array object to keep at the same
-  //position even going through the pupping routine.
-  if (_BgOutOfCoreFlag == 1) { //in taking object out of memory
-    objs[h.handle].obj = (LBObj *)(LBOBJ_OOC_IDX);
-  } else
-#endif
   {
     objs[h.handle].obj = NULL;
     // Maintain the linked list of empty positions by adding the newly removed
@@ -616,6 +581,7 @@ void LBDatabase::UnregisterObj(LDObjHandle h)
 
 void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force)
 {
+#if CMK_LBDB_ON
   if (force || (StatsOn() && _lb_args.traceComm())) {
     LBCommData* item_ptr;
 
@@ -638,10 +604,12 @@ void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned
     }
     item_ptr->addMessage(bytes);
   }
+#endif
 }
 
 void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int nDests, unsigned int bytes, int nMsgs)
 {
+#if CMK_LBDB_ON
   if (StatsOn() && _lb_args.traceComm()) {
     LBCommData* item_ptr;
     if (obj_running) {
@@ -652,6 +620,7 @@ void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int 
       item_ptr->addMessage(bytes, nMsgs);
     }
   }
+#endif
 }
 
 void LBDatabase::DumpDatabase()
@@ -894,7 +863,7 @@ void LBDatabase::MetaLBResumeWaitingChares(int lb_ideal_period) {
 }
 
 void LBDatabase::MetaLBCallLBOnChares() {
-#ifdef CMK_LBDB_ON
+#if CMK_LBDB_ON
   for (int i = 0; i < objs.size(); i++) {
     LBObj* obj = objs[i].obj;
     if (obj) {
@@ -1324,15 +1293,7 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
   new_client->data = data;
   new_client->refcount = cur_refcount;
 
-#if CMK_BIGSIM_CHARM
-  if(_BgOutOfCoreFlag!=2){
-    //during out-of-core emualtion for BigSim, if taking procs from disk to mem,
-    //client_count should not be increased
-    client_count++;
-  }
-#else
   client_count++;
-#endif
 
   return LDBarrierClient(clients.insert(clients.end(), new_client));
 }
@@ -1342,16 +1303,7 @@ void LocalBarrier::RemoveClient(LDBarrierClient c)
   delete *(c.i);
   clients.erase(c.i);
 
-#if CMK_BIGSIM_CHARM
-  //during out-of-core emulation for BigSim, if taking procs from mem to disk,
-  //client_count should not be increased
-  if(_BgOutOfCoreFlag!=1)
-  {
-    client_count--;
-  }
-#else
   client_count--;
-#endif
 }
 
 LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)

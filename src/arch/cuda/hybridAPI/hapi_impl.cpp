@@ -68,14 +68,6 @@ void initEventQueues() {
   CpvAccess(n_hapi_events) = 0;
 }
 
-// Returns the CUDA device associated with the given PE.
-// TODO: should be updated to exploit the hardware topology instead of round robin
-static inline int getMyCudaDevice(int my_node) {
-  int device_count;
-  hapiCheck(cudaGetDeviceCount(&device_count));
-  return my_node % device_count;
-}
-
 // Used to invoke user's Charm++ callback function
 void (*hapiInvokeCallback)(void*, void*) = NULL;
 
@@ -199,7 +191,9 @@ void GPUManager::init() {
 #endif
 
   // store CUDA device properties
-  hapiCheck(cudaGetDeviceProperties(&device_prop_, getMyCudaDevice(CmiMyNode())));
+  int device;
+  hapiCheck(cudaGetDevice(&device));
+  hapiCheck(cudaGetDeviceProperties(&device_prop_, device));
 
 #ifdef HAPI_CUDA_CALLBACK
   // check if CUDA callback is supported
@@ -209,9 +203,6 @@ void GPUManager::init() {
     CmiAbort("[HAPI] CUDA callback is not supported on this device");
   }
 #endif
-
-  // set which device to use
-  hapiCheck(cudaSetDevice(getMyCudaDevice(CmiMyNode())));
 
   // allocate host/device buffers array (both user and system-addressed)
   host_buffers_ = new void*[NUM_BUFFERS*2];
@@ -767,10 +758,79 @@ void initHybridAPI() {
   CsvAccess(gpu_manager).init();
 }
 
-// Set HAPI device for non-0 ranks
-void setHybridAPIDevice() {
-  // set which device to use
-  hapiCheck(cudaSetDevice(getMyCudaDevice(CmiMyNode())));
+// Set up PE to GPU mapping, invoked from all PEs
+// TODO: Support custom mappings
+void initDeviceMapping(char** argv) {
+  Mapping map_type = Mapping::Block; // Default is block mapping
+  bool all_gpus = false; // If true, all GPUs are visible to all processes.
+                         // Otherwise, only a subset are visible (e.g. with jsrun)
+  char* gpumap = NULL;
+
+  // Process +gpumap
+  if (CmiGetArgStringDesc(argv, "+gpumap", &gpumap,
+        "define pe to gpu device mapping")) {
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> PE-GPU mapping: %s\n", gpumap);
+    }
+
+    if (strcmp(gpumap, "none") == 0) {
+      map_type = Mapping::None;
+    }
+    else if (strcmp(gpumap, "block") == 0) {
+      map_type = Mapping::Block;
+    }
+    else if (strcmp(gpumap, "roundrobin") == 0) {
+      map_type = Mapping::RoundRobin;
+    }
+    else {
+      CmiAbort("Unsupported mapping type: %s, use one of \"none\", \"block\", "
+          "\"roundrobin\"", gpumap);
+    }
+  }
+
+  // Process +allgpus
+  if (CmiGetArgFlagDesc(argv, "+allgpus",
+        "all GPUs are visible to all processes")) {
+    all_gpus = true;
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> All GPUs are visible to all processes\n");
+    }
+  }
+
+  // No mapping specified, user assumes responsibility
+  if (map_type == Mapping::None) {
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> User should explicitly select devices for PEs/chares\n");
+    }
+    return;
+  }
+
+  CmiAssert(map_type != Mapping::None);
+
+  // Get number of GPUs (visible to each process)
+  int gpu_count;
+  hapiCheck(cudaGetDeviceCount(&gpu_count));
+  if (gpu_count <= 0) {
+    CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
+  }
+
+  // Perform mapping
+  int my_gpu = 0;
+  int pes_per_gpu = (all_gpus ? CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe())) :
+      CmiNodeSize(CmiMyNode())) / gpu_count;
+
+  switch (map_type) {
+    case Mapping::Block:
+      my_gpu = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) / pes_per_gpu;
+      break;
+    case Mapping::RoundRobin:
+      my_gpu = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) % gpu_count;
+      break;
+    default:
+      CmiAbort("Unsupported mapping type!");
+  }
+
+  hapiCheck(cudaSetDevice(my_gpu));
 }
 
 // Clean up and delete memory used by HAPI.

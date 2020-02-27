@@ -66,9 +66,6 @@ void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap);
 #include "XTTorus.h"
 #endif
 
-#if CMK_BIGSIM_CHARM
-#include "blue.h"
-#endif
 
 #include <vector>
 

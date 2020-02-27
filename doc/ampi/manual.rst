@@ -231,8 +231,13 @@ script is:
 
    $ ./build <target> <version> <opts>
 
-For building AMPI (which also includes building Charm++ and other
-libraries needed by AMPI), specify ``<target>`` to be ``AMPI``. And
+Users who are interested only in AMPI and not any other component of
+Charm++ should specify ``<target>`` to be ``AMPI-only``. This will build
+Charm++ and other libraries needed by AMPI in a mode configured and
+tuned exclusively for AMPI. To fully build Charm++ underneath AMPI for
+use with either paradigm, or for interoperation between the two, specify
+``<target>`` to be ``AMPI``.
+
 ``<opts>`` are command line options passed to the ``charmc`` compile
 script. Common compile time options such as
 ``-g, -O, -Ipath, -Lpath, -llib`` are accepted.
@@ -256,7 +261,7 @@ off:
 
 .. code-block:: bash
 
-   $ ./build AMPI gni-crayxc --with-production --disable-ampi-error-checking
+   $ ./build AMPI-only gni-crayxc --with-production --disable-ampi-error-checking
 
 AMPI can also be built with support for multithreaded parallelism on any
 communication layer by adding "smp" as an option after the build target.
@@ -264,7 +269,7 @@ For example, on an Infiniband Linux cluster:
 
 .. code-block:: bash
 
-   $ ./build AMPI verbs-linux-x86_64 smp --with-production
+   $ ./build AMPI-only verbs-linux-x86_64 smp --with-production
 
 AMPI ranks are implemented as user-level threads with a stack size
 default of 1MB. If the default is not correct for your program, you can
@@ -273,7 +278,7 @@ following build command illustrates this for an Intel Omni-Path system:
 
 .. code-block:: bash
 
-   $ ./build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
+   $ ./build AMPI-only ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
 
 The same can be done for AMPI’s RDMA messaging threshold using
 ``AMPI_RDMA_THRESHOLD_DEFAULT`` and, for messages sent within the same
@@ -377,10 +382,9 @@ arguments. A typical invocation of an AMPI program ``pgm`` with
 Here, the AMPI program ``pgm`` is run on 16 physical processors with 64
 total virtual ranks (which will be mapped 4 per processor initially).
 
-To run with load balancing, specify a load balancing strategy. If
-Address Space Layout Randomization is enabled on your target system, you
-may need to add the flag ``+isomalloc_sync`` when running with
-migration. You can also specify the size of user-level thread’s stack
+To run with load balancing, specify a load balancing strategy.
+
+You can also specify the size of user-level thread’s stack
 using the ``+tcharm_stacksize`` option, which can be used to decrease
 the size of the stack that must be migrated, as in the following
 example:
@@ -1485,10 +1489,12 @@ and additional command line options are required as well.
 User Defined Initial Mapping
 ----------------------------
 
-You can define the initial mapping of virtual processors (vp) to
-physical processors (p) as a runtime option. You can choose from
-predefined initial mappings or define your own mappings. The following
-predefined mappings are available:
+By default AMPI maps virtual processes to processing elements in a
+blocked fashion. This maximizes communication locality in the common
+case, but may not be ideal for all applications. With AMPI, users can
+define the initial mapping of virtual processors to physical processors
+at runtime, either choosing from the predefined initial mappings below
+or defining their own mapping in a file.
 
 Round Robin
    This mapping scheme maps virtual processor to physical processor in
@@ -1526,8 +1532,34 @@ Proportional Mapping
       $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP
       $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
 
-If you want to define your own mapping scheme, please contact us for
-assistance.
+Custom Mapping
+   To define your own mapping scheme, create a file named "mapfile"
+   which contains on each line the PE number you'd like that virtual
+   process to start on. This file is read when specifying the ``+mapping
+   MAPFILE`` option. The following mapfile will result in VPs 0, 2, 4,
+   and 6 being created on PE 0 and VPs 1, 3, 5, and 7 being created on
+   PE 1:
+
+   .. code-block:: none
+
+      0
+      1
+      0
+      1
+      0
+      1
+      0
+      1
+
+   .. code-block:: bash
+
+      $ ./charmrun ./hello +p2 +vp8 +mapping MAPFILE
+
+   Note that users can find the current mapping of ranks to PEs (after
+   dynamic load balancing) by calling ``AMPI_Comm_get_attr`` on
+   ``MPI_COMM_WORLD`` with the predefined ``AMPI_MY_WTH`` attribute.
+   This information can be gathered and dumped to a file for use in
+   future runs as the mapfile.
 
 Performance Visualization
 -------------------------
@@ -1870,7 +1902,7 @@ NAS Parallel Benchmarks (NPB 3.3)
       *cg.256.C* will appear in the *CG* and ``bin/`` directories. To
       run the particular benchmark, you must follow the standard
       procedure of running AMPI programs:
-      ``./charmrun ./cg.C.256 +p64 +vp256 ++nodelist nodelist +isomalloc_sync``
+      ``./charmrun ./cg.C.256 +p64 +vp256 ++nodelist nodelist``
 
 NAS PB Multi-Zone Version (NPB-MZ 3.3)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1903,7 +1935,7 @@ NAS PB Multi-Zone Version (NPB-MZ 3.3)
       directory. In the previous example, a file *bt-mz.256.C* will be
       created in the ``bin`` directory. To run the particular benchmark,
       you must follow the standard procedure of running AMPI programs:
-      ``./charmrun ./bt-mz.C.256 +p64 +vp256 ++nodelist nodelist +isomalloc_sync``
+      ``./charmrun ./bt-mz.C.256 +p64 +vp256 ++nodelist nodelist``
 
 HPCG v3.0
 ~~~~~~~~~

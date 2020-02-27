@@ -65,9 +65,8 @@ static inline typename std::enable_if<std::is_pointer<T>::value>::type pup_raw_p
   p((uint8_t *)&ptr, sizeof(T));
 }
 
-int _sync_iso = 0;
 #if __FAULT__
-static int _restart = 0;
+static char CmiIsomallocRestart;
 #endif
 static int _mmap_probe = 0;
 
@@ -136,28 +135,43 @@ static void disable_isomalloc(const char * why)
 {
   isomallocStart = nullptr;
   isomallocEnd = nullptr;
-  if (CmiMyPe() == 0) CmiPrintf("Charm++> Disabling isomalloc because %s.\n", why);
+  if (CmiMyPe() == 0)
+    CmiPrintf("Converse> Disabling Isomalloc: %s.\n", why);
 }
 
-#if !CMK_HAS_MMAP
-/****************** Manipulate memory map (Win32 non-version) *****************/
-static void * call_mmap_fixed(void * addr, size_t len)
+#ifdef _WIN32
+/****************** Manipulate memory map (Win32 version) *****************/
+#include <windows.h>
+
+static constexpr void * const mmap_fail = nullptr;
+
+static inline void * call_mmap_fixed(void * addr, size_t len)
 {
-  CmiAbort("isomalloc.C: mmap_fixed should never be called here.");
-  return NULL;
+  return VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 }
-static void * call_mmap_anywhere(size_t len)
+static inline void * call_mmap_anywhere(size_t len)
 {
-  CmiAbort("isomalloc.C: mmap_anywhere should never be called here.");
-  return NULL;
+  return call_mmap_fixed(nullptr, len);
 }
 static void call_munmap(void * addr, size_t len)
 {
-  CmiAbort("isomalloc.C: munmap should never be called here.");
+  auto ptr = (char *)addr;
+  MEMORY_BASIC_INFORMATION minfo;
+  while (len)
+  {
+    if (VirtualQuery(ptr, &minfo, sizeof(minfo)) == 0)
+      return;
+    if (minfo.BaseAddress != ptr || minfo.AllocationBase != ptr ||
+        minfo.State != MEM_COMMIT || minfo.RegionSize > len)
+      return;
+    if (VirtualFree(ptr, 0, MEM_RELEASE) == 0)
+      return;
+    ptr += minfo.RegionSize;
+    len -= minfo.RegionSize;
+  }
 }
-
-static int init_map() { return 0; /*Isomalloc never works without mmap*/ }
-#else /* CMK_HAS_MMAP */
+static inline int init_map() { return 1; /* No init necessary */ }
+#elif CMK_HAS_MMAP
 /****************** Manipulate memory map (UNIX version) *****************/
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -167,6 +181,9 @@ static int init_map() { return 0; /*Isomalloc never works without mmap*/ }
 #if !CMK_HAS_MMAP_ANON
 CpvStaticDeclare(int, zerofd); /*File descriptor for /dev/zero, for mmap*/
 #endif
+
+// Unlike VirtualAlloc, mmap returns -1 as a sentinel.
+#define mmap_fail (MAP_FAILED)
 
 /**
  * Maps this address with these flags.
@@ -214,8 +231,27 @@ static int init_map()
 #endif
   return 1;
 }
+#else /* CMK_HAS_MMAP */
+/****************** Manipulate memory map (stub non-version) *****************/
+static constexpr void * const mmap_fail = nullptr;
 
-#endif /* UNIX memory map */
+static void * call_mmap_fixed(void * addr, size_t len)
+{
+  CmiAbort("isomalloc.C: mmap_fixed should never be called here.");
+  return nullptr;
+}
+static void * call_mmap_anywhere(size_t len)
+{
+  CmiAbort("isomalloc.C: mmap_anywhere should never be called here.");
+  return nullptr;
+}
+static void call_munmap(void * addr, size_t len)
+{
+  CmiAbort("isomalloc.C: munmap should never be called here.");
+}
+
+static int init_map() { return 0; /*Isomalloc never works without mmap*/ }
+#endif
 
 /**
  * maps the virtual memory associated with slot using mmap
@@ -224,7 +260,7 @@ static void * map_global_memory(void * addr, size_t len)
 {
   void * pa = call_mmap_fixed(addr, len);
 
-  if (pa == (void *)~(uintptr_t)0)
+  if (pa == mmap_fail)
   { /*Map just failed completely*/
     auto err = errno;
     CmiError("Charm++> [%d] Isomalloc tried to mmap(%p, %zu), but encountered error %d\n", CmiMyPe(), addr, len, err);
@@ -297,15 +333,16 @@ static const constexpr CmiUInt8 vm_limit = tb * 256ull;
 
 static const constexpr memRange_t other_libs = 16ul * gig; /* space for other libraries to use */
 
-/* the smallest size used when describing unavailable regions,
-   also used for alignment of region assignment to avoid cache contention */
+/* the smallest size used when describing unavailable regions */
 static const constexpr memRange_t division_size = 256u * meg;
 
 /* Maybe write a new function that distributes start points as
  * 0, 1/2, 1/4, 3/4, 1/8, 3/8, 5/8, 7/8, 1/16, ... */
 static uint8_t * get_space_partition(uint8_t * start, uint8_t * end, int myunit, int numunits)
 {
-  return start + ((end - start) / division_size * myunit / numunits * division_size);
+  const uintptr_t available_slots = ((uintptr_t)end - (uintptr_t)start) / slotsize;
+  CmiEnforce(available_slots >= numunits);
+  return start + (available_slots * myunit / numunits * slotsize);
 }
 
 /*Check if this memory location is usable.
@@ -314,7 +351,7 @@ static uint8_t * get_space_partition(uint8_t * start, uint8_t * end, int myunit,
 static int bad_location(uint8_t * loc)
 {
   void * addr = call_mmap_fixed(loc, slotsize);
-  if (addr == (void *)~(uintptr_t)0 || addr != loc)
+  if (addr == mmap_fail || addr != loc)
   {
     DEBUG_PRINT("[%d] Skipping unmappable space at %p\n", CmiMyPe(), loc);
     return 1; /*No good*/
@@ -491,7 +528,7 @@ static int find_largest_free_region(memRegion_t * destRegion)
   regions[nRegions].start = codeDll;
   regions[nRegions++].len = division_size;
 
-  if (mmapAny != (void *)~(uintptr_t)0)
+  if (mmapAny != mmap_fail)
   {
     regions[nRegions].type = "Result of a non-fixed call to mmap";
     regions[nRegions].start = (uint8_t *)mmapAny;
@@ -540,7 +577,6 @@ static int find_largest_free_region(memRegion_t * destRegion)
 
 static int try_largest_mmap_region(memRegion_t * destRegion)
 {
-  void * bad_alloc = (void *)(-1); /* mmap error return address */
   void * range, * good_range = NULL;
   double shrink = 1.5;
   size_t size = ((size_t)(-1l)), good_size = 0;
@@ -548,7 +584,9 @@ static int try_largest_mmap_region(memRegion_t * destRegion)
   if (sizeof(size_t) >= 8) size = size >> 2; /* 25% of machine address space! */
   while (1)
   { /* test out an allocation of this size */
-#if CMK_HAS_MMAP
+#ifdef _WIN32
+    range = VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_READWRITE);
+#elif CMK_HAS_MMAP
     range = mmap(NULL, size, PROT_READ | PROT_WRITE,
                  MAP_PRIVATE
 #if CMK_HAS_MMAP_ANON
@@ -560,9 +598,9 @@ static int try_largest_mmap_region(memRegion_t * destRegion)
                  ,
                  -1, 0);
 #else
-    range = bad_alloc;
+    range = mmap_fail;
 #endif
-    if (range == bad_alloc)
+    if (range == mmap_fail)
     { /* mmap failed */
 #if CMK_HAS_USLEEP
       if (retry++ < 5)
@@ -594,25 +632,109 @@ static int try_largest_mmap_region(memRegion_t * destRegion)
   destRegion->start = (uint8_t *)good_range;
   destRegion->len = good_size;
 #if ISOMALLOC_DEBUG
+#ifndef _WIN32
   pid_t pid = getpid();
   {
     char s[128];
     sprintf(s, "cat /proc/%d/maps", pid);
     system(s);
   }
+#endif
   DEBUG_PRINT("[%d] try_largest_mmap_region: %p, %zu\n", CmiMyPe(), good_range,
               good_size);
 #endif
   return 1;
 }
 
-#ifndef CMK_CPV_IS_SMP
-#define CMK_CPV_IS_SMP
+struct CmiAddressSpaceRegion
+{
+  CmiUInt8 s, e;
+};
+
+CmiAddressSpaceRegion IsoRegion;
+
+static void CmiAddressSpaceRegionPup(pup_er cpup, void * data)
+{
+  auto region = (CmiAddressSpaceRegion *)data;
+  PUP::er & p = *(PUP::er *)cpup;
+
+  p | region->s;
+  p | region->e;
+}
+
+static void * CmiAddressSpaceRegionMerge(int * size, void * data, void ** contributions, int count)
+{
+  auto local = (CmiAddressSpaceRegion *)data;
+
+  for (int i = 0; i < count; ++i)
+  {
+    auto remote = (CmiAddressSpaceRegion *)contributions[i];
+
+    if (remote->s > local->s)
+      local->s = remote->s;
+    if (remote->e < local->e)
+      local->e = remote->e;
+  }
+
+  return local;
+}
+
+struct CmiAddressSpaceRegionMsg
+{
+  char converseHeader[CmiMsgHeaderSizeBytes];
+  CmiAddressSpaceRegion region;
+};
+
+static std::atomic<char> CmiIsomallocSyncHandlerDone;
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+extern void CommunicationServerThread(int sleepTime);
+static std::atomic<char> CmiIsomallocSyncCommThreadDone;
 #endif
 
-static void CmiIsomallocInitExtent()
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+static void CmiIsomallocSyncWaitCommThread()
 {
-  memRegion_t freeRegion{};
+  do
+    CommunicationServerThread(5);
+  while (!CmiIsomallocSyncCommThreadDone.load());
+
+  CommunicationServerThread(5);
+}
+#endif
+
+static void CmiIsomallocSyncWait()
+{
+  do
+    CsdSchedulePoll();
+  while (!CmiIsomallocSyncHandlerDone.load());
+
+  CsdSchedulePoll();
+}
+
+static int CmiIsomallocSyncBroadcastHandlerIdx;
+
+static void CmiIsomallocSyncReductionHandler(void * data)
+{
+  auto region = (CmiAddressSpaceRegion *)data;
+  CmiAssert(region == &IsoRegion);
+
+  CmiIsomallocSyncHandlerDone = 1;
+}
+static void CmiIsomallocSyncBroadcastHandler(void * msg)
+{
+  const CmiAddressSpaceRegion region = ((CmiAddressSpaceRegionMsg *)msg)->region;
+  DEBUG_PRINT("Isomalloc> Node %d received region for assignment: %" PRIx64 " %" PRIx64 "\n",
+              CmiMyNode(), region.s, region.e);
+
+  IsoRegion = region;
+
+  CmiFree(msg);
+
+  CmiIsomallocSyncHandlerDone = 1;
+}
+
+static void CmiIsomallocInitExtent(char ** argv)
+{
 #if 0
   /*Largest value a signed int can hold*/
   static constexpr memRange_t intMax = (((memRange_t)1) << (sizeof(int) * 8 - 1)) - 1;
@@ -620,6 +742,8 @@ static void CmiIsomallocInitExtent()
 
   if (CmiMyRank() == 0 && isomallocStart == nullptr)
   {
+    memRegion_t freeRegion{};
+
     /* Find the largest unused region of virtual address space */
     /*Round slot size up to nearest page size*/
     slotsize = 1024 * 1024;
@@ -629,7 +753,6 @@ static void CmiIsomallocInitExtent()
 #if ISOMALLOC_DEBUG
     if (CmiMyPe() == 0) DEBUG_PRINT("[%d] Using slotsize of %zu\n", CmiMyPe(), slotsize);
 #endif
-    freeRegion.len = 0u;
 
 #ifdef CMK_MMAP_START_ADDRESS /* Hardcoded start address, for machines where automatic \
                                  fails */
@@ -641,11 +764,11 @@ static void CmiIsomallocInitExtent()
     {
       if (_mmap_probe == 1)
       {
-        if (try_largest_mmap_region(&freeRegion)) _sync_iso = 1;
+        try_largest_mmap_region(&freeRegion);
       }
       else
       {
-        if (freeRegion.len == 0u) find_largest_free_region(&freeRegion);
+        find_largest_free_region(&freeRegion);
       }
     }
 
@@ -664,237 +787,336 @@ static void CmiIsomallocInitExtent()
       memRange_t start = CMIALIGN((uintptr_t)freeRegion.start, division_size);
       memRange_t end = CMIALIGN((uintptr_t)freeRegion.start + freeRegion.len - (division_size-1), division_size);
       memRange_t len = end - start;
-      freeRegion.start = (uint8_t *)start;
-      freeRegion.len = len;
+      IsoRegion.s = start;
+      IsoRegion.e = end;
       DEBUG_PRINT("[%d] Isomalloc memory region: 0x%zx - 0x%zx (%zu gigs)\n", CmiMyPe(),
                   start, end, len/gig);
     }
-  } /* end if myrank == 0 */
-
-  CmiNodeAllBarrier();
-
-  /*
-     on some machines, isomalloc memory regions on different nodes
-     can be different. use +isomalloc_sync to calculate the
-     intersect of all memory regions on all nodes.
-     */
-  if (_sync_iso == 1)
-  {
-#ifdef __FAULT__
-    if (_restart == 1)
-    {
-      CmiUInt8 s = (CmiUInt8)freeRegion.start;
-      CmiUInt8 e = (CmiUInt8)(freeRegion.start + freeRegion.len);
-      CmiUInt8 ss, ee;
-      int try_count, fd;
-      char fname[128];
-      sprintf(fname, ".isomalloc");
-      try_count = 0;
-      while ((fd = open(fname, O_RDONLY)) == -1 && try_count < 10000)
-      {
-        try_count++;
-      }
-      if (fd == -1)
-      {
-        CmiAbort(
-            "isomalloc_sync failed during restart, make sure you have a shared file "
-            "system.");
-      }
-      if (read(fd, &ss, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-      {
-        CmiAbort("Isomalloc> call to read() failed during restart!");
-      }
-      if (read(fd, &ee, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-      {
-        CmiAbort("Isomalloc> call to read() failed during restart!");
-      }
-      close(fd);
-      if (ss < s || ee > e)
-        CmiAbort(
-            "isomalloc_sync failed during restart, virtual memory regions do not "
-            "overlap.");
-      else
-      {
-        freeRegion.start = (uint8_t *)ss;
-        freeRegion.len = (uint8_t *)ee - (uint8_t *)ss;
-      }
-      CmiPrintf(
-          "Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%zu MB).\n",
-          freeRegion.start, freeRegion.start + freeRegion.len, freeRegion.len / meg);
-      goto AFTER_SYNC;
-    }
-#endif
-    if (CmiMyRank() == 0 && freeRegion.len > 0u)
-    {
-      if (CmiBarrier() == -1 && CmiMyPe() == 0)
-        CmiAbort("Charm++ Error> +isomalloc_sync requires CmiBarrier() implemented.\n");
-      else
-      {
-        uintptr_t s = (uintptr_t)freeRegion.start;
-        uintptr_t e = (uintptr_t)freeRegion.start + freeRegion.len;
-        int fd, i;
-        char fname[128];
-
-        if (CmiMyNode() == 0)
-          CmiPrintf("Charm++> Synchronizing isomalloc memory region...\n");
-
-        sprintf(fname, ".isomalloc.%d", CmiMyNode());
-
-        /* remove file before writing for safe */
-        unlink(fname);
-#if CMK_HAS_SYNC && !CMK_DISABLE_SYNC
-        if (system("sync") == -1)
-        {
-          CmiAbort(
-              "Isomalloc> call to system(\"sync\") failed while synchronizing memory "
-              "regions!");
-        }
-#endif
-
-        CmiBarrier();
-
-        /* write region into file */
-        while ((fd = open(fname, O_WRONLY | O_TRUNC | O_CREAT, 0644)) == -1)
-#ifndef __MINGW_H
-          CMK_CPV_IS_SMP
-#endif
-              ;
-        if (write(fd, &s, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-        {
-          CmiAbort(
-              "Isomalloc> call to write() failed while synchronizing memory regions!");
-        }
-        if (write(fd, &e, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-        {
-          CmiAbort(
-              "Isomalloc> call to write() failed while synchronizing memory regions!");
-        }
-        close(fd);
-
-#if CMK_HAS_SYNC && !CMK_DISABLE_SYNC
-        if (system("sync") == -1)
-        {
-          CmiAbort(
-              "Isomalloc> call to system(\"sync\") failed while synchronizing memory "
-              "regions!");
-        }
-#endif
-
-        CmiBarrier();
-
-        for (i = 0; i < CmiNumNodes(); i++)
-        {
-          CmiUInt8 ss, ee;
-          int try_count;
-          char fname[128];
-          if (i == CmiMyNode()) continue;
-          sprintf(fname, ".isomalloc.%d", i);
-          try_count = 0;
-          while ((fd = open(fname, O_RDONLY)) == -1 && try_count < 10000)
-          {
-            try_count++;
-#ifndef __MINGW_H
-            CMK_CPV_IS_SMP
-#endif
-                ;
-          }
-          if (fd == -1)
-          {
-            CmiAbort("isomalloc_sync failed, make sure you have a shared file system.");
-          }
-          if (read(fd, &ss, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-          {
-            CmiAbort(
-                "Isomalloc> call to read() failed while synchronizing memory regions!");
-          }
-          if (read(fd, &ee, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-          {
-            CmiAbort(
-                "Isomalloc> call to read() failed while synchronizing memory regions!");
-          }
-#if ISOMALLOC_DEBUG
-          if (CmiMyPe() == 0)
-            DEBUG_PRINT("[%d] load node %d isomalloc region: %" PRIx64 " %" PRIx64 ".\n", CmiMyPe(), i,
-                        ss, ee);
-#endif
-          close(fd);
-          if (ss > s) s = ss;
-          if (ee < e) e = ee;
-        }
-
-        CmiBarrier();
-
-        unlink(fname);
-#if CMK_HAS_SYNC && !CMK_DISABLE_SYNC
-        if (system("sync") == -1)
-        {
-          CmiAbort(
-              "Isomalloc> call to system(\"sync\") failed while synchronizing memory "
-              "regions!");
-        }
-#endif
-
-        /* update */
-        if (s > e)
-        {
-          if (CmiMyPe() == 0)
-            CmiPrintf("[%d] Invalid isomalloc region: %" PRIxPTR " - %" PRIxPTR ".\n", CmiMyPe(), s, e);
-          CmiAbort("Isomalloc> failed to find consolidated isomalloc region!");
-        }
-        freeRegion.start = (uint8_t *)(uintptr_t)s;
-        freeRegion.len = (uint8_t *)(uintptr_t)e - (uint8_t *)(uintptr_t)s;
-
-        if (CmiMyPe() == 0)
-          CmiPrintf("Charm++> Consolidated Isomalloc memory region: %p - %p (%zu MB).\n",
-                    freeRegion.start, freeRegion.start + freeRegion.len,
-                    freeRegion.len / meg);
-#if __FAULT__
-        if (CmiMyPe() == 0)
-        {
-          int fd;
-          char fname[128];
-          CmiUInt8 s = (CmiUInt8)freeRegion.start;
-          CmiUInt8 e = (CmiUInt8)(freeRegion.start + freeRegion.len);
-          sprintf(fname, ".isomalloc");
-          while ((fd = open(fname, O_WRONLY | O_TRUNC | O_CREAT, 0644)) == -1)
-            ;
-          if (write(fd, &s, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-          {
-            CmiAbort(
-                "Isomalloc> call to write() failed while synchronizing memory regions!");
-          }
-          if (write(fd, &e, sizeof(CmiUInt8)) != sizeof(CmiUInt8))
-          {
-            CmiAbort(
-                "Isomalloc> call to write() failed while synchronizing memory regions!");
-          }
-          close(fd);
-        }
-#endif
-      } /* end of barrier test */
-    }   /* end of rank 0 */
-    else
-    {
-      CmiBarrier();
-      CmiBarrier();
-      CmiBarrier();
-      CmiBarrier();
-    }
   }
 
-#ifdef __FAULT__
-    AFTER_SYNC:
+  /* isomalloc_sync
+   * Available address space regions can vary across nodes.
+   * Calculate the intersection of all memory regions on all nodes.
+   */
+
+  auto nosync = CmiGetArgFlagDesc(argv, "+no_isomalloc_sync", "disable global synchronization of isomalloc region");
+  CmiAssignOnce(&CmiIsomallocSyncBroadcastHandlerIdx, CmiRegisterHandler(CmiIsomallocSyncBroadcastHandler));
+
+#if __FAULT__
+  if (CmiIsomallocRestart)
+  {
+    if (CmiMyRank() == 0)
+    {
+      CmiAddressSpaceRegion previous;
+
+      int try_count = 0, fd;
+      while ((fd = open(".isomalloc", O_RDONLY)) == -1 && try_count < 10000)
+        try_count++;
+
+      if (fd == -1)
+        CmiAbort("isomalloc_sync failed during restart, make sure you have a shared file system.");
+      if (read(fd, &previous, sizeof(CmiAddressSpaceRegion)) != sizeof(CmiAddressSpaceRegion))
+        CmiAbort("Isomalloc> call to read() failed during restart!");
+
+      close(fd);
+      if (previous.s < IsoRegion.s || previous.e > IsoRegion.e)
+        CmiError("Isomalloc> Warning: virtual memory regions do not overlap: "
+                 "current %" PRIx64 " - %" PRIx64 ", previous %" PRIx64 " - %" PRIx64 "\n",
+                 IsoRegion.s, IsoRegion.e, previous.s, previous.e);
+      else
+        IsoRegion = previous;
+
+      if (CmiMyPe() == 0)
+        CmiPrintf("Isomalloc> Synchronized global address space.\n");
+
+      DEBUG_PRINT("Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%" PRId64 " MB).\n",
+                  (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
+    }
+  }
+  else
+#endif
+  if (nosync)
+  {
+    if (CmiMyPe() == 0)
+      CmiPrintf("Isomalloc> Disabling global synchronization of address space.\n");
+  }
+  else if (CmiNumNodes() > 1)
+  {
+    if (CmiMyRank() == 0)
+    {
+      if (CmiMyNode() == 0)
+      {
+        DEBUG_PRINT("Charm++> Synchronizing Isomalloc memory region...\n");
+      }
+
+      DEBUG_PRINT("Isomalloc> Node %d sending region for comparison: %" PRIx64 " %" PRIx64 "\n",
+                  CmiMyNode(), IsoRegion.s, IsoRegion.e);
+
+      CmiNodeReduceStruct(&IsoRegion, CmiAddressSpaceRegionPup, CmiAddressSpaceRegionMerge,
+                          CmiIsomallocSyncReductionHandler, nullptr);
+
+      CmiIsomallocSyncWait();
+
+      if (CmiMyNode() == 0)
+      {
+        DEBUG_PRINT("Isomalloc> Node %d sending region for assignment: %" PRIx64 " %" PRIx64 "\n",
+                    CmiMyNode(), IsoRegion.s, IsoRegion.e);
+
+        CmiAddressSpaceRegionMsg msg;
+        CmiInitMsgHeader(msg.converseHeader, sizeof(CmiAddressSpaceRegionMsg));
+        msg.region = IsoRegion;
+        CmiSetHandler((char *)&msg, CmiIsomallocSyncBroadcastHandlerIdx);
+        CmiSyncNodeBroadcast(sizeof(CmiAddressSpaceRegionMsg), &msg);
+
+        CsdSchedulePoll();
+
+        if (IsoRegion.s >= IsoRegion.e)
+          CmiAbort("Isomalloc> failed to find consolidated region: %" PRIx64 " - %" PRIx64 ".\n"
+                   "Try running with +no_isomalloc_sync if you do not need this functionality.\n",
+                   IsoRegion.s, IsoRegion.e);
+
+        if (CmiMyPe() == 0)
+          CmiPrintf("Isomalloc> Synchronized global address space.\n");
+
+        DEBUG_PRINT("Charm++> Consolidated Isomalloc memory region: %p - %p (%" PRId64 " MB).\n",
+                    (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
+      }
+
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+      CmiIsomallocSyncCommThreadDone = 1;
+#endif
+    }
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+    else if (CmiInCommThread())
+    {
+      CmiIsomallocSyncWaitCommThread();
+    }
+#endif
+    else
+    {
+      CmiIsomallocSyncWait();
+    }
+
+    CmiBarrier();
+  }
+
+  if (CmiMyRank() == 0)
+  {
+#if __FAULT__
+    if (!CmiIsomallocRestart && CmiMyNode() == 0)
+    {
+      int fd;
+      while ((fd = open(".isomalloc", O_WRONLY | O_TRUNC | O_CREAT, 0644)) == -1)
+        ;
+      if (write(fd, &IsoRegion, sizeof(CmiAddressSpaceRegion)) != sizeof(CmiAddressSpaceRegion))
+        CmiAbort("Isomalloc> call to write() failed while synchronizing memory regions!");
+      close(fd);
+    }
 #endif
 
-  if (CmiMyRank() == 0 && freeRegion.len > 0u)
-  {
-    /*Isomalloc covers entire unused region*/
-    isomallocStart = freeRegion.start;
-    isomallocEnd = freeRegion.start + freeRegion.len;
+    if (IsoRegion.e > IsoRegion.s)
+    {
+      isomallocStart = (uint8_t *)(uintptr_t)IsoRegion.s;
+      isomallocEnd = (uint8_t *)(uintptr_t)IsoRegion.e;
+    }
   }
 
   CmiNodeAllBarrier();
 }
+
+struct isommap
+{
+  isommap(uint8_t * s, uint8_t * e)
+    : start{s}, end{e}, allocated_extent{s}, lock{CmiCreateLock()}
+  {
+    IMP_DBG("[%d][%p] isommap::isommap(%p, %p)\n", CmiMyPe(), this, s, e);
+  }
+  isommap(PUP::reconstruct pr)
+    : lock{CmiCreateLock()}
+  {
+    IMP_DBG("[%d][%p] isommap::isommap(PUP::reconstruct)\n", CmiMyPe(), this);
+  }
+  ~isommap()
+  {
+    IMP_DBG("[%d][%p] isommap::~isommap()\n", CmiMyPe(), this);
+    clear();
+    CmiDestroyLock(lock);
+  }
+
+  void print() const
+  {
+    CmiPrintf("[%d][%p] isommap::print(): %p-%p %zu\n", CmiMyPe(), this, start, allocated_extent, allocated_extent - start);
+  }
+
+  bool isInRange(void * user_ptr) const
+  {
+    return start <= (const uint8_t *)user_ptr && (const uint8_t *)user_ptr < end;
+  }
+  bool isMapped(void * user_ptr) const
+  {
+    return start <= (const uint8_t *)user_ptr && (const uint8_t *)user_ptr < allocated_extent;
+  }
+
+  void pup(PUP::er & p)
+  {
+    IMP_DBG("[%d][%p] isommap::pup()%s%s%s%s\n", CmiMyPe(), this, p.isSizing() ? " sizing" : "",
+            p.isPacking() ? " packing" : "", p.isUnpacking() ? " unpacking" : "", p.isDeleting() ? " deleting" : "");
+
+    pup_raw_pointer(p, start);
+    pup_raw_pointer(p, end);
+    pup_raw_pointer(p, allocated_extent);
+
+    const size_t totalsize = allocated_extent - start;
+
+    if (p.isUnpacking())
+    {
+#if __FAULT__
+      if (start < isomallocStart || isomallocEnd < allocated_extent)
+        CmiAbort("Could not unpack Isomalloc memory region, virtual memory regions do not overlap: "
+                 "current %p - %p, context %p - %p",
+                 isomallocStart, isomallocEnd, start, allocated_extent);
+
+      if (isomallocEnd < end)
+        end = (uint8_t *)CMIALIGN((uintptr_t)isomallocEnd - (pagesize-1), pagesize);
+#endif
+
+      void * const mapped = map_global_memory(start, totalsize);
+      if (mapped == nullptr)
+        CmiAbort("Failed to unpack Isomalloc memory region!");
+    }
+
+    p(start, totalsize);
+
+    if (p.isDeleting())
+    {
+      clear();
+    }
+  }
+
+  void clear()
+  {
+    if (allocated_extent == start)
+      return;
+    unmap_global_memory(start, allocated_extent - start);
+    allocated_extent = start;
+  }
+
+  // canonical data
+  uint8_t * start, * end, * allocated_extent;
+
+  // local data
+  CmiNodeLock lock;
+};
+
+/************** dlmalloc mempool ***************/
+
+#include "memory-gnu-internal.C"
+
+struct isomalloc_dlmalloc : dlmalloc_impl
+{
+  isomalloc_dlmalloc(uint8_t * s, uint8_t * e)
+    : backend{s, e}, arena{create_mspace(0, 0)}
+  {
+    IMP_DBG("[%d][%p] isomalloc_dlmalloc::isomalloc_dlmalloc(%p, %p)\n", CmiMyPe(), this, s, e);
+  }
+  isomalloc_dlmalloc(PUP::reconstruct pr)
+    : backend{pr}
+  {
+    IMP_DBG("[%d][%p] isomalloc_dlmalloc::isomalloc_dlmalloc(PUP::reconstruct)\n", CmiMyPe(), this);
+  }
+
+  void pup(PUP::er & p)
+  {
+    p | backend;
+    pup_raw_pointer(p, arena);
+  }
+
+  isommap backend;
+  mspace arena;
+
+  virtual void * call_mmap(size_t length) override final
+  {
+    void * const mapped = map_global_memory(backend.allocated_extent, length);
+    if (mapped == nullptr)
+      return nullptr;
+    backend.allocated_extent += length;
+    return mapped;
+  }
+  virtual void * call_direct_mmap(size_t length) override final
+  {
+    return this->isomalloc_dlmalloc::call_mmap(length); // call call_mmap without the vtable lookup
+  }
+  virtual int call_munmap(void * addr, size_t length) override final
+  {
+    /*
+     * TODO: Unmap regions in the middle when requested and maintain a record of what is
+     * still mapped so that migration can skip the gaps. Complexity arises when
+     * considering RDMA transfers. We would need to determine when it is better to leave
+     * small gaps mapped and combine transfers instead of requesting multiple transfers.
+     */
+    if ((const uint8_t *)addr + length == backend.allocated_extent)
+    {
+      unmap_global_memory(addr, length);
+      backend.allocated_extent = (uint8_t *)addr;
+    }
+    return 0;
+  }
+  virtual void * call_mremap(void *old_address, size_t old_size, size_t new_size, int flags) override final
+  {
+    return MFAIL;
+  }
+
+  void * alloc(size_t size)
+  {
+    CmiLock(backend.lock);
+    void * ret = mspace_malloc(arena, size);
+    CmiUnlock(backend.lock);
+    return ret;
+  }
+  void * alloc(size_t size, size_t align)
+  {
+    CmiLock(backend.lock);
+    void * ret = mspace_memalign(arena, align, size);
+    CmiUnlock(backend.lock);
+    return ret;
+  }
+  void * calloc(size_t nelem, size_t size)
+  {
+    CmiLock(backend.lock);
+    void * ret = mspace_calloc(arena, nelem, size);
+    CmiUnlock(backend.lock);
+    return ret;
+  }
+  void * realloc(void * ptr, size_t size)
+  {
+    CmiLock(backend.lock);
+    void * ret = mspace_realloc(arena, ptr, size);
+    CmiUnlock(backend.lock);
+    return ret;
+  }
+  void free(void * ptr)
+  {
+    CmiLock(backend.lock);
+
+    CmiAssert(backend.isInRange(ptr));
+    CmiAssert(backend.isMapped(ptr));
+
+    mspace_free(arena, ptr);
+
+    CmiUnlock(backend.lock);
+  }
+  size_t length(void * ptr)
+  {
+    CmiLock(backend.lock);
+
+    mchunkptr oldp = mem2chunk(ptr);
+    size_t oc = chunksize(oldp) - overhead_for(oldp);
+
+    CmiUnlock(backend.lock);
+
+    return oc;
+  }
+};
 
 /************** Isomempool ***************/
 
@@ -902,12 +1124,24 @@ static void CmiIsomallocInitExtent()
 # define VERIFY_RBTREE
 #endif
 
-struct CmiIsomallocContext
+struct Isomempool
 {
   /* Isomempool
    *
    * This class is a wholly self-contained allocator, depending only on mmap/munmap.
    * It batches allocations of all sizes into a slab region that can expand as needed.
+   *
+   * Advantages:
+   * This mempool provides space-efficient memory management. It has been thoroughly
+   * verified for correctness. It contains robust assertions to pinpoint problems in the
+   * event of future modifications. The code is clean, self-documenting, modular, short
+   * in length, and well-optimized (for the approach it takes).
+   *
+   * Disadvantages:
+   * Performance is poor in programs that behave poorly with regard to the heap, as well
+   * as in certain circumstances in all programs. Problems with this mempool include lack
+   * of a special approach for very small allocations, and a cache-inefficient tree node
+   * layout.
    *
    * Definitions:
    * Regions are divisions within the pool, either allocated space or empty space between
@@ -1578,28 +1812,27 @@ struct CmiIsomallocContext
   static_assert(minimum_empty_region_size > 0, "region sizes cannot be zero");
   static_assert(minimum_empty_region_size >= sizeof(RegionHeader), "regions must allow space for a header");
 
-  CmiIsomallocContext(uint8_t * s, uint8_t * e)
-    : start{s}, end{e}, allocated_extent{s}, first_region{}, last_region{}, empty_tree{}, lock{CmiCreateLock()}
+  Isomempool(uint8_t * s, uint8_t * e)
+    : empty_tree{}, first_region{}, last_region{}, backend{s, e}
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::CmiIsomallocContext(%p, %p)\n", CmiMyPe(), this, s, e);
+    IMP_DBG("[%d][%p] Isomempool::Isomempool(%p, %p)\n", CmiMyPe(), this, s, e);
   }
-  CmiIsomallocContext(PUP::reconstruct pr)
-    : empty_tree{pr}, lock{CmiCreateLock()}
+  Isomempool(PUP::reconstruct pr)
+    : empty_tree{pr}, backend{pr}
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::CmiIsomallocContext(PUP::reconstruct)\n", CmiMyPe(), this);
+    IMP_DBG("[%d][%p] Isomempool::Isomempool(PUP::reconstruct)\n", CmiMyPe(), this);
   }
 
-  ~CmiIsomallocContext()
+  ~Isomempool()
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::~CmiIsomallocContext()\n", CmiMyPe(), this);
-
-    CmiDestroyLock(lock);
-    clear();
+    IMP_DBG("[%d][%p] Isomempool::~Isomempool()\n", CmiMyPe(), this);
   }
 
   void print_contents() const
   {
-    CmiPrintf("[%d][%p] CmiIsomallocContext::print_contents(): %p-%p %zu\n", CmiMyPe(), this, start, allocated_extent, allocated_extent - start);
+    CmiPrintf("[%d][%p] Isomempool::print_contents()\n", CmiMyPe(), this);
+
+    backend.print();
 
     if (first_region == nullptr)
       return;
@@ -1616,8 +1849,8 @@ struct CmiIsomallocContext
       next = node->next();
     }
 
-    const size_t size = (const uint8_t *)allocated_extent - (const uint8_t *)node;
-    CmiPrintf("  %d %p-%p %zu %zu\n", (int)node->occupied(), node, allocated_extent, size, node->size());
+    const size_t size = (const uint8_t *)backend.allocated_extent - (const uint8_t *)node;
+    CmiPrintf("  %d %p-%p %zu %zu\n", (int)node->occupied(), node, backend.allocated_extent, size, node->size());
   }
 
   static size_t get_alignment_filler(const void * ptr, size_t alignment)
@@ -1632,42 +1865,23 @@ struct CmiIsomallocContext
     return get_alignment_filler(ptr, minimum_alignment);
   }
 
-  void * alloc(size_t size, const size_t alignment = minimum_alignment, size_t alignment_offset = 0);
-  void free(void * user_ptr);
-  size_t length(void * user_ptr) const;
-
-  void pup(PUP::er & p);
-
-  bool isInRange(void * user_ptr) const
-  {
-    return start <= (const uint8_t *)user_ptr && (const uint8_t *)user_ptr < end;
-  }
-
-  bool isMapped(void * user_ptr) const
-  {
-    return start <= (const uint8_t *)user_ptr && (const uint8_t *)user_ptr < allocated_extent;
-  }
-
 private:
 
   // canonical data
-  uint8_t * start, * end, * allocated_extent;
-  RegionHeader * first_region, * last_region;
+  isommap backend;
   RBTree empty_tree;
-
-  // local data
-  CmiNodeLock lock;
+  RegionHeader * first_region, * last_region;
 
   void setFirstRegion(RegionHeader * p)
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::setFirstRegion(%p)\n", CmiMyPe(), this, p);
+    IMP_DBG("[%d][%p] Isomempool::setFirstRegion(%p)\n", CmiMyPe(), this, p);
 
     CmiAssert(p->prev() == nullptr);
     first_region = p;
   }
   void setLastRegion(RegionHeader * p)
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::setLastRegion(%p)\n", CmiMyPe(), this, p);
+    IMP_DBG("[%d][%p] Isomempool::setLastRegion(%p)\n", CmiMyPe(), this, p);
 
     CmiAssert(p->next() == nullptr);
     last_region = p;
@@ -1680,7 +1894,7 @@ private:
     auto empty_region = new (header + 1) EmptyRegion{};
     empty_tree.insert(empty_region);
 
-    CmiAssert((const uint8_t *)header + header->size() <= allocated_extent);
+    CmiAssert((const uint8_t *)header + header->size() <= backend.allocated_extent);
     CmiAssert(header == last_region || (const uint8_t *)header + header->size() == (const uint8_t *)header->next());
   }
 
@@ -1706,7 +1920,7 @@ private:
     RegionHeader * const empty_header = empty_region->header();
     empty_tree.remove(empty_region);
 
-    IMP_DBG("[%d][%p] CmiIsomallocContext::allocFromEmptyRegion(%zu, %p, %zu) by erasing and filling {%p, %zu}\n",
+    IMP_DBG("[%d][%p] Isomempool::allocFromEmptyRegion(%zu, %p, %zu) by erasing and filling {%p, %zu}\n",
             CmiMyPe(), this, size, empty_region, alignment_filler, empty_header, region_size);
 
     CmiAssert(!empty_header->prevIsEmpty());
@@ -1725,7 +1939,7 @@ private:
     {
       // Record a new empty region preceding the new occupied region.
 
-      IMP_DBG("[%d][%p] CmiIsomallocContext::allocFromEmptyRegion(%zu, %p, %zu) inserting empty region {%p, %zu} (left)\n",
+      IMP_DBG("[%d][%p] Isomempool::allocFromEmptyRegion(%zu, %p, %zu) inserting empty region {%p, %zu} (left)\n",
               CmiMyPe(), this, size, empty_header, alignment_filler, empty_header, alignment_filler);
 
       header_prev = new (empty_header) RegionHeader{empty_header_prev, header_ptr, alignment_filler, Occupied{false}};
@@ -1763,7 +1977,7 @@ private:
 
       size_difference -= follow_alignment_filler;
 
-      IMP_DBG("[%d][%p] CmiIsomallocContext::allocFromEmptyRegion(%zu, %p, %zu) inserting empty region {%p, %zu} (right)\n",
+      IMP_DBG("[%d][%p] Isomempool::allocFromEmptyRegion(%zu, %p, %zu) inserting empty region {%p, %zu} (right)\n",
               CmiMyPe(), this, size, empty_region, alignment_filler, follow_ptr, size_difference);
 
       header_next = new (follow_ptr) RegionHeader{header_ptr, empty_header_next, size_difference, Occupied{false}};
@@ -1797,7 +2011,7 @@ private:
 
   void * allocByExtending(const size_t size, const size_t alignment, const size_t alignment_offset)
   {
-    IMP_DBG("[%d][%p] CmiIsomallocContext::allocByExtending(%zu, %zu, %zu)\n", CmiMyPe(), this, size, alignment, alignment_offset);
+    IMP_DBG("[%d][%p] Isomempool::allocByExtending(%zu, %zu, %zu)\n", CmiMyPe(), this, size, alignment, alignment_offset);
 
     // Find the left bound of where we can place the new region.
 
@@ -1808,7 +2022,7 @@ private:
     {
       CmiAssert(first_region == nullptr);
 
-      used_extent = start;
+      used_extent = backend.start;
       header_prev = nullptr;
     }
     else if (last_region->isEmpty())
@@ -1817,7 +2031,7 @@ private:
       header_prev = last_region->prev();
 
       auto empty_region = (EmptyRegion *)(last_region + 1);
-      IMP_DBG("[%d][%p] CmiIsomallocContext::allocByExtending(%zu, %zu, %zu) erasing empty region {%p, %zu} (left)\n",
+      IMP_DBG("[%d][%p] Isomempool::allocByExtending(%zu, %zu, %zu) erasing empty region {%p, %zu} (left)\n",
               CmiMyPe(), this, size, alignment, alignment_offset, last_region, empty_region->size());
       empty_tree.remove(empty_region);
     }
@@ -1832,18 +2046,18 @@ private:
     const size_t alignment_filler = get_alignment_filler(used_extent + alignment_offset, alignment);
     const auto header_ptr = (RegionHeader *)(used_extent + alignment_filler);
 
-    const size_t allocated_free_space = allocated_extent - used_extent;
+    const size_t allocated_free_space = backend.allocated_extent - used_extent;
     CmiAssert(allocated_free_space < size); // should not be in this function if this fails
     const size_t space_needed = size - allocated_free_space;
     const size_t alloc_size = CMIALIGN(space_needed, slotsize);
-    const size_t space_remaining = end - used_extent;
+    const size_t space_remaining = backend.end - used_extent;
     if (space_remaining < alloc_size)
       return nullptr;
 
-    void * const mapped = map_global_memory(allocated_extent, alloc_size);
+    void * const mapped = map_global_memory(backend.allocated_extent, alloc_size);
     if (mapped == nullptr)
       return nullptr;
-    allocated_extent += alloc_size;
+    backend.allocated_extent += alloc_size;
 
     // Manage our left neighbor, if any.
 
@@ -1855,7 +2069,7 @@ private:
       const size_t empty_size = alignment_filler - used_extent_alignment_filler;
       uint8_t * const empty_header_ptr = used_extent + used_extent_alignment_filler;
 
-      IMP_DBG("[%d][%p] CmiIsomallocContext::allocByExtending(%zu, %zu, %zu) inserting empty region {%p, %zu} (left)\n",
+      IMP_DBG("[%d][%p] Isomempool::allocByExtending(%zu, %zu, %zu) inserting empty region {%p, %zu} (left)\n",
               CmiMyPe(), this, size, alignment, alignment_offset, empty_header_ptr, empty_size);
 
       auto empty_header = new (empty_header_ptr) RegionHeader{header_prev, header_ptr, empty_size, Occupied{false}};
@@ -1885,7 +2099,7 @@ private:
     auto follow_ptr = (uint8_t *)header_ptr + size;
     const size_t follow_alignment_filler = minimum_alignment_filler(follow_ptr);
     follow_ptr += follow_alignment_filler;
-    size_t size_difference = (const uint8_t *)allocated_extent - (const uint8_t *)follow_ptr;
+    size_t size_difference = (const uint8_t *)backend.allocated_extent - (const uint8_t *)follow_ptr;
 
     RegionHeader * header_next;
 
@@ -1893,7 +2107,7 @@ private:
     {
       // Record a new empty region following the new occupied region.
 
-      IMP_DBG("[%d][%p] CmiIsomallocContext::allocByExtending(%zu, %zu, %zu) inserting empty region {%p, %zu} (right)\n",
+      IMP_DBG("[%d][%p] Isomempool::allocByExtending(%zu, %zu, %zu) inserting empty region {%p, %zu} (right)\n",
               CmiMyPe(), this, size, alignment, alignment_offset, follow_ptr, size_difference);
 
       header_next = new (follow_ptr) RegionHeader{header_ptr, nullptr, size_difference, Occupied{false}};
@@ -1916,205 +2130,214 @@ private:
     return header + 1;
   }
 
-  void clear()
+public:
+
+  void * alloc(const size_t size, const size_t alignment = minimum_alignment, const size_t alignment_offset = 0)
   {
-    if (allocated_extent == start)
-      return;
-    unmap_global_memory(start, allocated_extent - start);
-    allocated_extent = start;
+    CmiLock(backend.lock);
+
+    IMP_DBG("[%d][%p] Isomempool::alloc(%zu, %zu, %zu)...\n", CmiMyPe(), this, size, alignment, alignment_offset);
+
+    const size_t practical_size = size + sizeof(RegionHeader);
+    const size_t practical_alignment_offset = alignment_offset + sizeof(RegionHeader);
+
+    // Find the smallest empty region that can fit the data.
+    EmptyRegion * node = empty_tree.lookup_region(practical_size, alignment, practical_alignment_offset);
+
+    // Perform the allocation.
+    void * ret = node != nullptr
+                 ? allocFromEmptyRegion(practical_size, node, get_alignment_filler(node->ptr() + practical_alignment_offset, alignment))
+                 : allocByExtending(practical_size, alignment, practical_alignment_offset);
+
+    IMP_DBG("[%d][%p] Isomempool::alloc(%zu, %zu, %zu) returning %p {header = %p}\n",
+            CmiMyPe(), this, size, alignment, alignment_offset, ret, (const uint8_t *)ret - sizeof(RegionHeader));
+
+    CmiUnlock(backend.lock);
+
+    return ret;
+  }
+
+  size_t length(void * user_ptr) const
+  {
+    const auto header = (const RegionHeader *)user_ptr - 1;
+    return header->usersize();
+  }
+
+  void free(void * user_ptr)
+  {
+    CmiLock(backend.lock);
+
+    CmiAssert(backend.isInRange(user_ptr));
+    CmiAssert(backend.isMapped(user_ptr));
+
+    const auto orig_header = (RegionHeader *)user_ptr - 1;
+    CmiAssert(!orig_header->isEmpty());
+
+    IMP_DBG("[%d][%p] Isomempool::free(%p)... {header = %p}\n", CmiMyPe(), this, user_ptr, orig_header);
+
+    RegionHeader * const orig_header_prev = orig_header->prev();
+    RegionHeader * const orig_header_next = orig_header->next();
+
+    RegionHeader * header = orig_header;
+    RegionHeader * header_prev;
+    RegionHeader * header_next;
+    size_t header_size = (orig_header_next != nullptr
+                           ? (const uint8_t *)orig_header_next
+                           : backend.allocated_extent)
+                           - (const uint8_t *)orig_header;
+
+    if (orig_header->nextIsEmpty())
+    {
+      // Merge with the free region to the right.
+
+      RegionHeader * const orig_header_next_next = orig_header_next->next();
+
+      const auto empty_region = (EmptyRegion *)(orig_header_next + 1);
+      IMP_DBG("[%d][%p] Isomempool::free(%p) erasing empty region {%p, %zu} (right)\n",
+              CmiMyPe(), this, user_ptr, orig_header_next, empty_region->size());
+      empty_tree.remove(empty_region);
+
+      header_next = orig_header_next_next;
+      header_size += orig_header_next->size();
+    }
+    else
+    {
+      // Directly link to the occupied region to the right.
+
+      header_next = orig_header_next;
+    }
+
+    if (orig_header->prevIsEmpty())
+    {
+      // Merge with the free region to the left.
+
+      RegionHeader * const orig_header_prev_prev = orig_header_prev->prev();
+      const size_t orig_header_prev_size = orig_header_prev->size();
+
+      auto empty_region = (EmptyRegion *)(orig_header_prev + 1);
+      IMP_DBG("[%d][%p] Isomempool::free(%p) erasing empty region {%p, %zu} (left)\n",
+              CmiMyPe(), this, user_ptr, orig_header_prev, empty_region->size());
+      empty_tree.remove(empty_region);
+
+      header = orig_header_prev;
+      header_prev = orig_header_prev_prev;
+      header_size += orig_header_prev_size;
+    }
+    else
+    {
+      // Try reclaiming slop space to the left.
+
+      header_prev = orig_header_prev;
+
+      uint8_t * available_ptr;
+      if (orig_header_prev != nullptr)
+      {
+        CmiAssert(!orig_header_prev->isEmpty());
+        available_ptr = (uint8_t *)orig_header_prev + orig_header_prev->size();
+        available_ptr += minimum_alignment_filler(available_ptr);
+      }
+      else
+      {
+        available_ptr = backend.start;
+        CmiAssert(minimum_alignment_filler(available_ptr) == 0);
+      }
+
+      CmiAssert(available_ptr <= (const uint8_t *)header);
+
+      header_size += (const uint8_t *)header - available_ptr;
+      header = (RegionHeader *)available_ptr;
+    }
+
+    if (header_size < minimum_empty_region_size)
+    {
+      // There is not enough space for a new empty region.
+      // Append it as slop to the previous occupied region.
+
+      IMP_DBG("[%d][%p] Isomempool::free(%p) remnant too small {%p, %zu}, appending to %p on left (%p on right)\n",
+              CmiMyPe(), this, user_ptr, header, header_size, header_prev, header_next);
+
+      if (header_prev == nullptr)
+        setFirstRegion(header_next);
+      else
+        header_prev->setNext(header_next);
+
+      if (header_next == nullptr)
+        setLastRegion(header_prev);
+      else
+        header_next->setPrev(header_prev);
+    }
+    else
+    {
+      // Add a new empty region containing the space from the freed region and any surrounding free space.
+
+      IMP_DBG("[%d][%p] Isomempool::free(%p) inserting empty region {%p, %zu}\n",
+              CmiMyPe(), this, user_ptr, header, header_size);
+
+      header = new (header) RegionHeader{header_prev, header_next, header_size, Occupied{false}};
+
+      if (header_prev == nullptr)
+        setFirstRegion(header);
+      else
+        setRegionNext(header_prev, header);
+
+      if (header_next == nullptr)
+        setLastRegion(header);
+      else
+        header_next->setPrev(header);
+
+      // Record the new empty region.
+      CmiAssert(!header->prevIsEmpty() && !header->nextIsEmpty());
+
+      insertEmptyRegion(header);
+    }
+
+    CmiUnlock(backend.lock);
+  }
+
+  void pup(PUP::er & p)
+  {
+    p | backend;
+
+    pup_raw_pointer(p, first_region);
+    pup_raw_pointer(p, last_region);
+    p | empty_tree;
+  }
+
+  void * calloc(size_t nelem, size_t size)
+  {
+    const size_t bytesize = nelem * size;
+    void * ret = alloc(bytesize);
+    if (ret != nullptr)
+      memset(ret, 0, bytesize);
+    return ret;
+  }
+
+  void * realloc(void * ptr, size_t size)
+  {
+    void *ret = alloc(size);
+    if (ret != nullptr && ptr != nullptr)
+    {
+      size_t copysize = length(ptr);
+      if (copysize > size)
+        copysize = size;
+      if (copysize > 0)
+        memcpy(ret, ptr, copysize);
+    }
+    if (ptr)
+      free(ptr);
+    return ret;
   }
 };
 
-void * CmiIsomallocContext::alloc(const size_t size, const size_t alignment, const size_t alignment_offset)
-{
-  CmiLock(lock);
-
-  IMP_DBG("[%d][%p] CmiIsomallocContext::alloc(%zu, %zu, %zu)...\n", CmiMyPe(), this, size, alignment, alignment_offset);
-
-  const size_t practical_size = size + sizeof(RegionHeader);
-  const size_t practical_alignment_offset = alignment_offset + sizeof(RegionHeader);
-
-  // Find the smallest empty region that can fit the data.
-  EmptyRegion * node = empty_tree.lookup_region(practical_size, alignment, practical_alignment_offset);
-
-  // Perform the allocation.
-  void * ret = node != nullptr
-               ? allocFromEmptyRegion(practical_size, node, get_alignment_filler(node->ptr() + practical_alignment_offset, alignment))
-               : allocByExtending(practical_size, alignment, practical_alignment_offset);
-
-  IMP_DBG("[%d][%p] CmiIsomallocContext::alloc(%zu, %zu, %zu) returning %p {header = %p}\n",
-          CmiMyPe(), this, size, alignment, alignment_offset, ret, (const uint8_t *)ret - sizeof(RegionHeader));
-
-  CmiUnlock(lock);
-
-  return ret;
-}
-
-size_t CmiIsomallocContext::length(void * user_ptr) const
-{
-  const auto header = (const RegionHeader *)user_ptr - 1;
-  return header->usersize();
-}
-
-void CmiIsomallocContext::free(void * user_ptr)
-{
-  CmiLock(lock);
-
-  const auto orig_header = (RegionHeader *)user_ptr - 1;
-  CmiAssert(!orig_header->isEmpty());
-
-  IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p)... {header = %p}\n", CmiMyPe(), this, user_ptr, orig_header);
-
-  RegionHeader * const orig_header_prev = orig_header->prev();
-  RegionHeader * const orig_header_next = orig_header->next();
-
-  RegionHeader * header = orig_header;
-  RegionHeader * header_prev;
-  RegionHeader * header_next;
-  size_t header_size = (orig_header_next != nullptr ? (const uint8_t *)orig_header_next : allocated_extent) - (const uint8_t *)orig_header;
-
-  if (orig_header->nextIsEmpty())
-  {
-    // Merge with the free region to the right.
-
-    RegionHeader * const orig_header_next_next = orig_header_next->next();
-
-    const auto empty_region = (EmptyRegion *)(orig_header_next + 1);
-    IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) erasing empty region {%p, %zu} (right)\n",
-            CmiMyPe(), this, user_ptr, orig_header_next, empty_region->size());
-    empty_tree.remove(empty_region);
-
-    header_next = orig_header_next_next;
-    header_size += orig_header_next->size();
-  }
-  else
-  {
-    // Directly link to the occupied region to the right.
-
-    header_next = orig_header_next;
-  }
-
-  if (orig_header->prevIsEmpty())
-  {
-    // Merge with the free region to the left.
-
-    RegionHeader * const orig_header_prev_prev = orig_header_prev->prev();
-    const size_t orig_header_prev_size = orig_header_prev->size();
-
-    auto empty_region = (EmptyRegion *)(orig_header_prev + 1);
-    IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) erasing empty region {%p, %zu} (left)\n",
-            CmiMyPe(), this, user_ptr, orig_header_prev, empty_region->size());
-    empty_tree.remove(empty_region);
-
-    header = orig_header_prev;
-    header_prev = orig_header_prev_prev;
-    header_size += orig_header_prev_size;
-  }
-  else
-  {
-    // Try reclaiming slop space to the left.
-
-    header_prev = orig_header_prev;
-
-    uint8_t * available_ptr;
-    if (orig_header_prev != nullptr)
-    {
-      CmiAssert(!orig_header_prev->isEmpty());
-      available_ptr = (uint8_t *)orig_header_prev + orig_header_prev->size();
-      available_ptr += minimum_alignment_filler(available_ptr);
-    }
-    else
-    {
-      available_ptr = start;
-      CmiAssert(minimum_alignment_filler(available_ptr) == 0);
-    }
-
-    CmiAssert(available_ptr <= (const uint8_t *)header);
-
-    header_size += (const uint8_t *)header - available_ptr;
-    header = (RegionHeader *)available_ptr;
-  }
-
-  if (header_size < minimum_empty_region_size)
-  {
-    // There is not enough space for a new empty region.
-    // Append it as slop to the previous occupied region.
-
-    IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) remnant too small {%p, %zu}, appending to %p on left (%p on right)\n",
-            CmiMyPe(), this, user_ptr, header, header_size, header_prev, header_next);
-
-    if (header_prev == nullptr)
-      setFirstRegion(header_next);
-    else
-      header_prev->setNext(header_next);
-
-    if (header_next == nullptr)
-      setLastRegion(header_prev);
-    else
-      header_next->setPrev(header_prev);
-  }
-  else
-  {
-    // Add a new empty region containing the space from the freed region and any surrounding free space.
-
-    IMP_DBG("[%d][%p] CmiIsomallocContext::free(%p) inserting empty region {%p, %zu}\n",
-            CmiMyPe(), this, user_ptr, header, header_size);
-
-    header = new (header) RegionHeader{header_prev, header_next, header_size, Occupied{false}};
-
-    if (header_prev == nullptr)
-      setFirstRegion(header);
-    else
-      setRegionNext(header_prev, header);
-
-    if (header_next == nullptr)
-      setLastRegion(header);
-    else
-      header_next->setPrev(header);
-
-    // Record the new empty region.
-    CmiAssert(!header->prevIsEmpty() && !header->nextIsEmpty());
-
-    insertEmptyRegion(header);
-  }
-
-  CmiUnlock(lock);
-}
-
-void CmiIsomallocContext::pup(PUP::er & p)
-{
-  IMP_DBG("[%d][%p] CmiIsomallocContext::pup()%s%s%s%s\n", CmiMyPe(), this, p.isSizing() ? " sizing" : "",
-          p.isPacking() ? " packing" : "", p.isUnpacking() ? " unpacking" : "", p.isDeleting() ? " deleting" : "");
-
-  pup_raw_pointer(p, start);
-  pup_raw_pointer(p, end);
-  pup_raw_pointer(p, allocated_extent);
-  pup_raw_pointer(p, first_region);
-  pup_raw_pointer(p, last_region);
-  p | empty_tree;
-
-  const size_t totalsize = allocated_extent - start;
-
-  if (p.isUnpacking())
-  {
-    void * const mapped = map_global_memory(start, totalsize);
-    if (mapped == nullptr)
-      CmiAbort("Failed to unpack CmiIsomallocContext!");
-  }
-
-  p(start, totalsize);
-
-  if (p.isDeleting())
-  {
-    clear();
-  }
-}
+using Mempool = isomalloc_dlmalloc;
 
 /************** External interface ***************/
 
+#ifndef MALLOC_ALIGNMENT
 #define MALLOC_ALIGNMENT ALIGN_BYTES
+#endif
 
-static size_t isomalloc_internal_validate_align(size_t align)
+static inline size_t isomalloc_internal_validate_align(size_t align)
 {
   /* make sure alignment is power of 2 */
   if ((align & (align - 1)) != 0)
@@ -2139,16 +2362,26 @@ int CmiIsomallocInRange(void * addr)
                             pointer_lt((uint8_t *)addr, isomallocEnd));
 }
 
-int _sync_iso_warned = 0;
+#if CMK_CONVERSE_MPI && (CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING)
+extern int num_workpes, total_pes;
+#endif
 
 void CmiIsomallocInit(char ** argv)
 {
+#if CMK_CONVERSE_MPI && (CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING)
+  if (num_workpes != total_pes)
+  {
+    disable_isomalloc("+wp is active and spare processor init code is WIP");
+    return;
+  }
+#endif
+
 #if CMK_NO_ISO_MALLOC
-  disable_isomalloc("isomalloc disabled by conv-mach");
+  disable_isomalloc("unsupported platform");
 #else
   if (CmiGetArgFlagDesc(argv, "+noisomalloc", "disable isomalloc"))
   {
-    disable_isomalloc("isomalloc disabled by user.");
+    disable_isomalloc("specified by user");
     return;
   }
 #if CMK_MMAP_PROBE
@@ -2163,12 +2396,10 @@ void CmiIsomallocInit(char ** argv)
           argv, "+isomalloc_test",
           "mmap test common areas for the largest available isomalloc region"))
     _mmap_probe = 0;
-  if (CmiGetArgFlagDesc(argv, "+isomalloc_sync", "synchronize isomalloc region globaly"))
-    _sync_iso = 1;
 #if __FAULT__
   if (CmiGetArgFlagDesc(argv, "+restartisomalloc",
                         "restarting isomalloc on this processor after a crash"))
-    _restart = 1;
+    CmiIsomallocRestart = 1;
 #endif
   if (!init_map())
   {
@@ -2176,81 +2407,89 @@ void CmiIsomallocInit(char ** argv)
   }
   else
   {
-    /* Warn user if ASLR is enabled and '+isomalloc_sync' is missing */
-    if (CmiMyPe() == 0 && read_randomflag() == 1 && _sync_iso == 0 &&
-        _sync_iso_warned == 0)
-    {
-      _sync_iso_warned = 1;
-      CmiPrintf(
-          "Warning> Randomization of virtual memory (ASLR) is turned "
-          "on in the kernel, thread migration may not work! Run 'echo 0 > "
-          "/proc/sys/kernel/randomize_va_space' as root to disable it, "
-          "or try running with '+isomalloc_sync'.\n");
-    }
-
-    CmiIsomallocInitExtent();
+    CmiIsomallocInitExtent(argv);
   }
 #endif
 }
 
 /* Contexts */
 
-CmiIsomallocContext * CmiIsomallocContextCreate(int myunit, int numunits)
+CmiIsomallocContext CmiIsomallocContextCreate(int myunit, int numunits)
 {
+  if (isomallocStart == nullptr)
+    return { nullptr };
+
   uint8_t * unrounded_start = get_space_partition(isomallocStart, isomallocEnd, myunit, numunits);
   uint8_t * unrounded_end = get_space_partition(isomallocStart, isomallocEnd, myunit+1, numunits);
   auto start = (uint8_t *)CMIALIGN((uintptr_t)unrounded_start, pagesize);
   auto end = (uint8_t *)CMIALIGN((uintptr_t)unrounded_end - (pagesize-1), pagesize);
-  auto ctx = new CmiIsomallocContext{start, end};
-
-  return ctx;
+  return { new Mempool{start, end} };
 }
 
-void CmiIsomallocContextDelete(CmiIsomallocContext * ctx)
+void CmiIsomallocContextDelete(CmiIsomallocContext ctx)
 {
+  auto pool = (Mempool *)ctx.opaque;
 #if ISOMEMPOOL_DEBUG
-  ctx->print_contents();
+  pool->print_contents();
 #endif
-  delete ctx;
+  delete pool;
 }
 
-void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext ** ctxptr)
+void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext * ctxptr)
 {
   PUP::er & p = *(PUP::er *)cpup;
 
   if (p.isUnpacking())
   {
-    *ctxptr = new CmiIsomallocContext{PUP::reconstruct{}};
+    ctxptr->opaque = new Mempool{PUP::reconstruct{}};
   }
 
-  p | **ctxptr;
+  auto pool = (Mempool *)ctxptr->opaque;
+
+  p | *pool;
 
   if (p.isDeleting())
   {
-    delete *ctxptr;
-    *ctxptr = nullptr;
+    delete pool;
+    ctxptr->opaque = nullptr;
   }
 }
 
-void * CmiIsomallocContextMalloc(CmiIsomallocContext * ctx, size_t size)
+void * CmiIsomallocContextMalloc(CmiIsomallocContext ctx, size_t size)
 {
-  return ctx->alloc(size);
+  auto pool = (Mempool *)ctx.opaque;
+  return pool->alloc(size);
 }
 
-void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * ctx, size_t align, size_t size)
+void * CmiIsomallocContextMallocAlign(CmiIsomallocContext ctx, size_t align, size_t size)
 {
-  return ctx->alloc(size, isomalloc_internal_validate_align(align));
+  auto pool = (Mempool *)ctx.opaque;
+  return pool->alloc(size, isomalloc_internal_validate_align(align));
 }
 
-void CmiIsomallocContextFree(CmiIsomallocContext * ctx, void * ptr)
+void * CmiIsomallocContextCalloc(CmiIsomallocContext ctx, size_t nelem, size_t size)
+{
+  auto pool = (Mempool *)ctx.opaque;
+  return pool->calloc(nelem, size);
+}
+
+void * CmiIsomallocContextRealloc(CmiIsomallocContext ctx, void * ptr, size_t size)
+{
+  auto pool = (Mempool *)ctx.opaque;
+  return pool->realloc(ptr, size);
+}
+
+void CmiIsomallocContextFree(CmiIsomallocContext ctx, void * ptr)
 {
   if (ptr == nullptr)
     return;
 
-  ctx->free(ptr);
+  auto pool = (Mempool *)ctx.opaque;
+  pool->free(ptr);
 }
 
-size_t CmiIsomallocContextGetLength(CmiIsomallocContext * ctx, void * ptr)
+size_t CmiIsomallocContextGetLength(CmiIsomallocContext ctx, void * ptr)
 {
-  return ctx->length(ptr);
+  auto pool = (Mempool *)ctx.opaque;
+  return pool->length(ptr);
 }

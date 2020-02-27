@@ -4,7 +4,6 @@
 #include <string.h> /* for strlen */
 #include <algorithm>
 #include <numeric>
-#include <forward_list>
 #include <bitset>
 #include <complex>
 #include <iostream>
@@ -154,13 +153,13 @@ class fromzDisk : public zdisk {
 /* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
  * if tracing is not being used (see bug #1640 for more details on the latter). */
 #ifndef AMPI_PE_LOCAL_IMPL
-#define AMPI_PE_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#define AMPI_PE_LOCAL_IMPL ( !CMK_TRACE_ENABLED )
 #endif
 
 /* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
  * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
 #ifndef AMPI_NODE_LOCAL_IMPL
-#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_TRACE_ENABLED )
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
@@ -175,9 +174,7 @@ class fromzDisk : public zdisk {
 
 /* messages larger than or equal to this threshold will always block on a matching recv */
 #ifndef AMPI_SSEND_THRESHOLD_DEFAULT
-#if CMK_BIGSIM_CHARM // ZC Direct API-based rendezvous protocol is not supported by BigSim
-#define AMPI_SSEND_THRESHOLD_DEFAULT 1000000000
-#elif CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#if   CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
 #define AMPI_SSEND_THRESHOLD_DEFAULT 262144
 #else
 #define AMPI_SSEND_THRESHOLD_DEFAULT 131072
@@ -186,7 +183,7 @@ class fromzDisk : public zdisk {
 
 /* AMPI uses RDMA sends if BigSim is not being used. */
 #ifndef AMPI_RDMA_IMPL
-#define AMPI_RDMA_IMPL !CMK_BIGSIM_CHARM
+#define AMPI_RDMA_IMPL 1
 #endif
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
@@ -198,11 +195,7 @@ extern int AMPI_RDMA_THRESHOLD;
 
 #define AMPI_ALLTOALL_THROTTLE   64
 #define AMPI_ALLTOALL_SHORT_MSG  256
-#if CMK_BIGSIM_CHARM
-#define AMPI_ALLTOALL_LONG_MSG   4194304
-#else
 #define AMPI_ALLTOALL_LONG_MSG   32768
-#endif
 
 typedef void (*MPI_MigrateFn)(void);
 
@@ -1200,11 +1193,6 @@ class AmpiRequest {
   bool complete      = false;
   bool blocked       = false; // this req is currently blocked on
 
-#if CMK_BIGSIM_CHARM
- public:
-  void *event        = nullptr; // the event point that corresponds to this message
-  int eventPe        = -1; // the PE that the event is located on
-#endif
 
  public:
   AmpiRequest() =default;
@@ -1295,13 +1283,6 @@ class AmpiRequest {
     p(reqIdx);
     p(complete);
     p(blocked);
-#if CMK_BIGSIM_CHARM
-    //needed for bigsim out-of-core emulation
-    //as the "log" is not moved from memory, this pointer is safe
-    //to be reused
-    p((char *)&event, sizeof(void *));
-    p(eventPe);
-#endif
   }
 
   virtual void print() const noexcept =0;
@@ -1762,11 +1743,6 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   MPI_Comm comm; // Communicator
  public:
   char *data; //Payload
-#if CMK_BIGSIM_CHARM
- public:
-  void *event;
-  int  eventPe; // the PE that the event is located
-#endif
 
  public:
   AmpiMsg() noexcept : data(NULL) {}
@@ -1862,32 +1838,39 @@ class AmpiMsg final : public CMessage_AmpiMsg {
 
 class AmpiMsgPool {
  private:
-  std::forward_list<AmpiMsg *> msgs; // list of free msgs
+  std::vector<AmpiMsg *> msgs; // list of free msgs
   int msgLength; // AmpiMsg::length of messages in the pool
   int maxMsgs; // max # of msgs in the pool
   int currMsgs; // current # of msgs in the pool
 
  public:
   AmpiMsgPool(int _numMsgs = 0, int _msgLength = 0) noexcept
-    : msgLength(_msgLength), maxMsgs(_numMsgs), currMsgs(0) {}
-  ~AmpiMsgPool() =default;
+    : msgs(_numMsgs), msgLength{_msgLength}, maxMsgs{_numMsgs}, currMsgs{0} {}
+  AmpiMsgPool(PUP::reconstruct) noexcept
+    : currMsgs{0} {}
+  ~AmpiMsgPool() {
+    for (int i = 0; i < currMsgs; ++i)
+      delete msgs[i];
+  }
   inline void clear() noexcept {
-    while (!msgs.empty()) {
-      delete msgs.front();
-      msgs.pop_front();
+    for (int i = 0; i < currMsgs; ++i) {
+      AmpiMsg *& msg = msgs[i];
+      delete msg;
+      msg = nullptr;
     }
     currMsgs = 0;
   }
   inline AmpiMsg* newAmpiMsg(CMK_REFNUM_TYPE seq, int ssendReq, int tag, int srcRank, int len) noexcept {
-    if (msgs.empty() || msgs.front()->origLength < len) {
+    if (currMsgs == 0 || msgs[currMsgs-1]->origLength < len) {
       int newlen = std::max(msgLength, len);
       AmpiMsg* msg = new (newlen, 0) AmpiMsg(seq, ssendReq, tag, srcRank, newlen);
       msg->setLength(len);
       return msg;
     } else {
-      AmpiMsg* msg = msgs.front();
-      msgs.pop_front();
+      AmpiMsg *& front = msgs[currMsgs-1];
+      AmpiMsg * msg = front;
       currMsgs--;
+      front = nullptr;
       msg->setSeq(seq);
       msg->setSsendReq(ssendReq);
       msg->setTag(tag);
@@ -1900,7 +1883,7 @@ class AmpiMsgPool {
     /* msg->origLength is the true size of the message's data buffer, while
      * msg->length is the space taken by the payload within it. */
     if (currMsgs != maxMsgs && msg->origLength >= msgLength && msg->origLength < 2*msgLength) {
-      msgs.push_front(msg);
+      msgs[currMsgs] = msg;
       currMsgs++;
     } else {
       delete msg;
@@ -1909,6 +1892,8 @@ class AmpiMsgPool {
   void pup(PUP::er& p) {
     p|msgLength;
     p|maxMsgs;
+    if (p.isUnpacking())
+      msgs.resize(maxMsgs);
     // Don't PUP the msgs in the free list or currMsgs, let the pool fill lazily
   }
 };
