@@ -1242,6 +1242,8 @@ ampiParent::ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept
 
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
 
+  thread->setResumeCallback(CkCallback(CkIndex_ampiParent::resumingAfterMigration(), thisProxy[thisIndex]));
+
 #if CMK_FAULT_EVAC
   AsyncEvacuate(false);
 #endif
@@ -1489,15 +1491,16 @@ void ampiParent::ckAboutToMigrate() noexcept {
 void ampiParent::ckJustMigrated() noexcept {
   ArrayElement1D::ckJustMigrated();
   prepareCtv();
+}
+
+void ampiParent::resumingAfterMigration() noexcept {
   if (userJustMigratedFn) {
-    CtvAccess(_curTCharm) = thread;
-    CtvAccess(ampiPtr) = this;
     const int old = CthInterceptionsTemporarilyActivateStart(thread->getThread());
     (*userJustMigratedFn)();
     CthInterceptionsTemporarilyActivateEnd(thread->getThread(), old);
-    CtvAccess(_curTCharm) = nullptr;
-    CtvAccess(ampiPtr) = nullptr;
   }
+
+  thread->start();
 }
 
 void ampiParent::ckJustRestored() noexcept {

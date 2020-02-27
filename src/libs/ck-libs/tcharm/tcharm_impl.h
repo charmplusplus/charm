@@ -103,6 +103,8 @@ class TCharm: public CBase_TCharm
 	TCharmInitMsg *initMsg; //Thread initialization data
 	double timeOffset; //Value to add to CkWallTimer to get my clock
 
+  CkCallback resumeCallback;
+
  public:
 	//User's heap-allocated/global data:
 	class UserData {
@@ -155,6 +157,12 @@ class TCharm: public CBase_TCharm
 	virtual void ckJustMigrated();
 	virtual void ckJustRestored();
 	virtual void ckAboutToMigrate();
+
+  template <class T = CkCallback>
+  void setResumeCallback(T && cb)
+  {
+    resumeCallback = std::forward<T>(cb);
+  }
 
 	void atBarrier();
 	void atExit(CkReductionMsg *msg) noexcept;
