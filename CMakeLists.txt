@@ -13,7 +13,7 @@
 # Version 3.4 added CMAKE_C_COMPILER_LAUNCHER and CMAKE_CXX_COMPILER_LAUNCHER
 cmake_minimum_required(VERSION 3.4)
 
-project(Charm++ LANGUAGES CXX C VERSION 6.10.0)
+project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
 find_package(Threads REQUIRED)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler

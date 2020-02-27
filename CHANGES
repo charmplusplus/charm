@@ -2,6 +2,21 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.10.1
+================================================================================
+
+This is a minor bug-fix release, with the following changes:
+
+- Fix verbs on new InfiniBand hardware/drivers. This fixes some of the observed
+  failures on InfiniBand machines, but not all of them; it is still a known
+  issue.
+
+- Fix isomalloc_sync crash in SMP OpenMP mode.
+
+- Avoid CmiAbort segfaults in production builds.
+
+
+================================================================================
 What's new in Charm++ 6.10.0
 ================================================================================
 
