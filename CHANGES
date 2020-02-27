@@ -11,8 +11,6 @@ This is a minor bug-fix release, with the following changes:
   failures on InfiniBand machines, but not all of them; it is still a known
   issue.
 
-- Fix isomalloc_sync crash in SMP OpenMP mode.
-
 - Avoid CmiAbort segfaults in production builds.
 
 
