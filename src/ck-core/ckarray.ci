@@ -28,6 +28,8 @@ module CkArray {
     entry [expedited] void incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper p);
     entry [nokeep] void recvNoKeepBroadcast(CkMessage *);
     entry void sendNoKeepBroadcast(CkMessage *);
+    entry [expedited,nokeep] void recvNoKeepExpeditedBroadcast(CkMessage *);
+    entry [expedited] void sendNoKeepExpeditedBroadcast(CkMessage *);
 
     entry void ckDestroy();
   };
