@@ -9,7 +9,7 @@
         implicit none
 
         integer, parameter :: parameter_variable = 0
-        intege, target :: module_variable
+        integer, target :: module_variable
         !$omp threadprivate(module_variable)
 
       end module test_mod
