@@ -159,7 +159,6 @@ static void privatization_about_to_migrate()
   if (rank != global_myrank)
   {
     printf("[%d] Globals incorrect when about to migrate!\n", rank);
-    MPI_Abort(MPI_COMM_WORLD, 1);
   }
 }
 static void privatization_just_migrated()
@@ -170,7 +169,6 @@ static void privatization_just_migrated()
   if (rank != global_myrank)
   {
     printf("[%d] Globals incorrect when just migrated!\n", rank);
-    MPI_Abort(MPI_COMM_WORLD, 1);
   }
 }
 #endif
