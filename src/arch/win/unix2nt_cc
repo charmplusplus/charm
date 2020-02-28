@@ -42,8 +42,8 @@ CL_CMD='CL.EXE'
 # Define NOMINMAX to avoid definition of unexpected min(a,b) and max(a,b)
 # macros,per http://support.microsoft.com/kb/143208
 CL_COMMON='-nologo -W1 -EHsc -D_WINDOWS -DNOMINMAX -GS-'
-# CL_COMMON="$CL_COMMON -I`cygpath -d \"$SDK_DIR/Include\"`"
-# CL_COMMON="$CL_COMMON -I`cygpath -d \"$VCC_DIR/Include\"`"
+# CL_COMMON+=" -I`cygpath -d \"$SDK_DIR/Include\"`"
+# CL_COMMON+=" -I`cygpath -d \"$VCC_DIR/Include\"`"
 CL_MT='-MT'
 CL_DLL='-LD'
 
@@ -71,9 +71,9 @@ fi
 LINK_COMMON='-nologo -subsystem:console -DYNAMICBASE:NO'
 #if [[ -d "`cygpath -u \"$SDK_DIR/Lib/x64\"`" ]]
 #then
-#LINK_COMMON="$LINK_COMMON -LIBPATH:`cygpath -d \"$SDK_DIR/Lib/x64\"`"
+#LINK_COMMON+=" -LIBPATH:`cygpath -d \"$SDK_DIR/Lib/x64\"`"
 #else
-#LINK_COMMON="$LINK_COMMON -LIBPATH:`cygpath -d \"$VCC_DIR/Lib/amd64\"`"
+#LINK_COMMON+=" -LIBPATH:`cygpath -d \"$VCC_DIR/Lib/amd64\"`"
 #fi
 #LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib 
 #  comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib 
@@ -184,69 +184,69 @@ do
 		VERBOSE='1'
 		;;
 	-E)
-		CL="$CL -E"
-		ML="$ML -EP"
+		CL+=' -E'
+		ML+=' -EP'
 		;;
 	-O0)
-		CL_OPTS="$CL_OPTS -Od"
+		CL_OPTS+=' -Od'
 		;;
 	-Og)
-		CL_OPTS="$CL_OPTS -DNDEBUG -Od"
-		ML_OPTS="$ML_OPTS -DNDEBUG"
+		CL_OPTS+=' -DNDEBUG -Od'
+		ML_OPTS+=' -DNDEBUG'
 		;;
 	-O|-O1|-Os)
-		CL_OPTS="$CL_OPTS -DNDEBUG -O1"
-		ML_OPTS="$ML_OPTS -DNDEBUG"
+		CL_OPTS+=' -DNDEBUG -O1'
+		ML_OPTS+=' -DNDEBUG'
 		;;
 	-O2)
-		CL_OPTS="$CL_OPTS -DNDEBUG -O2"
-		ML_OPTS="$ML_OPTS -DNDEBUG"
+		CL_OPTS+=' -DNDEBUG -O2'
+		ML_OPTS+=' -DNDEBUG'
 		;;
 	-O3|-Ofast)
-		CL_OPTS="$CL_OPTS -DNDEBUG -Ox"
-		ML_OPTS="$ML_OPTS -DNDEBUG"
+		CL_OPTS+=' -DNDEBUG -Ox'
+		ML_OPTS+=' -DNDEBUG'
 		;;
 	-g)
-		CL_OPTS="$CL_OPTS -Z7"
-		ML_OPTS="$ML_OPTS -Zi -Zd"
-		LINK_OPTS="$LINK_OPTS -DEBUG"
+		CL_OPTS+=' -Z7'
+		ML_OPTS+=' -Zi -Zd'
+		LINK_OPTS+=' -DEBUG'
 		CL_MT='-MTd'
 		;;
 	-c) 
-		CL="$CL -c"
-		ML="$ML -c"
+		CL+=' -c'
+		ML+=' -c'
         ;;
 	-D)
-		CL="$CL -D$1"
-		ML="$ML -D$1"
+		CL+=" -D$1"
+		ML+=" -D$1"
 		shift
 		;;
 	-U)
-		CL="$CL -U$1"
-		ML="$ML -U$1"
+		CL+=" -U$1"
+		ML+=" -U$1"
 		shift
 		;;
 	-D*)
 		def=`echo $arg | awk -F@ '{print substr($1,3)}'`
-		CL="$CL -D$def"
-		ML="$ML -D$def"
+		CL+=" -D$def"
+		ML+=" -D$def"
 		;;
 	-U*)
 		def=`echo $arg | awk -F@ '{print substr($1,3)}'`
-		CL="$CL -U$def"
-		ML="$ML -U$def"
+		CL+=" -U$def"
+		ML+=" -U$def"
 		;;
 	-I)
 		path="`cygpath -w $1`"
-		CL="$CL -I$path"
-		ML="$ML -I$path"
+		CL+=" -I$path"
+		ML+=" -I$path"
 		shift
 		;;
 	-I*)
 		path=`echo $arg | awk -F@ '{print substr($1,3)}'`
 		path="`cygpath -w $path`"
-		CL="$CL -I$path"
-		ML="$ML -I$path"
+		CL+=" -I$path"
+		ML+=" -I$path"
 		;;
 	-MM|-M)
 		DODEPS='1'
@@ -255,15 +255,15 @@ do
 		;;
 	-L)
 		LIBDIR="`cygpath -w $1`"
-		LIBDIRS="$LIBDIRS `cygpath -u $LIBDIR`"
+		LIBDIRS+=" `cygpath -u $LIBDIR`"
 		LINK=$LINK"	-LIBPATH:$LIBDIR"
 		shift
 		;;
 	-L*)
 		LIBDIR=`echo $arg | awk -F@ '{print substr($1,3)}'`
 		LIBDIR="`cygpath -w $LIBDIR`"
-		LIBDIRS="$LIBDIRS `cygpath -u $LIBDIR`"
-		LINK=$LINK"	-LIBPATH:$LIBDIR"
+		LIBDIRS+=" `cygpath -u $LIBDIR`"
+		LINK+="	-LIBPATH:$LIBDIR"
 		;;
 	-l*)
 		if [[ "$arg" != '-lm' ]]
@@ -285,7 +285,7 @@ do
 			  [[ -r "$dir/lib$L.lib" ]] && D="$dir/lib$L.lib"
 			done
 			[[ -z "$D" ]] && Abort "Couldn't find library $L in . or $LIBDIRS"
-			LINK="$LINK `cygpath -w $D`"
+			LINK+=" `cygpath -w $D`"
 		fi
 		;;
 	-o)
@@ -303,11 +303,11 @@ do
 			OUTPUT="-Fo`cygpath -w $out`"
 		elif [[ "x`getExtension $out`" = "x.exe" ]]
 		then
-			LINK="$LINK -out:$out"
+			LINK+=" -out:$out"
 			DOLINK='1'
 		else
 #It's an exe filename-- tell LINK
-			LINK="$LINK -out:$out.exe"
+			LINK+=" -out:$out.exe"
 			DOLINK='1'
 		fi
 		;;
@@ -316,9 +316,9 @@ do
 	*.o|*.a|*.lib|*.obj)
 		if [[ -n "$DOCOMPILE" ]]
 		then
-		  CL="$CL `cygpath -w $arg`"
+		  CL+=" `cygpath -w $arg`"
 		else
-		  LINK="$LINK `cygpath -w $arg`"
+		  LINK+=" `cygpath -w $arg`"
 		  DOLINK='1'
 		fi
 		;;
@@ -326,27 +326,27 @@ do
 	*.c)
 		base=`stripExtension $arg`
 		source="$arg"
-		CL="$CL -Tc`cygpath -w $arg`"
+		CL+=" -Tc`cygpath -w $arg`"
 		OBJ_OUTPUT="-Fo$base.o"
-		LINK="$LINK $base.o"
+		LINK+=" $base.o"
 		DOCOMPILE='1'
 		;;
 #ASM source file
 	*.asm)
 		base=`stripExtension $arg`
 		source="$arg"
-		ML="$ML -Ta`cygpath -w $arg`"
+		ML+=" -Ta`cygpath -w $arg`"
 #		OUTPUT="-Fo$base.o"
-		LINK="$LINK $base.o"
+		LINK+=" $base.o"
 		DOASSEMBLE='1'
 		;;
 #C++ source file
 	*.C|*.cxx|*.cpp)
 		base=`stripExtension $arg`
 		source="$arg"
-		CL="$CL -Tp`cygpath -w $arg`"
+		CL+=" -Tp`cygpath -w $arg`"
 #		OUTPUT="-Fo$base.o"
-		LINK="$LINK $base.o"
+		LINK+=" $base.o"
 		DOCOMPILE='1'
 		;;
 	'-fno-lifetime-dse'|'-rdynamic'|'-Wl,--export-dynamic')
@@ -361,7 +361,7 @@ do
 	esac
 done
 
-CL_OPTS="$CL_OPTS $CL_MT"
+CL_OPTS+=" $CL_MT"
 
 if [[ -n "$DODEPS" ]]
 then
@@ -380,7 +380,7 @@ fi
 if [[ -n "$DOCOMPILE" ]]
 then
 	OPTS="$CL_OPTS $OUTPUT $CL"
-	[[ -n "$DOLINK" && -z "$OUTPUT" ]] && OPTS="$OPTS $OBJ_OUTPUT"
+	[[ -n "$DOLINK" && -z "$OUTPUT" ]] && OPTS+=" $OBJ_OUTPUT"
 	[[ -n "$VERBOSE" ]] && echo "unix2nt_cc> $CL_CMD" $OPTS
 	"$CL_CMD" $OPTS
 	if [[ $? -ne 0 ]]
@@ -392,7 +392,7 @@ fi
 if [[ -n "$DOASSEMBLE" ]]
 then
 	OPTS="$ML_OPTS $OUTPUT $ML"
-	[[ -n "$DOLINK" && -z "$OUTPUT" ]] && OPTS="$OPTS $OBJ_OUTPUT"
+	[[ -n "$DOLINK" && -z "$OUTPUT" ]] && OPTS+=" $OBJ_OUTPUT"
 	[[ -n "$VERBOSE" ]] && echo "unix2nt_cc> $ML_CMD" $OPTS
 	"$ML_CMD" $OPTS
 	if [[ $? -ne 0 ]]
