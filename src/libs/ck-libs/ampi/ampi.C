@@ -1491,10 +1491,12 @@ void ampiParent::ckAboutToMigrate() noexcept {
 void ampiParent::ckJustMigrated() noexcept {
   ArrayElement1D::ckJustMigrated();
   prepareCtv();
+  didMigrate = true;
 }
 
 void ampiParent::resumeAfterMigration() noexcept {
-  if (userJustMigratedFn) {
+  if (didMigrate && userJustMigratedFn) {
+    didMigrate = false;
     CtvAccess(_curTCharm) = thread;
     CtvAccess(ampiPtr) = this;
     const int old = CthInterceptionsTemporarilyActivateStart(thread->getThread());

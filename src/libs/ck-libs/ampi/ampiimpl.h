@@ -2131,6 +2131,7 @@ class ampiParent final : public CBase_ampiParent {
   CProxy_ampi tmpRProxy;
 
   MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
+  bool didMigrate{};
 
  public:
   bool ampiInitCallDone;
