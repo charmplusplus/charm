@@ -1158,7 +1158,7 @@ extern int MaxDataNodes;
 extern int QueueUpperBound;
 extern int DataNodeWrap;
 extern int QueueWrap;
-extern int messageQueueOverflow;
+extern CmiMemoryAtomicInt messageQueueOverflow;
 
 int power_of_two_check(int n)
 {
