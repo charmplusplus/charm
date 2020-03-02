@@ -6,7 +6,7 @@
 # Increment the second and third digits when making a minor feature release
 # Increment the first digit when making a major feature release
 
-AC_INIT(Charm++, 61000, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
+AC_INIT(Charm++, 61001, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
