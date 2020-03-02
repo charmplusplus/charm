@@ -7,12 +7,9 @@ What's new in Charm++ 6.10.1
 
 This is a minor bug-fix release, with the following changes:
 
-- Fix verbs on new InfiniBand hardware/drivers. This fixes some of the observed
-  failures on InfiniBand machines, but not all of them; it is still a known
-  issue.
+- Fix verbs layer send completion errors on recent InfiniBand hardware/drivers.
 
-- Avoid CmiAbort segfaults in production builds.
-
+- Avoid aborting with a segfault when calling CmiAbort in production builds.
 
 ================================================================================
 What's new in Charm++ 6.10.0
