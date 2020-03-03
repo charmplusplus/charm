@@ -45,6 +45,15 @@ enum ProfilingStage{
   GpuMemCleanup = 8802
 };
 
+#ifdef HAPI_CUDA_CALLBACK
+struct hapiCallbackMessage {
+  char header[CmiMsgHeaderSizeBytes];
+  int rank;
+  void* cb;
+  void* cb_msg;
+};
+#endif
+
 #ifndef HAPI_CUDA_CALLBACK
 typedef struct hapiEvent {
   cudaEvent_t event;
@@ -556,15 +565,12 @@ static void* lightCallback(void *arg) {
   NVTXTracer nvtx_range("lightCallback", NVTXColor::Asbestos);
 #endif
 
-  char* conv_msg_tmp = (char*)arg + CmiMsgHeaderSizeBytes + sizeof(int);
-  void* cb = *((void**)conv_msg_tmp);
-  conv_msg_tmp += sizeof(void*);
-  void* cb_msg = *((void**)conv_msg_tmp);
+  hapiCallbackMessage* conv_msg = (hapiCallbackMessage*)arg;
 
   // invoke user callback
-  if (cb) {
+  if (conv_msg->cb) {
     CmiAssert(hapiInvokeCallback);
-    hapiInvokeCallback(cb, cb_msg);
+    hapiInvokeCallback(conv_msg->cb, conv_msg->cb_msg);
   }
 
   // notify process to QD
@@ -1334,14 +1340,10 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
 */
 
   // create converse message to be delivered to this PE after CUDA callback
-  char* conv_msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes + sizeof(int) +
-                                 sizeof(void*) + sizeof(void*)); // FIXME memory leak?
-  char* conv_msg_tmp = conv_msg + CmiMsgHeaderSizeBytes;
-  *((int*)conv_msg_tmp) = CmiMyRank();
-  conv_msg_tmp += sizeof(int);
-  *((void**)conv_msg_tmp) = cb;
-  conv_msg_tmp += sizeof(void*);
-  *((void**)conv_msg_tmp) = cb_msg;
+  hapiCallbackMessage* conv_msg = (hapiCallbackMessage*)CmiAlloc(sizeof(hapiCallbackMessage)); // FIXME memory leak?
+  conv_msg->rank = CmiMyRank();
+  conv_msg->cb = cb;
+  conv_msg->cb_msg = cb_msg;
   CmiSetHandler(conv_msg, CsvAccess(gpu_manager).light_cb_idx_);
 
   // push into CUDA stream
