@@ -111,6 +111,9 @@ option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 option(EVERYLB             "Compile EveryLB suite of load balancing strategies" OFF)
 option(F90CHARM            "Build f90charm" OFF)
 
+# option UCX PMI options
+set(UCX_PMI "" CACHE STRING "PMI type for UCX layer, can be one of simplepmi, simplepmi2, or ompipmix")
+
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 add_compile_options(${EXTRA_OPTS})
 
@@ -411,6 +414,11 @@ endif()
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-local.sh)
   configure_file(src/arch/${GDIR}/conv-mach-local.sh           include/ COPYONLY)
   configure_file(src/arch/${GDIR}/conv-mach-local.h            include/ COPYONLY)
+endif()
+
+if(${UCX_PMI})
+  configure_file(src/arch/${GDIR}/conv-mach-${UCX_PMI}.sh include/ COPYONLY)
+  configure_file(src/arch/${GDIR}/conv-mach-${UCX_PMI}.h include/ COPYONLY)
 endif()
 
 # Header files

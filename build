@@ -79,6 +79,7 @@ opt_task_queue=0
 opt_tcp=0
 opt_tracing=0
 opt_tracing_commthread=0
+opt_ucx_pmi=""
 opt_zlib=1
 
 opt_CC= #undef
@@ -101,6 +102,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     pthreads)
       opt_pthreads=1
+      ;;
+    slumrpmi|slurmpmi2|ompipmix)
+      opt_ucx_pmi=$arg
       ;;
   # Compilers
     gcc)
@@ -324,6 +328,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DTCP="$opt_tcp" \
   -DTRACING="$opt_tracing" \
   -DTRACING_COMMTHREAD="$opt_tracing_commthread" \
+  -DUCX_PMI="$opt_ucx_pmi" \
   -DZLIB="$opt_zlib"
 
 make $opt_parallel
