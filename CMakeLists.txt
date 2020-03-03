@@ -65,7 +65,7 @@ else()
 endif()
 
 # Build options
-set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,verbs")
+set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,uth,verbs")
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS")
 
 # Platform specific options (choose multiple if desired):
@@ -115,6 +115,11 @@ set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 add_compile_options(${EXTRA_OPTS})
 
 set(CMK_REPLAYSYSTEM ${REPLAY})
+
+if(${TARGET} STREQUAL "all-test")
+  message(WARNING "Setting TARGET to LIBS instead of all-test.")
+  set(TARGET "LIBS")
+endif()
 
 if(${REPLAY} AND NOT ${TRACING})
   set(CMK_REPLAYSYSTEM 0)
