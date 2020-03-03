@@ -14,10 +14,6 @@ void IfConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   strcpy(nameStr, label->charstar());
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 
-#if CMK_BIGSIM_CHARM
-  generateBeginTime(defs);
-  generateEventBracket(defs, SIF);
-#endif
 
   int indent = unravelClosuresBegin(defs);
 
@@ -43,10 +39,6 @@ void IfConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   strcat(nameStr, "_end");
   generateClosureSignature(decls, defs, entry, false, "void", label, true,
                            encapStateChild);
-#if CMK_BIGSIM_CHARM
-  generateBeginTime(defs);
-  generateEventBracket(defs, SIF_END);
-#endif
   indentBy(defs, 1);
   generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);

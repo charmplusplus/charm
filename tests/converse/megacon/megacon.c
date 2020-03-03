@@ -39,6 +39,7 @@ void deadlock_init(void);
 void multisend_init(void);
 void handler_init(void);
 void reduction_init(void);
+void nodereduction_init(void);
 
 void blkinhand_moduleinit(void);
 void posixth_moduleinit(void);
@@ -59,6 +60,7 @@ void deadlock_moduleinit(void);
 void multisend_moduleinit(void);
 void handler_moduleinit(void);
 void reduction_moduleinit(void);
+void nodereduction_moduleinit(void);
 
 struct testinfo
 {
@@ -90,6 +92,7 @@ tests[] = {
   { "handler",  handler_init,  handler_moduleinit,   1,  1 },
   { "multisend", multisend_init, multisend_moduleinit,  0,  1 },
   { "reduction", reduction_init, reduction_moduleinit, 0, 1 },
+  { "nodereduction", nodereduction_init, nodereduction_moduleinit, 0, 1 },
   { 0,0,0,0 },
 };
 

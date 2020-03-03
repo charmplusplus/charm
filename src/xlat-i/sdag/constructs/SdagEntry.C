@@ -86,9 +86,6 @@ void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     generateCode(decls, defs, sdagFuncName);
   }
 
-#if CMK_BIGSIM_CHARM
-  generateEndSeq(defs);
-#endif
   if (!entry->getContainer()->isGroup() || !entry->isConstructor())
     generateTraceEndCall(defs, 1);
 
@@ -104,10 +101,6 @@ void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   defs << "  ";
   generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
 
-#if CMK_BIGSIM_CHARM
-  generateTlineEndCall(defs);
-  generateBeginExec(defs, "spaceholder");
-#endif
   if (!entry->getContainer()->isGroup() || !entry->isConstructor())
     generateDummyBeginExecute(defs, 1, entry);
 
@@ -115,11 +108,7 @@ void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
 
   decls << "private:\n";
   generateClosureSignature(decls, defs, entry, false, "void", con1->text, true,
-#if CMK_BIGSIM_CHARM
-                           encapStateChild
-#else
                            encapState
-#endif
                            );
 
   if (!entry->paramIsMarshalled() && !entry->param->isVoid()) {

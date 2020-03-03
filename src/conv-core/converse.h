@@ -61,6 +61,14 @@
 
 #include "conv-header.h"
 
+/* Root of broadcast:
+ * non-bcast msg: root = 0;
+ * proc-level bcast msg: root >=1; (CmiMyPe()+1)
+ * node-level bcast msg: root <=-1; (-CmiMyNode()-1)
+ */
+#define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
+#define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
+
 #if CMK_ONESIDED_IMPL
 #define CMI_ZC_MSGTYPE(msg)                  ((CmiMsgHeaderBasic *)msg)->zcMsgType
 #define CMI_IS_ZC_P2P(msg)                   (CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_SEND_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_RECV_MSG)
@@ -514,6 +522,8 @@ extern void         CmiUnlock(CmiNodeLock lock);
 extern int          CmiTryLock(CmiNodeLock lock);
 extern void         CmiDestroyLock(CmiNodeLock lock);
 
+#define CmiInCommThread() (0)
+
 #endif
 
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
@@ -560,7 +570,13 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
 
+#if CMK_SMP
+#define CmiInCommThread()  (CmiMyRank() == CmiMyNodeSize())
+#else
+#define CmiInCommThread()  (0)
 #endif
+
+#endif /* CMK_SHARED_VARS_NT_THREADS */
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* non-SMP version */
 
@@ -1347,17 +1363,25 @@ void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn,
 void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
                      CmiReduceDeleteFn deleteFn, CmiReductionID id);
-void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn, int, int, int);
+void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
 void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
                          CmiReduceMergeFn mergeFn, CmiHandler dest,
                          CmiReduceDeleteFn deleteFn);
+void CmiNodeReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id);
+void CmiNodeReduceStructID(void *data, CmiReducePupFn pupFn,
+                           CmiReduceMergeFn mergeFn, CmiHandler dest,
+                           CmiReduceDeleteFn deleteFn, CmiReductionID id);
 int CmiGetReductionHandler(void);
 CmiHandler CmiGetReductionDestination(void);
 CmiReductionID CmiGetGlobalReduction(void);
+CmiReductionID CmiGetGlobalNodeReduction(void);
 CmiReductionID CmiGetDynamicReduction(void);
+CmiReductionID CmiGetDynamicNodeReduction(void);
 void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data);
+void CmiGetDynamicNodeReductionRemote(int handlerIdx, int node, int dataSize, void *data);
 
 void CmiResetGlobalReduceSeqID(void);
+void CmiResetGlobalNodeReduceSeqID(void);
 
 /* If the second parameter (the number of chunks to send) is negative, then
  * every message will be started aligned with 8 bytes, and a message header will
@@ -2181,12 +2205,8 @@ void CthSetThreadID(CthThread th, int a, int b, int c);
 void CthTraceResume(CthThread t);
 
 #if CMK_FAULT_EVAC
-#if CMK_BIGSIM_CHARM
-#define CmiNodeAlive(x) (1)
-#else
 CpvExtern(char *,_validProcessors);
 #define CmiNodeAlive(x)  (CpvAccess(_validProcessors)[x])
-#endif
 #endif
 
 int CmiEndianness(void);
@@ -2207,11 +2227,7 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "conv-trace.h"
 #include "persistent.h"
 
-#include "conv-rdma.h"
-
-/* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
-extern int _BgOutOfCoreFlag;
-extern int _BgInOutOfCoreMode;
+#include "cmirdmautils.h"
 
 #ifdef ADAPT_SCHED_MEM
 extern int numMemCriticalEntries;

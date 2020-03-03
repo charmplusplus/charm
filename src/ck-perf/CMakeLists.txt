@@ -1,4 +1,4 @@
-set(ckperf-h-sources trace-Tau.h trace-TauBOC.h trace-bluegene.h
+set(ckperf-h-sources trace-Tau.h trace-TauBOC.h
     trace-controlPoints.h trace-controlPointsBOC.h trace-counter.h trace-common.h
     trace-memory.h trace-projections.h trace-projectionsBOC.h trace-projector.h
     trace-simple.h trace-simpleBOC.h trace-summary.h trace-summaryBOC.h
@@ -21,8 +21,6 @@ if($CMK_TRACE_ENABLED})
     add_library(trace-utilization trace-utilization.C ${CMAKE_BINARY_DIR}/include/TraceUtilization.decl.h)
     add_library(trace-simple trace-simple.C ${CMAKE_BINARY_DIR}/include/TraceSimple.decl.h)
     add_library(trace-counter trace-counter.C)
-    # FIXME: add bluegene
-    # add_library(trace-bluegene trace-bluegene.C)
     add_library(trace-memory trace-memory.C)
 endif()
 add_library(trace-converse trace-converse.C)

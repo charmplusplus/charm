@@ -4,6 +4,8 @@
 #  Translates +pN-style conv-host options into
 # mpirun -npN options.
 
+export FROM_CHARMRUN='1'
+
 args=""
 
 # Arguments that need to be passed to the charm application, not mpirun (e.g. ++quiet)
@@ -77,6 +79,7 @@ do
 	++debugger)
 		DEBUGGER=$2
 		shift
+		;;
 	*) 
 	    args=$args" "$1
 	    ;;

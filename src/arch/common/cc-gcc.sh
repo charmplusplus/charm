@@ -14,30 +14,34 @@ CMK_LIBS="$CMK_LIBS -lckqt"
 CMK_PIC='-fPIC'
 
 if [ "$CMK_MACOSX" ]; then
-  # find real gcc (not Apple's clang) in $PATH on darwin, works with homebrew/macports
-  candidates=$(which gcc gcc-{4..19} gcc-mp-{4..19} 2>/dev/null)
-  for cand in $candidates; do
-    $cand -v 2>&1 | grep -q clang
-    if [ $? -eq 1 ]; then
-      cppcand=$(echo $cand | sed s,cc,++,)
-      CMK_CPP_C="$cand"
-      CMK_CC="$cand "
-      CMK_LD="$cand "
-      CMK_CXX="$cppcand "
-      CMK_LDXX="$cppcand "
+  if [ -z "$CMK_COMPILER_SUFFIX" ]; then
+    # find real gcc (not Apple's clang) in $PATH on darwin, works with homebrew/macports
+    candidates=$(which gcc gcc-{4..19} gcc-mp-{4..19} 2>/dev/null)
+    for cand in $candidates; do
+      $cand -v 2>&1 | grep -q clang
+      if [ $? -eq 1 ]; then
+        cppcand=$(echo $cand | sed s,cc,++,)
+        CMK_CPP_C="$cand"
+        CMK_CC="$cand "
+        CMK_LD="$cand "
+        CMK_CXX="$cppcand "
+        CMK_LDXX="$cppcand "
 
-      CMK_CC_FLAGS="-fPIC"
-      CMK_CXX_FLAGS="-fPIC -Wno-deprecated"
-      CMK_LD_FLAGS="-fPIC"
-      CMK_LDXX_FLAGS="-fPIC -multiply_defined suppress"
-      found=1
-      break
+        found=1
+        break
+      fi
+    done
+    if [ -z "$found" ]; then
+      echo "No suitable non-clang gcc found, exiting"
+      exit 1
     fi
-  done
-  if [ -z "$found" ]; then
-    echo "No suitable non-clang gcc found, exiting"
-    exit 1
   fi
+
+  # keep in sync with mpi-darwin-x86_64/conv-mach.sh
+  CMK_CC_FLAGS="-fPIC"
+  CMK_CXX_FLAGS="-fPIC -Wno-deprecated"
+  CMK_LD_FLAGS="-fPIC"
+  CMK_LDXX_FLAGS="-fPIC -multiply_defined suppress"
 fi
 
 if [ "$CMK_COMPILER" = "msvc" ]; then

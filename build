@@ -226,7 +226,6 @@ while [[ $# -gt 0 ]]; do
     --without-romio)
       opt_romio=0
       ;;
-
   # Miscellaneous options
     -j[0-9]*)
       opt_parallel=$arg
@@ -257,7 +256,6 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-
 
 ############ End option parsing
 

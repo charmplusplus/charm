@@ -20,6 +20,3 @@ pupDisk.o: pupDisk.C pupDisk.h someData.h pupDisk.decl.h
 test: all
 	$(call run, ./pupDisk +p4 10 20 4 )
 	$(call run, ./pupDisk +p4 10 20 4 r )
-
-bgtest: all
-	$(call run, ./pupDisk +p4 10 +x2 +y2 +z1)

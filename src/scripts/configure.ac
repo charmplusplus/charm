@@ -2,7 +2,7 @@
 # Increment the last 2 digits when making an API change
 # Increase the first three after branching for a release
 
-AC_INIT(Charm++, 61000, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
+AC_INIT(Charm++, 61001, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
@@ -2419,6 +2419,19 @@ EOT
 test_cxx "whether personality() and ADDR_NO_RANDOMIZE exist" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ADDR_NO_RANDOMIZE, $pass, [whether personality() and ADDR_NO_RANDOMIZE exist])
 
+#### test posix_spawn() ####
+cat > $t <<EOT
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <spawn.h>
+int main() {
+    return posix_spawn(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+}
+EOT
+test_cxx "whether posix_spawn() exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_POSIX_SPAWN, $pass, [whether posix_spawn() exists])
+
 
 # enable/disable zlib
 AC_ARG_ENABLE([zlib],
@@ -2967,14 +2980,21 @@ then
   # Force building of shared hwloc library in embedded mode.
   # See https://github.com/UIUC-PPL/charm/issues/2599 and 
   # https://github.com/open-mpi/hwloc/issues/371 for more details.
-  export LDFLAGS="-rpath $CHARMLIBSO"
+  enable_shared='yes'
+  export am_libhwloc_embedded_la_rpath="-rpath $CHARMLIBSO"
+else
+  enable_shared='no'
+  export am_libhwloc_embedded_la_rpath=''
 fi
+AC_SUBST(am_libhwloc_embedded_la_rpath)
 enable_pci='no'
 enable_libudev='no'
 enable_libxml2='no'
 enable_visibility='no'
 enable_nvml='no'
 enable_opencl='no'
+enable_gl='no'
+enable_cairo='no'
 . hwloc/VERSION
 export libhwloc_so_version
 AC_SUBST(libhwloc_so_version)
