@@ -619,6 +619,10 @@ if(${TARGET} STREQUAL "LIBS")
   add_subdirectory(src/libs/ck-libs)
 endif()
 
+if(${NETWORK} STREQUAL "uth")
+  set(CMK_UTH 1)
+endif()
+
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
   set(CMK_SUPPORTS_FSGLOBALS 0)
 elseif(${CMK_HAS_DLOPEN} AND ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
