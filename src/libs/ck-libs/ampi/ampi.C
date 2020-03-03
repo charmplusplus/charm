@@ -3180,9 +3180,9 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
                                                      getDDT(), AMPI_REQ_COMPLETED));
   }
   else { // Persistent request
-    CkAssert(sreq.isPersistent());
     AmpiRequestList& reqList = parent->ampiReqs;
     AmpiRequest& sreq = (*reqList[reqIdx]);
+    CkAssert(sreq.isPersistent());
     sreq.complete = true;
   }
 
