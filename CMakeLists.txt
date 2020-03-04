@@ -753,10 +753,16 @@ add_custom_target(create_symlinks ALL
                   COMMAND test -d ${CMAKE_BINARY_DIR}/tests || env SYSTEMLN='ln -s' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/tests && true
                  )
 
-# Create .vdir/.gdir/VERSION files
+# Create the .vdir/.gdir/VERSION files
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
 file(WRITE ${CMAKE_BINARY_DIR}/include/.vdir   "${CMK_VDIR}\n")
-file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
+
+# Adjust version number so it can be tested by numerical comparisons, e.g. 6.10.1 -> 61001:
+# #if CHARM_VERSION > 61001
+if(${PROJECT_VERSION_PATCH} LESS 10)
+  set(CHARM_VERSION_PATCH_PREFIX 0)
+endif()
+file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}\n")
 
 
 # Installation rules
