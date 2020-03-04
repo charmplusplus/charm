@@ -45,9 +45,6 @@ class AccelBlock : public Construct {
 
   /// Construct Methods ///
   void genDefs(XStr& str);
-
-  /// Construct Accel Support Methods ///
-  int genAccels_spe_c_funcBodies(XStr& str);
 };
 
 }  // namespace xi

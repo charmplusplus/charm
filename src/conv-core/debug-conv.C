@@ -1,7 +1,7 @@
 /*
 Converse-level debugger support
 
-Collected from convcore.C, conv-ccs.c, register.c by
+Collected from convcore.C, conv-ccs.C, register.C by
 Orion Sky Lawlor, olawlor@acm.org, 4/10/2001
  */
 #include <stdio.h> /*for sscanf*/
@@ -28,12 +28,11 @@ int _debugHandlerIdx;
 char ** memoryBackup;
 
 /** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
-CMI_EXTERNC_VARIABLE int _replaySystem;
+extern int _replaySystem;
 int _replaySystem = 0;
 int _conditionalDelivery = 0;
 
 #undef ConverseDeliver
-CMI_EXTERNC
 int ConverseDeliver(int pe) {
   return !_replaySystem && (!_conditionalDelivery || pe==CmiMyPe());
 }
@@ -66,7 +65,6 @@ u_long ntohl(u_long netlong) {
 
 #include "pup_c.h"
 
-CMI_EXTERNC
 void check_memory_leaks(LeakSearchInfo *info);
 
 CpvDeclare(int, CpdSearchLeaks_Index);
@@ -256,7 +254,6 @@ void handleDebugMessage(void *msg) {
 /* Special scheduler-type loop only executed while in
 freeze mode-- only executes CCS requests.
 */
-CMI_EXTERNC
 void CcsServerCheck(void);
 extern int _isCcsHandlerIdx(int idx);
 int (*CpdIsDebugMessage)(void *);
@@ -264,9 +261,6 @@ void * (*CpdGetNextMessage)(CsdSchedulerState_t*);
 
 void CpdFreezeModeScheduler(void)
 {
-#if CMK_BIGSIM_CHARM
-    CmiAbort("Cannot run CpdFreezeModeScheduler inside BigSim emulated environment");
-#else
 #if CMK_CCS_AVAILABLE
     void *msg;
     void *debugQ=CpvAccess(debugQueue);
@@ -319,21 +313,17 @@ void CpdFreezeModeScheduler(void)
         CmiHandleMessage(queuedMsg);
     }
 #endif
-#endif
 }
 
-CMI_EXTERNC
 void CpdMemoryMarkClean(char *msg);
 
 void CpdInit(void)
 {
-#if ! CMK_BIGSIM_CHARM
   CpvInitialize(int, freezeModeFlag);
   CpvAccess(freezeModeFlag) = 0;
 
   CpvInitialize(void *, debugQueue);
   CpvAccess(debugQueue) = CdsFifo_Create();
-#endif
 
   CpvInitialize(void *, conditionalQueue);
   CpvAccess(conditionalQueue) = CdsFifo_Create();
@@ -375,7 +365,7 @@ void CpdInit(void)
 /* If CharmDebug is attached, try to send it a message and wait */
 void CpdAborting(const char *message) {
 #if CMK_CCS_AVAILABLE
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag) {
     CpdNotify(CPD_ABORT, message);
     CpdFreeze();
   }

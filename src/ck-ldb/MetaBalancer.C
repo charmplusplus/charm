@@ -162,6 +162,12 @@ void MetaBalancer::init(void) {
   // to false so that it doesn't clear the handles.
   lb_in_progress = false;
 
+  // After the first reduction completes, we have a way to manually check for
+  // PEs without any objects. This flag is set to true if load is ever added
+  // so that the periodic call can be ignored if it comes late. Otherwise, it
+  // may come at a weird time and trigger an incorrect contribution.
+  ignore_periodic = false;
+
   is_prev_lb_refine = -1;
   if (_lb_args.metaLbOn()) {
     periodicCall((void *) this);
@@ -266,7 +272,7 @@ void MetaBalancer::AdjustCountForDeadContributor(int it_n) {
     index = i % VEC_SIZE;
     // When this contributor dies, the objDataCount gets updated only later so
     // we need to account for that by -1
-    if (total_count_vec[index] == (lbdatabase->getLBDB()->ObjDataCount() - 1)){
+    if (total_count_vec[index] == (lbdatabase->GetObjDataSz() - 1)){
       ContributeStats(i);
     }
   }
@@ -281,12 +287,17 @@ void MetaBalancer::SetCharePupSize(size_t psize) {
 
 bool MetaBalancer::AddLoad(int it_n, double load) {
 #if CMK_LBDB_ON
+  // From here on out we can ignore the periodic call to check for NoObj PEs
+  // since our PE has objects. The subsequent checks for NoObj PEs are
+  // triggered by the regular control flow.
+  ignore_periodic = true;
+
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
   adaptive_struct.total_syncs_called++;
   DEBADDETAIL(("At PE %d Total contribution for iteration %d is %d \
       total objs %d\n", CkMyPe(), it_n, total_count_vec[index],
-      lbdatabase->getLBDB()->ObjDataCount()));
+      lbdatabase->GetObjDataSz()));
 
   if (it_n <= adaptive_struct.finished_iteration_no) {
     CkAbort("Error!! Received load for iteration that has contributed\n");
@@ -301,12 +312,12 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
   if (load < min_load_vec[index]) {
     min_load_vec[index] = load;
   }
-  if (total_count_vec[index] > lbdatabase->getLBDB()->ObjDataCount()) {
+  if (total_count_vec[index] > lbdatabase->GetObjDataSz()) {
     CkPrintf("iteration %d received %d contributions and expected %d\n", it_n,
-        total_count_vec[index], lbdatabase->getLBDB()->ObjDataCount());
+        total_count_vec[index], lbdatabase->GetObjDataSz());
     CkAbort("Abort!!! Received more contribution");
   }
-  if (total_count_vec[index] == lbdatabase->getLBDB()->ObjDataCount()){
+  if (total_count_vec[index] == lbdatabase->GetObjDataSz()){
     ContributeStats(it_n);
   }
 #endif
@@ -324,13 +335,13 @@ void MetaBalancer::ContributeStats(int it_n) {
   int bytes, msgs, outsidepemsgs, outsidepebytes, num_nghbors, hops, hopbytes;
   bytes = msgs = outsidepemsgs = outsidepebytes = num_nghbors = hops = hopbytes = 0;
   if(_lb_args.traceComm())
-    lbdatabase->getLBDB()->GetCommInfo(bytes, msgs, outsidepemsgs,
+    lbdatabase->GetCommInfo(bytes, msgs, outsidepemsgs,
       outsidepebytes, num_nghbors, hops, hopbytes);
 
 
   int sync_for_bg = adaptive_struct.total_syncs_called +
-    lbdatabase->getLBDB()->ObjDataCount();
-  bg_walltime = bg_walltime * lbdatabase->getLBDB()->ObjDataCount() / sync_for_bg;
+    lbdatabase->GetObjDataSz();
+  bg_walltime = bg_walltime * lbdatabase->GetObjDataSz() / sync_for_bg;
 
   if (it_n < NEGLECT_IDLE) {
     prev_idle = idle_time;
@@ -340,9 +351,9 @@ void MetaBalancer::ContributeStats(int it_n) {
   // The chares do not contribute their 0th iteration load. So the total syncs
   // in reality is total_syncs_called + obj_counts
   int total_countable_syncs = adaptive_struct.total_syncs_called +
-    (1 - NEGLECT_IDLE) * lbdatabase->getLBDB()->ObjDataCount(); // TODO: Fix me!
+    (1 - NEGLECT_IDLE) * lbdatabase->GetObjDataSz(); // TODO: Fix me!
   if (total_countable_syncs != 0) {
-    idle_time = idle_time * lbdatabase->getLBDB()->ObjDataCount() / total_countable_syncs;
+    idle_time = idle_time * lbdatabase->GetObjDataSz() / total_countable_syncs;
   }
 
   double lb_data[STATS_COUNT];
@@ -370,7 +381,7 @@ void MetaBalancer::ContributeStats(int it_n) {
   lb_data[OUTSIDE_PE_KBYTES] = ((double) outsidepebytes/1024.0);
   lb_data[SUM_COMM_NEIGHBORS] = num_nghbors;
   lb_data[MAX_COMM_NEIGHBORS] = 0; // TODO
-  lb_data[SUM_OBJ_COUNT] = lbdatabase->getLBDB()->ObjDataCount();
+  lb_data[SUM_OBJ_COUNT] = lbdatabase->GetObjDataSz();
   lb_data[MAX_OBJ_COUNT] = lb_data[SUM_OBJ_COUNT];
   lb_data[SUM_OBJ_LOAD] = total_load_vec[index];
   lb_data[MAX_OBJ_LOAD] = max_load_vec[index];
@@ -974,13 +985,15 @@ void MetaBalancer::periodicCall(void *ad) {
 
 void MetaBalancer::checkForNoObj(void *ad) {
   MetaBalancer *s = (MetaBalancer *) ad;
-  s->HandleAdaptiveNoObj();
+  if (!s->ignore_periodic) {
+    s->HandleAdaptiveNoObj();
+  }
 }
 
 // Called by LBDatabase to indicate that no objs are there in this processor
 void MetaBalancer::HandleAdaptiveNoObj() {
 #if CMK_LBDB_ON
-  if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
+  if (lbdatabase->GetObjDataSz() == 0) {
     adaptive_struct.finished_iteration_no++;
     adaptive_struct.lb_iteration_no++;
     DEBAD(("(%d) --HandleAdaptiveNoObj %d\n", CkMyPe(),
@@ -1014,7 +1027,7 @@ void MetaBalancer::RegisterNoObjCallback(int index) {
 
 void MetaBalancer::TriggerAdaptiveReduction() {
 #if CMK_LBDB_ON
-  if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
+  if (lbdatabase->GetObjDataSz() == 0) {
     adaptive_struct.finished_iteration_no++;
     adaptive_struct.lb_iteration_no++;
     double lb_data[STATS_COUNT];

@@ -55,6 +55,7 @@ public:
 #endif
   inline const CkArrayIndex &getIndex(void) const {return idx;}
   inline CmiUInt8 getID() const { return id; }
+  inline CkLocMgr *getLocMgr() const {return myLocMgr; }
 
 #if CMK_LBDB_ON
 public:
@@ -73,9 +74,6 @@ public:
   bool isReadyMigrate()	{ return readyMigrate; }
   bool checkBufferedMigration();	// check and execute pending migration
   int   MigrateToPe();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        void Migrated();
-#endif
   inline void setMeasure(bool status) { enable_measure = status; }
 #else
   void AsyncMigrate(bool use){};

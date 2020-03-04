@@ -113,6 +113,7 @@ public:
       CkPrintf("[%d][%d][%d] Put Source Done\n", thisIndex, CkMyPe(), CkMyNode());
       sendValidationData();
     }
+    delete m;
   }
 
   // Executed on Index 1 (which receives data from put)
@@ -128,6 +129,7 @@ public:
       CkPrintf("[%d][%d][%d] Put Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
       thisProxy[otherIndex].sendValidationData();
     }
+    delete m;
   }
 
   // Executed on Index 0

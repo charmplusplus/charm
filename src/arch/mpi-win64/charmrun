@@ -1,8 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Conv-host for MPI:
 #  Translates +pN-style conv-host options into
 # mpirun -npN options.
+
+export FROM_CHARMRUN='1'
 
 args=""
 
@@ -12,6 +14,10 @@ pes=1
 ppn=1
 machinefile=""
 QUIET=0
+XTERM='xterm'
+DEBUG=0
+DEBUG_NO_PAUSE=0
+DEBUGGER='gdb'
 
 while [ $# -gt 0 ]
 do
@@ -47,10 +53,32 @@ do
 	    ;;
 	++quiet)
 	    QUIET=1
-	    charm_args=$charm_args" "$1
 	    ;;
-	++local)
+	++no-quiet)
+	    QUIET=0
+	    ;;
+	++local|++no-local)
 		# Ignored (unsupported by MPI layer)
+		;;
+	++xterm)
+		XTERM=$2
+		shift
+		;;
+	++debug)
+		DEBUG=1
+		;;
+	++no-debug)
+		DEBUG=0
+		;;
+	++debug-no-pause)
+		DEBUG_NO_PAUSE=1
+		;;
+	++no-debug-no-pause)
+		DEBUG_NO_PAUSE=0
+		;;
+	++debugger)
+		DEBUGGER=$2
+		shift
 		;;
 	*) 
 	    args=$args" "$1
@@ -59,7 +87,24 @@ do
     shift
 done
 
+test $QUIET -eq 1 && charm_args=$charm_args" "++quiet
+
 args=$args" "$charm_args
+
+if [ "$DEBUG" = '1' -o "$DEBUG_NO_PAUSE" = '1' ]
+then
+  DEBUG_RUN='-ex r'
+  DEBUG_POSTFIX='--args'
+  if [ "$DEBUGGER" = 'lldb' ]
+  then
+    DEBUG_RUN='-o r'
+    DEBUG_POSTFIX='--'
+  fi
+
+  args="$DEBUG_POSTFIX $args"
+  [ "$DEBUG_NO_PAUSE" = '1' ] && args="$DEBUG_RUN $args"
+  args="$XTERM -e $DEBUGGER $args"
+fi
 
 rem=`expr $pes % $ppn`
 quot=`expr $pes / $ppn`

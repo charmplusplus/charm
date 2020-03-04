@@ -3,15 +3,14 @@
 
 #include <string>
 #include <vector>
+#include <array>
+#include <queue>
+#include <functional>
 #include "charm++.h"
 #include "ampi.h"
 
 //Uncomment for debug print statements
 #define DDTDEBUG(...) //CkPrintf(__VA_ARGS__)
-
-using std::array;
-using std::vector;
-using std::string;
 
 /*
  * An MPI basic datatype is a type that corresponds to the basic
@@ -46,6 +45,7 @@ using std::string;
 #define CkDDT_INDEXED             47
 #define CkDDT_HINDEXED            48
 #define CkDDT_STRUCT              49
+#define CkDDT_FIRST_USER_TYPE     50
 
 enum CkDDT_Dir : bool {
   PACK   = true,
@@ -65,7 +65,7 @@ inline void serializeContig(char* userdata, char* buffer, size_t size, CkDDT_Dir
 
 /* Helper function to set names (used by AMPI too).
  * Leading whitespaces are significant, trailing spaces are not. */
-inline void CkDDT_SetName(string &dst, const char *src) noexcept
+inline void CkDDT_SetName(std::string &dst, const char *src) noexcept
 {
   int end = strlen(src)-1;
   while ((end>0) && (src[end]==' ')) {
@@ -129,8 +129,8 @@ class CkDDT_DataType
   MPI_Aint trueLB;
   MPI_Aint baseExtent;
   CkDDT_DataType *baseType;
-  vector<int> keyvals;
-  string name;
+  std::unordered_map<int, uintptr_t> attributes;
+  std::string name;
 
  public:
   CkDDT_DataType() = default;
@@ -150,9 +150,9 @@ class CkDDT_DataType
 
   virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
   {
+    size_t bufSize = std::min((size_t)num * (size_t)size, (size_t)msgLength);
     DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%d bytes)\n",
              (dir==PACK)?"packing":"unpacking", num, datatype, bufSize);
-    size_t bufSize = std::min((size_t)num * (size_t)size, (size_t)msgLength);
     if (iscontig) {
       serializeContig(userdata, buffer, bufSize, dir);
       return bufSize;
@@ -200,14 +200,18 @@ class CkDDT_DataType
     }
     return -1;
   }
-  vector<int>& getKeyvals() noexcept { return keyvals; }
+  std::unordered_map<int, uintptr_t> & getAttributes() noexcept { return attributes; }
   void setName(const char *src) noexcept { CkDDT_SetName(name, src); }
   void getName(char *dest, int *len) const noexcept {
     int length = *len = name.size();
     memcpy(dest, &name[0], length);
     dest[length] = '\0';
   }
+  std::string getName() const noexcept {return name;}
+  std::string getConfig() const noexcept;
+  virtual std::string getTypeMap() const noexcept;
   void setAbsolute(bool arg) noexcept { isAbsolute = arg; }
+  bool getAbsolute() const noexcept { return isAbsolute; }
 };
 
 /*
@@ -228,6 +232,7 @@ class CkDDT_Contiguous final : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -254,6 +259,7 @@ class CkDDT_Vector : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -278,6 +284,7 @@ class CkDDT_HVector final : public CkDDT_Vector
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -297,7 +304,7 @@ class CkDDT_HIndexed_Block : public CkDDT_DataType
   // The MPI Standard has arrDisp as an array of int's to MPI_Type_create_indexed_block, but
   // as an array of MPI_Aint's to MPI_Type_create_hindexed_block, so we store it as Aint's
   // internally and convert from int to Aint in Indexed_Block's constructor:
-  vector<MPI_Aint> arrayDisplacements;
+  std::vector<MPI_Aint> arrayDisplacements;
 
  public:
   CkDDT_HIndexed_Block() = default;
@@ -312,6 +319,7 @@ class CkDDT_HIndexed_Block : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -352,8 +360,8 @@ class CkDDT_Indexed_Block final : public CkDDT_HIndexed_Block
 class CkDDT_HIndexed : public CkDDT_DataType
 {
  protected:
-  vector<int> arrayBlockLength;
-  vector<MPI_Aint> arrayDisplacements;
+  std::vector<int> arrayBlockLength;
+  std::vector<MPI_Aint> arrayDisplacements;
 
  public:
   CkDDT_HIndexed() = default;
@@ -368,6 +376,7 @@ class CkDDT_HIndexed : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -407,10 +416,10 @@ class CkDDT_Indexed final : public CkDDT_HIndexed
 class CkDDT_Struct final : public CkDDT_DataType
 {
  protected:
-  vector<int> arrayBlockLength;
-  vector<MPI_Aint> arrayDisplacements;
-  vector<int> index;
-  vector<CkDDT_DataType *> arrayDataType;
+  std::vector<int> arrayBlockLength;
+  std::vector<MPI_Aint> arrayDisplacements;
+  std::vector<int> index;
+  std::vector<CkDDT_DataType *> arrayDataType;
 
  public:
   CkDDT_Struct() = default;
@@ -420,39 +429,39 @@ class CkDDT_Struct final : public CkDDT_DataType
                CkDDT_DataType **type, const char* name=nullptr) noexcept;
   CkDDT_Struct(const CkDDT_Struct &obj, MPI_Aint _lb, MPI_Aint _extent) noexcept;
 
-  vector<int>& getBaseIndices() noexcept { return index; }
-  const vector<int>& getBaseIndices() const noexcept { return index; }
-  vector<CkDDT_DataType *>& getBaseTypes() noexcept { return arrayDataType; }
-  const vector<CkDDT_DataType *>& getBaseTypes() const noexcept { return arrayDataType; }
+  std::vector<int>& getBaseIndices() noexcept { return index; }
+  const std::vector<int>& getBaseIndices() const noexcept { return index; }
+  std::vector<CkDDT_DataType *>& getBaseTypes() noexcept { return arrayDataType; }
+  const std::vector<CkDDT_DataType *>& getBaseTypes() const noexcept { return arrayDataType; }
 
   size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
   void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
  * This class maintains the table of all datatypes (predefined and user-defined).
  *
  * predefinedTypeTable - a reference to a const array declared as a static global variable
- *                       (to minimize per-rank memory fooprint), which holds the CkDDT_DataType
+ *                       (to minimize per-rank memory footprint), which holds the CkDDT_DataType
  *                       object pointers for all predefined types.
  * userTypeTable - a vector that holds the CkDDT_DataType object pointers for all user-defined types
- * types - used to identify which CkDDT_DataType derived class a type object really is,
- *         for PUPing the userTypeTable
+ * freeTypes - a priority queue of freed slot indexes in the userTypeTable, available for reuse.
  */
 class CkDDT
 {
  private:
-  const array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable;
-  vector<CkDDT_DataType *> userTypeTable;
-  vector<int> types;
+  const std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable;
+  std::vector<CkDDT_DataType *> userTypeTable;
+  std::priority_queue<int, std::vector<int>, std::greater<int>> freeTypes;
 
  public:
   // static methods used by ampi.C for predefined types creation:
   static
-  void addBasic(array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable_,
+  void addBasic(std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable_,
                 int type) noexcept
   {
     CkAssert(type >= 0);
@@ -462,7 +471,7 @@ class CkDDT
   }
 
   static
-  void addStruct(array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable_,
+  void addStruct(std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable_,
                  const char* name, int type, int val, int idx, int offset) noexcept
   {
     CkAssert(type > AMPI_MAX_BASIC_TYPE);
@@ -475,9 +484,9 @@ class CkDDT
   }
 
   static
-  const array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1> createPredefinedTypes() noexcept
+  const std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1> createPredefinedTypes() noexcept
   {
-    array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1> predefinedTypeTable_;
+    std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1> predefinedTypeTable_;
 
     addBasic(predefinedTypeTable_, MPI_DOUBLE);
     addBasic(predefinedTypeTable_, MPI_INT);
@@ -558,8 +567,8 @@ class CkDDT
     return predefinedTypeTable_;
   }
 
-  CkDDT(const array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable_) noexcept : predefinedTypeTable(predefinedTypeTable_) {}
-  CkDDT& operator=(const CkDDT &obj) = default;
+  CkDDT(const std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable_) noexcept : predefinedTypeTable(predefinedTypeTable_) {}
+  CkDDT& operator=(const CkDDT &obj) = delete;
   CkDDT(const CkDDT &obj) = default;
   ~CkDDT() noexcept;
 

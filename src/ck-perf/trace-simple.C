@@ -44,7 +44,7 @@ void TraceSimple::creation(envelope *, int epIdx, int num) {
 }
 
 void TraceSimple::creationMulticast(envelope *, int epIdx, int num, 
-				    int *pelist) {
+				    const int *pelist) {
   CkPrintf("[%d] Multicast Message for Entry Method id %d sent to %d pes\n",
 	   CkMyPe(), epIdx, num);
 }
@@ -137,11 +137,7 @@ extern "C" void traceSimpleExitFunction() {
 
 // Initialization of the parallel trace module.
 void initTraceSimpleBOC() {
-#ifdef __BIGSIM__
-  if (BgNodeRank()==0) {
-#else
     if (CkMyRank() == 0) {
-#endif
       registerExitFn(traceSimpleExitFunction);
     }
 }

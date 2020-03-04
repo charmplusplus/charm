@@ -1,9 +1,6 @@
 #include <unistd.h>
 #include "middle.h"
 
-#if CMK_BIGSIM_CHARM
-#include "bgconverse.h"
-#endif
 #include "ccs-server.h"
 #include "conv-ccs.h"
 
@@ -16,13 +13,15 @@
 #endif
 
 #if CMK_CCS_AVAILABLE
-extern "C" void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
+void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
 
-extern "C" void req_fw_handler(char *msg)
+void req_fw_handler(char *msg)
 {
   int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
   CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
+
   int destPE = (int)ChMessageInt(hdr->pe);
+  //  CmiPrintf("[%d] req_fw_handler got msg for pe %d\n",CmiMyPe(),destPE);
   if (CmiMyPe() == 0 && destPE == -1) {
     /* Broadcast message to all other processors */
     int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+ChMessageInt(hdr->len);
@@ -48,16 +47,31 @@ extern "C" void req_fw_handler(char *msg)
       }
     }
   }
-  CcsHandleRequest(hdr, msg+offset);
+  
+#if CMK_SMP
+  // Charmrun gave us a message that is being handled on the rank 0 CCS PE
+  // i.e., PE 0, but needs to get forwarded to the real PE destination
+  if(destPE>0 && destPE!=CmiMyPe())
+    
+    {
+      int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+ChMessageInt(hdr->len);
+      CmiSyncSend(destPE, len, msg);      
+    }
+  else
+#endif        
+    {
+      CcsHandleRequest(hdr, msg+offset);
+    }
   CmiFree(msg);
+
 }
 
-CMI_EXTERNC_VARIABLE int rep_fw_handler_idx;
+extern int rep_fw_handler_idx;
 /**
  * Decide if the reply is ready to be forwarded to the waiting client,
  * or if combination is required (for broadcast/multicast CCS requests.
  */
-extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
+int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
   int repPE = (int)ChMessageInt(rep->pe);
   if (repPE <= -1) {
     /* Reduce the message to get the final reply */
@@ -128,8 +142,6 @@ CpvDeclare(void *, debugQueue);
 CpvCExtern(int, freezeModeFlag);
 CpvDeclare(int, freezeModeFlag);
 
-extern "C" {
-
 /*
  Start the freeze-- call will not return until unfrozen
  via a CCS request.
@@ -143,9 +155,7 @@ void CpdFreeze(void)
   CpdNotify(CPD_FREEZE,pid);
   if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
   CpvAccess(freezeModeFlag) = 1;
-#if ! CMK_BIGSIM_CHARM
   CpdFreezeModeScheduler();
-#endif
 }
 
 void CpdUnFreeze(void)
@@ -157,34 +167,11 @@ int CpdIsFrozen(void) {
   return CpvAccess(freezeModeFlag);
 }
 
-}
-
-#if CMK_BIGSIM_CHARM
-#include "blue_impl.h"
-void BgProcessMessageFreezeMode(threadInfo *t, char *msg) {
-//  CmiPrintf("BgProcessMessageFreezeMode\n");
-#if CMK_CCS_AVAILABLE
-  void *debugQ=CpvAccess(debugQueue);
-  CmiAssert(msg!=NULL);
-  int processImmediately = CpdIsDebugMessage(msg);
-  if (processImmediately) BgProcessMessageDefault(t, msg);
-  while (!CpvAccess(freezeModeFlag) && !CdsFifo_Empty(debugQ)) {
-    BgProcessMessageDefault(t, (char*)CdsFifo_Dequeue(debugQ));
-  }
-  if (!processImmediately) {
-    if (!CpvAccess(freezeModeFlag)) BgProcessMessageDefault(t, msg); 
-    else CdsFifo_Enqueue(debugQ, msg);
-  }
-#else
-  BgProcessMessageDefault(t, msg);
-#endif
-}
-#endif
 
 void PrintDebugStackTrace(void *);
-extern "C" void * MemoryToSlot(void *ptr);
-extern "C" int Slot_StackTrace(void *s, void ***stack);
-extern "C" int Slot_ChareOwner(void *s);
+void * MemoryToSlot(void *ptr);
+int Slot_StackTrace(void *s, void ***stack);
+int Slot_ChareOwner(void *s);
 
 #include <stdarg.h>
 void CpdNotify(int type, ...) {

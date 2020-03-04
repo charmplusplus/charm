@@ -1,0 +1,129 @@
+// Tests that SDAG works correctly when migrations occur in the middle of an
+// SDAG invocation. Tests both synchronized and anytime migration. Tests that
+// messages received both before and after migration are correctly received, and
+// that SDAG closure data as well as recevied message data is correctly pupped.
+
+module migration {
+
+  // Message for testing migration. Data is filled with [0, index), as well as
+  // the PE on which the message was created.
+  message TestMessage {
+    int data[];
+  };
+
+  array [1D] MigrationTest {
+    entry MigrationTest();
+
+    // Sent before migration, with the origin PE
+    entry void sentBefore(TestMessage* msg);
+    // Sent after migration, in the ckJustMigratied method
+    entry void sentAfter(TestMessage* msg);
+
+    // All three are sent at the start of the test and will be received
+    // throughout the SDAG function after various types of migration.
+    entry void call1();
+    entry void call2();
+    entry void call3();
+
+    // Used to ensure all three of the above methods were received
+    entry void response1();
+    entry void response2();
+    entry void response3();
+
+    // Used for synchronization migrations
+    entry void doMigration();
+    entry [reductiontarget] void migrationDone();
+
+    entry void run() {
+      if (CkNumPes() > 1) {
+        serial {
+          TestMessage* msg = new (thisIndex+1) TestMessage(thisIndex, CkMyPe());
+          thisProxy[thisIndex].sentBefore(msg);
+        }
+
+        // Synchronized migration: QD calls doMigration, nothing else happens
+        // until migrationDone is called.
+        when doMigration() serial {
+          qd_reached = true;
+          if (thisIndex == 0) CkPrintf("Testing synchronized migration\n");
+          migrateToRandomPE();
+        }
+
+        // Called after all elements arrive on their new PEs
+        when migrationDone() {
+          serial { CkAssert(qd_reached); }
+
+          // Wait for both TestMessages and ensure they are sensible
+          when sentBefore(TestMessage* msg1), sentAfter(TestMessage* msg2) serial {
+            CkAssert(msg1->pe != msg2->pe);
+            CkAssert(msg1->pe >= 0 && msg1->pe < CkNumPes());
+            CkAssert(msg2->pe >= 0 && msg2->pe < CkNumPes());
+            CkAssert(msg1->validate());
+            CkAssert(msg2->validate());
+          }
+
+          // Receive one of the calls, which should have been correctly pupped
+          case {
+            when call1() serial { thisProxy[thisIndex].response1(); }
+            when call2() serial { thisProxy[thisIndex].response2(); }
+            when call3() serial { thisProxy[thisIndex].response3(); }
+          }
+        }
+
+        // Anytime migration: chares migrate without waiting for QD, and this
+        // method continues fulfilling dependencies whenever.
+        serial {
+          if (thisIndex == 0) CkPrintf("Testing anytime migration\n");
+          TestMessage* msg = new (thisIndex+1) TestMessage(thisIndex, CkMyPe());
+          thisProxy[thisIndex].sentBefore(msg);
+          migrateToRandomPE();
+        }
+
+        // Can receive TestMessages before all migration completes
+        when sentBefore(TestMessage* msg1), sentAfter(TestMessage* msg2) serial {
+          CkAssert(msg1->pe != msg2->pe);
+          CkAssert(msg1->pe >= 0 && msg1->pe < CkNumPes());
+          CkAssert(msg2->pe >= 0 && msg2->pe < CkNumPes());
+          CkAssert(msg1->validate());
+          CkAssert(msg2->validate());
+        }
+
+        // Receive another call before all migration completes
+        case {
+          when call1() serial { thisProxy[thisIndex].response1(); }
+          when call2() serial { thisProxy[thisIndex].response2(); }
+          when call3() serial { thisProxy[thisIndex].response3(); }
+        }
+
+        when migrationDone() {
+          // Receive final call
+          case {
+            when call1() serial { thisProxy[thisIndex].response1(); }
+            when call2() serial { thisProxy[thisIndex].response2(); }
+            when call3() serial { thisProxy[thisIndex].response3(); }
+          }
+        }
+
+        // Ensure that all calls were received
+        when response1(), response2(), response3() {}
+      }
+      serial {
+        contribute(CkCallback(CkReductionTarget(Main, migrationTestDone), mainProxy));
+      }
+
+      // Check for incorrect extra/straggler messages
+      overlap {
+        when sentBefore(TestMessage* msg) serial { CkAbort("Extra sentBefore\n"); }
+        when sentAfter(TestMessage* msg) serial { CkAbort("Extra sentAfter\n"); }
+        when call1() serial { CkAbort("Extra call1\n"); }
+        when call2() serial { CkAbort("Extra call2\n"); }
+        when call3() serial { CkAbort("Extra call3\n"); }
+        when response1() serial { CkAbort("Extra response1\n"); }
+        when response2() serial { CkAbort("Extra response2\n"); }
+        when response3() serial { CkAbort("Extra response3\n"); }
+        when doMigration() serial { CkAbort("Extra doMigration\n"); }
+        when migrationDone() serial { CkAbort("Extra migrationDone\n"); }
+      }
+    }
+  }
+}

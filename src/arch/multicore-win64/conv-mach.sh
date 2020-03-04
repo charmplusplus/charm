@@ -11,6 +11,9 @@ CMK_F90LIBS="-lvast90 -lg2c"
 CMK_POST_EXE=".exe"
 CMK_QT="none"
 
+CMK_WINDOWS='1'
+
 . $CHARMINC/cc-msvc.sh
 
+CMK_MULTICORE="1"
 CMK_NO_PARTITIONS="1"

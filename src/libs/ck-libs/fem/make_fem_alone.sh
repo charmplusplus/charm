@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Script to collect up all the source code needed
 # to build "FEM_ALONE", a version of the FEM framework

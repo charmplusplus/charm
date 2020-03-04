@@ -55,6 +55,7 @@ AC_DEFUN([PAC_PREFIX_ALL_FLAGS],[
 	PAC_PREFIX_FLAG($1, FCFLAGS)
 	PAC_PREFIX_FLAG($1, LDFLAGS)
 	PAC_PREFIX_FLAG($1, LIBS)
+	PAC_PREFIX_FLAG($1, EXTRA_LIBS)
 ])
 
 dnl Usage: PAC_APPEND_FLAG([-02], [CFLAGS])
@@ -63,7 +64,7 @@ dnl argument is already present in the variable
 AC_DEFUN([PAC_APPEND_FLAG],[
 	AC_REQUIRE([AC_PROG_FGREP])
 	AS_IF(
-		[echo "$$2" | $FGREP -e '$1' >/dev/null 2>&1],
+		[echo "$$2" | $FGREP -e "\<$1\>" >/dev/null 2>&1],
 		[echo "$2(='$$2') contains '$1', not appending" >&AS_MESSAGE_LOG_FD],
 		[echo "$2(='$$2') does not contain '$1', appending" >&AS_MESSAGE_LOG_FD
 		$2="$$2 $1"]
@@ -79,7 +80,7 @@ dnl should be added in reverse order.
 AC_DEFUN([PAC_PREPEND_FLAG],[
         AC_REQUIRE([AC_PROG_FGREP])
         AS_IF(
-                [echo "$$2" | $FGREP -e '$1' >/dev/null 2>&1],
+                [echo "$$2" | $FGREP -e "\<$1\>" >/dev/null 2>&1],
                 [echo "$2(='$$2') contains '$1', not prepending" >&AS_MESSAGE_LOG_FD],
                 [echo "$2(='$$2') does not contain '$1', prepending" >&AS_MESSAGE_LOG_FD
                 $2="$1 $$2"]
@@ -188,4 +189,28 @@ fi
 # This is needed for Mac OSX 10.5
 rm -rf conftest.dSYM
 rm -f conftest*
+])
+
+dnl PAC_CONF_HEX_TO_DEC(value,out_var)
+dnl
+dnl Converts the given hexadecimal integer constant to an integer constant and
+dnl stores the result in the shell variable given by 'out_var'.
+dnl
+dnl I think that printf like this will be sufficiently portable, but I don't
+dnl have any guarantee of it.  If not, we can fall back to AS_VAR_ARITH
+dnl and/or AC_COMPUTE_INT (the latter will probably be slow)
+AC_DEFUN([PAC_CONV_HEX_TO_DEC],[AS_VAR_SET([$2],[`printf "%d" $1`])])
+
+dnl PAC_GET_EXENAME(exe_name, out_exe_name)
+dnl
+dnl Prepends and appends program prefix and suffix as supplied by --program_prefix
+dnl and --program-sufix
+AC_DEFUN([PAC_GET_EXENAME],[
+$2=$1
+if test "$program_prefix" != "NONE" ; then
+    $2="${program_prefix}$$2"
+fi
+if test "$program_suffix" != "NONE" ; then
+    $2="$$2$program_suffix"
+fi
 ])

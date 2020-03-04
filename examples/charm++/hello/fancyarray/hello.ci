@@ -3,12 +3,12 @@ mainmodule hello {
   readonly int nElements;
 
   mainchare Main {
-    entry Main(CkArgMsg *);
-    entry void done(void);
+    entry Main(CkArgMsg*);
+    entry void done();
   };
 
   array [Fancy] Hello {
-    entry Hello(void);
+    entry Hello();
     entry void SayHi(int hiNo);
-  };        	
+  };
 };

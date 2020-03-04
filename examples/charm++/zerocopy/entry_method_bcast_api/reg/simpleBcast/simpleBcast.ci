@@ -1,0 +1,25 @@
+mainmodule simpleBcast {
+
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void zerocopySent();
+    entry [reductiontarget] void done();
+  };
+
+  array [1D] zcArray {
+    entry zcArray();
+    entry void recvLargeArray(nocopy int ptr1[n1], int n1, CkCallback doneCb);
+  };
+
+  group zcGroup {
+    entry zcGroup();
+    entry void recvLargeArray(nocopy int ptr1[n1], int n1, CkCallback doneCb);
+  };
+
+  nodegroup zcNodegroup {
+    entry zcNodegroup();
+    entry void recvLargeArray(nocopy int ptr1[n1], int n1, CkCallback doneCb);
+  };
+}

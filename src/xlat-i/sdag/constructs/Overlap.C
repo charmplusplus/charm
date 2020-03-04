@@ -10,10 +10,6 @@ OverlapConstruct::OverlapConstruct(SdagConstruct* olist)
 void OverlapConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-#if CMK_BIGSIM_CHARM
-  generateBeginTime(defs);
-  generateEventBracket(defs, SOVERLAP);
-#endif
   defs << "  ";
   generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
   endMethod(defs);
@@ -23,10 +19,6 @@ void OverlapConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   strcat(nameStr, "_end");
   generateClosureSignature(decls, defs, entry, false, "void", label, true,
                            encapStateChild);
-#if CMK_BIGSIM_CHARM
-  generateBeginTime(defs);
-  generateEventBracket(defs, SOVERLAP_END);
-#endif
   defs << "  ";
   generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);

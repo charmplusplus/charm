@@ -22,9 +22,10 @@
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
 #define CMK_THREADS_USE_JCONTEXT                           0
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
-#define CMK_THREADS_ARE_WIN32_FIBERS                       1
+#define CMK_THREADS_ARE_WIN32_FIBERS                       0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
@@ -40,7 +41,7 @@
 #define CMK_LBDB_ON					   1
 
 #undef  CMK_IMMEDIATE_MSG
-#define CMK_IMMEDIATE_MSG				   0
+#define CMK_IMMEDIATE_MSG				   1
 
 /*
 #define CMK_PCQUEUE_LOCK                                   1

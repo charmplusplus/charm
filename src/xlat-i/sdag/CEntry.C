@@ -42,8 +42,12 @@ void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
         if (var.name) {
           if (var.isRdma) {
             defs << "#if CMK_ONESIDED_IMPL\n";
-            if (var.isFirstRdma)
+            if (var.isFirstRdma) {
               defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams << ";\n";
+              // Root node is used for ZC Bcast and since this is a direct sdag call
+              // CkMyNode() is the root source node for the broadcast
+              defs << "  genClosure->getP" << i++ << "() = " << "CkMyNode()" << ";\n";
+            }
             defs << "  genClosure->getP" << i << "() = "
                  << "ncpyBuffer_" << var.name << ";\n";
             defs << "#else\n";
@@ -130,11 +134,6 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
        << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";
   defs << "  if (!__dep.get()) _sdag_init();\n";
 
-#if CMK_BIGSIM_CHARM
-  defs << "  void* _bgParentLog = NULL;\n";
-  defs << "  CkElapse(0.01e-6);\n";
-  SdagConstruct::generateTlineEndCall(defs);
-#endif
 
   if (needsParamMarshalling || isVoid) {
     // If the genClosure doesn't have a refnum yet, then assign the first
@@ -144,9 +143,6 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
               "genClosure->setRefnum(genClosure->getP0());\n";
 
 // add the incoming message to a buffer
-#if CMK_BIGSIM_CHARM
-    defs << "  SDAG::Buffer* cmsgbuf = ";
-#endif
 
     // note that there will always be a closure even when the method has no
     // parameters for consistency
@@ -160,9 +156,6 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
     // increase reference count by one for the state parameter
     defs << "  CmiReference(UsrToEnv(" << sv->name << "_msg));\n";
 
-#if CMK_BIGSIM_CHARM
-    defs << "  SDAG::Buffer* cmsgbuf = ";
-#endif
     // refnum automatically extracted from msg by MsgClosure::MsgClosure(...)
     defs << "  __dep->pushBuffer(" << entryNum << ", new SDAG::MsgClosure(" << sv->name
          << "_msg"
@@ -181,9 +174,6 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
   defs << "    mergePathHistory(currentSaved);\n";
 #endif
   SdagConstruct::generateTraceEndCall(defs, 2);
-#if CMK_BIGSIM_CHARM
-  SdagConstruct::generateEndExec(defs);
-#endif
 
   if (whenList.size() == 1) {
     (*whenList.begin())->generateWhenCode(defs, 2);

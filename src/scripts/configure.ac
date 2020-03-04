@@ -2,7 +2,7 @@
 # Increment the last 2 digits when making an API change
 # Increase the first three after branching for a release
 
-AC_INIT(Charm++, 60900, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
+AC_INIT(Charm++, 61001, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
@@ -113,7 +113,11 @@ add_make_flag "CMK_COMPILER:=$CMK_COMPILER" 'basic setup'
 add_make_flag "CMK_SMP:=$CMK_SMP" 'basic setup'
 add_make_flag "CMK_SHARED_SUF:=$CMK_SHARED_SUF" 'basic setup'
 add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
+add_make_flag "CMK_MACOSX:=$CMK_MACOSX" 'basic setup'
 add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
+add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
+add_make_flag "CMK_UTH:=$CMK_UTH" 'basic setup'
+add_make_flag "CMK_USE_LRTS:=$CMK_USE_LRTS" 'basic setup'
 add_make_flag "BUILD_CUDA:=$BUILD_CUDA" 'basic setup'
 
 # enable/disable error checking
@@ -124,12 +128,12 @@ AC_ARG_ENABLE([error-checking],
 
 if test "$enable_error_checking" = "no"
 then
-  Echo "Error checking is disabled" 
+  Echo "Charm++/LIBS error checking is disabled" 
   AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 0, [disable error checking])
   add_flag 'OPTS_CC="$OPTS_CC -U_FORTIFY_SOURCE"' 'error checking'
   add_flag 'OPTS_CXX="$OPTS_CXX -U_FORTIFY_SOURCE"' 'error checking'
 else
-  Echo "Error checking is enabled" 
+  Echo "Charm++/LIBS error checking is enabled" 
   AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 1, [enable error checking])
 fi
 
@@ -258,7 +262,14 @@ then
   Echo "Charm record/replay is disabled"
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
 else
-  Echo "Charm record/replay is enabled"
+  if test "$enable_tracing" = "no"
+  then
+    Echo "Charm record/replay is disabled because tracing is disabled"
+    AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
+  else
+    Echo "Charm record/replay is enabled"
+    AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 1, [enable replay])
+  fi
 fi
 
 AC_ARG_ENABLE([ccs],
@@ -753,7 +764,7 @@ then
   echo "Charm++ requires C++11 support, but doesn't know the flag to enable it"
   echo
   echo "For Intel's compiler please see"
-  echo "https://charm.cs.illinois.edu/redmine/issues/1560"
+  echo "https://github.com/UIUC-PPL/charm/issues/1560"
   echo "about making a suitable version of gcc/g++/libstdc++ available"
   echo
   echo "For Blue Gene/Q please use the Clang compiler"
@@ -810,7 +821,9 @@ EOT
       if test $strictpass -eq 1
       then
         got_opt_whole_archive="true"
-        IFS=' ' read LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST <<< $i
+        IFS=' ' read LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST <<EOF
+        $i
+EOF
         add_flag "$(echo LDXX_WHOLE_ARCHIVE_PRE=\"$LDXX_WHOLE_ARCHIVE_PRE\")" "Flags to link whole archives into libcharm.so"
         add_flag "$(echo LDXX_WHOLE_ARCHIVE_POST=\"$LDXX_WHOLE_ARCHIVE_POST\")" "Flags to link whole archives into libcharm.so"
         break
@@ -1162,6 +1175,10 @@ cat > $t <<EOT
 #include <ucontext.h>
 struct _libc_fpstate   fpstate;
 fpregset_t *fp;
+int main() {
+  ucontext_t context;
+  context.uc_mcontext.fpregs = 0;
+}
 EOT
 test_cxx "whether ucontext has FPU pointer" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_CONTEXT_FPU_POINTER, $pass, [whether ucontext has pointer])
@@ -1542,6 +1559,32 @@ else
       test_finish 1
     fi
   fi
+fi
+
+fi
+
+#### test if we can build UCX ####
+if test "$CMK_BUILD_UCX" = 1
+then
+cat > $tc <<EOT
+#include <ucp/api/ucp.h>
+int main(int argc, char **argv)
+{
+  unsigned major, minor, number;
+  ucp_get_version(&major, &minor, &number);
+  return 0;
+}
+EOT
+test_cc "whether build on UCX" "yes" "no" "-lucp"
+AC_DEFINE_UNQUOTED(CMK_BUILD_ON_UCX, $strictpass, [build UCX.])
+BUILD_UCX=$strictpass
+
+if test $BUILD_UCX -eq 0
+then
+  echo "Error: Unable to compile UCX"
+  test_finish 1
+else
+  test_linkc "whether -lucp" "ok" "no" "-lucp"
 fi
 
 fi
@@ -2029,6 +2072,7 @@ fi
 
 if test $pass -eq 1 -o $noldl -eq 1
 then
+	CMK_HAS_DLOPEN='1'
 # One version or another of dlopen worked: compile it in
 	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1, [dlopen])
 fi
@@ -2066,6 +2110,89 @@ int main()
 EOT
 test_cc "whether has RTLD_NEXT" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_RTLD_NEXT, $pass, [whether has RTLD_NEXT])
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
+  return dlmopen(LM_ID_NEWLM, "foo.so", 0) == NULL;
+}
+EOT
+test_cc "whether has dlmopen" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_DLMOPEN, $pass, [whether has dlmopen])
+CMK_HAS_DLMOPEN="$pass"
+
+cat > $tc <<EOT
+#include <unistd.h>
+int main()
+{
+  char exe[[1024]];
+  return readlink("/proc/self/exe", exe, sizeof(exe)-1) == -1;
+}
+EOT
+test_cc "whether has readlink" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_READLINK, $pass, [whether has readlink])
+CMK_HAS_READLINK="$pass"
+
+cat > $tc <<EOT
+#include <limits.h>
+#include <stdlib.h>
+int main()
+{
+  return realpath("/proc/self/exe", NULL) == NULL;
+}
+EOT
+test_cc "whether has realpath" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_REALPATH, $pass, [whether has realpath])
+CMK_HAS_REALPATH="$pass"
+
+case "$CMK_VDIR" in
+  *-win-*|*-win64)
+    CMK_CAN_GET_BINARY_PATH='1'
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='0' # TODO: technically possible, but more work to be done
+    ;;
+  *-darwin*)
+    CMK_CAN_GET_BINARY_PATH='1'
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY="$CMK_HAS_DLOPEN"
+    ;;
+  *)
+    if test "$CMK_HAS_READLINK" = '1' -o "$CMK_HAS_REALPATH" = '1'
+    then
+      CMK_CAN_GET_BINARY_PATH='1'
+    else
+      CMK_CAN_GET_BINARY_PATH='0'
+    fi
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY="$CMK_HAS_DLOPEN"
+    ;;
+esac
+
+if test "$CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1'
+then
+  CMK_SUPPORTS_FSGLOBALS='1'
+else
+  CMK_SUPPORTS_FSGLOBALS='0'
+fi
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_FSGLOBALS, $CMK_SUPPORTS_FSGLOBALS, [whether supports filesystem globals])
+add_flag "CMK_SUPPORTS_FSGLOBALS=$CMK_SUPPORTS_FSGLOBALS" 'filesystem globals'
+add_make_flag "CMK_SUPPORTS_FSGLOBALS:=$CMK_SUPPORTS_FSGLOBALS" 'filesystem globals'
+
+if test "$CMK_HAS_DLMOPEN" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1'
+then
+  CMK_SUPPORTS_PIPGLOBALS='1'
+else
+  CMK_SUPPORTS_PIPGLOBALS='0'
+fi
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIPGLOBALS, $CMK_SUPPORTS_PIPGLOBALS, [whether supports PiP globals])
+add_flag "CMK_SUPPORTS_PIPGLOBALS=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
+add_make_flag "CMK_SUPPORTS_PIPGLOBALS:=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
+
 
 ### test gethostname ####
 cat > $tc <<EOT
@@ -2216,6 +2343,10 @@ int main() {
 EOT
 test_link "whether has support for shm transport using Cross Memory Attach" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_CMA, $pass, [whether supports cma])
+CMK_HAS_CMA="$pass"
+
+test "$CMK_HAS_CMA" = '1' -a "$CMK_MULTICORE" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_USE_CMA='1' || CMK_USE_CMA='0'
+add_make_flag "CMK_USE_CMA:=$CMK_USE_CMA" 'Cross Memory Attach'
 
 #### check if -rdynamic works ####
 cat > $t <<EOT
@@ -2241,7 +2372,7 @@ fi
 
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
-#include "cmibacktrace.c"
+#include "cmibacktrace.C"
 
 int main() {
 	int nLevels=1;
@@ -2287,6 +2418,19 @@ int main() {
 EOT
 test_cxx "whether personality() and ADDR_NO_RANDOMIZE exist" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ADDR_NO_RANDOMIZE, $pass, [whether personality() and ADDR_NO_RANDOMIZE exist])
+
+#### test posix_spawn() ####
+cat > $t <<EOT
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <spawn.h>
+int main() {
+    return posix_spawn(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+}
+EOT
+test_cxx "whether posix_spawn() exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_POSIX_SPAWN, $pass, [whether posix_spawn() exists])
 
 
 # enable/disable zlib
@@ -2833,6 +2977,9 @@ enable_embedded_mode='yes'
 enable_static='yes'
 if test "$CMK_NO_BUILD_SHARED" = 'false'
 then
+  # Force building of shared hwloc library in embedded mode.
+  # See https://github.com/UIUC-PPL/charm/issues/2599 and 
+  # https://github.com/open-mpi/hwloc/issues/371 for more details.
   enable_shared='yes'
   export am_libhwloc_embedded_la_rpath="-rpath $CHARMLIBSO"
 else
@@ -2840,12 +2987,14 @@ else
   export am_libhwloc_embedded_la_rpath=''
 fi
 AC_SUBST(am_libhwloc_embedded_la_rpath)
-enable_libnuma='no'
 enable_pci='no'
 enable_libudev='no'
 enable_libxml2='no'
 enable_visibility='no'
 enable_nvml='no'
+enable_opencl='no'
+enable_gl='no'
+enable_cairo='no'
 . hwloc/VERSION
 export libhwloc_so_version
 AC_SUBST(libhwloc_so_version)

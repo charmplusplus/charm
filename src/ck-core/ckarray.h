@@ -37,10 +37,6 @@ Orion Sky Lawlor, olawlor@acm.org
 extern void _registerCkArray(void);
 CpvExtern (int ,serializer);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#define _MLOG_BCAST_TREE_ 1
-#define _MLOG_BCAST_BFACTOR_ 8
-#endif
 
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
@@ -139,6 +135,7 @@ public:
 	void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }
+	CkArray *ckLocalBranchOther(int rank) const { return _aid.ckLocalBranchOther(rank); }
 	CkLocMgr *ckLocMgr(void) const;
 	inline operator CkArrayID () const {return ckGetArrayID();}
 	unsigned int numLocalElements() const { return ckLocMgr()->numLocalElements(); }
@@ -316,8 +313,8 @@ public:
   virtual char *ckDebugChareName(void);
   virtual int ckDebugChareID(char*, int);
 
-  /// Synonym for ckMigrate
-  inline void migrateMe(int toPe) {ckMigrate(toPe);}
+  void ckEmigrate(int toPe) {ckMigrate(toPe);}
+
 
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute2(CkArrayIndex myIndex, int dataSize,const void *data,CkReduction::reducerType type,
@@ -346,7 +343,11 @@ protected:
   CkArrayID thisArrayID;//My source array's ID
 
   //More verbose form of abort
-  virtual void CkAbort(const char *str) const;
+  CMK_NORETURN
+#if defined __GNUC__ || defined __clang__
+  __attribute__ ((format (printf, 2, 3)))
+#endif
+  virtual void CkAbort(const char *format, ...) const;
 
 private:
 //Array implementation methods:
@@ -386,9 +387,6 @@ public:
   using array_index_t = T;
 
   ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
-        mlogData->objID.data.array.idx=thisIndexMax;
-#endif
 }
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute(int dataSize,const void *data,CkReduction::reducerType type,
@@ -429,6 +427,8 @@ typedef ArrayElementT<CkIndex4D> ArrayElement4D;
 typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
+
+#if CMK_CHARMPY
 
 extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
@@ -516,6 +516,8 @@ public:
   }
 };
 
+#endif
+
 /*@}*/
 
 
@@ -540,6 +542,20 @@ class CkArrayReducer;
 
 void _ckArrayInit(void);
 
+// Wrapper class to hold a message pointer
+// Used in ZC Bcast when root node is non-zero
+class MsgPointerWrapper {
+  public:
+    void *msg;
+    int ep;
+    int opts;
+    void pup(PUP::er &p) {
+      pup_pointer(&p, &msg);
+      p|ep;
+      p|opts;
+    }
+};
+
 class CkArray : public CkReductionMgr {
   friend class ArrayElement;
   friend class CProxy_ArrayBase;
@@ -555,10 +571,8 @@ class CkArray : public CkReductionMgr {
   // Separate mapping and storing the element pointers to speed iteration in broadcast
   std::unordered_map<CmiUInt8, unsigned int> localElems;
   std::vector<CkMigratable *> localElemVec;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    int *children;
-    int numChildren;
-#endif
+
+  UShort recvBroadcastEpIdx;
 private:
   bool stableLocations;
 
@@ -570,6 +584,8 @@ public:
   CkGroupID &getGroupID(void) {return thisgroup;}
   CkGroupID &getmCastMgr(void) {return mCastMgrID;}
   bool isSectionAutoDelegated(void) {return sectionAutoDelegate;}
+
+  UShort &getRecvBroadcastEpIdx(void) {return recvBroadcastEpIdx;}
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
@@ -677,6 +693,12 @@ public:
   void sendExpeditedBroadcast(CkMessage *msg);
   void recvExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
   void recvBroadcastViaTree(CkMessage *msg);
+  void recvNoKeepBroadcast(CkMessage *msg) { recvBroadcast(msg); }
+  void sendNoKeepBroadcast(CkMessage *msg);
+  void recvNoKeepExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
+  void sendNoKeepExpeditedBroadcast(CkMessage *msg);
+
+  void sendZCBroadcast(MsgPointerWrapper w);
 
   /// Whole array destruction, including all elements and the group itself
   void ckDestroy();
@@ -713,19 +735,23 @@ private:
 	      "You'll have to either use fewer array listeners, or increase the compile-time\n"
 	      "constant CK_ARRAYLISTENER_MAXLEN!\n");
   }
+
+  void incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper w);
+  void incrementBcastNo();
+
  private:
 
   CkArrayReducer *reducer; //Read-only copy of default reducer
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
+  CkArrayBroadcaster *getBroadcaster() {
+    return broadcaster;
+  }
   void flushStates();
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension
-	virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial.data()[0];}
-	void broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index);
-	static void staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index);
+#if CMK_ONESIDED_IMPL
+  void forwardZCMsgToOtherElems(envelope *env);
 #endif
+
 
         static bool isIrreducible() { return true; }
 };
@@ -734,6 +760,92 @@ public:
 // with usage in maps' populateInitial()
 typedef CkArray CkArrMgr;
 
+#if CMK_ONESIDED_IMPL
+struct ncpyBcastNoMsg{
+  char cmicore[CmiMsgHeaderSizeBytes];
+  int srcPe;
+  void *ref;
+};
+
+void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize);
+#endif
+
 /*@}*/
+
+///This arrayListener is in charge of delivering broadcasts to the array.
+class CkArrayBroadcaster : public CkArrayListener {
+  inline int &getData(ArrayElement *el) {return *ckGetData(el);}
+public:
+  CkArrayBroadcaster(bool _stableLocations, bool _broadcastViaScheduler);
+  CkArrayBroadcaster(CkMigrateMessage *m);
+  virtual void pup(PUP::er &p);
+  virtual ~CkArrayBroadcaster();
+  PUPable_decl(CkArrayBroadcaster);
+
+  virtual void ckElementStamp(int *eltInfo) {*eltInfo=getBcastNo();}
+
+  ///Element was just created on this processor
+  /// Return false if the element migrated away or deleted itself.
+  virtual bool ckElementCreated(ArrayElement *elt)
+    { return bringUpToDate(elt); }
+
+  ///Element just arrived on this processor (so just called pup)
+  /// Return false if the element migrated away or deleted itself.
+  virtual bool ckElementArriving(ArrayElement *elt)
+    { return bringUpToDate(elt); }
+
+  void incoming(CkArrayMessage *msg);
+
+  int incrementBcastNo();
+
+  bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
+#if CMK_CHARMPY
+  void deliver(CkArrayMessage *bcast, std::vector<CkMigratable*> &elements, int arrayId, bool doFree);
+#endif
+
+  void springCleaning(void);
+
+  void flushState();
+
+private:
+  //Number of broadcasts received (also serial number)
+#if CMK_SMP
+  std::atomic<int> bcastNo;
+#else
+  int bcastNo;
+#endif
+
+  int oldBcastNo;//Above value last spring cleaning
+  //This queue stores old broadcasts (in case a migrant arrives
+  // and needs to be brought up to date)
+  CkQ<CkArrayMessage *> oldBcasts;
+  bool stableLocations;
+  bool broadcastViaScheduler;
+
+  bool bringUpToDate(ArrayElement *el);
+
+public:
+#if CMK_SMP
+  int getBcastNo() const {
+    return bcastNo.load(std::memory_order_acquire);
+  }
+  void setBcastNo(int r) {
+    return bcastNo.store(r, std::memory_order_release);
+  }
+  int incBcastNo() {
+    return bcastNo.fetch_add(1, std::memory_order_release);
+  }
+  int decBcastNo() {
+    return bcastNo.fetch_sub(1, std::memory_order_release);
+  }
+#else
+  int getBcastNo() const { return bcastNo; }
+  void setBcastNo(int r) { bcastNo = r; }
+  int incBcastNo() { return bcastNo++; }
+  int decBcastNo() { return bcastNo--; }
+#endif
+
+
+};
 
 #endif

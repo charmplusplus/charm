@@ -81,10 +81,6 @@
 #define CMK_64BIT                1
 #endif
 
-#ifndef CMK_USE_MEMPOOL_ISOMALLOC
-#define CMK_USE_MEMPOOL_ISOMALLOC 0
-#endif
-
 #ifndef CMK_REPLAYSYSTEM
 #define CMK_REPLAYSYSTEM            1
 #endif
@@ -127,25 +123,12 @@
 #define CMK_CUDA                  0
 #endif
 
-#if !defined(CMK_BIGSIM_CHARM)
-#define CMK_BIGSIM_CHARM          0
-#endif
-
 #ifndef CMI_QD
-#define CMI_QD (CMK_BIGSIM_CHARM || CMK_REPLAYSYSTEM)
+#define CMI_QD (CMK_REPLAYSYSTEM)
 #endif
 
 #ifndef CMI_SWAPGLOBALS
 #define CMI_SWAPGLOBALS (CMK_HAS_ELF_H && !CMK_SMP)
-#endif
-
-/**
-    CmiReference broadcast/multicast optimization does not work for SMP
-    due to race condition on memory reference counter, needs lock to protect
- */
-#if CMK_SMP && CMK_BROADCAST_USE_CMIREFERENCE
-#undef CMK_BROADCAST_USE_CMIREFERENCE
-#define CMK_BROADCAST_USE_CMIREFERENCE                      0
 #endif
 
 #if !defined(CMK_CRAYXE)
@@ -171,9 +154,11 @@
    corresponding conv-mach.h */
 #if CMK_HAS_STDINT_H && !defined(CMK_TYPEDEF_INT2)
 #include <stdint.h>
+typedef int8_t  CMK_TYPEDEF_INT1;
 typedef int16_t CMK_TYPEDEF_INT2;
 typedef int32_t CMK_TYPEDEF_INT4;
 typedef int64_t CMK_TYPEDEF_INT8;
+typedef uint8_t  CMK_TYPEDEF_UINT1;
 typedef uint16_t CMK_TYPEDEF_UINT2;
 typedef uint32_t CMK_TYPEDEF_UINT4;
 typedef uint64_t CMK_TYPEDEF_UINT8;

@@ -18,8 +18,8 @@ ARGS      = 10 3 3
 
 # Specify the compilers, run script, flags etc.
 CXX       = $(CHARMBIN)/charmc
-CHARMC    = $(CHARMBIN)/charmc
-CXXFLAGS += -language charm++ $(OPT)
+CHARMC    = $(CHARMBIN)/charmc $(OPTS)
+CXXFLAGS += -language charm++ $(OPTS)
 EXECFLAGS = +p$(NP)
 ifdef $(NODELIST)
   EXECFLAGS += ++nodelist $(NODELIST)
@@ -28,7 +28,7 @@ endif
 
 ########### This stuff should be able take care of itself ############
 
-.PHONY: all clean again test bgtest translateInterface
+.PHONY: all clean again test translateInterface
 
 all: $(TARGET)
 

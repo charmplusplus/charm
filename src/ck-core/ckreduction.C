@@ -86,9 +86,11 @@ waits for the migrant contributions to straggle in.
 #endif
 
 extern bool _inrestart;
+#if CMK_CHARMPY
 //define a global instance of CkReductionTypesExt for external access
 CkReductionTypesExt charm_reducers;
 extern int (*PyReductionExt)(char**, int*, int, char**);
+#endif
 
 Group::Group():thisIndex(CkMyPe())
 {
@@ -185,8 +187,6 @@ CkReductionMgr::CkReductionMgr()
 { 
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
-#elif CMK_BIGSIM_CHARM
-  init_BinaryTree();
 #else
   init_TopoTree();
 #endif
@@ -199,10 +199,6 @@ CkReductionMgr::CkReductionMgr()
   nContrib=nRemote=0;
   is_inactive = false;
   maxStartRequest=0;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	numImmigrantRecObjs = 0;
-	numEmigrantRecObjs = 0;
-#endif
   disableNotifyChildrenStart = false;
 
   barrier_gCount=0;
@@ -231,10 +227,6 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   barrier_nSource=0;
   barrier_nContrib=barrier_nRemote=0;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  numImmigrantRecObjs = 0;
-  numEmigrantRecObjs = 0;
-#endif
 
 }
 
@@ -407,52 +399,15 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
 // Each contributor must contribute exactly once to the each reduction.
 void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&(m->log));
-#endif
   DEBR((AA "Contributor %p contributed for %d in grp %d ismigratable %d \n" AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-
-	// if object is an immigrant recovery object, we send the contribution to the source PE
-	if(CpvAccess(_currentObj)->mlogData->immigrantRecFlag){
-		
-		// turning on the message-logging bypass flag
-		envelope *env = UsrToEnv(m);
-		env->flags = env->flags | CK_BYPASS_DET_MLOG;
-    	thisProxy[CpvAccess(_currentObj)->mlogData->immigrantSourcePE].contributeViaMessage(m);
-		return;
-	}
-
-    Chare *oldObj = CpvAccess(_currentObj);
-    CpvAccess(_currentObj) = this;
-
-	// adding contribution
-	addContribution(m);
-
-    CpvAccess(_currentObj) = oldObj;
-#else
   addContribution(m);
-#endif
 }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){
-	//if(CkMyPe() == 2) CkPrintf("[%d] ---> Contributing Via Message\n",CkMyPe());
-	
-	// turning off bypassing flag
-	envelope *env = UsrToEnv(m);
-	env->flags = env->flags & ~CK_BYPASS_DET_MLOG;
-
-	// adding contribution
-    addContribution(m);
-}
-#else
 void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){}
-#endif
 
 void CkReductionMgr::checkIsActive() {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) || CMK_MEM_CHECKPOINT
@@ -589,9 +544,6 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 // of migrants that missed the main reduction.
 void CkReductionMgr::LateMigrantMsg(CkReductionMsg *m)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&(m->log));
-#endif
   addContribution(m);
 }
 
@@ -647,15 +599,11 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
 {
   if (isPast(m->redNo))
   {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CmiAbort("this version should not have late migrations");
-#else
 	//We've moved on-- forward late contribution straight to root
     DEBR((AA "Migrant gives late contribution for #%d!\n" AB,m->redNo));
    	// if (!hasParent()) //Root moved on too soon-- should never happen
    	//   CkAbort("Late reduction contribution received at root!\n");
     thisProxy[0].LateMigrantMsg(m);
-#endif
   }
   else if (isFuture(m->redNo)) {//An early contribution-- add to future Q
     DEBR((AA "Contributor gives early contribution-- for #%d\n" AB,m->redNo));
@@ -685,17 +633,6 @@ void CkReductionMgr::finishReduction(void)
   bool partialReduction = false;
 
   //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	if (nContrib<(lcount+adj(redNo).lcount) - numImmigrantRecObjs + numEmigrantRecObjs){
-          if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
-            partialReduction = true;
-          }
-          else {
-            DEBR((AA "Need more local messages %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
-            return; //Need more local messages
-          }
-	}
-#else
   if (nContrib<(lcount+adj(redNo).lcount)){
          if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
            partialReduction = true;
@@ -705,7 +642,6 @@ void CkReductionMgr::finishReduction(void)
            return; //Need more local messages
          }
   }
-#endif
 
   if (nRemote<treeKids()) {
     if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
@@ -719,11 +655,6 @@ void CkReductionMgr::finishReduction(void)
 	
  
   DEBR((AA "Reducing data... %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_END_EXECUTE(1);
-  void* _bgParentLog = NULL;
-  _TRACE_BG_BEGIN_EXECUTE_NOMSG("GroupReduce", &_bgParentLog, 0);
-#endif
   CkReductionMsg *result=reduceMessages(msgs);
   result->fromPE = CkMyPe();
   result->redNo=redNo;
@@ -738,11 +669,7 @@ void CkReductionMgr::finishReduction(void)
   {//Pass data up tree to parent
     DEBR((AA "Passing reduced data up to parent node %d.\n" AB,treeParent()));
     DEBR((AA "Message gcount is %d+%d+%d.\n" AB,result->gcount,gcount,adj(redNo).gcount));
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     result->gcount+=gcount+adj(redNo).gcount;
-#else
-    result->gcount+=gcount+adj(redNo).gcount;
-#endif
     thisProxy[treeParent()].RecvMsg(result);
   }
   else 
@@ -756,9 +683,7 @@ void CkReductionMgr::finishReduction(void)
       return; // Wait for migrants to contribute
     } else if (totalElements<result->nSources()) {
       DEBR((AA "Got %d of %d contributions\n" AB,result->nSources(),totalElements));
-#if !defined(_FAULT_CAUSAL_)
       CkAbort("ERROR! Too many contributions at root!\n");
-#endif
     }
     DEBR((AA "Passing result to client function\n" AB));
     CkSetRefNum(result, result->getUserFlag());
@@ -814,9 +739,6 @@ void CkReductionMgr::finishReduction(void)
 //Sent up the reduction tree with reduced data
   void CkReductionMgr::RecvMsg(CkReductionMsg *m)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&m->log);
-#endif
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
     DEBR((AA "Recv'd remote contribution %d for #%d\n" AB,nRemote,m->redNo));
     // If the remote contribution is real, then check whether we can remove the
@@ -889,9 +811,6 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
       msgs_nSources+=m->nSources();
-#if CMK_BIGSIM_CHARM
-      _TRACE_BG_ADD_BACKWARD_DEP(m->log);
-#endif
 
       // for "nop" reducer type, only need to accept one message
       if (nMsgs == 0 || m->reducer != CkReduction::nop) {
@@ -1040,8 +959,6 @@ void CkReductionMgr::pup(PUP::er &p)
     maxStartRequest=0;
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
-#elif CMK_BIGSIM_CHARM
-    init_BinaryTree();
 #else
     init_TopoTree();
 #endif
@@ -1257,9 +1174,6 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
   ret->sourceFlag=std::numeric_limits<int>::min();
   ret->gcount=0;
   ret->migratableContributor = true;
-#if CMK_BIGSIM_CHARM
-  ret->log = NULL;
-#endif
   return ret;
 }
 
@@ -1737,9 +1651,6 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
       simulated_message.userFlag = messages[message_idx]->userFlag;
       simulated_message.gcount = messages[message_idx]->gcount;
       simulated_message.migratableContributor = messages[message_idx]->migratableContributor;
-#if CMK_BIGSIM_CHARM
-      simulated_message.log = NULL;
-#endif
       simulated_messages[message_idx] = &simulated_message;
     }
 
@@ -1765,6 +1676,7 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
 }
 
 
+#if CMK_CHARMPY
 /////////////// external Python reducer ////////////////
 static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
 {
@@ -1787,8 +1699,7 @@ static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
 
     return CkReductionMsg::buildNew(reduction_result_size, reduction_result);
 }
-
-
+#endif
 
 /////////////////// Reduction Function Table /////////////////////
 CkReduction::CkReduction() {} //Dummy private constructor
@@ -1928,8 +1839,10 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
   // Allows multiple reductions to be done in the same message
   vec.emplace_back(CkReduction::tupleReduction_fn, false, "CkReduction::tuple");
 
+#if CMK_CHARMPY
   // Perform reduction using an external reducer defined in Python
   vec.emplace_back(CkReduction::reducerStruct(::external_py, false, "CkReduction::custom_python"));
+#endif
 
   return vec;
 }
@@ -1941,6 +1854,8 @@ std::vector<CkReduction::reducerStruct>& CkReduction::reducerTable()
   static std::vector<CkReduction::reducerStruct> table = initReducerTable();
   return table;
 }
+
+#if CMK_CHARMPY
 
 // Enum to detect type of contributors in a reduction
 typedef enum : uint8_t {
@@ -1987,6 +1902,13 @@ Group* getExtContributor<Group>(CkExtContributeInfo* contribute_params)
 
 // Functions to perform reduction over contributors from external clients (e.g. Charm4py)
 
+extern "C" {
+void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr);
+void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims);
+void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe);
+void CkExtContributeToSection(CkExtContributeInfo* contribute_params, int sid_pe, int sid_cnt, int rootPE);
+}
+
 // Generic function to extract CkExtContributeInfo and perform reduction
 template <class T>
 void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
@@ -2001,84 +1923,47 @@ void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
     me->contribute(contribute_params->dataSize, contribute_params->data, contribute_params->redtype, cb);
 }
 
-extern "C"
 void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
 {
-#if CMK_CHARMPY
-    cb.isCkExtReductionCb = true;
-
     switch (contribute_params->contributorType) {
-        case extContributorType::array :
+        case extContributorType::array:
             CkExtContribute<ArrayElement>(contribute_params, cb);
             break;
-        case extContributorType::group :
+        case extContributorType::group:
             CkExtContribute<Group>(contribute_params, cb);
             break;
         default : CkAbort("Invalid external contributor type!\n");
     }
-#else
-    CkAbort("charm4py support must be enabled to use CkExtContributeTo");
-#endif
 }
 
 // When a reduction contributes to a singleton chare
-extern "C"
 void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr)
 {
-    CkChareID targetChareID;
-    targetChareID.onPE = onPE;
-    targetChareID.objPtr = objPtr;
-
-    CkCallback cb(contribute_params->cbEpIdx, targetChareID);
-    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
+    CkCallback cb(onPE, objPtr, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
 // When a reduction contributes to an array element or broadcasts result to an array
-extern "C"
 void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims)
 {
-    CkCallback cb;
-    CkGroupID gId;
-    gId.idx = aid;
-
-    CkArrayID arrayId(gId);
-
-    if (ndims > 0) {
-        // callback to a particular array element
-        CkArrayIndex arrIndex(ndims, idx);
-        cb = CkCallback(contribute_params->cbEpIdx, arrIndex, arrayId);
-    }
-    else {
-        // callback broadcasts to all elements of array
-        cb = CkCallback(contribute_params->cbEpIdx, arrayId);
-    }
-    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
-
+    CkCallback cb(aid, idx, ndims, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
 // When a reduction contributes to a group chare element or broadcasts result to group
-extern "C"
 void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe)
 {
-    CkCallback cb;
-    CkGroupID groupId;
-    groupId.idx = gid;
-
-    if (pe == -1) {
-        // callback broadcasts to all PEs
-        cb = CkCallback(contribute_params->cbEpIdx, groupId);
-    }
-    else {
-        // callback to specific PE
-        cb = CkCallback(contribute_params->cbEpIdx, pe, groupId);
-    }
-    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
-
+    CkCallback cb(gid, pe, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
+void CkExtContributeToSection(CkExtContributeInfo* contribute_params, int sid_pe, int sid_cnt, int rootPE)
+{
+    CkCallback cb(sid_pe, sid_cnt, rootPE, contribute_params->cbEpIdx);
+    CkExtContributeTo(contribute_params, cb);
+}
+
+#endif
 
 /********** Code added by Sayantan *********************/
 /** Locking is a big problem in the nodegroup code for smp.
@@ -2100,10 +1985,6 @@ void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int
 /**nodegroup reduction manager . Most of it is similar to the guy above***/
 NodeGroup::NodeGroup(void):thisIndex(CkMyNode()) {
   __nodelock=CmiCreateLock();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    mlogData->objID.type = TypeNodeGroup;
-    mlogData->objID.data.group.onPE = CkMyNode();
-#endif
 
 }
 NodeGroup::~NodeGroup() {
@@ -2142,8 +2023,6 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 {
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
-#elif CMK_BIGSIM_CHARM
-  init_BinaryTree();
 #else
   init_TopoTree();
 #endif
@@ -2217,10 +2096,6 @@ void CkNodeReductionMgr::ckSetReductionClient(CkCallback *cb)
 
 void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    Chare *oldObj =CpvAccess(_currentObj);
-    CpvAccess(_currentObj) = this;
-#endif
 
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
@@ -2228,30 +2103,17 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
   DEBR(("[%d,%d] NodeGroup %d> localContribute called for redNo %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo));
   addContribution(m);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = oldObj;
-#endif
 }
 
 
 void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&m->log);
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    Chare *oldObj =CpvAccess(_currentObj);
-    CpvAccess(_currentObj) = this;
-#endif
   m->redNo=ci->redNo++;
   m->gcount=count;
   DEBR(("[%d,%d] contributewithCounter started for %d at %0.6f{{{\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer()));
   addContribution(m);
   DEBR(("[%d,%d] }}}contributewithCounter finished for %d at %0.6f\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer()));
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = oldObj;
-#endif
 }
 
 
@@ -2289,9 +2151,6 @@ void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 //Sent up the reduction tree with reduced data
 void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&m->log);
-#endif
 #ifndef CMK_CPV_IS_SMP
 #if CMK_IMMEDIATE_MSG
 	if(interrupt == true){
@@ -2432,17 +2291,9 @@ void CkNodeReductionMgr::finishReduction(void)
   DEBR((AA "Reducing node data...\n" AB));
 
   /**reduce all messages received at this node **/
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_END_EXECUTE(1);
-  void* _bgParentLog = NULL;
-  _TRACE_BG_BEGIN_EXECUTE_NOMSG("NodeReduce", &_bgParentLog, 0);
-#endif
   CkReductionMsg *result=CkReductionMgr::reduceMessages(msgs);
   result->redNo=redNo;
   DEBR((AA "Node Reduced gcount=%d; sourceFlag=%d\n" AB,result->gcount,result->sourceFlag));
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&result->log);
-#endif
 
   if (partialReduction) {
     msgs.enq(result);
@@ -2681,8 +2532,6 @@ void CkNodeReductionMgr::pup(PUP::er &p)
     lockEverything = CmiCreateLock();
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
-#elif CMK_BIGSIM_CHARM
-    init_BinaryTree();
 #else
     init_TopoTree();
 #endif		
@@ -2693,7 +2542,6 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p | maxModificationRedNo;
 #endif
 
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   bool isnull = (storedCallback == NULL);
   p | isnull;
   if (!isnull) {
@@ -2702,7 +2550,6 @@ void CkNodeReductionMgr::pup(PUP::er &p)
     }
     p|*storedCallback;
   }
-#endif
 
 }
 

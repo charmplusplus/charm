@@ -7,7 +7,7 @@
 
 #include "elements.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
 
@@ -34,11 +34,11 @@ void DistributedLB::initnodeFn()
 void DistributedLB::turnOn()
 {
 #if CMK_LBDB_ON
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOnBarrierReceiver(receiver);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOnNotifyMigrated(notifier);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOnStartLBFn(startLbFnHdl);
 #endif
 }
@@ -46,11 +46,11 @@ void DistributedLB::turnOn()
 void DistributedLB::turnOff()
 {
 #if CMK_LBDB_ON
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOffBarrierReceiver(receiver);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOffNotifyMigrated(notifier);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOffStartLBFn(startLbFnHdl);
 #endif
 }
@@ -144,6 +144,7 @@ void DistributedLB::LoadReduction(CkReductionMsg* redn_msg) {
           kTargetRatio);
     }
     PackAndSendMigrateMsgs();
+    delete [] results;
     return;
   }
 
@@ -167,6 +168,7 @@ void DistributedLB::LoadReduction(CkReductionMsg* redn_msg) {
     CkCallback cb(CkIndex_DistributedLB::DoneGossip(), thisProxy);
     CkStartQD(cb);
   }
+  delete [] results;
 }
 
 /*
@@ -279,7 +281,7 @@ void DistributedLB::DoneGossip() {
   // high so that load is initially only transferred from the most loaded PEs.
   // In subsequent phases it gets relaxed to allow less overloaded PEs to
   // transfer load as well.
-  transfer_threshold = (max_load + avg_load) / 2;
+  transfer_threshold = fmax(kTargetRatio * avg_load, (max_load + avg_load) / 2);
   lb_started = true;
   underloaded_pe_count = pe_no.size();
   Setup();
@@ -342,11 +344,13 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
     if (std::abs(load_ratio - old_ratio) < 0.01) {
       // The previous phase didn't meaningfully reduce the max load, so relax
       // the transfer threshold.
-      transfer_threshold = (transfer_threshold + avg_load) / 2;
+      transfer_threshold = fmax(kTargetRatio * avg_load,
+          (transfer_threshold + avg_load) / 2);
     } else {
       // The previous phase did reduce the max load, so update the transfer
       // threshold based on the new max load.
-      transfer_threshold = (max_load + avg_load) / 2;
+      transfer_threshold = fmax(kTargetRatio * avg_load,
+          (max_load + avg_load) / 2);
     }
     StartNextLBPhase();
   } else {
@@ -362,6 +366,7 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
     if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
       theLbdb->nextLoadbalancer(seqno);
   }
+  delete [] results;
 }
 
 /*

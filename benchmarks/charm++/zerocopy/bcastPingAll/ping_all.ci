@@ -1,0 +1,58 @@
+mainmodule ping_all
+{
+  readonly CProxy_main mainProxy;
+  readonly int printFormat;
+
+  mainchare main
+  {
+    entry main(CkArgMsg *);
+    entry void start();
+
+    entry [reductiontarget] void recv_done();
+
+    entry void recv_zc_send_free_ptr(CkDataMsg *msg);
+
+    entry [reductiontarget] void recv_zc_send_done1();
+    entry [reductiontarget] void recv_zc_send_done2();
+    entry [reductiontarget] void recv_zc_send_done3();
+    entry [reductiontarget] void recv_with_copy_done();
+    entry [reductiontarget] void recv_zc_send_with_copy_done();
+    entry [reductiontarget] void recv_zc_post_done1();
+    entry [reductiontarget] void recv_zc_post_done2();
+    entry [reductiontarget] void recv_zc_post_done3();
+
+    entry void done();
+  }
+
+  nodegroup LargeDataNodeGroup
+  {
+    entry LargeDataNodeGroup(int maxSize);
+
+    // regular message send api
+    entry [exclusive] void recv(char msg[size], size_t size, int iter, bool warmUp, int iterations);
+
+    // charm++ zero copy message send api for parameters marked "nocopy" (UNREG mode)
+    entry [exclusive] void recv_zc_send1(nocopy char msg[size], size_t size, int iter, bool warmUp, int iterations);
+
+    // charm++ zero copy message send api for parameters marked "nocopy" (REG mode)
+    entry [exclusive] void recv_zc_send2(nocopy char msg[size], size_t size, int iter, bool warmUp, int iterations);
+
+    // charm++ zero copy message send api for parameters marked "nocopy" (PREREG mode)
+    entry [exclusive] void recv_zc_send3(nocopy char msg[size], size_t size, int iter, bool warmUp, int iterations);
+
+    // regular message send api with copy
+    entry [exclusive] void recv_with_copy(char msg[size], size_t size, int iter, bool warmUp, int iterations);
+
+    // charm++ zero copy message send api for parameters marked "nocopy" with copy
+    entry [exclusive] void recv_zc_send_with_copy(nocopy char msg[size], size_t size, int iter, bool warmUp, int iterations);
+
+    // charm++ zero copy message recv api for parameters marked "nocopypost" (UNREG mode)
+    entry [exclusive] void recv_zc_post1(nocopypost char msg[size], size_t size, int iter, bool warmUp, int iterations);
+
+    // charm++ zero copy message recv api for parameters marked "nocopypost" (REG mode)
+    entry [exclusive] void recv_zc_post2(nocopypost char msg[size], size_t size, int iter, bool warmUp, int iterations);
+
+    // charm++ zero copy message recv api for parameters marked "nocopypost" (PREREG mode)
+    entry [exclusive] void recv_zc_post3(nocopypost char msg[size], size_t size, int iter, bool warmUp, int iterations);
+  }
+}

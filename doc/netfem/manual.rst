@@ -1,6 +1,6 @@
-=====================
-Charm++ NetFEM Manual
-=====================
+================
+NetFEM Framework
+================
 
 .. contents::
    :depth: 3
@@ -139,7 +139,7 @@ Simple Interface
 
 The details of how to make each call are:
 
-::
+.. code-block:: c++
 
      NetFEM NetFEM_Begin(int source, int step, int dim, int flavor);
 
@@ -170,7 +170,7 @@ out of your arrays. Or it can take the value NetFEM_WRITE, which writes
 out the data to files named “NetFEM/step/source.dat” for offline
 visualization.
 
-::
+.. code-block:: c++
 
      void NetFEM_End(NetFEM n);
 
@@ -182,7 +182,7 @@ visualization.
 Finishes describing a single piece of a mesh, which then makes the
 mesh available for display.
 
-::
+.. code-block:: c++
 
      void NetFEM_Nodes(NetFEM n,int nNodes,const double *loc,const char *name);
 
@@ -210,7 +210,7 @@ client. We recommend also including the location units here, for example
 "Position (m)".
 
 
-::
+.. code-block:: c++
 
      void NetFEM_Elements(NetFEM n,int nElements,int nodePerEl,const int *conn,const char *name);
 
@@ -242,7 +242,7 @@ or conn((e-1)*nodePerEl+1).
 name is a human-readable name for the elements to display in the client.
 For example, this might be "Linear-Strain Triangles".
 
-::
+.. code-block:: c++
 
      void NetFEM_Vector(NetFEM n,const double *data,const char *name);
 
@@ -267,7 +267,7 @@ data[2*e]; in Fortran, element :math:`e`\ ’s vector is data(:,e).
 name is a human-readable name for this vector data. For example, this
 might be "Velocity (m/s)".
 
-::
+.. code-block:: c++
 
      void NetFEM_Scalar(NetFEM n,const double *data,int dataPer,const char *name);
 
@@ -313,7 +313,7 @@ In C, use the macro “NetFEM_Field(theStruct,theField)” to describe the
 FIELD. For example, to describe the field “loc” of your structure named
 “node_t”,
 
-::
+.. code-block:: c++
 
       node_t *myNodes=...;
       ..., NetFEM_Field(node_t,loc), ...
@@ -329,7 +329,7 @@ arguments, can be used for this. For example, to describe the field
       TYPE(NODE), ALLOCATABLE :: n(:)
       ..., foffsetof(n(1),n(1)%loc),foffsetof(n(1),n(2)), ...
 
-::
+.. code-block:: c++
 
       void NetFEM_Nodes_field(NetFEM n,int nNodes,FIELD,const void *loc,const char *name);
 
@@ -339,7 +339,7 @@ arguments, can be used for this. For example, to describe the field
 
 A FIELD version of NetFEM_Nodes.
 
-::
+.. code-block:: c++
 
       void NetFEM_Elements_field(NetFEM n,int nElements,int nodePerEl,FIELD,int idxBase,const int *conn,const char *name);
 
@@ -351,7 +351,7 @@ A FIELD version of NetFEM_Elements. This version also allows you to
 control the starting node index of the connectivity array—in C, this is
 normally 0; in Fortran, this is normally 1.
 
-::
+.. code-block:: c++
 
       void NetFEM_Vector_field(NetFEM n,const double *data,FIELD,const char *name);
 
@@ -361,7 +361,7 @@ normally 0; in Fortran, this is normally 1.
 
 A FIELD version of NetFEM_Vector.
 
-::
+.. code-block:: c++
 
       void NetFEM_Scalar_field(NetFEM n,const double *data,int dataPer,FIELD,const char *name);
 

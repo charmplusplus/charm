@@ -6,7 +6,9 @@
 #include <string>
 #include <vector>
 
+#ifndef XI_LIBRARY
 #include "conv-config.h"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

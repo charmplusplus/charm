@@ -45,7 +45,7 @@
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
-/* decide which is the default implementation of the threads (see threads.c)
+/* decide which is the default implementation of the threads (see threads.C)
    Only one of the following can be 1. If none of them is selected, qthreads
    will be used as default. This default can be overwritten at compile time
    using -DCMK_THREADS_BUILD_"type"=1 */
@@ -92,5 +92,9 @@ In fault tolerant architectures, CK_MEM_CHECKPOINT can be set. In this case the
 extended header must contain also another field called "pn" (phase number).
 
 */
+
+#undef CMK_ONESIDED_IMPL
+// Disable CMK_ONESIDED_IMPL until bug https://github.com/UIUC-PPL/charm/issues/2589 is fixed
+#define CMK_ONESIDED_IMPL                                  0
 
 #endif

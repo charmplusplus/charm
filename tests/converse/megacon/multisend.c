@@ -67,6 +67,7 @@ void multisend_init(void)
     int sizes[nMulti];
     char *msgs[nMulti];
     multisendmsg first; /* Allocate one message on the stack (because you can!) */
+    CmiInitMsgHeader(first.core, sizeof(multisendmsg));
     for (m=0;m<nMulti;m++) {
       multisendmsg *msg;
       if (m==0) msg=&first;

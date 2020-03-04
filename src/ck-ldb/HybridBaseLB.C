@@ -4,15 +4,12 @@
 /*@{*/
 
 #include "HybridBaseLB.h"
-#include "LBDBManager.h"
 #include "GreedyLB.h"
-#include "GreedyCommLB.h"
-#include "RefineCommLB.h"
 #include "RefineLB.h"
 
 #define  DEBUGF(x)     // CmiPrintf x;
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(HybridBaseLB, "HybridBase load balancer")
 
@@ -45,7 +42,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
   receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
 			    (void*)(this));
-  notifier = theLbdb->getLBDB()->
+  notifier = theLbdb->
     NotifyMigrated((LDMigratedFn)(staticMigrated), (void*)(this));
 
   statsStrategy = FULL;
@@ -90,7 +87,6 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
 void HybridBaseLB::initTree()
 {
 #if CMK_LBDB_ON
-#if ! CMK_BIGSIM_CHARM
     // create a multicast group to optimize level 1 multicast
   if (tree->isroot(CkMyPe(), 1)) {
     int npes = tree->numChildren(CkMyPe(), 1);
@@ -103,7 +99,6 @@ void HybridBaseLB::initTree()
     }
   }
 #endif
-#endif
 }
 
 HybridBaseLB::~HybridBaseLB()
@@ -111,7 +106,7 @@ HybridBaseLB::~HybridBaseLB()
 #if CMK_LBDB_ON
   theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
   if (theLbdb) {
-    theLbdb->getLBDB()->
+    theLbdb->
       RemoveNotifyMigrated(notifier);
     //theLbdb->
     //  RemoveStartLBFn((LDStartLBFn)(staticStartLB));

@@ -144,7 +144,7 @@ class LogEntry {
 
     // Constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-	     int ml, CmiObjId *d, double rt, int numPe, int *pelist){
+	     int ml, CmiObjId *d, double rt, int numPe, const int *pelist){
 
       type = CREATION_MULTICAST; 
       mIdx = m; 
@@ -185,7 +185,7 @@ class LogEntry {
     // complementary function for adding papi data
     void addPapi(LONG_LONG_PAPI *papiVals){
 #if CMK_HAS_COUNTER_PAPI
-   	memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+   	memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*CkpvAccess(numEvents));
 #endif
     }
    
@@ -375,7 +375,7 @@ class LogPool {
   	void addMemoryUsage(unsigned char type,double time,double memUsage);
 	void addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);
 
-    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, int *pelist=NULL);
+    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, const int *pelist=NULL);
     void flushLogBuffer();
     void postProcessLog();
 
@@ -510,7 +510,7 @@ public:
 
     void creation(envelope *e, int epIdx, int num=1);
     void creation(char *m);
-    void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);
+    void creationMulticast(envelope *e, int epIdx, int num=1, const int *pelist=NULL);
     void creationDone(int num=1);
     void beginExecute(envelope *e, void *obj=NULL);
     void beginExecute(char *msg);
@@ -569,6 +569,8 @@ using namespace PUP;
 class toProjectionsFile : public toTextFile {
  protected:
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
  public:
   //Begin writing to this file, which should be opened for ascii write.
   toProjectionsFile(FILE *f_) :toTextFile(f_) {}
@@ -576,6 +578,8 @@ class toProjectionsFile : public toTextFile {
 class fromProjectionsFile : public fromTextFile {
  protected:
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
  public:
   //Begin writing to this file, which should be opened for ascii read.
   fromProjectionsFile(FILE *f_) :fromTextFile(f_) {}
@@ -586,6 +590,8 @@ class toProjectionsGZFile : public PUP::er {
   gzFile f;
  protected:
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
  public:
   //Begin writing to this gz file, which should be opened for gz write.
   toProjectionsGZFile(gzFile f_) :er(IS_PACKING), f(f_) {}

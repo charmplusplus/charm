@@ -41,7 +41,7 @@
    directly as normal c variables (1) */
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
-/* decide which is the default implementation of the threads (see threads.c)
+/* decide which is the default implementation of the threads (see threads.C)
    Only one of the following can be 1. If none of them is selected, qthreads
    will be used as default. This default can be overwritten at compile time
    using -DCMK_THREADS_BUILD_"type"=1 */
@@ -89,15 +89,15 @@ extended header must contain also another field called "pn" (phase number).
  * Specifies which version of PMI to use.
  * See src/arch/ofi/machine.C
  */
-#define CMK_OFI_USE_PMI                                     1
-#define CMK_OFI_USE_PMI2                                    0
+#define CMK_USE_PMI                                     1
+#define CMK_USE_PMI2                                    0
 
 /*
  * Use Simple client-side implementation of PMI.
- * Valid only for CMK_OFI_USE_PMI.
+ * Valid only for CMK_USE_PMI.
  * Optional in an SLURM environment.
- * See src/arch/ofi/simple_pmi/
+ * See src/arch/util/proc_management/simple_pmi/
  */
-#define CMK_OFI_USE_SIMPLEPMI                               1
+#define CMK_USE_SIMPLEPMI                               1
 
 #endif

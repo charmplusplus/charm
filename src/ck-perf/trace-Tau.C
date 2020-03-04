@@ -223,7 +223,7 @@ void TraceTau::creation(envelope *, int epIdx, int num) {
 }
 
 void TraceTau::creationMulticast(envelope *, int epIdx, int num, 
-				 int *pelist) {
+				 const int *pelist) {
   dprintf("[%d] Multicast Message for Entry Method id %d sent to %d pes\n",
 	  CkMyPe(), epIdx, num);
 }
@@ -417,11 +417,7 @@ void initTraceTauBOC() {
     }
   //TAU_PROFILER_CREATE(main, "main", "", TAU_DEFAULT);
   //TAU_PROFILER_START(main);
-#ifdef __BIGSIM__
-  if (BgNodeRank()==0) {
-#else
   if (CkMyRank() == 0) {
-#endif
     registerExitFn(traceTauExitFunction);
   }
 }

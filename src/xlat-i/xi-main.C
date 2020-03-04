@@ -200,13 +200,13 @@ void abortxi(char* name) {
 
 using namespace xi;
 
-int processAst(AstChildren<Module>* m, const bool chareNames, const bool dependsMode,
-               const int fortranMode_, const int internalMode_, char* fname_,
-               char* origFile_) {
+int processAst(xi::AstChildren<xi::Module> *m, const bool chareNames,
+               const bool dependsMode, const int fortranMode_,
+               const int internalMode_, char* fname_, char* origFile_) {
   // set globals based on input params
   fortranMode = fortranMode_;
   internalMode = internalMode_;
-  origFile = origFile_;
+  cur_file = origFile = origFile_;
   fname = fname_;
 
   if (!m) return 0;
@@ -238,6 +238,7 @@ int processAst(AstChildren<Module>* m, const bool chareNames, const bool depends
   return 0;
 }
 
+#ifndef XI_LIBRARY
 int main(int argc, char* argv[]) {
   origFile = NULL;
   fname = NULL;
@@ -294,3 +295,4 @@ int main(int argc, char* argv[]) {
   return processAst(m, chareNames, dependsMode, fortranMode, internalMode, fname,
                     origFile);
 }
+#endif

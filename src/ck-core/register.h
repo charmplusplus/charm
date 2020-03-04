@@ -76,6 +76,8 @@ class EntryInfo {
       marshalled messages.
     */
     CkMessagePupFn messagePup;
+    /// guard entryTable call and name swap for breakpoint in SMP
+    std::atomic<int> breakPointSet;
 #endif
 
     /// Charm++ Tracing enabled for this ep (can change dynamically)
@@ -108,6 +110,9 @@ class EntryInfo {
       ownsName(ownsN), name(n)
     {
       if (ownsName) initName(n);
+#if CMK_CHARMDEBUG
+      breakPointSet=0;
+#endif      
     }
 
     ~EntryInfo()
@@ -296,8 +301,8 @@ class CkRegisteredInfo {
 	void outOfBounds(int idx) {
 		const char *exampleName="";
 		if (vec.size()>0) exampleName=vec[0]->name;
-		CkPrintf("register.h> CkRegisteredInfo<%d,%s> called with invalid index "
-			"%d (should be less than %d)\n", sizeof(T),exampleName,
+		CkPrintf("register.h> CkRegisteredInfo<%zu,%s> called with invalid index "
+			"%d (should be less than %zu)\n", sizeof(T),exampleName,
 			idx, vec.size());
 		CkAbort("Registered idx is out of bounds-- is message or memory corrupted?");
 	}

@@ -8,7 +8,6 @@
 #include "ck.h"
 #include "envelope.h"
 #include "CentralLB.h"
-#include "LBDBManager.h"
 #include "LBSimulation.h"
 
 #define  DEBUGF(x)       // CmiPrintf x;
@@ -23,13 +22,6 @@
 #define USE_LDB_SPANNING_TREE 1
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-extern bool _restartFlag;
-extern void getGlobalStep(CkGroupID );
-extern void initMlogLBStep(CkGroupID );
-extern int globalResumeCount;
-extern void sendDummyMigrationCounts(int *);
-#endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvExtern(void *, CkGridObject);
@@ -95,9 +87,9 @@ void CentralLB::initLB(const CkLBOptions &opt)
   // create and turn on by default
   receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
-  notifier = theLbdb->getLBDB()->
+  notifier = theLbdb->
     NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
-  startLbFnHdl = theLbdb->getLBDB()->
+  startLbFnHdl = theLbdb->
     AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 
   // CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
@@ -115,7 +107,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (_lb_predict) predicted_model = new FutureModel(_lb_predict_window);
   else predicted_model=0;
   // register user interface callbacks
-  theLbdb->getLBDB()->SetupPredictor((LDPredictModelFn)(staticPredictorOn),(LDPredictWindowFn)(staticPredictorOnWin),(LDPredictFn)(staticPredictorOff),(LDPredictModelFn)(staticChangePredictor),(void*)(this));
+  theLbdb->SetupPredictor((LDPredictModelFn)(staticPredictorOn),(LDPredictWindowFn)(staticPredictorOnWin),(LDPredictFn)(staticPredictorOff),(LDPredictModelFn)(staticChangePredictor),(void*)(this));
 
   myspeed = theLbdb->ProcessorSpeed();
 
@@ -148,7 +140,7 @@ CentralLB::~CentralLB()
   delete statsData;
   theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
   if (theLbdb) {
-    theLbdb->getLBDB()->
+    theLbdb->
       RemoveNotifyMigrated(notifier);
     theLbdb->
       RemoveStartLBFn((LDStartLBFn)(staticStartLB));
@@ -159,11 +151,11 @@ CentralLB::~CentralLB()
 void CentralLB::turnOn() 
 {
 #if CMK_LBDB_ON
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOnBarrierReceiver(receiver);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOnNotifyMigrated(notifier);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOnStartLBFn(startLbFnHdl);
 #endif
 }
@@ -171,11 +163,11 @@ void CentralLB::turnOn()
 void CentralLB::turnOff() 
 {
 #if CMK_LBDB_ON
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOffBarrierReceiver(receiver);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOffNotifyMigrated(notifier);
-  theLbdb->getLBDB()->
+  theLbdb->
     TurnOffStartLBFn(startLbFnHdl);
 #endif
 }
@@ -196,9 +188,6 @@ void CentralLB::AtSync()
   DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
 #if CMK_MEM_CHECKPOINT	
   CkSetInLdb();
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	CpvAccess(_currentObj)=this;
 #endif
 
   // if num of processor is only 1, nothing should happen
@@ -227,9 +216,6 @@ void CentralLB::ProcessAtSync()
     start_lb_time = CkWallTimer();
   }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	initMlogLBStep(thisgroup);
-#endif
 
   // build message
   BuildStatsMsg();
@@ -361,9 +347,6 @@ void CentralLB::BuildStatsMsg()
   CLBStatsMsg* msg = new CLBStatsMsg(osz, csz);
   _MEMCHECK(msg);
   msg->from_pe = CkMyPe();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	msg->step = step();
-#endif
   //msg->serial = CrnRand();
 
 /*
@@ -432,30 +415,19 @@ void CentralLB::SendStats()
 
   statsMsg = NULL;
 
-#ifdef __BIGSIM__
-  BgEndStreaming();
-#endif
 
   {
   // enfore the barrier to wait until centralLB says no
   LDOMHandle h;
   h.id.id.idx = 0;
-  theLbdb->getLBDB()->RegisteringObjects(h);
+  theLbdb->RegisteringObjects(h);
   }
 #endif
 }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-extern int donotCountMigration;
-#endif
 
 void CentralLB::Migrated(int waitBarrier)
 {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    if(donotCountMigration){
-        return ;
-    }
-#endif
 
 #if CMK_LBDB_ON
   if (waitBarrier) {
@@ -593,14 +565,6 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
     CmiAssert(m!=NULL);
     const int pe = m->from_pe;
     DEBUGF(("Stats msg received, %d %d %d %p step %d\n", pe,stats_msg_count,m->n_objs,m,step()));
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
-/*      
- *  if(m->step < step()){
- *    //TODO: if a processor is redoing an old load balance step..
- *    //tell it that the step is done and that it should not perform any migrations
- *      thisProxy[pe].ReceiveDummyMigration();
- *  }*/
-#endif
 	
 #if CMK_FAULT_EVAC
     if(!CmiNodeAlive(pe)){
@@ -741,13 +705,6 @@ void CentralLB::LoadBalance()
 //          CmiPrintf("[%d] %.10f %.10f\n", i, statsData->objData[i].minWall, statsData->objData[i].maxWall);
 //      }
   }
-
-#if CMK_REPLAYSYSTEM
-  if (_replaySystem && !concurrent) {
-    loadBalancer_pointers = (LDHandle*)malloc(CkNumPes()*sizeof(LDHandle));
-    for (int i=0; i<statsData->n_objs; ++i) loadBalancer_pointers[statsData->from_proc[i]] = statsData->objData[i].handle.omhandle.ldb;
-  }
-#endif
   
   storedMigrateMsg = Strategy(statsData);
 
@@ -768,16 +725,9 @@ void CentralLB::ApplyDecision() {
     storedMigrateMsg = NULL;
   }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	migrateMsg->step = step();
-#endif
 
 #if CMK_REPLAYSYSTEM
   CpdHandleLBMessage(&migrateMsg);
-  if (_replaySystem && !concurrent) {
-    for (int i=0; i<migrateMsg->n_moves; ++i) migrateMsg->moves[i].obj.omhandle.ldb = loadBalancer_pointers[migrateMsg->moves[i].from_pe];
-    free(loadBalancer_pointers);
-  }
 #endif
   
   LBDatabaseObj()->get_avail_vector(migrateMsg->avail_vector);
@@ -802,10 +752,6 @@ void CentralLB::ApplyDecision() {
   }
 
   DEBUGF(("[%d]calling recv migration\n",CkMyPe()));
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
-    lbDecisionCount++;
-    migrateMsg->lbDecisionCount = lbDecisionCount;
-#endif
 
   envelope *env = UsrToEnv(migrateMsg);
 #if CMK_SCATTER_LB_RESULTS
@@ -1057,9 +1003,6 @@ void CentralLB::removeNonMigratable(LDStats* stats, int count)
 }
 
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-extern int restarted;
-#endif
 
 void CentralLB::ReceiveMigration(LBScatterMsg *m) {
   if (concurrent) {
@@ -1073,12 +1016,8 @@ void CentralLB::ReceiveMigration(LBScatterMsg *m) {
 #if CMK_MEM_CHECKPOINT
   CkResetInLdb();
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	restoreParallelRecovery(&resumeAfterRestoreParallelRecovery,(void *)this);
-#else
   contribute(CkCallback(CkReductionTarget(CentralLB, ProcessMigrationDecision),
               thisProxy));
-#endif
 
 }
 
@@ -1094,12 +1033,8 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 #if CMK_MEM_CHECKPOINT
   CkResetInLdb();
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	restoreParallelRecovery(&resumeAfterRestoreParallelRecovery,(void *)this);
-#else
   contribute(CkCallback(CkReductionTarget(CentralLB, ProcessReceiveMigration),
               thisProxy));
-#endif
 }
 
 void CentralLB::ProcessMigrationDecision() {
@@ -1114,6 +1049,10 @@ void CentralLB::ProcessMigrationDecision() {
     MigrateDecision& move = m->moves[i];
     const int me = CkMyPe();
     if (move.fromPe == me) {
+      if (move.toPe == me) {
+        CkAbort("[%d] Error, attempting to migrate from myself to myself\n",
+            CkMyPe());
+      }
       DEBUGF(("[%d] migrating object to %d\n", move.fromPe, move.toPe));
       // migrate object, in case it is already gone, inform toPe
       LDObjHandle objInfo = theLbdb->GetObjHandle(move.dbIndex);
@@ -1139,19 +1078,6 @@ void CentralLB::ProcessReceiveMigration()
         LBMigrateMsg *m = storedMigrateMsg;
         CmiAssert(m!=NULL);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	int *dummyCounts;
-
-	DEBUGF(("[%d] Starting ReceiveMigration WITH step %d m->step %d\n",CkMyPe(),step(),m->step));
-	// CmiPrintf("[%d] Starting ReceiveMigration step %d m->step %d\n",CkMyPe(),step(),m->step);
-	if(step() > m->step){
-		char str[100];
-		envelope *env = UsrToEnv(m);
-		return;
-	}
-	lbDecisionCount = m->lbDecisionCount;
-#endif
-
   if (_lb_args.debug() > 1) 
     if (CkMyPe()%1024==0) CmiPrintf("[%d] Starting ReceiveMigration step %d at %f\n",CkMyPe(),step(), CmiWallTimer());
 
@@ -1165,15 +1091,6 @@ void CentralLB::ProcessReceiveMigration()
 #endif
   migrates_expected = 0;
   future_migrates_expected = 0;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	int sending=0;
-    int dummy=0;
-	LBDB *_myLBDB = theLbdb->getLBDB();
-	if(_restartFlag){
-        dummyCounts = new int[CmiNumPes()];
-        memset(dummyCounts,0,sizeof(int)*CmiNumPes());
-    }
-#endif
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
@@ -1186,26 +1103,8 @@ void CentralLB::ProcessReceiveMigration()
 
       DEBUGF(("[%d] migrating object to %d\n",move.from_pe,move.to_pe));
       // migrate object, in case it is already gone, inform toPe
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
       if (theLbdb->Migrate(move.obj,move.to_pe) == 0) 
          thisProxy[move.to_pe].MissMigrate(!move.async_arrival);
-#else
-            if(_restartFlag){
-                DEBUG(CmiPrintf("[%d] need to move object from %d to %d \n",CkMyPe(),move.from_pe,move.to_pe));
-                theLbdb->Migrate(move.obj,move.to_pe);
-                sending++;
-            }else{
-                if(_myLBDB->validObjHandle(move.obj)){
-                    DEBUG(CmiPrintf("[%d] need to move object from %d to %d \n",CkMyPe(),move.from_pe,move.to_pe));
-                    theLbdb->Migrate(move.obj,move.to_pe);
-                    sending++;
-                }else{
-                    DEBUG(CmiPrintf("[%d] dummy move to pe %d detected after restart \n",CmiMyPe(),move.to_pe));
-                    dummyCounts[move.to_pe]++;
-                    dummy++;
-                }
-            }
-#endif
     } else if (move.from_pe != me && move.to_pe == me) {
 #if CMK_DRONE_MODE
       int to_pe_rank0 = CMK_RANK_0(move.to_pe);
@@ -1222,16 +1121,10 @@ void CentralLB::ProcessReceiveMigration()
     }
 
   }
+
   DEBUGF(("[%d] in ReceiveMigration %d moves expected: %d future expected: %d\n",CkMyPe(),m->n_moves, migrates_expected, future_migrates_expected));
   // if (_lb_debug) CkPrintf("[%d] expecting %d objects migrating.\n", CkMyPe(), migrates_expected);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	if(_restartFlag){
-		sendDummyMigrationCounts(dummyCounts);
-		_restartFlag  =false;
-    	delete []dummyCounts;
-	}
-#endif
 
 
 #if 0
@@ -1249,23 +1142,8 @@ void CentralLB::ProcessReceiveMigration()
   delete m;
 
 //	CkEvacuatedElement();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-//  migrates_expected = 0;
-//  //  ResumeClients(1);
-#endif
 #endif
 }
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void CentralLB::ReceiveDummyMigration(int globalDecisionCount){
-    DEBUGF(("[%d] ReceiveDummyMigration called for step %d with globalDecisionCount %d\n",CkMyPe(),step(),globalDecisionCount));
-    //TODO: this is gonna be important when a crash happens during checkpoint
-    //the globalDecisionCount would have to be saved and compared against
-    //a future recvMigration
-                
-	thisProxy[CkMyPe()].ResumeClients(1);
-}
-#endif
 
 // We assume that bit vector would have been aptly set async by either scheduler or charmrun.
 void CentralLB::CheckForRealloc(){
@@ -1346,15 +1224,10 @@ void CentralLB::MigrationDoneImpl (int balancing)
 	DEBUGF(("[%d] Incrementing Step %d \n",CkMyPe(),step()));
   // if sync resume, invoke a barrier
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    savedBalancing = balancing;
-    startLoadBalancingMlog(&resumeCentralLbAfterChkpt,(void *)this);
-#endif
 
   LBDatabase::Object()->MigrationDone();    // call registered callbacks
 
   LoadbalanceDone(balancing);        // callback
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   // if sync resume invoke a barrier
   if (balancing && _lb_args.syncResume()) {
     contribute(CkCallback(CkReductionTarget(CentralLB, ResumeClients),
@@ -1372,41 +1245,8 @@ void CentralLB::MigrationDoneImpl (int balancing)
   CmiGridQueueDeregisterAll ();
   CpvAccess(CkGridObject) = NULL;
 #endif  // if CMK_GRID_QUEUE_AVAILABLE
-#endif  // if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
 #endif  // if CMK_LBDB_ON
 }
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void CentralLB::endMigrationDone(int balancing){
-    DEBUGF(("[%d] CentralLB::endMigrationDone step %d\n",CkMyPe(),step()));
-
-
-  if (balancing && _lb_args.syncResume()) {
-    contribute(CkCallback(CkReductionTarget(CentralLB, ResumeClients),
-                thisProxy));
-  }
-  else{
-    if(CmiNodeAlive(CkMyPe())){
-    DEBUGF(("[%d] Sending ResumeClients balancing %d \n",CkMyPe(),balancing));
-    thisProxy [CkMyPe()].ResumeClients(balancing);
-    }
-  }
-
-}
-#endif
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void resumeCentralLbAfterChkpt(void *_lb){
-    CentralLB *lb= (CentralLB *)_lb;
-    CpvAccess(_currentObj)=lb;
-    lb->endMigrationDone(lb->savedBalancing);
-}
-void resumeAfterRestoreParallelRecovery(void *_lb){
-    CentralLB *lb= (CentralLB *)_lb;
-	lb->ProcessReceiveMigration();
-}
-#endif
-
 
 void CentralLB::ResumeClients()
 {
@@ -1416,10 +1256,6 @@ void CentralLB::ResumeClients()
 void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    resumeCount++;
-    globalResumeCount = resumeCount;
-#endif
   DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
 
   theLbdb->ResumeClients();
@@ -1465,7 +1301,7 @@ void CentralLB::CheckMigrationComplete()
     // release local barrier  so that the next load balancer can go
     LDOMHandle h;
     h.id.id.idx = 0;
-    theLbdb->getLBDB()->DoneRegisteringObjects(h);
+    theLbdb->DoneRegisteringObjects(h);
     // switch to the next load balancer in the list
     // subtle: called from Migrated() may result in Migrated() called in next LB
     if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
@@ -1784,8 +1620,7 @@ void CentralLB::readStatsMsgs(const char* filename)
   int i;
   FILE *f = fopen(filename, "r");
   if (f==NULL) {
-    CmiPrintf("Fatal Error> Cannot open LB Dump file %s!\n", filename);
-    CmiAbort("");
+    CkAbort("Fatal Error> Cannot open LB Dump file %s!\n", filename);
   }
 
   // at this stage, we need to rebuild the statsMsgList and
@@ -1831,8 +1666,7 @@ void CentralLB::writeStatsMsgs(const char* filename)
 #if CMK_LBDB_ON
   FILE *f = fopen(filename, "w");
   if (f==NULL) {
-    CmiPrintf("Fatal Error> writeStatsMsgs failed to open the output file %s!\n", filename);
-    CmiAbort("");
+    CkAbort("Fatal Error> writeStatsMsgs failed to open the output file %s!\n", filename);
   }
 
   const PUP::machineInfo &machInfo = PUP::machineInfo::current();
@@ -1894,10 +1728,6 @@ void CentralLB::pup(PUP::er &p) {
       statsMsg = new CLBStatsMsg;
     statsMsg->pup(p);
   }
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  p | lbDecisionCount;
-  p | resumeCount;
-#endif
   p | use_thread;
 }
 
@@ -1941,9 +1771,6 @@ void CLBStatsMsg::pup(PUP::er &p) {
 #if CMK_LB_CPUTIMER
   p|total_cputime;
   p|bg_cputime;
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  p | step;
 #endif
   p|n_objs;
   if (p.isUnpacking()) objData = new LDObjData[n_objs];
