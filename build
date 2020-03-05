@@ -14,6 +14,12 @@ if [[ $rc -ne 0 ]]; then
   exec ./buildold $@
 fi
 
+if [[ $(uname) != "Linux" && $(uname) != "Darwin" ]]; then
+  echo "Warning: CMake build is only supported on Linux and Darwin, running ./buildold instead."
+  sleep 2
+  exec ./buildold $@
+fi
+
 cmake_version_major=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 1 -d'.')
 cmake_version_minor=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 2 -d'.')
 
