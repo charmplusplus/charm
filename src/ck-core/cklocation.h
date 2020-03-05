@@ -572,8 +572,10 @@ private:
 	void initLB(CkGroupID lbmgrID, CkGroupID metalbID);
 
 public:
+#if CMK_LBDB_ON
   void recvAtSync(void);
   void dummyResumeFromSync(void);
+#endif
 
 };
 

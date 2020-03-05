@@ -1563,8 +1563,10 @@ void CkMigratable::CkAbort(const char *format, ...) const {
 
 void Chare::ResumeFromSync(void)
 {
+#if CMK_LBDB_ON
   ((CkLocMgr*)this)->dummyResumeFromSync();
 //	CkAbort("::ResumeFromSync() not defined for this array element!\n");
+#endif
 }
 
 void Chare::AtSyncBarrierReached(void)
@@ -3311,6 +3313,7 @@ void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_) {}
 void CkLocMgr::startInserting(void) {}
 void CkLocMgr::doneInserting(void) {}
 void CkLocMgr::dummyAtSync(void) {}
+void CkLocMgr::AtSyncBarrierReached(void) {}
 #endif
 
 
@@ -3358,10 +3361,8 @@ void CkLocMgr::dummyAtSync(void)
 	lbmgr->AtLocalBarrier(this);
 }
 
-#if 1
 void CkLocMgr::staticDummyResumeFromSync(void* data)
 {      ((CkLocMgr*)data)->dummyResumeFromSync(); }
-#endif
 
 void CkLocMgr::dummyResumeFromSync()
 {
