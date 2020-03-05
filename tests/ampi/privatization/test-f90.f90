@@ -28,6 +28,19 @@
       end subroutine mpi_main
 
 
+      subroutine subroutine_save(failed, rank, my_wth)
+
+        implicit none
+        save
+
+        integer :: failed, rank, my_wth
+        integer :: save_variable3
+
+        call test_privatization(failed, rank, my_wth, save_variable3)
+
+      end subroutine subroutine_save
+
+
       subroutine perform_test_batch(failed, rank, my_wth)
 
         use test_mod
@@ -42,6 +55,7 @@
         call test_privatization(failed, rank, my_wth, module_variable)
         call test_privatization(failed, rank, my_wth, save_variable1)
         call test_privatization(failed, rank, my_wth, save_variable2)
+        call subroutine_save(failed, rank, my_wth)
         call test_privatization(failed, rank, my_wth, common_variable)
 
       end subroutine perform_test_batch
