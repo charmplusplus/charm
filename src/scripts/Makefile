@@ -562,7 +562,8 @@ include Makefile.machine
 
 converse: charmrun-target swapglobal-target conv-cpm tmgr hwloc-target
 
-cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h: hwloc-target
+cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
+$(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
 
 hwloc-target:  conv-autoconfig.h
 	( $(MAKE) -C hwloc )
