@@ -1638,10 +1638,10 @@ void _initCharm(int unused_argc, char **argv)
             // XXX: Assuming uniformity of node size here
             num += num/CmiMyNodeSize();
 #endif
-            if (!_Cmi_forceSpinOnIdle && num > CmiNumCores())
+            if (!_Cmi_sleepOnIdle && !_Cmi_forceSpinOnIdle && num > CmiNumCores())
             {
               if (CmiMyPe() == 0)
-                CmiPrintf("\nCharm++> Warning: the number of SMP threads (%d) is greater than the number of physical cores (%d), so threads will sleep while idling. Use +CmiSpinOnIdle or +CmiSleepOnIdle to control this directly.\n\n", num, CmiNumCores());
+                CmiPrintf("\nCharm++> Warning: the number of SMP threads (%d) is greater than the number of physical cores (%d), so internally setting +CmiSleepOnIdle to make threads sleep while idling. Use +CmiSpinOnIdle to change this behavior and make the runtime system spin on message reception when idle, rather than sleeping\n\n", num, CmiNumCores());
               CmiLock(CksvAccess(_nodeLock));
               if (! _Cmi_sleepOnIdle) _Cmi_sleepOnIdle = 1;
               CmiUnlock(CksvAccess(_nodeLock));
