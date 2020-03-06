@@ -31,6 +31,20 @@
       end subroutine mpi_main
 
 
+      subroutine subroutine_save(failed, rank, my_wth, operation)
+
+        implicit none
+        save
+
+        integer :: failed, rank, my_wth, operation
+        integer :: save_variable3
+        !$omp threadprivate(save_variable3)
+
+        call test_privatization(failed, rank, my_wth, operation, save_variable3)
+
+      end subroutine subroutine_save
+
+
       subroutine perform_test_batch(failed, rank, my_wth, operation)
 
         use test_mod
@@ -48,6 +62,7 @@
         call test_privatization(failed, rank, my_wth, operation, module_variable)
         call test_privatization(failed, rank, my_wth, operation, save_variable1)
         call test_privatization(failed, rank, my_wth, operation, save_variable2)
+        call subroutine_save(failed, rank, my_wth, operation)
         call test_privatization(failed, rank, my_wth, operation, common_variable)
 
       end subroutine perform_test_batch

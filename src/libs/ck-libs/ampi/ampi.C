@@ -3109,7 +3109,11 @@ MPI_Request ampi::sendLocalMsg(int tag, int srcRank, const void* buf, int size, 
                CkMyPe(), parent->thisIndex, destPtr->parent->thisIndex);
     )
     destPtr->generic(makeAmpiMsg(destRank, tag, srcRank, buf, count, type, destComm, seq));
-    return MPI_REQUEST_NULL;
+    if (reqIdx == MPI_REQUEST_NULL) {
+      reqIdx = postReq(parent->reqPool.newReq<SendReq>((void*)buf, count, type, destRank, tag, destComm, getDDT(),
+                                                        AMPI_REQ_COMPLETED));
+    }
+    return reqIdx;
   }
 }
 
@@ -3192,14 +3196,18 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   // Send via normal Charm++ message with copies on both sender- and receiver-sides
   arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, seq));
 
-  if (reqIdx != MPI_REQUEST_NULL) { // Persistent send request
+  if (reqIdx == MPI_REQUEST_NULL) { // Sends via generic() get a pre-completed send request
+    reqIdx = postReq(parent->reqPool.newReq<SendReq>((void*)buf, count, type, rank, t, destcomm,
+                                                     getDDT(), AMPI_REQ_COMPLETED));
+  }
+  else { // Persistent request
     AmpiRequestList& reqList = parent->ampiReqs;
     AmpiRequest& sreq = (*reqList[reqIdx]);
     CkAssert(sreq.isPersistent());
     sreq.complete = true;
-    return reqIdx;
   }
-  return MPI_REQUEST_NULL;
+
+  return reqIdx;
 }
 
 // Invoked by recv'er when not co-located in the same process as sender.
@@ -6163,10 +6171,10 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
     if (req.test()) {
       pptr = req.wait(pptr, &sts);
       array_of_indices[(*outcount)] = i;
-      (*outcount)++;
       if (array_of_statuses != MPI_STATUSES_IGNORE)
         array_of_statuses[(*outcount)] = sts;
       reqs.freeNonPersReq(pptr, array_of_requests[i]);
+      (*outcount)++;
     }
     else {
       req.setBlocked(true);
@@ -6196,11 +6204,11 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
       if (req.test()) {
         pptr = req.wait(pptr, &sts);
         array_of_indices[(*outcount)] = i;
-        (*outcount)++;
         if (array_of_statuses != MPI_STATUSES_IGNORE)
           array_of_statuses[(*outcount)] = sts;
         reqs.unblockReqs(&array_of_requests[i], incount-i);
         reqs.freeNonPersReq(pptr, array_of_requests[i]);
+        *outcount = 1;
         CkAssert(pptr->numBlockedReqs == 0);
         return MPI_SUCCESS;
       }
@@ -6472,9 +6480,9 @@ AMPI_API_IMPL(int, MPI_Testsome, int incount, MPI_Request *array_of_requests, in
     testRequest(pptr, &array_of_requests[i], &flag, &sts);
     if (flag) {
       array_of_indices[(*outcount)] = i;
-      (*outcount)++;
       if (array_of_statuses != MPI_STATUSES_IGNORE)
         array_of_statuses[(*outcount)] = sts;
+      (*outcount)++;
     }
   }
 
