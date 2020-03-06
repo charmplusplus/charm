@@ -539,7 +539,7 @@ static void CthThreadBaseFree(CthThreadBase *th)
   th->stack=NULL;
 }
 
-void CthInterceptionsImmediateActivate(CthThread th)
+static void CthInterceptionsImmediateActivate(CthThread th)
 {
   CthThreadBase * const base = B(th);
 
@@ -556,7 +556,7 @@ void CthInterceptionsImmediateActivate(CthThread th)
     CmiTLSSegmentSet(&base->tlsseg);
 #endif
 }
-void CthInterceptionsImmediateDeactivate(CthThread th)
+static void CthInterceptionsImmediateDeactivate(CthThread th)
 {
   CthThreadBase * const base = B(th);
 
@@ -590,6 +590,25 @@ void CthInterceptionsDeactivatePop(CthThread th)
     return;
 
   CthInterceptionsImmediateActivate(th);
+}
+
+int CthInterceptionsTemporarilyActivateStart(CthThread th)
+{
+  CthThreadBase * const base = B(th);
+
+  const int old = base->interceptionDeactivations;
+  CmiAssert(old != 0);
+  base->interceptionDeactivations = 0;
+  CthInterceptionsImmediateActivate(th);
+  return old;
+}
+void CthInterceptionsTemporarilyActivateEnd(CthThread th, int old)
+{
+  CthThreadBase * const base = B(th);
+
+  CmiAssert(base->interceptionDeactivations == 0);
+  base->interceptionDeactivations = old;
+  CthInterceptionsImmediateDeactivate(th);
 }
 
 static void CthInterceptionsCreate(CthThread th)

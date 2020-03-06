@@ -1242,6 +1242,8 @@ ampiParent::ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept
 
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
 
+  thread->setResumeAfterMigrationCallback(CkCallback(CkIndex_ampiParent::resumeAfterMigration(), thisProxy[thisIndex]));
+
 #if CMK_FAULT_EVAC
   AsyncEvacuate(false);
 #endif
@@ -1476,16 +1478,35 @@ void ampiParent::setUserJustMigratedFn(MPI_MigrateFn f) noexcept {
 
 void ampiParent::ckAboutToMigrate() noexcept {
   if (userAboutToMigrateFn) {
+    CtvAccess(_curTCharm) = thread;
+    CtvAccess(ampiPtr) = this;
+    const int old = CthInterceptionsTemporarilyActivateStart(thread->getThread());
     (*userAboutToMigrateFn)();
+    CthInterceptionsTemporarilyActivateEnd(thread->getThread(), old);
+    CtvAccess(_curTCharm) = nullptr;
+    CtvAccess(ampiPtr) = nullptr;
   }
 }
 
 void ampiParent::ckJustMigrated() noexcept {
   ArrayElement1D::ckJustMigrated();
   prepareCtv();
-  if (userJustMigratedFn) {
+  didMigrate = true;
+}
+
+void ampiParent::resumeAfterMigration() noexcept {
+  if (didMigrate && userJustMigratedFn) {
+    didMigrate = false;
+    CtvAccess(_curTCharm) = thread;
+    CtvAccess(ampiPtr) = this;
+    const int old = CthInterceptionsTemporarilyActivateStart(thread->getThread());
     (*userJustMigratedFn)();
+    CthInterceptionsTemporarilyActivateEnd(thread->getThread(), old);
+    CtvAccess(_curTCharm) = nullptr;
+    CtvAccess(ampiPtr) = nullptr;
   }
+
+  thread->start();
 }
 
 void ampiParent::ckJustRestored() noexcept {
