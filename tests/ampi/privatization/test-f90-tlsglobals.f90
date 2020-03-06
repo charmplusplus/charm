@@ -37,7 +37,7 @@
         save
 
         integer :: failed, rank, my_wth, operation
-        integer :: save_variable3
+        integer, target :: save_variable3
         !$omp threadprivate(save_variable3)
 
         call test_privatization(failed, rank, my_wth, operation, save_variable3)
