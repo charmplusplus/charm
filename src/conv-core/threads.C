@@ -641,7 +641,7 @@ static void CthInterceptionsCreate(CthThread th)
       tlsptr = CmiIsomallocContextMallocAlign(base->isomallocContext, tlsdesc.align, tlsdesc.size);
     else
       tlsptr = CmiAlignedAlloc(tlsdesc.align, tlsdesc.size);
-    base->tlsseg = CmiTLSCreateSegUsingPtr(tlsptr);
+    CmiTLSCreateSegUsingPtr(&CpvAccess(Cth_PE_TLS), &base->tlsseg, tlsptr);
   }
   else
   {
@@ -675,11 +675,9 @@ static void CthBaseInit(char **argv)
   CpvAccess(Cth_serialNo) = 1;
 
 #if CMK_THREADS_BUILD_TLS
-  CmiTLSInit();
-  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
-
   CpvInitialize(tlsseg_t, Cth_PE_TLS);
-  CmiTLSSegmentGet(&CpvAccess(Cth_PE_TLS));
+  CmiTLSInit(&CpvAccess(Cth_PE_TLS));
+  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
 #endif
 }
 
