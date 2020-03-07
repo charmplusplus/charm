@@ -87,6 +87,10 @@ CmiIdleLock_checkMessage
 #include <atomic>
 #include <thread>
 
+#if CMK_HAS_OPENMP
+#include <omp.h>
+#endif
+
 void CmiStateInit(int pe, int rank, CmiState state);
 void CommunicationServerInit(void);
 
@@ -403,12 +407,6 @@ pthread_t *_Cmi_mypidlist;
 
 static void CmiStartThreads(char **argv)
 {
-  pthread_t pid;
-  size_t i;
-  int ok, tocreate;
-  pthread_attr_t attr;
-  int start, end;
-
   MACHSTATE(4,"CmiStartThreads")
   CmiMemLock_lock=CmiCreateLock();
   _smp_mutex = CmiCreateLock();
@@ -418,7 +416,7 @@ static void CmiStartThreads(char **argv)
   pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
     (CmiState)calloc(_Cmi_mynodesize+1, sizeof(struct CmiStateStruct));
-  for (i=0; i<_Cmi_mynodesize; i++)
+  for (int i=0; i<_Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
   /*Create a fake state structure for the comm. thread*/
 /*  CmiStateInit(-1,_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize)); */
@@ -440,12 +438,28 @@ static void CmiStartThreads(char **argv)
   }
 #endif
 
+  int tocreate;
 #if CMK_MULTICORE || CMK_SMP_NO_COMMTHD
   if (!Cmi_commthread)
     tocreate = _Cmi_mynodesize-1;
   else
 #endif
   tocreate = _Cmi_mynodesize;
+
+#if CMK_HAS_OPENMP
+
+  int num_threads = tocreate + 1;
+  omp_set_dynamic(0);
+  omp_set_num_threads(num_threads);
+  #pragma omp parallel
+  {
+    size_t i = omp_get_thread_num();
+    call_startfn((void *)i);
+  }
+
+#else
+
+  int start, end;
 #if CMK_CONVERSE_MPI
   if(!CharmLibInterOperate) {
     start = 0;
@@ -463,10 +477,14 @@ static void CmiStartThreads(char **argv)
   int numThreads = 0;
 #endif
 
-  for (i=start; i<=end; i++) {        
+  pthread_t pid;
+  int ok;
+  pthread_attr_t attr;
+
+  for (int i=start; i<=end; i++) {
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
-    ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
+    ok = pthread_create(&pid, &attr, call_startfn, (void *)(size_t)i);
     if (ok!=0){
       CmiPrintf("CmiStartThreads: %s(%d)\n", strerror(errno), errno);
       PerrorExit("pthread_create");
@@ -483,6 +501,8 @@ static void CmiStartThreads(char **argv)
   else 
 #endif
     pthread_setspecific(Cmi_state_key, Cmi_state_vector);
+#endif
+
 #endif
 
   MACHSTATE(4,"CmiStartThreads done")
