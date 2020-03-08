@@ -469,18 +469,6 @@ static inline void CmiTLSStatsInit()
 extern thread_local int CmiTLSPlaceholderInt;
 thread_local int CmiTLSPlaceholderInt = -1;
 
-struct CmiTLSPlaceholderWithConstructor
-{
-  CmiTLSPlaceholderWithConstructor()
-  {
-    data = -1;
-  }
-  int data;
-};
-
-extern thread_local CmiTLSPlaceholderWithConstructor CmiTLSPlaceholderStruct;
-thread_local CmiTLSPlaceholderWithConstructor CmiTLSPlaceholderStruct{};
-
 void CmiTLSInit(tlsseg_t * newThreadParent)
 {
 #ifdef CMK_TLS_SWITCHING_UNAVAILABLE
@@ -564,7 +552,6 @@ void CmiTLSInit(tlsseg_t * newThreadParent)
 
   // If emutls is active, setting these will eventually call emutls_init, which we need.
   CmiTLSPlaceholderInt = CmiMyPe();
-  CmiTLSPlaceholderStruct.data = CmiMyRank();
 #endif
 }
 
