@@ -735,15 +735,20 @@ foreach(opt SMP OMP TCP PTHREADS)
 endforeach()
 
 find_program(LSB_RELEASE_EXEC lsb_release)
-execute_process(COMMAND ${LSB_RELEASE_EXEC} -ds
-             OUTPUT_VARIABLE LSB_RELEASE_VER
+
+if(${LSB_RELEASE_EXEC})
+  execute_process(COMMAND ${LSB_RELEASE_EXEC} -ds
+             OUTPUT_VARIABLE OS_RELEASE
              OUTPUT_STRIP_TRAILING_WHITESPACE)
+else()
+  set(OS_RELEASE "${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION} ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
 
 
 # Print configuration
 message("==============================")
 message("Charm++ ${CHARM_VERSION} configuration: ")
-message("  OS version       ${LSB_RELEASE_VER}")
+message("  OS version:      ${OS_RELEASE}")
 message("  Triplet:         ${CHARM_PLATFORM}")
 message("  Network:         ${NETWORK}")
 message("  Build target:    ${TARGET}")
