@@ -18,7 +18,6 @@ public:
   DistBaseLB(CkMigrateMessage *m) : CBase_DistBaseLB(m) {}
   ~DistBaseLB();
 
-  static void staticAtSync(void*);
   void InvokeLB(void); // Everything is at the PE barrier
 
   void barrierDone();

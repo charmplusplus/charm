@@ -22,6 +22,7 @@ protected:
   bool barrierRegistered;//True iff barrier handle below is set
 
 private: //Load balancer state:
+  LDBarrierClient ldBarrierHandle;//Transient (not migrated)
   LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)
 public:
   CkArrayIndex thisIndexMax;
@@ -86,6 +87,8 @@ protected:
   virtual void CkAbort(const char *format, ...) const;
 
 public:
+  virtual void ResumeFromSync(void);
+  virtual void AtSyncBarrierReached(void);
   virtual void UserSetLBLoad(void);  /// user define this when setLBLoad is true
   void setObjTime(double cputime);
   double getObjTime();
@@ -97,8 +100,9 @@ public:
   void AtSync(int waitForMigration=1);
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
+  friend class LocalBarrier;
 private:
-  static void staticResumeFromSync(void* data);
+  void ResumeFromSyncHelper();
 public:
   void ReadyMigrate(bool ready);
   void ckFinishConstruction(void);

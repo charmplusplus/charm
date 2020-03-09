@@ -397,9 +397,7 @@ void LBManager::initnodeFn()
 }
 
 void LBManager::callAt(){
-  for (std::list<Chare *>::iterator i = chares.begin(); i != chares.end(); ++i)
-    if((*i)->atsync_notify)
-      (*i)->AtSyncBarrierReached();
+  localBarrier.CallReceivers();
   if(nloadbalancers > 0) loadbalancers[0]->InvokeLB();
 }
 
@@ -922,66 +920,71 @@ int LBRegisterObjUserData(int size)
   return CkpvAccess(lbobjdatalayout).claim(size);
 }
 
-
-class client {
-  friend class LocalBarrier;
-  void* data;
-  LDResumeFn fn;
+class LBClient {
+public:
+  Chare* chare;
+  std::function<void()> fn;
   int refcount;
+
+  LBClient(Chare* chare, std::function<void()> fn, int refcount) :
+    chare(chare),
+    fn(fn),
+    refcount(refcount)
+  {}
 };
-class receiver {
-  friend class LocalBarrier;
-  void* data;
-  LDBarrierFn fn;
+
+class LBReceiver {
+public:
+  std::function<void()> fn;
   int on;
+
+  LBReceiver(std::function<void()> fn, int on = 1) :
+    fn(fn),
+    on(on)
+  {}
 };
 
-void LBManager::AddClients(Chare* _new_chare, bool atsync, bool atsync_notify) {
-  //Chare types: AtSync, reached-notify, resume-notify
-  _new_chare->r_count = localBarrier.cur_refcount;
-  _new_chare->atsync = atsync;
-  _new_chare->atsync_notify = atsync_notify;
-  if(_new_chare->atsync)
-  localBarrier.client_count++;
+LDBarrierClient LocalBarrier::AddClient(Chare* chare, std::function<void()> fn) {
+  LBClient* new_client = new LBClient(chare, fn, cur_refcount);
 
-  chares.insert(chares.end(), _new_chare);
+  client_count++;
+
+  return LDBarrierClient(clients.insert(clients.end(), new_client));
 }
 
-void LBManager::RemoveClients(Chare* _new_chare) {
-  if(_new_chare->atsync)
-  localBarrier.client_count--;
-  chares.remove(_new_chare);
+void LocalBarrier::RemoveClient(LDBarrierClient c) {
+  delete *(c);
+  clients.erase(c);
+
+  client_count--;
 }
 
-LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
+LDBarrierReceiver LocalBarrier::AddReceiver(std::function<void()> fn)
 {
-  receiver* new_receiver = new receiver;
-  new_receiver->fn = fn;
-  new_receiver->data = data;
-  new_receiver->on = 1;
+  LBReceiver* new_receiver = new LBReceiver(fn);
 
   return LDBarrierReceiver(receivers.insert(receivers.end(), new_receiver));
 }
 
 void LocalBarrier::RemoveReceiver(LDBarrierReceiver c)
 {
-  delete *(c.i);
-  receivers.erase(c.i);
+  delete *(c);
+  receivers.erase(c);
 }
 
 void LocalBarrier::TurnOnReceiver(LDBarrierReceiver c)
 {
-  (*c.i)->on = 1;
+  (*c)->on = 1;
 }
 
 void LocalBarrier::TurnOffReceiver(LDBarrierReceiver c)
 {
-  (*c.i)->on = 0;
+  (*c)->on = 0;
 }
 
-void LocalBarrier::AtBarrier(Chare* _n_c, bool flood_atsync)
+void LocalBarrier::AtBarrier(LDBarrierClient h, bool flood_atsync)
 {
-  _n_c->r_count++;
+  (*h)->refcount++;
   at_count++;
 
   CheckBarrier(flood_atsync);
@@ -1037,7 +1040,7 @@ void LBManager::recvLbStart(int lb_step, int phynode, int pe) {
     local_pes_to_notify.remove(pe);
   else
     received_from_rank0 = true;
-  if(localBarrier.client_count == 1 && chares.front()->isLocMgr()) // CkLocMgr is usually a client on each PE
+  if(localBarrier.client_count == 1 && localBarrier.clients.front()->chare->isLocMgr()) // CkLocMgr is usually a client on each PE
     localBarrier.CheckBarrier(true); // Empty PE invokes barrier on self on receiving a flood msg
 }
 
@@ -1048,24 +1051,21 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
   if (!on) return;
 
   if (client_count == 1 && !flood_atsync){
-    if(_mgr->chares.front()->isLocMgr())
+    if(clients.front()->chare->isLocMgr())
       return;
   }
 
   // If there are no clients, resume as soon as we're turned on
   if (client_count == 0) {
     cur_refcount++;
-    for (std::list<Chare *>::iterator i = _mgr->chares.begin(); i != _mgr->chares.end(); ++i)
-        if((*i)->atsync_notify)
-        (*i)->AtSyncBarrierReached();
-    return;
+    CallReceivers();
   }
 
   if (at_count >= client_count) {
     bool at_barrier = true;
 
-    for(std::list<Chare*>::iterator i = _mgr->chares.begin(); i != _mgr->chares.end(); ++i) {
-      if ((*i)->r_count < cur_refcount && (*i)->atsync) {
+    for(auto& c : clients) {
+      if (c->refcount < cur_refcount) {
         at_barrier = false;
         break;
       }
@@ -1076,10 +1076,7 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
       propagate_atsync();
       at_count -= client_count;
       cur_refcount++;
-      for (std::list<Chare *>::iterator i = _mgr->chares.begin(); i != _mgr->chares.end(); ++i) {
-        if ((*i)->atsync_notify)
-          (*i)->AtSyncBarrierReached();
-      }
+      CallReceivers();
       if(_mgr->nloadbalancers > 0) _mgr->loadbalancers[0]->InvokeLB();
     }
   }
@@ -1087,19 +1084,11 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
 
 void LocalBarrier::CallReceivers(void)
 {
-  bool called_receiver=false;
-
-  for (std::list<receiver *>::iterator i = receivers.begin();
-       i != receivers.end(); ++i) {
-    receiver *recv = *i;
-    if (recv->on) {
-      recv->fn(recv->data);
-      called_receiver = true;
+  for (auto& r : receivers) {
+    if (r->on) {
+      r->fn();
     }
   }
-
-  if (!called_receiver)
-    ResumeClients();
 }
 
 void LocalBarrier::ResumeClients(void)
@@ -1110,9 +1099,8 @@ void LocalBarrier::ResumeClients(void)
     return;
   }
 
-  for (std::list<Chare *>::iterator i = _mgr->chares.begin(); i != _mgr->chares.end(); ++i)
-    if((*i)->atsync)
-    (*i)->ResumeFromSync();
+  for (auto& c : clients)
+    c->fn();
 
   _mgr->reset();
   _mgr->startedAtSync = false;

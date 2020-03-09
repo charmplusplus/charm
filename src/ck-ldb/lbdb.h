@@ -288,18 +288,11 @@ typedef void (*LDPredictWindowFn)(void* user_ptr, void* model, int wind);
 /*
  * Local Barrier calls
  */
-typedef void (*LDBarrierFn)(void *user_ptr);
-typedef void (*LDResumeFn)(void *user_ptr);
+class LBClient;
+typedef std::list<LBClient *>::iterator LDBarrierClient;
 
-class client;
-
-class receiver;
-struct LDBarrierReceiver {
-  std::list<receiver *>::iterator i;
-  LDBarrierReceiver() { }
-  LDBarrierReceiver(std::list<receiver *>::iterator in)
-  : i(in) { }
-};
+class LBReceiver;
+typedef std::list<LBReceiver *>::iterator LDBarrierReceiver;
 
 /*
  *  LBDB Configuration calls

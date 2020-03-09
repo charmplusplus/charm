@@ -562,9 +562,8 @@ private:
 #if CMK_LBDB_ON
 	LBManager *lbmgr;
   MetaBalancer *the_metalb;
-	static void staticDummyResumeFromSync(void* data);
-	static void staticRecvAtSync(void* data);
 	LDOMHandle myLBHandle;
+        LDBarrierClient lbBarrierClient;
         LDBarrierReceiver lbBarrierReceiver;
 #endif
 private:
@@ -572,7 +571,6 @@ private:
 
 public:
 #if CMK_LBDB_ON
-  void recvAtSync(void);
   void dummyResumeFromSync(void);
 #endif
 

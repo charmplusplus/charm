@@ -132,7 +132,6 @@ CentralLB::~CentralLB()
   if (lbmgr) {
     lbmgr->
       RemoveStartLBFn((LDStartLBFn)(staticStartLB));
-    lbmgr->RemoveClients((Chare*)(this));
   }
 #endif
 }

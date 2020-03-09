@@ -24,14 +24,11 @@ void HybridBaseLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
   me->Migrated(h, waitBarrier);
 }
 
-void HybridBaseLB::staticAtSync(void* data)
+void HybridBaseLB::AtBarrier()
 {
 #if CMK_MEM_CHECKPOINT	
   CkSetInLdb();
 #endif
-  HybridBaseLB *me = (HybridBaseLB*)(data);
-
-  me->AtSync();
 }
 
 HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
@@ -39,9 +36,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
 #if CMK_LBDB_ON
   lbname = (char *)"HybridBaseLB";
   thisProxy = CProxy_HybridBaseLB(thisgroup);
-  receiver = lbmgr->
-    AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
-			    (void*)(this));
+  receiver = lbmgr->AddLocalBarrierReceiver(this, &HybridBaseLB::AtBarrier);
 
   statsStrategy = FULL;
 

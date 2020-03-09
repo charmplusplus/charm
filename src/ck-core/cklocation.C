@@ -1536,9 +1536,7 @@ CkMigratable::~CkMigratable() {
 	if (barrierRegistered) {
 	  DEBL((AA "Removing barrier for element %s\n" AB,idx2str(thisIndexMax)));
 	  if (usesAtSync)
-		myRec->getLBMgr()->RemoveClients(this);
-	  else
-		myRec->getLBMgr()->RemoveLocalBarrierReceiver(ldBarrierRecvHandle);
+		myRec->getLBMgr()->RemoveLocalBarrierClient(ldBarrierHandle);
 	}
 
   if (_lb_args.metaLbOn()) {
@@ -1561,15 +1559,14 @@ void CkMigratable::CkAbort(const char *format, ...) const {
 	::CkAbort("CkMigratable '%s' aborting: %s", _chareTable[thisChareType]->name, newmsg);
 }
 
-void Chare::ResumeFromSync(void)
+void CkMigratable::ResumeFromSync(void)
 {
 #if CMK_LBDB_ON
-  ((CkLocMgr*)this)->dummyResumeFromSync();
-//	CkAbort("::ResumeFromSync() not defined for this array element!\n");
+	CkAbort("::ResumeFromSync() not defined for this array element!\n");
 #endif
 }
 
-void Chare::AtSyncBarrierReached(void)
+void CkMigratable::AtSyncBarrierReached(void)
 {
   CkAbort("::AtSyncBarrierReached() not defined for this array element!\n");
 }
@@ -1649,7 +1646,7 @@ void CkMigratable::recvLBPeriod(void *data) {
 
 void CkMigratable::metaLBCallLB() {
   if(usesAtSync)
-    myRec->getLBMgr()->AtLocalBarrier(this);
+    myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
 }
 
 void CkMigratable::ckFinishConstruction(void)
@@ -1661,11 +1658,9 @@ void CkMigratable::ckFinishConstruction(void)
 	myRec->setMeasure(usesAutoMeasure);
 	if (barrierRegistered) return;
 	DEBL((AA "Registering barrier client for %s\n" AB,idx2str(thisIndexMax)));
-	if (usesAtSync)
-	  myRec->getLBMgr()->AddClients(this, true, false);
-	else
-	  ldBarrierRecvHandle = myRec->getLBMgr()->AddLocalBarrierReceiver(
-            (LDBarrierFn)staticResumeFromSync,(void*)(this));
+	if (usesAtSync) {
+	  ldBarrierHandle = myRec->getLBMgr()->AddLocalBarrierClient(this, &CkMigratable::ResumeFromSyncHelper);
+	}
 	barrierRegistered=true;
 }
 
@@ -1694,7 +1689,7 @@ void CkMigratable::AtSync(int waitForMigration)
   }
 
   if (!_lb_args.metaLbOn()) {
-    myRec->getLBMgr()->AtLocalBarrier(this);
+    myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
     return;
   }
 
@@ -1753,22 +1748,21 @@ void CkMigratable::ReadyMigrate(bool ready)
 }
 
 
-void CkMigratable::staticResumeFromSync(void* data)
+void CkMigratable::ResumeFromSyncHelper()
 {
-	CkMigratable *el=(CkMigratable *)data;
-	DEBL((AA "Element %s resuming from sync\n" AB,idx2str(el->thisIndexMax)));
+  DEBL((AA "Element %s resuming from sync\n" AB,idx2str(thisIndexMax)));
 
   if (_lb_args.metaLbOn()) {
-  	el->clearMetaLBData();
-	}
+    clearMetaLBData();
+  }
 
-  CkLocMgr *localLocMgr = el->myRec->getLocMgr();
-  auto iter = localLocMgr->bufferedActiveRgetMsgs.find(el->ckGetID());
+  CkLocMgr *localLocMgr = myRec->getLocMgr();
+  auto iter = localLocMgr->bufferedActiveRgetMsgs.find(ckGetID());
   if(iter != localLocMgr->bufferedActiveRgetMsgs.end()) {
-    std::pair<CmiUInt8, CkMigratable*> idElemPair(el->ckGetID(), el);
+    std::pair<CmiUInt8, CkMigratable*> idElemPair(ckGetID(), this);
     localLocMgr->toBeResumeFromSynced.insert(idElemPair);
   } else {
-    el->ResumeFromSync();
+    ResumeFromSync();
   }
 }
 
@@ -2131,7 +2125,7 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 
 CkLocMgr::~CkLocMgr() {
 #if CMK_LBDB_ON
-  lbmgr->RemoveClients(this);
+  lbmgr->RemoveLocalBarrierClient(lbBarrierClient);
   lbmgr->DecreaseLocalBarrier(1);
   lbmgr->RemoveLocalBarrierReceiver(lbBarrierReceiver);
   lbmgr->UnregisterOM(myLBHandle);
@@ -3343,20 +3337,16 @@ void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 	  us to call Registering/DoneRegistering during each AtSync,
 	  and this is the only way to do so.
 	*/
-	lbBarrierReceiver = lbmgr->AddLocalBarrierReceiver(
-		(LDBarrierFn)staticRecvAtSync,(void*)(this));
-  lbmgr->AddClients(this, true, true);
+	lbBarrierReceiver = lbmgr->AddLocalBarrierReceiver(this, &CkLocMgr::AtSyncBarrierReached);
+	lbBarrierClient = lbmgr->AddLocalBarrierClient(this, &CkLocMgr::dummyResumeFromSync);
 	dummyAtSync();
 }
 
 void CkLocMgr::dummyAtSync(void)
 {
 	DEBL((AA "dummyAtSync called\n" AB));
-	lbmgr->AtLocalBarrier(this);
+	lbmgr->AtLocalBarrier(lbBarrierClient);
 }
-
-void CkLocMgr::staticDummyResumeFromSync(void* data)
-{      ((CkLocMgr*)data)->dummyResumeFromSync(); }
 
 void CkLocMgr::dummyResumeFromSync()
 {
@@ -3364,12 +3354,9 @@ void CkLocMgr::dummyResumeFromSync()
 	lbmgr->DoneRegisteringObjects(myLBHandle);
 	dummyAtSync();
 }
-void CkLocMgr::staticRecvAtSync(void* data)
-{      ((CkLocMgr*)data)->recvAtSync(); }
-void CkLocMgr::recvAtSync() {}
 void CkLocMgr::AtSyncBarrierReached()
 {
-	DEBL((AA "recvAtSync called\n" AB));
+	DEBL((AA "AtSyncBarrierReached called\n" AB));
 	lbmgr->RegisteringObjects(getOMHandle());
 }
 

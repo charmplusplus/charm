@@ -296,8 +296,6 @@ public:
   HybridBaseLB(CkMigrateMessage *m): CBase_HybridBaseLB(m) {}
   ~HybridBaseLB();
 
-  static void staticAtSync(void*);
-  void AtSync(void){CmiAbort("\nAtSync not implemented");}; // Everything is at the PE barrier
   void InvokeLB();
   void ProcessAtSync(void);
 
@@ -439,6 +437,7 @@ protected:
   StatsStrategy statsStrategy;
 
 private:
+  void AtBarrier(void);
   void FindNeighbors();
   void buildStats(int level);
   CLBStatsMsg * buildCombinedLBStatsMessage(int atlevel);

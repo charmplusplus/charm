@@ -10,11 +10,6 @@
 #define  DEBUGF(x)      // CmiPrintf x;
 
 
-void DistBaseLB::staticAtSync(void* data) {
-  DistBaseLB *me = (DistBaseLB*)(data);
-  me->ProcessAtSync();
-}
-
 void DistBaseLB::staticStartLB(void* data) {
   DistBaseLB *me = (DistBaseLB*)(data);
   me->barrierDone();
@@ -34,8 +29,7 @@ DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
 #if CMK_LBDB_ON
   lbname = (char *)"DistBaseLB";
   thisProxy = CProxy_DistBaseLB(thisgroup);
-  receiver = lbmgr->AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
-      (void*)(this));
+  receiver = lbmgr->AddLocalBarrierReceiver(this, &DistBaseLB::ProcessAtSync);
   startLbFnHdl = lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB),
       (void*)(this));
   lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)this);

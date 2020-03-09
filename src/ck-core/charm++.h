@@ -235,12 +235,9 @@ class Chare {
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
     int r_count;
-    bool atsync, atsync_notify;
     Chare(CkMigrateMessage *m);
     Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
-    virtual void ResumeFromSync(void);
-    virtual void AtSyncBarrierReached(void);
     virtual bool isLocMgr(void) { return false; }
     /// Pack/UnPack - tell the runtime how to serialize this class's
     /// data for migration, checkpoint, etc.

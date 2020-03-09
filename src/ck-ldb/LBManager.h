@@ -16,10 +16,6 @@
 class MetaBalancer;
 extern int _lb_version;
 
-class client;
-class receiver;
-
-
 // command line options
 class CkLBArgs
 {
@@ -133,12 +129,15 @@ public:
   ~LocalBarrier() { };
 
   void SetMgr(LBManager *mgr){ _mgr = mgr;};
-  LDBarrierReceiver AddReceiver(LDBarrierFn fn, void* data);
   void propagate_atsync();
+
+  LDBarrierClient AddClient(Chare* chare, std::function<void()> fn);
+  void RemoveClient(LDBarrierClient h);
+  LDBarrierReceiver AddReceiver(std::function<void()> fn);
   void RemoveReceiver(LDBarrierReceiver h);
   void TurnOnReceiver(LDBarrierReceiver h);
   void TurnOffReceiver(LDBarrierReceiver h);
-  void AtBarrier(Chare* _n_c, bool flood_atsync=false);
+  void AtBarrier(LDBarrierClient _n_c, bool flood_atsync=false);
   void DecreaseBarrier(int c);
   void TurnOn() { on = true; CheckBarrier(); };
   void TurnOff() { on = false; };
@@ -148,7 +147,8 @@ public:
   void CheckBarrier(bool flood_atsync=false);
   void ResumeClients(void);
 
-  std::list<receiver*> receivers;
+  std::list<LBClient*> clients;
+  std::list<LBReceiver*> receivers;
 
   LBManager *_mgr;
 
@@ -255,7 +255,6 @@ private:
   int startLBFn_count;
 
 public:
-  std::list<Chare*> chares;
   std::list<int> local_pes_to_notify;
   int chare_count;
   bool received_from_left;
@@ -406,16 +405,31 @@ public:
 
   void Migrated(LDObjHandle h, int waitBarrier=1);
 
-  void AddClients(Chare* _new_chare, bool atsync, bool atsync_notify);
-  void RemoveClients(Chare* _new_chare);
-
-  inline LDBarrierReceiver AddLocalBarrierReceiver(LDBarrierFn fn, void* data) {
-    return localBarrier.AddReceiver(fn,data);
+  template <typename T>
+  inline LDBarrierClient AddLocalBarrierClient(T* obj, void(T::*method)(void)) {
+    return AddLocalBarrierClient((Chare*)obj, std::bind(method, obj));
   }
+  inline LDBarrierClient AddLocalBarrierClient(Chare* obj, std::function<void()> fn) {
+    return localBarrier.AddClient(obj, fn);
+  }
+
+
+  inline void RemoveLocalBarrierClient(LDBarrierClient h) {
+    localBarrier.RemoveClient(h);
+  }
+
+  template <typename T>
+  inline LDBarrierReceiver AddLocalBarrierReceiver(T* obj, void(T::*method)(void)) {
+    return AddLocalBarrierReceiver(std::bind(method, obj));
+  }
+  inline LDBarrierReceiver AddLocalBarrierReceiver(std::function<void()> fn) {
+    return localBarrier.AddReceiver(fn);
+  }
+
   inline void RemoveLocalBarrierReceiver(LDBarrierReceiver h) {
     localBarrier.RemoveReceiver(h);
   }
-  inline void AtLocalBarrier(Chare* _n_c) {
+  inline void AtLocalBarrier(LDBarrierClient _n_c) {
     if (useBarrier) localBarrier.AtBarrier(_n_c);
   }
   inline void DecreaseLocalBarrier(int c) {
