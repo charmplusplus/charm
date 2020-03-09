@@ -120,7 +120,7 @@ option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 option(EVERYLB             "Compile EveryLB suite of load balancing strategies" OFF)
 option(F90CHARM            "Build f90charm" OFF)
 
-# option UCX PMI options
+# UCX PMI options
 set(UCX_PMI "" CACHE STRING "PMI type for UCX layer, can be one of simplepmi, simplepmi2, or ompipmix")
 
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
@@ -425,9 +425,9 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-local.sh)
   configure_file(src/arch/${GDIR}/conv-mach-local.h            include/ COPYONLY)
 endif()
 
-if(${UCX_PMI})
-  configure_file(src/arch/${GDIR}/conv-mach-${UCX_PMI}.sh include/ COPYONLY)
-  configure_file(src/arch/${GDIR}/conv-mach-${UCX_PMI}.h include/ COPYONLY)
+if(UCX_PMI)
+  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.sh include/ COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.h include/ COPYONLY)
 endif()
 
 # Header files
@@ -699,6 +699,10 @@ endif()
 file(APPEND ${optfile_sh} "CMK_HWLOC_LIBS=\"-lhwloc_embedded -lm\"\n" )
 file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
 
+if(UCX_PMI)
+  file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${UCX_PMI}.sh\n")
+endif()
+
 
 # Create conv-mach-opt.h
 set(optfile_h ${CMAKE_BINARY_DIR}/include/conv-mach-opt.h)
@@ -710,6 +714,10 @@ endforeach(l)
 
 if(NOT ${NETWORK} STREQUAL "mpi")
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
+endif()
+
+if(UCX_PMI)
+  file(APPEND ${optfile_h} "#include \"conv-mach-${UCX_PMI}.h\"\n")
 endif()
 
 # Create conv-mach-opt.mak
