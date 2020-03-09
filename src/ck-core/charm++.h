@@ -241,7 +241,7 @@ class Chare {
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
     virtual void ResumeFromSync(void);
     virtual void AtSyncBarrierReached(void);
-    virtual bool checkLocMgr(void);
+    virtual bool isLocMgr(void) { return false; }
     /// Pack/UnPack - tell the runtime how to serialize this class's
     /// data for migration, checkpoint, etc.
     virtual void pup(PUP::er &p);
@@ -347,7 +347,6 @@ class IrrGroup : public Chare {
 
     // Silly run-time type information
     virtual bool isNodeGroup() { return false; };
-    virtual bool isLocMgr(void){ return false; }
     virtual bool isArrMgr(void){ return false; }
     virtual bool isReductionMgr(void){ return false; }
     static bool isIrreducible(){ return true;}

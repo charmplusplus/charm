@@ -1040,7 +1040,7 @@ void LBManager::recvLbStart(int lb_step, int phynode, int pe) {
     local_pes_to_notify.remove(pe);
   else
     received_from_rank0 = true;
-  if(localBarrier.client_count == 1 && chares.front()->checkLocMgr()) // CkLocMgr is usually a client on each PE
+  if(localBarrier.client_count == 1 && chares.front()->isLocMgr()) // CkLocMgr is usually a client on each PE
     localBarrier.CheckBarrier(true); // Empty PE invokes barrier on self on receiving a flood msg
 }
 
@@ -1051,7 +1051,7 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
   if (!on) return;
 
   if (client_count == 1 && !flood_atsync){
-    if(_mgr->chares.front()->checkLocMgr())
+    if(_mgr->chares.front()->isLocMgr())
       return;
   }
 
