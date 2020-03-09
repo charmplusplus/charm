@@ -734,9 +734,16 @@ foreach(opt SMP OMP TCP PTHREADS)
     endif()
 endforeach()
 
+find_program(LSB_RELEASE_EXEC lsb_release)
+execute_process(COMMAND ${LSB_RELEASE_EXEC} -ds
+             OUTPUT_VARIABLE LSB_RELEASE_VER
+             OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+
 # Print configuration
 message("==============================")
 message("Charm++ ${CHARM_VERSION} configuration: ")
+message("  OS version       ${LSB_RELEASE_VER}")
 message("  Triplet:         ${CHARM_PLATFORM}")
 message("  Network:         ${NETWORK}")
 message("  Build target:    ${TARGET}")
