@@ -736,7 +736,7 @@ endforeach()
 
 find_program(LSB_RELEASE_EXEC lsb_release)
 
-if(${LSB_RELEASE_EXEC})
+if(LSB_RELEASE_EXEC)
   execute_process(COMMAND ${LSB_RELEASE_EXEC} -ds
              OUTPUT_VARIABLE OS_RELEASE
              OUTPUT_STRIP_TRAILING_WHITESPACE)
