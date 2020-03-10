@@ -1063,8 +1063,7 @@ void Parameter::pupAllValues(XStr& str) {
   } else if (isRdma()) {
     if (isDevice()) {
       str << "  implDestP|ncpyBuffer_" << name << ";\n";
-    }
-    else {
+    } else {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  implDestP|ncpyBuffer_" << name << ";\n";
       str << "#else\n";
