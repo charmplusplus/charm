@@ -288,9 +288,6 @@ void _loadbalancerInit()
   // to ignore baclground load
   _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBNoBackground",
                       "Load balancer ignores the background load.");
-#ifdef __BIGSIM__
-  _lb_args.ignoreBgLoad() = 1;
-#endif
   _lb_args.migObjOnly() = CmiGetArgFlagDesc(argv, "+LBObjOnly",
                       "Only load balancing migratable objects, ignoring all others.");
   if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = 1;

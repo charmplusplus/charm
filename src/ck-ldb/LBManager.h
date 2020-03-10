@@ -48,11 +48,7 @@ private:
 
  public:
   CkLBArgs() {
-#if CMK_BIGSIM_CHARM
-    _autoLbPeriod = 0.02;       // bigsim needs it to be faster (lb may hang)
-#else
-    _autoLbPeriod = -1.0;	// 0.5 second default
-#endif
+    _autoLbPeriod = -1.0;	// off by default
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
     _lb_printsumamry = _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
@@ -133,9 +129,6 @@ friend class LBManager;
 public:
   LocalBarrier() { cur_refcount = 1; client_count = 0; iter_no = -1; propagated_atsync_step=0;
                    max_receiver= 0; at_count = 0; on = false;
-  #if CMK_BIGSIM_CHARM
-  first_free_client_slot = 0;
-  #endif
     };
   ~LocalBarrier() { };
 
