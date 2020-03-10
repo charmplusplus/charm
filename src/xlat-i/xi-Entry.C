@@ -176,8 +176,7 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
       if (plist->param->getRdma() == CMK_ZC_P2P_RECV_MSG) {
         if (plist->param->isDevice()) {
           numRdmaDeviceParams++; // increment 'rdma' device param count
-        }
-        else {
+        } else {
           numRdmaRecvParams++; // increment recv 'rdma' param count
         }
       }
@@ -1501,8 +1500,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
                 << "- impl_buf_device);\n"
                 << "        }\n"
                 << "        __p | ncpyBuffer_" << sv->name << ";\n";
-        }
-        else {
+        } else {
           // CPU RDMA
           structure << "\n#if CMK_ONESIDED_IMPL\n";
           if (sv->isFirstRdma()) {
@@ -1920,8 +1918,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           str << "#else\n";
           str << "  void *buffPtrs["<< numRdmaDeviceParams <<"];\n";
           str << "  int buffSizes["<< numRdmaDeviceParams <<"];\n";
-        }
-        else {
+        } else {
           str << "  void *buffPtrs["<< numRdmaRecvParams <<"];\n";
           str << "  int buffSizes["<< numRdmaRecvParams <<"];\n";
         }
@@ -1947,8 +1944,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
             str << "impl_num_device_rdma_fields, ";
           str << "buffPtrs, buffSizes, ncpyPost, true);\n";
           str << "#endif\n";
-        }
-        else {
+        } else {
           str << "#if CMK_ONESIDED_IMPL\n";
           str << "  if(CMI_IS_ZC_RECV(env)) \n";
           str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), NULL, ";
