@@ -17,8 +17,8 @@ matrix:
     script:
     - sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
     - ./build LIBS mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C mpi-linux-x86_64-smp/tests TESTOPTS="+setcpuaffinity"
-    - make -C mpi-linux-x86_64-smp/examples TESTOPTS="+setcpuaffinity"
+    - make -C mpi-linux-x86_64/tests TESTOPTS="+setcpuaffinity"
+    - make -C mpi-linux-x86_64/examples TESTOPTS="+setcpuaffinity"
 
   - os: osx
     name: "NetLRTS-Darwin"
