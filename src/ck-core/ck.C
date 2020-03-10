@@ -548,12 +548,12 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
-  const auto msgtype = UsrToEnv(msg)->getMsgtype();
+  const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
   _entryTable[epIdx]->call(msg, obj);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
-  if (_entryTable[epIdx]->noKeep)
+  if (_entryTable[epIdx]->noKeep && msgtype != LAST_CK_ENVELOPE_TYPE)
   { /* Method doesn't keep/delete the message, so we have to: */
     if (msgtype != ArrayBcastFwdMsg) {
       _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
