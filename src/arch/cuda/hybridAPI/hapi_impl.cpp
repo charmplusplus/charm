@@ -4,6 +4,7 @@
 #include <queue>
 #include <atomic>
 #include <vector>
+#include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
