@@ -270,6 +270,9 @@ if [[ "$target" = "${target%AMPI-only}AMPI-only" ]]; then
 
     # strip "-only" suffix from AMPI target
     target="${target%AMPI-only}AMPI"
+
+    opt_prio_type="char"
+    opt_extra_opts="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 $opt_extra_opts "
 fi
 
 opt_network=$(echo $triplet | cut -d '-' -f1)
