@@ -539,7 +539,7 @@ static void CthThreadBaseFree(CthThreadBase *th)
   th->stack=NULL;
 }
 
-void CthInterceptionsImmediateActivate(CthThread th)
+static void CthInterceptionsImmediateActivate(CthThread th)
 {
   CthThreadBase * const base = B(th);
 
@@ -556,7 +556,7 @@ void CthInterceptionsImmediateActivate(CthThread th)
     CmiTLSSegmentSet(&base->tlsseg);
 #endif
 }
-void CthInterceptionsImmediateDeactivate(CthThread th)
+static void CthInterceptionsImmediateDeactivate(CthThread th)
 {
   CthThreadBase * const base = B(th);
 
@@ -592,6 +592,25 @@ void CthInterceptionsDeactivatePop(CthThread th)
   CthInterceptionsImmediateActivate(th);
 }
 
+int CthInterceptionsTemporarilyActivateStart(CthThread th)
+{
+  CthThreadBase * const base = B(th);
+
+  const int old = base->interceptionDeactivations;
+  CmiAssert(old != 0);
+  base->interceptionDeactivations = 0;
+  CthInterceptionsImmediateActivate(th);
+  return old;
+}
+void CthInterceptionsTemporarilyActivateEnd(CthThread th, int old)
+{
+  CthThreadBase * const base = B(th);
+
+  CmiAssert(base->interceptionDeactivations == 0);
+  base->interceptionDeactivations = old;
+  CthInterceptionsImmediateDeactivate(th);
+}
+
 static void CthInterceptionsCreate(CthThread th)
 {
   CthThreadBase * const base = B(th);
@@ -622,7 +641,7 @@ static void CthInterceptionsCreate(CthThread th)
       tlsptr = CmiIsomallocContextMallocAlign(base->isomallocContext, tlsdesc.align, tlsdesc.size);
     else
       tlsptr = CmiAlignedAlloc(tlsdesc.align, tlsdesc.size);
-    base->tlsseg = CmiTLSCreateSegUsingPtr(tlsptr);
+    CmiTLSCreateSegUsingPtr(&CpvAccess(Cth_PE_TLS), &base->tlsseg, tlsptr);
   }
   else
   {
@@ -656,11 +675,9 @@ static void CthBaseInit(char **argv)
   CpvAccess(Cth_serialNo) = 1;
 
 #if CMK_THREADS_BUILD_TLS
-  CmiTLSInit();
-  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
-
   CpvInitialize(tlsseg_t, Cth_PE_TLS);
-  CmiTLSSegmentGet(&CpvAccess(Cth_PE_TLS));
+  CmiTLSInit(&CpvAccess(Cth_PE_TLS));
+  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
 #endif
 }
 

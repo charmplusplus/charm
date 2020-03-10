@@ -548,13 +548,14 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
+  const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
   _entryTable[epIdx]->call(msg, obj);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
-  if (_entryTable[epIdx]->noKeep)
+  if (_entryTable[epIdx]->noKeep && msgtype != LAST_CK_ENVELOPE_TYPE)
   { /* Method doesn't keep/delete the message, so we have to: */
-    if (UsrToEnv(msg)->getMsgtype() != ArrayBcastFwdMsg) {
+    if (msgtype != ArrayBcastFwdMsg) {
       _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
     } else if (_entryTable[epIdx]->msgIdx != -1) {
       // For array broadcasts, the first time they show up here the msgIdx is
@@ -1366,13 +1367,13 @@ void CkUnpackMessage(envelope **pEnv)
     _TRACE_BEGIN_UNPACK();
     msg = _msgTable[msgIdx]->unpack(msg);
     _TRACE_END_UNPACK();
+    env=UsrToEnv(msg);
+    env->setPacked(0);
 #if CMK_ONESIDED_IMPL
     short int zcMsgType = CMI_ZC_MSGTYPE(env);
     if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Convert offsets back into buffer pointers
       CkUnpackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
 #endif
-    env=UsrToEnv(msg);
-    env->setPacked(0);
     *pEnv = env;
   }
 }

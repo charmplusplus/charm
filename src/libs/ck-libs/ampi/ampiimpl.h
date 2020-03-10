@@ -2131,6 +2131,7 @@ class ampiParent final : public CBase_ampiParent {
   CProxy_ampi tmpRProxy;
 
   MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
+  bool didMigrate{};
 
  public:
   bool ampiInitCallDone;
@@ -2216,6 +2217,7 @@ class ampiParent final : public CBase_ampiParent {
   void ckAboutToMigrate() noexcept;
   void ckJustMigrated() noexcept;
   void ckJustRestored() noexcept;
+  void resumeAfterMigration() noexcept;
   void setUserAboutToMigrateFn(MPI_MigrateFn f) noexcept;
   void setUserJustMigratedFn(MPI_MigrateFn f) noexcept;
   ~ampiParent() noexcept;
