@@ -548,13 +548,14 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
+  const auto msgtype = UsrToEnv(msg)->getMsgtype();
   _entryTable[epIdx]->call(msg, obj);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
   if (_entryTable[epIdx]->noKeep)
   { /* Method doesn't keep/delete the message, so we have to: */
-    if (UsrToEnv(msg)->getMsgtype() != ArrayBcastFwdMsg) {
+    if (msgtype != ArrayBcastFwdMsg) {
       _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
     } else if (_entryTable[epIdx]->msgIdx != -1) {
       // For array broadcasts, the first time they show up here the msgIdx is
