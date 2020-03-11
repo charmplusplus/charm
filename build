@@ -863,6 +863,8 @@ then
       # strip "-only" suffix from AMPI target
       PROGRAM="${PROGRAM%-only}"
     fi
+    OPTS="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 $OPTS "
+    CONFIG_OPTS="--with-prio-type=char $CONFIG_OPTS "
 else
     echo "CMK_AMPI_ONLY=\"0\"" >> $ConvSh
     echo "CMK_AMPI_ONLY:=0" >> $ConvMak
