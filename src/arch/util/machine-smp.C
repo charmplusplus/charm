@@ -93,8 +93,8 @@ static struct CmiStateStruct Cmi_default_state; /* State structure to return dur
 
 #if CMK_SHARED_VARS_NT_THREADS
 
-CmiNodeLock CmiMemLock_lock;
-CmiNodeLock cmiMemoryLock;
+CmiNodeLock CmiMemLock_lock; // used by CmiMemLock during heap interception (charmc -memory)
+CmiNodeLock cmiMemoryLock; // used by CmiMemoryAtomic*/ReadFence/WriteFence and CMK_PCQUEUE_LOCK
 static CmiNodeLock comm_mutex;
 #define CmiCommLockOrElse(x) /*empty*/
 #define CmiCommLock() (CmiLock(comm_mutex))
@@ -239,8 +239,8 @@ static void CmiDestroyLocks(void)
 /***************** Pthreads kernel SMP threads ******************/
 #elif CMK_SHARED_VARS_POSIX_THREADS_SMP
 
-CmiNodeLock CmiMemLock_lock;
-CmiNodeLock cmiMemoryLock;
+CmiNodeLock CmiMemLock_lock; // used by CmiMemLock during heap interception (charmc -memory)
+CmiNodeLock cmiMemoryLock; // used by CmiMemoryAtomic*/ReadFence/WriteFence and CMK_PCQUEUE_LOCK
 int _Cmi_sleepOnIdle=0;
 int _Cmi_forceSpinOnIdle=0;
 extern std::atomic<int> _cleanUp;
