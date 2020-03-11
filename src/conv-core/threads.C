@@ -162,7 +162,7 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW;
   typedef struct CthThreadBase
 {
   CthThreadToken *token; /* token that shall be enqueued into the ready queue*/
-  int scheduled;         /* has this thread been added to the ready queue ? */
+  CmiMemoryAtomicInt scheduled; /* has this thread been added to the ready queue ? */
 
   CmiObjId   tid;        /* globally unique tid */
   CthAwkFn   awakenfn;   /* Insert this thread into the ready queue */
@@ -409,7 +409,7 @@ void CthSetSerialNo(CthThread t, int no)
 
 static void CthThreadBaseInit(CthThreadBase *th)
 {
-  static int serialno = 1;
+  static CmiMemoryAtomicInt serialno{1};
   th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
   th->token->thread = S(th);
   th->token->serialNo = CpvAccess(Cth_serialNo)++;
