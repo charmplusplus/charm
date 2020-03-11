@@ -92,6 +92,8 @@ opt_CC= #undef
 opt_CXX= #undef
 opt_FC= #undef
 
+opt_compiler=""
+
 while [[ $# -gt 0 ]]; do
   arg=$1
   shift
@@ -116,28 +118,35 @@ while [[ $# -gt 0 ]]; do
     gcc)
       opt_CC=gcc
       opt_CXX=g++
+      opt_compiler+="$arg "
       ;;
     gfortran)
       opt_FC=gfortran
+      opt_compiler+="$arg "
       ;;
     clang)
       opt_CC=clang
       opt_CXX=clang++
+      opt_compiler+="$arg "
       ;;
     flang)
       opt_FC=flang
+      opt_compiler+="$arg "
       ;;
     icc|iccstatic)
       opt_CC=icc
       opt_CXX=icpc
+      opt_compiler+="$arg "
       ;;
     ifort)
       opt_FC=ifort
+      opt_compiler+="$arg "
       ;;
     xlc|xlc64)
       opt_CC=xlc_r
       opt_CXX=xlC_r
       opt_FC=xlf90_r
+      opt_compiler+="$arg "
       ;;
     pgcc|pgf90)
       echo "*** Warning: Ignoring unsupported option '$arg'."
@@ -146,6 +155,7 @@ while [[ $# -gt 0 ]]; do
       opt_CC=mpicc
       opt_CXX=mpicxx
       opt_FC=mpif90
+      opt_compiler+="$arg "
       ;;
   # Charm++ dynamic libraries
     --no-build-shared)
@@ -281,7 +291,17 @@ for option in ${!opt*}; do
   echo "  $option = ${!option}"
 done
 
-builddir=$triplet$opt_suffix
+# Append certain features and compilers to the end of the build directory name
+builddir_extra=""
+for flag in opt_smp opt_omp opt_tcp opt_pthreads opt_ucx_pmi; do
+  [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
+done
+
+for c in $opt_compiler; do
+  [[ -n $c ]] &&  builddir_extra+="-${c}"
+done
+
+builddir=$triplet$builddir_extra$opt_suffix
 
 rm -rf $builddir
 
