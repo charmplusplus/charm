@@ -1,6 +1,6 @@
 OPTS = -O3
 
-CHARM_DIR = ../../../..
+CHARM_DIR = ../../../../..
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 
@@ -8,7 +8,7 @@ NVCC = nvcc
 NVCC_FLAGS = -O3 -c -std=c++11 -use_fast_math
 LD_LIBS =
 
-TARGET = zerocopy
+TARGET = verify
 all: $(TARGET)
 
 OBJS = $(TARGET).o $(TARGET)CUDA.o
