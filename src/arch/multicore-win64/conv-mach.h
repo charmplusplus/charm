@@ -57,7 +57,7 @@
 
 #define CMK_LBDB_ON					   1
 
-#define CMK_PCQUEUE_LOCK                                   1
+/* #define CMK_PCQUEUE_LOCK                                   1 */
 
 #define CMK_CONVERSE_MPI                                   0
 

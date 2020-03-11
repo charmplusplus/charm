@@ -43,8 +43,6 @@
 #undef  CMK_IMMEDIATE_MSG
 #define CMK_IMMEDIATE_MSG				   1
 
-/*
-#define CMK_PCQUEUE_LOCK                                   1
-*/
+/* #define CMK_PCQUEUE_LOCK                                   1 */
 
 #endif
