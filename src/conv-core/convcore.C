@@ -279,7 +279,7 @@ void  LrtsRdmaFree(void*);
 
 CpvStaticDeclare(int, cmiMyPeIdle);
 #if CMK_SMP && CMK_TASKQUEUE
-CsvDeclare(unsigned int, idleThreadsCnt);
+CsvDeclare(CmiMemoryAtomicUInt, idleThreadsCnt);
 CpvDeclare(Queue, CsdTaskQueue);
 CpvDeclare(void *, CmiSuspendedTaskQueue);
 #endif
@@ -300,7 +300,7 @@ int MaxDataNodes;
 int QueueUpperBound;
 int DataNodeWrap;
 int QueueWrap;
-int messageQueueOverflow;
+CmiMemoryAtomicInt messageQueueOverflow;
 #endif
 
 /*****************************************************************************
@@ -2290,7 +2290,7 @@ void CsdInit(char **argv)
   CpvAccess(CsdLocalCounter) = argCsdLocalMax;
   CpvAccess(CsdSchedQueue) = CqsCreate();
 #if CMK_SMP && CMK_TASKQUEUE
-  CsvInitialize(unsigned int, idleThreadsCnt);
+  CsvInitialize(CmiMemoryAtomicUInt, idleThreadsCnt);
   CsvAccess(idleThreadsCnt) = 0;
 #endif
    #if CMK_USE_STL_MSGQ

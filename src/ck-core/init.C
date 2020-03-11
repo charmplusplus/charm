@@ -536,7 +536,7 @@ static void *mergeWarningMsg(int * size, void * data, void ** remote, int count)
 }
 
 /* Initializes the reduction, called on each processor */
-extern int messageQueueOverflow;
+extern CmiMemoryAtomicInt messageQueueOverflow;
 static inline void _sendWarnings(void)
 {
   DEBUGF(("[%d] _sendWarnings\n", CkMyPe()));

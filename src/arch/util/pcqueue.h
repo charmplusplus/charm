@@ -47,17 +47,19 @@
 #if !CMK_SMP || CMK_PCQUEUE_LOCK
 #define PCQueue_CmiMemoryReadFence()
 #define PCQueue_CmiMemoryWriteFence()
-#define PCQueue_CmiMemoryAtomicIncrement(k, mem) k=k+1
-#define PCQueue_CmiMemoryAtomicDecrement(k, mem) k=k-1
-#define PCQueue_CmiMemoryAtomicLoad(k, mem)      k
-#define PCQueue_CmiMemoryAtomicStore(k, v, mem)  k=v
+typedef int PCQueue_CmiMemoryAtomicInt;
+#define PCQueue_CmiMemoryAtomicIncrement(k, mem) ((k)++)
+#define PCQueue_CmiMemoryAtomicDecrement(k, mem) ((k)--)
+#define PCQueue_CmiMemoryAtomicLoad(k, mem)      (k)
+#define PCQueue_CmiMemoryAtomicStore(k, v, mem)  ((k) = (v))
 #else
 #define PCQueue_CmiMemoryReadFence               CmiMemoryReadFence
 #define PCQueue_CmiMemoryWriteFence              CmiMemoryWriteFence
-#define PCQueue_CmiMemoryAtomicIncrement(k, mem) std::atomic_fetch_add_explicit(&k, 1, mem)
-#define PCQueue_CmiMemoryAtomicDecrement(k, mem) std::atomic_fetch_sub_explicit(&k, 1, mem)
-#define PCQueue_CmiMemoryAtomicLoad(k, mem)      std::atomic_load_explicit(&k, mem)
-#define PCQueue_CmiMemoryAtomicStore(k, v, mem)  std::atomic_store_explicit(&k, v, mem);
+using PCQueue_CmiMemoryAtomicInt = std::atomic<int>;
+#define PCQueue_CmiMemoryAtomicIncrement(k, mem) std::atomic_fetch_add_explicit(&(k), 1, (mem))
+#define PCQueue_CmiMemoryAtomicDecrement(k, mem) std::atomic_fetch_sub_explicit(&(k), 1, (mem))
+#define PCQueue_CmiMemoryAtomicLoad(k, mem)      std::atomic_load_explicit(&(k), (mem))
+#define PCQueue_CmiMemoryAtomicStore(k, v, mem)  std::atomic_store_explicit(&(k), (v), (mem))
 #endif
 
 #define PCQueueSize 0x100
@@ -73,7 +75,7 @@
 typedef struct CircQueueStruct
 {
   struct CircQueueStruct * CMK_SMP_volatile next;
-  int push;
+  CmiMemoryAtomicInt push;
 #if CMK_SMP
   char _pad1[CMI_CACHE_LINE_SIZE - (sizeof(struct CircQueueStruct *) + sizeof(int))]; // align to cache line
 #endif
@@ -96,10 +98,8 @@ typedef struct PCQueueStruct
   CircQueue CMK_SMP_volatile tail;
 #if CMK_SMP
   char _pad2[CMI_CACHE_LINE_SIZE - sizeof(CircQueue)]; // align to cache line
-  std::atomic<int> len;
-#else
-  int len;
 #endif
+  PCQueue_CmiMemoryAtomicInt len;
 #if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiNodeLock  lock;
 #endif
@@ -269,10 +269,8 @@ typedef struct PCQueueStruct
   char** tail; /*pointing to the last element*/
 #if CMK_SMP
   char _pad2[CMI_CACHE_LINE_SIZE - sizeof(char**)]; // align to cache line
-  std::atomic<int> len;
-#else
-  int  len;
 #endif
+  PCQueue_CmiMemoryAtomicInt len;
 #if CMK_SMP
   char _pad3[CMI_CACHE_LINE_SIZE - sizeof(int)]; // align to cache line
 #endif
@@ -456,7 +454,7 @@ extern int MaxDataNodes;
 extern int QueueUpperBound;
 extern int DataNodeWrap;
 extern int QueueWrap;
-extern int messageQueueOverflow;
+extern CmiMemoryAtomicInt messageQueueOverflow;
 
 /* Queue Parameters - All must be 2^n for wrapping to work */
 #define NodePoolSize 0x100

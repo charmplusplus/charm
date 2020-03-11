@@ -34,7 +34,7 @@ CpvExtern(unsigned int, ratioIdx);
 CpvExtern(bool, ratioInit);
 CpvExtern(unsigned int, ratioSum);
 CpvExtern(int, prevGtid);
-CsvExtern(unsigned int, idleThreadsCnt);
+CsvExtern(CmiMemoryAtomicUInt, idleThreadsCnt);
 extern void* __kmp_launch_worker(void *);
 #endif
 
