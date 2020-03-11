@@ -293,11 +293,11 @@ done
 
 # Append certain features and compilers to the end of the build directory name
 builddir_extra=""
-for flag in opt_smp opt_omp opt_tcp opt_pthreads opt_ucx_pmi; do
+for flag in opt_smp opt_omp opt_tcp opt_pthreads; do
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
-for c in $opt_compiler; do
+for c in $opt_ucx_pmi $opt_compiler; do
   [[ -n $c ]] &&  builddir_extra+="-${c}"
 done
 
