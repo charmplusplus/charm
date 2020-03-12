@@ -2104,13 +2104,24 @@ extern int _immRunning;
 
 #ifdef __cplusplus /* SYNC_LANG */
 
+}
+// old versions of the <atomic> header have defects
+// we need CmiRecoverType because value_type is absent
+// error: ‘value_type’ in ‘struct std::atomic<unsigned int>’ does not name a type
+// we need value_type to explicitly cast the literal 1
+// error: no matching function for call to ‘atomic_fetch_add_explicit(std::atomic<unsigned int>*, int, std::memory_order)’
+template <typename T> struct CmiRecoverType { };
+template <> struct CmiRecoverType<std::atomic<int>> { using type = int; };
+template <> struct CmiRecoverType<std::atomic<unsigned int>> { using type = unsigned int; };
+extern "C" {
+
 #define CmiMemoryAtomicType(type) std::atomic<type>
-#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) std::atomic_fetch_add_explicit(&(someInt), 1, (std::MemModel))
-#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) std::atomic_fetch_sub_explicit(&(someInt), 1, (std::MemModel))
-#define CmiMemoryAtomicFetchAndIncMemOrder(input, output, MemModel) ((output) = std::atomic_fetch_add_explicit(&(input), 1, (std::MemModel)))
-#define CmiMemoryAtomicIncrementSimple(someInt) std::atomic_fetch_add(&(someInt), 1)
-#define CmiMemoryAtomicDecrementSimple(someInt) std::atomic_fetch_sub(&(someInt), 1)
-#define CmiMemoryAtomicFetchAndIncSimple(input, output)((output) = std::atomic_fetch_add(&(input), 1))
+#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) std::atomic_fetch_add_explicit(&(someInt), typename CmiRecoverType<decltype(someInt)>::type(1), (std::MemModel))
+#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) std::atomic_fetch_sub_explicit(&(someInt), typename CmiRecoverType<decltype(someInt)>::type(1), (std::MemModel))
+#define CmiMemoryAtomicFetchAndIncMemOrder(input, output, MemModel) ((output) = std::atomic_fetch_add_explicit(&(input), typename CmiRecoverType<decltype(input)>::type(1), (std::MemModel)))
+#define CmiMemoryAtomicIncrementSimple(someInt) std::atomic_fetch_add(&(someInt), typename CmiRecoverType<decltype(someInt)>::type(1))
+#define CmiMemoryAtomicDecrementSimple(someInt) std::atomic_fetch_sub(&(someInt), typename CmiRecoverType<decltype(someInt)>::type(1))
+#define CmiMemoryAtomicFetchAndIncSimple(input, output)((output) = std::atomic_fetch_add(&(input), typename CmiRecoverType<decltype(input)>::type(1)))
 
 #elif defined CMK_HAS_C11_STDATOMIC /* SYNC_LANG */
 
