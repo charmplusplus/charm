@@ -7,7 +7,12 @@ TOKENS=6
 
 all: ampi
 
-ampi: jacobi jacobi.iso jacobi.tls jacobi-get
+ampi: \
+  jacobi \
+  jacobi.pup \
+  jacobi.iso \
+  jacobi.tls \
+  jacobi-get \
 
 mpi: jacobi.C
 	mpiCC -o jacobi jacobi.C  $(OPTS)
@@ -16,9 +21,14 @@ jacobi-cpp: jacobi-cpp.C
 	$(CHARMC) -c jacobi-cpp.C 
 	$(CHARMC) -o jacobi-cpp jacobi-cpp.o -module CommonLBs -lm
 
-jacobi: jacobi.C
+jacobi.o: jacobi.C
 	$(CHARMC) -c jacobi.C 
+
+jacobi: jacobi.o
 	$(CHARMC) -o jacobi jacobi.o -module CommonLBs -lm
+
+jacobi.pup: jacobi.o
+	$(CHARMC) -o jacobi.pup jacobi.o -module CommonLBs -memory default -lm
 
 jacobi.iso: jacobi.C
 	$(CHARMC) -c -DNO_PUP jacobi.C -o jacobi.iso.o
@@ -45,6 +55,7 @@ jacobi-get-tokens:
 	make jacobi-get;
 
 test: ampi
+	$(call run, +p3 ./jacobi.pup 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1 )
 	$(call run, +p3 ./jacobi 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1 )
 	[ ! -s "jacobi.iso" ] || $(call run, +p3 ./jacobi.iso 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1)
 
