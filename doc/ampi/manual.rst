@@ -982,17 +982,19 @@ using a custom memory allocator, Isomalloc, which returns virtual memory
 addresses that are globally unique across an entire job. This
 means that every worker thread in the system reserves slices of virtual
 memory for all user-level threads, allowing transparent migration of
-stacks and pointers into memory (Isomalloc requires 64-bit virtual
+stacks and pointers into memory. (Isomalloc requires 64-bit virtual
 memory addresses and support from the operating system for mapping
-memory to arbitrary virtual addresses). Applications only need to link
-with Isomalloc to enable automatic migratability, using *-memory
-isomalloc*.
+memory to arbitrary virtual addresses.) Applications built with AMPI's
+toolchain wrappers are automatically linked with Isomalloc as the active
+``malloc`` implementation if the target platform supports the feature.
 
 For systems that do not support Isomalloc and for users that wish to
 have more fine-grain control over which application data structures will
 be copied at migration time, we have added a few calls to AMPI. These
 include the ability to register thread-specific data with the run-time
-system, and the means to pack and unpack all of the thread’s data.
+system, and the means to pack and unpack all of the thread’s data. This
+mode of operation requires passing ``-memory default`` at link time to
+disable Isomalloc's heap interception.
 
 .. warning::
 
