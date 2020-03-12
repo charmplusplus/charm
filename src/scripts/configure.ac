@@ -747,7 +747,7 @@ then
   got_cpp11="true"
 else
 # Flags for g++/clang++/icpc/xlC++, pgCC, and CrayCC respectively
-for i in "-std=c++11" "--c++11" "-h std=c++11"; do
+for i in "-std=c++11" "--c++11" "-h std=c++11" "-hstd=c++11"; do
     test_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then
@@ -775,7 +775,7 @@ test_native_cxx "whether native C++ compiler supports C++11 without flags" "yes"
 if test $strictpass -ne 1
 then
   # Flags for g++/clang++/icpc/xlC++, pgCC, and CrayCC respectively
-  for i in "-std=c++11" "--c++11" "-h std=c++11"; do
+  for i in "-std=c++11" "--c++11" "-h std=c++11" "-hstd=c++11"; do
     test_native_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then
