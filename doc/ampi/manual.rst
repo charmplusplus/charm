@@ -361,6 +361,14 @@ strategy at link time with ``-balancer <LB>``:
 
    $ ampicc pgm.c -o pgm -O3 -balancer GreedyRefineLB
 
+Internally, the toolchain wrappers call the Charm runtime's general
+toolchain script, ``charmc``. By default, they will specify ``-memory
+isomalloc`` and ``-module CommonLBs``. Advanced users can disable
+Isomalloc heap interception by passing ``-memory default``. For
+diagnostic purposes, the ``-verbose`` option will print all parameters
+passed to each stage of the toolchain. Refer to the Charm++ manual for
+information about the full set of parameters supported by ``charmc``.
+
 Running AMPI Programs
 ---------------------
 
