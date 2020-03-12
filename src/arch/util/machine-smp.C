@@ -94,7 +94,7 @@ static struct CmiStateStruct Cmi_default_state; /* State structure to return dur
 #if CMK_SHARED_VARS_NT_THREADS
 
 CmiNodeLock CmiMemLock_lock;
-#ifdef CMK_NO_ASM_AVAILABLE
+#if defined CMK_NEED_MEMORY_LOCK || CMK_PCQUEUE_LOCK
 CmiNodeLock cmiMemoryLock;
 #endif
 static CmiNodeLock comm_mutex;
@@ -199,9 +199,8 @@ static void CmiStartThreads(char **argv)
 
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex = CmiCreateLock();
-#ifdef CMK_NO_ASM_AVAILABLE
+#if defined CMK_NEED_MEMORY_LOCK || CMK_PCQUEUE_LOCK
   cmiMemoryLock = CmiCreateLock();
-  if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
 #endif
 
   Cmi_state_key = TlsAlloc();
@@ -238,7 +237,7 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-#ifdef CMK_NO_ASM_AVAILABLE
+#if defined CMK_NEED_MEMORY_LOCK || CMK_PCQUEUE_LOCK
   CmiDestroyLock(cmiMemoryLock);
 #endif
 }
@@ -247,7 +246,7 @@ static void CmiDestroyLocks(void)
 #elif CMK_SHARED_VARS_POSIX_THREADS_SMP
 
 CmiNodeLock CmiMemLock_lock;
-#ifdef CMK_NO_ASM_AVAILABLE
+#if defined CMK_NEED_MEMORY_LOCK || CMK_PCQUEUE_LOCK
 CmiNodeLock cmiMemoryLock;
 #endif
 int _Cmi_sleepOnIdle=0;
@@ -429,9 +428,8 @@ static void CmiStartThreads(char **argv)
   MACHSTATE(4,"CmiStartThreads")
   CmiMemLock_lock=CmiCreateLock();
   _smp_mutex = CmiCreateLock();
-#if defined(CMK_NO_ASM_AVAILABLE) && CMK_PCQUEUE_LOCK
+#if defined CMK_NEED_MEMORY_LOCK || CMK_PCQUEUE_LOCK
   cmiMemoryLock = CmiCreateLock();
-  if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
 #endif
 
 #if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
@@ -514,7 +512,7 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-#ifdef CMK_NO_ASM_AVAILABLE
+#if defined CMK_NEED_MEMORY_LOCK || CMK_PCQUEUE_LOCK
   CmiDestroyLock(cmiMemoryLock);
 #endif
 }

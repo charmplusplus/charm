@@ -536,7 +536,7 @@ static void *mergeWarningMsg(int * size, void * data, void ** remote, int count)
 }
 
 /* Initializes the reduction, called on each processor */
-extern int messageQueueOverflow;
+extern CmiMemoryAtomicInt messageQueueOverflow;
 static inline void _sendWarnings(void)
 {
   DEBUGF(("[%d] _sendWarnings\n", CkMyPe()));
@@ -1638,10 +1638,11 @@ void _initCharm(int unused_argc, char **argv)
             // XXX: Assuming uniformity of node size here
             num += num/CmiMyNodeSize();
 #endif
-            if (!_Cmi_forceSpinOnIdle && num > CmiNumCores())
+            if (!_Cmi_sleepOnIdle && !_Cmi_forceSpinOnIdle && num > CmiNumCores())
             {
               if (CmiMyPe() == 0)
-                CmiPrintf("\nCharm++> Warning: the number of SMP threads (%d) is greater than the number of physical cores (%d), so threads will sleep while idling. Use +CmiSpinOnIdle or +CmiSleepOnIdle to control this directly.\n\n", num, CmiNumCores());
+                CmiPrintf("Charm++> Warning: Running with more SMP threads (%d) than physical cores (%d).\n"
+                          "         Use +CmiSleepOnIdle (default behavior) or +CmiSpinOnIdle to silence this message.\n", num, CmiNumCores());
               CmiLock(CksvAccess(_nodeLock));
               if (! _Cmi_sleepOnIdle) _Cmi_sleepOnIdle = 1;
               CmiUnlock(CksvAccess(_nodeLock));

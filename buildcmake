@@ -270,6 +270,12 @@ if [[ "$target" = "${target%AMPI-only}AMPI-only" ]]; then
 
     # strip "-only" suffix from AMPI target
     target="${target%AMPI-only}AMPI"
+
+    # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
+    # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
+    # so we bump up the number of bits reserved for the collection in the objid.
+    opt_prio_type="char"
+    opt_extra_opts="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 -DCMK_OBJID_COLLECTION_BITS=29 $opt_extra_opts "
 fi
 
 opt_network=$(echo $triplet | cut -d '-' -f1)
