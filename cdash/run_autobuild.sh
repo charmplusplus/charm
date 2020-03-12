@@ -18,11 +18,9 @@ AUTOBUILD_TEST_OPTS=${AUTOBUILD_TEST_OPTS:-++local}
 ############################
 ############################
 
-# Check if we were started by cron
-PPPID=$(ps h -o ppid= $PPID)
-P_COMMAND=$(basename $(ps h -o comm= $PPPID))
-
-if [[ $P_COMMAND != "cron" && $P_COMMAND != "systemd" ]]; then
+# Check if we were started by cron or not
+# -t 1 => stdout is on a terminal
+if [[ -t 1 ]]; then
         # Interactive shell, run Experimental
         AUTOBUILD_CTEST_MODEL="Experimental"
 else
