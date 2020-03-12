@@ -1,7 +1,7 @@
 #!/bin/bash --login
 # Use a --login shell to make sure modules etc. get loaded.
 
-set -o errexit -o nounset
+set -o nounset
 
 # Configuration starts here
 
