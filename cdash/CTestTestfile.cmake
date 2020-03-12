@@ -1,4 +1,4 @@
-# Disable since that won't work in the cmake build:
+# Disabled since that won't work in the cmake build:
 # add_test(build-tests "make" "-C" "../tmp" "-j4" "all-test-tests" "all-test-examples" "all-test-benchmarks" "OPTS=\"-g\"")
 
 add_test(tests/ "make" "-C" "../tests" "test" "TESTOPTS=$ENV{AUTOBUILD_TEST_OPTS}")
