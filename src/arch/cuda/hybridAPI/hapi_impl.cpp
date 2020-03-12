@@ -88,7 +88,7 @@ void hapiInitCsv() {
 }
 
 // Initialize per-PE variables
-void initCpvs() {
+void hapiInitCpv() {
   // HAPI event-related
 #ifndef HAPI_CUDA_CALLBACK
   CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
