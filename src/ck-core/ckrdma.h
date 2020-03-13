@@ -79,7 +79,11 @@ struct CkNcpyBufferPost {
   cudaStream_t cuda_stream;
 #endif
 
-  CkNcpyBufferPost() : regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG) {}
+  CkNcpyBufferPost() : regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG) {
+#if CMK_CUDA
+    cuda_stream = cudaStreamPerThread;
+#endif
+  }
 };
 
 // Class to represent an Zerocopy buffer
