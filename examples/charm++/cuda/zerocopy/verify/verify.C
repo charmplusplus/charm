@@ -145,8 +145,8 @@ public:
         nodegroup_proxy[0].send();
         CkWaitQD();
       }
+      CkPrintf("PASS\n");
     }
-    CkPrintf("PASS\n");
 
     CkPrintf("Elapsed: %.6lf s\n", CkWallTimer() - start_time);
     CkExit();
