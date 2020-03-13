@@ -596,6 +596,8 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
   else
 #else
   // Shouldn't free message if device-side zero-copy
+  // FIXME: Actually doesn't matter for intra-node as memcpys are invoked inline,
+  // but may be necessary for inter-node
   if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_P2P_RECV_MSG)
     CkDeliverMessageReadonly(epIdx,msg,obj);
   else

@@ -275,7 +275,16 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
         str << "  int event_indices[" << entry->numRdmaDeviceParams << "];\n";
         int device_rdma_index = 0;
         callEach(&Parameter::prepareToDeviceCommBuffer, str, device_rdma_index);
-        str << "  int dest_pe = ckLocMgr()->lastKnown(ckGetIndex());\n";
+        str << "  int dest_pe;\n";
+        if (container->isChare()) {
+          str << "  dest_pe = CkRdmaGetDestPEChare(ckGetChareID().onPE, ckGetChareID().objPtr);\n";
+        } else if (container->isArray()) {
+          str << "  dest_pe = ckLocMgr()->lastKnown(ckGetIndex());\n";
+        } else if (container->isGroup() || container->isNodeGroup()) {
+          str << "  dest_pe = ckGetGroupPe();\n";
+        } else {
+          str << "  CkAbort(\"Unknown container type\");\n";
+        }
         str << "  CkRdmaToDeviceCommBuffer(dest_pe, impl_num_device_rdma_fields, "
           << "device_rdma_ptrs, device_rdma_sizes, device_indices, comm_offsets, "
           << "event_indices);\n";

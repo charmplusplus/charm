@@ -23,6 +23,8 @@
 CsvExtern(GPUManager, gpu_manager);
 #endif
 
+CkpvExtern(std::vector<VidBlock*>, vidblocks);
+
 // Integer used to store the ncpy ack handler idx
 bool useCMAForZC;
 static int ncpy_handler_idx, ncpy_bcastNo_handler_idx;
@@ -2371,6 +2373,22 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
 #else
   CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
 #endif
+}
+
+int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr) {
+  // Mechanism extracted from _prepareMsg() in ck.C
+  if (dest_pe < 0) {
+    int pe = -(dest_pe+1);
+    if (pe == CkMyPe()) {
+      VidBlock* vblk = CkpvAccess(vidblocks)[(CmiIntPtr)obj_ptr];
+      void *objPtr = vblk->getLocalChare();
+      dest_pe = objPtr ? pe : vblk->getActualID().onPE;
+    } else {
+      dest_pe = pe;
+    }
+  }
+
+  return dest_pe;
 }
 
 #if CMK_CUDA

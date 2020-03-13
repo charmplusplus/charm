@@ -629,6 +629,8 @@ int getRootNode(envelope *env);
 void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
     void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs, bool onlyDevice);
 
+int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr);
+
 void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, void** ptrs, int* sizes,
     int* device_indices, size_t* comm_offsets, int* event_indices);
 
