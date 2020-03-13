@@ -71,7 +71,7 @@ $(foreach i,$(CANDIDATES),$(eval $(call TEST_TARGET_AVAILABILITY,$i)))
 
 
 # Universal settings
-LINKOPTS := -module CommonLBs -balancer RandCentLB
+LINKOPTS := -balancer RandCentLB
 
 
 # Rule construction
