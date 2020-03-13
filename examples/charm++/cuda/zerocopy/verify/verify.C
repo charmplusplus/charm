@@ -55,8 +55,8 @@ struct Container {
 
     for (int i = 0; i < block_size; i++) {
       if (h_remote_data[i] != val) {
-        CkAbort("Verification failed: data %.3lf, expected %.3lf",
-            h_remote_data[i], val);
+        CkAbort("Validation failure at data index %d: expected %.3lf, got %.3lf\n",
+            i, val, h_remote_data[i]);
       }
     }
   }
@@ -118,14 +118,35 @@ public:
   void test() {
     start_time = CkWallTimer();
 
+    CkPrintf("Testing singleton chares... ");
     for (int i = 0; i < n_iters; i++) {
-      // Test singleton chares
-      CkPrintf("Testing singleton chares...\n");
       send_proxy.send();
       CkWaitQD();
-
-      // TODO
     }
+    CkPrintf("PASS\n");
+
+    CkPrintf("Testing chare array... ");
+    for (int i = 0; i < n_iters; i++) {
+      array_proxy[0].send();
+      CkWaitQD();
+    }
+    CkPrintf("PASS\n");
+
+    CkPrintf("Testing chare group... ");
+    for (int i = 0; i < n_iters; i++) {
+      group_proxy[0].send();
+      CkWaitQD();
+    }
+    CkPrintf("PASS\n");
+
+    if (test_nodegroup) {
+      CkPrintf("Testing chare nodegroup... ");
+      for (int i = 0; i < n_iters; i++) {
+        nodegroup_proxy[0].send();
+        CkWaitQD();
+      }
+    }
+    CkPrintf("PASS\n");
 
     CkPrintf("Elapsed: %.6lf s\n", CkWallTimer() - start_time);
     CkExit();
@@ -134,50 +155,103 @@ public:
 
 class VerifyChare : public CBase_VerifyChare {
   bool is_send;
-  Container con;
+  Container container;
 
 public:
   VerifyChare(bool is_send_) : is_send(is_send_) {
-    con.init(is_send ? 1 : 2);
+    container.init(is_send ? 1 : 2);
   }
 
   ~VerifyChare() {
-    con.clear();
+    container.clear();
   }
 
   void send() {
-    recv_proxy.recv(block_size, CkSendBuffer(con.d_local_data));
+    recv_proxy.recv(block_size, CkSendBuffer(container.d_local_data));
   }
 
   void recv(int& size, double*& data, CkNcpyBufferPost* post) {
-    data = con.d_remote_data;
+    data = container.d_remote_data;
   }
 
   void recv(int size, double* data) {
-    con.verify(1);
-    CkPrintf("Verification passed\n");
+    container.verify(1);
   }
 };
 
 class VerifyArray : public CBase_VerifyArray {
-  Container con;
+  Container container;
 
 public:
-  VerifyArray() {}
+  VerifyArray() {
+    container.init((thisIndex == 0) ? 1 : 2);
+  }
+
+  ~VerifyArray() {
+    container.clear();
+  }
+
+  void send() {
+    thisProxy[1].recv(block_size, CkSendBuffer(container.d_local_data));
+  }
+
+  void recv(int& size, double*& data, CkNcpyBufferPost* post) {
+    data = container.d_remote_data;
+  }
+
+  void recv(int size, double* data) {
+    container.verify(1);
+  }
 };
 
 class VerifyGroup : public CBase_VerifyGroup {
-  Container con;
+  Container container;
 
 public:
-  VerifyGroup() {}
+  VerifyGroup() {
+    container.init((thisIndex == 0) ? 1 : 2);
+  }
+
+  ~VerifyGroup() {
+    container.clear();
+  }
+
+  void send() {
+    thisProxy[1].recv(block_size, CkSendBuffer(container.d_local_data));
+  }
+
+  void recv(int& size, double*& data, CkNcpyBufferPost* post) {
+    data = container.d_remote_data;
+  }
+
+  void recv(int size, double* data) {
+    container.verify(1);
+  }
 };
 
 class VerifyNodeGroup : public CBase_VerifyNodeGroup {
-  Container con;
+  Container container;
 
 public:
-  VerifyNodeGroup() {}
+  VerifyNodeGroup() {
+    container.init((thisIndex == 0) ? 1 : 2);
+  }
+
+  ~VerifyNodeGroup() {
+    container.clear();
+  }
+
+  void send() {
+    thisProxy[1].recv(block_size, CkSendBuffer(container.d_local_data));
+  }
+
+  void recv(int& size, double*& data, CkNcpyBufferPost* post) {
+    data = container.d_remote_data;
+  }
+
+  void recv(int size, double* data) {
+    container.verify(1);
+  }
 };
 
 #include "verify.def.h"

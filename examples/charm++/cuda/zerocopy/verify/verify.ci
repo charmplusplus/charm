@@ -21,13 +21,19 @@ mainmodule verify {
 
   array [1D] VerifyArray {
     entry VerifyArray();
+    entry void send();
+    entry void recv(int size, nocopydevice double data[size]);
   };
 
   group VerifyGroup {
     entry VerifyGroup();
+    entry void send();
+    entry void recv(int size, nocopydevice double data[size]);
   };
 
   nodegroup VerifyNodeGroup {
     entry VerifyNodeGroup();
+    entry void send();
+    entry void recv(int size, nocopydevice double data[size]);
   };
 };
