@@ -1,5 +1,5 @@
--include ../../../common.mk
-CHARMC = ../../../../bin/charmc $(OPTS)
+-include ../../../../common.mk
+CHARMC = ../../../../../bin/charmc $(OPTS)
 OPTS = -O3
 
 # Set CUDATOOLKIT_HOME to the CUDA toolkit directory
@@ -7,7 +7,7 @@ CUDATOOLKIT_HOME ?= $(CUDA_HOME)
 NVCC = $(CUDATOOLKIT_HOME)/bin/nvcc
 NVCC_FLAGS = -O3 -c -std=c++11 -use_fast_math
 NVCC_INC = -I$(CUDATOOLKIT_HOME)/include
-CHARM_INC = -I../../../../include
+CHARM_INC = -I../../../../../include
 LD_LIBS =
 
 TARGET = jacobi2d

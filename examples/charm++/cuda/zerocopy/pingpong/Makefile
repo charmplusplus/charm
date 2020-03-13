@@ -1,6 +1,6 @@
 OPTS = -O3
 
-CHARM_DIR = ../../../..
+CHARM_DIR = ../../../../..
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 
