@@ -118,12 +118,15 @@ public:
   void test() {
     start_time = CkWallTimer();
 
+    /*
+    // TODO: Singleton chares are currently not supported
     CkPrintf("Testing singleton chares... ");
     for (int i = 0; i < n_iters; i++) {
       send_proxy.send();
       CkWaitQD();
     }
     CkPrintf("PASS\n");
+    */
 
     CkPrintf("Testing chare array... ");
     for (int i = 0; i < n_iters; i++) {

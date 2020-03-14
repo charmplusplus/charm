@@ -277,7 +277,9 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
         callEach(&Parameter::prepareToDeviceCommBuffer, str, device_rdma_index);
         str << "  int dest_pe;\n";
         if (container->isChare()) {
-          str << "  dest_pe = CkRdmaGetDestPEChare(ckGetChareID().onPE, ckGetChareID().objPtr);\n";
+          // TODO: Following code doesn't work, don't support singleton chares for now
+          //str << "  dest_pe = CkRdmaGetDestPEChare(ckGetChareID().onPE, ckGetChareID().objPtr);\n";
+          str << "  CkAbort(\"Singleton chares are not supported\");\n";
         } else if (container->isArray()) {
           str << "  dest_pe = ckLocMgr()->lastKnown(ckGetIndex());\n";
         } else if (container->isGroup() || container->isNodeGroup()) {
