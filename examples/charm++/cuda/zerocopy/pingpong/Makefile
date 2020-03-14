@@ -8,7 +8,7 @@ NVCC = nvcc
 NVCC_FLAGS = -O3 -c -std=c++11 -use_fast_math
 LD_LIBS =
 
-TARGET = zerocopy
+TARGET = pingpong
 all: $(TARGET)
 
 OBJS = $(TARGET).o $(TARGET)CUDA.o

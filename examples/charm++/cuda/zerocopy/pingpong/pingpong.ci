@@ -1,4 +1,4 @@
-mainmodule zerocopy {
+mainmodule pingpong {
   readonly CProxy_Main main_proxy;
   readonly CProxy_Block block_proxy;
   readonly int min_count;

@@ -1,4 +1,4 @@
-#include "zerocopy.decl.h"
+#include "pingpong.decl.h"
 #include "hapi.h"
 
 #define VALIDATE 0
@@ -258,4 +258,4 @@ public:
   }
 };
 
-#include "zerocopy.def.h"
+#include "pingpong.def.h"
