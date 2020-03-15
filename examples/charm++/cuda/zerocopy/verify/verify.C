@@ -170,11 +170,12 @@ public:
   }
 
   void send() {
-    recv_proxy.recv(block_size, CkSendBuffer(container.d_local_data));
+    recv_proxy.recv(block_size, CkSendBuffer(container.d_local_data, container.stream));
   }
 
   void recv(int& size, double*& data, CkNcpyBufferPost* post) {
     data = container.d_remote_data;
+    post[0].cuda_stream = container.stream;
   }
 
   void recv(int size, double* data) {
@@ -195,11 +196,12 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkSendBuffer(container.d_local_data));
+    thisProxy[1].recv(block_size, CkSendBuffer(container.d_local_data, container.stream));
   }
 
   void recv(int& size, double*& data, CkNcpyBufferPost* post) {
     data = container.d_remote_data;
+    post[0].cuda_stream = container.stream;
   }
 
   void recv(int size, double* data) {
@@ -220,11 +222,12 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkSendBuffer(container.d_local_data));
+    thisProxy[1].recv(block_size, CkSendBuffer(container.d_local_data, container.stream));
   }
 
   void recv(int& size, double*& data, CkNcpyBufferPost* post) {
     data = container.d_remote_data;
+    post[0].cuda_stream = container.stream;
   }
 
   void recv(int size, double* data) {
@@ -245,11 +248,12 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkSendBuffer(container.d_local_data));
+    thisProxy[1].recv(block_size, CkSendBuffer(container.d_local_data, container.stream));
   }
 
   void recv(int& size, double*& data, CkNcpyBufferPost* post) {
     data = container.d_remote_data;
+    post[0].cuda_stream = container.stream;
   }
 
   void recv(int size, double* data) {
