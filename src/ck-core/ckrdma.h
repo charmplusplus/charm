@@ -140,21 +140,43 @@ class CkNcpyBuffer{
   // ack handling pointer used for bcast and CMA p2p transfers
   const void *refAckInfo;
 
+#if CMK_CUDA
   // CUDA IPC
   int device_idx;
   size_t comm_offset;
   int event_idx;
+  cudaStream_t cuda_stream;
+#endif
 
   CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), ref(NULL), refAckInfo(NULL) {}
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
+#if CMK_CUDA
+    cuda_stream = cudaStreamPerThread;
+#endif
     cb = CkCallback(CkCallback::ignore);
     init(ptr_, cnt_, regMode_, deregMode_);
   }
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
+#if CMK_CUDA
+    cuda_stream = cudaStreamPerThread;
+#endif
     init(ptr_, cnt_, cb_, regMode_, deregMode_);
   }
+
+#if CMK_CUDA
+  explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, cudaStream_t cuda_stream_) {
+    cuda_stream = cuda_stream_;
+    cb = CkCallback(CkCallback::ignore);
+    init(ptr_, cnt_, CK_BUFFER_REG, CK_BUFFER_DEREG);
+  }
+
+  explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, cudaStream_t cuda_stream_) {
+    cuda_stream = cuda_stream_;
+    init(ptr_, cnt_, cb_, CK_BUFFER_REG, CK_BUFFER_DEREG);
+  }
+#endif
 
   void print() {
     CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%zu, pe:%d, regMode=%d, deregMode=%d, ref:%p, refAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, regMode, deregMode, ref, refAckInfo);
@@ -264,9 +286,11 @@ class CkNcpyBuffer{
     p|deregMode;
     p|isRegistered;
     PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
+#if CMK_CUDA
     p|device_idx;
     p|comm_offset;
     p|event_idx;
+#endif
   }
 
   friend void CkRdmaDirectAckHandler(void *ack);
@@ -332,6 +356,16 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, CkCallback &cb_, unsig
 static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
   return CkNcpyBuffer(ptr_, 0, regMode_, deregMode_);
 }
+
+#if CMK_CUDA
+static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, CkCallback &cb_, cudaStream_t cuda_stream_) {
+  return CkNcpyBuffer(ptr_, 0, cb_, cuda_stream_);
+}
+
+static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, cudaStream_t cuda_stream_) {
+  return CkNcpyBuffer(ptr_, 0, cuda_stream_);
+}
+#endif
 
 #if CMK_ONESIDED_IMPL
 // Represents the remote handler tag that should be invoked
@@ -631,7 +665,6 @@ void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
 
 int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr);
 
-void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, void** ptrs, int* sizes,
-    int* device_indices, size_t* comm_offsets, int* event_indices);
+void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, CkNcpyBuffer** buffers);
 
 #endif

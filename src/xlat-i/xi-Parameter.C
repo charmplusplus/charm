@@ -268,13 +268,6 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     if (hasrdma) {
       if (deviceRdmaSupported) {
         str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams << ";\n";
-        str << "  void* device_rdma_ptrs[" << entry->numRdmaDeviceParams << "];\n";
-        str << "  int device_rdma_sizes[" << entry->numRdmaDeviceParams << "];\n";
-        str << "  int device_indices[" << entry->numRdmaDeviceParams << "];\n";
-        str << "  size_t comm_offsets[" << entry->numRdmaDeviceParams << "];\n";
-        str << "  int event_indices[" << entry->numRdmaDeviceParams << "];\n";
-        int device_rdma_index = 0;
-        callEach(&Parameter::prepareToDeviceCommBuffer, str, device_rdma_index);
         str << "  int dest_pe;\n";
         if (container->isChare()) {
           // TODO: Following code doesn't work, don't support singleton chares for now
@@ -287,11 +280,10 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
         } else {
           str << "  CkAbort(\"Unknown container type\");\n";
         }
-        str << "  CkRdmaToDeviceCommBuffer(dest_pe, impl_num_device_rdma_fields, "
-          << "device_rdma_ptrs, device_rdma_sizes, device_indices, comm_offsets, "
-          << "event_indices);\n";
-        device_rdma_index = 0;
+        str << "  CkNcpyBuffer* device_buffers[" << entry->numRdmaDeviceParams << "];\n";
+        int device_rdma_index = 0;
         callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
+        str << "  CkRdmaToDeviceCommBuffer(dest_pe, impl_num_device_rdma_fields, device_buffers);\n";
       }
       else if (hasDevice()) {
         // Abort ASAP if broadcast or has send API zero-copy
@@ -434,28 +426,12 @@ void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
   }
 }
 
-void Parameter::prepareToDeviceCommBuffer(XStr& str, int& index) {
-  if (isRdma() && isDevice()) {
-    Type* dt = type->deref();
-    str << "  device_rdma_ptrs[" << index << "] = (void*)ncpyBuffer_" << name
-      << ".ptr;\n";
-    str << "  device_rdma_sizes[" << index << "] = sizeof(" << dt << ")*("
-      << arrLen << ");\n";
-    index++;
-  }
-}
-
 void Parameter::marshallDeviceRdmaParameters(XStr& str, int& index) {
   if (isRdma() && isDevice()) {
     Type* dt = type->deref();
     str << "  ncpyBuffer_" << name << ".cnt = sizeof(" << dt << ")*(" << arrLen
       << ");\n";
-    str << "  ncpyBuffer_" << name << ".device_idx = device_indices[" << index
-      << "];\n";
-    str << "  ncpyBuffer_" << name << ".comm_offset = comm_offsets[" << index
-      << "];\n";
-    str << "  ncpyBuffer_" << name << ".event_idx = event_indices[" << index
-      << "];\n";
+    str << "  device_buffers[" << index << "] = &ncpyBuffer_" << name << ";\n";
     index++;
   }
 }

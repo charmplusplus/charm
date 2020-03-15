@@ -2465,8 +2465,7 @@ static void findFreeIpcEvents(DeviceManager* dm, const size_t comm_offset, int& 
 }
 #endif
 
-void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, void** ptrs, int* sizes,
-    int* device_indices, size_t* comm_offsets, int* event_indices) {
+void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, CkNcpyBuffer** buffers) {
 #if CMK_CUDA
   // Only continue if we need to use device communication buffer (CUDA IPC)
   // TODO: If the destination PE is wrong (due to migration, etc.), need to
@@ -2475,29 +2474,26 @@ void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, void** ptrs, int* sizes,
 
   // Allocate blocks on device comm buffer
   DeviceManager* dm = CsvAccess(gpu_manager).device_map[CkMyPe()];
-  void* alloc_comm_buffers[numops];
 
   for (int i = 0; i < numops; i++) {
+    void* alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
 #if CMK_SMP
     CmiLock(dm->lock);
 #endif
-    alloc_comm_buffers[i] = dm->alloc_comm_buffer(sizes[i]);
-    device_indices[i] = dm->global_index;
-    comm_offsets[i] = (char*)alloc_comm_buffers[i] - (char*)dm->comm_buffer->base_ptr;
-    findFreeIpcEvents(dm, comm_offsets[i], event_indices[i]);
+    buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
+    buffers[i]->device_idx = dm->global_index;
+    findFreeIpcEvents(dm, buffers[i]->comm_offset, buffers[i]->event_idx);
 #if CMK_SMP
     CmiUnlock(dm->lock);
 #endif
 
-    cudaStream_t comm_stream = CsvAccess(gpu_manager).comm_streams[CmiMyRank()];
-
     // Initiate transfer from source buffer to device comm buffer
-    hapiCheck(cudaMemcpyAsync(alloc_comm_buffers[i], ptrs[i], sizes[i],
-          cudaMemcpyDeviceToDevice, comm_stream));
+    hapiCheck(cudaMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
+          cudaMemcpyDeviceToDevice, buffers[i]->cuda_stream));
 
     // Record event
     cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[dm->global_index];
-    hapiCheck(cudaEventRecord(my_device_info.src_event_pool[event_indices[i]], comm_stream));
+    hapiCheck(cudaEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->cuda_stream));
   }
 #else
   CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
