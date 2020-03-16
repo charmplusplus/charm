@@ -109,11 +109,14 @@ remove_make_flag() {
 
 add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
 add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
+add_flag "CMK_WINDOWS='$CMK_WINDOWS'" 'basic setup'
+add_flag "CMK_BLUEGENEQ='$CMK_BLUEGENEQ'" 'basic setup'
 add_make_flag "CMK_COMPILER:=$CMK_COMPILER" 'basic setup'
 add_make_flag "CMK_SMP:=$CMK_SMP" 'basic setup'
 add_make_flag "CMK_SHARED_SUF:=$CMK_SHARED_SUF" 'basic setup'
 add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
 add_make_flag "CMK_MACOSX:=$CMK_MACOSX" 'basic setup'
+add_make_flag "CMK_WINDOWS:=$CMK_WINDOWS" 'basic setup'
 add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
 add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
 add_make_flag "CMK_UTH:=$CMK_UTH" 'basic setup'
@@ -747,7 +750,7 @@ then
   got_cpp11="true"
 else
 # Flags for g++/clang++/icpc/xlC++, pgCC, and CrayCC respectively
-for i in "-std=c++11" "--c++11" "-h std=c++11"; do
+for i in "-std=c++11" "--c++11" "-h std=c++11" "-hstd=c++11"; do
     test_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then
@@ -775,7 +778,7 @@ test_native_cxx "whether native C++ compiler supports C++11 without flags" "yes"
 if test $strictpass -ne 1
 then
   # Flags for g++/clang++/icpc/xlC++, pgCC, and CrayCC respectively
-  for i in "-std=c++11" "--c++11" "-h std=c++11"; do
+  for i in "-std=c++11" "--c++11" "-h std=c++11" "-hstd=c++11"; do
     test_native_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then

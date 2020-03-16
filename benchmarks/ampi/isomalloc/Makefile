@@ -42,7 +42,7 @@ test-everything: $(foreach i,$(VARIANTS),test-$i)
 define VARIANT_RULES
 
 $1: $1.o
-	$$(AMPICC) -o $$@ $$^ -module CommonLBs -memory $1
+	$$(AMPICC) -o $$@ $$^ -memory $1
 
 $1.o: test.C
 	$$(AMPICC) -o $$@ -memory $1 -Disomalloc_method=$1 -c $$<
