@@ -53,8 +53,7 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_CF90_FIXED" ] && CMK_CF90_FIXED="$CMK_CF90"
 [ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
 [ -z "$CMK_CC_FASTEST" ] && CMK_CC_FASTEST="$CMK_CC"
-[ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
-[ -z "$CMK_CF77" ] && CMK_CF77_FIXED="$CMK_CF90"
+[ -z "$CMK_CF77" ] && CMK_CF77="$CMK_CF90"
 [ -z "$CMK_CF77_FIXED" ] && CMK_CF77_FIXED="$CMK_CF77"
 
 # set CMK_NATIVE defaults before adding potentially target-specific build-line args
