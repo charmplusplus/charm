@@ -2405,7 +2405,7 @@ static void findFreeIpcEvents(DeviceManager* dm, const size_t comm_offset, int& 
     size_t& buff_offset = my_device_info.event_pool_buff_offsets[i];
     // For a used event, check if it's complete and mark as free if so
     if (flag != 0) {
-      // TODO: Check in shared memory if receiver has invoked the memcpy from
+      // Check in shared memory if receiver has invoked the memcpy from
       // the device comm buffer on sender to destination buffer
       cuda_ipc_event_shared* shm_event_shared = (cuda_ipc_event_shared*)((char*)CsvAccess(gpu_manager).shm_ptr + CsvAccess(gpu_manager).shm_chunk_size * device_index + sizeof(cudaIpcMemHandle_t)) + i;
       bool can_query = false;
