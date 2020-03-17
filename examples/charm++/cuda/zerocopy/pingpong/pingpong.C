@@ -1,14 +1,13 @@
 #include "pingpong.decl.h"
 #include "hapi.h"
 
-#define VALIDATE 0
-
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
 /* readonly */ int min_count;
 /* readonly */ int max_count;
 /* readonly */ int n_iters;
 /* readonly */ bool use_zerocopy;
+/* readonly */ bool validate;
 
 extern void invokeInitKernel(double*, int, double, cudaStream_t);
 
@@ -23,6 +22,7 @@ class Main : public CBase_Main {
     max_count = 1024 * 1024;
     n_iters = 100;
     use_zerocopy = false;
+    validate = false;
 
     if (CkNumPes() != 2) {
       CkAbort("There should be 2 PEs");
@@ -30,7 +30,7 @@ class Main : public CBase_Main {
 
     // Process command line arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:x:i:z")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:x:i:zv")) != -1) {
       switch (c) {
         case 's':
           min_count = atoi(optarg);
@@ -44,6 +44,9 @@ class Main : public CBase_Main {
         case 'z':
           use_zerocopy = true;
           break;
+        case 'v':
+          validate = true;
+          break;
         default:
           CkAbort("Unknown command line argument detected");
       }
@@ -53,9 +56,9 @@ class Main : public CBase_Main {
     // Print info
     CkPrintf("[GPU zero-copy pingpong]\n"
         "Min count: %d doubles (%lu B), Max count: %d doubles (%lu B), "
-        "Iters: %d, Zerocopy: %d\n",
+        "Iters: %d, Zerocopy: %d, Validate: %d\n",
         min_count, min_count * sizeof(double), max_count, max_count * sizeof(double),
-        n_iters, use_zerocopy);
+        n_iters, use_zerocopy, validate);
 
     // Create block group chare
     block_proxy = CProxy_Block::ckNew(CkNumPes());
@@ -168,9 +171,7 @@ public:
     hapiCheck(cudaMemcpyAsync(d_remote_data, h_remote_data, count * sizeof(double), cudaMemcpyHostToDevice, stream));
     cudaStreamSynchronize(stream);
 
-#if VALIDATE
-    validateData(count);
-#endif
+    if (validate) validateData(count);
 
     afterReceive(count);
   }
@@ -190,9 +191,7 @@ public:
     // Wait for data transfer to complete
     cudaStreamSynchronize(stream);
 
-#if VALIDATE
-    validateData(count);
-#endif
+    if (validate) validateData(count);
 
     afterReceive(count);
   }

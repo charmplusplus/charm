@@ -5,6 +5,7 @@ mainmodule pingpong {
   readonly int max_count;
   readonly int n_iters;
   readonly bool use_zerocopy;
+  readonly bool validate;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
