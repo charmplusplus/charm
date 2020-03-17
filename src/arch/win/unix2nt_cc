@@ -56,13 +56,14 @@ ML_COMMON='-nologo -W1 -D_WINDOWS -DNOMINMAX'
 #Here, the full path to "link.exe" has to be added because, in cygwin, there
 #is a file "/usr/bin/link" which has the same name, and takes higher precedence
 #than the microsoft one.
+cl_path=`command -v cl`
 if [[ "`command -v link`" != '/usr/bin/link' ]]
 then
 LINK_CMD='link.exe'
-elif [[ -d "`cygpath -u \"$VCC_DIR/bin/HostX64/x64\"`" ]]
+elif [[ -d "`cygpath -u "${cl_path%cl}"`" ]]
 then
-LINK_CMD="$VCC_DIR/bin/HostX64/x64/link.exe"
-elif [[ -d "`cygpath -u \"$VCC_DIR/BIN/amd64\"`" ]]
+LINK_CMD="${cl_path%cl}link.exe"
+elif [[ -d "`cygpath -u "$VCC_DIR/BIN/amd64"`" ]]
 then
 LINK_CMD="$VCC_DIR/BIN/amd64/LINK.EXE"
 else
