@@ -211,7 +211,7 @@ do
 		CL_OPTS+=' -DNDEBUG -Ox'
 		ML_OPTS+=' -DNDEBUG'
 		;;
-	-g)
+	-g|-g[123456789]|-ggdb|-ggdb[123])
 		CL_OPTS+=' -Z7'
 		ML_OPTS+=' -Zi -Zd'
 		LINK_OPTS+=' -DEBUG'
