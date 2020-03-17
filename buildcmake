@@ -71,7 +71,6 @@ opt_qlogic=0
 opt_randomized_msgq=0
 opt_refnum_type="unsigned short"
 opt_replay=0
-opt_romio=1
 opt_shrinkexpand=0
 opt_smp=0
 opt_stats=0
@@ -81,6 +80,16 @@ opt_tcp=0
 opt_tracing=0
 opt_tracing_commthread=0
 opt_zlib=1
+
+# default to building ROMIO on AMPI where supported
+case "$triplet" in
+  *-win64*|*-win-*)
+    opt_romio=0
+    ;;
+  *)
+    opt_romio=1
+    ;;
+esac
 
 opt_CC= #undef
 opt_CXX= #undef
