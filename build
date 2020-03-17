@@ -225,7 +225,6 @@ LIBDIR=
 INCDIR=
 ARCH=
 BUILD_SHARED=""             # default no shared lib
-WITH_ROMIO="true"           # default to building ROMIO on AMPI
 WITH_PRODUCTION=
 DESTINATION=""
 DESTINATION_SUFFIX=""
@@ -275,6 +274,16 @@ shift
 #echo $ARCH
 
 OPT_DIRS="$src/$BASEVERSION $src/$ARCH $src/common"
+
+# default to building ROMIO on AMPI where supported
+case "$BASEVERSION" in
+  *-win64*|*-win-*)
+    WITH_ROMIO=''
+    ;;
+  *)
+    WITH_ROMIO='true'
+    ;;
+esac
 
 # process remainder of version argument as options, copied from below
 for w in $VERSOPTS; do
