@@ -15,4 +15,8 @@ CMK_RANLIB="echo "
 CMK_LIBS=""
 CMK_MOD_EXT="vo"
 
+# space character: avoid reset to default by conv-config.sh
+CMK_PIC=' '
+CMK_PIE=' '
+
 CMK_COMPILER='msvc'
