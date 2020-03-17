@@ -160,6 +160,7 @@ DOCOMPILE=''
 DOASSEMBLE=''
 DOLINK=''
 DODEPS=''
+SHARED=''
 OUTPUT=''
 CL_OPTS="$CL_COMMON"
 ML_OPTS="$ML_COMMON"
@@ -182,6 +183,9 @@ do
 	case "$arg" in
 	-verbose)
 		VERBOSE='1'
+		;;
+	-shared)
+		SHARED='1'
 		;;
 	-E)
 		CL+=' -E'
@@ -211,6 +215,7 @@ do
 		ML_OPTS+=' -Zi -Zd'
 		LINK_OPTS+=' -DEBUG'
 		CL_MT='-MTd'
+		CL_DLL='-LDd'
 		;;
 	-c) 
 		CL+=' -c'
@@ -301,6 +306,11 @@ do
 		elif [[ "x`getExtension $out`" = "x.so" ]]
 		then
 			OUTPUT="-Fo`cygpath -w $out`"
+		elif [[ "x`getExtension $out`" = "x.dll" ]]
+		then
+			OUTPUT="-Fo`cygpath -w $out`"
+			LINK+=" -dll -out:$out"
+			DOLINK='1'
 		elif [[ "x`getExtension $out`" = "x.exe" ]]
 		then
 			LINK+=" -out:$out"
@@ -361,7 +371,7 @@ do
 	esac
 done
 
-CL_OPTS+=" $CL_MT"
+[[ -n "$SHARED" ]] && CL_OPTS+=" $CL_DLL" || CL_OPTS+=" $CL_MT"
 
 if [[ -n "$DODEPS" ]]
 then
