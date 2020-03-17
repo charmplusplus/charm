@@ -2360,7 +2360,7 @@ EOT
 TRACE_LINK_FLAG=''
 CAN_EXPORT_SYMBOLS='0'
 for i in '-rdynamic' '-Wl,--export-dynamic'; do
-  test_link "whether has $i" "yes" "no" "$i"
+  test_link "whether has $i" "yes" "no" "" "$i"
   if test "$strictpass" = '1'; then
     TRACE_LINK_FLAG="$i"
     CAN_EXPORT_SYMBOLS='1'
