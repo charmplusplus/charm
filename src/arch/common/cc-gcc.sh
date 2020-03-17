@@ -12,6 +12,7 @@ CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_RANLIB='ranlib'
 CMK_LIBS="$CMK_LIBS -lckqt"
 CMK_PIC='-fPIC'
+CMK_PIE='' # empty string: will be reset to default by conv-config.sh
 
 if [ "$CMK_MACOSX" ]; then
   if [ -z "$CMK_COMPILER_SUFFIX" ]; then
