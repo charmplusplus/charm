@@ -89,6 +89,10 @@ CmiIdleLock_checkMessage
 #include <mutex>
 #include <condition_variable>
 
+#if CMK_HAS_OPENMP
+#include <omp.h>
+#endif
+
 void CmiStateInit(int pe, int rank, CmiState state);
 void CommunicationServerInit(void);
 
