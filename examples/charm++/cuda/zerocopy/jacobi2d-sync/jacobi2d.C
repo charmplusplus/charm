@@ -2,8 +2,6 @@
 #include "jacobi2d.decl.h"
 #include <utility>
 
-#define PRINT 0
-
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
 /* readonly */ int grid_size;
@@ -11,6 +9,7 @@
 /* readonly */ int n_chares;
 /* readonly */ int n_iters;
 /* readonly */ bool use_zerocopy;
+/* readonly */ bool print;
 
 extern void invokeInitKernel(double* d_temperature, int block_size, cudaStream_t stream);
 extern void invokeBoundaryKernels(double* d_temperature, int block_size, bool left_bound,
@@ -42,10 +41,11 @@ public:
     block_size = 4096;
     n_iters = 100;
     use_zerocopy = false;
+    print = false;
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:b:i:z")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:b:i:zp")) != -1) {
       switch (c) {
         case 's':
           grid_size = atoi(optarg);
@@ -59,9 +59,13 @@ public:
         case 'z':
           use_zerocopy = true;
           break;
+        case 'p':
+          print = true;
+          break;
         default:
           CkPrintf(
-              "Usage: %s -s [grid size] -b [block size] -i [iterations] -z (use GPU zerocopy)\n",
+              "Usage: %s -s [grid size] -b [block size] -i [iterations] "
+              "-z (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
       }
@@ -76,11 +80,10 @@ public:
     n_chares = grid_size / block_size;
 
     // Print configuration
-    CkPrintf("\n[CUDA 2D Jacobi example]\n");
-    CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d\n", grid_size, grid_size,
-        block_size, block_size, n_chares, n_chares);
-    CkPrintf("Iterations: %d\n", n_iters);
-    CkPrintf("Zerocopy: %d\n", use_zerocopy);
+    CkPrintf("\n[CUDA 2D Jacobi bulk-synchronous example]\n");
+    CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d, Iterations: %d, "
+        "Zerocopy: %d, Print: %d\n", grid_size, grid_size, block_size, block_size,
+        n_chares, n_chares, n_iters, use_zerocopy, print);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares, n_chares);
@@ -120,12 +123,13 @@ public:
              n_iters, CkWallTimer() - start_time);
     CkPrintf("Comm time: %.3lf us\nUpdate time: %.3lf us\n",
         (comm_agg_time / n_iters) * 1000000, (update_agg_time / n_iters) * 1000000);
-#if PRINT
-    sleep(1);
-    block_proxy(0,0).print();
-#else
-    CkExit();
-#endif
+
+    if (print) {
+      sleep(1);
+      block_proxy(0,0).print();
+    } else {
+      CkExit();
+    }
   }
 
   void printDone() {
@@ -224,22 +228,19 @@ class Block : public CBase_Block {
 
     int x = thisIndex.x, y = thisIndex.y;
     if (use_zerocopy) {
-      // TODO: Allow the user to provide the CUDA stream to the runtime
-      cudaStreamSynchronize(stream);
-
       // Send ghosts to neighboring chares
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_size,
-            CkSendBuffer(d_left_ghost));
+            CkSendBuffer(d_left_ghost, stream));
       if (!right_bound)
         thisProxy(x + 1, y).receiveGhostsZC(my_iter, LEFT, block_size,
-            CkSendBuffer(d_right_ghost));
+            CkSendBuffer(d_right_ghost, stream));
       if (!top_bound)
         thisProxy(x, y - 1).receiveGhostsZC(my_iter, BOTTOM, block_size,
-            CkSendBuffer(d_temperature + (block_size + 2) + 1));
+            CkSendBuffer(d_temperature + (block_size + 2) + 1, stream));
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_size,
-            CkSendBuffer(d_temperature + (block_size + 2) * block_size + 1));
+            CkSendBuffer(d_temperature + (block_size + 2) * block_size + 1, stream));
     }
     else {
       // Transfer ghosts from device to host

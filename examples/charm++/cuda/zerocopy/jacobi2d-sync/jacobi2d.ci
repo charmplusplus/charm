@@ -6,6 +6,7 @@ mainmodule jacobi2d {
   readonly int n_chares;
   readonly int n_iters;
   readonly bool use_zerocopy;
+  readonly bool print;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
