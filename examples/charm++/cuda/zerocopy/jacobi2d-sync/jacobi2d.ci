@@ -5,6 +5,7 @@ mainmodule jacobi2d {
   readonly int block_size;
   readonly int n_chares;
   readonly int n_iters;
+  readonly bool sync_ver;
   readonly bool use_zerocopy;
   readonly bool print;
 
@@ -22,6 +23,7 @@ mainmodule jacobi2d {
     entry void init();
     entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice double gh[w]);
     entry void receiveGhostsReg(int ref, int dir, int w, double gh[w]);
+    //entry void receiveConfirm(int ref, int dir);
 
     entry void exchangeGhosts() {
       serial {
@@ -45,9 +47,25 @@ mainmodule jacobi2d {
         }
       }
 
+      // With device-side zerocopy in asynchronous mode, need confirmation from
+      // neighbors that transfers are complete before updating the block
+      /*
+      if (use_zerocopy && !sync_ver) {
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when receiveConfirm[my_iter](int ref, int dir) {
+            serial {}
+          }
+        }
+      }
+      */
+
       serial {
-        CkCallback cb(CkReductionTarget(Main, commDone), main_proxy);
-        contribute(cb);
+        if (sync_ver) {
+          CkCallback cb(CkReductionTarget(Main, commDone), main_proxy);
+          contribute(cb);
+        } else {
+          update();
+        }
       }
     }
 

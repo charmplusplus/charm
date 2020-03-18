@@ -8,6 +8,7 @@
 /* readonly */ int block_size;
 /* readonly */ int n_chares;
 /* readonly */ int n_iters;
+/* readonly */ bool sync_ver;
 /* readonly */ bool use_zerocopy;
 /* readonly */ bool print;
 
@@ -42,10 +43,11 @@ public:
     n_iters = 100;
     use_zerocopy = false;
     print = false;
+    sync_ver = false;
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:b:i:zp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:b:i:yzp")) != -1) {
       switch (c) {
         case 's':
           grid_size = atoi(optarg);
@@ -56,6 +58,9 @@ public:
         case 'i':
           n_iters = atoi(optarg);
           break;
+        case 'y':
+          sync_ver = true;
+          break;
         case 'z':
           use_zerocopy = true;
           break;
@@ -65,7 +70,7 @@ public:
         default:
           CkPrintf(
               "Usage: %s -s [grid size] -b [block size] -i [iterations] "
-              "-z (use GPU zerocopy) -p (print blocks)\n",
+              "-y (use sync version) -z (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
       }
@@ -80,10 +85,11 @@ public:
     n_chares = grid_size / block_size;
 
     // Print configuration
-    CkPrintf("\n[CUDA 2D Jacobi bulk-synchronous example]\n");
+    CkPrintf("\n[CUDA 2D Jacobi example]\n");
     CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d, Iterations: %d, "
-        "Zerocopy: %d, Print: %d\n", grid_size, grid_size, block_size, block_size,
-        n_chares, n_chares, n_iters, use_zerocopy, print);
+        "Bulk-synchronous: %d, Zerocopy: %d, Print: %d\n", grid_size, grid_size,
+        block_size, block_size, n_chares, n_chares, n_iters, sync_ver,
+        use_zerocopy, print);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares, n_chares);
@@ -96,7 +102,7 @@ public:
 
     my_iter = 1;
     start_time = CkWallTimer();
-    comm_start_time = CkWallTimer();
+    if (sync_ver) comm_start_time = CkWallTimer();
     block_proxy.exchangeGhosts();
   }
 
@@ -119,10 +125,14 @@ public:
   }
 
   void done() {
+    double total_time = CkWallTimer() - start_time;
     CkPrintf("Finished due to max iterations %d, total time %lf seconds\n",
-             n_iters, CkWallTimer() - start_time);
-    CkPrintf("Comm time: %.3lf us\nUpdate time: %.3lf us\n",
-        (comm_agg_time / n_iters) * 1000000, (update_agg_time / n_iters) * 1000000);
+             n_iters, total_time);
+    if (sync_ver) {
+      CkPrintf("Comm time: %.3lf us\nUpdate time: %.3lf us\n",
+          (comm_agg_time / n_iters) * 1000000, (update_agg_time / n_iters) * 1000000);
+    }
+    CkPrintf("Iteration time: %.3lf us\n", (total_time / n_iters) * 1000000);
 
     if (print) {
       sleep(1);
@@ -144,6 +154,7 @@ class Block : public CBase_Block {
   int my_iter;
   int neighbors;
   int remote_count;
+  int x, y;
 
   double* __restrict__ h_temperature;
   double* __restrict__ d_temperature;
@@ -179,6 +190,8 @@ class Block : public CBase_Block {
     // Initialize values
     my_iter = 1;
     neighbors = 0;
+    x = thisIndex.x;
+    y = thisIndex.y;
 
     // Check bounds and set number of valid neighbors
     left_bound = right_bound = top_bound = bottom_bound = false;
@@ -226,7 +239,6 @@ class Block : public CBase_Block {
     invokePackingKernels(d_temperature, d_left_ghost, d_right_ghost, left_bound,
         right_bound, block_size, stream);
 
-    int x = thisIndex.x, y = thisIndex.y;
     if (use_zerocopy) {
       // Send ghosts to neighboring chares
       if (!left_bound)
@@ -290,12 +302,17 @@ class Block : public CBase_Block {
     switch (dir) {
       case LEFT:
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
+        //if (!sync_ver) thisProxy(x - 1, y).receiveConfirm(my_iter, RIGHT);
         break;
       case RIGHT:
         invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
+        //if (!sync_ver) thisProxy(x + 1, y).receiveConfirm(my_iter, LEFT);
         break;
       case TOP:
+        //if (!sync_ver) thisProxy(x, y - 1).receiveConfirm(my_iter, BOTTOM);
+        break;
       case BOTTOM:
+        //if (!sync_ver) thisProxy(x, y + 1).receiveConfirm(my_iter, TOP);
         break;
       default:
         CkAbort("Error: invalid direction");
@@ -351,8 +368,17 @@ class Block : public CBase_Block {
     // Swap pointers
     std::swap(d_temperature, d_new_temperature);
 
-    CkCallback cb(CkReductionTarget(Main, updateDone), main_proxy);
-    contribute(cb);
+    if (sync_ver) {
+      CkCallback cb(CkReductionTarget(Main, updateDone), main_proxy);
+      contribute(cb);
+    } else {
+      if (my_iter < n_iters) {
+      thisProxy[thisIndex].exchangeGhosts();
+      } else {
+        CkCallback cb(CkReductionTarget(Main, done), main_proxy);
+        contribute(cb);
+      }
+    }
   }
 
   void print() {
