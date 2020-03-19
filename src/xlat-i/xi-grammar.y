@@ -131,7 +131,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token NAMESPACE
 %token USING
 %token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
-%token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
+%token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED SIZET
 %token ACCEL
 %token READWRITE
 %token WRITEONLY
@@ -442,6 +442,8 @@ BuiltinType	: INT
 		{ $$ = new BuiltinType("long double"); }
 		| VOID
 		{ $$ = new BuiltinType("void"); }
+		| SIZET
+		{ $$ = new BuiltinType("size_t"); }
 		;
 
 NamedType	: Name OptTParams { $$ = new NamedType($1,$2); };

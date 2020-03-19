@@ -111,14 +111,15 @@ extern int yydebug;
     FLOAT = 321,
     DOUBLE = 322,
     UNSIGNED = 323,
-    ACCEL = 324,
-    READWRITE = 325,
-    WRITEONLY = 326,
-    ACCELBLOCK = 327,
-    MEMCRITICAL = 328,
-    REDUCTIONTARGET = 329,
-    CASE = 330,
-    TYPENAME = 331
+    SIZET = 324,
+    ACCEL = 325,
+    READWRITE = 326,
+    WRITEONLY = 327,
+    ACCELBLOCK = 328,
+    MEMCRITICAL = 329,
+    REDUCTIONTARGET = 330,
+    CASE = 331,
+    TYPENAME = 332
   };
 #endif
 /* Tokens.  */
@@ -188,14 +189,15 @@ extern int yydebug;
 #define FLOAT 321
 #define DOUBLE 322
 #define UNSIGNED 323
-#define ACCEL 324
-#define READWRITE 325
-#define WRITEONLY 326
-#define ACCELBLOCK 327
-#define MEMCRITICAL 328
-#define REDUCTIONTARGET 329
-#define CASE 330
-#define TYPENAME 331
+#define SIZET 324
+#define ACCEL 325
+#define READWRITE 326
+#define WRITEONLY 327
+#define ACCELBLOCK 328
+#define MEMCRITICAL 329
+#define REDUCTIONTARGET 330
+#define CASE 331
+#define TYPENAME 332
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -246,7 +248,7 @@ union YYSTYPE
   XStr* xstrptr;
   AccelBlock* accelBlock;
 
-#line 250 "y.tab.h" /* yacc.c:1909  */
+#line 252 "y.tab.h" /* yacc.c:1909  */
 };
 
 typedef union YYSTYPE YYSTYPE;

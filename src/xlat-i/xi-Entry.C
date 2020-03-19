@@ -970,8 +970,7 @@ XStr Entry::dataItemType() {
   if (container->isGroup()) {
     itemType << param->param->type;
   } else if (container->isArray()) {
-    itemType << "ArrayDataItem<" << param->param->type << ", " << aggregatorIndexType()
-             << ">";
+    itemType << param->param->type;
   }
   return itemType;
 }
@@ -984,7 +983,7 @@ XStr Entry::aggregatorType() {
               << ", " << container->indexName() << "::_callmarshall_" << epStr() << ">";
   } else if (container->isArray()) {
     groupType << "ArrayMeshStreamer<" << param->param->type << ", "
-              << aggregatorIndexType() << ", " << container->baseName() << ", "
+              << container->baseName() << ", "
               << "SimpleMeshRouter, " << container->indexName() << "::_callmarshall_"
               << epStr() << ">";
   }
@@ -1000,7 +999,7 @@ XStr Entry::aggregatorGlobalType(XStr& scope) {
               << ">";
   } else if (container->isArray()) {
     groupType << "ArrayMeshStreamer<" << param->param->type << ", "
-              << aggregatorIndexType() << ", " << scope << container->baseName() << ", "
+              << scope << container->baseName() << ", "
               << "SimpleMeshRouter, " << scope << container->indexName()
               << "::_callmarshall_" << epStr() << ">";
   }
@@ -1068,7 +1067,7 @@ void Entry::genTramDefs(XStr& str) {
 }
 
 // size of TRAM buffers in bytes
-const static int tramBufferSize = 16384;
+const static int tramBufferSize = 16384*2;
 
 void Entry::genTramInstantiation(XStr& str) {
   if (!container->tramInstances.empty()) {
@@ -1080,7 +1079,8 @@ void Entry::genTramInstantiation(XStr& str) {
         << "  int dims[nDims];\n"
         << "  dims[0] = CkNumPes() / pesPerNode;\n"
         << "  dims[1] = pesPerNode;\n"
-        << "  if (dims[0] * dims[1] != CkNumPes()) {\n"
+        //<< "  if (dims[0] * dims[1] != CkNumPes()) {\n"
+        << "  if (true) {\n"
         << "    dims[0] = CkNumPes();\n"
         << "    dims[1] = 1;\n"
         << "  }\n"
@@ -1094,7 +1094,7 @@ void Entry::genTramInstantiation(XStr& str) {
           << "    }\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str() << " tramProxy =\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()
-          << "::ckNew(2, dims, gId, itemsPerBuffer, false, 0.01);\n"
+          << "::ckNew(1, dims, gId, itemsPerBuffer, false, 0.01);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
           << "  }\n";
     }

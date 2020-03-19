@@ -128,6 +128,7 @@ struct rwentry rwtable[] = {
 {  "double",     DOUBLE },
 {  "unsigned",   UNSIGNED },
 {  "void",	VOID },
+{  "size_t",	SIZET},
 {  "const",	CONST },
 {  "atomic", 	SERIAL },
 {  "serial",    SERIAL },
