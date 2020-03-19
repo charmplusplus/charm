@@ -357,7 +357,7 @@ class Block : public CBase_Block {
     invokeJacobiKernel(d_temperature, d_new_temperature, block_size, stream);
 
     // Copy final temperature data back to host
-    if (my_iter++ == n_iters) {
+    if (my_iter == n_iters) {
       hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
             sizeof(double) * (block_size + 2) * (block_size + 2),
             cudaMemcpyDeviceToHost, stream));
@@ -369,11 +369,12 @@ class Block : public CBase_Block {
     std::swap(d_temperature, d_new_temperature);
 
     if (sync_ver) {
+      my_iter++;
       CkCallback cb(CkReductionTarget(Main, updateDone), main_proxy);
       contribute(cb);
     } else {
-      if (my_iter < n_iters) {
-      thisProxy[thisIndex].exchangeGhosts();
+      if (my_iter++ < n_iters) {
+        thisProxy[thisIndex].exchangeGhosts();
       } else {
         CkCallback cb(CkReductionTarget(Main, done), main_proxy);
         contribute(cb);
