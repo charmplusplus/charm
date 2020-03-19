@@ -3,7 +3,7 @@ CHARMC = ../../../../../bin/charmc $(OPTS)
 OPTS = -O3
 
 # Set CUDATOOLKIT_HOME to the CUDA toolkit directory
-CUDATOOLKIT_HOME ?= $(CUDA_HOME)
+CUDATOOLKIT_HOME ?= $(CUDA_DIR)
 NVCC = $(CUDATOOLKIT_HOME)/bin/nvcc
 NVCC_FLAGS = -O3 -c -std=c++11 -use_fast_math
 NVCC_INC = -I$(CUDATOOLKIT_HOME)/include

@@ -2,16 +2,15 @@
 #include "jacobi2d.decl.h"
 #include <utility>
 
-#define PRINT 0
-#define MEASURE_COMM 0
-
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
 /* readonly */ int grid_size;
 /* readonly */ int block_size;
 /* readonly */ int n_chares;
 /* readonly */ int n_iters;
+/* readonly */ bool sync_ver;
 /* readonly */ bool use_zerocopy;
+/* readonly */ bool print;
 
 extern void invokeInitKernel(double* d_temperature, int block_size, cudaStream_t stream);
 extern void invokeBoundaryKernels(double* d_temperature, int block_size, bool left_bound,
@@ -26,15 +25,14 @@ extern void invokeJacobiKernel(double* d_temperature, double* d_new_temperature,
 
 enum Direction { LEFT = 1, RIGHT, TOP, BOTTOM };
 
-// Used to specify LIFO ordering on callbacks
-class CallbackMsg : public CMessage_CallbackMsg {
-public:
-  CallbackMsg() {}
-};
-
 class Main : public CBase_Main {
+  int my_iter;
   double init_start_time;
   double start_time;
+  double comm_start_time;
+  double comm_agg_time;
+  double update_start_time;
+  double update_agg_time;
 
 public:
   Main(CkArgMsg* m) {
@@ -44,10 +42,12 @@ public:
     block_size = 4096;
     n_iters = 100;
     use_zerocopy = false;
+    print = false;
+    sync_ver = false;
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:b:i:z")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:b:i:yzp")) != -1) {
       switch (c) {
         case 's':
           grid_size = atoi(optarg);
@@ -58,12 +58,19 @@ public:
         case 'i':
           n_iters = atoi(optarg);
           break;
+        case 'y':
+          sync_ver = true;
+          break;
         case 'z':
           use_zerocopy = true;
           break;
+        case 'p':
+          print = true;
+          break;
         default:
           CkPrintf(
-              "Usage: %s -s [grid size] -b [block size] -i [iterations] -z (use GPU zerocopy)\n",
+              "Usage: %s -s [grid size] -b [block size] -i [iterations] "
+              "-y (use sync version) -z (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
       }
@@ -79,10 +86,10 @@ public:
 
     // Print configuration
     CkPrintf("\n[CUDA 2D Jacobi example]\n");
-    CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d\n", grid_size, grid_size,
-        block_size, block_size, n_chares, n_chares);
-    CkPrintf("Iterations: %d\n", n_iters);
-    CkPrintf("Zerocopy: %d\n", use_zerocopy);
+    CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d, Iterations: %d, "
+        "Bulk-synchronous: %d, Zerocopy: %d, Print: %d\n", grid_size, grid_size,
+        block_size, block_size, n_chares, n_chares, n_iters, sync_ver,
+        use_zerocopy, print);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares, n_chares);
@@ -93,21 +100,46 @@ public:
   void initDone() {
     CkPrintf("Chare array initialization time: %lf seconds\n", CkWallTimer() - init_start_time);
 
+    my_iter = 1;
     start_time = CkWallTimer();
-    block_proxy.iterate();
+    if (sync_ver) comm_start_time = CkWallTimer();
+    block_proxy.exchangeGhosts();
   }
 
-  void done(double time) {
-    CkPrintf("\nAverage time per iteration: %lf\n",
-             time / ((n_chares * n_chares) * n_iters));
+  void commDone() {
+    comm_agg_time += CkWallTimer() - comm_start_time;
+    update_start_time = CkWallTimer();
+    block_proxy.update();
+  }
+
+  void updateDone() {
+    update_agg_time += CkWallTimer() - update_start_time;
+
+    if (my_iter++ == n_iters) {
+      thisProxy.done();
+    }
+    else {
+      comm_start_time = CkWallTimer();
+      block_proxy.exchangeGhosts();
+    }
+  }
+
+  void done() {
+    double total_time = CkWallTimer() - start_time;
     CkPrintf("Finished due to max iterations %d, total time %lf seconds\n",
-             n_iters, CkWallTimer() - start_time);
-#if PRINT
-    sleep(1);
-    block_proxy(0,0).print();
-#else
-    CkExit();
-#endif
+             n_iters, total_time);
+    if (sync_ver) {
+      CkPrintf("Comm time: %.3lf us\nUpdate time: %.3lf us\n",
+          (comm_agg_time / n_iters) * 1000000, (update_agg_time / n_iters) * 1000000);
+    }
+    CkPrintf("Iteration time: %.3lf us\n", (total_time / n_iters) * 1000000);
+
+    if (print) {
+      sleep(1);
+      block_proxy(0,0).print();
+    } else {
+      CkExit();
+    }
   }
 
   void printDone() {
@@ -122,6 +154,7 @@ class Block : public CBase_Block {
   int my_iter;
   int neighbors;
   int remote_count;
+  int x, y;
 
   double* __restrict__ h_temperature;
   double* __restrict__ d_temperature;
@@ -136,13 +169,6 @@ class Block : public CBase_Block {
   cudaStream_t stream;
 
   bool left_bound, right_bound, top_bound, bottom_bound;
-  double iter_start_time;
-  double agg_time;
-
-#if MEASURE_COMM
-  double comm_start_time;
-  double comm_agg_time;
-#endif
 
   Block() {}
 
@@ -163,8 +189,9 @@ class Block : public CBase_Block {
   void init() {
     // Initialize values
     my_iter = 1;
-    agg_time = 0.0;
     neighbors = 0;
+    x = thisIndex.x;
+    y = thisIndex.y;
 
     // Check bounds and set number of valid neighbors
     left_bound = right_bound = top_bound = bottom_bound = false;
@@ -208,39 +235,26 @@ class Block : public CBase_Block {
   }
 
   void sendGhosts(void) {
-
     // Pack non-contiguous ghosts to temporary contiguous buffers on device
     invokePackingKernels(d_temperature, d_left_ghost, d_right_ghost, left_bound,
         right_bound, block_size, stream);
 
-    int x = thisIndex.x, y = thisIndex.y;
     if (use_zerocopy) {
-      // TODO: Allow the user to provide the CUDA stream to the runtime
-      cudaStreamSynchronize(stream);
-
-#if MEASURE_COMM
-      comm_start_time = CkWallTimer();
-#endif
-
       // Send ghosts to neighboring chares
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_size,
-            CkSendBuffer(d_left_ghost));
+            CkSendBuffer(d_left_ghost, stream));
       if (!right_bound)
         thisProxy(x + 1, y).receiveGhostsZC(my_iter, LEFT, block_size,
-            CkSendBuffer(d_right_ghost));
+            CkSendBuffer(d_right_ghost, stream));
       if (!top_bound)
         thisProxy(x, y - 1).receiveGhostsZC(my_iter, BOTTOM, block_size,
-            CkSendBuffer(d_temperature + (block_size + 2) + 1));
+            CkSendBuffer(d_temperature + (block_size + 2) + 1, stream));
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_size,
-            CkSendBuffer(d_temperature + (block_size + 2) * block_size + 1));
+            CkSendBuffer(d_temperature + (block_size + 2) * block_size + 1, stream));
     }
     else {
-#if MEASURE_COMM
-      comm_start_time = CkWallTimer();
-#endif
-
       // Transfer ghosts from device to host
       hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(double),
             cudaMemcpyDeviceToHost, stream));
@@ -287,17 +301,19 @@ class Block : public CBase_Block {
   void processGhostsZC(int dir, int width, double* gh) {
     switch (dir) {
       case LEFT:
-#if !MEASURE_COMM
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
-#endif
+        // TODO: Data transfer not guaranteed to be complete at this point
+        if (!sync_ver) thisProxy(x - 1, y).receiveConfirm(my_iter, RIGHT);
         break;
       case RIGHT:
-#if !MEASURE_COMM
         invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
-#endif
+        if (!sync_ver) thisProxy(x + 1, y).receiveConfirm(my_iter, LEFT);
         break;
       case TOP:
+        if (!sync_ver) thisProxy(x, y - 1).receiveConfirm(my_iter, BOTTOM);
+        break;
       case BOTTOM:
+        if (!sync_ver) thisProxy(x, y + 1).receiveConfirm(my_iter, TOP);
         break;
       default:
         CkAbort("Error: invalid direction");
@@ -310,17 +326,13 @@ class Block : public CBase_Block {
         memcpy(h_left_ghost, gh, width * sizeof(double));
         hapiCheck(cudaMemcpyAsync(d_left_ghost, h_left_ghost, block_size * sizeof(double),
               cudaMemcpyHostToDevice, stream));
-#if !MEASURE_COMM
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
-#endif
         break;
       case RIGHT:
         memcpy(h_right_ghost, gh, width * sizeof(double));
         hapiCheck(cudaMemcpyAsync(d_right_ghost, h_right_ghost, block_size * sizeof(double),
               cudaMemcpyHostToDevice, stream));
-#if !MEASURE_COMM
         invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
-#endif
         break;
       case TOP:
         memcpy(h_top_ghost, gh, width * sizeof(double));
@@ -338,16 +350,6 @@ class Block : public CBase_Block {
   }
 
   void update() {
-#if MEASURE_COMM
-    cudaStreamSynchronize(stream);
-    comm_agg_time += CkWallTimer() - comm_start_time;
-
-    if (my_iter == n_iters) {
-      CkPrintf("[%d,%d] Average comm time per iteration: %.3lf us\n",
-          thisIndex.x, thisIndex.y, (comm_agg_time / n_iters) * 1000000);
-    }
-#endif
-
     // Enforce boundary conditions
     invokeBoundaryKernels(d_temperature, block_size, left_bound, right_bound,
         top_bound, bottom_bound, stream);
@@ -366,6 +368,19 @@ class Block : public CBase_Block {
 
     // Swap pointers
     std::swap(d_temperature, d_new_temperature);
+
+    if (sync_ver) {
+      my_iter++;
+      CkCallback cb(CkReductionTarget(Main, updateDone), main_proxy);
+      contribute(cb);
+    } else {
+      if (my_iter++ < n_iters) {
+        thisProxy[thisIndex].exchangeGhosts();
+      } else {
+        CkCallback cb(CkReductionTarget(Main, done), main_proxy);
+        contribute(cb);
+      }
+    }
   }
 
   void print() {
