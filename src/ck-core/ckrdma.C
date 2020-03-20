@@ -2476,10 +2476,14 @@ void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, CkNcpyBuffer** buffers) {
   DeviceManager* dm = CsvAccess(gpu_manager).device_map[CkMyPe()];
 
   for (int i = 0; i < numops; i++) {
-    void* alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
 #if CMK_SMP
     CmiLock(dm->lock);
 #endif
+    void* alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
+    if (alloc_comm_buffer == nullptr) {
+      CkAbort("PE %d, device %d: Not enough memory on device communication buffer (%zu free)",
+          CkMyPe(), dm->global_index, dm->comm_buffer_free_size());
+    }
     buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
     buffers[i]->device_idx = dm->global_index;
     findFreeIpcEvents(dm, buffers[i]->comm_offset, buffers[i]->event_idx);
