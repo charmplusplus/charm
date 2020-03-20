@@ -1,6 +1,6 @@
 /**
  * \addtogroup CkLdb
-*/
+ */
 /*@{*/
 
 #ifndef LBMANAGER_H
@@ -8,10 +8,9 @@
 
 #include "LBDatabase.h"
 
-#define LB_FORMAT_VERSION     3
+#define LB_FORMAT_VERSION 3
 
 #define LB_MANAGER_VERSION 1
-
 
 class MetaBalancer;
 extern int _lb_version;
@@ -19,36 +18,39 @@ extern int _lb_version;
 // command line options
 class CkLBArgs
 {
-private:
-  double _autoLbPeriod;		// in seconds
-  double _lb_alpha;		// per message send overhead
-  double _lb_beta;		// per byte send overhead
-  int _lb_debug;		// 1 or greater
-  int _lb_printsumamry;		// print summary
-  int _lb_loop;                 // use multiple load balancers in loop
+ private:
+  double _autoLbPeriod;  // in seconds
+  double _lb_alpha;      // per message send overhead
+  double _lb_beta;       // per byte send overhead
+  int _lb_debug;         // 1 or greater
+  int _lb_printsumamry;  // print summary
+  int _lb_loop;          // use multiple load balancers in loop
   int _lb_ignoreBgLoad;
-  int _lb_migObjOnly;		// only consider migratable objs
+  int _lb_migObjOnly;  // only consider migratable objs
   int _lb_syncResume;
-  int _lb_samePeSpeed;		// ignore cpu speed
-  int _lb_testPeSpeed;		// test cpu speed
+  int _lb_samePeSpeed;          // ignore cpu speed
+  int _lb_testPeSpeed;          // test cpu speed
   int _lb_useCpuTime;           // use cpu instead of wallclock time
-  int _lb_statson;		// stats collection
-  int _lb_traceComm;		// stats collection for comm
+  int _lb_statson;              // stats collection
+  int _lb_traceComm;            // stats collection for comm
   int _lb_central_pe;           // processor number for centralized startegy
-  int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
-  int _lb_teamSize;		// specifies the team size for TeamLB
-  int _lb_maxDistPhases;  // Specifies the max number of LB phases in DistributedLB
-  double _lb_targetRatio; // Specifies the target load ratio for LBs that aim for a particular load ratio
+  int _lb_percentMovesAllowed;  // Specifies restriction on num of chares to be moved(as a
+                                // percentage of total number of chares). Used by RefineKLB
+  int _lb_teamSize;        // specifies the team size for TeamLB
+  int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
+  double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
+                           // particular load ratio
   int _lb_metaLbOn;
   char* _lb_metaLbModelDir;
 
  public:
-  CkLBArgs() {
-    _autoLbPeriod = -1.0;	// off by default
+  CkLBArgs()
+  {
+    _autoLbPeriod = -1.0;  // off by default
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
     _lb_printsumamry = _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
-    _lb_percentMovesAllowed=100;
+    _lb_percentMovesAllowed = 100;
     _lb_loop = 0;
     _lb_central_pe = 0;
     _lb_teamSize = 1;
@@ -57,27 +59,27 @@ private:
     _lb_metaLbOn = 0;
     _lb_metaLbModelDir = nullptr;
   }
-  inline double & lbperiod() { return _autoLbPeriod; }
-  inline int & debug() { return _lb_debug; }
-  inline int & teamSize() {return _lb_teamSize; }
-  inline int & printSummary() { return _lb_printsumamry; }
-  inline int & lbversion() { return _lb_version; }
-  inline int & loop() { return _lb_loop; }
-  inline int & ignoreBgLoad() { return _lb_ignoreBgLoad; }
-  inline int & migObjOnly() { return _lb_migObjOnly; }
-  inline int & syncResume() { return _lb_syncResume; }
-  inline int & samePeSpeed() { return _lb_samePeSpeed; }
-  inline int & testPeSpeed() { return _lb_testPeSpeed; }
-  inline int & useCpuTime() { return _lb_useCpuTime; }
-  inline int & statsOn() { return _lb_statson; }
-  inline int & traceComm() { return _lb_traceComm; }
-  inline int & central_pe() { return _lb_central_pe; }
-  inline double & alpha() { return _lb_alpha; }
-  inline double & beta() { return _lb_beta; }
-  inline int & percentMovesAllowed() { return _lb_percentMovesAllowed;}
-  inline int & maxDistPhases() { return _lb_maxDistPhases; }
-  inline double & targetRatio() { return _lb_targetRatio; }
-  inline int & metaLbOn() {return _lb_metaLbOn;}
+  inline double& lbperiod() { return _autoLbPeriod; }
+  inline int& debug() { return _lb_debug; }
+  inline int& teamSize() { return _lb_teamSize; }
+  inline int& printSummary() { return _lb_printsumamry; }
+  inline int& lbversion() { return _lb_version; }
+  inline int& loop() { return _lb_loop; }
+  inline int& ignoreBgLoad() { return _lb_ignoreBgLoad; }
+  inline int& migObjOnly() { return _lb_migObjOnly; }
+  inline int& syncResume() { return _lb_syncResume; }
+  inline int& samePeSpeed() { return _lb_samePeSpeed; }
+  inline int& testPeSpeed() { return _lb_testPeSpeed; }
+  inline int& useCpuTime() { return _lb_useCpuTime; }
+  inline int& statsOn() { return _lb_statson; }
+  inline int& traceComm() { return _lb_traceComm; }
+  inline int& central_pe() { return _lb_central_pe; }
+  inline double& alpha() { return _lb_alpha; }
+  inline double& beta() { return _lb_beta; }
+  inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
+  inline int& maxDistPhases() { return _lb_maxDistPhases; }
+  inline double& targetRatio() { return _lb_targetRatio; }
+  inline int& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
 };
 
@@ -88,47 +90,57 @@ extern int _lb_predict_delay;
 extern int _lb_predict_window;
 extern bool _lb_psizer_on;
 #ifndef PREDICT_DEBUG
-#define PREDICT_DEBUG  0   // 0 = No debug, 1 = Debug info on
+#define PREDICT_DEBUG 0  // 0 = No debug, 1 = Debug info on
 #endif
-#define PredictorPrintf  if (PREDICT_DEBUG) CmiPrintf
+#define PredictorPrintf \
+  if (PREDICT_DEBUG) CmiPrintf
 
 // used in constructor of all load balancers
 class CkLBOptions
 {
-private:
-  int seqno;		// for centralized lb, the seqno
-public:
-  CkLBOptions(): seqno(-1) {}
-  CkLBOptions(int s): seqno(s) {}
+ private:
+  int seqno;  // for centralized lb, the seqno
+ public:
+  CkLBOptions() : seqno(-1) {}
+  CkLBOptions(int s) : seqno(s) {}
   int getSeqNo() const { return seqno; }
 };
 PUPbytes(CkLBOptions)
 
 #include "LBManager.decl.h"
 
-extern CkGroupID _lbmgr;
+    extern CkGroupID _lbmgr;
 
 CkpvExtern(int, numLoadBalancers);
 CkpvExtern(bool, lbmanagerInited);
 
 // LB options, mostly controled by user parameter
-extern char * _lbtopo;
+extern char* _lbtopo;
 
 typedef void (*LBCreateFn)();
-typedef BaseLB * (*LBAllocFn)();
+typedef BaseLB* (*LBAllocFn)();
 void LBDefaultCreate(LBCreateFn f);
 
-void LBRegisterBalancer(const char *, LBCreateFn, LBAllocFn, const char *, int shown=1);
+void LBRegisterBalancer(const char*, LBCreateFn, LBAllocFn, const char*, int shown = 1);
 
-class LocalBarrier {
-friend class LBManager;
-public:
-  LocalBarrier() { cur_refcount = 1; client_count = 0; iter_no = -1; propagated_atsync_step=0;
-                   max_receiver= 0; at_count = 0; on = false;
-    };
-  ~LocalBarrier() { };
+class LocalBarrier
+{
+  friend class LBManager;
 
-  void SetMgr(LBManager *mgr){ _mgr = mgr;};
+ public:
+  LocalBarrier()
+  {
+    cur_refcount = 1;
+    client_count = 0;
+    iter_no = -1;
+    propagated_atsync_step = 0;
+    max_receiver = 0;
+    at_count = 0;
+    on = false;
+  };
+  ~LocalBarrier(){};
+
+  void SetMgr(LBManager* mgr) { _mgr = mgr; };
   void propagate_atsync();
 
   LDBarrierClient AddClient(Chare* chare, std::function<void()> fn);
@@ -137,20 +149,24 @@ public:
   void RemoveReceiver(LDBarrierReceiver h);
   void TurnOnReceiver(LDBarrierReceiver h);
   void TurnOffReceiver(LDBarrierReceiver h);
-  void AtBarrier(LDBarrierClient _n_c, bool flood_atsync=false);
+  void AtBarrier(LDBarrierClient _n_c, bool flood_atsync = false);
   void DecreaseBarrier(int c);
-  void TurnOn() { on = true; CheckBarrier(); };
+  void TurnOn()
+  {
+    on = true;
+    CheckBarrier();
+  };
   void TurnOff() { on = false; };
 
-public:
+ public:
   void CallReceivers(void);
-  void CheckBarrier(bool flood_atsync=false);
+  void CheckBarrier(bool flood_atsync = false);
   void ResumeClients(void);
 
   std::list<LBClient*> clients;
   std::list<LBReceiver*> receivers;
 
-  LBManager *_mgr;
+  LBManager* _mgr;
 
   int cur_refcount;
   int client_count;
@@ -162,82 +178,101 @@ public:
 
   int iter_no;
 
-  #if CMK_BIGSIM_CHARM
+#if CMK_BIGSIM_CHARM
   int first_free_client_slot;
-  #endif
+#endif
 };
 
 void _LBMgrInit();
 
 // main chare
-class LBMgrInit : public Chare {
-  public:
-    LBMgrInit(CkArgMsg*);
-    LBMgrInit(CkMigrateMessage *m):Chare(m) {}
+class LBMgrInit : public Chare
+{
+ public:
+  LBMgrInit(CkArgMsg*);
+  LBMgrInit(CkMigrateMessage* m) : Chare(m) {}
 };
 
 // class which implement a virtual function for the FuturePredictor
-class LBPredictorFunction {
-public:
+class LBPredictorFunction
+{
+ public:
   virtual ~LBPredictorFunction() {}
   int num_params;
 
-  virtual void initialize_params(double *x) {double normall=1.0/pow((double)2,(double)31); for (int i=0; i<num_params; ++i) x[i]=rand()*normall;}
+  virtual void initialize_params(double* x)
+  {
+    double normall = 1.0 / pow((double)2, (double)31);
+    for (int i = 0; i < num_params; ++i) x[i] = rand() * normall;
+  }
 
-  virtual double predict(double x, double *params) =0;
-  virtual void print(double *params) {PredictorPrintf("LB: unknown model\n");};
-  virtual void function(double x, double *param, double &y, double *dyda) =0;
+  virtual double predict(double x, double* params) = 0;
+  virtual void print(double* params) { PredictorPrintf("LB: unknown model\n"); };
+  virtual void function(double x, double* param, double& y, double* dyda) = 0;
 };
 
 // a default implementation for a FuturePredictor function
-class DefaultFunction : public LBPredictorFunction {
+class DefaultFunction : public LBPredictorFunction
+{
  public:
   // constructor
-  DefaultFunction() {num_params=6;};
+  DefaultFunction() { num_params = 6; };
 
   // compute the prediction function for the variable x with parameters param
-  double predict(double x, double *param) {return (param[0] + param[1]*x + param[2]*x*x + param[3]*sin(param[4]*(x+param[5])));}
+  double predict(double x, double* param)
+  {
+    return (param[0] + param[1] * x + param[2] * x * x +
+            param[3] * sin(param[4] * (x + param[5])));
+  }
 
-  void print(double *param) {PredictorPrintf("LB: %f + %fx + %fx^2 + %fsin%f(x+%f)\n",param[0],param[1],param[2],param[3],param[4],param[5]);}
+  void print(double* param)
+  {
+    PredictorPrintf("LB: %f + %fx + %fx^2 + %fsin%f(x+%f)\n", param[0], param[1],
+                    param[2], param[3], param[4], param[5]);
+  }
 
   // compute the prediction function and its derivatives respect to the parameters
-  void function(double x, double *param, double &y, double *dyda) {
+  void function(double x, double* param, double& y, double* dyda)
+  {
     double tmp;
 
     y = predict(x, param);
 
     dyda[0] = 1;
     dyda[1] = x;
-    dyda[2] = x*x;
-    tmp = param[4] * (x+param[5]);
+    dyda[2] = x * x;
+    tmp = param[4] * (x + param[5]);
     dyda[3] = sin(tmp);
-    dyda[4] = param[3] * (x+param[5]) * cos(tmp);
-    dyda[5] = param[3] * param[4] *cos(tmp);
+    dyda[4] = param[3] * (x + param[5]) * cos(tmp);
+    dyda[5] = param[3] * param[4] * cos(tmp);
   }
 };
 
-
-class LBManager : public CBase_LBManager {
-private:
-
-  struct MigrateCB {
+class LBManager : public CBase_LBManager
+{
+ private:
+  struct MigrateCB
+  {
     LDMigratedFn fn;
     void* data;
     int on;
   };
 
-  struct StartLBCB {
+  struct StartLBCB
+  {
     LDStartLBFn fn;
     void* data;
     int on;
   };
 
-  struct MigrationDoneCB {
+  struct MigrationDoneCB
+  {
     LDMigrationDoneFn fn;
     void* data;
   };
 
-  struct PredictCB {
+  struct PredictCB
+  {
     LDPredictModelFn on;
     LDPredictWindowFn onWin;
     LDPredictFn off;
@@ -245,16 +280,16 @@ private:
     void* data;
   };
 
-  LBDatabase *lbdb_obj;
+  LBDatabase* lbdb_obj;
 
-  LocalBarrier localBarrier;    // local barrier to trigger LB automatically
-  bool useBarrier;           // use barrier or not
+  LocalBarrier localBarrier;  // local barrier to trigger LB automatically
+  bool useBarrier;            // use barrier or not
 
   PredictCB* predictCBFn;
 
   int startLBFn_count;
 
-public:
+ public:
   std::list<int> local_pes_to_notify;
   int chare_count;
   bool received_from_left;
@@ -264,16 +299,22 @@ public:
 
   bool startedAtSync;
 
-  LBManager(void)  { init(); }
-  LBManager(CkMigrateMessage *m) : CBase_LBManager(m)  { init(); }
-  ~LBManager()  { if (avail_vector) delete [] avail_vector; }
+  LBManager(void) { init(); }
+  LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
+  ~LBManager()
+  {
+    if (avail_vector) delete[] avail_vector;
+  }
 
-private:
+ private:
   void init();
-public:
-  LBDatabase *getLBDB() {return lbdb_obj;}
-  inline static LBManager * Object() { return CkpvAccess(lbmanagerInited)?(LBManager *)CkLocalBranch(_lbmgr):NULL; }
 
+ public:
+  LBDatabase* getLBDB() { return lbdb_obj; }
+  inline static LBManager* Object()
+  {
+    return CkpvAccess(lbmanagerInited) ? (LBManager*)CkLocalBranch(_lbmgr) : NULL;
+  }
 
   static void initnodeFn(void);
 
@@ -282,72 +323,98 @@ public:
   /*
    * Calls from object managers to load database
    */
-//  LDOMHandle RegisterOM(LDOMid userID, void *userptr, LDCallbacks cb);
+  //  LDOMHandle RegisterOM(LDOMid userID, void *userptr, LDCallbacks cb);
 
   static void periodicLB(void*);
   void callAt();
   void setTimer();
 
-  LDOMHandle RegisterOM(LDOMid userID, void *userptr, LDCallbacks cb)
-  { return lbdb_obj->RegisterOM(userID, userptr, cb);}
-  int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest);}
-  void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh);}
-  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(this, omh);}
-  void DoneRegisteringObjects(LDOMHandle omh) { lbdb_obj->DoneRegisteringObjects(this, omh);}
-  void ObjectStart(const LDObjHandle &h) { lbdb_obj->ObjectStart(h);}
-  void ObjectStop(const LDObjHandle &h) { lbdb_obj->ObjectStop(h);}
-  void NonMigratable(LDObjHandle h) { lbdb_obj->NonMigratable(h);}
-  void Migratable(LDObjHandle h) { lbdb_obj->Migratable(h);}
-  void setPupSize(LDObjHandle h, size_t pup_size) { lbdb_obj->setPupSize(h, pup_size);}
+  LDOMHandle RegisterOM(LDOMid userID, void* userptr, LDCallbacks cb)
+  {
+    return lbdb_obj->RegisterOM(userID, userptr, cb);
+  }
+  int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest); }
+  void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh); }
+  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(this, omh); }
+  void DoneRegisteringObjects(LDOMHandle omh)
+  {
+    lbdb_obj->DoneRegisteringObjects(this, omh);
+  }
+  void ObjectStart(const LDObjHandle& h) { lbdb_obj->ObjectStart(h); }
+  void ObjectStop(const LDObjHandle& h) { lbdb_obj->ObjectStop(h); }
+  void NonMigratable(LDObjHandle h) { lbdb_obj->NonMigratable(h); }
+  void Migratable(LDObjHandle h) { lbdb_obj->Migratable(h); }
+  void setPupSize(LDObjHandle h, size_t pup_size) { lbdb_obj->setPupSize(h, pup_size); }
   void UseAsyncMigrate(LDObjHandle h, bool flag) { lbdb_obj->UseAsyncMigrate(h, flag); };
-  int GetObjDataSz(void) { return lbdb_obj->GetObjDataSz();}
-  int GetCommDataSz(void) { return lbdb_obj->GetCommDataSz();}
-  void GetObjData(LDObjData *data) { lbdb_obj->GetObjData(data);}
-  void GetCommData(LDCommData *data) { lbdb_obj->GetCommData(data);}
+  int GetObjDataSz(void) { return lbdb_obj->GetObjDataSz(); }
+  int GetCommDataSz(void) { return lbdb_obj->GetCommDataSz(); }
+  void GetObjData(LDObjData* data) { lbdb_obj->GetObjData(data); }
+  void GetCommData(LDCommData* data) { lbdb_obj->GetCommData(data); }
   void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& outsidebytes,
-                   int& num_nghbors, int& hops, int& hopbytes) {
-    lbdb_obj->GetCommInfo(bytes, msgs, withinbytes, outsidebytes, num_nghbors, hops, hopbytes);}
-  void CollectStatsOn(void) { lbdb_obj->CollectStatsOn();}
-  void CollectStatsOff(void) { lbdb_obj->CollectStatsOff();}
-  bool StatsOn(void) {lbdb_obj->StatsOn();}
-  int RunningObject(LDObjHandle* _o) const { return lbdb_obj->RunningObject(_o);}
-  const LDObjHandle *RunningObject() { return lbdb_obj->RunningObject();}
-  void ObjTime(LDObjHandle h, double walltime, double cputime) {
-    lbdb_obj->ObjTime(h, walltime, cputime);}
-  void GetObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
+                   int& num_nghbors, int& hops, int& hopbytes)
+  {
+    lbdb_obj->GetCommInfo(bytes, msgs, withinbytes, outsidebytes, num_nghbors, hops,
+                          hopbytes);
+  }
+  void CollectStatsOn(void) { lbdb_obj->CollectStatsOn(); }
+  void CollectStatsOff(void) { lbdb_obj->CollectStatsOff(); }
+  bool StatsOn(void) { lbdb_obj->StatsOn(); }
+  int RunningObject(LDObjHandle* _o) const { return lbdb_obj->RunningObject(_o); }
+  const LDObjHandle* RunningObject() { return lbdb_obj->RunningObject(); }
+  void ObjTime(LDObjHandle h, double walltime, double cputime)
+  {
+    lbdb_obj->ObjTime(h, walltime, cputime);
+  }
+  void GetObjLoad(LDObjHandle& h, LBRealType& walltime, LBRealType& cputime)
+  {
     lbdb_obj->GetObjLoad(h, walltime, cputime);
   };
-  void* GetObjUserData(LDObjHandle &h) { return lbdb_obj->GetObjUserData(h);}
-  void MetaLBCallLBOnChares() { lbdb_obj->MetaLBCallLBOnChares();}
-  void MetaLBResumeWaitingChares(int lb_period) {
-    lbdb_obj->MetaLBResumeWaitingChares(lb_period);}
-  void ClearLoads(void) { lbdb_obj->ClearLoads();}
-  const LDObjHandle &GetObjHandle(int idx) { return lbdb_obj->GetObjHandle(idx);}
-  void IdleTime(LBRealType *walltime) { lbdb_obj->IdleTime(walltime);}
-  void TotalTime(LBRealType *walltime, LBRealType *cputime) {
-    lbdb_obj->TotalTime(walltime, cputime);}
+  void* GetObjUserData(LDObjHandle& h) { return lbdb_obj->GetObjUserData(h); }
+  void MetaLBCallLBOnChares() { lbdb_obj->MetaLBCallLBOnChares(); }
+  void MetaLBResumeWaitingChares(int lb_period)
+  {
+    lbdb_obj->MetaLBResumeWaitingChares(lb_period);
+  }
+  void ClearLoads(void) { lbdb_obj->ClearLoads(); }
+  const LDObjHandle& GetObjHandle(int idx) { return lbdb_obj->GetObjHandle(idx); }
+  void IdleTime(LBRealType* walltime) { lbdb_obj->IdleTime(walltime); }
+  void TotalTime(LBRealType* walltime, LBRealType* cputime)
+  {
+    lbdb_obj->TotalTime(walltime, cputime);
+  }
 
-  void GetTime(LBRealType *total_walltime, LBRealType *total_cputime,
-               LBRealType *idletime, LBRealType *bg_walltime,
-               LBRealType *bg_cputime) { lbdb_obj->GetTime(total_walltime,
-               total_cputime, idletime, bg_walltime, bg_cputime);}
-  LDObjHandle RegisterObj(LDOMHandle omh, CmiUInt8 id,
-                          void* userPtr, int migratable) {
+  void GetTime(LBRealType* total_walltime, LBRealType* total_cputime,
+               LBRealType* idletime, LBRealType* bg_walltime, LBRealType* bg_cputime)
+  {
+    lbdb_obj->GetTime(total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);
+  }
+  LDObjHandle RegisterObj(LDOMHandle omh, CmiUInt8 id, void* userPtr, int migratable)
+  {
     return lbdb_obj->RegisterObj(omh, id, userPtr, migratable);
   }
-  void UnregisterObj(LDObjHandle h) { lbdb_obj->UnregisterObj(h);}
-  void EstObjLoad(const LDObjHandle &h, double cpuload) {
-    lbdb_obj->EstObjLoad(h, cpuload);}
-  void BackgroundLoad(LBRealType *walltime, LBRealType *cputime) {
-    lbdb_obj->BackgroundLoad(walltime, cputime);}
-  void Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force = 0) {
-    lbdb_obj->Send(destOM, destID, bytes, destObjProc, force);}
-  void MulticastSend(const LDOMHandle &_om, CmiUInt8 *_ids, int _n, unsigned int _b, int _nMsgs=1) {
-    lbdb_obj->MulticastSend(_om, _ids, _n, _b, _nMsgs);}
-  int useMem(){ return lbdb_obj->useMem(this);}
+  void UnregisterObj(LDObjHandle h) { lbdb_obj->UnregisterObj(h); }
+  void EstObjLoad(const LDObjHandle& h, double cpuload)
+  {
+    lbdb_obj->EstObjLoad(h, cpuload);
+  }
+  void BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
+  {
+    lbdb_obj->BackgroundLoad(walltime, cputime);
+  }
+  void Send(const LDOMHandle& destOM, const CmiUInt8& destID, unsigned int bytes,
+            int destObjProc, int force = 0)
+  {
+    lbdb_obj->Send(destOM, destID, bytes, destObjProc, force);
+  }
+  void MulticastSend(const LDOMHandle& _om, CmiUInt8* _ids, int _n, unsigned int _b,
+                     int _nMsgs = 1)
+  {
+    lbdb_obj->MulticastSend(_om, _ids, _n, _b, _nMsgs);
+  }
+  int useMem() { return lbdb_obj->useMem(this); }
 
 #if CMK_LB_USER_DATA
-  inline void* GetDBObjUserData(LDObjHandle &h, int idx)
+  inline void* GetDBObjUserData(LDObjHandle& h, int idx)
   {
     return lbdb_obj->LbObj(h)->getDBUserData(idx);
   }
@@ -365,80 +432,103 @@ public:
    * Calls from load balancer to load database
    */
 
-  int AddStartLBFn(LDStartLBFn fn, void *data);
-  void TurnOnStartLBFn(int handle)
-       { startLBFnList[handle]->on = 1; }
-  void TurnOffStartLBFn(int handle)
-       { startLBFnList[handle]->on = 0; }
+  int AddStartLBFn(LDStartLBFn fn, void* data);
+  void TurnOnStartLBFn(int handle) { startLBFnList[handle]->on = 1; }
+  void TurnOffStartLBFn(int handle) { startLBFnList[handle]->on = 0; }
   void RemoveStartLBFn(LDStartLBFn fn);
 
   void StartLB();
 
-  int AddMigrationDoneFn(LDMigrationDoneFn fn, void *data);
+  int AddMigrationDoneFn(LDMigrationDoneFn fn, void* data);
   void RemoveMigrationDoneFn(LDMigrationDoneFn fn);
   void MigrationDone();
 
-public:
+ public:
   inline void TurnManualLBOn() { useBarrier = false; }
   inline void TurnManualLBOff() { useBarrier = true; }
 
-  inline void PredictorOn(LBPredictorFunction *model) {
-    if (predictCBFn!=NULL) predictCBFn->on(predictCBFn->data, model);
-    else CmiPrintf("Predictor not supported in this load balancer\n");
+  inline void PredictorOn(LBPredictorFunction* model)
+  {
+    if (predictCBFn != NULL)
+      predictCBFn->on(predictCBFn->data, model);
+    else
+      CmiPrintf("Predictor not supported in this load balancer\n");
   }
-  inline void PredictorOn(LBPredictorFunction *model, int wind) {
-    if (predictCBFn!=NULL) predictCBFn->onWin(predictCBFn->data, model, wind);
-    else CmiPrintf("Predictor not supported in this load balancer\n");
+  inline void PredictorOn(LBPredictorFunction* model, int wind)
+  {
+    if (predictCBFn != NULL)
+      predictCBFn->onWin(predictCBFn->data, model, wind);
+    else
+      CmiPrintf("Predictor not supported in this load balancer\n");
   }
-  inline void PredictorOff() {
-    if (predictCBFn!=NULL) predictCBFn->off(predictCBFn->data);
-    else CmiPrintf("Predictor not supported in this load balancer\n");
+  inline void PredictorOff()
+  {
+    if (predictCBFn != NULL)
+      predictCBFn->off(predictCBFn->data);
+    else
+      CmiPrintf("Predictor not supported in this load balancer\n");
   }
-  inline void ChangePredictor(LBPredictorFunction *model) {
-    if (predictCBFn!=NULL) predictCBFn->change(predictCBFn->data, model);
-    else CmiPrintf("Predictor not supported in this load balancer");
+  inline void ChangePredictor(LBPredictorFunction* model)
+  {
+    if (predictCBFn != NULL)
+      predictCBFn->change(predictCBFn->data, model);
+    else
+      CmiPrintf("Predictor not supported in this load balancer");
   }
 
-  void SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off, LDPredictModelFn change, void* data);
+  void SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off,
+                      LDPredictModelFn change, void* data);
 
-  inline int CollectingCommStats(void) { return lbdb_obj->CollectingStats() && _lb_args.traceComm(); };
+  inline int CollectingCommStats(void)
+  {
+    return lbdb_obj->CollectingStats() && _lb_args.traceComm();
+  };
 
-  void Migrated(LDObjHandle h, int waitBarrier=1);
+  void Migrated(LDObjHandle h, int waitBarrier = 1);
 
   template <typename T>
-  inline LDBarrierClient AddLocalBarrierClient(T* obj, void(T::*method)(void)) {
+  inline LDBarrierClient AddLocalBarrierClient(T* obj, void (T::*method)(void))
+  {
     return AddLocalBarrierClient((Chare*)obj, std::bind(method, obj));
   }
-  inline LDBarrierClient AddLocalBarrierClient(Chare* obj, std::function<void()> fn) {
+  inline LDBarrierClient AddLocalBarrierClient(Chare* obj, std::function<void()> fn)
+  {
     return localBarrier.AddClient(obj, fn);
   }
 
-
-  inline void RemoveLocalBarrierClient(LDBarrierClient h) {
+  inline void RemoveLocalBarrierClient(LDBarrierClient h)
+  {
     localBarrier.RemoveClient(h);
   }
 
   template <typename T>
-  inline LDBarrierReceiver AddLocalBarrierReceiver(T* obj, void(T::*method)(void)) {
+  inline LDBarrierReceiver AddLocalBarrierReceiver(T* obj, void (T::*method)(void))
+  {
     return AddLocalBarrierReceiver(std::bind(method, obj));
   }
-  inline LDBarrierReceiver AddLocalBarrierReceiver(std::function<void()> fn) {
+  inline LDBarrierReceiver AddLocalBarrierReceiver(std::function<void()> fn)
+  {
     return localBarrier.AddReceiver(fn);
   }
 
-  inline void RemoveLocalBarrierReceiver(LDBarrierReceiver h) {
+  inline void RemoveLocalBarrierReceiver(LDBarrierReceiver h)
+  {
     localBarrier.RemoveReceiver(h);
   }
-  inline void AtLocalBarrier(LDBarrierClient _n_c) {
+  inline void AtLocalBarrier(LDBarrierClient _n_c)
+  {
     if (useBarrier) localBarrier.AtBarrier(_n_c);
   }
-  inline void DecreaseLocalBarrier(int c) {
+  inline void DecreaseLocalBarrier(int c)
+  {
     if (useBarrier) localBarrier.DecreaseBarrier(c);
   }
-  inline void TurnOnBarrierReceiver(LDBarrierReceiver h) {
+  inline void TurnOnBarrierReceiver(LDBarrierReceiver h)
+  {
     localBarrier.TurnOnReceiver(h);
   }
-  inline void TurnOffBarrierReceiver(LDBarrierReceiver h) {
+  inline void TurnOffBarrierReceiver(LDBarrierReceiver h)
+  {
     localBarrier.TurnOffReceiver(h);
   }
 
@@ -446,42 +536,44 @@ public:
   inline void LocalBarrierOff(void) { localBarrier.TurnOff(); };
   void ResumeClients();
   static int ProcessorSpeed();
-  inline void SetLBPeriod(double s) { }
-  inline double GetLBPeriod() { return 0;}
+  inline void SetLBPeriod(double s) {}
+  inline double GetLBPeriod() { return 0; }
 
   void SetMigrationCost(double cost);
   void SetStrategyCost(double cost);
   void UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad);
 
-
-private:
+ private:
   int mystep;
-  static char *avail_vector;	// processor bit vector
+  static char* avail_vector;  // processor bit vector
   static bool avail_vector_set;
-  int new_ld_balancer;		// for Node 0
+  int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
-public:
+
+ public:
   int nloadbalancers;
-  CkVec<BaseLB *>   loadbalancers;
+  CkVec<BaseLB*> loadbalancers;
 
   std::vector<MigrateCB*> migrateCBList;
   std::vector<StartLBCB*> startLBFnList;
   std::vector<MigrationDoneCB*> migrationDoneCBList;
 
-public:
-  BaseLB** getLoadBalancers() {return loadbalancers.getVec();}
-  int getNLoadBalancers() {return nloadbalancers;}
+ public:
+  BaseLB** getLoadBalancers() { return loadbalancers.getVec(); }
+  int getNLoadBalancers() { return nloadbalancers; }
 
-public:
+ public:
   static bool manualOn;
-public:
-  char *availVector() { return avail_vector; }
-  void get_avail_vector(char * bitmap);
-  void set_avail_vector(char * bitmap, int new_ld=-1);
-  int & new_lbbalancer() { return new_ld_balancer; }
 
-  struct LastLBInfo {
-    LBRealType *expectedLoad;
+ public:
+  char* availVector() { return avail_vector; }
+  void get_avail_vector(char* bitmap);
+  void set_avail_vector(char* bitmap, int new_ld = -1);
+  int& new_lbbalancer() { return new_ld_balancer; }
+
+  struct LastLBInfo
+  {
+    LBRealType* expectedLoad;
     LastLBInfo();
   };
   LastLBInfo lastLBInfo;
@@ -489,10 +581,10 @@ public:
   inline LBRealType* expectedLoad() { return lastLBInfo.expectedLoad; }
 
   int getLoadbalancerTicket();
-  void addLoadbalancer(BaseLB *lb, int seq);
+  void addLoadbalancer(BaseLB* lb, int seq);
   void nextLoadbalancer(int seq);
   void switchLoadbalancer(int switchFrom, int switchTo);
-  const char *loadbalancer(int seq);
+  const char* loadbalancer(int seq);
 
   inline int step() { return mystep; }
   inline void incStep() { mystep++; }
@@ -501,10 +593,10 @@ public:
 void TurnManualLBOn();
 void TurnManualLBOff();
 
-void LBTurnPredictorOn(LBPredictorFunction *model);
-void LBTurnPredictorOn(LBPredictorFunction *model, int wind);
+void LBTurnPredictorOn(LBPredictorFunction* model);
+void LBTurnPredictorOn(LBPredictorFunction* model, int wind);
 void LBTurnPredictorOff();
-void LBChangePredictor(LBPredictorFunction *model);
+void LBChangePredictor(LBPredictorFunction* model);
 
 void LBSetPeriod(double second);
 
@@ -522,35 +614,35 @@ inline LBManager* LBManagerObj() { return LBManager::Object(); }
 
 inline void CkStartLB() { LBManager::Object()->StartLB(); }
 
-inline void get_avail_vector(char * bitmap) {
-  LBManagerObj()->get_avail_vector(bitmap);
-}
+inline void get_avail_vector(char* bitmap) { LBManagerObj()->get_avail_vector(bitmap); }
 
-inline void set_avail_vector(char * bitmap) {
-  LBManagerObj()->set_avail_vector(bitmap);
-}
+inline void set_avail_vector(char* bitmap) { LBManagerObj()->set_avail_vector(bitmap); }
 
 //  a helper class to suspend/resume load instrumentation when calling into
 //  runtime apis
 
 class SystemLoad
 {
-  const LDObjHandle *objHandle;
-  LBManager *lbmgr;
-public:
-  SystemLoad() {
+  const LDObjHandle* objHandle;
+  LBManager* lbmgr;
+
+ public:
+  SystemLoad()
+  {
     lbmgr = LBManagerObj();
     objHandle = lbmgr->RunningObject();
-    if (objHandle != NULL) {
+    if (objHandle != NULL)
+    {
       lbmgr->ObjectStop(*objHandle);
     }
   }
-  ~SystemLoad() {
+  ~SystemLoad()
+  {
     if (objHandle) lbmgr->ObjectStart(*objHandle);
   }
 };
 
-#define CK_RUNTIME_API          SystemLoad load_entry;
+#define CK_RUNTIME_API SystemLoad load_entry;
 
 #endif /* LDATABASE_H */
 
