@@ -534,24 +534,22 @@ void initDeviceMapping(char** argv) {
   CmiUnlock(CsvAccess(gpu_manager).device_mapping_lock);
 #endif
 
-  // Process device communication buffer parameters
+  // Process device communication buffer parameters (in MB)
   int input_comm_buffer_size;
   if (CmiGetArgIntDesc(argv, "+gpucommbuffer", &input_comm_buffer_size,
-        "GPU communication buffer size")) {
+        "GPU communication buffer size (in MB)")) {
     if (CmiMyRank() == 0) {
-      if (input_comm_buffer_size < 4) {
-        CsvAccess(gpu_manager).comm_buffer_size = 4; // Buffer size should be at least 4 bytes
-      }
-      else {
-        CsvAccess(gpu_manager).comm_buffer_size = (size_t)input_comm_buffer_size;
-      }
+      // Round up size to the closest power of 2
+      size_t comm_buffer_size = (size_t)input_comm_buffer_size * 1024 * 1024;
+      int size_log2 = std::ceil(std::log2((double)comm_buffer_size));
+      CsvAccess(gpu_manager).comm_buffer_size = (size_t)std::pow(2, size_log2);
     }
   }
 
   if (CmiMyPe() == 0) {
-    CmiPrintf("HAPI> GPU communication buffer size: %lu bytes "
-        "(will be rounded up to the nearest power of two)\n",
-        CsvAccess(gpu_manager).comm_buffer_size);
+    CmiPrintf("HAPI> GPU communication buffer size: %lu MB "
+        "(rounded up to the nearest power of two)\n",
+        CsvAccess(gpu_manager).comm_buffer_size / (1024 * 1024));
   }
 
   CmiNodeBarrier();
