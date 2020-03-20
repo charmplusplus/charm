@@ -1,4 +1,4 @@
-#include "zerocopy.decl.h"
+#include "sdag.decl.h"
 #include <string>
 #include "hapi.h"
 
@@ -40,8 +40,8 @@ class Main : public CBase_Main {
     delete m;
 
     // Print info
-    CkPrintf("PEs/Chares: %d, Block size: %d, Iters: %d\n", CkNumPes(),
-        block_size, n_iters);
+    CkPrintf("PEs/Chares: %d, Block size: %d, Iters: %d\n",
+        CkNumPes(), block_size, n_iters);
 
     // Create block group chare
     block_proxy = CProxy_Block::ckNew();
@@ -120,8 +120,10 @@ class Block : public CBase_Block {
   void receive(int ref, int &size1, double *&arr1, int &size2, double *&arr2,
       int size3, int *arr3, CkNcpyBufferPost *ncpyPost) {
     // Inform the runtime where the incoming data should be stored
+    // and which CUDA stream should be used for the transfer
     arr1 = d_remote_data;
     arr2 = rdma_remote_data;
+    ncpyPost[0].cuda_stream = stream;
 
     // Last array should be available here as it is not RDMA
     // Copy it over for validation
@@ -161,4 +163,4 @@ class Block : public CBase_Block {
   }
 };
 
-#include "zerocopy.def.h"
+#include "sdag.def.h"

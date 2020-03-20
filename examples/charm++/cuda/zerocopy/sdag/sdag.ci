@@ -1,4 +1,4 @@
-mainmodule zerocopy {
+mainmodule sdag {
   readonly CProxy_Main main_proxy;
   readonly CProxy_Block block_proxy;
   readonly int block_size;
@@ -18,7 +18,7 @@ mainmodule zerocopy {
     entry void iterate() {
       serial {
         // Send device data to peer
-        thisProxy[peer].receive(iter, block_size, CkSendBuffer(d_local_data),
+        thisProxy[peer].receive(iter, block_size, CkSendBuffer(d_local_data, stream),
             block_size, CkSendBuffer(rdma_local_data), block_size, reg_local_data);
       }
 
