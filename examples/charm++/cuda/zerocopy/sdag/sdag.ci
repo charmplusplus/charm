@@ -13,20 +13,19 @@ mainmodule sdag {
     entry Block();
     entry void init();
     entry void receive(int ref, int size1, nocopydevice double arr1[size1],
-        int size2, nocopypost double arr2[size2], int size3, int arr3[size3]);
+        int size2, int arr2[size2]);
 
     entry void iterate() {
       serial {
         // Send device data to peer
         thisProxy[peer].receive(iter, block_size, CkSendBuffer(d_local_data, stream),
-            block_size, CkSendBuffer(rdma_local_data), block_size, reg_local_data);
+            block_size, reg_local_data);
       }
 
       // Receive device data from peer
-      // This is the second receive(), invoked after the data transfer is
-      // complete
+      // This is the second receive(), invoked after the data transfer is complete
       when receive[iter](int ref, int size1, nocopydevice double arr1[size1],
-          int size2, nocopypost double arr2[size2], int size3, int arr3[size3])
+          int size2, int arr2[size2])
       serial {
         // Validate received data
         validateData();
