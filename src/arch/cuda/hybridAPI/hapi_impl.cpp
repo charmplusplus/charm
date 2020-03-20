@@ -557,14 +557,17 @@ void initDeviceMapping(char** argv) {
   CmiNodeBarrier();
 
   // Create device communication buffers
-  DeviceManager* dm = CsvAccess(gpu_manager).device_map[CmiMyPe()];
+  // Should only be done by device representative threads
+  if (CpvAccess(device_rep)) {
+    DeviceManager* dm = CsvAccess(gpu_manager).device_map[CmiMyPe()];
 #if CMK_SMP
-  CmiLock(dm->lock);
+    CmiLock(dm->lock);
 #endif
-  dm->create_comm_buffer(CsvAccess(gpu_manager).comm_buffer_size);
+    dm->create_comm_buffer(CsvAccess(gpu_manager).comm_buffer_size);
 #if CMK_SMP
-  CmiUnlock(dm->lock);
+    CmiUnlock(dm->lock);
 #endif
+  }
 
   // Process +gpuipceventpool
   int input_ipc_event_pool_size;
@@ -590,17 +593,21 @@ void initDeviceMapping(char** argv) {
   }
 
   // Enable P2P access to other visible devices
+  // (only useful for multiple devices per process)
+  // Should only be done by device representative threads
   if (enable_peer) {
     if (CmiMyPe() == 0) {
       CmiPrintf("HAPI> Enabling P2P access between devices\n");
     }
-    for (int i = 0; i < CsvAccess(gpu_manager).device_count; i++) {
-      if (i != CpvAccess(my_device)) {
-        int can_access_peer;
+    if (CpvAccess(device_rep)) {
+      for (int i = 0; i < CsvAccess(gpu_manager).device_count; i++) {
+        if (i != CpvAccess(my_device)) {
+          int can_access_peer;
 
-        hapiCheck(cudaDeviceCanAccessPeer(&can_access_peer, CpvAccess(my_device), i));
-        if (can_access_peer) {
-          cudaDeviceEnablePeerAccess(i, 0);
+          hapiCheck(cudaDeviceCanAccessPeer(&can_access_peer, CpvAccess(my_device), i));
+          if (can_access_peer) {
+            cudaDeviceEnablePeerAccess(i, 0);
+          }
         }
       }
     }
@@ -746,7 +753,6 @@ void ipcHandleCreate() {
 void ipcHandleOpen() {
   for (int i = 0; i < CmiNumNodes() / CmiNumPhysicalNodes(); i++) {
     if (i == CmiMyNodeRankLocal()) continue;
-
 
     for (int j = 0; j < CsvAccess(gpu_manager).device_count; j++) {
       int device_index = CsvAccess(gpu_manager).device_count * i + j;
