@@ -11,10 +11,11 @@ class LBDatabase {
 friend class LBManager;
   LBDatabase();
   struct LBObjEntry {
+    static const LDObjIndex DEFAULT_NEXT = -1;
     LBObj* obj;
-    LDObjIndex next;
+    LDObjIndex nextEmpty;
 
-    LBObjEntry(LBObj* obj, LDObjIndex next = -1) : obj(obj), next(next) {}
+    LBObjEntry(LBObj* obj, LDObjIndex nextEmpty = DEFAULT_NEXT) : obj(obj), nextEmpty(nextEmpty) {}
   };
 
   struct MigrateCB {

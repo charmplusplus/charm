@@ -77,19 +77,20 @@ LDObjHandle LBDatabase::RegisterObj(LDOMHandle omh, CmiUInt8 id,
 
   {
     // objsEmptyHead maintains a linked list of empty positions within the objs array
-    // If objsEmptyHead == -1, there are no vacant positions, so add to the back
-    // If objsEmptyHead > -1, we place the new object at index objsEmptyHead and advance
+    // If objsEmptyHead == LDObjEntry::DEFAULT_NEXT, there are no vacant positions, so add to the back
+    // If objsEmptyHead != LDObjEntry::DEFAULT_NEXT, we place the new object at index objsEmptyHead and advance
     // objsEmptyHead to the next empty position.
-    if (objsEmptyHead == -1) {
+    if (objsEmptyHead == LBObjEntry::DEFAULT_NEXT) {
       newhandle.handle = objs.size();
       LBObj *obj = new LBObj(newhandle, userPtr, migratable);
       objs.emplace_back(obj);
     } else {
       newhandle.handle = objsEmptyHead;
       LBObj *obj = new LBObj(newhandle, userPtr, migratable);
-      objs[objsEmptyHead].obj = obj;
+      objs[newhandle.handle].obj = obj;
 
-      objsEmptyHead = objs[objsEmptyHead].next;
+      objsEmptyHead = objs[newhandle.handle].nextEmpty;
+      objs[newhandle.handle].nextEmpty = LBObjEntry::DEFAULT_NEXT;
     }
   }
 
@@ -101,13 +102,11 @@ void LBDatabase::UnregisterObj(LDObjHandle h)
 {
   delete objs[h.handle].obj;
 
-  {
-    objs[h.handle].obj = NULL;
-    // Maintain the linked list of empty positions by adding the newly removed
-    // index as the new objsEmptyHead
-    objs[h.handle].next = objsEmptyHead;
-    objsEmptyHead = h.handle;
-  }
+  objs[h.handle].obj = nullptr;
+  // Maintain the linked list of empty positions by adding the newly removed
+  // index as the new objsEmptyHead
+  objs[h.handle].nextEmpty = objsEmptyHead;
+  objsEmptyHead = h.handle;
 }
 
 void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force)
