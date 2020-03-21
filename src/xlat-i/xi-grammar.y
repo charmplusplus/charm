@@ -1134,8 +1134,7 @@ Parameter	: Type
 		{ /*Stop grabbing CPROGRAM segments*/
 			in_bracket=0;
 			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
-			$$->setRdma(CMK_ZC_P2P_RECV_MSG);
-			$$->setDevice(true);
+			$$->setRdma(CMK_ZC_DEVICE_MSG);
 			if (firstDeviceRdma) {
 				$$->setFirstDeviceRdma(true);
 				firstDeviceRdma = false;

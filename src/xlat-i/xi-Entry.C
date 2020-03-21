@@ -173,13 +173,10 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
       plist->param->entry = this;
       if (plist->param->getRdma() == CMK_ZC_P2P_SEND_MSG)
         numRdmaSendParams++; // increment send 'rdma' param count
-      if (plist->param->getRdma() == CMK_ZC_P2P_RECV_MSG) {
-        if (plist->param->isDevice()) {
-          numRdmaDeviceParams++; // increment 'rdma' device param count
-        } else {
-          numRdmaRecvParams++; // increment recv 'rdma' param count
-        }
-      }
+      if (plist->param->getRdma() == CMK_ZC_P2P_RECV_MSG)
+        numRdmaRecvParams++; // increment recv 'rdma' param count
+      if (plist->param->isDevice())
+        numRdmaDeviceParams++; // increment device 'rdma' param count
     }
     plist = plist->next;
   }
@@ -1814,37 +1811,32 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
 
   else {  // Normal case: call regular method
     if(param->hasRecvRdma()) {
-      if (param->hasDevice()) {
-        // With device-side RDMA, only P2P Recv API is supported
-        str << "  if (CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) {\n";
-        genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-        str << "  }\n";
-        str << "  else {\n";
-        str << "    CkAbort(\"Only P2P Recv API is supported with device-side zero-copy!\");\n";
-        str << "  }\n";
-      }
-      else {
-        str << "#if CMK_ONESIDED_IMPL\n";
-        str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
-        str << "#endif\n";
-        genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-        str << "#if CMK_ONESIDED_IMPL\n";
-        str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
-        //str << "#endif\n";
-        genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
-        //str << "#if CMK_ONESIDED_IMPL\n";
-        str << "    }\n";
-        str << "  } else {\n";
-        str << "#endif\n";
-      }
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+      str << "#endif\n";
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+      //str << "#endif\n";
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
+      //str << "#if CMK_ONESIDED_IMPL\n";
+      str << "    }\n";
+      str << "  } else {\n";
+      str << "#endif\n";
+    } else if (param->hasDevice()) {
+      // With device-side RDMA, only P2P Recv API is supported
+      str << "  if (CMI_ZC_MSGTYPE(env) == CMK_ZC_DEVICE_MSG) {\n";
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+      str << "  }\n";
+      str << "  else {\n";
+      str << "    CkAbort(\"Unexpected msg header: should be CMK_ZC_DEVICE_MSG\");\n";
+      str << "  }\n";
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
     if(param->hasRecvRdma()) {
-      if (!param->hasDevice()) {
-        str << "#if CMK_ONESIDED_IMPL\n";
-        str << "  }\n";
-        str << "#endif\n";
-      }
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  }\n";
+      str << "#endif\n";
     }
   }
 }
@@ -1910,49 +1902,34 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         str << ");\n";
       }
       if(isRdmaPost) {
-        str << "#if CMK_ONESIDED_IMPL\n";
         // Allocate an array of rdma pointers
         if (param->hasDevice()) {
-          str << "  void *buffPtrs["<< numRdmaRecvParams + numRdmaDeviceParams <<"];\n";
-          str << "  int buffSizes["<< numRdmaRecvParams + numRdmaDeviceParams <<"];\n";
-          str << "#else\n";
           str << "  void *buffPtrs["<< numRdmaDeviceParams <<"];\n";
           str << "  int buffSizes["<< numRdmaDeviceParams <<"];\n";
         } else {
+          str << "#if CMK_ONESIDED_IMPL\n";
           str << "  void *buffPtrs["<< numRdmaRecvParams <<"];\n";
           str << "  int buffSizes["<< numRdmaRecvParams <<"];\n";
+          str << "#endif\n";
         }
-        str << "#endif\n";
         param->storePostedRdmaPtrs(str, isSDAGGen);
         if (param->hasDevice()) {
-          str << "#if CMK_ONESIDED_IMPL\n";
-          // Both CPU & device RDMA
-          str << "  if(CMI_IS_ZC_RECV(env))\n";
-          str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), NULL, ";
-          if (isSDAGGen)
-            str << "genClosure->num_rdma_fields, genClosure->num_root_node, genClosure->num_device_rdma_fields, ";
-          else
-            str << "impl_num_rdma_fields, impl_num_root_node, impl_num_device_rdma_fields, ";
-          str << "buffPtrs, buffSizes, ncpyPost);\n";
-          str << "#else\n";
-          // Only device RDMA
-          str << "  if(CMI_IS_ZC_RECV(env))\n";
-          str << "    CkRdmaIssueRgetsDevice(env, ncpyEmApiMode::P2P_RECV, ";
+          str << "  if(CMI_IS_ZC_DEVICE(env))\n";
+          str << "    CkRdmaIssueRgetsDevice(env, ";
           if (isSDAGGen)
             str << "genClosure->num_device_rdma_fields, ";
           else
             str << "impl_num_device_rdma_fields, ";
-          str << "buffPtrs, buffSizes, ncpyPost, true);\n";
-          str << "#endif\n";
+          str << "buffPtrs, buffSizes, ncpyPost);\n";
         } else {
           str << "#if CMK_ONESIDED_IMPL\n";
           str << "  if(CMI_IS_ZC_RECV(env)) \n";
           str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), NULL, ";
           if(isSDAGGen)
-            str << "genClosure->num_rdma_fields, genClosure->num_root_node, 0, ";
+            str << "genClosure->num_rdma_fields, genClosure->num_root_node, ";
           else
-            str << "impl_num_rdma_fields, impl_num_root_node, 0, ";
-          str << "buffPtrs, buffSizes, NULL, NULL, ncpyPost);\n";
+            str << "impl_num_rdma_fields, impl_num_root_node, ";
+          str << "buffPtrs, buffSizes, ncpyPost);\n";
           str << "#endif\n";
         }
       }

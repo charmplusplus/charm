@@ -50,8 +50,7 @@ void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
               }
               defs << "  genClosure->getP" << i << "() = "
                    << "ncpyBuffer_" << var.name << ";\n";
-            }
-            else {
+            } else {
               defs << "#if CMK_ONESIDED_IMPL\n";
               if (var.isFirstRdma) {
                 defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams << ";\n";

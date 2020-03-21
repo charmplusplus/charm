@@ -13,7 +13,6 @@ class Value;
 class Parameter {
   int rdma;
   bool firstRdma;
-  bool device; // This is a device pointer
   bool firstDeviceRdma;
 
  public:
@@ -71,7 +70,6 @@ class Parameter {
   void setConditional(int c);
   void setRdma(int r);
   void setFirstRdma(bool fr);
-  void setDevice(bool d);
   void setFirstDeviceRdma(bool fr);
   int print(XStr& str, int withDefaultValues = 0, int useConst = 1, int fwdNum = 0);
   void printAddress(XStr& str);

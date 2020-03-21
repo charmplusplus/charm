@@ -317,8 +317,7 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
             indentBy(defs, cur + 2);
             defs << var.type << "* " << var.name << " = (" << var.type
                  << "*) (ncpyBuffer_" << var.name << ".ptr);\n";
-          }
-          else {
+          } else {
             if (var.isFirstRdma) {
               defs << "#if CMK_ONESIDED_IMPL\n";
               indentBy(defs, cur + 2);
