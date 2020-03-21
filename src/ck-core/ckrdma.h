@@ -301,9 +301,8 @@ class CkNcpyBuffer{
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
-  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg,
-      int numops, int rootNode, int numDeviceOps, void **arrPtrs, int *arrSizes,
-      CkNcpyBufferPost *postStructs);
+  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
+  friend void CkRdmaIssueRgetsDevice(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
 
   friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
@@ -423,7 +422,7 @@ struct NcpyEmBufferInfo{
  */
 envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg = NULL);
 
-void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, int numDeviceOps, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info);
 
@@ -660,11 +659,7 @@ int getRootNode(envelope *env);
 
 #endif /* End of CMK_ONESIDED_IMPL */
 
-void CkRdmaIssueRgetsDevice(envelope *env, ncpyEmApiMode emMode, int numops,
-    void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs, bool onlyDevice);
-
-int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr);
-
+void CkRdmaIssueRgetsDevice(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
 void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, CkNcpyBuffer** buffers);
 
 #endif

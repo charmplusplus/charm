@@ -152,9 +152,6 @@ class VidBlock {
 #endif
       return NULL;
     }
-    CkChareID& getActualID() {
-      return actualID;
-    }
     void pup(PUP::er &p) {
 #ifndef CMK_CHARE_USE_PTR
       int s = 0;
