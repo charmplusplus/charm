@@ -310,7 +310,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
       if (deviceRdmaSupported) {
         str << "    implP|impl_num_device_rdma_fields;\n";
         callEach(&Parameter::pupRdma, str, true, true);
-      } else {
+      } else if (!hasDevice()) {
         str << "#if CMK_ONESIDED_IMPL\n";
         str << "    implP|impl_num_rdma_fields;\n";
         str << "    implP|impl_num_root_node;\n";
@@ -344,8 +344,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
       if (deviceRdmaSupported) {
         str << "    implP|impl_num_device_rdma_fields;\n";
         callEach(&Parameter::pupRdma, str, true, true);
-      }
-      else if (!hasDevice()) {
+      } else if (!hasDevice()) {
         str << "#if CMK_ONESIDED_IMPL\n";
         str << "    implP|impl_num_rdma_fields;\n";
         str << "    implP|impl_num_root_node;\n";
@@ -365,8 +364,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     if (hasrdma) {
       if (deviceRdmaSupported) {
         str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_DEVICE_MSG;\n";
-      }
-      else if (!hasDevice()) {
+      } else if (!hasDevice()) {
         str << "#if CMK_ONESIDED_IMPL\n";
         // Only need to set message header when there is no device buffer involved
         if (isP2P) {
@@ -874,8 +872,7 @@ void ParamList::beginUnmarshallSDAG(XStr& str) {
         callEach(&Parameter::adjustUnmarshalledRdmaPtrsSDAG, str, true, true);
         str << "  implP|num_device_rdma_fields;\n";
         callEach(&Parameter::beginUnmarshallRdma, str, true, true);
-      }
-      else {
+      } else {
         str << "#if CMK_ONESIDED_IMPL\n";
         /* Before migration of the closure structure, Rdmawrapper pointers
          * store the offset to the actual buffer from the msgBuf
@@ -978,15 +975,19 @@ void ParamList::unmarshall(XStr& str, bool isInline, bool isFirst, bool isRdmaPo
   else if (!isVoid()) {
     bool isSDAGGen = entry->sdagCon || entry->isWhenEntry;
     if (param->isRdma()) {
-      str << "\n#if CMK_ONESIDED_IMPL\n";
-      str << "ncpyBuffer_" << param->getName() << "_ptr";
-      str << "\n#else\n";
-      // for recv rdma
-      if(param->isRecvRdma())
+      if (param->isDevice()) {
         str << "ncpyBuffer_" << param->getName() << "_ptr";
-      else // for send rdma
-        str << param->getName();
-      str << "\n#endif\n";
+      } else {
+        str << "\n#if CMK_ONESIDED_IMPL\n";
+        str << "ncpyBuffer_" << param->getName() << "_ptr";
+        str << "\n#else\n";
+        // for recv rdma
+        if(param->isRecvRdma())
+          str << "ncpyBuffer_" << param->getName() << "_ptr";
+        else // for send rdma
+          str << param->getName();
+        str << "\n#endif\n";
+      }
     } else if (param->isArray() || isInline) {
       if(isRdmaPost && isSDAGGen) str << "genClosure->";
       str << param->getName();

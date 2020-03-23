@@ -1827,8 +1827,7 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       // With device-side RDMA, only P2P Recv API is supported
       str << "  if (CMI_ZC_MSGTYPE(env) == CMK_ZC_DEVICE_MSG) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "  }\n";
-      str << "  else {\n";
+      str << "  } else {\n";
       str << "    CkAbort(\"Unexpected msg header: should be CMK_ZC_DEVICE_MSG\");\n";
       str << "  }\n";
     }
