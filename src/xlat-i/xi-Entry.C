@@ -1914,7 +1914,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         param->storePostedRdmaPtrs(str, isSDAGGen);
         if (param->hasDevice()) {
           str << "  if(CMI_IS_ZC_DEVICE(env))\n";
-          str << "    CkRdmaIssueRgetsDevice(env, ";
+          str << "    CkRdmaDeviceIssueRgets(env, ";
           if (isSDAGGen)
             str << "genClosure->num_device_rdma_fields, ";
           else

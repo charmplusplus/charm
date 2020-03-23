@@ -282,7 +282,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
         str << "  CkNcpyBuffer* device_buffers[" << entry->numRdmaDeviceParams << "];\n";
         int device_rdma_index = 0;
         callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
-        str << "  CkRdmaToDeviceCommBuffer(dest_pe, impl_num_device_rdma_fields, device_buffers);\n";
+        str << "  CkRdmaDeviceOnSender(dest_pe, impl_num_device_rdma_fields, device_buffers);\n";
       } else if (hasDevice()) {
         // Abort ASAP if broadcast or has host-side zero-copy
         if (!isP2P) {

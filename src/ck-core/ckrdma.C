@@ -2265,7 +2265,7 @@ void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int 
 
 // Device-side ZC API should be available regardless of CPU-side support
 // (i.e. CMK_ONESIDED_IMPL)
-void CkRdmaIssueRgetsDevice(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs) {
+void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs) {
 #if CMK_CUDA
   // Find which mode of transfer should be used
   CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
@@ -2285,7 +2285,7 @@ void CkRdmaIssueRgetsDevice(envelope *env, int numops, void **arrPtrs, int *arrS
     up|source;
 
     if (arrSizes[i] > source.cnt) {
-      CkAbort("CkRdmaIssueRgetsDevice: posted data size is larger than source data size!");
+      CkAbort("CkRdmaDeviceIssueRgets: posted data size is larger than source data size!");
     }
 
     // Destination buffer (on this receiver)
@@ -2439,39 +2439,51 @@ static void findFreeIpcEvents(DeviceManager* dm, const size_t comm_offset, int& 
 }
 #endif
 
-void CkRdmaToDeviceCommBuffer(int dest_pe, int numops, CkNcpyBuffer** buffers) {
+// Performs sender-side operations necessary for device zerocopy
+void CkRdmaDeviceOnSender(int dest_pe, int numops, CkNcpyBuffer** buffers) {
 #if CMK_CUDA
-  // Only continue if we need to use device communication buffer (CUDA IPC)
-  // TODO: If the destination PE is wrong (due to migration, etc.), need to
-  // restart the process!
-  if (findTransferModeDevice(CkMyPe(), dest_pe) != CkNcpyModeDevice::IPC) return;
+  // TODO: Need to handle the case where the destination PE could be wrong
+  // (due to migration, etc.)
 
-  // Allocate blocks on device comm buffer
-  DeviceManager* dm = CsvAccess(gpu_manager).device_map[CkMyPe()];
+  // Determine transfer mode (intra-process, inter-process, inter-node)
+  CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
 
-  for (int i = 0; i < numops; i++) {
+  if (transfer_mode == CkNcpyModeDevice::MEMCPY) {
+    // Don't need to do anything for intra-process
+    return;
+  } else if (transfer_mode == CkNcpyModeDevice::IPC) {
+    // Allocate blocks on device comm buffer
+    DeviceManager* dm = CsvAccess(gpu_manager).device_map[CkMyPe()];
+
+    for (int i = 0; i < numops; i++) {
 #if CMK_SMP
-    CmiLock(dm->lock);
+      CmiLock(dm->lock);
 #endif
-    void* alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
-    if (alloc_comm_buffer == nullptr) {
-      CkAbort("PE %d, device %d: Not enough memory on device communication buffer (%zu free)",
-          CkMyPe(), dm->global_index, dm->comm_buffer_free_size());
+      void* alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
+      if (alloc_comm_buffer == nullptr) {
+        CkAbort("PE %d, device %d: Not enough memory on device communication buffer (%zu free)",
+            CkMyPe(), dm->global_index, dm->comm_buffer_free_size());
+      }
+      buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
+      buffers[i]->device_idx = dm->global_index;
+      findFreeIpcEvents(dm, buffers[i]->comm_offset, buffers[i]->event_idx);
+#if CMK_SMP
+      CmiUnlock(dm->lock);
+#endif
+
+      // Initiate transfer from source buffer to device comm buffer
+      hapiCheck(cudaMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
+            cudaMemcpyDeviceToDevice, buffers[i]->cuda_stream));
+
+      // Record event
+      cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[dm->global_index];
+      hapiCheck(cudaEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->cuda_stream));
     }
-    buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
-    buffers[i]->device_idx = dm->global_index;
-    findFreeIpcEvents(dm, buffers[i]->comm_offset, buffers[i]->event_idx);
-#if CMK_SMP
-    CmiUnlock(dm->lock);
-#endif
-
-    // Initiate transfer from source buffer to device comm buffer
-    hapiCheck(cudaMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
-          cudaMemcpyDeviceToDevice, buffers[i]->cuda_stream));
-
-    // Record event
-    cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[dm->global_index];
-    hapiCheck(cudaEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->cuda_stream));
+  } else if (transfer_mode == CkNcpyModeDevice::RDMA) {
+    // TODO
+    return;
+  } else {
+    CkAbort("Unknown transfer mode");
   }
 #else
   CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
