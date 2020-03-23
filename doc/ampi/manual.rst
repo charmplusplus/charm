@@ -10,7 +10,7 @@ Introduction
 ============
 
 This manual describes Adaptive MPI (AMPI), which is an implementation of
-the MPI standard [1]_ on top of Charm++. AMPI acts as a regular MPI
+the MPI standard on top of Charm++. AMPI acts as a regular MPI
 implementation (akin to MPICH, OpenMPI, MVAPICH, etc.) with several
 built-in extensions that allow MPI developers to take advantage of
 Charm++’s dynamic runtime system, which provides support for process
@@ -23,6 +23,11 @@ then give a brief introduction to Charm++ and rationale for AMPI. We
 then describe AMPI in detail. Finally we summarize the changes required
 for existing MPI codes to run with AMPI. Appendices contain the details
 of installing AMPI, and building and running AMPI programs.
+
+.. note:: Currently, AMPI supports the MPI-2.2 standard, and the MPI-3.1
+   standard is under active development, though we already support
+   non-blocking and neighborhood collectives among other MPI-3.1
+   features.
 
 Overview
 --------
@@ -210,7 +215,7 @@ for most MPI-3.1 features and a collection of extensions explained in
 detail in this manual. One-sided communication calls in MPI-2 and MPI-3
 are implemented, but they do not yet take advantage of RMA features.
 Non-blocking collectives have been defined in AMPI since before
-MPI-3.0’s adoption of them. Also ROMIO [2]_ has been integrated into
+MPI-3.0’s adoption of them. ROMIO (http://www-unix.mcs.anl.gov/romio/) has been integrated into
 AMPI to support parallel I/O features.
 
 Building and Running AMPI Programs
@@ -924,10 +929,12 @@ around. This approach is portable across systems and compilers and may
 also improve locality and hence cache utilization. It also does not have
 the context-switch overhead of swapping globals. We have multiple tools
 for automating these transformations for different languages. Currently,
-there is a tool called *Photran*\  [3]_ for refactoring Fortran codes
+there is a tool called *Photran* (http://www.eclipse.org/photran) for
+refactoring Fortran codes
 that can do this transformation. It is Eclipse-based and works by
 constructing Abstract Syntax Trees (ASTs) of the program. We also have a
-tool built on top of the *ROSE compiler*\  [4]_ that works for C/C++ and
+tool built on top of the *ROSE compiler* (http://rosecompiler.org/)
+that works for C/C++ and
 Fortran programs that is available upon request. It emits patches for
 all files containing global variables which can then be applied to the
 source code.
@@ -2098,20 +2105,6 @@ Other AMPI codes
 
 -  Harm3D
 
-.. [1]
-   Currently, AMPI supports the MPI-2.2 standard, and the MPI-3.1
-   standard is under active development, though we already support
-   non-blocking and neighborhood collectives among other MPI-3.1
-   features.
-
-.. [2]
-   http://www-unix.mcs.anl.gov/romio/
-
-.. [3]
-   http://www.eclipse.org/photran
-
-.. [4]
-   http://rosecompiler.org/
 
 .. [PiP2018]
    Atsushi Hori, Min Si, Balazs Gerofi, Masamichi Takagi, Jai Dayal, Pavan
