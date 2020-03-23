@@ -1,13 +1,11 @@
--include ../../../../common.mk
-CHARMC = ../../../../../bin/charmc $(OPTS)
 OPTS = -O3
 
-# Set CUDATOOLKIT_HOME to the CUDA toolkit directory
-CUDATOOLKIT_HOME ?= $(CUDA_DIR)
-NVCC = $(CUDATOOLKIT_HOME)/bin/nvcc
+CHARM_DIR = ../../../../..
+CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
+CHARM_INC = -I$(CHARM_DIR)/include
+
+NVCC = nvcc
 NVCC_FLAGS = -O3 -c -std=c++11 -use_fast_math
-NVCC_INC = -I$(CUDATOOLKIT_HOME)/include
-CHARM_INC = -I../../../../../include
 LD_LIBS =
 
 TARGET = jacobi2d
@@ -21,14 +19,11 @@ $(TARGET): $(OBJS)
 $(TARGET).decl.h: $(TARGET).ci
 	$(CHARMC) $<
 
-$(TARGET).o: $(TARGET).C $(TARGET).decl.h
+$(TARGET).o: $(TARGET).C $(TARGET).decl.h $(TARGET).def.h
 	$(CHARMC) -c $<
 
 $(TARGET)CUDA.o: $(TARGET).cu
-	$(NVCC) -o $@ $(NVCC_FLAGS) $(NVCC_INC) $(CHARM_INC) $<
+	$(NVCC) -o $@ $(NVCC_FLAGS) $(CHARM_INC) $<
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o $(TARGET) charmrun
-
-test: all
-	$(call run, ./$(TARGET) +p2 32 16 )
