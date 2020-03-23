@@ -48,7 +48,7 @@ esac
 CMK_CF77="mpif77 -auto -fPIC "
 CMK_CF90="mpif90 -auto -fPIC "
 CMK_CF90_FIXED="$CMK_CF90 -132 -FI "
-F90DIR=`which ifort 2> /dev/null`
+F90DIR=`command -v ifort 2> /dev/null`
 if test -x "$F90DIR"
 then
   MYDIR="$PWD"

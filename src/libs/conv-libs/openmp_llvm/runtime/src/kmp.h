@@ -230,6 +230,10 @@ typedef union kmp_team kmp_team_p;
 typedef union kmp_info kmp_info_p;
 typedef union kmp_root kmp_root_p;
 
+#if CHARM_OMP
+#include "ompcharm.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1162,7 +1166,6 @@ typedef DWORD kmp_key_t;
 typedef pthread_t kmp_thread_t;
 typedef pthread_key_t kmp_key_t;
 #elif CHARM_OMP
-#include "ompcharm.h"
 typedef CthThread kmp_thread_t;
 typedef pthread_key_t kmp_key_t;
 #endif

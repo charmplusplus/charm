@@ -71,7 +71,6 @@ opt_qlogic=0
 opt_randomized_msgq=0
 opt_refnum_type="unsigned short"
 opt_replay=0
-opt_romio=1
 opt_shrinkexpand=0
 opt_smp=0
 opt_stats=0
@@ -81,6 +80,16 @@ opt_tcp=0
 opt_tracing=0
 opt_tracing_commthread=0
 opt_zlib=1
+
+# default to building ROMIO on AMPI where supported
+case "$triplet" in
+  *-win64*|*-win-*)
+    opt_romio=0
+    ;;
+  *)
+    opt_romio=1
+    ;;
+esac
 
 opt_CC= #undef
 opt_CXX= #undef
@@ -275,7 +284,7 @@ if [[ "$target" = "${target%AMPI-only}AMPI-only" ]]; then
     # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
     # so we bump up the number of bits reserved for the collection in the objid.
     opt_prio_type="char"
-    opt_extra_opts="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 -DCMK_OBJID_COLLECTION_BITS=29 $opt_extra_opts "
+    opt_extra_opts="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 -DCMK_FIFO_QUEUE_ONLY=1 -DCMK_OBJID_COLLECTION_BITS=29 $opt_extra_opts "
 fi
 
 opt_network=$(echo $triplet | cut -d '-' -f1)
