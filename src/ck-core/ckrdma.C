@@ -1089,12 +1089,12 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
   int msgsize = env->getTotalsize();
 
   int refSize = 0;
-  char* ref;
+  char *ref;
   int layerInfoSize, ncpyObjSize, extraSize;
 
   CkNcpyMode ncpyMode = findTransferMode(getSrcPe(env), CkMyPe());
   CmiSpanningTreeInfo *t = NULL;
-  if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets::topo tree has not been calculated \n");
+  if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
 
 
   if(emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
@@ -1158,6 +1158,7 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
 
     p|source;
   }
+
 
   if(emMode == ncpyEmApiMode::P2P_RECV) {
     switch(ncpyMode) {
