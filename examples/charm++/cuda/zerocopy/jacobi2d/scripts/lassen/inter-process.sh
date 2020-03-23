@@ -6,12 +6,13 @@
 #BSUB -nnodes 1
 #BSUB -J jacobi2d-sync
 
-cd $HOME/charm/examples/charm++/cuda/zerocopy-jacobi2d-sync
+cd $HOME/charm/examples/charm++/cuda/zerocopy/jacobi2d
 
 n_iters=1000
 grid_size=32768
+sync="-y"
 pool_size=128
-buffer_size=107374182
+buffer_size=1024
 
 echo "# Inter-process Jacobi2D"
 
@@ -22,7 +23,7 @@ do
   for iter in 1 2 3
   do
     echo "# Iteration $iter"
-    jsrun -n4 -a1 -c1 -g1 ./jacobi2d -s $grid_size -b $block_size -i $n_iters +ppn 1 +pemap L0,4,80,84 +gpumap block +gpuipceventpool $pool_size +gpucommbuffer $buffer_size
+    jsrun -n4 -a1 -c1 -g1 ./jacobi2d -s $grid_size -b $block_size -i $n_iters $sync +ppn 1 +pemap L0,4,80,84 +gpumap block +gpuipceventpool $pool_size +gpucommbuffer $buffer_size
   done
 done
 
@@ -33,6 +34,6 @@ do
   for iter in 1 2 3
   do
     echo "# Iteration $iter"
-    jsrun -n4 -a1 -c1 -g1 ./jacobi2d -s $grid_size -b $block_size -i $n_iters -z +ppn 1 +pemap L0,4,80,84 +gpumap block +gpuipceventpool $pool_size +gpucommbuffer $buffer_size
+    jsrun -n4 -a1 -c1 -g1 ./jacobi2d -s $grid_size -b $block_size -i $n_iters $sync -z +ppn 1 +pemap L0,4,80,84 +gpumap block +gpuipceventpool $pool_size +gpucommbuffer $buffer_size
   done
 done
