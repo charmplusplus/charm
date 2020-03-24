@@ -2328,8 +2328,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         }
       case CkNcpyModeDevice::RDMA:
         {
-          // TODO
-          CkAbort("GPU direct messaging between different physical nodes is not yet supported");
+          // Transfer the received/unpacked data on host to the destination device buffer
+          hapiCheck(cudaMemcpyAsync((void*)dest.ptr, source.data, std::min(source.cnt, dest.cnt),
+                cudaMemcpyHostToDevice, postStructs[i].cuda_stream));
           break;
         }
       default:
@@ -2480,8 +2481,14 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkNcpyBuffer** buffers) {
       hapiCheck(cudaEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->cuda_stream));
     }
   } else if (transfer_mode == CkNcpyModeDevice::RDMA) {
-    // TODO
-    return;
+    for (int i = 0; i < numops; i++) {
+      // Allocate temporary host buffer and copy the source buffer
+      buffers[i]->data_stored = true;
+      hapiCheck(cudaMallocHost(&buffers[i]->data, buffers[i]->cnt));
+      hapiCheck(cudaMemcpyAsync(buffers[i]->data, buffers[i]->ptr, buffers[i]->cnt,
+            cudaMemcpyDeviceToHost, buffers[i]->cuda_stream));
+      hapiCheck(cudaStreamSynchronize(buffers[i]->cuda_stream));
+    }
   } else {
     CkAbort("Unknown transfer mode");
   }

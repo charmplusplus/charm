@@ -141,14 +141,23 @@ class CkNcpyBuffer{
   const void *refAckInfo;
 
 #if CMK_CUDA
-  // CUDA IPC
+  // Used for CUDA IPC
   int device_idx;
   size_t comm_offset;
   int event_idx;
   cudaStream_t cuda_stream;
+
+  // Stores the actual data if device-side zerocopy cannot be performed
+  bool data_stored;
+  void* data;
 #endif
 
-  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), ref(NULL), refAckInfo(NULL) {}
+  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), ref(NULL), refAckInfo(NULL) {
+#if CMK_CUDA
+    data_stored = false;
+    data = NULL;
+#endif
+  }
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
 #if CMK_CUDA
@@ -210,6 +219,11 @@ class CkNcpyBuffer{
     // Register memory everytime new values are initialized
     if(cnt > 0)
       registerMem();
+
+#if CMK_CUDA
+    data_stored = false;
+    data = NULL;
+#endif
   }
 
   void setRef(const void *ref_) {
@@ -290,6 +304,13 @@ class CkNcpyBuffer{
     p|device_idx;
     p|comm_offset;
     p|event_idx;
+    p|data_stored;
+    if (data_stored) {
+      if (p.isUnpacking()) {
+        cudaMallocHost(&data, cnt);
+      }
+      PUParray(p, (char*)data, cnt);
+    }
 #endif
   }
 
