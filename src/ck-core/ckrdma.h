@@ -314,6 +314,14 @@ class CkNcpyBuffer{
 #endif
   }
 
+  ~CkNcpyBuffer() {
+#if CMK_CUDA
+    if (data) {
+      cudaFreeHost(data);
+    }
+#endif
+  }
+
   friend void CkRdmaDirectAckHandler(void *ack);
 
   friend void CkRdmaEMBcastAckHandler(void *ack);
