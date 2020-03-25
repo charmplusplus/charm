@@ -1081,6 +1081,12 @@ findModuleDep() {
 	PROCESSED_MODULES="$PROCESSED_MODULES $M"
 	#PRE_LIBRARIES=`AddList $PRE_LIBRARIES -lmodule$M`
 	PRE_LIBRARIES=`AddList -lmodule$M $PRE_LIBRARIES`
+
+	if [[ $M == "CkLoop" ]]; then
+		# CkLoop depends on pthreads, make sure it is always linked.
+		POST_LIBRARIES=`AddList $POST_LIBRARIES -pthread`
+	fi
+
 # HACK: add modules to both ends of library list, to avoid
 #  undefined symbol CkRegisterMainModule when it's in a module file.
 	POST_LIBRARIES=`AddList $POST_LIBRARIES -lmodule$M`
