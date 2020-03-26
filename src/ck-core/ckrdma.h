@@ -85,7 +85,7 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, cudaStream_t cuda_stream_) {
     cuda_stream = cuda_stream_;
     cb = CkCallback(CkCallback::ignore);
-    init(ptr_, cnt_, CK_BUFFER_REG, CK_BUFFER_DEREG);
+    CmiNcpyBuffer::init(ptr_, cnt_, CK_BUFFER_REG, CK_BUFFER_DEREG);
   }
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, cudaStream_t cuda_stream_) {
@@ -110,8 +110,6 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
     CmiNcpyBuffer::pup(p);
     p|cb;
   }
-
-  ~CkNcpyBuffer() : ~CmiNcpyBuffer() {}
 
   friend void CkRdmaDirectAckHandler(void *ack);
 
