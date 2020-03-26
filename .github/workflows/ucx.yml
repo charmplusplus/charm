@@ -10,8 +10,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v2
     - name: build-ucx
       run: git clone https://github.com/openucx/ucx.git && cd ucx && ./autogen.sh && ./contrib/configure-release --disable-numa && make -j4 && sudo make install
     - name: build-ompi
