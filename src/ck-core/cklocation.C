@@ -1759,8 +1759,7 @@ void CkMigratable::ResumeFromSyncHelper()
   CkLocMgr *localLocMgr = myRec->getLocMgr();
   auto iter = localLocMgr->bufferedActiveRgetMsgs.find(ckGetID());
   if(iter != localLocMgr->bufferedActiveRgetMsgs.end()) {
-    std::pair<CmiUInt8, CkMigratable*> idElemPair(ckGetID(), this);
-    localLocMgr->toBeResumeFromSynced.insert(idElemPair);
+    localLocMgr->toBeResumeFromSynced.emplace(ckGetID(), this);
   } else {
     ResumeFromSync();
   }
@@ -3309,7 +3308,7 @@ void CkLocMgr::AtSyncBarrierReached(void) {}
 void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 { //Find and register with the load balancer
 	lbmgr = (LBManager *)CkLocalBranch(lbmgrID_);
-	if (lbmgr == 0)
+	if (lbmgr == nullptr)
 		CkAbort("LBManager not yet created?\n");
 	DEBL((AA "Connected to load balancer %p\n" AB,lbmgr));
 	if(_lb_args.metaLbOn()){

@@ -329,11 +329,6 @@ void CentralLB::BuildStatsMsg()
   msg->from_pe = CkMyPe();
   //msg->serial = CrnRand();
 
-/*
-  lbmgr->TotalTime(&msg->total_walltime,&msg->total_cputime);
-  lbmgr->IdleTime(&msg->idletime);
-  lbmgr->BackgroundLoad(&msg->bg_walltime,&msg->bg_cputime);
-*/
 #if CMK_LB_CPUTIMER
   lbmgr->GetTime(&msg->total_walltime,&msg->total_cputime,
 		   &msg->idletime, &msg->bg_walltime,&msg->bg_cputime);
