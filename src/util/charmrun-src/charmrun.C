@@ -59,6 +59,22 @@
 #define DIRSEP "/"
 #endif
 
+#if CMK_HAS_ADDR_NO_RANDOMIZE
+#include <sys/personality.h>
+#endif
+
+#if CMK_HAS_POSIX_SPAWN
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <spawn.h>
+#ifdef __APPLE__
+#ifndef _POSIX_SPAWN_DISABLE_ASLR
+#define _POSIX_SPAWN_DISABLE_ASLR 0x100
+#endif
+#endif
+#endif
+
 #define PRINT(a) (arg_quiet ? 1 : printf a)
 
 #if CMK_SSH_NOT_NEEDED /*No SSH-- use daemon to start node-programs*/
@@ -746,7 +762,7 @@ static const char *arg_mylogin;
 #endif
 static int arg_mpiexec;
 static int arg_mpiexec_no_n;
-static int arg_no_va_rand;
+static int arg_va_rand;
 
 static const char *arg_nodeprog_a;
 static const char *arg_nodeprog_r;
@@ -906,8 +922,8 @@ static void arg_init(int argc, const char **argv)
   pparam_str(&arg_runscript, 0, "runscript", "Script to run node-program with");
   pparam_flag(&arg_help, 0, "help", "Print help messages");
   pparam_int(&arg_ppn, 0, "ppn", "Number of PEs per Charm++ node (=OS process)");
-  pparam_flag(&arg_no_va_rand, 0, "no-va-randomization",
-              "Disables randomization of the virtual address  space");
+  pparam_flag(&arg_va_rand, 0, "va-randomization",
+              "Allows randomization of the virtual address space (ASLR)");
 
   // Process Binding Parameters
   pparam_int(&proc_per.host, 0,
@@ -1782,7 +1798,6 @@ static void req_ccs_connect(void)
 /*Treat out of bound values as errors. Helps detecting bugs*/
 /* But when virtualized with Bigemulator, we can have more pes than nodetabs */
 /* TODO: We should somehow check boundaries also for bigemulator... */
-#if !CMK_BIGSIM_CHARM
     if (pe == -pe_count)
       fprintf(stderr, "Invalid processor index in CCS request: are you trying "
                       "to do a broadcast instead?");
@@ -1791,7 +1806,6 @@ static void req_ccs_connect(void)
     CcsServer_sendReply(&h.hdr, 0, 0);
     free(reqData);
     return;
-#endif
   } else if (pe < -1) {
     /*Treat negative values as multicast to a number of processors specified by
       -pe.
@@ -1808,9 +1822,6 @@ static void req_ccs_connect(void)
     CcsServer_sendReply(&h.hdr, 0, 0);
 #else
     int destpe = pe;
-#if CMK_BIGSIM_CHARM
-    destpe = destpe % pe_count;
-#endif
     if (replay_single)
       destpe = 0;
     /*Fill out the charmrun header & forward the CCS request*/
@@ -4456,21 +4467,6 @@ static void start_nodes_mpiexec() {}
 
 static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting) {}
 
-static void envCat(char *dest, LPTSTR oldEnv)
-{
-  char *src = oldEnv;
-  dest += strlen(dest); // Advance to end of dest
-  dest++;               // Advance past terminating NULL character
-  while ((*src) != '\0') {
-    int adv = strlen(src) + 1; // Length of newly-copied string plus NULL
-    strcpy(dest, src);         // Copy another environment string
-    dest += adv;               // Advance past newly-copied string and NULL
-    src += adv;                // Ditto for src
-  }
-  *dest = '\0'; // Paste on final terminating NULL character
-  FreeEnvironmentStrings(oldEnv);
-}
-
 /* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
 struct local_nodestart
@@ -4496,20 +4492,26 @@ struct local_nodestart
 
   void start(const nodetab_process & p)
   {
-    STARTUPINFO si = {0}; /* startup info for the process spawned */
-    PROCESS_INFORMATION pi; /* process Information for the process spawned */
-    char environment[10000]; /*Doubly-null terminated environment strings*/
+    std::string env{"NETSTART="};
+    env += create_netstart(p.nodeno);
+    env += '\0';
 
-    sprintf(environment, "NETSTART=%s", create_netstart(p.nodeno));
-    /*Paste all system environment strings */
-    envCat(environment, GetEnvironmentStrings());
+    /* Concatenate all system environment strings */
+    const LPTSTR oldEnv = GetEnvironmentStrings();
+    LPTSTR oldEnvEnd = oldEnv;
+    while (oldEnvEnd[0] != '\0' || oldEnvEnd[1] != '\0')
+        ++oldEnvEnd;
+    env.append(oldEnv, oldEnvEnd - oldEnv + 1);
+    FreeEnvironmentStrings(oldEnv);
 
     /* Initialise the security attributes for the process
      to be spawned */
+    STARTUPINFO si = {0};
     si.cb = sizeof(si);
     if (arg_verbose)
       printf("Charmrun> start %d node program on localhost.\n", p.nodeno);
 
+    PROCESS_INFORMATION pi;
     int ret;
     ret = CreateProcess(NULL,          /* application name */
                         const_cast<char*>(cmdLine.c_str()), /* command line */
@@ -4525,7 +4527,7 @@ struct local_nodestart
                         CREATE_NEW_PROCESS_GROUP | CREATE_NEW_CONSOLE,
 #endif
                         /* creation flags */
-                        environment, /* environment block */
+                        const_cast<char*>(env.data()), /* environment block */
                         ".",         /* working directory */
                         &si,         /* startup info */
                         &pi);
@@ -5049,6 +5051,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
       fprintf(f, "handle SIGPIPE nostop noprint\n");
       fprintf(f, "handle SIGWINCH nostop noprint\n");
       fprintf(f, "handle SIGWAITING nostop noprint\n");
+      fprintf(f, "set disable-randomization %s\n", arg_va_rand ? "off" : "on");
       if (arg_debug_commands)
         fprintf(f, "%s\n", arg_debug_commands);
       fprintf(f, "set args");
@@ -5068,6 +5071,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     } else if (strcmp(dbg, "lldb") == 0) {
       fprintf(f, "cat > /tmp/charmrun_lldb.$$ << END_OF_SCRIPT\n");
       fprintf(f, "platform shell -- /bin/rm -f /tmp/charmrun_lldb.$$\n");
+      fprintf(f, "settings set target.disable-aslr %s\n", arg_va_rand ? "false" : "true");
       // must launch before configuring signals, or else:
       // "error: No current process; cannot handle signals until you have a valid process."
       // use -s to stop at the entry point
@@ -5121,7 +5125,10 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "cat > /tmp/charmrun_inx.$$ << END_OF_SCRIPT\n");
     fprintf(f, "#!/bin/sh\n");
     fprintf(f, "/bin/rm -f /tmp/charmrun_inx.$$\n");
-    fprintf(f, "%s", arg_nodeprog_r);
+    if (!arg_va_rand)
+      fprintf(f, "command -v setarch >/dev/null 2>&1 && SETARCH=\"setarch `uname -m` -R \" || ");
+    fprintf(f, "SETARCH=\n");
+    fprintf(f, "${SETARCH}%s", arg_nodeprog_r);
     fprint_arg(f, argv);
     fprintf(f, "\n");
     fprintf(f, "echo 'program exited with code '\\$?\n");
@@ -5134,14 +5141,12 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, " -sl 5000");
     fprintf(f, " -e /tmp/charmrun_inx.$$\n");
   } else {
+    if (!arg_va_rand)
+      fprintf(f, "command -v setarch >/dev/null 2>&1 && SETARCH=\"setarch `uname -m` -R \" || ");
+    fprintf(f, "SETARCH=\n");
     if (arg_runscript)
       fprintf(f, "\"%s\" ", arg_runscript);
-    if (arg_no_va_rand) {
-      if (arg_verbose)
-        printf("Charmrun> setarch -R is used.\n");
-      fprintf(f, "setarch `uname -m` -R ");
-    }
-    fprintf(f, "\"%s\" ", arg_nodeprog_r);
+    fprintf(f, "${SETARCH}\"%s\" ", arg_nodeprog_r);
     fprint_arg(f, argv);
     if (h->nice != -100) {
       if (arg_verbose)
@@ -5554,6 +5559,10 @@ struct local_nodestart
   std::vector<const char *> dparamv;
   std::vector<char *> heapAllocated;
 
+#if CMK_HAS_ADDR_NO_RANDOMIZE
+  int persona;
+#endif
+
   local_nodestart(const char ** extra_argv = nullptr)
   {
     char ** env = main_envp;
@@ -5706,6 +5715,14 @@ struct local_nodestart
         dparamp = pparam_argv+1;
       }
     }
+
+#if CMK_HAS_ADDR_NO_RANDOMIZE
+    persona = personality(0xffffffff);
+    if (arg_va_rand)
+      personality(persona & ~ADDR_NO_RANDOMIZE);
+    else
+      personality(persona | ADDR_NO_RANDOMIZE);
+#endif
   }
 
   void start(const nodetab_process & p)
@@ -5715,6 +5732,48 @@ struct local_nodestart
     sprintf(envp[envc], "NETSTART=%s", create_netstart(p.nodeno));
     sprintf(envp[envc + 1], "CmiNumNodes=%d", 0);
 
+#if CMK_HAS_POSIX_SPAWN
+    // We need posix_spawn on macOS because it is the only way to disable ASLR at runtime.
+    // There is no harm in using it on any other platform that supports it.
+
+    posix_spawn_file_actions_t file_actions;
+    posix_spawn_file_actions_init(&file_actions);
+#if CMK_CHARMPY
+    // don't disable initial output on rank 0 process (need to be able to see python syntax errors, etc)
+    if (p.nodeno != 0)
+#endif
+    {
+      posix_spawn_file_actions_addopen(&file_actions, 0, "/dev/null", O_RDWR, 0);
+      posix_spawn_file_actions_addopen(&file_actions, 1, "/dev/null", O_RDWR, 0);
+      posix_spawn_file_actions_addopen(&file_actions, 2, "/dev/null", O_RDWR, 0);
+    }
+
+    posix_spawnattr_t attr;
+    short flags;
+    posix_spawnattr_init(&attr);
+    posix_spawnattr_getflags(&attr, &flags);
+#ifdef POSIX_SPAWN_USEVFORK
+    flags |= POSIX_SPAWN_USEVFORK;
+#endif
+#ifdef _POSIX_SPAWN_DISABLE_ASLR
+    if (arg_va_rand)
+      flags &= ~_POSIX_SPAWN_DISABLE_ASLR;
+    else
+      flags |= _POSIX_SPAWN_DISABLE_ASLR;
+#endif
+    posix_spawnattr_setflags(&attr, flags);
+
+    pid_t pid;
+    int status = posix_spawn(&pid, dparamp[0], &file_actions, &attr, const_cast<char *const *>(dparamp), envp);
+
+    posix_spawn_file_actions_destroy(&file_actions);
+    posix_spawnattr_destroy(&attr);
+
+    if (status != 0) {
+      fprintf(stderr, "posix_spawn failed: %s\n", strerror(status));
+      exit(1);
+    }
+#else
     int pid = fork();
     if (pid < 0) {
       fprintf(stderr, "fork failed: %s\n", strerror(errno));
@@ -5740,10 +5799,16 @@ struct local_nodestart
       kill(getppid(), 9);
       exit(1);
     }
+#endif
   }
 
   ~local_nodestart()
   {
+#if CMK_HAS_ADDR_NO_RANDOMIZE
+    if (!arg_va_rand)
+      personality(persona);
+#endif
+
     for (char * p : heapAllocated)
       free(p);
     for (int i = envc, i_end = envc + n; i < i_end; ++i)

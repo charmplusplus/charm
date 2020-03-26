@@ -4,15 +4,15 @@
       !!! OpenMP's threadprivate attribute and compiling with ampif90's -tlsglobals
       !!! option. Since parameter variables are immutable, they need not be privatized.
 
-      module test_mod
+      module test_mod_tlsglobals
 
         implicit none
 
         integer, parameter :: parameter_variable = 0
-        integer :: module_variable
+        integer, target :: module_variable
         !$omp threadprivate(module_variable)
 
-      end module test_mod
+      end module test_mod_tlsglobals
 
 
       subroutine mpi_main
@@ -31,23 +31,38 @@
       end subroutine mpi_main
 
 
-      subroutine perform_test_batch(failed, rank, my_wth)
+      subroutine subroutine_save(failed, rank, my_wth, operation)
 
-        use test_mod
+        implicit none
+        save
+
+        integer :: failed, rank, my_wth, operation
+        integer, target :: save_variable3
+        !$omp threadprivate(save_variable3)
+
+        call test_privatization(failed, rank, my_wth, operation, save_variable3)
+
+      end subroutine subroutine_save
+
+
+      subroutine perform_test_batch(failed, rank, my_wth, operation)
+
+        use test_mod_tlsglobals
         implicit none
 
-        integer :: failed, rank, my_wth
-        integer :: save_variable1 = 0
-        integer, save :: save_variable2
-        integer :: common_variable
+        integer :: failed, rank, my_wth, operation
+        integer, target :: save_variable1 = 0
+        integer, save, target :: save_variable2
+        integer, target :: common_variable
         common /commons/ common_variable
         !$omp threadprivate(save_variable1)
         !$omp threadprivate(save_variable2)
         !$omp threadprivate(/commons/)
 
-        call test_privatization(failed, rank, my_wth, module_variable)
-        call test_privatization(failed, rank, my_wth, save_variable1)
-        call test_privatization(failed, rank, my_wth, save_variable2)
-        call test_privatization(failed, rank, my_wth, common_variable)
+        call test_privatization(failed, rank, my_wth, operation, module_variable)
+        call test_privatization(failed, rank, my_wth, operation, save_variable1)
+        call test_privatization(failed, rank, my_wth, operation, save_variable2)
+        call subroutine_save(failed, rank, my_wth, operation)
+        call test_privatization(failed, rank, my_wth, operation, common_variable)
 
       end subroutine perform_test_batch

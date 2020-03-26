@@ -32,7 +32,7 @@ CMK_CF77="pgf77 "
 CMK_CF90="pgf90 "
 CMK_CF90_FIXED="$CMK_CF90 -Mfixed "
 f90libdir="."
-f90bindir=`which pgf90 2>/dev/null`
+f90bindir=`command -v pgf90 2>/dev/null`
 if test -n "$f90bindir"
 then
   f90libdir="$f90bindir/../lib"

@@ -200,6 +200,7 @@ int printf(const char *fmt, ...) {
 
 
 #include "converse.h"
+#include "cmirdmautils.h"
 #include "memory-isomalloc.h"
 
 #include <stdio.h>
@@ -350,16 +351,12 @@ static void KillOnAllSigs(int sigNo)
   already_in_signal_handler=1;
 
 #if CMK_CCS_AVAILABLE
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag) {
     int reply = 0;
     CpdNotify(CPD_SIGNAL,sigNo);
-#if ! CMK_BIGSIM_CHARM
     CcsSendReplyNoError(4,&reply);/*Send an empty reply if not*/
     CpvAccess(freezeModeFlag) = 1;
     CpdFreezeModeScheduler();
-#else
-    CpdFreeze();
-#endif
   }
 #endif
   
@@ -2010,8 +2007,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   Cmi_truecrash = 1;
 #endif
   if (CmiGetArgFlagDesc(*argv,"+truecrash","Do not install signal handlers") ||
-      CmiGetArgFlagDesc(*argv,"++debug",NULL /*meaning: don't show this*/) ||
-      CmiNumNodes()<=32) Cmi_truecrash = 1;
+      CmiGetArgFlagDesc(*argv,"++debug",NULL /*meaning: don't show this*/) ) Cmi_truecrash = 1;
     /* netpoll disable signal */
   if (CmiGetArgFlagDesc(*argv,"+netpoll","Do not use SIGIO--poll instead")) Cmi_netpoll = 1;
   if (CmiGetArgFlagDesc(*argv,"+netint","Use SIGIO")) Cmi_netpoll = 0;

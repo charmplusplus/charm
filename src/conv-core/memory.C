@@ -446,6 +446,10 @@ static inline void *mm_impl_pvalloc(size_t size)
 #include "memory-verbose.C"
 #endif
 
+#if CMK_MEMORY_BUILD_RECORD
+#include "memory-record.C"
+#endif
+
 #if CMK_MEMORY_BUILD_PARANOID
 #include "memory-paranoid.C"
 #endif
@@ -799,6 +803,10 @@ static void meta_init(char **argv) {
 
 #if CMK_MEMORY_BUILD_VERBOSE
 #include "memory-verbose.C"
+#endif
+
+#if CMK_MEMORY_BUILD_RECORD
+#include "memory-record.C"
 #endif
 
 #if CMK_MEMORY_BUILD_PARANOID

@@ -117,6 +117,12 @@
 
 #if defined __cplusplus
 #include <atomic>
+#elif defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L && !__STDC_NO_ATOMICS__ && \
+      (!defined __GNUC__ || __GNUC__ > 7 || (__GNUC__ == 7 && __GNUC_MINOR__ > 0) || defined __clang__ || \
+      (!defined _OPENMP && !defined __OBJC__))
+// see GCC SVN r239970 and https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65467
+#include <stdatomic.h>
+#define CMK_HAS_C11_STDATOMIC 1
 #endif
 
 /* brittle accommodation of libc header internals */
@@ -531,6 +537,9 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
 #endif
 #include <windows.h>
 #include "lrtslock.h"
@@ -1364,17 +1373,25 @@ void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn,
 void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
                      CmiReduceDeleteFn deleteFn, CmiReductionID id);
-void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn, int, int, int);
+void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
 void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
                          CmiReduceMergeFn mergeFn, CmiHandler dest,
                          CmiReduceDeleteFn deleteFn);
+void CmiNodeReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id);
+void CmiNodeReduceStructID(void *data, CmiReducePupFn pupFn,
+                           CmiReduceMergeFn mergeFn, CmiHandler dest,
+                           CmiReduceDeleteFn deleteFn, CmiReductionID id);
 int CmiGetReductionHandler(void);
 CmiHandler CmiGetReductionDestination(void);
 CmiReductionID CmiGetGlobalReduction(void);
+CmiReductionID CmiGetGlobalNodeReduction(void);
 CmiReductionID CmiGetDynamicReduction(void);
+CmiReductionID CmiGetDynamicNodeReduction(void);
 void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data);
+void CmiGetDynamicNodeReductionRemote(int handlerIdx, int node, int dataSize, void *data);
 
 void CmiResetGlobalReduceSeqID(void);
+void CmiResetGlobalNodeReduceSeqID(void);
 
 /* If the second parameter (the number of chunks to send) is negative, then
  * every message will be started aligned with 8 bytes, and a message header will
@@ -1622,10 +1639,10 @@ void CtgUninstall(void);
 /** Return the current global list */
 CtgGlobals CtgCurrentGlobals(void);
 
-void CthInterceptionsImmediateActivate(CthThread th);
-void CthInterceptionsImmediateDeactivate(CthThread th);
 void CthInterceptionsDeactivatePush(CthThread th);
 void CthInterceptionsDeactivatePop(CthThread th);
+int  CthInterceptionsTemporarilyActivateStart(CthThread th);
+void CthInterceptionsTemporarilyActivateEnd(CthThread th, int old);
 
 /* The thread listener structure. The user must register one such listener
 	if he wants to find out when a thread is suspended or when it starts running
@@ -2066,7 +2083,6 @@ extern int _immRunning;
 
 /******** Memory Fence ********/
 
-#if  CMK_SMP
 /* ImplSelect<num> selects one of two implementations for the atomic operations depending on the number of parameters
  * e.g.) CmiMemoryAtomicIncrement(input)
  *       -> ImplSelect2(input, CmiMemoryAtomicIncrementMemOrder, CmiMemoryAtomiIncrementSimple) CmiMemoryAtomicIncrementSimple
@@ -2085,76 +2101,118 @@ extern int _immRunning;
 #define CmiMemoryAtomicDecrement(...) ImplSelect2(__VA_ARGS__, CmiMemoryAtomicDecrementMemOrder, CmiMemoryAtomicDecrementSimple, )(__VA_ARGS__)
 #define CmiMemoryAtomicFetchAndInc(...) ImplSelect3(__VA_ARGS__, CmiMemoryAtomicFetchAndIncMemOrder, CmiMemoryAtomicFetchAndIncSimple, )(__VA_ARGS__)
 
-#if CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE
-#if __GNUC__ && __STDC_VERSION__ >= 201112L && !__STDC_NO_ATOMICS__
-#ifndef _STDATOMIC_H
-typedef enum
-  {
-    memory_order_relaxed = __ATOMIC_RELAXED,
-    memory_order_consume = __ATOMIC_CONSUME,
-    memory_order_acquire = __ATOMIC_ACQUIRE,
-    memory_order_release = __ATOMIC_RELEASE,
-    memory_order_acq_rel = __ATOMIC_ACQ_REL,
-    memory_order_seq_cst = __ATOMIC_SEQ_CST
-  } memory_order;
-#endif
+#if CMK_SMP
 
-#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) __atomic_fetch_add(&(someInt),1, MemModel);
-#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) __atomic_fetch_sub(&(someInt),1, MemModel);
-#define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) (output) = __atomic_fetch_add(&(input),1, MemModel);
+#ifdef __cplusplus /* SYNC_LANG */
 
-#else /* Mem ordering is not supported */
-#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) CmiMemoryAtomicIncrementSimple(someInt);
-#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) CmiMemoryAtomicDecrementSimple(someInt);
-#define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) CmiMemoryAtomicFetchAndIncSimple(input, output);
-#endif
-#define CmiMemoryAtomicIncrementSimple(someInt)    __sync_fetch_and_add(&(someInt), 1)
-#define CmiMemoryAtomicDecrementSimple(someInt)    __sync_fetch_and_sub(&(someInt), 1)
-#define CmiMemoryAtomicFetchAndIncSimple(input,output)   (output) =__sync_fetch_and_add(&(input), 1)
+}
+// old versions of the <atomic> header have defects
+// we need CmiRecoverType because value_type is absent
+// error: ‘value_type’ in ‘struct std::atomic<unsigned int>’ does not name a type
+// we need value_type to explicitly cast the literal 1
+// error: no matching function for call to ‘atomic_fetch_add_explicit(std::atomic<unsigned int>*, int, std::memory_order)’
+template <typename T> struct CmiRecoverType { };
+template <> struct CmiRecoverType<std::atomic<int>> { using type = int; };
+template <> struct CmiRecoverType<std::atomic<unsigned int>> { using type = unsigned int; };
+extern "C" {
 
-#else /* !CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE */
-#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) CmiMemoryAtomicIncrementSimple(someInt);
-#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) CmiMemoryAtomicDecrementSimple(someInt);
-#define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) CmiMemoryAtomicFetchAndIncSimple(input, output);
-#if CMK_GCC_X86_ASM /*SYNC_PRIM*/
+#define CmiMemoryAtomicType(type) std::atomic<type>
+#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) std::atomic_fetch_add_explicit(&(someInt), typename CmiRecoverType<decltype(someInt)>::type(1), (std::MemModel))
+#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) std::atomic_fetch_sub_explicit(&(someInt), typename CmiRecoverType<decltype(someInt)>::type(1), (std::MemModel))
+#define CmiMemoryAtomicFetchAndIncMemOrder(input, output, MemModel) ((output) = std::atomic_fetch_add_explicit(&(input), typename CmiRecoverType<decltype(input)>::type(1), (std::MemModel)))
+#define CmiMemoryAtomicIncrementSimple(someInt) std::atomic_fetch_add(&(someInt), typename CmiRecoverType<decltype(someInt)>::type(1))
+#define CmiMemoryAtomicDecrementSimple(someInt) std::atomic_fetch_sub(&(someInt), typename CmiRecoverType<decltype(someInt)>::type(1))
+#define CmiMemoryAtomicFetchAndIncSimple(input, output)((output) = std::atomic_fetch_add(&(input), typename CmiRecoverType<decltype(input)>::type(1)))
+
+#elif defined CMK_HAS_C11_STDATOMIC /* SYNC_LANG */
+
+#define CmiMemoryAtomicType(type) type
+#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) atomic_fetch_add_explicit(&(someInt), 1, (MemModel))
+#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) atomic_fetch_sub_explicit(&(someInt), 1, (MemModel))
+#define CmiMemoryAtomicFetchAndIncMemOrder(input, output, MemModel) ((output) = atomic_fetch_add_explicit(&(input), 1, (MemModel)))
+#define CmiMemoryAtomicIncrementSimple(someInt) atomic_fetch_add(&(someInt), 1)
+#define CmiMemoryAtomicDecrementSimple(someInt) atomic_fetch_sub(&(someInt), 1)
+#define CmiMemoryAtomicFetchAndIncSimple(input, output) ((output) = atomic_fetch_add(&(input), 1))
+
+#else /* SYNC_LANG */
+
+#define CmiMemoryAtomicType(type) type
+/* Mem ordering is not supported */
+#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) CmiMemoryAtomicIncrementSimple(someInt)
+#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) CmiMemoryAtomicDecrementSimple(someInt)
+#define CmiMemoryAtomicFetchAndIncMemOrder(input, output, MemModel) CmiMemoryAtomicFetchAndIncSimple((input), (output))
+
+#if CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE /* SYNC_PRIM */
+
+#define CmiMemoryAtomicIncrementSimple(someInt) __sync_fetch_and_add(&(someInt), 1)
+#define CmiMemoryAtomicDecrementSimple(someInt) __sync_fetch_and_sub(&(someInt), 1)
+#define CmiMemoryAtomicFetchAndIncSimple(input, output) ((output) = __sync_fetch_and_add(&(input), 1))
+
+#elif CMK_GCC_X86_ASM /* SYNC_PRIM */
+
 #if 1
 #define CmiMemoryAtomicIncrementSimple(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
 #define CmiMemoryAtomicDecrementSimple(someInt)  __asm__ __volatile__("lock decl (%0)" :: "r" (&(someInt)))
 #else /* 1 */
 /* this might be slightly faster, but does not compile with -O3 on netlrts-darwin-x86_64 */
-#define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl %0" :: "m" (someInt))
-#define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl %0" :: "m" (someInt))
+#define CmiMemoryAtomicIncrementSimple(someInt)  __asm__ __volatile__("lock incl %0" :: "m" (someInt))
+#define CmiMemoryAtomicDecrementSimple(someInt)  __asm__ __volatile__("lock decl %0" :: "m" (someInt))
 #endif /* 1 */
 #define CmiMemoryAtomicFetchAndIncSimple(input,output) __asm__ __volatile__( \
         "movl $1, %1\n\t" \
         "lock xaddl %1, %0" \
         : "=m"(input), "=r"(output) : "m"(input) : "memory")
-#else
-#define CMK_NO_ASM_AVAILABLE    1
+
+#else /* SYNC_PRIM */
+
 extern CmiNodeLock cmiMemoryLock;
-#define CmiMemoryAtomicIncrementSimple(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt+1; CmiUnlock(cmiMemoryLock); }
-#define CmiMemoryAtomicDecrementSimple(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt-1; CmiUnlock(cmiMemoryLock); }
-#define CmiMemoryAtomicFetchAndIncSimple(input,output) { CmiLock(cmiMemoryLock); output=input; input=output+1; CmiUnlock(cmiMemoryLock); }
-#endif
-#endif /* CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE */
+#define CmiMemoryAtomicIncrementSimple(someInt) { CmiLock(cmiMemoryLock); ((someInt)++); CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryAtomicDecrementSimple(someInt) { CmiLock(cmiMemoryLock); ((someInt)--); CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryAtomicFetchAndIncSimple(input,output) { CmiLock(cmiMemoryLock); ((output) = (input)++); CmiUnlock(cmiMemoryLock); }
+
+#endif /* SYNC_PRIM */
+
+#endif /* SYNC_LANG */
 
 #if CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE
 #define CmiMemoryReadFence()                 __sync_synchronize()
 #define CmiMemoryWriteFence()                __sync_synchronize()
+#elif defined _MSC_VER
+#define CmiMemoryReadFence()                 MemoryBarrier()
+#define CmiMemoryWriteFence()                MemoryBarrier()
+#elif defined __cplusplus
+#define CmiMemoryReadFence()                 std::atomic_thread_fence(std::memory_order_seq_cst)
+#define CmiMemoryWriteFence()                std::atomic_thread_fence(std::memory_order_seq_cst)
+#elif defined CMK_HAS_C11_STDATOMIC
+#define CmiMemoryReadFence()                 atomic_thread_fence(memory_order_seq_cst)
+#define CmiMemoryWriteFence()                atomic_thread_fence(memory_order_seq_cst)
 #else
-#define CMK_NO_ASM_AVAILABLE    1
 extern CmiNodeLock cmiMemoryLock;
 #define CmiMemoryReadFence()               { CmiLock(cmiMemoryLock); CmiUnlock(cmiMemoryLock); }
 #define CmiMemoryWriteFence()              { CmiLock(cmiMemoryLock); CmiUnlock(cmiMemoryLock); }
 #endif /* CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE */
 
 #else  /* for non-SMP, no need to define */
+
+#define CmiMemoryAtomicType(type) type
+#define CmiMemoryAtomicIncrementSimple(someInt) ((someInt)++)
+#define CmiMemoryAtomicDecrementSimple(someInt) ((someInt)--)
+#define CmiMemoryAtomicFetchAndIncSimple(input, output) ((output) = (input)++)
+#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) CmiMemoryAtomicIncrementSimple(someInt)
+#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) CmiMemoryAtomicDecrementSimple(someInt)
+#define CmiMemoryAtomicFetchAndIncMemOrder(input, output, MemModel) CmiMemoryAtomicFetchAndIncSimple((input), (output))
 #define CmiMemoryReadFence()
 #define CmiMemoryWriteFence()
-#define CmiMemoryAtomicIncrement(someInt)  someInt=someInt+1
-#define CmiMemoryAtomicDecrement(someInt)  someInt=someInt-1
-#define CmiMemoryAtomicFetchAndInc(input,output) output=input; input=output+1;
+
 #endif /*if CMK_SMP*/
+
+#ifdef __cplusplus
+using CmiMemoryAtomicInt = CmiMemoryAtomicType(int);
+using CmiMemoryAtomicUInt = CmiMemoryAtomicType(unsigned int);
+#else
+typedef CmiMemoryAtomicType(int) CmiMemoryAtomicInt;
+typedef CmiMemoryAtomicType(unsigned int) CmiMemoryAtomicUInt;
+#endif
 
 /******** Performance Counters ********/
 void CmiInitCounters(void);
@@ -2198,12 +2256,8 @@ void CthSetThreadID(CthThread th, int a, int b, int c);
 void CthTraceResume(CthThread t);
 
 #if CMK_FAULT_EVAC
-#if CMK_BIGSIM_CHARM
-#define CmiNodeAlive(x) (1)
-#else
 CpvExtern(char *,_validProcessors);
 #define CmiNodeAlive(x)  (CpvAccess(_validProcessors)[x])
-#endif
 #endif
 
 int CmiEndianness(void);
@@ -2224,11 +2278,7 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "conv-trace.h"
 #include "persistent.h"
 
-#include "conv-rdma.h"
-
-/* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
-extern int _BgOutOfCoreFlag;
-extern int _BgInOutOfCoreMode;
+#include "cmirdmautils.h"
 
 #ifdef ADAPT_SCHED_MEM
 extern int numMemCriticalEntries;

@@ -10,7 +10,7 @@ Introduction
 ============
 
 This manual describes Adaptive MPI (AMPI), which is an implementation of
-the MPI standard [1]_ on top of Charm++. AMPI acts as a regular MPI
+the MPI standard on top of Charm++. AMPI acts as a regular MPI
 implementation (akin to MPICH, OpenMPI, MVAPICH, etc.) with several
 built-in extensions that allow MPI developers to take advantage of
 Charm++’s dynamic runtime system, which provides support for process
@@ -23,6 +23,11 @@ then give a brief introduction to Charm++ and rationale for AMPI. We
 then describe AMPI in detail. Finally we summarize the changes required
 for existing MPI codes to run with AMPI. Appendices contain the details
 of installing AMPI, and building and running AMPI programs.
+
+.. note:: Currently, AMPI supports the MPI-2.2 standard, and the MPI-3.1
+   standard is under active development, though we already support
+   non-blocking and neighborhood collectives among other MPI-3.1
+   features.
 
 Overview
 --------
@@ -210,7 +215,7 @@ for most MPI-3.1 features and a collection of extensions explained in
 detail in this manual. One-sided communication calls in MPI-2 and MPI-3
 are implemented, but they do not yet take advantage of RMA features.
 Non-blocking collectives have been defined in AMPI since before
-MPI-3.0’s adoption of them. Also ROMIO [2]_ has been integrated into
+MPI-3.0’s adoption of them. ROMIO (http://www-unix.mcs.anl.gov/romio/) has been integrated into
 AMPI to support parallel I/O features.
 
 Building and Running AMPI Programs
@@ -231,8 +236,13 @@ script is:
 
    $ ./build <target> <version> <opts>
 
-For building AMPI (which also includes building Charm++ and other
-libraries needed by AMPI), specify ``<target>`` to be ``AMPI``. And
+Users who are interested only in AMPI and not any other component of
+Charm++ should specify ``<target>`` to be ``AMPI-only``. This will build
+Charm++ and other libraries needed by AMPI in a mode configured and
+tuned exclusively for AMPI. To fully build Charm++ underneath AMPI for
+use with either paradigm, or for interoperation between the two, specify
+``<target>`` to be ``AMPI``.
+
 ``<opts>`` are command line options passed to the ``charmc`` compile
 script. Common compile time options such as
 ``-g, -O, -Ipath, -Lpath, -llib`` are accepted.
@@ -256,7 +266,7 @@ off:
 
 .. code-block:: bash
 
-   $ ./build AMPI gni-crayxc --with-production --disable-ampi-error-checking
+   $ ./build AMPI-only gni-crayxc --with-production --disable-ampi-error-checking
 
 AMPI can also be built with support for multithreaded parallelism on any
 communication layer by adding "smp" as an option after the build target.
@@ -264,7 +274,7 @@ For example, on an Infiniband Linux cluster:
 
 .. code-block:: bash
 
-   $ ./build AMPI verbs-linux-x86_64 smp --with-production
+   $ ./build AMPI-only verbs-linux-x86_64 smp --with-production
 
 AMPI ranks are implemented as user-level threads with a stack size
 default of 1MB. If the default is not correct for your program, you can
@@ -273,7 +283,7 @@ following build command illustrates this for an Intel Omni-Path system:
 
 .. code-block:: bash
 
-   $ ./build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
+   $ ./build AMPI-only ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
 
 The same can be done for AMPI’s RDMA messaging threshold using
 ``AMPI_RDMA_THRESHOLD_DEFAULT`` and, for messages sent within the same
@@ -291,10 +301,15 @@ Building AMPI Programs
 AMPI provides compiler wrappers such as ``ampicc``, ``ampif90``, and
 ``ampicxx`` in the ``bin`` subdirectory of Charm++ installations. You can
 use them to build your AMPI program using the same syntax as other
-compilers like ``gcc``. These scripts automatically handle the details of
-linking against AMPI and the Charm++ runtime system. They are intended as
-drop-in replacements for ``mpicc`` wrappers provided by most conventional
-MPI implementations.
+compilers like ``gcc``. They are intended as drop-in replacements for
+``mpicc`` wrappers provided by most conventional MPI implementations.
+These scripts automatically handle the details of building and linking
+against AMPI and the Charm++ runtime system. This includes launching the
+compiler selected during the Charm++ build process, passing any toolchain
+parameters important for proper function on the selected build target,
+supplying the include and link paths for the runtime system, and linking
+with Charm++ components important for AMPI, including Isomalloc heap
+interception and commonly used load balancers.
 
 .. _tab:toolchain:
 .. table:: Full list of AMPI toolchain wrappers.
@@ -343,13 +358,21 @@ adding this directory to the ``$PATH`` environment variable:
 
 These wrappers also allow the user to configure AMPI and Charm++-specific
 functionality.
-To use Isomalloc for transparently migrating user heap data, link with
-*-memory isomalloc*. To use a Charm++ load balancer, link a strategy or
-a suite of strategies in with *-module <LB>*. For example:
+For example, to automatically select a Charm++ load balancer at program
+launch without passing the ``+balancer`` runtime parameter, specify a
+strategy at link time with ``-balancer <LB>``:
 
 .. code-block:: bash
 
-   $ ampicc pgm.c -o pgm -O3 -memory isomalloc -module CommonLBs
+   $ ampicc pgm.c -o pgm -O3 -balancer GreedyRefineLB
+
+Internally, the toolchain wrappers call the Charm runtime's general
+toolchain script, ``charmc``. By default, they will specify ``-memory
+isomalloc`` and ``-module CommonLBs``. Advanced users can disable
+Isomalloc heap interception by passing ``-memory default``. For
+diagnostic purposes, the ``-verbose`` option will print all parameters
+passed to each stage of the toolchain. Refer to the Charm++ manual for
+information about the full set of parameters supported by ``charmc``.
 
 Running AMPI Programs
 ---------------------
@@ -377,10 +400,9 @@ arguments. A typical invocation of an AMPI program ``pgm`` with
 Here, the AMPI program ``pgm`` is run on 16 physical processors with 64
 total virtual ranks (which will be mapped 4 per processor initially).
 
-To run with load balancing, specify a load balancing strategy. If
-Address Space Layout Randomization is enabled on your target system, you
-may need to add the flag ``+isomalloc_sync`` when running with
-migration. You can also specify the size of user-level thread’s stack
+To run with load balancing, specify a load balancing strategy.
+
+You can also specify the size of user-level thread’s stack
 using the ``+tcharm_stacksize`` option, which can be used to decrease
 the size of the stack that must be migrated, as in the following
 example:
@@ -907,10 +929,12 @@ around. This approach is portable across systems and compilers and may
 also improve locality and hence cache utilization. It also does not have
 the context-switch overhead of swapping globals. We have multiple tools
 for automating these transformations for different languages. Currently,
-there is a tool called *Photran*\  [3]_ for refactoring Fortran codes
+there is a tool called *Photran* (http://www.eclipse.org/photran) for
+refactoring Fortran codes
 that can do this transformation. It is Eclipse-based and works by
 constructing Abstract Syntax Trees (ASTs) of the program. We also have a
-tool built on top of the *ROSE compiler*\  [4]_ that works for C/C++ and
+tool built on top of the *ROSE compiler* (http://rosecompiler.org/)
+that works for C/C++ and
 Fortran programs that is available upon request. It emits patches for
 all files containing global variables which can then be applied to the
 source code.
@@ -965,17 +989,19 @@ using a custom memory allocator, Isomalloc, which returns virtual memory
 addresses that are globally unique across an entire job. This
 means that every worker thread in the system reserves slices of virtual
 memory for all user-level threads, allowing transparent migration of
-stacks and pointers into memory (Isomalloc requires 64-bit virtual
+stacks and pointers into memory. (Isomalloc requires 64-bit virtual
 memory addresses and support from the operating system for mapping
-memory to arbitrary virtual addresses). Applications only need to link
-with Isomalloc to enable automatic migratability, using *-memory
-isomalloc*.
+memory to arbitrary virtual addresses.) Applications built with AMPI's
+toolchain wrappers are automatically linked with Isomalloc as the active
+``malloc`` implementation if the target platform supports the feature.
 
 For systems that do not support Isomalloc and for users that wish to
 have more fine-grain control over which application data structures will
 be copied at migration time, we have added a few calls to AMPI. These
 include the ability to register thread-specific data with the run-time
-system, and the means to pack and unpack all of the thread’s data.
+system, and the means to pack and unpack all of the thread’s data. This
+mode of operation requires passing ``-memory default`` at link time to
+disable Isomalloc's heap interception.
 
 .. warning::
 
@@ -1485,10 +1511,12 @@ and additional command line options are required as well.
 User Defined Initial Mapping
 ----------------------------
 
-You can define the initial mapping of virtual processors (vp) to
-physical processors (p) as a runtime option. You can choose from
-predefined initial mappings or define your own mappings. The following
-predefined mappings are available:
+By default AMPI maps virtual processes to processing elements in a
+blocked fashion. This maximizes communication locality in the common
+case, but may not be ideal for all applications. With AMPI, users can
+define the initial mapping of virtual processors to physical processors
+at runtime, either choosing from the predefined initial mappings below
+or defining their own mapping in a file.
 
 Round Robin
    This mapping scheme maps virtual processor to physical processor in
@@ -1526,8 +1554,34 @@ Proportional Mapping
       $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP
       $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
 
-If you want to define your own mapping scheme, please contact us for
-assistance.
+Custom Mapping
+   To define your own mapping scheme, create a file named "mapfile"
+   which contains on each line the PE number you'd like that virtual
+   process to start on. This file is read when specifying the ``+mapping
+   MAPFILE`` option. The following mapfile will result in VPs 0, 2, 4,
+   and 6 being created on PE 0 and VPs 1, 3, 5, and 7 being created on
+   PE 1:
+
+   .. code-block:: none
+
+      0
+      1
+      0
+      1
+      0
+      1
+      0
+      1
+
+   .. code-block:: bash
+
+      $ ./charmrun ./hello +p2 +vp8 +mapping MAPFILE
+
+   Note that users can find the current mapping of ranks to PEs (after
+   dynamic load balancing) by calling ``AMPI_Comm_get_attr`` on
+   ``MPI_COMM_WORLD`` with the predefined ``AMPI_MY_WTH`` attribute.
+   This information can be gathered and dumped to a file for use in
+   future runs as the mapfile.
 
 Performance Visualization
 -------------------------
@@ -1870,7 +1924,7 @@ NAS Parallel Benchmarks (NPB 3.3)
       *cg.256.C* will appear in the *CG* and ``bin/`` directories. To
       run the particular benchmark, you must follow the standard
       procedure of running AMPI programs:
-      ``./charmrun ./cg.C.256 +p64 +vp256 ++nodelist nodelist +isomalloc_sync``
+      ``./charmrun ./cg.C.256 +p64 +vp256 ++nodelist nodelist``
 
 NAS PB Multi-Zone Version (NPB-MZ 3.3)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1903,7 +1957,7 @@ NAS PB Multi-Zone Version (NPB-MZ 3.3)
       directory. In the previous example, a file *bt-mz.256.C* will be
       created in the ``bin`` directory. To run the particular benchmark,
       you must follow the standard procedure of running AMPI programs:
-      ``./charmrun ./bt-mz.C.256 +p64 +vp256 ++nodelist nodelist +isomalloc_sync``
+      ``./charmrun ./bt-mz.C.256 +p64 +vp256 ++nodelist nodelist``
 
 HPCG v3.0
 ~~~~~~~~~
@@ -2051,20 +2105,6 @@ Other AMPI codes
 
 -  Harm3D
 
-.. [1]
-   Currently, AMPI supports the MPI-2.2 standard, and the MPI-3.1
-   standard is under active development, though we already support
-   non-blocking and neighborhood collectives among other MPI-3.1
-   features.
-
-.. [2]
-   http://www-unix.mcs.anl.gov/romio/
-
-.. [3]
-   http://www.eclipse.org/photran
-
-.. [4]
-   http://rosecompiler.org/
 
 .. [PiP2018]
    Atsushi Hori, Min Si, Balazs Gerofi, Masamichi Takagi, Jai Dayal, Pavan

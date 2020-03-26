@@ -21,6 +21,7 @@ clients, including the rest of Charm++, are actually C++.
 CkpvDeclare(std::vector<void *>, chare_objs);
 CkpvDeclare(std::vector<int>, chare_types);
 CkpvDeclare(std::vector<VidBlock *>, vidblocks);
+CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
 
 typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
@@ -547,13 +548,21 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
+  const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
   _entryTable[epIdx]->call(msg, obj);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
-  if (_entryTable[epIdx]->noKeep)
+  if (_entryTable[epIdx]->noKeep && msgtype != LAST_CK_ENVELOPE_TYPE)
   { /* Method doesn't keep/delete the message, so we have to: */
-    _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
+    if (msgtype != ArrayBcastFwdMsg) {
+      _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
+    } else if (_entryTable[epIdx]->msgIdx != -1) {
+      // For array broadcasts, the first time they show up here the msgIdx is
+      // -1, and they are just messages for CkArray::recvBroadcastNoKeep, so we
+      // don't want to delete them yet.
+      _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
+    }
   }
 }
 void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
@@ -670,13 +679,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0) {
-#if CMK_BIGSIM_CHARM
-      //In BigSim, CpvAccess(CsdSchedQueue) is not used. _CldEnqueue resets the
-      //handler to converse-level BigSim handler.
-      _CldEnqueue(CkMyPe(), pending, _infoIdx);
-#else
       CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
-#endif
     }
     CkpvAccess(_groupTable)->find(groupID).clearPending();
   }
@@ -1156,11 +1159,24 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   ArrayObjMap& object_map = CkpvAccess(array_objs);
   auto iter = object_map.find(env->getRecipientID());
   if (iter != object_map.end()) {
+
+    CkArrayMessage* msg = (CkArrayMessage*)EnvToUsr(env);
+
+    CkLocMgr *localLocMgr  = CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr();
+
+    // Check if the array element has active Rgets (because of ZC Pup)
+    auto iter2 = localLocMgr->bufferedActiveRgetMsgs.find(msg->array_element_id());
+
+    if(iter2 != localLocMgr->bufferedActiveRgetMsgs.end()) {
+      // array element has active rgets
+      iter2->second.push_back(msg); // Buffer msg for now and handle it after rgets complete
+      return;
+    }
+
     // First see if we already have a direct pointer to the object
     _SET_USED(env, 0);
     ck->process(); // ck->process() updates mProcessed count used in QD
     int opts = 0;
-    CkArrayMessage* msg = (CkArrayMessage*)EnvToUsr(env);
     if (msg->array_hops()>1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
@@ -1240,6 +1256,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       _processNodeBocInitMsg(ck,env);
       break;
     case ForBocMsg : // Group entry method message (non creation)
+    case ArrayBcastFwdMsg :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForBocMsg\n", CkMyPe());)
       // QD processing moved inside _processForBocMsg because it is conditional
       if(env->isPacked()) CkUnpackMessage(&env);
@@ -1254,6 +1271,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       // stats record moved to _processForNodeBocMsg because it is conditional
       break;
     case BocBcastMsg : // Broadcast that needs to be forwarded
+    case ArrayBcastMsg :
       if (env->isPacked()) CkUnpackMessage(&env);
       _processBocBcastMsg(ck,env);
       break;
@@ -1349,13 +1367,13 @@ void CkUnpackMessage(envelope **pEnv)
     _TRACE_BEGIN_UNPACK();
     msg = _msgTable[msgIdx]->unpack(msg);
     _TRACE_END_UNPACK();
+    env=UsrToEnv(msg);
+    env->setPacked(0);
 #if CMK_ONESIDED_IMPL
     short int zcMsgType = CMI_ZC_MSGTYPE(env);
     if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Convert offsets back into buffer pointers
       CkUnpackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
 #endif
-    env=UsrToEnv(msg);
-    env->setPacked(0);
     *pEnv = env;
   }
 }
@@ -1455,9 +1473,6 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   }
 }
 
-#if CMK_BIGSIM_CHARM
-#   define  _skipCldEnqueue   _CldEnqueue
-#endif
 
 // by pass Charm++ priority queue, send as Converse message
 static void _noCldEnqueueMulti(int npes, const int *pes, envelope *env)
@@ -1721,14 +1736,13 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     }else
     {
-// This is currently a workaround to prevent BIGSIM tests from breaking. It
-// prevents BIGSIM from working with node aware group broadcasts.
-// More info can be found here: https://github.com/UIUC-PPL/charm/pull/2440
-#if !CMK_BIGSIM_CHARM
         if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL)
-          env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
+          if (UsrToEnv(msg)->getMsgtype() == ArrayBcastMsg) {
+            env = _prepareMsgBranch(eIdx,msg,gID,ArrayBcastMsg);
+          } else {
+            env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
+          }
         else
-#endif
           env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
     }
 
@@ -1743,7 +1757,16 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
 
 static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
 {
-  envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  envelope* env;
+  if (UsrToEnv(msg)->getMsgtype() == ArrayBcastMsg) {
+    env = _prepareMsgBranch(eIdx,msg,gID,ArrayBcastFwdMsg);
+  } else if (UsrToEnv(msg)->getMsgtype() == BocBcastMsg
+      || UsrToEnv(msg)->getMsgtype() == ForNodeBocMsg) {
+    // TODO: Does this make sense when its a ForNode? Should ForNode even hit?
+    env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  } else {
+    CkAbort("Bad message type %i\n", UsrToEnv(msg)->getMsgtype());
+  }
   _TRACE_CREATION_N(env, CmiMyNodeSize());
   _CldEnqueueWithinNode(env, _infoIdx);
   _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
@@ -2124,10 +2147,6 @@ void CkDeleteChares() {
   }
 }
 
-#if CMK_BIGSIM_CHARM
-void CthEnqueueBigSimThread(CthThreadToken* token, int s,
-                                   int pb,unsigned int *prio);
-#endif
 
 //------------------- External client support (e.g. Charm4py) ----------------
 #if CMK_CHARMPY
@@ -2723,7 +2742,6 @@ class CkMessageReplay : public CkMessageWatcher {
 			return false;
 		}
 #endif
-#if ! CMK_BIGSIM_CHARM
 		if (nextSize!=env->getTotalsize())
                 {
 			CkPrintf("[%d] CkMessageReplay> Message size changed during replay org: [%d %d %d %d] got: [%d %d %d %d]\n", CkMyPe(), nextPE, nextSize, nextEvent, nextEP, env->getSrcPe(), env->getTotalsize(), env->getEvent(), env->getEpIdx());
@@ -2754,7 +2772,6 @@ class CkMessageReplay : public CkMessageWatcher {
 		  }
 		  if (!wasPacked) CkUnpackMessage(&env);
 		}
-#endif
 		return true;
 	}
 	bool isNext(CthThreadToken *token) {
@@ -2791,11 +2808,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	      CthThreadToken *token=delayedTokens.deq();
 	      if (isNext(token)) {
             REPLAYDEBUG("Dequeueing token: "<<token->serialNo)
-#if ! CMK_BIGSIM_CHARM
 	        CsdEnqueueLifo((void*)token);
-#else
-		CthEnqueueBigSimThread(token,0,0,NULL);
-#endif
 	        return;
 	      } else {
             REPLAYDEBUG("requeueing delayed token: "<<token->serialNo)
@@ -2921,9 +2934,7 @@ public:
 };
 
 void CkMessageReplayQuiescence(void *rep, double time) {
-#if ! CMK_BIGSIM_CHARM
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
-#endif
   CkMessageReplay *replay = (CkMessageReplay*)rep;
   //CmiStartQD(CkMessageReplayQuiescence, replay);
 }
@@ -2980,9 +2991,6 @@ void CpdHandleLBMessage(LBMigrateMsg **msg) {
   }
 }
 
-#if CMK_BIGSIM_CHARM
-CpvExtern(int      , CthResumeBigSimThreadIdx);
-#endif
 
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
@@ -3059,11 +3067,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    }
 	  }
 	  CpdSetInitializeMemory(1);
-#if ! CMK_BIGSIM_CHARM
 	  CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
-#else
-	  CkNumberHandler(CpvAccess(CthResumeBigSimThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
-#endif
 	  ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
 #else
           CkAbort("Option `+replay' requires that record-replay support be enabled at configure time (--enable-replay)");
@@ -3074,13 +3078,13 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	}
 }
 
-int CkMessageToEpIdx(void *msg) {
-        envelope *env=UsrToEnv(msg);
-	int ep=env->getEpIdx();
-	if (ep==CkIndex_CkArray::recvBroadcast(0))
-		return env->getsetArrayBcastEp();
-	else
-		return ep;
+int CkMessageToEpIdx(void* msg) {
+  envelope* env = UsrToEnv(msg);
+  int type = env->getMsgtype();
+  if (type == ArrayBcastMsg || type == ArrayBcastFwdMsg)
+    return env->getsetArrayBcastEp();
+  else
+    return env->getEpIdx();
 }
 
 int getCharmEnvelopeSize() {

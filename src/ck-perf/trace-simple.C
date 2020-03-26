@@ -137,11 +137,7 @@ extern "C" void traceSimpleExitFunction() {
 
 // Initialization of the parallel trace module.
 void initTraceSimpleBOC() {
-#ifdef __BIGSIM__
-  if (BgNodeRank()==0) {
-#else
     if (CkMyRank() == 0) {
-#endif
       registerExitFn(traceSimpleExitFunction);
     }
 }

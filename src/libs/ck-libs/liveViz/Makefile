@@ -40,11 +40,15 @@ colorScale.o: colorScale.C $(HEADDEP)
 ImageData.o : ImageData.C $(HEADDEP)
 	$(CHARMC) -c $(FLAGS) ImageData.C
 
-liveViz.decl.h liveViz.def.h: liveViz.ci
+liveViz.decl.h: liveViz.ci
 	$(CHARMC) liveViz.ci
 
-liveVizPoll.decl.h liveVizPoll.def.h: liveVizPoll.ci
+liveViz.def.h: liveViz.decl.h
+
+liveVizPoll.decl.h: liveVizPoll.ci
 	$(CHARMC) liveVizPoll.ci
+
+liveVizPoll.def.h: liveVizPoll.decl.h
 
 clean:
 	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) headers

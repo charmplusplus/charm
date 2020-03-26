@@ -82,12 +82,6 @@ void WhenConstruct::generateWhenCode(XStr& op, int indent) {
 
 // generate the call for this when
 
-#if CMK_BIGSIM_CHARM
-  // bgLog2 stores the parent dependence of when, e.g. for, olist
-  indentBy(op, indent);
-  op << "cmsgbuf->bgLog2 = "
-        "(void*)static_cast<SDAG::TransportableBigSimLog*>(c->closure[1])->log;\n";
-#endif
 
   // output the when function's name
   indentBy(op, indent);
@@ -103,8 +97,6 @@ void WhenConstruct::generateWhenCode(XStr& op, int indent) {
     if (state.isMessage)
       op << "static_cast<" << *state.type
          << "*>(static_cast<SDAG::MsgClosure*>(c->closure[" << cur << "])->msg)";
-    else if (state.isBgParentLog)
-      op << "NULL";
     else
       op << "static_cast<" << *state.type << "*>(c->closure[" << cur << "])";
     if (cur != encapState.size() - 1) op << ", ";
@@ -124,10 +116,6 @@ void WhenConstruct::generateWhenCode(XStr& op, int indent) {
   op << "\n";
   indentBy(op, indent);
   op << ");\n";
-#if CMK_BIGSIM_CHARM
-  generateTlineEndCall(op);
-  generateBeginExec(op, "sdagholder");
-#endif
 }
 
 void WhenConstruct::generateEntryName(XStr& defs, Entry* e, int curEntry) {
@@ -216,9 +204,6 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateClosureSignature(decls, defs, entry, false, "SDAG::Continuation*", label, false,
                            encapState, numRefs);
 
-#if CMK_BIGSIM_CHARM
-  generateBeginTime(defs);
-#endif
 
   if (entryLen > 1) defs << "  std::unordered_set<SDAG::Buffer*> ignore;\n";
 
@@ -267,27 +252,6 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   // decide based on whether buffers are found for each entry on the when
   defs << "  if (" << haveAllBuffersCond << ") {\n";
 
-#if CMK_BIGSIM_CHARM
-  {
-    // TODO: instead of this, add a length field to EntryList
-    defs << "    void* logs1[" << entryLen << "]; \n";
-    defs << "    void* logs2[" << entryLen + 1 << "]; \n";
-    int localnum = 0;
-    int cur = 0;
-    for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
-      XStr bufName("buf");
-      bufName << cur;
-      defs << "    logs1[" << localnum << "] = " << bufName << "->bgLog1; \n";
-      defs << "    logs2[" << localnum << "] = " << bufName << "->bgLog2; \n";
-      localnum++;
-    }
-    defs << "    logs2[" << localnum << "] = "
-         << "_bgParentLog; \n";
-    generateEventBracket(defs, SWHEN);
-    defs << "    _TRACE_BG_FORWARD_DEPS(logs1, logs2, " << localnum
-         << ", _bgParentLog);\n";
-  }
-#endif
 
   // remove all messages fetched from SDAG buffers
   defs << removeMessagesIfFound;
@@ -325,9 +289,8 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
       // if the current state param is a message, create a thin wrapper for it
       // (MsgClosure) for migration purposes
       if (state.isMessage) defs << "new SDAG::MsgClosure(";
-      if (state.isBgParentLog) defs << "new SDAG::TransportableBigSimLog(";
       state.name ? (defs << *state.name) : (defs << "gen" << cur);
-      if (state.isMessage || state.isBgParentLog) defs << ")";
+      if (state.isMessage) defs << ")";
       defs << ");\n";
     }
   }
@@ -353,10 +316,6 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateClosureSignature(decls, defs, entry, false, "void", label, true,
                            encapStateChild);
 
-#if CMK_BIGSIM_CHARM
-  generateBeginTime(defs);
-  generateEventBracket(defs, SWHEN_END);
-#endif
 
   // decrease the reference count of any message state parameters
   // that are going out of scope

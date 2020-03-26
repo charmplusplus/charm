@@ -1312,11 +1312,7 @@ static void CombineSummary()
 
 void initTraceSummaryBOC()
 {
-#ifdef __BIGSIM__
-  if(BgNodeRank()==0) {
-#else
   if (CkMyRank() == 0) {
-#endif
     registerExitFn(CombineSummary);
   }
 }

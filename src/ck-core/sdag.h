@@ -51,23 +51,6 @@ class CkMessage;
 class MergeablePathHistory;
 #endif
 namespace SDAG {
-  struct TransportableBigSimLog : public Closure {
-    void* log;
-    TransportableBigSimLog() : log(0) { init(); }
-    TransportableBigSimLog(CkMigrateMessage*) : log(0) { init(); }
-
-    TransportableBigSimLog(void* log)
-      : log(log) { init(); }
-
-    void pup(PUP::er& p) {
-      if (p.isUnpacking()) log = 0;
-      else if (log != 0)
-        CkAbort("BigSim logs stored by SDAG are not migratable\n");
-      packClosure(p);
-    }
-    PUPable_decl(TransportableBigSimLog);
-  };
-
   struct ForallClosure : public Closure {
     int val;
     ForallClosure() : val(0) { init(); }
@@ -198,19 +181,12 @@ namespace SDAG {
 #if USE_CRITICAL_PATH_HEADER_ARRAY
     MergeablePathHistory *savedPath;
 #endif
-#if CMK_BIGSIM_CHARM
-    void *bgLog1, *bgLog2;
-#endif
 
     Buffer(CkMigrateMessage*) { }
 
     Buffer(int entry, Closure* cl)
       : entry(entry)
       , cl(cl)
-#if CMK_BIGSIM_CHARM
-      , bgLog1(0)
-      , bgLog2(0)
-#endif
 #if USE_CRITICAL_PATH_HEADER_ARRAY
       ,savedPath(NULL)
 #endif
@@ -232,12 +208,6 @@ namespace SDAG {
     void pup(PUP::er& p) {
       p | entry;
       p | cl;
-#if CMK_BIGSIM_CHARM
-      if (p.isUnpacking())
-        bgLog1 = bgLog2 = 0;
-      else if (bgLog1 != 0 && bgLog2 != 0)
-        CkAbort("BigSim logs stored by SDAG are not migratable\n");
-#endif
     }
 
     virtual ~Buffer() {

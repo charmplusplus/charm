@@ -162,7 +162,7 @@ printUsage() {
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
     echo "  Other options that are not listed here will be passed directly to the"
     echo "underlying compiler and/or linker."
-    echo "Parallel Programming Lab, UIUC, 2019."
+    echo "Parallel Programming Lab, UIUC, 2020."
     echo $*
     exit 1
 }
@@ -476,7 +476,7 @@ do
 		"mblock") AddModules tcharmmain mblock ;;
 		"mblockf") AddModules tcharmmain mblock ; USE_F90_LIBRARIES="1" ;;
 
-		"charm"|"charm++"|"charm++f"|"f90charm"|"converse"|"converse++"|"bgcharm++"|"bgconverse++"|"bluegene"|"ckbluegene"|"bigsim")
+		"charm"|"charm++"|"charm++f"|"f90charm"|"converse"|"converse++")
 			PARADIGM="$1"
 			POST_LANGUAGE=1
 			;;
@@ -948,7 +948,7 @@ do
 	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
-	*.c|*.s|*.S|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
+	*.c|*.s|*.S|*.asm|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
 		BASE=`stripExtention \`basename $FILE\``
 		BASEO="$BASE.o"
 
@@ -1348,12 +1348,6 @@ case "$LANGUAGE" in
 	;;
 esac
 
-# update charm to bgcharm
-[ "$PARADIGM" = "charm++" -a -n "$CMK_BIGSIM" ] && PARADIGM="bgcharm++"
-[ "$PARADIGM" = "converse++" -a -n "$CMK_BIGSIM" ] && PARADIGM="bgconverse++"
-
-[ "$PARADIGM" = "bgcharm++" ] && TRACEMODE=`AddList $TRACEMODE bluegene`
-
 if [ $USE_F77_LIBRARIES = "1" ]
 then
 	POST_LIBRARIES="$POST_LIBRARIES $CMK_F77LIBS"
@@ -1389,18 +1383,6 @@ case "$PARADIGM" in
 "f90charm")
         PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm -lckf"
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
-	;;
-"bluegene"|"bigsim")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bigsim -lconv-bigsim-logs"
-	;;
-"ckbluegene")
-        POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
-	;;
-"bgcharm++")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bigsim -lconv-bigsim-logs -lconv-bluegene-stub"
-	;;
-"bgconverse++")
-        MIDDLE_LIBS="$MIDDLE_LIBS -lconv-bigsim -lconv-bigsim-logs"
 	;;
 esac
 
@@ -1502,7 +1484,7 @@ if [ x"$TRACEMODE" != x ]
 then
 for trace in $TRACEMODE; do
     case "$PARADIGM" in
-        "converse"|"converse++"|"bgconverse++"|"bigsim"|"bluegene")
+        "converse"|"converse++")
             if [ "$trace" != "counter" ]; then
                 Warning "Tracemode $trace isn't supported in Converse-level programs; Dropping it"
                 TRACEMODE=`DropList $trace $TRACEMODE`
@@ -1518,11 +1500,6 @@ done
 
 fi
 
-if test x$PARADIGM = x"bgcharm++"
-then
-    BALANCE=bluegene
-fi
-
 Debug "Finished with TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
 BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
@@ -1531,7 +1508,7 @@ BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
 
 # Set the default expansions of unprefixed variants
 case "$MEMORY" in
-  'verbose'|'paranoid'|'leak'|'isomalloc')
+  'verbose'|'record'|'paranoid'|'leak'|'isomalloc')
     MEMORY="os-$MEMORY"
     ;;
   charmdebug*)
@@ -1539,10 +1516,10 @@ case "$MEMORY" in
     ;;
 esac
 
-# Isomalloc does not work on BGQ or Windows:
+# -memory isomalloc does not work on BGQ or Windows:
 if [[ "$CMK_BLUEGENEQ" = '1' || "$CMK_WINDOWS" = '1' ]] && [[ "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]]
 then
-  Abort "Error: Isomalloc is not supported on BlueGene/Q or Windows."
+  Abort "Error: -memory isomalloc is not supported on BlueGene/Q or Windows."
 fi
 
 MEM_OBJ="-lmemory-${MEMORY}"
@@ -1624,7 +1601,7 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
+"charm"|"charm++"|"f90charm")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-machine $CORE_LIBS "
 	if [ -z "$NO_MAIN" ]
@@ -1645,7 +1622,7 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
+"converse"|"converse++")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lconv-core $MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
@@ -1675,7 +1652,7 @@ if [ -z "$STANDALONE" ]
 then
   ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES"
   case "$PARADIGM" in
-  "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
+  "charm"|"charm++"|"f90charm")
     ALL_LIBS="$ALL_LIBS -lmoduleNDMeshStreamer -lmodulecompletion"
     ;;
   esac
@@ -1882,7 +1859,7 @@ do
 #	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
 #	then
         case "$FILE_EXT" in
-        .c|.s|.S|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
+        .c|.s|.S|.asm|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASEO `stripExtention $BASEO`.f.o
         esac
@@ -1926,7 +1903,7 @@ do
 		  Do $CHARMBIN/charmxi $XIOPTS $FILE
                 fi
 		;;
-	*.c|*.s|*.S)
+	*.c|*.s|*.S|*.asm)
 		Do $CHARM_CC $CHARM_CC_FLAGS -c $FILE $DESTO
 		if [ "$Do_res" -ne 0 ]
 		then

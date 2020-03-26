@@ -7,50 +7,64 @@ TOKENS=6
 
 all: ampi
 
-ampi: jacobi jacobi.iso jacobi.tls jacobi-get
+AMPI_TARGETS := \
+  jacobi \
+  jacobi.pup \
+  jacobi.tls \
+  jacobi-get \
+
+ifeq ($(CMK_WINDOWS)$(CMK_BLUEGENEQ),00)
+AMPI_TARGETS += jacobi.iso
+endif
+
+ampi: $(AMPI_TARGETS)
 
 mpi: jacobi.C
 	mpiCC -o jacobi jacobi.C  $(OPTS)
 
 jacobi-cpp: jacobi-cpp.C
 	$(CHARMC) -c jacobi-cpp.C 
-	$(CHARMC) -o jacobi-cpp jacobi-cpp.o -module CommonLBs -lm
+	$(CHARMC) -o $@ jacobi-cpp.o -lm
 
-jacobi: jacobi.C
+jacobi.o: jacobi.C
 	$(CHARMC) -c jacobi.C 
-	$(CHARMC) -o jacobi jacobi.o -module CommonLBs -lm
+
+jacobi: jacobi.o
+	$(CHARMC) -o $@ $^ -lm
+
+jacobi.pup: jacobi.o
+	$(CHARMC) -o $@ $^ -memory default -lm
 
 jacobi.iso: jacobi.C
 	$(CHARMC) -c -DNO_PUP jacobi.C -o jacobi.iso.o
-	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module CommonLBs -memory isomalloc
+	$(CHARMC) -o $@ jacobi.iso.o -memory isomalloc
 
 jacobi.tls: jacobi.C
 ifeq ($(CMK_UTH),1)
 	@echo "Skipping jacobi.tls test on UTH (tlsglobals not supported)."
 else
 	-$(CHARMC) -c -tlsglobals jacobi.C -o jacobi.tls.o
-	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobals -module CommonLBs #-memory isomalloc
+	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobals
 endif
 
 jacobi.rose: jacobi.C
 	$(CHARMC) -roseomptlsglobals -o jacobi.rose.o -c $<
-	$(CHARMC) -roseomptlsglobals -o $@ jacobi.rose.o -module CommonLBs
+	$(CHARMC) -roseomptlsglobals -o $@ jacobi.rose.o
 
 jacobi-get: jacobi-get.C
 	$(CHARMC) -c jacobi-get.C
-	$(CHARMC) -o jacobi-get jacobi-get.o -module CommonLBs -lm
+	$(CHARMC) -o $@ jacobi-get.o -lm
 
 jacobi-get-tokens:
 	cd $(CHARMBASE)/tmp; touch machine.c; touch ckfutures.C; make AMPI OPTS="-DIGET_FLOWCONTROL=1 -DIGET_TOKENNUM=$(TOKENS)"; cd -; 
 	make jacobi-get;
 
 test: ampi
+	$(call run, +p3 ./jacobi.pup 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1 )
 	$(call run, +p3 ./jacobi 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1 )
-	[ ! -s "jacobi.iso" ] || $(call run, +p3 ./jacobi.iso 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1)
-
-bgtest: jacobi
-	$(call run, +p2 ./jacobi 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1 )
-	[ ! -s "jacobi.iso" ] || $(call run, +p2 ./jacobi.iso 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1 )
+ifeq ($(CMK_WINDOWS)$(CMK_BLUEGENEQ),00)
+	$(call run, +p3 ./jacobi.iso 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1)
+endif
 
 clean:
 	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls ampirun

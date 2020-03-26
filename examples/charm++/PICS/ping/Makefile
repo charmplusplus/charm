@@ -26,10 +26,3 @@ test: all
 	$(call run, +p1 ./pgm )
 	@echo "Inter-processor ping.."
 	$(call run, +p2 ./pgm )
-
-bgtest: all
-	@echo "Intra-processor ping.."
-	$(call run, +p1 ./pgm +x1 +y1 +z1 )
-	@echo "Inter-processor ping.."
-	$(call run, +p2 ./pgm +x2 +y1 +z1 )
-

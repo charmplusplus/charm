@@ -45,6 +45,7 @@ shift
 
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
+opt_ampi_only=0
 opt_build_shared=0
 opt_ccs=0
 opt_charmdebug=0
@@ -70,7 +71,6 @@ opt_qlogic=0
 opt_randomized_msgq=0
 opt_refnum_type="unsigned short"
 opt_replay=0
-opt_romio=1
 opt_shrinkexpand=0
 opt_smp=0
 opt_stats=0
@@ -80,6 +80,16 @@ opt_tcp=0
 opt_tracing=0
 opt_tracing_commthread=0
 opt_zlib=1
+
+# default to building ROMIO on AMPI where supported
+case "$triplet" in
+  *-win64*|*-win-*)
+    opt_romio=0
+    ;;
+  *)
+    opt_romio=1
+    ;;
+esac
 
 opt_CC= #undef
 opt_CXX= #undef
@@ -220,6 +230,9 @@ while [[ $# -gt 0 ]]; do
     --with-production)
       opt_production=1
       ;;
+    --ampi-only)
+      opt_ampi_only=1
+      ;;
     --with-romio)
       opt_romio=1
       ;;
@@ -261,6 +274,19 @@ done
 
 ############ End option parsing
 
+if [[ "$target" = "${target%AMPI-only}AMPI-only" ]]; then
+    opt_ampi_only=1
+
+    # strip "-only" suffix from AMPI target
+    target="${target%AMPI-only}AMPI"
+
+    # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
+    # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
+    # so we bump up the number of bits reserved for the collection in the objid.
+    opt_prio_type="char"
+    opt_extra_opts="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 -DCMK_FIFO_QUEUE_ONLY=1 -DCMK_OBJID_COLLECTION_BITS=29 $opt_extra_opts "
+fi
+
 opt_network=$(echo $triplet | cut -d '-' -f1)
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
@@ -294,6 +320,7 @@ fi
 
 CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DCMAKE_BUILD_TYPE="$opt_production" \
+  -DCMK_AMPI_ONLY="$opt_ampi_only" \
   -DCMK_AMPI_WITH_ROMIO="$opt_romio" \
   -DAMPI_ERROR_CHECKING="$opt_ampi_error_checking" \
   -DAMPI_MPICH_TESTS="$opt_ampi_mpich_tests" \

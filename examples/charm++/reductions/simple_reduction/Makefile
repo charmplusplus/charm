@@ -19,6 +19,3 @@ simple_reduction.o: simple_reduction.C simple_reduction.decl.h simple_reduction.
 
 test: all
 	$(call run, ./simple_reduction 20 4.5 10.3 +p4 )
-
-bgtest: all
-	$(call run, ./simple_reduction 20 4.5 10.3 +p4 +x2 +y2 +z2 )

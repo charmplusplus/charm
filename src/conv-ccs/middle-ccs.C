@@ -1,9 +1,6 @@
 #include <unistd.h>
 #include "middle.h"
 
-#if CMK_BIGSIM_CHARM
-#include "bgconverse.h"
-#endif
 #include "ccs-server.h"
 #include "conv-ccs.h"
 
@@ -158,9 +155,7 @@ void CpdFreeze(void)
   CpdNotify(CPD_FREEZE,pid);
   if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
   CpvAccess(freezeModeFlag) = 1;
-#if ! CMK_BIGSIM_CHARM
   CpdFreezeModeScheduler();
-#endif
 }
 
 void CpdUnFreeze(void)
@@ -172,27 +167,6 @@ int CpdIsFrozen(void) {
   return CpvAccess(freezeModeFlag);
 }
 
-#if CMK_BIGSIM_CHARM
-#include "blue_impl.h"
-void BgProcessMessageFreezeMode(threadInfo *t, char *msg) {
-//  CmiPrintf("BgProcessMessageFreezeMode\n");
-#if CMK_CCS_AVAILABLE
-  void *debugQ=CpvAccess(debugQueue);
-  CmiAssert(msg!=NULL);
-  int processImmediately = CpdIsDebugMessage(msg);
-  if (processImmediately) BgProcessMessageDefault(t, msg);
-  while (!CpvAccess(freezeModeFlag) && !CdsFifo_Empty(debugQ)) {
-    BgProcessMessageDefault(t, (char*)CdsFifo_Dequeue(debugQ));
-  }
-  if (!processImmediately) {
-    if (!CpvAccess(freezeModeFlag)) BgProcessMessageDefault(t, msg); 
-    else CdsFifo_Enqueue(debugQ, msg);
-  }
-#else
-  BgProcessMessageDefault(t, msg);
-#endif
-}
-#endif
 
 void PrintDebugStackTrace(void *);
 void * MemoryToSlot(void *ptr);
