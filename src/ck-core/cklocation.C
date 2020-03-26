@@ -1561,9 +1561,6 @@ void CkMigratable::CkAbort(const char *format, ...) const {
 
 void CkMigratable::ResumeFromSync(void)
 {
-#if CMK_LBDB_ON
-	CkAbort("::ResumeFromSync() not defined for this array element!\n");
-#endif
 }
 
 void CkMigratable::AtSyncBarrierReached(void)
