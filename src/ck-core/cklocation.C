@@ -1563,11 +1563,6 @@ void CkMigratable::ResumeFromSync(void)
 {
 }
 
-void CkMigratable::AtSyncBarrierReached(void)
-{
-  CkAbort("::AtSyncBarrierReached() not defined for this array element!\n");
-}
-
 void CkMigratable::UserSetLBLoad() {
 	CkAbort("::UserSetLBLoad() not defined for this array element!\n");
 }

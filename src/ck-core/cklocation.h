@@ -451,8 +451,6 @@ typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
 	void reclaimRemote(const CkArrayIndex &idx,int deletedOnPe);
 	void dummyAtSync(void);
 
-  void AtSyncBarrierReached();
-
 	/// return a list of migratables in this local record
 	void migratableList(CkLocRec *rec, std::vector<CkMigratable *> &list);
 
@@ -463,6 +461,7 @@ typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
 
 private:
 //Internal interface:
+	void AtSyncBarrierReached();
 	//Add given element array record at idx, replacing the existing record
 	void insertRec(CkLocRec *rec,const CmiUInt8 &id);
 
