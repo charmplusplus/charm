@@ -1655,13 +1655,13 @@ void _initCharm(int unused_argc, char **argv)
     // Only worker threads execute the following
     if (!CmiInCommThread()) {
       if (CmiMyRank() == 0) {
-        initHybridAPI(); // Initialize per-process variables (GPUManager)
+        hapiInitCsv(); // Initialize per-process variables (GPUManager)
       }
-      initCpvs(); // Initialize per-PE variables
+      hapiInitCpv(); // Initialize per-PE variables
 
       CmiNodeBarrier();
 
-      initDeviceMapping(argv); // Perform PE-device mapping
+      hapiMapping(argv); // Perform PE-device mapping
 
       CmiNodeBarrier();
 

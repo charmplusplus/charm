@@ -196,7 +196,7 @@ CpvDeclare(char *, _validProcessors);
 CpvExtern(int, n_hapi_events);
 extern "C" void hapiPollEvents();
 extern "C" void shmCleanup();
-extern "C" void exitHybridAPI();
+extern "C" void hapiExitCsv();
 #endif
 
 /*****************************************************************************
@@ -4088,7 +4088,7 @@ void ConverseCommonExit(void)
 
     if (CmiMyRank() == 0) {
       shmCleanup();
-      exitHybridAPI();
+      hapiExitCsv();
     }
   }
 #endif

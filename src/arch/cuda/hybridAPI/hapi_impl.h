@@ -13,15 +13,13 @@ extern "C" {
 // Scale the amount of memory each node pins.
 #define HAPI_MEMPOOL_SCALE 1.0
 
-// Initialize & exit hybrid API.
-void initHybridAPI();
-void exitHybridAPI();
-
-// Initializes PE-private variables, including event queues used for polling
-void initCpvs();
+// Init & exit functions
+void hapiInitCsv();
+void hapiInitCpv();
+void hapiExitCsv();
 
 // Maps PEs to devices
-void initDeviceMapping(char** argv);
+void hapiMapping(char** argv);
 
 // CUDA IPC related functions
 void shmCreate();

@@ -131,7 +131,7 @@ struct GPUManager {
     data_cleanup_idx_ = 0;
 
 #if CMK_SMP
-    // create mutex locks
+    // Create mutex locks
     queue_lock_ = CmiCreateLock();
     progress_lock_ = CmiCreateLock();
     stream_lock_ = CmiCreateLock();
@@ -161,11 +161,11 @@ struct GPUManager {
     // Number of CUDA IPC events per PE
     ipc_event_pool_size = -1;
 
-    // allocate host/device buffers array (both user and system-addressed)
+    // Allocate host/device buffers array (both user and system-addressed)
     host_buffers_ = new void*[NUM_BUFFERS*2];
     device_buffers_ = new void*[NUM_BUFFERS*2];
 
-    // initialize device array to NULL
+    // Initialize device array to NULL
     for (int i = 0; i < NUM_BUFFERS*2; i++) {
       device_buffers_[i] = NULL;
     }
@@ -188,6 +188,56 @@ struct GPUManager {
 
 #ifdef HAPI_INSTRUMENT_WRS
     init_instr_ = false;
+#endif
+  }
+
+  void destroy() {
+#if CMK_SMP
+    // Destroy mutex locks
+    CmiDestroyLock(queue_lock_);
+    CmiDestroyLock(progress_lock_);
+    CmiDestroyLock(stream_lock_);
+    CmiDestroyLock(mempool_lock_);
+    CmiDestroyLock(inst_lock_);
+#endif
+
+    // Delete data structures
+    delete[] host_buffers_;
+    delete[] device_buffers_;
+
+    // Destroy device managers
+    for (DeviceManager& dm : device_managers) {
+      dm.destroy();
+    }
+    device_managers.clear();
+
+    // Destroy streams
+    if (streams_) {
+      for (int i = 0; i < n_streams_; i++) {
+        hapiCheck(cudaStreamDestroy(streams_[i]));
+      }
+    }
+
+#ifdef HAPI_TRACE
+    // Print traced GPU events
+    for (int i = 0; i < time_idx_; i++) {
+      switch (gpu_events_[i].event_type) {
+        case DataSetup:
+          CmiPrintf("[HAPI] kernel %s data setup\n", gpu_events_[i].trace_name);
+          break;
+        case DataCleanup:
+          CmiPrintf("[HAPI] kernel %s data cleanup\n", gpu_events_[i].trace_name);
+          break;
+        case KernelExecution:
+          CmiPrintf("[HAPI] kernel %s execution\n", gpu_events_[i].trace_name);
+          break;
+        default:
+          CmiPrintf("[HAPI] invalid timer identifier\n");
+      }
+      CmiPrintf("[HAPI] %.2f:%.2f\n",
+          gpu_events_[i].cmi_start_time - gpu_events_[0].cmi_start_time,
+          gpu_events_[i].cmi_end_time - gpu_events_[0].cmi_start_time);
+    }
 #endif
   }
 
@@ -267,14 +317,6 @@ struct GPUManager {
     delete [] old_streams;
 
     return n_streams_;
-  }
-
-  void destroyStreams() {
-    if (streams_) {
-      for (int i = 0; i < n_streams_; i++) {
-        hapiCheck(cudaStreamDestroy(streams_[i]));
-      }
-    }
   }
 
   cudaStream_t getNextStream() {
