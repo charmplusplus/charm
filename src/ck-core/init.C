@@ -1654,15 +1654,18 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CUDA
     // Only worker threads execute the following
     if (!CmiInCommThread()) {
-      initDeviceMapping(argv);
       if (CmiMyRank() == 0) {
-        initHybridAPI();
+        hapiInitCsv(); // Initialize per-process variables (GPUManager)
       }
-      initEventQueues();
+      hapiInitCpv(); // Initialize per-PE variables
 
-      // ensure HAPI is initialized before registering callback functions
       CmiNodeBarrier();
 
+      hapiMapping(argv); // Perform PE-device mapping
+
+      CmiNodeBarrier();
+
+      // Register callback functions and initialize Charm++ layer functions
       hapiRegisterCallbacks();
       hapiInvokeCallback = CUDACallbackManager;
       hapiQdCreate = QdCreate;
