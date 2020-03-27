@@ -1,4 +1,4 @@
-name: UCX Linux
+name: UCX 1.7.0 Linux
 
 on: [push]
 
@@ -11,7 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build-ucx
-      run: git clone https://github.com/openucx/ucx.git && cd ucx && ./autogen.sh && ./contrib/configure-release --disable-numa && make -j4 && sudo make install
+      run: git clone --branch v1.7.0 https://github.com/openucx/ucx.git && cd ucx && ./autogen.sh && ./contrib/configure-release --disable-numa && make -j4 && sudo make install
     - name: build-ompi
       run: wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz && tar -xf openmpi-4.0.1.tar.gz && cd openmpi-4.0.1/ && ./configure --enable-mca-no-build=btl-uct --enable-install-libpmix && make -j 4 && sudo make install
     - name: build

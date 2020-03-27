@@ -4,7 +4,7 @@
       !!! OpenMP's threadprivate attribute and compiling with ampif90's -tlsglobals
       !!! option. Since parameter variables are immutable, they need not be privatized.
 
-      module test_mod
+      module test_mod_tlsglobals
 
         implicit none
 
@@ -12,7 +12,7 @@
         integer, target :: module_variable
         !$omp threadprivate(module_variable)
 
-      end module test_mod
+      end module test_mod_tlsglobals
 
 
       subroutine mpi_main
@@ -47,7 +47,7 @@
 
       subroutine perform_test_batch(failed, rank, my_wth, operation)
 
-        use test_mod
+        use test_mod_tlsglobals
         implicit none
 
         integer :: failed, rank, my_wth, operation

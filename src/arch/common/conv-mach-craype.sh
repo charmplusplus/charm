@@ -76,7 +76,7 @@ then
 CMK_CF77="ftn -auto "
 CMK_CF90="ftn -auto "
 
-F90DIR=`which ifort 2> /dev/null`
+F90DIR=`command -v ifort 2> /dev/null`
 if test -x "$F90DIR"
 then
   MYDIR="$PWD"

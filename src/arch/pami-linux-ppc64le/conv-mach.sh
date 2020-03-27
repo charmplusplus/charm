@@ -40,7 +40,7 @@ CMK_MOD_EXT='mod'
 CMK_F90_MODINC='-p'
 CMK_F90_USE_MODDIR=''
 
-F90DIR=`which ifort 2> /dev/null`
+F90DIR=`command -v ifort 2> /dev/null`
 if test -x "$F90DIR"
 then
   MYDIR="$PWD"
