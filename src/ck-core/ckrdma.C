@@ -2211,6 +2211,10 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         }
     }
 
+    // Add source callback for polling, so that it can be invoked once the transfer is complete
+    CkCallback* cb = new CkCallback(source.cb);
+    hapiAddCallback(postStructs[i].cuda_stream, cb);
+
     p|source;
   }
 
