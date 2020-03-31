@@ -192,13 +192,6 @@ class Stencil: public CBase_Stencil {
       // start measuring time
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
         startTime = CkWallTimer();
-
-#if CMK_LBDB_ON
-      // set period arbitrarily small so that LB occurs when AtSync is called
-      // this is in case the default LBPERIOD is larger than the time to complete LBPERIOD_ITER
-      // iterations
-      getLBMgr()->SetLBPeriod(0);
-#endif
     }
 
     void pup(PUP::er &p)
