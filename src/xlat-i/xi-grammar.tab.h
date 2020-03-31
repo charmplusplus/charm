@@ -112,14 +112,15 @@ extern int yydebug;
     DOUBLE = 322,
     UNSIGNED = 323,
     SIZET = 324,
-    ACCEL = 325,
-    READWRITE = 326,
-    WRITEONLY = 327,
-    ACCELBLOCK = 328,
-    MEMCRITICAL = 329,
-    REDUCTIONTARGET = 330,
-    CASE = 331,
-    TYPENAME = 332
+    BOOL = 325,
+    ACCEL = 326,
+    READWRITE = 327,
+    WRITEONLY = 328,
+    ACCELBLOCK = 329,
+    MEMCRITICAL = 330,
+    REDUCTIONTARGET = 331,
+    CASE = 332,
+    TYPENAME = 333
   };
 #endif
 /* Tokens.  */
@@ -190,14 +191,15 @@ extern int yydebug;
 #define DOUBLE 322
 #define UNSIGNED 323
 #define SIZET 324
-#define ACCEL 325
-#define READWRITE 326
-#define WRITEONLY 327
-#define ACCELBLOCK 328
-#define MEMCRITICAL 329
-#define REDUCTIONTARGET 330
-#define CASE 331
-#define TYPENAME 332
+#define BOOL 325
+#define ACCEL 326
+#define READWRITE 327
+#define WRITEONLY 328
+#define ACCELBLOCK 329
+#define MEMCRITICAL 330
+#define REDUCTIONTARGET 331
+#define CASE 332
+#define TYPENAME 333
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -206,6 +208,8 @@ union YYSTYPE
 {
 #line 53 "xi-grammar.y" /* yacc.c:1909  */
 
+  Attribute *attr;
+  Attribute::Argument *attrarg;
   AstChildren<Module> *modlist;
   Module *module;
   ConstructList *conslist;
@@ -248,7 +252,7 @@ union YYSTYPE
   XStr* xstrptr;
   AccelBlock* accelBlock;
 
-#line 252 "y.tab.h" /* yacc.c:1909  */
+#line 256 "y.tab.h" /* yacc.c:1909  */
 };
 
 typedef union YYSTYPE YYSTYPE;

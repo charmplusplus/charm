@@ -5,9 +5,9 @@ module NDMeshStreamer {
   message MeshStreamerMessageV {
     int destinationPes[];
     int sourcePes[];
-    char dataItems[];
     int offsets[];
     CkArrayIndex destObjects[];
+    char dataItems[];
   };
 
   template<class dtype, class RouterType>
@@ -34,14 +34,11 @@ module NDMeshStreamer {
     group [migratable] ArrayMeshStreamer :
     MeshStreamer<dtype, RouterType> {
     entry ArrayMeshStreamer(
-          int maxNumDataItemsBuffered, int numDimensions,
-          int dimensionSizes[numDimensions], CkArrayID clientAID,
-          bool yieldFlag = 0, double progressPeriodInMs = -1.0);
-    entry ArrayMeshStreamer(
           int numDimensions, int dimensionSizes[numDimensions],
           CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
-          double progressPeriodInMs = -1.0);
-
+          double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
+          int _thresholdFractionNum = 1, int _thresholdFractionDen = 2,
+          int _cutoffFractionNum = 1, int _cutoffFractionDen = 2);
     entry void processLocationRequest(CkArrayIndex arrayId, int deliveredToPe,
                                       int sourcePe);
     entry void resendMisdeliveredItems(CkArrayIndex arrayId, int destinationPe);

@@ -27,12 +27,12 @@
 
 #define TRAM_BROADCAST (-100)
 
-#define TRAM_BUFFER_SIZE 20480
+//#define TRAM_BUFFER_SIZE 20480
 
-#define TRAM_SEND_CUTOFF_NUMERATOR 5
-#define TRAM_SEND_CUTOFF_DENOMINATOR 10
-#define TRAM_SEND_FRACTION_NUMERATOR 5
-#define TRAM_SEND_FRACTION_DENOMINATOR 10
+//#define TRAM_SEND_CUTOFF_NUMERATOR 5
+//#define TRAM_SEND_CUTOFF_DENOMINATOR 10
+//#define TRAM_SEND_FRACTION_NUMERATOR 5
+//#define TRAM_SEND_FRACTION_DENOMINATOR 10
 extern void QdCreate(int n);
 extern void QdProcess(int n);
 //below code uses templates to generate appropriate TRAM_BROADCAST array index values
@@ -75,7 +75,7 @@ struct TramBroadcastInstance<CkArrayIndex>{
 };
 
 template <typename T>
-struct is_fixed_size {
+struct is_PUPbytes {
   static const bool value = false;
 };
 
@@ -106,7 +106,7 @@ public:
     }
   }
   template <typename dtype>
-  inline typename std::enable_if<is_fixed_size<dtype>::value,int>::type addDataItem(dtype& dataItem, CkArrayIndex index, int sourcePe) {
+  inline typename std::enable_if<is_PUPbytes<dtype>::value,int>::type addDataItem(dtype& dataItem, CkArrayIndex index, int sourcePe) {
     char* offset = dataItems + (numDataItems*sizeof(dtype));
     *reinterpret_cast<dtype*>(offset) = dataItem;
     destObjects[numDataItems]=index;
@@ -114,7 +114,7 @@ public:
     return ++numDataItems;
   }
   template <typename dtype>
-  inline typename std::enable_if<!is_fixed_size<dtype>::value,int>::type addDataItem(dtype& dataItem, CkArrayIndex index, int sourcePe) {
+  inline typename std::enable_if<!is_PUPbytes<dtype>::value,int>::type addDataItem(dtype& dataItem, CkArrayIndex index, int sourcePe) {
     size_t sz=PUP::size(dataItem);
     PUP::toMemBuf(dataItem,dataItems+offsets[numDataItems],sz);
     offsets[numDataItems+1]=offsets[numDataItems]+sz;
@@ -141,12 +141,12 @@ public:
     destinationPes[index] = destinationPe;
   }
   template <typename dtype>
-  inline typename std::enable_if<is_fixed_size<dtype>::value,dtype>::type getDataItem(const int index) {
+  inline typename std::enable_if<is_PUPbytes<dtype>::value,dtype>::type getDataItem(const int index) {
     char *objptr = dataItems + (numDataItems*sizeof(dtype));
     return *reinterpret_cast<dtype*>(objptr);
   }
   template <typename dtype>
-  inline typename std::enable_if<!is_fixed_size<dtype>::value,dtype>::type getDataItem(const int index) {
+  inline typename std::enable_if<!is_PUPbytes<dtype>::value,dtype>::type getDataItem(const int index) {
     dtype obj;
     size_t sz=offsets[index+1]-offsets[index];
     PUP::fromMemBuf(obj,dataItems+offsets[index],sz);
@@ -170,6 +170,7 @@ private:
   int bufferSize_;
   int maxNumDataItemsBuffered_;
   int numDataItemsBuffered_;
+  int maxItemsBuffered;
 
   CkCallback userCallback_;
   bool yieldFlag_;
@@ -192,6 +193,11 @@ private:
   int numLocalDone_;
   int numLocalContributors_;
   CompletionStatus myCompletionStatus_;
+  int tramBufferSize;
+  int thresholdFractionNumerator;
+  int thresholdFractionDenominator;
+  int cutoffFractionNumerator;
+  int cutoffFractionDenominator;
 
   virtual void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
 
@@ -227,7 +233,9 @@ protected:
 
   void ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
                   int *dimensionSizes, int bufferSize,
-                  bool yieldFlag, double progressPeriodInMs);
+                  bool yieldFlag, double progressPeriodInMs,
+                  int mib, int tfn, int tfd,
+                  int cfn, int cfd);
 
 public:
   MeshStreamer() {}
@@ -372,19 +380,11 @@ public:
 };
 
 template <class dtype, class RouterType>
-MeshStreamer<dtype, RouterType>::
-MeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
-             int *dimensionSizes, int bufferSize, bool yieldFlag,
-             double progressPeriodInMs) {
-  ctorHelper(maxNumDataItemsBuffered, numDimensions, dimensionSizes,
-             bufferSize, yieldFlag, progressPeriodInMs);
-}
-
-template <class dtype, class RouterType>
 void MeshStreamer<dtype, RouterType>::
 ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
            int *dimensionSizes, int bufferSize,
-           bool yieldFlag, double progressPeriodInMs) {
+           bool yieldFlag, double progressPeriodInMs,
+           int mib, int tfn, int tfd, int cfn, int cfd) {
 
   numDimensions_ = numDimensions;
   maxNumDataItemsBuffered_ = maxNumDataItemsBuffered;
@@ -394,6 +394,11 @@ ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
   numDataItemsBuffered_ = 0;
   numMembers_ = CkNumPes();
   myIndex_ = CkMyPe();
+  maxItemsBuffered = mib;
+  thresholdFractionNumerator = tfn;
+  thresholdFractionDenominator = tfd;
+  cutoffFractionNumerator = cfn;
+  cutoffFractionDenominator = cfd;
 
   myRouter_.initializeRouter(numDimensions_, myIndex_, dimensionSizes);
   int maxNumBuffers = myRouter_.maxNumAllocatedBuffers();
@@ -497,20 +502,20 @@ storeMessageData(int destinationPe, const Route& destinationRoute,
 
   // allocate new message if necessary
   if (messageBuffers[bufferIndex] == NULL) {
-    int numDestIndices = bufferSize_;
+    int numDestIndices = maxItemsBuffered;
     // personalized messages do not require destination indices
     if (personalizedMessage) {
       numDestIndices = 0;
     }
-    if (!is_fixed_size<dtype>::value) {
+    if (!is_PUPbytes<dtype>::value) {
       messageBuffers[bufferIndex] =
-        new (numDestIndices, numDestIndices, TRAM_BUFFER_SIZE, bufferSize_+1,bufferSize_, 8 * sizeof(int))
-        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_fixed_size<dtype>::value);
+        new (numDestIndices, numDestIndices, numDestIndices+1, numDestIndices, bufferSize_, 8 * sizeof(int))
+        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_PUPbytes<dtype>::value);
     }
     else {
       messageBuffers[bufferIndex] =
-        new (numDestIndices, numDestIndices, TRAM_BUFFER_SIZE, 0,bufferSize_, 8 * sizeof(int))
-        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_fixed_size<dtype>::value);
+        new (numDestIndices, numDestIndices, 0, numDestIndices, bufferSize_, 8 * sizeof(int))
+        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_PUPbytes<dtype>::value);
     }
 
     *(int *) CkPriorityPtr(messageBuffers[bufferIndex]) = prio_;
@@ -526,7 +531,7 @@ storeMessageData(int destinationPe, const Route& destinationRoute,
   }
   numDataItemsBuffered_++;
   // send if buffer is full
-  if (numBuffered == bufferSize_ || destinationBuffer->template getoffset<dtype>(destinationBuffer->numDataItems)>(TRAM_SEND_FRACTION_NUMERATOR*(TRAM_BUFFER_SIZE/TRAM_SEND_FRACTION_DENOMINATOR))) {
+  if (numBuffered == maxItemsBuffered || destinationBuffer->template getoffset<dtype>(destinationBuffer->numDataItems)>(thresholdFractionNumerator*(bufferSize_/thresholdFractionDenominator))) {
 
     sendMeshStreamerMessage(destinationBuffer, dimension,
                             destinationRoute.destinationPe);
@@ -554,17 +559,17 @@ storeMessage(int destinationPe, const Route& destinationRoute,
     = dataBuffers_[dimension];
 
   bool personalizedMessage = myRouter_.isMessagePersonalized(dimension);
-  if (PUP::size(const_cast<dtype&>(*(dataItem->dataItem)))>(TRAM_SEND_CUTOFF_NUMERATOR*(TRAM_BUFFER_SIZE/TRAM_SEND_CUTOFF_DENOMINATOR))) {
+  if (PUP::size(const_cast<dtype&>(*(dataItem->dataItem)))>(cutoffFractionNumerator*(bufferSize_/cutoffFractionDenominator))) {
     MeshStreamerMessageV* msg;
-    if (!is_fixed_size<dtype>::value) {
+    if (!is_PUPbytes<dtype>::value) {
       msg =
-        new (1, 1, TRAM_BUFFER_SIZE, bufferSize_+1,bufferSize_, 8 * sizeof(int))
-        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_fixed_size<dtype>::value);
+        new (1, 1, 2, 1, bufferSize_, 8 * sizeof(int))
+        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_PUPbytes<dtype>::value);
     }
     else {
       msg =
-        new (1, 1, TRAM_BUFFER_SIZE, 0,bufferSize_, 8 * sizeof(int))
-        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_fixed_size<dtype>::value);
+        new (1, 1, 0, 1, bufferSize_, 8 * sizeof(int))
+        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_PUPbytes<dtype>::value);
     }
     *(int *) CkPriorityPtr(msg) = prio_;
     CkSetQueueing(msg, CK_QUEUEING_IFIFO);
@@ -575,20 +580,20 @@ storeMessage(int destinationPe, const Route& destinationRoute,
 
   // allocate new message if necessary
   if (messageBuffers[bufferIndex] == NULL) {
-    int numDestIndices = bufferSize_;
+    int numDestIndices = maxItemsBuffered;
     // personalized messages do not require destination indices
     if (personalizedMessage) {
       numDestIndices = 0;
     }
-    if (!is_fixed_size<dtype>::value) {
+    if (!is_PUPbytes<dtype>::value) {
       messageBuffers[bufferIndex] =
-        new (numDestIndices, numDestIndices, TRAM_BUFFER_SIZE, bufferSize_+1,bufferSize_, 8 * sizeof(int))
-        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_fixed_size<dtype>::value);
+        new (numDestIndices, numDestIndices, numDestIndices+1, numDestIndices, bufferSize_, 8 * sizeof(int))
+        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_PUPbytes<dtype>::value);
     }
     else {
       messageBuffers[bufferIndex] =
-        new (numDestIndices, numDestIndices, TRAM_BUFFER_SIZE, 0, bufferSize_, 8 * sizeof(int))
-        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_fixed_size<dtype>::value);
+        new (numDestIndices, numDestIndices, 0, numDestIndices, bufferSize_, 8 * sizeof(int))
+        MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_PUPbytes<dtype>::value);
     }
 
     *(int *) CkPriorityPtr(messageBuffers[bufferIndex]) = prio_;
@@ -604,7 +609,7 @@ storeMessage(int destinationPe, const Route& destinationRoute,
   }
   numDataItemsBuffered_++;
   // send if buffer is full
-  if (numBuffered == bufferSize_ || destinationBuffer->template getoffset<dtype>(destinationBuffer->numDataItems)>=(TRAM_SEND_CUTOFF_NUMERATOR*(TRAM_BUFFER_SIZE/TRAM_SEND_CUTOFF_DENOMINATOR))) {
+  if (numBuffered == maxItemsBuffered || destinationBuffer->template getoffset<dtype>(destinationBuffer->numDataItems)>=(cutoffFractionNumerator*(bufferSize_/cutoffFractionDenominator))) {
 //record number of data items sent here
     sendMeshStreamerMessage(destinationBuffer, dimension,
                             destinationRoute.destinationPe);
@@ -840,8 +845,8 @@ inline void MeshStreamer<dtype, RouterType>::sendLargestBuffer() {
 
       // not sending the full buffer, shrink the message size
       envelope *env = UsrToEnv(destinationBuffer);
-      env->shrinkUsersize((TRAM_BUFFER_SIZE -
-      destinationBuffer->template getoffset<dtype>(destinationBuffer->numDataItems)));
+      //env->shrinkUsersize((bufferSize_ -
+      //destinationBuffer->template getoffset<dtype>(destinationBuffer->numDataItems)));
       numDataItemsBuffered_ -= destinationBuffer->numDataItems;
 
       destinationIndex =
@@ -887,8 +892,8 @@ flushDimension(int dimension, bool sendMsgCounts) {
       continue;
     }
     if(messageBuffers[j] == NULL && sendMsgCounts) {
-        messageBuffers[j] = new (0, 0, 0, 1, 0, 8 * sizeof(int))
-          MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_fixed_size<dtype>::value);
+        messageBuffers[j] = new (0, 0, 1, 0, 0, 8 * sizeof(int))
+          MeshStreamerMessageV(myRouter_.determineMsgType(dimension),is_PUPbytes<dtype>::value);
         *(int *) CkPriorityPtr(messageBuffers[j]) = prio_;
         CkSetQueueing(messageBuffers[j], CK_QUEUEING_IFIFO);
     }
@@ -896,10 +901,10 @@ flushDimension(int dimension, bool sendMsgCounts) {
       // if not sending the full buffer, shrink the message size
       envelope *env = UsrToEnv(messageBuffers[j]);
       //const UInt s = (bufferSize_ - messageBuffers[j]->numDataItems) * sizeof(dtype);
-      const UInt s = (bufferSize_ - messageBuffers[j]->template getoffset<dtype>(messageBuffers[j]->numDataItems));
-      if (env->getUsersize() > s) {
-        env->shrinkUsersize(s);
-      }
+      //const UInt s = (bufferSize_ - messageBuffers[j]->template getoffset<dtype>(messageBuffers[j]->numDataItems));
+      //if (env->getUsersize() > s) {
+      //  env->shrinkUsersize(s);
+      //}
     }
     
     MeshStreamerMessageV *destinationBuffer = messageBuffers[j];
@@ -963,6 +968,7 @@ void MeshStreamer<dtype, RouterType>::pup(PUP::er &p) {
   p|bufferSize_;
   p|maxNumDataItemsBuffered_;
   p|numDataItemsBuffered_;
+  p|maxItemsBuffered;
 
   p|userCallback_;
   p|yieldFlag_;
@@ -1040,9 +1046,14 @@ private:
   std::vector<int> destinationPes_;
   std::vector<bool> isCachedArrayMetadata_;
 #endif
+  int bufferSize;
+  int thresholdFractionNum;
+  int thresholdFractionDen;
+  int cutoffFractionNum;
+  int cutoffFractionDen;
 
   inline
-  void localDeliver(const char* data,size_t size,CkArrayIndex arrayId, int sourcePe/*const ArrayDataItem<dtype, itype>& packedDataItem*/) override {
+  void localDeliver(const char* data,size_t size,CkArrayIndex arrayId, int sourcePe) override {
     ClientType *clientObj;
 #ifdef CMK_TRAM_CACHE_ARRAY_METADATA
     clientObj = clientObjs_[arrayId];
@@ -1066,7 +1077,7 @@ private:
                 " are not guaranteed to be correct is currently"
                 " not supported.");
       }
-      if (!is_fixed_size<dtype>::value) {
+      if (!is_PUPbytes<dtype>::value) {
         dtype dataItem;
         PUP::fromMemBuf(dataItem,(void*)data,size);
         misdeliveredItems[arrayId].push_back(dataItem);
@@ -1103,23 +1114,16 @@ private:
 
 public:
 
-  ArrayMeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
-                    int *dimensionSizes, CkArrayID clientAID,
-                    bool yieldFlag = 0, double progressPeriodInMs = -1.0) {
-
-    this->ctorHelper(maxNumDataItemsBuffered, numDimensions, dimensionSizes, 0,
-                     yieldFlag, progressPeriodInMs);
-    clientAID_ = clientAID;
-    clientArrayMgr_ = clientAID_.ckLocalBranch();
-    clientLocMgr_ = clientArrayMgr_->getLocMgr();
-  }
-
   ArrayMeshStreamer(int numDimensions, int *dimensionSizes,
                     CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
-                    double progressPeriodInMs = -1.0) {
+                    double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
+                    int _thresholdFractionNum = 1, int _thresholdFractionDen = 2,
+                    int _cutoffFractionNum = 1, int _cutoffFractionDen = 2) {
 
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
-                     progressPeriodInMs);
+                     progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
+                     _thresholdFractionDen, _cutoffFractionNum,
+                     _cutoffFractionDen);
     clientAID_ = clientAID;
     clientArrayMgr_ = clientAID_.ckLocalBranch();
     clientLocMgr_ = clientArrayMgr_->getLocMgr();
