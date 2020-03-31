@@ -6,7 +6,7 @@
 #ifndef BASELB_H
 #define BASELB_H
 
-#include "LBDatabase.h"
+#include "LBManager.h"
 
 #define PER_MESSAGE_SEND_OVERHEAD_DEFAULT   3.5e-5
 #define PER_BYTE_SEND_OVERHEAD_DEFAULT      8.5e-9
@@ -24,9 +24,8 @@ class BaseLB: public CBase_BaseLB
 protected:
   int  seqno;
   const char *lbname;
-  LBDatabase *theLbdb;
+  LBManager *lbmgr;
   LDBarrierReceiver receiver;
-  int  notifier;
   int  startLbFnHdl;
 private:
   void initLB(const CkLBOptions &);
@@ -150,18 +149,21 @@ public:
 
   BaseLB(const CkLBOptions &opt)  { initLB(opt); }
   BaseLB(CkMigrateMessage *m):CBase_BaseLB(m) {
-    theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
+    lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   }
   virtual ~BaseLB();
 
   void unregister(); 
   inline const char *lbName() { return lbname; }
-  inline int step() { return theLbdb->step(); }
+  inline int step() { return lbmgr->step(); }
   virtual void turnOff() { CmiAbort("turnOff not implemented"); }
   virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
   virtual int  useMem()  { return 0; }
   virtual void pup(PUP::er &p);
   virtual void flushStates();
+//  virtual void AtSync(void) {  CmiAbort("AtSync not implemented"); } // Everything is at the PE barrier
+  virtual void InvokeLB(void) { CmiAbort("InvokeLB not implemented"); }
+  virtual void Migrated(int waitBarrier=1) { CmiAbort("Migrated not implemented"); }
 
   CkGroupID getGroupID() {return thisgroup;}
 };
@@ -270,7 +272,7 @@ public:
 };
 
 // for a FooLB, the following macro defines these functions for each LB:
-// CreateFooLB():        create BOC and register with LBDatabase with a 
+// CreateFooLB():        create BOC and register with LBManager with a
 //                       sequence ticket,
 // AllocateFooLB():      allocate the class instead of a BOC
 // static void lbinit(): an init call for charm module registration
@@ -278,7 +280,7 @@ public:
 
 #define CreateLBFunc_Def(x, str)		\
 void Create##x(void) { 	\
-  int seqno = LBDatabaseObj()->getLoadbalancerTicket();	\
+  int seqno = LBManagerObj()->getLoadbalancerTicket();	\
   CProxy_##x::ckNew(CkLBOptions(seqno)); 	\
 }	\
 \
