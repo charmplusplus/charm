@@ -256,6 +256,10 @@ while [[ $# -gt 0 ]]; do
       opt_romio=0
       ;;
   # Miscellaneous options
+    -k)
+      # -k is an option for make, not for the compiler.
+      echo "*** Warning: Ignoring '-k' option."
+      ;;
     -j[0-9]*)
       opt_parallel=$arg
       ;;
