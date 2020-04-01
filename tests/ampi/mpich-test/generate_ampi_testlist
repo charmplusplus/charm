@@ -753,8 +753,8 @@ sub RunMPIProgram {
 	    }
 	}
     }
-    print "$mpiexec $np_arg $np $extraArgs $mpiexecArgs $program_wrapper ./$programname ++quiet ++local +isomalloc_sync $progArgs\n";
-    open ( MPIOUT, "timeout -k 60 60 $mpiexec $np_arg $np $extraArgs $mpiexecArgs $program_wrapper ./$programname ++quiet ++local +isomalloc_sync $progArgs 2>&1 |" ) ||
+    print "$mpiexec $np_arg $np $extraArgs $mpiexecArgs $program_wrapper ./$programname ++quiet ++local $progArgs\n";
+    open ( MPIOUT, "timeout -k 60 60 $mpiexec $np_arg $np $extraArgs $mpiexecArgs $program_wrapper ./$programname ++quiet ++local $progArgs 2>&1 |" ) ||
 	die "Could not run ./$programname\n";
     if ($progEnv ne "") {
 	%ENV = %saveEnv;

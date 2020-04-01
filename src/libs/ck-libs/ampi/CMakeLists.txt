@@ -2,11 +2,11 @@ set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoa
 
 set(ampi-f90-sources ampifimpl.f90 ampimod.f90)
 
-set(ampi-h-sources ampi.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h mpio_functions.h mpio.h mpio_functions.h mpiof.h)
+set(ampi-h-sources ampi.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h mpio_functions.h mpio.h mpio_functions.h mpio_globals.h mpiof.h)
 
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
-add_library(ampi-compat compat_ampius.C compat_ampifus.C compat_ampi.c
+add_library(ampi-compat compat_ampi.c
        compat_ampim.C compat_ampifm.C compat_ampicm.C
        compat_ampicpp.C)
 
@@ -18,18 +18,42 @@ if(${CMK_CAN_LINK_FORTRAN})
     add_dependencies(moduleampif moduletcharm ck)
 endif()
 
-# FIXME: add fsglobls/pipglobals
+# FIXME: add fsglobals/pipglobals
 
-configure_file(ampiCC  ${CMAKE_BINARY_DIR}/bin/           COPYONLY)
-configure_file(ampiCC  ${CMAKE_BINARY_DIR}/bin/ampicc     COPYONLY)
-configure_file(ampiCC  ${CMAKE_BINARY_DIR}/bin/ampicxx    COPYONLY)
-configure_file(ampif77 ${CMAKE_BINARY_DIR}/bin            COPYONLY)
-configure_file(ampif90 ${CMAKE_BINARY_DIR}/bin            COPYONLY)
-configure_file(ampirun ${CMAKE_BINARY_DIR}/bin            COPYONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampicc         COPYONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampicxx        COPYONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampic++        COPYONLY)
+configure_file(ampif77       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
+configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
+configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/ampifort       COPYONLY)
+configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
+configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/ampiexec       COPYONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpicc.ampi     COPYONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpiCC.ampi     COPYONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpicxx.ampi    COPYONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpic++.ampi    COPYONLY)
+configure_file(ampif77       ${CMAKE_BINARY_DIR}/bin/mpif77.ampi    COPYONLY)
+configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/mpif90.ampi    COPYONLY)
+configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/mpifort.ampi   COPYONLY)
+configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/mpirun.ampi    COPYONLY)
+configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/mpiexec.ampi   COPYONLY)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/ampi/)
+configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpicc     COPYONLY)
+configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpiCC     COPYONLY)
+configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpicxx    COPYONLY)
+configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpic++    COPYONLY)
+configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpif77    COPYONLY)
+configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpif90    COPYONLY)
+configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpifort   COPYONLY)
+configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpirun    COPYONLY)
+configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpiexec   COPYONLY)
+
+configure_file(nm_globals.sh ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
 
 foreach(file ${ampi-h-sources})
   if(${file} STREQUAL "ampi.h")
-    make_directory(${CMAKE_BINARY_DIR}/include/ampi/)
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/ampi/)
     configure_file(${file} ${CMAKE_BINARY_DIR}/include/ampi/mpi.h COPYONLY)
   elseif(${file} STREQUAL "ampif.h")
     configure_file(${file} ${CMAKE_BINARY_DIR}/include/mpif.h COPYONLY)
@@ -87,7 +111,7 @@ if(${CMK_AMPI_WITH_ROMIO})
 
     # Since we link a program with charmc as part of ROMIO's configure,
     # we need all libraries built at this point.
-    add_dependencies(romio moduleampi ampi-compat ck modulecompletion conv-partition conv-util hwloc)
+    add_dependencies(romio moduleampi ampi-compat ck modulecompletion conv-partition conv-util hwloc conv-static conv-core)
     if(${CMK_CAN_LINK_FORTRAN})
         add_dependencies(romio moduleampif)
     endif()

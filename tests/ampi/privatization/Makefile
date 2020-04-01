@@ -70,6 +70,12 @@ endef
 $(foreach i,$(CANDIDATES),$(eval $(call TEST_TARGET_AVAILABILITY,$i)))
 
 
+# Universal settings
+LINKOPTS := -balancer RandCentLB
+
+
+# Rule construction
+
 EMPTY_MESSAGE := "No privatization methods supported for current AMPI target."
 
 all: $(foreach i,$(TARGETS),$i)
@@ -93,10 +99,10 @@ $1: $$(foreach j,$$(LANGUAGES),$$j-$1)
 
 # link
 cxx-$1: $1-test.o $1-test-cxx.o cxx-$1-other-object.o | libcxx-$1-static-library.a $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,libcxx-$1-shared-library.so) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,libcxx-$1-shared-library-dynamic.so)
-	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) $$^ -balancer RotateLB -rpath-origin -L. -lcxx-$1-static-library $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,-lcxx-$1-shared-library) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,-ldl)
+	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) $$^ $$(LINKOPTS) -rpath-origin -L. -lcxx-$1-static-library $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,-lcxx-$1-shared-library) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,-ldl)
 
 f90-$1: $1-test.o $1-test-f90.o
-	$$(AMPIF90) -o $$@ $$(OPTS_f90_$1) $$^ -balancer RotateLB
+	$$(AMPIF90) -o $$@ $$(OPTS_f90_$1) $$^ $$(LINKOPTS)
 
 libcxx-$1-%.so: cxx-$1-%-so.o
 	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) -shared -standalone $$<

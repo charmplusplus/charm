@@ -32,20 +32,26 @@ typedef Elf64_Phdr Phdr;
 typedef void * Addr;
 #endif
 
-typedef struct tlsseg {
-  Addr memseg;
+typedef struct tlsdesc {
   size_t size;
   size_t align;
+} tlsdesc_t;
+
+typedef struct tlsseg {
+  Addr memseg;
 } tlsseg_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void CmiTLSInit(void);
-void allocNewTLSSeg(tlsseg_t* t, CthThread th);
-void switchTLS(tlsseg_t*, tlsseg_t*);
-void currentTLS(tlsseg_t*);
+void CmiTLSInit(tlsseg_t * newThreadParent);
+
+tlsdesc_t CmiTLSGetDescription(void);
+void CmiTLSCreateSegUsingPtr(const tlsseg_t * threadParent, tlsseg_t * t, void * ptr);
+void * CmiTLSGetBuffer(tlsseg_t *);
+
+void CmiTLSSegmentSet(tlsseg_t *);
 
 #ifdef __cplusplus
 }

@@ -39,9 +39,10 @@
 
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
-#define CMK_THREADS_ARE_WIN32_FIBERS                       1
+#define CMK_THREADS_ARE_WIN32_FIBERS                       0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
@@ -56,7 +57,7 @@
 
 #define CMK_LBDB_ON					   1
 
-#define CMK_PCQUEUE_LOCK                                   1
+/* #define CMK_PCQUEUE_LOCK                                   1 */
 
 #define CMK_CONVERSE_MPI                                   0
 

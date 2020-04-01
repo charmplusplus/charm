@@ -321,8 +321,6 @@ FLINKAGE {
 #define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
 #define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
 #define ampi_set_migratable FTN_NAME ( AMPI_SET_MIGRATABLE , ampi_set_migratable )
-#define ampi_init_universe FTN_NAME( AMPI_INIT_UNIVERSE , ampi_init_universe )
-#define ampi_register_main FTN_NAME( AMPI_REGISTER_MAIN , ampi_register_main )
 #define ampi_register_pup FTN_NAME( AMPI_REGISTER_PUP , ampi_register_pup )
 #define ampi_register_about_to_migrate FTN_NAME ( AMPI_REGISTER_ABOUT_TO_MIGRATE , ampi_register_about_to_migrate )
 #define ampi_register_just_migrated FTN_NAME ( AMPI_REGISTER_JUST_MIGRATED , ampi_register_just_migrated )
@@ -347,12 +345,6 @@ FLINKAGE {
 #define ampi_command_argument_count FTN_NAME( AMPI_COMMAND_ARGUMENT_COUNT , ampi_command_argument_count )
 #define ampi_get_command_argument FTN_NAME( AMPI_GET_COMMAND_ARGUMENT , ampi_get_command_argument )
 
-#if CMK_BIGSIM_CHARM
-#define ampi_set_start_event FTN_NAME( AMPI_SET_START_EVENT , ampi_set_start_event )
-#define ampi_set_end_event FTN_NAME( AMPI_SET_END_EVENT , ampi_set_end_event )
-#define begintracebigsim FTN_NAME (BEGINTRACEBIGSIM , begintracebigsim)
-#define endtracebigsim FTN_NAME (ENDTRACEBIGSIM , endtracebigsim)
-#endif
 
 #if CMK_CUDA
 #define ampi_gpu_invoke_wr FTN_NAME ( AMPI_GPU_INVOKE_WR  , ampi_gpu_invoke_wr )
@@ -2191,11 +2183,6 @@ void ampi_set_migratable(int *mig, int *ierr) noexcept
   *ierr = AMPI_Set_migratable(*mig);
 }
 
-void ampi_register_main(MPI_MainFn fn, const char *name, int *ierr) noexcept
-{
-  *ierr = AMPI_Register_main(fn, name);
-}
-
 void ampi_register_pup(MPI_PupFn fn, void *data, int *idx, int *ierr) noexcept
 {
   *ierr = AMPI_Register_pup(fn, data, idx);
@@ -2293,23 +2280,6 @@ void ampi_trace_end(int *ierr) noexcept
   *ierr = AMPI_Trace_end();
 }
 
-#if CMK_BIGSIM_CHARM
-void ampi_set_start_event(int *comm, int *ierr) {
-  *ierr = AMPI_Set_start_event(*comm);
-}
-
-void ampi_set_end_event(int *ierr) {
-  *ierr = AMPI_Set_end_event();
-}
-
-void begintracebigsim(char* msg){
-  beginTraceBigSim(msg);
-}
-
-void endtracebigsim(char* msg, char* param){
-  endTraceBigSim(msg, param);
-}
-#endif
 
 #if CMK_CUDA
 void ampi_gpu_iinvoke_wr(int *to_call, int *request, int *ierr) noexcept {
@@ -2351,11 +2321,6 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
     memset(str, ' ', *len);
     *ierr = 1;
   }
-}
-
-void ampi_init_universe(int *unicomm, int *ierr) noexcept
-{
-  *ierr = AMPI_Init_universe(unicomm);
 }
 
 } // extern "C"

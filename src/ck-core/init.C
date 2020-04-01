@@ -79,6 +79,14 @@ never be excluded...
 
 #if CMK_CUDA
 #include "hapi_impl.h"
+
+extern void (*hapiInvokeCallback)(void*, void*);
+extern void CUDACallbackManager(void*, void*);
+
+extern void (*hapiQdCreate)(int);
+extern void (*hapiQdProcess)(int);
+extern void QdCreate(int);
+extern void QdProcess(int);
 #endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
@@ -160,12 +168,13 @@ CksvDeclare(GroupTable*, _nodeGroupTable);
 CksvDeclare(GroupIDTable, _nodeGroupIDTable);
 CksvDeclare(CmiImmediateLockType, _nodeGroupTableImmLock);
 CksvDeclare(CmiNodeLock, _nodeLock);
+CksvDeclare(CmiNodeLock, _nodeZCPendingLock);
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 CkpvDeclare(int, _charmEpoch);
 
 CkpvDeclare(bool, _destroyingNodeGroup);
 
-
+CksvDeclare(ObjNumRdmaOpsMap, pendingZCOps);
 CkpvDeclare(Stats*, _myStats);
 CkpvDeclare(MsgPool*, _msgPool);
 
@@ -237,7 +246,6 @@ void processRaiseEvacFile(char *raiseEvacFile);
 #endif
 
 extern bool useNodeBlkMapping;
-extern bool useCMAForZC;
 
 extern int quietMode;
 extern int quietModeRequested;
@@ -302,16 +310,16 @@ static inline void _parseCommandLineOpts(char **argv)
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
-      CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
+      if (!quietModeRequested)
+        CkPrintf("CharmFT> Restarting node %d after crash...\n", CmiMyNode());
   }
   // reading the killFile
   if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
     if(faultFunc == NULL){
       //do not read the killfile if this is a restarting processor
       killFlag = true;
-      if(CmiMyPe() == 0){
-        printf("[%d] killFlag set to true for file %s\n",CkMyPe(),killFile);
-      }
+      if (CmiMyPe() == 0 && !quietModeRequested)
+        CkPrintf("CharmFT> Using diagnostic kill file: %s\n", killFile);
     }
   }
 #endif
@@ -357,11 +365,6 @@ static inline void _parseCommandLineOpts(char **argv)
         if (CmiGetArgFlagDesc(argv,"+useNodeBlkMapping","Array elements are block-mapped in SMP-node level")) {
           useNodeBlkMapping = true;
         }
-
-  useCMAForZC = true;
-  if (CmiGetArgFlagDesc(argv, "+noCMAForZC", "When Cross Memory Attach (CMA) is supported, the program does not use CMA when using the Zerocopy API")) {
-    useCMAForZC = false;
-  }
 
 #if ! CMK_WITH_CONTROLPOINT
 	// Display a warning if charm++ wasn't compiled with control point support but user is expecting it
@@ -533,7 +536,7 @@ static void *mergeWarningMsg(int * size, void * data, void ** remote, int count)
 }
 
 /* Initializes the reduction, called on each processor */
-extern int messageQueueOverflow;
+extern CmiMemoryAtomicInt messageQueueOverflow;
 static inline void _sendWarnings(void)
 {
   DEBUGF(("[%d] _sendWarnings\n", CkMyPe()));
@@ -605,7 +608,6 @@ static void _exitHandler(envelope *env)
 
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
-#if !CMK_BIGSIM_THREAD
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -621,10 +623,6 @@ static void _exitHandler(envelope *env)
       }else{
 	CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
       }
-#else
-      CmiFree(env);
-      ConverseExit(_exitcode);
-#endif
       break;
     case ReqStatMsg: // Request stats and warnings message
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
@@ -1110,12 +1108,10 @@ void CkExit(int exitcode)
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 
-#if ! CMK_BIGSIM_THREAD
   _TRACE_END_EXECUTE();
   //Wait for stats, which will call ConverseExit when finished:
 	if(!CharmLibInterOperate)
   CsdScheduler(-1);
-#endif
 }
 
 void CkContinueExit()
@@ -1131,13 +1127,11 @@ void CkContinueExit()
    It is called by the machine layer whenever some problem occurs (it is thus up
    to the machine layer to call this function). */
 void EmergencyExit(void) {
-#ifndef __BIGSIM__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
   if (CkpvAccess(_coreState) != NULL) {
     delete CkpvAccess(_coreState);
     CkpvAccess(_coreState) = NULL;
   }
-#endif
 }
 
 static void _nullFn(void *, void *)
@@ -1183,11 +1177,7 @@ void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 void InitCallTable::enumerateInitCalls()
 {
   int i;
-#ifdef __BIGSIM__
-  if(BgNodeRank()==0)        // called only once on an emulating node
-#else
   if(CkMyRank()==0) 
-#endif
   {
     for (i=0; i<initNodeCalls.length(); i++) initNodeCalls[i]();
   }
@@ -1218,9 +1208,6 @@ void initQd(char **argv)
         }
 }
 
-#if CMK_BIGSIM_CHARM && CMK_CHARMDEBUG
-void CpdBgInit();
-#endif
 void CpdBreakPointInit();
 
 extern void (*CkRegisterMainModuleCallback)();
@@ -1335,9 +1322,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(CkCoreState *, _coreState);
 
 #if CMK_FAULT_EVAC
-#ifndef __BIGSIM__
 	CpvInitialize(char *,_validProcessors);
-#endif
 	CkpvInitialize(char ,startedEvac);
 #endif
 	CpvInitialize(int,serializer);
@@ -1349,12 +1334,15 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(GroupIDTable, _nodeGroupIDTable);
 	CksvInitialize(CmiImmediateLockType, _nodeGroupTableImmLock);
 	CksvInitialize(CmiNodeLock, _nodeLock);
+	CksvInitialize(CmiNodeLock, _nodeZCPendingLock);
 	CksvInitialize(PtrVec*,_nodeBocInitVec);
 	CksvInitialize(UInt,_numInitNodeMsgs);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
 	CksvInitialize(bool, _triggersSent);
 	CksvAccess(_triggersSent) = false;
+
+	CksvInitialize(objNumRdmaOpsMap, pendingZCOps);
 
 #if CMK_ONESIDED_IMPL
 	CksvInitialize(int, _numPendingRORdmaTransfers);
@@ -1388,15 +1376,15 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTable)->init();
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
+		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
 	}
+
 
 	CkCallbackInit();
 	
 	CmiNodeAllBarrier();
 
-#if ! CMK_BIGSIM_CHARM
-	initQd(argv);         // bigsim calls it in ConverseCommonInit
-#endif
+	initQd(argv);
 
 	CkpvAccess(_coreState)=new CkCoreState();
 
@@ -1423,9 +1411,6 @@ void _initCharm(int unused_argc, char **argv)
 	CmiAssignOnce(&_ROGroupRestartHandlerIdx, CkRegisterHandler(_ROGroupRestartHandler));
 #endif
 
-#ifdef __BIGSIM__
-	if(BgNodeRank()==0) 
-#endif
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 
 	CmiAssignOnce(&_triggerHandlerIdx, CkRegisterHandler(_triggerHandler));
@@ -1459,10 +1444,8 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
-#if CMK_ONESIDED_IMPL
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
 	initEMNcpyAckHandler();
-#endif
 	/**
 	  The rank-0 processor of each node calls the 
 	  translator-generated "_register" routines. 
@@ -1476,11 +1459,7 @@ void _initCharm(int unused_argc, char **argv)
 	  same order on every node, and *must not* be called by 
 	  multiple threads simultaniously.
 	*/
-#ifdef __BIGSIM__
-	if(BgNodeRank()==0) 
-#else
 	if(CkMyRank()==0)
-#endif
 	{
 		SDAG::registerPUPables();
 		CmiArgGroup("Charm++",NULL);
@@ -1558,9 +1537,8 @@ void _initCharm(int unused_argc, char **argv)
 	}
 
 	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */
-	if (CkMyRank() == 0) {
-	  CpdBreakPointInit();
-	}
+	CpdBreakPointInit();
+	
 	CmiNodeAllBarrier();
 
 	// Execute the initcalls registered in modules
@@ -1569,8 +1547,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CHARMDEBUG
 	CpdFinishInitialization();
 #endif
-	if (CkMyRank() == 0)
-	  _registerDone();
+	_registerDone();
 	CmiNodeAllBarrier();
 
 	CkpvAccess(_myStats) = new Stats();
@@ -1605,14 +1582,12 @@ void _initCharm(int unused_argc, char **argv)
 
 
 #if CMK_FAULT_EVAC
-#ifndef __BIGSIM__
 	CpvAccess(_validProcessors) = new char[CkNumPes()];
 	for(int vProc=0;vProc<CkNumPes();vProc++){
 		CpvAccess(_validProcessors)[vProc]=1;
 	}
 	CmiAssignOnce(&_ckEvacBcastIdx, CkRegisterHandler(_ckEvacBcast));
 	CmiAssignOnce(&_ckAckEvacIdx, CkRegisterHandler(_ckAckEvac));
-#endif
 
 	CkpvAccess(startedEvac) = 0;
 	evacuate = 0;
@@ -1644,17 +1619,13 @@ void _initCharm(int unused_argc, char **argv)
         CkFtFn  faultFunc_restart = CkRestartMain;
         if (faultFunc == NULL || faultFunc == faultFunc_restart) {         // this is not restart from memory
             // these two are blocking calls for non-bigsim
-#if ! CMK_BIGSIM_CHARM
 	  CmiInitCPUAffinity(argv);
           CmiInitMemAffinity(argv);
-#endif
         }
         CmiInitCPUTopology(argv);
         if (CkMyRank() == 0) {
           TopoManager_reset(); // initialize TopoManager singleton
-#if !CMK_BIGSIM_CHARM
           _topoTree = ST_RecursivePartition_getTreeInfo(0);
-#endif
         }
         CmiNodeAllBarrier(); // threads wait until _topoTree has been generated
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
@@ -1667,10 +1638,11 @@ void _initCharm(int unused_argc, char **argv)
             // XXX: Assuming uniformity of node size here
             num += num/CmiMyNodeSize();
 #endif
-            if (!_Cmi_forceSpinOnIdle && num > CmiNumCores())
+            if (!_Cmi_sleepOnIdle && !_Cmi_forceSpinOnIdle && num > CmiNumCores())
             {
               if (CmiMyPe() == 0)
-                CmiPrintf("\nCharm++> Warning: the number of SMP threads (%d) is greater than the number of physical cores (%d), so threads will sleep while idling. Use +CmiSpinOnIdle or +CmiSleepOnIdle to control this directly.\n\n", num, CmiNumCores());
+                CmiPrintf("Charm++> Warning: Running with more SMP threads (%d) than physical cores (%d).\n"
+                          "         Use +CmiSleepOnIdle (default behavior) or +CmiSpinOnIdle to silence this message.\n", num, CmiNumCores());
               CmiLock(CksvAccess(_nodeLock));
               if (! _Cmi_sleepOnIdle) _Cmi_sleepOnIdle = 1;
               CmiUnlock(CksvAccess(_nodeLock));
@@ -1680,19 +1652,22 @@ void _initCharm(int unused_argc, char **argv)
     }
 
 #if CMK_CUDA
-    if (CmiMyRank() == 0) {
-      initHybridAPI();
-    }
-    else /* CmiMyRank() != 0 */ {
-      setHybridAPIDevice();
-    }
-    initEventQueues();
+    // Only worker threads execute the following
+    if (!CmiInCommThread()) {
+      initDeviceMapping(argv);
+      if (CmiMyRank() == 0) {
+        initHybridAPI();
+      }
+      initEventQueues();
 
-    // ensure HAPI is initialized before registering callback functions
-    if (CmiMyRank() < CmiMyNodeSize()) {
+      // ensure HAPI is initialized before registering callback functions
       CmiNodeBarrier();
+
+      hapiRegisterCallbacks();
+      hapiInvokeCallback = CUDACallbackManager;
+      hapiQdCreate = QdCreate;
+      hapiQdProcess = QdProcess;
     }
-    hapiRegisterCallbacks();
 #endif
 
     if(CmiMyPe() == 0) {
@@ -1723,12 +1698,6 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 
     //CldCallback();
-#if CMK_BIGSIM_CHARM && CMK_CHARMDEBUG
-      // Register the BG handler for CCS. Notice that this is put into a variable shared by
-      // the whole real processor. This because converse needs to find it. We check that all
-      // virtual processors register the same index for this handler.
-    CpdBgInit();
-#endif
 
 	if (faultFunc) {
 #if CMK_WITH_STATS
@@ -1818,7 +1787,7 @@ void _initCharm(int unused_argc, char **argv)
         // Should not use CpdFreeze inside a thread (since this processor is really a user-level thread)
        if (CpvAccess(cpdSuspendStartup))
        { 
-          //CmiPrintf("In Parallel Debugging mode .....\n");
+	 if(CkMyPe()==0) CmiPrintf("In Parallel Debugging mode .....\n");
           CpdFreeze();
        }
 #endif

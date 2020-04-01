@@ -1,21 +1,19 @@
 # CMake-based build system for Charm++ and AMPI
 #
-# Supported targets: charm++, AMPI
-#
-# When updating any of the following:
+# When updating any of the following files:
 # - any Makefile
 # - adding, deleting, renaming any source file
 # - any configure script
 #
 # , please also update:
 # - this file
-# - buildcmake
+# - the buildcmake script
 # - files in cmake/
 
+# Version 3.4 added CMAKE_C_COMPILER_LAUNCHER and CMAKE_CXX_COMPILER_LAUNCHER
+cmake_minimum_required(VERSION 3.4)
 
-cmake_minimum_required(VERSION 3.11)
-
-project(Charm++ LANGUAGES CXX C VERSION 6.9.0)
+project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
 find_package(Threads REQUIRED)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
@@ -25,13 +23,25 @@ find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran c
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-enable_language(Fortran OPTIONAL)
+# Setting charmc as the compiler launcher for Fortran files only works with
+# CMake 3.11.0 or above. See 'CMAKE_Fortran_COMPILER_LAUNCHER' below for details.
+if(${CMAKE_VERSION} VERSION_LESS "3.11.0")
+  message(WARNING "CMake version 3.11.0 or higher is needed for Fortran support in Charm++.")
+else()
+  include(CheckLanguage)
+  check_language(Fortran)
+  if(CMAKE_Fortran_COMPILER)
+    enable_language(Fortran OPTIONAL)
+    include(FortranCInterface)
+    FortranCInterface_VERIFY()
+    FortranCInterface_VERIFY(CXX)
+  else()
+    message(STATUS "No Fortran support")
+  endif()
+endif()
 
 if(${FortranCInterface_VERIFIED_CXX})
   set(CMK_CAN_LINK_FORTRAN 1)
-  include(FortranCInterface)
-  FortranCInterface_VERIFY()
-  FortranCInterface_VERIFY(CXX)
 else()
   set(CMK_CAN_LINK_FORTRAN 0)
 endif()
@@ -55,7 +65,7 @@ else()
 endif()
 
 # Build options
-set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,verbs")
+set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,verbs")
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS")
 
 # Platform specific options (choose multiple if desired):
@@ -65,7 +75,6 @@ option(TCP "use TCP sockets for communication (only for netlrts)" OFF)
 option(PTHREADS "compile with pthreads Converse threads" OFF)
 
 # Advanced options:
-option(BIGEMULATOR "Compile for BigSim simulator" OFF)
 option(OOC "Compile with out of core support" OFF)
 option(SYNCFT "Compile with Charm++ fault tolerance support" OFF)
 option(PAPI "Compile with PAPI performance counter support" OFF)
@@ -105,10 +114,10 @@ option(F90CHARM            "Build f90charm" OFF)
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 add_compile_options(${EXTRA_OPTS})
 
-set(CMK_REPLAYSYTEM ${REPLAY})
+set(CMK_REPLAYSYSTEM ${REPLAY})
 
 if(${REPLAY} AND NOT ${TRACING})
-  set(CMK_REPLAYSYTEM 0)
+  set(CMK_REPLAYSYSTEM 0)
   message(WARNING "Charm record/replay is disabled because tracing is disabled")
 endif()
 
@@ -186,13 +195,21 @@ else()
 endif()
 
 set(CMK_OS_IS_LINUX 0)
+set(CMK_MACOSX 0)
+set(CMK_WINDOWS 0)
+set(CMK_BLUEGENEQ 0)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(CHARM_OS "darwin")
+  set(CMK_MACOSX 1)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(CHARM_OS "win")
+  set(CMK_WINDOWS 1)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(CHARM_OS "linux")
   set(CMK_OS_IS_LINUX 1)
+elseif(IS_DIRECTORY "/bgsys")
+  set(CHARM_OS "bluegeneq")
+  set(CMK_BLUEGENEQ 1)
 else()
   message(FATAL_ERROR "Unsupported operating system ${CMAKE_SYSTEM_NAME}.")
 endif()
@@ -289,7 +306,8 @@ configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @O
 # set_property(GLOBAL PROPERTY RULE_LAUNCH_CUSTOM ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_CXX_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
-# FIXME: the next line is the only reason we require cmake 3.11+
+# FIXME: CMAKE_Fortran_COMPILER_LAUNCHER is the only reason we require CMake 3.11+.
+# See also https://gitlab.kitware.com/cmake/cmake/issues/17499
 set(CMAKE_Fortran_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_CXX_LINK_EXECUTABLE
       "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
@@ -313,6 +331,10 @@ set(CMAKE_Fortran_CREATE_STATIC_LIBRARY
 set(CHARM_VERSION ${PROJECT_VERSION})
 set(CMK_COMPILER_KNOWS_C11 1)
 set(CMK_COMPILER_KNOWS_CPP11 1)
+
+if(NOT CMK_AMPI_ONLY)
+  set(CMK_AMPI_ONLY 0)
+endif()
 
 if(NOT CMK_AMPI_WITH_ROMIO)
   set(CMK_AMPI_WITH_ROMIO 1)
@@ -353,8 +375,6 @@ configure_file(src/arch/common/cc-gcc.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.h                      include/ COPYONLY)
 configure_file(src/arch/common/cc-mpi.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-mpiopts.sh                 include/ COPYONLY) #sh only
-configure_file(src/arch/common/conv-mach-bigemulator.sh      include/ COPYONLY)
-configure_file(src/arch/common/conv-mach-bigsim.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-craype.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-darwin.sh           include/ COPYONLY)
@@ -487,16 +507,16 @@ execute_process(COMMAND ${command} COMMAND grep CHARM_CC_FLAGS= COMMAND cut -c16
 execute_process(COMMAND ${command} COMMAND grep CHARM_CC= COMMAND cut -c10- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC)
 
 # FIXME: copy .so
+set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
 include(ExternalProject)
 ExternalProject_Add(hwloc
     URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
-    CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc && autoreconf -ivf 2> /dev/null 1> /dev/null
-    COMMAND
-        ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/configure
+    # touch: update timestamps on these files so that hwloc's Makefile does not invoke automake
+    CONFIGURE_COMMAND touch ${hwloc_dir}/aclocal.m4 ${hwloc_dir}/Makefile.in ${hwloc_dir}/configure &&
+        ${hwloc_dir}/configure
         --disable-cairo
         --disable-cuda
         --disable-gl
-        --disable-libnuma
         --disable-libxml2
         --disable-nvml
         --disable-opencl
@@ -513,7 +533,7 @@ ExternalProject_Add(hwloc
         CC=${CHARM_CC}
         > /dev/null
     BUILD_COMMAND make V=$(VERBOSE)
-    COMMAND cp src/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
+    COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
@@ -603,7 +623,6 @@ endif()
 if(${TARGET} STREQUAL "LIBS")
   add_subdirectory(src/libs/conv-libs)
   add_subdirectory(src/libs/ck-libs)
-  add_subdirectory(src/langs/bluegene)
 endif()
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
@@ -650,7 +669,7 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CMK_CHARMDEBUG CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS CMK_HAS_INT16 CMK_HAS_MMAP
         CMK_LIBJPEG CMK_MOD_EXT CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
         CMK_SYSLIBS CMK_TRACE_ENABLED CP OPTS_CC OPTS_CXX CMK_VDIR CMK_GDIR
-        CMK_HAS_ELF_H CMK_HAS_OPENMP)
+        CMK_HAS_ELF_H CMK_HAS_OPENMP CMK_AMPI_ONLY CMK_WINDOWS CMK_BLUEGENEQ)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 
@@ -665,7 +684,9 @@ file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
 set(optfile_h ${CMAKE_BINARY_DIR}/include/conv-mach-opt.h)
 
 file(WRITE  ${optfile_h} "/* Build-time options header, automatically generated by cmake */\n")
-file(APPEND ${optfile_h} "#define CMK_OPTIMIZE ${CMK_OPTIMIZE}\n")
+foreach(l CMK_AMPI_WITH_ROMIO CMK_OPTIMIZE CMK_AMPI_ONLY)
+    file(APPEND ${optfile_h} "#define ${l} ${${l}}\n")
+endforeach(l)
 
 if(NOT ${NETWORK} STREQUAL "mpi")
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
@@ -675,7 +696,11 @@ endif()
 set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
 
 file(WRITE  ${optfile_mak} "# Build-time options header, automatically generated by cmake\n")
-foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_BLUEGENEQ CMK_BUILD_PYTHON CMK_CHARMDEBUG CMK_COMPILER CMK_GDIR CMK_HAS_MALLOC_HOOK CMK_HAS_MMAP CMK_LIBJPEG CMK_LUSTREAPI CMK_MULTICORE CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS CMK_SHARED_SUF CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS CMK_TRACE_ENABLED CMK_USE_LRTS CMK_VDIR OPTSATBUILDTIME)
+foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTHON
+        CMK_CHARMDEBUG CMK_COMPILER CMK_GDIR CMK_HAS_MALLOC_HOOK CMK_HAS_MMAP CMK_LIBJPEG
+        CMK_LUSTREAPI CMK_MULTICORE CMK_UTH CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS
+        CMK_SHARED_SUF CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
+        CMK_TRACE_ENABLED CMK_USE_LRTS CMK_VDIR OPTSATBUILDTIME CMK_AMPI_ONLY CMK_WINDOWS)
     file(APPEND ${optfile_mak} "${l}:=${${l}}\n" )
 endforeach(l)
 

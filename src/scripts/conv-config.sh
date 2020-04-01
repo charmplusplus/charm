@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Generic converse configuration script:
 #   Reads various configuration scripts and sets defaults.
@@ -53,8 +53,7 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_CF90_FIXED" ] && CMK_CF90_FIXED="$CMK_CF90"
 [ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
 [ -z "$CMK_CC_FASTEST" ] && CMK_CC_FASTEST="$CMK_CC"
-[ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
-[ -z "$CMK_CF77" ] && CMK_CF77_FIXED="$CMK_CF90"
+[ -z "$CMK_CF77" ] && CMK_CF77="$CMK_CF90"
 [ -z "$CMK_CF77_FIXED" ] && CMK_CF77_FIXED="$CMK_CF77"
 
 # set CMK_NATIVE defaults before adding potentially target-specific build-line args
@@ -84,7 +83,7 @@ OPTS_CXX="$OPTS_CXX $USER_OPTS_CXX"
 OPTS_LD="$OPTS_LD $USER_OPTS_LD"
 
 [ -z "$CMK_PIC" ] && CMK_PIC='-fpic'
-[ -z "$CMK_PIE" ] && CMK_PIE='-pie -fPIE'
+[ -z "$CMK_PIE" ] && CMK_PIE='-fPIE'
 
 [ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"
 [ -z "$CMK_SEQ_CXX" ] && CMK_SEQ_CXX="$CMK_CXX"
@@ -116,8 +115,6 @@ CMK_SEQ_CC_FLAGS="$CMK_SEQ_CC_FLAGS $CMK_SEQ_DEFS"
 CMK_SEQ_CXX_FLAGS="$CMK_SEQ_CXX_FLAGS $CMK_SEQ_DEFS"
 CMK_SEQ_LD_FLAGS="$CMK_SEQ_LD_FLAGS $CMK_SEQ_DEFS"
 CMK_SEQ_LDXX_FLAGS="$CMK_SEQ_LDXX_FLAGS $CMK_SEQ_DEFS"
-
-[ -z "$CMK_CELL" ] && CMK_CELL=0
 
 [ -z "$CMK_C_OPENMP" ] && CMK_C_OPENMP="-fopenmp"
 [ -z "$CMK_F_OPENMP" ] && CMK_F_OPENMP="$CMK_C_OPENMP"

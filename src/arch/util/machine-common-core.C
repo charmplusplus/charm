@@ -29,14 +29,6 @@ FILE *debugLog = NULL;
 /* The number of children used when a msg is broadcast inside a node */
 #define BROADCAST_SPANNING_INTRA_FACTOR  8
 
-/* Root of broadcast:
- * non-bcast msg: root = 0;
- * proc-level bcast msg: root >=1; (CmiMyPe()+1)
- * node-level bcast msg: root <=-1; (-CmiMyNode()-1)
- */
-#define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
-#define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
-
 /**
  * For some machine layers such as on Active Message framework,
  * the receiver callback is usally executed on an internal
@@ -203,7 +195,7 @@ extern int CharmLibInterOperate;
 std::atomic<int> ckExitComplete {0};
 
 #if CMK_SMP
-std::atomic<int> commThdExit {0};
+std::atomic<int> numPEsReadyForExit {0};
 
 /**
  *  The macro defines whether to have a comm thd to offload some
@@ -563,17 +555,28 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
 
 
 static void SendToPeers(int size, char *msg) {
-    /* FIXME: now it's just a flat p2p send!! When node size is large,
-    * it should also be sent in a tree
-    */
-    int exceptRank = CMI_DEST_RANK(msg);
-    int i;
-    for (i=0; i<exceptRank; i++) {
-        CmiPushPE(i, CopyMsg(msg, size));
+  /* FIXME: now it's just a flat p2p send!! When node size is large,
+  * it should also be sent in a tree
+  */
+
+  int exceptRank = CMI_DEST_RANK(msg);
+  if (CMI_MSG_NOKEEP(msg)) {
+    for (int i = 0; i < exceptRank; i++) {
+      CmiReference(msg);
+      CmiPushPE(i, msg);
     }
-    for (i=exceptRank+1; i<CmiMyNodeSize(); i++) {
-        CmiPushPE(i, CopyMsg(msg, size));
+    for (int i = exceptRank + 1; i < CmiMyNodeSize(); i++) {
+      CmiReference(msg);
+      CmiPushPE(i, msg);
     }
+  } else {
+    for (int i = 0; i < exceptRank; i++) {
+      CmiPushPE(i, CopyMsg(msg, size));
+    }
+    for (int i = exceptRank + 1; i < CmiMyNodeSize(); i++) {
+      CmiPushPE(i, CopyMsg(msg, size));
+    }
+  }
 }
 
 
@@ -1155,7 +1158,7 @@ extern int MaxDataNodes;
 extern int QueueUpperBound;
 extern int DataNodeWrap;
 extern int QueueWrap;
-extern int messageQueueOverflow;
+extern CmiMemoryAtomicInt messageQueueOverflow;
 
 int power_of_two_check(int n)
 {
@@ -1459,6 +1462,12 @@ if (  MSG_STATISTIC)
     }
 #endif
 
+    if(CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger")) {
+#if CMK_CCS_AVAILABLE
+        cmiArgDebugFlag = 1;
+#endif
+    }
+
     /* CmiTimerInit(); */
 #if CMK_BROADCAST_HYPERCUBE
     /* CmiNodesDim = ceil(log2(CmiNumNodes)) except when #nodes is 1*/
@@ -1496,22 +1505,6 @@ void CthInit(char **argv);
 static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
-
-#if CMK_CCS_AVAILABLE
-/**
- * The reason to initialize this variable here:
- * cmiArgDebugFlag is possibly accessed in CmiPrintf/CmiError etc.,
- * therefore, we have to initialize this variable before any calls
- * to those functions (such as CmiPrintf). Otherwise, we may encounter
- * a memory segmentation fault (bad memory access). Note, even
- * testing CpvInitialized(cmiArgDebugFlag) doesn't help to solve
- * this problem because the variable indicating whether cmiArgDebugFlag is
- * initialized or not is not initialized, thus possibly causing another
- * bad memory access. --Chao Mei
- */
-  CpvInitialize(int, cmiArgDebugFlag);
-  CpvAccess(cmiArgDebugFlag) = 0;
-#endif
 
     LrtsPreCommonInit(everReturn);
 
@@ -1556,10 +1549,6 @@ static void ConverseRunPE(int everReturn) {
     CpvAccess(networkProgressCount) = 0;
 
     ConverseCommonInit(CmiMyArgv);
-#if CMK_OMP
-    CpvAccess(CmiSuspendedTaskQueue) = (void *)CMIQueueCreate();
-    CmiNodeAllBarrier();
-#endif
    
     // register idle events
 
@@ -1639,7 +1628,7 @@ static void CommunicationServer(int sleepTime) {
 #if CMK_SMP 
     AdvanceCommunication(1);
 
-    if (std::atomic_load_explicit(&commThdExit, std::memory_order_acquire) == CmiMyNodeSize()) {
+    if (std::atomic_load_explicit(&numPEsReadyForExit, std::memory_order_acquire) == CmiMyNodeSize()) {
         MACHSTATE(2, "CommunicationServer exiting {");
         LrtsDrainResources();
         MACHSTATE(2, "} CommunicationServer EXIT");
@@ -1649,7 +1638,6 @@ static void CommunicationServer(int sleepTime) {
 #if CMK_USE_XPMEM
         CmiExitXpmem();
 #endif
-        CmiNodeAllBarrier();
         LrtsExit(_exitcode);
         if(CharmLibInterOperate) {
           ckExitComplete = 1;
@@ -1709,14 +1697,18 @@ if (MSG_STATISTIC)
     /* In SMP, the communication thread will exit */
     if (CmiMyRank() == 0)
         _exitcode = exitcode;
-    std::atomic_fetch_add_explicit(&commThdExit, 1, std::memory_order_release); /* atomic increment */
-    CmiNodeAllBarrier();
-#if CMK_SMP_NO_COMMTHD
-#if CMK_USE_XPMEM
+#if CMK_SMP_NO_COMMTHD && CMK_USE_XPMEM
+    CmiNodeAllBarrier(); /* Ensure all threads have reached here before freeing xpmem buffers */
     if (CmiMyRank() == 0) CmiExitXpmem();
-    CmiNodeAllBarrier();
 #endif
-    if (CmiMyRank() == 0) LrtsExit(exitcode);
+    std::atomic_fetch_add_explicit(&numPEsReadyForExit, 1, std::memory_order_release); /* atomic increment */
+#if CMK_SMP_NO_COMMTHD
+    if (CmiMyRank() == 0) {
+      /* Spinning on this load is necessary to ensure all threads have fully exited the
+         barrier, otherwise exit may destroy it before all threads have left */
+      while (std::atomic_load_explicit(&numPEsReadyForExit, std::memory_order_acquire) != CmiMyNodeSize()) {}
+      LrtsExit(exitcode);
+    }
 #endif
     CmiYield();
     if (!CharmLibInterOperate || userDrivenMode) {
@@ -1728,6 +1720,7 @@ if (MSG_STATISTIC)
 }
 /* ##### End of Functions Related with Machine Running ##### */
 
+CMK_NORETURN
 void CmiAbortHelper(const char *source, const char *message, const char *suggestion,
                     int tellDebugger, int framesToSkip) {
   if (tellDebugger)
@@ -1762,7 +1755,6 @@ void CmiAbort(const char *message, ...) {
   vsnprintf(newmsg, sizeof(newmsg), message, args);
   va_end(args);
   CmiAbortHelper("Called CmiAbort", newmsg, NULL, 1, 0);
-  CMI_NORETURN_FUNCTION_END
 }
 
 /* ##### Beginning of Functions Providing Incoming Network Messages ##### */

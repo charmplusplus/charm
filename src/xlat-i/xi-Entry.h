@@ -187,11 +187,6 @@ class Entry : public Member {
   void genAccelFullCallList(XStr& str);
   void genAccelIndexWrapperDecl_general(XStr& str);
   void genAccelIndexWrapperDef_general(XStr& str);
-  void genAccelIndexWrapperDecl_spe(XStr& str);
-  void genAccelIndexWrapperDef_spe(XStr& str);
-  int genAccels_spe_c_funcBodies(XStr& str);
-  void genAccels_spe_c_regFuncs(XStr& str);
-  void genAccels_ppe_c_regFuncs(XStr& str);
 
   XStr aggregatorIndexType();
   XStr dataItemType();

@@ -343,7 +343,11 @@ protected:
   CkArrayID thisArrayID;//My source array's ID
 
   //More verbose form of abort
-  virtual void CkAbort(const char *str) const;
+  CMK_NORETURN
+#if defined __GNUC__ || defined __clang__
+  __attribute__ ((format (printf, 2, 3)))
+#endif
+  virtual void CkAbort(const char *format, ...) const;
 
 private:
 //Array implementation methods:
@@ -543,8 +547,12 @@ void _ckArrayInit(void);
 class MsgPointerWrapper {
   public:
     void *msg;
+    int ep;
+    int opts;
     void pup(PUP::er &p) {
       pup_pointer(&p, &msg);
+      p|ep;
+      p|opts;
     }
 };
 
@@ -685,6 +693,10 @@ public:
   void sendExpeditedBroadcast(CkMessage *msg);
   void recvExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
   void recvBroadcastViaTree(CkMessage *msg);
+  void recvNoKeepBroadcast(CkMessage *msg) { recvBroadcast(msg); }
+  void sendNoKeepBroadcast(CkMessage *msg);
+  void recvNoKeepExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
+  void sendNoKeepExpeditedBroadcast(CkMessage *msg);
 
   void sendZCBroadcast(MsgPointerWrapper w);
 
@@ -787,6 +799,9 @@ public:
   int incrementBcastNo();
 
   bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
+#if CMK_CHARMPY
+  void deliver(CkArrayMessage *bcast, std::vector<CkMigratable*> &elements, int arrayId, bool doFree);
+#endif
 
   void springCleaning(void);
 

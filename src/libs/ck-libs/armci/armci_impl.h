@@ -226,7 +226,6 @@ public:
 // ARMCI is supposed to be platform neutral, so calling this a thread did
 // not seem like a proper abstraction.
 class ArmciVirtualProcessor : public TCharmClient1D {
-  CmiIsomallocBlockList *memBlock;
   CProxy_ArmciVirtualProcessor thisProxy;
   AddressMsg *addressReply;
   CkPupPtrVec<Armci_Hdl> hdlList;
@@ -241,7 +240,17 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   ~ArmciVirtualProcessor();
  
   pointer BlockMalloc(int bytes) { 
-    return (void *)CmiIsomallocBlockListMalloc(memBlock, bytes); 
+    CmiIsomallocContext ctx = CmiIsomallocGetThreadContext(thread->getThread());
+    if (ctx.opaque == nullptr)
+      return malloc(bytes);
+    return CmiIsomallocContextMalloc(ctx, bytes);
+  }
+  void BlockFree(void * ptr) {
+    CmiIsomallocContext ctx = CmiIsomallocGetThreadContext(thread->getThread());
+    if (ctx.opaque == nullptr)
+      free(ptr);
+    else
+      CmiIsomallocContextFree(ctx, ptr);
   }
   void getAddresses(AddressMsg *msg);
 

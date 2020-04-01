@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Silly shorthand, used for source reorganization
 if [ $(dirname $0) = "." ]
@@ -17,15 +17,15 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ LIBS AMPI charm4py bigemulator msa'
+  echo '<targets>: converse charm++ LIBS AMPI charm4py msa'
   if test $more = 1
   then
   echo ''
   echo '  charm++         compile Charm++ core only'
   echo '  AMPI            compile Adaptive MPI on top of Charm++'
+  echo '  AMPI-only       compile Adaptive MPI with Charm++ built exclusively for it'
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
   echo '  charm4py        compile shared library version of Charm++ for charm4py'
-  echo '  bigemulator     build additional BigSim libraries'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
   echo '  Tau             build the TAU tracing library for generating TAU performance data' 
   echo '  ChaNGa          compile Charm++ core and necessary libraries for ChaNGa'
@@ -33,11 +33,11 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
-  echo 'help smp omp tcp bigemulator ooc syncft papi pthreads'
+  echo 'help smp omp tcp ooc syncft papi pthreads'
   echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
   if test $more = 1
   then
@@ -66,7 +66,6 @@ syntax() {
   echo '  pthreads        compile with pthreads Converse threads'
   echo ''
   echo 'Advanced options:'
-  echo '  bigemulator	  compile for BigSim simulator'
   echo '  ooc		  compile with out of core support'
   echo '  syncft	  compile with Charm++ fault tolerance support'
   echo '  papi            compile with PAPI performance counter support (if any)'
@@ -226,15 +225,14 @@ LIBDIR=
 INCDIR=
 ARCH=
 BUILD_SHARED=""             # default no shared lib
-WITH_ROMIO="true"           # default to building ROMIO on AMPI
 WITH_PRODUCTION=
-BUILD_EMULATOR=0
 DESTINATION=""
 DESTINATION_SUFFIX=""
 TAU_MAKEFILE=""
 QUIET=""
 BUILD_OMP=0
 ONLY_CONFIGURE=
+AMPI_ONLY=
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | ( less || more ) && exit 1
 [ $# -lt 2 ] && $(dirname "$0")/smart-build.pl && exit 1
@@ -277,6 +275,16 @@ shift
 
 OPT_DIRS="$src/$BASEVERSION $src/$ARCH $src/common"
 
+# default to building ROMIO on AMPI where supported
+case "$BASEVERSION" in
+  *-win64*|*-win-*)
+    WITH_ROMIO=''
+    ;;
+  *)
+    WITH_ROMIO='true'
+    ;;
+esac
+
 # process remainder of version argument as options, copied from below
 for w in $VERSOPTS; do
   # This has to be a build-time option (like "smp")
@@ -294,8 +302,6 @@ for w in $VERSOPTS; do
   # It specifies some other option:
           TestIfOption $w
           BOPTS="$BOPTS $w"
-          [ $w =  "bigemulator" ] && BUILD_EMULATOR=1
-          [ $w =  "bigsim" ] && BUILD_EMULATOR=1
           [ $w =  "cuda"   ] && BUILD_CUDA=1
         fi
 done
@@ -364,6 +370,9 @@ do
     --build-shared)
 		BUILD_SHARED="-build-shared"; 
 		shift
+		;;
+    --ampi-only)
+		AMPI_ONLY='1'; shift
 		;;
     --with-romio)
 		WITH_ROMIO="true"; shift
@@ -464,8 +473,6 @@ do
 # It specifies some other option:
           TestIfOption $1
           BOPTS="$BOPTS $1"
-          [ $1 =  "bigemulator" ] && BUILD_EMULATOR=1
-          [ $1 =  "bigsim" ] && BUILD_EMULATOR=1
           [ $1 =  "cuda"   ] && BUILD_CUDA=1
         fi
         shift
@@ -474,21 +481,29 @@ do
 done
 
 if [ $BUILD_CUDA -eq 1 ]; then
-  HAVE_CUDA="no"
-  echo "checking for CUDA toolkit directory"
-  CUDA_PRESET_DIRS="/usr/local/cuda /usr/lib/nvidia-cuda-toolkit"
-  CUDA_CANDIDATE_DIRS="$CUDATOOLKIT_HOME $CUDA_PRESET_DIRS"
-  for dir in $CUDA_CANDIDATE_DIRS; do
-    if test -d "$dir"; then
-      CUDA_DIR="$dir"
-      HAVE_CUDA="yes"
-      echo "CUDA_DIR=$CUDA_DIR"
-      break
+  echo "Checking if NVCC is in your path..."
+  which nvcc &> /dev/null
+  if [ $? -eq 0 ]; then
+    NVCC_PATH=$(which nvcc)
+    CUDA_DIR=${NVCC_PATH%"/bin/nvcc"}
+    echo "NVCC found, using CUDA in $CUDA_DIR"
+  else
+    echo "NVCC not found, checking candidate CUDA directories..."
+    HAVE_CUDA="no"
+    CUDA_PRESET_DIRS="/usr/local/cuda /usr/lib/nvidia-cuda-toolkit"
+    CUDA_CANDIDATE_DIRS="$CUDATOOLKIT_HOME $CUDA_DIR $CUDA_HOME $CUDA_PRESET_DIRS"
+    for dir in $CUDA_CANDIDATE_DIRS; do
+      if test -d $dir && test -e "$dir/bin/nvcc"; then
+        echo "CUDA found in $dir"
+        CUDA_DIR=$dir
+        HAVE_CUDA="yes"
+        break
+      fi
+    done
+    if [ $HAVE_CUDA = "no" ]; then
+      echo "Error> CUDA not found, searched $\CUDATOOLKIT_HOME \$CUDA_DIR \$CUDA_HOME $CUDA_PRESET_DIRS"
+      exit 1
     fi
-  done
-  if [ "$HAVE_CUDA" = "no" ]; then
-    echo "Error> no CUDA toolkit found, searched \$CUDATOOLKIT_HOME $CUDA_PRESET_DIRS"
-    exit 1
   fi
 fi
 
@@ -504,12 +519,6 @@ if [ "x_$ARCH" = "x_verbs" ] && type /usr/sbin/opafabricinfo >/dev/null 2>&1; th
   echo "WARNING: Detected Omni-Path diagnostic tools.";
   echo "Verbs on Omni-Path architectures is not well supported: please use an OFI build instead.";
 fi 
-
-if test -n "$WITH_PRODUCTION" -a $BUILD_EMULATOR -eq 1 -a -z "$ENABLE_TRACING"
-then
-  echo "Error: bigemulator requires tracing modules, --with-production must be used with --enable-tracing"
-  exit 1
-fi
 
 if [ -z "$MAKE" ] 
 then
@@ -531,37 +540,6 @@ then
     echo "Error> autoconf and automake are not installed."
     exit 1
   fi
-fi
-
-#generate header for uFcontext for the target VERSION
-UFCONTEXT_HEADER_NAME=
-if test `echo "$BASEVERSION" | grep -c "darwin"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="macho_gas"
-elif test `echo "$BASEVERSION" | grep -c "win"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="windows"
-else
-  UFCONTEXT_HEADER_NAME="elf_gas"
-fi
-
-if test `echo "$BASEVERSION" | grep -c "arm7"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="arm_aapcs_${UFCONTEXT_HEADER_NAME}"
-elif test `echo "$BASEVERSION" | grep -c "arm8"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="arm64_aapcs_${UFCONTEXT_HEADER_NAME}"
-elif test `echo "$BASEVERSION" | grep -c "mips"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="mips32_o32_${UFCONTEXT_HEADER_NAME}"
-elif test `echo "$BASEVERSION" | grep -c "bluegene\|pami\|ppc"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="ppc64_sysv_${UFCONTEXT_HEADER_NAME}"
-elif test `echo "$BASEVERSION" | grep -c "cray\|x86_64\|linux64\|amd64"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="x86_64_sysv_${UFCONTEXT_HEADER_NAME}"
-else
-  UFCONTEXT_HEADER_NAME="i386_sysv_${UFCONTEXT_HEADER_NAME}"
 fi
 
 #generate VERSION name combining all the build-time options.
@@ -712,13 +690,6 @@ then
   CONFIG_OPTS="--enable-lbuserdata $CONFIG_OPTS"
 fi
 
-if test $BUILD_EMULATOR = 1
-then
-  # export BIGSIM so that make targets can depend on it
-  MAKEOPTS="$MAKEOPTS BIGSIM=bigsim"
-  PROGRAM="$PROGRAM bigsim"
-fi
-
 if [ $BUILD_OMP = 2 ]
 then
   case $DESTINATION in
@@ -748,8 +719,6 @@ done
 Echo "Creating dir: $DESTINATION"
 Echo "Creating dir: $DESTINATION/tmp"
 mkdir -p "$DESTINATION/tmp"
-
-echo "TARGET=${UFCONTEXT_HEADER_NAME}" > $DESTINATION/tmp/uFcontext.mk
 
 # Create the bin, lib, include, etc. links:
 WINNAME=`echo $VERSION | awk -F- '{print $2}'`
@@ -883,8 +852,35 @@ fi
 
 if test  -n "$WITH_ROMIO" 
 then
-    echo "CMK_AMPI_WITH_ROMIO=\"true\"" >> $ConvSh
-    echo "CMK_AMPI_WITH_ROMIO:=true" >> $ConvMak
+    echo "CMK_AMPI_WITH_ROMIO=\"1\"" >> $ConvSh
+    echo "CMK_AMPI_WITH_ROMIO:=1" >> $ConvMak
+    echo '#define CMK_AMPI_WITH_ROMIO 1' >> $ConvHeader
+else
+    echo "CMK_AMPI_WITH_ROMIO=\"0\"" >> $ConvSh
+    echo "CMK_AMPI_WITH_ROMIO:=0" >> $ConvMak
+    echo '#define CMK_AMPI_WITH_ROMIO 0' >> $ConvHeader
+fi
+
+if [[ -n "$AMPI_ONLY" || "$PROGRAM" = "${PROGRAM%AMPI-only}AMPI-only" ]]
+then
+    echo "CMK_AMPI_ONLY=\"1\"" >> $ConvSh
+    echo "CMK_AMPI_ONLY:=1" >> $ConvMak
+    echo '#define CMK_AMPI_ONLY 1' >> $ConvHeader
+
+    if [[ "$PROGRAM" = "${PROGRAM%AMPI-only}AMPI-only" ]]
+    then
+      # strip "-only" suffix from AMPI target
+      PROGRAM="${PROGRAM%-only}"
+    fi
+    # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
+    # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
+    # so we bump up the number of bits reserved for the collection in the objid.
+    OPTS="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 -DCMK_FIFO_QUEUE_ONLY=1 -DCMK_OBJID_COLLECTION_BITS=29 $OPTS "
+    CONFIG_OPTS="--with-prio-type=char $CONFIG_OPTS "
+else
+    echo "CMK_AMPI_ONLY=\"0\"" >> $ConvSh
+    echo "CMK_AMPI_ONLY:=0" >> $ConvMak
+    echo '#define CMK_AMPI_ONLY 0' >> $ConvHeader
 fi
 
 if test -n "$WITH_PRODUCTION"

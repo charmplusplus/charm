@@ -50,7 +50,7 @@ void runThread(void* msg) {
       CthYield();
     }
     if (iter == (NITER / 4) && myId < ('A' + NSPAWN - 1)) {
-      CthThread nTh = CthCreateMigratable((CthVoidFn)runThread, 0, 160000);
+      CthThread nTh = CthCreate((CthVoidFn)runThread, 0, 160000);
       CthAwaken(nTh);
       CthYield();
     }
@@ -72,7 +72,7 @@ void test_init(int argc, char** argv) {
   /* skip communication thread */
   if (CmiMyRank() != CmiMyNodeSize()) {
     timeStart = CmiWallTimer();
-    CthThread yielder = CthCreateMigratable((CthVoidFn)runThread, 0, 160000);
+    CthThread yielder = CthCreate((CthVoidFn)runThread, 0, 160000);
     CthAwaken(yielder);
   }
 }

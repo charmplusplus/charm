@@ -352,7 +352,7 @@ void ADIOI_Calc_my_off_len(ADIO_File fd, int bufcount, MPI_Datatype
        /* First calculate what size of offset_list and len_list to allocate */
    
        /* filetype already flattened in ADIO_Open or ADIO_Fcntl */
-	flat_file = CtvAccess(ADIOI_Flatlist);
+	flat_file = ADIOI_Flatlist;
 	while (flat_file->type != fd->filetype) flat_file = flat_file->next;
 	disp = fd->disp;
 

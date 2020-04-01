@@ -105,10 +105,6 @@ void _createTraceprojections(char **argv)
   CkpvInitialize(CkVec<UsrEvent *>*, usrStats);
   CkpvAccess(usrEvents) = new CkVec<UsrEvent *>();
   CkpvAccess(usrStats) = new CkVec<UsrEvent *>();
-#if CMK_BIGSIM_CHARM
-  // CthRegister does not call the constructor
-//  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
-#endif //CMK_BIGSIM_CHARM
   CkpvInitialize(TraceProjections*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
@@ -359,18 +355,6 @@ LogPool::~LogPool()
 #endif
   }
 
-#if CMK_BIGSIM_CHARM
-  extern int correctTimeLog;
-  if (correctTimeLog) {
-    createFile("-bg");
-    if (CkMyPe() == 0) {
-      createSts("-bg");
-    }
-    writeHeader();
-    if (CkMyPe() == 0) writeSts(NULL);
-    postProcessLog();
-  }
-#endif
 
   delete[] pool;
   delete [] fname;
@@ -558,18 +542,6 @@ void LogPool::writeStatis(void)
   fclose(statisfp);
 }
 
-#if CMK_BIGSIM_CHARM
-static void updateProjLog(void *data, double t, double recvT, void *ptr)
-{
-  LogEntry *log = (LogEntry *)data;
-  FILE *fp = *(FILE **)ptr;
-  log->time = t;
-  log->recvTime = recvT<0.0?0:recvT;
-//  log->write(fp);
-  toProjectionsFile p(fp);
-  log->pup(p);
-}
-#endif
 
 // flush log entries to disk
 void LogPool::flushLogBuffer()
@@ -666,31 +638,10 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
   }
   if(poolSize==numEntries) {
     flushLogBuffer();
-#if CMK_BIGSIM_CHARM
-    extern int correctTimeLog;
-    if (correctTimeLog) CmiAbort("I/O interrupt!\n");
-#endif
   }
-#if CMK_BIGSIM_CHARM
-  switch (type) {
-    case BEGIN_PROCESSING:
-      pool[numEntries-1].recvTime = BgGetRecvTime();
-    case END_PROCESSING:
-    case BEGIN_COMPUTATION:
-    case END_COMPUTATION:
-    case CREATION:
-    case BEGIN_PACK:
-    case END_PACK:
-    case BEGIN_UNPACK:
-    case END_UNPACK:
-    case USER_EVENT_PAIR:
-      bgAddProjEvent(&pool[numEntries-1], numEntries-1, time, updateProjLog, &fp, BG_EVENT_PROJ);
-  }
-#endif
 }
 
 void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileName){
-#ifndef CMK_BIGSIM_CHARM
   if (type == CREATION ||
       type == CREATION_MULTICAST ||
       type == CREATION_BCAST) {
@@ -701,7 +652,6 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
   if(poolSize == numEntries){
     flushLogBuffer();
   }
-#endif	
 }
 
 void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
@@ -715,7 +665,6 @@ void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
 
   
 void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
-#ifndef CMK_BIGSIM_CHARM
   if (type == CREATION ||
       type == CREATION_MULTICAST ||
       type == CREATION_BCAST) {
@@ -726,7 +675,6 @@ void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
   if(poolSize == numEntries){
     flushLogBuffer();
   }
-#endif	
 	
 }  
 
@@ -749,7 +697,6 @@ void LogPool::addUserSuppliedNote(char *note){
 
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
   //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
-#ifndef CMK_BIGSIM_CHARM
 #if MPI_TRACE_MACHINE_HACK
   //This part of code is used  to combine the contiguous
   //MPI_Test and MPI_Iprobe events to reduce the number of
@@ -772,7 +719,6 @@ void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, d
   if(poolSize == numEntries){
     flushLogBuffer();
   }
-#endif	
 }
 
 
@@ -798,9 +744,6 @@ void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 
 void LogPool::postProcessLog()
 {
-#if CMK_BIGSIM_CHARM
-  bgUpdateProj(1);   // event type
-#endif
 }
 
 void LogPool::modLastEntryTimestamp(double ts)
@@ -1725,6 +1668,14 @@ void toProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
     };
 }
 
+void toProjectionsFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void toProjectionsFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
@@ -1755,6 +1706,14 @@ void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
     };
 }
 
+void fromProjectionsFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void fromProjectionsFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 #if CMK_USE_ZLIB
 void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
@@ -1777,6 +1736,14 @@ void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 #endif
     default: CmiAbort("Unrecognized pup type code!");
     };
+}
+
+void toProjectionsGZFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void toProjectionsGZFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
 }
 #endif
 
@@ -1851,11 +1818,7 @@ static void TraceProjectionsExitHandler()
 void initTraceProjectionsBOC()
 {
   // CkPrintf("[%d] Trace Projections initialization called!\n", CkMyPe());
-#ifdef __BIGSIM__
-  if (BgNodeRank() == 0) {
-#else
     if (CkMyRank() == 0) {
-#endif
       registerExitFn(TraceProjectionsExitHandler);
     }
 #if 0

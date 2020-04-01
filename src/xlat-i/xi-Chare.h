@@ -120,40 +120,6 @@ class Chare : public TEntity {
   void genTramDecls(XStr& str);
   void genTramInits(XStr& str);
 
-  // DMK - Accel Support
-  int genAccels_spe_c_funcBodies(XStr& str) {
-    int rtn = 0;
-    if (list) {
-      rtn += list->genAccels_spe_c_funcBodies(str);
-    }
-    return rtn;
-  }
-  void genAccels_spe_c_regFuncs(XStr& str) {
-    if (list) {
-      list->genAccels_spe_c_regFuncs(str);
-    }
-  }
-  void genAccels_spe_c_callInits(XStr& str) {
-    if (list) {
-      list->genAccels_spe_c_callInits(str);
-    }
-  }
-  void genAccels_spe_h_includes(XStr& str) {
-    if (list) {
-      list->genAccels_spe_h_includes(str);
-    }
-  }
-  void genAccels_spe_h_fiCountDefs(XStr& str) {
-    if (list) {
-      list->genAccels_spe_h_fiCountDefs(str);
-    }
-  }
-  void genAccels_ppe_c_regFuncs(XStr& str) {
-    if (list) {
-      list->genAccels_ppe_c_regFuncs(str);
-    }
-  }
-
   int nextEntry(void) { return entryCount++; }
   virtual void genSubDecls(XStr& str);
   virtual void outputClosuresDecl(XStr& str);

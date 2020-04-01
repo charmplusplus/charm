@@ -113,7 +113,7 @@ typedef struct mempool_type
   size_t block_tail;
   size_t limit;
   size_t size;
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+#if CMK_SMP && CMK_CONVERSE_UGNI
   CmiNodeLock mempoolLock;
   char padding[CMIPADDING((6 * sizeof(size_t) + sizeof(CmiNodeLock)), 16)];
 #elif !CMK_64BIT
@@ -136,7 +136,7 @@ void mempool_destroy(mempool_type* mptr);
 void* mempool_malloc(mempool_type* mptr, size_t size, int expand);
 void* mempool_large_malloc(mempool_type* mptr, size_t size, int expand);
 void mempool_free(mempool_type* mptr, void* ptr_free);
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+#if CMK_SMP && CMK_CONVERSE_UGNI
 void mempool_free_thread(void* ptr_free);
 #endif
 

@@ -179,20 +179,10 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     if (tcharm_nomig) { /*Nonmigratable version, for debugging*/
       tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
     } else {
-      /* HACK: Isomalloc gets memory from the mempool, which allocates chunks of memory in sizes
-       * that are powers of two only. Isomalloc & mempool also add their own metadata to every allocation,
-       * so we try to play nice with that here (since the stacksize is often already a power of two): */
-      int isomalloc_offset=64;
-      tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize-isomalloc_offset);
+      CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
+      tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
     }
-#if CMK_BIGSIM_CHARM
-    BgAttach(tid);
-    BgUnsetStartOutOfCore();
-#endif
   }
-#if CMI_SWAPGLOBALS
-  threadGlobals=CtgCreate(tid);
-#endif
   CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
   isStopped=true;
@@ -204,11 +194,6 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
-  if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) {
-    heapBlocks = CmiIsomallocBlockListNew();
-  } else {
-    heapBlocks = 0;
-  }
   nUd=0;
   usesAtSync=true;
   run();
@@ -219,11 +204,7 @@ TCharm::TCharm(CkMigrateMessage *msg)
 {
   initMsg=NULL;
   tid=NULL;
-#if CMI_SWAPGLOBALS
-  threadGlobals=NULL;
-#endif
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
-  heapBlocks=0;
 
 #if CMK_FAULT_EVAC
 	AsyncEvacuate(true);
@@ -251,7 +232,8 @@ void TCharm::pup(PUP::er &p) {
   p(isStopped); p(exitWhenDone); p(isSelfDone); p(asyncMigrate);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
-  
+  p | resumeAfterMigrationCallback;
+
   if (sema.size()>0){
   	CkAbort("TCharm::pup> Cannot migrate with unconsumed semaphores!\n");
   }
@@ -259,7 +241,6 @@ void TCharm::pup(PUP::er &p) {
   DBG("Packing thread");
 #if CMK_ERROR_CHECKING
   if (!p.isSizing() && !isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
-    if(_BgOutOfCoreFlag==0) //not doing out-of-core scheduling
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
   }	
   if (tcharm_nomig && !p.isSizing()) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
@@ -335,19 +316,10 @@ void TCharm::pupThread(PUP::er &pc) {
     pup_er p=(pup_er)&pc;
     checkPupMismatch(pc,5138,"before TCHARM thread"); 
 
-    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-      CmiIsomallocBlockListPup(p,&heapBlocks);
-
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
-#if CMK_BIGSIM_CHARM
-      BgAttach(tid);
-#endif
     }
-#if CMI_SWAPGLOBALS
-    threadGlobals=CtgPup(p,threadGlobals);
-#endif
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
 
@@ -386,14 +358,8 @@ void TCharm::UserData::pup(PUP::er &p)
 TCharm::~TCharm()
 {
   //BIGSIM_OOC DEBUGGING
-  //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
-
-  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
 
   CthFree(tid);
-#if CMI_SWAPGLOBALS
-  CtgFree(threadGlobals);
-#endif
 
   delete initMsg;
 }
@@ -430,7 +396,6 @@ void TCharm::ckAboutToMigrate(){
 // clear the data before restarting from disk
 void TCharm::clear()
 {
-  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
   delete initMsg;
 }
@@ -521,7 +486,10 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::allow_migrate()
 void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
-  start();
+  if (resumeAfterMigrationCallback.isInvalid())
+    start();
+  else
+    resumeAfterMigrationCallback.send();
 }
 
 
@@ -548,15 +516,7 @@ CkArrayID TCHARM_Get_threads() {
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::barrier() noexcept {
 	//Contribute to a synchronizing reduction
 	contribute(CkCallback(CkReductionTarget(TCharm, atBarrier), thisProxy[0]));
-#if CMK_BIGSIM_CHARM
-        void *curLog;		// store current log in timeline
-        _TRACE_BG_TLINE_END(&curLog);
-	TRACE_BG_AMPI_BREAK(NULL, "TCharm_Barrier_START", NULL, 0, 1);
-#endif
 	TCharm * dis = stop();
-#if CMK_BIGSIM_CHARM
-	 _TRACE_BG_SET_INFO(NULL, "TCHARM_Barrier_END",  &curLog, 1);
-#endif
 	return dis;
 }
 
@@ -705,12 +665,7 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     mapID=CProxy_ConfigurableRRMap::ckNew();
     opts.setMap(mapID);
   } else if(mapping==NULL){
-#if CMK_BIGSIM_CHARM
-    mapID=CProxy_BlockMap::ckNew();
-    opts.setMap(mapID);
-#else
     /* do nothing: use the default map */
-#endif
   } else if(0 == strcmp(mapping,"BLOCK_MAP")) {
     CkPrintf("TCharm> using BLOCK_MAP\n");
     mapID = CProxy_BlockMap::ckNew();

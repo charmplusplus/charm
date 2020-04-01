@@ -1,5 +1,5 @@
 COMMENT="Use pgf90 fortran compiler in $PG_DIR"
-PG_DIR=`which pgf90`
+PG_DIR=`command -v pgf90`
 if test x$PG_DIR = x 
 then
   echo charmc> Fatal error: pgf90 not found!
