@@ -34,10 +34,10 @@ CkLoop.o: CkLoop.C CkLoop.h ../../../../tmp/converse.h \
  ../../../../tmp/CkReduction.decl.h ../../../../tmp/ckmemcheckpoint.h \
  ../../../../tmp/CkMemCheckpoint.decl.h ../../../../tmp/readonly.h \
  ../../../../tmp/ckarray.h ../../../../tmp/cklocation.h \
- ../../../../tmp/LBDatabase.h ../../../../tmp/lbdb.h \
- ../../../../tmp/LBObj.h ../../../../tmp/LBOM.h ../../../../tmp/LBComm.h \
- ../../../../tmp/LBMachineUtil.h ../../../../tmp/LBDatabase.decl.h \
- ../../../../tmp/NullLB.decl.h ../../../../tmp/BaseLB.decl.h \
+ ../../../../tmp/LBManager.h ../../../../tmp/LBDatabase.h \
+ ../../../../tmp/lbdb.h ../../../../tmp/LBObj.h ../../../../tmp/LBOM.h \
+ ../../../../tmp/LBComm.h ../../../../tmp/LBMachineUtil.h \
+ ../../../../tmp/LBManager.decl.h ../../../../tmp/BaseLB.decl.h \
  ../../../../tmp/MetaBalancer.h ../../../../tmp/RandomForestModel.h \
  ../../../../tmp/MetaBalancer.decl.h ../../../../tmp/CkLocation.decl.h \
  ../../../../tmp/ckarrayoptions.h ../../../../tmp/ckmulticast.h \

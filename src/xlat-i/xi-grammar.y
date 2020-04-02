@@ -110,7 +110,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token STACKSIZE
 %token THREADED
 %token TEMPLATE
-%token SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE AGGREGATE
+%token WHENIDLE SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE AGGREGATE
 %token CREATEHERE CREATEHOME NOKEEP NOTRACE APPWORK
 %token VOID
 %token CONST
@@ -247,6 +247,7 @@ Name		: IDENT
 		| STACKSIZE { ReservedWord(STACKSIZE, @$.first_column, @$.last_column); YYABORT; }
 		| THREADED { ReservedWord(THREADED, @$.first_column, @$.last_column); YYABORT; }
 		| TEMPLATE { ReservedWord(TEMPLATE, @$.first_column, @$.last_column); YYABORT; }
+		| WHENIDLE { ReservedWord(WHENIDLE, @$.first_column, @$.last_column); YYABORT; }
 		| SYNC { ReservedWord(SYNC, @$.first_column, @$.last_column); YYABORT; }
 		| IGET { ReservedWord(IGET, @$.first_column, @$.last_column); YYABORT; }
 		| EXCLUSIVE { ReservedWord(EXCLUSIVE, @$.first_column, @$.last_column); YYABORT; }
@@ -977,6 +978,8 @@ EAttribList	: EAttrib
 
 EAttrib		: THREADED
 		{ $$ = STHREADED; }
+		| WHENIDLE
+		{ $$ = SWHENIDLE; }
 		| SYNC
 		{ $$ = SSYNC; }
                 | IGET
