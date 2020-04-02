@@ -139,4 +139,4 @@ int main() {
 # Unset workaround from above
 if(${CMAKE_VERSION} VERSION_LESS "3.8.0")
   set(CMAKE_REQUIRED_FLAGS "")
-else()
+endif()
