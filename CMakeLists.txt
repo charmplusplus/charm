@@ -111,6 +111,7 @@ option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 # Other options
 option(EVERYLB             "Compile EveryLB suite of load balancing strategies" OFF)
 option(F90CHARM            "Build f90charm" OFF)
+option(PEDANTIC            "Build with -pedantic" OFF)
 
 # UCX PMI options
 set(UCX_PMI "" CACHE STRING "PMI type for UCX layer, can be one of simplepmi, simplepmi2, or ompipmix")
@@ -731,7 +732,7 @@ foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTH
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS)
+foreach(opt SMP OMP TCP PTHREADS PEDANTIC)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
