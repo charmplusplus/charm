@@ -112,6 +112,7 @@ option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 option(EVERYLB             "Compile EveryLB suite of load balancing strategies" OFF)
 option(F90CHARM            "Build f90charm" OFF)
 option(PEDANTIC            "Build with -pedantic" OFF)
+option(BUILD_CUDA          "Build with CUDA support" OFF)
 
 # UCX PMI options
 set(UCX_PMI "" CACHE STRING "PMI type for UCX layer, can be one of simplepmi, simplepmi2, or ompipmix")
@@ -387,6 +388,7 @@ configure_file(src/arch/common/cc-mpi.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-mpiopts.sh                 include/ COPYONLY) #sh only
 configure_file(src/arch/common/conv-mach-craype.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.sh             include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-cuda.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-darwin.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-flang.sh            include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-gfortran.sh         include/ COPYONLY)

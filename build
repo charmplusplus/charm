@@ -56,6 +56,7 @@ opt_ccs=0
 opt_charmdebug=0
 opt_charmpy=0
 opt_controlpoint=0
+opt_cuda=0
 opt_drone_mode=0
 opt_error_checking=0
 opt_extra_opts=""
@@ -109,6 +110,9 @@ while [[ $# -gt 0 ]]; do
   shift
   case $arg in
   # Platform specific options
+    cuda)
+      opt_cuda=1
+      ;;
     smp)
       opt_smp=1
       ;;
@@ -360,6 +364,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DCHARMDEBUG="$opt_charmdebug" \
   -DCHARMPY="$opt_charmpy" \
   -DCONTROLPOINT="$opt_controlpoint" \
+  -DBUILD_CUDA="$opt_cuda" \
   -DDRONE_MODE="$opt_drone_mode" \
   -DERROR_CHECKING="$opt_error_checking" \
   -DEXTRA_OPTS="$opt_extra_opts" \
