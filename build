@@ -84,6 +84,7 @@ opt_shrinkexpand=0
 opt_smp=0
 opt_stats=0
 opt_suffix=""
+opt_syncft=0
 opt_task_queue=0
 opt_tcp=0
 opt_tracing=0
@@ -112,6 +113,9 @@ while [[ $# -gt 0 ]]; do
   shift
   case $arg in
   # Platform specific options
+    syncft)
+      opt_syncft=1
+      ;;
     cuda)
       opt_cuda=1
       ;;
@@ -329,7 +333,7 @@ done
 
 # Append certain features and compilers to the end of the build directory name
 builddir_extra=""
-for flag in opt_smp opt_omp opt_tcp opt_pthreads opt_pedantic; do
+for flag in opt_smp opt_omp opt_tcp opt_pthreads opt_pedantic opt_syncft; do
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
@@ -387,6 +391,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DSHRINKEXPAND="$opt_shrinkexpand" \
   -DSMP="$opt_smp" \
   -DSTATS="$opt_stats" \
+  -DSYNCFT="$opt_syncft" \
   -DTARGET="$target" \
   -DTASK_QUEUE="$opt_task_queue" \
   -DTCP="$opt_tcp" \
