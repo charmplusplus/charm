@@ -23,14 +23,6 @@ find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran c
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Workaround for CMake bug when calling check_include_file_cxx() with C++11: 
-# https://stackoverflow.com/questions/47213356/cmake-using-corrext-c-standard-when-checking-for-header-files
-if(${CMAKE_VERSION} VERSION_LESS "3.8.0")
-  set(CMAKE_REQUIRED_FLAGS "-std=c++11")
-else()
-  cmake_policy(SET CMP0067 NEW)
-endif()
-
 
 # Setting charmc as the compiler launcher for Fortran files only works with
 # CMake 3.11.0 or above. See 'CMAKE_Fortran_COMPILER_LAUNCHER' below for details.
