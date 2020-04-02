@@ -159,6 +159,9 @@ endif()
 
 if(${NETWORK} STREQUAL "multicore")
   set(SMP 0)
+  set(CMK_MULTICORE 1)
+else()
+  set(CMK_MULTICORE 0)
 endif()
 
 set(CMK_USE_ZLIB ${ZLIB})
