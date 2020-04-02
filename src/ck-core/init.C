@@ -250,6 +250,11 @@ extern bool useNodeBlkMapping;
 extern int quietMode;
 extern int quietModeRequested;
 
+void CkCallWhenIdle(int epIdx, void* obj) {
+  auto fn = reinterpret_cast<CcdVoidFn>(_entryTable[epIdx]->call);
+  CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, fn, obj);
+}
+
 // Modules are required to register command line opts they will parse. These
 // options are stored in the _optSet, and then when parsing command line opts
 // users will be warned about options starting with a '+' that are not in this
@@ -1139,7 +1144,7 @@ static void _nullFn(void *, void *)
   CmiAbort("Null-Method Called. Program may have Unregistered Module!!\n");
 }
 
-extern void _registerLBDatabase(void);
+extern void _registerLBManager(void);
 extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
@@ -1482,7 +1487,7 @@ void _initCharm(int unused_argc, char **argv)
 		*/
 		_registerCkFutures();
 		_registerCkArray();
-		_registerLBDatabase();
+		_registerLBManager();
     _registerMetaBalancer();
 		_registerCkCallback();
 		_registerwaitqd();
