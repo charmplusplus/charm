@@ -4,6 +4,7 @@ DIRS = \
   machinetest \
   pingpong \
   randomttl \
+  kNeighbors \
 
 TESTDIRS = $(DIRS)
 
