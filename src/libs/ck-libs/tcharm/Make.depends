@@ -37,12 +37,12 @@ tcharm.o: tcharm.C tcharm_impl.h ../../../../include/pup.h \
  ../../../../include/ckmemcheckpoint.h \
  ../../../../include/CkMemCheckpoint.decl.h \
  ../../../../include/readonly.h ../../../../include/ckarray.h \
- ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
- ../../../../include/lbdb.h ../../../../include/LBObj.h \
- ../../../../include/LBOM.h ../../../../include/LBComm.h \
- ../../../../include/LBMachineUtil.h \
- ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
- ../../../../include/BaseLB.decl.h ../../../../include/MetaBalancer.h \
+ ../../../../include/cklocation.h ../../../../include/LBManager.h \
+ ../../../../include/LBDatabase.h ../../../../include/lbdb.h \
+ ../../../../include/LBObj.h ../../../../include/LBOM.h \
+ ../../../../include/LBComm.h ../../../../include/LBMachineUtil.h \
+ ../../../../include/LBManager.decl.h ../../../../include/BaseLB.decl.h \
+ ../../../../include/MetaBalancer.h \
  ../../../../include/RandomForestModel.h \
  ../../../../include/MetaBalancer.decl.h \
  ../../../../include/CkLocation.decl.h \
@@ -99,12 +99,12 @@ tcharmmain.o: tcharmmain.C tcharm_impl.h ../../../../include/pup.h \
  ../../../../include/ckmemcheckpoint.h \
  ../../../../include/CkMemCheckpoint.decl.h \
  ../../../../include/readonly.h ../../../../include/ckarray.h \
- ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
- ../../../../include/lbdb.h ../../../../include/LBObj.h \
- ../../../../include/LBOM.h ../../../../include/LBComm.h \
- ../../../../include/LBMachineUtil.h \
- ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
- ../../../../include/BaseLB.decl.h ../../../../include/MetaBalancer.h \
+ ../../../../include/cklocation.h ../../../../include/LBManager.h \
+ ../../../../include/LBDatabase.h ../../../../include/lbdb.h \
+ ../../../../include/LBObj.h ../../../../include/LBOM.h \
+ ../../../../include/LBComm.h ../../../../include/LBMachineUtil.h \
+ ../../../../include/LBManager.decl.h ../../../../include/BaseLB.decl.h \
+ ../../../../include/MetaBalancer.h \
  ../../../../include/RandomForestModel.h \
  ../../../../include/MetaBalancer.decl.h \
  ../../../../include/CkLocation.decl.h \
