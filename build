@@ -11,13 +11,15 @@ command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
 if [[ $rc -ne 0 ]]; then
   echo "Warning: CMake unavailable, running ./buildold instead."
   sleep 2
-  exec ./buildold $@
+  ./buildold $@
+  exit $?
 fi
 
 if [[ $(uname) != "Linux" && $(uname) != "Darwin" ]]; then
   echo "Warning: CMake build is only supported on Linux and Darwin, running ./buildold instead."
   sleep 2
-  exec ./buildold $@
+  ./buildold $@
+  exit $?
 fi
 
 cmake_version_major=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 1 -d'.')
@@ -28,7 +30,8 @@ cmake_version_full=$(cmake --version | head -1 | cut -f 3 -d' ')
 if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 4) ]]; then
   echo "Warning: The CMake version on your system is too old (needed: 3.4.0 or later; available: $cmake_version_full), running ./buildold instead."
   sleep 2
-  exec ./buildold $@
+  ./buildold $@
+  exit $?
 fi
 
 usage()
