@@ -4,11 +4,7 @@ include(CheckCXXCompilerFlag)
 
 # Workaround for CMake bug when calling check_include_file_cxx() with C++11:
 # https://stackoverflow.com/uestions/47213356/cmake-using-corrext-c-standard-when-checking-for-header-files
-if(${CMAKE_VERSION} VERSION_LESS "3.8.0")
-  set(CMAKE_REQUIRED_FLAGS "-std=c++11")
-else()
-  cmake_policy(SET CMP0067 NEW)
-endif()
+set(CMAKE_REQUIRED_FLAGS "-std=c++11")
 
 
 # C++ type sizes
@@ -137,6 +133,4 @@ int main() {
 " CMK_EXPECTS_MORECORE)
 
 # Unset workaround from above
-if(${CMAKE_VERSION} VERSION_LESS "3.8.0")
-  set(CMAKE_REQUIRED_FLAGS "")
-endif()
+set(CMAKE_REQUIRED_FLAGS "")
