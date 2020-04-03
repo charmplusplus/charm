@@ -507,10 +507,10 @@ TreeLB.o: TreeLB.C TreeLB.h BaseLB.h LBManager.h LBDatabase.h lbdb.h \
  waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  CkCheckpointStatus.decl.h ckevacuation.h trace.h pathHistory.h \
  PathHistory.decl.h ckcallback-ccs.h CkCallback.decl.h BaseLB.decl.h \
- TreeLB.decl.h idm.h spanningTree.h tree_builder.h tree_level.h \
- lb_strategy.h strategy_factory.h greedy.h pheap.h refine.h \
+ TreeLB.decl.h idm.h spanningTree.h TreeBuilder.h TreeLevel.h \
+ TreeStrategyBase.h TreeStrategyFactory.h greedy.h pheap.h refine.h \
  ../include/TopoManager.h ../include/topomanager_config.h \
- ../include/converse.h tree_level.decl.h tree_level.def.h TreeLB.def.h
+ ../include/converse.h TreeLevel.decl.h TreeLevel.def.h TreeLB.def.h
 
 arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
  conv-header.h conv-config.h conv-autoconfig.h conv-common.h \

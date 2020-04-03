@@ -1,14 +1,14 @@
 #ifndef GREEDY_H
 #define GREEDY_H
 
-#include "lb_strategy.h"
+#include "TreeStrategyBase.h"
 #include "pheap.h"
 
 #include <algorithm>
 #include <queue>
 #include <vector>
 
-namespace lb_strategy
+namespace TreeStrategy
 {
 template <typename O, typename P, typename S>
 class Greedy : public Strategy<O, P, S>
@@ -98,6 +98,6 @@ class GreedyRefine : public Strategy<O, P, S>
   float tolerance = 1;  // tolerance above greedy maxload (not average load!)
 };
 
-}  // namespace lb_strategy
+}  // namespace TreeStrategy
 
 #endif /* GREEDY_H */

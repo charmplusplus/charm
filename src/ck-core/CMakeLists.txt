@@ -127,7 +127,7 @@ endif()
 
 # Single LBs
 add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C ${CMAKE_BINARY_DIR}/include/DistributedLB.decl.h ${ck-ci-sources})
-add_library(moduleTreeLB ../ck-ldb/TreeLB.C ${CMAKE_BINARY_DIR}/include/TreeLB.decl.h ${CMAKE_BINARY_DIR}/include/tree_level.decl.h ${ck-ci-sources})
+add_library(moduleTreeLB ../ck-ldb/TreeLB.C ${CMAKE_BINARY_DIR}/include/TreeLB.decl.h ${CMAKE_BINARY_DIR}/include/TreeLevel.decl.h ${ck-ci-sources})
 
 add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
 

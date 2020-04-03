@@ -1,10 +1,10 @@
-#ifndef LB_STRATEGY_H
-#define LB_STRATEGY_H
+#ifndef TREESTRATEGYBASE_H
+#define TREESTRATEGYBASE_H
 
 #include <algorithm>
 #include <random>
 
-namespace lb_strategy
+namespace TreeStrategy
 {
 template <typename T, bool is_ptr = std::is_pointer<T>::value>
 struct CmpLoadGreater
@@ -346,6 +346,6 @@ class Rotate : public Strategy<O, P, S>
   }
 };
 
-}  // namespace lb_strategy
+}  // namespace TreeStrategy
 
-#endif /* LB_STRATEGY_H */
+#endif /* TREESTRATEGYBASE_H */

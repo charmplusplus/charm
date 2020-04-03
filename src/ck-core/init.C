@@ -1139,7 +1139,7 @@ static void _nullFn(void *, void *)
 }
 
 extern void _registerLBManager(void);
-extern void _registertree_level(void);
+extern void _registerTreeLevel(void);
 extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
@@ -1483,7 +1483,7 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkFutures();
 		_registerCkArray();
 		_registerLBManager();
-    _registertree_level();
+		_registerTreeLevel();
     _registerMetaBalancer();
 		_registerCkCallback();
 		_registerwaitqd();

@@ -1,4 +1,4 @@
-module tree_level {
+module TreeLevel {
 
   message LBStatsMsg_1 {
     int pe_ids[];

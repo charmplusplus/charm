@@ -304,7 +304,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           CkReduction.decl.h \
           waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkCheckpointStatus.decl.h CkMemCheckpoint.decl.h \
-          LBManager.decl.h MetaBalancer.decl.h CentralLB.decl.h TreeLB.decl.h tree_level.decl.h \
+          LBManager.decl.h MetaBalancer.decl.h CentralLB.decl.h TreeLB.decl.h TreeLevel.decl.h \
           BaseLB.decl.h \
 	  DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \

@@ -37,5 +37,5 @@ TraceProjections.decl.h TraceProjections.def.h: trace-projections.ci.stamp
 TraceSimple.decl.h TraceSimple.def.h: trace-simple.ci.stamp
 TraceSummary.decl.h TraceSummary.def.h: trace-summary.ci.stamp
 TraceUtilization.decl.h TraceUtilization.def.h: trace-utilization.ci.stamp
-tree_level.decl.h tree_level.def.h: tree_level.ci.stamp
+TreeLevel.decl.h TreeLevel.def.h: TreeLevel.ci.stamp
 waitqd.decl.h waitqd.def.h: waitqd.ci.stamp

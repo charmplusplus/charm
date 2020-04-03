@@ -1,9 +1,9 @@
-#ifndef TREE_BUILDERS_H
-#define TREE_BUILDERS_H
+#ifndef TREEBUILDER_H
+#define TREEBUILDER_H
 
 #include "TreeLB.h"
 #include "spanningTree.h"
-#include "tree_level.h"
+#include "TreeLevel.h"
 #include <algorithm>
 
 extern int quietModeRequested;
@@ -366,4 +366,4 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
   int NODES_PER_GROUP;
 };
 
-#endif /* TREE_BUILDERS_H */
+#endif /* TREEBUILDER_H */

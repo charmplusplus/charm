@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace lb_strategy
+namespace TreeStrategy
 {
 inline float reldiff(float a, float b) { return std::max(a, b) / std::min(a, b); }
 
@@ -292,6 +292,6 @@ class RefineB : public Strategy<O, P, S>
   }
 };
 
-}  // namespace lb_strategy
+}  // namespace TreeStrategy
 
 #endif /* REFINE_H */

@@ -1,13 +1,13 @@
-#ifndef STRATEGY_FACTORY_H
-#define STRATEGY_FACTORY_H
+#ifndef TREESTRATEGYFACTORY_H
+#define TREESTRATEGYFACTORY_H
 
+#include "TreeStrategyBase.h"
 #include "greedy.h"
-#include "lb_strategy.h"
 #include "refine.h"
 
 #define LB_STRATEGIES_FOR_TESTING 1
 
-class StrategyFactory
+class TreeStrategyFactory
 {
  public:
   // NOTE: This is the only place currently where the templates for each strategy
@@ -15,10 +15,10 @@ class StrategyFactory
   // during preprocessing will not be part of the executable (because the templates
   // won't be instantiated)
   template <class O, class P, class S>
-  static lb_strategy::Strategy<O, P, S>* makeStrategy(const std::string& name,
-                                                      json& config)
+  static TreeStrategy::Strategy<O, P, S>* makeStrategy(const std::string& name,
+                                                       json& config)
   {
-    using namespace lb_strategy;
+    using namespace TreeStrategy;
     if (name == "Greedy") return new Greedy<O, P, S>();
     if (name == "GreedyRefine") return new GreedyRefine<O, P, S>(config);
     if (name == "RefineA") return new RefineA<O, P, S>();
@@ -34,4 +34,4 @@ class StrategyFactory
   }
 };
 
-#endif /* STRATEGY_FACTORY_H */
+#endif /* TREESTRATEGYFACTORY_H */

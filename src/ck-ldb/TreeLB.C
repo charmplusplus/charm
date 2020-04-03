@@ -1,6 +1,6 @@
 #include "TreeLB.h"
 #include "spanningTree.h"
-#include "tree_builder.h"  // TODO this can be deleted if we change it so that LBManager instantiates the builders
+#include "TreeBuilder.h"  // TODO this can be deleted if we change it so that LBManager instantiates the builders
 #include <fstream>  // TODO delete if json file is read from LBManager
 
 extern int quietModeRequested;

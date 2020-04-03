@@ -1,10 +1,10 @@
-#ifndef TREE_LEVEL_H
-#define TREE_LEVEL_H
+#ifndef TREELEVEL_H
+#define TREELEVEL_H
 
 #include "TopoManager.h"
 #include "TreeLB.h"
-#include "lb_strategy.h"
-#include "strategy_factory.h"
+#include "TreeStrategyBase.h"
+#include "TreeStrategyFactory.h"
 #include <cmath>
 #include <limits>  // std::numeric_limits
 
@@ -15,7 +15,7 @@
 
 // ----------------------- msgs -----------------------
 
-#include "tree_level.decl.h"
+#include "TreeLevel.decl.h"
 
 class LLBMigrateMsg : public TreeLBMessage, public CMessage_LLBMigrateMsg
 {
@@ -158,7 +158,7 @@ class TokenListMsg : public TreeLBMessage, public CMessage_TokenListMsg
   float* loads;
 };
 
-#include "tree_level.def.h"
+#include "TreeLevel.def.h"
 
 // ----------------------- StrategyWrapper -----------------------
 
@@ -261,7 +261,7 @@ class StrategyWrapper : public IStrategyWrapper
   {
     strategy_name = _strategy_name;
     isTreeRoot = _isTreeRoot;
-    strategy = StrategyFactory::makeStrategy<O, P, Solution>(strategy_name, config);
+    strategy = TreeStrategyFactory::makeStrategy<O, P, Solution>(strategy_name, config);
   }
 
   virtual ~StrategyWrapper() { delete strategy; }
@@ -440,7 +440,7 @@ class StrategyWrapper : public IStrategyWrapper
   std::vector<int> obj_local_ids;
   std::vector<O> foreign_objs;
   unsigned int foreign_obj_id;
-  lb_strategy::Strategy<O, P, Solution>* strategy;
+  TreeStrategy::Strategy<O, P, Solution>* strategy;
 };
 
 // --------------------------------------------------------------
@@ -463,7 +463,7 @@ class RootLevel : public LevelLogic
    */
   virtual void configure(bool rateAware, json& config)
   {
-    using namespace lb_strategy;
+    using namespace TreeStrategy;
     for (auto w : wrappers) delete w;
     wrappers.clear();
     if (num_groups == -1)
@@ -675,7 +675,7 @@ class NodeSetLevel : public LevelLogic
 
   virtual void configure(bool rateAware, json& config, int _cutoff_freq = 1)
   {
-    using namespace lb_strategy;
+    using namespace TreeStrategy;
     for (auto w : wrappers) delete w;
     wrappers.clear();
     current_strategy = 0;
@@ -925,7 +925,7 @@ class NodeLevel : public LevelLogic
 
   virtual void configure(bool rateAware, json& config, int _cutoff_freq = 1)
   {
-    using namespace lb_strategy;
+    using namespace TreeStrategy;
     for (auto w : wrappers) delete w;
     wrappers.clear();
     current_strategy = 0;
@@ -1233,4 +1233,4 @@ class MsgAggregator : public LevelLogic
   int num_children;
 };
 
-#endif /* TREE_LEVEL_H */
+#endif /* TREELEVEL_H */
