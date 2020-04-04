@@ -655,6 +655,16 @@ if(${NETWORK} STREQUAL "uth")
   set(CMK_UTH 1)
 endif()
 
+if(CHARMPY)
+  # Create libcharm.so for Charm4py
+  file(WRITE empty.cpp "")
+  add_library(charm SHARED empty.cpp)
+  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb moduleGreedyRefineLB moduleRandCentLB)
+
+  target_link_options(charm PRIVATE -Llib/ -standalone -whole-archive -c++stl -shared)
+  add_dependencies(charm hwloc)
+endif()
+
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
   set(CMK_SUPPORTS_FSGLOBALS 0)
 elseif(${CMK_HAS_DLOPEN} AND ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
