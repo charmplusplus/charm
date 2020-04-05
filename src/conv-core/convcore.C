@@ -65,7 +65,7 @@
 #ifndef _WIN32
 #include <sys/time.h>
 #include <sys/resource.h>
-#else
+#elif defined(_MSC_VER) && _MSC_VER < 1500
 #define snprintf _snprintf
 #endif
 
