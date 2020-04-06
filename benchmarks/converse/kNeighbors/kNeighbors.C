@@ -126,7 +126,7 @@ CmiStartFn mymain(int argc, char *argv[])
   CpvInitialize(int, msgSize);
 
   // Register Handlers
-  CpvInitialize(int, inititateHandler);
+  CpvInitialize(int, initiateHandler);
   CpvAccess(initiateHandler) = CmiRegisterHandler((CmiHandler) handleInitiate);
 
   CpvInitialize(int, completionHandler);
