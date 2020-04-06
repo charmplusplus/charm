@@ -3,6 +3,10 @@
  *revised by Yanhua, Gengbin
  */
 
+#include <vector>
+#include <unordered_map>
+#include <map>
+#include <algorithm>
 #if CMK_C_INLINE
 #define INLINE_KEYWORD inline
 #else
@@ -12,6 +16,12 @@
 #if MACHINE_DEBUG_LOG
 FILE *debugLog = NULL;
 #endif
+
+std::vector<int> sendMessageSizes;
+std::vector<int> receiveMessageSizes;
+
+std::unordered_map<int, int> senderUniq;
+std::unordered_map<int, int> receiverUniq;
 
 // Macro for message type
 #define CMI_CMA_MSGTYPE(msg)         ((CmiMsgHeaderBasic *)msg)->cmaMsgType
@@ -527,6 +537,7 @@ void CmiPushNode(void *msg) {
 /* This function handles the msg received as which queue to push into */
 static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
 
+    receiveMessageSizes.push_back(size);
 #if CMK_SMP_TRACE_COMMTHREAD
     TRACE_COMM_CREATION(TraceTimerCommon(), msg);
 #endif
@@ -558,7 +569,6 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
     }
 #endif
     CmiPushPE(CMI_DEST_RANK(msg), msg);
-
 }
 
 
@@ -674,6 +684,7 @@ if (MSG_STATISTIC)
 #if CMK_USE_OOB
     if (CpvAccess(_urgentSend)) mode |= OUT_OF_BAND;
 #endif
+    sendMessageSizes.push_back(size);
     return LrtsSendFunc(destNode, CmiGetPeGlobal(destPE,partition), size, msg, mode);
 }
 
@@ -1703,6 +1714,58 @@ if (MSG_STATISTIC)
 #if CMK_USE_XPMEM
     CmiExitXpmem();
 #endif
+    sort(sendMessageSizes.begin(), sendMessageSizes.end());
+    sort(receiveMessageSizes.begin(), receiveMessageSizes.end());
+
+    int size, value;
+    std::unordered_map<int, int>::iterator iter;
+
+    for(int i=0; i<sendMessageSizes.size(); i++) {
+      size = sendMessageSizes[i];
+      iter = senderUniq.find(size);
+      if(iter == senderUniq.end()) {
+        //not found
+        senderUniq[size] = 1;
+      } else {
+        value = iter->second;
+        iter->second = value + 1;
+      }
+    }
+
+    for(int i=0; i<receiveMessageSizes.size(); i++) {
+      size = receiveMessageSizes[i];
+      iter = receiverUniq.find(size);
+      if(iter == receiverUniq.end()) {
+        //not found
+        receiverUniq[size] = 1;
+      } else {
+        value = iter->second;
+        iter->second = value + 1;
+      }
+    }
+
+    CmiPrintf("[%d][%d][%d] ConverseExit Sender message sizes:%d, uniq=%d ===== Receiver message sizes:%d, uniq=%d\n",
+                                    CmiMyPe(), CmiMyNode(), CmiMyRank(), sendMessageSizes.size(), senderUniq.size(), receiveMessageSizes.size(), receiverUniq.size());
+ 
+    std::map<int, int>::iterator iter2;
+    std::map<int, int> senderUniqO(senderUniq.begin(), senderUniq.end());
+    std::map<int, int> receiverUniqO(receiverUniq.begin(), receiverUniq.end());
+
+    CmiPrintf("[%d][%d][%d] =================================================================\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+    iter2 = senderUniqO.begin();
+    while(iter2 != senderUniqO.end()) {
+      CmiPrintf("[%d][%d][%d] Sender Size:%d, Count:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), iter2->first, iter2->second);
+      iter2++;
+    }
+
+    CmiPrintf("[%d][%d][%d] =================================================================\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+    iter2 = receiverUniqO.begin();
+    while(iter2 != receiverUniqO.end()) {
+      CmiPrintf("[%d][%d][%d] Receiver Size:%d, Count:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), iter2->first, iter2->second);
+      iter2++;
+    }
+    CmiPrintf("[%d][%d][%d] =================================================================\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+
     LrtsExit(exitcode);
 #else
     /* In SMP, the communication thread will exit */

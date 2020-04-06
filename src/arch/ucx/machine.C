@@ -305,6 +305,7 @@ static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
     UcxRequest *req;
 
     if (tag == UCX_MSG_TAG_EAGER) {
+        //CmiPrintf("[%d][%d][%d] ucp_tag_recv_nb size:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), size);
         req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, buf,
                                            ucxCtx.eagerSize,
                                            ucp_dt_make_contig(1), tag,
@@ -312,6 +313,7 @@ static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
                                            UcxRxReqCompleted);
     } else {
         CmiEnforce(tag == UCX_MSG_TAG_PROBE);
+        //CmiPrintf("[%d][%d][%d] ucp_tag_msg_recv_nb size:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), size);
         req = (UcxRequest*)ucp_tag_msg_recv_nb(ucxCtx.worker, buf, size,
                                                ucp_dt_make_contig(1), msg,
                                                UcxRxReqCompleted);
