@@ -660,9 +660,8 @@ if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
   # Create libcharm.so for Charm4py
   file(WRITE empty.cpp "")
   add_library(charm SHARED empty.cpp)
-  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb moduleGreedyRefineLB moduleRandCentLB)
+  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb moduleGreedyRefineLB moduleRandCentLB "-Llib/ -standalone -whole-archive -c++stl -shared")
 
-  target_link_options(charm PRIVATE -Llib/ -standalone -whole-archive -c++stl -shared)
   add_dependencies(charm hwloc)
 endif()
 
