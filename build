@@ -140,9 +140,6 @@ while [[ $# -gt 0 ]]; do
     slumrpmi|slurmpmi2|ompipmix)
       opt_ucx_pmi=$arg
       ;;
-    charmpy|charm4py)
-      opt_charmpy=1
-      ;;
   # Compilers
     gcc)
       opt_CC=gcc

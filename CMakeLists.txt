@@ -67,7 +67,7 @@ endif()
 
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,uth,verbs")
-set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py")
 
 # Platform specific options (choose multiple if desired):
 option(SMP "Enable shared-memory communication within a single multi-processor machine instead of message passing." ON)
@@ -642,7 +642,7 @@ add_dependencies(moduletcharmmain ck)
 add_dependencies(moduletcharm ck)
 add_dependencies(tcharm-compat ck)
 
-if(NOT ${TARGET} STREQUAL "charm++")
+if(${TARGET} STREQUAL "AMPI" OR ${TARGET} STREQUAL "LIBS")
   add_subdirectory(src/libs/ck-libs/ampi)
 endif()
 
@@ -655,7 +655,8 @@ if(${NETWORK} STREQUAL "uth")
   set(CMK_UTH 1)
 endif()
 
-if(CHARMPY)
+# Charm4py
+if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
   # Create libcharm.so for Charm4py
   file(WRITE empty.cpp "")
   add_library(charm SHARED empty.cpp)
