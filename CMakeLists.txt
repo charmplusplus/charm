@@ -762,16 +762,23 @@ foreach(opt SMP OMP TCP PTHREADS PEDANTIC SYNCFT)
     endif()
 endforeach()
 
+# Find OS version
 find_program(LSB_RELEASE_EXEC lsb_release)
 
 if(LSB_RELEASE_EXEC)
   execute_process(COMMAND ${LSB_RELEASE_EXEC} -ds
              OUTPUT_VARIABLE OS_RELEASE
              OUTPUT_STRIP_TRAILING_WHITESPACE)
+elseif(CMK_MACOSX)
+  execute_process(COMMAND sw_vers -productVersion
+             OUTPUT_VARIABLE OS_RELEASE
+             OUTPUT_STRIP_TRAILING_WHITESPACE)
+  set(OS_RELEASE "MacOS ${OS_RELEASE}")
 else()
-  set(OS_RELEASE "${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION} ${CMAKE_SYSTEM_PROCESSOR}")
+  set(OS_RELEASE "${CMAKE_SYSTEM_NAME}")
 endif()
 
+set(OS_RELEASE "${OS_RELEASE} (${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}, ${CMAKE_SYSTEM_PROCESSOR})")
 
 # Print configuration
 message("==============================")
