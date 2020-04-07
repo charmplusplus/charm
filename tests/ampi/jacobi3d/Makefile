@@ -6,7 +6,7 @@ OBJS = jacobi.o
 CANDIDATES := jacobi
 TARGETS :=
 
-PARAMETERS :=
+PARAMETERS := -memory isomalloc
 
 # Ignore this test on platforms that don't support Isomalloc:
 define TEST_TARGET_AVAILABILITY
