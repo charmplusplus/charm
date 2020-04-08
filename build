@@ -49,6 +49,7 @@ if [[ $# -lt 2 ]]; then
   exit 1
 fi
 
+# Build options
 target=$1
 triplet=$2
 shift
@@ -105,11 +106,15 @@ case "$triplet" in
     ;;
 esac
 
+# Compiler options
 opt_CC= #undef
 opt_CXX= #undef
 opt_FC= #undef
 
 opt_compiler=""
+
+# Misc options
+VERBOSE=0
 
 while [[ $# -gt 0 ]]; do
   arg=$1
@@ -280,6 +285,10 @@ while [[ $# -gt 0 ]]; do
     -j[0-9]*)
       opt_parallel=$arg
       ;;
+    -v)
+      echo "Enabling verbose mode."
+      VERBOSE=1
+      ;;
     -j)
       opt_parallel="$arg"
       if [[ $# -gt 0 && $1 == [0-9]* ]]; then
@@ -403,6 +412,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DUCX_PMI="$opt_ucx_pmi" \
   -DZLIB="$opt_zlib"
 
+[[ $VERBOSE -eq 1 ]] && export VERBOSE
 make $opt_parallel
 
 echo 'Build successful.'
