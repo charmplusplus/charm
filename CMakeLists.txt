@@ -302,6 +302,14 @@ if(${CMAKE_BUILD_TYPE} MATCHES "Release" OR ${CMAKE_BUILD_TYPE} MATCHES "RelWith
     set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -optimize -production")
 endif()
 
+if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
+  # Create libcharm.so for Charm4py
+  add_compile_options(-build-shared)
+  set(BUILDOPTS "${BUILDOPTS} -build-shared")
+  set(OPTS "${OPTS} -build-shared")
+  set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -build-shared")
+endif()
+
 if(${CMAKE_BUILD_TYPE} MATCHES "Debug" OR ${CMAKE_BUILD_TYPE} MATCHES "RelWithDebInfo")
   add_compile_options(-g)
   set(BUILDOPTS "${BUILDOPTS} -g")
@@ -528,7 +536,7 @@ else()
 endif()
 
 # Figure out arguments to pass to hwloc's configure
-set(command ${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks $OPTS)
+set(command ${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS})
 execute_process(COMMAND ${command} COMMAND grep CHARM_CC_FLAGS= COMMAND cut -c16- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC_FLAGS)
 execute_process(COMMAND ${command} COMMAND grep CHARM_CC= COMMAND cut -c10- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC)
 
@@ -658,6 +666,7 @@ endif()
 # Charm4py
 if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
   # Create libcharm.so for Charm4py
+  # add_compile_options(-build-shared)
   file(WRITE empty.cpp "")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
