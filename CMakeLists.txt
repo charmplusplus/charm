@@ -535,7 +535,7 @@ else()
     set(hwloc_shared no)
 endif()
 
-# Figure out arguments to pass to hwloc's configure
+# Determine arguments to pass to hwloc's configure
 set(command ${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS})
 execute_process(COMMAND ${command} COMMAND grep CHARM_CC_FLAGS= COMMAND cut -c16- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC_FLAGS)
 execute_process(COMMAND ${command} COMMAND grep CHARM_CC= COMMAND cut -c10- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC)
