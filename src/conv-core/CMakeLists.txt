@@ -107,13 +107,13 @@ endif()
 add_library(global-swap global-elfgot.C)
 
 
-file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.c CONTENT
+file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.C CONTENT
 "extern const char * const CmiCommitID;
-const char * const CmiCommitID = \"${CHARM_VERSION}\";
+const char * const CmiCommitID = \"v${CHARM_VERSION}\";
 "
 )
 
-add_library(conv-core ${CMAKE_BINARY_DIR}/include/commitid.c ${conv-core-c-sources} ${conv-core-cxx-sources} ${conv-core-h-sources} ${conv-ccs-c-sources} ${conv-ccs-h-sources} ${conv-ccs-cxx-sources} ${conv-perf-cxx-sources} ${conv-perf-h-sources} ../conv-ldb/cldb.C)
+add_library(conv-core ${CMAKE_BINARY_DIR}/include/commitid.C ${conv-core-c-sources} ${conv-core-cxx-sources} ${conv-core-h-sources} ${conv-ccs-c-sources} ${conv-ccs-h-sources} ${conv-ccs-cxx-sources} ${conv-perf-cxx-sources} ${conv-perf-h-sources} ../conv-ldb/cldb.C)
 add_dependencies(conv-core hwloc)
 
 add_library(threads-default threads.C $<TARGET_OBJECTS:boost-context>)
