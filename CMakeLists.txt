@@ -138,7 +138,7 @@ else()
   set(CMK_DRONE_MODE 0)
 endif()
 
-if(${TASK_QUEUE})
+if(${TASK_QUEUE} OR ${OMP})
   set(CMK_TASKQUEUE 1)
 else()
   set(CMK_TASKQUEUE 0)
