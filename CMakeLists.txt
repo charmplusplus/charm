@@ -303,6 +303,7 @@ if(${CMAKE_BUILD_TYPE} MATCHES "Release" OR ${CMAKE_BUILD_TYPE} MATCHES "RelWith
 endif()
 
 if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
+  set(CMK_CHARMPY 1)
   # Create libcharm.so for Charm4py
   add_compile_options(-build-shared)
   set(BUILDOPTS "${BUILDOPTS} -build-shared")
