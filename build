@@ -22,8 +22,8 @@ if [[ $(uname) != "Linux" && $(uname) != "Darwin" ]]; then
   exit $?
 fi
 
-if [[ $2 == gni-* ]]; then
-    echo "Warning: CMake build does not support GNI, running ./buildold instead."
+if [[ $2 == gni-* || $2 == *-crayx? ]]; then
+    echo "Warning: CMake build does not support GNI or Cray, running ./buildold instead."
   sleep 2
   ./buildold $@
   exit $?
