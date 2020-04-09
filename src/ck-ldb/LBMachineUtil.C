@@ -4,7 +4,7 @@
 /*@{*/
 
 #include <stdlib.h>
-#include "LBDatabase.h"
+#include "LBManager.h"
 #include "LBMachineUtil.h"
 
 inline void LBMachineUtil::IdleStart(double curWallTime)
