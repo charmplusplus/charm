@@ -240,6 +240,10 @@ void _loadbalancerInit()
           // should this be supported?
           CkAbort("Sequencing multiple centralized strategies with TreeLB not supported\n");
       }
+    } else {
+      // For other ranks, consume the +balancer arguments to avoid spuriously
+      // passing them to the application
+      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"));
     }
   }
 
