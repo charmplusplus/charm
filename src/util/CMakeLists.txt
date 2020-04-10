@@ -3,12 +3,14 @@ set(conv-util-c-sources
     ../arch/util/mempool.C
     ../arch/util/persist-comm.C
     cmirdmautils.C
+    cmitrackmessages.C
     crc32.C
     sockRoutines.C
 )
 
 set(conv-util-h-sources
     cmirdmautils.h
+    cmitrackmessages.h
 )
 
 set(conv-util-cxx-sources
