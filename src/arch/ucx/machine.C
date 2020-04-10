@@ -44,6 +44,7 @@
 #define UCX_RMA_TAG_DEREG_AND_ACK       UCS_BIT(UCX_TAG_MSG_BITS + 3)
 #define UCX_MSG_TAG_MASK                UCS_MASK(UCX_TAG_MSG_BITS)
 #define UCX_RMA_TAG_MASK                (UCS_MASK(UCX_TAG_RMA_BITS) << UCX_TAG_MSG_BITS)
+#define UCX_MSG_TAG_MASK_FULL           0xffffffffffffffffUL
 
 #define UCX_LOG_PRIO 50 // Disabled by default
 
@@ -278,10 +279,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         }
     }
 
-    // Any RNDV thresh is allowed
-    if (!CmiGetArgInt(*argv, "+ucx_rndv_thresh", &ucxCtx.eagerSize)) {
-        ucxCtx.eagerSize = UCX_MSG_PROBE_THRESH;
-    }
+    // Eager messages should fit NcpyOperationInfo data.
+    // Adjust rendezvous threshold accordingly.
+    int thresh = UCX_MSG_PROBE_THRESH;
+    CmiGetArgInt(*argv, "+ucx_rndv_thresh", &thresh);
+    ucxCtx.eagerSize = std::max(LrtsGetMaxNcpyOperationInfoSize(), thresh);
 
     UcxInitEps(*numNodes, *myNodeID);
 
@@ -494,14 +496,17 @@ void UcxTxReqCompleted(void *request, ucs_status_t status)
 }
 
 // tag may carry RMA tag
-inline void* UcxSendMsg(int destNode, int destPE, int size,
-                               char *msg, ucp_tag_t tag,
-                               ucp_send_callback_t cb)
+inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
+                        ucp_tag_t tag, ucp_send_callback_t cb)
 {
     ucp_tag_t sTag;
 
     // Combine tag and sTag: sTag defines msg protocol, tag may indicate RMA requests
     sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_EAGER;
+
+    // Auxilliary messages (which add bits to the tag) should use eager.
+    CmiEnforce((tag == 0ul) || (sTag == UCX_MSG_TAG_EAGER));
+
     sTag |= tag;
 
     UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
@@ -614,8 +619,11 @@ void LrtsAdvanceCommunication(int whileidle)
     do {
        cnt = ucp_worker_progress(ucxCtx.worker);
 
+       // Probe with full tag mask to avoid long traversing thru unexpected
+       // queue of eager messages (messages with non-full mask added to the
+       // same unexpected queue)
        msg = ucp_tag_probe_nb(ucxCtx.worker, UCX_MSG_TAG_PROBE,
-                              UCX_MSG_TAG_MASK, 1, &info);
+                              UCX_MSG_TAG_MASK_FULL, 1, &info);
        if (msg != NULL) {
            UCX_LOG(3, "Got msg %p, len %zu\n", msg, info.length);
            UcxPostRxReq(UCX_MSG_TAG_PROBE, info.length, msg);
