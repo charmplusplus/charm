@@ -10,6 +10,7 @@
 #include <middle.h>
 #include <cklists.h>
 #include <objid.h>
+#include "cmitrackmessages.h"
 
 #ifndef CkIntbits
 #define CkIntbits (sizeof(int)*8)
@@ -331,7 +332,10 @@ public:
       env->pathHistory.reset();
 #endif
 
-
+#if CMK_ERROR_CHECKING
+      // Set default MSG ID in envelope allocation to -1
+      CMI_UNIQ_MSG_ID(env) = -1;
+#endif
       return env;
     }
     void reset() {

@@ -434,6 +434,7 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
 #include "machine-broadcast.C"
 #include "immediate.C"
 #include "machine-commthd-util.C"
+#include "cmitrackmessages.h"
 #if CMK_USE_CMA
 // cma_min_thresold and cma_max_threshold specify the range of sizes between which CMA will be used for SHM messaging
 int cma_works, cma_reg_msg, cma_min_threshold, cma_max_threshold;
@@ -579,6 +580,9 @@ static void SendToPeers(int size, char *msg) {
 
 /* Functions regarding sending operations */
 static void CmiSendSelf(char *msg) {
+#if CMK_ERROR_CHECKING
+    if(trackMessages) addToTracking(msg);
+#endif
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
         /* CmiBecomeNonImmediate(msg); */
@@ -629,6 +633,9 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
         int destLocalNode = CmiNodeOf(destPE); 
         int destNode = CmiGetNodeGlobal(destLocalNode,partition); 
 
+#if CMK_ERROR_CHECKING
+        if(trackMessages) addToTracking(msg);
+#endif
 #if CMK_USE_CMA
         if(cma_reg_msg && partition == CmiMyPartition() && CmiPeOnSamePhysicalNode(CmiMyPe(), destPE)) {
           if(CMI_CMA_MSGTYPE(msg) == CMK_REG_NO_CMA_MSG && cma_min_threshold <= size && size <= cma_max_threshold) {
@@ -703,6 +710,9 @@ void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
         int destRank = CmiRankOf(destPE);
 #if CMK_SMP
         if (CmiMyNode()==destNode && partition == CmiMyPartition()) {
+#if CMK_ERROR_CHECKING
+            if(trackMessages) addToTracking(msg);
+#endif
             CmiPushPE(destRank, msg);
 #if CMK_PERSISTENT_COMM
             if (CpvAccess(phs)) CpvAccess(curphs)++;

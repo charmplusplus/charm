@@ -4,6 +4,7 @@
 
 #define CONVERSE_MACHINE_BROADCAST_C_
 #include "spanningTree.h"
+#include "cmitrackmessages.h"
 
 CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode);
 
@@ -52,6 +53,7 @@ static void processBcastQs(void) {
 
 // Method to forward the received proc message to my child nodes
 static INLINE_KEYWORD void forwardProcBcastMsg(int size, char *msg) {
+  //CMI_SRC_PE(msg)      = CmiMyPe();
 #if CMK_BROADCAST_SPANNING_TREE
   SendSpanningChildrenProc(size, msg);
 #elif CMK_BROADCAST_HYPERCUBE

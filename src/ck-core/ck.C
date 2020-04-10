@@ -1411,9 +1411,14 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     }
     else
 #endif
-    CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
-  	env, env->getQueueing(),env->getPriobits(),
-  	(unsigned int *)env->getPrioPtr());
+    {
+#if CMK_ERROR_CHECKING
+      if(trackMessages) addToTracking((char *)env);
+#endif
+      CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
+          env, env->getQueueing(),env->getPriobits(),
+          (unsigned int *)env->getPrioPtr());
+    }
 #if CMK_PERSISTENT_COMM
     CmiPersistentOneSend();
 #endif
