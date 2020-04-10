@@ -1437,6 +1437,9 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     else
 #endif
     {
+#if CMK_ERROR_CHECKING
+      if(trackMessages) addToTracking((char *)env, CkMyPe());
+#endif
       CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
           env, env->getQueueing(),env->getPriobits(),
           (unsigned int *)env->getPrioPtr());

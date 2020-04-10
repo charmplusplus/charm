@@ -54,6 +54,7 @@
 #include <string.h>
 #include <vector>
 #include "hrctimer.h"
+#include "cmitrackmessages.h"
 #ifndef __STDC_FORMAT_MACROS
 # define __STDC_FORMAT_MACROS
 #endif
@@ -97,6 +98,7 @@ double longIdleThreshold;
 CpvExtern(double, idleBeginWalltime); // used for determining the conditon for long idle
 #endif
 
+extern bool trackMessages;
 
 #if CMI_QD
 void initQd(char **argv);
@@ -115,6 +117,8 @@ void CmiPoolAllocInit(int numBins);
 #if CMK_CONDS_USE_SPECIAL_CODE
 CmiSwitchToPEFnPtr CmiSwitchToPE;
 #endif
+
+CpvExtern(int, msgTrackHandler);
 
 CpvExtern(int, _traceCoreOn);   /* projector */
 void CcdModuleInit(char **);
@@ -1705,6 +1709,17 @@ void CmiHandleMessage(void *msg)
           CmiAbort("Msg handler does not exist, possible race condition during init\n");
         }
 #endif
+
+#if CMK_ERROR_CHECKING
+  // Do not send an ack for an ack message
+  // Also, do not send an ack for already processed messages
+  if(trackMessages && CmiGetHandler(msg) != CpvAccess(msgTrackHandler) && CMI_UNIQ_MSG_ID(msg) != -10) {
+#if CMI_QD
+    CpvAccess(cQdState)->mCreated++;
+#endif
+    sendTrackingAck((char *)msg);
+  }
+#endif
 	(h->hdlr)(msg,h->userPtr);
 #if CMK_TRACE_ENABLED
 	/* setMemoryStatus(0) */ /* charmdebug */
@@ -2043,6 +2058,10 @@ void CmiDeliverSpecificMsg(int handler)
 	CmiHandleMessage(msg);
 	return;
       } else {
+#if CMK_ERROR_CHECKING
+        if(trackMessages)
+          CmiAbort("CmiDeliverSpecificMsg: enqueing untracked message\n");
+#endif
 	CdsFifo_Enqueue(localqueue, msg);
       }
     }
@@ -2177,6 +2196,9 @@ void CthEnqueueNormalThread(CthThreadToken* token, int s,
 				   int pb,unsigned int *prio)
 {
   CmiSetHandler(token, CpvAccess(CthResumeNormalThreadIdx));
+#if CMK_ERROR_CHECKING
+  if(trackMessages) addToTracking((char *)token, CmiMyPe());
+#endif
   CsdEnqueueGeneral(token, s, pb, prio);
 }
 
@@ -2184,6 +2206,9 @@ void CthEnqueueSchedulingThread(CthThreadToken* token, int s,
 				       int pb,unsigned int *prio)
 {
   CmiSetHandler(token, CpvAccess(CthResumeSchedulingThreadIdx));
+#if CMK_ERROR_CHECKING
+  if(trackMessages) addToTracking((char *)token, CmiMyPe());
+#endif
   CsdEnqueueGeneral(token, s, pb, prio);
 }
 
@@ -3290,6 +3315,10 @@ void CmiInitMsgHeader(void *msg, int size) {
     CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
 #endif
     CMI_MSG_NOKEEP(msg) = 0;
+#if CMK_ERROR_CHECKING
+    CMI_UNIQ_MSG_ID(msg) = -1;
+    CMI_MSG_LAYER_TYPE(msg) = 0; // Set default as converse message
+#endif
   }
 }
 
@@ -4034,6 +4063,14 @@ void ConverseCommonInit(char **argv)
 #endif
 
   CmiPersistentInit();
+
+#if CMK_ERROR_CHECKING
+  trackMessages = false;
+  if (CmiGetArgFlagDesc(argv, "+trackMsgs", "Debugging option used to track delivery of messages")) {
+    trackMessages = true;
+    CmiMessageTrackerInit();
+  }
+#endif
 
   // Initialize converse handlers for supporting generic Direct Nocopy API
   CmiOnesidedDirectInit();
