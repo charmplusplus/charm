@@ -2,6 +2,7 @@
 #include "queueing.h"
 #include "cldb.h"
 #include <stdlib.h>
+#include "cmitrackmessages.h"
 
 void LoadNotifyFn(int l)
 {
@@ -111,6 +112,9 @@ void CldEnqueue(int pe, void *msg, int infofn)
   ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   if (pe == CmiMyPe() && !CmiImmIsRunning()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+#if CMK_ERROR_CHECKING
+    if(trackMessages) addToTracking((char *)msg, CmiMyPe());
+#endif
     /* CsdEnqueueGeneral is not thread or SIGIO safe */
     //CmiPrintf("   myself processor %d ==> %d, length=%d Timer:%f , priori=%d \n", CmiMyPe(), pe, len, CmiWallTimer(), *prioptr);
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
@@ -143,6 +147,9 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
   }
   if (node == CmiMyNode() && !CmiImmIsRunning()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+#if CMK_ERROR_CHECKING
+    if(trackMessages) addToTracking((char *)msg, CmiMyPe());
+#endif
     CsdNodeEnqueueGeneral(msg, queueing, priobits, prioptr);
   } else {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);

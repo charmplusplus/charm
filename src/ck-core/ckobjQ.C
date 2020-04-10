@@ -142,6 +142,7 @@ void _enqObjQueue(Chare *obj, envelope *env)
     token->objPtr = obj;
   
     CmiSetHandler(token, index_tokenHandler);
+    CmiAbort("_enqObjQueue: enqueuing untracked message\n");
     // enq to charm sched queue
     CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	token, env->getQueueing(),env->getPriobits(),
@@ -168,6 +169,7 @@ void _ObjectQHandler(void *converseMsg)
 //  CmiSetHandler(env, CmiGetXHandler(env));
   // I can do this because this message is always a charm+ message
   CmiSetHandler(env, _charmHandlerIdx);
+  CmiAbort("_ObjectQHandler: enqueuing untracked message\n");
   if (obj && obj->CkGetObjQueue().queue()) {  // queue enabled
     _enqObjQueue(obj, env);
   }
