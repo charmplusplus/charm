@@ -596,13 +596,23 @@ static void CmiSendSelf(char *msg) {
 /* Functions regarding P2P send op */
 #if USE_COMMON_SYNC_P2P
 void CmiSyncSendFn(int destPE, int size, char *msg) {
-    char *dupmsg = CopyMsg(msg, size);
-    CmiFreeSendFn(destPE, size, dupmsg);
+    if (CMI_MSG_NOKEEP(msg)) {
+        CmiReference(msg);
+        CmiFreeSendFn(destPE, size, msg);
+    } else {
+        char *dupmsg = CopyMsg(msg, size);
+        CmiFreeSendFn(destPE, size, dupmsg);
+    }
 }
 //inter-partition send
 void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
-    char *dupmsg = CopyMsg(msg, size);
-    CmiInterFreeSendFn(destPE, partition, size, dupmsg);
+    if (CMI_MSG_NOKEEP(msg)) {
+        CmiReference(msg);
+        CmiInterFreeSendFn(destPE, partition, size, msg);
+    } else {
+        char *dupmsg = CopyMsg(msg, size);
+        CmiInterFreeSendFn(destPE, partition, size, dupmsg);
+    }
 }
 
 #if CMK_USE_PXSHM
@@ -767,13 +777,23 @@ static void CmiSendNodeSelf(char *msg) {
 //I think this #if is incorrect - should be SYNC_P2P
 #if USE_COMMON_SYNC_P2P
 void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
-    char *dupmsg = CopyMsg(msg, size);
-    CmiFreeNodeSendFn(destNode, size, dupmsg);
+    if (CMI_MSG_NOKEEP(msg)) {
+        CmiReference(msg);
+        CmiFreeNodeSendFn(destNode, size, msg);
+    } else {
+        char *dupmsg = CopyMsg(msg, size);
+        CmiFreeNodeSendFn(destNode, size, dupmsg);
+    }
 }
 //inter-partition send
 void CmiInterSyncNodeSendFn(int destNode, int partition, int size, char *msg) {
-    char *dupmsg = CopyMsg(msg, size);
-    CmiInterFreeNodeSendFn(destNode, partition, size, dupmsg);
+    if (CMI_MSG_NOKEEP(msg)) {
+        CmiReference(msg);
+        CmiInterFreeNodeSendFn(destNode, partition, size, msg);
+    } else {
+        char *dupmsg = CopyMsg(msg, size);
+        CmiInterFreeNodeSendFn(destNode, partition, size, dupmsg);
+    }
 }
 
 //again, offloading the task to a generic function
