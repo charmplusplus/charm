@@ -13,6 +13,8 @@
 FILE *debugLog = NULL;
 #endif
 
+int cmiNcpyAckSize;
+
 // Macro for message type
 #define CMI_CMA_MSGTYPE(msg)         ((CmiMsgHeaderBasic *)msg)->cmaMsgType
 
@@ -1488,6 +1490,8 @@ if (  MSG_STATISTIC)
 #endif
     }
 
+    cmiNcpyAckSize = 0;
+
     /* CmiTimerInit(); */
 #if CMK_BROADCAST_HYPERCUBE
     /* CmiNodesDim = ceil(log2(CmiNumNodes)) except when #nodes is 1*/
@@ -2016,3 +2020,11 @@ void LrtsDestroyLock(LrtsNodeLock lock){
 
 #endif //CMK_SHARED_VARS_UNAVAILABLE
 #endif //CMK_USE_COMMON_LOCK
+
+void CmiSetNcpyAckSize(int ackSize) { // ackSize is sizeof(CkCallback) passed by the charm layer
+  cmiNcpyAckSize = ackSize;
+}
+
+int LrtsGetMaxNcpyOperationInfoSize() {
+  return sizeof(NcpyOperationInfo) + 2*cmiNcpyAckSize + 2*(CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
+}
