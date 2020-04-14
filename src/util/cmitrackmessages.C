@@ -59,7 +59,7 @@ void printStats() {
 void CmiPrintMTStatsOnIdle() {
   CmiPrintf("[%d][%d][%d] CmiPrintMTStatsOnIdle: CmiProcessor is idle, printing stats\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
   printStats();
-} 
+}
 
 
 void CmiMessageTrackerInit() {
@@ -69,7 +69,7 @@ void CmiMessageTrackerInit() {
   CpvInitialize(int, msgTrackHandler);
   CpvAccess(msgTrackHandler) = CmiRegisterHandler((CmiHandler) _receiveTrackingAck);
 
-  CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiPrintMTStatsOnIdle, NULL);
+  //CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiPrintMTStatsOnIdle, NULL);
 }
 
 // Method will be used to set a new uniq id
@@ -131,8 +131,8 @@ void sendTrackingAck(char *msg) {
 
   if(uniqId <= 0) {
 
-    CmiPrintf("[%d][%d][%d] Receiver received message with invalid id:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId);
-    //CmiAbort("[%d][%d][%d] Receiver received message with invalid id:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId);
+    //CmiPrintf("[%d][%d][%d] Receiver received message with invalid id:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId);
+    CmiAbort("[%d][%d][%d] Receiver received message with invalid id:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId);
 
   } else {
 

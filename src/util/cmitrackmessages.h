@@ -9,7 +9,7 @@ extern bool trackMessages;
 #include <unordered_map>
 
 #define CMI_UNIQ_MSG_ID(msg)         ((CmiMsgHeaderBasic *)msg)->uniqMsgId
-#define CMI_SRC_PE(msg)              ((CmiMsgHeaderBasic *)msg)->srcPe
+#define CMI_SRC_PE(msg)              ((CmiMsgHeaderBasic *)msg)->msgSrcPe
 
 typedef std::unordered_map<int, int> CmiIntIntMap;
 
