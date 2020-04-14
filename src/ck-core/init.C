@@ -1382,6 +1382,8 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
+
+		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
 
 
