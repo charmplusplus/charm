@@ -665,7 +665,7 @@ endif()
 if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
   # Create libcharm.so for Charm4py
   # add_compile_options(-build-shared)
-  file(WRITE empty.cpp "")
+  file(WRITE empty.cpp "// This file left intentionally blank. It is used for the charm4py build.")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
