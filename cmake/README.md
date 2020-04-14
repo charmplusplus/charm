@@ -1,0 +1,45 @@
+# The CMake build system
+
+This document provides an overview of the CMake build system for Charm++.
+
+## Requirements
+
+CMake version 3.4+ is required for all builds, due to the use of
+CMAKE_C_COMPILER_LAUNCHER and CMAKE_CXX_COMPILER_LAUNCHER for charmc, as
+discussed below.
+
+CMake version 3.11+ is required for Fortran support in Charm++ (i.e.,
+f90charm), due to the use of CMAKE_Fortran_COMPILER_LAUNCHER for charmc.
+
+No further software, apart from the usual Charm++ requirements (including
+autoconf/automake for the embedded hwloc), should be necessary.
+
+## Files
+
+The build system is comprised of the following files (filenames are relative
+to the Charm++ root directory):
+
+| Filename                              | Purpose                                        |
+|---------------------------------------|------------------------------------------------|
+| CMakeLists.txt                        | Main file; option parsing                      |
+| cmake/ci-files.cmake                  | Targets to create .decl.h files from .ci files |
+| cmake/detect-features.cmake           | Main system/compiler feature detection         |
+| cmake/detect-features-c.cmake         | Compiler feature detection for C               |
+| cmake/detect-features-cxx.cmake       | Compiler feature detection for C++             |
+| cmake/detect-features-fortran.cmake   | Compiler feature detection for Fortran         |
+| src/ck-core/CMakeLists.txt            | Targets for ck-core                            |
+| src/ck-perf/CMakeLists.txt            | Targets for ck-perf                            |
+| src/ck-pics/CMakeLists.txt            | Targets for ck-pics                            |
+| src/conv-core/CMakeLists.txt          | Targets for conv-core                          |
+| src/conv-ldb/CMakeLists.txt           | Targets for conv-ldb                           |
+| src/libs/ck-libs/ampi/CMakeLists.txt  | AMPI targets                                   |
+| src/libs/ck-libs/CMakeLists.txt       | Misc Ck libs targets                           |
+| src/libs/conv-libs/CMakeLists.txt     | Misc. Conv libs targets                        |
+| src/QuickThreads/CMakeLists.txt       | QuickThreads targets                           |
+| src/util/boost-context/CMakeLists.txt | Boost context library targets                  |
+| src/util/charmrun-src/CMakeLists.txt  | Charmrun target                                |
+| src/util/CMakeLists.txt               | Conv-util targets                              |
+| src/xlat-i/CMakeLists.txt             | Charmxi target                                 |
+
+There are other CMakeLists.txt files in the Charm++ distribution, but these are unrelated
+to the Charm++ build system.

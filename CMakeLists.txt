@@ -186,7 +186,7 @@ endif()
 
 set(CMK_REFNUM_TYPE ${REFNUM_TYPE})
 set(CMK_LBTIME_TYPE ${LBTIME_TYPE})
-set(CMK_LB_USER_DATA 0)
+set(CMK_LB_USER_DATA 0) #TODO
 
 set(CMK_RANDOMIZED_MSGQ ${RANDOMIZED_MSGQ})
 set(CMK_SHRINK_EXPAND ${SHRINKEXPAND})
@@ -324,12 +324,9 @@ include(cmake/ci-files.cmake)
 configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @ONLY)
 
 # Use charmc to compile/link everything
-# set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/charmc)
-# set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${CMAKE_BINARY_DIR}/bin/charmc)
-# set_property(GLOBAL PROPERTY RULE_LAUNCH_CUSTOM ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_CXX_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
-# FIXME: CMAKE_Fortran_COMPILER_LAUNCHER is the only reason we require CMake 3.11+.
+# FIXME: CMAKE_Fortran_COMPILER_LAUNCHER only works with CMake 3.11+.
 # See also https://gitlab.kitware.com/cmake/cmake/issues/17499
 set(CMAKE_Fortran_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_CXX_LINK_EXECUTABLE
