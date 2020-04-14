@@ -200,6 +200,7 @@ CmiStartFn mymain(int argc, char *argv[])
   CpvInitialize(int, acksReported);
   CpvAccess(acksReported) = 0;
 
+  CpvInitialize(std::vector<int>, neighbors);
   for(int i = CmiMyPe() - lowVal; i <= CmiMyPe() + highVal; i++) {
     if(i == CmiMyPe()) continue;
     if(i < 0) CpvAccess(neighbors).push_back(i + CmiNumPes());
