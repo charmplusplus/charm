@@ -21,16 +21,7 @@ public:
 	     CkNumPes(),nElements);
     mainProxy = thisProxy;
 
-    CkArrayOptions opts;
-    opts.setNumInitial(nElements);
-    CkCallback initCB(CkIndex_Main::initDone(), thisProxy);
-    opts.setInitCallback(initCB);
-    opts.setStaticInsertion(true);
-    arrProxy = CProxy_Hello::ckNew(opts);
-  };
-
-  void initDone(void) {
-    CkPrintf("Main::initDone reached\n");
+    arrProxy = CProxy_Hello::ckNew(nElements);
     arrProxy[0].SayHi(17);
   }
 
@@ -38,7 +29,7 @@ public:
   {
     CkPrintf("All done\n");
     CkExit();
-  };
+  }
 };
 
 /*array [1D]*/
