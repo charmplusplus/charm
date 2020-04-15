@@ -105,6 +105,7 @@ struct rwentry rwtable[] = {
 {  "template",	TEMPLATE },
 {  "class",	CLASS },
 {  "include",	INCLUDE },
+{  "whenidle",	WHENIDLE },
 {  "sync",	SYNC },
 {  "iget",       IGET },
 {  "exclusive",	EXCLUSIVE },

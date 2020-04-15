@@ -232,7 +232,8 @@ void TCharm::pup(PUP::er &p) {
   p(isStopped); p(exitWhenDone); p(isSelfDone); p(asyncMigrate);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
-  
+  p | resumeAfterMigrationCallback;
+
   if (sema.size()>0){
   	CkAbort("TCharm::pup> Cannot migrate with unconsumed semaphores!\n");
   }
@@ -492,7 +493,10 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::allow_migrate()
 void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
-  start();
+  if (resumeAfterMigrationCallback.isInvalid())
+    start();
+  else
+    resumeAfterMigrationCallback.send();
 }
 
 

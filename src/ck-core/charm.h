@@ -342,13 +342,15 @@ typedef enum {
   ArrayEltInitMsg      =20,              // Array Element Initialization message
   ForArrayEltMsg       =21,              // Array Element entry method message
   ForIDedObjMsg        =22,
-  BocBcastMsg          =23,
+  BocBcastMsg          =23,              // A broadcast to a group which will be sent to each node
+  ArrayBcastMsg        =24,              // A broadcast to an array which will be sent to each node
+  ArrayBcastFwdMsg     =25,              // A bcast which arrived on node and must be forwarded to local array elements
 #if CMK_LOCKLESS_QUEUE
-  WarnMsg              =24,              // Warning data message (Reduction)
-  WarnDoneMsg          =25,              // Signal completion of warnings reduction (Broadcast)
-  LAST_CK_ENVELOPE_TYPE =26              // Used for error-checking
+  WarnMsg              =26,              // Warning data message (Reduction)
+  WarnDoneMsg          =27,              // Signal completion of warnings reduction (Broadcast)
+  LAST_CK_ENVELOPE_TYPE =28              // Used for error-checking
 #else
-  LAST_CK_ENVELOPE_TYPE =24              // Used for error-checking
+  LAST_CK_ENVELOPE_TYPE =26              // Used for error-checking
 #endif
 } CkEnvelopeType;
 
@@ -481,6 +483,7 @@ extern void CkSummary_MarkEvent(int);
 extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
+extern void CkCallWhenIdle(int epIdx, void* obj);
 
 #ifdef __cplusplus
 }

@@ -13,6 +13,8 @@
 FILE *debugLog = NULL;
 #endif
 
+int cmiNcpyAckSize;
+
 // Macro for message type
 #define CMI_CMA_MSGTYPE(msg)         ((CmiMsgHeaderBasic *)msg)->cmaMsgType
 
@@ -596,13 +598,23 @@ static void CmiSendSelf(char *msg) {
 /* Functions regarding P2P send op */
 #if USE_COMMON_SYNC_P2P
 void CmiSyncSendFn(int destPE, int size, char *msg) {
-    char *dupmsg = CopyMsg(msg, size);
-    CmiFreeSendFn(destPE, size, dupmsg);
+    if (CMI_MSG_NOKEEP(msg)) {
+        CmiReference(msg);
+        CmiFreeSendFn(destPE, size, msg);
+    } else {
+        char *dupmsg = CopyMsg(msg, size);
+        CmiFreeSendFn(destPE, size, dupmsg);
+    }
 }
 //inter-partition send
 void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
-    char *dupmsg = CopyMsg(msg, size);
-    CmiInterFreeSendFn(destPE, partition, size, dupmsg);
+    if (CMI_MSG_NOKEEP(msg)) {
+        CmiReference(msg);
+        CmiInterFreeSendFn(destPE, partition, size, msg);
+    } else {
+        char *dupmsg = CopyMsg(msg, size);
+        CmiInterFreeSendFn(destPE, partition, size, dupmsg);
+    }
 }
 
 #if CMK_USE_PXSHM
@@ -767,13 +779,23 @@ static void CmiSendNodeSelf(char *msg) {
 //I think this #if is incorrect - should be SYNC_P2P
 #if USE_COMMON_SYNC_P2P
 void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
-    char *dupmsg = CopyMsg(msg, size);
-    CmiFreeNodeSendFn(destNode, size, dupmsg);
+    if (CMI_MSG_NOKEEP(msg)) {
+        CmiReference(msg);
+        CmiFreeNodeSendFn(destNode, size, msg);
+    } else {
+        char *dupmsg = CopyMsg(msg, size);
+        CmiFreeNodeSendFn(destNode, size, dupmsg);
+    }
 }
 //inter-partition send
 void CmiInterSyncNodeSendFn(int destNode, int partition, int size, char *msg) {
-    char *dupmsg = CopyMsg(msg, size);
-    CmiInterFreeNodeSendFn(destNode, partition, size, dupmsg);
+    if (CMI_MSG_NOKEEP(msg)) {
+        CmiReference(msg);
+        CmiInterFreeNodeSendFn(destNode, partition, size, msg);
+    } else {
+        char *dupmsg = CopyMsg(msg, size);
+        CmiInterFreeNodeSendFn(destNode, partition, size, dupmsg);
+    }
 }
 
 //again, offloading the task to a generic function
@@ -1158,7 +1180,7 @@ extern int MaxDataNodes;
 extern int QueueUpperBound;
 extern int DataNodeWrap;
 extern int QueueWrap;
-extern int messageQueueOverflow;
+extern CmiMemoryAtomicInt messageQueueOverflow;
 
 int power_of_two_check(int n)
 {
@@ -1462,6 +1484,14 @@ if (  MSG_STATISTIC)
     }
 #endif
 
+    if(CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger")) {
+#if CMK_CCS_AVAILABLE
+        cmiArgDebugFlag = 1;
+#endif
+    }
+
+    cmiNcpyAckSize = 0;
+
     /* CmiTimerInit(); */
 #if CMK_BROADCAST_HYPERCUBE
     /* CmiNodesDim = ceil(log2(CmiNumNodes)) except when #nodes is 1*/
@@ -1499,22 +1529,6 @@ void CthInit(char **argv);
 static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
-
-#if CMK_CCS_AVAILABLE
-/**
- * The reason to initialize this variable here:
- * cmiArgDebugFlag is possibly accessed in CmiPrintf/CmiError etc.,
- * therefore, we have to initialize this variable before any calls
- * to those functions (such as CmiPrintf). Otherwise, we may encounter
- * a memory segmentation fault (bad memory access). Note, even
- * testing CpvInitialized(cmiArgDebugFlag) doesn't help to solve
- * this problem because the variable indicating whether cmiArgDebugFlag is
- * initialized or not is not initialized, thus possibly causing another
- * bad memory access. --Chao Mei
- */
-  CpvInitialize(int, cmiArgDebugFlag);
-  CpvAccess(cmiArgDebugFlag) = 0;
-#endif
 
     LrtsPreCommonInit(everReturn);
 
@@ -1559,10 +1573,6 @@ static void ConverseRunPE(int everReturn) {
     CpvAccess(networkProgressCount) = 0;
 
     ConverseCommonInit(CmiMyArgv);
-#if CMK_OMP
-    CpvAccess(CmiSuspendedTaskQueue) = (void *)CMIQueueCreate();
-    CmiNodeAllBarrier();
-#endif
    
     // register idle events
 
@@ -2010,3 +2020,11 @@ void LrtsDestroyLock(LrtsNodeLock lock){
 
 #endif //CMK_SHARED_VARS_UNAVAILABLE
 #endif //CMK_USE_COMMON_LOCK
+
+void CmiSetNcpyAckSize(int ackSize) { // ackSize is sizeof(CkCallback) passed by the charm layer
+  cmiNcpyAckSize = ackSize;
+}
+
+int LrtsGetMaxNcpyOperationInfoSize() {
+  return sizeof(NcpyOperationInfo) + 2*cmiNcpyAckSize + 2*(CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
+}

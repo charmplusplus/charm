@@ -33,7 +33,7 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
@@ -225,7 +225,6 @@ LIBDIR=
 INCDIR=
 ARCH=
 BUILD_SHARED=""             # default no shared lib
-WITH_ROMIO="true"           # default to building ROMIO on AMPI
 WITH_PRODUCTION=
 DESTINATION=""
 DESTINATION_SUFFIX=""
@@ -275,6 +274,16 @@ shift
 #echo $ARCH
 
 OPT_DIRS="$src/$BASEVERSION $src/$ARCH $src/common"
+
+# default to building ROMIO on AMPI where supported
+case "$BASEVERSION" in
+  *-win64*|*-win-*)
+    WITH_ROMIO=''
+    ;;
+  *)
+    WITH_ROMIO='true'
+    ;;
+esac
 
 # process remainder of version argument as options, copied from below
 for w in $VERSOPTS; do
@@ -533,37 +542,6 @@ then
   fi
 fi
 
-#generate header for uFcontext for the target VERSION
-UFCONTEXT_HEADER_NAME=
-if test `echo "$BASEVERSION" | grep -c "darwin"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="macho_gas"
-elif test `echo "$BASEVERSION" | grep -c "win"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="windows"
-else
-  UFCONTEXT_HEADER_NAME="elf_gas"
-fi
-
-if test `echo "$BASEVERSION" | grep -c "arm7"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="arm_aapcs_${UFCONTEXT_HEADER_NAME}"
-elif test `echo "$BASEVERSION" | grep -c "arm8"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="arm64_aapcs_${UFCONTEXT_HEADER_NAME}"
-elif test `echo "$BASEVERSION" | grep -c "mips"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="mips32_o32_${UFCONTEXT_HEADER_NAME}"
-elif test `echo "$BASEVERSION" | grep -c "bluegene\|pami\|ppc"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="ppc64_sysv_${UFCONTEXT_HEADER_NAME}"
-elif test `echo "$BASEVERSION" | grep -c "cray\|x86_64\|linux64\|amd64"` -gt 0
-then
-  UFCONTEXT_HEADER_NAME="x86_64_sysv_${UFCONTEXT_HEADER_NAME}"
-else
-  UFCONTEXT_HEADER_NAME="i386_sysv_${UFCONTEXT_HEADER_NAME}"
-fi
-
 #generate VERSION name combining all the build-time options.
 if [ -n "$BOPTS" -o -n "$COMPILER" ]
 then
@@ -742,8 +720,6 @@ Echo "Creating dir: $DESTINATION"
 Echo "Creating dir: $DESTINATION/tmp"
 mkdir -p "$DESTINATION/tmp"
 
-echo "TARGET=${UFCONTEXT_HEADER_NAME}" > $DESTINATION/tmp/uFcontext.mk
-
 # Create the bin, lib, include, etc. links:
 WINNAME=`echo $VERSION | awk -F- '{print $2}'`
 if [ "x_$WINNAME" = "x_win64" -o "x_$WINNAME" = "x_win" ]
@@ -896,6 +872,11 @@ then
       # strip "-only" suffix from AMPI target
       PROGRAM="${PROGRAM%-only}"
     fi
+    # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
+    # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
+    # so we bump up the number of bits reserved for the collection in the objid.
+    OPTS="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 -DCMK_FIFO_QUEUE_ONLY=1 -DCMK_OBJID_COLLECTION_BITS=29 $OPTS "
+    CONFIG_OPTS="--with-prio-type=char $CONFIG_OPTS "
 else
     echo "CMK_AMPI_ONLY=\"0\"" >> $ConvSh
     echo "CMK_AMPI_ONLY:=0" >> $ConvMak

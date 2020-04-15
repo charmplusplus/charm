@@ -635,8 +635,6 @@ is contributed by each participant processor. All these contributions
 are merged according to a merge-function provided by the user. A
 Converse handler is then invoked with the resulting message. Reductions
 can be on the entire set of processors, or on a subset of the whole.
-Currently reductions are only implemented on processors sets. No
-equivalent exists for SMP nodes.
 
 There are eight functions used to deposit a message into the system,
 summarized in Table :numref:`table:reductions`. Half
@@ -687,6 +685,35 @@ Table :numref:`table:reductions` are:
   void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
   CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn,
   CmiReductionID id);
+
+Additionally, there are variations of the global reduction functions
+that operate on a per-node basis, instead of per-PE.
+
+.. _table:nodereductions:
+.. table:: Node reductions functions in Converse
+
+   =========== =================== ======================
+   \           **global**          **global with ID**
+   =========== =================== ======================
+   **message** CmiNodeReduce       CmiNodeReduceID
+   **data**    CmiNodeReduceStruct CmiNodeReduceStructID
+   =========== =================== ======================
+
+The signatures for the functions in
+Table :numref:`table:nodereductions` are:
+
+.. code-block:: c++
+
+  void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
+
+  void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
+  CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn);
+
+  void CmiNodeReduceID(void *msg, int size, CmiReduceMergeFn mergeFn,
+  CmiReductionID id);
+
+  void CmiNodeReduceStructID(void *data, CmiReducePupFn pupFn, CmiReduceMergeFn mergeFn,
+  CmiHandler dest, CmiReduceDeleteFn deleteFn, CmiReductionID id);
 
 In all the above, msg is the Converse message deposited by the local
 processor, size is the size of the message msg, and data is a pointer to
@@ -763,6 +790,9 @@ uniquely identify the reduction, and match them correctly. (**Note:** No
 two reductions can be active at the same time with the same
 CmiReductionID. It is up to the user to guarantee this.)
 
+CmiNodeReduce, CmiNodeReduceStruct, CmiNodeReduceID, and
+CmiNodeReduceStructID are the same, but for nodes instead of PEs.
+
 A CmiReductionID can be obtained by the user in three ways, using one of
 the following functions:
 
@@ -797,6 +827,14 @@ zero, data is ignored. The message received by handlerIdx consists of
 the standard Converse header, followed by the requested CmiReductionID
 (represented as a 4 bytes integer the user can cast to a CmiReductionID,
 a 4 byte integer containing dataSize, and the data itself.
+
+.. code-block:: c++
+
+  CmiReductionID CmiGetGlobalNodeReduction()
+  CmiReductionID CmiGetDynamicNodeReduction()
+  void CmiGetDynamicNodeReductionRemote(int handlerIdx, int node, int dataSize, void *data)
+
+Same as above, but for nodes instead of PEs.
 
 The other four functions (CmiListReduce, CmiListReduceStruct,
 CmiGroupReduce, CmiGroupReduceStruct) are used for reductions over
@@ -1477,6 +1515,12 @@ one processor to another, because internal pointers will still point to
 the correct locations, even on a new processor. This is especially
 useful when the format of the data structure is complex or unknown, as
 with thread stacks.
+
+During Converse startup, a global reduction and broadcast takes place in
+order to find the intersection of available virtual address space across
+all logical nodes. If this operation causes an unwanted delay at startup
+or fails entirely for a system-specific reason, it can be disabled with
+the command line option ``+no_isomalloc_sync``.
 
 Effective management of the virtual address space across a distributed
 machine is a complex task that requires a certain level of organization.

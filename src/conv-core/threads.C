@@ -162,7 +162,7 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW;
   typedef struct CthThreadBase
 {
   CthThreadToken *token; /* token that shall be enqueued into the ready queue*/
-  int scheduled;         /* has this thread been added to the ready queue ? */
+  CmiMemoryAtomicInt scheduled; /* has this thread been added to the ready queue ? */
 
   CmiObjId   tid;        /* globally unique tid */
   CthAwkFn   awakenfn;   /* Insert this thread into the ready queue */
@@ -409,7 +409,7 @@ void CthSetSerialNo(CthThread t, int no)
 
 static void CthThreadBaseInit(CthThreadBase *th)
 {
-  static int serialno = 1;
+  static CmiMemoryAtomicInt serialno{1};
   th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
   th->token->thread = S(th);
   th->token->serialNo = CpvAccess(Cth_serialNo)++;
@@ -539,7 +539,7 @@ static void CthThreadBaseFree(CthThreadBase *th)
   th->stack=NULL;
 }
 
-void CthInterceptionsImmediateActivate(CthThread th)
+static void CthInterceptionsImmediateActivate(CthThread th)
 {
   CthThreadBase * const base = B(th);
 
@@ -556,7 +556,7 @@ void CthInterceptionsImmediateActivate(CthThread th)
     CmiTLSSegmentSet(&base->tlsseg);
 #endif
 }
-void CthInterceptionsImmediateDeactivate(CthThread th)
+static void CthInterceptionsImmediateDeactivate(CthThread th)
 {
   CthThreadBase * const base = B(th);
 
@@ -592,6 +592,25 @@ void CthInterceptionsDeactivatePop(CthThread th)
   CthInterceptionsImmediateActivate(th);
 }
 
+int CthInterceptionsTemporarilyActivateStart(CthThread th)
+{
+  CthThreadBase * const base = B(th);
+
+  const int old = base->interceptionDeactivations;
+  CmiAssert(old != 0);
+  base->interceptionDeactivations = 0;
+  CthInterceptionsImmediateActivate(th);
+  return old;
+}
+void CthInterceptionsTemporarilyActivateEnd(CthThread th, int old)
+{
+  CthThreadBase * const base = B(th);
+
+  CmiAssert(base->interceptionDeactivations == 0);
+  base->interceptionDeactivations = old;
+  CthInterceptionsImmediateDeactivate(th);
+}
+
 static void CthInterceptionsCreate(CthThread th)
 {
   CthThreadBase * const base = B(th);
@@ -622,7 +641,7 @@ static void CthInterceptionsCreate(CthThread th)
       tlsptr = CmiIsomallocContextMallocAlign(base->isomallocContext, tlsdesc.align, tlsdesc.size);
     else
       tlsptr = CmiAlignedAlloc(tlsdesc.align, tlsdesc.size);
-    base->tlsseg = CmiTLSCreateSegUsingPtr(tlsptr);
+    CmiTLSCreateSegUsingPtr(&CpvAccess(Cth_PE_TLS), &base->tlsseg, tlsptr);
   }
   else
   {
@@ -656,11 +675,9 @@ static void CthBaseInit(char **argv)
   CpvAccess(Cth_serialNo) = 1;
 
 #if CMK_THREADS_BUILD_TLS
-  CmiTLSInit();
-  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
-
   CpvInitialize(tlsseg_t, Cth_PE_TLS);
-  CmiTLSSegmentGet(&CpvAccess(Cth_PE_TLS));
+  CmiTLSInit(&CpvAccess(Cth_PE_TLS));
+  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
 #endif
 }
 
@@ -878,8 +895,9 @@ void CthSuspend(void)
   for(l=cur->listener;l!=NULL;l=l->next){
     if (l->suspend) l->suspend(l);
   }
-  if (cur->choosefn == 0) CthNoStrategy();
-  next = cur->choosefn();
+  CthThFn choosefn = cur->choosefn;
+  if (choosefn == 0) CthNoStrategy();
+  next = choosefn(); // If this crashes, disable ASLR.
 #if CMK_OMP
   cur->tid.id[2] = CmiMyRank();
 #else
@@ -919,7 +937,8 @@ void CthSuspend(void)
 
 void CthAwaken(CthThread th)
 {
-  if (B(th)->awakenfn == 0) CthNoStrategy();
+  CthAwkFn awakenfn = B(th)->awakenfn;
+  if (awakenfn == 0) CthNoStrategy();
 
   /*BIGSIM_OOC DEBUGGING
     if(B(th)->scheduled==1){
@@ -935,7 +954,9 @@ void CthAwaken(CthThread th)
 #endif
 
   B(th)->scheduled++;
-  B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
+  CthThreadToken * token = B(th)->token;
+  constexpr int strategy = CQS_QUEUEING_FIFO;
+  awakenfn(token, strategy, 0, 0); // If this crashes, disable ASLR.
   /*B(th)->scheduled = 1; */
   /*changed due to out-of-core emulation in BigSim */
 
@@ -952,14 +973,16 @@ void CthYield(void)
 
 void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
-  if (B(th)->awakenfn == 0) CthNoStrategy();
+  CthAwkFn awakenfn = B(th)->awakenfn;
+  if (awakenfn == 0) CthNoStrategy();
 #if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
 #endif
 #endif
-  B(th)->awakenfn(B(th)->token, s, pb, prio);
+  CthThreadToken * token = B(th)->token;
+  awakenfn(token, s, pb, prio); // If this crashes, disable ASLR.
   /*B(th)->scheduled = 1; */
   /*changed due to out-of-core emulation in BigSim */
   B(th)->scheduled++;

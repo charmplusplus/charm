@@ -4221,6 +4221,16 @@ local
    immediately, they are allowed to have a non-void return value. An
    example can be found in ``examples/charm++/hello/local``.
 
+whenidle
+   a local entry method meant to be used with ``CkCallWhenIdle``,
+   which registers an entry method to be called when a processor is
+   idle. This mechanism provides a convenient way to do work (e.g. low
+   priority or speculative) in the absence of other work. ``whenidle``
+   entry methods must return a ``bool`` value, indicating whether the
+   entry method should be called when the processor is idle again, and
+   accept a ``double`` argument representing the current timestamp. An
+   example can be found in ``examples/charm++/whenidle``.
+
 python
    entry methods are enabled to be called from python scripts as
    explained in chapter :numref:`python`. Note that the object owning
@@ -11808,13 +11818,17 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  nocopy
 
+-  nocopypost
+
+-  migratable
+
+-  python
+
 -  Entry method attributes
 
    -  stacksize
 
    -  threaded
-
-   -  migratable
 
    -  createhere
 
@@ -11840,15 +11854,13 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
    -  notrace
 
-   -  python
+   -  accel (reserved for future/experimental use)
 
-   -  accel
+   -  readwrite (reserved for future/experimental use)
 
-   -  readwrite
+   -  writeonly (reserved for future/experimental use)
 
-   -  writeonly
-
-   -  accelblock
+   -  accelblock (reserved for future/experimental use)
 
    -  memcritical
 
@@ -11880,8 +11892,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
    -  serial
 
-   -  forward
-
    -  when
 
    -  while
@@ -11895,10 +11905,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
    -  else
 
    -  overlap
-
-   -  connect
-
-   -  publishes
 
 .. _sec:trace-projections:
 
