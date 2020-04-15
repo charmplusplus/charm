@@ -367,9 +367,8 @@ strategy at link time with ``-balancer <LB>``:
    $ ampicc pgm.c -o pgm -O3 -balancer GreedyRefineLB
 
 Internally, the toolchain wrappers call the Charm runtime's general
-toolchain script, ``charmc``. By default, they will specify``-module
-CommonLBs``. To use Isomalloc for transparently migrating user heap
-data, link with *-memory isomalloc*. Advanced users can disable
+toolchain script, ``charmc``. By default, they will specify ``-memory
+isomalloc`` and ``-module CommonLBs``. Advanced users can disable
 Isomalloc heap interception by passing ``-memory default``. For
 diagnostic purposes, the ``-verbose`` option will print all parameters
 passed to each stage of the toolchain. Refer to the Charm++ manual for
@@ -993,14 +992,16 @@ memory for all user-level threads, allowing transparent migration of
 stacks and pointers into memory. (Isomalloc requires 64-bit virtual
 memory addresses and support from the operating system for mapping
 memory to arbitrary virtual addresses.) Applications built with AMPI's
-toolchain wrappers only need to link with Isomalloc to enable automatic
-migratability, using *-memory isomalloc*.
+toolchain wrappers are automatically linked with Isomalloc as the active
+``malloc`` implementation if the target platform supports the feature.
 
 For systems that do not support Isomalloc and for users that wish to
 have more fine-grain control over which application data structures will
 be copied at migration time, we have added a few calls to AMPI. These
 include the ability to register thread-specific data with the run-time
-system, and the means to pack and unpack all of the thread’s data.
+system, and the means to pack and unpack all of the thread’s data. This
+mode of operation requires passing ``-memory default`` at link time to
+disable Isomalloc's heap interception.
 
 .. warning::
 
