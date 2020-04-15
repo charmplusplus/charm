@@ -33,7 +33,7 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win64$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
@@ -547,7 +547,7 @@ if [ -n "$BOPTS" -o -n "$COMPILER" ]
 then
   echo "Selected Compiler: $COMPILER"
 
-  if test -n "$COMPILER" -a `echo "$BASEVERSION" | grep -c "cray\|gni\|gemini"` -gt 0
+  if test -n "$COMPILER" -a `echo "$BASEVERSION" | grep -c "cray\|gni"` -gt 0
   then
     echo "Inserted explicit compiler options on Cray systems. Use compiler wrappers by loading PrgEnv-*"
     echo "e.g.) module load PrgEnv-* (e.g. cray for cce, gnu for gcc, intel for icc, and pgi for pgcc)"
