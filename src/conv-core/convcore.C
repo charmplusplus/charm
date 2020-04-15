@@ -91,7 +91,6 @@
 
 extern const char * const CmiCommitID;
 extern bool useCMAForZC;
-extern bool trackMessages;
 
 #if CMI_QD
 void initQd(char **argv);
@@ -3115,6 +3114,7 @@ void CmiInitMsgHeader(void *msg, int size) {
     CMI_MSG_NOKEEP(msg) = 0;
 #if CMK_ERROR_CHECKING
     CMI_UNIQ_MSG_ID(msg) = -1;
+    CMI_MSG_LAYER_TYPE(msg) = 0; // Set default as converse message
 #endif
   }
 }
@@ -3867,7 +3867,6 @@ void ConverseCommonInit(char **argv)
   trackMessages = false;
   if (CmiGetArgFlagDesc(argv, "+trackMsgs", "Debugging option used to track delivery of messages")) {
     trackMessages = true;
-    CmiMessageTrackerInit();
   }
 #endif
 

@@ -10,16 +10,27 @@ extern bool trackMessages;
 
 #define CMI_UNIQ_MSG_ID(msg)         ((CmiMsgHeaderBasic *)msg)->uniqMsgId
 #define CMI_SRC_PE(msg)              ((CmiMsgHeaderBasic *)msg)->msgSrcPe
+#define CMI_MSG_LAYER_TYPE(msg)      ((CmiMsgHeaderBasic *)msg)->msgLayerType
+
+struct msgInfo {
+  int msgHandler;
+  int type;
+  int ep; // -1 for conv, lrts
+  int count;
+};
 
 typedef std::unordered_map<int, int> CmiIntIntMap;
+typedef std::unordered_map<int, msgInfo> CmiIntMsgInfoMap;
 
 struct trackingAckMsg {
   char core[CmiMsgHeaderSizeBytes];
   int senderUniqId;
 };
 
+typedef int (*charmLevelFn)(void *msg);
 
-void CmiMessageTrackerInit();
+
+void CmiMessageTrackerInit(charmLevelFn fn);
 int getNewUniqId();
 void addToTracking(char *msg);
 void sendTrackingAck(char *msg);

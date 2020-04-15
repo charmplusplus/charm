@@ -15,6 +15,8 @@ once per node at Charm startup time.
 #include "ckarray.h"
 #include "debug-charm.h"
 
+#include "cmitrackmessages.h"
+
 CkRegisteredInfo<EntryInfo> _entryTable;
 CkRegisteredInfo<MsgInfo> _msgTable;
 CkRegisteredInfo<ChareInfo> _chareTable;
@@ -66,6 +68,10 @@ int CkRegisterEpInternal(const char *name, CkCallFnPtr call, int msgIdx, int cha
     e->isMemCritical=false;
   }
 #endif
+
+  if(trackMessages && CmiMyPe() == 0)
+    CmiPrintf("[%d][%d][%d] CkRegisterEpInternal name:%s, msgIdx:%d, chareIdx:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), name, msgIdx, chareIdx);
+
   return _entryTable.add(e);
 }
 

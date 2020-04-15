@@ -1,7 +1,9 @@
 #include "converse.h"
 #include "cmitrackmessages.h"
 
-#define DEBUG(x) x
+#define DEBUG(x) //x
+
+charmLevelFn getMsgEpIdxFn;
 
 // boolean to see if it is required to track messages
 bool trackMessages;
@@ -12,7 +14,7 @@ bool trackMessages;
 CpvDeclare(int, uniqMsgId);
 
 // Declare a pe level datastructure that stores the ids of outgoing messages
-CpvDeclare(CmiIntIntMap, sentUniqMsgIds);
+CpvDeclare(CmiIntMsgInfoMap, sentUniqMsgIds);
 
 // Converse handler for ack messages
 CpvDeclare(int, msgTrackHandler);
@@ -21,17 +23,24 @@ CpvDeclare(int, msgTrackHandler);
 void _receiveTrackingAck(trackingAckMsg *ackMsg) {
 
   // Update data structure removing the entry associated with the pe
-  std::unordered_map<int, int>::iterator iter;
+  CmiIntMsgInfoMap::iterator iter;
   int uniqId = ackMsg->senderUniqId;
   iter = CpvAccess(sentUniqMsgIds).find(uniqId);
+  msgInfo info;
 
   if(iter != CpvAccess(sentUniqMsgIds).end()) {
-    if(iter->second == 1) { // last count
+
+    info = iter->second;
+
+    if(iter->second.count == 1) { // last count
+      DEBUG(CmiPrintf("[%d][%d][%d] ERASING (uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d), remaining unacked messages = %zu \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.count, info.msgHandler, info.ep, CpvAccess(sentUniqMsgIds).size());)
+
       CpvAccess(sentUniqMsgIds).erase(iter);
-      DEBUG(CmiPrintf("[%d][%d][%d] Erased ack with id %d, remaining unacked messages = %zu\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CpvAccess(sentUniqMsgIds).size());)
+
     } else {
-      iter->second--;
-      DEBUG(CmiPrintf("[%d][%d][%d] Decremented id %d remaining unacked messages = %zu\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CpvAccess(sentUniqMsgIds).size());)
+
+      iter->second.count--;
+      DEBUG(CmiPrintf("[%d][%d][%d] DECREMENTING COUNTER (uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d), remaining unacked messages = %zu \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.count, info.msgHandler, info.ep, CpvAccess(sentUniqMsgIds).size());)
     }
   } else {
     //CmiPrintf("[%d][%d][%d] Sender Invalid msg id:%d returned back\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId);
@@ -42,7 +51,7 @@ void _receiveTrackingAck(trackingAckMsg *ackMsg) {
 
 
 void printStats() {
-  std::unordered_map<int, int>::iterator iter = CpvAccess(sentUniqMsgIds).begin();
+  CmiIntMsgInfoMap::iterator iter = CpvAccess(sentUniqMsgIds).begin();
   if(CpvAccess(sentUniqMsgIds).size() == 0) {
     CmiPrintf("[%d][%d][%d] =============== Message tracking - NO ENTRIES PRESENT ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
     return;
@@ -50,8 +59,11 @@ void printStats() {
 
   CmiPrintf("[%d][%d][%d] =============== Message tracking Num entries=%zu ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank(), CpvAccess(sentUniqMsgIds).size());
   int i = 1;
+  msgInfo info;
+
   while(iter != CpvAccess(sentUniqMsgIds).end()) {
-    CmiPrintf("[%d][%d][%d] =============== Entry %d: UniqId(%d) => Count(%d) ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank(), i++, iter->first, iter->second);
+    info = iter->second;
+    CmiPrintf("[%d][%d][%d] Entry:%d, PRINTING uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i++, iter->first, CmiMyPe(), info.type, info.count, info.msgHandler, info.ep);
     iter++;
   }
 }
@@ -62,12 +74,14 @@ void CmiPrintMTStatsOnIdle() {
 }
 
 
-void CmiMessageTrackerInit() {
+void CmiMessageTrackerInit(charmLevelFn fn) {
   CpvInitialize(int, uniqMsgId);
   CpvAccess(uniqMsgId) = 0;
 
   CpvInitialize(int, msgTrackHandler);
   CpvAccess(msgTrackHandler) = CmiRegisterHandler((CmiHandler) _receiveTrackingAck);
+
+  getMsgEpIdxFn = fn;
 
   //CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiPrintMTStatsOnIdle, NULL);
 }
@@ -83,8 +97,21 @@ inline void insertUniqIdEntry(char *msg) {
 
   CMI_UNIQ_MSG_ID(msg) = uniqId;
   CMI_SRC_PE(msg)      = CmiMyPe();
-  DEBUG(CmiPrintf("[%d][%d][%d] Add new unique Id %d with count 1 \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId);)
-  CpvAccess(sentUniqMsgIds).insert({uniqId, 1});
+
+  msgInfo info;
+  info.type = CMI_MSG_LAYER_TYPE(msg);
+  info.count = 1;
+
+  info.msgHandler = CmiGetHandler(msg);
+
+  if(info.type) { // it's a charm message
+    info.ep = getMsgEpIdxFn(msg);
+  } else {
+    info.ep = 0;
+  }
+
+  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.count, info.msgHandler, info.ep);)
+  CpvAccess(sentUniqMsgIds).insert({uniqId, info});
 }
 
 void addToTracking(char *msg) {
@@ -103,12 +130,15 @@ void addToTracking(char *msg) {
     insertUniqIdEntry(msg);
   } else {
     // uniqId already set, increase count
-    std::unordered_map<int, int>::iterator iter;
+    CmiIntMsgInfoMap::iterator iter;
     iter = CpvAccess(sentUniqMsgIds).find(uniqId);
 
     if(iter != CpvAccess(sentUniqMsgIds).end()) {
-      iter->second++; // incremeent counter
-      DEBUG(CmiPrintf("[%d][%d][%d] Update unique Id %d with count %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, iter->second);)
+      iter->second.count++; // increment counter
+
+      msgInfo info = iter->second;
+
+      DEBUG(CmiPrintf("[%d][%d][%d] INCREMENTING COUNTER uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.count, info.msgHandler, info.ep);)
     } else {
       insertUniqIdEntry(msg);
     }
@@ -143,6 +173,9 @@ void sendTrackingAck(char *msg) {
     markAcked(msg);
 
     CmiSetHandler(ackMsg, CpvAccess(msgTrackHandler));
+
+    DEBUG(CmiPrintf("[%d][%d][%d] ACKING with uniqId:%d back to pe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId, CMI_SRC_PE(msg));)
+
     CmiSyncSendAndFree(CMI_SRC_PE(msg), sizeof(trackingAckMsg), ackMsg);
   }
 }

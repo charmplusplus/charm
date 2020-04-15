@@ -53,7 +53,7 @@ static void processBcastQs(void) {
 
 // Method to forward the received proc message to my child nodes
 static INLINE_KEYWORD void forwardProcBcastMsg(int size, char *msg) {
-  //CMI_SRC_PE(msg)      = CmiMyPe();
+
 #if CMK_BROADCAST_SPANNING_TREE
   SendSpanningChildrenProc(size, msg);
 #elif CMK_BROADCAST_HYPERCUBE
@@ -68,12 +68,28 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
     CmiAssert(CMI_DEST_RANK(msg)==0);
     /*CmiPushPE(CMI_DEST_RANK(msg), msg);*/
 
+    int srcUniqId, srcPe;
+
+    if(trackMessages) {
+      srcUniqId = CMI_UNIQ_MSG_ID(msg);
+      srcPe = CMI_SRC_PE(msg);
+
+      CMI_UNIQ_MSG_ID(msg) = -1; // Add it to this forwarding PE's table
+      CMI_SRC_PE(msg) = CmiMyPe();
+    }
+
     // Forward regular messages, do not forward ncpy bcast messages as those messages
     // are forwarded separately after the completion of the payload transfer
 #if CMK_ONESIDED_IMPL
     if(!CMI_IS_ZC_BCAST(msg))
 #endif
       forwardProcBcastMsg(size, msg);
+
+    if(trackMessages) {
+      // Reset back the srcPe and uniqId
+      CMI_UNIQ_MSG_ID(msg) = srcUniqId;
+      CMI_SRC_PE(msg) = srcPe;
+    }
 
     CmiPushPE(0, msg);
 
