@@ -805,7 +805,14 @@ else()
   message("  F90 compiler:    N/A")
 endif()
 message("  Enabled options: ${opts_enabled}")
-message("==============================" )
+message("==============================")
+
+# Print warning
+message("############################################################")
+message("# The CMake build system is currently a beta version.      #")
+message("# Please let us know if you experience any issues.         #")
+message("# You can run ./buildold to use the previous build system. #")
+message("############################################################")
 
 # Make symlinks
 add_custom_target(create_symlinks ALL
