@@ -68,11 +68,12 @@ int CkRegisterEpInternal(const char *name, CkCallFnPtr call, int msgIdx, int cha
     e->isMemCritical=false;
   }
 #endif
+  int epIdx = _entryTable.add(e);
 
   if(trackMessages && CmiMyPe() == 0)
-    CmiPrintf("[%d][%d][%d] CkRegisterEpInternal name:%s, msgIdx:%d, chareIdx:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), name, msgIdx, chareIdx);
+    CmiPrintf("[%d][%d][%d] CkRegisterEpInternal name:%s, msgIdx:%d, chareIdx:%d, epIdx:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), name, msgIdx, chareIdx, epIdx);
 
-  return _entryTable.add(e);
+  return epIdx;
 }
 
 int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags)
