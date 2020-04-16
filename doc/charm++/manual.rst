@@ -8106,6 +8106,12 @@ After ``CkStartCheckpoint`` is executed, a directory of the designated
 name is created and a collection of checkpoint files are written into
 it.
 
+.. note::
+   Note that checkpoints are written to and read from several
+   automatically created subdirectories of the specified directory in
+   order to avoid creating too many files in the same directory, which
+   can stress the file system.
+
 Restarting
 ^^^^^^^^^^
 

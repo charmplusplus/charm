@@ -18,6 +18,8 @@ void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size) {
 int CmiGetRdmaCommonInfoSize() {
   return 0;
 }
+
+void CmiSetNcpyAckSize(int ackSize) {}
 #endif
 
 #if !CMK_ONESIDED_IMPL
