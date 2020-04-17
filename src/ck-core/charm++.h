@@ -237,7 +237,7 @@ class Chare {
     Chare(CkMigrateMessage *m);
     Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
-
+    virtual bool isLocMgr(void) { return false; }
     /// Pack/UnPack - tell the runtime how to serialize this class's
     /// data for migration, checkpoint, etc.
     virtual void pup(PUP::er &p);
@@ -343,7 +343,6 @@ class IrrGroup : public Chare {
 
     // Silly run-time type information
     virtual bool isNodeGroup() { return false; };
-    virtual bool isLocMgr(void){ return false; }
     virtual bool isArrMgr(void){ return false; }
     virtual bool isReductionMgr(void){ return false; }
     static bool isIrreducible(){ return true;}
@@ -1242,7 +1241,7 @@ void CmiMachineProgressImpl();
 
 #define CkNetworkProgress() {CpvAccess(networkProgressCount) ++; \
 if(CpvAccess(networkProgressCount) >=  networkProgressPeriod)  \
-    if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) { \
+    if (LBManagerObj()->StatsOn() == 0) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
     } \
@@ -1250,7 +1249,7 @@ if(CpvAccess(networkProgressCount) >=  networkProgressPeriod)  \
 
 #define CkNetworkProgressAfter(p) {CpvAccess(networkProgressCount) ++; \
 if(CpvAccess(networkProgressCount) >=  p)  \
-    if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) { \
+    if (LBManagerObj()->StatsOn() == 0) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
     } \

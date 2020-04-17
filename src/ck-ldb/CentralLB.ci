@@ -1,7 +1,7 @@
 module CentralLB {
 
 extern module BaseLB;
-extern module LBDatabase;
+extern module LBManager;
 
 include "CentralLBMsg.h";
 
