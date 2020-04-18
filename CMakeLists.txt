@@ -391,6 +391,10 @@ set(CMK_GDIR ${GDIR})
 # configure_file(src/arch/common/conv-mach-pre.sh            include/ COPYONLY) # unused
 configure_file(src/arch/common/cc-clang.sh                   include/ COPYONLY)
 configure_file(src/arch/common/cc-clang.h                    include/ COPYONLY)
+configure_file(src/arch/common/cc-icc.sh                     include/ COPYONLY)
+configure_file(src/arch/common/cc-icc.h                      include/ COPYONLY)
+configure_file(src/arch/common/cc-iccstatic.sh               include/ COPYONLY)
+configure_file(src/arch/common/cc-iccstatic.h                include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.h                      include/ COPYONLY)
 configure_file(src/arch/common/cc-mpi.sh                     include/ COPYONLY)
@@ -420,6 +424,15 @@ configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
+endif()
+
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-pxshm.sh)
+  configure_file(src/arch/${GDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
+  configure_file(src/arch/${GDIR}/conv-mach-pxshm.h          include/ COPYONLY)
+endif()
+
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-hugepages.sh)
+  configure_file(src/arch/${GDIR}/conv-mach-hugepages.sh         include/ COPYONLY)
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-smp.sh)
@@ -487,7 +500,7 @@ endforeach()
 
 
 # proc_management
-# file(MAKE_DIRECTORY include/proc_management/simple_pmi)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/proc_management/simple_pmi)
 
 set(proc_management-sources
 src/arch/util/proc_management/runtime-pmi.C
@@ -505,14 +518,12 @@ src/arch/util/proc_management/simple_pmi/simple_pmiutil.C
 src/arch/util/proc_management/simple_pmi/simple_pmiutil.h
 )
 
-# FIXME: these should be in include/proc_management
 foreach(filename ${proc_management-sources})
-    configure_file(${filename} include/ COPYONLY)
+    configure_file(${filename} include/proc_management/ COPYONLY)
 endforeach()
 
-# FIXME: these should be in include/proc_management/simple_pmi
 foreach(filename ${proc_management-simple_pmi-sources})
-    configure_file(${filename} include/ COPYONLY)
+    configure_file(${filename} include/proc_management/simple_pmi/ COPYONLY)
 endforeach()
 
 
@@ -596,6 +607,8 @@ add_dependencies(modulecompletion ck)
 # Charmrun + testrun
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/charmrun)
   configure_file(src/arch/${NETWORK}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
+elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/charmrun)
+  configure_file(src/arch/${GDIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
 else()
   add_subdirectory(src/util/charmrun-src)
   add_dependencies(charmrun create_symlinks)
@@ -794,7 +807,7 @@ set(OS_RELEASE "${OS_RELEASE} (${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}, ${C
 message("==============================")
 message("Charm++ ${CHARM_VERSION} configuration: ")
 message("  OS version:      ${OS_RELEASE}")
-message("  Triplet:         ${CHARM_PLATFORM}")
+message("  Machine layer:   ${CHARM_PLATFORM}")
 message("  Build target:    ${TARGET}")
 message("  Build type:      ${CMAKE_BUILD_TYPE}")
 message("  C compiler:      ${CMAKE_C_COMPILER} [${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}]")
