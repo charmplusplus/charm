@@ -500,32 +500,35 @@ endforeach()
 
 
 # proc_management
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/proc_management/simple_pmi)
+if(${NETWORK} STREQUAL "ucx" OR ${NETWORK} STREQUAL "ofi")
+  # file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/proc_management/simple_pmi)
 
-set(proc_management-sources
-src/arch/util/proc_management/runtime-pmi.C
-src/arch/util/proc_management/runtime-pmix.C
-src/arch/util/proc_management/runtime-codec.h
-src/arch/util/proc_management/runtime-pmi2.C
-src/arch/util/proc_management/runtime.h
-)
+  set(proc_management-sources
+  src/arch/util/proc_management/runtime-pmi.C
+  src/arch/util/proc_management/runtime-pmix.C
+  src/arch/util/proc_management/runtime-codec.h
+  src/arch/util/proc_management/runtime-pmi2.C
+  src/arch/util/proc_management/runtime.h
+  )
 
-set(proc_management-simple_pmi-sources
-src/arch/util/proc_management/simple_pmi/pmi.h
-src/arch/util/proc_management/simple_pmi/mpl.h
-src/arch/util/proc_management/simple_pmi/simple_pmi.C
-src/arch/util/proc_management/simple_pmi/simple_pmiutil.C
-src/arch/util/proc_management/simple_pmi/simple_pmiutil.h
-)
+  set(proc_management-simple_pmi-sources
+  src/arch/util/proc_management/simple_pmi/pmi.h
+  src/arch/util/proc_management/simple_pmi/mpl.h
+  src/arch/util/proc_management/simple_pmi/simple_pmi.C
+  src/arch/util/proc_management/simple_pmi/simple_pmiutil.C
+  src/arch/util/proc_management/simple_pmi/simple_pmiutil.h
+  )
 
-foreach(filename ${proc_management-sources})
-    configure_file(${filename} include/proc_management/ COPYONLY)
-endforeach()
+  # FIXME: this shoud be in include/proc_management/
+  foreach(filename ${proc_management-sources})
+      configure_file(${filename} include/ COPYONLY)
+  endforeach()
 
-foreach(filename ${proc_management-simple_pmi-sources})
-    configure_file(${filename} include/proc_management/simple_pmi/ COPYONLY)
-endforeach()
-
+  # FIXME: this shoud be in include/proc_management/simple_pmi
+  foreach(filename ${proc_management-simple_pmi-sources})
+      configure_file(${filename} include/ COPYONLY)
+  endforeach()
+endif()
 
 # Charmxi
 add_subdirectory(src/xlat-i)
