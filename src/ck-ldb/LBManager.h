@@ -30,19 +30,22 @@ class CkLBArgs
   int _lb_ignoreBgLoad;
   int _lb_migObjOnly;  // only consider migratable objs
   int _lb_syncResume;
-  int _lb_samePeSpeed;          // ignore cpu speed
-  int _lb_testPeSpeed;          // test cpu speed
-  int _lb_useCpuTime;           // use cpu instead of wallclock time
-  int _lb_statson;              // stats collection
-  int _lb_traceComm;            // stats collection for comm
-  int _lb_central_pe;           // processor number for centralized startegy
-  int _lb_teamSize;		// specifies the team size for TeamLB
-  int _lb_maxDistPhases;  // Specifies the max number of LB phases in DistributedLB
-  double _lb_targetRatio; // Specifies the target load ratio for LBs that aim for a particular load ratio
+  int _lb_samePeSpeed;     // ignore cpu speed
+  int _lb_testPeSpeed;     // test cpu speed
+  int _lb_useCpuTime;      // use cpu instead of wallclock time
+  int _lb_statson;         // stats collection
+  int _lb_traceComm;       // stats collection for comm
+  int _lb_central_pe;      // processor number for centralized startegy
+  int _lb_teamSize;        // specifies the team size for TeamLB
+  int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
+  double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
+                           // particular load ratio
   int _lb_metaLbOn;
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
-  std::vector<const char*> _lb_legacyCentralizedStrategies;  // list of centralized strategies specified by command-line (legacy mode)
+  std::vector<const char*>
+      _lb_legacyCentralizedStrategies;  // list of centralized strategies specified by
+                                        // command-line (legacy mode)
 
  public:
   CkLBArgs()
@@ -60,28 +63,31 @@ class CkLBArgs
     _lb_metaLbModelDir = nullptr;
   }
   inline char*& treeLBFile() { return _lb_treeLBFile; }
-  inline double & lbperiod() { return _autoLbPeriod; }
-  inline int & debug() { return _lb_debug; }
-  inline int & teamSize() {return _lb_teamSize; }
-  inline int & printSummary() { return _lb_printsumamry; }
-  inline int & lbversion() { return _lb_version; }
-  inline int & loop() { return _lb_loop; }
-  inline int & ignoreBgLoad() { return _lb_ignoreBgLoad; }
-  inline int & migObjOnly() { return _lb_migObjOnly; }
-  inline int & syncResume() { return _lb_syncResume; }
-  inline int & samePeSpeed() { return _lb_samePeSpeed; }
-  inline int & testPeSpeed() { return _lb_testPeSpeed; }
-  inline int & useCpuTime() { return _lb_useCpuTime; }
-  inline int & statsOn() { return _lb_statson; }
-  inline int & traceComm() { return _lb_traceComm; }
-  inline int & central_pe() { return _lb_central_pe; }
-  inline double & alpha() { return _lb_alpha; }
-  inline double & beta() { return _lb_beta; }
-  inline int & maxDistPhases() { return _lb_maxDistPhases; }
-  inline double & targetRatio() { return _lb_targetRatio; }
-  inline int & metaLbOn() {return _lb_metaLbOn;}
+  inline double& lbperiod() { return _autoLbPeriod; }
+  inline int& debug() { return _lb_debug; }
+  inline int& teamSize() { return _lb_teamSize; }
+  inline int& printSummary() { return _lb_printsumamry; }
+  inline int& lbversion() { return _lb_version; }
+  inline int& loop() { return _lb_loop; }
+  inline int& ignoreBgLoad() { return _lb_ignoreBgLoad; }
+  inline int& migObjOnly() { return _lb_migObjOnly; }
+  inline int& syncResume() { return _lb_syncResume; }
+  inline int& samePeSpeed() { return _lb_samePeSpeed; }
+  inline int& testPeSpeed() { return _lb_testPeSpeed; }
+  inline int& useCpuTime() { return _lb_useCpuTime; }
+  inline int& statsOn() { return _lb_statson; }
+  inline int& traceComm() { return _lb_traceComm; }
+  inline int& central_pe() { return _lb_central_pe; }
+  inline double& alpha() { return _lb_alpha; }
+  inline double& beta() { return _lb_beta; }
+  inline int& maxDistPhases() { return _lb_maxDistPhases; }
+  inline double& targetRatio() { return _lb_targetRatio; }
+  inline int& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
-  inline std::vector<const char*>& legacyCentralizedStrategies() { return _lb_legacyCentralizedStrategies; }
+  inline std::vector<const char*>& legacyCentralizedStrategies()
+  {
+    return _lb_legacyCentralizedStrategies;
+  }
 };
 
 extern CkLBArgs _lb_args;
@@ -317,8 +323,8 @@ class LBManager : public CBase_LBManager
 
   void pup(PUP::er& p);
 
-  void configureTreeLB(const char *json_str);
-  void configureTreeLB(json &config);
+  void configureTreeLB(const char* json_str);
+  void configureTreeLB(json& config);
 
   /*
    * Calls from object managers to load database

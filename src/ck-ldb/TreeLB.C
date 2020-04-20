@@ -1,13 +1,13 @@
+#include "TreeBuilder.h"  // TODO this can be deleted if we change it so that LBManager instantiates the builders
 #include "TreeLB.h"
 #include "spanningTree.h"
-#include "TreeBuilder.h"  // TODO this can be deleted if we change it so that LBManager instantiates the builders
 #include <fstream>  // TODO delete if json file is read from LBManager
 
 extern int quietModeRequested;
 
 CreateLBFunc_Def(TreeLB, "TreeLB")
 
-void TreeLB::staticStartLB(void* data)
+    void TreeLB::staticStartLB(void* data)
 {
   ((TreeLB*)data)->StartLB();
 }

@@ -2,8 +2,8 @@
 #define TREEBUILDER_H
 
 #include "TreeLB.h"
-#include "spanningTree.h"
 #include "TreeLevel.h"
+#include "spanningTree.h"
 #include <algorithm>
 
 extern int quietModeRequested;

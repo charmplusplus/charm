@@ -13,8 +13,8 @@
 #include "DistributedLB.h"
 #include "LBManager.h"
 #include "LBSimulation.h"
-#include "topology.h"
 #include "TreeLB.h"
+#include "topology.h"
 
 CkGroupID _lbmgr;
 
@@ -214,9 +214,11 @@ void _loadbalancerInit()
       CkPrintf(
           "Warning: MetaLB is activated. For Automatic strategy selection in MetaLB, "
           "pass directory of model files using +MetaLBModelDir.\n");
-    if (CkMyRank() == 0) {
+    if (CkMyRank() == 0)
+    {
       bool TreeLB_registered = false;
-      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
+      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
+      {
         if (strcmp(balancer, "GreedyLB") == 0)
           _lb_args.legacyCentralizedStrategies().push_back("Greedy");
         else if (strcmp(balancer, "GreedyRefineLB") == 0)
@@ -233,17 +235,21 @@ void _loadbalancerInit()
           lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
         if (strcmp(balancer, "TreeLB") == 0) TreeLB_registered = true;
       }
-      if (_lb_args.legacyCentralizedStrategies().size() > 0) {
-        if (!TreeLB_registered)
-          lbRegistry.addRuntimeBalancer("TreeLB");
+      if (_lb_args.legacyCentralizedStrategies().size() > 0)
+      {
+        if (!TreeLB_registered) lbRegistry.addRuntimeBalancer("TreeLB");
         if (_lb_args.legacyCentralizedStrategies().size() > 1)
           // should this be supported?
-          CkAbort("Sequencing multiple centralized strategies with TreeLB not supported\n");
+          CkAbort(
+              "Sequencing multiple centralized strategies with TreeLB not supported\n");
       }
-    } else {
+    }
+    else
+    {
       // For other ranks, consume the +balancer arguments to avoid spuriously
       // passing them to the application
-      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"));
+      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
+        ;
     }
   }
 
@@ -719,23 +725,30 @@ void LBManager::nextLoadbalancer(int seq)
 }
 
 // switch strategy
-void LBManager::switchLoadbalancer(int switchFrom, int switchTo) {
-  if(lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB") {
+void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
+{
+  if (lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB")
+  {
     json config;
-    if(lbNames[switchTo] == "Hybrid") {
+    if (lbNames[switchTo] == "Hybrid")
+    {
       config["tree"] = "PE_Process_Root";
       config["Root"]["pe"] = 0;
       config["Root"]["step_freq"] = 3;
       config["Root"]["strategies"] = {"GreedyRefine"};
       config["Process"]["strategies"] = {"GreedyRefine"};
-    } else {
+    }
+    else
+    {
       config["tree"] = "PE_Root";
       config["Root"]["pe"] = 0;
       config["Root"]["strategies"] = {lbNames[switchTo]};
     }
     configureTreeLB(config);
-  } else {
-    //TODO: Implement turn off / on for Distributed
+  }
+  else
+  {
+    // TODO: Implement turn off / on for Distributed
   }
 }
 
@@ -804,27 +817,31 @@ void LBManager::pup(PUP::er& p)
   }
 }
 
-extern "C" void configureTreeLB(const char *json_str) {
-  ((LBManager *)CkLocalBranch(_lbmgr))->configureTreeLB(json_str);
+extern "C" void configureTreeLB(const char* json_str)
+{
+  ((LBManager*)CkLocalBranch(_lbmgr))->configureTreeLB(json_str);
 }
 
-void LBManager::configureTreeLB(const char *json_str) {
+void LBManager::configureTreeLB(const char* json_str)
+{
   json config = json::parse(json_str);
   configureTreeLB(config);
 }
 
-void LBManager::configureTreeLB(json &config) {
+void LBManager::configureTreeLB(json& config)
+{
   bool found = false;
-  for (int i=0; i < nloadbalancers; i++) {
-    if (strcmp(loadbalancers[i]->lbName(), "TreeLB") == 0) {
+  for (int i = 0; i < nloadbalancers; i++)
+  {
+    if (strcmp(loadbalancers[i]->lbName(), "TreeLB") == 0)
+    {
       ((TreeLB*)loadbalancers[i])->configure(config);
       found = true;
-      //break; // not sure if there could be more than one TreeLB
+      // break; // not sure if there could be more than one TreeLB
     }
   }
   if (!found) CkAbort("LBManager: TreeLB is not in my list of load balancers");
 }
-
 
 void LBManager::ResetAdaptive()
 {
