@@ -35,8 +35,7 @@ class CkLBArgs
   int _lb_useCpuTime;      // use cpu instead of wallclock time
   int _lb_statson;         // stats collection
   int _lb_traceComm;       // stats collection for comm
-  int _lb_central_pe;      // processor number for centralized startegy
-  int _lb_teamSize;        // specifies the team size for TeamLB
+  int _lb_central_pe;      // processor number for centralized strategy
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
                            // particular load ratio
@@ -56,7 +55,6 @@ class CkLBArgs
     _lb_statson = _lb_traceComm = 1;
     _lb_loop = 0;
     _lb_central_pe = 0;
-    _lb_teamSize = 1;
     _lb_maxDistPhases = 10;
     _lb_targetRatio = 1.05;
     _lb_metaLbOn = 0;
@@ -65,7 +63,6 @@ class CkLBArgs
   inline char*& treeLBFile() { return _lb_treeLBFile; }
   inline double& lbperiod() { return _autoLbPeriod; }
   inline int& debug() { return _lb_debug; }
-  inline int& teamSize() { return _lb_teamSize; }
   inline int& printSummary() { return _lb_printsumamry; }
   inline int& lbversion() { return _lb_version; }
   inline int& loop() { return _lb_loop; }
