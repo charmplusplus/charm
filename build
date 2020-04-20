@@ -262,10 +262,6 @@ done
 if [ "$VERSION" = "$1" ]; then VERSOPTS=""; fi
 
 BASEVERSION="$VERSION"
-if test -f $src/$BASEVERSION/vdir_link
-then
-  BASEVERSION=`cat $src/$BASEVERSION/vdir_link`
-fi
 ARCH=`echo $BASEVERSION | sed -e 's@-.*@@'`
 shift
 
