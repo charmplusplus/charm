@@ -3941,6 +3941,10 @@ extern int quietMode;
 int quietMode; // quiet mode active (CmiPrintf's are disabled)
 CmiSpanningTreeInfo* _topoTree = NULL;
 
+#if CMK_HAS_IO_FILE_OVERFLOW
+extern "C" int _IO_file_overflow(FILE *, int);
+#endif
+
 /**
   Main Converse initialization routine.  This routine is 
   called by the machine file (machine.C) to set up Converse.
@@ -3968,6 +3972,12 @@ CmiSpanningTreeInfo* _topoTree = NULL;
 */
 void ConverseCommonInit(char **argv)
 {
+#if CMK_HAS_IO_FILE_OVERFLOW
+  // forcibly allocate output buffers now, see issue #2814
+  _IO_file_overflow(stdout, -1);
+  _IO_file_overflow(stderr, -1);
+#endif
+
   CpvInitialize(int, _urgentSend);
   CpvAccess(_urgentSend) = 0;
   CpvInitialize(int,interopExitFlag);
