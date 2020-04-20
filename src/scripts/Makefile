@@ -367,7 +367,7 @@ dirs+sources:
 	rm -rf hwloc
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
-	if case $(CMK_VDIR) in *win64*) true;; *-win-*) true;; *) false;; esac; then \
+	if case $(CMK_VDIR) in *-win-*) true;; *) false;; esac; then \
 		cp -f $(SRCBASE)/arch/win/unix2nt* ../bin; \
 		cp -f $(SRCBASE)/arch/win/createlink.exe ../bin; \
 	fi
@@ -496,7 +496,7 @@ endif
 endif
 endif
 
-ifneq ($(findstring -win64,$(CMK_VDIR))$(findstring -win-,$(CMK_VDIR)),)
+ifneq ($(findstring -win-,$(CMK_VDIR)),)
   IS_WINDOWS := 1
 else
   IS_WINDOWS := 0
