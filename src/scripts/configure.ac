@@ -1448,7 +1448,7 @@ cat > $tc <<EOT
 extern int _IO_file_overflow(FILE *, int);
 int main()
 {
-  return _IO_file_overflow;
+  return _IO_file_overflow(stdout, -1);
 }
 EOT
 test_linkc "whether has _IO_file_overflow" "yes" "no" ""
