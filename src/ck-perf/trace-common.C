@@ -513,10 +513,6 @@ void traceEndIdle()
 }
 
 // CMK_TRACE_ENABLED is already guarded in convcore.C
-// converse thread tracing is not supported in blue gene simulator
-// in BigSim, threads need to be traced manually (because virtual processors
-// themselves are implemented as threads and we don't want them to be traced
-// In BigSim, so far, only AMPI threads are traced.
 void traceResume(int eventID, int srcPE, CmiObjId *tid)
 {
     _TRACE_BEGIN_EXECUTE_DETAILED(eventID, ForChareMsg, _threadEP, srcPE, 0, NULL, tid);

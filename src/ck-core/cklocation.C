@@ -1788,8 +1788,6 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
 {
 #if CMK_LBDB_ON
 	DEBL((AA "Registering element %s with load balancer\n" AB,idx2str(idx)));
-	//BIGSIM_OOC DEBUGGING
-	//CkPrintf("LocMgr on %d: Registering element %s with load balancer\n", CkMyPe(), idx2str(idx));
 	nextPe = -1;
 	asyncMigrate = false;
 	readyMigrate = true;
@@ -3073,17 +3071,8 @@ void CkLocMgr::restore(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p)
 {
 	insertID(idx,id);
 
-	//This is in broughtIntoMem during out-of-core emulation in BigSim,
-	//informHome should not be called since such information is already
-	//immediately updated real migration
-#if CMK_ERROR_CHECKING
-	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
-#endif
 	CkLocRec *rec=createLocal(idx,false,false,false);
 	
-	//BIGSIM_OOC DEBUGGING
-	//CkPrintf("Proc[%d]: Registering element %s with LDB\n", CkMyPe(), idx2str(idx));
-
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_restore);
 
