@@ -940,55 +940,11 @@ public:
   }
 };
 
-class BlockMap : public RRMap
-{
+// This is currently  here for backwards compatibility
+class BlockMap : public DefaultArrayMap {
 public:
-  BlockMap(void){
-    DEBC((AA "Creating BlockMap\n" AB));
-  }
-  BlockMap(CkMigrateMessage *m):RRMap(m){ }
-  void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArray *mgr){
-    CkArrayIndex start = options.getStart();
-    CkArrayIndex end = options.getEnd();
-    CkArrayIndex step = options.getStep();
-    if (end.dimension == 0) {
-      CkFreeMsg(ctorMsg);
-      return;
-    }
-    int thisPe=CkMyPe();
-    int numPes=CkNumPes();
-    int binSize;
-    if (end.dimension == 1) {
-      binSize = (int)ceil((double)(end.data()[0]) / (double)numPes);
-    } else if (end.dimension == 2) {
-      binSize = (int)ceil((double)(end.data()[0] * end.data()[1]) / (double)numPes);
-    } else if (end.dimension == 3) {
-      binSize = (int)ceil((double)(end.data()[0] * end.data()[1] * end.data()[2])) / (double)numPes;
-    } else if (end.dimension == 4) {
-      binSize = (int)ceil((double)(((short int*)end.data())[0] * ((short int*)end.data())[1] *
-                ((short int*)end.data())[2] * ((short int*)end.data())[3]) / (double)numPes);
-    } else if (end.dimension == 5) {
-      binSize = (int)ceil((double)(((short int*)end.data())[0] * ((short int*)end.data())[1] *
-                ((short int*)end.data())[2] * ((short int*)end.data())[3] * ((short int*)end.data())[4]) /
-                (double)numPes);
-    } else if (end.dimension == 6) {
-      binSize = (int)ceil((double)(((short int*)end.data())[0] * ((short int*)end.data())[1] *
-                ((short int*)end.data())[2] * ((short int*)end.data())[3] * ((short int*)end.data())[4] *
-                ((short int*)end.data())[5]) / (double)numPes);
-    } else {
-      CkAbort("CkArrayIndex has more than 6 dimensions!");
-    }
-    CKARRAYMAP_POPULATE_INITIAL(i/binSize==thisPe);
-
-    /*CkArrayIndex idx;
-    for (idx=numElements.begin(); idx<numElements; idx.getNext(numElements)) {
-      int binSize = (int)ceil((double)numElements.getCombinedCount()/(double)numPes);
-      if (i/binSize==thisPe)
-        mgr->insertInitial(idx,CkCopyMsg(&ctorMsg));
-    }*/
-    mgr->doneInserting();
-    CkFreeMsg(ctorMsg);
-  }
+  BlockMap() {}
+  BlockMap(CkMigrateMessage *m) : DefaultArrayMap(m) {}
 };
 
 /**

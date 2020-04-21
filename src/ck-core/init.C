@@ -249,6 +249,11 @@ extern bool useNodeBlkMapping;
 extern int quietMode;
 extern int quietModeRequested;
 
+void CkCallWhenIdle(int epIdx, void* obj) {
+  auto fn = reinterpret_cast<CcdVoidFn>(_entryTable[epIdx]->call);
+  CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, fn, obj);
+}
+
 // Modules are required to register command line opts they will parse. These
 // options are stored in the _optSet, and then when parsing command line opts
 // users will be warned about options starting with a '+' that are not in this
@@ -1377,6 +1382,8 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
+
+		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
 
 
