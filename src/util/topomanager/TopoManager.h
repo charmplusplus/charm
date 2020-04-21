@@ -4,7 +4,7 @@
  *
  *  This would be the top level interface for all topology managers we
  *  will write for different machines (Cray, IBM ... for tori, meshes ...)
- *  Current we have functionality for Blue Gene, Cray XT, BigSim and 
+ *  Currently we have functionality for Blue Gene, Cray XT/XE, and
  *  non-topo machines.
  *
  */

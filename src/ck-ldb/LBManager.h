@@ -175,12 +175,7 @@ class LocalBarrier
   bool on;
   int propagated_atsync_step;
   int step;
-
   int iter_no;
-
-#if CMK_BIGSIM_CHARM
-  int first_free_client_slot;
-#endif
 };
 
 void _LBMgrInit();
