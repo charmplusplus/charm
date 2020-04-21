@@ -607,10 +607,10 @@ void LBSetPeriod(double second);
 int LBRegisterObjUserData(int size);
 #endif
 
-extern "C" void LBTurnInstrumentOn();
-extern "C" void LBTurnInstrumentOff();
-extern "C" void LBTurnCommOn();
-extern "C" void LBTurnCommOff();
+CLINKAGE void LBTurnInstrumentOn();
+CLINKAGE void LBTurnInstrumentOff();
+void LBTurnCommOn();
+void LBTurnCommOff();
 void LBClearLoads();
 
 inline LBManager* LBManagerObj() { return LBManager::Object(); }

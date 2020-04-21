@@ -812,7 +812,7 @@ void LBManager::pup(PUP::er& p)
   }
 }
 
-extern "C" void configureTreeLB(const char* json_str)
+void configureTreeLB(const char* json_str)
 {
   ((LBManager*)CkLocalBranch(_lbmgr))->configureTreeLB(json_str);
 }
@@ -1031,7 +1031,7 @@ void TurnManualLBOff()
 #endif
 }
 
-extern "C" void LBTurnInstrumentOn()
+void LBTurnInstrumentOn()
 {
 #if CMK_LBDB_ON
   if (CkpvAccess(lbmanagerInited))
@@ -1041,7 +1041,7 @@ extern "C" void LBTurnInstrumentOn()
 #endif
 }
 
-extern "C" void LBTurnInstrumentOff()
+void LBTurnInstrumentOff()
 {
 #if CMK_LBDB_ON
   if (CkpvAccess(lbmanagerInited))
@@ -1051,14 +1051,14 @@ extern "C" void LBTurnInstrumentOff()
 #endif
 }
 
-extern "C" void LBTurnCommOn()
+void LBTurnCommOn()
 {
 #if CMK_LBDB_ON
   _lb_args.traceComm() = 1;
 #endif
 }
 
-extern "C" void LBTurnCommOff()
+void LBTurnCommOff()
 {
 #if CMK_LBDB_ON
   _lb_args.traceComm() = 0;
