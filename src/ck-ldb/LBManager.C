@@ -92,7 +92,7 @@ class LBDBRegistry
 };
 
 static LBDBRegistry lbRegistry;
-static std::vector<const char*> lbNames;
+static std::vector<std::string> lbNames;
 
 void LBDefaultCreate(const char* lbname) { lbRegistry.addCompiletimeBalancer(lbname); }
 
