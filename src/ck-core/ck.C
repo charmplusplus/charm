@@ -542,9 +542,6 @@ int CkGetArgc(void) {
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
-  //BIGSIM_OOC DEBUGGING
-  //CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
-  //fflush(stdout);
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
@@ -567,10 +564,6 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 }
 void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 {
-  //BIGSIM_OOC DEBUGGING
-  //CkPrintf("CkDeliverMessageReadonly: name of entry fn: %s\n", _entryTable[epIdx]->name);
-  //fflush(stdout);
-
   void *deliverMsg;
   if (_entryTable[epIdx]->noKeep)
   { /* Deliver a read-only copy of the message */
@@ -1197,7 +1190,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   }
 }
 
-//BIGSIM_OOC DEBUGGING
+// Debugging support:
 #define TELLMSGTYPE(x) //x
 
 /**
