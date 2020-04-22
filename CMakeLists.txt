@@ -358,11 +358,8 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
 else()
   set(GDIR ${NETWORK})
 endif()
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${CHARM_PLATFORM}/vdir_link)
-  file(STRINGS src/arch/${CHARM_PLATFORM}/vdir_link VDIR)
-else()
-  set(VDIR ${CHARM_PLATFORM})
-endif()
+
+set(VDIR ${CHARM_PLATFORM})
 
 set(CMK_VDIR ${VDIR})
 set(CMK_GDIR ${GDIR})
