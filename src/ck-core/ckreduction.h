@@ -702,7 +702,7 @@ private:
 	bool inProgress;//Is a reduction started, but not complete?
 	bool creating;//Are elements still being created?
 	bool startRequested;//Should we start the next reduction when creation finished?
-  bool is_inactive;//Is it inactive
+        bool is_inactive;//Is it inactive
 	int gcount;//=el't created here - el't deleted here
 	int lcount;//Number of local contributors
 	int maxStartRequest; // the highest future ReductionStarting message received
@@ -725,7 +725,7 @@ private:
 	CkMsgQ<CkReductionMsg> futureRemoteMsgs;
 
 	CkMsgQ<CkReductionMsg> finalMsgs;
-  std::unordered_map<int, int> inactiveList;
+        std::unordered_map<int, int> inactiveList;
 
 //State:
 	void startReduction(int number,int srcPE);
