@@ -34,11 +34,9 @@ void DistributedLB::initnodeFn()
 void DistributedLB::turnOn()
 {
 #if CMK_LBDB_ON
-  theLbdb->
+  lbmgr->
     TurnOnBarrierReceiver(receiver);
-  theLbdb->
-    TurnOnNotifyMigrated(notifier);
-  theLbdb->
+  lbmgr->
     TurnOnStartLBFn(startLbFnHdl);
 #endif
 }
@@ -46,11 +44,9 @@ void DistributedLB::turnOn()
 void DistributedLB::turnOff()
 {
 #if CMK_LBDB_ON
-  theLbdb->
+  lbmgr->
     TurnOffBarrierReceiver(receiver);
-  theLbdb->
-    TurnOffNotifyMigrated(notifier);
-  theLbdb->
+  lbmgr->
     TurnOffStartLBFn(startLbFnHdl);
 #endif
 }
@@ -156,11 +152,14 @@ void DistributedLB::LoadReduction(CkReductionMsg* redn_msg) {
   // can receive more work. So assuming there exists an overloaded PE that can
   // donate work, I will start gossipping my load information.
   if (my_load < transfer_threshold) {
+    underloaded = true;
 		double r_loads[1];
 		int r_pe_no[1];
     r_loads[0] = my_load;
     r_pe_no[0] = CkMyPe();
     GossipLoadInfo(CkMyPe(), 1, r_pe_no, r_loads);
+  } else {
+    underloaded = false;
   }
 
   // Start quiescence detection at PE 0.
@@ -289,7 +288,7 @@ void DistributedLB::DoneGossip() {
 }
 
 void DistributedLB::StartNextLBPhase() {
-  if (underloaded_pe_count == 0 || my_load <= transfer_threshold) {
+  if (underloaded_pe_count == 0 || my_load <= transfer_threshold || underloaded) {
     // If this PE has no information about underloaded processors, or it has
     // no objects to donate to underloaded processors then do nothing.
     DoneWithLBPhase();
@@ -364,7 +363,7 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
     Cleanup();
     PackAndSendMigrateMsgs();
     if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
-      theLbdb->nextLoadbalancer(seqno);
+      lbmgr->nextLoadbalancer(seqno);
   }
   delete [] results;
 }

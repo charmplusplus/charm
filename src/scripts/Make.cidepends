@@ -9,10 +9,9 @@ EveryLB.decl.h EveryLB.def.h: EveryLB.ci.stamp
 GreedyLB.decl.h GreedyLB.def.h: GreedyLB.ci.stamp
 GreedyRefineLB.decl.h GreedyRefineLB.def.h: GreedyRefineLB.ci.stamp
 HybridBaseLB.decl.h HybridBaseLB.def.h: HybridBaseLB.ci.stamp
-LBDatabase.decl.h LBDatabase.def.h: LBDatabase.ci.stamp
+LBManager.decl.h LBManager.def.h: LBManager.ci.stamp
 MetaBalancer.decl.h MetaBalancer.def.h: MetaBalancer.ci.stamp
 MetisLB.decl.h MetisLB.def.h: MetisLB.ci.stamp
-NullLB.decl.h NullLB.def.h: NullLB.ci.stamp
 RandCentLB.decl.h RandCentLB.def.h: RandCentLB.ci.stamp
 RefineLB.decl.h RefineLB.def.h: RefineLB.ci.stamp
 RotateLB.decl.h RotateLB.def.h: RotateLB.ci.stamp

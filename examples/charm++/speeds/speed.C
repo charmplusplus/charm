@@ -7,7 +7,7 @@ void
 test::measure(int nc)
 {
   nchunks = nc;
-  int s = LBDatabase::ProcessorSpeed();
+  int s = LBManager::ProcessorSpeed();
   CkPrintf("[%d] speed = %d \n", CkMyPe(), s);
   CProxy_test grp(thisgroup);
   grp.recv(CkMyPe(), s);

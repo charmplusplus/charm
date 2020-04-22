@@ -483,6 +483,7 @@ extern void CkSummary_MarkEvent(int);
 extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
+extern void CkCallWhenIdle(int epIdx, void* obj);
 
 #ifdef __cplusplus
 }

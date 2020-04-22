@@ -4221,6 +4221,16 @@ local
    immediately, they are allowed to have a non-void return value. An
    example can be found in ``examples/charm++/hello/local``.
 
+whenidle
+   a local entry method meant to be used with ``CkCallWhenIdle``,
+   which registers an entry method to be called when a processor is
+   idle. This mechanism provides a convenient way to do work (e.g. low
+   priority or speculative) in the absence of other work. ``whenidle``
+   entry methods must return a ``bool`` value, indicating whether the
+   entry method should be called when the processor is idle again, and
+   accept a ``double`` argument representing the current timestamp. An
+   example can be found in ``examples/charm++/whenidle``.
+
 python
    entry methods are enabled to be called from python scripts as
    explained in chapter :numref:`python`. Note that the object owning
@@ -8095,6 +8105,12 @@ call to initiate the checkpoint.
 After ``CkStartCheckpoint`` is executed, a directory of the designated
 name is created and a collection of checkpoint files are written into
 it.
+
+.. note::
+   Note that checkpoints are written to and read from several
+   automatically created subdirectories of the specified directory in
+   order to avoid creating too many files in the same directory, which
+   can stress the file system.
 
 Restarting
 ^^^^^^^^^^
