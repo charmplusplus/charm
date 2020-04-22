@@ -7,7 +7,7 @@
 #
 # Usage: relink.script <build-version-name-string>
 #
-# Example: relink.script netlrts-linux-smp.
+# Example: relink.script netlrts-linux-i386-smp.
 # by Chee Wai Lee	10/13/2003
 #
 # rewritten by

@@ -33,7 +33,7 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win64$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
@@ -262,10 +262,6 @@ done
 if [ "$VERSION" = "$1" ]; then VERSOPTS=""; fi
 
 BASEVERSION="$VERSION"
-if test -f $src/$BASEVERSION/vdir_link
-then
-  BASEVERSION=`cat $src/$BASEVERSION/vdir_link`
-fi
 ARCH=`echo $BASEVERSION | sed -e 's@-.*@@'`
 shift
 
@@ -277,7 +273,7 @@ OPT_DIRS="$src/$BASEVERSION $src/$ARCH $src/common"
 
 # default to building ROMIO on AMPI where supported
 case "$BASEVERSION" in
-  *-win64*|*-win-*)
+  *-win-*)
     WITH_ROMIO=''
     ;;
   *)
@@ -722,7 +718,7 @@ mkdir -p "$DESTINATION/tmp"
 
 # Create the bin, lib, include, etc. links:
 WINNAME=`echo $VERSION | awk -F- '{print $2}'`
-if [ "x_$WINNAME" = "x_win64" -o "x_$WINNAME" = "x_win" ]
+if [ "x_$WINNAME" = "x_win" ]
 then
 #Win64 version needs special compilers and *copied* (not linked)
 # source files.
