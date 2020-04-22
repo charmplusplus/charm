@@ -2134,10 +2134,12 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
 }
 /***************************** End of Zerocopy PUP Support ****************************/
 
+/***************************** Direct GPU Messaging ***************************/
+
+#if CMK_CUDA
 // Device-side ZC API should be available regardless of CPU-side support
 // (i.e. CMK_ONESIDED_IMPL)
-void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs) {
-#if CMK_CUDA
+void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
   // Find which mode of transfer should be used
   CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
 
@@ -2149,7 +2151,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   p|received_numops;
   CkAssert(numops == received_numops);
 
-  CkNcpyBuffer source;
+  CkDeviceBuffer source;
 
   for (int i = 0; i < numops; i++) {
     // Unpack source buffer (from sender)
@@ -2160,7 +2162,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     }
 
     // Destination buffer (on this receiver)
-    CkNcpyBuffer dest((const void *)arrPtrs[i], arrSizes[i]);
+    CkDeviceBuffer dest((const void *)arrPtrs[i], arrSizes[i]);
 
     // Perform data transfers
     switch (mode) {
@@ -2217,10 +2219,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
     p|source;
   }
-
-#else
-  CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
-#endif
 }
 
 /*
@@ -2241,7 +2239,6 @@ int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr) {
 }
 */
 
-#if CMK_CUDA
 static void findFreeIpcEvents(DeviceManager* dm, const size_t comm_offset, int& event_idx) {
   int pool_size = CsvAccess(gpu_manager).ipc_event_pool_size;
   int device_index = dm->global_index;
@@ -2313,11 +2310,9 @@ static void findFreeIpcEvents(DeviceManager* dm, const size_t comm_offset, int& 
     CkAbort("CUDA IPC event pool empty");
   }
 }
-#endif
 
 // Performs sender-side operations necessary for device zerocopy
-void CkRdmaDeviceOnSender(int dest_pe, int numops, CkNcpyBuffer** buffers) {
-#if CMK_CUDA
+void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // TODO: Need to handle the case where the destination PE could be wrong
   // (due to migration, etc.)
 
@@ -2367,8 +2362,5 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkNcpyBuffer** buffers) {
   } else {
     CkAbort("Unknown transfer mode");
   }
-#else
-  CkAbort("Device-to-device zerocopy transfer is only supported with the CUDA build");
-#endif
 }
-
+#endif

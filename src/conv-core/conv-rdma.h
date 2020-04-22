@@ -164,24 +164,7 @@ class CmiNcpyBuffer {
   // ack handling pointer used for bcast and CMA p2p transfers
   const void *refAckInfo;
 
-#if CMK_CUDA
-  // Used for CUDA IPC
-  int device_idx;
-  size_t comm_offset;
-  int event_idx;
-  cudaStream_t cuda_stream;
-
-  // Stores the actual data if device-side zerocopy cannot be performed
-  bool data_stored;
-  void* data;
-#endif
-
-  CmiNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CMK_BUFFER_REG), deregMode(CMK_BUFFER_DEREG), ref(NULL), refAckInfo(NULL) {
-#if CMK_CUDA
-    data_stored = false;
-    data = NULL;
-#endif
-  }
+  CmiNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CMK_BUFFER_REG), deregMode(CMK_BUFFER_DEREG), ref(NULL), refAckInfo(NULL) {}
 
   explicit CmiNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_=CMK_BUFFER_REG, unsigned short int deregMode_=CMK_BUFFER_DEREG) {
     init(ptr_, cnt_, regMode_, deregMode_);
@@ -214,11 +197,6 @@ class CmiNcpyBuffer {
     // Register memory everytime new values are initialized
     if(cnt > 0)
       registerMem();
-
-#if CMK_CUDA
-    data_stored = false;
-    data = NULL;
-#endif
   }
 
   void setRef(const void *ref_) {
@@ -280,27 +258,9 @@ class CmiNcpyBuffer {
     p|deregMode;
     p|isRegistered;
     PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
-#if CMK_CUDA
-    p|device_idx;
-    p|comm_offset;
-    p|event_idx;
-    p|data_stored;
-    if (data_stored) {
-      if (p.isUnpacking()) {
-        cudaMallocHost(&data, cnt);
-      }
-      PUParray(p, (char*)data, cnt);
-    }
-#endif
   }
 
-  ~CmiNcpyBuffer() {
-#if CMK_CUDA
-    if (data) {
-      cudaFreeHost(data);
-    }
-#endif
-  }
+  ~CmiNcpyBuffer() {}
 
   void memcpyGet(CmiNcpyBuffer &source);
   void memcpyPut(CmiNcpyBuffer &destination);
@@ -321,6 +281,63 @@ class CmiNcpyBuffer {
 
 
 };
+
+#if CMK_CUDA
+class CmiDeviceBuffer {
+public:
+  // Pointer to and size of the buffer
+  const void* ptr;
+  size_t cnt;
+
+  // Home PE
+  int pe;
+
+  // Used for CUDA IPC
+  int device_idx;
+  size_t comm_offset;
+  int event_idx;
+  cudaStream_t cuda_stream;
+
+  // Stores the actual data if device-side zerocopy cannot be performed
+  bool data_stored;
+  void* data;
+
+  CmiDeviceBuffer() : ptr(NULL), cnt(0), pe(-1) { init(); }
+
+  explicit CmiDeviceBuffer(const void* ptr_, size_t cnt_) : ptr(ptr_), cnt(cnt_),
+    pe(CmiMyPe()) { init(); }
+
+  void init() {
+    device_idx = -1;
+    comm_offset = 0;
+    event_idx = -1;
+    cuda_stream = cudaStreamPerThread;
+
+    data_stored = false;
+    data = NULL;
+  }
+
+  void pup(PUP::er &p) {
+    p((char *)&ptr, sizeof(ptr));
+    p|cnt;
+    p|pe;
+    p|device_idx;
+    p|comm_offset;
+    p|event_idx;
+    p|data_stored;
+    if (data_stored) {
+      if (p.isUnpacking()) {
+        cudaMallocHost(&data, cnt);
+      }
+      PUParray(p, (char*)data, cnt);
+    }
+  }
+
+  ~CmiDeviceBuffer() {
+    if (data) cudaFreeHost(data);
+  }
+};
+#endif
 
 /***************************** Other Util *********************************/
 

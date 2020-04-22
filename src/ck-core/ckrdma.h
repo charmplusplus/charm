@@ -44,16 +44,7 @@ struct CkNcpyBufferPost {
   // deregMode
   unsigned short int deregMode;
 
-#if CMK_CUDA
-  // CUDA stream for device transfers
-  cudaStream_t cuda_stream;
-#endif
-
-  CkNcpyBufferPost() : regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG) {
-#if CMK_CUDA
-    cuda_stream = cudaStreamPerThread;
-#endif
-  }
+  CkNcpyBufferPost() : regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG) {}
 };
 
 // Class to represent an Zerocopy buffer
@@ -67,32 +58,13 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
   CkNcpyBuffer() : CmiNcpyBuffer() {}
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
-#if CMK_CUDA
-    cuda_stream = cudaStreamPerThread;
-#endif
     cb = CkCallback(CkCallback::ignore);
     CmiNcpyBuffer::init(ptr_, cnt_, regMode_, deregMode_);
   }
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
-#if CMK_CUDA
-    cuda_stream = cudaStreamPerThread;
-#endif
     init(ptr_, cnt_, cb_, regMode_, deregMode_);
   }
-
-#if CMK_CUDA
-  explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, cudaStream_t cuda_stream_) {
-    cuda_stream = cuda_stream_;
-    cb = CkCallback(CkCallback::ignore);
-    CmiNcpyBuffer::init(ptr_, cnt_, CK_BUFFER_REG, CK_BUFFER_DEREG);
-  }
-
-  explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, cudaStream_t cuda_stream_) {
-    cuda_stream = cuda_stream_;
-    init(ptr_, cnt_, cb_, CK_BUFFER_REG, CK_BUFFER_DEREG);
-  }
-#endif
 
   void print() {
     CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%zu, pe:%d, regMode=%d, deregMode=%d, ref:%p, refAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, regMode, deregMode, ref, refAckInfo);
@@ -120,7 +92,6 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
   friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
-  friend void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
 
   friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
@@ -172,16 +143,6 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, CkCallback &cb_, unsig
 static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
   return CkNcpyBuffer(ptr_, 0, regMode_, deregMode_);
 }
-
-#if CMK_CUDA
-static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, CkCallback &cb_, cudaStream_t cuda_stream_) {
-  return CkNcpyBuffer(ptr_, 0, cb_, cuda_stream_);
-}
-
-static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, cudaStream_t cuda_stream_) {
-  return CkNcpyBuffer(ptr_, 0, cuda_stream_);
-}
-#endif
 
 #if CMK_ONESIDED_IMPL
 // NOTE: Inside CkRdmaIssueRgets, a large message allocation is made consisting of space
@@ -484,8 +445,56 @@ void CkRdmaZCPupCustomHandler(void *ack);
 
 void _ncpyAckHandler(ncpyHandlerMsg *msg);
 
-// Device-side zerocopy functions
-void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
-void CkRdmaDeviceOnSender(int dest_pe, int numops, CkNcpyBuffer** buffers);
+/*************************** Direct GPU Messaging *****************************/
+
+#if CMK_CUDA
+// Structs used in direct GPU messaging
+struct CkDeviceBufferPost {
+  // CUDA stream for device transfers
+  cudaStream_t cuda_stream;
+
+  // Use per-thread stream by default
+  CkDeviceBufferPost() : cuda_stream(cudaStreamPerThread) {}
+};
+
+class CkDeviceBuffer : public CmiDeviceBuffer {
+public:
+  // Callback to be invoked on the sender/receiver
+  CkCallback cb;
+
+  CkDeviceBuffer() : CmiDeviceBuffer() {}
+
+  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_)
+    : CmiDeviceBuffer(ptr_, cnt_) {
+    cb = CkCallback(CkCallback::ignore);
+  }
+
+  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, CkCallback& cb_)
+    : CmiDeviceBuffer(ptr_, cnt_) {
+    cb = cb_;
+  }
+
+  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, cudaStream_t cuda_stream_)
+    : CmiDeviceBuffer(ptr_, cnt_) {
+    cuda_stream = cuda_stream_;
+  }
+
+  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, CkCallback& cb_, cudaStream_t cuda_stream_)
+    : CmiDeviceBuffer(ptr_, cnt_) {
+    cb = cb_;
+    cuda_stream = cuda_stream_;
+  }
+
+  void pup(PUP::er &p) {
+    CmiDeviceBuffer::pup(p);
+    p|cb;
+  }
+
+  friend void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
+};
+
+void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
+void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
+#endif // CMK_CUDA
 
 #endif

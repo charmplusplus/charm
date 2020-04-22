@@ -279,6 +279,7 @@ CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
     return CmiNcpyMode::RDMA;
 }
 
+#if CMK_CUDA
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe) {
   if (CmiNodeOf(srcPe) == CmiNodeOf(destPe)) {
     // Same logical node
@@ -293,6 +294,7 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe) {
     return CmiNcpyModeDevice::RDMA;
   }
 }
+#endif
 
 zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src) {
   zcPupSourceInfo *srcInfo = new zcPupSourceInfo();
