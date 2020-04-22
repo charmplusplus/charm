@@ -8529,7 +8529,7 @@ for example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 omp
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp
    $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
 
 This library is based on the LLVM OpenMP runtime library. So it supports
@@ -8573,7 +8573,7 @@ to avoid the error:
    $ sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
    $ sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 clang omp --with-production -j8
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 clang omp --with-production -j8
    $ echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
 
 On Mac, the Apple-provided clang installed in default doesn’t have
@@ -8587,7 +8587,7 @@ to the invocation of the Charm++ build script. For example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 omp gcc-7
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp gcc-7
    $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
 
 If this does not work, you should set environment variables so that the
@@ -10734,7 +10734,7 @@ appropriate choices for the build one wants to perform.
    ================================================================ =====================================================================
    Machine                                                          Build command
    ================================================================ =====================================================================
-   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux --with-production -j8``
+   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    Multicore (single node, shared memory) 64 bit Linux              ``./build charm++ multicore-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux                                            ``./build charm++ netlrts-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux (intel compilers)                          ``./build charm++ netlrts-linux-x86_64 icc --with-production -j8``
