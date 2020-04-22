@@ -415,7 +415,7 @@ void CkReductionMgr::checkIsActive() {
 #endif
 
   // Check the number of kids in the inactivelist before or at this redNo
-  std::map<int, int>::iterator it;
+  std::unordered_map<int, int>::iterator it;
   int c_inactive = 0;
   for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
     if (it->second <= redNo) {
@@ -447,10 +447,10 @@ void CkReductionMgr::checkAndAddToInactiveList(int id, int red_no) {
     thisProxy[id].ReductionStarting(new CkReductionNumberMsg(red_no));
   }
 
-  std::map<int, int>::iterator it;
+  std::unordered_map<int, int>::iterator it;
   it = inactiveList.find(id);
   if (it == inactiveList.end()) {
-    inactiveList.insert(std::pair<int, int>(id, red_no));
+    inactiveList.emplace(std::make_pair(id, red_no));
   } else {
     it->second = red_no;
   }
@@ -465,7 +465,7 @@ void CkReductionMgr::checkAndAddToInactiveList(int id, int red_no) {
 * particular red_no
 */
 void CkReductionMgr::checkAndRemoveFromInactiveList(int id, int red_no) {
-  std::map<int, int>::iterator it;
+  std::unordered_map<int, int>::iterator it;
   it = inactiveList.find(id);
   if (it == inactiveList.end()) {
     return;
@@ -498,7 +498,7 @@ void CkReductionMgr::sendReductionStartingToKids(int red_no) {
     thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
   }
 #else
-  std::map<int, int>::iterator it;
+  std::unordered_map<int, int>::iterator it;
   for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
     if (it->second <= red_no) {
       DEBR((AA "Parent sending reductionstarting to inactive kid %d\n" AB,
