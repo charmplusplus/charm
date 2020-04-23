@@ -626,7 +626,8 @@ then
         CONFIG_OPTS="--enable-task-queue $CONFIG_OPTS"
       fi
     elif [ $BUILD_OMP -eq 1 ]; then
-      BUILD_OMP=2 #this means omp keyword inserted without smp keyword"
+      BUILD_OMP=2 #this means omp keyword inserted without smp keyword (presumably when building multicore-*)
+      CONFIG_OPTS="--enable-task-queue $CONFIG_OPTS"
     fi
 fi
 
