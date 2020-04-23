@@ -111,11 +111,11 @@ class Block : public CBase_Block {
   }
 
   void receive(int ref, int &size1, double *&arr1, int size2, int *arr2,
-      CkNcpyBufferPost *ncpyPost) {
+      CkDeviceBufferPost *devicePost) {
     // Inform the runtime where the incoming data should be stored
     // and which CUDA stream should be used for the transfer
     arr1 = d_remote_data;
-    ncpyPost[0].cuda_stream = stream;
+    devicePost[0].cuda_stream = stream;
 
     // Last array should be available here as it is not RDMA
     // Copy it over for validation

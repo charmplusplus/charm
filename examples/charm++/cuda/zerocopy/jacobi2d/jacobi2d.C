@@ -243,16 +243,16 @@ class Block : public CBase_Block {
       // Send ghosts to neighboring chares
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_size,
-            CkSendBuffer(d_left_ghost, stream));
+            CkDeviceBuffer(d_left_ghost, stream));
       if (!right_bound)
         thisProxy(x + 1, y).receiveGhostsZC(my_iter, LEFT, block_size,
-            CkSendBuffer(d_right_ghost, stream));
+            CkDeviceBuffer(d_right_ghost, stream));
       if (!top_bound)
         thisProxy(x, y - 1).receiveGhostsZC(my_iter, BOTTOM, block_size,
-            CkSendBuffer(d_temperature + (block_size + 2) + 1, stream));
+            CkDeviceBuffer(d_temperature + (block_size + 2) + 1, stream));
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_size,
-            CkSendBuffer(d_temperature + (block_size + 2) * block_size + 1, stream));
+            CkDeviceBuffer(d_temperature + (block_size + 2) * block_size + 1, stream));
     }
     else {
       // Transfer ghosts from device to host
@@ -278,7 +278,7 @@ class Block : public CBase_Block {
     }
   }
 
-  void receiveGhostsZC(int ref, int dir, int &w, double *&buf, CkNcpyBufferPost *ncpyPost) {
+  void receiveGhostsZC(int ref, int dir, int &w, double *&buf, CkDeviceBufferPost *devicePost) {
     switch (dir) {
       case LEFT:
         buf = d_left_ghost;
@@ -295,7 +295,7 @@ class Block : public CBase_Block {
       default:
         CkAbort("Error: invalid direction");
     }
-    ncpyPost[0].cuda_stream = stream;
+    devicePost[0].cuda_stream = stream;
   }
 
   void processGhostsZC(int dir, int width, double* gh) {

@@ -18,7 +18,7 @@ mainmodule sdag {
     entry void iterate() {
       serial {
         // Send device data to peer
-        thisProxy[peer].receive(iter, block_size, CkSendBuffer(d_local_data, stream),
+        thisProxy[peer].receive(iter, block_size, CkDeviceBuffer(d_local_data, stream),
             block_size, reg_local_data);
       }
 

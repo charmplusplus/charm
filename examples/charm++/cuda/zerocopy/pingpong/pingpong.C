@@ -156,7 +156,7 @@ public:
     }
 
     if (use_zerocopy) {
-      thisProxy[peer].receive_zc(count, CkSendBuffer(d_local_data));
+      thisProxy[peer].receive_zc(count, CkDeviceBuffer(d_local_data, stream));
     }
     else {
       hapiCheck(cudaMemcpyAsync(h_local_data, d_local_data, count * sizeof(double), cudaMemcpyDeviceToHost, stream));
@@ -177,11 +177,11 @@ public:
   }
 
   // First receive, user should set the destination buffer
-  void receive_zc(int &count, double *&data, CkNcpyBufferPost *ncpyPost) {
+  void receive_zc(int &count, double *&data, CkDeviceBufferPost *devicePost) {
     // Inform the runtime where the incoming data should be stored
     // and which CUDA stream should be used for the transfer
     data = d_remote_data;
-    ncpyPost[0].cuda_stream = stream;
+    devicePost[0].cuda_stream = stream;
   }
 
   // Second receive, invoked after the data transfer is initiated
