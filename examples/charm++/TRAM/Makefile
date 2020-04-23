@@ -1,10 +1,6 @@
 -include ../../../include/conv-mach-opt.mak
 
-DIRS = \
-  randomAccessGroup \
-  randomAccessArray \
-  aggregateRandomAccessGroup \
-  aggregateRandomAccessArray \
+DIRS = aggregateRandomAccessArray
 
 TESTDIRS = $(DIRS)
 
