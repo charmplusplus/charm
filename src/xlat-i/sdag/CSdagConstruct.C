@@ -293,11 +293,11 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
                    << i++ << "();\n";
             }
             indentBy(defs, cur + 2);
-            defs << "CkNcpyBuffer & ncpyBuffer_" << var.name << " = gen" << cur
+            defs << "CkDeviceBuffer & deviceBuffer_" << var.name << " = gen" << cur
                  << "->getP" << i << "();\n";
             indentBy(defs, cur + 2);
             defs << var.type << "* " << var.name << " = (" << var.type
-                 << "*) (ncpyBuffer_" << var.name << ".ptr);\n";
+                 << "*) (deviceBuffer_" << var.name << ".ptr);\n";
           } else {
             if (var.isFirstRdma) {
               defs << "#if CMK_ONESIDED_IMPL\n";

@@ -49,7 +49,7 @@ void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
                 defs << "  genClosure->getP" << i++ << "() = " << numDeviceRdmaParams << ";\n";
               }
               defs << "  genClosure->getP" << i << "() = "
-                   << "ncpyBuffer_" << var.name << ";\n";
+                   << "deviceBuffer_" << var.name << ";\n";
             } else {
               defs << "#if CMK_ONESIDED_IMPL\n";
               if (var.isFirstRdma) {
@@ -95,8 +95,13 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
       if (i > 0) signature << ", ";
       if (sv->byConst) signature << "const ";
 
-      if (sv->isRdma)
-        signature << "CkNcpyBuffer ";
+      if (sv->isRdma) {
+        if (sv->isDevice) {
+          signature << "CkDeviceBuffer ";
+        } else {
+          signature << "CkNcpyBuffer ";
+        }
+      }
       else
         signature << sv->type << " ";
       if (sv->arrayLength != 0)
@@ -109,7 +114,11 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
       }
       if (sv->name != 0) {
         if (sv->isRdma) {
-          signature << "ncpyBuffer_" << sv->name;
+          if (sv->isDevice) {
+            signature << "deviceBuffer_" << sv->name;
+          } else {
+            signature << "ncpyBuffer_" << sv->name;
+          }
         } else {
           signature << sv->name;
         }

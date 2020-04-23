@@ -1509,17 +1509,17 @@ void Entry::genClosure(XStr& decls, bool isDef) {
             toPup << "        __p | num_device_rdma_fields;\n";
           }
           structure << "      "
-                    << "CkNcpyBuffer "
-                    << "ncpyBuffer_" << sv->name << ";\n";
+                    << "CkDeviceBuffer "
+                    << "deviceBuffer_" << sv->name << ";\n";
           getter << "      "
-                 << "CkNcpyBuffer & getP" << i << "() { return "
-                 << "ncpyBuffer_" << sv->name << "; }\n";
+                 << "CkDeviceBuffer & getP" << i << "() { return "
+                 << "deviceBuffer_" << sv->name << "; }\n";
           toPup << "        if (__p.isPacking()) {\n"
-                << "          ncpyBuffer_" << sv->name << ".ptr = "
-                << "(void *)((char *)(ncpyBuffer_" << sv->name << ".ptr) "
+                << "          deviceBuffer_" << sv->name << ".ptr = "
+                << "(void *)((char *)(deviceBuffer_" << sv->name << ".ptr) "
                 << "- impl_buf_device);\n"
                 << "        }\n"
-                << "        __p | ncpyBuffer_" << sv->name << ";\n";
+                << "        __p | deviceBuffer_" << sv->name << ";\n";
         } else {
           // CPU RDMA
           structure << "\n#if CMK_ONESIDED_IMPL\n";
@@ -1907,7 +1907,13 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
             str << "genClosure";
         }
         // Add CkNcpyBufferPost as the last parameter
-        if(isRdmaPost) str << ",ncpyPost";
+        if(isRdmaPost) {
+          if (param->hasDevice()) {
+            str << ", devicePost";
+          } else {
+            str << ",ncpyPost";
+          }
+        }
         str << ");\n";
         if (needsClosure) {
           if(!isRdmaPost)
@@ -1917,7 +1923,13 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         str << "(";
         param->unmarshall(str, false, true, isRdmaPost);
         // Add CkNcpyBufferPost as the last parameter
-        if(isRdmaPost) str << ",ncpyPost";
+        if(isRdmaPost) {
+          if (param->hasDevice()) {
+            str << ", devicePost";
+          } else {
+            str << ",ncpyPost";
+          }
+        }
         str << ");\n";
       }
       if(isRdmaPost) {
@@ -1939,7 +1951,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
             str << "genClosure->num_device_rdma_fields, ";
           else
             str << "impl_num_device_rdma_fields, ";
-          str << "buffPtrs, buffSizes, ncpyPost);\n";
+          str << "buffPtrs, buffSizes, devicePost);\n";
         } else {
           str << "#if CMK_ONESIDED_IMPL\n";
           str << "  if(CMI_IS_ZC_RECV(env)) \n";
