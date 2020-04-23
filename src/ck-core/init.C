@@ -1506,8 +1506,6 @@ void _initCharm(int unused_argc, char **argv)
                   register whatever load balancers are being linked in.
                   Without an executable (charm4py just uses libcharm.so), the load balancers in libcharm.so
                   have to somehow be registered during init.
-                  With the planned load balancing framework, load balancer registration will hopefully go away,
-                  at least for strategies used in central/hybrid, because they will stop being chares.
                 */
 		_registerTreeLB();
 #endif
