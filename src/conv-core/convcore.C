@@ -978,6 +978,10 @@ void CmiTimerInit(char **argv)
   CpvAccess(inittime_wallclock) = times(&temp);
   CpvAccess(inittime_virtual) = temp.tms_utime + temp.tms_stime;
   CpvAccess(clocktick) = 1.0 / (sysconf(_SC_CLK_TCK));
+
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 double CmiWallTimer(void)
@@ -1049,6 +1053,10 @@ void CmiTimerInit(char **argv)
 {
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
+
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 
   int tmptime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
   if(CmiMyRank() == 0) _absoluteTime = tmptime;   /* initialize only  once */
@@ -1181,6 +1189,9 @@ void CmiTimerInit(char **argv)
   if(cmiArgDebugFlag == 0)
     CmiBarrierZero();
 #endif  
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 double CmiCpuTimer(void)
@@ -1246,6 +1257,9 @@ void CmiTimerInit(char **argv)
   }
 #endif
   CpvAccess(inittime) = GetTimeBase (); 
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 double CmiWallTimer(void)
@@ -1323,6 +1337,9 @@ void CmiTimerInit(char **argv)
   CmiBarrier();
 #endif
   CpvAccess(inittime) = PPC64_TimeBase ();
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 double CmiWallTimer(void)
@@ -1376,6 +1393,9 @@ void CmiTimerInit(char **argv)
 	CpvAccess(inittime_wallclock) = tv.time*1.0 + tv.millitm*0.001;
 	ru = clock();
 	CpvAccess(inittime_virtual) = ((double) ru)/CLOCKS_PER_SEC;
+#if CMK_ERROR_CHECKING
+	CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 double CmiCpuTimer(void)
@@ -1428,6 +1448,9 @@ void CmiTimerInit(char **argv)
   CpvInitialize(long long, inittime_wallclock);
   CpvAccess(inittime_wallclock) = _rtc();
   clocktick = 1.0 / (double)(sysconf(_SC_SV2_USER_TIME_RATE));
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 int CmiTimerAbsolute(void)
@@ -1487,6 +1510,9 @@ void CmiTimerInit(char **argv)
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 int CmiTimerAbsolute(void)
