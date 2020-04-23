@@ -149,7 +149,7 @@ class RefineA : public Strategy<O, P, S>
       }
       if (CkMyPe() == 0 && _lb_args.debug() > 1)
         CkPrintf("M=%f maxload=%f\n", M, cur_maxload);
-      if ((cur_maxload < M) || (reldiff(cur_maxload, M) < 1.01))
+      if (cur_maxload / M < 1.01)
         upper = M;
       else
         lower = M;
@@ -278,7 +278,7 @@ class RefineB : public Strategy<O, P, S>
       }
       if (CkMyPe() == 0 && _lb_args.debug() > 1)
         CkPrintf("M=%f maxload=%f\n", M, cur_maxload);
-      if ((cur_maxload < M) || (reldiff(cur_maxload, M) < 1.01))
+      if (cur_maxload /  M < 1.01)
         upper = M;
       else
         lower = M;
