@@ -188,7 +188,7 @@ class StrategyWrapper : public IStrategyWrapper
   class Solution
   {
    public:
-    Solution(int& nmoves, int* num_incoming, int* loc, unsigned int foreign_obj_id_start,
+    Solution(int& nmoves, int* num_incoming, int* loc, int foreign_obj_id_start,
              std::vector<int>& obj_local_ids)
         : n_moves(nmoves),
           num_incoming(num_incoming),
@@ -248,7 +248,7 @@ class StrategyWrapper : public IStrategyWrapper
     int* num_incoming;
     int* loc;  // store solution of strategy here: loc[i] = newPe for object i
     std::vector<int>& obj_local_ids;
-    const unsigned int foreign_obj_id_start;
+    const int foreign_obj_id_start;
     IDM* idm = nullptr;
 #if CMK_ERROR_CHECKING
     size_t num_objs;
@@ -439,7 +439,7 @@ class StrategyWrapper : public IStrategyWrapper
   Solution* sol = nullptr;
   std::vector<int> obj_local_ids;
   std::vector<O> foreign_objs;
-  unsigned int foreign_obj_id;
+  int foreign_obj_id;
   TreeStrategy::Strategy<O, P, Solution>* strategy;
 };
 

@@ -98,10 +98,10 @@ template <int N, bool multi = (N > 1)>
 class Obj : public std::conditional<multi, obj_N_data<N>, obj_1_data>::type
 {
  public:
-  unsigned int id;
+  int id;
   int oldPe;
 
-  inline void populate(unsigned int _id, float* _load, int _oldPe)
+  inline void populate(int _id, float* _load, int _oldPe)
   {
     id = _id;
     oldPe = _oldPe;
@@ -117,7 +117,7 @@ class Obj : public std::conditional<multi, obj_N_data<N>, obj_1_data>::type
 };
 
 template <>
-inline void Obj<1>::populate(unsigned int _id, float* _load, int _oldPe)
+inline void Obj<1>::populate(int _id, float* _load, int _oldPe)
 {
   id = _id;
   load = *_load;
