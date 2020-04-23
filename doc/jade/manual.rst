@@ -162,7 +162,7 @@ ethernet environment, with debugging info produced:
 
 .. code-block:: bash
 
-   $ build jade netlrts-linux -g
+   $ build jade netlrts-linux-x86_64 -g
 
 Compiling and Running Jade Programs
 ===================================

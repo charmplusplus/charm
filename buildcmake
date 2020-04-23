@@ -83,7 +83,7 @@ opt_zlib=1
 
 # default to building ROMIO on AMPI where supported
 case "$triplet" in
-  *-win64*|*-win-*)
+  *-win-*)
     opt_romio=0
     ;;
   *)

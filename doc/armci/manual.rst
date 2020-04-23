@@ -57,7 +57,7 @@ Build charm target ARMCI (instead of charm or AMPI):
 .. code-block:: bash
 
    $ cd charm
-   $ ./build ARMCI netlrts-linux -O3
+   $ ./build ARMCI netlrts-linux-x86_64 -O3
 
 .. _sec::simple program:
 
