@@ -938,7 +938,7 @@ static void ampiNodeInit() noexcept
   int funclength = sizeof(funclist)/sizeof(char*);
   for (int i=0; i<funclength; i++) {
     int event_id = traceRegisterUserEvent(funclist[i], -1);
-    CsvAccess(tcharm_funcmap)->emplace(std::make_pair(funclist[i], event_id));
+    CsvAccess(tcharm_funcmap)->emplace(funclist[i], event_id);
   }
 
   // rename chare & function to something reasonable

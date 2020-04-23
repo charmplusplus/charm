@@ -450,7 +450,7 @@ void CkReductionMgr::checkAndAddToInactiveList(int id, int red_no) {
   std::unordered_map<int, int>::iterator it;
   it = inactiveList.find(id);
   if (it == inactiveList.end()) {
-    inactiveList.emplace(std::make_pair(id, red_no));
+    inactiveList.emplace(id, red_no);
   } else {
     it->second = red_no;
   }

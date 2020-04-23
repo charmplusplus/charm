@@ -2114,10 +2114,10 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
 
   // Create an entry for the unordered map with idx as the index and the vector size as the value
   CmiLock(CksvAccess(_nodeZCPendingLock));
-  CksvAccess(pendingZCOps).emplace(std::make_pair(id, CpvAccess(newZCPupGets).size()));
+  CksvAccess(pendingZCOps).emplace(id, CpvAccess(newZCPupGets).size());
   CmiUnlock(CksvAccess(_nodeZCPendingLock));
 
   // Create an entry for the unordered map with idx as the index and vector of messages as the value
-  locMgr->bufferedActiveRgetMsgs.emplace(std::make_pair(id, std::vector<CkArrayMessage *>())); // does not require locking as it is owned by locMgr
+  locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // does not require locking as it is owned by locMgr
 }
 /***************************** End of Zerocopy PUP Support ****************************/
