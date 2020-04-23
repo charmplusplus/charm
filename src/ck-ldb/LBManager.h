@@ -179,7 +179,6 @@ class LocalBarrier
   bool on;
   int propagated_atsync_step;
   int step;
-
   int iter_no;
 };
 
