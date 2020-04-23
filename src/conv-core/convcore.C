@@ -92,6 +92,11 @@
 
 extern const char * const CmiCommitID;
 extern bool useCMAForZC;
+#if CMK_ERROR_CHECKING
+double longIdleThreshold;
+CpvDeclare(double, idleBeginWalltime); // used for determining the conditon for long idle
+#endif
+
 
 #if CMI_QD
 void initQd(char **argv);
@@ -979,6 +984,10 @@ void CmiTimerInit(char **argv)
   CpvAccess(inittime_wallclock) = times(&temp);
   CpvAccess(inittime_virtual) = temp.tms_utime + temp.tms_stime;
   CpvAccess(clocktick) = 1.0 / (sysconf(_SC_CLK_TCK));
+
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 double CmiWallTimer(void)
@@ -1050,6 +1059,10 @@ void CmiTimerInit(char **argv)
 {
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
+
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 
   int tmptime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
   if(CmiMyRank() == 0) _absoluteTime = tmptime;   /* initialize only  once */
@@ -1182,6 +1195,9 @@ void CmiTimerInit(char **argv)
   if(cmiArgDebugFlag == 0)
     CmiBarrierZero();
 #endif  
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 double CmiCpuTimer(void)
@@ -1247,6 +1263,9 @@ void CmiTimerInit(char **argv)
   }
 #endif
   CpvAccess(inittime) = GetTimeBase (); 
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 double CmiWallTimer(void)
@@ -1324,6 +1343,9 @@ void CmiTimerInit(char **argv)
   CmiBarrier();
 #endif
   CpvAccess(inittime) = PPC64_TimeBase ();
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 double CmiWallTimer(void)
@@ -1377,6 +1399,9 @@ void CmiTimerInit(char **argv)
 	CpvAccess(inittime_wallclock) = tv.time*1.0 + tv.millitm*0.001;
 	ru = clock();
 	CpvAccess(inittime_virtual) = ((double) ru)/CLOCKS_PER_SEC;
+#if CMK_ERROR_CHECKING
+	CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 double CmiCpuTimer(void)
@@ -1429,6 +1454,9 @@ void CmiTimerInit(char **argv)
   CpvInitialize(long long, inittime_wallclock);
   CpvAccess(inittime_wallclock) = _rtc();
   clocktick = 1.0 / (double)(sysconf(_SC_SV2_USER_TIME_RATE));
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 int CmiTimerAbsolute(void)
@@ -1488,6 +1516,9 @@ void CmiTimerInit(char **argv)
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+#if CMK_ERROR_CHECKING
+  CpvInitialize(double, idleBeginWalltime);
+#endif
 }
 
 int CmiTimerAbsolute(void)
@@ -1632,12 +1663,22 @@ void CsdBeginIdle(void)
 #else
   CpvAccess(cmiMyPeIdle) = 1;
 #endif // CMK_SMP
+#if CMK_ERROR_CHECKING
+  CpvAccess(idleBeginWalltime) = CmiWallTimer();
+#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
 void CsdStillIdle(void)
 {
   CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
+
+#if CMK_ERROR_CHECKING
+  if(CmiWallTimer() - CpvAccess(idleBeginWalltime) > longIdleThreshold) {
+    CcdRaiseCondition(CcdPROCESSOR_LONG_IDLE); // Invoke LONG_IDLE ccd callbacks
+    CpvAccess(idleBeginWalltime) = CmiWallTimer(); // Reset idle timer
+  }
+#endif
 }
 
 void CsdEndIdle(void)
@@ -4027,6 +4068,12 @@ void ConverseCommonInit(char **argv)
   if (CmiGetArgFlagDesc(argv, "+noCMAForZC", "When Cross Memory Attach (CMA) is supported, the program does not use CMA when using the Zerocopy API")) {
     useCMAForZC = false;
   }
+
+#if CMK_ERROR_CHECKING
+  if(!CmiGetArgDoubleDesc(argv, "+longIdleThresh", &longIdleThreshold, "Pass the threshold time in seconds that is used for triggering the LONG_IDLE")) {
+    longIdleThreshold = 10;
+  }
+#endif
 
   CmiDeliversInit();
   CsdInit(argv);
