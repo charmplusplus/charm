@@ -376,7 +376,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   hostnameMsg  *msg;
   double startT;
  
-  int obtain_flag = 0;              // default off
+  int obtain_flag = 1;              // default on
   int show_flag = 0;                // default not show topology
 
   if (CmiMyRank() ==0) {
