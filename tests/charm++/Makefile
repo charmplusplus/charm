@@ -25,6 +25,7 @@ DIRS = \
   zerocopy \
   within_node_bcast \
   bombard \
+  longIdle \
 
 # skip sdag, megatest and commtest
 BGDIRS = \
