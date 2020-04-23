@@ -5,7 +5,6 @@ DIRS = \
   migrate \
   taskSpawn \
   taskSpawnRecursive \
-  streamingAllToAll \
   kNeighbor \
   zerocopy \
 
