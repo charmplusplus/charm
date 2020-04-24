@@ -14,7 +14,7 @@ all: $(TARGET)
 OBJS = $(TARGET).o $(TARGET)CUDA.o
 
 $(TARGET): $(OBJS)
-	$(CHARMC) -language charm++ -o $@ $(OBJS) $(LD_LIBS)
+	$(CHARMC) -language charm++ -module CommonLBs -o $@ $(OBJS) $(LD_LIBS)
 
 $(TARGET).decl.h: $(TARGET).ci
 	$(CHARMC) $<

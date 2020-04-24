@@ -1,22 +1,15 @@
 mainmodule verify {
   readonly CProxy_Main main_proxy;
-  readonly CProxy_VerifyChare send_proxy;
-  readonly CProxy_VerifyChare recv_proxy;
   readonly CProxy_VerifyArray array_proxy;
   readonly CProxy_VerifyGroup group_proxy;
   readonly CProxy_VerifyNodeGroup nodegroup_proxy;
   readonly int block_size;
   readonly int n_iters;
+  readonly bool lb_test;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
     entry [threaded] void test();
-  };
-
-  chare VerifyChare {
-    entry VerifyChare(bool is_send);
-    entry void send();
-    entry void recv(int size, nocopydevice double data[size]);
   };
 
   array [1D] VerifyArray {
