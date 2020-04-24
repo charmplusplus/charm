@@ -2230,7 +2230,7 @@ void CthEnqueueNormalThread(CthThreadToken* token, int s,
 {
   CmiSetHandler(token, CpvAccess(CthResumeNormalThreadIdx));
 #if CMK_ERROR_CHECKING
-  if(trackMessages) addToTracking((char *)token);
+  if(trackMessages) addToTracking((char *)token, CmiMyPe());
 #endif
   CsdEnqueueGeneral(token, s, pb, prio);
 }
@@ -2240,7 +2240,7 @@ void CthEnqueueSchedulingThread(CthThreadToken* token, int s,
 {
   CmiSetHandler(token, CpvAccess(CthResumeSchedulingThreadIdx));
 #if CMK_ERROR_CHECKING
-  if(trackMessages) addToTracking((char *)token);
+  if(trackMessages) addToTracking((char *)token, CmiMyPe());
 #endif
   CsdEnqueueGeneral(token, s, pb, prio);
 }

@@ -7,6 +7,7 @@ extern bool trackMessages;
 
 #if CMK_ERROR_CHECKING
 #include <unordered_map>
+#include <vector>
 
 #define CMI_UNIQ_MSG_ID(msg)         ((CmiMsgHeaderBasic *)msg)->uniqMsgId
 #define CMI_SRC_PE(msg)              ((CmiMsgHeaderBasic *)msg)->msgSrcPe
@@ -16,7 +17,7 @@ struct msgInfo {
   int msgHandler;
   int type;
   int ep; // -1 for conv, lrts
-  int count;
+  std::vector<int> destPes;
 };
 
 typedef std::unordered_map<int, int> CmiIntIntMap;
@@ -32,7 +33,7 @@ typedef int (*charmLevelFn)(void *msg);
 
 void CmiMessageTrackerInit(charmLevelFn fn);
 int getNewUniqId();
-void addToTracking(char *msg);
+void addToTracking(char *msg, int destPe);
 void sendTrackingAck(char *msg);
 void _receiveTrackingAck(trackingAckMsg *ackMsg);
 

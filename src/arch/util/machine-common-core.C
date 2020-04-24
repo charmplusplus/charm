@@ -584,7 +584,7 @@ static void SendToPeers(int size, char *msg) {
 /* Functions regarding sending operations */
 static void CmiSendSelf(char *msg) {
 #if CMK_ERROR_CHECKING
-    if(trackMessages) addToTracking(msg);
+    if(trackMessages) addToTracking(msg, CmiMyPe());
 #endif
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
@@ -637,7 +637,7 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
         int destNode = CmiGetNodeGlobal(destLocalNode,partition); 
 
 #if CMK_ERROR_CHECKING
-        if(trackMessages) addToTracking(msg);
+        if(trackMessages) addToTracking(msg, destPE);
 #endif
 #if CMK_USE_CMA
         if(cma_reg_msg && partition == CmiMyPartition() && CmiPeOnSamePhysicalNode(CmiMyPe(), destPE)) {
@@ -714,7 +714,7 @@ void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
 #if CMK_SMP
         if (CmiMyNode()==destNode && partition == CmiMyPartition()) {
 #if CMK_ERROR_CHECKING
-            if(trackMessages) addToTracking(msg);
+            if(trackMessages) addToTracking(msg, destPE);
 #endif
             CmiPushPE(destRank, msg);
 #if CMK_PERSISTENT_COMM
