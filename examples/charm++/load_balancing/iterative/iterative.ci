@@ -1,0 +1,17 @@
+mainmodule iterative {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Test test_proxy;
+  readonly int n_iters;
+  readonly int data_size;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [threaded] void test();
+  };
+
+  array [1D] Test {
+    entry Test();
+    entry void send(CkCallback cb);
+    entry void recv(CkCallback cb, int size, char data[size]);
+  };
+};
