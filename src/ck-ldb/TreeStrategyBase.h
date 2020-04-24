@@ -6,6 +6,32 @@
 
 namespace TreeStrategy
 {
+template <typename T, typename M, template <typename> class C = std::less>
+struct Cmp : std::binary_function<T, T, bool>
+{
+ private:
+  M (T::*p_)() const;
+
+ public:
+  explicit Cmp(M (T::*p)() const) : p_(p) {}
+  bool operator()(const T& a, const T& b) const
+  {
+    return C<M>()((a.*p_)(), (b.*p_)());
+  }
+};
+
+template<typename T, typename M>
+Cmp<T, M> makeCmp(M (T::*p)() const)
+{
+    return Cmp<T, M>(p);
+}
+
+template<template<typename> class C, typename T, typename M>
+Cmp<T, M, C> makeCmp(M (T::*p)() const)
+{
+    return Cmp<T, M, C>(p);
+}
+
 template <typename T, bool is_ptr = std::is_pointer<T>::value>
 struct CmpLoadGreater
 {

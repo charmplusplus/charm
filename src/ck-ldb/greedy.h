@@ -16,9 +16,9 @@ class Greedy : public Strategy<O, P, S>
  public:
   void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)
   {
-    if (!objsSorted) std::sort(objs.begin(), objs.end(), CmpLoadGreater<O>());
-    std::priority_queue<P, std::vector<P>, CmpLoadGreater<P>> procHeap(
-        CmpLoadGreater<P>(), procs);
+    if (!objsSorted) std::sort(objs.begin(), objs.end(), makeCmp(&O::getLoad));
+    std::priority_queue<P, std::vector<P>, decltype(makeCmp<std::greater>(&P::getLoad))> procHeap(
+      makeCmp<std::greater>(&P::getLoad), procs);
     for (const auto& o : objs)
     {
       P p = procHeap.top();
