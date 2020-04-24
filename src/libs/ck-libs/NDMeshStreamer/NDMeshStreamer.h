@@ -638,7 +638,6 @@ insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
   if (useCompletionDetection_) {
     detectorLocalObj_->produce();
   }
-  QdCreate(1);
   const static bool copyIndirectly = true;
 
   Route destinationRoute;
