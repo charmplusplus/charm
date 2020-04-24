@@ -2,7 +2,7 @@
 #include "cmitrackmessages.h"
 #include <algorithm>
 
-#define DEBUG(x) //x
+#define DEBUG(x) x
 
 charmLevelFn getMsgEpIdxFn;
 
@@ -125,7 +125,7 @@ inline void insertUniqIdEntry(char *msg, int destPe) {
     info.ep = 0;
   }
 
-  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep);)
+  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
   CpvAccess(sentUniqMsgIds).insert({uniqId, info});
 }
 
@@ -154,7 +154,7 @@ void addToTracking(char *msg, int destPe) {
 
       msgInfo info = iter->second;
 
-      DEBUG(CmiPrintf("[%d][%d][%d] INCREMENTING COUNTER uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep);)
+      DEBUG(CmiPrintf("[%d][%d][%d] INCREMENTING COUNTER uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
     } else {
       insertUniqIdEntry(msg, destPe);
     }
