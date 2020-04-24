@@ -8,6 +8,8 @@ all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 
+testp: $(foreach i,$(TESTDIRS),testp-$i)
+
 smptest: $(foreach i,$(TESTDIRS),smptest-$i)
 
 bgtest: $(foreach i,$(TESTDIRS),bgtest-$i)
@@ -21,6 +23,9 @@ $(foreach i,$(DIRS),build-$i):
 
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),testp-$i):
+	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
 $(foreach i,$(DIRS),smptest-$i):
 	$(MAKE) -C $(subst smptest-,,$@) smptest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'

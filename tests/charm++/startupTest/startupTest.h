@@ -102,6 +102,7 @@ class ReadArrZero : public CBase_ReadArrZero
       int a=1;
       workdone=false;
       reddone=false;
+      CmiPrintf("[%d][%d][%d] ReadArrZero [%d] contributing to createReport\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);
       contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::createReport(NULL),mainProxy),0);
     }
 
@@ -154,6 +155,7 @@ class ReadArrOne : public CBase_ReadArrOne
   ReadArrOne(int arrSize, double WasteUnits, CkCallback _cb) :size(arrSize), units(WasteUnits), callbacktoZero(_cb)
     {
       int a=1;
+      CmiPrintf("[%d][%d][%d] ReadArrOne [%d] contributing to createReport\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);
       contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::createReport(NULL),mainProxy),1);
     }
 

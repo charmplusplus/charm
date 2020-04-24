@@ -19,11 +19,17 @@ BGDIRS = \
 FTDIRS = \
   charm++ \
 
+TESTPDIRS= \
+  converse \
+  charm++  \
+
 TESTDIRS = $(DIRS)
 
 all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
+
+testp: $(foreach i,$(TESTPDIRS),testp-$i)
 
 bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
 
@@ -36,6 +42,9 @@ $(foreach i,$(DIRS),build-$i):
 
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(TESTPDIRS),testp-$i):
+	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' P='$(P)'
 
 $(foreach i,$(DIRS),bgtest-$i):
 	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'

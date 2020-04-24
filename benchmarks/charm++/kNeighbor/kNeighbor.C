@@ -114,6 +114,7 @@ public:
 
     void beginIteration() {
 	currentStep++;
+      CmiPrintf("[%d][%d][%d] beginIteration:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), currentStep);
         if (currentStep==numSteps) {
             CkPrintf("kNeighbor program finished!\n");
             //CkCallback *cb = new CkCallback(CkIndex_Main::terminate(NULL), thisProxy);

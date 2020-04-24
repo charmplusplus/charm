@@ -31,6 +31,18 @@ test: all
 	-sync
 	$(call run, ./hello +p4 +restart log )
 
+testp: all
+	-rm -fr log
+	$(call run, ./hello +p$(P) )
+	-sync
+	$(call run, ./hello +p$(P) +restart log )
+	$(call run, ./hello +p$$(( $(P) / 2 )) +restart log )
+	-sync
+	-rm -fr log
+	$(call run, ./hello +p$(P) )
+	-sync
+	$(call run, ./hello +p$(P) +restart log )
+
 smptest: all
 	-rm -fr log
 	$(call run, ./hello +p4 ++ppn 2 )
