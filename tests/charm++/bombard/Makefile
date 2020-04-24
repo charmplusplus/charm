@@ -27,3 +27,11 @@ test: all
 	$(call run, +p$(PROC) ./bombard 0 $(ARRSIZE) $(COUNT))
 	$(call run, +p$(PROC) ./bombard 1 $(ARRSIZE) $(COUNT))
 	$(call run, +p$(PROC) ./bombard 2 $(ARRSIZE) $(COUNT))
+
+smptest: all
+	$(call run, +p$(PROC) ./bombard 0 $(ARRSIZE) $(COUNT) ++ppn 1)
+	$(call run, +p$(PROC) ./bombard 1 $(ARRSIZE) $(COUNT) ++ppn 1)
+	$(call run, +p$(PROC) ./bombard 2 $(ARRSIZE) $(COUNT) ++ppn 1)
+	$(call run, +p$(PROC) ./bombard 0 $(ARRSIZE) $(COUNT) ++ppn 2)
+	$(call run, +p$(PROC) ./bombard 1 $(ARRSIZE) $(COUNT) ++ppn 2)
+	$(call run, +p$(PROC) ./bombard 2 $(ARRSIZE) $(COUNT) ++ppn 2)
