@@ -141,6 +141,8 @@ CmiStartFn mymain(int argc, char *argv[])
   CpvInitialize(int, exitHandler);
   CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) handleExit);
 
+  CpvInitialize(std::vector<int>, peVector);
+
   CpvInitialize(double,startTime);
   CpvInitialize(double,endTime);
 
