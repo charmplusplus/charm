@@ -146,9 +146,11 @@ public:
 
 class VerifyArray : public CBase_VerifyArray {
   Container container;
+  int pe;
 
 public:
   VerifyArray() {
+    usesAtSync = true;
     container.init((thisIndex == 0) ? 1 : 2);
   }
 
@@ -156,8 +158,16 @@ public:
     container.init((thisIndex == 0) ? 1 : 2);
   }
 
+  void pup(PUP::er& p) {
+    p|pe;
+  }
+
   void send() {
     thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    if (lb_test) {
+      pe = CkMyPe();
+      AtSync();
+    }
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
@@ -167,6 +177,14 @@ public:
 
   void recv(int size, double* data) {
     container.verify(1);
+    if (lb_test) {
+      pe = CkMyPe();
+      AtSync();
+    }
+  }
+
+  void ResumeFromSync() {
+    CkPrintf("[Chare %d] Migrated from PE %d to %d\n", thisIndex, pe, CkMyPe());
   }
 };
 
