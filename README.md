@@ -167,9 +167,9 @@ for more information:
 * `tsan` - Compile Charm++ with support for Thread Sanitizer.
 * `papi` - Enable PAPI performance counters.
 * `ooc` - Build Charm++ with out-of-core execution features.
-* `help` - show supported options for a version. For example, for `netlrts-linux`, running:
+* `help` - show supported options for a version. For example, for `netlrts-linux-x86_64`, running:
          
-         $ ./build charm++ netlrts-linux help
+         $ ./build charm++ netlrts-linux-x86_64 help
          
      will give:
     
