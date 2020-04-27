@@ -21,6 +21,7 @@ ScotchTopoLB.decl.h ScotchTopoLB.def.h: ScotchTopoLB.ci.stamp
 TempAwareRefineLB.decl.h TempAwareRefineLB.def.h: TempAwareRefineLB.ci.stamp
 ZoltanLB.decl.h ZoltanLB.def.h: ZoltanLB.ci.stamp
 CkArray.decl.h CkArray.def.h: ckarray.ci.stamp
+CkArrayMap.decl.h CkArrayMap.def.h: ckarraymap.ci.stamp
 CkCallback.decl.h CkCallback.def.h: ckcallback.ci.stamp
 CkCheckpoint.decl.h CkCheckpoint.def.h: ckcheckpoint.ci.stamp
 CkCheckpointStatus.decl.h CkCheckpointStatus.def.h: ckcheckpointstatus.ci.stamp
