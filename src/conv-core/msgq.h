@@ -98,7 +98,7 @@ void msgQ<P>::enq(const msg_t *msg, const prio_t &prio, const bool isFifo)
     bkt_t &bkt = msgbuckets[prio];
     // If this deq is empty, insert corresponding priority into prioQ
     if (bkt.empty())
-        prioQ.push( std::make_pair(prio, &bkt) );
+        prioQ.emplace(prio, &bkt);
     // Enq msg either at front or back of deq
     isFifo ? bkt.push_back(msg) : bkt.push_front(msg);
     #else
