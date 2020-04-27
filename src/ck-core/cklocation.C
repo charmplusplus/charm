@@ -1788,8 +1788,6 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
 {
 #if CMK_LBDB_ON
 	DEBL((AA "Registering element %s with load balancer\n" AB,idx2str(idx)));
-	//BIGSIM_OOC DEBUGGING
-	//CkPrintf("LocMgr on %d: Registering element %s with load balancer\n", CkMyPe(), idx2str(idx));
 	nextPe = -1;
 	asyncMigrate = false;
 	readyMigrate = true;
@@ -2527,8 +2525,6 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
   // Known, remote location or unknown location
   if (rec == NULL)
   {
-    if (opts & CK_MSG_KEEP)
-      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
     // known location
     int destPE = whichPE(id);
     if (destPE != -1)
@@ -2550,8 +2546,6 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
   // Send via the msg q
   if (type==CkDeliver_queue)
   {
-    if (opts & CK_MSG_KEEP)
-      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
     CkArrayManagerDeliver(CkMyPe(),msg,opts);
     return true;
   }
@@ -2564,8 +2558,6 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
   }
   CkMigratable *obj = arr->lookup(id);
   if (obj==NULL) {//That sibling of this object isn't created yet!
-    if (opts & CK_MSG_KEEP)
-      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
     if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer)
       return demandCreateElement(msg, rec->getIndex(), CkMyPe(),type);
     else { // BUFFERING message for nonexistent element
@@ -2584,7 +2576,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
     lbmgr->ObjectStop(objHandle);
 #endif
   // Finally, call the entry method
-  bool result = ((CkLocRec*)rec)->invokeEntry(obj,(void *)msg,msg->array_ep(),!(opts & CK_MSG_KEEP));
+  bool result = ((CkLocRec*)rec)->invokeEntry(obj,(void *)msg,msg->array_ep(), true);
 #if CMK_LBDB_ON
   if (wasAnObjRunning) lbmgr->ObjectStart(objHandle);
 #endif
@@ -2637,13 +2629,8 @@ void CkLocMgr::sendMsg(CkArrayMessage *msg, CkArrayID mgr, const CkArrayIndex &i
     return;
   }
 
-  // Copy the msg, if nokeep
-  if (opts & CK_MSG_KEEP)
-    msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-
   // Buffer the msg
   bufferedIndexMsgs[idx].push_back(msg);
-
 
   // If requested, demand-create the element:
   if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) {
@@ -2683,9 +2670,6 @@ void CkLocMgr::deliverUnknown(CkArrayMessage *msg, const CkArrayIndex* idx, CkDe
         CkArrayManagerDeliver(CkMyPe(),msg);
       }
     } else { // Has a manager-- must buffer the message
-      // Copy the msg, if nokeep
-      if (opts & CK_MSG_KEEP)
-        msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
       // Buffer the msg
       bufferedMsgs[id].push_back(msg);
       // If requested, demand-create the element:
@@ -3073,17 +3057,8 @@ void CkLocMgr::restore(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p)
 {
 	insertID(idx,id);
 
-	//This is in broughtIntoMem during out-of-core emulation in BigSim,
-	//informHome should not be called since such information is already
-	//immediately updated real migration
-#if CMK_ERROR_CHECKING
-	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
-#endif
 	CkLocRec *rec=createLocal(idx,false,false,false);
 	
-	//BIGSIM_OOC DEBUGGING
-	//CkPrintf("Proc[%d]: Registering element %s with LDB\n", CkMyPe(), idx2str(idx));
-
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_restore);
 
