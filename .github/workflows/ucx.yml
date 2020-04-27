@@ -10,6 +10,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
+    # Uncomment the lines below to set up a tmate session for debugging. 
+    # See https://github.com/marketplace/actions/debugging-with-tmate for details.
+    # This can't be enabled all the time as the tmate session will wait for a user to connect before running
+    # the build.
+    #- name: Tmate session for debugging
+    #  uses: mxschmitt/action-tmate@v2
     - name: build-ucx
       run: git clone --branch v1.7.0 https://github.com/openucx/ucx.git && cd ucx && ./autogen.sh && ./contrib/configure-release --disable-numa && make -j4 && sudo make install
     - name: build-ompi
