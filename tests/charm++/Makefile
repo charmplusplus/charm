@@ -43,6 +43,7 @@ NONSCALEDIRS = \
   alignment \
   queue \
   sdag \
+  startupTest \
 
 TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 
