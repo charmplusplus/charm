@@ -1,6 +1,7 @@
 #include "charm++.h"
 #include "ck.h"
 #include "ckarrayoptions.h"
+#include "ckarraymap.h"
 
 CkArrayOptions::CkArrayOptions(void)  // Default: empty array
     : start(),

@@ -1,2 +1,53 @@
 module CkArrayMap {
+  // Array Map object support:
+  group [migratable] CkArrayMap {
+  }
+
+  group [migratable] RRMap : CkArrayMap {
+    entry RRMap(void);
+  };
+
+  readonly CkGroupID _defaultArrayMapID;
+  readonly CkGroupID _fastArrayMapID;
+
+  group [migratable] DefaultArrayMap : RRMap {
+    entry DefaultArrayMap(void);
+  };
+
+  group [migratable] FastArrayMap : DefaultArrayMap {
+    entry FastArrayMap(void);
+  };
+
+  group [migratable] HilbertArrayMap : DefaultArrayMap {
+    entry HilbertArrayMap(void);
+  };
+
+  group [migratable] ReadFileMap : DefaultArrayMap {
+    entry ReadFileMap(void);
+  };
+
+  group [migratable] BlockMap : DefaultArrayMap {
+    entry BlockMap(void);
+  };
+
+  group [migratable] CldMap : CkArrayMap {
+    entry CldMap(void);
+  };
+
+  group [migratable] ConfigurableRRMap : RRMap {
+    entry ConfigurableRRMap(void);
+  };
+
+  initproc void _initConfigurableRRMap(void);
+
+  initnode void _propMapInit(void);
+  initproc void _CkMigratable_initInfoInit(void);
+
+  group [migratable] PropMap : CkArrayMap {
+    entry PropMap(void);
+  };
+
+  mainchare CkMapsInit {
+    entry CkMapsInit(CkArgMsg *m);
+  };
 }

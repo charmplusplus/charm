@@ -26,6 +26,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #ifndef __CKARRAY_H
 #define __CKARRAY_H
 
+#include "ckarraymap.h"
 #include "cklocation.h"
 #include "ckmulticast.h"
 #include "ckmemcheckpoint.h" // for CkArrayCheckPTReqMessage
