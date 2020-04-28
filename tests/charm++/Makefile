@@ -24,6 +24,7 @@ DIRS = \
   jacobi3d-sdag \
   zerocopy \
   within_node_bcast \
+  bombard \
 
 FTDIRS = \
   jacobi3d \
