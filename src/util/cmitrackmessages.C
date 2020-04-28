@@ -20,8 +20,15 @@ CpvDeclare(CmiIntMsgInfoMap, sentUniqMsgIds);
 // Converse handler for ack messages
 CpvDeclare(int, msgTrackHandler);
 
-// // Converse handler for when stats are done
-// CpvDeclare(int, statsDoneHandler);
+// Converse handler for when stats are done
+CpvDeclare(int, statsDoneHandler);
+
+// Converse handler for broadcasting to all PEs to print their stats
+CpvDeclare(int, printStatsHandler);
+
+inline void markAcked(char *msg) {
+  CMI_UNIQ_MSG_ID(msg) = -10;
+}
 
 // Converse handler to receive an ack message
 void _receiveTrackingAck(trackingAckMsg *ackMsg) {
@@ -47,14 +54,14 @@ void _receiveTrackingAck(trackingAckMsg *ackMsg) {
     }
 
     if(info.destPes.size() == 0) { // last count, remove map entry
-      DEBUG(CmiPrintf("[%d][%d][%d] ERASING (uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d), remaining unacked messages = %zu \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, CpvAccess(sentUniqMsgIds).size());)
+      DEBUG(CmiPrintf("[%d][%d][%d] ERASING (uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d), remaining unacked messages = %zu \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, CpvAccess(sentUniqMsgIds).size());)
 
       CpvAccess(sentUniqMsgIds).erase(iter);
 
     } else {
 
       //iter->second.count--;
-      DEBUG(CmiPrintf("[%d][%d][%d] DECREMENTING COUNTER (uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d), remaining unacked messages = %zu \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, CpvAccess(sentUniqMsgIds).size());)
+      DEBUG(CmiPrintf("[%d][%d][%d] DECREMENTING COUNTER (uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d), remaining unacked messages = %zu \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, CpvAccess(sentUniqMsgIds).size());)
     }
   } else {
     //CmiPrintf("[%d][%d][%d] Sender Invalid msg id:%d returned back\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId);
@@ -63,17 +70,22 @@ void _receiveTrackingAck(trackingAckMsg *ackMsg) {
   CmiFree(ackMsg);
 }
 
-//void doneAllStats(char *msg) {
-//  CmiPrintf("[%d][%d][%d] =============== Message tracking - All stats done ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
-//
-//}
-//
-//void *reductionMergeFn(int *size, void *data, void **remote, int count) {
-//  CmiPrintf("[%d][%d][%d] =============== Message tracking - REDUCTION ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
-//}
+void doneAllStats(char *msg) {
+  CmiPrintf("[%d][%d][%d] =============== Message tracking - All stats done, broadcast to everytone to print stats ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
 
+  char *bcastMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+  CmiSetHandler(bcastMsg, CpvAccess(printStatsHandler));
+  CMI_UNIQ_MSG_ID(bcastMsg) = -11;
+  CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes, bcastMsg);
+}
 
-void printStats() {
+void *reductionMergeFn(int *size, void *data, void **remote, int count) {
+  CmiPrintf("[%d][%d][%d] =============== Message tracking - REDUCTION ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
+}
+
+void printStats(char *msg) {
+  CmiFree(msg);
+
   CmiIntMsgInfoMap::iterator iter = CpvAccess(sentUniqMsgIds).begin();
 
   if(CpvAccess(sentUniqMsgIds).size() == 0) {
@@ -86,7 +98,7 @@ void printStats() {
 
     while(iter != CpvAccess(sentUniqMsgIds).end()) {
       info = iter->second;
-      CmiPrintf("[%d][%d][%d] Main Entry:%d, PRINTING uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, iter->first, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep);
+      CmiPrintf("[%d][%d][%d] Main Entry:%d, PRINTING uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, iter->first, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep);
       for(int j = 0; j < info.destPes.size(); j++) {
         CmiPrintf("[%d][%d][%d] Main Entry:%d Sub Entry:%d, PRINTING uniqId:%d, pe:%d, type:%d, msgHandler:%d, ep:%d, destPe %d = %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, j, iter->first, CmiMyPe(), info.type, info.msgHandler, info.ep, j, info.destPes[j]);
       }
@@ -96,15 +108,15 @@ void printStats() {
   }
 
   CsdExitScheduler();
-  //CmiPrintf("[%d][%d][%d] =============== Message tracking contributing to reduction ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
-  //char *reduceMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
-  //CmiSetHandler(reduceMsg, CpvAccess(statsDoneHandler));
-  //CmiReduce(reduceMsg, CmiMsgHeaderSizeBytes, reductionMergeFn);
 }
 
 void CmiPrintMTStatsOnIdle() {
-  CmiPrintf("[%d][%d][%d] CmiPrintMTStatsOnIdle: CmiProcessor is idle, printing stats\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
-  printStats();
+  CmiPrintf("[%d][%d][%d] CmiPrintMTStatsOnIdle: CmiProcessor is idle\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
+
+  char *reduceMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+  CmiSetHandler(reduceMsg, CpvAccess(statsDoneHandler));
+  CMI_UNIQ_MSG_ID(reduceMsg) = -12;
+  CmiReduce(reduceMsg, CmiMsgHeaderSizeBytes, reductionMergeFn);
 }
 
 
@@ -115,8 +127,11 @@ void CmiMessageTrackerInit(charmLevelFn fn) {
   CpvInitialize(int, msgTrackHandler);
   CpvAccess(msgTrackHandler) = CmiRegisterHandler((CmiHandler) _receiveTrackingAck);
 
-//  CpvInitialize(int, statsDoneHandler);
-//  CpvAccess(statsDoneHandler) = CmiRegisterHandler((CmiHandler) doneAllStats);
+  CpvInitialize(int, statsDoneHandler);
+  CpvAccess(statsDoneHandler) = CmiRegisterHandler((CmiHandler) doneAllStats);
+
+  CpvInitialize(int, printStatsHandler);
+  CpvAccess(printStatsHandler) = CmiRegisterHandler((CmiHandler) printStats);
 
   getMsgEpIdxFn = fn;
 
@@ -147,7 +162,7 @@ inline void insertUniqIdEntry(char *msg, int destPe) {
     info.ep = 0;
   }
 
-  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
+  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
   CpvAccess(sentUniqMsgIds).insert({uniqId, info});
 }
 
@@ -161,6 +176,11 @@ void addToTracking(char *msg, int destPe) {
   }
 
   int uniqId = CMI_UNIQ_MSG_ID(msg);
+
+  if(uniqId == -12 || uniqId == -11) {
+    // do not track
+    return;
+  }
 
   if(uniqId <= 0) {
     // uniqId not yet set
@@ -176,15 +196,11 @@ void addToTracking(char *msg, int destPe) {
 
       msgInfo info = iter->second;
 
-      DEBUG(CmiPrintf("[%d][%d][%d] INCREMENTING COUNTER uniqId:%d, pe:%d, type:%d, count:%d, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
+      DEBUG(CmiPrintf("[%d][%d][%d] INCREMENTING COUNTER uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
     } else {
       insertUniqIdEntry(msg, destPe);
     }
   }
-}
-
-inline void markAcked(char *msg) {
-  CMI_UNIQ_MSG_ID(msg) = -10;
 }
 
 // Called when the message has been received
