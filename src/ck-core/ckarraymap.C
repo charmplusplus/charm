@@ -129,7 +129,7 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayOptions& options,void *ctor
         /* The CkArrayIndex is supposed to have at most 3 dimensions, which
            means that all the fields are ints, and numElements.nInts represents
            how many of them are used */
-        CKARRAYMAP_POPULATE_INITIAL(CMK_RANK_0(procNum(arrayHdl,idx))==thisPe);
+        CKARRAYMAP_POPULATE_INITIAL(CMK_RANK_0(homePe(arrayHdl,idx))==thisPe);
 
 
 	mgr->doneInserting();
@@ -179,7 +179,7 @@ public:
     }
   } // End of indexInit
 
-  int procNum(int arrayHdl, const CkArrayIndex &i)
+  int homePe(int arrayHdl, const CkArrayIndex &i)
   {
     if (i.dimension == 1) {
       //Map 1D integer indices in simple round-robin fashion
@@ -310,7 +310,7 @@ public:
 
 /**
  * The default map object -- This does blocked mapping in the general case and
- * calls the round-robin procNum for the dynamic insertion case -- ASB
+ * calls the round-robin homePe for the dynamic insertion case -- ASB
  */
 class DefaultArrayMap : public RRMap
 {
@@ -340,11 +340,11 @@ public:
     amaps[idx] = NULL;
   }
 
-  int procNum(int arrayHdl, const CkArrayIndex &i) {
+  int homePe(int arrayHdl, const CkArrayIndex &i) {
     int flati;
     if (amaps[arrayHdl]->_nelems.dimension == 0) {
       dynamicIns[arrayHdl] = true;
-      return RRMap::procNum(arrayHdl, i);
+      return RRMap::homePe(arrayHdl, i);
     }
 
     if (i.dimension == 1) {
@@ -443,10 +443,10 @@ public:
     return idx;
   }
 
-  int procNum(int arrayHdl, const CkArrayIndex &i) {
+  int homePe(int arrayHdl, const CkArrayIndex &i) {
     int flati = 0;
     if (amaps[arrayHdl]->_nelems.dimension == 0) {
-      return RRMap::procNum(arrayHdl, i);
+      return RRMap::homePe(arrayHdl, i);
     }
 
     if (i.dimension == 1) {
@@ -665,12 +665,12 @@ public:
     return idx;
   }
 
-  int procNum(int arrayHdl, const CkArrayIndex &i) {
+  int homePe(int arrayHdl, const CkArrayIndex &i) {
     int flati = 0;
     int myInt;
     int dest;
     if (amaps[arrayHdl]->_nelems.dimension == 0) {
-      return RRMap::procNum(arrayHdl, i);
+      return RRMap::homePe(arrayHdl, i);
     }
     if (i.dimension == 1) {
       flati = i.data()[0];
@@ -812,7 +812,7 @@ public:
     return idx;
   }
 
-  int procNum(int arrayHdl, const CkArrayIndex &i) {
+  int homePe(int arrayHdl, const CkArrayIndex &i) {
     int flati;
 
     if (i.dimension == 1) {
@@ -881,10 +881,10 @@ public:
 	return (hash % CkNumPes());
       }
   }
-  int procNum(int arrayHdl, const CkArrayIndex &i)
+  /*int homePe(int arrayHdl, const CkArrayIndex &i)
   {
      return CLD_ANYWHERE;   // -1
-  }
+  }*/
   void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArray *mgr)  {
         CkArrayIndex start = options.getStart();
         CkArrayIndex end = options.getEnd();
@@ -1191,7 +1191,7 @@ public:
   {
     arrs[idx].destroy();
   }
-  int procNum(int arrayHdl, const CkArrayIndex &i)
+  int homePe(int arrayHdl, const CkArrayIndex &i)
   {
     return arrs[arrayHdl]->getMap(i);
   }

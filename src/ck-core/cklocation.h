@@ -101,13 +101,14 @@ public:
   CkArrayMap(void);
   CkArrayMap(CkMigrateMessage *m): IrrGroup(m) {}
   virtual ~CkArrayMap();
+
   virtual int registerArray(const CkArrayIndex& numElements, CkArrayID aid);
   virtual void unregisterArray(int idx);
   virtual void storeCkArrayOpts(CkArrayOptions options);
+
   virtual void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArray *mgr);
-  virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
-  virtual int homePe(int arrayHdl,const CkArrayIndex &element)
-             { return procNum(arrayHdl, element); }
+  virtual int procNum(int arrayHdl,const CkArrayIndex &element) { return homePe(arrayHdl, element); }
+  virtual int homePe(int arrayHdl,const CkArrayIndex &element) = 0;
 
   virtual void pup(PUP::er &p);
 
