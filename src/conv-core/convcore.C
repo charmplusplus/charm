@@ -1663,20 +1663,20 @@ void CsdBeginIdle(void)
 #else
   CpvAccess(cmiMyPeIdle) = 1;
 #endif // CMK_SMP
+  double curWallTime = CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 #if CMK_ERROR_CHECKING
-  CpvAccess(idleBeginWalltime) = CmiWallTimer();
+  CpvAccess(idleBeginWalltime) = curWallTime;
 #endif
-  CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
 void CsdStillIdle(void)
 {
-  CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
+  double curWallTime = CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
 
 #if CMK_ERROR_CHECKING
-  if(CmiWallTimer() - CpvAccess(idleBeginWalltime) > longIdleThreshold) {
-    CcdRaiseCondition(CcdPROCESSOR_LONG_IDLE); // Invoke LONG_IDLE ccd callbacks
-    CpvAccess(idleBeginWalltime) = CmiWallTimer(); // Reset idle timer
+  if(curWallTime - CpvAccess(idleBeginWalltime) > longIdleThreshold) {
+    curWallTime = CcdRaiseCondition(CcdPROCESSOR_LONG_IDLE); // Invoke LONG_IDLE ccd callbacks
+    CpvAccess(idleBeginWalltime) = curWallTime; // Reset idle timer
   }
 #endif
 }

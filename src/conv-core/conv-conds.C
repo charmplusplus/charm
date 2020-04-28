@@ -520,12 +520,13 @@ void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double deltaT)
  * Raise a condition causing all registered callbacks corresponding to 
  * that condition to be triggered
  */
-void CcdRaiseCondition(int condnum)
+double CcdRaiseCondition(int condnum)
 {
   CmiAssert(condnum < MAXNUMCONDS);
   double curWallTime=CmiWallTimer();
   call_cblist_remove(&(CpvAccess(conds).condcb[condnum]),curWallTime);
   call_cblist_keep(&(CpvAccess(conds).condcb_keep[condnum]),curWallTime);
+  return curWallTime;
 }
 
 
