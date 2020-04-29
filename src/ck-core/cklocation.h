@@ -110,6 +110,8 @@ public:
   virtual int homePe(const CkArrayOptions& options, const CkArrayIndex& element) const = 0;
 };
 
+extern void _CkMigratable_initInfoInit(void);
+
 #include "cklocrec.h"
 
 /*********************** CkMigratable ******************************/

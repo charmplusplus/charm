@@ -61,6 +61,5 @@ static inline CkGroupID CkCreatePropMap(void)
 }
 
 extern void _propMapInit(void);
-extern void _CkMigratable_initInfoInit(void);
 
 #endif

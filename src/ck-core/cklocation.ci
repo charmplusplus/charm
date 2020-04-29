@@ -22,4 +22,6 @@ module CkLocation {
     //Load balancing:
     entry void dummyAtSync(void);
   };
+
+  initproc void _CkMigratable_initInfoInit(void);
 };

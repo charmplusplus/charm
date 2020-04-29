@@ -856,7 +856,6 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	mapID = opts.getMap();
 	map=(CkArrayMap *)CkLocalBranch(mapID);
 	if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
-	mapHandle=map->registerArray(opts.getEnd(), thisgroup);
 
         // Figure out the mapping from indices to object IDs if one is possible
         compressor = ck::FixedArrayIndexCompressor::make(bounds);
@@ -882,7 +881,6 @@ CkLocMgr::~CkLocMgr() {
   lbmgr->RemoveLocalBarrierReceiver(lbBarrierReceiver);
   lbmgr->UnregisterOM(myLBHandle);
 #endif
-  map->unregisterArray(mapHandle);
 }
 
 void CkLocMgr::pup(PUP::er &p){
