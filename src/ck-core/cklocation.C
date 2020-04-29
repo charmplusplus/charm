@@ -2513,7 +2513,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
     // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
     // is enabled, so add the group information if so.
 #if CMK_GLOBAL_LOCATION_UPDATE
-    const CmiUInt8 lbObjId = ck::ObjID(thisgroup.idx, id).getID();
+    const CmiUInt8 lbObjId = ck::ObjID(getGroupID(), id).getID();
 #else
     const CmiUInt8 lbObjId = id;
 #endif
