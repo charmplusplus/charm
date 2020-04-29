@@ -70,5 +70,29 @@ test-bench: all
 	$(call run, +p8 ./readonlyBcast 8388576)
 	$(call run, +p8 ./readonlyZCBcast 8388576)
 
+
+testp: all
+	$(call run, +p$(P) ./readonlyBcast 32)
+	$(call run, +p$(P) ./readonlyZCBcast 32)
+
+	$(call run, +p$(P) ./readonlyBcast 256)
+	$(call run, +p$(P) ./readonlyZCBcast 256)
+
+	$(call run, +p$(P) ./readonlyBcast 2048)
+	$(call run, +p$(P) ./readonlyZCBcast 2048)
+
+	$(call run, +p$(P) ./readonlyBcast 16384)
+	$(call run, +p$(P) ./readonlyZCBcast 16384)
+
+	$(call run, +p$(P) ./readonlyBcast 131072)
+	$(call run, +p$(P) ./readonlyZCBcast 131072)
+
+	$(call run, +p$(P) ./readonlyBcast 1048576)
+	$(call run, +p$(P) ./readonlyZCBcast 1048576)
+
+	$(call run, +p$(P) ./readonlyBcast 8388576)
+	$(call run, +p$(P) ./readonlyZCBcast 8388576)
+
+
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o readonlyBcast readonlyZCBcast charmrun cifiles

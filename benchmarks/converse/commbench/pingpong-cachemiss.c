@@ -136,6 +136,7 @@ static void startNextNode(EmptyMsg* msg) {
   EmptyMsg m;
   CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   CmiFree(msg);
+  CmiPrintf("[%d][%d][%d] startNextNode\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
   if ((CmiMyNode() + 1) != CmiNumNodes()) {
     CmiSetHandler(&m, pva(nbrHandler));
     CmiSyncSend(pva(nodeList)[CmiMyNode() + 1], sizeof(EmptyMsg), &m);

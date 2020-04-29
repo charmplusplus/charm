@@ -124,6 +124,7 @@ static void startNextNode(EmptyMsg* msg) {
   EmptyMsg m;
   CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   CmiFree(msg);
+  CmiPrintf("[%d][%d][%d] startNextNode\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
   if ((CmiMyPe() + 1) != CmiNumPes()) {
     CmiSetHandler(&m, pva(nbrHandler));
     CmiSyncSend(pva(nodeList)[CmiMyPe() + 1], sizeof(EmptyMsg), &m);
@@ -138,6 +139,7 @@ static void startNextNbr(EmptyMsg* msg) {
   CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   CmiFree(msg);
   pva(nextNbr)++;
+  //CmiPrintf("[%d][%d][%d] startNextNbr nextNbr = %d\n",CmiMyPe(), CmiMyNode(), CmiMyRank(), pva(nextNbr));
   if (pva(nextNbr) == CmiMyPe()) {
     CmiSetHandler(&m, pva(nbrHandler));
     CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
@@ -167,6 +169,7 @@ static void startNextSize(EmptyMsg* msg) {
 
   CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   pva(nextSize)++;
+  //CmiPrintf("[%d][%d][%d] startNextSize nextSize = %d\n",CmiMyPe(), CmiMyNode(), CmiMyRank(), pva(nextSize));
   if (pva(nextSize) == pva(numSizes)) {
     pva(nextSize) = -1;
     CmiSetHandler(&m, pva(nbrHandler));

@@ -21,3 +21,11 @@ test: all
 	$(call run, ./migrateHello +p2 10000 1 )
 	$(call run, ./migrateHello +p2 10000 4096 )
 	$(call run, ./migrateHello +p2 10000 65536 )
+
+testp: all
+	$(call run, ./migrateHello +p$(P) 10000 1 )
+	$(call run, ./migrateHello +p$(P) 10000 4096 )
+	$(call run, ./migrateHello +p$(P) 10000 65536 )
+
+bgtest: all
+	$(call run, ./migrateHello +p2 10000 +x2 +y1 +z1 )
