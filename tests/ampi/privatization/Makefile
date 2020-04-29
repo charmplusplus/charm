@@ -87,6 +87,11 @@ ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
 
+testp: $(foreach i,$(TARGETS),testp-$i)
+ifeq (,$(TARGETS))
+	@echo $(EMPTY_MESSAGE)
+endif
+
 everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$j-$i))
 test-everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i))
 
@@ -132,6 +137,14 @@ test-f90-$1: f90-$1
 	$$(call run, ./f90-$1 +p1 +vp4 )
 	$$(call run, ./f90-$1 +p2 +vp2 )
 	$$(call run, ./f90-$1 +p2 +vp4 )
+
+testp-cxx-$1: cxx-$1
+	$$(call run, ./cxx-$1 +p$(P) +vp2 )
+	$$(call run, ./cxx-$1 +p$(P) +vp4 )
+
+testp-f90-$1: f90-$1
+	$$(call run, ./f90-$1 +p$(P) +vp2 )
+	$$(call run, ./f90-$1 +p$(P) +vp4 )
 
 test-$1: $$(foreach j,$$(LANGUAGES),test-$$j-$1)
 

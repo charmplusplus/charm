@@ -23,3 +23,16 @@ test: pgm
 	$(call run, ./pgm +p2 +vp1 )
 	$(call run, ./pgm +p2 +vp4 )
 	$(call run, ./pgm +p2 +vp20 )
+
+testp: pgm
+	$(call run, ./pgm +p$(P) +vp1 )
+	$(call run, ./pgm +p$(P) +vp4 )
+	$(call run, ./pgm +p$(P) +vp20 )
+
+bgtest: pgm
+	$(call run, ./pgm +p1 +vp1 +x1 +y1 +z1 )
+	$(call run, ./pgm +p1 +vp2 +x1 +y1 +z1 )
+	$(call run, ./pgm +p1 +vp4 +x1 +y1 +z1 )
+	$(call run, ./pgm +p2 +vp2 +x2 +y1 +z1 )
+	$(call run, ./pgm +p2 +vp4 +x2 +y1 +z1 )
+	$(call run, ./pgm +p2 +vp1 +x2 +y1 +z1 )

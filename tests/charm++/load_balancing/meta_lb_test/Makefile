@@ -14,6 +14,9 @@ test: period_selection
 	$(call run, +p2 ./period_selection +balancer RotateLB +MetaLB +LBObjOnly)
 	$(call run, +p4 ./period_selection +balancer RotateLB +MetaLB +LBObjOnly)
 
+testp: period_selection
+	$(call run, +p$(P) ./period_selection +balancer RotateLB +MetaLB +LBObjOnly)
+
 smptest: period_selection
 	$(call run, +p2 ./period_selection +balancer RotateLB +MetaLB +LBObjOnly ++ppn 2)
 	$(call run, +p4 ./period_selection +balancer RotateLB +MetaLB +LBObjOnly ++ppn 2)

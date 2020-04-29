@@ -12,6 +12,9 @@ intercomm_coll.o: intercomm_coll.C
 test: intercomm_coll
 	$(call run, ./intercomm_coll +p1 +vp4)
 #	$(call run, ./intercomm_coll +p2 +vp4)
+#
+testp: intercomm_coll
+	$(call run, ./intercomm_coll +p$(P) +vp4)
 
 clean:
 	rm -f *.o *.mod intercomm_coll *~ conv-host charmrun intercomm_coll.o charmrun.exe intercomm_coll.exe intercomm_coll.pdb intercomm_coll.ilk ampirun

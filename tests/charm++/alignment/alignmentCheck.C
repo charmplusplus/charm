@@ -1,3 +1,4 @@
+// Creates a chare on the last pe and checks alignments
 #include "converse.h"
 #include "envelope.h"
 #include <algorithm>
@@ -114,6 +115,10 @@ private:
   std::vector<TestMessage *> allMsgs;
 
 public:
+
+  Destination() {
+    CmiPrintf("[%d][%d][%d] constructor invoked\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+  }
 
   void receiveMessage(TestMessage *msg) {
     allMsgs.push_back(msg);

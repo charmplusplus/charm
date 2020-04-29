@@ -28,10 +28,10 @@ test: all
 	$(call run, +p$(PROC) ./bombard 1 $(ARRSIZE) $(COUNT))
 	$(call run, +p$(PROC) ./bombard 2 $(ARRSIZE) $(COUNT))
 
-smptest: all
-	$(call run, +p$(PROC) ./bombard 0 $(ARRSIZE) $(COUNT) ++ppn 1)
-	$(call run, +p$(PROC) ./bombard 1 $(ARRSIZE) $(COUNT) ++ppn 1)
-	$(call run, +p$(PROC) ./bombard 2 $(ARRSIZE) $(COUNT) ++ppn 1)
-	$(call run, +p$(PROC) ./bombard 0 $(ARRSIZE) $(COUNT) ++ppn 2)
-	$(call run, +p$(PROC) ./bombard 1 $(ARRSIZE) $(COUNT) ++ppn 2)
-	$(call run, +p$(PROC) ./bombard 2 $(ARRSIZE) $(COUNT) ++ppn 2)
+testp: all
+	$(call run, +p$(P) ./bombard 0 0 10)
+	$(call run, +p$(P) ./bombard 1 0 10)
+	$(call run, +p$(P) ./bombard 2 0 10)
+	$(call run, +p$(P) ./bombard 0 1000 10)
+	$(call run, +p$(P) ./bombard 1 1000 10)
+	$(call run, +p$(P) ./bombard 2 1000 10)
