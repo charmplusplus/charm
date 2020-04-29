@@ -69,7 +69,7 @@ void _receiveTrackingAck(trackingAckMsg *ackMsg) {
 }
 
 void doneAllStats(char *msg) {
-  CmiPrintf("[%d][%d][%d] =============== Message tracking - All stats done, broadcast to everytone to print stats ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
+  CmiPrintf("[%d][%d][%d] =============== Message tracking - All stats done, broadcast to everyone to print stats ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
   char *bcastMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
   CmiSetHandler(bcastMsg, CpvAccess(printStatsHandler));
   CMI_UNIQ_MSG_ID(bcastMsg) = -11;
