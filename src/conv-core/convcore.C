@@ -1707,7 +1707,7 @@ void CmiHandleMessage(void *msg)
 #if CMK_ERROR_CHECKING
   // Do not send an ack for an ack message
   // Also, do not send an ack for already processed messages
-  if(trackMessages && CmiGetHandler(msg) != CpvAccess(msgTrackHandler) && CMI_UNIQ_MSG_ID(msg) != -10) {
+  if(trackMessages && CmiGetHandler(msg) != CpvAccess(msgTrackHandler) && CMI_UNIQ_MSG_ID(msg) > -10) {
 #if CMI_QD
     CpvAccess(cQdState)->mCreated++;
 #endif
