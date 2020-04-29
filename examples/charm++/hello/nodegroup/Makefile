@@ -18,4 +18,10 @@ hello.o: hello.C hello.decl.h
 	$(CHARMC) -c hello.C
 
 test: all
-	$(call run, ./hello +p4 10 )
+	$(call run, ./hello +p4 )
+
+testp: all
+	$(call run, ./hello +p$(P) )
+
+bgtest: all
+	$(call run, ./hello +p4 10 +x2 +y2 +z2 )

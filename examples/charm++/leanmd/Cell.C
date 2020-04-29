@@ -118,6 +118,9 @@ void Cell::createComputes() {
 void Cell::sendPositions() {
   int len = particles.length();
 
+  if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
+    CmiPrintf("[%d][%d][%d] Cell::sendPositions Step Count=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), stepCount);
+
   //create the particle and control message to be sent to computes
   ParticleDataMsg* msg = new (len) ParticleDataMsg;
   msg->x = thisIndex.x;

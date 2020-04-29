@@ -19,3 +19,9 @@ hello.o: hello.C hello.decl.h
 
 test: all
 	$(call run, ./hello +p4 )
+
+testp: all
+	$(call run, ./hello +p$(P) )
+
+bgtest: all
+	$(call run, ./hello +p4 +x2 +y2 +z2 )
