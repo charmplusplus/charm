@@ -842,11 +842,10 @@ void CkLocMgr::flushAllRecs(void)
 
 
 /*************************** LocMgr: CREATION *****************************/
+// TODO: No longer need to save options AND bounds
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
-	:idCounter(1), thisProxy(thisgroup),
-  thislocalproxy(thisgroup,CkMyPe())
-        , bounds(opts.getBounds())
-{
+    : idCounter(1), thisProxy(thisgroup), thislocalproxy(thisgroup,CkMyPe()),
+      bounds(opts.getBounds()), options(opts) {
 	DEBC((AA "Creating new location manager %d\n" AB,thisgroup));
 // moved to _CkMigratable_initInfoInit()
 //	CkpvInitialize(CkMigratable_initInfo,mig_initInfo);

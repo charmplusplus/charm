@@ -7,6 +7,10 @@
 //whether to use block mapping in the SMP node level
 bool useNodeBlkMapping;
 
+// Group IDs for default maps
+CkGroupID _defaultArrayMapID;
+CkGroupID _fastArrayMapID;
+
 /*********************** Array Map ******************
 Given an array element index, an array map tells us
 the index's "home" Pe.  This is the Pe the element will
@@ -41,12 +45,87 @@ be forwarded by default.
 #   define DEBAD(x) /*CkPrintf x*/
 #endif
 
-CkArrayMap::CkArrayMap(void) { }
-CkArrayMap::~CkArrayMap() { }
-int CkArrayMap::registerArray(const CkArrayIndex& numElements, CkArrayID aid)
-{return 0;}
-void CkArrayMap::unregisterArray(int idx)
-{ }
+CkArrayMap::CkArrayMap() {}
+CkArrayMap::~CkArrayMap() {}
+
+int CkArrayMap::flattenIndex(const CkArrayOptions& options, const CkArrayIndex& idx) const {
+  if (idx.dimension == 1) {
+    return idx.data()[0];
+  } else if (options.getBounds().dimension == 0) {
+    return (idx.hash() + 739) % 1280107;
+  }
+
+  CkAssert(idx.dimension == options.getBounds().dimension);
+
+  int flat = idx.data()[0];
+  const CkArrayIndex& bounds = options.getBounds();
+  if (idx.dimension <= 3) {
+    for (int d = 1; d < idx.dimension - 1; d++) {
+      flat = flat * bounds.data()[d] + idx.data()[d];
+    }
+  } else {
+    for (int d = 1; d < idx.dimension - 1; d++) {
+      flat = flat * ((short int*)bounds.data())[d] + ((short int*)idx.data())[d];
+    }
+  }
+
+  return flat;
+}
+
+void CkArrayMap::populateInitial(const CkArrayOptions& options, void* ctorMsg, CkArray* mgr) const {
+  CkArrayIndex start = options.getStart();
+  CkArrayIndex end = options.getEnd();
+  CkArrayIndex step = options.getStep();
+
+  // TODO: Check against bounds
+  // TODO: Make sure to not insert if end is <= start
+  if (end.nInts == 0 || start == end) {
+    mgr->doneInserting();
+    CkFreeMsg(ctorMsg);
+    return;
+  }
+
+  if (start.dimension <= 3) {
+    CkArrayIndex i = start;
+    bool done = false;
+    while (!done) {
+      if (CMK_RANK_0(homePe(i)) == CkMyPe()) {
+        mgr->insertInitial(i, CkCopyMsg(&ctorMsg));
+      }
+      for (int d = start.dimension - 1; d >= 0; d--) {
+        i.data()[d] += step.data()[d];
+        if (i.data()[d] < end.data()[d]) {
+          break;
+        } else if (d > 0) {
+          i.data()[d] = start.data()[d];
+        } else {
+          done = true;
+        }
+      }
+    }
+  } else {
+    CkArrayIndex i = start;
+    bool done = false;
+    while (!done) {
+      if (CMK_RANK_0(homePe(i)) == CkMyPe()) {
+        mgr->insertInitial(i, CkCopyMsg(&ctorMsg));
+      }
+      for (int d = start.dimension - 1; d >= 0; d--) {
+        ((short int*)i.data())[d] += ((short int*)step.data())[d];
+        if (((short int*)i.data())[d] < ((short int*)end.data())[d]) {
+          break;
+        } else if (d > 0) {
+          ((short int*)i.data())[d] = ((short int*)start.data())[d];
+        } else {
+          done = true;
+        }
+      }
+    }
+  }
+
+  mgr->doneInserting();
+  CkFreeMsg(ctorMsg);
+}
 
 #define CKARRAYMAP_POPULATE_INITIAL(POPULATE_CONDITION) \
 int i; \
@@ -115,39 +194,6 @@ for (index[0] = start_data[0]; index[0] < end_data[0]; index[0] += step_data[0])
     } \
   } \
 }
-
-void CkArrayMap::populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArray *mgr)
-{
-  CkArrayIndex start = options.getStart();
-  CkArrayIndex end = options.getEnd();
-  CkArrayIndex step = options.getStep();
-	if (end.nInts==0) {
-          CkFreeMsg(ctorMsg);
-          return;
-        }
-	int thisPe=CkMyPe();
-        /* The CkArrayIndex is supposed to have at most 3 dimensions, which
-           means that all the fields are ints, and numElements.nInts represents
-           how many of them are used */
-        CKARRAYMAP_POPULATE_INITIAL(CMK_RANK_0(homePe(arrayHdl,idx))==thisPe);
-
-
-	mgr->doneInserting();
-	CkFreeMsg(ctorMsg);
-}
-
-void CkArrayMap::storeCkArrayOpts(CkArrayOptions options) {
-//options will not be used on demand_creation arrays
-  storeOpts = options;
-}
-
-void CkArrayMap::pup(PUP::er &p) {
-  p|storeOpts;
-  p|dynamicIns;
-}
-
-CkGroupID _defaultArrayMapID;
-CkGroupID _fastArrayMapID;
 
 class RRMap : public CkArrayMap
 {

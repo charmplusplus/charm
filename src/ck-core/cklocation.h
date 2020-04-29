@@ -95,25 +95,19 @@ public:
 /** The "map" is used by the array manager to map an array index to 
  * a home processor number.
  */
-class CkArrayMap : public IrrGroup // : public CkGroupReadyCallback
-{
+class CkArrayMap : public IrrGroup {
+protected:
+  int flattenIndex(const CkArrayOptions& options, const CkArrayIndex& idx) const;
+
 public:
-  CkArrayMap(void);
-  CkArrayMap(CkMigrateMessage *m): IrrGroup(m) {}
+  CkArrayMap();
+  CkArrayMap(CkMigrateMessage *m) : IrrGroup(m) {}
   virtual ~CkArrayMap();
 
-  virtual int registerArray(const CkArrayIndex& numElements, CkArrayID aid);
-  virtual void unregisterArray(int idx);
-  virtual void storeCkArrayOpts(CkArrayOptions options);
-
-  virtual void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArray *mgr);
-  virtual int procNum(int arrayHdl,const CkArrayIndex &element) { return homePe(arrayHdl, element); }
-  virtual int homePe(int arrayHdl,const CkArrayIndex &element) = 0;
-
-  virtual void pup(PUP::er &p);
-
-  CkArrayOptions storeOpts;
-  std::unordered_map<int, bool> dynamicIns;
+  virtual void populateInitial(const CkArrayOptions& options, void* ctorMsg, CkArray* mgr) const;
+  virtual int procNum(const CkArrayOptions& options, const CkArrayIndex& element) const
+      { return homePe(options, element); }
+  virtual int homePe(const CkArrayOptions& options, const CkArrayIndex& element) const = 0;
 };
 
 #include "cklocrec.h"
@@ -244,14 +238,14 @@ typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
 
 //Interface used by external users:
 	/// Home mapping
-	inline int homePe(const CkArrayIndex &idx) const {return CMK_RANK_0(map->homePe(mapHandle,idx));}
+	inline int homePe(const CkArrayIndex &idx) const {return CMK_RANK_0(map->homePe(options,idx));}
         inline int homePe(const CmiUInt8 id) const {
           if (compressor)
             return CMK_RANK_0(homePe(compressor->decompress(id)));
 
           return CMK_RANK_0(id >> 24);
         }
-	inline int procNum(const CkArrayIndex &idx) const {return CMK_RANK_0(map->procNum(mapHandle,idx));}
+	inline int procNum(const CkArrayIndex &idx) const {return CMK_RANK_0(map->procNum(options,idx));}
 	inline bool isHome (const CkArrayIndex &idx) const {return (bool)(homePe(idx)==CkMyPe());}
   int whichPE(const CkArrayIndex &idx) const;
   int whichPE(const CmiUInt8 id) const;
@@ -329,10 +323,9 @@ typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
         void deleteManager(CkArrayID aid, CkArray *mgr);
 
 	/// Populate this array with initial elements and store CkArrayOptions to the underlying map
-	void populateInitial(CkArrayOptions& options,void *initMsg,CkArray *mgr)
+	void populateInitial(CkArrayOptions& opts,void *initMsg,CkArray *mgr)
     {
-      map->storeCkArrayOpts(options);
-      map->populateInitial(mapHandle,options,initMsg,mgr);
+      map->populateInitial(opts,initMsg,mgr);
     }
 
 	/// Add a new local array element, calling element's constructor
@@ -485,6 +478,11 @@ public:
 private:
 	/// The core of the location manager: map array index to element representative
 	LocRecHash hash;
+
+	/// The master set of array options used arrays managed by this location manager
+	/// Any other arrays that are binded together must use CkArrayOptions that are
+	/// compatible with these (same map, same bounds, etc).
+	CkArrayOptions options;
 
 	//Map object
 	CkGroupID mapID;
