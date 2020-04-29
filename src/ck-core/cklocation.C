@@ -88,7 +88,8 @@ void UpdateLocation(MigrateInfo& migData) {
   }
 
   CkLocMgr *localLocMgr = (CkLocMgr *) CkLocalBranch(locMgrGid);
-  localLocMgr->updateLocation(migData.obj.id, migData.to_pe);
+  // CkLocMgr only uses element IDs, so extract just that part from the ObjID
+  localLocMgr->updateLocation(ck::ObjID(migData.obj.id).getElementID(), migData.to_pe);
 }
 #endif
 
@@ -2509,13 +2510,15 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
 #if CMK_LBDB_ON
   if ((idx || compressor) && type==CkDeliver_queue && !(opts & CK_MSG_LB_NOTRACE) && lbmgr->CollectingCommStats())
   {
+    // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
+    // is enabled, so add the group information if so.
 #if CMK_GLOBAL_LOCATION_UPDATE
-    CmiUInt8 locMgrGid = thisgroup.idx;
-    id = ck::ObjID(id).getElementID();
-    id |= locMgrGid << ck::ObjID().ELEMENT_BITS;
+    const CmiUInt8 lbObjId = ck::ObjID(thisgroup.idx, id).getID();
+#else
+    const CmiUInt8 lbObjId = id;
 #endif
     lbmgr->Send(myLBHandle
-                   , id
+                   , lbObjId
                    , UsrToEnv(msg)->getTotalsize()
                    , lastKnown(id)
                    , 1);
