@@ -1800,9 +1800,7 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
 	if(_lb_args.metaLbOn())
 	  the_metalb=mgr->getMetaBalancer();
 #if CMK_GLOBAL_LOCATION_UPDATE
-	CmiUInt8 locMgrGid = mgr->getGroupID().idx;
-	id_ = ck::ObjID(id_).getElementID();
-	id_ |= locMgrGid << ck::ObjID().ELEMENT_BITS;
+	id_ = ck::ObjID(mgr->getGroupID(), id_).getID();
 #endif        
 	ldHandle=lbmgr->RegisterObj(mgr->getOMHandle(),
 		id_, (void *)this,1);
