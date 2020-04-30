@@ -92,11 +92,6 @@ module CkIO_impl {
           entry void forwardData(const char data[bytes], size_t bytes, size_t offset);
           entry void syncData();
         };
-
-        group Map : CkArrayMap
-        {
-          entry Map();
-        };
       }
     }
   }

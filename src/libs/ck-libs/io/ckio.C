@@ -388,15 +388,6 @@ namespace Ck { namespace IO {
           myBytesWritten += l;
         }
       };
-
-      class Map : public CBase_Map {
-      public:
-        Map() {}
-
-        int homePe(const CkArrayOptions& opts, const CkArrayIndex &element) const {
-          return 0;
-        }
-      };
     }
 
     void open(string name, CkCallback opened, Options opts) {

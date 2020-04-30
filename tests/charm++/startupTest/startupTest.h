@@ -375,7 +375,7 @@ class OneMap: public CkArrayMap {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-  int procNum(int, const CkArrayIndex &);
+  int homePe(const CkArrayOptions&, const CkArrayIndex&) const;
 };
 
 class TwoMap: public CkArrayMap { 
@@ -386,7 +386,7 @@ class TwoMap: public CkArrayMap {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-    int procNum(int, const CkArrayIndex &);
+    int homePe(const CkArrayOptions&, const CkArrayIndex&) const;
 };
 
 class ThreeMap: public CkArrayMap { 
@@ -397,7 +397,7 @@ class ThreeMap: public CkArrayMap {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-    int procNum(int, const CkArrayIndex &);
+    int homePe(const CkArrayOptions&, const CkArrayIndex&) const;
 };
 
 class FourMap: public CkArrayMap { 
@@ -408,7 +408,7 @@ class FourMap: public CkArrayMap {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-    int procNum(int, const CkArrayIndex &);
+    int homePe(const CkArrayOptions&, const CkArrayIndex&) const;
 };
 
 class FiveMap: public CkArrayMap { 
@@ -419,7 +419,7 @@ class FiveMap: public CkArrayMap {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-    int procNum(int, const CkArrayIndex &);
+    int homePe(const CkArrayOptions&, const CkArrayIndex&) const;
 };
 
 
@@ -431,5 +431,5 @@ class SixMap: public CkArrayMap {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-  int procNum(int, const CkArrayIndex &);
+  int homePe(const CkArrayOptions&, const CkArrayIndex&) const;
 };
