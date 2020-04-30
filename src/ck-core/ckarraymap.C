@@ -167,7 +167,7 @@ protected:
     }
     // TODO: What do do in cases of shrink/expand, chkpt/restart etc, where
     // numPEs may change?
-    *blockSize = *totalChares / CkNumPes();
+    *blockSize = std::max(*totalChares / CkNumPes(), 1);
     *remainder = *totalChares % CkNumPes();
     *firstSet = *remainder * (*blockSize + 1);
   }
