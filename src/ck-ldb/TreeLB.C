@@ -7,11 +7,6 @@ extern int quietModeRequested;
 
 CreateLBFunc_Def(TreeLB, "TreeLB")
 
-void TreeLB::staticObjMovedIn(void* data, LDObjHandle h, bool waitBarrier)
-{
-  //  ((TreeLB*)data)->objMovedIn(h, waitBarrier);
-}
-
 void TreeLB::Migrated(int waitBarrier)
 {
   bool barrier = false;
