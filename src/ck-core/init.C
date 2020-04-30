@@ -74,6 +74,7 @@ never be excluded...
 #include "spanningTree.h"
 #if CMK_CHARM4PY
 #include "TreeLB.h"
+#include "cmitrackmessages.h"
 #endif
 
 #if CMK_CUDA
@@ -1395,7 +1396,10 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
 
 		CmiSetNcpyAckSize(sizeof(CkCallback));
+
+#if CMK_ERROR_CHECKING
 		if(trackMessages) CmiMessageTrackerCharmInit(CmiGetEpIdx);
+#endif
 	}
 
 
