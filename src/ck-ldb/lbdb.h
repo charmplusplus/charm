@@ -275,8 +275,6 @@ typedef struct {
 /*
  * Calls from load balancer to load database
  */  
-typedef void (*LDMigratedFn)(void* data, LDObjHandle handle, int waitBarrier);
-
 typedef void (*LDMigrationDoneFn)(void *user_ptr);
 
 typedef void (*LDPredictFn)(void* user_ptr);

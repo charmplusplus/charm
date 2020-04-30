@@ -18,12 +18,6 @@ friend class LBManager;
     LBObjEntry(LBObj* obj, LDObjIndex nextEmpty = DEFAULT_NEXT) : obj(obj), nextEmpty(nextEmpty) {}
   };
 
-  struct MigrateCB {
-    LDMigratedFn fn;
-    void* data;
-    int on;
-  };
-
   struct MigrationDoneCB {
     LDMigrationDoneFn fn;
     void* data;

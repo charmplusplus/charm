@@ -250,13 +250,6 @@ class DefaultFunction : public LBPredictorFunction
 class LBManager : public CBase_LBManager
 {
  private:
-  struct MigrateCB
-  {
-    LDMigratedFn fn;
-    void* data;
-    int on;
-  };
-
   struct StartLBCB
   {
     std::function<void()> fn;
@@ -415,7 +408,6 @@ class LBManager : public CBase_LBManager
   int useMem()
   {
     int size = sizeof(LBManager);
-    size += migrateCBList.size() * sizeof(MigrateCB);
     size += startLBFnList.size() * sizeof(StartLBCB);
     size += migrationDoneCBList.size() * sizeof(MigrationDoneCB);
     size += lbdb_obj->useMem();
@@ -567,7 +559,6 @@ class LBManager : public CBase_LBManager
   int nloadbalancers;
   CkVec<BaseLB*> loadbalancers;
 
-  std::vector<MigrateCB*> migrateCBList;
   std::vector<StartLBCB*> startLBFnList;
   std::vector<MigrationDoneCB*> migrationDoneCBList;
 
