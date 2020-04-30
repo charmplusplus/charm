@@ -55,11 +55,13 @@ public:
 \brief Migratable Chare Arrays: Implementation classes.
 */
 /*@{*/
+#if 0
 static inline CkGroupID CkCreatePropMap(void)
 {
   return CProxy_PropMap::ckNew();
 }
 
 extern void _propMapInit(void);
+#endif
 
 #endif

@@ -391,10 +391,9 @@ namespace Ck { namespace IO {
 
       class Map : public CBase_Map {
       public:
-        Map()
-          { }
+        Map() {}
 
-        int procNum(int arrayHdl, const CkArrayIndex &element) {
+        int homePe(const CkArrayOptions& opts, const CkArrayIndex &element) const {
           return 0;
         }
       };

@@ -18,6 +18,7 @@ module CkArrayMap {
     entry FastArrayMap(void);
   };
 
+#if 0
   group [migratable] HilbertArrayMap : DefaultArrayMap {
     entry HilbertArrayMap(void);
   };
@@ -45,6 +46,7 @@ module CkArrayMap {
   group [migratable] PropMap : CkArrayMap {
     entry PropMap(void);
   };
+#endif
 
   mainchare CkMapsInit {
     entry CkMapsInit(CkArgMsg *m);
