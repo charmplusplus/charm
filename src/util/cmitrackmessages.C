@@ -78,6 +78,7 @@ void doneAllStats(char *msg) {
 
 void *reductionMergeFn(int *size, void *data, void **remote, int count) {
   CmiPrintf("[%d][%d][%d] =============== Message tracking - REDUCTION ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
+  return data;
 }
 
 void printStats(char *msg) {
