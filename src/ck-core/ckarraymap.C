@@ -933,6 +933,8 @@ public:
   }
 };
 
+#endif
+
 class CkMapsInit : public Chare
 {
 public:
