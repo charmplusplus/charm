@@ -64,6 +64,7 @@ class Chare : public TEntity {
 
   int entryCount;
   int hasSdagEntry;
+  int hasWhenIdleEntry;
 
   void genTypedefs(XStr& str);
   void genRegisterMethodDef(XStr& str);
@@ -105,6 +106,8 @@ class Chare : public TEntity {
   int isForSection(void) const { return forElement == forSection; }
   int hasSdag() const { return hasSdagEntry; }
   void setSdag(int f) { hasSdagEntry = f; }
+  int hasWhenIdle() const { return hasWhenIdleEntry; }
+  void setWhenIdle(int f) { hasWhenIdleEntry = f; }
   forWhom getForWhom(void) const { return forElement; }
   void print(XStr& str);
   void check();

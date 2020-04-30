@@ -123,6 +123,20 @@ void Entry::check() {
           "'aggregate' entry methods can only be used in regular groups and chare arrays",
           first_line_);
   }
+
+  if (isWhenIdle()) {
+    if (!retType || strcmp(retType->getBaseName(), "bool")) {
+      XLAT_ERROR_NOCOL(
+        "whenidle functions must return 'bool'",
+        first_line_);
+    }
+
+    if (!param || param->next || strcmp(param->param->getType()->getBaseName(), "double")) {
+      XLAT_ERROR_NOCOL(
+        "whenidle functions must accept a single parameter of type 'double'",
+        first_line_);
+    }
+  }
 }
 
 void Entry::lookforCEntry(CEntry* centry) {
@@ -177,6 +191,9 @@ Entry::Entry(int l, Attribute* a, Type* r, const char* n, ParamList* p, Value* s
     }
     plist = plist->next;
   }
+  if (getAttribute(SWHENIDLE)) {
+    addAttribute(SLOCAL);
+  }
 }
 
 void Entry::setChare(Chare* c) {
@@ -219,6 +236,10 @@ void Entry::setChare(Chare* c) {
          ++i) {
       container->lookforCEntry(*i);
     }
+  }
+
+  if (isWhenIdle()) {
+    container->setWhenIdle(1);
   }
 }
 
@@ -867,10 +888,10 @@ void Entry::genGroupDefs(XStr& str) {
              "  // if there is a running obj being measured, stop it temporarily\n"
              "  LDObjHandle objHandle;\n"
              "  int objstopped = 0;\n"
-             "  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);\n"
-             "  if (the_lbdb->RunningObject(&objHandle)) {\n"
+             "  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);\n"
+             "  if (the_lbmgr->RunningObject(&objHandle)) {\n"
              "    objstopped = 1;\n"
-             "    the_lbdb->ObjectStop(objHandle);\n"
+             "    the_lbmgr->ObjectStop(objHandle);\n"
              "  }\n"
              "#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
@@ -886,7 +907,7 @@ void Entry::genGroupDefs(XStr& str) {
           << ");\n"
              "#endif\n";
       str << "#if CMK_LBDB_ON\n"
-             "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
+             "  if (objstopped) the_lbmgr->ObjectStart(objHandle);\n"
              "#endif\n";
       if (isAppWork()) str << " _TRACE_END_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
@@ -1466,8 +1487,13 @@ void Entry::genIndexDecls(XStr& str) {
   }
 
   // call function declaration
-  str << templateSpecLine << "\n    static void _call_" << epStr()
-      << "(void* impl_msg, void* impl_obj);";
+  if (!isWhenIdle()) {
+    str << templateSpecLine << "\n    static void _call_" << epStr()
+        << "(void* impl_msg, void* impl_obj);";
+  } else {
+    str << templateSpecLine << "\n    static void _call_" << epStr()
+        << "(void* impl_obj, double time);";
+  }
   str << templateSpecLine << "\n    static void _call_sdag_" << epStr()
       << "(void* impl_msg, void* impl_obj);";
   if (isThreaded()) {
@@ -2173,9 +2199,15 @@ void Entry::genDefs(XStr& str) {
   }
 
   // Generate the call-method body
-  str << makeDecl("void") << "::_call_" << epStr()
-      << "(void* impl_msg, void* impl_obj_void)\n";
-  str << "{\n";
+  if (isWhenIdle()) {
+    str << makeDecl("void") << "::_call_" << epStr()
+        << "(void* impl_obj_void, double time)\n";
+    str << "{\n";
+  } else {
+    str << makeDecl("void") << "::_call_" << epStr()
+        << "(void* impl_msg, void* impl_obj_void)\n";
+    str << "{\n";
+  }
   // Do not create impl_obj for migration constructor as compiler throws an unused
   // variable warning otherwise
   if (!isMigrationConstructor()) {
@@ -2198,6 +2230,9 @@ void Entry::genDefs(XStr& str) {
     param->endUnmarshall(str);
     str << postCall;
     if (isThreaded() && param->isMarshalled()) str << "  delete impl_msg_typed;\n";
+  } else if (isWhenIdle()) {
+    str << "  bool res = impl_obj->" << name << "(time);\n";
+    str << "  if (res) CkCallWhenIdle(idx_" << epStr() << "(), impl_obj);\n";
   } else {
     str << "  CkAbort(\"This method should never be called as it refers to a LOCAL entry "
            "method!\");\n";
@@ -2288,8 +2323,8 @@ XStr Entry::genRegEp(bool isForRedn) {
     str << "redn_wrapper_" << name << "(CkReductionMsg *impl_msg)\",\n";
   else
     str << name << "(" << paramType(0) << ")\",\n";
-  str << "      _call_" << epStr(isForRedn, true);
-  str << ", ";
+  str << "      reinterpret_cast<CkCallFnPtr>(_call_" << epStr(isForRedn, true);
+  str << "), ";
   /* messageIdx: */
   if (param->isMarshalled()) {
     if (param->hasConditional())
@@ -2450,7 +2485,9 @@ void Entry::setAccelCallbackName(XStr* acbn) { accelCallbackName = acbn; }
 int Entry::isThreaded(void) { return (hasAttribute(STHREADED)); }
 int Entry::isSync(void) { return (hasAttribute(SSYNC)); }
 int Entry::isIget(void) { return (hasAttribute(SIGET)); }
-int Entry::isConstructor(void) { return !strcmp(name, container->baseName(0).get_string());}
+int Entry::isConstructor(void) {
+  return !strcmp(name, container->baseName(0).get_string());
+}
 bool Entry::isMigrationConstructor() { return isConstructor() && (hasAttribute(SMIGRATE)); }
 int Entry::isExclusive(void) { return (hasAttribute(SLOCKED)); }
 int Entry::isImmediate(void) { return (hasAttribute(SIMMEDIATE)); }
@@ -2466,6 +2503,7 @@ int Entry::isAppWork(void) { return (hasAttribute(SAPPWORK)); }
 int Entry::isNoKeep(void) { return (hasAttribute(SNOKEEP)); }
 int Entry::isSdag(void) { return (sdagCon!=0); }
 bool Entry::isTramTarget(void) { return (hasAttribute(SAGGREGATE)) != 0; }
+int Entry::isWhenIdle(void) { return hasAttribute(SWHENIDLE); }
 
 // DMK - Accel support
 int Entry::isAccel(void) { return (hasAttribute(SACCEL)); }

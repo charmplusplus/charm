@@ -938,7 +938,7 @@ static void ampiNodeInit() noexcept
   int funclength = sizeof(funclist)/sizeof(char*);
   for (int i=0; i<funclength; i++) {
     int event_id = traceRegisterUserEvent(funclist[i], -1);
-    CsvAccess(tcharm_funcmap)->insert(std::pair<std::string, int>(funclist[i], event_id));
+    CsvAccess(tcharm_funcmap)->emplace(funclist[i], event_id);
   }
 
   // rename chare & function to something reasonable
@@ -1724,9 +1724,9 @@ bool ampiParent::getBuiltinAttribute(int keyval, void *attribute_val) noexcept {
     if (keyval == MPI_WIN_BASE)
       *((void**)attribute_val) = *win_base_storage;
     else if (keyval == MPI_WIN_SIZE)
-      *(MPI_Aint**)attribute_val = win_size_storage;
+      *(MPI_Aint *)attribute_val = *win_size_storage;
     else
-      *(int **)attribute_val = kv_builtin_storage;
+      *(int *)attribute_val = *kv_builtin_storage;
     return true;
   } else {
     switch(keyval) {

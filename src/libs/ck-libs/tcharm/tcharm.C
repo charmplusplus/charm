@@ -222,12 +222,6 @@ void checkPupMismatch(PUP::er &p,int expected,const char *where)
 }
 
 void TCharm::pup(PUP::er &p) {
-  //BIGSIM_OOC DEBUGGING
-  //if(!p.isUnpacking()){
-  //  CmiPrintf("TCharm[%d] packing: ", thisIndex);
-  //  CthPrintThdStack(tid);
-  //}
-
   checkPupMismatch(p,5134,"before TCHARM");
   p(isStopped); p(exitWhenDone); p(isSelfDone); p(asyncMigrate);
   p(threadInfo.thisElement);
@@ -302,13 +296,6 @@ void TCharm::pup(PUP::er &p) {
   
   s.endBlock(); //End of seeking block
   checkPupMismatch(p,5140,"after TCHARM");
-  
-  //BIGSIM_OOC DEBUGGING
-  //if(p.isUnpacking()){
-  //  CmiPrintf("TCharm[%d] unpacking: ", thisIndex);
-  //  CthPrintThdStack(tid);
-  //}
-
 }
 
 // Pup our thread and related data
@@ -357,10 +344,7 @@ void TCharm::UserData::pup(PUP::er &p)
 
 TCharm::~TCharm()
 {
-  //BIGSIM_OOC DEBUGGING
-
   CthFree(tid);
-
   delete initMsg;
 }
 

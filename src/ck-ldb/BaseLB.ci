@@ -1,6 +1,6 @@
 module BaseLB {
 
-extern module LBDatabase;
+extern module LBManager;
 
 message LBMigrateMsg {
   MigrateInfo moves[];

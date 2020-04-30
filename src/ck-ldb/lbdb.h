@@ -19,7 +19,7 @@
 #include <inttypes.h>
 #include <list>
 
-class LBDatabase;//Forward declaration
+class LBManager;//Forward declaration
 
 //typedef float floatType;
 // type defined by build option
@@ -256,15 +256,6 @@ typedef struct _LDCommData {
 } LDCommData;
 
 /*
- * Requests to load balancer
- *   FIXME: these routines don't seem to exist anywhere-- are they obsolete?
- *   Are the official versions now in LBDatabase.h?
- */
-void LBBalance(void *param);
-void LBCollectStatsOn(void);
-void LBCollectStatsOff(void);
-
-/*
  * Callbacks from database to object managers
  */
 typedef void (*LDMigrateFn)(LDObjHandle handle, int dest);
@@ -297,24 +288,11 @@ typedef void (*LDPredictWindowFn)(void* user_ptr, void* model, int wind);
 /*
  * Local Barrier calls
  */
-typedef void (*LDBarrierFn)(void *user_ptr);
-typedef void (*LDResumeFn)(void *user_ptr);
+class LBClient;
+typedef std::list<LBClient *>::iterator LDBarrierClient;
 
-class client;
-struct LDBarrierClient {
-  std::list<client *>::iterator i;
-  LDBarrierClient() { }
-  LDBarrierClient(std::list<client *>::iterator in)
-  : i(in) { }
-};
-
-class receiver;
-struct LDBarrierReceiver {
-  std::list<receiver *>::iterator i;
-  LDBarrierReceiver() { }
-  LDBarrierReceiver(std::list<receiver *>::iterator in)
-  : i(in) { }
-};
+class LBReceiver;
+typedef std::list<LBReceiver *>::iterator LDBarrierReceiver;
 
 /*
  *  LBDB Configuration calls

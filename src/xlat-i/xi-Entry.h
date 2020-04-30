@@ -116,6 +116,7 @@ class WhenStatementEChecker;
 #define SREDUCE 0x40000   // <- reduction target
 #define SAPPWORK 0x80000  // <- reduction target
 #define SAGGREGATE 0x100000
+#define SWHENIDLE (0x200000) // implies SLOCAL as well
 
 /* An entry construct */
 class Entry : public Member {
@@ -299,6 +300,7 @@ class Entry : public Member {
   int isNoKeep(void);
   int isSdag(void);
   bool isTramTarget(void);
+  int isWhenIdle(void);
 
   // DMK - Accel support
   int isAccel(void);

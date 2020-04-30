@@ -9,7 +9,6 @@
 
 //#define DEBUG  1
 #include "PathHistory.decl.h"
-#include "LBDatabase.h"
 #include "pathHistory.h"
 #include <register.h> 
 
