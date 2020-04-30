@@ -59,12 +59,6 @@ void CreateCentralLB()
 }
 */
 
-void CentralLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
-{
-  CentralLB *me = (CentralLB*)(data);
-  me->Migrated(waitBarrier);
-}
-
 void CentralLB::initLB(const CkLBOptions &opt)
 {
 #if CMK_LBDB_ON

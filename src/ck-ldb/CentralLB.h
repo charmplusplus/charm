@@ -140,7 +140,6 @@ public:
   inline void StartLB() { thisProxy.ProcessAtSync(); }
 
   // Migrated-element callback
-  static void staticMigrated(void* me, LDObjHandle h, int waitBarrier=1);
   void Migrated(int waitBarrier=1);
 
   void MigrationDone(int balancing);  // Call when migration is complete

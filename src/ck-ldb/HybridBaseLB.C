@@ -15,13 +15,6 @@ class DummyMsg: public CMessage_DummyMsg
 {
 };
 
-void HybridBaseLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
-{
-  HybridBaseLB *me = (HybridBaseLB*)(data);
-
-  me->Migrated(h, waitBarrier);
-}
-
 void HybridBaseLB::AtBarrier()
 {
 #if CMK_MEM_CHECKPOINT	
