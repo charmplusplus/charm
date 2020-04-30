@@ -72,6 +72,7 @@ never be excluded...
 #include <sstream>
 #include <limits.h>
 #include "spanningTree.h"
+#include "cmitrackmessages.h"
 #if CMK_CHARMPY
 #include "GreedyRefineLB.h"
 #include "RandCentLB.h"
@@ -1389,7 +1390,10 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
 
 		CmiSetNcpyAckSize(sizeof(CkCallback));
+
+#if CMK_ERROR_CHECKING
 		if(trackMessages) CmiMessageTrackerCharmInit(CmiGetEpIdx);
+#endif
 	}
 
 
