@@ -95,19 +95,25 @@ public:
 /** The "map" is used by the array manager to map an array index to 
  * a home processor number.
  */
-class CkArrayMap : public IrrGroup {
+class CkArrayMapObj {
 protected:
   int flattenIndex(const CkArrayOptions& options, const CkArrayIndex& idx) const;
 
 public:
-  CkArrayMap();
-  CkArrayMap(CkMigrateMessage *m) : IrrGroup(m) {}
-  virtual ~CkArrayMap();
+  CkArrayMapObj() {}
 
   virtual void populateInitial(const CkArrayOptions& options, void* ctorMsg, CkArray* mgr) const;
   virtual int procNum(const CkArrayOptions& options, const CkArrayIndex& element) const
       { return homePe(options, element); }
   virtual int homePe(const CkArrayOptions& options, const CkArrayIndex& element) const = 0;
+};
+
+class CkArrayMap : public IrrGroup {
+public:
+  CkArrayMap() {}
+  CkArrayMap(CkMigrateMessage *m) : IrrGroup(m) {}
+
+  virtual CkArrayMapObj* getMapObj() const = 0;
 };
 
 extern void _CkMigratable_initInfoInit(void);
@@ -489,7 +495,7 @@ private:
 	//Map object
 	CkGroupID mapID;
 	int mapHandle;
-	CkArrayMap *map;
+	CkArrayMapObj *map;
 
 	CkGroupID lbmgrID;
 	CkGroupID metalbID;

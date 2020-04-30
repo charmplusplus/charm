@@ -45,10 +45,7 @@ be forwarded by default.
 #   define DEBAD(x) /*CkPrintf x*/
 #endif
 
-CkArrayMap::CkArrayMap() {}
-CkArrayMap::~CkArrayMap() {}
-
-int CkArrayMap::flattenIndex(const CkArrayOptions& options, const CkArrayIndex& idx) const {
+int CkArrayMapObj::flattenIndex(const CkArrayOptions& options, const CkArrayIndex& idx) const {
   if (idx.dimension == 1) {
     return idx.data()[0];
   } else if (options.getBounds().dimension == 0) {
@@ -72,7 +69,7 @@ int CkArrayMap::flattenIndex(const CkArrayOptions& options, const CkArrayIndex& 
   return flat;
 }
 
-void CkArrayMap::populateInitial(const CkArrayOptions& options, void* ctorMsg, CkArray* mgr) const {
+void CkArrayMapObj::populateInitial(const CkArrayOptions& options, void* ctorMsg, CkArray* mgr) const {
   // TODO: one way for subclasses to override would be to modify options for only their PEs
   // start end and step, and then call this method.
   CkArrayIndex start = options.getStart();
@@ -129,10 +126,9 @@ void CkArrayMap::populateInitial(const CkArrayOptions& options, void* ctorMsg, C
   CkFreeMsg(ctorMsg);
 }
 
-class RRMap : public CkArrayMap {
+class RRMapObj : public CkArrayMapObj {
 public:
-  RRMap() {}
-  RRMap(CkMigrateMessage* m) : CkArrayMap(m) {}
+  RRMapObj() {}
 
   int homePe(const CkArrayOptions& opts, const CkArrayIndex& i) const {
     int flati = flattenIndex(opts, i);
@@ -146,11 +142,18 @@ public:
   }
 };
 
+class RRMap : public CkArrayMap {
+public:
+  RRMap() {}
+  RRMap(CkMigrateMessage* m) : CkArrayMap(m) {}
+  CkArrayMapObj* getMapObj() const { return new RRMapObj(); }
+};
+
 /**
  * The default map object -- This does blocked mapping in the general case and
  * calls the round-robin homePe for the dynamic insertion case -- ASB
  */
-class DefaultArrayMap : public RRMap {
+class DefaultArrayMapObj : public CkArrayMapObj {
 protected:
   void computeBlockData(const CkArrayOptions& opts,
       int* totalChares, int* blockSize, int* firstSet, int* remainder) const {
@@ -173,8 +176,7 @@ protected:
   }
 
 public:
-  DefaultArrayMap() {}
-  DefaultArrayMap(CkMigrateMessage* m) : RRMap(m) {}
+  DefaultArrayMapObj() {}
 
   int homePe(const CkArrayOptions& opts, const CkArrayIndex& i) const {
     int flati = flattenIndex(opts, i);
@@ -192,14 +194,20 @@ public:
   }
 };
 
+class DefaultArrayMap : public RRMap {
+public:
+  DefaultArrayMap() {}
+  DefaultArrayMap(CkMigrateMessage* m) : RRMap(m) {}
+  CkArrayMapObj* getMapObj() const { return new DefaultArrayMapObj(); }
+};
+
 /**
  *  A fast map for chare arrays which do static insertions and promise NOT
  *  to do late insertions -- ASB
  */
-class FastArrayMap : public DefaultArrayMap {
+class FastArrayMapObj : public DefaultArrayMapObj {
 public:
-  FastArrayMap() {}
-  FastArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m) {}
+  FastArrayMapObj() {}
 
   int homePe(const CkArrayOptions& opts, const CkArrayIndex& i) const {
     int flati = flattenIndex(opts, i);
@@ -209,6 +217,13 @@ public:
     computeBlockData(opts, &totalChares, &blockSize, &firstSet, &remainder);
     return (flati / blockSize);
   }
+};
+
+class FastArrayMap : public DefaultArrayMap {
+public:
+  FastArrayMap() {}
+  FastArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m) {}
+  CkArrayMapObj* getMapObj() const { return new FastArrayMapObj(); }
 };
 
 #if 0

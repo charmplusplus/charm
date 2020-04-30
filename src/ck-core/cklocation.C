@@ -854,7 +854,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 
 //Register with the map object
 	mapID = opts.getMap();
-	map=(CkArrayMap *)CkLocalBranch(mapID);
+	map=((CkArrayMap *)CkLocalBranch(mapID))->getMapObj();
 	if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
 
         // Figure out the mapping from indices to object IDs if one is possible
@@ -898,7 +898,7 @@ void CkLocMgr::pup(PUP::er &p){
 		CProxyElement_CkLocMgr newlocalproxy(thisgroup,CkMyPe());
 		thislocalproxy=newlocalproxy;
 		//Register with the map object
-		map=(CkArrayMap *)CkLocalBranch(mapID);
+		map=((CkArrayMap *)CkLocalBranch(mapID))->getMapObj();
 		if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
                 CkArrayIndex emptyIndex;
 		// _lbmgr is the fixed global groupID
