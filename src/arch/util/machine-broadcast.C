@@ -67,8 +67,8 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
     CmiAssert(CMI_DEST_RANK(msg)==0);
     /*CmiPushPE(CMI_DEST_RANK(msg), msg);*/
 
+#if CMK_ERROR_CHECKING
     int srcUniqId, srcPe;
-
     if(trackMessages) {
       srcUniqId = CMI_UNIQ_MSG_ID(msg);
       srcPe = CMI_SRC_PE(msg);
@@ -76,6 +76,7 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
       CMI_UNIQ_MSG_ID(msg) = -1; // Add it to this forwarding PE's table
       CMI_SRC_PE(msg) = CmiMyPe();
     }
+#endif
 
     // Forward regular messages, do not forward ncpy bcast messages as those messages
     // are forwarded separately after the completion of the payload transfer
@@ -84,11 +85,13 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
 #endif
       forwardProcBcastMsg(size, msg);
 
+#if CMK_ERROR_CHECKING
     if(trackMessages) {
       // Reset back the srcPe and uniqId
       CMI_UNIQ_MSG_ID(msg) = srcUniqId;
       CMI_SRC_PE(msg) = srcPe;
     }
+#endif
 
     CmiPushPE(0, msg);
 
