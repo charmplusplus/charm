@@ -43,3 +43,17 @@ to the Charm++ root directory):
 
 There are other CMakeLists.txt files in the Charm++ distribution, but these are unrelated
 to the Charm++ build system.
+
+Note that in most projects that use CMake, there is one CMakeLists.txt file per source
+directory. This doesn't work well in Charm++, as there are many targets that use files
+from multiple source directories.
+
+
+## Limitations
+
+Currently, the CMake build system has the following limitations.
+
+- No Windows support. 
+- No support for `gni-*` and `*-crayx?` targets.
+- Not all options available in the old build system are supported (e.g. those that
+  require specifying `-D` options).
