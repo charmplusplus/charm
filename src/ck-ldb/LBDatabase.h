@@ -24,12 +24,6 @@ friend class LBManager;
     int on;
   };
 
-  struct StartLBCB {
-    LDStartLBFn fn;
-    void* data;
-    int on;
-  };
-
   struct MigrationDoneCB {
     LDMigrationDoneFn fn;
     void* data;
@@ -143,7 +137,7 @@ public:
   void MetaLBCallLBOnChares();
   void MetaLBResumeWaitingChares(int lb_period);
   void ClearLoads(void);
-  int useMem(LBManager *mgr);
+  int useMem(void);
   LDObjHandle RegisterObj(LDOMHandle omh, CmiUInt8 id, void* userPtr,
                           int migratable);
   void UnregisterObj(LDObjHandle h);

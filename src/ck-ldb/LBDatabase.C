@@ -290,11 +290,10 @@ void LBDatabase::MetaLBCallLBOnChares() {
 #endif
 }
 
-int LBDatabase::useMem(LBManager *mgr) {
-  int size = sizeof(LBManager);
+int LBDatabase::useMem() {
+  int size = sizeof(LBDatabase);
   size += oms.size() * sizeof(LBOM);
   size += GetObjDataSz() * sizeof(LBObj);
-  size += mgr->startLBFnList.size() * sizeof(StartLBCB);
   size += commTable->useMem();
   return size;
 }

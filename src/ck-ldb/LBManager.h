@@ -259,9 +259,8 @@ class LBManager : public CBase_LBManager
 
   struct StartLBCB
   {
-    LDStartLBFn fn;
-    void* data;
-    int on;
+    std::function<void()> fn;
+    bool on;
   };
 
   struct MigrationDoneCB
@@ -413,7 +412,15 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->MulticastSend(_om, _ids, _n, _b, _nMsgs);
   }
-  int useMem() { return lbdb_obj->useMem(this); }
+  int useMem()
+  {
+    int size = sizeof(LBManager);
+    size += migrateCBList.size() * sizeof(MigrateCB);
+    size += startLBFnList.size() * sizeof(StartLBCB);
+    size += migrationDoneCBList.size() * sizeof(MigrationDoneCB);
+    size += lbdb_obj->useMem();
+    return size;
+  }
 
 #if CMK_LB_USER_DATA
   inline void* GetDBObjUserData(LDObjHandle& h, int idx)
@@ -433,11 +440,15 @@ class LBManager : public CBase_LBManager
   /*
    * Calls from load balancer to load database
    */
-
-  int AddStartLBFn(LDStartLBFn fn, void* data);
+  template <typename T>
+  inline int AddStartLBFn(T* obj, void (T::*method)(void))
+  {
+    return AddStartLBFn(std::bind(method, obj));
+  }
+  int AddStartLBFn(std::function<void()> fn);
   void TurnOnStartLBFn(int handle) { startLBFnList[handle]->on = 1; }
   void TurnOffStartLBFn(int handle) { startLBFnList[handle]->on = 0; }
-  void RemoveStartLBFn(LDStartLBFn fn);
+  void RemoveStartLBFn(int handle);
 
   void StartLB();
 

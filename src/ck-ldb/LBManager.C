@@ -528,31 +528,26 @@ void LBManager::init(void)
     setTimer();
 }
 
-int LBManager::AddStartLBFn(LDStartLBFn fn, void* data)
+int LBManager::AddStartLBFn(std::function<void()> fn)
 {
   // Save startLB function
   StartLBCB* callbk = new StartLBCB;
 
   callbk->fn = fn;
-  callbk->data = data;
-  callbk->on = 1;
+  callbk->on = true;
   startLBFnList.push_back(callbk);
   startLBFn_count++;
   return startLBFnList.size() - 1;
 }
 
-void LBManager::RemoveStartLBFn(LDStartLBFn fn)
+void LBManager::RemoveStartLBFn(int handle)
 {
-  for (int i = 0; i < startLBFnList.size(); i++)
+  StartLBCB* callbk = startLBFnList[handle];
+  if (callbk)
   {
-    StartLBCB* callbk = startLBFnList[i];
-    if (callbk && callbk->fn == fn)
-    {
-      delete callbk;
-      startLBFnList[i] = 0;
-      startLBFn_count--;
-      break;
-    }
+    delete callbk;
+    startLBFnList[handle] = nullptr;
+    startLBFn_count--;
   }
 }
 
@@ -565,7 +560,7 @@ void LBManager::StartLB()
   for (int i = 0; i < startLBFnList.size(); i++)
   {
     StartLBCB* startLBFn = startLBFnList[i];
-    if (startLBFn && startLBFn->on) startLBFn->fn(startLBFn->data);
+    if (startLBFn && startLBFn->on) startLBFn->fn();
   }
 }
 

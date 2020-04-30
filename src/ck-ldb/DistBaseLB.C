@@ -9,12 +9,6 @@
 
 #define  DEBUGF(x)      // CmiPrintf x;
 
-
-void DistBaseLB::staticStartLB(void* data) {
-  DistBaseLB *me = (DistBaseLB*)(data);
-  me->barrierDone();
-}
-
 void DistBaseLB::barrierDone() {
   thisProxy.InvokeLB();
 }
@@ -30,9 +24,7 @@ DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
   lbname = (char *)"DistBaseLB";
   thisProxy = CProxy_DistBaseLB(thisgroup);
   receiver = lbmgr->AddLocalBarrierReceiver(this, &DistBaseLB::ProcessAtSync);
-  startLbFnHdl = lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB),
-      (void*)(this));
-  lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)this);
+  startLbFnHdl = lbmgr->AddStartLBFn(this, &DistBaseLB::barrierDone);
 
   migrates_completed = 0;
   migrates_expected = 0;
@@ -56,7 +48,7 @@ DistBaseLB::~DistBaseLB() {
 #if CMK_LBDB_ON
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   if (lbmgr) {
-    lbmgr-> RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+    lbmgr->RemoveStartLBFn(startLbFnHdl);
   }
   if (mig_msgs) {
     delete [] mig_msgs;

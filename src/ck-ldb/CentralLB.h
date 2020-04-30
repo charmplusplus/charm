@@ -138,7 +138,6 @@ public:
 
   // manual start load balancing
   inline void StartLB() { thisProxy.ProcessAtSync(); }
-  static void staticStartLB(void* data);
 
   // Migrated-element callback
   static void staticMigrated(void* me, LDObjHandle h, int waitBarrier=1);

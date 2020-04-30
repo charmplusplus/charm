@@ -59,12 +59,6 @@ void CreateCentralLB()
 }
 */
 
-void CentralLB::staticStartLB(void* data)
-{
-  CentralLB *me = (CentralLB*)(data);
-  me->StartLB();
-}
-
 void CentralLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {
   CentralLB *me = (CentralLB*)(data);
@@ -80,7 +74,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   loadbalancer = thisgroup;
   // create and turn on by default
   startLbFnHdl = lbmgr->
-    AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
+    AddStartLBFn(this, &CentralLB::StartLB);
 
   // CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
   if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
@@ -130,8 +124,7 @@ CentralLB::~CentralLB()
   delete statsData;
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   if (lbmgr) {
-    lbmgr->
-      RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+    lbmgr->RemoveStartLBFn(startLbFnHdl);
   }
 #endif
 }
