@@ -4,12 +4,12 @@
 
 #define DEBUG(x) //x
 
-charmLevelFn getMsgEpIdxFn;
-
 // boolean set if user passes +trackMsgs (used to determine if tracking is enabled)
 bool trackMessages;
 
 #if CMK_ERROR_CHECKING
+
+charmLevelFn getMsgEpIdxFn;
 
 // uniqMsgId
 CpvDeclare(int, uniqMsgId);
