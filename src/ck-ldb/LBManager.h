@@ -258,8 +258,7 @@ class LBManager : public CBase_LBManager
 
   struct MigrationDoneCB
   {
-    LDMigrationDoneFn fn;
-    void* data;
+    std::function<void()> fn;
   };
 
   struct PredictCB
@@ -443,9 +442,14 @@ class LBManager : public CBase_LBManager
   void RemoveStartLBFn(int handle);
 
   void StartLB();
-
-  int AddMigrationDoneFn(LDMigrationDoneFn fn, void* data);
-  void RemoveMigrationDoneFn(LDMigrationDoneFn fn);
+  
+  template <typename T>
+  inline int AddMigrationDoneFn(T* obj, void (T::*method)(void))
+  {
+    return AddMigrationDoneFn(std::bind(method, obj));
+  }
+  int AddMigrationDoneFn(std::function<void()> fn);
+  void RemoveMigrationDoneFn(int handle);
   void MigrationDone();
 
  public:

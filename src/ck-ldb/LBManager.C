@@ -564,28 +564,23 @@ void LBManager::StartLB()
   }
 }
 
-int LBManager::AddMigrationDoneFn(LDMigrationDoneFn fn, void* data)
+int LBManager::AddMigrationDoneFn(std::function<void()> fn)
 {
   // Save migrationDone callback function
   MigrationDoneCB* callbk = new MigrationDoneCB;
 
   callbk->fn = fn;
-  callbk->data = data;
   migrationDoneCBList.push_back(callbk);
   return migrationDoneCBList.size() - 1;
 }
 
-void LBManager::RemoveMigrationDoneFn(LDMigrationDoneFn fn)
+void LBManager::RemoveMigrationDoneFn(int handle)
 {
-  for (int i = 0; i < migrationDoneCBList.size(); i++)
+  MigrationDoneCB* callbk = migrationDoneCBList[handle];
+  if (callbk)
   {
-    MigrationDoneCB* callbk = migrationDoneCBList[i];
-    if (callbk && callbk->fn == fn)
-    {
-      delete callbk;
-      migrationDoneCBList[i] = 0;
-      break;
-    }
+    delete callbk;
+    migrationDoneCBList[handle] = nullptr;
   }
 }
 
@@ -594,7 +589,7 @@ void LBManager::MigrationDone()
   for (int i = 0; i < migrationDoneCBList.size(); i++)
   {
     MigrationDoneCB* callbk = migrationDoneCBList[i];
-    if (callbk) callbk->fn(callbk->data);
+    if (callbk) callbk->fn();
   }
 }
 
