@@ -845,7 +845,7 @@ void CkLocMgr::flushAllRecs(void)
 // TODO: No longer need to save options AND bounds
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
     : idCounter(1), thisProxy(thisgroup), thislocalproxy(thisgroup,CkMyPe()),
-      bounds(opts.getBounds()), options(opts) {
+      bounds(opts.getBounds()) {
 	DEBC((AA "Creating new location manager %d\n" AB,thisgroup));
 // moved to _CkMigratable_initInfoInit()
 //	CkpvInitialize(CkMigratable_initInfo,mig_initInfo);
@@ -856,6 +856,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	mapID = opts.getMap();
 	map=((CkArrayMap *)CkLocalBranch(mapID))->getMapObj();
 	if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
+	map->setArrayOptions(opts);
 
         // Figure out the mapping from indices to object IDs if one is possible
         compressor = ck::FixedArrayIndexCompressor::make(bounds);

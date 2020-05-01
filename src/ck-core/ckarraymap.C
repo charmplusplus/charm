@@ -44,8 +44,11 @@ be forwarded by default.
 #   define DEBUG(x)   /**/
 #   define DEBAD(x) /*CkPrintf x*/
 #endif
+void CkArrayMapObj::setArrayOptions(const CkArrayOptions& opts) {
+  options = opts;
+}
 
-int CkArrayMapObj::flattenIndex(const CkArrayOptions& options, const CkArrayIndex& idx) const {
+int CkArrayMapObj::flattenIndex(const CkArrayIndex& idx) const {
   if (idx.dimension == 1) {
     return idx.data()[0];
   } else if (options.getBounds().dimension == 0) {
@@ -88,7 +91,7 @@ void CkArrayMapObj::populateInitial(const CkArrayOptions& options, void* ctorMsg
     CkArrayIndex i = start;
     bool done = false;
     while (!done) {
-      if (CMK_RANK_0(homePe(options, i)) == CkMyPe()) {
+      if (CMK_RANK_0(homePe(i)) == CkMyPe()) {
         mgr->insertInitial(i, CkCopyMsg(&ctorMsg));
       }
       for (int d = start.dimension - 1; d >= 0; d--) {
@@ -106,7 +109,7 @@ void CkArrayMapObj::populateInitial(const CkArrayOptions& options, void* ctorMsg
     CkArrayIndex i = start;
     bool done = false;
     while (!done) {
-      if (CMK_RANK_0(homePe(options, i)) == CkMyPe()) {
+      if (CMK_RANK_0(homePe(i)) == CkMyPe()) {
         mgr->insertInitial(i, CkCopyMsg(&ctorMsg));
       }
       for (int d = start.dimension - 1; d >= 0; d--) {
@@ -130,8 +133,8 @@ class RRMapObj : public CkArrayMapObj {
 public:
   RRMapObj() {}
 
-  int homePe(const CkArrayOptions& opts, const CkArrayIndex& i) const {
-    int flati = flattenIndex(opts, i);
+  int homePe(const CkArrayIndex& i) const {
+    int flati = flattenIndex(i);
     int home = flati % CkNumPes();
   #if CMK_FAULT_EVAC
     while(!CmiNodeAlive(home) || (home == CkMyPe() && CkpvAccess(startedEvac))) {
@@ -155,35 +158,34 @@ public:
  */
 class DefaultArrayMapObj : public CkArrayMapObj {
 protected:
-  void computeBlockData(const CkArrayOptions& opts,
-      int* totalChares, int* blockSize, int* firstSet, int* remainder) const {
-    // TODO: Should we base intial chares on bounds, or initial elems? I could
-    // see a desire to have extra elems to be created RR.
-    *totalChares = 0;
-    if (opts.getBounds().dimension >= 1) *totalChares = 1;
-    for (int d = 0; d < opts.getBounds().dimension; d++) {
-      if (opts.getBounds().dimension <= 3) {
-        *totalChares *= opts.getBounds().data()[d];
-      } else {
-        *totalChares *= ((short int*)opts.getBounds().data())[d];
+  int totalChares, blockSize, firstSet, remainder;
+public:
+  DefaultArrayMapObj()
+      : totalChares(0), blockSize(0), firstSet(0), remainder(0) {}
+
+  void setArrayOptions(const CkArrayOptions& opts) {
+    CkArrayMapObj::setArrayOptions(opts);
+
+    const CkArrayIndex& bounds = options.getBounds();
+    if (bounds.dimension >= 1) {
+      totalChares = 1;
+      for (int d = 0; d < bounds.dimension; d++) {
+        if (bounds.dimension <= 3) {
+          totalChares *= bounds.data()[d];
+        } else {
+          totalChares *= ((short int*)bounds.data())[d];
+        }
       }
     }
     // TODO: What do do in cases of shrink/expand, chkpt/restart etc, where
     // numPEs may change?
-    *blockSize = std::max(*totalChares / CkNumPes(), 1);
-    *remainder = *totalChares % CkNumPes();
-    *firstSet = *remainder * (*blockSize + 1);
+    blockSize = std::max(totalChares / CkNumPes(), 1);
+    remainder = totalChares % CkNumPes();
+    firstSet = remainder * (blockSize + 1);
   }
 
-public:
-  DefaultArrayMapObj() {}
-
-  int homePe(const CkArrayOptions& opts, const CkArrayIndex& i) const {
-    int flati = flattenIndex(opts, i);
-    int totalChares, blockSize, firstSet, remainder;
-    // TODO: This will be removed and stored in member variables when we convert
-    // maps from groups to regular objects.
-    computeBlockData(opts, &totalChares, &blockSize, &firstSet, &remainder);
+  int homePe(const CkArrayIndex& i) const {
+    int flati = flattenIndex(i);
     if (flati < firstSet) {
       return flati / (blockSize + 1);
     } else if (flati < totalChares) {
@@ -209,12 +211,14 @@ class FastArrayMapObj : public DefaultArrayMapObj {
 public:
   FastArrayMapObj() {}
 
-  int homePe(const CkArrayOptions& opts, const CkArrayIndex& i) const {
-    int flati = flattenIndex(opts, i);
-    int totalChares, blockSize, firstSet, remainder;
-    // TODO: This will be removed and stored in member variables when we convert
-    // maps from groups to regular objects.
-    computeBlockData(opts, &totalChares, &blockSize, &firstSet, &remainder);
+  void setArrayOptions(const CkArrayOptions& opts) {
+    DefaultArrayMapObj::setArrayOptions(opts);
+    // For this simple map, we want the ceiling of blockSize
+    if (remainder > 0) blockSize++;
+  }
+
+  int homePe(const CkArrayIndex& i) const {
+    int flati = flattenIndex(i);
     return (flati / blockSize);
   }
 };

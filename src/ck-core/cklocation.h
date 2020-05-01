@@ -97,15 +97,17 @@ public:
  */
 class CkArrayMapObj {
 protected:
-  int flattenIndex(const CkArrayOptions& options, const CkArrayIndex& idx) const;
+  CkArrayOptions options;
+  int flattenIndex(const CkArrayIndex& idx) const;
 
 public:
   CkArrayMapObj() {}
 
+  virtual void setArrayOptions(const CkArrayOptions& options);
   virtual void populateInitial(const CkArrayOptions& options, void* ctorMsg, CkArray* mgr) const;
-  virtual int procNum(const CkArrayOptions& options, const CkArrayIndex& element) const
-      { return homePe(options, element); }
-  virtual int homePe(const CkArrayOptions& options, const CkArrayIndex& element) const = 0;
+  virtual int procNum(const CkArrayIndex& element) const
+      { return homePe(element); }
+  virtual int homePe(const CkArrayIndex& element) const = 0;
 };
 
 class CkArrayMap : public IrrGroup {
@@ -246,14 +248,14 @@ typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
 
 //Interface used by external users:
 	/// Home mapping
-	inline int homePe(const CkArrayIndex &idx) const {return CMK_RANK_0(map->homePe(options,idx));}
+	inline int homePe(const CkArrayIndex &idx) const {return CMK_RANK_0(map->homePe(idx));}
         inline int homePe(const CmiUInt8 id) const {
           if (compressor)
             return CMK_RANK_0(homePe(compressor->decompress(id)));
 
           return CMK_RANK_0(id >> 24);
         }
-	inline int procNum(const CkArrayIndex &idx) const {return CMK_RANK_0(map->procNum(options,idx));}
+	inline int procNum(const CkArrayIndex &idx) const {return CMK_RANK_0(map->procNum(idx));}
 	inline bool isHome (const CkArrayIndex &idx) const {return (bool)(homePe(idx)==CkMyPe());}
   int whichPE(const CkArrayIndex &idx) const;
   int whichPE(const CmiUInt8 id) const;
@@ -486,11 +488,6 @@ public:
 private:
 	/// The core of the location manager: map array index to element representative
 	LocRecHash hash;
-
-	/// The master set of array options used arrays managed by this location manager
-	/// Any other arrays that are binded together must use CkArrayOptions that are
-	/// compatible with these (same map, same bounds, etc).
-	CkArrayOptions options;
 
 	//Map object
 	CkGroupID mapID;
