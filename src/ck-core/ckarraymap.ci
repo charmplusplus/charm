@@ -18,6 +18,10 @@ module CkArrayMap {
     entry FastArrayMap(void);
   };
 
+  PUPable RRMapObj;
+  PUPable DefaultArrayMapObj;
+  PUPable FastArrayMapObj;
+
 #if 0
   group [migratable] HilbertArrayMap : DefaultArrayMap {
     entry HilbertArrayMap(void);

@@ -97,8 +97,10 @@ void CkArrayMapObj::populateInitial(const CkArrayOptions& options, void* ctorMsg
 }
 
 class RRMapObj : public CkArrayMapObj {
+PUPable_decl(RRMapObj);
 public:
   RRMapObj() {}
+  RRMapObj(CkMigrateMessage* m) {}
 
   int homePe(const CkArrayIndex& i) const {
     int flati = flattenIndex(i);
@@ -124,11 +126,13 @@ public:
  * calls the round-robin homePe for the dynamic insertion case -- ASB
  */
 class DefaultArrayMapObj : public CkArrayMapObj {
+PUPable_decl(DefaultArrayMapObj);
 protected:
   int totalChares, blockSize, firstSet, remainder;
 public:
   DefaultArrayMapObj()
       : totalChares(0), blockSize(0), firstSet(0), remainder(0) {}
+  DefaultArrayMapObj(CkMigrateMessage* m) {}
 
   void setArrayOptions(const CkArrayOptions& opts) {
     CkArrayMapObj::setArrayOptions(opts);
@@ -161,6 +165,14 @@ public:
       return flati % CkNumPes();
     }
   }
+
+  // TODO: Not actually needed if we have to call setArrayOpts on unpack
+  void pup(PUP::er& p) {
+    p | totalChares;
+    p | blockSize;
+    p | firstSet;
+    p | remainder;
+  }
 };
 
 class DefaultArrayMap : public RRMap {
@@ -175,8 +187,10 @@ public:
  *  to do late insertions -- ASB
  */
 class FastArrayMapObj : public DefaultArrayMapObj {
+PUPable_decl(FastArrayMapObj);
 public:
   FastArrayMapObj() {}
+  FastArrayMapObj(CkMigrateMessage* m) : DefaultArrayMapObj(m) {}
 
   void setArrayOptions(const CkArrayOptions& opts) {
     DefaultArrayMapObj::setArrayOptions(opts);

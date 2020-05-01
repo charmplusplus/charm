@@ -95,7 +95,8 @@ public:
 /** The "map" is used by the array manager to map an array index to 
  * a home processor number.
  */
-class CkArrayMapObj {
+class CkArrayMapObj : public PUP::able {
+PUPable_abstract(CkArrayMapObj);
 protected:
   CkArrayOptions options;
   int flattenIndex(const CkArrayIndex& idx) const;
