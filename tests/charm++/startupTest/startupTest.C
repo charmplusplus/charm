@@ -209,31 +209,31 @@ void main::doneReport(CkReductionMsg *msg)
     }
 }
 
-int OneMap::homePe(const CkArrayOptions& opts, const CkArrayIndex& idx) const
+int OneMap::homePe(const CkArrayIndex& idx) const
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
   return(IntArrOne[idx1d.index[0]]%CkNumPes());
 }
 
-int TwoMap::homePe(const CkArrayOptions& opts, const CkArrayIndex& idx) const
+int TwoMap::homePe(const CkArrayIndex& idx) const
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
   return(IntArrTwo[idx1d.index[0]]%CkNumPes());
 }
 
-int ThreeMap::homePe(const CkArrayOptions& opts, const CkArrayIndex& idx) const
+int ThreeMap::homePe(const CkArrayIndex& idx) const
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
   return(IntArrThree[idx1d.index[0]]%CkNumPes());
 }
 
-int FourMap::homePe(const CkArrayOptions& opts, const CkArrayIndex& idx) const
+int FourMap::homePe(const CkArrayIndex& idx) const
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
   return(IntArrFour[idx1d.index[0]]%CkNumPes());
 }
 
-int FiveMap::homePe(const CkArrayOptions& opts, const CkArrayIndex& idx) const
+int FiveMap::homePe(const CkArrayIndex& idx) const
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
   int retval=IntArrFive[idx1d.index[0]]%CkNumPes();
@@ -241,7 +241,7 @@ int FiveMap::homePe(const CkArrayOptions& opts, const CkArrayIndex& idx) const
   return(retval);
 }
 
-int SixMap::homePe(const CkArrayOptions& opts, const CkArrayIndex& idx) const
+int SixMap::homePe(const CkArrayIndex& idx) const
 {
   CkArrayIndex2D idx2d = *(CkArrayIndex2D *) &idx;
   int retval=(idx2d.index[0]+idx2d.index[1])%CkNumPes();

@@ -11,39 +11,6 @@ bool useNodeBlkMapping;
 CkGroupID _defaultArrayMapID;
 CkGroupID _fastArrayMapID;
 
-/*********************** Array Map ******************
-Given an array element index, an array map tells us
-the index's "home" Pe.  This is the Pe the element will
-be created on, and also where messages to this element will
-be forwarded by default.
-*/
-
-#if ARRAY_DEBUG_OUTPUT
-#   define DEB(x) CkPrintf x  //General debug messages
-#   define DEBI(x) CkPrintf x  //Index debug messages
-#   define DEBC(x) CkPrintf x  //Construction debug messages
-#   define DEBS(x) CkPrintf x  //Send/recv/broadcast debug messages
-#   define DEBM(x) CkPrintf x  //Migration debug messages
-#   define DEBL(x) CkPrintf x  //Load balancing debug messages
-#   define DEBN(x) CkPrintf x  //Location debug messages
-#   define DEBB(x) CkPrintf x  //Broadcast debug messages
-#   define AA "LocMgr on %d: "
-#   define AB ,CkMyPe()
-#   define DEBUG(x) CkPrintf x
-#   define DEBAD(x) CkPrintf x
-#else
-#   define DEB(X) /*CkPrintf x*/
-#   define DEBI(X) /*CkPrintf x*/
-#   define DEBC(X) /*CkPrintf x*/
-#   define DEBS(x) /*CkPrintf x*/
-#   define DEBM(X) /*CkPrintf x*/
-#   define DEBL(X) /*CkPrintf x*/
-#   define DEBN(x) /*CkPrintf x*/
-#   define DEBB(x) /*CkPrintf x*/
-#   define str(x) /**/
-#   define DEBUG(x)   /**/
-#   define DEBAD(x) /*CkPrintf x*/
-#endif
 void CkArrayMapObj::setArrayOptions(const CkArrayOptions& opts) {
   options = opts;
 }
