@@ -78,12 +78,13 @@ void doneAllStats(char *msg) {
 
 void *reductionMergeFn(int *size, void *data, void **remote, int count) {
   CmiPrintf("[%d][%d][%d] =============== Message tracking - REDUCTION ==============\n",CmiMyPe(), CmiMyNode(), CmiMyRank());
-  return data;
+  *size = CmiMsgHeaderSizeBytes;
+  char *reduceMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+  CmiSetHandler(reduceMsg, CpvAccess(statsDoneHandler));
+  return reduceMsg;
 }
 
-void printStats(char *msg) {
-  CmiFree(msg);
-
+void printStats() {
   CmiIntMsgInfoMap::iterator iter = CpvAccess(sentUniqMsgIds).begin();
 
   if(CpvAccess(sentUniqMsgIds).size() == 0) {
@@ -106,6 +107,11 @@ void printStats(char *msg) {
   }
 
   CsdExitScheduler();
+}
+
+void _printStats(char *msg) {
+  CmiFree(msg);
+  printStats();
 }
 
 void CmiPrintMTStatsOnIdle() {
@@ -135,7 +141,7 @@ void CmiMessageTrackerInit() {
   CpvAccess(statsDoneHandler) = CmiRegisterHandler((CmiHandler) doneAllStats);
 
   CpvInitialize(int, printStatsHandler);
-  CpvAccess(printStatsHandler) = CmiRegisterHandler((CmiHandler) printStats);
+  CpvAccess(printStatsHandler) = CmiRegisterHandler((CmiHandler) _printStats);
 
   CcdCallOnCondition(CcdPROCESSOR_LONG_IDLE, (CcdVoidFn)CmiPrintMTStatsOnIdle, NULL);
 }
