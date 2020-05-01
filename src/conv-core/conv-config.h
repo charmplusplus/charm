@@ -36,7 +36,7 @@
 
 /* 
  Include the system/platform header.
-  (e.g., charm/src/arch/netlrts-linux/conv-mach.h )
+  (e.g., charm/src/arch/netlrts-linux-x86_64/conv-mach.h )
  
  This header declares the handling of malloc (OS or charm),
  signals, threads, timers, and other details. 

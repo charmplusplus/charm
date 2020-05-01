@@ -26,7 +26,6 @@ Charm++-prefix
 src/arch/win/createlink.exe
 
 # Ignore directories created from compilation
-/gemini_gni-crayxe*
 /gni-*
 /mpi-*
 /multicore-*

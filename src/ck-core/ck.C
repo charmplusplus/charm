@@ -542,9 +542,6 @@ int CkGetArgc(void) {
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
-  //BIGSIM_OOC DEBUGGING
-  //CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
-  //fflush(stdout);
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
@@ -567,10 +564,6 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 }
 void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 {
-  //BIGSIM_OOC DEBUGGING
-  //CkPrintf("CkDeliverMessageReadonly: name of entry fn: %s\n", _entryTable[epIdx]->name);
-  //fflush(stdout);
-
   void *deliverMsg;
   if (_entryTable[epIdx]->noKeep)
   { /* Deliver a read-only copy of the message */
@@ -1180,7 +1173,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     if (msg->array_hops()>1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
-    bool doFree = !(opts & CK_MSG_KEEP);
+    bool doFree = true;
 #if CMK_ONESIDED_IMPL
     if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) // Do not free a P2P_RECV_MSG
       doFree = false;
@@ -1197,7 +1190,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   }
 }
 
-//BIGSIM_OOC DEBUGGING
+// Debugging support:
 #define TELLMSGTYPE(x) //x
 
 /**
