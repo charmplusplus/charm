@@ -18,14 +18,6 @@ friend class LBManager;
     LBObjEntry(LBObj* obj, LDObjIndex nextEmpty = DEFAULT_NEXT) : obj(obj), nextEmpty(nextEmpty) {}
   };
 
-  struct PredictCB {
-    LDPredictModelFn on;
-    LDPredictWindowFn onWin;
-    LDPredictFn off;
-    LDPredictModelFn change;
-    void* data;
-  };
-
 private:
   std::vector<LBObjEntry> objs;
   std::vector<LBOM*> oms;

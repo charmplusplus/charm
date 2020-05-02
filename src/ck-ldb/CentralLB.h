@@ -130,12 +130,6 @@ public:
   void WillIbekilled(std::vector<char> avail, int);
   void StartCleanup();
 
-  // manual predictor start/stop
-  static void staticPredictorOn(void* data, void* model);
-  static void staticPredictorOnWin(void* data, void* model, int wind);
-  static void staticPredictorOff(void* data);
-  static void staticChangePredictor(void* data, void* model);
-
   // manual start load balancing
   inline void StartLB() { thisProxy.ProcessAtSync(); }
 

@@ -263,11 +263,10 @@ class LBManager : public CBase_LBManager
 
   struct PredictCB
   {
-    LDPredictModelFn on;
-    LDPredictWindowFn onWin;
-    LDPredictFn off;
-    LDPredictModelFn change;
-    void* data;
+    std::function<void(LBPredictorFunction* model)> on;
+    std::function<void(LBPredictorFunction* model, int win)> onWin;
+    std::function<void()> off;
+    std::function<void(LBPredictorFunction* model)> change;
   };
 
   LBDatabase* lbdb_obj;
@@ -459,34 +458,45 @@ class LBManager : public CBase_LBManager
   inline void PredictorOn(LBPredictorFunction* model)
   {
     if (predictCBFn != NULL)
-      predictCBFn->on(predictCBFn->data, model);
+      predictCBFn->on(model);
     else
       CmiPrintf("Predictor not supported in this load balancer\n");
   }
   inline void PredictorOn(LBPredictorFunction* model, int wind)
   {
     if (predictCBFn != NULL)
-      predictCBFn->onWin(predictCBFn->data, model, wind);
+      predictCBFn->onWin(model, wind);
     else
       CmiPrintf("Predictor not supported in this load balancer\n");
   }
   inline void PredictorOff()
   {
     if (predictCBFn != NULL)
-      predictCBFn->off(predictCBFn->data);
+      predictCBFn->off();
     else
       CmiPrintf("Predictor not supported in this load balancer\n");
   }
   inline void ChangePredictor(LBPredictorFunction* model)
   {
     if (predictCBFn != NULL)
-      predictCBFn->change(predictCBFn->data, model);
+      predictCBFn->change(model);
     else
       CmiPrintf("Predictor not supported in this load balancer");
   }
 
-  void SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off,
-                      LDPredictModelFn change, void* data);
+  template <typename T>
+  void SetupPredictor(void (T::*on)(LBPredictorFunction*),
+                      void (T::*onWin)(LBPredictorFunction*, int),
+                      void (T::*off)(void),
+                      void (T::*change)(LBPredictorFunction*),
+                      T* data)
+  {
+    if (predictCBFn == nullptr) predictCBFn = new PredictCB;
+    predictCBFn->on = [=](LBPredictorFunction* fn) { (data->*on)(fn); };
+    predictCBFn->onWin = [=](LBPredictorFunction* fn, int win) { (data->*onWin)(fn, win); };
+    predictCBFn->off = [=]() { (data->*off)(); };
+    predictCBFn->change = [=](LBPredictorFunction* fn) { (data->*change)(fn); };
+  }
 
   inline int CollectingCommStats(void)
   {

@@ -593,17 +593,6 @@ void LBManager::MigrationDone()
   }
 }
 
-void LBManager::SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin,
-                               LDPredictFn off, LDPredictModelFn change, void* data)
-{
-  if (predictCBFn == NULL) predictCBFn = new PredictCB;
-  predictCBFn->on = on;
-  predictCBFn->onWin = onWin;
-  predictCBFn->off = off;
-  predictCBFn->change = change;
-  predictCBFn->data = data;
-}
-
 void LBManager::DumpDatabase()
 {
 #ifdef DEBUG
