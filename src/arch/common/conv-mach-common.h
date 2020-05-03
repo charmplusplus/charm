@@ -100,3 +100,24 @@ enum cmiZCMsgType {
   CMK_ZC_BCAST_RECV_ALL_DONE_MSG = 7,
   CMK_ZC_DEVICE_MSG = 8
 };
+
+#ifndef CMK_NOCOPY_DIRECT_BYTES
+
+#if defined(_WIN32)
+#define CMK_NOCOPY_DIRECT_BYTES 1
+/* It is required to declare CMK_NOCOPY_DIRECT_BYTES to 1 instead of 0
+ * as this avoids the C2229 error (illegal zero-sized array)
+ * for char layerInfo[CMK_NOCOPY_DIRECT_BYTES] which is seen for
+ * a 0 sized array on VC++
+ */
+#else
+#define CMK_NOCOPY_DIRECT_BYTES 0
+#endif // end of if defined(_WIN32)
+
+#endif // end of ifndef CMK_NOCOPY_DIRECT_BYTES
+
+#ifndef CMK_COMMON_NOCOPY_DIRECT_BYTES
+#define CMK_COMMON_NOCOPY_DIRECT_BYTES 0
+#endif
+
+

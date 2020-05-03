@@ -1579,7 +1579,7 @@ void       CthFree(CthThread);
 void       CthSetSuspendable(CthThread, int);
 int        CthIsSuspendable(CthThread);
 
-/* added for bigsim out-of-core emulation */
+// For debugging
 void	   CthPrintThdMagic(CthThread); 
 void 	   CthPrintThdStack(CthThread);
 

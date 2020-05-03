@@ -19,7 +19,7 @@ Compiling and Installing
 
 NetFEM is part of Charm++, so it can be downloaded as part of charm. To
 build NetFEM, just build FEM normally, or else do a make in
-charm/netlrts-linux/tmp/libs/ck-libs/netfem/.
+charm/netlrts-linux-x86_64/tmp/libs/ck-libs/netfem/.
 
 To link with NetFEM, add -module netfem to your program’s link line.
 Note that you do *not* need to use the FEM framework to use NetFEM.

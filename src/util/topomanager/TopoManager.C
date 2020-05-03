@@ -4,8 +4,8 @@
  *
  *  This would be the top level interface for all topology managers we
  *  will write for different machines (cray, bg/l ... for tori, meshes ...)
- *  Current plan is to have functionality for Blue Gene/L, Cray XT3,
- *  BigSim and non-topo machines.
+ *  Currently we have functionality for Blue Gene, Cray XT/XE,
+ *  and non-topo machines.
  */
 
 #include "TopoManager.h"

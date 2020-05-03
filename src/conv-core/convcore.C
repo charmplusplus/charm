@@ -2107,10 +2107,6 @@ void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
 
-  /* BIGSIM_OOC DEBUGGING
-  CmiPrintf("Resume normal thread with token[%p] ==> thread[%p]\n", token, t);
-  */
-
   if(t == NULL){
     free(token);
     return;
@@ -2124,10 +2120,6 @@ void CthResumeNormalThread(CthThreadToken* token)
 #endif
 #endif
   
-  /* BIGSIM_OOC DEBUGGING
-  CmiPrintf("In CthResumeNormalThread:   ");
-  CthPrintThdMagic(t);
-  */
 #if CMK_OMP
   CthSetPrev(t, CthSelf());
 #endif
@@ -4231,7 +4223,6 @@ double CmiLog2(double x) {
 }
 #endif
 
-/* for bigsim */
 int CmiMyRank_(void)
 {
   return CmiMyRank();
