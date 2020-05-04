@@ -166,7 +166,7 @@ CmiStartFn mymain(int argc, char *argv[])
   std::srand (unsigned(std::time(0)) + CmiMyPe());
 
   // set values to Pes
-  for (int i=0; i <  CmiNumPes(); i++) CpvAccess(peVector).push_back(i);
+  for (int i=0; i < CmiNumPes(); i++) CpvAccess(peVector).push_back(i);
 
   // using built-in random generator
   std::random_shuffle(CpvAccess(peVector).begin(), CpvAccess(peVector).end());
