@@ -11,7 +11,7 @@ add_library(ampi-compat compat_ampi.c
        compat_ampicpp.C)
 
 add_library(moduleampi ${ampi-cxx-sources} ${ampi-h-sources})
-add_dependencies(moduleampi moduletcharm ck)
+add_dependencies(moduleampi moduletcharm ck ampi_funcptr_shim ampi_funcptr_fortran )
 
 
 # fsglobals/pipglobals
@@ -25,11 +25,13 @@ add_library(ampi_funcptr_loader OBJECT ampi_funcptr_loader.C)
 add_library(ampi_funcptr_fsglobals OBJECT ampi_funcptr_fsglobals.C)
 add_library(ampi_funcptr_pipglobals OBJECT ampi_funcptr_pipglobals.C)
 
-add_dependencies(ampi_funcptr_shim moduleampi)
-add_dependencies(ampi_funcptr_fortran moduleampi)
-add_dependencies(ampi_funcptr_loader moduleampi)
-add_dependencies(ampi_funcptr_fsglobals moduleampi)
-add_dependencies(ampi_funcptr_pipglobals moduleampi)
+add_dependencies(ampi_funcptr_shim ck)
+add_dependencies(ampi_funcptr_fortran ck)
+add_dependencies(ampi_funcptr_loader ck)
+add_dependencies(ampi_funcptr_fsglobals ck)
+add_dependencies(ampi_funcptr_pipglobals ck)
+
+add_dependencies(moduleampi ampi_funcptr_shim ampi_funcptr_fortran ampi_funcptr_loader ampi_funcptr_fsglobals ampi_funcptr_pipglobals)
 
 add_custom_command(TARGET moduleampi
     POST_BUILD
