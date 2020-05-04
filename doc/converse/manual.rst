@@ -1935,7 +1935,10 @@ CcdPROCESSOR_LONG_IDLE
    This feature is useful for debugging hangs in applications. It can allow
    the user to add a user defined function as a hook to execute when the program
    goes into a long idle state, typically seen during hangs. The test program
-   ``tests/charm++/longIdle`` illustrates the usage of CcdPROCESSOR_LONG_IDLE
+   ``tests/charm++/longIdle`` illustrates the usage of CcdPROCESSOR_LONG_IDLE.
+   Since the usage of CcdPROCESSOR_LONG_IDLE uses additional timers in the
+   scheduler loop, it is only enabled with error checking builds and requires
+   the user to build the target with ``--enable-error-checking``.
 
 CcdPROCESSOR_BEGIN_BUSY
    Raised when a message first arrives on an idle processor. That is,
