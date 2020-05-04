@@ -1,23 +1,4 @@
 module CkArrayMap {
-  // Array Map object support:
-  group [migratable] CkArrayMap {
-  }
-
-  group [migratable] RRMap : CkArrayMap {
-    entry RRMap(void);
-  };
-
-  readonly CkGroupID _defaultArrayMapID;
-  readonly CkGroupID _fastArrayMapID;
-
-  group [migratable] DefaultArrayMap : RRMap {
-    entry DefaultArrayMap(void);
-  };
-
-  group [migratable] FastArrayMap : DefaultArrayMap {
-    entry FastArrayMap(void);
-  };
-
   PUPable RRMapObj;
   PUPable DefaultArrayMapObj;
   PUPable FastArrayMapObj;
@@ -51,8 +32,4 @@ module CkArrayMap {
     entry PropMap(void);
   };
 #endif
-
-  mainchare CkMapsInit {
-    entry CkMapsInit(CkArgMsg *m);
-  };
 }

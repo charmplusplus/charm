@@ -111,14 +111,6 @@ public:
   virtual int homePe(const CkArrayIndex& element) const = 0;
 };
 
-class CkArrayMap : public IrrGroup {
-public:
-  CkArrayMap() {}
-  CkArrayMap(CkMigrateMessage *m) : IrrGroup(m) {}
-
-  virtual CkArrayMapObj* getMapObj() const = 0;
-};
-
 extern void _CkMigratable_initInfoInit(void);
 
 #include "cklocrec.h"

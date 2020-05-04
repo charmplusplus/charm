@@ -7,10 +7,6 @@
 //whether to use block mapping in the SMP node level
 bool useNodeBlkMapping;
 
-// Group IDs for default maps
-CkGroupID _defaultArrayMapID;
-CkGroupID _fastArrayMapID;
-
 void CkArrayMapObj::setArrayOptions(const CkArrayOptions& opts) {
   options = opts;
 }
@@ -107,13 +103,6 @@ int RRMapObj::homePe(const CkArrayIndex& i) const {
   return home;
 }
 
-class RRMap : public CkArrayMap {
-public:
-  RRMap() {}
-  RRMap(CkMigrateMessage* m) : CkArrayMap(m) {}
-  CkArrayMapObj* getMapObj() const { return new RRMapObj(); }
-};
-
 /**
  * The default map object -- This does blocked mapping in the general case and
  * calls the round-robin homePe for the dynamic insertion case -- ASB
@@ -150,21 +139,6 @@ int DefaultArrayMapObj::homePe(const CkArrayIndex& i) const {
   }
 }
 
-// TODO: Not actually needed if we have to call setArrayOpts on unpack
-void DefaultArrayMapObj::pup(PUP::er& p) {
-  p | totalChares;
-  p | blockSize;
-  p | firstSet;
-  p | remainder;
-}
-
-class DefaultArrayMap : public RRMap {
-public:
-  DefaultArrayMap() {}
-  DefaultArrayMap(CkMigrateMessage* m) : RRMap(m) {}
-  CkArrayMapObj* getMapObj() const { return new DefaultArrayMapObj(); }
-};
-
 /**
  *  A fast map for chare arrays which do static insertions and promise NOT
  *  to do late insertions -- ASB
@@ -179,13 +153,6 @@ int FastArrayMapObj::homePe(const CkArrayIndex& i) const {
   int flati = flattenIndex(i);
   return (flati / blockSize);
 }
-
-class FastArrayMap : public DefaultArrayMap {
-public:
-  FastArrayMap() {}
-  FastArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m) {}
-  CkArrayMapObj* getMapObj() const { return new FastArrayMapObj(); }
-};
 
 #if 0
 /* *
@@ -910,18 +877,5 @@ public:
 };
 
 #endif
-
-class CkMapsInit : public Chare
-{
-public:
-	CkMapsInit(CkArgMsg *msg) {
-		//_defaultArrayMapID = CProxy_HilbertArrayMap::ckNew();
-		_defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
-		_fastArrayMapID = CProxy_FastArrayMap::ckNew();
-		delete msg;
-	}
-
-	CkMapsInit(CkMigrateMessage *m) {}
-};
 
 #include "CkArrayMap.def.h"

@@ -7,9 +7,6 @@
 
 /******************* Map object ******************/
 
-extern CkGroupID _defaultArrayMapID;
-extern CkGroupID _fastArrayMapID;
-
 /**
 \addtogroup CkArray
 */
@@ -70,7 +67,6 @@ public:
 
   void setArrayOptions(const CkArrayOptions& opts);
   int homePe(const CkArrayIndex& i) const;
-  void pup(PUP::er& p);
 };
 
 class FastArrayMapObj : public DefaultArrayMapObj {
