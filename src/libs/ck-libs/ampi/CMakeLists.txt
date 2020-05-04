@@ -25,6 +25,12 @@ add_library(ampi_funcptr_loader OBJECT ampi_funcptr_loader.C)
 add_library(ampi_funcptr_fsglobals OBJECT ampi_funcptr_fsglobals.C)
 add_library(ampi_funcptr_pipglobals OBJECT ampi_funcptr_pipglobals.C)
 
+add_dependencies(ampi_funcptr_shim modeuleampi)
+add_dependencies(ampi_funcptr_fortran modeuleampi)
+add_dependencies(ampi_funcptr_loader modeuleampi)
+add_dependencies(ampi_funcptr_fsglobals modeuleampi)
+add_dependencies(ampi_funcptr_pipglobals modeuleampi)
+
 add_custom_command(TARGET moduleampi
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim.dir/ampi_funcptr_shim.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim.o
