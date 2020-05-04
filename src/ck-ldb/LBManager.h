@@ -485,11 +485,11 @@ class LBManager : public CBase_LBManager
   }
 
   template <typename T>
-  void SetupPredictor(void (T::*on)(LBPredictorFunction*),
+  void SetupPredictor(T* data,
+                      void (T::*on)(LBPredictorFunction*),
                       void (T::*onWin)(LBPredictorFunction*, int),
                       void (T::*off)(void),
-                      void (T::*change)(LBPredictorFunction*),
-                      T* data)
+                      void (T::*change)(LBPredictorFunction*))
   {
     if (predictCBFn == nullptr) predictCBFn = new PredictCB;
     predictCBFn->on = [=](LBPredictorFunction* fn) { (data->*on)(fn); };

@@ -85,7 +85,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (_lb_predict) predicted_model = new FutureModel(_lb_predict_window);
   else predicted_model=0;
   // register user interface callbacks
-  lbmgr->SetupPredictor(&CentralLB::predictorOn, &CentralLB::predictorOn, &CentralLB::predictorOff, &CentralLB::changePredictor, this);
+  lbmgr->SetupPredictor(this, &CentralLB::predictorOn, &CentralLB::predictorOn, &CentralLB::predictorOff, &CentralLB::changePredictor);
 
   myspeed = lbmgr->ProcessorSpeed();
 
