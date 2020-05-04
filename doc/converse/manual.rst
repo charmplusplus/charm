@@ -1926,6 +1926,17 @@ CcdPROCESSOR_STILL_IDLE
    to execute. That is, this condition is raised while the processor
    utilization graph is flat.
 
+CcdPROCESSOR_LONG_IDLE
+   This is an extension of CcdPROCESSOR_STILL_IDLE for a relatively longer
+   period of time. It is raised when the scheduler finds that it doesn't
+   have any messages to execute for a long period of time. The default
+   LONG_IDLE time is 10 seconds. However, it is customizable using a user
+   passed runtime flag ``+longIdleThresh <long idle time in seconds>``.
+   This feature is useful for debugging hangs in applications. It can allow
+   the user to add a user defined function as a hook to execute when the program
+   goes into a long idle state, typically seen during hangs. The test program
+   ``tests/charm++/longIdle`` illustrates the usage of CcdPROCESSOR_LONG_IDLE
+
 CcdPROCESSOR_BEGIN_BUSY
    Raised when a message first arrives on an idle processor. That is,
    raised on the rising edge of the processor utilization graph.
