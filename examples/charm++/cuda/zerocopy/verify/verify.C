@@ -183,9 +183,7 @@ public:
     }
   }
 
-  void ResumeFromSync() {
-    CkPrintf("[Chare %d] Migrated from PE %d to %d\n", thisIndex, pe, CkMyPe());
-  }
+  void ResumeFromSync() {}
 };
 
 class VerifyGroup : public CBase_VerifyGroup {
