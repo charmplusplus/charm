@@ -96,23 +96,16 @@ void CkArrayMapObj::populateInitial(const CkArrayOptions& options, void* ctorMsg
   CkFreeMsg(ctorMsg);
 }
 
-class RRMapObj : public CkArrayMapObj {
-PUPable_decl(RRMapObj);
-public:
-  RRMapObj() {}
-  RRMapObj(CkMigrateMessage* m) {}
-
-  int homePe(const CkArrayIndex& i) const {
-    int flati = flattenIndex(i);
-    int home = flati % CkNumPes();
-  #if CMK_FAULT_EVAC
-    while(!CmiNodeAlive(home) || (home == CkMyPe() && CkpvAccess(startedEvac))) {
-      home = (home + 1) % CkNumPes();
-    }
-  #endif
-    return home;
+int RRMapObj::homePe(const CkArrayIndex& i) const {
+  int flati = flattenIndex(i);
+  int home = flati % CkNumPes();
+#if CMK_FAULT_EVAC
+  while(!CmiNodeAlive(home) || (home == CkMyPe() && CkpvAccess(startedEvac))) {
+    home = (home + 1) % CkNumPes();
   }
-};
+#endif
+  return home;
+}
 
 class RRMap : public CkArrayMap {
 public:
@@ -125,55 +118,45 @@ public:
  * The default map object -- This does blocked mapping in the general case and
  * calls the round-robin homePe for the dynamic insertion case -- ASB
  */
-class DefaultArrayMapObj : public CkArrayMapObj {
-PUPable_decl(DefaultArrayMapObj);
-protected:
-  int totalChares, blockSize, firstSet, remainder;
-public:
-  DefaultArrayMapObj()
-      : totalChares(0), blockSize(0), firstSet(0), remainder(0) {}
-  DefaultArrayMapObj(CkMigrateMessage* m) {}
+void DefaultArrayMapObj::setArrayOptions(const CkArrayOptions& opts) {
+  CkArrayMapObj::setArrayOptions(opts);
 
-  void setArrayOptions(const CkArrayOptions& opts) {
-    CkArrayMapObj::setArrayOptions(opts);
-
-    const CkArrayIndex& bounds = options.getBounds();
-    if (bounds.dimension >= 1) {
-      totalChares = 1;
-      for (int d = 0; d < bounds.dimension; d++) {
-        if (bounds.dimension <= 3) {
-          totalChares *= bounds.data()[d];
-        } else {
-          totalChares *= ((short int*)bounds.data())[d];
-        }
+  const CkArrayIndex& bounds = options.getBounds();
+  if (bounds.dimension >= 1) {
+    totalChares = 1;
+    for (int d = 0; d < bounds.dimension; d++) {
+      if (bounds.dimension <= 3) {
+        totalChares *= bounds.data()[d];
+      } else {
+        totalChares *= ((short int*)bounds.data())[d];
       }
     }
-    // TODO: What do do in cases of shrink/expand, chkpt/restart etc, where
-    // numPEs may change?
-    blockSize = std::max(totalChares / CkNumPes(), 1);
-    remainder = totalChares % CkNumPes();
-    firstSet = remainder * (blockSize + 1);
   }
+  // TODO: What do do in cases of shrink/expand, chkpt/restart etc, where
+  // numPEs may change?
+  blockSize = std::max(totalChares / CkNumPes(), 1);
+  remainder = totalChares % CkNumPes();
+  firstSet = remainder * (blockSize + 1);
+}
 
-  int homePe(const CkArrayIndex& i) const {
-    int flati = flattenIndex(i);
-    if (flati < firstSet) {
-      return flati / (blockSize + 1);
-    } else if (flati < totalChares) {
-      return ((flati - firstSet) / blockSize) + remainder;
-    } else {
-      return flati % CkNumPes();
-    }
+int DefaultArrayMapObj::homePe(const CkArrayIndex& i) const {
+  int flati = flattenIndex(i);
+  if (flati < firstSet) {
+    return flati / (blockSize + 1);
+  } else if (flati < totalChares) {
+    return ((flati - firstSet) / blockSize) + remainder;
+  } else {
+    return flati % CkNumPes();
   }
+}
 
-  // TODO: Not actually needed if we have to call setArrayOpts on unpack
-  void pup(PUP::er& p) {
-    p | totalChares;
-    p | blockSize;
-    p | firstSet;
-    p | remainder;
-  }
-};
+// TODO: Not actually needed if we have to call setArrayOpts on unpack
+void DefaultArrayMapObj::pup(PUP::er& p) {
+  p | totalChares;
+  p | blockSize;
+  p | firstSet;
+  p | remainder;
+}
 
 class DefaultArrayMap : public RRMap {
 public:
@@ -186,23 +169,16 @@ public:
  *  A fast map for chare arrays which do static insertions and promise NOT
  *  to do late insertions -- ASB
  */
-class FastArrayMapObj : public DefaultArrayMapObj {
-PUPable_decl(FastArrayMapObj);
-public:
-  FastArrayMapObj() {}
-  FastArrayMapObj(CkMigrateMessage* m) : DefaultArrayMapObj(m) {}
+void FastArrayMapObj::setArrayOptions(const CkArrayOptions& opts) {
+  DefaultArrayMapObj::setArrayOptions(opts);
+  // For this simple map, we want the ceiling of blockSize
+  if (remainder > 0) blockSize++;
+}
 
-  void setArrayOptions(const CkArrayOptions& opts) {
-    DefaultArrayMapObj::setArrayOptions(opts);
-    // For this simple map, we want the ceiling of blockSize
-    if (remainder > 0) blockSize++;
-  }
-
-  int homePe(const CkArrayIndex& i) const {
-    int flati = flattenIndex(i);
-    return (flati / blockSize);
-  }
-};
+int FastArrayMapObj::homePe(const CkArrayIndex& i) const {
+  int flati = flattenIndex(i);
+  return (flati / blockSize);
+}
 
 class FastArrayMap : public DefaultArrayMap {
 public:

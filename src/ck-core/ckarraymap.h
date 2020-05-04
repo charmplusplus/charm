@@ -3,6 +3,8 @@
 
 #include "CkArrayMap.decl.h"
 
+#include "cklocation.h"
+
 /******************* Map object ******************/
 
 extern CkGroupID _defaultArrayMapID;
@@ -47,6 +49,39 @@ public:
 };
 
 #endif
+
+class RRMapObj : public CkArrayMapObj {
+PUPable_decl(RRMapObj);
+public:
+  RRMapObj() {}
+  RRMapObj(CkMigrateMessage* m) {}
+
+  int homePe(const CkArrayIndex& i) const;
+};
+
+class DefaultArrayMapObj : public CkArrayMapObj {
+PUPable_decl(DefaultArrayMapObj);
+protected:
+  int totalChares, blockSize, firstSet, remainder;
+public:
+  DefaultArrayMapObj()
+      : totalChares(0), blockSize(0), firstSet(0), remainder(0) {}
+  DefaultArrayMapObj(CkMigrateMessage* m) {}
+
+  void setArrayOptions(const CkArrayOptions& opts);
+  int homePe(const CkArrayIndex& i) const;
+  void pup(PUP::er& p);
+};
+
+class FastArrayMapObj : public DefaultArrayMapObj {
+PUPable_decl(FastArrayMapObj);
+public:
+  FastArrayMapObj() {}
+  FastArrayMapObj(CkMigrateMessage* m) : DefaultArrayMapObj(m) {}
+
+  void setArrayOptions(const CkArrayOptions& opts);
+  int homePe(const CkArrayIndex& i) const;
+};
 
 /*@}*/
 
