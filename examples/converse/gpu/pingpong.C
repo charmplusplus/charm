@@ -88,46 +88,35 @@ CmiStartFn mymain(int argc, char** argv) {
   // Initialize CPU topology
   CmiInitCPUTopology(argv);
 
-  // Wait for all PEs of the node to complete topology init
   CmiNodeAllBarrier();
 
   // Default parameters
   CpvAccess(msg_size) = 128;
   CpvAccess(n_iters) = 100;
 
-  // Process runtime parameters
-  argc = CmiGetArgc(argv);
-  int c;
-  while ((c = getopt(argc, argv, "s:i:")) != -1) {
-    switch (c) {
-      case 's':
-        CpvAccess(msg_size) = atoi(optarg);
-        break;
-      case 'i':
-        CpvAccess(n_iters) = atoi(optarg);
-        break;
-      default:
-        CmiAbort("Unknown command line argument detected");
-    }
-  }
-  /*
-  if (argc == 3) {
-    CpvAccess(msg_size) = atoi(argv[1]);
-    CpvAccess(n_iters) = atoi(argv[2]);
-  } else if (argc == 1) {
-    CpvAccess(msg_size) = 128;
-    CpvAccess(n_iters) = 100;
-  } else {
-    CmiAbort("Usage: %s <msg_size> <n_iters>\n", argv[0]);
-  }
-  */
-
   if (CmiMyPe() == 0) {
-    CmiPrintf("[GPU pingpong]\nMsg size: %d, iterations: %d\n", CpvAccess(msg_size), CpvAccess(n_iters));
-  }
+    // Process runtime parameters
+    // getopt only works properly when only used by PE 0
+    argc = CmiGetArgc(argv);
+    int c;
+    while ((c = getopt(argc, argv, "s:i:")) != -1) {
+      switch (c) {
+        case 's':
+          CpvAccess(msg_size) = atoi(optarg);
+          break;
+        case 'i':
+          CpvAccess(n_iters) = atoi(optarg);
+          break;
+        default:
+          CmiAbort("Unknown command line argument detected");
+      }
+    }
 
-  // Start!
-  //startRing();
+    CmiPrintf("[GPU pingpong]\nMsg size: %d, iterations: %d\n", CpvAccess(msg_size), CpvAccess(n_iters));
+
+    // Start!
+    startRing();
+  }
 
   return 0;
 }
