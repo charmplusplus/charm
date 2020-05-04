@@ -2,6 +2,7 @@
 #define _CKRDMAUTILS_H
 
 #include "conv-header.h"
+#include <limits>
 
 // Structure that can be used across layers
 typedef struct ncpystruct{
