@@ -64,6 +64,7 @@ class CkArrayListener : public PUP::able {
   virtual void flushState() {}
 };
 
+class CkArrayMapObj;
 /*********************** CkArrayOptions *******************************/
 /// Arguments for array creation:
 class CkArrayOptions {
@@ -73,7 +74,7 @@ class CkArrayOptions {
   CkArrayIndex numInitial;  ///< Number of elements to create
   /// Limits of element counts in each dimension of this and all bound arrays
   CkArrayIndex bounds;
-  CkGroupID map;       ///< Array location map object
+  CkArrayMapObj* mapObj;
   CkGroupID locMgr;    ///< Location manager to bind to
   CkGroupID mCastMgr;  /// <ckmulticast mgr to bind to, for sections
   CkPupAblePtrVec<CkArrayListener> arrayListeners;  // CkArrayListeners for this array
@@ -200,9 +201,8 @@ class CkArrayOptions {
     return *this;
   }
 
-  /// Use this location map
-  CkArrayOptions& setMap(const CkGroupID& m) {
-    map = m;
+  CkArrayOptions& setMapObj(CkArrayMapObj* o) {
+    mapObj = o;
     return *this;
   }
 
@@ -252,7 +252,7 @@ class CkArrayOptions {
   const CkArrayIndex& getStep(void) const { return step; }
   const CkArrayIndex& getNumInitial(void) const { return numInitial; }
   const CkArrayIndex& getBounds(void) const { return bounds; }
-  const CkGroupID& getMap(void) const { return map; }
+  CkArrayMapObj* getMapObj() const { return mapObj; }
   const CkGroupID& getLocationManager(void) const { return locMgr; }
   const CkGroupID& getMcastManager(void) const { return mCastMgr; }
   bool isSectionAutoDelegated(void) const { return sectionAutoDelegate; }

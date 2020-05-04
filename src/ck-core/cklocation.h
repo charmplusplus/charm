@@ -490,9 +490,7 @@ private:
 	/// The core of the location manager: map array index to element representative
 	LocRecHash hash;
 
-	//Map object
-	CkGroupID mapID;
-	int mapHandle;
+  CkArrayOptions options;
 	CkArrayMapObj *map;
 
 	CkGroupID lbmgrID;

@@ -586,7 +586,6 @@ static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
   if (locMgr.isZero())
   { //Create a new location manager
     CkEntryOptions  e_opts;
-    e_opts.setGroupDepID(opts.getMap());       // group creation dependence
     locMgr = CProxy_CkLocMgr::ckNew(opts, &e_opts);
     opts.setLocationManager(locMgr);
   }

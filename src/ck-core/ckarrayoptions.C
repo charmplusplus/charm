@@ -9,7 +9,7 @@ CkArrayOptions::CkArrayOptions(void)  // Default: empty array
       step(),
       numInitial(),
       bounds(),
-      map(_defaultArrayMapID) {
+      mapObj(NULL) {
   init();
 }
 
@@ -19,7 +19,7 @@ CkArrayOptions::CkArrayOptions(int ndims, int dims[]) // With initial elements (
       step(CkArrayIndex(ndims, 1)),
       numInitial(end),
       bounds(end),
-      map(_defaultArrayMapID) {
+      mapObj(NULL) {
   init();
 }
 
@@ -29,7 +29,7 @@ CkArrayOptions::CkArrayOptions(int ni1)  // With initial elements (1D)
       step(CkArrayIndex1D(1)),
       numInitial(end),
       bounds(end),
-      map(_defaultArrayMapID) {
+      mapObj(NULL) {
   init();
 }
 
@@ -39,7 +39,7 @@ CkArrayOptions::CkArrayOptions(int ni1, int ni2)  // With initial elements (2D)
       step(CkArrayIndex2D(1, 1)),
       numInitial(end),
       bounds(end),
-      map(_defaultArrayMapID) {
+      mapObj(NULL) {
   init();
 }
 
@@ -49,7 +49,7 @@ CkArrayOptions::CkArrayOptions(int ni1, int ni2, int ni3)  // With initial eleme
       step(CkArrayIndex3D(1, 1, 1)),
       numInitial(end),
       bounds(end),
-      map(_defaultArrayMapID) {
+      mapObj(NULL) {
   init();
 }
 
@@ -60,7 +60,7 @@ CkArrayOptions::CkArrayOptions(short int ni1, short int ni2, short int ni3,
       step(CkArrayIndex4D(1, 1, 1, 1)),
       numInitial(end),
       bounds(end),
-      map(_defaultArrayMapID) {
+      mapObj(NULL) {
   init();
 }
 
@@ -71,7 +71,7 @@ CkArrayOptions::CkArrayOptions(short int ni1, short int ni2, short int ni3, shor
       step(CkArrayIndex5D(1, 1, 1, 1, 1)),
       numInitial(end),
       bounds(end),
-      map(_defaultArrayMapID) {
+      mapObj(NULL) {
   init();
 }
 
@@ -83,7 +83,7 @@ CkArrayOptions::CkArrayOptions(short int ni1, short int ni2, short int ni3, shor
       step(CkArrayIndex6D(1, 1, 1, 1, 1, 1)),
       numInitial(end),
       bounds(end),
-      map(_defaultArrayMapID) {
+      mapObj(NULL) {
   init();
 }
 
@@ -93,7 +93,7 @@ CkArrayOptions::CkArrayOptions(CkArrayIndex s, CkArrayIndex e, CkArrayIndex step
       step(step),
       numInitial(end),
       bounds(end),
-      map(_defaultArrayMapID) {
+      mapObj(NULL) {
   init();
 }
 
@@ -110,7 +110,6 @@ void CkArrayOptions::init() {
 
 CkArrayOptions& CkArrayOptions::setStaticInsertion(bool b) {
   staticInsertion = b;
-  if (b && map == _defaultArrayMapID) map = _fastArrayMapID;
   return *this;
 }
 
@@ -185,7 +184,7 @@ void CkArrayOptions::pup(PUP::er& p) {
   p | step;
   p | numInitial;
   p | bounds;
-  p | map;
+  p | mapObj;
   p | locMgr;
   p | mCastMgr;
   p | arrayListeners;
