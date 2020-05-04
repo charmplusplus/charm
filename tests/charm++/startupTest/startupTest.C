@@ -83,23 +83,23 @@ main::main(CkArgMsg *msg)
     }
   //create one-five by map then array
 
-  CProxy_OneMap oneMap = CProxy_OneMap::ckNew(WasteUnits);
+  //CProxy_OneMap oneMap = CProxy_OneMap::ckNew(WasteUnits);
   CkArrayOptions arrOpts;
-  arrOpts.setMap(oneMap);
+  arrOpts.setMapObj(new OneMap(WasteUnits));
   oneProxy  = CProxy_ReadArrOne::ckNew(arrSize, WasteUnits, cb[0],arrOpts);  
   for(int i=0;i<arrSize;i++)
     oneProxy(i).insert(arrSize, WasteUnits,cb[0]);
   oneProxy.doneInserting();
 
-  CProxy_TwoMap twoMap = CProxy_TwoMap::ckNew(WasteUnits);
-  arrOpts.setMap(twoMap);
+  //CProxy_TwoMap twoMap = CProxy_TwoMap::ckNew(WasteUnits);
+  arrOpts.setMapObj(new TwoMap(WasteUnits));
   twoProxy  = CProxy_ReadArrTwo::ckNew(arrSize, WasteUnits, cb[1],arrOpts);  
   for(int i=0;i<arrSize;i++)
     twoProxy(i).insert(arrSize, WasteUnits,cb[1]);
   twoProxy.doneInserting();
 
-  CProxy_ThreeMap threeMap = CProxy_ThreeMap::ckNew(WasteUnits);
-  arrOpts.setMap(threeMap);
+  //CProxy_ThreeMap threeMap = CProxy_ThreeMap::ckNew(WasteUnits);
+  arrOpts.setMapObj(new ThreeMap(WasteUnits));
   threeProxy  = CProxy_ReadArrThree::ckNew(arrSize, WasteUnits, cb[2],arrOpts);  
   for(int i=0;i<arrSize;i++)
     threeProxy(i).insert(arrSize, WasteUnits,cb[2]);
@@ -107,8 +107,8 @@ main::main(CkArgMsg *msg)
 
   // make 4 new style
   CkArrayOptions arrOptsBulk(arrSize);
-  CProxy_FourMap fourMap = CProxy_FourMap::ckNew(WasteUnits);
-  arrOptsBulk.setMap(fourMap);
+  //CProxy_FourMap fourMap = CProxy_FourMap::ckNew(WasteUnits);
+  arrOptsBulk.setMapObj(new FourMap(WasteUnits));
   fourProxy  = CProxy_ReadArrFour::ckNew(arrSize,WasteUnits,cb[3],arrOptsBulk);  
   /*  for(int i=0;i<arrSize;i++)
       fourProxy(i).insert(arrSize, WasteUnits);*/
@@ -126,8 +126,8 @@ main::main(CkArgMsg *msg)
   //#define SIX_INSERT
 #ifdef SIX_INSERT
   // if you make six this way it may lose the race with seven 
-  CProxy_SixMap sixMap = CProxy_SixMap::ckNew(WasteUnits);
-  arrOpts.setMap(sixMap);
+  //CProxy_SixMap sixMap = CProxy_SixMap::ckNew(WasteUnits);
+  arrOpts.setMapObj(new SixMap(WasteUnits));
   sixProxy  = CProxy_ReadArrSix::ckNew(arrSize, arrSize2, WasteUnits,cb[5], arrOpts);  
   for(int i=0;i<arrSize;i++)
     for(int j=0;j<arrSize2;j++)
@@ -136,8 +136,8 @@ main::main(CkArgMsg *msg)
 #else
   // bulk build six
   CkArrayOptions arrOptsSix(arrSize,arrSize2);
-  CProxy_SixMap sixMap = CProxy_SixMap::ckNew(WasteUnits);
-  arrOptsSix.setMap(sixMap);
+  //CProxy_SixMap sixMap = CProxy_SixMap::ckNew(WasteUnits);
+  arrOptsSix.setMapObj(new SixMap(WasteUnits));
   sixProxy  = CProxy_ReadArrSix::ckNew(arrSize,arrSize2, WasteUnits, cb[5],arrOptsSix);  
   sixProxy.doneInserting();
 

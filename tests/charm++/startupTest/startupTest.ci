@@ -82,24 +82,10 @@ mainmodule startupTest {
   };        	
 
 	
-  group OneMap : CkArrayMap {
-	entry OneMap(double);
-  };
-
-  group TwoMap : CkArrayMap {
-	entry TwoMap(double);
-  };
-  group ThreeMap : CkArrayMap {
-	entry ThreeMap(double);
-  };
-  group FourMap : CkArrayMap {
-	entry FourMap(double);
-  };
-  group FiveMap : CkArrayMap {
-	entry FiveMap(double);
-  };
-
-  group SixMap : CkArrayMap {
-	entry SixMap(double);
-  };
+  PUPable OneMap;
+  PUPable TwoMap;
+  PUPable ThreeMap;
+  PUPable FourMap;
+  PUPable FiveMap;
+  PUPable SixMap;
 };

@@ -367,7 +367,8 @@ class ReadArrSeven : public CBase_ReadArrSeven
 
 
 
-class OneMap: public CkArrayMap, public CkArrayMapObj {
+class OneMap: public CkArrayMapObj {
+PUPable_decl(OneMap);
  public:
   double howmuch;
   OneMap(double _howmuch): howmuch(_howmuch)
@@ -375,11 +376,12 @@ class OneMap: public CkArrayMap, public CkArrayMapObj {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-  CkArrayMapObj* getMapObj() const { return new OneMap(howmuch); }
+  OneMap(CkMigrateMessage* msg) {}
   int homePe(const CkArrayIndex&) const;
 };
 
-class TwoMap: public CkArrayMap, public CkArrayMapObj {
+class TwoMap: public CkArrayMapObj {
+PUPable_decl(TwoMap);
  public:
   double howmuch;
   TwoMap(double _howmuch): howmuch(_howmuch)
@@ -387,11 +389,12 @@ class TwoMap: public CkArrayMap, public CkArrayMapObj {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-    CkArrayMapObj* getMapObj() const { return new TwoMap(howmuch); }
+  TwoMap(CkMigrateMessage* msg) {}
     int homePe(const CkArrayIndex&) const;
 };
 
-class ThreeMap: public CkArrayMap, public CkArrayMapObj {
+class ThreeMap: public CkArrayMapObj {
+PUPable_decl(ThreeMap);
  public:
   double howmuch;
   ThreeMap(double _howmuch) : howmuch(_howmuch)
@@ -399,11 +402,12 @@ class ThreeMap: public CkArrayMap, public CkArrayMapObj {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-    CkArrayMapObj* getMapObj() const { return new ThreeMap(howmuch); }
+  ThreeMap(CkMigrateMessage* msg) {}
     int homePe(const CkArrayIndex&) const;
 };
 
-class FourMap: public CkArrayMap, public CkArrayMapObj {
+class FourMap: public CkArrayMapObj {
+PUPable_decl(FourMap);
  public:
   double howmuch;
   FourMap(double _howmuch) : howmuch(_howmuch)
@@ -411,11 +415,12 @@ class FourMap: public CkArrayMap, public CkArrayMapObj {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-    CkArrayMapObj* getMapObj() const { return new FourMap(howmuch); }
+  FourMap(CkMigrateMessage* msg) {}
     int homePe(const CkArrayIndex&) const;
 };
 
-class FiveMap: public CkArrayMap, public CkArrayMapObj {
+class FiveMap: public CkArrayMapObj {
+PUPable_decl(FiveMap);
  public:
   double howmuch;
   FiveMap(double _howmuch) : howmuch(_howmuch)
@@ -423,12 +428,13 @@ class FiveMap: public CkArrayMap, public CkArrayMapObj {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-    CkArrayMapObj* getMapObj() const { return new FiveMap(howmuch); }
+  FiveMap(CkMigrateMessage* msg) {}
     int homePe(const CkArrayIndex&) const;
 };
 
 
-class SixMap: public CkArrayMap, public CkArrayMapObj {
+class SixMap: public CkArrayMapObj {
+PUPable_decl(SixMap);
  public:
   double howmuch;
   SixMap(double _howmuch) : howmuch(_howmuch)
@@ -436,6 +442,6 @@ class SixMap: public CkArrayMap, public CkArrayMapObj {
       CheckAllReadOnly();
       WasteTime(howmuch);
     }
-  CkArrayMapObj* getMapObj() const { return new SixMap(howmuch); }
+  SixMap(CkMigrateMessage* msg) {}
   int homePe(const CkArrayIndex&) const;
 };
