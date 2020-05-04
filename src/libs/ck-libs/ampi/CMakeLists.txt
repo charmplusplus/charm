@@ -25,11 +25,11 @@ add_library(ampi_funcptr_loader OBJECT ampi_funcptr_loader.C)
 add_library(ampi_funcptr_fsglobals OBJECT ampi_funcptr_fsglobals.C)
 add_library(ampi_funcptr_pipglobals OBJECT ampi_funcptr_pipglobals.C)
 
-add_dependencies(ampi_funcptr_shim modeuleampi)
-add_dependencies(ampi_funcptr_fortran modeuleampi)
-add_dependencies(ampi_funcptr_loader modeuleampi)
-add_dependencies(ampi_funcptr_fsglobals modeuleampi)
-add_dependencies(ampi_funcptr_pipglobals modeuleampi)
+add_dependencies(ampi_funcptr_shim moduleampi)
+add_dependencies(ampi_funcptr_fortran moduleampi)
+add_dependencies(ampi_funcptr_loader moduleampi)
+add_dependencies(ampi_funcptr_fsglobals moduleampi)
+add_dependencies(ampi_funcptr_pipglobals moduleampi)
 
 add_custom_command(TARGET moduleampi
     POST_BUILD
