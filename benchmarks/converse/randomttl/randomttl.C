@@ -36,6 +36,7 @@ std::mt19937 gen(rd());
 
 // Method to get a random value from the peVector
 int getRandomKFromPeVector() {
+  CmiAssert(CpvAccess(peVector).size() == CmiNumPes());
   std::vector<int>::iterator start = CpvAccess(peVector).begin();
   std::vector<int>::iterator end = CpvAccess(peVector).end();
 
@@ -49,18 +50,11 @@ void handleInitiate(char *initiateMsg) {
 
   CmiFree(initiateMsg);
 
-  std::srand (unsigned(std::time(0)) + CmiMyPe());
-
   // Create a message to hold an integer
   ttlMsg *msg = (ttlMsg *)CmiAlloc(sizeof(ttlMsg));
   msg->ttlVal = CpvAccess(ttl);
   CmiSetHandler(msg, CpvAccess(ttlMsgHandler));
 
-  // set values to Pes
-  for (int i=0; i <  CmiNumPes(); i++) CpvAccess(peVector).push_back(i);
-
-  // using built-in random generator
-  std::random_shuffle(CpvAccess(peVector).begin(), CpvAccess(peVector).end());
 
   // send messages to random k pes
   for (int i=0; i < CpvAccess(k); i++) {
@@ -95,8 +89,8 @@ void handleCompletion(ttlMsg *msg) {
   if(CpvAccess(compCounter) == CpvAccess(k) * CmiNumPes()) { // All launched ttls are complete
 
     CpvAccess(endTime) = CmiWallTimer();
-    CmiPrintf("[%d][%d][%d] Random TTL Completed, time taken is %lf us\n", CmiMyPe(), CmiMyNode(),
-                                                  CmiMyRank(), 1e6*(CpvAccess(endTime)-CpvAccess(startTime)));
+    CmiPrintf("[%d][%d][%d] Random TTL Completed, time taken is %lf s\n", CmiMyPe(), CmiMyNode(),
+                                                  CmiMyRank(), (CpvAccess(endTime)-CpvAccess(startTime)));
     // Exit, reuse msg
     CmiSetHandler(msg, CpvAccess(exitHandler));
     CmiSyncBroadcastAllAndFree(sizeof(ttlMsg), msg);
@@ -168,6 +162,14 @@ CmiStartFn mymain(int argc, char *argv[])
     if(CmiMyPe() == 0)
       CmiAbort("Usage: ./randomttl <k> <ttl>\n");
   }
+
+  std::srand (unsigned(std::time(0)) + CmiMyPe());
+
+  // set values to Pes
+  for (int i=0; i <  CmiNumPes(); i++) CpvAccess(peVector).push_back(i);
+
+  // using built-in random generator
+  std::random_shuffle(CpvAccess(peVector).begin(), CpvAccess(peVector).end());
 
   if(CmiMyPe() == 0) {
     if(CpvAccess(k) > CmiNumPes())
