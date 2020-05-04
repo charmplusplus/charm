@@ -644,21 +644,23 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
   CkArrayOptions opts(msg->numElements);
   CkAssert(CkpvAccess(mapCreated)==true);
 
-  if(haveConfigurableRRMap()){
+  /*if(haveConfigurableRRMap()){
     CkPrintf("TCharm> using ConfigurableRRMap\n");
     mapID=CProxy_ConfigurableRRMap::ckNew();
     opts.setMap(mapID);
-  } else if(mapping==NULL){
+  } else*/ if(mapping==NULL){
     /* do nothing: use the default map */
   } else if(0 == strcmp(mapping,"BLOCK_MAP")) {
     CkPrintf("TCharm> using BLOCK_MAP\n");
-    mapID = CProxy_BlockMap::ckNew();
-    opts.setMap(mapID);
+    // TODO: Same as default map
+    //mapID = CProxy_BlockMap::ckNew();
+    //opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"RR_MAP")) {
     CkPrintf("TCharm> using RR_MAP\n");
-    mapID = CProxy_RRMap::ckNew();
-    opts.setMap(mapID);
-  } else if(0 == strcmp(mapping,"MAPFILE")) {
+    //mapID = CProxy_RRMap::ckNew();
+    //opts.setMap(mapID);
+    opts.setMapObj(new RRMapObj());
+  } /*else if(0 == strcmp(mapping,"MAPFILE")) {
     CkPrintf("TCharm> reading map from mapfile\n");
     mapID = CProxy_ReadFileMap::ckNew();
     opts.setMap(mapID);
@@ -666,7 +668,7 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     CkPrintf("TCharm> using PROP_MAP\n");
     mapID = CkCreatePropMap();
     opts.setMap(mapID);
-  }
+  }*/
   opts.setStaticInsertion(true);
   opts.setSectionAutoDelegate(false);
   return CProxy_TCharm::ckNew(msg,opts);
