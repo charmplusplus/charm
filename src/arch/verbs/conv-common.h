@@ -25,7 +25,7 @@
 */
 #define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
 #if CMK_ERROR_CHECKING
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1, msgLayerType:1; CmiInt4 uniqMsgId; CmiUInt4 msgSrcPe;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1, msgLayerType:1, commSender:1; CmiInt4 uniqMsgId; CmiUInt4 msgSrcPe, msgSrcNode;
 #else
 #define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
 #endif

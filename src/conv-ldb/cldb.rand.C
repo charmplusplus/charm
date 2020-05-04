@@ -148,7 +148,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
   if (node == CmiMyNode() && !CmiImmIsRunning()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
 #if CMK_ERROR_CHECKING
-    if(trackMessages) addToTracking((char *)msg, CmiMyPe());
+    if(trackMessages) addToTracking((char *)msg, CmiMyNode(), true);
 #endif
     CsdNodeEnqueueGeneral(msg, queueing, priobits, prioptr);
   } else {

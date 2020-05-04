@@ -37,6 +37,7 @@ void _receiveTrackingAck(trackingAckMsg *ackMsg) {
   CmiIntMsgInfoMap::iterator iter;
   std::vector<int>::iterator iter2;
   int uniqId = ackMsg->senderUniqId;
+  int dest = CMI_SRC_PE(ackMsg);
   iter = CpvAccess(sentUniqMsgIds).find(uniqId);
   msgInfo info;
 
@@ -44,14 +45,21 @@ void _receiveTrackingAck(trackingAckMsg *ackMsg) {
 
     info = iter->second;
 
-    iter2 = find(info.destPes.begin(), info.destPes.end(), CMI_SRC_PE(ackMsg));
+    if(info.nodeLevel)
+      dest = CmiNodeOf(dest);
+
+    iter2 = find(info.destPes.begin(), info.destPes.end(), dest);
 
     if(iter2 != info.destPes.end()) {
       // element found, remove it
       info.destPes.erase(iter2);
 
     } else {
-      CmiAbort("[%d][%d][%d] Sender Invalid Pe:%d returned back for msg id:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), CMI_SRC_PE(ackMsg), ackMsg->senderUniqId);
+      CmiPrintf("[%d][%d][%d] Sender valid dest pes for msgId:%d are:\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId);
+      for(int i=0; i<info.destPes.size(); i++) {
+        CmiPrintf("[%d][%d][%d] Pe:%d = [%d]\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, info.destPes[i]);
+      }
+      CmiAbort("[%d][%d][%d] ******* Sender Invalid Pe:%d (other Pe:%d) returned back for msg id:%d and msg:%p and nodeLevel is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), dest, ackMsg->senderPe, ackMsg->senderUniqId, ackMsg, info.nodeLevel);
     }
 
     if(info.destPes.size() == 0) { // last count, remove map entry
@@ -63,7 +71,7 @@ void _receiveTrackingAck(trackingAckMsg *ackMsg) {
     }
   } else {
     //CmiPrintf("[%d][%d][%d] Sender Invalid msg id:%d returned back\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId);
-    CmiAbort("[%d][%d][%d] Sender Invalid msg id:%d returned back\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId);
+    CmiAbort("[%d][%d][%d] Sender Invalid msg id:%d returned back from PE:%d node:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId, CMI_SRC_PE(ackMsg), CMI_SRC_NODE(ackMsg));
   }
   CmiFree(ackMsg);
 }
@@ -131,6 +139,8 @@ void CmiMessageTrackerCharmInit(charmLevelFn fn) {
 void CmiMessageTrackerInit() {
 
   DEBUG(CmiPrintf("[%d][%d][%d] CmiMessageTrackerInit\n", CmiMyPe(), CmiMyNode(), CmiMyRank());)
+  CpvInitialize(CmiIntMsgInfoMap, sentUniqMsgIds);
+
   CpvInitialize(int, uniqMsgId);
   CpvAccess(uniqMsgId) = 0;
 
@@ -152,12 +162,22 @@ inline int getNewUniqId() {
   return ++CpvAccess(uniqMsgId);
 }
 
-inline void insertUniqIdEntry(char *msg, int destPe) {
+inline void insertUniqIdEntry(char *msg, int destPe, bool nodeLevel) {
   int uniqId = getNewUniqId();
 
   CMI_UNIQ_MSG_ID(msg) = uniqId;
-  CMI_SRC_PE(msg)      = CmiMyPe();
 
+#if CMK_SMP
+  if(CmiMyRank() == CmiMyNodeSize()) {
+    CMI_MSG_COMM_SENDER(msg) = 1;
+    CMI_SRC_NODE(msg) = CmiMyNode();
+  } else
+#endif
+  {
+    CMI_MSG_COMM_SENDER(msg) = 0;
+  }
+
+  CMI_SRC_PE(msg) = CmiMyPe();
   msgInfo info;
   info.type = CMI_MSG_LAYER_TYPE(msg);
   info.destPes.push_back(destPe);
@@ -170,43 +190,50 @@ inline void insertUniqIdEntry(char *msg, int destPe) {
     info.ep = 0;
   }
 
-  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
+  info.nodeLevel = nodeLevel;
+
+  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d, isNodeLevel:%d, msg:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe, nodeLevel, msg);)
+
   CpvAccess(sentUniqMsgIds).insert({uniqId, info});
 }
 
-void addToTracking(char *msg, int destPe) {
+void addToTracking(char *msg, int destPe, bool nodeLevel) {
 
   // Do not track ack messages
-  if(CmiGetHandler(msg) == CpvAccess(msgTrackHandler)) {
-    CMI_UNIQ_MSG_ID(msg) = -2;
-    CMI_SRC_PE(msg)      = CmiMyPe();
+  if(CmiGetHandler(msg) == CpvAccess(msgTrackHandler) || CMI_UNIQ_MSG_ID(msg) == -14) {
+    // Do nothing
     return;
   }
 
   int uniqId = CMI_UNIQ_MSG_ID(msg);
 
-  if(uniqId == -12 || uniqId == -11) {
+  if(uniqId == -11 || uniqId == -12 || uniqId == -13) {
     // do not track
     return;
   }
 
   if(uniqId <= 0) {
     // uniqId not yet set
-    insertUniqIdEntry(msg, destPe);
+    insertUniqIdEntry(msg, destPe, nodeLevel);
   } else {
     // uniqId already set, increase count
     CmiIntMsgInfoMap::iterator iter;
     iter = CpvAccess(sentUniqMsgIds).find(uniqId);
 
     if(iter != CpvAccess(sentUniqMsgIds).end()) {
-      //iter->second.count++; // increment counter
-      iter->second.destPes.push_back(destPe);
-
       msgInfo info = iter->second;
 
-      DEBUG(CmiPrintf("[%d][%d][%d] INCREMENTING COUNTER uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
+      if(nodeLevel != info.nodeLevel) {
+        // should add a new entry
+        insertUniqIdEntry(msg, destPe, nodeLevel);
+
+      } else {
+        //iter->second.count++; // increment counter
+        iter->second.destPes.push_back(destPe);
+        DEBUG(CmiPrintf("[%d][%d][%d] INCREMENTING COUNTER uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
+      }
     } else {
-      insertUniqIdEntry(msg, destPe);
+      insertUniqIdEntry(msg, destPe, nodeLevel);
     }
   }
 }
@@ -223,23 +250,50 @@ void sendTrackingAck(char *msg) {
 
   if(uniqId <= 0) {
 
-    //CmiPrintf("[%d][%d][%d] Receiver received message with invalid id:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId);
-    CmiAbort("[%d][%d][%d] Receiver received message with invalid id:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId);
+    //CmiPrintf("[%d][%d][%d] Receiver received message with invalid id:%d and msg is %p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, msg);
+    CmiAbort("[%d][%d][%d] Receiver received message %p with invalid id:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), msg, uniqId);
 
   } else {
 
     trackingAckMsg *ackMsg = (trackingAckMsg *)CmiAlloc(sizeof(trackingAckMsg));
     ackMsg->senderUniqId = CMI_UNIQ_MSG_ID(msg);
+    ackMsg->senderPe = CmiMyPe();
+
+    int srcPe = CMI_SRC_PE(msg);
 
     CMI_SRC_PE(ackMsg)      = CmiMyPe();
-    // To deal with messages that get enqueued twice
-    markAcked(msg);
+    CMI_UNIQ_MSG_ID(ackMsg) = -14;
+
+
+    if(CMI_MSG_NOKEEP(msg)) {
+      // Same message reused, ensure that the count drops to 1
+      if(CmiGetReference(msg) == 1) {
+        // To deal with messages that get enqueued twice
+        markAcked(msg);
+      }
+    } else {
+      // To deal with messages that get enqueued twice
+      markAcked(msg);
+    }
 
     CmiSetHandler(ackMsg, CpvAccess(msgTrackHandler));
 
-    DEBUG(CmiPrintf("[%d][%d][%d] ACKING with uniqId:%d back to pe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId, CMI_SRC_PE(msg));)
-
-    CmiSyncSendAndFree(CMI_SRC_PE(msg), sizeof(trackingAckMsg), ackMsg);
+#if CMK_SMP
+    if(CMI_MSG_COMM_SENDER(msg) == 1) {
+      CmiBecomeImmediate(ackMsg); // make it IMMEDIATE so that it is received on the comm thread
+      if(CMI_SRC_NODE(msg) == CmiMyNode()) {
+        DEBUG(CmiPrintf("[%d][%d][%d] ACKING with uniqId:%d back to my comm thread rank:%d, CMI_SRC_PE(msg)=%d, CMI_SRC_PE(ackMsg)=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId, CmiMyNodeSize(), CMI_SRC_PE(msg), CMI_SRC_PE(ackMsg));)
+        CmiPushPE(CmiMyNodeSize(), ackMsg);
+      } else {
+        DEBUG(CmiPrintf("[%d][%d][%d] ACKING with uniqId:%d back to other comm thread node:%d, CMI_SRC_PE(msg)=%d, CMI_SRC_PE(ackMsg)=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId, CMI_SRC_NODE(msg), CMI_SRC_PE(msg), CMI_SRC_PE(ackMsg));)
+        CmiSyncNodeSendAndFree(CMI_SRC_NODE(msg), sizeof(trackingAckMsg), ackMsg);
+      }
+    } else
+#endif
+    {
+      DEBUG(CmiPrintf("[%d][%d][%d] ACKING with uniqId:%d back to pe:%d, CMI_SRC_PE(msg)=%d, CMI_SRC_PE(ackMsg)=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ackMsg->senderUniqId, srcPe, CMI_SRC_PE(msg), CMI_SRC_PE(ackMsg));)
+      CmiSyncSendAndFree(CMI_SRC_PE(msg), sizeof(trackingAckMsg), ackMsg);
+    }
   }
 }
 
