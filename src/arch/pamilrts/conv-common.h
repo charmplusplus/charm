@@ -11,10 +11,10 @@
 
 //#define  DELTA_COMPRESS                                     1
 #if DELTA_COMPRESS
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1, msgLayerType:1; CmiInt4 uniqMsgId; CmiUInt4 msgSrcPe;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1, msgLayerType:1, commSender:1; CmiInt4 uniqMsgId; CmiUInt4 msgSrcPe, msgSrcNode;
 #else
 #if CMK_ERROR_CHECKING
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1, msgLayerType:1; CmiInt4 uniqMsgId; CmiUInt4 msgSrcPe;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1, msgLayerType:1, commSender:1; CmiInt4 uniqMsgId; CmiUInt4 msgSrcPe, msgSrcNode;
 #else
 #define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 #endif

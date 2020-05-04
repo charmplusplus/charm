@@ -566,17 +566,29 @@ static void SendToPeers(int size, char *msg) {
   if (CMI_MSG_NOKEEP(msg)) {
     for (int i = 0; i < exceptRank; i++) {
       CmiReference(msg);
+#if CMK_ERROR_CHECKING
+      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i);
+#endif
       CmiPushPE(i, msg);
     }
     for (int i = exceptRank + 1; i < CmiMyNodeSize(); i++) {
       CmiReference(msg);
+#if CMK_ERROR_CHECKING
+      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i);
+#endif
       CmiPushPE(i, msg);
     }
   } else {
     for (int i = 0; i < exceptRank; i++) {
+#if CMK_ERROR_CHECKING
+      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i);
+#endif
       CmiPushPE(i, CopyMsg(msg, size));
     }
     for (int i = exceptRank + 1; i < CmiMyNodeSize(); i++) {
+#if CMK_ERROR_CHECKING
+      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i);
+#endif
       CmiPushPE(i, CopyMsg(msg, size));
     }
   }
@@ -639,6 +651,13 @@ CpvExtern(int, _urgentSend);
 INLINE_KEYWORD CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode) {
   // Set the message as a regular message (defined in lrts-common.h)
   CMI_CMA_MSGTYPE(msg) = CMK_REG_NO_CMA_MSG;
+
+#if CMK_ERROR_CHECKING
+  if(trackMessages && CMI_UNIQ_MSG_ID(msg) == -1) {
+    CmiAbort("[%d][%d][%d] CmiSendNetworkFunc found the uniq id to be -1, hasn't been added\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+  }
+#endif
+
   return CmiInterSendNetworkFunc(destPE, CmiMyPartition(), size, msg, mode);
 }
 //the generic function that replaces the older one
@@ -648,9 +667,6 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
         int destLocalNode = CmiNodeOf(destPE); 
         int destNode = CmiGetNodeGlobal(destLocalNode,partition); 
 
-#if CMK_ERROR_CHECKING
-        if(trackMessages) addToTracking(msg, destPE);
-#endif
 #if CMK_USE_CMA
         if(cma_reg_msg && partition == CmiMyPartition() && CmiPeOnSamePhysicalNode(CmiMyPe(), destPE)) {
           if(CMI_CMA_MSGTYPE(msg) == CMK_REG_NO_CMA_MSG && cma_min_threshold <= size && size <= cma_max_threshold) {
@@ -736,6 +752,9 @@ void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = destRank;
+#if CMK_ERROR_CHECKING
+        if(trackMessages) addToTracking(msg, destPE);
+#endif
         CmiInterSendNetworkFunc(destPE, partition, size, msg, P2P_SYNC);
 
 #if CMK_PERSISTENT_COMM
@@ -768,6 +787,9 @@ if (  MSG_STATISTIC)
 
 #if CMK_NODE_QUEUE_AVAILABLE
 static void CmiSendNodeSelf(char *msg) {
+#if CMK_ERROR_CHECKING
+    if(trackMessages) addToTracking(msg, CmiMyNode(), true);
+#endif
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
         CmiPushImmediateMsg(msg);
@@ -832,6 +854,9 @@ if (  MSG_STATISTIC)
     msg_histogram[ret_log]++;
 }
 #endif
+#if CMK_ERROR_CHECKING
+        if(trackMessages) addToTracking(msg, destNode, true);
+#endif
         CmiInterSendNetworkFunc(CmiNodeFirst(destNode), partition, size, msg, P2P_SYNC);
     }
 #if CMK_PERSISTENT_COMM
@@ -854,6 +879,9 @@ if (  MSG_STATISTIC)
         if(ret_log >21) ret_log = 21;
         msg_histogram[ret_log]++;
 }
+#endif
+#if CMK_ERROR_CHECKING
+        if(trackMessages) addToTracking(msg, destNode, true);
 #endif
         return CmiSendNetworkFunc(CmiNodeFirst(destNode), size, msg, P2P_ASYNC);
     }

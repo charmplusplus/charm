@@ -2051,8 +2051,7 @@ void CmiDeliverSpecificMsg(int handler)
 	return;
       } else {
 #if CMK_ERROR_CHECKING
-        if(trackMessages)
-          CmiAbort("CmiDeliverSpecificMsg: enqueing untracked message\n");
+        if(trackMessages) addToTracking((char *)msg, CmiMyPe());
 #endif
 	CdsFifo_Enqueue(localqueue, msg);
       }
@@ -2188,6 +2187,11 @@ void CthEnqueueNormalThread(CthThreadToken* token, int s,
 				   int pb,unsigned int *prio)
 {
   CmiSetHandler(token, CpvAccess(CthResumeNormalThreadIdx));
+  // Initialize token
+#if CMK_ERROR_CHECKING
+  CMI_UNIQ_MSG_ID(token) = -1;
+  CMI_MSG_LAYER_TYPE(token) = 0;
+#endif
 #if CMK_ERROR_CHECKING
   if(trackMessages) addToTracking((char *)token, CmiMyPe());
 #endif

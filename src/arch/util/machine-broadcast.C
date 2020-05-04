@@ -68,13 +68,25 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
     /*CmiPushPE(CMI_DEST_RANK(msg), msg);*/
 
 #if CMK_ERROR_CHECKING
-    int srcUniqId, srcPe;
+    int srcUniqId, srcPe, srcNode;
+    bool isComm;
     if(trackMessages) {
       srcUniqId = CMI_UNIQ_MSG_ID(msg);
       srcPe = CMI_SRC_PE(msg);
+      srcNode = CMI_SRC_NODE(msg);
+      isComm = CMI_MSG_COMM_SENDER(msg);
 
       CMI_UNIQ_MSG_ID(msg) = -1; // Add it to this forwarding PE's table
       CMI_SRC_PE(msg) = CmiMyPe();
+      CMI_SRC_PE(msg) = CmiMyNode();
+#if CMK_SMP
+      if(CmiMyRank() == CmiMyNodeSize()) {
+        CMI_MSG_COMM_SENDER(msg) = 1;
+      } else
+#endif
+      {
+        CMI_MSG_COMM_SENDER(msg) = 0;
+      }
     }
 #endif
 
@@ -90,6 +102,10 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
       // Reset back the srcPe and uniqId
       CMI_UNIQ_MSG_ID(msg) = srcUniqId;
       CMI_SRC_PE(msg) = srcPe;
+      CMI_SRC_NODE(msg) = srcNode;
+      CMI_MSG_COMM_SENDER(msg) = isComm;
+
+
     }
 #endif
 
@@ -113,12 +129,51 @@ void CmiForwardNodeBcastMsg(int size, char *msg) {
 }
 
 static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
+
+#if CMK_ERROR_CHECKING
+    int srcUniqId, srcPe, srcNode;
+    bool isComm;
+    if(trackMessages) {
+      srcUniqId = CMI_UNIQ_MSG_ID(msg);
+      srcPe = CMI_SRC_PE(msg);
+      srcNode = CMI_SRC_NODE(msg);
+      isComm = CMI_MSG_COMM_SENDER(msg);
+
+      CMI_UNIQ_MSG_ID(msg) = -1; // Add it to this forwarding PE's table
+      CMI_SRC_PE(msg) = CmiMyPe();
+      CMI_SRC_PE(msg) = CmiMyNode();
+#if CMK_SMP
+      if(CmiMyRank() == CmiMyNodeSize()) {
+        CMI_MSG_COMM_SENDER(msg) = 1;
+      } else
+#endif
+      {
+        CMI_MSG_COMM_SENDER(msg) = 0;
+      }
+    }
+#endif
+
+    //CmiAbort("[%d][%d][%d] processNodeBcastMsg\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
     // Forward regular messages, do not forward ncpy bcast messages as those messages
     // are forwarded separately after the completion of the payload transfer
 #if CMK_ONESIDED_IMPL
     if(!CMI_IS_ZC_BCAST(msg))
 #endif
       forwardNodeBcastMsg(size, msg);
+
+
+
+#if CMK_ERROR_CHECKING
+    if(trackMessages) {
+      // Reset back the srcPe and uniqId
+      CMI_UNIQ_MSG_ID(msg) = srcUniqId;
+      CMI_SRC_PE(msg) = srcPe;
+      CMI_SRC_NODE(msg) = srcNode;
+      CMI_MSG_COMM_SENDER(msg) = isComm;
+    }
+#endif
+
+
 
     /* In SMP mode, this push operation needs to be executed
      * after forwarding broadcast messages. If it is executed
@@ -162,6 +217,11 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         nd += startNode;
         nd = nd%CmiNumNodes();
         CmiAssert(nd>=0 && nd!=CmiMyNode());
+
+        // NODE LEVEL
+#if CMK_ERROR_CHECKING
+        if(trackMessages) addToTracking(msg, nd, true);
+#endif
         newmsg = CopyMsg(msg, size);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
       }
@@ -177,8 +237,12 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
       }
       for (i=0; i < child_count; i++) {
         int nd = children[i];
-        newmsg = CopyMsg(msg, size);
+        // NODE LEVEL
         //CmiPrintf("[%d][%d] SendSpanningChildren: sending copymsg to %d \n", CmiMyPe(), CmiMyNode(), CmiNodeFirst(nd));
+#if CMK_ERROR_CHECKING
+        if(trackMessages) addToTracking(msg, nd, true);
+#endif
+        newmsg = CopyMsg(msg, size);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
       }
     }
@@ -223,6 +287,11 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
         nd = (nd+startNode)%CmiNumNodes();
         /*CmiPrintf("ND[%d]: send to node %d\n", CmiMyNode(), nd);*/
         CmiAssert(nd>=0 && nd!=CmiMyNode());
+
+        // NODE LEVEL
+#if CMK_ERROR_CHECKING
+        if(trackMessages) addToTracking(msg, nd, true);
+#endif
         newmsg = CopyMsg(msg, size);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
     }
