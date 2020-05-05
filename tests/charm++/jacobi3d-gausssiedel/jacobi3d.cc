@@ -523,109 +523,80 @@ void Jacobi::pup(PUP::er &p){
               //contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
     }
 
-class JacobiNodeMap : public CkArrayMap {
+JacobiMap::JacobiMap(int x, int y, int z) {
+  X = x; Y = y; Z = z;
+  mapping = new int[X*Y*Z];
 
-public:
-    JacobiNodeMap() {}
-    ~JacobiNodeMap() { 
-    }
+  // we are assuming that the no. of chares in each dimension is a 
+  // multiple of the torus dimension
 
-    int procNum(int, const CkArrayIndex &idx) {
-      int *index = (int *)idx.data();
-      return (CkMyNodeSize() * (index[0]*num_chare_x*num_chare_y + index[1]*num_chare_y + index[2]))%CkNumPes(); 
-    }
+  TopoManager tmgr;
+  int dimNX, dimNY, dimNZ, dimNT;
 
-};
+  dimNX = tmgr.getDimNX();
+  dimNY = tmgr.getDimNY();
+  dimNZ = tmgr.getDimNZ();
+  dimNT = tmgr.getDimNT();
 
-class JacobiMap : public CkArrayMap {
-  public:
-    int X, Y, Z;
-    int *mapping;
+  // we are assuming that the no. of chares in each dimension is a 
+  // multiple of the torus dimension
+  int numCharesPerPe = X*Y*Z/CkNumPes();
 
-    JacobiMap(int x, int y, int z) {
-      X = x; Y = y; Z = z;
-      mapping = new int[X*Y*Z];
-
-      // we are assuming that the no. of chares in each dimension is a 
-      // multiple of the torus dimension
-
-      TopoManager tmgr;
-      int dimNX, dimNY, dimNZ, dimNT;
-
-      dimNX = tmgr.getDimNX();
-      dimNY = tmgr.getDimNY();
-      dimNZ = tmgr.getDimNZ();
-      dimNT = tmgr.getDimNT();
-
-      // we are assuming that the no. of chares in each dimension is a 
-      // multiple of the torus dimension
-      int numCharesPerPe = X*Y*Z/CkNumPes();
-
-      int numCharesPerPeX = X / dimNX;
-      int numCharesPerPeY = Y / dimNY;
-      int numCharesPerPeZ = Z / dimNZ;
-      int pe = 0, pes = CkNumPes();
+  int numCharesPerPeX = X / dimNX;
+  int numCharesPerPeY = Y / dimNY;
+  int numCharesPerPeZ = Z / dimNZ;
+  int pe = 0, pes = CkNumPes();
 
 #if USE_BLOCK_RNDMAP
-      int used[pes];
-      for(int i=0; i<pes; i++)
-	used[i] = 0;
+  int used[pes];
+  for(int i=0; i<pes; i++)
+used[i] = 0;
 #endif
 
-      if(dimNT < 2) {	// one core per node
-          if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimNX, dimNY, dimNZ, dimNT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
-          for(int i=0; i<dimNX; i++)
-              for(int j=0; j<dimNY; j++)
-                  for(int k=0; k<dimNZ; k++)
-                  {
+  if(dimNT < 2) {	// one core per node
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimNX, dimNY, dimNZ, dimNT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+      for(int i=0; i<dimNX; i++)
+          for(int j=0; j<dimNY; j++)
+              for(int k=0; k<dimNZ; k++)
+              {
 #if USE_BLOCK_RNDMAP
+                  pe = myrand(pes); 
+                  while(used[pe]!=0) {
                       pe = myrand(pes); 
-                      while(used[pe]!=0) {
-                          pe = myrand(pes); 
-                      }
-                      used[pe] = 1;
+                  }
+                  used[pe] = 1;
 #endif
 
-                      for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
+                  for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
+                      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
+                          for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
+#if USE_TOPOMAP
+                              mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k);
+#elif USE_BLOCK_RNDMAP
+                              mapping[ci*Y*Z + cj*Z + ck] = pe;
+#endif
+                          }
+              }
+  } else {		// multiple cores per node
+      // In this case, we split the chares in the X dimension among the
+      // // cores on the same node. The strange thing I figured out is that
+      // // doing this in the Z dimension is not as good.
+      // numCharesPerPeX /= dimNT;
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimNX, dimNY, dimNZ, dimNT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ);
+
+      for(int i=0; i<dimNX; i++)
+          for(int j=0; j<dimNY; j++)
+              for(int k=0; k<dimNZ; k++)
+                  for(int l=0; l<dimNT; l++)
+                      for(int ci=(dimNT*i+l)*numCharesPerPeX; ci<(dimNT*i+l+1)*numCharesPerPeX; ci++)
                           for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
                               for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-#if USE_TOPOMAP
-                                  mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k);
-#elif USE_BLOCK_RNDMAP
-                                  mapping[ci*Y*Z + cj*Z + ck] = pe;
-#endif
+                                  mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k, l);
                               }
-                  }
-      } else {		// multiple cores per node
-          // In this case, we split the chares in the X dimension among the
-          // // cores on the same node. The strange thing I figured out is that
-          // // doing this in the Z dimension is not as good.
-          // numCharesPerPeX /= dimNT;
-          if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimNX, dimNY, dimNZ, dimNT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ);
+  } // end of if
 
-          for(int i=0; i<dimNX; i++)
-              for(int j=0; j<dimNY; j++)
-                  for(int k=0; k<dimNZ; k++)
-                      for(int l=0; l<dimNT; l++)
-                          for(int ci=(dimNT*i+l)*numCharesPerPeX; ci<(dimNT*i+l+1)*numCharesPerPeX; ci++)
-                              for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
-                                  for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-                                      mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k, l);
-                                  }
-      } // end of if
-
-      if(CkMyPe() == 0) CkPrintf("Map generated ... \n");
-    }
-
-    ~JacobiMap() { 
-        delete [] mapping;
-    }
-
-    int procNum(int, const CkArrayIndex &idx) {
-        int *index = (int *)idx.data();
-        return mapping[index[0]*Y*Z + index[1]*Z + index[2]]; 
-    }
-};
+  if(CkMyPe() == 0) CkPrintf("Map generated ... \n");
+}
 
 class TraceControl : public Group 
 {

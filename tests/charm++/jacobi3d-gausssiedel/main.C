@@ -114,17 +114,15 @@ public:
         processCommandlines(m->argc, m->argv);
         delete m;
 #if USE_TOPOMAP
-        CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y, num_chare_z);
         CkPrintf("Topology Mapping is being done ... \n");
         CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
-        opts.setMap(map);
+        opts.setMapObj(new JacobiMap(num_chare_x, num_chare_y, num_chare_z));
         array = CProxy_Jacobi::ckNew(opts);
 #else
 #if CKLOOP
         //map one chare to one node instead of one thread 
-        CProxy_JacobiNodeMap map = CProxy_JacobiNodeMap::ckNew();
         CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
-        opts.setMap(map);
+        opts.setMapObj(new JacobiNodeMap(num_chare_x, num_chare_y, num_chare_z));
         array = CProxy_Jacobi::ckNew(opts);
 #else
         array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y, num_chare_z);

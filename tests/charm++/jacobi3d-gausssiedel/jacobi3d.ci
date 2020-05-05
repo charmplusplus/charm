@@ -26,13 +26,8 @@ module jacobi3d {
     };
   };
 
-  group JacobiMap : CkArrayMap {
-    entry JacobiMap(int x, int y, int z);
-  };
-
-  group JacobiNodeMap : CkArrayMap {
-    entry JacobiNodeMap();
-  };
+  PUPable JacobiMap;
+  PUPable JacobiNodeMap;
 
   group TraceControl {
       entry TraceControl();
