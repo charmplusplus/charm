@@ -43,12 +43,9 @@ class PE_Root_Tree : public LBTreeBuilderCommon
     reset(L, logic, comm_parent, comm_children, comm_logic);
 
     int rootPE = 0;
-    try
+    if (config.contains("Root") && config["Root"].contains("pe"))
     {
       rootPE = config["Root"]["pe"];
-    }
-    catch (const std::exception& e)
-    {
     }
     CkAssert(rootPE >= 0 && rootPE < CkNumPes());
 
@@ -108,12 +105,9 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
     reset(L, logic, comm_parent, comm_children, comm_logic);
 
     int rootPE = 0;
-    try
+    if (config.contains("Root") && config["Root"].contains("pe"))
     {
       rootPE = config["Root"]["pe"];
-    }
-    catch (const std::exception& e)
-    {
     }
     CkAssert(rootPE >= 0 && rootPE < CkNumPes());
 
@@ -141,14 +135,10 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
       comm_parent[lvl] = level1root;
     }
 
-    int step_freq_lvl2;
-    try
+    int step_freq_lvl2 = 1;
+    if (config.contains("Root") && config["Root"].contains("step_freq"))
     {
       step_freq_lvl2 = config["Root"]["step_freq"];
-    }
-    catch (const std::exception& e)
-    {
-      step_freq_lvl2 = 1;
     }
 
     // node level (level 1)
@@ -222,12 +212,9 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
     reset(L, logic, comm_parent, comm_children, comm_logic);
 
     int rootPE = 0;
-    try
+    if (config.contains("Root") && config["Root"].contains("pe"))
     {
       rootPE = config["Root"]["pe"];
-    }
-    catch (const std::exception& e)
-    {
     }
     CkAssert(rootPE >= 0 && rootPE < CkNumPes());
 
@@ -257,24 +244,18 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
       comm_parent[lvl] = level1root;
     }
 
-    int step_freq_lvl2, step_freq_lvl3;
-    try
+    int step_freq_lvl2 = 1;
+    if (config.contains("ProcessGroup") && config["ProcessGroup"].contains("step_freq"))
     {
       step_freq_lvl2 = config["ProcessGroup"]["step_freq"];
     }
-    catch (const std::exception& e)
-    {
-      step_freq_lvl2 = 1;
-    }
-    try
+
+    int step_freq_lvl3 = step_freq_lvl2;
+    if (config.contains("Root") && config["Root"].contains("step_freq"))
     {
       step_freq_lvl3 = config["Root"]["step_freq"];
       if (step_freq_lvl3 % step_freq_lvl2 != 0)
         CkAbort("step_freq of Root level is not multiple of previous level\n");
-    }
-    catch (const std::exception& e)
-    {
-      step_freq_lvl3 = step_freq_lvl2;
     }
 
     // node level (level 1)

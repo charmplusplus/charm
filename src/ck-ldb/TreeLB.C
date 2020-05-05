@@ -39,13 +39,10 @@ void TreeLB::init(const CkLBOptions& opts)
   std::ifstream ifs(_lb_args.treeLBFile(), std::ifstream::in);
   if (ifs.good())
   {
-    try
+    config = json::parse(ifs, nullptr, false);
+    if (config.is_discarded())
     {
-      ifs >> config;
-    }
-    catch (const std::exception& e)
-    {
-      CkPrintf("Error reading TreeLB configuration file: %s\n", e.what());
+      CkPrintf("Error reading TreeLB configuration file: %s\n", _lb_args.treeLBFile());
       CkExit(1);
     }
   }
