@@ -1625,7 +1625,7 @@ void _initCharm(int unused_argc, char **argv)
     if (!_replaySystem) {
         CkFtFn  faultFunc_restart = CkRestartMain;
         if (faultFunc == NULL || faultFunc == faultFunc_restart) {         // this is not restart from memory
-            // these two are blocking calls for non-bigsim
+            // these two are blocking calls
 	  CmiInitCPUAffinity(argv);
           CmiInitMemAffinity(argv);
         }

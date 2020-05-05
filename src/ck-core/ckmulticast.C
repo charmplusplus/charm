@@ -1121,25 +1121,12 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
   DEBUGF(("[%d] send to local %d elems, ArraySection\n", CkMyPe(), nLocal));
   for (i=0; i<nLocal-1; i++) {
     CProxyElement_ArrayBase ap(aid, entry->localElem[i]);
-    if (_entryTable[msg->ep]->noKeep) {
-      CkSendMsgArrayInline(msg->ep, msg, sectionInfo.get_aid(), entry->localElem[i], CK_MSG_KEEP);
-    }
-    else {
-      // send through scheduler queue
-      multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
-      ap.ckSend((CkArrayMessage *)newm, msg->ep, CK_MSG_LB_NOTRACE);
-    }
-    // use CK_MSG_DONTFREE so that the message can be reused
-    // the drawback of this scheme bypassing queue is that 
-    // if # of local element is huge, this leads to a long time occupying CPU
-    // also load balancer seems not be able to correctly instrument load
-//    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[i], CK_MSG_KEEP);
-    //CmiNetworkProgressAfter(3);
+    multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
+    ap.ckSend((CkArrayMessage *)newm, msg->ep, CK_MSG_LB_NOTRACE);
   }
   if (nLocal) {
     CProxyElement_ArrayBase ap(aid, entry->localElem[nLocal-1]);
     ap.ckSend((CkArrayMessage *)msg, msg->ep, CK_MSG_LB_NOTRACE);
-//    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1]);
   }
   else {
     CkAssert (entry->rootSid.get_pe() == CkMyPe());
