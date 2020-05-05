@@ -1880,13 +1880,14 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPERIODIC_1day     15 /*every day*/
 
 /*Other conditions*/
-#define CcdQUIESCENCE        16
-#define CcdTOPOLOGY_AVAIL    17
-#define CcdSIGUSR1           18
-#define CcdSIGUSR2           19
+#define CcdEVERY             16
+#define CcdQUIESCENCE        17
+#define CcdTOPOLOGY_AVAIL    18
+#define CcdSIGUSR1           19
+#define CcdSIGUSR2           20
 
 /*User-defined conditions start here*/
-#define CcdUSER              20
+#define CcdUSER              21
 
 /*User-defined conditions end here*/
 /*Conditionally defined so users can build with larger CcdUSERMAX values*/

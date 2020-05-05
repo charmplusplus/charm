@@ -192,13 +192,6 @@ void (*notify_crash_fn)(int) = NULL;
 
 CpvDeclare(char *, _validProcessors);
 
-#if CMK_CUDA
-CpvExtern(int, n_hapi_events);
-extern "C" void hapiPollEvents();
-extern "C" void shmCleanup();
-extern "C" void hapiExitCsv();
-#endif
-
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -1933,12 +1926,10 @@ void CsdScheduleForever(void)
       }
     }
 #endif
-    #if CMK_CUDA
-    // check if any GPU work needs to be processed
-    if (CpvAccess(n_hapi_events) > 0) {
-      hapiPollEvents();
-    }
-    #endif
+
+    // Execute functions registered to be executed at every scheduler loop
+    CcdRaiseCondition(CcdEVERY);
+
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
 #if !CSD_NO_IDLE_TRACING
