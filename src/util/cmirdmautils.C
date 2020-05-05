@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <numeric>
+#include <limits>
 
 int getNcpyOpInfoTotalSize(
   int srcLayerSize,
