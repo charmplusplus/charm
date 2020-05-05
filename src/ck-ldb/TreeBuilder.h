@@ -145,11 +145,9 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
     lvl = 1;
     if (mype == level1root)
     {
-      std::vector<int> pes_in_node;
-      for (int pe = 0; pe < CkNumPes(); pe++)
-      {
-        if (CkNodeOf(pe) == mynode) pes_in_node.push_back(pe);
-      }
+      std::vector<int> pes_in_node(CkNodeSize(mynode));
+      std::iota(pes_in_node.begin(), pes_in_node.end(), CkNodeFirst(mynode));
+
       NodeLevel* level = new NodeLevel(lbmgr, pes_in_node);
       level->configure(false, config["Process"], step_freq_lvl2);
       logic[lvl] = level;
