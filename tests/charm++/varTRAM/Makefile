@@ -19,6 +19,6 @@ test: vartest
 	$(call run, ./vartest +p4 )
 
 smptest: vartest
-        $(call run, ./vartest 4 +p4 ++ppn 2)
+	$(call run, ./vartest 4 +p4 ++ppn 2)
 clean:
 	rm -f *.o *.decl.h *.def.h vartest charmrun*
