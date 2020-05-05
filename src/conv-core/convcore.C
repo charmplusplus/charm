@@ -4072,18 +4072,6 @@ void ConverseCommonExit(void)
   CmiFlush(stdout);  /* end of program, always flush */
 #endif
 
-#if CMK_CUDA
-  // Only worker threads execute the following
-  if (!CmiInCommThread()) {
-    // Ensure all PEs have finished GPU work before destructing
-    CmiNodeBarrier();
-
-    if (CmiMyRank() == 0) {
-      shmCleanup();
-      hapiExitCsv();
-    }
-  }
-#endif
   seedBalancerExit();
   EmergencyExit();
 }
