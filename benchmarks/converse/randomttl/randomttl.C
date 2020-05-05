@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <random>
 #include <iterator>
+#include <numeric>
 
 CpvDeclare(int, k);
 CpvDeclare(int, ttl);
