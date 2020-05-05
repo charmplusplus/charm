@@ -225,7 +225,7 @@ class StrategyWrapper : public IStrategyWrapper
       }
       else
       {
-        idm->data[o->oldPe].emplace_back(obj_local_ids[o->id], p->id);
+        (*idm)[o->oldPe].emplace_back(obj_local_ids[o->id], p->id);
       }
     }
 
@@ -394,7 +394,7 @@ class StrategyWrapper : public IStrategyWrapper
         }
         else
         {
-          for (auto& idm_move : idm->data[o.oldPe])
+          for (auto& idm_move : (*idm)[o.oldPe])
           {
             if (idm_move.first == obj_local_ids[o.id])
             {

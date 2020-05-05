@@ -295,14 +295,14 @@ void TreeLB::loadBalanceSubtree(int level)
   /// CkMessage *inter_subtree_migrations = nullptr;
   IDM idm;
   logic[level]->loadBalance(decisions, idm);
-  if (idm.numDests() > 0)
+  if (idm.size() > 0)
   {
     // this can happen when final destinations of chares has been decided,
     // and chares from a subtree need to migrate to a PE in a different subtree
     std::vector<int> idm_dests;
-    idm_dests.reserve(1 + idm.numDests());
+    idm_dests.reserve(1 + idm.size());
     idm_dests.push_back(CkMyPe());
-    for (auto& move : idm.data)
+    for (auto& move : idm)
     {
       CkAssert(move.second.size() > 0);
       idm_dests.push_back(move.first);
@@ -471,7 +471,7 @@ void TreeLB::objMovedIn(bool waitBarrier)
 void TreeLB::migrateObjects(const IDM& mig_order)
 {
   int level = 0;
-  int sent = logic[level]->migrateObjects(mig_order.data.at(CkMyPe()));
+  int sent = logic[level]->migrateObjects(mig_order.at(CkMyPe()));
   load_sent[level] += sent;
 #if DEBUG__TREE_LB_L2
   fprintf(stderr, "[%d] Received IDM order, sent=%d\n", CkMyPe(), sent);
