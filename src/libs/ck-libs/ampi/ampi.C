@@ -3128,7 +3128,7 @@ MPI_Request ampi::sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype ty
   }
   // All sync messages go thru ampi::genericSync (not generic or genericRdma)
 #if AMPI_PE_LOCAL_IMPL
-  if (destPtr != NULL) {
+  if (destPtr != nullptr && destPtr->parent != nullptr) {
     destPtr->genericSync(makeSyncMsg(t, sRank, buf, count, type, destProxy, destIdx, reqIdx, seq, destPtr));
   } else
 #endif
@@ -3163,7 +3163,7 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   int size = ddt->getSize(count);
   ampi *destPtr = arrProxy[destIdx].ckLocal();
 #if AMPI_PE_LOCAL_IMPL
-  if (destPtr != nullptr) {
+  if (destPtr != nullptr && destPtr->parent != nullptr) {
     // Complete message inline to PE-local destination VP
     return sendLocalMsg(t, sRank, buf, size, type, count, rank, destcomm,
                         seq, destPtr, sendType, reqIdx);
@@ -3290,7 +3290,7 @@ bool ampi::processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
     MPI_Request sreqIdx = msg->getSsendReq();
 #if AMPI_PE_LOCAL_IMPL
     ampi* srcPtr = thisProxy[srcIdx].ckLocal();
-    if (srcPtr != NULL) {
+    if (srcPtr != nullptr && srcPtr->parent != nullptr) {
       srcPtr->completedSend(sreqIdx);
     }
     else
