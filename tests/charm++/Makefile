@@ -25,7 +25,6 @@ DIRS = \
   zerocopy \
   within_node_bcast \
   bombard \
-  randomtram3d \
   varTRAM \
 
 FTDIRS = \
