@@ -25,7 +25,7 @@ class CkLBArgs
   double _lb_alpha;      // per message send overhead
   double _lb_beta;       // per byte send overhead
   int _lb_debug;         // 1 or greater
-  int _lb_printsumamry;  // print summary
+  int _lb_printsummary;  // print summary
   int _lb_loop;          // use multiple load balancers in loop
   int _lb_ignoreBgLoad;
   int _lb_migObjOnly;  // only consider migratable objs
@@ -51,7 +51,7 @@ class CkLBArgs
   {
     _autoLbPeriod = -1.0;  // off by default
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
-    _lb_printsumamry = _lb_migObjOnly = 0;
+    _lb_printsummary = _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
     _lb_loop = 0;
     _lb_central_pe = 0;
@@ -63,7 +63,7 @@ class CkLBArgs
   inline char*& treeLBFile() { return _lb_treeLBFile; }
   inline double& lbperiod() { return _autoLbPeriod; }
   inline int& debug() { return _lb_debug; }
-  inline int& printSummary() { return _lb_printsumamry; }
+  inline int& printSummary() { return _lb_printsummary; }
   inline int& lbversion() { return _lb_version; }
   inline int& loop() { return _lb_loop; }
   inline int& ignoreBgLoad() { return _lb_ignoreBgLoad; }
