@@ -2028,12 +2028,15 @@ callbacks from within ccd callbacks.
 
 .. code-block:: c++
 
-  void CcdRaiseCondition(int condNum)
+  double CcdRaiseCondition(int condNum)
 
 
 When this function is called, it invokes all the functions whose
 pointers were registered for the ``condNum`` via a *prior* call to
-``CcdCallOnCondition`` or ``CcdCallOnConditionKeep``.
+``CcdCallOnCondition`` or ``CcdCallOnConditionKeep``. The function
+internally calls ``CmiWallTimer`` and returns this value. When using
+``CcdRaiseCondition``, the return value can be used to determine the
+current walltime avoiding an additional call to ``CmiWallTimer``.
 
 .. code-block:: c++
 
