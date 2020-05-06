@@ -803,10 +803,20 @@ endif()
 
 set(OS_RELEASE "${OS_RELEASE} (${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}, ${CMAKE_SYSTEM_PROCESSOR})")
 
+cmake_host_system_information(RESULT MY_HOSTNAME QUERY FQDN)
+
+get_target_property(MAIN_CFLAGS ck COMPILE_OPTIONS)
+string(REPLACE ";" " " MAIN_CFLAGS "${MAIN_CFLAGS}")
+
+if(NOT opts_enabled)
+  set(opts_enabled "---")
+endif()
+
 # Print configuration
 message("==============================")
 message("Charm++ ${CHARM_VERSION} configuration: ")
 message("  OS version:      ${OS_RELEASE}")
+message("  Hostname:        ${MY_HOSTNAME}")
 message("  Machine layer:   ${CHARM_PLATFORM}")
 message("  Build target:    ${TARGET}")
 message("  Build type:      ${CMAKE_BUILD_TYPE}")
@@ -817,15 +827,19 @@ if(CMAKE_Fortran_COMPILER)
 else()
   message("  F90 compiler:    N/A")
 endif()
+message("  CMake:           ${CMAKE_COMMAND} [${CMAKE_VERSION}]")
+message("  Charmc flags:    ${MAIN_CFLAGS}")
 message("  Enabled options: ${opts_enabled}")
 message("==============================")
 
 # Print warning
-message("############################################################")
-message("# The CMake build system is currently a beta version.      #")
-message("# Please let us know if you experience any issues.         #")
-message("# You can run ./buildold to use the previous build system. #")
-message("############################################################")
+message("#################################################################")
+message("# The CMake build system is currently a beta version.           #")
+message("# Please let us know if you experience any problems by opening  #")
+message("# an issue on our GitHub (https://github.com/UIUC-PPL/charm),   #")
+message("# with the above configuration information.                     #")
+message("# You can run ./buildold to use the previous build system.      #")
+message("#################################################################")
 
 # Make symlinks
 add_custom_target(create_symlinks ALL
