@@ -1,4 +1,4 @@
-#include <algorithm>
+#include <numeric>
 #include <chrono>
 #include <random>
 #include <string>
