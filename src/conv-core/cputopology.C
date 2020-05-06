@@ -69,10 +69,6 @@ typedef struct _nodeTopoMsg {
   int *nodes;
 } nodeTopoMsg;
 
-typedef struct _topoDoneMsg { // used for empty reduction to indicate all PEs have topo info
-  char core[CmiMsgHeaderSizeBytes];
-} topoDoneMsg;
-
 // nodeIDs[pe] is the node number of processor pe
 class CpuTopology {
 public:
@@ -170,12 +166,10 @@ static std::map<skt_ip_t, _procInfo *> hostTable;
 
 CpvStaticDeclare(int, cpuTopoHandlerIdx);
 CpvStaticDeclare(int, cpuTopoRecvHandlerIdx);
-CpvStaticDeclare(int, topoDoneHandlerIdx);
 
 static CpuTopology cpuTopo;
 static CmiNodeLock topoLock = 0; /* Not spelled 'NULL' to quiet warnings when CmiNodeLock is just 'int' */
-static int done = 0;
-static int topoDone = 0;
+static int topo_doneflag = 0;
 static int _noip = 0;
 
 }
@@ -245,13 +239,6 @@ static void cpuTopoHandler(void *m)
   CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
 }
 
-/* called on PE 0 */
-static void topoDoneHandler(void *m) {
-  CmiLock(topoLock);
-  topoDone++;
-  CmiUnlock(topoLock);
-}
-
 /* called on each processor */
 static void cpuTopoRecvHandler(void *msg)
 {
@@ -265,7 +252,7 @@ static void cpuTopoRecvHandler(void *msg)
   }
   else
     CmiFree(m);
-  done++;
+  topo_doneflag++;
   CmiUnlock(topoLock);
 
   //if (CmiMyPe() == 0) cpuTopo.print();
@@ -295,20 +282,6 @@ static void * combineMessage(int *size, void *data, void **remote, int count)
     for (j=0; j<m->n; j++)
       msg->procs[n++] = m->procs[j];
   }
-  return msg;
-}
-
-// reduction function
-static void *emptyReduction(int *size, void *data, void **remote, int count)
-{
-  if (CmiMyPe() != 0) {
-    CmiLock(topoLock);
-    topoDone++;
-    CmiUnlock(topoLock);
-  }
-  *size = sizeof(topoDoneMsg);
-  topoDoneMsg *msg = (topoDoneMsg *)CmiAlloc(sizeof(topoDoneMsg));
-  CmiSetHandler((char *)msg, CpvAccess(topoDoneHandlerIdx));
   return msg;
 }
 
@@ -399,13 +372,10 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     {
       CpvInitialize(int, cpuTopoHandlerIdx);
       CpvInitialize(int, cpuTopoRecvHandlerIdx);
-      CpvInitialize(int, topoDoneHandlerIdx);
       CpvAccess(cpuTopoHandlerIdx) =
 	CmiRegisterHandler((CmiHandler)cpuTopoHandler);
       CpvAccess(cpuTopoRecvHandlerIdx) =
 	CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
-      CpvAccess(topoDoneHandlerIdx) =
-	CmiRegisterHandler((CmiHandler)topoDoneHandler);
     }
   if (!obtain_flag) {
     if (CmiMyRank() == 0) cpuTopo.sort();
@@ -481,15 +451,11 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   if (CmiMyPe() >= CmiNumPes()) {
     CmiNodeAllBarrier();         // comm thread waiting
 #if CMK_MACHINE_PROGRESS_DEFINED
-    bool waitForSecondReduction = (CmiNumNodes() > 1);
-    while (topoInProgress) {
+    while (topo_doneflag < CmiMyNodeSize()) {
       CmiNetworkProgress();
-      CmiLock(topoLock);
-      if (waitForSecondReduction) topoInProgress = topoDone < CmiMyNodeSize();
-      else topoInProgress = done < CmiMyNodeSize();
-      CmiUnlock(topoLock);
     }
 #endif
+    CmiBarrier(); // Match worker threads
     return;    /* comm thread return */
   }
 
@@ -524,33 +490,17 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   msg->procs[0].nodeID = 0;
   CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
 
-  // blocking here (wait for broadcast from PE0 to reach all PEs in this node)
-  while (topoInProgress) {
-    CsdSchedulePoll();
-    CmiLock(topoLock);
-    topoInProgress = done < CmiMyNodeSize();
-    CmiUnlock(topoLock);
+  // Process reduction messages
+  int n_children = CmiNumSpanTreeChildren(CmiMyPe());
+  if (n_children > 0) {
+    CsdScheduleCount(n_children);
   }
 
-  if (CmiNumNodes() > 1) {
-    topoDoneMsg *msg2 = (topoDoneMsg *)CmiAlloc(sizeof(topoDoneMsg));
-    CmiSetHandler((char *)msg2, CpvAccess(topoDoneHandlerIdx));
-    CmiReduce(msg2, sizeof(topoDoneMsg), emptyReduction);
-    if ((CmiMyPe() == 0) || (CmiNumSpanTreeChildren(CmiMyPe()) > 0)) {
-      // wait until everyone else has topo info
-      topoInProgress = true;
-      while (topoInProgress) {
-        CsdSchedulePoll();
-        CmiLock(topoLock);
-        topoInProgress = topoDone < CmiMyNodeSize();
-        CmiUnlock(topoLock);
-      }
-    } else {
-      CmiLock(topoLock);
-      topoDone++;
-      CmiUnlock(topoLock);
-    }
-  }
+  // Receive broadcast from PE 0
+  CmiDeliverSpecificMsg(CpvAccess(cpuTopoRecvHandlerIdx));
+
+  // Ensure all PEs have received CPU topology info
+  CmiBarrier();
 
   if (CmiMyPe() == 0) {
       CmiPrintf("Charm++> cpu topology info is gathered in %.3f seconds.\n", CmiWallTimer()-startT);
