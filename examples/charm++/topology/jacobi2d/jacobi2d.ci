@@ -18,8 +18,5 @@ mainmodule jacobi2d {
     entry void receiveGhosts(int dir, int size, double gh[size]);
   };
 
-  group JacobiMap : CkArrayMap {
-    entry JacobiMap(int x, int y);
-  };
-
+  PUPable JacobiMap;
 };

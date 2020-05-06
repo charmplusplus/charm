@@ -87,9 +87,8 @@ class Main : public CBase_Main
       // Create new array of worker chares
 #if USE_TOPOMAP
       CkPrintf("Topology Mapping is being done ... \n");
-      CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y);
       CkArrayOptions opts(num_chare_x, num_chare_y);
-      opts.setMap(map);
+      opts.setMapObj(new JacobiMap(num_chare_x, num_chare_y));
       array = CProxy_Jacobi::ckNew(opts);
 #else
       array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y);
@@ -272,11 +271,13 @@ class Jacobi: public CBase_Jacobi {
  *
  */
 
-class JacobiMap : public CkArrayMap {
+class JacobiMap : public CkArrayMapObj {
+PUPable_decl(JacobiMap);
   public:
     int X, Y;
     int **mapping;
 
+    // TODO: This can be moved to setArrayOpts (which will simplify pup too)
     JacobiMap(int x, int y) {
       X = x; Y = y;
       int i, j;
@@ -306,6 +307,7 @@ class JacobiMap : public CkArrayMap {
 		mapping[ci][cj] = tmgr.coordinatesToRank(i, j, k);
       }
     }
+    JacobiMap(CkMigrateMessage* msg) {}
 
     ~JacobiMap() {
       for (int i=0; i<X; i++)
@@ -313,9 +315,23 @@ class JacobiMap : public CkArrayMap {
       delete [] mapping;
     }
 
-    int procNum(int, const CkArrayIndex &idx) {
+    int homePe(const CkArrayIndex &idx) const {
       int *index = (int *)idx.data();
       return mapping[index[0]][index[1]];
+    }
+
+    void pup(PUP::er& p) {
+      p | X;
+      p | Y;
+      if (p.isUnpacking()) {
+        mapping = new int*[X];
+        for (int i = 0; i < X; i++) {
+          mapping[i] = new int[Y];
+        }
+      }
+      for (int i = 0; i < X; i++) {
+        PUParray(p, mapping[i], Y);
+      }
     }
 };
 

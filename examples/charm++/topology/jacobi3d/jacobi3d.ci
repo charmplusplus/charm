@@ -31,8 +31,5 @@ mainmodule jacobi3d {
     entry void ghostsFromBack(int height, int width, double s[height*width]);
   };
 
-  group JacobiMap : CkArrayMap {
-    entry JacobiMap(int x, int y, int z, int tx, int ty, int tz);
-  };
-
+  PUPable JacobiMap;
 };
