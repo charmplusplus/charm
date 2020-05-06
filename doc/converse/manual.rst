@@ -2037,6 +2037,11 @@ pointers were registered for the ``condNum`` via a *prior* call to
 internally calls ``CmiWallTimer`` and returns this value. When using
 ``CcdRaiseCondition``, the return value can be used to determine the
 current walltime avoiding an additional call to ``CmiWallTimer``.
+However, it is important to note that the walltime value returned
+by ``CcdRaiseCondition`` could be stale by the time it is returned
+since registered functions are executed between the timer call and
+the return. For this reason, this walltime value returned should be
+used in situations where an exact or current timer value is not desired.
 
 .. code-block:: c++
 
