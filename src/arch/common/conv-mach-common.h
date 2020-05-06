@@ -4,6 +4,8 @@
  * converse.h.
  */
 
+#ifdef __cplusplus
+
 // Enum for registration modes used in the Zerocopy API
 enum ncpyRegModes : unsigned char {
   /* CMK_BUFFER_REG is the default mode that always registers the buffer by treating network and non-network transfers
@@ -93,6 +95,7 @@ enum cmiZCMsgType : unsigned char {
   CMK_ZC_BCAST_RECV_DONE_MSG = 6,
   CMK_ZC_BCAST_RECV_ALL_DONE_MSG = 7
 };
+#endif //__cplusplus
 
 #ifndef CMK_NOCOPY_DIRECT_BYTES
 
