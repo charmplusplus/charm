@@ -4,7 +4,8 @@
 
 // Custom map which sums up the integers in the index and maps to procs based
 // on their least significant bits. Declared as a group in the .ci file.
-class BitMap : public CkArrayMap {
+class BitMap : public CkArrayMapObj {
+PUPable_decl(BitMap);
 private:
   int maxBitMap;
 public:
@@ -14,8 +15,12 @@ public:
     }
     maxBitMap = CkNumPes() - 1;
   }
+  BitMap(CkMigrateMessage* msg) {}
+  void pup(PUP::er& p) {
+    p | maxBitMap;
+  }
 
-  int gcd(int a, int b) {
+  int gcd(int a, int b) const {
     if (a == 0) return b;
     if (b == 0) return a;
     if (a == b) return a;
@@ -23,10 +28,8 @@ public:
     return gcd(a, b-a);
   }
 
-  int registerArray(CkArrayIndex& numElements, CkArrayID aid) { return 0; }
-
   // Call that returns the homePE of element with index idx
-  int procNum(int arrayHdl, const CkArrayIndex& idx) {
+  int homePe(const CkArrayIndex& idx) const {
     int i = 0;
     // Sum up the number of ints in the index (not the same as dimension)
     for (int x = 0; x < idx.nInts; x++) {
@@ -40,7 +43,7 @@ public:
   // the elements on each PE. Called once per PE. In most cases this function
   // can be left out in favor of the default implementation.
   void populateInitial(
-      int arrayHdl, CkArrayOptions& options, void* ctorMsg, CkArray* mgr) {
+      CkArrayOptions& options, void* ctorMsg, CkArray* mgr) const {
     // Start, end, and step determine the initial elements to be created.
     CkArrayIndex start = options.getStart();
     CkArrayIndex end = options.getEnd();
@@ -63,7 +66,7 @@ public:
       // For higher dimension indices we fall back to the default behavior,
       // which loops through the entire requested index space and checks if
       // procNum(...) returns our PE.
-      CkArrayMap::populateInitial(arrayHdl, options, ctorMsg, mgr);
+      CkArrayMapObj::populateInitial(options, ctorMsg, mgr);
     }
   }
 };
@@ -75,14 +78,11 @@ public:
 
     // Sums for testing mapping
     int sum1, sum2;
-    // Create a new map object
-    CProxy_BitMap myMap = CProxy_BitMap::ckNew();
-
 
     // Create a simple array with elements [0,10) (indices sum to 45)
     sum1 = 10 * (0 + 9) / 2;
     CkArrayOptions opts1(10);
-    opts1.setMap(myMap);
+    opts1.setMapObj(new BitMap());
     CProxy_Array1 a1 = CProxy_Array1::ckNew(sum1, opts1);
 
     // Create a more complex 1D array with elements [2,32) with step size of 3
@@ -92,7 +92,7 @@ public:
     opts2.setStart(CkArrayIndex1D(2));
     opts2.setEnd(CkArrayIndex1D(32));
     opts2.setStep(CkArrayIndex1D(3));
-    opts2.setMap(myMap);
+    opts2.setMapObj(new BitMap());
     CProxy_Array1 a2 = CProxy_Array1::ckNew(sum1, opts2);
 
     // Create a 2D array whose first dimension has elements [0,10), and whose
@@ -100,7 +100,7 @@ public:
     sum1 = (10 * (0 + 9) / 2) * 2;
     sum2 = (2 * (0 + 1) / 2) * 10;
     CkArrayOptions opts3(10,2);
-    opts3.setMap(myMap);
+    opts3.setMapObj(new BitMap());
     CProxy_Array2 a3 = CProxy_Array2::ckNew(sum1, sum2, opts3);
 
     // After all arrays are created and sums are checked we can exit.

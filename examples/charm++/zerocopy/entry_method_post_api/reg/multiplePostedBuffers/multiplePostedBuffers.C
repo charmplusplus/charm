@@ -24,9 +24,8 @@ class Main : public CBase_Main{
         CkExit(1);
       }
 
-      CProxy_RRMap rrMap = CProxy_RRMap::ckNew();
       CkArrayOptions opts(numElements);
-      opts.setMap(rrMap);
+      opts.setMapObj(new RRMapObj());
       CProxy_zerocopyObject zerocopyObj = CProxy_zerocopyObject::ckNew(opts);
       zerocopyObj.testZeroCopy(thisProxy);
     }

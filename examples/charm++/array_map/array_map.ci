@@ -4,9 +4,7 @@ mainmodule array_map {
   }
 
   // Our custom array map
-  group BitMap : CkArrayMap {
-    entry BitMap();
-  }
+  PUPable BitMap;
 
   array [1D] Array1 {
     entry Array1(int);
