@@ -162,7 +162,7 @@ while [[ $# -gt 0 ]]; do
     gcc-*)
       opt_CC=$arg
       opt_CXX=${arg/cc/++}
-      opt_compiler+="gcc "
+      opt_compiler+="$arg "
       ;;
     gfortran)
       opt_FC=gfortran
@@ -176,7 +176,7 @@ while [[ $# -gt 0 ]]; do
     clang-*)
       opt_CC=$arg
       opt_CXX=${arg/clang/clang++}
-      opt_compiler+="clang "
+      opt_compiler+="$arg "
       ;;
     flang)
       opt_FC=flang
