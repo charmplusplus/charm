@@ -2140,6 +2140,17 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // Find which mode of transfer should be used
   CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
 
+  // Allocate messages needed for RDMA
+  DeviceRdmaMsg** rdma_msgs = NULL;
+  if (mode == CkNcpyModeDevice::RDMA) {
+    rdma_msgs = (DeviceRdmaMsg**)CmiAlloc(sizeof(DeviceRdmaMsg*) * numops);
+    CmiAssert(rdma_msgs);
+    for (int i = 0; i < numops; i++) {
+      rdma_msgs[i] = (DeviceRdmaMsg*)CmiAlloc(sizeof(DeviceRdmaMsg));
+      CmiAssert(rdma_msgs[i]);
+    }
+  }
+
   // Start unpacking marshalled message
   PUP::toMem p((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
@@ -2198,9 +2209,20 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         }
       case CkNcpyModeDevice::RDMA:
         {
+          // XXX: Unused host-staged mechanism
+          /*
           // Transfer the received/unpacked data on host to the destination device buffer
           hapiCheck(cudaMemcpyAsync((void*)dest.ptr, source.data, std::min(source.cnt, dest.cnt),
                 cudaMemcpyHostToDevice, postStructs[i].cuda_stream));
+          */
+
+          // Store necessary data to send to sender
+          DeviceRdmaInfo& info = rdma_msgs[i]->info;
+          info.src_pe = source.pe;
+          info.src_ptr = source.ptr;
+          info.dest_pe = CmiMyPe();
+          info.dest_ptr = dest.ptr;
+          info.size = std::min(source.cnt, dest.cnt);
           break;
         }
       default:
@@ -2210,11 +2232,22 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         }
     }
 
-    // Add source callback for polling, so that it can be invoked once the transfer is complete
-    CkCallback* cb = new CkCallback(source.cb);
-    hapiAddCallback(postStructs[i].cuda_stream, cb);
+    if (mode == CkNcpyModeDevice::MEMCPY || mode == CkNcpyModeDevice::IPC) {
+      // Add source callback for polling, so that it can be invoked once the transfer is complete
+      CkCallback* cb = new CkCallback(source.cb);
+      hapiAddCallback(postStructs[i].cuda_stream, cb);
+    }
 
     p|source;
+  }
+
+  // Launch RDMA gets
+  if (mode == CkNcpyModeDevice::RDMA) {
+    for (int i = 0; i < numops; i++) {
+      // TODO: Increment QD?
+      CmiIssueRgetDevice(rdma_msgs[i]);
+    }
+    CmiFree(rdma_msgs);
   }
 }
 
@@ -2348,6 +2381,8 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       hapiCheck(cudaEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->cuda_stream));
     }
   } else if (transfer_mode == CkNcpyModeDevice::RDMA) {
+    // XXX: Unused host-staged mechanism
+    /*
     for (int i = 0; i < numops; i++) {
       // Allocate temporary host buffer and copy the source buffer
       buffers[i]->data_stored = true;
@@ -2356,6 +2391,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
             cudaMemcpyDeviceToHost, buffers[i]->cuda_stream));
       hapiCheck(cudaStreamSynchronize(buffers[i]->cuda_stream));
     }
+    */
   } else {
     CkAbort("Unknown transfer mode");
   }

@@ -362,3 +362,23 @@ void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest) {
   }
 }
 
+/**************************** Direct GPU Messaging ***************************/
+
+static int rget_device_handler_idx;
+
+static void rgetDeviceHandler(DeviceRdmaMsg* msg) {
+  DeviceRdmaInfo& info = msg->info;
+  CmiPrintf("rgetDeviceHandler on PE %d: src_pe %d, src_ptr %p, dest_pe %d, dest_ptr %p, size %zu\n",
+      CmiMyPe(), info.src_pe, info.src_ptr, info.dest_pe, info.dest_ptr, info.size);
+
+  // TODO issue a send through UCX with a special tag, so that it gets properly handled on the receiver
+}
+
+void CmiDeviceRdmaInit() {
+  rget_device_handler_idx = CmiRegisterHandler((CmiHandler)rgetDeviceHandler);
+}
+
+void CmiIssueRgetDevice(DeviceRdmaMsg* msg) {
+  CmiSetHandler(msg, rget_device_handler_idx);
+  CmiSyncSendAndFree(msg->info.src_pe, sizeof(DeviceRdmaMsg), msg);
+}

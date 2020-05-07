@@ -1,6 +1,7 @@
 #ifndef _CKRDMAUTILS_H
 #define _CKRDMAUTILS_H
 
+#include "stddef.h"
 #include "conv-header.h"
 
 // Structure that can be used across layers
@@ -56,6 +57,19 @@ typedef struct ncpystruct{
   int rootNode; // used only for Broadcast, -1 for p2p operations
 
 }NcpyOperationInfo;
+
+typedef struct DeviceRdmaInfo_ {
+  int src_pe;
+  const void* src_ptr;
+  int dest_pe;
+  const void* dest_ptr;
+  size_t size;
+} DeviceRdmaInfo;
+
+typedef struct DeviceRdmaMsg_ {
+  char header[CmiMsgHeaderSizeBytes];
+  DeviceRdmaInfo info;
+} DeviceRdmaMsg;
 
 #ifdef __cplusplus
 extern "C" {

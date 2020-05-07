@@ -4015,6 +4015,8 @@ void ConverseCommonInit(char **argv)
   // Initialize converse handlers for supporting generic Direct Nocopy API
   CmiOnesidedDirectInit();
 
+  CmiDeviceRdmaInit();
+
   useCMAForZC = true;
   if (CmiGetArgFlagDesc(argv, "+noCMAForZC", "When Cross Memory Attach (CMA) is supported, the program does not use CMA when using the Zerocopy API")) {
     useCMAForZC = false;
