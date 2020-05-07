@@ -9,9 +9,7 @@ CreateLBFunc_Def(TreeLB, "TreeLB")
 
 void TreeLB::Migrated(int waitBarrier)
 {
-  bool barrier = false;
-  if (waitBarrier) barrier = true;
-  objMovedIn(barrier);
+  objMovedIn(waitBarrier);
 }
 
 void TreeLB::init(const CkLBOptions& opts)
