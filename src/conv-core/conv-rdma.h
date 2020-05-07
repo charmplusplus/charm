@@ -64,6 +64,8 @@ int CmiDoesCMAWork(void);
 // Function declaration for supporting generic Direct Nocopy API
 void CmiOnesidedDirectInit(void);
 
+void CmiSetNcpyAckSize(int ackSize);
+
 #ifndef CMK_NOCOPY_DIRECT_BYTES
 
 #if defined(_WIN32)

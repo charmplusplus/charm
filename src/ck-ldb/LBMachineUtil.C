@@ -14,7 +14,6 @@ inline void LBMachineUtil::IdleStart(double curWallTime)
 
 inline void LBMachineUtil::IdleEnd(double curWallTime)
 {
-// skip counting idle time in BigSim
   if (state == on) {
     const double stop_idle = curWallTime;
     total_idletime += (stop_idle - start_idle);

@@ -90,8 +90,8 @@ Compiling, Running and Debugging a Sample POSE program
 ======================================================
 
 Sample code is available in the Charm++ source distribution. Assuming a
-netlrts-linux build of Charm++, look in
-``charm/netlrts-linux/examples/pose``. The SimBenchmark directory
+netlrts-linux-x86_64 build of Charm++, look in
+``charm/netlrts-linux-x86_64/examples/pose``. The SimBenchmark directory
 contains a synthetic benchmark simulation and is fairly straightforward
 to understand.
 
