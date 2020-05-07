@@ -20,8 +20,5 @@ mainmodule hello {
     entry void SayBye(sectionBcastMsg *msg);
   };
 
-  group HelloMap : CkArrayMap {
-    entry HelloMap(int w, int x, int y, int z);
-  };
-
+  PUPable HelloMap;
 };

@@ -22,6 +22,69 @@ struct sectionBcastMsg : public CkMcastBaseMsg, public CMessage_sectionBcastMsg 
   }
 };
 
+/** \class HelloMap
+ *
+ */
+class HelloMap : public CkArrayMapObj {
+PUPable_decl(HelloMap);
+  public:
+    int ****mapping;
+    int W, X, Y, Z;
+
+    HelloMap(int w, int x, int y, int z) : W(w), X(x), Y(y), Z(z) {
+      int i, j, k;
+      mapping = new int***[w];
+      for (i=0; i<w; i++) {
+        mapping[i] = new int**[x];
+	for(j=0; j<x; j++) {
+	  mapping[i][j] = new int*[y];
+	    for(k=0; k<y; k++)
+	      mapping[i][j][k] = new int[z];
+	}
+      }
+      /* naively fold onto the 1d rank array with z innermost */
+      for(int i=0; i<w; i++)
+	for(int j=0; j<x; j++)
+	  for(int k=0; k<y; k++)
+	    for(int l=0; l<z; l++) {
+	      mapping[i][j][k][l] = (i*x*y*z+ j*y*z + k*z +l)%CkNumPes();
+	    }
+
+    }
+    HelloMap(CkMigrateMessage* msg) {}
+    void pup(PUP::er& p) {
+      p | W;
+      p | X;
+      p | Y;
+      p | Z;
+      if (p.isUnpacking()) {
+        mapping = new int***[W];
+        for (int w = 0; w < W; w++) {
+          mapping[w] = new int**[X];
+          for (int x = 0; x < X; x++) {
+            mapping[w][x] = new int*[Y];
+            for (int y = 0; y < Y; y++) {
+              mapping[w][x][y] = new int[Z];
+            }
+          }
+        }
+      }
+      for (int w = 0; w < W; w++) {
+        for (int x = 0; x < X; x++) {
+          for (int y = 0; y < Y; y++) {
+            PUParray(p, mapping[w][x][y], Z);
+          }
+        }
+      }
+    }
+
+    int homePe(const CkArrayIndex &idx) const {
+      short *index = (short *)idx.data();
+      return mapping[index[0]][index[1]][index[2]][index[3]];
+    }
+};
+
+
 /** \class Main
  *
  */
@@ -55,9 +118,8 @@ public:
 	     CkNumPes(), numW, numX, numY, numZ);
     mainProxy = thisProxy;
 
-    CProxy_HelloMap map = CProxy_HelloMap::ckNew(numW, numX, numY, numZ);
     CkArrayOptions opts;
-    opts.setMap(map);
+    opts.setMapObj(new HelloMap(numW, numX, numY, numZ));
     arr = CProxy_Hello::ckNew(opts);
 
     for(int i1=0; i1<numW; i1++)
@@ -138,40 +200,6 @@ public:
     CkPrintf("Bye from element %d %d %d %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
     mainProxy.done_2();
   }
-};
-
-/** \class HelloMap
- *
- */
-class HelloMap : public CkArrayMap {
-  public:
-    int ****mapping;
-
-    HelloMap(int w, int x, int y, int z) {
-      int i, j, k;
-      mapping = new int***[w];
-      for (i=0; i<w; i++) {
-        mapping[i] = new int**[x];
-	for(j=0; j<x; j++) {
-	  mapping[i][j] = new int*[y];
-	    for(k=0; k<y; k++)
-	      mapping[i][j][k] = new int[z]; 
-	}
-      }
-      /* naively fold onto the 1d rank array with z innermost */
-      for(int i=0; i<w; i++)
-	for(int j=0; j<x; j++)
-	  for(int k=0; k<y; k++)
-	    for(int l=0; l<z; l++) {
-	      mapping[i][j][k][l] = (i*x*y*z+ j*y*z + k*z +l)%CkNumPes();
-	    }
-
-    }
-
-    int procNum(int, const CkArrayIndex &idx) {
-      short *index = (short *)idx.data();
-      return mapping[index[0]][index[1]][index[2]][index[3]]; 
-    }
 };
 
 #include "hello.def.h"
