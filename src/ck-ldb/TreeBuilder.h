@@ -125,10 +125,8 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
     if (mype == level1root)
     {
       // pes in my node excluding me
-      for (int pe = 0; pe < CkNumPes(); pe++)
-      {
-        if ((pe != mype) && (CkNodeOf(pe) == mynode)) comm_children[lvl].push_back(pe);
-      }
+      comm_children[lvl].resize(CkNodeSize(mynode) - 1);
+      std::iota(comm_children[lvl].begin(), comm_children[lvl].end(), level1root + 1);
     }
     else
     {
@@ -146,20 +144,22 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
     if (mype == level1root)
     {
       std::vector<int> pes_in_node(CkNodeSize(mynode));
-      std::iota(pes_in_node.begin(), pes_in_node.end(), CkNodeFirst(mynode));
+      std::iota(pes_in_node.begin(), pes_in_node.end(), level1root);
 
       NodeLevel* level = new NodeLevel(lbmgr, pes_in_node);
       level->configure(false, config["Process"], step_freq_lvl2);
       logic[lvl] = level;
 
       // set up comm-tree between levels 1 and 2
-      std::vector<int> level1_roots;
-      level1_roots.push_back(level2root);  // need this for getPETopoTreeEdges
-      for (int pe = 0; pe < CkNumPes(); pe++)
+      std::vector<int> level1_roots(CkNumNodes());
+      level1_roots[0] = level2root;  // need this for getPETopoTreeEdges
+
+      for (int node = 0, index = 1; node < CkNumNodes(); node++)
       {
-        if (pe == level2root) continue;
-        if (CkNodeFirst(CkNodeOf(pe)) == pe) level1_roots.push_back(pe);
+        if (CkNodeFirst(node) == level2root) continue;
+        level1_roots[index++] = CkNodeFirst(node);
       }
+
       int parent, num_children;
       int* children;
       getPETopoTreeEdges(mype, level2root, level1_roots.data(), level1_roots.size(), 4,
@@ -232,10 +232,8 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
     if (mype == level1root)
     {
       // pes in my node excluding me
-      for (int pe = 0; pe < CkNumPes(); pe++)
-      {
-        if ((pe != mype) && (CkNodeOf(pe) == mynode)) comm_children[lvl].push_back(pe);
-      }
+      comm_children[lvl].resize(CkNodeSize(mynode) - 1);
+      std::iota(comm_children[lvl].begin(), comm_children[lvl].end(), level1root + 1);
     }
     else
     {
@@ -260,22 +258,22 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
     lvl = 1;
     if (mype == level1root)
     {
-      std::vector<int> pes_in_node;
-      for (int pe = 0; pe < CkNumPes(); pe++)
-      {
-        if (CkNodeOf(pe) == mynode) pes_in_node.push_back(pe);
-      }
+      std::vector<int> pes_in_node(CkNodeSize(mynode));
+      std::iota(pes_in_node.begin(), pes_in_node.end(), level1root);
+
       NodeLevel* level = new NodeLevel(lbmgr, pes_in_node);
       level->configure(false, config["Process"], step_freq_lvl2);
       logic[lvl] = level;
 
       // set up comm-tree between levels 1 and 2
-      std::vector<int> level1_roots;
-      for (int pe = 0; pe < CkNumPes(); pe++)
+      std::vector<int> level1_roots(NODES_PER_GROUP);
+      // level2root is the first PE on the first node of mygroup
+      const int firstGroupNode = CkNodeOf(level2root);
+      for (int index = 0; index < NODES_PER_GROUP; index++)
       {
-        if ((CkNodeFirst(CkNodeOf(pe)) == pe) && (GroupOf(pe) == mygroup))
-          level1_roots.push_back(pe);
+        level1_roots[index] = CkNodeFirst(firstGroupNode + index);
       }
+      
       int parent, num_children;
       int* children;
       getPETopoTreeEdges(mype, level2root, level1_roots.data(), level1_roots.size(), 4,
@@ -293,24 +291,15 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
     lvl = 2;
     if (mype == level2root)
     {
-      std::vector<int> pes_in_group;
-      for (int pe = 0; pe < CkNumPes(); pe++)
-      {
-        if (GroupOf(pe) == mygroup) pes_in_group.push_back(pe);
-      }
+      // assumes all nodes in my group are same size
+      std::vector<int> pes_in_group(NODES_PER_GROUP * CkNodeSize(mynode));
+      std::iota(pes_in_group.begin(), pes_in_group.end(), GroupFirstPe(mygroup));
+      
       NodeSetLevel* level = new NodeSetLevel(lbmgr, pes_in_group);
       level->configure(false, config["ProcessGroup"], step_freq_lvl3);
       logic[lvl] = level;
 
-      /*if (mype == level3root) {
-        for (int pe=0; pe < CkNumPes(); pe++) {
-          if ((pe != mype) && (GroupFirstPe(GroupOf(pe)) == pe))
-      comm_children[lvl].push_back(pe);
-        }
-      } else {
-        comm_parent[lvl] = level3root;
-      }*/
-      if (mype != level3root)  // NEW
+      if (mype != level3root)
         comm_parent[lvl] = level3root;
     }
 
@@ -318,9 +307,10 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
     lvl = 3;
     if (mype == level3root)
     {
-      for (int pe = 0; pe < CkNumPes(); pe++)
-      {  // NEW
-        if ((pe != mype) && (GroupFirstPe(GroupOf(pe)) == pe))
+      for (int group = 0; group < num_groups; group++)
+      {
+        const int pe = GroupFirstPe(group);
+        if (pe != mype)
           comm_children[lvl - 1].push_back(pe);
       }
 
