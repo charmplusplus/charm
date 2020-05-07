@@ -317,6 +317,9 @@ void TreeLB::loadBalanceSubtree(int level)
     else
     {
       decisions[i]->level = level;
+      // Necessary because in some cases every message in decisions is actually
+      // the same message that we are reusing, so mark as unused
+      _SET_USED(UsrToEnv(decisions[i]), 0);
       thisProxy[children[curr_child++]].sendDecisionDown((CkMessage*)decisions[i]);
     }
   }
@@ -359,6 +362,9 @@ void TreeLB::sendDecisionDown(CkMessage* msg)
     for (int i = 0; i < children.size(); i++)
     {
       decisions[i + 1]->level = level;
+      // Necessary because in some cases every message in decisions is actually
+      // the same message that we are reusing, so mark as unused
+      _SET_USED(UsrToEnv(decisions[i + 1]), 0);
       thisProxy[children[i]].sendDecisionDown((CkMessage*)decisions[i + 1]);
     }
   }
