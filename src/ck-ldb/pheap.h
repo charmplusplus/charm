@@ -10,13 +10,14 @@ class ProcHeap
  public:
   ProcHeap(std::vector<P>& procs)
   {
-    Q.reserve(procs.size() + 1);
-    Q.emplace_back();
+    int index = 1;
+    Q.resize(procs.size() + 1);
     elem_pos.resize(CkNumPes(), 0);
     for (auto& p : procs)
     {
-      Q.push_back(p);
-      elem_pos[ptr(p)->id] = Q.size() - 1;
+      Q[index] = p;
+      elem_pos[ptr(p)->id] = index;
+      index++;
     }
     buildMinHeap();
   }

@@ -289,13 +289,13 @@ void TreeLB::loadBalanceSubtree(int level)
   {
     // this can happen when final destinations of chares has been decided,
     // and chares from a subtree need to migrate to a PE in a different subtree
-    std::vector<int> idm_dests;
-    idm_dests.reserve(1 + idm.size());
-    idm_dests.push_back(CkMyPe());
+    std::vector<int> idm_dests(1 + idm.size());
+    int index = 0;
+    idm_dests[index++] = CkMyPe();
     for (auto& move : idm)
     {
       CkAssert(move.second.size() > 0);
-      idm_dests.push_back(move.first);
+      idm_dests[index++] = move.first;
     }
     ST_RecursivePartition<std::vector<int>::iterator> tb(false, false);
     int num_subtrees =
