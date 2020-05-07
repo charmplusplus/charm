@@ -528,31 +528,26 @@ void LBManager::init(void)
     setTimer();
 }
 
-int LBManager::AddStartLBFn(LDStartLBFn fn, void* data)
+int LBManager::AddStartLBFn(std::function<void()> fn)
 {
   // Save startLB function
   StartLBCB* callbk = new StartLBCB;
 
   callbk->fn = fn;
-  callbk->data = data;
-  callbk->on = 1;
+  callbk->on = true;
   startLBFnList.push_back(callbk);
   startLBFn_count++;
   return startLBFnList.size() - 1;
 }
 
-void LBManager::RemoveStartLBFn(LDStartLBFn fn)
+void LBManager::RemoveStartLBFn(int handle)
 {
-  for (int i = 0; i < startLBFnList.size(); i++)
+  StartLBCB* callbk = startLBFnList[handle];
+  if (callbk)
   {
-    StartLBCB* callbk = startLBFnList[i];
-    if (callbk && callbk->fn == fn)
-    {
-      delete callbk;
-      startLBFnList[i] = 0;
-      startLBFn_count--;
-      break;
-    }
+    delete callbk;
+    startLBFnList[handle] = nullptr;
+    startLBFn_count--;
   }
 }
 
@@ -565,32 +560,27 @@ void LBManager::StartLB()
   for (int i = 0; i < startLBFnList.size(); i++)
   {
     StartLBCB* startLBFn = startLBFnList[i];
-    if (startLBFn && startLBFn->on) startLBFn->fn(startLBFn->data);
+    if (startLBFn && startLBFn->on) startLBFn->fn();
   }
 }
 
-int LBManager::AddMigrationDoneFn(LDMigrationDoneFn fn, void* data)
+int LBManager::AddMigrationDoneFn(std::function<void()> fn)
 {
   // Save migrationDone callback function
   MigrationDoneCB* callbk = new MigrationDoneCB;
 
   callbk->fn = fn;
-  callbk->data = data;
   migrationDoneCBList.push_back(callbk);
   return migrationDoneCBList.size() - 1;
 }
 
-void LBManager::RemoveMigrationDoneFn(LDMigrationDoneFn fn)
+void LBManager::RemoveMigrationDoneFn(int handle)
 {
-  for (int i = 0; i < migrationDoneCBList.size(); i++)
+  MigrationDoneCB* callbk = migrationDoneCBList[handle];
+  if (callbk)
   {
-    MigrationDoneCB* callbk = migrationDoneCBList[i];
-    if (callbk && callbk->fn == fn)
-    {
-      delete callbk;
-      migrationDoneCBList[i] = 0;
-      break;
-    }
+    delete callbk;
+    migrationDoneCBList[handle] = nullptr;
   }
 }
 
@@ -599,19 +589,8 @@ void LBManager::MigrationDone()
   for (int i = 0; i < migrationDoneCBList.size(); i++)
   {
     MigrationDoneCB* callbk = migrationDoneCBList[i];
-    if (callbk) callbk->fn(callbk->data);
+    if (callbk) callbk->fn();
   }
-}
-
-void LBManager::SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin,
-                               LDPredictFn off, LDPredictModelFn change, void* data)
-{
-  if (predictCBFn == NULL) predictCBFn = new PredictCB;
-  predictCBFn->on = on;
-  predictCBFn->onWin = onWin;
-  predictCBFn->off = off;
-  predictCBFn->change = change;
-  predictCBFn->data = data;
 }
 
 void LBManager::DumpDatabase()

@@ -250,33 +250,23 @@ class DefaultFunction : public LBPredictorFunction
 class LBManager : public CBase_LBManager
 {
  private:
-  struct MigrateCB
-  {
-    LDMigratedFn fn;
-    void* data;
-    int on;
-  };
-
   struct StartLBCB
   {
-    LDStartLBFn fn;
-    void* data;
-    int on;
+    std::function<void()> fn;
+    bool on;
   };
 
   struct MigrationDoneCB
   {
-    LDMigrationDoneFn fn;
-    void* data;
+    std::function<void()> fn;
   };
 
   struct PredictCB
   {
-    LDPredictModelFn on;
-    LDPredictWindowFn onWin;
-    LDPredictFn off;
-    LDPredictModelFn change;
-    void* data;
+    std::function<void(LBPredictorFunction* model)> on;
+    std::function<void(LBPredictorFunction* model, int win)> onWin;
+    std::function<void()> off;
+    std::function<void(LBPredictorFunction* model)> change;
   };
 
   LBDatabase* lbdb_obj;
@@ -413,7 +403,14 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->MulticastSend(_om, _ids, _n, _b, _nMsgs);
   }
-  int useMem() { return lbdb_obj->useMem(this); }
+  int useMem()
+  {
+    int size = sizeof(LBManager);
+    size += startLBFnList.size() * sizeof(StartLBCB);
+    size += migrationDoneCBList.size() * sizeof(MigrationDoneCB);
+    size += lbdb_obj->useMem();
+    return size;
+  }
 
 #if CMK_LB_USER_DATA
   inline void* GetDBObjUserData(LDObjHandle& h, int idx)
@@ -433,16 +430,25 @@ class LBManager : public CBase_LBManager
   /*
    * Calls from load balancer to load database
    */
-
-  int AddStartLBFn(LDStartLBFn fn, void* data);
+  template <typename T>
+  inline int AddStartLBFn(T* obj, void (T::*method)(void))
+  {
+    return AddStartLBFn(std::bind(method, obj));
+  }
+  int AddStartLBFn(std::function<void()> fn);
   void TurnOnStartLBFn(int handle) { startLBFnList[handle]->on = 1; }
   void TurnOffStartLBFn(int handle) { startLBFnList[handle]->on = 0; }
-  void RemoveStartLBFn(LDStartLBFn fn);
+  void RemoveStartLBFn(int handle);
 
   void StartLB();
-
-  int AddMigrationDoneFn(LDMigrationDoneFn fn, void* data);
-  void RemoveMigrationDoneFn(LDMigrationDoneFn fn);
+  
+  template <typename T>
+  inline int AddMigrationDoneFn(T* obj, void (T::*method)(void))
+  {
+    return AddMigrationDoneFn(std::bind(method, obj));
+  }
+  int AddMigrationDoneFn(std::function<void()> fn);
+  void RemoveMigrationDoneFn(int handle);
   void MigrationDone();
 
  public:
@@ -452,34 +458,45 @@ class LBManager : public CBase_LBManager
   inline void PredictorOn(LBPredictorFunction* model)
   {
     if (predictCBFn != NULL)
-      predictCBFn->on(predictCBFn->data, model);
+      predictCBFn->on(model);
     else
       CmiPrintf("Predictor not supported in this load balancer\n");
   }
   inline void PredictorOn(LBPredictorFunction* model, int wind)
   {
     if (predictCBFn != NULL)
-      predictCBFn->onWin(predictCBFn->data, model, wind);
+      predictCBFn->onWin(model, wind);
     else
       CmiPrintf("Predictor not supported in this load balancer\n");
   }
   inline void PredictorOff()
   {
     if (predictCBFn != NULL)
-      predictCBFn->off(predictCBFn->data);
+      predictCBFn->off();
     else
       CmiPrintf("Predictor not supported in this load balancer\n");
   }
   inline void ChangePredictor(LBPredictorFunction* model)
   {
     if (predictCBFn != NULL)
-      predictCBFn->change(predictCBFn->data, model);
+      predictCBFn->change(model);
     else
       CmiPrintf("Predictor not supported in this load balancer");
   }
 
-  void SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off,
-                      LDPredictModelFn change, void* data);
+  template <typename T>
+  void SetupPredictor(T* data,
+                      void (T::*on)(LBPredictorFunction*),
+                      void (T::*onWin)(LBPredictorFunction*, int),
+                      void (T::*off)(void),
+                      void (T::*change)(LBPredictorFunction*))
+  {
+    if (predictCBFn == nullptr) predictCBFn = new PredictCB;
+    predictCBFn->on = [=](LBPredictorFunction* fn) { (data->*on)(fn); };
+    predictCBFn->onWin = [=](LBPredictorFunction* fn, int win) { (data->*onWin)(fn, win); };
+    predictCBFn->off = [=]() { (data->*off)(); };
+    predictCBFn->change = [=](LBPredictorFunction* fn) { (data->*change)(fn); };
+  }
 
   inline int CollectingCommStats(void)
   {
@@ -556,7 +573,6 @@ class LBManager : public CBase_LBManager
   int nloadbalancers;
   CkVec<BaseLB*> loadbalancers;
 
-  std::vector<MigrateCB*> migrateCBList;
   std::vector<StartLBCB*> startLBFnList;
   std::vector<MigrationDoneCB*> migrationDoneCBList;
 

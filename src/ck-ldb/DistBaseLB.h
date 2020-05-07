@@ -21,7 +21,6 @@ public:
   void InvokeLB(void); // Everything is at the PE barrier
 
   void barrierDone();
-	static void staticStartLB(void*);
 	void ProcessAtSync();
   void LoadBalance();
   void ResumeClients();

@@ -136,9 +136,9 @@ class LBTreeBuilder
   virtual ~LBTreeBuilder() {}
 };
 
-// TODO I think the staticXXX functions are ugly. All load balancers should probably
-// just inherit from a common interface, and the load balancers should just register
-// themselves with LBManager instead of registering these functions
+// TODO All load balancers should probably just inherit from a common
+// interface, and the load balancers should just register themselves
+// with LBManager instead of registering these functions
 class TreeLB : public CBase_TreeLB
 {
  public:
@@ -153,11 +153,9 @@ class TreeLB : public CBase_TreeLB
   // start load balancing (non-AtSync mode)  NOTE: This seems to do a broadcast
   // (is this the behavior we want?)
   inline void StartLB() { thisProxy.ProcessAtSync(); }
-  static void staticStartLB(void*);
 
   // TODO: I would rename this group of functions (to maybe something like startLBLocal)
   // since they are also used in non-AtSync mode
-  static void staticAtSync(void*);
   virtual void InvokeLB();  // Start load balancing at this PE
   void Migrated(int waitBarrier = 1);
   void ProcessAtSync();  // Receive a message from AtSync to avoid making projections
@@ -175,7 +173,6 @@ class TreeLB : public CBase_TreeLB
 
   // called by LBManager when an actual chare migrates into this PE.
   // only happens in last level of tree
-  static void staticObjMovedIn(void* me, LDObjHandle h, bool waitBarrier = true);
   void objMovedIn(bool waitBarrier = true);
 
   void resumeClients();

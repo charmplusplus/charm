@@ -7,16 +7,6 @@ extern int quietModeRequested;
 
 CreateLBFunc_Def(TreeLB, "TreeLB")
 
-    void TreeLB::staticStartLB(void* data)
-{
-  ((TreeLB*)data)->StartLB();
-}
-
-void TreeLB::staticObjMovedIn(void* data, LDObjHandle h, bool waitBarrier)
-{
-  //  ((TreeLB*)data)->objMovedIn(h, waitBarrier);
-}
-
 void TreeLB::Migrated(int waitBarrier)
 {
   bool barrier = false;
@@ -33,7 +23,7 @@ void TreeLB::init(const CkLBOptions& opts)
   if (_lb_args.syncResume()) barrier_after_lb = true;
 
   // create and turn on by default
-  startLbFnHdl = lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB), (void*)(this));
+  startLbFnHdl = lbmgr->AddStartLBFn(this, &TreeLB::StartLB);
 
   json config;
   std::ifstream ifs(_lb_args.treeLBFile(), std::ifstream::in);
@@ -112,7 +102,7 @@ TreeLB::~TreeLB()
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   if (lbmgr)
   {
-    lbmgr->RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+    lbmgr->RemoveStartLBFn(startLbFnHdl);
   }
 
   for (auto l : logic) delete l;
