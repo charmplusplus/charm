@@ -1926,6 +1926,20 @@ CcdPROCESSOR_STILL_IDLE
    to execute. That is, this condition is raised while the processor
    utilization graph is flat.
 
+CcdPROCESSOR_LONG_IDLE
+   This is an extension of CcdPROCESSOR_STILL_IDLE for a relatively longer
+   period of time. It is raised when the scheduler finds that it doesn't
+   have any messages to execute for a long period of time. The default
+   LONG_IDLE time is 10 seconds. However, it is customizable using a user
+   passed runtime flag ``+longIdleThresh <long idle time in seconds>``.
+   This feature is useful for debugging hangs in applications. It can allow
+   the user to add a user defined function as a hook to execute when the program
+   goes into a long idle state, typically seen during hangs. The test program
+   ``tests/charm++/longIdle`` illustrates the usage of CcdPROCESSOR_LONG_IDLE.
+   Since the usage of CcdPROCESSOR_LONG_IDLE uses additional timers in the
+   scheduler loop, it is only enabled with error checking builds and requires
+   the user to build the target with ``--enable-error-checking``.
+
 CcdPROCESSOR_BEGIN_BUSY
    Raised when a message first arrives on an idle processor. That is,
    raised on the rising edge of the processor utilization graph.
@@ -2014,12 +2028,20 @@ callbacks from within ccd callbacks.
 
 .. code-block:: c++
 
-  void CcdRaiseCondition(int condNum)
+  double CcdRaiseCondition(int condNum)
 
 
 When this function is called, it invokes all the functions whose
 pointers were registered for the ``condNum`` via a *prior* call to
-``CcdCallOnCondition`` or ``CcdCallOnConditionKeep``.
+``CcdCallOnCondition`` or ``CcdCallOnConditionKeep``. The function
+internally calls ``CmiWallTimer`` and returns this value. When using
+``CcdRaiseCondition``, the return value can be used to determine the
+current walltime avoiding an additional call to ``CmiWallTimer``.
+However, it is important to note that the walltime value returned
+by ``CcdRaiseCondition`` could be stale by the time it is returned
+since registered functions are executed between the timer call and
+the return. For this reason, this walltime value returned should be
+used in situations where an exact or current timer value is not desired.
 
 .. code-block:: c++
 
