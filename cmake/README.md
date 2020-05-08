@@ -55,6 +55,6 @@ Currently, the CMake build system has the following limitations.
 
 - No Windows support. 
 - No support for `gni-*` and `*-crayx?` targets.
-- Not all options available in the old build system are supported
+- Not all options available in the old build system are supported.
 
 See https://github.com/UIUC-PPL/charm/issues/2839 for details.
