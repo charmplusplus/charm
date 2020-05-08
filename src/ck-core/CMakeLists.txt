@@ -19,7 +19,7 @@ set(ck-cxx-sources
     ../ck-perf/trace-common.C ../ck-perf/trace-controlPoints.C
     ../ck-perf/tracec.C ../ck-perf/tracef.C ../conv-perf/charmProjections.C
     ../util/ckbitvector.C ../util/ckregex.C
-    ck.C ckarray.C ckarrayoptions.C ckcallback.C
+    ck.C ckarray.C ckarraymap.C ckarrayoptions.C ckcallback.C
     ckcheckpoint.C ckevacuation.C ckfutures.C ckIgetControl.C
     cklocation.C ckmemcheckpoint.C ckmulticast.C
     ckobjid.C ckobjQ.C ckrdma.C ckreduction.C debug-charm.C
@@ -29,7 +29,7 @@ set(ck-cxx-sources
 
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     charm-api.h charm.h charmf.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
-    ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
+    ckarrayoptions.h ckarraymap.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
     ckevacuation.h ckfutures.h cklocation.h cklocrec.h
     ckmemcheckpoint.h ckmessage.h ckmigratable.h ckmulticast.h
     ckobjQ.h ckobjid.h ckrdma.h ckreduction.h cksection.h
@@ -42,6 +42,7 @@ set(ck-ci-sources
     ${CMAKE_BINARY_DIR}/include/BaseLB.decl.h
     ${CMAKE_BINARY_DIR}/include/CentralLB.decl.h
     ${CMAKE_BINARY_DIR}/include/CkArray.decl.h
+    ${CMAKE_BINARY_DIR}/include/CkArrayMap.decl.h
     ${CMAKE_BINARY_DIR}/include/CkCallback.decl.h
     ${CMAKE_BINARY_DIR}/include/CkCheckpoint.decl.h
     ${CMAKE_BINARY_DIR}/include/CkCheckpointStatus.decl.h
