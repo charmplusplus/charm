@@ -364,14 +364,14 @@ void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest) {
 
 /**************************** Direct GPU Messaging ***************************/
 
+#if CMK_CUDA
 static int rget_device_handler_idx;
 
 static void rgetDeviceHandler(DeviceRdmaMsg* msg) {
-  DeviceRdmaInfo& info = msg->info;
-  CmiPrintf("rgetDeviceHandler on PE %d: src_pe %d, src_ptr %p, dest_pe %d, dest_ptr %p, size %zu\n",
-      CmiMyPe(), info.src_pe, info.src_ptr, info.dest_pe, info.dest_ptr, info.size);
+  DeviceRdmaInfo* info = &msg->info;
 
-  // TODO issue a send through UCX with a special tag, so that it gets properly handled on the receiver
+  // Send device buffer through UCX with a special tag, so that it gets properly handled on the receiver
+  CmiSendDevice(info);
 }
 
 void CmiDeviceRdmaInit() {
@@ -379,6 +379,11 @@ void CmiDeviceRdmaInit() {
 }
 
 void CmiIssueRgetDevice(DeviceRdmaMsg* msg) {
+  // TODO: Post a receive
+  CmiRecvDevice(&msg->info);
+
+  // Send message with destination address to sender
   CmiSetHandler(msg, rget_device_handler_idx);
   CmiSyncSendAndFree(msg->info.src_pe, sizeof(DeviceRdmaMsg), msg);
 }
+#endif

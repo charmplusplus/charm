@@ -153,4 +153,18 @@ void CmiInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
 #endif
 
 #endif /*End of CMK_ONESIDED_IMPL */
+
+#if CMK_CUDA
+void LrtsSendDevice(DeviceRdmaInfo* info);
+void LrtsRecvDevice(DeviceRdmaInfo* info);
+
+inline void CmiSendDevice(DeviceRdmaInfo* info) {
+  LrtsSendDevice(info);
+}
+
+inline void CmiRecvDevice(DeviceRdmaInfo* info) {
+  LrtsRecvDevice(info);
+}
+#endif
+
 #endif

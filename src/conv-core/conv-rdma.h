@@ -374,7 +374,11 @@ zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src, std::function<void (void *)>
 void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest);
 
 /**************************** Direct GPU Messaging ***************************/
+#if CMK_CUDA
 void CmiDeviceRdmaInit();
+void CmiSendDevice(DeviceRdmaInfo* info);
+void CmiRecvDevice(DeviceRdmaInfo* info);
 void CmiIssueRgetDevice(DeviceRdmaMsg* msg);
+#endif
 
 #endif

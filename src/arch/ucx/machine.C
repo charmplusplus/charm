@@ -39,6 +39,7 @@
 #define UCX_TAG_RMA_BITS                4
 #define UCX_MSG_TAG_EAGER               UCS_BIT(0)
 #define UCX_MSG_TAG_PROBE               UCS_BIT(1)
+#define UCX_MSG_TAG_DEVICE              UCS_BIT(2)
 #define UCX_RMA_TAG_GET                 UCS_BIT(UCX_TAG_MSG_BITS + 1)
 #define UCX_RMA_TAG_REG_AND_SEND_BACK   UCS_BIT(UCX_TAG_MSG_BITS + 2)
 #define UCX_RMA_TAG_DEREG_AND_ACK       UCS_BIT(UCX_TAG_MSG_BITS + 3)
@@ -88,6 +89,9 @@ typedef struct UcxContext
     UcxRequest        **rxReqs;
 #if CMK_SMP
     PCQueue           txQueue;
+#endif
+#if CMK_CUDA
+    UcxRequest        **deviceReqs;
 #endif
     int               eagerSize;
     int               numRxReqs;
@@ -501,13 +505,17 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
 {
     ucp_tag_t sTag;
 
-    // Combine tag and sTag: sTag defines msg protocol, tag may indicate RMA requests
-    sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_EAGER;
+    if (tag = UCX_MSG_TAG_DEVICE) {
+      sTag = tag;
+    } else {
+      // Combine tag and sTag: sTag defines msg protocol, tag may indicate RMA requests
+      sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_EAGER;
 
-    // Auxilliary messages (which add bits to the tag) should use eager.
-    CmiEnforce((tag == 0ul) || (sTag == UCX_MSG_TAG_EAGER));
+      // Auxilliary messages (which add bits to the tag) should use eager.
+      CmiEnforce((tag == 0ul) || (sTag == UCX_MSG_TAG_EAGER));
 
-    sTag |= tag;
+      sTag |= tag;
+    }
 
     UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
             destNode, destPE, size, msg, tag);
@@ -723,6 +731,24 @@ void  LrtsBarrier()
     ret = runtime_barrier();
     UCX_CHECK_PMI_RET(ret, "runtime_barrier");
 }
+
+#if CMK_CUDA
+void LrtsSendDevice(DeviceRdmaInfo* info)
+{
+  UCX_LOG(4, "srcPE %d destPE %d", info->src_pe, info->dest_pe);
+
+  // TODO: UCX callback should invoke Charm++ callback?
+  UcxSendMsg(CmiNodeOf(info->dest_pe), info->src_pe, info->size,
+      (char*)info->src_ptr, UCX_MSG_TAG_DEVICE, UcxRmaSendCompleted);
+
+  UCX_LOG(4, "Sending device data to %d, mem size %d", info->src_pe, info->size);
+}
+
+void LrtsRecvDevice(DeviceRdmaInfo* info)
+{
+  // TODO: Use deviceReqs
+}
+#endif
 
 #if CMK_ONESIDED_IMPL
 #include "machine-onesided.C"
