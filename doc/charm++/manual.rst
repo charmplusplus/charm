@@ -3647,7 +3647,7 @@ buffer into an asynchronous entry method invocation, you shouldn’t
 access its fields, or pass that same buffer into a second entry method
 invocation. Note that this rule doesn’t preclude the *single reuse* of
 a received message - consider being inside the body of an entry method
-invocation :math:`i_1`, which has receiveed the message buffer :math:`m_1`
+invocation :math:`i_1`, which has received the message buffer :math:`m_1`
 as an input parameter. Then, :math:`m_1` may be passed to an asynchronous
 entry method invocation :math:`i_2`. However, once :math:`i_2` has been
 issued with :math:`m_1` as its input parameter, :math:`m_1` cannot be
