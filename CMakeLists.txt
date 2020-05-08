@@ -118,7 +118,9 @@ option(BUILD_CUDA          "Build with CUDA support" OFF)
 set(UCX_PMI "" CACHE STRING "PMI type for UCX layer, can be one of simplepmi, simplepmi2, or ompipmix")
 
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
-add_compile_options(${EXTRA_OPTS})
+
+separate_arguments(MY_EXTRA_OPTS UNIX_COMMAND ${EXTRA_OPTS})
+add_compile_options("${MY_EXTRA_OPTS}")
 
 set(CMK_REPLAYSYSTEM ${REPLAY})
 
