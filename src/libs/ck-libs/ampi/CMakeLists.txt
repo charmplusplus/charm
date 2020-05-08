@@ -11,14 +11,61 @@ add_library(ampi-compat compat_ampi.c
        compat_ampicpp.C)
 
 add_library(moduleampi ${ampi-cxx-sources} ${ampi-h-sources})
-add_dependencies(moduleampi moduletcharm ck)
+add_dependencies(moduleampi moduletcharm ck ampi_funcptr_shim ampi_funcptr_fortran )
+
+
+# fsglobals/pipglobals
+add_library(ampi_funcptr_shim OBJECT ampi_funcptr_shim.C)
+target_compile_options(ampi_funcptr_shim PRIVATE -ampi-funcptr-shim)
+
+add_library(ampi_funcptr_fortran OBJECT ampif.C)
+target_compile_options(ampi_funcptr_fortran PRIVATE -ampi-funcptr-shim)
+
+add_library(ampi_funcptr_loader OBJECT ampi_funcptr_loader.C)
+
+if(${CMK_SUPPORTS_FSGLOBALS})
+    add_library(ampi_funcptr_fsglobals OBJECT ampi_funcptr_fsglobals.C)
+    add_dependencies(ampi_funcptr_fsglobals ck)
+    add_dependencies(moduleampi ampi_funcptr_fsglobals)
+    add_custom_command(TARGET moduleampi
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_fsglobals.dir/ampi_funcptr_fsglobals.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_fsglobals.o
+        VERBATIM
+    )
+endif()
+
+if(${CMK_SUPPORTS_PIPGLOBALS})
+    add_library(ampi_funcptr_pipglobals OBJECT ampi_funcptr_pipglobals.C)
+    add_dependencies(ampi_funcptr_pipglobals ck)
+    add_dependencies(moduleampi ampi_funcptr_pipglobals)
+    add_custom_command(TARGET moduleampi
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_pipglobals.dir/ampi_funcptr_pipglobals.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_pipglobals.o
+        VERBATIM
+    )
+endif()
+
+add_dependencies(ampi_funcptr_shim ck)
+add_dependencies(ampi_funcptr_fortran ck)
+add_dependencies(ampi_funcptr_loader ck)
+
+add_dependencies(moduleampi ampi_funcptr_shim ampi_funcptr_fortran ampi_funcptr_loader)
+
+add_custom_command(TARGET moduleampi
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim.dir/ampi_funcptr_shim.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim.o
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_fortran.dir/ampif.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_fortran.o
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_loader.dir/ampi_funcptr_loader.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_loader.o
+    VERBATIM
+)
+
+
 
 if(${CMK_CAN_LINK_FORTRAN})
     add_library(moduleampif ${ampi-f90-sources} ${ampi-cxx-sources} ${ampi-h-sources})
     add_dependencies(moduleampif moduletcharm ck)
 endif()
 
-# FIXME: add fsglobals/pipglobals
 
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampicc         COPYONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/               COPYONLY)

@@ -196,7 +196,6 @@ CmiPrintf("start %d elements\n", nElements);
     mg->contribute(sizeof(int), &data,CkReduction::max_int, sid, cb);
     data = thisIndex+1;
     mg->contribute(sizeof(int), &data,CkReduction::product_int, sid, cb);
-    delete m;
     if (1)
     ckMigrate((CkMyPe()+1)%CkNumPes());
   }

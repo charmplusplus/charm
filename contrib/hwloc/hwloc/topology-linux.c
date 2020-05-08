@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2019 Inria.  All rights reserved.
+ * Copyright © 2009-2020 Inria.  All rights reserved.
  * Copyright © 2009-2013, 2015 Université Bordeaux
  * Copyright © 2009-2018 Cisco Systems, Inc.  All rights reserved.
  * Copyright © 2015 Intel, Inc.  All rights reserved.
@@ -258,7 +258,7 @@ static __hwloc_inline long hwloc_set_mempolicy(int mode __hwloc_attribute_unused
 # endif
 #endif
 static __hwloc_inline long hwloc_get_mempolicy(int *mode __hwloc_attribute_unused,
-					       const unsigned long *nodemask __hwloc_attribute_unused,
+					       unsigned long *nodemask __hwloc_attribute_unused,
 					       unsigned long maxnode __hwloc_attribute_unused,
 					       void *addr __hwloc_attribute_unused,
 					       int flags __hwloc_attribute_unused)
@@ -2205,8 +2205,14 @@ struct hwloc_linux_cpuinfo_proc {
   unsigned infos_count;
 };
 
+enum hwloc_linux_cgroup_type_e {
+      HWLOC_LINUX_CGROUP2,
+      HWLOC_LINUX_CGROUP1,
+      HWLOC_LINUX_CPUSET
+};
+
 static void
-hwloc_find_linux_cpuset_mntpnt(char **cgroup_mntpnt, char **cpuset_mntpnt, const char *root_path)
+hwloc_find_linux_cgroup_mntpnt(enum hwloc_linux_cgroup_type_e *cgtype, char **mntpnt, const char *root_path, int fsroot_fd)
 {
   char *mount_path;
   struct mntent mntent;
@@ -2215,8 +2221,7 @@ hwloc_find_linux_cpuset_mntpnt(char **cgroup_mntpnt, char **cpuset_mntpnt, const
   int err;
   size_t bufsize;
 
-  *cgroup_mntpnt = NULL;
-  *cpuset_mntpnt = NULL;
+  *mntpnt = NULL;
 
   if (root_path) {
     /* setmntent() doesn't support openat(), so use the root_path directly */
@@ -2241,14 +2246,51 @@ hwloc_find_linux_cpuset_mntpnt(char **cgroup_mntpnt, char **cpuset_mntpnt, const
    */
   bufsize = hwloc_getpagesize()*4;
   buf = malloc(bufsize);
-  if (!buf)
+  if (!buf) {
+    endmntent(fd);
     return;
+  }
 
   while (getmntent_r(fd, &mntent, buf, bufsize)) {
-    if (!strcmp(mntent.mnt_type, "cpuset")) {
+
+    if (!strcmp(mntent.mnt_type, "cgroup2")) {
+      char ctrls[1024]; /* there are about ten controllers with 10-char names */
+      char ctrlpath[256];
+      hwloc_debug("Found cgroup2 mount point on %s\n", mntent.mnt_dir);
+      /* read controllers */
+      snprintf(ctrlpath, sizeof(ctrlpath), "%s/cgroup.controllers", mntent.mnt_dir);
+      err = hwloc_read_path_by_length(ctrlpath, ctrls, sizeof(ctrls), fsroot_fd);
+      if (!err) {
+	/* look for cpuset separated by spaces */
+	char *ctrl, *_ctrls = ctrls;
+	char *tmp;
+	int cpuset_ctrl = 0;
+	tmp = strchr(ctrls, '\n');
+	if (tmp)
+	  *tmp = '\0';
+	hwloc_debug("Looking for `cpuset' controller in list `%s'\n", ctrls);
+	while ((ctrl = strsep(&_ctrls, " ")) != NULL) {
+	  if (!strcmp(ctrl, "cpuset")) {
+	    cpuset_ctrl = 1;
+	    break;
+	  }
+	}
+	if (cpuset_ctrl) {
+	  hwloc_debug("Found cgroup2/cpuset mount point on %s\n", mntent.mnt_dir);
+	  *cgtype = HWLOC_LINUX_CGROUP2;
+	  *mntpnt = strdup(mntent.mnt_dir);
+	  break;
+	}
+      } else {
+	hwloc_debug("Failed to read cgroup2 controllers from `%s'\n", ctrlpath);
+      }
+
+    } else if (!strcmp(mntent.mnt_type, "cpuset")) {
       hwloc_debug("Found cpuset mount point on %s\n", mntent.mnt_dir);
-      *cpuset_mntpnt = strdup(mntent.mnt_dir);
+      *cgtype = HWLOC_LINUX_CPUSET;
+      *mntpnt = strdup(mntent.mnt_dir);
       break;
+
     } else if (!strcmp(mntent.mnt_type, "cgroup")) {
       /* found a cgroup mntpnt */
       char *opt, *opts = mntent.mnt_opts;
@@ -2264,13 +2306,16 @@ hwloc_find_linux_cpuset_mntpnt(char **cgroup_mntpnt, char **cpuset_mntpnt, const
       if (!cpuset_opt)
 	continue;
       if (noprefix_opt) {
-	hwloc_debug("Found cgroup emulating a cpuset mount point on %s\n", mntent.mnt_dir);
-	*cpuset_mntpnt = strdup(mntent.mnt_dir);
+	hwloc_debug("Found cgroup1 emulating a cpuset mount point on %s\n", mntent.mnt_dir);
+	*cgtype = HWLOC_LINUX_CPUSET;
+	*mntpnt = strdup(mntent.mnt_dir);
+	break;
       } else {
-	hwloc_debug("Found cgroup/cpuset mount point on %s\n", mntent.mnt_dir);
-	*cgroup_mntpnt = strdup(mntent.mnt_dir);
+	hwloc_debug("Found cgroup1/cpuset mount point on %s\n", mntent.mnt_dir);
+	*cgtype = HWLOC_LINUX_CGROUP1;
+	*mntpnt = strdup(mntent.mnt_dir);
+	break;
       }
-      break;
     }
   }
 
@@ -2285,7 +2330,7 @@ hwloc_find_linux_cpuset_mntpnt(char **cgroup_mntpnt, char **cpuset_mntpnt, const
  * containing <name>.
  */
 static char *
-hwloc_read_linux_cpuset_name(int fsroot_fd, hwloc_pid_t pid)
+hwloc_read_linux_cgroup_name(int fsroot_fd, hwloc_pid_t pid)
 {
 #define CPUSET_NAME_LEN 128
   char cpuset_name[CPUSET_NAME_LEN];
@@ -2293,7 +2338,24 @@ hwloc_read_linux_cpuset_name(int fsroot_fd, hwloc_pid_t pid)
   int err;
   char *tmp;
 
-  /* check whether a cgroup-cpuset is enabled */
+  /* try to read from /proc/XXXX/cpuset */
+  if (!pid)
+    err = hwloc_read_path_by_length("/proc/self/cpuset", cpuset_name, sizeof(cpuset_name), fsroot_fd);
+  else {
+    char path[] = "/proc/XXXXXXXXXXX/cpuset";
+    snprintf(path, sizeof(path), "/proc/%d/cpuset", pid);
+    err = hwloc_read_path_by_length(path, cpuset_name, sizeof(cpuset_name), fsroot_fd);
+  }
+  if (!err) {
+    /* found a cpuset, return the name */
+    tmp = strchr(cpuset_name, '\n');
+    if (tmp)
+      *tmp = '\0';
+    hwloc_debug("Found cgroup name `%s'\n", cpuset_name);
+    return strdup(cpuset_name);
+  }
+
+  /* try to read from /proc/XXXX/cgroup */
   if (!pid)
     file = hwloc_fopen("/proc/self/cgroup", "r", fsroot_fd);
   else {
@@ -2306,53 +2368,38 @@ hwloc_read_linux_cpuset_name(int fsroot_fd, hwloc_pid_t pid)
 #define CGROUP_LINE_LEN 256
     char line[CGROUP_LINE_LEN];
     while (fgets(line, sizeof(line), file)) {
-      char *end, *colon = strchr(line, ':');
+      char *end, *path, *colon;
+      colon = strchr(line, ':');
       if (!colon)
 	continue;
-      if (strncmp(colon, ":cpuset:", 8))
+      if (!strncmp(colon, ":cpuset:", 8)) /* cgroup v1 cpuset-specific hierarchy */
+	path = colon + 8;
+      else if (!strncmp(colon, "::", 2)) /* cgroup v2 unified hierarchy */
+	path = colon + 2;
+      else
 	continue;
 
-      /* found a cgroup-cpuset line, return the name */
+      /* found a cgroup with cpusets, return the name */
       fclose(file);
-      end = strchr(colon, '\n');
+      end = strchr(path, '\n');
       if (end)
 	*end = '\0';
-      hwloc_debug("Found cgroup-cpuset %s\n", colon+8);
-      return strdup(colon+8);
+      hwloc_debug("Found cgroup-cpuset %s\n", path);
+      return strdup(path);
     }
     fclose(file);
   }
 
-  /* check whether a cpuset is enabled */
-  if (!pid)
-    err = hwloc_read_path_by_length("/proc/self/cpuset", cpuset_name, sizeof(cpuset_name), fsroot_fd);
-  else {
-    char path[] = "/proc/XXXXXXXXXXX/cpuset";
-    snprintf(path, sizeof(path), "/proc/%d/cpuset", pid);
-    err = hwloc_read_path_by_length(path, cpuset_name, sizeof(cpuset_name), fsroot_fd);
-  }
-  if (err < 0) {
-    /* found nothing */
-    hwloc_debug("%s", "No cgroup or cpuset found\n");
-    return NULL;
-  }
-
-  /* found a cpuset, return the name */
-  tmp = strchr(cpuset_name, '\n');
-  if (tmp)
-    *tmp = '\0';
-  hwloc_debug("Found cpuset %s\n", cpuset_name);
-  return strdup(cpuset_name);
+  /* found nothing */
+  hwloc_debug("%s", "No cgroup or cpuset found\n");
+  return NULL;
 }
 
-/*
- * Then, the cpuset description is available from either the cgroup or
- * the cpuset filesystem (usually mounted in / or /dev) where there
- * are cgroup<name>/cpuset.{cpus,mems} or cpuset<name>/{cpus,mems} files.
- */
 static void
-hwloc_admin_disable_set_from_cpuset(int root_fd,
-				    const char *cgroup_mntpnt, const char *cpuset_mntpnt, const char *cpuset_name,
+hwloc_admin_disable_set_from_cgroup(int root_fd,
+				    enum hwloc_linux_cgroup_type_e cgtype,
+				    const char *mntpnt,
+				    const char *cpuset_name,
 				    const char *attr_name,
 				    hwloc_bitmap_t admin_enabled_set)
 {
@@ -2360,24 +2407,31 @@ hwloc_admin_disable_set_from_cpuset(int root_fd,
   char cpuset_filename[CPUSET_FILENAME_LEN];
   int err;
 
-  if (cgroup_mntpnt) {
-    /* try to read the cpuset from cgroup */
-    snprintf(cpuset_filename, CPUSET_FILENAME_LEN, "%s%s/cpuset.%s", cgroup_mntpnt, cpuset_name, attr_name);
-    hwloc_debug("Trying to read cgroup file <%s>\n", cpuset_filename);
-  } else if (cpuset_mntpnt) {
+  switch (cgtype) {
+  case HWLOC_LINUX_CGROUP2:
+    /* try to read the cpuset from cgroup2. use the last "effective" mask to get a AND of parent masks */
+    snprintf(cpuset_filename, CPUSET_FILENAME_LEN, "%s%s/cpuset.%s.effective", mntpnt, cpuset_name, attr_name);
+    hwloc_debug("Trying to read cgroup2 file <%s>\n", cpuset_filename);
+    break;
+  case HWLOC_LINUX_CGROUP1:
+    /* try to read the cpuset from cgroup1. no need to use "effective_cpus/mems" since we'll remove offline CPUs in the core */
+    snprintf(cpuset_filename, CPUSET_FILENAME_LEN, "%s%s/cpuset.%s", mntpnt, cpuset_name, attr_name);
+    hwloc_debug("Trying to read cgroup1 file <%s>\n", cpuset_filename);
+    break;
+  case HWLOC_LINUX_CPUSET:
     /* try to read the cpuset directly */
-    snprintf(cpuset_filename, CPUSET_FILENAME_LEN, "%s%s/%s", cpuset_mntpnt, cpuset_name, attr_name);
+    snprintf(cpuset_filename, CPUSET_FILENAME_LEN, "%s%s/%s", mntpnt, cpuset_name, attr_name);
     hwloc_debug("Trying to read cpuset file <%s>\n", cpuset_filename);
+    break;
   }
 
   err = hwloc__read_path_as_cpulist(cpuset_filename, admin_enabled_set, root_fd);
-
   if (err < 0) {
     hwloc_debug("failed to read cpuset '%s' attribute '%s'\n", cpuset_name, attr_name);
     hwloc_bitmap_fill(admin_enabled_set);
-  } else {
-    hwloc_debug_bitmap("cpuset includes %s\n", admin_enabled_set);
+    return;
   }
+  hwloc_debug_bitmap("cpuset includes %s\n", admin_enabled_set);
 }
 
 static void
@@ -2405,6 +2459,7 @@ static void
 hwloc_parse_hugepages_info(struct hwloc_linux_backend_data_s *data,
 			   const char *dirpath,
 			   struct hwloc_numanode_attr_s *memory,
+			   unsigned allocated_page_types,
 			   uint64_t *remaining_local_memory)
 {
   DIR *dir;
@@ -2419,6 +2474,14 @@ hwloc_parse_hugepages_info(struct hwloc_linux_backend_data_s *data,
       int err;
       if (strncmp(dirent->d_name, "hugepages-", 10))
         continue;
+      if (index_ >= allocated_page_types) {
+	/* we must increase the page_types array */
+	struct hwloc_memory_page_type_s *tmp = realloc(memory->page_types, allocated_page_types * 2 * sizeof(*tmp));
+	if (!tmp)
+	  break;
+	memory->page_types = tmp;
+	allocated_page_types *= 2;
+      }
       memory->page_types[index_].size = strtoul(dirent->d_name+10, NULL, 0) * 1024ULL;
       err = snprintf(path, sizeof(path), "%s/%s/nr_hugepages", dirpath, dirent->d_name);
       if ((size_t) err < sizeof(path)
@@ -2446,7 +2509,14 @@ hwloc_get_machine_meminfo(struct hwloc_linux_backend_data_s *data,
 
   err = hwloc_stat("/sys/kernel/mm/hugepages", &st, data->root_fd);
   if (!err) {
-    types = 1 + st.st_nlink-2;
+    types = 1 /* normal non-huge size */ + st.st_nlink - 2 /* ignore . and .. */;
+    if (types < 3)
+      /* some buggy filesystems (e.g. btrfs when reading from fsroot)
+       * return wrong st_nlink for directories (always 1 for btrfs).
+       * use 3 as a sane default (default page + 2 huge sizes).
+       * hwloc_parse_hugepages_info() will extend it if needed.
+       */
+      types = 3;
     has_sysfs_hugepages = 1;
   }
 
@@ -2464,7 +2534,8 @@ hwloc_get_machine_meminfo(struct hwloc_linux_backend_data_s *data,
 
   if (has_sysfs_hugepages) {
     /* read from node%d/hugepages/hugepages-%skB/nr_hugepages */
-    hwloc_parse_hugepages_info(data, "/sys/kernel/mm/hugepages", memory, &remaining_local_memory);
+    hwloc_parse_hugepages_info(data, "/sys/kernel/mm/hugepages", memory, types, &remaining_local_memory);
+    /* memory->page_types_len may have changed */
   }
 
   /* use remaining memory as normal pages */
@@ -2488,7 +2559,14 @@ hwloc_get_sysfs_node_meminfo(struct hwloc_linux_backend_data_s *data,
   sprintf(path, "%s/node%d/hugepages", syspath, node);
   err = hwloc_stat(path, &st, data->root_fd);
   if (!err) {
-    types = 1 + st.st_nlink-2;
+    types = 1 /* normal non-huge size */ + st.st_nlink - 2 /* ignore . and .. */;
+    if (types < 3)
+      /* some buggy filesystems (e.g. btrfs when reading from fsroot)
+       * return wrong st_nlink for directories (always 1 for btrfs).
+       * use 3 as a sane default (default page + 2 huge sizes).
+       * hwloc_parse_hugepages_info() will extend it if needed.
+       */
+      types = 3;
     has_sysfs_hugepages = 1;
   }
 
@@ -2507,7 +2585,8 @@ hwloc_get_sysfs_node_meminfo(struct hwloc_linux_backend_data_s *data,
 
   if (has_sysfs_hugepages) {
     /* read from node%d/hugepages/hugepages-%skB/nr_hugepages */
-    hwloc_parse_hugepages_info(data, path, memory, &remaining_local_memory);
+    hwloc_parse_hugepages_info(data, path, memory, types, &remaining_local_memory);
+    /* memory->page_types_len may have changed */
   }
 
   /* use remaining memory as normal pages */
@@ -2697,7 +2776,7 @@ hwloc_read_unit32be(const char *p, const char *p1, uint32_t *buf, int root_fd)
 {
   size_t cb = 0;
   uint32_t *tmp = hwloc_read_raw(p, p1, &cb, root_fd);
-  if (sizeof(*buf) != cb) {
+  if ((NULL == tmp) || sizeof(*buf) != cb) {
     errno = EINVAL;
     free(tmp); /* tmp is either NULL or contains useless things */
     return -1;
@@ -5053,24 +5132,6 @@ hwloc_linux_free_cpuinfo(struct hwloc_linux_cpuinfo_proc * Lprocs, unsigned nump
  *************************************/
 
 static void
-hwloc__linux_get_mic_sn(struct hwloc_topology *topology, struct hwloc_linux_backend_data_s *data)
-{
-  char line[64], *tmp, *end;
-  if (hwloc_read_path_by_length("/proc/elog", line, sizeof(line), data->root_fd) < 0)
-    return;
-  if (strncmp(line, "Card ", 5))
-    return;
-  tmp = line + 5;
-  end = strchr(tmp, ':');
-  if (!end)
-    return;
-  *end = '\0';
-
-  if (tmp[0])
-    hwloc_obj_add_info(hwloc_get_root_obj(topology), "MICSerialNumber", tmp);
-}
-
-static void
 hwloc_gather_system_info(struct hwloc_topology *topology,
 			 struct hwloc_linux_backend_data_s *data)
 {
@@ -5220,17 +5281,17 @@ hwloc_linux_try_hardwired_cpuinfo(struct hwloc_backend *backend)
 
 static void hwloc_linux__get_allowed_resources(hwloc_topology_t topology, const char *root_path, int root_fd, char **cpuset_namep)
 {
-  char *cpuset_mntpnt, *cgroup_mntpnt, *cpuset_name = NULL;
+  enum hwloc_linux_cgroup_type_e cgtype;
+  char *mntpnt, *cpuset_name = NULL;
 
-  hwloc_find_linux_cpuset_mntpnt(&cgroup_mntpnt, &cpuset_mntpnt, root_path);
-  if (cgroup_mntpnt || cpuset_mntpnt) {
-    cpuset_name = hwloc_read_linux_cpuset_name(root_fd, topology->pid);
+  hwloc_find_linux_cgroup_mntpnt(&cgtype, &mntpnt, root_path, root_fd);
+  if (mntpnt) {
+    cpuset_name = hwloc_read_linux_cgroup_name(root_fd, topology->pid);
     if (cpuset_name) {
-      hwloc_admin_disable_set_from_cpuset(root_fd, cgroup_mntpnt, cpuset_mntpnt, cpuset_name, "cpus", topology->allowed_cpuset);
-      hwloc_admin_disable_set_from_cpuset(root_fd, cgroup_mntpnt, cpuset_mntpnt, cpuset_name, "mems", topology->allowed_nodeset);
+      hwloc_admin_disable_set_from_cgroup(root_fd, cgtype, mntpnt, cpuset_name, "cpus", topology->allowed_cpuset);
+      hwloc_admin_disable_set_from_cgroup(root_fd, cgtype, mntpnt, cpuset_name, "mems", topology->allowed_nodeset);
     }
-    free(cgroup_mntpnt);
-    free(cpuset_mntpnt);
+    free(mntpnt);
   }
   *cpuset_namep = cpuset_name;
 }
@@ -5450,8 +5511,6 @@ hwloc_linuxfs_look_cpu(struct hwloc_backend *backend, struct hwloc_disc_status *
     free(cpuset_name);
   }
 
-  hwloc__linux_get_mic_sn(topology, data);
-
   /* data->utsname was filled with real uname or \0, we can safely pass it */
   hwloc_add_uname_info(topology, &data->utsname);
 
@@ -5511,7 +5570,7 @@ hwloc_linuxfs_find_osdev_parent(struct hwloc_backend *backend, int root_fd,
   hwloc_bitmap_t cpuset;
   const char *tmp;
   hwloc_obj_t parent;
-  char *devicesubdir;
+  const char *devicesubdir;
   int err;
 
   if (osdev_flags & HWLOC_LINUXFS_OSDEV_FLAG_UNDER_BUS)
@@ -5553,16 +5612,17 @@ hwloc_linuxfs_find_osdev_parent(struct hwloc_backend *backend, int root_fd,
   /* iterate through busid to find the last one (previous ones are bridges) */
   foundpci = 0;
  nextpci:
-  if (sscanf(tmp+1, "%x:%x:%x.%x", &_pcidomain, &_pcibus, &_pcidev, &_pcifunc) == 4) {
+  /* tmp points to a PCI [domain:]bus:device.function */
+  if (sscanf(tmp, "%x:%x:%x.%x", &_pcidomain, &_pcibus, &_pcidev, &_pcifunc) == 4) {
     foundpci = 1;
     pcidomain = _pcidomain;
     pcibus = _pcibus;
     pcidev = _pcidev;
     pcifunc = _pcifunc;
-    tmp += 13;
+    tmp = strchr(tmp+4, ':')+9; /* tmp points to at least 4 digits for domain, then a ':' */
     goto nextpci;
   }
-  if (sscanf(tmp+1, "%x:%x.%x", &_pcibus, &_pcidev, &_pcifunc) == 3) {
+  if (sscanf(tmp, "%x:%x.%x", &_pcibus, &_pcidev, &_pcifunc) == 3) {
     foundpci = 1;
     pcidomain = 0;
     pcibus = _pcibus;
@@ -5651,7 +5711,7 @@ hwloc_linuxfs_block_class_fillinfos(struct hwloc_backend *backend __hwloc_attrib
   char blocktype[64] = "";
   unsigned sectorsize = 0;
   unsigned major_id, minor_id;
-  char *devicesubdir;
+  const char *devicesubdir;
   char *tmp;
 
   if (osdev_flags & HWLOC_LINUXFS_OSDEV_FLAG_UNDER_BUS)
@@ -6136,95 +6196,6 @@ hwloc_linuxfs_lookup_infiniband_class(struct hwloc_backend *backend, unsigned os
   return 0;
 }
 
-static void
-hwloc_linuxfs_mic_class_fillinfos(int root_fd,
-				  struct hwloc_obj *obj, const char *osdevpath)
-{
-  char path[296]; /* osdevpath <= 256 */
-  char family[64];
-  char sku[64];
-  char sn[64];
-  char string[21];
-
-  obj->subtype = strdup("MIC");
-
-  snprintf(path, sizeof(path), "%s/family", osdevpath);
-  if (!hwloc_read_path_by_length(path, family, sizeof(family), root_fd)) {
-    char *eol = strchr(family, '\n');
-    if (eol)
-      *eol = 0;
-    hwloc_obj_add_info(obj, "MICFamily", family);
-  }
-
-  snprintf(path, sizeof(path), "%s/sku", osdevpath);
-  if (!hwloc_read_path_by_length(path, sku, sizeof(sku), root_fd)) {
-    char *eol = strchr(sku, '\n');
-    if (eol)
-      *eol = 0;
-    hwloc_obj_add_info(obj, "MICSKU", sku);
-  }
-
-  snprintf(path, sizeof(path), "%s/serialnumber", osdevpath);
-  if (!hwloc_read_path_by_length(path, sn, sizeof(sn), root_fd)) {
-    char *eol;
-    eol = strchr(sn, '\n');
-    if (eol)
-      *eol = 0;
-    hwloc_obj_add_info(obj, "MICSerialNumber", sn);
-  }
-
-  snprintf(path, sizeof(path), "%s/active_cores", osdevpath);
-  if (!hwloc_read_path_by_length(path, string, sizeof(string), root_fd)) {
-    unsigned long count = strtoul(string, NULL, 16);
-    snprintf(string, sizeof(string), "%lu", count);
-    hwloc_obj_add_info(obj, "MICActiveCores", string);
-  }
-
-  snprintf(path, sizeof(path), "%s/memsize", osdevpath);
-  if (!hwloc_read_path_by_length(path, string, sizeof(string), root_fd)) {
-    unsigned long count = strtoul(string, NULL, 16);
-    snprintf(string, sizeof(string), "%lu", count);
-    hwloc_obj_add_info(obj, "MICMemorySize", string);
-  }
-}
-
-static int
-hwloc_linuxfs_lookup_mic_class(struct hwloc_backend *backend, unsigned osdev_flags)
-{
-  struct hwloc_linux_backend_data_s *data = backend->private_data;
-  int root_fd = data->root_fd;
-  unsigned idx;
-  DIR *dir;
-  struct dirent *dirent;
-
-  dir = hwloc_opendir("/sys/class/mic", root_fd);
-  if (!dir)
-    return 0;
-
-  while ((dirent = readdir(dir)) != NULL) {
-    char path[256];
-    hwloc_obj_t obj, parent;
-
-    if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, ".."))
-      continue;
-    if (sscanf(dirent->d_name, "mic%u", &idx) != 1)
-      continue;
-
-    snprintf(path, sizeof(path), "/sys/class/mic/mic%u", idx);
-    parent = hwloc_linuxfs_find_osdev_parent(backend, root_fd, path, osdev_flags);
-    if (!parent)
-      continue;
-
-    obj = hwloc_linux_add_os_device(backend, parent, HWLOC_OBJ_OSDEV_COPROC, dirent->d_name);
-
-    hwloc_linuxfs_mic_class_fillinfos(root_fd, obj, path);
-  }
-
-  closedir(dir);
-
-  return 0;
-}
-
 static int
 hwloc_linuxfs_lookup_drm_class(struct hwloc_backend *backend, unsigned osdev_flags)
 {
@@ -6537,16 +6508,18 @@ hwloc_linuxfs_pci_look_pcidevices(struct hwloc_backend *backend)
     size_t ret;
     int fd, err;
 
-    if (sscanf(dirent->d_name, "%04x:%02x:%02x.%01x", &domain, &bus, &dev, &func) != 4)
+    if (sscanf(dirent->d_name, "%x:%02x:%02x.%01x", &domain, &bus, &dev, &func) != 4)
       continue;
 
+#ifndef HWLOC_HAVE_32BITS_PCI_DOMAIN
     if (domain > 0xffff) {
       static int warned = 0;
-      if (!warned)
-	fprintf(stderr, "Ignoring PCI device with non-16bit domain\n");
+      if (!warned && !hwloc_hide_errors())
+	fprintf(stderr, "Ignoring PCI device with non-16bit domain.\nPass --enable-32bits-pci-domain to configure to support such devices\n(warning: it would break the library ABI, don't enable unless really needed).\n");
       warned = 1;
       continue;
     }
+#endif
 
     /* initialize the config space in case we fail to read it (missing permissions, etc). */
     memset(config_space_cache, 0xff, CONFIG_SPACE_CACHESIZE);
@@ -6784,7 +6757,6 @@ hwloc_look_linuxfs(struct hwloc_backend *backend, struct hwloc_disc_status *dsta
     hwloc_linuxfs_lookup_dax_class(backend, osdev_flags);
     hwloc_linuxfs_lookup_net_class(backend, osdev_flags);
     hwloc_linuxfs_lookup_infiniband_class(backend, osdev_flags);
-    hwloc_linuxfs_lookup_mic_class(backend, osdev_flags);
     if (ofilter != HWLOC_TYPE_FILTER_KEEP_IMPORTANT) {
       hwloc_linuxfs_lookup_drm_class(backend, osdev_flags);
       hwloc_linuxfs_lookup_dma_class(backend, osdev_flags);

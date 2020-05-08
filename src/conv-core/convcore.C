@@ -92,6 +92,11 @@
 
 extern const char * const CmiCommitID;
 extern bool useCMAForZC;
+#if CMK_ERROR_CHECKING
+double longIdleThreshold;
+CpvExtern(double, idleBeginWalltime); // used for determining the conditon for long idle
+#endif
+
 
 #if CMI_QD
 void initQd(char **argv);
@@ -1632,12 +1637,22 @@ void CsdBeginIdle(void)
 #else
   CpvAccess(cmiMyPeIdle) = 1;
 #endif // CMK_SMP
-  CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
+  double curWallTime = CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
+#if CMK_ERROR_CHECKING
+  CpvAccess(idleBeginWalltime) = curWallTime;
+#endif
 }
 
 void CsdStillIdle(void)
 {
-  CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
+  double curWallTime = CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
+
+#if CMK_ERROR_CHECKING
+  if(curWallTime - CpvAccess(idleBeginWalltime) > longIdleThreshold) {
+    curWallTime = CcdRaiseCondition(CcdPROCESSOR_LONG_IDLE); // Invoke LONG_IDLE ccd callbacks
+    CpvAccess(idleBeginWalltime) = curWallTime; // Reset idle timer
+  }
+#endif
 }
 
 void CsdEndIdle(void)
@@ -2106,10 +2121,6 @@ void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
 
-  /* BIGSIM_OOC DEBUGGING
-  CmiPrintf("Resume normal thread with token[%p] ==> thread[%p]\n", token, t);
-  */
-
   if(t == NULL){
     free(token);
     return;
@@ -2123,10 +2134,6 @@ void CthResumeNormalThread(CthThreadToken* token)
 #endif
 #endif
   
-  /* BIGSIM_OOC DEBUGGING
-  CmiPrintf("In CthResumeNormalThread:   ");
-  CthPrintThdMagic(t);
-  */
 #if CMK_OMP
   CthSetPrev(t, CthSelf());
 #endif
@@ -4036,6 +4043,12 @@ void ConverseCommonInit(char **argv)
     useCMAForZC = false;
   }
 
+#if CMK_ERROR_CHECKING
+  if(!CmiGetArgDoubleDesc(argv, "+longIdleThresh", &longIdleThreshold, "Pass the threshold time in seconds that is used for triggering the LONG_IDLE")) {
+    longIdleThreshold = 10;
+  }
+#endif
+
   CmiDeliversInit();
   CsdInit(argv);
 
@@ -4229,7 +4242,6 @@ double CmiLog2(double x) {
 }
 #endif
 
-/* for bigsim */
 int CmiMyRank_(void)
 {
   return CmiMyRank();

@@ -10,7 +10,7 @@ set(conv-core-h-sources ../util/cmitls.h cmipool.h cmidemangle.h
     memory-isomalloc.h msgq.h persistent.h queueing.h quiescence.h taskqueue.h)
 
 set(conv-core-cxx-sources ../util/cmitls.C conv-interoperate.C conv-taskQ.C cputopology.C
-    debug-conv++.C  memory-darwin-clang.C memory-os-wrapper.C queueing.C hrctimer.C)
+    debug-conv++.C  memory-darwin-clang.C queueing.C hrctimer.C)
 
 set(conv-ccs-c-sources ../conv-ccs/conv-ccs.C)
 
@@ -19,7 +19,7 @@ set(conv-ccs-h-sources ../conv-ccs/ccs-auth.h ../conv-ccs/ccs-builtins.h
 
 set(conv-ccs-cxx-sources ../conv-ccs/ccs-builtins.C ../conv-ccs/middle-ccs.C)
 
-set(conv-perf-cxx-sources ../conv-perf/traceCore.C ../conv-perf/traceCoreCommon.C)
+set(conv-perf-cxx-sources ../conv-perf/traceCore.C ../conv-perf/traceCoreCommon.C ../conv-perf/machineProjections.C)
 
 set(conv-perf-h-sources ../conv-perf/allEvents.h ../conv-perf/charmEvents.h
     ../conv-perf/charmProjections.h ../conv-perf/converseEvents.h
@@ -107,13 +107,13 @@ endif()
 add_library(global-swap global-elfgot.C)
 
 
-file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.c CONTENT
+file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.C CONTENT
 "extern const char * const CmiCommitID;
-const char * const CmiCommitID = \"${CHARM_VERSION}\";
+const char * const CmiCommitID = \"v${CHARM_VERSION}\";
 "
 )
 
-add_library(conv-core ${CMAKE_BINARY_DIR}/include/commitid.c ${conv-core-c-sources} ${conv-core-cxx-sources} ${conv-core-h-sources} ${conv-ccs-c-sources} ${conv-ccs-h-sources} ${conv-ccs-cxx-sources} ${conv-perf-cxx-sources} ${conv-perf-h-sources} ../conv-ldb/cldb.C)
+add_library(conv-core ${CMAKE_BINARY_DIR}/include/commitid.C ${conv-core-c-sources} ${conv-core-cxx-sources} ${conv-core-h-sources} ${conv-ccs-c-sources} ${conv-ccs-h-sources} ${conv-ccs-cxx-sources} ${conv-perf-cxx-sources} ${conv-perf-h-sources} ../conv-ldb/cldb.C)
 add_dependencies(conv-core hwloc)
 
 add_library(threads-default threads.C $<TARGET_OBJECTS:boost-context>)
@@ -193,7 +193,7 @@ target_include_directories(threads-uJcontext-memoryalias PRIVATE ../QuickThreads
 add_library(conv-static OBJECT conv-static.c)
 add_custom_command(TARGET conv-core
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:conv-static> ${CMAKE_BINARY_DIR}/lib/conv-static.o
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
     VERBATIM
 )
 add_dependencies(conv-core conv-static)
