@@ -56,6 +56,36 @@ int cmpFunc(const void *a, const void *b){
    
 }
 
+class MyMap : public CkArrayMapObj {
+PUPable_decl(MyMap);
+private:
+    int totalElems;
+public:
+    MyMap(int n) {
+        totalElems = n;
+    }
+    MyMap(CkMigrateMessage *m){}
+    void pup(PUP::er& p) {
+      p | totalElems;
+    }
+    int homePe(const CkArrayIndex &idx) const {
+        int elem = *(int *)idx.data();
+        int penum;
+#if BLOCKMAPPING
+        int blkSize = totalElems/CkNumPes();
+        penum = (elem/blkSize)%CkNumPes();
+#elif NODECYCLICMAPPING
+	int nid = (elem/CkMyNodeSize())%CkNumNodes();
+	int cid = elem % CkMyNodeSize();
+	penum = CkNodeFirst(nid)+cid;
+#else
+        //Default is RoundRobin Mapping
+        penum = elem%CkNumPes();
+#endif
+        return penum;
+    }
+};
+
 class Main: public CBase_Main {
 public:
     CProxy_Block array;
@@ -104,9 +134,8 @@ public:
         totalElems = numElems;
         timeRec = new double[numSteps];
 
-        CProxy_MyMap myMap = CProxy_MyMap::ckNew(totalElems);
         CkArrayOptions opts(totalElems);
-        opts.setMap(myMap);
+        opts.setMapObj(new MyMap(totalElems));
         array = CProxy_Block::ckNew(totalElems, opts);
 
         beginIteration();
@@ -187,36 +216,6 @@ public:
 //int Main::msgSizeArr[MSGSIZECNT] = {16, 32, 128, 256, 512, 1024, 2048, 4096};
 //int Main::msgSizeArr[MSGSIZECNT] = {10000};
 
-
-class MyMap : public CkArrayMap{
-private:
-    int totalElems;
-public:
-    MyMap(int n) {
-        totalElems = n;
-    }
-    MyMap(CkMigrateMessage *m){}
-    /*int registerArray(CkArrayMapRegisterMessage *m){
-    	delete m;
-    	return 0;
-    }*/
-    int procNum(int arrayHdl, const CkArrayIndex &idx){
-        int elem = *(int *)idx.data();
-        int penum;
-#if BLOCKMAPPING
-        int blkSize = totalElems/CkNumPes();
-        penum = (elem/blkSize)%CkNumPes();
-#elif NODECYCLICMAPPING
-	int nid = (elem/CkMyNodeSize())%CkNumNodes();
-	int cid = elem % CkMyNodeSize();
-	penum = CkNodeFirst(nid)+cid; 
-#else
-        //Default is RoundRobin Mapping
-        penum = elem%CkNumPes();
-#endif
-        return penum;
-    }
-};
 
 //#define WORKSIZECNT 5
 #define WORKSIZECNT 1

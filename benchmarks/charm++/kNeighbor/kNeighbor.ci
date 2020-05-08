@@ -22,7 +22,5 @@ mainmodule kNeighbor {
 	entry void printSts(int);
     };
 	
-	group MyMap : CkArrayMap{
-		entry MyMap(int);
-	};
+  PUPable MyMap;
 }
