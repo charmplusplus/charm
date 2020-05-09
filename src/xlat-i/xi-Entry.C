@@ -1845,9 +1845,11 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "#endif\n";
     } else if (param->hasDevice()) {
       // With device-side RDMA, only P2P Recv API is supported
+      str << "  bool is_inline = true;\n";
       str << "  if (CMI_ZC_MSGTYPE(env) == CMK_ZC_DEVICE_MSG) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "  } else {\n";
+      str << "  }\n";
+      str << "  if (is_inline) {\n";
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
     if(param->hasRecvRdma()) {
@@ -1946,7 +1948,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         param->storePostedRdmaPtrs(str, isSDAGGen);
         if (param->hasDevice()) {
           str << "  if(CMI_IS_ZC_DEVICE(env))\n";
-          str << "    CkRdmaDeviceIssueRgets(env, ";
+          str << "    is_inline = CkRdmaDeviceIssueRgets(env, ";
           if (isSDAGGen)
             str << "genClosure->num_device_rdma_fields, ";
           else

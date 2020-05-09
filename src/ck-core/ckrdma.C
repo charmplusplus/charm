@@ -2157,7 +2157,11 @@ void CkRdmaDeviceRecvHandler(void* data) {
 }
 
 // Invoked after post entry method
-void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
+bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
+  // Determine if the subsequent regular entry method should be invoked
+  // inline (intra-node) or not (inter-node)
+  bool is_inline = true;
+
   // Find which mode of transfer should be used
   CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
 
@@ -2167,6 +2171,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   DeviceRdmaInfo* rdma_info = NULL;
   DeviceRdmaOpMsg** rdma_msgs = NULL;
   if (mode == CkNcpyModeDevice::RDMA) {
+    // Need to have a second message invoke the regular entry method
+    is_inline = false;
+
     // Allocate and fill in metadata info for this set of Rgets
     rdma_info = (DeviceRdmaInfo*)CmiAlloc(sizeof(DeviceRdmaInfo));
     CmiAssert(rdma_info);
@@ -2282,6 +2289,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     }
     CmiFree(rdma_msgs);
   }
+
+  return is_inline;
 }
 
 /*
