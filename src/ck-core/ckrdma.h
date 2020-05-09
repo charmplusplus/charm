@@ -448,7 +448,12 @@ void _ncpyAckHandler(ncpyHandlerMsg *msg);
 /*************************** Direct GPU Messaging *****************************/
 
 #if CMK_CUDA
-// Structs used in direct GPU messaging
+typedef struct DeviceRdmaInfo_ {
+  int n_ops; // Number of RDMA operations, i.e. number of buffers being sent
+  int counter; // Used for tracking the number of completed RDMA operations
+  void* msg; // Charm++ message to be (re-)enqueued after all operations complete
+} DeviceRdmaInfo;
+
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
   cudaStream_t cuda_stream;
@@ -509,6 +514,7 @@ public:
   friend void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 };
 
+void CkRdmaDeviceRecvHandler(void* data);
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
 #endif // CMK_CUDA

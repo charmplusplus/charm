@@ -365,25 +365,26 @@ void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest) {
 /**************************** Direct GPU Messaging ***************************/
 
 #if CMK_CUDA
-static int rget_device_handler_idx;
+static int rdma_device_send_handler_idx;
 
-static void rgetDeviceHandler(DeviceRdmaMsg* msg) {
-  DeviceRdmaInfo* info = &msg->info;
+static void CmiRdmaDeviceSendHandler(DeviceRdmaOpMsg* msg) {
+  DeviceRdmaOp* op = &msg->op;
 
   // Send device buffer through UCX with a special tag, so that it gets properly handled on the receiver
-  CmiSendDevice(info);
+  CmiSendDevice(op);
 }
 
-void CmiDeviceRdmaInit() {
-  rget_device_handler_idx = CmiRegisterHandler((CmiHandler)rgetDeviceHandler);
+void CmiRdmaDeviceSendInit() {
+  // Register handler that initiates data transfer (sender -> receiver)
+  rdma_device_send_handler_idx = CmiRegisterHandler((CmiHandler)CmiRdmaDeviceSendHandler);
 }
 
-void CmiIssueRgetDevice(DeviceRdmaMsg* msg) {
-  // TODO: Post a receive
-  CmiRecvDevice(&msg->info);
+void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg) {
+  // Post a receive for device data
+  CmiRecvDevice(&msg->op);
 
   // Send message with destination address to sender
-  CmiSetHandler(msg, rget_device_handler_idx);
-  CmiSyncSendAndFree(msg->info.src_pe, sizeof(DeviceRdmaMsg), msg);
+  CmiSetHandler(msg, rdma_device_send_handler_idx);
+  CmiSyncSendAndFree(msg->op.src_pe, sizeof(DeviceRdmaOpMsg), msg);
 }
 #endif

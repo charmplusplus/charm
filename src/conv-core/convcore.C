@@ -4016,7 +4016,7 @@ void ConverseCommonInit(char **argv)
   CmiOnesidedDirectInit();
 
 #if CMK_CUDA
-  CmiDeviceRdmaInit();
+  CmiRdmaDeviceSendInit();
 #endif
 
   useCMAForZC = true;

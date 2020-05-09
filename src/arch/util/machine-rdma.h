@@ -155,15 +155,26 @@ void CmiInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
 #endif /*End of CMK_ONESIDED_IMPL */
 
 #if CMK_CUDA
-void LrtsSendDevice(DeviceRdmaInfo* info);
-void LrtsRecvDevice(DeviceRdmaInfo* info);
+void LrtsSendDevice(DeviceRdmaOp* op);
+void LrtsRecvDevice(DeviceRdmaOp* op);
 
-inline void CmiSendDevice(DeviceRdmaInfo* info) {
-  LrtsSendDevice(info);
+void CmiSendDevice(DeviceRdmaOp* op) {
+  LrtsSendDevice(op);
 }
 
-inline void CmiRecvDevice(DeviceRdmaInfo* info) {
-  LrtsRecvDevice(info);
+void CmiRecvDevice(DeviceRdmaOp* op) {
+  LrtsRecvDevice(op);
+}
+
+RdmaAckHandlerFn rdmaDeviceRecvHandlerFn;
+
+void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn) {
+  // Set handler function that gets invoked when data transfer is complete (on receiver)
+  rdmaDeviceRecvHandlerFn = fn;
+}
+
+void CmiInvokeRecvHandler(void* data) {
+  rdmaDeviceRecvHandlerFn(data);
 }
 #endif
 

@@ -58,18 +58,21 @@ typedef struct ncpystruct{
 
 }NcpyOperationInfo;
 
-typedef struct DeviceRdmaInfo_ {
+#if CMK_CUDA
+typedef struct DeviceRdmaOp_ {
   int src_pe;
   const void* src_ptr;
   int dest_pe;
   const void* dest_ptr;
   size_t size;
-} DeviceRdmaInfo;
+  void* info; // Pointer to DeviceRdmaInfo
+} DeviceRdmaOp;
 
-typedef struct DeviceRdmaMsg_ {
+typedef struct DeviceRdmaOpMsg_ {
   char header[CmiMsgHeaderSizeBytes];
-  DeviceRdmaInfo info;
-} DeviceRdmaMsg;
+  DeviceRdmaOp op;
+} DeviceRdmaOpMsg;
+#endif
 
 #ifdef __cplusplus
 extern "C" {

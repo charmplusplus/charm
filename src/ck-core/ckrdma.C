@@ -2134,19 +2134,51 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
 /***************************** Direct GPU Messaging ***************************/
 
 #if CMK_CUDA
-// Device-side ZC API should be available regardless of CPU-side support
-// (i.e. CMK_ONESIDED_IMPL)
+// Invoked when the inter-node Rget completes on the receiver
+void CkRdmaDeviceRecvHandler(void* data) {
+  // Process QD to mark completion of the outstanding RDMA operation
+  QdProcess(1);
+
+  DeviceRdmaOp* op = (DeviceRdmaOp*)data;
+
+  // TODO: Invoke source callback? (here or in UcxSendDeviceCompleted)
+
+  DeviceRdmaInfo* info = (DeviceRdmaInfo*)op->info;
+
+  // Update counter (there may be multiple buffers in transit)
+  info->counter++;
+
+  // Check if all buffers have been received
+  if (info->counter == info->n_ops) {
+    QdCreate(1);
+    CmiEnforce(CmiMyPe() == op->dest_pe);
+    enqueueNcpyMessage(op->dest_pe, info->msg);
+  }
+}
+
+// Invoked after post entry method
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
   // Find which mode of transfer should be used
   CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
 
-  // Allocate messages needed for RDMA
-  DeviceRdmaMsg** rdma_msgs = NULL;
+  // Change message header to invoke regular entry method
+  CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
+
+  DeviceRdmaInfo* rdma_info = NULL;
+  DeviceRdmaOpMsg** rdma_msgs = NULL;
   if (mode == CkNcpyModeDevice::RDMA) {
-    rdma_msgs = (DeviceRdmaMsg**)CmiAlloc(sizeof(DeviceRdmaMsg*) * numops);
+    // Allocate and fill in metadata info for this set of Rgets
+    rdma_info = (DeviceRdmaInfo*)CmiAlloc(sizeof(DeviceRdmaInfo));
+    CmiAssert(rdma_info);
+    rdma_info->n_ops = numops;
+    rdma_info->counter = 0;
+    rdma_info->msg = env;
+
+    // Allocate messages to be sent to sender
+    rdma_msgs = (DeviceRdmaOpMsg**)CmiAlloc(sizeof(DeviceRdmaOpMsg*) * numops);
     CmiAssert(rdma_msgs);
     for (int i = 0; i < numops; i++) {
-      rdma_msgs[i] = (DeviceRdmaMsg*)CmiAlloc(sizeof(DeviceRdmaMsg));
+      rdma_msgs[i] = (DeviceRdmaOpMsg*)CmiAlloc(sizeof(DeviceRdmaOpMsg));
       CmiAssert(rdma_msgs[i]);
     }
   }
@@ -2217,12 +2249,13 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
           */
 
           // Store necessary data to send to sender
-          DeviceRdmaInfo& info = rdma_msgs[i]->info;
-          info.src_pe = source.pe;
-          info.src_ptr = source.ptr;
-          info.dest_pe = CmiMyPe();
-          info.dest_ptr = dest.ptr;
-          info.size = std::min(source.cnt, dest.cnt);
+          DeviceRdmaOp& op = rdma_msgs[i]->op;
+          op.src_pe = source.pe;
+          op.src_ptr = source.ptr;
+          op.dest_pe = CmiMyPe();
+          op.dest_ptr = dest.ptr;
+          op.size = std::min(source.cnt, dest.cnt);
+          op.info = rdma_info;
           break;
         }
       default:
@@ -2244,8 +2277,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // Launch RDMA gets
   if (mode == CkNcpyModeDevice::RDMA) {
     for (int i = 0; i < numops; i++) {
-      // TODO: Increment QD?
-      CmiIssueRgetDevice(rdma_msgs[i]);
+      QdCreate(1);
+      CmiRdmaDeviceIssueRget(rdma_msgs[i]);
     }
     CmiFree(rdma_msgs);
   }

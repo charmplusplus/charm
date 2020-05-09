@@ -375,10 +375,12 @@ void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest);
 
 /**************************** Direct GPU Messaging ***************************/
 #if CMK_CUDA
-void CmiDeviceRdmaInit();
-void CmiSendDevice(DeviceRdmaInfo* info);
-void CmiRecvDevice(DeviceRdmaInfo* info);
-void CmiIssueRgetDevice(DeviceRdmaMsg* msg);
-#endif
+void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
+void CmiRdmaDeviceSendInit();
+void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg);
+
+void CmiSendDevice(DeviceRdmaOp* op);
+void CmiRecvDevice(DeviceRdmaOp* op);
+#endif // CMK_CUDA
 
 #endif
