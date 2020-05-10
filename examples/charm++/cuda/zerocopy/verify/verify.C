@@ -37,6 +37,9 @@ struct Container {
     hapiCheck(cudaMalloc(&d_remote_data, sizeof(double) * block_size));
     hapiCheck(cudaStreamCreate(&stream));
 
+    for (int i = 0; i < block_size; i++) {
+      h_local_data[i] = val;
+    }
     invokeInitKernel(d_local_data, block_size, val, stream);
     invokeInitKernel(d_remote_data, block_size, val, stream);
 
@@ -44,9 +47,11 @@ struct Container {
   }
 
   void verify(double val) {
+    /*
     hapiCheck(cudaMemcpyAsync(h_remote_data, d_remote_data,
           sizeof(double) * block_size, cudaMemcpyDeviceToHost, stream));
     hapiCheck(cudaStreamSynchronize(stream));
+    */
 
     for (int i = 0; i < block_size; i++) {
       if (h_remote_data[i] != val) {
@@ -163,7 +168,8 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    //thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    thisProxy[1].recv(block_size, CkDeviceBuffer(container.h_local_data, container.stream));
     if (lb_test) {
       pe = CkMyPe();
       AtSync();
@@ -171,7 +177,8 @@ public:
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
-    data = container.d_remote_data;
+    //data = container.d_remote_data;
+    data = container.h_remote_data;
     post[0].cuda_stream = container.stream;
   }
 
@@ -195,11 +202,13 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    //thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    thisProxy[1].recv(block_size, CkDeviceBuffer(container.h_local_data, container.stream));
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
-    data = container.d_remote_data;
+    //data = container.d_remote_data;
+    data = container.h_remote_data;
     post[0].cuda_stream = container.stream;
   }
 
@@ -217,11 +226,13 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    //thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    thisProxy[1].recv(block_size, CkDeviceBuffer(container.h_local_data, container.stream));
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
-    data = container.d_remote_data;
+    //data = container.d_remote_data;
+    data = container.h_remote_data;
     post[0].cuda_stream = container.stream;
   }
 
