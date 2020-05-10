@@ -595,7 +595,7 @@ ExternalProject_Add(hwloc
 )
 
 # TopoManager
-set(tmgr-cxx-sources src/util/topomanager/TopoManager.C)
+set(tmgr-cxx-sources src/util/topomanager/TopoManager.C src/util/topomanager/CrayNid.c src/util/topomanager/BGQTorus.C)
 set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h src/util/topomanager/XTTorus.h src/util/topomanager/BGQTorus.h)
 file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 add_library(tmgr ${tmgr-cxx-sources} ${tmgr-h-sources})
