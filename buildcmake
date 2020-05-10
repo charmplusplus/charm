@@ -22,13 +22,6 @@ if [[ $(uname) != "Linux" && $(uname) != "Darwin" ]]; then
   exit $?
 fi
 
-if [[ $2 == gni-* || $2 == *-crayx? ]]; then
-    echo "Warning: CMake build does not support GNI or Cray, running ./buildold instead."
-  sleep 2
-  ./buildold $@
-  exit $?
-fi
-
 cmake_version_major=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 1 -d'.')
 cmake_version_minor=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 2 -d'.')
 
@@ -352,7 +345,14 @@ if [[ "$target" = "${target%AMPI-only}AMPI-only" ]]; then
     opt_extra_opts="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 -DCMK_FIFO_QUEUE_ONLY=1 -DCMK_OBJID_COLLECTION_BITS=29 $opt_extra_opts "
 fi
 
-opt_network=$(echo $triplet | cut -d '-' -f1)
+if [[ $triplet == gni-* ]]; then
+  opt_network=$triplet
+  opt_CC=cc
+  opt_CXX=CC
+  opt_FC=ftn
+else 
+  opt_network=$(echo $triplet | cut -d '-' -f1)
+fi
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
 
