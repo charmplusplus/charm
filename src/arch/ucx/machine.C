@@ -52,7 +52,8 @@
 enum {
     UCX_SEND_OP,    // Regular Send using UcxSendMsg
     UCX_RMA_OP_PUT, // RMA Put operation using UcxRmaOp
-    UCX_RMA_OP_GET  // RMA Get operation using UcxRmaOp
+    UCX_RMA_OP_GET, // RMA Get operation using UcxRmaOp
+    UCX_DEVICE_OP   // Transfer device data
 };
 
 #define UCX_LOG(prio, fmt, ...) \
@@ -508,17 +509,13 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
 {
     ucp_tag_t sTag;
 
-    if (tag = UCX_MSG_TAG_DEVICE) {
-      sTag = tag;
-    } else {
-      // Combine tag and sTag: sTag defines msg protocol, tag may indicate RMA requests
-      sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_EAGER;
+    // Combine tag and sTag: sTag defines msg protocol, tag may indicate RMA requests
+    sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_EAGER;
 
-      // Auxilliary messages (which add bits to the tag) should use eager.
-      CmiEnforce((tag == 0ul) || (sTag == UCX_MSG_TAG_EAGER));
+    // Auxilliary messages (which add bits to the tag) should use eager.
+    CmiEnforce((tag == 0ul) || (sTag == UCX_MSG_TAG_EAGER));
 
-      sTag |= tag;
-    }
+    sTag |= tag;
 
     UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
             destNode, destPE, size, msg, tag);
@@ -613,6 +610,22 @@ static inline int ProcessTxQueue()
 
             // Post the GET or PUT operation from the comm thread
             UcxRmaOp((NcpyOperationInfo *)(req->msgBuf), req->op);
+        } else if (req->op == UCX_DEVICE_OP) { // Device data
+            ucs_status_ptr_t status_ptr;
+            CmiPrintf("[PE %d] ProcessTxQueue: sending data to node %d, src_ptr %p, size %zu\n", CmiMyPe(), req->dNode, req->msgBuf, req->size);
+            for (int i = 0; i < req->size/sizeof(double); i++) {
+              CmiPrintf("Send data[%d]: %lf\n", i, ((double*)req->msgBuf)[i]);
+            }
+            status_ptr = ucp_tag_send_nb(ucxCtx.eps[req->dNode], req->msgBuf,
+                                         req->size, ucp_dt_make_contig(1),
+                                         req->tag, req->cb);
+            if (!UCS_PTR_IS_PTR(status_ptr)) {
+                CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
+                CmiEnforce(UCS_PTR_STATUS(status_ptr) == UCS_OK);
+                CmiPrintf("[PE %d] ProcessTxQueue: send completed immediately\n", CmiMyPe());
+            } else {
+                ((UcxRequest*)status_ptr)->msgBuf = req->msgBuf;
+            }
         }
         CmiFree(req);
         return 1;
@@ -738,6 +751,7 @@ void  LrtsBarrier()
 #if CMK_CUDA
 void UcxSendDeviceCompleted(void* request, ucs_status_t status)
 {
+  CmiPrintf("[PE %d] UcxSendDeviceCompleted: status %d\n", CmiMyPe(), status);
   // TODO: Invoke Charm++ callback on sender?
   UcxRequest* req = (UcxRequest*)request;
   CmiEnforce(status == UCS_OK);
@@ -750,39 +764,78 @@ void UcxRecvDeviceCompleted(void* request, ucs_status_t status,
                             ucp_tag_recv_info_t* info)
 {
   UcxRequest* req = (UcxRequest*)request;
+
+  CmiPrintf("[PE %d] UcxRecvDeviceCompleted: status %d, len %zu, buf %p, req %p, tag %zu\n", CmiMyPe(), status, info->length, req->msgBuf, request, info->sender_tag);
+  for (int i = 0; i < info->length/sizeof(double); i++) {
+    CmiPrintf("Recv data[%d]: %lf\n", i, ((double*)req->msgBuf)[i]);
+  }
   CmiEnforce(status == UCS_OK);
+
+  if (ucs_unlikely(status == UCS_ERR_CANCELED)) return;
 
   // Invoke recv handler since data transfer is complete
   DeviceRdmaOp* op = (DeviceRdmaOp*)req->op;
-  CmiInvokeRecvHandler(op);
 
-  UCX_REQUEST_FREE(req);
-  UCX_LOG(4, "Device receive completed %p", req);
+  if (req->msgBuf != NULL) {
+    CmiInvokeRecvHandler(op);
+    UCX_REQUEST_FREE(req);
+  } else {
+    req->completed = 1;
+  }
 }
 
 void LrtsSendDevice(DeviceRdmaOp* op)
 {
-  UcxSendMsg(CmiNodeOf(op->dest_pe), op->src_pe, op->size,
-             (char*)op->src_ptr, UCX_MSG_TAG_DEVICE, UcxSendDeviceCompleted);
+  CmiPrintf("[PE %d] LrtsSendDevice: dest_pe %d (node %d), src_ptr %p, size %zu\n", CmiMyPe(), op->dest_pe, CmiNodeOf(op->dest_pe), op->src_ptr, op->size);
+#if CMK_SMP
+  UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
+  req->msgBuf = (void*)op->src_ptr;
+  req->size   = op->size;
+  req->tag    = UCX_MSG_TAG_DEVICE;
+  req->dNode  = CmiNodeOf(op->dest_pe);
+  req->cb     = UcxSendDeviceCompleted;
+  req->op     = UCX_DEVICE_OP;
+
+  PCQueuePush(ucxCtx.txQueue, (char *)req);
+#else
+  UcxRequest *req;
+
+  req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[CmiNodeOf(op->dest_pe)],
+                                     op->src_ptr, op->size,
+                                     ucp_dt_make_contig(1), UCX_MSG_TAG_DEVICE,
+                                     UcxSendDeviceCompleted);
+  if (!UCS_PTR_IS_PTR(req)) {
+      CmiEnforce(!UCS_PTR_IS_ERR(req));
+      return NULL;
+  }
+
+  req->msgBuf = op->src_ptr;
+#endif
 }
 
 void LrtsRecvDevice(DeviceRdmaOp* op)
 {
   UcxRequest* req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, (void*)op->dest_ptr,
-                                                 op->size, UCP_DATATYPE_CONTIG,
+                                                 op->size, ucp_dt_make_contig(1),
                                                  UCX_MSG_TAG_DEVICE,
                                                  UCX_MSG_TAG_MASK,
                                                  UcxRecvDeviceCompleted);
+  CmiPrintf("[PE %d] LrtsRecvDevice: dest_ptr %p, size %zu\n",
+      CmiMyPe(), op->dest_ptr, op->size);
 
   CmiEnforce(!UCS_PTR_IS_ERR(req));
 
   if (req->completed) {
+    CmiPrintf("[PE %d] LrtsRecvDevice: completed immediately\n", CmiMyPe());
     // Recv completed immediately
     CmiEnforce(UCS_PTR_STATUS(req) == UCS_OK);
     CmiInvokeRecvHandler(op);
+    UCX_REQUEST_FREE(req);
   } else {
+    CmiPrintf("[PE %d] LrtsRecvDevice: not completed immediately\n", CmiMyPe());
     // Store operation info to be used when operation completes later
     req->op = op;
+    req->msgBuf = (void*)op->dest_ptr;
   }
 }
 #endif

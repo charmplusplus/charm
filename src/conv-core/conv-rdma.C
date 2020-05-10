@@ -384,7 +384,9 @@ void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg) {
   CmiRecvDevice(&msg->op);
 
   // Send message with destination address to sender
+  // FIXME: Shouldn't free msg!
   CmiSetHandler(msg, rdma_device_send_handler_idx);
-  CmiSyncSendAndFree(msg->op.src_pe, sizeof(DeviceRdmaOpMsg), msg);
+  //CmiSyncSendAndFree(msg->op.src_pe, sizeof(DeviceRdmaOpMsg), msg);
+  CmiSyncSend(msg->op.src_pe, sizeof(DeviceRdmaOpMsg), msg);
 }
 #endif

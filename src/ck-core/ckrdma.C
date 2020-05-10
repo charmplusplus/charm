@@ -2144,6 +2144,7 @@ void CkRdmaDeviceRecvHandler(void* data) {
   // TODO: Invoke source callback? (here or in UcxSendDeviceCompleted)
 
   DeviceRdmaInfo* info = (DeviceRdmaInfo*)op->info;
+  CmiPrintf("msg content: %x\n", *(uint64_t*)(info->msg));
 
   // Update counter (there may be multiple buffers in transit)
   info->counter++;
@@ -2151,7 +2152,6 @@ void CkRdmaDeviceRecvHandler(void* data) {
   // Check if all buffers have been received
   if (info->counter == info->n_ops) {
     QdCreate(1);
-    CmiEnforce(CmiMyPe() == op->dest_pe);
     enqueueNcpyMessage(op->dest_pe, info->msg);
   }
 }
@@ -2180,6 +2180,8 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     rdma_info->n_ops = numops;
     rdma_info->counter = 0;
     rdma_info->msg = env;
+    CmiPrintf("msg set to %p\n", rdma_info->msg);
+    CmiPrintf("msg content: %x\n", *(uint64_t*)(rdma_info->msg));
 
     // Allocate messages to be sent to sender
     rdma_msgs = (DeviceRdmaOpMsg**)CmiAlloc(sizeof(DeviceRdmaOpMsg*) * numops);
@@ -2287,8 +2289,10 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       QdCreate(1);
       CmiRdmaDeviceIssueRget(rdma_msgs[i]);
     }
-    CmiFree(rdma_msgs);
+    //CmiFree(rdma_msgs);
   }
+
+  //enqueueNcpyMessage(CmiMyPe(), rdma_info->msg);
 
   return is_inline;
 }
