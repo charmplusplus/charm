@@ -350,7 +350,7 @@ if [[ $triplet == gni-* ]]; then
   opt_CC=cc
   opt_CXX=CC
   opt_FC=ftn
-else 
+else
   opt_network=$(echo $triplet | cut -d '-' -f1)
 fi
 
