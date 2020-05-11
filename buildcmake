@@ -348,6 +348,7 @@ fi
 # Special handling for gni-crayxc, gni-crayxe, mpi-crayxc, mpi-crayxe
 if [[ $triplet == gni-* || $triplet == *-crayx? ]]; then
   opt_network=$triplet
+  # Need to use Cray's compiler frontends on Cray systems
   opt_CC=cc
   opt_CXX=CC
   opt_FC=ftn
