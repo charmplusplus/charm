@@ -10,9 +10,9 @@
 # - the buildcmake script
 # - files in cmake/
 
-# Version 3.4 added CMAKE_C_COMPILER_LAUNCHER and CMAKE_CXX_COMPILER_LAUNCHER
 cmake_minimum_required(VERSION 3.4)
 
+# Fortran is optional, so don't include it in LANGUAGES here
 project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
 find_package(Threads REQUIRED)
@@ -23,22 +23,15 @@ find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran c
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-
-# Setting charmc as the compiler launcher for Fortran files only works with
-# CMake 3.11.0 or above. See 'CMAKE_Fortran_COMPILER_LAUNCHER' below for details.
-if(${CMAKE_VERSION} VERSION_LESS "3.11.0")
-  message(WARNING "CMake version 3.11.0 or higher is needed for Fortran support in Charm++.")
+include(CheckLanguage)
+check_language(Fortran)
+if(CMAKE_Fortran_COMPILER)
+  enable_language(Fortran OPTIONAL)
+  include(FortranCInterface)
+  FortranCInterface_VERIFY()
+  FortranCInterface_VERIFY(CXX)
 else()
-  include(CheckLanguage)
-  check_language(Fortran)
-  if(CMAKE_Fortran_COMPILER)
-    enable_language(Fortran OPTIONAL)
-    include(FortranCInterface)
-    FortranCInterface_VERIFY()
-    FortranCInterface_VERIFY(CXX)
-  else()
-    message(STATUS "No Fortran support")
-  endif()
+  message(STATUS "No Fortran support")
 endif()
 
 if(${FortranCInterface_VERIFIED_CXX})
@@ -335,11 +328,8 @@ include(cmake/ci-files.cmake)
 configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @ONLY)
 
 # Use charmc to compile/link everything
-set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
-set(CMAKE_CXX_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
-# FIXME: CMAKE_Fortran_COMPILER_LAUNCHER only works with CMake 3.11+.
-# See also https://gitlab.kitware.com/cmake/cmake/issues/17499
-set(CMAKE_Fortran_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
+set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/charmc)
+
 set(CMAKE_CXX_LINK_EXECUTABLE
       "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
 
