@@ -6,4 +6,6 @@ set(ckpics-h-sources picsautoperf.h picsautoperfAPI.h picsautoperfAPIC.h
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 add_library(ckpics ${ckpics-cxx-sources} ${ckpics-h-sources} ${CMAKE_BINARY_DIR}/include/TraceAutoPerf.decl.h)
 
+add_dependencies(ckpics ck)
+
 target_include_directories(ckpics PRIVATE . ../ck-perf ../ck-cp ../util/topomanager ../conv-ldb ../ck-ldb ../conv-perf)

@@ -92,6 +92,11 @@
 
 extern const char * const CmiCommitID;
 extern bool useCMAForZC;
+#if CMK_ERROR_CHECKING
+double longIdleThreshold;
+CpvExtern(double, idleBeginWalltime); // used for determining the conditon for long idle
+#endif
+
 
 #if CMI_QD
 void initQd(char **argv);
@@ -1632,12 +1637,22 @@ void CsdBeginIdle(void)
 #else
   CpvAccess(cmiMyPeIdle) = 1;
 #endif // CMK_SMP
-  CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
+  double curWallTime = CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
+#if CMK_ERROR_CHECKING
+  CpvAccess(idleBeginWalltime) = curWallTime;
+#endif
 }
 
 void CsdStillIdle(void)
 {
-  CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
+  double curWallTime = CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
+
+#if CMK_ERROR_CHECKING
+  if(curWallTime - CpvAccess(idleBeginWalltime) > longIdleThreshold) {
+    curWallTime = CcdRaiseCondition(CcdPROCESSOR_LONG_IDLE); // Invoke LONG_IDLE ccd callbacks
+    CpvAccess(idleBeginWalltime) = curWallTime; // Reset idle timer
+  }
+#endif
 }
 
 void CsdEndIdle(void)
@@ -4027,6 +4042,12 @@ void ConverseCommonInit(char **argv)
   if (CmiGetArgFlagDesc(argv, "+noCMAForZC", "When Cross Memory Attach (CMA) is supported, the program does not use CMA when using the Zerocopy API")) {
     useCMAForZC = false;
   }
+
+#if CMK_ERROR_CHECKING
+  if(!CmiGetArgDoubleDesc(argv, "+longIdleThresh", &longIdleThreshold, "Pass the threshold time in seconds that is used for triggering the LONG_IDLE")) {
+    longIdleThreshold = 10;
+  }
+#endif
 
   CmiDeliversInit();
   CsdInit(argv);
