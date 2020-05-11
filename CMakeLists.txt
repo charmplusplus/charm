@@ -243,7 +243,7 @@ set(CHARM_PLATFORM "${NETWORK}-${CHARM_OS}-${CHARM_CPU}")
 
 
 set(CMK_BUILD_CRAY 0)
-if(${NETWORK} MATCHES "gni-*")
+if(${NETWORK} MATCHES "gni-")
   set(CHARM_PLATFORM "${NETWORK}")
   set(CMK_BUILD_CRAY 1)
 elseif(${NETWORK} MATCHES "mpi-crayx")
@@ -376,7 +376,7 @@ set(CMK_F_OPENMP ${OpenMP_Fortran_FLAGS})
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
   file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
-elseif(${NETWORK} MATCHES "gni-*")
+elseif(${NETWORK} MATCHES "gni-")
   set(GDIR "gni")
 elseif(${NETWORK} MATCHES "mpi-crayx")
   set(GDIR "mpi")
