@@ -927,7 +927,7 @@ static void CmiIsomallocInitExtent(char ** argv)
 struct isommap
 {
   isommap(uint8_t * s, uint8_t * e)
-    : start{s}, end{e}, allocated_extent{s}, use_rdma{true}, lock{CmiCreateLock()}
+    : start{s}, end{e}, allocated_extent{s}, use_rdma{1}, lock{CmiCreateLock()}
   {
     IMP_DBG("[%d][%p] isommap::isommap(%p, %p)\n", CmiMyPe(), this, s, e);
   }
