@@ -2140,20 +2140,20 @@ void CkRdmaDeviceRecvHandler(void* data) {
   QdProcess(1);
 
   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
-
-  // TODO: Invoke source callback? (here or in UcxSendDeviceCompleted)
-
-  DeviceRdmaInfo* info = (DeviceRdmaInfo*)op->info;
-  CmiPrintf("msg content: %x\n", *(uint64_t*)(info->msg));
+  DeviceRdmaInfo* info = op->info;
 
   // Update counter (there may be multiple buffers in transit)
   info->counter++;
 
   // Check if all buffers have been received
+  // If so, invoke regular entry method
   if (info->counter == info->n_ops) {
     QdCreate(1);
     enqueueNcpyMessage(op->dest_pe, info->msg);
   }
+
+  // Free RDMA metadata
+  CmiFree(info);
 }
 
 // Invoked after post entry method
@@ -2168,27 +2168,31 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // Change message header to invoke regular entry method
   CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
 
-  DeviceRdmaInfo* rdma_info = NULL;
-  DeviceRdmaOpMsg** rdma_msgs = NULL;
+  void* rdma_data = NULL; // Used internally, should only be freed after RDMA completion
+  DeviceRdmaOpMsg** rdma_msgs = NULL; // Converse messages sent to sender
   if (mode == CkNcpyModeDevice::RDMA) {
-    // Need to have a second message invoke the regular entry method
+    // Need a second message invoke the regular entry method
     is_inline = false;
 
-    // Allocate and fill in metadata info for this set of Rgets
-    rdma_info = (DeviceRdmaInfo*)CmiAlloc(sizeof(DeviceRdmaInfo));
-    CmiAssert(rdma_info);
+    // Allocate and fill in metadata for this set of Rgets
+    rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) * sizeof(DeviceRdmaOp) * numops);
+    CmiEnforce(rdma_data);
+    DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
     rdma_info->n_ops = numops;
     rdma_info->counter = 0;
-    rdma_info->msg = env;
-    CmiPrintf("msg set to %p\n", rdma_info->msg);
-    CmiPrintf("msg content: %x\n", *(uint64_t*)(rdma_info->msg));
+
+    // Store a copy of the message
+    // XXX: Otherwise regular entry method doesn't get invoked, with zero handler error
+    size_t msg_size = env->getTotalsize();
+    rdma_info->msg = CmiAlloc(msg_size);
+    memcpy(rdma_info->msg, env, msg_size);
 
     // Allocate messages to be sent to sender
     rdma_msgs = (DeviceRdmaOpMsg**)CmiAlloc(sizeof(DeviceRdmaOpMsg*) * numops);
-    CmiAssert(rdma_msgs);
+    CmiEnforce(rdma_msgs);
     for (int i = 0; i < numops; i++) {
       rdma_msgs[i] = (DeviceRdmaOpMsg*)CmiAlloc(sizeof(DeviceRdmaOpMsg));
-      CmiAssert(rdma_msgs[i]);
+      CmiEnforce(rdma_msgs[i]);
     }
   }
 
@@ -2257,14 +2261,17 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
                 cudaMemcpyHostToDevice, postStructs[i].cuda_stream));
           */
 
-          // Store necessary data to send to sender
-          DeviceRdmaOp& op = rdma_msgs[i]->op;
-          op.src_pe = source.pe;
-          op.src_ptr = source.ptr;
-          op.dest_pe = CmiMyPe();
-          op.dest_ptr = dest.ptr;
-          op.size = std::min(source.cnt, dest.cnt);
-          op.info = rdma_info;
+          // Store necessary data to save and send to sender
+          DeviceRdmaOp& send_op = rdma_msgs[i]->op;
+          DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
+          save_op.src_pe   = send_op.src_pe   = source.pe;
+          save_op.src_ptr  = send_op.src_ptr  = source.ptr;
+          save_op.dest_pe  = send_op.dest_pe  = CmiMyPe();
+          save_op.dest_ptr = send_op.dest_ptr = dest.ptr;
+          save_op.size     = send_op.size     = std::min(source.cnt, dest.cnt);
+          save_op.info     = send_op.info     = (DeviceRdmaInfo*)rdma_data;
+          send_op.cb = new CkCallback(source.cb); // To be invoked on the sender
+          save_op.cb = NULL;
           break;
         }
       default:
@@ -2286,13 +2293,12 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // Launch RDMA gets
   if (mode == CkNcpyModeDevice::RDMA) {
     for (int i = 0; i < numops; i++) {
+      DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
       QdCreate(1);
-      CmiRdmaDeviceIssueRget(rdma_msgs[i]);
+      CmiRdmaDeviceIssueRget(rdma_msgs[i], save_op);
     }
-    //CmiFree(rdma_msgs);
+    CmiFree(rdma_msgs);
   }
-
-  //enqueueNcpyMessage(CmiMyPe(), rdma_info->msg);
 
   return is_inline;
 }

@@ -59,13 +59,20 @@ typedef struct ncpystruct{
 }NcpyOperationInfo;
 
 #if CMK_CUDA
+typedef struct DeviceRdmaInfo_ {
+  int n_ops; // Number of RDMA operations, i.e. number of buffers being sent
+  int counter; // Used to track the number of completed RDMA operations
+  void* msg; // Charm++ message to be (re-)enqueued after all operations complete
+} DeviceRdmaInfo;
+
 typedef struct DeviceRdmaOp_ {
   int src_pe;
   const void* src_ptr;
   int dest_pe;
   const void* dest_ptr;
   size_t size;
-  void* info; // Pointer to DeviceRdmaInfo
+  DeviceRdmaInfo* info;
+  void* cb;
 } DeviceRdmaOp;
 
 typedef struct DeviceRdmaOpMsg_ {

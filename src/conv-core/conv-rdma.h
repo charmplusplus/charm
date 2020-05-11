@@ -377,7 +377,7 @@ void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest);
 #if CMK_CUDA
 void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
 void CmiRdmaDeviceSendInit();
-void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg);
+void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg, DeviceRdmaOp* op);
 
 void CmiSendDevice(DeviceRdmaOp* op);
 void CmiRecvDevice(DeviceRdmaOp* op);
