@@ -18,20 +18,17 @@ project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 find_package(Threads REQUIRED)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
 
-
 # We need C++11 for (almost) all targets
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(CheckLanguage)
-check_language(Fortran)
+enable_language(Fortran OPTIONAL)
 if(CMAKE_Fortran_COMPILER)
-  enable_language(Fortran OPTIONAL)
   include(FortranCInterface)
   FortranCInterface_VERIFY()
   FortranCInterface_VERIFY(CXX)
 else()
-  message(STATUS "No Fortran support")
+  message(STATUS "Charm++: No Fortran support.")
 endif()
 
 if(${FortranCInterface_VERIFIED_CXX})
@@ -808,7 +805,7 @@ message("  C++ compiler:    ${CMAKE_CXX_COMPILER} [${CMAKE_CXX_COMPILER_ID} ${CM
 if(CMAKE_Fortran_COMPILER)
   message("  F90 compiler:    ${CMAKE_Fortran_COMPILER} [${CMAKE_Fortran_COMPILER_ID} ${CMAKE_Fortran_COMPILER_VERSION}]")
 else()
-  message("  F90 compiler:    N/A")
+  message("  F90 compiler:    ---")
 endif()
 message("  CMake:           ${CMAKE_COMMAND} [${CMAKE_VERSION}]")
 message("  Charmc flags:    ${MAIN_CFLAGS}")
