@@ -728,11 +728,6 @@ if(UCX_PMI)
   file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${UCX_PMI}.sh\n")
 endif()
 
-if(PXSHM)
-  file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-pxshm.sh\n")
-endif()
-
-
 # Create conv-mach-opt.h
 set(optfile_h ${CMAKE_BINARY_DIR}/include/conv-mach-opt.h)
 
@@ -749,10 +744,6 @@ if(UCX_PMI)
   file(APPEND ${optfile_h} "#include \"conv-mach-${UCX_PMI}.h\"\n")
 endif()
 
-if(PXSHM)
-  file(APPEND ${optfile_h} "#include \"conv-mach-pxshm.h\"\n")
-endif()
-
 # Create conv-mach-opt.mak
 set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
 
@@ -766,7 +757,7 @@ foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTH
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS PEDANTIC SYNCFT)
+foreach(opt SMP OMP TCP PTHREADS PEDANTIC SYNCFT PXSHM)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
