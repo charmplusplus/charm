@@ -235,6 +235,10 @@ void hapiMapping(char** argv) {
 
   // Perform mapping and set device representative PE
   int my_rank = all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank();
+  if (CmiInCommThread()) {
+    int first_pe = CmiNodeFirst(CmiMyNode());
+    my_rank = all_gpus ? CmiPhysicalRank(first_pe) : CmiRankOf(first_pe);
+  }
 
   switch (map_type) {
     case Mapping::Block:
@@ -251,6 +255,9 @@ void hapiMapping(char** argv) {
 
   // Set device and store PE-device mapping
   hapiCheck(cudaSetDevice(CpvAccess(my_device)));
+
+  if (CmiInCommThread()) return;
+
 #if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).device_mapping_lock);
 #endif
