@@ -66,8 +66,7 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
     entry.memoryBackup = NULL;
     entry.obj = obj;
     if (msg != NULL) {
-      entry.msg = msg;
-      CkReferenceMsg(msg);
+      entry.msg = CkReferenceMsg(msg);
     }
     else entry.msg = NULL;
     _debugData.push(entry);
