@@ -1674,22 +1674,17 @@ void _initCharm(int unused_argc, char **argv)
     }
 
 #if CMK_CUDA
+    // Only worker threads execute the following
     if (!CmiInCommThread()) {
       if (CmiMyRank() == 0) {
         hapiInitCsv(); // Initialize per-process variables (GPUManager)
       }
+      hapiInitCpv(); // Initialize per-PE variables
 
       CmiNodeBarrier();
-    }
 
-    hapiInitCpv(); // Initialize per-PE variables
+      hapiMapping(argv); // Perform PE-device mapping
 
-    // All threads (including comm threads) need to map to devices
-    // FIXME: Comm threads currently just map to the same device as PE rank 0
-    // (assumes one process per device)
-    hapiMapping(argv);
-
-    if (!CmiInCommThread()) {
       // Register polling function to be invoked at every scheduler loop
       CcdCallOnConditionKeep(CcdEVERY, hapiPollEvents, NULL);
 
