@@ -31,8 +31,8 @@ class LLBMigrateMsg : public TreeLBMessage, public CMessage_LLBMigrateMsg
 class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
 {
  public:
-  unsigned int n;  // num objs in this msg
-  unsigned int m;  // num pes in this msg
+  unsigned int nObjs;  // num objs in this msg
+  unsigned int nPes;  // num pes in this msg
 
   int* pe_ids;              // IDs of the pes in this msg
   float* bgloads;           // bgloads[i] is background load of i-th pe in this msg
@@ -55,28 +55,28 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
 
     // could pass n and m as parameters to this method, but don't think it would really
     // matter
-    unsigned int n = 0;
-    unsigned int m = 0;
+    unsigned int nObjs = 0;
+    unsigned int nPes = 0;
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
-      n += msg->n;
-      m += msg->m;
+      nObjs += msg->nObjs;
+      nPes += msg->nPes;
     }
 
     LBStatsMsg_1* newMsg;
     if (rateAware)
-      newMsg = new (m, m, m, m + 1, n, n, 0) LBStatsMsg_1;
+      newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1;
     else
-      newMsg = new (m, m, 0, m + 1, n, n, 0) LBStatsMsg_1;
-    newMsg->n = n;
-    newMsg->m = m;
+      newMsg = new (nPes, nPes, 0, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1;
+    newMsg->nObjs = nObjs;
+    newMsg->nPes = nPes;
     int pe_cnt = 0;
     int obj_cnt = 0;
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
-      const int msg_npes = msg->m;
+      const int msg_npes = msg->nPes;
       memcpy(newMsg->pe_ids + pe_cnt, msg->pe_ids, sizeof(int) * msg_npes);
       memcpy(newMsg->bgloads + pe_cnt, msg->bgloads, sizeof(float) * msg_npes);
       if (rateAware)
@@ -84,9 +84,9 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
       // memcpy(newMsg->obj_start + pe_cnt, msg->obj_start, sizeof(int)*msg_npes);
       for (int j = 0; j < msg_npes; j++)
         newMsg->obj_start[pe_cnt + j] = msg->obj_start[j] + obj_cnt;
-      memcpy(newMsg->oloads + obj_cnt, msg->oloads, sizeof(float) * (msg->n));
+      memcpy(newMsg->oloads + obj_cnt, msg->oloads, sizeof(float) * (msg->nObjs));
 
-      obj_cnt += msg->n;
+      obj_cnt += msg->nObjs;
       pe_cnt += msg_npes;
     }
     newMsg->obj_start[pe_cnt] = obj_cnt;
@@ -105,7 +105,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
-      for (int j = 0; j < msg->m; j++)
+      for (int j = 0; j < msg->nPes; j++)
       {
         int pe = msg->pe_ids[j];
         CkAssert(pe >= 0 && pe < CkNumPes());
@@ -501,8 +501,8 @@ class RootLevel : public LevelLogic
     }
     else
     {
-      m += ((LBStatsMsg_1*)stats)->m;
-      n += ((LBStatsMsg_1*)stats)->n;
+      nPes += ((LBStatsMsg_1*)stats)->nPes;
+      nObjs += ((LBStatsMsg_1*)stats)->nObjs;
     }
   }
 
@@ -515,8 +515,8 @@ class RootLevel : public LevelLogic
     const int num_children = stats_msgs.size();
     CkAssert(num_children > 0);
 #if DEBUG__TREE_LB_L1
-    CkPrintf("[%d] RootLevel::loadBalance, num_children=%d m=%d n=%d\n", CkMyPe(),
-             num_children, m, n);
+    CkPrintf("[%d] RootLevel::loadBalance, num_children=%d nPes=%d nObjs=%d\n", CkMyPe(),
+             num_children, nPes, nObjs);
 #endif
 
     if (num_groups == -1)
@@ -525,13 +525,13 @@ class RootLevel : public LevelLogic
       CkAssert(wrappers.size() > current_strategy);
       IStrategyWrapper* wrapper = wrappers[current_strategy];
       CkAssert(wrapper != nullptr);
-      CkAssert(m == CkNumPes());
-      LLBMigrateMsg* migMsg = new (m, m, n, 0) LLBMigrateMsg;
+      CkAssert(nPes == CkNumPes());
+      LLBMigrateMsg* migMsg = new (nPes, nPes, nObjs, 0) LLBMigrateMsg;
       migMsg->n_moves = 0;
-      std::fill(migMsg->num_incoming, migMsg->num_incoming + m, 0);
+      std::fill(migMsg->num_incoming, migMsg->num_incoming + nPes, 0);
 
       double t0 = CkWallTimer();
-      wrapper->prepStrategy(n, m, stats_msgs, migMsg);
+      wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
       wrapper->runStrategy(migMsg);
       if (current_strategy == wrappers.size() - 1)
       {
@@ -548,7 +548,7 @@ class RootLevel : public LevelLogic
       // need to cast pointer to ensure delete of CMessage_LBStatsMsg_1 is called
       for (auto msg : stats_msgs) delete (LBStatsMsg_1*)msg;
       stats_msgs.clear();
-      m = n = 0;
+      nPes = nObjs = 0;
       decisions.resize(num_children);
       decisions[0] = migMsg;
       for (int i = 1; i < num_children; i++)
@@ -655,8 +655,8 @@ class RootLevel : public LevelLogic
   bool repeat_strategies;
   size_t current_strategy = 0;
   bool group_strategy_dummy = false;  // if true, don't balance load between groups
-  unsigned int m = 0;  // total number of processors in msgs I am processing
-  unsigned int n = 0;  // total number of objects in msgs I am processing
+  unsigned int nPes = 0;  // total number of processors in msgs I am processing
+  unsigned int nObjs = 0;  // total number of objects in msgs I am processing
   float total_load = 0;
   std::vector<IStrategyWrapper*> wrappers;
 };
@@ -697,8 +697,8 @@ class NodeSetLevel : public LevelLogic
   virtual void depositStats(TreeLBMessage* stats)
   {
     stats_msgs.push_back(stats);
-    m += ((LBStatsMsg_1*)stats)->m;
-    n += ((LBStatsMsg_1*)stats)->n;
+    nPes += ((LBStatsMsg_1*)stats)->nPes;
+    nObjs += ((LBStatsMsg_1*)stats)->nObjs;
   }
 
   virtual bool cutoff() { return (lbmgr->step() + 1) % cutoff_freq != 0; }
@@ -712,21 +712,21 @@ class NodeSetLevel : public LevelLogic
     num_children = stats_msgs.size();
     CkAssert(num_children > 0);
 #if DEBUG__TREE_LB_L2
-    CkPrintf("[%d] NodeSetLevel::mergeStats, num_children=%d m=%d n=%d\n", CkMyPe(),
-             num_children, m, n);
+    CkPrintf("[%d] NodeSetLevel::mergeStats, num_children=%d nPes=%d nObjs=%d\n", CkMyPe(),
+             num_children, nPes, nObjs);
 #endif
 
     CkAssert(migMsg == nullptr);
-    int npes = CkNumPes();
-    migMsg = new (npes, npes, n, 0) LLBMigrateMsg;
+    int total_npes = CkNumPes();
+    migMsg = new (total_npes, total_npes, nObjs, 0) LLBMigrateMsg;
     migMsg->n_moves = 0;
-    std::fill(migMsg->num_incoming, migMsg->num_incoming + npes, 0);
+    std::fill(migMsg->num_incoming, migMsg->num_incoming + total_npes, 0);
 
-    float subtree_load = wrapper->prepStrategy(n, m, stats_msgs, migMsg);
+    float subtree_load = wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
     // need to cast pointer to ensure delete of CMessage_LBStatsMsg_1 is called
     for (auto msg : stats_msgs) delete (LBStatsMsg_1*)msg;
     stats_msgs.clear();
-    m = n = 0;
+    nPes = nObjs = 0;
 
     SubtreeLoadMsg* newMsg = new SubtreeLoadMsg;
     newMsg->pe = CkMyPe();
@@ -853,21 +853,21 @@ class NodeSetLevel : public LevelLogic
       num_children = stats_msgs.size();
       CkAssert(num_children > 0);
 #if DEBUG__TREE_LB_L2
-      CkPrintf("[%d] NodeSetLevel::loadBalance (w cutoff), num_children=%d m=%d n=%d\n",
-               CkMyPe(), num_children, m, n);
+      CkPrintf("[%d] NodeSetLevel::loadBalance (w cutoff), num_children=%d nPes=%d nObjs=%d\n",
+               CkMyPe(), num_children, nPes, nObjs);
 #endif
 
       CkAssert(migMsg == nullptr);
-      int npes = CkNumPes();
-      migMsg = new (npes, npes, n, 0) LLBMigrateMsg;
+      int total_npes = CkNumPes();
+      migMsg = new (total_npes, total_npes, nObjs, 0) LLBMigrateMsg;
       migMsg->n_moves = 0;
-      std::fill(migMsg->num_incoming, migMsg->num_incoming + npes, 0);
+      std::fill(migMsg->num_incoming, migMsg->num_incoming + total_npes, 0);
 
-      wrapper->prepStrategy(n, m, stats_msgs, migMsg);
+      wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
       // need to cast pointer to ensure delete of CMessage_LBStatsMsg_1 is called
       for (auto msg : stats_msgs) delete (LBStatsMsg_1*)msg;
       stats_msgs.clear();
-      m = n = 0;
+      nPes = nObjs = 0;
     }
     wrapper->runStrategy(migMsg, &idm);
     if (current_strategy == wrappers.size() - 1)
@@ -904,9 +904,9 @@ class NodeSetLevel : public LevelLogic
   LLBMigrateMsg* migMsg = nullptr;
   std::vector<int> pes;
   unsigned int num_children = 0;
-  unsigned int m =
+  unsigned int nPes =
       0;  // total number of processors in msgs I am processing (from my subtree)
-  unsigned int n =
+  unsigned int nObjs =
       0;  // total number of objects in msgs I am processing (from my subtree)
   int cutoff_freq = 0;
 };
@@ -987,26 +987,26 @@ class NodeLevel : public LevelLogic
     CkAssert(wrapper != nullptr);
     CkAssert(pes.size() > 0);
 
-    unsigned int n = 0;
-    unsigned int m = 0;
+    unsigned int nObjs = 0;
+    unsigned int nPes = 0;
     for (auto msg : stats_msgs)
     {
-      n += ((LBStatsMsg_1*)msg)->n;
-      m += ((LBStatsMsg_1*)msg)->m;
+      nObjs += ((LBStatsMsg_1*)msg)->nObjs;
+      nPes += ((LBStatsMsg_1*)msg)->nPes;
     }
-    CkAssert(m == pes.size());
+    CkAssert(nPes == pes.size());
 #if DEBUG__TREE_LB_L1
     if (CkMyPe() == 0)
-      CkPrintf("[%d] NodeLevel::withinNodeLoadBalance - m=%d n=%d\n", CkMyPe(), m, n);
+      CkPrintf("[%d] NodeLevel::withinNodeLoadBalance - nPes=%d nObjs=%d\n", CkMyPe(), nPes, nObjs);
 #endif
 
-    int npes = CkNumPes();
-    LLBMigrateMsg* migMsg = new (npes, npes, n, 0) LLBMigrateMsg;
+    int total_npes = CkNumPes();
+    LLBMigrateMsg* migMsg = new (total_npes, total_npes, nObjs, 0) LLBMigrateMsg;
     migMsg->n_moves = 0;
-    std::fill(migMsg->num_incoming, migMsg->num_incoming + npes, 0);
+    std::fill(migMsg->num_incoming, migMsg->num_incoming + total_npes, 0);
 
     double t0 = CkWallTimer();
-    wrapper->prepStrategy(n, m, stats_msgs, migMsg);
+    wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
     wrapper->runStrategy(migMsg);
 #if DEBUG__TREE_LB_L2
     CkPrintf("[%d] NodeLevel::withinNodeLoadBalance - strategy took %f secs\n", CkMyPe(),
@@ -1098,8 +1098,8 @@ class PELevel : public LevelLogic
       msg = new (1, 1, 1, 2, nobjs, nobjs, 0) LBStatsMsg_1;
     else
       msg = new (1, 1, 0, 2, nobjs, nobjs, 0) LBStatsMsg_1;
-    msg->n = nobjs;
-    msg->m = 1;
+    msg->nObjs = nobjs;
+    msg->nPes = 1;
     msg->pe_ids[0] = mype;
     msg->obj_start[0] = 0;
     msg->obj_start[1] = nobjs;
