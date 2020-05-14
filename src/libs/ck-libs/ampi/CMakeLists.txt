@@ -149,7 +149,7 @@ if(${CMK_AMPI_WITH_ROMIO})
              > /dev/null
         COMMAND cp -f ${romio_dir}/include/mpio.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f ${romio_dir}/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
-        BUILD_COMMAND cd ${romio_dir} && make > /dev/null
+        BUILD_COMMAND cd ${romio_dir} && make AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: > /dev/null
         COMMAND cp -f ${romio_dir}/.libs/libromio.a ${CMAKE_BINARY_DIR}/lib/libampiromio.a
         COMMAND test ${BUILD_SHARED} -eq 1 && cp -f ${romio_dir}/.libs/libromio${CMAKE_SHARED_LIBRARY_SUFFIX} ${CMAKE_BINARY_DIR}/lib_so/libampiromio${CMAKE_SHARED_LIBRARY_SUFFIX} || true
         INSTALL_COMMAND "" # No install step
