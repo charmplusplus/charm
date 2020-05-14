@@ -389,6 +389,13 @@ int TCharm::add(const TCharm::UserData &d) noexcept
 {
   if (nUd>=maxUserData)
     CkAbort("TCharm: Registered too many user data fields!\n");
+
+  // disable use of pup_buffer which conflicts with pup routines
+  CthThread th = getThread();
+  auto ctx = CmiIsomallocGetThreadContext(th);
+  if (ctx.opaque != nullptr)
+    CmiIsomallocEnableRDMA(ctx, 0);
+
   int nu=nUd++;
   ud[nu]=d;
   return nu;
