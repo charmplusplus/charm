@@ -1529,6 +1529,7 @@ void CthInit(char **argv);
 static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
+    int CmiMyArgc;
 
     LrtsPreCommonInit(everReturn);
 
@@ -1561,6 +1562,18 @@ static void ConverseRunPE(int everReturn) {
         CmiMyArgv=CmiCopyArgs(Cmi_argvcopy);
     else
         CmiMyArgv=Cmi_argv;
+    CmiMyArgc = CmiGetArgc(CmiMyArgv);
+
+    // Initialize LRTS layer. In SMP, the comm thread should perform
+    // the initialization to prevent potential issues that could occur
+    // when the thread that performed initialization and the thread
+    // invoking communication API are different.
+    if (CmiInCommThread()) {
+      CmiPrintf("PE %d running LrtsCommThread\n", CmiMyPe());
+      LrtsInitCommThread(&CmiMyArgc, &CmiMyArgv, &_Cmi_numnodes, &_Cmi_mynode);
+    }
+
+    CmiNodeAllBarrier();
 
     CthInit(CmiMyArgv);
 #if CMK_OMP
