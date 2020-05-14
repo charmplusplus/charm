@@ -104,6 +104,8 @@ option(F90CHARM            "Build f90charm" OFF)
 option(PEDANTIC            "Build with -pedantic" OFF)
 option(BUILD_CUDA          "Build with CUDA support" OFF)
 
+option(PXSHM               "Build with PXSHM" OFF)
+
 # UCX PMI options
 set(UCX_PMI "" CACHE STRING "PMI type for UCX layer, can be one of simplepmi, simplepmi2, or ompipmix")
 
@@ -726,7 +728,6 @@ if(UCX_PMI)
   file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${UCX_PMI}.sh\n")
 endif()
 
-
 # Create conv-mach-opt.h
 set(optfile_h ${CMAKE_BINARY_DIR}/include/conv-mach-opt.h)
 
@@ -756,7 +757,7 @@ foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTH
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS PEDANTIC SYNCFT)
+foreach(opt SMP OMP TCP PTHREADS PEDANTIC SYNCFT PXSHM)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
