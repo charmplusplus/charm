@@ -67,7 +67,7 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
     entry.obj = obj;
     if (msg != NULL) {
       entry.msg = msg;
-      CmiReference(UsrToEnv(msg));
+      CkReferenceMsg(msg);
     }
     else entry.msg = NULL;
     _debugData.push(entry);
