@@ -26,7 +26,7 @@ CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 
 // command line options
 CkLBArgs _lb_args;
-int _lb_predict = 0;
+bool _lb_predict = false;
 int _lb_predict_delay = 10;
 int _lb_predict_window = 20;
 bool _lb_psizer_on = false;
@@ -359,14 +359,14 @@ void _loadbalancerInit()
       argv, "+LBNoBackground", "Load balancer ignores the background load.");
   _lb_args.migObjOnly() = CmiGetArgFlagDesc(
       argv, "+LBObjOnly", "Only load balancing migratable objects, ignoring all others.");
-  if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = 1;
+  if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = true;
 
   // assume all CPUs are identical
   _lb_args.testPeSpeed() =
       CmiGetArgFlagDesc(argv, "+LBTestPESpeed", "Load balancer test all CPUs speed.");
   _lb_args.samePeSpeed() = CmiGetArgFlagDesc(
       argv, "+LBSameCpus", "Load balancer assumes all CPUs are of same speed.");
-  if (!_lb_args.testPeSpeed()) _lb_args.samePeSpeed() = 1;
+  if (!_lb_args.testPeSpeed()) _lb_args.samePeSpeed() = true;
 
   _lb_args.useCpuTime() = CmiGetArgFlagDesc(
       argv, "+LBUseCpuTime", "Load balancer uses CPU time instead of wallclock time.");

@@ -25,21 +25,21 @@ class CkLBArgs
   double _lb_alpha;      // per message send overhead
   double _lb_beta;       // per byte send overhead
   int _lb_debug;         // 1 or greater
-  int _lb_printsummary;  // print summary
-  int _lb_loop;          // use multiple load balancers in loop
-  int _lb_ignoreBgLoad;
-  int _lb_migObjOnly;  // only consider migratable objs
-  int _lb_syncResume;
-  int _lb_samePeSpeed;     // ignore cpu speed
-  int _lb_testPeSpeed;     // test cpu speed
-  int _lb_useCpuTime;      // use cpu instead of wallclock time
-  int _lb_statson;         // stats collection
-  int _lb_traceComm;       // stats collection for comm
+  bool _lb_printsummary;  // print summary
+  bool _lb_loop;          // use multiple load balancers in loop
+  bool _lb_ignoreBgLoad;
+  bool _lb_migObjOnly;  // only consider migratable objs
+  bool _lb_syncResume;
+  bool _lb_samePeSpeed;     // ignore cpu speed
+  bool _lb_testPeSpeed;     // test cpu speed
+  bool _lb_useCpuTime;      // use cpu instead of wallclock time
+  bool _lb_statson;         // stats collection
+  bool _lb_traceComm;       // stats collection for comm
   int _lb_central_pe;      // processor number for centralized strategy
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
                            // particular load ratio
-  int _lb_metaLbOn;
+  bool _lb_metaLbOn;
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
   std::vector<const char*>
@@ -50,36 +50,37 @@ class CkLBArgs
   CkLBArgs()
   {
     _autoLbPeriod = -1.0;  // off by default
-    _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
-    _lb_printsummary = _lb_migObjOnly = 0;
-    _lb_statson = _lb_traceComm = 1;
-    _lb_loop = 0;
+    _lb_debug = 0;
+    _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = false;
+    _lb_printsummary = _lb_migObjOnly = false;
+    _lb_statson = _lb_traceComm = true;
+    _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
     _lb_targetRatio = 1.05;
-    _lb_metaLbOn = 0;
+    _lb_metaLbOn = false;
     _lb_metaLbModelDir = nullptr;
   }
   inline char*& treeLBFile() { return _lb_treeLBFile; }
   inline double& lbperiod() { return _autoLbPeriod; }
   inline int& debug() { return _lb_debug; }
-  inline int& printSummary() { return _lb_printsummary; }
+  inline bool& printSummary() { return _lb_printsummary; }
   inline int& lbversion() { return _lb_version; }
-  inline int& loop() { return _lb_loop; }
-  inline int& ignoreBgLoad() { return _lb_ignoreBgLoad; }
-  inline int& migObjOnly() { return _lb_migObjOnly; }
-  inline int& syncResume() { return _lb_syncResume; }
-  inline int& samePeSpeed() { return _lb_samePeSpeed; }
-  inline int& testPeSpeed() { return _lb_testPeSpeed; }
-  inline int& useCpuTime() { return _lb_useCpuTime; }
-  inline int& statsOn() { return _lb_statson; }
-  inline int& traceComm() { return _lb_traceComm; }
+  inline bool& loop() { return _lb_loop; }
+  inline bool& ignoreBgLoad() { return _lb_ignoreBgLoad; }
+  inline bool& migObjOnly() { return _lb_migObjOnly; }
+  inline bool& syncResume() { return _lb_syncResume; }
+  inline bool& samePeSpeed() { return _lb_samePeSpeed; }
+  inline bool& testPeSpeed() { return _lb_testPeSpeed; }
+  inline bool& useCpuTime() { return _lb_useCpuTime; }
+  inline bool& statsOn() { return _lb_statson; }
+  inline bool& traceComm() { return _lb_traceComm; }
   inline int& central_pe() { return _lb_central_pe; }
   inline double& alpha() { return _lb_alpha; }
   inline double& beta() { return _lb_beta; }
   inline int& maxDistPhases() { return _lb_maxDistPhases; }
   inline double& targetRatio() { return _lb_targetRatio; }
-  inline int& metaLbOn() { return _lb_metaLbOn; }
+  inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
   inline std::vector<const char*>& legacyCentralizedStrategies()
   {
@@ -89,7 +90,7 @@ class CkLBArgs
 
 extern CkLBArgs _lb_args;
 
-extern int _lb_predict;
+extern bool _lb_predict;
 extern int _lb_predict_delay;
 extern int _lb_predict_window;
 extern bool _lb_psizer_on;
