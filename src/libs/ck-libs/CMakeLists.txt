@@ -1,5 +1,6 @@
 # cache
 add_library(moduleCkCache cache/CkCache.C cache/CkCache.h)
+configure_file(cache/CkCache.h ${CMAKE_BINARY_DIR}/include COPYONLY)
 add_dependencies(moduleCkCache ck)
 
 # sparseContiguousReducer
