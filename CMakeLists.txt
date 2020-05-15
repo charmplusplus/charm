@@ -639,10 +639,13 @@ configure_file(src/scripts/testrun bin/ COPYONLY)
 
 # CkLoop
 set(ckloop-cxx-files src/libs/ck-libs/ckloop/CkLoop.C)
-file(GLOB ckloop-h-files src/libs/ck-libs/ckloop/*.h)
+set(ckloop-h-files src/libs/ck-libs/ckloop/CkLambda.h src/libs/ck-libs/ckloop/CkLoopAPI.h src/libs/ck-libs/ckloop/CkLoop.h)
 add_library(moduleCkLoop ${ckloop-cxx-files} ${ckloop-h-files} ${CMAKE_BINARY_DIR}/include/CkLoop.decl.h)
 add_dependencies(moduleCkLoop ck)
 
+foreach(file ${ckloop-h-files})
+  configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+endforeach(file)
 
 # NDMeshStreamer
 file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)
