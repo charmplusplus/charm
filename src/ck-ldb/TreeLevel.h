@@ -469,9 +469,14 @@ class RootLevel : public LevelLogic
     if (num_groups == -1)
     {
       current_strategy = 0;
-      if (!rateAware)
+      for (const std::string& strategy_name : config["strategies"])
       {
-        for (const std::string& strategy_name : config["strategies"])
+        if (rateAware)
+        {
+          wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, true>>(
+              strategy_name, true, config[strategy_name]));
+        }
+        else
         {
           wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, false>>(
               strategy_name, true, config[strategy_name]));
@@ -679,9 +684,14 @@ class NodeSetLevel : public LevelLogic
     for (auto w : wrappers) delete w;
     wrappers.clear();
     current_strategy = 0;
-    if (!rateAware)
+    for (const std::string& strategy_name : config["strategies"])
     {
-      for (const std::string& strategy_name : config["strategies"])
+      if (rateAware)
+      {
+        wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, true>>(
+            strategy_name, false, config[strategy_name]));
+      }
+      else
       {
         wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, false>>(
             strategy_name, false, config[strategy_name]));
@@ -712,8 +722,8 @@ class NodeSetLevel : public LevelLogic
     num_children = stats_msgs.size();
     CkAssert(num_children > 0);
 #if DEBUG__TREE_LB_L2
-    CkPrintf("[%d] NodeSetLevel::mergeStats, num_children=%d nPes=%d nObjs=%d\n", CkMyPe(),
-             num_children, nPes, nObjs);
+    CkPrintf("[%d] NodeSetLevel::mergeStats, num_children=%d nPes=%d nObjs=%d\n",
+             CkMyPe(), num_children, nPes, nObjs);
 #endif
 
     CkAssert(migMsg == nullptr);
@@ -853,8 +863,9 @@ class NodeSetLevel : public LevelLogic
       num_children = stats_msgs.size();
       CkAssert(num_children > 0);
 #if DEBUG__TREE_LB_L2
-      CkPrintf("[%d] NodeSetLevel::loadBalance (w cutoff), num_children=%d nPes=%d nObjs=%d\n",
-               CkMyPe(), num_children, nPes, nObjs);
+      CkPrintf(
+          "[%d] NodeSetLevel::loadBalance (w cutoff), num_children=%d nPes=%d nObjs=%d\n",
+          CkMyPe(), num_children, nPes, nObjs);
 #endif
 
       CkAssert(migMsg == nullptr);
@@ -929,9 +940,14 @@ class NodeLevel : public LevelLogic
     for (auto w : wrappers) delete w;
     wrappers.clear();
     current_strategy = 0;
-    if (!rateAware)
+    for (const std::string& strategy_name : config["strategies"])
     {
-      for (const std::string& strategy_name : config["strategies"])
+      if (rateAware)
+      {
+        wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, true>>(
+            strategy_name, false, config[strategy_name]));
+      }
+      else
       {
         wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, false>>(
             strategy_name, false, config[strategy_name]));
@@ -997,7 +1013,8 @@ class NodeLevel : public LevelLogic
     CkAssert(nPes == pes.size());
 #if DEBUG__TREE_LB_L1
     if (CkMyPe() == 0)
-      CkPrintf("[%d] NodeLevel::withinNodeLoadBalance - nPes=%d nObjs=%d\n", CkMyPe(), nPes, nObjs);
+      CkPrintf("[%d] NodeLevel::withinNodeLoadBalance - nPes=%d nObjs=%d\n", CkMyPe(),
+               nPes, nObjs);
 #endif
 
     int total_npes = CkNumPes();
@@ -1050,7 +1067,7 @@ class PELevel : public LevelLogic
     }
   };
 
-  PELevel(LBManager* _lbmgr) : lbmgr(_lbmgr), rateAware(false) {}
+  PELevel(LBManager* _lbmgr) : lbmgr(_lbmgr), rateAware(_lb_args.testPeSpeed()) {}
 
   virtual ~PELevel() {}
 
@@ -1095,7 +1112,10 @@ class PELevel : public LevelLogic
     // allocate and populate stats msg
     LBStatsMsg_1* msg;
     if (rateAware)
+    {
       msg = new (1, 1, 1, 2, nobjs, nobjs, 0) LBStatsMsg_1;
+      msg->speeds[0] = float(lbmgr->ProcessorSpeed());
+    }
     else
       msg = new (1, 1, 0, 2, nobjs, nobjs, 0) LBStatsMsg_1;
     msg->nObjs = nobjs;
@@ -1105,7 +1125,12 @@ class PELevel : public LevelLogic
     msg->obj_start[1] = nobjs;
     for (int i = 0; i < nobjs; i++)
     {
-      msg->oloads[i] = float(myObjs[i].wallTime);
+      // If rateAware, convert object loads by multiplying by processor speed
+      // Note this conversion isn't done for bgloads because they never leave the PE
+      if (rateAware)
+        msg->oloads[i] = float(myObjs[i].wallTime) * msg->speeds[0];
+      else
+        msg->oloads[i] = float(myObjs[i].wallTime);
       msg->order[i] = i;
     }
 
@@ -1122,8 +1147,6 @@ class PELevel : public LevelLogic
     else
       msg->bgloads[0] = float(bg_walltime);
     // fprintf(stderr, "[%d] my bgload is %f %f\n", mype, msg->bgloads[0], bg_walltime);
-    if (rateAware)
-      msg->speeds[0] = 1.0;  // TODO if rateAware put speed of the processor in msg
 
     return msg;
   }

@@ -69,7 +69,7 @@ class PE_Root_Tree : public LBTreeBuilderCommon
     if (CkMyPe() == rootPE)
     {
       RootLevel* level = new RootLevel();
-      level->configure(false, config["Root"]);
+      level->configure(_lb_args.testPeSpeed(), config["Root"]);
       logic[1] = level;
     }
 
@@ -147,7 +147,7 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
       std::iota(pes_in_node.begin(), pes_in_node.end(), level1root);
 
       NodeLevel* level = new NodeLevel(lbmgr, pes_in_node);
-      level->configure(false, config["Process"], step_freq_lvl2);
+      level->configure(_lb_args.testPeSpeed(), config["Process"], step_freq_lvl2);
       logic[lvl] = level;
 
       // set up comm-tree between levels 1 and 2
@@ -178,7 +178,7 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
     if (mype == level2root)
     {
       RootLevel* level = new RootLevel();
-      level->configure(false, config["Root"]);
+      level->configure(_lb_args.testPeSpeed(), config["Root"]);
       logic[lvl] = level;
     }
 
@@ -262,7 +262,7 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
       std::iota(pes_in_node.begin(), pes_in_node.end(), level1root);
 
       NodeLevel* level = new NodeLevel(lbmgr, pes_in_node);
-      level->configure(false, config["Process"], step_freq_lvl2);
+      level->configure(_lb_args.testPeSpeed(), config["Process"], step_freq_lvl2);
       logic[lvl] = level;
 
       // set up comm-tree between levels 1 and 2
@@ -296,7 +296,7 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
       std::iota(pes_in_group.begin(), pes_in_group.end(), GroupFirstPe(mygroup));
       
       NodeSetLevel* level = new NodeSetLevel(lbmgr, pes_in_group);
-      level->configure(false, config["ProcessGroup"], step_freq_lvl3);
+      level->configure(_lb_args.testPeSpeed(), config["ProcessGroup"], step_freq_lvl3);
       logic[lvl] = level;
 
       if (mype != level3root)
@@ -315,7 +315,7 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
       }
 
       RootLevel* level = new RootLevel(num_groups);
-      level->configure(false, config["Root"]);
+      level->configure(_lb_args.testPeSpeed(), config["Root"]);
       logic[lvl] = level;
     }
 
