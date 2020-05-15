@@ -201,7 +201,7 @@ void CpdPythonGroup::cpdCheck(void *m) {
     CkPrintf("[%d] CpdPythonGroup::cpdCheck error while preparing interpreter\n",CkMyPe());
   }
   pyWorkers[pyReference].inUse = true;
-  CmiReference(UsrToEnv(msg));
+  CkReferenceMsg(msg);
   CthResume(CthCreate((CthVoidFn)_callthr_executeThread, new CkThrCallArg(msg,(PythonObject*)this), 0));
   if (resultNotNone) CpdFreeze();
 }

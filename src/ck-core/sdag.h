@@ -76,7 +76,7 @@ namespace SDAG {
       init();
       setRefnum(CkGetRefNum(msg));
       continuations = 0;
-      CmiReference(UsrToEnv(msg));
+      CkReferenceMsg(msg);
     }
 
     void pup(PUP::er& p) {
@@ -84,7 +84,7 @@ namespace SDAG {
       p | hasMsg;
       if (hasMsg) CkPupMessage(p, (void**)&msg);
       if (hasMsg && p.isUnpacking())
-        CmiReference(UsrToEnv(msg));
+        CkReferenceMsg(msg);
       packClosure(p);
     }
 
