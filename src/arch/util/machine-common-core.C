@@ -1569,7 +1569,6 @@ static void ConverseRunPE(int everReturn) {
     // when the thread that performed initialization and the thread
     // invoking communication API are different.
     if (CmiInCommThread()) {
-      CmiPrintf("PE %d running LrtsCommThread\n", CmiMyPe());
       LrtsInitCommThread(&CmiMyArgc, &CmiMyArgv, &_Cmi_numnodes, &_Cmi_mynode);
     }
 
