@@ -917,37 +917,27 @@ static void work(int iter_block, volatile int* result)
 
 int LDProcessorSpeed()
 {
-  // for SMP version, if one processor have done this testing,
-  // we can skip the other processors by remember the number here
-  static int thisProcessorSpeed = -1;
-
   if (_lb_args.samePeSpeed() ||
       CkNumPes() == 1)  // I think it is safe to assume that we can
     return 1;           // skip this if we are only using 1 PE
 
-  if (thisProcessorSpeed != -1) return thisProcessorSpeed;
+  volatile int result = 0;
 
-  // if (CkMyPe()==0) CkPrintf("Measuring processor speeds...");
-
-  volatile static int result = 0;  // I don't care what this is, its just for
-                                   // timing, so this is thread safe.
   int wps = 0;
-  const double elapse = 0.4;
-  // First, count how many iterations for .2 second.
+  const double elapse = 0.2;
+  // First, count how many iterations happen in "elapse" seconds.
   // Since we are doing lots of function calls, this will be rough
   const double end_time = CmiCpuTimer() + elapse;
-  wps = 0;
   while (CmiCpuTimer() < end_time)
   {
     work(1000, &result);
     wps += 1000;
   }
 
-  // Now we have a rough idea of how many iterations there are per
-  // second, so just perform a few cycles of correction by
-  // running for what we think is 1 second.  Then correct
-  // the number of iterations per second to make it closer
-  // to the correct value
+  // Now we have a rough idea of how many iterations happen in
+  // "elapse" seconds, so just perform a few cycles of correction
+  // by running for what should take that long. Then correct the
+  // number of iterations if needed.
 
   for (int i = 0; i < 2; i++)
   {
@@ -957,16 +947,6 @@ int LDProcessorSpeed()
     const double correction = elapse / (end_time - start_time);
     wps = (int)((double)wps * correction + 0.5);
   }
-
-  // If necessary, do a check now
-  //    const double start_time3 = CmiWallTimer();
-  //    work(msec * 1e-3 * wps);
-  //    const double end_time3 = CmiWallTimer();
-  //    CkPrintf("[%d] Work block size is %d %d %f\n",
-  //	     thisIndex,wps,msec,1.e3*(end_time3-start_time3));
-  thisProcessorSpeed = wps;
-
-  // if (CkMyPe()==0) CkPrintf(" Done.\n");
 
   return wps;
 }
