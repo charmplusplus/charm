@@ -2737,7 +2737,7 @@ void ampi::inorderBcast(AmpiMsg* msg, bool deleteMsg) noexcept
     req->receive(this, msg, deleteMsg);
   } else {
     // Reference the [nokeep] msg so it isn't freed by the runtime
-    CmiReference(UsrToEnv(msg));
+    CkReferenceMsg(msg);
     unexpectedBcastMsgs.put(msg);
   }
 }
@@ -3911,7 +3911,7 @@ void AmpiSeqQ::putOutOfOrder(int seqIdx, AmpiMsg *msg) noexcept
   if (msg->getSeqIdx() != COLL_SEQ_IDX && msg->getSeq() < el.getSeqIncoming())
     CkAbort("AMPI logic error: received late out-of-order message!\n");
 #endif
-  if (seqIdx == COLL_SEQ_IDX) CmiReference(UsrToEnv(msg)); // bcast msg is [nokeep]
+  if (seqIdx == COLL_SEQ_IDX) CkReferenceMsg(msg); // bcast msg is [nokeep]
   out.enq(msg);
   el.incNumOutOfOrder(); // We have another message in the out-of-order queue
 }
