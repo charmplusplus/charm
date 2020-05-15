@@ -37,7 +37,7 @@ CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
-echo AC_PACKAGE_VERSION > ../include/VERSION
+echo AC_PACKAGE_VERSION > ../bin/VERSION
 AC_DEFINE_UNQUOTED([CHARM_VERSION], AC_PACKAGE_VERSION, [Charm++ Release/API version number])
 
 charmout="charmconfig.out"

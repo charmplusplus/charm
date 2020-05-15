@@ -369,7 +369,7 @@ fi
 printVersion()
 {
 	findCharmBin $0
-	version=`cat $CHARMBIN/../include/VERSION`
+	version=`cat $CHARMBIN/VERSION`
 	echo Charm++ Version $version
 }
 

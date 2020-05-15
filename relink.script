@@ -36,8 +36,8 @@ done
 
 rm -f VERSION
 
-if test -f $1/include/VERSION
+if test -f $1/bin/VERSION
 then
-  echo ln -s $1/include/VERSION VERSION
-  ln -s $1/include/VERSION VERSION
+  echo ln -s $1/bin/VERSION VERSION
+  ln -s $1/bin/VERSION VERSION
 fi

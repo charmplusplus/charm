@@ -1,6 +1,6 @@
 # Determine where the tests/ examples/ benchmarks/ directories are.
 # Necessary for Windows, which does not have the usual tmp etc. symlinks.
-file(GLOB_RECURSE mydir FOLLOW_SYMLINKS  ../*/include/VERSION) # The '*' is the dir we want.
+file(GLOB_RECURSE mydir FOLLOW_SYMLINKS  ../*/bin/VERSION) # The '*' is the dir we want.
 get_filename_component(mydir ${mydir} DIRECTORY)
 
 # Build the tests using parallel make
