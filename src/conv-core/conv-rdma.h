@@ -301,8 +301,10 @@ public:
   cudaStream_t cuda_stream;
 
   // Stores the actual data if device-side zerocopy cannot be performed
+  /*
   bool data_stored;
   void* data;
+  */
 
   CmiDeviceBuffer() : ptr(NULL), cnt(0), pe(-1) { init(); }
 
@@ -315,8 +317,10 @@ public:
     event_idx = -1;
     cuda_stream = cudaStreamPerThread;
 
+    /*
     data_stored = false;
     data = NULL;
+    */
   }
 
   void pup(PUP::er &p) {
@@ -326,6 +330,10 @@ public:
     p|device_idx;
     p|comm_offset;
     p|event_idx;
+    if (p.isUnpacking()) {
+      CmiPrintf("Unpacked: ptr %p, cnt %zu, pe %d, device_idx %d, comm_offset %zu, event_idx %d\n", ptr, cnt, pe, device_idx, comm_offset, event_idx);
+    }
+    /*
     p|data_stored;
     if (data_stored) {
       if (p.isUnpacking()) {
@@ -333,10 +341,11 @@ public:
       }
       PUParray(p, (char*)data, cnt);
     }
+    */
   }
 
   ~CmiDeviceBuffer() {
-    if (data) cudaFreeHost(data);
+    //if (data) cudaFreeHost(data);
   }
 };
 #endif
