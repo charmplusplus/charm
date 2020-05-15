@@ -62,6 +62,10 @@ set(liveviz-cxx-sources liveViz/liveViz0.C liveViz/liveViz.C liveViz/liveVizPoll
 add_library(moduleliveViz ${liveviz-h-sources} ${liveviz-cxx-sources})
 add_dependencies(moduleliveViz ck)
 
+foreach(file ${liveviz-h-sources})
+    configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+endforeach()
+
 target_compile_options(moduleliveViz PRIVATE -DEXTERIOR_BLACK_PIXEL_ELIMINATION)
 
 # taskGraph
