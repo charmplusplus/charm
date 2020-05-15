@@ -57,7 +57,7 @@ endif()
 
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,uth,verbs")
-set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb")
 
 # Platform specific options (choose multiple if desired):
 option(SMP "Enable shared-memory communication within a single multi-processor machine instead of message passing." ON)
@@ -99,7 +99,6 @@ option(TASK_QUEUE          "Enable task queue" OFF)
 option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
-option(EVERYLB             "Compile EveryLB suite of load balancing strategies" OFF)
 option(F90CHARM            "Build f90charm" OFF)
 option(PEDANTIC            "Build with -pedantic" OFF)
 option(BUILD_CUDA          "Build with CUDA support" OFF)
@@ -118,6 +117,17 @@ set(CMK_REPLAYSYSTEM ${REPLAY})
 
 if(${TARGET} STREQUAL "all-test")
   message(WARNING "Setting TARGET to LIBS instead of all-test.")
+  set(TARGET "LIBS")
+endif()
+
+string(TOLOWER "${TARGET}" target_lower)
+
+if(${target_lower} STREQUAL "changa")
+  set(TARGET "LIBS")
+  set(LBUSERDATA 1)
+endif()
+
+if(${TARGET} STREQUAL "everylb")
   set(TARGET "LIBS")
 endif()
 
