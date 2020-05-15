@@ -248,6 +248,12 @@ else()
   message(FATAL_ERROR "Unsupported CPU ${CMAKE_SYSTEM_PROCESSOR}.")
 endif()
 
+# Adjust version number so it can be tested by numerical comparisons, e.g. 6.10.1 -> 61001:
+# #if CHARM_VERSION > 61001
+if(${PROJECT_VERSION_PATCH} LESS 10)
+  set(CHARM_VERSION_PATCH_PREFIX 0)
+endif()
+set(CHARM_VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}")
 
 set(CHARM_PLATFORM "${NETWORK}-${CHARM_OS}-${CHARM_CPU}")
 
@@ -359,7 +365,6 @@ set(CMAKE_Fortran_CREATE_STATIC_LIBRARY
       "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
 
 
-set(CHARM_VERSION ${PROJECT_VERSION})
 set(CMK_COMPILER_KNOWS_C11 1)
 set(CMK_COMPILER_KNOWS_CPP11 1)
 
@@ -806,7 +811,7 @@ endif()
 
 # Print configuration
 message("==============================")
-message("Charm++ ${CHARM_VERSION} configuration: ")
+message("Charm++ ${PROJECT_VERSION} configuration: ")
 message("  OS version:      ${OS_RELEASE}")
 message("  Hostname:        ${MY_HOSTNAME}")
 message("  Machine layer:   ${CHARM_PLATFORM}")
@@ -851,13 +856,7 @@ add_custom_target(create_symlinks ALL
 # Create the .vdir/.gdir/VERSION files
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
 file(WRITE ${CMAKE_BINARY_DIR}/include/.vdir   "${CMK_VDIR}\n")
-
-# Adjust version number so it can be tested by numerical comparisons, e.g. 6.10.1 -> 61001:
-# #if CHARM_VERSION > 61001
-if(${PROJECT_VERSION_PATCH} LESS 10)
-  set(CHARM_VERSION_PATCH_PREFIX 0)
-endif()
-file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}\n")
+file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
 
 
 # Installation rules
