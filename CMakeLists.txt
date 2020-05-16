@@ -57,7 +57,7 @@ endif()
 
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,uth,verbs")
-set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb")
 
 # Platform specific options (choose multiple if desired):
 option(SMP "Enable shared-memory communication within a single multi-processor machine instead of message passing." ON)
@@ -99,7 +99,6 @@ option(TASK_QUEUE          "Enable task queue" OFF)
 option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
-option(EVERYLB             "Compile EveryLB suite of load balancing strategies" OFF)
 option(F90CHARM            "Build f90charm" OFF)
 option(PEDANTIC            "Build with -pedantic" OFF)
 option(BUILD_CUDA          "Build with CUDA support" OFF)
@@ -118,6 +117,17 @@ set(CMK_REPLAYSYSTEM ${REPLAY})
 
 if(${TARGET} STREQUAL "all-test")
   message(WARNING "Setting TARGET to LIBS instead of all-test.")
+  set(TARGET "LIBS")
+endif()
+
+string(TOLOWER "${TARGET}" target_lower)
+
+if(${target_lower} STREQUAL "changa")
+  set(TARGET "LIBS")
+  set(LBUSERDATA 1)
+endif()
+
+if(${TARGET} STREQUAL "everylb")
   set(TARGET "LIBS")
 endif()
 
@@ -180,7 +190,8 @@ endif()
 
 set(CMK_REFNUM_TYPE ${REFNUM_TYPE})
 set(CMK_LBTIME_TYPE ${LBTIME_TYPE})
-set(CMK_LB_USER_DATA 0) #TODO
+
+set(CMK_LB_USER_DATA ${LBUSERDATA})
 
 set(CMK_RANDOMIZED_MSGQ ${RANDOMIZED_MSGQ})
 set(CMK_SHRINK_EXPAND ${SHRINKEXPAND})
@@ -237,6 +248,12 @@ else()
   message(FATAL_ERROR "Unsupported CPU ${CMAKE_SYSTEM_PROCESSOR}.")
 endif()
 
+# Adjust version number so it can be tested by numerical comparisons, e.g. 6.10.1 -> 61001:
+# #if CHARM_VERSION > 61001
+if(${PROJECT_VERSION_PATCH} LESS 10)
+  set(CHARM_VERSION_PATCH_PREFIX 0)
+endif()
+set(CHARM_VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}")
 
 set(CHARM_PLATFORM "${NETWORK}-${CHARM_OS}-${CHARM_CPU}")
 
@@ -348,7 +365,6 @@ set(CMAKE_Fortran_CREATE_STATIC_LIBRARY
       "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
 
 
-set(CHARM_VERSION ${PROJECT_VERSION})
 set(CMK_COMPILER_KNOWS_C11 1)
 set(CMK_COMPILER_KNOWS_CPP11 1)
 
@@ -623,10 +639,13 @@ configure_file(src/scripts/testrun bin/ COPYONLY)
 
 # CkLoop
 set(ckloop-cxx-files src/libs/ck-libs/ckloop/CkLoop.C)
-file(GLOB ckloop-h-files src/libs/ck-libs/ckloop/*.h)
+set(ckloop-h-files src/libs/ck-libs/ckloop/CkLambda.h src/libs/ck-libs/ckloop/CkLoopAPI.h src/libs/ck-libs/ckloop/CkLoop.h)
 add_library(moduleCkLoop ${ckloop-cxx-files} ${ckloop-h-files} ${CMAKE_BINARY_DIR}/include/CkLoop.decl.h)
 add_dependencies(moduleCkLoop ck)
 
+foreach(file ${ckloop-h-files})
+  configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+endforeach(file)
 
 # NDMeshStreamer
 file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)
@@ -795,7 +814,7 @@ endif()
 
 # Print configuration
 message("==============================")
-message("Charm++ ${CHARM_VERSION} configuration: ")
+message("Charm++ ${PROJECT_VERSION} configuration: ")
 message("  OS version:      ${OS_RELEASE}")
 message("  Hostname:        ${MY_HOSTNAME}")
 message("  Machine layer:   ${CHARM_PLATFORM}")
@@ -840,13 +859,7 @@ add_custom_target(create_symlinks ALL
 # Create the .vdir/.gdir/VERSION files
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
 file(WRITE ${CMAKE_BINARY_DIR}/include/.vdir   "${CMK_VDIR}\n")
-
-# Adjust version number so it can be tested by numerical comparisons, e.g. 6.10.1 -> 61001:
-# #if CHARM_VERSION > 61001
-if(${PROJECT_VERSION_PATCH} LESS 10)
-  set(CHARM_VERSION_PATCH_PREFIX 0)
-endif()
-file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}\n")
+file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
 
 
 # Installation rules

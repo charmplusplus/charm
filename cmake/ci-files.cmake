@@ -85,19 +85,21 @@ foreach(in_f ${ci-files})
         string(APPEND ci-output ".decl.h")
     endif()
 
-    set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/${ci-output})
+    string(REPLACE "decl.h" "def.h" ci-output-defh ${ci-output})
+
+    set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh})
 
     if(${ci-output} MATCHES "search.decl.h")
-        set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output})
+        set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh})
         add_custom_command(
-          OUTPUT ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output}
+          OUTPUT ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output-defh}
           COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${in_f}
           WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/cklibs
           DEPENDS ${in_f} charmxi
           )
     endif()
     add_custom_command(
-      OUTPUT ${CMAKE_BINARY_DIR}/include/${ci-output}
+      OUTPUT ${CMAKE_BINARY_DIR}/include/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh}
       COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${in_f}
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/
       DEPENDS ${in_f} charmxi
