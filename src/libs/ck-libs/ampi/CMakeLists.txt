@@ -117,6 +117,7 @@ configure_file(libmoduleampif.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
 if(${CMK_AMPI_WITH_ROMIO})
     # Compile ROMIO with the same flags as AMPI
     get_target_property(AMPI_CFLAGS moduleampi COMPILE_OPTIONS)
+    string(REPLACE ";" " " AMPI_CFLAGS "${AMPI_CFLAGS}")
     set(ROMIO_FLAGS "${AMPI_CFLAGS} -ampi-romio-configure")
     if(${CMK_CAN_LINK_FORTRAN})
         set(romio_f77 yes)

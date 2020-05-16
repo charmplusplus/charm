@@ -112,6 +112,7 @@ set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 
 separate_arguments(MY_EXTRA_OPTS UNIX_COMMAND "${EXTRA_OPTS}")
 add_compile_options("${MY_EXTRA_OPTS}")
+string(REPLACE ";" " " MY_EXTRA_OPTS "${MY_EXTRA_OPTS}")
 set(OPTS "${OPTS} ${MY_EXTRA_OPTS}")
 set(OPTSATBUILDTIME "${OPTSATBUILDTIME} ${MY_EXTRA_OPTS}")
 
