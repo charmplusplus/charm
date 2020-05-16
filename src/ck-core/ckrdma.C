@@ -2181,11 +2181,27 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     rdma_info->n_ops = numops;
     rdma_info->counter = 0;
 
-    // Store a copy of the message
-    // XXX: Otherwise regular entry method doesn't get invoked, with zero handler error
+    // [1] Reuse env
+    // Doesn't work, causes zero handler error
+    /*
+    rdma_info->msg = env;
+    */
+    // [2] Store a copy of the message
+    // This doesn't work with GPU buffers for some reason (works with host buffers)
+    /*
     size_t msg_size = env->getTotalsize();
     rdma_info->msg = CmiAlloc(msg_size);
     memcpy(rdma_info->msg, env, msg_size);
+    */
+    // [3] Copy CkMarshallMsg entirely
+    // Otherwise regular entry method doesn't get invoked, with zero handler error
+    // TODO: Find out why this is necessary, remove if it can be fixed
+    size_t msg_size = 48;
+    CkMarshallMsg* new_msg = CkAllocateMarshallMsg(msg_size, NULL);
+    memcpy(new_msg->msgBuf, ((CkMarshallMsg*)EnvToUsr(env))->msgBuf, msg_size);
+    envelope* new_env = UsrToEnv(new_msg);
+    memcpy(new_env, env, sizeof(envelope));
+    rdma_info->msg = new_env;
 
     // Allocate messages to be sent to sender
     rdma_msgs = (DeviceRdmaOpMsg**)CmiAlloc(sizeof(DeviceRdmaOpMsg*) * numops);

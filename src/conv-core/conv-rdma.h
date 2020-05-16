@@ -330,9 +330,6 @@ public:
     p|device_idx;
     p|comm_offset;
     p|event_idx;
-    if (p.isUnpacking()) {
-      CmiPrintf("Unpacked: ptr %p, cnt %zu, pe %d, device_idx %d, comm_offset %zu, event_idx %d\n", ptr, cnt, pe, device_idx, comm_offset, event_idx);
-    }
     /*
     p|data_stored;
     if (data_stored) {
