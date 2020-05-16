@@ -53,8 +53,10 @@ enum {
     UCX_SEND_OP,        // Regular Send using UcxSendMsg
     UCX_RMA_OP_PUT,     // RMA Put operation using UcxRmaOp
     UCX_RMA_OP_GET,     // RMA Get operation using UcxRmaOp
+#if CMK_CUDA
     UCX_DEVICE_SEND_OP, // Device send
     UCX_DEVICE_RECV_OP  // Device recv
+#endif
 };
 
 #define UCX_LOG(prio, fmt, ...) \
@@ -619,6 +621,7 @@ static inline int ProcessTxQueue()
 
             // Post the GET or PUT operation from the comm thread
             UcxRmaOp((NcpyOperationInfo *)(req->msgBuf), req->op);
+#if CMK_CUDA
         } else if (req->op == UCX_DEVICE_SEND_OP) { // Send device data
           ucs_status_ptr_t status_ptr;
           status_ptr = ucp_tag_send_nb(ucxCtx.eps[req->dNode], req->msgBuf,
@@ -647,6 +650,7 @@ static inline int ProcessTxQueue()
           UcxRequest* store_req = (UcxRequest*)status_ptr;
           store_req->device_op = req->device_op;
           store_req->msgBuf = req->msgBuf;
+#endif
         }
         CmiFree(req);
         return 1;
