@@ -1,4 +1,4 @@
-OPTS = -O3
+OPTS = -O0 -g
 
 CHARM_DIR = ../../../../..
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
