@@ -2213,11 +2213,9 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   }
 
   // Start unpacking marshalled message
-  PUP::toMem p((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   int received_numops;
   up|received_numops;
-  p|received_numops;
   CkAssert(numops == received_numops);
 
   CkDeviceBuffer source;
@@ -2302,8 +2300,6 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       CkCallback* cb = new CkCallback(source.cb);
       hapiAddCallback(postStructs[i].cuda_stream, cb);
     }
-
-    p|source;
   }
 
   // Launch RDMA gets
