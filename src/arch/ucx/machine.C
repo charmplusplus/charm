@@ -631,8 +631,6 @@ static inline int ProcessTxQueue()
             // Either send was complete or error
             CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
             CmiEnforce(UCS_PTR_STATUS(status_ptr) == UCS_OK);
-
-            // TODO: Send complete, invoke source callback
           } else {
             // Callback function will be invoked once send completes
             UcxRequest* store_req = (UcxRequest*)status_ptr;
