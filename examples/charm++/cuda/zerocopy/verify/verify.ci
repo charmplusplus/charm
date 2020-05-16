@@ -16,6 +16,7 @@ mainmodule verify {
     entry VerifyArray();
     entry void send();
     entry void recv(int size, nocopydevice double data[size]);
+    entry void reuse();
   };
 
   group VerifyGroup {

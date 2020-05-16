@@ -166,7 +166,9 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data,
+          CkCallback(CkIndex_VerifyArray::reuse(), thisProxy[thisIndex]),
+          container.stream));
     if (lb_test) {
       pe = CkMyPe();
       AtSync();
@@ -185,6 +187,8 @@ public:
       AtSync();
     }
   }
+
+  void reuse() {}
 
   void ResumeFromSync() {}
 };

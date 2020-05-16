@@ -775,8 +775,6 @@ void UcxSendDeviceCompleted(void* request, ucs_status_t status)
   CmiEnforce(status == UCS_OK);
   UcxRequest* req = (UcxRequest*)request;
 
-  // TODO: Invoke source callback
-
   UCX_REQUEST_FREE(req);
 }
 
@@ -818,8 +816,6 @@ void LrtsSendDevice(DeviceRdmaOp* op)
     // Either send was complete or error
     CmiEnforce(!UCS_PTR_IS_ERR(req));
     CmiEnforce(UCS_PTR_STATUS(req) == UCS_OK);
-
-    // TODO: Send complete, invoke source callback
   } else {
     // Callback function will be invoked once send completes
     req->device_op = op;

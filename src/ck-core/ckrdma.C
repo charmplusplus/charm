@@ -2142,6 +2142,13 @@ void CkRdmaDeviceRecvHandler(void* data) {
   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
   DeviceRdmaInfo* info = op->info;
 
+  // Invoke source callback
+  if (op->cb) {
+    CkCallback* cb = (CkCallback*)op->cb;
+    cb->send();
+    delete cb;
+  }
+
   // Update counter (there may be multiple buffers in transit)
   info->counter++;
 
@@ -2284,8 +2291,8 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
           save_op.dest_ptr = send_op.dest_ptr = dest.ptr;
           save_op.size     = send_op.size     = std::min(source.cnt, dest.cnt);
           save_op.info     = send_op.info     = (DeviceRdmaInfo*)rdma_data;
-          send_op.cb = new CkCallback(source.cb); // To be invoked on the sender
-          save_op.cb = NULL;
+          send_op.cb = NULL;
+          save_op.cb = new CkCallback(source.cb); // Will be invoked for the sender
           break;
         }
       default:

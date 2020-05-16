@@ -467,7 +467,7 @@ public:
     cb = CkCallback(CkCallback::ignore);
   }
 
-  explicit CkDeviceBuffer(const void* ptr_, CkCallback& cb_) : CmiDeviceBuffer(ptr_, 0) {
+  explicit CkDeviceBuffer(const void* ptr_, const CkCallback& cb_) : CmiDeviceBuffer(ptr_, 0) {
     cb = cb_;
   }
 
@@ -476,7 +476,7 @@ public:
     cuda_stream = cuda_stream_;
   }
 
-  explicit CkDeviceBuffer(const void* ptr_, CkCallback& cb_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, 0) {
+  explicit CkDeviceBuffer(const void* ptr_, const CkCallback& cb_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, 0) {
     cb = cb_;
     cuda_stream = cuda_stream_;
   }
@@ -486,7 +486,7 @@ public:
     cb = CkCallback(CkCallback::ignore);
   }
 
-  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, CkCallback& cb_) : CmiDeviceBuffer(ptr_, cnt_) {
+  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, const CkCallback& cb_) : CmiDeviceBuffer(ptr_, cnt_) {
     cb = cb_;
   }
 
@@ -495,7 +495,7 @@ public:
     cuda_stream = cuda_stream_;
   }
 
-  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, CkCallback& cb_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, cnt_) {
+  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, const CkCallback& cb_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, cnt_) {
     cb = cb_;
     cuda_stream = cuda_stream_;
   }
