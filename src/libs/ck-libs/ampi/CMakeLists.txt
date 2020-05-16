@@ -140,8 +140,6 @@ if(${CMK_AMPI_WITH_ROMIO})
             export FROM_MPICH=no &&
             export FROM_MPICH2=no &&
             export FROM_LAM=no &&
-            export "CFLAGS=${ROMIO_CFLAGS}" &&
-            export "FFLAGS=${ROMIO_CFLAGS}" &&
             export F77=${CMAKE_BINARY_DIR}/bin/ampif90 &&
             export CC=${CMAKE_BINARY_DIR}/bin/ampicc &&
             ./configure
@@ -150,7 +148,9 @@ if(${CMK_AMPI_WITH_ROMIO})
             --enable-static=yes
             --enable-shared=${romio_shared}
             --disable-weak-symbols
-             > /dev/null
+            CFLAGS=${ROMIO_FLAGS}
+            FFLAGS=${ROMIO_FLAGS}
+            > /dev/null
         COMMAND cp -f ${romio_dir}/include/mpio.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f ${romio_dir}/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f ${romio_dir}/include/mpio_functions.h ${CMAKE_BINARY_DIR}/include/
