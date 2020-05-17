@@ -712,7 +712,7 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
     if (hasArray || hasRdma()) {
       if (!usesImplBuf) {
         str << "  genClosure->_impl_marshall = impl_msg_typed;\n";
-        str << "  CmiReference(UsrToEnv(genClosure->_impl_marshall));\n";
+        str << "  CkReferenceMsg(genClosure->_impl_marshall);\n";
       } else {
         if (hasRdma() && !hasArray) str << "#if !CMK_ONESIDED_IMPL\n";
         str << "  genClosure->_impl_buf_in = impl_buf;\n";

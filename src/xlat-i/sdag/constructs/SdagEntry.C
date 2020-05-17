@@ -95,7 +95,7 @@ void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   // will only be one parameter which is the message (called 'gen0')
   if (!entry->paramIsMarshalled() && !entry->param->isVoid()) {
     // increase reference count by one for the state parameter
-    defs << "  CmiReference(UsrToEnv(gen0));\n";
+    defs << "  CkReferenceMsg(gen0);\n";
   }
 
   defs << "  ";
