@@ -38,10 +38,8 @@
 #if CMK_SMP
 #include <atomic>
 #define CMK_SMP_volatile volatile
-#define CMK_SMP_align alignas(CMI_CACHE_LINE_SIZE)
 #else
 #define CMK_SMP_volatile
-#define CMK_SMP_align
 #endif
 
 /* If we are using locks in PCQueue, we disable any other fence operation,
@@ -78,9 +76,13 @@ typedef struct CircQueueStruct
 {
   struct CircQueueStruct * CMK_SMP_volatile next;
   CmiMemoryAtomicInt push;
-  CMK_SMP_align int pull;
 #if CMK_SMP
-  CMK_SMP_align std::atomic<char *> data[PCQueueSize];
+  char _pad1[CMI_CACHE_LINE_SIZE - (sizeof(struct CircQueueStruct *) + sizeof(int))]; // align to cache line
+#endif
+  int pull;
+#if CMK_SMP
+  char _pad2[CMI_CACHE_LINE_SIZE - sizeof(int)]; // align to cache line
+  std::atomic<char *> data[PCQueueSize];
 #else
   char *data[PCQueueSize];
 #endif
@@ -90,8 +92,14 @@ typedef struct CircQueueStruct
 typedef struct PCQueueStruct
 {
   CircQueue head;
-  CMK_SMP_align CircQueue CMK_SMP_volatile tail;
-  CMK_SMP_align PCQueue_CmiMemoryAtomicInt len;
+#if CMK_SMP
+  char _pad1[CMI_CACHE_LINE_SIZE - sizeof(CircQueue)]; // align to cache line
+#endif
+  CircQueue CMK_SMP_volatile tail;
+#if CMK_SMP
+  char _pad2[CMI_CACHE_LINE_SIZE - sizeof(CircQueue)]; // align to cache line
+#endif
+  PCQueue_CmiMemoryAtomicInt len;
 #if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiNodeLock  lock;
 #endif
@@ -253,12 +261,21 @@ static void PCQueuePush(PCQueue Q, char *data)
 typedef struct PCQueueStruct
 {
   char **head; /*pointing to the first element*/
+#if CMK_SMP
+  char _pad1[CMI_CACHE_LINE_SIZE - sizeof(char**)]; // align to cache line
+#endif
 
-  //CMK_SMP_align char** CMK_SMP_volatile tail; /*pointing to the last element*/
-  CMK_SMP_align char** tail; /*pointing to the last element*/
+  //char** CMK_SMP_volatile tail; /*pointing to the last element*/
+  char** tail; /*pointing to the last element*/
+#if CMK_SMP
+  char _pad2[CMI_CACHE_LINE_SIZE - sizeof(char**)]; // align to cache line
+#endif
+  PCQueue_CmiMemoryAtomicInt len;
+#if CMK_SMP
+  char _pad3[CMI_CACHE_LINE_SIZE - sizeof(int)]; // align to cache line
+#endif
 
-  CMK_SMP_align PCQueue_CmiMemoryAtomicInt len;
-  CMK_SMP_align const char **data;
+  const char **data;
   const char **bufEnd;
 
 #if CMK_PCQUEUE_LOCK
@@ -468,9 +485,12 @@ typedef struct FreeNodePoolStruct
 typedef struct MPSCQueueStruct
 {
   std::atomic<unsigned int> push;
-  alignas(CMI_CACHE_LINE_SIZE) unsigned int pull;
-  alignas(CMI_CACHE_LINE_SIZE) std::atomic<uintptr_t> *nodes;
-  alignas(CMI_CACHE_LINE_SIZE) FreeNodePool freeNodePool;
+  char pad1[CMI_CACHE_LINE_SIZE - sizeof(std::atomic<unsigned int>)]; // align to cache line
+  unsigned int pull;
+  char pad2[CMI_CACHE_LINE_SIZE - sizeof(unsigned int)]; // align to cache line
+  std::atomic<uintptr_t> *nodes;
+  char pad3[CMI_CACHE_LINE_SIZE - sizeof(std::atomic<uintptr_t> *)]; // align to cache line
+  FreeNodePool freeNodePool;
 } *MPSCQueue;
 
 static unsigned int WrappedDifference(unsigned int push, unsigned int pull)
@@ -800,10 +820,15 @@ typedef struct FreeMPMCNodePoolStruct
 typedef struct MPMCQueueStruct
 {
   std::atomic<unsigned int> push;
-  alignas(CMI_CACHE_LINE_SIZE) std::atomic<unsigned int> pull;
-  alignas(CMI_CACHE_LINE_SIZE) std::atomic<uintptr_t> *nodes;
-  alignas(CMI_CACHE_LINE_SIZE) FreeMPMCNodePool freeMPMCNodePool;
-  alignas(CMI_CACHE_LINE_SIZE) std::atomic_flag queueOverflowed;
+  char pad1[CMI_CACHE_LINE_SIZE - sizeof(std::atomic<unsigned int>)]; // align to cache line
+  std::atomic<unsigned int> pull;
+  char pad2[CMI_CACHE_LINE_SIZE - sizeof(std::atomic<unsigned int>)]; // align to cache line
+  std::atomic<uintptr_t> *nodes;
+  char pad3[CMI_CACHE_LINE_SIZE - sizeof(std::atomic<uintptr_t> *)]; // align to cache line
+  FreeMPMCNodePool freeMPMCNodePool;
+  char pad4[CMI_CACHE_LINE_SIZE - sizeof(FreeMPMCNodePool)]; // align to cache line
+  std::atomic_flag queueOverflowed;
+
 } *MPMCQueue;
 
 /* Creates a MPMCDataNode while holds the char* to data */

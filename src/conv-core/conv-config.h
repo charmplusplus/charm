@@ -144,12 +144,7 @@
 #endif
 
 /* Cache line size */
-#ifdef __cplusplus
-#include <new>
-#endif
-#ifdef __cpp_lib_hardware_interference_size
-# define CMI_CACHE_LINE_SIZE std::hardware_destructive_interference_size
-#elif CMK_PPC64
+#if CMK_PPC64
 # define CMI_CACHE_LINE_SIZE 128
 #else
 # define CMI_CACHE_LINE_SIZE 64
