@@ -37,8 +37,8 @@ matrix:
     - export msys2+='& C:\\tools\\msys64\\msys2_shell.cmd -defterm -no-start'
     - export mingw64="$msys2 -mingw64 -full-path -here -c \$\* --"
     - export msys2+=" -msys2 -c \$\* --"
-    - $msys2 pacman -Sy pacman
-    - $msys2 pacman -Su
+    - $msys2 pacman -Sy --noconfirm pacman
+    - $msys2 pacman -Su --noconfirm
     - $msys2 pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config
     - export PATH=/C/tools/msys64/mingw64/bin:$PATH
     - $mingw64 src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata
