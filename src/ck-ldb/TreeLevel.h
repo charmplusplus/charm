@@ -553,7 +553,8 @@ class RootLevel : public LevelLogic
       decisions[0] = migMsg;
       for (int i = 1; i < num_children; i++)
       {
-        decisions[i] = CkReferenceMsg(migMsg);
+        CkReferenceMsg(migMsg);
+        decisions[i] = migMsg;
       }
     }
     else
@@ -638,7 +639,8 @@ class RootLevel : public LevelLogic
       decisions[0] = migMsg;
       for (int i = 1; i < num_children; i++)
       {
-        decisions[i] = CkReferenceMsg(migMsg);
+        CkReferenceMsg(migMsg);
+        decisions[i] = migMsg;
       }
     }
   }
@@ -886,7 +888,8 @@ class NodeSetLevel : public LevelLogic
     decisions[0] = migMsg;
     for (int i = 1; i < num_children; i++)
     {
-      decisions[i] = CkReferenceMsg(migMsg);
+      CkReferenceMsg(migMsg);
+      decisions[i] = migMsg;
     }
     migMsg = nullptr;
   }
@@ -982,7 +985,8 @@ class NodeLevel : public LevelLogic
       decisions[0] = decision;
       for (int i = 1; i < pes.size(); i++)
       {
-        decisions[i] = CkReferenceMsg(decision);
+        CkReferenceMsg(decision);
+        decisions[i] = decision;
       }
     }
   }
@@ -1034,7 +1038,8 @@ class NodeLevel : public LevelLogic
     decisions[0] = migMsg;
     for (int i = 1; i < pes.size(); i++)
     {
-      decisions[i] = CkReferenceMsg(migMsg);
+      CkReferenceMsg(migMsg);
+      decisions[i] = migMsg;
     }
   }
 
@@ -1237,7 +1242,8 @@ class MsgAggregator : public LevelLogic
     decisions[0] = decision;
     for (int i = 1; i < num_children + 1; i++)
     {
-      decisions[i] = CkReferenceMsg(decision);
+      CkReferenceMsg(decision);
+      decisions[i] = decision;
     }
   }
 
