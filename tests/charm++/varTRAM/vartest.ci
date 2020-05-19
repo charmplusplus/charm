@@ -9,7 +9,7 @@ mainmodule vartest {
     entry engine();
     entry engine(int,int,int);
     entry void simulate();
-    entry [aggregate(bufferSize : 2048, numDimensions : 2, thresholdNum : 1, thresholdDen : 2, cutoffNum : 1, cutoffDen : 2)] void ping(msg);
+    entry [aggregate(bufferSize : 2048, numDimensions : 2, thresholdNum : 1, thresholdDen : 2, cutoffNum : 1, cutoffDen : 2)] void ping(std::vector<int>);
   };
 };
 

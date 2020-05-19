@@ -1,41 +1,30 @@
 #include <numeric>
+#include <cassert>
 #include <chrono>
 #include <random>
 #include <string>
 #include <tuple>
 #include <map>
 #include <vector>
-struct msg;
-template <typename T>
-class is_PUPbytes;/*
-template <>
-struct is_PUPbytes<msg> {
-  static const bool value = false;
-};*/
+#include "pup_stl.h"
 #include "vartest.decl.h"
 CProxy_main mainProxy; //readonly
-struct msg {
-  std::vector<int> data;
-  msg(std::vector<int> s) : data(s) {}
-  friend void operator|(PUP::er& er, msg& m) {
-    er|m.data;
-  }
-  msg() : data() {}
-};
-
 class main : public CBase_main {
   CProxy_engine engines;
   int N;
   int msgcount;
   int lambda;
+  int startval;
+  std::chrono::time_point<std::chrono::high_resolution_clock> starttime;
 public:
   main(CkArgMsg* args) {
     if (args->argc == 4) {
-      mainProxy=thisProxy;
-      N=std::atoi(args->argv[1]);
-      msgcount=std::atoi(args->argv[2]);
-      lambda=std::atoi(args->argv[3]);
-      engines=CProxy_engine::ckNew(N,msgcount,lambda,N);
+      mainProxy = thisProxy;
+      N = std::atoi(args->argv[1]);
+      msgcount = std::atoi(args->argv[2]);
+      lambda = std::atoi(args->argv[3]);
+      engines = CProxy_engine::ckNew(N,msgcount,lambda,N);
+      starttime = std::chrono::high_resolution_clock::now();
       engines.simulate();
     }
     else {
@@ -45,10 +34,13 @@ public:
     delete args;
   }
   void startsum(int val) {
-    CkPrintf("Sum of generated data: %d\n",val);
+    startval = val;
   }
   void done(int val) {
-    CkPrintf("Sum of final data: %d\n",val);
+    auto endtime = std::chrono::high_resolution_clock::now();
+    auto dur = std::chrono::duration_cast<std::chrono::microseconds>(endtime-starttime);
+    assert(startval == val);
+    CkPrintf("Time : %d us\n",(endtime - starttime).count());
     CkExit();
   }
 };
@@ -63,35 +55,34 @@ public:
   engine() {}
   engine(int _N, int _msgcount, int _lambda) : N(_N), msgcount(_msgcount), lambda(_lambda), mt(thisIndex), iter(0), result1(0), result2(0) {}
   void simulate() {
-    for (int j=0;j!=N-1;++j) {
-      for (int k=0;k!=msgcount;++k) {
+    for (int j = 0;j != N-1;++j) {
+      for (int k = 0;k != msgcount;++k) {
         auto temp = rand();
         thisProxy[(thisIndex+j+1)%N].ping(temp);
-        result1 = std::accumulate(temp.data.begin(),temp.data.end(),result1);
+        result1 = std::accumulate(temp.begin(),temp.end(),result1);
       }
     }
     contribute(sizeof(int), &result1, CkReduction::sum_int, CkCallback(CkReductionTarget(main,startsum), mainProxy));
   } //after sending each message to the other PE
-//send a self-message to add scheduling overhead(enforce msg count)
-  void ping(msg val) {
-    result2 = std::accumulate(val.data.begin(),val.data.end(),result2);
+//send a self-message to add scheduling overhead(enforce msgcount)
+  void ping(std::vector<int> val) {
+    result2 = std::accumulate(val.begin(),val.end(),result2);
     ++iter;
     if (iter == (N-1)*msgcount) {
       contribute(sizeof(int), &result2, CkReduction::sum_int, CkCallback(CkReductionTarget(main,done), mainProxy));
     }
   }
-  msg rand() {
+  std::vector<int> rand() {
     //int length=lambda/4;
     std::uniform_int_distribution<> gen1(lambda/8,3*lambda/8);
     int length = gen1(mt);
     std::uniform_int_distribution<> gen2(0,373);
-    std::vector<int> gener;
+    std::vector<int> gener(gen1(mt));
     gener.reserve(gen1(mt));
-    for (int j=0;j!=length;++j) {
-      gener.push_back(gen2(mt));
+    for(auto& g : gener) {
+      g = gen2(mt);
     }
-    return msg(gener);
-    //return msg(0);
+    return gener;
   }
 };
 #include "vartest.def.h"
