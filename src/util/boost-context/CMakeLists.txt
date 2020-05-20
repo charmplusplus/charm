@@ -1,5 +1,4 @@
 enable_language(C ASM)
-set(CMAKE_ASM_COMPILER ${CMAKE_BINARY_DIR}/bin/charmc)
 
 if (${CHARM_OS} STREQUAL "darwin")
     set(ufcontext_sources jump_x86_64_sysv_macho_gas.S ontop_x86_64_sysv_macho_gas.S make_x86_64_sysv_macho_gas.S)
