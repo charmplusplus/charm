@@ -103,10 +103,8 @@ typedef struct {
 
 #if PXSHM_FENCE
   volatile int flagSender;
-  char pad1[CMI_CACHE_LINE_SIZE - sizeof(volatile int)]; // align to cache line
-  volatile int flagReceiver;
-  char pad2[CMI_CACHE_LINE_SIZE - sizeof(volatile int)]; // align to cache line
-  volatile int turn;
+  alignas(CMI_CACHE_LINE_SIZE) volatile int flagReceiver;
+  alignas(CMI_CACHE_LINE_SIZE) volatile int turn;
 #endif
 
 } sharedBufHeader;

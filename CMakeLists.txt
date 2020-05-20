@@ -10,35 +10,25 @@
 # - the buildcmake script
 # - files in cmake/
 
-# Version 3.4 added CMAKE_C_COMPILER_LAUNCHER and CMAKE_CXX_COMPILER_LAUNCHER
 cmake_minimum_required(VERSION 3.4)
 
+# Fortran is optional, so don't include it in LANGUAGES here
 project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
 find_package(Threads REQUIRED)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
 
-
 # We need C++11 for (almost) all targets
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-
-# Setting charmc as the compiler launcher for Fortran files only works with
-# CMake 3.11.0 or above. See 'CMAKE_Fortran_COMPILER_LAUNCHER' below for details.
-if(${CMAKE_VERSION} VERSION_LESS "3.11.0")
-  message(WARNING "CMake version 3.11.0 or higher is needed for Fortran support in Charm++.")
+enable_language(Fortran OPTIONAL)
+if(CMAKE_Fortran_COMPILER)
+  include(FortranCInterface)
+  FortranCInterface_VERIFY()
+  FortranCInterface_VERIFY(CXX)
 else()
-  include(CheckLanguage)
-  check_language(Fortran)
-  if(CMAKE_Fortran_COMPILER)
-    enable_language(Fortran OPTIONAL)
-    include(FortranCInterface)
-    FortranCInterface_VERIFY()
-    FortranCInterface_VERIFY(CXX)
-  else()
-    message(STATUS "No Fortran support")
-  endif()
+  message(STATUS "Charm++: No Fortran support.")
 endif()
 
 if(${FortranCInterface_VERIFIED_CXX})
@@ -67,7 +57,7 @@ endif()
 
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,uth,verbs")
-set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb")
 
 # Platform specific options (choose multiple if desired):
 option(SMP "Enable shared-memory communication within a single multi-processor machine instead of message passing." ON)
@@ -109,21 +99,38 @@ option(TASK_QUEUE          "Enable task queue" OFF)
 option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
-option(EVERYLB             "Compile EveryLB suite of load balancing strategies" OFF)
 option(F90CHARM            "Build f90charm" OFF)
 option(PEDANTIC            "Build with -pedantic" OFF)
 option(BUILD_CUDA          "Build with CUDA support" OFF)
+
+option(PXSHM               "Build with PXSHM" OFF)
 
 # UCX PMI options
 set(UCX_PMI "" CACHE STRING "PMI type for UCX layer, can be one of simplepmi, simplepmi2, or ompipmix")
 
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
-add_compile_options(${EXTRA_OPTS})
+
+separate_arguments(MY_EXTRA_OPTS UNIX_COMMAND "${EXTRA_OPTS}")
+add_compile_options("${MY_EXTRA_OPTS}")
+string(REPLACE ";" " " MY_EXTRA_OPTS "${MY_EXTRA_OPTS}")
+set(OPTS "${OPTS} ${MY_EXTRA_OPTS}")
+set(OPTSATBUILDTIME "${OPTSATBUILDTIME} ${MY_EXTRA_OPTS}")
 
 set(CMK_REPLAYSYSTEM ${REPLAY})
 
 if(${TARGET} STREQUAL "all-test")
   message(WARNING "Setting TARGET to LIBS instead of all-test.")
+  set(TARGET "LIBS")
+endif()
+
+string(TOLOWER "${TARGET}" target_lower)
+
+if(${target_lower} STREQUAL "changa")
+  set(TARGET "LIBS")
+  set(LBUSERDATA 1)
+endif()
+
+if(${TARGET} STREQUAL "everylb")
   set(TARGET "LIBS")
 endif()
 
@@ -186,7 +193,8 @@ endif()
 
 set(CMK_REFNUM_TYPE ${REFNUM_TYPE})
 set(CMK_LBTIME_TYPE ${LBTIME_TYPE})
-set(CMK_LB_USER_DATA 0) #TODO
+
+set(CMK_LB_USER_DATA ${LBUSERDATA})
 
 set(CMK_RANDOMIZED_MSGQ ${RANDOMIZED_MSGQ})
 set(CMK_SHRINK_EXPAND ${SHRINKEXPAND})
@@ -243,8 +251,23 @@ else()
   message(FATAL_ERROR "Unsupported CPU ${CMAKE_SYSTEM_PROCESSOR}.")
 endif()
 
+# Adjust version number so it can be tested by numerical comparisons, e.g. 6.10.1 -> 61001:
+# #if CHARM_VERSION > 61001
+if(${PROJECT_VERSION_PATCH} LESS 10)
+  set(CHARM_VERSION_PATCH_PREFIX 0)
+endif()
+set(CHARM_VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}")
 
 set(CHARM_PLATFORM "${NETWORK}-${CHARM_OS}-${CHARM_CPU}")
+
+
+set(CMK_BUILD_CRAY 0)
+if(${NETWORK} MATCHES "gni-")
+  set(CHARM_PLATFORM "${NETWORK}")
+  set(CMK_BUILD_CRAY 1)
+elseif(${NETWORK} MATCHES "mpi-crayx")
+  set(CHARM_PLATFORM "${NETWORK}")
+endif()
 
 set(CMK_BUILD_MPI 0)
 set(CMK_BUILD_ON_MPI 0)
@@ -259,7 +282,7 @@ if(${NETWORK} STREQUAL "ofi")
   set(CMK_BUILD_OFI 1)
 endif()
 
-set(CMK_BUILD_CRAY 0)
+
 set(CMK_ERROR_CHECKING ${ERROR_CHECKING})
 set(CMK_LOCKLESS_QUEUE 0)
 
@@ -324,11 +347,8 @@ include(cmake/ci-files.cmake)
 configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @ONLY)
 
 # Use charmc to compile/link everything
-set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
-set(CMAKE_CXX_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
-# FIXME: CMAKE_Fortran_COMPILER_LAUNCHER only works with CMake 3.11+.
-# See also https://gitlab.kitware.com/cmake/cmake/issues/17499
-set(CMAKE_Fortran_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
+set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/charmc)
+
 set(CMAKE_CXX_LINK_EXECUTABLE
       "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
 
@@ -348,7 +368,6 @@ set(CMAKE_Fortran_CREATE_STATIC_LIBRARY
       "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
 
 
-set(CHARM_VERSION ${PROJECT_VERSION})
 set(CMK_COMPILER_KNOWS_C11 1)
 set(CMK_COMPILER_KNOWS_CPP11 1)
 
@@ -356,7 +375,7 @@ if(NOT CMK_AMPI_ONLY)
   set(CMK_AMPI_ONLY 0)
 endif()
 
-if(NOT CMK_AMPI_WITH_ROMIO)
+if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
   set(CMK_AMPI_WITH_ROMIO 1)
 endif()
 
@@ -375,6 +394,10 @@ set(CMK_F_OPENMP ${OpenMP_Fortran_FLAGS})
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
   file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
+elseif(${NETWORK} MATCHES "gni-")
+  set(GDIR "gni")
+elseif(${NETWORK} MATCHES "mpi-crayx")
+  set(GDIR "mpi")
 else()
   set(GDIR ${NETWORK})
 endif()
@@ -575,7 +598,7 @@ ExternalProject_Add(hwloc
         CFLAGS=${CHARM_CC_FLAGS}
         CC=${CHARM_CC}
         > /dev/null
-    BUILD_COMMAND make V=$(VERBOSE)
+    BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
     COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
@@ -584,8 +607,8 @@ ExternalProject_Add(hwloc
 )
 
 # TopoManager
-set(tmgr-cxx-sources src/util/topomanager/TopoManager.C)
-set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h)
+set(tmgr-cxx-sources src/util/topomanager/TopoManager.C src/util/topomanager/CrayNid.c src/util/topomanager/BGQTorus.C)
+set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h src/util/topomanager/XTTorus.h src/util/topomanager/BGQTorus.h)
 file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 add_library(tmgr ${tmgr-cxx-sources} ${tmgr-h-sources})
 foreach(filename ${tmgr-h-sources})
@@ -619,10 +642,13 @@ configure_file(src/scripts/testrun bin/ COPYONLY)
 
 # CkLoop
 set(ckloop-cxx-files src/libs/ck-libs/ckloop/CkLoop.C)
-file(GLOB ckloop-h-files src/libs/ck-libs/ckloop/*.h)
+set(ckloop-h-files src/libs/ck-libs/ckloop/CkLambda.h src/libs/ck-libs/ckloop/CkLoopAPI.h src/libs/ck-libs/ckloop/CkLoop.h)
 add_library(moduleCkLoop ${ckloop-cxx-files} ${ckloop-h-files} ${CMAKE_BINARY_DIR}/include/CkLoop.decl.h)
 add_dependencies(moduleCkLoop ck)
 
+foreach(file ${ckloop-h-files})
+  configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+endforeach(file)
 
 # NDMeshStreamer
 file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)
@@ -687,35 +713,13 @@ if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
   add_dependencies(charm hwloc)
 endif()
 
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-  set(CMK_SUPPORTS_FSGLOBALS 0)
-elseif(${CMK_HAS_DLOPEN} AND ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
-  set(CMK_SUPPORTS_FSGLOBALS 1)
-elseif(${CMK_HAS_DLOPEN} AND (${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH}))
-  set(CMK_SUPPORTS_FSGLOBALS 1)
-else()
-  set(CMK_SUPPORTS_FSGLOBALS 0)
-endif()
-
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-  set(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY 0)
-else()
-  set(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY ${CMK_HAS_DLOPEN})
-endif()
-
-if(${CMK_HAS_DLMOPEN} AND ${CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY})
-  set(CMK_SUPPORTS_PIPGLOBALS 1)
-else()
-  set(CMK_SUPPORTS_PIPGLOBALS 0)
-endif()
-
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
 
 file(WRITE  ${optfile_sh} "# Build-time options header for charmc, automatically generated by cmake.\n")
 file(APPEND  ${optfile_sh} "[ -z \"$CHARMINC\" ] && CHARMINC=\".\"\n")
 
-if(NOT ${NETWORK} STREQUAL "mpi")
+if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-crayx")
     file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/cc-${CMK_COMPILER}.sh\n")
 endif()
 
@@ -746,7 +750,6 @@ if(UCX_PMI)
   file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${UCX_PMI}.sh\n")
 endif()
 
-
 # Create conv-mach-opt.h
 set(optfile_h ${CMAKE_BINARY_DIR}/include/conv-mach-opt.h)
 
@@ -755,7 +758,7 @@ foreach(l CMK_AMPI_WITH_ROMIO CMK_OPTIMIZE CMK_AMPI_ONLY)
     file(APPEND ${optfile_h} "#define ${l} ${${l}}\n")
 endforeach(l)
 
-if(NOT ${NETWORK} STREQUAL "mpi")
+if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-crayx")
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
 endif()
 
@@ -776,7 +779,7 @@ foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTH
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS PEDANTIC SYNCFT)
+foreach(opt SMP OMP TCP PTHREADS PEDANTIC SYNCFT PXSHM)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
@@ -814,7 +817,7 @@ endif()
 
 # Print configuration
 message("==============================")
-message("Charm++ ${CHARM_VERSION} configuration: ")
+message("Charm++ ${PROJECT_VERSION} configuration: ")
 message("  OS version:      ${OS_RELEASE}")
 message("  Hostname:        ${MY_HOSTNAME}")
 message("  Machine layer:   ${CHARM_PLATFORM}")
@@ -825,7 +828,7 @@ message("  C++ compiler:    ${CMAKE_CXX_COMPILER} [${CMAKE_CXX_COMPILER_ID} ${CM
 if(CMAKE_Fortran_COMPILER)
   message("  F90 compiler:    ${CMAKE_Fortran_COMPILER} [${CMAKE_Fortran_COMPILER_ID} ${CMAKE_Fortran_COMPILER_VERSION}]")
 else()
-  message("  F90 compiler:    N/A")
+  message("  F90 compiler:    ---")
 endif()
 message("  CMake:           ${CMAKE_COMMAND} [${CMAKE_VERSION}]")
 message("  Charmc flags:    ${MAIN_CFLAGS}")
@@ -859,13 +862,7 @@ add_custom_target(create_symlinks ALL
 # Create the .vdir/.gdir/VERSION files
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
 file(WRITE ${CMAKE_BINARY_DIR}/include/.vdir   "${CMK_VDIR}\n")
-
-# Adjust version number so it can be tested by numerical comparisons, e.g. 6.10.1 -> 61001:
-# #if CHARM_VERSION > 61001
-if(${PROJECT_VERSION_PATCH} LESS 10)
-  set(CHARM_VERSION_PATCH_PREFIX 0)
-endif()
-file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}\n")
+file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
 
 
 # Installation rules

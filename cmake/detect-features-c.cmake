@@ -104,7 +104,6 @@ check_function_exists(mstats CMK_HAS_MSTATS)
 check_function_exists(ntohl CMK_HAS_NTOHL)
 check_function_exists(offsetof CMK_HAS_OFFSETOF)
 check_function_exists(openat HAVE_OPENAT)
-check_symbol_exists(PMI_Get_nid pmic.h CMK_HAS_PMI_GET_NID)
 check_function_exists(poll CMK_USE_POLL)
 check_function_exists(popen CMK_HAS_POPEN)
 check_function_exists(posix_memalign HAVE_POSIX_MEMALIGN)
@@ -240,6 +239,8 @@ int main()
 }
 " CMK_HAS_NUMACTRL)
 
+set(tmp ${CMAKE_REQUIRED_LIBRARIES})
+set(CMAKE_REQUIRED_LIBRARIES $ENV{CRAY_PMI_POST_LINK_OPTS} $ENV{CRAY_UGNI_POST_LINK_OPTS} -lugni -lpmi)
 check_c_source_compiles("
 #include <pmi.h>
 int main() {
@@ -249,6 +250,7 @@ int main() {
     return 0;
 }
 " CMK_HAS_PMI_GET_NID)
+set(CMAKE_REQUIRED_LIBRARIES ${tmp})
 
 check_c_source_compiles("
 #include <rca_lib.h>
