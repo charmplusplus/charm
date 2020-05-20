@@ -85,7 +85,7 @@ PVT::PVT()
     localStats->TimerStop();
 #endif
 
-  LBDatabase::Object()->AddMigrationDoneFn(staticDoneLB, this);
+  LBManager::Object()->AddMigrationDoneFn(staticDoneLB, this);
 }
 
 /// PUP routine

@@ -121,7 +121,13 @@ AMPICC_POST_OPTS=''
 
 [ -n "$STANDALONE" ] && ARGS="$ARGS -standalone"
 
-[ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" -a -z "$ROMIO_CONFIGURE" ] && ROMIO='-lampiromio -pthread'
+if [ -z "$STANDALONE" -a -z "$ROMIO_CONFIGURE" ]
+then
+  [ -f "$CHARMBIN/../lib/libampiromio.a" ] && ROMIO='-lampiromio -pthread'
+
+  [ "$CMK_BLUEGENEQ" != '1' -a "$CMK_WINDOWS" != '1' ] && ARGS="-memory isomalloc $ARGS"
+  ARGS="-module CommonLBs $ARGS"
+fi
 
 FUNCPTR_SHIM_SUFFIX='.user'
 

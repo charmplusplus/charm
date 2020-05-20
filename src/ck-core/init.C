@@ -250,6 +250,11 @@ extern bool useNodeBlkMapping;
 extern int quietMode;
 extern int quietModeRequested;
 
+void CkCallWhenIdle(int epIdx, void* obj) {
+  auto fn = reinterpret_cast<CcdVoidFn>(_entryTable[epIdx]->call);
+  CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, fn, obj);
+}
+
 // Modules are required to register command line opts they will parse. These
 // options are stored in the _optSet, and then when parsing command line opts
 // users will be warned about options starting with a '+' that are not in this
@@ -536,7 +541,7 @@ static void *mergeWarningMsg(int * size, void * data, void ** remote, int count)
 }
 
 /* Initializes the reduction, called on each processor */
-extern int messageQueueOverflow;
+extern CmiMemoryAtomicInt messageQueueOverflow;
 static inline void _sendWarnings(void)
 {
   DEBUGF(("[%d] _sendWarnings\n", CkMyPe()));
@@ -1139,7 +1144,7 @@ static void _nullFn(void *, void *)
   CmiAbort("Null-Method Called. Program may have Unregistered Module!!\n");
 }
 
-extern void _registerLBDatabase(void);
+extern void _registerLBManager(void);
 extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
@@ -1377,6 +1382,8 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
+
+		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
 
 
@@ -1482,7 +1489,7 @@ void _initCharm(int unused_argc, char **argv)
 		*/
 		_registerCkFutures();
 		_registerCkArray();
-		_registerLBDatabase();
+		_registerLBManager();
     _registerMetaBalancer();
 		_registerCkCallback();
 		_registerwaitqd();
@@ -1618,7 +1625,7 @@ void _initCharm(int unused_argc, char **argv)
     if (!_replaySystem) {
         CkFtFn  faultFunc_restart = CkRestartMain;
         if (faultFunc == NULL || faultFunc == faultFunc_restart) {         // this is not restart from memory
-            // these two are blocking calls for non-bigsim
+            // these two are blocking calls
 	  CmiInitCPUAffinity(argv);
           CmiInitMemAffinity(argv);
         }
@@ -1638,10 +1645,11 @@ void _initCharm(int unused_argc, char **argv)
             // XXX: Assuming uniformity of node size here
             num += num/CmiMyNodeSize();
 #endif
-            if (!_Cmi_forceSpinOnIdle && num > CmiNumCores())
+            if (!_Cmi_sleepOnIdle && !_Cmi_forceSpinOnIdle && num > CmiNumCores())
             {
               if (CmiMyPe() == 0)
-                CmiPrintf("\nCharm++> Warning: the number of SMP threads (%d) is greater than the number of physical cores (%d), so threads will sleep while idling. Use +CmiSpinOnIdle or +CmiSleepOnIdle to control this directly.\n\n", num, CmiNumCores());
+                CmiPrintf("Charm++> Warning: Running with more SMP threads (%d) than physical cores (%d).\n"
+                          "         Use +CmiSleepOnIdle (default behavior) or +CmiSpinOnIdle to silence this message.\n", num, CmiNumCores());
               CmiLock(CksvAccess(_nodeLock));
               if (! _Cmi_sleepOnIdle) _Cmi_sleepOnIdle = 1;
               CmiUnlock(CksvAccess(_nodeLock));
@@ -1653,15 +1661,18 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CUDA
     // Only worker threads execute the following
     if (!CmiInCommThread()) {
-      initDeviceMapping(argv);
       if (CmiMyRank() == 0) {
-        initHybridAPI();
+        hapiInitCsv(); // Initialize per-process variables (GPUManager)
       }
-      initEventQueues();
+      hapiInitCpv(); // Initialize per-PE variables
 
-      // ensure HAPI is initialized before registering callback functions
       CmiNodeBarrier();
 
+      hapiMapping(argv); // Perform PE-device mapping
+
+      CmiNodeBarrier();
+
+      // Register callback functions and initialize Charm++ layer functions
       hapiRegisterCallbacks();
       hapiInvokeCallback = CUDACallbackManager;
       hapiQdCreate = QdCreate;

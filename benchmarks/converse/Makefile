@@ -3,6 +3,8 @@ DIRS = \
   cthtest \
   machinetest \
   pingpong \
+  randomttl \
+  kNeighbors \
 
 TESTDIRS = $(DIRS)
 

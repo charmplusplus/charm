@@ -1447,7 +1447,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
         DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,
             CpvAccess(serializer)));
         if (skipsched && _entryTable[ep]->noKeep) {
-          CProxy_CkArray(_aid).sendNoKeepExpeditedBroadcast(msg);
+          ap[CpvAccess(serializer)].sendNoKeepExpeditedBroadcast(msg);
         } else if (skipsched) {
           ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
         } else if (_entryTable[ep]->noKeep) {
@@ -1474,9 +1474,12 @@ void CkArray::incrementBcastNo(){
 
 void CkArray::sendZCBroadcast(MsgPointerWrapper w) {
   int skipsched = w.opts & CK_MSG_EXPEDITED;
-  if (skipsched) {
+  int nokeep = _entryTable[w.ep]->noKeep;
+  if (skipsched && nokeep) {
+    thisProxy.recvNoKeepExpeditedBroadcast((CkArrayMessage *)(w.msg));
+  } else if (skipsched) {
     thisProxy.recvExpeditedBroadcast((CkArrayMessage *)(w.msg));
-  } else if (_entryTable[w.ep]->noKeep) {
+  } else if (nokeep) {
     thisProxy.recvNoKeepBroadcast((CkArrayMessage *)(w.msg));
   } else {
     thisProxy.recvBroadcast((CkArrayMessage *)(w.msg));

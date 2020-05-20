@@ -93,10 +93,8 @@ static struct CmiStateStruct Cmi_default_state; /* State structure to return dur
 
 #if CMK_SHARED_VARS_NT_THREADS
 
-CmiNodeLock CmiMemLock_lock;
-#ifdef CMK_NO_ASM_AVAILABLE
-CmiNodeLock cmiMemoryLock;
-#endif
+CmiNodeLock CmiMemLock_lock; // used by CmiMemLock during heap interception (charmc -memory)
+CmiNodeLock cmiMemoryLock; // used by CmiMemoryAtomic*/ReadFence/WriteFence and CMK_PCQUEUE_LOCK
 static CmiNodeLock comm_mutex;
 #define CmiCommLockOrElse(x) /*empty*/
 #define CmiCommLock() (CmiLock(comm_mutex))
@@ -199,10 +197,7 @@ static void CmiStartThreads(char **argv)
 
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex = CmiCreateLock();
-#ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
-  if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
-#endif
 
   Cmi_state_key = TlsAlloc();
   if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc main");
@@ -238,18 +233,14 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-#ifdef CMK_NO_ASM_AVAILABLE
   CmiDestroyLock(cmiMemoryLock);
-#endif
 }
 
 /***************** Pthreads kernel SMP threads ******************/
 #elif CMK_SHARED_VARS_POSIX_THREADS_SMP
 
-CmiNodeLock CmiMemLock_lock;
-#ifdef CMK_NO_ASM_AVAILABLE
-CmiNodeLock cmiMemoryLock;
-#endif
+CmiNodeLock CmiMemLock_lock; // used by CmiMemLock during heap interception (charmc -memory)
+CmiNodeLock cmiMemoryLock; // used by CmiMemoryAtomic*/ReadFence/WriteFence and CMK_PCQUEUE_LOCK
 int _Cmi_sleepOnIdle=0;
 int _Cmi_forceSpinOnIdle=0;
 extern std::atomic<int> _cleanUp;
@@ -429,10 +420,7 @@ static void CmiStartThreads(char **argv)
   MACHSTATE(4,"CmiStartThreads")
   CmiMemLock_lock=CmiCreateLock();
   _smp_mutex = CmiCreateLock();
-#if defined(CMK_NO_ASM_AVAILABLE) && CMK_PCQUEUE_LOCK
   cmiMemoryLock = CmiCreateLock();
-  if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
-#endif
 
 #if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
   pthread_key_create(&Cmi_state_key, 0);
@@ -514,9 +502,7 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-#ifdef CMK_NO_ASM_AVAILABLE
   CmiDestroyLock(cmiMemoryLock);
-#endif
 }
 
 #endif

@@ -3646,12 +3646,12 @@ should *not* reuse the buffer. That is, after you have passed a message
 buffer into an asynchronous entry method invocation, you shouldn’t
 access its fields, or pass that same buffer into a second entry method
 invocation. Note that this rule doesn’t preclude the *single reuse* of
-an input message - consider an entry method invocation :math:`i_1`,
-which receives as input the message buffer :math:`m_1`. Then,
-:math:`m_1` may be passed to an asynchronous entry method invocation
-:math:`i_2`. However, once :math:`i_2` has been issued with :math:`m_1`
-as its input parameter, :math:`m_1` cannot be used in any further entry
-method invocations.
+a received message - consider being inside the body of an entry method
+invocation :math:`i_1`, which has received the message buffer :math:`m_1`
+as an input parameter. Then, :math:`m_1` may be passed to an asynchronous
+entry method invocation :math:`i_2`. However, once :math:`i_2` has been
+issued with :math:`m_1` as its input parameter, :math:`m_1` cannot be
+used in any further entry method invocations.
 
 Several kinds of message are available. Regular Charm++ messages are
 objects of *fixed size*. One can have messages that contain pointers or
@@ -4220,6 +4220,16 @@ local
    PUPable. Considering that these entry methods always execute
    immediately, they are allowed to have a non-void return value. An
    example can be found in ``examples/charm++/hello/local``.
+
+whenidle
+   a local entry method meant to be used with ``CkCallWhenIdle``,
+   which registers an entry method to be called when a processor is
+   idle. This mechanism provides a convenient way to do work (e.g. low
+   priority or speculative) in the absence of other work. ``whenidle``
+   entry methods must return a ``bool`` value, indicating whether the
+   entry method should be called when the processor is idle again, and
+   accept a ``double`` argument representing the current timestamp. An
+   example can be found in ``examples/charm++/whenidle``.
 
 python
    entry methods are enabled to be called from python scripts as
@@ -8096,6 +8106,12 @@ After ``CkStartCheckpoint`` is executed, a directory of the designated
 name is created and a collection of checkpoint files are written into
 it.
 
+.. note::
+   Note that checkpoints are written to and read from several
+   automatically created subdirectories of the specified directory in
+   order to avoid creating too many files in the same directory, which
+   can stress the file system.
+
 Restarting
 ^^^^^^^^^^
 
@@ -8513,7 +8529,7 @@ for example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 omp
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp
    $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
 
 This library is based on the LLVM OpenMP runtime library. So it supports
@@ -8557,7 +8573,7 @@ to avoid the error:
    $ sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
    $ sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 clang omp --with-production -j8
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 clang omp --with-production -j8
    $ echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
 
 On Mac, the Apple-provided clang installed in default doesn’t have
@@ -8571,7 +8587,7 @@ to the invocation of the Charm++ build script. For example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 omp gcc-7
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp gcc-7
    $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
 
 If this does not work, you should set environment variables so that the
@@ -10718,7 +10734,7 @@ appropriate choices for the build one wants to perform.
    ================================================================ =====================================================================
    Machine                                                          Build command
    ================================================================ =====================================================================
-   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux --with-production -j8``
+   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    Multicore (single node, shared memory) 64 bit Linux              ``./build charm++ multicore-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux                                            ``./build charm++ netlrts-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux (intel compilers)                          ``./build charm++ netlrts-linux-x86_64 icc --with-production -j8``
@@ -10810,7 +10826,7 @@ Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 As an experimental feature, Charm++ can be installed with the CMake tool,
-version 3.4 or newer (3.11 if you need Fortran support).
+version 3.4 or newer.
 This is currently supported on Linux and Darwin, but not on Windows.
 
 After downloading and unpacking Charm++, it can be installed in the following way:

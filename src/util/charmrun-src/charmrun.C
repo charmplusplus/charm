@@ -4467,21 +4467,6 @@ static void start_nodes_mpiexec() {}
 
 static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting) {}
 
-static void envCat(char *dest, LPTSTR oldEnv)
-{
-  char *src = oldEnv;
-  dest += strlen(dest); // Advance to end of dest
-  dest++;               // Advance past terminating NULL character
-  while ((*src) != '\0') {
-    int adv = strlen(src) + 1; // Length of newly-copied string plus NULL
-    strcpy(dest, src);         // Copy another environment string
-    dest += adv;               // Advance past newly-copied string and NULL
-    src += adv;                // Ditto for src
-  }
-  *dest = '\0'; // Paste on final terminating NULL character
-  FreeEnvironmentStrings(oldEnv);
-}
-
 /* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
 struct local_nodestart
@@ -4507,20 +4492,26 @@ struct local_nodestart
 
   void start(const nodetab_process & p)
   {
-    STARTUPINFO si = {0}; /* startup info for the process spawned */
-    PROCESS_INFORMATION pi; /* process Information for the process spawned */
-    char environment[10000]; /*Doubly-null terminated environment strings*/
+    std::string env{"NETSTART="};
+    env += create_netstart(p.nodeno);
+    env += '\0';
 
-    sprintf(environment, "NETSTART=%s", create_netstart(p.nodeno));
-    /*Paste all system environment strings */
-    envCat(environment, GetEnvironmentStrings());
+    /* Concatenate all system environment strings */
+    const LPTSTR oldEnv = GetEnvironmentStrings();
+    LPTSTR oldEnvEnd = oldEnv;
+    while (oldEnvEnd[0] != '\0' || oldEnvEnd[1] != '\0')
+        ++oldEnvEnd;
+    env.append(oldEnv, oldEnvEnd - oldEnv + 1);
+    FreeEnvironmentStrings(oldEnv);
 
     /* Initialise the security attributes for the process
      to be spawned */
+    STARTUPINFO si = {0};
     si.cb = sizeof(si);
     if (arg_verbose)
       printf("Charmrun> start %d node program on localhost.\n", p.nodeno);
 
+    PROCESS_INFORMATION pi;
     int ret;
     ret = CreateProcess(NULL,          /* application name */
                         const_cast<char*>(cmdLine.c_str()), /* command line */
@@ -4536,7 +4527,7 @@ struct local_nodestart
                         CREATE_NEW_PROCESS_GROUP | CREATE_NEW_CONSOLE,
 #endif
                         /* creation flags */
-                        environment, /* environment block */
+                        const_cast<char*>(env.data()), /* environment block */
                         ".",         /* working directory */
                         &si,         /* startup info */
                         &pi);

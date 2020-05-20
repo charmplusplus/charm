@@ -37,7 +37,6 @@
 #include <float.h>
 #include <charm-api.h>
 
-#include "LBDatabase.h"
 #include "arrayRedistributor.h"
 #include "pathHistory.h" 
 

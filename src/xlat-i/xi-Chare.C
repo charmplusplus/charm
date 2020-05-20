@@ -38,6 +38,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType* t, TypeList* b, AstChildren<Memb
   bases_CBase = NULL;
   setTemplate(0);
   hasSdagEntry = 0;
+  hasWhenIdleEntry = 0;
 }
 
 void Chare::check() {

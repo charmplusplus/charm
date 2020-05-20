@@ -36,7 +36,7 @@
 
 /* 
  Include the system/platform header.
-  (e.g., charm/src/arch/netlrts-linux/conv-mach.h )
+  (e.g., charm/src/arch/netlrts-linux-x86_64/conv-mach.h )
  
  This header declares the handling of malloc (OS or charm),
  signals, threads, timers, and other details. 
@@ -144,7 +144,12 @@
 #endif
 
 /* Cache line size */
-#if CMK_PPC64
+#ifdef __cplusplus
+#include <new>
+#endif
+#ifdef __cpp_lib_hardware_interference_size
+# define CMI_CACHE_LINE_SIZE std::hardware_destructive_interference_size
+#elif CMK_PPC64
 # define CMI_CACHE_LINE_SIZE 128
 #else
 # define CMI_CACHE_LINE_SIZE 64

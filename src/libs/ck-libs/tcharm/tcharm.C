@@ -222,17 +222,12 @@ void checkPupMismatch(PUP::er &p,int expected,const char *where)
 }
 
 void TCharm::pup(PUP::er &p) {
-  //BIGSIM_OOC DEBUGGING
-  //if(!p.isUnpacking()){
-  //  CmiPrintf("TCharm[%d] packing: ", thisIndex);
-  //  CthPrintThdStack(tid);
-  //}
-
   checkPupMismatch(p,5134,"before TCHARM");
   p(isStopped); p(exitWhenDone); p(isSelfDone); p(asyncMigrate);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
-  
+  p | resumeAfterMigrationCallback;
+
   if (sema.size()>0){
   	CkAbort("TCharm::pup> Cannot migrate with unconsumed semaphores!\n");
   }
@@ -301,13 +296,6 @@ void TCharm::pup(PUP::er &p) {
   
   s.endBlock(); //End of seeking block
   checkPupMismatch(p,5140,"after TCHARM");
-  
-  //BIGSIM_OOC DEBUGGING
-  //if(p.isUnpacking()){
-  //  CmiPrintf("TCharm[%d] unpacking: ", thisIndex);
-  //  CthPrintThdStack(tid);
-  //}
-
 }
 
 // Pup our thread and related data
@@ -356,10 +344,7 @@ void TCharm::UserData::pup(PUP::er &p)
 
 TCharm::~TCharm()
 {
-  //BIGSIM_OOC DEBUGGING
-
   CthFree(tid);
-
   delete initMsg;
 }
 
@@ -404,6 +389,13 @@ int TCharm::add(const TCharm::UserData &d) noexcept
 {
   if (nUd>=maxUserData)
     CkAbort("TCharm: Registered too many user data fields!\n");
+
+  // disable use of pup_buffer which conflicts with pup routines
+  CthThread th = getThread();
+  auto ctx = CmiIsomallocGetThreadContext(th);
+  if (ctx.opaque != nullptr)
+    CmiIsomallocEnableRDMA(ctx, 0);
+
   int nu=nUd++;
   ud[nu]=d;
   return nu;
@@ -485,7 +477,10 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::allow_migrate()
 void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
-  start();
+  if (resumeAfterMigrationCallback.isInvalid())
+    start();
+  else
+    resumeAfterMigrationCallback.send();
 }
 
 

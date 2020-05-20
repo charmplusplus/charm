@@ -10,6 +10,7 @@
 #include "converse.h"
 #include "hapi.h"
 #include "hapi_impl.h"
+#include "gpumanager.h"
 #ifdef HAPI_NVTX_PROFILE
 #include "hapi_nvtx.h"
 #endif
@@ -31,6 +32,9 @@ typedef struct gpuEventTimer {
   const char* trace_name;
 } gpuEventTimer;
 #endif
+
+static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
+static void releasePool(std::vector<BufferPool> &pools);
 
 // Event stages used for profiling.
 enum WorkRequestStage{
@@ -69,14 +73,6 @@ CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
 #endif
 CpvDeclare(int, n_hapi_events);
 
-void initEventQueues() {
-#ifndef HAPI_CUDA_CALLBACK
-  CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
-#endif
-  CpvInitialize(int, n_hapi_events);
-  CpvAccess(n_hapi_events) = 0;
-}
-
 // Used to invoke user's Charm++ callback function
 void (*hapiInvokeCallback)(void*, void*) = NULL;
 
@@ -84,323 +80,159 @@ void (*hapiInvokeCallback)(void*, void*) = NULL;
 void (*hapiQdCreate)(int) = NULL;
 void (*hapiQdProcess)(int) = NULL;
 
-// Initial size of the user-addressed portion of host/device buffer arrays;
-// the system-addressed portion of host/device buffer arrays (used when there
-// is no need to share buffers between work requests) will be equivalant in size.
-// FIXME hard-coded maximum
-#if CMK_SMP
-#define NUM_BUFFERS 4096
-#else
-#define NUM_BUFFERS 256
-#endif
-
 #define MAX_PINNED_REQ 64
 #define MAX_DELAYED_FREE_REQS 64
-
-// Contains data and methods needed by HAPI.
-class GPUManager {
-
-public:
-// Update for new row, again this shouldn't be hard coded!
-#define HAPI_MEMPOOL_NUM_SLOTS 20
-// Pre-allocated buffers will be at least this big (in bytes).
-#define HAPI_MEMPOOL_MIN_BUFFER_SIZE 256
-// Scale the amount of memory each node pins.
-#define HAPI_MEMPOOL_SCALE 1.0
-
-  std::vector<BufferPool> mempool_free_bufs_;
-  std::vector<size_t> mempool_boundaries_;
-  bool mempool_initialized_;
-
-  // The runtime system keeps track of all allocated buffers on the GPU.
-  // The following arrays contain pointers to host (CPU) data and the
-  // corresponding data on the device (GPU).
-  void **host_buffers_;
-  void **device_buffers_;
-
-  // Used to assign buffer IDs automatically by the system if the user
-  // specifies an invalid buffer ID.
-  int next_buffer_;
-
-  cudaStream_t *streams_;
-  int n_streams_;
-  int last_stream_id_;
-
-#ifdef HAPI_CUDA_CALLBACK
-  int host_to_device_cb_idx_;
-  int kernel_cb_idx_;
-  int device_to_host_cb_idx_;
-  int light_cb_idx_; // for lightweight version
-#endif
-
-  int running_kernel_idx_;
-  int data_setup_idx_;
-  int data_cleanup_idx_;
-
-#ifdef HAPI_TRACE
-  gpuEventTimer gpu_events_[QUEUE_SIZE_INIT * 3];
-  std::atomic<int> time_idx_;
-#endif
-
-#ifdef HAPI_INSTRUMENT_WRS
-  std::vector<std::vector<std::vector<hapiRequestTimeInfo>>> avg_times_;
-  bool init_instr_;
-#endif
-
-#if CMK_SMP
-  CmiNodeLock queue_lock_;
-  CmiNodeLock progress_lock_;
-  CmiNodeLock stream_lock_;
-  CmiNodeLock mempool_lock_;
-  CmiNodeLock inst_lock_;
-#endif
-
-  cudaDeviceProp device_prop_;
-#ifdef HAPI_CUDA_CALLBACK
-  bool cb_support;
-#endif
-
-  void init();
-  int createStreams();
-  int createNStreams(int);
-  void destroyStreams();
-  cudaStream_t getNextStream();
-  cudaStream_t getStream(int);
-  int getNStreams();
-  void allocateBuffers(hapiWorkRequest*);
-  void hostToDeviceTransfer(hapiWorkRequest*);
-  void deviceToHostTransfer(hapiWorkRequest*);
-  void freeBuffers(hapiWorkRequest*);
-  void runKernel(hapiWorkRequest*);
-};
 
 // Declare GPU Manager as a process-shared object.
 CsvDeclare(GPUManager, gpu_manager);
 
-void GPUManager::init() {
-  next_buffer_ = NUM_BUFFERS;
-  streams_ = NULL;
-  n_streams_ = 0;
-  last_stream_id_ = -1;
-  running_kernel_idx_ = 0;
-  data_setup_idx_ = 0;
-  data_cleanup_idx_ = 0;
+CpvDeclare(int, my_device); // GPU device that this thread is mapped to
+CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
 
-#if CMK_SMP
-  // create mutex locks
-  queue_lock_ = CmiCreateLock();
-  progress_lock_ = CmiCreateLock();
-  stream_lock_ = CmiCreateLock();
-  mempool_lock_ = CmiCreateLock();
-  inst_lock_ = CmiCreateLock();
+// Initialize per-process variables
+void hapiInitCsv() {
+  // Create and initialize GPU Manager object
+  CsvInitialize(GPUManager, gpu_manager);
+  CsvAccess(gpu_manager).init();
+}
+
+// Initialize per-PE variables
+void hapiInitCpv() {
+  // HAPI event-related
+#ifndef HAPI_CUDA_CALLBACK
+  CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
 #endif
+  CpvInitialize(int, n_hapi_events);
+  CpvAccess(n_hapi_events) = 0;
 
-#ifdef HAPI_TRACE
-  time_idx_ = 0;
-#endif
-
-  // store CUDA device properties
-  int device;
-  hapiCheck(cudaGetDevice(&device));
-  hapiCheck(cudaGetDeviceProperties(&device_prop_, device));
-
-#ifdef HAPI_CUDA_CALLBACK
-  // check if CUDA callback is supported
-  // CUDA 5.0 (compute capability 3.0) or newer
-  cb_support = (device_prop_.major >= 3);
-  if (!cb_support) {
-    CmiAbort("[HAPI] CUDA callback is not supported on this device");
-  }
-#endif
-
-  // allocate host/device buffers array (both user and system-addressed)
-  host_buffers_ = new void*[NUM_BUFFERS*2];
-  device_buffers_ = new void*[NUM_BUFFERS*2];
-
-  // initialize device array to NULL
-  for (int i = 0; i < NUM_BUFFERS*2; i++) {
-    device_buffers_[i] = NULL;
-  }
-
-#ifdef HAPI_TRACE
-  traceRegisterUserEvent("GPU Memory Setup", GpuMemSetup);
-  traceRegisterUserEvent("GPU Kernel Execution", GpuKernelExec);
-  traceRegisterUserEvent("GPU Memory Cleanup", GpuMemCleanup);
-#endif
-
-  // set up mempool metadata
-  mempool_initialized_ = false;
-  mempool_boundaries_.resize(HAPI_MEMPOOL_NUM_SLOTS);
-
-  size_t buf_size = HAPI_MEMPOOL_MIN_BUFFER_SIZE;
-  for(int i = 0; i < HAPI_MEMPOOL_NUM_SLOTS; i++){
-    mempool_boundaries_[i] = buf_size;
-    buf_size = buf_size << 1;
-  }
-
-#ifdef HAPI_INSTRUMENT_WRS
-  init_instr_ = false;
-#endif
+  // Device mapping
+  CpvInitialize(int, my_device);
+  CpvAccess(my_device) = 0;
+  CpvInitialize(bool, device_rep);
+  CpvAccess(device_rep) = false;
 }
 
-// Creates streams equal to the maximum number of concurrent kernels,
-// which depends on the compute capability of the device.
-// Returns the number of created streams.
-int GPUManager::createStreams() {
-  int new_n_streams = 0;
+// Clean up per-process data
+void hapiExitCsv() {
+  // Destroy GPU Manager object
+  CsvAccess(gpu_manager).destroy();
 
-  if (device_prop_.major == 3) {
-    if (device_prop_.minor == 0)
-      new_n_streams = 16;
-    else if (device_prop_.minor == 2)
-      new_n_streams = 4;
-    else // 3.5, 3.7 or unknown 3.x
-      new_n_streams = 32;
-  }
-  else if (device_prop_.major == 5) {
-    if (device_prop_.minor == 3)
-      new_n_streams = 16;
-    else // 5.0, 5.2 or unknown 5.x
-      new_n_streams = 32;
-  }
-  else if (device_prop_.major == 6) {
-    if (device_prop_.minor == 1)
-      new_n_streams = 32;
-    else if (device_prop_.minor == 2)
-      new_n_streams = 16;
-    else // 6.0 or unknown 6.x
-      new_n_streams = 128;
-  }
-  else // unknown (future) compute capability
-    new_n_streams = 128;
-#if !CMK_SMP
-  // Allocate total physical streams between GPU managers sharing a device...
-  // i.e. PEs / num devices
-  int device_count;
-  hapiCheck(cudaGetDeviceCount(&device_count));
-  int pes_per_device = CmiNumPesOnPhysicalNode(0) / device_count;
-  pes_per_device = pes_per_device > 0 ? pes_per_device : 1;
-  new_n_streams =  (new_n_streams + pes_per_device - 1) / pes_per_device;
-#endif
-
-  int total_n_streams = createNStreams(new_n_streams);
-
-  return total_n_streams;
-}
-
-int GPUManager::createNStreams(int new_n_streams) {
-  if (new_n_streams <= n_streams_) {
-    return n_streams_;
-  }
-
-  cudaStream_t* old_streams = streams_;
-
-  streams_ = new cudaStream_t[new_n_streams];
-
-  int i = 0;
-  // Copy old streams
-  for (; i < n_streams_; i++) {
-    // TODO alt. use memcpy?
-    streams_[i] = old_streams[i];
-  }
-
-  // Create new streams
-  for (; i < new_n_streams; i++) {
-    hapiCheck(cudaStreamCreate(&streams_[i]));
-  }
-
-  // Update
-  n_streams_ = new_n_streams;
-  delete [] old_streams;
-
-  return n_streams_;
-}
-
-void GPUManager::destroyStreams() {
-  if (streams_) {
-    for (int i = 0; i < n_streams_; i++) {
-      hapiCheck(cudaStreamDestroy(streams_[i]));
-    }
+  // Release memory pool
+  if (CsvAccess(gpu_manager).mempool_initialized_) {
+    releasePool(CsvAccess(gpu_manager).mempool_free_bufs_);
   }
 }
 
-cudaStream_t GPUManager::getNextStream() {
-  if (streams_ == NULL)
-    return NULL;
+// Set up PE to GPU mapping, invoked from all PEs
+// TODO: Support custom mappings
+void hapiMapping(char** argv) {
+  Mapping map_type = Mapping::Block; // Default is block mapping
+  bool all_gpus = false; // If true, all GPUs are visible to all processes.
+                         // Otherwise, only a subset are visible (e.g. with jsrun)
+  char* gpumap = NULL;
 
-  last_stream_id_ = (++last_stream_id_) % n_streams_;
-  return streams_[last_stream_id_];
-}
-
-cudaStream_t GPUManager::getStream(int i) {
-  if (streams_ == NULL)
-    return NULL;
-
-  if (i < 0 || i >= n_streams_)
-    CmiAbort("[HAPI] invalid stream ID");
-  return streams_[i];
-}
-
-int GPUManager::getNStreams() {
-  if (!streams_) // NULL - default stream
-    return 1;
-
-  return n_streams_;
-}
-
-// Allocates device buffers.
-void GPUManager::allocateBuffers(hapiWorkRequest* wr) {
-  for (int i = 0; i < wr->getBufferCount(); i++) {
-    hapiBufferInfo& bi = wr->buffers[i];
-    int index = bi.id;
-    size_t size = bi.size;
-
-    // if index value is invalid, use an available ID
-    if (index < 0 || index >= NUM_BUFFERS) {
-      bool is_found = false;
-      for (int j = next_buffer_; j < NUM_BUFFERS*2; j++) {
-        if (device_buffers_[j] == NULL) {
-          index = j;
-          is_found = true;
-          break;
-        }
-      }
-
-      // if no index was found, try to search for a value at the
-      // beginning of the system addressed space
-      if (!is_found) {
-        for (int j = NUM_BUFFERS; j < next_buffer_; j++) {
-          if (device_buffers_[j] == NULL) {
-            index = j;
-            is_found = true;
-            break;
-          }
-        }
-      }
-
-      if (!is_found) {
-        CmiAbort("[HAPI] ran out of device buffer indices");
-      }
-
-      next_buffer_ = index + 1;
-      if (next_buffer_ == NUM_BUFFERS*2) {
-        next_buffer_ = NUM_BUFFERS;
-      }
-
-      bi.id = index;
+  // Process +gpumap
+  if (CmiGetArgStringDesc(argv, "+gpumap", &gpumap,
+        "define pe to gpu device mapping")) {
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> PE-GPU mapping: %s\n", gpumap);
     }
 
-    if (device_buffers_[index] == NULL) {
-      // allocate device memory
-      hapiCheck(cudaMalloc((void **)&device_buffers_[index], size));
-
-#ifdef HAPI_DEBUG
-      CmiPrintf("[HAPI] allocated buffer %d at %p, time: %.2f, size: %zu\n",
-             index, device_buffers_[index], cutGetTimerValue(timerHandle),
-             size);
-#endif
+    if (strcmp(gpumap, "none") == 0) {
+      map_type = Mapping::None;
+    }
+    else if (strcmp(gpumap, "block") == 0) {
+      map_type = Mapping::Block;
+    }
+    else if (strcmp(gpumap, "roundrobin") == 0) {
+      map_type = Mapping::RoundRobin;
+    }
+    else {
+      CmiAbort("Unsupported mapping type: %s, use one of \"none\", \"block\", "
+          "\"roundrobin\"", gpumap);
     }
   }
+
+  // Process +allgpus
+  if (CmiGetArgFlagDesc(argv, "+allgpus",
+        "all GPUs are visible to all processes")) {
+    all_gpus = true;
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> All GPUs are visible to all processes\n");
+    }
+  }
+
+  // No mapping specified, user assumes responsibility
+  if (map_type == Mapping::None) {
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> User should explicitly select devices for PEs/chares\n");
+    }
+    return;
+  }
+
+  CmiAssert(map_type != Mapping::None);
+
+  if (CmiMyRank() == 0) {
+    // Count number of GPU devices used by each process
+    int visible_device_count;
+    hapiCheck(cudaGetDeviceCount(&visible_device_count));
+    if (visible_device_count <= 0) {
+      CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
+    }
+
+    int& device_count = CsvAccess(gpu_manager).device_count;
+    if (all_gpus) {
+      device_count = visible_device_count / (CmiNumNodes() / CmiNumPhysicalNodes());
+    } else {
+      device_count = visible_device_count;
+    }
+
+    // Handle the case where the number of GPUs per process are larger than
+    // the number of PEs per process. This is needed because we currently don't
+    // support each PE using more than one device.
+    if (device_count > CmiNodeSize(CmiMyNode())) {
+      if (CmiMyPe() == 0) {
+        CmiPrintf("HAPI> Found more GPU devices (%d) than PEs (%d) per process, "
+            "limiting to %d device(s) per process\n", device_count,
+            CmiNodeSize(CmiMyNode()), CmiNodeSize(CmiMyNode()));
+      }
+      device_count = CmiNodeSize(CmiMyNode());
+    }
+
+    // Count number of PEs per device
+    CsvAccess(gpu_manager).pes_per_device = CmiNodeSize(CmiMyNode()) / device_count;
+
+    // Count number of devices on a physical node
+    CsvAccess(gpu_manager).device_count_on_physical_node =
+      device_count * (CmiNumNodes() / CmiNumPhysicalNodes());
+  }
+
+  if (CmiMyPe() == 0) {
+    CmiPrintf("HAPI> Config: %d device(s) per process, %d PE(s) per device, %d device(s) per host\n",
+        CsvAccess(gpu_manager).device_count, CsvAccess(gpu_manager).pes_per_device,
+        CsvAccess(gpu_manager).device_count_on_physical_node);
+  }
+
+  CmiNodeBarrier();
+
+  // Perform mapping and set device representative PE
+  int my_rank = all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank();
+
+  switch (map_type) {
+    case Mapping::Block:
+      CpvAccess(my_device) = my_rank / CsvAccess(gpu_manager).pes_per_device;
+      if (my_rank % CsvAccess(gpu_manager).pes_per_device == 0) CpvAccess(device_rep) = true;
+      break;
+    case Mapping::RoundRobin:
+      CpvAccess(my_device) = my_rank % CsvAccess(gpu_manager).device_count;
+      if (my_rank < CsvAccess(gpu_manager).device_count) CpvAccess(device_rep) = true;
+      break;
+    default:
+      CmiAbort("Unsupported mapping type!");
+  }
+
+  // Set device for each PE
+  hapiCheck(cudaSetDevice(CpvAccess(my_device)));
 }
 
 #ifndef HAPI_CUDA_CALLBACK
@@ -420,63 +252,6 @@ void recordEvent(cudaStream_t stream, void* cb, void* cb_msg, hapiWorkRequest* w
 }
 #endif
 
-// Initiates host-to-device data transfer.
-void GPUManager::hostToDeviceTransfer(hapiWorkRequest* wr) {
-  for (int i = 0; i < wr->getBufferCount(); i++) {
-    hapiBufferInfo& bi = wr->buffers[i];
-    int index = bi.id;
-    size_t size = bi.size;
-    host_buffers_[index] = bi.host_buffer;
-
-    if (bi.transfer_to_device) {
-      hapiCheck(cudaMemcpyAsync(device_buffers_[index], host_buffers_[index], size,
-                                cudaMemcpyHostToDevice, wr->stream));
-
-#ifdef HAPI_DEBUG
-      CmiPrintf("[HAPI] transferring buffer %d from host to device, time: %.2f, "
-             "size: %zu\n", index, cutGetTimerValue(timerHandle), size);
-#endif
-    }
-  }
-}
-
-// Initiates device-to-host data transfer.
-void GPUManager::deviceToHostTransfer(hapiWorkRequest* wr) {
-  for (int i = 0; i < wr->getBufferCount(); i++) {
-    hapiBufferInfo& bi = wr->buffers[i];
-    int index = bi.id;
-    size_t size = bi.size;
-
-    if (bi.transfer_to_host) {
-      hapiCheck(cudaMemcpyAsync(host_buffers_[index], device_buffers_[index], size,
-                                cudaMemcpyDeviceToHost, wr->stream));
-
-#ifdef HAPI_DEBUG
-      CmiPrintf("[HAPI] transferring buffer %d from device to host, time %.2f, "
-             "size: %zu\n", index, cutGetTimerValue(timerHandle), size);
-#endif
-    }
-  }
-}
-
-// Frees device buffers.
-void GPUManager::freeBuffers(hapiWorkRequest* wr) {
-  for (int i = 0; i < wr->getBufferCount(); i++) {
-    hapiBufferInfo& bi = wr->buffers[i];
-    int index = bi.id;
-
-    if (bi.need_free) {
-      hapiCheck(cudaFree(device_buffers_[index]));
-      device_buffers_[index] = NULL;
-
-#ifdef HAPI_DEBUG
-      CmiPrintf("[HAPI] freed buffer %d, time %.2f\n",
-             index, cutGetTimerValue(timerHandle));
-#endif
-    }
-  }
-}
-
 inline static void hapiWorkRequestCleanup(hapiWorkRequest* wr) {
 #if CMK_SMP
   CmiLock(CsvAccess(gpu_manager).progress_lock_);
@@ -491,16 +266,6 @@ inline static void hapiWorkRequestCleanup(hapiWorkRequest* wr) {
 
   // free hapiWorkRequest
   delete wr;
-}
-
-// Run the user's kernel for the given work request.
-// This used to be a switch statement defined by the user to allow the runtime
-// to execute the correct kernel.
-void GPUManager::runKernel(hapiWorkRequest* wr) {
-	if (wr->runKernel) {
-		wr->runKernel(wr, wr->stream, device_buffers_);
-	}
-	// else, might be only for data transfer (or might be a bug?)
 }
 
 #ifdef HAPI_CUDA_CALLBACK
@@ -754,135 +519,6 @@ hapiWorkRequest::hapiWorkRequest() :
 #endif
   }
 
-static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
-static void releasePool(std::vector<BufferPool> &pools);
-
-// Initialization of HAPI functionalities.
-void initHybridAPI() {
-  // create and initialize GPU Manager object
-  CsvInitialize(GPUManager, gpu_manager);
-  CsvAccess(gpu_manager).init();
-}
-
-// Set up PE to GPU mapping, invoked from all PEs
-// TODO: Support custom mappings
-void initDeviceMapping(char** argv) {
-  Mapping map_type = Mapping::Block; // Default is block mapping
-  bool all_gpus = false; // If true, all GPUs are visible to all processes.
-                         // Otherwise, only a subset are visible (e.g. with jsrun)
-  char* gpumap = NULL;
-
-  // Process +gpumap
-  if (CmiGetArgStringDesc(argv, "+gpumap", &gpumap,
-        "define pe to gpu device mapping")) {
-    if (CmiMyPe() == 0) {
-      CmiPrintf("HAPI> PE-GPU mapping: %s\n", gpumap);
-    }
-
-    if (strcmp(gpumap, "none") == 0) {
-      map_type = Mapping::None;
-    }
-    else if (strcmp(gpumap, "block") == 0) {
-      map_type = Mapping::Block;
-    }
-    else if (strcmp(gpumap, "roundrobin") == 0) {
-      map_type = Mapping::RoundRobin;
-    }
-    else {
-      CmiAbort("Unsupported mapping type: %s, use one of \"none\", \"block\", "
-          "\"roundrobin\"", gpumap);
-    }
-  }
-
-  // Process +allgpus
-  if (CmiGetArgFlagDesc(argv, "+allgpus",
-        "all GPUs are visible to all processes")) {
-    all_gpus = true;
-    if (CmiMyPe() == 0) {
-      CmiPrintf("HAPI> All GPUs are visible to all processes\n");
-    }
-  }
-
-  // No mapping specified, user assumes responsibility
-  if (map_type == Mapping::None) {
-    if (CmiMyPe() == 0) {
-      CmiPrintf("HAPI> User should explicitly select devices for PEs/chares\n");
-    }
-    return;
-  }
-
-  CmiAssert(map_type != Mapping::None);
-
-  // Get number of GPUs (visible to each process)
-  int gpu_count;
-  hapiCheck(cudaGetDeviceCount(&gpu_count));
-  if (gpu_count <= 0) {
-    CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
-  }
-
-  // Perform mapping
-  int my_gpu = 0;
-  int pes_per_gpu = (all_gpus ? CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe())) :
-      CmiNodeSize(CmiMyNode())) / gpu_count;
-
-  switch (map_type) {
-    case Mapping::Block:
-      my_gpu = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) / pes_per_gpu;
-      break;
-    case Mapping::RoundRobin:
-      my_gpu = (all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank()) % gpu_count;
-      break;
-    default:
-      CmiAbort("Unsupported mapping type!");
-  }
-
-  hapiCheck(cudaSetDevice(my_gpu));
-}
-
-// Clean up and delete memory used by HAPI.
-void exitHybridAPI() {
-#if CMK_SMP
-  // destroy mutex locks
-  CmiDestroyLock(CsvAccess(gpu_manager).queue_lock_);
-  CmiDestroyLock(CsvAccess(gpu_manager).progress_lock_);
-  CmiDestroyLock(CsvAccess(gpu_manager).stream_lock_);
-  CmiDestroyLock(CsvAccess(gpu_manager).mempool_lock_);
-#endif
-
-  // destroy streams (if they were created)
-  CsvAccess(gpu_manager).destroyStreams();
-
-  // release memory pool if it was used
-  if (CsvAccess(gpu_manager).mempool_initialized_) {
-    releasePool(CsvAccess(gpu_manager).mempool_free_bufs_);
-  }
-
-#ifdef HAPI_TRACE
-  for (int i = 0; i < CsvAccess(gpu_manager).time_idx_; i++) {
-    switch (CsvAccess(gpu_manager).gpu_events_[i].event_type) {
-    case DataSetup:
-      CmiPrintf("[HAPI] kernel %s data setup\n",
-             CsvAccess(gpu_manager).gpu_events_[i].trace_name);
-      break;
-    case DataCleanup:
-      CmiPrintf("[HAPI] kernel %s data cleanup\n",
-             CsvAccess(gpu_manager).gpu_events_[i].trace_name);
-      break;
-    case KernelExecution:
-      CmiPrintf("[HAPI] kernel %s execution\n",
-             CsvAccess(gpu_manager).gpu_events_[i].trace_name);
-      break;
-    default:
-      CmiPrintf("[HAPI] invalid timer identifier\n");
-    }
-    CmiPrintf("[HAPI] %.2f:%.2f\n",
-           CsvAccess(gpu_manager).gpu_events_[i].cmi_start_time -
-           CsvAccess(gpu_manager).gpu_events_[0].cmi_start_time,
-           CsvAccess(gpu_manager).gpu_events_[i].cmi_end_time -
-           CsvAccess(gpu_manager).gpu_events_[0].cmi_start_time);
-  }
-#endif
-}
 
 /******************** DEPRECATED ********************/
 // Need to be updated with the Tracing API.
@@ -983,8 +619,13 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
     pools[i].head = NULL;
   }
 
+  int device;
+  cudaDeviceProp device_prop;
+  hapiCheck(cudaGetDevice(&device));
+  hapiCheck(cudaGetDeviceProperties(&device_prop, device));
+
   // divide by # of PEs on physical node and multiply by # of PEs in logical node
-  size_t available_memory = CsvAccess(gpu_manager).device_prop_.totalGlobalMem /
+  size_t available_memory = device_prop.totalGlobalMem /
                            CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()))
                            * CmiMyNodeSize() * HAPI_MEMPOOL_SCALE;
 

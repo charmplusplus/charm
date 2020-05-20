@@ -12,14 +12,10 @@
 void BaseLB::initLB(const CkLBOptions &opt) {
   seqno = opt.getSeqNo();
   CkpvAccess(numLoadBalancers) ++;
-/*
-  if (CkpvAccess(numLoadBalancers) - CkpvAccess(hasNullLB) > 1)
-    CmiAbort("Error: try to create more than one load balancer strategies!");
-*/
-  theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
+  lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   lbname = "Unknown";
-  // register this load balancer to LBDatabase at the sequence number
-  theLbdb->addLoadbalancer(this, seqno);
+  // register this load balancer to LBManager at the sequence number
+  lbmgr->addLoadbalancer(this, seqno);
 }
 
 BaseLB::~BaseLB() {
@@ -27,7 +23,7 @@ BaseLB::~BaseLB() {
 }
 
 void BaseLB::unregister() {
-  theLbdb->RemoveLocalBarrierReceiver(receiver);
+  lbmgr->RemoveLocalBarrierReceiver(receiver);
   CkpvAccess(numLoadBalancers) --;
 }
 
@@ -37,7 +33,7 @@ void BaseLB::pup(PUP::er &p) {
   {
     if (CkMyPe()==0) {
       if (seqno!=-1) {
-        int newseq = LBDatabaseObj()->getLoadbalancerTicket();
+        int newseq = LBManagerObj()->getLoadbalancerTicket();
         CmiAssert(newseq == seqno);
       }
     }
@@ -47,7 +43,7 @@ void BaseLB::pup(PUP::er &p) {
 
 void BaseLB::flushStates() {
   Group::flushStates();
-  theLbdb->ClearLoads();
+  lbmgr->ClearLoads();
 }
 
 #else

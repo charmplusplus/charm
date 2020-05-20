@@ -109,6 +109,7 @@ extern void  CkFreeSysMsg(void *msg);
 extern void* CkAllocBuffer(void *msg, int bufsize);
 extern void  CkFreeMsg(void *msg);
 extern void* CkCopyMsg(void **pMsg);
+extern void* CkReferenceMsg(void *msg);
 extern void  CkSetQueueing(void *msg, int strategy);
 extern void* CkPriorityPtr(void *msg);
 
@@ -365,8 +366,7 @@ typedef enum {
 #define CK_MSG_INLINE      	0x1
 #define CK_MSG_IMMEDIATE   	0x2
 #define CK_MSG_EXPEDITED	0x4
-#define CK_MSG_KEEP		0x8    /* send without freeing message */
-#define CK_MSG_LB_NOTRACE	0x10   /* load balancer doesn't trace */
+#define CK_MSG_LB_NOTRACE	0x8   /* load balancer doesn't trace */
 
 #ifdef __cplusplus
 #define CK_MSGOPTIONAL =0
@@ -483,6 +483,7 @@ extern void CkSummary_MarkEvent(int);
 extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
+extern void CkCallWhenIdle(int epIdx, void* obj);
 
 #ifdef __cplusplus
 }

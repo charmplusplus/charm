@@ -45,7 +45,7 @@ public:
   inline void ckStopTiming(void) {myRec->stopTiming();}
   //Begin load balancer measurements again (e.g., after CthSuspend)
   inline void ckStartTiming(void) {myRec->startTiming();}
-  inline LBDatabase *getLBDB(void) const {return myRec->getLBDB();}
+  inline LBManager *getLBMgr(void) const {return myRec->getLBMgr();}
   inline MetaBalancer *getMetaBalancer(void) const {return myRec->getMetaBalancer();}
 #else
   inline void ckStopTiming(void) { }
@@ -99,8 +99,9 @@ public:
   void AtSync(int waitForMigration=1);
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
+  friend class LocalBarrier;
 private:
-  static void staticResumeFromSync(void* data);
+  void ResumeFromSyncHelper();
 public:
   void ReadyMigrate(bool ready);
   void ckFinishConstruction(void);

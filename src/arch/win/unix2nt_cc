@@ -56,13 +56,14 @@ ML_COMMON='-nologo -W1 -D_WINDOWS -DNOMINMAX'
 #Here, the full path to "link.exe" has to be added because, in cygwin, there
 #is a file "/usr/bin/link" which has the same name, and takes higher precedence
 #than the microsoft one.
+cl_path=`command -v cl`
 if [[ "`command -v link`" != '/usr/bin/link' ]]
 then
 LINK_CMD='link.exe'
-elif [[ -d "`cygpath -u \"$VCC_DIR/bin/HostX64/x64\"`" ]]
+elif [[ -d "`cygpath -u "${cl_path%cl}"`" ]]
 then
-LINK_CMD="$VCC_DIR/bin/HostX64/x64/link.exe"
-elif [[ -d "`cygpath -u \"$VCC_DIR/BIN/amd64\"`" ]]
+LINK_CMD="${cl_path%cl}link.exe"
+elif [[ -d "`cygpath -u "$VCC_DIR/BIN/amd64"`" ]]
 then
 LINK_CMD="$VCC_DIR/BIN/amd64/LINK.EXE"
 else
@@ -160,6 +161,7 @@ DOCOMPILE=''
 DOASSEMBLE=''
 DOLINK=''
 DODEPS=''
+SHARED=''
 OUTPUT=''
 CL_OPTS="$CL_COMMON"
 ML_OPTS="$ML_COMMON"
@@ -182,6 +184,9 @@ do
 	case "$arg" in
 	-verbose)
 		VERBOSE='1'
+		;;
+	-shared)
+		SHARED='1'
 		;;
 	-E)
 		CL+=' -E'
@@ -206,11 +211,12 @@ do
 		CL_OPTS+=' -DNDEBUG -Ox'
 		ML_OPTS+=' -DNDEBUG'
 		;;
-	-g)
+	-g|-g[123456789]|-ggdb|-ggdb[123])
 		CL_OPTS+=' -Z7'
 		ML_OPTS+=' -Zi -Zd'
 		LINK_OPTS+=' -DEBUG'
 		CL_MT='-MTd'
+		CL_DLL='-LDd'
 		;;
 	-c) 
 		CL+=' -c'
@@ -301,6 +307,11 @@ do
 		elif [[ "x`getExtension $out`" = "x.so" ]]
 		then
 			OUTPUT="-Fo`cygpath -w $out`"
+		elif [[ "x`getExtension $out`" = "x.dll" ]]
+		then
+			OUTPUT="-Fo`cygpath -w $out`"
+			LINK+=" -dll -out:$out"
+			DOLINK='1'
 		elif [[ "x`getExtension $out`" = "x.exe" ]]
 		then
 			LINK+=" -out:$out"
@@ -361,7 +372,7 @@ do
 	esac
 done
 
-CL_OPTS+=" $CL_MT"
+[[ -n "$SHARED" ]] && CL_OPTS+=" $CL_DLL" || CL_OPTS+=" $CL_MT"
 
 if [[ -n "$DODEPS" ]]
 then

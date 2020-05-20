@@ -13,7 +13,7 @@ clients, including the rest of Charm++, are actually C++.
 #include "pathHistory.h"
 
 #if CMK_LBDB_ON
-#include "LBDatabase.h"
+#include "LBManager.h"
 #endif // CMK_LBDB_ON
 
 #ifndef CMK_CHARE_USE_PTR
@@ -542,19 +542,17 @@ int CkGetArgc(void) {
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
-  //BIGSIM_OOC DEBUGGING
-  //CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
-  //fflush(stdout);
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
+  const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
   _entryTable[epIdx]->call(msg, obj);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
-  if (_entryTable[epIdx]->noKeep)
+  if (_entryTable[epIdx]->noKeep && msgtype != LAST_CK_ENVELOPE_TYPE)
   { /* Method doesn't keep/delete the message, so we have to: */
-    if (UsrToEnv(msg)->getMsgtype() != ArrayBcastFwdMsg) {
+    if (msgtype != ArrayBcastFwdMsg) {
       _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
     } else if (_entryTable[epIdx]->msgIdx != -1) {
       // For array broadcasts, the first time they show up here the msgIdx is
@@ -566,10 +564,6 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 }
 void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 {
-  //BIGSIM_OOC DEBUGGING
-  //CkPrintf("CkDeliverMessageReadonly: name of entry fn: %s\n", _entryTable[epIdx]->name);
-  //fflush(stdout);
-
   void *deliverMsg;
   if (_entryTable[epIdx]->noKeep)
   { /* Deliver a read-only copy of the message */
@@ -1055,10 +1049,10 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
   // if there is a running obj being measured, stop it temporarily
   LDObjHandle objHandle;
   int objstopped = 0;
-  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);
-  if (the_lbdb->RunningObject(&objHandle)) {
+  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);
+  if (the_lbmgr->RunningObject(&objHandle)) {
     objstopped = 1;
-    the_lbdb->ObjectStop(objHandle);
+    the_lbmgr->ObjectStop(objHandle);
   }
 #endif
 
@@ -1075,7 +1069,7 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 #endif
 
 #if CMK_LBDB_ON
-  if (objstopped) the_lbdb->ObjectStart(objHandle);
+  if (objstopped) the_lbmgr->ObjectStart(objHandle);
 #endif
   _STATS_RECORD_PROCESS_BRANCH_1();
 }
@@ -1179,7 +1173,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     if (msg->array_hops()>1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
-    bool doFree = !(opts & CK_MSG_KEEP);
+    bool doFree = true;
 #if CMK_ONESIDED_IMPL
     if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) // Do not free a P2P_RECV_MSG
       doFree = false;
@@ -1196,7 +1190,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   }
 }
 
-//BIGSIM_OOC DEBUGGING
+// Debugging support:
 #define TELLMSGTYPE(x) //x
 
 /**
@@ -1366,13 +1360,13 @@ void CkUnpackMessage(envelope **pEnv)
     _TRACE_BEGIN_UNPACK();
     msg = _msgTable[msgIdx]->unpack(msg);
     _TRACE_END_UNPACK();
+    env=UsrToEnv(msg);
+    env->setPacked(0);
 #if CMK_ONESIDED_IMPL
     short int zcMsgType = CMI_ZC_MSGTYPE(env);
     if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Convert offsets back into buffer pointers
       CkUnpackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
 #endif
-    env=UsrToEnv(msg);
-    env->setPacked(0);
     *pEnv = env;
   }
 }

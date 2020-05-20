@@ -150,14 +150,14 @@ class fromzDisk : public zdisk {
 #endif
 #endif // AMPIMSGLOG
 
-/* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
- * if tracing is not being used (see bug #1640 for more details on the latter). */
+/* AMPI sends messages inline to PE-local destination VPs if
+ * tracing is disabled (see bug #1640). */
 #ifndef AMPI_PE_LOCAL_IMPL
 #define AMPI_PE_LOCAL_IMPL ( !CMK_TRACE_ENABLED )
 #endif
 
-/* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
- * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
+/* AMPI sends messages using a zero copy protocol to Node-local destination VPs
+ * tracing is disabled (such msgs are currently untraced). */
 #ifndef AMPI_NODE_LOCAL_IMPL
 #define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_TRACE_ENABLED )
 #endif
@@ -181,7 +181,6 @@ class fromzDisk : public zdisk {
 #endif
 #endif
 
-/* AMPI uses RDMA sends if BigSim is not being used. */
 #ifndef AMPI_RDMA_IMPL
 #define AMPI_RDMA_IMPL 1
 #endif
@@ -2131,6 +2130,7 @@ class ampiParent final : public CBase_ampiParent {
   CProxy_ampi tmpRProxy;
 
   MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
+  bool didMigrate{};
 
  public:
   bool ampiInitCallDone;
@@ -2216,6 +2216,7 @@ class ampiParent final : public CBase_ampiParent {
   void ckAboutToMigrate() noexcept;
   void ckJustMigrated() noexcept;
   void ckJustRestored() noexcept;
+  void resumeAfterMigration() noexcept;
   void setUserAboutToMigrateFn(MPI_MigrateFn f) noexcept;
   void setUserJustMigratedFn(MPI_MigrateFn f) noexcept;
   ~ampiParent() noexcept;
