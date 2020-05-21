@@ -385,7 +385,7 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
   DEBUGF(("[%d] resetSection: old entry:%p new entry:%p\n", CkMyPe(), oldentry, entry));
 
   const std::vector<CkArrayIndex> &al = sid->_elems;
-  CmiAssert(info.get_aid() == aid);
+  CmiAssert(info.get_aid() == (CkGroupID)aid);
   prepareCookie(entry, *sid, al.data(), sid->_elems.size(), aid);
 
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -1063,7 +1063,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   int i;
   CkSectionInfo &sectionInfo = msg->_cookie;
   mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
-  CmiAssert(entry->getAid() == sectionInfo.get_aid());
+  CmiAssert((CkGroupID)entry->getAid() == sectionInfo.get_aid());
 
   if (entry->notReady()) {
     DEBUGF(("entry not ready, enq buffer %p, msg-used?: %d\n", msg, UsrToEnv(msg)->isUsed()));
@@ -1088,7 +1088,7 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
   int i;
   CkSectionInfo &sectionInfo = msg->_cookie;
   mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
-  CmiAssert(entry->getAid() == sectionInfo.get_aid());
+  CmiAssert((CkGroupID)entry->getAid() == sectionInfo.get_aid());
   CkGroupID aid = sectionInfo.get_aid();
   
   // send to local
