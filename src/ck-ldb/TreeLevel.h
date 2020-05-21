@@ -552,7 +552,10 @@ class RootLevel : public LevelLogic
       decisions.resize(num_children);
       decisions[0] = migMsg;
       for (int i = 1; i < num_children; i++)
-        decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&migMsg);
+      {
+        CkReferenceMsg(migMsg);
+        decisions[i] = migMsg;
+      }
     }
     else
     {
@@ -635,7 +638,10 @@ class RootLevel : public LevelLogic
       decisions.resize(num_children);
       decisions[0] = migMsg;
       for (int i = 1; i < num_children; i++)
-        decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&migMsg);
+      {
+        CkReferenceMsg(migMsg);
+        decisions[i] = migMsg;
+      }
     }
   }
 
@@ -881,7 +887,10 @@ class NodeSetLevel : public LevelLogic
     decisions.resize(num_children);
     decisions[0] = migMsg;
     for (int i = 1; i < num_children; i++)
-      decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&migMsg);
+    {
+      CkReferenceMsg(migMsg);
+      decisions[i] = migMsg;
+    }
     migMsg = nullptr;
   }
 
@@ -975,7 +984,10 @@ class NodeLevel : public LevelLogic
       // just forward decision from root to children
       decisions[0] = decision;
       for (int i = 1; i < pes.size(); i++)
-        decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&decision);
+      {
+        CkReferenceMsg(decision);
+        decisions[i] = decision;
+      }
     }
   }
 
@@ -1025,7 +1037,10 @@ class NodeLevel : public LevelLogic
     stats_msgs.clear();
     decisions[0] = migMsg;
     for (int i = 1; i < pes.size(); i++)
-      decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&migMsg);
+    {
+      CkReferenceMsg(migMsg);
+      decisions[i] = migMsg;
+    }
   }
 
   LBManager* lbmgr;
@@ -1226,7 +1241,10 @@ class MsgAggregator : public LevelLogic
     decisions.resize(num_children + 1);
     decisions[0] = decision;
     for (int i = 1; i < num_children + 1; i++)
-      decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&decision);
+    {
+      CkReferenceMsg(decision);
+      decisions[i] = decision;
+    }
   }
 
  protected:
