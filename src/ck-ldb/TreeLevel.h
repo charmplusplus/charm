@@ -10,9 +10,6 @@
 
 #define FLOAT_TO_INT_MULT 10000
 
-// TODO rateAware is not implemented, that is: collecting processor speeds
-// passing that information to rateAware lb strategies
-
 // ----------------------- msgs -----------------------
 
 #include "TreeLevel.decl.h"
