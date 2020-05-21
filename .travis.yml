@@ -17,15 +17,15 @@ matrix:
     script:
     - sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
     - ./build LIBS mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C mpi-linux-x86_64-smp/tmp -j3 all-test-tests all-test-examples OPTS="-g"
-    - make -C mpi-linux-x86_64-smp/tmp test-tests test-examples TESTOPTS="+setcpuaffinity"
+    - make -C mpi-linux-x86_64-smp/tests TESTOPTS="+setcpuaffinity"
+    - make -C mpi-linux-x86_64-smp/examples TESTOPTS="+setcpuaffinity"
 
   - os: osx
     name: "NetLRTS-Darwin"
     script:
     - ./build LIBS netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C netlrts-darwin-x86_64/tmp -j3 all-test-tests all-test-examples OPTS="-g"
-    - make -C netlrts-darwin-x86_64/tmp test-tests test-examples TESTOPTS="++local"
+    - make -C netlrts-darwin-x86_64/tests test TESTOPTS="++local"
+    - make -C netlrts-darwin-x86_64/examples test TESTOPTS="++local"
 
   - os: windows
     name: "NetLRTS-Win"
@@ -37,6 +37,9 @@ matrix:
     - export msys2+='& C:\\tools\\msys64\\msys2_shell.cmd -defterm -no-start'
     - export mingw64="$msys2 -mingw64 -full-path -here -c \$\* --"
     - export msys2+=" -msys2 -c \$\* --"
+    # Next two lines work around https://github.com/msys2/MSYS2-packages/issues/1962
+    - $msys2 pacman -Sy --noconfirm pacman
+    - $msys2 pacman -Su --noconfirm
     - $msys2 pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config
     - export PATH=/C/tools/msys64/mingw64/bin:$PATH
     - $mingw64 src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata
