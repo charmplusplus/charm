@@ -99,10 +99,9 @@ class KMeansBOC : public CBase_KMeansBOC {
  public:
  KMeansBOC(bool outlierAutomatic, int numKSeeds, int _peNumKeep,
 	   double _entryThreshold, bool outlierUsePhases) :
-  autoCompute(outlierAutomatic), numK(numKSeeds), 
-    peNumKeep(_peNumKeep), entryThreshold(_entryThreshold),
-    usePhases(outlierUsePhases) {};
- KMeansBOC(CkMigrateMessage *m):CBase_KMeansBOC(m) {};
+  autoCompute(outlierAutomatic), usePhases(outlierUsePhases),
+  numK(numKSeeds), peNumKeep(_peNumKeep), entryThreshold(_entryThreshold) {}
+ KMeansBOC(CkMigrateMessage *m):CBase_KMeansBOC(m) {}
   
   void startKMeansAnalysis();
   void flushCheck(bool someFlush);

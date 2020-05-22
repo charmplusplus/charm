@@ -26,7 +26,7 @@
 void ConverseInit(int, char**, CmiStartFn, int, int);
 void ConverseExit(int exitcode);
 
-void CmiAbort(const char *);
+void CmiAbort(const char *, ...);
 
 void          CmiSyncSendFn(int, int, char *);
 void          CmiFreeSendFn(int, int, char *);
@@ -87,9 +87,9 @@ void          CmiReleaseCommHandle(CmiCommHandle handle);
  */
 
 #if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
-void          CmiSyncListSendFn(int, int *, int, char*);
-CmiCommHandle CmiAsyncListSendFn(int, int *, int, char*);
-void          CmiFreeListSendFn(int, int *, int, char*);
+void          CmiSyncListSendFn(int, const int *, int, char*);
+CmiCommHandle CmiAsyncListSendFn(int, const int *, int, char*);
+void          CmiFreeListSendFn(int, const int *, int, char*);
 #endif
 
 #if ! CMK_MULTICAST_GROUP_USE_COMMON_CODE
@@ -131,7 +131,7 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 /** GROUPS DEFINITION
 
  * For groups of processors (establishing and managing) some more functions are
- * needed, they also con be found in common code (convcore.c) or here.
+ * needed, they also con be found in common code (convcore.C) or here.
  */
 
 #if ! CMK_MULTICAST_DEF_USE_COMMON_CODE
@@ -145,10 +145,10 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 
  * In order to deliver the messages to objects (either converse register
  * handlers, or charm objects), a scheduler is needed. The one implemented in
- * convcore.c can be used, or a new one can be implemented here. At present, all
+ * convcore.C can be used, or a new one can be implemented here. At present, all
  * machines use the default one, exept sim-linux.
 
- * If the one in convcore.c is used, still one function is needed.
+ * If the one in convcore.C is used, still one function is needed.
  */
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE /* use the default one */
@@ -193,20 +193,14 @@ int _Cmi_mynodesize;
 int _Cmi_mynode;
 int _Cmi_numnodes;
 
-CMI_EXTERNC
 int CmiMyPe(void);
-CMI_EXTERNC
 int CmiMyRank(void);
-CMI_EXTERNC
 int CmiNodeFirst(int node);
-CMI_EXTERNC
 int CmiNodeSize(int node);
-CMI_EXTERNC
 int CmiNodeOf(int pe);
-CMI_EXTERNC
 int CmiRankOf(int pe);
 
-/* optional, these functions are implemented in "machine-smp.c", so including
+/* optional, these functions are implemented in "machine-smp.C", so including
    this file avoid the necessity to reimplement them.
  */
 void CmiNodeBarrier(void);
@@ -226,7 +220,7 @@ void         CmiLock(CmiNodeLock lock);
 void         CmiUnlock(CmiNodeLock lock);
 int          CmiTryLock(CmiNodeLock lock);
 
-/* optional, these functions are implemented in "machine-smp.c", so including
+/* optional, these functions are implemented in "machine-smp.C", so including
    this file avoid the necessity to reimplement them.
  */
 void CmiNodeBarrier(void);
@@ -244,20 +238,14 @@ int _Cmi_mynodesize;
 int _Cmi_mynode;
 int _Cmi_numnodes;
 
-CMI_EXTERNC
 int CmiMyPe(void);
-CMI_EXTERNC
 int CmiMyRank(void);
-CMI_EXTERNC
 int CmiNodeFirst(int node);
-CMI_EXTERNC
 int CmiNodeSize(int node);
-CMI_EXTERNC
 int CmiNodeOf(int pe);
-CMI_EXTERNC
 int CmiRankOf(int pe);
 
-/* optional, these functions are implemented in "machine-smp.c", so including
+/* optional, these functions are implemented in "machine-smp.C", so including
    this file avoid the necessity to reimplement them.
  */
 void CmiNodeBarrier(void);
@@ -294,7 +282,7 @@ int CmiBarrierZero(void);
 
 /** PRINTF FUNCTIONS
 
- * Default code is provided in convcore.c but for particular architectures they
+ * Default code is provided in convcore.C but for particular architectures they
  * can be reimplemented. At present only netlrts- versions reimplement them.
 
  */
@@ -311,7 +299,7 @@ int  CmiScanf(const char *, ...);
 /** SPANNING TREE
 
  * During some working operations (such as quiescence detection), spanning trees
- * are used. Default code in convcore.c can be used, or a new definition can be
+ * are used. Default code in convcore.C can be used, or a new definition can be
  * implemented here.
  */
 
@@ -334,13 +322,13 @@ void     CmiNodeSpanTreeChildren(int node, int *children) ;
  * If immediate messages are supported, the following function is needed. There
  * is an exeption if the machine progress is also defined (see later for this).
 
- * Moreover, the file "immediate.c" should be included, otherwise all its
+ * Moreover, the file "immediate.C" should be included, otherwise all its
  * functions and variables have to be redefined.
 */
 
 #if CMK_CCS_AVAILABLE
 
-#include "immediate.c"
+#include "immediate.C"
 
 #if ! CMK_MACHINE_PROGRESS_DEFINED /* Hack for some machines */
 void CmiProbeImmediateMsg(void);

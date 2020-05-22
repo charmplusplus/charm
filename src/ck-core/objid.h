@@ -5,6 +5,24 @@
 #include "converse.h"
 #include "pup.h"
 
+// The default 64-bit ID layout is: 21 collection bits + 40 element bits + 3 type tag bits.
+// Users can override the number of bits for collections using -DCMK_OBJID_COLLECTION_BITS=N.
+// The element bits trade-off with the collection bits, while the type tag bits remain constant.
+#ifndef CMK_OBJID_COLLECTION_BITS
+#define CMK_OBJID_COLLECTION_BITS 21
+#endif
+
+#define CMK_OBJID_TYPE_TAG_BITS   3
+#define CMK_OBJID_ELEMENT_BITS    (64 - CMK_OBJID_COLLECTION_BITS - CMK_OBJID_TYPE_TAG_BITS)
+
+// Sanity checks:
+static_assert(CMK_OBJID_COLLECTION_BITS > 0,
+              "CMK_OBJID_COLLECTION_BITS must be greater than 0!");
+static_assert(CMK_OBJID_COLLECTION_BITS < (64 - CMK_OBJID_TYPE_TAG_BITS),
+              "CMK_OBJID_COLLECTION_BITS must be less than (64 - CMK_OBJID_TYPE_TAG_BITS)!");
+static_assert((CMK_OBJID_COLLECTION_BITS + CMK_OBJID_ELEMENT_BITS + CMK_OBJID_TYPE_TAG_BITS) == 64,
+              "The total number of collection + element + type tag bits must be 64!");
+
 namespace ck {
 
 /**
@@ -20,10 +38,21 @@ class ObjID {
             : id( ((CmiUInt8)gid.idx << ELEMENT_BITS) | eid)
         {
             if ( (CmiUInt8)gid.idx > (COLLECTION_MASK >> ELEMENT_BITS) ) {
-              CmiAbort("Failed to create a new ObjID due to running out of collection bits!");
+              CmiPrintf("\nError> ObjID ran out of collection bits, please try re-building "
+                        "Charm++ with a higher number of collection bits using "
+                        "-DCMK_OBJID_COLLECTION_BITS=N, such that %d<N<30\n",
+                        COLLECTION_BITS);
+              // We don't generally recommend collections bits > 30, though it's possible,
+              // b/c then ObjID only has < 32 bits for the element ID.
+              CmiAbort("Attempting to create too many chare collections!");
             }
             if ( eid > ELEMENT_MASK ) {
-              CmiAbort("Failed to create a new ObjID due to running out of element bits!");
+              CmiPrintf("\nError> ObjID ran out of element bits, please try re-building "
+                        "Charm++ with a lower number of collection bits using "
+                        "-DCMK_OBJID_COLLECTION_BITS=N, such that 3<N<%d\n",
+                        COLLECTION_BITS);
+              // We don't generally recommend collections bits <= 3 though it's possible
+              CmiAbort("Attempting to create too many chare elements!");
             }
         }
 
@@ -39,9 +68,9 @@ class ObjID {
         inline CmiUInt8 getID() const { return id & (COLLECTION_MASK | ELEMENT_MASK); }
 
         enum bits {
-          ELEMENT_BITS    = 36,
-          COLLECTION_BITS = 25,
-          TYPE_TAG_BITS   = 3
+          ELEMENT_BITS    = CMK_OBJID_ELEMENT_BITS,
+          COLLECTION_BITS = CMK_OBJID_COLLECTION_BITS,
+          TYPE_TAG_BITS   = CMK_OBJID_TYPE_TAG_BITS
         };
         enum masks : CmiUInt8 {
           ELEMENT_MASK =   ((1ULL << ELEMENT_BITS) - 1),

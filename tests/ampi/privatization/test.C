@@ -5,38 +5,45 @@
 #include "test.h"
 
 
-static int print_test_result(int rank, int my_wth, const char * name, bool result)
+static int print_test_result(int rank, int my_wth, const char * name, int result)
 {
   printf(result_indent "[%d](%d) %s %s\n", rank, my_wth, name, result ? "passed" : "failed");
-  return result ? 0 : 1;
+  return !result;
 }
 
-void test_privatization(int & failed, int & rank, int & my_wth, int & global)
+void test_privatization(int & failed, int & rank, int & my_wth, int & operation, int & global)
 {
   MPI_Barrier(MPI_COMM_WORLD);
 
-  global = 0;
+  if (operation == 0)
+  {
+    global = 0;
 
-  MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
-  if (rank == 0)
-    global = 1;
+    if (rank == 0)
+      global = 1;
 
-  MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
-  failed += print_test_result(rank, my_wth, "single write test", global == (rank == 0 ? 1 : 0));
+    failed += print_test_result(rank, my_wth, "single write test", global == (rank == 0 ? 1 : 0));
 
-  MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
-  global = 0;
+    global = 0;
 
-  MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
-  global = rank;
+    global = rank;
 
-  MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
-  failed += print_test_result(rank, my_wth, "many write test", global == rank);
+    failed += print_test_result(rank, my_wth, "many write test", global == rank);
+  }
+  else if (operation == 1)
+  {
+    failed += print_test_result(rank, my_wth, "migration test", global == rank);
+  }
 
   MPI_Barrier(MPI_COMM_WORLD);
 }
@@ -52,19 +59,31 @@ void privatization_test_framework(void)
   int my_wth, flag;
   MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &my_wth, &flag);
 
+  int operation;
 
   int failed_before = 0;
-  perform_test_batch(failed_before, rank, my_wth);
+  operation = 0;
+  perform_test_batch(failed_before, rank, my_wth, operation);
 
+#if defined test_migration
   if (rank == 0) printf("Requesting migration.\n");
   AMPI_Migrate(AMPI_INFO_LB_SYNC);
 
+  int failed_migration = 0;
+  operation = 1;
+  perform_test_batch(failed_migration, rank, my_wth, operation);
+#endif
+
   int failed_after = 0;
-  perform_test_batch(failed_after, rank, my_wth);
+  operation = 0;
+  perform_test_batch(failed_after, rank, my_wth, operation);
 
   if (failed_before != failed_after) printf("[%d](%d) Migration caused a test inconsistency.\n", rank, my_wth);
 
   int failed = failed_before + failed_after;
+#if defined test_migration
+  failed += failed_migration;
+#endif
   int total_failures = 0;
   MPI_Reduce(&failed, &total_failures, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 

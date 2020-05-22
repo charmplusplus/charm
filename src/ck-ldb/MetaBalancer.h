@@ -30,7 +30,7 @@
 #ifndef METABALANCER_H
 #define METABALANCER_H
 
-#include "LBDatabase.h"
+#include "LBManager.h"
 #include "RandomForestModel.h"
 #include <vector>
 
@@ -153,7 +153,7 @@ public:
   void SetStrategyCost(double lb_strategy_cost);
 
 private:
-  LBDatabase* lbdatabase;
+  LBManager* lbmanager;
   std::vector<double> total_load_vec;
   // Keeps track of how many local chares contributed
   std::vector<int> total_count_vec;
@@ -236,7 +236,7 @@ private:
 
 public:
   bool lb_in_progress;
-
+  bool ignore_periodic;
 };
 
 class MetaBalancerRedn : public CBase_MetaBalancerRedn {

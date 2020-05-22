@@ -1,6 +1,6 @@
-# Copyright © 2009-2014 Inria.  All rights reserved.
+# Copyright © 2009-2019 Inria.  All rights reserved.
 # Copyright © 2009-2010 Université Bordeaux
-# Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
+# Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 # Copyright © 2011      Oracle and/or its affiliates.  All rights reserved.
 # See COPYING in top-level directory.
 
@@ -9,13 +9,20 @@
 
 if HWLOC_BUILD_STANDALONE
 include_HEADERS = hwloc.h
+
+if BUILD_NETLOCSCOTCH
+include_HEADERS += netloc.h netlocscotch.h
+endif
+
 include_hwlocdir = $(includedir)/hwloc
 include_hwloc_HEADERS = \
         hwloc/bitmap.h \
         hwloc/helper.h \
         hwloc/inlines.h \
         hwloc/diff.h \
-        hwloc/myriexpress.h \
+        hwloc/shmem.h \
+        hwloc/distances.h \
+        hwloc/export.h \
         hwloc/openfabrics-verbs.h \
         hwloc/opencl.h \
         hwloc/cuda.h \
@@ -23,7 +30,6 @@ include_hwloc_HEADERS = \
         hwloc/nvml.h \
         hwloc/plugins.h \
         hwloc/gl.h \
-        hwloc/intel-mic.h \
         hwloc/rename.h \
         hwloc/deprecated.h
 include_hwloc_autogendir = $(includedir)/hwloc/autogen
@@ -35,7 +41,11 @@ noinst_HEADERS = \
         private/misc.h \
         private/xml.h \
         private/components.h \
-        private/cpuid-x86.h
+        private/internal-components.h \
+        private/cpuid-x86.h \
+        private/netloc.h \
+        netloc/utarray.h \
+        netloc/uthash.h
 
 if HWLOC_HAVE_LINUX
 include_hwloc_HEADERS += \

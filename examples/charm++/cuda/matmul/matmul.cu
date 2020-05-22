@@ -147,10 +147,14 @@ void cudaMatMul(int matrixSize, float* h_A, float* h_B, float* h_C, float* d_A,
   wr->addBuffer(h_C, size, false, true, true);
   wr->setCallback(cb);
   if (useCublas) {
+#ifdef HAPI_TRACE
     wr->setTraceName("blas");
+#endif
     wr->setRunKernel(run_BLAS_KERNEL);
   } else {
+#ifdef HAPI_TRACE
     wr->setTraceName("matmul");
+#endif
     wr->setRunKernel(run_MATMUL_KERNEL);
   }
   wr->copyUserData(&matrixSize, sizeof(int));

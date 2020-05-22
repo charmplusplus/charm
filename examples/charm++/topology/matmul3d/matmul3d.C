@@ -48,11 +48,11 @@ Main::Main(CkArgMsg* m) {
   }
 
   if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
-    CkAbort("array_size_X % block_size_X != 0!");
+    CkAbort("array_size_X %% block_size_X != 0!");
   if (arrayDimY < blockDimY || arrayDimY % blockDimY != 0)
-    CkAbort("array_size_Y % block_size_Y != 0!");
+    CkAbort("array_size_Y %% block_size_Y != 0!");
   if (arrayDimZ < blockDimZ || arrayDimZ % blockDimZ != 0)
-    CkAbort("array_size_Z % block_size_Z != 0!");
+    CkAbort("array_size_Z %% block_size_Z != 0!");
 
   num_chare_x = arrayDimX / blockDimX;
   num_chare_y = arrayDimY / blockDimY;

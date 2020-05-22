@@ -13,36 +13,53 @@ typedef struct ncpystruct{
 #endif
 
   const void *srcPtr;
-  int srcPe;
   char *srcLayerInfo;
-  int srcLayerSize;
   char *srcAck;
-  int srcAckSize;
-  int srcSize;
-  unsigned short int srcMode;
-  unsigned short int isSrcRegistered;
   const void *srcRef;
+  int srcPe;
+  int srcSize;
+  short int srcLayerSize;
+  short int srcAckSize;
+  unsigned char srcRegMode;
+  unsigned char srcDeregMode;
+  unsigned char isSrcRegistered;
 
   const void *destPtr;
-  int destPe;
   char *destLayerInfo;
-  int destLayerSize;
   char *destAck;
-  int destAckSize;
-  int destSize;
-  unsigned short int destMode;
-  unsigned short int isDestRegistered;
   const void *destRef;
+  int destPe;
+  int destSize;
+  short int destAckSize;
+  short int destLayerSize;
+  unsigned char destRegMode;
+  unsigned char destDeregMode;
+  unsigned char isDestRegistered;
+
+  unsigned char opMode; // CMK_DIRECT_API for p2p direct api
+                        // CMK_DIRECT_API_REVERSE for p2p direct api with inverse operation
+                        // CMK_EM_API for p2p entry method api
+                        // CMK_EM_API_REVERSE for p2p entry method api with inverse operation
 
   // Variables used for ack handling
-  int ackMode; // 0 for call both src and dest acks
-               // 1 for call just src ack
-               // 2 for call just dest ack
-  int freeMe; // 1 for free, 0 for do not free
+  unsigned char ackMode; // CMK_SRC_DEST_ACK for call both src and dest acks
+                         // CMK_SRC_ACK for call just src ack
+                         // CMK_DEST_ACK for call just dest ack
 
-  int ncpyOpInfoSize;
+  unsigned char freeMe;  // CMK_FREE_NCPYOPINFO in order to free NcpyOperationInfo
+                         // CMK_DONT_FREE_NCPYOPINFO in order to not free NcpyOperationInfo
+
+  short int ncpyOpInfoSize;
+
+  int rootNode; // used only for Broadcast, -1 for p2p operations
+
+  void *refPtr;
 
 }NcpyOperationInfo;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int getNcpyOpInfoTotalSize(
   int srcLayerSize,
@@ -57,7 +74,8 @@ void setNcpyOpInfo(
   char *srcAck,
   int srcAckSize,
   int srcSize,
-  unsigned short int srcMode,
+  unsigned short int srcRegMode,
+  unsigned short int srcDeregMode,
   unsigned short int isSrcRegistered,
   int srcPe,
   const void *srcRef,
@@ -67,11 +85,20 @@ void setNcpyOpInfo(
   char *destAck,
   int destAckSize,
   int destSize,
-  unsigned short int destMode,
+  unsigned short int destRegMode,
+  unsigned short int destDeregMode,
   unsigned short int isdestRegistered,
   int destPe,
   const void *destRef,
+  int rootNode,
   NcpyOperationInfo *ncpyOpInfo);
 
 void resetNcpyOpInfoPointers(NcpyOperationInfo *ncpyOpInfo);
+
+void setReverseModeForNcpyOpInfo(NcpyOperationInfo *ncpyOpInfo);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

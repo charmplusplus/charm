@@ -110,11 +110,12 @@ void ReservedWord(int token, int fCol, int lCol);
 %token STACKSIZE
 %token THREADED
 %token TEMPLATE
-%token SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE AGGREGATE
+%token WHENIDLE SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE AGGREGATE
 %token CREATEHERE CREATEHOME NOKEEP NOTRACE APPWORK
 %token VOID
 %token CONST
 %token NOCOPY
+%token NOCOPYPOST
 %token PACKED
 %token VARSIZE
 %token ENTRY
@@ -246,12 +247,14 @@ Name		: IDENT
 		| STACKSIZE { ReservedWord(STACKSIZE, @$.first_column, @$.last_column); YYABORT; }
 		| THREADED { ReservedWord(THREADED, @$.first_column, @$.last_column); YYABORT; }
 		| TEMPLATE { ReservedWord(TEMPLATE, @$.first_column, @$.last_column); YYABORT; }
+		| WHENIDLE { ReservedWord(WHENIDLE, @$.first_column, @$.last_column); YYABORT; }
 		| SYNC { ReservedWord(SYNC, @$.first_column, @$.last_column); YYABORT; }
 		| IGET { ReservedWord(IGET, @$.first_column, @$.last_column); YYABORT; }
 		| EXCLUSIVE { ReservedWord(EXCLUSIVE, @$.first_column, @$.last_column); YYABORT; }
 		| IMMEDIATE { ReservedWord(IMMEDIATE, @$.first_column, @$.last_column); YYABORT; }
 		| SKIPSCHED { ReservedWord(SKIPSCHED, @$.first_column, @$.last_column); YYABORT; }
 		| NOCOPY { ReservedWord(NOCOPY, @$.first_column, @$.last_column); YYABORT; }
+		| NOCOPYPOST { ReservedWord(NOCOPYPOST, @$.first_column, @$.last_column); YYABORT; }
 		| INLINE { ReservedWord(INLINE, @$.first_column, @$.last_column); YYABORT; }
 		| VIRTUAL { ReservedWord(VIRTUAL, @$.first_column, @$.last_column); YYABORT; }
 		| MIGRATABLE { ReservedWord(MIGRATABLE, @$.first_column, @$.last_column); YYABORT; }
@@ -975,6 +978,8 @@ EAttribList	: EAttrib
 
 EAttrib		: THREADED
 		{ $$ = STHREADED; }
+		| WHENIDLE
+		{ $$ = SWHENIDLE; }
 		| SYNC
 		{ $$ = SSYNC; }
                 | IGET
@@ -1105,7 +1110,17 @@ Parameter	: Type
 		{ /*Stop grabbing CPROGRAM segments*/
 			in_bracket=0;
 			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
-			$$->setRdma(true);
+			$$->setRdma(CMK_ZC_P2P_SEND_MSG);
+			if(firstRdma) {
+				$$->setFirstRdma(true);
+				firstRdma = false;
+			}
+		}
+		| NOCOPYPOST ParamBracketStart CCode ']'
+		{ /*Stop grabbing CPROGRAM segments*/
+			in_bracket=0;
+			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
+			$$->setRdma(CMK_ZC_P2P_RECV_MSG);
 			if(firstRdma) {
 				$$->setFirstRdma(true);
 				firstRdma = false;

@@ -76,6 +76,8 @@ class EntryInfo {
       marshalled messages.
     */
     CkMessagePupFn messagePup;
+    /// guard entryTable call and name swap for breakpoint in SMP
+    std::atomic<int> breakPointSet;
 #endif
 
     /// Charm++ Tracing enabled for this ep (can change dynamically)
@@ -84,9 +86,12 @@ class EntryInfo {
     bool noKeep;
     /// Method is an immediate entry method and can bypass scheduler
     bool isImmediate;
+    /// Method is an inline entry method and can bypass scheduler and execute inline
+    bool isInline;
     /// true if this EP is charm internal functions
     bool inCharm;
     bool appWork;
+    bool ownsName; // if entry is templated or setName() is called, then free name in dtor
 #ifdef ADAPT_SCHED_MEM
    /// true if this EP is used to be rescheduled when adjusting memory usage
    bool isMemCritical;
@@ -95,15 +100,44 @@ class EntryInfo {
     /// Human-readable name of entry method, including parameters.
     const char *name;
 
-    EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
+    EntryInfo(const char *n, CkCallFnPtr c, int m, int ci, bool ownsN=false) :
       call(c), msgIdx(m), chareIdx(ci),
       marshallUnpack(0)
 #if CMK_CHARMDEBUG
       ,messagePup(0)
 #endif
-      ,traceEnabled(true), noKeep(false), isImmediate(false), inCharm(false), appWork(false)
-      ,name(n)
-    { }
+      ,traceEnabled(true), noKeep(false), isImmediate(false), isInline(false), inCharm(false), appWork(false),
+      ownsName(ownsN), name(n)
+    {
+      if (ownsName) initName(n);
+#if CMK_CHARMDEBUG
+      breakPointSet=0;
+#endif      
+    }
+
+    ~EntryInfo()
+    {
+      if (ownsName) delete [] name;
+    }
+
+    /// For changing the name after initialization
+    void setName(const char* new_name)
+    {
+      if (ownsName) delete [] name;
+      initName(new_name);
+    }
+
+  private:
+    // Should only be called from ctor or setName
+    void initName(const char* new_name)
+    {
+      size_t len = strlen(new_name);
+      // This is freed via the name pointer in the destructor
+      char* temp = new char[len + 1];
+      strcpy(temp, new_name);
+      name = temp;
+      ownsName = true;
+    }
 };
 
 /**
@@ -267,8 +301,8 @@ class CkRegisteredInfo {
 	void outOfBounds(int idx) {
 		const char *exampleName="";
 		if (vec.size()>0) exampleName=vec[0]->name;
-		CkPrintf("register.h> CkRegisteredInfo<%d,%s> called with invalid index "
-			"%d (should be less than %d)\n", sizeof(T),exampleName,
+		CkPrintf("register.h> CkRegisteredInfo<%zu,%s> called with invalid index "
+			"%d (should be less than %zu)\n", sizeof(T),exampleName,
 			idx, vec.size());
 		CkAbort("Registered idx is out of bounds-- is message or memory corrupted?");
 	}

@@ -45,7 +45,7 @@ public:
   inline void ckStopTiming(void) {myRec->stopTiming();}
   //Begin load balancer measurements again (e.g., after CthSuspend)
   inline void ckStartTiming(void) {myRec->startTiming();}
-  inline LBDatabase *getLBDB(void) const {return myRec->getLBDB();}
+  inline LBManager *getLBMgr(void) const {return myRec->getLBMgr();}
   inline MetaBalancer *getMetaBalancer(void) const {return myRec->getMetaBalancer();}
 #else
   inline void ckStopTiming(void) { }
@@ -80,7 +80,11 @@ public:
 
 protected:
   /// A more verbose form of abort
-  virtual void CkAbort(const char *str) const;
+  CMK_NORETURN
+#if defined __GNUC__ || defined __clang__
+  __attribute__ ((format (printf, 2, 3)))
+#endif
+  virtual void CkAbort(const char *format, ...) const;
 
 public:
   virtual void ResumeFromSync(void);
@@ -95,8 +99,9 @@ public:
   void AtSync(int waitForMigration=1);
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
+  friend class LocalBarrier;
 private:
-  static void staticResumeFromSync(void* data);
+  void ResumeFromSyncHelper();
 public:
   void ReadyMigrate(bool ready);
   void ckFinishConstruction(void);

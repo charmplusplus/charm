@@ -1,7 +1,7 @@
 
 # machine specific recommendation
 case `hostname` in
-*.ranger.tacc.utexas.edu) CMK_DEFS="-tp barcelona-64 " ;;
+*.ranger.tacc.utexas.edu) CMK_DEFS="$CMK_DEFS -tp barcelona-64" ;;
 esac
 
 CMK_CPP_C="pgcc -E "
@@ -32,7 +32,7 @@ CMK_CF77="pgf77 "
 CMK_CF90="pgf90 "
 CMK_CF90_FIXED="$CMK_CF90 -Mfixed "
 f90libdir="."
-f90bindir=`which pgf90 2>/dev/null`
+f90bindir=`command -v pgf90 2>/dev/null`
 if test -n "$f90bindir"
 then
   f90libdir="$f90bindir/../lib"

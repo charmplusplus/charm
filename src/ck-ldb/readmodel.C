@@ -82,7 +82,7 @@ void ForestModel::readModel(const char* dir) {
   for (int k = 0; k < NUM_TREES; k++) {
     int classifierID, r1, r2;
     double val;
-    vector<double> w(3);
+    std::vector<double> w(3);
 
     int w_i;
     gzgets(pFile, linebuffer, LINE_SIZE);

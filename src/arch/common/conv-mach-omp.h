@@ -1,4 +1,3 @@
-#define CMK_TASKQUEUE 1
 #define CMK_OMP 1
 
 #if CMK_THREADS_BUILD_DEFAULT && !CMK_ARM

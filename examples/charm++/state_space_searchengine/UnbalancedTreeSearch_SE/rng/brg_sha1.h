@@ -40,8 +40,7 @@
 #define SHA1_DIGEST_SIZE 20
 
 #if defined(__cplusplus)
-extern "C"
-{
+extern "C" {
 #endif
 
 /** BEGIN: UTS RNG Harness **/

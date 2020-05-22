@@ -2,52 +2,79 @@
 #include <algorithm>
 #include <limits>
 
-using std::numeric_limits;
-
 void
 CkDDT::pup(PUP::er &p) noexcept
 {
-  p|types;
+  size_t numTypes = userTypeTable.size();
+  p|numTypes;
+
+  std::vector<signed char> types;
+  if (p.isPacking()) {
+    types.resize(numTypes);
+    for (int i=0; i<userTypeTable.size(); i++) {
+      if (userTypeTable[i] == nullptr)
+        types[i] = MPI_DATATYPE_NULL;
+      else // only the CkDDT types matter for unpacking so clamp all other values to fit in a signed char
+        types[i] = std::max(AMPI_MAX_PREDEFINED_TYPE, std::min(CkDDT_FIRST_USER_TYPE, userTypeTable[i]->getType()));
+    }
+    p(types.data(), numTypes);
+    types.clear();
+  }
+  else if (p.isSizing()) {
+    p((signed char *)nullptr, numTypes);
+  }
+
   if (p.isUnpacking()) {
-    typeTable.resize(types.size(), nullptr);
+    types.resize(numTypes);
+    p(types.data(), numTypes);
+    userTypeTable.resize(numTypes, nullptr);
     for (int i=0; i<types.size(); i++) {
       switch (types[i]) {
         case MPI_DATATYPE_NULL:
+          freeTypes.emplace(i);
           break;
         case CkDDT_CONTIGUOUS:
-          typeTable[i] = new CkDDT_Contiguous;
+          userTypeTable[i] = new CkDDT_Contiguous;
           break;
         case CkDDT_VECTOR:
-          typeTable[i] = new CkDDT_Vector;
+          userTypeTable[i] = new CkDDT_Vector;
           break;
         case CkDDT_HVECTOR:
-          typeTable[i] = new CkDDT_HVector;
+          userTypeTable[i] = new CkDDT_HVector;
           break;
         case CkDDT_INDEXED_BLOCK:
-          typeTable[i] = new CkDDT_Indexed_Block;
+          userTypeTable[i] = new CkDDT_Indexed_Block;
           break;
         case CkDDT_HINDEXED_BLOCK:
-          typeTable[i] = new CkDDT_HIndexed_Block;
+          userTypeTable[i] = new CkDDT_HIndexed_Block;
           break;
         case CkDDT_INDEXED:
-          typeTable[i] = new CkDDT_Indexed;
+          userTypeTable[i] = new CkDDT_Indexed;
           break;
         case CkDDT_HINDEXED:
-          typeTable[i] = new CkDDT_HIndexed;
+          userTypeTable[i] = new CkDDT_HIndexed;
           break;
         case CkDDT_STRUCT:
-          typeTable[i] = new CkDDT_Struct;
+          userTypeTable[i] = new CkDDT_Struct;
           break;
-        default: //CkDDT_PRIMITIVE
-          typeTable[i] = new CkDDT_DataType;
+        default: // predefined type
+          userTypeTable[i] = new CkDDT_DataType;
           break;
       }
     }
+
+    for (int i=0; i<types.size(); i++) {
+      if (types[i] != MPI_DATATYPE_NULL) {
+        userTypeTable[i]->pupType(p, this);
+      }
+    }
+
+    return;
   }
 
-  for (int i=0; i<types.size(); i++) {
-    if (types[i] != MPI_DATATYPE_NULL) {
-      typeTable[i]->pupType(p, this);
+  for (CkDDT_DataType * userType : userTypeTable) {
+    if (userType != nullptr) {
+      userType->pupType(p, this);
     }
   }
 }
@@ -55,31 +82,36 @@ CkDDT::pup(PUP::er &p) noexcept
 void
 CkDDT::freeType(int index) noexcept
 {
-  CkAssert(types.size() == typeTable.size());
-  if (index > CkDDT_MAX_PRIMITIVE_TYPE) {
+  if (index > AMPI_MAX_PREDEFINED_TYPE) {
+    int idx = index - AMPI_MAX_PREDEFINED_TYPE - 1;
     // Decrement the ref count and free the type if there are no references to it.
-    if (typeTable[index]->decRefCount() == 0) {
+    if (userTypeTable[idx]->decRefCount() == 0) {
       // Remove a reference from this type's base type(s).
-      if (typeTable[index]->getType() == CkDDT_STRUCT) {
-        int count = typeTable[index]->getCount();
-        vector<int> &baseIndices = static_cast<CkDDT_Struct &>(*typeTable[index]).getBaseIndices();
+      if (userTypeTable[idx]->getType() == CkDDT_STRUCT) {
+        int count = userTypeTable[idx]->getCount();
+        std::vector<int> &baseIndices = static_cast<CkDDT_Struct &>(*userTypeTable[idx]).getBaseIndices();
         for (int i=0; i<count; i++) {
           freeType(baseIndices[i]);
         }
       }
       else {
-        freeType(typeTable[index]->getBaseIndex());
+        freeType(userTypeTable[idx]->getBaseIndex());
       }
 
       // Free non-primitive type
-      delete typeTable[index];
-      typeTable[index] = nullptr;
-      types[index] = MPI_DATATYPE_NULL;
-      // Free all NULL types from back of typeTable
-      while (typeTable.back() == nullptr) {
-        typeTable.pop_back();
-        CkAssert(types.back() == MPI_DATATYPE_NULL);
-        types.pop_back();
+      delete userTypeTable[idx];
+      if (idx == userTypeTable.size()-1) {
+        userTypeTable.pop_back();
+        // Free all NULL types from back of userTypeTable
+        while (!userTypeTable.empty() && userTypeTable.back() == nullptr) {
+          userTypeTable.pop_back();
+          // Normally we would also erase --idx from freeTypes but std::priority_queue does not support that.
+          // Instead, handle that during insertType.
+        }
+      }
+      else {
+        userTypeTable[idx] = nullptr;
+        freeTypes.emplace(idx);
       }
     }
   }
@@ -87,9 +119,9 @@ CkDDT::freeType(int index) noexcept
 
 CkDDT::~CkDDT() noexcept
 {
-  for (int i=0; i<typeTable.size(); i++) {
-    if (typeTable[i] != nullptr) {
-      delete typeTable[i];
+  for (int i=0; i<userTypeTable.size(); i++) {
+    if (userTypeTable[i] != nullptr) {
+      delete userTypeTable[i];
     }
   }
 }
@@ -97,18 +129,24 @@ CkDDT::~CkDDT() noexcept
 int
 CkDDT::insertType(CkDDT_DataType* ptr, int type) noexcept
 {
-  // Search thru non-primitive types for a free one first:
-  CkAssert(types.size() == typeTable.size());
-  for (int i=CkDDT_MAX_PRIMITIVE_TYPE+1; i<types.size(); i++) {
-    if (types[i] == MPI_DATATYPE_NULL) {
-      types[i] = type;
-      typeTable[i] = ptr;
-      return i;
+  // Try to fill a freed slot before adding to the end of the table
+  if (!freeTypes.empty()) {
+    int i = freeTypes.top();
+    // std::priority_queue only supports erasing the front element,
+    // so there might be stale entries past the end of userTypeTable.
+    if (i < userTypeTable.size()) {
+      freeTypes.pop();
+      userTypeTable[i] = ptr;
+      return AMPI_MAX_PREDEFINED_TYPE + 1 + i;
+    }
+    else {
+      // if so, clear them out
+      freeTypes = decltype(freeTypes){};
     }
   }
-  types.push_back(type);
-  typeTable.push_back(ptr);
-  return types.size()-1;
+
+  userTypeTable.push_back(ptr);
+  return AMPI_MAX_PREDEFINED_TYPE + userTypeTable.size();
 }
 
 void
@@ -116,38 +154,48 @@ CkDDT::createDup(int nIndexOld, int *nIndexNew) noexcept
 {
   CkDDT_DataType *dttype = getType(nIndexOld);
   CkDDT_DataType *type;
+  int typeClass;
 
   switch (dttype->getType()) {
     case CkDDT_CONTIGUOUS:
       type = new CkDDT_Contiguous(static_cast<CkDDT_Contiguous&> (*dttype));
+      typeClass = CkDDT_CONTIGUOUS;
       break;
     case CkDDT_VECTOR:
       type = new CkDDT_Vector(static_cast<CkDDT_Vector&> (*dttype));
+      typeClass = CkDDT_VECTOR;
       break;
     case CkDDT_HVECTOR:
       type = new CkDDT_HVector(static_cast<CkDDT_HVector&> (*dttype));
+      typeClass = CkDDT_HVECTOR;
       break;
     case CkDDT_INDEXED_BLOCK:
       type = new CkDDT_Indexed_Block(static_cast<CkDDT_Indexed_Block&> (*dttype));
+      typeClass = CkDDT_INDEXED_BLOCK;
       break;
     case CkDDT_HINDEXED_BLOCK:
       type = new CkDDT_HIndexed_Block(static_cast<CkDDT_HIndexed_Block&> (*dttype));
+      typeClass = CkDDT_HINDEXED_BLOCK;
       break;
     case CkDDT_INDEXED:
       type = new CkDDT_Indexed(static_cast<CkDDT_Indexed&> (*dttype));
+      typeClass = CkDDT_INDEXED;
       break;
     case CkDDT_HINDEXED:
       type = new CkDDT_HIndexed(static_cast<CkDDT_HIndexed&> (*dttype));
+      typeClass = CkDDT_HINDEXED;
       break;
     case CkDDT_STRUCT:
       type = new CkDDT_Struct(static_cast<CkDDT_Struct&> (*dttype));
+      typeClass = CkDDT_STRUCT;
       break;
     default:
       type = new CkDDT_DataType(*dttype);
+      typeClass = dttype->getType();
       break;
   }
 
-  *nIndexNew = insertType(type, types[nIndexOld]);
+  *nIndexNew = insertType(type, typeClass);
 }
 
 int
@@ -164,7 +212,7 @@ CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], MPI_Aint a[], in
   int ret = dttype->getContents(ni, na, nd, i, a, d);
   if (dttype->getType() == CkDDT_STRUCT) {
     int count = dttype->getCount();
-    vector<CkDDT_DataType *> &baseTypes = static_cast<CkDDT_Struct &>(*dttype).getBaseTypes();
+    std::vector<CkDDT_DataType *> &baseTypes = static_cast<CkDDT_Struct &>(*dttype).getBaseTypes();
     for (int i=0; i<count; i++) {
       baseTypes[i]->incRefCount();
     }
@@ -180,52 +228,62 @@ CkDDT::createResized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Dat
 {
   CkDDT_DataType *dttype = getType(oldtype);
   CkDDT_DataType *type;
+  int typeClass;
 
   switch (dttype->getType()) {
     case CkDDT_CONTIGUOUS:
       type = new CkDDT_Contiguous(static_cast<CkDDT_Contiguous &>(*dttype));
       type->setSize(lb, extent);
+      typeClass = CkDDT_CONTIGUOUS;
       break;
     case CkDDT_VECTOR:
       type = new CkDDT_Vector(static_cast<CkDDT_Vector &>(*dttype));
       type->setSize(lb, extent);
+      typeClass = CkDDT_VECTOR;
       break;
     case CkDDT_HVECTOR:
       type = new CkDDT_HVector(static_cast<CkDDT_HVector &>(*dttype));
       type->setSize(lb, extent);
+      typeClass = CkDDT_HVECTOR;
       break;
     case CkDDT_INDEXED_BLOCK:
       type = new CkDDT_Indexed_Block(static_cast<CkDDT_Indexed_Block &>(*dttype));
       type->setSize(lb, extent);
+      typeClass = CkDDT_INDEXED_BLOCK;
       break;
     case CkDDT_HINDEXED_BLOCK:
       type = new CkDDT_HIndexed_Block(static_cast<CkDDT_HIndexed_Block &>(*dttype));
       type->setSize(lb, extent);
+      typeClass = CkDDT_HINDEXED_BLOCK;
       break;
     case CkDDT_INDEXED:
       type = new CkDDT_Indexed(static_cast<CkDDT_Indexed &>(*dttype));
       type->setSize(lb, extent);
+      typeClass = CkDDT_INDEXED;
       break;
     case CkDDT_HINDEXED:
       type = new CkDDT_HIndexed(static_cast<CkDDT_HIndexed &>(*dttype));
       type->setSize(lb, extent);
+      typeClass = CkDDT_HINDEXED;
       break;
     case CkDDT_STRUCT:
       type = new CkDDT_Struct(static_cast<CkDDT_Struct &>(*dttype));
       type->setSize(lb, extent);
+      typeClass = CkDDT_STRUCT;
       break;
     default:
       type = new CkDDT_DataType(*dttype, lb, extent);
+      typeClass = dttype->getType();
       break;
   }
 
-  *newType = insertType(type, types[oldtype]);
+  *newType = insertType(type, typeClass);
 }
 
 void
 CkDDT::newContiguous(int count, MPI_Datatype oldType, MPI_Datatype *newType) noexcept
 {
-  CkDDT_DataType *type = new CkDDT_Contiguous(count, oldType, typeTable[oldType]);
+  CkDDT_DataType *type = new CkDDT_Contiguous(count, oldType, getType(oldType));
   *newType = insertType(type, CkDDT_CONTIGUOUS);
 }
 
@@ -233,7 +291,7 @@ void
 CkDDT::newVector(int count, int blocklength, int stride,
                  MPI_Datatype oldType, MPI_Datatype* newType) noexcept
 {
-  CkDDT_DataType* type = new CkDDT_Vector(count, blocklength, stride, oldType, typeTable[oldType]);
+  CkDDT_DataType* type = new CkDDT_Vector(count, blocklength, stride, oldType, getType(oldType));
   *newType = insertType(type, CkDDT_VECTOR);
 }
 
@@ -241,7 +299,7 @@ void
 CkDDT::newHVector(int count, int blocklength, int stride,
                   MPI_Datatype oldtype, MPI_Datatype* newType) noexcept
 {
-  CkDDT_DataType* type = new CkDDT_HVector(count, blocklength, stride, oldtype, typeTable[oldtype]);
+  CkDDT_DataType* type = new CkDDT_HVector(count, blocklength, stride, oldtype, getType(oldtype));
   *newType = insertType(type, CkDDT_HVECTOR);
 }
 
@@ -252,7 +310,7 @@ CkDDT::newIndexedBlock(int count, int Blocklength, const int *arrDisp, MPI_Datat
   // Convert arrDisp from an array of int's to an array of MPI_Aint's. This is needed because
   // MPI_Type_create_indexed_block takes ints and MPI_Type_create_hindexed_block takes MPI_Aint's
   // and we use HIndexed_Block to represent both of those datatypes internally.
-  CkDDT_DataType* oldtype = typeTable[oldtypeIdx];
+  CkDDT_DataType* oldtype = getType(oldtypeIdx);
   std::vector<MPI_Aint> arrDispBytes(count);
   for (int i=0; i<count; i++) {
     arrDispBytes[i] = static_cast<MPI_Aint>(arrDisp[i] * oldtype->getExtent());
@@ -267,7 +325,7 @@ CkDDT::newHIndexedBlock(int count, int Blocklength, const MPI_Aint *arrDisp, MPI
                         MPI_Datatype *newType) noexcept
 {
   CkDDT_DataType *type = new CkDDT_HIndexed_Block(count, Blocklength, arrDisp,
-                                                  oldtype, typeTable[oldtype]);
+                                                  oldtype, getType(oldtype));
   *newType = insertType(type, CkDDT_HINDEXED_BLOCK);
 }
 
@@ -275,8 +333,8 @@ void
 CkDDT::newIndexed(int count, const int* arrbLength, MPI_Aint* arrDisp,
                   MPI_Datatype oldtypeIdx, MPI_Datatype* newType) noexcept
 {
-  CkDDT_DataType* oldtype = typeTable[oldtypeIdx];
-  vector<MPI_Aint> dispBytesArr(count);
+  CkDDT_DataType* oldtype = getType(oldtypeIdx);
+  std::vector<MPI_Aint> dispBytesArr(count);
   for (int i=0; i<count; i++) {
     dispBytesArr[i] = arrDisp[i] * oldtype->getExtent();
   }
@@ -289,7 +347,7 @@ void
 CkDDT::newHIndexed(int count, const int* arrbLength, const MPI_Aint* arrDisp,
                    MPI_Datatype oldtype, MPI_Datatype* newType) noexcept
 {
-  CkDDT_DataType* type = new CkDDT_HIndexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
+  CkDDT_DataType* type = new CkDDT_HIndexed(count, arrbLength, arrDisp, oldtype, getType(oldtype));
   *newType = insertType(type, CkDDT_HINDEXED);
 }
 
@@ -297,12 +355,157 @@ void
 CkDDT::newStruct(int count, const int* arrbLength, const MPI_Aint* arrDisp,
                  const MPI_Datatype *oldtype, MPI_Datatype* newType) noexcept
 {
-  vector<CkDDT_DataType *> olddatatypes(count);
+  std::vector<CkDDT_DataType *> olddatatypes(count);
   for(int i=0;i<count;i++){
     olddatatypes[i] = getType(oldtype[i]);
   }
   CkDDT_DataType* type = new CkDDT_Struct(count, arrbLength, arrDisp, oldtype, olddatatypes.data());
   *newType = insertType(type, CkDDT_STRUCT);
+}
+
+std::string
+CkDDT_DataType::getConfig() const noexcept
+{
+  std::string res(getName());
+  res+=": ";
+  res+=getTypeMap();
+  res+=" lb=" + std::to_string(lb);
+  res+=" ub=" + std::to_string(ub);
+  res+=" extent=" + std::to_string(extent);
+  res+=" trueExtent=" + std::to_string(trueExtent);
+  res+=" trueLB=" + std::to_string(trueLB);
+  res+=" size=" + std::to_string(size);
+  res+=" iscontig=" + std::to_string(iscontig);
+
+  return res;
+}
+
+std::string
+CkDDT_DataType::getTypeMap() const noexcept
+{
+  std::string res("{");
+  for(int i=0; i<count; i++) {
+    res+=("(");
+    res+=(baseType ? baseType->getName() : getName());
+    res+=(",");
+    res+=(std::to_string(lb));
+    res+=(")");
+    if (i!=count -1)
+      res+=(",");
+  }
+  res+=("}");
+  return res;
+}
+
+std::string
+CkDDT_Contiguous::getTypeMap() const noexcept
+{
+  std::string res("{");
+  for(int i=0; i<count; i++) {
+    res+=("(");
+    res+=("TYPE_"+std::to_string(baseIndex));
+    res+=(",");
+    res+=(std::to_string(i*baseType->getExtent()));
+    res+=(")");
+    if (i!=count -1)
+      res+=(",");
+  }
+  res+=("}");
+  return res;
+}
+
+std::string
+CkDDT_Vector::getTypeMap() const noexcept
+{
+  std::string res("{");
+  int disp = 0;
+  for(int i=0; i<count; i++) {
+    for(int j=0; j<blockLength; j++) {
+      res+=("(");
+      res+=("TYPE_"+std::to_string(baseIndex));
+      res+=(",");
+      res+=(std::to_string(j*baseType->getExtent()+disp));
+      res+=(")");
+      if (j!=blockLength -1)
+        res+=(",");
+    }
+    disp += strideLength*baseType->getExtent();
+    res+=(";");
+  }
+  res+=("}");
+  return res;
+}
+
+std::string
+CkDDT_HVector::getTypeMap() const noexcept
+{
+  std::string res("{");
+  int disp = 0;
+  for(int i=0; i<count; i++) {
+    for(int j=0; j<blockLength; j++) {
+      res+=("(");
+      res+=("TYPE_"+std::to_string(baseIndex));
+      res+=(",");
+      res+=(std::to_string(j*baseType->getExtent()+disp));
+      res+=(")");
+      if (j!=blockLength -1)
+        res+=(",");
+    }
+    disp += strideLength;
+  }
+  res+=("}");
+  return res;
+}
+
+std::string
+CkDDT_HIndexed::getTypeMap() const noexcept
+{
+  std::string res("{");
+  for(int i=0; i<count; i++) {
+    res+=("(");
+    res+=("TYPE_"+std::to_string(baseIndex));
+    res+=(",");
+    res+=(std::to_string(arrayDisplacements[i]));
+    res+=(")");
+    if (i!=count -1)
+      res+=(",");
+  }
+  res+=("}");
+  return res;
+}
+
+std::string
+CkDDT_HIndexed_Block::getTypeMap() const noexcept
+{
+  std::string res("{");
+  for(int i=0; i<count; i++) {
+    res+=("(");
+    res+=("TYPE_"+std::to_string(baseIndex));
+    res+=(",");
+    res+=(std::to_string(arrayDisplacements[i]));
+    res+=(")");
+    if (i!=count -1)
+      res+=(",");
+  }
+  res+=("}");
+  return res;
+}
+
+std::string
+CkDDT_Struct::getTypeMap() const noexcept
+{
+  std::string res("{");
+  for(int i=0; i<count; i++) {
+    res+=("(");
+    res+=(arrayDataType[i]->getName());
+    res+=(",");
+    res+=(std::to_string(arrayDisplacements[i]));
+    res+=(")");
+    if (i!=count -1)
+      res+=(",");
+  }
+  res+=("}");
+  return res;
 }
 
 CkDDT_DataType::CkDDT_DataType(int type) noexcept : datatype(type)
@@ -477,19 +680,17 @@ CkDDT_DataType::CkDDT_DataType(int type) noexcept : datatype(type)
   baseIndex   = -1;
   refCount    = 1;
 
-  DDTDEBUG("CkDDT_DataType constructor: type=%d, size=%d, extent=%ld, iscontig=%d\n",
-           type, size, extent, iscontig);
+  DDTDEBUG("CkDDT_DataType() %s\n", getConfig().c_str());
 }
-
 
 CkDDT_DataType::CkDDT_DataType(int datatype, int size, MPI_Aint extent, int count, MPI_Aint lb,
                                MPI_Aint ub, bool iscontig, int baseSize, MPI_Aint baseExtent,
                                CkDDT_DataType* baseType, int numElements, int baseIndex,
                                MPI_Aint trueExtent, MPI_Aint trueLB) noexcept :
-    datatype(datatype), refCount(1), size(size), extent(extent), count(count), lb(lb), ub(ub),
-    trueExtent(trueExtent), trueLB(trueLB), iscontig(iscontig), baseSize(baseSize),
-    baseExtent(baseExtent), baseType(baseType), numElements(numElements), baseIndex(baseIndex),
-    isAbsolute(false)
+    iscontig(iscontig), isAbsolute(false), size(size), count(count), datatype(datatype),
+    refCount(1), baseSize(baseSize), baseIndex(baseIndex), numElements(numElements),
+    extent(extent), ub(ub), lb(lb), trueExtent(trueExtent), trueLB(trueLB),
+    baseExtent(baseExtent), baseType(baseType)
 {
   if (baseType) {
     baseType->incRefCount();
@@ -497,22 +698,22 @@ CkDDT_DataType::CkDDT_DataType(int datatype, int size, MPI_Aint extent, int coun
 }
 
 CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, MPI_Aint _lb/*=0*/, MPI_Aint _extent/*=0*/) noexcept :
-  datatype(obj.datatype)
-  ,refCount(1)
+  iscontig(obj.iscontig)
+  ,isAbsolute(obj.isAbsolute)
   ,size(obj.size)
-  ,extent(obj.extent)
   ,count(obj.count)
-  ,lb(obj.lb)
+  ,datatype(obj.datatype)
+  ,refCount(1)
+  ,baseSize(obj.baseSize)
+  ,baseIndex(obj.baseIndex)
+  ,numElements(obj.numElements)
+  ,extent(obj.extent)
   ,ub(obj.ub)
+  ,lb(obj.lb)
   ,trueExtent(obj.trueExtent)
   ,trueLB(obj.trueLB)
-  ,iscontig(obj.iscontig)
-  ,baseSize(obj.baseSize)
   ,baseExtent(obj.baseExtent)
   ,baseType(obj.baseType)
-  ,numElements(obj.numElements)
-  ,baseIndex(obj.baseIndex)
-  ,isAbsolute(obj.isAbsolute)
   ,name(obj.name)
 {
   if (baseType) {
@@ -574,7 +775,7 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt) noexcept
   p|iscontig;
   p|isAbsolute;
   p|numElements;
-  p|keyvals;
+  p|attributes;
   p|name;
   if (p.isUnpacking()) {
     baseType = NULL;
@@ -631,6 +832,7 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
   else {
     iscontig = baseType->isContig();
   }
+  DDTDEBUG("CkDDT_Contiguous() %s\n", getConfig().c_str());
 }
 
 size_t
@@ -760,6 +962,7 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
       iscontig = false;
     }
   }
+  DDTDEBUG("CkDDT_Vector() %s\n", getConfig().c_str());
 }
 
 size_t
@@ -871,6 +1074,7 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
       iscontig = false;
     }
   }
+  DDTDEBUG("CkDDT_HVector() %s\n", getConfig().c_str());
 }
 
 size_t
@@ -1063,6 +1267,7 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const MPI_Ain
     }
     iscontig = (contig && baseType->isContig());
   }
+  DDTDEBUG("CkDDT_{H}Indexed_Block() %s\n", getConfig().c_str());
 }
 
 size_t
@@ -1277,6 +1482,7 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const MPI_Aint* 
     }
     iscontig = (contig && baseType->isContig());
   }
+  DDTDEBUG("CkDDT_HIndexed() %s\n", getConfig().c_str());
 }
 
 size_t
@@ -1353,13 +1559,15 @@ CkDDT_HIndexed::getNumBasicElements(int bytes) const noexcept
 }
 
 CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock, const MPI_Aint* arrDisp,
-                           const int *bindex, CkDDT_DataType** arrBase) noexcept
+                           const int *bindex, CkDDT_DataType** arrBase,
+                           const char* name/*=nullptr*/) noexcept
   : CkDDT_DataType(CkDDT_STRUCT, 0, 0, nCount, 0, 0, 0, 0, 0, NULL, 0, 0, 0, 0),
     arrayBlockLength(nCount),
     arrayDisplacements(nCount),
     index(nCount),
     arrayDataType(nCount)
 {
+  if (name != nullptr) setName(name);
   int saveExtent = 0;
   for (int i=0; i<count; i++) {
     arrayBlockLength[i] = arrBlock[i];
@@ -1455,7 +1663,7 @@ CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock, const MPI_Aint* arrD
       iscontig = false;
     }
   }
-  DDTDEBUG("type %d: ub=%ld, lb=%ld, extent=%ld, size=%d, iscontig=%d\n",datatype,ub,lb,extent,size,iscontig);
+  DDTDEBUG("CkDDT_Struct() %s\n", getConfig().c_str());
 }
 
 size_t
@@ -1552,10 +1760,10 @@ CkDDT_Struct::getNumBasicElements(int bytes) const noexcept
   }
 
   int rem = bytes % size;
-  const vector<CkDDT_DataType *> &types = getBaseTypes();
+  const std::vector<CkDDT_DataType *> &baseTypes = getBaseTypes();
   int basicTypes = 0;
-  for (int i=0; i<types.size(); i++) {
-    basicTypes += types[i]->getNumBasicElements(types[i]->getSize());
+  for (int i=0; i<baseTypes.size(); i++) {
+    basicTypes += baseTypes[i]->getNumBasicElements(baseTypes[i]->getSize());
   }
 
   int count = (bytes / size) * basicTypes;
@@ -1563,13 +1771,13 @@ CkDDT_Struct::getNumBasicElements(int bytes) const noexcept
     return count;
   }
 
-  for (int i=0; i<types.size(); i++) {
-    int type_size = types[i]->getSize();
+  for (int i=0; i<baseTypes.size(); i++) {
+    int type_size = baseTypes[i]->getSize();
     if ((type_size * arrayBlockLength[i]) > rem) {
-      return count + types[i]->getNumBasicElements(rem);
+      return count + baseTypes[i]->getNumBasicElements(rem);
     }
     else {
-      count += types[i]->getNumBasicElements(type_size) * arrayBlockLength[i];
+      count += baseTypes[i]->getNumBasicElements(type_size) * arrayBlockLength[i];
       rem -= type_size * arrayBlockLength[i];
     }
     if (rem == 0) {

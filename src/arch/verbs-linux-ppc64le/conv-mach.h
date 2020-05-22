@@ -30,8 +30,7 @@
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
-#define CMK_THREADS_USE_CONTEXT                            0
-#define CMK_THREADS_USE_FCONTEXT                           1
+#define CMK_THREADS_USE_CONTEXT                            1
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 
@@ -65,9 +64,6 @@
 #undef CMK_IMMEDIATE_MSG
 #define CMK_IMMEDIATE_MSG                                  0
 */
-
-#undef CMK_DIRECT
-#define CMK_DIRECT                                         1
 
 #undef CMK_DISABLE_SYNC
 #define CMK_DISABLE_SYNC                                   1

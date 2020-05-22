@@ -1,7 +1,8 @@
+-include ../../include/conv-mach-opt.mak
+
 DIRS = \
   megatest \
   alignment \
-  pingpong \
   simplearrayhello \
   provisioning \
   load_balancing \
@@ -11,14 +12,8 @@ DIRS = \
   sdag \
   ckAllocSysMsgTest \
   method_templates \
-  xcastredn \
   demand_creation \
-  migrate \
-  taskSpawn \
-  taskSpawnRecursive \
-  streamingAllToAll \
   startupTest \
-  kNeighbor \
   topology \
   io \
   sparse \
@@ -27,20 +22,13 @@ DIRS = \
   charmxi_parsing \
   jacobi3d \
   jacobi3d-sdag \
-
-# skip sdag, megatest and commtest
-BGDIRS = \
-  pingpong \
-  simplearrayhello \
-  load_balancing \
-  chkpt \
-  delegation \
+  zerocopy \
+  within_node_bcast \
+  longIdle \
+  bombard \
 
 FTDIRS = \
   jacobi3d \
-  jacobi3d-sdag \
-
-MLOGFTDIRS = \
   jacobi3d-sdag \
 
 TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
@@ -48,12 +36,15 @@ TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
 all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
+ifeq ($(CMK_SMP),1)
+ifneq ($(CMK_MULTICORE),1)
+	make smptest
+endif
+endif
 
-bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
+smptest: $(foreach i,$(TESTDIRS),smptest-$i)
 
-syncfttest causalfttest mpisyncfttest: $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
-
-mlogfttest: $(foreach i,$(filter $(MLOGFTDIRS),$(DIRS)),test-$i)
+syncfttest mpisyncfttest: $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
@@ -65,8 +56,8 @@ $(foreach i,$(DIRS),build-$i):
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
-$(foreach i,$(DIRS),bgtest-$i):
-	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+$(foreach i,$(DIRS),smptest-$i):
+	$(MAKE) -C $(subst smptest-,,$@) smptest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

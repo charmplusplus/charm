@@ -44,63 +44,10 @@
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
-#if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
-#include <Carbon/Carbon.h>
-#include <Multiprocessing.h>
-#endif
-
-#if CMK_BIGSIM_CHARM
-#include "middle-blue.h"
-using namespace BGConverse;
-#endif
 
 extern "C" int CmiNumCores(void) {
-  int a = 1;
-#ifdef _WIN32
-struct _SYSTEM_INFO sysinfo;
-#endif  
-
-  /* Allow the user to override the number of CPUs for use
-     in scalability testing, debugging, etc. */
-  char *forcecount = getenv("FORCECPUCOUNT");
-  if (forcecount != NULL) {
-    if (sscanf(forcecount, "%d", &a) == 1) {
-      return a; /* if we got a valid count, return it */
-    } else {
-      a = 1;      /* otherwise use the real available hardware CPU count */
-    }
-  }
-
-#if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
-  a = MPProcessorsScheduled(); /* Number of active/running CPUs */
-#endif
-
-#ifdef _WIN32
-  //struct _SYSTEM_INFO sysinfo;  
-  GetSystemInfo(&sysinfo);
-  a = sysinfo.dwNumberOfProcessors; /* total number of CPUs */
-#endif /* _MSC_VER */
-
-
-#ifdef _SC_NPROCESSORS_ONLN
-  a = sysconf(_SC_NPROCESSORS_ONLN); /* number of active/running CPUs */
-#ifdef _SC_NPROCESSORS_CONF
-  /* also consider CPUs that are temporarily powered down by the OS */
-  const int b = sysconf(_SC_NPROCESSORS_CONF);
-  if ( b > a ) a = b;
-#endif
-#elif defined(_SC_CRAY_NCPU)
-  a = sysconf(_SC_CRAY_NCPU);
-#elif defined(_SC_NPROC_ONLN)
-  a = sysconf(_SC_NPROC_ONLN); /* number of active/running CPUs */
-#endif
-#if CMK_BLUEGENEQ
-  a *= Kernel_ProcessCount();
-#endif
-
-  if (a < 1) a = 1;
-
-  return a;
+  // PU count is the intended output here rather than literal cores
+  return CmiHwlocTopologyLocal.total_num_pus;
 }
 
 struct _procInfo {
@@ -219,7 +166,7 @@ int CpuTopology::supported = 0;
 namespace CpuTopoDetails {
 
 static nodeTopoMsg *topomsg = NULL;
-static CmmTable hostTable;
+static std::map<skt_ip_t, _procInfo *> hostTable;
 
 CpvStaticDeclare(int, cpuTopoHandlerIdx);
 CpvStaticDeclare(int, cpuTopoRecvHandlerIdx);
@@ -238,7 +185,7 @@ using namespace CpuTopoDetails;
 static void printTopology(int numNodes)
 {
   // assume all nodes have same number of cores
-  const int ways = CmiNumCores();
+  const int ways = CmiHwlocTopologyLocal.num_pus;
   if (ways > 1)
     CmiPrintf("Charm++> Running on %d hosts (%d sockets x %d cores x %d PUs = %d-way SMP)\n",
               numNodes, CmiHwlocTopologyLocal.num_sockets,
@@ -247,9 +194,6 @@ static void printTopology(int numNodes)
               ways);
   else
     CmiPrintf("Charm++> Running on %d hosts\n", numNodes);
-
-  if (ways != CmiHwlocTopologyLocal.num_pus)
-    CmiPrintf("Charm++> Warning: Internally-determined PU count does not match hwloc's result!\n");
 }
 
 /* called on PE 0 */
@@ -257,11 +201,10 @@ static void cpuTopoHandler(void *m)
 {
   _procInfo *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
-  int tag, tag1, pe;
+  int pe;
 
   if (topomsg == NULL) {
     int i;
-    hostTable = CmmNew();
     topomsg = (nodeTopoMsg *)CmiAlloc(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int));
     CmiSetHandler((char *)topomsg, CpvAccess(cpuTopoRecvHandlerIdx));
     topomsg->nodes = (int *)((char*)topomsg + sizeof(nodeTopoMsg));
@@ -279,26 +222,24 @@ static void cpuTopoHandler(void *m)
   skt_print_ip(str, msg->ip);
   printf("hostname: %d %s\n", msg->pe, str);
 */
-    tag = *(int*)&proc->ip;
+    skt_ip_t & ip = proc->ip;
     pe = proc->pe;
-    if ((rec = (_procInfo *)CmmProbe(hostTable, 1, &tag, &tag1)) != NULL) {
+    auto iter = hostTable.find(ip);
+    if (iter != hostTable.end()) {
+      rec = iter->second;
     }
     else {
       proc->nodeID = pe;           // we will compact the node ID later
       rec = proc;
-      CmmPut(hostTable, 1, &tag, proc);
+      hostTable.emplace(ip, proc);
     }
     topomsg->nodes[pe] = rec->nodeID;
     rec->rank ++;
   }
 
-  printTopology(CmmEntries(hostTable));
+  printTopology(hostTable.size());
 
-    // clean up CmmTable
-  hostnameMsg *tmpm;
-  tag = CmmWildCard;
-  while ((tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)));
-  CmmFree(hostTable);
+  hostTable.clear();
   CmiFree(msg);
 
   CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
@@ -455,9 +396,6 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 					   "Show cpu topology info"))
     show_flag = 1;
 
-#if CMK_BIGSIM_CHARM
-  if (BgNodeRank() == 0)
-#endif
     {
       CpvInitialize(int, cpuTopoHandlerIdx);
       CpvInitialize(int, cpuTopoRecvHandlerIdx);
@@ -477,32 +415,10 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   }
 
   if (CmiMyPe() == 0) {
-#if CMK_BIGSIM_CHARM
-    if (BgNodeRank() == 0)
-#endif
       startT = CmiWallTimer();
   }
 
-#if CMK_BIGSIM_CHARM
-  if (BgNodeRank() == 0)
-  {
-    //int numPes = BgNumNodes()*BgGetNumWorkThread();
-    int numPes = cpuTopo.numPes = CkNumPes();
-    cpuTopo.nodeIDs = new int[numPes];
-    CpuTopology::supported = 1;
-    int wth = BgGetNumWorkThread();
-    for (int i=0; i<numPes; i++) {
-      int nid = i / wth;
-      cpuTopo.nodeIDs[i] = nid;
-    }
-    cpuTopo.sort();
-  }
-  return;
-#else
 
-#if CMK_USE_GM
-  CmiBarrier();
-#endif
 
 
 #if 0
@@ -637,14 +553,10 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   }
 
   if (CmiMyPe() == 0) {
-#if CMK_BIGSIM_CHARM
-    if (BgNodeRank() == 0)
-#endif
       CmiPrintf("Charm++> cpu topology info is gathered in %.3f seconds.\n", CmiWallTimer()-startT);
   }
 #endif
 
-#endif   /* __BIGSIM__ */
 
   // now every one should have the node info
   CcdRaiseCondition(CcdTOPOLOGY_AVAIL);      // call callbacks

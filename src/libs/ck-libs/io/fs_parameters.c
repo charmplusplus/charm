@@ -6,6 +6,7 @@
 #include <lustre/lustre_user.h>
 #include <errno.h>
 #include <libgen.h>
+#include <string.h>
 
 static inline int maxInt(int a, int b) {
   return a > b ? a : b;
@@ -35,12 +36,15 @@ size_t CkGetFileStripeSize(const char *filename) {
     // If errno == ENOENT, may be trying to write a file that doesn't exist yet,
     // so try reading the properties of the path's parent instead.
     // This won't work on Windows (could implement with _splitpath_s).
-    char* directory = dirname(filename);
+    char* filenameCopy = strdup(filename);
+    char* directory = dirname(filenameCopy);
     rc = llapi_file_get_stripe(directory, lump);
+    free(filenameCopy);
   }
 
   if (rc != 0) {
-    CkAbort("[CkIO] llapi_file_get_stripe error");
+    CkPrintf("[CkIO] Cannot extract lustre file stripe size for %s, using default of 4 MB\n", filename);
+    return 4 * 1024 * 1024;
   }
 
   return lump->lmm_stripe_size;

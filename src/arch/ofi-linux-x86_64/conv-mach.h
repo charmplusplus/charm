@@ -41,7 +41,7 @@
    directly as normal c variables (1) */
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
-/* decide which is the default implementation of the threads (see threads.c)
+/* decide which is the default implementation of the threads (see threads.C)
    Only one of the following can be 1. If none of them is selected, qthreads
    will be used as default. This default can be overwritten at compile time
    using -DCMK_THREADS_BUILD_"type"=1 */
@@ -51,7 +51,7 @@
 #define CMK_THREADS_USE_PTHREADS                           0
 
 /* Specifies what kind of timer to use, and the correspondent headers will be
-   included in convcore.c. If none is selected, then the machine.C file needs to
+   included in convcore.C. If none is selected, then the machine.C file needs to
    implement the timer primitives. */
 #define CMK_TIMER_USE_RTC                                  0
 #define CMK_TIMER_USE_RDTSC                                0
@@ -61,7 +61,7 @@
 #define CMK_TIMER_USE_BLUEGENEL                            0
 
 /* Specifies what the processor will do when it is idle, either sleep (1) or go
-   into busy waiting mode (0). In convcore.c there are a few files included if
+   into busy waiting mode (0). In convcore.C there are a few files included if
    sleeping mode, but the real distinct implementation is in the machine.C
    file. */
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
@@ -89,15 +89,15 @@ extended header must contain also another field called "pn" (phase number).
  * Specifies which version of PMI to use.
  * See src/arch/ofi/machine.C
  */
-#define CMK_OFI_USE_PMI                                     1
-#define CMK_OFI_USE_PMI2                                    0
+#define CMK_USE_PMI                                     1
+#define CMK_USE_PMI2                                    0
 
 /*
  * Use Simple client-side implementation of PMI.
- * Valid only for CMK_OFI_USE_PMI.
+ * Valid only for CMK_USE_PMI.
  * Optional in an SLURM environment.
- * See src/arch/ofi/simple_pmi/
+ * See src/arch/util/proc_management/simple_pmi/
  */
-#define CMK_OFI_USE_SIMPLEPMI                               1
+#define CMK_USE_SIMPLEPMI                               1
 
 #endif

@@ -304,7 +304,7 @@ void TraceEntry::write(FILE* fp, int prevLID, int prevSeek, int nextLID, int nex
 
 /***************** Class TraceLogger Definition *****************/
 TraceLogger::TraceLogger(char* program, int b):
-	numLangs(1), numEntries(0), lastWriteFlag(false), prevLID(0), prevSeek(0)
+	numEntries(0), numLangs(1), lastWriteFlag(false), prevLID(0), prevSeek(0)
 {
   binary = b;
 
@@ -487,7 +487,7 @@ void TraceLogger::openLogFiles()
 	//	CmiPrintf("FILE NAME %s at %d \n",fName[i],i);
 	    	CmiAbort("Cannot open Projector Trace File for writing ... \n");
   	}
-	CmiPrintf("[%d]Iteration %d : fp %d \n",CmiMyPe(),i,fp);
+	CmiPrintf("[%d]Iteration %d : fp %s\n",CmiMyPe(),i,fName[i]);
 	fptrs[i] = fp;
 
 	if(i == 1)

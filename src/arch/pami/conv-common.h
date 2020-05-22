@@ -5,11 +5,10 @@
 
 #define CMK_HANDLE_SIGUSR                                  1
 
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt1 cmaMsgType:2, nokeep:1;
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }
-#define CMK_MSG_HEADER_BIGSIM_    { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
@@ -37,3 +36,5 @@
 #define CMK_PERSISTENT_COMM                                0
 
 #define CMK_CONVERSE_MPI                                   0
+
+#define CMK_CONVERSE_PAMI                                  1

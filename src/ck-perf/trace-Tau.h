@@ -29,7 +29,7 @@ class TraceTau : public Trace {
   
   // "creation" of message(s) - message Sends
   void creation(envelope *, int epIdx, int num=1);
-  void creationMulticast(envelope *, int epIdx, int num=1, int *pelist=NULL);
+  void creationMulticast(envelope *, int epIdx, int num=1, const int *pelist=NULL);
   void creationDone(int num=1);
   
   void messageRecv(char *env, int pe);

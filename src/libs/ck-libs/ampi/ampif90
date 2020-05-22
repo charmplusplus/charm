@@ -1,29 +1,13 @@
-#!/bin/sh
-CHARMBIN=`dirname $0`
+#!/bin/bash
+CHARMBIN=$(dirname $0)
 
-STANDALONE=""
+# protect rpath arguments from disappearing due to variable expansion
+ORIGIN='\$ORIGIN'
 
-processArgs() {
-while [ ! $# -eq 0 ]
-do
-  arg="$1"
-  case "$arg" in
-  -standalone)
-     STANDALONE="true"
-     ;;
-  *)
-     ;;
-  esac
-  shift
-done
-}
+export AMPICC_MODE='ampif'
 
-eval processArgs "$@"
-
-[ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" ] && ROMIO=-lampiromio
-
-ln $CHARMBIN/../include/mpif.h .
-$CHARMBIN/charmc -language ampif -default-to-aout $@ $ROMIO
+cp -n $CHARMBIN/../include/mpif.h .
+$CHARMBIN/ampiCC "$@"
 status=$?
 /bin/rm -f mpif.h
 exit $status

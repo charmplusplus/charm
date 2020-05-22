@@ -12,7 +12,7 @@
 #include "ckgraph.h"
 #include <metis.h>
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
 

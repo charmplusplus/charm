@@ -54,7 +54,7 @@ static void get_hypergraph_edge_wgts(void *data, int numGID, int numLID, int num
                                      int edge_weight_dim, ZOLTAN_ID_PTR edgeGID, ZOLTAN_ID_PTR edgeLID,
                                      float *edge_wgts, int *ierr);
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(ZoltanLB, "Use Zoltan(tm) to partition object graph")
 

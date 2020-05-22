@@ -38,6 +38,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType* t, TypeList* b, AstChildren<Memb
   bases_CBase = NULL;
   setTemplate(0);
   hasSdagEntry = 0;
+  hasWhenIdleEntry = 0;
 }
 
 void Chare::check() {
@@ -1093,9 +1094,9 @@ void Group::genSubDecls(XStr& str) {
         << "{ return " << super << "::ckGetSectionID(i); }\n"
         << "inline CkGroupID ckGetGroupIDn(int i) const\n"
         << "{ return " << super << "::ckGetGroupIDn(i); }\n"
-        << "inline int *ckGetElements() const\n"
+        << "inline const int *ckGetElements() const\n"
         << "{ return " << super << "::ckGetElements(); }\n"
-        << "inline int *ckGetElements(int i) const\n"
+        << "inline const int *ckGetElements(int i) const\n"
         << "{ return " << super << "::ckGetElements(i); }\n"
         << "inline int ckGetNumElements() const\n"
         << "{ return " << super << "::ckGetNumElements(); } \n"

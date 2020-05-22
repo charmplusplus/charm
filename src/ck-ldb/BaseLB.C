@@ -12,14 +12,10 @@
 void BaseLB::initLB(const CkLBOptions &opt) {
   seqno = opt.getSeqNo();
   CkpvAccess(numLoadBalancers) ++;
-/*
-  if (CkpvAccess(numLoadBalancers) - CkpvAccess(hasNullLB) > 1)
-    CmiAbort("Error: try to create more than one load balancer strategies!");
-*/
-  theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
+  lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   lbname = "Unknown";
-  // register this load balancer to LBDatabase at the sequence number
-  theLbdb->addLoadbalancer(this, seqno);
+  // register this load balancer to LBManager at the sequence number
+  lbmgr->addLoadbalancer(this, seqno);
 }
 
 BaseLB::~BaseLB() {
@@ -27,7 +23,7 @@ BaseLB::~BaseLB() {
 }
 
 void BaseLB::unregister() {
-  theLbdb->RemoveLocalBarrierReceiver(receiver);
+  lbmgr->RemoveLocalBarrierReceiver(receiver);
   CkpvAccess(numLoadBalancers) --;
 }
 
@@ -37,7 +33,7 @@ void BaseLB::pup(PUP::er &p) {
   {
     if (CkMyPe()==0) {
       if (seqno!=-1) {
-        int newseq = LBDatabaseObj()->getLoadbalancerTicket();
+        int newseq = LBManagerObj()->getLoadbalancerTicket();
         CmiAssert(newseq == seqno);
       }
     }
@@ -47,7 +43,7 @@ void BaseLB::pup(PUP::er &p) {
 
 void BaseLB::flushStates() {
   Group::flushStates();
-  theLbdb->ClearLoads();
+  lbmgr->ClearLoads();
 }
 
 #else
@@ -185,7 +181,7 @@ int BaseLB::LDStats::getHash(const CmiUInt8 &oid, const LDOMid &mid)
         int index = (id+hash)%hashSize;
 	if (index == -1 || objHash[index] == -1) return -1;
         if (objData[objHash[index]].objID() == oid &&
-            LDOMidEqual(objData[objHash[index]].omID(), mid))
+            objData[objHash[index]].omID() == mid)
             return objHash[index];
     }
     //  CkPrintf("not found \n");
@@ -268,7 +264,7 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 	    }
             else if (receiver_type == LD_OBJLIST_MSG) {
               int nobjs;
-              LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+              const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
 	      mcast_count ++;
 	      CkVec<int> pes;
 	      for (int i=0; i<nobjs; i++) {
@@ -312,7 +308,7 @@ void BaseLB::LDStats::print()
   for(int pe=0; pe < nprocs(); pe++) {
     struct ProcStats &proc = procs[pe];
 
-    CkPrintf("Proc %d (%d) Speed %d Total = %f Idle = %f Bg = %f nObjs = %d",
+    CkPrintf("Proc %d (%d) Speed %f Total = %f Idle = %f Bg = %f nObjs = %d",
       pe, proc.pe, proc.pe_speed, proc.total_walltime, proc.idletime,
       proc.bg_walltime, proc.n_objs);
 #if CMK_LB_CPUTIMER
@@ -326,7 +322,7 @@ void BaseLB::LDStats::print()
       LDObjData &odata = objData[i];
       CkPrintf("Object %d\n",i);
       CkPrintf("     id = %" PRIu64 "\n",odata.objID());
-      CkPrintf("  OM id = %d\t",odata.omID().id);
+      CkPrintf("  OM id = %d\t",odata.omID().id.idx);
       CkPrintf("   Mig. = %d\n",odata.migratable);
 #if CMK_LB_CPUTIMER
       CkPrintf("    CPU = %f\t",odata.cpuTime);
@@ -344,14 +340,14 @@ void BaseLB::LDStats::print()
 	CkPrintf("    sender PE = %d\t",cdata[i].src_proc);
       else
 	CkPrintf("    sender id = %d:[%" PRIu64 "]\t",
-		 cdata[i].sender.omID().id,sid);
+		 cdata[i].sender.omID().id.idx,sid);
 
       CmiUInt8 &rid = cdata[i].receiver.get_destObj().objID();
       if (cdata[i].recv_type() == LD_PROC_MSG)
 	CkPrintf("  receiver PE = %d\n",cdata[i].receiver.proc());
       else	
 	CkPrintf("  receiver id = %d:[%" PRIu64 "]\n",
-		 cdata[i].receiver.get_destObj().omID().id,rid);
+		 cdata[i].receiver.get_destObj().omID().id.idx,rid);
       
       CkPrintf("     messages = %d\t",cdata[i].messages);
       CkPrintf("        bytes = %d\n",cdata[i].bytes);

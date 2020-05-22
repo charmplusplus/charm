@@ -38,6 +38,7 @@ class WhenStatementEChecker;
 #define SREDUCE 0x40000   // <- reduction target
 #define SAPPWORK 0x80000  // <- reduction target
 #define SAGGREGATE 0x100000
+#define SWHENIDLE (0x200000 | SLOCAL) // implies SLOCAL as well
 
 /* An entry construct */
 class Entry : public Member {
@@ -47,6 +48,8 @@ class Entry : public Member {
   XStr* genClosureTypeNameProxyTemp;
   int line, entryCount;
   int first_line_, last_line_;
+  int numRdmaSendParams; // stores the number of rdma send parameters (marked nocopy)
+  int numRdmaRecvParams; // stores the number of rdma recv parameters (marked nocopypost)
 
  private:
   int attribs;
@@ -63,6 +66,9 @@ class Entry : public Member {
   int hasCallMarshall;
   void genCall(XStr& dest, const XStr& preCall, bool redn_wrapper = false,
                bool usesImplBuf = false);
+
+  void genRegularCall(XStr& dest, const XStr& preCall, bool redn_wrapper = false,
+               bool usesImplBuf = false, bool isRdmaPost = false);
 
   XStr epStr(bool isForRedn = false, bool templateCall = false);
   XStr epIdx(int fromProxy = 1, bool isForRedn = false);
@@ -104,11 +110,6 @@ class Entry : public Member {
   void genAccelFullCallList(XStr& str);
   void genAccelIndexWrapperDecl_general(XStr& str);
   void genAccelIndexWrapperDef_general(XStr& str);
-  void genAccelIndexWrapperDecl_spe(XStr& str);
-  void genAccelIndexWrapperDef_spe(XStr& str);
-  int genAccels_spe_c_funcBodies(XStr& str);
-  void genAccels_spe_c_regFuncs(XStr& str);
-  void genAccels_ppe_c_regFuncs(XStr& str);
 
   XStr aggregatorIndexType();
   XStr dataItemType();
@@ -188,6 +189,7 @@ class Entry : public Member {
   int isNoKeep(void);
   int isSdag(void);
   bool isTramTarget(void);
+  int isWhenIdle(void);
 
   // DMK - Accel support
   int isAccel(void);
@@ -212,6 +214,8 @@ class Entry : public Member {
   int getLine();
   void genTramRegs(XStr& str);
   void genTramPups(XStr& scope, XStr& decls, XStr& defs);
+
+  Chare* getContainer(void) const;
 };
 
 // TODO(Ralf): why not simply use list<Entry*> instead?

@@ -80,7 +80,7 @@ void TraceControlPoints::creation(envelope *, int epIdx, int num) {
 }
 
 void TraceControlPoints::creationMulticast(envelope *, int epIdx, int num, 
-				    int *pelist) {
+				    const int *pelist) {
   //  CkPrintf("[%d] Multicast Message for Entry Method id %d sent to %d pes\n", CkMyPe(), epIdx, num);
 }
 
@@ -247,11 +247,7 @@ extern "C" void traceControlPointsExitFunction() {
 // Initialization of the parallel trace module.
 void initTraceControlPointsBOC() {
 /*
-#ifdef __BIGSIM__
-  if (BgNodeRank()==0) {
-#else
     if (CkMyRank() == 0) {
-#endif
       registerExitFn(traceControlPointsExitFunction);
     }
 */

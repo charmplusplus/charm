@@ -64,9 +64,6 @@
 #define CMK_IMMEDIATE_MSG       0
 */
 
-#undef CMK_DIRECT                 
-#define CMK_DIRECT                                        1
-
 #undef CMK_DISABLE_SYNC
 #define CMK_DISABLE_SYNC       1
 

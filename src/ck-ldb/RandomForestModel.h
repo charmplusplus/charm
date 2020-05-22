@@ -40,10 +40,9 @@
 #define LB_CLASSES 6
 #define DEPTH 9
 
-using std::vector;
 namespace rfmodel {
 struct DataMatrix {
-  vector<double> data;
+  std::vector<double> data;
   int num_rows;
   int num_cols;
   DataMatrix() {}
@@ -53,7 +52,7 @@ struct DataMatrix {
     else
       data.resize(nrows * ncols, 0);
   }
-  DataMatrix(const vector<double>& d, int nrows, int ncols)
+  DataMatrix(const std::vector<double>& d, int nrows, int ncols)
       : data(d), num_rows(nrows), num_cols(ncols) {
     CkAssert(d.size() == (size_t)nrows * (size_t)ncols);
   }
@@ -176,21 +175,21 @@ struct Model {
   int classifierID;
   int r1;
   int r2;
-  vector<double> w;
+  std::vector<double> w;
   double weakTest(const DataMatrix& X) const;
 };
 
 struct TreeModel {
   int l_X, l_D;
   int* classes;
-  vector<Model> weakModels;
-  vector<double> leafdist;
-  void treeTest(const DataMatrix& X, vector<double>& Ysoft) const;
+  std::vector<Model> weakModels;
+  std::vector<double> leafdist;
+  void treeTest(const DataMatrix& X, std::vector<double>& Ysoft) const;
 };
 
 struct ForestModel {
   int classes[LB_CLASSES];
-  vector<TreeModel> treeModels;
+  std::vector<TreeModel> treeModels;
   void readModel(const char* dir);
   int forestTest(std::vector<double>& X, int num_rows, int num_cols);
 };

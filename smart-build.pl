@@ -36,7 +36,7 @@ sub promptUserYN {
 	}
   }
 }
-  
+
 
 # The beginning of the good stuff:
 print "\n============================================================\n";
@@ -202,6 +202,22 @@ if($skip_choosing eq "false"){
 }
 
 
+# check for UCX
+
+if($skip_choosing eq "false"){
+  my $ucx_found = index(`cc $tempfile -Wl,-lucp 2>&1`, "-lucp") == -1;
+
+  if ($ucx_found) {
+    print "\nI found that you have UCX libs available in your toolchain.\nDo you want to build Charm++ targeting UCX? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+      $converse_network_type = "ucx";
+      $skip_choosing = "true";
+    }
+  }
+}
+
+
 # check for Verbs
 
 if($skip_choosing eq "false"){
@@ -247,14 +263,14 @@ if($skip_choosing eq "false"){
 }
 
 
-if($skip_choosing eq "false") { 
-  
+if($skip_choosing eq "false") {
+
   print "\nDo you have a special network interconnect? [y/N]: ";
   my $p = promptUserYN();
   if($p eq "yes"){
 
 	print << "EOF";
-	
+
 Choose an interconnect from below: [1-10]
 	 1) MPI
 	 2) Infiniband (verbs)
@@ -263,9 +279,10 @@ Choose an interconnect from below: [1-10]
 	 5) Blue Gene/Q
 	 6) Intel Omni-Path (ofi)
 	 7) PAMI
+	 8) UCX
 
 EOF
-	
+
 	while(my $line = <>){
 	  chomp $line;
 	  if($line eq "1"){
@@ -289,10 +306,30 @@ EOF
 	  } elsif($line eq "7"){
 		$converse_network_type = "pamilrts";
 		last;
+	  } elsif($line eq "8"){
+		$converse_network_type = "ucx";
+		last;
 	  } else {
 		print "Invalid option, please try again :P\n"
 	  }
-	}	
+	}
+  }
+}
+
+
+# check for CUDA
+
+my $nvcc_found = "false";
+my $n = system("which nvcc > /dev/null 2>/dev/null") / 256;
+if($n == 0){
+  $nvcc_found = "true";
+}
+
+if($nvcc_found eq "true"){
+  print "\nI found that you have NVCC available in your path.\nDo you want to build Charm++ with GPU Manager support for CUDA? [y/N]: ";
+  my $p = promptUserYN();
+  if($p eq "yes") {
+    $options = "$options cuda";
   }
 }
 
@@ -308,7 +345,7 @@ if($arch eq ""){
 	  	$arch = $arch . "-arm7";
 	  }
 }
-  
+
 # Fixup $arch to match the inconsistent directories in src/archs
 
 if($arch eq "netlrts-darwin"){
@@ -347,7 +384,7 @@ if($opts =~ m/pxshm/){
 }
 
 if ($counter != 1) {
-    print "How do you want to handle SMP/Multicore: [1-$counter]\n";
+    print "\nHow do you want to handle SMP/Multicore: [1-$counter]\n";
     print $smp_opts;
 
     while(my $line = <>){
@@ -417,13 +454,9 @@ $explanations{"flang"} = "Use the flang compiler for Fortran";
 $explanations{"ifort"} = "Use Intel's ifort Fortran compiler";
 $explanations{"pgf90"} = "Use Portland Group's pgf90 Fortran compiler";
 $explanations{"syncft"} = "Use fault tolerance support";
-$explanations{"mlogft"} = "Use message logging fault tolerance support";
-$explanations{"causalft"} = "Use causal message logging fault tolerance support";
 $explanations{"omp"} = "Build Charm++ with integrated OpenMP support";
 $explanations{"papi"} = "Enable PAPI performance counters";
 $explanations{"pedantic"} = "Enable pedantic compiler warnings";
-$explanations{"bigemulator"} = "Build additional BigSim libraries";
-$explanations{"bigsim"} = "Compile Charm++ as running on the BigSim emulator";
 $explanations{"nolb"} = "Build without load balancing support";
 $explanations{"perftools"} = "Build with support for the Cray perftools";
 $explanations{"persistent"} = "Build the persistent communication interface";
@@ -443,7 +476,7 @@ $explanations{"tsan"} = "Compile Charm++ with support for Thread Sanitizer";
   $opts = $1;
 
   my @option_list = split(" ", $opts);
-  
+
 
   # Prune out entries that would already have been chosen above, such as smp
   my @option_list_pruned = ();
@@ -512,14 +545,14 @@ $explanations{"tsan"} = "Compile Charm++ with support for Thread Sanitizer";
 
 # Choose compiler flags
 print << "EOF";
-	
+
 Choose a set of compiler flags [1-5]
 	1) none
 	2) debug mode                        -g -O0
 	3) production build [default]        --with-production
 	4) production build w/ projections   --with-production --enable-tracing
 	5) custom
-	
+
 EOF
 
 my $compiler_flags = "";
@@ -534,16 +567,16 @@ while(my $line = <>){
 	} elsif($line eq "4" ){
  		$compiler_flags = "--with-production --enable-tracing";
 		last;
-	} elsif($line eq "3" || $line eq ""){ 
+	} elsif($line eq "3" || $line eq ""){
                 $compiler_flags = "--with-production";
-                last; 
+                last;
         }  elsif($line eq "5"){
 
 		print "Enter compiler options: ";
 		my $input_line = <>;
 		chomp($input_line);
 		$compiler_flags = $input_line;
-		
+
 		last;
 	} else {
 		print "Invalid option, please try again :P\n"
@@ -580,18 +613,18 @@ while(my $line = <>){
 	} else {
 		print "Invalid option, please try again :P\n"
 	}
-	
+
 }
 
 # Determine whether to use a -j flag for faster building
 my $j = "";
     print << "EOF";
-    
+
 Do you want to compile in parallel?
         1) No
         2) Build with -j2
         3) Build with -j4
-        4) Build with -j8 
+        4) Build with -j8
         5) Build with -j16 [default]
         6) Build with -j32
         7) Build with -j
@@ -605,7 +638,7 @@ EOF
 	    last;
         } elsif($line eq "2") {
 	    $j = "-j2";
-	    last; 
+	    last;
 	} elsif($line eq "3") {
 	    $j = "-j4";
 	    last;
@@ -648,7 +681,7 @@ print "Do you want to start the build now? [Y/n]: ";
 my $p = promptUserYN();
 if($p eq "yes" || $p eq "default"){
   if(-e "$dirname/src/arch/$arch"){
-	print "Building with: ${build_line}\n";	
+	print "Building with: ${build_line}\n";
 	# Execute the build line
 	system($build_line);
   } else {

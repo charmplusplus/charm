@@ -1,16 +1,17 @@
 -include ../../../common.mk
-CHARMC = ../../../../bin/charmc $(USE_WR) $(OPTS)
+CHARMC = ../../../../bin/charmc $(DEFS) $(OPTS)
 
-# use deprecated hapiWorkRequest for GPU offloading
-USE_WR = #-DUSE_WR
+# -DUSE_WR: use deprecated hapiWorkRequest for GPU offloading
+# -USE_NVTX: use NVTX to profile CPU functions, need -lnvToolsExt in LD_LIBS
+DEFS = #-DUSE_WR -USE_NVTX
 
 # set CUDATOOLKIT_HOME to the CUDA toolkit directory
 CUDATOOLKIT_HOME ?= /usr/local/cuda
 NVCC = $(CUDATOOLKIT_HOME)/bin/nvcc
-NVCC_FLAGS = -c -std=c++11 $(USE_WR)
+NVCC_FLAGS = -c -std=c++11 $(DEFS)
 NVCC_INC = -I$(CUDATOOLKIT_HOME)/include
 CHARM_INC = -I../../../../include
-LD_LIBS =
+LD_LIBS = #-lnvToolsExt
 
 TARGET = vecadd
 all: $(TARGET)

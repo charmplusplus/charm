@@ -1,7 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 #
 # good for job less than 30 minutes
 # have to pass bank using -A or set PROJECT environment variable
+
+export FROM_CHARMRUN='1'
 
 args=""
 pes=1
@@ -46,7 +48,9 @@ do
 		;;
 	++quiet)
 		QUIET=1
-		args=$args" "$1
+		;;
+	++no-quiet)
+		QUIET=0
 		;;
   --pernode)
     pernode=$2
@@ -59,6 +63,8 @@ do
 	shift
 done
 
+
+test $QUIET -eq 1 && args=$args" "++quiet
 
 test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
 

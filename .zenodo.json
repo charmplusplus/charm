@@ -1,0 +1,242 @@
+{
+    "description": "The Charm++ parallel programming system.", 
+    "upload_type": "software", 
+    "creators": [
+        {
+            "orcid": "0000-0001-9673-8445", 
+            "affiliation": "University of Illinois", 
+            "name": "Laxmikant Kale"
+        }, 
+        {
+            "name": "Bilge Acun"
+        }, 
+        {
+            "name": "Seonmyeong Bak"
+        }, 
+        {
+            "name": "Aaron Becker"
+        }, 
+        {
+            "name": "Milind Bhandarkar"
+        }, 
+        {
+            "name": "Nitin Bhat"
+        }, 
+        {
+            "name": "Abhinav Bhatele"
+        }, 
+        {
+            "name": "Eric Bohm"
+        }, 
+        {
+            "name": "Cyril Bordage"
+        }, 
+        {
+            "name": "Robert Brunner"
+        }, 
+        {
+            "name": "Ronak Buch"
+        }, 
+        {
+            "name": "Sayantan Chakravorty"
+        }, 
+        {
+            "name": "Kavitha Chandrasekar"
+        }, 
+        {
+            "name": "Jaemin Choi"
+        }, 
+        {
+            "name": "Michael Denardo"
+        }, 
+        {
+            "name": "Jayant DeSouza"
+        }, 
+        {
+            "name": "Matthias Diener"
+        }, 
+        {
+            "name": "Harshit Dokania"
+        }, 
+        {
+            "name": "Isaac Dooley"
+        }, 
+        {
+            "name": "Wayne Fenton"
+        }, 
+        {
+            "name": "Juan Galvez"
+        }, 
+        {
+            "name": "Fillipo Gioachin"
+        }, 
+        {
+            "name": "Abhishek Gupta"
+        }, 
+        {
+            "name": "Gagan Gupta"
+        }, 
+        {
+            "name": "Manish Gupta"
+        }, 
+        {
+            "name": "Attila Gursoy"
+        }, 
+        {
+            "name": "Vipul Harsh"
+        }, 
+        {
+            "name": "Fang Hu"
+        }, 
+        {
+            "name": "Chao Huang"
+        }, 
+        {
+            "name": "Narain Jagathesan"
+        }, 
+        {
+            "name": "Nikhil Jain"
+        }, 
+        {
+            "name": "Pritish Jetley"
+        }, 
+        {
+            "name": "Prateek Jindal"
+        }, 
+        {
+            "name": "Raghavendra Kanakagiri"
+        }, 
+        {
+            "name": "Greg Koenig"
+        }, 
+        {
+            "name": "Sanjeev Krishnan"
+        }, 
+        {
+            "name": "Sameer Kumar"
+        }, 
+        {
+            "name": "David Kunzman"
+        }, 
+        {
+            "name": "Michael Lang"
+        }, 
+        {
+            "name": "Akhil Langer"
+        }, 
+        {
+            "name": "Orion Lawlor"
+        }, 
+        {
+            "name": "Chee Wai Lee"
+        }, 
+        {
+            "name": "Jonathan Lifflander"
+        }, 
+        {
+            "name": "Karthik Mahesh"
+        }, 
+        {
+            "name": "Celso Mendes"
+        }, 
+        {
+            "name": "Harshitha Menon"
+        }, 
+        {
+            "name": "Chao Mei"
+        }, 
+        {
+            "name": "Esteban Meneses"
+        }, 
+        {
+            "name": "Eric Mikida"
+        }, 
+        {
+            "name": "Phil Miller"
+        }, 
+        {
+            "name": "Ryan Mokos"
+        }, 
+        {
+            "name": "Venkatasubrahmanian Narayanan"
+        }, 
+        {
+            "name": "Xiang Ni"
+        }, 
+        {
+            "name": "Kevin Nomura"
+        }, 
+        {
+            "name": "Sameer Paranjpye"
+        }, 
+        {
+            "name": "Parthasarathy Ramachandran"
+        }, 
+        {
+            "name": "Balkrishna Ramkumar"
+        }, 
+        {
+            "name": "Evan Ramos"
+        }, 
+        {
+            "name": "Michael Robson"
+        }, 
+        {
+            "name": "Neelam Saboo"
+        }, 
+        {
+            "name": "Vikram Saletore"
+        }, 
+        {
+            "name": "Osman Sarood"
+        }, 
+        {
+            "name": "Karthik Senthil"
+        }, 
+        {
+            "name": "Nimish Shah"
+        }, 
+        {
+            "name": "Wennie Shu"
+        }, 
+        {
+            "name": "Amitabh B. Sinha"
+        }, 
+        {
+            "name": "Yanhua Sun"
+        }, 
+        {
+            "name": "Zehra Sura"
+        }, 
+        {
+            "name": "Ehsan Totoni"
+        }, 
+        {
+            "name": "Krishnan Varadarajan"
+        }, 
+        {
+            "name": "Ramprasad Venkataraman"
+        }, 
+        {
+            "name": "Jackie Wang"
+        }, 
+        {
+            "name": "Lukasz Wesolowski"
+        }, 
+        {
+            "name": "Sam White"
+        }, 
+        {
+            "name": "Terry Wilmarth"
+        }, 
+        {
+            "name": "Jeff Wright"
+        }, 
+        {
+            "name": "Joshua Yelon"
+        }, 
+        {
+            "name": "Gengbin Zheng"
+        }
+    ]
+}

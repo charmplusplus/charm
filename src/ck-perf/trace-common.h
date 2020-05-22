@@ -82,23 +82,14 @@ CkpvExtern(bool, verbose);
 CkpvExtern(double, traceInitTime);
 CkpvExtern(double, traceInitCpuTime);
 
-#if CMK_BIGSIM_CHARM
-#define  TRACE_TIMER   BgGetTime
-#define  TRACE_CPUTIMER   BgGetTime
-inline double TraceTimer() { return TRACE_TIMER(); }
-inline double TraceTimer(double t) { return t; }
-inline double TraceCpuTimer() { return TRACE_TIMER(); }
-inline double TraceCpuTimer(double t) { return t; }
-#else
 #define  TRACE_TIMER   CmiWallTimer
 #define  TRACE_CPUTIMER   CmiCpuTimer
 inline double TraceTimer() { return TRACE_TIMER() - CkpvAccess(traceInitTime); }
 inline double TraceTimer(double t) { return t - CkpvAccess(traceInitTime); }
 inline double TraceCpuTimer() { return TRACE_CPUTIMER() - CkpvAccess(traceInitCpuTime); }
 inline double TraceCpuTimer(double t) { return t - CkpvAccess(traceInitCpuTime); }
-#endif
 
-extern "C" double TraceTimerCommon(); //TraceTimer to be used in common lrts layers
+double TraceTimerCommon(); //TraceTimer to be used in common lrts layers
 
 #define TRACE_WARN(msg) if (CkpvAccess(verbose)) CmiPrintf(msg)
 
@@ -117,21 +108,22 @@ extern int _sdagMsg, _sdagChare, _sdagEP;
 
 /** Write out the common parts of the .sts file. */
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
-extern "C" void (*registerMachineUserEvents())();
+void (*registerMachineUserEvents())();
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
 #ifdef USE_SPP_PAPI
 #define NUMPAPIEVENTS 6
 #else
-#define NUMPAPIEVENTS 4
+#define NUMPAPIEVENTS 2
 #endif
 CkpvExtern(int, papiEventSet);
 CkpvExtern(LONG_LONG_PAPI*, papiValues);
 CkpvExtern(int, papiStarted);
 CkpvExtern(int, papiStopped);
-extern int papiEvents[NUMPAPIEVENTS];
-void initPAPI(); 
+CkpvExtern(int*, papiEvents);
+CkpvExtern(int, numEvents);
+void initPAPI();
 #endif
 
 #endif

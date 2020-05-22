@@ -143,7 +143,7 @@ void TraceAutoPerf::countNewChare()
 void TraceAutoPerf::creation(envelope *env, int epIdx, int num) { 
 } 
 
-void TraceAutoPerf::creationMulticast(envelope *, int epIdx, int num, int *pelist) { }
+void TraceAutoPerf::creationMulticast(envelope *, int epIdx, int num, const int *pelist) { }
 
 void TraceAutoPerf::creationDone(int num) { }
 

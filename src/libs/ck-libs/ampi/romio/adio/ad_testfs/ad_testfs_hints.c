@@ -1,6 +1,5 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 2001 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -8,7 +7,9 @@
 
 #include "ad_testfs.h"
 #include "adioi.h"
-
+#ifdef ROMIO_BGL
+#include "../ad_bgl/ad_bgl.h"
+#endif
 void ADIOI_TESTFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
 {
     int myrank, nprocs;

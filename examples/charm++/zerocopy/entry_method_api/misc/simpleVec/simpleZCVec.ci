@@ -1,0 +1,15 @@
+mainmodule simpleZCVec {
+
+  readonly int numElements;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void done();
+  };
+
+  array [1D] zerocopyObject{
+    entry zerocopyObject(CProxy_Main);
+    entry void zerocopySend(nocopy int ptr1[size1], int size1, nocopy int ptr2[size2], int size2);
+    entry void zerocopySenderCompleteCB(CkDataMsg *); // called when it is safe to cleanup the pointer on the source
+  };
+}

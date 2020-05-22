@@ -11,8 +11,11 @@
 using std::list;
 #include <algorithm>
 using std::for_each;
+
+#if __cplusplus < 201103L
 #include <functional>
 using std::mem_fun;
+#endif
 
 namespace xi {
 SdagConstruct::SdagConstruct(EToken t, SdagConstruct* construct1) {
@@ -67,7 +70,11 @@ SdagConstruct::~SdagConstruct() {
 void SdagConstruct::numberNodes(void) {
   if (constructs != 0)
     for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
              mem_fun(&SdagConstruct::numberNodes));
+#else
+             [](SdagConstruct * c) { c->numberNodes(); } );
+#endif
 }
 
 XStr* SdagConstruct::createLabel(const char* str, int nodeNum) {
@@ -84,7 +91,12 @@ void SdagConstruct::labelNodes() {
   if (label_str != 0) label = createLabel(label_str, nodeNum);
 
   if (constructs != 0)
-    for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::labelNodes));
+    for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
+             mem_fun(&SdagConstruct::labelNodes));
+#else
+             [](SdagConstruct * c) { c->labelNodes(); } );
+#endif
 }
 
 void EntryList::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct* thisWhen) {
@@ -182,26 +194,7 @@ void SdagConstruct::propagateState(int uniqueVarNum) {
 
   encapState = encap;
 
-#if CMK_BIGSIM_CHARM
-  // adding _bgParentLog as the last extra parameter for tracing
-  stateVarsChildren = new list<CStateVar*>(*stateVars);
-  sv = new CStateVar(0, "void *", 0, "_bgParentLog", 0, NULL, 1);
-  sv->isBgParentLog = true;
-  stateVarsChildren->push_back(sv);
-
-  {
-    list<CStateVar*> lst;
-    lst.push_back(sv);
-    EncapState* state = new EncapState(NULL, lst);
-    state->type = new XStr("void");
-    state->name = new XStr("_bgParentLog");
-    state->isBgParentLog = true;
-    encapStateChild.push_back(state);
-    encap.push_back(state);
-  }
-#else
   stateVarsChildren = stateVars;
-#endif
 
   encapStateChild = encap;
 
@@ -291,25 +284,36 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
 
       // if the var is one of the following it a system state var that should
       // not be brought into scope
-      if (!var.isCounter && !var.isSpeculator && !var.isBgParentLog) {
+      if (!var.isCounter && !var.isSpeculator) {
         if (var.isRdma) {
-          defs << "#if CMK_ONESIDED_IMPL\n";
           if (var.isFirstRdma) {
+            defs << "#if CMK_ONESIDED_IMPL\n";
             indentBy(defs, cur + 2);
             defs << "int "
                  << "& num_rdma_fields = ";
             defs << "gen" << cur;
             defs << "->"
-                 << "getP" << i++ << "();\n";
+                 << "getP" << i << "();\n";
+            indentBy(defs, cur + 2);
+            i++;
+            defs << "int "
+                 << "& num_root_node = ";
+            defs << "gen" << cur;
+            defs << "->"
+                 << "getP" << i << "();\n";
+            defs << "#else\n";
+            i++;
+            defs << "#endif\n";
           }
+          defs << "#if CMK_ONESIDED_IMPL\n";
           indentBy(defs, cur + 2);
-          defs << "CkRdmaWrapper "
-               << "& rdmawrapper_" << var.name << " = ";
+          defs << "CkNcpyBuffer "
+               << "& ncpyBuffer_" << var.name << " = ";
           defs << "gen" << cur << "->"
                << "getP" << i << "();\n";
           indentBy(defs, cur + 2);
           defs << var.type << "* " << var.name << " = "
-               << "(" << var.type << "*) (rdmawrapper_" << var.name << ".ptr);\n";
+               << "(" << var.type << "*) (ncpyBuffer_" << var.name << ".ptr);\n";
           defs << "#else\n";
           indentBy(defs, cur + 2);
           defs << var.type << "*"
@@ -560,7 +564,11 @@ void SdagConstruct::setNext(SdagConstruct* n, int boe) {
 // for trace
 void SdagConstruct::generateTrace() {
   for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
            mem_fun(&SdagConstruct::generateTrace));
+#else
+           [](SdagConstruct * c) { c->generateTrace(); } );
+#endif
   if (con1) con1->generateTrace();
   if (con2) con2->generateTrace();
   if (con3) con3->generateTrace();

@@ -1,7 +1,10 @@
 #include <time.h>
 #include "cublas_v2.h"
-#include "hapi.h"
 #include "matmul.decl.h"
+#include "hapi.h"
+#ifdef USE_NVTX
+#include "hapi_nvtx.h"
+#endif
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ int matrixSize;
@@ -15,6 +18,9 @@ extern void cudaMatMul(int, float*, float*, float*, float*, float*, float*,
 #endif
 
 void randomInit(float* data, int size) {
+#ifdef USE_NVTX
+    NVTXTracer nvtx_range("randomInit", NVTXColor::PeterRiver);
+#endif
   for (int i = 0; i < size; ++i) {
     data[i] = rand() / (float)RAND_MAX;
   }
@@ -28,6 +34,10 @@ class Main : public CBase_Main {
 
  public:
   Main(CkArgMsg* m) {
+#ifdef USE_NVTX
+    NVTXTracer nvtx_range("Main::Main", NVTXColor::Turquoise);
+#endif
+
     // default values
     mainProxy = thisProxy;
     numChares = 4;
@@ -72,6 +82,10 @@ class Main : public CBase_Main {
   }
 
   void done() {
+#ifdef USE_NVTX
+    NVTXTracer nvtx_range("Main::done", NVTXColor::Turquoise);
+#endif
+
     CkPrintf("\nElapsed time: %f s\n", CkWallTimer() - startTime);
     CkExit();
   }
@@ -92,6 +106,10 @@ class Workers : public CBase_Workers {
 
  public:
   Workers() {
+#ifdef USE_NVTX
+    NVTXTracer nvtx_range("Workers::Workers", NVTXColor::WetAsphalt);
+#endif
+
     int size = sizeof(float) * matrixSize * matrixSize;
     hapiCheck(cudaMallocHost(&h_A, size));
     hapiCheck(cudaMallocHost(&h_B, size));
@@ -113,6 +131,10 @@ class Workers : public CBase_Workers {
   }
 
   ~Workers() {
+#ifdef USE_NVTX
+    NVTXTracer nvtx_range("Workers::~Workers", NVTXColor::WetAsphalt);
+#endif
+
     hapiFreeHost(h_A);
     hapiFreeHost(h_B);
     hapiFreeHost(h_C);
@@ -127,6 +149,10 @@ class Workers : public CBase_Workers {
   }
 
   void begin() {
+#ifdef USE_NVTX
+    NVTXTracer nvtx_range("Workers::begin", NVTXColor::Carrot);
+#endif
+
     CkArrayIndex1D myIndex = CkArrayIndex1D(thisIndex);
     CkCallback* cb =
         new CkCallback(CkIndex_Workers::complete(), myIndex, thisArrayID);
@@ -139,6 +165,10 @@ class Workers : public CBase_Workers {
   }
 
   void complete() {
+#ifdef USE_NVTX
+    NVTXTracer nvtx_range("Workers::complete", NVTXColor::Clouds);
+#endif
+
 #ifdef DEBUG
     CkPrintf("[%d] A\n", thisIndex);
     for (int i = 0; i < matrixSize; i++) {

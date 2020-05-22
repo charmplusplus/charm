@@ -1,158 +1,99 @@
-#include "mpi.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include "dtypes.h"
-#include "gcomm.h"
-
-#if defined(NEEDS_STDLIB_PROTOTYPES)
-#include "protofix.h"
-#endif
-
-int verbose = 0;
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
-   This program is from mpich/tsuite/pt2pt and should be changed there only.
-   It needs gcomm and dtype from mpich/tsuite, and can be run with 
-   any number of processes > 1.
-
-   This version uses Pack to send a message and Unpack OR the datatype 
-   to receive it.
+ *
+ *  (C) 2003 by Argonne National Laboratory.
+ *      See COPYRIGHT in top-level directory.
  */
-int main( int argc, char **argv )
+#include "mpi.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "mpitest.h"
+
+/*
+static char MTEST_Descrip[] = "Head to head send-recv to test backoff in device when large messages are being transferred";
+*/
+
+#define  MAX_NMSGS 100
+int main(int argc, char *argv[])
 {
-MPI_Datatype *types;
-void         **inbufs, **outbufs;
-char         **names;
-char         *packbuf, *unpackbuf;
-int          packsize, unpacksize, position;
-int          *counts, *bytesize, ntype;
-MPI_Comm     comms[20];
-int          ncomm = 20, rank, np, partner, tag, count;
-int          i, j, k, err, toterr, world_rank;
-int          errloc;
-MPI_Status   status;
-char         *obuf;
+    int errs = 0;
+    int rank, size, source, dest, partner;
+    int i, testnum;
+    double tsend;
+    static int msgsizes[] = { 100, 1000, 10000, 100000, -1 };
+    static int nmsgs[] = { 100, 10, 10, 4 };
+    MPI_Comm comm;
 
-MPI_Init( &argc, &argv );
+    MTest_Init(&argc, &argv);
 
-AllocateForData( &types, &inbufs, &outbufs, &counts, &bytesize, 
-		 &names, &ntype );
-GenerateData( types, inbufs, outbufs, counts, bytesize, names, &ntype );
+    comm = MPI_COMM_WORLD;
 
-MPI_Comm_rank( MPI_COMM_WORLD, &world_rank );
-MakeComms( comms, 20, &ncomm, 0 );
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &size);
+    source = 0;
+    dest = 1;
+    if (size < 2) {
+        printf("This test requires at least 2 processes\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 
-/* Test over a wide range of datatypes and communicators */
-err = 0;
-for (i=0; i<ncomm; i++) {
-    MPI_Comm_rank( comms[i], &rank );
-    MPI_Comm_size( comms[i], &np );
-    if (np < 2) continue;
-    if (world_rank == 0 && verbose) {
-	fprintf( stdout, "Testing with communicator with %d members\n", np );
-	}
-    tag = i;
-    for (j=0; j<ntype; j++) {
-	if (world_rank == 0 && verbose) 
-	    fprintf( stdout, "Testing type %s\n", names[j] );
-        if (rank == 0) {
-	    partner = np - 1;
-	    MPI_Pack_size( counts[j], types[j], comms[i], &packsize );
-	    packbuf = (char *)malloc( packsize );
-	    if (!packbuf) 
-		MPI_Abort( MPI_COMM_WORLD, 1 );
-	    position = 0;
-	    MPI_Pack( inbufs[j], counts[j], types[j], packbuf, packsize, 
-		      &position, comms[i] );
-	    /* Send twice */
-            MPI_Send( packbuf, position, MPI_PACKED, partner, tag, comms[i] );
-            MPI_Send( packbuf, position, MPI_PACKED, partner, tag, comms[i] );
-	    free( packbuf );
-            }
-        else if (rank == np-1) {
-	    partner = 0;
-	    obuf = outbufs[j];
-	    for (k=0; k<bytesize[j]; k++) 
-		obuf[k] = 0;
-	    /* Receive directly */
-            MPI_Recv( outbufs[j], counts[j], types[j], partner, tag, comms[i],
-                      &status );
-            /* Test correct */
-            MPI_Get_count( &status, types[j], &count );
-            if (count != counts[j]) {
-		fprintf( stderr, 
-			"Error in counts (got %d expected %d) with type %s\n",
-			 count, counts[j], names[j] );
-                err++;
-                }
-            if (status.MPI_SOURCE != partner) {
-		fprintf( stderr, 
-			"Error in source (got %d expected %d) with type %s\n",
-			 status.MPI_SOURCE, partner, names[j] );
-                err++;
-                }
-            if ((errloc = CheckData( inbufs[j], outbufs[j], bytesize[j] ))) {
-		fprintf( stderr, 
-                    "Error in data at byte %d with type %s (type %d on %d)\n", 
-			 errloc - 1, names[j], j, world_rank );
-                err++;
-                }
-	    /* Receive packed, then unpack */
-	    MPI_Pack_size( counts[j], types[j], comms[i], &unpacksize ); 
-	    unpackbuf = (char *)malloc( unpacksize );
-	    if (!unpackbuf) 
-		MPI_Abort( MPI_COMM_WORLD, 1 );
-            MPI_Recv( unpackbuf, unpacksize, MPI_PACKED, partner, tag, 
-		      comms[i], &status );
-	    obuf = outbufs[j];
-	    for (k=0; k<bytesize[j]; k++) 
-		obuf[k] = 0;
-	    position = 0;
-            MPI_Get_count( &status, MPI_PACKED, &unpacksize );
-	    MPI_Unpack( unpackbuf, unpacksize, &position, 
-		        outbufs[j], counts[j], types[j], comms[i] );
-	    free( unpackbuf );
-            /* Test correct */
-#ifdef FOO
-	    /* Length is tricky; a correct code will have signaled an error 
-	       in MPI_Unpack */
-	    count = position;
-            if (count != counts[j]) {
-		fprintf( stderr, 
-		"Error in counts (got %d expected %d) with type %s (Unpack)\n",
-			 count, counts[j], names[j] );
-                err++;
-                }
-#endif
-            if (status.MPI_SOURCE != partner) {
-		fprintf( stderr, 
-		"Error in source (got %d expected %d) with type %s (Unpack)\n",
-			 status.MPI_SOURCE, partner, names[j] );
-                err++;
-                }
-            if ((errloc = CheckData( inbufs[j], outbufs[j], bytesize[j] ))) {
-		fprintf( stderr, 
-            "Error in data at byte %d with type %s (type %d on %d, Unpack)\n", 
-			errloc - 1, names[j], j, world_rank );
-                err++;
+    for (testnum = 0; msgsizes[testnum] > 0; testnum++) {
+        if (rank == source || rank == dest) {
+            int nmsg = nmsgs[testnum];
+            int msgSize = msgsizes[testnum];
+            MPI_Request r[MAX_NMSGS];
+            int *buf[MAX_NMSGS];
+
+            for (i = 0; i < nmsg; i++) {
+                buf[i] = (int *) malloc(msgSize * sizeof(int));
+                if (!buf[i]) {
+                    fprintf(stderr, "Unable to allocate %d bytes\n", msgSize);
+                    MPI_Abort(MPI_COMM_WORLD, 1);
                 }
             }
-	}
+            partner = (rank + 1) % size;
+
+            MPI_Sendrecv(MPI_BOTTOM, 0, MPI_INT, partner, 10,
+                         MPI_BOTTOM, 0, MPI_INT, partner, 10, comm, MPI_STATUS_IGNORE);
+            /* Try to fill up the outgoing message buffers */
+            for (i = 0; i < nmsg; i++) {
+                MPI_Isend(buf[i], msgSize, MPI_INT, partner, testnum, comm, &r[i]);
+            }
+            for (i = 0; i < nmsg; i++) {
+                MPI_Recv(buf[i], msgSize, MPI_INT, partner, testnum, comm, MPI_STATUS_IGNORE);
+            }
+            MPI_Waitall(nmsg, r, MPI_STATUSES_IGNORE);
+
+            /* Repeat the test, but make one of the processes sleep */
+            MPI_Sendrecv(MPI_BOTTOM, 0, MPI_INT, partner, 10,
+                         MPI_BOTTOM, 0, MPI_INT, partner, 10, comm, MPI_STATUS_IGNORE);
+            if (rank == dest)
+                MTestSleep(1);
+            /* Try to fill up the outgoing message buffers */
+            tsend = MPI_Wtime();
+            for (i = 0; i < nmsg; i++) {
+                MPI_Isend(buf[i], msgSize, MPI_INT, partner, testnum, comm, &r[i]);
+            }
+            tsend = MPI_Wtime() - tsend;
+            for (i = 0; i < nmsg; i++) {
+                MPI_Recv(buf[i], msgSize, MPI_INT, partner, testnum, comm, MPI_STATUS_IGNORE);
+            }
+            MPI_Waitall(nmsg, r, MPI_STATUSES_IGNORE);
+
+            if (tsend > 0.5) {
+                printf("Isends for %d messages of size %d took too long (%f seconds)\n", nmsg,
+                       msgSize, tsend);
+                errs++;
+            }
+            MTestPrintfMsg(1, "%d Isends for size = %d took %f seconds\n", nmsg, msgSize, tsend);
+
+            for (i = 0; i < nmsg; i++) {
+                free(buf[i]);
+            }
+        }
     }
-if (err > 0) {
-    fprintf( stderr, "%d errors on %d\n", err, rank );
-    }
-MPI_Allreduce( &err, &toterr, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD );
- if (world_rank == 0) {
-     if (toterr == 0) {
-	 printf( " No Errors\n" );
-     }
-     else {
-	 printf (" Found %d errors\n", toterr );
-     }
- }
-FreeDatatypes( types, inbufs, outbufs, counts, bytesize, names, ntype );
-FreeComms( comms, ncomm );
-MPI_Barrier( MPI_COMM_WORLD );
-MPI_Finalize();
-return err;
+
+    MTest_Finalize(errs);
+    MPI_Finalize();
+    return 0;
 }

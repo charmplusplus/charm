@@ -3,14 +3,14 @@
 
 #include <string>
 #include <vector>
+#include <array>
+#include <queue>
+#include <functional>
 #include "charm++.h"
 #include "ampi.h"
 
 //Uncomment for debug print statements
 #define DDTDEBUG(...) //CkPrintf(__VA_ARGS__)
-
-using std::vector;
-using std::string;
 
 /*
  * An MPI basic datatype is a type that corresponds to the basic
@@ -19,15 +19,15 @@ using std::string;
  * MPI_Get_elements returns the number of the basic types in a
  * more complex datatype such as an MPI struct or vector type.
  */
-#define CkDDT_MAX_BASIC_TYPE      27
+#define AMPI_MAX_BASIC_TYPE      29
 
 /*
- * CkDDT_MAX_PRIMITIVE_TYPE indicates the highest
+ * AMPI_MAX_PREDEFINED_TYPE indicates the highest
  * datatype defined in the MPI standard.
  *
  * Note: do not free datatypes less than or equal to this value.
  */
-#define CkDDT_MAX_PRIMITIVE_TYPE  41
+#define AMPI_MAX_PREDEFINED_TYPE  41
 
 /*
  * These are the different kinds of MPI derived datatypes
@@ -45,6 +45,7 @@ using std::string;
 #define CkDDT_INDEXED             47
 #define CkDDT_HINDEXED            48
 #define CkDDT_STRUCT              49
+#define CkDDT_FIRST_USER_TYPE     50
 
 enum CkDDT_Dir : bool {
   PACK   = true,
@@ -64,7 +65,7 @@ inline void serializeContig(char* userdata, char* buffer, size_t size, CkDDT_Dir
 
 /* Helper function to set names (used by AMPI too).
  * Leading whitespaces are significant, trailing spaces are not. */
-inline void CkDDT_SetName(string &dst, const char *src) noexcept
+inline void CkDDT_SetName(std::string &dst, const char *src) noexcept
 {
   int end = strlen(src)-1;
   while ((end>0) && (src[end]==' ')) {
@@ -128,8 +129,8 @@ class CkDDT_DataType
   MPI_Aint trueLB;
   MPI_Aint baseExtent;
   CkDDT_DataType *baseType;
-  vector<int> keyvals;
-  string name;
+  std::unordered_map<int, uintptr_t> attributes;
+  std::string name;
 
  public:
   CkDDT_DataType() = default;
@@ -149,9 +150,9 @@ class CkDDT_DataType
 
   virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
   {
+    size_t bufSize = std::min((size_t)num * (size_t)size, (size_t)msgLength);
     DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%d bytes)\n",
              (dir==PACK)?"packing":"unpacking", num, datatype, bufSize);
-    size_t bufSize = std::min((size_t)num * (size_t)size, (size_t)msgLength);
     if (iscontig) {
       serializeContig(userdata, buffer, bufSize, dir);
       return bufSize;
@@ -186,7 +187,7 @@ class CkDDT_DataType
   int getNumElements() const noexcept { return numElements; }
   void incRefCount() noexcept {
     CkAssert(refCount > 0);
-    if (datatype > CkDDT_MAX_PRIMITIVE_TYPE) {
+    if (datatype > AMPI_MAX_PREDEFINED_TYPE) {
       refCount++;
     }
   }
@@ -194,19 +195,23 @@ class CkDDT_DataType
     // Callers of this function should always check its return
     // value and free the type only if it returns 0.
     CkAssert(refCount > 0);
-    if (datatype > CkDDT_MAX_PRIMITIVE_TYPE) {
+    if (datatype > AMPI_MAX_PREDEFINED_TYPE) {
       return --refCount;
     }
     return -1;
   }
-  vector<int>& getKeyvals() noexcept { return keyvals; }
+  std::unordered_map<int, uintptr_t> & getAttributes() noexcept { return attributes; }
   void setName(const char *src) noexcept { CkDDT_SetName(name, src); }
   void getName(char *dest, int *len) const noexcept {
     int length = *len = name.size();
     memcpy(dest, &name[0], length);
     dest[length] = '\0';
   }
+  std::string getName() const noexcept {return name;}
+  std::string getConfig() const noexcept;
+  virtual std::string getTypeMap() const noexcept;
   void setAbsolute(bool arg) noexcept { isAbsolute = arg; }
+  bool getAbsolute() const noexcept { return isAbsolute; }
 };
 
 /*
@@ -227,6 +232,7 @@ class CkDDT_Contiguous final : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -253,6 +259,7 @@ class CkDDT_Vector : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -277,6 +284,7 @@ class CkDDT_HVector final : public CkDDT_Vector
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -296,7 +304,7 @@ class CkDDT_HIndexed_Block : public CkDDT_DataType
   // The MPI Standard has arrDisp as an array of int's to MPI_Type_create_indexed_block, but
   // as an array of MPI_Aint's to MPI_Type_create_hindexed_block, so we store it as Aint's
   // internally and convert from int to Aint in Indexed_Block's constructor:
-  vector<MPI_Aint> arrayDisplacements;
+  std::vector<MPI_Aint> arrayDisplacements;
 
  public:
   CkDDT_HIndexed_Block() = default;
@@ -311,6 +319,7 @@ class CkDDT_HIndexed_Block : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -351,8 +360,8 @@ class CkDDT_Indexed_Block final : public CkDDT_HIndexed_Block
 class CkDDT_HIndexed : public CkDDT_DataType
 {
  protected:
-  vector<int> arrayBlockLength;
-  vector<MPI_Aint> arrayDisplacements;
+  std::vector<int> arrayBlockLength;
+  std::vector<MPI_Aint> arrayDisplacements;
 
  public:
   CkDDT_HIndexed() = default;
@@ -367,6 +376,7 @@ class CkDDT_HIndexed : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
@@ -406,95 +416,108 @@ class CkDDT_Indexed final : public CkDDT_HIndexed
 class CkDDT_Struct final : public CkDDT_DataType
 {
  protected:
-  vector<int> arrayBlockLength;
-  vector<MPI_Aint> arrayDisplacements;
-  vector<int> index;
-  vector<CkDDT_DataType *> arrayDataType;
+  std::vector<int> arrayBlockLength;
+  std::vector<MPI_Aint> arrayDisplacements;
+  std::vector<int> index;
+  std::vector<CkDDT_DataType *> arrayDataType;
 
  public:
   CkDDT_Struct() = default;
   ~CkDDT_Struct() override = default;
   CkDDT_Struct& operator=(const CkDDT_Struct& obj) noexcept;
   CkDDT_Struct(int count, const int* arrBlock, const MPI_Aint* arrDisp, const int *index,
-               CkDDT_DataType **type) noexcept;
+               CkDDT_DataType **type, const char* name=nullptr) noexcept;
   CkDDT_Struct(const CkDDT_Struct &obj, MPI_Aint _lb, MPI_Aint _extent) noexcept;
 
-  vector<int>& getBaseIndices() noexcept { return index; }
-  const vector<int>& getBaseIndices() const noexcept { return index; }
-  vector<CkDDT_DataType *>& getBaseTypes() noexcept { return arrayDataType; }
-  const vector<CkDDT_DataType *>& getBaseTypes() const noexcept { return arrayDataType; }
+  std::vector<int>& getBaseIndices() noexcept { return index; }
+  const std::vector<int>& getBaseIndices() const noexcept { return index; }
+  std::vector<CkDDT_DataType *>& getBaseTypes() noexcept { return arrayDataType; }
+  const std::vector<CkDDT_DataType *>& getBaseTypes() const noexcept { return arrayDataType; }
 
   size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
   void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
+  std::string getTypeMap() const noexcept override;
 };
 
 /*
- * This class maintains the table of all datatypes (primitive and derived).
- * The first 'CkDDT_MAX_PRIMITIVE_TYPE' entries of the table contain primitive datatypes.
+ * This class maintains the table of all datatypes (predefined and user-defined).
  *
- * typeTable - holds the CkDDT_DataType object pointers
- * types - used to identify which CkDDT_DataType derived class a type object is, for PUP
+ * predefinedTypeTable - a reference to a const array declared as a static global variable
+ *                       (to minimize per-rank memory footprint), which holds the CkDDT_DataType
+ *                       object pointers for all predefined types.
+ * userTypeTable - a vector that holds the CkDDT_DataType object pointers for all user-defined types
+ * freeTypes - a priority queue of freed slot indexes in the userTypeTable, available for reuse.
  */
 class CkDDT
 {
  private:
-  vector<CkDDT_DataType *> typeTable;
-  vector<int> types;
-
-  void addBasic(int type) noexcept {
-    CkAssert(types.size() > type && types[type] == MPI_DATATYPE_NULL);
-    typeTable[type]               = new CkDDT_DataType(type);
-    types[type]                   = type;
-  }
-
-  void addStruct(const char* name, int type, int val, int idx, int offset) noexcept {
-    CkAssert(types.size() > type && types[type] == MPI_DATATYPE_NULL);
-    const int bLengths[2]           = {1, 1};
-    MPI_Datatype bTypes[2]          = {val, idx};
-    CkDDT_DataType* nTypes[2]       = {getType(val), getType(idx)};
-    MPI_Aint offsets[2]             = {0, offset};
-    typeTable[type]                 = new CkDDT_Struct(2, bLengths, offsets, bTypes, nTypes);
-    typeTable[type]->setName(name);
-    types[type]                     = CkDDT_STRUCT;
-  }
+  const std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable;
+  std::vector<CkDDT_DataType *> userTypeTable;
+  std::priority_queue<int, std::vector<int>, std::greater<int>> freeTypes;
 
  public:
-
-  CkDDT() noexcept : typeTable(CkDDT_MAX_PRIMITIVE_TYPE+1, nullptr), types(CkDDT_MAX_PRIMITIVE_TYPE+1, MPI_DATATYPE_NULL)
+  // static methods used by ampi.C for predefined types creation:
+  static
+  void addBasic(std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable_,
+                int type) noexcept
   {
-    addBasic(MPI_DOUBLE);
-    addBasic(MPI_INT);
-    addBasic(MPI_FLOAT);
-    addBasic(MPI_LOGICAL);
-    addBasic(MPI_C_BOOL);
-    addBasic(MPI_CHAR);
-    addBasic(MPI_BYTE);
-    addBasic(MPI_PACKED);
-    addBasic(MPI_SHORT);
-    addBasic(MPI_LONG);
-    addBasic(MPI_UNSIGNED_CHAR);
-    addBasic(MPI_UNSIGNED_SHORT);
-    addBasic(MPI_UNSIGNED);
-    addBasic(MPI_UNSIGNED_LONG);
-    addBasic(MPI_LONG_DOUBLE);
-    addBasic(MPI_LONG_LONG_INT);
-    addBasic(MPI_SIGNED_CHAR);
-    addBasic(MPI_UNSIGNED_LONG_LONG);
-    addBasic(MPI_WCHAR);
-    addBasic(MPI_INT8_T);
-    addBasic(MPI_INT16_T);
-    addBasic(MPI_INT32_T);
-    addBasic(MPI_INT64_T);
-    addBasic(MPI_UINT8_T);
-    addBasic(MPI_UINT16_T);
-    addBasic(MPI_UINT32_T);
-    addBasic(MPI_UINT64_T);
-    addBasic(MPI_AINT);
-    addBasic(MPI_LB);
-    addBasic(MPI_UB);
+    CkAssert(type >= 0);
+    CkAssert(type <= AMPI_MAX_BASIC_TYPE);
+    CkAssert(type <= AMPI_MAX_PREDEFINED_TYPE);
+    predefinedTypeTable_[type] = new CkDDT_DataType(type);
+  }
+
+  static
+  void addStruct(std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable_,
+                 const char* name, int type, int val, int idx, int offset) noexcept
+  {
+    CkAssert(type > AMPI_MAX_BASIC_TYPE);
+    CkAssert(type <= AMPI_MAX_PREDEFINED_TYPE);
+    const int bLengths[2]      = {1, 1};
+    MPI_Datatype bTypes[2]     = {val, idx};
+    CkDDT_DataType* nTypes[2]  = {const_cast<CkDDT_DataType *>(predefinedTypeTable_[val]), const_cast<CkDDT_DataType *>(predefinedTypeTable_[idx])};
+    MPI_Aint offsets[2]        = {0, offset};
+    predefinedTypeTable_[type] = new CkDDT_Struct(2, bLengths, offsets, bTypes, nTypes, name);
+  }
+
+  static
+  const std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1> createPredefinedTypes() noexcept
+  {
+    std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1> predefinedTypeTable_;
+
+    addBasic(predefinedTypeTable_, MPI_DOUBLE);
+    addBasic(predefinedTypeTable_, MPI_INT);
+    addBasic(predefinedTypeTable_, MPI_FLOAT);
+    addBasic(predefinedTypeTable_, MPI_LOGICAL);
+    addBasic(predefinedTypeTable_, MPI_C_BOOL);
+    addBasic(predefinedTypeTable_, MPI_CHAR);
+    addBasic(predefinedTypeTable_, MPI_BYTE);
+    addBasic(predefinedTypeTable_, MPI_PACKED);
+    addBasic(predefinedTypeTable_, MPI_SHORT);
+    addBasic(predefinedTypeTable_, MPI_LONG);
+    addBasic(predefinedTypeTable_, MPI_UNSIGNED_CHAR);
+    addBasic(predefinedTypeTable_, MPI_UNSIGNED_SHORT);
+    addBasic(predefinedTypeTable_, MPI_UNSIGNED);
+    addBasic(predefinedTypeTable_, MPI_UNSIGNED_LONG);
+    addBasic(predefinedTypeTable_, MPI_LONG_DOUBLE);
+    addBasic(predefinedTypeTable_, MPI_LONG_LONG_INT);
+    addBasic(predefinedTypeTable_, MPI_SIGNED_CHAR);
+    addBasic(predefinedTypeTable_, MPI_UNSIGNED_LONG_LONG);
+    addBasic(predefinedTypeTable_, MPI_WCHAR);
+    addBasic(predefinedTypeTable_, MPI_INT8_T);
+    addBasic(predefinedTypeTable_, MPI_INT16_T);
+    addBasic(predefinedTypeTable_, MPI_INT32_T);
+    addBasic(predefinedTypeTable_, MPI_INT64_T);
+    addBasic(predefinedTypeTable_, MPI_UINT8_T);
+    addBasic(predefinedTypeTable_, MPI_UINT16_T);
+    addBasic(predefinedTypeTable_, MPI_UINT32_T);
+    addBasic(predefinedTypeTable_, MPI_UINT64_T);
+    addBasic(predefinedTypeTable_, MPI_AINT);
+    addBasic(predefinedTypeTable_, MPI_LB);
+    addBasic(predefinedTypeTable_, MPI_UB);
 
     /*
      * The following types have multiple elements, for serialize to know where to write data
@@ -503,47 +526,49 @@ class CkDDT
 
     // Contiguous:
     typedef struct { int val; int idx; } IntInt;
-    addStruct("MPI_2INT", MPI_2INT, MPI_INT, MPI_INT, offsetof(IntInt, idx));
+    addStruct(predefinedTypeTable_, "MPI_2INT", MPI_2INT, MPI_INT, MPI_INT, offsetof(IntInt, idx));
 
     typedef struct { float val; float idx; } FloatFloat;
-    addStruct("MPI_2FLOAT", MPI_2FLOAT, MPI_FLOAT, MPI_FLOAT, offsetof(FloatFloat, idx));
+    addStruct(predefinedTypeTable_, "MPI_2FLOAT", MPI_2FLOAT, MPI_FLOAT, MPI_FLOAT, offsetof(FloatFloat, idx));
 
     typedef struct { double val; double idx; } DoubleDouble;
-    addStruct("MPI_2DOUBLE", MPI_2DOUBLE, MPI_DOUBLE, MPI_DOUBLE, offsetof(DoubleDouble, idx));
+    addStruct(predefinedTypeTable_, "MPI_2DOUBLE", MPI_2DOUBLE, MPI_DOUBLE, MPI_DOUBLE, offsetof(DoubleDouble, idx));
 
     typedef struct { float val; int idx; } FloatInt;
-    addStruct("MPI_FLOAT_INT", MPI_FLOAT_INT, MPI_FLOAT, MPI_INT, offsetof(FloatInt, idx));
+    addStruct(predefinedTypeTable_, "MPI_FLOAT_INT", MPI_FLOAT_INT, MPI_FLOAT, MPI_INT, offsetof(FloatInt, idx));
 
     // Non-contiguous:
     typedef struct { double val; int idx; } DoubleInt;
-    addStruct("MPI_DOUBLE_INT", MPI_DOUBLE_INT, MPI_DOUBLE, MPI_INT, offsetof(DoubleInt, idx));
+    addStruct(predefinedTypeTable_, "MPI_DOUBLE_INT", MPI_DOUBLE_INT, MPI_DOUBLE, MPI_INT, offsetof(DoubleInt, idx));
 
     typedef struct { long val; int idx; } LongInt;
-    addStruct("MPI_LONG_INT", MPI_LONG_INT, MPI_LONG, MPI_INT, offsetof(LongInt, idx));
+    addStruct(predefinedTypeTable_, "MPI_LONG_INT", MPI_LONG_INT, MPI_LONG, MPI_INT, offsetof(LongInt, idx));
 
     typedef struct { short val; int idx; } ShortInt;
-    addStruct("MPI_SHORT_INT", MPI_SHORT_INT, MPI_SHORT, MPI_INT, offsetof(ShortInt, idx));
+    addStruct(predefinedTypeTable_, "MPI_SHORT_INT", MPI_SHORT_INT, MPI_SHORT, MPI_INT, offsetof(ShortInt, idx));
 
     typedef struct { long double val; int idx; } LongdoubleInt;
-    addStruct("MPI_LONG_DOUBLE_INT", MPI_LONG_DOUBLE_INT, MPI_LONG_DOUBLE, MPI_INT,
+    addStruct(predefinedTypeTable_, "MPI_LONG_DOUBLE_INT", MPI_LONG_DOUBLE_INT, MPI_LONG_DOUBLE, MPI_INT,
               offsetof(LongdoubleInt, idx));
 
     // Complex datatypes:
     typedef struct { float val; float idx; } FloatComplex;
-    addStruct("MPI_FLOAT_COMPLEX", MPI_FLOAT_COMPLEX, MPI_FLOAT, MPI_FLOAT,
+    addStruct(predefinedTypeTable_, "MPI_FLOAT_COMPLEX", MPI_FLOAT_COMPLEX, MPI_FLOAT, MPI_FLOAT,
               offsetof(FloatComplex, idx));
-    addStruct("MPI_COMPLEX", MPI_COMPLEX, MPI_FLOAT, MPI_FLOAT, offsetof(FloatComplex, idx));
+    addStruct(predefinedTypeTable_, "MPI_COMPLEX", MPI_COMPLEX, MPI_FLOAT, MPI_FLOAT, offsetof(FloatComplex, idx));
 
     typedef struct { double val; double idx; } DoubleComplex;
-    addStruct("MPI_DOUBLE_COMPLEX", MPI_DOUBLE_COMPLEX, MPI_DOUBLE, MPI_DOUBLE,
+    addStruct(predefinedTypeTable_, "MPI_DOUBLE_COMPLEX", MPI_DOUBLE_COMPLEX, MPI_DOUBLE, MPI_DOUBLE,
               offsetof(DoubleComplex, idx));
 
     typedef struct { long double val; long double idx; } LongDoubleComplex;
-    addStruct("MPI_LONG_DOUBLE_COMPLEX", MPI_LONG_DOUBLE_COMPLEX, MPI_LONG_DOUBLE, MPI_LONG_DOUBLE,
+    addStruct(predefinedTypeTable_, "MPI_LONG_DOUBLE_COMPLEX", MPI_LONG_DOUBLE_COMPLEX, MPI_LONG_DOUBLE, MPI_LONG_DOUBLE,
               offsetof(LongDoubleComplex, idx));
+    return predefinedTypeTable_;
   }
 
-  CkDDT& operator=(const CkDDT &obj) = default;
+  CkDDT(const std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable_) noexcept : predefinedTypeTable(predefinedTypeTable_) {}
+  CkDDT& operator=(const CkDDT &obj) = delete;
   CkDDT(const CkDDT &obj) = default;
   ~CkDDT() noexcept;
 
@@ -574,11 +599,14 @@ class CkDDT
                   int array_of_integers[], MPI_Aint array_of_addresses[], int array_of_datatypes[]) noexcept;
 
   CkDDT_DataType* getType(int nIndex) const noexcept {
-    #if CMK_ERROR_CHECKING
-    if (nIndex < 0 || nIndex > typeTable.size())
-      CkAbort("AMPI> invalid datatype index passed to getType!");
-    #endif
-    return typeTable[nIndex];
+    if (nIndex <= AMPI_MAX_PREDEFINED_TYPE) {
+      CkAssert(nIndex >= 0);
+      return const_cast<CkDDT_DataType *>(predefinedTypeTable[nIndex]);
+    }
+    else {
+      CkAssert((nIndex - AMPI_MAX_PREDEFINED_TYPE - 1) < userTypeTable.size());
+      return userTypeTable[nIndex - AMPI_MAX_PREDEFINED_TYPE - 1];
+    }
   }
 
   bool isContig(int nIndex) const noexcept { return getType(nIndex)->isContig(); }

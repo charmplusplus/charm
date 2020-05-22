@@ -1,1254 +1,1261 @@
-dnl
-dnl This files contains additional macros for using autoconf to 
-dnl build configure scripts.
-dnl
-dnl Almost all of this file is taken from the aclocal.m4 of MPICH
-dnl
-dnl Get the format of Fortran names.  Uses F77, FFLAGS, and sets WDEF.
-dnl If the test fails, sets NOF77 to 1, HAVE_FORTRAN to 0.
-dnl
-dnl
-define(PAC_GET_FORTNAMES,[
-   rm -f confftest.f confftest.o
-   cat > confftest.f <<EOF
-       subroutine mpir_init_fop( a )
-       integer a
-       a = 1
-       return
-       end
-EOF
-   $F77 $FFLAGS -c confftest.f > /dev/null 2>&1
-   if test ! -s confftest.o ; then
-        print_error "Unable to test Fortran compiler"
-        print_error "(compiling a test program failed to produce an "
-        print_error "object file)."
-	NOF77=1
-   elif test -z "$FORTRANNAMES" ; then
-    if test $arch_CRAY ; then
-     # Cray doesn't accept -a ...
-     nameform1=`strings confftest.o | grep mpir_init_fop_  | head -1`
-     nameform2=`strings confftest.o | grep MPIR_INIT_FOP   | head -1`
-     nameform3=`strings confftest.o | grep mpir_init_fop   | head -1`
-     nameform4=`strings confftest.o | grep mpir_init_fop__ | head -1`
-    else
-     nameform1=`strings -a confftest.o | grep mpir_init_fop_  | head -1`
-     nameform2=`strings -a confftest.o | grep MPIR_INIT_FOP   | head -1`
-     nameform3=`strings -a confftest.o | grep mpir_init_fop   | head -1`
-     nameform4=`strings -a confftest.o | grep mpir_init_fop__ | head -1`
-    fi
-    rm -f confftest.f confftest.o
-    if test -n "$nameform4" ; then
-	echo "Fortran externals are lower case and have two trailing underscores"
-	FORTRANNAMES="FORTRANDOUBLEUNDERSCORE"
-    elif test -n "$nameform1" ; then
-        # We don't set this in CFLAGS; it is a default case
-        echo "Fortran externals have a trailing underscore and are lowercase"
-	FORTRANNAMES="FORTRANUNDERSCORE"
-    elif test -n "$nameform2" ; then
-	echo "Fortran externals are uppercase"     
-	FORTRANNAMES="FORTRANCAPS" 
-    elif test -n "$nameform3" ; then
-	echo "Fortran externals are lower case"
-	FORTRANNAMES="FORTRANNOUNDERSCORE"
-    else
-	print_error "Unable to determine the form of Fortran external names"
-	print_error "Make sure that the compiler $F77 can be run on this system"
-	print_error "Turning off Fortran (-nof77 being assumed)."
-	NOF77=1
-    fi
-    fi
-    if test -n "$FORTRANNAMES" ; then
-        WDEF="-D$FORTRANNAMES"
-    fi
-    ])dnl
-dnl
-dnl
-dnl
-dnl PAC_GETWD(varname [, filename ] )
-dnl
-dnl This is from the aclocal.m4 of MPICH. 
-dnl Set varname to current directory.  Use filename (relative to current
-dnl directory) if provided to double check.
-dnl
-dnl Need a way to use "automounter fix" for this.
-dnl
-define(PAC_GETWD,[
-$1=$PWD
-if test "${$1}" != "" -a -d "${$1}" ; then 
-    if test -r ${$1}/.foo$$ ; then
-        /bin/rm -f ${$1}/.foo$$
-        /bin/rm -f .foo$$
-    fi
-    if test -r ${$1}/.foo$$ -o -r .foo$$ ; then
-        $1=
-    else
-        echo "test" > ${$1}/.foo$$
-        if test ! -r .foo$$ ; then
-            /bin/rm -f ${$1}/.foo$$
-            $1=
-        else
-            /bin/rm -f ${$1}/.foo$$
-        fi
-    fi
-fi
-if test "${$1}" = "" ; then
-    $1=`pwd | sed -e 's%/tmp_mnt/%/%g'`
-fi
-dnl
-dnl First, test the PWD is sensible
-ifelse($2,,,
-if test ! -r ${$1}/$2 ; then
-    dnl PWD must be messed up
-    $1=`pwd`
-    if test ! -r ${$1}/$2 ; then
-        print_error "Cannot determine the root directory!" 
-        exit 1
-    fi
-    $1=`pwd | sed -e 's%/tmp_mnt/%/%g'`
-    if test ! -d ${$1} ; then 
-        print_error "Warning: your default path uses the automounter; this may"
-        print_error "cause some problems if you use other NFS-connected systems.
-"
-        $1=`pwd`
-    fi
-fi)
-if test -z "${$1}" ; then
-    $1=`pwd | sed -e 's%/tmp_mnt/%/%g'`
-    if test ! -d ${$1} ; then 
-        print_error "Warning: your default path uses the automounter; this may"
-        print_error "cause some problems if you use other NFS-connected systems.
-"
-        $1=`pwd`
-    fi
-fi
-])
-dnl
-dnl
-dnl PAC_GET_TYPE_SIZE(typename,var_for_size)
-dnl
-dnl sets var_for_size to the size.  Ignores if the size cannot be determined
-dnl (see aclocal.m4 in MPICH)
-dnl
-define(PAC_GET_TYPE_SIZE,
-[Pac_name="$1"
- Pac_varname=`echo "$Pac_name" | sed -e 's/ /_/g' -e 's/\*/star/g'`
-eval Pac_testval=\$"${Pac_varname}_len"
-if test -z "$Pac_testval" ; then
-   changequote(<<,>>)
-   define(<<AC_TYPE_NAME>>,translit(CROSS_SIZEOF_$1,[a-z *],[A-Z_P]))dnl
-   changequote([,])
-   eval Pac_testval=\$"AC_TYPE_NAME"
-fi
-if test -n "$Pac_testval" ; then
-    Pac_CV_NAME=$Pac_testval
-else
-AC_MSG_CHECKING([for size of $1])
-dnl Check for existing size or for CROSS_SIZEOF_name
-/bin/rm -f conftestval
-AC_TEST_PROGRAM([#include <stdio.h>
-main() { 
-  FILE *f=fopen("conftestval","w");
-  if (!f) exit(1);
-  fprintf( f, "%d\n", sizeof($1));
-  exit(0);
-}],Pac_CV_NAME=`cat conftestval`,Pac_CV_NAME="")
-/bin/rm -f conftestval
-if test -n "$Pac_CV_NAME" -a "$Pac_CV_NAME" != 0 ; then
-    AC_MSG_RESULT($Pac_CV_NAME)
-    eval ${Pac_varname}_len=$Pac_CV_NAME
-else
-    AC_MSG_RESULT(unavailable)
-fi
-fi
-$2=$Pac_CV_NAME
-])dnl
-dnl
-dnl
-dnl
-define(PAC_INT_LT_POINTER,[
-if test -z "$intsize" ; then
-    PAC_GET_TYPE_SIZE(int,intsize)
-fi
-if test -z "$pointersize" ; then
-    PAC_GET_TYPE_SIZE(void *,pointersize)
-fi
-AC_MSG_CHECKING([for int large enough for pointers])
-if test -n "$pointersize" -a -n "$intsize" ; then
-    if test $pointersize -le $intsize ; then
-       AC_MSG_RESULT(yes)
-    else
-       AC_DEFINE(INT_LT_POINTER,,[Define if int smaller than pointer])
-       AC_MSG_RESULT(no)
-    fi
-else
-    AC_MSG_RESULT(cannot determine; assuming it is;)
-    echo "use '-intsize' and '-ptrsize' to indicate otherwise"
-fi
-])dnl
-dnl
-dnl
-dnl Check whether to use -n, \c, or newline-tab to separate
-dnl checking messages from result messages.
-dnl from MPICH
-define(AC_PROG_ECHO_N,
-ac_echo_n=yes
-[if (echo "testing\c"; echo 1,2,3) | grep c >/dev/null; then
-  if (echo -n testing; echo 1,2,3) | sed s/-n/xn/ | grep xn >/dev/null; then
-    ac_n= ac_c='
-' ac_t='	'
-  else
-    ac_n=-n ac_c= ac_t=
-  fi
-else
-  ac_n= ac_c='\c' ac_t=
-fi
-ac_echo_test=`echo foo 1>&1`
-if test -z "$ac_echo_test" ; then
-     print_error "Your sh shell does not handle the output redirection"
-     print_error "1>&1 correctly.  Configure will work around this problem,"
-     print_error "but you should report the problem to your vendor."
-fi
-])dnl
-dnl AC_MSG_CHECKING(FEATURE-DESCRIPTION)
-define(AC_FD_MSG,1)dnl
-define(AC_MSG_CHECKING,[dnl
-if test -z "$ac_echo_n" ; then
-AC_PROG_ECHO_N
-fi
-if test -z "$ac_echo_test" -a AC_FD_MSG = 1 ; then
-echo $ac_n "checking $1""... $ac_c"
-else
-echo $ac_n "checking $1""... $ac_c" 1>&AC_FD_MSG
-fi])dnl
-dnl
-dnl AC_MSG(msg)
-dnl generates "msg..." (no newline)
-define(AC_MSG,[dnl
-if test -z "$ac_echo_n" ; then
-AC_PROG_ECHO_N
-fi
-if test -z "$ac_echo_test" -a AC_FD_MSG = 1 ; then
-echo $ac_n "$1""... $ac_c"
-else
-echo $ac_n "$1""... $ac_c" 1>&AC_FD_MSG
-fi])dnl
-dnl
-dnl AC_CHECKING(FEATURE-DESCRIPTION)
-define(AC_CHECKING,dnl
-[echo "checking $1" 1>&AC_FD_MSG])dnl
-dnl
-dnl AC_MSG_RESULT(RESULT-DESCRIPTION)
-define(AC_MSG_RESULT,dnl
-if test -z "$ac_echo_test" -a AC_FD_MSG = 1 ; then
-[echo "$ac_t""$1"]
-else
-[echo "$ac_t""$1" 1>&AC_FD_MSG]
-fi)dnl
-dnl
-define(PAC_GET_SPECIAL_SYSTEM_INFO,[
+# generated automatically by aclocal 1.15 -*- Autoconf -*-
+
+# Copyright (C) 1996-2014 Free Software Foundation, Inc.
+
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY, to the extent permitted by law; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.
+
+m4_ifndef([AC_CONFIG_MACRO_DIRS], [m4_defun([_AM_CONFIG_MACRO_DIRS], [])m4_defun([AC_CONFIG_MACRO_DIRS], [_AM_CONFIG_MACRO_DIRS($@)])])
+m4_ifndef([AC_AUTOCONF_VERSION],
+  [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
+m4_if(m4_defn([AC_AUTOCONF_VERSION]), [2.69],,
+[m4_warning([this file was generated for autoconf 2.69.
+You have another version of autoconf.  It may work, but is not guaranteed to.
+If you have problems, you may need to regenerate the build system entirely.
+To do so, use the procedure documented by the package, typically 'autoreconf'.])])
+
+# Copyright (C) 2002-2014 Free Software Foundation, Inc.
 #
-if test -n "$arch_IRIX"; then
-   AC_MSG_CHECKING(for IRIX OS version)
-   dnl This block of code replaces a generic "IRIX" arch value with
-   dnl  IRIX_<version>_<chip>
-   dnl  For example
-   dnl  IRIX_5_4400 (IRIX 5.x, using MIPS 4400)
-   osversion=`uname -r | sed 's/\..*//'`
-   dnl Note that we need to allow brackets here, so we briefly turn off 
-   dnl the macro quotes
-   changequote(,)dnl
-   dnl Get the second field (looking for 6.1)
-   osvminor=`uname -r | sed 's/[0-9]\.\([0-9]*\)\..*/\1/'`
-   AC_MSG_RESULT($osversion)
-   dnl Get SGI processor count by quick hack
-   AC_MSG_CHECKING(for IRIX cpucount)
-   cpucount=`hinv | grep '[0-9]* [0-9]* MHZ IP[0-9]* Proc' | cut -f 1 -d' '`
-   if test "$cpucount" = "" ; then
-     cpucount=`hinv | grep 'Processor [0-9]*:' | wc -l | sed -e 's/ //g'`
-   fi
-   changequote([,])dnl
-   if test "$cpucount" = "" ; then
-     print_error "Could not determine cpucount."
-     print_error "Please send "
-     hinv
-     print_error "to romio-maint@mcs.anl.gov"
-     exit 1
-   fi
-   AC_MSG_RESULT($cpucount)
-   dnl
-   AC_MSG_CHECKING(for IRIX cpumodel)
-   dnl The tail -1 is necessary for multiple processor SGI boxes
-   dnl We might use this to detect SGI multiprocessors and recommend
-   dnl -comm=shared
-   cputype=`hinv -t cpu | tail -1 | cut -f 3 -d' '`
-   if test -z "$cputype" ; then
-        print_error "Could not get cputype from hinv -t cpu command."
-        print_error "Please send "
-        hinv -t cpu 2>&1
-        hinv -t cpu | cut -f 3 -d' ' 2>&1
-        print_error "to romio-maint@mcs.anl.gov" 
-        exit 1
-   fi
-   AC_MSG_RESULT($cputype)
-   dnl echo "checking for osversion and cputype"
-   dnl cputype may contain R4400, R2000A/R3000, or something else.  
-   dnl We may eventually need to look at it.
-   if test -z "$osversion" ; then
-        print_error "Could not determine OS version.  Please send" 
-        print_error " " 
-        uname -a
-        print_error "to romio-maint@mcs.anl.gov" 
-        exit 1
-   elif test $osversion = 4 ; then
-        true
-   elif test $osversion = 5 ; then
-        true
-   elif test $osversion = 6 ; then
-        true
-   else 
-       print_error "Could not recognize the version of IRIX (got $osversion)"
-       print_error "ROMIO knows about versions 4, 5 and 6; the version being"
-       print_error "returned from uname -r is $osversion."
-       print_error "Please send"
-       uname -a 2>&1
-       hinv 2>&1
-       print_error "to romio-maint@mcs.anl.gov"
-       exit 1
-   fi
-   AC_MSG_CHECKING(for cputype)
-   OLD_ARCH=IRIX
-   IRIXARCH="$ARCH_$osversion"
-   dnl Now, handle the chip set
-   changequote(,)dnl
-   cputype=`echo $cputype | sed -e 's%.*/%%' -e 's/R//' | tr -d "[A-Z]"`
-   changequote([,])dnl
-   case $cputype in 
-        3000) ;;
-        4000) ;;
-        4400) ;;
-        4600) ;;
-        5000) ;;
-        8000) ;;
-        10000);;
-	12000);;
-        *)
-        print_error "Unexpected IRIX/MIPS chipset $cputype.  Please send the output"
-        print_error " "
-        uname -a 2>&1
-        hinv 2>&1 
-        print_error " " 
-        print_error "to romio-maint@mcs.anl.gov" 
-        print_error "ROMIO will continue and assume that the cputype is"
-        print_error "compatible with a MIPS 4400 processor."
-        print_error " " 
-        cputype=4400
-        ;;
-   esac
-   AC_MSG_RESULT($cputype)
-   IRIXARCH="$IRIXARCH_$cputype"
-   echo "IRIX-specific architecture is $IRIXARCH"
-fi
-])dnl
-dnl
-dnl
-dnl On an SGI check whether to link 32 bit objects or 64 bit objects
-dnl for the MPI-2 datatype accessor functions
-dnl
-define(PAC_CHECK_SGI_3264,[
-AC_MSG_CHECKING(for 32-bit or 64-bit objects)
-cat <<EOF >bittest.c
-main()
-{
-  int i;
-  i = 0;
-}
-EOF
-$CC $CFLAGS -c bittest.c > /dev/null 2>&1
-if test $MIPS = 4 ; then
-    testlink='$CC $CFLAGS -o bittest bittest.o adio/sgi/mpi2/mips4.64/get_contents.o $MPI_LIB >/dev/null 2>&1'
-    if eval $testlink ; then
-       BITS=64
-    else
-        testlink='$CC $CFLAGS -o bittest bittest.o adio/sgi/mpi2/mips4.32/get_contents.o $MPI_LIB >/dev/null 2>&1'
-        if eval $testlink ; then
-           BITS=32
-        else
-            echo "Error: Can't link with either 32-bit or 64-bit"
-            echo "Send email to romio-maint@mcs.anl.gov"
-            exit 1
-        fi
-    fi
-else
-    testlink='$CC $CFLAGS -o bittest bittest.o adio/sgi/mpi2/mips3.64/get_contents.o $MPI_LIB >/dev/null 2>&1'
-    if eval $testlink ; then
-       BITS=64
-    else
-        testlink='$CC $CFLAGS -o bittest bittest.o adio/sgi/mpi2/mips3.32/get_contents.o $MPI_LIB >/dev/null 2>&1'
-        if eval $testlink ; then
-           BITS=32
-        else
-            echo "Error: Can't link with either 32-bit or 64-bit"
-            echo "Send email to romio-maint@mcs.anl.gov"
-            exit 1
-        fi
-    fi
-fi
-rm -f bittest*
-AC_MSG_RESULT($BITS bit)
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_AUTOMAKE_VERSION(VERSION)
+# ----------------------------
+# Automake X.Y traces this macro to ensure aclocal.m4 has been
+# generated from the m4 files accompanying Automake X.Y.
+# (This private macro should not be called outside this file.)
+AC_DEFUN([AM_AUTOMAKE_VERSION],
+[am__api_version='1.15'
+dnl Some users find AM_AUTOMAKE_VERSION and mistake it for a way to
+dnl require some minimum version.  Point them to the right macro.
+m4_if([$1], [1.15], [],
+      [AC_FATAL([Do not call $0, use AM_INIT_AUTOMAKE([$1]).])])dnl
 ])
-dnl
-dnl
-dnl
-define(PAC_TEST_MPI,[
-  AC_MSG_CHECKING(if a simple MPI program compiles and links)
-  rm -f mpitest.c
-  cat > mpitest.c <<EOF
-#include "mpi.h"
-     int main(int argc, char **argv)
-     {
-         MPI_Init(&argc,&argv);
-         MPI_Finalize(); 
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test ! -x conftest ; then
-      echo " "
-      print_error "Unable to compile a simple MPI program"
-      print_error "Use the -mpi, -mpiincdir, and -mpilib options to configure to specify the"
-      print_error "MPI implementation, the include path for mpi.h, and the MPI library to link"
-      rm -f conftest mpitest.c
-      exit 1
-  else
-      rm -f conftest mpitest.c
-  fi
-AC_MSG_RESULT(yes)
-])dnl
-dnl
-dnl
-dnl
-define(PAC_NEEDS_FINT,[
-  AC_MSG_CHECKING(if MPI_Fint is defined in the MPI implementation)
-  cat > mpitest1.c <<EOF
-#include "mpi.h"
-     main()
-     {
-         MPI_Fint i;
-         i = 0;
-     }
-EOF
-  rm -f mpitest1.o
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c mpitest1.c > /dev/null 2>&1
-  if test ! -s mpitest1.o ; then
-      NEEDS_MPI_FINT="#define NEEDS_MPI_FINT"
-      CFLAGS="$CFLAGS -DNEEDS_MPI_FINT"
-      AC_MSG_RESULT(no)
-      rm -f mpitest1.o mpitest1.c
-  else
-      NEEDS_MPI_FINT=""
-      AC_MSG_RESULT(yes)
-      rm -f mpitest1.o mpitest1.c
-  fi
-])dnl
-dnl
-dnl
-dnl
-define(PAC_LONG_64,[
-if test -z "$longsize" ; then
-    PAC_GET_TYPE_SIZE(long,longsize)
-fi
-if test -n "$longsize" ; then
-   if test $longsize = 8 ; then
-       AC_DEFINE(HAVE_LONG_64,,[Define if long is 64 bits])
-   fi
-else
-   echo "assuming size of long is NOT 8 bytes; use '-longsize' to indicate otherwise"
-fi
-])dnl
-dnl
-dnl
-define(PAC_MPI_LONG_LONG_INT,[
-  AC_MSG_CHECKING(if MPI_LONG_LONG_INT is defined in mpi.h)
-  rm -f mpitest.c
-  cat > mpitest.c <<EOF
-#include "mpi.h"
-     main(int argc, char **argv)
-     {
-         long long i;   
-         MPI_Init(&argc,&argv);
-         MPI_Send(&i, 1, MPI_LONG_LONG_INT, 0, 0, MPI_COMM_WORLD);
-         MPI_Finalize(); 
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest ; then
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_MPI_LONG_LONG_INT,,[Define if mpi has long long it])
-  else
-      AC_MSG_RESULT(no)
-  fi
-  rm -f conftest mpitest.c
-])dnl
-dnl
-dnl Check that the compile accepts ANSI prototypes. 
-dnl PAC_CHECK_CC_PROTOTYPES()
-dnl
-define(PAC_CHECK_CC_PROTOTYPES,[
-AC_MSG_CHECKING(that the compiler $CC accepts ANSI prototypes)
-AC_COMPILE_CHECK(,[int f(double a){return 0;}],,eval "ac_cv_ccworks=yes",eval "ac_cv_ccworks=no")
-AC_MSG_RESULT($ac_cv_ccworks)
-if test $ac_cv_ccworks = "yes" ; then
-   AC_DEFINE(HAVE_PROTOTYPES,,[Define if C compiler supports prototypes])
-fi
-])dnl
-dnl
-dnl
-dnl PAC_TEST_LONG_LONG()
-dnl
-dnl tests if the compiler prints long long correctly and whether to use
-dnl %ld or %lld. Called from within PAC_LONG_LONG_64.
-dnl
-define(PAC_TEST_LONG_LONG,
-[AC_MSG_CHECKING([if the compiler prints long longs correctly with %lld])
-rm -f conftestll
-AC_TEST_PROGRAM([#include <stdio.h>
-main() {
-  long long i=8; 
-  FILE *f=fopen("conftestll","w");
-  if (!f) exit(1);
-  fprintf( f, "%lld\n", i);
-  exit(0);
-}],Pac_CV_NAME=`cat conftestll`,Pac_CV_NAME="")
-rm -f conftestll
-if test "$Pac_CV_NAME" = 8 ; then
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_LONG_LONG_64,,[Define if have 64 bit long long])
-    DEFINE_MPI_OFFSET="typedef long long MPI_Offset;"
-    FORTRAN_MPI_OFFSET="integer*8"
-    echo "defining MPI_Offset as long long in C and integer*8 in Fortran"
-    LL="\%lld"
-else
-    AC_MSG_RESULT(no)
-    AC_MSG_CHECKING([if the compiler prints long longs correctly with %ld])
-    AC_TEST_PROGRAM([#include <stdio.h>
-    main() {
-      long long i=8; 
-      FILE *f=fopen("conftestll","w");
-      if (!f) exit(1);
-      fprintf( f, "%ld\n", i);
-      exit(0);
-    }],Pac_CV_NAME=`cat conftestll`,Pac_CV_NAME="")
-    rm -f conftestll
-    if test "$Pac_CV_NAME" = 8 ; then
-       AC_MSG_RESULT(yes)
-       AC_DEFINE(HAVE_LONG_LONG_64,,[Define if long long is 64 bits])
-       DEFINE_MPI_OFFSET="typedef long long MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer*8"
-       echo "defining MPI_Offset as long long in C and integer*8 in Fortran"
-       LL="\%ld"
-    else
-       AC_MSG_RESULT(no!!)
-       echo "the compiler doesn't print long longs correctly!"
-       echo "defining MPI_Offset as long in C and integer in Fortran" 
-       DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer"
-       LL="\%ld"
-       MPI_OFFSET_KIND1="!"
-       MPI_OFFSET_KIND2="!"
-    fi
-fi
-])dnl
-dnl
-dnl
-dnl PAC_LONG_LONG_64: check if there is a 64-bit long long
-dnl
-define(PAC_LONG_LONG_64,[
-if test -n "$longlongsize" ; then
-    if test "$longlongsize" = 8 ; then
-       echo "defining MPI_Offset as long long in C and integer*8 in Fortran" 
-       AC_DEFINE(HAVE_LONG_LONG_64,,[Define if long long is 64 bits])
-       DEFINE_MPI_OFFSET="typedef long long MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer*8"
-       LL="\%lld"
-    elif test "$longlongsize" = "int" ; then  # a hack to set MPI_Offset as int
-       echo "defining MPI_Offset as int in C and integer in Fortran"
-       DEFINE_MPI_OFFSET="typedef int MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer"
-       AC_DEFINE(MPI_OFFSET_IS_INT,,[Define if MPI_Offset is int])
-       LL="\%d"
-       MPI_OFFSET_KIND1="!"
-       MPI_OFFSET_KIND2="!"
-    else 
-       echo "defining MPI_Offset as long in C and integer in Fortran" 
-       DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer"
-       LL="\%ld"
-       MPI_OFFSET_KIND1="!"
-       MPI_OFFSET_KIND2="!"
-    fi
-else
-   PAC_GET_TYPE_SIZE(long long, longlongsize)
-   if test -n "$longlongsize" ; then
-      if test "$longlongsize" = 8 ; then
-         PAC_TEST_LONG_LONG()
+
+# _AM_AUTOCONF_VERSION(VERSION)
+# -----------------------------
+# aclocal traces this macro to find the Autoconf version.
+# This is a private macro too.  Using m4_define simplifies
+# the logic in aclocal, which can simply ignore this definition.
+m4_define([_AM_AUTOCONF_VERSION], [])
+
+# AM_SET_CURRENT_AUTOMAKE_VERSION
+# -------------------------------
+# Call AM_AUTOMAKE_VERSION and AM_AUTOMAKE_VERSION so they can be traced.
+# This function is AC_REQUIREd by AM_INIT_AUTOMAKE.
+AC_DEFUN([AM_SET_CURRENT_AUTOMAKE_VERSION],
+[AM_AUTOMAKE_VERSION([1.15])dnl
+m4_ifndef([AC_AUTOCONF_VERSION],
+  [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
+_AM_AUTOCONF_VERSION(m4_defn([AC_AUTOCONF_VERSION]))])
+
+# Copyright (C) 2011-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_PROG_AR([ACT-IF-FAIL])
+# -------------------------
+# Try to determine the archiver interface, and trigger the ar-lib wrapper
+# if it is needed.  If the detection of archiver interface fails, run
+# ACT-IF-FAIL (default is to abort configure with a proper error message).
+AC_DEFUN([AM_PROG_AR],
+[AC_BEFORE([$0], [LT_INIT])dnl
+AC_BEFORE([$0], [AC_PROG_LIBTOOL])dnl
+AC_REQUIRE([AM_AUX_DIR_EXPAND])dnl
+AC_REQUIRE_AUX_FILE([ar-lib])dnl
+AC_CHECK_TOOLS([AR], [ar lib "link -lib"], [false])
+: ${AR=ar}
+
+AC_CACHE_CHECK([the archiver ($AR) interface], [am_cv_ar_interface],
+  [AC_LANG_PUSH([C])
+   am_cv_ar_interface=ar
+   AC_COMPILE_IFELSE([AC_LANG_SOURCE([[int some_variable = 0;]])],
+     [am_ar_try='$AR cru libconftest.a conftest.$ac_objext >&AS_MESSAGE_LOG_FD'
+      AC_TRY_EVAL([am_ar_try])
+      if test "$ac_status" -eq 0; then
+        am_cv_ar_interface=ar
       else
-         echo "defining MPI_Offset as long in C and integer in Fortran" 
-         DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-         FORTRAN_MPI_OFFSET="integer"
-         LL="\%ld"
-         MPI_OFFSET_KIND1="!"
-         MPI_OFFSET_KIND2="!"
+        am_ar_try='$AR -NOLOGO -OUT:conftest.lib conftest.$ac_objext >&AS_MESSAGE_LOG_FD'
+        AC_TRY_EVAL([am_ar_try])
+        if test "$ac_status" -eq 0; then
+          am_cv_ar_interface=lib
+        else
+          am_cv_ar_interface=unknown
+        fi
       fi
-   else 
-dnl   check if longlong is not supported or only its size cannot be determined
-dnl   because the program cannot be run.
-      rm -f ltest.c
-      cat > ltest.c <<EOF
-        main()
-        {
-           long long i=8;
-           return 0;
-        }
-EOF
-      rm -f conftest
-      $CC $USER_CFLAGS -o conftest ltest.c > /dev/null 2>&1
-      if test -x conftest ; then
-         echo "assuming size of long long is 8bytes; use '-longlongsize' to indicate otherwise"
-         rm -f conftest ltest.c
-         echo "defining MPI_Offset as long long in C and integer*8 in Fortran" 
-         AC_DEFINE(HAVE_LONG_LONG_64,,[Define if long long is 64 bits])
-         DEFINE_MPI_OFFSET="typedef long long MPI_Offset;"
-         FORTRAN_MPI_OFFSET="integer*8"
-         LL="\%lld"
-      else 
-         echo "assuming long long is not available; use '-longlongsize' to indicate otherwise"
-         echo "defining MPI_Offset as long in C and integer in Fortran" 
-         DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-         FORTRAN_MPI_OFFSET="integer"
-         LL="\%ld"
-         MPI_OFFSET_KIND1="!"
-         MPI_OFFSET_KIND2="!"
-      fi
-   fi
-fi
-])dnl
-dnl
-dnl
-define(PAC_MPI_INFO,[
-  AC_MSG_CHECKING(if MPI_Info functions are defined in the MPI implementation)
-  rm -f mpitest.c
-  cat > mpitest.c <<EOF
-#include "mpi.h"
-     main(int argc, char **argv)
-     {
-         MPI_Info info;
-         MPI_Init(&argc,&argv);
-         MPI_Info_create(&info);
-         MPI_Finalize(); 
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest ; then
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_MPI_INFO,,[Define if MPI_Info available])
-      HAVE_MPI_INFO="#define HAVE_MPI_INFO"
-      MPI_FINFO1="!"
-      MPI_FINFO2="!"
-      MPI_FINFO3="!"
-      MPI_FINFO4="!"
-  else
-      AC_MSG_RESULT(no)
-      BUILD_MPI_INFO=1
-      MPI_FINFO1="      INTEGER MPI_MAX_INFO_KEY, MPI_MAX_INFO_VAL"
-      MPI_FINFO2="      PARAMETER (MPI_MAX_INFO_KEY=255, MPI_MAX_INFO_VAL=1024)"
-      MPI_FINFO3="      INTEGER MPI_INFO_NULL"
-      MPI_FINFO4="      PARAMETER (MPI_INFO_NULL=0)"
-  fi
-  rm -f conftest mpitest.c
-])dnl
-dnl
-dnl
-define(PAC_MPI_DARRAY_SUBARRAY,[
-  AC_MSG_CHECKING(if darray and subarray constructors are defined in the MPI implementation)
-  rm -f mpitest.c
-  cat > mpitest.c <<EOF
-#include "mpi.h"
-     main(int argc, char **argv)
-     {
-         int i=MPI_DISTRIBUTE_CYCLIC;
-         MPI_Datatype t;
-         MPI_Init(&argc,&argv);
-         MPI_Type_create_darray(i, i, i, &i, &i, &i, &i, i, MPI_INT, &t);
-         MPI_Type_create_subarray(i, &i, &i, &i, i, MPI_INT, &t);
-         MPI_Finalize(); 
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest ; then
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_MPI_DARRAY_SUBARRAY,,[Define if MPI Darray available])
-      HAVE_MPI_DARRAY_SUBARRAY="#define HAVE_MPI_DARRAY_SUBARRAY"
-      MPI_FARRAY1="!"
-      MPI_FARRAY2="!"
-      MPI_FARRAY3="!"
-      MPI_FARRAY4="!"
-      MPI_FARRAY5="!"
-      MPI_FARRAY6="!"
-      MPI_FARRAY7="!"
-  else
-      AC_MSG_RESULT(no)
-      BUILD_MPI_ARRAY=1
-      MPI_FARRAY1="      INTEGER MPI_ORDER_C, MPI_ORDER_FORTRAN"
-      MPI_FARRAY2="      PARAMETER (MPI_ORDER_C=56, MPI_ORDER_FORTRAN=57)"
-      MPI_FARRAY3="      INTEGER MPI_DISTRIBUTE_BLOCK, MPI_DISTRIBUTE_CYCLIC"
-      MPI_FARRAY4="      INTEGER MPI_DISTRIBUTE_NONE, MPI_DISTRIBUTE_DFLT_DARG"
-      MPI_FARRAY5="      PARAMETER (MPI_DISTRIBUTE_BLOCK=121, MPI_DISTRIBUTE_CYCLIC=122)"
-      MPI_FARRAY6="      PARAMETER (MPI_DISTRIBUTE_NONE=123)"
-      MPI_FARRAY7="      PARAMETER (MPI_DISTRIBUTE_DFLT_DARG=-49767)"
-  fi
-  rm -f conftest mpitest.c
-])dnl
-dnl
-dnl
-define(PAC_CHECK_MPI_SGI_INFO_NULL,[
-  AC_MSG_CHECKING(if MPI_INFO_NULL is defined in mpi.h)
-  rm -f mpitest.c
-  cat > mpitest.c <<EOF
-#include "mpi.h"
-     main(int argc, char **argv)
-     {
-	int i;
-	i = MPI_INFO_NULL;
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest ; then
-      AC_MSG_RESULT(yes)
-      cp adio/sgi/mpi3.1/*.h include
-  else
-      AC_MSG_RESULT(no)
-  fi
-  rm -f conftest mpitest.c
-])dnl
-dnl
-dnl
-dnl
-define(PAC_CHECK_MPIOF_H,[
-  AC_MSG_CHECKING(if mpiof.h is included in mpif.h)
-  rm -f mpitest.f
-  cat > mpitest.f <<EOF
-      program main
-      implicit none
-      include 'mpif.h'
-      integer i
-      i = MPI_MODE_RDWR
-      stop
-      end
-EOF
-  rm -f conftest
-  $F77 $FFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.f $MPI_LIB > /dev/null 2>&1
-  if test -x conftest ; then
-      AC_MSG_RESULT(yes)
-      MPIOF_H_INCLUDED=1
-  else
-      AC_MSG_RESULT(no)
-  fi
-  rm -f conftest mpitest.f
-])dnl
-dnl
-dnl
-dnl check if pread64 is defined in IRIX. needed on IRIX 6.5
-dnl
-define(PAC_HAVE_PREAD64,[
-  AC_MSG_CHECKING(if pread64 is defined)
-  rm -f conftest.c
-  cat > conftest.c <<EOF
-#include <unistd.h>
-     main()
-     {
-         int fd=0, buf=0, i=0;
-         off64_t off=0;
-         pread64(fd, &buf, i, off);
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -o conftest conftest.c > /dev/null 2>&1
-  if test -x conftest ; then
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_PREAD64,,[Define if pread64 available])
-  else
-      AC_MSG_RESULT(no)
-  fi
-rm -f conftest conftest.c
-])dnl
-dnl
-dnl
-define(PAC_TEST_MPI_SGI_type_is_contig,[
-  AC_MSG_CHECKING(if MPI_SGI_type_is_contig is defined)
-  rm -f mpitest.c
-  cat > mpitest.c <<EOF
-#include "mpi.h"
-     main(int argc, char **argv)
-     {
-         MPI_Datatype type;
-         int i;
+      rm -f conftest.lib libconftest.a
+     ])
+   AC_LANG_POP([C])])
 
-         MPI_Init(&argc,&argv);
-         i = MPI_SGI_type_is_contig(type);
-         MPI_Finalize(); 
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest ; then
-     AC_MSG_RESULT(yes)
-  else
-     AC_MSG_RESULT(no)
-     AC_DEFINE(NO_MPI_SGI_type_is_contig,,[Define if no MPI type is contig])
-  fi
-  rm -f conftest mpitest.c
-])dnl
-dnl
-dnl
-dnl
-define(PAC_TEST_MPI_COMBINERS,[
-  AC_MSG_CHECKING(if MPI-2 combiners are defined in mpi.h)
-  rm -f mpitest.c
-  cat > mpitest.c <<EOF
-#include "mpi.h"
-     main(int argc, char **argv)
-     {
-         int i;
-
-         MPI_Init(&argc,&argv);
-         i = MPI_COMBINER_STRUCT;
-         MPI_Finalize(); 
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest ; then
-     AC_MSG_RESULT(yes)
-     AC_DEFINE(HAVE_MPI_COMBINERS,,[Define if MPI combiners available])
-  else
-     AC_MSG_RESULT(no)
-  fi
-  rm -f conftest mpitest.c
-])dnl
-dnl
-dnl
-dnl PAC_MPI_OFFSET_KIND()
-dnl
-dnl tries to determine the Fortran 90 kind parameter for 8-byte integers
-dnl
-define(PAC_MPI_OFFSET_KIND,
-[AC_MSG_CHECKING([for Fortran 90 KIND parameter for 8-byte integers])
-rm -f kind.f kind.o kind
-cat <<EOF > kind.f
-      program main
-      integer i
-      i = selected_int_kind(16)
-      open(8, file="k.out", form="formatted")
-      write (8,*) i
-      close(8)
-      stop
-      end
-EOF
-if test -z "$F90" ; then
-   F90=f90
-fi
-KINDVAL=""
-if $F90 -o kind kind.f >/dev/null 2>&1 ; then
-    ./kind >/dev/null 2>&1
-    if test -s k.out ; then 
-        KINDVAL=`cat k.out`
-    fi
-fi
-rm -f kind k.out kind.f kind.o k.out
-if test -n "$KINDVAL" -a "$KINDVAL" != "-1" ; then
-   AC_MSG_RESULT($KINDVAL)
-   MPI_OFFSET_KIND1="      INTEGER MPI_OFFSET_KIND"
-   MPI_OFFSET_KIND2="      PARAMETER (MPI_OFFSET_KIND=$KINDVAL)"
-else
-    AC_MSG_RESULT(unavailable)
-fi
-])dnl
-dnl
-dnl
-define(PAC_TEST_MPI_HAVE_OFFSET_KIND,[
-  AC_MSG_CHECKING(if MPI_OFFSET_KIND is defined in mpif.h)
-  rm -f mpitest.f
-  cat > mpitest.f <<EOF
-      program main
-      implicit none
-      include 'mpif.h'
-      integer i
-      i = MPI_OFFSET_KIND
-      stop
-      end
-EOF
-  rm -f conftest
-  $F77 $FFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.f $MPI_LIB > /dev/null 2>&1
-  if test -x conftest ; then
-     AC_MSG_RESULT(yes)
-     MPI_OFFSET_KIND1="!"
-     MPI_OFFSET_KIND2="!"
-  else
-     AC_MSG_RESULT(no)
-  fi
-  rm -f conftest mpitest.f
-])dnl
-dnl
-dnl
-dnl PAC_GET_XFS_MEMALIGN
-dnl 
-dnl
-define(PAC_GET_XFS_MEMALIGN,
-[AC_MSG_CHECKING([for memory alignment needed for direct I/O])
-/bin/rm -f memalignval
-/bin/rm -f /tmp/romio_tmp.bin
-AC_TEST_PROGRAM([#include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdio.h>
-main() { 
-  struct dioattr st;
-  int fd = open("/tmp/romio_tmp.bin", O_RDWR | O_CREAT, 0644);
-  FILE *f=fopen("memalignval","w");
-  if (fd == -1) exit(1);
-  if (!f) exit(1);
-  fcntl(fd, F_DIOINFO, &st);
-  fprintf( f, "%u\n", st.d_mem);
-  exit(0);
-}],Pac_CV_NAME=`cat memalignval`,Pac_CV_NAME="")
-/bin/rm -f memalignval
-/bin/rm -f /tmp/romio_tmp.bin
-if test -n "$Pac_CV_NAME" -a "$Pac_CV_NAME" != 0 ; then
-    AC_MSG_RESULT($Pac_CV_NAME)
-    CFLAGS="$CFLAGS -DXFS_MEMALIGN=$Pac_CV_NAME"
-else
-    AC_MSG_RESULT(unavailable, assuming 128)
-    CFLAGS="$CFLAGS -DXFS_MEMALIGN=128"
-fi
-])dnl
-dnl
-dnl
-dnl Look for a style of VPATH.  Known forms are
-dnl VPATH = .:dir
-dnl .PATH: . dir
-dnl
-dnl Defines VPATH or .PATH with . $(srcdir)
-dnl Requires that vpath work with implicit targets
-dnl NEED TO DO: Check that $< works on explicit targets.
-dnl
-define(PAC_MAKE_VPATH,[
-AC_SUBST(VPATH)
-AC_MSG_CHECKING(for virtual path format)
-rm -rf conftest*
-mkdir conftestdir
-cat >conftestdir/a.c <<EOF
-A sample file
-EOF
-cat > conftest <<EOF
-all: a.o
-VPATH=.:conftestdir
-.c.o:
-	@echo \$<
-EOF
-ac_out=`$MAKE -f conftest 2>&1 | grep 'conftestdir/a.c'`
-if test -n "$ac_out" ; then 
-    AC_MSG_RESULT(VPATH)
-    VPATH='VPATH=.:$(srcdir)'
-else
-    rm -f conftest
-    cat > conftest <<EOF
-all: a.o
-.PATH: . conftestdir
-.c.o:
-	@echo \$<
-EOF
-    ac_out=`$MAKE -f conftest 2>&1 | grep 'conftestdir/a.c'`
-    if test -n "$ac_out" ; then 
-        AC_MSG_RESULT(.PATH)
-        VPATH='.PATH: . $(srcdir)'
-    else
-	AC_MSG_RESULT(neither VPATH nor .PATH works)
-    fi
-fi
-rm -rf conftest*
-])dnl
-dnl
-dnl
-dnl There is a bug in AC_PREPARE that sets the srcdir incorrectly (it
-dnl is correct in configure, but it puts an absolute path into config.status,
-dnl which is a big problem for scripts like mpireconfig that are wrappers
-dnl around config.status).  The bug is in not recognizing that ./ and .//
-dnl are the same  directory as . (in fact, ./[/]* is the same).
-dnl
-define(PAC_FIXUP_SRCDIR,[
-# Find the source files, if location was not specified.
-if test "$srcdirdefaulted" = "yes" ; then
-  srcdir=""
-  # Try the directory containing this script, then `..'.
-  prog=[$]0
-changequote(,)dnl
-  confdir=`echo $prog|sed 's%/[^/][^/]*$%%'`
-  # Remove all trailing /'s 
-  confdir=`echo $confdir|sed 's%[/*]$%%'`
-changequote([,])dnl
-  test "X$confdir" = "X$prog" && confdir=.
-  srcdir=$confdir
-  if test ! -r $srcdir/$unique_file; then
-    srcdir=..
-  fi
-fi
-if test ! -r $srcdir/$unique_file; then
-  if test x$srcdirdefaulted = xyes; then
-    echo "configure: Cannot find sources in \`${confdir}' or \`..'." 1>&2
-  else
-    echo "configure: Cannot find sources in \`${srcdir}'." 1>&2
-  fi
-  exit 1
-fi
-# Preserve a srcdir of `.' to avoid automounter screwups with pwd.
-# (and preserve ./ and .//)
-# But we can't avoid them for `..', to make subdirectories work.
-case $srcdir in
-  .|./|.//|/*|~*) ;;
-  *) srcdir=`cd $srcdir; pwd` ;; # Make relative path absolute.
+case $am_cv_ar_interface in
+ar)
+  ;;
+lib)
+  # Microsoft lib, so override with the ar-lib wrapper script.
+  # FIXME: It is wrong to rewrite AR.
+  # But if we don't then we get into trouble of one sort or another.
+  # A longer-term fix would be to have automake use am__AR in this case,
+  # and then we could set am__AR="$am_aux_dir/ar-lib \$(AR)" or something
+  # similar.
+  AR="$am_aux_dir/ar-lib $AR"
+  ;;
+unknown)
+  m4_default([$1],
+             [AC_MSG_ERROR([could not determine $AR interface])])
+  ;;
 esac
+AC_SUBST([AR])dnl
 ])
-dnl
-dnl
-dnl AC_TRY_LINK(INCLUDES, FUNCTION-BODY,
-dnl             ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND])
-define(AC_TRY_LINK,
-if test -z "$ac_ext" ; then 
-    ac_ext=c
-fi
-[cat > conftest.$ac_ext <<EOF
-dnl This sometimes fails to find confdefs.h, for some reason.
-dnl [#]line __oline__ "[$]0"
-dnl [#]line __oline__ "configure"
-#include "confdefs.h"
-[$1]
-int main() { return 0; }
-int t() {
-[$2]
-; return 0; }
-EOF
-rm -f conftest.out
-if test -z "$ac_link" ; then
-ac_link='${CC-cc} -o conftest $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >conftest.out 2>&1'
-fi
-if eval $ac_link; then
-  ifelse([$3], , :, [rm -rf conftest*
-  $3])
+
+# AM_AUX_DIR_EXPAND                                         -*- Autoconf -*-
+
+# Copyright (C) 2001-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# For projects using AC_CONFIG_AUX_DIR([foo]), Autoconf sets
+# $ac_aux_dir to '$srcdir/foo'.  In other projects, it is set to
+# '$srcdir', '$srcdir/..', or '$srcdir/../..'.
+#
+# Of course, Automake must honor this variable whenever it calls a
+# tool from the auxiliary directory.  The problem is that $srcdir (and
+# therefore $ac_aux_dir as well) can be either absolute or relative,
+# depending on how configure is run.  This is pretty annoying, since
+# it makes $ac_aux_dir quite unusable in subdirectories: in the top
+# source directory, any form will work fine, but in subdirectories a
+# relative path needs to be adjusted first.
+#
+# $ac_aux_dir/missing
+#    fails when called from a subdirectory if $ac_aux_dir is relative
+# $top_srcdir/$ac_aux_dir/missing
+#    fails if $ac_aux_dir is absolute,
+#    fails when called from a subdirectory in a VPATH build with
+#          a relative $ac_aux_dir
+#
+# The reason of the latter failure is that $top_srcdir and $ac_aux_dir
+# are both prefixed by $srcdir.  In an in-source build this is usually
+# harmless because $srcdir is '.', but things will broke when you
+# start a VPATH build or use an absolute $srcdir.
+#
+# So we could use something similar to $top_srcdir/$ac_aux_dir/missing,
+# iff we strip the leading $srcdir from $ac_aux_dir.  That would be:
+#   am_aux_dir='\$(top_srcdir)/'`expr "$ac_aux_dir" : "$srcdir//*\(.*\)"`
+# and then we would define $MISSING as
+#   MISSING="\${SHELL} $am_aux_dir/missing"
+# This will work as long as MISSING is not called from configure, because
+# unfortunately $(top_srcdir) has no meaning in configure.
+# However there are other variables, like CC, which are often used in
+# configure, and could therefore not use this "fixed" $ac_aux_dir.
+#
+# Another solution, used here, is to always expand $ac_aux_dir to an
+# absolute PATH.  The drawback is that using absolute paths prevent a
+# configured tree to be moved without reconfiguration.
+
+AC_DEFUN([AM_AUX_DIR_EXPAND],
+[AC_REQUIRE([AC_CONFIG_AUX_DIR_DEFAULT])dnl
+# Expand $ac_aux_dir to an absolute path.
+am_aux_dir=`cd "$ac_aux_dir" && pwd`
+])
+
+# AM_CONDITIONAL                                            -*- Autoconf -*-
+
+# Copyright (C) 1997-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_CONDITIONAL(NAME, SHELL-CONDITION)
+# -------------------------------------
+# Define a conditional.
+AC_DEFUN([AM_CONDITIONAL],
+[AC_PREREQ([2.52])dnl
+ m4_if([$1], [TRUE],  [AC_FATAL([$0: invalid condition: $1])],
+       [$1], [FALSE], [AC_FATAL([$0: invalid condition: $1])])dnl
+AC_SUBST([$1_TRUE])dnl
+AC_SUBST([$1_FALSE])dnl
+_AM_SUBST_NOTMAKE([$1_TRUE])dnl
+_AM_SUBST_NOTMAKE([$1_FALSE])dnl
+m4_define([_AM_COND_VALUE_$1], [$2])dnl
+if $2; then
+  $1_TRUE=
+  $1_FALSE='#'
 else
-  if test -s conftest.out ; then cat conftest.out >> config.log ; fi
-ifelse([$4], , , [rm -rf conftest*
-  $4
-])dnl
+  $1_TRUE='#'
+  $1_FALSE=
 fi
-rm -f conftest*]
-)dnl
-dnl
-dnl
-define(PAC_HAVE_MOUNT_NFS,[
-  AC_MSG_CHECKING([if MOUNT_NFS is defined in the include files])
-  rm -f conftest.c
-  cat > conftest.c <<EOF
-#include <sys/param.h>
-#include <sys/mount.h>
-     main()
-     {
-         int i=MOUNT_NFS;
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -o conftest conftest.c > /dev/null 2>&1
-  if test -x conftest ; then
-     AC_MSG_RESULT(yes)
-     AC_DEFINE(HAVE_MOUNT_NFS,,[Define if MOUNT_NFS defined])
-  else
-     AC_MSG_RESULT(no)
+AC_CONFIG_COMMANDS_PRE(
+[if test -z "${$1_TRUE}" && test -z "${$1_FALSE}"; then
+  AC_MSG_ERROR([[conditional "$1" was never defined.
+Usually this means the macro was only invoked conditionally.]])
+fi])])
+
+# Copyright (C) 1999-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+
+# There are a few dirty hacks below to avoid letting 'AC_PROG_CC' be
+# written in clear, in which case automake, when reading aclocal.m4,
+# will think it sees a *use*, and therefore will trigger all it's
+# C support machinery.  Also note that it means that autoscan, seeing
+# CC etc. in the Makefile, will ask for an AC_PROG_CC use...
+
+
+# _AM_DEPENDENCIES(NAME)
+# ----------------------
+# See how the compiler implements dependency checking.
+# NAME is "CC", "CXX", "OBJC", "OBJCXX", "UPC", or "GJC".
+# We try a few techniques and use that to set a single cache variable.
+#
+# We don't AC_REQUIRE the corresponding AC_PROG_CC since the latter was
+# modified to invoke _AM_DEPENDENCIES(CC); we would have a circular
+# dependency, and given that the user is not expected to run this macro,
+# just rely on AC_PROG_CC.
+AC_DEFUN([_AM_DEPENDENCIES],
+[AC_REQUIRE([AM_SET_DEPDIR])dnl
+AC_REQUIRE([AM_OUTPUT_DEPENDENCY_COMMANDS])dnl
+AC_REQUIRE([AM_MAKE_INCLUDE])dnl
+AC_REQUIRE([AM_DEP_TRACK])dnl
+
+m4_if([$1], [CC],   [depcc="$CC"   am_compiler_list=],
+      [$1], [CXX],  [depcc="$CXX"  am_compiler_list=],
+      [$1], [OBJC], [depcc="$OBJC" am_compiler_list='gcc3 gcc'],
+      [$1], [OBJCXX], [depcc="$OBJCXX" am_compiler_list='gcc3 gcc'],
+      [$1], [UPC],  [depcc="$UPC"  am_compiler_list=],
+      [$1], [GCJ],  [depcc="$GCJ"  am_compiler_list='gcc3 gcc'],
+                    [depcc="$$1"   am_compiler_list=])
+
+AC_CACHE_CHECK([dependency style of $depcc],
+               [am_cv_$1_dependencies_compiler_type],
+[if test -z "$AMDEP_TRUE" && test -f "$am_depcomp"; then
+  # We make a subdir and do the tests there.  Otherwise we can end up
+  # making bogus files that we don't know about and never remove.  For
+  # instance it was reported that on HP-UX the gcc test will end up
+  # making a dummy file named 'D' -- because '-MD' means "put the output
+  # in D".
+  rm -rf conftest.dir
+  mkdir conftest.dir
+  # Copy depcomp to subdir because otherwise we won't find it if we're
+  # using a relative directory.
+  cp "$am_depcomp" conftest.dir
+  cd conftest.dir
+  # We will build objects and dependencies in a subdirectory because
+  # it helps to detect inapplicable dependency modes.  For instance
+  # both Tru64's cc and ICC support -MD to output dependencies as a
+  # side effect of compilation, but ICC will put the dependencies in
+  # the current directory while Tru64 will put them in the object
+  # directory.
+  mkdir sub
+
+  am_cv_$1_dependencies_compiler_type=none
+  if test "$am_compiler_list" = ""; then
+     am_compiler_list=`sed -n ['s/^#*\([a-zA-Z0-9]*\))$/\1/p'] < ./depcomp`
   fi
-  rm -f conftest conftest.c
-])dnl
-dnl
-dnl
-dnl PAC_MPI_OFFSET_KIND_4BYTE()
-dnl
-dnl tries to determine the Fortran 90 kind parameter for 4-byte integers
-dnl
-define(PAC_MPI_OFFSET_KIND_4BYTE,
-[AC_MSG_CHECKING([for Fortran 90 KIND parameter for 4-byte integers])
-rm -f kind.f kind.o kind
-cat <<EOF > kind.f
-      program main
-      integer i
-      i = selected_int_kind(8)
-      open(8, file="k.out", form="formatted")
-      write (8,*) i
-      close(8)
-      stop
-      end
-EOF
-if test -z "$F90" ; then
-   F90=f90
-fi
-KINDVAL=""
-if $F90 -o kind kind.f >/dev/null 2>&1 ; then
-    ./kind >/dev/null 2>&1
-    if test -s k.out ; then 
-        KINDVAL=`cat k.out`
+  am__universal=false
+  m4_case([$1], [CC],
+    [case " $depcc " in #(
+     *\ -arch\ *\ -arch\ *) am__universal=true ;;
+     esac],
+    [CXX],
+    [case " $depcc " in #(
+     *\ -arch\ *\ -arch\ *) am__universal=true ;;
+     esac])
+
+  for depmode in $am_compiler_list; do
+    # Setup a source with many dependencies, because some compilers
+    # like to wrap large dependency lists on column 80 (with \), and
+    # we should not choose a depcomp mode which is confused by this.
+    #
+    # We need to recreate these files for each test, as the compiler may
+    # overwrite some of them when testing with obscure command lines.
+    # This happens at least with the AIX C compiler.
+    : > sub/conftest.c
+    for i in 1 2 3 4 5 6; do
+      echo '#include "conftst'$i'.h"' >> sub/conftest.c
+      # Using ": > sub/conftst$i.h" creates only sub/conftst1.h with
+      # Solaris 10 /bin/sh.
+      echo '/* dummy */' > sub/conftst$i.h
+    done
+    echo "${am__include} ${am__quote}sub/conftest.Po${am__quote}" > confmf
+
+    # We check with '-c' and '-o' for the sake of the "dashmstdout"
+    # mode.  It turns out that the SunPro C++ compiler does not properly
+    # handle '-M -o', and we need to detect this.  Also, some Intel
+    # versions had trouble with output in subdirs.
+    am__obj=sub/conftest.${OBJEXT-o}
+    am__minus_obj="-o $am__obj"
+    case $depmode in
+    gcc)
+      # This depmode causes a compiler race in universal mode.
+      test "$am__universal" = false || continue
+      ;;
+    nosideeffect)
+      # After this tag, mechanisms are not by side-effect, so they'll
+      # only be used when explicitly requested.
+      if test "x$enable_dependency_tracking" = xyes; then
+	continue
+      else
+	break
+      fi
+      ;;
+    msvc7 | msvc7msys | msvisualcpp | msvcmsys)
+      # This compiler won't grok '-c -o', but also, the minuso test has
+      # not run yet.  These depmodes are late enough in the game, and
+      # so weak that their functioning should not be impacted.
+      am__obj=conftest.${OBJEXT-o}
+      am__minus_obj=
+      ;;
+    none) break ;;
+    esac
+    if depmode=$depmode \
+       source=sub/conftest.c object=$am__obj \
+       depfile=sub/conftest.Po tmpdepfile=sub/conftest.TPo \
+       $SHELL ./depcomp $depcc -c $am__minus_obj sub/conftest.c \
+         >/dev/null 2>conftest.err &&
+       grep sub/conftst1.h sub/conftest.Po > /dev/null 2>&1 &&
+       grep sub/conftst6.h sub/conftest.Po > /dev/null 2>&1 &&
+       grep $am__obj sub/conftest.Po > /dev/null 2>&1 &&
+       ${MAKE-make} -s -f confmf > /dev/null 2>&1; then
+      # icc doesn't choke on unknown options, it will just issue warnings
+      # or remarks (even with -Werror).  So we grep stderr for any message
+      # that says an option was ignored or not supported.
+      # When given -MP, icc 7.0 and 7.1 complain thusly:
+      #   icc: Command line warning: ignoring option '-M'; no argument required
+      # The diagnosis changed in icc 8.0:
+      #   icc: Command line remark: option '-MP' not supported
+      if (grep 'ignoring option' conftest.err ||
+          grep 'not supported' conftest.err) >/dev/null 2>&1; then :; else
+        am_cv_$1_dependencies_compiler_type=$depmode
+        break
+      fi
     fi
-fi
-rm -f kind k.out kind.f kind.o
-if test -n "$KINDVAL" -a "$KINDVAL" != "-1" ; then
-   AC_MSG_RESULT($KINDVAL)
-   MPI_OFFSET_KIND1="      INTEGER MPI_OFFSET_KIND"
-   MPI_OFFSET_KIND2="      PARAMETER (MPI_OFFSET_KIND=$KINDVAL)"
+  done
+
+  cd ..
+  rm -rf conftest.dir
 else
-    AC_MSG_RESULT(unavailable)
+  am_cv_$1_dependencies_compiler_type=none
 fi
-])dnl
-dnl
-dnl
-define(PAC_FUNC_STRERROR,[
-  AC_MSG_CHECKING([for strerror()])
-  rm -f conftest.c
-  cat > conftest.c <<EOF
-#include <string.h>
-     main()
-     {
-        char *s = strerror(5);
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -o conftest conftest.c >> config.log 2>&1
-  if test -x conftest ; then
-     AC_MSG_RESULT(yes)
-     AC_DEFINE(HAVE_STRERROR,,[Define if strerror available])
-  else
-     AC_MSG_RESULT(no)
-     AC_MSG_CHECKING([for sys_errlist])
-     rm -f conftest.c
-changequote(,)
-     cat > conftest.c <<EOF
-#include <stdio.h>
-        main()
-        {
-           extern char *sys_errlist[];
-	   printf("%s\n", sys_errlist[34]);
-        }
-EOF
-changequote([,])
-     rm -f conftest
-     $CC $USER_CFLAGS -o conftest conftest.c > config.log 2>&1
-     if test -x conftest ; then
-        AC_MSG_RESULT(yes)
-        AC_DEFINE(HAVE_SYSERRLIST,,[Define if syserrlist available])
-     else
-        AC_MSG_RESULT(no)
-     fi
+])
+AC_SUBST([$1DEPMODE], [depmode=$am_cv_$1_dependencies_compiler_type])
+AM_CONDITIONAL([am__fastdep$1], [
+  test "x$enable_dependency_tracking" != xno \
+  && test "$am_cv_$1_dependencies_compiler_type" = gcc3])
+])
+
+
+# AM_SET_DEPDIR
+# -------------
+# Choose a directory name for dependency files.
+# This macro is AC_REQUIREd in _AM_DEPENDENCIES.
+AC_DEFUN([AM_SET_DEPDIR],
+[AC_REQUIRE([AM_SET_LEADING_DOT])dnl
+AC_SUBST([DEPDIR], ["${am__leading_dot}deps"])dnl
+])
+
+
+# AM_DEP_TRACK
+# ------------
+AC_DEFUN([AM_DEP_TRACK],
+[AC_ARG_ENABLE([dependency-tracking], [dnl
+AS_HELP_STRING(
+  [--enable-dependency-tracking],
+  [do not reject slow dependency extractors])
+AS_HELP_STRING(
+  [--disable-dependency-tracking],
+  [speeds up one-time build])])
+if test "x$enable_dependency_tracking" != xno; then
+  am_depcomp="$ac_aux_dir/depcomp"
+  AMDEPBACKSLASH='\'
+  am__nodep='_no'
+fi
+AM_CONDITIONAL([AMDEP], [test "x$enable_dependency_tracking" != xno])
+AC_SUBST([AMDEPBACKSLASH])dnl
+_AM_SUBST_NOTMAKE([AMDEPBACKSLASH])dnl
+AC_SUBST([am__nodep])dnl
+_AM_SUBST_NOTMAKE([am__nodep])dnl
+])
+
+# Generate code to set up dependency tracking.              -*- Autoconf -*-
+
+# Copyright (C) 1999-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+
+# _AM_OUTPUT_DEPENDENCY_COMMANDS
+# ------------------------------
+AC_DEFUN([_AM_OUTPUT_DEPENDENCY_COMMANDS],
+[{
+  # Older Autoconf quotes --file arguments for eval, but not when files
+  # are listed without --file.  Let's play safe and only enable the eval
+  # if we detect the quoting.
+  case $CONFIG_FILES in
+  *\'*) eval set x "$CONFIG_FILES" ;;
+  *)   set x $CONFIG_FILES ;;
+  esac
+  shift
+  for mf
+  do
+    # Strip MF so we end up with the name of the file.
+    mf=`echo "$mf" | sed -e 's/:.*$//'`
+    # Check whether this is an Automake generated Makefile or not.
+    # We used to match only the files named 'Makefile.in', but
+    # some people rename them; so instead we look at the file content.
+    # Grep'ing the first line is not enough: some people post-process
+    # each Makefile.in and add a new line on top of each file to say so.
+    # Grep'ing the whole file is not good either: AIX grep has a line
+    # limit of 2048, but all sed's we know have understand at least 4000.
+    if sed -n 's,^#.*generated by automake.*,X,p' "$mf" | grep X >/dev/null 2>&1; then
+      dirpart=`AS_DIRNAME("$mf")`
+    else
+      continue
+    fi
+    # Extract the definition of DEPDIR, am__include, and am__quote
+    # from the Makefile without running 'make'.
+    DEPDIR=`sed -n 's/^DEPDIR = //p' < "$mf"`
+    test -z "$DEPDIR" && continue
+    am__include=`sed -n 's/^am__include = //p' < "$mf"`
+    test -z "$am__include" && continue
+    am__quote=`sed -n 's/^am__quote = //p' < "$mf"`
+    # Find all dependency output files, they are included files with
+    # $(DEPDIR) in their names.  We invoke sed twice because it is the
+    # simplest approach to changing $(DEPDIR) to its actual value in the
+    # expansion.
+    for file in `sed -n "
+      s/^$am__include $am__quote\(.*(DEPDIR).*\)$am__quote"'$/\1/p' <"$mf" | \
+	 sed -e 's/\$(DEPDIR)/'"$DEPDIR"'/g'`; do
+      # Make sure the directory exists.
+      test -f "$dirpart/$file" && continue
+      fdir=`AS_DIRNAME(["$file"])`
+      AS_MKDIR_P([$dirpart/$fdir])
+      # echo "creating $dirpart/$file"
+      echo '# dummy' > "$dirpart/$file"
+    done
+  done
+}
+])# _AM_OUTPUT_DEPENDENCY_COMMANDS
+
+
+# AM_OUTPUT_DEPENDENCY_COMMANDS
+# -----------------------------
+# This macro should only be invoked once -- use via AC_REQUIRE.
+#
+# This code is only required when automatic dependency tracking
+# is enabled.  FIXME.  This creates each '.P' file that we will
+# need in order to bootstrap the dependency handling code.
+AC_DEFUN([AM_OUTPUT_DEPENDENCY_COMMANDS],
+[AC_CONFIG_COMMANDS([depfiles],
+     [test x"$AMDEP_TRUE" != x"" || _AM_OUTPUT_DEPENDENCY_COMMANDS],
+     [AMDEP_TRUE="$AMDEP_TRUE" ac_aux_dir="$ac_aux_dir"])
+])
+
+# Do all the work for Automake.                             -*- Autoconf -*-
+
+# Copyright (C) 1996-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# This macro actually does too much.  Some checks are only needed if
+# your package does certain things.  But this isn't really a big deal.
+
+dnl Redefine AC_PROG_CC to automatically invoke _AM_PROG_CC_C_O.
+m4_define([AC_PROG_CC],
+m4_defn([AC_PROG_CC])
+[_AM_PROG_CC_C_O
+])
+
+# AM_INIT_AUTOMAKE(PACKAGE, VERSION, [NO-DEFINE])
+# AM_INIT_AUTOMAKE([OPTIONS])
+# -----------------------------------------------
+# The call with PACKAGE and VERSION arguments is the old style
+# call (pre autoconf-2.50), which is being phased out.  PACKAGE
+# and VERSION should now be passed to AC_INIT and removed from
+# the call to AM_INIT_AUTOMAKE.
+# We support both call styles for the transition.  After
+# the next Automake release, Autoconf can make the AC_INIT
+# arguments mandatory, and then we can depend on a new Autoconf
+# release and drop the old call support.
+AC_DEFUN([AM_INIT_AUTOMAKE],
+[AC_PREREQ([2.65])dnl
+dnl Autoconf wants to disallow AM_ names.  We explicitly allow
+dnl the ones we care about.
+m4_pattern_allow([^AM_[A-Z]+FLAGS$])dnl
+AC_REQUIRE([AM_SET_CURRENT_AUTOMAKE_VERSION])dnl
+AC_REQUIRE([AC_PROG_INSTALL])dnl
+if test "`cd $srcdir && pwd`" != "`pwd`"; then
+  # Use -I$(srcdir) only when $(srcdir) != ., so that make's output
+  # is not polluted with repeated "-I."
+  AC_SUBST([am__isrc], [' -I$(srcdir)'])_AM_SUBST_NOTMAKE([am__isrc])dnl
+  # test to see if srcdir already configured
+  if test -f $srcdir/config.status; then
+    AC_MSG_ERROR([source directory already configured; run "make distclean" there first])
   fi
-  rm -f conftest conftest.c
-])dnl
-dnl
-dnl
-dnl
-define(PAC_C_INLINE,[
-AC_MSG_CHECKING([for inline])
-if eval "test \"`echo '$''{'pac_cv_c_inline'+set}'`\" = set"; then
-   AC_MSG_RESULT([(cached)])
-else
-  AC_COMPILE_CHECK(,[inline int a( int b ){return b+1;}],[int a;],
-pac_cv_c_inline="yes",pac_cv_c_inline="no")
 fi
-AC_MSG_RESULT($pac_cv_c_inline)
-if test "$pac_cv_c_inline" = "no" ; then
-    AC_DEFINE(inline,,[Define if inline is not supported])
+
+# test whether we have cygpath
+if test -z "$CYGPATH_W"; then
+  if (cygpath --version) >/dev/null 2>/dev/null; then
+    CYGPATH_W='cygpath -w'
+  else
+    CYGPATH_W=echo
+  fi
 fi
-])dnl
-define(AC_MSG_WARN,[AC_MSG_RESULT([Warning: $1])])
-dnl
-dnl PAC_CHECK_HEADER(HEADER-FILE, ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND],
-dnl PRE-REQ-HEADERS )
-dnl
-dnl BUG: AIX 4.1 can't handle a \055 (octal for -) in a tr string (sometimes;
-dnl it works from the shell but not within a file)
-dnl I've removed that and hoped that no header will include a - in the
-dnl name
-dnl
-dnl This can fail if the header needs OTHER headers for the compile
-dnl to succeed.  Those headers should be specified in the "pre-req-headers"
-dnl For example 
-dnl PAC_CHECK_HEADER(sys/vfs.h,AC_DEFINE(HAVE_SYS_VFS_H),,
-dnl                  [#include <sys/types.h>])
-dnl
-define(PAC_CHECK_HEADER,dnl
-[dnl Do the transliteration at runtime so arg 1 can be a shell variable.
-changequote(,)dnl
-ac_safe=`echo "$1" | tr '[a-z]./' '[A-Z]__'`
-changequote([,])dnl
-AC_MSG_CHECKING([for $1])
-dnl AC_CACHE_VAL(ac_cv_header_$ac_safe,[dnl
-AC_COMPILE_CHECK(,[$4]
-[#include <$1>],main();,eval "ac_cv_header_$ac_safe=yes",
-  eval "ac_cv_header_$ac_safe=no")dnl])dnl
-if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
-  AC_MSG_RESULT(yes)
-  ifelse([$2], , :, [$2])
-else
-  AC_MSG_RESULT(no)
-ifelse([$3], , , [$3
-])dnl
+AC_SUBST([CYGPATH_W])
+
+# Define the identity of the package.
+dnl Distinguish between old-style and new-style calls.
+m4_ifval([$2],
+[AC_DIAGNOSE([obsolete],
+             [$0: two- and three-arguments forms are deprecated.])
+m4_ifval([$3], [_AM_SET_OPTION([no-define])])dnl
+ AC_SUBST([PACKAGE], [$1])dnl
+ AC_SUBST([VERSION], [$2])],
+[_AM_SET_OPTIONS([$1])dnl
+dnl Diagnose old-style AC_INIT with new-style AM_AUTOMAKE_INIT.
+m4_if(
+  m4_ifdef([AC_PACKAGE_NAME], [ok]):m4_ifdef([AC_PACKAGE_VERSION], [ok]),
+  [ok:ok],,
+  [m4_fatal([AC_INIT should be called with package and version arguments])])dnl
+ AC_SUBST([PACKAGE], ['AC_PACKAGE_TARNAME'])dnl
+ AC_SUBST([VERSION], ['AC_PACKAGE_VERSION'])])dnl
+
+_AM_IF_OPTION([no-define],,
+[AC_DEFINE_UNQUOTED([PACKAGE], ["$PACKAGE"], [Name of package])
+ AC_DEFINE_UNQUOTED([VERSION], ["$VERSION"], [Version number of package])])dnl
+
+# Some tools Automake needs.
+AC_REQUIRE([AM_SANITY_CHECK])dnl
+AC_REQUIRE([AC_ARG_PROGRAM])dnl
+AM_MISSING_PROG([ACLOCAL], [aclocal-${am__api_version}])
+AM_MISSING_PROG([AUTOCONF], [autoconf])
+AM_MISSING_PROG([AUTOMAKE], [automake-${am__api_version}])
+AM_MISSING_PROG([AUTOHEADER], [autoheader])
+AM_MISSING_PROG([MAKEINFO], [makeinfo])
+AC_REQUIRE([AM_PROG_INSTALL_SH])dnl
+AC_REQUIRE([AM_PROG_INSTALL_STRIP])dnl
+AC_REQUIRE([AC_PROG_MKDIR_P])dnl
+# For better backward compatibility.  To be removed once Automake 1.9.x
+# dies out for good.  For more background, see:
+# <http://lists.gnu.org/archive/html/automake/2012-07/msg00001.html>
+# <http://lists.gnu.org/archive/html/automake/2012-07/msg00014.html>
+AC_SUBST([mkdir_p], ['$(MKDIR_P)'])
+# We need awk for the "check" target (and possibly the TAP driver).  The
+# system "awk" is bad on some platforms.
+AC_REQUIRE([AC_PROG_AWK])dnl
+AC_REQUIRE([AC_PROG_MAKE_SET])dnl
+AC_REQUIRE([AM_SET_LEADING_DOT])dnl
+_AM_IF_OPTION([tar-ustar], [_AM_PROG_TAR([ustar])],
+	      [_AM_IF_OPTION([tar-pax], [_AM_PROG_TAR([pax])],
+			     [_AM_PROG_TAR([v7])])])
+_AM_IF_OPTION([no-dependencies],,
+[AC_PROVIDE_IFELSE([AC_PROG_CC],
+		  [_AM_DEPENDENCIES([CC])],
+		  [m4_define([AC_PROG_CC],
+			     m4_defn([AC_PROG_CC])[_AM_DEPENDENCIES([CC])])])dnl
+AC_PROVIDE_IFELSE([AC_PROG_CXX],
+		  [_AM_DEPENDENCIES([CXX])],
+		  [m4_define([AC_PROG_CXX],
+			     m4_defn([AC_PROG_CXX])[_AM_DEPENDENCIES([CXX])])])dnl
+AC_PROVIDE_IFELSE([AC_PROG_OBJC],
+		  [_AM_DEPENDENCIES([OBJC])],
+		  [m4_define([AC_PROG_OBJC],
+			     m4_defn([AC_PROG_OBJC])[_AM_DEPENDENCIES([OBJC])])])dnl
+AC_PROVIDE_IFELSE([AC_PROG_OBJCXX],
+		  [_AM_DEPENDENCIES([OBJCXX])],
+		  [m4_define([AC_PROG_OBJCXX],
+			     m4_defn([AC_PROG_OBJCXX])[_AM_DEPENDENCIES([OBJCXX])])])dnl
+])
+AC_REQUIRE([AM_SILENT_RULES])dnl
+dnl The testsuite driver may need to know about EXEEXT, so add the
+dnl 'am__EXEEXT' conditional if _AM_COMPILER_EXEEXT was seen.  This
+dnl macro is hooked onto _AC_COMPILER_EXEEXT early, see below.
+AC_CONFIG_COMMANDS_PRE(dnl
+[m4_provide_if([_AM_COMPILER_EXEEXT],
+  [AM_CONDITIONAL([am__EXEEXT], [test -n "$EXEEXT"])])])dnl
+
+# POSIX will say in a future version that running "rm -f" with no argument
+# is OK; and we want to be able to make that assumption in our Makefile
+# recipes.  So use an aggressive probe to check that the usage we want is
+# actually supported "in the wild" to an acceptable degree.
+# See automake bug#10828.
+# To make any issue more visible, cause the running configure to be aborted
+# by default if the 'rm' program in use doesn't match our expectations; the
+# user can still override this though.
+if rm -f && rm -fr && rm -rf; then : OK; else
+  cat >&2 <<'END'
+Oops!
+
+Your 'rm' program seems unable to run without file operands specified
+on the command line, even when the '-f' option is present.  This is contrary
+to the behaviour of most rm programs out there, and not conforming with
+the upcoming POSIX standard: <http://austingroupbugs.net/view.php?id=542>
+
+Please tell bug-automake@gnu.org about your system, including the value
+of your $PATH and any error possibly output before this message.  This
+can help us improve future automake versions.
+
+END
+  if test x"$ACCEPT_INFERIOR_RM_PROGRAM" = x"yes"; then
+    echo 'Configuration will proceed anyway, since you have set the' >&2
+    echo 'ACCEPT_INFERIOR_RM_PROGRAM variable to "yes"' >&2
+    echo >&2
+  else
+    cat >&2 <<'END'
+Aborting the configuration process, to ensure you take notice of the issue.
+
+You can download and install GNU coreutils to get an 'rm' implementation
+that behaves properly: <http://www.gnu.org/software/coreutils/>.
+
+If you want to complete the configuration process using your problematic
+'rm' anyway, export the environment variable ACCEPT_INFERIOR_RM_PROGRAM
+to "yes", and re-run configure.
+
+END
+    AC_MSG_ERROR([Your 'rm' program is bad, sorry.])
+  fi
 fi
-])dnl
-dnl
-dnl PAC_CHECK_HEADERS(HEADER-FILE... [, ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND]])
-define(PAC_CHECK_HEADERS,[for ac_hdr in $1
-do
-PAC_CHECK_HEADER($ac_hdr,
-[changequote(, )dnl
-  ac_tr_hdr=HAVE_`echo $ac_hdr | tr '[a-z]./' '[A-Z]__'`
-changequote([, ])dnl
-  AC_DEFINE($ac_tr_hdr) $2], $3)dnl
+dnl The trailing newline in this macro's definition is deliberate, for
+dnl backward compatibility and to allow trailing 'dnl'-style comments
+dnl after the AM_INIT_AUTOMAKE invocation. See automake bug#16841.
+])
+
+dnl Hook into '_AC_COMPILER_EXEEXT' early to learn its expansion.  Do not
+dnl add the conditional right here, as _AC_COMPILER_EXEEXT may be further
+dnl mangled by Autoconf and run in a shell conditional statement.
+m4_define([_AC_COMPILER_EXEEXT],
+m4_defn([_AC_COMPILER_EXEEXT])[m4_provide([_AM_COMPILER_EXEEXT])])
+
+# When config.status generates a header, we must update the stamp-h file.
+# This file resides in the same directory as the config header
+# that is generated.  The stamp files are numbered to have different names.
+
+# Autoconf calls _AC_AM_CONFIG_HEADER_HOOK (when defined) in the
+# loop where config.status creates the headers, so we can generate
+# our stamp files there.
+AC_DEFUN([_AC_AM_CONFIG_HEADER_HOOK],
+[# Compute $1's index in $config_headers.
+_am_arg=$1
+_am_stamp_count=1
+for _am_header in $config_headers :; do
+  case $_am_header in
+    $_am_arg | $_am_arg:* )
+      break ;;
+    * )
+      _am_stamp_count=`expr $_am_stamp_count + 1` ;;
+  esac
 done
-])dnl
-dnl
-define(PAC_TEST_MPIR_STATUS_SET_BYTES,[
-  AC_MSG_CHECKING(if MPIR_Status_set_bytes is defined)
-  rm -f mpitest.c
-  cat > mpitest.c <<EOF
-#include "mpi.h"
-     main(int argc, char **argv)
-     {
-     	 MPI_Status status;
-         MPI_Datatype type;
-	 int err;
+echo "timestamp for $_am_arg" >`AS_DIRNAME(["$_am_arg"])`/stamp-h[]$_am_stamp_count])
 
-         MPI_Init(&argc,&argv);
-         MPIR_Status_set_bytes(status,type,err);
-         MPI_Finalize(); 
-     }
-EOF
-  rm -f conftest
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest ; then
-     AC_MSG_RESULT(yes)
-     AC_DEFINE(HAVE_STATUS_SET_BYTES,,[Define if status set bytes available])
-  else
-     AC_MSG_RESULT(no)
-  fi
-  rm -f conftest mpitest.c
-])dnl
-dnl
-dnl
-dnl
+# Copyright (C) 2001-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
 
+# AM_PROG_INSTALL_SH
+# ------------------
+# Define $install_sh.
+AC_DEFUN([AM_PROG_INSTALL_SH],
+[AC_REQUIRE([AM_AUX_DIR_EXPAND])dnl
+if test x"${install_sh+set}" != xset; then
+  case $am_aux_dir in
+  *\ * | *\	*)
+    install_sh="\${SHELL} '$am_aux_dir/install-sh'" ;;
+  *)
+    install_sh="\${SHELL} $am_aux_dir/install-sh"
+  esac
+fi
+AC_SUBST([install_sh])])
+
+# Copyright (C) 2003-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# Check whether the underlying file-system supports filenames
+# with a leading dot.  For instance MS-DOS doesn't.
+AC_DEFUN([AM_SET_LEADING_DOT],
+[rm -rf .tst 2>/dev/null
+mkdir .tst 2>/dev/null
+if test -d .tst; then
+  am__leading_dot=.
+else
+  am__leading_dot=_
+fi
+rmdir .tst 2>/dev/null
+AC_SUBST([am__leading_dot])])
+
+# Add --enable-maintainer-mode option to configure.         -*- Autoconf -*-
+# From Jim Meyering
+
+# Copyright (C) 1996-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_MAINTAINER_MODE([DEFAULT-MODE])
+# ----------------------------------
+# Control maintainer-specific portions of Makefiles.
+# Default is to disable them, unless 'enable' is passed literally.
+# For symmetry, 'disable' may be passed as well.  Anyway, the user
+# can override the default with the --enable/--disable switch.
+AC_DEFUN([AM_MAINTAINER_MODE],
+[m4_case(m4_default([$1], [disable]),
+       [enable], [m4_define([am_maintainer_other], [disable])],
+       [disable], [m4_define([am_maintainer_other], [enable])],
+       [m4_define([am_maintainer_other], [enable])
+        m4_warn([syntax], [unexpected argument to AM@&t@_MAINTAINER_MODE: $1])])
+AC_MSG_CHECKING([whether to enable maintainer-specific portions of Makefiles])
+  dnl maintainer-mode's default is 'disable' unless 'enable' is passed
+  AC_ARG_ENABLE([maintainer-mode],
+    [AS_HELP_STRING([--]am_maintainer_other[-maintainer-mode],
+      am_maintainer_other[ make rules and dependencies not useful
+      (and sometimes confusing) to the casual installer])],
+    [USE_MAINTAINER_MODE=$enableval],
+    [USE_MAINTAINER_MODE=]m4_if(am_maintainer_other, [enable], [no], [yes]))
+  AC_MSG_RESULT([$USE_MAINTAINER_MODE])
+  AM_CONDITIONAL([MAINTAINER_MODE], [test $USE_MAINTAINER_MODE = yes])
+  MAINT=$MAINTAINER_MODE_TRUE
+  AC_SUBST([MAINT])dnl
+]
+)
+
+# Check to see how 'make' treats includes.	            -*- Autoconf -*-
+
+# Copyright (C) 2001-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_MAKE_INCLUDE()
+# -----------------
+# Check to see how make treats includes.
+AC_DEFUN([AM_MAKE_INCLUDE],
+[am_make=${MAKE-make}
+cat > confinc << 'END'
+am__doit:
+	@echo this is the am__doit target
+.PHONY: am__doit
+END
+# If we don't find an include directive, just comment out the code.
+AC_MSG_CHECKING([for style of include used by $am_make])
+am__include="#"
+am__quote=
+_am_result=none
+# First try GNU make style include.
+echo "include confinc" > confmf
+# Ignore all kinds of additional output from 'make'.
+case `$am_make -s -f confmf 2> /dev/null` in #(
+*the\ am__doit\ target*)
+  am__include=include
+  am__quote=
+  _am_result=GNU
+  ;;
+esac
+# Now try BSD make style include.
+if test "$am__include" = "#"; then
+   echo '.include "confinc"' > confmf
+   case `$am_make -s -f confmf 2> /dev/null` in #(
+   *the\ am__doit\ target*)
+     am__include=.include
+     am__quote="\""
+     _am_result=BSD
+     ;;
+   esac
+fi
+AC_SUBST([am__include])
+AC_SUBST([am__quote])
+AC_MSG_RESULT([$_am_result])
+rm -f confinc confmf
+])
+
+# Fake the existence of programs that GNU maintainers use.  -*- Autoconf -*-
+
+# Copyright (C) 1997-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_MISSING_PROG(NAME, PROGRAM)
+# ------------------------------
+AC_DEFUN([AM_MISSING_PROG],
+[AC_REQUIRE([AM_MISSING_HAS_RUN])
+$1=${$1-"${am_missing_run}$2"}
+AC_SUBST($1)])
+
+# AM_MISSING_HAS_RUN
+# ------------------
+# Define MISSING if not defined so far and test if it is modern enough.
+# If it is, set am_missing_run to use it, otherwise, to nothing.
+AC_DEFUN([AM_MISSING_HAS_RUN],
+[AC_REQUIRE([AM_AUX_DIR_EXPAND])dnl
+AC_REQUIRE_AUX_FILE([missing])dnl
+if test x"${MISSING+set}" != xset; then
+  case $am_aux_dir in
+  *\ * | *\	*)
+    MISSING="\${SHELL} \"$am_aux_dir/missing\"" ;;
+  *)
+    MISSING="\${SHELL} $am_aux_dir/missing" ;;
+  esac
+fi
+# Use eval to expand $SHELL
+if eval "$MISSING --is-lightweight"; then
+  am_missing_run="$MISSING "
+else
+  am_missing_run=
+  AC_MSG_WARN(['missing' script is too old or missing])
+fi
+])
+
+# Helper functions for option handling.                     -*- Autoconf -*-
+
+# Copyright (C) 2001-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# _AM_MANGLE_OPTION(NAME)
+# -----------------------
+AC_DEFUN([_AM_MANGLE_OPTION],
+[[_AM_OPTION_]m4_bpatsubst($1, [[^a-zA-Z0-9_]], [_])])
+
+# _AM_SET_OPTION(NAME)
+# --------------------
+# Set option NAME.  Presently that only means defining a flag for this option.
+AC_DEFUN([_AM_SET_OPTION],
+[m4_define(_AM_MANGLE_OPTION([$1]), [1])])
+
+# _AM_SET_OPTIONS(OPTIONS)
+# ------------------------
+# OPTIONS is a space-separated list of Automake options.
+AC_DEFUN([_AM_SET_OPTIONS],
+[m4_foreach_w([_AM_Option], [$1], [_AM_SET_OPTION(_AM_Option)])])
+
+# _AM_IF_OPTION(OPTION, IF-SET, [IF-NOT-SET])
+# -------------------------------------------
+# Execute IF-SET if OPTION is set, IF-NOT-SET otherwise.
+AC_DEFUN([_AM_IF_OPTION],
+[m4_ifset(_AM_MANGLE_OPTION([$1]), [$2], [$3])])
+
+# Copyright (C) 1999-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# _AM_PROG_CC_C_O
+# ---------------
+# Like AC_PROG_CC_C_O, but changed for automake.  We rewrite AC_PROG_CC
+# to automatically call this.
+AC_DEFUN([_AM_PROG_CC_C_O],
+[AC_REQUIRE([AM_AUX_DIR_EXPAND])dnl
+AC_REQUIRE_AUX_FILE([compile])dnl
+AC_LANG_PUSH([C])dnl
+AC_CACHE_CHECK(
+  [whether $CC understands -c and -o together],
+  [am_cv_prog_cc_c_o],
+  [AC_LANG_CONFTEST([AC_LANG_PROGRAM([])])
+  # Make sure it works both with $CC and with simple cc.
+  # Following AC_PROG_CC_C_O, we do the test twice because some
+  # compilers refuse to overwrite an existing .o file with -o,
+  # though they will create one.
+  am_cv_prog_cc_c_o=yes
+  for am_i in 1 2; do
+    if AM_RUN_LOG([$CC -c conftest.$ac_ext -o conftest2.$ac_objext]) \
+         && test -f conftest2.$ac_objext; then
+      : OK
+    else
+      am_cv_prog_cc_c_o=no
+      break
+    fi
+  done
+  rm -f core conftest*
+  unset am_i])
+if test "$am_cv_prog_cc_c_o" != yes; then
+   # Losing compiler, so override with the script.
+   # FIXME: It is wrong to rewrite CC.
+   # But if we don't then we get into trouble of one sort or another.
+   # A longer-term fix would be to have automake use am__CC in this case,
+   # and then we could set am__CC="\$(top_srcdir)/compile \$(CC)"
+   CC="$am_aux_dir/compile $CC"
+fi
+AC_LANG_POP([C])])
+
+# For backward compatibility.
+AC_DEFUN_ONCE([AM_PROG_CC_C_O], [AC_REQUIRE([AC_PROG_CC])])
+
+# Copyright (C) 2001-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_RUN_LOG(COMMAND)
+# -------------------
+# Run COMMAND, save the exit status in ac_status, and log it.
+# (This has been adapted from Autoconf's _AC_RUN_LOG macro.)
+AC_DEFUN([AM_RUN_LOG],
+[{ echo "$as_me:$LINENO: $1" >&AS_MESSAGE_LOG_FD
+   ($1) >&AS_MESSAGE_LOG_FD 2>&AS_MESSAGE_LOG_FD
+   ac_status=$?
+   echo "$as_me:$LINENO: \$? = $ac_status" >&AS_MESSAGE_LOG_FD
+   (exit $ac_status); }])
+
+# Check to make sure that the build environment is sane.    -*- Autoconf -*-
+
+# Copyright (C) 1996-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_SANITY_CHECK
+# ---------------
+AC_DEFUN([AM_SANITY_CHECK],
+[AC_MSG_CHECKING([whether build environment is sane])
+# Reject unsafe characters in $srcdir or the absolute working directory
+# name.  Accept space and tab only in the latter.
+am_lf='
+'
+case `pwd` in
+  *[[\\\"\#\$\&\'\`$am_lf]]*)
+    AC_MSG_ERROR([unsafe absolute working directory name]);;
+esac
+case $srcdir in
+  *[[\\\"\#\$\&\'\`$am_lf\ \	]]*)
+    AC_MSG_ERROR([unsafe srcdir value: '$srcdir']);;
+esac
+
+# Do 'set' in a subshell so we don't clobber the current shell's
+# arguments.  Must try -L first in case configure is actually a
+# symlink; some systems play weird games with the mod time of symlinks
+# (eg FreeBSD returns the mod time of the symlink's containing
+# directory).
+if (
+   am_has_slept=no
+   for am_try in 1 2; do
+     echo "timestamp, slept: $am_has_slept" > conftest.file
+     set X `ls -Lt "$srcdir/configure" conftest.file 2> /dev/null`
+     if test "$[*]" = "X"; then
+	# -L didn't work.
+	set X `ls -t "$srcdir/configure" conftest.file`
+     fi
+     if test "$[*]" != "X $srcdir/configure conftest.file" \
+	&& test "$[*]" != "X conftest.file $srcdir/configure"; then
+
+	# If neither matched, then we have a broken ls.  This can happen
+	# if, for instance, CONFIG_SHELL is bash and it inherits a
+	# broken ls alias from the environment.  This has actually
+	# happened.  Such a system could not be considered "sane".
+	AC_MSG_ERROR([ls -t appears to fail.  Make sure there is not a broken
+  alias in your environment])
+     fi
+     if test "$[2]" = conftest.file || test $am_try -eq 2; then
+       break
+     fi
+     # Just in case.
+     sleep 1
+     am_has_slept=yes
+   done
+   test "$[2]" = conftest.file
+   )
+then
+   # Ok.
+   :
+else
+   AC_MSG_ERROR([newly created file is older than distributed files!
+Check your system clock])
+fi
+AC_MSG_RESULT([yes])
+# If we didn't sleep, we still need to ensure time stamps of config.status and
+# generated files are strictly newer.
+am_sleep_pid=
+if grep 'slept: no' conftest.file >/dev/null 2>&1; then
+  ( sleep 1 ) &
+  am_sleep_pid=$!
+fi
+AC_CONFIG_COMMANDS_PRE(
+  [AC_MSG_CHECKING([that generated files are newer than configure])
+   if test -n "$am_sleep_pid"; then
+     # Hide warnings about reused PIDs.
+     wait $am_sleep_pid 2>/dev/null
+   fi
+   AC_MSG_RESULT([done])])
+rm -f conftest.file
+])
+
+# Copyright (C) 2009-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_SILENT_RULES([DEFAULT])
+# --------------------------
+# Enable less verbose build rules; with the default set to DEFAULT
+# ("yes" being less verbose, "no" or empty being verbose).
+AC_DEFUN([AM_SILENT_RULES],
+[AC_ARG_ENABLE([silent-rules], [dnl
+AS_HELP_STRING(
+  [--enable-silent-rules],
+  [less verbose build output (undo: "make V=1")])
+AS_HELP_STRING(
+  [--disable-silent-rules],
+  [verbose build output (undo: "make V=0")])dnl
+])
+case $enable_silent_rules in @%:@ (((
+  yes) AM_DEFAULT_VERBOSITY=0;;
+   no) AM_DEFAULT_VERBOSITY=1;;
+    *) AM_DEFAULT_VERBOSITY=m4_if([$1], [yes], [0], [1]);;
+esac
+dnl
+dnl A few 'make' implementations (e.g., NonStop OS and NextStep)
+dnl do not support nested variable expansions.
+dnl See automake bug#9928 and bug#10237.
+am_make=${MAKE-make}
+AC_CACHE_CHECK([whether $am_make supports nested variables],
+   [am_cv_make_support_nested_variables],
+   [if AS_ECHO([['TRUE=$(BAR$(V))
+BAR0=false
+BAR1=true
+V=1
+am__doit:
+	@$(TRUE)
+.PHONY: am__doit']]) | $am_make -f - >/dev/null 2>&1; then
+  am_cv_make_support_nested_variables=yes
+else
+  am_cv_make_support_nested_variables=no
+fi])
+if test $am_cv_make_support_nested_variables = yes; then
+  dnl Using '$V' instead of '$(V)' breaks IRIX make.
+  AM_V='$(V)'
+  AM_DEFAULT_V='$(AM_DEFAULT_VERBOSITY)'
+else
+  AM_V=$AM_DEFAULT_VERBOSITY
+  AM_DEFAULT_V=$AM_DEFAULT_VERBOSITY
+fi
+AC_SUBST([AM_V])dnl
+AM_SUBST_NOTMAKE([AM_V])dnl
+AC_SUBST([AM_DEFAULT_V])dnl
+AM_SUBST_NOTMAKE([AM_DEFAULT_V])dnl
+AC_SUBST([AM_DEFAULT_VERBOSITY])dnl
+AM_BACKSLASH='\'
+AC_SUBST([AM_BACKSLASH])dnl
+_AM_SUBST_NOTMAKE([AM_BACKSLASH])dnl
+])
+
+# Copyright (C) 2001-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# AM_PROG_INSTALL_STRIP
+# ---------------------
+# One issue with vendor 'install' (even GNU) is that you can't
+# specify the program used to strip binaries.  This is especially
+# annoying in cross-compiling environments, where the build's strip
+# is unlikely to handle the host's binaries.
+# Fortunately install-sh will honor a STRIPPROG variable, so we
+# always use install-sh in "make install-strip", and initialize
+# STRIPPROG with the value of the STRIP variable (set by the user).
+AC_DEFUN([AM_PROG_INSTALL_STRIP],
+[AC_REQUIRE([AM_PROG_INSTALL_SH])dnl
+# Installed binaries are usually stripped using 'strip' when the user
+# run "make install-strip".  However 'strip' might not be the right
+# tool to use in cross-compilation environments, therefore Automake
+# will honor the 'STRIP' environment variable to overrule this program.
+dnl Don't test for $cross_compiling = yes, because it might be 'maybe'.
+if test "$cross_compiling" != no; then
+  AC_CHECK_TOOL([STRIP], [strip], :)
+fi
+INSTALL_STRIP_PROGRAM="\$(install_sh) -c -s"
+AC_SUBST([INSTALL_STRIP_PROGRAM])])
+
+# Copyright (C) 2006-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# _AM_SUBST_NOTMAKE(VARIABLE)
+# ---------------------------
+# Prevent Automake from outputting VARIABLE = @VARIABLE@ in Makefile.in.
+# This macro is traced by Automake.
+AC_DEFUN([_AM_SUBST_NOTMAKE])
+
+# AM_SUBST_NOTMAKE(VARIABLE)
+# --------------------------
+# Public sister of _AM_SUBST_NOTMAKE.
+AC_DEFUN([AM_SUBST_NOTMAKE], [_AM_SUBST_NOTMAKE($@)])
+
+# Check how to create a tarball.                            -*- Autoconf -*-
+
+# Copyright (C) 2004-2014 Free Software Foundation, Inc.
+#
+# This file is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# _AM_PROG_TAR(FORMAT)
+# --------------------
+# Check how to create a tarball in format FORMAT.
+# FORMAT should be one of 'v7', 'ustar', or 'pax'.
+#
+# Substitute a variable $(am__tar) that is a command
+# writing to stdout a FORMAT-tarball containing the directory
+# $tardir.
+#     tardir=directory && $(am__tar) > result.tar
+#
+# Substitute a variable $(am__untar) that extract such
+# a tarball read from stdin.
+#     $(am__untar) < result.tar
+#
+AC_DEFUN([_AM_PROG_TAR],
+[# Always define AMTAR for backward compatibility.  Yes, it's still used
+# in the wild :-(  We should find a proper way to deprecate it ...
+AC_SUBST([AMTAR], ['$${TAR-tar}'])
+
+# We'll loop over all known methods to create a tar archive until one works.
+_am_tools='gnutar m4_if([$1], [ustar], [plaintar]) pax cpio none'
+
+m4_if([$1], [v7],
+  [am__tar='$${TAR-tar} chof - "$$tardir"' am__untar='$${TAR-tar} xf -'],
+
+  [m4_case([$1],
+    [ustar],
+     [# The POSIX 1988 'ustar' format is defined with fixed-size fields.
+      # There is notably a 21 bits limit for the UID and the GID.  In fact,
+      # the 'pax' utility can hang on bigger UID/GID (see automake bug#8343
+      # and bug#13588).
+      am_max_uid=2097151 # 2^21 - 1
+      am_max_gid=$am_max_uid
+      # The $UID and $GID variables are not portable, so we need to resort
+      # to the POSIX-mandated id(1) utility.  Errors in the 'id' calls
+      # below are definitely unexpected, so allow the users to see them
+      # (that is, avoid stderr redirection).
+      am_uid=`id -u || echo unknown`
+      am_gid=`id -g || echo unknown`
+      AC_MSG_CHECKING([whether UID '$am_uid' is supported by ustar format])
+      if test $am_uid -le $am_max_uid; then
+         AC_MSG_RESULT([yes])
+      else
+         AC_MSG_RESULT([no])
+         _am_tools=none
+      fi
+      AC_MSG_CHECKING([whether GID '$am_gid' is supported by ustar format])
+      if test $am_gid -le $am_max_gid; then
+         AC_MSG_RESULT([yes])
+      else
+        AC_MSG_RESULT([no])
+        _am_tools=none
+      fi],
+
+  [pax],
+    [],
+
+  [m4_fatal([Unknown tar format])])
+
+  AC_MSG_CHECKING([how to create a $1 tar archive])
+
+  # Go ahead even if we have the value already cached.  We do so because we
+  # need to set the values for the 'am__tar' and 'am__untar' variables.
+  _am_tools=${am_cv_prog_tar_$1-$_am_tools}
+
+  for _am_tool in $_am_tools; do
+    case $_am_tool in
+    gnutar)
+      for _am_tar in tar gnutar gtar; do
+        AM_RUN_LOG([$_am_tar --version]) && break
+      done
+      am__tar="$_am_tar --format=m4_if([$1], [pax], [posix], [$1]) -chf - "'"$$tardir"'
+      am__tar_="$_am_tar --format=m4_if([$1], [pax], [posix], [$1]) -chf - "'"$tardir"'
+      am__untar="$_am_tar -xf -"
+      ;;
+    plaintar)
+      # Must skip GNU tar: if it does not support --format= it doesn't create
+      # ustar tarball either.
+      (tar --version) >/dev/null 2>&1 && continue
+      am__tar='tar chf - "$$tardir"'
+      am__tar_='tar chf - "$tardir"'
+      am__untar='tar xf -'
+      ;;
+    pax)
+      am__tar='pax -L -x $1 -w "$$tardir"'
+      am__tar_='pax -L -x $1 -w "$tardir"'
+      am__untar='pax -r'
+      ;;
+    cpio)
+      am__tar='find "$$tardir" -print | cpio -o -H $1 -L'
+      am__tar_='find "$tardir" -print | cpio -o -H $1 -L'
+      am__untar='cpio -i -H $1 -d'
+      ;;
+    none)
+      am__tar=false
+      am__tar_=false
+      am__untar=false
+      ;;
+    esac
+
+    # If the value was cached, stop now.  We just wanted to have am__tar
+    # and am__untar set.
+    test -n "${am_cv_prog_tar_$1}" && break
+
+    # tar/untar a dummy directory, and stop if the command works.
+    rm -rf conftest.dir
+    mkdir conftest.dir
+    echo GrepMe > conftest.dir/file
+    AM_RUN_LOG([tardir=conftest.dir && eval $am__tar_ >conftest.tar])
+    rm -rf conftest.dir
+    if test -s conftest.tar; then
+      AM_RUN_LOG([$am__untar <conftest.tar])
+      AM_RUN_LOG([cat conftest.dir/file])
+      grep GrepMe conftest.dir/file >/dev/null 2>&1 && break
+    fi
+  done
+  rm -rf conftest.dir
+
+  AC_CACHE_VAL([am_cv_prog_tar_$1], [am_cv_prog_tar_$1=$_am_tool])
+  AC_MSG_RESULT([$am_cv_prog_tar_$1])])
+
+AC_SUBST([am__tar])
+AC_SUBST([am__untar])
+]) # _AM_PROG_TAR
+
+m4_include([confdb/aclocal_cc.m4])
+m4_include([confdb/aclocal_coverage.m4])
+m4_include([confdb/aclocal_f77.m4])
+m4_include([confdb/aclocal_fc.m4])
+m4_include([confdb/aclocal_make.m4])
+m4_include([confdb/aclocal_romio.m4])
+m4_include([confdb/aclocal_runlog.m4])
+m4_include([confdb/aclocal_util.m4])
+m4_include([confdb/libtool.m4])
+m4_include([confdb/ltoptions.m4])
+m4_include([confdb/ltsugar.m4])
+m4_include([confdb/ltversion.m4])
+m4_include([confdb/lt~obsolete.m4])

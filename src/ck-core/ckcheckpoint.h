@@ -45,13 +45,8 @@ restarting of Charm++ programs. ...
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
 void CkPupChareData(PUP::er &p);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void CkPupGroupData(PUP::er &p,bool create=true);
-void CkPupNodeGroupData(PUP::er &p,bool create=true);
-#else
 void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);
-#endif
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
 void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
@@ -69,7 +64,7 @@ int  CkCountArrayElements();
 #if CMK_SHRINK_EXPAND
 enum realloc_state : uint8_t { NO_REALLOC=0, REALLOC_MSG_RECEIVED=1, REALLOC_IN_PROGRESS=2 };
 extern realloc_state pending_realloc_state;
-extern CkGroupID _lbdb;
+extern CkGroupID _lbmgr;
 #endif
 
 // some useful flags (for disk checkpointing)

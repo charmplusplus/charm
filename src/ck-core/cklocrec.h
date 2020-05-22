@@ -22,7 +22,7 @@ private:
   bool  readyMigrate;    /// status whether it is ready to migrate
   bool  enable_measure;
   int  nextPe;              /// next migration dest processor
-  LBDatabase *the_lbdb;
+  LBManager *lbmgr;
   MetaBalancer *the_metalb;
   LDObjHandle ldHandle;
 #endif
@@ -55,10 +55,11 @@ public:
 #endif
   inline const CkArrayIndex &getIndex(void) const {return idx;}
   inline CmiUInt8 getID() const { return id; }
+  inline CkLocMgr *getLocMgr() const {return myLocMgr; }
 
 #if CMK_LBDB_ON
 public:
-  inline LBDatabase *getLBDB(void) const {return the_lbdb;}
+  inline LBManager *getLBMgr(void) const {return lbmgr;}
   inline MetaBalancer *getMetaBalancer(void) const {return the_metalb;}
   inline LDObjHandle getLdHandle() const{return ldHandle;}
   static void staticMigrate(LDObjHandle h, int dest);
@@ -73,9 +74,6 @@ public:
   bool isReadyMigrate()	{ return readyMigrate; }
   bool checkBufferedMigration();	// check and execute pending migration
   int   MigrateToPe();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        void Migrated();
-#endif
   inline void setMeasure(bool status) { enable_measure = status; }
 #else
   void AsyncMigrate(bool use){};
