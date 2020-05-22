@@ -12,14 +12,28 @@
       end module test_mod
 
 
+      ! Define these to test that calling them works
+      subroutine about_to_migrate
+      end subroutine about_to_migrate
+
+      subroutine just_migrated
+      end subroutine just_migrated
+
+
       subroutine mpi_main
 
         implicit none
         include 'mpif.h'
 
+        external about_to_migrate
+        external just_migrated
+
         integer :: ierr
 
         call mpi_init(ierr)
+
+        call ampi_register_about_to_migrate(about_to_migrate, ierr)
+        call ampi_register_just_migrated(just_migrated, ierr)
 
         call privatization_test_framework()
 

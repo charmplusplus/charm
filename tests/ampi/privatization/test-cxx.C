@@ -146,9 +146,11 @@ void perform_test_batch(int & failed, int & test, int & rank, int & my_wth, int 
 #if defined test_migration
 test_thread_local extern int global_myrank;
 test_thread_local int global_myrank;
+#endif
 
 static void privatization_about_to_migrate()
 {
+#if defined test_migration
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -156,9 +158,11 @@ static void privatization_about_to_migrate()
   {
     printf("[%d] Globals incorrect when about to migrate!\n", rank);
   }
+#endif
 }
 static void privatization_just_migrated()
 {
+#if defined test_migration
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -166,8 +170,8 @@ static void privatization_just_migrated()
   {
     printf("[%d] Globals incorrect when just migrated!\n", rank);
   }
-}
 #endif
+}
 
 int main(int argc, char **argv)
 {
@@ -175,9 +179,9 @@ int main(int argc, char **argv)
 
 #if defined test_migration
   MPI_Comm_rank(MPI_COMM_WORLD, &global_myrank);
+#endif
   AMPI_Register_about_to_migrate(privatization_about_to_migrate);
   AMPI_Register_just_migrated(privatization_just_migrated);
-#endif
 
   privatization_test_framework();
 
