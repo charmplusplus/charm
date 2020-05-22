@@ -80,7 +80,7 @@ do
 done
 }
 
-eval processArgs "$@"
+eval processArgs "$AMPI_BUILD_FLAGS" "$@"
 
 # If there are no filename arguments specified, just pass through
 # compiler options to charmc. Helps with configure scripts that
