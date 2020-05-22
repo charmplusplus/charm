@@ -33,7 +33,9 @@ void cuptiInit() {
 
   CUPTI_CALL(cuptiGetTimestamp(&CsvAccess(cupti_start_time)));
 
-  printf("HAPI> GPU tracing using CUPTI is enabled\n");
+  if (CmiMyPe() == 0) {
+    printf("HAPI> GPU tracing using CUPTI is enabled\n");
+  }
 }
 
 static const char* cuptiMemcpyKindString(CUpti_ActivityMemcpyKind kind)
