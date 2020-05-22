@@ -28,34 +28,43 @@
       end subroutine mpi_main
 
 
-      subroutine subroutine_save(failed, rank, my_wth, operation)
+      subroutine subroutine_save(failed, test, rank, my_wth, operation)
 
         implicit none
         save
 
-        integer :: failed, rank, my_wth, operation
+        integer :: failed, test, rank, my_wth, operation
         integer, target :: save_variable3
 
-        call test_privatization(failed, rank, my_wth, operation, save_variable3)
+        call test_privatization(failed, test, rank, my_wth, operation, save_variable3)
 
       end subroutine subroutine_save
 
 
-      subroutine perform_test_batch(failed, rank, my_wth, operation)
+      subroutine perform_test_batch(failed, test, rank, my_wth, operation)
 
         use test_mod
         implicit none
 
-        integer :: failed, rank, my_wth, operation
+        integer :: failed, test, rank, my_wth, operation
         integer, target :: save_variable1 = 0
         integer, save, target :: save_variable2
         integer, target :: common_variable
         common /commons/ common_variable
 
-        call test_privatization(failed, rank, my_wth, operation, module_variable)
-        call test_privatization(failed, rank, my_wth, operation, save_variable1)
-        call test_privatization(failed, rank, my_wth, operation, save_variable2)
-        call subroutine_save(failed, rank, my_wth, operation)
-        call test_privatization(failed, rank, my_wth, operation, common_variable)
+        call print_test_fortran(test, rank, 'module variable')
+        call test_privatization(failed, test, rank, my_wth, operation, module_variable)
+
+        call print_test_fortran(test, rank, 'implicit save variable')
+        call test_privatization(failed, test, rank, my_wth, operation, save_variable1)
+
+        call print_test_fortran(test, rank, 'explicit save variable')
+        call test_privatization(failed, test, rank, my_wth, operation, save_variable2)
+
+        call print_test_fortran(test, rank, 'subroutine save variable')
+        call subroutine_save(failed, test, rank, my_wth, operation)
+
+        call print_test_fortran(test, rank, 'common block variable')
+        call test_privatization(failed, test, rank, my_wth, operation, common_variable)
 
       end subroutine perform_test_batch
