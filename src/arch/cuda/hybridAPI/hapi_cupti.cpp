@@ -1,3 +1,6 @@
+#include <stdio.h>
+
+#include "converse.h"
 #include "hapi_cupti.h"
 
 CsvDeclare(uint64_t, cupti_start_time);
@@ -32,50 +35,6 @@ void cuptiInit() {
 
   printf("HAPI> GPU tracing using CUPTI is enabled\n");
 }
-
-void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *max_num_records)
-{
-  uint8_t *bfr = (uint8_t *) malloc(CUPTI_BUF_SIZE + CUPTI_ALIGN_SIZE);
-  if (bfr == NULL) {
-    CmiAbort("[CUPTI] Error: out of memory\n");
-  }
-
-  *size = CUPTI_BUF_SIZE;
-  *buffer = CUPTI_ALIGN_BUFFER(bfr, CUPTI_ALIGN_SIZE);
-  *max_num_records = 0;
-}
-
-void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t stream_id, uint8_t *buffer, size_t size, size_t valid_size)
-{
-  CUptiResult status;
-  CUpti_Activity *record = NULL;
-
-  printf("========== CUPTI Activity Traces ==========\n");
-
-  if (valid_size > 0) {
-    do {
-      status = cuptiActivityGetNextRecord(buffer, valid_size, &record);
-      if (status == CUPTI_SUCCESS) {
-        cuptiPrintActivity(record);
-      }
-      else if (status == CUPTI_ERROR_MAX_LIMIT_REACHED)
-        break;
-      else {
-        CUPTI_CALL(status);
-      }
-    } while (1);
-
-    // report any records dropped from the queue
-    size_t dropped;
-    CUPTI_CALL(cuptiActivityGetNumDroppedRecords(ctx, stream_id, &dropped));
-    if (dropped != 0) {
-      printf("[CUPTI] Dropped %u activity records\n", (unsigned int) dropped);
-    }
-  }
-
-  free(buffer);
-}
-
 
 static const char* cuptiMemcpyKindString(CUpti_ActivityMemcpyKind kind)
 {
@@ -332,4 +291,47 @@ static void cuptiPrintActivity(CUpti_Activity *record)
       printf("  <unknown>\n");
       break;
   }
+}
+
+void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *max_num_records)
+{
+  uint8_t *bfr = (uint8_t *) malloc(CUPTI_BUF_SIZE + CUPTI_ALIGN_SIZE);
+  if (bfr == NULL) {
+    CmiAbort("[CUPTI] Error: out of memory\n");
+  }
+
+  *size = CUPTI_BUF_SIZE;
+  *buffer = CUPTI_ALIGN_BUFFER(bfr, CUPTI_ALIGN_SIZE);
+  *max_num_records = 0;
+}
+
+void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t stream_id, uint8_t *buffer, size_t size, size_t valid_size)
+{
+  CUptiResult status;
+  CUpti_Activity *record = NULL;
+
+  printf("========== CUPTI Activity Traces ==========\n");
+
+  if (valid_size > 0) {
+    do {
+      status = cuptiActivityGetNextRecord(buffer, valid_size, &record);
+      if (status == CUPTI_SUCCESS) {
+        cuptiPrintActivity(record);
+      }
+      else if (status == CUPTI_ERROR_MAX_LIMIT_REACHED)
+        break;
+      else {
+        CUPTI_CALL(status);
+      }
+    } while (1);
+
+    // report any records dropped from the queue
+    size_t dropped;
+    CUPTI_CALL(cuptiActivityGetNumDroppedRecords(ctx, stream_id, &dropped));
+    if (dropped != 0) {
+      printf("[CUPTI] Dropped %u activity records\n", (unsigned int) dropped);
+    }
+  }
+
+  free(buffer);
 }
