@@ -555,7 +555,7 @@ class LBManager : public CBase_LBManager
   inline void LocalBarrierOn(void) { localBarrier.TurnOn(); };
   inline void LocalBarrierOff(void) { localBarrier.TurnOff(); };
   void ResumeClients();
-  int ProcessorSpeed();
+  static int ProcessorSpeed();
   inline void SetLBPeriod(double s) {}
   inline double GetLBPeriod() { return 0; }
 
@@ -565,7 +565,6 @@ class LBManager : public CBase_LBManager
 
  private:
   int mystep;
-  int peSpeed;
   static char* avail_vector;  // processor bit vector
   static bool avail_vector_set;
   int new_ld_balancer;  // for Node 0

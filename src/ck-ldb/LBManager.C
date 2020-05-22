@@ -119,58 +119,6 @@ static void createLoadBalancer(const char* lbname)
   fn();
 }
 
-#if CMK_LBDB_ON
-static void work(int iter_block, volatile int* result)
-{
-  int i;
-  *result = 1;
-  for (i = 0; i < iter_block; i++)
-  {
-    double b = 0.1 + 0.1 * *result;
-    *result = (int)(sqrt(1 + cos(b * 1.57)));
-  }
-}
-
-int LDProcessorSpeed()
-{
-  if (_lb_args.samePeSpeed() ||
-      CkNumPes() == 1)  // I think it is safe to assume that we can
-    return 1;           // skip this if we are only using 1 PE
-
-  volatile int result = 0;
-
-  int wps = 0;
-  const double elapse = 0.2;
-  // First, count how many iterations happen in "elapse" seconds.
-  // Since we are doing lots of function calls, this will be rough
-  const double end_time = CmiCpuTimer() + elapse;
-  while (CmiCpuTimer() < end_time)
-  {
-    work(1000, &result);
-    wps += 1000;
-  }
-
-  // Now we have a rough idea of how many iterations happen in
-  // "elapse" seconds, so just perform a few cycles of correction
-  // by running for what should take that long. Then correct the
-  // number of iterations if needed.
-
-  for (int i = 0; i < 2; i++)
-  {
-    const double start_time = CmiCpuTimer();
-    work(wps, &result);
-    const double end_time = CmiCpuTimer();
-    const double correction = elapse / (end_time - start_time);
-    wps = (int)((double)wps * correction + 0.5);
-  }
-
-  return wps;
-}
-
-#else
-int LDProcessorSpeed() { return 1; }
-#endif  // CMK_LBDB_ON
-
 // mainchare
 LBMgrInit::LBMgrInit(CkArgMsg* m)
 {
@@ -564,8 +512,6 @@ void LBManager::init(void)
   rank0pe = CkMyRank() == 0;
   reset();
 
-  peSpeed = (_lb_args.testPeSpeed()) ? LDProcessorSpeed() : 1;
-
 #if CMK_LB_CPUTIMER
   obj_cputime = 0;
 #endif
@@ -957,7 +903,63 @@ void LBManager::UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad)
 #endif
 }
 
-int LBManager::ProcessorSpeed() { return peSpeed; }
+#if CMK_LBDB_ON
+static void work(int iter_block, volatile int* result)
+{
+  int i;
+  *result = 1;
+  for (i = 0; i < iter_block; i++)
+  {
+    double b = 0.1 + 0.1 * *result;
+    *result = (int)(sqrt(1 + cos(b * 1.57)));
+  }
+}
+
+int LDProcessorSpeed()
+{
+  if (_lb_args.samePeSpeed() ||
+      CkNumPes() == 1)  // I think it is safe to assume that we can
+    return 1;           // skip this if we are only using 1 PE
+
+  volatile int result = 0;
+
+  int wps = 0;
+  const double elapse = 0.2;
+  // First, count how many iterations happen in "elapse" seconds.
+  // Since we are doing lots of function calls, this will be rough
+  const double end_time = CmiCpuTimer() + elapse;
+  while (CmiCpuTimer() < end_time)
+  {
+    work(1000, &result);
+    wps += 1000;
+  }
+
+  // Now we have a rough idea of how many iterations happen in
+  // "elapse" seconds, so just perform a few cycles of correction
+  // by running for what should take that long. Then correct the
+  // number of iterations if needed.
+
+  for (int i = 0; i < 2; i++)
+  {
+    const double start_time = CmiCpuTimer();
+    work(wps, &result);
+    const double end_time = CmiCpuTimer();
+    const double correction = elapse / (end_time - start_time);
+    wps = (int)((double)wps * correction + 0.5);
+  }
+
+  return wps;
+}
+
+#else
+int LDProcessorSpeed() { return 1; }
+#endif  // CMK_LBDB_ON
+
+int LBManager::ProcessorSpeed()
+{
+  static int peSpeed = LDProcessorSpeed();
+  return peSpeed;
+}
 
 /*
   callable from user's code
