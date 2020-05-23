@@ -150,10 +150,11 @@ test_thread_local int global_myrank;
 
 static void privatization_about_to_migrate()
 {
-#if defined test_migration
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  printf("[%d] About to migrate.\n", rank);
 
+#if defined test_migration
   if (rank != global_myrank)
   {
     printf("[%d] Globals incorrect when about to migrate!\n", rank);
@@ -162,10 +163,11 @@ static void privatization_about_to_migrate()
 }
 static void privatization_just_migrated()
 {
-#if defined test_migration
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  printf("[%d] Just migrated.\n", rank);
 
+#if defined test_migration
   if (rank != global_myrank)
   {
     printf("[%d] Globals incorrect when just migrated!\n", rank);
