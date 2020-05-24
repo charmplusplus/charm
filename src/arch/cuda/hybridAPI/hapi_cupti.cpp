@@ -5,6 +5,51 @@
 
 CsvDeclare(uint64_t, cupti_start_time);
 
+static void cuptiPrintActivity(CUpti_Activity *record);
+
+static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *max_num_records)
+{
+  uint8_t *bfr = (uint8_t *) malloc(CUPTI_BUF_SIZE + CUPTI_ALIGN_SIZE);
+  if (bfr == NULL) {
+    CmiAbort("[CUPTI] Error: out of memory\n");
+  }
+
+  *size = CUPTI_BUF_SIZE;
+  *buffer = CUPTI_ALIGN_BUFFER(bfr, CUPTI_ALIGN_SIZE);
+  *max_num_records = 0;
+}
+
+static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t stream_id, uint8_t *buffer, size_t size, size_t valid_size)
+{
+  CUptiResult status;
+  CUpti_Activity *record = NULL;
+
+  printf("========== CUPTI Activity Traces ==========\n");
+
+  if (valid_size > 0) {
+    do {
+      status = cuptiActivityGetNextRecord(buffer, valid_size, &record);
+      if (status == CUPTI_SUCCESS) {
+        cuptiPrintActivity(record);
+      }
+      else if (status == CUPTI_ERROR_MAX_LIMIT_REACHED)
+        break;
+      else {
+        CUPTI_CALL(status);
+      }
+    } while (1);
+
+    // report any records dropped from the queue
+    size_t dropped;
+    CUPTI_CALL(cuptiActivityGetNumDroppedRecords(ctx, stream_id, &dropped));
+    if (dropped != 0) {
+      printf("[CUPTI] Dropped %u activity records\n", (unsigned int) dropped);
+    }
+  }
+
+  free(buffer);
+}
+
 void cuptiInit() {
   // CUPTI Activity API needs to be initialized before cuInit() or
   // CUDA runtime call
@@ -38,6 +83,11 @@ void cuptiInit() {
   }
 }
 
+void cuptiExit() {
+  // Flush CUPTI activity records
+  cuptiActivityFlushAll(0);
+}
+
 static const char* cuptiMemcpyKindString(CUpti_ActivityMemcpyKind kind)
 {
   switch (kind) {
@@ -66,7 +116,7 @@ static const char* cuptiMemcpyKindString(CUpti_ActivityMemcpyKind kind)
   return "<unknown>";
 }
 
-const char* cuptiActivityOverheadKindString(CUpti_ActivityOverheadKind kind)
+static const char* cuptiActivityOverheadKindString(CUpti_ActivityOverheadKind kind)
 {
   switch (kind) {
     case CUPTI_ACTIVITY_OVERHEAD_DRIVER_COMPILER:
@@ -84,7 +134,7 @@ const char* cuptiActivityOverheadKindString(CUpti_ActivityOverheadKind kind)
   return "<unknown>";
 }
 
-const char *cuptiActivityObjectKindString(CUpti_ActivityObjectKind kind)
+static const char *cuptiActivityObjectKindString(CUpti_ActivityObjectKind kind)
 {
   switch (kind) {
     case CUPTI_ACTIVITY_OBJECT_PROCESS:
@@ -104,7 +154,7 @@ const char *cuptiActivityObjectKindString(CUpti_ActivityObjectKind kind)
   return "<unknown>";
 }
 
-uint32_t cuptiActivityObjectKindId(CUpti_ActivityObjectKind kind, CUpti_ActivityObjectKindId *id)
+static uint32_t cuptiActivityObjectKindId(CUpti_ActivityObjectKind kind, CUpti_ActivityObjectKindId *id)
 {
   switch (kind) {
     case CUPTI_ACTIVITY_OBJECT_PROCESS:
@@ -293,47 +343,4 @@ static void cuptiPrintActivity(CUpti_Activity *record)
       printf("  <unknown>\n");
       break;
   }
-}
-
-void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *max_num_records)
-{
-  uint8_t *bfr = (uint8_t *) malloc(CUPTI_BUF_SIZE + CUPTI_ALIGN_SIZE);
-  if (bfr == NULL) {
-    CmiAbort("[CUPTI] Error: out of memory\n");
-  }
-
-  *size = CUPTI_BUF_SIZE;
-  *buffer = CUPTI_ALIGN_BUFFER(bfr, CUPTI_ALIGN_SIZE);
-  *max_num_records = 0;
-}
-
-void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t stream_id, uint8_t *buffer, size_t size, size_t valid_size)
-{
-  CUptiResult status;
-  CUpti_Activity *record = NULL;
-
-  printf("========== CUPTI Activity Traces ==========\n");
-
-  if (valid_size > 0) {
-    do {
-      status = cuptiActivityGetNextRecord(buffer, valid_size, &record);
-      if (status == CUPTI_SUCCESS) {
-        cuptiPrintActivity(record);
-      }
-      else if (status == CUPTI_ERROR_MAX_LIMIT_REACHED)
-        break;
-      else {
-        CUPTI_CALL(status);
-      }
-    } while (1);
-
-    // report any records dropped from the queue
-    size_t dropped;
-    CUPTI_CALL(cuptiActivityGetNumDroppedRecords(ctx, stream_id, &dropped));
-    if (dropped != 0) {
-      printf("[CUPTI] Dropped %u activity records\n", (unsigned int) dropped);
-    }
-  }
-
-  free(buffer);
 }

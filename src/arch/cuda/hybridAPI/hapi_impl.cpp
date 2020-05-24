@@ -63,7 +63,6 @@ void hapiInitCsv() {
   CsvAccess(gpu_manager).init();
 
 #ifdef HAPI_TRACE
-  // Initialize CUPTI
   cuptiInit();
 #endif
 }
@@ -95,8 +94,7 @@ void hapiExitCsv() {
   }
 
 #ifdef HAPI_TRACE
-  // Flush CUPTI activity records
-  cuptiActivityFlushAll(0);
+  cuptiExit();
 #endif
 }
 

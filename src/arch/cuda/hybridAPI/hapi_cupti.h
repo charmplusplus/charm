@@ -22,8 +22,6 @@
   (((uintptr_t) (buffer) & ((align)-1)) ? ((buffer) + (align) - ((uintptr_t) (buffer) & ((align)-1))) : (buffer))
 
 void cuptiInit();
-
-void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *max_num_records);
-void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t stream_id, uint8_t *buffer, size_t size, size_t valid_size);
+void cuptiExit();
 
 #endif // __HAPI_CUPTI_H_
