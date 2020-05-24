@@ -1,5 +1,5 @@
 #!/bin/bash
-AMPICC="$0"
+[ -z "$AMPICC" ] && AMPICC="$(basename $0)"
 CHARMBIN=$(dirname $0)
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
@@ -27,8 +27,40 @@ while [ ! $# -eq 0 ]
 do
   arg="$1"
   case "$arg" in
-  -show)
-     echo "charmc"
+  -showme:command|--showme:command)
+     shift
+     echo "$CHARMBIN/$AMPICC" $ARGS "$@"
+     exit 0
+     ;;
+  -showme:compile|--showme:compile)
+     exit 0
+     ;;
+  -showme:link|--showme:link)
+     exit 0
+     ;;
+  -showme:incdirs|--showme:incdirs)
+     exit 0
+     ;;
+  -showme:libdirs|--showme:libdirs)
+     exit 0
+     ;;
+  -showme:libs|--showme:libs)
+     exit 0
+     ;;
+  -showme:version|--showme:version)
+     echo "AMPI ($AMPICC)"
+     exit 0
+     ;;
+  -showme:help|--showme:help)
+     echo "AMPI ($AMPICC)"
+     exit 0
+     ;;
+  -showme:*|--showme:*)
+     exit 1
+     ;;
+  -show*|--show*)
+     shift
+     echo "$CHARMBIN/$AMPICC" $ARGS "$@"
      exit 0
      ;;
   -v|--version|-print-search-dirs)

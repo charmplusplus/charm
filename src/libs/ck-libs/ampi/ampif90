@@ -4,6 +4,7 @@ CHARMBIN=$(dirname $0)
 # protect rpath arguments from disappearing due to variable expansion
 ORIGIN='\$ORIGIN'
 
+export AMPICC="$(basename $0)"
 export AMPICC_MODE='ampif'
 
 cp -n $CHARMBIN/../include/mpif.h .
