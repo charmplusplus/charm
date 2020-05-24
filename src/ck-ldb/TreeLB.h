@@ -32,8 +32,8 @@ class LevelLogic
 
   /// return msg with lb stats for this PE. only needed at leaves
   virtual TreeLBMessage* getStats() { CkAbort("LevelLogic::getStats not implemented\n"); }
-  // FIXME maybe these should be "=0" methods, but then the subclass would
-  // have to implement empty methods if it doesn't need them
+  // Note: These are not "=0" methods, because then the subclass would have to
+  // implement (and abort inside) empty methods if it doesn't need them
 
   /// deposit stats msg received from a child
   virtual void depositStats(TreeLBMessage* stats) { stats_msgs.push_back(stats); }
