@@ -12,14 +12,47 @@
       end module test_mod
 
 
+      subroutine about_to_migrate
+
+        implicit none
+        include 'mpif.h'
+
+        integer :: rank, ierr
+
+        call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr)
+        print 1000, rank
+        1000 format ('[', I0, '] About to migrate.')
+
+      end subroutine about_to_migrate
+
+      subroutine just_migrated
+
+        implicit none
+        include 'mpif.h'
+
+        integer :: rank, ierr
+
+        call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr)
+        print 2000, rank
+        2000 format ('[', I0, '] Just migrated.')
+
+      end subroutine just_migrated
+
+
       subroutine mpi_main
 
         implicit none
         include 'mpif.h'
 
+        external about_to_migrate
+        external just_migrated
+
         integer :: ierr
 
         call mpi_init(ierr)
+
+        call ampi_register_about_to_migrate(about_to_migrate, ierr)
+        call ampi_register_just_migrated(just_migrated, ierr)
 
         call privatization_test_framework()
 
