@@ -504,11 +504,10 @@ hapiWorkRequest::hapiWorkRequest() :
   }
 
 
-/******************** DEPRECATED ********************/
-// Need to be updated with the Tracing API.
+// TODO: Need to be updated with the Tracing API
+#ifdef HAPI_TRACE
 static inline void gpuEventStart(hapiWorkRequest* wr, int* index,
                                  WorkRequestStage event, ProfilingStage stage) {
-#ifdef HAPI_TRACE
   gpuEventTimer* shared_gpu_events_ = CsvAccess(gpu_manager).gpu_events_;
   int shared_time_idx_ = CsvAccess(gpu_manager).time_idx_++;
   shared_gpu_events_[shared_time_idx_].cmi_start_time = CmiWallTimer();
@@ -520,13 +519,10 @@ static inline void gpuEventStart(hapiWorkRequest* wr, int* index,
   CmiPrintf("[HAPI] start event %d of WR %s, profiling stage %d\n",
          event, wr->trace_name, stage);
 #endif
-#endif // HAPI_TRACE
 }
 
-/******************** DEPRECATED ********************/
-// Need to be updated with the Tracing API.
+// TODO: Need to be updated with the Tracing API
 static inline void gpuEventEnd(int index) {
-#ifdef HAPI_TRACE
   CsvAccess(gpu_manager).gpu_events_[index].cmi_end_time = CmiWallTimer();
   traceUserBracketEvent(CsvAccess(gpu_manager).gpu_events_[index].stage,
                         CsvAccess(gpu_manager).gpu_events_[index].cmi_start_time,
@@ -537,8 +533,8 @@ static inline void gpuEventEnd(int index) {
           CsvAccess(gpu_manager).gpu_events_[index].trace_name,
           CsvAccess(gpu_manager).gpu_events_[index].stage);
 #endif
-#endif // HAPI_TRACE
 }
+#endif // HAPI_TRACE
 
 static inline void hapiWorkRequestStartTime(hapiWorkRequest* wr) {
 #ifdef HAPI_INSTRUMENT_WRS
