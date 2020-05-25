@@ -100,7 +100,6 @@ option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
 option(F90CHARM            "Build f90charm" OFF)
-option(PEDANTIC            "Build with -pedantic" OFF)
 option(BUILD_CUDA          "Build with CUDA support" OFF)
 
 option(PXSHM               "Build with PXSHM" OFF)
@@ -444,8 +443,6 @@ configure_file(src/arch/common/conv-mach-omp.sh              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-omp.h               include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ooc.sh              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-papi.sh             include/ COPYONLY)
-configure_file(src/arch/common/conv-mach-pedantic.sh         include/ COPYONLY)
-configure_file(src/arch/common/conv-mach-pedantic.h          include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-perftools.sh        include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-persistent.sh       include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-pgf90.sh            include/ COPYONLY)
@@ -792,7 +789,7 @@ foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTH
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS PEDANTIC SYNCFT PXSHM)
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
