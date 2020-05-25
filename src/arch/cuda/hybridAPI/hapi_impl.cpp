@@ -25,19 +25,6 @@ extern "C" double CmiWallTimer();
 static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
 static void releasePool(std::vector<BufferPool> &pools);
 
-// Event stages used for profiling
-enum WorkRequestStage {
-  DataSetup        = 1,
-  KernelExecution  = 2,
-  DataCleanup      = 3
-};
-
-enum ProfilingStage {
-  GpuMemSetup   = 8800,
-  GpuKernelExec = 8801,
-  GpuMemCleanup = 8802
-};
-
 #ifdef HAPI_CUDA_CALLBACK
 struct hapiCallbackMessage {
   char header[CmiMsgHeaderSizeBytes];
