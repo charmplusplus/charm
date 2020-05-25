@@ -19,21 +19,6 @@
 #define NUM_BUFFERS 256
 #endif
 
-#ifdef HAPI_TRACE
-// Event stages used for profiling
-enum WorkRequestStage{
-  DataSetup        = 1,
-  KernelExecution  = 2,
-  DataCleanup      = 3
-};
-
-enum ProfilingStage{
-  GpuMemSetup   = 8800,
-  GpuKernelExec = 8801,
-  GpuMemCleanup = 8802
-};
-#endif
-
 // Contains per-process data and methods needed by HAPI.
 struct GPUManager {
   std::vector<BufferPool> mempool_free_bufs_;
