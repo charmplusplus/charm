@@ -21,13 +21,13 @@
 
 #ifdef HAPI_TRACE
 // Event stages used for profiling
-enum WorkRequestStage{
+enum WorkRequestStage {
   DataSetup        = 1,
   KernelExecution  = 2,
   DataCleanup      = 3
 };
 
-enum ProfilingStage{
+enum ProfilingStage {
   GpuMemSetup   = 8800,
   GpuKernelExec = 8801,
   GpuMemCleanup = 8802
