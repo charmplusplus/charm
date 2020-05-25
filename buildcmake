@@ -301,7 +301,12 @@ while [[ $# -gt 0 ]]; do
       ;;
     -v)
       echo "Enabling verbose mode."
-      VERBOSE=1
+      VERBOSE=1 # Run 'make' verbosely
+      ;;
+    -vv)
+      echo "Enabling extra verbose mode."
+      VERBOSE=1 # Run 'make' verbosely
+      opt_extra_opts+="-verbose -save " # Run 'charmc' verbosely
       ;;
     -j)
       opt_parallel="$arg"
