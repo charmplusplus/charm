@@ -15,13 +15,6 @@ if [[ $rc -ne 0 ]]; then
   exit $?
 fi
 
-if [[ $(uname) != "Linux" && $(uname) != "Darwin" ]]; then
-  echo "Warning: CMake build is only supported on Linux and Darwin, running ./buildold instead."
-  sleep 2
-  ./buildold $@
-  exit $?
-fi
-
 cmake_version_major=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 1 -d'.')
 cmake_version_minor=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 2 -d'.')
 
@@ -359,6 +352,17 @@ if [[ $triplet == gni-* || $triplet == *-crayx? ]]; then
   opt_FC=ftn
 else
   opt_network=$(echo $triplet | cut -d '-' -f1)
+fi
+
+my_os=$(echo  $triplet | cut -d '-' -f2)
+my_dir=$(dirname $0)
+
+# Special handling for Windows compiler
+if [[ $my_os == "win" ]]; then
+  # Need to use unix2nt_cc on Windows/Cygwin
+  opt_CC=$(realpath $my_dir)/src/arch/win/unix2nt_cc
+  opt_CXX=$opt_CC
+  opt_FC=
 fi
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'

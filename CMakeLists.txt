@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 3.4)
 # Fortran is optional, so don't include it in LANGUAGES here
 project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
-find_package(Threads REQUIRED)
+find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
 
 # We need C++11 for (almost) all targets
@@ -181,7 +181,12 @@ else()
   set(CMK_MULTICORE 0)
 endif()
 
-set(CMK_USE_ZLIB ${ZLIB})
+if(NOT ${CHARM_OS} STREQUAL "win")
+  set(CMK_USE_ZLIB ${ZLIB})
+else()
+  set(CMK_USE_ZLIB 0)
+endif()
+
 if(${CMK_USE_ZLIB})
   find_package(ZLIB REQUIRED)
   set(CMK_SYSLIBS "${CMK_SYSLIBS} -lz")
@@ -235,7 +240,7 @@ set(CMK_BLUEGENEQ 0)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(CHARM_OS "darwin")
   set(CMK_MACOSX 1)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
   set(CHARM_OS "win")
   set(CMK_WINDOWS 1)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -431,6 +436,8 @@ configure_file(src/arch/common/cc-gcc.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.h                      include/ COPYONLY)
 configure_file(src/arch/common/cc-mpi.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-mpiopts.sh                 include/ COPYONLY) #sh only
+configure_file(src/arch/common/cc-msvc.h                     include/ COPYONLY)
+configure_file(src/arch/common/cc-msvc.sh                    include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-craype.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.h              include/ COPYONLY)
@@ -487,6 +494,12 @@ endif()
 if(UCX_PMI)
   configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.sh include/ COPYONLY)
   configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.h include/ COPYONLY)
+endif()
+
+if(CHARM_OS STREQUAL "win")
+  configure_file(src/arch/win/unix2nt_cc                       bin/ COPYONLY)
+  configure_file(src/arch/win/unix2nt_ar                       bin/ COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/src/arch/win/unistd.h    include/ COPYONLY)
 endif()
 
 # Header files
@@ -858,7 +871,7 @@ message("#################################################################")
 add_custom_target(create_symlinks ALL
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/bin ${CMAKE_SOURCE_DIR}/bin
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/lib ${CMAKE_SOURCE_DIR}/lib
-                  COMMAND test ${BUILD_SHARED} -eq 1 && ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/lib_so ${CMAKE_SOURCE_DIR}/lib_so || true
+                  COMMAND test ${BUILD_SHARED} = 1 && ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/lib_so ${CMAKE_SOURCE_DIR}/lib_so || true
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/include ${CMAKE_SOURCE_DIR}/include
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/include ${CMAKE_SOURCE_DIR}/tmp
 

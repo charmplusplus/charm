@@ -3,8 +3,12 @@ include(CheckFunctionExists)
 include(CheckCSourceCompiles)
 include(CheckSymbolExists)
 
-set(CMAKE_EXTRA_INCLUDE_FILES sys/types.h sys/socket.h)
-set(CMAKE_REQUIRED_LIBRARIES -lm ${CMAKE_DL_LIBS} -pthread)
+if(NOT CHARM_OS STREQUAL "win")
+  set(CMAKE_EXTRA_INCLUDE_FILES sys/types.h sys/socket.h)
+  set(CMAKE_REQUIRED_LIBRARIES -lm ${CMAKE_DL_LIBS} -pthread)
+else()
+  set(CMAKE_REQUIRED_LIBRARIES -lm -pthread)
+endif()
 set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
 
 # C types and type sizes
