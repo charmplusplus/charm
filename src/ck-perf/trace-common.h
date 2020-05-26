@@ -82,21 +82,12 @@ CkpvExtern(bool, verbose);
 CkpvExtern(double, traceInitTime);
 CkpvExtern(double, traceInitCpuTime);
 
-#if CMK_BIGSIM_CHARM
-#define  TRACE_TIMER   BgGetTime
-#define  TRACE_CPUTIMER   BgGetTime
-inline double TraceTimer() { return TRACE_TIMER(); }
-inline double TraceTimer(double t) { return t; }
-inline double TraceCpuTimer() { return TRACE_TIMER(); }
-inline double TraceCpuTimer(double t) { return t; }
-#else
 #define  TRACE_TIMER   CmiWallTimer
 #define  TRACE_CPUTIMER   CmiCpuTimer
 inline double TraceTimer() { return TRACE_TIMER() - CkpvAccess(traceInitTime); }
 inline double TraceTimer(double t) { return t - CkpvAccess(traceInitTime); }
 inline double TraceCpuTimer() { return TRACE_CPUTIMER() - CkpvAccess(traceInitCpuTime); }
 inline double TraceCpuTimer(double t) { return t - CkpvAccess(traceInitCpuTime); }
-#endif
 
 double TraceTimerCommon(); //TraceTimer to be used in common lrts layers
 
@@ -124,14 +115,15 @@ void (*registerMachineUserEvents())();
 #ifdef USE_SPP_PAPI
 #define NUMPAPIEVENTS 6
 #else
-#define NUMPAPIEVENTS 4
+#define NUMPAPIEVENTS 2
 #endif
 CkpvExtern(int, papiEventSet);
 CkpvExtern(LONG_LONG_PAPI*, papiValues);
 CkpvExtern(int, papiStarted);
 CkpvExtern(int, papiStopped);
-extern int papiEvents[NUMPAPIEVENTS];
-void initPAPI(); 
+CkpvExtern(int*, papiEvents);
+CkpvExtern(int, numEvents);
+void initPAPI();
 #endif
 
 #endif

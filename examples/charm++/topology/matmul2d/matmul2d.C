@@ -43,9 +43,9 @@ Main::Main(CkArgMsg* m) {
   */
 
   if (N < T || N % T != 0)
-    CkAbort("N % T != 0!");
+    CkAbort("N %% T != 0!");
   if (K < T || K % T != 0)
-    CkAbort("K % T != 0!");
+    CkAbort("K %% T != 0!");
 
   // print info
   CkPrintf("Running Matrix Multiplication on %d processors with (%d, %d) chares\n", CkNumPes(), num_chares_per_dim, num_chares_per_dim);

@@ -24,9 +24,8 @@
    of the message and used in the LRTS based CMA implementaion.
 */
 #define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 zcMsgType:3, cmaMsgType:2;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
 #define CMK_MSG_HEADER_EXT       { CMK_MSG_HEADER_EXT_ }
-#define CMK_MSG_HEADER_BIGSIM_  { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
@@ -55,6 +54,6 @@
 
 #define CMK_NOCOPY_DIRECT_BYTES                           16
 
-#define CMK_REG_REQUIRED                                   1
+#define CMK_REG_REQUIRED                                   CMK_ONESIDED_IMPL
 
 #define CMK_CONVERSE_MPI                                   0

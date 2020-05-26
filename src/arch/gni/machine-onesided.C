@@ -227,7 +227,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
                             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                             dest_addr,
                             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                            ncpyOpInfo->srcSize,
+                            std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
                             (uint64_t)ncpyOpInfo,
                             CmiNodeOf(ncpyOpInfo->srcPe),
                             GNI_POST_RDMA_GET,
@@ -270,6 +270,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
                       CmiNodeOf(ncpyOpInfo->destPe),
                       RDMA_REG_AND_GET_MD_DIRECT_TAG);
 #else // non-smp mode
+
     // send the small message directly
     gni_return_t status = send_smsg_message(&smsg_queue,
                               CmiNodeOf(ncpyOpInfo->destPe),
@@ -277,7 +278,6 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
                               ncpyOpInfo->ncpyOpInfoSize,
                               RDMA_REG_AND_GET_MD_DIRECT_TAG,
                               0, NULL, CHARM_SMSG, 1);
-    GNI_RC_CHECK("Sending REG & GET metadata msg failed!", status);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
     if(status == GNI_RC_SUCCESS) {
       CmiFree(ncpyOpInfo);
@@ -300,7 +300,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           src_addr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          ncpyOpInfo->srcSize,
+                          std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
                           (uint64_t)ncpyOpInfo,
                           CmiNodeOf(ncpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -342,7 +342,7 @@ void _performOneRgetForWorkerThread(MSG_LIST *ptr) {
             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
             (uint64_t)ncpyOpInfo->destPtr,
             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-            ncpyOpInfo->srcSize,
+            std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
             (uint64_t)ncpyOpInfo,
             ptr->destNode,
             GNI_POST_RDMA_GET,
@@ -356,7 +356,7 @@ void _performOneRputForWorkerThread(MSG_LIST *ptr) {
             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
             (uint64_t)ncpyOpInfo->srcPtr,
             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-            ncpyOpInfo->srcSize,
+            std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
             (uint64_t)ncpyOpInfo,
             ptr->destNode,
             GNI_POST_RDMA_PUT,
@@ -366,6 +366,9 @@ void _performOneRputForWorkerThread(MSG_LIST *ptr) {
 
 
 void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
+
+  if(ncpyOpInfo->opMode == CMK_BCAST_EM_API)
+    return;
 
   // ncpyOpInfo is a part of the received message and can be freed before this send completes
   // for that reason, it is copied into a new message
@@ -378,13 +381,13 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
 #if CMK_SMP
   // send the small message to the other node through the comm thread
   buffer_small_msgs(&smsg_queue, newNcpyOpInfo, newNcpyOpInfo->ncpyOpInfoSize,
-                        CmiNodeOf(newNcpyOpInfo->srcPe),
+                        CmiNodeOf(pe),
                         RDMA_DEREG_AND_ACK_MD_DIRECT_TAG);
 #else // non-smp mode
 
   // send the small message directly
   gni_return_t status = send_smsg_message(&smsg_queue,
-                          CmiNodeOf(newNcpyOpInfo->srcPe),
+                          CmiNodeOf(pe),
                           newNcpyOpInfo,
                           newNcpyOpInfo->ncpyOpInfoSize,
                           RDMA_DEREG_AND_ACK_MD_DIRECT_TAG,

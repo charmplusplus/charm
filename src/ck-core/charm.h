@@ -9,6 +9,7 @@
 #include <sys/types.h> /* for size_t */
 
 #ifdef __cplusplus
+#include "conv-rdma.h"
 #include "pup.h"
 extern "C" {
 #endif
@@ -108,6 +109,7 @@ extern void  CkFreeSysMsg(void *msg);
 extern void* CkAllocBuffer(void *msg, int bufsize);
 extern void  CkFreeMsg(void *msg);
 extern void* CkCopyMsg(void **pMsg);
+extern void* CkReferenceMsg(void *msg);
 extern void  CkSetQueueing(void *msg, int strategy);
 extern void* CkPriorityPtr(void *msg);
 
@@ -116,6 +118,7 @@ extern void* CkPriorityPtr(void *msg);
  * Functions be to called from external clients (e.g. Charm4py)
  *
  *****************************************************************************/
+#if CMK_CHARMPY
 
 extern void registerCkRegisterMainModuleCallback(void (*cb)(void));
 extern void registerMainchareCtorExtCallback(void (*cb)(int, void*, int, int, char **));
@@ -123,6 +126,7 @@ extern void registerReadOnlyRecvExtCallback(void (*cb)(int, char*));
 extern void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char*, int));
 extern void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int));
 extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int));
+extern void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int*, int, int, char *, int));
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
 extern void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int));
 extern void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *));
@@ -134,9 +138,15 @@ extern int CkNumPesHook(void); // function equivalent of CkNumPes macro
 extern int CkGroupGetReductionNumber(int gid);
 /// Get current redNo of specified array element on this PE
 extern int CkArrayGetReductionNumber(int aid, int ndims, int *index);
-extern void registerCreateReductionTargetMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*));
+extern void CkSetMigratable(int aid, int ndims, int *index, char migratable);
+extern void CkStartQDExt_ChareCallback(int onPE, void* objPtr, int epIdx, int fid);
+extern void CkStartQDExt_GroupCallback(int gid, int pe, int epIdx, int fid);
+extern void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, int fid);
+extern void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep);
+extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*));
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
 
+#endif
 /*********************************************************/
 /**
 \addtogroup CkRegister
@@ -167,17 +177,6 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 #define CK_EP_INLINE      (1<<8)
 
 /** type of a chare */
-#if CMK_MESSAGE_LOGGING
-typedef enum{
-	TypeInvalid=0,
-	TypeChare,
-	TypeMainChare,
-	TypeGroup,
-	TypeNodeGroup,
-	TypeArray,
-	TypeSection
-} ChareType;
-#else
 typedef enum{
 	TypeInvalid=0,
 	TypeChare,
@@ -186,7 +185,6 @@ typedef enum{
 	TypeNodeGroup,
 	TypeArray
 } ChareType;
-#endif
 
 /** A "call function" to invoke a method on an object. See EntryInfo */
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);
@@ -206,25 +204,28 @@ extern void CkRegisterArrayDimensions(int chareIndex, int ndims);
 extern void CkRegisterChareInCharm(int chareIndex);
 /** Register this chare as a mainchare, with this entry point as its constructor.*/
 extern int CkRegisterMainChare(int chareIndex, int epIndex);
-extern void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 /** Register a default constructor for this chare.*/
 extern void CkRegisterDefaultCtor(int chareIndex, int ctorEpIndex);
 /** Register a migration constructor for this chare.*/
 extern void CkRegisterMigCtor(int chareIndex, int ctorEpIndex);
 /** Indicate whether this group is an IrrGroup. */
 extern void CkRegisterGroupIrr(int chareIndex,int isIrr);
-extern void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
-extern void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
-extern void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 /** Register the chare baseIdx as a base class of the chare derivedIdx. */
 extern void CkRegisterBase(int derivedIdx, int baseIdx);
+#if CMK_CHARMPY
+extern void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterSectionManagerExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg);
+#endif
 
 /** This function pup's a global variable.*/
 typedef void (*CkPupReadonlyFnPtr)(void *pup_er);
 /** Register this readonly global variable.*/
 extern void CkRegisterReadonly(const char *name,const char *type,
 	size_t size, void *ptr,CkPupReadonlyFnPtr pup_fn);
-extern void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg);
 /** Register this readonly message.*/
 extern void CkRegisterReadonlyMsg(const char *name,const char *type,
 	void** pMsg);
@@ -292,11 +293,13 @@ extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg);
 extern void CkCreateLocalGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 
+#if CMK_CHARMPY
 extern int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_sizes);
 extern int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, char **bufs, int *buf_sizes, int map_gid, char useAtSync);
 extern void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, int num_bufs, char **bufs, int *buf_sizes, char useAtSync);
 extern void CkArrayDoneInsertingExt(int aid);
 extern void CkMigrateExt(int aid, int ndims, int *index, int toPe);
+#endif
 
 
 /******************************************************************************
@@ -340,12 +343,15 @@ typedef enum {
   ArrayEltInitMsg      =20,              // Array Element Initialization message
   ForArrayEltMsg       =21,              // Array Element entry method message
   ForIDedObjMsg        =22,
+  BocBcastMsg          =23,              // A broadcast to a group which will be sent to each node
+  ArrayBcastMsg        =24,              // A broadcast to an array which will be sent to each node
+  ArrayBcastFwdMsg     =25,              // A bcast which arrived on node and must be forwarded to local array elements
 #if CMK_LOCKLESS_QUEUE
-  WarnMsg              =23,              // Warning data message (Reduction)
-  WarnDoneMsg          =24,              // Signal completion of warnings reduction (Broadcast)
-  LAST_CK_ENVELOPE_TYPE =25              // Used for error-checking
+  WarnMsg              =26,              // Warning data message (Reduction)
+  WarnDoneMsg          =27,              // Signal completion of warnings reduction (Broadcast)
+  LAST_CK_ENVELOPE_TYPE =28              // Used for error-checking
 #else
-  LAST_CK_ENVELOPE_TYPE =23              // Used for error-checking
+  LAST_CK_ENVELOPE_TYPE =26              // Used for error-checking
 #endif
 } CkEnvelopeType;
 
@@ -360,8 +366,7 @@ typedef enum {
 #define CK_MSG_INLINE      	0x1
 #define CK_MSG_IMMEDIATE   	0x2
 #define CK_MSG_EXPEDITED	0x4
-#define CK_MSG_KEEP		0x8    /* send without freeing message */
-#define CK_MSG_LB_NOTRACE	0x10   /* load balancer doesn't trace */
+#define CK_MSG_LB_NOTRACE	0x8   /* load balancer doesn't trace */
 
 #ifdef __cplusplus
 #define CK_MSGOPTIONAL =0
@@ -378,6 +383,7 @@ extern void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, 
 extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchInline(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, const int *nodes, int opts CK_MSGOPTIONAL);
+extern void CkBroadcastWithinNode(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 
@@ -394,25 +400,29 @@ extern void CkDeliverMessageFree(int epIdx,void *msg,void *object);
 extern void CkDeliverMessageReadonly(int epIdx,const void *msg,void *object);
 
 extern void *CkLocalBranch(CkGroupID gID);
+extern void *CkLocalBranchOther(CkGroupID gID, int rank);
 extern void *CkLocalNodeBranch(CkGroupID gID);
 extern void *CkLocalChare(const CkChareID *chare);
 
 extern void CkArrayManagerDeliver(int onPe,void *msg, int opts CK_MSGOPTIONAL);
 
+#if CMK_CHARMPY
 /// Send msg to chare with ID (onPe,objPtr) to entry method 'epIdx'
 extern void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize);
 /// Send msg to chare copying data into CkMessage from multiple input buffers
 extern void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
 /// Send msg to group with ID 'gid'. if pe == -1, msg will be broadcasted, else
 /// it will go to the group instance in that PE
-extern void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize);
+extern void CkGroupExtSend(int gid, int npes, const int *pes, int epIdx, char *msg, int msgSize);
 /// Send msg to group copying data into CkMessage from multiple input buffers
-extern void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+extern void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+extern void CkForwardMulticastMsg(int gid, int num_children, const int *children);
 /// Send msg to array with ID 'aid'. idx is index of destination and ndims the number
 /// of dimensions of the index. If ndims <= 0, msg will be broadcasted to all array elements
 extern void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize);
 /// Send msg to array copying data into CkMessage from multiple input buffers
 extern void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+#endif
 
 /*@}*/
 
@@ -473,6 +483,7 @@ extern void CkSummary_MarkEvent(int);
 extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
+extern void CkCallWhenIdle(int epIdx, void* obj);
 
 #ifdef __cplusplus
 }

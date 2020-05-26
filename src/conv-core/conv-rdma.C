@@ -2,6 +2,13 @@
  * Specific implementations are in arch/layer/machine-onesided.{h,c}
  */
 #include "converse.h"
+#include "conv-rdma.h"
+#include <algorithm>
+#include <vector>
+
+bool useCMAForZC;
+CpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets);
+static int zc_pup_handler_idx;
 
 // Methods required to keep the Nocopy Direct API functional on non-LRTS layers
 #if !CMK_USE_LRTS
@@ -11,9 +18,12 @@ void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size) {
 int CmiGetRdmaCommonInfoSize() {
   return 0;
 }
+
+void CmiSetNcpyAckSize(int ackSize) {}
 #endif
 
 #if !CMK_ONESIDED_IMPL
+/****************************** Zerocopy Direct API For non-RDMA layers *****************************/
 /* Support for generic implementation */
 
 // Function Pointer to Acknowledement handler function for the Direct API
@@ -50,19 +60,12 @@ static void putDataHandler(ConverseRdmaMsg *payloadMsg) {
   // copy the received messsage into the user's destination address
   memcpy((char *)ncpyOpInfo->destPtr,
          (char *)payloadMsg + sizeof(ConverseRdmaMsg) + ncpyOpInfo->ncpyOpInfoSize,
-         ncpyOpInfo->srcSize);
+         std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize));
 
   // Invoke the destination ack
   ncpyOpInfo->ackMode = CMK_DEST_ACK; // Only invoke the destination ack
   ncpyOpInfo->freeMe  = CMK_DONT_FREE_NCPYOPINFO;
   ncpyDirectAckHandlerFn(ncpyOpInfo);
-}
-
-// Rget/Rput operations are implemented as normal converse messages
-// This method is invoked during converse initialization to initialize these message handlers
-void CmiOnesidedDirectInit(void) {
-  get_request_handler_idx = CmiRegisterHandler((CmiHandler)getRequestHandler);
-  put_data_handler_idx = CmiRegisterHandler((CmiHandler)putDataHandler);
 }
 
 void CmiSetDirectNcpyAckHandler(RdmaAckCallerFn fn) {
@@ -92,6 +95,7 @@ void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 
   int ncpyOpInfoSize = ncpyOpInfo->ncpyOpInfoSize;
   int size = ncpyOpInfo->srcSize;
+  int destPe = ncpyOpInfo->destPe;
 
   // Send a ConverseRdmaMsg to the other PE sending the array
   ConverseRdmaMsg *payloadMsg = (ConverseRdmaMsg *)CmiAlloc(sizeof(ConverseRdmaMsg) + ncpyOpInfoSize + size);
@@ -112,7 +116,7 @@ void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
   ncpyDirectAckHandlerFn(ncpyOpInfo);
 
   CmiSetHandler(payloadMsg, put_data_handler_idx);
-  CmiSyncSendAndFree(ncpyOpInfo->destPe,
+  CmiSyncSendAndFree(destPe,
                      sizeof(ConverseRdmaMsg) + ncpyOpInfoSize + size,
                      payloadMsg);
 }
@@ -121,83 +125,223 @@ void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short 
 
 void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode) {}
 
-#else
+#endif
 
-// Support for sending an ack message for the Entry Method API
-
-RdmaEMAckCallerFn ncpyEMAckHandlerFn; // P2P API ack handler function
-
-RdmaAckCallerFn ncpyEMBcastAckHandlerFn; // BCast API ack handler function
-
-RdmaAckCallerFn ncpyEMBcastPostAckHandlerFn; // BCast API ack handler function
-
-static int invoke_entry_method_ack_handler_idx, ncpy_bcast_ack_handler_idx;
-static int ncpy_bcast_post_handler_idx;
-
-// Ack Message is typically used in case of reverse operation (when a reverse put is used instead of a get)
-typedef struct _ackEntryMethodMsg{
-  char cmicore[CmiMsgHeaderSizeBytes];
-  void *ref;
-} ackEntryMethodMsg;
-
-// Handler invoked on receiving a ackEntryMethodMsg
-// This handler invokes the ncpyEMAckHandler on the receiver side
-static void ackEntryMethodHandler(ackEntryMethodMsg *msg) {
-  // Invoke the charm handler
-  ncpyEMAckHandlerFn(CmiMyPe(), msg->ref);
-}
-
-// This handler invokes the ncpyEMBcastAckHandler on the source (root node or intermediate nodes)
-static void bcastAckHandler(ackEntryMethodMsg *msg) {
-  ncpyEMBcastAckHandlerFn(msg->ref);
-}
-
-static void bcastPostAckArrayHandler(ackEntryMethodMsg *msg) {
-  ncpyEMBcastPostAckHandlerFn(msg->ref);
-}
-
-// Method to create a ackEntryMethodMsg and send it
-void CmiInvokeRemoteAckHandler(int pe, void *ref) {
-  ackEntryMethodMsg *msg = (ackEntryMethodMsg *)CmiAlloc(sizeof(ackEntryMethodMsg));
-  msg->ref = ref;
-
-  CmiSetHandler(msg, invoke_entry_method_ack_handler_idx);
-  CmiSyncSendAndFree(pe, sizeof(ackEntryMethodMsg), msg);
-}
-
-// Register converse handler for invoking ack on reverse operation
+// Rget/Rput operations are implemented as normal converse messages
+// This method is invoked during converse initialization to initialize these message handlers
 void CmiOnesidedDirectInit(void) {
-  invoke_entry_method_ack_handler_idx = CmiRegisterHandler((CmiHandler)ackEntryMethodHandler);
-  ncpy_bcast_ack_handler_idx = CmiRegisterHandler((CmiHandler)bcastAckHandler);
-
-  ncpy_bcast_post_handler_idx = CmiRegisterHandler((CmiHandler)bcastPostAckArrayHandler);
+#if !CMK_ONESIDED_IMPL
+  get_request_handler_idx = CmiRegisterHandler((CmiHandler)getRequestHandler);
+  put_data_handler_idx = CmiRegisterHandler((CmiHandler)putDataHandler);
+#endif
+  zc_pup_handler_idx = CmiRegisterHandler((CmiHandler)zcPupHandler);
 }
 
-void CmiSetEMNcpyAckHandler(RdmaEMAckCallerFn fn, RdmaAckCallerFn bcastFn, RdmaAckCallerFn bcastArrayFn) {
-  // set the EM Ack caller function
-  ncpyEMAckHandlerFn = fn;
+/****************************** Zerocopy Direct API *****************************/
 
-  // set the EM Bcast Ack caller function
-  ncpyEMBcastAckHandlerFn = bcastFn;
-
-  // set the EM Bcast Post Ack caller function
-  ncpyEMBcastPostAckHandlerFn = bcastArrayFn;
+// Get Methods
+void CmiNcpyBuffer::memcpyGet(CmiNcpyBuffer &source) {
+  // memcpy the data from the source buffer into the destination buffer
+  memcpy((void *)ptr, source.ptr, std::min(cnt, source.cnt));
 }
 
-void CmiInvokeBcastAckHandler(int pe, void *ref) {
-
-  ackEntryMethodMsg *msg = (ackEntryMethodMsg *)CmiAlloc(sizeof(ackEntryMethodMsg));
-  msg->ref = ref;
-
-  CmiSetHandler(msg, ncpy_bcast_ack_handler_idx);
-  CmiSyncSendAndFree(pe, sizeof(ackEntryMethodMsg), msg);
-}
-
-void CmiInvokeBcastPostAckHandler(int pe, void *ref) {
-  ackEntryMethodMsg *msg = (ackEntryMethodMsg *)CmiAlloc(sizeof(ackEntryMethodMsg));
-  msg->ref = ref;
-
-  CmiSetHandler(msg, ncpy_bcast_post_handler_idx);
-  CmiSyncSendAndFree(pe, sizeof(ackEntryMethodMsg), msg);
+#if CMK_USE_CMA
+void CmiNcpyBuffer::cmaGet(CmiNcpyBuffer &source) {
+  CmiIssueRgetUsingCMA(source.ptr,
+         source.layerInfo,
+         source.pe,
+         ptr,
+         layerInfo,
+         pe,
+         std::min(cnt, source.cnt));
 }
 #endif
+
+
+void CmiNcpyBuffer::rdmaGet(CmiNcpyBuffer &source, int ackSize, char *srcAck, char *destAck) {
+
+  //int ackSize = sizeof(CmiCallback);
+
+  if(regMode == CMK_BUFFER_UNREG) {
+    // register it because it is required for RGET
+    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
+
+    isRegistered = true;
+  }
+
+  int rootNode = -1; // -1 is the rootNode for p2p operations
+
+  NcpyOperationInfo *ncpyOpInfo = createNcpyOpInfo(source, *this, ackSize, srcAck, destAck, rootNode, CMK_DIRECT_API, (void *)ref);
+
+  CmiIssueRget(ncpyOpInfo);
+}
+
+NcpyOperationInfo *CmiNcpyBuffer::createNcpyOpInfo(CmiNcpyBuffer &source, CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck, int rootNode, int opMode, void *refPtr) {
+
+  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+
+  // Create a general object that can be used across layers and can store the state of the CmiNcpyBuffer objects
+  int ncpyObjSize = getNcpyOpInfoTotalSize(
+                      layerInfoSize,
+                      ackSize,
+                      layerInfoSize,
+                      ackSize);
+
+  NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyObjSize);
+
+  setNcpyOpInfo(source.ptr,
+                (char *)(source.layerInfo),
+                layerInfoSize,
+                srcAck,
+                ackSize,
+                source.cnt,
+                source.regMode,
+                source.deregMode,
+                source.isRegistered,
+                source.pe,
+                source.ref,
+                destination.ptr,
+                (char *)(destination.layerInfo),
+                layerInfoSize,
+                destAck,
+                ackSize,
+                destination.cnt,
+                destination.regMode,
+                destination.deregMode,
+                destination.isRegistered,
+                destination.pe,
+                destination.ref,
+                rootNode,
+                ncpyOpInfo);
+
+  ncpyOpInfo->opMode = opMode;
+  ncpyOpInfo->refPtr = refPtr;
+
+  return ncpyOpInfo;
+}
+
+// Put Methods
+void CmiNcpyBuffer::memcpyPut(CmiNcpyBuffer &destination) {
+  // memcpy the data from the source buffer into the destination buffer
+  memcpy((void *)destination.ptr, ptr, std::min(cnt, destination.cnt));
+}
+
+#if CMK_USE_CMA
+void CmiNcpyBuffer::cmaPut(CmiNcpyBuffer &destination) {
+  CmiIssueRputUsingCMA(destination.ptr,
+                       destination.layerInfo,
+                       destination.pe,
+                       ptr,
+                       layerInfo,
+                       pe,
+                       std::min(cnt, destination.cnt));
+}
+#endif
+
+void CmiNcpyBuffer::rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck) {
+
+  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+
+  if(regMode == CMK_BUFFER_UNREG) {
+    // register it because it is required for RPUT
+    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
+
+    isRegistered = true;
+  }
+
+  int rootNode = -1; // -1 is the rootNode for p2p operations
+
+  NcpyOperationInfo *ncpyOpInfo = createNcpyOpInfo(*this, destination, ackSize, srcAck, destAck, rootNode, CMK_DIRECT_API, (void *)ref);
+
+  CmiIssueRput(ncpyOpInfo);
+}
+
+// Returns CmiNcpyMode::MEMCPY if both the PEs are the same and memcpy can be used
+// Returns CmiNcpyMode::CMA if both the PEs are in the same physical node and CMA can be used
+// Returns CmiNcpyMode::RDMA if RDMA needs to be used
+CmiNcpyMode findTransferMode(int srcPe, int destPe) {
+  if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
+    return CmiNcpyMode::MEMCPY;
+#if CMK_USE_CMA
+  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
+    return CmiNcpyMode::CMA;
+#endif
+  else
+    return CmiNcpyMode::RDMA;
+}
+
+CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
+  if(srcNode==destNode)
+    return CmiNcpyMode::MEMCPY;
+#if CMK_USE_CMA
+  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(CmiNodeFirst(srcNode), CmiNodeFirst(destNode)))
+    return CmiNcpyMode::CMA;
+#endif
+  else
+    return CmiNcpyMode::RDMA;
+}
+
+zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src) {
+  zcPupSourceInfo *srcInfo = new zcPupSourceInfo();
+  srcInfo->src = src;
+  srcInfo->deallocate = free;
+  return srcInfo;
+}
+
+zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src, std::function<void (void *)> deallocate) {
+  zcPupSourceInfo *srcInfo = new zcPupSourceInfo();
+  srcInfo->src = src;
+  srcInfo->deallocate = deallocate;
+  return srcInfo;
+}
+
+void zcPupDone(void *ref) {
+  zcPupSourceInfo *srcInfo = (zcPupSourceInfo *)(ref);
+#if CMK_REG_REQUIRED
+  deregisterBuffer(srcInfo->src);
+#endif
+
+  srcInfo->deallocate((void *)srcInfo->src.ptr);
+  delete srcInfo;
+}
+
+void zcPupHandler(ncpyHandlerMsg *msg) {
+  zcPupDone(msg->ref);
+}
+
+void invokeZCPupHandler(void *ref, int pe) {
+  ncpyHandlerMsg *msg = (ncpyHandlerMsg *)CmiAlloc(sizeof(ncpyHandlerMsg));
+  msg->ref = (void *)ref;
+
+  CmiSetHandler(msg, zc_pup_handler_idx);
+  CmiSyncSendAndFree(pe, sizeof(ncpyHandlerMsg), (char *)msg);
+}
+
+void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest) {
+  CmiNcpyMode transferMode = findTransferMode(src.pe, dest.pe);
+  if(transferMode == CmiNcpyMode::MEMCPY) {
+    CmiAbort("zcPupGet: memcpyGet should not happen\n");
+  }
+#if CMK_USE_CMA
+  else if(transferMode == CmiNcpyMode::CMA) {
+    dest.cmaGet(src);
+
+#if CMK_REG_REQUIRED
+    // De-register destination buffer
+    deregisterBuffer(dest);
+#endif
+
+    if(src.ref)
+      invokeZCPupHandler((void *)src.ref, src.pe);
+    else
+      CmiAbort("zcPupGet - src.ref is NULL\n");
+  }
+#endif
+  else {
+    int ackSize = 0;
+    int rootNode = -1; // -1 is the rootNode for p2p operations
+    NcpyOperationInfo *ncpyOpInfo = dest.createNcpyOpInfo(src, dest, ackSize, NULL, NULL, rootNode, CMK_ZC_PUP, NULL);
+    CpvAccess(newZCPupGets).push_back(ncpyOpInfo);
+  }
+}
+

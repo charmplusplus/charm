@@ -1,4 +1,5 @@
 -include ../../../../../common.mk
+-include ../../../../../../include/conv-mach-opt.mak
 CHARMC	= ../../../../../../bin/charmc $(OPTS)
 
 OBJS = stencil3d.o
@@ -26,6 +27,7 @@ clean:
 test: stencil3d
 	$(call run, +p4 ./stencil3d 64 32 +balancer RefineLB )
 	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyLB )
-
-bgtest: stencil3d
-	$(call run, +p4 ./stencil3d 32 16 +balancer CommLB +x2 +y2 +z1 +cth1 +wth1 )
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p4 ./stencil3d 64 32 +balancer RefineLB +noCMAForZC )
+	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyLB +noCMAForZC )
+endif

@@ -391,6 +391,26 @@ void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
   CmiSyncMulticastAndFree(grp, len, msg);
 }
 
+void CldEnqueueWithinNode(void *msg, int infofn)
+{
+  int len, queueing, priobits;
+  unsigned int *prioptr;
+  CldPackFn pfn;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+
+  // If message is NOKEEP, do not pack it since its pointer is just going to
+  // be shared with the other PEs on this node.
+  if (pfn && !CMI_MSG_NOKEEP(msg)) {
+    pfn(&msg);
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  }
+  CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
+  CmiSetInfo(msg,infofn);
+
+  CmiWithinNodeBroadcast(len, (char *)msg);
+}
+
 void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
 {
   int len, queueing, priobits,i; unsigned int *prioptr;
@@ -563,11 +583,9 @@ static void CldComputeNeighborData(void)
 
   topofn = LBTopoLookup(_lbtopo);
   if (topofn == NULL) {
-    char str[1024];
     CmiPrintf("SeedLB> Fatal error: Unknown topology: %s. Choose from:\n", _lbtopo);
     printoutTopo();
-    sprintf(str, "SeedLB> Fatal error: Unknown topology: %s", _lbtopo);
-    CmiAbort(str);
+    CmiAbort("SeedLB> Fatal error: Unknown topology: %s", _lbtopo);
   }
   topo = topofn(CmiNumPes());
   npes = getTopoMaxNeighbors(topo);

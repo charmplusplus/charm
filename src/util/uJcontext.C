@@ -100,7 +100,7 @@ int setJcontext (const uJcontext_t *u)
 		/* FIXME: only if stack grows down (they all do...) */
 		new_sp+=mu->uc_stack.ss_size-caller_distance;
 		
-#ifndef CMK_BLUEGENEQ
+#if !CMK_BLUEGENEQ
 		VERBOSE( printf("About to switch to stack %p ",new_sp); printStack(); )
 		if (1) { /* change to new stack */
 #ifdef _MSC_VER 

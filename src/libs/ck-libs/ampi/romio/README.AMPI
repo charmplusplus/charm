@@ -4,16 +4,32 @@ Modifications
 Here is a list of modifications and clarifications to the version of
 ROMIO integrated into AMPI:
 
+* Commented out the unconditional assignment of MPI_IMPL in the configure
+  script so that AMPI can specify it when configuring.
 * Used MPI_Info_* calls from AMPI, and darray calls from ROMIO.
 * Set -DHAVE_STATUS_SET_BYTES in configure and configure.in, and
   add status setting call in adio/common/status_setb.c
+* Extended the ADIOI_Datatype_iscontig stub so that count == 0 types
+  are considered contiguous. (Needed for HDF5's parallel tests.)
 * Use AMPI's AMPI_Type_is_contiguous() extension in adio/common/iscontig.c
+  (currently disabled pending review of CkDDT's contiguity handling)
 * Excluded directories doc, lib, man, and test in the distribution.
   (lib will be generated in the building directory $CHARMDIR/tmp/)
 * The final library lib/$ARCH/libmpio.a is copied to
   $CHARMDIR/lib/libampiromio.a and the user is supposed to link
   with ampiromio at link time.
 * Global variables were privatized, as shown in the section below.
+* Function declarations have been moved from mpio.h.in to a new file,
+  mpio_functions.h, in line with ampi_functions.h. As part of this,
+  the mpi.h include has been moved to the bottom of mpio.h.in, and one
+  item that depends on mpi.h typedefs has been moved to ampi.h.
+* HAVE_MPI_OFFSET is unconditionally defined to 1.
+* MPIR_Ext_cs_yield has been corrected to ROMIO_THREAD_CS_YIELD in
+  adio/common/ad_i{read,write}_coll.c.
+* PMPI_File_set_errhandler has been corrected to MPI_File_set_errhandler
+  in adio/common/ad_end.c and mpi-io/close.c.
+* MPIO_Request_{c2f,f2c} are declared regardless of HAVE_MPI_GREQUEST
+  and mpi-io/ioreq_{c2f,f2c}.c are always built.
 
 
 Variable privatization
@@ -21,8 +37,8 @@ Variable privatization
 
 ROMIO has several global variables that need to be privatized for AMPI.
 The following table contains the currently known global variables and how they
-are handled in this integrated version of ROMIO. Privatization is done with
-the Ctv* functions of Charm++.
+are handled in this integrated version of ROMIO. Privatization is done manually
+by including the globals in the ampiParent class.
 
 ================ ========= =========================== ==================================
 Defined in       Type (nm) Variable name               Status

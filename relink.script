@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # The essential directories for the proper functioning of charm++ is
 # usually linked to the latest build version. For the convenience of
@@ -7,7 +7,7 @@
 #
 # Usage: relink.script <build-version-name-string>
 #
-# Example: relink.script netlrts-linux-smp.
+# Example: relink.script netlrts-linux-i386-smp.
 # by Chee Wai Lee	10/13/2003
 #
 # rewritten by

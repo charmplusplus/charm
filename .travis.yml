@@ -1,0 +1,44 @@
+language: cpp
+
+before_install:	
+  - |	
+      if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then	
+        git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {	
+          echo "Only docs were updated, stopping build process."	
+          exit	
+        }	
+      fi
+
+matrix:
+  include:
+  - os: linux
+    name: "MPI-Linux SMP"
+    dist: xenial
+    script:
+    - sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
+    - ./build LIBS mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C mpi-linux-x86_64-smp/tests TESTOPTS="+setcpuaffinity"
+    - make -C mpi-linux-x86_64-smp/examples TESTOPTS="+setcpuaffinity"
+
+  - os: osx
+    name: "NetLRTS-Darwin"
+    script:
+    - ./build LIBS netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C netlrts-darwin-x86_64/tests test TESTOPTS="++local"
+    - make -C netlrts-darwin-x86_64/examples test TESTOPTS="++local"
+
+  - os: windows
+    name: "NetLRTS-Win"
+    script:
+    - rm -rf C:/tools/msys64
+    - choco upgrade -y msys2
+    - export msys2='cmd //C RefreshEnv.cmd '
+    - export msys2+='& set MSYS=winsymlinks:nativestrict '
+    - export msys2+='& C:\\tools\\msys64\\msys2_shell.cmd -defterm -no-start'
+    - export mingw64="$msys2 -mingw64 -full-path -here -c \$\* --"
+    - export msys2+=" -msys2 -c \$\* --"
+    - $msys2 pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config
+    - export PATH=/C/tools/msys64/mingw64/bin:$PATH
+    - $mingw64 src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata
+    - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp -j3 all-test-tests
+    - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tests/charm++ test

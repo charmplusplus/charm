@@ -54,7 +54,7 @@ public:
     ngid = CProxy_LargeDataNodeGroup::ckNew();
 
     // Create a callback method to pass in the Zerocopy Bcast API call
-    int idx_zerocopySent = CkIndex_main::zerocopySent(NULL);
+    int idx_zerocopySent = CkIndex_main::zerocopySent();
     cb = CkCallback(idx_zerocopySent, thisProxy);
 
     CkPrintf("Size (bytes) \t\tIterations\t\tRegular Bcast API (one-way us)\tZero Copy Bcast Send API (one-way us)\t\n");
@@ -90,7 +90,7 @@ public:
     }
   }
 
-  void zerocopySent(CkDataMsg *msg) {
+  void zerocopySent() {
     zc_bcast_done();
   }
 
@@ -105,9 +105,9 @@ public:
         niter = 0;
         if(warmUp == false) {
             if(size < 1 << 24)
-              CkPrintf("%d\t\t\t%d\t\t\t%lf\t\t\t%lf\n", size, iterations, reg_time, zcpy_time);
+              CkPrintf("%zu\t\t\t%d\t\t\t%lf\t\t\t%lf\n", size, iterations, reg_time, zcpy_time);
             else
-              CkPrintf("%d\t\t%d\t\t\t%lf\t\t\t%lf\n", size, iterations, reg_time, zcpy_time);
+              CkPrintf("%zu\t\t%d\t\t\t%lf\t\t\t%lf\n", size, iterations, reg_time, zcpy_time);
         }
         size = size << 1;
         if(warmUp)

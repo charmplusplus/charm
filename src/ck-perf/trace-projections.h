@@ -164,7 +164,7 @@ class LogEntry {
     // complementary function for adding papi data
     void addPapi(LONG_LONG_PAPI *papiVals){
 #if CMK_HAS_COUNTER_PAPI
-   	memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+   	memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*CkpvAccess(numEvents));
 #endif
     }
    
@@ -541,6 +541,8 @@ using namespace PUP;
 class toProjectionsFile : public toTextFile {
  protected:
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
  public:
   //Begin writing to this file, which should be opened for ascii write.
   toProjectionsFile(FILE *f_) :toTextFile(f_) {}
@@ -548,6 +550,8 @@ class toProjectionsFile : public toTextFile {
 class fromProjectionsFile : public fromTextFile {
  protected:
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
  public:
   //Begin writing to this file, which should be opened for ascii read.
   fromProjectionsFile(FILE *f_) :fromTextFile(f_) {}
@@ -558,6 +562,8 @@ class toProjectionsGZFile : public PUP::er {
   gzFile f;
  protected:
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n,size_t itemSize,dataType t);
+  virtual void pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
  public:
   //Begin writing to this gz file, which should be opened for gz write.
   toProjectionsGZFile(gzFile f_) :er(IS_PACKING), f(f_) {}

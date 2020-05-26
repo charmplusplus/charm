@@ -10,8 +10,6 @@
 #include <malloc.h>
 #endif
 
-#include "memory-isomalloc.h"
-
 #if CMK_HAS_TLS_VARIABLES
 
 extern int quietModeRequested;
@@ -37,12 +35,6 @@ extern int quietModeRequested;
  * Of note are sections 3.4.2 (IA-32, a.k.a. x86) and 3.4.6 (x86-64).
  */
 
-extern "C" {
-void* getTLS();
-void setTLS(void*);
-void* swapTLS(void*);
-}
-
 #if CMK_TLS_SWITCHING_X86_64
 # define CMK_TLS_X86_MOV "movq"
 # ifdef __APPLE__
@@ -50,12 +42,50 @@ void* swapTLS(void*);
 # else
 #  define CMK_TLS_X86_REG "fs"
 # endif
+# define CMK_TLS_X86_WIDTH "8"
 #elif CMK_TLS_SWITCHING_X86
 # define CMK_TLS_X86_MOV "movl"
 # define CMK_TLS_X86_REG "gs"
+# define CMK_TLS_X86_WIDTH "4"
 #else
 # define CMK_TLS_SWITCHING_UNAVAILABLE
 #endif
+
+#ifdef __APPLE__
+
+extern "C" {
+void* getTLSForKey(size_t);
+void setTLSForKey(size_t, void*);
+}
+
+void* getTLSForKey(size_t key)
+{
+#ifdef CMK_TLS_X86_MOV
+  void* ptr;
+  asm volatile (CMK_TLS_X86_MOV " %%" CMK_TLS_X86_REG ":0x0(,%1," CMK_TLS_X86_WIDTH "), %0\n"
+                : "=&r"(ptr)
+                : "r"(key));
+  return ptr;
+#else
+  return nullptr;
+#endif
+}
+
+void setTLSForKey(size_t key, void* newptr)
+{
+#ifdef CMK_TLS_X86_MOV
+  asm volatile (CMK_TLS_X86_MOV " %0, %%" CMK_TLS_X86_REG ":0x0(,%1," CMK_TLS_X86_WIDTH ")\n"
+                :
+                : "r"(newptr), "r"(key));
+#endif
+}
+
+#else
+
+extern "C" {
+void* getTLS();
+void setTLS(void*);
+}
 
 void* getTLS()
 {
@@ -72,59 +102,91 @@ void* getTLS()
 void setTLS(void* newptr)
 {
 #ifdef CMK_TLS_X86_MOV
-  asm volatile (CMK_TLS_X86_MOV " %0, %%" CMK_TLS_X86_REG ":0x0\n\t"
+  asm volatile (CMK_TLS_X86_MOV " %0, %%" CMK_TLS_X86_REG ":0x0\n"
                 :
                 : "r"(newptr));
 #endif
 }
 
-void* swapTLS(void* newptr)
-{
-  void* oldptr = getTLS();
-  setTLS(newptr);
-  return oldptr;
-}
+#endif
 
 
 // ----- TLS segment size determination -----
+
+static tlsdesc_t CmiTLSDescription;
 
 #if CMK_HAS_DL_ITERATE_PHDR
 
 # include <link.h>
 
-static inline void CmiTLSStatsInit(void)
-{
-}
-
 static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
 {
   size_t i;
-  tlsseg_t* t = (tlsseg_t*)data;
+  auto t = (tlsdesc_t *)data;
 
   for (i = 0; i < info->dlpi_phnum; i++)
   {
     const ElfW(Phdr) * hdr = &info->dlpi_phdr[i];
     if (hdr->p_type == PT_TLS)
     {
-      t->size += hdr->p_memsz;
-      if (t->align < hdr->p_align)
-        t->align = hdr->p_align;
+      const size_t align = hdr->p_align;
+      t->size += CMIALIGN(hdr->p_memsz, align);
+      if (t->align < align)
+        t->align = align;
     }
   }
 
   return 0;
 }
 
-static void populateTLSSegStats(tlsseg_t * t)
+static inline void CmiTLSStatsInit(void)
 {
-  t->size = 0;
-  t->align = 0;
-  dl_iterate_phdr(count_tls_sizes, t); /* count all PT_TLS sections */
+  CmiTLSDescription.size = 0;
+  CmiTLSDescription.align = 0;
+  dl_iterate_phdr(count_tls_sizes, &CmiTLSDescription); /* count all PT_TLS sections */
 }
 
 #elif defined __APPLE__
 
-// parts adapted from threadLocalVariables.c in dyld
+static constexpr size_t global_align = 16; // Apple uses alignment by 16
+
+# include <map>
+
+struct CmiTLSSegment
+{
+  const void * ptr;
+  size_t size;
+};
+static std::map<unsigned long, CmiTLSSegment> CmiTLSSegments;
+
+
+// things needed for GNU emutls
+
+# include <vector>
+# include <pthread.h>
+
+struct CmiTLSEmuTLSObject
+{
+  size_t size;
+  size_t align;
+  uintptr_t offset;
+  const void * initial;
+};
+
+static size_t CmiTLSSizeWithoutEmuTLS;
+static size_t CmiTLSEmuTLSNumObjects;
+static constexpr size_t CmiTLSEmuTLSArbitraryExtra = 32;
+static unsigned long CmiTLSEmuTLSKey;
+static std::vector<CmiTLSEmuTLSObject *> CmiTLSEmuTLSObjects;
+
+static inline size_t CmiTLSEmuTLSGetAlignedSize(size_t numobjects)
+{
+  const size_t size = sizeof(void *) * (2 /* emutls_array */ + numobjects + CmiTLSEmuTLSArbitraryExtra);
+  return CMIALIGN(size, global_align);
+}
+
+
+// things needed for TLV sections
 
 # include <mach-o/dyld.h>
 # include <mach-o/nlist.h>
@@ -145,9 +207,21 @@ static void populateTLSSegStats(tlsseg_t * t)
   typedef struct nlist macho_nlist;
 #endif
 
-static size_t GetTLVSizeFromMachOHeader()
+struct TLVDescriptor
+{
+  void * (*thunk)(struct TLVDescriptor *);
+  unsigned long key;
+  unsigned long offset;
+};
+
+
+static inline void CmiTLSStatsInit()
 {
   size_t totalsize = 0;
+  size_t total_emutls_num = 0;
+
+  // Parse all Mach-O headers to get TLS/TLV information.
+  // Adapted from threadLocalVariables.c in dyld.
 
   for (uint32_t c = 0; c < _dyld_image_count(); ++c)
   {
@@ -158,13 +232,16 @@ static size_t GetTLVSizeFromMachOHeader()
     CmiEnforce(mh_orig->magic == MACHO_HEADER_MAGIC);
     const auto mh = (const macho_header *)mh_orig;
     const auto mh_addr = (const char *)mh;
+    // const char * const name = _dyld_get_image_name(c);
 
-    const uint8_t * start = nullptr;
-    unsigned long size = 0;
+    uint64_t text_vmaddr = 0, linkedit_vmaddr = 0, linkedit_fileoff = 0;
     intptr_t slide = 0;
     bool slideComputed = false;
 
-    uint64_t text_vmaddr = 0, linkedit_vmaddr = 0, linkedit_fileoff = 0;
+    const uint8_t * start = nullptr;
+    unsigned long size = 0;
+    unsigned long key = 0;
+    bool haveKey = false;
 
     const uint32_t cmd_count = mh->ncmds;
     const auto cmds = (const struct load_command *)(mh_addr + sizeof(macho_header));
@@ -212,6 +289,23 @@ static size_t GetTLVSizeFromMachOHeader()
               size = newEnd - start;
             }
           }
+          else if (section_type == S_THREAD_LOCAL_VARIABLES)
+          {
+            const auto tlvstart = (const TLVDescriptor *)(sect->addr + slide);
+            const auto tlvend = (const TLVDescriptor *)(sect->addr + slide + sect->size);
+            for (const TLVDescriptor * d = tlvstart; d < tlvend; ++d)
+            {
+              if (haveKey)
+              {
+                CmiEnforce(d->key == key);
+              }
+              else
+              {
+                key = d->key;
+                haveKey = true;
+              }
+            }
+          }
         }
       }
       else if (lc_type == LC_SYMTAB && text_vmaddr)
@@ -228,12 +322,19 @@ static size_t GetTLVSizeFromMachOHeader()
             continue;
 
           static const char emutls_prefix[] = "___emutls_v.";
+          static constexpr size_t emutls_prefix_len = sizeof(emutls_prefix)-1;
           const char * const symname = strtab + nl->n_un.n_strx;
-          if (strncmp(symname, emutls_prefix, sizeof(emutls_prefix)-1) == 0)
+          if (strncmp(symname, emutls_prefix, emutls_prefix_len) == 0)
           {
-            const auto addr = (const size_t *)(nl->n_value + slide);
-            const size_t symsize = *addr;
-            totalsize += symsize;
+            const auto obj = (CmiTLSEmuTLSObject *)(nl->n_value + slide);
+
+            // Save this object pointer for later. We need all fields in the struct.
+            // Don't consider the placeholders for migration, since we need emutls to allocate them itself.
+            static const char CmiTLSPlaceholder_prefix[] = "CmiTLSPlaceholder";
+            if (strncmp(symname + emutls_prefix_len, CmiTLSPlaceholder_prefix, sizeof(CmiTLSPlaceholder_prefix)-1) != 0)
+              CmiTLSEmuTLSObjects.emplace_back(obj);
+
+            ++total_emutls_num;
           }
         }
       }
@@ -241,26 +342,47 @@ static size_t GetTLVSizeFromMachOHeader()
       cmd = (const struct load_command *)(((const char *)cmd) + cmd->cmdsize);
     }
 
-    totalsize += size;
+    // Add any TLV section found in this image.
+    CmiEnforce(haveKey == (size > 0));
+    if (size > 0)
+    {
+      const size_t alignedsize = CMIALIGN(size, global_align);
+
+      const bool didInsert = CmiTLSSegments.emplace(key, CmiTLSSegment{start, alignedsize}).second;
+      CmiEnforce(didInsert);
+
+      totalsize += alignedsize;
+    }
   }
 
-  return totalsize;
-}
+  // Tabulate the results.
 
-static size_t CmiTLSSize;
+  CmiTLSSizeWithoutEmuTLS = totalsize;
 
-static inline void CmiTLSStatsInit(void)
-{
-  // calculate the TLS size once at startup
-  CmiTLSSize = GetTLVSizeFromMachOHeader();
-}
+  if (total_emutls_num > 0)
+  {
+    // Predict the value that emutls_key will be after emutls_init is called.
+    pthread_key_t fakekey;
+    pthread_key_create(&fakekey, nullptr);
+    CmiTLSEmuTLSKey = fakekey + 1;
+    CmiTLSEmuTLSNumObjects = total_emutls_num;
 
-static void populateTLSSegStats(tlsseg_t * t)
-{
-  // fill the struct with the cached size
-  t->size = CmiTLSSize;
-  // Apple uses alignment by 16
-  t->align = 16;
+    totalsize += CmiTLSEmuTLSGetAlignedSize(total_emutls_num);
+
+    // Assign emutls offsets.
+    // Leave room for the placeholders to take the first indexes so that the first one calls emutls_init.
+    size_t migratable_emutls_idx = total_emutls_num - CmiTLSEmuTLSObjects.size();
+    for (CmiTLSEmuTLSObject * obj : CmiTLSEmuTLSObjects)
+    {
+      obj->offset = ++migratable_emutls_idx;
+      size_t size = CMIALIGN(obj->size, obj->align);
+      size = CMIALIGN(size, global_align);
+      totalsize += size;
+    }
+  }
+
+  CmiTLSDescription.size = totalsize;
+  CmiTLSDescription.align = global_align;
 }
 
 #elif CMK_HAS_ELF_H && CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT
@@ -324,20 +446,12 @@ static void CmiTLSStatsInit()
     CmiTLSExecutableStart = *pCmiExecutableStart;
   else
     CmiPrintf("Charm++> Error: \"CmiExecutableStart\" symbol not found. -tlsglobals disabled.\n");
-}
 
-static void populateTLSSegStats(tlsseg_t * t)
-{
   Phdr* phdr = getTLSPhdrEntry();
   if (phdr != NULL)
   {
-    t->align = phdr->p_align;
-    t->size = phdr->p_memsz;
-  }
-  else
-  {
-    t->size = 0;
-    t->align = 0;
+    const size_t align = CmiTLSDescription.align = phdr->p_align;
+    CmiTLSDescription.size = CMIALIGN(phdr->p_memsz, align);
   }
 }
 
@@ -347,17 +461,15 @@ static inline void CmiTLSStatsInit()
 {
 }
 
-static void populateTLSSegStats(tlsseg_t * t)
-{
-  t->size = 0;
-}
-
 #endif
 
 
 // ----- CmiTLS implementation -----
 
-void CmiTLSInit()
+extern thread_local int CmiTLSPlaceholderInt;
+thread_local int CmiTLSPlaceholderInt = -1;
+
+void CmiTLSInit(tlsseg_t * newThreadParent)
 {
 #ifdef CMK_TLS_SWITCHING_UNAVAILABLE
   CmiAbort("TLS globals are not supported.");
@@ -374,36 +486,133 @@ void CmiTLSInit()
 
     CmiTLSStatsInit();
   }
+
+#ifdef __APPLE__
+  // Allocate our own thread-local storage for each PE's parent so that CmiTLSSegmentSet
+  // is simple and tlsseg_t does not need to contain a std::map of keys to pointers.
+
+  CmiNodeAllBarrier();
+
+  void * memseg = CmiAlignedAlloc(CmiTLSDescription.align, CmiTLSDescription.size);
+  memset(memseg, 0, CmiTLSDescription.size);
+
+  auto data = (char *)memseg;
+  for (const auto & tlv : CmiTLSSegments)
+  {
+    const void * const ptr = tlv.second.ptr;
+    const size_t size = tlv.second.size;
+
+    memcpy(data, ptr, size);
+
+    data += size;
+  }
+
+  const size_t total_emutls_num = CmiTLSEmuTLSNumObjects;
+  if (total_emutls_num > 0)
+  {
+    *(size_t *)data = total_emutls_num + CmiTLSEmuTLSArbitraryExtra;
+    auto ptrs = (void **)data;
+    size_t my_emutls_size = CmiTLSEmuTLSGetAlignedSize(total_emutls_num);
+    data += my_emutls_size;
+
+    // Fill in emutls pointers and copy initial values.
+    for (CmiTLSEmuTLSObject * obj : CmiTLSEmuTLSObjects)
+    {
+      size_t size = CMIALIGN(obj->size, obj->align);
+      size = CMIALIGN(size, global_align);
+
+      ptrs[obj->offset] = data;
+
+      if (obj->initial != nullptr)
+        memcpy(data, obj->initial, obj->size);
+
+      data += size;
+      my_emutls_size += size;
+    }
+
+    CmiNodeAllBarrier();
+
+    if (CmiMyRank() == 0)
+    {
+      // Add this entry for CmiTLSSegmentSet.
+      const bool didInsert = CmiTLSSegments.emplace(CmiTLSEmuTLSKey, CmiTLSSegment{nullptr, my_emutls_size}).second;
+      CmiEnforce(didInsert);
+    }
+
+    CmiNodeAllBarrier();
+  }
+
+  newThreadParent->memseg = memseg;
+
+  // Replace the default key values with our custom ones packed into a single buffer.
+  CmiTLSSegmentSet(newThreadParent);
+#else
+  newThreadParent->memseg = (Addr)getTLS();
+#endif
+
+  // If emutls is active, setting these will eventually call emutls_init, which we need.
+  CmiTLSPlaceholderInt = CmiMyPe();
 #endif
 }
 
-void allocNewTLSSeg(tlsseg_t* t, CthThread th)
+tlsdesc_t CmiTLSGetDescription()
 {
-  populateTLSSegStats(t);
-
-  if (t->size > 0)
-  {
-    t->size = CMIALIGN(t->size, t->align);
-    t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size);
-    memcpy((void*)t->memseg, (char *)getTLS() - t->size, t->size);
-    t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
-    /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), t->align, t->memseg, t->size); */
-  }
-  else
-  {
-    /* since we don't have a PT_TLS section to copy, keep whatever the system gave us */
-    t->memseg = (Addr)getTLS();
-  }
+  return CmiTLSDescription;
 }
 
-void switchTLS(tlsseg_t* cur, tlsseg_t* next)
+void CmiTLSCreateSegUsingPtr(const tlsseg_t * threadParent, tlsseg_t * t, void * ptr)
 {
-  cur->memseg = (Addr)swapTLS((void*)next->memseg);
+  auto memseg = (char *)ptr;
+
+#ifdef __APPLE__
+  memcpy(memseg, threadParent->memseg, CmiTLSDescription.size);
+
+  // Fill in emutls pointers.
+  auto ptrs = (void **)((char *)memseg + CmiTLSSizeWithoutEmuTLS);
+  auto data = (char *)ptrs + CmiTLSEmuTLSGetAlignedSize(CmiTLSEmuTLSNumObjects);
+  for (CmiTLSEmuTLSObject * obj : CmiTLSEmuTLSObjects)
+  {
+    size_t size = CMIALIGN(obj->size, obj->align);
+    size = CMIALIGN(size, global_align);
+
+    ptrs[obj->offset] = data;
+
+    data += size;
+  }
+
+  t->memseg = memseg;
+#else
+  memcpy(memseg, (const char *)threadParent->memseg - CmiTLSDescription.size, CmiTLSDescription.size);
+
+  t->memseg = (Addr)(memseg + CmiTLSDescription.size);
+  /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), CmiTLSDescription.align, t->memseg, CmiTLSDescription.size); */
+#endif
 }
 
-void currentTLS(tlsseg_t* cur)
+void * CmiTLSGetBuffer(tlsseg_t * t)
 {
-  cur->memseg = (Addr)getTLS();
+#ifdef __APPLE__
+  return t->memseg;
+#else
+  return (char *)t->memseg - CmiTLSDescription.size;
+#endif
+}
+
+void CmiTLSSegmentSet(tlsseg_t * next)
+{
+#ifdef __APPLE__
+  auto data = (char *)next->memseg;
+  for (const auto & tlv : CmiTLSSegments)
+  {
+    const unsigned long key = tlv.first;
+    const size_t size = tlv.second.size;
+
+    setTLSForKey(key, data);
+    data += size;
+  }
+#else
+  setTLS((void*)next->memseg);
+#endif
 }
 
 #endif

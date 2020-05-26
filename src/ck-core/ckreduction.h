@@ -25,10 +25,6 @@ The calls needed to use the reduction manager are:
 #define FRAG_THRESHOLD 131072
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#define MAX_INT 5000000
-#define _MLOG_REDUCE_P2P_ 0
-#endif
 
 //This message is sent between group objects on a single PE
 // to let each know the other has been created.
@@ -275,6 +271,7 @@ private:
 };
 PUPbytes(CkReduction::reducerType)
 
+#if CMK_CHARMPY
 //CkReductionTypesExt struct to expose the reducerTypes for external
 //modules like Charm4py
         /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -340,11 +337,17 @@ struct CkReductionTypesExt {
     int min_ulong_long = CkReduction::min_ulong_long;
     int min_float = CkReduction::min_float;
     int min_double = CkReduction::min_double;
+    // logical and, or, xor
+    int logical_and_bool = CkReduction::logical_and_bool;
+    int logical_or_bool = CkReduction::logical_or_bool;
+    int logical_xor_bool = CkReduction::logical_xor_bool;
     // External custom reducer in Python
     int external_py = CkReduction::external_py;
 };
 
 extern "C" CkReductionTypesExt charm_reducers;
+
+#endif
 
 //A CkReductionMsg is sent up the reduction tree-- it
 // carries a contribution, or several reduced contributions.
@@ -430,14 +433,6 @@ private:
                          // value = 0 to nFrags-1
         CkSectionInfo sid;   // section cookie for multicast
 	CkCallback callback; //What to do when done
-#if CMK_BIGSIM_CHARM
-public:
-	/* AMPI reductions use bare CkReductionMsg's instead of AmpiMsg's */
-	void *event; // the event point that corresponds to this message
-	int eventPe; // the PE that the event is located on
-private:
-        void *log;
-#endif
 	void *data;//Reduction data
 	double dataStorage;//Start of data array (so it's double-aligned)
 };
@@ -691,32 +686,12 @@ public:
 		when there are no gcount
 	*/
 	int getGCount(){return gcount;};
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	void decGCount(){gcount--;}
-	void incNumImmigrantRecObjs(){
-		numImmigrantRecObjs++;
-	}
-	void decNumImmigrantRecObjs(){
-		numImmigrantRecObjs--;
-	}
-	void incNumEmigrantRecObjs(){
-		numEmigrantRecObjs++;
-	}
-	void decNumEmigrantRecObjs(){
-		numEmigrantRecObjs--;
-	}
-
-#endif
 
         //Combine (& free) the current message vector.
 	static CkReductionMsg *reduceMessages(CkMsgQ<CkReductionMsg> &msgs);
 
 private:
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	int numImmigrantRecObjs;
-	int numEmigrantRecObjs;
-#endif
 
 //Data members
 	//Stored callback function (may be NULL if none has been set)
@@ -727,14 +702,13 @@ private:
 	bool inProgress;//Is a reduction started, but not complete?
 	bool creating;//Are elements still being created?
 	bool startRequested;//Should we start the next reduction when creation finished?
+      bool is_inactive;//Is it inactive
 	int gcount;//=el't created here - el't deleted here
 	int lcount;//Number of local contributors
 	int maxStartRequest; // the highest future ReductionStarting message received
 
 	//Current local and remote contributions
 	int nContrib,nRemote;
-  // Is it inactive
-  bool is_inactive;
 
         // simple barrier
         CkCallback barrier_storedCallback;
@@ -751,7 +725,7 @@ private:
 	CkMsgQ<CkReductionMsg> futureRemoteMsgs;
 
 	CkMsgQ<CkReductionMsg> finalMsgs;
-  std::map<int, int> inactiveList;
+      std::unordered_map<int, int> inactiveList;
 
 //State:
 	void startReduction(int number,int srcPE);

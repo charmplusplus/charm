@@ -49,6 +49,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include "converse.h"
+#include "cmirdmautils.h"
+#include <algorithm>
 
 /*Support for ++debug: */
 #include <unistd.h> /*For getpid()*/
@@ -91,9 +93,9 @@
 #include "request.h"
 
 /* Runtime to exchange EP addresses during LrtsInit() */
-#if CMK_OFI_USE_PMI
+#if CMK_USE_PMI
 #include "runtime-pmi.C"
-#elif CMK_OFI_USE_PMI2
+#elif CMK_USE_PMI2
 #include "runtime-pmi2.C"
 #endif
 
@@ -162,23 +164,18 @@ static inline int process_completion_queue();
       int pm_ret = posix_memalign((void**)(&ptr), CACHELINE_LEN, size); \
       if (unlikely((pm_ret != 0) || !ptr))                              \
       {                                                                 \
-          CmiPrintf("posix_memalign: ret %d", pm_ret);                  \
-          if (pm_ret == ENOMEM)                                         \
-              CmiAbort("posix_memalign: out of memory");                \
-          else                                                          \
-              CmiAbort("posix_memalign: error");                        \
+          CmiAbort("posix_memalign: ret %d", pm_ret);                   \
       }                                                                 \
   } while (0)
 
 #define OFI_RETRY(func)                                 \
     do {                                                \
-        ssize_t _ret;                                   \
+        intmax_t _ret;                                  \
         do {                                            \
             _ret = func;                                \
             if (likely(_ret == 0)) break;               \
             if (_ret != -FI_EAGAIN) {                   \
-                CmiPrintf("OFI_RETRY: ret %d\n", _ret); \
-                CmiAbort("OFI_RETRY error");            \
+                CmiAbort("OFI_RETRY: ret %jd\n", _ret); \
             }                                           \
             process_completion_queue();                 \
         } while (_ret == -FI_EAGAIN);                   \
@@ -344,8 +341,8 @@ static int fill_av_ofi(int myid, int nnodes, struct fid_ep *ep,
 
 static OFIContext context;
 
-#if CMK_ONESIDED_IMPL
 #include "machine-rdma.h"
+#if CMK_ONESIDED_IMPL
 #include "machine-onesided.h"
 #endif
 
@@ -1148,6 +1145,7 @@ void recv_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
     case OFI_OP_ACK:
         process_long_send_ack(e, req);
         break;
+#if CMK_ONESIDED_IMPL
     case OFI_RDMA_DIRECT_REG_AND_PUT:
         process_onesided_reg_and_put(e, req);
         break;
@@ -1157,6 +1155,7 @@ void recv_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
     case OFI_RDMA_DIRECT_DEREG_AND_ACK:
         process_onesided_dereg_and_ack(e, req);
         break;
+#endif
     default:
         MACHSTATE2(3, "--> unknown operation %x len=%ld", e->tag, e->len);
         CmiAbort("!! Wrong operation !!");
@@ -1606,7 +1605,7 @@ int fill_av_ofi(int myid,
                 CmiAbort("OFI::LrtsInit::snprintf error");
             }
 
-            ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen);
+            ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen, i);
             if (ret) {
                 CmiAbort("OFI::LrtsInit::runtime_kvs_get error");
             }
@@ -1755,7 +1754,7 @@ int fill_av(int myid,
             CmiAbort("OFI::LrtsInit::snprintf error");
         }
 
-        ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen);
+        ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen, i);
         if (ret) {
             CmiAbort("OFI::LrtsInit::runtime_kvs_get error");
         }

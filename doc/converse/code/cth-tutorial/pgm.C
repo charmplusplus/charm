@@ -42,8 +42,8 @@ void worker2Work(void* msg) {
 //create two worker threads and push them on scheduler Q
 void initThreads(int argc, char* argv[]) {
   printf("called initThreads\n");
-  CthThread worker1 = CthCreateMigratable((CthVoidFn)worker1Work, 0, 160000);
-  CthThread worker2 = CthCreateMigratable((CthVoidFn)worker2Work, 0, 160000);
+  CthThread worker1 = CthCreate((CthVoidFn)worker1Work, 0, 160000);
+  CthThread worker2 = CthCreate((CthVoidFn)worker2Work, 0, 160000);
   CthAwaken(worker1); CthAwaken(worker2);
 }
 

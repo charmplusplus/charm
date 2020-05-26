@@ -39,9 +39,11 @@
 #include <sys/stat.h>
 #include <gni_pub.h>
 #include <pmi.h>
+#include <algorithm>
 //#include <numatoolkit.h>
 
 #include "converse.h"
+#include "cmirdmautils.h"
 
 #if REGULARPAGE
 #define     LARGEPAGE              0
@@ -1792,76 +1794,6 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
     return 0;
 }
 
-#if 0
-// this is no different from the common code
-void LrtsSyncListSendFn(int npes, const int *pes, int len, char *msg)
-{
-  int i;
-#if CMK_BROADCAST_USE_CMIREFERENCE
-  for(i=0;i<npes;i++) {
-    if (pes[i] == CmiMyPe())
-      CmiSyncSend(pes[i], len, msg);
-    else {
-      CmiReference(msg);
-      CmiSyncSendAndFree(pes[i], len, msg);
-    }
-  }
-#else
-  for(i=0;i<npes;i++) {
-    CmiSyncSend(pes[i], len, msg);
-  }
-#endif
-}
-
-CmiCommHandle LrtsAsyncListSendFn(int npes, const int *pes, int len, char *msg)
-{
-  /* A better asynchronous implementation may be wanted, but at least it works */
-  CmiSyncListSendFn(npes, pes, len, msg);
-  return (CmiCommHandle) 0;
-}
-
-void LrtsFreeListSendFn(int npes, const int *pes, int len, char *msg)
-{
-  if (npes == 1) {
-      CmiSyncSendAndFree(pes[0], len, msg);
-      return;
-  }
-#if CMK_PERSISTENT_COMM
-  if (CpvAccess(phs) && len > PERSIST_MIN_SIZE
-#if CMK_SMP
-            && IS_PERSISTENT_MEMORY(msg)
-#endif
-     ){
-      int i;
-      for(i=0;i<npes;i++) {
-        if (pes[i] == CmiMyPe())
-          CmiSyncSend(pes[i], len, msg);
-        else {
-          CmiReference(msg);
-          CmiSyncSendAndFree(pes[i], len, msg);
-        }
-      }
-      CmiFree(msg);
-      return;
-  }
-#endif
-
-#if CMK_BROADCAST_USE_CMIREFERENCE
-  CmiSyncListSendFn(npes, pes, len, msg);
-  CmiFree(msg);
-#else
-  int i;
-  for(i=0;i<npes-1;i++) {
-    CmiSyncSend(pes[i], len, msg);
-  }
-  if (npes>0)
-    CmiSyncSendAndFree(pes[npes-1], len, msg);
-  else
-    CmiFree(msg);
-#endif
-}
-#endif
-
 static void    PumpDatagramConnection(void);
 static      int         event_SetupConnect = 111;
 static      int         event_PumpSmsg = 222 ;
@@ -2294,7 +2226,7 @@ static void PumpNetworkSmsg()
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->srcPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          newNcpyOpInfo->srcSize,
+                          std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -2348,11 +2280,13 @@ static void PumpNetworkSmsg()
                                                                 newNcpyOpInfo->srcSize,
                                                                 GNI_MEM_READ_ONLY);
 
+                newNcpyOpInfo->isSrcRegistered = 1; // Set isSrcRegistered to 1 after registration
+
                 post_rdma((uint64_t)newNcpyOpInfo->destPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->srcPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          newNcpyOpInfo->srcSize,
+                          std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -2375,14 +2309,16 @@ static void PumpNetworkSmsg()
 
                 ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl =
                                               registerDirectMem(newNcpyOpInfo->destPtr,
-                                                                newNcpyOpInfo->srcSize,
+                                                                newNcpyOpInfo->destSize,
                                                                 GNI_MEM_READWRITE);
+
+                newNcpyOpInfo->isDestRegistered = 1; // Set isDestRegistered to 1 after registration
 
                 post_rdma((uint64_t)newNcpyOpInfo->srcPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->destPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          newNcpyOpInfo->srcSize,
+                          std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->srcPe),
                           GNI_POST_RDMA_GET,
@@ -2403,15 +2339,35 @@ static void PumpNetworkSmsg()
 
                 resetNcpyOpInfoPointers(newNcpyOpInfo);
 
-                LrtsDeregisterMem(newNcpyOpInfo->srcPtr,
-                                  (char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize(),
-                                  newNcpyOpInfo->srcPe,
-                                  newNcpyOpInfo->srcRegMode);
+                if(CmiMyNode() == CmiNodeOf(newNcpyOpInfo->srcPe)) {
+                  LrtsDeregisterMem(newNcpyOpInfo->srcPtr,
+                                    (char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize(),
+                                    newNcpyOpInfo->srcPe,
+                                    newNcpyOpInfo->srcRegMode);
 
-                newNcpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+                  newNcpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
 
-                // Invoke source ack
-                newNcpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+                  // Invoke source ack
+                  newNcpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+
+                } else if(CmiMyNode() == CmiNodeOf(newNcpyOpInfo->destPe)) {
+                  // Deregister the destination buffer
+                  LrtsDeregisterMem(newNcpyOpInfo->destPtr,
+                                    (char *)newNcpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(),
+                                    newNcpyOpInfo->destPe,
+                                    newNcpyOpInfo->destRegMode);
+
+                  newNcpyOpInfo->isDestRegistered = 0; // Set isDestRegistered to 0 after de-registration
+
+                  // Invoke destination ack
+                  newNcpyOpInfo->opMode = CMK_EM_API_DEST_ACK_INVOKE;
+
+                } else {
+
+                  CmiAbort(" Cannot de-register on a different node than the source or destinaton");
+                }
+
+                newNcpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
                 CmiInvokeNcpyAck(newNcpyOpInfo);
                 break;
             }
@@ -2560,7 +2516,8 @@ static gni_return_t  registerMessage(void *msg, int size, int seqno, gni_mem_han
         }
     }
     else {
-        //big msg, can not fit into memory poo        status = registerMemory(msg, size, memh, NULL);
+        //big msg, can not fit into memory pool, or persistent message
+        status = registerMemory(msg, size, memh, NULL);
     }
     return status;
 }
@@ -3486,7 +3443,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue, SMSG_QUEUE *prio_queue)
             ptr = (MSG_LIST*)PCQueuePop(current_queue);
             CMI_PCQUEUEPOP_UNLOCK(current_queue)
             if (ptr == 0) break;
-#if CMK_SMP
+#if CMK_SMP && CMK_ONESIDED_IMPL
             if (ptr->tag == RDMA_COMM_PERFORM_GET_TAG) {
                 // Comm thread performing GET on behalf of worker thread for Direct API
                 _performOneRgetForWorkerThread(ptr);

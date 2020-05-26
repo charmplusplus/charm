@@ -417,11 +417,7 @@ void initTraceTauBOC() {
     }
   //TAU_PROFILER_CREATE(main, "main", "", TAU_DEFAULT);
   //TAU_PROFILER_START(main);
-#ifdef __BIGSIM__
-  if (BgNodeRank()==0) {
-#else
   if (CkMyRank() == 0) {
-#endif
     registerExitFn(traceTauExitFunction);
   }
 }

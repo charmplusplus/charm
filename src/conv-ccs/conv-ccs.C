@@ -77,7 +77,7 @@ CcsHandlerRec *CcsGetHandler(const char *name) {
 void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge) {
   CcsHandlerRec *rec=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&name);
   if (rec==NULL) {
-    CmiAbort("CCS: Unknown CCS handler name.\n");
+    CmiAbort("[%d] CCS: Unknown CCS handler name %s.\n",CmiMyPe(),name);
   }
   rec->mergeFn=newMerge;
   rec->redID=CmiGetGlobalReduction();
@@ -233,9 +233,10 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 /*Look up handler's converse ID*/
   char *handlerStr=hdr->handler;
   CcsHandlerRec *fn=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
+  //  CmiPrintf("[%d] CCS: CCS handler name '%s' requested.\n",CmiMyPe(), hdr->handler);
   if (fn==NULL) {
-    CmiPrintf("CCS: Unknown CCS handler name '%s' requested. Ignoring...\n",
-	      hdr->handler);
+    CmiPrintf("[%d] CCS: Unknown CCS handler name '%s' requested. Ignoring...\n"
+	      ,CmiMyPe(), hdr->handler);
     CpvAccess(ccsReq)=hdr;
     CcsSendReply(0,NULL); /*Send an empty reply to the possibly waiting client*/
     return;
@@ -276,7 +277,7 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
   }
 }
 
-#if ! NODE_0_IS_CONVHOST || CMK_BIGSIM_CHARM
+#if ! NODE_0_IS_CONVHOST
 /* The followings are necessary to prevent CCS requests to be processed before
  * CCS has been initialized. Really it matters only when NODE_0_IS_CONVHOST=0, but
  * it doesn't hurt having it in the other case as well */
@@ -297,49 +298,10 @@ void CcsBufferMessage(char *msg) {
 /*Unpacks request message to call above routine*/
 int _ccsHandlerIdx = 0;/*Converse handler index of routine req_fw_handler*/
 
-#if CMK_BIGSIM_CHARM
-CpvDeclare(int, _bgCcsHandlerIdx);
-CpvDeclare(int, _bgCcsAck);
-extern "C" int BgNodeSize(void);
-extern void addBgNodeInbuffer(char *, int);
-/* This routine is needed when the application is built on top of the bigemulator
- * layer of Charm. In this case, the real CCS handler must be called within a
- * worker thread. The function of this function is to receive the CCS message in
- * the bottom converse layer and forward it to the emulated layer. */
-static void bg_req_fw_handler(char *msg) {
-  /* Get out of the message who is the destination pe */
-  int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
-  CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
-  int destPE = (int)ChMessageInt(hdr->pe);
-  if (CpvAccess(_bgCcsAck) < BgNodeSize()) {
-    CcsBufferMessage(msg);
-    return;
-  }
-  //CmiPrintf("CCS scheduling message\n");
-  if (destPE == -1) destPE = 0;
-  if (destPE < -1) {
-    ChMessageInt_t *pes_nbo = (ChMessageInt_t *)(msg+CmiReservedHeaderSize+sizeof(CcsImplHeader));
-    destPE = ChMessageInt(pes_nbo[0]);
-  }
-  //CmiAssert(destPE >= 0); // FixME: should cover also broadcast and multicast -> create generic function to extract destpe
-  (((CmiBlueGeneMsgHeader*)msg)->tID) = 0;
-  (((CmiBlueGeneMsgHeader*)msg)->n) = 0;
-  (((CmiBlueGeneMsgHeader*)msg)->flag) = 0;
-  (((CmiBlueGeneMsgHeader*)msg)->t) = 0;
-  (((CmiBlueGeneMsgHeader*)msg)->hID) = CpvAccess(_bgCcsHandlerIdx);
-  /* Get the right thread to deliver to (for now assume it is using CyclicMapInfo) */
-  addBgNodeInbuffer(msg, destPE/CmiNumPes());
-  //CmiPrintf("message CCS added %d to %d\n",((CmiBlueGeneMsgHeader*)msg)->hID, ((CmiBlueGeneMsgHeader*)msg)->tID);
-}
-#define req_fw_handler bg_req_fw_handler
-#endif
 void req_fw_handler(char *msg);
 
 void CcsReleaseMessages(void) {
-#if ! NODE_0_IS_CONVHOST || CMK_BIGSIM_CHARM
-#if CMK_BIGSIM_CHARM
-  if (CpvAccess(_bgCcsAck) == 0 || CpvAccess(_bgCcsAck) < BgNodeSize()) return;
-#endif
+#if ! NODE_0_IS_CONVHOST
   if (CcsNumBufferedMsgs > 0) {
     int i;
     //CmiPrintf("CCS: %d messages released\n",CcsNumBufferedMsgs);
@@ -472,14 +434,12 @@ void CcsImpl_netRequest(CcsImplHeader *hdr,const void *reqData)
   char *msg;
   int len,repPE=ChMessageInt(hdr->pe);
   if (repPE<=-CmiNumPes() || repPE>=CmiNumPes()) {
-#if ! CMK_BIGSIM_CHARM
     /*Treat out of bound values as errors. Helps detecting bugs*/
     if (repPE==-CmiNumPes()) CmiPrintf("Invalid processor index in CCS request: are you trying to do a broadcast instead?");
     else CmiPrintf("Invalid processor index in CCS request.");
     CpvAccess(ccsReq)=hdr;
     CcsSendReply(0,NULL); /*Send an empty reply to the possibly waiting client*/
     return;
-#endif
   }
 
   msg=CcsImpl_ccs2converse(hdr,reqData,&len);
@@ -538,7 +498,7 @@ int _isCcsHandlerIdx(int hIdx) {
 
 void CcsBuiltinsInit(char **argv);
 
-CpvDeclare(int, cmiArgDebugFlag);
+int cmiArgDebugFlag; // Value is 0, unless reset in ConverseCommonInit
 CpvDeclare(char *, displayArgument);
 CpvCExtern(int, cpdSuspendStartup);
 CpvDeclare(int, cpdSuspendStartup);
@@ -550,12 +510,6 @@ void CcsInit(char **argv)
   CpvInitialize(CcsImplHeader *, ccsReq);
   CpvAccess(ccsReq) = NULL;
   CmiAssignOnce(&_ccsHandlerIdx,CmiRegisterHandler((CmiHandler)req_fw_handler));
-#if CMK_BIGSIM_CHARM
-  CpvInitialize(int, _bgCcsHandlerIdx);
-  CpvAccess(_bgCcsHandlerIdx) = 0;
-  CpvInitialize(int, _bgCcsAck);
-  CpvAccess(_bgCcsAck) = 0;
-#endif
   CpvInitialize(char *, displayArgument);
   CpvInitialize(int, cpdSuspendStartup);
   CpvAccess(displayArgument) = NULL;
@@ -583,9 +537,8 @@ void CcsInit(char **argv)
   }
 #endif
   /* if in parallel debug mode i.e ++cpd, freeze */
-  if (CmiGetArgFlagDesc(argv, "+cpd", "Used *only* in conjunction with parallel debugger"))
+  if (cmiArgDebugFlag)
   {
-    if(CmiMyRank() == 0) CpvAccess(cmiArgDebugFlag) = 1;
      if (CmiGetArgStringDesc(argv, "+DebugDisplay",&(CpvAccess(displayArgument)), "X display for gdb used only in cpd mode"))
      {
         if (CpvAccess(displayArgument) == NULL)
@@ -598,7 +551,12 @@ void CcsInit(char **argv)
      }
 
      if (CmiGetArgFlagDesc(argv, "+DebugSuspend", "Suspend execution at beginning of program")) {
-       if(CmiMyRank() == 0) CpvAccess(cpdSuspendStartup) = 1;
+#if CMK_SMP       
+       if(!CmiInCommThread()) CpvAccess(cpdSuspendStartup) = 1;
+#else
+       CpvAccess(cpdSuspendStartup) = 1;
+#endif       
+       //       CmiPrintf("[%d] set SuspendStartup %d\n",CmiMyPe(), CpvAccess(cpdSuspendStartup));
      }
   }
 

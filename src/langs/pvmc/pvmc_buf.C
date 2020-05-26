@@ -428,7 +428,7 @@ int pvmc_unpackmsg(void *msgbuf, void *start_of_msg)
   if ((CpvAccess(pvmc_rbufid)<=0) || (CpvAccess(pvmc_rbufid) >= MAX_BUFFERS) ||
       (CpvAccess(pvmc_bufarray)[CpvAccess(pvmc_rbufid)].refcount <= 0)) {
     PRINTF("Pe(%d) tid=%d:%s:%d pvmc_unpackmsg() uninitialized recv buffer\n",
-	   MYPE(),__FILE__,__LINE__);
+	   MYPE(),pvm_mytid(),__FILE__,__LINE__);
     return -1;
   }
   cur_buf = &(CpvAccess(pvmc_bufarray)[CpvAccess(pvmc_rbufid)]);

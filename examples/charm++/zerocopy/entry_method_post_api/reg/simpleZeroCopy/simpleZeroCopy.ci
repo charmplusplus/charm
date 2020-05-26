@@ -10,12 +10,32 @@ mainmodule simpleZeroCopy {
   array [1D] zerocopyObject{
     entry zerocopyObject();
     entry void testZeroCopy(CProxy_Main mProxy);
+    entry void ResumeFromSync();
     entry void zerocopySent(CkDataMsg *msg);
     entry void send(int n1, int ptr1[n1], int n2, double ptr2[n2], int n3, char ptr3[n3]);
     entry void zerocopySend(int n1, nocopypost int ptr1[n1], int n2, nocopypost double ptr2[n2], int n3, nocopypost char ptr3[n3]);
     entry void mixedSend(int n1, int ptr1[n1], int n2, nocopypost double ptr2[n2], int n3, nocopypost int ptr3[n3], int n4, double ptr4[n4]);
 
     entry void sdagRun() {
+      serial {
+        // increase iteration and continue
+        iter++;
+      }
+
+      if(iter % LBPERIOD_ITER == 0) {
+        serial {
+          AtSync();
+        }
+
+        when ResumeFromSync() {
+          serial {
+            contribute(lbReductionCb);
+          }
+        }
+
+        when BarrierDone() {}
+      }
+
       serial {
         // send num arrays to its partner
         for(int i = 1; i <= num; i++)
@@ -24,18 +44,16 @@ mainmodule simpleZeroCopy {
 
       // wait for num arrays from partner
       for (j = 1; j <= num; j++){
-        when sdagRecv[iter] (int iter, int n1, nocopypost int ptr1[n1], int n2, nocopypost double ptr2[n2]){
+        when sdagRecv[iter] (int index, int n1, nocopypost int ptr1[n1], int n2, nocopypost double ptr2[n2]){
 
           serial {
 
-            //CmiPrintf("[%d][%d][%d] sdagRecv actual method %p, %p and received are %p, %p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), iArr1, dArr2, ptr1, ptr2);
             // increment counter on receiving a sdagRecv
             sdagZeroCopyRecvCounter++;
             compareArray(iArr1, iArr1copy, n1);
             compareArray(dArr2, dArr2copy, n2);
 
             // check that all sends and recvs have completed and then advance
-            //CmiPrintf("[%d][%d][%d] SdagRun recvcounter=%d, sentcounter=%d, num=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), sdagZeroCopyRecvCounter, sdagZeroCopySentCounter, num);
             if(sdagZeroCopySentCounter == 2*num && sdagZeroCopyRecvCounter == num)
               nextStep();
           }
@@ -44,7 +62,7 @@ mainmodule simpleZeroCopy {
     }
 
     entry void sdagZeroCopySent(CkDataMsg *msg);
-    entry void sdagRecv(int iter, int n1, nocopypost int ptr1[n1], int n2, nocopypost double ptr2[n2]);
+    entry void sdagRecv(int index, int n1, nocopypost int ptr1[n1], int n2, nocopypost double ptr2[n2]);
+    entry [reductiontarget] void BarrierDone();
   };
-
 }

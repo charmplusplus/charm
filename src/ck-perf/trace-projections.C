@@ -105,10 +105,6 @@ void _createTraceprojections(char **argv)
   CkpvInitialize(CkVec<UsrEvent *>*, usrStats);
   CkpvAccess(usrEvents) = new CkVec<UsrEvent *>();
   CkpvAccess(usrStats) = new CkVec<UsrEvent *>();
-#if CMK_BIGSIM_CHARM
-  // CthRegister does not call the constructor
-//  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
-#endif //CMK_BIGSIM_CHARM
   CkpvInitialize(TraceProjections*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
@@ -359,18 +355,6 @@ LogPool::~LogPool()
 #endif
   }
 
-#if CMK_BIGSIM_CHARM
-  extern int correctTimeLog;
-  if (correctTimeLog) {
-    createFile("-bg");
-    if (CkMyPe() == 0) {
-      createSts("-bg");
-    }
-    writeHeader();
-    if (CkMyPe() == 0) writeSts(NULL);
-    postProcessLog();
-  }
-#endif
 
   delete[] pool;
   delete [] fname;
@@ -482,12 +466,12 @@ void LogPool::writeSts(void)
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
   fprintf(stsfp, "TOTAL_PHASES %d\n", numPhases);
 #if CMK_HAS_COUNTER_PAPI
-  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", NUMPAPIEVENTS);
-  // for now, use i, next time use papiEvents[i].
+  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", CkpvAccess(numEvents));
+  // for now, use i, next time use CkpvAccess(papiEvents)[i].
   // **CW** papi event names is a hack.
   char eventName[PAPI_MAX_STR_LEN];
-  for (i=0;i<NUMPAPIEVENTS;i++) {
-    PAPI_event_code_to_name(papiEvents[i], eventName);
+  for (i=0;i<CkpvAccess(numEvents);i++) {
+    PAPI_event_code_to_name(CkpvAccess(papiEvents)[i], eventName);
     fprintf(stsfp, "PAPI_EVENT %d %s\n", i, eventName);
   }
 #endif
@@ -558,18 +542,6 @@ void LogPool::writeStatis(void)
   fclose(statisfp);
 }
 
-#if CMK_BIGSIM_CHARM
-static void updateProjLog(void *data, double t, double recvT, void *ptr)
-{
-  LogEntry *log = (LogEntry *)data;
-  FILE *fp = *(FILE **)ptr;
-  log->time = t;
-  log->recvTime = recvT<0.0?0:recvT;
-//  log->write(fp);
-  toProjectionsFile p(fp);
-  log->pup(p);
-}
-#endif
 
 // flush log entries to disk
 void LogPool::flushLogBuffer()
@@ -666,31 +638,10 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
   }
   if(poolSize==numEntries) {
     flushLogBuffer();
-#if CMK_BIGSIM_CHARM
-    extern int correctTimeLog;
-    if (correctTimeLog) CmiAbort("I/O interrupt!\n");
-#endif
   }
-#if CMK_BIGSIM_CHARM
-  switch (type) {
-    case BEGIN_PROCESSING:
-      pool[numEntries-1].recvTime = BgGetRecvTime();
-    case END_PROCESSING:
-    case BEGIN_COMPUTATION:
-    case END_COMPUTATION:
-    case CREATION:
-    case BEGIN_PACK:
-    case END_PACK:
-    case BEGIN_UNPACK:
-    case END_UNPACK:
-    case USER_EVENT_PAIR:
-      bgAddProjEvent(&pool[numEntries-1], numEntries-1, time, updateProjLog, &fp, BG_EVENT_PROJ);
-  }
-#endif
 }
 
 void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileName){
-#ifndef CMK_BIGSIM_CHARM
   if (type == CREATION ||
       type == CREATION_MULTICAST ||
       type == CREATION_BCAST) {
@@ -701,7 +652,6 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
   if(poolSize == numEntries){
     flushLogBuffer();
   }
-#endif	
 }
 
 void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
@@ -715,7 +665,6 @@ void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
 
   
 void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
-#ifndef CMK_BIGSIM_CHARM
   if (type == CREATION ||
       type == CREATION_MULTICAST ||
       type == CREATION_BCAST) {
@@ -726,7 +675,6 @@ void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
   if(poolSize == numEntries){
     flushLogBuffer();
   }
-#endif	
 	
 }  
 
@@ -749,7 +697,6 @@ void LogPool::addUserSuppliedNote(char *note){
 
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
   //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
-#ifndef CMK_BIGSIM_CHARM
 #if MPI_TRACE_MACHINE_HACK
   //This part of code is used  to combine the contiguous
   //MPI_Test and MPI_Iprobe events to reduce the number of
@@ -772,7 +719,6 @@ void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, d
   if(poolSize == numEntries){
     flushLogBuffer();
   }
-#endif	
 }
 
 
@@ -798,9 +744,6 @@ void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 
 void LogPool::postProcessLog()
 {
-#if CMK_BIGSIM_CHARM
-  bgUpdateProj(1);   // event type
-#endif
 }
 
 void LogPool::modLastEntryTimestamp(double ts)
@@ -812,7 +755,7 @@ void LogPool::modLastEntryTimestamp(double ts)
 //void LogEntry::addPapi(LONG_LONG_PAPI *papiVals)
 //{
 //#if CMK_HAS_COUNTER_PAPI
-//   memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+//   memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*CkpvAccess(numEvents));
 //#endif
 //}
 
@@ -871,7 +814,7 @@ void LogEntry::pup(PUP::er &p)
       p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       //p|numPapiEvents;
-      for (i=0; i<NUMPAPIEVENTS; i++) {
+      for (i=0; i<CkpvAccess(numEvents); i++) {
 	// not yet!!!
 	//	p|papiIDs[i]; 
 	p|papiValues[i];
@@ -890,7 +833,7 @@ void LogEntry::pup(PUP::er &p)
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen; p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       //p|numPapiEvents;
-      for (i=0; i<NUMPAPIEVENTS; i++) {
+      for (i=0; i<CkpvAccess(numEvents); i++) {
 	// not yet!!!
 	//	p|papiIDs[i];
 	p|papiValues[i];
@@ -993,7 +936,7 @@ TraceProjections::TraceProjections(char **argv):
   if (CmiGetArgLongDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
 		       "Log entries to buffer per I/O")) {
     if (CkMyPe() == 0) {
-      CmiPrintf("Trace: logsize: %ld\n", CkpvAccess(CtrLogBufSize));
+      CmiPrintf("Trace: logsize: %" PRId64 "\n", CkpvAccess(CtrLogBufSize));
     }
   }
   checknested = 
@@ -1680,6 +1623,14 @@ void toProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
     };
 }
 
+void toProjectionsFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void toProjectionsFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
@@ -1710,6 +1661,14 @@ void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
     };
 }
 
+void fromProjectionsFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void fromProjectionsFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 #if CMK_USE_ZLIB
 void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
@@ -1732,6 +1691,14 @@ void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 #endif
     default: CmiAbort("Unrecognized pup type code!");
     };
+}
+
+void toProjectionsGZFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void toProjectionsGZFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
 }
 #endif
 
@@ -1806,11 +1773,7 @@ static void TraceProjectionsExitHandler()
 void initTraceProjectionsBOC()
 {
   // CkPrintf("[%d] Trace Projections initialization called!\n", CkMyPe());
-#ifdef __BIGSIM__
-  if (BgNodeRank() == 0) {
-#else
     if (CkMyRank() == 0) {
-#endif
       registerExitFn(TraceProjectionsExitHandler);
     }
 #if 0
@@ -1896,12 +1859,12 @@ void TraceProjectionsBOC::print_warning()
     if (flush_count == 0) return;
     std::set<int>::iterator it;
     CkPrintf("*************************************************************\n");
-    CkPrintf("Warning: Projections log flushed to disk %d times on %d cores:", flush_count, list.size());
+    CkPrintf("Warning: Projections log flushed to disk %d times on %zu cores:", flush_count, list.size());
     for (it=list.begin(); it!=list.end(); it++)
       CkPrintf(" %d", *it);
     CkPrintf(".\n");
     CkPrintf("Warning: The performance data is likely invalid, unless the flushes have been explicitly synchronized by your program.\n");
-    CkPrintf("Warning: This may be fixed by specifying a larger +logsize (current value %d).\n", CkpvAccess(CtrLogBufSize));
+    CkPrintf("Warning: This may be fixed by specifying a larger +logsize (current value %" PRId64 ").\n", CkpvAccess(CtrLogBufSize));
     CkPrintf("*************************************************************\n");
 }
 

@@ -30,6 +30,7 @@ class Main : public CBase_Main{
     } else {
       size = CkNumPes() * 10; // default with 10 chare array elements per pe
     }
+    delete m;
 
     counter = 0;
     mainProxy = thisProxy;
@@ -49,7 +50,7 @@ class Main : public CBase_Main{
     assignValues(buffer, bufferSize);
 
     // create a callback method
-    int idx_zerocopySent = CkIndex_Main::zerocopySent(NULL);
+    int idx_zerocopySent = CkIndex_Main::zerocopySent();
     CkCallback cb = CkCallback(idx_zerocopySent, thisProxy);
 
     CkCallback doneCb = CkCallback(CkReductionTarget(Main, done), thisProxy);
@@ -64,7 +65,7 @@ class Main : public CBase_Main{
     ngrpProxy.recvLargeArray(CkSendBuffer(buffer, cb, CK_BUFFER_PREREG), bufferSize, doneCb);
   }
 
-  void zerocopySent(CkDataMsg *m) {
+  void zerocopySent() {
     CkPrintf("[%d][%d][%d] Source callback invoked\n", CkMyPe(), CkMyNode(), CmiMyRank());
     done();
   }

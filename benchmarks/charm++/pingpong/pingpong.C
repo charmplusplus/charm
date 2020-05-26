@@ -464,10 +464,10 @@ public:
     double OOB=9999999999.0;
 
     CkCallback srcCb(CkCallback::ignore);
-    mySrcInfo = CkNcpyBuffer(sourceBuffer, payload * sizeof(char), srcCb);
+    mySrcInfo = CkNcpyBuffer(sourceBuffer, payload * sizeof(char), srcCb, CK_BUFFER_REG, CK_BUFFER_NODEREG);
 
     CkCallback destCb(CkIndex_PingN::destRDMACompleted(NULL), thisProxy[thisIndex]);
-    CkNcpyBuffer myDestInfo = CkNcpyBuffer(destBuffer, payload * sizeof(char), destCb);
+    CkNcpyBuffer myDestInfo = CkNcpyBuffer(destBuffer, payload * sizeof(char), destCb, CK_BUFFER_REG, CK_BUFFER_NODEREG);
 
     thisProxy[nbr].recvHandle(myDestInfo);
   }

@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <limits>
 
 int getNcpyOpInfoTotalSize(
   int srcLayerSize,
@@ -20,6 +21,7 @@ void setNcpyOpInfo(
     int srcAckSize,
     int srcSize,
     unsigned short int srcRegMode,
+    unsigned short int srcDeregMode,
     unsigned short int isSrcRegistered,
     int srcPe,
     const void *srcRef,
@@ -30,9 +32,11 @@ void setNcpyOpInfo(
     int destAckSize,
     int destSize,
     unsigned short int destRegMode,
+    unsigned short int destDeregMode,
     unsigned short int isDestRegistered,
     int destPe,
     const void *destRef,
+    int rootNode,
     NcpyOperationInfo *ncpyOpInfo) {
 
   char *base = (char *)ncpyOpInfo + sizeof(NcpyOperationInfo);
@@ -72,26 +76,40 @@ void setNcpyOpInfo(
   ncpyOpInfo->srcPtr = srcPtr;
   ncpyOpInfo->srcPe = srcPe;
   ncpyOpInfo->srcRef = srcRef;
-  ncpyOpInfo->srcLayerSize = srcLayerSize;
-  ncpyOpInfo->srcAckSize = srcAckSize;
+  CmiAssert(srcLayerSize <= std::numeric_limits<unsigned short int>::max());
+  ncpyOpInfo->srcLayerSize = (short int)srcLayerSize;
+  CmiAssert(srcAckSize <= std::numeric_limits<unsigned short int>::max());
+  ncpyOpInfo->srcAckSize = (short int)srcAckSize;
   ncpyOpInfo->srcSize = srcSize;
-  ncpyOpInfo->srcRegMode = srcRegMode;
-  ncpyOpInfo->isSrcRegistered = isSrcRegistered;
+  CmiAssert(srcRegMode <= std::numeric_limits<unsigned char>::max());
+  ncpyOpInfo->srcRegMode = (unsigned char)srcRegMode;
+  CmiAssert(srcDeregMode <= std::numeric_limits<unsigned char>::max());
+  ncpyOpInfo->srcDeregMode = (unsigned char)srcDeregMode;
+  CmiAssert(isSrcRegistered <= std::numeric_limits<unsigned char>::max());
+  ncpyOpInfo->isSrcRegistered = (unsigned char)isSrcRegistered;
 
   ncpyOpInfo->destPtr = destPtr;
   ncpyOpInfo->destPe = destPe;
   ncpyOpInfo->destRef = destRef;
-  ncpyOpInfo->destLayerSize = destLayerSize;
-  ncpyOpInfo->destAckSize = destAckSize;
+  CmiAssert(destLayerSize <= std::numeric_limits<unsigned short int>::max());
+  ncpyOpInfo->destLayerSize = (unsigned short int)destLayerSize;
+  CmiAssert(destAckSize <= std::numeric_limits<unsigned short int>::max());
+  ncpyOpInfo->destAckSize = (unsigned short int)destAckSize;
   ncpyOpInfo->destSize = destSize;
-  ncpyOpInfo->destRegMode = destRegMode;
-  ncpyOpInfo->isDestRegistered = isDestRegistered;
+  CmiAssert(destRegMode <= std::numeric_limits<unsigned char>::max());
+  ncpyOpInfo->destRegMode = (unsigned char)destRegMode;
+  CmiAssert(destDeregMode <= std::numeric_limits<unsigned char>::max());
+  ncpyOpInfo->destDeregMode = (unsigned char)destDeregMode;
+  CmiAssert(isDestRegistered <= std::numeric_limits<unsigned char>::max());
+  ncpyOpInfo->isDestRegistered = (unsigned char)isDestRegistered;
 
   ncpyOpInfo->opMode  = CMK_DIRECT_API; // default operation mode is CMK_DIRECT_API
   ncpyOpInfo->ackMode = CMK_SRC_DEST_ACK; // default ack mode is CMK_SRC_DEST_ACK
   ncpyOpInfo->freeMe  = CMK_FREE_NCPYOPINFO; // default ack mode is CMK_FREE_NCPYOPINFO
 
-  ncpyOpInfo->ncpyOpInfoSize = sizeof(NcpyOperationInfo) + srcLayerSize + destLayerSize + srcAckSize + destAckSize;
+  ncpyOpInfo->rootNode = rootNode;
+
+  ncpyOpInfo->ncpyOpInfoSize = (unsigned short int)(sizeof(NcpyOperationInfo) + srcLayerSize + destLayerSize + srcAckSize + destAckSize);
 }
 
 

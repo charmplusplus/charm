@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 [ -x ./gatherflat.local ]  && exec ./gatherflat.local $@
 

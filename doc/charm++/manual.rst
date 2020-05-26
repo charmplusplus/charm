@@ -28,12 +28,12 @@ platforms supported by Charm++ are the IBM BlueGene/Q and OpenPOWER
 systems, Cray XE, XK, and XC systems, Omni-Path and Infiniband clusters,
 single workstations and networks of workstations (including x86 (running
 Linux, Windows, MacOS)), etc. The communication protocols and
-infrastructures supported by Charm++ are UDP, MPI, OFI, Infiniband,
+infrastructures supported by Charm++ are UDP, MPI, OFI, UCX, Infiniband,
 uGNI, and PAMI. Charm++ programs can run without changing the source on
 all these platforms. Charm++ programs can also interoperate with MPI
-programs (§ :numref:`sec:mpiinterop`). Please see the Installation and Usage
+programs (Section :numref:`sec:mpiinterop`). Please see the Installation and Usage
 section for details about installing, compiling and running Charm++
-programs (§ :numref:`sec:install`).
+programs (Section :numref:`sec:install`).
 
 Programming Model
 -----------------
@@ -53,7 +53,7 @@ Charm++ family of the same model.
 Execution Model
 ---------------
 
-A basic unit of parallel computation in Charm++ programs is a *chare* .
+A basic unit of parallel computation in Charm++ programs is a *chare*.
 A chare is similar to a process, an actor, an ADA task, etc. At its most
 basic level, it is just a C++ object. A Charm++ computation consists of
 a large number of chares distributed on available processors of the
@@ -87,8 +87,7 @@ scheduler, it repeats the cycle. I.e. there is no pre-emptive scheduling
 of other invocations.
 
 When a chare method executes, it may create method invocations for other
-chares. The Charm Runtime System (RTS, sometimes referred to as the
-Chare Kernel in the manual) locates the PE where the targeted chare
+chares. The Charm Runtime System (RTS) locates the PE where the targeted chare
 resides, and delivers the invocation to the scheduler on that PE.
 
 Methods of a chare that can be remotely invoked are called *entry*
@@ -122,7 +121,7 @@ So, one can think of Charm++ as supporting a *global object space*.
 
 Every Charm++ program must have at least one mainchare. Each mainchare
 is created by the system on processor 0 when the Charm++ program starts
-up. Execution of a Charm++ program begins with the Charm Kernel
+up. Execution of a Charm++ program begins with the Charm RTS
 constructing all the designated mainchares. For a mainchare named X,
 execution starts at constructor X() or X(CkArgMsg \*) which are
 equivalent. Typically, the mainchare constructor starts the computation
@@ -146,7 +145,7 @@ allowing for some localized non-determinism (e.g. a pair of methods may
 execute in any order, but when they both finish, the execution continues
 in a pre-determined manner, say executing a 3rd entry method). To
 simplify expression of such control structures, Charm++ provides two
-methods: the structured dagger notation (Sec :numref:`sec:sdag`), which
+methods: the structured dagger notation (Section :numref:`sec:sdag`), which
 is the main notation we recommend you use. Alternatively, you may use
 threaded entry methods, in combination with *futures* and *sync* methods
 (See :numref:`threaded`). The threaded methods run in light-weight
@@ -193,7 +192,7 @@ features of the Charm++ programming system. Part I, “Basic Usage”, is
 sufficient for writing full-fledged applications. Note that only the
 last two chapters of this part involve the notion of physical processors
 (cores, nodes, ..), with the exception of simple query-type utilities
-(Sec :numref:`basic utility fns`). We strongly suggest that all
+(Section :numref:`basic utility fns`). We strongly suggest that all
 application developers, beginners and experts alike, try to stick to the
 basic language to the extent possible, and use features from the
 advanced sections only when you are convinced they are essential. (They
@@ -287,6 +286,8 @@ programs can be referred in section :numref:`basic utility fns`.
 Basic Charm++ Programming
 =========================
 
+.. _programstructure:
+
 Program Structure, Compilation and Utilities
 --------------------------------------------
 
@@ -345,6 +346,14 @@ Syntax highlighting in Emacs can be enabled by triggering C++ handling on the .c
 
    (add-to-list 'auto-mode-alist '("\\.ci\\'" . c++-mode))
 
+Pygments
+''''''''
+
+Pygments supports syntax highlighting of .ci files starting with version 2.4.0,
+when setting ``charmci`` as the highlighting language, or automatically for files with
+the ``.ci`` filename extension.
+
+
 Modules
 ~~~~~~~
 
@@ -356,7 +365,7 @@ cannot be nested, but each *ci* file can have several modules. Modules
 are specified using the keyword *module*. A module name must be a valid
 C++ identifier.
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module myFirstModule {
        // Parallel interface declarations go here
@@ -396,7 +405,7 @@ A module may depend on the parallel entities declared in another module.
 It can express this dependency using the *extern* keyword. *extern* ed
 modules do not have to be present in the same *ci* file.
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module mySecondModule {
 
@@ -431,7 +440,7 @@ modules. The decl.h and def.h files may be generated for other modules,
 but the runtime system is not aware of entities declared in such
 unreachable modules.
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module A {
        ...
@@ -475,7 +484,7 @@ become laborious if the decl.h file has to included in several places.
 Charm++ supports the keyword *include* in *ci* files to permit the
 inclusion of any header directly into the generated decl.h files.
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module A {
        include "myUtilityClass.h"; //< Note the semicolon
@@ -533,9 +542,10 @@ when running a Charm++ program.
 ``void CkAssert(int expression)``
 Aborts the program if expression is 0.
 
-``void CkAbort(const char \*message)``
+``void CkAbort(const char *format, ...)``
 Causes the program to abort, printing
-the given error message. This function never returns.
+the given error message. Supports printf-style formatting.
+This function never returns.
 
 ``void CkExit()``
 This call informs the Charm RTS that computation on all
@@ -650,7 +660,7 @@ entry method and is used to create or spawn chare objects during
 execution. Class member functions are annotated as entry methods by
 declaring them in the interface file as:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    entry void Entry1(parameters);
 
@@ -666,7 +676,7 @@ parameter marshalling.
 For example, a chare could have this entry method declaration in the
 interface (``.ci``) file:
 
-.. code-block:: c++
+.. code-block:: charmci
 
      entry void foo(int i,int k);
 
@@ -677,7 +687,7 @@ Since Charm++ runs on distributed memory machines, we cannot pass an
 array via a pointer in the usual C++ way. Instead, we must specify the
 length of the array in the interface file, as:
 
-.. code-block:: c++
+.. code-block:: charmci
 
      entry void bar(int n,double arr[n]);
 
@@ -699,7 +709,7 @@ section.
 Array parameters and other parameters can be combined in arbitrary ways,
 as:
 
-.. code-block:: c++
+.. code-block:: charmci
 
      entry void doLine(float data[n],int n);
      entry void doPlane(float data[n*n],int n);
@@ -734,7 +744,7 @@ large structure by reference than by value.
 As an example, refer to the following code from
 ``examples/charm++/PUP/HeapPUP``:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // In HeapObject.h:
 
@@ -811,7 +821,7 @@ constructor that is an entry method, and may have any number of other
 entry methods. All chare classes and their entry methods are declared in
 the interface (``.ci``) file:
 
-.. code-block:: c++
+.. code-block:: charmci
 
        chare ChareType
        {
@@ -969,14 +979,14 @@ Read-only variables are declared by using the type modifier readonly,
 which is similar to const in C++. Read-only data is specified in the
 ``.ci`` file (the interface file) as:
 
-.. code-block:: c++
+.. code-block:: charmci
 
     readonly Type ReadonlyVarName;
 
 The variable ReadonlyVarName is declared to be a read-only variable of
 type Type. Type must be a single token and not a type expression.
 
-.. code-block:: c++
+.. code-block:: charmci
 
     readonly message MessageType *ReadonlyMsgName;
 
@@ -985,7 +995,7 @@ type MessageType. Pointers are not allowed to be readonly variables
 unless they are pointers to message types. In this case, the message
 will be initialized on every PE.
 
-.. code-block:: c++
+.. code-block:: charmci
 
     readonly Type ReadonlyArrayName [arraysize];
 
@@ -1044,7 +1054,7 @@ Declaring a One-dimensional Array
 
 You can declare a one-dimensional (1D) chare array as:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    //In the .ci file:
    array [1D] A {
@@ -1073,8 +1083,8 @@ several fields:
        void someEntry(parameters2);
    };
 
-Note that A must have a *migration constructor*, which is typically
-empty:
+Note that A must have a *migration constructor* if it is to be migratable.
+The migration constructor is typically empty:
 
 .. code-block:: c++
 
@@ -1099,7 +1109,7 @@ Declaring Multi-dimensional Arrays
 Charm++ supports multi-dimensional or user-defined indices. These array
 types can be declared as:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    //In the .ci file:
    array [1D]  ArrayA { entry ArrayA(); entry void e(parameters);}
@@ -1327,7 +1337,7 @@ callback to the reduction target, the entry method index is generated by
 ``CkIndex_ChareClass::method_name(...)``. For example, the code for a
 typed reduction that yields an ``int``, would look like this:
 
-.. code-block:: c++
+.. code-block:: charmci
 
      // In the .ci file...
      entry [reductiontarget] void done(int result);
@@ -1503,7 +1513,7 @@ the contributed elements if you need to know which array element gave a
 particular contribution. Additionally, if the contributed elements are
 of a complex data type, you will likely have to supply code for
 serializing/deserializing them. Consider using the PUP interface
-(§ :numref:`sec:pup`) to simplify your object serialization
+(Section :numref:`sec:pup`) to simplify your object serialization
 needs.
 
 If the outcome of your reduction is dependent on the order in which data
@@ -1591,7 +1601,7 @@ one another, related to data and synchronization dependencies.
 Consider one way of expressing these constraints using flags, buffers,
 and counters, as in the following example:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1661,7 +1671,7 @@ messages in a ``when`` statement, or to do local operations before a
 message is sent or after it’s received. The earlier example can be
 adapted to use serial blocks as follows:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1715,7 +1725,7 @@ generated-code macro in the class.
 Serial blocks can also specify a textual ‘label’ that will appear in
 traces, as follows:
 
-.. code-block:: c++
+.. code-block:: charmci
 
      entry void firstInput(Input i) {
        serial "process first" {
@@ -1741,7 +1751,7 @@ processed; otherwise, control is returned to the Charm++ scheduler.
 
 The use of ``when`` substantially simplifies the example from above:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1791,7 +1801,7 @@ For simplicity, ``when`` constructs can also specify multiple expected
 entry methods that all feed into a single body, by separating their
 prototypes with commas:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    entry void startStep() {
      when firstInput(Input first),
@@ -1822,7 +1832,7 @@ denoting the desired reference number in square brackets between the
 entry method name and its parameter list. For parameter marshalled entry
 methods, the reference number expression will be compared for equality
 with the entry method’s first argument. For entry methods that accept an
-explicit message (§ :numref:`messages`), the reference number on the
+explicit message (Section :numref:`messages`), the reference number on the
 message can be set by calling the function
 ``CkSetRefNum(void *msg, CMK_REFNUM_TYPE ref)``. Matching is used in the
 loop example below, and in
@@ -1836,7 +1846,7 @@ they appeared in plain C or C++ code. In the running example,
 start the next step. Instead of this arrangement, the loop structure can
 be made explicit:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1873,7 +1883,7 @@ be made explicit:
 If this code should instead run for a fixed number of iterations, we can
 instead use a for loop:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -1936,7 +1946,7 @@ independently before the call to ``computeInteractions``. Since we don’t
 care which order they get processed in, and want it to happen as soon as
 possible, we can apply ``overlap``:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // in .ci file
    chare ComputeObject {
@@ -2331,10 +2341,10 @@ Objects can be created in one of two ways: they can be created using a
 normal constructor as usual; or they can be created using their pup
 constructor. The pup constructor for Charm++ array elements and
 PUP::able objects is a “migration constructor” that takes a single
-“CkMigrateMessage \*"; for other objects, such as parameter marshalled
-objects, the pup constructor has no parameters. The pup constructor is
-always followed by a call to the object’s pup method in ``isUnpacking``
-mode.
+“CkMigrateMessage \*" which the user should not free; for other objects,
+such as parameter marshalled objects, the pup constructor has no parameters.
+The pup constructor is always followed by a call to the object’s pup method
+in ``isUnpacking`` mode.
 
 Once objects are created, they respond to regular user methods and
 remote entry methods as usual. At any time, the object pup method can be
@@ -2414,7 +2424,7 @@ parameters must abide by the standard PUP contract (see section
 A simple example of using PUP to marshall user defined data types
 follows:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    class Buffer {
    public:
@@ -3137,7 +3147,7 @@ Simple Load Balancer Usage Example - Automatic with Sync LB
 A simple example of how to use a load balancer in sync mode in one’s
 application is presented below.
 
-.. code-block:: c++
+.. code-block:: charmci
 
    /*** lbexample.ci ***/
    mainmodule lbexample {
@@ -3357,6 +3367,21 @@ on all branches of the group. This call is also asynchronous and
 non-blocking, and it, too, returns immediately after sending the
 message.
 
+Finally, when running in SMP mode with multiple PEs per node, one can
+broadcast a message to the branches of a group local to the sending node:
+
+.. code-block:: c++
+
+   CkWithinNodeBroadcast(CkIndex_Foo::bar(), msg, fooProxy);
+
+Where ``CkIndex_Foo::bar()`` is the index of the entry method you wish to
+invoke, msg is the ``Charm++`` message (section :numref:`messages`) you wish to
+send, and ``fooProxy`` is the proxy to the group you wish to send. As before,
+it is an asynchrounous call which returns immediately. Furthermore, if the
+receiving entry method is marked as ``[nokeep]`` (:numref:`attributes`), the
+message pointer will be shared with each group chare instead of creating an
+independent copy per receiver.
+
 Recall that each PE hosts a branch of every instantiated group.
 Sequential objects, chares and other groups can gain access to this
 *PE-local* branch using ckLocalBranch():
@@ -3457,7 +3482,7 @@ particular branch of a nodegroup, it may be executed by *any* PE in that
 logical node. Thus two invocations of a single entry method on a
 particular branch of a NodeGroup may be executed *concurrently* by two
 different PEs in the logical node. If this could cause data races in
-your program, please consult § :numref:`sec:nodegroups/exclusive`
+your program, please consult Section :numref:`sec:nodegroups/exclusive`
 (below).
 
 .. _sec:nodegroups/exclusive:
@@ -3476,7 +3501,7 @@ PE within that logical node will execute any other *exclusive* methods.
 However, PEs in the logical node may still execute *non-exclusive* entry
 method invocations. An entry method can be marked exclusive by tagging
 it with the exclusive attribute, as explained in
-§ :numref:`attributes`.
+Section :numref:`attributes`.
 
 Accessing the Local Branch of a NodeGroup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -3508,7 +3533,7 @@ the routine exactly once on *every logical node* before the computation
 begins, or to declare a regular C++ subroutine initproc to be executed
 exactly once on *every PE*.
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module foo {
        initnode void fooNodeInit(void);
@@ -3563,7 +3588,7 @@ sequence:
    However, if your program structure requires it, you can explicitly
    specify that the creation of certain Groups/NodeGroups depends on the
    creation of others, as described in
-   § :numref:`sec:groups/creation`. In addition, since those
+   Section :numref:`sec:groups/creation`. In addition, since those
    objects are initialized after the initialization of readonly
    variables, readonly variables can be used in the constructors of
    Groups and NodeGroups.
@@ -3621,12 +3646,12 @@ should *not* reuse the buffer. That is, after you have passed a message
 buffer into an asynchronous entry method invocation, you shouldn’t
 access its fields, or pass that same buffer into a second entry method
 invocation. Note that this rule doesn’t preclude the *single reuse* of
-an input message - consider an entry method invocation :math:`i_1`,
-which receives as input the message buffer :math:`m_1`. Then,
-:math:`m_1` may be passed to an asynchronous entry method invocation
-:math:`i_2`. However, once :math:`i_2` has been issued with :math:`m_1`
-as its input parameter, :math:`m_1` cannot be used in any further entry
-method invocations.
+a received message - consider being inside the body of an entry method
+invocation :math:`i_1`, which has received the message buffer :math:`m_1`
+as an input parameter. Then, :math:`m_1` may be passed to an asynchronous
+entry method invocation :math:`i_2`. However, once :math:`i_2` has been
+issued with :math:`m_1` as its input parameter, :math:`m_1` cannot be
+used in any further entry method invocations.
 
 Several kinds of message are available. Regular Charm++ messages are
 objects of *fixed size*. One can have messages that contain pointers or
@@ -3655,7 +3680,7 @@ with the entire message comprises a contiguous buffer of memory.
 **Packed Messages.** A *packed* message is used to communicate
 non-linear data structures via messages. However, we defer a more
 detailed description of their use to
-§ :numref:`sec:messages/packed_msgs`.
+Section :numref:`sec:messages/packed_msgs`.
 
 .. _memory allocation:
 
@@ -3675,7 +3700,7 @@ code for messages. Message declaration is straightforward for fixed-size
 messages. Given a message of type ``MyFixedSizeMsg``, simply include the
 following in the .ci file:
 
-.. code-block:: c++
+.. code-block:: charmci
 
     message MyFixedSizeMsg;
 
@@ -3685,7 +3710,7 @@ encapsulate. The following example illustrates this requirement. In it,
 a message of type ``MyVarsizeMsg``, which encapsulates three
 variable-length arrays of different types, is declared:
 
-.. code-block:: c++
+.. code-block:: charmci
 
     message MyVarsizeMsg {
       int arr1[];
@@ -3782,7 +3807,7 @@ write:
 
 Notice the last argument to the overloaded new operator, which specifies
 the number of bits used to store message priority. The section on
-prioritized execution (§ :numref:`prioritized message passing`)
+prioritized execution (Section :numref:`prioritized message passing`)
 describes how priorities can be employed in your program.
 
 Another version of the overloaded new operator allows you to pass in an
@@ -4196,6 +4221,16 @@ local
    immediately, they are allowed to have a non-void return value. An
    example can be found in ``examples/charm++/hello/local``.
 
+whenidle
+   a local entry method meant to be used with ``CkCallWhenIdle``,
+   which registers an entry method to be called when a processor is
+   idle. This mechanism provides a convenient way to do work (e.g. low
+   priority or speculative) in the absence of other work. ``whenidle``
+   entry methods must return a ``bool`` value, indicating whether the
+   entry method should be called when the processor is idle again, and
+   accept a ``double`` argument representing the current timestamp. An
+   example can be found in ``examples/charm++/whenidle``.
+
 python
    entry methods are enabled to be called from python scripts as
    explained in chapter :numref:`python`. Note that the object owning
@@ -4433,8 +4468,8 @@ Zero Copy Messaging API
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Apart from using messages, Charm++ also provides APIs to avoid sender
-and receiver side copies. On RDMA enabled networks like GNI, Verbs, PAMI
-and OFI, these internally make use of one-sided communication by using
+and receiver side copies. On RDMA enabled networks like GNI, Verbs, PAMI, OFI,
+and UCX these internally make use of one-sided communication by using
 the underlying Remote Direct Memory Access (RDMA) enabled network. For
 large arrays (few 100 KBs or more), the cost of copying during
 marshalling the message can be quite high. Using these APIs can help not
@@ -4449,60 +4484,65 @@ mainly due to additional small messages required for sending the
 metadata message and the acknowledgment message on completion.
 
 For within process data-transfers, this API uses regular memcpy to
-achieve zerocopy semantics. Similarly, on CMA-enabled machines, in a few
+achieve zero copy semantics. Similarly, on CMA-enabled machines, in a few
 cases, this API takes advantage of CMA to perform inter-process
 intra-physical host data transfers. This API is also functional on
 non-RDMA enabled networks like regular ethernet, except that it does not
 avoid copies and behaves like a regular Charm++ entry method invocation.
 
-There are two APIs that provide Zero copy semantics in Charm++:
+There are three APIs that provide zero copy semantics in Charm++:
 
 -  Zero Copy Direct API
 
 -  Zero Copy Entry Method Send API
 
+-  Zero Copy Entry Method Post API
+
 Zero Copy Direct API
 ^^^^^^^^^^^^^^^^^^^^
 
-The Zero copy Direct API allows users to explicitly invoke a standard
+The Zero Copy Direct API allows users to explicitly invoke a standard
 set of methods on predefined buffer information objects to avoid copies.
 Unlike the Entry Method API which calls the zero copy operation for
 every zero copy entry method invocation, the direct API provides a more
 flexible interface by allowing the user to exploit the persistent nature
 of iterative applications to perform zero copy operations using the same
 buffer information objects across iteration boundaries. It is also more
-beneficial than the Zero copy entry method API because unlike the entry
-method API, which avoids just the sender side copy, the Zero copy Direct
+beneficial than the Zero Copy Entry Method Send API because unlike the entry
+method Send API, which avoids just the sender side copy, the Zero Copy Direct
 API avoids both sender and receiver side copies.
 
-To send an array using the zero copy Direct API, define a CkNcpyBuffer
+To send an array using the Zero Copy Direct API, define a CkNcpyBuffer
 object on the sender chare specifying the pointer, size, a CkCallback
-object and an optional mode parameter.
+object and optional reg-mode and dereg-mode parameters.
 
 .. code-block:: c++
 
    CkCallback srcCb(CkIndex_Ping1::sourceDone, thisProxy[thisIndex]);
    // CkNcpyBuffer object representing the source buffer
-   CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_REG);
+   CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb);
+   // ^ is equivalent to CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_REG, CK_BUFFER_DEREG);
 
 When used inside a CkNcpyBuffer object that represents the source buffer
 information, the callback is specified to notify about the safety of
 reusing the buffer and indicates that the get or put call has been
-completed. In those cases where the application can determine safety of
+completed. In those cases where the application can determine the safety of
 reusing the buffer through other synchronization mechanisms, the
 callback is not entirely useful and in such cases,
 ``CkCallback::ignore`` can be passed as the callback parameter. The
-optional mode operator is used to determine the network registration
-mode for the buffer. It is only relevant on networks requiring explicit
-memory registration for performing RDMA operations. These networks
-include GNI, OFI and Verbs. When the mode is not specified by the user,
-the default mode is considered to be ``CK_BUFFER_REG``
+optional reg-mode and dereg-mode parameters are used to determine the network
+registration mode and de-registration mode for the buffer. They are only relevant on
+networks requiring explicit memory registration for performing RDMA operations.
+These networks include GNI, OFI, UCX and Verbs. When the reg-mode is not specified by the user,
+the default reg-mode is considered to be ``CK_BUFFER_REG`` and similarly, when the
+dereg-mode is not specified by the user, the default dereg-mode is considered to be
+``CK_BUFFER_DEREG``.
 
-Similarly, to receive an array using the Zero copy Direct API, define
+Similarly, to receive an array using the Zero Copy Direct API, define
 another CkNcpyBuffer object on the receiver chare object specifying the
-pointer, the size, a CkCallback object and an optional mode parameter.
-When used inside a CkNcpyBuffer object that represents the destination
-buffer, the callback is specified to notify the completion of data
+pointer, the size, a CkCallback object and the optional reg-mode and dereg-mode
+parameters. When used inside a CkNcpyBuffer object that represents the
+destination buffer, the callback is specified to notify the completion of data
 transfer into the CkNcpyBuffer buffer. In those cases where the
 application can determine data transfer completion through other
 synchronization mechanisms, the callback is not entirely useful and in
@@ -4513,7 +4553,8 @@ parameter.
 
    CkCallback destCb(CkIndex_Ping1::destinationDone, thisProxy[thisIndex]);
    // CkNcpyBuffer object representing the destination buffer
-   CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb, CK_BUFFER_REG);
+   CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb);
+   // is equivalent to CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb, CK_BUFFER_REG, CK_BUFFER_DEREG);
 
 Once the source CkNcpyBuffer and destination CkNcpyBuffer objects have
 been defined on the sender and receiver chares, to perform a get
@@ -4544,7 +4585,7 @@ into the local destination buffer.
 Similarly, a receiver’s destination CkNcpyBuffer object can be sent to
 the sender for the sender to perform a put on its source object by
 passing the source CkNcpyBuffer object as an argument to the runtime
-defined put method as shown in in the code snippet.
+defined put method as shown in the code snippet.
 
 .. code-block:: c++
 
@@ -4606,6 +4647,8 @@ method by casting the ``data`` field of the ``CkDataMsg`` object into a
 
        // access buffer pointer and free it
        free(source->ptr);
+
+       delete msg;
    }
 
 The following code snippet illustrates the usage of the ``setRef``
@@ -4636,6 +4679,8 @@ code snippet.
 
        // get reference pointer
        const void *refPtr = src->ref;
+
+       delete msg;
    }
 
 The usage of ``CkDataMsg`` and ``setRef`` in order to access the
@@ -4690,12 +4735,12 @@ pattern of using the same objects across iterations is demonstrated in
 
 This API is demonstrated in ``examples/charm++/zerocopy/direct_api``
 
-Memory Registration and Modes of Operation
+Memory Registration and Registration Modes
 ''''''''''''''''''''''''''''''''''''''''''
 
-There are four modes of operation for the Zero Copy Direct API. These
-modes act as control switches on networks that require memory
-registration like GNI, OFI and Verbs, in order to perform RDMA
+There are four modes of memory registration for the Zero Copy API. These
+registration modes act as control switches on networks that require memory
+registration like GNI, OFI, UCX and Verbs, in order to perform RDMA
 operations . They dictate the functioning of the API providing flexible
 options based on user requirement. On other networks, where network
 memory management is not necessary (Netlrts) or is internally handled by
@@ -4758,18 +4803,50 @@ actual networking or registration information. It cannot be used for
 performing any zerocopy operations. This mode was added as it was useful
 for implementing a runtime system feature.
 
-Memory De-registration
-''''''''''''''''''''''
+Memory De-registration and De-registration Modes
+''''''''''''''''''''''''''''''''''''''''''''''''
 
-Similar to memory registration, there is a method available to
-de-register memory after the completion of the operations. This allows
-for other buffers to use the registered memory as machines/networks are
-limited by the maximum amount of registered or pinned memory. Registered
-memory can be de-registered by calling the ``deregisterMem()`` method on
-the CkNcpyBuffer object.
+On network layers that require explicit memory registration, it is
+important to de-register the registered memory. Since networks are limited
+by the maximum registered or pinned memory, not de-registering pinned memory can
+lead to a pinned memory leak, which could potentially reduce application performance
+because it limits the amount of pinned memory available to the process.
 
-Other Methods
-'''''''''''''
+Similar to memory registration modes, the ZC API also provides two de-registration modes.
+
+``CK_BUFFER_DEREG``:
+
+
+``CK_BUFFER_DEREG`` is the default mode that is used when no dereg-mode is
+specified. This mode signals to the RTS that all the memory registered by the ``CkNcpyBuffer``
+object should be de-registered by the RTS. Hence, when ``CK_BUFFER_DEREG`` is specified by the user,
+it is the runtime system's responsibility to de-register the buffer registered by the ``CkNcpyBuffer``
+object. This dereg-mode is used when the user is not likely to reuse the buffer and wants the
+de-registration responsibility transferred to the RTS.
+
+``CK_BUFFER_NODEREG``:
+
+This mode is specified when the user doesn't want the RTS to de-register the buffer after the
+completion of the zero copy operation. It is beneficial when the user wants to reuse the same buffer
+(and reuse the ``CkNcpyBuffer`` object) by avoiding the cost of de-registration and registration.
+
+
+Important Methods
+'''''''''''''''''
+
+The Zero Copy API provides important methods that offer utilities that
+can be used by the user.
+
+The ``deregisterMem`` method is used by the user to de-register memory after
+the completion of the zero copy operations. This allows for other buffers to use the
+registered memory as machines/networks are limited by the maximum amount of
+registered or pinned memory. Registered memory can be de-registered by calling
+the ``deregisterMem()`` method on the CkNcpyBuffer object.
+
+.. code-block:: c++
+
+   // de-register previously registered buffer
+   dest.registerMem();
 
 In addition to ``deregisterMem()``, there are other methods in a
 CkNcpyBuffer object that offer other utilities. The
@@ -4801,29 +4878,56 @@ registration memory handles and will not incur any registration costs.
    // register previously de-registered buffer
    src.registerMem();
 
+It should be noted that the Zero Copy Direct API is optimized only for
+point to point communication. Although it can be used for use cases where a
+single buffer needs to be broadcasted to multiple recipients, it is very likely
+that the API will currently perform suboptimally. This is primarily
+because of the implementation which assumes point to point communication for the
+Zero Copy Direct API. Having the same source buffer information (CkNcpyBuffer)
+being passed to a large number of processes, with each process performing a get call
+from the same source process will cause network congestion at the source process by
+slowing down each get operation because of competing get calls.
+
+We are currently working on optimizing the Zero Copy Direct API for broadcast operations.
+Currently, the Zero Copy Entry Method Send API and the Zero Copy Entry Method Post API
+handle optimized broadcast operations by using a spanning tree as explained in the following
+sections.
+
 Zero Copy Entry Method Send API
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The Zero copy Entry Method Send API only allows the user to only avoid
-the sender side copy without avoiding the receiver side copy. It
-offloads the user from the responsibility of making additional calls to
+The Zero Copy Entry Method Send API allows the user to only avoid
+the sender side copy. On the receiver side, the buffer is allocated by the
+runtime system and a pointer to the Readonly buffer is provided to the user
+as an entry method parameter.
+For a broadcast operation, there is only one buffer allocated by the
+runtime system for each recipient process and a pointer to the same buffer is passed
+to all the recipient objects on that process (or logical node).
+
+This API offloads the user from the responsibility of making additional calls to
 support zero copy semantics. It extends the capability of the existing
 entry methods with slight modifications in order to send large buffers
 without a copy.
 
-To send an array using the zero copy message send API, specify the array
+To send an array using the Zero Copy Message Send API, specify the array
 parameter in the .ci file with the nocopy specifier.
 
-.. code-block:: c++
+.. code-block:: charmci
 
+   // same .ci specification is used for p2p and bcast operations
    entry void foo (int size, nocopy int arr[size]);
 
 While calling the entry method from the .C file, wrap the array i.e the
-pointer in a CkSendBuffer wrapper.
+pointer in a CkSendBuffer wrapper. The CkSendBuffer wrapper is essentially
+a method that constructs a CkNcpyBuffer around the passed pointer.
 
 .. code-block:: c++
 
+   // for point to point send
    arrayProxy[0].foo(500000, CkSendBuffer(arrPtr));
+
+   // for readonly broadcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr));
 
 Until the RDMA operation is completed, it is not safe to modify the
 buffer. To be notified on completion of the RDMA operation, pass an
@@ -4832,24 +4936,129 @@ specific nocopy array.
 
 .. code-block:: c++
 
-   CkCallback cb(CkIndex_Foo::zerocopySent(NULL), thisProxy[thisIndex]);
-   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb));
+   CkCallback cb1(CkIndex_Foo::zerocopySent(), thisProxy[thisIndex]);
 
-The callback will be invoked on completion of the RDMA operation
-associated with the corresponding array. Inside the callback, it is safe
-to overwrite the buffer sent via the zero copy entry method send API and
-this buffer can be accessed by dereferencing the CkDataMsg received in
-the callback.
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1));
+
+   // for readonly broadcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1));
+
+The CkSendBuffer wrapper also allows users to specify two optional mode parameters.
+These are used to determine the network registration mode and network de-registration
+mode for the buffer.  It is only relevant on networks requiring explicit memory registration
+for performing RDMA operations. These networks include GNI, OFI, and Verbs. When the registration mode
+is not specified by the user, the default mode is considered to be ``CK_BUFFER_REG``. Similarly, when
+the de-registration mode is not specified by the user, the default mode is considered to be ``CK_BUFFER_DEREG``.
+Note that in order to specify a de-registration mode, the registration mode has to be specified in the
+constructor because of how default parameters work with constructors.
+
+.. code-block:: c++
+
+   /* Specifying registration modes only, without any de-registration mode (uses default de-reg mode) */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1)); for REG reg-mode because of REG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1)); for REG reg-mode because of REG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   /* Specifying de-registration modes */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+
+The memory registration mode and de-registration mode can also be specified without a callback, as shown below:
+
+.. code-block:: c++
+
+   /* Specifying registration modes only, without any de-registration mode (uses default de-reg mode) */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr)); for REG reg-mode because of REG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr)); for REG reg-mode because of REG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   /* Specifying de-registration modes */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+
+In the case of point to point communication, the callback will be invoked on completion
+of the RDMA operation associated with the corresponding array.
+
+For zero copy broadcast operations, the callback will be invoked when all the broadcast
+recipient processes have successfully received the broadcasted array. Note that this does
+not necessarily mean that the recipient objects have received the data i.e. it is possible that the
+process (or the logical node) has received the data, but the individual entry methods
+are still waiting in the scheduler (and are scheduled to run) and hence have not received the
+data.
+
+
+Inside the callback, it is safe to overwrite the buffer sent via the Zero Copy Entry Method Send API.
 
 .. code-block:: c++
 
    //called when RDMA operation is completed
-   void zerocopySent(CkDataMsg *m)
+   void zerocopySent() {
+     // update the buffer to the next pointer
+     updateBuffer();
+   }
+
+The callback methods can also take a pointer to a ``CkDataMsg`` message.
+This message can be used to access the original buffer information
+object i.e. the ``CkNcpyBuffer`` object constructed by CkSendBuffer and
+used for the zero copy transfer. The buffer information object available in
+the callback allows access to all its information including the buffer pointer.
+
+.. code-block:: c++
+
+   //called when RDMA operation is completed
+   void zerocopySent(CkDataMsg *msg)
    {
-     //get access to the pointer and free the allocated buffer
-     void *ptr = *((void **)(m->data));
-     free(ptr);
-     delete m;
+     // Cast msg->data to a CkNcpyBuffer to get the source buffer information object
+     CkNcpyBuffer *source = (CkNcpyBuffer *)(msg->data));
+
+     // access buffer pointer and free it
+     free(ptr); // if the callback is executed on the source process
+     delete msg;
    }
 
 The RDMA call is associated with a nocopy array rather than the entry
@@ -4859,6 +5068,19 @@ it is attached to and not to all the nocopy arrays passed in an entry
 method invocation. On completion of the RDMA call for each array, the
 corresponding callback is separately invoked.
 
+On the receiver side, the entry method is defined as a regular entry method in the .C file,
+with the nocopy parameter being received as a pointer as shown below:
+
+.. code-block:: c++
+
+   void foo (int size, int *arr) {
+     // data received in runtime system buffer pointed by arr
+     // Note that 'arr' buffer is Readonly
+
+     computeValues();
+   }
+
+
 As an example, for an entry method with two nocopy array parameters,
 each called with the same callback, the callback will be invoked twice:
 on completing the transfer of each of the two nocopy parameters.
@@ -4866,7 +5088,7 @@ on completing the transfer of each of the two nocopy parameters.
 For multiple arrays to be sent via RDMA, declare the entry method in the
 .ci file as:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    entry void foo (int size1, nocopy int arr1[size1], int size2, nocopy double arr2[size2]);
 
@@ -4879,28 +5101,30 @@ associated with each nocopy array.
    CkCallback cb2(CkIndex_Foo::zerocopySent2(NULL), thisProxy[thisIndex]);
    arrayProxy[0].foo(500000, CkSendBuffer(arrPtr1, cb1), 1024000, CkSendBuffer(arrPtr2, cb2));
 
-This API is demonstrated in
+This API for point to point communication is demonstrated in
 ``examples/charm++/zerocopy/entry_method_api`` and
-``benchmarks/charm++/pingpong``
+``benchmarks/charm++/pingpong``. For broadcast operations, the usage of this API is
+demonstrated in ``examples/charm++/zerocopy/entry_method_bcast_api``.
 
 It should be noted that calls to entry methods with nocopy specified
-parameters are currently only supported for point to point operations
-and not for collective operations. Additionally, there is also no
-support for migration of chares that have pending RDMA transfer
-requests.
+parameters is currently supported for point to point operations
+and only collection-wide broadcast operations like broadcasts across an entire
+chare array or group or nodegroup. It is yet to be supported for section broadcasts.
+Additionally, there is also no support for migration of chares that have
+pending RDMA transfer requests.
 
 It should also be noted that the benefit of this API can be seen for
 large arrays on only RDMA enabled networks. On networks which do not
-support RDMA and for within process sends (which uses shared memory),
+support RDMA, and, for within process sends (which uses shared memory),
 the API is functional but doesn’t show any performance benefit as it
 behaves like a regular entry method that copies its arguments.
 
 Table :numref:`tab:rdmathreshold` displays the
-message size thresholds for the zero copy entry method send API on
+message size thresholds for the Zero Copy Entry Method Send API on
 popular systems and build architectures. These results were obtained by
 running ``benchmarks/charm++/zerocopy/entry_method_api/pingpong`` in
 non-SMP mode on production builds. For message sizes greater than or
-equal to the displayed thresholds, the zero copy API is found to perform
+equal to the displayed thresholds, the Zero Copy API is found to perform
 better than the regular message send API. For network layers that are
 not pamilrts, gni, verbs, ofi or mpi, the generic implementation is
 used.
@@ -4919,6 +5143,152 @@ used.
    Intel Cluster (Bridges)       Intel Omni-Path ``ofi-linux-x86_64``   64 KB           32 KB      32 KB
    Intel KNL Cluster (Stampede2) Intel Omni-Path ``ofi-linux-x86_64``   1 MB            64 KB      64 KB
    ============================= =============== ====================== =============== ========== ==========
+
+Zero Copy Entry Method Post API
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Zero Copy Entry Method Post API is an extension of the Zero Copy Entry Method
+Send API. This API allows users to receive the sent data in a user posted buffer. In
+addition to saving the sender side copy, it also avoids the receiver side copy by not
+using any intermediate buffers and directly receiving the data in the user posted buffer.
+Unlike the Zero Copy Entry Method Send API, this API should be used when the user wishes
+to receive the data in a user posted buffer, which is allocated and managed by the user.
+
+The posting of the receiver buffer happens at an object level, where each recipient object,
+for example, a chare array element or a group element or nodegroup element posts a receiver
+buffer using a special version of the entry method.
+
+To send an array using the Zero Copy Post API, specify the array
+parameter in the .ci file with the nocopypost specifier.
+
+.. code-block:: charmci
+
+   // same .ci specification is used for p2p and bcast operations
+   entry void foo (int size, nocopypost int arr[size]);
+
+   // ^ note that the nocopypost specifier is different from nocopy and
+   // indicates the usage of the post API for the array arr
+
+The sender side code for the Zero Copy Entry Method Post API is exactly the same as
+Zero Copy Entry Method Send API and can be referenced from the previous section. In this section,
+we will highlight the differences between the two APIs and demonstrate the usage of the Post API
+on the receiver side.
+
+As previously mentioned, the Zero Copy Entry Method Post API posts user buffers to receive the
+data sent by the sender. This is done using a special overloaded version of the recipient
+entry method, called Post entry method. The overloaded function has all the entry method parameters
+and an additional ``CkNcpyBufferPost`` array parameter at the end of the signature. Additionally, the
+entry method parameters are specified as references instead of values. Inside this post entry method,
+the received references can be initialized by the user. The pointer reference is assigned to a user
+allocated buffer, i.e. the buffer in which the user wishes to receive the data. The size variable
+reference could be assigned to a value (or variable) that represents the size of the data of that type
+that needs to be received. If this reference variable is not assigned inside the post entry method, the size specified
+at the sender in the CkSendBuffer wrapper will be used as the default size. The post entry method also
+allows the receiver to specify the memory registration mode and the memory de-registration mode.
+This is done by indexing the ncpyPost array and assigning the ``regMode`` and ``deregMode`` parameters
+present inside each array element of the ``CkNcpyBufferPost`` array. When the network memory
+registration mode is unassigned by the user, the default ``CK_BUFFER_REG`` regMode is used. Similarly, when
+the de-registration mode is unassigned by the user, the default ``CK_BUFFER_DEREG`` deregMode is used.
+
+For the entry method ``foo`` specified with a nocopypost specifier, the resulting post function defined
+in the .C file will be:
+
+.. code-block:: c++
+
+   void foo (int &size, int *& arr, CkNcpyBufferPost *ncpyPost) {
+     arr = myBuffer;      // myBuffer is a user allocated buffer
+
+     size = 2000;         // 2000 ints need to be received.
+
+     ncpyPost[0].regMode = CK_BUFFER_REG; // specify the regMode for the 0th pointer
+
+     ncpyPost[0].deregMode = CK_BUFFER_DEREG; // specify the deregMode for the 0th pointer
+   }
+
+In addition to the post entry method, the regular entry method also needs to be defined
+as in the case of the Entry Method Send API, where the nocopypost parameter is being received
+as a pointer as shown below:
+
+.. code-block:: c++
+
+  void foo (int size, int *arr) {
+    // arr points to myBuffer and the data sent is received in myBuffer
+    // Note that 'arr' buffer is the same as myBuffer, which is user allocated and managed
+
+    computeValues();
+  }
+
+Similarly, for sending and receiving multiple arrays, the .ci file specification will be:
+
+.. code-block:: charmci
+
+  entry void foo(nocopypost int arr1[size1], int size1, nocopypost char arr2[size2], int size2);
+
+
+In the .C file, we define a post entry method and a regular entry method:
+
+.. code-block:: c++
+
+  // post entry method
+  void foo(int *& arr1, int & size1, char *& arr2, int & size2, CkNcpyBufferPost *ncpyPost) {
+
+    arr1 = myBuffer1;
+    ncpyPost[0].regMode = CK_BUFFER_UNREG;
+    ncpyPost[0].deregMode = CK_BUFFER_DEREG;
+
+    arr2 = myBuffer2; // myBuffer2 is allocated using CkRdmaAlloc
+    ncpyPost[1].regMode = CK_BUFFER_PREREG;
+    ncpyPost[1].deregMode = CK_BUFFER_NODEREG;
+  }
+
+  // regular entry method
+  void foo(int *arr1, int size1, char *arr2, int size2) {
+
+    // sent buffer is received in myBuffer1, same as arr1
+
+    // sent buffer is received in myBuffer2, same as arr2
+  }
+
+It is important to note that the ``CkNcpyBufferPost`` array has as many elements as the
+number of ``nocopypost`` parameters in the entry method declaration in the .ci file. For
+n nocopypost parameters, the ``CkNcpyBufferPost`` array is indexed by 0 to n-1.
+
+This API for point to point communication is demonstrated in
+``examples/charm++/zerocopy/entry_method_post_api`` and
+for broadcast operations, the usage of this API is
+demonstrated in ``examples/charm++/zerocopy/entry_method_bcast_post_api``.
+
+Similar to the Zero Copy Entry Method Send API, it should be noted that calls to
+entry methods with nocopypost specified parameters are currently supported for
+point to point operations and only collection-wide broadcast operations like broadcasts
+across an entire chare array or group or nodegroup. It is yet to be supported for
+section broadcasts. Additionally, there is also no support for migration of chares that have
+pending RDMA transfer requests.
+
+
+Using Zerocopy Post API in iterative applications
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In iterative applications, when using the Zerocopy Post API, it is important to post different
+buffers for each iteration in order to receive each iteration's sent data in a separate buffer.
+Posting the same buffer across iterations could lead to overwriting the buffer when the receiver receives
+a message for that entry method. An example illustrating the use of the Zerocopy Post API to post
+different buffers in an iterative program, which uses SDAG is
+``examples/charm++/zerocopy/entry_method_post_api/reg/multiplePostedBuffers``. It is also important
+to post different buffers for each unique sender in order to receive each sender's data in a separate
+buffer. Posting the same buffer for different senders would overwrite the buffer when the receiver
+receives a message for that entry method.
+
+Additionally, in iterative applications which use load balancing, for the load balancing iterations,
+it is required to ensure that the Zerocopy sends are performed only after all chare array elements have
+completed migration. This can be achieved by a chare array wide reduction after ``ResumeFromSync`` has been
+reached. This programming construct has the same effect as that of a barrier, enforced after array elements
+have completed load balancing. This is required to avoid cases where it is possible that the buffer is
+posted on receiving a send and is then freed by the destructor or the unpacking pup method,
+which is invoked by the RTS because of migration due to load balancing. This scheme of using a
+reduction following ``ResumeFromSync`` is illustrated in
+``examples/charm++/zerocopy/entry_method_post_api/reg/simpleZeroCopy`` and
+``examples/charm++/zerocopy/entry_method_post_api/reg/multiplePostedBuffers``.
 
 .. _callbacks:
 
@@ -5224,7 +5594,7 @@ returned data can either be in the form of a Charm++ message or any type
 that has the PUP method implemented. Because the caller of a sync entry
 method will block, it must execute in a thread separate from the
 scheduler; that is, it must be a threaded entry method (*cf.*
-§ :numref:`threaded`, above). If a sync entry method returns a value,
+Section :numref:`threaded`, above). If a sync entry method returns a value,
 it is provided as the return value from the invocation on the proxy
 object:
 
@@ -5267,7 +5637,7 @@ means of the following functions:
 To illustrate the use of all these functions, a Fibonacci example in
 Charm++ using futures in presented below:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    chare fib {
      entry fib(bool amIroot, int n, CkFuture f);
@@ -5467,7 +5837,7 @@ has two variants which expect the following arguments:
    Upon quiescence detection, the specified callback is called with no
    parameters. Note that using this variant, you could have your program
    terminate after quiescence is detected, by supplying the above method
-   with a CkExit callback (§ :numref:`sec:callbacks/creating`).
+   with a CkExit callback (Section :numref:`sec:callbacks/creating`).
 
 #. An index corresponding to the entry function that is to be called,
    and a handle to the chare on which that entry function should be
@@ -5503,7 +5873,7 @@ this:
 
 Note that CkWaitQD should only be called from a threaded entry method
 because a call to CkWaitQD suspends the current thread of execution
-(*cf.* § :numref:`threaded`).
+(*cf.* Section :numref:`threaded`).
 
 .. _advanced arrays:
 
@@ -5674,7 +6044,7 @@ CkArrayMap and defines these virtual methods:
 For example, a simple 1D blockmapping scheme. Actual mapping is handled
 in the procNum function.
 
-.. code-block:: c++
+.. code-block:: charmci
 
     // In the .ci file:
     group BlockMap : CkArrayMap {
@@ -5751,7 +6121,7 @@ is the constructor message to pass, and ``mgr`` is the array manager which
 creates the elements.
 
 To create an element, call ``void CkArray::insertInitial(CkArrayIndex
-idx,void\* ctorMsg)`` on ``mgr``, passing in the index and a copy of the
+idx, void* ctorMsg)`` on ``mgr``, passing in the index and a copy of the
 constructor message. For example, to insert a 2D element (x,y), call:
 
 .. code-block:: c++
@@ -6019,7 +6389,7 @@ user code. Larger values will increase the size of each message.
 
 You can then declare an array indexed by Foo objects with
 
-.. code-block:: c++
+.. code-block:: charmci
 
     // in the .ci file:
     array [Foo] AF { entry AF(); ... }
@@ -6067,7 +6437,7 @@ Charm++ also supports sections which are a subset of elements of
 multiple chare arrays/groups of the same type (see
 :numref:`cross array section`).
 
-Multicast operations, a broadcast to all members of a section, are
+Multicast operations (a broadcast to all members of a section) are
 directly supported by the section proxy. For array sections, multicast
 operations by default use optimized spanning trees via the CkMulticast
 library in Charm++. For group sections, multicast operations by default
@@ -6128,22 +6498,24 @@ Group sections
 
 Group sections are created in the same way as array sections. A group
 “A” will have an associated “CProxySection_A” type which is used to
-create a section and obtain a proxy. In this case, ckNew() will receive
+create a section and obtain a proxy. In this case, ``ckNew()`` will receive
 the list of PE IDs which will form the section. See
-examples/charm++/groupsection for an example.
+``examples/charm++/groupsection`` for an example.
 
-It is important to note that Charm++ does not automatically delegate
-group sections to the internal CkMulticast library, and instead defaults
-to a point-to-point implementation of multicasts. To use CkMulticast
-with group sections, the user must manually delegate after invoking
-group creation. See :numref:`Manual Delegation` for information on how
-to do this.
+.. important::
+    It is important to note that Charm++ does not automatically delegate
+    group sections to the internal CkMulticast library, and instead defaults
+    to a point-to-point implementation of multicasts. To use CkMulticast
+    with group sections, the user must manually delegate after invoking
+    group creation. See :numref:`Manual Delegation` for information on how
+    to do this.
 
 Creation order restrictions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Important: Array sections should be created in post-constructor entry
-methods to avoid race conditions.
+.. attention::
+    Array sections should be created in post-constructor entry
+    methods to avoid race conditions.
 
 If the user wants to invoke section creation from a group, special care
 must be taken that the collection for which we are creating a section
@@ -6173,7 +6545,7 @@ broadcast to all the section members, like this:
      CProxySection_Hello proxy;
      proxy.someEntry(...); // section broadcast
 
-See examples/charm++/arraysection for examples on how sections are used.
+See ``examples/charm++/arraysection`` for examples on how sections are used.
 
 You can send the section proxy in a message to another processor, and
 still safely invoke the entry functions on the section proxy.
@@ -6195,10 +6567,8 @@ factor when creating the section.
 
      CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(..., 3); // factor is 3
 
-Note, to use CkMulticast library, all multicast messages must inherit
-from CkMcastBaseMsg, as the following example shows. Note that
-CkMcastBaseMsg must come first, this is IMPORTANT for CkMulticast
-library to retrieve section information out of the message.
+Note that, to use CkMulticast library, all multicast messages must inherit
+from CkMcastBaseMsg, as the following example shows.
 
 .. code-block:: c++
 
@@ -6207,6 +6577,10 @@ library to retrieve section information out of the message.
    public:
      int *data;
    };
+
+.. attention::
+    CkMcastBaseMsg must come first, this is important for CkMulticast
+    library to retrieve section information from the message.
 
 Due to this restriction, when using CkMulticast you must define messages
 explicitly for multicast entry functions and no parameter marshalling
@@ -6223,12 +6597,12 @@ default case for array sections), or manually for group sections.
 Since an array element can be a member of multiple array sections, it is
 necessary to disambiguate between which array section reduction it is
 participating in each time it contributes to one. For this purpose, a
-data structure called “CkSectionInfo” is created by CkMulticast library
+data structure called ``CkSectionInfo`` is created by CkMulticast library
 for each array section that the array element belongs to. During a
 section reduction, the array element must pass the CkSectionInfo as a
-parameter in the contribute(). The CkSectionInfo for a section can be
+parameter in the ``contribute()``. The CkSectionInfo for a section can be
 retrieved from a message in a multicast entry point using function call
-CkGetSectionInfo:
+``CkGetSectionInfo()``:
 
 .. code-block:: c++
 
@@ -6266,15 +6640,15 @@ As in an array reduction, users can use built-in reduction types
 (Section :numref:`builtin_reduction`) or define his/her own reducer
 functions (Section :numref:`new_type_reduction`).
 
-Section Operations and Migration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Section Operations with Migrating Elements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When using a section reduction, you don’t need to worry about migrations
 of array elements. When migration happens, an array element in the array
 section can still use the CkSectionInfo it stored previously for doing a
 reduction. Reduction messages will be correctly delivered but may not be
 as efficient until a new multicast spanning tree is rebuilt internally
-in the CkMulticastMgr library. When a new spanning tree is rebuilt, an
+in the CkMulticast library. When a new spanning tree is rebuilt, an
 updated CkSectionInfo is passed along with a multicast message, so it is
 recommended that CkGetSectionInfo() function is always called when a
 multicast message arrives (as shown in the above SayHi example).
@@ -6365,11 +6739,11 @@ to delegate [13]_ sections to custom libraries (called delegation
 managers). Note that group sections are not automatically delegated to
 CkMulticast and hence must be manually delegated to this library to
 benefit from the optimized multicast tree implementation. This is
-explained in this section, and see examples/charm++/groupsection for an
+explained here, and see ``examples/charm++/groupsection`` for an
 example.
 
 While creating a chare array one can set the auto delegation flag to
-false in CkArrayOptions and the runtime system will not use the default
+``false`` in CkArrayOptions and the runtime system will not use the default
 CkMulticast library. A CkMulticastMgr (or any other delegation manager)
 group can then be created by the user, and any section delegated to it.
 
@@ -6394,7 +6768,7 @@ managers):
 
 One can also set the default branching factor when creating a
 CkMulticastMgr group. Sections created via this manager will use the
-specified branching factor for their multicast tree. For example,
+specified branching factor for their multicast tree. For example:
 
 .. code-block:: c++
 
@@ -6458,7 +6832,7 @@ BaseChare, then the derived chare of type DerivedChare needs to be
 declared in the Charm++ interface file to be explicitly derived from
 BaseChare. Thus, the constructs in the ``.ci`` file should look like:
 
-.. code-block:: c++
+.. code-block:: charmci
 
      chare BaseChare {
        entry BaseChare(someMessage *);
@@ -6538,7 +6912,7 @@ Inheritance for Messages
 Messages cannot inherit from other messages. A message can, however,
 inherit from a regular C++ class. For example:
 
-.. code-block:: c++
+.. code-block:: charmci
 
     // In the .ci file:
     message BaseMessage1;
@@ -6587,7 +6961,7 @@ described below.
 
 A message template might be declared as follows:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module A {
      template <class DType, int N=3>
@@ -6688,7 +7062,7 @@ instantiation is desired.
 For the message and chare templates described above, a few
 instantiations might look like
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module D {
      extern module A;
@@ -6706,7 +7080,7 @@ because they must specify the chare class containing them. The template
 arguments are also specified directly in the method’s parameters, rather
 than as distinct template arguments.
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module E {
      extern module D;
@@ -6862,7 +7236,7 @@ every node, you can safely store the CkReduction::reducerType in a
 global or class-static variable. For the example above, the reduction
 function is registered and used in the following manner:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // In the .ci file:
    initnode void registerSumTwoShorts(void);
@@ -7189,7 +7563,8 @@ concrete subclasses require these four features:
 
 -  A migration constructor — a constructor that takes ``CkMigrateMessage *``.
    This is used to create the new object on the receive side,
-   immediately before calling the new object's pup routine.
+   immediately before calling the new object's pup routine. Users should not free
+   the CkMigrateMessage.
 
 -  A working, virtual ``pup`` method. You can omit this if your class has no
    data that needs to be packed.
@@ -7208,7 +7583,7 @@ needed.
 For example, if *parent* is a concrete superclass, and *child* and *tchild* are
 its subclasses:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // --------- In the .ci file ---------
    PUPable parent;
@@ -7348,7 +7723,7 @@ can be kept and the object used indefinitely.
 For example, if the entry method bar needs a ``PUP::able`` parent object for
 in-call processing, you would use a ``CkReference`` like this:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // --------- In the .ci file ---------
    entry void barRef(int x, CkReference<parent> p);
@@ -7361,7 +7736,7 @@ in-call processing, you would use a ``CkReference`` like this:
 If the entry method needs to keep its parameter, use a ``CkPointer`` like
 this:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // --------- In the .ci file ---------
    entry void barPtr(int x, CkPointer<parent> p);
@@ -7731,6 +8106,12 @@ After ``CkStartCheckpoint`` is executed, a directory of the designated
 name is created and a collection of checkpoint files are written into
 it.
 
+.. note::
+   Note that checkpoints are written to and read from several
+   automatically created subdirectories of the specified directory in
+   order to avoid creating too many files in the same directory, which
+   can stress the file system.
+
 Restarting
 ^^^^^^^^^^
 
@@ -7969,7 +8350,7 @@ a MPI+OpenMP hybrid program, Charm++ will work perfectly with any
 shared-memory parallel programming languages (e.g. OpenMP). As with
 ordinary OpenMP applications, the number of threads used in the OpenMP
 parts of the program can be controlled with the ``OMP_NUM_THREADS``
-environment variable. See Sec. :numref:`charmrun` for details on how
+environment variable. See Section :numref:`charmrun` for details on how
 to propagate such environment variables.
 
 If there are no spare cores allocated, to avoid resource contention, a
@@ -8148,7 +8529,7 @@ for example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 omp
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp
    $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
 
 This library is based on the LLVM OpenMP runtime library. So it supports
@@ -8192,7 +8573,7 @@ to avoid the error:
    $ sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
    $ sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 clang omp --with-production -j8
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 clang omp --with-production -j8
    $ echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
 
 On Mac, the Apple-provided clang installed in default doesn’t have
@@ -8206,7 +8587,7 @@ to the invocation of the Charm++ build script. For example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 omp gcc-7
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp gcc-7
    $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
 
 If this does not work, you should set environment variables so that the
@@ -8572,7 +8953,7 @@ two functions one after another.
 A small example of user driven interoperation can be found in
 ``examples/charm++/user-driven-interop``.
 
-.. _sec:kokkosinterop
+.. _sec:kokkosinterop:
 
 Interoperation with Kokkos
 --------------------------
@@ -8643,6 +9024,57 @@ Calls to the Kokkos parallel API such as ``Kokkos::parallel_for()`` can
 be made between these calls. Communication between the different Kokkos
 instances can be done via messages and entry method invocation among
 the nodegroup chares as in regular Charm++.
+
+.. _sec:rajainterop:
+
+Interoperation with RAJA
+------------------------
+
+RAJA is a shared-memory parallel programming model in C++ developed by
+Lawrence Livermore National Laboratory (https://github.com/LLNL/RAJA).
+RAJA shares similar goals and concepts with Kokkos (Section :numref:`sec:kokkosinterop`).
+
+In this section, we explore the basic interoperability of RAJA with
+Charm++. Currently there is no sophisticated integration scheme, Charm++
+only manages the communication between different RAJA instances with
+each instance individually managing the parallel execution underneath.
+Example programs can be found in ``examples/charm++/shared_runtimes/raja/hello``
+and ``examples/charm++/shared_runtimes/raja/vecadd``.
+
+Compiling the RAJA Library
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+RAJA supports multiple backends for parallel execution. We recommend
+OpenMP for multicore CPUs and CUDA for machines with GPUs. Because RAJA
+can be built with more than one backend, it is preferable to build both
+OpenMP and CUDA backends on GPU machines.
+
+To build RAJA with both OpenMP and CUDA backends (required for ``vecadd``
+example), use the following commands:
+
+.. code-block:: bash
+
+   $ mkdir build && install
+   $ cd build
+   $ cmake -DENABLE_CUDA=On -DCMAKE_INSTALL_PREFIX=<path to RAJA install folder> ../
+   $ make -j
+   $ make install
+
+For more compilation options and assistance, please refer to the `RAJA User Guide
+<https://raja.readthedocs.io/en/master/>`_.
+
+Program Structure and Flow
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The basic programming pattern using RAJA and Charm++ together for
+parallel execution in distributed memory environments is the following.
+We use a Charm++ nodegroup (which corresponds to a OS process) to
+encapsulate a RAJA instance that will manage the parallel execution
+underneath. Calls to the RAJA parallel API such as ``RAJA::forall()`` can
+be made in a method of the nodegroup to perform parallel computation in
+shared memory. Communication between the different RAJA instances can be
+performed via messages and entry method invocation among the nodegroup
+chares as in regular Charm++.
 
 .. _sec:partition:
 
@@ -9601,7 +10033,7 @@ python-compliant. This is done through the keyword python placed in
 square brackets before the object name in the .ci file. Some examples
 follow:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    mainchare [python] main {...}
    array [1D] [python] myArray {...}
@@ -9747,7 +10179,7 @@ can return an object as complex as needed.
 
 The method must have the following signature:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    entry [python] void highMethod(int handle);
 
@@ -10173,7 +10605,7 @@ To make a Charm++ application malleable, first, pup routines for all of
 the constructs in the application need to be written. This includes
 writing a pup routine for the ``mainchare`` and marking it migratable:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    	mainchare [migratable]  Main { ... }
 
@@ -10252,7 +10684,7 @@ Charm++ can be downloaded using one of the following methods:
 
 -  From source archive - The latest development version of Charm++ can
    be downloaded from our source archive using *git clone
-   http://charm.cs.illinois.edu/gerrit/charm*.
+   https://github.com/UIUC-PPL/charm*.
 
 If you download the source code from the website, you will have to
 unpack it using a tool capable of extracting gzip’d tar files, such as
@@ -10302,7 +10734,7 @@ appropriate choices for the build one wants to perform.
    ================================================================ =====================================================================
    Machine                                                          Build command
    ================================================================ =====================================================================
-   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux --with-production -j8``
+   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    Multicore (single node, shared memory) 64 bit Linux              ``./build charm++ multicore-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux                                            ``./build charm++ netlrts-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux (intel compilers)                          ``./build charm++ netlrts-linux-x86_64 icc --with-production -j8``
@@ -10313,6 +10745,8 @@ appropriate choices for the build one wants to perform.
    MPI with 64 bit Linux (mpicxx wrappers)                          ``./build charm++ mpi-linux-x86_64 mpicxx --with-production -j8``
    IBVERBS with 64 bit Linux                                        ``./build charm++ verbs-linux-x86_64 --with-production -j8``
    OFI with 64 bit Linux                                            ``./build charm++ ofi-linux-x86_64 --with-production -j8``
+   UCX with 64 bit Linux                                            ``./build charm++ ucx-linux-x86_64 --with-production -j8``
+   UCX with 64 bit Linux (Armv8)                                    ``./build charm++ ucx-linux-arm8 --with-production -j8``
    Net with 64 bit Windows                                          ``./build charm++ netlrts-win-x86_64 --with-production -j8``
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
    Net with 64 bit Mac                                              ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
@@ -10341,6 +10775,8 @@ the command line while configuring from a blank slate. To build with all
 defaults, ``cmake .`` is sufficient, though invoking CMake from a
 separate location (ex:
 ``mkdir mybuild && cd mybuild && cmake ../charm``) is recommended.
+Please see Section :numref:`sec:cmakeinstall` for building Charm++
+directly with CMake.
 
 Installation through the Spack package manager
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10383,6 +10819,42 @@ select another version with the ``@`` option (for example,
 
    	$ spack install charmpp@develop
 
+
+.. _sec:cmakeinstall:
+
+Installation with CMake
+~~~~~~~~~~~~~~~~~~~~~~~
+
+As an experimental feature, Charm++ can be installed with the CMake tool,
+version 3.4 or newer.
+This is currently supported on Linux and Darwin, but not on Windows.
+
+After downloading and unpacking Charm++, it can be installed in the following way:
+
+.. code-block:: bash
+
+   $ cd charm
+   $ mkdir build-cmake
+   $ cd build-cmake
+   $ cmake ..
+   $ make -j4
+
+
+By default, CMake builds the netlrts version. 
+Other configuration options can be specified in the cmake command above.
+For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the following command can be used:
+
+.. code-block:: bash
+
+   $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
+
+To simplify building with CMake, the `buildcmake` command is a simple wrapper around cmake
+that supports many of the options that `build` supports.
+
+.. code-block:: bash
+
+   $ ./buildcmake AMPI netlrts-linux-x86_64 smp --with-production
+
 Charm++ installation directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -10424,6 +10896,83 @@ Reducing disk usage
 The charm directory contains a collection of example-programs and
 test-programs. These may be deleted with no other effects. You may also
 ``strip`` all the binaries in ``charm/bin``.
+
+Installation for Specific Builds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+UCX
+^^^
+UCX stands for Unified Communication X and is a high performance communication
+library that can be used as a backend networking layer for Charm++ builds on
+supported transports like Infiniband, Omni-Path, gni, TCP/IP, etc.
+
+In order to install Charm++ with UCX backend, you require UCX or HPC-X modules
+in your environment. In case UCX or HPC-X is not available in your environment,
+you can build UCX from scratch using the following steps:
+
+.. code-block:: bash
+
+   $ git clone https://github.com/openucx/ucx.git
+   $ cd ucx
+   $ ./autogen.sh
+   $ ./contrib/configure-release --prefix=$HOME/ucx/build
+   $ make -j8
+   $ make install
+
+After installing UCX, there are several supported process management interfaces (PMI)
+that can be specified as options in order to build Charm++ with UCX. These include
+Simple PMI, Slurm PMI, Slurm PMI 2 and PMIx (using OpenMPI). Currently, in order to
+use PMIx for process management, it is required to have OpenMPI installed on the system.
+Additionally, in order to use the other supported process management interfaces, it is
+required to have a non-OpenMPI based MPI implementation installed on the system (e.g.
+Intel MPI, MVAPICH, MPICH, etc.).
+
+The following section shows examples of build commands that can be used to build targets
+with the UCX backend using different process management interfaces. It should be noted that
+unless UCX is installed in a system directory, in order for Charm++ to find the UCX installation,
+it is required to pass the UCX build directory as ``--basedir``.
+
+To build the Charm++ target with Simple PMI, do not specify any additional option as shown
+in the build command.
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+
+To build the Charm++ target with Slurm PMI, specify ``slurmpmi`` in the build command.
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 slurmpmi --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+
+Similarly, to build the Charm++ target with Slurm PMI 2, specify ``slurmpmi2`` in the build command.
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 slurmpmi2 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+
+To build the Charm++ target with PMIx, you would require an OpenMPI implementation with PMIx
+enabled to be installed on your system. In case OpenMPI is not available in your environment,
+you can build OpenMPI from scratch using the following steps:
+
+.. code-block:: bash
+
+  $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
+  $ tar -xvf openmpi-4.0.1.tar.gz
+  $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
+  $ make -j24
+  $ make install all
+
+After installing OpenMPI or using the pre-installed OpenMPI, you can build the Charm++ target with
+the UCX backend by specifying ``ompipmix`` in the build command and passing the OpenMPI installation
+path as ``--basedir`` (in addition to passing the UCX build directory)
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 ompipmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/openmpi-4.0.1/build -j16
+
+It should be noted that the pmix version is the most stable version of using the UCX backend. We're in the
+process of debugging some recent issues with Simple PMI, Slurm PMI and Slurm PMI2.
 
 .. _sec:compile:
 
@@ -11008,6 +11557,13 @@ are available:
    ``0-15:4.3``. ``++ppn 10 +pemap 0-11:6.5+12`` equals
    ``++ppn 10 +pemap 0,12,1,13,2,14,3,15,4,16,6,18,7,19,8,20,9,21,10,22``
 
+   By default, this option accepts PU indices assigned by the OS. The
+   user might want to instead provide logical PU indices used by hwloc
+   (see `link <https://www.open-mpi.org/projects/hwloc/doc/v2.1.0/a00342.php#faq_indexes>`
+   for details). To do this, prepend the sequence with an alphabet L
+   (case-insensitive). For instance, ``+pemap L0-3`` will instruct the
+   runtime to bind threads to PUs with logical indices 0-3.
+
 ``+commap p[,q,...]``
    Bind communication threads to the listed cores, one per process.
 
@@ -11191,6 +11747,23 @@ directory. Pathname resolution is performed as follows:
 #. The system tries to locate this program (with modified pathname and
    appended extension if specified) on all nodes.
 
+
+Instructions to run Charm++ programs for Specific Builds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+UCX
+^^^
+When Charm++ is built with UCX using Simple PMI, Slurm PMI or Slurm PMI2, ensure that
+an MPI implementation which is not OpenMPI is loaded in the environment. Use the mpirun
+launcher provided by the non-OpenMPI implementation to launch programs. Alternatively, you
+can also use any system provided launchers.
+
+When Charm++ is built with UCX using PMIx, ensure that an OpenMPI implementation is loaded
+in the environment. Use the mpiexec/mpirun launcher provided with OpenMPI to launch programs.
+
+Note that due to bug #2477, binaries built with UCX cannot be run in standalone mode i.e without
+a launcher.
+
 .. _sec:keywords:
 
 Reserved words in ``.ci`` files
@@ -11251,13 +11824,17 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  nocopy
 
+-  nocopypost
+
+-  migratable
+
+-  python
+
 -  Entry method attributes
 
    -  stacksize
 
    -  threaded
-
-   -  migratable
 
    -  createhere
 
@@ -11283,15 +11860,13 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
    -  notrace
 
-   -  python
+   -  accel (reserved for future/experimental use)
 
-   -  accel
+   -  readwrite (reserved for future/experimental use)
 
-   -  readwrite
+   -  writeonly (reserved for future/experimental use)
 
-   -  writeonly
-
-   -  accelblock
+   -  accelblock (reserved for future/experimental use)
 
    -  memcritical
 
@@ -11323,8 +11898,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
    -  serial
 
-   -  forward
-
    -  when
 
    -  while
@@ -11338,10 +11911,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
    -  else
 
    -  overlap
-
-   -  connect
-
-   -  publishes
 
 .. _sec:trace-projections:
 
@@ -11812,8 +12381,8 @@ bear, without worrying that they will perturb execution to avoid the
 bug.
 
 Support for record-replay is enabled in common builds of Charm++. Builds
-with the ``--with-production`` option disable this support to reduce
-overhead. To record traces, simply run the program with an additional
+with either of the ``--with-production`` or ``--disable-tracing`` options
+disable record-replay support. To record traces, simply run the program with an additional
 command line-flag ``+record``. The generated traces can be repeated with
 the command-line flag ``+replay``. The full range of parallel and
 sequential debugging techniques are available to apply during

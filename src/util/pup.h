@@ -57,6 +57,7 @@ class bar {
 #include <stdio.h> /*<- for "FILE *" */
 #include <type_traits>
 #include <utility>
+#include <functional>
 
 #ifndef __cplusplus
 #error "Use pup_c.h for C programs-- pup.h is for C++ programs"
@@ -68,7 +69,6 @@ class bar {
 #ifndef CHARM_H
 #  include "converse.h" // <- for CMK_* defines
 #endif
-extern "C" void CmiAbort(const char *msg);
 #endif
 
 //We need CkMigrateMessage only to distinguish the migration
@@ -126,6 +126,33 @@ typedef enum {
   Tpointer,
   dataType_last //<- for setting table lengths, etc.
 } dataType;
+
+static inline dataType getXlateDataType(signed char *a) { return Tchar; }
+#if CMK_SIGNEDCHAR_DIFF_CHAR
+static inline dataType getXlateDataType(char *a) { return Tchar; }
+#endif
+static inline dataType getXlateDataType(short *a) { return Tshort; }
+static inline dataType getXlateDataType(int *a) { return Tint; }
+static inline dataType getXlateDataType(long *a) { return Tlong; }
+static inline dataType getXlateDataType(unsigned char *a) { return Tuchar; }
+static inline dataType getXlateDataType(unsigned short *a) { return Tushort; }
+static inline dataType getXlateDataType(unsigned int *a) { return Tuint; }
+static inline dataType getXlateDataType(unsigned long *a) { return Tulong; }
+static inline dataType getXlateDataType(float *a) { return Tfloat; }
+static inline dataType getXlateDataType(double *a) { return Tdouble; }
+#if CMK_LONG_DOUBLE_DEFINED
+static inline dataType getXlateDataType(long double *a) { return Tlongdouble; }
+#endif
+static inline dataType getXlateDataType(bool *a) { return Tbool; }
+#ifdef CMK_PUP_LONG_LONG
+static inline dataType getXlateDataType(CMK_PUP_LONG_LONG *a) { return Tlonglong; }
+static inline dataType getXlateDataType(unsigned CMK_PUP_LONG_LONG *a) { return Tulonglong; }
+#endif
+#if CMK_HAS_INT16
+static inline dataType getXlateDataType(CmiInt16 *a) { return Tint128; }
+static inline dataType getXlateDataType(CmiUInt16 *a) { return Tuint128; }
+#endif
+
 
 //This should be a 1-byte unsigned type
 typedef unsigned char myByte;
@@ -202,92 +229,37 @@ class er {
   void becomeUserlevel(void) {PUP_er_state|=IS_USERLEVEL;}
   bool isUserlevel(void) const {return (PUP_er_state&IS_USERLEVEL)!=0?true:false;}
   
-  //This indicates that the pup routine should not call system objects' pups.
+  //This indicates that the pup routine is restoring from a checkpoint.
   void becomeRestarting(void) {PUP_er_state|=IS_RESTARTING;}
   bool isRestarting(void) const {return (PUP_er_state&IS_RESTARTING)!=0?true:false;}
   
   bool hasComments(void) const {return (PUP_er_state&IS_COMMENTS)!=0?true:false;}
 
 //For single elements, pretend it's an array containing one element
-  void operator()(signed char &v)     {(*this)(&v,1);}
-#if CMK_SIGNEDCHAR_DIFF_CHAR
-  void operator()(char &v)            {(*this)(&v,1);}
-#endif
-  void operator()(short &v)           {(*this)(&v,1);}
-  void operator()(int &v)             {(*this)(&v,1);}
-  void operator()(long &v)            {(*this)(&v,1);}
-  void operator()(unsigned char &v)   {(*this)(&v,1);}
-  void operator()(unsigned short &v)  {(*this)(&v,1);}
-  void operator()(unsigned int &v)    {(*this)(&v,1);}
-  void operator()(unsigned long &v)   {(*this)(&v,1);}
-  void operator()(float &v)           {(*this)(&v,1);}
-  void operator()(double &v)          {(*this)(&v,1);}
-#if CMK_LONG_DOUBLE_DEFINED
-  void operator()(long double &v)     {(*this)(&v,1);}
-#endif
-  void operator()(bool &v)         {(*this)(&v,1);}
-#ifdef CMK_PUP_LONG_LONG
-  void operator()(CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
-  void operator()(unsigned CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
-#endif
-#if CMK_HAS_INT16
-  void operator()(CmiInt16 &v) {(*this)(&v,1);}
-  void operator()(CmiUInt16 &v) {(*this)(&v,1);}
-#endif
+  template<class T>
+  void operator()(T &v)               {(*this)(&v,1);}
+
   void operator()(void* &v,void* sig) {(*this)(&v,1,sig);}
-  
-//For arrays:
-  //Integral types:
-  void operator()(signed char *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(signed char),Tchar);}
-#if CMK_SIGNEDCHAR_DIFF_CHAR
-  void operator()(char *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(char),Tchar);}
-#endif
-  void operator()(short *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(short),Tshort);}
-  void operator()(int *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(int),Tint);}
-  void operator()(long *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(long),Tlong);}
 
-  //Unsigned integral types:
-  void operator()(unsigned char *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned char),Tuchar);}
-  void operator()(unsigned short *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned short),Tushort);}
-  void operator()(unsigned int *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned int),Tuint);}
-  void operator()(unsigned long *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned long),Tulong);}
+  //For arrays:
+  template<class T>
+  void operator()(T *a,size_t nItems) {
+    bytes((void *)a,nItems, sizeof(T), getXlateDataType(a));
+  }
 
-  //Floating-point types:
-  void operator()(float *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(float),Tfloat);}
-  void operator()(double *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(double),Tdouble);}
+  // Standard pup_buffer API that calls malloc for allocation on isUnpacking and free for deallocation on isPacking
+  template<class T>
+  void pup_buffer(T *&a, size_t nItems) {
+    pup_buffer((void *&)a, nItems, sizeof(T), getXlateDataType(a));
+  }
 
-#if CMK_LONG_DOUBLE_DEFINED
-  void operator()(long double *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(long double),Tlongdouble);}
-#endif
-
-  //For bools:
-  void operator()(bool *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(bool),Tbool);}
-
-#ifdef CMK_PUP_LONG_LONG
-  void operator()(CMK_PUP_LONG_LONG *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(CMK_PUP_LONG_LONG),Tlonglong);}
-  void operator()(unsigned CMK_PUP_LONG_LONG *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned CMK_PUP_LONG_LONG),Tulonglong);}
-#endif
-#if CMK_HAS_INT16
-  void operator()(CmiInt16 *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(CmiInt16),Tint128);}
-  void operator()(CmiUInt16 *a,size_t nItems)
-    {bytes((void *)a,nItems,sizeof(CmiUInt16),Tuint128);}
-#endif
+  // Custom pup_buffer API that calls user provided 'allocate' function for allocation on isUnpacking and
+  // user provided 'deallocate' function for deallocation on isPacking
+  // Custom pup_buffer behaves same as the standard pup_buffer except for calling custom allocator and deallocator methods
+  template<class T>
+  void pup_buffer(T *&a, size_t nItems, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+    pup_buffer((void *&)a, nItems, sizeof(T), getXlateDataType(a), allocate, deallocate);
+  }
 
   //For pointers: the last parameter is to make it more difficult to call
   //(should not be used in normal code as pointers may loose meaning across processor)
@@ -333,6 +305,9 @@ class er {
   // and data type t from p.  Desc describes the data item
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t) =0;
   virtual void object(able** a);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t) = 0;
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) = 0;
 
   virtual size_t size(void) const { return 0; }
   
@@ -398,6 +373,10 @@ class sizer : public er {
   size_t nBytes;
   //Generic bottleneck: n items of size itemSize
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
  public:
   //Write data to the given buffer
   sizer(void):er(IS_SIZING),nBytes(0) {}
@@ -436,6 +415,10 @@ class mem : public er { //Memory-buffer packers and unpackers
     return reinterpret_cast<char*>(origBuf);
   }
 
+  inline void reset() {
+    buf = origBuf;
+  }
+
   inline void advance(size_t const offset) {
     buf += offset;
   }
@@ -446,6 +429,10 @@ class toMem : public mem {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
  public:
   //Write data to the given buffer
   toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
@@ -463,6 +450,12 @@ class fromMem : public mem {
  protected:
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
+  void pup_buffer_generic(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, bool isMalloc);
+
  public:
   //Read data from the given buffer
   fromMem(const void *Nbuf):mem(IS_UNPACKING,(myByte *)Nbuf) {}
@@ -494,6 +487,10 @@ class toDisk : public disk {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
   bool error;
  public:
   // Write data to the given file pointer
@@ -508,6 +505,10 @@ class fromDisk : public disk {
  protected:
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
  public:
   // Read data from the given file pointer 
   // (must be opened for binary read)
@@ -534,6 +535,10 @@ class toTextUtil : public er {
   virtual void synchronize(unsigned int m);
  protected:
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
   virtual void object(able** a);
 };
 /* Return the number of characters, including terminating NULL */
@@ -566,6 +571,10 @@ class toTextFile : public er {
  protected:
   FILE *f;
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
  public:
   //Begin writing to this file, which should be opened for ascii write.
   // You must close the file yourself when done.
@@ -583,6 +592,10 @@ class fromTextFile : public er {
   double readDouble(void);
   
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
   virtual void parseError(const char *what);
  public:
   //Begin writing to this file, which should be opened for ascii read.
@@ -667,6 +680,10 @@ class xlater : public wrap_er {
   
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
  public:
   xlater(const machineInfo &fromMachine, er &fromData);
 };

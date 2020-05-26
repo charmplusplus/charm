@@ -2,12 +2,7 @@
 #include <stdlib.h>
 #include "mpi.h"
 
-#if CMK_BIGSIM_CHARM
-extern "C" void BgPrintf(const char *);
-#define BGPRINTF(x) if (rank == 0) BgPrintf(x);
-#else
 #define BGPRINTF(x)
-#endif
 
 #define DIMX 100
 #define DIMY 100
@@ -139,11 +134,7 @@ int main(int ac, char** av)
 
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-#if CMK_AIX
-  cp = (chunk*)malloc(sizeof(chunk));
-#else
   cp = new chunk;
-#endif
 #if defined(AMPI) && ! defined(NO_PUP)
   AMPI_Register_pup((MPI_PupFn)chunk_pup, (void*)&cp, &cp_idx);
 #endif

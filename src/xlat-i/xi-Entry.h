@@ -38,6 +38,7 @@ class WhenStatementEChecker;
 #define SREDUCE 0x40000   // <- reduction target
 #define SAPPWORK 0x80000  // <- reduction target
 #define SAGGREGATE 0x100000
+#define SWHENIDLE (0x200000 | SLOCAL) // implies SLOCAL as well
 
 /* An entry construct */
 class Entry : public Member {
@@ -109,11 +110,6 @@ class Entry : public Member {
   void genAccelFullCallList(XStr& str);
   void genAccelIndexWrapperDecl_general(XStr& str);
   void genAccelIndexWrapperDef_general(XStr& str);
-  void genAccelIndexWrapperDecl_spe(XStr& str);
-  void genAccelIndexWrapperDef_spe(XStr& str);
-  int genAccels_spe_c_funcBodies(XStr& str);
-  void genAccels_spe_c_regFuncs(XStr& str);
-  void genAccels_ppe_c_regFuncs(XStr& str);
 
   XStr aggregatorIndexType();
   XStr dataItemType();
@@ -193,6 +189,7 @@ class Entry : public Member {
   int isNoKeep(void);
   int isSdag(void);
   bool isTramTarget(void);
+  int isWhenIdle(void);
 
   // DMK - Accel support
   int isAccel(void);

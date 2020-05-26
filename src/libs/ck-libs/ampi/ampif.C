@@ -1,5 +1,7 @@
 #include "ampi.h"
-#include "ampiimpl.h"
+
+#include <string.h>
+#include <vector>
 
 FLINKAGE {
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
@@ -44,6 +46,7 @@ FLINKAGE {
 #define mpi_startall FTN_NAME( MPI_STARTALL , mpi_startall )
 #define mpi_sendrecv FTN_NAME( MPI_SENDRECV , mpi_sendrecv )
 #define mpi_sendrecv_replace FTN_NAME( MPI_SENDRECV_REPLACE , mpi_sendrecv_replace )
+#define mpi_type_match_size FTN_NAME( MPI_TYPE_MATCH_SIZE , mpi_type_match_size )
 #define mpi_type_contiguous FTN_NAME( MPI_TYPE_CONTIGUOUS , mpi_type_contiguous )
 #define mpi_type_vector FTN_NAME( MPI_TYPE_VECTOR , mpi_type_vector )
 #define mpi_type_hvector FTN_NAME( MPI_TYPE_HVECTOR , mpi_type_hvector )
@@ -233,12 +236,17 @@ FLINKAGE {
 #define mpi_finalize FTN_NAME( MPI_FINALIZE , mpi_finalize )
 #define mpi_finalized FTN_NAME( MPI_FINALIZED , mpi_finalized )
 #define mpi_abort FTN_NAME( MPI_ABORT , mpi_abort )
+#define mpi_file_call_errhandler FTN_NAME( MPI_FILE_CALL_ERRHANDLER , mpi_file_call_errhandler )
+#define mpi_file_create_errhandler FTN_NAME( MPI_FILE_CREATE_ERRHANDLER , mpi_file_create_errhandler )
+#define mpi_file_set_errhandler FTN_NAME( MPI_FILE_SET_ERRHANDLER , mpi_file_set_errhandler )
+#define mpi_file_get_errhandler FTN_NAME( MPI_FILE_GET_ERRHANDLER , mpi_file_get_errhandler )
 
 /* MPI-2 */
 #define mpi_type_get_envelope FTN_NAME ( MPI_TYPE_GET_ENVELOPE , mpi_type_get_envelope )
 #define mpi_type_get_contents FTN_NAME ( MPI_TYPE_GET_CONTENTS , mpi_type_get_contents )
 
 #define mpi_win_create FTN_NAME ( MPI_WIN_CREATE , mpi_win_create )
+#define mpi_win_allocate FTN_NAME ( MPI_WIN_ALLOCATE , mpi_win_allocate )
 #define mpi_win_free  FTN_NAME ( MPI_WIN_FREE  , mpi_win_free )
 #define mpi_win_create_errhandler FTN_NAME ( MPI_WIN_CREATE_ERRHANDLER , mpi_win_create_errhandler )
 #define mpi_win_call_errhandler FTN_NAME ( MPI_WIN_CALL_ERRHANDLER , mpi_win_call_errhandler )
@@ -256,7 +264,9 @@ FLINKAGE {
 #define mpi_win_get_info  FTN_NAME ( MPI_WIN_GET_INFO  , mpi_win_get_info )
 #define mpi_win_fence  FTN_NAME ( MPI_WIN_FENCE  , mpi_win_fence )
 #define mpi_win_lock  FTN_NAME ( MPI_WIN_LOCK  , mpi_win_lock )
+#define mpi_win_lock_all  FTN_NAME ( MPI_WIN_LOCK_ALL , mpi_win_lock_all )
 #define mpi_win_unlock  FTN_NAME ( MPI_WIN_UNLOCK  , mpi_win_unlock )
+#define mpi_win_unlock_all  FTN_NAME ( MPI_WIN_UNLOCK_ALL  , mpi_win_unlock_all )
 #define mpi_win_post  FTN_NAME ( MPI_WIN_POST  , mpi_win_post )
 #define mpi_win_wait  FTN_NAME ( MPI_WIN_WAIT  , mpi_win_wait )
 #define mpi_win_start  FTN_NAME ( MPI_WIN_START  , mpi_win_start )
@@ -299,6 +309,9 @@ FLINKAGE {
 #define ampif_add_error_string FTN_NAME ( AMPIF_ADD_ERROR_STRING , ampif_add_error_string )
 #define ampif_print FTN_NAME( AMPIF_PRINT , ampif_print )
 
+/* Extensions needed by ROMIO */
+#define mpir_status_set_bytes FTN_NAME ( MPIR_STATUS_SET_BYTES, mpir_status_set_bytes )
+
 /* AMPI extensions */
 #define ampi_migrate FTN_NAME( AMPI_MIGRATE , ampi_migrate )
 #define ampi_load_start_measure FTN_NAME( AMPI_LOAD_START_MEASURE, ampi_load_start_measure )
@@ -308,8 +321,6 @@ FLINKAGE {
 #define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
 #define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
 #define ampi_set_migratable FTN_NAME ( AMPI_SET_MIGRATABLE , ampi_set_migratable )
-#define ampi_init_universe FTN_NAME( AMPI_INIT_UNIVERSE , ampi_init_universe )
-#define ampi_register_main FTN_NAME( AMPI_REGISTER_MAIN , ampi_register_main )
 #define ampi_register_pup FTN_NAME( AMPI_REGISTER_PUP , ampi_register_pup )
 #define ampi_register_about_to_migrate FTN_NAME ( AMPI_REGISTER_ABOUT_TO_MIGRATE , ampi_register_about_to_migrate )
 #define ampi_register_just_migrated FTN_NAME ( AMPI_REGISTER_JUST_MIGRATED , ampi_register_just_migrated )
@@ -334,12 +345,6 @@ FLINKAGE {
 #define ampi_command_argument_count FTN_NAME( AMPI_COMMAND_ARGUMENT_COUNT , ampi_command_argument_count )
 #define ampi_get_command_argument FTN_NAME( AMPI_GET_COMMAND_ARGUMENT , ampi_get_command_argument )
 
-#if CMK_BIGSIM_CHARM
-#define ampi_set_start_event FTN_NAME( AMPI_SET_START_EVENT , ampi_set_start_event )
-#define ampi_set_end_event FTN_NAME( AMPI_SET_END_EVENT , ampi_set_end_event )
-#define begintracebigsim FTN_NAME (BEGINTRACEBIGSIM , begintracebigsim)
-#define endtracebigsim FTN_NAME (ENDTRACEBIGSIM , endtracebigsim)
-#endif
 
 #if CMK_CUDA
 #define ampi_gpu_invoke_wr FTN_NAME ( AMPI_GPU_INVOKE_WR  , ampi_gpu_invoke_wr )
@@ -522,6 +527,11 @@ void mpi_sendrecv_replace(void *buf, int* count, int* datatype,
   MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
   *ierr = MPI_Sendrecv_replace(buf, *count, *datatype, *dest, *sendtag,
                                *source, *recvtag, *comm, s);
+}
+
+void mpi_type_match_size(int *typeclass, int *size, int *datatype, int *ierr)
+{
+    *ierr = MPI_Type_match_size(*typeclass, *size, (MPI_Datatype*)datatype);
 }
 
 void mpi_barrier(int *comm, int *ierr) noexcept
@@ -1541,6 +1551,21 @@ void mpi_comm_free_errhandler(int *errhandler, int *ierr) noexcept
   *ierr = MPI_Comm_free_errhandler(errhandler);
 }
 
+void mpi_file_create_errhandler(void (*function)(MPI_File*,int*,...), int *errhandler, int *ierr) noexcept
+{
+  *ierr = MPI_File_create_errhandler(function, errhandler);
+}
+
+void mpi_file_set_errhandler(MPI_File* file, int* errhandler, int *ierr) noexcept
+{
+  *ierr = MPI_File_set_errhandler(*file, *errhandler);
+}
+
+void mpi_file_get_errhandler(MPI_File* file, int *errhandler, int *ierr) noexcept
+{
+  *ierr = MPI_File_get_errhandler(*file, errhandler);
+}
+
 void mpi_errhandler_create(void (*function)(MPI_Comm*,int*,...), int *errhandler, int *ierr) noexcept
 {
   *ierr = MPI_Errhandler_create(function, errhandler);
@@ -1803,6 +1828,12 @@ void mpi_win_create(void *base, MPI_Aint *size, int *disp_unit,
   *ierr = MPI_Win_create(base, *size, *disp_unit, *info, *comm, newwin);
 }
 
+void mpi_win_allocate(MPI_Aint *size, int *disp_unit,
+                      int *info, int *comm, void *base, MPI_Win *win, int *ierr) noexcept
+{
+  *ierr = MPI_Win_allocate(*size, *disp_unit, *info, *comm, base, win);
+}
+
 void mpi_win_free(int *win, int *ierr) noexcept
 {
   *ierr = MPI_Win_free(win);
@@ -1900,9 +1931,19 @@ void mpi_win_lock(int *lock_type, int *rank, int *assert, int *win, int *ierr) n
   *ierr = MPI_Win_lock(*lock_type, *rank, *assert, *win);
 }
 
+void mpi_win_lock_all(int *assert, int *win, int *ierr) noexcept
+{
+  *ierr = MPI_Win_lock_all(*assert, *win);
+}
+
 void mpi_win_unlock(int *rank, int *win, int *ierr) noexcept
 {
   *ierr = MPI_Win_unlock(*rank, *win);
+}
+
+void mpi_win_unlock_all(int *win, int *ierr) noexcept
+{
+  *ierr = MPI_Win_unlock_all(*win);
 }
 
 void mpi_win_post(int *group, int *assertion, int *win, int *ierr) noexcept
@@ -2045,7 +2086,7 @@ void ampif_info_get(int* info, const char *key, int* valuelen, char *value, int 
   char tmpKey[MPI_MAX_INFO_KEY];
   ampif_str_f2c(tmpKey, key, *klen);
 
-  vector<char> tmpValue(*valuelen);
+  std::vector<char> tmpValue(*valuelen);
 
   *ierr = MPI_Info_get(*info, tmpKey, *valuelen, tmpValue.data(), flag);
 
@@ -2092,6 +2133,13 @@ void mpi_pcontrol(int *level) noexcept
   MPI_Pcontrol(*level);
 }
 
+/* Extensions needed by ROMIO */
+void mpir_status_set_bytes(int *status, int* datatype, MPI_Count *nbytes, int* ierr) noexcept
+{
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = MPIR_Status_set_bytes(s, *datatype, *nbytes);
+}
+
 /* AMPI Extensions */
 void ampi_migrate(int *hints, int *ierr) noexcept
 {
@@ -2133,11 +2181,6 @@ void ampi_migrate_to_pe(int *dest, int *ierr) noexcept
 void ampi_set_migratable(int *mig, int *ierr) noexcept
 {
   *ierr = AMPI_Set_migratable(*mig);
-}
-
-void ampi_register_main(MPI_MainFn fn, const char *name, int *ierr) noexcept
-{
-  *ierr = AMPI_Register_main(fn, name);
 }
 
 void ampi_register_pup(MPI_PupFn fn, void *data, int *idx, int *ierr) noexcept
@@ -2237,23 +2280,6 @@ void ampi_trace_end(int *ierr) noexcept
   *ierr = AMPI_Trace_end();
 }
 
-#if CMK_BIGSIM_CHARM
-void ampi_set_start_event(int *comm, int *ierr) {
-  *ierr = AMPI_Set_start_event(*comm);
-}
-
-void ampi_set_end_event(int *ierr) {
-  *ierr = AMPI_Set_end_event();
-}
-
-void begintracebigsim(char* msg){
-  beginTraceBigSim(msg);
-}
-
-void endtracebigsim(char* msg, char* param){
-  endTraceBigSim(msg, param);
-}
-#endif
 
 #if CMK_CUDA
 void ampi_gpu_iinvoke_wr(int *to_call, int *request, int *ierr) noexcept {
@@ -2272,13 +2298,13 @@ void ampi_gpu_invoke_wr(int *to_call, int *ierr) noexcept {
  *      if 'i' is zero the program name is returned.
  */
 void ampi_command_argument_count(int *count) noexcept {
-  *count = CkGetArgc()-1;
+  *count = AMPI_Get_argc()-1;
 }
 
 void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
 {
-  char **argv = CkGetArgv();
-  int nc = CkGetArgc()-1;
+  char **argv = AMPI_Get_argv();
+  int nc = AMPI_Get_argc()-1;
   int arglen = strlen(argv[*c]);
 
   if (*c >= 0 && *c <= nc) {
@@ -2295,15 +2321,6 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
     memset(str, ' ', *len);
     *ierr = 1;
   }
-}
-
-void ampi_init_universe(int *unicomm, int *ierr) noexcept
-{
-  AMPI_API("AMPI_Init_universe");
-  for(int i=0; i<_mpi_nworlds; i++) {
-    unicomm[i] = MPI_COMM_UNIVERSE[i];
-  }
-  *ierr = MPI_SUCCESS;
 }
 
 } // extern "C"

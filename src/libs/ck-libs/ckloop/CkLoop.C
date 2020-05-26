@@ -567,11 +567,7 @@ static void RegisterCkLoopHdlrs() {
     CpvAccess(dummyEnv) = envelope::alloc(ForChareMsg,0,0); //Msgtype is the same as the one used for TRACE_BEGIN_EXECUTED_DETAILED
 #endif
     CpvAccess(NdhStealWorkHandler) = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
-#ifdef __BIGSIM__
-    if(BgNodeRank()==0) {
-#else
       if(CkMyRank()==0) {
-#endif
         int _ckloopMsg = CkRegisterMsg("ckloop_converse_msg", 0, 0, 0, 0);
         int _ckloopChare = CkRegisterChare("ckloop_converse_chare", 0, TypeInvalid);
         CkRegisterChareInCharm(_ckloopChare);

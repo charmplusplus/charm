@@ -13,7 +13,7 @@ clients, including the rest of Charm++, are actually C++.
 #include "pathHistory.h"
 
 #if CMK_LBDB_ON
-#include "LBDatabase.h"
+#include "LBManager.h"
 #endif // CMK_LBDB_ON
 
 #ifndef CMK_CHARE_USE_PTR
@@ -21,6 +21,7 @@ clients, including the rest of Charm++, are actually C++.
 CkpvDeclare(std::vector<void *>, chare_objs);
 CkpvDeclare(std::vector<int>, chare_types);
 CkpvDeclare(std::vector<VidBlock *>, vidblocks);
+CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
 
 typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
@@ -71,11 +72,6 @@ Chare::Chare(void) {
   }
   chareIdx = CkpvAccess(currentChareIdx);
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  mlogData = new ChareMlogData();
-  mlogData->objID.type = TypeChare;
-  mlogData->objID.data.chare.id = thishandle;
-#endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
   if (_defaultObjectQ)  CkEnableObjQ();
 #endif
@@ -88,9 +84,6 @@ Chare::Chare(CkMigrateMessage* m) {
   magic = 0;
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        mlogData = NULL;
-#endif
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
   if (_defaultObjectQ)  CkEnableObjQ();
@@ -139,13 +132,6 @@ void Chare::pup(PUP::er &p)
   p(chareIdx);
   if (chareIdx != -1) thishandle.objPtr=(void*)(CmiIntPtr)chareIdx;
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	if(p.isUnpacking()){
-		if(mlogData == NULL || !mlogData->teamRecoveryFlag)
-        	mlogData = new ChareMlogData();
-	}
-	mlogData->pup(p);
-#endif
 #if CMK_ERROR_CHECKING
   p(magic);
 #endif
@@ -184,11 +170,6 @@ void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
 
 IrrGroup::IrrGroup(void) {
   thisgroup = CkpvAccess(_currentGroup);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        mlogData->objID.type = TypeGroup;
-        mlogData->objID.data.group.id = thisgroup;
-        mlogData->objID.data.group.onPE = CkMyPe();
-#endif
 }
 
 IrrGroup::~IrrGroup() {
@@ -457,13 +438,11 @@ void CkSectionID::pup(PUP::er &p) {
 /**** Tiny random API routines */
 
 #if CMK_CUDA
-void CUDACallbackManager(void *fn) {
-  if (fn != NULL) {
-    CkCallback *cb = (CkCallback*) fn;
-    cb->send();
+void CUDACallbackManager(void *fn, void *msg) {
+  if (fn) {
+    ((CkCallback*)fn)->send(msg);
   }
 }
-
 #endif
 
 void QdCreate(int n) {
@@ -497,6 +476,13 @@ int CkGetSrcNode(void *msg)
 void *CkLocalBranch(CkGroupID gID) {
   return _localBranch(gID);
 }
+
+// Similar to CkLocalBranch, but should be used from non-PE-local, but node-local PE
+// Ensure thread safety while using this function as it is accessing a non-PE-local group
+void *CkLocalBranchOther(CkGroupID gID, int rank) {
+  return _localBranchOther(gID, rank);
+}
+static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env);
 
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
@@ -556,35 +542,29 @@ int CkGetArgc(void) {
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CpvAccess(_currentObj) = (Chare *)obj;
-//      printf("[%d] CurrentObj set to %p\n",CkMyPe(),obj);
-#endif
-  //BIGSIM_OOC DEBUGGING
-  //CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
-  //fflush(stdout);
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
+  const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
   _entryTable[epIdx]->call(msg, obj);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
-  if (_entryTable[epIdx]->noKeep)
+  if (_entryTable[epIdx]->noKeep && msgtype != LAST_CK_ENVELOPE_TYPE)
   { /* Method doesn't keep/delete the message, so we have to: */
-    _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
+    if (msgtype != ArrayBcastFwdMsg) {
+      _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
+    } else if (_entryTable[epIdx]->msgIdx != -1) {
+      // For array broadcasts, the first time they show up here the msgIdx is
+      // -1, and they are just messages for CkArray::recvBroadcastNoKeep, so we
+      // don't want to delete them yet.
+      _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
+    }
   }
 }
 void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 {
-  //BIGSIM_OOC DEBUGGING
-  //CkPrintf("CkDeliverMessageReadonly: name of entry fn: %s\n", _entryTable[epIdx]->name);
-  //fflush(stdout);
-
   void *deliverMsg;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CpvAccess(_currentObj) = (Chare *)obj;
-#endif
   if (_entryTable[epIdx]->noKeep)
   { /* Deliver a read-only copy of the message */
     deliverMsg=(void *)msg;
@@ -692,13 +672,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0) {
-#if CMK_BIGSIM_CHARM
-      //In BigSim, CpvAccess(CsdSchedQueue) is not used. _CldEnqueue resets the
-      //handler to converse-level BigSim handler.
-      _CldEnqueue(CkMyPe(), pending, _infoIdx);
-#else
       CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
-#endif
     }
     CkpvAccess(_groupTable)->find(groupID).clearPending();
   }
@@ -1075,10 +1049,10 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
   // if there is a running obj being measured, stop it temporarily
   LDObjHandle objHandle;
   int objstopped = 0;
-  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);
-  if (the_lbdb->RunningObject(&objHandle)) {
+  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);
+  if (the_lbmgr->RunningObject(&objHandle)) {
     objstopped = 1;
-    the_lbdb->ObjectStop(objHandle);
+    the_lbmgr->ObjectStop(objHandle);
   }
 #endif
 
@@ -1089,13 +1063,13 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
   _invokeEntry(epIdx,env,obj);
 
 #if CMK_ONESIDED_IMPL && CMK_SMP
-  if(msgType == CMK_ZC_BCAST_RECV_DONE_MSG && CmiMyRank()!=0) {
+  if(msgType == CMK_ZC_BCAST_RECV_DONE_MSG) {
     updatePeerCounterAndPush(env);
   }
 #endif
 
 #if CMK_LBDB_ON
-  if (objstopped) the_lbdb->ObjectStart(objHandle);
+  if (objstopped) the_lbmgr->ObjectStart(objHandle);
 #endif
   _STATS_RECORD_PROCESS_BRANCH_1();
 }
@@ -1178,15 +1152,28 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   ArrayObjMap& object_map = CkpvAccess(array_objs);
   auto iter = object_map.find(env->getRecipientID());
   if (iter != object_map.end()) {
+
+    CkArrayMessage* msg = (CkArrayMessage*)EnvToUsr(env);
+
+    CkLocMgr *localLocMgr  = CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr();
+
+    // Check if the array element has active Rgets (because of ZC Pup)
+    auto iter2 = localLocMgr->bufferedActiveRgetMsgs.find(msg->array_element_id());
+
+    if(iter2 != localLocMgr->bufferedActiveRgetMsgs.end()) {
+      // array element has active rgets
+      iter2->second.push_back(msg); // Buffer msg for now and handle it after rgets complete
+      return;
+    }
+
     // First see if we already have a direct pointer to the object
     _SET_USED(env, 0);
     ck->process(); // ck->process() updates mProcessed count used in QD
     int opts = 0;
-    CkArrayMessage* msg = (CkArrayMessage*)EnvToUsr(env);
     if (msg->array_hops()>1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
-    bool doFree = !(opts & CK_MSG_KEEP);
+    bool doFree = true;
 #if CMK_ONESIDED_IMPL
     if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) // Do not free a P2P_RECV_MSG
       doFree = false;
@@ -1203,7 +1190,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   }
 }
 
-//BIGSIM_OOC DEBUGGING
+// Debugging support:
 #define TELLMSGTYPE(x) //x
 
 /**
@@ -1243,22 +1230,6 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     if (!ck->watcher->processMessage(&env,ck)) return;
   }
 //#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        Chare *obj=NULL;
-        CkObjID sender;
-        MCount SN;
-        MlogEntry *entry=NULL;
-        if(env->getMsgtype() == ForBocMsg || env->getMsgtype() == ForNodeBocMsg
-           || env->getMsgtype() == ForArrayEltMsg
-           || env->getMsgtype() == ForChareMsg) {
-                sender = env->sender;
-                SN = env->SN;
-                int result = preProcessReceivedMessage(env,&obj,&entry);
-                if(result == 0){
-                        return;
-                }
-        }
-#endif
 #if USE_CRITICAL_PATH_HEADER_ARRAY
   CK_CRITICALPATH_START(env)
 #endif
@@ -1278,6 +1249,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       _processNodeBocInitMsg(ck,env);
       break;
     case ForBocMsg : // Group entry method message (non creation)
+    case ArrayBcastFwdMsg :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForBocMsg\n", CkMyPe());)
       // QD processing moved inside _processForBocMsg because it is conditional
       if(env->isPacked()) CkUnpackMessage(&env);
@@ -1290,6 +1262,11 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       if(env->isPacked()) CkUnpackMessage(&env);
       _processForNodeBocMsg(ck,env);
       // stats record moved to _processForNodeBocMsg because it is conditional
+      break;
+    case BocBcastMsg : // Broadcast that needs to be forwarded
+    case ArrayBcastMsg :
+      if (env->isPacked()) CkUnpackMessage(&env);
+      _processBocBcastMsg(ck,env);
       break;
 
 // Array support
@@ -1333,11 +1310,6 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     default:
       CmiAbort("Fatal Charm++ Error> Unknown msg-type in _processHandler.\n");
   }
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        if(obj != NULL){
-                postProcessReceivedMessage(obj,sender,SN,entry);
-        }
-#endif
 
 
 #if USE_CRITICAL_PATH_HEADER_ARRAY
@@ -1365,6 +1337,11 @@ void CkPackMessage(envelope **pEnv)
   envelope *env = *pEnv;
   if(!env->isPacked() && _msgTable[env->getMsgIdx()]->pack) {
     void *msg = EnvToUsr(env);
+#if CMK_ONESIDED_IMPL
+    short int zcMsgType = CMI_ZC_MSGTYPE(env);
+    if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Store buffer pointers as offsets
+      CkPackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
+#endif
     _TRACE_BEGIN_PACK();
     msg = _msgTable[env->getMsgIdx()]->pack(msg);
     _TRACE_END_PACK();
@@ -1385,6 +1362,11 @@ void CkUnpackMessage(envelope **pEnv)
     _TRACE_END_UNPACK();
     env=UsrToEnv(msg);
     env->setPacked(0);
+#if CMK_ONESIDED_IMPL
+    short int zcMsgType = CMI_ZC_MSGTYPE(env);
+    if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Convert offsets back into buffer pointers
+      CkUnpackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
+#endif
     *pEnv = env;
   }
 }
@@ -1433,15 +1415,16 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 
 #if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC_BCAST(env))
-    CkRdmaPrepareBcastMsg(env);
+  if (CMI_IS_ZC(env)) {
+    CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
+  }
 #endif
 
 #if CMK_FAULT_EVAC
-  if(pe == CkMyPe() ){
-    if(!CmiNodeAlive(CkMyPe())){
-	printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
-//	return;
+  if (pe == CkMyPe()) {
+    if (!CmiNodeAlive(CkMyPe())) {
+      printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
+      //return;
     }
   }
 #endif
@@ -1453,15 +1436,18 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     }
     else
 #endif
-    CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
-  	env, env->getQueueing(),env->getPriobits(),
-  	(unsigned int *)env->getPrioPtr());
+    {
+      CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
+          env, env->getQueueing(),env->getPriobits(),
+          (unsigned int *)env->getPrioPtr());
+    }
 #if CMK_PERSISTENT_COMM
     CmiPersistentOneSend();
 #endif
   } else {
-    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode())
+    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode()) {
       CkPackMessage(&env);
+    }
     int len=env->getTotalsize();
     CmiSetXHandler(env,CmiGetHandler(env));
 #if CMK_OBJECT_QUEUE_AVAILABLE
@@ -1471,44 +1457,15 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
-		CmiSyncBroadcastAndFree(len, (char *)env); 
-	else
-		CmiSyncBroadcast(len, (char *)env);
-#else
- 			CmiSyncBroadcastAndFree(len, (char *)env); 
-#endif
-
-}
-    else if (pe==CLD_BROADCAST_ALL) { 
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
-		CmiSyncBroadcastAllAndFree(len, (char *)env);
-	else
-		CmiSyncBroadcastAll(len, (char *)env);
-#else
-                        CmiSyncBroadcastAllAndFree(len, (char *)env);
-#endif
-
-}
-    else{
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
-		CmiSyncSendAndFree(pe, len, (char *)env);
-	else
-		CmiSyncSend(pe, len, (char *)env);
-#else
-                        CmiSyncSendAndFree(pe, len, (char *)env);
-#endif
-
-		}
+      CmiSyncNodeBroadcastAndFree(len, (char *)env);
+    } else if (pe==CLD_BROADCAST_ALL) {
+      CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
+    } else {
+      CmiSyncSendAndFree(pe, len, (char *)env);
+    }
   }
 }
 
-#if CMK_BIGSIM_CHARM
-#   define  _skipCldEnqueue   _CldEnqueue
-#endif
 
 // by pass Charm++ priority queue, send as Converse message
 static void _noCldEnqueueMulti(int npes, const int *pes, envelope *env)
@@ -1540,14 +1497,14 @@ static void _noCldEnqueue(int pe, envelope *env)
 
 #if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC_BCAST(env))
-    CkRdmaPrepareBcastMsg(env);
+  if(CMI_IS_ZC(env))
+    CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
 #endif
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
-  else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
+  if (pe==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
+  else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
   else CmiSyncSendAndFree(pe, len, (char *)env);
 }
 
@@ -1569,44 +1526,27 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
 #if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC_BCAST(env))
-    CkRdmaPrepareBcastMsg(env);
+  if(CMI_IS_ZC(env))
+    CkRdmaPrepareZCMsg(env, node);
 #endif
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (node==CLD_BROADCAST) { 
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
-		CmiSyncNodeBroadcastAndFree(len, (char *)env); 
-	else
-		CmiSyncNodeBroadcast(len, (char *)env);
-#else
 	CmiSyncNodeBroadcastAndFree(len, (char *)env); 
-#endif
 }
   else if (node==CLD_BROADCAST_ALL) { 
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
 		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
-	else
-		CmiSyncNodeBroadcastAll(len, (char *)env);
-#else
-		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
-#endif
 
 }
   else {
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
-		CmiSyncNodeSendAndFree(node, len, (char *)env);
-	else
-		CmiSyncNodeSend(node, len, (char *)env);
-#else
 	CmiSyncNodeSendAndFree(node, len, (char *)env);
-#endif
   }
 }
+
+#if CMK_REPLAYSYSTEM && !CMK_TRACE_ENABLED
+#error "Building with Record/Replay support requires tracing support!"
+#endif
 
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
@@ -1697,12 +1637,6 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
   // VidBlock was not yet filled). The problem is that the creation was never
   // traced later when the VidBlock was filled. One solution is to trace the
   // creation here, the other to trace it in VidBlock->msgDeliver().
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  if (destPE!=-1) {
-    CpvAccess(_qd)->create();
-  }
-	sendChareMsg(env,destPE,_infoIdx,pCid);
-#else
   _TRACE_CREATION_1(env);
   if (destPE!=-1) {
     CpvAccess(_qd)->create();
@@ -1712,7 +1646,6 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
       _CldEnqueue(destPE, env, _infoIdx);
   }
   _TRACE_CREATION_DONE(1);
-#endif
 }
 
 void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
@@ -1756,6 +1689,8 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
+
+  CMI_MSG_NOKEEP(env) = _entryTable[eIdx]->noKeep;
   /*
 #if CMK_ERROR_CHECKING
   nodeRedMgr.setZero();
@@ -1794,12 +1729,16 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     }else
     {
-        env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+        if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL)
+          if (UsrToEnv(msg)->getMsgtype() == ArrayBcastMsg) {
+            env = _prepareMsgBranch(eIdx,msg,gID,ArrayBcastMsg);
+          } else {
+            env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
+          }
+        else
+          env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
     }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	sendGroupMsg(env,pe,_infoIdx);
-#else
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
   _TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM)
@@ -1807,7 +1746,28 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
   else
     _skipCldEnqueue(pe, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
-#endif
+}
+
+static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
+{
+  envelope* env;
+  if (UsrToEnv(msg)->getMsgtype() == ArrayBcastMsg) {
+    env = _prepareMsgBranch(eIdx,msg,gID,ArrayBcastFwdMsg);
+  } else if (UsrToEnv(msg)->getMsgtype() == BocBcastMsg
+      || UsrToEnv(msg)->getMsgtype() == ForNodeBocMsg) {
+    // TODO: Does this make sense when its a ForNode? Should ForNode even hit?
+    env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  } else {
+    CkAbort("Bad message type %i\n", UsrToEnv(msg)->getMsgtype());
+  }
+  _TRACE_CREATION_N(env, CmiMyNodeSize());
+  _CldEnqueueWithinNode(env, _infoIdx);
+  _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
+}
+
+static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env) {
+  _SET_USED(env, 0);
+  _sendMsgBranchWithinNode(env->getEpIdx(), EnvToUsr(env), env->getGroupNum());
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
@@ -1935,6 +1895,13 @@ void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opt
   CpvAccess(_qd)->create(npes);
 }
 
+void CkBroadcastWithinNode(int eIdx, void *msg, CkGroupID gID, int opts)
+{
+  _sendMsgBranchWithinNode(eIdx, msg, gID);
+  _STATS_RECORD_SEND_BRANCH_N(CmiMyNodeSize());
+  CpvAccess(_qd)->create(CmiMyNodeSize());
+}
+
 void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts)
 {
   _sendMsgBranch(eIdx, msg, gID, CLD_BROADCAST_ALL, opts);
@@ -1953,9 +1920,6 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
     {
         env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
     }
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    sendNodeGroupMsg(env,node,_infoIdx);
-#else
   numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1);
   _TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM) {
@@ -1964,7 +1928,6 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
   else
     _CldNodeEnqueue(node, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
-#endif
 }
 
 static inline void _sendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID,
@@ -2006,7 +1969,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
 {
   if (node==CkMyNode()) {
 #if CMK_ONESIDED_IMPL
-    if (CMI_ZC_MSGTYPE(msg) == CMK_REG_NO_ZC_MSG)
+    if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
 #endif
     {
       CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
@@ -2111,16 +2074,12 @@ static void _prepareOutgoingArrayMsg(envelope *env,int type)
 void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	sendArrayMsg(env,pe,_infoIdx);
-#else
   if (opts & CK_MSG_IMMEDIATE)
     CmiBecomeImmediate(env);
   if (opts & CK_MSG_SKIP_OR_IMM)
     _noCldEnqueue(pe, env);
   else
     _skipCldEnqueue(pe, env, _infoIdx);
-#endif
 }
 
 class ElementDestroyer : public CkLocIterator {
@@ -2181,12 +2140,9 @@ void CkDeleteChares() {
   }
 }
 
-#if CMK_BIGSIM_CHARM
-void CthEnqueueBigSimThread(CthThreadToken* token, int s,
-                                   int pb,unsigned int *prio);
-#endif
 
 //------------------- External client support (e.g. Charm4py) ----------------
+#if CMK_CHARMPY
 
 static std::vector< std::vector<char> > ext_args;
 static std::vector<char*> ext_argv;
@@ -2252,6 +2208,11 @@ void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char 
   ArrayMsgRecvExtCallback = cb;
 }
 
+void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int) = NULL;
+void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int *, int, int, char *, int)) {
+  ArrayBcastRecvExtCallback = cb;
+}
+
 int (*ArrayElemLeaveExt)(int, int, int *, char**, int) = NULL;
 void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int)) {
   ArrayElemLeaveExt = cb;
@@ -2267,9 +2228,9 @@ void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *)) {
   ArrayResumeFromSyncExtCallback = cb;
 }
 
-void (*CreateReductionTargetMsgExt)(void*, int, int, int, char**, int*) = NULL;
-void registerCreateReductionTargetMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*)) {
-  CreateReductionTargetMsgExt = cb;
+void (*CreateCallbackMsgExt)(void*, int, int, int, int *, char**, int*) = NULL;
+void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*)) {
+  CreateCallbackMsgExt = cb;
 }
 
 int (*PyReductionExt)(char**, int*, int, char**) = NULL;
@@ -2422,7 +2383,7 @@ void CkMigrateExt(int aid, int ndims, int *index, int toPe) {
   CProxyElement_ArrayBase arrayProxy = CProxyElement_ArrayBase(gId, arrayIndex);
   ArrayElement* arrayElement = arrayProxy.ckLocal();
   CkAssert(arrayElement != NULL);
-  arrayElement->migrateMe(toPe);
+  arrayElement->ckMigrate(toPe);
 }
 
 void CkArrayDoneInsertingExt(int aid) {
@@ -2447,8 +2408,37 @@ int CkArrayGetReductionNumber(int aid, int ndims, int *index) {
   return arrayElement->getRedNo();
 }
 
+void CkSetMigratable(int aid, int ndims, int *index, char migratable) {
+  CkGroupID gId;
+  gId.idx = aid;
+  CkArrayIndex arrayIndex(ndims, index);
+  CProxyElement_ArrayBase arrayProxy = CProxyElement_ArrayBase(gId, arrayIndex);
+  ArrayElement* arrayElement = arrayProxy.ckLocal();
+  CkAssert(arrayElement != NULL);
+  arrayElement->setMigratable(migratable);
+}
+
+void CkStartQDExt_ChareCallback(int onPE, void* objPtr, int epIdx, int fid)
+{
+  CkStartQD(CkCallback(onPE, objPtr, epIdx, (CMK_REFNUM_TYPE)fid));
+}
+
+void CkStartQDExt_GroupCallback(int gid, int pe, int epIdx, int fid)
+{
+  CkStartQD(CkCallback(gid, pe, epIdx, (CMK_REFNUM_TYPE)fid));
+}
+
+void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, int fid)
+{
+  CkStartQD(CkCallback(aid, idx, ndims, epIdx, (CMK_REFNUM_TYPE)fid));
+}
+
+void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep)
+{
+  CkStartQD(CkCallback(sid_pe, sid_cnt, rootPE, ep));
+}
+
 void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
-  //ckCheck();    // checks that gid is not zero
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
   PUP::toMem implP((void *)impl_msg->msgBuf);
@@ -2465,7 +2455,6 @@ void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
 
 void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
-  //ckCheck();    // checks that gid is not zero
   int totalSize = 0;
   for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
   int marshall_msg_size = (sizeof(char)*totalSize + 3*sizeof(int));
@@ -2482,8 +2471,7 @@ void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char 
   CkSendMsg(epIdx, impl_msg, &chareID);
 }
 
-void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize) {
-  //ckCheck();    // checks that gid is not zero
+void CkGroupExtSend(int gid, int npes, const int *pes, int epIdx, char *msg, int msgSize) {
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
   PUP::toMem implP((void *)impl_msg->msgBuf);
@@ -2494,15 +2482,16 @@ void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize) {
   CkGroupID gId;
   gId.idx = gid;
 
-  if (pe == -1)
+  if (pes[0] == -1)
     CkBroadcastMsgBranch(epIdx, impl_msg, gId, 0);
+  else if (npes == 1)
+    CkSendMsgBranch(epIdx, impl_msg, pes[0], gId, 0);
   else
-    CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
+    CkSendMsgBranchMulti(epIdx, impl_msg, gId, npes, pes, 0);
 }
 
-void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
+void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
-  //ckCheck();    // checks that gid is not zero
   int totalSize = 0;
   for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
   int marshall_msg_size = (sizeof(char)*totalSize + 3*sizeof(int));
@@ -2515,10 +2504,18 @@ void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs,
   CkGroupID gId;
   gId.idx = gid;
 
-  if (pe == -1)
+  if (pes[0] == -1)
     CkBroadcastMsgBranch(epIdx, impl_msg, gId, 0);
+  else if (npes == 1)
+    CkSendMsgBranch(epIdx, impl_msg, pes[0], gId, 0);
   else
-    CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
+    CkSendMsgBranchMulti(epIdx, impl_msg, gId, npes, pes, 0);
+}
+
+void CkForwardMulticastMsg(int _gid, int num_children, const int *children) {
+  CkGroupID gid;
+  gid.idx = _gid;
+  ((SectionManagerExt*)CkLocalBranch(gid))->forwardMulticastMsg(num_children, children);
 }
 
 void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize) {
@@ -2568,6 +2565,8 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
   }
 }
 
+#endif
+
 //------------------- Message Watcher (record/replay) ----------------
 
 #include "crc32.h"
@@ -2594,7 +2593,7 @@ static FILE *openReplayFile(const char *prefix, const char *suffix, const char *
   FILE *f = fopen(fName.c_str(), permissions);
   REPLAYDEBUG("openReplayfile " << fName.c_str());
   if (f==NULL) {
-    CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
+    CkPrintf("[%d] Could not open replay file '%s' with permissions '%s'\n",
              CkMyPe(), fName.c_str(), permissions);
     CkAbort("openReplayFile> Could not open replay file");
   }
@@ -2736,7 +2735,6 @@ class CkMessageReplay : public CkMessageWatcher {
 			return false;
 		}
 #endif
-#if ! CMK_BIGSIM_CHARM
 		if (nextSize!=env->getTotalsize())
                 {
 			CkPrintf("[%d] CkMessageReplay> Message size changed during replay org: [%d %d %d %d] got: [%d %d %d %d]\n", CkMyPe(), nextPE, nextSize, nextEvent, nextEP, env->getSrcPe(), env->getTotalsize(), env->getEvent(), env->getEpIdx());
@@ -2767,7 +2765,6 @@ class CkMessageReplay : public CkMessageWatcher {
 		  }
 		  if (!wasPacked) CkUnpackMessage(&env);
 		}
-#endif
 		return true;
 	}
 	bool isNext(CthThreadToken *token) {
@@ -2804,11 +2801,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	      CthThreadToken *token=delayedTokens.deq();
 	      if (isNext(token)) {
             REPLAYDEBUG("Dequeueing token: "<<token->serialNo)
-#if ! CMK_BIGSIM_CHARM
 	        CsdEnqueueLifo((void*)token);
-#else
-		CthEnqueueBigSimThread(token,0,0,NULL);
-#endif
 	        return;
 	      } else {
             REPLAYDEBUG("requeueing delayed token: "<<token->serialNo)
@@ -2900,14 +2893,12 @@ class CkMessageDetailReplay : public CkMessageWatcher {
     CmiUInt4 size; size_t nread;
     if ((nread=fread(&size, 4, 1, f)) < 1) {
       if (feof(f)) return NULL;
-      CkPrintf("Broken record file (metadata) got %d\n",nread);
-      CkAbort("");
+      CkAbort("Broken record file (metadata) got %zu\n",nread);
     }
     void *env = CmiAlloc(size);
     long tell = ftell(f);
     if ((nread=fread(env, size, 1, f)) < 1) {
-      CkPrintf("Broken record file (data) expecting %d, got %d (file position %lld)\n",size,nread,tell);
-      CkAbort("");
+      CkAbort("Broken record file (data) expecting %d, got %zu (file position %ld)\n",size,nread,tell);
     }
     //*(int*)env = 0x34567890; // set first integer as magic
     return env;
@@ -2936,9 +2927,7 @@ public:
 };
 
 void CkMessageReplayQuiescence(void *rep, double time) {
-#if ! CMK_BIGSIM_CHARM
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
-#endif
   CkMessageReplay *replay = (CkMessageReplay*)rep;
   //CmiStartQD(CkMessageReplayQuiescence, replay);
 }
@@ -2995,9 +2984,6 @@ void CpdHandleLBMessage(LBMigrateMsg **msg) {
   }
 }
 
-#if CMK_BIGSIM_CHARM
-CpvExtern(int      , CthResumeBigSimThreadIdx);
-#endif
 
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
@@ -3074,11 +3060,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    }
 	  }
 	  CpdSetInitializeMemory(1);
-#if ! CMK_BIGSIM_CHARM
 	  CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
-#else
-	  CkNumberHandler(CpvAccess(CthResumeBigSimThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
-#endif
 	  ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
 #else
           CkAbort("Option `+replay' requires that record-replay support be enabled at configure time (--enable-replay)");
@@ -3089,13 +3071,13 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	}
 }
 
-int CkMessageToEpIdx(void *msg) {
-        envelope *env=UsrToEnv(msg);
-	int ep=env->getEpIdx();
-	if (ep==CkIndex_CkArray::recvBroadcast(0))
-		return env->getsetArrayBcastEp();
-	else
-		return ep;
+int CkMessageToEpIdx(void* msg) {
+  envelope* env = UsrToEnv(msg);
+  int type = env->getMsgtype();
+  if (type == ArrayBcastMsg || type == ArrayBcastFwdMsg)
+    return env->getsetArrayBcastEp();
+  else
+    return env->getEpIdx();
 }
 
 int getCharmEnvelopeSize() {

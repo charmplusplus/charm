@@ -222,6 +222,8 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
+      // Root node is pupped on the source as it is required for ZC Bcast when the source is non-zero
+      str << "  int impl_num_root_node = CkMyNode();\n";
       callEach(&Parameter::marshallRdmaParameters, str, true);
       str << "#else\n";
       if (!hasArrays) str << "  int impl_arrstart=0;\n";
@@ -234,6 +236,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "    implP|impl_num_rdma_fields;\n";
+      str << "  implP|impl_num_root_node;\n";
       // All rdma parameters have to be pupped at the start
       callEach(&Parameter::pupRdma, str, true);
       str << "#else\n";
@@ -262,6 +265,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     if (hasRdma()) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "    implP|impl_num_rdma_fields;\n";
+      str << "  implP|impl_num_root_node;\n";
       callEach(&Parameter::pupRdma, str, true);
       str << "#else\n";
       callEach(&Parameter::pupRdma, str, false);
@@ -438,12 +442,8 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
           if (hasRdma()) {
             str << "#if CMK_ONESIDED_IMPL\n";
             str << "  char *impl_buf_begin = impl_buf;\n";
-            if(hasRecvRdma())
-              //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-              //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
-              str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-            str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
             str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
+            str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
             callEach(&Parameter::beginUnmarshallRdma, str, true);
             str << "#else\n";
             callEach(&Parameter::beginUnmarshallRdma, str, false);
@@ -454,11 +454,6 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
           if (hasRdma()) {
             str << "#if CMK_ONESIDED_IMPL\n";
             str << "  char *impl_buf_begin = impl_buf;\n";
-            if(hasRecvRdma())
-              //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-              //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
-              str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-            str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
             callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true);
             str << "#else\n";
             callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, false);
@@ -482,12 +477,8 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
         if (hasRdma()) {
           str << "#if CMK_ONESIDED_IMPL\n";
           str << "  char *impl_buf_begin = impl_buf;\n";
-          if(hasRecvRdma())
-            //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-            //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
-            str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-          str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
           str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
+          str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
           callEach(&Parameter::beginUnmarshallRdma, str, true);
           str << "#else\n";
           callEach(&Parameter::beginUnmarshallRdma, str, false);
@@ -519,20 +510,18 @@ void ParamList::beginUnmarshall(XStr& str) {
     if (hasRdma()) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  char *impl_buf_begin = impl_buf;\n";
-      if(hasRecvRdma())
-        //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-        //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
-        str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-      str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
       str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
+      str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
       callEach(&Parameter::beginUnmarshallRdma, str, true);
       str << "#else\n";
       callEach(&Parameter::beginUnmarshallRdma, str, false);
       str << "#endif\n";
       if (hasRecvRdma()) {
         str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
-        for(int index=0; index < entry->numRdmaRecvParams; index++)
+        for(int index=0; index < entry->numRdmaRecvParams; index++) {
           str << "  ncpyPost[" <<index<<  "].regMode = CK_BUFFER_REG;\n";
+          str << "  ncpyPost[" <<index<<  "].deregMode = CK_BUFFER_DEREG;\n";
+        }
       }
     }
     callEach(&Parameter::beginUnmarshall, str);
@@ -558,25 +547,63 @@ void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
 void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count) {
   if(isRdma()) {
     if(genRdma) {
-      str << "  if(CMI_IS_ZC_RECV(env)) \n";
-      str << "    buffPtrs["<< count++ <<"] = (void *)" << "ncpyBuffer_";
+      Type* dt = type->deref();
+      str << "  if(CMI_IS_ZC_RECV(env)) {\n";
+      str << "    buffPtrs["<< count <<"] = (void *)" << "ncpyBuffer_";
       str << name << "_ptr;\n";
+      if(isSDAGGen)
+        str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
+      else
+        str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * "<< arrLen << ".t;\n";
+      str <<  "  }\n";
 
-      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) \n";
+      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+
+      // Error checking if posted buffer is larger than the source buffer
+      str << "  if( ";
+      if(isSDAGGen)
+        str << "genClosure->";
+      str << "ncpyBuffer_" << name << ".cnt < " ;
+      if(isSDAGGen)
+         str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
+      else
+        str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
+
+      str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
+
       str << "    memcpy(" << "ncpyBuffer_" << name << "_ptr,";
       if(isSDAGGen)
         str << "genClosure->";
       str << "ncpyBuffer_" << name << ".ptr,";
       if(isSDAGGen)
-        str << "genClosure->";
-      str << "ncpyBuffer_" << name << ".cnt);\n";
+        str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
+      else
+        str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
+
+      str << "  }\n";
+
     } else {
       Type* dt = type->deref();  // Type, without &
+
+      // Error checking if posted buffer is larger than the source buffer
+      str << "  if(impl_cnt_" << name << " < " ;
+      if(isSDAGGen)
+         str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
+      else
+        str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
+
+      str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
+
       // memcpy the pointer into the user passed buffer
       str << "  memcpy(" << "ncpyBuffer_" << name << "_ptr,";
       if(isSDAGGen)
         str << "genClosure->";
-      str << name << "," << "impl_cnt_" << name << ");\n";
+      str << name << ",";
+
+      if(isSDAGGen)
+        str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
+      else
+        str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
     }
   }
 }
@@ -624,6 +651,7 @@ void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma) {
     if (genRdma) {
       if (isFirstRdma()) {
         str << "  implP|genClosure->num_rdma_fields;\n";
+        str << "  implP|genClosure->num_root_node;\n";
       }
       str << "  implP|genClosure->ncpyBuffer_" << name << ";\n";
       if(isRecvRdma()) {
@@ -663,15 +691,13 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
     if (hasRdma()) {
       if(hasRecvRdma()) {
         str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
-        for(int index=0; index < entry->numRdmaRecvParams; index++)
+        for(int index=0; index < entry->numRdmaRecvParams; index++) {
           str << "  ncpyPost[" <<index<<  "].regMode = CK_BUFFER_REG;\n";
+          str << "  ncpyPost[" <<index<<  "].deregMode = CK_BUFFER_DEREG;\n";
+        }
       }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  char *impl_buf_begin = impl_buf;\n";
-      if(hasRecvRdma())
-        //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-        str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-      str << "    CkUnpackRdmaPtrs(impl_buf_begin);\n";
       callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true);
       str << "#else\n";
       callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, false);
@@ -686,7 +712,7 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
     if (hasArray || hasRdma()) {
       if (!usesImplBuf) {
         str << "  genClosure->_impl_marshall = impl_msg_typed;\n";
-        str << "  CmiReference(UsrToEnv(genClosure->_impl_marshall));\n";
+        str << "  CkReferenceMsg(genClosure->_impl_marshall);\n";
       } else {
         if (hasRdma() && !hasArray) str << "#if !CMK_ONESIDED_IMPL\n";
         str << "  genClosure->_impl_buf_in = impl_buf;\n";
@@ -710,6 +736,7 @@ void ParamList::beginUnmarshallSDAG(XStr& str) {
        */
       callEach(&Parameter::adjustUnmarshalledRdmaPtrsSDAG, str);
       str << "  implP|num_rdma_fields;\n";
+      str << "  implP|num_root_node;\n";
       callEach(&Parameter::beginUnmarshallRdma, str, true);
       str << "#else\n";
       callEach(&Parameter::beginUnmarshallRdma, str, false);

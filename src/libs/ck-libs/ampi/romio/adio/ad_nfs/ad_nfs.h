@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -7,10 +7,11 @@
 #ifndef AD_NFS_INCLUDE
 #define AD_NFS_INCLUDE
 
+#include "adio.h"
+
 #include <unistd.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#include "adio.h"
 
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
@@ -18,11 +19,15 @@
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-#ifdef HAVE_AIO_H
-#include <aio.h>
-#endif
-#ifdef HAVE_SYS_AIO_H
-#include <sys/aio.h>
+#ifdef HAVE_AIO_LITE_H
+#include <aio-lite.h>
+#else
+ #ifdef  HAVE_AIO_H
+ #include <aio.h>
+ #endif
+ #ifdef HAVE_SYS_AIO_H
+ #include <sys/aio.h>
+ #endif
 #endif
 
 /* Workaround for incomplete set of definitions if __REDIRECT is not 
@@ -43,7 +48,7 @@ void ADIOI_NFS_ReadContig(ADIO_File fd, void *buf, int count,
                       MPI_Datatype datatype, int file_ptr_type,
                      ADIO_Offset offset, ADIO_Status *status, int
 		     *error_code);
-void ADIOI_NFS_WriteContig(ADIO_File fd, void *buf, int count, 
+void ADIOI_NFS_WriteContig(ADIO_File fd, const void *buf, int count,
                       MPI_Datatype datatype, int file_ptr_type,
                       ADIO_Offset offset, ADIO_Status *status, int
 		      *error_code);   
@@ -65,7 +70,7 @@ void ADIOI_NFS_WriteComplete(ADIO_Request *request, ADIO_Status *status,
 			int *error_code); 
 void ADIOI_NFS_Fcntl(ADIO_File fd, int flag, ADIO_Fcntl_t *fcntl_struct, int
 		*error_code); 
-void ADIOI_NFS_WriteStrided(ADIO_File fd, void *buf, int count,
+void ADIOI_NFS_WriteStrided(ADIO_File fd, const void *buf, int count,
 		       MPI_Datatype datatype, int file_ptr_type,
 		       ADIO_Offset offset, ADIO_Status *status, int
 		       *error_code);
@@ -74,7 +79,7 @@ void ADIOI_NFS_ReadStrided(ADIO_File fd, void *buf, int count,
 		       ADIO_Offset offset, ADIO_Status *status, int
 		       *error_code);
 void ADIOI_NFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code);
-void ADIOI_NFS_Get_shared_fp(ADIO_File fd, int size, ADIO_Offset *shared_fp, 
+void ADIOI_NFS_Get_shared_fp(ADIO_File fd, ADIO_Offset size, ADIO_Offset *shared_fp,
 			 int *error_code);
 void ADIOI_NFS_Set_shared_fp(ADIO_File fd, ADIO_Offset offset, int *error_code);
 void ADIOI_NFS_Resize(ADIO_File fd, ADIO_Offset size, int *error_code);

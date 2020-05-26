@@ -20,6 +20,3 @@ seek_block.o: seek_block.C seek_block.h seek_block.decl.h
 test: all
 	$(call run, ./seek_block +p4  )
 	$(call run, ./seek_block +p4  )
-
-bgtest: all
-	$(call run, ./seek_block +p4 +x2 +y2 +z1)

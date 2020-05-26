@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -6,36 +6,9 @@
  */
 
 #include "adio.h"
-#include "converse.h" //For Ctv*
+#include "adio_extern.h"
 
-CtvDeclare(ADIOI_Flatlist_node*, ADIOI_Flatlist);
-CtvDeclare(ADIOI_Datarep *, ADIOI_Datarep_head);
-    /* list of datareps registered by the user */
-
-/* for f2c and c2f conversion */
-CtvDeclare(ADIO_File *, ADIOI_Ftable);
-CtvDeclare(int, ADIOI_Ftable_ptr);
-CtvDeclare(int, ADIOI_Ftable_max);
-CtvDeclare(ADIO_Request *, ADIOI_Reqtable);
-CtvDeclare(int, ADIOI_Reqtable_ptr);
-CtvDeclare(int, ADIOI_Reqtable_max);
-#ifndef HAVE_MPI_INFO
-MPI_Info *MPIR_Infotable = NULL;
-int MPIR_Infotable_ptr = 0, MPIR_Infotable_max = 0;
-#endif
-
-CtvDeclare(MPI_Info, ADIOI_syshints);
-
-CtvDeclare(MPI_Op, ADIO_same_amode);
-
-#if defined(ROMIO_XFS) || defined(ROMIO_LUSTRE)
-int ADIOI_Direct_read = 0, ADIOI_Direct_write = 0;
-#endif
-
-CtvDeclare(int, ADIO_Init_keyval);
-
-CtvDeclare(MPI_Errhandler, ADIOI_DFLT_ERR_HANDLER);
-
+/* AMPI: Global variable initialization moved to ampi.C */
 
 static void my_consensus(void *invec, void *inoutvec, int *len, MPI_Datatype *datatype)
 {
@@ -59,38 +32,12 @@ void ADIO_Init(int *argc, char ***argv, int *error_code)
     ADIOI_UNREFERENCED_ARG(argc);
     ADIOI_UNREFERENCED_ARG(argv);
 
-    CtvInitialize(ADIOI_Flatlist_node*, ADIOI_Flatlist);
-    CtvInitialize(ADIOI_Datarep *, ADIOI_Datarep_head);
-    CtvInitialize(ADIO_File *, ADIOI_Ftable);
-    CtvInitialize(int, ADIOI_Ftable_ptr);
-    CtvInitialize(int, ADIOI_Ftable_max);
-    CtvInitialize(ADIO_Request *, ADIOI_Reqtable);
-    CtvInitialize(int, ADIOI_Reqtable_ptr);
-    CtvInitialize(int, ADIOI_Reqtable_max);
-    CtvInitialize(MPI_Info, ADIOI_syshints);
-    CtvInitialize(MPI_Op, ADIO_same_amode);
-    CtvInitialize(int, ADIO_Init_keyval);
-    CtvInitialize(MPI_Errhandler, ADIOI_DFLT_ERR_HANDLER);
-
-    CtvAccess(ADIOI_Flatlist) = NULL;
-    CtvAccess(ADIOI_Datarep_head) = NULL;
-    CtvAccess(ADIOI_Ftable) = NULL;
-    CtvAccess(ADIOI_Ftable_ptr) = 0;
-    CtvAccess(ADIOI_Ftable_max) = 0;
-    CtvAccess(ADIOI_Reqtable) = NULL;
-    CtvAccess(ADIOI_Reqtable_ptr) = 0;
-    CtvAccess(ADIOI_Reqtable_max) = 0;
-    CtvAccess(ADIOI_syshints) = MPI_INFO_NULL;
-    CtvAccess(ADIO_same_amode) = MPI_OP_NULL;
-    CtvAccess(ADIO_Init_keyval) = MPI_KEYVAL_INVALID;
-    CtvAccess(ADIOI_DFLT_ERR_HANDLER) = MPI_ERRORS_RETURN;
-
 /* initialize the linked list containing flattened datatypes */
-    CtvAccess(ADIOI_Flatlist) = (ADIOI_Flatlist_node *) ADIOI_Malloc(sizeof(ADIOI_Flatlist_node));
-    CtvAccess(ADIOI_Flatlist)->type = MPI_DATATYPE_NULL;
-    CtvAccess(ADIOI_Flatlist)->next = NULL;
-    CtvAccess(ADIOI_Flatlist)->blocklens = NULL;
-    CtvAccess(ADIOI_Flatlist)->indices = NULL;
+    ADIOI_Flatlist = (ADIOI_Flatlist_node *) ADIOI_Malloc(sizeof(ADIOI_Flatlist_node));
+    ADIOI_Flatlist->type = MPI_DATATYPE_NULL;
+    ADIOI_Flatlist->next = NULL;
+    ADIOI_Flatlist->blocklens = NULL;
+    ADIOI_Flatlist->indices = NULL;
 
 #if defined(ROMIO_XFS) || defined(ROMIO_LUSTRE)
     c = getenv("MPIO_DIRECT_READ");
@@ -103,11 +50,6 @@ void ADIO_Init(int *argc, char ***argv, int *error_code)
     else ADIOI_Direct_write = 0;
 #endif
 
-    /* Assume system-wide hints won't change between runs: move hint processing
-     * from ADIO_Open to here */
-    /* FIXME should be checking error code from MPI_Info_create here */
-    MPI_Info_create(&CtvAccess(ADIOI_syshints));
-    ADIOI_process_system_hints(CtvAccess(ADIOI_syshints));
 
 #ifdef ADIOI_MPE_LOGGING
     {
@@ -160,5 +102,5 @@ void ADIO_Init(int *argc, char ***argv, int *error_code)
 #endif
 
     *error_code = MPI_SUCCESS;
-    MPI_Op_create(my_consensus, 1, &CtvAccess(ADIO_same_amode));
+    MPI_Op_create(my_consensus, 1, &ADIO_same_amode);
 }

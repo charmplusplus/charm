@@ -6,10 +6,14 @@
 #include <new>   // for in-place new operator
 #include "ckhashtable.h"
 #include <vector>
+#include "ckrdma.h"
 
 typedef CkQ<void *> PtrQ;
 class envelope;
 typedef std::vector<CkZeroPtr<envelope> > PtrVec;
+
+// Map to store object index and number of pending rdma ops
+typedef std::unordered_map<CmiUInt8, CmiUInt1> ObjNumRdmaOpsMap;
 
 class IrrGroup;
 class TableEntry {
@@ -155,6 +159,13 @@ CkpvExtern(char **,Ck_argv);
 static inline IrrGroup *_localBranch(CkGroupID gID)
 {
   return CkpvAccess(_groupTable)->find(gID).getObj();
+}
+
+// Similar to _localBranch, but should be used from non-PE-local, but node-local PE
+// Ensure thread safety while using this function as it is accessing a non-PE-local group
+static inline IrrGroup *_localBranchOther(CkGroupID gID, int rank)
+{
+  return CkpvAccessOther(_groupTable, rank)->find(gID).getObj();
 }
 
 extern void _registerCommandLineOpt(const char* opt);

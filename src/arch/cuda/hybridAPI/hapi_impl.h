@@ -5,13 +5,21 @@
 extern "C" {
 #endif
 
-// Initialize & exit hybrid API.
-void initHybridAPI();
-void setHybridAPIDevice();
-void exitHybridAPI();
+// Mempool macros
+// Update for new row, again this shouldn't be hard coded!
+#define HAPI_MEMPOOL_NUM_SLOTS 20
+// Pre-allocated buffers will be at least this big (in bytes).
+#define HAPI_MEMPOOL_MIN_BUFFER_SIZE 256
+// Scale the amount of memory each node pins.
+#define HAPI_MEMPOOL_SCALE 1.0
 
-// Initializes event queues used for polling.
-void initEventQueues();
+// Init & exit functions
+void hapiInitCsv();
+void hapiInitCpv();
+void hapiExitCsv();
+
+// Maps PEs to devices
+void hapiMapping(char** argv);
 
 // Registers callback handler functions.
 void hapiRegisterCallbacks();
@@ -36,6 +44,13 @@ typedef struct _bufferPool {
   int num;
 #endif
 } BufferPool;
+
+// PE-GPU mapping types
+enum class Mapping {
+  None, // Mapping is explicitly performed by the user
+  Block,
+  RoundRobin
+};
 
 #ifdef __cplusplus
 }

@@ -89,7 +89,7 @@ std::atomic<int> ckExitComplete {0};
 #define CMI_PAMI_ACK_DISPATCH             9
 #define CMI_PAMI_DISPATCH                10
 
-#ifdef CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
 #define SHORT_CUTOFF   128
 #define EAGER_CUTOFF   4096
 #else
@@ -1069,10 +1069,15 @@ void ConverseExit(int exitcode) {
 }
 
 /* exit() called on any node would abort the whole program */
-void CmiAbort(const char * message) {
+void CmiAbort(const char * message, ...) {
+    char newmsg[256];
+    va_list args;
+    va_start(args, message);
+    vsnprintf(newmsg, sizeof(newmsg), message, args);
+    va_end(args);
     CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
              "{snd:%d,rcv:%d} Reason: %s\n",CmiMyPe(),
-             MSGQLEN(), ORECVS(), message);
+             MSGQLEN(), ORECVS(), newmsg);
 
     //CmiPrintStackTrace(0);
     //while (msgQueueLen > 0 || outstanding_recvs > 0) {
@@ -1525,6 +1530,29 @@ void CmiFreeBroadcastAllFn(int size, char *msg) {
 
     CmiFree(msg);
 #endif
+}
+
+void CmiWithinNodeBroadcastFn(int size, char* msg) {
+  int nodeFirst = CmiNodeFirst(CmiMyNode());
+  int nodeLast = nodeFirst + CmiNodeSize(CmiMyNode());
+  if (CMI_MSG_NOKEEP(msg)) {
+    for (int i = nodeFirst; i < CmiMyPe(); i++) {
+      CmiReference(msg);
+      CmiFreeSendFn(i, size, msg);
+    }
+    for (int i = CmiMyPe() + 1; i < nodeLast; i++) {
+      CmiReference(msg);
+      CmiFreeSendFn(i, size, msg);
+    }
+  } else {
+    for (int i = nodeFirst; i < CmiMyPe(); i++) {
+      CmiSyncSendFn(i, size, msg);
+    }
+    for (int i = CmiMyPe() + 1; i < nodeLast; i++) {
+      CmiSyncSendFn(i, size, msg);
+    }
+  }
+  CmiSyncSendAndFree(CmiMyPe(), size, msg);
 }
 
 #if !CMK_ENABLE_ASYNC_PROGRESS  
@@ -2171,7 +2199,7 @@ void rzv_pkt_dispatch (pami_context_t       context,
   rzv_recv->size       = rzv_hdr->bytes;
   rzv_recv->rank       = rzv_hdr->rank;
 
-#ifdef CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
   CmiAssert (pipe_addr != NULL);
   CmiAssert (pipe_size == sizeof(pami_memregion_t));
   memcpy(&rzv_recv->rmregion, pipe_addr, sizeof(pami_memregion_t));

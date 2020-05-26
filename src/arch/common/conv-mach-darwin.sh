@@ -6,9 +6,8 @@ CMK_QT='generic64-light'
 CMK_XIOPTS=''
 
 CMK_CC_FLAGS="$CMK_CC_FLAGS -fPIC -dynamic -fno-common "
-CMK_LD_FLAGS="$CMK_LD_FLAGS -Wl,-no_pie "
 CMK_CXX_FLAGS="$CMK_CXX_FLAGS -fPIC -dynamic -fno-common -stdlib=libc++ "
-CMK_LDXX_FLAGS="$CMK_LDXX_FLAGS -multiply_defined suppress -Wl,-no_pie -stdlib=libc++ "
+CMK_LDXX_FLAGS="$CMK_LDXX_FLAGS -multiply_defined suppress -stdlib=libc++ "
 
 # setting for shared lib
 CMK_SHARED_SUF="dylib"
@@ -25,3 +24,13 @@ fi
 # Assumes gfortran compiler:
 CMK_CF77="$CMK_CF77 -mmacosx-version-min=10.7"
 CMK_CF90="$CMK_CF90 -mmacosx-version-min=10.7"
+
+CMK_NATIVE_CC='clang'
+CMK_NATIVE_LD='clang'
+CMK_NATIVE_CXX='clang++'
+CMK_NATIVE_LDXX='clang++'
+
+CMK_NATIVE_CC_FLAGS="$CMK_CC_FLAGS"
+CMK_NATIVE_LD_FLAGS="$CMK_LD_FLAGS"
+CMK_NATIVE_CXX_FLAGS="$CMK_CXX_FLAGS"
+CMK_NATIVE_LDXX_FLAGS="$CMK_LDXX_FLAGS"

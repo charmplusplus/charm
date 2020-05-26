@@ -34,11 +34,9 @@ void DistributedLB::initnodeFn()
 void DistributedLB::turnOn()
 {
 #if CMK_LBDB_ON
-  theLbdb->getLBDB()->
+  lbmgr->
     TurnOnBarrierReceiver(receiver);
-  theLbdb->getLBDB()->
-    TurnOnNotifyMigrated(notifier);
-  theLbdb->getLBDB()->
+  lbmgr->
     TurnOnStartLBFn(startLbFnHdl);
 #endif
 }
@@ -46,11 +44,9 @@ void DistributedLB::turnOn()
 void DistributedLB::turnOff()
 {
 #if CMK_LBDB_ON
-  theLbdb->getLBDB()->
+  lbmgr->
     TurnOffBarrierReceiver(receiver);
-  theLbdb->getLBDB()->
-    TurnOffNotifyMigrated(notifier);
-  theLbdb->getLBDB()->
+  lbmgr->
     TurnOffStartLBFn(startLbFnHdl);
 #endif
 }
@@ -156,11 +152,14 @@ void DistributedLB::LoadReduction(CkReductionMsg* redn_msg) {
   // can receive more work. So assuming there exists an overloaded PE that can
   // donate work, I will start gossipping my load information.
   if (my_load < transfer_threshold) {
+    underloaded = true;
 		double r_loads[1];
 		int r_pe_no[1];
     r_loads[0] = my_load;
     r_pe_no[0] = CkMyPe();
     GossipLoadInfo(CkMyPe(), 1, r_pe_no, r_loads);
+  } else {
+    underloaded = false;
   }
 
   // Start quiescence detection at PE 0.
@@ -281,7 +280,7 @@ void DistributedLB::DoneGossip() {
   // high so that load is initially only transferred from the most loaded PEs.
   // In subsequent phases it gets relaxed to allow less overloaded PEs to
   // transfer load as well.
-  transfer_threshold = (max_load + avg_load) / 2;
+  transfer_threshold = fmax(kTargetRatio * avg_load, (max_load + avg_load) / 2);
   lb_started = true;
   underloaded_pe_count = pe_no.size();
   Setup();
@@ -289,7 +288,7 @@ void DistributedLB::DoneGossip() {
 }
 
 void DistributedLB::StartNextLBPhase() {
-  if (underloaded_pe_count == 0 || my_load <= transfer_threshold) {
+  if (underloaded_pe_count == 0 || my_load <= transfer_threshold || underloaded) {
     // If this PE has no information about underloaded processors, or it has
     // no objects to donate to underloaded processors then do nothing.
     DoneWithLBPhase();
@@ -344,11 +343,13 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
     if (std::abs(load_ratio - old_ratio) < 0.01) {
       // The previous phase didn't meaningfully reduce the max load, so relax
       // the transfer threshold.
-      transfer_threshold = (transfer_threshold + avg_load) / 2;
+      transfer_threshold = fmax(kTargetRatio * avg_load,
+          (transfer_threshold + avg_load) / 2);
     } else {
       // The previous phase did reduce the max load, so update the transfer
       // threshold based on the new max load.
-      transfer_threshold = (max_load + avg_load) / 2;
+      transfer_threshold = fmax(kTargetRatio * avg_load,
+          (max_load + avg_load) / 2);
     }
     StartNextLBPhase();
   } else {
@@ -362,7 +363,7 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
     Cleanup();
     PackAndSendMigrateMsgs();
     if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
-      theLbdb->nextLoadbalancer(seqno);
+      lbmgr->nextLoadbalancer(seqno);
   }
   delete [] results;
 }

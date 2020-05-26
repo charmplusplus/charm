@@ -90,8 +90,8 @@ Compiling, Running and Debugging a Sample POSE program
 ======================================================
 
 Sample code is available in the Charm++ source distribution. Assuming a
-netlrts-linux build of Charm++, look in
-``charm/netlrts-linux/examples/pose``. The SimBenchmark directory
+netlrts-linux-x86_64 build of Charm++, look in
+``charm/netlrts-linux-x86_64/examples/pose``. The SimBenchmark directory
 contains a synthetic benchmark simulation and is fairly straightforward
 to understand.
 
@@ -444,10 +444,10 @@ To interface these with a main program module, say :math:`Pgm` in files
 ``pgm.ci``, ``pgm.h`` and ``pgm.C``, the ``pgm.ci`` file must declare
 the POSE module as extern in the ``mainmodule Pgm`` block. For example:
 
-.. code-block:: c++
+.. code-block:: charmci
 
   mainmodule Pgm {
-    extern module <modname>;
+    extern module modname;
     readonly CkChareID mainhandle;
 
     mainchare main {

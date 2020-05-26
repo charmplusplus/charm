@@ -1,7 +1,7 @@
 dnl -*- Autoconf -*-
 dnl
-dnl Copyright © 2009-2018 Inria.  All rights reserved.
-dnl Copyright © 2009-2012, 2015-2017 Université Bordeaux
+dnl Copyright © 2009-2020 Inria.  All rights reserved.
+dnl Copyright © 2009-2012, 2015-2017, 2020 Université Bordeaux
 dnl Copyright © 2004-2005 The Trustees of Indiana University and Indiana
 dnl                         University Research and Technology
 dnl                         Corporation.  All rights reserved.
@@ -12,6 +12,7 @@ dnl                         University of Stuttgart.  All rights reserved.
 dnl Copyright © 2006-2017 Cisco Systems, Inc.  All rights reserved.
 dnl Copyright © 2012  Blue Brain Project, BBP/EPFL. All rights reserved.
 dnl Copyright © 2012       Oracle and/or its affiliates.  All rights reserved.
+dnl Copyright © 2012  Los Alamos National Security, LLC. All rights reserved.
 dnl See COPYING in top-level directory.
 
 # Main hwloc m4 macro, to be invoked by the user
@@ -80,16 +81,26 @@ EOF])
 
     # Get the version of hwloc that we are installing
     AC_MSG_CHECKING([for hwloc version])
-    HWLOC_VERSION="`$HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION`"
+    HWLOC_VERSION="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION`"
     if test "$?" != "0"; then
         AC_MSG_ERROR([Cannot continue])
     fi
-    HWLOC_RELEASE_DATE="`$HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --release-date`"
+    AC_MSG_RESULT([$HWLOC_VERSION])
     AC_SUBST(HWLOC_VERSION)
     AC_DEFINE_UNQUOTED([HWLOC_VERSION], ["$HWLOC_VERSION"],
                        [The library version, always available, even in embedded mode, contrary to VERSION])
+
+    HWLOC_VERSION_MAJOR="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --major`"
+    AC_DEFINE_UNQUOTED([HWLOC_VERSION_MAJOR], [$HWLOC_VERSION_MAJOR], [The library version major number])
+    HWLOC_VERSION_MINOR="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --minor`"
+    AC_DEFINE_UNQUOTED([HWLOC_VERSION_MINOR], [$HWLOC_VERSION_MINOR], [The library version minor number])
+    HWLOC_VERSION_RELEASE="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --release`"
+    AC_DEFINE_UNQUOTED([HWLOC_VERSION_RELEASE], [$HWLOC_VERSION_RELEASE], [The library version release number])
+    HWLOC_VERSION_GREEK="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --greek`"
+    AC_DEFINE_UNQUOTED([HWLOC_VERSION_GREEK], ["$HWLOC_VERSION_GREEK"], [The library version optional greek suffix string])
+
+    HWLOC_RELEASE_DATE="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --release-date`"
     AC_SUBST(HWLOC_RELEASE_DATE)
-    AC_MSG_RESULT([$HWLOC_VERSION])
 
     # Debug mode?
     AC_MSG_CHECKING([if want hwloc maintainer support])
@@ -150,6 +161,15 @@ EOF])
           [AC_DEFINE([HWLOC_SYM_TRANSFORM], [0])],
           [AC_DEFINE([HWLOC_SYM_TRANSFORM], [1])])
 
+    # Disabled for Charm++ due to https://github.com/UIUC-PPL/charm/issues/2606
+    # hwloc 2.0+ requires a C99 compliant compiler
+    #AC_PROG_CC_C99
+    # The result of AC_PROG_CC_C99 is stored in ac_cv_prog_cc_c99
+    #if test "x$ac_cv_prog_cc_c99" = xno ; then
+    #    AC_MSG_WARN([hwloc requires a C99 compiler])
+    #    AC_MSG_ERROR([Aborting.])
+    #fi
+
     # GCC specifics.
     if test "x$GCC" = "xyes"; then
         HWLOC_GCC_CFLAGS="-Wall -Wmissing-prototypes -Wundef"
@@ -179,7 +199,7 @@ EOF])
     # List of components to be built, either statically or dynamically.
     # To be enlarged below.
     #
-    hwloc_components="noos xml synthetic custom xml_nolibxml"
+    hwloc_components="noos xml synthetic xml_nolibxml"
 
     #
     # Check OS support
@@ -197,10 +217,13 @@ EOF])
         hwloc_linux=yes
         AC_MSG_RESULT([Linux])
         hwloc_components="$hwloc_components linux"
-	if test x$enable_pci != xno; then
-	  hwloc_components="$hwloc_components linuxpci"
-	  AC_DEFINE(HWLOC_HAVE_LINUXPCI, 1, [Define to 1 if building the Linux PCI component])
-	  hwloc_linuxpci_happy=yes
+        if test "x$enable_io" != xno; then
+	  AC_DEFINE(HWLOC_HAVE_LINUXIO, 1, [Define to 1 for I/O discovery in the Linux component])
+	  hwloc_linuxio_happy=yes
+	  if test x$enable_pci != xno; then
+	    AC_DEFINE(HWLOC_HAVE_LINUXPCI, 1, [Define to 1 if enabling Linux-specific PCI discovery in the Linux I/O component])
+	    hwloc_linuxpci_happy=yes
+	  fi
 	fi
         ;;
       *-*-irix*)
@@ -226,12 +249,6 @@ EOF])
         hwloc_aix=yes
         AC_MSG_RESULT([AIX])
         hwloc_components="$hwloc_components aix"
-        ;;
-      *-*-osf*)
-        AC_DEFINE(HWLOC_OSF_SYS, 1, [Define to 1 on OSF])
-        hwloc_osf=yes
-        AC_MSG_RESULT([OSF])
-        hwloc_components="$hwloc_components osf"
         ;;
       *-*-hpux*)
         AC_DEFINE(HWLOC_HPUX_SYS, 1, [Define to 1 on HP-UX])
@@ -264,7 +281,7 @@ EOF])
         AC_MSG_WARN([*** hwloc does not support this system.])
         AC_MSG_WARN([*** hwloc will *attempt* to build (but it may not work).])
         AC_MSG_WARN([*** hwloc run-time results may be reduced to showing just one processor,])
-        AC_MSG_WARN([*** and binding will likely not be supported.])
+        AC_MSG_WARN([*** and binding will not be supported.])
         AC_MSG_WARN([*** You have been warned.])
         AC_MSG_WARN([*** Pausing to give you time to read this message...])
         AC_MSG_WARN([***********************************************************])
@@ -360,6 +377,54 @@ EOF])
         ])
     ])
 
+    AS_IF([test "$hwloc_mode" = "standalone"],[
+        # For the common developer case, if we're in a developer checkout and
+        # using the GNU compilers, turn on maximum warnings unless
+        # specifically disabled by the user.
+        AC_MSG_CHECKING([whether to enable "picky" compiler mode])
+        hwloc_want_picky=0
+        AS_IF([test "$hwloc_c_vendor" = "gnu"],
+              [AS_IF([test -e "$srcdir/.git"],
+                     [hwloc_want_picky=1])])
+        if test "$enable_picky" = "yes"; then
+            if test "$GCC" = "yes"; then
+                AC_MSG_RESULT([yes])
+                hwloc_want_picky=1
+            else
+                AC_MSG_RESULT([no])
+                AC_MSG_WARN([Warning: --enable-picky used, but is currently only defined for the GCC compiler set -- automatically disabled])
+                hwloc_want_picky=0
+            fi
+        elif test "$enable_picky" = "no"; then
+            AC_MSG_RESULT([no])
+            hwloc_want_picky=0
+        else
+            if test "$hwloc_want_picky" = 1; then
+                AC_MSG_RESULT([yes (default)])
+            else
+                AC_MSG_RESULT([no (default)])
+            fi
+        fi
+        if test "$hwloc_want_picky" = 1; then
+            add="-Wall -Wextra -Wunused-parameter -Wundef -Wno-long-long -Wsign-compare"
+            add="$add -Wmissing-declarations -Wmissing-prototypes -Wstrict-prototypes"
+            add="$add -Wcomment -pedantic -Wshadow -Wwrite-strings -Wnested-externs"
+            add="$add -Wpointer-arith -Wbad-function-cast -Wold-style-definition"
+            add="$add -Werror-implicit-function-declaration"
+
+	    _HWLOC_CHECK_GCC_OPTION([-Wdiscarded-qualifiers], [add])
+	    _HWLOC_CHECK_GCC_OPTION([-Wvariadic-macros], [add])
+	    _HWLOC_CHECK_GCC_OPTION([-Wtype-limits], [add])
+	    _HWLOC_CHECK_GCC_OPTION([-Wstack-usage=262144], [add])
+
+	    # -Wextra enables some -Wfoo that we want to disable it at some place
+	    _HWLOC_CHECK_GCC_OPTION([-Wmissing-field-initializers], [add], [AC_DEFINE(HWLOC_HAVE_GCC_W_MISSING_FIELD_INITIALIZERS, 1, [Define to 1 if gcc -Wmissing-field-initializers is supported and enabled])])
+	    _HWLOC_CHECK_GCC_OPTION([-Wcast-function-type], [add], [AC_DEFINE(HWLOC_HAVE_GCC_W_CAST_FUNCTION_TYPE, 1, [Define to 1 if gcc -Wcast-function-type is supported and enabled])])
+
+            HWLOC_CFLAGS="$HWLOC_CFLAGS $add"
+        fi
+    ])
+
     #
     # Now detect support
     #
@@ -368,6 +433,13 @@ EOF])
     AC_CHECK_HEADERS([dirent.h])
     AC_CHECK_HEADERS([strings.h])
     AC_CHECK_HEADERS([ctype.h])
+
+    if test x$hwloc_freebsd = xyes; then
+
+      AC_CHECK_HEADERS([sys/domainset.h])
+
+    fi
+
 
     AC_CHECK_FUNCS([strcasecmp], [
       _HWLOC_CHECK_DECL([strcasecmp], [
@@ -454,24 +526,10 @@ EOF])
     		_SC_PAGE_SIZE,
     		_SC_LARGE_PAGESIZE],,[:],[[#include <unistd.h>]])
 
-    AC_HAVE_HEADERS([mach/mach_host.h])
-    AC_HAVE_HEADERS([mach/mach_init.h], [
+    AC_HAVE_HEADERS([mach/mach_init.h])
+    AC_HAVE_HEADERS([mach_init.h])
+    AC_HAVE_HEADERS([mach/mach_host.h], [
       AC_CHECK_FUNCS([host_info])
-    ])
-
-    AC_CHECK_HEADERS([sys/param.h])
-    AC_CHECK_HEADERS([sys/sysctl.h], [
-      AC_CHECK_DECLS([CTL_HW, HW_NCPU],,,[[
-      #if HAVE_SYS_PARAM_H
-      #include <sys/param.h>
-      #endif
-      #include <sys/sysctl.h>
-      ]])
-    ],,[
-      AC_INCLUDES_DEFAULT
-      #if HAVE_SYS_PARAM_H
-      #include <sys/param.h>
-      #endif
     ])
 
     AC_CHECK_DECLS([strtoull], [], [AC_CHECK_FUNCS([strtoull])], [AC_INCLUDES_DEFAULT])
@@ -484,7 +542,53 @@ EOF])
     AC_CHECK_DECLS([_putenv], [], [], [AC_INCLUDES_DEFAULT])
     # Could add mkdir and access for hwloc-gather-cpuid.c on Windows
 
+    broken_snprintf=no
+    AC_MSG_CHECKING([whether snprintf is correct])
+    AC_RUN_IFELSE([
+      AC_LANG_PROGRAM([[
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+        ]], [[
+char buf[7];
+assert(snprintf(buf, 7, "abcdef") == 6);
+assert(snprintf(buf, 6, "abcdef") == 6);
+assert(snprintf(buf, 5, "abcdef") == 6);
+assert(snprintf(buf, 0, "abcdef") == 6);
+assert(snprintf(NULL, 0, "abcdef") == 6);
+return 0;
+        ]])],
+	AC_MSG_RESULT([yes]),
+	[
+	  AC_MSG_RESULT([no])
+	  broken_snprintf=yes
+	], [
+	  AC_MSG_RESULT([don't know (cross-compiling)])
+	  broken_snprintf=maybe
+	])
+
+    if test x$broken_snprintf = xno; then
+      AC_DEFINE([HWLOC_HAVE_CORRECT_SNPRINTF], 1, [Define to 1 if snprintf supports NULL output buffer and returns the correct length on truncation])
+    fi
+
     if test "x$hwloc_linux" != "xyes" ; then
+      # Don't look for sys/sysctl.h on Linux because it's deprecated and
+      # generates a warning in GCC10. Also it's unneeded.
+      AC_CHECK_HEADERS([sys/param.h])
+      AC_CHECK_HEADERS([sys/sysctl.h], [
+        AC_CHECK_DECLS([CTL_HW, HW_NCPU, HW_REALMEM64, HW_MEMSIZE64, HW_PHYSMEM64, HW_USERMEM64, HW_REALMEM, HW_MEMSIZE, HW_PHYSMEM, HW_USERMEM],,,[[
+        #if HAVE_SYS_PARAM_H
+        #include <sys/param.h>
+        #endif
+        #include <sys/sysctl.h>
+        ]])
+      ],,[
+        AC_INCLUDES_DEFAULT
+        #if HAVE_SYS_PARAM_H
+        #include <sys/param.h>
+        #endif
+      ])
+
       # Don't detect sysctl* on Linux because its sysctl() syscall is
       # long deprecated and unneeded. Some libc still expose the symbol
       # and raise a big warning at link time.
@@ -623,21 +727,15 @@ EOF])
          AC_MSG_RESULT([yes])],
         [AC_MSG_RESULT([no])])
 
-    AC_MSG_CHECKING([for working syscall])
+    AC_MSG_CHECKING([for working syscall with 6 parameters])
     AC_LINK_IFELSE([
       AC_LANG_PROGRAM([[
           #include <unistd.h>
           #include <sys/syscall.h>
-          ]], [[syscall(1, 2, 3);]])],
-        [AC_DEFINE([HWLOC_HAVE_SYSCALL], [1], [Define to 1 if function `syscall' is available])
+          ]], [[syscall(0, 1, 2, 3, 4, 5, 6);]])],
+        [AC_DEFINE([HWLOC_HAVE_SYSCALL], [1], [Define to 1 if function `syscall' is available with 6 parameters])
          AC_MSG_RESULT([yes])],
         [AC_MSG_RESULT([no])])
-
-    # Check for kerrighed, but don't abort if not found.  It's illegal
-    # to pass in an empty 3rd argument, but we trust the output of
-    # pkg-config, so just give it a value that will always work:
-    # printf.
-    HWLOC_PKG_CHECK_MODULES([KERRIGHED], [kerrighed >= 2.0], [printf], [stdio.h], [], [:])
 
     AC_PATH_PROGS([HWLOC_MS_LIB], [lib])
     AC_ARG_VAR([HWLOC_MS_LIB], [Path to Microsoft's Visual Studio `lib' tool])
@@ -740,44 +838,6 @@ EOF])
     )
     AC_CHECK_FUNCS([cpuset_setid])
 
-    # Linux libnuma support
-    hwloc_linux_libnuma_happy=no
-    if test "x$enable_libnuma" != "xno"; then
-        hwloc_linux_libnuma_happy=yes
-        AC_CHECK_HEADERS([numaif.h], [
-            AC_CHECK_LIB([numa], [numa_available], [HWLOC_LINUX_LIBNUMA_LIBS="-lnuma"], [hwloc_linux_libnuma_happy=no])
-        ], [hwloc_linux_libnuma_happy=no])
-    fi
-    AC_SUBST(HWLOC_LINUX_LIBNUMA_LIBS)
-    # If we asked for Linux libnuma support but couldn't deliver, fail
-    HWLOC_LIBS="$HWLOC_LIBS $HWLOC_LINUX_LIBNUMA_LIBS"
-    AS_IF([test "$enable_libnuma" = "yes" -a "$hwloc_linux_libnuma_happy" = "no"],
-          [AC_MSG_WARN([Specified --enable-libnuma switch, but could not])
-           AC_MSG_WARN([find appropriate support])
-           AC_MSG_ERROR([Cannot continue])])
-    if test "x$hwloc_linux_libnuma_happy" = "xyes"; then
-      tmp_save_LIBS="$LIBS"
-      LIBS="$LIBS $HWLOC_LINUX_LIBNUMA_LIBS"
-
-      AC_CHECK_LIB([numa], [set_mempolicy], [
-	enable_set_mempolicy=yes
-	AC_DEFINE([HWLOC_HAVE_SET_MEMPOLICY], [1], [Define to 1 if set_mempolicy is available.])
-      ])
-      AC_CHECK_LIB([numa], [mbind], [
-	enable_mbind=yes
-	AC_DEFINE([HWLOC_HAVE_MBIND], [1], [Define to 1 if mbind is available.])
-      ])
-      AC_CHECK_LIB([numa], [migrate_pages], [
-	enable_migrate_pages=yes
-	AC_DEFINE([HWLOC_HAVE_MIGRATE_PAGES], [1], [Define to 1 if migrate_pages is available.])
-      ])
-      AC_CHECK_LIB([numa], [move_pages], [
-	AC_DEFINE([HWLOC_HAVE_MOVE_PAGES], [1], [Define to 1 if move_pages is available.])
-      ])
-
-      LIBS="$tmp_save_LIBS"
-    fi
-
     # Linux libudev support
     if test "x$enable_libudev" != xno; then
       AC_CHECK_HEADERS([libudev.h], [
@@ -788,35 +848,39 @@ EOF])
       ])
     fi
 
+    AS_IF([test "x$enable_32bits_pci_domain" = "xyes"], [
+      AC_DEFINE([HWLOC_HAVE_32BITS_PCI_DOMAIN], 1,
+        [Define to 1 if --enable-32bits-pci-domain is called.])
+    ])
+
     # PCI support via libpciaccess.  NOTE: we do not support
     # libpci/pciutils because that library is GPL and is incompatible
     # with our BSD license.
-    hwloc_pci_happy=no
-    if test "x$enable_pci" != xno; then
-      hwloc_pci_happy=yes
-      HWLOC_PKG_CHECK_MODULES([PCIACCESS], [pciaccess], [pci_slot_match_iterator_create], [pciaccess.h], [:], [hwloc_pci_happy=no])
+    hwloc_pciaccess_happy=no
+    if test "x$enable_io" != xno && test "x$enable_pci" != xno; then
+      hwloc_pciaccess_happy=yes
+      HWLOC_PKG_CHECK_MODULES([PCIACCESS], [pciaccess], [pci_slot_match_iterator_create], [pciaccess.h], [:], [hwloc_pciaccess_happy=no])
 
       # Only add the REQUIRES if we got pciaccess through pkg-config.
       # Otherwise we don't know if pciaccess.pc is installed
-      AS_IF([test "$hwloc_pci_happy" = "yes"], [HWLOC_PCIACCESS_REQUIRES=pciaccess])
+      AS_IF([test "$hwloc_pciaccess_happy" = "yes"], [HWLOC_PCIACCESS_REQUIRES=pciaccess])
 
       # Just for giggles, if we didn't find a pciaccess pkg-config,
       # just try looking for its header file and library.
-      AS_IF([test "$hwloc_pci_happy" != "yes"],
+      AS_IF([test "$hwloc_pciaccess_happy" != "yes"],
          [AC_CHECK_HEADER([pciaccess.h],
               [AC_CHECK_LIB([pciaccess], [pci_slot_match_iterator_create],
-                   [hwloc_pci_happy=yes
+                   [hwloc_pciaccess_happy=yes
                     HWLOC_PCIACCESS_LIBS="-lpciaccess"])
               ])
          ])
 
-      AS_IF([test "$hwloc_pci_happy" = "yes"],
-         [hwloc_pci_lib=pciaccess
-          hwloc_components="$hwloc_components pci"
+      AS_IF([test "$hwloc_pciaccess_happy" = "yes"],
+         [hwloc_components="$hwloc_components pci"
           hwloc_pci_component_maybeplugin=1])
     fi
     # If we asked for pci support but couldn't deliver, fail
-    AS_IF([test "$enable_pci" = "yes" -a "$hwloc_pci_happy" = "no"],
+    AS_IF([test "$enable_pci" = "yes" -a "$hwloc_pciaccess_happy" = "no"],
           [AC_MSG_WARN([Specified --enable-pci switch, but could not])
            AC_MSG_WARN([find appropriate support])
            AC_MSG_ERROR([Cannot continue])])
@@ -824,7 +888,7 @@ EOF])
 
     # OpenCL support
     hwloc_opencl_happy=no
-    if test "x$enable_opencl" != "xno"; then
+    if test "x$enable_io" != xno && test "x$enable_opencl" != "xno"; then
       hwloc_opencl_happy=yes
       case ${target} in
       *-*-darwin*)
@@ -857,18 +921,6 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
     AC_SUBST(HWLOC_OPENCL_CFLAGS)
     AC_SUBST(HWLOC_OPENCL_LIBS)
     AC_SUBST(HWLOC_OPENCL_LDFLAGS)
-    # Check if required extensions are available
-    if test "x$hwloc_opencl_happy" = "xyes"; then
-      tmp_save_CFLAGS="$CFLAGS"
-      CFLAGS="$CFLAGS $HWLOC_OPENCL_CFLAGS"
-      tmp_save_LIBS="$LIBS"
-      LIBS="$LIBS $HWLOC_OPENCL_LIBS"
-      AC_CHECK_DECLS([CL_DEVICE_TOPOLOGY_AMD],[hwloc_opencl_amd_happy=yes],[:],[[#include <CL/cl_ext.h>]])
-      CFLAGS="$tmp_save_CFLAGS"
-      LIBS="$tmp_save_LIBS"
-      # We can't do anything without CL_DEVICE_TOPOLOGY_AMD so far, so disable OpenCL entirely if not found
-      test "x$hwloc_opencl_amd_happy" != "xyes" && hwloc_opencl_happy=no
-    fi
     # If we asked for opencl support but couldn't deliver, fail
     AS_IF([test "$enable_opencl" = "yes" -a "$hwloc_opencl_happy" = "no"],
           [AC_MSG_WARN([Specified --enable-opencl switch, but could not])
@@ -887,7 +939,7 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
     # CUDA support
     hwloc_have_cuda=no
     hwloc_have_cudart=no
-    if test "x$enable_cuda" != "xno"; then
+    if test "x$enable_io" != xno && test "x$enable_cuda" != "xno"; then
       AC_CHECK_HEADERS([cuda.h], [
         AC_MSG_CHECKING(if CUDA_VERSION >= 3020)
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
@@ -936,7 +988,7 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
 
     # NVML support
     hwloc_nvml_happy=no
-    if test "x$enable_nvml" != "xno"; then
+    if test "x$enable_io" != xno && test "x$enable_nvml" != "xno"; then
 	hwloc_nvml_happy=yes
 	AC_CHECK_HEADERS([nvml.h], [
 	  AC_CHECK_LIB([nvidia-ml], [nvmlInit], [HWLOC_NVML_LIBS="-lnvidia-ml"], [hwloc_nvml_happy=no])
@@ -984,6 +1036,7 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
              AC_CHECK_HEADERS([X11/Xutil.h],
                 [AC_CHECK_HEADERS([X11/keysym.h],
                     [AC_DEFINE([HWLOC_HAVE_X11_KEYSYM], [1], [Define to 1 if X11 headers including Xutil.h and keysym.h are available.])
+                     hwloc_x11_keysym_happy=yes
                      HWLOC_X11_CPPFLAGS="$X_CFLAGS"
                      AC_SUBST([HWLOC_X11_CPPFLAGS])
                      HWLOC_X11_LIBS="$X_PRE_LIBS $X_LIBS -lX11 $X_EXTRA_LIBS"
@@ -996,7 +1049,7 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
 
     # GL Support
     hwloc_gl_happy=no
-    if test "x$enable_gl" != "xno"; then
+    if test "x$enable_io" != xno && test "x$enable_gl" != "xno"; then
 	hwloc_gl_happy=yes
 
 	AS_IF([test "$hwloc_enable_X11" != "yes"],
@@ -1054,7 +1107,7 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
 	AC_MSG_CHECKING([for x86 cpuid])
 	old_CPPFLAGS="$CPPFLAGS"
 	CPPFLAGS="$CPPFLAGS -I$HWLOC_top_srcdir/include"
-	# We need hwloc_uint64_t but we can't use hwloc/autogen/config.h before configure ends.
+	# We need hwloc_uint64_t but we can't use autogen/config.h before configure ends.
 	# So pass #include/#define manually here for now.
 	CPUID_CHECK_HEADERS=
 	CPUID_CHECK_DEFINE=
@@ -1123,34 +1176,74 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
 
     # Plugin support
     AC_MSG_CHECKING([if plugin support is enabled])
-    # Plugins (even core support) are totally disabled by default
-    AS_IF([test "x$enable_plugins" = "x"], [enable_plugins=no])
-    AS_IF([test "x$enable_plugins" != "xno"], [hwloc_have_plugins=yes], [hwloc_have_plugins=no])
-    AC_MSG_RESULT([$hwloc_have_plugins])
-    AS_IF([test "x$hwloc_have_plugins" = "xyes"],
-          [AC_DEFINE([HWLOC_HAVE_PLUGINS], 1, [Define to 1 if the hwloc library should support dynamically-loaded plugins])])
+    # Plugins (even core support) are totally disabled by default.
+    # Pass --enable-plugins=foo (with "foo" NOT an existing component) to enable plugins but build none of them.
+    if test "x$enable_plugins" = xyes; then
+      hwloc_have_plugins=yes
+      requested_plugins="$hwloc_components"
+    else if test "x$enable_plugins" != xno -a "x$enable_plugins" != x; then
+      hwloc_have_plugins=yes
+      requested_plugins=`echo $enable_plugins | sed -e 's/,/ /g'`
+    else
+      hwloc_have_plugins=no
+    fi fi
+    AC_MSG_RESULT($hwloc_have_plugins)
 
-    # Some sanity checks about plugins
-    # libltdl doesn't work on AIX as of 2.4.2
-    AS_IF([test "x$enable_plugins" = "xyes" -a "x$hwloc_aix" = "xyes"],
-      [AC_MSG_WARN([libltdl does not work on AIX, plugins support cannot be enabled.])
-       AC_MSG_ERROR([Cannot continue])])
-    # posix linkers don't work well with plugins and windows dll constraints
-    AS_IF([test "x$enable_plugins" = "xyes" -a "x$hwloc_windows" = "xyes"],
-      [AC_MSG_WARN([Plugins not supported on non-native Windows build, plugins support cannot be enabled.])
-       AC_MSG_ERROR([Cannot continue])])
-
-    # If we want plugins, look for ltdl.h and libltdl
     if test "x$hwloc_have_plugins" = xyes; then
-      AC_CHECK_HEADER([ltdl.h], [],
-	[AC_MSG_WARN([Plugin support requested, but could not find ltdl.h])
-	 AC_MSG_ERROR([Cannot continue])])
-      AC_CHECK_LIB([ltdl], [lt_dlopenext],
-	[HWLOC_LIBS="$HWLOC_LIBS -lltdl"],
-	[AC_MSG_WARN([Plugin support requested, but could not find libltdl])
-	 AC_MSG_ERROR([Cannot continue])])
-      # Add libltdl static-build dependencies to hwloc.pc
-      HWLOC_CHECK_LTDL_DEPS
+      # dlopen and ltdl (at least 2.4.2) doesn't work on AIX
+      # posix linkers don't work well with plugins and windows dll constraints
+      if test "x$enable_plugin_dlopen" = x; then
+        if test "x$hwloc_aix" = "xyes"; then
+          AC_MSG_WARN([dlopen does not work on AIX, disabled by default.])
+          enable_plugin_dlopen=no
+        else if test "x$hwloc_windows" = "xyes"; then
+          AC_MSG_WARN([dlopen not supported on non-native Windows build, disabled by default.])
+          enable_plugin_dlopen=no
+        fi fi
+      fi
+      if test "x$enable_plugin_ltdl" = x; then
+        if test "x$hwloc_aix" = "xyes"; then
+          AC_MSG_WARN([ltdl does not work on AIX, disabled by default.])
+          enable_plugin_dlopen=no
+        else if test "x$hwloc_windows" = "xyes"; then
+          AC_MSG_WARN([ltdl not supported on non-native Windows build, disabled by default.])
+          enable_plugin_dlopen=no
+        fi fi
+      fi
+
+      # Look for dlopen
+      if test "x$enable_plugin_dlopen" != xno; then
+        HWLOC_CHECK_DLOPEN([hwloc_dlopen_ready], [hwloc_dlopen_libs])
+      fi
+      # Look for ltdl
+      if test "x$enable_plugin_ltdl" != xno; then
+        HWLOC_CHECK_LTDL([hwloc_ltdl_ready], [hwloc_ltdl_libs])
+      fi
+
+      # Now use dlopen by default, or ltdl, or just fail to enable plugins
+      AC_MSG_CHECKING([which library to use for loading plugins])
+      if test "x$hwloc_dlopen_ready" = xyes; then
+        AC_MSG_RESULT([dlopen])
+	hwloc_plugins_load=dlopen
+        # Now enable dlopen libs
+        HWLOC_DL_LIBS="$hwloc_dlopen_libs"
+        AC_SUBST(HWLOC_DL_LIBS)
+      else if test x$hwloc_ltdl_ready = xyes; then
+        AC_MSG_RESULT([ltdl])
+        hwloc_plugins_load=ltdl
+        # Now enable ltdl libs
+        AC_DEFINE([HWLOC_HAVE_LTDL], 1, [Define to 1 if the hwloc library should use ltdl for loading plugins])
+        HWLOC_LTDL_LIBS="$hwloc_ltdl_libs"
+        AC_SUBST(HWLOC_LTDL_LIBS)
+        # Add ltdl static-build dependencies to hwloc.pc
+        HWLOC_CHECK_LTDL_DEPS
+      else
+        AC_MSG_RESULT([none])
+        AC_MSG_WARN([Plugin support requested, but could not enable dlopen or ltdl])
+        AC_MSG_ERROR([Cannot continue])
+      fi fi
+
+      AC_DEFINE([HWLOC_HAVE_PLUGINS], 1, [Define to 1 if the hwloc library should support dynamically-loaded plugins])
     fi
 
     AC_ARG_WITH([hwloc-plugins-path],
@@ -1163,19 +1256,18 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
     AC_SUBST(HWLOC_PLUGINS_DIR)
 
     # Static components output file
-    hwloc_static_components_dir=${HWLOC_top_builddir}/src
+    hwloc_static_components_dir=${HWLOC_top_builddir}/hwloc
     mkdir -p ${hwloc_static_components_dir}
     hwloc_static_components_file=${hwloc_static_components_dir}/static-components.h
     rm -f ${hwloc_static_components_file}
 
-    # Make $enable_plugins easier to use (it contains either "yes" (all) or a list of <name>)
-    HWLOC_PREPARE_FILTER_COMPONENTS([$enable_plugins])
+    HWLOC_PREPARE_FILTER_COMPONENTS([$requested_plugins])
     # Now we have some hwloc_<name>_component_wantplugin=1
 
     # See which core components want plugin and support it
     HWLOC_FILTER_COMPONENTS
     # Now we have some hwloc_<name>_component=plugin/static
-    # and hwloc_static/plugin_components
+    # and hwloc_static/plugin_components=list (space separated)
     AC_MSG_CHECKING([components to build statically])
     AC_MSG_RESULT($hwloc_static_components)
     HWLOC_LIST_STATIC_COMPONENTS([$hwloc_static_components_file], [$hwloc_static_components])
@@ -1230,11 +1322,13 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
     AS_IF([test "$hwloc_mode" = "embedded"],
           [HWLOC_EMBEDDED_CFLAGS=$HWLOC_CFLAGS
            HWLOC_EMBEDDED_CPPFLAGS=$HWLOC_CPPFLAGS
-           HWLOC_EMBEDDED_LDADD='$(HWLOC_top_builddir)/src/libhwloc_embedded.la'
+           HWLOC_EMBEDDED_LDFLAGS=$HWLOC_LDFLAGS
+           HWLOC_EMBEDDED_LDADD='$(HWLOC_top_builddir)/hwloc/libhwloc_embedded.la'
            HWLOC_EMBEDDED_LIBS=$HWLOC_LIBS
            HWLOC_LIBS=])
     AC_SUBST(HWLOC_EMBEDDED_CFLAGS)
     AC_SUBST(HWLOC_EMBEDDED_CPPFLAGS)
+    AC_SUBST(HWLOC_EMBEDDED_LDFLAGS)
     AC_SUBST(HWLOC_EMBEDDED_LDADD)
     AC_SUBST(HWLOC_EMBEDDED_LIBS)
 
@@ -1242,7 +1336,7 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
     AC_CONFIG_FILES(
         hwloc_config_prefix[Makefile]
         hwloc_config_prefix[include/Makefile]
-        hwloc_config_prefix[src/Makefile ]
+        hwloc_config_prefix[hwloc/Makefile]
     )
 
     # Cleanup
@@ -1270,29 +1364,25 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_HAVE_GCC], [test "x$GCC" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_MS_LIB], [test "x$HWLOC_MS_LIB" != "x"])
         AM_CONDITIONAL([HWLOC_HAVE_OPENAT], [test "x$hwloc_have_openat" = "xyes"])
-        AM_CONDITIONAL([HWLOC_HAVE_LINUX_LIBNUMA],
-                       [test "x$hwloc_have_linux_libnuma" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_SCHED_SETAFFINITY],
                        [test "x$hwloc_have_sched_setaffinity" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_PTHREAD],
                        [test "x$hwloc_have_pthread" = "xyes"])
+        AM_CONDITIONAL([HWLOC_HAVE_LINUX_LIBNUMA],
+                       [test "x$hwloc_have_linux_libnuma" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_LIBIBVERBS],
                        [test "x$hwloc_have_libibverbs" = "xyes"])
 	AM_CONDITIONAL([HWLOC_HAVE_CUDA],
 		       [test "x$hwloc_have_cuda" = "xyes"])
 	AM_CONDITIONAL([HWLOC_HAVE_GL],
 		       [test "x$hwloc_have_gl" = "xyes"])
-	AM_CONDITIONAL([HWLOC_HAVE_MYRIEXPRESS],
-		       [test "x$hwloc_have_myriexpress" = "xyes"])
 	AM_CONDITIONAL([HWLOC_HAVE_CUDART],
 		       [test "x$hwloc_have_cudart" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_LIBXML2], [test "$hwloc_libxml2_happy" = "yes"])
         AM_CONDITIONAL([HWLOC_HAVE_CAIRO], [test "$hwloc_cairo_happy" = "yes"])
-        AM_CONDITIONAL([HWLOC_HAVE_PCI], [test "$hwloc_pci_happy" = "yes"])
+        AM_CONDITIONAL([HWLOC_HAVE_PCIACCESS], [test "$hwloc_pciaccess_happy" = "yes"])
         AM_CONDITIONAL([HWLOC_HAVE_OPENCL], [test "$hwloc_opencl_happy" = "yes"])
         AM_CONDITIONAL([HWLOC_HAVE_NVML], [test "$hwloc_nvml_happy" = "yes"])
-        AM_CONDITIONAL([HWLOC_HAVE_SET_MEMPOLICY], [test "x$enable_set_mempolicy" != "xno"])
-        AM_CONDITIONAL([HWLOC_HAVE_MBIND], [test "x$enable_mbind" != "xno"])
         AM_CONDITIONAL([HWLOC_HAVE_BUNZIPP], [test "x$BUNZIPP" != "xfalse"])
         AM_CONDITIONAL([HWLOC_HAVE_USER32], [test "x$hwloc_have_user32" = "xyes"])
 
@@ -1311,7 +1401,6 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_HAVE_NETBSD], [test "x$hwloc_netbsd" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_SOLARIS], [test "x$hwloc_solaris" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_AIX], [test "x$hwloc_aix" = "xyes"])
-        AM_CONDITIONAL([HWLOC_HAVE_OSF], [test "x$hwloc_osf" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_HPUX], [test "x$hwloc_hpux" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_WINDOWS], [test "x$hwloc_windows" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_MINGW32], [test "x$target_os" = "xmingw32"])
@@ -1320,6 +1409,8 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_HAVE_X86_32], [test "x$hwloc_x86_32" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_X86_64], [test "x$hwloc_x86_64" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_X86_CPUID], [test "x$hwloc_have_x86_cpuid" = "xyes"])
+
+        AM_CONDITIONAL([HWLOC_HAVE_32BITS_PCI_DOMAIN], [test "x$enable_32bits_pci_domain" = "xyes"])
 
         AM_CONDITIONAL([HWLOC_HAVE_PLUGINS], [test "x$hwloc_have_plugins" = "xyes"])
         AM_CONDITIONAL([HWLOC_PCI_BUILD_STATIC], [test "x$hwloc_pci_component" = "xstatic"])
@@ -1332,6 +1423,11 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_HAVE_CXX], [test "x$hwloc_have_cxx" = "xyes"])
     ])
     hwloc_did_am_conditionals=yes
+
+    # For backwards compatibility (i.e., packages that only call
+    # HWLOC_DO_AM_CONDITIONS, not NETLOC DO_AM_CONDITIONALS), we also have to
+    # do the netloc AM conditionals here
+    NETLOC_DO_AM_CONDITIONALS
 ])dnl
 
 #-----------------------------------------------------------------------
@@ -1367,6 +1463,49 @@ AC_DEFUN([_HWLOC_CHECK_DECLS], [
   HWLOC_CHECK_DECL([$1], [ac_have_decl=1], [ac_have_decl=0], [$4])
   AC_DEFINE_UNQUOTED(AS_TR_CPP([HAVE_DECL_$1]), [$ac_have_decl],
     [Define to 1 if you have the declaration of `$1', and to 0 if you don't])
+])
+
+#-----------------------------------------------------------------------
+
+dnl HWLOC_CHECK_DLOPEN
+dnl
+dnl set $1 to yes or not
+dnl set $2 to -ldl or so
+AC_DEFUN([HWLOC_CHECK_DLOPEN], [
+  [$1]=no
+  AC_MSG_CHECKING([for dlopen])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+      #include <dlfcn.h>
+      #include <stdlib.h>
+      void *handle;
+    ]], [[
+      handle = dlopen(NULL, RTLD_NOW|RTLD_LOCAL);
+    ]])],
+    [AC_MSG_RESULT([yes])
+     [$1]=yes],
+    [AC_MSG_RESULT([no])
+     AC_CHECK_HEADER([dlfcn.h],
+       [AC_CHECK_LIB([dl], [dlopen],
+                     [[$1]=yes
+	             [$2]=-ldl])
+        ])
+    ])
+])
+
+#-----------------------------------------------------------------------
+
+dnl HWLOC_CHECK_LTDL
+dnl
+dnl set $1 to yes or not
+dnl set $2 to -lltdl or so
+AC_DEFUN([HWLOC_CHECK_LTDL], [
+  [$1]=no
+  AC_CHECK_HEADER([ltdl.h],
+    [AC_CHECK_LIB([ltdl], [lt_dlopenext],
+                  [[$1]=yes
+		   [$2]=-lltdl])
+     ])
 ])
 
 #-----------------------------------------------------------------------

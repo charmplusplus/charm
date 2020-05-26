@@ -1,7 +1,28 @@
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
-OBJS=blkinhand.o megacon.o ringsimple.o ring.o fibobj.o fibthr.o broadc.o priotest.o deadlock.o vars.o nodenum.o specmsg.o bigmsg.o vecsend.o posixth.o future.o multicast.o multisend.o handler.o reduction.o
+OBJS = \
+  blkinhand.o \
+  megacon.o \
+  ringsimple.o \
+  ring.o \
+  fibobj.o \
+  fibthr.o \
+  broadc.o \
+  priotest.o \
+  deadlock.o \
+  vars.o \
+  nodenum.o \
+  specmsg.o \
+  bigmsg.o \
+  vecsend.o \
+  posixth.o \
+  future.o \
+  multicast.o \
+  multisend.o \
+  handler.o \
+  reduction.o \
+  nodereduction.o \
 
 all: pgm
 
@@ -81,6 +102,9 @@ handler.o: handler.c
 reduction.o: reduction.c
 	$(CHARMC) reduction.c
 
+nodereduction.o: nodereduction.c
+	$(CHARMC) nodereduction.c
+
 clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
@@ -92,3 +116,7 @@ test: pgm
 	$(call run, ./pgm +p2 )
 	$(call run, ./pgm +p3 )
 	$(call run, ./pgm +p4 )
+
+smptest: pgm
+	$(call run, ./pgm +p2 ++ppn 2)
+	$(call run, ./pgm +p4 ++ppn 2)

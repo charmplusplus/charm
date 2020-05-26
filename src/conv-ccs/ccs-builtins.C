@@ -232,7 +232,7 @@ static void CpdList_ccs_list_items_set(char *msg)
     PUP_toNetwork_unpack p(req.extra);
     pupCpd(p,acc,req);
     if (p.size()!=req.extraLen)
-    	CmiPrintf("Size mismatch during ccs_list_items.set: client sent %d bytes, but %d bytes used!\n",
+	CmiPrintf("Size mismatch during ccs_list_items.set: client sent %d bytes, but %zu bytes used!\n",
 		req.extraLen,p.size());
   }
   CmiFree(msg);
@@ -253,10 +253,6 @@ void CpdMachineArchitecture(char *msg) {
   char firstByte = *((char*)&value);
   if (firstByte == 1) reply[3] = 1;
   else reply[3] = 2;
-  // add the third bit if we are in bigsim
-#if CMK_BIGSIM_CHARM
-  reply[3] |= 4;
-#endif
   // get the size of an "int"
   reply[4] = sizeof(int);
   // get the size of an "long"
@@ -294,7 +290,7 @@ static void CpdList_ccs_list_items_fmt(char *msg)
       PUP_fmt p(pp);
       pupCpd(p,acc,req);
       if (pp.size()!=bufLen)
-	CmiError("ERROR! Sizing/packing length mismatch for %s list pup function (%d sizing, %d packing)\n",
+	CmiError("ERROR! Sizing/packing length mismatch for %s list pup function (%d sizing, %zu packing)\n",
 		acc->getPath(),bufLen,pp.size());
     }
     CcsSendReply(bufLen,(void *)buf);
@@ -699,6 +695,15 @@ void PUP_fmt::synchronize(unsigned int m) {
 	fieldHeader(typeCode_sync,1);
 	p(m);
 }
+
+void PUP_fmt::pup_buffer(void *&ptr,size_t n,size_t itemSize,PUP::dataType t) {
+  bytes(ptr, n, itemSize, t);
+}
+
+void PUP_fmt::pup_buffer(void *&ptr,size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate){
+  bytes(ptr, n, itemSize, t);
+}
+
 void PUP_fmt::bytes(void *ptr,size_t n,size_t itemSize,PUP::dataType t) {
 	if(itemSize > INT_MAX || n > INT_MAX || itemSize*n > INT_MAX)
 		CmiAbort("Ccs does not support messages greater than INT_MAX...\n");
