@@ -142,7 +142,7 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
               int nobjs;
               const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
 	      mcast_count ++;
-	      CkVec<int> pes;
+	      std::vector<int> pes;
 	      for (i=0; i<nobjs; i++) {
 	        int idx = stats->getHash(objs[i]);
 		CmiAssert(idx != -1);
@@ -150,8 +150,8 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 	        receiverPE = stats->to_proc[idx];
 		CmiAssert(receiverPE < count && receiverPE >= 0);
 		int exist = 0;
-	        for (int p=0; p<pes.size(); p++) 
-		  if (receiverPE == pes[p]) { exist=1; break; }
+	        for (auto pe : pes)
+		  if (receiverPE == pe) { exist=1; break; }
 		if (exist) continue;
 		pes.push_back(receiverPE);
 	        if(senderPE != receiverPE)
