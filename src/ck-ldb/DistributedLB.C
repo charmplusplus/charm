@@ -356,17 +356,17 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
 * information propagation stage (gossip).
 */
 void DistributedLB::LoadBalance() {
-  CkVec<int> obj_no;
-  CkVec<int> obj_pe_no;
+  vector<int> obj_no;
+  vector<int> obj_pe_no;
 
   // Balance load and add objs to be transferred to obj_no and pe to be
   // transferred to in obj_pe_no
   MapObjsToPe(objs, obj_no, obj_pe_no);
-  total_migrates += obj_no.length();
-  total_migrates_ack = obj_no.length();
+  total_migrates += obj_no.size();
+  total_migrates_ack = obj_no.size();
 
   // If there is no migration, then this is done
-  if (obj_no.length() == 0) {
+  if (obj_no.empty()) {
     DoneWithLBPhase();
 	}
 }
@@ -417,8 +417,8 @@ void DistributedLB::Cleanup() {
 * can be transferred and finds suitable receiver PEs. The mapping is stored in
 * obj_no and the corresponding entry in obj_pe_no indicates the receiver PE.
 */
-void DistributedLB::MapObjsToPe(minHeap *objs, CkVec<int> &obj_no,
-    CkVec<int> &obj_pe_no) {
+void DistributedLB::MapObjsToPe(minHeap *objs, vector<int> &obj_no,
+                                vector<int> &obj_pe_no) {
   int p_id;
   double p_load;
   int rand_pe;
@@ -459,8 +459,8 @@ void DistributedLB::MapObjsToPe(minHeap *objs, CkVec<int> &obj_no,
 
     // Found an object and a suitable PE to transfer it to. Decrement the obj
     // count and update the loads.
-    obj_no.insertAtEnd(obj->Id);
-    obj_pe_no.insertAtEnd(p_id);
+    obj_no.push_back(obj->Id);
+    obj_pe_no.push_back(p_id);
     objs_count--;
     loads[rand_pe] += obj->load;
     my_load -= obj->load;
@@ -546,14 +546,14 @@ void DistributedLB::RecvAck(int obj_id, int assigned_pe, bool can_accept) {
     item->Id = obj_id;
     objs->insert(item);
 
-    CkVec<int> obj_no;
-    CkVec<int> obj_pe_no;
+    vector<int> obj_no;
+    vector<int> obj_pe_no;
     MapObjsToPe(objs, obj_no, obj_pe_no);
 
     // If a PE could be found to transfer this object, MapObjsToPe sends a
     // message to it. Wait for the ack.
     // Maybe at this point we can try to force it or just drop it.
-    if (obj_pe_no.size() > 0) {
+    if (!obj_pe_no.empty()) {
       total_migrates_ack++;
       total_migrates++;
     }
