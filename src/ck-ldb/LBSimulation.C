@@ -83,7 +83,7 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 	for(pe = 0; pe < count; pe++)
     	  peLoads[pe] = stats->procs[pe].bg_walltime;
 
-    	for(int obj = 0; obj < stats->n_objs; obj++)
+    	for(int obj = 0; obj < stats->objData.size(); obj++)
     	{
 		int pe = stats->to_proc[obj];
 		if (pe == -1) continue;     // this object is out
@@ -105,8 +105,7 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 	    msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
 
 	  int mcast_count = 0;
-          for (int cidx=0; cidx < stats->n_comm; cidx++) {
-	    LDCommData& cdata = stats->commData[cidx];
+          for (auto& cdata : stats->commData) {
 	    int senderPE, receiverPE;
 	    if (cdata.from_proc())
 	      senderPE = cdata.src_proc;

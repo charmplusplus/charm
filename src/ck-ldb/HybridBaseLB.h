@@ -305,7 +305,7 @@ public:
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ReceiveVectorMigration(LBVectorMigrateMsg *); // Receive migration data
   virtual void GetObjsToMigrate(int toPe, double load, LDStats *stats,
-      int atlevel, CkVec<LDCommData>& comms, CkVec<LDObjData>& objs);
+                                int atlevel, std::vector<LDCommData>& comms, std::vector<LDObjData>& objs);
   void CreateMigrationOutObjs(int atlevel, LDStats* stats, int objidx);
   void TotalObjMigrated(int count, int level);
 
@@ -313,7 +313,7 @@ public:
   void Migrated(int waitBarrier);
 
   void ObjMigrated(LDObjData data, LDCommData *cdata, int n, int level);
-  void ObjsMigrated(CkVec<LDObjData>&& data, int m, LDCommData *cdata, int n, int level);
+  void ObjsMigrated(std::vector<LDObjData>&& data, int m, LDCommData *cdata, int n, int level);
   void VectorDone(int atlevel);
   void MigrationDone(int balancing);  // Call when migration is complete
   void StatsDone(int level);  // Call when LDStats migration is complete
@@ -347,11 +347,11 @@ protected:
   virtual void work(LDStats* stats);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
   // helper function
-  LBMigrateMsg * createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo, int count);
+  LBMigrateMsg * createMigrateMsg(std::vector<MigrateInfo *> &migrateInfo, int count);
   virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats);
   void    printSummary(LDStats *stats, int count);
   void    initTree();
-  void collectCommData(int objIdx, CkVec<LDCommData> &comm, int atlevel);
+  void collectCommData(int objIdx, std::vector<LDCommData> &comm, int atlevel);
 
   // Not to be used -- maintained for legacy applications
   virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs) {
@@ -379,10 +379,10 @@ protected:
     int info_recved;		// for CollectInfo()
     int vector_expected, vector_completed;
     int resumeAfterMigration;
-    CkVec<MigrationRecord> outObjs;
-    //CkVec<Location> unmatchedObjs;
+    std::vector<MigrationRecord> outObjs;
+    //std::vector<Location> unmatchedObjs;
     std::map< LDObjKey, int >  unmatchedObjs;
-    CkVec<Location> matchedObjs;	 // don't need to be sent up
+    std::vector<Location> matchedObjs;	 // don't need to be sent up
   public:
     LevelData(): parent(-1), children(NULL), nChildren(0), 
                  statsMsgsList(NULL), stats_msg_count(0),
@@ -415,8 +415,8 @@ protected:
       vector_completed = 0;
       resumeAfterMigration = 0;
       if (statsData) statsData->clear();
-      outObjs.free();
-      matchedObjs.free();
+      outObjs.clear();
+      matchedObjs.clear();
       unmatchedObjs.clear();
     }
     int useMem() {
@@ -428,7 +428,7 @@ protected:
     }
   };
 
-  CkVec<LevelData *>  levelData;
+  std::vector<LevelData *>  levelData;
 
   int currentLevel;
 
@@ -454,7 +454,7 @@ private:
   double totalLoad;
   double maxMem;                    // on level = max - 1
 
-  CkVec<Location> newObjs;
+  std::vector<Location> newObjs;
 
   int vector_n_moves;
 };

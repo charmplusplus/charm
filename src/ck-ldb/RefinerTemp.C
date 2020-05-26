@@ -11,7 +11,7 @@
 
 int* RefinerTemp::AllocProcs(int count, BaseLB::LDStats* stats)
 {
-  return new int[stats->n_objs];
+  return new int[stats->objData.size()];
 }
 
 void RefinerTemp::FreeProcs(int* bufs)
