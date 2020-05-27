@@ -515,23 +515,23 @@ public:
   Barrier& operator=(const Barrier&) = delete;
 
   explicit Barrier(unsigned int count) :
-    curCount(count), barrierCount(count), curGeneration(0) {
+    curCount(count), barrierCount(count), curSense(true) {
   }
 
   void wait() {
     std::unique_lock<std::mutex> lock(barrierMutex);
-    const unsigned int gen = curGeneration;
+    const bool sense = curSense;
 
     curCount--;
 
     if (curCount == 0) {
-      curGeneration++;
+      curSense = !curSense;
       curCount = barrierCount;
       barrierCond.notify_all();
       return;
     }
 
-    while (gen == curGeneration) {
+    while (sense == curSense) {
       barrierCond.wait(lock);
     }
   }
@@ -539,7 +539,7 @@ public:
 private:
   std::mutex barrierMutex;
   std::condition_variable barrierCond;
-  unsigned int curGeneration;
+  bool curSense;
   unsigned int curCount;
   const unsigned int barrierCount;
 };
