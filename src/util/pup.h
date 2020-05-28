@@ -1010,7 +1010,6 @@ inline void PUParray(PUP::er &p,T *t,size_t n) {
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
   }; }
-#define PUPmarshallBytes(type) PUPbytes(type)
 
 /// Make PUP work with this function pointer type, copied as raw bytes.
 #define PUPfunctionpointer(fnPtrType) \
