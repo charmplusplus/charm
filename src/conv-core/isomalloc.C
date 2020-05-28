@@ -927,7 +927,7 @@ static void CmiIsomallocInitExtent(char ** argv)
 struct isommap
 {
   isommap(uint8_t * s, uint8_t * e)
-    : start{s}, end{e}, allocated_extent{s}, lock{CmiCreateLock()}
+    : start{s}, end{e}, allocated_extent{s}, use_rdma{1}, lock{CmiCreateLock()}
   {
     IMP_DBG("[%d][%p] isommap::isommap(%p, %p)\n", CmiMyPe(), this, s, e);
   }
@@ -965,12 +965,12 @@ struct isommap
     pup_raw_pointer(p, start);
     pup_raw_pointer(p, end);
     pup_raw_pointer(p, allocated_extent);
+    p | use_rdma;
 
     const size_t totalsize = allocated_extent - start;
 
     if (p.isUnpacking())
     {
-#if __FAULT__
       if (start < isomallocStart || isomallocEnd < allocated_extent)
         CmiAbort("Could not unpack Isomalloc memory region, virtual memory regions do not overlap: "
                  "current %p - %p, context %p - %p",
@@ -978,18 +978,42 @@ struct isommap
 
       if (isomallocEnd < end)
         end = (uint8_t *)CMIALIGN((uintptr_t)isomallocEnd - (pagesize-1), pagesize);
-#endif
-
-      void * const mapped = map_global_memory(start, totalsize);
-      if (mapped == nullptr)
-        CmiAbort("Failed to unpack Isomalloc memory region!");
     }
 
-    p(start, totalsize);
-
-    if (p.isDeleting())
+    if (use_rdma)
     {
-      clear();
+      uint8_t * localstart = start;
+
+      p.pup_buffer(localstart, totalsize,
+                   [localstart](size_t totalsize) -> void *
+                   {
+                     void * const mapped = map_global_memory(localstart, totalsize);
+                     if (mapped == nullptr)
+                       CmiAbort("Failed to unpack Isomalloc memory region!");
+                     return mapped;
+                   },
+                   [totalsize](void * start)
+                   {
+                     unmap_global_memory(start, totalsize);
+                   }
+                   );
+
+      if (p.isDeleting())
+        allocated_extent = start; // the context no longer owns the mmapped region
+    }
+    else
+    {
+      if (p.isUnpacking())
+      {
+        void * const mapped = map_global_memory(start, totalsize);
+        if (mapped == nullptr)
+          CmiAbort("Failed to unpack Isomalloc memory region!");
+      }
+
+      p(start, totalsize);
+
+      if (p.isDeleting())
+        clear();
     }
   }
 
@@ -1001,8 +1025,14 @@ struct isommap
     allocated_extent = start;
   }
 
+  void EnableRDMA(int enable)
+  {
+    use_rdma = enable;
+  }
+
   // canonical data
   uint8_t * start, * end, * allocated_extent;
+  int use_rdma;
 
   // local data
   CmiNodeLock lock;
@@ -2453,6 +2483,12 @@ void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext * ctxptr)
     delete pool;
     ctxptr->opaque = nullptr;
   }
+}
+
+void CmiIsomallocEnableRDMA(CmiIsomallocContext ctx, int enable)
+{
+  auto pool = (Mempool *)ctx.opaque;
+  pool->backend.EnableRDMA(enable);
 }
 
 void * CmiIsomallocContextMalloc(CmiIsomallocContext ctx, size_t size)

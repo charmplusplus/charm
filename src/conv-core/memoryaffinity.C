@@ -182,7 +182,7 @@ void CmiInitMemAffinity(char **argv) {
         for (i=0; i<strlen((const char *)nodemap); i++) {
             if (nodemap[i]==',') nodemapArrSize++;
         }
-        nodemapArr = malloc(nodemapArrSize*sizeof(int));
+        nodemapArr = (int *) malloc(nodemapArrSize*sizeof(int));
         prevIntStart=j=0;
         for (i=0; i<strlen((const char *)nodemap); i++) {
             if (nodemap[i]==',') {
