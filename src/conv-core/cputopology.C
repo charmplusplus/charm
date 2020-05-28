@@ -60,8 +60,7 @@ struct _procInfo {
 
 typedef struct _hostnameMsg {
   char core[CmiMsgHeaderSizeBytes];
-  int n;
-  _procInfo *procs;
+  _procInfo proc;
 } hostnameMsg;
 
 typedef struct _nodeTopoMsg {
@@ -162,7 +161,7 @@ int CpuTopology::supported = 0;
 namespace CpuTopoDetails {
 
 static nodeTopoMsg *topomsg = NULL;
-static std::map<skt_ip_t, _procInfo *> hostTable;
+static std::map<skt_ip_t, hostnameMsg*> hostTable;
 
 CpvStaticDeclare(int, cpuTopoHandlerIdx);
 CpvStaticDeclare(int, cpuTopoRecvHandlerIdx);
@@ -190,99 +189,63 @@ static void printTopology(int numNodes)
     CmiPrintf("Charm++> Running on %d hosts\n", numNodes);
 }
 
-/* called on PE 0 */
-static void cpuTopoHandler(void *m)
+// Called on PE 0
+static void cpuTopoHandler(void* m)
 {
-  _procInfo *rec;
-  hostnameMsg *msg = (hostnameMsg *)m;
-  int pe;
+  static int msg_count = 0;
 
-  if (topomsg == NULL) {
-    int i;
-    topomsg = (nodeTopoMsg *)CmiAlloc(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int));
-    CmiSetHandler((char *)topomsg, CpvAccess(cpuTopoRecvHandlerIdx));
-    topomsg->nodes = (int *)((char*)topomsg + sizeof(nodeTopoMsg));
-    for (i=0; i<CmiNumPes(); i++) topomsg->nodes[i] = -1;
-  }
-  CmiAssert(topomsg != NULL);
+  hostnameMsg* msg = (hostnameMsg*)m;
+  _procInfo* proc = &msg->proc;
+  _procInfo* rec;
+  skt_ip_t& ip = proc->ip;
+  int pe = proc->pe;
 
-  msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
-  CmiAssert(msg->n == CmiNumPes());
-  for (int i=0; i<msg->n; i++) 
-  {
-    _procInfo *proc = msg->procs+i;
-
-/*   for debug
-  skt_print_ip(str, msg->ip);
-  printf("hostname: %d %s\n", msg->pe, str);
-*/
-    skt_ip_t & ip = proc->ip;
-    pe = proc->pe;
-    auto iter = hostTable.find(ip);
-    if (iter != hostTable.end()) {
-      rec = iter->second;
-    }
-    else {
-      proc->nodeID = pe;           // we will compact the node ID later
-      rec = proc;
-      hostTable.emplace(ip, proc);
-    }
-    topomsg->nodes[pe] = rec->nodeID;
-    rec->rank ++;
+  // Look for IP in host table
+  auto iter = hostTable.find(ip);
+  if (iter != hostTable.end()) {
+    // Use existing entry, free received message
+    rec = &iter->second->proc;
+    CmiFree(msg);
+  } else {
+    // New entry
+    proc->nodeID = pe; // We will compact the node ID later
+    rec = proc;
+    hostTable.emplace(ip, msg);
   }
 
-  printTopology(hostTable.size());
+  topomsg->nodes[pe] = rec->nodeID;
+  rec->rank++;
 
-  hostTable.clear();
-  CmiFree(msg);
+  if (++msg_count == CmiNumPes()) {
+    // Received messages from all PEs
+    printTopology(hostTable.size());
 
-  CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
+    for (const auto& pair : hostTable) {
+      CmiFree(pair.second);
+    }
+    hostTable.clear();
+
+    // Broadcast topology message
+    CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg) + CmiNumPes() * sizeof(int),
+        (char*)topomsg);
+  }
 }
 
-/* called on each processor */
-static void cpuTopoRecvHandler(void *msg)
+// Called on each PE
+static void cpuTopoRecvHandler(void* m)
 {
-  nodeTopoMsg *m = (nodeTopoMsg *)msg;
-  m->nodes = (int *)((char*)m + sizeof(nodeTopoMsg));
+  nodeTopoMsg* msg = (nodeTopoMsg*)m;
+  msg->nodes = (int*)((char*)msg + sizeof(nodeTopoMsg));
 
   CmiLock(topoLock);
   if (cpuTopo.nodeIDs == NULL) {
-    cpuTopo.nodeIDs = m->nodes;
+    cpuTopo.nodeIDs = msg->nodes;
     cpuTopo.sort();
+  } else {
+    CmiFree(msg);
   }
-  else
-    CmiFree(m);
   topo_doneflag++;
   CmiUnlock(topoLock);
-
-  //if (CmiMyPe() == 0) cpuTopo.print();
-}
-
-// reduction function
-static void * combineMessage(int *size, void *data, void **remote, int count) 
-{
-  int i, j;
-  int nprocs = ((hostnameMsg *)data)->n;
-  if (count == 0) return data;
-  for (i=0; i<count; i++) nprocs += ((hostnameMsg *)remote[i])->n;
-  *size = sizeof(hostnameMsg)+sizeof(_procInfo)*nprocs;
-  hostnameMsg *msg = (hostnameMsg *)CmiAlloc(*size);
-  msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
-  msg->n = nprocs;
-  CmiSetHandler((char *)msg, CpvAccess(cpuTopoHandlerIdx));
-
-  int n=0;
-  hostnameMsg *m = (hostnameMsg*)data;
-  m->procs = (_procInfo*)((char*)m + sizeof(hostnameMsg));
-  for (j=0; j<m->n; j++)
-    msg->procs[n++] = m->procs[j];
-  for (i=0; i<count; i++) {
-    m = (hostnameMsg*)remote[i];
-    m->procs = (_procInfo*)((char*)m + sizeof(hostnameMsg));
-    for (j=0; j<m->n; j++)
-      msg->procs[n++] = m->procs[j];
-  }
-  return msg;
 }
 
 /******************  API implementation **********************/
@@ -478,22 +441,36 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   CmiNodeAllBarrier();
   if (_noip) return; 
 
-    /* prepare a msg to send */
-  msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg)+sizeof(_procInfo));
-  msg->n = 1;
-  msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
-  CmiSetHandler((char *)msg, CpvAccess(cpuTopoHandlerIdx));
-  msg->procs[0].pe = CmiMyPe();
-  msg->procs[0].ip = myip;
-  msg->procs[0].ncores = CmiNumCores();
-  msg->procs[0].rank = 0;
-  msg->procs[0].nodeID = 0;
-  CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
+  // Prepare message containing proc info
+  msg = (hostnameMsg*)CmiAlloc(sizeof(hostnameMsg));
+  CmiSetHandler((char*)msg, CpvAccess(cpuTopoHandlerIdx));
+  _procInfo* proc = &msg->proc;
+  proc->pe = CmiMyPe();
+  proc->ip = myip;
+  proc->ncores = CmiNumCores();
+  proc->rank = 0;
+  proc->nodeID = 0;
 
-  // Process reduction messages
-  int n_children = CmiNumSpanTreeChildren(CmiMyPe());
-  if (n_children > 0) {
-    CsdScheduleCount(n_children);
+  // All PEs (worker threads) send messages to PE 0
+  // XXX: Involve only rank 0 PEs?
+  CmiSyncSendAndFree(0, sizeof(hostnameMsg), (void*)msg);
+
+  if (CmiMyPe() == 0) {
+    // Prepare topo message for broadcasting in advance
+    if (topomsg == NULL) {
+      topomsg = (nodeTopoMsg*)CmiAlloc(sizeof(nodeTopoMsg) + CmiNumPes() * sizeof(int));
+      CmiSetHandler((char*)topomsg, CpvAccess(cpuTopoRecvHandlerIdx));
+      topomsg->nodes = (int*)((char*)topomsg + sizeof(nodeTopoMsg));
+      for (int i = 0; i < CmiNumPes(); i++) {
+        topomsg->nodes[i] = -1;
+      }
+    }
+    CmiAssert(topomsg != NULL);
+
+    // Handle received messages
+    for (int i = 0; i < CmiNumPes(); i++) {
+      CmiDeliverSpecificMsg(CpvAccess(cpuTopoHandlerIdx));
+    }
   }
 
   // Receive broadcast from PE 0
