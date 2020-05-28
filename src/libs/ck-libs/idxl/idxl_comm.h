@@ -28,7 +28,6 @@ class IDXL_Share {
   IDXL_Share(int c,int i) :chk(c), idx(i) {}
   void pup(PUP::er &p) {p(chk); p(idx);}
 };
-PUPmarshall(IDXL_Share)
 
 /**
  * IDXL_Rec lists all the chunks that share an entity.
@@ -105,7 +104,6 @@ public:
 	void sort2d(double *coord);
 	void sort3d(double *coord);
 };
-PUPmarshall(IDXL_List)
 
 /// This class formats a local index for output.
 /// This is used, e.g., to print 1-based global numbers 
