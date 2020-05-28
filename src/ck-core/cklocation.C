@@ -2551,7 +2551,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
     return true;
   }
 
-  CkAssert(mgr == UsrToEnv(msg)->getArrayMgr());
+  CkAssert((CkGroupID)mgr == UsrToEnv(msg)->getArrayMgr());
   CkArray *arr = managers[mgr];
   if (!arr) {
     bufferedShadowElemMsgs[id].push_back(msg);
