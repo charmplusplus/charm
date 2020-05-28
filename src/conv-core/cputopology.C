@@ -229,11 +229,15 @@ static void cpuTopoHandler(void* m)
     CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg) + CmiNumPes() * sizeof(int),
         (char*)topomsg);
   }
+
+  CmiPrintf("cpuTopoHandler, count %d, PE %d\n", msg_count, CmiMyPe());
 }
 
 // Called on each PE
 static void cpuTopoRecvHandler(void* m)
 {
+  CmiPrintf("cpuTopoRecvHandler, PE %d\n", CmiMyPe());
+
   nodeTopoMsg* msg = (nodeTopoMsg*)m;
   msg->nodes = (int*)((char*)msg + sizeof(nodeTopoMsg));
 
@@ -418,7 +422,9 @@ extern "C" void LrtsInitCpuTopo(char **argv)
       CmiNetworkProgress();
     }
 #endif
+    CmiPrintf("Comm thread %d before barrier\n", CmiMyPe());
     CmiBarrier(); // Match worker threads
+    CmiPrintf("Comm thread %d after barrier, returning\n", CmiMyPe());
     return;    /* comm thread return */
   }
 
@@ -473,8 +479,12 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     }
   }
 
+  CmiPrintf("Before receive broadcast, PE %d\n", CmiMyPe());
+
   // Receive broadcast from PE 0
   CmiDeliverSpecificMsg(CpvAccess(cpuTopoRecvHandlerIdx));
+
+  CmiPrintf("After receive broadcast, PE %d\n", CmiMyPe());
 
   // Ensure all PEs have received CPU topology info
   CmiBarrier();
