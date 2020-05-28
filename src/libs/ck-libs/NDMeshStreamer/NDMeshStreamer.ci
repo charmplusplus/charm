@@ -5,7 +5,7 @@ module NDMeshStreamer {
   message MeshStreamerMessageV {
     int destinationPes[];
     int sourcePes[];
-    int offsets[];
+    std::uint16_t offsets[];
     CkArrayIndex destObjects[];
     char dataItems[];
   };

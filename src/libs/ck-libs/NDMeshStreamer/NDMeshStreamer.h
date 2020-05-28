@@ -15,6 +15,7 @@
 #include "VirtualRouter.h"
 #include "pup_stl.h"
 #include "debug-charm.h"
+#include <cstdint>
 
 // limit total number of buffered data items to
 // maxNumDataItemsBuffered_ (flush when limit is reached) but allow
@@ -96,7 +97,7 @@ public:
   int *destinationPes;
   int* sourcePes;
   char *dataItems;
-  int *offsets;
+  std::uint16_t *offsets;
   CkArrayIndex *destObjects;
 
   MeshStreamerMessageV(int t,bool _isFixedSize): numDataItems(0), msgType(t),fixedSize(_isFixedSize) {
@@ -153,7 +154,7 @@ public:
     return obj;
   }
   template <typename dtype>
-  inline size_t getoffset(const int index) {
+  inline size_t getoffset(const std::uint16_t index) {
     if (fixedSize) {
       return sizeof(dtype)*index;
     }

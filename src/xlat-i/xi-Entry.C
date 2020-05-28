@@ -1039,16 +1039,16 @@ const int   tramDefaultBufferSize = 16384;
 const char *tramArgNumDimensions      = "numDimensions";
 const int   tramDefaultNumDimensions  = 2;
 
-const char *tramArgThresholdFractionNumerator = "thresholdNum";
+const char *tramArgThresholdFractionNumerator = "thresholdNumer";
 const int tramDefaultThresholdFractionNumerator = 1;
 
-const char *tramArgThresholdFractionDenominator = "thresholdDen";
+const char *tramArgThresholdFractionDenominator = "thresholdDenom";
 const int tramDefaultThresholdFractionDenominator = 2;
 
-const char *tramArgCutoffFractionNumerator = "cutoffNum";
+const char *tramArgCutoffFractionNumerator = "cutoffNumer";
 const int tramDefaultCutoffFractionNumerator = 1;
 
-const char *tramArgCutoffFractionDenominator = "cutoffDen";
+const char *tramArgCutoffFractionDenominator = "cutoffDenom";
 const int tramDefaultCutoffFractionDenominator = 2;
 
 const char *tramMaxItemsBuffered = "maxItems";
