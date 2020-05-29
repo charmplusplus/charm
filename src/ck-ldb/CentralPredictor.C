@@ -135,7 +135,7 @@ bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
     y[i] = mod->collection[i+1].objData[object].wallTime;
   }
 
-  Marquardt_coefficients(x,y,mod->parameters[object],alpha,beta,chisq,mod->predictor);
+  Marquardt_coefficients(x,y,mod->parameters[object].data(),alpha,beta,chisq,mod->predictor);
   ochisq = chisq;
 
   while (chisq > 0.01 || !allow_stop) {
@@ -210,24 +210,25 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
 
   } else {
     const int n_objs = stats->objData.size();
-    if (predicted_model->parameters == NULL) {     // time to create the new prediction model
+    if (predicted_model->parameters.empty()) {     // time to create the new prediction model
       // allocate parameters
-      predicted_model->model_valid = new bool[n_objs];
-      predicted_model->parameters = new double*[n_objs];
-      for (i=0; i<n_objs; ++i) predicted_model->parameters[i] = new double[predicted_model->predictor->num_params];
+      predicted_model->model_valid.resize(n_objs);
+      predicted_model->parameters.resize(n_objs);
+      for (auto& param_list : predicted_model->parameters)
+        param_list.resize(predicted_model->predictor->num_params);
       for (i=0; i<n_objs; ++i) {
 	// initialization
-	predicted_model->predictor->initialize_params(predicted_model->parameters[i]);
-	predicted_model->predictor->print(predicted_model->parameters[i]);
+	predicted_model->predictor->initialize_params(predicted_model->parameters[i].data());
+	predicted_model->predictor->print(predicted_model->parameters[i].data());
 
 	model_done = Marquardt_solver(predicted_model, i);
 	// always initialize to false for conservativity
 	predicted_model->model_valid[i] = false;
 	CkPrintf("LB: Model for object %d %s\n",i,model_done?"found":"not found");
-	predicted_model->predictor->print(predicted_model->parameters[i]);
+	predicted_model->predictor->print(predicted_model->parameters[i].data());
       }
 
-      if (predicted_model->model_valid) {
+      if (!predicted_model->model_valid.empty()) {
 	CkPrintf("LB: New model completely constructed\n");
       } else {
 	CkPrintf("LB: Construction of new model failed\n");
@@ -235,19 +236,27 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
 
     } else {     // model already constructed, update it
 
-      double *error_model = new double[n_objs];
-      double *error_default = new double[n_objs];
+      std::vector<double> error_model(n_objs), error_default(n_objs);
 
       CkPrintf("Error in estimation:\n");
       for (i=0; i<n_objs; ++i) {
-	error_model[i] = stats->objData[i].wallTime-predicted_model->predictor->predict(predicted_model->collection[(predicted_model->start_stats-1)%predicted_model->n_stats].objData[i].wallTime,predicted_model->parameters[i]);
-	error_default[i] = stats->objData[i].wallTime-predicted_model->collection[(predicted_model->start_stats-1)%predicted_model->n_stats].objData[i].wallTime;
-	CkPrintf("object %d: real time=%f, model error=%f, default error=%f\n",i,stats->objData[i].wallTime,error_model[i],error_default[i]);
+        const auto predicted_wallTime =
+            predicted_model
+                ->collection[(predicted_model->start_stats - 1) %
+                             predicted_model->collection.size()]
+                .objData[i]
+                .wallTime;
+        error_model[i] = stats->objData[i].wallTime -
+                         predicted_model->predictor->predict(
+                             predicted_wallTime, predicted_model->parameters[i].data());
+        error_default[i] = stats->objData[i].wallTime - predicted_wallTime;
+        CkPrintf("object %d: real time=%f, model error=%f, default error=%f\n", i,
+                 stats->objData[i].wallTime, error_model[i], error_default[i]);
       }
 
       // save statistics in the last position
-      if (predicted_model->start_stats >= predicted_model->n_stats) predicted_model->start_stats -= predicted_model->n_stats;
-      if (predicted_model->cur_stats < predicted_model->n_stats) ++predicted_model->cur_stats;
+      if (predicted_model->start_stats >= predicted_model->collection.size()) predicted_model->start_stats -= predicted_model->collection.size();
+      if (predicted_model->cur_stats < predicted_model->collection.size()) ++predicted_model->cur_stats;
 
       predicted_model->collection[predicted_model->start_stats].n_migrateobjs = stats->n_migrateobjs;
       predicted_model->collection[predicted_model->start_stats].objData = stats->objData;
@@ -266,10 +275,10 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
         if (fabs(error_model[i]) > fabs(error_default[i])) {  // no absolute error check
 	  predicted_model->model_valid[i] = false;
 	  // model wrong, rebuild it now
-	  predicted_model->predictor->initialize_params(predicted_model->parameters[i]);
+	  predicted_model->predictor->initialize_params(predicted_model->parameters[i].data());
 	  model_done = Marquardt_solver(predicted_model, i);
 	  CkPrintf("LB: Updated model for object %d %s",i,model_done?"success":"failed. ");
-	  predicted_model->predictor->print(predicted_model->parameters[i]);
+	  predicted_model->predictor->print(predicted_model->parameters[i].data());
 	}
 	if (fabs(error_model[i]) < fabs(error_default[i])) predicted_model->model_valid[i] = true;
       }
@@ -280,7 +289,7 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
     double *param;
     for (int i=0; i<n_objs; ++i) {
       if (predicted_model->model_valid[i]) {
-	param = predicted_model->parameters[i];
+	param = predicted_model->parameters[i].data();
 	stats->objData[i].wallTime = predicted_model->predictor->predict(stats->objData[i].wallTime, param);
 #if CMK_LB_CPUTIMER
 	stats->objData[i].cpuTime = predicted_model->predictor->predict(stats->objData[i].cpuTime, param);
