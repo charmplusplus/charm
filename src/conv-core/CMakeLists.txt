@@ -122,7 +122,7 @@ if(GIT)
              )
   endif()
 else()
-  set(CHARM_VERSION_GIT "${CHARM_VERSION}")
+  set(CHARM_VERSION_GIT "v${CHARM_VERSION}")
 endif()
 
 file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.C CONTENT
