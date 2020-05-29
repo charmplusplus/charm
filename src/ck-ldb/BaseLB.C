@@ -66,7 +66,7 @@ inline static int ObjKey(const CmiUInt8 &oid, const int hashSize) {
 
 BaseLB::LDStats::LDStats(int c, int complete)
 	: n_migrateobjs(0),
-          objHash(NULL), complete_flag(complete)
+          complete_flag(complete)
 {
   count = c;
   if (count == 0) count = CkNumPes();
@@ -146,14 +146,11 @@ static unsigned int primeLargerThan(unsigned int x)
 
 void BaseLB::LDStats::makeCommHash() {
   // hash table is already build
-  if (objHash) return;
+  if (!objHash.empty()) return;
    
-  int i;
   hashSize = primeLargerThan(objData.size() * 2);
-  objHash = new int[hashSize];
-  for(i=0;i<hashSize;i++)
-        objHash[i] = -1;
-  i = 0;
+  objHash.assign(hashSize, -1);
+  int i = 0;
   for(const auto& obj : objData) {
         const CmiUInt8 &oid = obj.objID();
         int hash = ObjKey(oid, hashSize);
@@ -165,8 +162,7 @@ void BaseLB::LDStats::makeCommHash() {
 }
 
 void BaseLB::LDStats::deleteCommHash() {
-  if (objHash) delete [] objHash;
-  objHash = NULL;
+  objHash.clear();
   for(auto& comm : commData) {
       comm.clearHash();
   }
@@ -405,7 +401,6 @@ void BaseLB::LDStats::pup(PUP::er &p)
     // user can specify simulated processors other than the real # of procs.
     int maxpe = nprocs() > LBSimulation::simProcs ? nprocs() : LBSimulation::simProcs;
     procs = new ProcStats[maxpe];
-    objHash = NULL;
   }
   // ignore the background load when unpacking if the user change the # of procs
   // otherwise load everything
@@ -424,7 +419,6 @@ void BaseLB::LDStats::pup(PUP::er &p)
   if (p.isUnpacking())
     count = LBSimulation::simProcs;
   if (p.isUnpacking()) {
-    objHash = NULL;
     if (_lb_args.lbversion() <= 1) 
       for (i=0; i<nprocs(); i++) procs[i].pe = i;
   }

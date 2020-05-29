@@ -95,7 +95,7 @@ public:
     std::vector<LDCommData> commData;	// communication data - edge list representation
 				// of the communication between objects
 
-    int *objHash;		// this a map from the hash for the 4 integer
+    std::vector<int> objHash;		// this a map from the hash for the 4 integer
 				// LDObjId to the index in the vector "objData"
     int  hashSize;
 
