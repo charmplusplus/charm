@@ -127,7 +127,7 @@ endif()
 
 file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.C CONTENT
 "extern const char * const CmiCommitID;
-const char * const CmiCommitID = \"v${CHARM_VERSION_GIT}\";
+const char * const CmiCommitID = \"${CHARM_VERSION_GIT}\";
 "
 )
 
