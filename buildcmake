@@ -2,7 +2,7 @@
 
 # Thin wrapper around CMake to start a build with a similar command line as ./buildold
 
-set -o errexit -o nounset
+set -o nounset
 
 cmake --version
 
