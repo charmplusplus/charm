@@ -447,6 +447,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DUCX_PMI="$opt_ucx_pmi" \
   -DZLIB="$opt_zlib"
 
+cat $builddir/CMakeFiles/CMakeError.log
+
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
 make $opt_parallel
 
