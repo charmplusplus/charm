@@ -60,7 +60,7 @@ elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "XL")
 elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
   set(CMK_COMPILER msvc)
 else()
-  message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
+  message(FATAL_ERROR "Unknown compiler ---${CMAKE_CXX_COMPILER_ID}---")
 endif()
 
 # Build options
