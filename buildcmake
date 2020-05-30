@@ -4,6 +4,8 @@
 
 set -o errexit -o nounset
 
+cmake --version
+
 # Check that CMake is available and that the version is sufficiently new
 
 command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
