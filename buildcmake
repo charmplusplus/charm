@@ -448,7 +448,12 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DZLIB="$opt_zlib"
 
 pwd
+echo XXXXXXXX
 cat CMakeFiles/CMakeError.log
+echo ---------------------------------
+cat CMakeFiles/CMakeOutput.log
+
+
 
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
 make $opt_parallel
