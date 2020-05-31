@@ -9,7 +9,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build-charm++
-      run: ./build ChaNGa netlrts-linux-x86_64 -g -j4 --with-production
+      run: |
+        ssh-copy-id localhost
+        ./build ChaNGa netlrts-linux-x86_64 -g -j4 --with-production
     - name: build-changa
       run: | 
         git clone https://github.com/N-bodyshop/utility
