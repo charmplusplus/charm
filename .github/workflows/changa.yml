@@ -1,0 +1,22 @@
+name: ChaNGa
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: build-charm++
+      run: ./build ChaNGa uth-linux-x86_64 -g -j4 --with-production
+    - name: build-changa
+      run: | 
+        git clone git@github.com:N-bodyshop/utility
+        git clone git@github.com:N-bodyshop/changa
+        cd changa
+        make
+    - name: test-changa
+      run: |
+        cd testcollapse
+        make test
