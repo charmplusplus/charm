@@ -10,9 +10,6 @@ jobs:
     - uses: actions/checkout@v2
     - name: build-charm++
       run: |
-        ssh-keygen -f $HOME/.ssh/id_rsa -N ""
-        echo "NoHostAuthenticationForLocalhost yes" >> ~/.ssh/config
-        ssh-copy-id localhost
         ./build ChaNGa netlrts-linux-x86_64 -g -j4 --with-production
     - name: build-changa
       run: | 
@@ -24,4 +21,5 @@ jobs:
     - name: test-changa
       run: |
         cd changa/testcollapse
+        sed -i "s,charmrun,charmrun ++local," Makefile
         make test
