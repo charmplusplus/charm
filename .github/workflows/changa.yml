@@ -15,6 +15,7 @@ jobs:
         git clone https://github.com/N-bodyshop/utility
         git clone http://github.com/N-bodyshop/changa
         cd changa
+        ./configure
         make
     - name: test-changa
       run: |
