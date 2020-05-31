@@ -12,8 +12,8 @@ jobs:
       run: ./build ChaNGa uth-linux-x86_64 -g -j4 --with-production
     - name: build-changa
       run: | 
-        git clone git@github.com:N-bodyshop/utility
-        git clone git@github.com:N-bodyshop/changa
+        git clone https://github.com/N-bodyshop/utility
+        git clone http://github.com/N-bodyshop/changa
         cd changa
         make
     - name: test-changa
