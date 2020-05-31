@@ -20,6 +20,5 @@ jobs:
         make
     - name: test-changa
       run: |
-        cd changa/testcollapse
-        sed -i "s,charmrun,charmrun ++local," Makefile
+        cd changa/teststep
         make test
