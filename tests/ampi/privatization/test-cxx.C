@@ -49,10 +49,8 @@ static int * get_extern_global_sharedlibrary()
 #endif
 
 
-void perform_test_batch(int & failed, int & rank, int & my_wth, int & operation)
+void perform_test_batch(int & failed, int & test, int & rank, int & my_wth, int & operation)
 {
-  if (rank == 0) printf("Beginning round of testing.\n");
-
 #if defined test_dynamiclib
   int * extern_global_sharedlibrary_dynamic_ptr = nullptr;
 #if defined test_staticvars
@@ -81,97 +79,101 @@ void perform_test_batch(int & failed, int & rank, int & my_wth, int & operation)
 #endif
 
 
-  if (rank == 0) printf("Testing: extern global, in same object\n");
-  test_privatization(failed, rank, my_wth, operation, *get_extern_global_sameobject());
+  print_test(test, rank, "extern global, in same object");
+  test_privatization(failed, test, rank, my_wth, operation, *get_extern_global_sameobject());
 #if defined test_staticvars
-  if (rank == 0) printf("Testing: static global, in same object\n");
-  test_privatization(failed, rank, my_wth, operation, *get_static_global_sameobject());
-  if (rank == 0) printf("Testing: static local, in same object\n");
-  test_privatization(failed, rank, my_wth, operation, *get_static_local_sameobject());
+  print_test(test, rank, "static global, in same object");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_global_sameobject());
+  print_test(test, rank, "static local, in same object");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_local_sameobject());
 #endif
 
-  if (rank == 0) printf("Testing: extern global, in other object\n");
-  test_privatization(failed, rank, my_wth, operation, *get_extern_global_otherobject());
+  print_test(test, rank, "extern global, in other object");
+  test_privatization(failed, test, rank, my_wth, operation, *get_extern_global_otherobject());
 #if defined test_staticvars
-  if (rank == 0) printf("Testing: static global, in other object\n");
-  test_privatization(failed, rank, my_wth, operation, *get_static_global_otherobject());
-  if (rank == 0) printf("Testing: static local, in other object\n");
-  test_privatization(failed, rank, my_wth, operation, *get_static_local_otherobject());
+  print_test(test, rank, "static global, in other object");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_global_otherobject());
+  print_test(test, rank, "static local, in other object");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_local_otherobject());
 #endif
 
-  if (rank == 0) printf("Testing: extern global, in static library\n");
-  test_privatization(failed, rank, my_wth, operation, *get_extern_global_staticlibrary());
+  print_test(test, rank, "extern global, in static library");
+  test_privatization(failed, test, rank, my_wth, operation, *get_extern_global_staticlibrary());
 #if defined test_staticvars
-  if (rank == 0) printf("Testing: static global, in static library\n");
-  test_privatization(failed, rank, my_wth, operation, *get_static_global_staticlibrary());
-  if (rank == 0) printf("Testing: static local, in static library\n");
-  test_privatization(failed, rank, my_wth, operation, *get_static_local_staticlibrary());
+  print_test(test, rank, "static global, in static library");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_global_staticlibrary());
+  print_test(test, rank, "static local, in static library");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_local_staticlibrary());
 #endif
 
 #if defined test_sharedlib
-  if (rank == 0) printf("Testing: extern global, in shared library\n");
-  test_privatization(failed, rank, my_wth, operation, *get_extern_global_sharedlibrary());
+  print_test(test, rank, "extern global, in shared library");
+  test_privatization(failed, test, rank, my_wth, operation, *get_extern_global_sharedlibrary());
 #if defined test_staticvars
-  if (rank == 0) printf("Testing: static global, in shared library\n");
-  test_privatization(failed, rank, my_wth, operation, *get_static_global_sharedlibrary());
-  if (rank == 0) printf("Testing: static local, in shared library\n");
-  test_privatization(failed, rank, my_wth, operation, *get_static_local_sharedlibrary());
+  print_test(test, rank, "static global, in shared library");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_global_sharedlibrary());
+  print_test(test, rank, "static local, in shared library");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_local_sharedlibrary());
 #endif
 #endif
 
 #if defined test_dynamiclib
-  if (rank == 0) printf("Testing: extern global, in shared library, linked dynamically\n");
+  print_test(test, rank, "extern global, in shared library, linked dynamically");
   if (extern_global_sharedlibrary_dynamic_ptr)
-    test_privatization(failed, rank, my_wth, operation, *extern_global_sharedlibrary_dynamic_ptr);
+    test_privatization(failed, test, rank, my_wth, operation, *extern_global_sharedlibrary_dynamic_ptr);
   else
-    if (rank == 0) printf(result_indent "Skipped.\n");
+    test_skip(test, rank);
 #if defined test_staticvars
-  if (rank == 0) printf("Testing: static global, in shared library, linked dynamically\n");
+  print_test(test, rank, "static global, in shared library, linked dynamically");
   if (get_static_global_sharedlibrary_dynamic_ptr)
-    test_privatization(failed, rank, my_wth, operation, *get_static_global_sharedlibrary_dynamic_ptr());
+    test_privatization(failed, test, rank, my_wth, operation, *get_static_global_sharedlibrary_dynamic_ptr());
   else
-    if (rank == 0) printf(result_indent "Skipped.\n");
-  if (rank == 0) printf("Testing: static local, in shared library, linked dynamically\n");
+    test_skip(test, rank);
+  print_test(test, rank, "static local, in shared library, linked dynamically");
   if (get_static_local_sharedlibrary_dynamic_ptr)
-    test_privatization(failed, rank, my_wth, operation, *get_static_local_sharedlibrary_dynamic_ptr());
+    test_privatization(failed, test, rank, my_wth, operation, *get_static_local_sharedlibrary_dynamic_ptr());
   else
-    if (rank == 0) printf(result_indent "Skipped.\n");
+    test_skip(test, rank);
 #endif
 #endif
 
 #if defined test_dynamiclib
   dlclose(dynamiclib);
 #endif
-
-  if (rank == 0) printf("Round of testing complete.\n");
 }
 
 
 #if defined test_migration
 test_thread_local extern int global_myrank;
 test_thread_local int global_myrank;
+#endif
 
 static void privatization_about_to_migrate()
 {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  printf("[%d] About to migrate.\n", rank);
 
+#if defined test_migration
   if (rank != global_myrank)
   {
     printf("[%d] Globals incorrect when about to migrate!\n", rank);
   }
+#endif
 }
 static void privatization_just_migrated()
 {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  printf("[%d] Just migrated.\n", rank);
 
+#if defined test_migration
   if (rank != global_myrank)
   {
     printf("[%d] Globals incorrect when just migrated!\n", rank);
   }
-}
 #endif
+}
 
 int main(int argc, char **argv)
 {
@@ -179,9 +181,9 @@ int main(int argc, char **argv)
 
 #if defined test_migration
   MPI_Comm_rank(MPI_COMM_WORLD, &global_myrank);
+#endif
   AMPI_Register_about_to_migrate(privatization_about_to_migrate);
   AMPI_Register_just_migrated(privatization_just_migrated);
-#endif
 
   privatization_test_framework();
 
