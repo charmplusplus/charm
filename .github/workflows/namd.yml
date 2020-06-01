@@ -21,5 +21,5 @@ jobs:
         make -j4
     - name: test-namd
       run: |
-        cd namd/Linux-x86_64-g++
+        cd ../namd/Linux-x86_64-g++
         ./charmrun ++local +p2 ./namd2 src/alanin
