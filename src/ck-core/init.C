@@ -1658,6 +1658,8 @@ void _initCharm(int unused_argc, char **argv)
 #endif
     }
 
+    CmiBarrier();
+
 #if CMK_CUDA
     // Only worker threads execute the following
     if (!CmiInCommThread()) {
