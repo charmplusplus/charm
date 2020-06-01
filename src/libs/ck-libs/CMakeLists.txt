@@ -69,6 +69,8 @@ endforeach()
 
 target_compile_options(moduleliveViz PRIVATE -DEXTERIOR_BLACK_PIXEL_ELIMINATION)
 
+file(WRITE ${CMAKE_BINARY_DIR}/lib/libmoduleliveViz.dep "${CMK_LIBJPEG}\n")
+
 # taskGraph
 configure_file(taskGraph/taskGraph.h ${CMAKE_BINARY_DIR}/include COPYONLY)
 add_library(moduletaskGraph taskGraph/taskGraph.h taskGraph/taskGraph.C)
