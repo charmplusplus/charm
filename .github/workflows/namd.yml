@@ -12,8 +12,7 @@ jobs:
       run: ./build charm++ netlrts-linux-x86_64 -g -j4 --with-production
     - name: build-namd
       run: |
-        pwd
-        ls
+        sudo apt -y install sfftw-dev
         cd ..
         git clone https://charm.cs.illinois.edu/gerrit/namd
         cd namd
