@@ -85,6 +85,10 @@ else()
   set(CMK_SUPPORTS_PIPGLOBALS 0)
 endif()
 
+# Misc. flags
+set(CMK_LBID_64BIT 1)
+set(CMK_CKSECTIONINFO_STL 1)
+
 # Create conv-autoconfig.h by iterating over all variable names and #defining them.
 get_cmake_property(_variableNames VARIABLES)
 list (SORT _variableNames)
@@ -93,7 +97,7 @@ set(optfile ${CMAKE_BINARY_DIR}/include/conv-autoconfig.h)
 file(REMOVE ${optfile})
 
 foreach (v ${_variableNames})
-    if(("${v}" MATCHES "^CMK_"  OR "${v}" MATCHES "^SIZEOF_" OR "${v}" MATCHES "^CHARM_") AND NOT "${v}" MATCHES "_CODE$")
+    if(("${v}" MATCHES "^CMK_"  OR "${v}" MATCHES "^SIZEOF_" OR "${v}" MATCHES "^CHARM_" OR "${v}" MATCHES "^QLOGIC$") AND NOT "${v}" MATCHES "_CODE$")
         if("${${v}}" STREQUAL "" OR "${${v}}" STREQUAL "FALSE")
             set(${v} 0)
         elseif("${${v}}" STREQUAL "TRUE")
