@@ -1,0 +1,23 @@
+name: NAMD
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: build-charm++
+      run: ./build charm++ netlrts-linux-x86_64 -g -j4 --with-production
+    - name: build-namd
+      run: |
+        git clone https://charm.cs.illinois.edu/gerrit/namd
+        cd namd
+        ./config Linux-x86_64-g++ --charm-arch netlrts-linux-x86_64
+        cd Linux-x86_64-g++
+        make -j4
+    - name: test-namd
+      run: |
+        cd namd/Linux-x86_64-g++
+        ./charmrun ++local +p2 ./namd2 src/alanin
