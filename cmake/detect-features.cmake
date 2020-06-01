@@ -89,6 +89,9 @@ endif()
 set(CMK_LBID_64BIT 1)
 set(CMK_CKSECTIONINFO_STL 1)
 
+#FIXME: add CMK_CRAY_MAXNID
+
+
 # Create conv-autoconfig.h by iterating over all variable names and #defining them.
 get_cmake_property(_variableNames VARIABLES)
 list (SORT _variableNames)
