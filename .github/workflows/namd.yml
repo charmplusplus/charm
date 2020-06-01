@@ -19,7 +19,13 @@ jobs:
         ./config Linux-x86_64-g++ --charm-base ../charm --charm-arch netlrts-linux-x86_64 --without-tcl
         cd Linux-x86_64-g++
         make -j4
-    - name: test-namd
+    - name: test-namd-alanin
       run: |
         cd ../namd/Linux-x86_64-g++
         ./charmrun ++local +p2 ./namd2 src/alanin
+    - name: test-namd-apoa1
+      run: |
+        cd ../namd/Linux-x86_64-g++
+        wget http://www.ks.uiuc.edu/Research/namd/utilities/apoa1.tar.gz
+        tar xzf apoa1.tar.gz
+        ./charmrun ++local +p4 ./namd2 apoa1/apoa1.namd
