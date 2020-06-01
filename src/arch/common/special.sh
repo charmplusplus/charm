@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 export CHARMINC=../include
 . ./conv-config.sh

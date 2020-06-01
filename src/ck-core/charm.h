@@ -9,6 +9,7 @@
 #include <sys/types.h> /* for size_t */
 
 #ifdef __cplusplus
+#include "conv-rdma.h"
 #include "pup.h"
 extern "C" {
 #endif
@@ -108,6 +109,7 @@ extern void  CkFreeSysMsg(void *msg);
 extern void* CkAllocBuffer(void *msg, int bufsize);
 extern void  CkFreeMsg(void *msg);
 extern void* CkCopyMsg(void **pMsg);
+extern void* CkReferenceMsg(void *msg);
 extern void  CkSetQueueing(void *msg, int strategy);
 extern void* CkPriorityPtr(void *msg);
 
@@ -124,6 +126,7 @@ extern void registerReadOnlyRecvExtCallback(void (*cb)(int, char*));
 extern void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char*, int));
 extern void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int));
 extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int));
+extern void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int*, int, int, char *, int));
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
 extern void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int));
 extern void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *));
@@ -131,7 +134,6 @@ extern void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *))
 extern void StartCharmExt(int argc, char **argv); // start Converse/Charm, argv are the command-line arguments
 extern int CkMyPeHook(void);   // function equivalent of CkMyPe macro
 extern int CkNumPesHook(void); // function equivalent of CkNumPes macro
-extern void CmiAbortHook(const char *msg);
 /// Get current redNo of specified group instance on this PE
 extern int CkGroupGetReductionNumber(int gid);
 /// Get current redNo of specified array element on this PE
@@ -341,12 +343,15 @@ typedef enum {
   ArrayEltInitMsg      =20,              // Array Element Initialization message
   ForArrayEltMsg       =21,              // Array Element entry method message
   ForIDedObjMsg        =22,
+  BocBcastMsg          =23,              // A broadcast to a group which will be sent to each node
+  ArrayBcastMsg        =24,              // A broadcast to an array which will be sent to each node
+  ArrayBcastFwdMsg     =25,              // A bcast which arrived on node and must be forwarded to local array elements
 #if CMK_LOCKLESS_QUEUE
-  WarnMsg              =23,              // Warning data message (Reduction)
-  WarnDoneMsg          =24,              // Signal completion of warnings reduction (Broadcast)
-  LAST_CK_ENVELOPE_TYPE =25              // Used for error-checking
+  WarnMsg              =26,              // Warning data message (Reduction)
+  WarnDoneMsg          =27,              // Signal completion of warnings reduction (Broadcast)
+  LAST_CK_ENVELOPE_TYPE =28              // Used for error-checking
 #else
-  LAST_CK_ENVELOPE_TYPE =23              // Used for error-checking
+  LAST_CK_ENVELOPE_TYPE =26              // Used for error-checking
 #endif
 } CkEnvelopeType;
 
@@ -361,8 +366,7 @@ typedef enum {
 #define CK_MSG_INLINE      	0x1
 #define CK_MSG_IMMEDIATE   	0x2
 #define CK_MSG_EXPEDITED	0x4
-#define CK_MSG_KEEP		0x8    /* send without freeing message */
-#define CK_MSG_LB_NOTRACE	0x10   /* load balancer doesn't trace */
+#define CK_MSG_LB_NOTRACE	0x8   /* load balancer doesn't trace */
 
 #ifdef __cplusplus
 #define CK_MSGOPTIONAL =0
@@ -479,6 +483,7 @@ extern void CkSummary_MarkEvent(int);
 extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
+extern void CkCallWhenIdle(int epIdx, void* obj);
 
 #ifdef __cplusplus
 }

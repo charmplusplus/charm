@@ -6,7 +6,7 @@
 /*
  Startup routine for use when you include the commonly used load balancers.
 */
-#include <LBDatabase.h>
+#include <LBManager.h>
 #include "CommonLBs.decl.h"
 
 static void CreateNoLB(void)

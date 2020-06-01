@@ -10,6 +10,7 @@
 #include <string>
 
 #include "converse.h"
+#include "cmirdmautils.h"
 #include "machine.h"
 #include "pcqueue.h"
 #include "machine-lrts.h"
@@ -36,13 +37,14 @@
 #define UCX_MSG_NUM_RX_REQS_MAX         1024
 #define UCX_TAG_MSG_BITS                4
 #define UCX_TAG_RMA_BITS                4
-#define UCX_MSG_TAG_DIRECT              UCS_BIT(0)
+#define UCX_MSG_TAG_EAGER               UCS_BIT(0)
 #define UCX_MSG_TAG_PROBE               UCS_BIT(1)
 #define UCX_RMA_TAG_GET                 UCS_BIT(UCX_TAG_MSG_BITS + 1)
 #define UCX_RMA_TAG_REG_AND_SEND_BACK   UCS_BIT(UCX_TAG_MSG_BITS + 2)
 #define UCX_RMA_TAG_DEREG_AND_ACK       UCS_BIT(UCX_TAG_MSG_BITS + 3)
 #define UCX_MSG_TAG_MASK                UCS_MASK(UCX_TAG_MSG_BITS)
 #define UCX_RMA_TAG_MASK                (UCS_MASK(UCX_TAG_RMA_BITS) << UCX_TAG_MSG_BITS)
+#define UCX_MSG_TAG_MASK_FULL           0xffffffffffffffffUL
 
 #define UCX_LOG_PRIO 50 // Disabled by default
 
@@ -141,17 +143,17 @@ void UcxRequestInit(void *request)
 
 static void UcxInitEps(int numNodes, int myId)
 {
+    size_t addrlen;
     ucp_address_t *address;
     ucs_status_t status;
     ucp_ep_params_t eParams;
-    size_t addrlen, maxval, len, partLen;
     ucp_ep_h ep;
-    int i, j, ret, peer, maxkey, parts;
+    int i, j, ret, peer, maxkey, maxval, parts, len, partLen;
     char *keys, *addrp, *remoteAddr;
 
     ret = runtime_get_max_keylen(&maxkey);
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_get_max_keylen error");
-    ret = runtime_get_max_vallen((int*)&maxval);
+    ret = runtime_get_max_vallen(&maxval);
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_get_max_vallen error");
 
     // Reduce maxval value, because with PMI1 it has to fit cmd + key + value
@@ -166,6 +168,7 @@ static void UcxInitEps(int numNodes, int myId)
 
     status = ucp_worker_get_address(ucxCtx.worker, &address, &addrlen);
     UCX_CHECK_STATUS(status, "UcxInitEps: ucp_worker_get_address error");
+    CmiEnforce(addrlen < std::numeric_limits<int>::max()); //address should fit to int
 
     parts = (addrlen / maxval) + 1;
 
@@ -176,7 +179,7 @@ static void UcxInitEps(int numNodes, int myId)
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
 
     addrp = (char*)address;
-    len   = addrlen;
+    len   = (int)addrlen;
     for (i = 0; i < parts; ++i) {
         partLen = std::min(maxval, len);
         ret = snprintf(keys, maxkey, "UCX-%d-%d", myId, i);
@@ -187,10 +190,9 @@ static void UcxInitEps(int numNodes, int myId)
         len   -= partLen;
     }
 
-    /* Ensure that all nodes published their worker addresses */
+    // Ensure that all nodes published their worker addresses
     ret = runtime_barrier();
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_barrier");
-
 
     ucp_worker_release_address(ucxCtx.worker, address);
 
@@ -277,10 +279,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         }
     }
 
-    // Any RNDV thresh is allowed
-    if (!CmiGetArgInt(*argv, "+ucx_rndv_thresh", &ucxCtx.eagerSize)) {
-        ucxCtx.eagerSize = UCX_MSG_PROBE_THRESH;
-    }
+    // Eager messages should fit NcpyOperationInfo data.
+    // Adjust rendezvous threshold accordingly.
+    int thresh = UCX_MSG_PROBE_THRESH;
+    CmiGetArgInt(*argv, "+ucx_rndv_thresh", &thresh);
+    ucxCtx.eagerSize = std::max(LrtsGetMaxNcpyOperationInfoSize(), thresh);
 
     UcxInitEps(*numNodes, *myNodeID);
 
@@ -298,13 +301,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
             ucxCtx.numRxReqs, ucxCtx.eagerSize);
 }
 
-static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
-                                       ucp_tag_message_h msg)
+static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
+                                               ucp_tag_message_h msg)
 {
     void *buf = CmiAlloc(size);
     UcxRequest *req;
 
-    if (tag == UCX_MSG_TAG_DIRECT) {
+    if (tag == UCX_MSG_TAG_EAGER) {
         req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, buf,
                                            ucxCtx.eagerSize,
                                            ucp_dt_make_contig(1), tag,
@@ -323,26 +326,39 @@ static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
 
     // Request completed immediately
     if (req->completed) {
-        int idx = req->idx;
-
         if (!(tag & UCX_RMA_TAG_MASK)) {
             handleOneRecvedMsg(size, (char*)buf);
-        }
-
-        UCX_REQUEST_FREE(req);
-
-        if (tag & UCX_MSG_TAG_DIRECT) {
-            ucxCtx.rxReqs[idx] = UcxPostRxReq(UCX_MSG_TAG_DIRECT, ucxCtx.eagerSize, NULL);
-            ucxCtx.rxReqs[idx]->idx = idx;
-            req = ucxCtx.rxReqs[idx];
-        } else {
-            return NULL;
         }
     } else {
         req->msgBuf = buf;
     }
 
     return req;
+}
+
+static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
+                                       ucp_tag_message_h msg)
+{
+    UcxRequest *req = UcxPostRxReqInternal(tag, size, msg);
+    int idx = req->idx;
+
+    do {
+        if (req->completed) {
+            UCX_REQUEST_FREE(req);
+
+            if (tag & UCX_MSG_TAG_EAGER) {
+                req = UcxPostRxReqInternal(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
+                req->idx = idx;
+                ucxCtx.rxReqs[idx] = req;
+            } else {
+                return NULL;
+            }
+        }
+        else {
+            return req;
+        }
+    }
+    while (1);
 }
 
 static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, char *rxBuf,
@@ -354,8 +370,8 @@ static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, char *rxBuf,
 
     UCX_REQUEST_FREE(request);
 
-    if (tag & UCX_MSG_TAG_DIRECT) {
-        ucxCtx.rxReqs[idx]      = UcxPostRxReq(UCX_MSG_TAG_DIRECT,
+    if (tag & UCX_MSG_TAG_EAGER) {
+        ucxCtx.rxReqs[idx]      = UcxPostRxReq(UCX_MSG_TAG_EAGER,
                                                ucxCtx.eagerSize, NULL);
         ucxCtx.rxReqs[idx]->idx = idx;
         return ucxCtx.rxReqs[idx];
@@ -447,7 +463,7 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
 #endif
 
     if (req->msgBuf != NULL) {
-        // Request is not completed immideately
+        // Request is not completed immediately
         UcxHandleRxReq(req, (char*)req->msgBuf, info->length, info->sender_tag, req->idx);
     } else {
         req->completed = 1;
@@ -461,7 +477,7 @@ static void UcxPrepostRxBuffers()
     ucxCtx.rxReqs = (UcxRequest**)CmiAlloc(sizeof(UcxRequest*) * ucxCtx.numRxReqs);
 
     for (i = 0; i < ucxCtx.numRxReqs; i++) {
-        ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_DIRECT, ucxCtx.eagerSize, NULL);
+        ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
         ucxCtx.rxReqs[i]->idx = i;
     }
     UCX_LOG(3, "UCX: preposted %d rx requests", ucxCtx.numRxReqs);
@@ -480,14 +496,17 @@ void UcxTxReqCompleted(void *request, ucs_status_t status)
 }
 
 // tag may carry RMA tag
-inline void* UcxSendMsg(int destNode, int destPE, int size,
-                               char *msg, ucp_tag_t tag,
-                               ucp_send_callback_t cb)
+inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
+                        ucp_tag_t tag, ucp_send_callback_t cb)
 {
     ucp_tag_t sTag;
 
     // Combine tag and sTag: sTag defines msg protocol, tag may indicate RMA requests
-    sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_DIRECT;
+    sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_EAGER;
+
+    // Auxilliary messages (which add bits to the tag) should use eager.
+    CmiEnforce((tag == 0ul) || (sTag == UCX_MSG_TAG_EAGER));
+
     sTag |= tag;
 
     UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
@@ -600,8 +619,11 @@ void LrtsAdvanceCommunication(int whileidle)
     do {
        cnt = ucp_worker_progress(ucxCtx.worker);
 
+       // Probe with full tag mask to avoid long traversing thru unexpected
+       // queue of eager messages (messages with non-full mask added to the
+       // same unexpected queue)
        msg = ucp_tag_probe_nb(ucxCtx.worker, UCX_MSG_TAG_PROBE,
-                              UCX_MSG_TAG_MASK, 1, &info);
+                              UCX_MSG_TAG_MASK_FULL, 1, &info);
        if (msg != NULL) {
            UCX_LOG(3, "Got msg %p, len %zu\n", msg, info.length);
            UcxPostRxReq(UCX_MSG_TAG_PROBE, info.length, msg);

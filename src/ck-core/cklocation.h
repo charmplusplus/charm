@@ -42,9 +42,9 @@ public:
 
 /* Utility */
 //#if CMK_LBDB_ON
-#include "LBDatabase.h"
+#include "LBManager.h"
 #include "MetaBalancer.h"
-class LBDatabase;
+class LBManager;
 //#endif
 
 //Forward declarations
@@ -289,6 +289,7 @@ typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHas
 typedef std::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
 typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
 typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
+typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
 
 	CkLocMgr(CkArrayOptions opts);
 	CkLocMgr(CkMigrateMessage *m);
@@ -430,8 +431,8 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
     void metaLBCallLB(CkLocRec *rec);
 
 #if CMK_LBDB_ON
-	LBDatabase *getLBDB(void) const { return the_lbdb; }
-    MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
+	LBManager *getLBMgr(void) const { return lbmgr; }
+	MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
 	const LDOMHandle &getOMHandle(void) const { return myLBHandle; }
 #endif
 
@@ -460,6 +461,7 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
 
 private:
 //Internal interface:
+	void AtSyncBarrierReached();
 	//Add given element array record at idx, replacing the existing record
 	void insertRec(CkLocRec *rec,const CmiUInt8 &id);
 
@@ -492,6 +494,14 @@ private:
 public:
 	void callMethod(CkLocRec *rec,CkMigratable_voidfn_t fn);
 
+	// Deliver buffered msgs that were buffered because of active rdma gets
+	void deliverAnyBufferedRdmaMsgs(CmiUInt8);
+
+	// Take all those actions that were waiting for the rgets launched from pup_buffer to complete
+	// These actions include: calling ckJustMigrated, calling ResumeFromSync and delivering any buffered messages
+	// that were sent for the element (which was still carrying out rgets)
+	void processAfterActiveRgetsCompleted(CmiUInt8 id);
+
 //Data Members:
     //Map array ID to manager and elements
     ArrayIdMap managers;
@@ -511,8 +521,13 @@ public:
     MsgBuffer bufferedMsgs;
     MsgBuffer bufferedRemoteMsgs;
     MsgBuffer bufferedShadowElemMsgs;
+    MsgBuffer bufferedActiveRgetMsgs;
 
     IndexMsgBuffer bufferedIndexMsgs;
+
+    // Map stores the CkMigratable elements that have active Rgets
+    // ResumeFromSync is not called for these elements until the Rgets have completed
+    ElemMap toBeResumeFromSynced;
 
 	bool addElementToRec(CkLocRec *rec,CkArray *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
@@ -528,34 +543,35 @@ public:
 private:
 	/// The core of the location manager: map array index to element representative
 	LocRecHash hash;
-	CmiImmediateLockType hashImmLock;
 
 	//Map object
 	CkGroupID mapID;
 	int mapHandle;
 	CkArrayMap *map;
 
-	CkGroupID lbdbID;
+	CkGroupID lbmgrID;
 	CkGroupID metalbID;
+
+	std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
 
 	ck::ArrayIndexCompressor *compressor;
 	CkArrayIndex bounds;
 	void checkInBounds(const CkArrayIndex &idx);
 
 #if CMK_LBDB_ON
-	LBDatabase *the_lbdb;
+	LBManager *lbmgr;
   MetaBalancer *the_metalb;
-	LDBarrierClient dummyBarrierHandle;
-	static void staticDummyResumeFromSync(void* data);
-	void dummyResumeFromSync(void);
-	static void staticRecvAtSync(void* data);
-	void recvAtSync(void);
 	LDOMHandle myLBHandle;
+        LDBarrierClient lbBarrierClient;
         LDBarrierReceiver lbBarrierReceiver;
 #endif
 private:
-	void initLB(CkGroupID lbdbID, CkGroupID metalbID);
+	void initLB(CkGroupID lbmgrID, CkGroupID metalbID);
 
+public:
+#if CMK_LBDB_ON
+  void dummyResumeFromSync(void);
+#endif
 
 };
 

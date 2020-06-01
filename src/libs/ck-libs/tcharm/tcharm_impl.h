@@ -82,13 +82,9 @@ CtvExtern(TCharm *,_curTCharm);
 class TCharm: public CBase_TCharm
 {
  private:
-	friend class TCharmAPIRoutine; //So he can get to heapBlocks:
+	friend class TCharmAPIRoutine;
 
 	CthThread tid; //Our migratable thread
-	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
-#if CMI_SWAPGLOBALS
-	CtgGlobals threadGlobals; //Global data
-#endif
 
 	//isSelfDone is added for out-of-core emulation in BigSim
 	//when thread is brought back into core, ResumeFromSync is called
@@ -106,6 +102,9 @@ class TCharm: public CBase_TCharm
 
 	TCharmInitMsg *initMsg; //Thread initialization data
 	double timeOffset; //Value to add to CkWallTimer to get my clock
+
+	// Called from ResumeFromSync so TCharm users can do things before start()
+	CkCallback resumeAfterMigrationCallback;
 
  public:
 	//User's heap-allocated/global data:
@@ -159,6 +158,12 @@ class TCharm: public CBase_TCharm
 	virtual void ckJustMigrated();
 	virtual void ckJustRestored();
 	virtual void ckAboutToMigrate();
+
+	template <class T = CkCallback>
+	void setResumeAfterMigrationCallback(T && cb)
+	{
+		resumeAfterMigrationCallback = std::forward<T>(cb);
+	}
 
 	void atBarrier();
 	void atExit(CkReductionMsg *msg) noexcept;
@@ -255,13 +260,15 @@ class TCharm: public CBase_TCharm
 	}
 
  private:
-	CMI_WARN_UNUSED_RESULT TCharm * stop_static() noexcept {
+	CMI_WARN_UNUSED_RESULT static TCharm * stop_static() noexcept {
+		TCharm::deactivateThread();
 		CthSuspend();
 		/* SUBTLE: We have to do the get() because "this" may have changed
 		 * during a migration-suspend.  If you access *any* members
 		 * from this point onward, you'll cause heap corruption if
 		 * we're resuming from migration!  (OSL 2003/9/23) */
 		TCharm *dis=TCharm::get();
+		TCharm::activateThread();
 		dis->isStopped=false;
 		dis->startTiming();
 		return dis;
@@ -294,26 +301,16 @@ class TCharm: public CBase_TCharm
 	CMI_WARN_UNUSED_RESULT TCharm * allow_migrate();
 
 	//Entering thread context: turn stuff on
-	static void activateThread(void) noexcept {
-		// NOTE: if changing the body of this function, you also need to
-		//       modify TCharmAPIRoutine's destructor, which has the body
-		//       of this routine inlined into it to avoid extra branching.
-		TCharm *tc=CtvAccess(_curTCharm);
-		if (tc!=NULL) {
-			if (tc->heapBlocks)
-				CmiIsomallocBlockListActivate(tc->heapBlocks);
-#if CMI_SWAPGLOBALS
-			if (tc->threadGlobals)
-				CtgInstall(tc->threadGlobals);
-#endif
-		}
+	static void activateThread() noexcept {
+		TCharm *tc = CtvAccess(_curTCharm);
+		if (tc != nullptr)
+			CthInterceptionsDeactivatePop(tc->getThread());
 	}
 	//Leaving this thread's context: turn stuff back off
 	static void deactivateThread() noexcept {
-		CmiIsomallocBlockListActivate(NULL);
-#if CMI_SWAPGLOBALS
-		CtgInstall(NULL);
-#endif
+		TCharm *tc = CtvAccess(_curTCharm);
+		if (tc != nullptr)
+			CthInterceptionsDeactivatePush(tc->getThread());
 	}
 
 	/// System() call emulation:
@@ -349,16 +346,9 @@ int tcharm_routineNametoID(char const *routineName) noexcept
 // - Traces library code entry/exit with appropriate build flags
 class TCharmAPIRoutine {
 private:
-	bool doIsomalloc; // Whether to enable/disable Isomalloc for Heap memory
-	bool doSwapglobals; // Whether to swap sets of global variables
-	tlsseg_t oldtlsseg; // for TLS globals
 #if CMK_TRACE_ENABLED
 	double start; // starting time of trace event
 	int tcharm_routineID; // TCharm routine ID that is traced
-#endif
-#if CMK_BIGSIM_CHARM
-	void *callEvent; // The BigSim-level event that called into the library
-	int pe;          // in case thread migrates
 #endif
 
 public:
@@ -368,27 +358,11 @@ public:
 #else
 	TCharmAPIRoutine() noexcept {
 #endif
-#if CMK_BIGSIM_CHARM
-		// Start a new event, so we can distinguish between client
-		// execution and library execution
-		_TRACE_BG_TLINE_END(&callEvent);
-		_TRACE_BG_END_EXECUTE(0);
-		pe = CmiMyPe();
-		_TRACE_BG_BEGIN_EXECUTE_NOMSG(routineName, &callEvent, 0);
-#endif
 #if CMK_TRACE_ENABLED
 		start = CmiWallTimer();
 		tcharm_routineID = tcharm_routineNametoID(routineName);
 #endif
 
-		doIsomalloc = (CmiIsomallocBlockListCurrent() != NULL);
-#if CMI_SWAPGLOBALS
-		doSwapglobals = (CtgCurrentGlobals() != NULL);
-#endif
-		if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-			CtgInstallMainThreadTLS(&oldtlsseg); //switch to main thread
-		}
-		//Disable migratable memory allocation while in Charm++:
 		TCharm::deactivateThread();
 
 #if CMK_TRACE_ENABLED
@@ -402,31 +376,8 @@ public:
 		double stop = CmiWallTimer();
 #endif
 
-		TCharm *tc=CtvAccess(_curTCharm);
-		if(tc != NULL){
-			//Reenable migratable memory allocation
-			// NOTE: body of TCharm::activateThread() is inlined here:
-			if(doIsomalloc){
-				CmiIsomallocBlockListActivate(tc->heapBlocks);
-			}
-#if CMI_SWAPGLOBALS
-			if(doSwapglobals){
-				CtgInstall(tc->threadGlobals);
-			}
-#endif
-		}
-		if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-			tlsseg_t cur;
-			CtgInstallCthTLS(&cur, &oldtlsseg); // switch back to user's CthThread
-		}
+		TCharm::activateThread();
 
-#if CMK_BIGSIM_CHARM
-		void *log;
-		_TRACE_BG_TLINE_END(&log);
-		_TRACE_BG_END_EXECUTE(0);
-		_TRACE_BG_BEGIN_EXECUTE_NOMSG("user_code", &log, 0);
-		if (CmiMyPe() == pe) _TRACE_BG_ADD_BACKWARD_DEP(callEvent);
-#endif
 #if CMK_TRACE_ENABLED
 		if (tcharm_routineID > -1) // is it a routine we care about?
 			traceUserBracketEventNestedID(tcharm_routineID, start, stop, TCHARM_Element());

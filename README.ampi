@@ -27,14 +27,11 @@ in bin/, such as ampicc, ampicxx, ampif77, and ampif90:
 
     ampif90 pgm.f90 -o pgm
 
-To enable transparent migration of user heap data, link with
-"-memory isomalloc". To perform dynamic load balancing, link in a Charm++
-load balancer (suite) using "-module <LB>". For example:
-
-    ampicc pgm.c -o pgm -memory isomalloc -module CommonLBs
-
-Note that you need to specify a Fortran compiler when building Charm++/AMPI
-for Fortran compilation to work.
+For consistency with other MPI implementations, these wrappers are also
+provided using their standard names with the suffix ".ampi".
+Additionally, the "bin/ampi" subdirectory contains the wrappers with
+their standard names, for simplicity of overriding the default system MPI
+via the $PATH environment variable.
 
 
 Running AMPI Programs
@@ -84,7 +81,6 @@ prefixed with AMPI_:
       manual for more information on how to use it.
     * AMPI_Register_pup is used to register PUP routines and user data.
     * AMPI_Get_pup_data returns a pointer to user data managed by the runtime.
-    * AMPI_Register_main is used to register multiple AMPI modules.
     * AMPI_Load_set_value sets the calling rank's load to the given user value.
     * AMPI_Load_start_measure starts load balance information collection.
     * AMPI_Load_stop_measure stops load balance information collection.

@@ -27,9 +27,6 @@
 //#include "queueing.h"
 #include <unistd.h>
 
-#if CMK_BIGSIM_CHARM
-#include "blue_impl.h"
-#endif
 
 
 #if CMK_CHARMDEBUG && CMK_CCS_AVAILABLE && !defined(_WIN32)
@@ -39,13 +36,6 @@
 CkpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints we should skip */
 CkpvDeclare(DebugEntryTable, _debugEntryTable);
 CpdPersistentChecker persistentCheckerUselessClass;
-
-void CpdFinishInitialization() {
-  CkpvInitialize(int, skipBreakpoint);
-  CkpvAccess(skipBreakpoint) = 0;
-  CkpvInitialize(DebugEntryTable, _debugEntryTable);
-  CkpvAccess(_debugEntryTable).resize(_entryTable.size());
-}
 
 void resetAllCRC();
 void checkAllCRC(int report);
@@ -69,15 +59,14 @@ int CpdInUserCode() {return cpdInSystem==0 && _debugData.length()>0 && _debugDat
 // Function called right before an entry method
 void CpdBeforeEp(int ep, void *obj, void *msg) {
 #if CMK_CHARMDEBUG
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag && CmiMyRank()==0) {
     DebugRecursiveEntry entry;
     entry.previousChareID = setMemoryChareIDFromPtr(obj);
     entry.alreadyUserCode = _entryTable[ep]->inCharm ? 0 : 1;
     entry.memoryBackup = NULL;
     entry.obj = obj;
     if (msg != NULL) {
-      entry.msg = msg;
-      CmiReference(UsrToEnv(msg));
+      entry.msg = CkReferenceMsg(msg);
     }
     else entry.msg = NULL;
     _debugData.push(entry);
@@ -99,7 +88,7 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
 // Function called right after an entry method
 void CpdAfterEp(int ep) {
 #if CMK_CHARMDEBUG
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag && CmiMyRank()==0) {
     DebugRecursiveEntry entry = _debugData.peek();
     std::vector<DebugPersistentCheck> &postExecutes = CkpvAccess(_debugEntryTable)[ep].postProcess;
     for (int i=0; i<postExecutes.size(); ++i) {
@@ -504,12 +493,8 @@ public:
       p((char*)type, strlen(type));
       return;
     }
-#if ! CMK_BIGSIM_CHARM
     if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
     if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
-#else
-    isCharm=1; type="BG";
-#endif
     if (curObj < 0) type="Conditional";
     sprintf(name,"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
     p(name, strlen(name));
@@ -560,13 +545,7 @@ static void CpdDeliverMessageInt(int msgNum) {
     CmiReference(queuedMsg);
     CdsFifo_Enqueue(CpvAccess(conditionalQueue), queuedMsg);
   }  
-#if CMK_BIGSIM_CHARM
-  stopVTimer();
-  BgProcessMessageDefault(cta(threadinfo), queuedMsg);
-  startVTimer();
-#else
   CmiHandleMessage(queuedMsg);
-#endif
   CkpvAccess(skipBreakpoint) = 0;
   while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);  
 }
@@ -776,10 +755,20 @@ void CpdBreakPointInit()
   CkpvAccess(lastBreakPointMsg) = NULL;
   CkpvAccess(lastBreakPointObject) = NULL;
   CkpvAccess(lastBreakPointIndex) = 0;
-  CpvAccess(_debugMsg) = CkRegisterMsg("debug_msg",0,0,0,0);
-  CpvAccess(_debugChare) = CkRegisterChare("debug_Chare",0,TypeChare);
-  CkRegisterChareInCharm(CpvAccess(_debugChare));
+  if(CkMyRank() == 0)
+    {
+      CpvAccess(_debugMsg) = CkRegisterMsg("debug_msg",0,0,0,0);
+      CpvAccess(_debugChare) = CkRegisterChare("debug_Chare",0,TypeChare);
+      CkRegisterChareInCharm(CpvAccess(_debugChare));
+    }
   CpvAccess(breakPointEntryTable) = new CpdBpFuncTable_t(10,0.5,CkHashFunction_int,CkHashCompare_int );
+}
+
+void CpdFinishInitialization() {
+  CkpvInitialize(int, skipBreakpoint);
+  CkpvAccess(skipBreakpoint) = 0;
+  CkpvInitialize(DebugEntryTable, _debugEntryTable);
+  CkpvAccess(_debugEntryTable).resize(_entryTable.size());
 }
 
 static void _call_freeze_on_break_point(void * msg, void * object)
@@ -798,12 +787,9 @@ static void _call_freeze_on_break_point(void * msg, void * object)
       CkpvAccess(lastBreakPointMsg) = msg;
       CkpvAccess(lastBreakPointObject) = object;
       CkpvAccess(lastBreakPointIndex) = CkMessageToEpIdx(msg);
+      //      CkPrintf("[%d] notify for bp %s m %p o %p idx %d\n",CkMyPe(), breakPointEntryInfo->name, msg, object,CkpvAccess(lastBreakPointIndex));
       CpdNotify(CPD_BREAKPOINT,breakPointEntryInfo->name);
       CpdFreeze();
-#if CMK_BIGSIM_CHARM
-      stopVTimer();
-      ((workThreadInfo*)cta(threadinfo))->scheduler(-1);
-#endif
   }
 }
 
@@ -823,9 +809,6 @@ void CpdDeliverSingleMessage () {
     }
     CkpvAccess(lastBreakPointMsg) = NULL;
     CkpvAccess(lastBreakPointObject) = NULL;
-#if CMK_BIGSIM_CHARM
-    ((workThreadInfo*)cta(threadinfo))->stopScheduler();
-#endif
   }
   else {
     // we were not stopped at a breakpoint, then deliver the first message in the debug queue
@@ -837,13 +820,7 @@ void CpdDeliverSingleMessage () {
         CmiReference(queuedMsg);
         CdsFifo_Enqueue(CpvAccess(conditionalQueue),queuedMsg);
       }
-#if CMK_BIGSIM_CHARM
-      stopVTimer();
-      BgProcessMessageDefault(cta(threadinfo), queuedMsg);
-      startVTimer();
-#else
       CmiHandleMessage(queuedMsg);
-#endif
       CkpvAccess(skipBreakpoint) = 0;
     }
   }
@@ -852,20 +829,28 @@ void CpdDeliverSingleMessage () {
 //ccs handler when continue from a break point
 void CpdContinueFromBreakPoint ()
 {
+  
+  //  CkPrintf("[%d] CpdContinueFromBreakPoint\n",CkMyPe());
+  
     CpdUnFreeze();
     if ( (CkpvAccess(lastBreakPointMsg) != NULL) && (CkpvAccess(lastBreakPointObject) != NULL) )
     {
         EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CkpvAccess(lastBreakPointIndex));
         if (breakPointEntryInfo != NULL) {
+	  //	  CkPrintf("[%d] Continue found calling lastBreakPoint\n",CkMyPe());
            breakPointEntryInfo->call(CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject));
-#if CMK_BIGSIM_CHARM
-           ((workThreadInfo*)cta(threadinfo))->stopScheduler();
-#endif
         } else {
           // This means that the breakpoint got deleted in the meanwhile
           
         }
     }
+#if 0
+    else 
+      {//debugging block
+	CmiPrintStackTrace(0);
+	CkPrintf("[%d] Continue found lastBreakPointmsg %p object %p idx %d\n",CkMyPe(), CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject), CkpvAccess(lastBreakPointIndex));
+    }
+#endif    
     CkpvAccess(lastBreakPointMsg) = NULL;
     CkpvAccess(lastBreakPointObject) = NULL;
 }
@@ -889,8 +874,14 @@ void CpdSetBreakPoint (char *msg)
              breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, 1, 0 );
              //CmiPrintf("Breakpoint is set for function %s with an epIdx = %ld\n", _entryTable[tableIdx]->name, tableIdx);
              CpvAccess(breakPointEntryTable)->put(tableIdx) = breakPointEntryInfo;
-             _entryTable[tableIdx]->name = "debug_breakpoint_ep";
-             _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
+#if CMK_SMP	     
+	    if(++_entryTable[tableIdx]->breakPointSet==CkMyNodeSize() )
+#endif	       
+	      {
+
+		_entryTable[tableIdx]->name = "debug_breakpoint_ep";
+		_entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
+	      }
            } else {
              if (breakPointEntryInfo->msgIdx == 0) {
                // Reset the breakpoint info
@@ -932,8 +923,14 @@ void CpdRemoveBreakPoint (char *msg)
         if (breakPointEntryInfo != NULL) {
           if (--breakPointEntryInfo->msgIdx == 0) {
             // If we are the last to delete the breakpoint, then restore the original name and call function pointer
-            _entryTable[idx]->name =  breakPointEntryInfo->name;
-            _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+#if CMK_SMP	    
+	    if(--_entryTable[idx]->breakPointSet==0)
+#endif	      
+	      {
+	      _entryTable[idx]->name =  breakPointEntryInfo->name;
+	      _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+	    }
+	    //	    CkPrintf("[%d] remonebp _entryTable[%d]->breakPointSet %d\n",CkMyPe(), idx,  _entryTable[idx]->breakPointSet.load());
           }
           reply = ~0 ;
           CkpvAccess(_debugEntryTable)[idx].isBreakpoint = false;
@@ -959,8 +956,14 @@ void CpdRemoveAllBreakPoints ()
     int idx = *(int *)keyPointer;
     if (--breakPointEntryInfo->msgIdx == 0) {
       // If we are the last to delete the breakpoint, then restore the original name and call function pointer
-      _entryTable[idx]->name =  breakPointEntryInfo->name;
-      _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+#if CMK_SMP	    
+      if(--_entryTable[idx]->breakPointSet==0)
+#endif	      
+	{
+	  _entryTable[idx]->name =  breakPointEntryInfo->name;
+	  _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+	}
+      //      CkPrintf("[%d] remallbp _entryTable[%d]->breakPointSet %d\n",CkMyPe(), idx,  _entryTable[idx]->breakPointSet.load());
     }
     CkpvAccess(_debugEntryTable)[idx].isBreakpoint = false;
   }
@@ -974,22 +977,6 @@ int CpdIsCharmDebugMessage(void *msg) {
          env->getMsgtype() == FillVidMsg || _entryTable[env->getEpIdx()]->inCharm;
 }
 
-#if CMK_BIGSIM_CHARM
-CpvExtern(int, _bgCcsHandlerIdx);
-int CpdIsBgCharmDebugMessage(void *msg) {
-  envelope *env = (envelope*)msg;
-  if (CmiBgMsgFlag(msg) == BG_CLONE) {
-    env=*(envelope**)(((char*)msg)+CmiBlueGeneMsgHeaderSizeBytes);
-  }
-  if  ((((CmiBlueGeneMsgHeader*)env)->hID) == CpvAccess(_bgCcsHandlerIdx)) return 1;
-    // make sure it indeed is a charm message
-  if (CmiBgMsgHandle(env) == _charmHandlerIdx) {
-    return env->getMsgtype() == ForVidMsg || env->getMsgtype() == FillVidMsg ||
-         _entryTable[env->getEpIdx()]->inCharm;
-  }
-  return 1;
-}
-#endif
 
 CpvExtern(char *, displayArgument);
 
@@ -1078,48 +1065,13 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_msgStack());
   CpdGetNextMessage = CsdNextMessage;
   CpdIsDebugMessage = CpdIsCharmDebugMessage;
-#if CMK_BIGSIM_CHARM
-  CpdIsDebugMessage = CpdIsBgCharmDebugMessage;
-#endif
 }
 
-#if CMK_BIGSIM_CHARM
-CpvExtern(int, _bgCcsHandlerIdx);
-CpvExtern(int, _bgCcsAck);
-void req_fw_handler(char*);
-CkpvExtern(void *, debugQueue);
-CkpvExtern(int, freezeModeFlag);
-#include "blue_impl.h"
-extern void BgProcessMessageFreezeMode(threadInfo *, char *);
-
-void CpdBgInit()
-{
-        // Register the BG handler for CCS. Notice that this is put into a variable shared by
-        // the whole real processor. This because converse needs to find it. We check that all
-        // virtual processors register the same index for this handler.
-        int bgCcsHandlerIdx = CkRegisterHandler(req_fw_handler);
-        if (CpvAccess(_bgCcsHandlerIdx) == 0) CpvAccess(_bgCcsHandlerIdx) = bgCcsHandlerIdx;
-        CkAssert(CpvAccess(_bgCcsHandlerIdx)==bgCcsHandlerIdx);
-        CpvAccess(_bgCcsAck) ++;
-        CcsReleaseMessages();
-        
-        CkpvInitialize(int, freezeModeFlag);
-        CkpvAccess(freezeModeFlag) = 0;
-
-        CkpvInitialize(void *, debugQueue);
-        CkpvAccess(debugQueue) = CdsFifo_Create();
-        
-        BgProcessMessage = BgProcessMessageFreezeMode;
-}
-#endif
 
 #else
 
 void CpdBreakPointInit() {}
 void CpdCharmInit() {}
-#if CMK_BIGSIM_CHARM
-void CpdBgInit() {}
-#endif
 
 void CpdFinishInitialization() {}
 

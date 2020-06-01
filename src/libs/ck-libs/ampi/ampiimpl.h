@@ -4,7 +4,6 @@
 #include <string.h> /* for strlen */
 #include <algorithm>
 #include <numeric>
-#include <forward_list>
 #include <bitset>
 #include <complex>
 #include <iostream>
@@ -12,6 +11,10 @@
 #include "ampi.h"
 #include "ddt.h"
 #include "charm++.h"
+
+#if CMK_AMPI_WITH_ROMIO
+# include "mpio_globals.h"
+#endif
 
 // Set to 1 to print debug statements
 #define AMPI_DO_DEBUG 0
@@ -147,16 +150,16 @@ class fromzDisk : public zdisk {
 #endif
 #endif // AMPIMSGLOG
 
-/* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
- * if tracing is not being used (see bug #1640 for more details on the latter). */
+/* AMPI sends messages inline to PE-local destination VPs if
+ * tracing is disabled (see bug #1640). */
 #ifndef AMPI_PE_LOCAL_IMPL
-#define AMPI_PE_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#define AMPI_PE_LOCAL_IMPL ( !CMK_TRACE_ENABLED )
 #endif
 
-/* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
- * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
+/* AMPI sends messages using a zero copy protocol to Node-local destination VPs
+ * tracing is disabled (such msgs are currently untraced). */
 #ifndef AMPI_NODE_LOCAL_IMPL
-#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_TRACE_ENABLED )
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
@@ -171,18 +174,15 @@ class fromzDisk : public zdisk {
 
 /* messages larger than or equal to this threshold will always block on a matching recv */
 #ifndef AMPI_SSEND_THRESHOLD_DEFAULT
-#if CMK_BIGSIM_CHARM // ZC Direct API-based rendezvous protocol is not supported by BigSim
-#define AMPI_SSEND_THRESHOLD_DEFAULT 1000000000
-#elif CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#if   CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
 #define AMPI_SSEND_THRESHOLD_DEFAULT 262144
 #else
 #define AMPI_SSEND_THRESHOLD_DEFAULT 131072
 #endif
 #endif
 
-/* AMPI uses RDMA sends if BigSim is not being used. */
 #ifndef AMPI_RDMA_IMPL
-#define AMPI_RDMA_IMPL !CMK_BIGSIM_CHARM
+#define AMPI_RDMA_IMPL 1
 #endif
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
@@ -194,11 +194,7 @@ extern int AMPI_RDMA_THRESHOLD;
 
 #define AMPI_ALLTOALL_THROTTLE   64
 #define AMPI_ALLTOALL_SHORT_MSG  256
-#if CMK_BIGSIM_CHARM
-#define AMPI_ALLTOALL_LONG_MSG   4194304
-#else
 #define AMPI_ALLTOALL_LONG_MSG   32768
-#endif
 
 typedef void (*MPI_MigrateFn)(void);
 
@@ -974,16 +970,6 @@ class ampiCommStruct {
 };
 PUPmarshall(ampiCommStruct)
 
-class mpi_comm_worlds{
-  ampiCommStruct comms[MPI_MAX_COMM_WORLDS];
- public:
-  ampiCommStruct &operator[](int i) noexcept {return comms[i];}
-  void pup(PUP::er &p) noexcept {
-    for (int i=0;i<MPI_MAX_COMM_WORLDS;i++)
-      comms[i].pup(p);
-  }
-};
-
 // group operations
 inline void outputOp(const std::vector<int>& vec) noexcept {
   if (vec.size() > 50) {
@@ -1140,8 +1126,6 @@ inline std::vector<int> rangeExclOp(int n, int ranges[][3], const std::vector<in
 #include "charm-api.h"
 #include <sys/stat.h> // for mkdir
 
-extern int _mpi_nworlds;
-
 //MPI_ANY_TAG is defined in ampi.h to MPI_TAG_UB_VALUE+1
 #define MPI_ATA_SEQ_TAG     MPI_TAG_UB_VALUE+2
 #define MPI_BCAST_TAG       MPI_TAG_UB_VALUE+3
@@ -1208,11 +1192,6 @@ class AmpiRequest {
   bool complete      = false;
   bool blocked       = false; // this req is currently blocked on
 
-#if CMK_BIGSIM_CHARM
- public:
-  void *event        = nullptr; // the event point that corresponds to this message
-  int eventPe        = -1; // the PE that the event is located on
-#endif
 
  public:
   AmpiRequest() =default;
@@ -1303,13 +1282,6 @@ class AmpiRequest {
     p(reqIdx);
     p(complete);
     p(blocked);
-#if CMK_BIGSIM_CHARM
-    //needed for bigsim out-of-core emulation
-    //as the "log" is not moved from memory, this pointer is safe
-    //to be reused
-    p((char *)&event, sizeof(void *));
-    p(eventPe);
-#endif
   }
 
   virtual void print() const noexcept =0;
@@ -1770,11 +1742,6 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   MPI_Comm comm; // Communicator
  public:
   char *data; //Payload
-#if CMK_BIGSIM_CHARM
- public:
-  void *event;
-  int  eventPe; // the PE that the event is located
-#endif
 
  public:
   AmpiMsg() noexcept : data(NULL) {}
@@ -1870,32 +1837,39 @@ class AmpiMsg final : public CMessage_AmpiMsg {
 
 class AmpiMsgPool {
  private:
-  std::forward_list<AmpiMsg *> msgs; // list of free msgs
+  std::vector<AmpiMsg *> msgs; // list of free msgs
   int msgLength; // AmpiMsg::length of messages in the pool
   int maxMsgs; // max # of msgs in the pool
   int currMsgs; // current # of msgs in the pool
 
  public:
   AmpiMsgPool(int _numMsgs = 0, int _msgLength = 0) noexcept
-    : msgLength(_msgLength), maxMsgs(_numMsgs), currMsgs(0) {}
-  ~AmpiMsgPool() =default;
+    : msgs(_numMsgs), msgLength{_msgLength}, maxMsgs{_numMsgs}, currMsgs{0} {}
+  AmpiMsgPool(PUP::reconstruct) noexcept
+    : currMsgs{0} {}
+  ~AmpiMsgPool() {
+    for (int i = 0; i < currMsgs; ++i)
+      delete msgs[i];
+  }
   inline void clear() noexcept {
-    while (!msgs.empty()) {
-      delete msgs.front();
-      msgs.pop_front();
+    for (int i = 0; i < currMsgs; ++i) {
+      AmpiMsg *& msg = msgs[i];
+      delete msg;
+      msg = nullptr;
     }
     currMsgs = 0;
   }
   inline AmpiMsg* newAmpiMsg(CMK_REFNUM_TYPE seq, int ssendReq, int tag, int srcRank, int len) noexcept {
-    if (msgs.empty() || msgs.front()->origLength < len) {
+    if (currMsgs == 0 || msgs[currMsgs-1]->origLength < len) {
       int newlen = std::max(msgLength, len);
       AmpiMsg* msg = new (newlen, 0) AmpiMsg(seq, ssendReq, tag, srcRank, newlen);
       msg->setLength(len);
       return msg;
     } else {
-      AmpiMsg* msg = msgs.front();
-      msgs.pop_front();
+      AmpiMsg *& front = msgs[currMsgs-1];
+      AmpiMsg * msg = front;
       currMsgs--;
+      front = nullptr;
       msg->setSeq(seq);
       msg->setSsendReq(ssendReq);
       msg->setTag(tag);
@@ -1908,7 +1882,7 @@ class AmpiMsgPool {
     /* msg->origLength is the true size of the message's data buffer, while
      * msg->length is the space taken by the payload within it. */
     if (currMsgs != maxMsgs && msg->origLength >= msgLength && msg->origLength < 2*msgLength) {
-      msgs.push_front(msg);
+      msgs[currMsgs] = msg;
       currMsgs++;
     } else {
       delete msg;
@@ -1917,6 +1891,8 @@ class AmpiMsgPool {
   void pup(PUP::er& p) {
     p|msgLength;
     p|maxMsgs;
+    if (p.isUnpacking())
+      msgs.resize(maxMsgs);
     // Don't PUP the msgs in the free list or currMsgs, let the pool fill lazily
   }
 };
@@ -2099,7 +2075,6 @@ PUPmarshall(AmpiSeqQ)
 
 
 inline CProxy_ampi ampiCommStruct::getProxy() const noexcept {return ampiID;}
-const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo) noexcept;
 
 // Max value of a predefined MPI_Op (values defined in ampi.h)
 #define AMPI_MAX_PREDEFINED_OP 13
@@ -2122,7 +2097,6 @@ class ampiParent final : public CBase_ampiParent {
   CkDDT myDDT;
 
  private:
-  MPI_Comm worldNo; //My MPI_COMM_WORLD
   ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
 
   CkPupPtrVec<ampiCommStruct> splitComm;     //Communicators from MPI_Comm_split
@@ -2156,9 +2130,14 @@ class ampiParent final : public CBase_ampiParent {
   CProxy_ampi tmpRProxy;
 
   MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
+  bool didMigrate{};
 
  public:
   bool ampiInitCallDone;
+
+#if CMK_AMPI_WITH_ROMIO
+  ADIO_GlobalStruct romio_globals;
+#endif
 
  private:
   bool kv_set_builtin(int keyval, void* attribute_val) noexcept;
@@ -2232,11 +2211,12 @@ class ampiParent final : public CBase_ampiParent {
   void intraChildRegister(const ampiCommStruct &s) noexcept;
 
  public:
-  ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_) noexcept;
+  ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept;
   ampiParent(CkMigrateMessage *msg) noexcept;
   void ckAboutToMigrate() noexcept;
   void ckJustMigrated() noexcept;
   void ckJustRestored() noexcept;
+  void resumeAfterMigration() noexcept;
   void setUserAboutToMigrateFn(MPI_MigrateFn f) noexcept;
   void setUserJustMigratedFn(MPI_MigrateFn f) noexcept;
   ~ampiParent() noexcept;
@@ -2319,7 +2299,6 @@ class ampiParent final : public CBase_ampiParent {
 
   inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept {
     if (comm==MPI_COMM_WORLD) return getWorldStruct();
-    if (comm==worldNo) return getWorldStruct();
     if (isSplit(comm)) return getSplit(comm);
     if (isGroup(comm)) return getGroup(comm);
     if (isCart(comm)) return getCart(comm);
@@ -2327,7 +2306,8 @@ class ampiParent final : public CBase_ampiParent {
     if (isDistGraph(comm)) return getDistGraph(comm);
     if (isInter(comm)) return getInter(comm);
     if (isIntra(comm)) return getIntra(comm);
-    return universeComm2CommStruct(comm);
+    CkAbort("Invalid communicator used: %d", comm);
+    return getWorldStruct();
   }
 
   inline std::unordered_map<int, uintptr_t> & getAttributes(MPI_Comm comm) noexcept {
@@ -2337,7 +2317,6 @@ class ampiParent final : public CBase_ampiParent {
 
   inline ampi *comm2ampi(MPI_Comm comm) const noexcept {
     if (comm==MPI_COMM_WORLD) return worldPtr;
-    if (comm==worldNo) return worldPtr;
     if (isSplit(comm)) {
       const ampiCommStruct &st=getSplit(comm);
       return st.getProxy()[thisIndex].ckLocal();
@@ -2366,14 +2345,13 @@ class ampiParent final : public CBase_ampiParent {
       const ampiCommStruct &st=getIntra(comm);
       return st.getProxy()[thisIndex].ckLocal();
     }
-    if (comm>MPI_COMM_WORLD) return worldPtr; //Use MPI_WORLD ampi for cross-world messages:
-    CkAbort("Invalid communicator used!");
+    CkAbort("Invalid communicator used: %d", comm);
     return NULL;
   }
 
   inline bool hasComm(const MPI_Group group) const noexcept {
     MPI_Comm comm = (MPI_Comm)group;
-    return ( comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm) ||
+    return ( comm==MPI_COMM_WORLD || isSplit(comm) || isGroup(comm) ||
              isCart(comm) || isGraph(comm) || isDistGraph(comm) || isIntra(comm) );
     //isInter omitted because its comm number != its group number
   }
@@ -2980,7 +2958,7 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 "AMPI_Win_wait", "AMPI_Exit" /*AMPI extensions:*/, "AMPI_Migrate",
 "AMPI_Load_start_measure", "AMPI_Load_stop_measure",
 "AMPI_Load_set_value", "AMPI_Migrate_to_pe", "AMPI_Set_migratable",
-"AMPI_Register_pup", "AMPI_Get_pup_data", "AMPI_Register_main",
+"AMPI_Register_pup", "AMPI_Get_pup_data",
 "AMPI_Register_about_to_migrate", "AMPI_Register_just_migrated",
 "AMPI_Iget", "AMPI_Iget_wait", "AMPI_Iget_free", "AMPI_Iget_data",
 "AMPI_Type_is_contiguous", "AMPI_Yield", "AMPI_Suspend",
@@ -2990,6 +2968,15 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 // not traced: AMPI_Trace_begin, AMPI_Trace_end
 
 #endif // CMK_TRACE_ENABLED
+
+extern bool ampi_nodeinit_has_been_called;
+inline void ampiVerifyNodeinit(const char * routineName)
+{
+  if (!ampi_nodeinit_has_been_called)
+  { /* Charm hasn't been started yet! */
+    CkAbort("%s> AMPI has not been initialized! Possibly due to AMPI requiring '#include \"mpi.h\" be in the same file as main() in C/C++ programs and \'program main\' be renamed to \'subroutine mpi_main\' in Fortran programs!", routineName);
+  }
+}
 
 //Use this to mark the start of AMPI interface routines that can only be called on AMPI threads:
 #if CMK_ERROR_CHECKING
@@ -3002,7 +2989,8 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 #endif
 
 //Use this for MPI_Init and routines than can be called before AMPI threads have been initialized:
-#define AMPI_API_INIT(routineName, ...) TCHARM_API_TRACE(routineName, "ampi"); \
+#define AMPI_API_INIT(routineName, ...) ampiVerifyNodeinit(routineName); \
+  TCHARM_API_TRACE(routineName, "ampi"); \
   AMPI_DEBUG_ARGS(routineName, __VA_ARGS__)
 
 #endif // _AMPIIMPL_H

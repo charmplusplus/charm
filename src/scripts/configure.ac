@@ -2,7 +2,7 @@
 # Increment the last 2 digits when making an API change
 # Increase the first three after branching for a release
 
-AC_INIT(Charm++, 60900, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
+AC_INIT(Charm++, 61001, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
@@ -109,10 +109,14 @@ remove_make_flag() {
 
 add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
 add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
+add_flag "CMK_WINDOWS='$CMK_WINDOWS'" 'basic setup'
+add_flag "CMK_BLUEGENEQ='$CMK_BLUEGENEQ'" 'basic setup'
 add_make_flag "CMK_COMPILER:=$CMK_COMPILER" 'basic setup'
 add_make_flag "CMK_SMP:=$CMK_SMP" 'basic setup'
 add_make_flag "CMK_SHARED_SUF:=$CMK_SHARED_SUF" 'basic setup'
 add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
+add_make_flag "CMK_MACOSX:=$CMK_MACOSX" 'basic setup'
+add_make_flag "CMK_WINDOWS:=$CMK_WINDOWS" 'basic setup'
 add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
 add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
 add_make_flag "CMK_UTH:=$CMK_UTH" 'basic setup'
@@ -127,12 +131,12 @@ AC_ARG_ENABLE([error-checking],
 
 if test "$enable_error_checking" = "no"
 then
-  Echo "Error checking is disabled" 
+  Echo "Charm++/LIBS error checking is disabled" 
   AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 0, [disable error checking])
   add_flag 'OPTS_CC="$OPTS_CC -U_FORTIFY_SOURCE"' 'error checking'
   add_flag 'OPTS_CXX="$OPTS_CXX -U_FORTIFY_SOURCE"' 'error checking'
 else
-  Echo "Error checking is enabled" 
+  Echo "Charm++/LIBS error checking is enabled" 
   AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 1, [enable error checking])
 fi
 
@@ -746,7 +750,7 @@ then
   got_cpp11="true"
 else
 # Flags for g++/clang++/icpc/xlC++, pgCC, and CrayCC respectively
-for i in "-std=c++11" "--c++11" "-h std=c++11"; do
+for i in "-std=c++11" "--c++11" "-h std=c++11" "-hstd=c++11"; do
     test_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then
@@ -774,7 +778,7 @@ test_native_cxx "whether native C++ compiler supports C++11 without flags" "yes"
 if test $strictpass -ne 1
 then
   # Flags for g++/clang++/icpc/xlC++, pgCC, and CrayCC respectively
-  for i in "-std=c++11" "--c++11" "-h std=c++11"; do
+  for i in "-std=c++11" "--c++11" "-h std=c++11" "-hstd=c++11"; do
     test_native_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then
@@ -820,7 +824,9 @@ EOT
       if test $strictpass -eq 1
       then
         got_opt_whole_archive="true"
-        IFS=' ' read LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST <<< $i
+        IFS=' ' read LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST <<EOF
+        $i
+EOF
         add_flag "$(echo LDXX_WHOLE_ARCHIVE_PRE=\"$LDXX_WHOLE_ARCHIVE_PRE\")" "Flags to link whole archives into libcharm.so"
         add_flag "$(echo LDXX_WHOLE_ARCHIVE_POST=\"$LDXX_WHOLE_ARCHIVE_POST\")" "Flags to link whole archives into libcharm.so"
         break
@@ -2039,8 +2045,6 @@ exists])
 
 #### check if dlopen works ####
 skip_dl=0
-# for bproc, ignore -ldl
-test -n "$CMK_BPROC" && skip_dl=1
 test -n "$CMK_NO_DL" && skip_dl=1
 dl_opt='-ldl'
 #workaround for pgcc 4.0, -ldl crash linking, so use -Wl,-ldl to skip the prelinker.
@@ -2151,7 +2155,7 @@ AC_DEFINE_UNQUOTED(CMK_HAS_REALPATH, $pass, [whether has realpath])
 CMK_HAS_REALPATH="$pass"
 
 case "$CMK_VDIR" in
-  *-win-*|*-win64)
+  *-win-*)
     CMK_CAN_GET_BINARY_PATH='1'
     CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='0' # TODO: technically possible, but more work to be done
     ;;
@@ -2354,7 +2358,7 @@ EOT
 TRACE_LINK_FLAG=''
 CAN_EXPORT_SYMBOLS='0'
 for i in '-rdynamic' '-Wl,--export-dynamic'; do
-  test_link "whether has $i" "yes" "no" "$i"
+  test_link "whether has $i" "yes" "no" "" "$i"
   if test "$strictpass" = '1'; then
     TRACE_LINK_FLAG="$i"
     CAN_EXPORT_SYMBOLS='1'
@@ -2416,6 +2420,19 @@ EOT
 test_cxx "whether personality() and ADDR_NO_RANDOMIZE exist" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ADDR_NO_RANDOMIZE, $pass, [whether personality() and ADDR_NO_RANDOMIZE exist])
 
+#### test posix_spawn() ####
+cat > $t <<EOT
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <spawn.h>
+int main() {
+    return posix_spawn(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+}
+EOT
+test_cxx "whether posix_spawn() exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_POSIX_SPAWN, $pass, [whether posix_spawn() exists])
+
 
 # enable/disable zlib
 AC_ARG_ENABLE([zlib],
@@ -2425,8 +2442,7 @@ AC_ARG_ENABLE([zlib],
             [enable_zlib=yes])
 
 #### test if has zlib ####
-# bproc doesnot like -lz in any case
-if test -z "$CMK_BPROC" && test "$enable_zlib" = "yes"
+if test "$enable_zlib" = "yes"
 then
 
 cat > $t <<EOT
@@ -2713,36 +2729,6 @@ EOT
 	fi
 fi
 
-#### test the version number of bproc ####
-if test -n "$CMK_BPROC"
-then
-cat > $t <<EOT
-#include <stdio.h>
-#include <sys/bproc.h>
-int main()
-{
-  struct bproc_version_t vers;
-  bproc_version(&vers);
-  printf("%s\n", vers.version_string);
-}
-EOT
-test_link "whether bproc compiles" "yes" "no" "-lbproc"
-if test $pass -eq 1
-then 
-AC_MSG_CHECKING("bproc version")
-bproc_ver=`./testlink`
-if test x$bproc_ver = x
-then
-test_result 0 "bproc version" "ERROR" ""
-test_finish 1
-else
-test_result 0 "bproc version" "$bproc_ver" ""
-fi
-bproc_ver=`echo $bproc_ver | cut -d'.' -f1`
-AC_DEFINE_UNQUOTED(CMK_BPROC_VERSION, $bproc_ver, [bproc version])
-fi
-fi
-
 #### test the if command sync exists ####
 AC_CHECK_PROG(SYNC, sync, sync )
 if test -n "$SYNC"
@@ -2961,6 +2947,9 @@ enable_embedded_mode='yes'
 enable_static='yes'
 if test "$CMK_NO_BUILD_SHARED" = 'false'
 then
+  # Force building of shared hwloc library in embedded mode.
+  # See https://github.com/UIUC-PPL/charm/issues/2599 and 
+  # https://github.com/open-mpi/hwloc/issues/371 for more details.
   enable_shared='yes'
   export am_libhwloc_embedded_la_rpath="-rpath $CHARMLIBSO"
 else
@@ -2968,13 +2957,14 @@ else
   export am_libhwloc_embedded_la_rpath=''
 fi
 AC_SUBST(am_libhwloc_embedded_la_rpath)
-enable_libnuma='no'
 enable_pci='no'
 enable_libudev='no'
 enable_libxml2='no'
 enable_visibility='no'
 enable_nvml='no'
 enable_opencl='no'
+enable_gl='no'
+enable_cairo='no'
 . hwloc/VERSION
 export libhwloc_so_version
 AC_SUBST(libhwloc_so_version)

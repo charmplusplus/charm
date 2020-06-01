@@ -30,7 +30,7 @@ endif
 
 ########### This stuff should be able take care of itself ############
 
-.PHONY: all clean again test bgtest translateInterface
+.PHONY: all clean again test translateInterface
 
 all: $(TARGET)
 

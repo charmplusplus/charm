@@ -12,8 +12,5 @@ speed.o : speed.C speed.h speed.ci
 test: pgm
 	$(call run, +p4 ./pgm 8 )
 
-bgtest: pgm
-	$(call run, +p4 ./pgm 8 +x2 +y2 +z1 )
-
 clean:
 	rm -f conv-host pgm *.def.h *.decl.h *.o *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk

@@ -292,11 +292,7 @@ public:
     }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0, const GroupDepNum groupDepNumRequest=GroupDepNum{}, const bool incEvent=true)
     {
-#if CMK_LOCKLESS_QUEUE
       CkAssert(type>=NewChareMsg && type<LAST_CK_ENVELOPE_TYPE);
-#else
-      CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
-#endif
 #if CMK_USE_STL_MSGQ
       // Ideally, this should be a static compile-time assert. However we need API changes for that
       CkAssert(sizeof(CMK_MSG_PRIO_TYPE) >= sizeof(int)*CkPriobitsToInts(prio));
@@ -397,12 +393,16 @@ public:
 // Group-specific fields
     CkGroupID   getGroupNum(void) const {
       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+          || getMsgtype()==BocBcastMsg || getMsgtype()==NodeBocInitMsg
+          || getMsgtype()==ForNodeBocMsg || getMsgtype()==ArrayBcastMsg
+          || getMsgtype() == ArrayBcastFwdMsg);
       return type.group.g;
     }
     void   setGroupNum(const CkGroupID g) {
       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+          || getMsgtype()==BocBcastMsg || getMsgtype()==NodeBocInitMsg
+          || getMsgtype()==ForNodeBocMsg || getMsgtype()==ArrayBcastMsg
+          || getMsgtype() == ArrayBcastFwdMsg);
       type.group.g = g;
     }
     void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.epoch=epoch; }

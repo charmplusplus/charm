@@ -31,9 +31,9 @@ Linux, Windows, MacOS)), etc. The communication protocols and
 infrastructures supported by Charm++ are UDP, MPI, OFI, UCX, Infiniband,
 uGNI, and PAMI. Charm++ programs can run without changing the source on
 all these platforms. Charm++ programs can also interoperate with MPI
-programs (§ :numref:`sec:mpiinterop`). Please see the Installation and Usage
+programs (Section :numref:`sec:mpiinterop`). Please see the Installation and Usage
 section for details about installing, compiling and running Charm++
-programs (§ :numref:`sec:install`).
+programs (Section :numref:`sec:install`).
 
 Programming Model
 -----------------
@@ -87,8 +87,7 @@ scheduler, it repeats the cycle. I.e. there is no pre-emptive scheduling
 of other invocations.
 
 When a chare method executes, it may create method invocations for other
-chares. The Charm Runtime System (RTS, sometimes referred to as the
-Chare Kernel in the manual) locates the PE where the targeted chare
+chares. The Charm Runtime System (RTS) locates the PE where the targeted chare
 resides, and delivers the invocation to the scheduler on that PE.
 
 Methods of a chare that can be remotely invoked are called *entry*
@@ -122,7 +121,7 @@ So, one can think of Charm++ as supporting a *global object space*.
 
 Every Charm++ program must have at least one mainchare. Each mainchare
 is created by the system on processor 0 when the Charm++ program starts
-up. Execution of a Charm++ program begins with the Charm Kernel
+up. Execution of a Charm++ program begins with the Charm RTS
 constructing all the designated mainchares. For a mainchare named X,
 execution starts at constructor X() or X(CkArgMsg \*) which are
 equivalent. Typically, the mainchare constructor starts the computation
@@ -146,7 +145,7 @@ allowing for some localized non-determinism (e.g. a pair of methods may
 execute in any order, but when they both finish, the execution continues
 in a pre-determined manner, say executing a 3rd entry method). To
 simplify expression of such control structures, Charm++ provides two
-methods: the structured dagger notation (Sec :numref:`sec:sdag`), which
+methods: the structured dagger notation (Section :numref:`sec:sdag`), which
 is the main notation we recommend you use. Alternatively, you may use
 threaded entry methods, in combination with *futures* and *sync* methods
 (See :numref:`threaded`). The threaded methods run in light-weight
@@ -193,7 +192,7 @@ features of the Charm++ programming system. Part I, “Basic Usage”, is
 sufficient for writing full-fledged applications. Note that only the
 last two chapters of this part involve the notion of physical processors
 (cores, nodes, ..), with the exception of simple query-type utilities
-(Sec :numref:`basic utility fns`). We strongly suggest that all
+(Section :numref:`basic utility fns`). We strongly suggest that all
 application developers, beginners and experts alike, try to stick to the
 basic language to the extent possible, and use features from the
 advanced sections only when you are convinced they are essential. (They
@@ -543,9 +542,10 @@ when running a Charm++ program.
 ``void CkAssert(int expression)``
 Aborts the program if expression is 0.
 
-``void CkAbort(const char \*message)``
+``void CkAbort(const char *format, ...)``
 Causes the program to abort, printing
-the given error message. This function never returns.
+the given error message. Supports printf-style formatting.
+This function never returns.
 
 ``void CkExit()``
 This call informs the Charm RTS that computation on all
@@ -1513,7 +1513,7 @@ the contributed elements if you need to know which array element gave a
 particular contribution. Additionally, if the contributed elements are
 of a complex data type, you will likely have to supply code for
 serializing/deserializing them. Consider using the PUP interface
-(§ :numref:`sec:pup`) to simplify your object serialization
+(Section :numref:`sec:pup`) to simplify your object serialization
 needs.
 
 If the outcome of your reduction is dependent on the order in which data
@@ -1832,7 +1832,7 @@ denoting the desired reference number in square brackets between the
 entry method name and its parameter list. For parameter marshalled entry
 methods, the reference number expression will be compared for equality
 with the entry method’s first argument. For entry methods that accept an
-explicit message (§ :numref:`messages`), the reference number on the
+explicit message (Section :numref:`messages`), the reference number on the
 message can be set by calling the function
 ``CkSetRefNum(void *msg, CMK_REFNUM_TYPE ref)``. Matching is used in the
 loop example below, and in
@@ -3482,7 +3482,7 @@ particular branch of a nodegroup, it may be executed by *any* PE in that
 logical node. Thus two invocations of a single entry method on a
 particular branch of a NodeGroup may be executed *concurrently* by two
 different PEs in the logical node. If this could cause data races in
-your program, please consult § :numref:`sec:nodegroups/exclusive`
+your program, please consult Section :numref:`sec:nodegroups/exclusive`
 (below).
 
 .. _sec:nodegroups/exclusive:
@@ -3501,7 +3501,7 @@ PE within that logical node will execute any other *exclusive* methods.
 However, PEs in the logical node may still execute *non-exclusive* entry
 method invocations. An entry method can be marked exclusive by tagging
 it with the exclusive attribute, as explained in
-§ :numref:`attributes`.
+Section :numref:`attributes`.
 
 Accessing the Local Branch of a NodeGroup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -3588,7 +3588,7 @@ sequence:
    However, if your program structure requires it, you can explicitly
    specify that the creation of certain Groups/NodeGroups depends on the
    creation of others, as described in
-   § :numref:`sec:groups/creation`. In addition, since those
+   Section :numref:`sec:groups/creation`. In addition, since those
    objects are initialized after the initialization of readonly
    variables, readonly variables can be used in the constructors of
    Groups and NodeGroups.
@@ -3646,12 +3646,12 @@ should *not* reuse the buffer. That is, after you have passed a message
 buffer into an asynchronous entry method invocation, you shouldn’t
 access its fields, or pass that same buffer into a second entry method
 invocation. Note that this rule doesn’t preclude the *single reuse* of
-an input message - consider an entry method invocation :math:`i_1`,
-which receives as input the message buffer :math:`m_1`. Then,
-:math:`m_1` may be passed to an asynchronous entry method invocation
-:math:`i_2`. However, once :math:`i_2` has been issued with :math:`m_1`
-as its input parameter, :math:`m_1` cannot be used in any further entry
-method invocations.
+a received message - consider being inside the body of an entry method
+invocation :math:`i_1`, which has received the message buffer :math:`m_1`
+as an input parameter. Then, :math:`m_1` may be passed to an asynchronous
+entry method invocation :math:`i_2`. However, once :math:`i_2` has been
+issued with :math:`m_1` as its input parameter, :math:`m_1` cannot be
+used in any further entry method invocations.
 
 Several kinds of message are available. Regular Charm++ messages are
 objects of *fixed size*. One can have messages that contain pointers or
@@ -3680,7 +3680,7 @@ with the entire message comprises a contiguous buffer of memory.
 **Packed Messages.** A *packed* message is used to communicate
 non-linear data structures via messages. However, we defer a more
 detailed description of their use to
-§ :numref:`sec:messages/packed_msgs`.
+Section :numref:`sec:messages/packed_msgs`.
 
 .. _memory allocation:
 
@@ -3807,7 +3807,7 @@ write:
 
 Notice the last argument to the overloaded new operator, which specifies
 the number of bits used to store message priority. The section on
-prioritized execution (§ :numref:`prioritized message passing`)
+prioritized execution (Section :numref:`prioritized message passing`)
 describes how priorities can be employed in your program.
 
 Another version of the overloaded new operator allows you to pass in an
@@ -4220,6 +4220,16 @@ local
    PUPable. Considering that these entry methods always execute
    immediately, they are allowed to have a non-void return value. An
    example can be found in ``examples/charm++/hello/local``.
+
+whenidle
+   a local entry method meant to be used with ``CkCallWhenIdle``,
+   which registers an entry method to be called when a processor is
+   idle. This mechanism provides a convenient way to do work (e.g. low
+   priority or speculative) in the absence of other work. ``whenidle``
+   entry methods must return a ``bool`` value, indicating whether the
+   entry method should be called when the processor is idle again, and
+   accept a ``double`` argument representing the current timestamp. An
+   example can be found in ``examples/charm++/whenidle``.
 
 python
    entry methods are enabled to be called from python scripts as
@@ -5584,7 +5594,7 @@ returned data can either be in the form of a Charm++ message or any type
 that has the PUP method implemented. Because the caller of a sync entry
 method will block, it must execute in a thread separate from the
 scheduler; that is, it must be a threaded entry method (*cf.*
-§ :numref:`threaded`, above). If a sync entry method returns a value,
+Section :numref:`threaded`, above). If a sync entry method returns a value,
 it is provided as the return value from the invocation on the proxy
 object:
 
@@ -5827,7 +5837,7 @@ has two variants which expect the following arguments:
    Upon quiescence detection, the specified callback is called with no
    parameters. Note that using this variant, you could have your program
    terminate after quiescence is detected, by supplying the above method
-   with a CkExit callback (§ :numref:`sec:callbacks/creating`).
+   with a CkExit callback (Section :numref:`sec:callbacks/creating`).
 
 #. An index corresponding to the entry function that is to be called,
    and a handle to the chare on which that entry function should be
@@ -5863,7 +5873,7 @@ this:
 
 Note that CkWaitQD should only be called from a threaded entry method
 because a call to CkWaitQD suspends the current thread of execution
-(*cf.* § :numref:`threaded`).
+(*cf.* Section :numref:`threaded`).
 
 .. _advanced arrays:
 
@@ -6111,7 +6121,7 @@ is the constructor message to pass, and ``mgr`` is the array manager which
 creates the elements.
 
 To create an element, call ``void CkArray::insertInitial(CkArrayIndex
-idx,void\* ctorMsg)`` on ``mgr``, passing in the index and a copy of the
+idx, void* ctorMsg)`` on ``mgr``, passing in the index and a copy of the
 constructor message. For example, to insert a 2D element (x,y), call:
 
 .. code-block:: c++
@@ -8096,6 +8106,12 @@ After ``CkStartCheckpoint`` is executed, a directory of the designated
 name is created and a collection of checkpoint files are written into
 it.
 
+.. note::
+   Note that checkpoints are written to and read from several
+   automatically created subdirectories of the specified directory in
+   order to avoid creating too many files in the same directory, which
+   can stress the file system.
+
 Restarting
 ^^^^^^^^^^
 
@@ -8334,7 +8350,7 @@ a MPI+OpenMP hybrid program, Charm++ will work perfectly with any
 shared-memory parallel programming languages (e.g. OpenMP). As with
 ordinary OpenMP applications, the number of threads used in the OpenMP
 parts of the program can be controlled with the ``OMP_NUM_THREADS``
-environment variable. See Sec. :numref:`charmrun` for details on how
+environment variable. See Section :numref:`charmrun` for details on how
 to propagate such environment variables.
 
 If there are no spare cores allocated, to avoid resource contention, a
@@ -8513,7 +8529,7 @@ for example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 omp
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp
    $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
 
 This library is based on the LLVM OpenMP runtime library. So it supports
@@ -8557,7 +8573,7 @@ to avoid the error:
    $ sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
    $ sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 clang omp --with-production -j8
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 clang omp --with-production -j8
    $ echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
 
 On Mac, the Apple-provided clang installed in default doesn’t have
@@ -8571,7 +8587,7 @@ to the invocation of the Charm++ build script. For example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 omp gcc-7
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp gcc-7
    $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
 
 If this does not work, you should set environment variables so that the
@@ -10718,7 +10734,7 @@ appropriate choices for the build one wants to perform.
    ================================================================ =====================================================================
    Machine                                                          Build command
    ================================================================ =====================================================================
-   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux --with-production -j8``
+   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    Multicore (single node, shared memory) 64 bit Linux              ``./build charm++ multicore-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux                                            ``./build charm++ netlrts-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux (intel compilers)                          ``./build charm++ netlrts-linux-x86_64 icc --with-production -j8``
@@ -10730,6 +10746,7 @@ appropriate choices for the build one wants to perform.
    IBVERBS with 64 bit Linux                                        ``./build charm++ verbs-linux-x86_64 --with-production -j8``
    OFI with 64 bit Linux                                            ``./build charm++ ofi-linux-x86_64 --with-production -j8``
    UCX with 64 bit Linux                                            ``./build charm++ ucx-linux-x86_64 --with-production -j8``
+   UCX with 64 bit Linux (Armv8)                                    ``./build charm++ ucx-linux-arm8 --with-production -j8``
    Net with 64 bit Windows                                          ``./build charm++ netlrts-win-x86_64 --with-production -j8``
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
    Net with 64 bit Mac                                              ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
@@ -10808,7 +10825,8 @@ select another version with the ``@`` option (for example,
 Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-As an experimental feature, Charm++ can be installed with the CMake tool, version 3.11 or newer.
+As an experimental feature, Charm++ can be installed with the CMake tool,
+version 3.4 or newer.
 This is currently supported on Linux and Darwin, but not on Windows.
 
 After downloading and unpacking Charm++, it can be installed in the following way:
@@ -10878,6 +10896,83 @@ Reducing disk usage
 The charm directory contains a collection of example-programs and
 test-programs. These may be deleted with no other effects. You may also
 ``strip`` all the binaries in ``charm/bin``.
+
+Installation for Specific Builds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+UCX
+^^^
+UCX stands for Unified Communication X and is a high performance communication
+library that can be used as a backend networking layer for Charm++ builds on
+supported transports like Infiniband, Omni-Path, gni, TCP/IP, etc.
+
+In order to install Charm++ with UCX backend, you require UCX or HPC-X modules
+in your environment. In case UCX or HPC-X is not available in your environment,
+you can build UCX from scratch using the following steps:
+
+.. code-block:: bash
+
+   $ git clone https://github.com/openucx/ucx.git
+   $ cd ucx
+   $ ./autogen.sh
+   $ ./contrib/configure-release --prefix=$HOME/ucx/build
+   $ make -j8
+   $ make install
+
+After installing UCX, there are several supported process management interfaces (PMI)
+that can be specified as options in order to build Charm++ with UCX. These include
+Simple PMI, Slurm PMI, Slurm PMI 2 and PMIx (using OpenMPI). Currently, in order to
+use PMIx for process management, it is required to have OpenMPI installed on the system.
+Additionally, in order to use the other supported process management interfaces, it is
+required to have a non-OpenMPI based MPI implementation installed on the system (e.g.
+Intel MPI, MVAPICH, MPICH, etc.).
+
+The following section shows examples of build commands that can be used to build targets
+with the UCX backend using different process management interfaces. It should be noted that
+unless UCX is installed in a system directory, in order for Charm++ to find the UCX installation,
+it is required to pass the UCX build directory as ``--basedir``.
+
+To build the Charm++ target with Simple PMI, do not specify any additional option as shown
+in the build command.
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+
+To build the Charm++ target with Slurm PMI, specify ``slurmpmi`` in the build command.
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 slurmpmi --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+
+Similarly, to build the Charm++ target with Slurm PMI 2, specify ``slurmpmi2`` in the build command.
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 slurmpmi2 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
+
+To build the Charm++ target with PMIx, you would require an OpenMPI implementation with PMIx
+enabled to be installed on your system. In case OpenMPI is not available in your environment,
+you can build OpenMPI from scratch using the following steps:
+
+.. code-block:: bash
+
+  $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
+  $ tar -xvf openmpi-4.0.1.tar.gz
+  $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
+  $ make -j24
+  $ make install all
+
+After installing OpenMPI or using the pre-installed OpenMPI, you can build the Charm++ target with
+the UCX backend by specifying ``ompipmix`` in the build command and passing the OpenMPI installation
+path as ``--basedir`` (in addition to passing the UCX build directory)
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 ompipmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/openmpi-4.0.1/build -j16
+
+It should be noted that the pmix version is the most stable version of using the UCX backend. We're in the
+process of debugging some recent issues with Simple PMI, Slurm PMI and Slurm PMI2.
 
 .. _sec:compile:
 
@@ -11462,6 +11557,13 @@ are available:
    ``0-15:4.3``. ``++ppn 10 +pemap 0-11:6.5+12`` equals
    ``++ppn 10 +pemap 0,12,1,13,2,14,3,15,4,16,6,18,7,19,8,20,9,21,10,22``
 
+   By default, this option accepts PU indices assigned by the OS. The
+   user might want to instead provide logical PU indices used by hwloc
+   (see `link <https://www.open-mpi.org/projects/hwloc/doc/v2.1.0/a00342.php#faq_indexes>`
+   for details). To do this, prepend the sequence with an alphabet L
+   (case-insensitive). For instance, ``+pemap L0-3`` will instruct the
+   runtime to bind threads to PUs with logical indices 0-3.
+
 ``+commap p[,q,...]``
    Bind communication threads to the listed cores, one per process.
 
@@ -11645,6 +11747,23 @@ directory. Pathname resolution is performed as follows:
 #. The system tries to locate this program (with modified pathname and
    appended extension if specified) on all nodes.
 
+
+Instructions to run Charm++ programs for Specific Builds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+UCX
+^^^
+When Charm++ is built with UCX using Simple PMI, Slurm PMI or Slurm PMI2, ensure that
+an MPI implementation which is not OpenMPI is loaded in the environment. Use the mpirun
+launcher provided by the non-OpenMPI implementation to launch programs. Alternatively, you
+can also use any system provided launchers.
+
+When Charm++ is built with UCX using PMIx, ensure that an OpenMPI implementation is loaded
+in the environment. Use the mpiexec/mpirun launcher provided with OpenMPI to launch programs.
+
+Note that due to bug #2477, binaries built with UCX cannot be run in standalone mode i.e without
+a launcher.
+
 .. _sec:keywords:
 
 Reserved words in ``.ci`` files
@@ -11705,13 +11824,17 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  nocopy
 
+-  nocopypost
+
+-  migratable
+
+-  python
+
 -  Entry method attributes
 
    -  stacksize
 
    -  threaded
-
-   -  migratable
 
    -  createhere
 
@@ -11737,15 +11860,13 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
    -  notrace
 
-   -  python
+   -  accel (reserved for future/experimental use)
 
-   -  accel
+   -  readwrite (reserved for future/experimental use)
 
-   -  readwrite
+   -  writeonly (reserved for future/experimental use)
 
-   -  writeonly
-
-   -  accelblock
+   -  accelblock (reserved for future/experimental use)
 
    -  memcritical
 
@@ -11777,8 +11898,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
    -  serial
 
-   -  forward
-
    -  when
 
    -  while
@@ -11792,10 +11911,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
    -  else
 
    -  overlap
-
-   -  connect
-
-   -  publishes
 
 .. _sec:trace-projections:
 

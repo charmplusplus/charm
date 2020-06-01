@@ -577,7 +577,7 @@ class CkDDT
   }
 
   CkDDT(const std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1>& predefinedTypeTable_) noexcept : predefinedTypeTable(predefinedTypeTable_) {}
-  CkDDT& operator=(const CkDDT &obj) = default;
+  CkDDT& operator=(const CkDDT &obj) = delete;
   CkDDT(const CkDDT &obj) = default;
   ~CkDDT() noexcept;
 

@@ -26,4 +26,6 @@ add_executable(charmxi ${charmxi-cxx-sources} ${charmxi-h-sources})
 
 target_include_directories(charmxi PRIVATE sdag .)
 
+target_compile_options(charmxi PRIVATE -host)
+
 target_link_libraries(charmxi -host "-language c++")

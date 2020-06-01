@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ##############################################################################
 # charmc: Compiler for Converse/Charm/Charm++ programs
 #
@@ -8,6 +8,8 @@
 # ALL variables used by this script should be initialized here.
 #
 ##############################################################################
+
+export FROM_CHARMC='1'
 
 # Filter extra cmake arguments
 # This has no effect when building Charm++ without cmake
@@ -102,6 +104,7 @@ USE_BUILD_OPTIONS=0
 COPY_EXIT="true"
 CHARM_SHARED="0"
 BUILD_SHARE="0"
+USER_INITIATED_SHARED='0'
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
 ROSE_OMP_TLS_GLOBALS="no"
@@ -112,16 +115,16 @@ NOABORT=""
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
 
-CMK_CELL=0
-SPU_USE_CPP=0
-SPU_EXTRA_LIBS=""
-
 MPI_INTEROPERATE=""
 NO_MAIN_MODULE=""
 NO_MAIN=""
 CUSTOM_PARTITION=""
 PREPROCESS_CI="yes"
 INPUT_GIVEN=""
+PASSTHROUGH_COMPILER_OPTIONS=""
+
+# protect rpath arguments from disappearing due to variable expansion
+ORIGIN='\$ORIGIN'
 
 ####################################################################
 #
@@ -159,7 +162,7 @@ printUsage() {
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
     echo "  Other options that are not listed here will be passed directly to the"
     echo "underlying compiler and/or linker."
-    echo "Parallel Programming Lab, UIUC, 2019."
+    echo "Parallel Programming Lab, UIUC, 2020."
     echo $*
     exit 1
 }
@@ -427,6 +430,13 @@ do
 		exit 0
 		;;
 
+	-v|--version|-print-search-dirs)
+		# Make sure these compiler options are passed through even if no
+		# file to compile is specified
+		PASSTHROUGH_COMPILER_OPTIONS+=" $arg"
+		OPTS="$OPTS $arg"
+		;;
+
 	"-machine")
 		MACHTYPE="$1"
 		shift
@@ -445,6 +455,12 @@ do
 		SKIP_MODULEINIT="yes"
 		;;
 
+	"-isysroot")
+		# Ignore -isysroot and the following argument (macOS SDK path),
+		# which charmc can not parse (Bug #2495).
+		shift
+		;;
+
 	"-language")
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
@@ -460,7 +476,7 @@ do
 		"mblock") AddModules tcharmmain mblock ;;
 		"mblockf") AddModules tcharmmain mblock ; USE_F90_LIBRARIES="1" ;;
 
-		"charm"|"charm++"|"charm++f"|"f90charm"|"converse"|"converse++"|"bgcharm++"|"bgconverse++"|"bluegene"|"ckbluegene"|"bigsim")
+		"charm"|"charm++"|"charm++f"|"f90charm"|"converse"|"converse++")
 			PARADIGM="$1"
 			POST_LANGUAGE=1
 			;;
@@ -548,15 +564,6 @@ do
 	"-verbose")
 		echo "Verbose mode set"
 		VERBOSE=true
-		;;
-
-        "-spu-cpp")
-		SPU_USE_CPP=1
-		;;
-
-        "-spu-lib")
-		SPU_EXTRA_LIBS="$SPU_EXTRA_LIBS -l$1"
-		shift
 		;;
 
         "-intrinsic")
@@ -730,9 +737,18 @@ do
 		shift
 		;;
 
-	-I)
+	-I|--include-path)
 		OPTS_CPP="$OPTS_CPP -I$1"
 		shift
+		;;
+	--pre-include|-include|--system-include|-isystem|-iquote|-idirafter)
+		OPTS_CPP="$OPTS_CPP $arg $1"
+		shift
+		;;
+	@*.rsp)
+		# Pass through response files (*.rsp) to the compiler.
+		# See https://github.com/UIUC-PPL/charm/issues/2617 for details.
+		OPTS="$OPTS $arg"
 		;;
 
 	-D*|-I*)
@@ -765,9 +781,10 @@ do
 		OPTS="$OPTS $arg"
 		;;
 	-shared|-G)
-		BUILD_SHARE="1"
+		USER_INITIATED_SHARED='1'
+		OPTS_LD="$OPTS_LD $arg"
 		;;
-	-L*|-shared|-G) # note that this is not executed if $arg == -shared|-G, due to the case above; might be a bug
+	-L*)
 		OPTS_LD="$OPTS_LD $arg"
 		;;
 	-charm-shared|-cs)
@@ -931,7 +948,7 @@ do
 	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
-	*.c|*.s|*.S|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
+	*.c|*.s|*.S|*.asm|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
 		BASE=`stripExtention \`basename $FILE\``
 		BASEO="$BASE.o"
 
@@ -1064,6 +1081,13 @@ findModuleDep() {
 	PROCESSED_MODULES="$PROCESSED_MODULES $M"
 	#PRE_LIBRARIES=`AddList $PRE_LIBRARIES -lmodule$M`
 	PRE_LIBRARIES=`AddList -lmodule$M $PRE_LIBRARIES`
+
+	if [[ "$M" == 'CkLoop' && "$CMK_SMP" != '1' && "$CMK_WINDOWS" != '1' ]]; then
+		# CkLoop depends on pthreads in non-SMP, non-Windows machines,
+		# so make sure it is linked.
+		POST_LIBRARIES=`AddList $POST_LIBRARIES -pthread`
+	fi
+
 # HACK: add modules to both ends of library list, to avoid
 #  undefined symbol CkRegisterMainModule when it's in a module file.
 	POST_LIBRARIES=`AddList $POST_LIBRARIES -lmodule$M`
@@ -1113,12 +1137,7 @@ Debugf "----------- Module dependency search complete ------------"
 ##############################################################################
 
 
-if [ x"$CMK_NO_BUILD_SHARED" = "xfalse" ]
-then
- 	BUILD_SHARE="1"
-fi
-
-if [ "$BUILD_SHARE" = "1" ]
+if [ "$BUILD_SHARE" = '1' -o "$USER_INITIATED_SHARED" = '1' ]
 then
 	USE_PIC="1"
 fi
@@ -1143,9 +1162,17 @@ if [ "$BUILD_SHARE" = "1" ]
 then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
-	*.a|*.so|*.so.*|*.sl|*.dylib)
+	*.a)
 		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
 		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
+		;;
+	*.so|*.so.*|*.sl|*.dylib)
+		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
+		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
+		if [ "$CMK_MACOSX" = "1" -a -z "$STANDALONE" ]; then
+			fname=`basename $OBJECT`
+			OPTS_LD="$OPTS_LD -Wl,-install_name,$CHARMLIBSO/$fname"
+		fi
 		;;
 	*)
 		BUILD_SHARE="0"
@@ -1328,12 +1355,6 @@ case "$LANGUAGE" in
 	;;
 esac
 
-# update charm to bgcharm
-[ "$PARADIGM" = "charm++" -a -n "$CMK_BIGSIM" ] && PARADIGM="bgcharm++"
-[ "$PARADIGM" = "converse++" -a -n "$CMK_BIGSIM" ] && PARADIGM="bgconverse++"
-
-[ "$PARADIGM" = "bgcharm++" ] && TRACEMODE=`AddList $TRACEMODE bluegene`
-
 if [ $USE_F77_LIBRARIES = "1" ]
 then
 	POST_LIBRARIES="$POST_LIBRARIES $CMK_F77LIBS"
@@ -1370,47 +1391,7 @@ case "$PARADIGM" in
         PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm -lckf"
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
 	;;
-"bluegene"|"bigsim")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bigsim -lconv-bigsim-logs"
-	;;
-"ckbluegene")
-        POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
-	;;
-"bgcharm++")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bigsim -lconv-bigsim-logs -lconv-bluegene-stub"
-	;;
-"bgconverse++")
-        MIDDLE_LIBS="$MIDDLE_LIBS -lconv-bigsim -lconv-bigsim-logs"
-	;;
 esac
-
-# DMK - ACCEL SUPPORT - If this is a cell build, add the spe code object to POST_LIBRARIES
-if [ $CMK_CELL -eq 1 ]
-then
-
-  if [ "$PARADIGM" = "converse++" ]
-  then
-    # Include a "do nothing" register_accel_spe_funcs() function
-    POST_LIBRARIES="$POST_LIBRARIES -lnoAccelStub"
-  fi
-
-  if [ "$PARADIGM" = "charm++" ]
-  then
-
-    if [ $SPU_USE_CPP -eq 1 ]
-    then
-        SPU_COMPILER=$CMK_SPU_CXX
-        SPU_LINKER=$CMK_SPU_LDXX
-    else
-        SPU_COMPILER=$CMK_SPU_CC
-        SPU_LINKER=$CMK_SPU_LD
-    fi
-
-    # Include the spe object file for linking into main executable
-    POST_LIBRARIES="$POST_LIBRARIES main__funcLookup__.genSPECode.ppe.o"
-
-  fi
-fi
 
 if [ "$AMPIMAIN" != "" ]
 then
@@ -1510,7 +1491,7 @@ if [ x"$TRACEMODE" != x ]
 then
 for trace in $TRACEMODE; do
     case "$PARADIGM" in
-        "converse"|"converse++"|"bgconverse++"|"bigsim"|"bluegene")
+        "converse"|"converse++")
             if [ "$trace" != "counter" ]; then
                 Warning "Tracemode $trace isn't supported in Converse-level programs; Dropping it"
                 TRACEMODE=`DropList $trace $TRACEMODE`
@@ -1526,11 +1507,6 @@ done
 
 fi
 
-if test x$PARADIGM = x"bgcharm++"
-then
-    BALANCE=bluegene
-fi
-
 Debug "Finished with TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
 BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
@@ -1539,7 +1515,7 @@ BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
 
 # Set the default expansions of unprefixed variants
 case "$MEMORY" in
-  'verbose'|'paranoid'|'leak'|'isomalloc')
+  'verbose'|'record'|'paranoid'|'leak'|'isomalloc')
     MEMORY="os-$MEMORY"
     ;;
   charmdebug*)
@@ -1547,10 +1523,10 @@ case "$MEMORY" in
     ;;
 esac
 
-# Isomalloc does not work on BGQ or Windows:
-if [ "$CMK_BLUEGENEQ" = "1" -o "$CMK_COMPILER" = "msvc" ] && [ "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]
+# -memory isomalloc does not work on BGQ or Windows:
+if [[ "$CMK_BLUEGENEQ" = '1' || "$CMK_WINDOWS" = '1' ]] && [[ "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]]
 then
-  Abort "Error: Isomalloc is not supported on BlueGene/Q or Windows."
+  Abort "Error: -memory isomalloc is not supported on BlueGene/Q or Windows."
 fi
 
 MEM_OBJ="-lmemory-${MEMORY}"
@@ -1609,9 +1585,9 @@ then
 fi
 # done getting TAU variables
 
-if [ "$BUILD_SHARE" = "0" ]
+if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
 then
-       MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
+       MIDDLE_LIBS="$MEM_OBJ $THREAD_OBJ $MIDDLE_LIBS"
 fi
 
 CMK_SYSLIBS="$CMK_SYSLIBS -lm"
@@ -1632,7 +1608,7 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
+"charm"|"charm++"|"f90charm")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-machine $CORE_LIBS "
 	if [ -z "$NO_MAIN" ]
@@ -1653,9 +1629,9 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
+"converse"|"converse++")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
+	MIDDLE_LIBS="-lconv-core $MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
 "c"|"C"|"c++"|"C++"|"f90"|"f77")
   ;;
@@ -1664,7 +1640,7 @@ case "$PARADIGM" in
 	;;
 esac
 
-if [ "$BUILD_SHARE" = "0" ]
+if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
 then
 	MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
 fi
@@ -1683,7 +1659,7 @@ if [ -z "$STANDALONE" ]
 then
   ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES"
   case "$PARADIGM" in
-  "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
+  "charm"|"charm++"|"f90charm")
     ALL_LIBS="$ALL_LIBS -lmoduleNDMeshStreamer -lmodulecompletion"
     ;;
   esac
@@ -1698,7 +1674,7 @@ else
   ALL_LIBS="$ALL_LIBS $CMK_SYSLIBS"
 fi
 
-if [ "$BUILD_SHARE" = "0" ]
+if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
 then
   ALL_LIBS="$ALL_LIBS $CHARMLIB/conv-static.o"
 fi
@@ -1717,7 +1693,7 @@ Debugf "All libraries are: $ALL_LIBS"
 
 # preserve this variable in its state here for use later
 CHARM_ALL_LIBS="$ALL_LIBS"
-if [ "$BUILD_SHARE" = "1" -o -n "$SKIP_MODULEINIT" ]
+if [ "$BUILD_SHARE" = '1' -o "$USER_INITIATED_SHARED" = '1' -o -n "$SKIP_MODULEINIT" ]
 then
   ALL_LIBS="$OBJECTFILES $ALL_LIBS"
 else
@@ -1890,7 +1866,7 @@ do
 #	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
 #	then
         case "$FILE_EXT" in
-        .c|.s|.S|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
+        .c|.s|.S|.asm|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASEO `stripExtention $BASEO`.f.o
         esac
@@ -1934,7 +1910,7 @@ do
 		  Do $CHARMBIN/charmxi $XIOPTS $FILE
                 fi
 		;;
-	*.c|*.s|*.S)
+	*.c|*.s|*.S|*.asm)
 		Do $CHARM_CC $CHARM_CC_FLAGS -c $FILE $DESTO
 		if [ "$Do_res" -ne 0 ]
 		then
@@ -2044,7 +2020,7 @@ MakeSO() {
 		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		echo "!!  Failed to compile Charm++ shared library. You can disable shared   !!"
 		echo "!!  lib compilation by providing --no-build-shared build option like:  !!"
-		echo "!!     ./build charm++ netlrts-linux --no-build-shared -O              !!"
+		echo "!!     ./build charm++ netlrts-linux-x86_64 --no-build-shared          !!"
 		echo "!!  or reexecute this charmc command with the --no-build-shared option !!"
 		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		Abort "Command $soCmd returned error code $Do_res"
@@ -2055,6 +2031,7 @@ MakeSO() {
 
 if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ]
 then
+	[[ -n "$PASSTHROUGH_COMPILER_OPTIONS" ]] && $CHARM_CXX $PASSTHROUGH_COMPILER_OPTIONS
 # We have no target object, or are playing preprocessor tricks-- just end
 	Debugf "No target object-- finished"
 	Success
@@ -2086,12 +2063,7 @@ case "$OBJECT" in
 	;;
 *.so|*.so.*|*.sl|*.dylib)
 # Make shared library
-	# If building shared is not supported and this object is not standalone, exit.
-	if [ "$BUILD_SHARE" = 0 -a -z "$STANDALONE" ]
-	then
-		Warning "Warning: building shared library is not supported, recompile charm++ with '--build-shared'."
-		End 1
-	elif [ "$CHARM_SHARED" = "0" ]
+	if [ "$BUILD_SHARE" = '1' ]
 	then
 	  	MakeSO
 	fi
@@ -2128,20 +2100,6 @@ esac
 fi
 # If the above case returns, we're not creating a .o or .a file,
 # so linking is needed.
-
-if [ $CMK_CELL -eq 1 ]
-then
-
-  if [ "$PARADIGM" = "charm++" ]
-  then
-
-    # Make the spe object file to be included
-    Do $SPU_COMPILER -c -I$CHARMINC $CMK_SYSINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
-    Do $SPU_LINKER -L$CHARMLIB -o main__funcLookup__.genSPECode main__funcLookup__.genSPECode.o $CMK_SPERT_LIBS $SPU_EXTRA_LIBS
-    Do $CMK_PPU_EMBEDSPU spert_main main__funcLookup__.genSPECode main__funcLookup__.genSPECode.ppe.o
-
-  fi
-fi
 
 # check if we're linking a sequential object
 case "$LANGUAGE" in
@@ -2369,20 +2327,8 @@ case "$OBJECT" in
 esac
 fi
 
-if [ "$BUILD_SHARE" = "1" -a "$CHARM_SHARED" = "1" ]
-then
-  # build an application .so linking with charm .so
-  OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
-  Debugf "Running ldro..."
-  DoNoErrCheck $RM $OBJECT
-  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD -o $OBJECT $ALL_LIBS
-  [ "$MAKE_LD" = "1" ] && Do $CMK_LD $CMK_LD_FLAGS $CMK_LIBDIR $OPTS_LD -o $OBJECT $ALL_LIBS
-  Copyobj
-else
-# Make a regular executable: call the appropriate linker
-  [ "$MAKE_LDXX" = "1" ] && Do $CHARM_LDXX $CHARM_LDXX_FLAGS -o $OBJECT
-  [ "$MAKE_LD" = "1" ] && Do $CHARM_LD $CHARM_LD_FLAGS -o $OBJECT
-fi
+[ "$MAKE_LDXX" = "1" ] && Do $CHARM_LDXX $CHARM_LDXX_FLAGS -o $OBJECT
+[ "$MAKE_LD" = "1" ] && Do $CHARM_LD $CHARM_LD_FLAGS -o $OBJECT
 
 ########################################################################
 #

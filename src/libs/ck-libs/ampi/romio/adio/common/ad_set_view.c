@@ -63,7 +63,7 @@ void ADIO_Set_view(ADIO_File fd, ADIO_Offset disp, MPI_Datatype etype,
         ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
 	if (filetype_is_contig) fd->fp_ind = disp;
 	else {
-	    flat_file = CtvAccess(ADIOI_Flatlist);
+	    flat_file = ADIOI_Flatlist;
 	    while (flat_file->type != fd->filetype) 
 		flat_file = flat_file->next;
 	    for (i=0; i<flat_file->count; i++) {

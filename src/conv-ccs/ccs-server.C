@@ -329,7 +329,7 @@ static CcsSecMan *CcsSecMan_default(const char *authFile)
 }
 
 /*********************************************************/
-#define CCSDBG(x) /*printf x*/
+#define CCSDBG(x) //printf x
 
 /*CCS Server state is all stored in global variables.
 Since there's only one server, this is ugly but OK.
@@ -434,7 +434,7 @@ int CcsServer_recvRequest(CcsImplHeader *hdr,void **reqData)
     ret=0;
   }
 
-  CCSDBG(("CCS   Got all %d data bytes for request.\n",reqBytes));
+  CCSDBG(("CCS   Ret %d request.\n",ret));
   skt_set_abort(old);
 
   return ret;
@@ -533,11 +533,7 @@ int check_stdio_header(CcsImplHeader *hdr) {
 }
 
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
-#if CMK_BIGSIM_CHARM
-#define MAX_PRINT_BUF_SIZE 1024
-#else
 #define MAX_PRINT_BUF_SIZE 8192
-#endif
 int print_fw_handler_idx;
 
 /* Receives messages passed to processor 0 by all other processors as a

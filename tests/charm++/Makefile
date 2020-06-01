@@ -24,13 +24,8 @@ DIRS = \
   jacobi3d-sdag \
   zerocopy \
   within_node_bcast \
-
-# skip sdag, megatest and commtest
-BGDIRS = \
-  simplearrayhello \
-  load_balancing \
-  chkpt \
-  delegation \
+  longIdle \
+  bombard \
 
 FTDIRS = \
   jacobi3d \
@@ -49,8 +44,6 @@ endif
 
 smptest: $(foreach i,$(TESTDIRS),smptest-$i)
 
-bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
-
 syncfttest mpisyncfttest: $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
 
 clean: $(foreach i,$(DIRS),clean-$i)
@@ -65,9 +58,6 @@ $(foreach i,$(DIRS),test-$i):
 
 $(foreach i,$(DIRS),smptest-$i):
 	$(MAKE) -C $(subst smptest-,,$@) smptest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
-
-$(foreach i,$(DIRS),bgtest-$i):
-	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

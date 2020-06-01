@@ -86,17 +86,6 @@ void ftraceFlushLog()
   traceFlushLog();
 }
 
-#if CMK_BIGSIM_CHARM
-void fbgprintf(char *str, int len)
-{
-  char *newstr = new char[len + 1];
-  _MEMCHECK(newstr);
-  strncpy(newstr, str, len);
-  newstr[len] = 0;
-  BgPrintf(newstr);
-  delete [] newstr;
-}
-#endif
 
 }  // FLINKAGE
 

@@ -30,6 +30,8 @@ void noopit(const char*, ...)
 #define DEBUGC(x) x
 //#define DEBUGC(x) 
 
+#define SUBDIR_SIZE 256
+
 CkGroupID _sysChkptMgr;
 
 typedef struct _GroupInfo{
@@ -167,28 +169,32 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatus);
 
 static void addPartitionDirectory(ostringstream &path) {
-        if (CmiNumPartitions() > 1) {
-          path << "/part-" << CmiMyPartition() << '/';
-        }
+  if (CmiNumPartitions() > 1) {
+    path << "/part-" << CmiMyPartition();
+  }
 }
 
 static FILE* openCheckpointFile(const char *dirname, const char *basename,
-                                const char *mode, int id = -1) {
-        ostringstream out;
-        out << dirname << '/';
-        addPartitionDirectory(out);
-        out << basename;
-        if (id != -1)
-                out << '_' << id;
-        out << ".dat";
+    const char *mode, int id = -1) {
+  ostringstream out;
+  out << dirname;
+  addPartitionDirectory(out);
+  if (id != -1) {
+    int subdir_id = id / SUBDIR_SIZE;
+    out << "/sub" << subdir_id;
+  }
+  out << "/" << basename;
+  if (id != -1) {
+    out << "_" << id;
+  }
+  out << ".dat";
 
-        FILE *fp = CmiFopen(out.str().c_str(), mode);
-        if (!fp) {
-
-                CkAbort("PE %d failed to open checkpoint file: %s, mode: %s, status: %s",
-				CkMyPe(), out.str().c_str(), mode, strerror(errno));
-        }
-        return fp;
+  FILE *fp = CmiFopen(out.str().c_str(), mode);
+  if (!fp) {
+    CkAbort("PE %d failed to open checkpoint file: %s, mode: %s, status: %s",
+        CkMyPe(), out.str().c_str(), mode, strerror(errno));
+  }
+  return fp;
 }
 
 /**
@@ -214,20 +220,45 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	requestStatus = _requestStatus;
 	// make dir on all PEs in case it is a local directory
 	CmiMkdir(dirname);
-	bool success = true;
-        if (CmiNumPartitions() > 1) {
-          ostringstream partDir;
-          partDir << dirname;
-          addPartitionDirectory(partDir);
-          CmiMkdir(partDir.str().c_str());
-        }
 
+	// Create partition directories (if applicable)
+	ostringstream dirPath;
+	dirPath << dirname;
+	if (CmiNumPartitions() > 1) {
+		addPartitionDirectory(dirPath);
+		CmiMkdir(dirPath.str().c_str());
+	}
+
+	// Due to file system issues we have observed, divide checkpoints
+	// into subdirectories to avoid having too many files in a single directory.
+	// Nodegroups should be checked separately since they could go into
+	// different subdirectory.
+
+	// Save current path for later use with nodegroups
+	ostringstream dirPathNode;
+	dirPathNode << dirPath.str();
+
+	// Create subdirectories
+	int mySubDir = CkMyPe() / SUBDIR_SIZE;
+	dirPath << "/sub" << mySubDir;
+	CmiMkdir(dirPath.str().c_str());
+
+	// Create Nodegroup subdirectory if needed
+	if (CkMyRank() == 0) {
+		int mySubDirNode = CkMyNode() / SUBDIR_SIZE;
+		if (mySubDirNode != mySubDir) {
+			dirPathNode << "/sub" << mySubDirNode;
+			CmiMkdir(dirPathNode.str().c_str());
+		}
+	}
+
+	bool success = true;
 	if (CkMyPe() == 0) {
 #if CMK_SHRINK_EXPAND
     if (pending_realloc_state == REALLOC_IN_PROGRESS) {
       // After restarting from this AtSync checkpoint, resume execution along the
       // normal path (i.e. whatever the user defined as ResumeFromSync.)
-      CkCallback resumeFromSyncCB(CkIndex_LBDatabase::ResumeClients(), _lbdb);
+      CkCallback resumeFromSyncCB(CkIndex_LBManager::ResumeClients(), _lbmgr);
       success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
     } else
 #endif

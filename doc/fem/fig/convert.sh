@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 c="convert -density 144x144 "
 for fig in conn_indexing conn_indexing_old

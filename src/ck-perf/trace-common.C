@@ -29,11 +29,6 @@ static int warned = 0;
 
 CkpvDeclare(TraceArray*, _traces);		// lists of all trace modules
 
-/* trace for bluegene */
-class TraceBluegene;
-CkpvDeclare(TraceBluegene*, _tracebg);
-int traceBluegeneLinked=0;			// if trace-bluegene is linked
-
 CkpvDeclare(bool,   dumpData);
 CkpvDeclare(double, traceInitTime);
 CkpvDeclare(double, traceInitCpuTime);
@@ -63,11 +58,7 @@ int _sdagMsg, _sdagChare, _sdagEP;
 CtvDeclare(int, curThreadEvent);
 CpvDeclare(int, curPeEvent);
 
-#if CMK_BIGSIM_CHARM
-double TraceTimerCommon(){return TRACE_TIMER();}
-#else
 double TraceTimerCommon(){return TRACE_TIMER() - CkpvAccess(traceInitTime);}
-#endif
 #if CMK_TRACE_ENABLED
 void CthSetEventInfo(CthThread t, int event, int srcPE);
 #endif
@@ -210,11 +201,7 @@ static void traceCommonInit(char **argv)
 
   
   
-#ifdef __BIGSIM__
-  if(BgNodeRank()==0) {
-#else
   if(CkMyRank()==0) {
-#endif
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0, TypeInvalid);
     CkRegisterChareInCharm(_threadChare);
@@ -400,11 +387,6 @@ static int checkTraceOnPe(char **argv)
 {
   int traceOnPE = 1;
   char *procs = NULL;
-#if CMK_BIGSIM_CHARM
-  // check bgconfig file for settings
-  traceOnPE=0;
-  if (BgTraceProjectionOn(CkMyPe())) traceOnPE = 1;
-#endif
   if (CmiGetArgStringDesc(argv, "+traceprocessors", &procs, "A list of processors to trace, e.g. 0,10,20-30"))
   {
     CkListString procList(procs);
@@ -531,10 +513,6 @@ void traceEndIdle()
 }
 
 // CMK_TRACE_ENABLED is already guarded in convcore.C
-// converse thread tracing is not supported in blue gene simulator
-// in BigSim, threads need to be traced manually (because virtual processors
-// themselves are implemented as threads and we don't want them to be traced
-// In BigSim, so far, only AMPI threads are traced.
 void traceResume(int eventID, int srcPE, CmiObjId *tid)
 {
     _TRACE_BEGIN_EXECUTE_DETAILED(eventID, ForChareMsg, _threadEP, srcPE, 0, NULL, tid);
@@ -780,18 +758,12 @@ void traceFlushLog(void)
 */
 void traceClose(void)
 {
-#if ! CMK_BIGSIM_CHARM
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceClose();
-#endif   
 }
 
 void traceCharmClose(void)
 {
-#if CMK_BIGSIM_CHARM
-  OPTIMIZE_WARNING
-  CkpvAccess(_traces)->traceClose();
-#endif
 }
 
 /* **CW** This is the API called from user code to support CCS operations 

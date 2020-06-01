@@ -330,9 +330,9 @@ calculations are required to access data.
 
 To use MSA in a Charm++ program:
 
--  build Charm++ for your architecture, e.g. ``netlrts-linux``.
+-  build Charm++ for your architecture, e.g. ``netlrts-linux-x86_64``.
 
--  ``cd charm/netlrts-linux/tmp/libs/ck-libs/multiphaseSharedArrays/; make``
+-  ``cd charm/netlrts-linux-x86_64/tmp/libs/ck-libs/multiphaseSharedArrays/; make``
 
 -  ``#include “msa/msa.h”`` in your header file.
 

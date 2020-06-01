@@ -17,9 +17,6 @@
 
 void CreateHybridBaseLB();
 
-/// for backward compatibility
-typedef LBMigrateMsg NLBMigrateMsg;
-
 inline int mymin(int x, int y) { return x<y?x:y; }
 
 // base class
@@ -299,8 +296,7 @@ public:
   HybridBaseLB(CkMigrateMessage *m): CBase_HybridBaseLB(m) {}
   ~HybridBaseLB();
 
-  static void staticAtSync(void*);
-  void AtSync(void); // Everything is at the PE barrier
+  void InvokeLB();
   void ProcessAtSync(void);
 
   void ReceiveStats(CkMarshalledCLBStatsMessage &&m, int fromlevel); 
@@ -441,6 +437,7 @@ protected:
   StatsStrategy statsStrategy;
 
 private:
+  void AtBarrier(void);
   void FindNeighbors();
   void buildStats(int level);
   CLBStatsMsg * buildCombinedLBStatsMessage(int atlevel);
@@ -465,6 +462,6 @@ private:
 };
 
 
-#endif /* NBORBASELB_H */
+#endif /* HYBRIDBASELB_H */
 
 /*@}*/

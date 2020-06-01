@@ -68,7 +68,8 @@ enum ncpyOperationMode {
   CMK_EM_API_REVERSE         = 4,
   CMK_BCAST_EM_API           = 5,
   CMK_BCAST_EM_API_REVERSE   = 6,
-  CMK_READONLY_BCAST         = 7
+  CMK_READONLY_BCAST         = 7,
+  CMK_ZC_PUP                 = 8
 };
 
 // Enum for the method of acknowledglement handling after the completion of a zerocopy operation
@@ -92,9 +93,30 @@ enum cmiZCMsgType {
   CMK_REG_NO_ZC_MSG = 0,
   CMK_ZC_P2P_SEND_MSG = 1,
   CMK_ZC_P2P_RECV_MSG = 2,
-  CMK_ZC_P2P_RECV_DONE_MSG = 3,
+  CMK_ZC_SEND_DONE_MSG = 3, // USED for both ZC_BCAST_SEND_DONE_MSG & ZC_P2P_SEND_DONE_MSG
   CMK_ZC_BCAST_SEND_MSG = 4,
   CMK_ZC_BCAST_RECV_MSG = 5,
   CMK_ZC_BCAST_RECV_DONE_MSG = 6,
   CMK_ZC_BCAST_RECV_ALL_DONE_MSG = 7
 };
+
+#ifndef CMK_NOCOPY_DIRECT_BYTES
+
+#if defined(_WIN32)
+#define CMK_NOCOPY_DIRECT_BYTES 1
+/* It is required to declare CMK_NOCOPY_DIRECT_BYTES to 1 instead of 0
+ * as this avoids the C2229 error (illegal zero-sized array)
+ * for char layerInfo[CMK_NOCOPY_DIRECT_BYTES] which is seen for
+ * a 0 sized array on VC++
+ */
+#else
+#define CMK_NOCOPY_DIRECT_BYTES 0
+#endif // end of if defined(_WIN32)
+
+#endif // end of ifndef CMK_NOCOPY_DIRECT_BYTES
+
+#ifndef CMK_COMMON_NOCOPY_DIRECT_BYTES
+#define CMK_COMMON_NOCOPY_DIRECT_BYTES 0
+#endif
+
+
