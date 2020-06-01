@@ -17,7 +17,7 @@ jobs:
         cd ..
         git clone https://charm.cs.illinois.edu/gerrit/namd
         cd namd
-        ./config Linux-x86_64-g++ --charm-arch netlrts-linux-x86_64
+        ./config Linux-x86_64-g++ --charm-base ../charm --charm-arch netlrts-linux-x86_64
         cd Linux-x86_64-g++
         make -j4
     - name: test-namd
