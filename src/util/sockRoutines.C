@@ -13,9 +13,6 @@
 #include <poll.h>
 #endif
 
-#if CMK_BPROC
-#include <sys/bproc.h>
-#endif
 
 #ifndef CMK_NOT_USE_CONVERSE
 #  include "converse.h" /* use real CmiTmpAlloc/Free */
@@ -311,32 +308,12 @@ skt_ip_t skt_lookup_ip(const char *name)
 */
 skt_ip_t skt_innode_my_ip(void)
 {  
-#if CMK_BPROC
-  /* on Scyld, the hostname is just the node number */
-  char hostname[200];
-  sprintf(hostname, "%d", bproc_currnode());
-  return skt_innode_lookup_ip(hostname);
-#else
   return skt_my_ip();
-#endif
 }
 
 skt_ip_t skt_innode_lookup_ip(const char *name)
 {
-#if CMK_BPROC
-  struct sockaddr_in addr;
-  int len = sizeof(struct sockaddr_in);
-  if (-1 == bproc_nodeaddr(atoi(name), &addr, &len)) {
-    return _skt_invalid_ip;
-  }
-  else {
-    skt_ip_t ret;
-    memcpy(&ret,&addr.sin_addr.s_addr,sizeof(ret));
-    return ret;
-  }
-#else
   return skt_lookup_ip(name);
-#endif
 }
 
 /*Write as dotted decimal*/
