@@ -15,6 +15,8 @@ cmake_minimum_required(VERSION 3.4)
 # Fortran is optional, so don't include it in LANGUAGES here
 project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
+message(${CMAKE_GENERATOR}xxx)
+
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
 
