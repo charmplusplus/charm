@@ -1,5 +1,8 @@
 language: cpp
 
+git:
+  autocrlf: false
+
 before_install:	
   - |	
       if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then	
@@ -32,7 +35,7 @@ matrix:
     script:
     #- rm -rf C:/tools/msys64
     - choco upgrade -y cygwin cyg-get
-    - cyg-get.bat cmake make git
+    - cyg-get.bat cmake make
     #- cyg-get install -y make
     #- export msys2='cmd //C RefreshEnv.cmd '
     #- export msys2+='& set MSYS=winsymlinks:nativestrict '
@@ -41,6 +44,6 @@ matrix:
     #- export msys2+=" -msys2 -c \$\* --"
     #- $msys2 pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config cmake
    # - export PATH=/C/tools/msys64/mingw64/bin:$PATH
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "git clone --branch cmake-win https://github.com/UIUC-PPL/charm && cd charm && ./build charm++ netlrts-win-x86_64 --with-production"
+    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && ./build charm++ netlrts-win-x86_64 --with-production"
    # - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp -j3 all-test-tests
    # - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tests/charm++ test
