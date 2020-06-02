@@ -2059,8 +2059,6 @@ exists])
 
 #### check if dlopen works ####
 skip_dl=0
-# for bproc, ignore -ldl
-test -n "$CMK_BPROC" && skip_dl=1
 test -n "$CMK_NO_DL" && skip_dl=1
 dl_opt='-ldl'
 #workaround for pgcc 4.0, -ldl crash linking, so use -Wl,-ldl to skip the prelinker.
@@ -2458,8 +2456,7 @@ AC_ARG_ENABLE([zlib],
             [enable_zlib=yes])
 
 #### test if has zlib ####
-# bproc doesnot like -lz in any case
-if test -z "$CMK_BPROC" && test "$enable_zlib" = "yes"
+if test "$enable_zlib" = "yes"
 then
 
 cat > $t <<EOT
@@ -2744,36 +2741,6 @@ EOT
 		add_make_flag 'CMK_NO_BUILD_SHARED:=true' 'build-shared'
 		CMK_NO_BUILD_SHARED='true'
 	fi
-fi
-
-#### test the version number of bproc ####
-if test -n "$CMK_BPROC"
-then
-cat > $t <<EOT
-#include <stdio.h>
-#include <sys/bproc.h>
-int main()
-{
-  struct bproc_version_t vers;
-  bproc_version(&vers);
-  printf("%s\n", vers.version_string);
-}
-EOT
-test_link "whether bproc compiles" "yes" "no" "-lbproc"
-if test $pass -eq 1
-then 
-AC_MSG_CHECKING("bproc version")
-bproc_ver=`./testlink`
-if test x$bproc_ver = x
-then
-test_result 0 "bproc version" "ERROR" ""
-test_finish 1
-else
-test_result 0 "bproc version" "$bproc_ver" ""
-fi
-bproc_ver=`echo $bproc_ver | cut -d'.' -f1`
-AC_DEFINE_UNQUOTED(CMK_BPROC_VERSION, $bproc_ver, [bproc version])
-fi
 fi
 
 #### test the if command sync exists ####

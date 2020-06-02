@@ -266,6 +266,5 @@ class CkArrayOptions {
 
   void pup(PUP::er& p);
 };
-PUPmarshall(CkArrayOptions)
 
 #endif
