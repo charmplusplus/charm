@@ -48,7 +48,6 @@ public:
 		p(id,nId);
 	}
 };
-PUPmarshall(CkViewableID)
 
 /**
  * A reference-counted object.  This is used for simple object sharing,
@@ -331,7 +330,6 @@ public:
 	
 	void pup(PUP::er &p);
 };
-PUPmarshall(CkInterestSet)
 
 
 /// An interestView is a QuadView that keeps track of 

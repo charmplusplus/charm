@@ -955,29 +955,10 @@ namespace PUP {
 	     if (PUP::as_bytes<someClass>::value) { ... }
 	*/
 	template<class T> class as_bytes {
-#ifdef CK_DEFAULT_BITWISE_PUP   /* OLD */
-		public: enum {value=1};
-#else /* normal case: don't pack as bytes by default */
+    /* default is to not pack as bytes by default */
 		public: enum {value=0};
-#endif
 	};
 
-
-#ifdef CK_DEFAULT_BITWISE_PUP   /* OLD compatability mode*/
-/// Default operator| and PUParray: copy as bytes.
-template <class T>
-inline void operator|(PUP::er &p,T &t) {p((void *)&t,sizeof(T));}
-template <class T>
-inline void PUParray(PUP::er &p,T *ta,size_t n) { p((void *)ta,n*sizeof(T)); }
-
-/* enable normal pup mode from CK_DEFAULT_BITWISE_PUP */
-#  define PUPmarshall(type) \
-template<class T> inline void operator|(PUP::er &p,T &t) { t.pup(p); } \
-template<class T> inline void PUParray(PUP::er &p,T *t,size_t n) { \
-	for (size_t i=0;i<n;i++) p|t[i]; \
-}
-
-#else /* !CK_DEFAULT_BITWISE_PUP */
 
 // Defines is_pupable to allow enums to be pupped in pup_stl.h
 namespace details {
@@ -1022,12 +1003,6 @@ inline void PUParray(PUP::er &p,T *t,size_t n) {
 	p.syncComment(PUP::sync_end_array);
 }
 
-/* PUPmarshall macro: now a deprecated no-op */
-#  define PUPmarshall(type) /* empty, pup routines now the default */
-#endif
-#define PUPmarshal(type) PUPmarshall(type) /*Support this common misspelling*/
-
-
 /// Copy this type as raw memory (like memcpy).
 #define PUPbytes(type) \
   namespace PUP { inline void operator|(PUP::er &p,type &t) {p((char *)&t,sizeof(type));} } \
@@ -1035,7 +1010,6 @@ inline void PUParray(PUP::er &p,T *t,size_t n) {
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
   }; }
-#define PUPmarshallBytes(type) PUPbytes(type)
 
 /// Make PUP work with this function pointer type, copied as raw bytes.
 #define PUPfunctionpointer(fnPtrType) \
