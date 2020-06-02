@@ -147,7 +147,6 @@ public:
 
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxy_ArrayBase)
 
 class CProxyElement_ArrayBase:public CProxy_ArrayBase {
 private:
@@ -176,7 +175,6 @@ public:
 	ArrayElement *ckLocal(void) const;
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxyElement_ArrayBase)
 
 
 #define _AUTO_DELEGATE_MCASTMGR_ON_ 1
@@ -269,7 +267,6 @@ public:
 	inline int ckGetBfactor() const { return _sid[0].bfactor; }
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxySection_ArrayBase)
 
 //Simple C-like API:
 void CkSetMsgArrayIfNotThere(void *msg);
