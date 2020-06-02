@@ -17,6 +17,9 @@ echo BB $WINDOWSSDKDIR
 echo CC $WindowsSdkDir
 echo PATH $PATH
 
+echo ============================
+ls /cygdrive/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio\ 14.0/VC/bin/amd64/
+
 # Configurable option: Location of MSDEV
 if [[ -z "$VCINSTALLDIR" ]]
 then
