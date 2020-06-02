@@ -14,28 +14,28 @@ typedef struct ncpystruct{
 #endif
 
   const void *srcPtr;
-  int srcPe;
   char *srcLayerInfo;
-  int srcLayerSize;
   char *srcAck;
-  int srcAckSize;
-  int srcSize;
-  unsigned short int srcRegMode;
-  unsigned short int srcDeregMode;
-  unsigned short int isSrcRegistered;
   const void *srcRef;
+  int srcPe;
+  int srcSize;
+  short int srcLayerSize;
+  short int srcAckSize;
+  unsigned char srcRegMode;
+  unsigned char srcDeregMode;
+  unsigned char isSrcRegistered;
 
   const void *destPtr;
-  int destPe;
   char *destLayerInfo;
-  int destLayerSize;
   char *destAck;
-  int destAckSize;
-  int destSize;
-  unsigned short int destRegMode;
-  unsigned short int destDeregMode;
-  unsigned short int isDestRegistered;
   const void *destRef;
+  int destPe;
+  int destSize;
+  short int destAckSize;
+  short int destLayerSize;
+  unsigned char destRegMode;
+  unsigned char destDeregMode;
+  unsigned char isDestRegistered;
 
   unsigned char opMode; // CMK_DIRECT_API for p2p direct api
                         // CMK_DIRECT_API_REVERSE for p2p direct api with inverse operation
@@ -50,11 +50,11 @@ typedef struct ncpystruct{
   unsigned char freeMe;  // CMK_FREE_NCPYOPINFO in order to free NcpyOperationInfo
                          // CMK_DONT_FREE_NCPYOPINFO in order to not free NcpyOperationInfo
 
-  void *refPtr;
-
-  int ncpyOpInfoSize;
+  short int ncpyOpInfoSize;
 
   int rootNode; // used only for Broadcast, -1 for p2p operations
+
+  void *refPtr;
 
 }NcpyOperationInfo;
 

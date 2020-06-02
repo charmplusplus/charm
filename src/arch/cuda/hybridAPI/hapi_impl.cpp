@@ -54,15 +54,15 @@ enum ProfilingStage{
 };
 
 #ifdef HAPI_CUDA_CALLBACK
-struct hapiCbMsg {
+struct hapiCallbackMessage {
   char header[CmiMsgHeaderSizeBytes];
   int rank;
   void* cb;
   void* cb_msg;
-
-  hapiCbMsg() : rank(-1), cb(NULL), cb_msg(NULL) {}
 };
-#else
+#endif
+
+#ifndef HAPI_CUDA_CALLBACK
 typedef struct hapiEvent {
   cudaEvent_t event;
   void* cb;
@@ -482,9 +482,9 @@ static void CUDACallback(void *data) {
   NVTXTracer nvtx_range("CUDACallback", NVTXColor::Silver);
 #endif
 
-  // Send message to the original PE
-  char* conv_msg = (char8)data;
-  int dstRank = *((int*)(conv_msg + CmiMsgHeaderSizeBytes));
+  // send message to the original PE
+  char *conv_msg = (char*)data;
+  int dstRank = *((int *)(conv_msg + CmiMsgHeaderSizeBytes));
   CmiPushPE(dstRank, conv_msg);
 }
 
@@ -1255,8 +1255,8 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
 #endif
 */
 
-  // Create converse message to be delivered to this PE after CUDA callback
-  hapiCbMsg* conv_msg = (hapiCbMsg*)CmiAlloc(sizeof(hapiCbMsg)); // FIXME memory leak?
+  // create converse message to be delivered to this PE after CUDA callback
+  hapiCallbackMessage* conv_msg = (hapiCallbackMessage*)CmiAlloc(sizeof(hapiCallbackMessage)); // FIXME memory leak?
   conv_msg->rank = CmiMyRank();
   conv_msg->cb = cb;
   conv_msg->cb_msg = cb_msg;

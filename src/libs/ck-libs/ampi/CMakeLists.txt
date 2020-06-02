@@ -11,14 +11,61 @@ add_library(ampi-compat compat_ampi.c
        compat_ampicpp.C)
 
 add_library(moduleampi ${ampi-cxx-sources} ${ampi-h-sources})
-add_dependencies(moduleampi moduletcharm ck)
+add_dependencies(moduleampi moduletcharm ck ampi_funcptr_shim ampi_funcptr_fortran )
+
+
+# fsglobals/pipglobals
+add_library(ampi_funcptr_shim OBJECT ampi_funcptr_shim.C)
+target_compile_options(ampi_funcptr_shim PRIVATE -ampi-funcptr-shim)
+
+add_library(ampi_funcptr_fortran OBJECT ampif.C)
+target_compile_options(ampi_funcptr_fortran PRIVATE -ampi-funcptr-shim)
+
+add_library(ampi_funcptr_loader OBJECT ampi_funcptr_loader.C)
+
+if(${CMK_SUPPORTS_FSGLOBALS})
+    add_library(ampi_funcptr_fsglobals OBJECT ampi_funcptr_fsglobals.C)
+    add_dependencies(ampi_funcptr_fsglobals ck)
+    add_dependencies(moduleampi ampi_funcptr_fsglobals)
+    add_custom_command(TARGET moduleampi
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_fsglobals.dir/ampi_funcptr_fsglobals.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_fsglobals.o
+        VERBATIM
+    )
+endif()
+
+if(${CMK_SUPPORTS_PIPGLOBALS})
+    add_library(ampi_funcptr_pipglobals OBJECT ampi_funcptr_pipglobals.C)
+    add_dependencies(ampi_funcptr_pipglobals ck)
+    add_dependencies(moduleampi ampi_funcptr_pipglobals)
+    add_custom_command(TARGET moduleampi
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_pipglobals.dir/ampi_funcptr_pipglobals.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_pipglobals.o
+        VERBATIM
+    )
+endif()
+
+add_dependencies(ampi_funcptr_shim ck)
+add_dependencies(ampi_funcptr_fortran ck)
+add_dependencies(ampi_funcptr_loader ck)
+
+add_dependencies(moduleampi ampi_funcptr_shim ampi_funcptr_fortran ampi_funcptr_loader)
+
+add_custom_command(TARGET moduleampi
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim.dir/ampi_funcptr_shim.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim.o
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_fortran.dir/ampif.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_fortran.o
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_loader.dir/ampi_funcptr_loader.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_loader.o
+    VERBATIM
+)
+
+
 
 if(${CMK_CAN_LINK_FORTRAN})
     add_library(moduleampif ${ampi-f90-sources} ${ampi-cxx-sources} ${ampi-h-sources})
     add_dependencies(moduleampif moduletcharm ck)
 endif()
 
-# FIXME: add fsglobals/pipglobals
 
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampicc         COPYONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
@@ -68,6 +115,10 @@ configure_file(libmoduleampif.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
 
 # ROMIO
 if(${CMK_AMPI_WITH_ROMIO})
+    # Compile ROMIO with the same flags as AMPI
+    get_target_property(AMPI_CFLAGS moduleampi COMPILE_OPTIONS)
+    string(REPLACE ";" " " AMPI_CFLAGS "${AMPI_CFLAGS}")
+    set(ROMIO_FLAGS "${AMPI_CFLAGS} -ampi-romio-configure")
     if(${CMK_CAN_LINK_FORTRAN})
         set(romio_f77 yes)
     else()
@@ -87,10 +138,8 @@ if(${CMK_AMPI_WITH_ROMIO})
             touch aclocal.m4 Makefile.in configure config.status &&
             export MPI_IMPL=ampi &&
             export FROM_MPICH=no &&
-            export FROM_MPICH2=no && 
+            export FROM_MPICH2=no &&
             export FROM_LAM=no &&
-            export CFLAGS=-ampi-romio-configure &&
-            export FFLAGS=-ampi-romio-configure &&
             export F77=${CMAKE_BINARY_DIR}/bin/ampif90 &&
             export CC=${CMAKE_BINARY_DIR}/bin/ampicc &&
             ./configure
@@ -99,10 +148,13 @@ if(${CMK_AMPI_WITH_ROMIO})
             --enable-static=yes
             --enable-shared=${romio_shared}
             --disable-weak-symbols
-             > /dev/null
+            CFLAGS=${ROMIO_FLAGS}
+            FFLAGS=${ROMIO_FLAGS}
+            > /dev/null
         COMMAND cp -f ${romio_dir}/include/mpio.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f ${romio_dir}/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
-        BUILD_COMMAND cd ${romio_dir} && make > /dev/null
+        COMMAND cp -f ${romio_dir}/include/mpio_functions.h ${CMAKE_BINARY_DIR}/include/
+        BUILD_COMMAND cd ${romio_dir} && make AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: > /dev/null
         COMMAND cp -f ${romio_dir}/.libs/libromio.a ${CMAKE_BINARY_DIR}/lib/libampiromio.a
         COMMAND test ${BUILD_SHARED} -eq 1 && cp -f ${romio_dir}/.libs/libromio${CMAKE_SHARED_LIBRARY_SUFFIX} ${CMAKE_BINARY_DIR}/lib_so/libampiromio${CMAKE_SHARED_LIBRARY_SUFFIX} || true
         INSTALL_COMMAND "" # No install step

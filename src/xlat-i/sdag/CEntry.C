@@ -174,7 +174,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
     // keeping a meta-structure for every message passed in
 
     // increase reference count by one for the state parameter
-    defs << "  CmiReference(UsrToEnv(" << sv->name << "_msg));\n";
+    defs << "  CkReferenceMsg(" << sv->name << "_msg);\n";
 
     // refnum automatically extracted from msg by MsgClosure::MsgClosure(...)
     defs << "  __dep->pushBuffer(" << entryNum << ", new SDAG::MsgClosure(" << sv->name

@@ -26,6 +26,7 @@ typedef struct CmiIsomallocContext {
 CmiIsomallocContext CmiIsomallocContextCreate(int myunit, int numunits);
 void CmiIsomallocContextDelete(CmiIsomallocContext ctx);
 void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext * ctxptr);
+void CmiIsomallocEnableRDMA(CmiIsomallocContext ctx, int enable); /* on by default */
 
 /*Allocate/free from this context*/
 void * CmiIsomallocContextMalloc(CmiIsomallocContext ctx, size_t size);

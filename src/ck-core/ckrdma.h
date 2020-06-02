@@ -249,9 +249,9 @@ struct NcpyBcastAckInfo{
 #else
   int counter;
 #endif
-  bool isRoot;
   int pe;
   int numops;
+  bool isRoot;
 
 #if CMK_SMP
   int getCounter() const {
@@ -280,13 +280,10 @@ struct NcpyBcastRootAckInfo : public NcpyBcastAckInfo {
 
 struct NcpyBcastInterimAckInfo : public NcpyBcastAckInfo {
   void *msg;
-
-  // for RECV
-  bool isRecv;
-  bool isArray;
   void *parentBcastAckInfo;
   int origPe;
-
+  bool isRecv;
+  bool isArray;
 };
 
 // Method called on the bcast source to store some information for ack handling
@@ -360,8 +357,8 @@ struct NcpyROBcastBuffAckInfo {
 struct NcpyROBcastAckInfo {
   int numChildren;
   int counter;
-  bool isRoot;
   int numops;
+  bool isRoot;
   NcpyROBcastBuffAckInfo buffAckInfo[0];
 };
 
@@ -417,11 +414,6 @@ int getRootNode(envelope *env);
 
 // Function declaration for EM Ncpy Ack handler initialization
 void initEMNcpyAckHandler(void);
-
-struct zcPupIncompleteInfo {
-  int numRdmaOps;
-  std::vector<envelope*> bufferedMessages;
-};
 
 struct zcPupPendingRgetsMsg {
   char cmicore[CmiMsgHeaderSizeBytes];

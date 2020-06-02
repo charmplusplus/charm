@@ -109,6 +109,7 @@ extern void  CkFreeSysMsg(void *msg);
 extern void* CkAllocBuffer(void *msg, int bufsize);
 extern void  CkFreeMsg(void *msg);
 extern void* CkCopyMsg(void **pMsg);
+extern void* CkReferenceMsg(void *msg);
 extern void  CkSetQueueing(void *msg, int strategy);
 extern void* CkPriorityPtr(void *msg);
 

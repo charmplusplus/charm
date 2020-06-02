@@ -1859,35 +1859,36 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPROCESSOR_BEGIN_IDLE 1
 #define CcdPROCESSOR_END_BUSY 1 /*Synonym*/
 #define CcdPROCESSOR_STILL_IDLE 2
+#define CcdPROCESSOR_LONG_IDLE 3
 
 /*Periodic calls*/
-#define CcdPERIODIC           3 /*every few ms*/
-#define CcdPERIODIC_10ms      4 /*every 10ms (100Hz)*/
-#define CcdPERIODIC_100ms     5 /*every 100ms (10Hz)*/
-#define CcdPERIODIC_1second   6 /*every second*/
-#define CcdPERIODIC_1s        6 /*every second*/
-#define CcdPERIODIC_5s        7 /*every second*/
-#define CcdPERIODIC_5seconds  7 /*every second*/
-#define CcdPERIODIC_10second  8 /*every 10 seconds*/
-#define CcdPERIODIC_10seconds 8 /*every 10 seconds*/
-#define CcdPERIODIC_10s       8 /*every 10 seconds*/
-#define CcdPERIODIC_1minute   9 /*every minute*/
-#define CcdPERIODIC_2minute  10 /*every 2 minute*/
-#define CcdPERIODIC_5minute  11 /*every 5 minute*/
-#define CcdPERIODIC_10minute 12 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    13 /*every hour*/
-#define CcdPERIODIC_12hour   14 /*every 12 hours*/
-#define CcdPERIODIC_1day     15 /*every day*/
+#define CcdPERIODIC           4 /*every few ms*/
+#define CcdPERIODIC_10ms      5 /*every 10ms (100Hz)*/
+#define CcdPERIODIC_100ms     6 /*every 100ms (10Hz)*/
+#define CcdPERIODIC_1second   7 /*every second*/
+#define CcdPERIODIC_1s        7 /*every second*/
+#define CcdPERIODIC_5s        8 /*every second*/
+#define CcdPERIODIC_5seconds  8 /*every second*/
+#define CcdPERIODIC_10second  9 /*every 10 seconds*/
+#define CcdPERIODIC_10seconds 9 /*every 10 seconds*/
+#define CcdPERIODIC_10s       9 /*every 10 seconds*/
+#define CcdPERIODIC_1minute  10 /*every minute*/
+#define CcdPERIODIC_2minute  11 /*every 2 minute*/
+#define CcdPERIODIC_5minute  12 /*every 5 minute*/
+#define CcdPERIODIC_10minute 13 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    14 /*every hour*/
+#define CcdPERIODIC_12hour   15 /*every 12 hours*/
+#define CcdPERIODIC_1day     16 /*every day*/
 
 /*Other conditions*/
-#define CcdEVERY             16
-#define CcdQUIESCENCE        17
-#define CcdTOPOLOGY_AVAIL    18
-#define CcdSIGUSR1           19
-#define CcdSIGUSR2           20
+#define CcdEVERY             17
+#define CcdQUIESCENCE        18
+#define CcdTOPOLOGY_AVAIL    19
+#define CcdSIGUSR1           20
+#define CcdSIGUSR2           21
 
 /*User-defined conditions start here*/
-#define CcdUSER              21
+#define CcdUSER              22
 
 /*User-defined conditions end here*/
 /*Conditionally defined so users can build with larger CcdUSERMAX values*/
@@ -1910,7 +1911,7 @@ int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe);
 int CcdCallOnConditionKeepOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe);
 void CcdCancelCallOnCondition(int condnum, int idx);
 void CcdCancelCallOnConditionKeep(int condnum, int idx);
-void CcdRaiseCondition(int condnum);
+double CcdRaiseCondition(int condnum);
 double CcdSetResolution(double newResolution);
 double CcdResetResolution(void);
 double CcdIncreaseResolution(double newResolution);
