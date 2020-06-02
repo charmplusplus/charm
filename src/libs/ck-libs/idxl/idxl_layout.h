@@ -131,7 +131,6 @@ public:
 	
 	static IDXL_Layout_List &get(void);
 };
-PUPmarshall(IDXL_Layout_List)
 
 #endif
 
