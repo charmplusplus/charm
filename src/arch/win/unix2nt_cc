@@ -15,6 +15,7 @@ set -o errexit
 echo AA $VCINSTALLDIR
 echo BB $WINDOWSSDKDIR
 echo CC $WindowsSdkDir
+echo PATH $PATH
 
 # Configurable option: Location of MSDEV
 if [[ -z "$VCINSTALLDIR" ]]
