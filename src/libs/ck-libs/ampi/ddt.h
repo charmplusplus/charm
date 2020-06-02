@@ -143,6 +143,7 @@ class CkDDT_DataType
   CkDDT_DataType& operator=(const CkDDT_DataType& obj) noexcept;
 
   virtual void pupType(PUP::er &p, CkDDT* ddt) noexcept;
+  virtual void pup(PUP::er &p) noexcept;
   virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const noexcept;
   virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
                           int array_of_integers[], MPI_Aint array_of_addresses[],
@@ -229,6 +230,7 @@ class CkDDT_Contiguous final : public CkDDT_DataType
 
   size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
   void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  virtual void pup(PUP::er &p) noexcept override;
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
@@ -256,6 +258,7 @@ class CkDDT_Vector : public CkDDT_DataType
 
   size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
   void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  virtual void pup(PUP::er &p) noexcept override;
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
@@ -281,6 +284,7 @@ class CkDDT_HVector final : public CkDDT_Vector
 
   size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
   void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  virtual void pup(PUP::er &p) noexcept override;
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
@@ -316,6 +320,7 @@ class CkDDT_HIndexed_Block : public CkDDT_DataType
 
   size_t serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
   void pupType(PUP::er &p, CkDDT *ddt) noexcept override;
+  virtual void pup(PUP::er &p) noexcept override;
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
@@ -343,6 +348,7 @@ class CkDDT_Indexed_Block final : public CkDDT_HIndexed_Block
 
   size_t serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
   void pupType(PUP::er &p, CkDDT *ddt) noexcept override;
+  virtual void pup(PUP::er &p) noexcept override;
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
@@ -373,6 +379,7 @@ class CkDDT_HIndexed : public CkDDT_DataType
 
   size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
   void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  virtual void pup(PUP::er &p) noexcept override;
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
@@ -398,6 +405,7 @@ class CkDDT_Indexed final : public CkDDT_HIndexed
 
   size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
   void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  virtual void pup(PUP::er &p) noexcept override;
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
@@ -436,6 +444,7 @@ class CkDDT_Struct final : public CkDDT_DataType
 
   size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
   void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  virtual void pup(PUP::er &p) noexcept override;
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
