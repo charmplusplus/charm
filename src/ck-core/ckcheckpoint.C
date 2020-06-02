@@ -41,7 +41,6 @@ typedef struct _GroupInfo{
         bool present;
 } GroupInfo;
 PUPbytes(GroupInfo)
-PUPmarshall(GroupInfo)
 
 bool _inrestart = false;
 bool _restarted = false;
