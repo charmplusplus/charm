@@ -504,7 +504,6 @@ class FEM_Attribute {
 			     const IDXL_Layout &layout, const char *caller);
 
 };
-PUPmarshall(FEM_Attribute)
 
 ///A single table of user data associated with an entity.
 /**
@@ -564,7 +563,6 @@ class FEM_DataAttribute : public FEM_Attribute {
    */
   void interpolate(int *iNodes,int rNode,int k);
 };
-PUPmarshall(FEM_DataAttribute)
 
 ///The FEM_Attribute is of type integer indices
 /**
@@ -613,7 +611,6 @@ class FEM_IndexAttribute : public FEM_Attribute {
   /// Copy src[srcEntity] into our dstEntity.
   virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
 };
-PUPmarshall(FEM_IndexAttribute)
 
 ///The FEM_Attribute is a variable set of integer indices
 /**
@@ -974,7 +971,6 @@ class FEM_Entity {
 
   void print(const char *type,const IDXL_Print_Map &map);
 };
-PUPmarshall(FEM_Entity)
 
 // Now that we have FEM_Entity, we can define attribute lenth, as entity length
 inline int FEM_Attribute::getLength(void) const { return e->size(); }
@@ -1035,7 +1031,6 @@ class FEM_Node : public FEM_Entity {
   bool hasConn(int idx);
   void print(const char *type,const IDXL_Print_Map &map);
 };
-PUPmarshall(FEM_Node)
 
 
 ///FEM_Elem is a type of FEM_Entity, which refers to elems
@@ -1084,8 +1079,6 @@ class FEM_Elem:public FEM_Entity {
   void connIs(int i,const int *src) {conn->get().setRow(i,src);}
   bool hasConn(int idx);
 };
-PUPmarshall(FEM_Elem)
-
 
 
 ///FEM_Sparse is a type of FEM_Entity, which refers to edges
@@ -1127,7 +1120,6 @@ class FEM_Sparse : public FEM_Elem {
   inline elem_t &setElem(void) {return elem->get();}
   inline const elem_t &getElem(void) const {return elem->get();}
 };
-PUPmarshall(FEM_Sparse)
 
 /** Describes a user function to pup a piece of mesh data
  */
@@ -1514,8 +1506,6 @@ class FEM_Mesh : public CkNoncopyable {
   void detectFeatures();
 
 };
-
-PUPmarshall(FEM_Mesh)
 
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
 FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *caller);

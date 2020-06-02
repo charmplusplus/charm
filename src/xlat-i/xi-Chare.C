@@ -377,7 +377,6 @@ void Chare::genSubDecls(XStr& str) {
 
   genMemberDecls(str);
   str << CIClassEnd;
-  if (!isTemplated()) str << "PUPmarshall(" << ptype << ")\n";
 }
 
 void Chare::genMemberDecls(XStr& str) {
@@ -423,8 +422,6 @@ void Chare::genPythonDecls(XStr& str) {
   // declare all static python methods and CkPy_MethodsCustom
   if (list) list->recurse<XStr&>(str, &Member::genPythonDecls);
   str << "\n";
-
-  if (!isTemplated()) str << "PUPmarshall(" << ptype << ")\n";
 }
 
 void Chare::genPythonDefs(XStr& str) {
@@ -1138,7 +1135,6 @@ void Group::genSubDecls(XStr& str) {
   str << "    }\n";
   genMemberDecls(str);
   str << CIClassEnd;
-  if (!isTemplated()) str << "PUPmarshall(" << ptype << ")\n";
 }
 //
 // Array Constructor
@@ -1678,7 +1674,6 @@ void Array::genSubDecls(XStr& str) {
 
   genMemberDecls(str);
   str << CIClassEnd;
-  if (!isTemplated()) str << "PUPmarshall(" << ptype << ")\n";
 }
 
 static void disambig_array(XStr& str, const XStr& super) {
