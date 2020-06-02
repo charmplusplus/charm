@@ -12,6 +12,10 @@ set -o errexit
 # Known bugs: pathnames with spaces cause quoting problems.
 ##############################################################################
 
+echo AA $VCINSTALLDIR
+echo BB $WINDOWSSDKDIR
+echo CC $WindowsSdkDir
+
 # Configurable option: Location of MSDEV
 if [[ -z "$VCINSTALLDIR" ]]
 then
