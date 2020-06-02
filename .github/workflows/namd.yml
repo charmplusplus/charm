@@ -37,7 +37,7 @@ jobs:
         wget http://www.ks.uiuc.edu/Research/namd/utilities/apoa1.tar.gz
         tar xzf apoa1.tar.gz
         sed -i 's,500,100,' apoa1/apoa1.namd # Reduce number of steps to 100
-        sed -i 's,/usr/tmp,/tmp,' apoa1/apoa1.namd # Set output file name
+        sed -i 's,/usr/tmp,/tmp,' apoa1/apoa1.namd # Change output prefix
         rm apoa1.tar.gz
     
     - name: test-namd-apoa1
