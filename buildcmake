@@ -4,7 +4,7 @@
 
 set -o nounset
 
-cmake --version
+export CMAKE_GENERATOR="Unix Makefiles"
 
 # Check that CMake is available and that the version is sufficiently new
 
