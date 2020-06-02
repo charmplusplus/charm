@@ -31,8 +31,8 @@ matrix:
     name: "NetLRTS-Win"
     script:
     #- rm -rf C:/tools/msys64
-    - choco upgrade -y cygwin cyg-get
-    - cyg-get install -y make
+    - choco upgrade -y make
+    #- cyg-get install -y make
     #- export msys2='cmd //C RefreshEnv.cmd '
     #- export msys2+='& set MSYS=winsymlinks:nativestrict '
     #- export msys2+='& C:\\tools\\msys64\\msys2_shell.cmd -defterm -no-start'
