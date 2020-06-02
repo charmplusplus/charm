@@ -24,12 +24,13 @@ jobs:
         cd ../namd/Linux-x86_64-g++
         ./charmrun ++local +p2 ./namd2 src/alanin
         
-    - name: cache-apoa1-files
+    - name: Cache apoa1 files
+      id: cache-apoa1-files
       uses: actions/cache@v2.0.0
       with:
         path: ~/namddata/apoa1
         key: namd-apoa1-files
-    - name: download-apoa1-files
+    - name: Download apoa1 files
       if: steps.cache-apoa1-files.outputs.cache-hit != 'true'
       run: |
         mkdir -p ~/namddata
