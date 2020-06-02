@@ -1880,7 +1880,7 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPERIODIC_1day     16 /*every day*/
 
 /*Other conditions*/
-#define CcdEVERY             17
+#define CcdSCHEDLOOP         17
 #define CcdQUIESCENCE        18
 #define CcdTOPOLOGY_AVAIL    19
 #define CcdSIGUSR1           20

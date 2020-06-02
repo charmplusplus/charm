@@ -1681,7 +1681,7 @@ void _initCharm(int unused_argc, char **argv)
       hapiMapping(argv); // Perform PE-device mapping
 
       // Register polling function to be invoked at every scheduler loop
-      CcdCallOnConditionKeep(CcdEVERY, hapiPollEvents, NULL);
+      CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
 
       CmiNodeBarrier();
 
