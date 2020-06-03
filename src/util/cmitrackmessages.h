@@ -21,6 +21,7 @@ struct msgInfo {
   int ep; // -1 for conv, lrts
   std::vector<int> destPes;
   bool nodeLevel;
+  bool networkMsg;
 };
 
 typedef std::unordered_map<int, int> CmiIntIntMap;
@@ -38,7 +39,7 @@ typedef int (*charmLevelFn)(void *msg);
 void CmiMessageTrackerCharmInit(charmLevelFn fn);
 void CmiMessageTrackerInit();
 int getNewUniqId();
-void addToTracking(char *msg, int destPe, bool nodeLevel=false);
+void addToTracking(char *msg, int destPe, bool nodeLevel, bool networkMsg);
 void sendTrackingAck(char *msg);
 void _receiveTrackingAck(trackingAckMsg *ackMsg);
 

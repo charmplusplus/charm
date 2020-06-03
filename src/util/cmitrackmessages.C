@@ -162,7 +162,7 @@ inline int getNewUniqId() {
   return ++CpvAccess(uniqMsgId);
 }
 
-inline void insertUniqIdEntry(char *msg, int destPe, bool nodeLevel) {
+inline void insertUniqIdEntry(char *msg, int destPe, bool nodeLevel, bool networkMsg) {
   int uniqId = getNewUniqId();
 
   CMI_UNIQ_MSG_ID(msg) = uniqId;
@@ -191,13 +191,14 @@ inline void insertUniqIdEntry(char *msg, int destPe, bool nodeLevel) {
   }
 
   info.nodeLevel = nodeLevel;
+  info.networkMsg = networkMsg;
 
-  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d, isNodeLevel:%d, msg:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe, nodeLevel, msg);)
+  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d, isNodeLevel:%d, isNetworkMsg:%d, msg:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe, nodeLevel, networkMsg, msg);)
 
   CpvAccess(sentUniqMsgIds).insert({uniqId, info});
 }
 
-void addToTracking(char *msg, int destPe, bool nodeLevel) {
+void addToTracking(char *msg, int destPe, bool nodeLevel, bool networkMsg) {
 
   // Do not track ack messages
   if(CmiGetHandler(msg) == CpvAccess(msgTrackHandler) || CMI_UNIQ_MSG_ID(msg) == -14) {
@@ -214,7 +215,7 @@ void addToTracking(char *msg, int destPe, bool nodeLevel) {
 
   if(uniqId <= 0) {
     // uniqId not yet set
-    insertUniqIdEntry(msg, destPe, nodeLevel);
+    insertUniqIdEntry(msg, destPe, nodeLevel, networkMsg);
   } else {
     // uniqId already set, increase count
     CmiIntMsgInfoMap::iterator iter;
@@ -225,7 +226,7 @@ void addToTracking(char *msg, int destPe, bool nodeLevel) {
 
       if(nodeLevel != info.nodeLevel) {
         // should add a new entry
-        insertUniqIdEntry(msg, destPe, nodeLevel);
+        insertUniqIdEntry(msg, destPe, nodeLevel, networkMsg);
 
       } else {
         //iter->second.count++; // increment counter
@@ -233,7 +234,7 @@ void addToTracking(char *msg, int destPe, bool nodeLevel) {
         DEBUG(CmiPrintf("[%d][%d][%d] INCREMENTING COUNTER uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
       }
     } else {
-      insertUniqIdEntry(msg, destPe, nodeLevel);
+      insertUniqIdEntry(msg, destPe, nodeLevel, networkMsg);
     }
   }
 }
