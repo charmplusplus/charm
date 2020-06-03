@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <cstdint>
 #include <vector>
 #include <list>
 #include <map>
@@ -15,7 +16,6 @@
 #include "VirtualRouter.h"
 #include "pup_stl.h"
 #include "debug-charm.h"
-#include <cstdint>
 
 // limit total number of buffered data items to
 // maxNumDataItemsBuffered_ (flush when limit is reached) but allow
@@ -81,31 +81,33 @@ struct is_PUPbytes {
 };
 
 template <class dtype>
-  struct DataItemHandle {
-    CkArrayIndex arrayIndex;
-    const dtype *dataItem;
-    DataItemHandle(CkArrayIndex _idx, dtype* _ptr) : arrayIndex(_idx), dataItem(_ptr) {}
-  };
+struct DataItemHandle {
+  CkArrayIndex arrayIndex;
+  const dtype *dataItem;
+  DataItemHandle(CkArrayIndex _idx, dtype* _ptr) : arrayIndex(_idx), dataItem(_ptr) {}
+};
+
 class MeshStreamerMessageV : public CMessage_MeshStreamerMessageV {
 
 public:
 
   int finalMsgCount;
-  int numDataItems;
   int msgType;
+  int numDataItems;
   bool fixedSize;
   int *destinationPes;
-  int* sourcePes;
+  int *sourcePes;
   char *dataItems;
   std::uint16_t *offsets;
   CkArrayIndex *destObjects;
 
-  MeshStreamerMessageV(int t,bool _isFixedSize): numDataItems(0), msgType(t),fixedSize(_isFixedSize) {
+  MeshStreamerMessageV(int t, bool isFixedSize): numDataItems(0), msgType(t), fixedSize(isFixedSize) {
     finalMsgCount = -1;
-    if (!_isFixedSize) {
-      offsets[0]=0;
+    if (!isFixedSize) {
+      offsets[0] = 0;
     }
   }
+
   template <typename dtype>
   inline typename std::enable_if<is_PUPbytes<dtype>::value,int>::type addDataItem(dtype& dataItem, CkArrayIndex index, int sourcePe) {
     char* offset = dataItems + (numDataItems*sizeof(dtype));
@@ -141,6 +143,7 @@ public:
   inline void markDestination(const int index, const int destinationPe) {
     destinationPes[index] = destinationPe;
   }
+
   template <typename dtype>
   inline typename std::enable_if<is_PUPbytes<dtype>::value,dtype>::type getDataItem(const int index) {
     char *objptr = dataItems + (numDataItems*sizeof(dtype));
@@ -153,6 +156,7 @@ public:
     PUP::fromMemBuf(obj,dataItems+offsets[index],sz);
     return obj;
   }
+
   template <typename dtype>
   inline size_t getoffset(const std::uint16_t index) {
     if (fixedSize) {
@@ -493,7 +497,7 @@ sendMeshStreamerMessage(MeshStreamerMessageV *destinationBuffer,
 template <class dtype, class RouterType>
 inline void MeshStreamer<dtype, RouterType>::
 storeMessageData(int destinationPe, const Route& destinationRoute,
-             char *dataItem, size_t size,CkArrayIndex arrayId) {
+                 char *dataItem, size_t size,CkArrayIndex arrayId) {
   int dimension = destinationRoute.dimension;
   int bufferIndex = destinationRoute.dimensionIndex;
   std::vector<MeshStreamerMessageV *> &messageBuffers
@@ -526,13 +530,15 @@ storeMessageData(int destinationPe, const Route& destinationRoute,
 
   MeshStreamerMessageV *destinationBuffer = messageBuffers[bufferIndex];
   int numBuffered =
-    copyDataIntoMessage(destinationBuffer, dataItem, size,arrayId);
+    copyDataIntoMessage(destinationBuffer, dataItem, size, arrayId);
   if (!personalizedMessage) {
     destinationBuffer->markDestination(numBuffered-1, destinationPe);
   }
   numDataItemsBuffered_++;
+
   // send if buffer is full
-  if (numBuffered == maxItemsBuffered || destinationBuffer->template getoffset<dtype>(destinationBuffer->numDataItems)>(thresholdFractionNumerator*(bufferSize_/thresholdFractionDenominator))) {
+  if (numBuffered == maxItemsBuffered || destinationBuffer->template getoffset<dtype>(destinationBuffer->numDataItems)
+      > (thresholdFractionNumerator*(bufferSize_/thresholdFractionDenominator))) {
 
     sendMeshStreamerMessage(destinationBuffer, dimension,
                             destinationRoute.destinationPe);

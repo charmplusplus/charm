@@ -1,5 +1,6 @@
 module NDMeshStreamer {
   extern module completion;
+
   include "DataItemTypes.h";
 
   message MeshStreamerMessageV {
@@ -30,6 +31,7 @@ module NDMeshStreamer {
 
     entry void receiveAtDestination(MeshStreamerMessageV *msg);
   };
+
   template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
     group [migratable] ArrayMeshStreamer :
     MeshStreamer<dtype, RouterType> {
@@ -43,6 +45,5 @@ module NDMeshStreamer {
                                       int sourcePe);
     entry void resendMisdeliveredItems(CkArrayIndex arrayId, int destinationPe);
     entry void updateLocationAtSource(CkArrayIndex arrayId, int destinationPe);
-
   };
 };

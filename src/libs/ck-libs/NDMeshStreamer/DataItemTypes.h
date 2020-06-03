@@ -1,8 +1,10 @@
 #ifndef DATA_ITEM_TYPES_H
 #define DATA_ITEM_TYPES_H
 
-#define CHUNK_SIZE 256
 #include <utility>
+
+#define CHUNK_SIZE 256
+
 template<class dtype, class itype>
 class ArrayDataItem {
 
@@ -27,6 +29,7 @@ template <typename dtype, typename itype>
 void operator|(PUP::er &p, ArrayDataItem<dtype, itype>& obj) {
    obj.pup(p);
 }
+
 class ChunkDataItem {
 
 public:
