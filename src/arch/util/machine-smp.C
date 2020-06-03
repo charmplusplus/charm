@@ -81,8 +81,12 @@ CmiIdleLock_checkMessage
 #include "machine-smp.h"
 #include "sockRoutines.h"
 
-#include <mutex>
-#include <condition_variable>
+#if __has_include(<barrier>)
+#  include <barrier>
+#else
+#  include <mutex>
+#  include <condition_variable>
+#endif
 
 void CmiStateInit(int pe, int rank, CmiState state);
 void CommunicationServerInit(void);
@@ -509,29 +513,35 @@ static void CmiDestroyLocks(void)
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
 
+#if __cpp_lib_barrier
+
+using Barrier = std::barrier;
+
+#else
+
 class Barrier {
 public:
   Barrier(const Barrier&) = delete;
   Barrier& operator=(const Barrier&) = delete;
 
   explicit Barrier(unsigned int count) :
-    curCount(count), barrierCount(count), curGeneration(0) {
+    curCount(count), barrierCount(count), curSense(true) {
   }
 
-  void wait() {
+  void arrive_and_wait() {
     std::unique_lock<std::mutex> lock(barrierMutex);
-    const unsigned int gen = curGeneration;
+    const bool sense = curSense;
 
     curCount--;
 
     if (curCount == 0) {
-      curGeneration++;
+      curSense = !curSense;
       curCount = barrierCount;
       barrierCond.notify_all();
       return;
     }
 
-    while (gen == curGeneration) {
+    while (sense == curSense) {
       barrierCond.wait(lock);
     }
   }
@@ -539,15 +549,17 @@ public:
 private:
   std::mutex barrierMutex;
   std::condition_variable barrierCond;
-  unsigned int curGeneration;
+  bool curSense;
   unsigned int curCount;
   const unsigned int barrierCount;
 };
 
+#endif
+
 /* Wait for all worker threads */
 void CmiNodeBarrier(void) {
   static Barrier nodeBarrier(CmiMyNodeSize());
-  nodeBarrier.wait();
+  nodeBarrier.arrive_and_wait();
 }
 
 /* Wait for all worker threads as well as comm. thread */
@@ -557,12 +569,12 @@ void CmiNodeAllBarrier(void) {
 #if CMK_MULTICORE || CMK_SMP_NO_COMMTHD
   if (!Cmi_commthread) {
     static Barrier nodeBarrier(CmiMyNodeSize());
-    nodeBarrier.wait();
+    nodeBarrier.arrive_and_wait();
     return;
   }
 #endif
   static Barrier nodeAllBarrier(CmiMyNodeSize() + 1);
-  nodeAllBarrier.wait();
+  nodeAllBarrier.arrive_and_wait();
 }
 
 #endif
