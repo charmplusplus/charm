@@ -665,6 +665,16 @@ static void _exitHandler(envelope *env)
 #if CMK_SHRINK_EXPAND
       ConverseCleanup();
 #endif
+
+#if CMK_CUDA
+      // Ensure all PEs have finished GPU work
+      CmiNodeBarrier();
+
+      if (CmiMyRank() == 0) {
+        hapiExitCsv();
+      }
+#endif
+
       //everyone exits here - there may be issues with leftover messages in the queue
 #if !CMK_WITH_STATS && !CMK_WITH_WARNINGS
       DEBUGF(("[%d] Calling converse exit from ReqStatMsg \n",CkMyPe()));
@@ -1667,6 +1677,9 @@ void _initCharm(int unused_argc, char **argv)
       CmiNodeBarrier();
 
       hapiMapping(argv); // Perform PE-device mapping
+
+      // Register polling function to be invoked at every scheduler loop
+      CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
 
       CmiNodeBarrier();
 
