@@ -5,7 +5,7 @@
 #include "converse.h"
 #include "buddy_allocator.h"
 
-// Manages a GPU device - accessible through GPUManager
+// Manages a GPU device, accessible through GPUManager
 struct DeviceManager {
 #if CMK_SMP
   // Used in SMP mode, should be locked by the caller

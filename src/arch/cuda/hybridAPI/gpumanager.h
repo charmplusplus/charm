@@ -3,6 +3,7 @@
 
 #include <cuda_runtime.h>
 #include <vector>
+#include <string>
 #include <unordered_map>
 
 #include "converse.h"
@@ -108,7 +109,7 @@ struct GPUManager {
 
   // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
   void* shm_ptr;
-  char* shm_name;
+  std::string shm_name;
   int shm_file;
   size_t shm_chunk_size;
   size_t shm_size;
@@ -152,7 +153,6 @@ struct GPUManager {
 
     // Shared memory region for CUDA IPC
     shm_ptr = NULL;
-    shm_name = NULL;
     shm_file = -1;
     shm_chunk_size = 0;
     shm_size = 0;

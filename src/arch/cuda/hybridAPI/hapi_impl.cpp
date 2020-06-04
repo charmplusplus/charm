@@ -211,7 +211,7 @@ void hapiMapping(char** argv) {
       device_count = CmiNodeSize(CmiMyNode());
     }
 
-    // Create DeviceManagers in GPUManager
+    // Create a DeviceManager per GPU device
     std::vector<DeviceManager>& device_managers = CsvAccess(gpu_manager).device_managers;
     for (int i = 0; i < device_count; i++) {
       device_managers.emplace_back(i, device_count * CmiMyNodeRankLocal() + i);
@@ -293,7 +293,7 @@ void hapiMapping(char** argv) {
 #endif
   }
 
-  // Process +gpuipceventpool
+  // Process custom size for CUDA IPC event pool
   int input_ipc_event_pool_size;
   if (!CmiGetArgIntDesc(argv, "+gpuipceventpool", &input_ipc_event_pool_size,
         "GPU IPC event pool size per PE")) {
@@ -309,8 +309,8 @@ void hapiMapping(char** argv) {
         input_ipc_event_pool_size, CsvAccess(gpu_manager).ipc_event_pool_size);
   }
 
-  // Process +nogpupeer
-  bool enable_peer = true; // P2P access is enabled by default
+  // Check if P2P access should be enabled
+  bool enable_peer = true; // Enabled by default
   if (CmiGetArgFlagDesc(argv, "+nogpupeer",
         "do not enable P2P access between visible GPU pairs")) {
     enable_peer = false;
@@ -335,8 +335,7 @@ void hapiMapping(char** argv) {
         }
       }
     }
-  }
-  else {
+  } else {
     if (CmiMyPe() == 0) {
       CmiPrintf("HAPI> P2P access between devices not enabled\n");
     }
@@ -633,9 +632,10 @@ void shmCreate() {
   struct stat shm_file_stat;
 
   // Create the shared memory file
-  CsvAccess(gpu_manager).shm_name = new char[16];
-  sprintf(CsvAccess(gpu_manager).shm_name, "cudaipc_shmem-%d", CmiPhysicalNodeID(CmiMyPe()));
-  CsvAccess(gpu_manager).shm_file = shm_open(CsvAccess(gpu_manager).shm_name,
+  CsvAccess(gpu_manager).shm_name.assign("cudaipc_shmem-");
+  int host_id = CmiPhysicalNodeID(CmiMyPe());
+  CsvAccess(gpu_manager).shm_name.append(std::to_string(host_id));
+  CsvAccess(gpu_manager).shm_file = shm_open(CsvAccess(gpu_manager).shm_name.c_str(),
       O_CREAT | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
   if (CsvAccess(gpu_manager).shm_file < 0) {
     CmiError("Failure at shm_open");
@@ -706,10 +706,9 @@ void shmCleanup() {
     close(CsvAccess(gpu_manager).shm_file);
   }
 
-  if (CsvAccess(gpu_manager).shm_name != NULL) {
-    shm_unlink(CsvAccess(gpu_manager).shm_name);
-    delete CsvAccess(gpu_manager).shm_name;
-    CsvAccess(gpu_manager).shm_name = NULL;
+  if (!CsvAccess(gpu_manager).shm_name.empty()) {
+    shm_unlink(CsvAccess(gpu_manager).shm_name.c_str());
+    CsvAccess(gpu_manager).shm_name.clear();
   }
 }
 
