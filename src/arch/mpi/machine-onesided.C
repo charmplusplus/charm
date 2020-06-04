@@ -76,6 +76,8 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfoMsg) {
   // On receiving a POST_DIRECT_SEND, the MPI rank should post an MPI_Isend
   CMI_MSGTYPE(ncpyOpInfoMsg) = POST_DIRECT_SEND;
 
+  CMI_UNIQ_MSG_ID(ncpyOpInfoMsg) = -15;
+
   // Send the tag for the receiver MPI rank to post an MPI_Isend
   ncpyOpInfoMsg->tag = tag;
 
@@ -109,6 +111,8 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfoMsg) {
   // Mark the message type as POST_DIRECT_RECV
   // On receiving a POST_DIRECT_RECV, the MPI rank should post an MPI_Irecv
   CMI_MSGTYPE(ncpyOpInfoMsg) = POST_DIRECT_RECV;
+
+  CMI_UNIQ_MSG_ID(ncpyOpInfoMsg) = -15;
 
   // Send the tag for the receiver MPI rank to post an MPI_Irecv
   ncpyOpInfoMsg->tag = tag;
