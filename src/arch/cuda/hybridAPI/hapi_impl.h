@@ -21,6 +21,12 @@ void hapiExitCsv();
 // Maps PEs to devices
 void hapiMapping(char** argv);
 
+// CUDA IPC related functions
+void shmCreate();
+void shmCleanup();
+void ipcHandleCreate();
+void ipcHandleOpen();
+
 // Registers callback handler functions.
 void hapiRegisterCallbacks();
 

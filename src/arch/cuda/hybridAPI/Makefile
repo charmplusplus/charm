@@ -18,7 +18,7 @@ libcudahybridapi.a: hybridapi.o
 	-rm -f $@
 	ar q $@ hybridapi.o
 
-hybridapi.o: hapi_impl.cpp hapi_impl.h hapi.h hapi_nvtx.h
+hybridapi.o: hapi_impl.cpp hapi_impl.h gpumanager.h devicemanager.h buddy_allocator.h hapi.h hapi_nvtx.h
 	$(CHARMC) $(FLAGS) $(INC) -o $@ $<
 
 clean:

@@ -8,6 +8,7 @@
 #include "converse.h"
 #include "hapi.h"
 #include "hapi_impl.h"
+#include "devicemanager.h"
 
 // Initial size of the user-addressed portion of host/device buffer arrays;
 // the system-addressed portion of host/device buffer arrays (used when there
@@ -18,6 +19,30 @@
 #else
 #define NUM_BUFFERS 256
 #endif
+
+// CUDA IPC Event related struct, stored in shared memory.
+// A struct is used in each interaction/message between sender and receiver.
+// Number of struct objects per device will be equal to the CUDA IPC event pool size.
+struct cuda_ipc_event_shared {
+  cudaIpcEventHandle_t src_event_handle;
+  cudaIpcEventHandle_t dst_event_handle;
+  bool src_flag; // Unused for now
+  bool dst_flag;
+  pthread_mutex_t lock;
+};
+
+// Per-device struct containing data for CUDA IPC
+// Use SMP lock in DeviceManager if needed
+struct cuda_ipc_device_info {
+  std::vector<cudaEvent_t> src_event_pool;
+  std::vector<cudaEvent_t> dst_event_pool;
+  // Flag per event pair
+  // 0: free, 1: used by source, 2: used by destination
+  int* event_pool_flags;
+  // Offset in device comm buffer (per event)
+  size_t* event_pool_buff_offsets;
+  void* buffer;
+};
 
 // Contains per-process data and methods needed by HAPI.
 struct GPUManager {
@@ -66,6 +91,7 @@ struct GPUManager {
   CmiNodeLock stream_lock_;
   CmiNodeLock mempool_lock_;
   CmiNodeLock inst_lock_;
+  CmiNodeLock device_mapping_lock;
 #endif
 
 #ifdef HAPI_CUDA_CALLBACK
@@ -74,6 +100,26 @@ struct GPUManager {
   int device_count; // GPU devices usable by this process (could be less than the number of visible devices)
   int device_count_on_physical_node;
   int pes_per_device;
+  std::vector<DeviceManager> device_managers;
+  std::unordered_map<int, DeviceManager*> device_map;
+
+  // Device communication buffer
+  size_t comm_buffer_size;
+
+  // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
+  void* shm_ptr;
+  char* shm_name;
+  int shm_file;
+  size_t shm_chunk_size;
+  size_t shm_size;
+  void* shm_my_ptr;
+
+  // CUDA IPC event pool size (per PE)
+  int ipc_event_pool_size;
+
+  // CUDA IPC handles opened for processes on the same node
+  // Vector size is equal to the number of devices on the physical node
+  std::vector<cuda_ipc_device_info> cuda_ipc_device_infos;
 
   void init() {
     next_buffer_ = NUM_BUFFERS;
@@ -91,6 +137,7 @@ struct GPUManager {
     stream_lock_ = CmiCreateLock();
     mempool_lock_ = CmiCreateLock();
     inst_lock_ = CmiCreateLock();
+    device_mapping_lock = CmiCreateLock();
 #endif
 
 #ifdef HAPI_TRACE
@@ -99,6 +146,20 @@ struct GPUManager {
 
     // Number of PEs mapped to each device
     pes_per_device = -1;
+
+    // Device communication buffer
+    comm_buffer_size = 1 << 26; // 64MB by default
+
+    // Shared memory region for CUDA IPC
+    shm_ptr = NULL;
+    shm_name = NULL;
+    shm_file = -1;
+    shm_chunk_size = 0;
+    shm_size = 0;
+    shm_my_ptr = NULL;
+
+    // Number of CUDA IPC events per PE
+    ipc_event_pool_size = -1;
 
     // Allocate host/device buffers array (both user and system-addressed)
     host_buffers_ = new void*[NUM_BUFFERS*2];
@@ -143,6 +204,12 @@ struct GPUManager {
     // Delete data structures
     delete[] host_buffers_;
     delete[] device_buffers_;
+
+    // Destroy device managers
+    for (DeviceManager& dm : device_managers) {
+      dm.destroy();
+    }
+    device_managers.clear();
 
     // Destroy streams
     if (streams_) {
