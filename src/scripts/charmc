@@ -503,10 +503,18 @@ do
 
 	"-balancer")
 #                test -n "$BALANCER" && Abort "More than one -balancer specified!"
-		BALANCER="$BALANCER $1"
 		mod=`echo $1| sed -e 's/:/ /' -e 's/,/ /g'`
-		AddModules $mod
 		shift
+		case $mod in GreedyLB|GreedyRefineLB|RefineLB|RandCentLB|DummyLB|RotateLB)
+			Warning "Warning: $mod is now part of TreeLB. To use it, you must also pass +balancer $mod at runtime."
+			mod="TreeLB"
+			if [ -n "$LEGACY_TREELB_ADDED" ]; then
+				continue
+			fi
+			LEGACY_TREELB_ADDED=1
+		esac
+		BALANCER="$BALANCER $mod"
+		AddModules $mod
 		;;
 
 	"-balance")
