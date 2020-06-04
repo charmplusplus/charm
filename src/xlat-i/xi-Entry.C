@@ -46,8 +46,7 @@ void Entry::check() {
           first_line_);
 
     if (isConstructor() && (isSync() || isIget())) {
-      XLAT_ERROR_NOCOL("constructors cannot have the 'sync' attribute",
-                       first_line_);
+      XLAT_ERROR_NOCOL("constructors cannot have the 'sync' attribute", first_line_);
       removeAttribute(SSYNC);
     }
 
@@ -1033,11 +1032,11 @@ XStr Entry::aggregatorName() {
   return aggregatorName;
 }
 
-const char *tramArgBufferSize     = "bufferSize";
-const int   tramDefaultBufferSize = 16384;
+const char *tramArgBufferSize = "bufferSize";
+const int tramDefaultBufferSize = 16384;
 
-const char *tramArgNumDimensions      = "numDimensions";
-const int   tramDefaultNumDimensions  = 2;
+const char *tramArgNumDimensions = "numDimensions";
+const int tramDefaultNumDimensions = 2;
 
 const char *tramArgThresholdFractionNumerator = "thresholdNumer";
 const int tramDefaultThresholdFractionNumerator = 1;
@@ -1062,8 +1061,8 @@ void Entry::genTramTypes() {
     typeString << aggregatorType();
     nameString << aggregatorName();
     itemTypeString << dataItemType();
-    int bufferSize     = aggregate->getArgument(tramArgBufferSize, tramDefaultBufferSize);
-    int numDimensions  = aggregate->getArgument(tramArgNumDimensions, tramDefaultNumDimensions);
+    int bufferSize = aggregate->getArgument(tramArgBufferSize, tramDefaultBufferSize);
+    int numDimensions = aggregate->getArgument(tramArgNumDimensions, tramDefaultNumDimensions);
     int thresholdFractionNumerator = aggregate->getArgument(tramArgThresholdFractionNumerator, tramDefaultThresholdFractionNumerator);
     int thresholdFractionDenominator = aggregate->getArgument(tramArgThresholdFractionDenominator, tramDefaultThresholdFractionDenominator);
     int cutoffFractionNumerator = aggregate->getArgument(tramArgCutoffFractionNumerator, tramDefaultCutoffFractionNumerator);
@@ -1072,10 +1071,12 @@ void Entry::genTramTypes() {
 
     Attribute::Argument *arg = aggregate->getArgs();
     while (arg) {
-      if (strcmp(arg->name, tramArgBufferSize) && strcmp(arg->name, tramArgNumDimensions) &&
-        strcmp(arg->name, tramArgThresholdFractionNumerator) && strcmp(arg->name, tramArgThresholdFractionDenominator) &&
-	strcmp(arg->name, tramArgCutoffFractionNumerator) && strcmp(arg->name, tramArgCutoffFractionDenominator) &&
-        strcmp(arg->name, tramMaxItemsBuffered)) {
+      if (strcmp(arg->name, tramArgBufferSize) && strcmp(arg->name, tramArgNumDimensions)
+          && strcmp(arg->name, tramArgThresholdFractionNumerator)
+          && strcmp(arg->name, tramArgThresholdFractionDenominator)
+          && strcmp(arg->name, tramArgCutoffFractionNumerator)
+          && strcmp(arg->name, tramArgCutoffFractionDenominator)
+          && strcmp(arg->name, tramMaxItemsBuffered)) {
         XLAT_ERROR_NOCOL("unsupported argument to aggregate attribute",
                          first_line_);
       }
@@ -1088,9 +1089,11 @@ void Entry::genTramTypes() {
       numDimensions = tramDefaultNumDimensions;
     }
 
-    container->tramInstances.
-      push_back(TramInfo(typeString.get_string(), nameString.get_string(),
-                         itemTypeString.get_string(), numDimensions, bufferSize, maxItemsBuffered, thresholdFractionNumerator, thresholdFractionDenominator, cutoffFractionNumerator, cutoffFractionDenominator));
+    container->tramInstances.push_back(TramInfo(typeString.get_string(),
+          nameString.get_string(), itemTypeString.get_string(), numDimensions,
+          bufferSize, maxItemsBuffered, thresholdFractionNumerator,
+          thresholdFractionDenominator, cutoffFractionNumerator,
+          cutoffFractionDenominator));
     tramInstanceIndex = container->tramInstances.size();
   }
 }
@@ -1135,7 +1138,7 @@ void Entry::genTramDefs(XStr& str) {
 void Entry::genTramInstantiation(XStr& str) {
   if (!container->tramInstances.empty()) {
     for (int i = 0; i < container->tramInstances.size(); i++) {
-      int bufferSize    = container->tramInstances[i].bufferSize;
+      int bufferSize = container->tramInstances[i].bufferSize;
       int maxItemsBuffered = container->tramInstances[i].maxItemsBuffered;
       int numDimensions = container->tramInstances[i].numDimensions;
       int thresholdFractionNum = container->tramInstances[i].thresholdFractionNumerator;
@@ -1164,9 +1167,9 @@ void Entry::genTramInstantiation(XStr& str) {
       str << "    int tramBufferSize = " << bufferSize <<";\n"
           << "    int maxItemsBuffered = " << maxItemsBuffered <<";\n"
           << "    int thresholdFractionNum = " << thresholdFractionNum <<";\n"
-	  << "    int thresholdFractionDen = " << thresholdFractionDen <<";\n"
-	  << "    int cutoffFractionNum = " << cutoffFractionNum <<";\n"
-	  << "    int cutoffFractionDen = " << cutoffFractionDen <<";\n"
+          << "    int thresholdFractionDen = " << thresholdFractionDen <<";\n"
+          << "    int cutoffFractionNum = " << cutoffFractionNum <<";\n"
+          << "    int cutoffFractionDen = " << cutoffFractionDen <<";\n"
           << "    int itemsPerBuffer = tramBufferSize / sizeof("
           << container->tramInstances[i].itemType.c_str() << ");\n"
           << "    if (itemsPerBuffer == 0) {\n"
@@ -1175,7 +1178,9 @@ void Entry::genTramInstantiation(XStr& str) {
           << "    CProxy_" << container->tramInstances[i].type.c_str()
           << " tramProxy =\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()
-          << "::ckNew(nDims, dims, gId, tramBufferSize, false, 0.01, maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, cutoffFractionNum, cutoffFractionDen);\n"
+          << "::ckNew(nDims, dims, gId, tramBufferSize, false, 0.01, "
+          << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
+          << "cutoffFractionNum, cutoffFractionDen);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
           << "  }\n";
     }
@@ -2347,9 +2352,9 @@ XStr Entry::genRegEp(bool isForRedn) {
   // parameter marshalled (and hence flagged as nokeep), but we'll delete the
   // CkReductionMsg in generated code, not runtime code. (so that we can cast
   // it to CkReductionMsg not CkMarshallMsg)
-  if ( !isForRedn && (hasAttribute(SNOKEEP)) ) str << "+CK_EP_NOKEEP";
+  if (!isForRedn && hasAttribute(SNOKEEP)) str << "+CK_EP_NOKEEP";
   if (hasAttribute(SNOTRACE)) str << "+CK_EP_TRACEDISABLE";
-  if (hasAttribute(SIMMEDIATE)) { 
+  if (hasAttribute(SIMMEDIATE)) {
     str << "+CK_EP_TRACEDISABLE";
     str << "+CK_EP_IMMEDIATE";
   }
@@ -2358,7 +2363,7 @@ XStr Entry::genRegEp(bool isForRedn) {
 
   /*MEICHAO*/
   if (hasAttribute(SMEM)) str << "+CK_EP_MEMCRITICAL";
-  
+
   if (internalMode) str << "+CK_EP_INTRINSIC";
   str << ")";
   return str;
@@ -2488,20 +2493,20 @@ int Entry::isIget(void) { return (hasAttribute(SIGET)); }
 int Entry::isConstructor(void) {
   return !strcmp(name, container->baseName(0).get_string());
 }
-bool Entry::isMigrationConstructor() { return isConstructor() && (hasAttribute(SMIGRATE)); }
+bool Entry::isMigrationConstructor() { return isConstructor() && hasAttribute(SMIGRATE); }
 int Entry::isExclusive(void) { return (hasAttribute(SLOCKED)); }
 int Entry::isImmediate(void) { return (hasAttribute(SIMMEDIATE)); }
 int Entry::isSkipscheduler(void) { return (hasAttribute(SSKIPSCHED)); }
 int Entry::isInline(void) { return hasAttribute(SINLINE); }
 int Entry::isLocal(void) { return hasAttribute(SLOCAL); }
-int Entry::isCreate(void) { return (hasAttribute(SCREATEHERE))||(hasAttribute(SCREATEHOME)); }
+int Entry::isCreate(void) { return (hasAttribute(SCREATEHERE)) || (hasAttribute(SCREATEHOME)); }
 int Entry::isCreateHome(void) { return (hasAttribute(SCREATEHOME)); }
 int Entry::isCreateHere(void) { return (hasAttribute(SCREATEHERE)); }
 int Entry::isPython(void) { return (hasAttribute(SPYTHON)); }
 int Entry::isNoTrace(void) { return (hasAttribute(SNOTRACE)); }
 int Entry::isAppWork(void) { return (hasAttribute(SAPPWORK)); }
 int Entry::isNoKeep(void) { return (hasAttribute(SNOKEEP)); }
-int Entry::isSdag(void) { return (sdagCon!=0); }
+int Entry::isSdag(void) { return (sdagCon != 0); }
 bool Entry::isTramTarget(void) { return (hasAttribute(SAGGREGATE)) != 0; }
 int Entry::isWhenIdle(void) { return hasAttribute(SWHENIDLE); }
 

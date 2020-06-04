@@ -8,7 +8,9 @@
 #include <vector>
 #include "pup_stl.h"
 #include "vartest.decl.h"
-CProxy_main mainProxy; //readonly
+
+/* readonly */ CProxy_main mainProxy;
+
 class main : public CBase_main {
   CProxy_engine engines;
   int N;
@@ -16,6 +18,7 @@ class main : public CBase_main {
   int lambda;
   int startval;
   std::chrono::time_point<std::chrono::high_resolution_clock> starttime;
+
 public:
   main(CkArgMsg* args) {
     if (args->argc == 4) {
@@ -33,9 +36,11 @@ public:
     }
     delete args;
   }
+
   void startsum(int val) {
     startval = val;
   }
+
   void done(int val) {
     auto endtime = std::chrono::high_resolution_clock::now();
     auto dur = std::chrono::duration_cast<std::chrono::microseconds>(endtime-starttime);
@@ -44,6 +49,7 @@ public:
     CkExit();
   }
 };
+
 class engine : public CBase_engine {
   int N;
   int msgcount;
@@ -51,9 +57,12 @@ class engine : public CBase_engine {
   std::mt19937 mt;
   int iter;
   int result1,result2;
+
 public:
   engine() {}
+
   engine(int _N, int _msgcount, int _lambda) : N(_N), msgcount(_msgcount), lambda(_lambda), mt(thisIndex), iter(0), result1(0), result2(0) {}
+
   void simulate() {
     for (int j = 0;j != N-1;++j) {
       for (int k = 0;k != msgcount;++k) {
@@ -63,8 +72,10 @@ public:
       }
     }
     contribute(sizeof(int), &result1, CkReduction::sum_int, CkCallback(CkReductionTarget(main,startsum), mainProxy));
-  } //after sending each message to the other PE
-//send a self-message to add scheduling overhead(enforce msgcount)
+  }
+
+  // After sending each message to the other PE,
+  // send a self-message to add scheduling overhead (enforce msgcount)
   void ping(std::vector<int> val) {
     result2 = std::accumulate(val.begin(),val.end(),result2);
     ++iter;
@@ -72,6 +83,7 @@ public:
       contribute(sizeof(int), &result2, CkReduction::sum_int, CkCallback(CkReductionTarget(main,done), mainProxy));
     }
   }
+
   std::vector<int> rand() {
     //int length=lambda/4;
     std::uniform_int_distribution<> gen1(lambda/8,3*lambda/8);
@@ -85,5 +97,5 @@ public:
     return gener;
   }
 };
-#include "vartest.def.h"
 
+#include "vartest.def.h"

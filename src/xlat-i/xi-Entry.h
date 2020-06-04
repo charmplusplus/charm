@@ -13,15 +13,15 @@ namespace xi {
 class Attribute {
 public:
   struct Argument {
-    int       value;
-    char     *name;
+    int value;
+    char *name;
     Argument *next;
 
     Argument(const char* name_, int value_, Argument *next_ = NULL)
     : value(value_), next(next_) {
       name = new char[strlen(name_) + 1];
       strcpy(name, name_);
-    };
+    }
 
     ~Argument() {
       if (next) {
@@ -32,7 +32,7 @@ public:
   };
 
   Attribute(int type, Argument* args = NULL, Attribute* next = NULL)
-  : type_(type), args_(args), next_(next) { };
+  : type_(type), args_(args), next_(next) {}
 
   ~Attribute() {
     if (args_) {
@@ -45,7 +45,7 @@ public:
   }
 
   Attribute* getNext() { return next_; }
-  Argument*  getArgs() { return args_; }
+  Argument* getArgs() { return args_; }
 
   int is(int type) { return (type_ == type); }
 
@@ -81,12 +81,12 @@ public:
 
     return def;
   }
+
 private:
-  int        type_;
-  Argument  *args_;
+  int type_;
+  Argument *args_;
   Attribute *next_;
 };
-
 
 class Value;
 class CStateVar;
@@ -116,7 +116,7 @@ class WhenStatementEChecker;
 #define SREDUCE 0x40000   // <- reduction target
 #define SAPPWORK 0x80000  // <- reduction target
 #define SAGGREGATE 0x100000
-#define SWHENIDLE (0x200000) // implies SLOCAL as well
+#define SWHENIDLE 0x200000 // implies SLOCAL as well
 
 /* An entry construct */
 class Entry : public Member {
@@ -129,12 +129,12 @@ class Entry : public Member {
   int numRdmaSendParams; // stores the number of rdma send parameters (marked nocopy)
   int numRdmaRecvParams; // stores the number of rdma recv parameters (marked nocopypost)
 
- private:    
+ private:
   Attribute *attribs;
   Type *retType;
   Value *stacksize;
   const char *pythonDoc;
-    
+
  public:
   XStr proxyName(void);
   XStr indexName(void);
@@ -245,6 +245,7 @@ class Entry : public Member {
 
   Entry(int l, Attribute *a, Type* r, const char* n, ParamList* p, Value* sz = 0,
         SdagConstruct* sc = 0, const char* e = 0, int fl = -1, int ll = -1);
+
   inline int hasAttribute(int attribute) {
     return (attribs != NULL) && (attribs->hasAttribute(attribute));
   }
@@ -278,6 +279,7 @@ class Entry : public Member {
       }
     }
   }
+
   void setChare(Chare* c);
   int paramIsMarshalled(void);
   int getStackSize(void);

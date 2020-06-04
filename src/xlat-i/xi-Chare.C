@@ -221,12 +221,12 @@ void Chare::preprocess() {
     list->preprocess();
     list->recurse(this, &Member::setChare);
     list->recursev(&Member::preprocessSDAG);
-    //Add migration constructor to MemberList
-    if(isMigratable()) {
-      Entry *e=new Entry(line,new Attribute(SMIGRATE),NULL,
-                         (char *)type->getBaseName(),
-                         new ParamList(new Parameter(line,
-                                                     new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);
+    // Add migration constructor to MemberList
+    if (isMigratable()) {
+      Entry* e = new Entry(line, new Attribute(SMIGRATE), NULL,
+                          (char *)type->getBaseName(),
+                          new ParamList(new Parameter(line,
+                              new PtrType(new NamedType("CkMigrateMessage")))), 0, 0, 0);
       e->setChare(this);
       list->push_back(e);
     }
