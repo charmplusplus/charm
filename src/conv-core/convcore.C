@@ -1943,7 +1943,7 @@ void CsdScheduleForever(void)
 #endif
 
     // Execute functions registered to be executed at every scheduler loop
-    CcdRaiseCondition(CcdEVERY);
+    CcdRaiseCondition(CcdSCHEDLOOP);
 
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
