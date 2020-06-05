@@ -68,6 +68,11 @@ foreach(file ${liveviz-h-sources})
 endforeach()
 
 target_compile_options(moduleliveViz PRIVATE -DEXTERIOR_BLACK_PIXEL_ELIMINATION)
+if(CMK_USE_LIBJPEG)
+    target_include_directories(moduleliveViz PRIVATE ${JPEG_INCLUDE_DIRS})
+endif()
+
+file(WRITE ${CMAKE_BINARY_DIR}/lib/libmoduleliveViz.dep "${CMK_LIBJPEG}\n")
 
 # taskGraph
 configure_file(taskGraph/taskGraph.h ${CMAKE_BINARY_DIR}/include COPYONLY)

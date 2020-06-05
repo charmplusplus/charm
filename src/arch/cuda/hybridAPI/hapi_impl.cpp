@@ -908,8 +908,10 @@ void hapiClearInstrument() {
 // all successive completed events in the queue starting from the front.
 // TODO Maybe we should make one pass of all events in the queue instead,
 // since there might be completed events later in the queue.
-void hapiPollEvents() {
+void hapiPollEvents(void* param, double cur_time) {
 #ifndef HAPI_CUDA_CALLBACK
+  if (CpvAccess(n_hapi_events) <= 0) return;
+
   std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
   while (!queue.empty()) {
     hapiEvent hev = queue.front();

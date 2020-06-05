@@ -1977,6 +1977,10 @@ CcdPERIODIC_12hour
 CcdPERIODIC_1day
    Raised once every day.
 
+CcdSCHEDLOOP
+   Raised at every scheduler loop. Use with caution to avoid adding
+   significant overhead to the scheduler.
+
 CcdQUIESCENCE
    Raised when the quiescence detection system has determined that the
    system is quiescent.
