@@ -15,8 +15,6 @@ cmake_minimum_required(VERSION 3.4)
 # Fortran is optional, so don't include it in LANGUAGES here
 project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
-message(${CMAKE_GENERATOR}xxx)
-
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
 
@@ -24,7 +22,7 @@ find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran c
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#enable_language(Fortran OPTIONAL)
+enable_language(Fortran OPTIONAL)
 if(CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
   FortranCInterface_VERIFY()
@@ -62,7 +60,7 @@ elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "XL")
 elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
   set(CMK_COMPILER msvc)
 else()
-  message(FATAL_ERROR "Unknown compiler ---${CMAKE_CXX_COMPILER_ID}---")
+  message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
 # Build options

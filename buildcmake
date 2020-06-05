@@ -2,9 +2,7 @@
 
 # Thin wrapper around CMake to start a build with a similar command line as ./buildold
 
-set -o nounset
-
-export CMAKE_GENERATOR="Unix Makefiles"
+set -o errexit -o nounset
 
 # Check that CMake is available and that the version is sufficiently new
 
@@ -446,14 +444,6 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DTRACING_COMMTHREAD="$opt_tracing_commthread" \
   -DUCX_PMI="$opt_ucx_pmi" \
   -DZLIB="$opt_zlib"
-
-pwd
-echo XXXXXXXX
-cat CMakeFiles/CMakeError.log
-echo ---------------------------------
-cat CMakeFiles/CMakeOutput.log
-
-
 
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
 make $opt_parallel
