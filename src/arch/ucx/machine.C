@@ -607,7 +607,7 @@ static inline int ProcessTxQueue()
         }
 #endif
         else {
-          CmiAbort("[%d][%d][%d] ProcessTxQueue req->op is %d and is Invalid\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), req->op);
+          CmiAbort("[%d][%d][%d] UCX:ProcessTxQueue req->op(%d) is Invalid\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), req->op);
         }
         CmiFree(req);
         return 1;
