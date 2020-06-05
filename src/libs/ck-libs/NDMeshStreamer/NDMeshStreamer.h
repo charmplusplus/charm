@@ -28,12 +28,6 @@
 
 #define TRAM_BROADCAST (-100)
 
-//#define TRAM_BUFFER_SIZE 20480
-
-//#define TRAM_SEND_CUTOFF_NUMERATOR 5
-//#define TRAM_SEND_CUTOFF_DENOMINATOR 10
-//#define TRAM_SEND_FRACTION_NUMERATOR 5
-//#define TRAM_SEND_FRACTION_DENOMINATOR 10
 extern void QdCreate(int n);
 extern void QdProcess(int n);
 //below code uses templates to generate appropriate TRAM_BROADCAST array index values
@@ -229,7 +223,7 @@ protected:
               MeshStreamerMessageV *destinationBuffer,
               char *dataHandle, size_t size, CkArrayIndex index);
   void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe);
-  void storeMessageData(int destinationPe,
+  void storeMessageIntermed(int destinationPe,
                     const Route& destinationCoordinates,
                     char *data, size_t size,CkArrayIndex);
   void storeMessage(int destinationPe,
@@ -496,7 +490,7 @@ sendMeshStreamerMessage(MeshStreamerMessageV *destinationBuffer,
 
 template <class dtype, class RouterType>
 inline void MeshStreamer<dtype, RouterType>::
-storeMessageData(int destinationPe, const Route& destinationRoute,
+storeMessageIntermed(int destinationPe, const Route& destinationRoute,
                  char *dataItem, size_t size,CkArrayIndex arrayId) {
   int dimension = destinationRoute.dimension;
   int bufferIndex = destinationRoute.dimensionIndex;
@@ -802,7 +796,7 @@ receiveAlongRoute(MeshStreamerMessageV *msg) {
 				 myRouter_.dimensionReceived(msg->msgType),
 				 destinationRoute);
       }
-      storeMessageData(destinationPe, destinationRoute,
+      storeMessageIntermed(destinationPe, destinationRoute,
                        msg->dataItems + msg->template getoffset<dtype>(i),
                        msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i),
                        msg->destObjects[i]);

@@ -74,8 +74,6 @@ public:
     contribute(sizeof(int), &result1, CkReduction::sum_int, CkCallback(CkReductionTarget(main,startsum), mainProxy));
   }
 
-  // After sending each message to the other PE,
-  // send a self-message to add scheduling overhead (enforce msgcount)
   void ping(std::vector<int> val) {
     result2 = std::accumulate(val.begin(),val.end(),result2);
     ++iter;

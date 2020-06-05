@@ -2,6 +2,9 @@
 
 DIRS = aggregateRandomAccessArray
 
+#aggregateRandomAccessGroup can be restored once TRAM support for groups is reimplemented
+#the non-aggregate API tests are removed since TRAM now exclusively supports the aggregate API
+
 TESTDIRS = $(DIRS)
 
 ifeq ($(CMK_COMPILER),bgxlc)
