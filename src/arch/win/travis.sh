@@ -29,6 +29,8 @@ export WindowsSdkDir="C:\Program Files (x86)\Windows Kits\10"
 
 export PATH="/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64:$PATH"
 
+echo $PATH
+
 export TESTOPTS="++local"
 
 "$@"
