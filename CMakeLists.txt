@@ -22,7 +22,11 @@ find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran c
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-enable_language(Fortran OPTIONAL)
+# No Fortran support on Windows
+if(NOT (CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "CYGWIN"))
+  enable_language(Fortran OPTIONAL)
+endif()
+
 if(CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
   FortranCInterface_VERIFY()
