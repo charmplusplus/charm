@@ -29,11 +29,13 @@ export LIBPATH="C:\Windows\Microsoft.NET\Framework64\v4.0.30319;$LIBPATH"
 export VCINSTALLDIR="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC"
 export WindowsSdkDir="C:\Program Files (x86)\Windows Kits\10"
 
-export PATH="/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64:$PATH"
+export PATH="/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64:$PATH"
 
 echo $PATH
 
-/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64/cl.exe
+ls /cygdrive/c
+
+/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64/cl.exe
 
 cl.exe
 
