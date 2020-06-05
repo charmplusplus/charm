@@ -35,7 +35,7 @@ echo $PATH
 
 ls /cygdrive/c
 
-/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64/cl.exe
+"/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64/cl.exe"
 
 cl.exe
 
