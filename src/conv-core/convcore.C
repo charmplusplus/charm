@@ -2059,7 +2059,7 @@ void CmiDeliverSpecificMsg(int handler)
 	return;
       } else {
 #if CMK_ERROR_CHECKING
-        if(trackMessages) addToTracking((char *)msg, CmiMyPe());
+        if(trackMessages) addToTracking((char *)msg, CmiMyPe(), false, false);
 #endif
 	CdsFifo_Enqueue(localqueue, msg);
       }
@@ -2201,7 +2201,7 @@ void CthEnqueueNormalThread(CthThreadToken* token, int s,
   CMI_MSG_LAYER_TYPE(token) = 0;
 #endif
 #if CMK_ERROR_CHECKING
-  if(trackMessages) addToTracking((char *)token, CmiMyPe());
+  if(trackMessages) addToTracking((char *)token, CmiMyPe(), false, false);
 #endif
   CsdEnqueueGeneral(token, s, pb, prio);
 }
@@ -2211,7 +2211,7 @@ void CthEnqueueSchedulingThread(CthThreadToken* token, int s,
 {
   CmiSetHandler(token, CpvAccess(CthResumeSchedulingThreadIdx));
 #if CMK_ERROR_CHECKING
-  if(trackMessages) addToTracking((char *)token, CmiMyPe());
+  if(trackMessages) addToTracking((char *)token, CmiMyPe(), false, false);
 #endif
   CsdEnqueueGeneral(token, s, pb, prio);
 }

@@ -220,7 +220,7 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
 
         // NODE LEVEL
 #if CMK_ERROR_CHECKING
-        if(trackMessages) addToTracking(msg, nd, true);
+        if(trackMessages) addToTracking(msg, nd, true, true);
 #endif
         newmsg = CopyMsg(msg, size);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
@@ -240,7 +240,7 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         // NODE LEVEL
         //CmiPrintf("[%d][%d] SendSpanningChildren: sending copymsg to %d \n", CmiMyPe(), CmiMyNode(), CmiNodeFirst(nd));
 #if CMK_ERROR_CHECKING
-        if(trackMessages) addToTracking(msg, nd, true);
+        if(trackMessages) addToTracking(msg, nd, true, true);
 #endif
         newmsg = CopyMsg(msg, size);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
@@ -290,7 +290,7 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
 
         // NODE LEVEL
 #if CMK_ERROR_CHECKING
-        if(trackMessages) addToTracking(msg, nd, true);
+        if(trackMessages) addToTracking(msg, nd, true, true);
 #endif
         newmsg = CopyMsg(msg, size);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);

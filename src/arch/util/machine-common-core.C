@@ -567,27 +567,27 @@ static void SendToPeers(int size, char *msg) {
     for (int i = 0; i < exceptRank; i++) {
       CmiReference(msg);
 #if CMK_ERROR_CHECKING
-      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i);
+      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i, false, false);
 #endif
       CmiPushPE(i, msg);
     }
     for (int i = exceptRank + 1; i < CmiMyNodeSize(); i++) {
       CmiReference(msg);
 #if CMK_ERROR_CHECKING
-      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i);
+      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i, false, false);
 #endif
       CmiPushPE(i, msg);
     }
   } else {
     for (int i = 0; i < exceptRank; i++) {
 #if CMK_ERROR_CHECKING
-      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i);
+      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i, false, false);
 #endif
       CmiPushPE(i, CopyMsg(msg, size));
     }
     for (int i = exceptRank + 1; i < CmiMyNodeSize(); i++) {
 #if CMK_ERROR_CHECKING
-      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i);
+      if(trackMessages) addToTracking(msg, CmiMyNode()*CmiMyNodeSize() + i, false, false);
 #endif
       CmiPushPE(i, CopyMsg(msg, size));
     }
@@ -598,7 +598,7 @@ static void SendToPeers(int size, char *msg) {
 /* Functions regarding sending operations */
 static void CmiSendSelf(char *msg) {
 #if CMK_ERROR_CHECKING
-    if(trackMessages) addToTracking(msg, CmiMyPe());
+    if(trackMessages) addToTracking(msg, CmiMyPe(), false, false);
 #endif
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
@@ -742,7 +742,7 @@ void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
 #if CMK_SMP
         if (CmiMyNode()==destNode && partition == CmiMyPartition()) {
 #if CMK_ERROR_CHECKING
-            if(trackMessages) addToTracking(msg, destPE);
+            if(trackMessages) addToTracking(msg, destPE, false, false);
 #endif
             CmiPushPE(destRank, msg);
 #if CMK_PERSISTENT_COMM
@@ -753,7 +753,7 @@ void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
 #endif
         CMI_DEST_RANK(msg) = destRank;
 #if CMK_ERROR_CHECKING
-        if(trackMessages) addToTracking(msg, destPE);
+        if(trackMessages) addToTracking(msg, destPE, false, true);
 #endif
         CmiInterSendNetworkFunc(destPE, partition, size, msg, P2P_SYNC);
 
@@ -788,7 +788,7 @@ if (  MSG_STATISTIC)
 #if CMK_NODE_QUEUE_AVAILABLE
 static void CmiSendNodeSelf(char *msg) {
 #if CMK_ERROR_CHECKING
-    if(trackMessages) addToTracking(msg, CmiMyNode(), true);
+    if(trackMessages) addToTracking(msg, CmiMyNode(), true, false);
 #endif
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
@@ -855,7 +855,7 @@ if (  MSG_STATISTIC)
 }
 #endif
 #if CMK_ERROR_CHECKING
-        if(trackMessages) addToTracking(msg, destNode, true);
+        if(trackMessages) addToTracking(msg, destNode, true, true);
 #endif
         CmiInterSendNetworkFunc(CmiNodeFirst(destNode), partition, size, msg, P2P_SYNC);
     }
@@ -881,7 +881,7 @@ if (  MSG_STATISTIC)
 }
 #endif
 #if CMK_ERROR_CHECKING
-        if(trackMessages) addToTracking(msg, destNode, true);
+        if(trackMessages) addToTracking(msg, destNode, true, true);
 #endif
         return CmiSendNetworkFunc(CmiNodeFirst(destNode), size, msg, P2P_ASYNC);
     }

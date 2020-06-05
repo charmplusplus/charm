@@ -12,6 +12,10 @@
 #include <mpi.h>
 #include <algorithm>
 
+#if CMK_ERROR_CHECKING
+#include "cmitrackmessages.h"
+#endif
+
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
 #  warning "   Try doing an 'rm charm/include/mpi.h' and building again."
@@ -674,6 +678,9 @@ static void ReleasePostedMessages(void) {
             else
 #endif
             {
+#if CMK_ERROR_CHECKING
+              if(trackMessages) setMsgLeftSender(msg_tmp->msg);
+#endif
               CmiFree(msg_tmp->msg);
             }
             /* CmiFree(msg_tmp); */
@@ -850,6 +857,11 @@ static int PumpMsgs(void) {
 				continue;
 			}
 	#endif
+
+
+#if CMK_ERROR_CHECKING
+            if(trackMessages) addToRecvedUnackedMsgs(msg);
+#endif
             if(CMI_MSGTYPE(msg) == REGULAR) {
               handleOneRecvedMsg(nbytes, msg);
             }

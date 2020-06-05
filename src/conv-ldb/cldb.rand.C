@@ -113,7 +113,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
   if (pe == CmiMyPe() && !CmiImmIsRunning()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
 #if CMK_ERROR_CHECKING
-    if(trackMessages) addToTracking((char *)msg, CmiMyPe());
+    if(trackMessages) addToTracking((char *)msg, CmiMyPe(), false, false);
 #endif
     /* CsdEnqueueGeneral is not thread or SIGIO safe */
     //CmiPrintf("   myself processor %d ==> %d, length=%d Timer:%f , priori=%d \n", CmiMyPe(), pe, len, CmiWallTimer(), *prioptr);
@@ -148,7 +148,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
   if (node == CmiMyNode() && !CmiImmIsRunning()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
 #if CMK_ERROR_CHECKING
-    if(trackMessages) addToTracking((char *)msg, CmiMyNode(), true);
+    if(trackMessages) addToTracking((char *)msg, CmiMyNode(), true, false);
 #endif
     CsdNodeEnqueueGeneral(msg, queueing, priobits, prioptr);
   } else {

@@ -30,6 +30,10 @@
 #include "runtime-pmix.C"
 #endif
 
+#if CMK_ERROR_CHECKING
+#include "cmitrackmessages.h"
+#endif
+
 #define CmiSetMsgSize(msg, sz)    ((((CmiMsgHeaderBasic *)msg)->size) = (sz))
 
 #define UCX_MSG_PROBE_THRESH            32768
@@ -77,6 +81,9 @@ typedef struct UcxRequest
 #if CMK_ONESIDED_IMPL
     void           *ncpyAck;
     ucp_rkey_h     rkey;
+#endif
+#if CMK_ERROR_CHECKING
+    ucp_tag_t           tag;
 #endif
 } UcxRequest;
 
@@ -327,6 +334,9 @@ static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
     // Request completed immediately
     if (req->completed) {
         if (!(tag & UCX_RMA_TAG_MASK)) {
+#if CMK_ERROR_CHECKING
+            if(trackMessages) addToRecvedUnackedMsgs((char *)buf);
+#endif
             handleOneRecvedMsg(size, (char*)buf);
         }
     } else {
@@ -365,6 +375,9 @@ static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, char *rxBuf,
                                          size_t size, ucp_tag_t tag, int idx)
 {
     if (!(tag & UCX_RMA_TAG_MASK)) {
+#if CMK_ERROR_CHECKING
+        if(trackMessages) addToRecvedUnackedMsgs(rxBuf);
+#endif
         handleOneRecvedMsg(size, rxBuf);
     }
 
@@ -490,6 +503,11 @@ void UcxTxReqCompleted(void *request, ucs_status_t status)
     CmiEnforce(status == UCS_OK);
     CmiEnforce(req->msgBuf);
 
+#if CMK_ERROR_CHECKING
+    if(trackMessages && req->tag != UCX_RMA_TAG_GET && req->tag != UCX_RMA_TAG_REG_AND_SEND_BACK && req->tag != UCX_RMA_TAG_DEREG_AND_ACK ) setMsgLeftSender((char *)(req->msgBuf));
+
+#endif
+
     UCX_LOG(3, "TX req %p completed, free msg %p", req, req->msgBuf);
     CmiFree(req->msgBuf);
     UCX_REQUEST_FREE(req);
@@ -533,6 +551,9 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
         return NULL;
     }
 
+#if CMK_ERROR_CHECKING
+    req->tag = sTag;
+#endif
     req->msgBuf = msg;
 #endif
 
@@ -554,6 +575,10 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
     if (req == NULL) {
         /* Request completed in place or error occured */
         UCX_LOG(3, "Sent msg %p (len %d) inline", msg, size);
+
+#if CMK_ERROR_CHECKING
+        if(trackMessages) setMsgLeftSender(msg);
+#endif
         CmiFree(msg);
         return NULL;
     }

@@ -1,6 +1,7 @@
 #include "converse.h"
 #include "cmitrackmessages.h"
 #include <algorithm>
+#include <utility>
 
 #define DEBUG(x) //x
 
@@ -25,6 +26,9 @@ CpvDeclare(int, statsDoneHandler);
 
 // Converse handler for broadcasting to all PEs to print their stats
 CpvDeclare(int, printStatsHandler);
+
+// Declare a pe level data structure that stores the ids and pes of incoming messages
+CpvDeclare(CmiIntIntPair, recvedUnackedMsgs);
 
 inline void markAcked(char *msg) {
   CMI_UNIQ_MSG_ID(msg) = -10;
@@ -153,6 +157,8 @@ void CmiMessageTrackerInit() {
   CpvInitialize(int, printStatsHandler);
   CpvAccess(printStatsHandler) = CmiRegisterHandler((CmiHandler) _printStats);
 
+  CpvInitialize(CmiIntIntPair, recvedUnackedMsgs);
+
   CcdCallOnCondition(CcdPROCESSOR_LONG_IDLE, (CcdVoidFn)CmiPrintMTStatsOnIdle, NULL);
 }
 
@@ -162,7 +168,7 @@ inline int getNewUniqId() {
   return ++CpvAccess(uniqMsgId);
 }
 
-inline void insertUniqIdEntry(char *msg, int destPe, bool nodeLevel) {
+inline void insertUniqIdEntry(char *msg, int destPe, bool nodeLevel, bool networkMsg) {
   int uniqId = getNewUniqId();
 
   CMI_UNIQ_MSG_ID(msg) = uniqId;
@@ -191,13 +197,63 @@ inline void insertUniqIdEntry(char *msg, int destPe, bool nodeLevel) {
   }
 
   info.nodeLevel = nodeLevel;
+  info.networkMsg = networkMsg;
 
-  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d, isNodeLevel:%d, msg:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe, nodeLevel, msg);)
+  if(networkMsg)
+    CMI_NETWORK_MSG(msg) = 1;
+  else
+    CMI_NETWORK_MSG(msg) = 0;
+
+  info.leftSender = false;
+
+  DEBUG(CmiPrintf("[%d][%d][%d] ADDING uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d, isNodeLevel:%d, isNetworkMsg:%d, msg:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe, nodeLevel, networkMsg, msg);)
 
   CpvAccess(sentUniqMsgIds).insert({uniqId, info});
 }
 
-void addToTracking(char *msg, int destPe, bool nodeLevel) {
+void setMsgLeftSender(char *msg) {
+  int uniqId = CMI_UNIQ_MSG_ID(msg);
+
+  if(CmiGetHandler(msg) == CpvAccess(msgTrackHandler) || uniqId  == -14 || uniqId == -11 || uniqId == -12 || uniqId == -13 || uniqId == -15 ) {
+    return;
+  }
+
+  CmiIntMsgInfoMap::iterator iter;
+  iter = CpvAccess(sentUniqMsgIds).find(uniqId);
+  msgInfo info;
+
+  if(iter != CpvAccess(sentUniqMsgIds).end()) {
+
+    info = iter->second;
+
+    if(info.networkMsg != true) {
+      //DEBUG(CmiPrintf("[%d][%d][%d] LEFT SENDER NON networkMsg uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, isNodeLevel:%d, isNetworkMsg:%d, leftSender:%d, msg:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, info.nodeLevel, info.networkMsg, info.leftSender, msg);)
+      CmiPrintf("[%d][%d][%d] LEFT SENDER NON networkMsg uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, isNodeLevel:%d, isNetworkMsg:%d, leftSender:%d, msg:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, info.nodeLevel, info.networkMsg, info.leftSender, msg);
+    }
+
+    CmiAssert(info.networkMsg == true);
+
+    info.leftSender = true;
+
+    DEBUG(CmiPrintf("[%d][%d][%d] LEFT SENDER uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, isNodeLevel:%d, isNetworkMsg:%d, leftSender:%d, msg:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, info.nodeLevel, info.networkMsg, info.leftSender, msg);)
+
+  } else {
+    // It's probably already acked
+    //CmiAbort("setMsgLeftSender:: did not find msg with uniqId:%d\n", uniqId);
+  }
+}
+
+void addToRecvedUnackedMsgs(char *msg) {
+  int uniqId = CMI_UNIQ_MSG_ID(msg);
+  if(CmiGetHandler(msg) == CpvAccess(msgTrackHandler) || uniqId  == -14 || uniqId == -11 || uniqId == -12 || uniqId == -13 || uniqId == -15 ) {
+    return;
+  }
+
+  CmiAssert(CMI_NETWORK_MSG(msg) == 1);
+  CpvAccess(recvedUnackedMsgs).insert(CpvAccess(recvedUnackedMsgs).end(),  std::make_pair(CMI_UNIQ_MSG_ID(msg), CMI_SRC_PE(msg)));
+}
+
+void addToTracking(char *msg, int destPe, bool nodeLevel, bool networkMsg) {
 
   // Do not track ack messages
   if(CmiGetHandler(msg) == CpvAccess(msgTrackHandler) || CMI_UNIQ_MSG_ID(msg) == -14) {
@@ -207,14 +263,14 @@ void addToTracking(char *msg, int destPe, bool nodeLevel) {
 
   int uniqId = CMI_UNIQ_MSG_ID(msg);
 
-  if(uniqId == -11 || uniqId == -12 || uniqId == -13) {
+  if(uniqId == -11 || uniqId == -12 || uniqId == -13 || uniqId == -15) {
     // do not track
     return;
   }
 
   if(uniqId <= 0) {
     // uniqId not yet set
-    insertUniqIdEntry(msg, destPe, nodeLevel);
+    insertUniqIdEntry(msg, destPe, nodeLevel, networkMsg);
   } else {
     // uniqId already set, increase count
     CmiIntMsgInfoMap::iterator iter;
@@ -225,15 +281,21 @@ void addToTracking(char *msg, int destPe, bool nodeLevel) {
 
       if(nodeLevel != info.nodeLevel) {
         // should add a new entry
-        insertUniqIdEntry(msg, destPe, nodeLevel);
+        insertUniqIdEntry(msg, destPe, nodeLevel, networkMsg);
 
       } else {
+
+        if(networkMsg != info.networkMsg) {
+          insertUniqIdEntry(msg, destPe, nodeLevel, networkMsg);
+          //CmiAbort("networkMsg being modified is different from networkMsg being newly added\n");
+        }
+
         //iter->second.count++; // increment counter
         iter->second.destPes.push_back(destPe);
         DEBUG(CmiPrintf("[%d][%d][%d] INCREMENTING COUNTER uniqId:%d, pe:%d, type:%d, count:%zu, msgHandler:%d, ep:%d, destPe:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), uniqId, CmiMyPe(), info.type, info.destPes.size(), info.msgHandler, info.ep, destPe);)
       }
     } else {
-      insertUniqIdEntry(msg, destPe, nodeLevel);
+      insertUniqIdEntry(msg, destPe, nodeLevel, networkMsg);
     }
   }
 }
@@ -277,6 +339,9 @@ void sendTrackingAck(char *msg) {
     }
 
     CmiSetHandler(ackMsg, CpvAccess(msgTrackHandler));
+
+    if(CMI_NETWORK_MSG(msg))
+      CpvAccess(recvedUnackedMsgs).erase(std::make_pair(CMI_UNIQ_MSG_ID(msg), CMI_SRC_PE(msg)));
 
 #if CMK_SMP
     if(CMI_MSG_COMM_SENDER(msg) == 1) {

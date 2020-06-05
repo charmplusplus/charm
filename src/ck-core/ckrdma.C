@@ -353,7 +353,7 @@ void enqueueNcpyMessage(int destPe, void *msg){
     CmiHandleMessage(msg);
   } else {                   // invoked from the comm thread, so send message to the worker thread
 #if CMK_ERROR_CHECKING
-    if(trackMessages) addToTracking((char *)msg, destPe);
+    if(trackMessages) addToTracking((char *)msg, destPe, false, false);
 #endif
     CmiPushPE(CmiRankOf(destPe), msg);
   }
@@ -1672,7 +1672,7 @@ void updatePeerCounterAndPush(envelope *env) {
       // Reset message
       CMI_UNIQ_MSG_ID(env) = -1;
 
-      addToTracking((char *)env, peerAckInfo->peerParentPe);
+      addToTracking((char *)env, peerAckInfo->peerParentPe, false, false);
     }
 #endif
     CmiPushPE(CmiRankOf(peerAckInfo->peerParentPe), env);
