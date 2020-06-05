@@ -598,10 +598,16 @@ static inline int ProcessTxQueue()
             } else {
                 ((UcxRequest*)status_ptr)->msgBuf = req->msgBuf;
             }
-        } else if(req->op == UCX_RMA_OP_GET || req->op == UCX_RMA_OP_PUT) { // RMA Get or Put
+        }
+#if CMK_ONESIDED_IMPL
+        else if(req->op == UCX_RMA_OP_GET || req->op == UCX_RMA_OP_PUT) { // RMA Get or Put
 
             // Post the GET or PUT operation from the comm thread
             UcxRmaOp((NcpyOperationInfo *)(req->msgBuf), req->op);
+        }
+#endif
+        else {
+          CmiAbort("[%d][%d][%d] ProcessTxQueue req->op is %d and is Invalid\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), req->op);
         }
         CmiFree(req);
         return 1;
