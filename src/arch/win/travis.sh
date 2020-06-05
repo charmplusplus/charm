@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -o errexit
-
 # Script to set environment variables for Travis Windows VMs
 
 export INCLUDE=""
@@ -30,14 +28,6 @@ export VCINSTALLDIR="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC"
 export WindowsSdkDir="C:\Program Files (x86)\Windows Kits\10"
 
 export PATH="/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64:$PATH"
-
-echo $PATH
-
-ls /cygdrive/c
-
-"/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64/cl.exe"
-
-cl.exe
 
 export TESTOPTS="++local"
 
