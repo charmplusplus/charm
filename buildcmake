@@ -446,6 +446,6 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DZLIB="$opt_zlib"
 
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
-make $opt_parallel
+make hwloc
 
 echo 'Build successful.'
