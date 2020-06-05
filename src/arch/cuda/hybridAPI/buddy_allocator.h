@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __BUDDY_ALLOCATOR_H_
+#define __BUDDY_ALLOCATOR_H_
 
 #include <cstdio>
 #include <cstdlib>
@@ -242,3 +243,5 @@ merge_done:
   }; // struct allocator
 
 } // namespace buddy
+
+#endif // __BUDDY_ALLOCATOR_H_

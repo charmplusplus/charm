@@ -21,9 +21,9 @@
 #define NUM_BUFFERS 256
 #endif
 
-// CUDA IPC Event related struct, stored in shared memory.
-// A struct is used in each interaction/message between sender and receiver.
-// Number of struct objects per device will be equal to the CUDA IPC event pool size.
+// CUDA IPC Event related struct, stored in host-wide shared memory.
+// One object is used for each interaction/message between sender and receiver.
+// The number of these objects per device will be equal to the CUDA IPC event pool size.
 struct cuda_ipc_event_shared {
   cudaIpcEventHandle_t src_event_handle;
   cudaIpcEventHandle_t dst_event_handle;
@@ -32,16 +32,16 @@ struct cuda_ipc_event_shared {
   pthread_mutex_t lock;
 };
 
-// Per-device struct containing data for CUDA IPC
-// Use SMP lock in DeviceManager if needed
+// Per-device struct containing data for CUDA IPC.
+// Use SMP lock in DeviceManager if needed.
 struct cuda_ipc_device_info {
   std::vector<cudaEvent_t> src_event_pool;
   std::vector<cudaEvent_t> dst_event_pool;
   // Flag per event pair
   // 0: free, 1: used by source, 2: used by destination
-  int* event_pool_flags;
+  std::vector<int> event_pool_flags;
   // Offset in device comm buffer (per event)
-  size_t* event_pool_buff_offsets;
+  std::vector<size_t> event_pool_buff_offsets;
   void* buffer;
 };
 
@@ -116,7 +116,7 @@ struct GPUManager {
   void* shm_my_ptr;
 
   // CUDA IPC event pool size (per PE)
-  int ipc_event_pool_size;
+  int cuda_ipc_event_pool_size;
 
   // CUDA IPC handles opened for processes on the same node
   // Vector size is equal to the number of devices on the physical node
@@ -159,7 +159,7 @@ struct GPUManager {
     shm_my_ptr = NULL;
 
     // Number of CUDA IPC events per PE
-    ipc_event_pool_size = -1;
+    cuda_ipc_event_pool_size = -1;
 
     // Allocate host/device buffers array (both user and system-addressed)
     host_buffers_ = new void*[NUM_BUFFERS*2];
