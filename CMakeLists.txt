@@ -596,6 +596,7 @@ endif()
 
 # Charmxi
 add_subdirectory(src/xlat-i)
+add_dependencies(charmxi create_symlinks)
 
 # Converse
 add_subdirectory(src/QuickThreads)
