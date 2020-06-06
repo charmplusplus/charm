@@ -1,5 +1,6 @@
 # Numerical representation of Charm++ release line and API revision
-# Essentially just the version number stripped of decimal points (e.g. 6.10.1 -> 61001)
+# Essentially just the version number stripped of decimal points with minor
+#   fields padded to 2 digits each. (e.g. 6.10.1 -> 61001)
 # Ensure that this number is always numerically and lexicographically increasing.
 #
 # Increment the last 2 digits when making a bugfix release
