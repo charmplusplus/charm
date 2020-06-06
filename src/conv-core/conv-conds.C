@@ -5,6 +5,10 @@
 #include "converse.h"
 #include "charm-api.h"
 
+#if CMK_ERROR_CHECKING
+CpvDeclare(double, idleBeginWalltime); // used for determining the conditon for long idle
+#endif
+
 /**
  * Structure to hold the requisites for a callback
  */
@@ -430,6 +434,10 @@ void CcdModuleInit(char **ignored)
    CpvAccess(pcb).resolution = CCD_DEFAULT_RESOLUTION;
    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,CcdCallBacksReset,0);
    CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,CcdCallBacksReset,0);
+
+#if CMK_ERROR_CHECKING
+   CpvInitialize(double, idleBeginWalltime); //used for LONG_IDLE
+#endif
 }
 
 
@@ -520,12 +528,13 @@ void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double deltaT)
  * Raise a condition causing all registered callbacks corresponding to 
  * that condition to be triggered
  */
-void CcdRaiseCondition(int condnum)
+double CcdRaiseCondition(int condnum)
 {
   CmiAssert(condnum < MAXNUMCONDS);
   double curWallTime=CmiWallTimer();
   call_cblist_remove(&(CpvAccess(conds).condcb[condnum]),curWallTime);
   call_cblist_keep(&(CpvAccess(conds).condcb_keep[condnum]),curWallTime);
+  return curWallTime;
 }
 
 

@@ -47,6 +47,7 @@ private:
   std::vector<int> pe_no;
   std::vector<double> loads;
   std::vector<double> distribution;
+  bool underloaded;
 
   minHeap* objs;
 

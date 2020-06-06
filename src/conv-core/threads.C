@@ -901,11 +901,6 @@ void CthSuspend(void)
 #if CMK_OMP
   cur->tid.id[2] = CmiMyRank();
 #else
-  /*cur->scheduled=0;*/
-  /*changed due to out-of-core emulation in BigSim*/
-  /** Sometimes, a CthThread is running without ever being awakened
-   * In this case, the scheduled is the initialized value "0"
-   */
   if(cur->scheduled > 0)
     cur->scheduled--;
 
@@ -940,12 +935,6 @@ void CthAwaken(CthThread th)
   CthAwkFn awakenfn = B(th)->awakenfn;
   if (awakenfn == 0) CthNoStrategy();
 
-  /*BIGSIM_OOC DEBUGGING
-    if(B(th)->scheduled==1){
-    CmiPrintf("====Thread %p is already scheduled!!!!\n", th);
-    return;
-    } */
-
 #if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
@@ -957,9 +946,6 @@ void CthAwaken(CthThread th)
   CthThreadToken * token = B(th)->token;
   constexpr int strategy = CQS_QUEUEING_FIFO;
   awakenfn(token, strategy, 0, 0); // If this crashes, disable ASLR.
-  /*B(th)->scheduled = 1; */
-  /*changed due to out-of-core emulation in BigSim */
-
 }
 
 void CthYield(void)
@@ -983,8 +969,6 @@ void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 #endif
   CthThreadToken * token = B(th)->token;
   awakenfn(token, s, pb, prio); // If this crashes, disable ASLR.
-  /*B(th)->scheduled = 1; */
-  /*changed due to out-of-core emulation in BigSim */
   B(th)->scheduled++;
 }
 
@@ -2222,7 +2206,7 @@ CthThread CthPup(pup_er p, CthThread t)
   return t;
 }
 
-/* Functions that help debugging of out-of-core emulation in BigSim */
+/* Functions that help debugging */
 void CthPrintThdStack(CthThread t){
   CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", t, t->base.stack, t->stackp);
 }
@@ -2260,7 +2244,7 @@ void CthTraceResume(CthThread t)
   traceResume(B(t)->eventID, B(t)->srcPE,&t->base.tid);
 }
 #endif
-/* Functions that help debugging of out-of-core emulation in BigSim */
+/* Functions that help debugging */
 void CthPrintThdMagic(CthThread t){
   CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
 }

@@ -7,12 +7,13 @@ set(ck-cxx-sources
     ../ck-ldb/DistBaseLB.C ../ck-ldb/forestTest.C
     ../ck-ldb/HybridBaseLB.C
     ../ck-ldb/LBComm.C ../ck-ldb/LBDatabase.C
+    ../ck-ldb/LBManager.C
     ../ck-ldb/lbdbf.C
     ../ck-ldb/LBMachineUtil.C
     ../ck-ldb/LBObj.C
     ../ck-ldb/LBSimulation.C ../ck-ldb/LButil.C
     ../ck-ldb/manager.C ../ck-ldb/MetaBalancer.C
-    ../ck-ldb/NullLB.C ../ck-ldb/readmodel.C
+    ../ck-ldb/readmodel.C
     ../ck-ldb/Refiner.C ../ck-ldb/RefinerTemp.C
     ../ck-ldb/treeTest.C ../ck-ldb/weakTest.C
     ../ck-perf/trace-common.C ../ck-perf/trace-controlPoints.C
@@ -21,7 +22,7 @@ set(ck-cxx-sources
     ck.C ckarray.C ckarrayoptions.C ckcallback.C
     ckcheckpoint.C ckevacuation.C ckfutures.C ckIgetControl.C
     cklocation.C ckmemcheckpoint.C ckmulticast.C
-    ckobjid.C ckobjQ.C ckrdma.C ckreduction.C debug-charm.C
+    ckobjQ.C ckrdma.C ckreduction.C debug-charm.C
     debug-message.C init.C modifyScheduler.C mpi-interoperate.C msgalloc.C
     qd.C register.C sdag.C waitqd.C
 )
@@ -31,7 +32,7 @@ set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
     ckevacuation.h ckfutures.h cklocation.h cklocrec.h
     ckmemcheckpoint.h ckmessage.h ckmigratable.h ckmulticast.h
-    ckobjQ.h ckobjid.h ckrdma.h ckreduction.h cksection.h
+    ckobjQ.h ckrdma.h ckreduction.h cksection.h
     ckstream.h debug-charm.h envelope-path.h envelope.h init.h
     middle-conv.h middle.h mpi-interoperate.h objid.h qd.h
     readonly.h register.h sdag.h stats.h waitqd.h ../ck-ldb/CentralLB.h
@@ -57,10 +58,9 @@ set(ck-ci-sources
     ${CMAKE_BINARY_DIR}/include/f90main.decl.h
     ${CMAKE_BINARY_DIR}/include/GreedyLB.decl.h
     ${CMAKE_BINARY_DIR}/include/HybridBaseLB.decl.h
-    ${CMAKE_BINARY_DIR}/include/LBDatabase.decl.h
+    ${CMAKE_BINARY_DIR}/include/LBManager.decl.h
     ${CMAKE_BINARY_DIR}/include/MetaBalancer.decl.h
     ${CMAKE_BINARY_DIR}/include/mpi_main.decl.h
-    ${CMAKE_BINARY_DIR}/include/NullLB.decl.h
     ${CMAKE_BINARY_DIR}/include/PathHistory.decl.h
     ${CMAKE_BINARY_DIR}/include/RefineLB.decl.h
     ${CMAKE_BINARY_DIR}/include/TraceControlPoints.decl.h
@@ -84,10 +84,9 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/GreedyLB.h ../ck-ldb/GreedyRefineLB.h
     ../ck-ldb/HybridBaseLB.h ../ck-ldb/HybridLBMsg.h
     ../ck-ldb/LBComm.h
-    ../ck-ldb/LBDatabase.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
+    ../ck-ldb/LBDatabase.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
     ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h
-    ../ck-ldb/NullLB.h
     ../ck-ldb/RandCentLB.h ../ck-ldb/RandomForestModel.h
     ../ck-ldb/RefineLB.h ../ck-ldb/Refiner.h
     ../ck-ldb/RefinerTemp.h ../ck-ldb/RotateLB.h

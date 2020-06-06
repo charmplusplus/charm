@@ -19,9 +19,6 @@
 #include <assert.h>
 #include <math.h>
 #include <limits.h>
-#if CMK_BPROC
-#include <sys/bproc.h>
-#endif
 #if CMK_USE_POLL
 #include <poll.h>
 #endif
@@ -774,12 +771,6 @@ static int arg_server_port = 0;
 static const char *arg_server_auth = NULL;
 static int replay_single = 0;
 
-#if CMK_BPROC
-static int arg_startpe;
-static int arg_endpe;
-static int arg_singlemaster;
-static int arg_skipmaster;
-#endif
 
 struct TopologyRequest
 {
@@ -905,20 +896,6 @@ static void arg_init(int argc, const char **argv)
   pparam_flag(&arg_in_xterm, 0, "in-xterm", "Run each node in an xterm window");
   pparam_str(&arg_xterm, 0, "xterm", "Which xterm to use");
 #endif
-#ifdef CMK_BPROC
-  /* options for Scyld */
-  pparam_int(&arg_startpe, 0, "startpe", "First PE to start job(SCYLD)");
-  pparam_int(&arg_endpe, 1000000, "endpe", "Last PE to start job(SCYLD)");
-  pparam_flag(&arg_singlemaster, 0, "singlemaster",
-              "Only assign one process to master node(SCYLD)");
-  pparam_flag(&arg_skipmaster, 0, "skipmaster",
-              "Do not assign any process to master node(SCYLD)");
-  if (arg_skipmaster && arg_singlemaster) {
-    PRINT(("Charmrun> 'singlemaster' is ignored due to 'skipmaster'. \n"));
-    arg_singlemaster = 0;
-  }
-  pparam_flag(&arg_debug, 0, "debug", "Turn on more verbose debug prints");
-#endif
   pparam_str(&arg_runscript, 0, "runscript", "Script to run node-program with");
   pparam_flag(&arg_help, 0, "help", "Print help messages");
   pparam_int(&arg_ppn, 0, "ppn", "Number of PEs per Charm++ node (=OS process)");
@@ -1042,13 +1019,6 @@ static void arg_init(int argc, const char **argv)
     }
   }
 
-#ifdef CMK_BPROC
-  if (arg_local) {
-    fprintf(stderr,
-            "Warning> ++local cannot be used in bproc version, ignored!\n");
-    arg_local = 0;
-  }
-#endif
 
 #if CMK_USE_SSH
   /* Find the current value of the CONV_RSH variable */
@@ -1348,14 +1318,8 @@ skt_ip_t nodetab_host::resolve(const char *name)
 {
   skt_ip_t ip = skt_innode_lookup_ip(name);
   if (skt_ip_match(ip, _skt_invalid_ip)) {
-#ifdef CMK_BPROC
-    /* only the master node is used */
-    if (!(1 <= arg_requested_pes && atoi(name) == -1))
-#endif
-    {
-      fprintf(stderr, "ERROR> Cannot obtain IP address of %s\n", name);
-      exit(1);
-    }
+    fprintf(stderr, "ERROR> Cannot obtain IP address of %s\n", name);
+    exit(1);
   }
 
   return ip;
@@ -3860,7 +3824,6 @@ static void req_charmrun_connect(void)
 
 static void start_one_node_ssh(nodetab_process & p, const char ** argv = arg_argv);
 
-#ifndef CMK_BPROC
 
 static void start_nodes_batch_and_connect(std::vector<nodetab_process> & process_table)
 {
@@ -3964,7 +3927,6 @@ static void batch_launch_sequence(std::vector<nodetab_process> & process_table)
   req_all_clients_connected();
 }
 
-#endif
 
 /*Start the server socket the clients will connect to.*/
 static void req_start_server(void)
@@ -4125,10 +4087,6 @@ static void start_nodes_mpiexec();
 #ifdef HSTART
 static void start_next_level_charmruns(void);
 #endif
-#if CMK_BPROC
-static void nodetab_init_for_scyld(void);
-static void start_nodes_scyld(void);
-#endif
 static void kill_nodes(void);
 static void open_gdb_info(void);
 static void read_global_segments_size(void);
@@ -4154,16 +4112,8 @@ int main(int argc, const char **argv, char **envp)
     printf("Charmrun> charmrun started...\n");
 
   start_timer = GetClock();
-#if CMK_BPROC
-  /* check scyld configuration */
-  if (arg_nodelist)
-    nodetab_init();
-  else
-    nodetab_init_for_scyld();
-#else
   /* Initialize the node-table by reading nodesfile */
   nodetab_init();
-#endif
 
   if (arg_requested_numhosts > 0)
   {
@@ -4223,9 +4173,6 @@ int main(int argc, const char **argv, char **envp)
   if (0 != getenv("CONV_DAEMON"))
     start_nodes_daemon(my_process_table);
   else
-#if CMK_BPROC
-    start_nodes_scyld();
-#else
 #if CMK_USE_IBVERBS
     PRINT(("Charmrun> IBVERBS version of charmrun\n"));
 #endif
@@ -4269,10 +4216,9 @@ int main(int argc, const char **argv, char **envp)
     } else
       start_nodes_local(my_process_table);
   }
-#endif
 
   if (arg_charmdebug) {
-#if defined(_WIN32) || CMK_BPROC
+#if defined(_WIN32)
     /* Gdb stream (and charmdebug) currently valid only with ssh subsystem */
     fprintf(stderr,
             "Charmdebug is supported currently only with the ssh subsystem\n");
@@ -4467,21 +4413,6 @@ static void start_nodes_mpiexec() {}
 
 static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting) {}
 
-static void envCat(char *dest, LPTSTR oldEnv)
-{
-  char *src = oldEnv;
-  dest += strlen(dest); // Advance to end of dest
-  dest++;               // Advance past terminating NULL character
-  while ((*src) != '\0') {
-    int adv = strlen(src) + 1; // Length of newly-copied string plus NULL
-    strcpy(dest, src);         // Copy another environment string
-    dest += adv;               // Advance past newly-copied string and NULL
-    src += adv;                // Ditto for src
-  }
-  *dest = '\0'; // Paste on final terminating NULL character
-  FreeEnvironmentStrings(oldEnv);
-}
-
 /* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
 struct local_nodestart
@@ -4507,20 +4438,26 @@ struct local_nodestart
 
   void start(const nodetab_process & p)
   {
-    STARTUPINFO si = {0}; /* startup info for the process spawned */
-    PROCESS_INFORMATION pi; /* process Information for the process spawned */
-    char environment[10000]; /*Doubly-null terminated environment strings*/
+    std::string env{"NETSTART="};
+    env += create_netstart(p.nodeno);
+    env += '\0';
 
-    sprintf(environment, "NETSTART=%s", create_netstart(p.nodeno));
-    /*Paste all system environment strings */
-    envCat(environment, GetEnvironmentStrings());
+    /* Concatenate all system environment strings */
+    const LPTSTR oldEnv = GetEnvironmentStrings();
+    LPTSTR oldEnvEnd = oldEnv;
+    while (oldEnvEnd[0] != '\0' || oldEnvEnd[1] != '\0')
+        ++oldEnvEnd;
+    env.append(oldEnv, oldEnvEnd - oldEnv + 1);
+    FreeEnvironmentStrings(oldEnv);
 
     /* Initialise the security attributes for the process
      to be spawned */
+    STARTUPINFO si = {0};
     si.cb = sizeof(si);
     if (arg_verbose)
       printf("Charmrun> start %d node program on localhost.\n", p.nodeno);
 
+    PROCESS_INFORMATION pi;
     int ret;
     ret = CreateProcess(NULL,          /* application name */
                         const_cast<char*>(cmdLine.c_str()), /* command line */
@@ -4536,7 +4473,7 @@ struct local_nodestart
                         CREATE_NEW_PROCESS_GROUP | CREATE_NEW_CONSOLE,
 #endif
                         /* creation flags */
-                        environment, /* environment block */
+                        const_cast<char*>(env.data()), /* environment block */
                         ".",         /* working directory */
                         &si,         /* startup info */
                         &pi);
@@ -4567,113 +4504,6 @@ static void start_nodes_local(const std::vector<nodetab_process> & process_table
   for (const nodetab_process & p : process_table)
     state.start(p);
 }
-
-#elif CMK_BPROC
-
-static int bproc_nodeisup(int node)
-{
-  int status = 0;
-#if CMK_BPROC_VERSION < 4
-  if (bproc_nodestatus(node) == bproc_node_up)
-    status = 1;
-  if (arg_verbose)
-    printf("Charmrun> node %d status: %s\n", node, status ? "up" : "down");
-#else
-  char nodestatus[128];
-  if (node == -1) { /* master node is always up */
-    strcpy(nodestatus, "up");
-    status = 1;
-  }
-  if (bproc_nodestatus(node, nodestatus, 128)) {
-    if (strcmp(nodestatus, "up") == 0)
-      status = 1;
-  }
-  if (arg_verbose)
-    printf("Charmrun> node %d status: %s\n", node, nodestatus);
-#endif
-  return status;
-}
-
-/* ++ppn now is supported in both SMP and non SMP version
-   in SMP, ++ppn specifies number of threads on each node;
-   in non-SMP, ++ppn specifies number of processes on each node. */
-static void nodetab_init_for_scyld()
-{
-  int maxNodes = bproc_numnodes() + 1;
-  if (arg_endpe < maxNodes)
-    maxNodes = arg_endpe + 1;
-
-  /* check which slave node is available from frompe to endpe */
-  int hostno = 0;
-  for (int i = -1; i < maxNodes; i++) {
-    char hostname[256];
-    if (!bproc_nodeisup(i))
-      continue;
-    if (i != -1 && i < arg_startpe)
-      continue;
-    if (i == -1 && arg_skipmaster)
-      continue; /* skip master node -1 */
-    sprintf(hostname, "%d", i);
-    nodetab_host * h = new nodetab_host{};
-    h->name = strdup(hostname);
-    h->ip = nodetab_host::resolve(hostname);
-    h->hostno = hostno++;
-    host_table.push_back(h);
-  }
-
-  const int hosts_size = host_table.size();
-  if (hosts_size == 0) {
-    fprintf(stderr, "Charmrun> no slave node available!\n");
-    exit(1);
-  }
-  if (arg_verbose)
-    printf("Charmrun> There are %d slave nodes available.\n",
-           hosts_size - (arg_skipmaster ? 0 : 1));
-}
-
-static void start_nodes_scyld(void)
-{
-  char *envp[2] = { (char *) malloc(256), NULL };
-  for (const nodetab_process & p : my_process_table)
-  {
-    const nodetab_host * h = p.host;
-    const int bproc_nodeno = atoi(h->name);
-
-    if (arg_verbose)
-      printf("Charmrun> start node program on slave node: %d.\n", bproc_nodeno);
-    sprintf(envp[0], "NETSTART=%s", create_netstart(p.nodeno));
-
-    int pid = fork();
-    if (pid < 0)
-      exit(1);
-    if (pid == 0) {
-      int fd, fd1 = dup(1);
-      if (!(arg_debug || arg_debug_no_pause)) { /* debug mode */
-        if (fd = open("/dev/null", O_RDWR)) {
-          dup2(fd, 0);
-          dup2(fd, 1);
-          dup2(fd, 2);
-        }
-      }
-      if (bproc_nodeno == -1) {
-        int status = execve(pparam_argv[1], pparam_argv + 1, envp);
-        dup2(fd1, 1);
-        fprintf(stderr, "execve failed to start process \"%s\" with status: %d\n",
-               pparam_argv[1], status);
-      } else {
-        int status = bproc_execmove(bproc_nodeno, pparam_argv[1], pparam_argv + 1, envp);
-        dup2(fd1, 1);
-        fprintf(stderr, "bproc_execmove failed to start remote process \"%s\" with "
-               "status: %d\n",
-               pparam_argv[1], status);
-      }
-      kill(getppid(), 9);
-      exit(1);
-    }
-  }
-  free(envp[0]);
-}
-static void finish_nodes(std::vector<nodetab_process> & process_table) {}
 
 #else
 /*Unix systems can use Ssh normally*/

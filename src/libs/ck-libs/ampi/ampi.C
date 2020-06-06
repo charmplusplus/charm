@@ -938,7 +938,7 @@ static void ampiNodeInit() noexcept
   int funclength = sizeof(funclist)/sizeof(char*);
   for (int i=0; i<funclength; i++) {
     int event_id = traceRegisterUserEvent(funclist[i], -1);
-    CsvAccess(tcharm_funcmap)->insert(std::pair<std::string, int>(funclist[i], event_id));
+    CsvAccess(tcharm_funcmap)->emplace(funclist[i], event_id);
   }
 
   // rename chare & function to something reasonable
@@ -1724,9 +1724,9 @@ bool ampiParent::getBuiltinAttribute(int keyval, void *attribute_val) noexcept {
     if (keyval == MPI_WIN_BASE)
       *((void**)attribute_val) = *win_base_storage;
     else if (keyval == MPI_WIN_SIZE)
-      *(MPI_Aint**)attribute_val = win_size_storage;
+      *(MPI_Aint *)attribute_val = *win_size_storage;
     else
-      *(int **)attribute_val = kv_builtin_storage;
+      *(int *)attribute_val = *kv_builtin_storage;
     return true;
   } else {
     switch(keyval) {
@@ -2737,7 +2737,7 @@ void ampi::inorderBcast(AmpiMsg* msg, bool deleteMsg) noexcept
     req->receive(this, msg, deleteMsg);
   } else {
     // Reference the [nokeep] msg so it isn't freed by the runtime
-    CmiReference(UsrToEnv(msg));
+    CkReferenceMsg(msg);
     unexpectedBcastMsgs.put(msg);
   }
 }
@@ -3128,7 +3128,7 @@ MPI_Request ampi::sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype ty
   }
   // All sync messages go thru ampi::genericSync (not generic or genericRdma)
 #if AMPI_PE_LOCAL_IMPL
-  if (destPtr != NULL) {
+  if (destPtr != nullptr && destPtr->parent != nullptr) {
     destPtr->genericSync(makeSyncMsg(t, sRank, buf, count, type, destProxy, destIdx, reqIdx, seq, destPtr));
   } else
 #endif
@@ -3163,7 +3163,7 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   int size = ddt->getSize(count);
   ampi *destPtr = arrProxy[destIdx].ckLocal();
 #if AMPI_PE_LOCAL_IMPL
-  if (destPtr != nullptr) {
+  if (destPtr != nullptr && destPtr->parent != nullptr) {
     // Complete message inline to PE-local destination VP
     return sendLocalMsg(t, sRank, buf, size, type, count, rank, destcomm,
                         seq, destPtr, sendType, reqIdx);
@@ -3290,7 +3290,7 @@ bool ampi::processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
     MPI_Request sreqIdx = msg->getSsendReq();
 #if AMPI_PE_LOCAL_IMPL
     ampi* srcPtr = thisProxy[srcIdx].ckLocal();
-    if (srcPtr != NULL) {
+    if (srcPtr != nullptr && srcPtr->parent != nullptr) {
       srcPtr->completedSend(sreqIdx);
     }
     else
@@ -3911,7 +3911,7 @@ void AmpiSeqQ::putOutOfOrder(int seqIdx, AmpiMsg *msg) noexcept
   if (msg->getSeqIdx() != COLL_SEQ_IDX && msg->getSeq() < el.getSeqIncoming())
     CkAbort("AMPI logic error: received late out-of-order message!\n");
 #endif
-  if (seqIdx == COLL_SEQ_IDX) CmiReference(UsrToEnv(msg)); // bcast msg is [nokeep]
+  if (seqIdx == COLL_SEQ_IDX) CkReferenceMsg(msg); // bcast msg is [nokeep]
   out.enq(msg);
   el.incNumOutOfOrder(); // We have another message in the out-of-order queue
 }

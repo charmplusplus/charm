@@ -14,7 +14,7 @@ DIRS = \
 
 all: $(foreach i,$(DIRS),build-$i)
 
-test: $(foreach i,$(TESTDIRS),test-$i)
+test: $(foreach i,$(DIRS),test-$i)
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#

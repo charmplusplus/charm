@@ -250,6 +250,11 @@ extern bool useNodeBlkMapping;
 extern int quietMode;
 extern int quietModeRequested;
 
+void CkCallWhenIdle(int epIdx, void* obj) {
+  auto fn = reinterpret_cast<CcdVoidFn>(_entryTable[epIdx]->call);
+  CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, fn, obj);
+}
+
 // Modules are required to register command line opts they will parse. These
 // options are stored in the _optSet, and then when parsing command line opts
 // users will be warned about options starting with a '+' that are not in this
@@ -661,6 +666,16 @@ static void _exitHandler(envelope *env)
 #if CMK_SHRINK_EXPAND
       ConverseCleanup();
 #endif
+
+#if CMK_CUDA
+      // Ensure all PEs have finished GPU work
+      CmiNodeBarrier();
+
+      if (CmiMyRank() == 0) {
+        hapiExitCsv();
+      }
+#endif
+
       //everyone exits here - there may be issues with leftover messages in the queue
 #if !CMK_WITH_STATS && !CMK_WITH_WARNINGS
       DEBUGF(("[%d] Calling converse exit from ReqStatMsg \n",CkMyPe()));
@@ -1139,7 +1154,7 @@ static void _nullFn(void *, void *)
   CmiAbort("Null-Method Called. Program may have Unregistered Module!!\n");
 }
 
-extern void _registerLBDatabase(void);
+extern void _registerLBManager(void);
 extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
@@ -1377,6 +1392,8 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
+
+		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
 
 
@@ -1482,7 +1499,7 @@ void _initCharm(int unused_argc, char **argv)
 		*/
 		_registerCkFutures();
 		_registerCkArray();
-		_registerLBDatabase();
+		_registerLBManager();
     _registerMetaBalancer();
 		_registerCkCallback();
 		_registerwaitqd();
@@ -1618,7 +1635,7 @@ void _initCharm(int unused_argc, char **argv)
     if (!_replaySystem) {
         CkFtFn  faultFunc_restart = CkRestartMain;
         if (faultFunc == NULL || faultFunc == faultFunc_restart) {         // this is not restart from memory
-            // these two are blocking calls for non-bigsim
+            // these two are blocking calls
 	  CmiInitCPUAffinity(argv);
           CmiInitMemAffinity(argv);
         }
@@ -1654,15 +1671,21 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CUDA
     // Only worker threads execute the following
     if (!CmiInCommThread()) {
-      initDeviceMapping(argv);
       if (CmiMyRank() == 0) {
-        initHybridAPI();
+        hapiInitCsv(); // Initialize per-process variables (GPUManager)
       }
-      initEventQueues();
+      hapiInitCpv(); // Initialize per-PE variables
 
-      // ensure HAPI is initialized before registering callback functions
       CmiNodeBarrier();
 
+      hapiMapping(argv); // Perform PE-device mapping
+
+      // Register polling function to be invoked at every scheduler loop
+      CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
+
+      CmiNodeBarrier();
+
+      // Register callback functions and initialize Charm++ layer functions
       hapiRegisterCallbacks();
       hapiInvokeCallback = CUDACallbackManager;
       hapiQdCreate = QdCreate;

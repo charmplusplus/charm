@@ -59,7 +59,6 @@ class CkMarshalledMessage {
         }
 	void pup(PUP::er &p) {CkPupMessage(p,&msg,1);}
 };
-PUPmarshall(CkMarshalledMessage)
 
 /**
  * CkEntryOptions describes the options associated
@@ -237,7 +236,7 @@ class Chare {
     Chare(CkMigrateMessage *m);
     Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
-
+    virtual bool isLocMgr(void) { return false; }
     /// Pack/UnPack - tell the runtime how to serialize this class's
     /// data for migration, checkpoint, etc.
     virtual void pup(PUP::er &p);
@@ -343,7 +342,6 @@ class IrrGroup : public Chare {
 
     // Silly run-time type information
     virtual bool isNodeGroup() { return false; };
-    virtual bool isLocMgr(void){ return false; }
     virtual bool isArrMgr(void){ return false; }
     virtual bool isReductionMgr(void){ return false; }
     static bool isIrreducible(){ return true;}
@@ -790,8 +788,6 @@ class CProxy {
     void pup(PUP::er &p);
 };
 
-PUPmarshall(CProxy)
-
 
 /*The base classes of each proxy type
 */
@@ -826,7 +822,6 @@ class CProxy_Chare : public CProxy {
     	p((char *)&_ck_cid.objPtr,sizeof(_ck_cid.objPtr));
     }
 };
-PUPmarshall(CProxy_Chare)
 
 /******************* Reduction Declarations ****************/
 //Silly: need the type of a reduction client here so it can be used by proxies.
@@ -917,7 +912,6 @@ class CProxy_Group : public CProxy {
     }
     CK_REDUCTION_CLIENT_DECL
 };
-PUPmarshall(CProxy_Group)
 
 class CProxyElement_Group : public CProxy_Group {
   private:
@@ -944,7 +938,6 @@ class CProxyElement_Group : public CProxy_Group {
     	p(_onPE);
     }
 };
-PUPmarshall(CProxyElement_Group)
 
 #define GROUP_SECTION_PROXY 1
 class CProxySection_Group : public CProxy_Group {
@@ -1028,7 +1021,6 @@ public:
     for (int i=0; i<_nsid; ++i) p | _sid[i];
   }
 };
-PUPmarshall(CProxySection_Group)
 
 /* These classes exist to provide chare indices for the basic
  chare types.*/
@@ -1242,7 +1234,7 @@ void CmiMachineProgressImpl();
 
 #define CkNetworkProgress() {CpvAccess(networkProgressCount) ++; \
 if(CpvAccess(networkProgressCount) >=  networkProgressPeriod)  \
-    if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) { \
+    if (LBManagerObj()->StatsOn() == 0) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
     } \
@@ -1250,7 +1242,7 @@ if(CpvAccess(networkProgressCount) >=  networkProgressPeriod)  \
 
 #define CkNetworkProgressAfter(p) {CpvAccess(networkProgressCount) ++; \
 if(CpvAccess(networkProgressCount) >=  p)  \
-    if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) { \
+    if (LBManagerObj()->StatsOn() == 0) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
     } \

@@ -17,7 +17,7 @@ mainmodule hello {
 
   array [1D] Hello {
     entry Hello();
-    entry void SayHi(HiMsg *);
+    entry [nokeep] void SayHi(HiMsg *);
     entry void start();
     entry void cb_client(CkReductionMsg *msg);
   };        	

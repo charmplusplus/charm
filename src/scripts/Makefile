@@ -7,6 +7,7 @@
 #     * Charm++ runtime
 #     * ITC++ Translator
 #     * Languages
+#     * Documentation
 #
 # This Makefile is common to all machines.  This works because the charmc
 # is smart enough to "conceal" the differences between machines.  charmc
@@ -289,10 +290,9 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
 	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h\
-          ckobjid.h\
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
-	  waitqd.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
+	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
           LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  RefinerTemp.h Refiner.h ckgraph.h ckheap.h \
           elements.h topology.h manager.h \
@@ -303,7 +303,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           CkReduction.decl.h \
           waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkCheckpointStatus.decl.h CkMemCheckpoint.decl.h \
-          LBDatabase.decl.h MetaBalancer.decl.h CentralLB.decl.h NullLB.decl.h \
+          LBManager.decl.h MetaBalancer.decl.h CentralLB.decl.h \
           BaseLB.decl.h \
 	  DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
@@ -366,7 +366,7 @@ dirs+sources:
 	rm -rf hwloc
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
-	if case $(CMK_VDIR) in *win64*) true;; *-win-*) true;; *) false;; esac; then \
+	if case $(CMK_VDIR) in *-win-*) true;; *) false;; esac; then \
 		cp -f $(SRCBASE)/arch/win/unix2nt* ../bin; \
 		cp -f $(SRCBASE)/arch/win/createlink.exe ../bin; \
 	fi
@@ -495,7 +495,7 @@ endif
 endif
 endif
 
-ifneq ($(findstring -win64,$(CMK_VDIR))$(findstring -win-,$(CMK_VDIR)),)
+ifneq ($(findstring -win-,$(CMK_VDIR)),)
   IS_WINDOWS := 1
 else
   IS_WINDOWS := 0
@@ -748,13 +748,13 @@ CK_LIBS_CORE=$(L)/libck.a
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o\
-           waitqd.o LBDatabase.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
-	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckobjid.o\
+           waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
+	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o DistBaseLB.o \
            ckgraph.o LButil.o RefinerTemp.o Refiner.o \
            manager.o ckset.o ckheap.o \
-	   NullLB.o LBSimulation.o modifyScheduler.o \
+	   LBSimulation.o modifyScheduler.o \
 	   charmProjections.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
            trace-controlPoints.o mpi-interoperate.o ckregex.o sdag.o \
@@ -822,8 +822,8 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
   CkReduction.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
-  cklocation.h ckmulticast.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h LBObj.h LBOM.h LBComm.h \
-  LBMachineUtil.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
+  cklocation.h ckmulticast.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h LBObj.h LBOM.h LBComm.h \
+  LBMachineUtil.h LBManager.decl.h MetaBalancer.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \

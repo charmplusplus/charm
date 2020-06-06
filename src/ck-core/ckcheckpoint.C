@@ -41,7 +41,6 @@ typedef struct _GroupInfo{
         bool present;
 } GroupInfo;
 PUPbytes(GroupInfo)
-PUPmarshall(GroupInfo)
 
 bool _inrestart = false;
 bool _restarted = false;
@@ -258,7 +257,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
     if (pending_realloc_state == REALLOC_IN_PROGRESS) {
       // After restarting from this AtSync checkpoint, resume execution along the
       // normal path (i.e. whatever the user defined as ResumeFromSync.)
-      CkCallback resumeFromSyncCB(CkIndex_LBDatabase::ResumeClients(), _lbdb);
+      CkCallback resumeFromSyncCB(CkIndex_LBManager::ResumeClients(), _lbmgr);
       success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
     } else
 #endif

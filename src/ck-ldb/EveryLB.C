@@ -6,7 +6,7 @@
 /*
  Startup routine for use when you include all the load balancers.
 */
-#include <LBDatabase.h>
+#include <LBManager.h>
 #include "EveryLB.decl.h"
 
 static void CreateNoLB(void)

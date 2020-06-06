@@ -150,14 +150,14 @@ class fromzDisk : public zdisk {
 #endif
 #endif // AMPIMSGLOG
 
-/* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
- * if tracing is not being used (see bug #1640 for more details on the latter). */
+/* AMPI sends messages inline to PE-local destination VPs if
+ * tracing is disabled (see bug #1640). */
 #ifndef AMPI_PE_LOCAL_IMPL
 #define AMPI_PE_LOCAL_IMPL ( !CMK_TRACE_ENABLED )
 #endif
 
-/* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
- * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
+/* AMPI sends messages using a zero copy protocol to Node-local destination VPs
+ * tracing is disabled (such msgs are currently untraced). */
 #ifndef AMPI_NODE_LOCAL_IMPL
 #define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_TRACE_ENABLED )
 #endif
@@ -181,7 +181,6 @@ class fromzDisk : public zdisk {
 #endif
 #endif
 
-/* AMPI uses RDMA sends if BigSim is not being used. */
 #ifndef AMPI_RDMA_IMPL
 #define AMPI_RDMA_IMPL 1
 #endif
@@ -969,7 +968,6 @@ class ampiCommStruct {
     }
   }
 };
-PUPmarshall(ampiCommStruct)
 
 // group operations
 inline void outputOp(const std::vector<int>& vec) noexcept {
@@ -1157,10 +1155,6 @@ enum AmpiReqType : uint8_t {
   AMPI_GPU_REQ     = 9
 #endif
 };
-
-inline void operator|(PUP::er &p, AmpiReqType &r) {
-  pup_bytes(&p, (void *)&r, sizeof(AmpiReqType));
-}
 
 enum AmpiReqSts : char {
   AMPI_REQ_PENDING   = 0,
@@ -2072,8 +2066,6 @@ public:
     elements[destRank].decSeqOutgoing();
   }
 };
-PUPmarshall(AmpiSeqQ)
-
 
 inline CProxy_ampi ampiCommStruct::getProxy() const noexcept {return ampiID;}
 

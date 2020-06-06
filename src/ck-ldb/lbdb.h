@@ -19,7 +19,7 @@
 #include <inttypes.h>
 #include <list>
 
-class LBDatabase;//Forward declaration
+class LBManager;//Forward declaration
 
 //typedef float floatType;
 // type defined by build option
@@ -256,15 +256,6 @@ typedef struct _LDCommData {
 } LDCommData;
 
 /*
- * Requests to load balancer
- *   FIXME: these routines don't seem to exist anywhere-- are they obsolete?
- *   Are the official versions now in LBDatabase.h?
- */
-void LBBalance(void *param);
-void LBCollectStatsOn(void);
-void LBCollectStatsOff(void);
-
-/*
  * Callbacks from database to object managers
  */
 typedef void (*LDMigrateFn)(LDObjHandle handle, int dest);
@@ -297,24 +288,11 @@ typedef void (*LDPredictWindowFn)(void* user_ptr, void* model, int wind);
 /*
  * Local Barrier calls
  */
-typedef void (*LDBarrierFn)(void *user_ptr);
-typedef void (*LDResumeFn)(void *user_ptr);
+class LBClient;
+typedef std::list<LBClient *>::iterator LDBarrierClient;
 
-class client;
-struct LDBarrierClient {
-  std::list<client *>::iterator i;
-  LDBarrierClient() { }
-  LDBarrierClient(std::list<client *>::iterator in)
-  : i(in) { }
-};
-
-class receiver;
-struct LDBarrierReceiver {
-  std::list<receiver *>::iterator i;
-  LDBarrierReceiver() { }
-  LDBarrierReceiver(std::list<receiver *>::iterator in)
-  : i(in) { }
-};
+class LBReceiver;
+typedef std::list<LBReceiver *>::iterator LDBarrierReceiver;
 
 /*
  *  LBDB Configuration calls
@@ -328,13 +306,11 @@ PUPbytes(LDHandle)
 inline void LDOMid::pup(PUP::er &p) {
   id.pup(p);
 }
-PUPmarshall(LDOMid)
 
 inline void LDObjKey::pup(PUP::er &p) {
   p|omId;
   p|objId;
 }
-PUPmarshall(LDObjKey)
 
 inline void LDObjStats::pup(PUP::er &p) {
   p|index;
@@ -342,19 +318,17 @@ inline void LDObjStats::pup(PUP::er &p) {
   p|from_proc;
   p|to_proc;
 }
-PUPmarshall(LDObjStats)
+
 inline void LDOMHandle::pup(PUP::er &p) {
   p|id;
   p|handle;
 }
-PUPmarshall(LDOMHandle)
 
 inline void LDObjHandle::pup(PUP::er &p) {
   p|omhandle;
   p|id;
   p|handle;
 }
-PUPmarshall(LDObjHandle)
 
 inline void LBObjUserData::pup(PUP::er &p) {
   int hasData;
@@ -368,7 +342,6 @@ inline void LBObjUserData::pup(PUP::er &p) {
   }
   if (data) p(data, CkpvAccess(lbobjdatalayout).size());
 }
-PUPmarshall(LBObjUserData)
 
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
@@ -389,7 +362,6 @@ inline void LDObjData::pup(PUP::er &p) {
 #endif
   p|pupSize;
 }
-PUPmarshall(LDObjData)
 
 inline bool LDCommDesc::operator==(const LDCommDesc &obj) const {
     if (type != obj.type) return false;
@@ -434,7 +406,6 @@ inline void LDCommDesc::pup(PUP::er &p) {
                            break; }
   }   // end of switch
 }
-PUPmarshall(LDCommDesc)
 
 inline void LDCommData::pup(PUP::er &p) {
     p|src_proc;
@@ -446,7 +417,6 @@ inline void LDCommData::pup(PUP::er &p) {
       sendHash = recvHash = -1;
     }
 }
-PUPmarshall(LDCommData)
 
 #endif /* LBDBH_H */
 

@@ -92,6 +92,11 @@
 
 extern const char * const CmiCommitID;
 extern bool useCMAForZC;
+#if CMK_ERROR_CHECKING
+double longIdleThreshold;
+CpvExtern(double, idleBeginWalltime); // used for determining the conditon for long idle
+#endif
+
 
 #if CMI_QD
 void initQd(char **argv);
@@ -191,12 +196,6 @@ void (*notify_crash_fn)(int) = NULL;
 #endif
 
 CpvDeclare(char *, _validProcessors);
-
-#if CMK_CUDA
-CpvExtern(int, n_hapi_events);
-extern "C" void hapiPollEvents();
-extern "C" void exitHybridAPI();
-#endif
 
 /*****************************************************************************
  *
@@ -1632,12 +1631,22 @@ void CsdBeginIdle(void)
 #else
   CpvAccess(cmiMyPeIdle) = 1;
 #endif // CMK_SMP
-  CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
+  double curWallTime = CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
+#if CMK_ERROR_CHECKING
+  CpvAccess(idleBeginWalltime) = curWallTime;
+#endif
 }
 
 void CsdStillIdle(void)
 {
-  CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
+  double curWallTime = CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
+
+#if CMK_ERROR_CHECKING
+  if(curWallTime - CpvAccess(idleBeginWalltime) > longIdleThreshold) {
+    curWallTime = CcdRaiseCondition(CcdPROCESSOR_LONG_IDLE); // Invoke LONG_IDLE ccd callbacks
+    CpvAccess(idleBeginWalltime) = curWallTime; // Reset idle timer
+  }
+#endif
 }
 
 void CsdEndIdle(void)
@@ -1932,12 +1941,10 @@ void CsdScheduleForever(void)
       }
     }
 #endif
-    #if CMK_CUDA
-    // check if any GPU work needs to be processed
-    if (CpvAccess(n_hapi_events) > 0) {
-      hapiPollEvents();
-    }
-    #endif
+
+    // Execute functions registered to be executed at every scheduler loop
+    CcdRaiseCondition(CcdSCHEDLOOP);
+
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
 #if !CSD_NO_IDLE_TRACING
@@ -2106,10 +2113,6 @@ void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
 
-  /* BIGSIM_OOC DEBUGGING
-  CmiPrintf("Resume normal thread with token[%p] ==> thread[%p]\n", token, t);
-  */
-
   if(t == NULL){
     free(token);
     return;
@@ -2123,10 +2126,6 @@ void CthResumeNormalThread(CthThreadToken* token)
 #endif
 #endif
   
-  /* BIGSIM_OOC DEBUGGING
-  CmiPrintf("In CthResumeNormalThread:   ");
-  CthPrintThdMagic(t);
-  */
 #if CMK_OMP
   CthSetPrev(t, CthSelf());
 #endif
@@ -4036,6 +4035,12 @@ void ConverseCommonInit(char **argv)
     useCMAForZC = false;
   }
 
+#if CMK_ERROR_CHECKING
+  if(!CmiGetArgDoubleDesc(argv, "+longIdleThresh", &longIdleThreshold, "Pass the threshold time in seconds that is used for triggering the LONG_IDLE")) {
+    longIdleThreshold = 10;
+  }
+#endif
+
   CmiDeliversInit();
   CsdInit(argv);
 
@@ -4079,17 +4084,6 @@ void ConverseCommonExit(void)
   CmiFlush(stdout);  /* end of program, always flush */
 #endif
 
-#if CMK_CUDA
-  // Only worker threads execute the following
-  if (!CmiInCommThread()) {
-    // Ensure all PEs have finished GPU work before destructing
-    CmiNodeBarrier();
-
-    if (CmiMyRank() == 0) {
-      exitHybridAPI();
-    }
-  }
-#endif
   seedBalancerExit();
   EmergencyExit();
 }
@@ -4229,7 +4223,6 @@ double CmiLog2(double x) {
 }
 #endif
 
-/* for bigsim */
 int CmiMyRank_(void)
 {
   return CmiMyRank();
