@@ -281,6 +281,23 @@ CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
     return CmiNcpyMode::RDMA;
 }
 
+#if CMK_CUDA
+CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe) {
+  if (CmiNodeOf(srcPe) == CmiNodeOf(destPe)) {
+    // Same logical node
+    return CmiNcpyModeDevice::MEMCPY;
+  }
+  else if (CmiPeOnSamePhysicalNode(srcPe, destPe)) {
+    // Different logical nodes, same physical node
+    return CmiNcpyModeDevice::IPC;
+  }
+  else {
+    // Different physical nodes, requires GPUDirect RDMA
+    return CmiNcpyModeDevice::RDMA;
+  }
+}
+#endif
+
 zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src) {
   zcPupSourceInfo *srcInfo = new zcPupSourceInfo();
   srcInfo->src = src;

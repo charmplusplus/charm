@@ -15,6 +15,15 @@
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
 #endif
 
+#if CMK_CUDA
+// For device-side zero-copy operations
+#include "hapi.h"
+#include "gpumanager.h"
+#include <pthread.h>
+
+CsvExtern(GPUManager, gpu_manager);
+#endif
+
 // Integer used to store the ncpy ack handler idx
 static int ncpy_handler_idx, ncpy_bcastNo_handler_idx, zcpy_pup_complete_handler_idx;
 CpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets);
@@ -2121,3 +2130,245 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
   locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // does not require locking as it is owned by locMgr
 }
 /***************************** End of Zerocopy PUP Support ****************************/
+
+/***************************** Direct GPU Messaging ***************************/
+
+#if CMK_CUDA
+// Invoked after post entry method
+bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
+  // Determine if the subsequent regular entry method should be invoked
+  // inline (intra-node) or not (inter-node)
+  bool is_inline = true;
+
+  // Find which mode of transfer should be used
+  CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
+
+  // Change message header to invoke regular entry method
+  CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
+
+  // Start unpacking marshalled message
+  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
+  int received_numops;
+  up|received_numops;
+  CkAssert(numops == received_numops);
+
+  CkDeviceBuffer source;
+
+  for (int i = 0; i < numops; i++) {
+    // Unpack source buffer (from sender)
+    up|source;
+
+    if (arrSizes[i] > source.cnt) {
+      CkAbort("CkRdmaDeviceIssueRgets: posted data size is larger than source data size!");
+    }
+
+    // Destination buffer (on this receiver)
+    CkDeviceBuffer dest((const void *)arrPtrs[i], arrSizes[i]);
+
+    // Perform data transfers
+    switch (mode) {
+      case CkNcpyModeDevice::MEMCPY:
+        {
+          // Directly invoke memcpy from source buffer to destination buffer
+          hapiCheck(cudaMemcpyAsync((void*)dest.ptr, source.ptr, std::min(source.cnt, dest.cnt),
+                cudaMemcpyDeviceToDevice, postStructs[i].cuda_stream));
+          break;
+        }
+      case CkNcpyModeDevice::IPC:
+        {
+          cuda_ipc_device_info& device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[source.device_idx];
+
+          // 1. Make user-provided stream wait for IPC event using cudaStreamWaitEvent
+          //    (source buffer to device comm buffer on source)
+          hapiCheck(cudaStreamWaitEvent(postStructs[i].cuda_stream, device_info.src_event_pool[source.event_idx], 0));
+
+          // 2. Invoke cudaMemcpyAsync (from source device comm buffer to destination buffer)
+          hapiCheck(cudaMemcpyAsync((void*)dest.ptr, (void*)((char*)device_info.buffer + source.comm_offset),
+                std::min(source.cnt, dest.cnt), cudaMemcpyDeviceToDevice, postStructs[i].cuda_stream));
+
+          // 3. Record IPC event so that the sender can query it for freeing
+          //    device comm buffer and corresponding pair of CUDA IPC events
+          hapiCheck(cudaEventRecord(device_info.dst_event_pool[source.event_idx], postStructs[i].cuda_stream));
+
+          // 4. Set flag in shared memory so that the sender can start querying
+          //    completion of the IPC event
+          cuda_ipc_event_shared* shm_event_shared = (cuda_ipc_event_shared*)((char*)CsvAccess(gpu_manager).shm_ptr
+                + CsvAccess(gpu_manager).shm_chunk_size * source.device_idx
+                + sizeof(cudaIpcMemHandle_t)) + source.event_idx;
+          pthread_mutex_lock(&shm_event_shared->lock);
+          shm_event_shared->dst_flag = true;
+          pthread_mutex_unlock(&shm_event_shared->lock);
+          break;
+        }
+      case CkNcpyModeDevice::RDMA:
+        {
+          // Transfer the received/unpacked data on host to the destination device buffer
+          // TODO: Use GPUDirect RDMA
+          hapiCheck(cudaMemcpyAsync((void*)dest.ptr, source.data, std::min(source.cnt, dest.cnt),
+                cudaMemcpyHostToDevice, postStructs[i].cuda_stream));
+          break;
+        }
+      default:
+        {
+          CkAbort("Invalid mode");
+          break;
+        }
+    }
+
+    // Add source callback for polling, so that it can be invoked once the transfer is complete
+    CkCallback* cb = new CkCallback(source.cb);
+    hapiAddCallback(postStructs[i].cuda_stream, cb);
+  }
+
+  return is_inline;
+}
+
+// Unused, left for future reference
+/*
+int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr) {
+  // Mechanism extracted from _prepareMsg() in ck.C
+  if (dest_pe < 0) {
+    int pe = -(dest_pe+1);
+    if (pe == CkMyPe()) {
+      VidBlock* vblk = CkpvAccess(vidblocks)[(CmiIntPtr)obj_ptr];
+      void *objPtr = vblk->getLocalChare();
+      dest_pe = objPtr ? pe : vblk->getActualID().onPE;
+    } else {
+      dest_pe = pe;
+    }
+  }
+
+  return dest_pe;
+}
+*/
+
+static void findFreeIpcEvents(DeviceManager* dm, const size_t comm_offset, int& event_idx) {
+  int pool_size = CsvAccess(gpu_manager).cuda_ipc_event_pool_size;
+  int device_index = dm->global_index;
+  cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[device_index];
+
+  // Free IPC events that are complete
+  // TODO: Don't do this every time but only when the event pool is somewhat empty
+  for (int i = 0; i < pool_size; i++) {
+    int& event_flag = my_device_info.event_pool_flags[i];
+    cudaEvent_t& ev = my_device_info.dst_event_pool[i];
+    size_t& buff_offset = my_device_info.event_pool_buff_offsets[i];
+    // For a used event, check if it's complete and mark as free if so
+    if (event_flag != 0) {
+      // Check in shared memory if receiver has invoked the memcpy from
+      // the device comm buffer on sender to destination buffer
+      cuda_ipc_event_shared* shm_event_shared =
+        (cuda_ipc_event_shared*)((char*)CsvAccess(gpu_manager).shm_ptr
+            + CsvAccess(gpu_manager).shm_chunk_size * device_index
+            + sizeof(cudaIpcMemHandle_t)) + i;
+      bool can_query = false;
+      pthread_mutex_lock(&shm_event_shared->lock);
+      if (shm_event_shared->dst_flag == true) {
+        shm_event_shared->dst_flag = false;
+        can_query = true;
+      }
+      pthread_mutex_unlock(&shm_event_shared->lock);
+
+      // If the receiver has invoked the memcpy,
+      // the sender can query the event for completion
+      if (can_query) {
+        if (cudaEventQuery(ev) == cudaSuccess) {
+          // Event completion means that the transfer from source device comm buffer
+          // to dest buffer is complete, so free the allocated block
+          if (event_flag == 1) {
+            dm->free_comm_buffer(buff_offset);
+          }
+
+          // Mark event as free
+          event_flag = 0;
+        }
+      }
+    }
+  }
+
+  // Allocate CUDA IPC events from the pool
+  // Two events are used per message:
+  // 1) Recorded by the sender after 'source buffer -> device comm buffer' cudaMemcpy.
+  //    Can be used by the sender to determine if the sender buffer is free for reuse.
+  //    It is also used by the receiver to create a dependency for the second cudaMemcpy
+  //    ('device comm buffer -> dest buffer')
+  // 2) Recorded by the receiver after 'device comm buffer -> dest buffer' cudaMemcpy.
+  //    It is used by the sender to determine when the allocated block on
+  //    device comm buffer and IPC events can be freed.
+  bool found_free = false;
+  for (int i = 0; i < pool_size; i++) {
+    int& event_flag = my_device_info.event_pool_flags[i];
+    size_t& buff_offset = my_device_info.event_pool_buff_offsets[i];
+    if (event_flag == 0) {
+      found_free = true;
+      event_idx = i;
+      event_flag = 1;
+      buff_offset = comm_offset;
+      break;
+    }
+  }
+
+  // FIXME: Instead of aborting, we can maybe create IPC events on demand
+  // (although they probably cannot be shared through the shared memory
+  // allocated and shared between processes at init time)
+  if (!(found_free)) {
+    CkAbort("CUDA IPC event pool empty");
+  }
+}
+
+// Performs sender-side operations necessary for device zerocopy
+void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
+  // TODO: Need to handle the case where the destination PE could be wrong
+  //       (due to migration, etc.). Currently the code relies on a global
+  //       location update after migration (with CMK_GLOBAL_LOCATION_UPDATE).
+
+  // Determine transfer mode (intra-process, inter-process, inter-node)
+  CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
+
+  if (transfer_mode == CkNcpyModeDevice::MEMCPY) {
+    // Don't need to do anything for intra-process
+    return;
+  } else if (transfer_mode == CkNcpyModeDevice::IPC) {
+    // Allocate blocks on device comm buffer
+    DeviceManager* dm = CsvAccess(gpu_manager).device_map[CkMyPe()];
+
+    for (int i = 0; i < numops; i++) {
+#if CMK_SMP
+      CmiLock(dm->lock);
+#endif
+      void* alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
+      if (alloc_comm_buffer == nullptr) {
+        CkAbort("PE %d, device %d: Not enough memory on device communication buffer (%zu free)",
+            CkMyPe(), dm->global_index, dm->comm_buffer_free_size());
+      }
+      buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
+      buffers[i]->device_idx = dm->global_index;
+      findFreeIpcEvents(dm, buffers[i]->comm_offset, buffers[i]->event_idx);
+#if CMK_SMP
+      CmiUnlock(dm->lock);
+#endif
+
+      // Initiate transfer from source buffer to device comm buffer
+      hapiCheck(cudaMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
+            cudaMemcpyDeviceToDevice, buffers[i]->cuda_stream));
+
+      // Record event
+      cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[dm->global_index];
+      hapiCheck(cudaEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->cuda_stream));
+    }
+  } else if (transfer_mode == CkNcpyModeDevice::RDMA) {
+    // Use a naive host-staged mechanism
+    // TODO: Use GPUDirect RDMA
+    for (int i = 0; i < numops; i++) {
+      // Allocate temporary host buffer and copy the source buffer
+      buffers[i]->data_stored = true;
+      hapiCheck(cudaMallocHost(&buffers[i]->data, buffers[i]->cnt));
+      hapiCheck(cudaMemcpyAsync(buffers[i]->data, buffers[i]->ptr, buffers[i]->cnt,
+            cudaMemcpyDeviceToHost, buffers[i]->cuda_stream));
+      hapiCheck(cudaStreamSynchronize(buffers[i]->cuda_stream));
+    }
+  } else {
+    CkAbort("Unknown transfer mode");
+  }
+}
+#endif
