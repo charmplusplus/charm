@@ -1,8 +1,13 @@
-# Decimal representation of Charm++ release line and API revision
-# Increment the last 2 digits when making an API change
-# Increase the first three after branching for a release
+# Numerical representation of Charm++ release line and API revision
+# Essentially just the version number stripped of decimal points with minor
+#   fields padded to 2 digits each. (e.g. 6.10.1 -> 61001)
+# Ensure that this number is always numerically and lexicographically increasing.
+#
+# Increment the last 2 digits when making a bugfix release
+# Increment the second and third digits when making a minor feature release
+# Increment the first digit when making a major feature release
 
-AC_INIT(Charm++, 61001, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
+AC_INIT([Charm++], [61001], [charm@cs.illinois.edu], [charm], [https://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
