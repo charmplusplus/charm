@@ -667,7 +667,8 @@ void LBManager::addLoadbalancer(BaseLB* lb, int seq)
       CmiAbort("LBManager");
     }
   }
-  loadbalancers.resize(seq + 1);
+  if (loadbalancers.size() < seq + 1)
+    loadbalancers.resize(seq + 1);
   loadbalancers[seq] = lb;
 }
 
