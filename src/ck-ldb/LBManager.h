@@ -571,7 +571,6 @@ class LBManager : public CBase_LBManager
   MetaBalancer* metabalancer;
 
  public:
-  int nloadbalancers;
   CkVec<BaseLB*> loadbalancers;
 
   std::vector<StartLBCB*> startLBFnList;
@@ -579,7 +578,6 @@ class LBManager : public CBase_LBManager
 
  public:
   BaseLB** getLoadBalancers() { return loadbalancers.getVec(); }
-  int getNLoadBalancers() { return nloadbalancers; }
 
  public:
   static bool manualOn;
