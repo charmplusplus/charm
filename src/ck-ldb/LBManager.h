@@ -578,6 +578,7 @@ class LBManager : public CBase_LBManager
 
  public:
   BaseLB** getLoadBalancers() { return loadbalancers.getVec(); }
+  int getNLoadBalancers() { return loadbalancers.size(); }
 
  public:
   static bool manualOn;
