@@ -21,7 +21,6 @@ CkGroupID _lbmgr;
 CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
 
-CkpvDeclare(int, numLoadBalancers); /**< num of lb created */
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 
 // command line options
@@ -158,8 +157,6 @@ void _loadbalancerInit()
 {
   CkpvInitialize(bool, lbmanagerInited);
   CkpvAccess(lbmanagerInited) = false;
-  CkpvInitialize(int, numLoadBalancers);
-  CkpvAccess(numLoadBalancers) = 0;
 
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);

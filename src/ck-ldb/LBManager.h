@@ -116,7 +116,6 @@ PUPbytes(CkLBOptions)
 
     extern CkGroupID _lbmgr;
 
-CkpvExtern(int, numLoadBalancers);
 CkpvExtern(bool, lbmanagerInited);
 
 // LB options, mostly controled by user parameter

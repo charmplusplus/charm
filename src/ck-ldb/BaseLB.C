@@ -11,20 +11,10 @@
 
 void BaseLB::initLB(const CkLBOptions &opt) {
   seqno = opt.getSeqNo();
-  CkpvAccess(numLoadBalancers) ++;
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   lbname = "Unknown";
   // register this load balancer to LBManager at the sequence number
   lbmgr->addLoadbalancer(this, seqno);
-}
-
-BaseLB::~BaseLB() {
-  CkpvAccess(numLoadBalancers) --;
-}
-
-void BaseLB::unregister() {
-  lbmgr->RemoveLocalBarrierReceiver(receiver);
-  CkpvAccess(numLoadBalancers) --;
 }
 
 void BaseLB::pup(PUP::er &p) { 
