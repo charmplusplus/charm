@@ -1014,7 +1014,7 @@ double CmiTimer(void)
 
 #if CMK_SMP
 # if CMK_HAS_RUSAGE_THREAD
-#define RUSAGE_WHO        RUSAGE_THREAD   /* RUSAGE_THREAD, only in latest Linux kernels */
+#define RUSAGE_WHO        RUSAGE_THREAD   /* since Linux 2.6.26 */
 #else
 #undef RUSAGE_WHO
 #endif
