@@ -1,6 +1,6 @@
 mainmodule single {
   mainchare Main {
-    entry Main(CkArgMsg *m);
+    entry [nokeep] Main(CkArgMsg *m);
   };
 
   chare JobProducer {
@@ -15,4 +15,3 @@ mainmodule single {
 
   chare CkChannel<int>;
 }
-

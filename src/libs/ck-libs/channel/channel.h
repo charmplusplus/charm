@@ -155,11 +155,11 @@ public:
 
   std::pair<int, T> receiveFromAny(int* channels, int numChannels) {
     int which = checkChannels(channels, numChannels);
-    if (which >= 0) goto END;
-    waiting.waitForAny(channels, numChannels, CthSelf());
-    CthSuspend();
-    which = checkChannels(channels, numChannels);
-  END:
+    if (which < 0) {
+      waiting.waitForAny(channels, numChannels, CthSelf());
+      CthSuspend();
+      which = checkChannels(channels, numChannels);
+    }
     auto front = data[which].front();
     data[which].pop();
     return std::make_pair(which, front);

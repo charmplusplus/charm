@@ -4,7 +4,7 @@ mainmodule multi {
   readonly int numWorkers;
 
   mainchare Main {
-    entry Main(CkArgMsg *m);
+    entry [nokeep] Main(CkArgMsg *m);
     entry void stageI();
     entry void stageII(std::pair<int, int>);
   };
