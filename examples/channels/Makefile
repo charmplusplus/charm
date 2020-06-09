@@ -1,6 +1,7 @@
 DIRS = \
   single \
   multi \
+  stress \
 
 TESTDIRS = $(DIRS)
 

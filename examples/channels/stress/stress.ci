@@ -1,0 +1,21 @@
+mainmodule stress {
+
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main {
+    entry [nokeep] Main(CkArgMsg *m);
+  };
+
+  chare JobProducer {
+    entry JobProducer(CProxy_CkMultiChannel<NUM_ITERS, int>);
+    entry [threaded] void run();
+  };
+
+  array [1D] JobConsumer {
+    entry JobConsumer(CProxy_CkMultiChannel<NUM_ITERS, int>);
+    entry [threaded] void run();
+  }
+
+  chare CkMultiChannel<NUM_ITERS, int>;
+}
+

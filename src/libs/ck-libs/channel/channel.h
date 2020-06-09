@@ -60,24 +60,22 @@ public:
   // Returns true when a thread is waiting on a channel
   // Stores the waiting thread in the reference argument
   bool hasWaiter(int channel, CthThread &thread) {
-    if (waiting[channel].empty()) {
-      return false;
-    } else {
+    // While a thread is waiting on a channel
+    while (!waiting[channel].empty()) {
       // Pop a request from the wait-queue
       auto request = waiting[channel].front();
       waiting[channel].pop();
-      // If it has expired
-      if (request->expired) {
-        // Recurse and check for another waiter
-        return hasWaiter(channel, thread);
-      } else {
-        // Otherwise, mark it as expired
+      // If it is not expired
+      if (!request->expired) {
+        // Mark it as expired
         request->expired = true;
-        // And set the return values
+        // Return thread
         thread = request->thread;
         return true;
       }
     }
+    // Return nothing
+    return false;
   }
   // Places a waiter into the queue for the specified channel
   void wait(int channel, const CthThread &thread) {
