@@ -1,0 +1,10 @@
+
+module channel {
+  template <typename T>
+  chare CkChannel {
+    entry CkChannel();
+    entry void send(T);
+    entry [sync] T receive();
+    entry [threaded] void receive(CkCallback cb);
+  };
+};
