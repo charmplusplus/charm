@@ -20,7 +20,7 @@ void Main::stageI() {
   CkCallback cb(CkIndex_Main::stageII(std::make_pair(0, 0)), mainProxy);
   int channels[2];
   std::iota(channels, channels + 2, 0);
-  channel.receiveFromAny(channels, 2, cb);
+  channel.receiveAnyAsync(channels, 2, cb);
   CkPrintf("[MAIN] Sending data to a random channel...\n");
   std::srand(std::time(nullptr));
   int ch = std::rand() % 2;

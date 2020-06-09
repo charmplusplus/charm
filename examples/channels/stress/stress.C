@@ -25,7 +25,7 @@ Main::Main(CkArgMsg *m) {
 void JobConsumer::run() {
   int channels[NUM_ITERS];
   std::iota(channels, channels + NUM_ITERS, 0);
-  std::pair<int, int> result = channel.receiveFromAny(channels, NUM_ITERS);
+  std::pair<int, int> result = channel.receiveAny(channels, NUM_ITERS);
   int iter = result.first + 1;
   if (iter % itersPerHeartbeat == 0) {
     channel.send(result.first, result.second);

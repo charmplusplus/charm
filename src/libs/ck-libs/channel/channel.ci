@@ -4,21 +4,35 @@ module channel {
   chare CkChannel {
     entry CkChannel();
     entry void send(T);
+
     entry [sync] T receive();
-    entry [threaded] void receive(CkCallback);
+    entry [threaded] void receiveAsync(CkCallback);
+
+    entry [threaded] void receiveN(int);
+    entry [threaded] void receiveNAsync(int, CkCallback);
+
+    entry [threaded] void waitN(int numMsgs);
   };
 
   template <int N, typename T>
   chare CkMultiChannel {
     entry CkMultiChannel();
     entry void send(int, T);
-    entry [sync] T receive(int);
-    entry [sync] std::pair<int, T> receiveFromAny(int channels[numChannels], int numChannels);
 
-    entry [threaded] void receive(int, CkCallback);
-    entry [threaded] void receiveFromAny(int channels[numChannels], int numChannels, CkCallback cb);
+    entry [sync] T receive(int);
+    entry [threaded] void receiveAsync(int, CkCallback);
+
+    entry [threaded] void receiveN(int channel, int numMsgs);
+    entry [threaded] void receiveNAsync(int channel, int numMsgs, CkCallback cb);
+
+    entry [sync] std::vector<T> receiveAll(int channels[numChannels], int numChannels);
+    entry [threaded] void receiveAllAsync(int channels[numChannels], int numChannels, CkCallback cb);
+
+    entry [sync] std::pair<int, T> receiveAny(int channels[numChannels], int numChannels);
+    entry [threaded] void receiveAnyAsync(int channels[numChannels], int numChannels, CkCallback cb);
 
     entry [sync] void waitAll(int channels[numChannels], int numChannels);
+    entry [sync] int waitAny(int channels[numChannels], int numChannels);
     entry [sync] void waitN(int channel, int numMsgs);
   };
 };
