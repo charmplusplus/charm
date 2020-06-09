@@ -1,5 +1,6 @@
 DIRS = \
   single \
+  multi \
 
 TESTDIRS = $(DIRS)
 

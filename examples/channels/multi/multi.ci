@@ -1,0 +1,24 @@
+mainmodule multi {
+
+  readonly CProxy_Main mainProxy;
+  readonly int numWorkers;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void stageI();
+    entry void stageII(std::pair<int, int>);
+  };
+
+  chare JobProducer {
+    entry JobProducer(CProxy_CkMultiChannel<2, int>);
+    entry [threaded] void run();
+  };
+
+  group JobConsumer {
+    entry JobConsumer(CProxy_CkMultiChannel<2, int>);
+    entry [threaded] void run();
+  }
+
+  chare CkMultiChannel<2, int>;
+}
+
