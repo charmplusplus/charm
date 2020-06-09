@@ -1,0 +1,18 @@
+mainmodule single {
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+  };
+
+  chare JobProducer {
+    entry JobProducer(CProxy_CkChannel<int>);
+    entry void run();
+  };
+
+  group JobConsumer {
+    entry JobConsumer(CProxy_CkChannel<int>);
+    entry [threaded] void run();
+  }
+
+  chare CkChannel<int>;
+}
+
