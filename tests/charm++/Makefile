@@ -26,6 +26,7 @@ DIRS = \
   within_node_bcast \
   longIdle \
   bombard \
+  varTRAM \
 
 FTDIRS = \
   jacobi3d \
