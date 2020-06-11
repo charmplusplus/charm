@@ -1,5 +1,5 @@
 
-#line 3 "lex.yy.c"
+#line 2 "lex.yy.c"
 
 #define  YY_INT_ALIGNED short int
 
@@ -831,8 +831,8 @@ int count_newlines(const char *s);
 #undef yywrap
 #endif
 
+#line 834 "lex.yy.c"
 #line 835 "lex.yy.c"
-#line 836 "lex.yy.c"
 
 #define INITIAL 0
 
@@ -1057,7 +1057,7 @@ YY_DECL
 	{
 #line 61 "xi-scan.l"
 
-#line 1061 "lex.yy.c"
+#line 1060 "lex.yy.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1209,7 +1209,7 @@ YY_RULE_SETUP
 #line 78 "xi-scan.l"
 ECHO;
 	YY_BREAK
-#line 1213 "lex.yy.c"
+#line 1212 "lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 				yyterminate();
 
@@ -2242,6 +2242,8 @@ struct rwentry rwtable[] = {
 {  "double",     DOUBLE },
 {  "unsigned",   UNSIGNED },
 {  "void",	VOID },
+{  "size_t",	SIZET},
+{  "bool",	BOOL},
 {  "const",	CONST },
 {  "atomic", 	SERIAL },
 {  "serial",    SERIAL },
