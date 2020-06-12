@@ -13,6 +13,7 @@ module NDMeshStreamer {
 
   template<class dtype, class RouterType>
   group [migratable] MeshStreamer {
+    entry void localDeliver(size_t size, const char data[size], CkArrayIndex arrayId, int sourcePe);
     entry void receiveAlongRoute(MeshStreamerMessageV *msg);
     entry void enablePeriodicFlushing();
     entry void finish();
@@ -32,10 +33,22 @@ module NDMeshStreamer {
     entry void receiveAtDestination(MeshStreamerMessageV *msg);
   };
 
+  template<class dtype, class RouterType>
+  nodegroup MeshStreamerNG {
+    entry MeshStreamerNG(int numDimensions, int dimensionSizes[numDimensions],
+                    CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
+                    double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
+                    int _thresholdFractionNum = 1, int _thresholdFractionDen = 2,
+                    int _cutoffFractionNum = 1, int _cutoffFractionDen = 2);
+    entry void set(CProxy_MeshStreamer<dtype, RouterType> gp);
+    entry void receiveAlongRoute(MeshStreamerMessageV *msg);
+    entry void receiveAtDestination(MeshStreamerMessageV *msg);
+  };
+
   template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
     group [migratable] ArrayMeshStreamer :
     MeshStreamer<dtype, RouterType> {
-    entry ArrayMeshStreamer(
+    entry ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy,
           int numDimensions, int dimensionSizes[numDimensions],
           CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
           double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,

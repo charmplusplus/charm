@@ -13,6 +13,7 @@ class CEntry;
 
 struct TramInfo {
   std::string type;
+  std::string nodeType;
   std::string name;
   std::string itemType;
   int numDimensions;
@@ -23,9 +24,9 @@ struct TramInfo {
   int cutoffFractionNumerator;
   int cutoffFractionDenominator;
 
-  TramInfo(const char* t, const char* n, const char* i, int nd, int b,
+  TramInfo(const char* t, const char* nt, const char* n, const char* i, int nd, int b,
     int mib, int tfn, int tfd, int cfn, int cfd)
-    : type(t), name(n), itemType(i), numDimensions(nd), bufferSize(b),
+    : type(t), nodeType(nt), name(n), itemType(i), numDimensions(nd), bufferSize(b),
     maxItemsBuffered(mib), thresholdFractionNumerator(tfn),
     thresholdFractionDenominator(tfd), cutoffFractionNumerator(cfn),
     cutoffFractionDenominator(cfd) {}

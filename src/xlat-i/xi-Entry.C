@@ -1010,6 +1010,13 @@ XStr Entry::aggregatorType() {
   return groupType;
 }
 
+XStr Entry::aggregatorNodeType() {
+  XStr groupType;
+  groupType << "MeshStreamerNG<" << param->param->type << ", "
+            << "SimpleMeshRouter>";
+  return groupType;
+}
+
 XStr Entry::aggregatorGlobalType(XStr& scope) {
   XStr groupType;
   if (container->isGroup()) {
@@ -1023,6 +1030,13 @@ XStr Entry::aggregatorGlobalType(XStr& scope) {
               << "SimpleMeshRouter, " << scope << container->indexName()
               << "::_callmarshall_" << epStr() << ">";
   }
+  return groupType;
+}
+
+XStr Entry::aggregatorNodeGlobalType(XStr& scope) {
+  XStr groupType;
+  groupType << "MeshStreamerNG<" << param->param->type << ", "
+            << "SimpleMeshRouter>";
   return groupType;
 }
 
@@ -1057,8 +1071,9 @@ void Entry::genTramTypes() {
   Attribute* aggregate = getAttribute(SAGGREGATE);
 
   if (aggregate) {
-    XStr typeString, nameString, itemTypeString;
+    XStr typeString, nodeTypeString, nameString, itemTypeString;
     typeString << aggregatorType();
+    nodeTypeString << aggregatorNodeType();
     nameString << aggregatorName();
     itemTypeString << dataItemType();
     int bufferSize = aggregate->getArgument(tramArgBufferSize, tramDefaultBufferSize);
@@ -1089,7 +1104,7 @@ void Entry::genTramTypes() {
       numDimensions = tramDefaultNumDimensions;
     }
 
-    container->tramInstances.push_back(TramInfo(typeString.get_string(),
+    container->tramInstances.push_back(TramInfo(typeString.get_string(), nodeTypeString.get_string(),
           nameString.get_string(), itemTypeString.get_string(), numDimensions,
           bufferSize, maxItemsBuffered, thresholdFractionNumerator,
           thresholdFractionDenominator, cutoffFractionNumerator,
@@ -1175,13 +1190,20 @@ void Entry::genTramInstantiation(XStr& str) {
           << "    if (itemsPerBuffer == 0) {\n"
           << "      itemsPerBuffer = 1;\n"
           << "    }\n"
-          << "    CProxy_" << container->tramInstances[i].type.c_str()
-          << " tramProxy =\n"
-          << "    CProxy_" << container->tramInstances[i].type.c_str()
+          << "    CProxy_" << container->tramInstances[i].nodeType.c_str()
+          << " tramNodeProxy =\n"
+          << "    CProxy_" << container->tramInstances[i].nodeType.c_str()
           << "::ckNew(nDims, dims, gId, tramBufferSize, false, 0.01, "
           << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
           << "cutoffFractionNum, cutoffFractionDen);\n"
+          << "    CProxy_" << container->tramInstances[i].type.c_str()
+          << " tramProxy =\n"
+          << "    CProxy_" << container->tramInstances[i].type.c_str()
+          << "::ckNew(tramNodeProxy, nDims, dims, gId, tramBufferSize, false, 0.01, "
+          << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
+          << "cutoffFractionNum, cutoffFractionDen);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
+          << "tramNodeProxy.set(tramProxy);\n"
           << "  }\n";
     }
   }
@@ -1194,12 +1216,20 @@ XStr Entry::tramBaseType() {
   return baseTypeString;
 }
 
+XStr Entry::tramBaseNodeType() {
+  XStr baseTypeString;
+  baseTypeString << "MeshStreamerNG<" << dataItemType() << ", SimpleMeshRouter>";
+
+  return baseTypeString;
+}
+
 void Entry::genTramRegs(XStr& str) {
   if (isTramTarget()) {
     XStr messageTypeString;
     messageTypeString << "MeshStreamerMessageV";
 
     XStr baseTypeString = tramBaseType();
+    XStr baseNodeTypeString = tramBaseNodeType();
 
     NamedType messageType(messageTypeString.get_string());
     Message helper(-1, &messageType);
@@ -1208,9 +1238,13 @@ void Entry::genTramRegs(XStr& str) {
     str << "\n  /* REG: group " << aggregatorType() << ": IrrGroup;\n  */\n"
         << "  CkIndex_" << aggregatorType() << "::__register(\"" << aggregatorType()
         << "\", sizeof(" << aggregatorType() << "));\n"
+	<< "  CkIndex_" << aggregatorNodeType() << "::__register(\"" << aggregatorNodeType()
+	<< "\", sizeof(" << aggregatorNodeType() << "));\n"
         << "  /* REG: group " << baseTypeString << ": IrrGroup;\n  */\n"
         << "  CkIndex_" << baseTypeString << "::__register(\"" << baseTypeString
-        << "\", sizeof(" << baseTypeString << "));\n";
+        << "\", sizeof(" << baseTypeString << "));\n"
+	<< "  CkIndex_" << baseNodeTypeString << "::__register(\"" << baseNodeTypeString
+	<< "\", sizeof(" << baseNodeTypeString << "));\n";
   }
 }
 

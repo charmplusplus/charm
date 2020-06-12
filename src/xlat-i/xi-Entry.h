@@ -192,8 +192,11 @@ class Entry : public Member {
   XStr aggregatorIndexType();
   XStr dataItemType();
   XStr tramBaseType();
+  XStr tramBaseNodeType();
   XStr aggregatorType();
+  XStr aggregatorNodeType();
   XStr aggregatorGlobalType(XStr& scope);
+  XStr aggregatorNodeGlobalType(XStr& scope);
   XStr aggregatorName();
   XStr paramType(int withDefaultVals, int withEO = 0, int useConst = 1, int rValue = 0);
   XStr paramComma(int withDefaultVals, int withEO = 0);

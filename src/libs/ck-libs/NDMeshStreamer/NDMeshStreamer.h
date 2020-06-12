@@ -84,7 +84,7 @@ struct DataItemHandle {
 class MeshStreamerMessageV : public CMessage_MeshStreamerMessageV {
 
 public:
-
+  int destinationIndex;
   int finalMsgCount;
   int msgType;
   int numDataItems;
@@ -101,6 +101,7 @@ public:
       offsets[0] = 0;
     }
   }
+  void setDestIndex(int dI) { destinationIndex = dI;}
 
   template <typename dtype>
   inline typename std::enable_if<is_PUPbytes<dtype>::value,int>::type addDataItem(dtype& dataItem, CkArrayIndex index, int sourcePe) {
@@ -163,6 +164,85 @@ public:
 };
 
 template <class dtype, class RouterType>
+class MeshStreamerNG : public CBase_MeshStreamerNG<dtype, RouterType> {
+  CProxy_MeshStreamer<dtype, RouterType> groupProxy;
+  int myIndex_;
+  RouterType myRouter_;
+public:
+  MeshStreamerNG(int numDimensions, int *dimensionSizes,
+                    CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
+                    double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
+                    int _thresholdFractionNum = 1, int _thresholdFractionDen = 2,
+                    int _cutoffFractionNum = 1, int _cutoffFractionDen = 2) {
+    myIndex_ = CkMyNode();
+    myRouter_.initializeRouter(numDimensions, myIndex_, dimensionSizes);
+  }
+  MeshStreamerNG(CkMigrateMessage* m) {}
+  void set(CProxy_MeshStreamer<dtype, RouterType> gp) {
+    groupProxy = gp;
+  }
+  void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
+    const static bool copyIndirectly = true;
+
+    Route destinationRoute;
+    myRouter_.determineInitialRoute(destinationPe, destinationRoute);
+    storeMessage(destinationPe, destinationRoute, dataItemHandle,
+                 copyIndirectly);
+    // release control to scheduler if requested by the user,
+    //   assume caller is threaded entry
+    if (yieldFlag_ && ++yieldCount_ == 1024) {
+      yieldCount_ = 0;
+      CthYield();
+    }
+  }
+  void receiveAlongRoute(MeshStreamerMessageV *msg) {
+    int destinationPe, lastDestinationPe;
+    Route destinationRoute;
+
+    lastDestinationPe = -1;
+    for (int i = 0; i < msg->numDataItems; i++) {
+      destinationPe = msg->destinationPes[i];
+      if (CmiNodeOf(destinationPe) == myIndex_) {
+        //dtype dataItem = msg->getDataItem<dtype>(i);
+        this->groupProxy[destinationPe].localDeliver(msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i),
+msg->dataItems+msg->template getoffset<dtype>(i),                   msg->destObjects[i], msg->sourcePes[i]);
+      }
+      else if (destinationPe != TRAM_BROADCAST) {
+        if (destinationPe != lastDestinationPe) {
+          // do this once per sequence of items with the same destination
+	  myRouter_.determineRoute(destinationPe,
+				 myRouter_.dimensionReceived(msg->msgType),
+				 destinationRoute);
+        }
+        groupProxy.ckLocalBranch()->storeMessageIntermed(destinationPe, destinationRoute,
+                       msg->dataItems + msg->template getoffset<dtype>(i),
+                       msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i),
+                       msg->destObjects[i]);
+      }
+      lastDestinationPe = destinationPe;
+    }
+
+#ifdef CMK_TRAM_VERBOSE_OUTPUT
+    envelope *env = UsrToEnv(msg);
+    CkPrintf("[%d] received along route from %d %d items finalMsgCount: %d"
+               " msgType: %d\n", myIndex_, env->getSrcPe(),
+               msg->numDataItems, msg->finalMsgCount, msg->msgType);
+#endif
+
+    delete msg;
+    //this->groupProxy[msg->destinationIndex].receiveAlongRoute(msg);
+  }
+  void receiveAtDestination(MeshStreamerMessageV *msg) {
+    this->groupProxy[msg->destinationIndex].receiveAtDestination(msg);
+  }
+  void pup(PUP::er& p) {
+    p|groupProxy;
+    p|myIndex_;
+    p|myRouter_;
+  }
+};
+
+template <class dtype, class RouterType>
 class MeshStreamer : public CBase_MeshStreamer<dtype, RouterType> {
 
 private:
@@ -197,8 +277,7 @@ private:
   int thresholdFractionDenominator;
   int cutoffFractionNumerator;
   int cutoffFractionDenominator;
-
-  virtual void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
+  CProxy_MeshStreamerNG<dtype, RouterType> ngProxy;
 
   virtual void initLocalClients() { CkAbort("Called what should be a pure virtual base method"); }
 
@@ -223,9 +302,6 @@ protected:
               MeshStreamerMessageV *destinationBuffer,
               char *dataHandle, size_t size, CkArrayIndex index);
   void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe);
-  void storeMessageIntermed(int destinationPe,
-                    const Route& destinationCoordinates,
-                    char *data, size_t size,CkArrayIndex);
   void storeMessage(int destinationPe,
                     const Route& destinationCoordinates,
                     const DataItemHandle<dtype> *dataItem, bool copyIndirectly = false);
@@ -239,11 +315,15 @@ protected:
 public:
   MeshStreamer() {}
   MeshStreamer(CkMigrateMessage *) {}
-  MeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
+  MeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy, int maxNumDataItemsBuffered, int numDimensions,
                int *dimensionSizes, int bufferSize,
                bool yieldFlag = 0, double progressPeriodInMs = -1.0);
 
   // entry
+  virtual void localDeliver(size_t size, const char* data, CkArrayIndex arrayId,int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
+  void storeMessageIntermed(int destinationPe,
+                    const Route& destinationCoordinates,
+                    char *data, size_t size,CkArrayIndex);
 
   void receiveAlongRoute(MeshStreamerMessageV *msg);
   void enablePeriodicFlushing(){
@@ -473,18 +553,19 @@ sendMeshStreamerMessage(MeshStreamerMessageV *destinationBuffer,
                         int dimension, int destinationIndex) {
 
   bool personalizedMessage = myRouter_.isMessagePersonalized(dimension);
+  destinationBuffer->setDestIndex(destinationIndex);
   if (personalizedMessage) {
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
     CkPrintf("[%d] sending to %d\n", myIndex_, destinationIndex);
 #endif
-    this->thisProxy[destinationIndex].receiveAtDestination(destinationBuffer);
+    this->ngProxy[CmiNodeOf(destinationIndex)].receiveAtDestination(destinationBuffer);
   }
   else {
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
     CkPrintf("[%d] sending intermediate to %d\n",
              myIndex_, destinationIndex);
 #endif
-    this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
+    this->ngProxy[CmiNodeOf(destinationIndex)].receiveAlongRoute(destinationBuffer);
   }
 }
 
@@ -576,7 +657,7 @@ storeMessage(int destinationPe, const Route& destinationRoute,
     *(int *) CkPriorityPtr(msg) = prio_;
     CkSetQueueing(msg, CK_QUEUEING_IFIFO);
     copyDataItemIntoMessage(msg,dataItem,copyIndirectly);
-    this->thisProxy[destinationPe].receiveAtDestination(msg);
+    this->ngProxy[destinationPe].receiveAtDestination(msg);
     return;
   }
 
@@ -633,6 +714,7 @@ storeMessage(int destinationPe, const Route& destinationRoute,
 template <class dtype, class RouterType>
 inline void MeshStreamer<dtype, RouterType>::
 insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
+  ngProxy.ckLocalBranch()->insertData(dataItemHandle, destinationPe);
   // no data items should be submitted after all local contributors call done
   // and staged completion has begun
   CkAssert(stagedCompletionStarted_ == false);
@@ -785,9 +867,9 @@ receiveAlongRoute(MeshStreamerMessageV *msg) {
     destinationPe = msg->destinationPes[i];
     if (destinationPe == myIndex_) {
       //dtype dataItem = msg->getDataItem<dtype>(i);
-      localDeliver(msg->dataItems+msg->template getoffset<dtype>(i),
-                   msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i),
-                   msg->destObjects[i], msg->sourcePes[i]);
+      localDeliver(msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i),
+msg->dataItems+msg->template getoffset<dtype>(i),
+        msg->destObjects[i], msg->sourcePes[i]);
     }
     else if (destinationPe != TRAM_BROADCAST) {
       if (destinationPe != lastDestinationPe) {
@@ -1060,7 +1142,7 @@ private:
   int cutoffFractionDen;
 
   inline
-  void localDeliver(const char* data,size_t size,CkArrayIndex arrayId, int sourcePe) override {
+  void localDeliver(size_t size, const char* data, CkArrayIndex arrayId, int sourcePe) override {
     ClientType *clientObj;
 #ifdef CMK_TRAM_CACHE_ARRAY_METADATA
     clientObj = clientObjs_[arrayId];
@@ -1121,7 +1203,7 @@ private:
 
 public:
 
-  ArrayMeshStreamer(int numDimensions, int *dimensionSizes,
+  ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy, int numDimensions, int *dimensionSizes,
                     CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
                     double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
                     int _thresholdFractionNum = 1, int _thresholdFractionDen = 2,
@@ -1142,7 +1224,7 @@ public:
        MeshStreamerMessageV *msg) {
     for (int i = 0; i < msg->numDataItems; i++) {
       //const ArrayDataItem<dtype, itype> packedData = msg->getDataItem<ArrayDataItem<dtype, itype>>(i);
-      this->localDeliver(msg->dataItems+msg->template getoffset<dtype>(i),msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i),msg->destObjects[i],msg->sourcePes[i]);
+      this->localDeliver(msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i), msg->dataItems+msg->template getoffset<dtype>(i),msg->destObjects[i],msg->sourcePes[i]);
     }
     if (this->useStagedCompletion_) {
       this->markMessageReceived(msg->msgType, msg->finalMsgCount);
@@ -1179,7 +1261,7 @@ public:
       size_t sz = PUP::size(const_cast<dtype&>(dataItem));
       char* data = new char[sz];
       PUP::toMemBuf(const_cast<dtype&>(dataItem),data, sz);
-      localDeliver(data,sz,arrayIndex,this->myIndex_);
+      localDeliver(sz,data,arrayIndex,this->myIndex_);
       delete[] data;
       return;
     }
