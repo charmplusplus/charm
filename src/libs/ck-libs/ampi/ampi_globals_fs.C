@@ -74,7 +74,7 @@ static std::atomic<size_t> rank_count{};
 int main(int argc, char ** argv)
 {
   const size_t myrank = rank_count++;
-  if (CmiMyPe() == 0 && myrank == 0 && !quietModeRequested)
+  if (CmiMyNode() == 0 && myrank == 0 && !quietModeRequested)
     CmiPrintf("AMPI> Using fsglobals privatization method.\n");
 
   SharedObject myexe;
