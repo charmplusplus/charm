@@ -2,9 +2,7 @@ set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoa
 
 set(ampi-f90-sources ampifimpl.f90 ampimod.f90)
 
-set(ampi-h-sources ampi.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h mpio_functions.h mpio.h mpio_functions.h mpio_globals.h mpiof.h)
-
-include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
+set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h mpio_functions.h mpio.h mpio_functions.h mpio_globals.h mpiof.h)
 
 add_library(ampi-compat compat_ampi.c
        compat_ampim.C compat_ampifm.C compat_ampicm.C
@@ -64,22 +62,29 @@ add_custom_command(TARGET moduleampi
 if(${CMK_CAN_LINK_FORTRAN})
     add_library(moduleampif ${ampi-f90-sources} ${ampi-cxx-sources} ${ampi-h-sources})
     add_dependencies(moduleampif moduletcharm ck)
+
+    add_custom_command(TARGET moduleampif
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/moduleampif.dir/ampifimpl.f90.o ${CMAKE_BINARY_DIR}/lib/ampifimpl.o
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/moduleampif.dir/ampimod.f90.o ${CMAKE_BINARY_DIR}/lib/ampimod.o
+    VERBATIM
+    )
 endif()
 
 
-configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampicc         COPYONLY)
-configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
-configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampicxx        COPYONLY)
-configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampic++        COPYONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampicc         @ONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/               @ONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampicxx        @ONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampic++        @ONLY)
 configure_file(ampif77       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
 configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
 configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/ampifort       COPYONLY)
 configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
 configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/ampiexec       COPYONLY)
-configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpicc.ampi     COPYONLY)
-configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpiCC.ampi     COPYONLY)
-configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpicxx.ampi    COPYONLY)
-configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpic++.ampi    COPYONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpicc.ampi     @ONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpiCC.ampi     @ONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpicxx.ampi    @ONLY)
+configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpic++.ampi    @ONLY)
 configure_file(ampif77       ${CMAKE_BINARY_DIR}/bin/mpif77.ampi    COPYONLY)
 configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/mpif90.ampi    COPYONLY)
 configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/mpifort.ampi   COPYONLY)
@@ -102,8 +107,10 @@ foreach(file ${ampi-h-sources})
   if(${file} STREQUAL "ampi.h")
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/ampi/)
     configure_file(${file} ${CMAKE_BINARY_DIR}/include/ampi/mpi.h COPYONLY)
+    configure_file(${file} ${CMAKE_BINARY_DIR}/include/ampi.h COPYONLY)
   elseif(${file} STREQUAL "ampif.h")
     configure_file(${file} ${CMAKE_BINARY_DIR}/include/mpif.h COPYONLY)
+    configure_file(${file} ${CMAKE_BINARY_DIR}/include/ampif.h COPYONLY)
   else()
     configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
   endif()
