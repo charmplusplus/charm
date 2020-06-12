@@ -20,6 +20,7 @@ void HybridBaseLB::AtBarrier()
 #if CMK_MEM_CHECKPOINT	
   CkSetInLdb();
 #endif
+  InvokeLB();
 }
 
 HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)

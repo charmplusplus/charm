@@ -26,6 +26,9 @@ DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
   receiver = lbmgr->AddLocalBarrierReceiver(this, &DistBaseLB::ProcessAtSync);
   startLbFnHdl = lbmgr->AddStartLBFn(this, &DistBaseLB::barrierDone);
 
+  if (opt.getSeqNo() > 0)
+    turnOff();
+
   migrates_completed = 0;
   migrates_expected = 0;
   lb_started = false;

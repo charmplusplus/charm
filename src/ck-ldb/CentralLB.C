@@ -69,6 +69,8 @@ void CentralLB::initLB(const CkLBOptions &opt)
   // create and turn on by default
   startLbFnHdl = lbmgr->
     AddStartLBFn(this, &CentralLB::StartLB);
+  receiver = lbmgr->
+    AddLocalBarrierReceiver(this, &CentralLB::InvokeLB);
 
   // CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
   if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))

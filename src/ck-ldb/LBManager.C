@@ -1238,7 +1238,6 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
       at_count -= client_count;
       cur_refcount++;
       CallReceivers();
-      if (_mgr->loadbalancers.size() > 0) _mgr->loadbalancers[0]->InvokeLB();
     }
   }
 }
