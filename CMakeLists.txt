@@ -532,7 +532,9 @@ endif()
 
 # Header files
 configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
-configure_file(src/arch/${GDIR}/conv-common.sh               include/ COPYONLY)
+if(EXISTS src/arch/${GDIR}/conv-common.sh)
+  configure_file(src/arch/${GDIR}/conv-common.sh               include/ COPYONLY)
+endif()
 configure_file(src/arch/${VDIR}/conv-mach.h                  include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-common.h            include/ COPYONLY)
 configure_file(src/arch/util/lrts-common.h                   include/ COPYONLY)
