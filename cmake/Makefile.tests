@@ -3,7 +3,7 @@
 # The rules below are for compatibility with the CMake build system
 
 charm++:
-	make -C .. -q lib/libckpics.a || make -C ..
+	make -C .. -q lib/libmoduletcharm.a || make -C ..
 
 AMPI: charm++
 	make -C .. -q lib/libmoduleampi.a || { echo "=== You are missing the AMPI targets. Please build Charm++ with './build AMPI <...>' . ==="; exit 1; }
