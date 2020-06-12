@@ -230,15 +230,21 @@ void _loadbalancerInit()
           _lb_args.legacyCentralizedStrategies().push_back("Rotate");
         else
           lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
+
         if (strcmp(balancer, "TreeLB") == 0) TreeLB_registered = true;
-      }
-      if (_lb_args.legacyCentralizedStrategies().size() > 0)
-      {
-        if (!TreeLB_registered) lbRegistry.addRuntimeBalancer("TreeLB");
-        if (_lb_args.legacyCentralizedStrategies().size() > 1)
-          // should this be supported?
-          CkAbort(
-              "Sequencing multiple centralized strategies with TreeLB not supported\n");
+
+        if (!_lb_args.legacyCentralizedStrategies().empty())
+        {
+          if (!TreeLB_registered)
+          {
+            lbRegistry.addRuntimeBalancer("TreeLB");
+            TreeLB_registered = true;
+          }
+          if (_lb_args.legacyCentralizedStrategies().size() > 1)
+            // TODO: add support for multiple instances of TreeLB
+            CkAbort(
+                 "Sequencing multiple centralized strategies with TreeLB not supported\n");
+        }
       }
     }
     else
