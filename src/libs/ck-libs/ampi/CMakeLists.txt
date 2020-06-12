@@ -4,8 +4,6 @@ set(ampi-f90-sources ampifimpl.f90 ampimod.f90)
 
 set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h mpio_functions.h mpio.h mpio_functions.h mpio_globals.h mpiof.h)
 
-include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
-
 add_library(ampi-compat compat_ampi.c
        compat_ampim.C compat_ampifm.C compat_ampicm.C
        compat_ampicpp.C)
