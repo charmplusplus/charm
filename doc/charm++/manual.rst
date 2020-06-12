@@ -3646,12 +3646,12 @@ should *not* reuse the buffer. That is, after you have passed a message
 buffer into an asynchronous entry method invocation, you shouldn’t
 access its fields, or pass that same buffer into a second entry method
 invocation. Note that this rule doesn’t preclude the *single reuse* of
-an input message - consider an entry method invocation :math:`i_1`,
-which receives as input the message buffer :math:`m_1`. Then,
-:math:`m_1` may be passed to an asynchronous entry method invocation
-:math:`i_2`. However, once :math:`i_2` has been issued with :math:`m_1`
-as its input parameter, :math:`m_1` cannot be used in any further entry
-method invocations.
+a received message - consider being inside the body of an entry method
+invocation :math:`i_1`, which has received the message buffer :math:`m_1`
+as an input parameter. Then, :math:`m_1` may be passed to an asynchronous
+entry method invocation :math:`i_2`. However, once :math:`i_2` has been
+issued with :math:`m_1` as its input parameter, :math:`m_1` cannot be
+used in any further entry method invocations.
 
 Several kinds of message are available. Regular Charm++ messages are
 objects of *fixed size*. One can have messages that contain pointers or
@@ -4248,7 +4248,7 @@ aggregate
    messages before being sent, to reduce fine-grained overhead. The
    aggregation is handled by the Topological Routing and Aggregation
    Module (TRAM). The argument to this entry method must be a single
-   fixed-size object. More details on TRAM are given in the `TRAM
+   PUPable object. More details on TRAM are given in the `TRAM
    section <http://charm.cs.illinois.edu/manuals/html/libraries/manual-1p.html#TRAM>`__
    of the libraries manual.
 
@@ -10826,7 +10826,7 @@ Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 As an experimental feature, Charm++ can be installed with the CMake tool,
-version 3.4 or newer (3.11 if you need Fortran support).
+version 3.4 or newer.
 This is currently supported on Linux and Darwin, but not on Windows.
 
 After downloading and unpacking Charm++, it can be installed in the following way:

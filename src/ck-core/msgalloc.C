@@ -95,6 +95,12 @@ void* CkCopyMsg(void **pMsg)
   return srcMsg;
 }
 
+void* CkReferenceMsg(void* msg)
+{
+  CmiReference(UsrToEnv(msg));
+  return msg;
+}
+
 void  CkSetQueueing(void *msg, int strategy)
 {
   UsrToEnv(msg)->setQueueing((unsigned char) strategy);

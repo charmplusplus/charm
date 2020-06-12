@@ -25,7 +25,7 @@ void hapiMapping(char** argv);
 void hapiRegisterCallbacks();
 
 // Polls for GPU work completion. Does not do anything if HAPI_CUDA_CALLBACK is defined.
-void hapiPollEvents();
+void hapiPollEvents(void* param, double cur_time);
 
 // BufferPool constructs for mempool implementation.
 // Data and metadata reside in same chunk of memory.

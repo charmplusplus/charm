@@ -197,12 +197,6 @@ void (*notify_crash_fn)(int) = NULL;
 
 CpvDeclare(char *, _validProcessors);
 
-#if CMK_CUDA
-CpvExtern(int, n_hapi_events);
-extern "C" void hapiPollEvents();
-extern "C" void hapiExitCsv();
-#endif
-
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -1020,12 +1014,12 @@ double CmiTimer(void)
 
 #if CMK_SMP
 # if CMK_HAS_RUSAGE_THREAD
-#define RUSAGE_WHO        1   /* RUSAGE_THREAD, only in latest Linux kernels */
+#define RUSAGE_WHO        RUSAGE_THREAD   /* since Linux 2.6.26 */
 #else
 #undef RUSAGE_WHO
 #endif
 #else
-#define RUSAGE_WHO        0
+#define RUSAGE_WHO        RUSAGE_SELF
 #endif
 
 static double inittime_wallclock;
@@ -1947,12 +1941,10 @@ void CsdScheduleForever(void)
       }
     }
 #endif
-    #if CMK_CUDA
-    // check if any GPU work needs to be processed
-    if (CpvAccess(n_hapi_events) > 0) {
-      hapiPollEvents();
-    }
-    #endif
+
+    // Execute functions registered to be executed at every scheduler loop
+    CcdRaiseCondition(CcdSCHEDLOOP);
+
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
 #if !CSD_NO_IDLE_TRACING
@@ -4092,17 +4084,6 @@ void ConverseCommonExit(void)
   CmiFlush(stdout);  /* end of program, always flush */
 #endif
 
-#if CMK_CUDA
-  // Only worker threads execute the following
-  if (!CmiInCommThread()) {
-    // Ensure all PEs have finished GPU work before destructing
-    CmiNodeBarrier();
-
-    if (CmiMyRank() == 0) {
-      hapiExitCsv();
-    }
-  }
-#endif
   seedBalancerExit();
   EmergencyExit();
 }

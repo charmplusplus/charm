@@ -49,6 +49,15 @@ enum ProfilingStage{
   GpuMemCleanup = 8802
 };
 
+#ifdef HAPI_CUDA_CALLBACK
+struct hapiCallbackMessage {
+  char header[CmiMsgHeaderSizeBytes];
+  int rank;
+  void* cb;
+  void* cb_msg;
+};
+#endif
+
 #ifndef HAPI_CUDA_CALLBACK
 typedef struct hapiEvent {
   cudaEvent_t event;
@@ -267,7 +276,7 @@ static void* hostToDeviceCallback(void* arg) {
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
   CmiAssert(hapiInvokeCallback);
-  hapiInvokeCallback(wr->host_to_device_cb);
+  hapiInvokeCallback(wr->host_to_device_cb, NULL);
 
   // inform QD that the host-to-device transfer is complete
   CmiAssert(hapiQdProcess);
@@ -283,7 +292,7 @@ static void* kernelCallback(void* arg) {
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
   CmiAssert(hapiInvokeCallback);
-  hapiInvokeCallback(wr->kernel_cb);
+  hapiInvokeCallback(wr->kernel_cb, NULL);
 
   // inform QD that the kernel is complete
   CmiAssert(hapiQdProcess);
@@ -303,7 +312,7 @@ static void* deviceToHostCallback(void* arg) {
   // invoke user callback
   if (wr->device_to_host_cb) {
     CmiAssert(hapiInvokeCallback);
-    hapiInvokeCallback(wr->device_to_host_cb);
+    hapiInvokeCallback(wr->device_to_host_cb, NULL);
   }
 
   hapiWorkRequestCleanup(wr);
@@ -321,13 +330,12 @@ static void* lightCallback(void *arg) {
   NVTXTracer nvtx_range("lightCallback", NVTXColor::Asbestos);
 #endif
 
-  char* conv_msg_tmp = (char*)arg + CmiMsgHeaderSizeBytes + sizeof(int);
-  void* cb = *((void**)conv_msg_tmp);
+  hapiCallbackMessage* conv_msg = (hapiCallbackMessage*)arg;
 
   // invoke user callback
-  if (cb) {
+  if (conv_msg->cb) {
     CmiAssert(hapiInvokeCallback);
-    hapiInvokeCallback(cb);
+    hapiInvokeCallback(conv_msg->cb, conv_msg->cb_msg);
   }
 
   // notify process to QD
@@ -361,21 +369,15 @@ void hapiRegisterCallbacks() {
 // that a thread created by the CUDA runtime does not have access to any of the
 // CpvDeclare'd variables as it is not one of the threads created by the Charm++
 // runtime.
-static void CUDART_CB CUDACallback(cudaStream_t stream, cudaError_t status,
-                                   void *data) {
+static void CUDACallback(void *data) {
 #ifdef HAPI_NVTX_PROFILE
   NVTXTracer nvtx_range("CUDACallback", NVTXColor::Silver);
 #endif
 
-  if (status == cudaSuccess) {
-    // send message to the original PE
-    char *conv_msg = (char*)data;
-    int dstRank = *((int *)(conv_msg + CmiMsgHeaderSizeBytes));
-    CmiPushPE(dstRank, conv_msg);
-  }
-  else {
-    CmiAbort("[HAPI] error before CUDACallback");
-  }
+  // send message to the original PE
+  char *conv_msg = (char*)data;
+  int dstRank = *((int *)(conv_msg + CmiMsgHeaderSizeBytes));
+  CmiPushPE(dstRank, conv_msg);
 }
 
 enum CallbackStage {
@@ -409,7 +411,7 @@ static void addCallback(hapiWorkRequest *wr, CallbackStage stage) {
   CmiSetHandler(conv_msg, handlerIdx);
 
   // add callback into CUDA stream
-  hapiCheck(cudaStreamAddCallback(wr->stream, CUDACallback, (void*)conv_msg, 0));
+  hapiCheck(cudaLaunchHostFunc(wr->stream, CUDACallback, (void*)conv_msg));
 }
 #endif // HAPI_CUDA_CALLBACK
 
@@ -906,8 +908,10 @@ void hapiClearInstrument() {
 // all successive completed events in the queue starting from the front.
 // TODO Maybe we should make one pass of all events in the queue instead,
 // since there might be completed events later in the queue.
-void hapiPollEvents() {
+void hapiPollEvents(void* param, double cur_time) {
 #ifndef HAPI_CUDA_CALLBACK
+  if (CpvAccess(n_hapi_events) <= 0) return;
+
   std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
   while (!queue.empty()) {
     hapiEvent hev = queue.front();
@@ -979,16 +983,14 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
 */
 
   // create converse message to be delivered to this PE after CUDA callback
-  char* conv_msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes + sizeof(int) +
-                                 sizeof(void*)); // FIXME memory leak?
-  char* conv_msg_tmp = conv_msg + CmiMsgHeaderSizeBytes;
-  *((int*)conv_msg_tmp) = CmiMyRank();
-  conv_msg_tmp += sizeof(int);
-  *((void**)conv_msg_tmp) = cb;
+  hapiCallbackMessage* conv_msg = (hapiCallbackMessage*)CmiAlloc(sizeof(hapiCallbackMessage)); // FIXME memory leak?
+  conv_msg->rank = CmiMyRank();
+  conv_msg->cb = cb;
+  conv_msg->cb_msg = cb_msg;
   CmiSetHandler(conv_msg, CsvAccess(gpu_manager).light_cb_idx_);
 
   // push into CUDA stream
-  hapiCheck(cudaStreamAddCallback(stream, CUDACallback, (void*)conv_msg, 0));
+  hapiCheck(cudaLaunchHostFunc(stream, CUDACallback, (void*)conv_msg));
 
   /*
 #if CMK_SMP

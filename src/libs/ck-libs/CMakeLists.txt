@@ -1,5 +1,6 @@
 # cache
 add_library(moduleCkCache cache/CkCache.C cache/CkCache.h)
+configure_file(cache/CkCache.h ${CMAKE_BINARY_DIR}/include COPYONLY)
 add_dependencies(moduleCkCache ck)
 
 # sparseContiguousReducer
@@ -62,7 +63,16 @@ set(liveviz-cxx-sources liveViz/liveViz0.C liveViz/liveViz.C liveViz/liveVizPoll
 add_library(moduleliveViz ${liveviz-h-sources} ${liveviz-cxx-sources})
 add_dependencies(moduleliveViz ck)
 
+foreach(file ${liveviz-h-sources})
+    configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+endforeach()
+
 target_compile_options(moduleliveViz PRIVATE -DEXTERIOR_BLACK_PIXEL_ELIMINATION)
+if(CMK_USE_LIBJPEG)
+    target_include_directories(moduleliveViz PRIVATE ${JPEG_INCLUDE_DIRS})
+endif()
+
+file(WRITE ${CMAKE_BINARY_DIR}/lib/libmoduleliveViz.dep "${CMK_LIBJPEG}\n")
 
 # taskGraph
 configure_file(taskGraph/taskGraph.h ${CMAKE_BINARY_DIR}/include COPYONLY)

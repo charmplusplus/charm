@@ -104,7 +104,6 @@ check_function_exists(mstats CMK_HAS_MSTATS)
 check_function_exists(ntohl CMK_HAS_NTOHL)
 check_function_exists(offsetof CMK_HAS_OFFSETOF)
 check_function_exists(openat HAVE_OPENAT)
-check_symbol_exists(PMI_Get_nid pmic.h CMK_HAS_PMI_GET_NID)
 check_function_exists(poll CMK_USE_POLL)
 check_function_exists(popen CMK_HAS_POPEN)
 check_function_exists(posix_memalign HAVE_POSIX_MEMALIGN)
@@ -155,6 +154,33 @@ else()
   set(CP "cp -p")
 endif()
 file(REMOVE ${CMAKE_BINARY_DIR}/test_file ${CMAKE_BINARY_DIR}/test_file2)
+
+
+check_c_source_compiles("
+#include <stdio.h>
+#include <lustre/lustreapi.h>
+#include <lustre/lustre_user.h>
+
+int main() {
+  llapi_printf(LLAPI_MSG_NORMAL, \"Lustre FS is available\");
+  return 0;
+}
+" CMK_HAS_LUSTREFS)
+
+
+if(CMK_HAS_LUSTREFS)
+  set(CMK_LUSTREAPI "-llustreapi")
+else()
+  set(CMK_LUSTREAPI "")
+endif()
+
+
+check_c_source_compiles("
+int main()
+{
+  asm volatile(\"eieio\" ::: \"memory\");
+}
+" CMK_PPC_ASM)
 
 check_c_source_compiles("
 int main()
@@ -240,6 +266,8 @@ int main()
 }
 " CMK_HAS_NUMACTRL)
 
+set(tmp ${CMAKE_REQUIRED_LIBRARIES})
+set(CMAKE_REQUIRED_LIBRARIES $ENV{CRAY_PMI_POST_LINK_OPTS} $ENV{CRAY_UGNI_POST_LINK_OPTS} -lugni -lpmi)
 check_c_source_compiles("
 #include <pmi.h>
 int main() {
@@ -249,6 +277,7 @@ int main() {
     return 0;
 }
 " CMK_HAS_PMI_GET_NID)
+set(CMAKE_REQUIRED_LIBRARIES ${tmp})
 
 check_c_source_compiles("
 #include <rca_lib.h>
@@ -333,6 +362,12 @@ int main() {
     return 0;
 }
 " CMK_BALANCED_INJECTION_API)
+
+if(NOT CMK_BALANCED_INJECTION_API)
+  # Since it is often checked via #ifdef, CMK_BALANCED_INJECTION_API
+  # can't be set to zero, but must be unset.
+  unset(CMK_BALANCED_INJECTION_API CACHE)
+endif()
 
 if(${CMK_BUILD_OFI} EQUAL 1)
   set(tmp ${CMAKE_REQUIRED_LIBRARIES})

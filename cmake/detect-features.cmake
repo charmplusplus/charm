@@ -10,7 +10,7 @@ endif()
 
 
 set(CMK_MACHINE_NAME \"${CHARM_PLATFORM}\")
-set(CHARM_VERSION ${PROJECT_VERSION})
+
 set(CMK_CCS_AVAILABLE 1)
 if(${NETWORK} STREQUAL "uth" OR ${NETWORK} STREQUAL "pami" OR ${NETWORK} STREQUAL "pamilrts")
   set(CMK_CCS_AVAILABLE 0)
@@ -62,6 +62,36 @@ endif()
 
 set(CMAKE_REQUIRED_FLAGS "")
 
+# Support for fsglobals/pipglobals
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+  set(CMK_SUPPORTS_FSGLOBALS 0)
+elseif(${CMK_HAS_DLOPEN} AND ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+  set(CMK_SUPPORTS_FSGLOBALS 1)
+elseif(${CMK_HAS_DLOPEN} AND (${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH}))
+  set(CMK_SUPPORTS_FSGLOBALS 1)
+else()
+  set(CMK_SUPPORTS_FSGLOBALS 0)
+endif()
+
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+  set(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY 0)
+else()
+  set(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY ${CMK_HAS_DLOPEN})
+endif()
+
+if(CMK_HAS_DLMOPEN AND CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY)
+  set(CMK_SUPPORTS_PIPGLOBALS 1)
+else()
+  set(CMK_SUPPORTS_PIPGLOBALS 0)
+endif()
+
+# Misc. flags
+set(CMK_LBID_64BIT 1)
+set(CMK_CKSECTIONINFO_STL 1)
+
+#FIXME: add CMK_CRAY_MAXNID
+
+
 # Create conv-autoconfig.h by iterating over all variable names and #defining them.
 get_cmake_property(_variableNames VARIABLES)
 list (SORT _variableNames)
@@ -70,7 +100,7 @@ set(optfile ${CMAKE_BINARY_DIR}/include/conv-autoconfig.h)
 file(REMOVE ${optfile})
 
 foreach (v ${_variableNames})
-    if(("${v}" MATCHES "^CMK_"  OR "${v}" MATCHES "^SIZEOF_" OR "${v}" MATCHES "^CHARM_") AND NOT "${v}" MATCHES "_CODE$")
+    if(("${v}" MATCHES "^CMK_"  OR "${v}" MATCHES "^SIZEOF_" OR "${v}" MATCHES "^CHARM_" OR "${v}" MATCHES "^QLOGIC$") AND NOT "${v}" MATCHES "_CODE$")
         if("${${v}}" STREQUAL "" OR "${${v}}" STREQUAL "FALSE")
             set(${v} 0)
         elseif("${${v}}" STREQUAL "TRUE")

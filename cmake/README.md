@@ -4,12 +4,7 @@ This document provides an overview of the CMake build system for Charm++.
 
 ## Requirements
 
-CMake version 3.4+ is required for all builds, due to the use of
-CMAKE_C_COMPILER_LAUNCHER and CMAKE_CXX_COMPILER_LAUNCHER for charmc, as
-discussed below.
-
-CMake version 3.11+ is required for Fortran support in Charm++ (i.e.,
-f90charm), due to the use of CMAKE_Fortran_COMPILER_LAUNCHER for charmc.
+CMake version 3.4+ is required for all builds.
 
 No further software, apart from the usual Charm++ requirements (including
 autoconf/automake for the embedded hwloc), should be necessary.
@@ -55,5 +50,6 @@ Currently, the CMake build system has the following limitations.
 
 - No Windows support. 
 - No support for `gni-*` and `*-crayx?` targets.
-- Not all options available in the old build system are supported (e.g. those that
-  require specifying `-D` options).
+- Not all options available in the old build system are supported.
+
+See https://github.com/UIUC-PPL/charm/issues/2839 for details.

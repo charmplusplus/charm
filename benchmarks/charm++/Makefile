@@ -5,10 +5,10 @@ DIRS = \
   migrate \
   taskSpawn \
   taskSpawnRecursive \
-  streamingAllToAll \
   kNeighbor \
   zerocopy \
 
+#streamingAllToAll benchmark must be rewritten with the [aggregate] API before it can be added back
 TESTDIRS = $(DIRS)
 
 all: $(foreach i,$(DIRS),build-$i)
