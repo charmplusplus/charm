@@ -155,8 +155,8 @@ public:
 
   inline const char *lbName() { return lbname; }
   inline int step() { return lbmgr->step(); }
-  virtual void turnOff() { CmiAbort("turnOff not implemented"); }
-  virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
+  virtual void turnOff();
+  virtual void turnOn();
   virtual int  useMem()  { return 0; }
   virtual void pup(PUP::er &p);
   virtual void flushStates();
