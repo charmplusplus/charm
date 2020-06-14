@@ -1623,16 +1623,6 @@ void _initCharm(int unused_argc, char **argv)
 	}	
 #endif
 
-#if CMK_CUDA
-  // Perform HAPI initialization for GPU support
-  hapiInit(argv);
-
-  // Initialize Charm++ layer functions
-  hapiInvokeCallback = CUDACallbackManager;
-  hapiQdCreate = QdCreate;
-  hapiQdProcess = QdProcess;
-#endif
-
     if (CkMyRank() == 0) {
       TopoManager_init();
     }
@@ -1691,6 +1681,16 @@ void _initCharm(int unused_argc, char **argv)
             fclose(fp);
         }
     }
+
+#if CMK_CUDA
+  // Perform HAPI initialization for GPU support
+  hapiInit(argv);
+
+  // Initialize Charm++ layer functions
+  hapiInvokeCallback = CUDACallbackManager;
+  hapiQdCreate = QdCreate;
+  hapiQdProcess = QdProcess;
+#endif
 
 #if CMK_USE_PXSHM && ( CMK_CRAYXE || CMK_CRAYXC ) && CMK_SMP
       // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized
