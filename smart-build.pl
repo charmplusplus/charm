@@ -350,8 +350,6 @@ if($arch eq ""){
 
 if($arch eq "netlrts-darwin"){
 	$arch = "netlrts-darwin-x86_64";
-} elsif($arch eq "multicore-linux-arm7"){
-	$arch = "multicore-arm7";
 }
 
 

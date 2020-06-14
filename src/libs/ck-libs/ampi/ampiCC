@@ -1,4 +1,11 @@
 #!/bin/bash
+
+# Filter extra cmake arguments
+# This has no effect when building Charm++ without cmake
+if [[ "$1" = "@CMAKE_C_COMPILER@" ]]; then shift; fi
+if [[ "$1" = "@CMAKE_CXX_COMPILER@" ]]; then shift; fi
+if [[ "$1" = "@CMAKE_Fortran_COMPILER@" ]]; then shift; fi
+
 [ -z "$AMPICC" ] && AMPICC="$(basename $0)"
 CHARMBIN=$(dirname $0)
 CHARMLIB="$CHARMBIN/../lib"

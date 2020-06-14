@@ -111,6 +111,7 @@ option(F90CHARM            "Build f90charm" OFF)
 option(BUILD_CUDA          "Build with CUDA support" OFF)
 
 option(PXSHM               "Build with PXSHM" OFF)
+option(QLOGIC              "QLogic based Infiniband" OFF)
 
 # UCX PMI options
 set(UCX_PMI "" CACHE STRING "PMI type for UCX layer, can be one of simplepmi, simplepmi2, or ompipmix")
@@ -195,9 +196,11 @@ if(${CMK_USE_ZLIB})
   set(CMK_SYSLIBS "${CMK_SYSLIBS} -lz")
 endif()
 
+set(CMK_USE_LIBJPEG 0)
 find_package(JPEG)
 IF(JPEG_FOUND)
   set(CMK_LIBJPEG "-ljpeg")
+  set(CMK_USE_LIBJPEG 1)
 ENDIF()
 
 find_package(PythonInterp)
@@ -297,10 +300,16 @@ endif()
 
 set(CMK_BUILD_MPI 0)
 set(CMK_BUILD_ON_MPI 0)
+set(CMK_CXX_MPI_BINDINGS 1) # Always true, this just checked for a conflict with old mpich versions.
 if(${NETWORK} STREQUAL "mpi")
   set(CMK_BUILD_MPI 1)
   set(CMK_BUILD_ON_MPI 1)
   find_package(MPI REQUIRED)
+endif()
+
+set(CMK_BUILD_ON_UCX 0)
+if(${NETWORK} STREQUAL "ucx")
+  set(CMK_BUILD_ON_UCX 1)
 endif()
 
 set(CMK_BUILD_OFI 0)
@@ -433,34 +442,53 @@ set(VDIR ${CHARM_PLATFORM})
 set(CMK_VDIR ${VDIR})
 set(CMK_GDIR ${GDIR})
 
-# configure_file(src/arch/common/conv-mach-opt.sh            include/ COPYONLY) # generated
-# configure_file(src/arch/common/conv-mach-pre.sh            include/ COPYONLY) # unused
+configure_file(src/arch/common/cc-bluegene.sh                include/ COPYONLY)
 configure_file(src/arch/common/cc-clang.sh                   include/ COPYONLY)
 configure_file(src/arch/common/cc-clang.h                    include/ COPYONLY)
+configure_file(src/arch/common/cc-craycc.h                   include/ COPYONLY)
+configure_file(src/arch/common/cc-craycc.sh                  include/ COPYONLY)
+configure_file(src/arch/common/cc-msvc.h                     include/ COPYONLY)
+configure_file(src/arch/common/cc-msvc.sh                    include/ COPYONLY)
+configure_file(src/arch/common/cc-pgcc.h                     include/ COPYONLY)
+configure_file(src/arch/common/cc-pgcc.sh                    include/ COPYONLY)
 configure_file(src/arch/common/cc-icc.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-icc.h                      include/ COPYONLY)
+configure_file(src/arch/common/cc-xlc.h                      include/ COPYONLY)
+configure_file(src/arch/common/cc-xlc.sh                     include/ COPYONLY)
+configure_file(src/arch/common/cc-xlc64.sh                   include/ COPYONLY)
+configure_file(src/arch/common/cc-xlc64.h                    include/ COPYONLY)
 configure_file(src/arch/common/cc-iccstatic.sh               include/ COPYONLY)
 configure_file(src/arch/common/cc-iccstatic.h                include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.h                      include/ COPYONLY)
 configure_file(src/arch/common/cc-mpi.sh                     include/ COPYONLY)
-configure_file(src/arch/common/cc-mpiopts.sh                 include/ COPYONLY) #sh only
+configure_file(src/arch/common/cc-mpiopts.sh                 include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-craype.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-darwin.sh           include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-flang.h             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-flang.sh            include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-gfortran.sh         include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-gfortran.h          include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ifort.sh            include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-ifort.h             include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-nolb.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-nolb.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-omp.sh              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-omp.h               include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-ooc.h               include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ooc.sh              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-papi.sh             include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-papi.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-perftools.sh        include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-perftools.h         include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-persistent.sh       include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-persistent.h        include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-pgf90.sh            include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-pgf90.h             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-syncft.sh           include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-tsan.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-tsan.sh             include/ COPYONLY)
 configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
@@ -468,6 +496,11 @@ configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
+endif()
+
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-sysvshm.sh)
+  configure_file(src/arch/${VDIR}/conv-mach-sysvshm.sh       include/ COPYONLY)
+  configure_file(src/arch/${VDIR}/conv-mach-sysvshm.h        include/ COPYONLY)
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-pxshm.sh)
@@ -505,6 +538,9 @@ endif()
 
 # Header files
 configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
+if(EXISTS src/arch/${GDIR}/conv-common.sh)
+  configure_file(src/arch/${GDIR}/conv-common.sh               include/ COPYONLY)
+endif()
 configure_file(src/arch/${VDIR}/conv-mach.h                  include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-common.h            include/ COPYONLY)
 configure_file(src/arch/util/lrts-common.h                   include/ COPYONLY)
@@ -639,11 +675,19 @@ foreach(filename ${tmgr-h-sources})
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
 
+if(${TARGET} STREQUAL "LIBS")
+  add_subdirectory(src/libs/conv-libs)
+  add_subdirectory(src/libs/ck-libs)
+  set(EVERYLB 1)
+endif()
+
 # Charm++
 add_subdirectory(src/ck-core)
 add_subdirectory(src/ck-perf)
-add_subdirectory(src/ck-pics)
 
+if(TRACING)
+  add_subdirectory(src/ck-pics)
+endif()
 
 set(modulecompletion-h-sources src/libs/ck-libs/completion/completion.h)
 set(modulecompletion-cxx-sources src/libs/ck-libs/completion/completion.C)
@@ -713,11 +757,6 @@ add_dependencies(tcharm-compat ck)
 
 if(${TARGET} STREQUAL "AMPI" OR ${TARGET} STREQUAL "LIBS")
   add_subdirectory(src/libs/ck-libs/ampi)
-endif()
-
-if(${TARGET} STREQUAL "LIBS")
-  add_subdirectory(src/libs/conv-libs)
-  add_subdirectory(src/libs/ck-libs)
 endif()
 
 if(${NETWORK} STREQUAL "uth")
@@ -819,6 +858,13 @@ foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM)
     endif()
 endforeach()
 
+# Options that need no .h/.sh additions
+foreach(opt TRACING TRACING_COMMTHREAD)
+    if(${opt})
+        set(opts_enabled "${opts_enabled}${opt} ")
+    endif()
+endforeach()
+
 # Determine OS/kernel version
 find_program(LSB_RELEASE_EXEC lsb_release)
 
@@ -894,6 +940,10 @@ add_custom_target(create_symlinks ALL
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
 file(WRITE ${CMAKE_BINARY_DIR}/include/.vdir   "${CMK_VDIR}\n")
 file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
+
+
+# Copy the Makefile used for building and running tests
+configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests ${CMAKE_BINARY_DIR}/include/Makefile COPYONLY)
 
 
 # Installation rules

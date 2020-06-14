@@ -6,6 +6,7 @@ add_dependencies(moduleCkCache ck)
 # sparseContiguousReducer
 add_library(moduleCkSparseContiguousReducer sparseContiguousReducer/cksparsecontiguousreducer.h sparseContiguousReducer/cksparsecontiguousreducer.C)
 add_dependencies(moduleCkSparseContiguousReducer ck)
+configure_file(sparseContiguousReducer/cksparsecontiguousreducer.h ${CMAKE_BINARY_DIR}/include COPYONLY)
 
 # multiphaseSharedArrays
 add_library(modulemsa multiphaseSharedArrays/msa.h multiphaseSharedArrays/msa-common.h multiphaseSharedArrays/msa-distArray.h multiphaseSharedArrays/msa-DistPageMgr.h multiphaseSharedArrays/msa-distArray.C)
@@ -40,15 +41,15 @@ configure_file(mblock/libmodulemblock.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
 configure_file(mblock/mblock.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
 configure_file(mblock/mblockf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
 
-add_library(libmodulemblock mblock/mblock.C mblock/patch.C
+add_library(modulemblock mblock/mblock.C mblock/patch.C
 mblock/compat_driver.c mblock/compat_fdriver.c mblock/mblock.h
 mblock/mblockf.h mblock/patch.h mblock/gridutil.h mblock/mblock_impl.h)
-add_dependencies(libmodulemblock ck)
+add_dependencies(modulemblock ck)
 
 # barrier
 configure_file(barrier/barrier.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
-add_library(libmodulebarrier barrier/barrier.C barrier/barrier.h)
-add_dependencies(libmodulebarrier ck)
+add_library(modulebarrier barrier/barrier.C barrier/barrier.h)
+add_dependencies(modulebarrier ck)
 
 # irecv
 configure_file(irecv/receiver.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
@@ -68,6 +69,11 @@ foreach(file ${liveviz-h-sources})
 endforeach()
 
 target_compile_options(moduleliveViz PRIVATE -DEXTERIOR_BLACK_PIXEL_ELIMINATION)
+if(CMK_USE_LIBJPEG)
+    target_include_directories(moduleliveViz PRIVATE ${JPEG_INCLUDE_DIRS})
+endif()
+
+file(WRITE ${CMAKE_BINARY_DIR}/lib/libmoduleliveViz.dep "${CMK_LIBJPEG}\n")
 
 # taskGraph
 configure_file(taskGraph/taskGraph.h ${CMAKE_BINARY_DIR}/include COPYONLY)
@@ -79,7 +85,7 @@ add_dependencies(moduletaskGraph ck)
 set(search-h-sources search/search.h search/problem.h search/serialtree.h search/idastar.h)
 set(search-cxx-sources search/search.C search/problem.C search/serialtree.C search/idastar.C)
 
-foreach(file ${search-h-sources})  
+foreach(file ${search-h-sources})
     configure_file(${file} ${CMAKE_BINARY_DIR}/include/cklibs/ COPYONLY)
 endforeach()
 
@@ -108,3 +114,42 @@ add_library(moduleseqpose ${pose-cxx-sources})
 target_compile_options(moduleseqpose PRIVATE -DSEQUENTIAL_POSE=1)
 add_dependencies(modulepose ck)
 add_dependencies(moduleseqpose ck)
+
+configure_file(pose/libmodulepose.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
+configure_file(pose/libmodulepose.dep ${CMAKE_BINARY_DIR}/lib/libmoduleseqpose.dep COPYONLY)
+
+
+# idxl
+set(idxl-h-sources idxl/idxlc.h idxl/idxlf.h idxl/idxl.h idxl/idxl_layout.h idxl/idxl_comm.h)
+set(idxl-cxx-sources idxl/idxl.C idxl/idxl_layout.C idxl/idxl_comm.C idxl/idxl_api.C)
+add_library(idxl ${idxl-h-sources} ${idxl-cxx-sources})
+add_dependencies(idxl ck moduleampi)
+
+set_target_properties(idxl PROPERTIES RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/ampicxx)
+
+foreach(file ${idxl-h-sources})
+	configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+endforeach()
+
+
+# searchengine
+
+set(searchengine-h-sources state_space_searchengine/searchEngine.h state_space_searchengine/searchEngine_impl.h)
+
+set(searchengine-cxx-sources state_space_searchengine/searchEngine.C)
+
+add_library(modulesearchEngine ${searchengine-h-sources} ${searchengine-cxx-sources})
+add_dependencies(modulesearchEngine ck)
+configure_file(state_space_searchengine/searchEngine.h ${CMAKE_BINARY_DIR}/include COPYONLY)
+configure_file(state_space_searchengine/searchEngine_impl.h ${CMAKE_BINARY_DIR}/include COPYONLY)
+
+add_library(modulesearchEngine_bound ${searchengine-h-sources} ${searchengine-cxx-sources} ${CMAKE_BINARY_DIR}/include/searchEngine_bound.decl.h)
+add_dependencies(modulesearchEngine_bound ck)
+target_compile_options(modulesearchEngine_bound PRIVATE -DBRANCHBOUND)
+
+add_custom_command(
+      OUTPUT ${CMAKE_BINARY_DIR}/include/searchEngine_bound.decl.h
+      COMMAND sed -e 's/module searchEngine/module searchEngine_bound/' ${CMAKE_CURRENT_SOURCE_DIR}/state_space_searchengine/searchEngine.ci > searchEngine_bound.ci && ${CMAKE_BINARY_DIR}/bin/charmc -DBRANCHBOUND -E searchEngine_bound.ci
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/
+      DEPENDS charmxi
+      )

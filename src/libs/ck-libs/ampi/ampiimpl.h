@@ -968,7 +968,6 @@ class ampiCommStruct {
     }
   }
 };
-PUPmarshall(ampiCommStruct)
 
 // group operations
 inline void outputOp(const std::vector<int>& vec) noexcept {
@@ -1156,10 +1155,6 @@ enum AmpiReqType : uint8_t {
   AMPI_GPU_REQ     = 9
 #endif
 };
-
-inline void operator|(PUP::er &p, AmpiReqType &r) {
-  pup_bytes(&p, (void *)&r, sizeof(AmpiReqType));
-}
 
 enum AmpiReqSts : char {
   AMPI_REQ_PENDING   = 0,
@@ -2071,8 +2066,6 @@ public:
     elements[destRank].decSeqOutgoing();
   }
 };
-PUPmarshall(AmpiSeqQ)
-
 
 inline CProxy_ampi ampiCommStruct::getProxy() const noexcept {return ampiID;}
 
