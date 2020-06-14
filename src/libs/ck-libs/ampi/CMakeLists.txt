@@ -9,7 +9,7 @@ add_library(ampi-compat compat_ampi.c
        compat_ampicpp.C)
 
 add_library(moduleampi ${ampi-cxx-sources} ${ampi-h-sources})
-add_dependencies(moduleampi moduletcharm ck ampi_funcptr_shim ampi_funcptr_fortran )
+add_dependencies(moduleampi moduletcharm ck ampi_funcptr_shim ampi_funcptr_fortran)
 
 
 # fsglobals/pipglobals
@@ -140,9 +140,7 @@ if(${CMK_AMPI_WITH_ROMIO})
     include(ExternalProject)
     ExternalProject_Add(romio
         URL ${CMAKE_CURRENT_SOURCE_DIR}/romio
-        # touch: update timestamps on these files so that ROMIO's Makefile does not run configure a second time
         CONFIGURE_COMMAND cd ${romio_dir} &&
-            touch aclocal.m4 Makefile.in configure config.status &&
             export MPI_IMPL=ampi &&
             export FROM_MPICH=no &&
             export FROM_MPICH2=no &&
@@ -161,17 +159,19 @@ if(${CMK_AMPI_WITH_ROMIO})
         COMMAND cp -f ${romio_dir}/include/mpio.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f ${romio_dir}/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f ${romio_dir}/include/mpio_functions.h ${CMAKE_BINARY_DIR}/include/
-        BUILD_COMMAND cd ${romio_dir} && make AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: > /dev/null
-        COMMAND cp -f ${romio_dir}/.libs/libromio.a ${CMAKE_BINARY_DIR}/lib/libampiromio.a
+        BUILD_COMMAND make -C ${romio_dir} AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: > /dev/null
+        INSTALL_COMMAND cp -f ${romio_dir}/.libs/libromio.a ${CMAKE_BINARY_DIR}/lib/libampiromio.a
         COMMAND test ${BUILD_SHARED} -eq 1 && cp -f ${romio_dir}/.libs/libromio${CMAKE_SHARED_LIBRARY_SUFFIX} ${CMAKE_BINARY_DIR}/lib_so/libampiromio${CMAKE_SHARED_LIBRARY_SUFFIX} || true
-        INSTALL_COMMAND "" # No install step
         LIST_SEPARATOR ^^
     )
 
     # Since we link a program with charmc as part of ROMIO's configure,
     # we need all libraries built at this point.
-    add_dependencies(romio moduleampi ampi-compat ck modulecompletion conv-partition conv-util hwloc conv-static conv-core)
+    add_dependencies(romio moduleampi ampi-compat ck modulecompletion
+        conv-partition conv-util hwloc conv-static conv-core ldb-rand
+        memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
+        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer)
     if(${CMK_CAN_LINK_FORTRAN})
-        add_dependencies(romio moduleampif)
+        add_dependencies(romio moduleampif conv-utilf)
     endif()
 endif()
