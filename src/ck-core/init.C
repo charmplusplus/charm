@@ -668,14 +668,8 @@ static void _exitHandler(envelope *env)
 #endif
 
 #if CMK_CUDA
-      // Ensure all PEs have finished GPU work
-      CmiNodeBarrier();
-
-      if (CmiMyRank() == 0) {
-        shmCleanup();
-
-        hapiExitCsv();
-      }
+      // Clean up HAPI
+      hapiExit();
 #endif
 
       //everyone exits here - there may be issues with leftover messages in the queue
@@ -1631,46 +1625,12 @@ void _initCharm(int unused_argc, char **argv)
 
 #if CMK_CUDA
   // Perform HAPI initialization for GPU support
-  if (!CmiInCommThread()) {
-    if (CmiMyRank() == 0) {
-      hapiInitCsv(); // Initialize per-process variables (GPUManager)
-    }
-    hapiInitCpv(); // Initialize per-PE variables
+  hapiInit(argv);
 
-    CmiNodeBarrier();
-
-    hapiMapping(argv); // Perform PE-device mapping
-
-    // Register polling function to be invoked at every scheduler loop
-    CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
-
-    CmiNodeBarrier();
-
-    if (CmiMyRank() == 0) {
-      shmCreate(); // Create a per-host shared memory region
-    }
-
-    CmiNodeBarrier();
-
-    ipcHandleCreate(); // Create CUDA IPC handles
-  }
-
-  // Ensure CUDA IPC handles are available for all processes
-  // Note: Causes a hang when this barrier is placed after CPU topology initialization
-  // FIXME: This only needs to be a host-wide synchronization
-  CmiBarrier();
-
-  if (!CmiInCommThread()) {
-    if (CmiMyRank() == 0) {
-      ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
-    }
-
-    // Register callback functions and initialize Charm++ layer functions
-    hapiRegisterCallbacks();
-    hapiInvokeCallback = CUDACallbackManager;
-    hapiQdCreate = QdCreate;
-    hapiQdProcess = QdProcess;
-  }
+  // Initialize Charm++ layer functions
+  hapiInvokeCallback = CUDACallbackManager;
+  hapiQdCreate = QdCreate;
+  hapiQdProcess = QdProcess;
 #endif
 
     if (CkMyRank() == 0) {

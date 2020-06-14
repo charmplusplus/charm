@@ -104,15 +104,78 @@ static inline int CmiMyNodeRankLocal() {
   return CmiNodeRankLocal(CmiMyPe());
 }
 
+// HAPI internal function declarations
+static void hapiInitCsv();
+static void hapiInitCpv();
+static void hapiExitCsv();
+
+static void hapiMapping(char** argv);
+static void hapiRegisterCallbacks();
+
+// CUDA IPC related functions
+static void shmCreate();
+static void shmCleanup();
+static void ipcHandleCreate();
+static void ipcHandleOpen();
+
+// Called by all PEs in Charm++ layer init
+void hapiInit(char** argv) {
+  if (!CmiInCommThread()) {
+    if (CmiMyRank() == 0) {
+      hapiInitCsv(); // Initialize per-process variables (GPUManager)
+    }
+    hapiInitCpv(); // Initialize per-PE variables
+
+    CmiNodeBarrier();
+
+    hapiMapping(argv); // Perform PE-device mapping
+
+    // Register polling function to be invoked at every scheduler loop
+    CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
+
+    CmiNodeBarrier();
+
+    if (CmiMyRank() == 0) {
+      shmCreate(); // Create a per-host shared memory region
+    }
+
+    CmiNodeBarrier();
+
+    ipcHandleCreate(); // Create CUDA IPC handles
+  }
+
+  // Ensure CUDA IPC handles are available for all processes
+  // Note: Causes a hang when this barrier is placed after CPU topology initialization
+  // FIXME: This only needs to be a host-wide synchronization
+  CmiBarrier();
+
+  if (CmiMyRank() == 0) {
+    ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
+  }
+
+  hapiRegisterCallbacks(); // Register callback functions
+}
+
+void hapiExit() {
+  // Ensure all PEs have finished GPU work
+  CmiNodeBarrier();
+
+  if (CmiMyRank() == 0) {
+    shmCleanup();
+
+    hapiExitCsv();
+  }
+}
+
 // Initialize per-process variables
-void hapiInitCsv() {
+static void hapiInitCsv() {
   // Create and initialize GPU Manager object
   CsvInitialize(GPUManager, gpu_manager);
   CsvAccess(gpu_manager).init();
 }
 
 // Initialize per-PE variables
-void hapiInitCpv() {
+static void hapiInitCpv() {
   // HAPI event-related
 #ifndef HAPI_CUDA_CALLBACK
   CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
@@ -128,7 +191,7 @@ void hapiInitCpv() {
 }
 
 // Clean up per-process data
-void hapiExitCsv() {
+static void hapiExitCsv() {
   // Destroy GPU Manager object
   CsvAccess(gpu_manager).destroy();
 
@@ -140,7 +203,7 @@ void hapiExitCsv() {
 
 // Set up PE to GPU mapping, invoked from all PEs
 // TODO: Support custom mappings
-void hapiMapping(char** argv) {
+static void hapiMapping(char** argv) {
   Mapping map_type = Mapping::Block; // Default is block mapping
   bool all_gpus = false; // If true, all GPUs are visible to all processes.
                          // Otherwise, only a subset are visible (e.g. with jsrun)
@@ -454,7 +517,7 @@ static void* lightCallback(void *arg) {
 #endif // HAPI_CUDA_CALLBACK
 
 // Register callback functions. All PEs need to call this.
-void hapiRegisterCallbacks() {
+static void hapiRegisterCallbacks() {
 #ifdef HAPI_CUDA_CALLBACK
   // FIXME: Potential race condition on assignments, but CmiAssignOnce
   // causes a hang at startup.
@@ -628,7 +691,7 @@ hapiWorkRequest::hapiWorkRequest() :
 
 // Create POSIX shared memory region accessible to all processes on the same host
 // Invoked by PE rank 0 of each process (no locking needed for SMP)
-void shmCreate() {
+static void shmCreate() {
   struct stat shm_file_stat;
 
   // Create the shared memory file
@@ -697,7 +760,7 @@ shm_cleanup:
 
 // Clean up shared memory region
 // Invoked by PE rank 0 of each process
-void shmCleanup() {
+static void shmCleanup() {
   if (CsvAccess(gpu_manager).shm_ptr != NULL) {
     munmap(CsvAccess(gpu_manager).shm_ptr, CsvAccess(gpu_manager).shm_size);
   }
@@ -714,7 +777,7 @@ void shmCleanup() {
 
 // Create CUDA IPC handles and populate shared memory region
 // Invoked by all PEs
-void ipcHandleCreate() {
+static void ipcHandleCreate() {
   // Only device reps should continue to perform the following operations
   // so that they are done only once per device
   if (!CpvAccess(device_rep)) return;
@@ -756,7 +819,7 @@ void ipcHandleCreate() {
 
 // Open CUDA IPC handles created by other processes
 // Invoked by PE rank 0 of each process
-void ipcHandleOpen() {
+static void ipcHandleOpen() {
   // Loop through all processes on this host
   for (int i = 0; i < CmiNumNodes() / CmiNumPhysicalNodes(); i++) {
     if (i == CmiMyNodeRankLocal()) continue;
