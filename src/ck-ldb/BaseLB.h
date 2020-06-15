@@ -151,7 +151,7 @@ public:
   BaseLB(CkMigrateMessage *m):CBase_BaseLB(m) {
     lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   }
-  virtual ~BaseLB() {};
+  virtual ~BaseLB() {}
 
   inline const char *lbName() { return lbname; }
   inline int step() { return lbmgr->step(); }
