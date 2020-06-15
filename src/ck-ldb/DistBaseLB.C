@@ -10,12 +10,35 @@
 #define  DEBUGF(x)      // CmiPrintf x;
 
 void DistBaseLB::barrierDone() {
-  thisProxy.InvokeLB();
+#if CMK_LBDB_ON
+  if (lb_started) {
+    return;
+  }
+  lb_started = true;
+
+  start_lb_time = 0;
+
+  if (CkNumPes() == 1) {
+    MigrationDone(0);
+    return;
+  }
+
+  start_lb_time = CkWallTimer();
+  if (CkMyPe() == 0) {
+    if (_lb_args.debug()) {
+      CkPrintf("[%s] Load balancing step %d starting at %f\n",
+          lbName(), step(),start_lb_time);
+    }
+  }
+
+  AssembleStats();
+  thisProxy[CkMyPe()].LoadBalance();
+#endif
 }
 
-void DistBaseLB::ProcessAtSync() {
-  // Ensuring that the strategy starts only after the barrier
-  CkCallback cb (CkReductionTarget(DistBaseLB, barrierDone), 0, thisProxy);
+void DistBaseLB::InvokeLB() {
+  // Ensure that the strategy starts only after the barrier
+  CkCallback cb (CkReductionTarget(DistBaseLB, barrierDone), thisProxy);
   contribute(cb);
 }
 
@@ -23,7 +46,7 @@ DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
 #if CMK_LBDB_ON
   lbname = (char *)"DistBaseLB";
   thisProxy = CProxy_DistBaseLB(thisgroup);
-  receiver = lbmgr->AddLocalBarrierReceiver(this, &DistBaseLB::ProcessAtSync);
+  receiver = lbmgr->AddLocalBarrierReceiver(this, &DistBaseLB::InvokeLB);
   startLbFnHdl = lbmgr->AddStartLBFn(this, &DistBaseLB::barrierDone);
 
   if (opt.getSeqNo() > 0)
@@ -56,34 +79,6 @@ DistBaseLB::~DistBaseLB() {
   if (mig_msgs) {
     delete [] mig_msgs;
   }
-#endif
-}
-
-
-void DistBaseLB::InvokeLB() {
-#if CMK_LBDB_ON
-  if (lb_started) {
-    return;
-  }
-  lb_started = true;
-
-  start_lb_time = 0;
-
-  if (CkNumPes() == 1) {
-    MigrationDone(0);
-    return;
-  }
-
-  start_lb_time = CkWallTimer();
-  if (CkMyPe() == 0) {
-    if (_lb_args.debug()) {
-      CkPrintf("[%s] Load balancing step %d starting at %f\n",
-          lbName(), step(),start_lb_time);
-    }
-  }
-
-  AssembleStats();
-  thisProxy[CkMyPe()].LoadBalance();
 #endif
 }
 
