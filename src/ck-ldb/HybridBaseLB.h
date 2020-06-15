@@ -436,7 +436,6 @@ protected:
   StatsStrategy statsStrategy;
 
 private:
-  void AtBarrier(void);
   void FindNeighbors();
   void buildStats(int level);
   CLBStatsMsg * buildCombinedLBStatsMessage(int atlevel);
