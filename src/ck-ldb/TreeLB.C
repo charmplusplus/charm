@@ -91,8 +91,6 @@ void TreeLB::init(const CkLBOptions& opts)
   if (_lb_args.statsOn())
     lbmgr->CollectStatsOn();  // collect load and (optionally) comm stats
 
-  receiver = lbmgr->AddLocalBarrierReceiver(this, &TreeLB::InvokeLB);
-
   if (opts.getSeqNo() > 0) {
     turnOff();
   }

@@ -46,7 +46,6 @@ DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
 #if CMK_LBDB_ON
   lbname = (char *)"DistBaseLB";
   thisProxy = CProxy_DistBaseLB(thisgroup);
-  receiver = lbmgr->AddLocalBarrierReceiver(this, &DistBaseLB::InvokeLB);
   startLbFnHdl = lbmgr->AddStartLBFn(this, &DistBaseLB::barrierDone);
 
   if (opt.getSeqNo() > 0)

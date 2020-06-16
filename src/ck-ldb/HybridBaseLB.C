@@ -20,7 +20,6 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
 #if CMK_LBDB_ON
   lbname = (char *)"HybridBaseLB";
   thisProxy = CProxy_HybridBaseLB(thisgroup);
-  receiver = lbmgr->AddLocalBarrierReceiver(this, &HybridBaseLB::InvokeLB);
 
   statsStrategy = FULL;
 

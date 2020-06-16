@@ -45,7 +45,6 @@ void BaseLB::flushStates() {}
 void BaseLB::turnOn()
 {
 #if CMK_LBDB_ON
-  lbmgr->TurnOnBarrierReceiver(receiver);
   lbmgr->TurnOnStartLBFn(startLbFnHdl);
 #endif
 }
@@ -53,7 +52,6 @@ void BaseLB::turnOn()
 void BaseLB::turnOff()
 {
 #if CMK_LBDB_ON
-  lbmgr->TurnOffBarrierReceiver(receiver);
   lbmgr->TurnOffStartLBFn(startLbFnHdl);
 #endif
 }

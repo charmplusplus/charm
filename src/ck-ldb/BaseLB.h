@@ -25,7 +25,6 @@ protected:
   int  seqno;
   const char *lbname;
   LBManager *lbmgr;
-  LDBarrierReceiver receiver;
   int  startLbFnHdl;
 private:
   void initLB(const CkLBOptions &);

@@ -474,6 +474,7 @@ void LBManager::initnodeFn()
 void LBManager::callAt()
 {
   localBarrier.CallReceivers();
+  //TODO: Add support for sequencing multiple LBs
   if (loadbalancers.size() > 0) loadbalancers[0]->InvokeLB();
 }
 
@@ -1238,6 +1239,8 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
       at_count -= client_count;
       cur_refcount++;
       CallReceivers();
+      //TODO: Add support for sequencing multiple LBs
+      if (_mgr->loadbalancers.size() > 0) _mgr->loadbalancers[0]->InvokeLB();
     }
   }
 }
