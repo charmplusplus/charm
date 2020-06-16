@@ -108,6 +108,7 @@ add_library(moduleCommonLBs
     ../ck-ldb/manager.C
     ${CMAKE_BINARY_DIR}/include/CommonLBs.decl.h
     ${CMAKE_BINARY_DIR}/include/TreeLB.decl.h
+    ${CMAKE_BINARY_DIR}/include/TreeLevel.decl.h
     ${CMAKE_BINARY_DIR}/include/MetisLB.decl.h
     ${ck-ci-sources}
 )
@@ -120,6 +121,7 @@ add_library(moduleEveryLB
     ${CMAKE_BINARY_DIR}/include/CommonLBs.decl.h
     ${CMAKE_BINARY_DIR}/include/EveryLB.decl.h
     ${CMAKE_BINARY_DIR}/include/TreeLB.decl.h
+    ${CMAKE_BINARY_DIR}/include/TreeLevel.decl.h
     ${CMAKE_BINARY_DIR}/include/TempAwareRefineLB.decl.h
     ${CMAKE_BINARY_DIR}/include/MetisLB.decl.h
 )
