@@ -8,23 +8,38 @@ foreach(filename ${ckperf-h-sources})
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
 
-include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
-
-if($CMK_TRACE_ENABLED})
+if(CMK_TRACE_ENABLED)
     add_library(trace-projector trace-projector.C ../conv-perf/traceCore.C
         ../conv-perf/traceCoreCommon.C ../conv-perf/charmProjections.C
         ../conv-perf/converseProjections.C ../conv-perf/machineProjections.C)
-    add_library(trace-projections trace-projections.C ${CMAKE_BINARY_DIR}/include/TraceProjections.decl.h)
-    add_library(trace-controlPoints trace-controlPoints.C)
-    add_library(trace-perfReport ../ck-pics/trace-perf.C ../ck-pics/picsautoperf.C ../ck-pics/picsautoperfAPI.C ../ck-pics/picstreenode.C ../ck-pics/picsdecisiontree.C ${CMAKE_BINARY_DIR}/include/TraceAutoPerf.decl.h)
-    add_library(trace-summary trace-summary.C ${CMAKE_BINARY_DIR}/include/TraceSummary.decl.h)
-    add_library(trace-utilization trace-utilization.C ${CMAKE_BINARY_DIR}/include/TraceUtilization.decl.h)
-    add_library(trace-simple trace-simple.C ${CMAKE_BINARY_DIR}/include/TraceSimple.decl.h)
-    add_library(trace-counter trace-counter.C)
-    add_library(trace-memory trace-memory.C)
-endif()
-add_library(trace-converse trace-converse.C)
+    add_dependencies(trace-projector ck)
 
-if(${CMK_CAN_LINK_FORTRAN})
+    add_library(trace-projections trace-projections.C)
+    add_dependencies(trace-projections ck)
+
+    add_library(trace-controlPoints trace-controlPoints.C)
+    add_dependencies(trace-controlPoints ck)
+
+    add_library(trace-summary trace-summary.C )
+    add_dependencies(trace-summary ck)
+
+    add_library(trace-utilization trace-utilization.C)
+    add_dependencies(trace-utilization ck)
+
+    add_library(trace-simple trace-simple.C)
+    add_dependencies(trace-simple ck)
+
+    add_library(trace-counter trace-counter.C)
+    add_dependencies(trace-counter ck)
+
+    add_library(trace-memory trace-memory.C)
+    add_dependencies(trace-memory ck)
+endif()
+
+add_library(trace-converse trace-converse.C)
+add_dependencies(trace-converse ck)
+
+
+if(CMK_CAN_LINK_FORTRAN)
     add_library(tracef_f tracef_f.f90)
 endif()
