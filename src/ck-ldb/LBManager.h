@@ -116,7 +116,6 @@ PUPbytes(CkLBOptions)
 
     extern CkGroupID _lbmgr;
 
-CkpvExtern(int, numLoadBalancers);
 CkpvExtern(bool, lbmanagerInited);
 
 // LB options, mostly controled by user parameter
@@ -571,7 +570,6 @@ class LBManager : public CBase_LBManager
   MetaBalancer* metabalancer;
 
  public:
-  int nloadbalancers;
   CkVec<BaseLB*> loadbalancers;
 
   std::vector<StartLBCB*> startLBFnList;
@@ -579,7 +577,7 @@ class LBManager : public CBase_LBManager
 
  public:
   BaseLB** getLoadBalancers() { return loadbalancers.getVec(); }
-  int getNLoadBalancers() { return nloadbalancers; }
+  int getNLoadBalancers() { return loadbalancers.size(); }
 
  public:
   static bool manualOn;

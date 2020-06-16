@@ -151,9 +151,8 @@ public:
   BaseLB(CkMigrateMessage *m):CBase_BaseLB(m) {
     lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   }
-  virtual ~BaseLB();
+  virtual ~BaseLB() {}
 
-  void unregister(); 
   inline const char *lbName() { return lbname; }
   inline int step() { return lbmgr->step(); }
   virtual void turnOff() { CmiAbort("turnOff not implemented"); }

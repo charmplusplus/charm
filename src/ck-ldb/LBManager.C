@@ -21,7 +21,6 @@ CkGroupID _lbmgr;
 CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
 
-CkpvDeclare(int, numLoadBalancers); /**< num of lb created */
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 
 // command line options
@@ -158,8 +157,6 @@ void _loadbalancerInit()
 {
   CkpvInitialize(bool, lbmanagerInited);
   CkpvAccess(lbmanagerInited) = false;
-  CkpvInitialize(int, numLoadBalancers);
-  CkpvAccess(numLoadBalancers) = 0;
 
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
@@ -471,7 +468,7 @@ void LBManager::initnodeFn()
 void LBManager::callAt()
 {
   localBarrier.CallReceivers();
-  if (nloadbalancers > 0) loadbalancers[0]->InvokeLB();
+  if (loadbalancers.size() > 0) loadbalancers[0]->InvokeLB();
 }
 
 // Called at end of each load balancing cycle
@@ -502,7 +499,6 @@ void LBManager::reset()
 void LBManager::init(void)
 {
   mystep = 0;
-  nloadbalancers = 0;
   new_ld_balancer = 0;
   chare_count = 0;
   metabalancer = nullptr;
@@ -604,7 +600,7 @@ void LBManager::DumpDatabase()
 void LBManager::Migrated(LDObjHandle h, int waitBarrier)
 {
   // Object migrated, inform load balancers
-  if (nloadbalancers > 0) loadbalancers[0]->Migrated(waitBarrier);
+  if (loadbalancers.size() > 0) loadbalancers[0]->Migrated(waitBarrier);
 }
 
 LBManager::LastLBInfo::LastLBInfo() { expectedLoad = _expectedLoad; }
@@ -651,11 +647,8 @@ void LBManager::set_avail_vector(char* bitmap, int new_ld)
 // and broadcast the ticket number to all processors
 int LBManager::getLoadbalancerTicket()
 {
-  int seq = nloadbalancers;
-  nloadbalancers++;
-  loadbalancers.resize(nloadbalancers);
-  loadbalancers[seq] = NULL;
-  return seq;
+  loadbalancers.push_back(nullptr);
+  return loadbalancers.size() - 1;
 }
 
 void LBManager::addLoadbalancer(BaseLB* lb, int seq)
@@ -664,16 +657,15 @@ void LBManager::addLoadbalancer(BaseLB* lb, int seq)
   if (seq == -1) return;
   if (CkMyPe() == 0)
   {
-    CmiAssert(seq < nloadbalancers);
+    CmiAssert(seq < loadbalancers.size());
     if (loadbalancers[seq])
     {
       CmiPrintf("Duplicate load balancer created at %d\n", seq);
       CmiAbort("LBManager");
     }
   }
-  else
-    nloadbalancers++;
-  loadbalancers.resize(seq + 1);
+  if (loadbalancers.size() < seq + 1)
+    loadbalancers.resize(seq + 1);
   loadbalancers[seq] = lb;
 }
 
@@ -684,11 +676,11 @@ void LBManager::nextLoadbalancer(int seq)
   int next = seq + 1;
   if (_lb_args.loop())
   {
-    if (next == nloadbalancers) next = 0;
+    if (next == loadbalancers.size()) next = 0;
   }
   else
   {
-    if (next == nloadbalancers) next--;  // keep using the last one
+    if (next == loadbalancers.size()) next--;  // keep using the last one
   }
   if (seq != next)
   {
@@ -782,7 +774,6 @@ void LBManager::pup(PUP::er& p)
   p | mystep;
   if (p.isUnpacking())
   {
-    nloadbalancers = 0;
     if (_lb_args.metaLbOn())
     {
       // if unpacking set metabalancer using the id
@@ -805,7 +796,7 @@ void LBManager::configureTreeLB(const char* json_str)
 void LBManager::configureTreeLB(json& config)
 {
   bool found = false;
-  for (int i = 0; i < nloadbalancers; i++)
+  for (int i = 0; i < loadbalancers.size(); i++)
   {
     if (strcmp(loadbalancers[i]->lbName(), "TreeLB") == 0)
     {
@@ -1241,7 +1232,7 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
       at_count -= client_count;
       cur_refcount++;
       CallReceivers();
-      if (_mgr->nloadbalancers > 0) _mgr->loadbalancers[0]->InvokeLB();
+      if (_mgr->loadbalancers.size() > 0) _mgr->loadbalancers[0]->InvokeLB();
     }
   }
 }
