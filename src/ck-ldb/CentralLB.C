@@ -123,22 +123,6 @@ CentralLB::~CentralLB()
 #endif
 }
 
-void CentralLB::turnOn() 
-{
-#if CMK_LBDB_ON
-  lbmgr->
-    TurnOnStartLBFn(startLbFnHdl);
-#endif
-}
-
-void CentralLB::turnOff() 
-{
-#if CMK_LBDB_ON
-  lbmgr->
-    TurnOffStartLBFn(startLbFnHdl);
-#endif
-}
-
 void CentralLB::SetPESpeed(int speed) 
 {
   myspeed = speed;

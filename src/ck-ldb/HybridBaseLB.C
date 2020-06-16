@@ -15,19 +15,11 @@ class DummyMsg: public CMessage_DummyMsg
 {
 };
 
-void HybridBaseLB::AtBarrier()
-{
-#if CMK_MEM_CHECKPOINT	
-  CkSetInLdb();
-#endif
-}
-
 HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
 {
 #if CMK_LBDB_ON
   lbname = (char *)"HybridBaseLB";
   thisProxy = CProxy_HybridBaseLB(thisgroup);
-  receiver = lbmgr->AddLocalBarrierReceiver(this, &HybridBaseLB::AtBarrier);
 
   statsStrategy = FULL;
 
@@ -127,6 +119,10 @@ void HybridBaseLB::FindNeighbors()
 
 void HybridBaseLB::InvokeLB()
 {
+#if CMK_MEM_CHECKPOINT
+  CkSetInLdb();
+#endif
+
 #if CMK_LBDB_ON
   //  CkPrintf("[%d] HybridBaseLB At Sync step %d!!!!\n",CkMyPe(),mystep);
 

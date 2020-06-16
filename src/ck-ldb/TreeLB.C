@@ -91,6 +91,11 @@ void TreeLB::init(const CkLBOptions& opts)
   if (_lb_args.statsOn())
     lbmgr->CollectStatsOn();  // collect load and (optionally) comm stats
 
+  if (opts.getSeqNo() > 0)
+  {
+    turnOff();
+  }
+
 #endif
 }
 

@@ -42,6 +42,20 @@ void BaseLB::pup(PUP::er &p) {}
 void BaseLB::flushStates() {}
 #endif
 
+void BaseLB::turnOn()
+{
+#if CMK_LBDB_ON
+  lbmgr->TurnOnStartLBFn(startLbFnHdl);
+#endif
+}
+
+void BaseLB::turnOff()
+{
+#if CMK_LBDB_ON
+  lbmgr->TurnOffStartLBFn(startLbFnHdl);
+#endif
+}
+
 static inline int i_abs(int c) { return c>0?c:-c; }
 
 // assume integer is 32 bits

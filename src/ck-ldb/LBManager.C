@@ -230,15 +230,21 @@ void _loadbalancerInit()
           _lb_args.legacyCentralizedStrategies().push_back("Rotate");
         else
           lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
+
         if (strcmp(balancer, "TreeLB") == 0) TreeLB_registered = true;
-      }
-      if (_lb_args.legacyCentralizedStrategies().size() > 0)
-      {
-        if (!TreeLB_registered) lbRegistry.addRuntimeBalancer("TreeLB");
-        if (_lb_args.legacyCentralizedStrategies().size() > 1)
-          // should this be supported?
-          CkAbort(
-              "Sequencing multiple centralized strategies with TreeLB not supported\n");
+
+        if (!_lb_args.legacyCentralizedStrategies().empty())
+        {
+          if (!TreeLB_registered)
+          {
+            lbRegistry.addRuntimeBalancer("TreeLB");
+            TreeLB_registered = true;
+          }
+          if (_lb_args.legacyCentralizedStrategies().size() > 1)
+            // TODO: add support for multiple instances of TreeLB
+            CkAbort(
+                 "Sequencing multiple centralized strategies with TreeLB not supported\n");
+        }
       }
     }
     else
@@ -468,6 +474,7 @@ void LBManager::initnodeFn()
 void LBManager::callAt()
 {
   localBarrier.CallReceivers();
+  //TODO: Add support for sequencing multiple LBs
   if (loadbalancers.size() > 0) loadbalancers[0]->InvokeLB();
 }
 
@@ -1232,6 +1239,7 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
       at_count -= client_count;
       cur_refcount++;
       CallReceivers();
+      //TODO: Add support for sequencing multiple LBs
       if (_mgr->loadbalancers.size() > 0) _mgr->loadbalancers[0]->InvokeLB();
     }
   }
