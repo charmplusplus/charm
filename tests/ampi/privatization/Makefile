@@ -26,13 +26,12 @@ CANDIDATES := \
   swapglobals \
   tlsglobals \
 
-# Don't enable these for universal testing because they are not 100% portable to all platforms and toolchain versions.
-# ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
-#   CANDIDATES += fsglobals
-# endif
-# ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
-#   CANDIDATES += pipglobals
-# endif
+ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
+  CANDIDATES += fsglobals
+endif
+ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
+  CANDIDATES += pipglobals
+endif
 
 
 # Define what options to pass to charmc for each method.
@@ -143,11 +142,8 @@ $(foreach i,$(VARIANTS),$(eval $(call VARIANT_RULES,$i)))
 tlsglobals-test-f90.o: test-f90-tlsglobals.f90
 	$(AMPIF90) -o $@ $(OPTS_f90_tlsglobals) -c $<
 
-
-FUNCPTR_SHIM_SUFFIX := .user
-
 clean:
-	rm -f *.o *.a *.so *.mod $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(strip $j-$i $(wildcard $j-$i$(FUNCPTR_SHIM_SUFFIX)*)))) charmrun ampirun
+	rm -f *.o *.a *.so *.mod $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(strip $j-$i $(wildcard $j-$i$(CMK_USER_SUFFIX)*)))) charmrun ampirun
 
 .SUFFIXES:
 .PHONY: \

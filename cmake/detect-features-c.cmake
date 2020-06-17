@@ -207,6 +207,18 @@ int main() {
 " CMK_HAS_ADDR_NO_RANDOMIZE)
 
 check_c_source_compiles("
+__attribute__((visibility(\"default\"))) int myfunc();
+int myfunc()
+{
+  return 0;
+}
+int main()
+{
+  return 0;
+}
+" CMK_HAS_ATTRIBUTE_VISIBILITY_DEFAULT)
+
+check_c_source_compiles("
 #define _GNU_SOURCE
 #include <sys/uio.h>
 #include <errno.h>
