@@ -52,15 +52,23 @@ OPTS=""
 #Specific options
 #charm internal flag, only pass to c and cxx, not f90
 OPTS_CPP_INTERNAL="-D__CHARMC__=1"
-OPTS_CPP=
+OPTS_CC_GENCPM=""
+OPTS_CPP=""
 OPTS_LDRO=""
 OPTS_CC=""
-OPTS_CC_GENCPM=""
 OPTS_CXX=""
 OPTS_F90=""
 OPTS_LD=""
+ARG_OPTS_CPP=""
+ARG_OPTS_LDRO=""
+ARG_OPTS_CC=""
+ARG_OPTS_CXX=""
+ARG_OPTS_F90=""
+ARG_OPTS_LD=""
 USE_PIC="0"
 USE_PIE='0'
+USE_FVISIBILITY_HIDDEN=''
+USE_UNDEFINED_DYNAMIC=''
 
 CHARMDEBUG=""
 LINK_PYTHON=""
@@ -108,7 +116,6 @@ USER_INITIATED_SHARED='0'
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
 ROSE_OMP_TLS_GLOBALS="no"
-AMPI_FUNCPTR_SHIM='0'
 PRINT_BUILDING_BLOCKS=""
 NOABORT=""
 
@@ -556,9 +563,16 @@ do
 		ROSE_OMP_TLS_GLOBALS="yes"
 		;;
 
-	"-ampi-funcptr-shim")
-		AMPI_FUNCPTR_SHIM='1'
+	"-fpie"|"-fPIE")
 		USE_PIE='1'
+		;;
+
+	"-fvisibility=hidden")
+		USE_FVISIBILITY_HIDDEN="$arg"
+		;;
+
+	"-Wl,-undefined,dynamic_lookup")
+		USE_UNDEFINED_DYNAMIC="$arg"
 		;;
 
 	"-verbose")
@@ -617,37 +631,37 @@ do
 		;;
 
 	"-cpp-option")
-		OPTS_CPP="$OPTS_CPP $1"
+		ARG_OPTS_CPP="$ARG_OPTS_CPP $1"
 		shift
 		;;
 
 	"-ldro-option")
-		OPTS_LDRO="$OPTS_LDRO $1"
+		ARG_OPTS_LDRO="$ARG_OPTS_LDRO $1"
 		shift
 		;;
 
 	"-cc-option")
-		OPTS_CC="$OPTS_CC $1"
+		ARG_OPTS_CC="$ARG_OPTS_CC $1"
 		shift
 		;;
 
 	"-c++-option")
-		OPTS_CXX="$OPTS_CXX $1"
+		ARG_OPTS_CXX="$ARG_OPTS_CXX $1"
 		shift
 		;;
 
 	"-f90-option")
-		OPTS_F90="$OPTS_F90 $1"
+		ARG_OPTS_F90="$ARG_OPTS_F90 $1"
 		shift
 		;;
 
 	"-ld-option"|"-ld++-option")
-		OPTS_LD="$OPTS_LD $1"
+		ARG_OPTS_LD="$ARG_OPTS_LD $1"
 		shift
 		;;
 
 	"-rpath")
-		OPTS_LD="$OPTS_LD -rpath $1"
+		ARG_OPTS_LD="$ARG_OPTS_LD -rpath $1"
 		shift
 		;;
 
@@ -738,11 +752,11 @@ do
 		;;
 
 	-I|--include-path)
-		OPTS_CPP="$OPTS_CPP -I$1"
+		ARG_OPTS_CPP="$ARG_OPTS_CPP -I$1"
 		shift
 		;;
 	--pre-include|-include|--system-include|-isystem|-iquote|-idirafter)
-		OPTS_CPP="$OPTS_CPP $arg $1"
+		ARG_OPTS_CPP="$ARG_OPTS_CPP $arg $1"
 		shift
 		;;
 	@*.rsp)
@@ -754,9 +768,9 @@ do
 	-D*|-I*)
 		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null
 		then
-		  OPTS_CPP="$OPTS_CPP "\"$arg\"
+		  ARG_OPTS_CPP="$ARG_OPTS_CPP "\"$arg\"
 		else
-		  OPTS_CPP="$OPTS_CPP $arg"
+		  ARG_OPTS_CPP="$ARG_OPTS_CPP $arg"
    		fi
 		;;
 
@@ -782,10 +796,10 @@ do
 		;;
 	-shared|-G)
 		USER_INITIATED_SHARED='1'
-		OPTS_LD="$OPTS_LD $arg"
+		ARG_OPTS_LD="$ARG_OPTS_LD $arg"
 		;;
 	-L*)
-		OPTS_LD="$OPTS_LD $arg"
+		ARG_OPTS_LD="$ARG_OPTS_LD $arg"
 		;;
 	-charm-shared|-cs)
 		CHARM_SHARED="1"
@@ -845,7 +859,7 @@ do
 		;;
 
 	-s)
-		OPTS_LD="$OPTS_LD   $arg"
+		ARG_OPTS_LD="$ARG_OPTS_LD   $arg"
 		;;
 	-no-charmrun)
 		COPY_CHARMRUN=false
@@ -989,6 +1003,13 @@ Debug "Read config script, setting defaults..."
 
 Debug "Setting vars..."
 
+OPTS_CPP="$OPTS_CPP $ARG_OPTS_CPP"
+OPTS_LDRO="$OPTS_LDRO $ARG_OPTS_LDRO"
+OPTS_CC="$OPTS_CC $ARG_OPTS_CC"
+OPTS_CXX="$OPTS_CXX $ARG_OPTS_CXX"
+OPTS_F90="$OPTS_F90 $ARG_OPTS_F90"
+OPTS_LD="$OPTS_LD $ARG_OPTS_LD"
+
 if [ "$USE_BUILD_OPTIONS" = "1" ]
 then
 	[ -n "$VERBOSE" ] && echo "Charmc applying build time options: $BUILDOPTS"
@@ -1068,12 +1089,6 @@ then
     OPTS_F90="$OPTS_F90 $TLSGLOBALS_OPTS"
 fi
 
-if [ "$AMPI_FUNCPTR_SHIM" = '1' ]
-then
-    OPTS_CC="$OPTS_CC -DAMPI_USE_FUNCPTR"
-    OPTS_CXX="$OPTS_CXX -DAMPI_USE_FUNCPTR"
-fi
-
 # Look up and add the dependencies for module $1
 findModuleDep() {
 	M=$1
@@ -1142,6 +1157,14 @@ then
 	USE_PIC="1"
 fi
 
+if [ "$USE_PIE" = "1" ]
+then
+       OPTS_CC="$OPTS_CC $CMK_PIE"
+       OPTS_CXX="$OPTS_CXX $CMK_PIE"
+       OPTS_F90="$OPTS_F90 $CMK_PIE"
+       OPTS_LD="$OPTS_LD $CMK_PIE"
+fi
+
 if [ "$USE_PIC" = "1" ]
 then
        OPTS_CC="$OPTS_CC $CMK_PIC"
@@ -1150,12 +1173,20 @@ then
        OPTS_LD="$OPTS_LD $CMK_PIC"
 fi
 
-if [ "$USE_PIE" = "1" ]
+if [[ "$CMK_COMPILER_KNOWS_FVISIBILITY" = '1' && -n "$USE_FVISIBILITY_HIDDEN" ]]
 then
-       OPTS_CC="$OPTS_CC $CMK_PIE"
-       OPTS_CXX="$OPTS_CXX $CMK_PIE"
-       OPTS_F90="$OPTS_F90 $CMK_PIE"
-       OPTS_LD="$OPTS_LD $CMK_PIE"
+       OPTS_CC="$OPTS_CC $USE_FVISIBILITY_HIDDEN"
+       OPTS_CXX="$OPTS_CXX $USE_FVISIBILITY_HIDDEN"
+       OPTS_F90="$OPTS_F90 $USE_FVISIBILITY_HIDDEN"
+       OPTS_LD="$OPTS_LD $USE_FVISIBILITY_HIDDEN"
+fi
+
+if [[ "$CMK_LINKER_KNOWS_UNDEFINED" = '1' && -n "$USE_UNDEFINED_DYNAMIC" ]]
+then
+       OPTS_CC="$OPTS_CC $USE_UNDEFINED_DYNAMIC"
+       OPTS_CXX="$OPTS_CXX $USE_UNDEFINED_DYNAMIC"
+       OPTS_F90="$OPTS_F90 $USE_UNDEFINED_DYNAMIC"
+       OPTS_LD="$OPTS_LD $USE_UNDEFINED_DYNAMIC"
 fi
 
 if [ "$BUILD_SHARE" = "1" ]
@@ -1357,7 +1388,7 @@ esac
 
 if [ $USE_F77_LIBRARIES = "1" ]
 then
-	POST_LIBRARIES="$POST_LIBRARIES $CMK_F77LIBS"
+	CMK_SYSLIBS="$CMK_SYSLIBS $CMK_F77LIBS"
 fi
 
 if [ $USE_F90_LIBRARIES = "1" ]
@@ -1368,7 +1399,8 @@ then
 		Abort "Error: Fortran support library $CHARMLIB/libconv-utilf.a missing. Is your Fortran compiler working?"
 	fi
 
-	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
+	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf"
+	CMK_SYSLIBS="$CMK_SYSLIBS $CMK_F90LIBS"
 fi
 
 # GEN-CPM options
@@ -1669,10 +1701,10 @@ fi
 
 if [ -n "$LINK_WHOLE_ARCHIVE" ]
 then
-  ALL_LIBS="$CXX_NO_AS_NEEDED $LDXX_WHOLE_ARCHIVE_PRE $ALL_LIBS $LDXX_WHOLE_ARCHIVE_POST $CMK_SYSLIBS"
-else
-  ALL_LIBS="$ALL_LIBS $CMK_SYSLIBS"
+  ALL_LIBS="$CXX_NO_AS_NEEDED $LDXX_WHOLE_ARCHIVE_PRE $ALL_LIBS $LDXX_WHOLE_ARCHIVE_POST"
 fi
+
+ALL_LIBS="$ALL_LIBS $CMK_SYSLIBS"
 
 if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
 then
