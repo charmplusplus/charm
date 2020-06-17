@@ -1232,7 +1232,7 @@ typedef int MPIX_Grequest_wait_function(int count, void **array_of_states,
    this definition. */
 #ifndef HAVE_MPI_DATAREP_FUNCTIONS
 #define HAVE_MPI_DATAREP_FUNCTIONS
-typedef int (MPI_Datarep_conversion_function)(void *, MPI_Datatype, int, 
+typedef int (MPI_Datarep_conversion_function)(void *, MPI_Datatype, int,
              void *, MPI_Offset, void *);
 typedef int (MPI_Datarep_extent_function)(MPI_Datatype datatype, MPI_Aint *,
 					  void *);
@@ -1373,6 +1373,9 @@ typedef struct {
 
 /* Declare functions */
 
+#ifdef AMPI_NO_UNIMPLEMENTED_WARNINGS
+# define AMPI_UNIMPLEMENTED
+#else
 #if defined __cplusplus && __cplusplus >= 201402L
 # define AMPI_UNIMPLEMENTED [[deprecated("currently unimplemented in AMPI")]]
 #elif defined __GNUC__ || defined __clang__
@@ -1381,6 +1384,7 @@ typedef struct {
 # define AMPI_UNIMPLEMENTED __declspec(deprecated("currently unimplemented in AMPI"))
 #else
 # define AMPI_UNIMPLEMENTED
+#endif
 #endif
 
 #undef AMPI_INTERNAL_SKIP_FUNCTIONS
