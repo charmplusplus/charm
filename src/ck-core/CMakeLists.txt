@@ -128,6 +128,7 @@ add_library(moduleEveryLB
     ${CMAKE_BINARY_DIR}/include/TempAwareRefineLB.decl.h
     ${CMAKE_BINARY_DIR}/include/DummyLB.decl.h
     ${CMAKE_BINARY_DIR}/include/GreedyRefineLB.decl.h
+    ${CMAKE_BINARY_DIR}/include/RandCentLB.decl.h
     ${CMAKE_BINARY_DIR}/include/RotateLB.decl.h
     ${CMAKE_BINARY_DIR}/include/MetisLB.decl.h
 )
