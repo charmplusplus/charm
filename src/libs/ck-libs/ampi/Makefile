@@ -11,7 +11,7 @@ HEADDEP=$(HEADERS) ampiimpl.h ddt.h \
 COMPAT=compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
 	   compat_ampicpp.o
-OBJS=ampi.o ampif.o ampiOneSided.o \
+OBJS=ampi.o $(AMPIF_OBJ) ampiOneSided.o \
      ampiMisc.o ddt.o mpich-alltoall.o ampi_mpix.o ampi_noimpl.o
 
 AMPI_LIB=libmoduleampi
@@ -21,23 +21,36 @@ DESTF=$(AMPI_LIBDIR)/$(AMPI_LIB)f.a
 COMPATLIB=$(AMPI_LIBDIR)/libampi-compat.a
 ROMIOLIB=$(AMPI_LIBDIR)/libampiromio
 
+AMPIF_OBJ=$(AMPI_LIBDIR)/ampif.o
 AMPIFIMPL_OBJ=$(AMPI_LIBDIR)/ampifimpl.o
 AMPIMOD_OBJ=$(AMPI_LIBDIR)/ampimod.o
 
 FUNCPTR_SHIM_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim.o
-FUNCPTR_FORTRAN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_fortran.o
+FUNCPTR_SHIM_MAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_main.o
+FUNCPTR_SHIM_FORTRAN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran.o
+FUNCPTR_SHIM_FMPIMAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fmpimain.o
 FUNCPTR_LOADER_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader.o
-FUNCPTR_PIPGLOBALS_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_pipglobals.o
-FUNCPTR_FSGLOBALS_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_fsglobals.o
+FUNCPTR_LOADER_STUB_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader_stub.o
+GLOBALS_PIP_OBJ=$(AMPI_LIBDIR)/ampi_globals_pip.o
+GLOBALS_FS_OBJ=$(AMPI_LIBDIR)/ampi_globals_fs.o
 
-AMPI_TARGET = $(DEST) $(FUNCPTR_SHIM_OBJ) $(FUNCPTR_LOADER_OBJ)
-AMPIF_TARGET = $(DESTF) $(FUNCPTR_FORTRAN_OBJ)
+AMPI_TARGET = \
+  $(DEST) \
+  $(FUNCPTR_SHIM_OBJ) \
+  $(FUNCPTR_SHIM_MAIN_OBJ) \
+  $(FUNCPTR_LOADER_OBJ) \
+  $(FUNCPTR_LOADER_STUB_OBJ) \
+
+AMPIF_TARGET = \
+  $(DESTF) \
+  $(FUNCPTR_SHIM_FORTRAN_OBJ) \
+  $(FUNCPTR_SHIM_FMPIMAIN_OBJ) \
 
 ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
-  AMPI_TARGET += $(FUNCPTR_PIPGLOBALS_OBJ)
+  AMPI_TARGET += $(GLOBALS_PIP_OBJ)
 endif
 ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
-  AMPI_TARGET += $(FUNCPTR_FSGLOBALS_OBJ)
+  AMPI_TARGET += $(GLOBALS_FS_OBJ)
 endif
 
 ifeq ($(CMK_NO_BUILD_SHARED),false)
@@ -170,8 +183,8 @@ compat_ampicpp.o: compat_ampicpp.C
 ampi.o: ampi.C $(HEADDEP)
 	$(CHARMC) -c ampi.C
 
-ampif.o: ampif.C $(HEADDEP)
-	$(CHARMC) -c ampif.C
+$(AMPIF_OBJ): ampif.C $(HEADDEP)
+	$(CHARMC) -c $< -o $@
 
 ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP)
 	$(CHARMC) -c ampiOneSided.C
@@ -188,18 +201,27 @@ ampi.decl.h ampi.def.h: ampi.ci
 ddt.o: ddt.C ddt.h $(HEADDEP)
 
 $(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP)
-	$(CHARMC) -ampi-funcptr-shim -c $< -o $@
+	$(CHARMC) -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
 
-$(FUNCPTR_FORTRAN_OBJ): ampif.C $(HEADDEP)
-	-$(CHARMC) -ampi-funcptr-shim -c $< -o $@
+$(FUNCPTR_SHIM_MAIN_OBJ): ampi_funcptr_shim_main.C
+	$(CHARMC) -fPIE -c $< -o $@
+
+$(FUNCPTR_SHIM_FMPIMAIN_OBJ): ampi_funcptr_shim_fmpimain.C
+	$(CHARMC) -fPIE -c $< -o $@
+
+$(FUNCPTR_SHIM_FORTRAN_OBJ): ampif.C $(HEADDEP)
+	-$(CHARMC) -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
 
 $(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP)
 	$(CHARMC) -c $< -o $@
 
-$(FUNCPTR_FSGLOBALS_OBJ): ampi_funcptr_fsglobals.C $(HEADDEP)
+$(FUNCPTR_LOADER_STUB_OBJ): ampi_funcptr_loader_stub.C $(HEADDEP)
 	$(CHARMC) -c $< -o $@
 
-$(FUNCPTR_PIPGLOBALS_OBJ): ampi_funcptr_pipglobals.C $(HEADDEP)
+$(GLOBALS_FS_OBJ): ampi_globals_fs.C $(HEADDEP)
+	$(CHARMC) -c $< -o $@
+
+$(GLOBALS_PIP_OBJ): ampi_globals_pip.C $(HEADDEP)
 	$(CHARMC) -c $< -o $@
 
 clean:

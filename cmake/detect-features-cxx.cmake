@@ -18,6 +18,8 @@ check_include_file_cxx(regex CMK_HAS_REGEX)
 # C++ compiler flags
 check_cxx_compiler_flag("-mno-tls-direct-seg-refs" CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS)
 
+check_cxx_compiler_flag("-fvisibility=hidden" CMK_COMPILER_KNOWS_FVISIBILITY)
+
 check_cxx_compiler_flag("-fno-stack-protector" CMK_COMPILER_KNOWS_FNOSTACKPROTECTOR)
 if(${CMK_COMPILER_KNOWS_FNOSTACKPROTECTOR})
   set(OPTS_CC "${OPTS_CC} -fno-stack-protector")
@@ -28,6 +30,16 @@ check_cxx_compiler_flag("-fno-lifetime-dse" CMK_COMPILER_KNOWS_LIFETIMEDSE)
 if(${CMK_COMPILER_KNOWS_LIFETIMEDSE})
   set(OPTS_CXX "${OPTS_CXX} -fno-lifetime-dse")
 endif()
+
+check_cxx_compiler_flag("-rdynamic" CMK_COMPILER_KNOWS_RDYNAMIC)
+check_cxx_compiler_flag("-Wl,--export-dynamic" CMK_LINKER_KNOWS_EXPORT_DYNAMIC)
+if(${CMK_COMPILER_KNOWS_RDYNAMIC})
+  set(OPTS_LD "${OPTS_LD} -rdynamic")
+elseif(${CMK_LINKER_KNOWS_EXPORT_DYNAMIC})
+  set(OPTS_LD "${OPTS_LD} -Wl,--export-dynamic")
+endif()
+
+check_cxx_compiler_flag("-Wl,-undefined,dynamic_lookup" CMK_LINKER_KNOWS_UNDEFINED)
 
 # C++ complex tests
 check_cxx_source_compiles("
