@@ -9,6 +9,7 @@ CMK_XIOPTS=""
 CMK_F90LIBS="-lvast90 -lg2c"
 
 CMK_POST_EXE=".exe"
+CMK_SHARED_SUF='dll'
 CMK_QT="none"
 
 CMK_WINDOWS='1'

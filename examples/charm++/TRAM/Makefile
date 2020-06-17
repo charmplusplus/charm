@@ -1,10 +1,9 @@
 -include ../../../include/conv-mach-opt.mak
 
-DIRS = \
-  randomAccessGroup \
-  randomAccessArray \
-  aggregateRandomAccessGroup \
-  aggregateRandomAccessArray \
+DIRS = aggregateRandomAccessArray
+
+#aggregateRandomAccessGroup can be restored once TRAM support for groups is reimplemented
+#the non-aggregate API tests are removed since TRAM now exclusively supports the aggregate API
 
 TESTDIRS = $(DIRS)
 
