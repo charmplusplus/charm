@@ -77,6 +77,7 @@ opt_network=0
 opt_numa=0
 opt_omp=0
 opt_parallel=-j1
+opt_persistent=0
 opt_prio_type="bitvec"
 opt_production=0
 opt_pthreads=0
@@ -146,6 +147,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     slumrpmi|slurmpmi2|ompipmix)
       opt_ucx_pmi=$arg
+      ;;
+    persistent)
+      opt_persistent=1
       ;;
   # Compilers
     gcc)
@@ -378,7 +382,7 @@ done
 
 # Append certain features and compilers to the end of the build directory name
 builddir_extra=""
-for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft; do
+for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_persistent; do
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
@@ -427,6 +431,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DNETWORK="$opt_network" \
   -DNUMA="$opt_numa" \
   -DOMP="$opt_omp" \
+  -DPERSISTENT="opt_persistent" \
   -DPRIO_TYPE="$opt_prio_type" \
   -DPTHREADS="$opt_pthreads" \
   -DPXSHM="$opt_pxshm" \

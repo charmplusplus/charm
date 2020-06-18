@@ -88,6 +88,7 @@ option(CHARMDEBUG          "Enable charmDebug" OFF)
 option(REPLAY              "Enable record/replay" OFF)
 option(CCS                 "Enable CCS" OFF)
 option(CONTROLPOINT        "Enable control point" OFF)
+option(PERSISTENT          "Enable Persistent Communication API" OFF)
 option(LBUSERDATA          "Enable LB user data" OFF)
 option(LOCKLESS_QUEUE      "Enable lockless queue for PE local and node queue" OFF)
 option(SHRINKEXPAND        "Enable malleable jobs / shrink expand" OFF)
@@ -536,6 +537,14 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-syncft.h)
   configure_file(src/arch/${GDIR}/conv-mach-syncft.h            include/ COPYONLY)
 endif()
 
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/machine-persistent.h)
+  configure_file(src/arch/${GDIR}/machine-persistent.h          include/ COPYONLY)
+endif()
+
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/machine-persistent.C)
+  configure_file(src/arch/${GDIR}/machine-persistent.C          include/ COPYONLY)
+endif()
+
 if(UCX_PMI)
   configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.sh include/ COPYONLY)
   configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.h include/ COPYONLY)
@@ -854,7 +863,7 @@ foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTH
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM)
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
