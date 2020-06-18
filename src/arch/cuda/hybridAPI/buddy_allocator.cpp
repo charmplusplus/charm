@@ -52,7 +52,7 @@ namespace buddy {
   }
 
   allocator::allocator(size_t size) : min_size(4), base_ptr(NULL) {
-    if (size <= 0) {
+    if (size == 0) {
       fprintf(stderr, "Allocator size has to be larger than 0 bytes\n");
       abort();
     }
@@ -60,7 +60,11 @@ namespace buddy {
     // Request GPU memory (closest power of 2)
     int total_size_log2 = std::ceil(std::log2((double)size));
     total_size = (size_t)std::pow(2, total_size_log2);
-    cudaMalloc(&base_ptr, total_size);
+    cudaError_t status = cudaMalloc(&base_ptr, total_size);
+    if (status != cudaSuccess) {
+      fprintf(stderr, "Failed to allocate GPU memory\n");
+      abort();
+    }
     DEBUG_PRINT("Initialized base_ptr %p with %lu bytes\n", (void*)base_ptr, total_size);
 
     // Initialize buckets and set up last bucket (for size min_size)
@@ -71,7 +75,11 @@ namespace buddy {
 
   allocator::~allocator() {
     // Free GPU memory
-    cudaFree(base_ptr);
+    cudaError_t status = cudaFree(base_ptr);
+    if (status != cudaSuccess) {
+      fprintf(stderr, "Failed to free GPU memory\n");
+      abort();
+    }
     delete[] buckets;
   }
 
