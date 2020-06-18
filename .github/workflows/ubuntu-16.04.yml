@@ -1,0 +1,23 @@
+name: Ubuntu 16.04 Randomized queues
+
+on: [push]
+
+jobs:
+  build:
+    timeout-minutes: 45
+
+    runs-on: ubuntu-16.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install cmake
+        ./build LIBS multicore-linux-x86_64 --enable-randomized-msgq -j4 -g
+    - name: test
+      run: |
+        cd multicore-linux-x86_64/tmp
+        make all-test -j4
+        make test
+        
