@@ -12812,7 +12812,7 @@ MPI_OFFSET_KIND2="!"
 TEST_CC=""
 TEST_F77=""
 #
-known_mpi_impls="mpich_mpi mpich_mpi sgi_mpi hp_mpi cray_mpi lam_mpi open_mpi_mpi"
+known_mpi_impls="mpich_mpi mpich_mpi sgi_mpi hp_mpi cray_mpi lam_mpi open_mpi_mpi ampi_mpi"
 
 # a shell var for checking arguments given via --with-file-system=...
 known_filesystems="nfs ufs pfs pvfs pvfs2 testfs xfs panfs gridftp lustre gpfs zoidfs hfs piofs sfs"

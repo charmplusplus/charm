@@ -87,6 +87,7 @@ do
   # while MPI tests will be compiled with AMPI.
   -ampi-romio-configure) # Strictly for internal use.
      ROMIO_CONFIGURE='true'
+     ARGS+=" -DAMPI_NO_UNIMPLEMENTED_WARNINGS " # Don't bother showing these warnings
      ;;
   mpitest*) # mpitest.c, mpitest1.c, mpitest.f, etc
      ARGS="$ARGS \"$arg\""
