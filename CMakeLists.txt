@@ -517,6 +517,11 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-smp.sh)
   configure_file(src/arch/${VDIR}/conv-mach-smp.h            include/ COPYONLY)
 endif()
 
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-smp.sh)
+  configure_file(src/arch/${GDIR}/conv-mach-smp.sh           include/ COPYONLY)
+  configure_file(src/arch/${GDIR}/conv-mach-smp.h            include/ COPYONLY)
+endif()
+
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-tcp.sh)
   configure_file(src/arch/${GDIR}/conv-mach-tcp.sh           include/ COPYONLY)
   configure_file(src/arch/${GDIR}/conv-mach-tcp.h            include/ COPYONLY)
