@@ -4,6 +4,14 @@
 #include <list>
 #include <unordered_map>
 
+// A cached memory allocator with GPU memory as the backing store.
+// A fixed size allocation is initially made to the backing store,
+// and the allocator hands out a block of memory from it when the user
+// requests an allocation. This mechanism is currently used to support
+// one-time creation and sharing of CUDA IPC handles for device-to-device
+// data transfers. It also uses the buddy allocation algorithm to
+// minimize external fragmentation that could occur from concurrent
+// allocation/deallocation requests (hence its name).
 namespace buddy {
 
 #define BUDDY_DEBUG 0

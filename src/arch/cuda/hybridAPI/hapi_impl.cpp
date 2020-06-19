@@ -126,20 +126,20 @@ void hapiInit(char** argv) {
     }
     hapiInitCpv(); // Initialize per-PE variables
 
-    CmiNodeBarrier();
+    CmiNodeBarrier(); // Ensure hapiInitCsv is done for all PEs within a logical node
 
     hapiMapping(argv); // Perform PE-device mapping
 
     // Register polling function to be invoked at every scheduler loop
     CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
 
-    CmiNodeBarrier();
+    CmiNodeBarrier(); // Ensure PE-device mappings are complete within a logical node
 
     if (CmiMyRank() == 0) {
       shmCreate(); // Create a per-host shared memory region
     }
 
-    CmiNodeBarrier();
+    CmiNodeBarrier(); // Ensure shared memory regions have been created
 
     ipcHandleCreate(); // Create CUDA IPC handles
   }
@@ -341,7 +341,7 @@ static void hapiMapping(char** argv) {
         CsvAccess(gpu_manager).comm_buffer_size / (1024 * 1024));
   }
 
-  CmiNodeBarrier();
+  CmiNodeBarrier(); // Ensure device communication buffer size is set
 
   // Create device communication buffers
   // Should only be done by device representative threads
