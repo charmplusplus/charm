@@ -31,7 +31,4 @@ export PATH="/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN
 
 export TESTOPTS="++local"
 
-which cpp
-cpp --version
-
 "$@"
