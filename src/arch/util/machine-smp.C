@@ -81,12 +81,13 @@ CmiIdleLock_checkMessage
 #include "machine-smp.h"
 #include "sockRoutines.h"
 
-#if __has_include(<barrier>)
-#  include <barrier>
-#else
-#  include <mutex>
-#  include <condition_variable>
+#if defined(__has_include)
+#  if __has_include(<barrier>)
+#    include <barrier>
+#  endif
 #endif
+#include <mutex>
+#include <condition_variable>
 
 void CmiStateInit(int pe, int rank, CmiState state);
 void CommunicationServerInit(void);
