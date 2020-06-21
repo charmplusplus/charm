@@ -689,6 +689,7 @@ ExternalProject_Add(hwloc
         HWLOC_FLAGS=${CHARM_CC_FLAGS}
         CFLAGS=${CHARM_CC_FLAGS}
         CC=${CHARM_CC}
+	CC_FOR_BUILD=${CHARM_CC}
     BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
     INSTALL_COMMAND test -f hwloc/.libs/libhwloc_embedded.lib && cp hwloc/.libs/libhwloc_embedded.lib hwloc/.libs/libhwloc_embedded.a
     COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
