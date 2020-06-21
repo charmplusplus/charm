@@ -453,6 +453,6 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
 [[ $ONLY_CONFIGURE -eq 1 ]] && exit 0
 
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
-make hwloc
+make $opt_parallel
 
 echo 'Build successful.'

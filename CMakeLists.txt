@@ -392,6 +392,7 @@ configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @O
 
 # Use charmc to compile/link everything
 set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/charmc)
+#set(CMAKE_ASM_COMPILER ${CMAKE_BINARY_DIR}/bin/charmc)
 
 set(CMAKE_CXX_LINK_EXECUTABLE
       "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
@@ -655,8 +656,7 @@ set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
 include(ExternalProject)
 ExternalProject_Add(hwloc
     URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
-    # touch: update timestamps on these files so that hwloc's Makefile does not invoke automake
-    CONFIGURE_COMMAND touch ${hwloc_dir}/aclocal.m4 ${hwloc_dir}/Makefile.in ${hwloc_dir}/configure &&
+    CONFIGURE_COMMAND
         ${hwloc_dir}/configure
         --disable-cairo
         --disable-cuda
@@ -675,13 +675,12 @@ ExternalProject_Add(hwloc
         HWLOC_FLAGS=${CHARM_CC_FLAGS}
         CFLAGS=${CHARM_CC_FLAGS}
         CC=${CHARM_CC}
-        > /dev/null
     BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
+    INSTALL_COMMAND test -f hwloc/.libs/libhwloc_embedded.lib && cp hwloc/.libs/libhwloc_embedded.lib hwloc/.libs/libhwloc_embedded.a
     COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
-    INSTALL_COMMAND "" #empty
 )
 
 # TopoManager
@@ -830,7 +829,10 @@ if(NOT ${CMAKE_DL_LIBS} STREQUAL "")
     set(DL_LIB "-l${CMAKE_DL_LIBS}")
 endif()
 file(APPEND ${optfile_sh} "CMK_HWLOC_LIBS=\"-lhwloc_embedded -lm\"\n" )
-file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
+
+if (NOT CMK_WINDOWS)
+  file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
+endif()
 
 if(UCX_PMI)
   file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${UCX_PMI}.sh\n")
