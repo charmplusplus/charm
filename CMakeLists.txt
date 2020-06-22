@@ -957,6 +957,16 @@ message("# You can run ./buildold to use the previous build system.      #")
 message("#################################################################")
 
 # Make symlinks
+if(CMK_WINDOWS)
+  # add_executable(createlink src/arch/win/createlink.cpp)
+  # target_compile_options(createlink PRIVATE -seq -D_WIN32_WINNT=0x0500)
+  # target_link_libraries(createlink -seq)
+  # set(SYSTEMLN "${CMAKE_BINARY_DIR}/bin/createlink.exe")
+  set(SYSTEMLN "ln")
+else()
+  set(SYSTEMLN "ln -s")
+endif()
+
 add_custom_target(create_symlinks ALL
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/bin ${CMAKE_SOURCE_DIR}/bin
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/lib ${CMAKE_SOURCE_DIR}/lib
@@ -966,10 +976,14 @@ add_custom_target(create_symlinks ALL
 
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/include ${CMAKE_BINARY_DIR}/tmp
 
-                  COMMAND test -d ${CMAKE_BINARY_DIR}/benchmarks || env SYSTEMLN='ln -s' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/benchmarks ${CMAKE_BINARY_DIR}/benchmarks && true
-                  COMMAND test -d ${CMAKE_BINARY_DIR}/examples || env SYSTEMLN='ln -s' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/examples ${CMAKE_BINARY_DIR}/examples && true
-                  COMMAND test -d ${CMAKE_BINARY_DIR}/tests || env SYSTEMLN='ln -s' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/tests && true
+                  COMMAND test -d ${CMAKE_BINARY_DIR}/benchmarks || env SYSTEMLN='${SYSTEMLN}' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/benchmarks ${CMAKE_BINARY_DIR}/benchmarks && true
+                  COMMAND test -d ${CMAKE_BINARY_DIR}/examples || env SYSTEMLN='${SYSTEMLN}' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/examples ${CMAKE_BINARY_DIR}/examples && true
+                  COMMAND test -d ${CMAKE_BINARY_DIR}/tests || env SYSTEMLN='${SYSTEMLN}' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/tests && true
                  )
+
+# if(CMK_WINDOWS)
+#   add_dependencies(create_symlinks createlink)
+# endif()
 
 # Create the .vdir/.gdir/VERSION files
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
