@@ -67,7 +67,7 @@ set(ck-ci-sources
     ${CMAKE_BINARY_DIR}/include/waitqd.decl.h
 )
 
-set(ldb-cxx-sources  ../ck-ldb/BlockLB.C
+set(ldb-cxx-sources
     ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C
     ../ck-ldb/DummyLB.C ../ck-ldb/EveryLB.C
     ../ck-ldb/GreedyLB.C ../ck-ldb/GreedyRefineLB.C
@@ -128,9 +128,16 @@ add_library(moduleEveryLB
     ${CMAKE_BINARY_DIR}/include/TempAwareRefineLB.decl.h
     ${CMAKE_BINARY_DIR}/include/DummyLB.decl.h
     ${CMAKE_BINARY_DIR}/include/GreedyRefineLB.decl.h
+    ${CMAKE_BINARY_DIR}/include/RandCentLB.decl.h
     ${CMAKE_BINARY_DIR}/include/RotateLB.decl.h
     ${CMAKE_BINARY_DIR}/include/MetisLB.decl.h
 )
+configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
+
+add_library(moduleMetisLB ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
+add_dependencies(moduleMetisLB ck libckmetis)
+
+add_custom_target(libckmetis COMMAND make -C ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis)
 endif()
 
 # Single LBs
@@ -142,11 +149,20 @@ add_library(moduleRandCentLB ../ck-ldb/RandCentLB.C ${CMAKE_BINARY_DIR}/include/
 add_library(moduleRefineLB ../ck-ldb/RefineLB.C ${CMAKE_BINARY_DIR}/include/RefineLB.decl.h ${ck-ci-sources})
 add_library(moduleRotateLB ../ck-ldb/RotateLB.C ${CMAKE_BINARY_DIR}/include/RotateLB.decl.h ${CMAKE_BINARY_DIR}/include/CentralLB.decl.h ${ck-ci-sources})
 
+# Only for backwards compatibility
 add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
+configure_file(../libs/ck-libs/dummy/ckdummy.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
+# CkIO
 add_library(moduleCkIO ../libs/ck-libs/io/ckio.C ../libs/ck-libs/io/fs_parameters.c ../libs/ck-libs/io/ckio.h ${CMAKE_BINARY_DIR}/include/CkIO.decl.h)
 add_dependencies(moduleCkIO ck)
 configure_file(../libs/ck-libs/io/ckio.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+
+if(CMK_LUSTREAPI)
+    file(WRITE ${CMAKE_BINARY_DIR}/lib/libmoduleCkIO.dep "${CMK_LUSTREAPI}\n")
+else()
+    file(WRITE ${CMAKE_BINARY_DIR}/lib/libmoduleCkIO.dep "\n")
+endif()
 
 foreach(filename ${ck-h-sources} ${ldb-h-sources})
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
