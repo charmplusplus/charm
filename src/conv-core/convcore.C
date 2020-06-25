@@ -65,7 +65,7 @@
 #ifndef _WIN32
 #include <sys/time.h>
 #include <sys/resource.h>
-#else
+#elif defined(_MSC_VER) && _MSC_VER < 1500
 #define snprintf _snprintf
 #endif
 
@@ -196,12 +196,6 @@ void (*notify_crash_fn)(int) = NULL;
 #endif
 
 CpvDeclare(char *, _validProcessors);
-
-#if CMK_CUDA
-CpvExtern(int, n_hapi_events);
-extern "C" void hapiPollEvents();
-extern "C" void hapiExitCsv();
-#endif
 
 /*****************************************************************************
  *
@@ -1020,12 +1014,12 @@ double CmiTimer(void)
 
 #if CMK_SMP
 # if CMK_HAS_RUSAGE_THREAD
-#define RUSAGE_WHO        1   /* RUSAGE_THREAD, only in latest Linux kernels */
+#define RUSAGE_WHO        RUSAGE_THREAD   /* since Linux 2.6.26 */
 #else
 #undef RUSAGE_WHO
 #endif
 #else
-#define RUSAGE_WHO        0
+#define RUSAGE_WHO        RUSAGE_SELF
 #endif
 
 static double inittime_wallclock;
@@ -1947,12 +1941,10 @@ void CsdScheduleForever(void)
       }
     }
 #endif
-    #if CMK_CUDA
-    // check if any GPU work needs to be processed
-    if (CpvAccess(n_hapi_events) > 0) {
-      hapiPollEvents();
-    }
-    #endif
+
+    // Execute functions registered to be executed at every scheduler loop
+    CcdRaiseCondition(CcdSCHEDLOOP);
+
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
 #if !CSD_NO_IDLE_TRACING
@@ -3948,6 +3940,10 @@ extern int quietMode;
 int quietMode; // quiet mode active (CmiPrintf's are disabled)
 CmiSpanningTreeInfo* _topoTree = NULL;
 
+#if CMK_HAS_IO_FILE_OVERFLOW
+extern "C" int _IO_file_overflow(FILE *, int);
+#endif
+
 /**
   Main Converse initialization routine.  This routine is 
   called by the machine file (machine.C) to set up Converse.
@@ -3975,6 +3971,12 @@ CmiSpanningTreeInfo* _topoTree = NULL;
 */
 void ConverseCommonInit(char **argv)
 {
+#if CMK_HAS_IO_FILE_OVERFLOW
+  // forcibly allocate output buffers now, see issue #2814
+  _IO_file_overflow(stdout, -1);
+  _IO_file_overflow(stderr, -1);
+#endif
+
   CpvInitialize(int, _urgentSend);
   CpvAccess(_urgentSend) = 0;
   CpvInitialize(int,interopExitFlag);
@@ -4092,17 +4094,6 @@ void ConverseCommonExit(void)
   CmiFlush(stdout);  /* end of program, always flush */
 #endif
 
-#if CMK_CUDA
-  // Only worker threads execute the following
-  if (!CmiInCommThread()) {
-    // Ensure all PEs have finished GPU work before destructing
-    CmiNodeBarrier();
-
-    if (CmiMyRank() == 0) {
-      hapiExitCsv();
-    }
-  }
-#endif
   seedBalancerExit();
   EmergencyExit();
 }

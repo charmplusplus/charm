@@ -1,0 +1,22 @@
+module TreeLB {
+
+  include "idm.h";
+
+  extern module BaseLB;
+
+  initnode void lbinit(void);
+
+  group [migratable] TreeLB : BaseLB {
+
+    entry void TreeLB(const CkLBOptions &);
+    entry [reductiontarget] void ProcessAtSync(void);
+
+    entry void sendStatsUp(CkMessage *stats);
+    entry void sendDecisionDown(CkMessage *decision);
+    entry void recvLoadTokens(CkMessage *tokens);
+    entry void multicastIDM(IDM &mig_order, int num_pes, int _pes[num_pes]);
+    entry [reductiontarget] void resumeClients(void);
+    entry [reductiontarget] void reportLbTime(double times[n], int n);
+  };
+
+};

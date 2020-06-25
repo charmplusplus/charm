@@ -288,7 +288,6 @@ public:
         return (lhs._gid < rhs._gid);
     }
 };
-PUPmarshall(CkArrayID)
 
 typedef int CkIndex1D;
 typedef struct {int x,y;} CkIndex2D;

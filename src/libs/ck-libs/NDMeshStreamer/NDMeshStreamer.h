@@ -868,8 +868,8 @@ receiveAlongRoute(MeshStreamerMessageV *msg) {
     if (destinationPe == myIndex_) {
       //dtype dataItem = msg->getDataItem<dtype>(i);
       localDeliver(msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i),
-msg->dataItems+msg->template getoffset<dtype>(i),
-        msg->destObjects[i], msg->sourcePes[i]);
+                   msg->dataItems+msg->template getoffset<dtype>(i),
+                   msg->destObjects[i], msg->sourcePes[i]);
     }
     else if (destinationPe != TRAM_BROADCAST) {
       if (destinationPe != lastDestinationPe) {

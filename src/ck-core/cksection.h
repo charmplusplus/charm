@@ -84,7 +84,6 @@ public:
 };
 
 PUPbytes(CkSectionInfo)
-PUPmarshall(CkSectionInfo)
 
 // ----------- CkMcastBaseMsg -----------
 
@@ -181,6 +180,5 @@ public:
   ~CkSectionID() = default;
   void pup(PUP::er &p);
 };
-PUPmarshall(CkSectionID)
 
 #endif

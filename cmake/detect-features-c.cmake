@@ -155,6 +155,33 @@ else()
 endif()
 file(REMOVE ${CMAKE_BINARY_DIR}/test_file ${CMAKE_BINARY_DIR}/test_file2)
 
+
+check_c_source_compiles("
+#include <stdio.h>
+#include <lustre/lustreapi.h>
+#include <lustre/lustre_user.h>
+
+int main() {
+  llapi_printf(LLAPI_MSG_NORMAL, \"Lustre FS is available\");
+  return 0;
+}
+" CMK_HAS_LUSTREFS)
+
+
+if(CMK_HAS_LUSTREFS)
+  set(CMK_LUSTREAPI "-llustreapi")
+else()
+  set(CMK_LUSTREAPI "")
+endif()
+
+
+check_c_source_compiles("
+int main()
+{
+  asm volatile(\"eieio\" ::: \"memory\");
+}
+" CMK_PPC_ASM)
+
 check_c_source_compiles("
 int main()
 {
@@ -178,6 +205,18 @@ int main() {
     return 0;
 }
 " CMK_HAS_ADDR_NO_RANDOMIZE)
+
+check_c_source_compiles("
+__attribute__((visibility(\"default\"))) int myfunc();
+int myfunc()
+{
+  return 0;
+}
+int main()
+{
+  return 0;
+}
+" CMK_HAS_ATTRIBUTE_VISIBILITY_DEFAULT)
 
 check_c_source_compiles("
 #define _GNU_SOURCE
@@ -224,6 +263,15 @@ int main()
   return __executable_start;
 }
 " CMK_HAS_EXECUTABLE_START)
+
+check_c_source_compiles("
+#include <stdio.h>
+extern int _IO_file_overflow(FILE *, int);
+int main()
+{
+  return _IO_file_overflow(stdout, -1);
+}
+" CMK_HAS_IO_FILE_OVERFLOW)
 
 check_c_source_compiles("
 #include <stdlib.h>
@@ -335,6 +383,12 @@ int main() {
     return 0;
 }
 " CMK_BALANCED_INJECTION_API)
+
+if(NOT CMK_BALANCED_INJECTION_API)
+  # Since it is often checked via #ifdef, CMK_BALANCED_INJECTION_API
+  # can't be set to zero, but must be unset.
+  unset(CMK_BALANCED_INJECTION_API CACHE)
+endif()
 
 if(${CMK_BUILD_OFI} EQUAL 1)
   set(tmp ${CMAKE_REQUIRED_LIBRARIES})

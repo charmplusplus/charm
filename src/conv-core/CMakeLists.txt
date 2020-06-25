@@ -65,20 +65,20 @@ if(${CMK_HAS_MMAP})
     add_library(memory-gnu memory.C)
     target_compile_definitions(memory-gnu PRIVATE -DCMK_MEMORY_BUILD_GNU)
 
-    add_library(memory-verbose memory.C)
-    target_compile_definitions(memory-verbose PRIVATE -DCMK_MEMORY_BUILD_VERBOSE)
+    add_library(memory-gnu-verbose memory.C)
+    target_compile_definitions(memory-gnu-verbose PRIVATE -DCMK_MEMORY_BUILD_VERBOSE)
 
-    add_library(memory-record memory.C)
-    target_compile_definitions(memory-record PRIVATE -DCMK_MEMORY_BUILD_RECORD)
+    add_library(memory-gnu-record memory.C)
+    target_compile_definitions(memory-gnu-record PRIVATE -DCMK_MEMORY_BUILD_RECORD)
 
-    add_library(memory-paranoid memory.C)
-    target_compile_definitions(memory-paranoid PRIVATE -DCMK_MEMORY_BUILD_PARANOID)
+    add_library(memory-gnu-paranoid memory.C)
+    target_compile_definitions(memory-gnu-paranoid PRIVATE -DCMK_MEMORY_BUILD_PARANOID)
 
-    add_library(memory-leak memory.C)
-    target_compile_definitions(memory-leak PRIVATE -DCMK_MEMORY_BUILD_LEAK)
+    add_library(memory-gnu-leak memory.C)
+    target_compile_definitions(memory-gnu-leak PRIVATE -DCMK_MEMORY_BUILD_LEAK)
 
-    add_library(memory-isomalloc memory.C)
-    target_compile_definitions(memory-isomalloc PRIVATE -DCMK_MEMORY_BUILD_ISOMALLOC)
+    add_library(memory-gnu-isomalloc memory.C)
+    target_compile_definitions(memory-gnu-isomalloc PRIVATE -DCMK_MEMORY_BUILD_ISOMALLOC)
 endif()
 
 if(${CMK_CHARMDEBUG})
@@ -122,12 +122,12 @@ if(GIT)
              )
   endif()
 else()
-  set(CHARM_VERSION_GIT "${CHARM_VERSION}")
+  set(CHARM_VERSION_GIT "v${CHARM_VERSION}")
 endif()
 
 file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.C CONTENT
 "extern const char * const CmiCommitID;
-const char * const CmiCommitID = \"v${CHARM_VERSION_GIT}\";
+const char * const CmiCommitID = \"${CHARM_VERSION_GIT}\";
 "
 )
 
@@ -182,9 +182,11 @@ add_library(threads-pthreads threads.C)
 target_compile_definitions(threads-pthreads PRIVATE -DCMK_THREADS_BUILD_PTHREADS=1)
 target_include_directories(threads-pthreads PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-fibers threads.C)
-target_compile_definitions(threads-fibers PRIVATE -DCMK_THREADS_BUILD_FIBERS=1)
-target_include_directories(threads-fibers PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
+if(CMK_WINDOWS)
+    add_library(threads-fibers threads.C)
+    target_compile_definitions(threads-fibers PRIVATE -DCMK_THREADS_BUILD_FIBERS=1)
+    target_include_directories(threads-fibers PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
+endif()
 
 add_library(threads-stackcopy threads.C)
 target_compile_definitions(threads-stackcopy PRIVATE -DCMK_THREADS_BUILD_STACKCOPY=1)
@@ -226,10 +228,17 @@ add_executable(conv-cpm ../xlatcpm/conv-cpm.C)
 target_compile_options(conv-cpm PRIVATE -host)
 set_target_properties(conv-cpm PROPERTIES LINK_FLAGS "-host -language c++")
 
-add_library(tsm ../langs/simplemsg/simplemsg.C ../langs/simplemsg/simplemsg.h)
-add_library(sm ../langs/simplemsg/sm.C ../langs/simplemsg/sm.h)
+add_library(tsm EXCLUDE_FROM_ALL ../langs/simplemsg/simplemsg.C ../langs/simplemsg/simplemsg.h)
+add_library(sm EXCLUDE_FROM_ALL ../langs/simplemsg/sm.C ../langs/simplemsg/sm.h )
 
-add_library(pvmc ../langs/pvmc/pvmc_buf.C ../langs/pvmc/pvmc_comm.C ../langs/pvmc/pvmc_conv.C ../langs/pvmc/pvmc_main.C ../langs/pvmc/pvmc_pack.C ../langs/pvmc/pvmc_groups.C)
+add_library(pvmc EXCLUDE_FROM_ALL ../langs/pvmc/pvmc_buf.C ../langs/pvmc/pvmc_comm.C ../langs/pvmc/pvmc_conv.C ../langs/pvmc/pvmc_main.C ../langs/pvmc/pvmc_pack.C ../langs/pvmc/pvmc_groups.C)
+
+
+configure_file(../langs/pvmc/pvmc.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+configure_file(../langs/pvmc/pvm3.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+configure_file(../langs/simplemsg/sm.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+configure_file(../langs/simplemsg/simplemsg.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+
 
 if(${F90CHARM})
     include(../ci-files.cmake)

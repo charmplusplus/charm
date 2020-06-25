@@ -273,19 +273,6 @@ typedef struct {
 } LDCallbacks;
 
 /*
- * Calls from load balancer to load database
- */  
-typedef void (*LDMigratedFn)(void* data, LDObjHandle handle, int waitBarrier);
-
-typedef void (*LDStartLBFn)(void *user_ptr);
-
-typedef void (*LDMigrationDoneFn)(void *user_ptr);
-
-typedef void (*LDPredictFn)(void* user_ptr);
-typedef void (*LDPredictModelFn)(void* user_ptr, void* model);
-typedef void (*LDPredictWindowFn)(void* user_ptr, void* model, int wind);
-
-/*
  * Local Barrier calls
  */
 class LBClient;
@@ -306,13 +293,11 @@ PUPbytes(LDHandle)
 inline void LDOMid::pup(PUP::er &p) {
   id.pup(p);
 }
-PUPmarshall(LDOMid)
 
 inline void LDObjKey::pup(PUP::er &p) {
   p|omId;
   p|objId;
 }
-PUPmarshall(LDObjKey)
 
 inline void LDObjStats::pup(PUP::er &p) {
   p|index;
@@ -320,19 +305,17 @@ inline void LDObjStats::pup(PUP::er &p) {
   p|from_proc;
   p|to_proc;
 }
-PUPmarshall(LDObjStats)
+
 inline void LDOMHandle::pup(PUP::er &p) {
   p|id;
   p|handle;
 }
-PUPmarshall(LDOMHandle)
 
 inline void LDObjHandle::pup(PUP::er &p) {
   p|omhandle;
   p|id;
   p|handle;
 }
-PUPmarshall(LDObjHandle)
 
 inline void LBObjUserData::pup(PUP::er &p) {
   int hasData;
@@ -346,7 +329,6 @@ inline void LBObjUserData::pup(PUP::er &p) {
   }
   if (data) p(data, CkpvAccess(lbobjdatalayout).size());
 }
-PUPmarshall(LBObjUserData)
 
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
@@ -367,7 +349,6 @@ inline void LDObjData::pup(PUP::er &p) {
 #endif
   p|pupSize;
 }
-PUPmarshall(LDObjData)
 
 inline bool LDCommDesc::operator==(const LDCommDesc &obj) const {
     if (type != obj.type) return false;
@@ -412,7 +393,6 @@ inline void LDCommDesc::pup(PUP::er &p) {
                            break; }
   }   // end of switch
 }
-PUPmarshall(LDCommDesc)
 
 inline void LDCommData::pup(PUP::er &p) {
     p|src_proc;
@@ -424,7 +404,6 @@ inline void LDCommData::pup(PUP::er &p) {
       sendHash = recvHash = -1;
     }
 }
-PUPmarshall(LDCommData)
 
 #endif /* LBDBH_H */
 

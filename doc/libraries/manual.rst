@@ -690,9 +690,10 @@ Sending to a Chare Array
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 For sending to a chare array, the entry method should be marked [aggregate],
-which can take attribute parameters to :
+which can take attribute parameters:
 
 .. code-block:: c++
+
    array [1D] test {
      entry [aggregate(numDimensions: 2, bufferSize: 2048, thresholdFractionNumer : 1,
      thresholdFractionDenom : 2, cutoffFractionNumer : 1,
@@ -757,6 +758,7 @@ deadlock could arise. With the periodic flushing mechanism, the buffer
 holding A is guaranteed to be sent out eventually, and deadlock is
 prevented.
 
+<<<<<<< HEAD
 Opting in to fixed-size message handling
 ~~~~~~~~~~~
 Variable-sized message handling in TRAM includes storing
@@ -766,13 +768,32 @@ fixed-size codepath, the is_PUPbytes type trait should be
 explicitly defined for the message type:
 .. code-block:: c++
    .ci file:
+=======
+Opting into Fixed-Size Message Handling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Variable-sized message handling in TRAM includes storing
+and sending additional data that is irrelevant in
+the case of fixed-size messages. To opt into the faster
+fixed-size codepath, the is_PUPbytes type trait should be
+explicitly defined for the message type:
+
+.. code-block:: charmci
+
+>>>>>>> master
    array [1D] test {
      entry [aggregate(numDimensions: 2, bufferSize: 2048, thresholdFractionNumer : 1,
      thresholdFractionDenom : 2, cutoffFractionNumer : 1,
      cutoffFractionDenom : 2)] void ping(int data);
    };
+<<<<<<< HEAD
    ...
    C++:
+=======
+
+.. code-block:: c++
+
+>>>>>>> master
    template <>
    struct is_PUPbytes<int> {
      static const bool value = true;

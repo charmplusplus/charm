@@ -73,18 +73,35 @@ static std::atomic<size_t> rank_count{};
 
 int main(int argc, char ** argv)
 {
+  const size_t myrank = rank_count++;
+  if (CmiMyNode() == 0 && myrank == 0 && !quietModeRequested)
+    CmiPrintf("AMPI> Using fsglobals privatization method.\n");
+
   SharedObject myexe;
 
   // copy the user binary for this rank on the filesystem and open it
   {
-    static const char FUNCPTR_SHIM_SUFFIX[] = ".user";
+    static const char exe_suffix[] = STRINGIFY(CMK_POST_EXE);
+    static const char user_suffix[] = STRINGIFY(CMK_USER_SUFFIX);
+    static const char so_suffix[] = "." STRINGIFY(CMK_SHARED_SUF);
+    static constexpr size_t exe_suffix_len = sizeof(exe_suffix)-1;
 
     std::string src{ampi_binary_path};
-    src += FUNCPTR_SHIM_SUFFIX;
+    if (exe_suffix_len > 0)
+    {
+      size_t pos = src.length() - exe_suffix_len;
+      if (!src.compare(pos, exe_suffix_len, exe_suffix))
+        src.resize(pos);
+    }
+    src += user_suffix;
 
     std::string dst{src};
+
+    src += so_suffix;
+
     dst += '.';
-    dst += std::to_string(rank_count++);
+    dst += std::to_string(myrank);
+    dst += so_suffix;
     const char * dststr = dst.c_str();
 
     if (access(dststr, R_OK) != 0)
