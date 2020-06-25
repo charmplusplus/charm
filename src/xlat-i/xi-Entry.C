@@ -1238,13 +1238,13 @@ void Entry::genTramRegs(XStr& str) {
     str << "\n  /* REG: group " << aggregatorType() << ": IrrGroup;\n  */\n"
         << "  CkIndex_" << aggregatorType() << "::__register(\"" << aggregatorType()
         << "\", sizeof(" << aggregatorType() << "));\n"
-	<< "  CkIndex_" << aggregatorNodeType() << "::__register(\"" << aggregatorNodeType()
-	<< "\", sizeof(" << aggregatorNodeType() << "));\n"
+        << "  CkIndex_" << aggregatorNodeType() << "::__register(\"" << aggregatorNodeType()
+        << "\", sizeof(" << aggregatorNodeType() << "));\n"
         << "  /* REG: group " << baseTypeString << ": IrrGroup;\n  */\n"
         << "  CkIndex_" << baseTypeString << "::__register(\"" << baseTypeString
         << "\", sizeof(" << baseTypeString << "));\n"
-	<< "  CkIndex_" << baseNodeTypeString << "::__register(\"" << baseNodeTypeString
-	<< "\", sizeof(" << baseNodeTypeString << "));\n";
+        << "  CkIndex_" << baseNodeTypeString << "::__register(\"" << baseNodeTypeString
+        << "\", sizeof(" << baseNodeTypeString << "));\n";
   }
 }
 
