@@ -168,6 +168,9 @@ class MeshStreamerNG : public CBase_MeshStreamerNG<dtype, RouterType> {
   CProxy_MeshStreamer<dtype, RouterType> groupProxy;
   int myIndex_;
   RouterType myRouter_;
+  int yieldCount_;
+  bool yieldFlag_;
+
 public:
   MeshStreamerNG(int numDimensions, int *dimensionSizes,
                     CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
