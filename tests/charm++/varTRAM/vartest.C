@@ -9,87 +9,91 @@
 #include "pup_stl.h"
 #include "vartest.decl.h"
 
-/* readonly */ CProxy_main mainProxy;
+/* readonly */ CProxy_Main mainProxy;
+/* readonly */ int n_engines;
+/* readonly */ int msg_count;
+/* readonly */ int lambda;
 
-class main : public CBase_main {
-  CProxy_engine engines;
-  int N;
-  int msgcount;
-  int lambda;
-  int startval;
-  std::chrono::time_point<std::chrono::high_resolution_clock> starttime;
+class Main : public CBase_Main {
+  CProxy_Engine engines;
+  int generated_sum;
+  int received_sum;
+  std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
 
 public:
-  main(CkArgMsg* args) {
+  Main(CkArgMsg* args) {
     if (args->argc == 4) {
       mainProxy = thisProxy;
-      N = std::atoi(args->argv[1]);
-      msgcount = std::atoi(args->argv[2]);
+      n_engines = std::atoi(args->argv[1]);
+      msg_count = std::atoi(args->argv[2]);
       lambda = std::atoi(args->argv[3]);
-      engines = CProxy_engine::ckNew(N,msgcount,lambda,N);
-      starttime = std::chrono::high_resolution_clock::now();
+
+      engines = CProxy_Engine::ckNew(n_engines);
+      start_time = std::chrono::high_resolution_clock::now();
       engines.simulate();
-    }
-    else {
-      CkPrintf("Usage: %s N Msgcount lambda [given: %d]\n",args->argv[0], args->argc);
+    } else {
+      CkPrintf("Usage: %s [n_engines] [msg_count] [lambda]\n", args->argv[0]);
       CkExit();
     }
     delete args;
   }
 
-  void startsum(int val) {
-    startval = val;
+  void generatedSum(int val) {
+    generated_sum = val;
   }
 
-  void done(int val) {
-    auto endtime = std::chrono::high_resolution_clock::now();
-    auto dur = std::chrono::duration_cast<std::chrono::microseconds>(endtime-starttime);
-    assert(startval == val);
-    CkPrintf("Time : %d us\n",(endtime - starttime).count());
+  void receivedSum(int val) {
+    CkPrintf("Generated sum: %d, received sum: %d (two sums should match)\n",
+        generated_sum, received_sum);
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::micro> dur = end_time - start_time;
+    CkPrintf("Time: %.3lf us\n", dur.count());
+
     CkExit();
   }
 };
 
-class engine : public CBase_engine {
-  int N;
-  int msgcount;
-  int lambda;
+class Engine : public CBase_Engine {
   std::mt19937 mt;
   int iter;
-  int result1,result2;
+  int generated;
+  int received;
 
 public:
-  engine() {}
-
-  engine(int _N, int _msgcount, int _lambda) : N(_N), msgcount(_msgcount), lambda(_lambda), mt(thisIndex), iter(0), result1(0), result2(0) {}
+  Engine() : mt(thisIndex), iter(0), generated(0), received(0) {}
 
   void simulate() {
-    for (int j = 0;j != N-1;++j) {
-      for (int k = 0;k != msgcount;++k) {
-        auto temp = rand();
-        thisProxy[(thisIndex+j+1)%N].ping(temp);
-        result1 = std::accumulate(temp.begin(),temp.end(),result1);
+    for (int i = 0; i < n_engines-1; i++) {
+      for (int j = 0; j < msg_count; j++) {
+        // Generate a random vector and send to a different engine
+        auto temp = randVec();
+        thisProxy[(thisIndex + 1 + i) % n_engines].ping(temp);
+
+        // Store the sum of the generated vector elements
+        generated = std::accumulate(temp.begin(), temp.end(), generated);
       }
     }
-    contribute(sizeof(int), &result1, CkReduction::sum_int, CkCallback(CkReductionTarget(main,startsum), mainProxy));
+    contribute(sizeof(int), &generated, CkReduction::sum_int,
+        CkCallback(CkReductionTarget(Main, generatedSum), mainProxy));
   }
 
-  void ping(std::vector<int> val) {
-    result2 = std::accumulate(val.begin(),val.end(),result2);
-    ++iter;
-    if (iter == (N-1)*msgcount) {
-      contribute(sizeof(int), &result2, CkReduction::sum_int, CkCallback(CkReductionTarget(main,done), mainProxy));
+  void ping(std::vector<int> vec) {
+    received = std::accumulate(vec.begin(), vec.end(), received);
+    if (++iter == (n_engines-1) * msg_count) {
+      contribute(sizeof(int), &received, CkReduction::sum_int,
+          CkCallback(CkReductionTarget(Main, receivedSum), mainProxy));
     }
   }
 
-  std::vector<int> rand() {
-    //int length=lambda/4;
-    std::uniform_int_distribution<> gen1(lambda/8,3*lambda/8);
-    int length = gen1(mt);
-    std::uniform_int_distribution<> gen2(0,373);
+  std::vector<int> randVec() {
+    std::uniform_int_distribution<> gen1(lambda/8, 3*lambda/8);
+    std::uniform_int_distribution<> gen2(0, 373);
+
+    // Generate vector with random size between lambda/8 and 3*lambda/8
     std::vector<int> gener(gen1(mt));
-    gener.reserve(gen1(mt));
-    for(auto& g : gener) {
+    for (auto& g : gener) {
+      // Generate random number between 0 and 373
       g = gen2(mt);
     }
     return gener;

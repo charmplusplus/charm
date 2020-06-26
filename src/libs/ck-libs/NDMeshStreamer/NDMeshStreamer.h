@@ -180,10 +180,13 @@ public:
     myIndex_ = CkMyNode();
     myRouter_.initializeRouter(numDimensions, myIndex_, dimensionSizes);
   }
+
   MeshStreamerNG(CkMigrateMessage* m) {}
+
   void set(CProxy_MeshStreamer<dtype, RouterType> gp) {
     groupProxy = gp;
   }
+
   void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
     const static bool copyIndirectly = true;
 
@@ -198,6 +201,13 @@ public:
       CthYield();
     }
   }
+
+  void storeMessage(int destinationPe, const Route& destinationCoordinates,
+      const DataItemHandle<dtype> *dataItem, bool copyIndirectly) {
+    MeshStreamer<dtype, RouterType>::storeMessage(destinationPe, destinationCoordinates, dataItem,
+        copyIndirectly);
+  }
+
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
     int destinationPe, lastDestinationPe;
     Route destinationRoute;
@@ -235,9 +245,11 @@ msg->dataItems+msg->template getoffset<dtype>(i),                   msg->destObj
     delete msg;
     //this->groupProxy[msg->destinationIndex].receiveAlongRoute(msg);
   }
+
   void receiveAtDestination(MeshStreamerMessageV *msg) {
     this->groupProxy[msg->destinationIndex].receiveAtDestination(msg);
   }
+
   void pup(PUP::er& p) {
     p|groupProxy;
     p|myIndex_;
@@ -1186,9 +1198,7 @@ private:
     }
   }
 
-
   inline void initLocalClients() override {
-
     if (this->useCompletionDetection_) {
 #ifdef CMK_TRAM_CACHE_ARRAY_METADATA
       numArrayElements_ = (clientArrayMgr_->getNumInitial()).data()[0];
@@ -1205,7 +1215,6 @@ private:
   }
 
 public:
-
   ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy, int numDimensions, int *dimensionSizes,
                     CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
                     double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
@@ -1223,8 +1232,7 @@ public:
 
   ArrayMeshStreamer(CkMigrateMessage *) {}
 
-  void receiveAtDestination(
-       MeshStreamerMessageV *msg) {
+  void receiveAtDestination(MeshStreamerMessageV *msg) override {
     for (int i = 0; i < msg->numDataItems; i++) {
       //const ArrayDataItem<dtype, itype> packedData = msg->getDataItem<ArrayDataItem<dtype, itype>>(i);
       this->localDeliver(msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i), msg->dataItems+msg->template getoffset<dtype>(i),msg->destObjects[i],msg->sourcePes[i]);
@@ -1235,9 +1243,9 @@ public:
 
     delete msg;
   }
+
   template <bool deliverInline = false>
   inline void insertData(const dtype& dataItem, CkArrayIndex arrayIndex) {
-
     // no data items should be submitted after all local contributors call done
     // and staged completion has begun
     CkAssert(this->stagedCompletionStarted_ == false);
@@ -1272,24 +1280,20 @@ public:
     // this implementation avoids copying an item before transfer into message
     DataItemHandle<dtype> tempHandle(arrayIndex,const_cast<dtype*>(&dataItem));
 
-    MeshStreamer<dtype, RouterType>::
-      insertData(&tempHandle, destinationPe);
-
+    MeshStreamer<dtype, RouterType>::insertData(&tempHandle, destinationPe);
   }
 
   inline int copyDataIntoMessage(
-
       MeshStreamerMessageV *destinationBuffer, //ArrayDataItem<dtype, itype>
-      char *dataHandle, size_t size) {
+      char *dataHandle, size_t size, CkArrayIndex index) override {
 
       return MeshStreamer<dtype, RouterType>::
-        copyDataIntoMessage(destinationBuffer, dataHandle, size);
+        copyDataIntoMessage(destinationBuffer, dataHandle, size, index);
   }
 
   inline int copyDataItemIntoMessage(
-
       MeshStreamerMessageV *destinationBuffer, //ArrayDataItem<dtype, itype>
-      const DataItemHandle<dtype> *dataItemHandle, bool copyIndirectly) {
+      const DataItemHandle<dtype> *dataItemHandle, bool copyIndirectly) override {
 
     if (copyIndirectly == true) {
       // newly inserted items are passed through a handle to avoid copying
@@ -1313,7 +1317,6 @@ public:
   }
 
   void resendMisdeliveredItems(CkArrayIndex arrayId, int destinationPe) {
-
     clientLocMgr_->updateLocation(arrayId, clientLocMgr_->lookupID(arrayId),destinationPe);
 
     std::vector<dtype > &bufferedItems
@@ -1330,7 +1333,6 @@ public:
   }
 
   void updateLocationAtSource(CkArrayIndex arrayId, int destinationPe) {
-
     int prevOwner = clientArrayMgr_->lastKnown((CkArrayIndex)arrayId);
 
     if (prevOwner != destinationPe) {
@@ -1353,7 +1355,7 @@ public:
     }
   }
 
-  void pup(PUP::er &p) {
+  void pup(PUP::er &p) override {
     p|clientAID_;
     if (p.isUnpacking()) {
       clientArrayMgr_ = clientAID_.ckLocalBranch();
