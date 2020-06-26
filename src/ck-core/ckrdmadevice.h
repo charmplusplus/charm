@@ -7,6 +7,8 @@
 #include "ckcallback.h"
 #include "conv-rdmadevice.h"
 
+#define CkNcpyModeDevice CmiNcpyModeDevice
+
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
   cudaStream_t cuda_stream;

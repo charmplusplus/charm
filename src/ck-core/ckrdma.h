@@ -24,7 +24,6 @@
 
 #define CkNcpyStatus CmiNcpyStatus
 #define CkNcpyMode CmiNcpyMode
-#define CkNcpyModeDevice CmiNcpyModeDevice
 
 // P2P_SEND mode is used for EM P2P Send API
 // BCAST_SEND mode is used for EM BCAST Send API
