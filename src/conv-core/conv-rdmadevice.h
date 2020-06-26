@@ -7,6 +7,12 @@
 #include "pup.h"
 #include <cuda_runtime.h>
 
+// Represents the mode of device-side zerocopy transfer
+// MEMCPY indicates that the PEs are on the same logical node and cudaMemcpyDeviceToDevice can be used
+// IPC indicates that the PEs are on different logical nodes within the same physical node and CUDA IPC can be used
+// RDMA indicates that the PEs are on different physical nodes and requires GPUDirect RDMA
+enum class CmiNcpyModeDevice : char { MEMCPY, IPC, RDMA };
+
 class CmiDeviceBuffer {
 public:
   // Pointer to and size of the buffer
@@ -61,6 +67,8 @@ public:
     if (data) cudaFreeHost(data);
   }
 };
+
+CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
 
 #endif // CMK_CUDA
 

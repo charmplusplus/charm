@@ -87,12 +87,6 @@ void CmiSetNcpyAckSize(int ackSize);
 // CkNcpyMode::RDMA indicates that the neither MEMCPY or CMA can be used and REMOTE Direct Memory Access needs to be used
 enum class CmiNcpyMode : char { MEMCPY, CMA, RDMA };
 
-// Represents the mode of device-side zerocopy transfer
-// MEMCPY indicates that the PEs are on the same logical node and cudaMemcpyDeviceToDevice can be used
-// IPC indicates that the PEs are on different logical nodes within the same physical node and CUDA IPC can be used
-// RDMA indicates that the PEs are on different physical nodes and requires GPUDirect RDMA
-enum class CmiNcpyModeDevice : char { MEMCPY, IPC, RDMA };
-
 // Represents the completion status of the zerocopy transfer (used as a return value for CkNcpyBuffer::get & CkNcpyBuffer:::put)
 // CMA and MEMCPY transfers complete instantly and return CkNcpyStatus::complete
 // RDMA transfers use a remote asynchronous call and hence return CkNcpyStatus::incomplete
@@ -258,8 +252,6 @@ class CmiNcpyBuffer {
     PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
   }
 
-  ~CmiNcpyBuffer() {}
-
   void memcpyGet(CmiNcpyBuffer &source);
   void memcpyPut(CmiNcpyBuffer &destination);
 
@@ -289,7 +281,6 @@ inline void deregisterBuffer(CmiNcpyBuffer &buffInfo) {
 }
 CmiNcpyMode findTransferMode(int srcPe, int destPe);
 CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode);
-CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
 
 
 // Converse message to invoke the Ncpy handler on a remote process
