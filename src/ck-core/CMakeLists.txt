@@ -22,7 +22,7 @@ set(ck-cxx-sources
     ck.C ckarray.C ckarrayoptions.C ckcallback.C
     ckcheckpoint.C ckevacuation.C ckfutures.C ckIgetControl.C
     cklocation.C ckmemcheckpoint.C ckmulticast.C
-    ckobjQ.C ckrdma.C ckreduction.C debug-charm.C
+    ckobjQ.C ckrdma.C ckrdmadevice.C ckreduction.C debug-charm.C
     debug-message.C init.C modifyScheduler.C mpi-interoperate.C msgalloc.C
     qd.C register.C sdag.C waitqd.C
 )
@@ -32,7 +32,7 @@ set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
     ckevacuation.h ckfutures.h cklocation.h cklocrec.h
     ckmemcheckpoint.h ckmessage.h ckmigratable.h ckmulticast.h
-    ckobjQ.h ckrdma.h ckreduction.h cksection.h
+    ckobjQ.h ckrdma.h ckrdmadevice.h ckreduction.h cksection.h
     ckstream.h debug-charm.h envelope-path.h envelope.h init.h
     middle-conv.h middle.h mpi-interoperate.h objid.h qd.h
     readonly.h register.h sdag.h stats.h waitqd.h ../ck-ldb/CentralLB.h

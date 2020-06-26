@@ -194,6 +194,8 @@ public:
 
 #include "ckrdma.h"
 
+#include "ckrdmadevice.h"
+
 /********************* Superclass of all Chares ******************/
 #if CMK_MULTIPLE_DELETE
 #define CHARM_INPLACE_NEW \
