@@ -39,8 +39,6 @@ struct CkNcpyBufferPost {
 
   // deregMode
   unsigned short int deregMode;
-
-  CkNcpyBufferPost() : regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG) {}
 };
 
 // Class to represent an Zerocopy buffer
@@ -434,5 +432,4 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr);
 void CkRdmaZCPupCustomHandler(void *ack);
 
 void _ncpyAckHandler(ncpyHandlerMsg *msg);
-
 #endif
