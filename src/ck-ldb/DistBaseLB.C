@@ -9,63 +9,7 @@
 
 #define  DEBUGF(x)      // CmiPrintf x;
 
-
-void DistBaseLB::staticStartLB(void* data) {
-  DistBaseLB *me = (DistBaseLB*)(data);
-  me->barrierDone();
-}
-
 void DistBaseLB::barrierDone() {
-  thisProxy.InvokeLB();
-}
-
-void DistBaseLB::ProcessAtSync() {
-  // Ensuring that the strategy starts only after the barrier
-  CkCallback cb (CkReductionTarget(DistBaseLB, barrierDone), 0, thisProxy);
-  contribute(cb);
-}
-
-DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
-#if CMK_LBDB_ON
-  lbname = (char *)"DistBaseLB";
-  thisProxy = CProxy_DistBaseLB(thisgroup);
-  receiver = lbmgr->AddLocalBarrierReceiver(this, &DistBaseLB::ProcessAtSync);
-  startLbFnHdl = lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB),
-      (void*)(this));
-  lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)this);
-
-  migrates_completed = 0;
-  migrates_expected = 0;
-  lb_started = false;
-  mig_msgs = NULL;
-
-  myStats.pe_speed = lbmgr->ProcessorSpeed();
-  myStats.from_pe = CkMyPe();
-  myStats.n_objs = 0;
-  myStats.objData = NULL;
-  myStats.n_comm = 0;
-  myStats.commData = NULL;
-
-  if (_lb_args.statsOn()) {
-    lbmgr->CollectStatsOn();
-  }
-#endif
-}
-
-DistBaseLB::~DistBaseLB() {
-#if CMK_LBDB_ON
-  lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
-  if (lbmgr) {
-    lbmgr-> RemoveStartLBFn((LDStartLBFn)(staticStartLB));
-  }
-  if (mig_msgs) {
-    delete [] mig_msgs;
-  }
-#endif
-}
-
-
-void DistBaseLB::InvokeLB() {
 #if CMK_LBDB_ON
   if (lb_started) {
     return;
@@ -89,6 +33,51 @@ void DistBaseLB::InvokeLB() {
 
   AssembleStats();
   thisProxy[CkMyPe()].LoadBalance();
+#endif
+}
+
+void DistBaseLB::InvokeLB() {
+  // Ensure that the strategy starts only after the barrier
+  CkCallback cb (CkReductionTarget(DistBaseLB, barrierDone), thisProxy);
+  contribute(cb);
+}
+
+DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
+#if CMK_LBDB_ON
+  lbname = (char *)"DistBaseLB";
+  thisProxy = CProxy_DistBaseLB(thisgroup);
+  startLbFnHdl = lbmgr->AddStartLBFn(this, &DistBaseLB::barrierDone);
+
+  if (opt.getSeqNo() > 0)
+    turnOff();
+
+  migrates_completed = 0;
+  migrates_expected = 0;
+  lb_started = false;
+  mig_msgs = NULL;
+
+  myStats.pe_speed = lbmgr->ProcessorSpeed();
+  myStats.from_pe = CkMyPe();
+  myStats.n_objs = 0;
+  myStats.objData = NULL;
+  myStats.n_comm = 0;
+  myStats.commData = NULL;
+
+  if (_lb_args.statsOn()) {
+    lbmgr->CollectStatsOn();
+  }
+#endif
+}
+
+DistBaseLB::~DistBaseLB() {
+#if CMK_LBDB_ON
+  lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
+  if (lbmgr) {
+    lbmgr->RemoveStartLBFn(startLbFnHdl);
+  }
+  if (mig_msgs) {
+    delete [] mig_msgs;
+  }
 #endif
 }
 

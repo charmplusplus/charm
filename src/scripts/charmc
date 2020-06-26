@@ -373,6 +373,19 @@ then
 fi
 }
 
+filterLegacyLB()
+{
+    local module="$1"
+    local warningOn="$2"
+    case $module in GreedyLB|GreedyRefineLB|RefineLB|RandCentLB|DummyLB|RotateLB)
+        if [ "$warningOn" = "1" ]; then
+            Warning "Warning: $module is now part of TreeLB. To use it, you must also pass +balancer $module at runtime."
+        fi
+	module="TreeLB"
+    esac
+    echo $module
+}
+
 printVersion()
 {
 	findCharmBin $0
@@ -503,17 +516,24 @@ do
                 ;;
 
 	"-module"|"-modules")
-		AddModules `echo $1 | sed -e 's/,/ /g'`
+		local mod=`echo $1 | sed -e 's/,/ /g'`
+		for module in $mod; do
+			module=$(filterLegacyLB $module "0")
+			AddModules $module
+		done
                 INPUT_GIVEN="1"
 		shift
 		;;
 
 	"-balancer")
 #                test -n "$BALANCER" && Abort "More than one -balancer specified!"
-		BALANCER="$BALANCER $1"
-		mod=`echo $1| sed -e 's/:/ /' -e 's/,/ /g'`
-		AddModules $mod
+		local mod=`echo $1| sed -e 's/:/ /' -e 's/,/ /g'`
 		shift
+		for module in $mod; do
+			module=$(filterLegacyLB $module "1")
+			notInList $module $BALANCER && BALANCER="$BALANCER $module"
+			AddModules $module
+		done
 		;;
 
 	"-balance")

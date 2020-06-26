@@ -31,26 +31,6 @@ void DistributedLB::initnodeFn()
   _registerCommandLineOpt("+DistLBMaxPhases");
 }
 
-void DistributedLB::turnOn()
-{
-#if CMK_LBDB_ON
-  lbmgr->
-    TurnOnBarrierReceiver(receiver);
-  lbmgr->
-    TurnOnStartLBFn(startLbFnHdl);
-#endif
-}
-
-void DistributedLB::turnOff()
-{
-#if CMK_LBDB_ON
-  lbmgr->
-    TurnOffBarrierReceiver(receiver);
-  lbmgr->
-    TurnOffStartLBFn(startLbFnHdl);
-#endif
-}
-
 void DistributedLB::InitLB(const CkLBOptions &opt) {
   thisProxy = CProxy_DistributedLB(thisgroup);
   if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
