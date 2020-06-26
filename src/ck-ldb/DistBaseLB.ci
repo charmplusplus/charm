@@ -8,7 +8,6 @@ group [migratable] DistBaseLB: BaseLB {
   entry void DistBaseLB(const CkLBOptions &);  
   entry void LoadBalance();
   entry [reductiontarget] void barrierDone();
-	entry void InvokeLB();
   entry [reductiontarget] void ResumeClients();
   entry void ResumeClients(int balancing);
 };

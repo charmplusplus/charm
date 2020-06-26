@@ -1617,7 +1617,7 @@ void CkMigratable::AtSync(int waitForMigration)
 {
 	if (!usesAtSync)
 		CkAbort("You must set usesAtSync=true in your array element constructor to use AtSync!\n");
-	if(CkpvAccess(numLoadBalancers) == 0) {
+	if(myRec->getLBMgr()->getNLoadBalancers() == 0) {
 		ResumeFromSync();
 		return;
 	}
