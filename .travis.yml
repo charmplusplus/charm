@@ -47,7 +47,7 @@ matrix:
    # - export PATH=/C/tools/msys64/mingw64/bin:$PATH
     - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 --without-romio -g --with-production -j3"
     - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm/tests/converse/megacon && src/arch/win/travis.sh  ../../../bin/charmc  -gen-cpm blkinhand.c -verbose"
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests -j3"
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests test TESTOPTS=++local"
+   # - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests -j3"
+   # - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests test TESTOPTS=++local"
    # - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp -j3 all-test-tests
    # - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tests/charm++ test
