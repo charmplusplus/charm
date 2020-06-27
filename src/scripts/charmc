@@ -1867,7 +1867,7 @@ do
 	DELETE="$DELETE $MYTMP.c $MYTMP.i"
 	DoNoErrCheck $RM $BASE.cpm.h $MYTMP.c
 	Do touch $BASE.cpm.h
-	Do $LN -f -s $FILE $MYTMP.c
+	Do cp -f $FILE $MYTMP.c
 	Do $CHARM_CPP_C $CHARM_CPP_C_FLAGS $MYTMP.c > $MYTMP.i
 	Do $CHARMBIN/conv-cpm $MYTMP.i $BASE.cpm.h
 done
