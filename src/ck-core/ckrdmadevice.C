@@ -1,3 +1,47 @@
+/*
+ * Direct GPU Messaging
+ *
+ * Uses host-bypass mechanisms to directly transfer data between GPU devices.
+ *
+ * 1) Intra-process (intra-node): The sender sends a metadata message to the
+ *    receiver containing the pointer to the source GPU buffer. There is
+ *    no setup needed on the sender side. The receiver invokes device-to-device
+ *    transfer from the source GPU buffer to the destination GPU buffer.
+ *
+ * 2) Inter-process (intra-node): The pointer to the source GPU buffer will be
+ *    invalid on the receiver as it is a different process. Thus CUDA IPC is
+ *    used to create a handle to the source GPU buffer, which can be opened on
+ *    the receiver side to initiate the data transfer. To mitigate the overheads
+ *    of creating and destroying IPC handles, the runtime first allocates a
+ *    'device communication buffer' on each GPU device, creates IPC handles
+ *    only for these buffers, and then exchanges the handles between processes
+ *    on the same physical node. This means each process will have IPC handles
+ *    for all device communication buffers on the same host (that are potentially
+ *    managed by other processes) and can perform data transfers using these
+ *    handles. Each GPU-GPU data transfer invovles requesting a block from the
+ *    device communication buffer on the sender, copying the source GPU buffer
+ *    to the allocated block, sending a metadata message to the receiver
+ *    (that contains the offset of the allocated block), and performing a
+ *    transfer from the block on the sender's device communication buffer to
+ *    the destination GPU buffer. CUDA Events are used to enforce the correct
+ *    ordering between these data transfers. Because multiple PEs can be mapped
+ *    to the same GPU and hence concurrently request allocations from the same
+ *    device communication buffer, a thread-safe allocator using the buddy
+ *    allocation algorithm was implemented. The allocator first calls cudaMalloc
+ *    to obtain a relatively large chunk of memory and then services allocation
+ *    and deallocation requests from PEs that are mapped to its GPU device.
+ *    The buddy algorithm was used to minimize the external fragmentation that
+ *    could occur from concurrent manipulations of the device communication
+ *    buffer.
+ *
+ * TODO
+ * 3) Inter-node: This currently uses a simple host-staged mechanism to perform
+ *    a device-to-host copy of the source GPU buffer to a message, which is sent
+ *    to the receiver. The receiver then performs a host-to-device copy to the
+ *    destination GPU buffer. This will be updated to use GPUDirect RDMA to
+ *    directly performa true device-to-device transfer.
+ */
+
 #if CMK_CUDA
 
 #include "hapi.h"
