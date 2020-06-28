@@ -691,7 +691,7 @@ ExternalProject_Add(hwloc
         CC_FOR_BUILD=${CHARM_CC}
         > /dev/null
     BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-    INSTALL_COMMAND test -f hwloc/.libs/libhwloc_embedded.lib && cp hwloc/.libs/libhwloc_embedded.lib hwloc/.libs/libhwloc_embedded.a
+    INSTALL_COMMAND test -f hwloc/.libs/libhwloc_embedded.lib && cp hwloc/.libs/libhwloc_embedded.lib hwloc/.libs/libhwloc_embedded.a || true # On Windows, the library is created as .lib
     COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
