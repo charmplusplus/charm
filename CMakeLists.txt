@@ -865,7 +865,7 @@ foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTH
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT)
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
