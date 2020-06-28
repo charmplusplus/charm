@@ -76,6 +76,7 @@ opt_mempool_cutoff=26
 opt_network=0
 opt_numa=0
 opt_omp=0
+opt_ooc=0
 opt_parallel=-j1
 opt_persistent=0
 opt_prio_type="bitvec"
