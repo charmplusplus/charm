@@ -393,7 +393,7 @@ fi
 #if [[ -n "$CL" ]]
 if [[ -n "$DOCOMPILE" ]]
 then
-	OPTS="$CL_OPTS $OUTPUT $CL -I." # '-I.' in case inout file is a full path
+	OPTS="$CL_OPTS $OUTPUT $CL -I." # '-I.' in case input file is a full path
 	[[ -n "$DOLINK" && -z "$OUTPUT" ]] && OPTS+=" $OBJ_OUTPUT"
 	[[ -n "$VERBOSE" ]] && echo "unix2nt_cc> $CL_CMD" $OPTS
 	"$CL_CMD" $OPTS
