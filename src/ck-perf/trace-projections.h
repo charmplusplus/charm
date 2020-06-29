@@ -63,7 +63,7 @@ class LogEntry {
 #if CMK_HAS_COUNTER_PAPI
     LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
-    std::vector<char> fName;
+    std::string fName;
     int userSuppliedData;
     unsigned char type;
 
@@ -157,10 +157,7 @@ class LogEntry {
       if(_fileName == NULL){
         fName.clear();
       }else{
-        int flen = strlen(_fileName)+1;
-        fName.resize(flen+1);
-        fName[0] = ' ';
-        memcpy(fName.data()+1, _fileName, flen);
+        fName = _fileName;
       }	
     }
 
