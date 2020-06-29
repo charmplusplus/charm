@@ -59,7 +59,6 @@ class CkMarshalledMessage {
         }
 	void pup(PUP::er &p) {CkPupMessage(p,&msg,1);}
 };
-PUPmarshall(CkMarshalledMessage)
 
 /**
  * CkEntryOptions describes the options associated
@@ -789,8 +788,6 @@ class CProxy {
     void pup(PUP::er &p);
 };
 
-PUPmarshall(CProxy)
-
 
 /*The base classes of each proxy type
 */
@@ -825,7 +822,6 @@ class CProxy_Chare : public CProxy {
     	p((char *)&_ck_cid.objPtr,sizeof(_ck_cid.objPtr));
     }
 };
-PUPmarshall(CProxy_Chare)
 
 /******************* Reduction Declarations ****************/
 //Silly: need the type of a reduction client here so it can be used by proxies.
@@ -916,7 +912,6 @@ class CProxy_Group : public CProxy {
     }
     CK_REDUCTION_CLIENT_DECL
 };
-PUPmarshall(CProxy_Group)
 
 class CProxyElement_Group : public CProxy_Group {
   private:
@@ -943,7 +938,6 @@ class CProxyElement_Group : public CProxy_Group {
     	p(_onPE);
     }
 };
-PUPmarshall(CProxyElement_Group)
 
 #define GROUP_SECTION_PROXY 1
 class CProxySection_Group : public CProxy_Group {
@@ -1001,7 +995,6 @@ public:
     p | _sid;
   }
 };
-PUPmarshall(CProxySection_Group)
 
 /* These classes exist to provide chare indices for the basic
  chare types.*/
