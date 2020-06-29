@@ -70,62 +70,41 @@ class CkEntryOptions : public CkNoncopyable {
 	int queueingtype; //CK_QUEUEING type
 	int prioBits; //Number of bits of priority to use
 	typedef unsigned int prio_t; //Datatype used to represent priorities
-	prio_t *prioPtr; //Points to message priority values
+	std::vector<prio_t> prioPtr; //Points to message priority values
 	prio_t prioStore; //For short priorities, stores the priority value
 	std::vector<CkGroupID> depGroupIDs;  // group dependencies
 public:
 	CkEntryOptions(void): queueingtype(CK_QUEUEING_FIFO), prioBits(0), 
-                              prioPtr(NULL), prioStore(0) {
-	}
-
-	~CkEntryOptions() {
-		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
-                     queueingtype != CK_QUEUEING_ILIFO ) {
-			delete [] prioPtr;
-			prioBits = 0;
-		}
+                              prioStore(0) {
 	}
 	
 	inline CkEntryOptions& setPriority(prio_t integerPrio) {
 		queueingtype=CK_QUEUEING_IFIFO;
 		prioBits=8*sizeof(integerPrio);
-		prioPtr=&prioStore;
+		prioPtr.assign({prioStore});
 		prioStore=integerPrio;
         return *this;
 	}
 	inline CkEntryOptions& setPriority(int prioBits_,const prio_t *prioPtr_) {
-		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
-                     queueingtype != CK_QUEUEING_ILIFO ) {
-			delete [] prioPtr;
-			prioBits = 0;
-		}
 		queueingtype=CK_QUEUEING_BFIFO;
 		prioBits=prioBits_;
 		int dataLength = (prioBits + (sizeof(prio_t)*8 - 1)) /
 		                 (sizeof(prio_t)*8);
-		prioPtr = new prio_t[dataLength];
-		memcpy((void *)prioPtr, prioPtr_, dataLength*sizeof(unsigned int));
+		prioPtr.assign(prioPtr_, prioPtr_ + dataLength);
         return *this;
 	}
 	inline CkEntryOptions& setPriority(const CkBitVector &cbv) {
 		if ( !cbv.data.empty() ) {
-			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
-                             queueingtype != CK_QUEUEING_ILIFO ) {
-				delete [] prioPtr;
-				prioBits = 0;
-			}
 			queueingtype=CK_QUEUEING_BFIFO;
 			prioBits=cbv.usedBits;
 			int dataLength = (prioBits + (sizeof(prio_t)*8 - 1)) /
 		                 	(sizeof(prio_t)*8);
-			prioPtr = new prio_t[dataLength];
-			memcpy((void *)prioPtr, cbv.data.data(), dataLength*sizeof(prio_t));
+			const prio_t * const src = cbv.data.data();
+			prioPtr.assign(src, src + dataLength);
 		} else {
 			queueingtype=CK_QUEUEING_BFIFO;
 			prioBits=0;
-			int dataLength = 1;
-			prioPtr = new prio_t[dataLength];
-			prioPtr[0] = 0;
+			prioPtr.assign({0});
 		}
         return *this;
 	}
@@ -141,7 +120,7 @@ public:
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
 	inline int getPriorityBits(void) const {return prioBits;}
-	inline const prio_t *getPriorityPtr(void) const {return prioPtr;}
+	inline const prio_t *getPriorityPtr(void) const { return prioPtr.data(); }
 	inline CkGroupID getGroupDepID() const { return depGroupIDs[0]; }
 	inline CkGroupID getGroupDepID(int index) const { return depGroupIDs[index]; }
 	inline int getGroupDepSize() const { return sizeof(CkGroupID)*(depGroupIDs.size()); }
