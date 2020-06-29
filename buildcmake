@@ -39,10 +39,20 @@ usage()
   echo "Usage: $0 <target> <triplet> [other options]"
   echo "  See the Charm++ manual at"
   echo "  https://charm.rtfd.io/en/latest/charm++/manual.html#installing-charm"
-  echo "  for full instructions."
+  echo "  for full instructions, or run './build --help'"
+}
+
+help()
+{
+  ./buildold --help
+  exit 0
 }
 
 ############ Begin option parsing
+
+if [[ $# -eq 1 && $1 == "--help" ]]; then
+  help
+fi
 
 if [[ $# -lt 2 ]]; then
   usage
@@ -304,6 +314,9 @@ while [[ $# -gt 0 ]]; do
     -k)
       # -k is an option for make, not for the compiler.
       echo "*** Warning: Ignoring '-k' option."
+      ;;
+    --help)
+      help
       ;;
     -j[0-9]*)
       opt_parallel=$arg
