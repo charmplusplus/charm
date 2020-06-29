@@ -1072,6 +1072,16 @@ EOT
 test_cxx "whether has malloc.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLOC_H, $pass, [whether has malloc.h])
 
+#### test if has strings.h ####
+cat > $t <<EOT
+#include <strings.h>
+int main() {
+  return 0;
+}
+EOT
+test_cxx "whether has strings.h " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STRINGS_H, $pass, [whether has strings.h])
+
 #### test if has alloca.h ####
 cat > $t <<EOT
 #include <alloca.h>

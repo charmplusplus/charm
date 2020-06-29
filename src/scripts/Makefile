@@ -882,7 +882,7 @@ TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecis
 loadbalancers: $(COMMON_LDBS) $(L)/libmoduleCommonLBs.a
 
 everylb: $(ALL_LDBS) $(L)/libmoduleEveryLB.a
-MetisLB.o GridMetisLB.o: metis
+MetisLB.o GridMetisLB.o: | metis
 
 %LB: $(L)/libmodule%LB.a
 	@true
