@@ -129,22 +129,20 @@ void LBRegisterBalancer(const char*, LBCreateFn, LBAllocFn, const char*, int sho
 
 class LocalBarrier
 {
-  friend class LBManager;
-
  public:
   LocalBarrier()
   {
     cur_refcount = 1;
-    client_count = 0;
     iter_no = -1;
     propagated_atsync_step = 0;
-    max_receiver = 0;
     at_count = 0;
     on = false;
+    startedAtSync = false;
+    rank0pe = CkMyRank() == 0;
   };
   ~LocalBarrier(){};
 
-  void SetMgr(LBManager* mgr) { _mgr = mgr; };
+  void SetMgr(CProxy_LBManager mgr) { _mgr = mgr; };
   void propagate_atsync();
 
   LDBarrierClient AddClient(Chare* chare, std::function<void()> fn);
@@ -161,6 +159,7 @@ class LocalBarrier
     CheckBarrier();
   };
   void TurnOff() { on = false; };
+  void reset();
 
  public:
   void CallReceivers(void);
@@ -170,16 +169,21 @@ class LocalBarrier
   std::list<LBClient*> clients;
   std::list<LBReceiver*> receivers;
 
-  LBManager* _mgr;
+  std::list<int> local_pes_to_notify;
+  
+  CProxy_LBManager _mgr;
 
   int cur_refcount;
-  int client_count;
-  int max_receiver;
   int at_count;
   bool on;
+  bool rank0pe;
   int propagated_atsync_step;
   int step;
   int iter_no;
+  bool received_from_left;
+  bool received_from_right;
+  bool received_from_rank0;
+  bool startedAtSync;
 };
 
 void _LBMgrInit();
@@ -279,14 +283,7 @@ class LBManager : public CBase_LBManager
   int startLBFn_count;
 
  public:
-  std::list<int> local_pes_to_notify;
   int chare_count;
-  bool received_from_left;
-  bool received_from_right;
-  bool received_from_rank0;
-  bool rank0pe;
-
-  bool startedAtSync;
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
@@ -297,6 +294,7 @@ class LBManager : public CBase_LBManager
 
  private:
   void init();
+  void InvokeLB();
 
  public:
   LBDatabase* getLBDB() { return lbdb_obj; }
@@ -425,7 +423,6 @@ class LBManager : public CBase_LBManager
 
   void reset();
   void recvLbStart(int lb_step, int phynode, int pe);
-  void invokeLbStart(int pe, int lb_step, int phynode, int mype);
 
   /*
    * Calls from load balancer to load database
