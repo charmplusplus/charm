@@ -2889,7 +2889,7 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 #if CMK_OUT_OF_CORE
 	/* Load in any elements that are out-of-core */
     for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
-		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getIndex());
+		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getID());
 		if (el) if (!el->isInCore) CooBringIn(el->prefetchObjID);
 	}
 #endif
