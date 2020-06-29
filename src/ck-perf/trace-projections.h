@@ -9,7 +9,10 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <vector>
 #include <stack>
+#include <string>
+#include <algorithm>
 
 #include "trace.h"
 #include "trace-common.h"
@@ -52,7 +55,7 @@ class LogEntry {
     std::vector<int> pes;
     unsigned long memUsage;
     double stat;	//Used for storing User Stats
-    std::vector<char> userSuppliedNote;
+    std::string userSuppliedNote;
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
@@ -173,15 +176,13 @@ class LogEntry {
     }
 
     void setUserSuppliedNote(char *note){
-
-      int length = strlen(note)+1;
-      userSuppliedNote.assign(note, note + length);
-      for(int i=0;i<length;i++){
-	if(userSuppliedNote[i] == '\n' || userSuppliedNote[i] == '\r'){
-	  userSuppliedNote[i] = ' ';
-	}
+      if (note == nullptr) {
+        userSuppliedNote.clear();
+        return;
       }
-	  
+      userSuppliedNote = note;
+      std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\n', ' ');
+      std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\r', ' ');
     }
 	
 
