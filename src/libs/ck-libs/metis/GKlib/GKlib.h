@@ -17,7 +17,9 @@
 
 #if defined(_MSC_VER)
 #define __MSC__
+#ifndef USE_GKREGEX
 #define USE_GKREGEX
+#endif
 #define WIN32
 #endif
 #if defined(__ICC)
