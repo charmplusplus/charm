@@ -397,9 +397,9 @@ public:
 
 	MSA_PageT()
 		{
-			data.reserve(ENTRIES_PER_PAGE);
+			data.resize(ENTRIES_PER_PAGE);
 			for (int i=0;i<ENTRIES_PER_PAGE;i++){
-				data.emplace_back(m.getIdentity());
+				data[i]=m.getIdentity();
 			}
 		}
 

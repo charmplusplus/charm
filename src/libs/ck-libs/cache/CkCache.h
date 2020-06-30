@@ -317,18 +317,18 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
   template<class CkCacheKey>
   CkCacheManager<CkCacheKey>::CkCacheManager(int size, int n, CkGroupID *gid) {
     init();
-    locMgr.reserve(n);
-    for (int i=0; i<n; ++i) locMgr.emplace_back(gid[i]);
+    locMgr.resize(n);
+    for (int i=0; i<n; ++i) locMgr[i] = gid[i];
     maxSize = (CmiUInt8)size * 1024 * 1024;
   }
 
   template<class CkCacheKey>
   CkCacheManager<CkCacheKey>::CkCacheManager(int size, int n, CkGroupID *gid, int nWB, CkGroupID *gidWB) {
     init();
-    locMgr.reserve(n);
-    for (int i=0; i<n; ++i) locMgr.emplace_back(gid[i]);
-    locMgrWB.reserve(nWB);
-    for (int i=0; i<nWB; ++i) locMgrWB.emplace_back(gidWB[i]);
+    locMgr.resize(n);
+    for (int i=0; i<n; ++i) locMgr[i] = gid[i];
+    locMgrWB.resize(nWB);
+    for (int i=0; i<nWB; ++i) locMgrWB[i] = gidWB[i];
     maxSize = (CmiUInt8)size * 1024 * 1024;
   }
 
