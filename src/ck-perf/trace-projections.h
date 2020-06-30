@@ -51,7 +51,6 @@ class LogEntry {
     int msglen;
     int nestedID; // Nested thread ID, e.g. virtual AMPI rank number
     CmiObjId   id;
-    int numpes = 0;
     std::vector<int> pes;
     unsigned long memUsage;
     double stat;	//Used for storing User Stats
@@ -85,7 +84,6 @@ class LogEntry {
 #else
       //numPapiEvents = 0;
 #endif
-      numpes=numPe;
       pes.resize(numPe);
       stat=statVal;
     }
@@ -144,7 +142,6 @@ class LogEntry {
       
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
       recvTime = rt; 
-      numpes = numPe;
       pes.resize(numPe);
       if (pelist != NULL) {
         for (int i=0; i<numPe; i++) {
