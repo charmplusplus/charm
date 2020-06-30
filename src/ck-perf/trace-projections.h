@@ -142,12 +142,10 @@ class LogEntry {
       
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
       recvTime = rt; 
-      pes.resize(numPe);
-      if (pelist != NULL) {
-        for (int i=0; i<numPe; i++) {
-          pes[i] = pelist[i];
-        }
-      }
+      if (pelist != nullptr)
+        pes.assign(pelist, pelist + numPe);
+      else
+        pes.resize(numPe);
     }
 
     void setFName(char *_fileName){
