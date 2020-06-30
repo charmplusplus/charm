@@ -957,13 +957,13 @@ public:
       :CProxy_Group(g) { }
   CProxySection_Group(const int n, const CkGroupID *gid,  int const * const *elems, const int *nElems, int factor=USE_DEFAULT_BRANCH_FACTOR)
       :CProxy_Group(gid[0]) {
-    _sid.reserve(n);
-    for (int i=0; i<n; ++i) _sid.emplace_back(gid[i], elems[i], nElems[i], factor);
+    _sid.resize(n);
+    for (int i=0; i<n; ++i) _sid[i] = CkSectionID{gid[i], elems[i], nElems[i], factor};
   }
   CProxySection_Group(const int n, const CkGroupID *gid, int const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
       :CProxy_Group(gid[0],CK_DELCTOR_ARGS) {
-    _sid.reserve(n);
-    for (int i=0; i<n; ++i) _sid.emplace_back(gid[i], elems[i], nElems[i]);
+    _sid.resize(n);
+    for (int i=0; i<n; ++i) _sid[i] = CkSectionID{gid[i], elems[i], nElems[i]};
   }
   
   ~CProxySection_Group() {
