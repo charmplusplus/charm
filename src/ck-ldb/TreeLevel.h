@@ -319,7 +319,7 @@ class StrategyWrapper : public IStrategyWrapper
       procMap.resize(CkNumPes(), -1);
       for (int i = 0; i < procs.size(); i++) procMap[procs[i].id] = i;
       if ((CkMyPe() == 0 || isTreeRoot) && _lb_args.debug() > 0)
-        CkPrintf("[%d] num_procs=%lu num_objs=%lu\n", CkMyPe(), procs.size(),
+        CkPrintf("[%d] num_procs=%zu num_objs=%zu\n", CkMyPe(), procs.size(),
                  objs.size());
       if (objs.size() > 0)
       {

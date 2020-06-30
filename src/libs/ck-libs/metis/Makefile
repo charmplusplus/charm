@@ -64,8 +64,8 @@ cd $(BUILDDIR) && cmake $(CURDIR) $(CONFIG_FLAGS)
 endef
 
 all clean install:
-	make -C GKlib $@;
-	make -C libmetis $@;
+	$(MAKE) -C GKlib $@;
+	$(MAKE) -C libmetis $@;
 
 uninstall:
 	xargs rm < $(BUILDDIR)/install_manifest.txt

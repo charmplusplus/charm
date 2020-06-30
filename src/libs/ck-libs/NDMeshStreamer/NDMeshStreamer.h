@@ -1139,7 +1139,7 @@ public:
   ArrayMeshStreamer(CkMigrateMessage *) {}
 
   void receiveAtDestination(
-       MeshStreamerMessageV *msg) {
+       MeshStreamerMessageV *msg) override {
     for (int i = 0; i < msg->numDataItems; i++) {
       //const ArrayDataItem<dtype, itype> packedData = msg->getDataItem<ArrayDataItem<dtype, itype>>(i);
       this->localDeliver(msg->dataItems+msg->template getoffset<dtype>(i),msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i),msg->destObjects[i],msg->sourcePes[i]);
@@ -1204,7 +1204,7 @@ public:
   inline int copyDataItemIntoMessage(
 
       MeshStreamerMessageV *destinationBuffer, //ArrayDataItem<dtype, itype>
-      const DataItemHandle<dtype> *dataItemHandle, bool copyIndirectly) {
+      const DataItemHandle<dtype> *dataItemHandle, bool copyIndirectly) override {
 
     if (copyIndirectly == true) {
       // newly inserted items are passed through a handle to avoid copying
@@ -1268,7 +1268,7 @@ public:
     }
   }
 
-  void pup(PUP::er &p) {
+  void pup(PUP::er &p) override {
     p|clientAID_;
     if (p.isUnpacking()) {
       clientArrayMgr_ = clientAID_.ckLocalBranch();

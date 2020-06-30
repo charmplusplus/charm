@@ -86,6 +86,8 @@ Topo::Topo(TopoInitMsg* _m)
 	case TopoRandGraph:
 		ConstructRandGraph();
 		break;
+	case TopoError:
+		break;
 	};
 
   delete _m;
