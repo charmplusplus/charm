@@ -123,8 +123,8 @@ class RandomSequence : public CkSequenceInternal<T> {
     start_ = start - min_;
     max_ = min_ + (end - start);
     std::cout << "starting element " << start_ << " ending ele " << end << " max " << max_ << " min " << min_ << std::endl;
-    const char * datastart = bit_vector.data() + (start/8);
-    bit_vector_.assign(datastart, datastart + ((max_+1)/8 + 1));
+    auto datastart = bit_vector + (start/8);
+    std::copy(datastart, datastart + ((max_+1)/8 + 1), bit_vector_);
   }
 
   template <typename GenericIterator>
@@ -146,7 +146,6 @@ class RandomSequence : public CkSequenceInternal<T> {
     }
     max_;
     std::cout << "max " << max_ << std::endl;
-    bit_vector_.clear();
     bit_vector_.resize((max_+1)/8 + 1);
 
     for (GenericIterator it = begin; it != end; ++it) {
@@ -206,7 +205,6 @@ template <typename T>
 inline void RandomSequence<T>::Insert(const T& element) {
   int ele_ind = element - start_;
   if (ele_ind/8 > (max_+1)/8) {
-    int diff = ((ele_ind + 1) / 8) - (( max_ + 1) / 8);
     bit_vector_.resize((ele_ind+1)/8 + 1);
   }
   Set(bit_vector_, ele_ind);

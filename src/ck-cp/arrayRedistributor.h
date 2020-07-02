@@ -337,9 +337,9 @@ class redistributor2D: public CBase_redistributor2D {
   void printArrays(){
 #if DEBUG > 2
     CkAssert(data_arrays.size()==2);
-    for(auto diter = data_arrays.begin(); diter != data_arrays.end(); diter++){
-      int which_array = diter->first;
-      const std::vector<double> & data = diter->second;
+    for(auto & data_array : data_arrays){
+      int which_array = data_array.first;
+      const std::vector<double> & data = data_array.second;
       CkPrintf("%d,%d data_arrays[%d].size() = %zu\n", thisIndex.x, thisIndex.y, which_array, data.size());
     }
 #endif
@@ -403,13 +403,13 @@ class redistributor2D: public CBase_redistributor2D {
 	  CkPrintf("w=%d h=%d x_offset=%d y_offset=%d\n", w, h, x_offset, y_offset);
 #endif
 	  
-	  for(auto diter = data_arrays.begin(); diter != data_arrays.end(); diter++){
+	  for(auto & data_array : data_arrays){
 	    
 	    redistributor2DMsg* msg = new(w*h) redistributor2DMsg;  
 	    //	    CkPrintf("Created message msg %p\n", msg);  
 	    
-	    int which_array = diter->first;
-	    const std::vector<double> & t = diter->second;
+	    int which_array = data_array.first;
+	    const std::vector<double> & t = data_array.second;
 	    int s = t.size();
 	    
 	    for(int j=0; j<h; j++){
@@ -445,9 +445,9 @@ class redistributor2D: public CBase_redistributor2D {
 #endif
 
       // Free my arrays
-      for(auto diter = data_arrays.begin(); diter != data_arrays.end(); diter++){
-	int which_array = diter->first;
-	data_arrays[which_array].clear();
+      for(auto & data_array : data_arrays){
+        int which_array = data_array.first;
+        data_arrays[which_array].clear();
       }
       continueToNextStep();
       
@@ -482,14 +482,14 @@ class redistributor2D: public CBase_redistributor2D {
 
     resizeGranulesHasBeenCalled = false;
 
-    for(auto diter = data_arrays.begin(); diter != data_arrays.end(); diter++){
-      int which_array = diter->first;
-      const std::vector<double> & data = diter->second;
+    for(auto & data_array : data_arrays){
+      int which_array = data_array.first;
+      const std::vector<double> & data = data_array.second;
       if( ! ((data.empty() && !thisElemActive) || (!data.empty() && thisElemActive) )){
-	CkPrintf("[%d] ERROR: ! ((data.empty() && !thisElemActive) || (!data.empty() && thisElemActive) )",CkMyPe());
-	CkPrintf("[%d] ERROR: thisElemActive=%d  (perhaps continueToNextStep was called too soon)\n",CkMyPe(), (int)thisElemActive );
+        CkPrintf("[%d] ERROR: ! ((data.empty() && !thisElemActive) || (!data.empty() && thisElemActive) )",CkMyPe());
+        CkPrintf("[%d] ERROR: thisElemActive=%d  (perhaps continueToNextStep was called too soon)\n",CkMyPe(), (int)thisElemActive );
 
-	CkAbort("ERROR");	
+        CkAbort("ERROR");
       }
     }
     
@@ -544,11 +544,11 @@ class redistributor2D: public CBase_redistributor2D {
 
     if(incoming_count == 0){
       // Allocate new arrays 
-      for(auto diter = data_arrays.begin(); diter != data_arrays.end(); diter++){
-	int w = diter->first;
-	data_arrays_incoming[w].clear();
-	data_arrays_incoming[w].resize((new_width+2*data_x_ghost)*(new_height+2*data_y_ghost));
-
+      for(auto & data_array : data_arrays){
+        int w = data_array.first;
+        std::vector<double> & data_array_incoming = data_arrays_incoming[w];
+        data_array_incoming.clear();
+        data_array_incoming.resize((new_width+2*data_x_ghost)*(new_height+2*data_y_ghost));
       }
     }
     
@@ -586,10 +586,9 @@ class redistributor2D: public CBase_redistributor2D {
 
     if(incoming_count == new_height*new_width*data_arrays.size()){
 
-      for(auto diter = data_arrays.begin(); diter != data_arrays.end(); diter++){
-	int w = diter->first;
-	std::vector<double> & data = data_arrays[w] = std::move(data_arrays_incoming[w]);
-
+      for(auto & data_array : data_arrays){
+        int w = data_array.first;
+        data_arrays[w] = std::move(data_arrays_incoming[w]);
       }
 
       continueToNextStep();
