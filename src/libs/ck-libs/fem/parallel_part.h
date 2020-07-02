@@ -83,67 +83,39 @@ public:
 		owned by 1 element - numShared 0
 		owned by 2 elements - numShared 2
 	*/
-	int numShared;
-	/*somewhat horrible semantics
-		-if numShared == 0 shared is NULL
-		- else stores all the chunks that share this node
-	*/
-	int *shared;
-	NodeElem(){
-		global = -1;
-		numShared = 0;
-		shared = NULL;
+	std::vector<int> shared;
+	NodeElem() : global(-1) {
 	}
-	NodeElem(int g_,int num_){
-		global = g_; numShared= num_;
-		if(numShared != 0){
-			shared = new int[numShared];
-		}else{
-			shared = NULL;
-		}
+	NodeElem(int g_,int num_) : global(g_) {
+		shared.resize(num_);
 	}
-	NodeElem(int g_){
-		global = g_;
-		numShared = 0;
-		shared = NULL;
+	NodeElem(int g_) : global(g_) {
 	}
 	NodeElem(const NodeElem &rhs){
-		shared=NULL;
+		*this = rhs;
+	}
+	NodeElem(NodeElem &&rhs){
 		*this = rhs;
 	}
 	NodeElem& operator=(const NodeElem &rhs){
 		global = rhs.global;
-		numShared = rhs.numShared;
-		if(shared != NULL){
-			delete [] shared;
-		}
-		shared = new int[numShared];
-		memcpy(shared,rhs.shared,numShared*sizeof(int));
+		shared = rhs.shared;
+		return *this;
+	}
+	NodeElem& operator=(NodeElem &&rhs){
+		global = rhs.global;
+		shared = std::move(rhs.shared);
+		return *this;
 	}
 
-	bool operator == (const NodeElem &rhs){
-		if(global == rhs.global){
-			return true;
-		}else{
-			return false;
-		}
+	bool operator ==(const NodeElem &rhs){
+		return global == rhs.global;
 	}
 	virtual void pup(PUP::er &p){
 		p | global;
-		p | numShared;
-		if(p.isUnpacking()){
-			if(numShared != 0){
-				shared = new int[numShared];
-			}else{
-				shared = NULL;
-			}
-		}
-		p(shared,numShared);
+		p | shared;
 	}
 	~NodeElem(){
-		if(shared != NULL){
-			delete [] shared;
-		}
 	}
 };
 

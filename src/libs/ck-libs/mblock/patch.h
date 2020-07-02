@@ -160,7 +160,7 @@ public:
 //A simple "block" object
 class block {
 	blockDim dim;
-	vector3d *locs;
+	std::vector<vector3d> locs;
 	int nPatches;
 	patch **patches;
 public:
@@ -187,11 +187,7 @@ public:
   void pup(PUP::er &p)
   {
     dim.pup(p);
-    int n = dim.getSize();
-    p(n);
-    if(p.isUnpacking())
-      locs = new vector3d[n];
-    p((char*)locs, n*sizeof(vector3d));
+    p|locs;
     p(nPatches);
     if(p.isUnpacking())
       patches = new patch*[nPatches];
