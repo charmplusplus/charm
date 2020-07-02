@@ -123,8 +123,8 @@ class RandomSequence : public CkSequenceInternal<T> {
     start_ = start - min_;
     max_ = min_ + (end - start);
     std::cout << "starting element " << start_ << " ending ele " << end << " max " << max_ << " min " << min_ << std::endl;
-    auto datastart = bit_vector + (start/8);
-    std::copy(datastart, datastart + ((max_+1)/8 + 1), bit_vector_);
+    auto datastart = bit_vector.begin() + (start/8);
+    std::copy(datastart, datastart + ((max_+1)/8 + 1), bit_vector_.begin());
   }
 
   template <typename GenericIterator>
