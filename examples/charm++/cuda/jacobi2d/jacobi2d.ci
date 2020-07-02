@@ -1,0 +1,51 @@
+mainmodule jacobi2d {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Block block_proxy;
+  readonly int grid_size;
+  readonly int block_size;
+  readonly int n_chares;
+  readonly int n_iters;
+  readonly bool sync_ver;
+  readonly bool print;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void initDone();
+    entry [reductiontarget] void commDone();
+    entry [reductiontarget] void updateDone();
+    entry [reductiontarget] void done();
+    entry void printDone();
+  };
+
+  array [2D] Block {
+    entry Block(void);
+    entry void init();
+    entry void receiveGhosts(int ref, int dir, int w, double gh[w]);
+
+    entry void exchangeGhosts() {
+      serial {
+        sendGhosts();
+      }
+
+      for (remote_count = 0; remote_count < neighbors; remote_count++) {
+        when receiveGhosts[my_iter](int ref, int dir, int w, double buf[w]) {
+          serial {
+            processGhosts(dir, w, buf);
+          }
+        }
+      }
+
+      serial {
+        if (sync_ver) {
+          CkCallback cb(CkReductionTarget(Main, commDone), main_proxy);
+          contribute(cb);
+        } else {
+          update();
+        }
+      }
+    }
+
+    entry void update();
+    entry void print();
+  };
+};
