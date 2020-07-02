@@ -86,7 +86,7 @@ waits for the migrant contributions to straggle in.
 #endif
 
 extern bool _inrestart;
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 //define a global instance of CkReductionTypesExt for external access
 CkReductionTypesExt charm_reducers;
 extern int (*PyReductionExt)(char**, int*, int, char**);
@@ -1676,7 +1676,7 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
 }
 
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 /////////////// external Python reducer ////////////////
 static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
 {
@@ -1839,7 +1839,7 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
   // Allows multiple reductions to be done in the same message
   vec.emplace_back(CkReduction::tupleReduction_fn, false, "CkReduction::tuple");
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
   // Perform reduction using an external reducer defined in Python
   vec.emplace_back(CkReduction::reducerStruct(::external_py, false, "CkReduction::custom_python"));
 #endif
@@ -1855,7 +1855,7 @@ std::vector<CkReduction::reducerStruct>& CkReduction::reducerTable()
   return table;
 }
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 // Enum to detect type of contributors in a reduction
 typedef enum : uint8_t {

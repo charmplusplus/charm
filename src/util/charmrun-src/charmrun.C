@@ -4464,7 +4464,7 @@ struct local_nodestart
                         NULL, /*&sa,*/ /* process SA */
                         NULL, /*&sa,*/ /* thread SA */
                         FALSE,         /* inherit flag */
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
                         // don't disable console output on rank 0 process (need to be able to see python syntax errors, etc)
                         CREATE_NEW_PROCESS_GROUP | (p.nodeno == 0 ? 0 : DETACHED_PROCESS),
 #elif 1
@@ -5577,7 +5577,7 @@ struct local_nodestart
 
     posix_spawn_file_actions_t file_actions;
     posix_spawn_file_actions_init(&file_actions);
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
     // don't disable initial output on rank 0 process (need to be able to see python syntax errors, etc)
     if (p.nodeno != 0)
 #endif
@@ -5620,7 +5620,7 @@ struct local_nodestart
     }
     if (pid == 0) {
       int fd, fd2 = dup(2);
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
       // don't disable initial output on rank 0 process (need to be able to see python syntax errors, etc)
       if ((p.nodeno != 0) && (-1 != (fd = open("/dev/null", O_RDWR)))) {
 #else

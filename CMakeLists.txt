@@ -92,7 +92,6 @@ option(PERSISTENT          "Enable Persistent Communication API" OFF)
 option(LBUSERDATA          "Enable LB user data" OFF)
 option(LOCKLESS_QUEUE      "Enable lockless queue for PE local and node queue" OFF)
 option(SHRINKEXPAND        "Enable malleable jobs / shrink expand" OFF)
-option(CHARMPY             "Enable CharmPy support" OFF)
 option(NUMA                "Support memory affinity with NUMA" OFF)
 set(LBTIME_TYPE "double" CACHE STRING "Load balancing timer type")
 option(QLOGIC              "QLogic based Infiniband" OFF)
@@ -230,7 +229,6 @@ set(CMK_WITH_CONTROLPOINT ${CONTROLPOINT})
 set(CMK_WITH_STATS ${STATS})
 
 set(CMK_CHARMDEBUG ${CHARMDEBUG})
-set(CMK_CHARMPY ${CHARMPY})
 
 
 set(CMK_MSG_PRIO_TYPE ${PRIO_TYPE})
@@ -361,8 +359,9 @@ if(${CMAKE_BUILD_TYPE} MATCHES "Release" OR ${CMAKE_BUILD_TYPE} MATCHES "RelWith
     set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -optimize -production")
 endif()
 
-if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
-  set(CMK_CHARMPY 1)
+set(CMK_CHARM4PY 0)
+if(${TARGET} STREQUAL "charm4py")
+  set(CMK_CHARM4PY 1)
   # Create libcharm.so for Charm4py
   add_compile_options(-build-shared)
   set(BUILDOPTS "${BUILDOPTS} -build-shared")
@@ -780,7 +779,7 @@ if(${NETWORK} STREQUAL "uth")
 endif()
 
 # Charm4py
-if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
+if(${TARGET} STREQUAL "charm4py")
   # Create libcharm.so for Charm4py
   # add_compile_options(-build-shared)
   file(WRITE empty.cpp "// This file left intentionally blank. It is used for the charm4py build.")
