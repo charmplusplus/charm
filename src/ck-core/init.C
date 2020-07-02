@@ -667,12 +667,8 @@ static void _exitHandler(envelope *env)
 #endif
 
 #if CMK_CUDA
-      // Ensure all PEs have finished GPU work
-      CmiNodeBarrier();
-
-      if (CmiMyRank() == 0) {
-        hapiExitCsv();
-      }
+      // Clean up HAPI
+      hapiExit();
 #endif
 
       //everyone exits here - there may be issues with leftover messages in the queue
@@ -1666,31 +1662,6 @@ void _initCharm(int unused_argc, char **argv)
 #endif
     }
 
-#if CMK_CUDA
-    // Only worker threads execute the following
-    if (!CmiInCommThread()) {
-      if (CmiMyRank() == 0) {
-        hapiInitCsv(); // Initialize per-process variables (GPUManager)
-      }
-      hapiInitCpv(); // Initialize per-PE variables
-
-      CmiNodeBarrier();
-
-      hapiMapping(argv); // Perform PE-device mapping
-
-      // Register polling function to be invoked at every scheduler loop
-      CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
-
-      CmiNodeBarrier();
-
-      // Register callback functions and initialize Charm++ layer functions
-      hapiRegisterCallbacks();
-      hapiInvokeCallback = CUDACallbackManager;
-      hapiQdCreate = QdCreate;
-      hapiQdProcess = QdProcess;
-    }
-#endif
-
     if(CmiMyPe() == 0) {
         char *topoFilename;
         if(CmiGetArgStringDesc(argv,"+printTopo",&topoFilename,"topo file name")) 
@@ -1708,6 +1679,16 @@ void _initCharm(int unused_argc, char **argv)
             fclose(fp);
         }
     }
+
+#if CMK_CUDA
+  // Perform HAPI initialization for GPU support
+  hapiInit(argv);
+
+  // Initialize Charm++ layer functions
+  hapiInvokeCallback = CUDACallbackManager;
+  hapiQdCreate = QdCreate;
+  hapiQdProcess = QdProcess;
+#endif
 
 #if CMK_USE_PXSHM && ( CMK_CRAYXE || CMK_CRAYXC ) && CMK_SMP
       // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized
