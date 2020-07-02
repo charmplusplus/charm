@@ -2,6 +2,7 @@
 #define __UIUC_CS_CHARM_CKBITVECTOR_H
 
 #include "ckstream.h"
+#include "pup_stl.h"
 
 /* ************************************************************************
  *
@@ -18,7 +19,7 @@ typedef CmiUInt4 prio_t;
 class CkBitVector {
  protected:
   prio_t usedBits;
-  prio_t *data;
+  std::vector<prio_t> data;
 
  protected:
   static prio_t chunkBits() { return chunkSize()*8; }
@@ -55,6 +56,7 @@ class CkBitVector {
   ~CkBitVector();
 
   CkBitVector & operator=(const CkBitVector &b);
+  CkBitVector & operator=(CkBitVector &&b);
 
   // Bit operations. 0 is the least significant bit, and 32 (+) is the
   // most significant bit.
@@ -99,7 +101,7 @@ class CkBitVector {
 
   // For debugging in megatest
 #ifdef DEBUGGING
-  CmiUInt4 * getData() { return data; }
+  CmiUInt4 * getData() { return data.data(); }
   unsigned int getDataLength() { return chunks(usedBits); }
 #endif
 

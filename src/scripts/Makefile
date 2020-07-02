@@ -198,7 +198,7 @@ test-zc: charm++
 
 test-converse: converse test-tests-converse test-examples-converse test-benchmarks-converse
 
-test-charm: charm++ test-tests-charm test-tests-charm test-tests-charm
+test-charm: charm++ test-tests-charm test-examples-charm test-benchmarks-charm
 
 test-AMPI: AMPI test-tests-AMPI test-examples-AMPI test-benchmarks-AMPI
 
@@ -882,7 +882,7 @@ TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecis
 loadbalancers: $(COMMON_LDBS) $(L)/libmoduleCommonLBs.a
 
 everylb: $(ALL_LDBS) $(L)/libmoduleEveryLB.a
-MetisLB.o GridMetisLB.o: metis
+MetisLB.o GridMetisLB.o: | metis
 
 %LB: $(L)/libmodule%LB.a
 	@true
