@@ -14,7 +14,7 @@ namespace buddy {
       printf("bucket[%d]: ", i);
       for (const auto& block : buckets[i]) {
         free += block.size;
-        printf("{%p, %lu} ", block.ptr, block.size);
+        printf("{%p, %zu} ", block.ptr, block.size);
       }
       printf("\n");
     }
@@ -26,10 +26,10 @@ namespace buddy {
       const auto& block = elem.second;
       allocated += block.size;
       used += block.requested;
-      printf("ptr: %p, size: %lu, req: %lu\n", elem.first, block.size, block.requested);
+      printf("ptr: %p, size: %zu, req: %zu\n", elem.first, block.size, block.requested);
     }
 
-    printf("(fragmentation) free: %lu, allocated: %lu, used: %lu\n", free, allocated, used);
+    printf("(fragmentation) free: %zu, allocated: %zu, used: %zu\n", free, allocated, used);
   }
 
   size_t allocator::get_free_size() {
@@ -65,7 +65,7 @@ namespace buddy {
       fprintf(stderr, "Failed to allocate GPU memory\n");
       abort();
     }
-    DEBUG_PRINT("Initialized base_ptr %p with %lu bytes\n", (void*)base_ptr, total_size);
+    DEBUG_PRINT("Initialized base_ptr %p with %zu bytes\n", (void*)base_ptr, total_size);
 
     // Initialize buckets and set up last bucket (for size min_size)
     bucket_count = total_size_log2 - 1;
@@ -100,7 +100,7 @@ namespace buddy {
 
     // No empty bucket found
     if (bucket == bucket_count) {
-      DEBUG_PRINT("No free blocks, malloc request %lu\n", request);
+      DEBUG_PRINT("No free blocks, malloc request %zu\n", request);
       return nullptr;
     }
 
@@ -126,7 +126,7 @@ namespace buddy {
         std::forward_as_tuple(ptr),
         std::forward_as_tuple(size, request));
 
-    DEBUG_PRINT("Allocated ptr %p (base_ptr + %lu) with %lu bytes, requested was %lu bytes\n",
+    DEBUG_PRINT("Allocated ptr %p (base_ptr + %zu) with %zu bytes, requested was %zu bytes\n",
         (void*)ptr, (size_t)(ptr - base_ptr), size, request);
 
 #if BUDDY_DEBUG
@@ -186,7 +186,7 @@ namespace buddy {
     }
 
 merge_done:
-    DEBUG_PRINT("Freed ptr %p with %lu bytes, requested was %lu bytes\n", ptr, size, requested);
+    DEBUG_PRINT("Freed ptr %p with %zu bytes, requested was %zu bytes\n", ptr, size, requested);
 
 #if BUDDY_DEBUG
     print_status();

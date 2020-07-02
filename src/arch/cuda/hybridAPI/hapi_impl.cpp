@@ -336,7 +336,7 @@ static void hapiMapping(char** argv) {
   }
 
   if (CmiMyPe() == 0) {
-    CmiPrintf("HAPI> GPU communication buffer size: %lu MB "
+    CmiPrintf("HAPI> GPU communication buffer size: %zu MB "
         "(rounded up to the nearest power of two)\n",
         CsvAccess(gpu_manager).comm_buffer_size / (1024 * 1024));
   }
