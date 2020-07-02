@@ -45,7 +45,8 @@ public:
     auto endtime = std::chrono::high_resolution_clock::now();
     auto dur = std::chrono::duration_cast<std::chrono::microseconds>(endtime-starttime);
     assert(startval == val);
-    CkPrintf("Time : %d us\n",(endtime - starttime).count());
+    long long timeval = (endtime - starttime).count();
+    CkPrintf("Time : %lld us\n", timeval);
     CkExit();
   }
 };

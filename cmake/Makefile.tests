@@ -66,7 +66,7 @@ test-zc: charm++
 
 test-converse: converse test-tests-converse test-examples-converse test-benchmarks-converse
 
-test-charm: charm++ test-tests-charm test-tests-charm test-tests-charm
+test-charm: charm++ test-tests-charm test-examples-charm test-benchmarks-charm
 
 test-AMPI: AMPI test-tests-AMPI test-examples-AMPI test-benchmarks-AMPI
 
