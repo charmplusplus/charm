@@ -1,4 +1,4 @@
-name: NetLRTS Linux CUDA
+name: NetLRTS Linux CUDA buildold
 
 # Buildonly test, as CUDA needs an actual device to run.
 
