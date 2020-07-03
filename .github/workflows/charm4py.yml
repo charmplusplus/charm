@@ -13,6 +13,7 @@ jobs:
     - name: build-charm4py
       run: |
         pip install setuptools
+        pip3 install setuptools
         git clone https://github.com/UIUC-PPL/charm4py
         export PYTHONPATH="$PWD/charm4py"
         
