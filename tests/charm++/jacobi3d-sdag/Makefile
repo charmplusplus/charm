@@ -10,11 +10,11 @@ OMP_FLAG = -DJACOBI_OPENMP -fopenmp
 all: jacobi3d
 
 jacobi3d: $(OBJS)
-	$(CHARMC) -language charm++ -module DummyLB -o jacobi3d $(OBJS)
+	$(CHARMC) -language charm++ -module TreeLB -o jacobi3d $(OBJS)
 #	$(CHARMC) -language charm++ -module EveryLB -memory paranoid -o jacobi3d $(OBJS)
 
 jacobi3d_omp: $(OBJS_OMP)
-	$(CHARMC) -language charm++ -module DummyLB $(OMP_FLAG) -o jacobi3d_omp $(OBJS_OMP)
+	$(CHARMC) -language charm++ -module TreeLB $(OMP_FLAG) -o jacobi3d_omp $(OBJS_OMP)
 
 projections: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode projections -lz -o jacobi3d.prj $(OBJS)

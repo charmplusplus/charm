@@ -1,12 +1,7 @@
 // AUTOMATICALLY GENERATED FILE
 
 module EveryLB {
-  extern module DummyLB;
-  extern module GreedyLB;
-  extern module GreedyRefineLB;
-  extern module RandCentLB;
-  extern module RefineLB;
-  extern module RotateLB;
+  extern module TreeLB;
   extern module DistributedLB;
   extern module MetisLB;
 

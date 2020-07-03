@@ -73,8 +73,7 @@ never be excluded...
 #include <limits.h>
 #include "spanningTree.h"
 #if CMK_CHARMPY
-#include "GreedyRefineLB.h"
-#include "RandCentLB.h"
+#include "TreeLB.h"
 #endif
 
 #if CMK_CUDA
@@ -668,14 +667,8 @@ static void _exitHandler(envelope *env)
 #endif
 
 #if CMK_CUDA
-      // Ensure all PEs have finished GPU work
-      CmiNodeBarrier();
-
-      if (CmiMyRank() == 0) {
-        shmCleanup();
-
-        hapiExitCsv();
-      }
+      // Clean up HAPI
+      hapiExit();
 #endif
 
       //everyone exits here - there may be issues with leftover messages in the queue
@@ -1157,6 +1150,7 @@ static void _nullFn(void *, void *)
 }
 
 extern void _registerLBManager(void);
+extern void _registerTreeLevel(void);
 extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
@@ -1502,6 +1496,7 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkFutures();
 		_registerCkArray();
 		_registerLBManager();
+		_registerTreeLevel();
     _registerMetaBalancer();
 		_registerCkCallback();
 		_registerwaitqd();
@@ -1517,11 +1512,8 @@ void _initCharm(int unused_argc, char **argv)
                   register whatever load balancers are being linked in.
                   Without an executable (charm4py just uses libcharm.so), the load balancers in libcharm.so
                   have to somehow be registered during init.
-                  With the planned load balancing framework, load balancer registration will hopefully go away,
-                  at least for strategies used in central/hybrid, because they will stop being chares.
                 */
-		_registerGreedyRefineLB();
-		_registerRandCentLB();
+		_registerTreeLB();
 #endif
 
 		/**
@@ -1731,6 +1723,16 @@ void _initCharm(int unused_argc, char **argv)
             fclose(fp);
         }
     }
+
+#if CMK_CUDA
+  // Perform HAPI initialization for GPU support
+  hapiInit(argv);
+
+  // Initialize Charm++ layer functions
+  hapiInvokeCallback = CUDACallbackManager;
+  hapiQdCreate = QdCreate;
+  hapiQdProcess = QdProcess;
+#endif
 
 #if CMK_USE_PXSHM && ( CMK_CRAYXE || CMK_CRAYXC ) && CMK_SMP
       // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized

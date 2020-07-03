@@ -65,6 +65,14 @@ FTN_NAME(CAPITALNAME,lowername) routine_args { \
 	return Cname c_args;\
 }
 
+/** Shared object symbol exporting */
+#ifdef _WIN32
+# define CMI_EXPORT __declspec(dllexport)
+#elif CMK_HAS_ATTRIBUTE_VISIBILITY_DEFAULT
+# define CMI_EXPORT __attribute__((visibility("default")))
+#else
+# define CMI_EXPORT
+#endif
 
 #endif /*Def(thisHeader) */
 

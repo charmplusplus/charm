@@ -23,8 +23,9 @@
         integer :: rank, ierr
 
         call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr)
-        print 1000, rank
-        1000 format ('[', I0, '] About to migrate.')
+        ! Uncomment here and below when issue #2932 is fixed.
+        ! print 1000, rank
+        ! 1000 format ('[', I0, '] About to migrate.')
 
       end subroutine about_to_migrate
 
@@ -36,8 +37,8 @@
         integer :: rank, ierr
 
         call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr)
-        print 2000, rank
-        2000 format ('[', I0, '] Just migrated.')
+        ! print 2000, rank
+        ! 2000 format ('[', I0, '] Just migrated.')
 
       end subroutine just_migrated
 

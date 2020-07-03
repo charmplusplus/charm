@@ -9,16 +9,16 @@
 class LBSimulation
 {
 public:
-  static int doSimulation;
+  static bool doSimulation;
   static char* dumpFile;
   static int dumpStep;
   static int dumpStepSize;
   static int simStep;
   static int simStepSize;
   static int simProcs;
-  static int procsChanged;
+  static bool procsChanged;
 
-  static int showDecisionsOnly;
+  static bool showDecisionsOnly;
 public:
   LBSimulation(int numPes_);
   ~LBSimulation();
