@@ -2,14 +2,10 @@
 
 DIRS = \
   charm++ \
+  converse \
   ampi \
   armci \
   collide \
-
-# TODO #2467: eliminate the need for this
-ifneq ($(BUILD_CUDA),1)
-  DIRS += converse
-endif
 
 TESTDIRS = $(DIRS)
 
