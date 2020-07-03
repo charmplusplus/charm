@@ -12,8 +12,8 @@ jobs:
       run: ./build charm4py netlrts-linux-x86_64 tcp -g -j4 --with-production
     - name: build-charm4py
       run: |
-        pip install setuptools
-        pip3 install setuptools
+        pip install setuptools cython
+        pip3 install setuptools cython
         git clone https://github.com/UIUC-PPL/charm4py
         export PYTHONPATH="$PWD/charm4py"
         
