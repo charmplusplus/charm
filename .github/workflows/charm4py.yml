@@ -21,6 +21,8 @@ jobs:
         mkdir -p charm4py/charm_src/charm/lib && cp lib/libcharm.so charm4py/charm_src/charm/lib
         mkdir -p charm4py/charm_src/charm/include && cp -r -L include/* charm4py/charm_src/charm/include
         
+        cat include/commitid.C
+        
         cd charm4py
         export CHARM4PY_BUILD_CFFI=1
         python3 setup.py build_ext --inplace
