@@ -1065,8 +1065,10 @@ static void add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple,in
 	if (elType>=FEM_MAX_ELTYPE) CkAbort("Element exceeds (stupid) hardcoded maximum element types\n");
 	cur->elem[elType].add=true;
 	cur->elem[elType].tuplesPerElem=tuplesPerElem;
-	cur->elem[elType].elem2tuple=CkCopyArray(elem2tuple,
-		          tuplesPerElem*cur->nodesPerTuple,idxBase);
+	const size_t len = tuplesPerElem*cur->nodesPerTuple;
+	cur->elem[elType].elem2tuple.assign(elem2tuple, elem2tuple + len);
+	for (int & x : cur->elem[elType].elem2tuple)
+	  x -= idxBase;
 }
 
 CLINKAGE void FEM_Add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple)
@@ -1500,10 +1502,10 @@ CLINKAGE void FEM_Add_elem2face_tuples(int fem_mesh, int elem_type, int nodesPer
 	if(cur->elem[elem_type].tuplesPerElem != 0)
 	  CkPrintf("FEM> WARNING: Don't call FEM_Add_elem2face_tuples() repeatedly with the same element type\n");
 	
-	int idxBase=0;
 	cur->nodesPerTuple=nodesPerTuple;
 	cur->elem[elem_type].tuplesPerElem=tuplesPerElem;
-	cur->elem[elem_type].elem2tuple=CkCopyArray(elem2tuple, tuplesPerElem*cur->nodesPerTuple,idxBase);
+	const size_t len = tuplesPerElem*cur->nodesPerTuple;
+	cur->elem[elem_type].elem2tuple.assign(elem2tuple, elem2tuple + len);
 
 }
 FORTRAN_AS_C(FEM_ADD_ELEM2FACE_TUPLES,FEM_Add_elem2face_tuples,fem_add_elem2face_tuples,
