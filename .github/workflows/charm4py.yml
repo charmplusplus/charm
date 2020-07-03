@@ -9,10 +9,11 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build-charm++
-      run: ./build charm4py netlrts-linux-x86_64 tcp -g -j4 --with-production
-    - name: build-charm4py
       run: |
         git fetch --unshallow # Need full repo for 'git describe' used by charm4py
+        ./build charm4py netlrts-linux-x86_64 tcp -g -j4 --with-production
+    - name: build-charm4py
+      run: |
         pip install setuptools cython cffi
         pip3 install setuptools cython cffi
         git clone https://github.com/UIUC-PPL/charm4py
