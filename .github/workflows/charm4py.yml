@@ -13,7 +13,7 @@ jobs:
     - name: build-charm4py
       run: |
         cd ..
-        git clone git clone https://github.com/UIUC-PPL/charm4py
+        git clone https://github.com/UIUC-PPL/charm4py
         export PYTHONPATH="$PWD/charm4py"
         
         mkdir -p charm4py/charm_src/charm/bin && cp bin/charmrun charm4py/charm_src/charm/bin
@@ -23,10 +23,7 @@ jobs:
         cd charm4py
         export CHARM4PY_BUILD_CFFI=1
         python3 setup.py build_ext --inplace
-        python2 setup.py build_ext --inplace
-        
-        python3 auto_test.py
-       
+        python2 setup.py build_ext --inplace       
     - name: test-charm4py
       run: |
         export PYTHONPATH="$PWD/charm4py"
