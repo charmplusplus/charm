@@ -30,5 +30,6 @@ jobs:
     - name: test-charm4py
       run: |
         export PYTHONPATH="$PWD/charm4py"
+        export CHARM4PY_TEST_NUM_PROCESSES=2
         cd charm4py
         python3 auto_test.py
