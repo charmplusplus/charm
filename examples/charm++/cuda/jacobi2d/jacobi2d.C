@@ -43,6 +43,10 @@ public:
     print = false;
     sync_ver = false;
 
+    // Initialize aggregate timers
+    comm_agg_time = 0.0;
+    update_agg_time = 0.0;
+
     // Process arguments
     int c;
     while ((c = getopt(m->argc, m->argv, "s:b:i:yp")) != -1) {
