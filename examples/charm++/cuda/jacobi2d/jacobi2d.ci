@@ -20,6 +20,7 @@ mainmodule jacobi2d {
   array [2D] Block {
     entry Block(void);
     entry void init();
+    entry void initDone();
     entry void receiveGhosts(int ref, int dir, int w, double gh[w]);
 
     entry void exchangeGhosts() {

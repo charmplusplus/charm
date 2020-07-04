@@ -92,8 +92,7 @@ public:
   }
 
   void initDone() {
-    CkPrintf("Chare array initialization time: %lf seconds\n", CkWallTimer() - init_start_time);
-
+    CkPrintf("Init time: %.3lf us\n", CkWallTimer() - init_start_time);
     my_iter = 1;
     start_time = CkWallTimer();
     if (sync_ver) comm_start_time = CkWallTimer();
@@ -224,8 +223,13 @@ class Block : public CBase_Block {
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_size, stream);
 
-    CkCallback cb(CkReductionTarget(Main, initDone), main_proxy);
-    contribute(cb);
+    // TODO: Support reduction callback in hapiAddCallback
+    CkCallback* cb = new CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
+    hapiAddCallback(stream, cb);
+  }
+
+  void initDone() {
+    contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
   }
 
   void sendGhosts(void) {
