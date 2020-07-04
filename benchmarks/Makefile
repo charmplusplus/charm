@@ -8,14 +8,13 @@ DIRS = \
   charm++ \
   converse \
 
-FTDIRS = \
-  charm++ \
-
 TESTDIRS = $(DIRS)
 
 all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
+
+syncfttest mpisyncfttest:
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
