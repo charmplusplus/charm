@@ -172,13 +172,10 @@ Tau:
 LIBS: CONVLIBS CHARMLIBS everylb
 	echo "Built LIBS Successfully"
 
-syncfttest mpisyncfttest : charm++ LIBS
+test syncfttest mpisyncfttest: LIBS
 	$(MAKE) -C ../tests $@
-
-test: LIBS
-	$(MAKE) -C ../tests test
-	$(MAKE) -C ../examples test
-	$(MAKE) -C ../benchmarks test
+	$(MAKE) -C ../examples $@
+	$(MAKE) -C ../benchmarks $@
 
 test-tests: LIBS
 	$(MAKE) -C ../tests test
