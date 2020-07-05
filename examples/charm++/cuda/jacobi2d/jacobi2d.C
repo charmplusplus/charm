@@ -307,6 +307,7 @@ class Block : public CBase_Block {
             cudaMemcpyDeviceToHost, stream));
     }
 
+    // TODO: Fix to be asynchronous
     cudaStreamSynchronize(stream);
 
     // Swap pointers
