@@ -99,8 +99,6 @@ f90charm: charm++ $(L)/libf90charm.a
 libcharm: charm++
 	cd $(L) ; $(CHARMC) -standalone -whole-archive -c++stl -shared -o libcharm.so $(LIBCHARM_LIBS)
 
-charmpy: libcharm
-
 charm4py: libcharm
 
 LIBCHARM_LIBS= libck.a libconv-core.a libconv-util.a libmemory-default.a libconv-machine.a \
