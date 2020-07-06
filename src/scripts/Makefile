@@ -99,13 +99,11 @@ f90charm: charm++ $(L)/libf90charm.a
 libcharm: charm++
 	cd $(L) ; $(CHARMC) -standalone -whole-archive -c++stl -shared -o libcharm.so $(LIBCHARM_LIBS)
 
-charmpy: libcharm
-
 charm4py: libcharm
 
 LIBCHARM_LIBS= libck.a libconv-core.a libconv-util.a libmemory-default.a libconv-machine.a \
                libthreads-default.a libconv-partition.a libtmgr.a libhwloc_embedded.a \
-               libldb-rand.a libconv-ldb.a libmoduleGreedyRefineLB.a libmoduleRandCentLB.a
+               libldb-rand.a libconv-ldb.a libmoduleTreeLB.a
 
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
@@ -174,13 +172,10 @@ Tau:
 LIBS: CONVLIBS CHARMLIBS everylb
 	echo "Built LIBS Successfully"
 
-syncfttest mpisyncfttest : charm++ LIBS
+test syncfttest mpisyncfttest: LIBS
 	$(MAKE) -C ../tests $@
-
-test: LIBS
-	$(MAKE) -C ../tests test
-	$(MAKE) -C ../examples test
-	$(MAKE) -C ../benchmarks test
+	$(MAKE) -C ../examples $@
+	$(MAKE) -C ../benchmarks $@
 
 test-tests: LIBS
 	$(MAKE) -C ../tests test
@@ -198,7 +193,7 @@ test-zc: charm++
 
 test-converse: converse test-tests-converse test-examples-converse test-benchmarks-converse
 
-test-charm: charm++ test-tests-charm test-tests-charm test-tests-charm
+test-charm: charm++ test-tests-charm test-examples-charm test-benchmarks-charm
 
 test-AMPI: AMPI test-tests-AMPI test-examples-AMPI test-benchmarks-AMPI
 
@@ -273,7 +268,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh conv-mach-common.h \
       cmipool.h mempool.h cmiqueue.h \
-      cmitls.h lrtslock.h conv-rdma.h lrts-common.h conv-header.h
+      cmitls.h lrtslock.h conv-rdma.h conv-rdmadevice.h lrts-common.h conv-header.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -282,28 +277,28 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
 	sockRoutines.h sockRoutines.C cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
-	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h cmirdmautils.h
+	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp cmirdmautils.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h debug-charm.h\
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h\
+	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h ckrdmadevice.h \
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
 	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
           LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  RefinerTemp.h Refiner.h ckgraph.h ckheap.h \
           elements.h topology.h manager.h \
-	  BaseLB.h CentralLB.h CentralLBMsg.h \
+	  BaseLB.h CentralLB.h CentralLBMsg.h TreeLB.h \
 	  DistBaseLB.h HybridBaseLB.h HybridLBMsg.h \
 	  middle.h middle-conv.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkMulticast.decl.h	\
           CkReduction.decl.h \
           waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkCheckpointStatus.decl.h CkMemCheckpoint.decl.h \
-          LBManager.decl.h MetaBalancer.decl.h CentralLB.decl.h \
+          LBManager.decl.h MetaBalancer.decl.h CentralLB.decl.h TreeLB.decl.h TreeLevel.decl.h \
           BaseLB.decl.h \
 	  DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
@@ -545,7 +540,7 @@ LIBCONV_CORE=convcore.o hrctimer.o conv-conds.o conv-taskQ.o queueing.o msgmgr.o
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o memory-darwin-clang.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o commitid.o conv-interoperate.o conv-rdma.o \
+	cmitls.o memoryaffinity.o commitid.o conv-interoperate.o conv-rdma.o conv-rdmadevice.o \
 
 LIBCONV_LDB = topology.o generate.o edgelist.o
 
@@ -747,11 +742,11 @@ CK_LIBS_CORE=$(L)/libck.a
 
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
-	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o\
+	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o ckrdmadevice.o \
            waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
 	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
-	   BaseLB.o CentralLB.o HybridBaseLB.o DistBaseLB.o \
+	   BaseLB.o CentralLB.o TreeLB.o HybridBaseLB.o DistBaseLB.o \
            ckgraph.o LButil.o RefinerTemp.o Refiner.o \
            manager.o ckset.o ckheap.o \
 	   LBSimulation.o modifyScheduler.o \
@@ -882,7 +877,7 @@ TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecis
 loadbalancers: $(COMMON_LDBS) $(L)/libmoduleCommonLBs.a
 
 everylb: $(ALL_LDBS) $(L)/libmoduleEveryLB.a
-MetisLB.o GridMetisLB.o: metis
+MetisLB.o GridMetisLB.o: | metis
 
 %LB: $(L)/libmodule%LB.a
 	@true

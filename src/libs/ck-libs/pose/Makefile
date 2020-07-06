@@ -27,17 +27,23 @@ LIBSEQDEST =  $(CHARMLIB)/$(SEQLIB)
 
 all:  $(LIBDEST) $(LIBSEQDEST)
 
-.PHONY:  pose seqpose
+.PHONY: \
+  pose \
+  seqpose \
+  headerinst \
+  clean \
+  docs \
+  depends \
 
 pose: $(LIBDEST)
 
 seqpose:  $(LIBSEQDEST) 
 
-$(LIBDEST):	$(OBJECTS) $(POSEINCDIR) headerinst
+$(LIBDEST): $(OBJECTS) | $(POSEINCDIR) headerinst
 	$(CHARMC) -o $(LIBDEST) $(OBJECTS)
 	/bin/cp libmodulepose.dep $(CHARMLIB)/.
 
-$(LIBSEQDEST):	$(SEQOBJECTS) $(POSEINCDIR) headerinst
+$(LIBSEQDEST): $(SEQOBJECTS) | $(POSEINCDIR) headerinst
 	$(CHARMC) -o $(LIBSEQDEST) $(SEQOBJECTS)
 	/bin/cp libmodulepose.dep $(CHARMLIB)/libmoduleseqpose.dep
 

@@ -7,6 +7,8 @@
 #define LBMANAGER_H
 
 #include "LBDatabase.h"
+#include "json.hpp"
+using json = nlohmann::json;
 
 #define LB_FORMAT_VERSION 3
 
@@ -23,69 +25,72 @@ class CkLBArgs
   double _lb_alpha;      // per message send overhead
   double _lb_beta;       // per byte send overhead
   int _lb_debug;         // 1 or greater
-  int _lb_printsumamry;  // print summary
-  int _lb_loop;          // use multiple load balancers in loop
-  int _lb_ignoreBgLoad;
-  int _lb_migObjOnly;  // only consider migratable objs
-  int _lb_syncResume;
-  int _lb_samePeSpeed;          // ignore cpu speed
-  int _lb_testPeSpeed;          // test cpu speed
-  int _lb_useCpuTime;           // use cpu instead of wallclock time
-  int _lb_statson;              // stats collection
-  int _lb_traceComm;            // stats collection for comm
-  int _lb_central_pe;           // processor number for centralized startegy
-  int _lb_percentMovesAllowed;  // Specifies restriction on num of chares to be moved(as a
-                                // percentage of total number of chares). Used by RefineKLB
-  int _lb_teamSize;        // specifies the team size for TeamLB
+  bool _lb_printsummary;  // print summary
+  bool _lb_loop;          // use multiple load balancers in loop
+  bool _lb_ignoreBgLoad;
+  bool _lb_migObjOnly;  // only consider migratable objs
+  bool _lb_syncResume;
+  bool _lb_samePeSpeed;     // ignore cpu speed
+  bool _lb_testPeSpeed;     // test cpu speed
+  bool _lb_useCpuTime;      // use cpu instead of wallclock time
+  bool _lb_statson;         // stats collection
+  bool _lb_traceComm;       // stats collection for comm
+  int _lb_central_pe;      // processor number for centralized strategy
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
                            // particular load ratio
-  int _lb_metaLbOn;
+  bool _lb_metaLbOn;
   char* _lb_metaLbModelDir;
+  char* _lb_treeLBFile = (char*)"treelb.json";
+  std::vector<const char*>
+      _lb_legacyCentralizedStrategies;  // list of centralized strategies specified by
+                                        // command-line (legacy mode)
 
  public:
   CkLBArgs()
   {
     _autoLbPeriod = -1.0;  // off by default
-    _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
-    _lb_printsumamry = _lb_migObjOnly = 0;
-    _lb_statson = _lb_traceComm = 1;
-    _lb_percentMovesAllowed = 100;
-    _lb_loop = 0;
+    _lb_debug = 0;
+    _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = false;
+    _lb_printsummary = _lb_migObjOnly = false;
+    _lb_statson = _lb_traceComm = true;
+    _lb_loop = false;
     _lb_central_pe = 0;
-    _lb_teamSize = 1;
     _lb_maxDistPhases = 10;
     _lb_targetRatio = 1.05;
-    _lb_metaLbOn = 0;
+    _lb_metaLbOn = false;
     _lb_metaLbModelDir = nullptr;
   }
+  inline char*& treeLBFile() { return _lb_treeLBFile; }
   inline double& lbperiod() { return _autoLbPeriod; }
   inline int& debug() { return _lb_debug; }
-  inline int& teamSize() { return _lb_teamSize; }
-  inline int& printSummary() { return _lb_printsumamry; }
+  inline bool& printSummary() { return _lb_printsummary; }
   inline int& lbversion() { return _lb_version; }
-  inline int& loop() { return _lb_loop; }
-  inline int& ignoreBgLoad() { return _lb_ignoreBgLoad; }
-  inline int& migObjOnly() { return _lb_migObjOnly; }
-  inline int& syncResume() { return _lb_syncResume; }
-  inline int& samePeSpeed() { return _lb_samePeSpeed; }
-  inline int& testPeSpeed() { return _lb_testPeSpeed; }
-  inline int& useCpuTime() { return _lb_useCpuTime; }
-  inline int& statsOn() { return _lb_statson; }
-  inline int& traceComm() { return _lb_traceComm; }
+  inline bool& loop() { return _lb_loop; }
+  inline bool& ignoreBgLoad() { return _lb_ignoreBgLoad; }
+  inline bool& migObjOnly() { return _lb_migObjOnly; }
+  inline bool& syncResume() { return _lb_syncResume; }
+  inline bool& samePeSpeed() { return _lb_samePeSpeed; }
+  inline bool& testPeSpeed() { return _lb_testPeSpeed; }
+  inline bool& useCpuTime() { return _lb_useCpuTime; }
+  inline bool& statsOn() { return _lb_statson; }
+  inline bool& traceComm() { return _lb_traceComm; }
   inline int& central_pe() { return _lb_central_pe; }
   inline double& alpha() { return _lb_alpha; }
   inline double& beta() { return _lb_beta; }
-  inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
   inline int& maxDistPhases() { return _lb_maxDistPhases; }
   inline double& targetRatio() { return _lb_targetRatio; }
-  inline int& metaLbOn() { return _lb_metaLbOn; }
+  inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
+  inline std::vector<const char*>& legacyCentralizedStrategies()
+  {
+    return _lb_legacyCentralizedStrategies;
+  }
 };
 
 extern CkLBArgs _lb_args;
 
-extern int _lb_predict;
+extern bool _lb_predict;
 extern int _lb_predict_delay;
 extern int _lb_predict_window;
 extern bool _lb_psizer_on;
@@ -111,7 +116,6 @@ PUPbytes(CkLBOptions)
 
     extern CkGroupID _lbmgr;
 
-CkpvExtern(int, numLoadBalancers);
 CkpvExtern(bool, lbmanagerInited);
 
 // LB options, mostly controled by user parameter
@@ -246,33 +250,23 @@ class DefaultFunction : public LBPredictorFunction
 class LBManager : public CBase_LBManager
 {
  private:
-  struct MigrateCB
-  {
-    LDMigratedFn fn;
-    void* data;
-    int on;
-  };
-
   struct StartLBCB
   {
-    LDStartLBFn fn;
-    void* data;
-    int on;
+    std::function<void()> fn;
+    bool on;
   };
 
   struct MigrationDoneCB
   {
-    LDMigrationDoneFn fn;
-    void* data;
+    std::function<void()> fn;
   };
 
   struct PredictCB
   {
-    LDPredictModelFn on;
-    LDPredictWindowFn onWin;
-    LDPredictFn off;
-    LDPredictModelFn change;
-    void* data;
+    std::function<void(LBPredictorFunction* model)> on;
+    std::function<void(LBPredictorFunction* model, int win)> onWin;
+    std::function<void()> off;
+    std::function<void(LBPredictorFunction* model)> change;
   };
 
   LBDatabase* lbdb_obj;
@@ -314,6 +308,9 @@ class LBManager : public CBase_LBManager
   static void initnodeFn(void);
 
   void pup(PUP::er& p);
+
+  void configureTreeLB(const char* json_str);
+  void configureTreeLB(json& config);
 
   /*
    * Calls from object managers to load database
@@ -406,7 +403,14 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->MulticastSend(_om, _ids, _n, _b, _nMsgs);
   }
-  int useMem() { return lbdb_obj->useMem(this); }
+  int useMem()
+  {
+    int size = sizeof(LBManager);
+    size += startLBFnList.size() * sizeof(StartLBCB);
+    size += migrationDoneCBList.size() * sizeof(MigrationDoneCB);
+    size += lbdb_obj->useMem();
+    return size;
+  }
 
 #if CMK_LB_USER_DATA
   inline void* GetDBObjUserData(LDObjHandle& h, int idx)
@@ -426,16 +430,25 @@ class LBManager : public CBase_LBManager
   /*
    * Calls from load balancer to load database
    */
-
-  int AddStartLBFn(LDStartLBFn fn, void* data);
+  template <typename T>
+  inline int AddStartLBFn(T* obj, void (T::*method)(void))
+  {
+    return AddStartLBFn(std::bind(method, obj));
+  }
+  int AddStartLBFn(std::function<void()> fn);
   void TurnOnStartLBFn(int handle) { startLBFnList[handle]->on = 1; }
   void TurnOffStartLBFn(int handle) { startLBFnList[handle]->on = 0; }
-  void RemoveStartLBFn(LDStartLBFn fn);
+  void RemoveStartLBFn(int handle);
 
   void StartLB();
-
-  int AddMigrationDoneFn(LDMigrationDoneFn fn, void* data);
-  void RemoveMigrationDoneFn(LDMigrationDoneFn fn);
+  
+  template <typename T>
+  inline int AddMigrationDoneFn(T* obj, void (T::*method)(void))
+  {
+    return AddMigrationDoneFn(std::bind(method, obj));
+  }
+  int AddMigrationDoneFn(std::function<void()> fn);
+  void RemoveMigrationDoneFn(int handle);
   void MigrationDone();
 
  public:
@@ -445,34 +458,45 @@ class LBManager : public CBase_LBManager
   inline void PredictorOn(LBPredictorFunction* model)
   {
     if (predictCBFn != NULL)
-      predictCBFn->on(predictCBFn->data, model);
+      predictCBFn->on(model);
     else
       CmiPrintf("Predictor not supported in this load balancer\n");
   }
   inline void PredictorOn(LBPredictorFunction* model, int wind)
   {
     if (predictCBFn != NULL)
-      predictCBFn->onWin(predictCBFn->data, model, wind);
+      predictCBFn->onWin(model, wind);
     else
       CmiPrintf("Predictor not supported in this load balancer\n");
   }
   inline void PredictorOff()
   {
     if (predictCBFn != NULL)
-      predictCBFn->off(predictCBFn->data);
+      predictCBFn->off();
     else
       CmiPrintf("Predictor not supported in this load balancer\n");
   }
   inline void ChangePredictor(LBPredictorFunction* model)
   {
     if (predictCBFn != NULL)
-      predictCBFn->change(predictCBFn->data, model);
+      predictCBFn->change(model);
     else
       CmiPrintf("Predictor not supported in this load balancer");
   }
 
-  void SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off,
-                      LDPredictModelFn change, void* data);
+  template <typename T>
+  void SetupPredictor(T* data,
+                      void (T::*on)(LBPredictorFunction*),
+                      void (T::*onWin)(LBPredictorFunction*, int),
+                      void (T::*off)(void),
+                      void (T::*change)(LBPredictorFunction*))
+  {
+    if (predictCBFn == nullptr) predictCBFn = new PredictCB;
+    predictCBFn->on = [=](LBPredictorFunction* fn) { (data->*on)(fn); };
+    predictCBFn->onWin = [=](LBPredictorFunction* fn, int win) { (data->*onWin)(fn, win); };
+    predictCBFn->off = [=]() { (data->*off)(); };
+    predictCBFn->change = [=](LBPredictorFunction* fn) { (data->*change)(fn); };
+  }
 
   inline int CollectingCommStats(void)
   {
@@ -546,16 +570,14 @@ class LBManager : public CBase_LBManager
   MetaBalancer* metabalancer;
 
  public:
-  int nloadbalancers;
   CkVec<BaseLB*> loadbalancers;
 
-  std::vector<MigrateCB*> migrateCBList;
   std::vector<StartLBCB*> startLBFnList;
   std::vector<MigrationDoneCB*> migrationDoneCBList;
 
  public:
   BaseLB** getLoadBalancers() { return loadbalancers.getVec(); }
-  int getNLoadBalancers() { return nloadbalancers; }
+  int getNLoadBalancers() { return loadbalancers.size(); }
 
  public:
   static bool manualOn;
@@ -599,10 +621,10 @@ void LBSetPeriod(double second);
 int LBRegisterObjUserData(int size);
 #endif
 
-extern "C" void LBTurnInstrumentOn();
-extern "C" void LBTurnInstrumentOff();
-extern "C" void LBTurnCommOn();
-extern "C" void LBTurnCommOff();
+CLINKAGE void LBTurnInstrumentOn();
+CLINKAGE void LBTurnInstrumentOff();
+void LBTurnCommOn();
+void LBTurnCommOff();
 void LBClearLoads();
 
 inline LBManager* LBManagerObj() { return LBManager::Object(); }

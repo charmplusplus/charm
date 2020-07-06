@@ -4248,7 +4248,7 @@ aggregate
    messages before being sent, to reduce fine-grained overhead. The
    aggregation is handled by the Topological Routing and Aggregation
    Module (TRAM). The argument to this entry method must be a single
-   fixed-size object. More details on TRAM are given in the `TRAM
+   PUPable object. More details on TRAM are given in the `TRAM
    section <http://charm.cs.illinois.edu/manuals/html/libraries/manual-1p.html#TRAM>`__
    of the libraries manual.
 

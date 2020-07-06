@@ -1,8 +1,13 @@
-# Decimal representation of Charm++ release line and API revision
-# Increment the last 2 digits when making an API change
-# Increase the first three after branching for a release
+# Numerical representation of Charm++ release line and API revision
+# Essentially just the version number stripped of decimal points with minor
+#   fields padded to 2 digits each. (e.g. 6.10.1 -> 61001)
+# Ensure that this number is always numerically and lexicographically increasing.
+#
+# Increment the last 2 digits when making a bugfix release
+# Increment the second and third digits when making a minor feature release
+# Increment the first digit when making a major feature release
 
-AC_INIT(Charm++, 61001, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
+AC_INIT([Charm++], [61001], [charm@cs.illinois.edu], [charm], [https://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
@@ -109,11 +114,16 @@ remove_make_flag() {
 
 add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
 add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
+add_flag "CMK_MACOSX='$CMK_MACOSX'" 'basic setup'
 add_flag "CMK_WINDOWS='$CMK_WINDOWS'" 'basic setup'
 add_flag "CMK_BLUEGENEQ='$CMK_BLUEGENEQ'" 'basic setup'
+add_flag "CMK_POST_EXE='$CMK_POST_EXE'" 'basic setup'
+add_flag "CMK_SHARED_SUF='$CMK_SHARED_SUF'" 'basic setup'
+add_flag "CMK_USER_SUFFIX='$CMK_USER_SUFFIX'" 'basic setup'
 add_make_flag "CMK_COMPILER:=$CMK_COMPILER" 'basic setup'
 add_make_flag "CMK_SMP:=$CMK_SMP" 'basic setup'
 add_make_flag "CMK_SHARED_SUF:=$CMK_SHARED_SUF" 'basic setup'
+add_make_flag "CMK_USER_SUFFIX:=$CMK_USER_SUFFIX" 'basic setup'
 add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
 add_make_flag "CMK_MACOSX:=$CMK_MACOSX" 'basic setup'
 add_make_flag "CMK_WINDOWS:=$CMK_WINDOWS" 'basic setup'
@@ -122,6 +132,9 @@ add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
 add_make_flag "CMK_UTH:=$CMK_UTH" 'basic setup'
 add_make_flag "CMK_USE_LRTS:=$CMK_USE_LRTS" 'basic setup'
 add_make_flag "BUILD_CUDA:=$BUILD_CUDA" 'basic setup'
+AC_DEFINE_UNQUOTED(CMK_POST_EXE, $CMK_POST_EXE, [basic setup])
+AC_DEFINE_UNQUOTED(CMK_SHARED_SUF, $CMK_SHARED_SUF, [basic setup])
+AC_DEFINE_UNQUOTED(CMK_USER_SUFFIX, $CMK_USER_SUFFIX, [basic setup])
 
 # enable/disable error checking
 AC_ARG_ENABLE([error-checking],
@@ -357,19 +370,19 @@ else
   AC_DEFINE_UNQUOTED(CMK_SHRINK_EXPAND, 0, [disable shrinkexpand])
 fi
 
-AC_ARG_ENABLE([charmpy],
-            [AS_HELP_STRING([--enable-charmpy],
+AC_ARG_ENABLE([charm4py],
+            [AS_HELP_STRING([--enable-charm4py],
               [enable charm4py support])],
-            [enable_charmpy=$enableval],
-            [enable_charmpy=no])
+            [enable_charm4py=$enableval],
+            [enable_charm4py=no])
 
-if test "$enable_charmpy" = "yes"
+if test "$enable_charm4py" = "yes"
 then
   Echo "charm4py support is enabled"
-  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 1, [enable charmpy])
+  AC_DEFINE_UNQUOTED(CMK_CHARM4PY, 1, [enable charm4py])
 else
   Echo "charm4py support is disabled"
-  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 0, [disable charmpy])
+  AC_DEFINE_UNQUOTED(CMK_CHARM4PY, 0, [disable charm4py])
 fi
 
 AC_ARG_WITH([numa],
@@ -803,8 +816,15 @@ then
     add_flag 'CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="1"' "tlsglobals"
 fi
 
+# Test for a flag important for shared linking
+test_cxx "whether C++ compiler accepts -fvisibility=hidden" "yes" "no" "-fvisibility=hidden"
+if test $strictpass -eq 1
+then
+    add_flag 'CMK_COMPILER_KNOWS_FVISIBILITY="1"' "-fvisibility=hidden"
+fi
+
 # Determine compiler/linker flags to build libcharm.so for charm4py
-if test "$enable_charmpy" = "yes"
+if test "$enable_charm4py" = "yes"
 then
 
   cat > $t <<EOT
@@ -1051,6 +1071,16 @@ int main() {
 EOT
 test_cxx "whether has malloc.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLOC_H, $pass, [whether has malloc.h])
+
+#### test if has strings.h ####
+cat > $t <<EOT
+#include <strings.h>
+int main() {
+  return 0;
+}
+EOT
+test_cxx "whether has strings.h " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STRINGS_H, $pass, [whether has strings.h])
 
 #### test if has alloca.h ####
 cat > $t <<EOT
@@ -1439,6 +1469,20 @@ EOT
 test_linkc "whether synchronization primitives (__sync_synchronize) works in C" "yes" "no" ""
 
 AC_DEFINE_UNQUOTED(CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE, $pass, [whether sync_synchronize primitives works in C])
+
+
+### test for _IO_file_overflow ###
+
+cat > $tc <<EOT
+#include <stdio.h>
+extern int _IO_file_overflow(FILE *, int);
+int main()
+{
+  return _IO_file_overflow(stdout, -1);
+}
+EOT
+test_linkc "whether has _IO_file_overflow" "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK_HAS_IO_FILE_OVERFLOW], $pass, [whether has _IO_file_overflow])
 
 
 ### test for __executable_start ###
@@ -2043,6 +2087,17 @@ AC_DEFINE_UNQUOTED(CMK_HAS_BINDPROCESSOR, $pass, [whether the bindprocessor()
 exists])
 
 
+#### check if visibility attribute works ####
+cat > $t <<EOT
+__attribute__((visibility("default"))) int myfunc();
+int myfunc()
+{
+  return 0;
+}
+EOT
+test_cxx 'whether has __attribute__((visibility("default")))' "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_ATTRIBUTE_VISIBILITY_DEFAULT, $pass, [whether has __attribute__((visibility("default")))])
+
 #### check if dlopen works ####
 skip_dl=0
 test -n "$CMK_NO_DL" && skip_dl=1
@@ -2157,7 +2212,7 @@ CMK_HAS_REALPATH="$pass"
 case "$CMK_VDIR" in
   *-win-*)
     CMK_CAN_GET_BINARY_PATH='1'
-    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='0' # TODO: technically possible, but more work to be done
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='1'
     ;;
   *-darwin*)
     CMK_CAN_GET_BINARY_PATH='1'
@@ -2370,6 +2425,9 @@ if test "$CAN_EXPORT_SYMBOLS" = '1'; then
   add_flag 'CMK_LD="$CMK_LD '$TRACE_LINK_FLAG'"' "exporting program symbols to shared objects"
   add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "exporting program symbols to shared objects"
 fi
+
+test_link "whether has -Wl,-undefined,dynamic_lookup" "yes" "no" "" "-Wl,-undefined,dynamic_lookup"
+add_flag "CMK_LINKER_KNOWS_UNDEFINED='$strictpass'" "importing program symbols from shared objects"
 
 #### check if glibc backtrace exists ####
 cat > $t <<EOT

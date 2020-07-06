@@ -39,10 +39,20 @@ usage()
   echo "Usage: $0 <target> <triplet> [other options]"
   echo "  See the Charm++ manual at"
   echo "  https://charm.rtfd.io/en/latest/charm++/manual.html#installing-charm"
-  echo "  for full instructions."
+  echo "  for full instructions, or run './build --help'"
+}
+
+help()
+{
+  ./buildold --help
+  exit 0
 }
 
 ############ Begin option parsing
+
+if [[ $# -eq 1 && $1 == "--help" ]]; then
+  help
+fi
 
 if [[ $# -lt 2 ]]; then
   usage
@@ -61,7 +71,6 @@ opt_ampi_only=0
 opt_build_shared=0
 opt_ccs=0
 opt_charmdebug=0
-opt_charmpy=0
 opt_controlpoint=0
 opt_cuda=0
 opt_drone_mode=0
@@ -76,7 +85,9 @@ opt_mempool_cutoff=26
 opt_network=0
 opt_numa=0
 opt_omp=0
+opt_ooc=0
 opt_parallel=-j1
+opt_persistent=0
 opt_prio_type="bitvec"
 opt_production=0
 opt_pthreads=0
@@ -116,6 +127,7 @@ opt_compiler=""
 
 # Misc options
 VERBOSE=0
+ONLY_CONFIGURE=0
 
 while [[ $# -gt 0 ]]; do
   arg=$1
@@ -134,6 +146,9 @@ while [[ $# -gt 0 ]]; do
     omp)
       opt_omp=1
       ;;
+    ooc)
+      opt_ooc=1
+      ;;
     tcp)
       opt_tcp=1
       ;;
@@ -145,6 +160,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     slumrpmi|slurmpmi2|ompipmix)
       opt_ucx_pmi=$arg
+      ;;
+    persistent)
+      opt_persistent=1
       ;;
   # Compilers
     gcc)
@@ -249,9 +267,6 @@ while [[ $# -gt 0 ]]; do
     --enable-shrinkexpand)
       opt_shrinkexpand=1
       ;;
-    --enable-charmpy)
-      opt_charmpy=1
-      ;;
     --with-numa)
       opt_numa=1
       ;;
@@ -296,6 +311,9 @@ while [[ $# -gt 0 ]]; do
       # -k is an option for make, not for the compiler.
       echo "*** Warning: Ignoring '-k' option."
       ;;
+    --help)
+      help
+      ;;
     -j[0-9]*)
       opt_parallel=$arg
       ;;
@@ -307,6 +325,10 @@ while [[ $# -gt 0 ]]; do
       echo "Enabling extra verbose mode."
       VERBOSE=1 # Run 'make' verbosely
       opt_extra_opts+="-verbose -save " # Run 'charmc' verbosely
+      ;;
+    --only-configure)
+      # Run only cmake, not make
+      ONLY_CONFIGURE=1
       ;;
     -j)
       opt_parallel="$arg"
@@ -373,7 +395,7 @@ done
 
 # Append certain features and compilers to the end of the build directory name
 builddir_extra=""
-for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft; do
+for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent; do
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
@@ -409,7 +431,6 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DBUILD_SHARED="$opt_build_shared" \
   -DCCS="$opt_ccs" \
   -DCHARMDEBUG="$opt_charmdebug" \
-  -DCHARMPY="$opt_charmpy" \
   -DCONTROLPOINT="$opt_controlpoint" \
   -DBUILD_CUDA="$opt_cuda" \
   -DDRONE_MODE="$opt_drone_mode" \
@@ -422,6 +443,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DNETWORK="$opt_network" \
   -DNUMA="$opt_numa" \
   -DOMP="$opt_omp" \
+  -DOOC="$opt_ooc" \
+  -DPERSISTENT="$opt_persistent" \
   -DPRIO_TYPE="$opt_prio_type" \
   -DPTHREADS="$opt_pthreads" \
   -DPXSHM="$opt_pxshm" \
@@ -440,6 +463,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DTRACING_COMMTHREAD="$opt_tracing_commthread" \
   -DUCX_PMI="$opt_ucx_pmi" \
   -DZLIB="$opt_zlib"
+
+[[ $ONLY_CONFIGURE -eq 1 ]] && exit 0
 
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
 make $opt_parallel

@@ -50,7 +50,7 @@ struct DeviceManager {
     comm_buffer->free((void*)(comm_buffer->base_ptr + offset));
   }
 
-  size_t comm_buffer_free_size() {
+  size_t get_comm_buffer_free_size() {
     return comm_buffer->get_free_size();
   }
 

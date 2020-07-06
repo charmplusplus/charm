@@ -72,9 +72,8 @@ never be excluded...
 #include <sstream>
 #include <limits.h>
 #include "spanningTree.h"
-#if CMK_CHARMPY
-#include "GreedyRefineLB.h"
-#include "RandCentLB.h"
+#if CMK_CHARM4PY
+#include "TreeLB.h"
 #endif
 
 #if CMK_CUDA
@@ -668,14 +667,8 @@ static void _exitHandler(envelope *env)
 #endif
 
 #if CMK_CUDA
-      // Ensure all PEs have finished GPU work
-      CmiNodeBarrier();
-
-      if (CmiMyRank() == 0) {
-        shmCleanup();
-
-        hapiExitCsv();
-      }
+      // Clean up HAPI
+      hapiExit();
 #endif
 
       //everyone exits here - there may be issues with leftover messages in the queue
@@ -1157,6 +1150,7 @@ static void _nullFn(void *, void *)
 }
 
 extern void _registerLBManager(void);
+extern void _registerTreeLevel(void);
 extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
@@ -1502,6 +1496,7 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkFutures();
 		_registerCkArray();
 		_registerLBManager();
+		_registerTreeLevel();
     _registerMetaBalancer();
 		_registerCkCallback();
 		_registerwaitqd();
@@ -1510,18 +1505,15 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_MEM_CHECKPOINT
 		_registerCkMemCheckpoint();
 #endif
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
                 /**
                   Load balancers are currently registered in Charm++ through a C file that is generated and
                   and compiled by charmc when making an executable. That file contains appropriate calls to
                   register whatever load balancers are being linked in.
                   Without an executable (charm4py just uses libcharm.so), the load balancers in libcharm.so
                   have to somehow be registered during init.
-                  With the planned load balancing framework, load balancer registration will hopefully go away,
-                  at least for strategies used in central/hybrid, because they will stop being chares.
                 */
-		_registerGreedyRefineLB();
-		_registerRandCentLB();
+		_registerTreeLB();
 #endif
 
 		/**
@@ -1529,7 +1521,7 @@ void _initCharm(int unused_argc, char **argv)
 		  "mainmodule" .ci file.  It will include calls to 
 		  register all the .ci files.
 		*/
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
 		CkRegisterMainModule();
 #else
                 // CkRegisterMainModule doesn't exist in charm4py because there is no executable.
@@ -1550,7 +1542,7 @@ void _initCharm(int unused_argc, char **argv)
 		  programs, which don't have a .ci file and hence have
 		  no other way to control the _register process.
 		*/
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
 		_registerExternalModules(argv);
 #endif
 	}
@@ -1629,50 +1621,6 @@ void _initCharm(int unused_argc, char **argv)
 	}	
 #endif
 
-#if CMK_CUDA
-  // Perform HAPI initialization for GPU support
-  if (!CmiInCommThread()) {
-    if (CmiMyRank() == 0) {
-      hapiInitCsv(); // Initialize per-process variables (GPUManager)
-    }
-    hapiInitCpv(); // Initialize per-PE variables
-
-    CmiNodeBarrier();
-
-    hapiMapping(argv); // Perform PE-device mapping
-
-    // Register polling function to be invoked at every scheduler loop
-    CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
-
-    CmiNodeBarrier();
-
-    if (CmiMyRank() == 0) {
-      shmCreate(); // Create a per-host shared memory region
-    }
-
-    CmiNodeBarrier();
-
-    ipcHandleCreate(); // Create CUDA IPC handles
-  }
-
-  // Ensure CUDA IPC handles are available for all processes
-  // Note: Causes a hang when this barrier is placed after CPU topology initialization
-  // FIXME: This only needs to be a host-wide synchronization
-  CmiBarrier();
-
-  if (!CmiInCommThread()) {
-    if (CmiMyRank() == 0) {
-      ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
-    }
-
-    // Register callback functions and initialize Charm++ layer functions
-    hapiRegisterCallbacks();
-    hapiInvokeCallback = CUDACallbackManager;
-    hapiQdCreate = QdCreate;
-    hapiQdProcess = QdProcess;
-  }
-#endif
-
     if (CkMyRank() == 0) {
       TopoManager_init();
     }
@@ -1731,6 +1679,16 @@ void _initCharm(int unused_argc, char **argv)
             fclose(fp);
         }
     }
+
+#if CMK_CUDA
+  // Perform HAPI initialization for GPU support
+  hapiInit(argv);
+
+  // Initialize Charm++ layer functions
+  hapiInvokeCallback = CUDACallbackManager;
+  hapiQdCreate = QdCreate;
+  hapiQdProcess = QdProcess;
+#endif
 
 #if CMK_USE_PXSHM && ( CMK_CRAYXE || CMK_CRAYXC ) && CMK_SMP
       // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized
