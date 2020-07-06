@@ -3027,9 +3027,14 @@ typedef void * SharedObject;
 typedef int (*ampi_maintype)(int, char **);
 typedef void (*ampi_fmaintype)(void);
 
-ampi_maintype AMPI_Main_Get_C(SharedObject myexe);
-ampi_fmaintype AMPI_Main_Get_F(SharedObject myexe);
-int AMPI_Main_Dispatch(SharedObject myexe, int argc, char ** argv);
+struct ampi_mainstruct
+{
+  ampi_maintype c;
+  ampi_fmaintype f;
+};
+
+ampi_mainstruct AMPI_Main_Get(SharedObject myexe);
+int AMPI_Main_Dispatch(ampi_mainstruct, int argc, char ** argv);
 
 /* For internal AMPI use only: semantics subject to change. */
 CLINKAGE void AMPI_Node_Setup(int numranks);
