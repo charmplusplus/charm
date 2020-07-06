@@ -11780,7 +11780,7 @@ void TCHARM_Node_Setup(int numelements)
 }
 
 #if defined _WIN32 || CMK_DLL_USE_DLOPEN
-ampi_maintype AMPI_Main_Get_C(SharedObject myexe)
+static ampi_maintype AMPI_Main_Get_C(SharedObject myexe)
 {
   auto AMPI_Main_cpp_ptr = (ampi_maintype)dlsym(myexe, "AMPI_Main_cpp");
   if (AMPI_Main_cpp_ptr)
@@ -11797,7 +11797,7 @@ ampi_maintype AMPI_Main_Get_C(SharedObject myexe)
   return nullptr;
 }
 
-ampi_fmaintype AMPI_Main_Get_F(SharedObject myexe)
+static ampi_fmaintype AMPI_Main_Get_F(SharedObject myexe)
 {
   auto fmpi_main_ptr = (ampi_fmaintype)dlsym(myexe, STRINGIFY(FTN_NAME(MPI_MAIN,mpi_main)));
   if (fmpi_main_ptr)
@@ -11810,15 +11810,24 @@ ampi_fmaintype AMPI_Main_Get_F(SharedObject myexe)
   return nullptr;
 }
 
-int AMPI_Main_Dispatch(SharedObject myexe, int argc, char ** argv)
+ampi_mainstruct AMPI_Main_Get(SharedObject myexe)
 {
-  ampi_maintype c = AMPI_Main_Get_C(myexe);
+  return ampi_mainstruct
+  {
+    AMPI_Main_Get_C(myexe),
+    AMPI_Main_Get_F(myexe)
+  };
+}
+
+int AMPI_Main_Dispatch(ampi_mainstruct mainstruct, int argc, char ** argv)
+{
+  ampi_maintype c = mainstruct.c;
   if (c != nullptr)
   {
     return c(argc, argv);
   }
 
-  ampi_fmaintype f = AMPI_Main_Get_F(myexe);
+  ampi_fmaintype f = mainstruct.f;
   if (f != nullptr)
   {
     f();
