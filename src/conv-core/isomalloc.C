@@ -1017,6 +1017,11 @@ struct isommap
     }
   }
 
+  void JustMigrated()
+  {
+    // Can be used for any post-migration functionality, such as restoring mprotect permissions.
+  }
+
   void clear()
   {
     if (allocated_extent == start)
@@ -2483,6 +2488,12 @@ void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext * ctxptr)
     delete pool;
     ctxptr->opaque = nullptr;
   }
+}
+
+void CmiIsomallocContextJustMigrated(CmiIsomallocContext ctx)
+{
+  auto pool = (Mempool *)ctx.opaque;
+  pool->backend.JustMigrated();
 }
 
 void CmiIsomallocEnableRDMA(CmiIsomallocContext ctx, int enable)
