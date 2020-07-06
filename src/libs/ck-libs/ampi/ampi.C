@@ -11774,6 +11774,11 @@ int AMPI_GPU_Invoke(cudaStream_t stream)
 
 #include "ampi.def.h"
 
+void TCHARM_Node_Setup(int numelements)
+{
+  AMPI_Node_Setup(numelements);
+}
+
 #if defined _WIN32 || CMK_DLL_USE_DLOPEN
 ampi_maintype AMPI_Main_Get_C(SharedObject myexe)
 {

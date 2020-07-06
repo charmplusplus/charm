@@ -9,7 +9,7 @@ HEADDEP=$(HEADERS) \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
-	   compat_ampicpp.o
+       compat_ampicpp.o compat_ampins.o
 OBJS=ampi.o $(AMPIF_OBJ) ampiOneSided.o \
      ampiMisc.o ddt.o mpich-alltoall.o ampi_mpix.o ampi_noimpl.o
 
@@ -188,6 +188,9 @@ compat_ampicm.o: compat_ampicm.C
 
 compat_ampi.o: compat_ampi.c
 	$(CHARMC) -c compat_ampi.c
+
+compat_ampins.o: compat_ampins.C
+	$(CHARMC) -c $<
 
 ampi_mpix.o: ampi_mpix.C $(HEADDEP) headers
 

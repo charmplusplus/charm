@@ -3031,4 +3031,7 @@ ampi_maintype AMPI_Main_Get_C(SharedObject myexe);
 ampi_fmaintype AMPI_Main_Get_F(SharedObject myexe);
 int AMPI_Main_Dispatch(SharedObject myexe, int argc, char ** argv);
 
+/* For internal AMPI use only: semantics subject to change. */
+CLINKAGE void AMPI_Node_Setup(int numranks);
+
 #endif // _AMPIIMPL_H
