@@ -31,4 +31,4 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o $(TARGET) charmrun
 
 clean-nsys:
-	rm -f *.qdstrm *.sqlite
+	rm -f *.qdstrm *.sqlite *.qdrep
