@@ -13,6 +13,7 @@ add_library(modulemsa multiphaseSharedArrays/msa.h multiphaseSharedArrays/msa-co
 add_dependencies(modulemsa ck)
 
 # armci
+configure_file(armci/libmodulearmci.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
 configure_file(armci/armci.h ${CMAKE_BINARY_DIR}/include COPYONLY)
 add_library(modulearmci armci/armci_vp.C armci/armci_impl.h armci/armci_api.C armci/armci.h)
 add_dependencies(modulearmci ck)
