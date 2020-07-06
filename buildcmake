@@ -71,7 +71,6 @@ opt_ampi_only=0
 opt_build_shared=0
 opt_ccs=0
 opt_charmdebug=0
-opt_charmpy=0
 opt_controlpoint=0
 opt_cuda=0
 opt_drone_mode=0
@@ -268,9 +267,6 @@ while [[ $# -gt 0 ]]; do
     --enable-shrinkexpand)
       opt_shrinkexpand=1
       ;;
-    --enable-charmpy)
-      opt_charmpy=1
-      ;;
     --with-numa)
       opt_numa=1
       ;;
@@ -435,7 +431,6 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DBUILD_SHARED="$opt_build_shared" \
   -DCCS="$opt_ccs" \
   -DCHARMDEBUG="$opt_charmdebug" \
-  -DCHARMPY="$opt_charmpy" \
   -DCONTROLPOINT="$opt_controlpoint" \
   -DBUILD_CUDA="$opt_cuda" \
   -DDRONE_MODE="$opt_drone_mode" \
