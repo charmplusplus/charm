@@ -1621,50 +1621,6 @@ void _initCharm(int unused_argc, char **argv)
 	}	
 #endif
 
-#if CMK_CUDA
-  // Perform HAPI initialization for GPU support
-  if (!CmiInCommThread()) {
-    if (CmiMyRank() == 0) {
-      hapiInitCsv(); // Initialize per-process variables (GPUManager)
-    }
-    hapiInitCpv(); // Initialize per-PE variables
-
-    CmiNodeBarrier();
-
-    hapiMapping(argv); // Perform PE-device mapping
-
-    // Register polling function to be invoked at every scheduler loop
-    CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
-
-    CmiNodeBarrier();
-
-    if (CmiMyRank() == 0) {
-      shmCreate(); // Create a per-host shared memory region
-    }
-
-    CmiNodeBarrier();
-
-    ipcHandleCreate(); // Create CUDA IPC handles
-  }
-
-  // Ensure CUDA IPC handles are available for all processes
-  // Note: Causes a hang when this barrier is placed after CPU topology initialization
-  // FIXME: This only needs to be a host-wide synchronization
-  CmiBarrier();
-
-  if (!CmiInCommThread()) {
-    if (CmiMyRank() == 0) {
-      ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
-    }
-
-    // Register callback functions and initialize Charm++ layer functions
-    hapiRegisterCallbacks();
-    hapiInvokeCallback = CUDACallbackManager;
-    hapiQdCreate = QdCreate;
-    hapiQdProcess = QdProcess;
-  }
-#endif
-
     if (CkMyRank() == 0) {
       TopoManager_init();
     }
