@@ -14,9 +14,8 @@ sync="-y"
 
 echo "# Jacobi2D"
 
-#for block_size in 16384 8192 4096 2048 1024
 for block_size in 16384
 do
   echo "# Block size $block_size"
-  jsrun -n1 -a1 -c1 -g1 --smpiargs="-disable_gpu_hooks" nsys profile -f true -o jacobi2d-g$grid_size-b$block_size-p%q{OMPI_COMM_WORLD_RANK} ./jacobi2d -s $grid_size -b $block_size -i $n_iters $sync +ppn 1 +pemap L0,4,80,84 +gpumap block
+  jsrun -n4 -a1 -c1 -g1 --smpiargs="-disable_gpu_hooks" nsys profile -f true -o jacobi2d-g$grid_size-b$block_size-p%q{OMPI_COMM_WORLD_RANK} ./jacobi2d -s $grid_size -b $block_size -i $n_iters $sync +ppn 1 +pemap L0,4,80,84 +gpumap block
 done
