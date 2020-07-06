@@ -4,13 +4,10 @@
 OPTS += $(OPTSATBUILDTIME)
 
 DIRS = \
+  util \
   charm++ \
+  converse \
   ampi \
-
-# TODO #2467: eliminate the need for this
-ifneq ($(BUILD_CUDA),1)
-  DIRS += converse util
-endif
 
 FTDIRS = \
   charm++ \

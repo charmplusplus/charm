@@ -6,11 +6,7 @@ OPTS += $(OPTSATBUILDTIME)
 DIRS = \
   ampi \
   charm++ \
-
-# TODO #2467: eliminate the need for this
-ifneq ($(BUILD_CUDA),1)
-  DIRS += converse
-endif
+  converse \
 
 TESTDIRS = $(DIRS)
 
