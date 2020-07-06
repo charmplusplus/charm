@@ -58,6 +58,9 @@ static char* mapping = NULL;
 CsvDeclare(funcmap*, tcharm_funcmap);
 #endif
 
+// circumstances that need special handling so that node setup runs on pthread 0:
+#define TCHARM_NODESETUP_COMMTHD (CMK_CONVERSE_MPI && CMK_SMP && !CMK_SMP_NO_COMMTHD)
+
 void TCharm::nodeInit()
 {
   static bool tcharm_nodeinit_has_been_called;
@@ -80,10 +83,21 @@ void TCharm::nodeInit()
   nChunks = CkNumPes();
   CmiGetArgIntDesc(argv, "-vp", &nChunks, "Set the total number of virtual processors");
   CmiGetArgIntDesc(argv, "+vp", &nChunks, nullptr);
+
+#if !TCHARM_NODESETUP_COMMTHD
+  TCHARM_Node_Setup(nChunks);
+#endif
 }
 
 void TCharm::procInit()
 {
+#if TCHARM_NODESETUP_COMMTHD
+  if (CmiInCommThread())
+    TCHARM_Node_Setup(nChunks);
+
+  CmiNodeAllBarrier();
+#endif
+
   CtvInitialize(TCharm *,_curTCharm);
   CtvAccess(_curTCharm)=NULL;
   tcharm_initted=true;
