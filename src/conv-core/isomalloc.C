@@ -2491,6 +2491,12 @@ void CmiIsomallocEnableRDMA(CmiIsomallocContext ctx, int enable)
   pool->backend.EnableRDMA(enable);
 }
 
+CmiIsomallocRegion CmiIsomallocContextGetUsedExtent(CmiIsomallocContext ctx)
+{
+  auto pool = (Mempool *)ctx.opaque;
+  return CmiIsomallocRegion{pool->backend.start, pool->backend.allocated_extent};
+}
+
 void * CmiIsomallocContextMalloc(CmiIsomallocContext ctx, size_t size)
 {
   auto pool = (Mempool *)ctx.opaque;
