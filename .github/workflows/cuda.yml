@@ -1,0 +1,22 @@
+name: NetLRTS Linux CUDA buildold
+
+# Buildonly test, as CUDA needs an actual device to run.
+
+on: [push]
+
+jobs:
+  build:
+    timeout-minutes: 45
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install nvidia-cuda-toolkit
+        ./buildold all-test netlrts-linux-x86_64 cuda -j4
+        export CUDATOOLKIT_HOME=/usr # TODO: make this unnecessary
+        make -j4 -C netlrts-linux-x86_64-cuda/examples/charm++/cuda
+        make -j4 -C netlrts-linux-x86_64-cuda/examples/ampi/cuda

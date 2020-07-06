@@ -72,7 +72,7 @@ never be excluded...
 #include <sstream>
 #include <limits.h>
 #include "spanningTree.h"
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 #include "TreeLB.h"
 #endif
 
@@ -1505,7 +1505,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_MEM_CHECKPOINT
 		_registerCkMemCheckpoint();
 #endif
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
                 /**
                   Load balancers are currently registered in Charm++ through a C file that is generated and
                   and compiled by charmc when making an executable. That file contains appropriate calls to
@@ -1521,7 +1521,7 @@ void _initCharm(int unused_argc, char **argv)
 		  "mainmodule" .ci file.  It will include calls to 
 		  register all the .ci files.
 		*/
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
 		CkRegisterMainModule();
 #else
                 // CkRegisterMainModule doesn't exist in charm4py because there is no executable.
@@ -1542,7 +1542,7 @@ void _initCharm(int unused_argc, char **argv)
 		  programs, which don't have a .ci file and hence have
 		  no other way to control the _register process.
 		*/
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
 		_registerExternalModules(argv);
 #endif
 	}

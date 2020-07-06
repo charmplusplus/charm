@@ -126,7 +126,7 @@ public:
   std::unordered_map<int, bool> dynamicIns;
 };
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 extern int (*ArrayMapProcNumExtCallback)(int, int, const int *);
 

@@ -44,7 +44,7 @@ static
 int CkRegisterEpInternal(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
 	int ck_ep_flags, bool isTemplated)
 {
-#if !CMK_CHARMPY    // charm4py can support dynamic registration of Chares after program start
+#if !CMK_CHARM4PY    // charm4py can support dynamic registration of Chares after program start
   if (__registerDone) {
     CkPrintf("Charm++: late entry method registration happened after init\nEntry point: %s, addr: %p\n", name, call);
     CkAbort("Did you forget to import a module or instantiate a templated entry method in a .ci file?\n");
@@ -96,7 +96,7 @@ void CkRegisterGroupIrr(int chareIndex,int isIrr){
   _chareTable[chareIndex]->isIrr = (isIrr!=0);
 }
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 // TODO give a unique name to entry methods when calling CkRegisterEp
 // (no need has appeared for this so this is very low priority)
@@ -182,7 +182,7 @@ int CkRegisterMainChare(int chareIdx, int entryIdx)
   return mIdx;
 }
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(MainchareExt), TypeMainChare);
@@ -220,7 +220,7 @@ void CkRegisterReadonly(const char *name,const char *type,
   _readonlyTable.add(new ReadonlyInfo(name,type,size,ptr,pup_fn));
 }
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg) {
   if (msgSize > 0) ReadOnlyExt::setData(msg, msgSize);
   CkRegisterReadonly(name, type, msgSize, ReadOnlyExt::ro_data, ReadOnlyExt::_roPup);
