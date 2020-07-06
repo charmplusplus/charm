@@ -271,7 +271,7 @@ private:
 };
 PUPbytes(CkReduction::reducerType)
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 //CkReductionTypesExt struct to expose the reducerTypes for external
 //modules like Charm4py
         /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

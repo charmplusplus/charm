@@ -45,10 +45,10 @@ all-test-AMPI-examples: AMPI
 all-test-AMPI-benchmarks: AMPI
 	$(MAKE) -C ../benchmarks/ampi all
 
-test: LIBS
-	$(MAKE) -C ../tests test
-	$(MAKE) -C ../examples test
-	$(MAKE) -C ../benchmarks test
+test syncfttest mpisyncfttest: LIBS
+	$(MAKE) -C ../tests $@
+	$(MAKE) -C ../examples $@
+	$(MAKE) -C ../benchmarks $@
 
 test-tests: LIBS
 	$(MAKE) -C ../tests test

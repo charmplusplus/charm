@@ -99,8 +99,6 @@ f90charm: charm++ $(L)/libf90charm.a
 libcharm: charm++
 	cd $(L) ; $(CHARMC) -standalone -whole-archive -c++stl -shared -o libcharm.so $(LIBCHARM_LIBS)
 
-charmpy: libcharm
-
 charm4py: libcharm
 
 LIBCHARM_LIBS= libck.a libconv-core.a libconv-util.a libmemory-default.a libconv-machine.a \
@@ -174,13 +172,10 @@ Tau:
 LIBS: CONVLIBS CHARMLIBS everylb
 	echo "Built LIBS Successfully"
 
-syncfttest mpisyncfttest : charm++ LIBS
+test syncfttest mpisyncfttest: LIBS
 	$(MAKE) -C ../tests $@
-
-test: LIBS
-	$(MAKE) -C ../tests test
-	$(MAKE) -C ../examples test
-	$(MAKE) -C ../benchmarks test
+	$(MAKE) -C ../examples $@
+	$(MAKE) -C ../benchmarks $@
 
 test-tests: LIBS
 	$(MAKE) -C ../tests test
