@@ -186,7 +186,7 @@ extern int yydebug;
     CONST = 294,
     NOCOPY = 295,
     NOCOPYPOST = 296,
-    DEVICE = 297,
+    NOCOPYDEVICE = 297,
     PACKED = 298,
     VARSIZE = 299,
     ENTRY = 300,
@@ -267,7 +267,7 @@ extern int yydebug;
 #define CONST 294
 #define NOCOPY 295
 #define NOCOPYPOST 296
-#define DEVICE 297
+#define NOCOPYDEVICE 297
 #define PACKED 298
 #define VARSIZE 299
 #define ENTRY 300
@@ -751,26 +751,26 @@ static const char *const yytname[] =
   "SYNC", "IGET", "EXCLUSIVE", "IMMEDIATE", "SKIPSCHED", "INLINE",
   "VIRTUAL", "MIGRATABLE", "AGGREGATE", "CREATEHERE", "CREATEHOME",
   "NOKEEP", "NOTRACE", "APPWORK", "VOID", "CONST", "NOCOPY", "NOCOPYPOST",
-  "DEVICE", "PACKED", "VARSIZE", "ENTRY", "FOR", "FORALL", "WHILE", "WHEN",
-  "OVERLAP", "SERIAL", "IF", "ELSE", "PYTHON", "LOCAL", "NAMESPACE",
-  "USING", "IDENT", "NUMBER", "LITERAL", "CPROGRAM", "HASHIF", "HASHIFDEF",
-  "INT", "LONG", "SHORT", "CHAR", "FLOAT", "DOUBLE", "UNSIGNED", "SIZET",
-  "BOOL", "ACCEL", "READWRITE", "WRITEONLY", "ACCELBLOCK", "MEMCRITICAL",
-  "REDUCTIONTARGET", "CASE", "TYPENAME", "';'", "':'", "'{'", "'}'", "','",
-  "'<'", "'>'", "'*'", "'('", "')'", "'&'", "'.'", "'['", "']'", "'='",
-  "'-'", "$accept", "File", "ModuleEList", "OptExtern",
-  "OneOrMoreSemiColon", "OptSemiColon", "Name", "QualName", "Module",
-  "ConstructEList", "ConstructList", "ConstructSemi", "Construct",
-  "TParam", "TParamList", "TParamEList", "OptTParams", "BuiltinType",
-  "NamedType", "QualNamedType", "SimpleType", "OnePtrType", "PtrType",
-  "FuncType", "BaseType", "BaseDataType", "RestrictedType", "Type",
-  "ArrayDim", "Dim", "DimList", "Readonly", "ReadonlyMsg", "OptVoid",
-  "MAttribs", "MAttribList", "MAttrib", "CAttribs", "CAttribList",
-  "PythonOptions", "ArrayAttrib", "ArrayAttribs", "ArrayAttribList",
-  "CAttrib", "OptConditional", "MsgArray", "Var", "VarList", "Message",
-  "OptBaseList", "BaseList", "Chare", "Group", "NodeGroup",
-  "ArrayIndexType", "Array", "TChare", "TGroup", "TNodeGroup", "TArray",
-  "TMessage", "OptTypeInit", "OptNameInit", "TVar", "TVarList",
+  "NOCOPYDEVICE", "PACKED", "VARSIZE", "ENTRY", "FOR", "FORALL", "WHILE",
+  "WHEN", "OVERLAP", "SERIAL", "IF", "ELSE", "PYTHON", "LOCAL",
+  "NAMESPACE", "USING", "IDENT", "NUMBER", "LITERAL", "CPROGRAM", "HASHIF",
+  "HASHIFDEF", "INT", "LONG", "SHORT", "CHAR", "FLOAT", "DOUBLE",
+  "UNSIGNED", "SIZET", "BOOL", "ACCEL", "READWRITE", "WRITEONLY",
+  "ACCELBLOCK", "MEMCRITICAL", "REDUCTIONTARGET", "CASE", "TYPENAME",
+  "';'", "':'", "'{'", "'}'", "','", "'<'", "'>'", "'*'", "'('", "')'",
+  "'&'", "'.'", "'['", "']'", "'='", "'-'", "$accept", "File",
+  "ModuleEList", "OptExtern", "OneOrMoreSemiColon", "OptSemiColon", "Name",
+  "QualName", "Module", "ConstructEList", "ConstructList", "ConstructSemi",
+  "Construct", "TParam", "TParamList", "TParamEList", "OptTParams",
+  "BuiltinType", "NamedType", "QualNamedType", "SimpleType", "OnePtrType",
+  "PtrType", "FuncType", "BaseType", "BaseDataType", "RestrictedType",
+  "Type", "ArrayDim", "Dim", "DimList", "Readonly", "ReadonlyMsg",
+  "OptVoid", "MAttribs", "MAttribList", "MAttrib", "CAttribs",
+  "CAttribList", "PythonOptions", "ArrayAttrib", "ArrayAttribs",
+  "ArrayAttribList", "CAttrib", "OptConditional", "MsgArray", "Var",
+  "VarList", "Message", "OptBaseList", "BaseList", "Chare", "Group",
+  "NodeGroup", "ArrayIndexType", "Array", "TChare", "TGroup", "TNodeGroup",
+  "TArray", "TMessage", "OptTypeInit", "OptNameInit", "TVar", "TVarList",
   "TemplateSpec", "Template", "MemberEList", "MemberList",
   "NonEntryMember", "InitNode", "InitProc", "PUPableClass", "IncludeFile",
   "Member", "MemberBody", "UnexpectedToken", "Entry", "AccelBlock",
@@ -2506,7 +2506,7 @@ yyreduce:
 
   case 35:
 #line 264 "xi-grammar.y" /* yacc.c:1646  */
-    { ReservedWord(DEVICE, (yyloc).first_column, (yyloc).last_column); YYABORT; }
+    { ReservedWord(NOCOPYDEVICE, (yyloc).first_column, (yyloc).last_column); YYABORT; }
 #line 2511 "y.tab.c" /* yacc.c:1646  */
     break;
 

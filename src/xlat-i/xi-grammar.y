@@ -119,7 +119,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token CONST
 %token NOCOPY
 %token NOCOPYPOST
-%token DEVICE
+%token NOCOPYDEVICE
 %token PACKED
 %token VARSIZE
 %token ENTRY
@@ -261,7 +261,7 @@ Name		: IDENT
 		| SKIPSCHED { ReservedWord(SKIPSCHED, @$.first_column, @$.last_column); YYABORT; }
 		| NOCOPY { ReservedWord(NOCOPY, @$.first_column, @$.last_column); YYABORT; }
 		| NOCOPYPOST { ReservedWord(NOCOPYPOST, @$.first_column, @$.last_column); YYABORT; }
-		| DEVICE { ReservedWord(DEVICE, @$.first_column, @$.last_column); YYABORT; }
+		| NOCOPYDEVICE { ReservedWord(NOCOPYDEVICE, @$.first_column, @$.last_column); YYABORT; }
 		| INLINE { ReservedWord(INLINE, @$.first_column, @$.last_column); YYABORT; }
 		| VIRTUAL { ReservedWord(VIRTUAL, @$.first_column, @$.last_column); YYABORT; }
 		| MIGRATABLE { ReservedWord(MIGRATABLE, @$.first_column, @$.last_column); YYABORT; }
@@ -1150,7 +1150,7 @@ Parameter	: Type
 				firstRdma = false;
 			}
 		}
-		| DEVICE ParamBracketStart CCode ']'
+		| NOCOPYDEVICE ParamBracketStart CCode ']'
 		{ /*Stop grabbing CPROGRAM segments*/
 			in_bracket=0;
 			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
