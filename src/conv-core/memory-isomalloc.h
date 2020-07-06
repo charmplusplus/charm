@@ -43,6 +43,9 @@ void * CmiIsomallocContextRealloc(CmiIsomallocContext ctx, void * ptr, size_t si
 void CmiIsomallocContextFree(CmiIsomallocContext ctx, void * ptr);
 size_t CmiIsomallocContextGetLength(CmiIsomallocContext ctx, void * ptr);
 
+void * CmiIsomallocContextPermanentAlloc(CmiIsomallocContext ctx, size_t size);
+void * CmiIsomallocContextPermanentAllocAlign(CmiIsomallocContext ctx, size_t align, size_t size);
+
 CmiIsomallocContext CmiIsomallocGetThreadContext(CthThread th);
 
 /****** Converse Thread functionality that depends on Isomalloc ********/
