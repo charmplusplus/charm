@@ -1050,7 +1050,7 @@ struct isommap
 struct isomalloc_dlmalloc : dlmalloc_impl
 {
   isomalloc_dlmalloc(uint8_t * s, uint8_t * e)
-    : backend{s, e}, arena{create_mspace(0, 0)}
+    : backend{s, e}, arena{}
   {
     IMP_DBG("[%d][%p] isomalloc_dlmalloc::isomalloc_dlmalloc(%p, %p)\n", CmiMyPe(), this, s, e);
   }
@@ -1058,6 +1058,14 @@ struct isomalloc_dlmalloc : dlmalloc_impl
     : backend{pr}
   {
     IMP_DBG("[%d][%p] isomalloc_dlmalloc::isomalloc_dlmalloc(PUP::reconstruct)\n", CmiMyPe(), this);
+  }
+
+  void activate_random_access_heap()
+  {
+    if (arena != nullptr)
+      return;
+
+    arena = create_mspace(0, 0);
   }
 
   void pup(PUP::er & p)
@@ -1104,6 +1112,7 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   void * alloc(size_t size)
   {
     CmiLock(backend.lock);
+    CmiAssert(arena != nullptr);
     void * ret = mspace_malloc(arena, size);
     CmiUnlock(backend.lock);
     return ret;
@@ -1111,6 +1120,7 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   void * alloc(size_t size, size_t align)
   {
     CmiLock(backend.lock);
+    CmiAssert(arena != nullptr);
     void * ret = mspace_memalign(arena, align, size);
     CmiUnlock(backend.lock);
     return ret;
@@ -1118,6 +1128,7 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   void * calloc(size_t nelem, size_t size)
   {
     CmiLock(backend.lock);
+    CmiAssert(arena != nullptr);
     void * ret = mspace_calloc(arena, nelem, size);
     CmiUnlock(backend.lock);
     return ret;
@@ -1125,6 +1136,7 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   void * realloc(void * ptr, size_t size)
   {
     CmiLock(backend.lock);
+    CmiAssert(arena != nullptr);
     void * ret = mspace_realloc(arena, ptr, size);
     CmiUnlock(backend.lock);
     return ret;
@@ -1133,6 +1145,7 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   {
     CmiLock(backend.lock);
 
+    CmiAssert(arena != nullptr);
     CmiAssert(backend.isInRange(ptr));
     CmiAssert(backend.isMapped(ptr));
 
@@ -1143,6 +1156,8 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   size_t length(void * ptr)
   {
     CmiLock(backend.lock);
+
+    CmiAssert(arena != nullptr);
 
     mchunkptr oldp = mem2chunk(ptr);
     size_t oc = chunksize(oldp) - overhead_for(oldp);
@@ -1858,6 +1873,10 @@ struct Isomempool
     IMP_DBG("[%d][%p] Isomempool::Isomempool(PUP::reconstruct)\n", CmiMyPe(), this);
   }
 
+  void activate_random_access_heap()
+  {
+  }
+
   ~Isomempool()
   {
     IMP_DBG("[%d][%p] Isomempool::~Isomempool()\n", CmiMyPe(), this);
@@ -2488,6 +2507,12 @@ void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext * ctxptr)
     delete pool;
     ctxptr->opaque = nullptr;
   }
+}
+
+void CmiIsomallocContextEnableRandomAccess(CmiIsomallocContext ctx)
+{
+  auto pool = (Mempool *)ctx.opaque;
+  pool->activate_random_access_heap();
 }
 
 void CmiIsomallocContextJustMigrated(CmiIsomallocContext ctx)
