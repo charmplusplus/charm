@@ -666,12 +666,12 @@ void ParamList::beginUnmarshall(XStr& str) {
 }
 
 void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
-  int count = 0; // Used to keep track of indices
   if (hasDevice()) {
+    int count = 0; // Used to keep track of indices
     callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen, true, count);
   } else {
     str << "#if CMK_ONESIDED_IMPL\n";
-    callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen, false, count);
+    callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen, false);
     str << "#else\n";
     callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen, false);
     str << "#endif\n";
