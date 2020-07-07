@@ -646,6 +646,10 @@ void ParamList::beginUnmarshall(XStr& str) {
         str << "#endif\n";
         if (hasRecvRdma()) {
           str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
+          for (int index = 0; index < entry->numRdmaRecvParams; index++) {
+            str << "  ncpyPost[" << index << "].regMode = CK_BUFFER_REG;\n";
+            str << "  ncpyPost[" << index << "].deregMode = CK_BUFFER_DEREG;\n";
+          }
         }
       }
     }
