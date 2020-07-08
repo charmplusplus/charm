@@ -236,7 +236,7 @@ class Block : public CBase_Block {
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
   }
 
-  void sendGhosts(void) {
+  void prepareGhosts() {
     // Pack non-contiguous ghosts to temporary contiguous buffers on device
     invokePackingKernels(d_temperature, d_left_ghost, d_right_ghost, left_bound,
         right_bound, block_size, stream);
@@ -250,9 +250,16 @@ class Block : public CBase_Block {
           block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
     hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size + 1,
           block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
-    cudaStreamSynchronize(stream);
 
-    // Send ghosts to neighboring chares
+    // Add asynchronous callback to be invoked when packing and device-to-host
+    // transfers are complete
+    CkCallback* cb = new CkCallback(CkIndex_Block::prepareGhostsDone(0), thisProxy[thisIndex]);
+    cb->setRefnum(my_iter);
+    hapiAddCallback(stream, cb);
+  }
+
+  void sendGhosts() {
+    // Halo regions have been moved to host memory, send them to neighboring chares
     if (!left_bound)
       thisProxy(x - 1, y).receiveGhosts(my_iter, RIGHT, block_size, h_left_ghost);
     if (!right_bound)
@@ -307,24 +314,10 @@ class Block : public CBase_Block {
             cudaMemcpyDeviceToHost, stream));
     }
 
-    // TODO: Fix to be asynchronous
-    cudaStreamSynchronize(stream);
-
-    // Swap pointers
-    std::swap(d_temperature, d_new_temperature);
-
-    if (sync_ver) {
-      my_iter++;
-      CkCallback cb(CkReductionTarget(Main, updateDone), main_proxy);
-      contribute(cb);
-    } else {
-      if (my_iter++ < n_iters) {
-        thisProxy[thisIndex].exchangeGhosts();
-      } else {
-        CkCallback cb(CkReductionTarget(Main, done), main_proxy);
-        contribute(cb);
-      }
-    }
+    // Add asynchronous callback to be invoked when update is complete
+    CkCallback* cb = new CkCallback(CkIndex_Block::updateDone(0), thisProxy[thisIndex]);
+    cb->setRefnum(my_iter);
+    hapiAddCallback(stream, cb);
   }
 
   void print() {
