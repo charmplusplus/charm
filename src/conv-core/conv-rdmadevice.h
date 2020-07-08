@@ -19,8 +19,9 @@ public:
   const void* ptr;
   size_t cnt;
 
-  // Home PE
-  int pe;
+  // Source and destination PEs
+  int src_pe;
+  int dest_pe;
 
   // Used for CUDA IPC
   int device_idx;
@@ -32,10 +33,10 @@ public:
   bool data_stored;
   void* data;
 
-  CmiDeviceBuffer() : ptr(NULL), cnt(0), pe(-1) { init(); }
+  CmiDeviceBuffer() : ptr(NULL), cnt(0), src_pe(-1), dest_pe(-1) { init(); }
 
   explicit CmiDeviceBuffer(const void* ptr_, size_t cnt_) : ptr(ptr_), cnt(cnt_),
-    pe(CmiMyPe()) { init(); }
+    src_pe(CmiMyPe()), dest_pe(-1) { init(); }
 
   void init() {
     device_idx = -1;
@@ -50,7 +51,8 @@ public:
   void pup(PUP::er &p) {
     p((char *)&ptr, sizeof(ptr));
     p|cnt;
-    p|pe;
+    p|src_pe;
+    p|dest_pe;
     p|device_idx;
     p|comm_offset;
     p|event_idx;
