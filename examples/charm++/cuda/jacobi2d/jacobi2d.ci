@@ -21,18 +21,18 @@ mainmodule jacobi2d {
     entry Block(void);
     entry void init();
     entry void initDone();
-    entry void prepareGhostsDone(int ref);
+    entry void prepareGhostsDone();
     entry void receiveGhosts(int ref, int dir, int w, double gh[w]);
-    entry void updateDone(int ref);
+    entry void updateDone();
 
     entry void exchangeGhosts() {
       serial {
         prepareGhosts();
       }
 
-      when prepareGhostsDone[my_iter](int ref) {
+      // XXX: Can't do tag matching (which is not necessary here), a segfault occurs
+      when prepareGhostsDone() {
         serial {
-          CkPrintf("prepareGhostsDone\n");
           sendGhosts();
         }
       }
@@ -54,9 +54,9 @@ mainmodule jacobi2d {
         }
       }
 
-      when updateDone[my_iter](int ref) {
+      // XXX: Same here
+      when updateDone() {
         serial {
-          CkPrintf("updateDone\n");
           // Swap pointers
           std::swap(d_temperature, d_new_temperature);
 

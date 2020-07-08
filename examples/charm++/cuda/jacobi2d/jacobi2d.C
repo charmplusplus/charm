@@ -253,8 +253,9 @@ class Block : public CBase_Block {
 
     // Add asynchronous callback to be invoked when packing and device-to-host
     // transfers are complete
-    CkCallback* cb = new CkCallback(CkIndex_Block::prepareGhostsDone(0), thisProxy[thisIndex]);
-    cb->setRefnum(my_iter);
+    CkCallback* cb = new CkCallback(CkIndex_Block::prepareGhostsDone(), thisProxy[thisIndex]);
+    // XXX: Can't do tag matching, segfault occurs
+    //cb->setRefnum(my_iter);
     hapiAddCallback(stream, cb);
   }
 
@@ -315,8 +316,8 @@ class Block : public CBase_Block {
     }
 
     // Add asynchronous callback to be invoked when update is complete
-    CkCallback* cb = new CkCallback(CkIndex_Block::updateDone(0), thisProxy[thisIndex]);
-    cb->setRefnum(my_iter);
+    CkCallback* cb = new CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
+    //cb->setRefnum(my_iter);
     hapiAddCallback(stream, cb);
   }
 
