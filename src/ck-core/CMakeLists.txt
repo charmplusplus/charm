@@ -15,7 +15,6 @@ set(ck-cxx-sources
     ../ck-ldb/manager.C ../ck-ldb/MetaBalancer.C
     ../ck-ldb/readmodel.C
     ../ck-ldb/Refiner.C ../ck-ldb/RefinerTemp.C
-    ../ck-ldb/TreeLB.C
     ../ck-ldb/treeTest.C ../ck-ldb/weakTest.C
     ../ck-perf/trace-common.C ../ck-perf/trace-controlPoints.C
     ../ck-perf/tracec.C ../ck-perf/tracef.C ../conv-perf/charmProjections.C
