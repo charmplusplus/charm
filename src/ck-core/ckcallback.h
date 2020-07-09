@@ -117,7 +117,7 @@ private:
 		CMK_REFNUM_TYPE refnum; // Reference number to set on the message
 		bool hasRefnum;
 	} array;
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 	struct s_section {
 		int sid_pe; // section ID
 		int sid_cnt; // section ID
@@ -148,7 +148,7 @@ private:
 public:
 	callbackType type;
 	callbackData d;
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 	bool isExtCallback = false;
 #endif
 
@@ -201,7 +201,7 @@ public:
 		  d.cfn.onPE == other.d.cfn.onPE &&
 		  d.cfn.param == other.d.cfn.param);
 	    case bcastSection:
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 	      return (d.section.sid_pe == other.d.section.sid_pe &&
 		d.section.sid_cnt == other.d.section.sid_cnt &&
 		d.section.rootPE == other.d.section.rootPE &&
@@ -333,7 +333,7 @@ public:
     // Bcast to array
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool forceInline=false);
 	
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
 	//Bcast to section
 	CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline=false);
 	CkCallback(int ep, CkSectionID &sid);
@@ -359,7 +359,7 @@ public:
 	  d.ccsReply.reply=reply;
 	}
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
   CkCallback(int onPE, void* objPtr, int ep, CMK_REFNUM_TYPE fid) {
     CkChareID id;
@@ -488,7 +488,7 @@ public:
                   d.array.refnum = refnum;
                   break;
 
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
                 case bcastSection:
                   d.section.hasRefnum = true;
                   d.section.refnum = refnum;
