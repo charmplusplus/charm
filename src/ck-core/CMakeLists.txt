@@ -15,6 +15,7 @@ set(ck-cxx-sources
     ../ck-ldb/manager.C ../ck-ldb/MetaBalancer.C
     ../ck-ldb/readmodel.C
     ../ck-ldb/Refiner.C ../ck-ldb/RefinerTemp.C
+    ../ck-ldb/TreeLB.C
     ../ck-ldb/treeTest.C ../ck-ldb/weakTest.C
     ../ck-perf/trace-common.C ../ck-perf/trace-controlPoints.C
     ../ck-perf/tracec.C ../ck-perf/tracef.C ../conv-perf/charmProjections.C
@@ -26,10 +27,6 @@ set(ck-cxx-sources
     debug-message.C init.C modifyScheduler.C mpi-interoperate.C msgalloc.C
     qd.C register.C sdag.C waitqd.C
 )
-
-if(CMK_CHARM4PY)
-    set(ck-cxx-sources ${ck-cxx-sources} ../ck-ldb/TreeLB.C)
-endif()
 
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     charm-api.h charm.h charmf.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
