@@ -113,7 +113,11 @@ static void hapiMapping(char** argv);
 static void hapiRegisterCallbacks();
 
 // CUDA IPC related functions
+static void shmSetup();
 static void shmCreate();
+static void shmOpen();
+static void shmMap();
+static void shmAbort();
 static void shmCleanup();
 static void ipcHandleCreate();
 static void ipcHandleOpen();
@@ -132,17 +136,25 @@ void hapiInit(char** argv) {
 
     // Register polling function to be invoked at every scheduler loop
     CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
-
-    CmiNodeBarrier(); // Ensure PE-device mappings are complete within a logical node
-
-    if (CmiMyRank() == 0) {
-      shmCreate(); // Create a per-host shared memory region
-    }
-
-    CmiNodeBarrier(); // Ensure shared memory regions have been created
-
-    ipcHandleCreate(); // Create CUDA IPC handles
   }
+
+  if (CmiMyRank() == 0) {
+    shmSetup();
+    if (CmiMyNodeRankLocal() == 0) {
+      shmCreate(); // Create a per-host shared memory region
+      CmiBarrier(); // FIXME: Only needs to be a host-wide barrier
+    } else {
+      CmiBarrier();
+      shmOpen(); // Open the shared memory region created by local logical node 0
+    }
+    shmMap(); // Map the shared memory file into memory
+  } else {
+    CmiBarrier();
+  }
+
+  CmiNodeBarrier(); // Ensure shared memory has been mapped into the logical node
+
+  ipcHandleCreate(); // Create CUDA IPC handles
 
   // Ensure CUDA IPC handles are available for all processes
   // Note: Causes a hang when this barrier is placed after CPU topology initialization
@@ -704,57 +716,100 @@ hapiWorkRequest::hapiWorkRequest() :
 #endif
   }
 
-// Create POSIX shared memory region accessible to all processes on the same host
-// Invoked by PE rank 0 of each process (no locking needed for SMP)
-static void shmCreate() {
-  struct stat shm_file_stat;
+static void shmSetup() {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
-  // Create the shared memory file
-  csv_gpu_manager.shm_name.assign("cudaipc_shmem-");
+  // Set up shared memory file name
+  csv_gpu_manager.shm_name.assign("charm-cuda-host");
   int host_id = CmiPhysicalNodeID(CmiMyPe());
   csv_gpu_manager.shm_name.append(std::to_string(host_id));
-  csv_gpu_manager.shm_file = shm_open(csv_gpu_manager.shm_name.c_str(),
-      O_CREAT | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
-  if (csv_gpu_manager.shm_file < 0) {
-    CmiError("Failure at shm_open");
-    goto shm_cleanup;
-  }
+  const char* shm_name = csv_gpu_manager.shm_name.c_str();
 
   // Calculate shared memory region size
   csv_gpu_manager.shm_chunk_size = sizeof(cudaIpcMemHandle_t) +
       sizeof(cuda_ipc_event_shared) * csv_gpu_manager.cuda_ipc_event_pool_size;
   csv_gpu_manager.shm_size = csv_gpu_manager.shm_chunk_size *
     csv_gpu_manager.device_count_on_physical_node;
+}
 
-  // Set it to the appropriate size
-  // Only done by the first process on each physical node
-  if (CmiMyNodeRankLocal() == 0) {
-    if (ftruncate(csv_gpu_manager.shm_file, 0) != 0) {
-      CmiError("Failure at ftruncate");
-      goto shm_cleanup;
-    }
+// Create POSIX shared memory region accessible to all processes on the same host
+// Invoked by PE rank 0 of local logical node 0 (1 PE per host)
+static void shmCreate() {
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
-    if (ftruncate(csv_gpu_manager.shm_file, csv_gpu_manager.shm_size) != 0) {
-      CmiError("Failure at ftruncate");
-      goto shm_cleanup;
+  // Remove the shared memory file if it exists (could be left over from a
+  // previous run that exited abnormally)
+  struct stat stat_result;
+  std::string stat_path("/dev/shm/");
+  stat_path.append(csv_gpu_manager.shm_name);
+  if (stat(stat_path.c_str(), &stat_result) == 0) {
+    if (remove(stat_path.c_str())) {
+      CmiAbort("Failure during shared memory file removal");
+    } else {
+      CmiPrintf("PE %d, removing file\n", CmiMyPe());
     }
   }
 
-  // Busywait until file is properly sized (processes other than process 0)
+  // Create the shared memory file
+  csv_gpu_manager.shm_file = shm_open(csv_gpu_manager.shm_name.c_str(),
+      O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+  if (csv_gpu_manager.shm_file < 0) {
+    CmiError("Failure at shm_open");
+    shmAbort();
+  }
+
+  // Set it to the appropriate size
+  if (ftruncate(csv_gpu_manager.shm_file, 0) != 0) {
+    CmiError("Failure at ftruncate");
+    shmAbort();
+  }
+  if (ftruncate(csv_gpu_manager.shm_file, csv_gpu_manager.shm_size) != 0) {
+    CmiError("Failure at ftruncate");
+    shmAbort();
+  }
+
+  // Busywait until file is properly sized
+  struct stat shm_file_stat;
   do {
     if (fstat(csv_gpu_manager.shm_file, &shm_file_stat) != 0) {
       CmiError("Failure at fstat");
-      goto shm_cleanup;
+      shmAbort();
     }
   } while (shm_file_stat.st_size != csv_gpu_manager.shm_size);
+}
+
+// Open POSIX shared memory region
+// Invoked by logical nodes other than local rank 0
+static void shmOpen() {
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+
+  // Open the shared memory file
+  csv_gpu_manager.shm_file = shm_open(csv_gpu_manager.shm_name.c_str(),
+      O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+  if (csv_gpu_manager.shm_file < 0) {
+    CmiError("Failure at shm_open");
+    shmAbort();
+  }
+
+  // Busywait until file is properly sized
+  struct stat shm_file_stat;
+  do {
+    if (fstat(csv_gpu_manager.shm_file, &shm_file_stat) != 0) {
+      CmiError("Failure at fstat");
+      shmAbort();
+    }
+  } while (shm_file_stat.st_size != csv_gpu_manager.shm_size);
+}
+
+static void shmMap() {
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   // Map shared memory file into memory
   csv_gpu_manager.shm_ptr = mmap(NULL, csv_gpu_manager.shm_size,
       PROT_READ | PROT_WRITE, MAP_SHARED, csv_gpu_manager.shm_file, 0);
   if (csv_gpu_manager.shm_ptr == (void*)-1) {
     CmiError("Failure at mmap");
-    goto shm_cleanup;
+    shmAbort();
   }
 
   // Store pointer to my process' portion of the shared memory region
@@ -766,12 +821,11 @@ static void shmCreate() {
   for (int i = 0; i < csv_gpu_manager.device_count_on_physical_node; i++) {
     csv_gpu_manager.cuda_ipc_device_infos.emplace_back();
   }
+}
 
-  return;
-
-shm_cleanup:
+static void shmAbort() {
   shmCleanup();
-  CmiAbort("Failure in shared memory region creation");
+  CmiAbort("Failure in shared memory initialization");
 }
 
 // Clean up shared memory region
