@@ -165,7 +165,7 @@ TAU_MAKEFILE=Make.tau
 include	$(TAU_MAKEFILE) #stub-makefile
 
 #builds TAU's trace library
-Tau: 
+Tau:
 	echo "buliding charm trace library with support for TAU."
 	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
 
@@ -423,11 +423,11 @@ endif
 ###############################################################################
 #
 # Converse Libraries
-# 
+#
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.a $(L)/libldb-spray.a   $(L)/libldb-workstealing.a  $(L)/libldb-neighbor.a $(L)/libldb-none.a $(L)/libldb-test.a
 
-TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a 
+TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a
 
 BUILD_TRACING := $(CMK_TRACE_ENABLED)
 
@@ -588,7 +588,7 @@ CONVLIBS: converse
 	$(MAKE) -C libs convlibs
 
 $(L)/libconv-core.a: $(LIBCONV_CORE)
-	$(CHARMC) $(TAU_LIBS) -o $@ $(LIBCONV_CORE) 
+	$(CHARMC) $(TAU_LIBS) -o $@ $(LIBCONV_CORE)
 
 $(L)/libconv-partition.a: custom_partitioner.o set_partition_params.o
 	$(CHARMC) -o $@ $^
@@ -647,7 +647,7 @@ $(L)/libldb-spray.a: cldb.spray.C $(CVHEADERS)
 #	$(CHARMC) -o $@ cldb.prioritycentralized.C
 
 #//$(L)/libldb-prioritycentralizedopt.a: cldb.prioritycentralizedopt.c cldb.prioritycentralizedopt.h  $(CVHEADERS)
-#//	$(CHARMC) -o $@ cldb.prioritycentralizedopt.c 
+#//	$(CHARMC) -o $@ cldb.prioritycentralizedopt.c
 
 $(L)/libldb-test.a: cldb.test.C $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.test.C
@@ -754,7 +754,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
            trace-controlPoints.o mpi-interoperate.o ckregex.o sdag.o \
 
-ifeq($(CMK_CHARM4PY),1)
+ifeq ($(CMK_CHARM4PY),1)
 	LIBCK_CORE+=TreeLB.o
 endif
 
@@ -764,7 +764,7 @@ charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr
 CHARMLIBS: charm++ CONVLIBS
 	$(MAKE) -C libs charmlibs
 
-$(L)/libck.a: $(LIBCK_CORE) 
+$(L)/libck.a: $(LIBCK_CORE)
 	$(CHARMC) -o $@ $(LIBCK_CORE)
 
 ## Charm fortran AMPI
@@ -831,7 +831,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   TraceSimple.def.h ckregex.h
 	$(CHARMC) -c -I. $(TAU_INCLUDE) $(TAU_DEFS) trace-Tau.C -o libtrace-Tau.o
 
-tau_selective.o: $(TAUROOT)/utils/tau_selective.cpp 
+tau_selective.o: $(TAUROOT)/utils/tau_selective.cpp
 	$(CHARMC) -I$(TAUROOT)/utils -DTAU_DYNINST $(TAUROOT)/utils/tau_selective.cpp
 
 $(L)/libtrace-Tau.a: $(TAU_TRACE_OBJ) tau_selective.o
@@ -870,7 +870,7 @@ tracef_f.o: tracef_f.f90
 TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o trace-perf.o picsautoperfAPI.o picsautoperf.o trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-utilization.o	\
 	      trace-projector.o trace-converse.o trace-all.o \
-          trace-memory.o 
+          trace-memory.o
 
 ###############################################################################
 #
