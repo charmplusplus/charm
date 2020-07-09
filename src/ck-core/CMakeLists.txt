@@ -27,6 +27,10 @@ set(ck-cxx-sources
     qd.C register.C sdag.C waitqd.C
 )
 
+if(CMK_CHARM4PY)
+    set(ck-cxx-sources ${ck-cxx-sources} ../ck-ldb/TreeLB.C)
+endif()
+
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     charm-api.h charm.h charmf.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
     ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
