@@ -103,7 +103,7 @@ charm4py: libcharm
 
 LIBCHARM_LIBS= libck.a libconv-core.a libconv-util.a libmemory-default.a libconv-machine.a \
                libthreads-default.a libconv-partition.a libtmgr.a libhwloc_embedded.a \
-               libldb-rand.a libconv-ldb.a libmoduleTreeLB.a
+               libldb-rand.a libconv-ldb.a
 
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
