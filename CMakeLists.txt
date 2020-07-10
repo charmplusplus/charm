@@ -120,7 +120,6 @@ option(TASK_QUEUE          "Enable task queue" OFF)
 option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
-option(F90CHARM            "Build f90charm" OFF)
 option(BUILD_CUDA          "Build with CUDA support" OFF)
 
 option(PXSHM               "Build with PXSHM" OFF)

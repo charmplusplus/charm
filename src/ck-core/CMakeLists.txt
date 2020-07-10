@@ -162,7 +162,13 @@ target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../uti
 # Fortran interface
 if(${CMK_CAN_LINK_FORTRAN})
     add_library(ckf charmf.C charmmod.f90 charmf.h ${ck-ci-sources})
+    add_custom_command(TARGET ckf
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/charm.mod ${CMAKE_BINARY_DIR}/include/
+        VERBATIM
+    )
     add_library(ckmainf mainf.f90)
+    add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h ${ck-ci-sources})
 endif()
 
 add_library(mpi-mainmodule mpi-mainmodule.C ${ck-ci-sources})

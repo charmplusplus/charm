@@ -1,3 +1,5 @@
+-include ../../include/conv-mach-opt.mak
+
 DIRS = \
   allToAll \
   array_map \
@@ -32,6 +34,10 @@ DIRS = \
   TRAM \
   user-driven-interop \
   zerocopy \
+
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+#  DIRS += f90charm
+endif
 
 TESTDIRS = $(DIRS)
 

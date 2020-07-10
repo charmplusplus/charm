@@ -11,6 +11,10 @@ DIRS = \
   exit \
 #  chkpt \
 
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  DIRS += fallreduce
+endif
+
 ifeq ($(BUILD_MPICH_TESTS),true)
 DIRS += mpich-test
 endif

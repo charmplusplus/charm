@@ -4,9 +4,10 @@ AMPICC=../../../bin/ampicxx $(OPTS)
 AMPIF90=../../../bin/ampif90 $(OPTS)
 
 
-LANGUAGES := \
-  cxx \
-  f90 \
+LANGUAGES := cxx
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  LANGUAGES += f90
+endif
 
 
 # for constructing individual build rules
