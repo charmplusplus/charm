@@ -74,6 +74,13 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // Unpack source buffer (from sender)
     up|source;
 
+    // Check if destination PE is correct
+    // TODO: Handle this case instead of aborting
+    if (source.dest_pe != CkMyPe()) {
+      CkAbort("Current PE does not match the destination PE determined by the sender. "
+          "Please enable CMK_GLOBAL_LOCATION_UPDATE.");
+    }
+
     if (arrSizes[i] > source.cnt) {
       CkAbort("CkRdmaDeviceIssueRgets: posted data size is larger than source data size!");
     }
@@ -238,6 +245,11 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 
   // Determine transfer mode (intra-process, inter-process, inter-node)
   CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
+
+  // Store destination PE in the metadata message
+  for (int i = 0; i < numops; i++) {
+    buffers[i]->dest_pe = dest_pe;
+  }
 
   if (transfer_mode == CkNcpyModeDevice::MEMCPY) {
     // Don't need to do anything for intra-process
