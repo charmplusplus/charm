@@ -2142,7 +2142,7 @@ void CkDeleteChares() {
 
 
 //------------------- External client support (e.g. Charm4py) ----------------
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 static std::vector< std::vector<char> > ext_args;
 static std::vector<char*> ext_argv;

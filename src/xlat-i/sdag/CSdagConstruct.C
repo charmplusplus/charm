@@ -595,7 +595,7 @@ void SdagConstruct::generateTraceBeginCall(XStr& op, int indent) {
        << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, ";
 
     if (entry->getContainer()->isArray())
-      op << "ckGetArrayIndex().getProjectionID()";
+      op << "this->ckGetArrayIndex().getProjectionID()";
     else
       op << "NULL";
 
@@ -608,7 +608,7 @@ void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent, Entry* entry
   op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, ";
 
   if (entry->getContainer()->isArray())
-    op << "ckGetArrayIndex().getProjectionID()";
+    op << "this->ckGetArrayIndex().getProjectionID()";
   else
     op << "NULL";
 

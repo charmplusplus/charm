@@ -59,18 +59,6 @@ void CreateCentralLB()
 }
 */
 
-void CentralLB::staticStartLB(void* data)
-{
-  CentralLB *me = (CentralLB*)(data);
-  me->StartLB();
-}
-
-void CentralLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
-{
-  CentralLB *me = (CentralLB*)(data);
-  me->Migrated(waitBarrier);
-}
-
 void CentralLB::initLB(const CkLBOptions &opt)
 {
 #if CMK_LBDB_ON
@@ -80,7 +68,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   loadbalancer = thisgroup;
   // create and turn on by default
   startLbFnHdl = lbmgr->
-    AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
+    AddStartLBFn(this, &CentralLB::StartLB);
 
   // CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
   if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
@@ -97,7 +85,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (_lb_predict) predicted_model = new FutureModel(_lb_predict_window);
   else predicted_model=0;
   // register user interface callbacks
-  lbmgr->SetupPredictor((LDPredictModelFn)(staticPredictorOn),(LDPredictWindowFn)(staticPredictorOnWin),(LDPredictFn)(staticPredictorOff),(LDPredictModelFn)(staticChangePredictor),(void*)(this));
+  lbmgr->SetupPredictor(this, &CentralLB::predictorOn, &CentralLB::predictorOn, &CentralLB::predictorOff, &CentralLB::changePredictor);
 
   myspeed = lbmgr->ProcessorSpeed();
 
@@ -130,25 +118,8 @@ CentralLB::~CentralLB()
   delete statsData;
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   if (lbmgr) {
-    lbmgr->
-      RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+    lbmgr->RemoveStartLBFn(startLbFnHdl);
   }
-#endif
-}
-
-void CentralLB::turnOn() 
-{
-#if CMK_LBDB_ON
-  lbmgr->
-    TurnOnStartLBFn(startLbFnHdl);
-#endif
-}
-
-void CentralLB::turnOff() 
-{
-#if CMK_LBDB_ON
-  lbmgr->
-    TurnOffStartLBFn(startLbFnHdl);
 #endif
 }
 

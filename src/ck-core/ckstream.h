@@ -8,7 +8,7 @@
 #define BUF_MAXLEN  16384
 #define TBUF_MAXLEN   128
 
-#if defined(_WIN32)
+#if defined(_WIN32) && defined(_MSC_VER) && _MSC_VER < 1500
 #define snprintf _snprintf
 #endif
 

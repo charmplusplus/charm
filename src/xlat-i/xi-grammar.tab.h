@@ -84,7 +84,7 @@ extern int yydebug;
     CONST = 294,
     NOCOPY = 295,
     NOCOPYPOST = 296,
-    DEVICE = 297,
+    NOCOPYDEVICE = 297,
     PACKED = 298,
     VARSIZE = 299,
     ENTRY = 300,
@@ -113,14 +113,16 @@ extern int yydebug;
     FLOAT = 323,
     DOUBLE = 324,
     UNSIGNED = 325,
-    ACCEL = 326,
-    READWRITE = 327,
-    WRITEONLY = 328,
-    ACCELBLOCK = 329,
-    MEMCRITICAL = 330,
-    REDUCTIONTARGET = 331,
-    CASE = 332,
-    TYPENAME = 333
+    SIZET = 326,
+    BOOL = 327,
+    ACCEL = 328,
+    READWRITE = 329,
+    WRITEONLY = 330,
+    ACCELBLOCK = 331,
+    MEMCRITICAL = 332,
+    REDUCTIONTARGET = 333,
+    CASE = 334,
+    TYPENAME = 335
   };
 #endif
 /* Tokens.  */
@@ -163,7 +165,7 @@ extern int yydebug;
 #define CONST 294
 #define NOCOPY 295
 #define NOCOPYPOST 296
-#define DEVICE 297
+#define NOCOPYDEVICE 297
 #define PACKED 298
 #define VARSIZE 299
 #define ENTRY 300
@@ -192,14 +194,16 @@ extern int yydebug;
 #define FLOAT 323
 #define DOUBLE 324
 #define UNSIGNED 325
-#define ACCEL 326
-#define READWRITE 327
-#define WRITEONLY 328
-#define ACCELBLOCK 329
-#define MEMCRITICAL 330
-#define REDUCTIONTARGET 331
-#define CASE 332
-#define TYPENAME 333
+#define SIZET 326
+#define BOOL 327
+#define ACCEL 328
+#define READWRITE 329
+#define WRITEONLY 330
+#define ACCELBLOCK 331
+#define MEMCRITICAL 332
+#define REDUCTIONTARGET 333
+#define CASE 334
+#define TYPENAME 335
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -208,6 +212,8 @@ union YYSTYPE
 {
 #line 54 "xi-grammar.y" /* yacc.c:1909  */
 
+  Attribute *attr;
+  Attribute::Argument *attrarg;
   AstChildren<Module> *modlist;
   Module *module;
   ConstructList *conslist;
@@ -250,7 +256,7 @@ union YYSTYPE
   XStr* xstrptr;
   AccelBlock* accelBlock;
 
-#line 254 "y.tab.h" /* yacc.c:1909  */
+#line 260 "y.tab.h" /* yacc.c:1909  */
 };
 
 typedef union YYSTYPE YYSTYPE;

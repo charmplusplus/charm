@@ -49,6 +49,7 @@ check_include_file(pthread_np.h HAVE_PTHREAD_NP_H)
 check_include_file(stdlib.h HAVE_STDLIB_H)
 check_include_file(string.h HAVE_STRING_H)
 check_include_file(strings.h HAVE_STRINGS_H)
+set(CMK_HAS_STRINGS_H ${HAVE_STRINGS_H})
 check_include_file(unistd.h HAVE_UNISTD_H)
 check_include_file(regex.h CMK_HAS_REGEX_H)
 check_include_file(values.h CMK_HAS_VALUES_H)
@@ -207,6 +208,18 @@ int main() {
 " CMK_HAS_ADDR_NO_RANDOMIZE)
 
 check_c_source_compiles("
+__attribute__((visibility(\"default\"))) int myfunc();
+int myfunc()
+{
+  return 0;
+}
+int main()
+{
+  return 0;
+}
+" CMK_HAS_ATTRIBUTE_VISIBILITY_DEFAULT)
+
+check_c_source_compiles("
 #define _GNU_SOURCE
 #include <sys/uio.h>
 #include <errno.h>
@@ -251,6 +264,15 @@ int main()
   return __executable_start;
 }
 " CMK_HAS_EXECUTABLE_START)
+
+check_c_source_compiles("
+#include <stdio.h>
+extern int _IO_file_overflow(FILE *, int);
+int main()
+{
+  return _IO_file_overflow(stdout, -1);
+}
+" CMK_HAS_IO_FILE_OVERFLOW)
 
 check_c_source_compiles("
 #include <stdlib.h>

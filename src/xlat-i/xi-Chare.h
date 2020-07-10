@@ -15,7 +15,20 @@ struct TramInfo {
   std::string type;
   std::string name;
   std::string itemType;
-  TramInfo(const char* t, const char* n, const char* i) : type(t), name(n), itemType(i) {}
+  int numDimensions;
+  int bufferSize;
+  int maxItemsBuffered;
+  int thresholdFractionNumerator;
+  int thresholdFractionDenominator;
+  int cutoffFractionNumerator;
+  int cutoffFractionDenominator;
+
+  TramInfo(const char* t, const char* n, const char* i, int nd, int b,
+    int mib, int tfn, int tfd, int cfn, int cfd)
+    : type(t), name(n), itemType(i), numDimensions(nd), bufferSize(b),
+    maxItemsBuffered(mib), thresholdFractionNumerator(tfn),
+    thresholdFractionDenominator(tfd), cutoffFractionNumerator(cfn),
+    cutoffFractionDenominator(cfd) {}
 };
 
 /* Chare or group is a templated entity */

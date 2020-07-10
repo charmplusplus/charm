@@ -6,7 +6,7 @@ OBJS = hello.o hellof.o
 all: pgm
 
 pgm: $(OBJS) 
-	$(CHARMC) -o pgm $(OBJS) -language f90charm -balancer RotateLB
+	$(CHARMC) -o pgm $(OBJS) -language f90charm -balancer TreeLB
 
 hello.decl.h: hello.ci
 	$(CHARMC) hello.ci -language f90charm
