@@ -456,7 +456,7 @@ void ArrayElement::CkAbort(const char *format, ...) const
 void ArrayElement::recvBroadcast(CkMessage *m){
 }
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 ArrayElemExt::ArrayElemExt(void *impl_msg)
 {
@@ -1292,7 +1292,7 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
   }
 }
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 extern void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int);
 
@@ -1560,7 +1560,7 @@ void CkArray::recvBroadcast(CkMessage* m) {
   } else
 #endif
   {
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
     broadcaster->deliver(msg, localElemVec, thisgroup.idx, stableLocations);
 #else
     for (unsigned int i = 0; i < len; ++i) {
@@ -1575,7 +1575,7 @@ void CkArray::recvBroadcast(CkMessage* m) {
       broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
     }
 
-#endif // CMK_CHARMPY
+#endif // CMK_CHARM4PY
   }
 
   // CkArrayBroadcaster doesn't have msg buffered, and there was no last

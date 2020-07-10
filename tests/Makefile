@@ -4,13 +4,10 @@
 OPTS += $(OPTSATBUILDTIME)
 
 DIRS = \
+  util \
   charm++ \
+  converse \
   ampi \
-
-# TODO #2467: eliminate the need for this
-ifneq ($(BUILD_CUDA),1)
-  DIRS += converse util
-endif
 
 FTDIRS = \
   charm++ \
@@ -22,7 +19,7 @@ all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 
-syncfttest mpisyncfttest : $(foreach i,$(filter $(FTDIRS),$(TESTDIRS)),test-$i)
+syncfttest mpisyncfttest: $(foreach i,$(filter $(FTDIRS),$(TESTDIRS)),test-$i)
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
