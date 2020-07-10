@@ -19,6 +19,8 @@ $(TARGET): $(OBJS)
 $(TARGET).decl.h: $(TARGET).ci
 	$(CHARMC) $<
 
+$(TARGET).def.h: $(TARGET).ci
+
 $(TARGET).o: $(TARGET).C $(TARGET).decl.h $(TARGET).def.h
 	$(CHARMC) -c $<
 
