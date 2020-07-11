@@ -194,7 +194,7 @@ else()
   set(CMK_MULTICORE 0)
 endif()
 
-if(NOT ${CHARM_OS} STREQUAL "win")
+if(NOT ${CMK_COMPILER} STREQUAL "msvc")
   set(CMK_USE_ZLIB ${ZLIB})
 else()
   set(CMK_USE_ZLIB 0)
