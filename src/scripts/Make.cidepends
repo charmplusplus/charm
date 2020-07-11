@@ -14,7 +14,6 @@ ScotchRefineLB.decl.h ScotchRefineLB.def.h: ScotchRefineLB.ci.stamp
 ScotchTopoLB.decl.h ScotchTopoLB.def.h: ScotchTopoLB.ci.stamp
 TempAwareRefineLB.decl.h TempAwareRefineLB.def.h: TempAwareRefineLB.ci.stamp
 TreeLB.decl.h TreeLB.def.h: TreeLB.ci.stamp
-TreeLevel.decl.h TreeLevel.def.h: TreeLevel.ci.stamp
 ZoltanLB.decl.h ZoltanLB.def.h: ZoltanLB.ci.stamp
 CkArray.decl.h CkArray.def.h: ckarray.ci.stamp
 CkCallback.decl.h CkCallback.def.h: ckcallback.ci.stamp
@@ -38,4 +37,5 @@ TraceProjections.decl.h TraceProjections.def.h: trace-projections.ci.stamp
 TraceSimple.decl.h TraceSimple.def.h: trace-simple.ci.stamp
 TraceSummary.decl.h TraceSummary.def.h: trace-summary.ci.stamp
 TraceUtilization.decl.h TraceUtilization.def.h: trace-utilization.ci.stamp
+TreeLevel.decl.h TreeLevel.def.h: TreeLevel.ci.stamp
 waitqd.decl.h waitqd.def.h: waitqd.ci.stamp
