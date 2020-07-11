@@ -233,17 +233,41 @@ class Block : public CBase_Block {
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_size, stream);
 
-    CkCallback cb(CkReductionTarget(Main, initDone), main_proxy);
-    contribute(cb);
+    // TODO: Support reduction callback in hapiAddCallback
+    CkCallback* cb = new CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
+    hapiAddCallback(stream, cb);
   }
 
-  void sendGhosts(void) {
+  void initDone() {
+    contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
+  }
+
+  void packGhosts() {
     // Pack non-contiguous ghosts to temporary contiguous buffers on device
     invokePackingKernels(d_temperature, d_left_ghost, d_right_ghost, left_bound,
         right_bound, block_size, stream);
 
+    if (!use_zerocopy) {
+      // Transfer ghosts from device to host
+      hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(double),
+            cudaMemcpyDeviceToHost, stream));
+      hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost, block_size * sizeof(double),
+            cudaMemcpyDeviceToHost, stream));
+      hapiCheck(cudaMemcpyAsync(h_top_ghost, d_temperature + (block_size + 2) + 1,
+            block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
+      hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size + 1,
+            block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
+
+      // Add asynchronous callback to be invoked when packing and device-to-host
+      // transfers are complete
+      CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
+      hapiAddCallback(stream, cb);
+    }
+  }
+
+  void sendGhosts() {
+    // Send ghosts to neighboring chares
     if (use_zerocopy) {
-      // Send ghosts to neighboring chares
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_size,
             CkDeviceBuffer(d_left_ghost, stream));
@@ -257,18 +281,6 @@ class Block : public CBase_Block {
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_size,
             CkDeviceBuffer(d_temperature + (block_size + 2) * block_size + 1, stream));
     } else {
-      // Transfer ghosts from device to host
-      hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(double),
-            cudaMemcpyDeviceToHost, stream));
-      hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost, block_size * sizeof(double),
-            cudaMemcpyDeviceToHost, stream));
-      hapiCheck(cudaMemcpyAsync(h_top_ghost, d_temperature + (block_size + 2) + 1,
-            block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
-      hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size + 1,
-            block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
-      cudaStreamSynchronize(stream);
-
-      // Send ghosts to neighboring chares
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsReg(my_iter, RIGHT, block_size, h_left_ghost);
       if (!right_bound)
@@ -301,25 +313,53 @@ class Block : public CBase_Block {
   }
 
   void processGhostsZC(int dir, int width, double* gh) {
+    CkCallback* cb;
     switch (dir) {
       case LEFT:
+        if (!sync_ver) {
+          cb = new CkCallback(CkIndex_Block::receiveCompleteLeft(), thisProxy[thisIndex]);
+          hapiAddCallback(stream, cb);
+        }
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
-        // TODO: Data transfer not guaranteed to be complete at this point
-        if (!sync_ver) thisProxy(x - 1, y).receiveConfirm(my_iter, RIGHT);
         break;
       case RIGHT:
+        if (!sync_ver) {
+          cb = new CkCallback(CkIndex_Block::receiveCompleteRight(), thisProxy[thisIndex]);
+          hapiAddCallback(stream, cb);
+        }
         invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
-        if (!sync_ver) thisProxy(x + 1, y).receiveConfirm(my_iter, LEFT);
         break;
       case TOP:
-        if (!sync_ver) thisProxy(x, y - 1).receiveConfirm(my_iter, BOTTOM);
+        if (!sync_ver) {
+          cb = new CkCallback(CkIndex_Block::receiveCompleteTop(), thisProxy[thisIndex]);
+          hapiAddCallback(stream, cb);
+        }
         break;
       case BOTTOM:
-        if (!sync_ver) thisProxy(x, y + 1).receiveConfirm(my_iter, TOP);
+        if (!sync_ver) {
+          cb = new CkCallback(CkIndex_Block::receiveCompleteBottom(), thisProxy[thisIndex]);
+          hapiAddCallback(stream, cb);
+        }
         break;
       default:
         CkAbort("Error: invalid direction");
     }
+  }
+
+  void receiveCompleteLeft() {
+    thisProxy(x - 1, y).receiveConfirm(my_iter, RIGHT);
+  }
+
+  void receiveCompleteRight() {
+    thisProxy(x + 1, y).receiveConfirm(my_iter, LEFT);
+  }
+
+  void receiveCompleteTop() {
+    thisProxy(x, y - 1).receiveConfirm(my_iter, BOTTOM);
+  }
+
+  void receiveCompleteBottom() {
+    thisProxy(x, y + 1).receiveConfirm(my_iter, TOP);
   }
 
   void processGhostsReg(int dir, int width, double* gh) {
@@ -366,30 +406,16 @@ class Block : public CBase_Block {
             cudaMemcpyDeviceToHost, stream));
     }
 
-    cudaStreamSynchronize(stream);
-
-    // Swap pointers
-    std::swap(d_temperature, d_new_temperature);
-
-    if (sync_ver) {
-      my_iter++;
-      CkCallback cb(CkReductionTarget(Main, updateDone), main_proxy);
-      contribute(cb);
-    } else {
-      if (my_iter++ < n_iters) {
-        thisProxy[thisIndex].exchangeGhosts();
-      } else {
-        CkCallback cb(CkReductionTarget(Main, done), main_proxy);
-        contribute(cb);
-      }
-    }
+    // Add asynchronous callback to be invoked when update is complete
+    CkCallback* cb = new CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
+    hapiAddCallback(stream, cb);
   }
 
   void print() {
     CkPrintf("[%d,%d]\n", thisIndex.x, thisIndex.y);
     for (int j = 0; j < block_size + 2; j++) {
       for (int i = 0; i < block_size + 2; i++) {
-        CkPrintf("%.3lf ", h_temperature[(block_size + 2) * j + i]);
+        CkPrintf("%.6lf ", h_temperature[(block_size + 2) * j + i]);
       }
       CkPrintf("\n");
     }
