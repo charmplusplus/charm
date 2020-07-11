@@ -63,7 +63,7 @@ endif()
 set(CMAKE_REQUIRED_FLAGS "")
 
 # Support for fsglobals/pipglobals
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+if(CMK_WINDOWS)
   set(CMK_SUPPORTS_FSGLOBALS 1)
 elseif(CMK_HAS_DLOPEN AND ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   set(CMK_SUPPORTS_FSGLOBALS 1)
