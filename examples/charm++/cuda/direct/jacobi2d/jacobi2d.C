@@ -45,6 +45,10 @@ public:
     print = false;
     sync_ver = false;
 
+    // Initialize aggregate timers
+    comm_agg_time = 0.0;
+    update_agg_time = 0.0;
+
     // Process arguments
     int c;
     while ((c = getopt(m->argc, m->argv, "s:b:i:yzp")) != -1) {
@@ -117,8 +121,7 @@ public:
 
     if (my_iter++ == n_iters) {
       thisProxy.done();
-    }
-    else {
+    } else {
       comm_start_time = CkWallTimer();
       block_proxy.exchangeGhosts();
     }
@@ -253,8 +256,7 @@ class Block : public CBase_Block {
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_size,
             CkDeviceBuffer(d_temperature + (block_size + 2) * block_size + 1, stream));
-    }
-    else {
+    } else {
       // Transfer ghosts from device to host
       hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(double),
             cudaMemcpyDeviceToHost, stream));
@@ -395,12 +397,10 @@ class Block : public CBase_Block {
     if (!(thisIndex.x == n_chares-1 && thisIndex.y == n_chares-1)) {
       if (thisIndex.x == n_chares-1) {
         thisProxy(0,thisIndex.y+1).print();
-      }
-      else {
+      } else {
         thisProxy(thisIndex.x+1,thisIndex.y).print();
       }
-    }
-    else {
+    } else {
       main_proxy.printDone();
     }
   }
