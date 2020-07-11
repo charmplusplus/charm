@@ -1,10 +1,10 @@
 #ifndef _CONV_RDMADEVICE_H_
 #define _CONV_RDMADEVICE_H_
 
-#if CMK_CUDA
-
-#include "cmirdmautils.h"
+#include "conv-header.h"
 #include "pup.h"
+
+#if CMK_CUDA
 #include <cuda_runtime.h>
 
 // Represents the mode of device-side zerocopy transfer
