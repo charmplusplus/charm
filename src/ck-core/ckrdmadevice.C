@@ -42,11 +42,15 @@
  *    directly performa true device-to-device transfer.
  */
 
+#include <pthread.h>
+#include "envelope.h"
+#include "charm++.h"
+#include "ckrdmadevice.h"
+
 #if CMK_CUDA
 
 #include "hapi.h"
 #include "gpumanager.h"
-#include <pthread.h>
 
 CsvExtern(GPUManager, gpu_manager);
 
@@ -265,7 +269,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       void* alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
       if (alloc_comm_buffer == nullptr) {
         CkAbort("PE %d, device %d: Not enough memory on device communication buffer (%zu free)",
-            CkMyPe(), dm->global_index, dm->comm_buffer_free_size());
+            CkMyPe(), dm->global_index, dm->get_comm_buffer_free_size());
       }
       buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
       buffers[i]->device_idx = dm->global_index;

@@ -1,7 +1,7 @@
-#if CMK_CUDA
-
 #include "converse.h"
 #include "conv-rdmadevice.h"
+
+#if CMK_CUDA
 
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe) {
   if (CmiNodeOf(srcPe) == CmiNodeOf(destPe)) {

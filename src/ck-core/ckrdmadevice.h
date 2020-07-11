@@ -1,11 +1,11 @@
 #ifndef _CKRDMADEVICE_H_
 #define _CKRDMADEVICE_H_
 
-#if CMK_CUDA
-
-#include <cuda_runtime.h>
 #include "ckcallback.h"
 #include "conv-rdmadevice.h"
+
+#if CMK_CUDA
+#include <cuda_runtime.h>
 
 #define CkNcpyModeDevice CmiNcpyModeDevice
 
