@@ -15,6 +15,13 @@ if [[ $rc -ne 0 ]]; then
   exit $?
 fi
 
+if [[ $(uname) == "MSYS"* || $(uname) == "MINGW"* ]]; then
+  echo "Warning: CMake build is not supported under MSYS, running ./buildold instead."
+  sleep 2
+  ./buildold $@
+  exit $?
+fi
+
 cmake_version_major=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 1 -d'.')
 cmake_version_minor=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 2 -d'.')
 
