@@ -427,6 +427,7 @@ if [[ -n $opt_incdir ]]; then
 fi
 
 CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
+  -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE="$opt_production" \
   -DCMK_AMPI_ONLY="$opt_ampi_only" \
   -DCMK_AMPI_WITH_ROMIO="$opt_romio" \
