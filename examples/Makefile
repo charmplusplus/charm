@@ -1,5 +1,8 @@
 -include ../include/conv-mach-opt.mak
 
+# Temporary hack that needs to be removed / replaced
+OPTS += $(OPTSATBUILDTIME)
+
 DIRS = \
   charm++ \
   converse \
