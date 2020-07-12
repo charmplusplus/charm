@@ -204,6 +204,10 @@ while [[ $# -gt 0 ]]; do
     pgcc|pgf90)
       echo "*** Warning: Ignoring unsupported option '$arg'."
       ;;
+    msvc)
+      opt_CC=msvc # fake, will be replaced below
+      opt_compiler+="$arg "
+      ;;
     mpicxx)
       opt_CC=mpicc
       opt_CXX=mpicxx
@@ -380,7 +384,7 @@ my_os=$(echo  $triplet | cut -d '-' -f2)
 my_dir=$(dirname $0)
 
 # Special handling for Windows compiler
-if [[ $my_os == "win" ]]; then
+if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
   # Need to use unix2nt_cc on Windows/Cygwin
   opt_CC=$(realpath $my_dir)/src/arch/win/unix2nt_cc
   opt_CXX=$opt_CC

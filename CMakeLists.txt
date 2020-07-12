@@ -560,7 +560,7 @@ if(UCX_PMI)
   configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.h include/ COPYONLY)
 endif()
 
-if(CHARM_OS STREQUAL "win")
+if(CMK_COMPILER STREQUAL "msvc")
   configure_file(src/arch/win/unix2nt_cc                      bin/ COPYONLY)
   configure_file(src/arch/win/unix2nt_ar                      bin/ COPYONLY)
   configure_file(${CMAKE_SOURCE_DIR}/src/arch/win/unistd.h    include/ COPYONLY)
