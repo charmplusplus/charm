@@ -22,25 +22,6 @@ find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran c
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# No Fortran support on Windows
-if(NOT (CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "CYGWIN"))
-  enable_language(Fortran OPTIONAL)
-endif()
-
-if(CMAKE_Fortran_COMPILER)
-  include(FortranCInterface)
-  FortranCInterface_VERIFY()
-  FortranCInterface_VERIFY(CXX)
-else()
-  message(STATUS "Charm++: No Fortran support.")
-endif()
-
-if(${FortranCInterface_VERIFIED_CXX})
-  set(CMK_CAN_LINK_FORTRAN 1)
-else()
-  set(CMK_CAN_LINK_FORTRAN 0)
-endif()
-
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(CMK_COMPILER gcc)
   get_filename_component(mytmp ${CMAKE_CXX_COMPILER} NAME)
@@ -65,6 +46,25 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR (CMAKE_CXX_COMPILER_ID STREQUAL 
   set(CMK_COMPILER msvc)
 else()
   message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
+# No Fortran support with MSVC
+if(NOT CMK_COMPILER STREQUAL "msvc")
+  enable_language(Fortran OPTIONAL)
+endif()
+
+if(CMAKE_Fortran_COMPILER)
+  include(FortranCInterface)
+  FortranCInterface_VERIFY()
+  FortranCInterface_VERIFY(CXX)
+else()
+  message(STATUS "Charm++: No Fortran support.")
+endif()
+
+if(${FortranCInterface_VERIFIED_CXX})
+  set(CMK_CAN_LINK_FORTRAN 1)
+else()
+  set(CMK_CAN_LINK_FORTRAN 0)
 endif()
 
 # Build options
