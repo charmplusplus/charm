@@ -68,7 +68,7 @@ object_id=$(git write-tree)
 version="charm-$(cat src/scripts/VERSION)"
 
 # Generate the distribution tarball
-git archive --format=tar.gz --prefix="$version/" -o "$version".tar.gz "$object_id"
+git archive --format=tar.gz --prefix="$version/" -o "$version.tar.gz" "$object_id"
 
 # And clean up the mess we made
 git reset --hard
