@@ -53,3 +53,9 @@ test-pxshm: all
 	$(call run, +p4 ./kNeighbor +setcpuaffinity 5 10000 256)
 	$(call run, +p4 ./kNeighbor +setcpuaffinity 5 10000 1024)
 	$(call run, +p4 ./kNeighbor +setcpuaffinity 5 10000 16384)
+
+testp: all
+	$(call run, +p$(P) ./kNeighbor $$(( $(P) * 10 )) 100 64)
+	$(call run, +p$(P) ./kNeighbor $$(( $(P) * 10 )) 100 256)
+	$(call run, +p$(P) ./kNeighbor $$(( $(P) * 10 )) 100 1024)
+	$(call run, +p$(P) ./kNeighbor $$(( $(P) * 10 )) 100 16384)
