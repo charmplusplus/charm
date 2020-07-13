@@ -649,7 +649,6 @@ set(command ${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS})
 execute_process(COMMAND ${command} COMMAND grep CHARM_CC_FLAGS= COMMAND cut -c16- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC_FLAGS)
 execute_process(COMMAND ${command} COMMAND grep CHARM_CC= COMMAND cut -c10- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC)
 
-# FIXME: copy .so
 set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
 include(ExternalProject)
 ExternalProject_Add(hwloc
@@ -666,7 +665,6 @@ ExternalProject_Add(hwloc
         --disable-pci
         --disable-libudev
         --disable-visibility
-        --enable-embedded-mode
         --enable-shared=${hwloc_shared}
         --enable-static
         --with-hwloc-symbol-prefix=cmi_
@@ -676,11 +674,11 @@ ExternalProject_Add(hwloc
         CC=${CHARM_CC}
         > /dev/null
     BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-    COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
+    INSTALL_COMMAND cp hwloc/.libs/libhwloc.a ${CMAKE_BINARY_DIR}/lib/libhwloc_embedded.a
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
-    INSTALL_COMMAND "" #empty
+    COMMAND test ${hwloc_shared} = yes && cp hwloc/.libs/libhwloc_embedded.${CMK_SHARED_SUF} ${CMAKE_BINARY_DIR}/lib_so/libhwloc_embedded.${CMK_SHARED_SUF}
 )
 
 # TopoManager
