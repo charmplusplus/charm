@@ -1,5 +1,8 @@
 name: ShellCheck
 
+# See https://github.com/koalaman/shellcheck/wiki
+# for explanations of ShellCheck error codes
+
 on: [push]
 
 jobs:
