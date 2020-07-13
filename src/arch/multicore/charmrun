@@ -14,7 +14,7 @@ while [ $# -gt 0 ]
 do
         case $1 in
 	+p|+ppn|++ppn)
-		args=$args" "$1" "$2
+		args="$args $1 $2"
 		shift;
 		shift
 		;;
@@ -73,11 +73,11 @@ done
 
 test $QUIET -eq 1 && args=$args" "++quiet
 
-if [ "$DEBUG" = '1' -o "$DEBUG_NO_PAUSE" = '1' ]
+if [ "$DEBUG" = '1' ] || [ "$DEBUG_NO_PAUSE" = '1' ]
 then
   if [ -z "$DEBUGGER" ]
   then
-    [ "`uname -s 2>/dev/null`" = 'Darwin' ] && DEBUGGER='lldb' || DEBUGGER='gdb'
+    [ "$(uname -s 2>/dev/null)" = 'Darwin' ] && DEBUGGER='lldb' || DEBUGGER='gdb'
   fi
 
   DEBUG_RUN='-ex r'
@@ -93,7 +93,7 @@ then
   args="$XTERM -e $DEBUGGER $args"
 fi
 
-test $QUIET -eq 0 && echo Running command: $cmd $args
+test $QUIET -eq 0 && echo Running command: "$cmd" "$args"
 test $QUIET -eq 0 && echo
 
-exec $cmd $args
+exec "$cmd" "$args"

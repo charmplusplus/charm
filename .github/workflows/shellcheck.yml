@@ -1,0 +1,16 @@
+name: ShellCheck
+
+on: [push]
+
+jobs:
+  build:
+    timeout-minutes: 45
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: ShellCheck
+      run: |
+        # TODO: add more scripts
+        shellcheck build buildcmake package-tarball.sh relink.script src/scripts/commitid.sh src/scripts/testrun src/arch/uth/charmrun src/arch/sim/charmrun src/arch/multicore/charmrun src/arch/mpi-win-x86_64/charmrun
