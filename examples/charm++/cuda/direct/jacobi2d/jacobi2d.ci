@@ -25,11 +25,7 @@ mainmodule jacobi2d {
     entry void packGhostsDone();
     entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice double gh[w]);
     entry void receiveGhostsReg(int ref, int dir, int w, double gh[w]);
-    entry void receiveCompleteLeft();
-    entry void receiveCompleteRight();
-    entry void receiveCompleteTop();
-    entry void receiveCompleteBottom();
-    entry void receiveConfirm(int ref, int dir);
+    entry void sendGhostDone();
     entry void updateDone();
 
     entry void exchangeGhosts() {
@@ -66,11 +62,11 @@ mainmodule jacobi2d {
         }
       }
 
-      // With device-side zerocopy in asynchronous mode, need confirmation from
-      // neighbors that transfers are complete before updating the block
+      // With device-side zerocopy in asynchronous mode, need to wait until
+      // ghost transfers are complete before updating the block
       if (use_zerocopy && !sync_ver) {
         for (remote_count = 0; remote_count < neighbors; remote_count++) {
-          when receiveConfirm[my_iter](int ref, int dir) {
+          when sendGhostDone() {
             serial {}
           }
         }

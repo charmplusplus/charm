@@ -268,18 +268,20 @@ class Block : public CBase_Block {
   void sendGhosts() {
     // Send ghosts to neighboring chares
     if (use_zerocopy) {
+      CkCallback cb(CkIndex_Block::sendGhostDone(), thisProxy[thisIndex]);
+
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_size,
-            CkDeviceBuffer(d_left_ghost, stream));
+            CkDeviceBuffer(d_left_ghost, cb, stream));
       if (!right_bound)
         thisProxy(x + 1, y).receiveGhostsZC(my_iter, LEFT, block_size,
-            CkDeviceBuffer(d_right_ghost, stream));
+            CkDeviceBuffer(d_right_ghost, cb, stream));
       if (!top_bound)
         thisProxy(x, y - 1).receiveGhostsZC(my_iter, BOTTOM, block_size,
-            CkDeviceBuffer(d_temperature + (block_size + 2) + 1, stream));
+            CkDeviceBuffer(d_temperature + (block_size + 2) + 1, cb, stream));
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_size,
-            CkDeviceBuffer(d_temperature + (block_size + 2) * block_size + 1, stream));
+            CkDeviceBuffer(d_temperature + (block_size + 2) * block_size + 1, cb, stream));
     } else {
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsReg(my_iter, RIGHT, block_size, h_left_ghost);
@@ -313,53 +315,19 @@ class Block : public CBase_Block {
   }
 
   void processGhostsZC(int dir, int width, double* gh) {
-    CkCallback* cb;
     switch (dir) {
       case LEFT:
-        if (!sync_ver) {
-          cb = new CkCallback(CkIndex_Block::receiveCompleteLeft(), thisProxy[thisIndex]);
-          hapiAddCallback(stream, cb);
-        }
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
         break;
       case RIGHT:
-        if (!sync_ver) {
-          cb = new CkCallback(CkIndex_Block::receiveCompleteRight(), thisProxy[thisIndex]);
-          hapiAddCallback(stream, cb);
-        }
         invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
         break;
       case TOP:
-        if (!sync_ver) {
-          cb = new CkCallback(CkIndex_Block::receiveCompleteTop(), thisProxy[thisIndex]);
-          hapiAddCallback(stream, cb);
-        }
-        break;
       case BOTTOM:
-        if (!sync_ver) {
-          cb = new CkCallback(CkIndex_Block::receiveCompleteBottom(), thisProxy[thisIndex]);
-          hapiAddCallback(stream, cb);
-        }
         break;
       default:
         CkAbort("Error: invalid direction");
     }
-  }
-
-  void receiveCompleteLeft() {
-    thisProxy(x - 1, y).receiveConfirm(my_iter, RIGHT);
-  }
-
-  void receiveCompleteRight() {
-    thisProxy(x + 1, y).receiveConfirm(my_iter, LEFT);
-  }
-
-  void receiveCompleteTop() {
-    thisProxy(x, y - 1).receiveConfirm(my_iter, BOTTOM);
-  }
-
-  void receiveCompleteBottom() {
-    thisProxy(x, y + 1).receiveConfirm(my_iter, TOP);
   }
 
   void processGhostsReg(int dir, int width, double* gh) {
