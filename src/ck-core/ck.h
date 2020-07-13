@@ -11,6 +11,7 @@
 #include "stats.h"
 #include "ckfutures.h"
 #include "TopoManager.h"
+#include "BaseLB.h"
 
 #if CMK_ERROR_CHECKING
 #define _CHECK_VALID(p, msg) do {if((p)==0){CkAbort(msg);}} while(0)

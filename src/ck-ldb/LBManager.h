@@ -6,6 +6,7 @@
 #ifndef LBMANAGER_H
 #define LBMANAGER_H
 
+#include "cksyncbarrier.h"
 #include "LBDatabase.h"
 #include "json.hpp"
 using json = nlohmann::json;
@@ -127,65 +128,6 @@ void LBDefaultCreate(LBCreateFn f);
 
 void LBRegisterBalancer(const char*, LBCreateFn, LBAllocFn, const char*, int shown = 1);
 
-class LocalBarrier
-{
- public:
-  LocalBarrier()
-  {
-    cur_refcount = 1;
-    iter_no = -1;
-    propagated_atsync_step = 0;
-    at_count = 0;
-    on = false;
-    startedAtSync = false;
-    rank0pe = CkMyRank() == 0;
-  };
-  ~LocalBarrier(){};
-
-  void SetMgr(CProxy_LBManager mgr) { _mgr = mgr; };
-  void propagate_atsync();
-
-  LDBarrierClient AddClient(Chare* chare, std::function<void()> fn);
-  void RemoveClient(LDBarrierClient h);
-  LDBarrierReceiver AddReceiver(std::function<void()> fn);
-  void RemoveReceiver(LDBarrierReceiver h);
-  void TurnOnReceiver(LDBarrierReceiver h);
-  void TurnOffReceiver(LDBarrierReceiver h);
-  void AtBarrier(LDBarrierClient _n_c, bool flood_atsync = false);
-  void DecreaseBarrier(int c);
-  void TurnOn()
-  {
-    on = true;
-    CheckBarrier();
-  };
-  void TurnOff() { on = false; };
-  void reset();
-
- public:
-  void CallReceivers(void);
-  void CheckBarrier(bool flood_atsync = false);
-  void ResumeClients(void);
-
-  std::list<LBClient*> clients;
-  std::list<LBReceiver*> receivers;
-
-  std::list<int> local_pes_to_notify;
-  
-  CProxy_LBManager _mgr;
-
-  int cur_refcount;
-  int at_count;
-  bool on;
-  bool rank0pe;
-  int propagated_atsync_step;
-  int step;
-  int iter_no;
-  bool received_from_left;
-  bool received_from_right;
-  bool received_from_rank0;
-  bool startedAtSync;
-};
-
 void _LBMgrInit();
 
 // main chare
@@ -275,7 +217,6 @@ class LBManager : public CBase_LBManager
 
   LBDatabase* lbdb_obj;
 
-  LocalBarrier localBarrier;  // local barrier to trigger LB automatically
   bool useBarrier;            // use barrier or not
 
   PredictCB* predictCBFn;
@@ -316,7 +257,6 @@ class LBManager : public CBase_LBManager
   //  LDOMHandle RegisterOM(LDOMid userID, void *userptr, LDCallbacks cb);
 
   static void periodicLB(void*);
-  void callAt();
   void setTimer();
 
   LDOMHandle RegisterOM(LDOMid userID, void* userptr, LDCallbacks cb)
@@ -422,7 +362,6 @@ class LBManager : public CBase_LBManager
   void DumpDatabase(void);
 
   void reset();
-  void recvLbStart(int lb_step, int phynode, int pe);
 
   /*
    * Calls from load balancer to load database
@@ -509,12 +448,12 @@ class LBManager : public CBase_LBManager
   }
   inline LDBarrierClient AddLocalBarrierClient(Chare* obj, std::function<void()> fn)
   {
-    return localBarrier.AddClient(obj, fn);
+    return CkSyncBarrier::Object()->AddClient(obj, fn);
   }
 
   inline void RemoveLocalBarrierClient(LDBarrierClient h)
   {
-    localBarrier.RemoveClient(h);
+    CkSyncBarrier::Object()->RemoveClient(h);
   }
 
   template <typename T>
@@ -524,32 +463,32 @@ class LBManager : public CBase_LBManager
   }
   inline LDBarrierReceiver AddLocalBarrierReceiver(std::function<void()> fn)
   {
-    return localBarrier.AddReceiver(fn);
+    return CkSyncBarrier::Object()->AddReceiver(fn);
   }
 
   inline void RemoveLocalBarrierReceiver(LDBarrierReceiver h)
   {
-    localBarrier.RemoveReceiver(h);
+    CkSyncBarrier::Object()->RemoveReceiver(h);
   }
   inline void AtLocalBarrier(LDBarrierClient _n_c)
   {
-    if (useBarrier) localBarrier.AtBarrier(_n_c);
+    if (useBarrier) CkSyncBarrier::Object()->AtBarrier(_n_c);
   }
   inline void DecreaseLocalBarrier(int c)
   {
-    if (useBarrier) localBarrier.DecreaseBarrier(c);
+    if (useBarrier) CkSyncBarrier::Object()->DecreaseBarrier(c);
   }
   inline void TurnOnBarrierReceiver(LDBarrierReceiver h)
   {
-    localBarrier.TurnOnReceiver(h);
+    CkSyncBarrier::Object()->TurnOnReceiver(h);
   }
   inline void TurnOffBarrierReceiver(LDBarrierReceiver h)
   {
-    localBarrier.TurnOffReceiver(h);
+    CkSyncBarrier::Object()->TurnOffReceiver(h);
   }
 
-  inline void LocalBarrierOn(void) { localBarrier.TurnOn(); };
-  inline void LocalBarrierOff(void) { localBarrier.TurnOff(); };
+  inline void LocalBarrierOn(void) { CkSyncBarrier::Object()->TurnOn(); };
+  inline void LocalBarrierOff(void) { CkSyncBarrier::Object()->TurnOff(); };
   void ResumeClients();
   static int ProcessorSpeed();
   inline void SetLBPeriod(double s) {}

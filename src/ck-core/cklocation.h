@@ -42,9 +42,9 @@ public:
 
 /* Utility */
 //#if CMK_LBDB_ON
-#include "LBManager.h"
-#include "MetaBalancer.h"
 class LBManager;
+class MetaBalancer;
+#include "lbdb.h"
 //#endif
 
 //Forward declarations
