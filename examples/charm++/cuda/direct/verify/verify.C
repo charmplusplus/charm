@@ -2,6 +2,8 @@
 #include <string>
 #include "hapi.h"
 
+#define ERROR_TOLERANCE 1e-6
+
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_VerifyArray array_proxy;
 /* readonly */ CProxy_VerifyGroup group_proxy;
@@ -52,8 +54,8 @@ struct Container {
     hapiCheck(cudaStreamSynchronize(stream));
 
     for (int i = 0; i < block_size; i++) {
-      if (h_remote_data[i] != val) {
-        CkAbort("Validation failure at data index %d: expected %.3lf, got %.3lf\n",
+      if (fabs(h_remote_data[i] - val) > ERROR_TOLERANCE) {
+        CkAbort("Validation failure at data index %d: expected %.6lf, got %.6lf\n",
             i, val, h_remote_data[i]);
       }
     }
