@@ -678,7 +678,7 @@ ExternalProject_Add(hwloc
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
-    COMMAND test ${hwloc_shared} = yes && cp hwloc/.libs/libhwloc_embedded.${CMK_SHARED_SUF} ${CMAKE_BINARY_DIR}/lib_so/libhwloc_embedded.${CMK_SHARED_SUF}
+    COMMAND test ${hwloc_shared} = yes && cp hwloc/.libs/libhwloc.${CMK_SHARED_SUF} ${CMAKE_BINARY_DIR}/lib_so/libhwloc_embedded.${CMK_SHARED_SUF}
 )
 
 # TopoManager
