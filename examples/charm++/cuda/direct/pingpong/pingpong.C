@@ -61,7 +61,7 @@ class Main : public CBase_Main {
         n_iters, use_zerocopy, validate);
 
     // Create block group chare
-    block_proxy = CProxy_Block::ckNew(CkNumPes());
+    block_proxy = CProxy_Block::ckNew();
     start_time = CkWallTimer();
     block_proxy.init();
   }
@@ -69,7 +69,7 @@ class Main : public CBase_Main {
   void initDone() {
     CkPrintf("Data initialized, starting test...\n");
     cur_count = min_count;
-    thisProxy.testBegin(cur_count);
+    testBegin(cur_count);
   }
 
   void testBegin(int count) {

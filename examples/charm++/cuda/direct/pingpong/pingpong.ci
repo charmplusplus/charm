@@ -15,12 +15,11 @@ mainmodule pingpong {
     entry [reductiontarget] void terminate();
   };
 
-  //group Block {
-  array [1d] Block {
+  group Block {
     entry Block();
     entry void init();
     entry void send(int count);
     entry void receive_reg(int count, double data[count]);
-    entry void receive_zc(int count, device double data[count]);
+    entry void receive_zc(int count, nocopydevice double data[count]);
   };
 };
