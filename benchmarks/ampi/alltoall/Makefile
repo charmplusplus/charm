@@ -1,3 +1,4 @@
+-include ../../common.mk
 OPTS = -O3
 CHARMC = ../../../bin/ampicc
 CHARMF = ../../../bin/ampif90
@@ -23,11 +24,11 @@ alltoall.mpi: alltoall.c
 
 mpibench: mpibench.c
 	$(CHARMC) -c mpibench.c $(OPTS)
-	$(CHARMC) -o pgm mpibench.o $(OPTS) $(LIBS)
+	$(CHARMC) -o mpibench mpibench.o $(OPTS) $(LIBS)
 
 mpibench.mpi: mpibench.c
 	$(MPICC) -c mpibench.c $(OPTS)
-	$(MPICC) -o pgm-mpi mpibench.o $(OPTS) $(LIBS)
+	$(MPICC) -o mpibench.mpi mpibench.o $(OPTS) $(LIBS)
 
 alltoall_VPtest: alltoall_VPtest.c
 	$(CHARMC) -c alltoall_VPtest.c $(OPTS)
@@ -37,5 +38,9 @@ alltoall_VPtest_f: alltoall_VPtest.f
 	$(CHARMF) -c alltoall_VPtest.f -swapglobals  $(OPTS)
 	$(CHARMF) -o alltoall_VPtest_f alltoall_VPtest.o -swapglobals $(OPTS) $(LIBS)
 
+test: all
+	$(call run, +p4 ./mpibench +vp2)
+	mpirun -n 4 ./mpibench.mpi
+
 clean:
-	rm -rf *~ *.o alltoall mpibench charmrun conv-host allgather ampirun
+	rm -rf *~ *.o alltoall mpibench mpibench.mpi charmrun conv-host allgather ampirun

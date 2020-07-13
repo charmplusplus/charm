@@ -29,7 +29,7 @@ endef
 $(foreach i,$(CANDIDATES),$(eval $(call TEST_TARGET_AVAILABILITY,$i)))
 
 # command pieces
-TESTFLAGS := +balancer RandCentLB +LBPeriod 0.01
+TESTFLAGS := +balancer RandCentLB
 
 # build rules
 all: $(foreach i,$(TARGETS),$i)

@@ -1,5 +1,9 @@
 DIRS = \
+  alltoall \
+  isomalloc \
+  onesided \
   pingpong \
+  speed \
 
 TESTDIRS = $(DIRS)
 
