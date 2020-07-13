@@ -294,6 +294,8 @@ class Block : public CBase_Block {
     }
   }
 
+  // This is the post entry method, the regular entry method is defined as a
+  // SDAG entry method in the .ci file
   void receiveGhostsZC(int ref, int dir, int &w, double *&buf, CkDeviceBufferPost *devicePost) {
     switch (dir) {
       case LEFT:
