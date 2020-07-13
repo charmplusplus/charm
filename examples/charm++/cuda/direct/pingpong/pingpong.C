@@ -6,12 +6,13 @@
 /* readonly */ int min_count;
 /* readonly */ int max_count;
 /* readonly */ int n_iters;
-/* readonly */ bool use_zerocopy;
+/* readonly */ int warmup_iters;
 /* readonly */ bool validate;
 
 extern void invokeInitKernel(double*, int, double, cudaStream_t);
 
 class Main : public CBase_Main {
+  bool zerocopy;
   int cur_count;
   double start_time;
 
@@ -21,8 +22,9 @@ class Main : public CBase_Main {
     min_count = 1;
     max_count = 1024 * 1024;
     n_iters = 100;
-    use_zerocopy = false;
+    warmup_iters = 10;
     validate = false;
+    zerocopy = false;
 
     if (CkNumPes() != 2) {
       CkAbort("There should be 2 PEs");
@@ -30,7 +32,7 @@ class Main : public CBase_Main {
 
     // Process command line arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:x:i:zv")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:x:i:w:zv")) != -1) {
       switch (c) {
         case 's':
           min_count = atoi(optarg);
@@ -41,8 +43,8 @@ class Main : public CBase_Main {
         case 'i':
           n_iters = atoi(optarg);
           break;
-        case 'z':
-          use_zerocopy = true;
+        case 'w':
+          warmup_iters = atoi(optarg);
           break;
         case 'v':
           validate = true;
@@ -56,9 +58,9 @@ class Main : public CBase_Main {
     // Print info
     CkPrintf("[GPU zero-copy pingpong]\n"
         "Min count: %d doubles (%lu B), Max count: %d doubles (%lu B), "
-        "Iters: %d, Zerocopy: %d, Validate: %d\n",
+        "Iters: %d, Warmup: %d, Validate: %d\n",
         min_count, min_count * sizeof(double), max_count, max_count * sizeof(double),
-        n_iters, use_zerocopy, validate);
+        n_iters, warmup_iters, validate);
 
     // Create block group chare
     block_proxy = CProxy_Block::ckNew();
@@ -67,23 +69,30 @@ class Main : public CBase_Main {
   }
 
   void initDone() {
-    CkPrintf("Data initialized, starting test...\n");
+    CkPrintf("Data initialized, starting %s test...\n",
+        zerocopy ? "zerocopy" : "regular");
     cur_count = min_count;
-    testBegin(cur_count);
+    testBegin(cur_count, zerocopy);
   }
 
-  void testBegin(int count) {
+  void testBegin(int count, bool zerocopy) {
     // Start ping
-    block_proxy[0].send(count);
+    block_proxy[0].send(count, zerocopy);
   }
 
   void testEnd() {
     cur_count *= 2;
     if (cur_count <= max_count) {
-      thisProxy.testBegin(cur_count);
-    }
-    else {
-      thisProxy.terminate();
+      // Proceed to next message size
+      thisProxy.testBegin(cur_count, zerocopy);
+    } else {
+      if (!zerocopy) {
+        // Regular case done, proceed to zerocopy case
+        zerocopy = true;
+        block_proxy.init();
+      } else {
+        terminate();
+      }
     }
   }
 
@@ -105,24 +114,35 @@ public:
   double* h_remote_data;
   double* d_local_data;
   double* d_remote_data;
+  bool memory_allocated;
 
   cudaStream_t stream;
+  bool stream_created;
 
-  Block() {}
+  Block() {
+    memory_allocated = false;
+    stream_created = false;
+  }
 
   ~Block() {
-    // Free memory and destroy CUDA stream
-    hapiCheck(cudaFreeHost(h_local_data));
-    hapiCheck(cudaFreeHost(h_remote_data));
-    hapiCheck(cudaFree(d_local_data));
-    hapiCheck(cudaFree(d_remote_data));
-    cudaStreamDestroy(stream);
+    if (memory_allocated) {
+      if (CkMyPe() == 0) free(pingpong_times);
+      hapiCheck(cudaFreeHost(h_local_data));
+      hapiCheck(cudaFreeHost(h_remote_data));
+      hapiCheck(cudaFree(d_local_data));
+      hapiCheck(cudaFree(d_remote_data));
+    }
+
+    if (stream_created) cudaStreamDestroy(stream);
   }
 
   void init() {
+    // Reset iteration count
     iter = 1;
 
+    // Allocate memory for timers
     if (CkMyPe() == 0) {
+      if (memory_allocated) free(pingpong_times);
       pingpong_times = (double*)malloc(n_iters * sizeof(double));
     }
 
@@ -130,12 +150,24 @@ public:
     peer = (thisIndex < CkNumPes() / 2) ? (thisIndex + CkNumPes() / 2) :
       (thisIndex - CkNumPes() / 2);
 
-    // Allocate memory and create CUDA stream
+    // Allocate memory
+    if (memory_allocated) {
+      hapiCheck(cudaFreeHost(h_local_data));
+      hapiCheck(cudaFreeHost(h_remote_data));
+      hapiCheck(cudaFree(d_local_data));
+      hapiCheck(cudaFree(d_remote_data));
+    }
     hapiCheck(cudaMallocHost(&h_local_data, max_count * sizeof(double)));
     hapiCheck(cudaMallocHost(&h_remote_data, max_count * sizeof(double)));
     hapiCheck(cudaMalloc(&d_local_data, max_count * sizeof(double)));
     hapiCheck(cudaMalloc(&d_remote_data, max_count * sizeof(double)));
-    cudaStreamCreate(&stream);
+    memory_allocated = true;
+
+    // Create CUDA stream
+    if (!stream_created) {
+      cudaStreamCreate(&stream);
+      stream_created = true;
+    }
 
     // Initialize data
     invokeInitKernel(d_local_data, max_count, (double)thisIndex, stream);
@@ -150,63 +182,62 @@ public:
     */
   }
 
-  void send(int count) {
-    if (CkMyPe() == 0) {
-      pingpong_start_time = CkWallTimer();
-    }
+  void send(int count, bool zerocopy) {
+    if (CkMyPe() == 0) pingpong_start_time = CkWallTimer();
 
-    if (use_zerocopy) {
-      thisProxy[peer].receive_zc(count, CkDeviceBuffer(d_local_data, stream));
-    }
-    else {
-      hapiCheck(cudaMemcpyAsync(h_local_data, d_local_data, count * sizeof(double), cudaMemcpyDeviceToHost, stream));
+    if (!zerocopy) {
+      hapiCheck(cudaMemcpyAsync(h_local_data, d_local_data, count * sizeof(double),
+            cudaMemcpyDeviceToHost, stream));
       cudaStreamSynchronize(stream);
-      thisProxy[peer].receive_reg(count, h_local_data);
+      thisProxy[peer].receiveReg(count, h_local_data);
+    } else {
+      thisProxy[peer].receiveZC(count, CkDeviceBuffer(d_local_data, stream));
     }
   }
 
-  void receive_reg(int count, double *data) {
-    // XXX: Do cudaMemcpy straight from data?
+  void receiveReg(int count, double *data) {
+    // XXX: Do cudaMemcpy straight from data? It won't be pinned memory though
     memcpy(h_remote_data, data, count * sizeof(double));
-    hapiCheck(cudaMemcpyAsync(d_remote_data, h_remote_data, count * sizeof(double), cudaMemcpyHostToDevice, stream));
+    hapiCheck(cudaMemcpyAsync(d_remote_data, h_remote_data, count * sizeof(double),
+          cudaMemcpyHostToDevice, stream));
     cudaStreamSynchronize(stream);
 
-    if (validate) validateData(count);
-
-    afterReceive(count);
+    afterReceive(count, false);
   }
 
-  // First receive, user should set the destination buffer
-  void receive_zc(int &count, double *&data, CkDeviceBufferPost *devicePost) {
+  // First receive (post entry method), user should set the destination buffer
+  void receiveZC(int &count, double *&data, CkDeviceBufferPost *devicePost) {
     // Inform the runtime where the incoming data should be stored
     // and which CUDA stream should be used for the transfer
     data = d_remote_data;
     devicePost[0].cuda_stream = stream;
   }
 
-  // Second receive, invoked after the data transfer is initiated
+  // Second receive (regular entry method), invoked after the data transfer is initiated
   // The user can either wait for it to complete or offload other operations
   // into the stream (that may be dependent on the arriving data)
-  void receive_zc(int count, double *data) {
+  void receiveZC(int count, double *data) {
     // Wait for data transfer to complete
     cudaStreamSynchronize(stream);
 
-    if (validate) validateData(count);
-
-    afterReceive(count);
+    afterReceive(count, true);
   }
 
-  void afterReceive(int count) {
+  void afterReceive(int count, bool zerocopy) {
+    // Validate data if needed
+    if (validate) validateData(count);
+
     if (CkMyPe() == 1) {
-      // Send pong
-      send(count);
-    }
-    else {
-      // Received pong
-      pingpong_times[iter-1] = CkWallTimer() - pingpong_start_time;
+      // PE 1: send pong
+      send(count, zerocopy);
+    } else {
+      // PE 0: received pong
+      if (iter > warmup_iters) {
+        pingpong_times[iter-warmup_iters-1] = CkWallTimer() - pingpong_start_time;
+      }
 
       // Start next iteration or end test for current count
-      if (iter++ == n_iters) {
+      if (iter++ == warmup_iters + n_iters) {
         // Reset iteration
         iter = 1;
 
@@ -230,9 +261,8 @@ public:
         CkPrintf("Roundtrip time for %d doubles (%lu B): %.3lf += %.3lf us (95%% confidence)\n",
             count, count * sizeof(double), pingpong_times_mean * 1000000, 2 * stderror * 1000000);
         main_proxy.testEnd();
-      }
-      else {
-        send(count);
+      } else {
+        send(count, zerocopy);
       }
     }
   }

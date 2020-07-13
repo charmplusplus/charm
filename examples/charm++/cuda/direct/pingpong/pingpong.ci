@@ -4,13 +4,13 @@ mainmodule pingpong {
   readonly int min_count;
   readonly int max_count;
   readonly int n_iters;
-  readonly bool use_zerocopy;
+  readonly int warmup_iters;
   readonly bool validate;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void initDone();
-    entry void testBegin(int count);
+    entry void testBegin(int count, bool zerocopy);
     entry void testEnd();
     entry [reductiontarget] void terminate();
   };
@@ -18,8 +18,8 @@ mainmodule pingpong {
   group Block {
     entry Block();
     entry void init();
-    entry void send(int count);
-    entry void receive_reg(int count, double data[count]);
-    entry void receive_zc(int count, nocopydevice double data[count]);
+    entry void send(int count, bool zerocopy);
+    entry void receiveReg(int count, double data[count]);
+    entry void receiveZC(int count, nocopydevice double data[count]);
   };
 };
