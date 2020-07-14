@@ -11,6 +11,10 @@ DIRS = \
   exit \
 #  chkpt \
 
+NONSCALEDIRS = \
+  datatype \
+  exit \
+
 ifeq ($(BUILD_MPICH_TESTS),true)
 DIRS += mpich-test
 endif
@@ -20,10 +24,13 @@ FTDIRS = \
 
 TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
 
+TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 
 all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
+
+testp: $(foreach i,$(TESTPDIRS),testp-$i)
 
 syncfttest : $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
 
@@ -38,6 +45,9 @@ $(foreach i,$(DIRS),build-$i):
 
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(TESTPDIRS),testp-$i):
+	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' P='$(P)'
 
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

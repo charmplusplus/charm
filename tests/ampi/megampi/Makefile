@@ -22,3 +22,7 @@ test: pgm
 	$(call run, ./pgm +p2 +vp4 +balancer RandCentLB)
 	$(call run, ./pgm +p2 +vp1 +balancer RandCentLB)
 
+testp: pgm
+	$(call run, ./pgm +p$(P) +vp1 )
+	$(call run, ./pgm +p$(P) +vp2 )
+	$(call run, ./pgm +p$(P) +vp4 )

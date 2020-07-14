@@ -14,3 +14,6 @@ clean:
 
 test: pgm
 	$(call run, ./pgm +p2 +vp4 )
+
+testp: pgm
+	$(call run, ./pgm +p$(P) +vp4 )
