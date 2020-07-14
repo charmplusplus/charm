@@ -14,3 +14,6 @@ clean:
 
 test: pgm
 	$(call run, ./pgm +p4 1000000 100)
+
+testp: pgm
+		$(call run, ./pgm +p$(P) 1000000 $$(( $(P) * 10 )) )
