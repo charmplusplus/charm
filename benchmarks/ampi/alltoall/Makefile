@@ -4,7 +4,8 @@ CHARMC = ../../../bin/ampicc
 CHARMF = ../../../bin/ampif90
 MPICC = mpicc
 
-all: mpibench mpibench.mpi
+all: mpibench
+all-mpi: mpibench.mpi
 
 allgather: allgather.c
 	$(CHARMC) -c allgather.c $(OPTS)
@@ -40,6 +41,8 @@ alltoall_VPtest_f: alltoall_VPtest.f
 
 test: all
 	$(call run, +p4 ./mpibench +vp2)
+
+test-mpi: all-mpi
 	mpirun -n 4 ./mpibench.mpi
 
 clean:
