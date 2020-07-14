@@ -12,6 +12,10 @@
 
 cmake_minimum_required(VERSION 3.4)
 
+if(CMAKE_VERSION VERSION_GREATER 3.11)
+  cmake_policy(SET CMP0075 OLD)
+endif()
+
 # Fortran is optional, so don't include it in LANGUAGES here
 project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
@@ -786,7 +790,7 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb moduleGreedyRefineLB moduleRandCentLB "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
