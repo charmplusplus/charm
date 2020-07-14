@@ -12,6 +12,10 @@
 
 cmake_minimum_required(VERSION 3.4)
 
+if(CMAKE_VERSION VERSION_GREATER 3.11)
+  cmake_policy(SET CMP0075 OLD)
+endif()
+
 # Fortran is optional, so don't include it in LANGUAGES here
 project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
