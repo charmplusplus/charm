@@ -1,3 +1,5 @@
+-include ../../../../common.mk
+
 OPTS = -O3
 
 CHARM_DIR = ../../../../..
@@ -26,6 +28,9 @@ $(TARGET).o: $(TARGET).C $(TARGET).decl.h $(TARGET).def.h
 
 $(TARGET)CUDA.o: $(TARGET).cu
 	$(NVCC) -o $@ $(NVCC_FLAGS) $(CHARM_INC) $<
+
+test: all
+	$(call run, +p2 ./pingpong +gpumap block)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o $(TARGET) charmrun
