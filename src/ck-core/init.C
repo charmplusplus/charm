@@ -72,6 +72,7 @@ never be excluded...
 #include <sstream>
 #include <limits.h>
 #include "spanningTree.h"
+#include "CkSyncBarrier.decl.h"
 #if CMK_CHARM4PY
 #include "TreeLB.h"
 #endif

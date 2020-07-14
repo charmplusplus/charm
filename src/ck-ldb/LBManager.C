@@ -5,17 +5,13 @@
 
 #include "converse.h"
 #include <charm++.h>
-
-/*
- * This C++ file contains the Charm stub functions
- */
+#include "cksyncbarrier.h"
 
 #include "DistributedLB.h"
 #include "LBManager.h"
 #include "LBSimulation.h"
 #include "TreeLB.h"
 #include "topology.h"
-#include "MetaBalancer.h"
 
 CkGroupID _lbmgr;
 
@@ -896,6 +892,49 @@ void LBManager::UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad)
   }
 #endif
 }
+
+LDBarrierClient LBManager::AddLocalBarrierClient(Chare* obj, std::function<void()> fn)
+{
+  return CkSyncBarrier::Object()->AddClient(obj, fn);
+}
+
+void LBManager::RemoveLocalBarrierClient(LDBarrierClient h)
+{
+  CkSyncBarrier::Object()->RemoveClient(h);
+}
+
+LDBarrierReceiver LBManager::AddLocalBarrierReceiver(std::function<void()> fn)
+{
+  return CkSyncBarrier::Object()->AddReceiver(fn);
+}
+
+void LBManager::RemoveLocalBarrierReceiver(LDBarrierReceiver h)
+{
+  CkSyncBarrier::Object()->RemoveReceiver(h);
+}
+
+void LBManager::AtLocalBarrier(LDBarrierClient _n_c)
+{
+  if (useBarrier) CkSyncBarrier::Object()->AtBarrier(_n_c);
+}
+
+void LBManager::DecreaseLocalBarrier(int c)
+{
+  if (useBarrier) CkSyncBarrier::Object()->DecreaseBarrier(c);
+}
+
+void LBManager::TurnOnBarrierReceiver(LDBarrierReceiver h)
+{
+  CkSyncBarrier::Object()->TurnOnReceiver(h);
+}
+
+void LBManager::TurnOffBarrierReceiver(LDBarrierReceiver h)
+{
+  CkSyncBarrier::Object()->TurnOffReceiver(h);
+}
+
+void LBManager::LocalBarrierOn(void) { CkSyncBarrier::Object()->TurnOn(); };
+void LBManager::LocalBarrierOff(void) { CkSyncBarrier::Object()->TurnOff(); };
 
 #if CMK_LBDB_ON
 static void work(int iter_block, volatile int* result)

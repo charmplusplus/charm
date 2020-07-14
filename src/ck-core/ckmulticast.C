@@ -14,10 +14,6 @@
 #include "envelope.h"
 #include "register.h"
 
-#if CMK_LBDB_ON
-#include "LBManager.h"
-#endif
-
 #include "ckmulticast.h"
 #include "spanningTree.h"
 #include "XArraySectionReducer.h"

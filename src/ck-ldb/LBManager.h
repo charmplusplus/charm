@@ -6,7 +6,6 @@
 #ifndef LBMANAGER_H
 #define LBMANAGER_H
 
-#include "cksyncbarrier.h"
 #include "LBDatabase.h"
 #include "json.hpp"
 using json = nlohmann::json;
@@ -441,54 +440,29 @@ class LBManager : public CBase_LBManager
 
   void Migrated(LDObjHandle h, int waitBarrier = 1);
 
+  LDBarrierClient AddLocalBarrierClient(Chare* obj, std::function<void()> fn);
   template <typename T>
   inline LDBarrierClient AddLocalBarrierClient(T* obj, void (T::*method)(void))
   {
     return AddLocalBarrierClient((Chare*)obj, std::bind(method, obj));
   }
-  inline LDBarrierClient AddLocalBarrierClient(Chare* obj, std::function<void()> fn)
-  {
-    return CkSyncBarrier::Object()->AddClient(obj, fn);
-  }
 
-  inline void RemoveLocalBarrierClient(LDBarrierClient h)
-  {
-    CkSyncBarrier::Object()->RemoveClient(h);
-  }
+  void RemoveLocalBarrierClient(LDBarrierClient h);
 
+  LDBarrierReceiver AddLocalBarrierReceiver(std::function<void()> fn);
   template <typename T>
   inline LDBarrierReceiver AddLocalBarrierReceiver(T* obj, void (T::*method)(void))
   {
     return AddLocalBarrierReceiver(std::bind(method, obj));
   }
-  inline LDBarrierReceiver AddLocalBarrierReceiver(std::function<void()> fn)
-  {
-    return CkSyncBarrier::Object()->AddReceiver(fn);
-  }
+  void RemoveLocalBarrierReceiver(LDBarrierReceiver h);
+  void AtLocalBarrier(LDBarrierClient _n_c);
+  void DecreaseLocalBarrier(int c);
+  void TurnOnBarrierReceiver(LDBarrierReceiver h);
+  void TurnOffBarrierReceiver(LDBarrierReceiver h);
 
-  inline void RemoveLocalBarrierReceiver(LDBarrierReceiver h)
-  {
-    CkSyncBarrier::Object()->RemoveReceiver(h);
-  }
-  inline void AtLocalBarrier(LDBarrierClient _n_c)
-  {
-    if (useBarrier) CkSyncBarrier::Object()->AtBarrier(_n_c);
-  }
-  inline void DecreaseLocalBarrier(int c)
-  {
-    if (useBarrier) CkSyncBarrier::Object()->DecreaseBarrier(c);
-  }
-  inline void TurnOnBarrierReceiver(LDBarrierReceiver h)
-  {
-    CkSyncBarrier::Object()->TurnOnReceiver(h);
-  }
-  inline void TurnOffBarrierReceiver(LDBarrierReceiver h)
-  {
-    CkSyncBarrier::Object()->TurnOffReceiver(h);
-  }
-
-  inline void LocalBarrierOn(void) { CkSyncBarrier::Object()->TurnOn(); };
-  inline void LocalBarrierOff(void) { CkSyncBarrier::Object()->TurnOff(); };
+  void LocalBarrierOn(void);
+  void LocalBarrierOff(void);
   void ResumeClients();
   static int ProcessorSpeed();
   inline void SetLBPeriod(double s) {}
