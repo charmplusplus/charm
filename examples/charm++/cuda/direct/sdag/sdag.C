@@ -2,6 +2,8 @@
 #include <string>
 #include "hapi.h"
 
+#define ERROR_TOLERANCE 1e-6
+
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
 /* readonly */ int block_size;
@@ -132,20 +134,22 @@ class Block : public CBase_Block {
     // Validate data
     bool validated = true;
     for (int i = 0; i < block_size; i++) {
-      if (h_remote_data[i] != (double)peer) {
+      if (fabs(h_remote_data[i] - (double)peer) > ERROR_TOLERANCE) {
         CkPrintf("h_remote_data[%d] = %lf invalid! Expected %lf\n", i,
             h_remote_data[i], (double)peer);
         validated = false;
       }
-      if (reg_remote_data[i] != peer) {
+      if (fabs(reg_remote_data[i] - (double)peer) > ERROR_TOLERANCE) {
         CkPrintf("reg_remote_data[%d] = %d invalid! Expected %d\n", i,
             reg_remote_data[i], peer);
         validated = false;
       }
     }
 
-    if (!validated) {
-      CkPrintf("PE %d: Validation failed\n", CkMyPe());
+    if (validated) {
+      CkPrintf("PE %d: Validation success\n", CkMyPe());
+    } else {
+      CkAbort("PE %d: Validation failed\n", CkMyPe());
     }
   }
 };

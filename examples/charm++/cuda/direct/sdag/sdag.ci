@@ -12,7 +12,7 @@ mainmodule sdag {
   group Block {
     entry Block();
     entry void init();
-    entry void receive(int ref, int size1, device double arr1[size1],
+    entry void receive(int ref, int size1, nocopydevice double arr1[size1],
         int size2, int arr2[size2]);
 
     entry void iterate() {
@@ -24,7 +24,7 @@ mainmodule sdag {
 
       // Receive device data from peer
       // This is the second receive(), invoked after the data transfer is complete
-      when receive[iter](int ref, int size1, device double arr1[size1],
+      when receive[iter](int ref, int size1, nocopydevice double arr1[size1],
           int size2, int arr2[size2])
       serial {
         // Validate received data
@@ -33,8 +33,7 @@ mainmodule sdag {
         // Continue next iteration or return to Main for termination
         if (iter++ < n_iters) {
           thisProxy[thisIndex].iterate();
-        }
-        else {
+        } else {
           contribute(CkCallback(CkReductionTarget(Main, terminate), main_proxy));
         }
       }
