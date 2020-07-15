@@ -40,7 +40,8 @@ alltoall_VPtest_f: alltoall_VPtest.f
 	$(CHARMF) -o alltoall_VPtest_f alltoall_VPtest.o -swapglobals $(OPTS) $(LIBS)
 
 test: all
-	$(call run, +p4 ./mpibench +vp2)
+	$(call run, +p4 ./mpibench +vp4)
+	$(call run, +p4 ./mpibench +vp8)
 
 test-mpi: all-mpi
 	mpirun -n 4 ./mpibench.mpi
