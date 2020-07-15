@@ -56,8 +56,9 @@ test-$1: $1
 	$$(call run, ./$1 +p2 +vp4 $(TESTFLAGS) )
 
 testp-$1: $1
-	$$(call run, ./$1 +p$(P) +vp1 $(TESTFLAGS) )
-	$$(call run, ./$1 +p$(P) +vp2 $(TESTFLAGS) )
+	$$(call run, ./$1 +p$(P) +vp$(P) $(TESTFLAGS) )
+	$$(call run, ./$1 +p$(P) +vp$$(( $(P) * 2 )) $(TESTFLAGS) )
+	$$(call run, ./$1 +p$(P) +vp$$(( $(P) * 4 )) $(TESTFLAGS) )
 
 endef
 
