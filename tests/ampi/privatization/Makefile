@@ -141,12 +141,14 @@ test-f90-$1: f90-$1
 	$$(call run, ./f90-$1 +p2 +vp4 +balancer RandCentLB)
 
 testp-cxx-$1: cxx-$1
-	$$(call run, ./cxx-$1 +p$(P) +vp2 +balancer RandCentLB)
-	$$(call run, ./cxx-$1 +p$(P) +vp4 +balancer RandCentLB)
+	$$(call run, ./cxx-$1 +p$(P) +vp$(P) +balancer RandCentLB)
+	$$(call run, ./cxx-$1 +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB)
+	$$(call run, ./cxx-$1 +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB)
 
 testp-f90-$1: f90-$1
 	$$(call run, ./f90-$1 +p$(P) +vp2 +balancer RandCentLB)
-	$$(call run, ./f90-$1 +p$(P) +vp4 +balancer RandCentLB)
+	$$(call run, ./f90-$1 +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB)
+	$$(call run, ./f90-$1 +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB)
 
 
 endef
