@@ -46,7 +46,7 @@ FEATURES_cxx_swapglobals := migration
 FEATURES_cxx_tlsglobals := migration staticvars sharedlib
 FEATURES_cxx_roseomptlsglobals := migration staticvars sharedlib
 FEATURES_cxx_fsglobals := staticvars
-FEATURES_cxx_pipglobals := staticvars sharedlib
+FEATURES_cxx_pipglobals := staticvars sharedlib dynamiclib
 
 
 # Determine which methods to test in the current environment and target.
