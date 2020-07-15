@@ -29,7 +29,7 @@ int main(int argc, char ** argv)
     }
     binary_path += suffix;
 
-    const Lmid_t lmid = myrank == 0 ? LM_ID_BASE : LM_ID_NEWLM;
+    const Lmid_t lmid = /* myrank == 0 ? LM_ID_BASE : */ LM_ID_NEWLM;
     myexe = dlmopen(lmid, binary_path.c_str(), RTLD_NOW|RTLD_LOCAL);
   }
 
