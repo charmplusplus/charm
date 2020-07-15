@@ -2,10 +2,11 @@ CDIR := $(shell cd ../../../.. && pwd)
 -include $(CDIR)/include/conv-mach-opt.mak
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h \
+HEADERS=ampi.h ampif.h ampiimpl.h \
 		ampi-interoperate.h ampi.decl.h \
-		mpio_globals.h \
-		ampi_functions.h mpio_functions.h
+		ampi_functions.h
+ROMIO_HEADERS=mpio.h mpiof.h mpio_functions.h mpio_globals.h
+ROMIO_STUB=romio-stub
 HEADDEP=$(HEADERS) ampiimpl.h ddt.h \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampi.o \
@@ -71,7 +72,7 @@ all: AMPI AMPIF $(COMPATLIB) $(ROMIO)
 
 # AMPI and AMPIF are order-only dependencies (|), i.e., no up-to-date check
 # is done, in order to prevent ROMIO recompilation when AMPI changes.
-$(ROMIO): | AMPI AMPIF
+$(ROMIO): | $(DEST) $(DESTF)
 	@echo "Building ROMIO"
 # update timestamps on these files so that ROMIO's Makefile does not run configure a second time
 	@touch romio/aclocal.m4 romio/Makefile.in romio/configure romio/config.status
@@ -126,6 +127,7 @@ $(COMPATLIB): $(COMPAT)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
+	cp $(addprefix $(ROMIO_STUB)/,$(ROMIO_HEADERS)) $(CDIR)/include/
 
 	# Put AMPI's mpi.h in a separate directory to support the MPI machine layer and MPI interop
 	mkdir -p $(CDIR)/include/ampi/
@@ -135,7 +137,6 @@ headers: $(HEADERS)
 	cp ampiimpl.h $(CDIR)/include/          # For AMPI + Charm++ interop
 	cp ddt.h $(CDIR)/include/               # For AMPI + Charm++ interop
 	cp ampi-interoperate.h $(CDIR)/include/ # For AMPI + Charm++ interop
-	cp mpio_globals.h $(CDIR)/include/
 	cp ampiCC $(CDIR)/bin/ampicc
 	cp ampiCC $(CDIR)/bin/ampiCC
 	cp ampiCC $(CDIR)/bin/ampicxx
@@ -177,55 +178,58 @@ compat_ampi.o: compat_ampi.c
 	$(CHARMC) -c compat_ampi.c
 
 ampi_mpix.o: ampi_mpix.C $(HEADDEP)
+	$(CHARMC) -c $< -I$(ROMIO_STUB)
 
 ampi_noimpl.o: ampi_noimpl.C $(HEADDEP)
+	$(CHARMC) -c $< -I$(ROMIO_STUB)
 
 compat_ampicpp.o: compat_ampicpp.C
 	$(CHARMC) -c compat_ampicpp.C
 
 ampi.o: ampi.C $(HEADDEP)
-	$(CHARMC) -c ampi.C
+	$(CHARMC) -c $< -I$(ROMIO_STUB)
 
 $(AMPIF_OBJ): ampif.C $(HEADDEP)
-	$(CHARMC) -c $< -o $@
+	$(CHARMC) -c $< -I$(ROMIO_STUB) -o $@
 
 ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP)
-	$(CHARMC) -c ampiOneSided.C
+	$(CHARMC) -c $< -I$(ROMIO_STUB)
 
 ampiMisc.o: ampiMisc.C ampiimpl.h $(HEADDEP)
-	$(CHARMC) -c ampiMisc.C
+	$(CHARMC) -c $< -I$(ROMIO_STUB)
 
 mpich-alltoall.o: mpich-alltoall.C $(HEADDEP)
-	$(CHARMC) -c mpich-alltoall.C
+	$(CHARMC) -c $< -I$(ROMIO_STUB)
 
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
 
 ddt.o: ddt.C ddt.h $(HEADDEP)
+	$(CHARMC) -c $< -I$(ROMIO_STUB)
 
-$(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP)
-	$(CHARMC) -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
+$(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP) | $(ROMIO)
+	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
 
-$(FUNCPTR_SHIM_MAIN_OBJ): ampi_funcptr_shim_main.C
-	$(CHARMC) -fPIE -c $< -o $@
+$(FUNCPTR_SHIM_MAIN_OBJ): ampi_funcptr_shim_main.C | $(ROMIO)
+	$(CHARMC) -language ampi -fPIE -c $< -o $@
 
-$(FUNCPTR_SHIM_FMPIMAIN_OBJ): ampi_funcptr_shim_fmpimain.C
-	$(CHARMC) -fPIE -c $< -o $@
+$(FUNCPTR_SHIM_FMPIMAIN_OBJ): ampi_funcptr_shim_fmpimain.C | $(ROMIO)
+	$(CHARMC) -language ampi -fPIE -c $< -o $@
 
-$(FUNCPTR_SHIM_FORTRAN_OBJ): ampif.C $(HEADDEP)
-	-$(CHARMC) -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
+$(FUNCPTR_SHIM_FORTRAN_OBJ): ampif.C $(HEADDEP) | $(ROMIO)
+	-$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
 
-$(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP)
-	$(CHARMC) -c $< -o $@
+$(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP) | $(ROMIO)
+	$(CHARMC) -language ampi -c $< -o $@
 
-$(FUNCPTR_LOADER_STUB_OBJ): ampi_funcptr_loader_stub.C $(HEADDEP)
-	$(CHARMC) -c $< -o $@
+$(FUNCPTR_LOADER_STUB_OBJ): ampi_funcptr_loader_stub.C $(HEADDEP) | $(ROMIO)
+	$(CHARMC) -language ampi -c $< -o $@
 
-$(GLOBALS_FS_OBJ): ampi_globals_fs.C $(HEADDEP)
-	$(CHARMC) -c $< -o $@
+$(GLOBALS_FS_OBJ): ampi_globals_fs.C $(HEADDEP) | $(ROMIO)
+	$(CHARMC) -language ampi -c $< -o $@
 
-$(GLOBALS_PIP_OBJ): ampi_globals_pip.C $(HEADDEP)
-	$(CHARMC) -c $< -o $@
+$(GLOBALS_PIP_OBJ): ampi_globals_pip.C $(HEADDEP) | $(ROMIO)
+	$(CHARMC) -language ampi -c $< -o $@
 
 clean:
 	rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) $(COMPATLIB) conv-host charmrun headers *.mod
