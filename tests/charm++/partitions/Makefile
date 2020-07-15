@@ -27,7 +27,6 @@ else
 	$(call run, ./hello +p4 10 2 +partitions 2)
 endif
 
-
 testp: all
 ifeq ($(CMK_NO_PARTITIONS),1)
 	echo "Skipping test since build does not support partitions"
@@ -36,8 +35,6 @@ else ifeq ($(CMK_BLUEGENEQ),1)
 else
 	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) $$(( $(P) / 2 )) +partitions $$(( $(P) / 2 )) )
 endif
-
-
 
 smptest: all
 ifeq ($(CMK_NO_PARTITIONS),1)

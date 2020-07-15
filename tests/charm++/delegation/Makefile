@@ -18,6 +18,9 @@ clean: $(foreach i,$(DIRS),clean-$i)
 $(foreach i,$(DIRS),build-$i):
 	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
 
+$(foreach i,$(DIRS),test-$i):
+	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
 $(foreach i,$(DIRS),testp-$i):
 	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' P='$(P)'
 
