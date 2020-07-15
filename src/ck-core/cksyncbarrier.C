@@ -210,4 +210,9 @@ void CkSyncBarrier::ResumeClients(void)
   startedAtSync = false;
 }
 
+void CkSyncBarrier::pup(PUP::er& p)
+{
+  IrrGroup::pup(p);
+}
+
 #include "CkSyncBarrier.def.h"

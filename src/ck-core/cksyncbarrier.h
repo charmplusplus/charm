@@ -17,8 +17,24 @@ CkpvExtern(bool, cksyncbarrierInited);
 
 class CkSyncBarrier : public CBase_CkSyncBarrier
 {
-public:
-  CkSyncBarrier()
+private:
+  std::list<LBClient*> clients;
+  std::list<LBReceiver*> receivers;
+
+  std::list<int> local_pes_to_notify;
+
+  int cur_refcount;
+  int at_count;
+  bool on;
+  bool rank0pe;
+  int propagated_atsync_step;
+  int iter_no;
+  bool received_from_left;
+  bool received_from_right;
+  bool received_from_rank0;
+  bool startedAtSync;
+
+  void init()
   {
     CkpvAccess(cksyncbarrierInited) = true;
     cur_refcount = 1;
@@ -29,8 +45,14 @@ public:
     startedAtSync = false;
     rank0pe = CkMyRank() == 0;
     reset();
-  };
+  }
+
+public:
+  CkSyncBarrier() { init(); };
+  CkSyncBarrier(CkMigrateMessage* m) : CBase_CkSyncBarrier(m) { init(); }
   ~CkSyncBarrier(){};
+
+  void pup(PUP::er& p);
 
   inline static CkSyncBarrier* Object()
   {
@@ -60,24 +82,6 @@ public:
   void CallReceivers(void);
   void CheckBarrier(bool flood_atsync = false);
   void ResumeClients(void);
-
-private:
-  std::list<LBClient*> clients;
-  std::list<LBReceiver*> receivers;
-
-  std::list<int> local_pes_to_notify;
-
-  int cur_refcount;
-  int at_count;
-  bool on;
-  bool rank0pe;
-  int propagated_atsync_step;
-  int step;
-  int iter_no;
-  bool received_from_left;
-  bool received_from_right;
-  bool received_from_rank0;
-  bool startedAtSync;
 };
 
 #endif /* CKSYNCBARRIER_H */
