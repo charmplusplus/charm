@@ -34,6 +34,8 @@ ROMIO integrated into AMPI:
   and mpi-io/Makefile.mk.
 * Building of mpi-io/{get,set}_errh.c has been temporarily enabled in
   order to provide MPI_File_{get,set}_errhandler. See mpi-io/Makefile.mk.
+* PMPI function declarations in mpio_functions.h have been disabled.
+  This does not affect PMPI functionality.
 
 
 Variable privatization
