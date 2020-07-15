@@ -31,6 +31,7 @@ $(foreach i,$(DIRS),build-$i):
 
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
 $(foreach i,$(TESTPDIRS),testp-$i):
 	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' P='$(P)'
 
