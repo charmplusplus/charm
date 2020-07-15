@@ -12,6 +12,7 @@ DIRS = \
 #  chkpt \
 
 NONSCALEDIRS = \
+  privatization \
   datatype \
   exit \
 
