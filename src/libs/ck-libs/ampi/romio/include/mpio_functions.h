@@ -259,6 +259,7 @@ AMPI_CUSTOM_FUNC(MPI_Info, MPI_Info_f2c, MPI_Fint info)
 #endif   /* HAVE_PRAGMA_HP_SEC_DEF */
 
 
+#if 0
 /**************** BINDINGS FOR THE PROFILING INTERFACE ***************/
 
 
@@ -449,4 +450,6 @@ AMPI_CUSTOM_FUNC(int, PMPI_Info_free, MPI_Info *)
 
 AMPI_CUSTOM_FUNC(MPI_Fint, PMPI_Info_c2f, MPI_Info)
 AMPI_CUSTOM_FUNC(MPI_Info, PMPI_Info_f2c, MPI_Fint)
+#endif
+
 #endif
