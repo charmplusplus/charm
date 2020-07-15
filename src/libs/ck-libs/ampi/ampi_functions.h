@@ -451,8 +451,10 @@ AMPI_FUNC(int, MPI_Abort, MPI_Comm comm, int errorcode)
 AMPI_FUNC(int, MPI_Pcontrol, const int level, ...)
 AMPI_FUNC(int, MPI_File_call_errhandler, MPI_File fh, int errorcode)
 AMPI_FUNC(int, MPI_File_create_errhandler, MPI_File_errhandler_function *function, MPI_Errhandler *errhandler)
+#if 0
 AMPI_FUNC(int, MPI_File_get_errhandler, MPI_File file, MPI_Errhandler *errhandler)
 AMPI_FUNC(int, MPI_File_set_errhandler, MPI_File file, MPI_Errhandler errhandler)
+#endif
 
 /*********************One sided communication routines *****************/
 #ifndef MPI_WIN_NULL_DELETE_FN
