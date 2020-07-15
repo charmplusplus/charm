@@ -42,7 +42,9 @@
  *    directly performa true device-to-device transfer.
  */
 
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 #include "envelope.h"
 #include "charm++.h"
 #include "ckrdmadevice.h"

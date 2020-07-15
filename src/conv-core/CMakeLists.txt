@@ -5,7 +5,7 @@ set(conv-core-c-sources cmipool.C conv-conds.C
 
 set(conv-core-h-sources ../util/cmitls.h cmipool.h cmidemangle.h
     conv-config.h conv-cpath.h conv-cpm.h conv-header.h conv-ooc.h
-    conv-qd.h conv-random.h conv-rdma.h conv-rdmadevice.C conv-taskQ.h conv-trace.h converse.h
+    conv-qd.h conv-random.h conv-rdma.h conv-rdmadevice.h conv-taskQ.h conv-trace.h converse.h
     cpthreads.h debug-conv++.h debug-conv.h hrctimer.h mem-arena.h memory-gnu-threads.h
     memory-isomalloc.h msgq.h persistent.h queueing.h quiescence.h taskqueue.h)
 
