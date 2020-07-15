@@ -97,6 +97,9 @@ ifneq ($(ROMIOLIBSHARED),)
 	cp romio/.libs/libromio.$(CMK_SHARED_SUF) $(ROMIOLIBSHARED)
 ifeq ($(CMK_MACOSX),1)
 	install_name_tool -id $(ROMIOLIBSHARED) $(ROMIOLIBSHARED)
+else
+# hack
+	-ln -s $(ROMIOLIBSHARED) $(CDIR)/lib_so/libromio.so.0
 endif
 endif
 	@echo "ROMIO built successfully"
