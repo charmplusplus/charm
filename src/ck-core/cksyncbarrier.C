@@ -43,10 +43,7 @@ void CkSyncBarrier::reset()
 {
   if (rank0pe)
   {
-    int peFirst = CkNodeFirst(CkMyNode());
-    local_pes_to_notify.clear();
-    for (int pe = peFirst; pe < peFirst + CkNodeSize(CkMyNode()); pe++)
-      local_pes_to_notify.insert(local_pes_to_notify.end(), pe);
+    std::fill(rank_needs_flood.begin(), rank_needs_flood.end(), true);
     received_from_left = false;
     received_from_right = false;
   }
@@ -98,8 +95,8 @@ void CkSyncBarrier::propagate_atsync()
 {
   if (propagated_atsync_step < cur_refcount)
   {
-    int mype = CkMyPe();
-    int mynode = CkNodeOf(mype);
+    const int mype = CkMyPe();
+    const int mynode = CkNodeOf(mype);
     if (!rank0pe)
     {
       if (!received_from_rank0)
@@ -111,11 +108,14 @@ void CkSyncBarrier::propagate_atsync()
     }
     else
     {  // Rank0 PE
-      int peFirst = CkNodeFirst(CkMyNode());
       // Flood non-zero ranks on this node
-      for (std::list<int>::iterator it = local_pes_to_notify.begin();
-           it != local_pes_to_notify.end(); ++it)
-        thisProxy[*it].recvLbStart(cur_refcount, mynode, mype);
+      for (int i = 1; i < rank_needs_flood.size(); ++i)
+      {
+        if (rank_needs_flood[i])
+        {
+          thisProxy[mype + i].recvLbStart(cur_refcount, mynode, mype);
+        }
+      }
       if (!received_from_left && mynode > 0)
       {  // Flood left node
         int pe = CkNodeFirst(mynode - 1);
@@ -134,14 +134,14 @@ void CkSyncBarrier::propagate_atsync()
 void CkSyncBarrier::recvLbStart(int lb_step, int sourcenode, int pe)
 {
   if (lb_step != cur_refcount || startedAtSync) return;
-  int mype = CkMyPe();
-  int mynode = CkNodeOf(mype);
+  const int mype = CkMyPe();
+  const int mynode = CkNodeOf(mype);
   if (sourcenode < mynode)
     received_from_left = true;
   else if (sourcenode > mynode)
     received_from_right = true;
-  else if (rank0pe)
-    local_pes_to_notify.remove(pe);
+  else if (rank0pe) // convert incoming pe number to local rank
+    rank_needs_flood[pe - mype] = false;
   else
     received_from_rank0 = true;
   if (clients.size() == 1 &&

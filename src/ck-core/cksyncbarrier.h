@@ -21,7 +21,7 @@ private:
   std::list<LBClient*> clients;
   std::list<LBReceiver*> receivers;
 
-  std::list<int> local_pes_to_notify;
+  std::vector<bool> rank_needs_flood;
 
   int cur_refcount;
   int at_count;
@@ -44,6 +44,10 @@ private:
     on = false;
     startedAtSync = false;
     rank0pe = CkMyRank() == 0;
+    if (rank0pe)
+    {
+      rank_needs_flood.resize(CkNodeSize(CkMyNode()));
+    }
     reset();
   }
 
