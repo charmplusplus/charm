@@ -10,6 +10,9 @@ pgm: iotest.ci iotest.C
 test: pgm
 	$(call run, ./pgm +p4 4 )
 
+testp: pgm
+	$(call run, ./pgm +p$(P) $(P) )
+
 smptest: pgm
 	$(call run, ./pgm 4 +p2 ++ppn 2)
 	$(call run, ./pgm 4 +p4 ++ppn 2)
