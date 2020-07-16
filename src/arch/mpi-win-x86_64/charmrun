@@ -122,7 +122,8 @@ if test -n "$mpiexec_cmd"
 then
     test $QUIET -eq 0 && echo "charmrun> $mpiexec_cmd -n $pes $args"
     test $QUIET -eq 0 && echo
-    "$mpiexec_cmd" -n $pes "$args"
+    # shellcheck disable=SC2086
+    "$mpiexec_cmd" -n $pes $args
 else
     echo "Don't know how to run MPI program."
     exit 1
