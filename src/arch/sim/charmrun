@@ -6,4 +6,4 @@ export FROM_CHARMRUN='1'
 
 PATH=.:$PATH
 export PATH
-$*
+"$@"
