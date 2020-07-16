@@ -19,6 +19,9 @@
 #
 #     make charm++ OPTS="-g -save -verbose"
 #
+# On making changes to this file, ensure that the same changes are ported to
+# cmake/Makefile.tests in order to maintain consistency with the cmake based build
+# system, which is the default build system
 ###############################################################################
 
 SHELL=/bin/sh

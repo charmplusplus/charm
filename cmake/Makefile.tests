@@ -1,6 +1,14 @@
 # This Makefile contains the rules to build & test Charm++
 
 # The rules below are for compatibility with the CMake build system
+#
+# On making changes to this file, ensure that the same changes are ported
+# to src/scripts/Makefile in order to maintain consistency with the old
+# non-cmake based build system
+#
+# Changes to cmake/Makefile.tests will be reflected in <charm-arch>/tmp/Makefile
+# for a new cmake based build. If you want these changes to reflect in the existing
+# charm builds, you would have to manually copy them to <charm-arch>/tmp/Makefile
 
 all: charm++
 
