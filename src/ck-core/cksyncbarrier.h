@@ -51,6 +51,11 @@ private:
     reset();
   }
 
+  void propagate_atsync();
+  void reset();
+  void CallReceivers(void);
+  void CheckBarrier(bool flood_atsync = false);
+
 public:
   CkSyncBarrier() { init(); };
   CkSyncBarrier(CkMigrateMessage* m) : CBase_CkSyncBarrier(m) { init(); }
@@ -64,7 +69,6 @@ public:
                                            : nullptr;
   }
 
-  void propagate_atsync();
   void recvLbStart(int lb_step, int sourcenode, int pe);
 
   LDBarrierClient AddClient(Chare* chare, std::function<void()> fn);
@@ -81,10 +85,7 @@ public:
     CheckBarrier();
   };
   void TurnOff() { on = false; };
-  void reset();
 
-  void CallReceivers(void);
-  void CheckBarrier(bool flood_atsync = false);
   void ResumeClients(void);
 };
 
