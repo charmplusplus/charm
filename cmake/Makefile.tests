@@ -53,7 +53,7 @@ all-test-AMPI-examples: AMPI
 all-test-AMPI-benchmarks: AMPI
 	$(MAKE) -C ../benchmarks/ampi all
 
-test syncfttest mpisyncfttest: LIBS
+test syncfttest mpisyncfttest testp: LIBS
 	$(MAKE) -C ../tests $@
 	$(MAKE) -C ../examples $@
 	$(MAKE) -C ../benchmarks $@
