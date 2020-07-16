@@ -59,6 +59,15 @@ test-examples: LIBS
 test-benchmarks: LIBS
 	$(MAKE) -C ../benchmarks test
 
+testp-tests: LIBS
+	$(MAKE) -C ../tests testp
+
+testp-examples: LIBS
+	$(MAKE) -C ../examples testp
+
+testp-benchmarks: LIBS
+	$(MAKE) -C ../benchmarks testp
+
 test-zc: charm++
 	$(MAKE) -C ../tests/charm++/zerocopy test
 	$(MAKE) -C ../examples/charm++/zerocopy test
