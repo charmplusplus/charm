@@ -70,6 +70,25 @@ ifneq ($(CMK_BLUEGENEQ),1)
 endif
 endif
 
+testp: ampi
+	$(call run, +p$(P) ./jacobi.pup $(P) $(P) $(P) 40 +vp$(P) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.pup $(P) $(P) $(P) 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.pup $(P) $(P) $(P) 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
+
+	$(call run, +p$(P) ./jacobi $(P) $(P) $(P) 40 +vp$(P) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi $(P) $(P) $(P) 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi $(P) $(P) $(P) 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
+
+ifneq ($(CMK_WINDOWS),1)
+ifneq ($(CMK_BLUEGENEQ),1)
+	$(call run, +p$(P) ./jacobi.iso $(P) $(P) $(P) 40 +vp$(P) +balancer RotateLB +LBDebug 1)
+	$(call run, +p$(P) ./jacobi.iso $(P) $(P) $(P) 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.iso $(P) $(P) $(P) 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
+endif
+endif
+
+
+
 clean:
 	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls ampirun
 	rm -rf 40 80 120

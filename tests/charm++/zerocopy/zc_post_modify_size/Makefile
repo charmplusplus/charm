@@ -24,6 +24,12 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p4 ./zc_post_modify_size +noCMAForZC)
 endif
 
+testp: all
+	$(call run, +p$(P) ./zc_post_modify_size )
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./zc_post_modify_size +noCMAForZC)
+endif
+
 smptest: all
 	$(call run, +p2 ./zc_post_modify_size ++ppn 2)
 	$(call run, +p4 ./zc_post_modify_size ++ppn 2)
