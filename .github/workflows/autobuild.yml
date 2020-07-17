@@ -2,7 +2,7 @@ name: Autobuild
 
 on:
   schedule:
-    - cron: '58 * * * *'
+    - cron: '59 * * * *'
 
 jobs:
   build:
@@ -11,19 +11,14 @@ jobs:
     runs-on: might
 
     steps:
-    - uses: actions/checkout@v1
-    - name: projections
-      run: |
-        git clone https://github.com/UIUC-PPL/projections
-        cd projections
-        make
+    - uses: actions/checkout@v2
     - name: build
       run: ./build all-test netlrts-linux-x86_64 -g -j6 --with-production -pedantic
     - name: test
       run: |
-        make -C multicore-darwin-x86_64/tests all -j3
-        make -C multicore-darwin-x86_64/tests test TESTOPTS=++local
-        make -C multicore-darwin-x86_64/examples all -j3
-        make -C multicore-darwin-x86_64/examples test TESTOPTS=++local
-        make -C multicore-darwin-x86_64/benchmarks all -j3
-        make -C multicore-darwin-x86_64/benchmarks test TESTOPTS=++local
+        make -C netlrts-linux-x86_64/tests all -j3
+        make -C netlrts-linux-x86_64/tests test TESTOPTS=++local
+        make -C netlrts-linux-x86_64/examples all -j3
+        make -C netlrts-linux-x86_64/examples test TESTOPTS=++local
+        make -C netlrts-linux-x86_64/benchmarks all -j3
+        make -C netlrts-linux-x86_64/benchmarks test TESTOPTS=++local
