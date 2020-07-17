@@ -96,4 +96,5 @@ fi
 test $QUIET -eq 0 && echo Running command: "$cmd" "$args"
 test $QUIET -eq 0 && echo
 
-exec "$cmd" "$args"
+# shellcheck disable=SC2086
+exec "$cmd" $args
