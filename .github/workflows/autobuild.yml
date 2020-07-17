@@ -2,7 +2,7 @@ name: Autobuild
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '58 * * * *'
 
 jobs:
   build:
