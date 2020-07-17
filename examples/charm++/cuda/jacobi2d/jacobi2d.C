@@ -8,6 +8,7 @@
 /* readonly */ int block_size;
 /* readonly */ int n_chares;
 /* readonly */ int n_iters;
+/* readonly */ int warmup_iters;
 /* readonly */ bool sync_ver;
 /* readonly */ bool print;
 
@@ -40,6 +41,7 @@ public:
     grid_size = 16384;
     block_size = 4096;
     n_iters = 100;
+    warmup_iters = 10;
     print = false;
     sync_ver = false;
 
@@ -49,7 +51,7 @@ public:
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:b:i:yp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:b:i:w:yp")) != -1) {
       switch (c) {
         case 's':
           grid_size = atoi(optarg);
@@ -60,6 +62,9 @@ public:
         case 'i':
           n_iters = atoi(optarg);
           break;
+        case 'w':
+          warmup_iters = atoi(optarg);
+          break;
         case 'y':
           sync_ver = true;
           break;
@@ -68,7 +73,7 @@ public:
           break;
         default:
           CkPrintf(
-              "Usage: %s -s [grid size] -b [block size] -i [iterations] "
+              "Usage: %s -s [grid size] -b [block size] -i [iterations] -w [warmup]"
               "-y (use sync version) -z (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
@@ -86,8 +91,9 @@ public:
     // Print configuration
     CkPrintf("\n[CUDA 2D Jacobi example]\n");
     CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d, Iterations: %d, "
-        "Bulk-synchronous: %d, Print: %d\n", grid_size, grid_size, block_size,
-        block_size, n_chares, n_chares, n_iters, sync_ver, print);
+        "Warm-up: %d, Bulk-synchronous: %d, Print: %d\n", grid_size, grid_size,
+        block_size, block_size, n_chares, n_chares, n_iters, warmup_iters,
+        sync_ver, print);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares, n_chares);
@@ -104,32 +110,33 @@ public:
   }
 
   void commDone() {
-    comm_agg_time += CkWallTimer() - comm_start_time;
+    if (my_iter > warmup_iters) comm_agg_time += CkWallTimer() - comm_start_time;
     update_start_time = CkWallTimer();
     block_proxy.update();
   }
 
   void updateDone() {
-    update_agg_time += CkWallTimer() - update_start_time;
+    if (my_iter > warmup_iters) update_agg_time += CkWallTimer() - update_start_time;
 
-    if (my_iter++ == n_iters) {
-      thisProxy.done();
-    }
-    else {
+    if (my_iter++ == (warmup_iters + n_iters)) {
+      thisProxy.done(0);
+    } else {
       comm_start_time = CkWallTimer();
       block_proxy.exchangeGhosts();
     }
   }
 
-  void done() {
+  void done(double iter_agg_times) {
     double total_time = CkWallTimer() - start_time;
     CkPrintf("Finished due to max iterations %d, total time %lf seconds\n",
              n_iters, total_time);
     if (sync_ver) {
       CkPrintf("Comm time: %.3lf us\nUpdate time: %.3lf us\n",
           (comm_agg_time / n_iters) * 1000000, (update_agg_time / n_iters) * 1000000);
+    } else {
+      CkPrintf("Average iteration time: %.3lf us\n",
+          iter_agg_times / n_iters / (n_chares * n_chares) * 1000000);
     }
-    CkPrintf("Iteration time: %.3lf us\n", (total_time / n_iters) * 1000000);
 
     if (print) {
       sleep(1);
@@ -167,6 +174,9 @@ class Block : public CBase_Block {
 
   bool left_bound, right_bound, top_bound, bottom_bound;
 
+  double iter_start_time;
+  double iter_agg_time;
+
   Block() {}
 
   ~Block() {
@@ -189,6 +199,7 @@ class Block : public CBase_Block {
     neighbors = 0;
     x = thisIndex.x;
     y = thisIndex.y;
+    iter_agg_time = 0.0;
 
     // Check bounds and set number of valid neighbors
     left_bound = right_bound = top_bound = bottom_bound = false;
@@ -309,7 +320,7 @@ class Block : public CBase_Block {
     invokeJacobiKernel(d_temperature, d_new_temperature, block_size, stream);
 
     // Copy final temperature data back to host
-    if (my_iter == n_iters) {
+    if (my_iter == warmup_iters + n_iters) {
       hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
             sizeof(double) * (block_size + 2) * (block_size + 2),
             cudaMemcpyDeviceToHost, stream));

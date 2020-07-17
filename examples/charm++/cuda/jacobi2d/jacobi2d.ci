@@ -5,6 +5,7 @@ mainmodule jacobi2d {
   readonly int block_size;
   readonly int n_chares;
   readonly int n_iters;
+  readonly int warmup_iters;
   readonly bool sync_ver;
   readonly bool print;
 
@@ -13,7 +14,7 @@ mainmodule jacobi2d {
     entry [reductiontarget] void initDone();
     entry [reductiontarget] void commDone();
     entry [reductiontarget] void updateDone();
-    entry [reductiontarget] void done();
+    entry [reductiontarget] void done(double iter_agg_times);
     entry void printDone();
   };
 
@@ -27,6 +28,7 @@ mainmodule jacobi2d {
 
     entry void exchangeGhosts() {
       serial {
+        iter_start_time = CkWallTimer();
         prepareGhosts();
       }
 
@@ -57,19 +59,21 @@ mainmodule jacobi2d {
       // XXX: Same here
       when updateDone() {
         serial {
+          if (my_iter > warmup_iters) iter_agg_time += CkWallTimer() - iter_start_time;
+
           // Swap pointers
           std::swap(d_temperature, d_new_temperature);
 
+          my_iter++;
           if (sync_ver) {
-            my_iter++;
             CkCallback cb(CkReductionTarget(Main, updateDone), main_proxy);
             contribute(cb);
           } else {
-            if (my_iter++ < n_iters) {
+            if (my_iter < warmup_iters + n_iters) {
               thisProxy[thisIndex].exchangeGhosts();
             } else {
               CkCallback cb(CkReductionTarget(Main, done), main_proxy);
-              contribute(cb);
+              contribute(sizeof(double), &iter_agg_time, CkReduction::sum_double, cb);
             }
           }
         }
