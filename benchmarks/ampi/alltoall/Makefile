@@ -46,5 +46,10 @@ test: all
 test-mpi: all-mpi
 	mpirun -n 4 ./mpibench.mpi
 
+testp: all
+	$(call run, +p$(P) ./mpibench +vp$(P) )
+	$(call run, +p$(P) ./mpibench +vp$$(( $(P) * 2 )) )
+	$(call run, +p$(P) ./mpibench +vp$$(( $(P) * 4 )) )
+
 clean:
 	rm -rf *~ *.o alltoall mpibench mpibench.mpi charmrun conv-host allgather ampirun
