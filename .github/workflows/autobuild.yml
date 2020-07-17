@@ -9,6 +9,7 @@ jobs:
     timeout-minutes: 60
 
     runs-on: might
+    name: netlrts-linux-x86_64 -pedantic
 
     steps:
     - uses: actions/checkout@v2
