@@ -1,11 +1,11 @@
 set(conv-core-c-sources cmipool.C conv-conds.C
-    conv-rdma.C convcore.C cpm.C cpthreads.C cpuaffinity.C debug-conv.C futures.C
+    conv-rdma.C conv-rdmadevice.C convcore.C cpm.C cpthreads.C cpuaffinity.C debug-conv.C futures.C
     global-nop.C isomalloc.C mem-arena.C memoryaffinity.C msgmgr.C quiescence.C
     random.C)
 
 set(conv-core-h-sources ../util/cmitls.h cmipool.h cmidemangle.h
     conv-config.h conv-cpath.h conv-cpm.h conv-header.h conv-ooc.h
-    conv-qd.h conv-random.h conv-rdma.h conv-taskQ.h conv-trace.h converse.h
+    conv-qd.h conv-random.h conv-rdma.h conv-rdmadevice.h conv-taskQ.h conv-trace.h converse.h
     cpthreads.h debug-conv++.h debug-conv.h hrctimer.h mem-arena.h memory-gnu-threads.h
     memory-isomalloc.h msgq.h persistent.h queueing.h quiescence.h taskqueue.h)
 

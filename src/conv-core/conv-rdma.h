@@ -81,7 +81,7 @@ void CmiSetNcpyAckSize(int ackSize);
 #define CMK_COMMON_NOCOPY_DIRECT_BYTES 0
 #endif
 
-// Represents the mode of the zerocopy transfer
+// Represents the mode of host-side zerocopy transfer
 // CkNcpyMode::MEMCPY indicates that the PEs are on the logical node and memcpy can be used
 // CkNcpyMode::CMA indicates that the PEs are on the same physical node and CMA can be used
 // CkNcpyMode::RDMA indicates that the neither MEMCPY or CMA can be used and REMOTE Direct Memory Access needs to be used

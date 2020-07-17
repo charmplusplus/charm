@@ -24,6 +24,12 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p4 ./direct_api 100 +noCMAForZC)
 endif
 
+testp: all
+	$(call run, +p$(P) ./direct_api $$(( $(P) * 8)) )
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./direct_api $$(( $(P) * 8)) +noCMAForZC)
+endif
+
 smptest: all
 	$(call run, +p2 ./direct_api 60 ++ppn 2)
 	$(call run, +p4 ./direct_api 100 ++ppn 2)
