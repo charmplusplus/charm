@@ -26,6 +26,9 @@ test: all
 	$(call run, ./ckAllocSysMsgTest 40  5  2 3  +p2 )
 	$(call run, ./ckAllocSysMsgTest 30 10 10 3  +p4 )
 
+testp: all
+	$(call run, ./ckAllocSysMsgTest $(P) 10 10 3 +p$(P) )
+
 smptest: all
 	$(call run, ./ckAllocSysMsgTest 30 10 10 3  +p2 ++ppn 2)
 	$(call run, ./ckAllocSysMsgTest 40  5  2 3  +p2 ++ppn 2)

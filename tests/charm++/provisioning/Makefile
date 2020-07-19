@@ -32,6 +32,9 @@ ifneq (,$(filter netlrts verbs,$(MACHINE_LAYER)))
 endif
 endif
 
+testp: all
+	$(call run, +p$(P) ./$(TARGET))
+
 smptest:
 ifeq (,$(findstring +p,$(TESTOPTS)))
 ifneq (,$(filter netlrts verbs,$(MACHINE_LAYER)))
