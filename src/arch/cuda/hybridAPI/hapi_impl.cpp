@@ -746,8 +746,6 @@ static void shmCreate() {
   if (stat(stat_path.c_str(), &stat_result) == 0) {
     if (remove(stat_path.c_str())) {
       CmiAbort("Failure during shared memory file removal");
-    } else {
-      CmiPrintf("PE %d, removing file\n", CmiMyPe());
     }
   }
 
