@@ -50,6 +50,9 @@ class LBDBRegistry
   CkVec<LBDBEntry> lbtables;       // a list of available LBs linked
   CkVec<const char*> compile_lbs;  // load balancers at compile time
   CkVec<const char*> runtime_lbs;  // load balancers at run time
+  // map of {index in runtime_lbs, name of legacy LB to instantiate TreeLB with}
+  // for use with the legacy LBs (e.g. GreedyLB -> the predefined Greedy version of TreeLB)
+  std::unordered_map<int, const char*> legacy_runtime_treelbs;
  public:
   LBDBRegistry() {}
   void displayLBs()
@@ -68,7 +71,15 @@ class LBDBRegistry
     lbtables.push_back(LBDBEntry(name, fn, afn, help, shown));
   }
   void addCompiletimeBalancer(const char* name) { compile_lbs.push_back(name); }
-  void addRuntimeBalancer(const char* name) { runtime_lbs.push_back(name); }
+  void addRuntimeBalancer(const char* name, const char* legacyLBName = nullptr)
+  {
+    if (legacyLBName != nullptr)
+    {
+      legacy_runtime_treelbs.emplace(runtime_lbs.size(), legacyLBName);
+    }
+
+    runtime_lbs.push_back(name);
+  }
   LBCreateFn search(const char* name)
   {
     char* ptr = strpbrk((char*)name, ":,");
@@ -102,7 +113,7 @@ void LBRegisterBalancer(const char* name, LBCreateFn fn, LBAllocFn afn, const ch
 LBAllocFn getLBAllocFn(const char* lbname) { return lbRegistry.getLBAllocFn(lbname); }
 
 // create a load balancer group using the strategy name
-static void createLoadBalancer(const char* lbname)
+static void createLoadBalancer(const char* lbname, const char* legacybalancer = nullptr)
 {
   LBCreateFn fn = lbRegistry.search(lbname);
   if (!fn)
@@ -112,7 +123,8 @@ static void createLoadBalancer(const char* lbname)
     CkAbort("Abort");
   }
   // invoke function to create load balancer
-  fn();
+  int seqno = LBManagerObj()->getLoadbalancerTicket();
+  fn(CkLBOptions(seqno, legacybalancer));
 }
 
 // mainchare
@@ -127,7 +139,11 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
     for (int i = 0; i < lbRegistry.runtime_lbs.size(); i++)
     {
       const char* balancer = lbRegistry.runtime_lbs[i];
-      createLoadBalancer(balancer);
+      // If this is a legacy TreeLB, pass in the legacy LB name
+      const char* legacybalancer = lbRegistry.legacy_runtime_treelbs.count(i) > 0
+                                       ? lbRegistry.legacy_runtime_treelbs[i]
+                                       : nullptr;
+      createLoadBalancer(balancer, legacybalancer);
     }
   }
   else if (lbRegistry.compile_lbs.size() > 0)
@@ -210,37 +226,31 @@ void _loadbalancerInit()
           "pass directory of model files using +MetaLBModelDir.\n");
     if (CkMyRank() == 0)
     {
-      bool TreeLB_registered = false;
       while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
       {
+        bool isLegacyTreeLB = true;
+        const char* legacyBalancer;
         if (strcmp(balancer, "GreedyLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("Greedy");
+          legacyBalancer = "Greedy";
         else if (strcmp(balancer, "GreedyRefineLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("GreedyRefine");
+          legacyBalancer = "GreedyRefine";
         else if (strcmp(balancer, "RefineLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("RefineA");
+          legacyBalancer = "RefineA";
         else if (strcmp(balancer, "RandCentLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("Random");
+          legacyBalancer = "Random";
         else if (strcmp(balancer, "DummyLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("Dummy");
+          legacyBalancer = "Dummy";
         else if (strcmp(balancer, "RotateLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("Rotate");
+          legacyBalancer = "Rotate";
         else
-          lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
-
-        if (strcmp(balancer, "TreeLB") == 0) TreeLB_registered = true;
-
-        if (!_lb_args.legacyCentralizedStrategies().empty())
         {
-          if (!TreeLB_registered)
-          {
-            lbRegistry.addRuntimeBalancer("TreeLB");
-            TreeLB_registered = true;
-          }
-          if (_lb_args.legacyCentralizedStrategies().size() > 1)
-            // TODO: add support for multiple instances of TreeLB
-            CkAbort(
-                 "Sequencing multiple centralized strategies with TreeLB not supported\n");
+          lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
+          isLegacyTreeLB = false;
+        }
+
+        if (isLegacyTreeLB)
+        {
+          lbRegistry.addRuntimeBalancer("TreeLB", legacyBalancer);
         }
       }
     }
@@ -470,8 +480,10 @@ void LBManager::initnodeFn()
 
 void LBManager::InvokeLB()
 {
-  //TODO: Add support for sequencing multiple LBs
-  if (loadbalancers.size() > 0) loadbalancers[0]->InvokeLB();
+  if (loadbalancers.size() > 0)
+  {
+    loadbalancers[currentLBIndex]->InvokeLB();
+  }
 }
 
 // Called at end of each load balancing cycle
@@ -491,6 +503,7 @@ void LBManager::init(void)
   chare_count = 0;
   metabalancer = nullptr;
   lbdb_obj = new LBDatabase();
+  currentLBIndex = 0;
   
 #if CMK_LB_CPUTIMER
   obj_cputime = 0;
@@ -590,7 +603,7 @@ void LBManager::DumpDatabase()
 void LBManager::Migrated(LDObjHandle h, int waitBarrier)
 {
   // Object migrated, inform load balancers
-  if (loadbalancers.size() > 0) loadbalancers[0]->Migrated(waitBarrier);
+  if (loadbalancers.size() > 0) loadbalancers[currentLBIndex]->Migrated(waitBarrier);
 }
 
 LBManager::LastLBInfo::LastLBInfo() { expectedLoad = _expectedLoad; }
@@ -663,20 +676,20 @@ void LBManager::addLoadbalancer(BaseLB* lb, int seq)
 void LBManager::nextLoadbalancer(int seq)
 {
   if (seq == -1) return;  // -1 means this is the only LB
-  int next = seq + 1;
+  currentLBIndex = seq + 1;
   if (_lb_args.loop())
   {
-    if (next == loadbalancers.size()) next = 0;
+    if (currentLBIndex == loadbalancers.size()) currentLBIndex = 0;
   }
   else
   {
-    if (next == loadbalancers.size()) next--;  // keep using the last one
+    if (currentLBIndex == loadbalancers.size()) currentLBIndex--;  // keep using the last one
   }
-  if (seq != next)
+  if (seq != currentLBIndex)
   {
     loadbalancers[seq]->turnOff();
-    CmiAssert(loadbalancers[next]);
-    loadbalancers[next]->turnOn();
+    CmiAssert(loadbalancers[currentLBIndex]);
+    loadbalancers[currentLBIndex]->turnOn();
   }
 }
 
