@@ -273,6 +273,19 @@ typedef struct {
 } LDCallbacks;
 
 /*
+ * Calls from load balancer to load database
+ */  
+typedef void (*LDMigratedFn)(void* data, LDObjHandle handle, int waitBarrier);
+
+typedef void (*LDStartLBFn)(void *user_ptr);
+
+typedef void (*LDMigrationDoneFn)(void *user_ptr);
+
+typedef void (*LDPredictFn)(void* user_ptr);
+typedef void (*LDPredictModelFn)(void* user_ptr, void* model);
+typedef void (*LDPredictWindowFn)(void* user_ptr, void* model, int wind);
+
+/*
  * Local Barrier calls
  */
 class LBClient;

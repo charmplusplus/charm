@@ -25,6 +25,7 @@ protected:
   int  seqno;
   const char *lbname;
   LBManager *lbmgr;
+  LDBarrierReceiver receiver;
   int  startLbFnHdl;
 private:
   void initLB(const CkLBOptions &);
@@ -150,12 +151,13 @@ public:
   BaseLB(CkMigrateMessage *m):CBase_BaseLB(m) {
     lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   }
-  virtual ~BaseLB() {}
+  virtual ~BaseLB();
 
+  void unregister(); 
   inline const char *lbName() { return lbname; }
   inline int step() { return lbmgr->step(); }
-  virtual void turnOff();
-  virtual void turnOn();
+  virtual void turnOff() { CmiAbort("turnOff not implemented"); }
+  virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
   virtual int  useMem()  { return 0; }
   virtual void pup(PUP::er &p);
   virtual void flushStates();

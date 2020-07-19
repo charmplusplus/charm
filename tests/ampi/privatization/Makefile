@@ -72,7 +72,7 @@ $(foreach i,$(CANDIDATES),$(eval $(call TEST_TARGET_AVAILABILITY,$i)))
 
 
 # Universal settings
-LINKOPTS := -balancer TreeLB
+LINKOPTS := -balancer RandCentLB
 
 
 # Rule construction
@@ -123,16 +123,16 @@ $1-%.o f90-$1-%.o: %.f90
 
 # test
 test-cxx-$1: cxx-$1
-	$$(call run, ./cxx-$1 +p1 +vp2 +balancer RandCentLB)
-	$$(call run, ./cxx-$1 +p1 +vp4 +balancer RandCentLB)
-	$$(call run, ./cxx-$1 +p2 +vp2 +balancer RandCentLB)
-	$$(call run, ./cxx-$1 +p2 +vp4 +balancer RandCentLB)
+	$$(call run, ./cxx-$1 +p1 +vp2 )
+	$$(call run, ./cxx-$1 +p1 +vp4 )
+	$$(call run, ./cxx-$1 +p2 +vp2 )
+	$$(call run, ./cxx-$1 +p2 +vp4 )
 
 test-f90-$1: f90-$1
-	$$(call run, ./f90-$1 +p1 +vp2 +balancer RandCentLB)
-	$$(call run, ./f90-$1 +p1 +vp4 +balancer RandCentLB)
-	$$(call run, ./f90-$1 +p2 +vp2 +balancer RandCentLB)
-	$$(call run, ./f90-$1 +p2 +vp4 +balancer RandCentLB)
+	$$(call run, ./f90-$1 +p1 +vp2 )
+	$$(call run, ./f90-$1 +p1 +vp4 )
+	$$(call run, ./f90-$1 +p2 +vp2 )
+	$$(call run, ./f90-$1 +p2 +vp4 )
 
 endef
 

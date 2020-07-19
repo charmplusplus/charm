@@ -9,13 +9,13 @@
 int LBSimulation::dumpStep = -1;  	     /// first step number to dump
 int LBSimulation::dumpStepSize = 1;          /// number of steps to dump 
 char* LBSimulation::dumpFile = (char*)"lbdata.dat"; /// dump file name
-bool LBSimulation::doSimulation = false; 	     /// flag if do simulation
+int LBSimulation::doSimulation = 0; 	     /// flag if do simulation
 int LBSimulation::simStep = -1;              /// first step number to simulate
 int LBSimulation::simStepSize = 1;           /// number of steps to simulate
 int LBSimulation::simProcs = 0; 	     /// simulation target procs
-bool LBSimulation::procsChanged = false;          /// flag if the number of procs has been changed
+int LBSimulation::procsChanged = 0;          /// flag if the number of procs has been changed
 
-bool LBSimulation::showDecisionsOnly = false;     /// flag to write all LB decisions
+int LBSimulation::showDecisionsOnly = 0;     /// flag to write all LB decisions
 int _lb_version = LB_FORMAT_VERSION;	     /// data file version
 
 /*****************************************************************************

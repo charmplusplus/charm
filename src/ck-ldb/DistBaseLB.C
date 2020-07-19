@@ -9,36 +9,19 @@
 
 #define  DEBUGF(x)      // CmiPrintf x;
 
-void DistBaseLB::barrierDone() {
-#if CMK_LBDB_ON
-  if (lb_started) {
-    return;
-  }
-  lb_started = true;
 
-  start_lb_time = 0;
-
-  if (CkNumPes() == 1) {
-    MigrationDone(0);
-    return;
-  }
-
-  start_lb_time = CkWallTimer();
-  if (CkMyPe() == 0) {
-    if (_lb_args.debug()) {
-      CkPrintf("[%s] Load balancing step %d starting at %f\n",
-          lbName(), step(),start_lb_time);
-    }
-  }
-
-  AssembleStats();
-  thisProxy[CkMyPe()].LoadBalance();
-#endif
+void DistBaseLB::staticStartLB(void* data) {
+  DistBaseLB *me = (DistBaseLB*)(data);
+  me->barrierDone();
 }
 
-void DistBaseLB::InvokeLB() {
-  // Ensure that the strategy starts only after the barrier
-  CkCallback cb (CkReductionTarget(DistBaseLB, barrierDone), thisProxy);
+void DistBaseLB::barrierDone() {
+  thisProxy.InvokeLB();
+}
+
+void DistBaseLB::ProcessAtSync() {
+  // Ensuring that the strategy starts only after the barrier
+  CkCallback cb (CkReductionTarget(DistBaseLB, barrierDone), 0, thisProxy);
   contribute(cb);
 }
 
@@ -46,10 +29,10 @@ DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
 #if CMK_LBDB_ON
   lbname = (char *)"DistBaseLB";
   thisProxy = CProxy_DistBaseLB(thisgroup);
-  startLbFnHdl = lbmgr->AddStartLBFn(this, &DistBaseLB::barrierDone);
-
-  if (opt.getSeqNo() > 0)
-    turnOff();
+  receiver = lbmgr->AddLocalBarrierReceiver(this, &DistBaseLB::ProcessAtSync);
+  startLbFnHdl = lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB),
+      (void*)(this));
+  lbmgr->AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)this);
 
   migrates_completed = 0;
   migrates_expected = 0;
@@ -73,11 +56,39 @@ DistBaseLB::~DistBaseLB() {
 #if CMK_LBDB_ON
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   if (lbmgr) {
-    lbmgr->RemoveStartLBFn(startLbFnHdl);
+    lbmgr-> RemoveStartLBFn((LDStartLBFn)(staticStartLB));
   }
   if (mig_msgs) {
     delete [] mig_msgs;
   }
+#endif
+}
+
+
+void DistBaseLB::InvokeLB() {
+#if CMK_LBDB_ON
+  if (lb_started) {
+    return;
+  }
+  lb_started = true;
+
+  start_lb_time = 0;
+
+  if (CkNumPes() == 1) {
+    MigrationDone(0);
+    return;
+  }
+
+  start_lb_time = CkWallTimer();
+  if (CkMyPe() == 0) {
+    if (_lb_args.debug()) {
+      CkPrintf("[%s] Load balancing step %d starting at %f\n",
+          lbName(), step(),start_lb_time);
+    }
+  }
+
+  AssembleStats();
+  thisProxy[CkMyPe()].LoadBalance();
 #endif
 }
 

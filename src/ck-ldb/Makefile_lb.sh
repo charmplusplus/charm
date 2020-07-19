@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #Typical load balancers
-COMMON_LDBS="TreeLB DistributedLB"
+COMMON_LDBS="DummyLB GreedyLB GreedyRefineLB RandCentLB RefineLB RotateLB DistributedLB"
 #Load balancers for more specialized circumstances
 SPECIALIZED_LDBS="MetisLB"
 #Load balanders which have an external dependency, or require some other kind of intervention

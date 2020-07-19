@@ -9,6 +9,11 @@ CkGroupID TheGVT;
 CpvExtern(int, stateRecovery);
 CpvExtern(eventID, theEventID);
 
+static void staticDoneLB(void *data)
+{
+  ((PVT*)data)->doneLB();
+}
+
 /// Basic Constructor
 PVT::PVT() 
 {
@@ -80,7 +85,7 @@ PVT::PVT()
     localStats->TimerStop();
 #endif
 
-  LBManager::Object()->AddMigrationDoneFn(this, &PVT::doneLB);
+  LBManager::Object()->AddMigrationDoneFn(staticDoneLB, this);
 }
 
 /// PUP routine

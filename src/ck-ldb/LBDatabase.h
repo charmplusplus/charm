@@ -18,6 +18,31 @@ friend class LBManager;
     LBObjEntry(LBObj* obj, LDObjIndex nextEmpty = DEFAULT_NEXT) : obj(obj), nextEmpty(nextEmpty) {}
   };
 
+  struct MigrateCB {
+    LDMigratedFn fn;
+    void* data;
+    int on;
+  };
+
+  struct StartLBCB {
+    LDStartLBFn fn;
+    void* data;
+    int on;
+  };
+
+  struct MigrationDoneCB {
+    LDMigrationDoneFn fn;
+    void* data;
+  };
+
+  struct PredictCB {
+    LDPredictModelFn on;
+    LDPredictWindowFn onWin;
+    LDPredictFn off;
+    LDPredictModelFn change;
+    void* data;
+  };
+
 private:
   std::vector<LBObjEntry> objs;
   std::vector<LBOM*> oms;
@@ -118,7 +143,7 @@ public:
   void MetaLBCallLBOnChares();
   void MetaLBResumeWaitingChares(int lb_period);
   void ClearLoads(void);
-  int useMem(void);
+  int useMem(LBManager *mgr);
   LDObjHandle RegisterObj(LDOMHandle omh, CmiUInt8 id, void* userPtr,
                           int migratable);
   void UnregisterObj(LDObjHandle h);

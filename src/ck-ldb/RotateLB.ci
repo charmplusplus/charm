@@ -1,0 +1,11 @@
+module RotateLB
+{
+  extern module CentralLB;
+
+  initnode void lbinit (void);
+
+  group [migratable] RotateLB : CentralLB
+  {
+    entry void RotateLB (const CkLBOptions &);
+  };
+};

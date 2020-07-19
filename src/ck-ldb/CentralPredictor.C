@@ -7,6 +7,30 @@
 #include <charm++.h>
 #include "CentralLB.h"
 
+void CentralLB::staticPredictorOn(void* data, void *model)
+{
+  CentralLB *me = (CentralLB*)(data);
+  me->predictorOn((LBPredictorFunction*)model);
+}
+
+void CentralLB::staticPredictorOnWin(void* data, void *model, int wind)
+{
+  CentralLB *me = (CentralLB*)(data);
+  me->predictorOn((LBPredictorFunction*)model, wind);
+}
+
+void CentralLB::staticPredictorOff(void* data)
+{
+  CentralLB *me = (CentralLB*)(data);
+  me->predictorOff();
+}
+
+void CentralLB::staticChangePredictor(void* data, void *model)
+{
+  CentralLB *me = (CentralLB*)(data);
+  me->changePredictor((LBPredictorFunction*)model);
+}
+
 #define MAX_CHISQ_ITER 10000
 #define SMALL_NUMBER   0.00001    // to avoid singular matrix in gaussj
 

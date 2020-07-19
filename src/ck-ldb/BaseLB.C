@@ -11,10 +11,20 @@
 
 void BaseLB::initLB(const CkLBOptions &opt) {
   seqno = opt.getSeqNo();
+  CkpvAccess(numLoadBalancers) ++;
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   lbname = "Unknown";
   // register this load balancer to LBManager at the sequence number
   lbmgr->addLoadbalancer(this, seqno);
+}
+
+BaseLB::~BaseLB() {
+  CkpvAccess(numLoadBalancers) --;
+}
+
+void BaseLB::unregister() {
+  lbmgr->RemoveLocalBarrierReceiver(receiver);
+  CkpvAccess(numLoadBalancers) --;
 }
 
 void BaseLB::pup(PUP::er &p) { 
@@ -37,24 +47,12 @@ void BaseLB::flushStates() {
 }
 
 #else
+BaseLB::~BaseLB() {} 
 void BaseLB::initLB(const CkLBOptions &) {}
+void BaseLB::unregister() {}
 void BaseLB::pup(PUP::er &p) {}
 void BaseLB::flushStates() {}
 #endif
-
-void BaseLB::turnOn()
-{
-#if CMK_LBDB_ON
-  lbmgr->TurnOnStartLBFn(startLbFnHdl);
-#endif
-}
-
-void BaseLB::turnOff()
-{
-#if CMK_LBDB_ON
-  lbmgr->TurnOffStartLBFn(startLbFnHdl);
-#endif
-}
 
 static inline int i_abs(int c) { return c>0?c:-c; }
 

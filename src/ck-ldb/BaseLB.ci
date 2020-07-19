@@ -19,6 +19,7 @@ message LBVectorMigrateMsg {
 
 group [migratable] BaseLB {
   entry void BaseLB(const CkLBOptions &);  
+  entry void unregister(void);
 };
 
 };

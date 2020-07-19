@@ -1,0 +1,9 @@
+module RandCentLB {
+
+extern module CentralLB;
+initnode void lbinit(void);
+group [migratable] RandCentLB : CentralLB {
+  entry void RandCentLB(const CkLBOptions &);  
+};
+
+};

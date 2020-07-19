@@ -18,8 +18,11 @@ public:
   DistBaseLB(CkMigrateMessage *m) : CBase_DistBaseLB(m) {}
   ~DistBaseLB();
 
-  void InvokeLB(void);
-  void barrierDone(); // Everything is at the PE barrier
+  void InvokeLB(void); // Everything is at the PE barrier
+
+  void barrierDone();
+	static void staticStartLB(void*);
+	void ProcessAtSync();
   void LoadBalance();
   void ResumeClients();
   void ResumeClients(int balancing);

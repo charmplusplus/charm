@@ -13,7 +13,6 @@
 #include "DistributedLB.h"
 #include "LBManager.h"
 #include "LBSimulation.h"
-#include "TreeLB.h"
 #include "topology.h"
 
 CkGroupID _lbmgr;
@@ -21,11 +20,12 @@ CkGroupID _lbmgr;
 CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
 
+CkpvDeclare(int, numLoadBalancers); /**< num of lb created */
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 
 // command line options
 CkLBArgs _lb_args;
-bool _lb_predict = false;
+int _lb_predict = 0;
 int _lb_predict_delay = 10;
 int _lb_predict_window = 20;
 bool _lb_psizer_on = false;
@@ -91,7 +91,7 @@ class LBDBRegistry
 };
 
 static LBDBRegistry lbRegistry;
-static std::vector<std::string> lbNames;
+static std::vector<const char*> lbNames;
 
 void LBDefaultCreate(const char* lbname) { lbRegistry.addCompiletimeBalancer(lbname); }
 
@@ -157,6 +157,8 @@ void _loadbalancerInit()
 {
   CkpvInitialize(bool, lbmanagerInited);
   CkpvAccess(lbmanagerInited) = false;
+  CkpvInitialize(int, numLoadBalancers);
+  CkpvAccess(numLoadBalancers) = 0;
 
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
@@ -165,8 +167,6 @@ void _loadbalancerInit()
   char** argv = CkGetArgv();
   char* balancer = NULL;
   CmiArgGroup("Charm++", "Load Balancer");
-
-  CmiGetArgStringDesc(argv, "+TreeLBFile", &_lb_args.treeLBFile(), "TreeLB config file");
 
   // turn on MetaBalancer if set
   _lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB", "Turn on MetaBalancer");
@@ -211,48 +211,10 @@ void _loadbalancerInit()
       CkPrintf(
           "Warning: MetaLB is activated. For Automatic strategy selection in MetaLB, "
           "pass directory of model files using +MetaLBModelDir.\n");
-    if (CkMyRank() == 0)
+    while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
     {
-      bool TreeLB_registered = false;
-      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
-      {
-        if (strcmp(balancer, "GreedyLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("Greedy");
-        else if (strcmp(balancer, "GreedyRefineLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("GreedyRefine");
-        else if (strcmp(balancer, "RefineLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("RefineA");
-        else if (strcmp(balancer, "RandCentLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("Random");
-        else if (strcmp(balancer, "DummyLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("Dummy");
-        else if (strcmp(balancer, "RotateLB") == 0)
-          _lb_args.legacyCentralizedStrategies().push_back("Rotate");
-        else
-          lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
-
-        if (strcmp(balancer, "TreeLB") == 0) TreeLB_registered = true;
-
-        if (!_lb_args.legacyCentralizedStrategies().empty())
-        {
-          if (!TreeLB_registered)
-          {
-            lbRegistry.addRuntimeBalancer("TreeLB");
-            TreeLB_registered = true;
-          }
-          if (_lb_args.legacyCentralizedStrategies().size() > 1)
-            // TODO: add support for multiple instances of TreeLB
-            CkAbort(
-                 "Sequencing multiple centralized strategies with TreeLB not supported\n");
-        }
-      }
-    }
-    else
-    {
-      // For other ranks, consume the +balancer arguments to avoid spuriously
-      // passing them to the application
-      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
-        ;
+      if (CkMyRank() == 0)
+        lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
     }
   }
 
@@ -273,6 +235,10 @@ void _loadbalancerInit()
   // now called in cldb.C: CldModuleGeneralInit()
   // registerLBTopos();
   CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
+  // Read the percentage parameter for RefineKLB and GreedyRefineLB
+  CmiGetArgIntDesc(
+      argv, "+LBPercentMoves", &_lb_args.percentMovesAllowed(),
+      "Percentage of chares to be moved (used by RefineKLB and GreedyRefineLB) [0-100]");
 
   /**************** FUTURE PREDICTOR ****************/
   _lb_predict = CmiGetArgFlagDesc(argv, "+LBPredictor", "Turn on LB future predictor");
@@ -353,6 +319,10 @@ void _loadbalancerInit()
     _lb_args.debug() =
         CmiGetArgFlagDesc(argv, "+LBDebug", "Turn on LB debugging printouts");
 
+  // getting the size of the team with +teamSize
+  if (!CmiGetArgIntDesc(argv, "+teamSize", &_lb_args.teamSize(), "Team size"))
+    _lb_args.teamSize() = 1;
+
   // ask to print summary/quality of load balancer
   _lb_args.printSummary() =
       CmiGetArgFlagDesc(argv, "+LBPrintSummary", "Print load balancing result summary");
@@ -362,14 +332,14 @@ void _loadbalancerInit()
       argv, "+LBNoBackground", "Load balancer ignores the background load.");
   _lb_args.migObjOnly() = CmiGetArgFlagDesc(
       argv, "+LBObjOnly", "Only load balancing migratable objects, ignoring all others.");
-  if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = true;
+  if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = 1;
 
   // assume all CPUs are identical
   _lb_args.testPeSpeed() =
       CmiGetArgFlagDesc(argv, "+LBTestPESpeed", "Load balancer test all CPUs speed.");
   _lb_args.samePeSpeed() = CmiGetArgFlagDesc(
       argv, "+LBSameCpus", "Load balancer assumes all CPUs are of same speed.");
-  if (!_lb_args.testPeSpeed()) _lb_args.samePeSpeed() = true;
+  if (!_lb_args.testPeSpeed()) _lb_args.samePeSpeed() = 1;
 
   _lb_args.useCpuTime() = CmiGetArgFlagDesc(
       argv, "+LBUseCpuTime", "Load balancer uses CPU time instead of wallclock time.");
@@ -441,9 +411,9 @@ void LBManager::initnodeFn()
 
   _registerCommandLineOpt("+balancer");
   _registerCommandLineOpt("+LBPeriod");
-  _registerCommandLineOpt("+TreeLBFile");
   _registerCommandLineOpt("+LBLoop");
   _registerCommandLineOpt("+LBTopo");
+  _registerCommandLineOpt("+LBPercentMoves");
   _registerCommandLineOpt("+LBPredictor");
   _registerCommandLineOpt("+LBPredictorDelay");
   _registerCommandLineOpt("+LBPredictorWindow");
@@ -458,6 +428,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBShowDecisions");
   _registerCommandLineOpt("+LBSyncResume");
   _registerCommandLineOpt("+LBDebug");
+  _registerCommandLineOpt("+teamSize");
   _registerCommandLineOpt("+LBPrintSummary");
   _registerCommandLineOpt("+LBNoBackground");
   _registerCommandLineOpt("+LBObjOnly");
@@ -474,8 +445,7 @@ void LBManager::initnodeFn()
 void LBManager::callAt()
 {
   localBarrier.CallReceivers();
-  //TODO: Add support for sequencing multiple LBs
-  if (loadbalancers.size() > 0) loadbalancers[0]->InvokeLB();
+  if (nloadbalancers > 0) loadbalancers[0]->InvokeLB();
 }
 
 // Called at end of each load balancing cycle
@@ -506,6 +476,7 @@ void LBManager::reset()
 void LBManager::init(void)
 {
   mystep = 0;
+  nloadbalancers = 0;
   new_ld_balancer = 0;
   chare_count = 0;
   metabalancer = nullptr;
@@ -531,26 +502,31 @@ void LBManager::init(void)
     setTimer();
 }
 
-int LBManager::AddStartLBFn(std::function<void()> fn)
+int LBManager::AddStartLBFn(LDStartLBFn fn, void* data)
 {
   // Save startLB function
   StartLBCB* callbk = new StartLBCB;
 
   callbk->fn = fn;
-  callbk->on = true;
+  callbk->data = data;
+  callbk->on = 1;
   startLBFnList.push_back(callbk);
   startLBFn_count++;
   return startLBFnList.size() - 1;
 }
 
-void LBManager::RemoveStartLBFn(int handle)
+void LBManager::RemoveStartLBFn(LDStartLBFn fn)
 {
-  StartLBCB* callbk = startLBFnList[handle];
-  if (callbk)
+  for (int i = 0; i < startLBFnList.size(); i++)
   {
-    delete callbk;
-    startLBFnList[handle] = nullptr;
-    startLBFn_count--;
+    StartLBCB* callbk = startLBFnList[i];
+    if (callbk && callbk->fn == fn)
+    {
+      delete callbk;
+      startLBFnList[i] = 0;
+      startLBFn_count--;
+      break;
+    }
   }
 }
 
@@ -563,27 +539,32 @@ void LBManager::StartLB()
   for (int i = 0; i < startLBFnList.size(); i++)
   {
     StartLBCB* startLBFn = startLBFnList[i];
-    if (startLBFn && startLBFn->on) startLBFn->fn();
+    if (startLBFn && startLBFn->on) startLBFn->fn(startLBFn->data);
   }
 }
 
-int LBManager::AddMigrationDoneFn(std::function<void()> fn)
+int LBManager::AddMigrationDoneFn(LDMigrationDoneFn fn, void* data)
 {
   // Save migrationDone callback function
   MigrationDoneCB* callbk = new MigrationDoneCB;
 
   callbk->fn = fn;
+  callbk->data = data;
   migrationDoneCBList.push_back(callbk);
   return migrationDoneCBList.size() - 1;
 }
 
-void LBManager::RemoveMigrationDoneFn(int handle)
+void LBManager::RemoveMigrationDoneFn(LDMigrationDoneFn fn)
 {
-  MigrationDoneCB* callbk = migrationDoneCBList[handle];
-  if (callbk)
+  for (int i = 0; i < migrationDoneCBList.size(); i++)
   {
-    delete callbk;
-    migrationDoneCBList[handle] = nullptr;
+    MigrationDoneCB* callbk = migrationDoneCBList[i];
+    if (callbk && callbk->fn == fn)
+    {
+      delete callbk;
+      migrationDoneCBList[i] = 0;
+      break;
+    }
   }
 }
 
@@ -592,8 +573,19 @@ void LBManager::MigrationDone()
   for (int i = 0; i < migrationDoneCBList.size(); i++)
   {
     MigrationDoneCB* callbk = migrationDoneCBList[i];
-    if (callbk) callbk->fn();
+    if (callbk) callbk->fn(callbk->data);
   }
+}
+
+void LBManager::SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin,
+                               LDPredictFn off, LDPredictModelFn change, void* data)
+{
+  if (predictCBFn == NULL) predictCBFn = new PredictCB;
+  predictCBFn->on = on;
+  predictCBFn->onWin = onWin;
+  predictCBFn->off = off;
+  predictCBFn->change = change;
+  predictCBFn->data = data;
 }
 
 void LBManager::DumpDatabase()
@@ -607,7 +599,7 @@ void LBManager::DumpDatabase()
 void LBManager::Migrated(LDObjHandle h, int waitBarrier)
 {
   // Object migrated, inform load balancers
-  if (loadbalancers.size() > 0) loadbalancers[0]->Migrated(waitBarrier);
+  if (nloadbalancers > 0) loadbalancers[0]->Migrated(waitBarrier);
 }
 
 LBManager::LastLBInfo::LastLBInfo() { expectedLoad = _expectedLoad; }
@@ -654,8 +646,11 @@ void LBManager::set_avail_vector(char* bitmap, int new_ld)
 // and broadcast the ticket number to all processors
 int LBManager::getLoadbalancerTicket()
 {
-  loadbalancers.push_back(nullptr);
-  return loadbalancers.size() - 1;
+  int seq = nloadbalancers;
+  nloadbalancers++;
+  loadbalancers.resize(nloadbalancers);
+  loadbalancers[seq] = NULL;
+  return seq;
 }
 
 void LBManager::addLoadbalancer(BaseLB* lb, int seq)
@@ -664,15 +659,16 @@ void LBManager::addLoadbalancer(BaseLB* lb, int seq)
   if (seq == -1) return;
   if (CkMyPe() == 0)
   {
-    CmiAssert(seq < loadbalancers.size());
+    CmiAssert(seq < nloadbalancers);
     if (loadbalancers[seq])
     {
       CmiPrintf("Duplicate load balancer created at %d\n", seq);
       CmiAbort("LBManager");
     }
   }
-  if (loadbalancers.size() < seq + 1)
-    loadbalancers.resize(seq + 1);
+  else
+    nloadbalancers++;
+  loadbalancers.resize(seq + 1);
   loadbalancers[seq] = lb;
 }
 
@@ -683,11 +679,11 @@ void LBManager::nextLoadbalancer(int seq)
   int next = seq + 1;
   if (_lb_args.loop())
   {
-    if (next == loadbalancers.size()) next = 0;
+    if (next == nloadbalancers) next = 0;
   }
   else
   {
-    if (next == loadbalancers.size()) next--;  // keep using the last one
+    if (next == nloadbalancers) next--;  // keep using the last one
   }
   if (seq != next)
   {
@@ -700,29 +696,7 @@ void LBManager::nextLoadbalancer(int seq)
 // switch strategy
 void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
 {
-  if (lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB")
-  {
-    json config;
-    if (lbNames[switchTo] == "Hybrid")
-    {
-      config["tree"] = "PE_Process_Root";
-      config["Root"]["pe"] = 0;
-      config["Root"]["step_freq"] = 3;
-      config["Root"]["strategies"] = {"GreedyRefine"};
-      config["Process"]["strategies"] = {"GreedyRefine"};
-    }
-    else
-    {
-      config["tree"] = "PE_Root";
-      config["Root"]["pe"] = 0;
-      config["Root"]["strategies"] = {lbNames[switchTo]};
-    }
-    configureTreeLB(config);
-  }
-  else
-  {
-    // TODO: Implement turn off / on for Distributed
-  }
+  // TODO: Implement turn off / on
 }
 
 // return the seq-th load balancer string name of
@@ -781,38 +755,13 @@ void LBManager::pup(PUP::er& p)
   p | mystep;
   if (p.isUnpacking())
   {
+    nloadbalancers = 0;
     if (_lb_args.metaLbOn())
     {
       // if unpacking set metabalancer using the id
       metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
     }
   }
-}
-
-void configureTreeLB(const char* json_str)
-{
-  ((LBManager*)CkLocalBranch(_lbmgr))->configureTreeLB(json_str);
-}
-
-void LBManager::configureTreeLB(const char* json_str)
-{
-  json config = json::parse(json_str);
-  configureTreeLB(config);
-}
-
-void LBManager::configureTreeLB(json& config)
-{
-  bool found = false;
-  for (int i = 0; i < loadbalancers.size(); i++)
-  {
-    if (strcmp(loadbalancers[i]->lbName(), "TreeLB") == 0)
-    {
-      ((TreeLB*)loadbalancers[i])->configure(config);
-      found = true;
-      // break; // not sure if there could be more than one TreeLB
-    }
-  }
-  if (!found) CkAbort("LBManager: TreeLB is not in my list of load balancers");
 }
 
 void LBManager::ResetAdaptive()
@@ -915,27 +864,37 @@ static void work(int iter_block, volatile int* result)
 
 int LDProcessorSpeed()
 {
+  // for SMP version, if one processor have done this testing,
+  // we can skip the other processors by remember the number here
+  static int thisProcessorSpeed = -1;
+
   if (_lb_args.samePeSpeed() ||
       CkNumPes() == 1)  // I think it is safe to assume that we can
     return 1;           // skip this if we are only using 1 PE
 
-  volatile int result = 0;
+  if (thisProcessorSpeed != -1) return thisProcessorSpeed;
 
+  // if (CkMyPe()==0) CkPrintf("Measuring processor speeds...");
+
+  volatile static int result = 0;  // I don't care what this is, its just for
+                                   // timing, so this is thread safe.
   int wps = 0;
-  const double elapse = 0.2;
-  // First, count how many iterations happen in "elapse" seconds.
+  const double elapse = 0.4;
+  // First, count how many iterations for .2 second.
   // Since we are doing lots of function calls, this will be rough
   const double end_time = CmiCpuTimer() + elapse;
+  wps = 0;
   while (CmiCpuTimer() < end_time)
   {
     work(1000, &result);
     wps += 1000;
   }
 
-  // Now we have a rough idea of how many iterations happen in
-  // "elapse" seconds, so just perform a few cycles of correction
-  // by running for what should take that long. Then correct the
-  // number of iterations if needed.
+  // Now we have a rough idea of how many iterations there are per
+  // second, so just perform a few cycles of correction by
+  // running for what we think is 1 second.  Then correct
+  // the number of iterations per second to make it closer
+  // to the correct value
 
   for (int i = 0; i < 2; i++)
   {
@@ -946,6 +905,16 @@ int LDProcessorSpeed()
     wps = (int)((double)wps * correction + 0.5);
   }
 
+  // If necessary, do a check now
+  //    const double start_time3 = CmiWallTimer();
+  //    work(msec * 1e-3 * wps);
+  //    const double end_time3 = CmiWallTimer();
+  //    CkPrintf("[%d] Work block size is %d %d %f\n",
+  //	     thisIndex,wps,msec,1.e3*(end_time3-start_time3));
+  thisProcessorSpeed = wps;
+
+  // if (CkMyPe()==0) CkPrintf(" Done.\n");
+
   return wps;
 }
 
@@ -953,11 +922,7 @@ int LDProcessorSpeed()
 int LDProcessorSpeed() { return 1; }
 #endif  // CMK_LBDB_ON
 
-int LBManager::ProcessorSpeed()
-{
-  static int peSpeed = LDProcessorSpeed();
-  return peSpeed;
-}
+int LBManager::ProcessorSpeed() { return LDProcessorSpeed(); }
 
 /*
   callable from user's code
@@ -992,7 +957,7 @@ void TurnManualLBOff()
 #endif
 }
 
-void LBTurnInstrumentOn()
+extern "C" void LBTurnInstrumentOn()
 {
 #if CMK_LBDB_ON
   if (CkpvAccess(lbmanagerInited))
@@ -1002,7 +967,7 @@ void LBTurnInstrumentOn()
 #endif
 }
 
-void LBTurnInstrumentOff()
+extern "C" void LBTurnInstrumentOff()
 {
 #if CMK_LBDB_ON
   if (CkpvAccess(lbmanagerInited))
@@ -1012,14 +977,14 @@ void LBTurnInstrumentOff()
 #endif
 }
 
-void LBTurnCommOn()
+extern "C" void LBTurnCommOn()
 {
 #if CMK_LBDB_ON
   _lb_args.traceComm() = 1;
 #endif
 }
 
-void LBTurnCommOff()
+extern "C" void LBTurnCommOff()
 {
 #if CMK_LBDB_ON
   _lb_args.traceComm() = 0;
@@ -1239,8 +1204,7 @@ void LocalBarrier::CheckBarrier(bool flood_atsync)
       at_count -= client_count;
       cur_refcount++;
       CallReceivers();
-      //TODO: Add support for sequencing multiple LBs
-      if (_mgr->loadbalancers.size() > 0) _mgr->loadbalancers[0]->InvokeLB();
+      if (_mgr->nloadbalancers > 0) _mgr->loadbalancers[0]->InvokeLB();
     }
   }
 }

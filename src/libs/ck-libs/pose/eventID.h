@@ -6,7 +6,7 @@
 #include "charm++.h"
 #include "limits.h"
 
-#if defined(_WIN32) && defined(_MSC_VER) && _MSC_VER < 1500
+#ifdef _WIN32
 #define snprintf _snprintf
 #endif
 

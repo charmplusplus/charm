@@ -4,7 +4,7 @@ CHARMC	= ../../../../bin/charmc $(OPTS)
 all: period_selection
 
 period_selection: period_selection.decl.h period_selection.C
-	$(CHARMC) period_selection.C -o period_selection -module TreeLB
+	$(CHARMC) period_selection.C -o period_selection -module RotateLB
 
 period_selection.decl.h: period_selection.ci
 	$(CHARMC) period_selection.ci
