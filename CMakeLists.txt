@@ -12,6 +12,19 @@
 
 cmake_minimum_required(VERSION 3.4)
 
+# Print warning
+message("#################################################################")
+message("# The CMake build system is currently a beta version.           #")
+message("# Please let us know if you experience any problems by opening  #")
+message("# an issue on our GitHub (https://github.com/UIUC-PPL/charm),   #")
+message("# with the below configuration information.                     #")
+message("# You can run './buildold' to use the previous build system.    #")
+message("#################################################################")
+
+if(CMAKE_VERSION VERSION_GREATER 3.11)
+  cmake_policy(SET CMP0075 OLD)
+endif()
+
 # Fortran is optional, so don't include it in LANGUAGES here
 project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
@@ -92,7 +105,6 @@ option(PERSISTENT          "Enable Persistent Communication API" OFF)
 option(LBUSERDATA          "Enable LB user data" OFF)
 option(LOCKLESS_QUEUE      "Enable lockless queue for PE local and node queue" OFF)
 option(SHRINKEXPAND        "Enable malleable jobs / shrink expand" OFF)
-option(CHARMPY             "Enable CharmPy support" OFF)
 option(NUMA                "Support memory affinity with NUMA" OFF)
 set(LBTIME_TYPE "double" CACHE STRING "Load balancing timer type")
 option(QLOGIC              "QLogic based Infiniband" OFF)
@@ -230,7 +242,6 @@ set(CMK_WITH_CONTROLPOINT ${CONTROLPOINT})
 set(CMK_WITH_STATS ${STATS})
 
 set(CMK_CHARMDEBUG ${CHARMDEBUG})
-set(CMK_CHARMPY ${CHARMPY})
 
 
 set(CMK_MSG_PRIO_TYPE ${PRIO_TYPE})
@@ -361,8 +372,9 @@ if(${CMAKE_BUILD_TYPE} MATCHES "Release" OR ${CMAKE_BUILD_TYPE} MATCHES "RelWith
     set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -optimize -production")
 endif()
 
-if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
-  set(CMK_CHARMPY 1)
+set(CMK_CHARM4PY 0)
+if(${TARGET} STREQUAL "charm4py")
+  set(CMK_CHARM4PY 1)
   # Create libcharm.so for Charm4py
   add_compile_options(-build-shared)
   set(BUILDOPTS "${BUILDOPTS} -build-shared")
@@ -780,14 +792,14 @@ if(${NETWORK} STREQUAL "uth")
 endif()
 
 # Charm4py
-if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
+if(${TARGET} STREQUAL "charm4py")
   # Create libcharm.so for Charm4py
   # add_compile_options(-build-shared)
   file(WRITE empty.cpp "// This file left intentionally blank. It is used for the charm4py build.")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb moduleGreedyRefineLB moduleRandCentLB "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
@@ -908,10 +920,34 @@ if(NOT opts_enabled)
   set(opts_enabled "---")
 endif()
 
+# Get version information
+find_program(GIT git)
+
+if(GIT)
+  execute_process(COMMAND git describe --exact-match --dirty=*
+             OUTPUT_VARIABLE CHARM_VERSION_GIT
+             RESULT_VARIABLE git_result
+             OUTPUT_STRIP_TRAILING_WHITESPACE
+             ERROR_QUIET
+             )
+  if(NOT ${git_result} EQUAL 0)
+    execute_process(COMMAND git describe --long --always --dirty=*
+             OUTPUT_VARIABLE CHARM_VERSION_GIT
+             OUTPUT_STRIP_TRAILING_WHITESPACE
+             )
+    set(CHARM_REL "(dev)")
+  else()
+    set(CHARM_REL "(release)")
+  endif()
+else()
+  set(CHARM_VERSION_GIT "v${CHARM_VERSION}")
+endif()
+
 # Print configuration
 message("==============================")
 message("Charm++ ${PROJECT_VERSION} configuration: ")
 message("  OS version:      ${OS_RELEASE}")
+message("  Charm++ version: ${CHARM_VERSION_GIT} ${CHARM_REL}")
 message("  Hostname:        ${MY_HOSTNAME}")
 message("  Machine layer:   ${CHARM_PLATFORM}")
 message("  Build target:    ${TARGET}")
@@ -927,15 +963,6 @@ message("  CMake:           ${CMAKE_COMMAND} [${CMAKE_VERSION}]")
 message("  Charmc flags:    ${MAIN_CFLAGS}")
 message("  Enabled options: ${opts_enabled}")
 message("==============================")
-
-# Print warning
-message("#################################################################")
-message("# The CMake build system is currently a beta version.           #")
-message("# Please let us know if you experience any problems by opening  #")
-message("# an issue on our GitHub (https://github.com/UIUC-PPL/charm),   #")
-message("# with the above configuration information.                     #")
-message("# You can run ./buildold to use the previous build system.      #")
-message("#################################################################")
 
 # Make symlinks
 add_custom_target(create_symlinks ALL

@@ -118,7 +118,7 @@ extern void* CkPriorityPtr(void *msg);
  * Functions be to called from external clients (e.g. Charm4py)
  *
  *****************************************************************************/
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 extern void registerCkRegisterMainModuleCallback(void (*cb)(void));
 extern void registerMainchareCtorExtCallback(void (*cb)(int, void*, int, int, char **));
@@ -212,7 +212,7 @@ extern void CkRegisterMigCtor(int chareIndex, int ctorEpIndex);
 extern void CkRegisterGroupIrr(int chareIndex,int isIrr);
 /** Register the chare baseIdx as a base class of the chare derivedIdx. */
 extern void CkRegisterBase(int derivedIdx, int baseIdx);
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 extern void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterSectionManagerExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
@@ -293,7 +293,7 @@ extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg);
 extern void CkCreateLocalGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 extern int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_sizes);
 extern int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, char **bufs, int *buf_sizes, int map_gid, char useAtSync);
 extern void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, int num_bufs, char **bufs, int *buf_sizes, char useAtSync);
@@ -406,7 +406,7 @@ extern void *CkLocalChare(const CkChareID *chare);
 
 extern void CkArrayManagerDeliver(int onPe,void *msg, int opts CK_MSGOPTIONAL);
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 /// Send msg to chare with ID (onPe,objPtr) to entry method 'epIdx'
 extern void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize);
 /// Send msg to chare copying data into CkMessage from multiple input buffers

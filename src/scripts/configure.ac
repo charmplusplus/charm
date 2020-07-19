@@ -370,19 +370,19 @@ else
   AC_DEFINE_UNQUOTED(CMK_SHRINK_EXPAND, 0, [disable shrinkexpand])
 fi
 
-AC_ARG_ENABLE([charmpy],
-            [AS_HELP_STRING([--enable-charmpy],
+AC_ARG_ENABLE([charm4py],
+            [AS_HELP_STRING([--enable-charm4py],
               [enable charm4py support])],
-            [enable_charmpy=$enableval],
-            [enable_charmpy=no])
+            [enable_charm4py=$enableval],
+            [enable_charm4py=no])
 
-if test "$enable_charmpy" = "yes"
+if test "$enable_charm4py" = "yes"
 then
   Echo "charm4py support is enabled"
-  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 1, [enable charmpy])
+  AC_DEFINE_UNQUOTED(CMK_CHARM4PY, 1, [enable charm4py])
 else
   Echo "charm4py support is disabled"
-  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 0, [disable charmpy])
+  AC_DEFINE_UNQUOTED(CMK_CHARM4PY, 0, [disable charm4py])
 fi
 
 AC_ARG_WITH([numa],
@@ -824,7 +824,7 @@ then
 fi
 
 # Determine compiler/linker flags to build libcharm.so for charm4py
-if test "$enable_charmpy" = "yes"
+if test "$enable_charm4py" = "yes"
 then
 
   cat > $t <<EOT

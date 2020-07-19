@@ -11,14 +11,14 @@ command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
 if [[ $rc -ne 0 ]]; then
   echo "Warning: CMake unavailable, running ./buildold instead."
   sleep 2
-  ./buildold $@
+  ./buildold "$@"
   exit $?
 fi
 
 if [[ $(uname) != "Linux" && $(uname) != "Darwin" ]]; then
   echo "Warning: CMake build is only supported on Linux and Darwin, running ./buildold instead."
   sleep 2
-  ./buildold $@
+  ./buildold "$@"
   exit $?
 fi
 
@@ -30,7 +30,7 @@ cmake_version_full=$(cmake --version | head -1 | cut -f 3 -d' ')
 if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 4) ]]; then
   echo "Warning: The CMake version on your system is too old (needed: 3.4.0 or later; available: $cmake_version_full), running ./buildold instead."
   sleep 2
-  ./buildold $@
+  ./buildold "$@"
   exit $?
 fi
 
@@ -71,7 +71,6 @@ opt_ampi_only=0
 opt_build_shared=0
 opt_ccs=0
 opt_charmdebug=0
-opt_charmpy=0
 opt_controlpoint=0
 opt_cuda=0
 opt_drone_mode=0
@@ -268,9 +267,6 @@ while [[ $# -gt 0 ]]; do
     --enable-shrinkexpand)
       opt_shrinkexpand=1
       ;;
-    --enable-charmpy)
-      opt_charmpy=1
-      ;;
     --with-numa)
       opt_numa=1
       ;;
@@ -384,7 +380,7 @@ if [[ $triplet == gni-* || $triplet == *-crayx? ]]; then
   opt_CXX=CC
   opt_FC=ftn
 else
-  opt_network=$(echo $triplet | cut -d '-' -f1)
+  opt_network=$(echo "$triplet" | cut -d '-' -f1)
 fi
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
@@ -409,11 +405,11 @@ done
 
 builddir=$triplet$builddir_extra$opt_suffix
 
-rm -rf $builddir
+rm -rf "$builddir"
 
-mkdir $builddir
+mkdir "$builddir"
 
-cd $builddir
+cd "$builddir"
 
 if [[ -n $opt_libdir ]]; then
   mkdir -p include
@@ -435,7 +431,6 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DBUILD_SHARED="$opt_build_shared" \
   -DCCS="$opt_ccs" \
   -DCHARMDEBUG="$opt_charmdebug" \
-  -DCHARMPY="$opt_charmpy" \
   -DCONTROLPOINT="$opt_controlpoint" \
   -DBUILD_CUDA="$opt_cuda" \
   -DDRONE_MODE="$opt_drone_mode" \
@@ -472,6 +467,6 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
 [[ $ONLY_CONFIGURE -eq 1 ]] && exit 0
 
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
-make $opt_parallel
+make "$opt_parallel"
 
 echo 'Build successful.'

@@ -2,20 +2,24 @@
 
 DIRS = \
   charm++ \
+  converse \
   ampi \
   armci \
   collide \
 
-# TODO #2467: eliminate the need for this
-ifneq ($(BUILD_CUDA),1)
-  DIRS += converse
-endif
-
 TESTDIRS = $(DIRS)
+
+TESTPDIRS = \
+  charm++ \
+  ampi \
 
 all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
+
+testp: $(foreach i,$(TESTPDIRS),testp-$i)
+
+syncfttest mpisyncfttest:
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
@@ -26,6 +30,9 @@ $(foreach i,$(DIRS),build-$i):
 
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),testp-$i):
+	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' P='$(P)'
 
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'
