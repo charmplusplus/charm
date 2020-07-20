@@ -2,8 +2,8 @@
 
 set -o nounset -o posix -o pipefail
 
-progname=$(basename $0)
-progdir=$(dirname $0)
+progname=$(basename "$0")
+progdir=$(dirname "$0")
 
 verbose=0
 num_ranks=1
@@ -80,7 +80,7 @@ processArgs() {
         return
         ;;
 
-      -*|--*)
+      -*)
         echo "$progname error: unknown option \"$arg\""
         exit 1
         ;;
