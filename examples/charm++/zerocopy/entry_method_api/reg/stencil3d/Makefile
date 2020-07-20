@@ -39,6 +39,3 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer RefineLB +noCMAForZC)
 	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyLB +noCMAForZC)
 endif
-
-
-
