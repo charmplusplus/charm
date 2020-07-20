@@ -1,11 +1,10 @@
 -include ../../common.mk
 OPTS = -O3
 CHARMC = ../../../bin/ampicc
-CHARMF = ../../../bin/ampif90
 MPICC = mpicc
 
-all: mpibench
-all-mpi: mpibench.mpi
+all: mpibench allgather alltoall alltoall_VPtest
+all-mpi: mpibench.mpi allgather.mpi alltoall.mpi
 
 allgather: allgather.c
 	$(CHARMC) -c allgather.c $(OPTS)
@@ -35,13 +34,15 @@ alltoall_VPtest: alltoall_VPtest.c
 	$(CHARMC) -c alltoall_VPtest.c $(OPTS)
 	$(CHARMC) -o alltoall_VPtest alltoall_VPtest.o $(OPTS) $(LIBS)
 
-alltoall_VPtest_f: alltoall_VPtest.f
-	$(CHARMF) -c alltoall_VPtest.f -swapglobals  $(OPTS)
-	$(CHARMF) -o alltoall_VPtest_f alltoall_VPtest.o -swapglobals $(OPTS) $(LIBS)
-
 test: all
 	$(call run, +p4 ./mpibench +vp4)
 	$(call run, +p4 ./mpibench +vp8)
+#	$(call run, +p4 ./alltoall +vp4)
+#	$(call run, +p4 ./alltoall +vp8)
+#	$(call run, +p4 ./allgather +vp4)
+#	$(call run, +p4 ./allgather +vp8)
+	$(call run, +p4 ./alltoall_VPtest 1024 +vp4)
+	$(call run, +p4 ./alltoall_VPtest 1024 +vp8)
 
 test-mpi: all-mpi
 	mpirun -n 4 ./mpibench.mpi
@@ -50,6 +51,9 @@ testp: all
 	$(call run, +p$(P) ./mpibench +vp$(P) )
 	$(call run, +p$(P) ./mpibench +vp$$(( $(P) * 2 )) )
 	$(call run, +p$(P) ./mpibench +vp$$(( $(P) * 4 )) )
+	$(call run, +p$(P) ./alltoall_VPtest 1024 +vp$(P) )
+	$(call run, +p$(P) ./alltoall_VPtest 1024 +vp$$(( $(P) * 2 )) )
+	$(call run, +p$(P) ./alltoall_VPtest 1024 +vp$$(( $(P) * 4 )) )
 
 clean:
 	rm -rf *~ *.o alltoall mpibench mpibench.mpi charmrun conv-host allgather ampirun
