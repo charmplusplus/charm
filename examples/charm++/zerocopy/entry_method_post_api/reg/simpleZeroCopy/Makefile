@@ -22,5 +22,13 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p4 ./simpleZeroCopy 32 +balancer GreedyLB +noCMAForZC)
 endif
 
+testp: all
+	$(call run, +p$(P) ./simpleZeroCopy $$(( $(P) * 10 )) +balancer RotateLB)
+	$(call run, +p$(P) ./simpleZeroCopy $$(( $(P) * 10 )) +balancer GreedyLB)
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./simpleZeroCopy $$(( $(P) * 10 )) +balancer RotateLB +noCMAForZC)
+	$(call run, +p$(P) ./simpleZeroCopy $$(( $(P) * 10 )) +balancer GreedyLB +noCMAForZC)
+endif
+
 clean:
 	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun simpleZeroCopy
