@@ -38,32 +38,8 @@ CXXFLAGS=-I.
 
 all: charm++ LIBS AMPI f90charm TSM SM PVM everylb
 
-all-test: all-test-tests all-test-examples all-test-benchmarks
 
-all-test-tests: LIBS
-	$(MAKE) -C ../tests all
-
-all-test-examples: LIBS
-	$(MAKE) -C ../examples all
-
-all-test-benchmarks: LIBS
-	$(MAKE) -C ../benchmarks all
-
-all-zc: charm++
-	$(MAKE) -C ../tests/charm++/zerocopy all
-	$(MAKE) -C ../examples/charm++/zerocopy all
-	$(MAKE) -C ../benchmarks/charm++/zerocopy all
-
-all-test-AMPI: all-test-AMPI-tests all-test-AMPI-examples all-test-AMPI-benchmarks
-
-all-test-AMPI-tests: AMPI
-	$(MAKE) -C ../tests/ampi all
-
-all-test-AMPI-examples: AMPI
-	$(MAKE) -C ../examples/ampi all
-
-all-test-AMPI-benchmarks: AMPI
-	$(MAKE) -C ../benchmarks/ampi all
+include ../../cmake/Makefile.tests.common
 
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
@@ -174,68 +150,6 @@ Tau:
 
 LIBS: CONVLIBS CHARMLIBS everylb
 	echo "Built LIBS Successfully"
-
-test syncfttest mpisyncfttest: LIBS
-	$(MAKE) -C ../tests $@
-	$(MAKE) -C ../examples $@
-	$(MAKE) -C ../benchmarks $@
-
-test-tests: LIBS
-	$(MAKE) -C ../tests test
-
-test-examples: LIBS
-	$(MAKE) -C ../examples test
-
-test-benchmarks: LIBS
-	$(MAKE) -C ../benchmarks test
-
-testp-tests: LIBS
-	$(MAKE) -C ../tests testp
-
-testp-examples: LIBS
-	$(MAKE) -C ../examples testp
-
-testp-benchmarks: LIBS
-	$(MAKE) -C ../benchmarks testp
-
-test-zc: charm++
-	$(MAKE) -C ../tests/charm++/zerocopy test
-	$(MAKE) -C ../examples/charm++/zerocopy test
-	$(MAKE) -C ../benchmarks/charm++/zerocopy test
-
-test-converse: converse test-tests-converse test-examples-converse test-benchmarks-converse
-
-test-charm: charm++ test-tests-charm test-examples-charm test-benchmarks-charm
-
-test-AMPI: AMPI test-tests-AMPI test-examples-AMPI test-benchmarks-AMPI
-
-test-tests-converse: converse
-	$(MAKE) -C ../tests test-converse
-
-test-tests-charm: charm++
-	$(MAKE) -C ../tests test-charm
-
-test-tests-AMPI: AMPI
-	$(MAKE) -C ../tests test-AMPI
-
-test-examples-converse: converse
-	$(MAKE) -C ../examples test-converse
-
-test-examples-charm: charm++
-	$(MAKE) -C ../examples test-charm
-
-test-examples-AMPI: AMPI
-	$(MAKE) -C ../examples test-AMPI
-
-test-benchmarks-converse: converse
-	$(MAKE) -C ../benchmarks test-converse
-
-test-benchmarks-charm: charm++
-	$(MAKE) -C ../benchmarks test-charm
-
-test-benchmarks-AMPI: AMPI
-	$(MAKE) -C ../benchmarks test-AMPI
-
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
