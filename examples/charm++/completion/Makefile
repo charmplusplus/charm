@@ -30,3 +30,6 @@ comp.o: comp.C $(DECLS)
 test: all
 	$(call run, +p1 ./$(EXEC_NAME) )
 	$(call run, +p4 ./$(EXEC_NAME) )
+
+testp: all
+	$(call run, +p$(P) ./$(EXEC_NAME) )
