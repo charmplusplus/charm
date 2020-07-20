@@ -60,17 +60,16 @@ class grp : public CBase_grp {
 
       if(mode == 0) {
         // p2p case - first PE sends to last PE
+        if(CkMyPe() == 0) {
+          for(int i = 0; i < sendCount; i++) {
+            if(arraySize > 0)
+              thisProxy[CkNumPes()-1].receive(buffer1, arraySize);
+            else
+              thisProxy[CkNumPes()-1].receive(arraySize);
+          }
+        }
 
         if(CkMyPe() != CkNumPes() - 1) {
-
-          if(CkMyPe() == 0) {
-            for(int i = 0; i < sendCount; i++) {
-              if(arraySize > 0)
-                thisProxy[CkNumPes()-1].receive(buffer1, arraySize);
-              else
-                thisProxy[CkNumPes()-1].receive(arraySize);
-            }
-          }
           // contribute to reduction
           contribute(reductionCb);
         }
@@ -78,13 +77,16 @@ class grp : public CBase_grp {
       } else if(mode == 1) {
         // all to one - all PEs send to last PE
 
-        if(CkMyPe() != CkNumPes() - 1) {
+        if(CkMyPe() != CkNumPes() - 1 || CkMyPe() == 0) {
           for(int i = 0; i < sendCount; i++) {
             if(arraySize > 0)
               thisProxy[CkNumPes()-1].receive(buffer1, arraySize);
             else
               thisProxy[CkNumPes()-1].receive(arraySize);
           }
+        }
+
+        if(CkMyPe() != CkNumPes() - 1) {
           // contribute to reduction
           contribute(reductionCb);
         }
@@ -122,7 +124,7 @@ class grp : public CBase_grp {
 
         CkAssert(CkMyPe() == CkNumPes() - 1);
 
-        if(counter == CkNumPes() - 1) {
+        if((counter == CkNumPes() - 1) || (CkNumPes() == 1 && counter == 1)) {
           counter = 0;
           recvCount++;
           CmiPrintf("[%d][%d][%d] allToOne Receiver: ITER = %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), recvCount);
