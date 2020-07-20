@@ -29,5 +29,3 @@ $(foreach i,$(DIRS),clean-$i):
 
 $(foreach i,$(DIRS),testp-$i):
 	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
-
-
