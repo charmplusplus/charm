@@ -387,13 +387,13 @@ else
   opt_network=$(echo "$triplet" | cut -d '-' -f1)
 fi
 
-my_os=$(echo  $triplet | cut -d '-' -f2)
-my_dir=$(dirname $0)
+my_os=$(echo "$triplet" | cut -d '-' -f2)
+my_dir=$(dirname "$0")
 
 # Special handling for Windows compiler
 if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
   # Need to use unix2nt_cc on Windows/Cygwin
-  opt_CC=$(realpath $my_dir)/src/arch/win/unix2nt_cc
+  opt_CC=$(realpath "$my_dir")/src/arch/win/unix2nt_cc
   opt_CXX=$opt_CC
   opt_FC=
 fi
