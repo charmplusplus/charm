@@ -46,6 +46,8 @@ test: all
 
 test-mpi: all-mpi
 	mpirun -n 4 ./mpibench.mpi
+	mpirun -n 4 ./allgather.mpi 1024
+	mpirun -n 4 ./alltoall.mpi 1024
 
 testp: all
 	$(call run, +p$(P) ./mpibench +vp$(P) )
