@@ -85,6 +85,10 @@ public:
       CkAbort("Invalid grid & block configuration\n");
     }
 
+    if (warmup_iters < 1) {
+      CkAbort("Need at least 1 warmup iteration\n");
+    }
+
     // Number of chares per dimension
     n_chares = grid_size / block_size;
 
@@ -104,7 +108,6 @@ public:
   void initDone() {
     CkPrintf("Init time: %.3lf us\n", CkWallTimer() - init_start_time);
     my_iter = 1;
-    start_time = CkWallTimer();
     if (sync_ver) comm_start_time = CkWallTimer();
     block_proxy.exchangeGhosts();
   }
@@ -116,7 +119,11 @@ public:
   }
 
   void updateDone() {
-    if (my_iter > warmup_iters) update_agg_time += CkWallTimer() - update_start_time;
+    if (my_iter > warmup_iters) {
+      update_agg_time += CkWallTimer() - update_start_time;
+    } else if (my_iter == warmup_iters) {
+      start_time = CkWallTimer();
+    }
 
     if (my_iter++ == (warmup_iters + n_iters)) {
       thisProxy.done(0);
@@ -126,16 +133,13 @@ public:
     }
   }
 
-  void done(double iter_agg_times) {
+  void done() {
     double total_time = CkWallTimer() - start_time;
-    CkPrintf("Finished due to max iterations %d, total time %lf seconds\n",
-             n_iters, total_time);
+    CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
+        total_time, (total_time / n_iters) * 1000000);
     if (sync_ver) {
       CkPrintf("Comm time: %.3lf us\nUpdate time: %.3lf us\n",
           (comm_agg_time / n_iters) * 1000000, (update_agg_time / n_iters) * 1000000);
-    } else {
-      CkPrintf("Average iteration time: %.3lf us\n",
-          iter_agg_times / n_iters / (n_chares * n_chares) * 1000000);
     }
 
     if (print) {
@@ -175,7 +179,6 @@ class Block : public CBase_Block {
   bool left_bound, right_bound, top_bound, bottom_bound;
 
   double iter_start_time;
-  double iter_agg_time;
 
   Block() {}
 
@@ -195,11 +198,10 @@ class Block : public CBase_Block {
 
   void init() {
     // Initialize values
-    my_iter = 1;
+    my_iter = 0;
     neighbors = 0;
     x = thisIndex.x;
     y = thisIndex.y;
-    iter_agg_time = 0.0;
 
     // Check bounds and set number of valid neighbors
     left_bound = right_bound = top_bound = bottom_bound = false;
@@ -268,6 +270,10 @@ class Block : public CBase_Block {
     // XXX: Can't do tag matching, segfault occurs
     //cb->setRefnum(my_iter);
     hapiAddCallback(stream, cb);
+    /*
+    cudaStreamSynchronize(stream);
+    thisProxy[thisIndex].prepareGhostsDone();
+    */
   }
 
   void sendGhosts() {
@@ -330,6 +336,10 @@ class Block : public CBase_Block {
     CkCallback* cb = new CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
     //cb->setRefnum(my_iter);
     hapiAddCallback(stream, cb);
+    /*
+    cudaStreamSynchronize(stream);
+    thisProxy[thisIndex].updateDone();
+    */
   }
 
   void print() {
