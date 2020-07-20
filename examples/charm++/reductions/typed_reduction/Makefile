@@ -25,5 +25,8 @@ test: $(BINARY)
 	$(call run, ./typed_reduction +p1 )
 	$(call run, ./typed_reduction +p4 )
 
+testp: $(BINARY)
+	$(call run, ./typed_reduction +p$(P) )
+
 clean:
 	rm -f *.o *.decl.h *.def.h charmrun $(BINARY)

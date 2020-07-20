@@ -25,9 +25,17 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o stencil3d stencil3d.prj charmrun *~
 
 test: stencil3d
-	$(call run, +p4 ./stencil3d 64 32 +balancer RefineLB )
-	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyLB )
+	$(call run, +p4 ./stencil3d 64 32 +balancer RefineLB)
+	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyLB)
 ifeq ($(CMK_USE_CMA),1)
-	$(call run, +p4 ./stencil3d 64 32 +balancer RefineLB +noCMAForZC )
-	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyLB +noCMAForZC )
+	$(call run, +p4 ./stencil3d 64 32 +balancer RefineLB +noCMAForZC)
+	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyLB +noCMAForZC)
+endif
+
+testp: stencil3d
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer RefineLB)
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyLB)
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer RefineLB +noCMAForZC)
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyLB +noCMAForZC)
 endif

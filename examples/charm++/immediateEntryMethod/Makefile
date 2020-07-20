@@ -19,3 +19,6 @@ clean:
 
 test: all
 	$(call run, +p4 ./immediateEM)
+
+testp: all
+	$(call run, +p$(P) ./immediateEM)
