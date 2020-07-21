@@ -216,12 +216,17 @@ CmiStartFn mymain(int argc, char *argv[])
     CpvAccess(maxMsgSize) = 1 << 14;
     CpvAccess(factor) = 2;
   } else {
-    CmiAbort("Usage: ./pingpong <ncycles> <minsize> <maxsize> <increase factor> \nExample: ./pingpong 100 2 128 2\n");
+    if(CmiMyPe() == 0)
+      CmiAbort("Usage: ./pingpong <ncycles> <minsize> <maxsize> <increase factor> \nExample: ./pingpong 100 2 128 2\n");
   }
 
   if(CmiMyPe() == 0) {
     CmiPrintf("Pingpong with iterations = %d, minMsgSize = %d, maxMsgSize = %d, increase factor = %d\n",
         CpvAccess(nCycles), CpvAccess(minMsgSize), CpvAccess(maxMsgSize), CpvAccess(factor));
+  }
+
+  if(CmiNumPes() != 2 && CmiMyPe() == 0) {
+    CmiAbort("This test is designed for only 2 pes and cannot be run on %d pe(s)!\n", CmiNumPes());
   }
 
   CpvAccess(msgSize)= CpvAccess(minMsgSize) + CmiMsgHeaderSizeBytes;

@@ -4,7 +4,6 @@ BINARY = fib
 
 CHARMCFLAGS = $(OPTS)
 CHARMCLINKFLAGS = -language charm++ $(OPTS)
-TESTFLAGS =  +p1
 
 %.o: %.C
 
@@ -22,7 +21,10 @@ $(BINARY): $(patsubst %.C,%.o,$(wildcard *.C))
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: $(BINARY)
-	$(call run, ./$(BINARY) 5 $(TESTFLAGS))
+	$(call run, ./$(BINARY) +p4 7)
+
+testp: $(BINARY)
+	$(call run, ./$(BINARY) +p$(P) $$(( $(P) + 10 )) )
 
 clean:
 	rm -f *.o *.decl.h *.def.h charmrun $(BINARY)

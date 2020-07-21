@@ -24,5 +24,8 @@ randomAccess.o: randomAccess.C randomAccess.decl.h randomAccess.def.h
 test: $(BINARY)
 	$(call run, +p4 ./random_access 14 8 )
 
+testp: $(BINARY)
+	$(call run, +p$(P) ./random_access 14 8 )
+
 clean:
 	rm -f *.o *.decl.h *.def.h $(BINARY) charmrun* *.stamp

@@ -490,12 +490,6 @@ endif
 endif
 endif
 
-ifneq ($(findstring -win-,$(CMK_VDIR)),)
-  IS_WINDOWS := 1
-else
-  IS_WINDOWS := 0
-endif
-
 THREADLIBS = \
   $(L)/libthreads-default.a \
   $(L)/libthreads-default-tls.a \
@@ -505,7 +499,7 @@ THREADLIBS = \
   $(L)/libthreads-uFcontext-tls.a \
   $(L)/libthreads-stackcopy.a \
 
-ifneq ($(IS_WINDOWS),0)
+ifeq (1,$(CMK_WINDOWS))
 
 THREADLIBS += \
   $(L)/libthreads-fibers.a \

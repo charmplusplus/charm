@@ -24,5 +24,8 @@ Compute.o: Compute.C Compute.h leanmd.decl.h defs.h physics.h
 test: leanmd
 	$(call run, +p4 ./leanmd 3 3 3 20 )
 
+testp: leanmd
+	$(call run, +p$(P) ./leanmd $(P) $(P) $(P) 20 )
+
 clean:
 	rm -f *.decl.h *.def.h *.o leanmd leanmd.prj charmrun
