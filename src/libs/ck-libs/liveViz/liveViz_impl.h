@@ -42,7 +42,7 @@ public:
 		p | clientGetImageCallback;
 
 #ifdef CMK_MEM_CHECKPOINT
-		if (p.isUnpacking() && p.isRestarting() && CmiMyPe() == 0)
+		if (p.isUnpacking() && p.isCheckpoint() && CmiMyPe() == 0)
 			liveViz0Init(lv_config);
 #endif
 	}
