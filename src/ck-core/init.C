@@ -73,8 +73,7 @@ never be excluded...
 #include <limits.h>
 #include "spanningTree.h"
 #if CMK_CHARM4PY
-#include "GreedyRefineLB.h"
-#include "RandCentLB.h"
+#include "TreeLB.h"
 #endif
 
 #if CMK_CUDA
@@ -1151,6 +1150,7 @@ static void _nullFn(void *, void *)
 }
 
 extern void _registerLBManager(void);
+extern void _registerTreeLevel(void);
 extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
@@ -1496,6 +1496,7 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkFutures();
 		_registerCkArray();
 		_registerLBManager();
+		_registerTreeLevel();
     _registerMetaBalancer();
 		_registerCkCallback();
 		_registerwaitqd();
@@ -1511,11 +1512,8 @@ void _initCharm(int unused_argc, char **argv)
                   register whatever load balancers are being linked in.
                   Without an executable (charm4py just uses libcharm.so), the load balancers in libcharm.so
                   have to somehow be registered during init.
-                  With the planned load balancing framework, load balancer registration will hopefully go away,
-                  at least for strategies used in central/hybrid, because they will stop being chares.
                 */
-		_registerGreedyRefineLB();
-		_registerRandCentLB();
+		_registerTreeLB();
 #endif
 
 		/**
