@@ -19,3 +19,6 @@ simple_reduction.o: simple_reduction.C simple_reduction.decl.h simple_reduction.
 
 test: all
 	$(call run, ./simple_reduction 20 4.5 10.3 +p4 )
+
+testp: all
+	$(call run, ./simple_reduction $$(( $(P) * 10 )) 4.5 10.3 +p$(P) )
