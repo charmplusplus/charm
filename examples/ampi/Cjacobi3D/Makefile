@@ -13,10 +13,8 @@ AMPI_TARGETS := \
   jacobi.tls \
   jacobi-get \
 
-ifneq ($(CMK_WINDOWS),1)
-ifneq ($(CMK_BLUEGENEQ),1)
-AMPI_TARGETS += jacobi.iso
-endif
+ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
+  AMPI_TARGETS += jacobi.iso
 endif
 
 ampi: $(AMPI_TARGETS)
@@ -64,10 +62,8 @@ jacobi-get-tokens:
 test: ampi
 	$(call run, +p3 ./jacobi.pup 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1 )
 	$(call run, +p3 ./jacobi 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1 )
-ifneq ($(CMK_WINDOWS),1)
-ifneq ($(CMK_BLUEGENEQ),1)
+ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
 	$(call run, +p3 ./jacobi.iso 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1)
-endif
 endif
 
 testp: ampi
