@@ -20,3 +20,5 @@ taskSpawn.o: taskSpawn.C taskSpawn.decl.h
 test: all
 	$(call run, ./taskSpawn +p4 50000 100 )
 
+testp: all
+	$(call run, ./taskSpawn +p$(P) $$(( $(P) * 50000)) 100)

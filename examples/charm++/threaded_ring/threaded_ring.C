@@ -2,7 +2,7 @@
 
 Main::Main(CkArgMsg*)
 {
-    nElems = 10;
+    nElems = 10 * CkNumPes();
     CProxy_Ring A = CProxy_Ring::ckNew(nElems);
     A.run();
 }
