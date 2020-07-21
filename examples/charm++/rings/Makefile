@@ -12,5 +12,8 @@ rings.o : rings.C rings.h rings.ci
 test: pgm
 	$(call run, +p4 ./pgm )
 
+testp: pgm
+	$(call run, +p$(P) ./pgm )
+
 clean:
 	rm -f conv-host pgm *.o *.decl.h *.def.h *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
