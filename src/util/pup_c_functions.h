@@ -34,7 +34,8 @@ AMPI_CUSTOM_FUNC(int, pup_isUnpacking, const pup_er p)
 AMPI_CUSTOM_FUNC(int, pup_isSizing, const pup_er p)
 AMPI_CUSTOM_FUNC(int, pup_isDeleting, const pup_er p)
 AMPI_CUSTOM_FUNC(int, pup_isUserlevel, const pup_er p)
-AMPI_CUSTOM_FUNC(int, pup_isRestarting, const pup_er p)
+AMPI_CUSTOM_FUNC(int, pup_isCheckpoint, const pup_er p)
+AMPI_CUSTOM_FUNC(int, pup_isMigration, const pup_er p)
 AMPI_CUSTOM_FUNC(char *, pup_typeString, const pup_er p)
 
 /*Insert a synchronization into the data stream */
