@@ -23,5 +23,11 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p2 ./zcpy_immediate 20 +noCMAForZC )
 endif
 
+testp: all
+	$(call run, +p$(P) ./zcpy_immediate $$(( $(P) * 10 )) )
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./zcpy_immediate $$(( $(P) * 10 )) +noCMAForZC )
+endif
+
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o zcpy_immediate charmrun cifiles
