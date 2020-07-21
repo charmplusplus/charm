@@ -162,7 +162,7 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW;
   typedef struct CthThreadBase
 {
   CthThreadToken *token; /* token that shall be enqueued into the ready queue*/
-  int scheduled;         /* has this thread been added to the ready queue ? */
+  CmiMemoryAtomicInt scheduled; /* has this thread been added to the ready queue ? */
 
   CmiObjId   tid;        /* globally unique tid */
   CthAwkFn   awakenfn;   /* Insert this thread into the ready queue */
@@ -191,7 +191,7 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW;
 #endif
 
   int interceptionDeactivations;
-  CmiIsomallocContext *isomallocContext;
+  CmiIsomallocContext isomallocContext;
 #if CMI_SWAPGLOBALS
   CtgGlobals threadGlobals;
 #endif
@@ -409,14 +409,10 @@ void CthSetSerialNo(CthThread t, int no)
 
 static void CthThreadBaseInit(CthThreadBase *th)
 {
-  static int serialno = 1;
+  static CmiMemoryAtomicInt serialno{1};
   th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
   th->token->thread = S(th);
-#if CMK_BIGSIM_CHARM
-  th->token->serialNo = -1;
-#else
   th->token->serialNo = CpvAccess(Cth_serialNo)++;
-#endif
   th->scheduled = 0;
 
   th->awakenfn = 0;
@@ -435,7 +431,7 @@ static void CthThreadBaseInit(CthThreadBase *th)
 #if CMK_THREADS_ALIAS_STACK
   th->aliasStackHandle=0;
 #endif
-  th->isomallocContext = NULL;
+  th->isomallocContext.opaque = nullptr;
   th->interceptionDeactivations = 1;
 
   th->stack=NULL;
@@ -454,7 +450,7 @@ static void CthThreadBaseInit(CthThreadBase *th)
   th->magic = THD_MAGIC_NUM;
 }
 
-static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratable, CmiIsomallocContext * ctx)
+static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratable, CmiIsomallocContext ctx)
 {
   void *ret=NULL;
   if (*stackSize==0) *stackSize=CthCpvAccess(_defaultStackSize);
@@ -506,7 +502,7 @@ static void CthThreadBaseFree(CthThreadBase *th)
   void * tlsptr = CmiTLSGetBuffer(&th->tlsseg);
   if (th->isMigratable)
   {
-    if (th->isomallocContext != nullptr)
+    if (th->isomallocContext.opaque != nullptr)
       CmiIsomallocContextFree(th->isomallocContext, tlsptr);
   }
   else
@@ -517,7 +513,7 @@ static void CthThreadBaseFree(CthThreadBase *th)
   void * globalptr = th->threadGlobals.data_seg;
   if (th->isMigratable)
   {
-    if (th->isomallocContext != nullptr)
+    if (th->isomallocContext.opaque != nullptr)
       CmiIsomallocContextFree(th->isomallocContext, globalptr);
   }
   else
@@ -528,10 +524,10 @@ static void CthThreadBaseFree(CthThreadBase *th)
 #if CMK_THREADS_ALIAS_STACK
     CthAliasFree(th->aliasStackHandle);
 #endif
-    if (th->isomallocContext)
+    if (th->isomallocContext.opaque)
     {
       CmiIsomallocContextDelete(th->isomallocContext);
-      th->isomallocContext = nullptr;
+      th->isomallocContext.opaque = nullptr;
     }
   }
   else if (th->stack!=NULL) {
@@ -543,7 +539,7 @@ static void CthThreadBaseFree(CthThreadBase *th)
   th->stack=NULL;
 }
 
-void CthInterceptionsImmediateActivate(CthThread th)
+static void CthInterceptionsImmediateActivate(CthThread th)
 {
   CthThreadBase * const base = B(th);
 
@@ -560,7 +556,7 @@ void CthInterceptionsImmediateActivate(CthThread th)
     CmiTLSSegmentSet(&base->tlsseg);
 #endif
 }
-void CthInterceptionsImmediateDeactivate(CthThread th)
+static void CthInterceptionsImmediateDeactivate(CthThread th)
 {
   CthThreadBase * const base = B(th);
 
@@ -573,7 +569,7 @@ void CthInterceptionsImmediateDeactivate(CthThread th)
     CmiTLSSegmentSet(&CpvAccess(Cth_PE_TLS));
 #endif
 
-  CmiMemoryIsomallocContextActivate(nullptr);
+  CmiMemoryIsomallocContextActivate(CmiIsomallocContext{});
 }
 
 void CthInterceptionsDeactivatePush(CthThread th)
@@ -594,6 +590,25 @@ void CthInterceptionsDeactivatePop(CthThread th)
     return;
 
   CthInterceptionsImmediateActivate(th);
+}
+
+int CthInterceptionsTemporarilyActivateStart(CthThread th)
+{
+  CthThreadBase * const base = B(th);
+
+  const int old = base->interceptionDeactivations;
+  CmiAssert(old != 0);
+  base->interceptionDeactivations = 0;
+  CthInterceptionsImmediateActivate(th);
+  return old;
+}
+void CthInterceptionsTemporarilyActivateEnd(CthThread th, int old)
+{
+  CthThreadBase * const base = B(th);
+
+  CmiAssert(base->interceptionDeactivations == 0);
+  base->interceptionDeactivations = old;
+  CthInterceptionsImmediateDeactivate(th);
 }
 
 static void CthInterceptionsCreate(CthThread th)
@@ -626,7 +641,7 @@ static void CthInterceptionsCreate(CthThread th)
       tlsptr = CmiIsomallocContextMallocAlign(base->isomallocContext, tlsdesc.align, tlsdesc.size);
     else
       tlsptr = CmiAlignedAlloc(tlsdesc.align, tlsdesc.size);
-    base->tlsseg = CmiTLSCreateSegUsingPtr(tlsptr);
+    CmiTLSCreateSegUsingPtr(&CpvAccess(Cth_PE_TLS), &base->tlsseg, tlsptr);
   }
   else
   {
@@ -660,11 +675,9 @@ static void CthBaseInit(char **argv)
   CpvAccess(Cth_serialNo) = 1;
 
 #if CMK_THREADS_BUILD_TLS
-  CmiTLSInit();
-  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
-
   CpvInitialize(tlsseg_t, Cth_PE_TLS);
-  CmiTLSSegmentGet(&CpvAccess(Cth_PE_TLS));
+  CmiTLSInit(&CpvAccess(Cth_PE_TLS));
+  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
 #endif
 }
 
@@ -687,15 +700,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
    * When unpacking, reset the thread pointer in token to this thread.
    */
 
-  if(_BgOutOfCoreFlag!=0){
-    pup_bytes(p, &t->token, sizeof(void *));
-    if(!pup_isUnpacking(p)){
-      t->token->thread = NULL;
-    }
-    pup_int(p, &t->scheduled);
-  }
   if(pup_isUnpacking(p)){
-    if(_BgOutOfCoreFlag==0){
       t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
       t->token->thread = S(t);
       t->token->serialNo = CpvAccess(Cth_serialNo)++;
@@ -703,30 +708,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
         set scheduled to 0 in the unpacking period since the thread has
         not been scheduled */
       t->scheduled = 0;
-    }else{
-      /* During out-of-core emulation */
-      /* 
-       * When t->scheduled is set, the thread is in the queue so the token
-       * should be kept. Otherwise, allocate a new space for the token
-       */
-      if(t->scheduled==0){
-        /*CmiPrintf("Creating a new token for %p!\n", t->token);*/
-        t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
-      }
-      t->token->thread = S(t);
-      t->token->serialNo = CpvAccess(Cth_serialNo)++;
-    }
   }
-
-  /*BIGSIM_OOC DEBUGGING */
-  /*if(_BgOutOfCoreFlag!=0){
-    if(pup_isUnpacking(p)){
-    CmiPrintf("Unpacking: ");
-    }else{
-    CmiPrintf("Packing: ");
-    }	
-    CmiPrintf("thd=%p, its token=%p, token's thd=%p\n", t, t->token, t->token->thread); 
-    } */
 
   /*Really need a pup_functionPtr here:*/
   pup_bytes(p,&t->awakenfn,sizeof(t->awakenfn));
@@ -744,7 +726,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
   if (t->isMigratable) {
 #if CMK_THREADS_ALIAS_STACK
     if (pup_isUnpacking(p)) { 
-      CthAllocateStack(t, &t->stacksize, 1, nullptr);
+      CthAllocateStack(t, &t->stacksize, 1, CmiIsomallocContext{});
     }
     CthAliasEnable(t);
     pup_bytes(p,t->stack,t->stacksize);
@@ -913,16 +895,12 @@ void CthSuspend(void)
   for(l=cur->listener;l!=NULL;l=l->next){
     if (l->suspend) l->suspend(l);
   }
-  if (cur->choosefn == 0) CthNoStrategy();
-  next = cur->choosefn();
+  CthThFn choosefn = cur->choosefn;
+  if (choosefn == 0) CthNoStrategy();
+  next = choosefn(); // If this crashes, disable ASLR.
 #if CMK_OMP
   cur->tid.id[2] = CmiMyRank();
 #else
-  /*cur->scheduled=0;*/
-  /*changed due to out-of-core emulation in BigSim*/
-  /** Sometimes, a CthThread is running without ever being awakened
-   * In this case, the scheduled is the initialized value "0"
-   */
   if(cur->scheduled > 0)
     cur->scheduled--;
 
@@ -954,13 +932,8 @@ void CthSuspend(void)
 
 void CthAwaken(CthThread th)
 {
-  if (B(th)->awakenfn == 0) CthNoStrategy();
-
-  /*BIGSIM_OOC DEBUGGING
-    if(B(th)->scheduled==1){
-    CmiPrintf("====Thread %p is already scheduled!!!!\n", th);
-    return;
-    } */
+  CthAwkFn awakenfn = B(th)->awakenfn;
+  if (awakenfn == 0) CthNoStrategy();
 
 #if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
@@ -970,10 +943,9 @@ void CthAwaken(CthThread th)
 #endif
 
   B(th)->scheduled++;
-  B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
-  /*B(th)->scheduled = 1; */
-  /*changed due to out-of-core emulation in BigSim */
-
+  CthThreadToken * token = B(th)->token;
+  constexpr int strategy = CQS_QUEUEING_FIFO;
+  awakenfn(token, strategy, 0, 0); // If this crashes, disable ASLR.
 }
 
 void CthYield(void)
@@ -987,16 +959,16 @@ void CthYield(void)
 
 void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
-  if (B(th)->awakenfn == 0) CthNoStrategy();
+  CthAwkFn awakenfn = B(th)->awakenfn;
+  if (awakenfn == 0) CthNoStrategy();
 #if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
 #endif
 #endif
-  B(th)->awakenfn(B(th)->token, s, pb, prio);
-  /*B(th)->scheduled = 1; */
-  /*changed due to out-of-core emulation in BigSim */
+  CthThreadToken * token = B(th)->token;
+  awakenfn(token, s, pb, prio); // If this crashes, disable ASLR.
   B(th)->scheduled++;
 }
 
@@ -1264,7 +1236,7 @@ CthThread CthCreate(CthVoidFn fn,void *arg,int size)
   CthThreadInit(result, fn, arg);
   return result;
 }
-CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext * ctx)
+CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext ctx)
 {
   /*All threads are migratable under stack copying*/
   return CthCreate(fn,arg,size);
@@ -1468,7 +1440,7 @@ CthThread CthPup(pup_er p, CthThread t)
   CmiAbort("CthPup not implemented.\n");
   return 0;
 }
-CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext * ctx)
+CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext ctx)
 {
   /*Fibers are never migratable, unless we can figure out how to set their stacks*/
   return CthCreate(fn,arg,size);
@@ -1639,7 +1611,7 @@ CthThread CthPup(pup_er p, CthThread t)
   CmiAbort("CthPup not implemented.\n");
   return 0;
 }
-CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext * ctx)
+CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext ctx)
 {
   /*Pthreads are never migratable, unless we can figure out how to set their stacks*/
   return CthCreate(fn,arg,size);
@@ -1866,7 +1838,7 @@ int ptrDiffLen(const void *a,const void *b) {
   return ret;
 }
 
-static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int migratable, CmiIsomallocContext * ctx)
+static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int migratable, CmiIsomallocContext ctx)
 {
   CthThread result;
   char *stack, *ss_sp, *ss_end;
@@ -1961,9 +1933,9 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int migratabl
 
 CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 {
-  return CthCreateInner(fn, arg, size, 0, nullptr);
+  return CthCreateInner(fn, arg, size, 0, CmiIsomallocContext{});
 }
-CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext * ctx)
+CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext ctx)
 {
   return CthCreateInner(fn, arg, size, 1, ctx);
 }
@@ -2154,7 +2126,7 @@ static void CthOnly(void *arg, void *vt, qt_userf_t fn)
   CthThreadFinished(CthSelf());
 }
 
-static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int Migratable, CmiIsomallocContext * ctx)
+static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int Migratable, CmiIsomallocContext ctx)
 {
   CthThread result; qt_t *stack, *stackbase, *stackp;
   const size_t pagesize = CmiGetPageSize();
@@ -2195,9 +2167,9 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size, int Migratabl
 
 CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 {
-  return CthCreateInner(fn, arg, size, 0, nullptr);
+  return CthCreateInner(fn, arg, size, 0, CmiIsomallocContext{});
 }
-CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext * ctx)
+CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext ctx)
 {
   return CthCreateInner(fn, arg, size, 1, ctx);
 }
@@ -2234,7 +2206,7 @@ CthThread CthPup(pup_er p, CthThread t)
   return t;
 }
 
-/* Functions that help debugging of out-of-core emulation in BigSim */
+/* Functions that help debugging */
 void CthPrintThdStack(CthThread t){
   CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", t, t->base.stack, t->stackp);
 }
@@ -2272,12 +2244,12 @@ void CthTraceResume(CthThread t)
   traceResume(B(t)->eventID, B(t)->srcPE,&t->base.tid);
 }
 #endif
-/* Functions that help debugging of out-of-core emulation in BigSim */
+/* Functions that help debugging */
 void CthPrintThdMagic(CthThread t){
   CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
 }
 
-CmiIsomallocContext * CmiIsomallocGetThreadContext(CthThread th)
+CmiIsomallocContext CmiIsomallocGetThreadContext(CthThread th)
 {
   return B(th)->isomallocContext;
 }

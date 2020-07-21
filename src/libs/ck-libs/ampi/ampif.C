@@ -345,12 +345,6 @@ FLINKAGE {
 #define ampi_command_argument_count FTN_NAME( AMPI_COMMAND_ARGUMENT_COUNT , ampi_command_argument_count )
 #define ampi_get_command_argument FTN_NAME( AMPI_GET_COMMAND_ARGUMENT , ampi_get_command_argument )
 
-#if CMK_BIGSIM_CHARM
-#define ampi_set_start_event FTN_NAME( AMPI_SET_START_EVENT , ampi_set_start_event )
-#define ampi_set_end_event FTN_NAME( AMPI_SET_END_EVENT , ampi_set_end_event )
-#define begintracebigsim FTN_NAME (BEGINTRACEBIGSIM , begintracebigsim)
-#define endtracebigsim FTN_NAME (ENDTRACEBIGSIM , endtracebigsim)
-#endif
 
 #if CMK_CUDA
 #define ampi_gpu_invoke_wr FTN_NAME ( AMPI_GPU_INVOKE_WR  , ampi_gpu_invoke_wr )
@@ -2286,23 +2280,6 @@ void ampi_trace_end(int *ierr) noexcept
   *ierr = AMPI_Trace_end();
 }
 
-#if CMK_BIGSIM_CHARM
-void ampi_set_start_event(int *comm, int *ierr) {
-  *ierr = AMPI_Set_start_event(*comm);
-}
-
-void ampi_set_end_event(int *ierr) {
-  *ierr = AMPI_Set_end_event();
-}
-
-void begintracebigsim(char* msg){
-  beginTraceBigSim(msg);
-}
-
-void endtracebigsim(char* msg, char* param){
-  endTraceBigSim(msg, param);
-}
-#endif
 
 #if CMK_CUDA
 void ampi_gpu_iinvoke_wr(int *to_call, int *request, int *ierr) noexcept {

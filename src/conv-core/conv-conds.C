@@ -5,6 +5,10 @@
 #include "converse.h"
 #include "charm-api.h"
 
+#if CMK_ERROR_CHECKING
+CpvDeclare(double, idleBeginWalltime); // used for determining the conditon for long idle
+#endif
+
 /**
  * Structure to hold the requisites for a callback
  */
@@ -181,21 +185,12 @@ static void call_cblist_remove(ccd_cblist *l,double curWallTime)
   /* reentrant */
   if (l->flag) return;
   l->flag = 1;
-#if ! CMK_BIGSIM_CHARM
   for(i=0, idx=l->first;i<len;i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
     (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
     int unused = CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
-#else
-  for(i=0, idx=l->last;i<len;i++) {
-    int old = CmiSwitchToPE(l->elems[idx].cb.pe);
-    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
-    int unused = CmiSwitchToPE(old);
-    idx = l->elems[idx].prev;
-  }
-#endif
   remove_n_elems(l,len);
   l->flag = 0;
 }
@@ -439,6 +434,10 @@ void CcdModuleInit(char **ignored)
    CpvAccess(pcb).resolution = CCD_DEFAULT_RESOLUTION;
    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,CcdCallBacksReset,0);
    CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,CcdCallBacksReset,0);
+
+#if CMK_ERROR_CHECKING
+   CpvInitialize(double, idleBeginWalltime); //used for LONG_IDLE
+#endif
 }
 
 
@@ -529,12 +528,13 @@ void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double deltaT)
  * Raise a condition causing all registered callbacks corresponding to 
  * that condition to be triggered
  */
-void CcdRaiseCondition(int condnum)
+double CcdRaiseCondition(int condnum)
 {
   CmiAssert(condnum < MAXNUMCONDS);
   double curWallTime=CmiWallTimer();
   call_cblist_remove(&(CpvAccess(conds).condcb[condnum]),curWallTime);
   call_cblist_keep(&(CpvAccess(conds).condcb_keep[condnum]),curWallTime);
+  return curWallTime;
 }
 
 

@@ -43,18 +43,6 @@ testf: fpgm
 	$(call run, ./fpgm +p1 +vp3 -read )
 	rm -f fem_mesh_vp3_*
 
-bgtest: pgm
-	$(call run, ./pgm +p1 +vp1 +x1 +y1 +z1 )
-	$(call run, ./pgm +p1 +vp2 +x1 +y1 +z1 )
-	$(call run, ./pgm +p2 +vp1 +x2 +y1 +z1 )
-	$(call run, ./pgm +p2 +vp2 +x2 +y1 +z1 )
-	$(call run, ./pgm +p2 +vp3 +x2 +y1 +z1 )
-	$(call run, ./pgm +p2 +vp4 +x2 +y1 +z1 )
-	-@rm -f fem_mesh_vp3_*
-	$(call run, ./pgm +p1 +vp3 -write +x3 +y1 +z1 )
-	$(call run, ./pgm +p1 +vp3 -read  +x3 +y1 +z1 )
-	rm -f fem_mesh_vp3_*
-
 test-mig:
 	rm -fr pgm pgm.o
 	$(MAKE) OPTS="-DENABLE_MIG=1 -memory isomalloc -balancer RandCentLB" pgm

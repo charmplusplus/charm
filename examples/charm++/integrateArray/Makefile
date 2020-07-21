@@ -10,9 +10,8 @@ pgm: pgm.o
 test: pgm
 	$(call run, +p4 ./pgm 1000000 100 )
 
-bgtest: pgm
-	$(call run, +p4 ./pgm 1000000 100 +x2 +y2 +z2 )
-
+testp: pgm
+	$(call run, ./pgm +p$(P) 1000000 $$(( $(P) * 10 )) )
 
 # compile program with trace projections - performance trace library
 pgm_prof: pgm.o

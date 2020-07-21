@@ -24,7 +24,7 @@ class CkSequenceFactory {
     return new RandomSequence<T>(begin, end);
   }
 
-  static CkSequenceInternal<T>* CreateRandomSequence(char* bit_vector, int
+  static CkSequenceInternal<T>* CreateRandomSequence(const std::vector<char> & bit_vector, int
       start_ele, int end_ele) {
     return new RandomSequence<T>(bit_vector, start_ele, end_ele);
   }

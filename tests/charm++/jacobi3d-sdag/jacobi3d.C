@@ -171,7 +171,7 @@ class Main : public CBase_Main {
 
       TopoManager tmgr;
       CkArray *jarr = array.ckLocalBranch();
-      int jmap[num_chare_x][num_chare_y][num_chare_z];
+      std::vector<std::vector<std::vector<int>>> jmap(num_chare_x, std::vector<std::vector<int> >(num_chare_y,std::vector <int>(num_chare_z)));
 
       int hops=0, p;
       for(int i=0; i<num_chare_x; i++)

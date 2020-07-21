@@ -24,3 +24,13 @@ fi
 # Assumes gfortran compiler:
 CMK_CF77="$CMK_CF77 -mmacosx-version-min=10.7"
 CMK_CF90="$CMK_CF90 -mmacosx-version-min=10.7"
+
+CMK_NATIVE_CC='clang'
+CMK_NATIVE_LD='clang'
+CMK_NATIVE_CXX='clang++'
+CMK_NATIVE_LDXX='clang++'
+
+CMK_NATIVE_CC_FLAGS="$CMK_CC_FLAGS"
+CMK_NATIVE_LD_FLAGS="$CMK_LD_FLAGS"
+CMK_NATIVE_CXX_FLAGS="$CMK_CXX_FLAGS"
+CMK_NATIVE_LDXX_FLAGS="$CMK_LDXX_FLAGS"

@@ -3,12 +3,7 @@
 #include "mpi.h"
 #include <math.h>
 
-#if CMK_BIGSIM_CHARM
-extern "C" void BgPrintf(const char *);
-#define BGPRINTF(x)  if (thisIndex == 0) BgPrintf(x);
-#else
 #define BGPRINTF(x)
-#endif
 
 #define DIMX 100 
 #define DIMY 100

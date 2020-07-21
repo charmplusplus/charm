@@ -6,7 +6,7 @@ OBJS = jacobi.o
 CANDIDATES := jacobi
 TARGETS :=
 
-PARAMETERS := -memory isomalloc
+PARAMETERS :=
 
 # Ignore this test on platforms that don't support Isomalloc:
 define TEST_TARGET_AVAILABILITY
@@ -29,8 +29,8 @@ jacobi.o: jacobi.C
 syncfttest: $(foreach i,$(TARGETS),test-$i)
 
 test-jacobi: jacobi
-	$(call run, ./jacobi 2 2 2 200 +vp8 +p8 +isomalloc_sync +killFile kill_01.txt )
-	$(call run, ./jacobi 4 2 2 200 +vp16 +p8 +isomalloc_sync +killFile kill_02.txt )
+	$(call run, ./jacobi 2 2 2 200 +vp8 +p8 +killFile kill_01.txt )
+	$(call run, ./jacobi 4 2 2 200 +vp16 +p8 +killFile kill_02.txt )
 
 clean:
 	rm -f *.o jacobi jacobi.o *~ moduleinit.C charmrun conv-host ampirun

@@ -28,16 +28,9 @@ void OListConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
 
   sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
   strcat(nameStr, "_end");
-#if CMK_BIGSIM_CHARM
-  defs << "  CkVec<void*> " << label << "_bgLogList;\n";
-#endif
 
   generateClosureSignature(decls, defs, entry, false, "void", label, true,
                            encapStateChild);
-#if CMK_BIGSIM_CHARM
-  generateBeginTime(defs);
-  defs << "  " << label << "_bgLogList.insertAtEnd(_bgParentLog);\n";
-#endif
   // Accumulate all the bgParent pointers that the calling when_end functions give
   defs << "  " << counter << "->decrement();\n";
 
@@ -59,10 +52,6 @@ void OListConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
 
   defs << "  " << counter << "->deref();\n";
 
-#if CMK_BIGSIM_CHARM
-  generateListEventBracket(defs, SOLIST_END);
-  defs << "    " << label << "_bgLogList.length()=0;\n";
-#endif
 
   defs << "    ";
   generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");

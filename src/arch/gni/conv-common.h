@@ -18,21 +18,20 @@
 
 #if DELTA_COMPRESS
 #if CMK_ERROR_CHECKING
-#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt2 seq; unsigned char cksum, magic; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
+#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt2 seq; unsigned char cksum, magic; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 #else
-#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt4 seq; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
+#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt4 seq; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 #endif
 #else 
 #if CMK_ERROR_CHECKING
-#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt2 seq; unsigned char cksum, magic; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
+#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt2 seq; unsigned char cksum, magic; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 #else
-#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt4 seq; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
+#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt4 seq; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 #endif
 #endif
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }
-#define CMK_MSG_HEADER_BIGSIM_    { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1

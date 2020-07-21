@@ -184,7 +184,9 @@ void CmiMemorySweep(const char *where) { }
 
 void CmiMemoryCheck(void)
 {
+	CmiMemLock();
 	memory_check();
+	CmiMemUnlock();
 }
 
 /********** Allocation/Free ***********/
@@ -253,11 +255,6 @@ static Slot *Slot_fmUser(void *user) {
 
 /********** meta_ routines ***********/
 
-#if ! CMK_MEMORY_BUILD_OS
-/* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.C"
-#endif
-
 /*Only display startup status messages from processor 0*/
 static void status(const char *msg) {
   if (CmiMyPe()==0 && !CmiArgGivingUsage()) {
@@ -302,9 +299,16 @@ static void meta_init(char **argv)
 
 static void *meta_malloc(size_t size)
 {
-  Slot *s=(Slot *)mm_malloc(sizeof(Slot)+size+PADLEN);
-  if (s==NULL) return s;
-  return setSlot(s,size);
+  CmiMemLock();
+  Slot *s=(Slot *)mm_impl_malloc(sizeof(Slot)+size+PADLEN);
+  if (s==NULL)
+  {
+    CmiMemUnlock();
+    return s;
+  }
+  void *result = setSlot(s,size);
+  CmiMemUnlock();
+  return result;
 }
 
 static void meta_free(void *mem)
@@ -315,20 +319,22 @@ static void meta_free(void *mem)
     memAbort("Free'd near-NULL block",mem);
 
   s=((Slot *)mem)-1;
+  CmiMemLock();
   if (s->magic==SLOTMAGIC_VALLOC)
   { /*Allocated with special alignment*/
     freeSlot(s);
-    mm_free(((char *)mem)-CmiGetPageSize());
+    mm_impl_free(((char *)mem)-CmiGetPageSize());
   }
   else if (s->magic==SLOTMAGIC) 
   { /*Ordinary allocated block */
     freeSlot(s);
-    mm_free(s);
+    mm_impl_free(s);
   }
   else if (s->magic==SLOTMAGIC_FREED)
     memAbort("Free'd block twice",mem);
   else /*Unknown magic number*/
     memAbort("Free'd non-malloc'd block",mem);
+  CmiMemUnlock();
 }
 
 static void *meta_calloc(size_t nelem, size_t size)
@@ -361,35 +367,44 @@ static void *meta_realloc(void *oldBuffer, size_t newSize)
 
 static void *meta_memalign(size_t align, size_t size)
 {
+  CmiMemLock();
   /*Allocate a whole extra page for our slot structure*/
-  char *alloc=(char *)mm_memalign(align,CmiGetPageSize()+size+PADLEN);
+  char *alloc=(char *)mm_impl_memalign(align,CmiGetPageSize()+size+PADLEN);
   Slot *s=(Slot *)(alloc+CmiGetPageSize()-sizeof(Slot));
   void *user=setSlot(s,size);
   s->magic=SLOTMAGIC_VALLOC;
+  CmiMemUnlock();
   return user;  
 }
 
 static int meta_posix_memalign(void **outptr, size_t align, size_t size)
 {
+  CmiMemLock();
   /*Allocate a whole extra page for our slot structure*/
-  int ret = mm_posix_memalign(outptr,align,CmiGetPageSize()+size+PADLEN);
+  int ret = mm_impl_posix_memalign(outptr,align,CmiGetPageSize()+size+PADLEN);
   if (ret != 0)
+  {
+    CmiMemUnlock();
     return ret;
+  }
   char *alloc=(char *)*outptr;
   Slot *s=(Slot *)(alloc+CmiGetPageSize()-sizeof(Slot));
   void *user=setSlot(s,size);
   s->magic=SLOTMAGIC_VALLOC;
   *outptr = user;
+  CmiMemUnlock();
   return 0;
 }
 
 static void *meta_aligned_alloc(size_t align, size_t size)
 {
+  CmiMemLock();
   /*Allocate a whole extra page for our slot structure*/
-  char *alloc=(char *)mm_aligned_alloc(align,CmiGetPageSize()+size+PADLEN);
+  char *alloc=(char *)mm_impl_aligned_alloc(align,CmiGetPageSize()+size+PADLEN);
   Slot *s=(Slot *)(alloc+CmiGetPageSize()-sizeof(Slot));
   void *user=setSlot(s,size);
   s->magic=SLOTMAGIC_VALLOC;
+  CmiMemUnlock();
   return user;
 }
 

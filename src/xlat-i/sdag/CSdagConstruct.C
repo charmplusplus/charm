@@ -194,26 +194,7 @@ void SdagConstruct::propagateState(int uniqueVarNum) {
 
   encapState = encap;
 
-#if CMK_BIGSIM_CHARM
-  // adding _bgParentLog as the last extra parameter for tracing
-  stateVarsChildren = new list<CStateVar*>(*stateVars);
-  sv = new CStateVar(0, "void *", 0, "_bgParentLog", 0, NULL, 1);
-  sv->isBgParentLog = true;
-  stateVarsChildren->push_back(sv);
-
-  {
-    list<CStateVar*> lst;
-    lst.push_back(sv);
-    EncapState* state = new EncapState(NULL, lst);
-    state->type = new XStr("void");
-    state->name = new XStr("_bgParentLog");
-    state->isBgParentLog = true;
-    encapStateChild.push_back(state);
-    encap.push_back(state);
-  }
-#else
   stateVarsChildren = stateVars;
-#endif
 
   encapStateChild = encap;
 
@@ -303,7 +284,7 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
 
       // if the var is one of the following it a system state var that should
       // not be brought into scope
-      if (!var.isCounter && !var.isSpeculator && !var.isBgParentLog) {
+      if (!var.isCounter && !var.isSpeculator) {
         if (var.isRdma) {
           if (var.isFirstRdma) {
             defs << "#if CMK_ONESIDED_IMPL\n";
@@ -600,7 +581,7 @@ void SdagConstruct::generateTraceBeginCall(XStr& op, int indent) {
        << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, ";
 
     if (entry->getContainer()->isArray())
-      op << "ckGetArrayIndex().getProjectionID()";
+      op << "this->ckGetArrayIndex().getProjectionID()";
     else
       op << "NULL";
 
@@ -613,7 +594,7 @@ void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent, Entry* entry
   op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, ";
 
   if (entry->getContainer()->isArray())
-    op << "ckGetArrayIndex().getProjectionID()";
+    op << "this->ckGetArrayIndex().getProjectionID()";
   else
     op << "NULL";
 

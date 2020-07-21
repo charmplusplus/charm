@@ -103,6 +103,9 @@ class TCharm: public CBase_TCharm
 	TCharmInitMsg *initMsg; //Thread initialization data
 	double timeOffset; //Value to add to CkWallTimer to get my clock
 
+	// Called from ResumeFromSync so TCharm users can do things before start()
+	CkCallback resumeAfterMigrationCallback;
+
  public:
 	//User's heap-allocated/global data:
 	class UserData {
@@ -155,6 +158,12 @@ class TCharm: public CBase_TCharm
 	virtual void ckJustMigrated();
 	virtual void ckJustRestored();
 	virtual void ckAboutToMigrate();
+
+	template <class T = CkCallback>
+	void setResumeAfterMigrationCallback(T && cb)
+	{
+		resumeAfterMigrationCallback = std::forward<T>(cb);
+	}
 
 	void atBarrier();
 	void atExit(CkReductionMsg *msg) noexcept;
@@ -341,10 +350,6 @@ private:
 	double start; // starting time of trace event
 	int tcharm_routineID; // TCharm routine ID that is traced
 #endif
-#if CMK_BIGSIM_CHARM
-	void *callEvent; // The BigSim-level event that called into the library
-	int pe;          // in case thread migrates
-#endif
 
 public:
 	// Entering Charm++ from user code
@@ -352,14 +357,6 @@ public:
 	TCharmAPIRoutine(const char *routineName, const char *libraryName) noexcept {
 #else
 	TCharmAPIRoutine() noexcept {
-#endif
-#if CMK_BIGSIM_CHARM
-		// Start a new event, so we can distinguish between client
-		// execution and library execution
-		_TRACE_BG_TLINE_END(&callEvent);
-		_TRACE_BG_END_EXECUTE(0);
-		pe = CmiMyPe();
-		_TRACE_BG_BEGIN_EXECUTE_NOMSG(routineName, &callEvent, 0);
 #endif
 #if CMK_TRACE_ENABLED
 		start = CmiWallTimer();
@@ -381,13 +378,6 @@ public:
 
 		TCharm::activateThread();
 
-#if CMK_BIGSIM_CHARM
-		void *log;
-		_TRACE_BG_TLINE_END(&log);
-		_TRACE_BG_END_EXECUTE(0);
-		_TRACE_BG_BEGIN_EXECUTE_NOMSG("user_code", &log, 0);
-		if (CmiMyPe() == pe) _TRACE_BG_ADD_BACKWARD_DEP(callEvent);
-#endif
 #if CMK_TRACE_ENABLED
 		if (tcharm_routineID > -1) // is it a routine we care about?
 			traceUserBracketEventNestedID(tcharm_routineID, start, stop, TCHARM_Element());

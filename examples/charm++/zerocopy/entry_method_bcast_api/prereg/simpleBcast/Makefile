@@ -22,5 +22,12 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p6 ./simpleBcast +noCMAForZC)
 endif
 
+testp: all
+	$(call run, +p$(P) ./simpleBcast)
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./simpleBcast +noCMAForZC)
+endif
+
+
 clean:
 	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun simpleBcast

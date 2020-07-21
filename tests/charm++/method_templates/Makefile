@@ -30,7 +30,7 @@ endif
 
 ########### This stuff should be able take care of itself ############
 
-.PHONY: all clean again test bgtest translateInterface
+.PHONY: all clean again test translateInterface
 
 all: $(TARGET)
 
@@ -46,6 +46,10 @@ again:
 test: all
 	@echo "########################################################################################"
 	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS))
+
+testp: all
+	@echo "########################################################################################"
+	$(call run, +p$(P) ./$(TARGET) $(ARGS))
 
 smptest: all
 	@echo "########################################################################################"

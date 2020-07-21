@@ -1,5 +1,5 @@
-// ci file defines the function API's of the parallel objects
-// These remotely invocable functions are called entry functions in Charm++
+// ci files define the function APIs of parallel objects
+// These remotely invocable functions are called entry methods in Charm++
 
 mainmodule pgm {
 

@@ -2,6 +2,16 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.10.1
+================================================================================
+
+This is a minor bug-fix release, with the following changes:
+
+- Fix verbs layer send completion errors on recent InfiniBand hardware/drivers.
+
+- Avoid aborting with a segfault when calling CmiAbort in production builds.
+
+================================================================================
 What's new in Charm++ 6.10.0
 ================================================================================
 
@@ -32,14 +42,17 @@ Misc:
   infrastructure. Programs that rely on custom load balancers or the internals of the LB
   infrastructure will likely require some changes for compatibility.
   
+- Upcoming deprecation notice: The next release of Charm++ will remove the BigSim emulation
+  facility from the runtime system.
+  
 Known Issues:
-
-- A hang occurs in multiprocess runs in SMP mode with completion detection on GNI builds.
-  (https://github.com/UIUC-PPL/charm/issues/2508)
 
 - Recent InfiniBand machines crash in SMP builds due to problems in the verbs layer implementation.
   Users are recommended to use UCX for the time being if possible.
   (https://github.com/UIUC-PPL/charm/issues/2532)
+  
+- UCX sometimes hangs/crashes on Frontera.
+  (https://github.com/UIUC-PPL/charm/issues/2635, https://github.com/UIUC-PPL/charm/issues/2636)
 
 Charm++ Features & Fixes:
 

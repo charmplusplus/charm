@@ -43,6 +43,7 @@
 //#include <numatoolkit.h>
 
 #include "converse.h"
+#include "cmirdmautils.h"
 
 #if REGULARPAGE
 #define     LARGEPAGE              0

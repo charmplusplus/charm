@@ -385,7 +385,7 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
   DEBUGF(("[%d] resetSection: old entry:%p new entry:%p\n", CkMyPe(), oldentry, entry));
 
   const std::vector<CkArrayIndex> &al = sid->_elems;
-  CmiAssert(info.get_aid() == aid);
+  CmiAssert(info.get_aid() == (CkGroupID)aid);
   prepareCookie(entry, *sid, al.data(), sid->_elems.size(), aid);
 
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -937,7 +937,7 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
       // fixme: running obj?
       envelope *env = UsrToEnv(msg);
       const LDOMHandle &om = CProxy_ArrayBase(s.get_aid()).ckLocMgr()->getOMHandle();
-      LBDatabaseObj()->MulticastSend(om,entry->allObjKeys.data(),entry->allObjKeys.size(),env->getTotalsize());
+      LBManagerObj()->MulticastSend(om,entry->allObjKeys.data(),entry->allObjKeys.size(),env->getTotalsize());
     }
 #endif
 
@@ -1063,7 +1063,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   int i;
   CkSectionInfo &sectionInfo = msg->_cookie;
   mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
-  CmiAssert(entry->getAid() == sectionInfo.get_aid());
+  CmiAssert((CkGroupID)entry->getAid() == sectionInfo.get_aid());
 
   if (entry->notReady()) {
     DEBUGF(("entry not ready, enq buffer %p, msg-used?: %d\n", msg, UsrToEnv(msg)->isUsed()));
@@ -1088,7 +1088,7 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
   int i;
   CkSectionInfo &sectionInfo = msg->_cookie;
   mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
-  CmiAssert(entry->getAid() == sectionInfo.get_aid());
+  CmiAssert((CkGroupID)entry->getAid() == sectionInfo.get_aid());
   CkGroupID aid = sectionInfo.get_aid();
   
   // send to local
@@ -1121,25 +1121,12 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
   DEBUGF(("[%d] send to local %d elems, ArraySection\n", CkMyPe(), nLocal));
   for (i=0; i<nLocal-1; i++) {
     CProxyElement_ArrayBase ap(aid, entry->localElem[i]);
-    if (_entryTable[msg->ep]->noKeep) {
-      CkSendMsgArrayInline(msg->ep, msg, sectionInfo.get_aid(), entry->localElem[i], CK_MSG_KEEP);
-    }
-    else {
-      // send through scheduler queue
-      multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
-      ap.ckSend((CkArrayMessage *)newm, msg->ep, CK_MSG_LB_NOTRACE);
-    }
-    // use CK_MSG_DONTFREE so that the message can be reused
-    // the drawback of this scheme bypassing queue is that 
-    // if # of local element is huge, this leads to a long time occupying CPU
-    // also load balancer seems not be able to correctly instrument load
-//    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[i], CK_MSG_KEEP);
-    //CmiNetworkProgressAfter(3);
+    multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
+    ap.ckSend((CkArrayMessage *)newm, msg->ep, CK_MSG_LB_NOTRACE);
   }
   if (nLocal) {
     CProxyElement_ArrayBase ap(aid, entry->localElem[nLocal-1]);
     ap.ckSend((CkArrayMessage *)msg, msg->ep, CK_MSG_LB_NOTRACE);
-//    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1]);
   }
   else {
     CkAssert (entry->rootSid.get_pe() == CkMyPe());

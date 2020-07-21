@@ -32,5 +32,10 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyLB +noCMAForZC)
 endif
 
-bgtest: stencil3d
-	$(call run, +p4 ./stencil3d 32 16 +balancer GreedyLB +x2 +y2 +z1 +cth1 +wth1 )
+testp: stencil3d
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer RefineLB)
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyLB)
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer RefineLB +noCMAForZC)
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyLB +noCMAForZC)
+endif

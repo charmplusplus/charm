@@ -2293,7 +2293,7 @@ PUP modes
 ^^^^^^^^^
 
 Charm++ uses your pup method to both pack and unpack, by passing
-different types of PUP::ers to it. The method p.isUnpacking() returns
+different types of PUP::ers to it. The method ``p.isUnpacking()`` returns
 true if your object is being unpacked—that is, your object’s values are
 being restored. Your pup method must work properly in sizing, packing,
 and unpacking modes; and to save and restore properly, the same fields
@@ -2304,20 +2304,39 @@ Three modes are used, with three separate types of PUP::er: sizing,
 which only computes the size of your data without modifying it; packing,
 which reads/saves values out of your data; and unpacking, which
 writes/restores values into your data. You can determine exactly which
-type of PUP::er was passed to you using the p.isSizing(), p.isPacking(),
-and p.isUnpacking() methods. However, sizing and packing should almost
+type of PUP::er was passed to you using the ``p.isSizing()``, ``p.isPacking()``,
+and ``p.isUnpacking()`` methods. However, sizing and packing should almost
 always be handled identically, so most programs should use
-p.isUnpacking() and !p.isUnpacking(). Any program that calls
-p.isPacking() and does not also call p.isSizing() is probably buggy,
+``p.isUnpacking()`` and ``!p.isUnpacking()``. Any program that calls
+``p.isPacking()`` and does not also call ``p.isSizing()`` is probably buggy,
 because sizing and packing must see exactly the same data.
 
-The p.isDeleting() flag indicates the object will be deleted after
+The ``p.isDeleting()`` flag indicates the object will be deleted after
 calling the pup method. This is normally only needed for pup methods
 called via the C or f90 interface, as provided by AMPI or the other
 frameworks. Other Charm++ array elements, marshalled parameters, and
 other C++ interface objects have their destructor called when they are
-deleted, so the p.isDeleting() call is not normally required—instead,
+deleted, so the ``p.isDeleting()`` call is not normally required—instead,
 memory should be deallocated in the destructor as usual.
+
+Separately from indicating if the pup method is being used for sizing,
+packing, or unpacking, the system also provides methods to determine
+the purpose of a pup. The ``p.isCheckpoint()`` and ``p.isMigration()``
+methods let the user determine if the runtime system has invoked the
+pup method for checkpointing (both in-memory and to disk) or for
+PE-to-PE migration (this is most commonly done for load balancing).
+These allow the user to customize their pup functions, for
+example, one may want to minimize checkpoint size by not including
+data that can be reconstructed. Note that these are orthogonal to the
+direction of the pup (e.g. ``p.isCheckpoint()`` will return true both
+when creating a checkpoint and when restoring from a checkpoint; one
+can differentiate between these two cases because when creating a
+checkpoint ``p.isPacking()`` will also return true, while
+``p.isUnpacking()`` will return true when restoring). The runtime
+system guarantees that at most of these will be set. There may be
+cases where neither ``p.isCheckpoint()`` nor ``p.isMigration()``
+return true (e.g. when the system is marshalling entry method
+arguments).
 
 More specialized modes and PUP::ers are described in
 section :numref:`sec:PUP:CommonPUPers`.
@@ -3646,12 +3665,12 @@ should *not* reuse the buffer. That is, after you have passed a message
 buffer into an asynchronous entry method invocation, you shouldn’t
 access its fields, or pass that same buffer into a second entry method
 invocation. Note that this rule doesn’t preclude the *single reuse* of
-an input message - consider an entry method invocation :math:`i_1`,
-which receives as input the message buffer :math:`m_1`. Then,
-:math:`m_1` may be passed to an asynchronous entry method invocation
-:math:`i_2`. However, once :math:`i_2` has been issued with :math:`m_1`
-as its input parameter, :math:`m_1` cannot be used in any further entry
-method invocations.
+a received message - consider being inside the body of an entry method
+invocation :math:`i_1`, which has received the message buffer :math:`m_1`
+as an input parameter. Then, :math:`m_1` may be passed to an asynchronous
+entry method invocation :math:`i_2`. However, once :math:`i_2` has been
+issued with :math:`m_1` as its input parameter, :math:`m_1` cannot be
+used in any further entry method invocations.
 
 Several kinds of message are available. Regular Charm++ messages are
 objects of *fixed size*. One can have messages that contain pointers or
@@ -4221,6 +4240,16 @@ local
    immediately, they are allowed to have a non-void return value. An
    example can be found in ``examples/charm++/hello/local``.
 
+whenidle
+   a local entry method meant to be used with ``CkCallWhenIdle``,
+   which registers an entry method to be called when a processor is
+   idle. This mechanism provides a convenient way to do work (e.g. low
+   priority or speculative) in the absence of other work. ``whenidle``
+   entry methods must return a ``bool`` value, indicating whether the
+   entry method should be called when the processor is idle again, and
+   accept a ``double`` argument representing the current timestamp. An
+   example can be found in ``examples/charm++/whenidle``.
+
 python
    entry methods are enabled to be called from python scripts as
    explained in chapter :numref:`python`. Note that the object owning
@@ -4238,7 +4267,7 @@ aggregate
    messages before being sent, to reduce fine-grained overhead. The
    aggregation is handled by the Topological Routing and Aggregation
    Module (TRAM). The argument to this entry method must be a single
-   fixed-size object. More details on TRAM are given in the `TRAM
+   PUPable object. More details on TRAM are given in the `TRAM
    section <http://charm.cs.illinois.edu/manuals/html/libraries/manual-1p.html#TRAM>`__
    of the libraries manual.
 
@@ -8096,6 +8125,12 @@ After ``CkStartCheckpoint`` is executed, a directory of the designated
 name is created and a collection of checkpoint files are written into
 it.
 
+.. note::
+   Note that checkpoints are written to and read from several
+   automatically created subdirectories of the specified directory in
+   order to avoid creating too many files in the same directory, which
+   can stress the file system.
+
 Restarting
 ^^^^^^^^^^
 
@@ -8513,7 +8548,7 @@ for example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 omp
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp
    $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
 
 This library is based on the LLVM OpenMP runtime library. So it supports
@@ -8557,7 +8592,7 @@ to avoid the error:
    $ sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
    $ sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 clang omp --with-production -j8
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 clang omp --with-production -j8
    $ echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
 
 On Mac, the Apple-provided clang installed in default doesn’t have
@@ -8571,7 +8606,7 @@ to the invocation of the Charm++ build script. For example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux64 omp gcc-7
+   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp gcc-7
    $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
 
 If this does not work, you should set environment variables so that the
@@ -10718,7 +10753,7 @@ appropriate choices for the build one wants to perform.
    ================================================================ =====================================================================
    Machine                                                          Build command
    ================================================================ =====================================================================
-   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux --with-production -j8``
+   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    Multicore (single node, shared memory) 64 bit Linux              ``./build charm++ multicore-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux                                            ``./build charm++ netlrts-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux (intel compilers)                          ``./build charm++ netlrts-linux-x86_64 icc --with-production -j8``
@@ -10810,7 +10845,7 @@ Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 As an experimental feature, Charm++ can be installed with the CMake tool,
-version 3.4 or newer (3.11 if you need Fortran support).
+version 3.4 or newer.
 This is currently supported on Linux and Darwin, but not on Windows.
 
 After downloading and unpacking Charm++, it can be installed in the following way:
@@ -11541,6 +11576,13 @@ are available:
    ``0-15:4.3``. ``++ppn 10 +pemap 0-11:6.5+12`` equals
    ``++ppn 10 +pemap 0,12,1,13,2,14,3,15,4,16,6,18,7,19,8,20,9,21,10,22``
 
+   By default, this option accepts PU indices assigned by the OS. The
+   user might want to instead provide logical PU indices used by hwloc
+   (see `link <https://www.open-mpi.org/projects/hwloc/doc/v2.1.0/a00342.php#faq_indexes>`
+   for details). To do this, prepend the sequence with an alphabet L
+   (case-insensitive). For instance, ``+pemap L0-3`` will instruct the
+   runtime to bind threads to PUs with logical indices 0-3.
+
 ``+commap p[,q,...]``
    Bind communication threads to the listed cores, one per process.
 
@@ -11801,13 +11843,17 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  nocopy
 
+-  nocopypost
+
+-  migratable
+
+-  python
+
 -  Entry method attributes
 
    -  stacksize
 
    -  threaded
-
-   -  migratable
 
    -  createhere
 
@@ -11833,15 +11879,13 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
    -  notrace
 
-   -  python
+   -  accel (reserved for future/experimental use)
 
-   -  accel
+   -  readwrite (reserved for future/experimental use)
 
-   -  readwrite
+   -  writeonly (reserved for future/experimental use)
 
-   -  writeonly
-
-   -  accelblock
+   -  accelblock (reserved for future/experimental use)
 
    -  memcritical
 
@@ -11873,8 +11917,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
    -  serial
 
-   -  forward
-
    -  when
 
    -  while
@@ -11888,10 +11930,6 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
    -  else
 
    -  overlap
-
-   -  connect
-
-   -  publishes
 
 .. _sec:trace-projections:
 

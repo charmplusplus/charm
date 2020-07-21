@@ -18,12 +18,12 @@ hello.ci.stamp: hello.ci
 test: all
 	$(call run, +p3 ./hello 10 )
 
+testp: all
+	$(call run, +p$(P) ./hello $$(( $(P) * 8 )) )
+
 smptest: all
 	$(call run, +p2 ./hello 10 ++ppn 2 )
 	$(call run, +p4 ./hello 10 ++ppn 2 )
-
-bgtest: all
-	$(call run, +p3 ./hello 10 +x1 +y1 +z3 )
 
 clean:
 	rm -f conv-host *.o charmrun charmrun.exe

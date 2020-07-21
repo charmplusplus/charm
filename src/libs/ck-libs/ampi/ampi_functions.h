@@ -601,12 +601,6 @@ AMPI_CUSTOM_FUNC(int, AMPI_Alltoall_long, void *sendbuf, int sendcount, MPI_Data
                        void *recvbuf, int recvcount, MPI_Datatype recvtype,
                        MPI_Comm comm)
 
-#if CMK_BIGSIM_CHARM
-AMPI_CUSTOM_FUNC(int, AMPI_Set_start_event, MPI_Comm comm)
-AMPI_CUSTOM_FUNC(int, AMPI_Set_end_event, void)
-AMPI_CUSTOM_FUNC(void, beginTraceBigSim, char* msg)
-AMPI_CUSTOM_FUNC(void, endTraceBigSim, char* msg, char* param)
-#endif
 
 #ifdef __cplusplus
 #if CMK_CUDA
@@ -638,6 +632,7 @@ AMPI_CUSTOM_FUNC(long, ampiCurrentStackUsage, void)
 #elif defined __INTEL_COMPILER
 # pragma warning push
 # pragma warning disable 1478
+# pragma warning disable 1786
 #endif
 
 #ifndef AMPI_FUNC_NOIMPL

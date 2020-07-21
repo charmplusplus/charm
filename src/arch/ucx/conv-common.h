@@ -23,11 +23,10 @@
  * - startid, redID
  * - rank is needed by broadcast
  */
-#define CMK_MSG_HEADER_UNIQUE    CmiUInt4 size; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
+#define CMK_MSG_HEADER_UNIQUE    CmiUInt4 size; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT            { CMK_MSG_HEADER_UNIQUE }
-#define CMK_MSG_HEADER_BIGSIM_ {CMK_MSG_HEADER_UNIQUE CMK_BIGSIM_FIELDS}
 
 /* defines different parameters of groups of processors. (next 4 definitions)
    used in converse.h (the first) and convcore.c (the others). a value of 1
@@ -53,9 +52,6 @@
 /* Specifies if the routines which send multiple messages (vectors of messages)
    to a processors are implemented in convcore.c (1) or in machine.C (1). */
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
-
-/* Enable the CCS protocol if set to 1. */
-#define CMK_CCS_AVAILABLE                                  1
 
 /* Defines if there is a "charmrun" program running on the system, which
    interacts with possible connecting clients (0), or if there is no such

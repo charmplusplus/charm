@@ -1,16 +1,16 @@
 set(conv-core-c-sources cmipool.C conv-conds.C
-    conv-rdma.C convcore.C cpm.C cpthreads.C cpuaffinity.C debug-conv.C futures.C
+    conv-rdma.C conv-rdmadevice.C convcore.C cpm.C cpthreads.C cpuaffinity.C debug-conv.C futures.C
     global-nop.C isomalloc.C mem-arena.C memoryaffinity.C msgmgr.C quiescence.C
     random.C)
 
 set(conv-core-h-sources ../util/cmitls.h cmipool.h cmidemangle.h
     conv-config.h conv-cpath.h conv-cpm.h conv-header.h conv-ooc.h
-    conv-qd.h conv-random.h conv-rdma.h conv-taskQ.h conv-trace.h converse.h
+    conv-qd.h conv-random.h conv-rdma.h conv-rdmadevice.h conv-taskQ.h conv-trace.h converse.h
     cpthreads.h debug-conv++.h debug-conv.h hrctimer.h mem-arena.h memory-gnu-threads.h
     memory-isomalloc.h msgq.h persistent.h queueing.h quiescence.h taskqueue.h)
 
 set(conv-core-cxx-sources ../util/cmitls.C conv-interoperate.C conv-taskQ.C cputopology.C
-    debug-conv++.C  memory-darwin-clang.C memory-os-wrapper.C queueing.C hrctimer.C)
+    debug-conv++.C  memory-darwin-clang.C queueing.C hrctimer.C)
 
 set(conv-ccs-c-sources ../conv-ccs/conv-ccs.C)
 
@@ -19,7 +19,7 @@ set(conv-ccs-h-sources ../conv-ccs/ccs-auth.h ../conv-ccs/ccs-builtins.h
 
 set(conv-ccs-cxx-sources ../conv-ccs/ccs-builtins.C ../conv-ccs/middle-ccs.C)
 
-set(conv-perf-cxx-sources ../conv-perf/traceCore.C ../conv-perf/traceCoreCommon.C)
+set(conv-perf-cxx-sources ../conv-perf/traceCore.C ../conv-perf/traceCoreCommon.C ../conv-perf/machineProjections.C)
 
 set(conv-perf-h-sources ../conv-perf/allEvents.h ../conv-perf/charmEvents.h
     ../conv-perf/charmProjections.h ../conv-perf/converseEvents.h
@@ -44,6 +44,9 @@ target_compile_definitions(memory-os PRIVATE -DCMK_MEMORY_BUILD_OS)
 add_library(memory-os-verbose memory.C)
 target_compile_definitions(memory-os-verbose PRIVATE -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_VERBOSE)
 
+add_library(memory-os-record memory.C)
+target_compile_definitions(memory-os-record PRIVATE -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_RECORD)
+
 add_library(memory-os-paranoid memory.C)
 target_compile_definitions(memory-os-paranoid PRIVATE -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_PARANOID)
 
@@ -62,17 +65,20 @@ if(${CMK_HAS_MMAP})
     add_library(memory-gnu memory.C)
     target_compile_definitions(memory-gnu PRIVATE -DCMK_MEMORY_BUILD_GNU)
 
-    add_library(memory-verbose memory.C)
-    target_compile_definitions(memory-verbose PRIVATE -DCMK_MEMORY_BUILD_VERBOSE)
+    add_library(memory-gnu-verbose memory.C)
+    target_compile_definitions(memory-gnu-verbose PRIVATE -DCMK_MEMORY_BUILD_VERBOSE)
 
-    add_library(memory-paranoid memory.C)
-    target_compile_definitions(memory-paranoid PRIVATE -DCMK_MEMORY_BUILD_PARANOID)
+    add_library(memory-gnu-record memory.C)
+    target_compile_definitions(memory-gnu-record PRIVATE -DCMK_MEMORY_BUILD_RECORD)
 
-    add_library(memory-leak memory.C)
-    target_compile_definitions(memory-leak PRIVATE -DCMK_MEMORY_BUILD_LEAK)
+    add_library(memory-gnu-paranoid memory.C)
+    target_compile_definitions(memory-gnu-paranoid PRIVATE -DCMK_MEMORY_BUILD_PARANOID)
 
-    add_library(memory-isomalloc memory.C)
-    target_compile_definitions(memory-isomalloc PRIVATE -DCMK_MEMORY_BUILD_ISOMALLOC)
+    add_library(memory-gnu-leak memory.C)
+    target_compile_definitions(memory-gnu-leak PRIVATE -DCMK_MEMORY_BUILD_LEAK)
+
+    add_library(memory-gnu-isomalloc memory.C)
+    target_compile_definitions(memory-gnu-isomalloc PRIVATE -DCMK_MEMORY_BUILD_ISOMALLOC)
 endif()
 
 if(${CMK_CHARMDEBUG})
@@ -100,14 +106,32 @@ endif()
 
 add_library(global-swap global-elfgot.C)
 
+find_program(GIT git)
 
-file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.c CONTENT
+if(GIT)
+  execute_process(COMMAND git describe --exact-match
+             OUTPUT_VARIABLE CHARM_VERSION_GIT
+             RESULT_VARIABLE git_result
+             OUTPUT_STRIP_TRAILING_WHITESPACE
+             ERROR_QUIET
+             )
+  if(NOT ${git_result} EQUAL 0)
+    execute_process(COMMAND git describe --long --always
+             OUTPUT_VARIABLE CHARM_VERSION_GIT
+             OUTPUT_STRIP_TRAILING_WHITESPACE
+             )
+  endif()
+else()
+  set(CHARM_VERSION_GIT "v${CHARM_VERSION}")
+endif()
+
+file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.C CONTENT
 "extern const char * const CmiCommitID;
-const char * const CmiCommitID = \"${CHARM_VERSION}\";
+const char * const CmiCommitID = \"${CHARM_VERSION_GIT}\";
 "
 )
 
-add_library(conv-core ${CMAKE_BINARY_DIR}/include/commitid.c ${conv-core-c-sources} ${conv-core-cxx-sources} ${conv-core-h-sources} ${conv-ccs-c-sources} ${conv-ccs-h-sources} ${conv-ccs-cxx-sources} ${conv-perf-cxx-sources} ${conv-perf-h-sources} ../conv-ldb/cldb.C)
+add_library(conv-core ${CMAKE_BINARY_DIR}/include/commitid.C ${conv-core-c-sources} ${conv-core-cxx-sources} ${conv-core-h-sources} ${conv-ccs-c-sources} ${conv-ccs-h-sources} ${conv-ccs-cxx-sources} ${conv-perf-cxx-sources} ${conv-perf-h-sources} ../conv-ldb/cldb.C)
 add_dependencies(conv-core hwloc)
 
 add_library(threads-default threads.C $<TARGET_OBJECTS:boost-context>)
@@ -158,9 +182,11 @@ add_library(threads-pthreads threads.C)
 target_compile_definitions(threads-pthreads PRIVATE -DCMK_THREADS_BUILD_PTHREADS=1)
 target_include_directories(threads-pthreads PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-fibers threads.C)
-target_compile_definitions(threads-fibers PRIVATE -DCMK_THREADS_BUILD_FIBERS=1)
-target_include_directories(threads-fibers PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
+if(CMK_WINDOWS)
+    add_library(threads-fibers threads.C)
+    target_compile_definitions(threads-fibers PRIVATE -DCMK_THREADS_BUILD_FIBERS=1)
+    target_include_directories(threads-fibers PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
+endif()
 
 add_library(threads-stackcopy threads.C)
 target_compile_definitions(threads-stackcopy PRIVATE -DCMK_THREADS_BUILD_STACKCOPY=1)
@@ -187,7 +213,7 @@ target_include_directories(threads-uJcontext-memoryalias PRIVATE ../QuickThreads
 add_library(conv-static OBJECT conv-static.c)
 add_custom_command(TARGET conv-core
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:conv-static> ${CMAKE_BINARY_DIR}/lib/conv-static.o
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
     VERBATIM
 )
 add_dependencies(conv-core conv-static)
@@ -202,10 +228,17 @@ add_executable(conv-cpm ../xlatcpm/conv-cpm.C)
 target_compile_options(conv-cpm PRIVATE -host)
 set_target_properties(conv-cpm PROPERTIES LINK_FLAGS "-host -language c++")
 
-add_library(tsm ../langs/simplemsg/simplemsg.C ../langs/simplemsg/simplemsg.h)
-add_library(sm ../langs/simplemsg/sm.C ../langs/simplemsg/sm.h)
+add_library(tsm EXCLUDE_FROM_ALL ../langs/simplemsg/simplemsg.C ../langs/simplemsg/simplemsg.h)
+add_library(sm EXCLUDE_FROM_ALL ../langs/simplemsg/sm.C ../langs/simplemsg/sm.h )
 
-add_library(pvmc ../langs/pvmc/pvmc_buf.C ../langs/pvmc/pvmc_comm.C ../langs/pvmc/pvmc_conv.C ../langs/pvmc/pvmc_main.C ../langs/pvmc/pvmc_pack.C ../langs/pvmc/pvmc_groups.C)
+add_library(pvmc EXCLUDE_FROM_ALL ../langs/pvmc/pvmc_buf.C ../langs/pvmc/pvmc_comm.C ../langs/pvmc/pvmc_conv.C ../langs/pvmc/pvmc_main.C ../langs/pvmc/pvmc_pack.C ../langs/pvmc/pvmc_groups.C)
+
+
+configure_file(../langs/pvmc/pvmc.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+configure_file(../langs/pvmc/pvm3.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+configure_file(../langs/simplemsg/sm.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+configure_file(../langs/simplemsg/simplemsg.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+
 
 if(${F90CHARM})
     include(../ci-files.cmake)

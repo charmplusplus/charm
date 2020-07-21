@@ -38,6 +38,14 @@ void PUP_toNetwork_sizer::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t
 	}
 }
 
+void PUP_toNetwork_sizer::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void PUP_toNetwork_sizer::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 #define casesPUP_toNetwork_types \
 	casePUP_toNetwork_type(Tfloat,float,float); \
 	casePUP_toNetwork_type(Tdouble,double,double); \
@@ -79,6 +87,14 @@ void PUP_toNetwork_pack::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
        	}
 }
 
+void PUP_toNetwork_pack::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void PUP_toNetwork_pack::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 void PUP_toNetwork_unpack::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
 {
 	size_t i;
@@ -103,6 +119,14 @@ void PUP_toNetwork_unpack::bytes(void *p,size_t n,size_t itemSize,PUP::dataType 
        	default: 
        		CmiAbort("Unrecognized type passed to PUP_toNetwork_unpack!\n");
        	}
+}
+
+void PUP_toNetwork_unpack::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void PUP_toNetwork_unpack::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
 }
 
 

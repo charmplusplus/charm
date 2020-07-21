@@ -31,6 +31,18 @@ test: all
 	-sync
 	$(call run, ./hello +p4 +restart log )
 
+testp: all
+	-rm -fr log
+	$(call run, ./hello +p$(P) )
+	-sync
+	$(call run, ./hello +p$(P) +restart log )
+	$(call run, ./hello +p$$(( $(P) / 2 )) +restart log )
+	-sync
+	-rm -fr log
+	$(call run, ./hello +p$(P) )
+	-sync
+	$(call run, ./hello +p$(P) +restart log )
+
 smptest: all
 	-rm -fr log
 	$(call run, ./hello +p4 ++ppn 2 )
@@ -42,9 +54,3 @@ smptest: all
 	$(call run, ./hello +p2 ++ppn 2)
 	-sync
 	$(call run, ./hello +p4 +restart log ++ppn 4 )
-
-bgtest: all
-	-rm -fr log
-	$(call run, ./hello +p2 +x3 +y1 +z1 )
-	$(call run, ./hello +p2 +restart log  +x3 +y1 +z1 )
-	$(call run, ./hello +p2 +restart log  +x2 +y2 +z1 )

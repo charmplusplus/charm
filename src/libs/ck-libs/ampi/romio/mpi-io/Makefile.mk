@@ -27,6 +27,8 @@ romio_mpi_sources +=          \
     mpi-io/get_posn_sh.c      \
     mpi-io/get_size.c         \
     mpi-io/get_view.c         \
+    mpi-io/ioreq_c2f.c        \
+    mpi-io/ioreq_f2c.c        \
     mpi-io/iread.c            \
     mpi-io/iread_all.c        \
     mpi-io/iread_at.c         \
@@ -81,8 +83,6 @@ romio_other_sources +=       \
 
 # helper variables for conditionally compiled sources
 mpio_request_sources=   \
-    mpi-io/ioreq_c2f.c  \
-    mpi-io/ioreq_f2c.c  \
     mpi-io/iotest.c     \
     mpi-io/iotestall.c  \
     mpi-io/iotestany.c  \

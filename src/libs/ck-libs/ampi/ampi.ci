@@ -35,6 +35,7 @@ module ampi {
     entry EXPEDITED void ResumeThread();
     entry EXPEDITED void Checkpoint(int len, char dname[len]);
     entry EXPEDITED void ExchangeProxy(CProxy_ampi);
+    entry EXPEDITED void resumeAfterMigration();
   };
 
   array[1D] ampi {
