@@ -6,6 +6,7 @@
 #include <string.h>
 #include "machine.h"
 #include "converse.h"
+#include "cmirdmautils.h"
 #include "pcqueue.h"
 #include "assert.h"
 #include "malloc.h"
@@ -59,7 +60,7 @@ char *ALIGN_32(char *p) {
 #define CMI_PAMI_ACK_DISPATCH             9
 #define CMI_PAMI_DISPATCH                10
 
-#ifdef CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
 #define SHORT_CUTOFF   128
 #define EAGER_CUTOFF   4096
 #else

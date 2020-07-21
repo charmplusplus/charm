@@ -30,6 +30,8 @@ void noopit(const char*, ...)
 #define DEBUGC(x) x
 //#define DEBUGC(x) 
 
+#define SUBDIR_SIZE 256
+
 CkGroupID _sysChkptMgr;
 
 typedef struct _GroupInfo{
@@ -39,7 +41,6 @@ typedef struct _GroupInfo{
         bool present;
 } GroupInfo;
 PUPbytes(GroupInfo)
-PUPmarshall(GroupInfo)
 
 bool _inrestart = false;
 bool _restarted = false;
@@ -99,12 +100,12 @@ extern void _initDone();
 static void bdcastRO(void){
 	int i;
 	// Determine the size of the RODataMessage
-	PUP::sizer ps;
+	PUP::sizer ps(PUP::er::IS_CHECKPOINT);
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
 	// Allocate and fill out the RODataMessage
 	envelope *env = _allocEnv(RODataMsg, ps.size());
-	PUP::toMem pp((char *)EnvToUsr(env));
+	PUP::toMem pp((char *)EnvToUsr(env), PUP::er::IS_CHECKPOINT);
 #if CMK_ONESIDED_IMPL
 	// Messages of type 'RODataMsg' need to have numZerocopyROops pupped in order
 	// to be processed inside _processRODataMsg
@@ -127,7 +128,7 @@ static void bdcastRO(void){
 static void bdcastROGroupData(void){
 	int i;
 	//Determine the size of the RODataMessage
-	PUP::sizer ps, ps1;
+	PUP::sizer ps(PUP::er::IS_CHECKPOINT), ps1(PUP::er::IS_CHECKPOINT);
 	CkPupROData(ps);
 	int ROSize = ps.size();
 
@@ -144,7 +145,7 @@ static void bdcastROGroupData(void){
 	payloadOffset += sizeof(int);
 
 	//Allocate and fill out the RODataMessage
-	PUP::toMem pp((char *)payloadOffset);
+	PUP::toMem pp((char *)payloadOffset, PUP::er::IS_CHECKPOINT);
 	CkPupROData(pp);
 
 	CkPupGroupData(pp);
@@ -167,28 +168,32 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatus);
 
 static void addPartitionDirectory(ostringstream &path) {
-        if (CmiNumPartitions() > 1) {
-          path << "/part-" << CmiMyPartition() << '/';
-        }
+  if (CmiNumPartitions() > 1) {
+    path << "/part-" << CmiMyPartition();
+  }
 }
 
 static FILE* openCheckpointFile(const char *dirname, const char *basename,
-                                const char *mode, int id = -1) {
-        ostringstream out;
-        out << dirname << '/';
-        addPartitionDirectory(out);
-        out << basename;
-        if (id != -1)
-                out << '_' << id;
-        out << ".dat";
+    const char *mode, int id = -1) {
+  ostringstream out;
+  out << dirname;
+  addPartitionDirectory(out);
+  if (id != -1) {
+    int subdir_id = id / SUBDIR_SIZE;
+    out << "/sub" << subdir_id;
+  }
+  out << "/" << basename;
+  if (id != -1) {
+    out << "_" << id;
+  }
+  out << ".dat";
 
-        FILE *fp = CmiFopen(out.str().c_str(), mode);
-        if (!fp) {
-
-                CkAbort("PE %d failed to open checkpoint file: %s, mode: %s, status: %s",
-				CkMyPe(), out.str().c_str(), mode, strerror(errno));
-        }
-        return fp;
+  FILE *fp = CmiFopen(out.str().c_str(), mode);
+  if (!fp) {
+    CkAbort("PE %d failed to open checkpoint file: %s, mode: %s, status: %s",
+        CkMyPe(), out.str().c_str(), mode, strerror(errno));
+  }
+  return fp;
 }
 
 /**
@@ -214,20 +219,45 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	requestStatus = _requestStatus;
 	// make dir on all PEs in case it is a local directory
 	CmiMkdir(dirname);
-	bool success = true;
-        if (CmiNumPartitions() > 1) {
-          ostringstream partDir;
-          partDir << dirname;
-          addPartitionDirectory(partDir);
-          CmiMkdir(partDir.str().c_str());
-        }
 
+	// Create partition directories (if applicable)
+	ostringstream dirPath;
+	dirPath << dirname;
+	if (CmiNumPartitions() > 1) {
+		addPartitionDirectory(dirPath);
+		CmiMkdir(dirPath.str().c_str());
+	}
+
+	// Due to file system issues we have observed, divide checkpoints
+	// into subdirectories to avoid having too many files in a single directory.
+	// Nodegroups should be checked separately since they could go into
+	// different subdirectory.
+
+	// Save current path for later use with nodegroups
+	ostringstream dirPathNode;
+	dirPathNode << dirPath.str();
+
+	// Create subdirectories
+	int mySubDir = CkMyPe() / SUBDIR_SIZE;
+	dirPath << "/sub" << mySubDir;
+	CmiMkdir(dirPath.str().c_str());
+
+	// Create Nodegroup subdirectory if needed
+	if (CkMyRank() == 0) {
+		int mySubDirNode = CkMyNode() / SUBDIR_SIZE;
+		if (mySubDirNode != mySubDir) {
+			dirPathNode << "/sub" << mySubDirNode;
+			CmiMkdir(dirPathNode.str().c_str());
+		}
+	}
+
+	bool success = true;
 	if (CkMyPe() == 0) {
 #if CMK_SHRINK_EXPAND
     if (pending_realloc_state == REALLOC_IN_PROGRESS) {
       // After restarting from this AtSync checkpoint, resume execution along the
       // normal path (i.e. whatever the user defined as ResumeFromSync.)
-      CkCallback resumeFromSyncCB(CkIndex_LBDatabase::ResumeClients(), _lbdb);
+      CkCallback resumeFromSyncCB(CkIndex_LBManager::ResumeClients(), _lbmgr);
       success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
     } else
 #endif
@@ -239,7 +269,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 #ifndef CMK_CHARE_USE_PTR
 	// save plain singleton chares into Chares.dat
 	FILE* fChares = openCheckpointFile(dirname, "Chares", "wb", CkMyPe());
-	PUP::toDisk pChares(fChares);
+	PUP::toDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
 	CkPupChareData(pChares);
 	if(pChares.checkError())
 	  success = false;
@@ -250,7 +280,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", CkMyPe());
-	PUP::toDisk pGroups(fGroups);
+	PUP::toDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
         CkPupGroupData(pGroups);
 	if(pGroups.checkError())
 	  success = false;
@@ -261,7 +291,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
 	if (CkMyRank() == 0) {
 	  FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", CkMyNode());
-	  PUP::toDisk pNodeGroups(fNodeGroups);
+	  PUP::toDisk pNodeGroups(fNodeGroups, PUP::er::IS_CHECKPOINT);
           CkPupNodeGroupData(pNodeGroups);
 	  if(pNodeGroups.checkError())
 	    success = false;
@@ -271,7 +301,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 
 	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
 	FILE *datFile = openCheckpointFile(dirname, "arr", "wb", CkMyPe());
-	PUP::toDisk  p(datFile);
+	PUP::toDisk  p(datFile, PUP::er::IS_CHECKPOINT);
 	CkPupArrayElementsData(p);
 	if(p.checkError())
 	  success = false;
@@ -622,7 +652,7 @@ static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatu
 	
 	// save readonlys, and callback BTW
 	FILE* fRO = openCheckpointFile(dirname, "RO", "wb", -1);
-	PUP::toDisk pRO(fRO);
+	PUP::toDisk pRO(fRO, PUP::er::IS_CHECKPOINT);
 	int _numPes = CkNumPes();
 	pRO|_numPes;
 	int _numNodes = CkNumNodes();
@@ -645,7 +675,7 @@ static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatu
 	// save mainchares into MainChares.dat
 	{
 		FILE* fMain = openCheckpointFile(dirname, "MainChares", "wb", -1);
-		PUP::toDisk pMain(fMain);
+		PUP::toDisk pMain(fMain, PUP::er::IS_CHECKPOINT);
 		CkPupMainChareData(pMain, NULL);
 		if(pMain.checkError())
 		{
@@ -724,7 +754,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// restore readonlys
 	FILE* fRO = openCheckpointFile(dirname, "RO", "rb", -1);
 	int _numPes = -1;
-	PUP::fromDisk pRO(fRO);
+	PUP::fromDisk pRO(fRO, PUP::er::IS_CHECKPOINT);
 	pRO|_numPes;
 	int _numNodes = -1;
 	pRO|_numNodes;
@@ -741,7 +771,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// restore mainchares
 	FILE* fMain = openCheckpointFile(dirname, "MainChares", "rb");
 	if(fMain && CkMyPe()==0){ // only main chares have been checkpointed, we restart on PE0
-		PUP::fromDisk pMain(fMain);
+		PUP::fromDisk pMain(fMain, PUP::er::IS_CHECKPOINT);
 		CkPupMainChareData(pMain, args);
 		CmiFclose(fMain);
 		DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
@@ -752,7 +782,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// restore chares only when number of pes is the same 
 	if(CkNumPes() == _numPes) {
 		FILE* fChares = openCheckpointFile(dirname, "Chares", "rb", CkMyPe());
-		PUP::fromDisk pChares(fChares);
+		PUP::fromDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
 		CkPupChareData(pChares);
 		CmiFclose(fChares);
 		if (CmiMyRank() == 0) _chareRestored = true;
@@ -764,7 +794,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// restore from PE0's copy if shrink/expand
 	FILE* fGroups = openCheckpointFile(dirname, "Groups", "rb",
                                      (CkNumPes() == _numPes) ? CkMyPe() : 0);
-	PUP::fromDisk pGroups(fGroups);
+	PUP::fromDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
     CkPupGroupData(pGroups);
 	CmiFclose(fGroups);
 
@@ -773,7 +803,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	if(CkMyRank()==0){
                 FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "rb",
                                                        (CkNumNodes() == _numNodes) ? CkMyNode() : 0);
-                PUP::fromDisk pNodeGroups(fNodeGroups);
+                PUP::fromDisk pNodeGroups(fNodeGroups, PUP::er::IS_CHECKPOINT);
         CkPupNodeGroupData(pNodeGroups);
 		CmiFclose(fNodeGroups);
 	}
@@ -785,7 +815,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
           for (i=0; i<_numPes;i++) {
             if (i%CkNumPes() == CkMyPe()) {
               FILE *datFile = openCheckpointFile(dirname, "arr", "rb", i);
-	      PUP::fromDisk  p(datFile);
+	      PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
 	      CkPupArrayElementsData(p);
 	      CmiFclose(datFile);
             }
@@ -824,7 +854,7 @@ void CkResumeRestartMain(char * msg) {
 
   int _numPes = -1;
   if(CkMyPe()!=0) {
-    PUP::fromMem pRO((char *)(msg+CmiMsgHeaderSizeBytes+2*sizeof(int)));
+    PUP::fromMem pRO((char *)(msg+CmiMsgHeaderSizeBytes+2*sizeof(int)), PUP::er::IS_CHECKPOINT);
 
     CkPupROData(pRO);
     CmiPrintf("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
@@ -839,7 +869,7 @@ void CkResumeRestartMain(char * msg) {
     /* CmiPrintf("[%d] For shrinkexpand newpe=%d, oldpe=%d \n",Cmi_myoldpe, CkMyPe(), Cmi_myoldpe); */
     // non-shrink files would be empty since LB would take care
     FILE *datFile = openCheckpointFile(dirname, "arr", "rb", Cmi_myoldpe);
-    PUP::fromDisk  p(datFile);
+    PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
     CkPupArrayElementsData(p);
     CmiFclose(datFile);
   }

@@ -49,6 +49,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include "converse.h"
+#include "cmirdmautils.h"
 #include <algorithm>
 
 /*Support for ++debug: */

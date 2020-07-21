@@ -221,10 +221,11 @@ AMPI_CUSTOM_FUNC(int, MPIO_Waitsome, int incount, MPIO_Request array_of_requests
                   int array_of_indices[], MPI_Status array_of_statuses[])
 AMPI_CUSTOM_FUNC(int, MPIO_Testsome, int incount, MPIO_Request array_of_requests[], int *outcount,
                   int array_of_indices[], MPI_Status array_of_statuses[])
+#endif /* HAVE_MPI_GREQUEST */
 
+/* AMPI: Moved these out of the #ifndef HAVE_MPI_GREQUEST */
 AMPI_CUSTOM_FUNC(MPI_Fint, MPIO_Request_c2f, MPIO_Request request)
 AMPI_CUSTOM_FUNC(MPIO_Request, MPIO_Request_f2c, MPI_Fint request)
-#endif /* HAVE_MPI_GREQUEST */
 
 /* info functions if not defined in the MPI implementation */
 #ifndef HAVE_MPI_INFO

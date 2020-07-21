@@ -47,7 +47,7 @@ void Entry::check() {
 
     if (isConstructor() && (isSync() || isIget())) {
       XLAT_ERROR_NOCOL("constructors cannot have the 'sync' attribute", first_line_);
-      attribs ^= SSYNC;
+      removeAttribute(SSYNC);
     }
 
     if (param->isCkArgMsgPtr() && (!isConstructor() || !container->isMainChare()))
@@ -111,7 +111,7 @@ void Entry::check() {
   }
 
   if (isTramTarget()) {
-    if (param && (!param->isMarshalled() || param->isVoid() || param->next != NULL))
+    if (param && (/*!param->isMarshalled() ||*/ param->isVoid() || param->next != NULL))
       XLAT_ERROR_NOCOL(
           "'aggregate' entry methods must be parameter-marshalled "
           "and take a single argument",
@@ -121,6 +121,20 @@ void Entry::check() {
       XLAT_ERROR_NOCOL(
           "'aggregate' entry methods can only be used in regular groups and chare arrays",
           first_line_);
+  }
+
+  if (isWhenIdle()) {
+    if (!retType || strcmp(retType->getBaseName(), "bool")) {
+      XLAT_ERROR_NOCOL(
+        "whenidle functions must return 'bool'",
+        first_line_);
+    }
+
+    if (!param || param->next || strcmp(param->param->getType()->getBaseName(), "double")) {
+      XLAT_ERROR_NOCOL(
+        "whenidle functions must accept a single parameter of type 'double'",
+        first_line_);
+    }
   }
 }
 
@@ -139,7 +153,7 @@ void Entry::lookforCEntry(CEntry* centry) {
   centry->decl_entry = this;
 }
 
-Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
+Entry::Entry(int l, Attribute* a, Type* r, const char* n, ParamList* p, Value* sz,
              SdagConstruct* sc, const char* e, int fl, int ll)
     : attribs(a),
       retType(r),
@@ -162,8 +176,7 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
   entryCount = -1;
   isWhenEntry = 0;
   containsWhenConstruct = false;
-  if (param && param->isMarshalled() && !isThreaded()) attribs |= SNOKEEP;
-
+  if (param && param->isMarshalled() && !isThreaded()) addAttribute(SNOKEEP);
   if (isPython()) pythonDoc = python_doc;
   ParamList* plist = p;
   while (plist != NULL) {
@@ -176,6 +189,9 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
         numRdmaRecvParams++; // increment recv 'rdma' param count
     }
     plist = plist->next;
+  }
+  if (getAttribute(SWHENIDLE)) {
+    addAttribute(SLOCAL);
   }
 }
 
@@ -220,13 +236,17 @@ void Entry::setChare(Chare* c) {
       container->lookforCEntry(*i);
     }
   }
+
+  if (isWhenIdle()) {
+    container->setWhenIdle(1);
+  }
 }
 
 void Entry::preprocessSDAG() {
   if (isSdag() || isWhenEntry) {
     if (container->isNodeGroup()) {
-      attribs |= SLOCKED;  // Make the method [exclusive] to preclude races on SDAG
-                           // control structures
+      addAttribute(SLOCKED); // Make the method [exclusive] to preclude races on SDAG
+                             // control structures
     }
   }
 }
@@ -867,10 +887,10 @@ void Entry::genGroupDefs(XStr& str) {
              "  // if there is a running obj being measured, stop it temporarily\n"
              "  LDObjHandle objHandle;\n"
              "  int objstopped = 0;\n"
-             "  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);\n"
-             "  if (the_lbdb->RunningObject(&objHandle)) {\n"
+             "  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);\n"
+             "  if (the_lbmgr->RunningObject(&objHandle)) {\n"
              "    objstopped = 1;\n"
-             "    the_lbdb->ObjectStop(objHandle);\n"
+             "    the_lbmgr->ObjectStop(objHandle);\n"
              "  }\n"
              "#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
@@ -886,7 +906,7 @@ void Entry::genGroupDefs(XStr& str) {
           << ");\n"
              "#endif\n";
       str << "#if CMK_LBDB_ON\n"
-             "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
+             "  if (objstopped) the_lbmgr->ObjectStart(objHandle);\n"
              "#endif\n";
       if (isAppWork()) str << " _TRACE_END_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
@@ -970,8 +990,7 @@ XStr Entry::dataItemType() {
   if (container->isGroup()) {
     itemType << param->param->type;
   } else if (container->isArray()) {
-    itemType << "ArrayDataItem<" << param->param->type << ", " << aggregatorIndexType()
-             << ">";
+    itemType << param->param->type;
   }
   return itemType;
 }
@@ -984,7 +1003,7 @@ XStr Entry::aggregatorType() {
               << ", " << container->indexName() << "::_callmarshall_" << epStr() << ">";
   } else if (container->isArray()) {
     groupType << "ArrayMeshStreamer<" << param->param->type << ", "
-              << aggregatorIndexType() << ", " << container->baseName() << ", "
+              << container->baseName() << ", "
               << "SimpleMeshRouter, " << container->indexName() << "::_callmarshall_"
               << epStr() << ">";
   }
@@ -1000,7 +1019,7 @@ XStr Entry::aggregatorGlobalType(XStr& scope) {
               << ">";
   } else if (container->isArray()) {
     groupType << "ArrayMeshStreamer<" << param->param->type << ", "
-              << aggregatorIndexType() << ", " << scope << container->baseName() << ", "
+              << scope << container->baseName() << ", "
               << "SimpleMeshRouter, " << scope << container->indexName()
               << "::_callmarshall_" << epStr() << ">";
   }
@@ -1013,19 +1032,68 @@ XStr Entry::aggregatorName() {
   return aggregatorName;
 }
 
+const char *tramArgBufferSize = "bufferSize";
+const int tramDefaultBufferSize = 16384;
+
+const char *tramArgNumDimensions = "numDimensions";
+const int tramDefaultNumDimensions = 2;
+
+const char *tramArgThresholdFractionNumerator = "thresholdNumer";
+const int tramDefaultThresholdFractionNumerator = 1;
+
+const char *tramArgThresholdFractionDenominator = "thresholdDenom";
+const int tramDefaultThresholdFractionDenominator = 2;
+
+const char *tramArgCutoffFractionNumerator = "cutoffNumer";
+const int tramDefaultCutoffFractionNumerator = 1;
+
+const char *tramArgCutoffFractionDenominator = "cutoffDenom";
+const int tramDefaultCutoffFractionDenominator = 2;
+
+const char *tramMaxItemsBuffered = "maxItems";
+const int tramDefaultMaxItemsBuffered = 1000;
+
 void Entry::genTramTypes() {
-  if (isTramTarget()) {
+  Attribute* aggregate = getAttribute(SAGGREGATE);
+
+  if (aggregate) {
     XStr typeString, nameString, itemTypeString;
     typeString << aggregatorType();
     nameString << aggregatorName();
     itemTypeString << dataItemType();
-#if __cplusplus >= 201103L
-    container->tramInstances.emplace_back(
-        typeString.get_string(), nameString.get_string(), itemTypeString.get_string());
-#else
-    container->tramInstances.push_back(TramInfo(
-        typeString.get_string(), nameString.get_string(), itemTypeString.get_string()));
-#endif
+    int bufferSize = aggregate->getArgument(tramArgBufferSize, tramDefaultBufferSize);
+    int numDimensions = aggregate->getArgument(tramArgNumDimensions, tramDefaultNumDimensions);
+    int thresholdFractionNumerator = aggregate->getArgument(tramArgThresholdFractionNumerator, tramDefaultThresholdFractionNumerator);
+    int thresholdFractionDenominator = aggregate->getArgument(tramArgThresholdFractionDenominator, tramDefaultThresholdFractionDenominator);
+    int cutoffFractionNumerator = aggregate->getArgument(tramArgCutoffFractionNumerator, tramDefaultCutoffFractionNumerator);
+    int cutoffFractionDenominator = aggregate->getArgument(tramArgCutoffFractionDenominator, tramDefaultCutoffFractionDenominator);
+    int maxItemsBuffered = aggregate->getArgument(tramMaxItemsBuffered, tramDefaultMaxItemsBuffered);
+
+    Attribute::Argument *arg = aggregate->getArgs();
+    while (arg) {
+      if (strcmp(arg->name, tramArgBufferSize) && strcmp(arg->name, tramArgNumDimensions)
+          && strcmp(arg->name, tramArgThresholdFractionNumerator)
+          && strcmp(arg->name, tramArgThresholdFractionDenominator)
+          && strcmp(arg->name, tramArgCutoffFractionNumerator)
+          && strcmp(arg->name, tramArgCutoffFractionDenominator)
+          && strcmp(arg->name, tramMaxItemsBuffered)) {
+        XLAT_ERROR_NOCOL("unsupported argument to aggregate attribute",
+                         first_line_);
+      }
+      arg = arg->next;
+    }
+
+    if (numDimensions != 1 && numDimensions != 2) {
+      XLAT_ERROR_NOCOL("aggregate currently only supports generating 1D or 2D streamers",
+                       first_line_);
+      numDimensions = tramDefaultNumDimensions;
+    }
+
+    container->tramInstances.push_back(TramInfo(typeString.get_string(),
+          nameString.get_string(), itemTypeString.get_string(), numDimensions,
+          bufferSize, maxItemsBuffered, thresholdFractionNumerator,
+          thresholdFractionDenominator, cutoffFractionNumerator,
+          cutoffFractionDenominator));
     tramInstanceIndex = container->tramInstances.size();
   }
 }
@@ -1067,34 +1135,52 @@ void Entry::genTramDefs(XStr& str) {
   }
 }
 
-// size of TRAM buffers in bytes
-const static int tramBufferSize = 16384;
-
 void Entry::genTramInstantiation(XStr& str) {
   if (!container->tramInstances.empty()) {
-    str << "  int pesPerNode = CkMyNodeSize();\n"
-        << "  if (pesPerNode == 1) {\n"
-        << "    pesPerNode = CmiNumCores();\n"
-        << "  }\n"
-        << "  const int nDims = 2;\n"
-        << "  int dims[nDims];\n"
-        << "  dims[0] = CkNumPes() / pesPerNode;\n"
-        << "  dims[1] = pesPerNode;\n"
-        << "  if (dims[0] * dims[1] != CkNumPes()) {\n"
-        << "    dims[0] = CkNumPes();\n"
-        << "    dims[1] = 1;\n"
-        << "  }\n"
-        << "  int tramBufferSize = " << tramBufferSize << ";\n";
     for (int i = 0; i < container->tramInstances.size(); i++) {
-      str << "  {\n"
+      int bufferSize = container->tramInstances[i].bufferSize;
+      int maxItemsBuffered = container->tramInstances[i].maxItemsBuffered;
+      int numDimensions = container->tramInstances[i].numDimensions;
+      int thresholdFractionNum = container->tramInstances[i].thresholdFractionNumerator;
+      int thresholdFractionDen = container->tramInstances[i].thresholdFractionDenominator;
+      int cutoffFractionNum = container->tramInstances[i].cutoffFractionNumerator;
+      int cutoffFractionDen = container->tramInstances[i].cutoffFractionDenominator;
+
+      str << "  {\n    const int nDims = " << numDimensions << ";\n";
+
+      if (numDimensions == 1) {
+        str << "    int dims[] = { CkNumPes() };\n";
+      } else { // Has to be 2 by the previous "assertion"
+        str << "    int pesPerNode = CkMyNodeSize();\n"
+            << "    if (pesPerNode == 1) {\n"
+            << "      pesPerNode = CmiNumCores();\n"
+            << "    }\n"
+            << "    int dims[nDims];\n"
+            << "    dims[0] = CkNumPes() / pesPerNode;\n"
+            << "    dims[1] = pesPerNode;\n"
+            << "    if (dims[0] * dims[1] != CkNumPes()) {\n"
+            << "      dims[0] = CkNumPes();\n"
+            << "      dims[1] = 1;\n"
+            << "    }\n";
+      }
+
+      str << "    int tramBufferSize = " << bufferSize <<";\n"
+          << "    int maxItemsBuffered = " << maxItemsBuffered <<";\n"
+          << "    int thresholdFractionNum = " << thresholdFractionNum <<";\n"
+          << "    int thresholdFractionDen = " << thresholdFractionDen <<";\n"
+          << "    int cutoffFractionNum = " << cutoffFractionNum <<";\n"
+          << "    int cutoffFractionDen = " << cutoffFractionDen <<";\n"
           << "    int itemsPerBuffer = tramBufferSize / sizeof("
           << container->tramInstances[i].itemType.c_str() << ");\n"
           << "    if (itemsPerBuffer == 0) {\n"
           << "      itemsPerBuffer = 1;\n"
           << "    }\n"
-          << "    CProxy_" << container->tramInstances[i].type.c_str() << " tramProxy =\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()
-          << "::ckNew(2, dims, gId, itemsPerBuffer, false, 10.0);\n"
+          << " tramProxy =\n"
+          << "    CProxy_" << container->tramInstances[i].type.c_str()
+          << "::ckNew(nDims, dims, gId, tramBufferSize, false, 0.01, "
+          << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
+          << "cutoffFractionNum, cutoffFractionDen);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
           << "  }\n";
     }
@@ -1111,7 +1197,7 @@ XStr Entry::tramBaseType() {
 void Entry::genTramRegs(XStr& str) {
   if (isTramTarget()) {
     XStr messageTypeString;
-    messageTypeString << "MeshStreamerMessage<" << dataItemType() << ">";
+    messageTypeString << "MeshStreamerMessageV";
 
     XStr baseTypeString = tramBaseType();
 
@@ -1406,8 +1492,13 @@ void Entry::genIndexDecls(XStr& str) {
   }
 
   // call function declaration
-  str << templateSpecLine << "\n    static void _call_" << epStr()
-      << "(void* impl_msg, void* impl_obj);";
+  if (!isWhenIdle()) {
+    str << templateSpecLine << "\n    static void _call_" << epStr()
+        << "(void* impl_msg, void* impl_obj);";
+  } else {
+    str << templateSpecLine << "\n    static void _call_" << epStr()
+        << "(void* impl_obj, double time);";
+  }
   str << templateSpecLine << "\n    static void _call_sdag_" << epStr()
       << "(void* impl_msg, void* impl_obj);";
   if (isThreaded()) {
@@ -1697,9 +1788,6 @@ XStr Entry::callThread(const XStr& procName, int prependEntryName) {
       << ", new CkThrCallArg(impl_msg,impl_obj), " << getStackSize() << ");\n";
   str << "  ((Chare *)impl_obj)->CkAddThreadListeners(tid,impl_msg);\n";
 // str << "  CkpvAccess(_traces)->CkAddThreadListeners(tid);\n";
-#if CMK_BIGSIM_CHARM
-  str << "  BgAttach(tid);\n";
-#endif
   str << "  CthResume(tid);\n";
   str << "}\n";
 
@@ -1891,14 +1979,6 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         // pack rdma pointers for broadcast unmarshall
         // this is done to support broadcasts before all chare array elements are
         // finished with their EM execution using the same msg
-        str << "#if CMK_ONESIDED_IMPL\n";
-        if(param->hasRecvRdma())
-          //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-          //str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
-          //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
-          str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-        str << "    CkPackRdmaPtrs(impl_buf_begin);\n";
-        str << "#endif\n";
       }
     }
 }
@@ -2124,9 +2204,15 @@ void Entry::genDefs(XStr& str) {
   }
 
   // Generate the call-method body
-  str << makeDecl("void") << "::_call_" << epStr()
-      << "(void* impl_msg, void* impl_obj_void)\n";
-  str << "{\n";
+  if (isWhenIdle()) {
+    str << makeDecl("void") << "::_call_" << epStr()
+        << "(void* impl_obj_void, double time)\n";
+    str << "{\n";
+  } else {
+    str << makeDecl("void") << "::_call_" << epStr()
+        << "(void* impl_msg, void* impl_obj_void)\n";
+    str << "{\n";
+  }
   // Do not create impl_obj for migration constructor as compiler throws an unused
   // variable warning otherwise
   if (!isMigrationConstructor()) {
@@ -2149,6 +2235,9 @@ void Entry::genDefs(XStr& str) {
     param->endUnmarshall(str);
     str << postCall;
     if (isThreaded() && param->isMarshalled()) str << "  delete impl_msg_typed;\n";
+  } else if (isWhenIdle()) {
+    str << "  bool res = impl_obj->" << name << "(time);\n";
+    str << "  if (res) CkCallWhenIdle(idx_" << epStr() << "(), impl_obj);\n";
   } else {
     str << "  CkAbort(\"This method should never be called as it refers to a LOCAL entry "
            "method!\");\n";
@@ -2239,8 +2328,8 @@ XStr Entry::genRegEp(bool isForRedn) {
     str << "redn_wrapper_" << name << "(CkReductionMsg *impl_msg)\",\n";
   else
     str << name << "(" << paramType(0) << ")\",\n";
-  str << "      _call_" << epStr(isForRedn, true);
-  str << ", ";
+  str << "      reinterpret_cast<CkCallFnPtr>(_call_" << epStr(isForRedn, true);
+  str << "), ";
   /* messageIdx: */
   if (param->isMarshalled()) {
     if (param->hasConditional())
@@ -2263,17 +2352,17 @@ XStr Entry::genRegEp(bool isForRedn) {
   // parameter marshalled (and hence flagged as nokeep), but we'll delete the
   // CkReductionMsg in generated code, not runtime code. (so that we can cast
   // it to CkReductionMsg not CkMarshallMsg)
-  if (!isForRedn && (attribs & SNOKEEP)) str << "+CK_EP_NOKEEP";
-  if (attribs & SNOTRACE) str << "+CK_EP_TRACEDISABLE";
-  if (attribs & SIMMEDIATE) {
-     str << "+CK_EP_TRACEDISABLE";
-     str << "+CK_EP_IMMEDIATE";
+  if (!isForRedn && hasAttribute(SNOKEEP)) str << "+CK_EP_NOKEEP";
+  if (hasAttribute(SNOTRACE)) str << "+CK_EP_TRACEDISABLE";
+  if (hasAttribute(SIMMEDIATE)) {
+    str << "+CK_EP_TRACEDISABLE";
+    str << "+CK_EP_IMMEDIATE";
   }
-  if (attribs & SINLINE) str << "+CK_EP_INLINE";
-  if (attribs & SAPPWORK) str << "+CK_EP_APPWORK";
+  if (hasAttribute(SINLINE)) str << "+CK_EP_INLINE";
+  if (hasAttribute(SAPPWORK)) str << "+CK_EP_APPWORK";
 
   /*MEICHAO*/
-  if (attribs & SMEM) str << "+CK_EP_MEMCRITICAL";
+  if (hasAttribute(SMEM)) str << "+CK_EP_MEMCRITICAL";
 
   if (internalMode) str << "+CK_EP_INTRINSIC";
   str << ")";
@@ -2398,33 +2487,34 @@ void Entry::setAccelParam(ParamList* apl) { accelParam = apl; }
 void Entry::setAccelCodeBody(XStr* acb) { accelCodeBody = acb; }
 void Entry::setAccelCallbackName(XStr* acbn) { accelCallbackName = acbn; }
 
-int Entry::isThreaded(void) { return (attribs & STHREADED); }
-int Entry::isSync(void) { return (attribs & SSYNC); }
-int Entry::isIget(void) { return (attribs & SIGET); }
+int Entry::isThreaded(void) { return (hasAttribute(STHREADED)); }
+int Entry::isSync(void) { return (hasAttribute(SSYNC)); }
+int Entry::isIget(void) { return (hasAttribute(SIGET)); }
 int Entry::isConstructor(void) {
   return !strcmp(name, container->baseName(0).get_string());
 }
-bool Entry::isMigrationConstructor() { return isConstructor() && (attribs & SMIGRATE); }
-int Entry::isExclusive(void) { return (attribs & SLOCKED); }
-int Entry::isImmediate(void) { return (attribs & SIMMEDIATE); }
-int Entry::isSkipscheduler(void) { return (attribs & SSKIPSCHED); }
-int Entry::isInline(void) { return attribs & SINLINE; }
-int Entry::isLocal(void) { return attribs & SLOCAL; }
-int Entry::isCreate(void) { return (attribs & SCREATEHERE) || (attribs & SCREATEHOME); }
-int Entry::isCreateHome(void) { return (attribs & SCREATEHOME); }
-int Entry::isCreateHere(void) { return (attribs & SCREATEHERE); }
-int Entry::isPython(void) { return (attribs & SPYTHON); }
-int Entry::isNoTrace(void) { return (attribs & SNOTRACE); }
-int Entry::isAppWork(void) { return (attribs & SAPPWORK); }
-int Entry::isNoKeep(void) { return (attribs & SNOKEEP); }
+bool Entry::isMigrationConstructor() { return isConstructor() && hasAttribute(SMIGRATE); }
+int Entry::isExclusive(void) { return (hasAttribute(SLOCKED)); }
+int Entry::isImmediate(void) { return (hasAttribute(SIMMEDIATE)); }
+int Entry::isSkipscheduler(void) { return (hasAttribute(SSKIPSCHED)); }
+int Entry::isInline(void) { return hasAttribute(SINLINE); }
+int Entry::isLocal(void) { return hasAttribute(SLOCAL); }
+int Entry::isCreate(void) { return (hasAttribute(SCREATEHERE)) || (hasAttribute(SCREATEHOME)); }
+int Entry::isCreateHome(void) { return (hasAttribute(SCREATEHOME)); }
+int Entry::isCreateHere(void) { return (hasAttribute(SCREATEHERE)); }
+int Entry::isPython(void) { return (hasAttribute(SPYTHON)); }
+int Entry::isNoTrace(void) { return (hasAttribute(SNOTRACE)); }
+int Entry::isAppWork(void) { return (hasAttribute(SAPPWORK)); }
+int Entry::isNoKeep(void) { return (hasAttribute(SNOKEEP)); }
 int Entry::isSdag(void) { return (sdagCon != 0); }
-bool Entry::isTramTarget(void) { return (attribs & SAGGREGATE) != 0; }
+bool Entry::isTramTarget(void) { return (hasAttribute(SAGGREGATE)) != 0; }
+int Entry::isWhenIdle(void) { return hasAttribute(SWHENIDLE); }
 
 // DMK - Accel support
-int Entry::isAccel(void) { return (attribs & SACCEL); }
+int Entry::isAccel(void) { return (hasAttribute(SACCEL)); }
 
-int Entry::isMemCritical(void) { return (attribs & SMEM); }
-int Entry::isReductionTarget(void) { return (attribs & SREDUCE); }
+int Entry::isMemCritical(void) { return (hasAttribute(SMEM)); }
+int Entry::isReductionTarget(void) { return (hasAttribute(SREDUCE)); }
 
 char* Entry::getEntryName() { return name; }
 int Entry::getLine() { return line; }

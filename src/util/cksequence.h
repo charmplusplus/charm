@@ -125,7 +125,7 @@ class CkSequence {
   /**
   * Creates a RandomSequence by default
   */
-  CkSequence() : bit_vector_(NULL), compact_(false) {}
+  CkSequence() : compact_(false) {}
 
   /**
   * Creates Sequence object based on the vector passed in. The default sequence
@@ -156,8 +156,7 @@ class CkSequence {
     }
 
     // Allocate memory for the bit vector
-    bit_vector_ = (char *) malloc ((max_+1)/CHAR_SIZE + 1);
-    memset(bit_vector_, 0, (max_+1)/CHAR_SIZE + 1);
+    bit_vector_.resize((max_+1)/CHAR_SIZE + 1);
 
     for (GenericIterator it = begin; it != end; ++it) {
       Set(bit_vector_, (*it));
@@ -187,8 +186,8 @@ class CkSequence {
     }
 
     // Allocate memory for the bit vector
-    bit_vector_ = (char *) malloc ((max_+1)/CHAR_SIZE + 1);
-    memset(bit_vector_, 0, (max_+1)/CHAR_SIZE + 1);
+    bit_vector_.clear();
+    bit_vector_.resize((max_+1)/CHAR_SIZE + 1);
 
     for (GenericIterator it = begin; it != end; ++it) {
       Set(bit_vector_, (*it));
@@ -197,10 +196,6 @@ class CkSequence {
 
 
   ~CkSequence() {
-    if (bit_vector_ != NULL) {
-      delete bit_vector_;
-      bit_vector_ = NULL;
-    }
     for (int i = 0; i < subsequence_list_.size(); i++) {
       //delete subsequence_list_[i];
     }
@@ -279,12 +274,7 @@ class CkSequence {
     p|max_;
     p|num_elements_;
     p|compact_;
-    if (p.isUnpacking() && !compact_) {
-      bit_vector_ = (char *) malloc((max_+1)/CHAR_SIZE + 1);
-    }
-    if (!compact_) {
-      PUParray(p, bit_vector_, (max_+1)/CHAR_SIZE + 1);
-    }
+    p|bit_vector_;
     if (!p.isUnpacking()) {
       int size = subsequence_list_.size();
       p|size;
@@ -324,7 +314,7 @@ class CkSequence {
 
   // Storing the sequence 
   bool compact_;
-  char* bit_vector_;
+  std::vector<char> bit_vector_;
 
   // Contains the combination of different types of sequences namely Random and
   // Strided. 
@@ -337,10 +327,10 @@ inline void CkSequence<T>::Insert(const T& element) {
   if (compact_) {
     CkAbort("Cannot insert after DoneInserting() is called\n");
   }
-  if ((element/CHAR_SIZE) > ((max_+1)/CHAR_SIZE)) {
-    bit_vector_ = (char *) realloc(bit_vector_, (element+1)/CHAR_SIZE + 1);
-    int diff = ((element + 1) / CHAR_SIZE) - ((max_+1) / CHAR_SIZE);
-    memset(&bit_vector_[((max_+1)/CHAR_SIZE) + 1], 0, diff);
+  const int maxsize = (max_+1)/CHAR_SIZE;
+  if ((element/CHAR_SIZE) > maxsize) {
+    const int newsize = (element+1)/CHAR_SIZE;
+    bit_vector_.resize(newsize + 1);
   }
 
   Set(bit_vector_, element);
@@ -452,8 +442,7 @@ inline void CkSequence<T>::Compact() {
       CkSequenceFactory<T>::CreateRandomSequence(bit_vector_, seq_begin_ele,start_random);
     subsequence_list_.push_back(sequence_internal);
   }
-  delete bit_vector_;
-  bit_vector_ = NULL;
+  bit_vector_.clear();
 }
 
 template <class T>

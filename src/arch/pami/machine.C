@@ -89,7 +89,7 @@ std::atomic<int> ckExitComplete {0};
 #define CMI_PAMI_ACK_DISPATCH             9
 #define CMI_PAMI_DISPATCH                10
 
-#ifdef CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
 #define SHORT_CUTOFF   128
 #define EAGER_CUTOFF   4096
 #else
@@ -2199,7 +2199,7 @@ void rzv_pkt_dispatch (pami_context_t       context,
   rzv_recv->size       = rzv_hdr->bytes;
   rzv_recv->rank       = rzv_hdr->rank;
 
-#ifdef CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
   CmiAssert (pipe_addr != NULL);
   CmiAssert (pipe_size == sizeof(pami_memregion_t));
   memcpy(&rzv_recv->rmregion, pipe_addr, sizeof(pami_memregion_t));

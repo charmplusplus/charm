@@ -7,23 +7,23 @@
 VOLD=""
 if test -r VERSION
 then
-    VOLD=`cat VERSION`
+    VOLD=$(cat VERSION)
 fi
 
 # Potentially set by the higher-level package-tarball.sh script
 if [ "$RELEASE" = "1" ]
 then
     echo Release mode
-    (cd $SRCBASE && git describe --exact-match) > VERSION.new || exit 1
+    (cd "$SRCBASE" && git describe --exact-match) > VERSION.new || exit 1
 else
     echo Dev mode
-    (cd $SRCBASE && git describe --long --always) > VERSION.new || touch VERSION.new
+    (cd "$SRCBASE" && git describe --long --always) > VERSION.new || touch VERSION.new
 fi
 
-VNEW=`cat VERSION.new`
+VNEW=$(cat VERSION.new)
 
 if test -n "$VNEW" -a "$VOLD" != "$VNEW"
 then
     cp VERSION.new VERSION
-    echo Copying VERSION.new = $VNEW over VERSION = $VOLD
+    echo Copying VERSION.new = "$VNEW" over VERSION = "$VOLD"
 fi

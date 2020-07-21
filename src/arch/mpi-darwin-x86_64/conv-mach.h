@@ -37,7 +37,8 @@
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 #define CMK_THREADS_USE_CONTEXT                            0
-#define CMK_THREADS_USE_JCONTEXT                           1
+#define CMK_THREADS_USE_JCONTEXT                           0
+#define CMK_THREADS_USE_FCONTEXT                           1
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           0
@@ -58,8 +59,6 @@
 
 #undef CMK_STACKSIZE_DEFAULT
 #define CMK_STACKSIZE_DEFAULT                              262144
-
-//#define CMK_NO_ISO_MALLOC                                1
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0

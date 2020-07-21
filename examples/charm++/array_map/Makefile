@@ -14,3 +14,6 @@ clean:
 
 test: all
 	$(call run, ./array_map +p4)
+
+testp: all
+	$(call run, ./array_map +p$(P))

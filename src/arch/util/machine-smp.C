@@ -81,6 +81,11 @@ CmiIdleLock_checkMessage
 #include "machine-smp.h"
 #include "sockRoutines.h"
 
+#if defined(__has_include)
+#  if __has_include(<barrier>)
+#    include <barrier>
+#  endif
+#endif
 #include <mutex>
 #include <condition_variable>
 
@@ -93,10 +98,8 @@ static struct CmiStateStruct Cmi_default_state; /* State structure to return dur
 
 #if CMK_SHARED_VARS_NT_THREADS
 
-CmiNodeLock CmiMemLock_lock;
-#ifdef CMK_NO_ASM_AVAILABLE
-CmiNodeLock cmiMemoryLock;
-#endif
+CmiNodeLock CmiMemLock_lock; // used by CmiMemLock during heap interception (charmc -memory)
+CmiNodeLock cmiMemoryLock; // used by CmiMemoryAtomic*/ReadFence/WriteFence and CMK_PCQUEUE_LOCK
 static CmiNodeLock comm_mutex;
 #define CmiCommLockOrElse(x) /*empty*/
 #define CmiCommLock() (CmiLock(comm_mutex))
@@ -199,10 +202,7 @@ static void CmiStartThreads(char **argv)
 
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex = CmiCreateLock();
-#ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
-  if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
-#endif
 
   Cmi_state_key = TlsAlloc();
   if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc main");
@@ -238,18 +238,14 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-#ifdef CMK_NO_ASM_AVAILABLE
   CmiDestroyLock(cmiMemoryLock);
-#endif
 }
 
 /***************** Pthreads kernel SMP threads ******************/
 #elif CMK_SHARED_VARS_POSIX_THREADS_SMP
 
-CmiNodeLock CmiMemLock_lock;
-#ifdef CMK_NO_ASM_AVAILABLE
-CmiNodeLock cmiMemoryLock;
-#endif
+CmiNodeLock CmiMemLock_lock; // used by CmiMemLock during heap interception (charmc -memory)
+CmiNodeLock cmiMemoryLock; // used by CmiMemoryAtomic*/ReadFence/WriteFence and CMK_PCQUEUE_LOCK
 int _Cmi_sleepOnIdle=0;
 int _Cmi_forceSpinOnIdle=0;
 extern std::atomic<int> _cleanUp;
@@ -429,10 +425,7 @@ static void CmiStartThreads(char **argv)
   MACHSTATE(4,"CmiStartThreads")
   CmiMemLock_lock=CmiCreateLock();
   _smp_mutex = CmiCreateLock();
-#if defined(CMK_NO_ASM_AVAILABLE) && CMK_PCQUEUE_LOCK
   cmiMemoryLock = CmiCreateLock();
-  if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
-#endif
 
 #if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
   pthread_key_create(&Cmi_state_key, 0);
@@ -514,14 +507,18 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-#ifdef CMK_NO_ASM_AVAILABLE
   CmiDestroyLock(cmiMemoryLock);
-#endif
 }
 
 #endif
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
+
+#if __cpp_lib_barrier
+
+using Barrier = std::barrier;
+
+#else
 
 class Barrier {
 public:
@@ -529,23 +526,23 @@ public:
   Barrier& operator=(const Barrier&) = delete;
 
   explicit Barrier(unsigned int count) :
-    curCount(count), barrierCount(count), curGeneration(0) {
+    curCount(count), barrierCount(count), curSense(true) {
   }
 
-  void wait() {
+  void arrive_and_wait() {
     std::unique_lock<std::mutex> lock(barrierMutex);
-    const unsigned int gen = curGeneration;
+    const bool sense = curSense;
 
     curCount--;
 
     if (curCount == 0) {
-      curGeneration++;
+      curSense = !curSense;
       curCount = barrierCount;
       barrierCond.notify_all();
       return;
     }
 
-    while (gen == curGeneration) {
+    while (sense == curSense) {
       barrierCond.wait(lock);
     }
   }
@@ -553,15 +550,17 @@ public:
 private:
   std::mutex barrierMutex;
   std::condition_variable barrierCond;
-  unsigned int curGeneration;
+  bool curSense;
   unsigned int curCount;
   const unsigned int barrierCount;
 };
 
+#endif
+
 /* Wait for all worker threads */
 void CmiNodeBarrier(void) {
   static Barrier nodeBarrier(CmiMyNodeSize());
-  nodeBarrier.wait();
+  nodeBarrier.arrive_and_wait();
 }
 
 /* Wait for all worker threads as well as comm. thread */
@@ -571,12 +570,12 @@ void CmiNodeAllBarrier(void) {
 #if CMK_MULTICORE || CMK_SMP_NO_COMMTHD
   if (!Cmi_commthread) {
     static Barrier nodeBarrier(CmiMyNodeSize());
-    nodeBarrier.wait();
+    nodeBarrier.arrive_and_wait();
     return;
   }
 #endif
   static Barrier nodeAllBarrier(CmiMyNodeSize() + 1);
-  nodeAllBarrier.wait();
+  nodeAllBarrier.arrive_and_wait();
 }
 
 #endif

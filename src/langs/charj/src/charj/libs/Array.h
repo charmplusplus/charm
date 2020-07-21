@@ -106,47 +106,30 @@ namespace CharjArray {
   class Array {
   private:
     Domain<dims> domain;
-    type *block;
+    std::vector<type> block;
     int ref_cout;
-    bool did_init;
     Array* ref_parent;
 
   public:
-    Array(Domain<dims> domain_) : ref_parent(0), did_init(false) {
-      init(domain_);
+    Array(Domain<dims> domain_) : domain(domain_), ref_parent(NULL)  {
+      //if (atype == ROW_MAJOR)
+      block.resize(domain_.size());
     }
 
-    Array(type **block_) : did_init(false) {
-      block = *block_;
+    Array(std::vector<type> block_) : block(block_) {
     }
 
-    Array(type& block_) : did_init(false) {
-      block = &block_;
-    }
-
-    Array() : ref_parent(0), did_init(false) {
+    Array() : ref_parent(NULL) {
 
     }
 
     Array(Array* parent, Domain<dims> domain_)
-        : ref_parent(parent), did_init(false) {
-      domain = domain_;
-      block = parent->block;
+        : domain(domain_), block(parent->block), ref_parent(parent) {
     }
 
-    void init(Domain<dims> &domain_) {
-      domain = domain_;
-      //if (atype == ROW_MAJOR)
-      block = new type[domain.size()];
-      //printf("Array: allocating memory, size=%d, base pointer=%p\n",
-      //       domain.size(), block);
-      did_init = true;
-    }
-
-    type* raw() { return block; }
+    type* raw() { return block.data(); }
 
     ~Array() {
-      if (did_init) delete[] block;
     }
 
     /*type* operator[] (const Domain<dims> &domain) {
@@ -166,18 +149,18 @@ namespace CharjArray {
     }
 
     type& access(const int i, const int j) {
-      //printf("Array: accessing, index (%d,%d), offset=%d, base pointer=%p\n",
-      //i, j, atype::access(i, j, domain), block);
+      //printf("Array: accessing, index (%d,%d), offset=%d\n",
+      //i, j, atype::access(i, j, domain));
       return block[atype::access(i, j, domain)];
     }
 
     type& access(const int i, const Range r) {
       Domain<1> d(r);
-      //printf("Array: accessing subrange, size = %d, range (%d,%d), base pointer=%p\n",
-      //d.size(), r.start, r.stop, block);
+      //printf("Array: accessing subrange, size = %d, range (%d,%d)\n",
+      //d.size(), r.start, r.stop);
       type* buf = new type[d.size()];
       for (int j = 0; j < d.size(); j++) {
-        //printf("Array: copying element (%d,%d), base pointer=%p\n", i, j, block);
+        //printf("Array: copying element (%d,%d)\n", i, j);
         buf[j] = block[atype::access(i, j, domain)];
       }
       return *buf;
@@ -201,15 +184,11 @@ namespace CharjArray {
 
     void pup(PUP::er& p) { 
         p | domain;
-        if (p.isUnpacking()) {
-            block = new type[domain.size()];
-        }
-        PUParray(p, block, domain.size());
+        p | block;
     }
 
     void fill(const type &t) {
-      for (int i = 0; i < domain.size(); ++i)
-	block[i] = t;
+      std::fill(block.begin(), block.end(), t);
     }
 
     /// Do these arrays have the same shape and contents?

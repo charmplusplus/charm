@@ -61,7 +61,6 @@ public:
 		p|l; p|r; p|t; p|b;
 	}
 };
-PUPmarshall(CkRect)
 
 /**
 This class describes an image, represented as a flat byte array.
@@ -190,7 +189,6 @@ public:
 		p|wid; p|ht; p|colors; p|layout; p|row;
 	}
 };
-PUPmarshall(CkImage)
 
 
 //A heap-allocated image
@@ -221,7 +219,6 @@ public:
 	//Pup both image size as well as image data.
 	void pup(PUP::er &p);
 };
-PUPmarshall(CkAllocImage)
 
 
 #endif

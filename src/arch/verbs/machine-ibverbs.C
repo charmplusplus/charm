@@ -976,11 +976,10 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	attr.qp_state 	    = IBV_QPS_RTS;
 #if ! QLOGIC
 	attr.timeout 	    = 26;
-	attr.retry_cnt 	    = 20;
 #else
 	attr.timeout 	    = 14;
-	attr.retry_cnt 	    = 7;
 #endif
+	attr.retry_cnt 	    = 7;
 	attr.rnr_retry 	    = 7;
 	attr.sq_psn 	    = context->localAddr[node].psn;
 	attr.max_rd_atomic  = 1;
@@ -999,15 +998,9 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
         if(err == 22) {
           //use inverted logic
 #if QLOGIC
-          mtu = IBV_MTU_2048;
-          attr.path_mtu             = mtu;
           attr.timeout              = 26;
-          attr.retry_cnt            = 20;
 #else
-          mtu = IBV_MTU_4096;
-          attr.path_mtu             = mtu;
           attr.timeout              = 14;
-          attr.retry_cnt            = 7;
 #endif
 
           MACHSTATE3(3,"Retry:dlid 0x%x qp 0x%x psn 0x%x",attr.ah_attr.dlid,attr.dest_qp_num,attr.sq_psn);

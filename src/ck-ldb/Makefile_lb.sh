@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #Typical load balancers
-COMMON_LDBS="DummyLB GreedyLB GreedyRefineLB CommLB RandCentLB RefineLB RefineCommLB RotateLB DistributedLB HierarchicalLB HybridLB ComboCentLB RefineSwapLB NeighborLB OrbLB BlockLB GreedyCommLB NodeLevelLB"
+COMMON_LDBS="TreeLB DistributedLB"
 #Load balancers for more specialized circumstances
-SPECIALIZED_LDBS="GraphPartLB GraphBFTLB GridCommLB GridCommRefineLB HbmLB RefineKLB  TempAwareCommLB TreeMatchLB GreedyAgentLB NeighborCommLB PhasebyArrayLB RecBipartLB CommAwareRefineLB AdaptiveLB MetisLB GridMetisLB"
+SPECIALIZED_LDBS="MetisLB"
 #Load balanders which have an external dependency, or require some other kind of intervention
-UNCOMMON_LDBS="ScotchLB TeamLB WSLB TempAwareGreedyLB GridHybridSeedLB TopoCentLB GridHybridLB TopoLB RefineTopoLB TempAwareRefineLB"
+UNCOMMON_LDBS="ScotchLB TempAwareRefineLB"
 
 ALL_LDBS="$COMMON_LDBS $SPECIALIZED_LDBS"
 
@@ -30,19 +30,11 @@ echo >> $out
 
 for bal in $ALL_LDBS $UNCOMMON_LDBS
 do 
-        manager=""
-        [ $bal = 'GreedyCommLB' ] && manager="manager.o"
-        [ $bal = 'GridCommLB' ] && manager="manager.o"
-        [ $bal = 'GridCommRefineLB' ] && manager="manager.o"
-        [ $bal = 'GridHybridLB' ] && manager="manager.o"
-        [ $bal = 'GridHybridSeedLB' ] && manager="manager.o"
-        [ $bal = 'TreeMatchLB' ] && manager="tm_tree.o tm_bucket.o tm_timings.o tm_mapping.o"
-
 #implicit make rules exist for xxxxLB, we override them so users can choose
 #make xxxxLB if they only want to build one without the kitchen sink of EveryLB
 
 	cat >> $out << EOB 
-\$(L)/libmodule$bal.a: $manager
+\$(L)/libmodule$bal.a:
 LBHEADERS += $bal.h $bal.decl.h
 
 EOB
@@ -77,11 +69,6 @@ for bal in $ALL_LDBS $UNCOMMON_LDBS
 do
 	echo "    $bal.o \\" >> $out
 done
-echo "    manager.o  \\" >> $out
-echo "    tm_tree.o  \\" >> $out
-echo "    tm_timings.o  \\" >> $out
-echo "    tm_bucket.o \\" >> $out
-echo "    tm_mapping.o" >> $out
 
 echo "# EveryLB dependecies" >> $out
 echo "EVERYLB_DEPS=EveryLB.o \\" >> $out
@@ -89,11 +76,6 @@ for bal in $ALL_LDBS
 do
 	echo "    $bal.o \\" >> $out
 done
-echo "    manager.o \\" >> $out
-echo "    tm_tree.o  \\" >> $out
-echo "    tm_timings.o  \\" >> $out
-echo "    tm_bucket.o \\" >> $out
-echo "    tm_mapping.o" >> $out
 
 echo "# CommonLBs dependencies" >> $out
 echo "COMMONLBS_DEPS=CommonLBs.o \\" >> $out

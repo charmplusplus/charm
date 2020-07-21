@@ -1,2 +1,7 @@
 # *.C files are C++ (used for identifying the file type correctly on GitHub)
 *.C linguist-language=C++
+
+# Highlight *.ci files as C++
+*.ci linguist-language=C++
+
+cmake/Makefile.tests linguist-language=Makefile

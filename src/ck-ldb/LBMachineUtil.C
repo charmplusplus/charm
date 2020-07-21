@@ -4,7 +4,7 @@
 /*@{*/
 
 #include <stdlib.h>
-#include "LBDatabase.h"
+#include "LBManager.h"
 #include "LBMachineUtil.h"
 
 inline void LBMachineUtil::IdleStart(double curWallTime)
@@ -14,7 +14,6 @@ inline void LBMachineUtil::IdleStart(double curWallTime)
 
 inline void LBMachineUtil::IdleEnd(double curWallTime)
 {
-// skip counting idle time in BigSim
   if (state == on) {
     const double stop_idle = curWallTime;
     total_idletime += (stop_idle - start_idle);
@@ -51,12 +50,10 @@ void LBMachineUtil::StatsOn()
 #endif
 
   if (state == off) {
-#if ! CMK_BIGSIM_CHARM
     cancel_idleStart=CcdCallOnConditionKeep(
 	 CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)staticIdleStart,(void *)this);
     cancel_idleEnd=CcdCallOnConditionKeep(
          CcdPROCESSOR_END_IDLE,(CcdVoidFn)staticIdleEnd,(void *)this);
-#endif
     state = on;
   }
 
@@ -75,10 +72,8 @@ void LBMachineUtil::StatsOn()
 void LBMachineUtil::StatsOff()
 {
   if (state == on) {
-#if ! CMK_BIGSIM_CHARM
     CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,cancel_idleStart);
     CcdCancelCallOnConditionKeep(CcdPROCESSOR_END_IDLE,cancel_idleEnd);
-#endif
     state = off;
   }
 

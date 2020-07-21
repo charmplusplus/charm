@@ -330,9 +330,9 @@ calculations are required to access data.
 
 To use MSA in a Charm++ program:
 
--  build Charm++ for your architecture, e.g. ``netlrts-linux``.
+-  build Charm++ for your architecture, e.g. ``netlrts-linux-x86_64``.
 
--  ``cd charm/netlrts-linux/tmp/libs/ck-libs/multiphaseSharedArrays/; make``
+-  ``cd charm/netlrts-linux-x86_64/tmp/libs/ck-libs/multiphaseSharedArrays/; make``
 
 -  ``#include “msa/msa.h”`` in your header file.
 
@@ -686,96 +686,19 @@ The total buffering capacity specified by the user may be reached even
 when no single buffer is completely filled up. In that case the buffer
 with the greatest number of buffered data items is sent.
 
-Application User Interface
---------------------------
-
-A typical usage scenario for TRAM involves a start-up phase followed by
-one or more *communication steps*. We next describe the application user
-interface and details relevant to usage of the library, which normally
-follows these steps:
-
-#. Start-up Creation of a TRAM group and set up of client arrays and
-   groups
-
-#. Initialization Calling an initialization function, which returns
-   through a callback
-
-#. Sending An arbitrary number of sends using the insertData function
-   call on the local instance of the library
-
-#. Receiving Processing received data items through the process function
-   which serves as the delivery interface for the library and must be
-   defined by the user
-
-#. Termination Termination of a communication step
-
-#. Re-initialization After termination of a communication step, the
-   library instance is not active. However, re-initialization using step
-   :math:`2` leads to a new communication step.
-
-Start-Up
-~~~~~~~~
-
-Start-up is typically performed once in a program, often inside the main
-function of the mainchare, and involves creating an aggregator instance.
-An instance of TRAM is restricted to sending data items of a single
-user-specified type, which we denote by dtype, to a single
-user-specified chare array or group.
-
-Sending to a Group
-^^^^^^^^^^^^^^^^^^
-
-To use TRAM for sending to a group, a GroupMeshStreamer group should be
-created. Either of the following two GroupMeshStreamer constructors can
-be used for that purpose:
-
-.. code-block:: c++
-
-   template<class dtype, class ClientType, class RouterType>
-   GroupMeshStreamer<dtype, ClientType, RouterType>::
-   GroupMeshStreamer(int maxNumDataItemsBuffered,
-                     int numDimensions,
-                     int *dimensionSizes,
-                     CkGroupID clientGID,
-                     bool yieldFlag = 0,
-                     double progressPeriodInMs = -1.0);
-
-   template<class dtype, class ClientType, class RouterType>
-   GroupMeshStreamer<dtype, ClientType, RouterType>::
-   GroupMeshStreamer(int numDimensions,
-                     int *dimensionSizes,
-                     CkGroupID clientGID,
-                     int bufferSize,
-                     bool yieldFlag = 0,
-                     double progressPeriodInMs = -1.0);
-
 Sending to a Chare Array
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-For sending to a chare array, an ArrayMeshStreamer group should be
-created, which has a similar constructor interface to GroupMeshStreamer:
+For sending to a chare array, the entry method should be marked [aggregate],
+which can take attribute parameters:
 
 .. code-block:: c++
 
-   template <class dtype, class itype, class ClientType,
-             class RouterType>
-   ArrayMeshStreamer<dtype, itype, ClientType, RouterType>::
-   ArrayMeshStreamer(int maxNumDataItemsBuffered,
-                     int numDimensions,
-                     int *dimensionSizes,
-                     CkArrayID clientAID,
-                     bool yieldFlag = 0,
-                     double progressPeriodInMs = -1.0);
-
-   template <class dtype, class itype, class ClientType,
-             class RouterType>
-   ArrayMeshStreamer<dtype, itype, ClientType, RouterType>::
-   ArrayMeshStreamer(int numDimensions,
-                     int *dimensionSizes,
-                     CkArrayID clientAID,
-                     int bufferSize,
-                     bool yieldFlag = 0,
-                     double progressPeriodInMs = -1.0);
+   array [1D] test {
+     entry [aggregate(numDimensions: 2, bufferSize: 2048, thresholdFractionNumer : 1,
+     thresholdFractionDenom : 2, cutoffFractionNumer : 1,
+     cutoffFractionDenom : 2)] void ping(vector<int> data);
+   };
 
 Description of parameters:
 
@@ -784,182 +707,25 @@ Description of parameters:
 
 -  numDimensions: number of dimensions in grid of PEs
 
--  dimensionSizes: array of size numDimensions containing the size of
-   each dimension in the grid
-
--  clientGID: the group ID for the client group
-
--  clientAID: the array ID for the client array
-
 -  bufferSize: size of the buffer for each peer, in terms of number of
    data items
 
--  yieldFlag: when true, calls CthYield() after every :math:`1024` item
-   insertions; setting it true requires all data items to be submitted
-   from threaded entry methods. Ensures that pending messages are sent
-   out by the runtime system when a large number of data items are
-   submitted from a single entry method.
+-  thresholdFractionNumer: numerator of the fraction of the buffer that
+   data items
 
--  progressPeriodInMs: number of milliseconds between periodic progress
-   checks; relevant only when periodic flushing is enabled (see
-   Section :numref:`sec:tram_termination`).
+-  thresholdFractionDenom: size of the buffer for each peer, in terms of number of
+   data items
 
-Template parameters:
+-  cutoffFractionNumer: size of the buffer for each peer, in terms of number of
+   data items
 
--  dtype: data item type
-
--  itype: index type of client chare array (use int for one-dimensional
-   chare arrays and CkArrayIndex for all other index types)
-
--  ClientType: type of client group or array
-
--  | RouterType: the routing protocol to be used. The choices are:
-   | (1) SimpleMeshRouter - original grid aggregation scheme;
-   | (2) NodeAwareMeshRouter - base node-aware aggregation scheme;
-   | (3) AggressiveNodeAwareMeshRouter - advanced node-aware aggregation
-     scheme;
-
-Initialization
-~~~~~~~~~~~~~~
-
-A TRAM instance needs to be initialized before every communication step.
-There are currently three main modes of operation, depending on the type
-of termination used: *staged completion*, *completion detection*, or
-*quiescence detection*. The modes of termination are described later.
-Here, we present the interface for initializing a communication step for
-each of the three modes.
-
-When using completion detection, each local instance of TRAM must be
-initialized using the following variant of the overloaded init function:
-
-.. code-block:: c++
-
-   template <class dtype, class RouterType>
-   void MeshStreamer<dtype, RouterType>::
-   init(int numContributors,
-        CkCallback startCb,
-        CkCallback endCb,
-        CProxy_CompletionDetector detector,
-        int prio,
-        bool usePeriodicFlushing);
-
-Description of parameters:
-
--  numContributors: number of done calls expected globally before
-   termination of this communication step
-
--  startCb: callback to be invoked by the library after initialization
-   is complete
-
--  endCb: callback to be invoked by the library after termination of
-   this communication step
-
--  detector: an inactive CompletionDetector object to be used by TRAM
-
--  prio: Charm++ priority to be used for messages sent using TRAM in
-   this communication step
-
--  usePeriodicFlushing: specifies whether periodic flushing should be
-   used for this communication step
-
-When using staged completion, a completion detector object is not
-required as input, as the library performs its own specialized form of
-termination. In this case, each local instance of TRAM must be
-initialized using a different interface for the overloaded init
-function:
-
-.. code-block:: c++
-
-   template <class dtype, class RouterType>
-   void MeshStreamer<dtype, RouterType>::
-   init(int numLocalContributors,
-        CkCallback startCb,
-        CkCallback endCb,
-        int prio,
-        bool usePeriodicFlushing);
-
-Note that numLocalContributors denotes the local number of done calls
-expected, rather than the global as in the first interface of init.
-
-A common case is to have a single chare array perform all the sends in a
-communication step, with each element of the array as a contributor. For
-this case there is a special version of init that takes as input the
-CkArrayID object for the chare array that will perform the sends,
-precluding the need to manually determine the number of client chares
-per PE:
-
-.. code-block:: c++
-
-   template <class dtype, class RouterType>
-   void MeshStreamer<dtype, RouterType>::
-   init(CkArrayID senderArrayID,
-        CkCallback startCb,
-        CkCallback endCb,
-        int prio,
-        bool usePeriodicFlushing);
-
-The init interface for using quiescence detection is:
-
-.. code-block:: c++
-
-   template <class dtype, class RouterType>
-   void MeshStreamer<dtype, RouterType>::init(CkCallback startCb,
-                                              int prio);
-
-After initialization is finished, the system invokes startCb,
-signaling to the user that the library is ready to accept data items
-for sending.
+-  cutoffFractionDenom: size of the buffer for each peer, in terms of number of
+   data items
 
 Sending
 ~~~~~~~
 
-Sending with TRAM is done through calls to insertData and broadcast.
-
-.. code-block:: c++
-
-   template <class dtype, class RouterType>
-   void MeshStreamer<dtype, RouterType>::
-   insertData(const dtype& dataItem,
-              int destinationPe);
-
-   template <class dtype, class itype, class ClientType,
-             class RouterType>
-   void ArrayMeshStreamer<dtype, itype, ClientType, RouterType>::
-   insertData(const dtype& dataItem,
-              itype arrayIndex);
-
-   template <class dtype, class RouterType>
-   void MeshStreamer<dtype, RouterType>::
-   broadcast(const dtype& dataItem);
-
--  dataItem: reference to a data item to be sent
-
--  destinationPe: index of destination PE
-
--  arrayIndex: index of destination array element
-
-Broadcasting has the effect of delivering the data item:
-
--  once on every PE involved in the computation for GroupMeshStreamer
-
--  once for every array element involved in the computation for
-   ArrayMeshStreamer
-
-Receiving
-~~~~~~~~~
-
-To receive data items sent using TRAM, the user must define the process
-function for each client group and array:
-
-.. code-block:: c++
-
-   void process(const dtype &ran);
-
-Each item is delivered by the library using a separate call to process
-on the destination PE. The call is made locally, so process should not
-be an entry method.
-
-.. _sec:tram_termination:
+Sending with TRAM is done through calls to the entry method marked as [aggregate].
 
 Termination
 ~~~~~~~~~~~
@@ -967,61 +733,11 @@ Termination
 Flushing and termination mechanisms are used in TRAM to prevent deadlock
 due to indefinite buffering of items. Flushing works by sending out all
 buffers in a local instance if no items have been submitted or received
-since the last progress check. Meanwhile, termination detection is used
-to send out partially filled buffers at the end of a communication step
-after it has been determined that no additional items will be submitted.
+since the last progress check. Meanwhile, termination detection support is
+necessary for certain applications.
 
-Currently, three means of termination are supported: staged completion,
-completion detection, and quiescence detection. Periodic flushing is a
-secondary mechanism which can be enabled or disabled when initiating one
-of the primary mechanisms.
-
-Termination typically requires the user to issue a number of calls to
-the done function:
-
-.. code-block:: c++
-
-   template <class dtype, class RouterType>
-   void MeshStreamer<dtype, RouterType>::
-   done(int numContributorsFinished = 1);
-
-When using completion detection, the number of done calls that are
-expected globally by the TRAM instance is specified using the
-numContributors parameter to init. Safe termination requires that no
-calls to insertData or broadcast are made after the last call to done is
-performed globally. Because order of execution is uncertain in parallel
-applications, some care is required to ensure the above condition is
-met. A simple way to terminate safely is to set numContributors equal to
-the number of senders, and call done once for each sender that is done
-submitting items.
-
-In contrast to using completion detection, using staged completion
-involves setting the local number of expected calls to done using the
-numLocalContributors parameter in the init function. To ensure safe
-termination, no insertData or broadcast calls should be made on any PE
-where done has been called the expected number of times.
-
-Another version of init for staged completion, which takes a CkArrayID
-object as an argument, provides a simplified interface in the common
-case when a single chare array performs all the sends within a
-communication step, with each of its elements as a contributor. For this
-version of init, TRAM determines the appropriate number of local
-contributors automatically. It also correctly handles the case of PEs
-without any contributors by immediately marking those PEs as having
-finished the communication step. As such, this version of init should be
-preferred by the user when applicable.
-
-Staged completion is not supported when array location data is not
-guaranteed to be correct, as this can potentially violate the
-termination conditions used to guarantee successful termination. In
-order to guarantee correct location data in applications that use load
-balancing, Charm++ must be compiled with -DCMKGLOBALLOCATIONUPDATE,
-which has the effect of performing a global broadcast of location data
-for chare array elements that migrate during load balancing.
-Unfortunately, this operation is expensive when migrating large numbers
-of elements. As an alternative, completion detection and quiescence
-detection modes will work properly without the global location update
-mechanism, and even in the case of anytime migration.
+Currently, the only termination detection method supported is quiescence
+detection.
 
 When using quiescence detection, no end callback is used, and no done
 calls are required. Instead, termination of a communication step is
@@ -1030,96 +746,41 @@ supports passing a callback as parameter. TRAM is set up such that
 quiescence will not be detected until all items sent in the current
 communication step have been delivered to their final destinations.
 
-The choice of which termination mechanism to use is left to the user.
-Using completion detection mode is more convenient when the global
-number of contributors is known, while staged completion is easier to
-use if the local number of contributors can be determined with ease, or
-if sending is done from the elements of a chare array. If either mode
-can be used with ease, staged completion should be preferred. Unlike the
-other mechanisms, staged completion does not involve persistent
-background communication to determine when the global number of expected
-done calls is reached. Staged completion is also generally faster at
-reaching termination due to not being dependent on periodic progress
-checks. Unlike completion detection, staged completion does incur a
-small bandwidth overhead (:math:`4` bytes) for every TRAM message, but
-in practice this is more than offset by the persistent traffic incurred
-by completion detection.
-
 Periodic flushing is an auxiliary mechanism which checks at a regular
 interval whether any sends have taken place since the last time the
 check was performed. If not, the mechanism sends out all the data items
-buffered per local instance of the library. The period is specified by
-the user in the TRAM constructor. A typical use case for periodic
+buffered per local instance of the library.  A typical use case for periodic
 flushing is when the submission of a data item B to TRAM happens as a
 result of the delivery of another data item A sent using the same TRAM
 instance. If A is buffered inside the library and insufficient data
 items are submitted to cause the buffer holding A to be sent out, a
 deadlock could arise. With the periodic flushing mechanism, the buffer
 holding A is guaranteed to be sent out eventually, and deadlock is
-prevented. Periodic flushing is required when using the completion
-detection or quiescence detection termination modes.
+prevented.
 
-Re-initialization
-~~~~~~~~~~~~~~~~~
+Opting into Fixed-Size Message Handling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A TRAM instance that has terminated cannot be used for sending more data
-items until it has been re-initialized. Re-initialization is achieved by
-calling init, which prepares the instance of the library for a new
-communication step. Re-initialization is useful for iterative
-applications, where it is often convenient to have a single
-communication step per iteration of the application.
+Variable-sized message handling in TRAM includes storing
+and sending additional data that is irrelevant in
+the case of fixed-size messages. To opt into the faster
+fixed-size codepath, the is_PUPbytes type trait should be
+explicitly defined for the message type:
 
-Charm++ Registration of Templated Classes
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. code-block:: charmci
 
-Due to the use of templates in TRAM, the library template instances must
-be explicitly registered with the Charm++ runtime by the user of the
-library. This must be done in the .ci file for the application, and
-typically involves three steps.
+   array [1D] test {
+     entry [aggregate(numDimensions: 2, bufferSize: 2048, thresholdFractionNumer : 1,
+     thresholdFractionDenom : 2, cutoffFractionNumer : 1,
+     cutoffFractionDenom : 2)] void ping(int data);
+   };
 
-For GroupMeshStreamer template instances, registration is done as
-follows:
+.. code-block:: c++
 
--  Registration of the message type:
-
-   .. code-block:: c++
-
-      message MeshStreamerMessage<dtype>;
-
--  Registration of the base aggregator class
-
-   .. code-block:: c++
-
-      group MeshStreamer<dtype, RouterType>;
-
--  Registration of the derived aggregator class
-
-   .. code-block:: c++
-
-      group GroupMeshStreamer<dtype, ClientType, RouterType>;
-
-For ArrayMeshStreamer template instances, registration is done as
-follows:
-
--  Registration of the message type:
-
-   .. code-block:: c++
-
-      message MeshStreamerMessage<ArrayDataItem<dtype, itype> >;
-
--  Registration of the base aggregator class
-
-   .. code-block:: c++
-
-      group MeshStreamer<ArrayDataItem<dtype, itype>,
-                         RouterType>;
-
--  Registration of the derived aggregator class
-
-   .. code-block:: c++
-
-      group ArrayMeshStreamer<dtype, itype, ClientType,
-                              RouterType>;
+   template <>
+   struct is_PUPbytes<int> {
+     static const bool value = true;
+   };
 
 Example
 -------

@@ -33,6 +33,12 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, ./pgm +p6 200000 10 +noCMAForZC)
 endif
 
+testp: all
+	$(call run, ./pgm +p$(P) 200000 10)
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, ./pgm +p$(P) 200000 10 +noCMAForZC)
+endif
+
 smptest: all
 	$(call run, ./pgm +p4 200000 10 ++ppn 2)
 	$(call run, ./pgm +p4 200000 10 ++ppn 4)
@@ -43,6 +49,3 @@ endif
 
 test-bench: all
 	$(call run, ./pgm +p10)
-
-bgtest: all
-	$(call run, ./pgm +p2 +x2 +y1 +z1 )

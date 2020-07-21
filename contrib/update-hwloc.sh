@@ -5,6 +5,12 @@ if [[ -z "$1" ]]; then
     exit 0
 fi
 
+git diff --quiet --exit-code HEAD
+if [[ $? != 0 ]]; then
+  echo 'Error: Git repository is not clean.'
+  exit 1
+fi
+
 get_abs_filename()
 {
     echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
@@ -34,6 +40,7 @@ DIST_SUBDIRS=( \
   utils \
   tests \
   doc \
+  contrib/completion \
   contrib/hwloc-ps.www \
   contrib/misc \
   contrib/systemd \
@@ -102,12 +109,22 @@ for i in "${DIST_STUB[@]}"; do
     touch "$i"
 done
 
+# Run autoreconf once first so identifying patches for cherry-picking is easier
+autoreconf -ivf
+if [[ $? != 0 ]]; then
+  echo "$0 needs to be updated for this hwloc version."
+  exit 1
+fi
+rm -rf autom4te.cache/
+find . -name '*~' -delete
+
 cd ..
 git add -f hwloc
+git commit -m "EDIT THIS COMMIT"
 
 popd > /dev/null
 
 echo 'Done. Please:'
-echo '1. Review the git history to see if there are any patches that should be cherry-picked and squashed.'
-echo '2. Verify that autoreconf completes successfully in the hwloc directory.'
+echo '1. Review the git history of contrib/hwloc for patches that should be cherry-picked and squashed.'
+echo '2. In contrib/hwloc, run: autoreconf -ivf && rm -rf autom4te.cache/ && find . -name "*~" -delete'
 echo '3. Verify that an all-test build with --build-shared -charm-shared completes successfully.'

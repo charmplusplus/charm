@@ -61,7 +61,7 @@ class BitVectorIterator : public CkSequenceIteratorInternal<T> {
  public:
   BitVectorIterator() {}
 
-  BitVectorIterator(char*& bit_vector, int start, int index, int max) :
+  BitVectorIterator(const std::vector<char> & bit_vector, int start, int index, int max) :
       bit_vector_(bit_vector), start_(start), index_(index), max_(max) {
     while ((index_ < max_ + 1) && !IsSet(bit_vector_, index_)) {
       index_++;
@@ -99,7 +99,7 @@ class BitVectorIterator : public CkSequenceIteratorInternal<T> {
   }
 
  private:
-  char* bit_vector_;
+  std::vector<char> bit_vector_;
   int start_;
   int index_;
   int max_;
@@ -118,13 +118,13 @@ class RandomSequence : public CkSequenceInternal<T> {
   RandomSequence() {
   }
 
-  RandomSequence(char*& bit_vector, int start, int end) {
+  RandomSequence(const std::vector<char> & bit_vector, int start, int end) {
     min_ = start % 8;
     start_ = start - min_;
     max_ = min_ + (end - start);
     std::cout << "starting element " << start_ << " ending ele " << end << " max " << max_ << " min " << min_ << std::endl;
-    bit_vector_ = (char *) malloc ((max_+1)/8 + 1);
-    memcpy(bit_vector_, &bit_vector[(start/8)], (max_+1)/8 + 1);
+    auto datastart = bit_vector.begin() + (start/8);
+    std::copy(datastart, datastart + ((max_+1)/8 + 1), bit_vector_.begin());
   }
 
   template <typename GenericIterator>
@@ -146,8 +146,7 @@ class RandomSequence : public CkSequenceInternal<T> {
     }
     max_;
     std::cout << "max " << max_ << std::endl;
-    bit_vector_ = (char *) malloc ((max_+1)/8 + 1);
-    memset(bit_vector_, 0, (max_+1)/8 + 1);
+    bit_vector_.resize((max_+1)/8 + 1);
 
     for (GenericIterator it = begin; it != end; ++it) {
       Set(bit_vector_, (*it));
@@ -191,10 +190,7 @@ class RandomSequence : public CkSequenceInternal<T> {
     p|start_;
     p|min_;
     p|max_;
-    if (p.isUnpacking()) {
-      bit_vector_ = (char *) malloc ((max_+1)/8 + 1);
-    }
-    PUParray(p, bit_vector_, ((max_+1)/8 + 1));
+    p|bit_vector_;
   }
 
  private:
@@ -202,16 +198,14 @@ class RandomSequence : public CkSequenceInternal<T> {
   T start_;
   T min_;
   T max_;
-  char* bit_vector_;
+  std::vector<char> bit_vector_;
 };
 
 template <typename T>
 inline void RandomSequence<T>::Insert(const T& element) {
   int ele_ind = element - start_;
   if (ele_ind/8 > (max_+1)/8) {
-    int diff = ((ele_ind + 1) / 8) - (( max_ + 1) / 8);
-    bit_vector_ = (char *) realloc(bit_vector_, (ele_ind+1)/8 + 1);
-    memset(&bit_vector_[((max_+1)/8) + 1], 0, diff);
+    bit_vector_.resize((ele_ind+1)/8 + 1);
   }
   Set(bit_vector_, ele_ind);
   if (ele_ind > max_) { 

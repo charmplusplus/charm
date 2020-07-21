@@ -33,27 +33,24 @@ DIRS = \
   user-driven-interop \
   zerocopy \
 
-BGDIRS = \
+TESTDIRS = $(DIRS)
+
+NONSCALEDIRS = \
+  ckcallback \
+  cksequence \
   hello \
-  integrate \
-  integratePUPable \
-  integrateArray \
-  load_balancing \
-  piArray \
+  namespace \
   PUP \
   NQueen \
-  reductions \
-  ring \
-  rings \
-  speeds \
+  sync_square \
 
-TESTDIRS = $(DIRS)
+TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 
 all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 
-bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
+testp: $(foreach i,$(TESTPDIRS),testp-$i)
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
@@ -65,8 +62,8 @@ $(foreach i,$(DIRS),build-$i):
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
-$(foreach i,$(DIRS),bgtest-$i):
-	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+$(foreach i,$(DIRS),testp-$i):
+	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' P='$(P)'
 
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

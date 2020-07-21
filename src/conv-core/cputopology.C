@@ -44,10 +44,6 @@
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
-#if CMK_BIGSIM_CHARM
-#include "middle-blue.h"
-using namespace BGConverse;
-#endif
 
 extern "C" int CmiNumCores(void) {
   // PU count is the intended output here rather than literal cores
@@ -87,7 +83,9 @@ public:
   static int supported;
 
   ~CpuTopology() {
-    delete [] bynodes;
+    auto n = bynodes;
+    bynodes = nullptr;
+    delete [] n;
   }
 
     // return -1 when not supported
@@ -170,7 +168,7 @@ int CpuTopology::supported = 0;
 namespace CpuTopoDetails {
 
 static nodeTopoMsg *topomsg = NULL;
-static CmmTable hostTable;
+static std::map<skt_ip_t, _procInfo *> hostTable;
 
 CpvStaticDeclare(int, cpuTopoHandlerIdx);
 CpvStaticDeclare(int, cpuTopoRecvHandlerIdx);
@@ -205,11 +203,10 @@ static void cpuTopoHandler(void *m)
 {
   _procInfo *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
-  int tag, tag1, pe;
+  int pe;
 
   if (topomsg == NULL) {
     int i;
-    hostTable = CmmNew();
     topomsg = (nodeTopoMsg *)CmiAlloc(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int));
     CmiSetHandler((char *)topomsg, CpvAccess(cpuTopoRecvHandlerIdx));
     topomsg->nodes = (int *)((char*)topomsg + sizeof(nodeTopoMsg));
@@ -227,26 +224,24 @@ static void cpuTopoHandler(void *m)
   skt_print_ip(str, msg->ip);
   printf("hostname: %d %s\n", msg->pe, str);
 */
-    tag = *(int*)&proc->ip;
+    skt_ip_t & ip = proc->ip;
     pe = proc->pe;
-    if ((rec = (_procInfo *)CmmProbe(hostTable, 1, &tag, &tag1)) != NULL) {
+    auto iter = hostTable.find(ip);
+    if (iter != hostTable.end()) {
+      rec = iter->second;
     }
     else {
       proc->nodeID = pe;           // we will compact the node ID later
       rec = proc;
-      CmmPut(hostTable, 1, &tag, proc);
+      hostTable.emplace(ip, proc);
     }
     topomsg->nodes[pe] = rec->nodeID;
     rec->rank ++;
   }
 
-  printTopology(CmmEntries(hostTable));
+  printTopology(hostTable.size());
 
-    // clean up CmmTable
-  hostnameMsg *tmpm;
-  tag = CmmWildCard;
-  while ((tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)));
-  CmmFree(hostTable);
+  hostTable.clear();
   CmiFree(msg);
 
   CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
@@ -403,9 +398,6 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 					   "Show cpu topology info"))
     show_flag = 1;
 
-#if CMK_BIGSIM_CHARM
-  if (BgNodeRank() == 0)
-#endif
     {
       CpvInitialize(int, cpuTopoHandlerIdx);
       CpvInitialize(int, cpuTopoRecvHandlerIdx);
@@ -425,28 +417,9 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   }
 
   if (CmiMyPe() == 0) {
-#if CMK_BIGSIM_CHARM
-    if (BgNodeRank() == 0)
-#endif
       startT = CmiWallTimer();
   }
 
-#if CMK_BIGSIM_CHARM
-  if (BgNodeRank() == 0)
-  {
-    //int numPes = BgNumNodes()*BgGetNumWorkThread();
-    int numPes = cpuTopo.numPes = CkNumPes();
-    cpuTopo.nodeIDs = new int[numPes];
-    CpuTopology::supported = 1;
-    int wth = BgGetNumWorkThread();
-    for (int i=0; i<numPes; i++) {
-      int nid = i / wth;
-      cpuTopo.nodeIDs[i] = nid;
-    }
-    cpuTopo.sort();
-  }
-  return;
-#else
 
 
 
@@ -528,8 +501,6 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   #if CMK_HAS_GETHOSTNAME && !CMK_BLUEGENEQ
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
     // fprintf(stderr, "[%d] IP is %d.%d.%d.%d\n", CmiMyPe(), myip.data[0],myip.data[1],myip.data[2],myip.data[3]);
-  #elif CMK_BPROC
-    myip = skt_innode_my_ip();
   #else
     if (!CmiMyPe())
     CmiPrintf("CmiInitCPUTopology Warning: Can not get unique name for the compute nodes. \n");
@@ -582,14 +553,10 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   }
 
   if (CmiMyPe() == 0) {
-#if CMK_BIGSIM_CHARM
-    if (BgNodeRank() == 0)
-#endif
       CmiPrintf("Charm++> cpu topology info is gathered in %.3f seconds.\n", CmiWallTimer()-startT);
   }
 #endif
 
-#endif   /* __BIGSIM__ */
 
   // now every one should have the node info
   CcdRaiseCondition(CcdTOPOLOGY_AVAIL);      // call callbacks

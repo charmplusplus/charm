@@ -3,6 +3,7 @@
 [![Build Status](https://travis-ci.org/UIUC-PPL/charm.svg?branch=master)](https://travis-ci.org/UIUC-PPL/charm)
 [![Documentation Status](https://readthedocs.org/projects/charm/badge/?version=latest)](https://charm.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3370873.svg)](https://doi.org/10.5281/zenodo.3370873)
+[![CDash](https://img.shields.io/badge/CDash-dashboard-blue)](https://my.cdash.org/index.php?project=Charm%2B%2B)
 
 ## Introduction
 Charm++ is a message-passing parallel language and runtime system.
@@ -166,15 +167,14 @@ for more information:
 * `tsan` - Compile Charm++ with support for Thread Sanitizer.
 * `papi` - Enable PAPI performance counters.
 * `ooc` - Build Charm++ with out-of-core execution features.
-* `bigsim` - Compile Charm++ as running on the BigSim emulator.
-* `help` - show supported options for a version. For example, for `netlrts-linux`, running:
+* `help` - show supported options for a version. For example, for `netlrts-linux-x86_64`, running:
          
-         $ ./build charm++ netlrts-linux help
+         $ ./build charm++ netlrts-linux-x86_64 help
          
      will give:
     
       Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64
-      Supported options: bigemulator bigsim clustermatic common cuda flang gfortran ifort local nolb omp ooc papi pedantic perftools persistent pgf90 pxshm scyld smp syncft sysvshm tcp tsan
+      Supported options: common cuda flang gfortran ifort local nolb omp ooc papi perftools persistent pgf90 pxshm smp syncft sysvshm tcp tsan
 
 
 ## Building the Source
@@ -359,4 +359,4 @@ Ronak Buch, Michael Robson, Eric Mikida, Sam White, Juan Galvez, Nitin Bhat,
 Kavitha Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos,
 Raghavendra Kanakagiri, and Venkatasubrahmanian Narayanan.
 
-Copyright (C) 1989-2019 Regents of the University of Illinois
+Copyright (C) 1989-2020 Regents of the University of Illinois

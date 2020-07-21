@@ -1,7 +1,7 @@
 # -*- shell-script -*-
 #
 # Copyright © 2009      CNRS
-# Copyright © 2009-2018 Inria.  All rights reserved.
+# Copyright © 2009-2020 Inria.  All rights reserved.
 # Copyright © 2009, 2011-2012      Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 #
@@ -17,7 +17,7 @@
 ####################################################################
 
 AC_INIT([hwloc],
-        [m4_normalize(esyscmd([config/hwloc_get_version.sh VERSION --version]))],
+        [m4_normalize(esyscmd([sh config/hwloc_get_version.sh VERSION --version]))],
         [http://github.com/open-mpi/hwloc/issues], [hwloc])
 AC_PREREQ(2.63)
 AC_CONFIG_AUX_DIR(./config)
@@ -97,7 +97,6 @@ LT_LANG([C++])
 CFLAGS_save=$CFLAGS
 AC_PROG_CC
 AM_PROG_CC_C_O
-AC_PROG_CC_C99
 CFLAGS=$CFLAGS_save
 
 AC_ARG_VAR(CC_FOR_BUILD,[build system C compiler])
@@ -273,7 +272,7 @@ EOF
 
 # Plugin support
 hwloc_plugin_summary=$hwloc_have_plugins
-test "x$hwloc_plugin_components" != "x" && hwloc_plugin_summary="yes ("`echo $hwloc_plugin_components`")" # echo removes the starting space
+test "x$hwloc_plugin_components" != "x" && hwloc_plugin_summary="$hwloc_plugins_load ("`echo $hwloc_plugin_components`")" # echo removes the starting space
 cat <<EOF
 Plugin support:              $hwloc_plugin_summary
 EOF
