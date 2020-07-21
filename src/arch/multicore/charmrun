@@ -2,6 +2,7 @@
 
 export FROM_CHARMRUN='1'
 
+cmd=""
 args=""
 QUIET=0
 XTERM='xterm'
@@ -55,8 +56,16 @@ do
 		shift
 		shift
 		;;
-	*)
+	+*)
 		args=$args" "$1
+		shift
+		;;
+	*)
+		if [ -z "$cmd" ]; then
+			cmd=$1
+		else
+			args=$args" "$1
+		fi
 		shift
 		;;
 	esac
@@ -84,8 +93,8 @@ then
   args="$XTERM -e $DEBUGGER $args"
 fi
 
-test $QUIET -eq 0 && echo Running command: "$args"
+test $QUIET -eq 0 && echo Running command: "$cmd" "$args"
 test $QUIET -eq 0 && echo
 
 # shellcheck disable=SC2086
-exec $args
+exec "$cmd" $args
