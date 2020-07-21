@@ -14,8 +14,13 @@ pingpong_multipairs: pingpong_multipairs.o
 
 pingpong_multipairs.o: pingpong_multipairs.C
 	$(CHARMC) -language converse++ -c pingpong_multipairs.C
-test: pingpong
+
+test: pingpong pingpong_multipairs
 	$(call run, ./pingpong +p2 )
+	$(call run, ./pingpong_multipairs +p2 )
+ 
+testp: pingpong pingpong_multipairs
+	$(call run, ./pingpong_multipairs +p$(P))
 
 clean:
 	rm -f core *.cpm.h

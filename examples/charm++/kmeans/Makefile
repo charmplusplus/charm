@@ -20,3 +20,5 @@ clean:
 test: all
 	$(call run, +p4 ./kmeans 32 4 4 )
 
+testp: all
+	$(call run, +p$(P) ./kmeans $$(( $(P) * 8 )) $$(( $(P) * 2 )) $$(( $(P) * 2)) )

@@ -17,6 +17,15 @@ test: all
 	$(call run, +p2 ./multiping 1 8)
 	$(call run, +p2 ./multiping 1 32)
 
+testp: all
+	$(call run, +p$(P) ./pingall 0)
+	$(call run, +p$(P) ./pingall 1)
+	$(call run, +p$(P) ./multiping 0 8)
+	$(call run, +p$(P) ./multiping 0 32)
+	$(call run, +p$(P) ./multiping 1 8)
+	$(call run, +p$(P) ./multiping 1 32)
+
+
 clean:
 	rm -f core *.cpm.h *~
 	rm -f pingall multiping
