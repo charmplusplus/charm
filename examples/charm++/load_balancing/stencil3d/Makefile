@@ -30,3 +30,9 @@ test: stencil3d
 	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyRefineLB +LBDebug 1 )
 	$(call run, +p4 ./stencil3d 64 32 +balancer DistributedLB +LBDebug 1 )
 
+
+testp: stencil3d
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer RefineLB +LBDebug 1 )
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyLB +LBDebug 1 )
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyRefineLB +LBDebug 1 )
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer DistributedLB +LBDebug 1 )
