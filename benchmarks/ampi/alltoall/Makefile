@@ -58,4 +58,4 @@ testp: all
 	$(call run, +p$(P) ./alltoall_VPtest 1024 +vp$$(( $(P) * 4 )) )
 
 clean:
-	rm -rf *~ *.o alltoall mpibench mpibench.mpi charmrun conv-host allgather ampirun
+	rm -rf *~ *.o alltoall alltoall.mpi mpibench mpibench.mpi charmrun conv-host allgather allgather.mpi ampirun
