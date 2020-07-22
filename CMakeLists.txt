@@ -156,7 +156,7 @@ if(${TARGET} STREQUAL "all-test")
         conv-partition conv-util hwloc conv-static conv-core ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
         conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer create_symlinks moduleCkCache trace-converse moduleCommonLBs moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper threads-default-tls ldb-neighbor ldb-workstealing modulearmci modulecollidecharm modulecollide memory-os)
-  if(${CMK_CAN_LINK_FORTRAN})
+  if(CMK_CAN_LINK_FORTRAN)
     add_dependencies(all-test moduleampif conv-utilf ckmainf)
   endif()
   set(TARGET "LIBS")
