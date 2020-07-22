@@ -20,7 +20,7 @@ public:
   {
     delete m;
     counter=0;
-    nElements=5;
+    nElements=5 * CkNumPes();
 
     CkPrintf("Running Hello on %d processors for %d elements\n",CkNumPes(),nElements);
     mainProxy = thisProxy;

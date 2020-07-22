@@ -20,3 +20,6 @@ allToAll.o: allToAll.C allToAll.decl.h
 test: all
 	$(call run, ./allToAll +p4 1024 )
 
+testp: all
+	$(call run, ./allToAll +p$(P) 1024 )
+

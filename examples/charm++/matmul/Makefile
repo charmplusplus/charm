@@ -18,5 +18,8 @@ matmul.decl.h: matmul.ci
 test: $(BINARY)
 	$(call run, +p4 ./matmul 50 5 )
 
+testp: $(BINARY)
+	$(call run, +p$(P) ./matmul $$(( $(P) * 10 ))  5 )
+
 clean:
 	rm -f *.o *.decl.h *.def.h $(BINARY) charmrun

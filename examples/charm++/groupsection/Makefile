@@ -15,5 +15,8 @@ check.decl.h: check.ci
 test: check
 	$(call run, +p4 ./check )
 
+testp: check
+	$(call run, +p$(P) ./check )
+
 clean:
 	rm -f *.decl.h *.def.h *.o check charmrun
