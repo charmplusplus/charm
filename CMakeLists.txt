@@ -78,7 +78,7 @@ endif()
 
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,uth,verbs")
-set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
 
 # Platform specific options (choose multiple if desired):
 option(SMP "Enable shared-memory communication within a single multi-processor machine instead of message passing." ON)
@@ -151,7 +151,14 @@ endif()
 set(CMK_REPLAYSYSTEM ${REPLAY})
 
 if(${TARGET} STREQUAL "all-test")
-  message(WARNING "Setting TARGET to LIBS instead of all-test.")
+  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test)
+  add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
+        conv-partition conv-util hwloc conv-static conv-core ldb-rand
+        memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
+        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer create_symlinks moduleCkCache trace-converse moduleCommonLBs moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper threads-default-tls ldb-neighbor ldb-workstealing modulearmci modulecollidecharm modulecollide memory-os)
+  if(${CMK_CAN_LINK_FORTRAN})
+    add_dependencies(all-test moduleampif conv-utilf ckmainf)
+  endif()
   set(TARGET "LIBS")
 endif()
 
