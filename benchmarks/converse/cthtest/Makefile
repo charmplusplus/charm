@@ -18,5 +18,9 @@ test: pgm
 #	-$(LINKLINE) -thread qt && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
 #	-$(LINKLINE) -thread uJcontext && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
 
+
+testp: pgm
+	$(call run, ./pgm +p$(P))
+
 clean:
 	rm -f conv-host *.o pgm *.bak pgm.*.log pgm.sts *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
