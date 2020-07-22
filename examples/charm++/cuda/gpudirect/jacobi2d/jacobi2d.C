@@ -8,6 +8,7 @@
 /* readonly */ int block_size;
 /* readonly */ int n_chares;
 /* readonly */ int n_iters;
+/* readonly */ int warmup_iters;
 /* readonly */ bool sync_ver;
 /* readonly */ bool use_zerocopy;
 /* readonly */ bool print;
@@ -41,9 +42,11 @@ public:
     grid_size = 16384;
     block_size = 4096;
     n_iters = 100;
+    warmup_iters = 10;
     use_zerocopy = false;
     print = false;
     sync_ver = false;
+    my_iter = 0;
 
     // Initialize aggregate timers
     comm_agg_time = 0.0;
@@ -51,7 +54,7 @@ public:
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:b:i:yzp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:b:i:w:yzp")) != -1) {
       switch (c) {
         case 's':
           grid_size = atoi(optarg);
@@ -61,6 +64,9 @@ public:
           break;
         case 'i':
           n_iters = atoi(optarg);
+          break;
+        case 'w':
+          warmup_iters = atoi(optarg);
           break;
         case 'y':
           sync_ver = true;
@@ -73,7 +79,7 @@ public:
           break;
         default:
           CkPrintf(
-              "Usage: %s -s [grid size] -b [block size] -i [iterations] "
+              "Usage: %s -s [grid size] -b [block size] -i [iterations] -w [warmup]"
               "-y (use sync version) -z (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
@@ -91,9 +97,9 @@ public:
     // Print configuration
     CkPrintf("\n[CUDA 2D Jacobi example]\n");
     CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d, Iterations: %d, "
-        "Bulk-synchronous: %d, Zerocopy: %d, Print: %d\n", grid_size, grid_size,
-        block_size, block_size, n_chares, n_chares, n_iters, sync_ver,
-        use_zerocopy, print);
+        "Warm-up: %d, Bulk-synchronous: %d, Zerocopy: %d, Print: %d\n\n",
+        grid_size, grid_size, block_size, block_size, n_chares, n_chares,
+        n_iters, warmup_iters, sync_ver, use_zerocopy, print);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares, n_chares);
@@ -102,40 +108,43 @@ public:
   }
 
   void initDone() {
-    CkPrintf("Chare array initialization time: %lf seconds\n", CkWallTimer() - init_start_time);
+    CkPrintf("Init time: %.3lf s\n", CkWallTimer() - init_start_time);
 
-    my_iter = 1;
-    start_time = CkWallTimer();
+    startIter();
+  }
+
+  void startIter() {
+    if (my_iter++ == warmup_iters) start_time = CkWallTimer();
     if (sync_ver) comm_start_time = CkWallTimer();
+
     block_proxy.exchangeGhosts();
   }
 
   void commDone() {
-    comm_agg_time += CkWallTimer() - comm_start_time;
+    if (my_iter > warmup_iters) comm_agg_time += CkWallTimer() - comm_start_time;
     update_start_time = CkWallTimer();
+
     block_proxy.update();
   }
 
   void updateDone() {
-    update_agg_time += CkWallTimer() - update_start_time;
+    if (my_iter > warmup_iters) update_agg_time += CkWallTimer() - update_start_time;
 
-    if (my_iter++ == n_iters) {
-      thisProxy.done();
+    if (my_iter == warmup_iters + n_iters) {
+      done();
     } else {
-      comm_start_time = CkWallTimer();
-      block_proxy.exchangeGhosts();
+      startIter();
     }
   }
 
   void done() {
     double total_time = CkWallTimer() - start_time;
-    CkPrintf("Finished due to max iterations %d, total time %lf seconds\n",
-             n_iters, total_time);
+    CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
+        total_time, (total_time / n_iters) * 1e6);
     if (sync_ver) {
-      CkPrintf("Comm time: %.3lf us\nUpdate time: %.3lf us\n",
-          (comm_agg_time / n_iters) * 1000000, (update_agg_time / n_iters) * 1000000);
+      CkPrintf("Comm time per iteration: %.3lf us\nUpdate time per iteration: %.3lf us\n",
+          (comm_agg_time / n_iters) * 1e6, (update_agg_time / n_iters) * 1e6);
     }
-    CkPrintf("Iteration time: %.3lf us\n", (total_time / n_iters) * 1000000);
 
     if (print) {
       sleep(1);
@@ -191,7 +200,7 @@ class Block : public CBase_Block {
 
   void init() {
     // Initialize values
-    my_iter = 1;
+    my_iter = 0;
     neighbors = 0;
     x = thisIndex.x;
     y = thisIndex.y;
@@ -370,7 +379,7 @@ class Block : public CBase_Block {
     invokeJacobiKernel(d_temperature, d_new_temperature, block_size, stream);
 
     // Copy final temperature data back to host
-    if (my_iter == n_iters) {
+    if (my_iter == warmup_iters + n_iters) {
       hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
             sizeof(double) * (block_size + 2) * (block_size + 2),
             cudaMemcpyDeviceToHost, stream));

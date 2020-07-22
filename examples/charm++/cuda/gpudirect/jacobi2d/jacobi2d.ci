@@ -5,6 +5,7 @@ mainmodule jacobi2d {
   readonly int block_size;
   readonly int n_chares;
   readonly int n_iters;
+  readonly int warmup_iters;
   readonly bool sync_ver;
   readonly bool use_zerocopy;
   readonly bool print;
@@ -12,6 +13,7 @@ mainmodule jacobi2d {
   mainchare Main {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void initDone();
+    entry void startIter();
     entry [reductiontarget] void commDone();
     entry [reductiontarget] void updateDone();
     entry [reductiontarget] void done();
@@ -30,19 +32,17 @@ mainmodule jacobi2d {
 
     entry void exchangeGhosts() {
       serial {
+        my_iter++;
         packGhosts();
-        // Packed buffers can be enqueued for sending right away with zerocopy
-        // Without it, they should first be transferred to host memory
-        if (use_zerocopy) {
-          sendGhosts();
-        }
       }
 
-      if (!use_zerocopy) {
+      // Packed buffers can be enqueued for sending right away with zerocopy
+      // Without it, they should first be transferred to host memory
+      if (use_zerocopy) {
+        serial { sendGhosts(); }
+      } else {
         when packGhostsDone() {
-          serial {
-            sendGhosts();
-          }
+          serial { sendGhosts(); }
         }
       }
 
@@ -62,9 +62,8 @@ mainmodule jacobi2d {
         }
       }
 
-      // With device-side zerocopy in asynchronous mode, need to wait until
-      // ghost transfers are complete before updating the block
-      if (use_zerocopy && !sync_ver) {
+      // With device-side zerocopy, need to wait until ghost transfers are complete
+      if (use_zerocopy) {
         for (remote_count = 0; remote_count < neighbors; remote_count++) {
           when sendGhostDone() {
             serial {}
@@ -73,9 +72,8 @@ mainmodule jacobi2d {
       }
 
       serial {
-        if (sync_ver) {
-          CkCallback cb(CkReductionTarget(Main, commDone), main_proxy);
-          contribute(cb);
+        if (sync_ver || my_iter <= warmup_iters) {
+          contribute(CkCallback(CkReductionTarget(Main, commDone), main_proxy));
         } else {
           update();
         }
@@ -87,16 +85,13 @@ mainmodule jacobi2d {
           std::swap(d_temperature, d_new_temperature);
 
           // Iteration comoplete
-          if (sync_ver) {
-            my_iter++;
-            CkCallback cb(CkReductionTarget(Main, updateDone), main_proxy);
-            contribute(cb);
+          if (sync_ver || my_iter <= warmup_iters) {
+            contribute(CkCallback(CkReductionTarget(Main, updateDone), main_proxy));
           } else {
-            if (my_iter++ < n_iters) {
+            if (my_iter < warmup_iters + n_iters) {
               thisProxy[thisIndex].exchangeGhosts();
             } else {
-              CkCallback cb(CkReductionTarget(Main, done), main_proxy);
-              contribute(cb);
+              contribute(CkCallback(CkReductionTarget(Main, done), main_proxy));
             }
           }
         }
