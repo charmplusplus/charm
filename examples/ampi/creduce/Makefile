@@ -22,3 +22,8 @@ test: pgm
 	$(call run, ./pgm +p2 +vp1 )
 	$(call run, ./pgm +p2 +vp2 )
 	$(call run, ./pgm +p2 +vp4 )
+
+testp: pgm
+	$(call run, ./pgm +p$(P) +vp$(P) )
+	$(call run, ./pgm +p$(P) +vp$$(( $(P) * 2 )) )
+	$(call run, ./pgm +p$(P) +vp$$(( $(P) * 4 )) )

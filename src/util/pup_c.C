@@ -64,8 +64,10 @@ CLINKAGE int pup_isDeleting(const pup_er p)
   { return (mp.isDeleting())?1:0;}
 CLINKAGE int pup_isUserlevel(const pup_er p)
   { return (mp.isUserlevel())?1:0;}
-CLINKAGE int pup_isRestarting(const pup_er p)
-  { return (mp.isRestarting())?1:0;}
+CLINKAGE int pup_isCheckpoint(const pup_er p)
+  { return (mp.isCheckpoint())?1:0;}
+CLINKAGE int pup_isMigration(const pup_er p)
+  { return (mp.isMigration())?1:0;}
 CLINKAGE char* pup_typeString(const pup_er p)
   { return (char *)mp.typeString(); }
 
