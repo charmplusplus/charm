@@ -1841,6 +1841,10 @@ void CkMigratable::setObjPosition(const std::vector<LBRealType>& pos)
 }
 double CkMigratable::getObjTime() { return myRec->getObjTime(); }
 
+const std::vector<LBRealType> CkMigratable::getObjVectorLoad() const {
+  return myRec->getObjVectorLoad();
+}
+
 #  if CMK_LB_USER_DATA
 /**
  * Use this method to set user specified data to the lbdatabase.
@@ -1860,6 +1864,10 @@ double CkMigratable::getObjTime() { return myRec->getObjTime(); }
  */
 void* CkMigratable::getObjUserData(int idx) { return myRec->getObjUserData(idx); }
 #  endif
+
+void CkMigratable::CkLBSetPhase(int phase) {
+  myRec->CkLBSetPhase(phase);
+}
 
 void CkMigratable::clearMetaLBData()
 {
@@ -2064,10 +2072,16 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 void CkMigratable::setObjTime(double cputime) {}
 void CkMigratable::setObjPosition(const std::vector<LBRealType> pos) {}
 double CkMigratable::getObjTime() { return 0.0; }
+const std::vector<LBRealType> CkMigratable::getObjVectorLoad() const
+{
+  return std::vector<LBRealType>();
+};
 
 #  if CMK_LB_USER_DATA
 void* CkMigratable::getObjUserData(int idx) { return NULL; }
 #  endif
+
+void CkMigratable::CkLBSetPhase(int phase) {}
 
 /* no load balancer: need dummy implementations to prevent link error */
 void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg) {}
@@ -2159,9 +2173,23 @@ const std::vector<LBRealType>& CkLocRec::getObjPosition()
 {
   return lbmgr->GetObjPosition(ldHandle);
 }
-#  if CMK_LB_USER_DATA
-void* CkLocRec::getObjUserData(int idx) { return lbmgr->GetDBObjUserData(ldHandle, idx); }
-#  endif
+double CkLocRec::getObjTime() {
+        LBRealType walltime, cputime;
+        lbmgr->GetObjLoad(ldHandle, walltime, cputime);
+        return walltime;
+}
+const std::vector<LBRealType> CkLocRec::getObjVectorLoad() const {
+  return lbmgr->GetObjVectorLoad(ldHandle);
+}
+#if CMK_LB_USER_DATA
+void* CkLocRec::getObjUserData(int idx) {
+        return lbmgr->GetDBObjUserData(ldHandle, idx);
+}
+#endif
+
+void CkLocRec::CkLBSetPhase(int phase) {
+  lbmgr->SetPhase(ldHandle, phase);
+}
 #endif
 
 // Attempt to destroy this record. If the location manager is done with the

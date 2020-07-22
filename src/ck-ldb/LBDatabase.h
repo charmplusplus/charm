@@ -67,6 +67,10 @@ public:
     LbObj(h)->getTime(&walltime, &cputime);
   };
 
+  inline const std::vector<LBRealType> GetObjVectorLoad (const LDObjHandle& h) const {
+    return LbObj(h)->getVectorLoad();
+  }
+
   inline void ObjPosition(LDObjHandle h, const std::vector<LBRealType>& pos) {
     LbObj(h)->setPosition(pos);
   };
@@ -154,6 +158,10 @@ public:
       MeasuredObjTime(walltime, cputime);
     }
   };
+
+  inline void SetPhase(const LDObjHandle &h, int phase) {
+    LbObj(h)->setPhase(phase);
+  }
   inline const LDObjHandle &GetObjHandle(int idx) {
     return LbObjIdx(idx)->GetLDObjHandle();
   }

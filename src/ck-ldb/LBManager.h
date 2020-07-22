@@ -298,6 +298,10 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjLoad(h, walltime, cputime);
   };
+  inline const std::vector<LBRealType> GetObjVectorLoad (const LDObjHandle& h)
+  {
+    return lbdb_obj->GetObjVectorLoad(h);
+  }
   void SetObjPosition(LDObjHandle h, const std::vector<LBRealType>& pos)
   {
     lbdb_obj->ObjPosition(h, pos);
@@ -363,6 +367,11 @@ class LBManager : public CBase_LBManager
     return lbdb_obj->LbObj(h)->getDBUserData(idx);
   }
 #endif
+
+  inline void SetPhase(LDObjHandle& h, int phase)
+  {
+    lbdb_obj->SetPhase(h, phase);
+  }
 
   void ResetAdaptive();
 
