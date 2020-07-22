@@ -33,6 +33,7 @@ public:
     startCTime = -1.0;
     lastCpuTime = .0;
 #endif
+    phase = -1;
   }
 
   ~LBObj() { };
@@ -95,6 +96,7 @@ public:
   inline void setPupSize(size_t obj_pup_size) {
     data.pupSize = pup_encodeSize(obj_pup_size);
   }
+  inline void setPhase(const int phase) { this->phase = phase; };
   inline void UseAsyncMigrate(bool async) { data.asyncArrival = async; }
   inline LDObjData &ObjData() { return data; };
   inline void lastKnownLoad(LBRealType *w, LBRealType *c) {
@@ -109,6 +111,10 @@ public:
 #if CMK_LB_USER_DATA
   inline void *getDBUserData(int idx) { return  data.getUserData(idx); }
 #endif
+  inline const std::vector<LBRealType> getVectorLoad() const
+  {
+    return data.vectorLoad;
+  }
 private:
 
   void *localUserData;               // local user data, not in database
@@ -122,6 +128,7 @@ private:
   double startCTime;
   LBRealType lastCpuTime;
 #endif
+  int phase;
 //  bool migratable;   // temp
 };
 
