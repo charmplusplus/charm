@@ -11,7 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: ./build all-test multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
+      run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
     - name: test
       run: |
         make -C multicore-darwin-x86_64/tests all -j3 OPTS="-tracemode projections"
@@ -27,4 +27,4 @@ jobs:
         make
         cd ../multicore-darwin-x86_64/tests/charm++/megatest
         ../../../../projections/bin/projections --exit pgm.sts
-        
+
