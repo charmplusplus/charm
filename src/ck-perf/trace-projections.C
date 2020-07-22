@@ -878,15 +878,25 @@ void LogEntry::pup(PUP::er &p)
     case CREATION_BCAST:
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
-      p|event; p|pe; p|msglen; p|irecvtime; p|pes.size();
-      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      p|event; p|pe; p|msglen; p|irecvtime;
+      { // Needed to control the scope of numpes
+        int numpes = pes.size();
+        p | numpes;
+        if (p.isUnpacking()) pes.resize(numpes);
+      }
+      if (p.isUnpacking()) recvTime = irecvtime / 1.0e6;
       break;
     case CREATION_MULTICAST:
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
-      p|event; p|pe; p|msglen; p|irecvtime; p|pes.size();
-      p|pes;
-      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      p|event; p|pe; p|msglen; p|irecvtime;
+      { // Needed to control the scope of numpes
+        int numpes = pes.size();
+        p | numpes;
+        if (p.isUnpacking()) pes.resize(numpes);
+      }
+      p | pes;
+      if (p.isUnpacking()) recvTime = irecvtime / 1.0e6;
       break;
     case MESSAGE_RECV:
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen;
