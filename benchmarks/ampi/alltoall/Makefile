@@ -8,7 +8,7 @@ all-mpi: mpibench.mpi allgather.mpi alltoall.mpi
 
 allgather: allgather.c
 	$(CHARMC) -c allgather.c $(OPTS)
-	$(CHARMC) -o allgather allgather.o $(OPTS) $(LIBS) -memory gnu
+	$(CHARMC) -o allgather allgather.o $(OPTS) $(LIBS)
 
 allgather.mpi: allgather.c
 	$(MPICC) -c allgather.c $(OPTS)
@@ -16,7 +16,7 @@ allgather.mpi: allgather.c
 
 alltoall: alltoall.c
 	$(CHARMC) -c alltoall.c $(OPTS)
-	$(CHARMC) -o alltoall alltoall.o $(OPTS) $(LIBS) -memory gnu
+	$(CHARMC) -o alltoall alltoall.o $(OPTS) $(LIBS)
 
 alltoall.mpi: alltoall.c
 	$(MPICC) -c alltoall.c $(OPTS)
@@ -37,10 +37,10 @@ alltoall_VPtest: alltoall_VPtest.c
 test: all
 	$(call run, +p4 ./mpibench +vp4)
 	$(call run, +p4 ./mpibench +vp8)
-#	$(call run, +p4 ./alltoall +vp4)
-#	$(call run, +p4 ./alltoall +vp8)
-#	$(call run, +p4 ./allgather +vp4)
-#	$(call run, +p4 ./allgather +vp8)
+	$(call run, +p4 ./alltoall 1024 +vp4)
+	$(call run, +p4 ./alltoall 1024 +vp8)
+	$(call run, +p4 ./allgather 1024 +vp4)
+	$(call run, +p4 ./allgather 1024 +vp8)
 	$(call run, +p4 ./alltoall_VPtest 1024 +vp4)
 	$(call run, +p4 ./alltoall_VPtest 1024 +vp8)
 
@@ -53,9 +53,15 @@ testp: all
 	$(call run, +p$(P) ./mpibench +vp$(P) )
 	$(call run, +p$(P) ./mpibench +vp$$(( $(P) * 2 )) )
 	$(call run, +p$(P) ./mpibench +vp$$(( $(P) * 4 )) )
+	$(call run, +p$(P) ./alltoall 1024 +vp$(P) )
+	$(call run, +p$(P) ./alltoall 1024 +vp$$(( $(P) * 2 )) )
+	$(call run, +p$(P) ./alltoall 1024 +vp$$(( $(P) * 4 )) )
+	$(call run, +p$(P) ./allgather 1024 +vp$(P) )
+	$(call run, +p$(P) ./allgather 1024 +vp$$(( $(P) * 2 )) )
+	$(call run, +p$(P) ./allgather 1024 +vp$$(( $(P) * 4 )) )
 	$(call run, +p$(P) ./alltoall_VPtest 1024 +vp$(P) )
 	$(call run, +p$(P) ./alltoall_VPtest 1024 +vp$$(( $(P) * 2 )) )
 	$(call run, +p$(P) ./alltoall_VPtest 1024 +vp$$(( $(P) * 4 )) )
 
 clean:
-	rm -rf *~ *.o alltoall alltoall.mpi mpibench mpibench.mpi charmrun conv-host allgather allgather.mpi ampirun
+	rm -rf *~ *.o alltoall alltoall.mpi alltoall_VPtest mpibench mpibench.mpi charmrun conv-host allgather allgather.mpi ampirun
