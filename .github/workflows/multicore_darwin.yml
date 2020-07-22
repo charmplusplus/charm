@@ -25,6 +25,7 @@ jobs:
         git clone https://github.com/UIUC-PPL/projections
         cd projections
         make
-        cd ../multicore-darwin-x86_64/tests/charm++/megatest
-        ../../../../projections/bin/projections --exit pgm.sts
-
+        proj=$PWD/bin/projections
+        cd ..
+        files=$(find . -name *.sts)
+        for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
