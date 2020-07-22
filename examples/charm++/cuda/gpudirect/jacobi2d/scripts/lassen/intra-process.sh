@@ -6,9 +6,9 @@
 #BSUB -nnodes 1
 #BSUB -J jacobi2d-sync
 
-cd $HOME/charm/examples/charm++/cuda/zerocopy/jacobi2d
+cd $HOME/charm/examples/charm++/cuda/gpudirect/jacobi2d
 
-n_iters=1000
+n_iters=100
 grid_size=32768
 sync="-y"
 
