@@ -1,4 +1,4 @@
-name: NetLRTS Linux buildold
+name: NetLRTS Linux buildold testp
 
 on: [push]
 
@@ -14,5 +14,4 @@ jobs:
       run: ./buildold all-test netlrts-linux-x86_64 -g -j4 --with-production
     - name: test
       run: |
-        make -C netlrts-linux-x86_64/tmp test TESTOPTS="++local"
         make -C netlrts-linux-x86_64/tmp testp TESTOPTS="++local" P=2
