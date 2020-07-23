@@ -11,6 +11,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./buildold LIBS netlrts-linux-x86_64 -g -j4 --with-production
+      run: ./buildold all-test netlrts-linux-x86_64 -g -j4 --with-production
     - name: test
-      run: make -C netlrts-linux-x86_64/tests all OPTS="-g" -j4 && make -C netlrts-linux-x86_64/tests test TESTOPTS="++local"
+      run: |
+        make -C netlrts-linux-x86_64/tmp test TESTOPTS="++local"
+        make -C netlrts-linux-x86_64/tmp testp TESTOPTS="++local" P=1
