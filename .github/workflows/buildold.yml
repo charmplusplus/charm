@@ -15,4 +15,4 @@ jobs:
     - name: test
       run: |
         make -C netlrts-linux-x86_64/tmp test TESTOPTS="++local"
-        make -C netlrts-linux-x86_64/tmp testp TESTOPTS="++local" P=1
+        make -C netlrts-linux-x86_64/tmp testp TESTOPTS="++local" P=2
