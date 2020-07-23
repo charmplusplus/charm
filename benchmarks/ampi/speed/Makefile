@@ -24,7 +24,7 @@ msgspeed.o: msgspeed.c
 	$(CHARMC) -c $<
 
 test: all
-	$(call run, hello +p2)
+	$(call run, ./hello +p2)
 
 
 # Various stand-alone (non-charm) API calls:
