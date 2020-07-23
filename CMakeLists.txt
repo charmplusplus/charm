@@ -95,7 +95,7 @@ option(PAPI "Compile with PAPI performance counter support" OFF)
 option(ERROR_CHECKING      "Enable error checking" OFF)
 option(AMPI_ERROR_CHECKING "Enable AMPI error checking" OFF)
 option(STATS               "Enable statistics collection" OFF)
-option(TRACING             "Enable tracing modules" OFF)
+set(TRACING "" CACHE STRING "Enable tracing modules")
 option(TRACING_COMMTHREAD  "Enable tracing communication thread" OFF)
 option(CHARMDEBUG          "Enable charmDebug" OFF)
 option(REPLAY              "Enable record/replay" OFF)
@@ -115,6 +115,15 @@ option(ZLIB                "Enable zlib support" ON)
 option(AMPI_MPICH_TESTS    "Enable mpich tests for AMPI" OFF)
 option(DRONE_MODE          "Enable drone mode" OFF)
 option(TASK_QUEUE          "Enable task queue" OFF)
+
+
+if(TRACING STREQUAL "")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(TRACING 1)
+  else()
+    set(TRACING 0)
+  endif()
+endif()
 
 # Charm++ dynamic libraries
 option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
@@ -991,6 +1000,7 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
 
 # Copy the Makefile used for building and running tests
 configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests ${CMAKE_BINARY_DIR}/include/Makefile COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests.common ${CMAKE_BINARY_DIR}/include/Makefile.tests.common COPYONLY)
 
 
 # Installation rules
