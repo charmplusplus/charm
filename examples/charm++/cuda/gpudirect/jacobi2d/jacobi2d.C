@@ -395,7 +395,11 @@ class Block : public CBase_Block {
     CkPrintf("[%d,%d]\n", thisIndex.x, thisIndex.y);
     for (int j = 0; j < block_size + 2; j++) {
       for (int i = 0; i < block_size + 2; i++) {
+#ifdef TEST_CORRECTNESS
+        CkPrintf("%d ", h_temperature[(block_size + 2) * j + i]);
+#else
         CkPrintf("%.6lf ", h_temperature[(block_size + 2) * j + i]);
+#endif
       }
       CkPrintf("\n");
     }

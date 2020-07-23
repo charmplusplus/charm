@@ -9,35 +9,35 @@ __global__ void initKernel(DataType* temperature, int block_size) {
   int j = blockDim.y * blockIdx.y + threadIdx.y;
 
   if (i < block_size + 2 && j < block_size + 2) {
-    temperature[(block_size + 2) * j + i] = 0.0;
+    temperature[(block_size + 2) * j + i] = 0;
   }
 }
 
 __global__ void leftBoundaryKernel(DataType* temperature, int block_size) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_size) {
-    temperature[(block_size + 2) * (1 + j)] = 1.0;
+    temperature[(block_size + 2) * (1 + j)] = 1;
   }
 }
 
 __global__ void rightBoundaryKernel(DataType* temperature, int block_size) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_size) {
-    temperature[(block_size + 2) * (1 + j) + (block_size + 1)] = 1.0;
+    temperature[(block_size + 2) * (1 + j) + (block_size + 1)] = 1;
   }
 }
 
 __global__ void topBoundaryKernel(DataType* temperature, int block_size) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i < block_size) {
-    temperature[1 + i] = 1.0;
+    temperature[1 + i] = 1;
   }
 }
 
 __global__ void bottomBoundaryKernel(DataType* temperature, int block_size) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i < block_size) {
-    temperature[(block_size + 2) * (block_size + 1) + (1 + i)] = 1.0;
+    temperature[(block_size + 2) * (block_size + 1) + (1 + i)] = 1;
   }
 }
 
@@ -74,13 +74,21 @@ __global__ void jacobiKernel(DataType* temperature, DataType* new_temperature, i
   int j = (blockDim.y * blockIdx.y + threadIdx.y) + 1;
 
   if (i <= block_size && j <= block_size) {
+#ifdef TEST_CORRECTNESS
     new_temperature[j * (block_size + 2) + i] =
         (temperature[j * (block_size + 2) + (i - 1)] +
          temperature[j * (block_size + 2) + (i + 1)] +
          temperature[(j - 1) * (block_size + 2) + i] +
          temperature[(j + 1) * (block_size + 2) + i] +
-         temperature[j * (block_size + 2) + i]) *
-        DIVIDEBY5;
+         temperature[j * (block_size + 2) + i]) % 100000;
+#else
+    new_temperature[j * (block_size + 2) + i] =
+        (temperature[j * (block_size + 2) + (i - 1)] +
+         temperature[j * (block_size + 2) + (i + 1)] +
+         temperature[(j - 1) * (block_size + 2) + i] +
+         temperature[(j + 1) * (block_size + 2) + i] +
+         temperature[j * (block_size + 2) + i]) * DIVIDEBY5;
+#endif
   }
 }
 
