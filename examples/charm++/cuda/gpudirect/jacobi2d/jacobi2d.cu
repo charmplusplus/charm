@@ -1,9 +1,10 @@
 #include "hapi.h"
+#include "jacobi2d.h"
 
 #define TILE_SIZE 16
 #define DIVIDEBY5 0.2
 
-__global__ void initKernel(double* temperature, int block_size) {
+__global__ void initKernel(DataType* temperature, int block_size) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   int j = blockDim.y * blockIdx.y + threadIdx.y;
 
@@ -12,63 +13,63 @@ __global__ void initKernel(double* temperature, int block_size) {
   }
 }
 
-__global__ void leftBoundaryKernel(double* temperature, int block_size) {
+__global__ void leftBoundaryKernel(DataType* temperature, int block_size) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_size) {
     temperature[(block_size + 2) * (1 + j)] = 1.0;
   }
 }
 
-__global__ void rightBoundaryKernel(double* temperature, int block_size) {
+__global__ void rightBoundaryKernel(DataType* temperature, int block_size) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_size) {
     temperature[(block_size + 2) * (1 + j) + (block_size + 1)] = 1.0;
   }
 }
 
-__global__ void topBoundaryKernel(double* temperature, int block_size) {
+__global__ void topBoundaryKernel(DataType* temperature, int block_size) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i < block_size) {
     temperature[1 + i] = 1.0;
   }
 }
 
-__global__ void bottomBoundaryKernel(double* temperature, int block_size) {
+__global__ void bottomBoundaryKernel(DataType* temperature, int block_size) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i < block_size) {
     temperature[(block_size + 2) * (block_size + 1) + (1 + i)] = 1.0;
   }
 }
 
-__global__ void leftPackingKernel(double* temperature, double* ghost, int block_size) {
+__global__ void leftPackingKernel(DataType* temperature, DataType* ghost, int block_size) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_size) {
     ghost[j] = temperature[(block_size + 2) * (1 + j) + 1];
   }
 }
 
-__global__ void rightPackingKernel(double* temperature, double* ghost, int block_size) {
+__global__ void rightPackingKernel(DataType* temperature, DataType* ghost, int block_size) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_size) {
     ghost[j] = temperature[(block_size + 2) * (1 + j) + (block_size)];
   }
 }
 
-__global__ void leftUnpackingKernel(double* temperature, double* ghost, int block_size) {
+__global__ void leftUnpackingKernel(DataType* temperature, DataType* ghost, int block_size) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_size) {
     temperature[(block_size + 2) * (1 + j) + 1] = ghost[j];
   }
 }
 
-__global__ void rightUnpackingKernel(double* temperature, double* ghost, int block_size) {
+__global__ void rightUnpackingKernel(DataType* temperature, DataType* ghost, int block_size) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_size) {
     temperature[(block_size + 2) * (1 + j) + (block_size)] = ghost[j];
   }
 }
 
-__global__ void jacobiKernel(double* temperature, double* new_temperature, int block_size) {
+__global__ void jacobiKernel(DataType* temperature, DataType* new_temperature, int block_size) {
   int i = (blockDim.x * blockIdx.x + threadIdx.x) + 1;
   int j = (blockDim.y * blockIdx.y + threadIdx.y) + 1;
 
@@ -83,7 +84,7 @@ __global__ void jacobiKernel(double* temperature, double* new_temperature, int b
   }
 }
 
-void invokeInitKernel(double* d_temperature, int block_size, cudaStream_t stream) {
+void invokeInitKernel(DataType* d_temperature, int block_size, cudaStream_t stream) {
   dim3 block_dim(TILE_SIZE, TILE_SIZE);
   dim3 grid_dim(((block_size + 2) + (block_dim.x - 1)) / block_dim.x,
       ((block_size + 2) + (block_dim.y - 1)) / block_dim.y);
@@ -92,7 +93,7 @@ void invokeInitKernel(double* d_temperature, int block_size, cudaStream_t stream
   hapiCheck(cudaPeekAtLastError());
 }
 
-void invokeBoundaryKernels(double* d_temperature, int block_size, bool left_bound,
+void invokeBoundaryKernels(DataType* d_temperature, int block_size, bool left_bound,
     bool right_bound, bool top_bound, bool bottom_bound, cudaStream_t stream) {
   dim3 block_dim(TILE_SIZE * TILE_SIZE);
   dim3 grid_dim((block_size + (block_dim.x - 1)) / block_dim.x);
@@ -112,8 +113,8 @@ void invokeBoundaryKernels(double* d_temperature, int block_size, bool left_boun
   hapiCheck(cudaPeekAtLastError());
 }
 
-void invokePackingKernels(double* d_temperature, double* d_left_ghost,
-    double* d_right_ghost, bool left_bound, bool right_bound, int block_size,
+void invokePackingKernels(DataType* d_temperature, DataType* d_left_ghost,
+    DataType* d_right_ghost, bool left_bound, bool right_bound, int block_size,
     cudaStream_t stream) {
   dim3 block_dim(TILE_SIZE * TILE_SIZE);
   dim3 grid_dim((block_size + (block_dim.x - 1)) / block_dim.x);
@@ -126,7 +127,7 @@ void invokePackingKernels(double* d_temperature, double* d_left_ghost,
   hapiCheck(cudaPeekAtLastError());
 }
 
-void invokeUnpackingKernel(double* d_temperature, double* d_ghost, bool is_left,
+void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost, bool is_left,
     int block_size, cudaStream_t stream) {
   dim3 block_dim(TILE_SIZE * TILE_SIZE);
   dim3 grid_dim((block_size + (block_dim.x - 1)) / block_dim.x);
@@ -139,7 +140,7 @@ void invokeUnpackingKernel(double* d_temperature, double* d_ghost, bool is_left,
   hapiCheck(cudaPeekAtLastError());
 }
 
-void invokeJacobiKernel(double* d_temperature, double* d_new_temperature, int block_size,
+void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature, int block_size,
     cudaStream_t stream) {
   dim3 block_dim(TILE_SIZE, TILE_SIZE);
   dim3 grid_dim((block_size + (block_dim.x - 1)) / block_dim.x,

@@ -1,4 +1,6 @@
 mainmodule jacobi2d {
+  include "jacobi2d.h";
+
   readonly CProxy_Main main_proxy;
   readonly CProxy_Block block_proxy;
   readonly int grid_size;
@@ -25,8 +27,8 @@ mainmodule jacobi2d {
     entry void init();
     entry void initDone();
     entry void packGhostsDone();
-    entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice double gh[w]);
-    entry void receiveGhostsReg(int ref, int dir, int w, double gh[w]);
+    entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
+    entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
     entry void sendGhostDone();
     entry void updateDone();
 
@@ -48,13 +50,13 @@ mainmodule jacobi2d {
 
       for (remote_count = 0; remote_count < neighbors; remote_count++) {
         if (use_zerocopy) {
-          when receiveGhostsZC[my_iter](int ref, int dir, int w, nocopydevice double buf[w]) {
+          when receiveGhostsZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
             serial {
               processGhostsZC(dir, w, buf);
             }
           }
         } else {
-          when receiveGhostsReg[my_iter](int ref, int dir, int w, double buf[w]) {
+          when receiveGhostsReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
             serial {
               processGhostsReg(dir, w, buf);
             }

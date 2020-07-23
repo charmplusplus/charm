@@ -1,5 +1,6 @@
 #include "hapi.h"
 #include "jacobi2d.decl.h"
+#include "jacobi2d.h"
 #include <utility>
 
 /* readonly */ CProxy_Main main_proxy;
@@ -13,15 +14,15 @@
 /* readonly */ bool use_zerocopy;
 /* readonly */ bool print;
 
-extern void invokeInitKernel(double* d_temperature, int block_size, cudaStream_t stream);
-extern void invokeBoundaryKernels(double* d_temperature, int block_size, bool left_bound,
+extern void invokeInitKernel(DataType* d_temperature, int block_size, cudaStream_t stream);
+extern void invokeBoundaryKernels(DataType* d_temperature, int block_size, bool left_bound,
     bool right_bound, bool top_bound, bool bottom_bound, cudaStream_t stream);
-extern void invokePackingKernels(double* d_temperature, double* d_left_ghost,
-    double* d_right_ghost, bool left_bound, bool right_bound, int block_size,
+extern void invokePackingKernels(DataType* d_temperature, DataType* d_left_ghost,
+    DataType* d_right_ghost, bool left_bound, bool right_bound, int block_size,
     cudaStream_t stream);
-extern void invokeUnpackingKernel(double* d_temperature, double* d_ghost,
+extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     bool is_left, int block_size, cudaStream_t stream);
-extern void invokeJacobiKernel(double* d_temperature, double* d_new_temperature,
+extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
     int block_size, cudaStream_t stream);
 
 enum Direction { LEFT = 1, RIGHT, TOP, BOTTOM };
@@ -168,15 +169,15 @@ class Block : public CBase_Block {
   int remote_count;
   int x, y;
 
-  double* __restrict__ h_temperature;
-  double* __restrict__ d_temperature;
-  double* __restrict__ d_new_temperature;
-  double* __restrict__ h_left_ghost;
-  double* __restrict__ h_right_ghost;
-  double* __restrict__ h_bottom_ghost;
-  double* __restrict__ h_top_ghost;
-  double* __restrict__ d_left_ghost;
-  double* __restrict__ d_right_ghost;
+  DataType* __restrict__ h_temperature;
+  DataType* __restrict__ d_temperature;
+  DataType* __restrict__ d_new_temperature;
+  DataType* __restrict__ h_left_ghost;
+  DataType* __restrict__ h_right_ghost;
+  DataType* __restrict__ h_bottom_ghost;
+  DataType* __restrict__ h_top_ghost;
+  DataType* __restrict__ d_left_ghost;
+  DataType* __restrict__ d_right_ghost;
 
   cudaStream_t stream;
 
@@ -226,17 +227,17 @@ class Block : public CBase_Block {
 
     // Allocate memory and create CUDA stream
     hapiCheck(cudaMallocHost((void**)&h_temperature,
-          sizeof(double) * (block_size + 2) * (block_size + 2)));
+          sizeof(DataType) * (block_size + 2) * (block_size + 2)));
     hapiCheck(cudaMalloc((void**)&d_temperature,
-          sizeof(double) * (block_size + 2) * (block_size + 2)));
+          sizeof(DataType) * (block_size + 2) * (block_size + 2)));
     hapiCheck(cudaMalloc((void**)&d_new_temperature,
-          sizeof(double) * (block_size + 2) * (block_size + 2)));
-    hapiCheck(cudaMallocHost((void**)&h_left_ghost, sizeof(double) * block_size));
-    hapiCheck(cudaMallocHost((void**)&h_right_ghost, sizeof(double) * block_size));
-    hapiCheck(cudaMallocHost((void**)&h_bottom_ghost, sizeof(double) * block_size));
-    hapiCheck(cudaMallocHost((void**)&h_top_ghost, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc((void**)&d_left_ghost, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc((void**)&d_right_ghost, sizeof(double) * block_size));
+          sizeof(DataType) * (block_size + 2) * (block_size + 2)));
+    hapiCheck(cudaMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_size));
+    hapiCheck(cudaMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_size));
+    hapiCheck(cudaMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_size));
+    hapiCheck(cudaMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_size));
+    hapiCheck(cudaMalloc((void**)&d_left_ghost, sizeof(DataType) * block_size));
+    hapiCheck(cudaMalloc((void**)&d_right_ghost, sizeof(DataType) * block_size));
     cudaStreamCreate(&stream);
 
     // Initialize temperature data
@@ -258,14 +259,14 @@ class Block : public CBase_Block {
 
     if (!use_zerocopy) {
       // Transfer ghosts from device to host
-      hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(double),
+      hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(DataType),
             cudaMemcpyDeviceToHost, stream));
-      hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost, block_size * sizeof(double),
+      hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost, block_size * sizeof(DataType),
             cudaMemcpyDeviceToHost, stream));
       hapiCheck(cudaMemcpyAsync(h_top_ghost, d_temperature + (block_size + 2) + 1,
-            block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
+            block_size * sizeof(DataType), cudaMemcpyDeviceToHost, stream));
       hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size + 1,
-            block_size * sizeof(double), cudaMemcpyDeviceToHost, stream));
+            block_size * sizeof(DataType), cudaMemcpyDeviceToHost, stream));
 
       // Add asynchronous callback to be invoked when packing and device-to-host
       // transfers are complete
@@ -305,7 +306,7 @@ class Block : public CBase_Block {
 
   // This is the post entry method, the regular entry method is defined as a
   // SDAG entry method in the .ci file
-  void receiveGhostsZC(int ref, int dir, int &w, double *&buf, CkDeviceBufferPost *devicePost) {
+  void receiveGhostsZC(int ref, int dir, int &w, DataType *&buf, CkDeviceBufferPost *devicePost) {
     switch (dir) {
       case LEFT:
         buf = d_left_ghost;
@@ -325,7 +326,7 @@ class Block : public CBase_Block {
     devicePost[0].cuda_stream = stream;
   }
 
-  void processGhostsZC(int dir, int width, double* gh) {
+  void processGhostsZC(int dir, int width, DataType* gh) {
     switch (dir) {
       case LEFT:
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
@@ -341,29 +342,29 @@ class Block : public CBase_Block {
     }
   }
 
-  void processGhostsReg(int dir, int width, double* gh) {
+  void processGhostsReg(int dir, int width, DataType* gh) {
     switch (dir) {
       case LEFT:
-        memcpy(h_left_ghost, gh, width * sizeof(double));
-        hapiCheck(cudaMemcpyAsync(d_left_ghost, h_left_ghost, block_size * sizeof(double),
+        memcpy(h_left_ghost, gh, width * sizeof(DataType));
+        hapiCheck(cudaMemcpyAsync(d_left_ghost, h_left_ghost, block_size * sizeof(DataType),
               cudaMemcpyHostToDevice, stream));
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
         break;
       case RIGHT:
-        memcpy(h_right_ghost, gh, width * sizeof(double));
-        hapiCheck(cudaMemcpyAsync(d_right_ghost, h_right_ghost, block_size * sizeof(double),
+        memcpy(h_right_ghost, gh, width * sizeof(DataType));
+        hapiCheck(cudaMemcpyAsync(d_right_ghost, h_right_ghost, block_size * sizeof(DataType),
               cudaMemcpyHostToDevice, stream));
         invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
         break;
       case TOP:
-        memcpy(h_top_ghost, gh, width * sizeof(double));
+        memcpy(h_top_ghost, gh, width * sizeof(DataType));
         hapiCheck(cudaMemcpyAsync(d_temperature + (block_size + 2) + 1, h_top_ghost,
-              block_size * sizeof(double), cudaMemcpyHostToDevice, stream));
+              block_size * sizeof(DataType), cudaMemcpyHostToDevice, stream));
         break;
       case BOTTOM:
-        memcpy(h_bottom_ghost, gh, width * sizeof(double));
+        memcpy(h_bottom_ghost, gh, width * sizeof(DataType));
         hapiCheck(cudaMemcpyAsync(d_temperature + (block_size + 2) * block_size + 1,
-              h_bottom_ghost, block_size * sizeof(double), cudaMemcpyHostToDevice, stream));
+              h_bottom_ghost, block_size * sizeof(DataType), cudaMemcpyHostToDevice, stream));
         break;
       default:
         CkAbort("Error: invalid direction");
@@ -381,7 +382,7 @@ class Block : public CBase_Block {
     // Copy final temperature data back to host
     if (my_iter == warmup_iters + n_iters) {
       hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
-            sizeof(double) * (block_size + 2) * (block_size + 2),
+            sizeof(DataType) * (block_size + 2) * (block_size + 2),
             cudaMemcpyDeviceToHost, stream));
     }
 

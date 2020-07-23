@@ -16,15 +16,15 @@ OBJS = $(TARGET).o $(TARGET)CUDA.o
 $(TARGET): $(OBJS)
 	$(CHARMC) -language charm++ -o $@ $(OBJS) $(LD_LIBS)
 
-$(TARGET).decl.h: $(TARGET).ci
+$(TARGET).decl.h: $(TARGET).ci $(TARGET).h
 	$(CHARMC) $<
 
-$(TARGET).def.h: $(TARGET).ci
+$(TARGET).def.h: $(TARGET).ci $(TARGET).h
 
-$(TARGET).o: $(TARGET).C $(TARGET).decl.h $(TARGET).def.h
+$(TARGET).o: $(TARGET).C $(TARGET).decl.h $(TARGET).def.h $(TARGET).h
 	$(CHARMC) -c $<
 
-$(TARGET)CUDA.o: $(TARGET).cu
+$(TARGET)CUDA.o: $(TARGET).cu $(TARGET).h
 	$(NVCC) -o $@ $(NVCC_FLAGS) $(CHARM_INC) $<
 
 clean:
