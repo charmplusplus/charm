@@ -3991,7 +3991,24 @@ void ConverseCommonInit(char **argv)
   CmiIOInit(argv);
 #endif
   if (CmiMyPe() == 0)
+  {
     CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
+
+    // \033[33m and \033[0m are ANSI color codes to make text yellow and to reset colors,
+    // respectively
+#if !CMK_OPTIMIZE
+    CmiPrintf(
+        "\033[33mCharm++ built without optimization.\n"
+        "Do not use for performance benchmarking (build with --with-production to do "
+        "so).\033[0m\n");
+#endif
+#if CMK_ERROR_CHECKING
+    CmiPrintf(
+        "\033[33mCharm++ built with internal error checking enabled.\n"
+        "Do not use for performance benchmarking (build without --enable-error-checking "
+        "to do so).\033[0m\n");
+#endif
+  }
 
   CpvInitialize(int, cmiMyPeIdle);
   CpvAccess(cmiMyPeIdle) = 0;
