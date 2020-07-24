@@ -78,6 +78,8 @@ template <class dtype>
 struct DataItemHandle {
   CkArrayIndex arrayIndex;
   const dtype *dataItem;
+
+  DataItemHandle(dtype* _ptr) : dataItem(_ptr) {}
   DataItemHandle(CkArrayIndex _idx, dtype* _ptr) : arrayIndex(_idx), dataItem(_ptr) {}
 };
 
@@ -1063,7 +1065,8 @@ private:
     delete msg;
   }
 
-  inline void localDeliver(const char* data) {
+  inline void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,
+      int sourcePe) override {
     EntryMethod(const_cast<char*>(data), clientObj_);
     if (this->useCompletionDetection_) {
       this->detectorLocalObj_->consume();
@@ -1089,6 +1092,11 @@ public:
   }
 
   GroupMeshStreamer(CkMigrateMessage*) {}
+
+  inline void insertData(const dtype& dataItem, int destinationPe) {
+    DataItemHandle<dtype> tempHandle(const_cast<dtype*>(&dataItem));
+    MeshStreamer<dtype, RouterType>::insertData(&tempHandle, destinationPe);
+  }
 
   void pup(PUP::er& p) override {
     p|clientGID_;
