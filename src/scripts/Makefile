@@ -203,7 +203,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
 	sockRoutines.h sockRoutines.C cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
-	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp cmirdmautils.h
+	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp cmirdmautils.h cmitrackmessages.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h debug-charm.h\
@@ -469,7 +469,7 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
 	conv-lists.o persist-comm.o mempool.o \
 	crc32.o  lz4.o partitioning_strategies.o hilbert.o \
-	spanningTree.o cmirdmautils.o
+	spanningTree.o cmirdmautils.o cmitrackmessages.o
 
 LIBCONV_UTILF=pup_f.o
 

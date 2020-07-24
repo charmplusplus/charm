@@ -74,6 +74,7 @@ never be excluded...
 #include "spanningTree.h"
 #if CMK_CHARM4PY
 #include "TreeLB.h"
+#include "cmitrackmessages.h"
 #endif
 
 #if CMK_CUDA
@@ -189,6 +190,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 extern int userDrivenMode;
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
+extern bool trackMessages;
 CpvCExtern(int,interopExitFlag);
 void StopInteropScheduler();
 
@@ -1295,6 +1297,10 @@ void _sendReadonlies() {
   _initDone();
 }
 
+int CmiGetEpIdx(void *msg) {
+  return ((envelope *)msg)->getEpIdx();
+}
+
 /**
   This is the main charm setup routine.  It's called
   on all processors after Converse initialization.
@@ -1390,6 +1396,10 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
 
 		CmiSetNcpyAckSize(sizeof(CkCallback));
+
+#if CMK_ERROR_CHECKING
+		if(trackMessages) CmiMessageTrackerCharmInit(CmiGetEpIdx);
+#endif
 	}
 
 
