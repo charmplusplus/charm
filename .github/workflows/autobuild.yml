@@ -2,7 +2,7 @@ name: Autobuild
 
 on:
   schedule:
-    - cron: '59 * * * *'
+    - cron: '01 05 * * *' # UTC, corresponds to 00:01 CDT
 
 jobs:
   build:
