@@ -1,0 +1,25 @@
+name: Autobuild
+
+on:
+  schedule:
+    - cron: '01 05 * * *' # UTC, corresponds to 00:01 CDT
+
+jobs:
+  build:
+    timeout-minutes: 60
+
+    runs-on: might
+    name: netlrts-linux-x86_64 -pedantic
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./build all-test netlrts-linux-x86_64 -g -j6 --with-production -pedantic
+    - name: test
+      run: |
+        make -C netlrts-linux-x86_64/tests all -j3
+        make -C netlrts-linux-x86_64/tests test TESTOPTS=++local
+        make -C netlrts-linux-x86_64/examples all -j3
+        make -C netlrts-linux-x86_64/examples test TESTOPTS=++local
+        make -C netlrts-linux-x86_64/benchmarks all -j3
+        make -C netlrts-linux-x86_64/benchmarks test TESTOPTS=++local

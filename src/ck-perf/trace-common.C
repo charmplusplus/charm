@@ -435,7 +435,7 @@ static inline void _traceInit(char **argv)
   // check if trace is turned on/off for this pe
   CkpvAccess(traceOnPe) = checkTraceOnPe(argv);
 
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
   // defined in moduleInit.C
   _createTraces(argv);
 #endif

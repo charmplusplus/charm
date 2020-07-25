@@ -1,5 +1,13 @@
 // Global Variable Privatization Test - Framework
 
+#ifndef __STDC_FORMAT_MACROS
+# define __STDC_FORMAT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+# define __STDC_LIMIT_MACROS
+#endif
+#include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include "mpi.h"
 #include "test.h"

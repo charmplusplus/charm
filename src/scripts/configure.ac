@@ -370,19 +370,19 @@ else
   AC_DEFINE_UNQUOTED(CMK_SHRINK_EXPAND, 0, [disable shrinkexpand])
 fi
 
-AC_ARG_ENABLE([charmpy],
-            [AS_HELP_STRING([--enable-charmpy],
+AC_ARG_ENABLE([charm4py],
+            [AS_HELP_STRING([--enable-charm4py],
               [enable charm4py support])],
-            [enable_charmpy=$enableval],
-            [enable_charmpy=no])
+            [enable_charm4py=$enableval],
+            [enable_charm4py=no])
 
-if test "$enable_charmpy" = "yes"
+if test "$enable_charm4py" = "yes"
 then
   Echo "charm4py support is enabled"
-  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 1, [enable charmpy])
+  AC_DEFINE_UNQUOTED(CMK_CHARM4PY, 1, [enable charm4py])
 else
   Echo "charm4py support is disabled"
-  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 0, [disable charmpy])
+  AC_DEFINE_UNQUOTED(CMK_CHARM4PY, 0, [disable charm4py])
 fi
 
 AC_ARG_WITH([numa],
@@ -824,7 +824,7 @@ then
 fi
 
 # Determine compiler/linker flags to build libcharm.so for charm4py
-if test "$enable_charmpy" = "yes"
+if test "$enable_charm4py" = "yes"
 then
 
   cat > $t <<EOT
@@ -1071,6 +1071,16 @@ int main() {
 EOT
 test_cxx "whether has malloc.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLOC_H, $pass, [whether has malloc.h])
+
+#### test if has strings.h ####
+cat > $t <<EOT
+#include <strings.h>
+int main() {
+  return 0;
+}
+EOT
+test_cxx "whether has strings.h " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STRINGS_H, $pass, [whether has strings.h])
 
 #### test if has alloca.h ####
 cat > $t <<EOT
@@ -2393,6 +2403,10 @@ CMK_HAS_CMA="$pass"
 
 test "$CMK_HAS_CMA" = '1' -a "$CMK_MULTICORE" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_USE_CMA='1' || CMK_USE_CMA='0'
 add_make_flag "CMK_USE_CMA:=$CMK_USE_CMA" 'Cross Memory Attach'
+
+test "$CMK_WINDOWS" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_SUPPORTS_MEMORY_ISOMALLOC='1' || CMK_SUPPORTS_MEMORY_ISOMALLOC='0'
+add_flag "CMK_SUPPORTS_MEMORY_ISOMALLOC='$CMK_SUPPORTS_MEMORY_ISOMALLOC'" '-memory isomalloc'
+add_make_flag "CMK_SUPPORTS_MEMORY_ISOMALLOC:=$CMK_SUPPORTS_MEMORY_ISOMALLOC" '-memory isomalloc'
 
 #### check if -rdynamic works ####
 cat > $t <<EOT

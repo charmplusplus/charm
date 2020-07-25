@@ -18,6 +18,9 @@ vartest.o: vartest.C vartest.def.h
 test: vartest
 	$(call run, ./vartest +p4 8 100 100)
 
+testp: vartest
+	$(call run, ./vartest +p$(P) $$(( $(P) * 10 )) 100 100)
+
 smptest: vartest
 	$(call run, ./vartest 8 100 100 +p4 ++ppn 2)
 clean:

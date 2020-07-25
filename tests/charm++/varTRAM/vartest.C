@@ -49,7 +49,6 @@ public:
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::micro> dur = end_time - start_time;
     CkPrintf("Time: %.3lf us\n", dur.count());
-
     CkExit();
   }
 };

@@ -12,6 +12,19 @@
 
 cmake_minimum_required(VERSION 3.4)
 
+# Print warning
+message("#################################################################")
+message("# The CMake build system is currently a beta version.           #")
+message("# Please let us know if you experience any problems by opening  #")
+message("# an issue on our GitHub (https://github.com/UIUC-PPL/charm),   #")
+message("# with the below configuration information.                     #")
+message("# You can run './buildold' to use the previous build system.    #")
+message("#################################################################")
+
+if(CMAKE_VERSION VERSION_GREATER 3.11)
+  cmake_policy(SET CMP0075 OLD)
+endif()
+
 # Fortran is optional, so don't include it in LANGUAGES here
 project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
 
@@ -82,7 +95,7 @@ option(PAPI "Compile with PAPI performance counter support" OFF)
 option(ERROR_CHECKING      "Enable error checking" OFF)
 option(AMPI_ERROR_CHECKING "Enable AMPI error checking" OFF)
 option(STATS               "Enable statistics collection" OFF)
-option(TRACING             "Enable tracing modules" OFF)
+set(TRACING "" CACHE STRING "Enable tracing modules")
 option(TRACING_COMMTHREAD  "Enable tracing communication thread" OFF)
 option(CHARMDEBUG          "Enable charmDebug" OFF)
 option(REPLAY              "Enable record/replay" OFF)
@@ -92,7 +105,6 @@ option(PERSISTENT          "Enable Persistent Communication API" OFF)
 option(LBUSERDATA          "Enable LB user data" OFF)
 option(LOCKLESS_QUEUE      "Enable lockless queue for PE local and node queue" OFF)
 option(SHRINKEXPAND        "Enable malleable jobs / shrink expand" OFF)
-option(CHARMPY             "Enable CharmPy support" OFF)
 option(NUMA                "Support memory affinity with NUMA" OFF)
 set(LBTIME_TYPE "double" CACHE STRING "Load balancing timer type")
 option(QLOGIC              "QLogic based Infiniband" OFF)
@@ -103,6 +115,15 @@ option(ZLIB                "Enable zlib support" ON)
 option(AMPI_MPICH_TESTS    "Enable mpich tests for AMPI" OFF)
 option(DRONE_MODE          "Enable drone mode" OFF)
 option(TASK_QUEUE          "Enable task queue" OFF)
+
+
+if(TRACING STREQUAL "")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(TRACING 1)
+  else()
+    set(TRACING 0)
+  endif()
+endif()
 
 # Charm++ dynamic libraries
 option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
@@ -230,7 +251,6 @@ set(CMK_WITH_CONTROLPOINT ${CONTROLPOINT})
 set(CMK_WITH_STATS ${STATS})
 
 set(CMK_CHARMDEBUG ${CHARMDEBUG})
-set(CMK_CHARMPY ${CHARMPY})
 
 
 set(CMK_MSG_PRIO_TYPE ${PRIO_TYPE})
@@ -247,6 +267,7 @@ set(CMK_BLUEGENEQ 0)
 set(CMK_POST_EXE "")
 set(CMK_SHARED_SUF "so")
 set(CMK_USER_SUFFIX ".user")
+set(CMK_SUPPORTS_MEMORY_ISOMALLOC 1)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(CHARM_OS "darwin")
   set(CMK_MACOSX 1)
@@ -256,12 +277,14 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(CMK_WINDOWS 1)
   set(CMK_POST_EXE ".exe")
   set(CMK_SHARED_SUF "dll")
+  set(CMK_SUPPORTS_MEMORY_ISOMALLOC 0)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(CHARM_OS "linux")
   set(CMK_OS_IS_LINUX 1)
 elseif(IS_DIRECTORY "/bgsys")
   set(CHARM_OS "bluegeneq")
   set(CMK_BLUEGENEQ 1)
+  set(CMK_SUPPORTS_MEMORY_ISOMALLOC 0)
 else()
   message(FATAL_ERROR "Unsupported operating system ${CMAKE_SYSTEM_NAME}.")
 endif()
@@ -361,8 +384,9 @@ if(${CMAKE_BUILD_TYPE} MATCHES "Release" OR ${CMAKE_BUILD_TYPE} MATCHES "RelWith
     set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -optimize -production")
 endif()
 
-if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
-  set(CMK_CHARMPY 1)
+set(CMK_CHARM4PY 0)
+if(${TARGET} STREQUAL "charm4py")
+  set(CMK_CHARM4PY 1)
   # Create libcharm.so for Charm4py
   add_compile_options(-build-shared)
   set(BUILDOPTS "${BUILDOPTS} -build-shared")
@@ -780,14 +804,14 @@ if(${NETWORK} STREQUAL "uth")
 endif()
 
 # Charm4py
-if(${TARGET} STREQUAL "charm4py" OR ${TARGET} STREQUAL "charmpy")
+if(${TARGET} STREQUAL "charm4py")
   # Create libcharm.so for Charm4py
   # add_compile_options(-build-shared)
   file(WRITE empty.cpp "// This file left intentionally blank. It is used for the charm4py build.")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb moduleGreedyRefineLB moduleRandCentLB "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
@@ -820,7 +844,8 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CMK_HAS_ELF_H CMK_HAS_OPENMP CMK_AMPI_ONLY CMK_WINDOWS CMK_BLUEGENEQ
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
         CMK_MACOSX CMK_POST_EXE CMK_SHARED_SUF CMK_USER_SUFFIX OPTS_LD
-        CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED)
+        CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED
+        CMK_SUPPORTS_MEMORY_ISOMALLOC)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 
@@ -860,12 +885,12 @@ foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTH
         CMK_LUSTREAPI CMK_MULTICORE CMK_UTH CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS
         CMK_SHARED_SUF CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
         CMK_TRACE_ENABLED CMK_USE_LRTS CMK_VDIR OPTSATBUILDTIME CMK_AMPI_ONLY CMK_WINDOWS
-        CMK_USER_SUFFIX)
+        CMK_USER_SUFFIX CMK_CAN_LINK_FORTRAN CMK_SUPPORTS_MEMORY_ISOMALLOC)
     file(APPEND ${optfile_mak} "${l}:=${${l}}\n" )
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT)
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
@@ -908,10 +933,34 @@ if(NOT opts_enabled)
   set(opts_enabled "---")
 endif()
 
+# Get version information
+find_program(GIT git)
+
+if(GIT)
+  execute_process(COMMAND git describe --exact-match --dirty=*
+             OUTPUT_VARIABLE CHARM_VERSION_GIT
+             RESULT_VARIABLE git_result
+             OUTPUT_STRIP_TRAILING_WHITESPACE
+             ERROR_QUIET
+             )
+  if(NOT ${git_result} EQUAL 0)
+    execute_process(COMMAND git describe --long --always --dirty=*
+             OUTPUT_VARIABLE CHARM_VERSION_GIT
+             OUTPUT_STRIP_TRAILING_WHITESPACE
+             )
+    set(CHARM_REL "(dev)")
+  else()
+    set(CHARM_REL "(release)")
+  endif()
+else()
+  set(CHARM_VERSION_GIT "v${CHARM_VERSION}")
+endif()
+
 # Print configuration
 message("==============================")
 message("Charm++ ${PROJECT_VERSION} configuration: ")
 message("  OS version:      ${OS_RELEASE}")
+message("  Charm++ version: ${CHARM_VERSION_GIT} ${CHARM_REL}")
 message("  Hostname:        ${MY_HOSTNAME}")
 message("  Machine layer:   ${CHARM_PLATFORM}")
 message("  Build target:    ${TARGET}")
@@ -927,15 +976,6 @@ message("  CMake:           ${CMAKE_COMMAND} [${CMAKE_VERSION}]")
 message("  Charmc flags:    ${MAIN_CFLAGS}")
 message("  Enabled options: ${opts_enabled}")
 message("==============================")
-
-# Print warning
-message("#################################################################")
-message("# The CMake build system is currently a beta version.           #")
-message("# Please let us know if you experience any problems by opening  #")
-message("# an issue on our GitHub (https://github.com/UIUC-PPL/charm),   #")
-message("# with the above configuration information.                     #")
-message("# You can run ./buildold to use the previous build system.      #")
-message("#################################################################")
 
 # Make symlinks
 add_custom_target(create_symlinks ALL
@@ -960,6 +1000,7 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
 
 # Copy the Makefile used for building and running tests
 configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests ${CMAKE_BINARY_DIR}/include/Makefile COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests.common ${CMAKE_BINARY_DIR}/include/Makefile.tests.common COPYONLY)
 
 
 # Installation rules

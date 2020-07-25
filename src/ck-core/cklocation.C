@@ -1629,7 +1629,7 @@ void CkMigratable::AtSync(int waitForMigration)
   if (usesAutoMeasure == false) UserSetLBLoad();
 
   if(_lb_psizer_on || _lb_args.metaLbOn()){
-    PUP::sizer ps;
+    PUP::sizer ps(PUP::er::IS_MIGRATION);
     this->virtual_pup(ps);
     if(_lb_psizer_on)
       setPupSize(ps.size());
@@ -2889,7 +2889,7 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 #if CMK_OUT_OF_CORE
 	/* Load in any elements that are out-of-core */
     for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
-		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getIndex());
+		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getID());
 		if (el) if (!el->isInCore) CooBringIn(el->prefetchObjID);
 	}
 #endif
@@ -2901,7 +2901,7 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 //First pass: find size of migration message
 	size_t bufSize;
 	{
-		PUP::sizer p;
+		PUP::sizer p(PUP::er::IS_MIGRATION);
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		bufSize=p.size(); 
 	}
@@ -2927,7 +2927,7 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
     );
 
 	{
-		PUP::toMem p(msg->packData); 
+		PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION); 
 		p.becomeDeleting(); 
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		if (p.size()!=bufSize) {
@@ -2978,7 +2978,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 {
 	const CkArrayIndex &idx=msg->idx;
 		
-	PUP::fromMem p(msg->packData); 
+	PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
 	
 	if (msg->nManagers < managers.size())
 		CkAbort("Array element arrived from location with fewer managers!\n");

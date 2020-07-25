@@ -19,6 +19,9 @@
 #
 #     make charm++ OPTS="-g -save -verbose"
 #
+# On making changes to this file, ensure that the same changes are ported to
+# cmake/Makefile.tests in order to maintain consistency with the cmake based build
+# system, which is the default build system
 ###############################################################################
 
 SHELL=/bin/sh
@@ -35,32 +38,8 @@ CXXFLAGS=-I.
 
 all: charm++ LIBS AMPI f90charm TSM SM PVM everylb
 
-all-test: all-test-tests all-test-examples all-test-benchmarks
 
-all-test-tests: LIBS
-	$(MAKE) -C ../tests all
-
-all-test-examples: LIBS
-	$(MAKE) -C ../examples all
-
-all-test-benchmarks: LIBS
-	$(MAKE) -C ../benchmarks all
-
-all-zc: charm++
-	$(MAKE) -C ../tests/charm++/zerocopy all
-	$(MAKE) -C ../examples/charm++/zerocopy all
-	$(MAKE) -C ../benchmarks/charm++/zerocopy all
-
-all-test-AMPI: all-test-AMPI-tests all-test-AMPI-examples all-test-AMPI-benchmarks
-
-all-test-AMPI-tests: AMPI
-	$(MAKE) -C ../tests/ampi all
-
-all-test-AMPI-examples: AMPI
-	$(MAKE) -C ../examples/ampi all
-
-all-test-AMPI-benchmarks: AMPI
-	$(MAKE) -C ../benchmarks/ampi all
+include ../../cmake/Makefile.tests.common
 
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
@@ -99,13 +78,11 @@ f90charm: charm++ $(L)/libf90charm.a
 libcharm: charm++
 	cd $(L) ; $(CHARMC) -standalone -whole-archive -c++stl -shared -o libcharm.so $(LIBCHARM_LIBS)
 
-charmpy: libcharm
-
 charm4py: libcharm
 
 LIBCHARM_LIBS= libck.a libconv-core.a libconv-util.a libmemory-default.a libconv-machine.a \
                libthreads-default.a libconv-partition.a libtmgr.a libhwloc_embedded.a \
-               libldb-rand.a libconv-ldb.a libmoduleTreeLB.a
+               libldb-rand.a libconv-ldb.a
 
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
@@ -174,62 +151,6 @@ Tau:
 LIBS: CONVLIBS CHARMLIBS everylb
 	echo "Built LIBS Successfully"
 
-syncfttest mpisyncfttest : charm++ LIBS
-	$(MAKE) -C ../tests $@
-
-test: LIBS
-	$(MAKE) -C ../tests test
-	$(MAKE) -C ../examples test
-	$(MAKE) -C ../benchmarks test
-
-test-tests: LIBS
-	$(MAKE) -C ../tests test
-
-test-examples: LIBS
-	$(MAKE) -C ../examples test
-
-test-benchmarks: LIBS
-	$(MAKE) -C ../benchmarks test
-
-test-zc: charm++
-	$(MAKE) -C ../tests/charm++/zerocopy test
-	$(MAKE) -C ../examples/charm++/zerocopy test
-	$(MAKE) -C ../benchmarks/charm++/zerocopy test
-
-test-converse: converse test-tests-converse test-examples-converse test-benchmarks-converse
-
-test-charm: charm++ test-tests-charm test-tests-charm test-tests-charm
-
-test-AMPI: AMPI test-tests-AMPI test-examples-AMPI test-benchmarks-AMPI
-
-test-tests-converse: converse
-	$(MAKE) -C ../tests test-converse
-
-test-tests-charm: charm++
-	$(MAKE) -C ../tests test-charm
-
-test-tests-AMPI: AMPI
-	$(MAKE) -C ../tests test-AMPI
-
-test-examples-converse: converse
-	$(MAKE) -C ../examples test-converse
-
-test-examples-charm: charm++
-	$(MAKE) -C ../examples test-charm
-
-test-examples-AMPI: AMPI
-	$(MAKE) -C ../examples test-AMPI
-
-test-benchmarks-converse: converse
-	$(MAKE) -C ../benchmarks test-converse
-
-test-benchmarks-charm: charm++
-	$(MAKE) -C ../benchmarks test-charm
-
-test-benchmarks-AMPI: AMPI
-	$(MAKE) -C ../benchmarks test-AMPI
-
-
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
 SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
@@ -273,7 +194,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh conv-mach-common.h \
       cmipool.h mempool.h cmiqueue.h \
-      cmitls.h lrtslock.h conv-rdma.h lrts-common.h conv-header.h
+      cmitls.h lrtslock.h conv-rdma.h conv-rdmadevice.h lrts-common.h conv-header.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -289,7 +210,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h\
+	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h ckrdmadevice.h \
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
 	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
@@ -495,12 +416,6 @@ endif
 endif
 endif
 
-ifneq ($(findstring -win-,$(CMK_VDIR)),)
-  IS_WINDOWS := 1
-else
-  IS_WINDOWS := 0
-endif
-
 THREADLIBS = \
   $(L)/libthreads-default.a \
   $(L)/libthreads-default-tls.a \
@@ -510,7 +425,7 @@ THREADLIBS = \
   $(L)/libthreads-uFcontext-tls.a \
   $(L)/libthreads-stackcopy.a \
 
-ifneq ($(IS_WINDOWS),0)
+ifeq (1,$(CMK_WINDOWS))
 
 THREADLIBS += \
   $(L)/libthreads-fibers.a \
@@ -545,7 +460,7 @@ LIBCONV_CORE=convcore.o hrctimer.o conv-conds.o conv-taskQ.o queueing.o msgmgr.o
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o memory-darwin-clang.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o commitid.o conv-interoperate.o conv-rdma.o \
+	cmitls.o memoryaffinity.o commitid.o conv-interoperate.o conv-rdma.o conv-rdmadevice.o \
 
 LIBCONV_LDB = topology.o generate.o edgelist.o
 
@@ -747,7 +662,7 @@ CK_LIBS_CORE=$(L)/libck.a
 
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
-	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o\
+	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o ckrdmadevice.o \
            waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
 	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
@@ -882,7 +797,7 @@ TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecis
 loadbalancers: $(COMMON_LDBS) $(L)/libmoduleCommonLBs.a
 
 everylb: $(ALL_LDBS) $(L)/libmoduleEveryLB.a
-MetisLB.o GridMetisLB.o: metis
+MetisLB.o GridMetisLB.o: | metis
 
 %LB: $(L)/libmodule%LB.a
 	@true
