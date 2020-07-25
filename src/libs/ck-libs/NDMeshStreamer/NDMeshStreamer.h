@@ -224,6 +224,7 @@ protected:
   virtual int copyDataIntoMessage(
               MeshStreamerMessageV *destinationBuffer,
               char *dataHandle, size_t size, CkArrayIndex index);
+  void createDetectors();
   void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe);
   void storeMessageIntermed(int destinationPe,
                     const Route& destinationCoordinates,
@@ -633,15 +634,18 @@ storeMessage(int destinationPe, const Route& destinationRoute,
 }
 
 template <class dtype, class RouterType>
-inline void MeshStreamer<dtype, RouterType>::
-insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
-  // no data items should be submitted after all local contributors call done
-  // and staged completion has begun
+inline void MeshStreamer<dtype, RouterType>::createDetectors() {
+  // No data items should be submitted when staged completion has begun
   CkAssert(stagedCompletionStarted_ == false);
 
-  if (useCompletionDetection_) {
-    detectorLocalObj_->produce();
-  }
+  // Increment completion detection and quiescence detection
+  if (useCompletionDetection_) detectorLocalObj_->produce();
+  QdCreate(1);
+}
+
+template <class dtype, class RouterType>
+inline void MeshStreamer<dtype, RouterType>::
+insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
   const static bool copyIndirectly = true;
 
   Route destinationRoute;
@@ -1094,6 +1098,8 @@ public:
   GroupMeshStreamer(CkMigrateMessage*) {}
 
   inline void insertData(const dtype& dataItem, int destinationPe) {
+    this->createDetectors();
+
     DataItemHandle<dtype> tempHandle(const_cast<dtype*>(&dataItem));
     MeshStreamer<dtype, RouterType>::insertData(&tempHandle, destinationPe);
   }
@@ -1222,14 +1228,8 @@ public:
   }
   template <bool deliverInline = false>
   inline void insertData(const dtype& dataItem, CkArrayIndex arrayIndex) {
+    this->createDetectors();
 
-    // no data items should be submitted after all local contributors call done
-    // and staged completion has begun
-    CkAssert(this->stagedCompletionStarted_ == false);
-    if (this->useCompletionDetection_) {
-      this->detectorLocalObj_->produce();
-    }
-    QdCreate(1);
     int destinationPe;
 #ifdef CMK_TRAM_CACHE_ARRAY_METADATA
     if (isCachedArrayMetadata_[arrayIndex]) {
