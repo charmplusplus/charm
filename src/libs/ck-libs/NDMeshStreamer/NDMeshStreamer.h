@@ -79,8 +79,7 @@ struct DataItemHandle {
   CkArrayIndex arrayIndex;
   const dtype *dataItem;
 
-  DataItemHandle(dtype* _ptr) : dataItem(_ptr) {}
-  DataItemHandle(CkArrayIndex _idx, dtype* _ptr) : arrayIndex(_idx), dataItem(_ptr) {}
+  DataItemHandle(dtype* _ptr, CkArrayIndex _idx = CkArrayIndex()) : dataItem(_ptr), arrayIndex(_idx) {}
 };
 
 class MeshStreamerMessageV : public CMessage_MeshStreamerMessageV {
@@ -1252,7 +1251,7 @@ public:
     }
 
     // this implementation avoids copying an item before transfer into message
-    DataItemHandle<dtype> tempHandle(arrayIndex,const_cast<dtype*>(&dataItem));
+    DataItemHandle<dtype> tempHandle(const_cast<dtype*>(&dataItem), arrayIndex);
 
     MeshStreamer<dtype, RouterType>::
       insertData(&tempHandle, destinationPe);
@@ -1304,7 +1303,7 @@ public:
     Route destinationRoute;
     this->myRouter_.determineInitialRoute(destinationPe, destinationRoute);
     for (int i = 0; i < bufferedItems.size(); i++) {
-      DataItemHandle<dtype> temporary(arrayId,&bufferedItems[i]);
+      DataItemHandle<dtype> temporary(&bufferedItems[i], arrayId);
       this->storeMessage(destinationPe, destinationRoute, &temporary);
     }
 
