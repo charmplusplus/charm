@@ -218,8 +218,10 @@ public:
       destinationPe = msg->destinationPes[i];
       if (CmiNodeOf(destinationPe) == myIndex_) {
         //dtype dataItem = msg->getDataItem<dtype>(i);
-        this->groupProxy[destinationPe].localDeliver(msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i),
-msg->dataItems+msg->template getoffset<dtype>(i),                   msg->destObjects[i], msg->sourcePes[i]);
+        this->groupProxy[destinationPe].localDeliver(
+            msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
+            msg->dataItems + msg->getoffset<dtype>(i),
+            msg->destObjects[i], msg->sourcePes[i]);
       }
       else if (destinationPe != TRAM_BROADCAST) {
         if (destinationPe != lastDestinationPe) {
@@ -671,7 +673,7 @@ storeMessage(int destinationPe, const Route& destinationRoute,
     *(int *) CkPriorityPtr(msg) = prio_;
     CkSetQueueing(msg, CK_QUEUEING_IFIFO);
     copyDataItemIntoMessage(msg,dataItem,copyIndirectly);
-    this->ngProxy[destinationPe].receiveAtDestination(msg);
+    this->ngProxy[CmiNodeOf(destinationPe)].receiveAtDestination(msg);
     return;
   }
 
@@ -872,8 +874,8 @@ receiveAlongRoute(MeshStreamerMessageV *msg) {
     destinationPe = msg->destinationPes[i];
     if (destinationPe == myIndex_) {
       //dtype dataItem = msg->getDataItem<dtype>(i);
-      localDeliver(msg->template getoffset<dtype>(i+1)-msg->template getoffset<dtype>(i),
-                   msg->dataItems+msg->template getoffset<dtype>(i),
+      localDeliver(msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
+                   msg->dataItems + msg->getoffset<dtype>(i),
                    msg->destObjects[i], msg->sourcePes[i]);
     }
     else if (destinationPe != TRAM_BROADCAST) {
@@ -1150,7 +1152,7 @@ private:
     delete msg;
   }
 
-  inline void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,
+  inline void localDeliver(size_t size, const char* data, CkArrayIndex arrayId,
       int sourcePe) override {
     EntryMethod(const_cast<char*>(data), clientObj_);
     if (this->useCompletionDetection_) {
