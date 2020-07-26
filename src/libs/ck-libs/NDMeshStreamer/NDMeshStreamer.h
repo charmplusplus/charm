@@ -78,7 +78,8 @@ template <class dtype>
 struct DataItemHandle {
   CkArrayIndex arrayIndex;
   const dtype *dataItem;
-  DataItemHandle(CkArrayIndex _idx, dtype* _ptr) : arrayIndex(_idx), dataItem(_ptr) {}
+
+  DataItemHandle(dtype* _ptr, CkArrayIndex _idx = CkArrayIndex()) : dataItem(_ptr), arrayIndex(_idx) {}
 };
 
 class MeshStreamerMessageV : public CMessage_MeshStreamerMessageV {
@@ -316,6 +317,7 @@ protected:
   virtual int copyDataIntoMessage(
               MeshStreamerMessageV *destinationBuffer,
               char *dataHandle, size_t size, CkArrayIndex index);
+  void createDetectors();
   void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe);
   void storeMessage(int destinationPe,
                     const Route& destinationCoordinates,
@@ -330,9 +332,6 @@ protected:
 public:
   MeshStreamer() {}
   MeshStreamer(CkMigrateMessage *) {}
-  MeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy, int maxNumDataItemsBuffered, int numDimensions,
-               int *dimensionSizes, int bufferSize,
-               bool yieldFlag = 0, double progressPeriodInMs = -1.0);
 
   // entry
   virtual void localDeliver(size_t size, const char* data, CkArrayIndex arrayId,int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
@@ -727,28 +726,19 @@ storeMessage(int destinationPe, const Route& destinationRoute,
 }
 
 template <class dtype, class RouterType>
+inline void MeshStreamer<dtype, RouterType>::createDetectors() {
+  // No data items should be submitted when staged completion has begun
+  CkAssert(stagedCompletionStarted_ == false);
+
+  // Increment completion detection and quiescence detection
+  if (useCompletionDetection_) detectorLocalObj_->produce();
+  QdCreate(1);
+}
+
+template <class dtype, class RouterType>
 inline void MeshStreamer<dtype, RouterType>::
 insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
   ngProxy.ckLocalBranch()->insertData(dataItemHandle, destinationPe);
-  // no data items should be submitted after all local contributors call done
-  // and staged completion has begun
-  CkAssert(stagedCompletionStarted_ == false);
-
-  if (useCompletionDetection_) {
-    detectorLocalObj_->produce();
-  }
-  const static bool copyIndirectly = true;
-
-  Route destinationRoute;
-  myRouter_.determineInitialRoute(destinationPe, destinationRoute);
-  storeMessage(destinationPe, destinationRoute, dataItemHandle,
-               copyIndirectly);
-  // release control to scheduler if requested by the user,
-  //   assume caller is threaded entry
-  if (yieldFlag_ && ++yieldCount_ == 1024) {
-    yieldCount_ = 0;
-    CthYield();
-  }
 }
 
 template <class dtype, class RouterType>
@@ -1133,6 +1123,76 @@ void MeshStreamer<dtype, RouterType>::pup(PUP::er &p) {
 
 }
 
+template <class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype, ClientType> >
+class GroupMeshStreamer :
+  public CBase_GroupMeshStreamer<dtype, ClientType, RouterType, EntryMethod> {
+private:
+  CkGroupID clientGID_;
+  ClientType *clientObj_;
+
+  void receiveAtDestination(MeshStreamerMessageV* msg) override {
+    for (int i = 0; i < msg->numDataItems; i++) {
+      EntryMethod(msg->dataItems + msg->getoffset<dtype>(i), clientObj_);
+    }
+
+    if (this->useStagedCompletion_) {
+#ifdef CMK_TRAM_VERBOSE_OUTPUT
+      envelope* env = UsrToEnv(msg);
+      CkPrintf("[%d] received at dest from %d %d items finalMsgCount: %d"
+               " msgType: %d\n", this->myIndex_, env->getSrcPe(),
+               msg->numDataItems, msg->finalMsgCount, msg->msgType);
+#endif
+      this->markMessageReceived(msg->msgType, msg->finalMsgCount);
+    } else if (this->useCompletionDetection_) {
+      this->detectorLocalObj_->consume(msg->numDataItems);
+    }
+    QdProcess(msg->numDataItems);
+    delete msg;
+  }
+
+  inline void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,
+      int sourcePe) override {
+    EntryMethod(const_cast<char*>(data), clientObj_);
+    if (this->useCompletionDetection_) {
+      this->detectorLocalObj_->consume();
+    }
+    QdProcess(1);
+  }
+
+  inline void initLocalClients() override {
+    // No action required
+  }
+
+public:
+  GroupMeshStreamer(int numDimensions, int* dimensionSizes,
+      CkGroupID clientGID, int bufferSize, bool yieldFlag,
+      double progressPeriodInMs, int maxItemsBuffered,
+      int _thresholdFractionNum, int _thresholdFractionDen,
+      int _cutoffFractionNum, int _cutoffFractionDen) {
+    this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
+        progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
+        _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
+    clientGID_ = clientGID;
+    clientObj_ = (ClientType*)CkLocalBranch(clientGID_);
+  }
+
+  GroupMeshStreamer(CkMigrateMessage*) {}
+
+  inline void insertData(const dtype& dataItem, int destinationPe) {
+    this->createDetectors();
+
+    DataItemHandle<dtype> tempHandle(const_cast<dtype*>(&dataItem));
+    MeshStreamer<dtype, RouterType>::insertData(&tempHandle, destinationPe);
+  }
+
+  void pup(PUP::er& p) override {
+    p|clientGID_;
+    if (p.isUnpacking()) {
+      clientObj_ = (ClientType*)CkLocalBranch(clientGID_);
+    }
+  }
+};
+
 template <class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
 class ArrayMeshStreamer :
   public CBase_ArrayMeshStreamer<dtype, ClientType, RouterType, EntryMethod> {
@@ -1215,12 +1275,12 @@ private:
   }
 
 public:
-  ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy, int numDimensions, int *dimensionSizes,
-                    CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
-                    double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
-                    int _thresholdFractionNum = 1, int _thresholdFractionDen = 2,
-                    int _cutoffFractionNum = 1, int _cutoffFractionDen = 2) {
-
+  ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy,
+                    int numDimensions, int *dimensionSizes,
+                    CkArrayID clientAID, int bufferSize, bool yieldFlag,
+                    double progressPeriodInMs, int maxItemsBuffered,
+                    int _thresholdFractionNum, int _thresholdFractionDen,
+                    int _cutoffFractionNum, int _cutoffFractionDen) {
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
                      progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
                      _thresholdFractionDen, _cutoffFractionNum,
@@ -1246,13 +1306,8 @@ public:
 
   template <bool deliverInline = false>
   inline void insertData(const dtype& dataItem, CkArrayIndex arrayIndex) {
-    // no data items should be submitted after all local contributors call done
-    // and staged completion has begun
-    CkAssert(this->stagedCompletionStarted_ == false);
-    if (this->useCompletionDetection_) {
-      this->detectorLocalObj_->produce();
-    }
-    QdCreate(1);
+    this->createDetectors();
+
     int destinationPe;
 #ifdef CMK_TRAM_CACHE_ARRAY_METADATA
     if (isCachedArrayMetadata_[arrayIndex]) {
@@ -1278,7 +1333,7 @@ public:
     }
 
     // this implementation avoids copying an item before transfer into message
-    DataItemHandle<dtype> tempHandle(arrayIndex,const_cast<dtype*>(&dataItem));
+    DataItemHandle<dtype> tempHandle(const_cast<dtype*>(&dataItem), arrayIndex);
 
     MeshStreamer<dtype, RouterType>::insertData(&tempHandle, destinationPe);
   }
@@ -1325,7 +1380,7 @@ public:
     Route destinationRoute;
     this->myRouter_.determineInitialRoute(destinationPe, destinationRoute);
     for (int i = 0; i < bufferedItems.size(); i++) {
-      DataItemHandle<dtype> temporary(arrayId,&bufferedItems[i]);
+      DataItemHandle<dtype> temporary(&bufferedItems[i], arrayId);
       this->storeMessage(destinationPe, destinationRoute, &temporary);
     }
 

@@ -46,14 +46,23 @@ module NDMeshStreamer {
   };
 
   template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
-    group [migratable] ArrayMeshStreamer :
-    MeshStreamer<dtype, RouterType> {
+  group [migratable] GroupMeshStreamer : MeshStreamer<dtype, RouterType> {
+    entry GroupMeshStreamer(int numDimensions, int dimensionSizes[numDimensions],
+                            CkGroupID clientGID, int bufferSize, bool yieldFlag,
+                            double progressPeriodInMs, int maxItemsBuffered,
+                            int _thresholdFractionNum, int _thresholdFractionDen,
+                            int _cutoffFractionNum, int _cutoffFractionDen);
+  };
+
+  template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
+  group [migratable] ArrayMeshStreamer :
+  MeshStreamer<dtype, RouterType> {
     entry ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy,
-          int numDimensions, int dimensionSizes[numDimensions],
-          CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
-          double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
-          int _thresholdFractionNum = 1, int _thresholdFractionDen = 2,
-          int _cutoffFractionNum = 1, int _cutoffFractionDen = 2);
+                            int numDimensions, int dimensionSizes[numDimensions],
+                            CkArrayID clientAID, int bufferSize, bool yieldFlag,
+                            double progressPeriodInMs, int maxItemsBuffered,
+                            int _thresholdFractionNum, int _thresholdFractionDen,
+                            int _cutoffFractionNum, int _cutoffFractionDen);
     entry void processLocationRequest(CkArrayIndex arrayId, int deliveredToPe,
                                       int sourcePe);
     entry void resendMisdeliveredItems(CkArrayIndex arrayId, int destinationPe);
