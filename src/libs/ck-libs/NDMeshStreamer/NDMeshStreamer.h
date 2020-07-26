@@ -174,10 +174,10 @@ class MeshStreamerNG : public CBase_MeshStreamerNG<dtype, RouterType> {
 
 public:
   MeshStreamerNG(int numDimensions, int *dimensionSizes,
-                    CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
-                    double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
-                    int _thresholdFractionNum = 1, int _thresholdFractionDen = 2,
-                    int _cutoffFractionNum = 1, int _cutoffFractionDen = 2) {
+                 CkArrayID clientAID, int bufferSize, bool yieldFlag,
+                 double progressPeriodInMs, int maxItemsBuffered,
+                 int _thresholdFractionNum, int _thresholdFractionDen,
+                 int _cutoffFractionNum, int _cutoffFractionDen) {
     myIndex_ = CkMyNode();
     myRouter_.initializeRouter(numDimensions, myIndex_, dimensionSizes);
   }
@@ -205,8 +205,8 @@ public:
 
   void storeMessage(int destinationPe, const Route& destinationCoordinates,
       const DataItemHandle<dtype> *dataItem, bool copyIndirectly) {
-    MeshStreamer<dtype, RouterType>::storeMessage(destinationPe, destinationCoordinates, dataItem,
-        copyIndirectly);
+    MeshStreamer<dtype, RouterType>::storeMessage(destinationPe,
+        destinationCoordinates, dataItem, copyIndirectly);
   }
 
   void receiveAlongRoute(MeshStreamerMessageV *msg) {

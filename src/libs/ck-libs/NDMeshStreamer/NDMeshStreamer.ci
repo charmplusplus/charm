@@ -36,10 +36,10 @@ module NDMeshStreamer {
   template<class dtype, class RouterType>
   nodegroup MeshStreamerNG : MeshStreamer<dtype, RouterType> {
     entry MeshStreamerNG(int numDimensions, int dimensionSizes[numDimensions],
-                    CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
-                    double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
-                    int _thresholdFractionNum = 1, int _thresholdFractionDen = 2,
-                    int _cutoffFractionNum = 1, int _cutoffFractionDen = 2);
+                         CkArrayID clientAID, int bufferSize, bool yieldFlag,
+                         double progressPeriodInMs, int maxItemsBuffered,
+                         int _thresholdFractionNum, int _thresholdFractionDen,
+                         int _cutoffFractionNum, int _cutoffFractionDen);
     entry void set(CProxy_MeshStreamer<dtype, RouterType> gp);
     entry void receiveAlongRoute(MeshStreamerMessageV *msg);
     entry void receiveAtDestination(MeshStreamerMessageV *msg);
