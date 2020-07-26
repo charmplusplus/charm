@@ -879,8 +879,8 @@ receiveAlongRoute(MeshStreamerMessageV *msg) {
     if (destinationPe == myIndex_) {
       //dtype dataItem = msg->getDataItem<dtype>(i);
       localDeliver(msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
-                   msg->dataItems + msg->getoffset<dtype>(i),
-                   msg->destObjects[i], msg->sourcePes[i]);
+          msg->dataItems + msg->getoffset<dtype>(i),
+          msg->destObjects[i], msg->sourcePes[i]);
     }
     else if (destinationPe != TRAM_BROADCAST) {
       if (destinationPe != lastDestinationPe) {
@@ -889,9 +889,9 @@ receiveAlongRoute(MeshStreamerMessageV *msg) {
             myRouter_.dimensionReceived(msg->msgType), destinationRoute);
       }
       storeMessageIntermed(destinationPe, destinationRoute,
-                           msg->dataItems + msg->getoffset<dtype>(i),
-                           msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
-                           msg->destObjects[i]);
+          msg->dataItems + msg->getoffset<dtype>(i),
+          msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
+          msg->destObjects[i]);
     }
     lastDestinationPe = destinationPe;
   }
