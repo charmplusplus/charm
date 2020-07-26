@@ -40,7 +40,7 @@ module NDMeshStreamer {
                          double progressPeriodInMs, int maxItemsBuffered,
                          int _thresholdFractionNum, int _thresholdFractionDen,
                          int _cutoffFractionNum, int _cutoffFractionDen);
-    entry void set(CProxy_MeshStreamer<dtype, RouterType> gp);
+    entry void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> gp);
     entry void receiveAlongRoute(MeshStreamerMessageV *msg);
     entry void receiveAtDestination(MeshStreamerMessageV *msg);
   };

@@ -1206,7 +1206,7 @@ void Entry::genTramInstantiation(XStr& str) {
           << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
           << "cutoffFractionNum, cutoffFractionDen);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
-          << "tramNodeProxy.set(tramProxy);\n"
+          << "    tramNodeProxy.setGroupProxy(tramProxy);\n"
           << "  }\n";
     }
   }

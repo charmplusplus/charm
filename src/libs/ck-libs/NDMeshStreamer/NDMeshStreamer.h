@@ -184,7 +184,7 @@ public:
 
   MeshStreamerNG(CkMigrateMessage* m) {}
 
-  void set(CProxy_MeshStreamer<dtype, RouterType> gp) {
+  void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> gp) {
     groupProxy = gp;
   }
 
