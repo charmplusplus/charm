@@ -298,7 +298,6 @@ private:
   int thresholdFractionDenominator;
   int cutoffFractionNumerator;
   int cutoffFractionDenominator;
-  CProxy_MeshStreamerNG<dtype, RouterType> ngProxy;
 
   virtual void initLocalClients() { CkAbort("Called what should be a pure virtual base method"); }
 
@@ -316,6 +315,8 @@ protected:
   bool stagedCompletionStarted_;
   bool useCompletionDetection_;
   CompletionDetector *detectorLocalObj_;
+  CProxy_MeshStreamerNG<dtype, RouterType> ngProxy;
+
   virtual int copyDataItemIntoMessage(
               MeshStreamerMessageV *destinationBuffer,
               const DataItemHandle<dtype> *dataItemHandle, bool copyIndirectly = false);
@@ -1168,14 +1169,16 @@ private:
   }
 
 public:
-  GroupMeshStreamer(int numDimensions, int* dimensionSizes,
-      CkGroupID clientGID, int bufferSize, bool yieldFlag,
-      double progressPeriodInMs, int maxItemsBuffered,
-      int _thresholdFractionNum, int _thresholdFractionDen,
-      int _cutoffFractionNum, int _cutoffFractionDen) {
+  GroupMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy,
+                    int numDimensions, int* dimensionSizes,
+                    CkGroupID clientGID, int bufferSize, bool yieldFlag,
+                    double progressPeriodInMs, int maxItemsBuffered,
+                    int _thresholdFractionNum, int _thresholdFractionDen,
+                    int _cutoffFractionNum, int _cutoffFractionDen) {
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
-        progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
-        _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
+                     progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
+                     _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
+    this->ngProxy = ngProxy;
     clientGID_ = clientGID;
     clientObj_ = (ClientType*)CkLocalBranch(clientGID_);
   }
@@ -1287,8 +1290,8 @@ public:
                     int _cutoffFractionNum, int _cutoffFractionDen) {
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
                      progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
-                     _thresholdFractionDen, _cutoffFractionNum,
-                     _cutoffFractionDen);
+                     _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
+    this->ngProxy = ngProxy;
     clientAID_ = clientAID;
     clientArrayMgr_ = clientAID_.ckLocalBranch();
     clientLocMgr_ = clientArrayMgr_->getLocMgr();
