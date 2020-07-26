@@ -242,9 +242,6 @@ protected:
 public:
   MeshStreamer() {}
   MeshStreamer(CkMigrateMessage *) {}
-  MeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
-               int *dimensionSizes, int bufferSize,
-               bool yieldFlag = 0, double progressPeriodInMs = -1.0);
 
   // entry
 
@@ -1083,11 +1080,11 @@ private:
   }
 
 public:
-  GroupMeshStreamer(int numDimensions, int* dimensionSizes, CkGroupID clientGID,
-      int bufferSize, bool yieldFlag = 0, double progressPeriodInMs = -1.0,
-      int maxItemsBuffered = 1000, int _thresholdFractionNum = 1,
-      int _thresholdFractionDen = 2, int _cutoffFractionNum = 1,
-      int _cutoffFractionDen = 2) {
+  GroupMeshStreamer(int numDimensions, int* dimensionSizes,
+      CkGroupID clientGID, int bufferSize, bool yieldFlag,
+      double progressPeriodInMs, int maxItemsBuffered,
+      int _thresholdFractionNum, int _thresholdFractionDen,
+      int _cutoffFractionNum, int _cutoffFractionDen) {
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
         progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
         _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
@@ -1198,10 +1195,10 @@ private:
 public:
 
   ArrayMeshStreamer(int numDimensions, int *dimensionSizes,
-                    CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
-                    double progressPeriodInMs = -1.0, int maxItemsBuffered = 1000,
-                    int _thresholdFractionNum = 1, int _thresholdFractionDen = 2,
-                    int _cutoffFractionNum = 1, int _cutoffFractionDen = 2) {
+                    CkArrayID clientAID, int bufferSize, bool yieldFlag,
+                    double progressPeriodInMs, int maxItemsBuffered,
+                    int _thresholdFractionNum, int _thresholdFractionDen,
+                    int _cutoffFractionNum, int _cutoffFractionDen) {
 
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
                      progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
