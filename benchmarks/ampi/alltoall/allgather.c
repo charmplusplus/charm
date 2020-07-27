@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 
   if (my_id == 0)
   {
-    elapsed_time_sec = MPI_Wtime() - startTime / max_msgs;
+    elapsed_time_sec = (MPI_Wtime() - startTime) / max_msgs;
     bandwidth = msg_size * (p - 1) / elapsed_time_sec;
 
     fprintf(stdout, "%5d %7d\t ", max_msgs, msg_size);
