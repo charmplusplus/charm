@@ -33,7 +33,13 @@ ifeq ($(CMK_NO_PARTITIONS),1)
 else ifeq ($(CMK_BLUEGENEQ),1)
 	echo "Skipping partitions test on BGQ"
 else
-	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) $$(( $(P) / 2 )) +partitions $$(( $(P) / 2 )) )
+	@if [ $$(( $(P) % 2 )) = 0 ]; then \
+	echo "P is even, running partitions test with $(P)/2 partitions" && \
+	echo $(call run, ./hello +p$(P) $$(( $(P) * 4 )) 2 +partitions $$(( $(P) / 2 )) ) && \
+	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) 2 +partitions $$(( $(P) / 2 )) ); \
+	else echo "P is odd, running partitions test with 1 partition" && \
+	echo $(call run, ./hello +p$(P) $$(( $(P) * 4 )) $(P) +partitions 1) && \
+	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) $(P) +partitions 1); fi
 endif
 
 smptest: all
