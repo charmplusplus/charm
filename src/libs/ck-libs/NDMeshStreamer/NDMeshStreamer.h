@@ -8,6 +8,7 @@
 #include <list>
 #include <map>
 #include <type_traits>
+#include <mutex>
 #include "pup.h"
 #include "NDMeshStreamer.decl.h"
 #include "DataItemTypes.h"
@@ -168,7 +169,8 @@ template <class dtype, class RouterType>
 class MeshStreamerNG : public CBase_MeshStreamerNG<dtype, RouterType> {
   CProxy_MeshStreamer<dtype, RouterType> groupProxy;
   int myIndex_;
-  RouterType myRouter_;
+  std::vector<RouterType> myRouters_;
+  std::mutex* locks_;
   int yieldCount_;
   bool yieldFlag_;
 
@@ -179,7 +181,14 @@ public:
                  int _thresholdFractionNum, int _thresholdFractionDen,
                  int _cutoffFractionNum, int _cutoffFractionDen) {
     myIndex_ = CkMyNode();
-    myRouter_.initializeRouter(numDimensions, myIndex_, dimensionSizes);
+
+    // Initialize per-PE variables and locks
+    locks_ = new std::mutex[CkMyNodeSize()];
+    for (int i = 0; i < CkMyNodeSize(); i++) {
+      myRouters_.emplace_back();
+      RouterType& router = myRouters_.back();
+      router.initializeRouter(numDimensions, myIndex_, dimensionSizes);
+    }
   }
 
   MeshStreamerNG(CkMigrateMessage* m) {}
@@ -188,13 +197,14 @@ public:
     groupProxy = gp;
   }
 
-  void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
+  void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe,
+                  const int callRank) {
     const static bool copyIndirectly = true;
 
-    Route destinationRoute;
-    myRouter_.determineInitialRoute(destinationPe, destinationRoute);
+    thread_local Route destinationRoute;
+    myRouters_[callRank].determineInitialRoute(destinationPe, destinationRoute);
     storeMessage(destinationPe, destinationRoute, dataItemHandle,
-                 copyIndirectly);
+                 copyIndirectly, callRank);
     // release control to scheduler if requested by the user,
     //   assume caller is threaded entry
     if (yieldFlag_ && ++yieldCount_ == 1024) {
@@ -203,18 +213,19 @@ public:
     }
   }
 
-  void storeMessage(int destinationPe, const Route& destinationCoordinates,
-      const DataItemHandle<dtype> *dataItem, bool copyIndirectly) {
+  inline void storeMessage(int destinationPe, const Route& destinationRoute,
+      const DataItemHandle<dtype> *dataItem, bool copyIndirectly, const int callRank) {
     // TODO: Move message storage to nodegroup
-    MeshStreamer<dtype, RouterType>::storeMessage(destinationPe,
-        destinationCoordinates, dataItem, copyIndirectly);
+    locks_[callRank].lock();
+    MeshStreamer<dtype, RouterType>* ms = (MeshStreamer<dtype, RouterType>*)CkLocalBranchOther(groupProxy.ckGetGroupID(), callRank);
+    ms->storeMessage(destinationPe, destinationRoute, dataItem, copyIndirectly);
+    locks_[callRank].unlock();
   }
 
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
-    int destinationPe, lastDestinationPe;
-    Route destinationRoute;
+    thread_local int destinationPe, lastDestinationPe = -1;
+    thread_local Route destinationRoute;
 
-    lastDestinationPe = -1;
     for (int i = 0; i < msg->numDataItems; i++) {
       destinationPe = msg->destinationPes[i];
       if (CmiNodeOf(destinationPe) == myIndex_) {
@@ -227,8 +238,8 @@ public:
       else if (destinationPe != TRAM_BROADCAST) {
         if (destinationPe != lastDestinationPe) {
           // do this once per sequence of items with the same destination
-          myRouter_.determineRoute(destinationPe,
-              myRouter_.dimensionReceived(msg->msgType),
+          myRouters_[CkMyRank()].determineRoute(destinationPe,
+              myRouters_[CkMyRank()].dimensionReceived(msg->msgType),
               destinationRoute);
         }
         groupProxy.ckLocalBranch()->storeMessageIntermed(destinationPe,
@@ -253,13 +264,13 @@ public:
   }
 
   void receiveAtDestination(MeshStreamerMessageV *msg) {
-    this->groupProxy[msg->destinationIndex].receiveAtDestination(msg);
+    groupProxy[msg->destinationIndex].receiveAtDestination(msg);
   }
 
   void pup(PUP::er& p) {
     p|groupProxy;
     p|myIndex_;
-    p|myRouter_;
+    p|myRouters_;
   }
 };
 
@@ -325,9 +336,6 @@ protected:
               char *dataHandle, size_t size, CkArrayIndex index);
   void createDetectors();
   void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe);
-  void storeMessage(int destinationPe,
-                    const Route& destinationCoordinates,
-                    const DataItemHandle<dtype> *dataItem, bool copyIndirectly = false);
 
   void ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
                   int *dimensionSizes, int bufferSize,
@@ -341,6 +349,9 @@ public:
 
   // entry
   virtual void localDeliver(size_t size, const char* data, CkArrayIndex arrayId,int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
+  void storeMessage(int destinationPe,
+                    const Route& destinationCoordinates,
+                    const DataItemHandle<dtype> *dataItem, bool copyIndirectly = false);
   void storeMessageIntermed(int destinationPe, const Route& destinationRoute,
                             char *dataItem, size_t size, CkArrayIndex arrayId);
 
@@ -744,7 +755,7 @@ template <class dtype, class RouterType>
 inline void MeshStreamer<dtype, RouterType>::
 insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
   // Delegate to nodegroup
-  ngProxy.ckLocalBranch()->insertData(dataItemHandle, destinationPe);
+  ngProxy.ckLocalBranch()->insertData(dataItemHandle, destinationPe, CkMyRank());
 }
 
 template <class dtype, class RouterType>
