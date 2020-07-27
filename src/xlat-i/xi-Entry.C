@@ -1016,8 +1016,7 @@ XStr Entry::aggregatorType() {
 XStr Entry::aggregatorNodeType() {
   XStr groupType;
   groupType << "MeshStreamerNG<" << param->param->type << ", "
-            << container->baseName() << ", SimpleMeshRouter"
-            << ", " << container->indexName() << "::_callmarshall_" << epStr() << ">";
+            << "SimpleMeshRouter>";
   return groupType;
 }
 
