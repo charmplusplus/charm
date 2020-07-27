@@ -34,7 +34,7 @@ module NDMeshStreamer {
   };
 
   template<class dtype, class RouterType>
-  nodegroup MeshStreamerNG : MeshStreamer<dtype, RouterType> {
+  nodegroup MeshStreamerNG {
     entry MeshStreamerNG(int numDimensions, int dimensionSizes[numDimensions],
                          CkArrayID clientAID, int bufferSize, bool yieldFlag,
                          double progressPeriodInMs, int maxItemsBuffered,
