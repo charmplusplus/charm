@@ -1181,14 +1181,14 @@ private:
 
 public:
   GroupMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy,
-                    int numDimensions, int* dimensionSizes,
-                    CkGroupID clientGID, int bufferSize, bool yieldFlag,
-                    double progressPeriodInMs, int maxItemsBuffered,
-                    int _thresholdFractionNum, int _thresholdFractionDen,
-                    int _cutoffFractionNum, int _cutoffFractionDen) {
+      int numDimensions, int* dimensionSizes,
+      CkGroupID clientGID, int bufferSize, bool yieldFlag,
+      double progressPeriodInMs, int maxItemsBuffered,
+      int _thresholdFractionNum, int _thresholdFractionDen,
+      int _cutoffFractionNum, int _cutoffFractionDen) {
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
-                     progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
-                     _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
+        progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
+        _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
     this->ngProxy = ngProxy;
     clientGID_ = clientGID;
     clientObj_ = (ClientType*)CkLocalBranch(clientGID_);
@@ -1294,11 +1294,11 @@ private:
 
 public:
   ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy,
-                    int numDimensions, int *dimensionSizes,
-                    CkArrayID clientAID, int bufferSize, bool yieldFlag,
-                    double progressPeriodInMs, int maxItemsBuffered,
-                    int _thresholdFractionNum, int _thresholdFractionDen,
-                    int _cutoffFractionNum, int _cutoffFractionDen) {
+      int numDimensions, int *dimensionSizes,
+      CkArrayID clientAID, int bufferSize, bool yieldFlag,
+      double progressPeriodInMs, int maxItemsBuffered,
+      int _thresholdFractionNum, int _thresholdFractionDen,
+      int _cutoffFractionNum, int _cutoffFractionDen) {
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
                      progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
                      _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);

@@ -56,8 +56,7 @@ module NDMeshStreamer {
   };
 
   template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
-  group [migratable] ArrayMeshStreamer :
-  MeshStreamer<dtype, RouterType> {
+  group [migratable] ArrayMeshStreamer : MeshStreamer<dtype, RouterType> {
     entry ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy,
                             int numDimensions, int dimensionSizes[numDimensions],
                             CkArrayID clientAID, int bufferSize, bool yieldFlag,
