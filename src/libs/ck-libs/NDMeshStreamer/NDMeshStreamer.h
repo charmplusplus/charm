@@ -196,23 +196,6 @@ public:
     groupProxy = gp;
   }
 
-  void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe,
-                  const int callPe) {
-    thread_local int callRank = CkNodeOf(callPe);
-    GroupData<dtype>& callData = groupData_[callRank];
-
-    callData.destinationPe = destinationPe;
-    callData.copyIndirectly = true;
-    myRouters_[callRank].determineInitialRoute(destinationPe, callData.destinationRoute);
-    groupProxy[callPe].storeMessage();
-    // release control to scheduler if requested by the user,
-    //   assume caller is threaded entry
-    if (yieldFlag_ && ++yieldCount_ == 1024) {
-      yieldCount_ = 0;
-      CthYield();
-    }
-  }
-
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
     thread_local int destinationPe, lastDestinationPe = -1;
     thread_local Route destinationRoute;
@@ -768,8 +751,18 @@ inline void MeshStreamer<dtype, RouterType>::createDetectors() {
 template <class dtype, class RouterType>
 inline void MeshStreamer<dtype, RouterType>::
 insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
+    Route destinationRoute;
+    myRouter_.determineInitialRoute(destinationPe, destinationRoute);
+    storeMessage(destinationPe, destinationRoute, dataItemHandle, true);
+    // release control to scheduler if requested by the user,
+    //   assume caller is threaded entry
+    if (yieldFlag_ && ++yieldCount_ == 1024) {
+      yieldCount_ = 0;
+      CthYield();
+    }
+
   // Delegate to nodegroup
-  ngProxy.ckLocalBranch()->insertData(dataItemHandle, destinationPe, CkMyPe());
+  //ngProxy.ckLocalBranch()->insertData(dataItemHandle, destinationPe, CkMyPe());
 }
 
 template <class dtype, class RouterType>
