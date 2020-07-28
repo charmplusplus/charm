@@ -172,6 +172,9 @@ class MeshStreamerNG : public CBase_MeshStreamerNG<dtype, RouterType> {
   GroupData<dtype>* groupData_;
   int yieldCount_;
   bool yieldFlag_;
+#if CMK_SMP
+  CmiNodeLock smpLock;
+#endif
 
 public:
   MeshStreamerNG(int numDimensions, int *dimensionSizes,
@@ -188,15 +191,29 @@ public:
       RouterType& router = myRouters_.back();
       router.initializeRouter(numDimensions, myIndex_, dimensionSizes);
     }
+
+#if CMK_SMP
+    smpLock = CmiCreateLock();
+#endif
   }
 
   MeshStreamerNG(CkMigrateMessage* m) {}
 
   void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> gp) {
+#if CMK_SMP
+    CmiLock(smpLock);
+#endif
     groupProxy = gp;
+#if CMK_SMP
+    CmiUnlock(smpLock);
+#endif
   }
 
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
+#if CMK_SMP
+    CmiLock(smpLock);
+#endif
+
     thread_local int destinationPe, lastDestinationPe = -1;
     thread_local Route destinationRoute;
 
@@ -235,10 +252,19 @@ public:
 
     delete msg;
     //this->groupProxy[msg->destinationIndex].receiveAlongRoute(msg);
+#if CMK_SMP
+    CmiUnlock(smpLock);
+#endif
   }
 
   void receiveAtDestination(MeshStreamerMessageV *msg) {
+#if CMK_SMP
+    CmiLock(smpLock);
+#endif
     groupProxy[msg->destinationIndex].receiveAtDestination(msg);
+#if CMK_SMP
+    CmiUnlock(smpLock);
+#endif
   }
 
   void pup(PUP::er& p) {
@@ -751,15 +777,15 @@ inline void MeshStreamer<dtype, RouterType>::createDetectors() {
 template <class dtype, class RouterType>
 inline void MeshStreamer<dtype, RouterType>::
 insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
-    Route destinationRoute;
-    myRouter_.determineInitialRoute(destinationPe, destinationRoute);
-    storeMessage(destinationPe, destinationRoute, dataItemHandle, true);
-    // release control to scheduler if requested by the user,
-    //   assume caller is threaded entry
-    if (yieldFlag_ && ++yieldCount_ == 1024) {
-      yieldCount_ = 0;
-      CthYield();
-    }
+  Route destinationRoute;
+  myRouter_.determineInitialRoute(destinationPe, destinationRoute);
+  storeMessage(destinationPe, destinationRoute, dataItemHandle, true);
+  // release control to scheduler if requested by the user,
+  //   assume caller is threaded entry
+  if (yieldFlag_ && ++yieldCount_ == 1024) {
+    yieldCount_ = 0;
+    CthYield();
+  }
 
   // Delegate to nodegroup
   //ngProxy.ckLocalBranch()->insertData(dataItemHandle, destinationPe, CkMyPe());
