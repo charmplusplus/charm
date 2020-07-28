@@ -2,6 +2,7 @@
 #define DATA_ITEM_TYPES_H
 
 #include <utility>
+#include "ckarray.h"
 
 #define CHUNK_SIZE 256
 
@@ -56,6 +57,14 @@ public:
     return *this;
   }
   
+};
+
+template <class dtype>
+struct DataItemHandle {
+  CkArrayIndex arrayIndex;
+  const dtype *dataItem;
+
+  DataItemHandle(dtype* _ptr, CkArrayIndex _idx = CkArrayIndex()) : dataItem(_ptr), arrayIndex(_idx) {}
 };
 
 template <class dtype, class ClientType>
