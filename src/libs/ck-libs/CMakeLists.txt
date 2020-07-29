@@ -1,3 +1,5 @@
+## The targets in this file are only built when building LIBS
+
 # cache
 add_library(moduleCkCache cache/CkCache.C cache/CkCache.h)
 configure_file(cache/CkCache.h ${CMAKE_BINARY_DIR}/include COPYONLY)
@@ -154,3 +156,17 @@ add_custom_command(
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/
       DEPENDS charmxi
       )
+
+# amr
+set(amr-h-sources amr/amr.h amr/bitvec.h amr/fifo.h amr/statcoll.h)
+
+set(amr-cxx-sources amr/amr.C amr/fifo.C amr/statcoll.C)
+
+add_library(amr ${amr-cxx-sources} ${amr-h-sources})
+
+add_dependencies(amr ck)
+
+foreach(file ${amr-h-sources})
+  configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+endforeach()
+
