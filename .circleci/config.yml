@@ -8,24 +8,24 @@ jobs:
       - checkout
       - run:
           name: Build
-          command: ./build LIBS netlrts-linux-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
+          command: ./build all-test netlrts-linux-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
       - run:
           name: Test
-          command: make -C netlrts-linux-x86_64/tests test TESTOPTS="++local" &&  make -C netlrts-linux-x86_64/examples test TESTOPTS="++local"
- 
+          command: make -C netlrts-linux-x86_64/tests test TESTOPTS="++local" && make -C netlrts-linux-x86_64/examples test TESTOPTS="++local"
+
   NetLRTS-smp:
     machine:
       image: ubuntu-1604:201903-01
-    
+
     steps:
       - checkout
       - run:
           name: Build
-          command: ./build LIBS netlrts-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
+          command: ./build all-test netlrts-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
       - run:
           name: Test
           command: make -C netlrts-linux-x86_64-smp/tests test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle" && make -C netlrts-linux-x86_64-smp/examples test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle"
- 
+
 workflows:
   version: 2
   build:
