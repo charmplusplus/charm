@@ -161,23 +161,25 @@ add_custom_command(
 # pythonCCS
 
 if(CMK_BUILD_PYTHON)
-  set(pythonCCS-h-sources pythonCCS/PythonCCS.h pythonCCS/PythonCCS-client.h)
+  if(PYTHON_VERSION_MAJOR EQUAL 2) # pythonCCS needs Python 2.x
+    set(pythonCCS-h-sources pythonCCS/PythonCCS.h pythonCCS/PythonCCS-client.h)
 
-  file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/pythonIncludes.h CONTENT
-    "#include \"python${CMK_BUILD_PYTHON}/Python.h\"
-     #include \"python${CMK_BUILD_PYTHON}/compile.h\"
-     #include \"python${CMK_BUILD_PYTHON}/eval.h\"
-     #include \"python${CMK_BUILD_PYTHON}/node.h\"
-    "
-    )
+    file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/pythonIncludes.h CONTENT
+      "#include \"python${CMK_BUILD_PYTHON}/Python.h\"
+       #include \"python${CMK_BUILD_PYTHON}/compile.h\"
+       #include \"python${CMK_BUILD_PYTHON}/eval.h\"
+       #include \"python${CMK_BUILD_PYTHON}/node.h\"
+      "
+      )
 
-  foreach(file ${pythonCCS-h-sources})
-    configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
-  endforeach()
+    foreach(file ${pythonCCS-h-sources})
+      configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+    endforeach()
 
-  add_library(modulePythonCCS pythonCCS/PythonCCS.C pythonCCS/PythonCCS-client.C)
-  add_library(modulecharmdebug_python pythonCCS/charmdebug-python.C)
+    add_library(modulePythonCCS pythonCCS/PythonCCS.C pythonCCS/PythonCCS-client.C)
+    add_library(modulecharmdebug_python pythonCCS/charmdebug-python.C)
 
-  add_dependencies(modulePythonCCS ck)
-  add_dependencies(modulecharmdebug_python ck)
+    add_dependencies(modulePythonCCS ck)
+    add_dependencies(modulecharmdebug_python ck)
+  endif()
 endif()
