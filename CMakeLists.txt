@@ -96,7 +96,7 @@ option(SYNCFT "Compile with Charm++ fault tolerance support" OFF)
 option(PAPI "Compile with PAPI performance counter support" OFF)
 
 # Enable/disable features:
-option(ERROR_CHECKING      "Enable error checking" OFF)
+set(ERROR_CHECKING "" CACHE STRING "Enable error checking")
 option(AMPI_ERROR_CHECKING "Enable AMPI error checking" OFF)
 option(STATS               "Enable statistics collection" OFF)
 set(TRACING "" CACHE STRING "Enable tracing modules")
@@ -126,6 +126,14 @@ if(TRACING STREQUAL "")
     set(TRACING 1)
   else()
     set(TRACING 0)
+  endif()
+endif()
+
+if(ERROR_CHECKING STREQUAL "")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(ERROR_CHECKING 1)
+  else()
+    set(ERROR_CHECKING 0)
   endif()
 endif()
 
@@ -921,7 +929,7 @@ foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC)
 endforeach()
 
 # Options that need no .h/.sh additions
-foreach(opt TRACING TRACING_COMMTHREAD)
+foreach(opt TRACING TRACING_COMMTHREAD ERROR_CHECKING)
     if(${opt})
         set(opts_enabled "${opts_enabled}${opt} ")
     endif()
