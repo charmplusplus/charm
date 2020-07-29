@@ -213,7 +213,6 @@ public:
 #if CMK_SMP
     CmiLock(smpLock);
 #endif
-
     thread_local int destinationPe, lastDestinationPe = -1;
     thread_local Route destinationRoute;
 
@@ -351,14 +350,8 @@ public:
 
   // entry
   virtual void localDeliver(size_t size, const char* data, CkArrayIndex arrayId,int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
-  void storeMessage();
-  void storeMessage(int destinationPe,
-                    const Route& destinationCoordinates,
-                    const DataItemHandle<dtype> *dataItem, bool copyIndirectly);
-  void storeMessageHelper(int destinationPe,
-                          const Route& destinationCoordinates,
-                          const DataItemHandle<dtype> *dataItem,
-                          bool copyIndirectly);
+  void storeMessage(int destinationPe, const Route& destinationRoute,
+                    const DataItemHandle<dtype> *dataItem, bool copyIndirectly = false);
   void storeMessageIntermed(int destinationPe, const Route& destinationRoute,
                             char *dataItem, size_t size, CkArrayIndex arrayId);
 
@@ -673,22 +666,6 @@ template <class dtype, class RouterType>
 inline void MeshStreamer<dtype, RouterType>::
 storeMessage(int destinationPe, const Route& destinationRoute,
              const DataItemHandle<dtype> *dataItem, bool copyIndirectly) {
-  storeMessageHelper(destinationPe, destinationRoute, dataItem, copyIndirectly);
-}
-
-template <class dtype, class RouterType>
-inline void MeshStreamer<dtype, RouterType>::
-storeMessage() {
-  GroupData<dtype>* groupData = ngProxy.ckLocalBranch()->getGroupData();
-  GroupData<dtype>& myData = groupData[CkMyRank()];
-  storeMessageHelper(myData.destinationPe, myData.destinationRoute,
-      myData.dataItem, myData.copyIndirectly);
-}
-
-template <class dtype, class RouterType>
-inline void MeshStreamer<dtype, RouterType>::
-storeMessageHelper(int destinationPe, const Route& destinationRoute,
-                   const DataItemHandle<dtype> *dataItem, bool copyIndirectly) {
   int dimension = destinationRoute.dimension;
   int bufferIndex = destinationRoute.dimensionIndex;
   std::vector<MeshStreamerMessageV *> &messageBuffers

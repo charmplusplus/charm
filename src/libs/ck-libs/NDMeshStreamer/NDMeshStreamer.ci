@@ -30,7 +30,6 @@ module NDMeshStreamer {
     entry void init(CkCallback endCb, int prio);
     entry [reductiontarget] void syncInit();
 
-    entry void storeMessage();
     entry void receiveAtDestination(MeshStreamerMessageV *msg);
   };
 
