@@ -176,7 +176,11 @@ if(${TARGET} STREQUAL "all-test")
   add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
         conv-partition conv-util hwloc conv-static conv-core ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer create_symlinks moduleCkCache trace-converse moduleCommonLBs moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper threads-default-tls ldb-neighbor ldb-workstealing modulearmci modulecollidecharm modulecollide memory-os)
+        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
+        create_symlinks moduleCkCache trace-converse moduleCommonLBs
+        moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
+        threads-default-tls ldb-neighbor ldb-workstealing modulearmci
+        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc)
   if(CMK_CAN_LINK_FORTRAN)
     add_dependencies(all-test moduleampif conv-utilf ckmainf)
   endif()
