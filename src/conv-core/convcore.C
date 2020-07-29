@@ -3991,7 +3991,22 @@ void ConverseCommonInit(char **argv)
   CmiIOInit(argv);
 #endif
   if (CmiMyPe() == 0)
+  {
     CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
+
+#if !CMK_OPTIMIZE
+    CmiPrintf(
+        "Charm++ built without optimization.\n"
+        "Do not use for performance benchmarking (build with --with-production to do "
+        "so).\n");
+#endif
+#if CMK_ERROR_CHECKING
+    CmiPrintf(
+        "Charm++ built with internal error checking enabled.\n"
+        "Do not use for performance benchmarking (build without --enable-error-checking "
+        "to do so).\n");
+#endif
+  }
 
   CpvInitialize(int, cmiMyPeIdle);
   CpvAccess(cmiMyPeIdle) = 0;

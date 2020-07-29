@@ -15,8 +15,8 @@ if [[ $rc -ne 0 ]]; then
   exit $?
 fi
 
-if [[ $(uname) != "Linux" && $(uname) != "Darwin" ]]; then
-  echo "Warning: CMake build is only supported on Linux and Darwin, running ./buildold instead."
+if [[ $(uname) == "MSYS"* || $(uname) == "MINGW"* ]]; then
+  echo "Warning: CMake build is not supported under MSYS, running ./buildold instead."
   sleep 2
   ./buildold "$@"
   exit $?
@@ -74,7 +74,7 @@ opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
 opt_drone_mode=0
-opt_error_checking=0
+opt_error_checking= #undef
 opt_extra_opts=""
 opt_incdir=""
 opt_lbtime_type="double"
@@ -103,7 +103,7 @@ opt_suffix=""
 opt_syncft=0
 opt_task_queue=0
 opt_tcp=0
-opt_tracing=0
+opt_tracing= #undef
 opt_tracing_commthread=0
 opt_ucx_pmi=""
 opt_zlib=1
@@ -210,6 +210,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     pgcc|pgf90)
       echo "*** Warning: Ignoring unsupported option '$arg'."
+      ;;
+    msvc)
+      opt_CC=msvc # fake, will be replaced below
+      opt_compiler+="$arg "
       ;;
     mpicxx)
       opt_CC=mpicc
@@ -383,6 +387,17 @@ else
   opt_network=$(echo "$triplet" | cut -d '-' -f1)
 fi
 
+my_os=$(echo "$triplet" | cut -d '-' -f2)
+my_dir=$(dirname "$0")
+
+# Special handling for Windows compiler
+if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
+  # Need to use unix2nt_cc on Windows/Cygwin
+  opt_CC=$(realpath "$my_dir")/src/arch/win/unix2nt_cc
+  opt_CXX=$opt_CC
+  opt_FC=
+fi
+
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
 
 
@@ -423,6 +438,7 @@ if [[ -n $opt_incdir ]]; then
 fi
 
 CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
+  -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE="$opt_production" \
   -DCMK_AMPI_ONLY="$opt_ampi_only" \
   -DCMK_AMPI_WITH_ROMIO="$opt_romio" \
