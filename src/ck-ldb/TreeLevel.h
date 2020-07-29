@@ -37,6 +37,11 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
   unsigned int nPes;  // num pes in this msg
   size_t posDimension; // dimension of entries in positions
 
+  // Dimension of vector loads in this msg. Note that this can be 0. Object loads are
+  // stored as (regular walltime, <vector load>) where dimension gives the size of <vector
+  // load>.
+  unsigned int dimension;
+
   int* pe_ids;              // IDs of the pes in this msg
   float* bgloads;           // bgloads[i] is background load of i-th pe in this msg
   float* speeds;            // speeds[i] is speed of i-th pe
@@ -61,7 +66,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     unsigned int nPes = 0;
     size_t minPosDimension = std::numeric_limits<size_t>::max();
     size_t maxPosDimension = std::numeric_limits<size_t>::min();
-
+    unsigned int dimension = ((LBStatsMsg_1*)msgs[0])->dimension;
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
@@ -69,20 +74,22 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
       nPes += msg->nPes;
       minPosDimension = std::min(minPosDimension, msg->posDimension);
       maxPosDimension = std::max(maxPosDimension, msg->posDimension);
+      CkAssert(dimension == msg->dimension);
     }
     CkAssertMsg(msgs.empty() || minPosDimension == maxPosDimension,
                 "Position of every object for LB must be of same dimension");
     const size_t posDimension = minPosDimension;
     LBStatsMsg_1* newMsg;
     if (rateAware)
-      newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs, nObjs * posDimension) LBStatsMsg_1;
+      newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs, nObjs * posDimension, nObjs * (1 + dimension)) LBStatsMsg_1;
     else
-      newMsg = new (nPes, nPes, 0, nPes + 1, nObjs, nObjs * posDimension) LBStatsMsg_1;
+      newMsg = new (nPes, nPes, 0, nPes + 1, nObjs, nObjs * posDimension, nObjs * (1 + dimension)) LBStatsMsg_1;
     newMsg->nObjs = nObjs;
     newMsg->nPes = nPes;
     newMsg->posDimension = posDimension;
     int pe_cnt = 0;
     int obj_cnt = 0;
+    int load_cnt = 0;
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
@@ -93,14 +100,15 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
         memcpy(newMsg->speeds + pe_cnt, msg->speeds, sizeof(float) * msg_npes);
       // memcpy(newMsg->obj_start + pe_cnt, msg->obj_start, sizeof(int)*msg_npes);
       for (int j = 0; j < msg_npes; j++)
-        newMsg->obj_start[pe_cnt + j] = msg->obj_start[j] + obj_cnt;
-      memcpy(newMsg->oloads + obj_cnt, msg->oloads, sizeof(float) * (msg->nObjs));
+        newMsg->obj_start[pe_cnt + j] = msg->obj_start[j] + load_cnt;
+      memcpy(newMsg->oloads + load_cnt, msg->oloads, sizeof(float) * (msg->nObjs * (1 + dimension)));
       memcpy(newMsg->positions + obj_cnt * posDimension, msg->positions,
              sizeof(float) * msg->nObjs * posDimension);
       obj_cnt += msg->nObjs;
+      load_cnt += msg->nObjs * (1 + dimension);
       pe_cnt += msg_npes;
     }
-    newMsg->obj_start[pe_cnt] = obj_cnt;
+    newMsg->obj_start[pe_cnt] = load_cnt;
 
     return newMsg;
   }
@@ -125,7 +133,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
         migMsg->obj_start[pe] = obj_cnt;
         int local_id = 0;
         for (int k = msg->obj_start[j]; k < msg->obj_start[j + 1];
-             k++, obj_cnt++, local_id++)
+             k += 1 + msg->dimension, obj_cnt++, local_id++)
         {
           objs[obj_cnt].populate(obj_cnt, msg->oloads + k, pe);
           if (msg->posDimension > 0)
@@ -1095,6 +1103,15 @@ class PELevel : public LevelLogic
     CkAssertMsg(nobjs == 0 || minPosDimension == maxPosDimension,
                 "Position of every object for LB must be of same dimension!");
     const size_t posDimension = (nobjs == 0) ? 0 : minPosDimension;
+
+    // Currently assumes that every object sent to LB has the same dimension
+    // TODO: Allow for different dimensions
+    // Assumes that every PE has at least one object for LB
+    // If dimension is 0, then phases are not being used
+    CkAssert(nobjs > 0);
+    const auto dimension = myObjs[0].vectorLoad.size();
+    const auto nobjLoads = nobjs * (1 + dimension);
+
     // TODO verify that non-migratable objects are not added to msg and are only counted
     // as background load
 
@@ -1116,25 +1133,35 @@ class PELevel : public LevelLogic
     LBStatsMsg_1* msg;
     if (rateAware)
     {
-      msg = new (1, 1, 1, 2, nobjs, nobjs * posDimension) LBStatsMsg_1;
+      msg = new (1, 1, 1, 2, nobjs, nobjs * posDimension, nobjLoads) LBStatsMsg_1;
       msg->speeds[0] = float(lbmgr->ProcessorSpeed());
     }
     else
-      msg = new (1, 1, 0, 2, nobjs, nobjs * posDimension) LBStatsMsg_1;
+      msg = new (1, 1, 0, 2, nobjs, nobjs * posDimension, nobjLoads) LBStatsMsg_1;
     msg->nObjs = nobjs;
     msg->nPes = 1;
     msg->posDimension = posDimension;
     msg->pe_ids[0] = mype;
     msg->obj_start[0] = 0;
-    msg->obj_start[1] = nobjs;
+    msg->obj_start[1] = nobjLoads;
+    msg->dimension = dimension;
     for (int i = 0; i < nobjs; i++)
     {
+      int index = i * (1 + dimension);
       // If rateAware, convert object loads by multiplying by processor speed
       // Note this conversion isn't done for bgloads because they never leave the PE
       if (rateAware)
-        msg->oloads[i] = float(myObjs[i].wallTime) * msg->speeds[0];
+        msg->oloads[index++] = float(myObjs[i].wallTime) * msg->speeds[0];
       else
-        msg->oloads[i] = float(myObjs[i].wallTime);
+        msg->oloads[index++] = float(myObjs[i].wallTime);
+
+      // Currently assumes that every object sent to LB has the same dimension
+      // TODO: Allow for different dimensions
+      CkAssert(myObjs[i].vectorLoad.size() == dimension);
+      for (int j = 0; j < dimension; j++)
+      {
+        msg->oloads[index++] = float(myObjs[i].vectorLoad[j]);
+      }
       if (posDimension > 0)
       {
         for (int j = 0; j < posDimension; j++)
