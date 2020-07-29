@@ -1193,20 +1193,13 @@ void Entry::genTramInstantiation(XStr& str) {
           << "    if (itemsPerBuffer == 0) {\n"
           << "      itemsPerBuffer = 1;\n"
           << "    }\n"
-          << "    CProxy_" << container->tramInstances[i].nodeType.c_str()
-          << " tramNodeProxy =\n"
-          << "    CProxy_" << container->tramInstances[i].nodeType.c_str()
-          << "::ckNew(nDims, dims, gId, tramBufferSize, false, 0.01, "
-          << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
-          << "cutoffFractionNum, cutoffFractionDen);\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()
           << " tramProxy =\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()
-          << "::ckNew(tramNodeProxy, nDims, dims, gId, tramBufferSize, false, 0.01, "
+          << "::ckNew(nDims, dims, gId, tramBufferSize, false, 0.01, "
           << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
           << "cutoffFractionNum, cutoffFractionDen);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
-          << "    tramNodeProxy.setGroupProxy(tramProxy);\n"
           << "  }\n";
     }
   }
