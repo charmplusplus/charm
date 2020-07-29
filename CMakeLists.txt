@@ -234,16 +234,24 @@ IF(JPEG_FOUND)
   set(CMK_USE_LIBJPEG 1)
 ENDIF()
 
+# Check for Python
+# PythonCCS requires Python v2.x and is the only target that uses this
+# With CMake 3.12+ we could use FindPython() here
+set(CMK_HAS_PYTHON 0)
+set(CMK_PYTHON_VERSION "")
+set(CMK_BUILD_PYTHON "")
+
+set(Python_ADDITIONAL_VERSIONS 2)
 find_package(PythonInterp)
+
 if(PYTHONINTERP_FOUND)
-  set(CMK_HAS_PYTHON 1)
   set(__MY_PYTHON_VER "${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}")
-  set(CMK_PYTHON_VERSION ${__MY_PYTHON_VER})
-  set(CMK_BUILD_PYTHON ${__MY_PYTHON_VER})
-else()
-  set(CMK_HAS_PYTHON 0)
-  set(CMK_PYTHON_VERSION "")
-  set(CMK_BUILD_PYTHON "")
+  check_include_file(python${__MY_PYTHON_VER}/Python.h __MY_HAS_PYTHONH)
+  if(__MY_HAS_PYTHONH)
+    set(CMK_HAS_PYTHON 1)
+    set(CMK_PYTHON_VERSION ${__MY_PYTHON_VER})
+    set(CMK_BUILD_PYTHON ${__MY_PYTHON_VER})
+  endif()
 endif()
 
 set(CMK_REFNUM_TYPE ${REFNUM_TYPE})
