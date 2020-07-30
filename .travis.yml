@@ -20,16 +20,20 @@ matrix:
     dist: xenial
     script:
     - sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
-    - ./build LIBS mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C mpi-linux-x86_64-smp/tests TESTOPTS="+setcpuaffinity"
-    - make -C mpi-linux-x86_64-smp/examples TESTOPTS="+setcpuaffinity"
+    - ./build all-test mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C mpi-linux-x86_64-smp/tests test TESTOPTS="+setcpuaffinity"
+    - make -C mpi-linux-x86_64-smp/examples test TESTOPTS="+setcpuaffinity"
+    # Crashes in test-gnu-isomalloc:
+    #- make -C mpi-linux-x86_64-smp/benchmarks test TESTOPTS="+setcpuaffinity"
 
   - os: osx
     name: "NetLRTS-Darwin"
     script:
-    - ./build LIBS netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - ./build all-test netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
     - make -C netlrts-darwin-x86_64/tests test TESTOPTS="++local"
     - make -C netlrts-darwin-x86_64/examples test TESTOPTS="++local"
+    # Hangs in mpibench:
+    #- make -C netlrts-darwin-x86_64/benchmarks test TESTOPTS="++local"
 
   - os: windows
     name: "NetLRTS-Win"
