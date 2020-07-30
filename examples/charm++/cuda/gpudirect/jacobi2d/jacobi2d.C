@@ -3,6 +3,9 @@
 #include "jacobi2d.h"
 #include <utility>
 
+#define COMM_ONLY 0
+#define CUDA_SYNC 0
+
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
 /* readonly */ int grid_size;
@@ -253,9 +256,11 @@ class Block : public CBase_Block {
   }
 
   void packGhosts() {
+#if !COMM_ONLY
     // Pack non-contiguous ghosts to temporary contiguous buffers on device
     invokePackingKernels(d_temperature, d_left_ghost, d_right_ghost, left_bound,
         right_bound, block_size, stream);
+#endif
 
     if (!use_zerocopy) {
       // Transfer ghosts from device to host
@@ -268,10 +273,15 @@ class Block : public CBase_Block {
       hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size + 1,
             block_size * sizeof(DataType), cudaMemcpyDeviceToHost, stream));
 
+#if CUDA_SYNC
+      cudaStreamSynchronize(stream);
+      thisProxy[thisIndex].packGhostsDone();
+#else
       // Add asynchronous callback to be invoked when packing and device-to-host
       // transfers are complete
       CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
       hapiAddCallback(stream, cb);
+#endif
     }
   }
 
@@ -348,13 +358,17 @@ class Block : public CBase_Block {
         memcpy(h_left_ghost, gh, width * sizeof(DataType));
         hapiCheck(cudaMemcpyAsync(d_left_ghost, h_left_ghost, block_size * sizeof(DataType),
               cudaMemcpyHostToDevice, stream));
+#if !COMM_ONLY
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
+#endif
         break;
       case RIGHT:
         memcpy(h_right_ghost, gh, width * sizeof(DataType));
         hapiCheck(cudaMemcpyAsync(d_right_ghost, h_right_ghost, block_size * sizeof(DataType),
               cudaMemcpyHostToDevice, stream));
+#if !COMM_ONLY
         invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
+#endif
         break;
       case TOP:
         memcpy(h_top_ghost, gh, width * sizeof(DataType));
@@ -372,12 +386,14 @@ class Block : public CBase_Block {
   }
 
   void update() {
+#if !COMM_ONLY
     // Enforce boundary conditions
     invokeBoundaryKernels(d_temperature, block_size, left_bound, right_bound,
         top_bound, bottom_bound, stream);
 
     // Invoke GPU kernel for Jacobi computation
     invokeJacobiKernel(d_temperature, d_new_temperature, block_size, stream);
+#endif
 
     // Copy final temperature data back to host
     if (my_iter == warmup_iters + n_iters) {
@@ -386,9 +402,14 @@ class Block : public CBase_Block {
             cudaMemcpyDeviceToHost, stream));
     }
 
+#if CUDA_SYNC
+    cudaStreamSynchronize(stream);
+    thisProxy[thisIndex].updateDone();
+#else
     // Add asynchronous callback to be invoked when update is complete
     CkCallback* cb = new CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
     hapiAddCallback(stream, cb);
+#endif
   }
 
   void print() {
