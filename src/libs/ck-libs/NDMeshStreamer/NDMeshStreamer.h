@@ -74,6 +74,14 @@ struct is_PUPbytes {
   static const bool value = false;
 };
 
+template<class dtype>
+struct GroupData {
+  int destinationPe;
+  Route destinationRoute;
+  DataItemHandle<dtype>* dataItem;
+  bool copyIndirectly;
+};
+
 class MeshStreamerMessageV : public CMessage_MeshStreamerMessageV {
 
 public:
@@ -158,19 +166,26 @@ public:
 
 template <class dtype, class RouterType>
 class MeshStreamerNG : public CBase_MeshStreamerNG<dtype, RouterType> {
+  CProxy_MeshStreamer<dtype, RouterType> groupProxy;
   int myIndex_;
   std::vector<RouterType> myRouters_;
-  CProxy_MeshStreamer<dtype, RouterType> groupProxy;
+  GroupData<dtype>* groupData_;
+  int yieldCount_;
+  bool yieldFlag_;
 #if CMK_SMP
   CmiNodeLock smpLock;
 #endif
 
 public:
-  MeshStreamerNG(CProxy_MeshStreamer<dtype, RouterType> groupProxy,
-      int numDimensions, int dimensionSizes[numDimensions]) {
-    this->groupProxy = groupProxy;
+  MeshStreamerNG(int numDimensions, int *dimensionSizes,
+                 CkArrayID clientAID, int bufferSize, bool yieldFlag,
+                 double progressPeriodInMs, int maxItemsBuffered,
+                 int _thresholdFractionNum, int _thresholdFractionDen,
+                 int _cutoffFractionNum, int _cutoffFractionDen) {
     myIndex_ = CkMyNode();
 
+    // Initialize per-PE data
+    groupData_ = new GroupData<dtype>[CkMyNodeSize()];
     for (int i = 0; i < CkMyNodeSize(); i++) {
       myRouters_.emplace_back();
       RouterType& router = myRouters_.back();
@@ -184,6 +199,16 @@ public:
 
   MeshStreamerNG(CkMigrateMessage* m) {}
 
+  void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> gp) {
+#if CMK_SMP
+    CmiLock(smpLock);
+#endif
+    groupProxy = gp;
+#if CMK_SMP
+    CmiUnlock(smpLock);
+#endif
+  }
+
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
 #if CMK_SMP
     CmiLock(smpLock);
@@ -195,7 +220,7 @@ public:
       destinationPe = msg->destinationPes[i];
       if (CmiNodeOf(destinationPe) == myIndex_) {
         //dtype dataItem = msg->getDataItem<dtype>(i);
-        groupProxy[destinationPe].localDeliver(
+        this->groupProxy[destinationPe].localDeliver(
             msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
             msg->dataItems + msg->getoffset<dtype>(i),
             msg->destObjects[i], msg->sourcePes[i]);
@@ -225,6 +250,7 @@ public:
     // TODO: Staged completion?
 
     delete msg;
+    //this->groupProxy[msg->destinationIndex].receiveAlongRoute(msg);
 #if CMK_SMP
     CmiUnlock(smpLock);
 #endif
@@ -245,6 +271,8 @@ public:
     p|myIndex_;
     p|myRouters_;
   }
+
+  GroupData<dtype>* getGroupData() { return groupData_; }
 };
 
 template <class dtype, class RouterType>
@@ -533,16 +561,6 @@ ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
 
   hasSentRecently_ = false;
 
-  // Create nodegroup
-  if (CkMyPe() == 0) {
-    ngProxy = CProxy_MeshStreamerNG<dtype, RouterType>::ckNew(this->thisProxy, numDimensions, dimensionSizes);
-  }
-}
-
-template <class dtype, class RouterType>
-void MeshStreamer<dtype, RouterType::
-setNGProxy(CProxy_MeshStreamerNG<dtype, RouterType> ngp) {
-  ngProxy = ngp;
 }
 
 template <class dtype, class RouterType>
@@ -570,14 +588,14 @@ sendMeshStreamerMessage(MeshStreamerMessageV *destinationBuffer,
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
     CkPrintf("[%d] sending to %d\n", myIndex_, destinationIndex);
 #endif
-    ngProxy[CmiNodeOf(destinationIndex)].receiveAtDestination(destinationBuffer);
+    this->ngProxy[CmiNodeOf(destinationIndex)].receiveAtDestination(destinationBuffer);
   }
   else {
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
     CkPrintf("[%d] sending intermediate to %d\n",
              myIndex_, destinationIndex);
 #endif
-    ngProxy[CmiNodeOf(destinationIndex)].receiveAlongRoute(destinationBuffer);
+    this->ngProxy[CmiNodeOf(destinationIndex)].receiveAlongRoute(destinationBuffer);
   }
 }
 
@@ -669,7 +687,7 @@ storeMessage(int destinationPe, const Route& destinationRoute,
     *(int *) CkPriorityPtr(msg) = prio_;
     CkSetQueueing(msg, CK_QUEUEING_IFIFO);
     copyDataItemIntoMessage(msg,dataItem,copyIndirectly);
-    ngProxy[CmiNodeOf(destinationPe)].receiveAtDestination(msg);
+    this->ngProxy[CmiNodeOf(destinationPe)].receiveAtDestination(msg);
     return;
   }
 
@@ -745,6 +763,9 @@ insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
     yieldCount_ = 0;
     CthYield();
   }
+
+  // Delegate to nodegroup
+  //ngProxy.ckLocalBranch()->insertData(dataItemHandle, destinationPe, CkMyPe());
 }
 
 template <class dtype, class RouterType>
@@ -1189,9 +1210,7 @@ public:
     this->createDetectors();
 
     DataItemHandle<dtype> tempHandle(const_cast<dtype*>(&dataItem));
-    MeshStreamerNG<dtype, RouterType>* ng = this->ngProxy.ckLocalBranch();
-
-    ng->insertData(&tempHandle, destinationPe, CmiMyRank());
+    MeshStreamer<dtype, RouterType>::insertData(&tempHandle, destinationPe);
   }
 
   void pup(PUP::er& p) override {
@@ -1346,9 +1365,8 @@ public:
 
     // this implementation avoids copying an item before transfer into message
     DataItemHandle<dtype> tempHandle(const_cast<dtype*>(&dataItem), arrayIndex);
-    MeshStreamerNG<dtype, RouterType>* ng = this->ngProxy.ckLocalBranch();
 
-    ng->insertData(&tempHandle, destinationPe, CmiMyRank());
+    MeshStreamer<dtype, RouterType>::insertData(&tempHandle, destinationPe);
   }
 
   inline int copyDataIntoMessage(
