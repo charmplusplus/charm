@@ -213,6 +213,8 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
           // to dest buffer is complete, so free the allocated block
           if (event_flag == 1) {
             dm->free_comm_buffer(buff_offset);
+          } else {
+            CkAbort("Retrieved cudaSuccess for a free IPC event");
           }
 
           // Mark event as free
