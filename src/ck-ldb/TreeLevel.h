@@ -499,7 +499,13 @@ class RootLevel : public LevelLogic
 
   virtual ~RootLevel()
   {
-    for (auto w : wrappers) delete w;
+    for (auto v : wrappers)
+    {
+      for (auto w : v)
+      {
+        delete w;
+      }
+    }
   }
 
   /**
@@ -511,14 +517,41 @@ class RootLevel : public LevelLogic
                          bool token_passing = true)
   {
     using namespace TreeStrategy;
-    for (auto w : wrappers) delete w;
+    for (auto v : wrappers)
+    {
+      for (auto w : v)
+      {
+        delete w;
+      }
+    }
     wrappers.clear();
     if (num_groups == -1)
     {
       current_strategy = 0;
       for (const std::string& strategy_name : strategies)
       {
-        wrappers.push_back(CreateStrategyWrapper<1>(strategy_name, true, config[strategy_name], rateAware));
+        wrappers.push_back({CreateStrategyWrapper<1>(strategy_name, true,
+                                                     config[strategy_name], rateAware),
+                            CreateStrategyWrapper<1>(strategy_name, true,
+                                                     config[strategy_name], rateAware),
+                            CreateStrategyWrapper<2>(strategy_name, true,
+                                                     config[strategy_name], rateAware),
+                            CreateStrategyWrapper<3>(strategy_name, true,
+                                                     config[strategy_name], rateAware),
+                            CreateStrategyWrapper<4>(strategy_name, true,
+                                                     config[strategy_name], rateAware),
+                            CreateStrategyWrapper<5>(strategy_name, true,
+                                                     config[strategy_name], rateAware),
+                            CreateStrategyWrapper<6>(strategy_name, true,
+                                                     config[strategy_name], rateAware),
+                            CreateStrategyWrapper<7>(strategy_name, true,
+                                                     config[strategy_name], rateAware),
+                            CreateStrategyWrapper<8>(strategy_name, true,
+                                                     config[strategy_name], rateAware),
+                            CreateStrategyWrapper<9>(strategy_name, true,
+                                                     config[strategy_name], rateAware),
+                            CreateStrategyWrapper<10>(strategy_name, true,
+                                                      config[strategy_name], rateAware)});
       }
       this->repeat_strategies = repeat_strategies;
     }
@@ -559,7 +592,9 @@ class RootLevel : public LevelLogic
     {
       // msg has object loads
       CkAssert(wrappers.size() > current_strategy);
-      IStrategyWrapper* wrapper = wrappers[current_strategy];
+      const auto dimension = ((LBStatsMsg_1*)stats_msgs[0])->dimension;
+      CkAssert(dimension <= 10);
+      IStrategyWrapper* wrapper = wrappers[current_strategy][dimension];
       CkAssert(wrapper != nullptr);
       CkAssert(nPes == CkNumPes());
       LLBMigrateMsg* migMsg = new (nPes, nPes, nObjs, 0) LLBMigrateMsg;
@@ -690,7 +725,7 @@ class RootLevel : public LevelLogic
   unsigned int nPes = 0;  // total number of processors in msgs I am processing
   unsigned int nObjs = 0;  // total number of objects in msgs I am processing
   float total_load = 0;
-  std::vector<IStrategyWrapper*> wrappers;
+  std::vector<std::vector<IStrategyWrapper*>> wrappers;
 };
 
 // ---------------- NodeSetLevel ----------------
