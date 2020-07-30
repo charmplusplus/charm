@@ -21,7 +21,7 @@ message("# with the below configuration information.                     #")
 message("# You can run './buildold' to use the previous build system.    #")
 message("#################################################################")
 
-if(CMAKE_VERSION VERSION_GREATER 3.11)
+if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
   cmake_policy(SET CMP0075 OLD)
 endif()
 
@@ -82,7 +82,7 @@ endif()
 
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,uth,verbs")
-set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
 
 # Platform specific options (choose multiple if desired):
 option(SMP "Enable shared-memory communication within a single multi-processor machine instead of message passing." ON)
@@ -96,7 +96,7 @@ option(SYNCFT "Compile with Charm++ fault tolerance support" OFF)
 option(PAPI "Compile with PAPI performance counter support" OFF)
 
 # Enable/disable features:
-option(ERROR_CHECKING      "Enable error checking" OFF)
+set(ERROR_CHECKING "" CACHE STRING "Enable error checking")
 option(AMPI_ERROR_CHECKING "Enable AMPI error checking" OFF)
 option(STATS               "Enable statistics collection" OFF)
 set(TRACING "" CACHE STRING "Enable tracing modules")
@@ -126,6 +126,14 @@ if(TRACING STREQUAL "")
     set(TRACING 1)
   else()
     set(TRACING 0)
+  endif()
+endif()
+
+if(ERROR_CHECKING STREQUAL "")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(ERROR_CHECKING 1)
+  else()
+    set(ERROR_CHECKING 0)
   endif()
 endif()
 
@@ -164,7 +172,18 @@ endif()
 set(CMK_REPLAYSYSTEM ${REPLAY})
 
 if(${TARGET} STREQUAL "all-test")
-  message(WARNING "Setting TARGET to LIBS instead of all-test.")
+  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test)
+  add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
+        conv-partition conv-util hwloc conv-static conv-core ldb-rand
+        memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
+        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
+        create_symlinks moduleCkCache trace-converse moduleCommonLBs
+        moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
+        threads-default-tls ldb-neighbor ldb-workstealing modulearmci
+        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc)
+  if(CMK_CAN_LINK_FORTRAN)
+    add_dependencies(all-test moduleampif conv-utilf ckmainf)
+  endif()
   set(TARGET "LIBS")
 endif()
 
@@ -930,7 +949,7 @@ foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC)
 endforeach()
 
 # Options that need no .h/.sh additions
-foreach(opt TRACING TRACING_COMMTHREAD)
+foreach(opt TRACING TRACING_COMMTHREAD ERROR_CHECKING)
     if(${opt})
         set(opts_enabled "${opts_enabled}${opt} ")
     endif()
