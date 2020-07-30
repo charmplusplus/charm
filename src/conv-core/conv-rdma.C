@@ -57,6 +57,8 @@ static void putDataHandler(ConverseRdmaMsg *payloadMsg) {
   ncpyOpInfo->ackMode = CMK_DEST_ACK; // Only invoke the destination ack
   ncpyOpInfo->freeMe  = CMK_DONT_FREE_NCPYOPINFO;
   ncpyDirectAckHandlerFn(ncpyOpInfo);
+
+  CmiFree(payloadMsg);
 }
 
 // Rget/Rput operations are implemented as normal converse messages
