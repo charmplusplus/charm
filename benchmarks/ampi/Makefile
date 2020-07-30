@@ -1,9 +1,14 @@
+-include ../../include/conv-mach-opt.mak
+
 DIRS = \
   alltoall \
-  isomalloc \
   onesided \
   pingpong \
   speed \
+
+ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
+  DIRS += isomalloc
+endif
 
 TESTDIRS = $(DIRS)
 
