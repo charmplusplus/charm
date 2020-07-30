@@ -20,9 +20,9 @@ class TreeStrategyFactory
   {
     using namespace TreeStrategy;
     if (name == "Greedy") return new Greedy<O, P, S>();
-    if (name == "GreedyRefine") return new GreedyRefine<O, P, S>(config);
+/*    if (name == "GreedyRefine") return new GreedyRefine<O, P, S>(config);
     if (name == "RefineA") return new RefineA<O, P, S>();
-    if (name == "RefineB") return new RefineB<O, P, S>();
+    if (name == "RefineB") return new RefineB<O, P, S>();*/
     if (name == "Random") return new Random<O, P, S>();
 #if LB_STRATEGIES_FOR_TESTING
     if (name == "Dummy") return new Dummy<O, P, S>();
