@@ -178,13 +178,14 @@ int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr) {
 */
 
 static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
-  int pool_size = CsvAccess(gpu_manager).cuda_ipc_event_pool_size;
+  int pool_size = CsvAccess(gpu_manager).cuda_ipc_event_pool_size_pe;
+  int pool_start = CkMyRank() * pool_size;
   int device_index = dm->global_index;
   cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[device_index];
 
   // Free IPC events that are complete
   // TODO: Don't do this every time but only when the event pool is somewhat empty
-  for (int i = 0; i < pool_size; i++) {
+  for (int i = pool_start; i < pool_start + pool_size; i++) {
     int& event_flag = my_device_info.event_pool_flags[i];
     cudaEvent_t& ev = my_device_info.dst_event_pool[i];
     size_t& buff_offset = my_device_info.event_pool_buff_offsets[i];
@@ -230,7 +231,7 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
   // 2) Recorded by the receiver after 'device comm buffer -> dest buffer' cudaMemcpy.
   //    It is used by the sender to determine when the allocated block on
   //    device comm buffer and IPC events can be freed.
-  for (int i = 0; i < pool_size; i++) {
+  for (int i = pool_start; i < pool_start + pool_size; i++) {
     int& event_flag = my_device_info.event_pool_flags[i];
     size_t& buff_offset = my_device_info.event_pool_buff_offsets[i];
     if (event_flag == 0) {

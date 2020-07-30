@@ -382,12 +382,13 @@ static void hapiMapping(char** argv) {
   }
 
   if (CmiMyRank() == 0) {
-    csv_gpu_manager.cuda_ipc_event_pool_size = input_cuda_ipc_event_pool_size * csv_gpu_manager.pes_per_device;
+    csv_gpu_manager.cuda_ipc_event_pool_size_pe = input_cuda_ipc_event_pool_size;
+    csv_gpu_manager.cuda_ipc_event_pool_size_total = input_cuda_ipc_event_pool_size * csv_gpu_manager.pes_per_device;
   }
 
   if (CmiMyPe() == 0) {
     CmiPrintf("HAPI> CUDA IPC event pool size - %d per PE, %d per device\n",
-        input_cuda_ipc_event_pool_size, csv_gpu_manager.cuda_ipc_event_pool_size);
+        csv_gpu_manager.cuda_ipc_event_pool_size_pe, csv_gpu_manager.cuda_ipc_event_pool_size_total);
   }
 
   // Check if P2P access should be enabled
@@ -728,7 +729,7 @@ static void shmSetup() {
 
   // Calculate shared memory region size
   csv_gpu_manager.shm_chunk_size = sizeof(cudaIpcMemHandle_t) +
-      sizeof(cuda_ipc_event_shared) * csv_gpu_manager.cuda_ipc_event_pool_size;
+      sizeof(cuda_ipc_event_shared) * csv_gpu_manager.cuda_ipc_event_pool_size_total;
   csv_gpu_manager.shm_size = csv_gpu_manager.shm_chunk_size *
     csv_gpu_manager.device_count_on_physical_node;
 }
@@ -870,7 +871,7 @@ static void ipcHandleCreate() {
   cuda_ipc_device_info& my_device_info = csv_gpu_manager.cuda_ipc_device_infos[my_dm.global_index];
   cuda_ipc_event_shared* shm_event_shared = (cuda_ipc_event_shared*)((char*)shm_mem_handle + sizeof(cudaIpcMemHandle_t));
 
-  for (int i = 0; i < csv_gpu_manager.cuda_ipc_event_pool_size; i++) {
+  for (int i = 0; i < csv_gpu_manager.cuda_ipc_event_pool_size_total; i++) {
     cuda_ipc_event_shared* cur_shm_event_shared = shm_event_shared + i;
 
     my_device_info.event_pool_flags.push_back(0);
@@ -919,7 +920,7 @@ static void ipcHandleOpen() {
       cur_device_info.event_pool_flags.clear();
       cur_device_info.event_pool_buff_offsets.clear();
 
-      for (int k = 0; k < csv_gpu_manager.cuda_ipc_event_pool_size; k++) {
+      for (int k = 0; k < csv_gpu_manager.cuda_ipc_event_pool_size_total; k++) {
         cuda_ipc_event_shared* cur_shm_event_shared = shm_event_shared + k;
 
         cur_device_info.src_event_pool.emplace_back();
