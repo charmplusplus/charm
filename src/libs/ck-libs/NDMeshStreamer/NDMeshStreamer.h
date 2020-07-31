@@ -190,13 +190,7 @@ public:
   MeshStreamerNG(CkMigrateMessage* m) {}
 
   void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> gp) {
-#if CMK_SMP
-    CmiLock(smpLock);
-#endif
     groupProxy = gp;
-#if CMK_SMP
-    CmiUnlock(smpLock);
-#endif
   }
 
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
