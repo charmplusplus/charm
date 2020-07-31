@@ -23,11 +23,12 @@ fi
 
 subdirs="bin include lib lib_so tmp"
 
+# remove symbolic link
+rm -f $subdirs
+
 for i in $subdirs
 do
-  # remove symbolic link
-  rm -f "$i"
-  # skip nonexistent subdir
+# skip nonexistent subdir
   test ! -d "$1/$i" && continue;
   echo ln -s "$1/$i" "$i"
   ln -s "$1/$i" "$i"
