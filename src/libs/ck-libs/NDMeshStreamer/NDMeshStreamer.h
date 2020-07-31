@@ -74,14 +74,6 @@ struct is_PUPbytes {
   static const bool value = false;
 };
 
-template<class dtype>
-struct GroupData {
-  int destinationPe;
-  Route destinationRoute;
-  DataItemHandle<dtype>* dataItem;
-  bool copyIndirectly;
-};
-
 class MeshStreamerMessageV : public CMessage_MeshStreamerMessageV {
 
 public:
@@ -169,7 +161,6 @@ class MeshStreamerNG : public CBase_MeshStreamerNG<dtype, RouterType> {
   CProxy_MeshStreamer<dtype, RouterType> groupProxy;
   int myIndex_;
   std::vector<RouterType> myRouters_;
-  GroupData<dtype>* groupData_;
   int yieldCount_;
   bool yieldFlag_;
 #if CMK_SMP
@@ -185,7 +176,6 @@ public:
     myIndex_ = CkMyNode();
 
     // Initialize per-PE data
-    groupData_ = new GroupData<dtype>[CkMyNodeSize()];
     for (int i = 0; i < CkMyNodeSize(); i++) {
       myRouters_.emplace_back();
       RouterType& router = myRouters_.back();
@@ -271,8 +261,6 @@ public:
     p|myIndex_;
     p|myRouters_;
   }
-
-  GroupData<dtype>* getGroupData() { return groupData_; }
 };
 
 template <class dtype, class RouterType>
