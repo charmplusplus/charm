@@ -24,6 +24,7 @@ fi
 subdirs="bin include lib lib_so tmp"
 
 # remove symbolic link
+# shellcheck disable=SC2086
 rm -f $subdirs
 
 for i in $subdirs
