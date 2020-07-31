@@ -179,7 +179,7 @@ public:
     for (int i = 0; i < CkMyNodeSize(); i++) {
       myRouters_.emplace_back();
       RouterType& router = myRouters_.back();
-      router.initializeRouter(numDimensions, myIndex_, dimensionSizes);
+      router.initializeRouter(numDimensions, i, dimensionSizes);
     }
 
 #if CMK_SMP
@@ -194,9 +194,6 @@ public:
   }
 
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
-#if CMK_SMP
-    CmiLock(smpLock);
-#endif
     thread_local int destinationPe, lastDestinationPe = -1;
     thread_local Route destinationRoute;
 
@@ -235,9 +232,6 @@ public:
 
     delete msg;
     //this->groupProxy[msg->destinationIndex].receiveAlongRoute(msg);
-#if CMK_SMP
-    CmiUnlock(smpLock);
-#endif
   }
 
   void receiveAtDestination(MeshStreamerMessageV *msg) {
@@ -570,7 +564,8 @@ sendMeshStreamerMessage(MeshStreamerMessageV *destinationBuffer,
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
     CkPrintf("[%d] sending to %d\n", myIndex_, destinationIndex);
 #endif
-    this->ngProxy[CmiNodeOf(destinationIndex)].receiveAtDestination(destinationBuffer);
+    //this->ngProxy[CmiNodeOf(destinationIndex)].receiveAtDestination(destinationBuffer);
+    this->thisProxy[destinationIndex].receiveAtDestination(destinationBuffer);
   }
   else {
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
@@ -578,6 +573,7 @@ sendMeshStreamerMessage(MeshStreamerMessageV *destinationBuffer,
              myIndex_, destinationIndex);
 #endif
     this->ngProxy[CmiNodeOf(destinationIndex)].receiveAlongRoute(destinationBuffer);
+    //this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
   }
 }
 
@@ -669,7 +665,8 @@ storeMessage(int destinationPe, const Route& destinationRoute,
     *(int *) CkPriorityPtr(msg) = prio_;
     CkSetQueueing(msg, CK_QUEUEING_IFIFO);
     copyDataItemIntoMessage(msg,dataItem,copyIndirectly);
-    this->ngProxy[CmiNodeOf(destinationPe)].receiveAtDestination(msg);
+    //this->ngProxy[CmiNodeOf(destinationPe)].receiveAtDestination(msg);
+    this->thisProxy[destinationPe].receiveAtDestination(msg);
     return;
   }
 
@@ -745,9 +742,6 @@ insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe) {
     yieldCount_ = 0;
     CthYield();
   }
-
-  // Delegate to nodegroup
-  //ngProxy.ckLocalBranch()->insertData(dataItemHandle, destinationPe, CkMyPe());
 }
 
 template <class dtype, class RouterType>
