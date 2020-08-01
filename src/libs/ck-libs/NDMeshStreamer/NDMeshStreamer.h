@@ -196,29 +196,26 @@ public:
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
     thread_local int destinationPe, lastDestinationPe = -1;
     thread_local Route destinationRoute;
+    thread_local bool all_delivered = true;
 
     for (int i = 0; i < msg->numDataItems; i++) {
       destinationPe = msg->destinationPes[i];
       if (CmiNodeOf(destinationPe) == myIndex_) {
-        //dtype dataItem = msg->getDataItem<dtype>(i);
         this->groupProxy[destinationPe].localDeliver(
             msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
             msg->dataItems + msg->getoffset<dtype>(i),
             msg->destObjects[i], msg->sourcePes[i]);
+      } else {
+        all_delivered = false;
       }
-      else if (destinationPe != TRAM_BROADCAST) {
-        if (destinationPe != lastDestinationPe) {
-          // do this once per sequence of items with the same destination
-          myRouters_[CkMyRank()].determineRoute(destinationPe,
-              myRouters_[CkMyRank()].dimensionReceived(msg->msgType),
-              destinationRoute);
-        }
-        groupProxy.ckLocalBranch()->storeMessageIntermed(destinationPe,
-            destinationRoute, msg->dataItems + msg->getoffset<dtype>(i),
-            msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
-            msg->destObjects[i]);
-      }
-      lastDestinationPe = destinationPe;
+    }
+
+    if (all_delivered) {
+      // All data items have been locally delivered
+      delete msg;
+    } else {
+      // Some data items remaining, delegate to group
+      this->groupProxy[msg->destinationIndex].receiveAlongRoute(msg);
     }
 
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
@@ -229,9 +226,6 @@ public:
 #endif
 
     // TODO: Staged completion?
-
-    delete msg;
-    //this->groupProxy[msg->destinationIndex].receiveAlongRoute(msg);
   }
 
   void receiveAtDestination(MeshStreamerMessageV *msg) {
@@ -873,13 +867,9 @@ receiveAlongRoute(MeshStreamerMessageV *msg) {
   lastDestinationPe = -1;
   for (int i = 0; i < msg->numDataItems; i++) {
     destinationPe = msg->destinationPes[i];
-    if (destinationPe == myIndex_) {
-      //dtype dataItem = msg->getDataItem<dtype>(i);
-      localDeliver(msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
-          msg->dataItems + msg->getoffset<dtype>(i),
-          msg->destObjects[i], msg->sourcePes[i]);
-    }
-    else if (destinationPe != TRAM_BROADCAST) {
+    // Messages with this PE as the final destination should have already been
+    // delivered by the nodegroup
+    if (destinationPe != myIndex_ && destinationPe != TRAM_BROADCAST) {
       if (destinationPe != lastDestinationPe) {
         // do this once per sequence of items with the same destination
         myRouter_.determineRoute(destinationPe,
