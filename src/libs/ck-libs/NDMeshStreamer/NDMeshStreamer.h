@@ -161,11 +161,7 @@ class MeshStreamerNG : public CBase_MeshStreamerNG<dtype, RouterType> {
   int myIndex_;
 
 public:
-  MeshStreamerNG(int numDimensions, int *dimensionSizes,
-                 CkArrayID clientAID, int bufferSize, bool yieldFlag,
-                 double progressPeriodInMs, int maxItemsBuffered,
-                 int _thresholdFractionNum, int _thresholdFractionDen,
-                 int _cutoffFractionNum, int _cutoffFractionDen) {
+  MeshStreamerNG() {
     myIndex_ = CkMyNode();
   }
 

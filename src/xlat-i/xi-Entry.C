@@ -1196,9 +1196,7 @@ void Entry::genTramInstantiation(XStr& str) {
           << "    CProxy_" << container->tramInstances[i].nodeType.c_str()
           << " tramNodeProxy =\n"
           << "    CProxy_" << container->tramInstances[i].nodeType.c_str()
-          << "::ckNew(nDims, dims, gId, tramBufferSize, false, 0.01, "
-          << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
-          << "cutoffFractionNum, cutoffFractionDen);\n"
+          << "::ckNew();\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()
           << " tramProxy =\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()

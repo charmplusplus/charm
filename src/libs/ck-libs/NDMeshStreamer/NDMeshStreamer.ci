@@ -35,11 +35,7 @@ module NDMeshStreamer {
 
   template<class dtype, class RouterType>
   nodegroup MeshStreamerNG {
-    entry MeshStreamerNG(int numDimensions, int dimensionSizes[numDimensions],
-                         CkArrayID clientAID, int bufferSize, bool yieldFlag,
-                         double progressPeriodInMs, int maxItemsBuffered,
-                         int _thresholdFractionNum, int _thresholdFractionDen,
-                         int _cutoffFractionNum, int _cutoffFractionDen);
+    entry MeshStreamerNG();
     entry void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> groupProxy);
     entry void receiveAlongRoute(MeshStreamerMessageV *msg);
   };
