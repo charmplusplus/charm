@@ -159,12 +159,6 @@ template <class dtype, class RouterType>
 class MeshStreamerNG : public CBase_MeshStreamerNG<dtype, RouterType> {
   CProxy_MeshStreamer<dtype, RouterType> groupProxy;
   int myIndex_;
-  std::vector<RouterType> myRouters_;
-  int yieldCount_;
-  bool yieldFlag_;
-#if CMK_SMP
-  CmiNodeLock smpLock;
-#endif
 
 public:
   MeshStreamerNG(int numDimensions, int *dimensionSizes,
@@ -173,17 +167,6 @@ public:
                  int _thresholdFractionNum, int _thresholdFractionDen,
                  int _cutoffFractionNum, int _cutoffFractionDen) {
     myIndex_ = CkMyNode();
-
-    // Initialize per-PE data
-    for (int i = 0; i < CkMyNodeSize(); i++) {
-      myRouters_.emplace_back();
-      RouterType& router = myRouters_.back();
-      router.initializeRouter(numDimensions, i, dimensionSizes);
-    }
-
-#if CMK_SMP
-    smpLock = CmiCreateLock();
-#endif
   }
 
   MeshStreamerNG(CkMigrateMessage* m) {}
@@ -193,9 +176,9 @@ public:
   }
 
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
-    thread_local int destinationPe, lastDestinationPe = -1;
-    thread_local Route destinationRoute;
-    thread_local bool all_delivered = true;
+    int destinationPe, lastDestinationPe = -1;
+    Route destinationRoute;
+    bool all_delivered = true;
 
     for (int i = 0; i < msg->numDataItems; i++) {
       destinationPe = msg->destinationPes[i];
@@ -209,14 +192,6 @@ public:
       }
     }
 
-    if (all_delivered) {
-      // All data items have been locally delivered
-      delete msg;
-    } else {
-      // Some data items remaining, delegate to group
-      this->groupProxy[msg->destinationIndex].receiveAlongRoute(msg);
-    }
-
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
     envelope *env = UsrToEnv(msg);
     CkPrintf("[%d] received along route from %d %d items finalMsgCount: %d"
@@ -224,13 +199,22 @@ public:
                msg->numDataItems, msg->finalMsgCount, msg->msgType);
 #endif
 
-    // TODO: Staged completion?
+    if (all_delivered) {
+      // All data items have been locally delivered
+      delete msg;
+    } else {
+      // Some data items remaining, delegate to the group
+      // TODO: This should eventually be handled by the nodegroup
+      //       once the message buffers are moved
+      this->groupProxy[msg->destinationIndex].receiveAlongRoute(msg);
+    }
+
+    // XXX: Staged completion is not supported
   }
 
   void pup(PUP::er& p) {
     p|groupProxy;
     p|myIndex_;
-    p|myRouters_;
   }
 };
 
