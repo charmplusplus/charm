@@ -296,6 +296,10 @@ protected:
               char *dataHandle, size_t size, CkArrayIndex index);
   void createDetectors();
   void insertData(const DataItemHandle<dtype> *dataItemHandle, int destinationPe);
+  void storeMessage(int destinationPe, const Route& destinationRoute,
+                    const DataItemHandle<dtype> *dataItem, bool copyIndirectly = false);
+  void storeMessageIntermed(int destinationPe, const Route& destinationRoute,
+                            char *dataItem, size_t size, CkArrayIndex arrayId);
 
   void ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
                   int *dimensionSizes, int bufferSize,
@@ -309,11 +313,6 @@ public:
 
   // entry
   virtual void localDeliver(size_t size, const char* data, CkArrayIndex arrayId,int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
-  void storeMessage(int destinationPe, const Route& destinationRoute,
-                    const DataItemHandle<dtype> *dataItem, bool copyIndirectly = false);
-  void storeMessageIntermed(int destinationPe, const Route& destinationRoute,
-                            char *dataItem, size_t size, CkArrayIndex arrayId);
-
   void receiveAlongRoute(MeshStreamerMessageV *msg);
   void enablePeriodicFlushing(){
     if (progressPeriodInMs_ <= 0) {
@@ -526,14 +525,14 @@ template <class dtype, class RouterType>
 inline int MeshStreamer<dtype, RouterType>::
 copyDataItemIntoMessage(MeshStreamerMessageV *destinationBuffer,
                         const DataItemHandle<dtype> *dataItemHandle, bool copyIndirectly) {
-  return destinationBuffer->template addDataItem<dtype>(const_cast<dtype&>(*(dataItemHandle->dataItem)), dataItemHandle->arrayIndex,this->myIndex_);
+  return destinationBuffer->template addDataItem<dtype>(const_cast<dtype&>(*(dataItemHandle->dataItem)), dataItemHandle->arrayIndex, this->myIndex_);
 }
 
 template <class dtype, class RouterType>
 inline int MeshStreamer<dtype, RouterType>::
 copyDataIntoMessage(MeshStreamerMessageV *destinationBuffer,
                         char *dataHandle, size_t size, CkArrayIndex index) {
-  return destinationBuffer->addData(dataHandle, size, index,this->myIndex_);
+  return destinationBuffer->addData(dataHandle, size, index, this->myIndex_);
 }
 
 template <class dtype, class RouterType>
