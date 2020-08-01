@@ -94,7 +94,6 @@ public:
       offsets[0] = 0;
     }
   }
-  void setDestIndex(int dI) { destinationIndex = dI;}
 
   template <typename dtype>
   inline typename std::enable_if<is_PUPbytes<dtype>::value,int>::type addDataItem(dtype& dataItem, CkArrayIndex index, int sourcePe) {
@@ -189,8 +188,8 @@ public:
 
   MeshStreamerNG(CkMigrateMessage* m) {}
 
-  void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> gp) {
-    groupProxy = gp;
+  void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> groupProxy) {
+    this->groupProxy = groupProxy;
   }
 
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
@@ -226,16 +225,6 @@ public:
 #endif
 
     // TODO: Staged completion?
-  }
-
-  void receiveAtDestination(MeshStreamerMessageV *msg) {
-#if CMK_SMP
-    CmiLock(smpLock);
-#endif
-    groupProxy[msg->destinationIndex].receiveAtDestination(msg);
-#if CMK_SMP
-    CmiUnlock(smpLock);
-#endif
   }
 
   void pup(PUP::er& p) {
@@ -297,7 +286,7 @@ protected:
   bool stagedCompletionStarted_;
   bool useCompletionDetection_;
   CompletionDetector *detectorLocalObj_;
-  CProxy_MeshStreamerNG<dtype, RouterType> ngProxy;
+  CProxy_MeshStreamerNG<dtype, RouterType> nodeGroupProxy;
 
   virtual int copyDataItemIntoMessage(
               MeshStreamerMessageV *destinationBuffer,
@@ -553,12 +542,11 @@ sendMeshStreamerMessage(MeshStreamerMessageV *destinationBuffer,
                         int dimension, int destinationIndex) {
 
   bool personalizedMessage = myRouter_.isMessagePersonalized(dimension);
-  destinationBuffer->setDestIndex(destinationIndex);
+  destinationBuffer->destinationIndex = destinationIndex;
   if (personalizedMessage) {
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
     CkPrintf("[%d] sending to %d\n", myIndex_, destinationIndex);
 #endif
-    //this->ngProxy[CmiNodeOf(destinationIndex)].receiveAtDestination(destinationBuffer);
     this->thisProxy[destinationIndex].receiveAtDestination(destinationBuffer);
   }
   else {
@@ -566,8 +554,7 @@ sendMeshStreamerMessage(MeshStreamerMessageV *destinationBuffer,
     CkPrintf("[%d] sending intermediate to %d\n",
              myIndex_, destinationIndex);
 #endif
-    this->ngProxy[CmiNodeOf(destinationIndex)].receiveAlongRoute(destinationBuffer);
-    //this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
+    this->nodeGroupProxy[CmiNodeOf(destinationIndex)].receiveAlongRoute(destinationBuffer);
   }
 }
 
@@ -659,7 +646,6 @@ storeMessage(int destinationPe, const Route& destinationRoute,
     *(int *) CkPriorityPtr(msg) = prio_;
     CkSetQueueing(msg, CK_QUEUEING_IFIFO);
     copyDataItemIntoMessage(msg,dataItem,copyIndirectly);
-    //this->ngProxy[CmiNodeOf(destinationPe)].receiveAtDestination(msg);
     this->thisProxy[destinationPe].receiveAtDestination(msg);
     return;
   }
@@ -1156,7 +1142,7 @@ private:
   }
 
 public:
-  GroupMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy,
+  GroupMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> nodeGroupProxy,
       int numDimensions, int* dimensionSizes,
       CkGroupID clientGID, int bufferSize, bool yieldFlag,
       double progressPeriodInMs, int maxItemsBuffered,
@@ -1165,7 +1151,7 @@ public:
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
         progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
         _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
-    this->ngProxy = ngProxy;
+    this->nodeGroupProxy = nodeGroupProxy;
     clientGID_ = clientGID;
     clientObj_ = (ClientType*)CkLocalBranch(clientGID_);
   }
@@ -1269,7 +1255,7 @@ private:
   }
 
 public:
-  ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> ngProxy,
+  ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> nodeGroupProxy,
       int numDimensions, int *dimensionSizes,
       CkArrayID clientAID, int bufferSize, bool yieldFlag,
       double progressPeriodInMs, int maxItemsBuffered,
@@ -1278,7 +1264,7 @@ public:
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
                      progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
                      _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
-    this->ngProxy = ngProxy;
+    this->nodeGroupProxy = nodeGroupProxy;
     clientAID_ = clientAID;
     clientArrayMgr_ = clientAID_.ckLocalBranch();
     clientLocMgr_ = clientArrayMgr_->getLocMgr();
