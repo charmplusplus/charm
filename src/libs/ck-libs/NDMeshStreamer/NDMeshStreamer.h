@@ -165,8 +165,6 @@ public:
     myIndex_ = CkMyNode();
   }
 
-  MeshStreamerNG(CkMigrateMessage* m) {}
-
   void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> groupProxy) {
     this->groupProxy = groupProxy;
   }
