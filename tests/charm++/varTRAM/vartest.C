@@ -42,9 +42,12 @@ public:
     generated_sum = val;
   }
 
-  void receivedSum(int val) {
+  void receivedSum(int received_sum) {
     CkPrintf("Generated sum: %d, received sum: %d (two sums should match)\n",
         generated_sum, received_sum);
+    if (generated_sum != received_sum) {
+      CkAbort("Sums did not match");
+    }
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::micro> dur = end_time - start_time;
