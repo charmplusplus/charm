@@ -724,13 +724,13 @@ then
 #Win64 version needs special compilers and *copied* (not linked)
 # source files.
   cp $src/win/system_ln $DESTINATION/tmp
-  cp $src/win/unistd.h $DESTINATION/tmp
   echo "Compiling createlink.cpp ..."
   case "$COMPILER" in
     gcc*|clang*)
       createlinkcc="$COMPILER"
       ;;
     *)
+      cp $src/win/unistd.h $DESTINATION/tmp
       createlinkcc="./unix2nt_cc"
       ;;
   esac
