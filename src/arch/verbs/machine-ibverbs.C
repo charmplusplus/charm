@@ -2078,6 +2078,7 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		context->tokensLeft++;
 #endif
 		CmiInvokeNcpyAck(rdmaPacket->localBuffer);
+		free(rdmaPacket);
 		return;
 
 	}
