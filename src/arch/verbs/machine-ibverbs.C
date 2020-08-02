@@ -1839,6 +1839,10 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 			processRdmaRequest(rdmaPacket,nodeNo,0);
 		}*/
 	}
+	if(rdma && header->code == INFIRDMA_ACK){ // Ack processing for RDMA operations issued by the regular API (through LrtsSendFunc)
+		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)(buffer->buf+sizeof(struct infiPacketHeader)) ;
+		processRdmaAck(rdmaPacket);
+	}
 #if CMK_ONESIDED_IMPL
 	if(header->code == INFIRDMA_DIRECT_REG_AND_PUT){
 		// Register the source buffer and perform PUT
