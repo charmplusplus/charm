@@ -1,11 +1,11 @@
-OPTS = -O3
+OPTS = -O3 -g
 
 CHARM_DIR = ../../../../..
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 
 NVCC = nvcc
-NVCC_FLAGS = -c -std=c++11 -use_fast_math $(OPTS)
+NVCC_FLAGS = -c -std=c++11 -use_fast_math -lineinfo $(OPTS)
 LD_LIBS =
 
 TARGET = jacobi2d
