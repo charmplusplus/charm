@@ -1923,7 +1923,9 @@ instead use a for loop:
 Note that ``int iter;`` is declared in the chare’s class definition and
 not in the ``.ci`` file. This is necessary because the Charm++ interface
 translator does not fully parse the declarations in the ``for`` loop
-header, because of the inherent complexities of C++.
+header, because of the inherent complexities of C++. Finally, there is
+currently no mechanism by which to ``break`` or ``continue`` from an
+SDAG loop.
 
 SDAG also supports conditional execution of statements and blocks with
 ``if`` statements. The syntax of SDAG ``if`` statements matches that of
@@ -2293,7 +2295,7 @@ PUP modes
 ^^^^^^^^^
 
 Charm++ uses your pup method to both pack and unpack, by passing
-different types of PUP::ers to it. The method p.isUnpacking() returns
+different types of PUP::ers to it. The method ``p.isUnpacking()`` returns
 true if your object is being unpacked—that is, your object’s values are
 being restored. Your pup method must work properly in sizing, packing,
 and unpacking modes; and to save and restore properly, the same fields
@@ -2304,20 +2306,39 @@ Three modes are used, with three separate types of PUP::er: sizing,
 which only computes the size of your data without modifying it; packing,
 which reads/saves values out of your data; and unpacking, which
 writes/restores values into your data. You can determine exactly which
-type of PUP::er was passed to you using the p.isSizing(), p.isPacking(),
-and p.isUnpacking() methods. However, sizing and packing should almost
+type of PUP::er was passed to you using the ``p.isSizing()``, ``p.isPacking()``,
+and ``p.isUnpacking()`` methods. However, sizing and packing should almost
 always be handled identically, so most programs should use
-p.isUnpacking() and !p.isUnpacking(). Any program that calls
-p.isPacking() and does not also call p.isSizing() is probably buggy,
+``p.isUnpacking()`` and ``!p.isUnpacking()``. Any program that calls
+``p.isPacking()`` and does not also call ``p.isSizing()`` is probably buggy,
 because sizing and packing must see exactly the same data.
 
-The p.isDeleting() flag indicates the object will be deleted after
+The ``p.isDeleting()`` flag indicates the object will be deleted after
 calling the pup method. This is normally only needed for pup methods
 called via the C or f90 interface, as provided by AMPI or the other
 frameworks. Other Charm++ array elements, marshalled parameters, and
 other C++ interface objects have their destructor called when they are
-deleted, so the p.isDeleting() call is not normally required—instead,
+deleted, so the ``p.isDeleting()`` call is not normally required—instead,
 memory should be deallocated in the destructor as usual.
+
+Separately from indicating if the pup method is being used for sizing,
+packing, or unpacking, the system also provides methods to determine
+the purpose of a pup. The ``p.isCheckpoint()`` and ``p.isMigration()``
+methods let the user determine if the runtime system has invoked the
+pup method for checkpointing (both in-memory and to disk) or for
+PE-to-PE migration (this is most commonly done for load balancing).
+These allow the user to customize their pup functions, for
+example, one may want to minimize checkpoint size by not including
+data that can be reconstructed. Note that these are orthogonal to the
+direction of the pup (e.g. ``p.isCheckpoint()`` will return true both
+when creating a checkpoint and when restoring from a checkpoint; one
+can differentiate between these two cases because when creating a
+checkpoint ``p.isPacking()`` will also return true, while
+``p.isUnpacking()`` will return true when restoring). The runtime
+system guarantees that at most of these will be set. There may be
+cases where neither ``p.isCheckpoint()`` nor ``p.isMigration()``
+return true (e.g. when the system is marshalling entry method
+arguments).
 
 More specialized modes and PUP::ers are described in
 section :numref:`sec:PUP:CommonPUPers`.

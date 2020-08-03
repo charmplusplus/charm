@@ -17,5 +17,8 @@ $(TARGET).o: $(TARGET).C $(TARGET).decl.h
 test: $(TARGET)
 	$(call run, +p4 ./$(TARGET) +balancer GreedyRefineLB +LBDebug 1)
 
+testp: $(TARGET)
+	$(call run, +p$(P) ./$(TARGET) +balancer GreedyRefineLB +LBDebug 1)
+
 clean:
 	rm -f $(TARGET) *.decl.h *.def.h *.o charmrun

@@ -12,7 +12,7 @@ elseif(${CMK_QT} STREQUAL "generic-mic64")
 elseif(${CMK_QT} STREQUAL "aix") # BG
 	set(ckqt-c-sources md/setjmp.c)
 elseif(${CMK_QT} STREQUAL "none") # Win
-	message(FATAL_ERROR "Unsupported Quickthreads version \"${CMK_QT}\"")
+	set(ckqt-c-sources md/setjmp.c)
 elseif(${CMK_QT} STREQUAL "i386-gcc")
 	message(FATAL_ERROR "Unsupported Quickthreads version \"${CMK_QT}\"")
 else()

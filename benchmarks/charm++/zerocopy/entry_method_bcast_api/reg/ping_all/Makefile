@@ -16,5 +16,8 @@ ping_all.o : ping_all.C cifiles
 test: all
 	$(call run, +p4 ./ping_all)
 
+testp: all
+	$(call run, +p$(P) ./ping_all)
+
 clean:
 	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun ping_all

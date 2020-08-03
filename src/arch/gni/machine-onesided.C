@@ -244,10 +244,16 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
       // send the small message to the other node through the comm thread
       buffer_small_msgs(&smsg_queue, ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize, CmiNodeOf(ncpyOpInfo->srcPe), RDMA_PUT_MD_DIRECT_TAG);
 #else // nonsmp mode
-      // send the small message directly
       int msgMode = (ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) ? CHARM_SMSG : SMSG_DONT_FREE;
 
-      gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(ncpyOpInfo->srcPe), ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize, RDMA_PUT_MD_DIRECT_TAG, 0, NULL, SMSG_DONT_FREE, 1);
+      // send the small message directly
+      gni_return_t status = send_smsg_message(&smsg_queue,
+                              CmiNodeOf(ncpyOpInfo->srcPe),
+                              ncpyOpInfo,
+                              ncpyOpInfo->ncpyOpInfoSize,
+                              RDMA_PUT_MD_DIRECT_TAG,
+                              0, NULL, msgMode, 1);
+
 #if !CMK_SMSGS_FREE_AFTER_EVENT
       if(status == GNI_RC_SUCCESS && ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) {
         CmiFree(ncpyOpInfo);
