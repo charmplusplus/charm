@@ -139,6 +139,7 @@ void hapiInit(char** argv) {
     CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
   }
 
+  /*(
   if (CmiMyRank() == 0) {
     shmSetup();
     if (CmiMyNodeRankLocal() == 0) {
@@ -165,6 +166,7 @@ void hapiInit(char** argv) {
   if (CmiMyRank() == 0) {
     ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
   }
+  */
 
   hapiRegisterCallbacks(); // Register callback functions
 }
@@ -174,7 +176,7 @@ void hapiExit() {
   CmiNodeBarrier();
 
   if (CmiMyRank() == 0) {
-    shmCleanup();
+    //shmCleanup();
 
     hapiExitCsv();
   }
