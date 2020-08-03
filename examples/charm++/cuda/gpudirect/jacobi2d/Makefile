@@ -29,3 +29,6 @@ $(TARGET)CUDA.o: $(TARGET).cu $(TARGET).h
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o $(TARGET) charmrun
+
+clean-nsys:
+	rm -f *.qdrep
