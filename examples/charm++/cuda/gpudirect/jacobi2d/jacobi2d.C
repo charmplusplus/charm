@@ -184,14 +184,16 @@ class Block : public CBase_Block {
   DataType* __restrict__ d_left_ghost;
   DataType* __restrict__ d_right_ghost;
 
-  cudaStream_t stream;
+  cudaStream_t compute_stream;
+  cudaStream_t comm_stream;
+
+  cudaEvent_t compute_event;
 
   bool left_bound, right_bound, top_bound, bottom_bound;
 
   Block() {}
 
   ~Block() {
-    // Free memory and destroy CUDA stream
     hapiCheck(cudaFreeHost(h_temperature));
     hapiCheck(cudaFree(d_temperature));
     hapiCheck(cudaFree(d_new_temperature));
@@ -201,7 +203,9 @@ class Block : public CBase_Block {
     hapiCheck(cudaFreeHost(h_bottom_ghost));
     hapiCheck(cudaFree(d_left_ghost));
     hapiCheck(cudaFree(d_right_ghost));
-    cudaStreamDestroy(stream);
+    hapiCheck(cudaStreamDestroy(compute_stream));
+    hapiCheck(cudaStreamDestroy(comm_stream));
+    hapiCheck(cudaEventDestroy(compute_event));
   }
 
   void init() {
@@ -234,7 +238,7 @@ class Block : public CBase_Block {
     else
       neighbors++;
 
-    // Allocate memory and create CUDA stream
+    // Allocate memory and create CUDA entities
     hapiCheck(cudaMallocHost((void**)&h_temperature,
           sizeof(DataType) * (block_size + 2) * (block_size + 2)));
     hapiCheck(cudaMalloc((void**)&d_temperature,
@@ -247,18 +251,20 @@ class Block : public CBase_Block {
     hapiCheck(cudaMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_size));
     hapiCheck(cudaMalloc((void**)&d_left_ghost, sizeof(DataType) * block_size));
     hapiCheck(cudaMalloc((void**)&d_right_ghost, sizeof(DataType) * block_size));
-    cudaStreamCreate(&stream);
+    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
+    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
 
     // Initialize temperature data
-    invokeInitKernel(d_temperature, block_size, stream);
+    invokeInitKernel(d_temperature, block_size, compute_stream);
 
 #if CUDA_SYNC
-    cudaStreamSynchronize(stream);
+    cudaStreamSynchronize(compute_stream);
     thisProxy[thisIndex].initDone();
 #else
     // TODO: Support reduction callback in hapiAddCallback
     CkCallback* cb = new CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
-    hapiAddCallback(stream, cb);
+    hapiAddCallback(compute_stream, cb);
 #endif
   }
 
@@ -274,26 +280,30 @@ class Block : public CBase_Block {
 #if !COMM_ONLY
     // Enforce boundary conditions
     invokeBoundaryKernels(d_temperature, block_size, left_bound, right_bound,
-        top_bound, bottom_bound, stream);
+        top_bound, bottom_bound, compute_stream);
 
     // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, block_size, stream);
+    invokeJacobiKernel(d_temperature, d_new_temperature, block_size, compute_stream);
 #endif
+
+    // Record event to create dependency for communication stream
+    hapiCheck(cudaEventRecord(compute_event, compute_stream));
+    hapiCheck(cudaStreamWaitEvent(comm_stream, compute_event, 0));
 
     // Copy final temperature data back to host
     if (my_iter == warmup_iters + n_iters) {
       hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
             sizeof(DataType) * (block_size + 2) * (block_size + 2),
-            cudaMemcpyDeviceToHost, stream));
+            cudaMemcpyDeviceToHost, comm_stream));
     }
 
     if (sync_ver) {
 #if CUDA_SYNC
-      cudaStreamSynchronize(stream);
+      cudaStreamSynchronize(compute_stream);
       thisProxy[thisIndex].updateDone();
 #else
       CkCallback* cb = new CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
-      hapiAddCallback(stream, cb);
+      hapiAddCallback(compute_stream, cb);
 #endif
     }
   }
@@ -310,32 +320,32 @@ class Block : public CBase_Block {
 #if !COMM_ONLY
     // Pack non-contiguous ghosts to temporary contiguous buffers on device
     invokePackingKernels(d_temperature, d_left_ghost, d_right_ghost, left_bound,
-        right_bound, block_size, stream);
+        right_bound, block_size, comm_stream);
 #endif
 
     if (!use_zerocopy) {
       // Transfer ghosts from device to host
       if (!left_bound)
         hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(DataType),
-              cudaMemcpyDeviceToHost, stream));
+              cudaMemcpyDeviceToHost, comm_stream));
       if (!right_bound)
         hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost, block_size * sizeof(DataType),
-              cudaMemcpyDeviceToHost, stream));
+              cudaMemcpyDeviceToHost, comm_stream));
       if (!top_bound)
         hapiCheck(cudaMemcpyAsync(h_top_ghost, d_temperature + (block_size + 2) + 1,
-              block_size * sizeof(DataType), cudaMemcpyDeviceToHost, stream));
+              block_size * sizeof(DataType), cudaMemcpyDeviceToHost, comm_stream));
       if (!bottom_bound)
         hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size + 1,
-              block_size * sizeof(DataType), cudaMemcpyDeviceToHost, stream));
+              block_size * sizeof(DataType), cudaMemcpyDeviceToHost, comm_stream));
 
 #if CUDA_SYNC
-      cudaStreamSynchronize(stream);
+      cudaStreamSynchronize(comm_stream);
       thisProxy[thisIndex].packGhostsDone();
 #else
       // Add asynchronous callback to be invoked when packing and device-to-host
       // transfers are complete
       CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
-      hapiAddCallback(stream, cb);
+      hapiAddCallback(comm_stream, cb);
 #endif
     }
   }
@@ -351,16 +361,16 @@ class Block : public CBase_Block {
 
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_size,
-            CkDeviceBuffer(d_left_ghost, cb, stream));
+            CkDeviceBuffer(d_left_ghost, cb, comm_stream));
       if (!right_bound)
         thisProxy(x + 1, y).receiveGhostsZC(my_iter, LEFT, block_size,
-            CkDeviceBuffer(d_right_ghost, cb, stream));
+            CkDeviceBuffer(d_right_ghost, cb, comm_stream));
       if (!top_bound)
         thisProxy(x, y - 1).receiveGhostsZC(my_iter, BOTTOM, block_size,
-            CkDeviceBuffer(d_temperature + (block_size + 2) + 1, cb, stream));
+            CkDeviceBuffer(d_temperature + (block_size + 2) + 1, cb, comm_stream));
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_size,
-            CkDeviceBuffer(d_temperature + (block_size + 2) * block_size + 1, cb, stream));
+            CkDeviceBuffer(d_temperature + (block_size + 2) * block_size + 1, cb, comm_stream));
     } else {
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsReg(my_iter, RIGHT, block_size, h_left_ghost);
@@ -392,7 +402,7 @@ class Block : public CBase_Block {
       default:
         CkAbort("Error: invalid direction");
     }
-    devicePost[0].cuda_stream = stream;
+    devicePost[0].cuda_stream = comm_stream;
   }
 
   void processGhostsZC(int dir, int width, DataType* gh) {
@@ -402,10 +412,10 @@ class Block : public CBase_Block {
 
     switch (dir) {
       case LEFT:
-        invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
+        invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, comm_stream);
         break;
       case RIGHT:
-        invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
+        invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, comm_stream);
         break;
       case TOP:
       case BOTTOM:
@@ -424,28 +434,28 @@ class Block : public CBase_Block {
       case LEFT:
         memcpy(h_left_ghost, gh, width * sizeof(DataType));
         hapiCheck(cudaMemcpyAsync(d_left_ghost, h_left_ghost, block_size * sizeof(DataType),
-              cudaMemcpyHostToDevice, stream));
+              cudaMemcpyHostToDevice, comm_stream));
 #if !COMM_ONLY
-        invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
+        invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, comm_stream);
 #endif
         break;
       case RIGHT:
         memcpy(h_right_ghost, gh, width * sizeof(DataType));
         hapiCheck(cudaMemcpyAsync(d_right_ghost, h_right_ghost, block_size * sizeof(DataType),
-              cudaMemcpyHostToDevice, stream));
+              cudaMemcpyHostToDevice, comm_stream));
 #if !COMM_ONLY
-        invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, stream);
+        invokeUnpackingKernel(d_temperature, d_right_ghost, false, block_size, comm_stream);
 #endif
         break;
       case TOP:
         memcpy(h_top_ghost, gh, width * sizeof(DataType));
         hapiCheck(cudaMemcpyAsync(d_temperature + (block_size + 2) + 1, h_top_ghost,
-              block_size * sizeof(DataType), cudaMemcpyHostToDevice, stream));
+              block_size * sizeof(DataType), cudaMemcpyHostToDevice, comm_stream));
         break;
       case BOTTOM:
         memcpy(h_bottom_ghost, gh, width * sizeof(DataType));
         hapiCheck(cudaMemcpyAsync(d_temperature + (block_size + 2) * block_size + 1,
-              h_bottom_ghost, block_size * sizeof(DataType), cudaMemcpyHostToDevice, stream));
+              h_bottom_ghost, block_size * sizeof(DataType), cudaMemcpyHostToDevice, comm_stream));
         break;
       default:
         CkAbort("Error: invalid direction");
