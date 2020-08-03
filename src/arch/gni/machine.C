@@ -3270,26 +3270,16 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
 #endif
         break;
 #endif
-     case RDMA_PUT_MD_DIRECT_TAG:
-        ncpyOpInfo = (NcpyOperationInfo *)(ptr->msg);
-        msgMode = (ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) ? CHARM_SMSG : SMSG_DONT_FREE;
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, ncpyOpInfo->ncpyOpInfoSize, ptr->tag, 1, ptr, msgMode, 1);
-#if !CMK_SMSGS_FREE_AFTER_EVENT
-        if(status == GNI_RC_SUCCESS && msgMode) {
-          CmiFree(ptr->msg);
-        }
-#endif
-        break;
 
+     case RDMA_PUT_MD_DIRECT_TAG:
      case RDMA_REG_AND_GET_MD_DIRECT_TAG:
      case RDMA_REG_AND_PUT_MD_DIRECT_TAG:
      case RDMA_DEREG_AND_ACK_MD_DIRECT_TAG:
-        //msgSize = sizeof(CmiGNIRzvRdmaReverseOp_t) + 2*(((CmiGNIRzvRdmaReverseOp_t *)(ptr->msg))->ackSize);
         ncpyOpInfo = (NcpyOperationInfo *)(ptr->msg);
         msgMode = (ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) ? CHARM_SMSG : SMSG_DONT_FREE;
         status = send_smsg_message(queue, ptr->destNode, ptr->msg, ncpyOpInfo->ncpyOpInfoSize, ptr->tag, 1, ptr, msgMode, 1);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
-        if(status == GNI_RC_SUCCESS && msgMode) {
+        if(status == GNI_RC_SUCCESS && ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) {
           CmiFree(ptr->msg);
         }
 #endif
