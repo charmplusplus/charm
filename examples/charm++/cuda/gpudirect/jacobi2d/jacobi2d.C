@@ -1,7 +1,9 @@
 #include "hapi.h"
+#include "hapi_nvtx.h"
 #include "jacobi2d.decl.h"
 #include "jacobi2d.h"
 #include <utility>
+#include <sstream>
 
 #define COMM_ONLY 0
 #define CUDA_SYNC 0
@@ -209,6 +211,10 @@ class Block : public CBase_Block {
     x = thisIndex.x;
     y = thisIndex.y;
 
+    std::ostringstream os;
+    os << "Init (" << std::to_string(x) << "," << std::to_string(y) << ")";
+    NVTXTracer(os.str(), NVTXColor::Turquoise);
+
     // Check bounds and set number of valid neighbors
     left_bound = right_bound = top_bound = bottom_bound = false;
     if (thisIndex.x == 0)
@@ -256,6 +262,10 @@ class Block : public CBase_Block {
   }
 
   void packGhosts() {
+    std::ostringstream os;
+    os << "packGhosts (" << std::to_string(x) << "," << std::to_string(y) << ")";
+    NVTXTracer(os.str(), NVTXColor::Emerald);
+
 #if !COMM_ONLY
     // Pack non-contiguous ghosts to temporary contiguous buffers on device
     invokePackingKernels(d_temperature, d_left_ghost, d_right_ghost, left_bound,
@@ -264,14 +274,18 @@ class Block : public CBase_Block {
 
     if (!use_zerocopy) {
       // Transfer ghosts from device to host
-      hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(DataType),
-            cudaMemcpyDeviceToHost, stream));
-      hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost, block_size * sizeof(DataType),
-            cudaMemcpyDeviceToHost, stream));
-      hapiCheck(cudaMemcpyAsync(h_top_ghost, d_temperature + (block_size + 2) + 1,
-            block_size * sizeof(DataType), cudaMemcpyDeviceToHost, stream));
-      hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size + 1,
-            block_size * sizeof(DataType), cudaMemcpyDeviceToHost, stream));
+      if (!left_bound)
+        hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost, block_size * sizeof(DataType),
+              cudaMemcpyDeviceToHost, stream));
+      if (!right_bound)
+        hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost, block_size * sizeof(DataType),
+              cudaMemcpyDeviceToHost, stream));
+      if (!top_bound)
+        hapiCheck(cudaMemcpyAsync(h_top_ghost, d_temperature + (block_size + 2) + 1,
+              block_size * sizeof(DataType), cudaMemcpyDeviceToHost, stream));
+      if (!bottom_bound)
+        hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_temperature + (block_size + 2) * block_size + 1,
+              block_size * sizeof(DataType), cudaMemcpyDeviceToHost, stream));
 
 #if CUDA_SYNC
       cudaStreamSynchronize(stream);
@@ -286,6 +300,10 @@ class Block : public CBase_Block {
   }
 
   void sendGhosts() {
+    std::ostringstream os;
+    os << "sendGhosts (" << std::to_string(x) << "," << std::to_string(y) << ")";
+    NVTXTracer(os.str(), NVTXColor::PeterRiver);
+
     // Send ghosts to neighboring chares
     if (use_zerocopy) {
       CkCallback cb(CkIndex_Block::sendGhostDone(), thisProxy[thisIndex]);
@@ -337,6 +355,10 @@ class Block : public CBase_Block {
   }
 
   void processGhostsZC(int dir, int width, DataType* gh) {
+    std::ostringstream os;
+    os << "processGhostsZC (" << std::to_string(x) << "," << std::to_string(y) << ")";
+    NVTXTracer(os.str(), NVTXColor::Amethyst);
+
     switch (dir) {
       case LEFT:
         invokeUnpackingKernel(d_temperature, d_left_ghost, true, block_size, stream);
@@ -353,6 +375,10 @@ class Block : public CBase_Block {
   }
 
   void processGhostsReg(int dir, int width, DataType* gh) {
+    std::ostringstream os;
+    os << "processGhostsReg (" << std::to_string(x) << "," << std::to_string(y) << ")";
+    NVTXTracer(os.str(), NVTXColor::Amethyst);
+
     switch (dir) {
       case LEFT:
         memcpy(h_left_ghost, gh, width * sizeof(DataType));
@@ -386,6 +412,10 @@ class Block : public CBase_Block {
   }
 
   void update() {
+    std::ostringstream os;
+    os << "update (" << std::to_string(x) << "," << std::to_string(y) << ")";
+    NVTXTracer(os.str(), NVTXColor::WetAsphalt);
+
 #if !COMM_ONLY
     // Enforce boundary conditions
     invokeBoundaryKernels(d_temperature, block_size, left_bound, right_bound,
