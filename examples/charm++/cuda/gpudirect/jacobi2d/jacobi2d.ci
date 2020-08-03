@@ -86,7 +86,7 @@ mainmodule jacobi2d {
           // Swap pointers
           std::swap(d_temperature, d_new_temperature);
 
-          // Iteration comoplete
+          // Iteration complete
           if (sync_ver || my_iter <= warmup_iters) {
             contribute(CkCallback(CkReductionTarget(Main, updateDone), main_proxy));
           } else {
