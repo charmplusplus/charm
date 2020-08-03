@@ -55,8 +55,8 @@ public:
     my_iter = 0;
 
     // Initialize aggregate timers
-    comm_agg_time = 0.0;
     update_agg_time = 0.0;
+    comm_agg_time = 0.0;
 
     // Process arguments
     int c;
@@ -121,29 +121,29 @@ public:
 
   void startIter() {
     if (my_iter++ == warmup_iters) start_time = CkWallTimer();
-    if (sync_ver) comm_start_time = CkWallTimer();
+    update_start_time = CkWallTimer();
 
     block_proxy.exchangeGhosts();
   }
 
-  void commDone() {
-    if (my_iter > warmup_iters) comm_agg_time += CkWallTimer() - comm_start_time;
-    update_start_time = CkWallTimer();
-
-    block_proxy.update();
-  }
-
   void updateDone() {
     if (my_iter > warmup_iters) update_agg_time += CkWallTimer() - update_start_time;
+    comm_start_time = CkWallTimer();
+
+    block_proxy.packGhosts();
+  }
+
+  void commDone() {
+    if (my_iter > warmup_iters) comm_agg_time += CkWallTimer() - comm_start_time;
 
     if (my_iter == warmup_iters + n_iters) {
-      done();
+      allDone();
     } else {
       startIter();
     }
   }
 
-  void done() {
+  void allDone() {
     double total_time = CkWallTimer() - start_time;
     CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
         total_time, (total_time / n_iters) * 1e6);
@@ -252,13 +252,54 @@ class Block : public CBase_Block {
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_size, stream);
 
+#if CUDA_SYNC
+    cudaStreamSynchronize(stream);
+    thisProxy[thisIndex].initDone();
+#else
     // TODO: Support reduction callback in hapiAddCallback
     CkCallback* cb = new CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
     hapiAddCallback(stream, cb);
+#endif
   }
 
   void initDone() {
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
+  }
+
+  void update() {
+    std::ostringstream os;
+    os << "update (" << std::to_string(x) << "," << std::to_string(y) << ")";
+    NVTXTracer(os.str(), NVTXColor::WetAsphalt);
+
+#if !COMM_ONLY
+    // Enforce boundary conditions
+    invokeBoundaryKernels(d_temperature, block_size, left_bound, right_bound,
+        top_bound, bottom_bound, stream);
+
+    // Invoke GPU kernel for Jacobi computation
+    invokeJacobiKernel(d_temperature, d_new_temperature, block_size, stream);
+#endif
+
+    // Copy final temperature data back to host
+    if (my_iter == warmup_iters + n_iters) {
+      hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
+            sizeof(DataType) * (block_size + 2) * (block_size + 2),
+            cudaMemcpyDeviceToHost, stream));
+    }
+
+    if (sync_ver) {
+#if CUDA_SYNC
+      cudaStreamSynchronize(stream);
+      thisProxy[thisIndex].updateDone();
+#else
+      CkCallback* cb = new CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
+      hapiAddCallback(stream, cb);
+#endif
+    }
+  }
+
+  void updateDone() {
+    contribute(CkCallback(CkReductionTarget(Main, updateDone), main_proxy));
   }
 
   void packGhosts() {
@@ -409,37 +450,6 @@ class Block : public CBase_Block {
       default:
         CkAbort("Error: invalid direction");
     }
-  }
-
-  void update() {
-    std::ostringstream os;
-    os << "update (" << std::to_string(x) << "," << std::to_string(y) << ")";
-    NVTXTracer(os.str(), NVTXColor::WetAsphalt);
-
-#if !COMM_ONLY
-    // Enforce boundary conditions
-    invokeBoundaryKernels(d_temperature, block_size, left_bound, right_bound,
-        top_bound, bottom_bound, stream);
-
-    // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, block_size, stream);
-#endif
-
-    // Copy final temperature data back to host
-    if (my_iter == warmup_iters + n_iters) {
-      hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
-            sizeof(DataType) * (block_size + 2) * (block_size + 2),
-            cudaMemcpyDeviceToHost, stream));
-    }
-
-#if CUDA_SYNC
-    cudaStreamSynchronize(stream);
-    thisProxy[thisIndex].updateDone();
-#else
-    // Add asynchronous callback to be invoked when update is complete
-    CkCallback* cb = new CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
-    hapiAddCallback(stream, cb);
-#endif
   }
 
   void print() {

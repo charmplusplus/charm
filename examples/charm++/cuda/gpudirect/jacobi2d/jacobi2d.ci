@@ -16,9 +16,9 @@ mainmodule jacobi2d {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void initDone();
     entry void startIter();
-    entry [reductiontarget] void commDone();
     entry [reductiontarget] void updateDone();
-    entry [reductiontarget] void done();
+    entry [reductiontarget] void commDone();
+    entry [reductiontarget] void allDone();
     entry void printDone();
   };
 
@@ -26,16 +26,19 @@ mainmodule jacobi2d {
     entry Block(void);
     entry void init();
     entry void initDone();
+    entry void update();
+    entry void updateDone();
+    entry void packGhosts();
     entry void packGhostsDone();
     entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
     entry void sendGhostDone();
-    entry void updateDone();
 
     entry void exchangeGhosts() {
       serial {
         my_iter++;
-        packGhosts();
+        update();
+        if (!sync_ver) packGhosts();
       }
 
       // Packed buffers can be enqueued for sending right away with zerocopy
@@ -74,33 +77,21 @@ mainmodule jacobi2d {
       }
 
       serial {
+        // Swap pointers
+        std::swap(d_temperature, d_new_temperature);
+
         if (sync_ver || my_iter <= warmup_iters) {
           contribute(CkCallback(CkReductionTarget(Main, commDone), main_proxy));
         } else {
-          update();
-        }
-      }
-
-      when updateDone() {
-        serial {
-          // Swap pointers
-          std::swap(d_temperature, d_new_temperature);
-
-          // Iteration complete
-          if (sync_ver || my_iter <= warmup_iters) {
-            contribute(CkCallback(CkReductionTarget(Main, updateDone), main_proxy));
+          if (my_iter < warmup_iters + n_iters) {
+            thisProxy[thisIndex].exchangeGhosts();
           } else {
-            if (my_iter < warmup_iters + n_iters) {
-              thisProxy[thisIndex].exchangeGhosts();
-            } else {
-              contribute(CkCallback(CkReductionTarget(Main, done), main_proxy));
-            }
+            contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
           }
         }
       }
     }
 
-    entry void update();
     entry void print();
   };
 };
