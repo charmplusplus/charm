@@ -2,6 +2,21 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.10.2
+================================================================================
+
+This is a minor bug-fix release, with the following changes:
+
+- Verbs layer - Fixed memory leaks in acknowledgment handling for
+  large message transfers.
+
+- GNI layer - Fixed a minor issue related to freeing short messages
+  sent while using the Zero copy API on gni-crayxe platforms.
+
+- Fixed a memory leak in the copy based implementation of the Zero
+  copy API impacting non-RDMA enabled layers like netlrts.
+
+================================================================================
 What's new in Charm++ 6.10.1
 ================================================================================
 
