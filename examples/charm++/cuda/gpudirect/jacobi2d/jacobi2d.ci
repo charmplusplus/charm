@@ -10,7 +10,7 @@ mainmodule jacobi2d {
   readonly int warmup_iters;
   readonly bool sync_ver;
   readonly bool use_zerocopy;
-  readonly bool print;
+  readonly bool print_elements;
 
   mainchare Main {
     entry Main(CkArgMsg* m);

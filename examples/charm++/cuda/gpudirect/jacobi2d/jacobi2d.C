@@ -17,7 +17,7 @@
 /* readonly */ int warmup_iters;
 /* readonly */ bool sync_ver;
 /* readonly */ bool use_zerocopy;
-/* readonly */ bool print;
+/* readonly */ bool print_elements;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_size, cudaStream_t stream);
 extern void invokeBoundaryKernels(DataType* d_temperature, int block_size, bool left_bound,
@@ -50,7 +50,7 @@ public:
     n_iters = 100;
     warmup_iters = 10;
     use_zerocopy = false;
-    print = false;
+    print_elements = false;
     sync_ver = false;
     my_iter = 0;
 
@@ -81,7 +81,7 @@ public:
           use_zerocopy = true;
           break;
         case 'p':
-          print = true;
+          print_elements = true;
           break;
         default:
           CkPrintf(
@@ -105,7 +105,7 @@ public:
     CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d, Iterations: %d, "
         "Warm-up: %d, Bulk-synchronous: %d, Zerocopy: %d, Print: %d\n\n",
         grid_size, grid_size, block_size, block_size, n_chares, n_chares,
-        n_iters, warmup_iters, sync_ver, use_zerocopy, print);
+        n_iters, warmup_iters, sync_ver, use_zerocopy, print_elements);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares, n_chares);
@@ -152,7 +152,7 @@ public:
           (comm_agg_time / n_iters) * 1e6, (update_agg_time / n_iters) * 1e6);
     }
 
-    if (print) {
+    if (print_elements) {
       sleep(1);
       block_proxy(0,0).print();
     } else {
@@ -291,7 +291,7 @@ class Block : public CBase_Block {
     hapiCheck(cudaStreamWaitEvent(comm_stream, compute_event, 0));
 
     // Copy final temperature data back to host
-    if (my_iter == warmup_iters + n_iters) {
+    if (print_elements && (my_iter == warmup_iters + n_iters)) {
       hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
             sizeof(DataType) * (block_size + 2) * (block_size + 2),
             cudaMemcpyDeviceToHost, comm_stream));
