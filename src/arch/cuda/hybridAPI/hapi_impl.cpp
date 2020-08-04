@@ -114,6 +114,7 @@ static void hapiMapping(char** argv);
 static void hapiRegisterCallbacks();
 
 // CUDA IPC related functions
+static void shmInit();
 static void shmSetup();
 static void shmCreate();
 static void shmOpen();
@@ -135,38 +136,13 @@ void hapiInit(char** argv) {
 
     hapiMapping(argv); // Perform PE-device mapping
 
+#ifndef HAPI_CUDA_CALLBACK
     // Register polling function to be invoked at every scheduler loop
     CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
+#endif
   }
 
-  /*(
-  if (CmiMyRank() == 0) {
-    shmSetup();
-    if (CmiMyNodeRankLocal() == 0) {
-      shmCreate(); // Create a per-host shared memory region
-      CmiBarrier(); // FIXME: Only needs to be a host-wide barrier
-    } else {
-      CmiBarrier();
-      shmOpen(); // Open the shared memory region created by local logical node 0
-    }
-    shmMap(); // Map the shared memory file into memory
-  } else {
-    CmiBarrier();
-  }
-
-  CmiNodeBarrier(); // Ensure shared memory has been mapped into the logical node
-
-  ipcHandleCreate(); // Create CUDA IPC handles
-
-  // Ensure CUDA IPC handles are available for all processes
-  // Note: Causes a hang when this barrier is placed after CPU topology initialization
-  // FIXME: This only needs to be a host-wide synchronization
-  CmiBarrier();
-
-  if (CmiMyRank() == 0) {
-    ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
-  }
-  */
+  shmInit();
 
   hapiRegisterCallbacks(); // Register callback functions
 }
@@ -176,7 +152,7 @@ void hapiExit() {
   CmiNodeBarrier();
 
   if (CmiMyRank() == 0) {
-    //shmCleanup();
+    shmCleanup();
 
     hapiExitCsv();
   }
@@ -343,59 +319,78 @@ static void hapiMapping(char** argv) {
   CmiUnlock(csv_gpu_manager.device_mapping_lock);
 #endif
 
-  // Process device communication buffer parameters (in MB)
-  int input_comm_buffer_size;
-  if (CmiGetArgIntDesc(argv, "+gpucommbuffer", &input_comm_buffer_size,
-        "GPU communication buffer size (in MB)")) {
-    if (CmiMyRank() == 0) {
-      // Round up size to the closest power of 2
-      size_t comm_buffer_size = (size_t)input_comm_buffer_size * 1024 * 1024;
-      int size_log2 = std::ceil(std::log2((double)comm_buffer_size));
-      csv_gpu_manager.comm_buffer_size = (size_t)std::pow(2, size_log2);
+  // Check if user opted out of shared memory optimizations for
+  // inter-process GPU messaging
+  bool no_shm = false;
+  if (CmiGetArgFlagDesc(argv, "+gpunoshm",
+        "disable shared memory optimizations for inter-process GPU messaging")) {
+    no_shm = true;
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> Disabled shared memory optimizations for inter-process GPU messaging\n");
     }
   }
 
-  if (CmiMyPe() == 0) {
-    CmiPrintf("HAPI> GPU communication buffer size: %zu MB "
-        "(rounded up to the nearest power of two)\n",
-        csv_gpu_manager.comm_buffer_size / (1024 * 1024));
-  }
-
-  CmiNodeBarrier(); // Ensure device communication buffer size is set
-
-  // Create device communication buffers
-  // Should only be done by device representative threads
-  if (cpv_device_rep) {
-    DeviceManager* dm = csv_gpu_manager.device_map[CmiMyPe()];
-#if CMK_SMP
-    CmiLock(dm->lock);
-#endif
-    dm->create_comm_buffer(csv_gpu_manager.comm_buffer_size);
-#if CMK_SMP
-    CmiUnlock(dm->lock);
-#endif
-  }
-
-  // Process custom size for CUDA IPC event pool
-  int input_cuda_ipc_event_pool_size;
-  if (!CmiGetArgIntDesc(argv, "+gpuipceventpool", &input_cuda_ipc_event_pool_size,
-        "GPU IPC event pool size per PE")) {
-    input_cuda_ipc_event_pool_size = 16;
-  }
-
   if (CmiMyRank() == 0) {
-    csv_gpu_manager.cuda_ipc_event_pool_size_pe = input_cuda_ipc_event_pool_size;
-    csv_gpu_manager.cuda_ipc_event_pool_size_total = input_cuda_ipc_event_pool_size * csv_gpu_manager.pes_per_device;
+    if (no_shm) csv_gpu_manager.use_shm = false;
   }
 
-  if (CmiMyPe() == 0) {
-    CmiPrintf("HAPI> CUDA IPC event pool size - %d per PE, %d per device\n",
-        csv_gpu_manager.cuda_ipc_event_pool_size_pe, csv_gpu_manager.cuda_ipc_event_pool_size_total);
+  CmiNodeBarrier();
+
+  if (csv_gpu_manager.use_shm) {
+    // Process device communication buffer parameters (in MB)
+    int input_comm_buffer_size;
+    if (CmiGetArgIntDesc(argv, "+gpucommbuffer", &input_comm_buffer_size,
+          "GPU communication buffer size (in MB)")) {
+      if (CmiMyRank() == 0) {
+        // Round up size to the closest power of 2
+        size_t comm_buffer_size = (size_t)input_comm_buffer_size * 1024 * 1024;
+        int size_log2 = std::ceil(std::log2((double)comm_buffer_size));
+        csv_gpu_manager.comm_buffer_size = (size_t)std::pow(2, size_log2);
+      }
+    }
+
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> GPU communication buffer size: %zu MB "
+          "(rounded up to the nearest power of two)\n",
+          csv_gpu_manager.comm_buffer_size / (1024 * 1024));
+    }
+
+    CmiNodeBarrier(); // Ensure device communication buffer size is set
+
+    // Create device communication buffers
+    // Should only be done by device representative threads
+    if (cpv_device_rep) {
+      DeviceManager* dm = csv_gpu_manager.device_map[CmiMyPe()];
+#if CMK_SMP
+      CmiLock(dm->lock);
+#endif
+      dm->create_comm_buffer(csv_gpu_manager.comm_buffer_size);
+#if CMK_SMP
+      CmiUnlock(dm->lock);
+#endif
+    }
+
+    // Process custom size for CUDA IPC event pool
+    int input_cuda_ipc_event_pool_size;
+    if (!CmiGetArgIntDesc(argv, "+gpuipceventpool", &input_cuda_ipc_event_pool_size,
+          "GPU IPC event pool size per PE")) {
+      input_cuda_ipc_event_pool_size = 16;
+    }
+
+    if (CmiMyRank() == 0) {
+      csv_gpu_manager.cuda_ipc_event_pool_size_pe = input_cuda_ipc_event_pool_size;
+      csv_gpu_manager.cuda_ipc_event_pool_size_total = input_cuda_ipc_event_pool_size * csv_gpu_manager.pes_per_device;
+    }
+
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> CUDA IPC event pool size - %d per PE, %d per device\n",
+          csv_gpu_manager.cuda_ipc_event_pool_size_pe, csv_gpu_manager.cuda_ipc_event_pool_size_total);
+    }
   }
 
   // Check if P2P access should be enabled
   bool enable_peer = true; // Enabled by default
-  if (CmiGetArgFlagDesc(argv, "+nogpupeer",
+  if (CmiGetArgFlagDesc(argv, "+gpunopeer",
         "do not enable P2P access between visible GPU pairs")) {
     enable_peer = false;
   }
@@ -720,6 +715,37 @@ hapiWorkRequest::hapiWorkRequest() :
 #endif
   }
 
+static void shmInit() {
+  if (!CsvAccess(gpu_manager).use_shm) return;
+
+  if (CmiMyRank() == 0) {
+    shmSetup();
+    if (CmiMyNodeRankLocal() == 0) {
+      shmCreate(); // Create a per-host shared memory region
+      CmiBarrier(); // FIXME: Only needs to be a host-wide barrier
+    } else {
+      CmiBarrier();
+      shmOpen(); // Open the shared memory region created by local logical node 0
+    }
+    shmMap(); // Map the shared memory file into memory
+  } else {
+    CmiBarrier();
+  }
+
+  CmiNodeBarrier(); // Ensure shared memory has been mapped into the logical node
+
+  ipcHandleCreate(); // Create CUDA IPC handles
+
+  // Ensure CUDA IPC handles are available for all processes
+  // Note: Causes a hang when this barrier is placed after CPU topology initialization
+  // FIXME: This only needs to be a host-wide synchronization
+  CmiBarrier();
+
+  if (CmiMyRank() == 0) {
+    ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
+  }
+}
+
 static void shmSetup() {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
@@ -834,6 +860,7 @@ static void shmAbort() {
 // Invoked by PE rank 0 of each process
 static void shmCleanup() {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  if (!csv_gpu_manager.use_shm) return;
 
   if (csv_gpu_manager.shm_ptr != NULL) {
     munmap(csv_gpu_manager.shm_ptr, csv_gpu_manager.shm_size);

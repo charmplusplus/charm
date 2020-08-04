@@ -107,6 +107,7 @@ struct GPUManager {
   size_t comm_buffer_size;
 
   // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
+  bool use_shm;
   void* shm_ptr;
   std::string shm_name;
   int shm_file;
@@ -152,6 +153,7 @@ struct GPUManager {
     comm_buffer_size = 1 << 26; // 64MB by default
 
     // Shared memory region for CUDA IPC
+    use_shm = true;
     shm_ptr = NULL;
     shm_file = -1;
     shm_chunk_size = 0;
