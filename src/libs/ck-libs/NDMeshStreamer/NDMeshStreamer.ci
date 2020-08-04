@@ -36,7 +36,7 @@ module NDMeshStreamer {
   template<class dtype, class RouterType>
   nodegroup MeshStreamerNG {
     entry MeshStreamerNG();
-    entry void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> groupProxy);
+    entry [immediate] void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> groupProxy);
     entry void receiveAlongRoute(MeshStreamerMessageV *msg);
   };
 
