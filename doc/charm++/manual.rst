@@ -8847,7 +8847,7 @@ with GPU support (CMake build is currently not supported), e.g.
 
 .. code-block:: bash
 
-   $ ./buildold charm++ netlrts-linux-x86_64 cuda -j8
+   $ ./buildold charm++ netlrts-linux-x86_64 cuda -j8 --with-production
 
 Building with GPU support requires an installation of the CUDA Toolkit on the
 system, which is automatically found by the build script. If the script fails
@@ -8858,7 +8858,7 @@ Using GPU Manager
 ~~~~~~~~~~~~~~~~~
 
 As explained in the Overview section, use of CUDA streams is strongly
-recommended. This provides the opportutnity for kernels offloaded by chares
+recommended. This provides the opportunity for kernels offloaded by chares
 to execute concurrently on the GPU.
 
 In a typical Charm++ application using CUDA, the ``.C`` and ``.ci`` files
@@ -8888,28 +8888,18 @@ The following is a list of HAPI functions:
    void hapiCreateStreams();
    cudaStream_t hapiGetStream();
 
-   cudaError_t hapiMalloc(void** devPtr, size_t size);
-   cudaError_t hapiFree(void* devPtr);
-   cudaError_t hapiMallocHost(void** ptr, size_t size);
-   cudaError_t hapiFreeHost(void* ptr);
-
    void* hapiPoolMalloc(int size);
    void hapiPoolFree(void* ptr);
-
-   cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count,
-                               cudaMemcpyKind kind, cudaStream_t stream = 0);
 
    hapiCheck(code);
 
 ``hapiCreateStreams`` creates as many streams as the maximum number of
 concurrent kernels supported by the GPU device. ``hapiGetStream`` hands
-out a stream created by the runtime in a round-robin fashion. The
-``hapiMalloc`` and ``hapiFree`` functions are wrappers to the
-corresponding CUDA API calls, and ``hapiPool`` functions provides memory
-pool functionalities which are used to obtain/free device memory without
-interrupting the GPU. ``hapiCheck`` is used to check if the input code
-block executes without errors. The given code should return
-``cudaError_t`` for it to work.
+out a stream created by the runtime in a round-robin fashion.
+``hapiPool`` functions provides memory pool functionalities which are
+used to obtain/free device memory without interrupting the GPU.
+``hapiCheck`` is used to check if the input code block executes without
+errors. The provided code should return ``cudaError_t`` for it to work.
 
 Examples using CUDA and HAPI can be found under
 ``examples/charm++/cuda``. Codes under ``#ifdef USE_WR`` use the
@@ -8936,12 +8926,13 @@ specifier to the parameter of the receiving entry method in the ``.ci`` file:
    entry void foo(int size, nocopydevice double arr[size]);
 
 This entry method should be invoked on the sender by wrapping the
-source buffer with CkDeviceBuffer, whose constructor takes a pointer
+source buffer with ``CkDeviceBuffer``, whose constructor takes a pointer
 to the source buffer, a Charm++ callback to be invoked once the transfer
 completes (optional), and a CUDA stream associated with the transfer
 (also optional):
 
 .. code-block:: c++
+
    // Constructors of CkDeviceBuffer
    CkDeviceBuffer(const void* ptr);
    CkDeviceBuffer(const void* ptr, const CkCallback& cb);
@@ -8958,6 +8949,7 @@ can be used to specify the CUDA stream where the data transfer will be
 enqueued:
 
 .. code-block:: c++
+
    // Post entry method
    void foo(int& size, double*& arr, CkDeviceBufferPost* post) {
      arr = dest_buffer; // Inform the location of the destination buffer to the runtime
