@@ -169,6 +169,8 @@ public:
     this->groupProxy = groupProxy;
   }
 
+  // May be executed by multiple PEs concurrently, but should be fine
+  // since each of them are handling a different MeshStreamerMessageV
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
     int destinationPe, lastDestinationPe = -1;
     Route destinationRoute;
@@ -430,6 +432,11 @@ ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
            int *dimensionSizes, int bufferSize,
            bool yieldFlag, double progressPeriodInMs,
            int mib, int tfn, int tfd, int cfn, int cfd) {
+  // Pass the group's proxy to the nodegroup so that it can invoke
+  // the group's entry methods
+  if (CkMyRank() == 0) {
+    nodeGroupProxy.ckLocalBranch()->setGroupProxy(this->thisProxy);
+  }
 
   numDimensions_ = numDimensions;
   maxNumDataItemsBuffered_ = maxNumDataItemsBuffered;
@@ -1125,10 +1132,10 @@ public:
       double progressPeriodInMs, int maxItemsBuffered,
       int _thresholdFractionNum, int _thresholdFractionDen,
       int _cutoffFractionNum, int _cutoffFractionDen) {
+    this->nodeGroupProxy = nodeGroupProxy;
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
         progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
         _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
-    this->nodeGroupProxy = nodeGroupProxy;
     clientGID_ = clientGID;
     clientObj_ = (ClientType*)CkLocalBranch(clientGID_);
   }
@@ -1238,10 +1245,10 @@ public:
       double progressPeriodInMs, int maxItemsBuffered,
       int _thresholdFractionNum, int _thresholdFractionDen,
       int _cutoffFractionNum, int _cutoffFractionDen) {
+    this->nodeGroupProxy = nodeGroupProxy;
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
                      progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
                      _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
-    this->nodeGroupProxy = nodeGroupProxy;
     clientAID_ = clientAID;
     clientArrayMgr_ = clientAID_.ckLocalBranch();
     clientLocMgr_ = clientArrayMgr_->getLocMgr();
