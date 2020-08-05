@@ -8883,23 +8883,23 @@ The following is a list of HAPI functions:
 
 .. code-block:: c++
 
-     void hapiAddCallback(cudaStream_t stream, CkCallback* callback);
+   void hapiAddCallback(cudaStream_t stream, CkCallback* callback);
 
-     void hapiCreateStreams();
-     cudaStream_t hapiGetStream();
+   void hapiCreateStreams();
+   cudaStream_t hapiGetStream();
 
-     cudaError_t hapiMalloc(void** devPtr, size_t size);
-     cudaError_t hapiFree(void* devPtr);
-     cudaError_t hapiMallocHost(void** ptr, size_t size);
-     cudaError_t hapiFreeHost(void* ptr);
+   cudaError_t hapiMalloc(void** devPtr, size_t size);
+   cudaError_t hapiFree(void* devPtr);
+   cudaError_t hapiMallocHost(void** ptr, size_t size);
+   cudaError_t hapiFreeHost(void* ptr);
 
-     void* hapiPoolMalloc(int size);
-     void hapiPoolFree(void* ptr);
+   void* hapiPoolMalloc(int size);
+   void hapiPoolFree(void* ptr);
 
-     cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count,
-                                 cudaMemcpyKind kind, cudaStream_t stream = 0);
+   cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count,
+                               cudaMemcpyKind kind, cudaStream_t stream = 0);
 
-     hapiCheck(code);
+   hapiCheck(code);
 
 ``hapiCreateStreams`` creates as many streams as the maximum number of
 concurrent kernels supported by the GPU device. ``hapiGetStream`` hands
@@ -8914,6 +8914,76 @@ block executes without errors. The given code should return
 Examples using CUDA and HAPI can be found under
 ``examples/charm++/cuda``. Codes under ``#ifdef USE_WR`` use the
 ``hapiWorkRequest`` scheme, which is now deprecated.
+
+Direct GPU Messaging
+~~~~~~~~~~~~~~~~~~~~
+
+Inspired by CUDA-aware MPI, the direct GPU messaging feature in Charm++
+attempts to reduce the latency and increase the bandwidth for inter-GPU
+data transfers by bypassing host memory. In Charm++, however, some
+metadata exchanges between the sender and receiver are required as the
+destination buffer is not known by the sender. Thus our approach is
+based on the Zero Copy Entry Method Post API (section :numref:`nocopyapi`),
+where the sender sends a metadata message containing the address of the
+source buffer on the GPU and the receiver posts an Rget from the source
+buffer to the destination buffer (also on the GPU).
+
+To send a GPU buffer using direct GPU messaging, add a ``nocopydevice``
+specifier to the parameter of the receiving entry method in the ``.ci`` file:
+
+.. code-block:: charmci
+
+   entry void foo(int size, nocopydevice double arr[size]);
+
+This entry method should be invoked on the sender by wrapping the
+source buffer with CkDeviceBuffer, whose constructor takes a pointer
+to the source buffer, a Charm++ callback to be invoked once the transfer
+completes (optional), and a CUDA stream associated with the transfer
+(also optional):
+
+.. code-block:: c++
+   // Constructors of CkDeviceBuffer
+   CkDeviceBuffer(const void* ptr);
+   CkDeviceBuffer(const void* ptr, const CkCallback& cb);
+   CkDeviceBuffer(const void* ptr, cudaStream_t stream);
+   CkDeviceBuffer(const void* ptr, const CkCallback& cb, cudaStream_t stream);
+
+   // Call on sender
+   someProxy.foo(source_buffer, cb, stream);
+
+As with the Zero Copy Entry Method Post API, two entry methods
+(post entry method and regular entry method) must be specified, and the
+post entry method has an additional ``CkDeviceBufferPost`` argument that
+can be used to specify the CUDA stream where the data transfer will be
+enqueued:
+
+.. code-block:: c++
+   // Post entry method
+   void foo(int& size, double*& arr, CkDeviceBufferPost* post) {
+     arr = dest_buffer; // Inform the location of the destination buffer to the runtime
+     post[0].cuda_stream = stream; // Perform the data transfer in the specified CUDA stream
+   }
+
+   // Regular entry method
+   void foo(int size, double* arr) {
+     // Data transfer into arr has been initiated
+     ...
+   }
+
+The specified CUDA stream can be used by the receiver to asynchronously invoke
+GPU operations dependent on the arriving data, without explicitly synchronizing
+with the host. This brings us to an important difference from the host-side
+Zero Copy API: the regular entry method is invoked after the data transfer is
+**initiated**, not after it is complete. It should also be noted that the
+regular entry method can be defined as a SDAG method if so desired.
+
+Currently the direct GPU messaging feature is limited to **intra-node** messages.
+Inter-node messages will be transferred using the naive host-staged mechanism
+where the data is first transferred to the host from the source GPU, sent over
+the network, then transferred to the destination GPU.
+
+Examples using the direct GPU messaging feature can be found in
+``examples/charm++/cuda/gpudirect``.
 
 .. _sec:mpiinterop:
 
@@ -11974,6 +12044,8 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 -  nocopy
 
 -  nocopypost
+
+-  nocopydevice
 
 -  migratable
 
