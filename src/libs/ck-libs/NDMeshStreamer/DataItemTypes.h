@@ -2,7 +2,7 @@
 #define DATA_ITEM_TYPES_H
 
 #include <utility>
-#include "ckarray.h"
+#include "ckarrayindex.h" // For CkArrayIndex in DataItemHandle
 
 #define CHUNK_SIZE 256
 
