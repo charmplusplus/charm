@@ -8785,6 +8785,136 @@ following example shows how this API can be used.
 
    CkSetPeHelpsOtherThreads(1);
 
+.. _sec:gpu:
+
+GPU Support
+-----------
+
+Overview
+~~~~~~~~
+
+GPUs are throughput-oriented devices with peak computational
+capabilities that greatly surpass equivalent-generation CPUs but with
+limited control logic. This currently constrains them to be used as
+accelerator devices controlled by code on the CPU. Traditionally,
+programmers have had to either (a) halt the execution of work on the CPU
+whenever issuing GPU work to simplify synchronization or (b) issue GPU
+work asynchronously and carefully manage and synchronize concurrent GPU
+work in order to ensure progress and good performance. The latter becomes
+significantly more difficult with overdecomposition as in Charm++, where
+numerous concurrent objects launch computational kernels and initiate
+data transfers on the GPU.
+
+The support for GPUs in the Charm++ runtime system consist of the
+**GPU Manager** module and **Hybrid API (HAPI)**. Currently only NVIDIA GPUs
+(and CUDA) are supported, although we are actively working on providing
+support for AMD and Intel GPUs as well. CUDA code can be integrated in
+Charm++ just like any C/C++ program to offload computational kernels,
+but when used naively, performance will most likely be far from ideal.
+This is because overdecomposition, a core concept of Charm++, creates
+relatively fine-grained objects and tasks that needs support from the
+runtime to be executed efficiently.
+
+We strongly recommend using CUDA Streams to assign one more streams
+to each chare, so that multiple GPU operations initiated by different
+chares can be executed concurrently when possible. Concurrent Kernel
+Execution in CUDA allows kernels in different streams to execute
+concurrently on the device unless a single kernel uses all of the available
+GPU resources. It should be noted that concurrent data transfers (even when
+they are in different streams) are limited by the number of DMA engines
+on the GPU, and most current GPUs have only one engine per direction
+(host-to-device, device-to-host).
+
+In addition to using CUDA Streams to maximize concurrency, another
+important consideration is avoiding synchronization calls such as
+``cudaStreamSynchronize`` or ``cudaDeviceSynchronize``. This is because
+the chare that has just enqueued some work to the GPU should yield the
+PE, in order to allow other chares waiting on the same PE to execute.
+Because of the message-driven execution pattern in Charm++, it is infeasible
+for the user to asynchronously detect when a GPU operation completes,
+either by manually polling the GPU or adding a CUDA Callback to the stream.
+One of the core functionalities of GPU Manager is supporting this asynchronous
+detection, which allows a Charm++ callback to be invoked when all previous
+operations in a specified CUDA stream complete. This is exposed to the
+user via a HAPI call, which is demonstrated in the usage section below.
+
+Enabling GPU Support
+~~~~~~~~~~~~~~~~~~~~
+
+GPU support via GPU Manager and HAPI is not included by default when
+building Charm++. Use ``buildold`` with the ``cuda`` option to build Charm++
+with GPU support (CMake build is currently not supported), e.g.
+
+.. code-block:: bash
+
+   $ ./buildold charm++ netlrts-linux-x86_64 cuda -j8
+
+Building with GPU support requires an installation of the CUDA Toolkit on the
+system, which is automatically found by the build script. If the script fails
+to find it, provide the path as one of ``CUDATOOLKIT_HOME``, ``CUDA_DIR``,
+or ``CUDA_HOME`` environment variables.
+
+Using GPU Manager
+~~~~~~~~~~~~~~~~~
+
+As explained in the Overview section, use of CUDA streams is strongly
+recommended. This provides the opportutnity for kernels offloaded by chares
+to execute concurrently on the GPU.
+
+In a typical Charm++ application using CUDA, the ``.C`` and ``.ci`` files
+would contain the Charm++ code, whereas a ``.cu`` file would contain the
+definition of CUDA kernels and functions that serve as entry points
+from the Charm++ application to use GPU capabilities. Calls to CUDA and/or
+HAPI to invoke kernels, perform data transfers, or enqueue detection for
+GPU work completion would be placed inside this file, although they could
+also be put in the ``.C`` file provided that the right header files are
+included (``<cuda_runtime.h>`` and/or ``"hapi.h"``). The user should make sure
+that the CUDA kernels are compiled by ``nvcc``, however.
+
+After the necessary GPU operations are enqueued in the appropriate CUDA stream,
+the user would call ``hapiAddCallback`` to have a Charm++ callback to be invoked
+when all previous operations in the stream complete. For example,
+``hapiAddCallback`` can be called after a kernel invocation and a device-to-host
+data transfer to asynchronously 'enqueue' a Charm++ callback that prints the
+computed data out to ``stdout`` (which will only be invoked when both the kernel
+and data transfer complete).
+
+The following is a list of HAPI functions:
+
+.. code-block:: c++
+
+     void hapiAddCallback(cudaStream_t stream, CkCallback* callback);
+
+     void hapiCreateStreams();
+     cudaStream_t hapiGetStream();
+
+     cudaError_t hapiMalloc(void** devPtr, size_t size);
+     cudaError_t hapiFree(void* devPtr);
+     cudaError_t hapiMallocHost(void** ptr, size_t size);
+     cudaError_t hapiFreeHost(void* ptr);
+
+     void* hapiPoolMalloc(int size);
+     void hapiPoolFree(void* ptr);
+
+     cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count,
+                                 cudaMemcpyKind kind, cudaStream_t stream = 0);
+
+     hapiCheck(code);
+
+``hapiCreateStreams`` creates as many streams as the maximum number of
+concurrent kernels supported by the GPU device. ``hapiGetStream`` hands
+out a stream created by the runtime in a round-robin fashion. The
+``hapiMalloc`` and ``hapiFree`` functions are wrappers to the
+corresponding CUDA API calls, and ``hapiPool`` functions provides memory
+pool functionalities which are used to obtain/free device memory without
+interrupting the GPU. ``hapiCheck`` is used to check if the input code
+block executes without errors. The given code should return
+``cudaError_t`` for it to work.
+
+Examples using CUDA and HAPI can be found under
+``examples/charm++/cuda``. Codes under ``#ifdef USE_WR`` use the
+``hapiWorkRequest`` scheme, which is now deprecated.
+
 .. _sec:mpiinterop:
 
 Charm-MPI Interoperation
