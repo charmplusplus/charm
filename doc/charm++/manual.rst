@@ -1923,7 +1923,9 @@ instead use a for loop:
 Note that ``int iter;`` is declared in the chare’s class definition and
 not in the ``.ci`` file. This is necessary because the Charm++ interface
 translator does not fully parse the declarations in the ``for`` loop
-header, because of the inherent complexities of C++.
+header, because of the inherent complexities of C++. Finally, there is
+currently no mechanism by which to ``break`` or ``continue`` from an
+SDAG loop.
 
 SDAG also supports conditional execution of statements and blocks with
 ``if`` statements. The syntax of SDAG ``if`` statements matches that of
