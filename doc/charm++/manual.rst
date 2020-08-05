@@ -8847,7 +8847,7 @@ with GPU support (CMake build is currently not supported), e.g.
 
 .. code-block:: bash
 
-   $ ./buildold charm++ netlrts-linux-x86_64 cuda -j8 --with-production
+   $ ./build charm++ netlrts-linux-x86_64 cuda -j8 --with-production
 
 Building with GPU support requires an installation of the CUDA Toolkit on the
 system, which is automatically found by the build script. If the script fails
