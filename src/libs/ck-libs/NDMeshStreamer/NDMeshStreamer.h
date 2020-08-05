@@ -180,8 +180,8 @@ public:
       destinationPe = msg->destinationPes[i];
       if (CmiNodeOf(destinationPe) == myIndex_) {
         this->groupProxy[destinationPe].localDeliver(
-            msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
             msg->dataItems + msg->getoffset<dtype>(i),
+            msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
             msg->destObjects[i], msg->sourcePes[i]);
       } else {
         all_delivered = false;
@@ -292,7 +292,7 @@ public:
   MeshStreamer(CkMigrateMessage *) {}
 
   // entry
-  virtual void localDeliver(size_t size, const char* data, CkArrayIndex arrayId,int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
+  virtual void localDeliver(const char* data, size_t size, CkArrayIndex arrayId, int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
   void receiveAlongRoute(MeshStreamerMessageV *msg);
   void enablePeriodicFlushing(){
     if (progressPeriodInMs_ <= 0) {
@@ -1112,7 +1112,7 @@ private:
     delete msg;
   }
 
-  inline void localDeliver(size_t size, const char* data, CkArrayIndex arrayId,
+  inline void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,
       int sourcePe) override {
     EntryMethod(const_cast<char*>(data), clientObj_);
     if (this->useCompletionDetection_) {
@@ -1180,7 +1180,7 @@ private:
   int cutoffFractionNum;
   int cutoffFractionDen;
 
-  inline void localDeliver(size_t size, const char* data, CkArrayIndex arrayId,
+  inline void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,
       int sourcePe) override {
     ClientType *clientObj;
 #ifdef CMK_TRAM_CACHE_ARRAY_METADATA
@@ -1259,8 +1259,8 @@ public:
   void receiveAtDestination(MeshStreamerMessageV *msg) override {
     for (int i = 0; i < msg->numDataItems; i++) {
       //const ArrayDataItem<dtype, itype> packedData = msg->getDataItem<ArrayDataItem<dtype, itype>>(i);
-      this->localDeliver(msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
-          msg->dataItems + msg->getoffset<dtype>(i),
+      this->localDeliver(msg->dataItems + msg->getoffset<dtype>(i),
+          msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
           msg->destObjects[i], msg->sourcePes[i]);
     }
     if (this->useStagedCompletion_) {
@@ -1294,7 +1294,7 @@ public:
       size_t sz = PUP::size(const_cast<dtype&>(dataItem));
       char* data = new char[sz];
       PUP::toMemBuf(const_cast<dtype&>(dataItem),data, sz);
-      localDeliver(sz, data, arrayIndex, this->myIndex_);
+      localDeliver(data, sz, arrayIndex, this->myIndex_);
       delete[] data;
       return;
     }

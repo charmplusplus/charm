@@ -13,7 +13,7 @@ module NDMeshStreamer {
 
   template<class dtype, class RouterType>
   group [migratable] MeshStreamer {
-    entry void localDeliver(size_t size, const char data[size], CkArrayIndex arrayId, int sourcePe);
+    entry void localDeliver(const char data[size], size_t size, CkArrayIndex arrayId, int sourcePe);
     entry void receiveAlongRoute(MeshStreamerMessageV *msg);
     entry void enablePeriodicFlushing();
     entry void finish();
