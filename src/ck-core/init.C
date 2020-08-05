@@ -1498,7 +1498,7 @@ void _initCharm(int unused_argc, char **argv)
 		*/
 		_registerCkFutures();
 		_registerCkArray();
-                _registerCkSyncBarrier();
+		_registerCkSyncBarrier();
 		_registerLBManager();
 		_registerTreeLevel();
     _registerMetaBalancer();
