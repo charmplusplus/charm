@@ -39,34 +39,6 @@ set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     readonly.h register.h sdag.h stats.h waitqd.h ../ck-ldb/CentralLB.h
     ../ck-cp/arrayRedistributor.h ../ck-cp/controlPoints.h ../ck-cp/controlPointsf.h ../ck-cp/pathHistory.h ../ck-cp/API-generator/cp_effects.h)
 
-set(ck-ci-sources
-    ${CMAKE_BINARY_DIR}/include/BaseLB.decl.h
-    ${CMAKE_BINARY_DIR}/include/CentralLB.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkArray.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkCallback.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkCheckpoint.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkCheckpointStatus.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkFutures.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkLocation.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkMarshall.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkMemCheckpoint.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkMulticast.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkReduction.decl.h
-    ${CMAKE_BINARY_DIR}/include/CkSyncBarrier.decl.h
-    ${CMAKE_BINARY_DIR}/include/ControlPoints.decl.h
-    ${CMAKE_BINARY_DIR}/include/completion.decl.h
-    ${CMAKE_BINARY_DIR}/include/DistBaseLB.decl.h
-    ${CMAKE_BINARY_DIR}/include/DistributedLB.decl.h
-    ${CMAKE_BINARY_DIR}/include/f90main.decl.h
-    ${CMAKE_BINARY_DIR}/include/HybridBaseLB.decl.h
-    ${CMAKE_BINARY_DIR}/include/LBManager.decl.h
-    ${CMAKE_BINARY_DIR}/include/MetaBalancer.decl.h
-    ${CMAKE_BINARY_DIR}/include/mpi_main.decl.h
-    ${CMAKE_BINARY_DIR}/include/PathHistory.decl.h
-    ${CMAKE_BINARY_DIR}/include/TraceControlPoints.decl.h
-    ${CMAKE_BINARY_DIR}/include/waitqd.decl.h
-)
-
 set(ldb-cxx-sources
     ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C
     ../ck-ldb/EveryLB.C
@@ -98,7 +70,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
 
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
-add_library(ck ${ck-cxx-sources} ${ck-h-sources} ${ck-ci-sources} ${all-ci-outputs})
+add_library(ck ${ck-cxx-sources} ${ck-h-sources} ${all-ci-outputs})
 add_library(ckmain main.C)
 add_dependencies(ckmain ck)
 
@@ -107,26 +79,16 @@ add_library(moduleCommonLBs
     ../ck-ldb/DistributedLB.C
     ../ck-ldb/TreeLB.C
     ../ck-ldb/manager.C
-    ${CMAKE_BINARY_DIR}/include/CommonLBs.decl.h
-    ${CMAKE_BINARY_DIR}/include/TreeLB.decl.h
-    ${CMAKE_BINARY_DIR}/include/TreeLevel.decl.h
-    ${CMAKE_BINARY_DIR}/include/MetisLB.decl.h
-    ${ck-ci-sources}
 )
+add_dependencies(moduleCommonLBs ck)
 
 if(${EVERYLB})
 add_library(moduleEveryLB
     ${ldb-cxx-sources}
     ${ldb-h-sources}
-    ${ck-ci-sources}
-    ${CMAKE_BINARY_DIR}/include/CommonLBs.decl.h
-    ${CMAKE_BINARY_DIR}/include/EveryLB.decl.h
-    ${CMAKE_BINARY_DIR}/include/TreeLB.decl.h
-    ${CMAKE_BINARY_DIR}/include/TreeLevel.decl.h
-    ${CMAKE_BINARY_DIR}/include/TempAwareRefineLB.decl.h
-    ${CMAKE_BINARY_DIR}/include/MetisLB.decl.h
 )
 configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
+add_dependencies(moduleEveryLB ck)
 
 add_library(moduleMetisLB ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
 add_dependencies(moduleMetisLB ck libckmetis)
@@ -135,15 +97,17 @@ add_custom_target(libckmetis COMMAND make -C ${CMAKE_SOURCE_DIR}/src/libs/ck-lib
 endif()
 
 # Single LBs
-add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C ${CMAKE_BINARY_DIR}/include/DistributedLB.decl.h ${ck-ci-sources})
-add_library(moduleTreeLB ../ck-ldb/TreeLB.C ${CMAKE_BINARY_DIR}/include/TreeLB.decl.h ${CMAKE_BINARY_DIR}/include/TreeLevel.decl.h ${ck-ci-sources})
+add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C)
+add_dependencies(moduleDistributedLB ck)
+add_library(moduleTreeLB ../ck-ldb/TreeLB.C)
+add_dependencies(moduleTreeLB ck)
 
 # Only for backwards compatibility
 add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
 configure_file(../libs/ck-libs/dummy/ckdummy.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
 # CkIO
-add_library(moduleCkIO ../libs/ck-libs/io/ckio.C ../libs/ck-libs/io/fs_parameters.c ../libs/ck-libs/io/ckio.h ${CMAKE_BINARY_DIR}/include/CkIO.decl.h)
+add_library(moduleCkIO ../libs/ck-libs/io/ckio.C ../libs/ck-libs/io/fs_parameters.c ../libs/ck-libs/io/ckio.h)
 add_dependencies(moduleCkIO ck)
 configure_file(../libs/ck-libs/io/ckio.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
@@ -162,8 +126,10 @@ target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../uti
 
 # Fortran interface
 if(${CMK_CAN_LINK_FORTRAN})
-    add_library(ckf charmf.C charmmod.f90 charmf.h ${ck-ci-sources})
+    add_library(ckf charmf.C charmmod.f90 charmf.h)
+    add_dependencies(ckf ck)
     add_library(ckmainf mainf.f90)
 endif()
 
-add_library(mpi-mainmodule mpi-mainmodule.C ${ck-ci-sources})
+add_library(mpi-mainmodule mpi-mainmodule.C)
+add_dependencies(mpi-mainmodule ck)
