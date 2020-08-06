@@ -33,6 +33,10 @@ module NDMeshStreamer {
     entry void receiveAtDestination(MeshStreamerMessageV *msg);
   };
 
+  // Messages are delivered to this nodegroup at intermediate and destination
+  // logical nodes instead of the group (MeshStreamer). At the destination
+  // nodegroup element, data items are locally delivered via the group
+  // elements.
   template<class dtype, class RouterType>
   nodegroup MeshStreamerNG {
     entry MeshStreamerNG();
