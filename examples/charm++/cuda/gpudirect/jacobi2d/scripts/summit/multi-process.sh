@@ -12,17 +12,16 @@ warmup_iters=10
 grid_size=32768
 sync=""
 pemap="L0,4,84,88"
-pool_size=2048
-buffer_size=1024
 
 echo "# Multi-process Jacobi2D"
 
-for block_size in 16384 8192 4096 2048 1024
+for div in 2 4 8 16 32
 do
+  block_size=$((grid_size / div))
   echo "# Block size $block_size"
   for iter in 1 2 3
   do
     echo "# Iteration $iter"
-    jsrun -n4 -a1 -c$ppn -g1 -K2 -r4 ./jacobi2d -s $grid_size -b $block_size -i $n_iters -w $warmup_iters $sync +ppn $ppn +pemap $pemap +gpumap block +gpuipceventpool $pool_size +gpucommbuffer $buffer_size
+    jsrun -n4 -a1 -c$ppn -g1 -K2 -r4 ./jacobi2d -s $grid_size -b $block_size -i $n_iters -w $warmup_iters $sync +ppn $ppn +pemap $pemap +gpumap block +gpunoshm
   done
 done
