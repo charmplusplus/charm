@@ -629,7 +629,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim0*nDim1);
+      allpairs.resize((size_t)nDim0*nDim1);
       coords.resize(dims);
       for(int i=0; i<nDim0; i++)
         for(int j=0; j<nDim1; j++)
@@ -651,7 +651,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim0*nDim1*nDim2);
+      allpairs.resize((size_t)nDim0*nDim1*nDim2);
       coords.resize(dims);
       for(int i=0; i<nDim0; i++)
         for(int j=0; j<nDim1; j++)
@@ -676,7 +676,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim[0]*nDim[1]*nDim[2]*nDim[3]);
+      allpairs.resize((size_t)nDim[0]*nDim[1]*nDim[2]*nDim[3]);
       coords.resize(dims);
       for(int i=0; i<nDim[0]; i++)
         for(int j=0; j<nDim[1]; j++)
@@ -703,7 +703,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]);
+      allpairs.resize((size_t)nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]);
       coords.resize(dims);
       for(int i=0; i<nDim[0]; i++)
         for(int j=0; j<nDim[1]; j++)
@@ -733,7 +733,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]*nDim[5]);
+      allpairs.resize((size_t)nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]*nDim[5]);
       coords.resize(dims);
       for(int i=0; i<nDim[0]; i++)
         for(int j=0; j<nDim[1]; j++)
@@ -1137,9 +1137,9 @@ class arrInfo {
    std::vector<int> _map;
  public:
    arrInfo() {}
-   arrInfo(const CkArrayIndex& n, int *speeds) : _nelems(n), _map(_nelems.getCombinedCount())
+   arrInfo(const CkArrayIndex& n, int *_speeds) : _nelems(n), _map(_nelems.getCombinedCount())
    {
-     distrib(speeds);
+     distrib(_speeds);
    }
    ~arrInfo() {}
    int getMap(const CkArrayIndex &i);
@@ -1161,17 +1161,17 @@ static int cmp(const void *first, const void *second)
 }
 
 void
-arrInfo::distrib(int *speeds)
+arrInfo::distrib(int *_speeds)
 {
   int _nelemsCount = _nelems.getCombinedCount();
   double total = 0.0;
   int npes = CkNumPes();
   int i,j,k;
   for(i=0;i<npes;i++)
-    total += (double) speeds[i];
+    total += (double) _speeds[i];
   std::vector<double> nspeeds(npes);
   for(i=0;i<npes;i++)
-    nspeeds[i] = (double) speeds[i] / total;
+    nspeeds[i] = (double) _speeds[i] / total;
   std::vector<int> cp(npes);
   for(i=0;i<npes;i++)
     cp[i] = (int) (nspeeds[i]*_nelemsCount);

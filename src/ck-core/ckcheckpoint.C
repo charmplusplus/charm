@@ -214,7 +214,7 @@ public:
 };
 
 // broadcast
-void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _requestStatus){
+void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback _cb, bool _requestStatus){
 	chkptStartTimer = CmiWallTimer();
 	requestStatus = _requestStatus;
 	// make dir on all PEs in case it is a local directory
@@ -262,7 +262,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
     } else
 #endif
     {
-      success &= checkpointOne(dirname, cb, requestStatus);
+      success &= checkpointOne(dirname, _cb, requestStatus);
     }
   }
 
@@ -316,7 +316,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 #endif
 #endif
 	chkpStatus = success?CK_CHECKPOINT_SUCCESS:CK_CHECKPOINT_FAILURE;
-	restartCB = cb;
+	restartCB = _cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
 
 	// Use barrier instead of contribute here:
@@ -646,7 +646,7 @@ void CkPupProcessorData(PUP::er &p)
 }
 
 // called only on pe 0
-static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatus){
+static bool checkpointOne(const char* dirname, CkCallback& _cb, bool requestStatus){
 	CmiAssert(CkMyPe()==0);
 	char filename[1024];
 	
@@ -658,7 +658,7 @@ static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatu
 	int _numNodes = CkNumNodes();
 
 	pRO|_numNodes;
-	pRO|cb;
+	pRO|_cb;
 	CkPupROData(pRO);
 	pRO|requestStatus;
 
@@ -718,19 +718,19 @@ void CkTestArrayElements()
 }
 */
 
-void CkStartCheckpoint(const char* dirname,const CkCallback& cb, bool requestStatus)
+void CkStartCheckpoint(const char* dirname,const CkCallback& _cb, bool requestStatus)
 {
-  if(cb.isInvalid()) 
+  if(_cb.isInvalid()) 
     CkAbort("callback after checkpoint is not set properly");
 
-  if(cb.containsPointer())
+  if(_cb.containsPointer())
     CkAbort("Cannot restart from a callback based on a pointer");
 
 
 	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 	
 	// hand over to checkpoint managers for per-processor checkpointing
-	CProxy_CkCheckpointMgr(_sysChkptMgr).Checkpoint(dirname, cb, requestStatus);
+	CProxy_CkCheckpointMgr(_sysChkptMgr).Checkpoint(dirname, _cb, requestStatus);
 }
 
 /**

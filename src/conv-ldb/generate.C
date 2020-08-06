@@ -122,7 +122,7 @@ n -= (V-1);
 }
 #endif
 
-static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int n)
+static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int v, int n)
 	/* Add more edges to make up a total of E edges */
   {	int i,j,w,x,y,k;
 	int c1,max,maxi;
@@ -131,17 +131,17 @@ static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int
 	int flag=0;
 
 	/* first add edges for a C-way spanning tree.*/
-        varr=(int **)calloc(V, sizeof(int*));
-        for (i=0;i<V;i++)
+        varr=(int **)calloc(v, sizeof(int*));
+        for (i=0;i<v;i++)
             varr[i] = (int *)calloc(2, sizeof(int));
 	
   c1 = 1;
 	if (C>1) c1 = C-1;
 
-	for (i=0; i<= V/c1; i++)
+	for (i=0; i<= v/c1; i++)
 	  for (j=0; j<c1; j++) {
 	      w = c1*i + j +1; 
-	      if (w < V) {
+	      if (w < v) {
 		addEdge(graph, EdgeList,i,w);
 		count++;
 			      }
@@ -149,7 +149,7 @@ static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int
 	
 	/*varr is array of vertices and free connection for each vertex*/
 	j=0;
-	for (i=0;i<V;i++)
+	for (i=0;i<v;i++)
 		if(connections(graph, i)<C)
 		{
 		 varr[j][0]=i;
@@ -279,7 +279,7 @@ static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int
 						 varrlen--;
 					}
 			}	      
-        for (i=0;i<V;i++) free(varr[i]);
+        for (i=0;i<v;i++) free(varr[i]);
         free(varr);
 }
 

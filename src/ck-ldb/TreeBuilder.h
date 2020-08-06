@@ -292,7 +292,7 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
     if (mype == level2root)
     {
       // assumes all nodes in my group are same size
-      std::vector<int> pes_in_group(NODES_PER_GROUP * CkNodeSize(mynode));
+      std::vector<int> pes_in_group((size_t)NODES_PER_GROUP * CkNodeSize(mynode));
       std::iota(pes_in_group.begin(), pes_in_group.end(), GroupFirstPe(mygroup));
       
       NodeSetLevel* level = new NodeSetLevel(lbmgr, pes_in_group);

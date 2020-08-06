@@ -48,9 +48,9 @@ struct DataMatrix {
   DataMatrix() {}
   DataMatrix(int nrows, int ncols, bool ones = false) : num_rows(nrows), num_cols(ncols) {
     if (ones)
-      data.resize(nrows * ncols, 1);
+      data.resize((size_t)nrows * ncols, 1);
     else
-      data.resize(nrows * ncols, 0);
+      data.resize((size_t)nrows * ncols, 0);
   }
   DataMatrix(const std::vector<double>& d, int nrows, int ncols)
       : data(d), num_rows(nrows), num_cols(ncols) {

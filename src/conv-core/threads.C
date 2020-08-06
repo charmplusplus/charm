@@ -456,7 +456,8 @@ static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratab
   if (*stackSize==0) *stackSize=CthCpvAccess(_defaultStackSize);
   th->stacksize=*stackSize;
   if (!useMigratable || !CmiIsomallocEnabled()) {
-    ret=malloc(*stackSize); 
+    ret=malloc(*stackSize);
+    CmiEnforce(ret != nullptr);
   } else {
     th->isMigratable = useMigratable;
 #if CMK_THREADS_ALIAS_STACK

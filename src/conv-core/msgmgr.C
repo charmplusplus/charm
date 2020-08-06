@@ -1,6 +1,7 @@
 
 #include <stdlib.h>
 #include <converse.h>
+#include <limits>
 
 #define CmiAlloc  malloc
 #define CmiFree   free
@@ -168,7 +169,9 @@ CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup)
       int ntags, *tags;
       void *msg;
       pup_int(p, &ntags);
+      CmiEnforce(ntags <= std::numeric_limits<size_t>::max() / sizeof(int));
       tags = (int*) malloc(ntags*sizeof(int));
+      CmiEnforce(tags != nullptr);
       pup_ints(p, tags, ntags);
       msgpup(p,&msg);
       CmmPut(t, ntags, tags, msg);

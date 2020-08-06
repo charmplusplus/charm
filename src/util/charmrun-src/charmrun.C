@@ -4365,16 +4365,16 @@ static void start_nodes_daemon(std::vector<nodetab_process> & process_table)
   {
     const nodetab_host * h = p.host;
 
-    char *arg_currdir_r = pathfix(arg_currdir_a, h->pathfixes);
-    strcpy(task.cwd, arg_currdir_r);
-    free(arg_currdir_r);
-    char *arg_nodeprog_r = pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
-    strcpy(task.pgm, arg_nodeprog_r);
+    char *_arg_currdir_r = pathfix(arg_currdir_a, h->pathfixes);
+    strcpy(task.cwd, _arg_currdir_r);
+    free(_arg_currdir_r);
+    char *_arg_nodeprog_r = pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
+    strcpy(task.pgm, _arg_nodeprog_r);
 
     if (arg_verbose)
       printf("Charmrun> Starting node program %d on '%s' as %s.\n", p.nodeno,
-             h->name, arg_nodeprog_r);
-    free(arg_nodeprog_r);
+             h->name, _arg_nodeprog_r);
+    free(_arg_nodeprog_r);
     sprintf(task.env, "NETSTART=%s", create_netstart(p.nodeno));
 
     char nodeArgBuffer[5120]; /*Buffer to hold assembled program arguments*/
@@ -4819,14 +4819,14 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
           "/usr/X11R6/bin:/usr/openwin/bin\"\n");
 
   /* find the node-program */
-  char *arg_nodeprog_r = pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
+  char *_arg_nodeprog_r = pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
 
   /* find the current directory, relative version */
-  char *arg_currdir_r = pathfix(arg_currdir_a, h->pathfixes);
+  char *_arg_currdir_r = pathfix(arg_currdir_a, h->pathfixes);
 
   if (arg_verbose) {
     printf("Charmrun> find the node program \"%s\" at \"%s\" for %d.\n",
-           arg_nodeprog_r, arg_currdir_r, nodeno);
+           _arg_nodeprog_r, _arg_currdir_r, nodeno);
   }
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     ssh_Find(f, h->xterm, "F_XTERM");
@@ -4856,15 +4856,15 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "fi\n");
   }
 
-  fprintf(f, "if test ! -x \"%s\"\nthen\n", arg_nodeprog_r);
-  fprintf(f, "  Echo 'Cannot locate this node-program: %s'\n", arg_nodeprog_r);
+  fprintf(f, "if test ! -x \"%s\"\nthen\n", _arg_nodeprog_r);
+  fprintf(f, "  Echo 'Cannot locate this node-program: %s'\n", _arg_nodeprog_r);
   fprintf(f, "  Exit 1\n");
   fprintf(f, "fi\n");
 
-  fprintf(f, "cd \"%s\"\n", arg_currdir_r);
+  fprintf(f, "cd \"%s\"\n", _arg_currdir_r);
   fprintf(f, "if test $? = 1\nthen\n");
   fprintf(f, "  Echo 'Cannot propagate this current directory:'\n");
-  fprintf(f, "  Echo '%s'\n", arg_currdir_r);
+  fprintf(f, "  Echo '%s'\n", _arg_currdir_r);
   fprintf(f, "  Exit 1\n");
   fprintf(f, "fi\n");
 
@@ -4908,9 +4908,9 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
       fprintf(f, "$F_XTERM");
       fprintf(f, " -title 'Node %d (%s)' ", nodeno, h->name);
       if (strcmp(dbg, "idb") == 0)
-        fprintf(f, " -e $F_DBG \"%s\" -c /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+        fprintf(f, " -e $F_DBG \"%s\" -c /tmp/charmrun_gdb.$$ \n", _arg_nodeprog_r);
       else
-        fprintf(f, " -e $F_DBG \"%s\" -x /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+        fprintf(f, " -e $F_DBG \"%s\" -x /tmp/charmrun_gdb.$$ \n", _arg_nodeprog_r);
     } else if (strcmp(dbg, "lldb") == 0) {
       fprintf(f, "cat > /tmp/charmrun_lldb.$$ << END_OF_SCRIPT\n");
       fprintf(f, "platform shell -- /bin/rm -f /tmp/charmrun_lldb.$$\n");
@@ -4933,7 +4933,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
         fprintf(f, "\"%s\" ", arg_runscript);
       fprintf(f, "$F_XTERM");
       fprintf(f, " -title 'Node %d (%s)' ", nodeno, h->name);
-      fprintf(f, " -e $F_DBG \"%s\" -s /tmp/charmrun_lldb.$$ \n", arg_nodeprog_r);
+      fprintf(f, " -e $F_DBG \"%s\" -s /tmp/charmrun_lldb.$$ \n", _arg_nodeprog_r);
     } else if (strcmp(dbg, "dbx") == 0) {
       fprintf(f, "cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
       fprintf(f, "sh /bin/rm -f /tmp/charmrun_dbx.$$\n");
@@ -4955,7 +4955,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
         fprint_arg(f, argv);
         fprintf(f, "\' ");
       }
-      fprintf(f, "-s/tmp/charmrun_dbx.$$ %s", arg_nodeprog_r);
+      fprintf(f, "-s/tmp/charmrun_dbx.$$ %s", _arg_nodeprog_r);
       if (arg_debug_no_pause)
         fprint_arg(f, argv);
       fprintf(f, "\n");
@@ -4971,7 +4971,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     if (!arg_va_rand)
       fprintf(f, "command -v setarch >/dev/null 2>&1 && SETARCH=\"setarch `uname -m` -R \" || ");
     fprintf(f, "SETARCH=\n");
-    fprintf(f, "${SETARCH}%s", arg_nodeprog_r);
+    fprintf(f, "${SETARCH}%s", _arg_nodeprog_r);
     fprint_arg(f, argv);
     fprintf(f, "\n");
     fprintf(f, "echo 'program exited with code '\\$?\n");
@@ -4989,7 +4989,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "SETARCH=\n");
     if (arg_runscript)
       fprintf(f, "\"%s\" ", arg_runscript);
-    fprintf(f, "${SETARCH}\"%s\" ", arg_nodeprog_r);
+    fprintf(f, "${SETARCH}\"%s\" ", _arg_nodeprog_r);
     fprint_arg(f, argv);
     if (h->nice != -100) {
       if (arg_verbose)
@@ -5008,7 +5008,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
                "    ldd \"%s\"\n"
                "  ) > /tmp/charmrun_err.$$ 2>&1 \n"
                "fi\n",
-            arg_nodeprog_r, arg_nodeprog_r);
+            _arg_nodeprog_r, _arg_nodeprog_r);
   }
 
   /* End the node-program subshell. To minimize the number
@@ -5035,7 +5035,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
           "  Exit 1\n"
           "fi\n");
   fprintf(f, "Exit 0\n");
-  free(arg_currdir_r);
+  free(_arg_currdir_r);
 }
 
 /* use the command "size" to get information about the position of the ".data"
