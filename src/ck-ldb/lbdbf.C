@@ -6,7 +6,6 @@
 #include "charm++.h"
 #include "charm-api.h"
 
-
 #define flbturninstrumentoff  FTN_NAME(FLBTURNINSTRUMENTOFF, flbturninstrumentoff)
 #define flbturninstrumenton   FTN_NAME(FLBTURNINSTRUMENTON, flbturninstrumenton)
 
