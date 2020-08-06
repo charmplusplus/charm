@@ -24,5 +24,8 @@ $(BINARY): $(patsubst %.C,%.o,$(wildcard *.C))
 test: $(BINARY)
 	$(call run, ./$(BINARY) $(TESTFLAGS))
 
+testp: $(BINARY)
+	$(call run, ./$(BINARY) $(P))
+
 clean:
 	rm -f *.o *.decl.h *.def.h charmrun $(BINARY)

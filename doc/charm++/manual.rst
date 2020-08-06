@@ -1923,7 +1923,9 @@ instead use a for loop:
 Note that ``int iter;`` is declared in the chare’s class definition and
 not in the ``.ci`` file. This is necessary because the Charm++ interface
 translator does not fully parse the declarations in the ``for`` loop
-header, because of the inherent complexities of C++.
+header, because of the inherent complexities of C++. Finally, there is
+currently no mechanism by which to ``break`` or ``continue`` from an
+SDAG loop.
 
 SDAG also supports conditional execution of statements and blocks with
 ``if`` statements. The syntax of SDAG ``if`` statements matches that of
@@ -2293,7 +2295,7 @@ PUP modes
 ^^^^^^^^^
 
 Charm++ uses your pup method to both pack and unpack, by passing
-different types of PUP::ers to it. The method p.isUnpacking() returns
+different types of PUP::ers to it. The method ``p.isUnpacking()`` returns
 true if your object is being unpacked—that is, your object’s values are
 being restored. Your pup method must work properly in sizing, packing,
 and unpacking modes; and to save and restore properly, the same fields
@@ -2304,20 +2306,39 @@ Three modes are used, with three separate types of PUP::er: sizing,
 which only computes the size of your data without modifying it; packing,
 which reads/saves values out of your data; and unpacking, which
 writes/restores values into your data. You can determine exactly which
-type of PUP::er was passed to you using the p.isSizing(), p.isPacking(),
-and p.isUnpacking() methods. However, sizing and packing should almost
+type of PUP::er was passed to you using the ``p.isSizing()``, ``p.isPacking()``,
+and ``p.isUnpacking()`` methods. However, sizing and packing should almost
 always be handled identically, so most programs should use
-p.isUnpacking() and !p.isUnpacking(). Any program that calls
-p.isPacking() and does not also call p.isSizing() is probably buggy,
+``p.isUnpacking()`` and ``!p.isUnpacking()``. Any program that calls
+``p.isPacking()`` and does not also call ``p.isSizing()`` is probably buggy,
 because sizing and packing must see exactly the same data.
 
-The p.isDeleting() flag indicates the object will be deleted after
+The ``p.isDeleting()`` flag indicates the object will be deleted after
 calling the pup method. This is normally only needed for pup methods
 called via the C or f90 interface, as provided by AMPI or the other
 frameworks. Other Charm++ array elements, marshalled parameters, and
 other C++ interface objects have their destructor called when they are
-deleted, so the p.isDeleting() call is not normally required—instead,
+deleted, so the ``p.isDeleting()`` call is not normally required—instead,
 memory should be deallocated in the destructor as usual.
+
+Separately from indicating if the pup method is being used for sizing,
+packing, or unpacking, the system also provides methods to determine
+the purpose of a pup. The ``p.isCheckpoint()`` and ``p.isMigration()``
+methods let the user determine if the runtime system has invoked the
+pup method for checkpointing (both in-memory and to disk) or for
+PE-to-PE migration (this is most commonly done for load balancing).
+These allow the user to customize their pup functions, for
+example, one may want to minimize checkpoint size by not including
+data that can be reconstructed. Note that these are orthogonal to the
+direction of the pup (e.g. ``p.isCheckpoint()`` will return true both
+when creating a checkpoint and when restoring from a checkpoint; one
+can differentiate between these two cases because when creating a
+checkpoint ``p.isPacking()`` will also return true, while
+``p.isUnpacking()`` will return true when restoring). The runtime
+system guarantees that at most of these will be set. There may be
+cases where neither ``p.isCheckpoint()`` nor ``p.isMigration()``
+return true (e.g. when the system is marshalling entry method
+arguments).
 
 More specialized modes and PUP::ers are described in
 section :numref:`sec:PUP:CommonPUPers`.
@@ -8766,6 +8787,198 @@ following example shows how this API can be used.
 
    CkSetPeHelpsOtherThreads(1);
 
+.. _sec:gpu:
+
+GPU Support
+-----------
+
+Overview
+~~~~~~~~
+
+GPUs are throughput-oriented devices with peak computational
+capabilities that greatly surpass equivalent-generation CPUs but with
+limited control logic. This currently constrains them to be used as
+accelerator devices controlled by code on the CPU. Traditionally,
+programmers have had to either (a) halt the execution of work on the CPU
+whenever issuing GPU work to simplify synchronization or (b) issue GPU
+work asynchronously and carefully manage and synchronize concurrent GPU
+work in order to ensure progress and good performance. The latter becomes
+significantly more difficult with overdecomposition as in Charm++, where
+numerous concurrent objects launch computational kernels and initiate
+data transfers on the GPU.
+
+The support for GPUs in the Charm++ runtime system consist of the
+**GPU Manager** module and **Hybrid API (HAPI)**. Currently only NVIDIA GPUs
+(and CUDA) are supported, although we are actively working on providing
+support for AMD and Intel GPUs as well. CUDA code can be integrated in
+Charm++ just like any C/C++ program to offload computational kernels,
+but when used naively, performance will most likely be far from ideal.
+This is because overdecomposition, a core concept of Charm++, creates
+relatively fine-grained objects and tasks that needs support from the
+runtime to be executed efficiently.
+
+We strongly recommend using CUDA Streams to assign one more streams
+to each chare, so that multiple GPU operations initiated by different
+chares can be executed concurrently when possible. Concurrent Kernel
+Execution in CUDA allows kernels in different streams to execute
+concurrently on the device unless a single kernel uses all of the available
+GPU resources. It should be noted that concurrent data transfers (even when
+they are in different streams) are limited by the number of DMA engines
+on the GPU, and most current GPUs have only one engine per direction
+(host-to-device, device-to-host).
+
+In addition to using CUDA Streams to maximize concurrency, another
+important consideration is avoiding synchronization calls such as
+``cudaStreamSynchronize`` or ``cudaDeviceSynchronize``. This is because
+the chare that has just enqueued some work to the GPU should yield the
+PE, in order to allow other chares waiting on the same PE to execute.
+Because of the message-driven execution pattern in Charm++, it is infeasible
+for the user to asynchronously detect when a GPU operation completes,
+either by manually polling the GPU or adding a CUDA Callback to the stream.
+One of the core functionalities of GPU Manager is supporting this asynchronous
+detection, which allows a Charm++ callback to be invoked when all previous
+operations in a specified CUDA stream complete. This is exposed to the
+user via a HAPI call, which is demonstrated in the usage section below.
+
+Enabling GPU Support
+~~~~~~~~~~~~~~~~~~~~
+
+GPU support via GPU Manager and HAPI is not included by default when
+building Charm++. Use ``buildold`` with the ``cuda`` option to build Charm++
+with GPU support (CMake build is currently not supported), e.g.
+
+.. code-block:: bash
+
+   $ ./build charm++ netlrts-linux-x86_64 cuda -j8 --with-production
+
+Building with GPU support requires an installation of the CUDA Toolkit on the
+system, which is automatically found by the build script. If the script fails
+to find it, provide the path as one of ``CUDATOOLKIT_HOME``, ``CUDA_DIR``,
+or ``CUDA_HOME`` environment variables.
+
+Using GPU Manager
+~~~~~~~~~~~~~~~~~
+
+As explained in the Overview section, use of CUDA streams is strongly
+recommended. This provides the opportunity for kernels offloaded by chares
+to execute concurrently on the GPU.
+
+In a typical Charm++ application using CUDA, the ``.C`` and ``.ci`` files
+would contain the Charm++ code, whereas a ``.cu`` file would contain the
+definition of CUDA kernels and functions that serve as entry points
+from the Charm++ application to use GPU capabilities. Calls to CUDA and/or
+HAPI to invoke kernels, perform data transfers, or enqueue detection for
+GPU work completion would be placed inside this file, although they could
+also be put in the ``.C`` file provided that the right header files are
+included (``<cuda_runtime.h>`` and/or ``"hapi.h"``). The user should make sure
+that the CUDA kernels are compiled by ``nvcc``, however.
+
+After the necessary GPU operations are enqueued in the appropriate CUDA stream,
+the user would call ``hapiAddCallback`` to have a Charm++ callback to be invoked
+when all previous operations in the stream complete. For example,
+``hapiAddCallback`` can be called after a kernel invocation and a device-to-host
+data transfer to asynchronously 'enqueue' a Charm++ callback that prints the
+computed data out to ``stdout`` (which will only be invoked when both the kernel
+and data transfer complete).
+
+The following is a list of HAPI functions:
+
+.. code-block:: c++
+
+   void hapiAddCallback(cudaStream_t stream, CkCallback* callback);
+
+   void hapiCreateStreams();
+   cudaStream_t hapiGetStream();
+
+   void* hapiPoolMalloc(int size);
+   void hapiPoolFree(void* ptr);
+
+   hapiCheck(code);
+
+``hapiCreateStreams`` creates as many streams as the maximum number of
+concurrent kernels supported by the GPU device. ``hapiGetStream`` hands
+out a stream created by the runtime in a round-robin fashion.
+``hapiPool`` functions provides memory pool functionalities which are
+used to obtain/free device memory without interrupting the GPU.
+``hapiCheck`` is used to check if the input code block executes without
+errors. The provided code should return ``cudaError_t`` for it to work.
+
+Examples using CUDA and HAPI can be found under
+``examples/charm++/cuda``. Codes under ``#ifdef USE_WR`` use the
+``hapiWorkRequest`` scheme, which is now deprecated.
+
+Direct GPU Messaging
+~~~~~~~~~~~~~~~~~~~~
+
+Inspired by CUDA-aware MPI, the direct GPU messaging feature in Charm++
+attempts to reduce the latency and increase the bandwidth for inter-GPU
+data transfers by bypassing host memory. In Charm++, however, some
+metadata exchanges between the sender and receiver are required as the
+destination buffer is not known by the sender. Thus our approach is
+based on the Zero Copy Entry Method Post API (section :numref:`nocopyapi`),
+where the sender sends a metadata message containing the address of the
+source buffer on the GPU and the receiver posts an Rget from the source
+buffer to the destination buffer (also on the GPU).
+
+To send a GPU buffer using direct GPU messaging, add a ``nocopydevice``
+specifier to the parameter of the receiving entry method in the ``.ci`` file:
+
+.. code-block:: charmci
+
+   entry void foo(int size, nocopydevice double arr[size]);
+
+This entry method should be invoked on the sender by wrapping the
+source buffer with ``CkDeviceBuffer``, whose constructor takes a pointer
+to the source buffer, a Charm++ callback to be invoked once the transfer
+completes (optional), and a CUDA stream associated with the transfer
+(also optional):
+
+.. code-block:: c++
+
+   // Constructors of CkDeviceBuffer
+   CkDeviceBuffer(const void* ptr);
+   CkDeviceBuffer(const void* ptr, const CkCallback& cb);
+   CkDeviceBuffer(const void* ptr, cudaStream_t stream);
+   CkDeviceBuffer(const void* ptr, const CkCallback& cb, cudaStream_t stream);
+
+   // Call on sender
+   someProxy.foo(source_buffer, cb, stream);
+
+As with the Zero Copy Entry Method Post API, two entry methods
+(post entry method and regular entry method) must be specified, and the
+post entry method has an additional ``CkDeviceBufferPost`` argument that
+can be used to specify the CUDA stream where the data transfer will be
+enqueued:
+
+.. code-block:: c++
+
+   // Post entry method
+   void foo(int& size, double*& arr, CkDeviceBufferPost* post) {
+     arr = dest_buffer; // Inform the location of the destination buffer to the runtime
+     post[0].cuda_stream = stream; // Perform the data transfer in the specified CUDA stream
+   }
+
+   // Regular entry method
+   void foo(int size, double* arr) {
+     // Data transfer into arr has been initiated
+     ...
+   }
+
+The specified CUDA stream can be used by the receiver to asynchronously invoke
+GPU operations dependent on the arriving data, without explicitly synchronizing
+with the host. This brings us to an important difference from the host-side
+Zero Copy API: the regular entry method is invoked after the data transfer is
+**initiated**, not after it is complete. It should also be noted that the
+regular entry method can be defined as a SDAG method if so desired.
+
+Currently the direct GPU messaging feature is limited to **intra-node** messages.
+Inter-node messages will be transferred using the naive host-staged mechanism
+where the data is first transferred to the host from the source GPU, sent over
+the network, then transferred to the destination GPU.
+
+Examples using the direct GPU messaging feature can be found in
+``examples/charm++/cuda/gpudirect``.
+
 .. _sec:mpiinterop:
 
 Charm-MPI Interoperation
@@ -11825,6 +12038,8 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 -  nocopy
 
 -  nocopypost
+
+-  nocopydevice
 
 -  migratable
 

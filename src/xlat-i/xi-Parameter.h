@@ -13,6 +13,7 @@ class Value;
 class Parameter {
   int rdma;
   bool firstRdma;
+  bool firstDeviceRdma;
 
  public:
   Type* type;
@@ -35,25 +36,27 @@ class Parameter {
   friend class ParamList;
   void pup(XStr& str);
   void pupArray(XStr& str);
-  void pupRdma(XStr& str, bool genRdma);
+  void pupRdma(XStr& str, bool genRdma, bool device);
   void copyPtr(XStr& str);
   void check();
   void checkPointer(Type* dt);
   void marshallArraySizes(XStr& str, Type* dt);
   void marshallRegArraySizes(XStr& str);
   void marshallRdmaParameters(XStr& str, bool genRdma);
+  void prepareToDeviceCommBuffer(XStr& str, int& index);
+  void marshallDeviceRdmaParameters(XStr& str, int& index);
   void marshallArrayData(XStr& str);
   void marshallRdmaArrayData(XStr& str);
   void beginUnmarshall(XStr& str);
   void beginUnmarshallArray(XStr& str);
-  void beginUnmarshallRdma(XStr& str, bool genRdma);
+  void beginUnmarshallRdma(XStr& str, bool genRdma, bool device);
   void beginUnmarshallSDAGRdma(XStr& str);
   void beginUnmarshallSDAGCall(XStr& str);
-  void beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma);
+  void beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma, bool device);
   void unmarshallArrayData(XStr& str);
   void unmarshallRegArrayData(XStr& str);
   void unmarshallRdmaArrayData(XStr& str, bool genRegArray);
-  void adjustUnmarshalledRdmaPtrsSDAG(XStr& str);
+  void adjustUnmarshalledRdmaPtrsSDAG(XStr& str, bool genRdma, bool device);
   void unmarshallRegArrayDataSDAG(XStr& str);
   void unmarshallRdmaArrayDataSDAG(XStr& str);
   void unmarshallRegArrayDataSDAGCall(XStr& str);
@@ -67,6 +70,7 @@ class Parameter {
   void setConditional(int c);
   void setRdma(int r);
   void setFirstRdma(bool fr);
+  void setFirstDeviceRdma(bool fr);
   int print(XStr& str, int withDefaultValues = 0, int useConst = 1, int fwdNum = 0);
   void printAddress(XStr& str);
   void printValue(XStr& str);
@@ -78,8 +82,10 @@ class Parameter {
   int isRdma(void) const;
   int isSendRdma(void) const;
   int isRecvRdma(void) const;
+  int isDevice(void) const;
   int getRdma(void) const;
   int isFirstRdma(void) const;
+  int isFirstDeviceRdma(void) const;
   int isConditional(void) const;
   Type* getType(void) { return type; }
   const char* getArrayLen(void) const { return arrLen; }
@@ -87,7 +93,7 @@ class Parameter {
   void setGivenName(const char* s) { given_name = s; }
   const char* getName(void) const { return name; }
   void printMsg(XStr& str);
-  void storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count);
+  void storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count);
   int operator==(const Parameter& parm) const;
 
   // DMK - Added for accelerator options
@@ -112,9 +118,17 @@ class ParamList {
   typedef void (Parameter::*fn_t)(XStr& str);
   typedef void (Parameter::*rdmafn_t)(XStr& str, bool genRegArray);
   typedef void (Parameter::*rdmarecvfn_t)(XStr& str, bool genRdma, bool isSDAGGen, int &count);
+  typedef void (Parameter::*rdmaheterofn_t)(XStr& str, bool genRdma, bool device);
+  typedef void (Parameter::*rdmaheterocountfn_t)(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count);
+  typedef void (Parameter::*rdmadevicefn_t)(XStr& str, int& index);
   void callEach(fn_t f, XStr& str);
   void callEach(rdmafn_t f, XStr& str, bool genRegArray);
   void callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen);
+  void callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen, int &count);
+  void callEach(rdmaheterofn_t f, XStr& str, bool genRdma, bool device);
+  void callEach(rdmaheterocountfn_t f, XStr& str, bool genRdma, bool isSDAGGen, bool device);
+  void callEach(rdmaheterocountfn_t f, XStr& str, bool genRdma, bool isSDAGGen, bool device, int& count);
+  void callEach(rdmadevicefn_t f, XStr& str, int& index);
   void encloseFlag(XStr& str);
   bool manyPointers;
 
@@ -141,9 +155,12 @@ class ParamList {
   int hasRdma(void);
   int hasSendRdma(void);
   int hasRecvRdma(void);
+  int hasDevice(void);
   int isRdma(void);
+  int isDevice(void);
   int getRdma(void);
   int isFirstRdma(void);
+  int isFirstDeviceRdma(void);
   int isRecvRdma(void);
   const char* getGivenName(void) const;
   void setGivenName(const char* s);

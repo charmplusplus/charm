@@ -18,4 +18,4 @@ reftest.o: reftest.C reftest.decl.h
 	$(CHARMC) -c reftest.C
 
 test: all
-	$(call run, +p4 ./reftest 16 4 )
+	$(call run, +p4 ./reftest)
