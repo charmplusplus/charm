@@ -4,6 +4,9 @@
 #BSUB -nnodes 1
 #BSUB -J jacobi2d
 
+# Function to display commands
+exe() { echo "\$ $@" ; "$@" ; }
+
 cd $HOME/work/charm/examples/charm++/cuda/gpudirect/jacobi2d
 
 ppn=1
@@ -22,6 +25,6 @@ do
   for iter in 1 2 3
   do
     echo "# Iteration $iter"
-    jsrun -n4 -a1 -c$ppn -g1 -K2 -r4 ./jacobi2d -s $grid_size -b $block_size -i $n_iters -w $warmup_iters $sync +ppn $ppn +pemap $pemap +gpumap block +gpunoshm
+    exe jsrun -n4 -a1 -c$ppn -g1 -K2 -r4 ./jacobi2d -s $grid_size -b $block_size -i $n_iters -w $warmup_iters $sync +ppn $ppn +pemap $pemap +gpumap block +gpunoshm
   done
 done
