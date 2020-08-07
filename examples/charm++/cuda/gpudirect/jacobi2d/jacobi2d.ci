@@ -32,7 +32,6 @@ mainmodule jacobi2d {
     entry void packGhostsDone();
     entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
-    entry void sendGhostDone();
 
     entry void exchangeGhosts() {
       serial {
@@ -41,13 +40,12 @@ mainmodule jacobi2d {
         if (!sync_ver) packGhosts();
       }
 
-      // Packed buffers can be enqueued for sending right away with zerocopy
-      // Without it, they should first be transferred to host memory
-      if (use_zerocopy) {
-        serial { sendGhosts(); }
-      } else {
-        when packGhostsDone() {
-          serial { sendGhosts(); }
+      when packGhostsDone() {
+        serial {
+          // When packing is done, we know that the new temperatures have been updated
+          // (because the host doesn't separately detect when the Jacobi kernel completes)
+          std::swap(d_temperature, d_new_temperature);
+          sendGhosts();
         }
       }
 
@@ -67,19 +65,7 @@ mainmodule jacobi2d {
         }
       }
 
-      // With device-side zerocopy, need to wait until ghost transfers are complete
-      if (use_zerocopy) {
-        for (remote_count = 0; remote_count < neighbors; remote_count++) {
-          when sendGhostDone() {
-            serial {}
-          }
-        }
-      }
-
       serial {
-        // Swap pointers
-        std::swap(d_temperature, d_new_temperature);
-
         if (sync_ver || my_iter <= warmup_iters) {
           contribute(CkCallback(CkReductionTarget(Main, commDone), main_proxy));
         } else {
