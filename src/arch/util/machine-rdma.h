@@ -45,7 +45,7 @@ void CmiIssueRgetUsingCMA(
   const void* destAddr,
   void *destInfo,
   int destPe,
-  int size) {
+  size_t size) {
 
   // Use SHM transport for a PE on the same host
   struct iovec local, remote;
@@ -70,7 +70,7 @@ void CmiIssueRputUsingCMA(
   const void* srcAddr,
   void *srcInfo,
   int srcPe,
-  int size) {
+  size_t size) {
 
   // Use SHM transport for a PE on the same host
   struct iovec local, remote;
