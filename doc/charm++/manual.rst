@@ -8808,7 +8808,8 @@ numerous concurrent objects launch computational kernels and initiate
 data transfers on the GPU.
 
 The support for GPUs in the Charm++ runtime system consist of the
-**GPU Manager** module and **Hybrid API (HAPI)**. Currently only NVIDIA GPUs
+**GPU Manager** module and **Hybrid API (HAPI)**. HAPI exposes the core
+functionalities of GPU Manager to the Charm++ user. Currently only NVIDIA GPUs
 (and CUDA) are supported, although we are actively working on providing
 support for AMD and Intel GPUs as well. CUDA code can be integrated in
 Charm++ just like any C/C++ program to offload computational kernels,
@@ -8844,7 +8845,7 @@ Enabling GPU Support
 ~~~~~~~~~~~~~~~~~~~~
 
 GPU support via GPU Manager and HAPI is not included by default when
-building Charm++. Use ``buildold`` with the ``cuda`` option to build Charm++
+building Charm++. Use ``build`` with the ``cuda`` option to build Charm++
 with GPU support (CMake build is currently not supported), e.g.
 
 .. code-block:: bash
@@ -8856,8 +8857,8 @@ system, which is automatically found by the build script. If the script fails
 to find it, provide the path as one of ``CUDATOOLKIT_HOME``, ``CUDA_DIR``,
 or ``CUDA_HOME`` environment variables.
 
-Using GPU Manager
-~~~~~~~~~~~~~~~~~
+Using GPU Support through HAPI
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 As explained in the Overview section, use of CUDA streams is strongly
 recommended. This provides the opportunity for kernels offloaded by chares
@@ -8877,9 +8878,10 @@ After the necessary GPU operations are enqueued in the appropriate CUDA stream,
 the user would call ``hapiAddCallback`` to have a Charm++ callback to be invoked
 when all previous operations in the stream complete. For example,
 ``hapiAddCallback`` can be called after a kernel invocation and a device-to-host
-data transfer to asynchronously 'enqueue' a Charm++ callback that prints the
-computed data out to ``stdout`` (which will only be invoked when both the kernel
-and data transfer complete).
+data transfer to asynchronously 'enqueue' a Charm++ callback that prints out
+the data computed by the GPU to ``stdout``. The GPU Manager module ensures
+that the Charm++ callback will only be invoked once the GPU kernel and
+device-to-host data transfer complete.
 
 The following is a list of HAPI functions:
 
