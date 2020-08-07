@@ -393,7 +393,8 @@ void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
 
 void CldEnqueueWithinNode(void *msg, int infofn)
 {
-  int len, queueing, priobits;
+  size_t len;
+  int queueing, priobits;
   unsigned int *prioptr;
   CldPackFn pfn;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
