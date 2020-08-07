@@ -121,6 +121,7 @@ void CmiForwardProcBcastMsg(size_t size, char *msg) {
 void CmiForwardMsgToPeers(size_t size, char *msg) {
   SendToPeers(size, msg);
 }
+#endif
 
 static void SendSpanningChildren(size_t size, char *msg, int rankToAssign, int startNode) {
 #if CMK_BROADCAST_SPANNING_TREE
