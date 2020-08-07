@@ -4230,7 +4230,7 @@ char *CmiCopyMsg(char *msg, size_t len)
 
 unsigned char computeCheckSum(unsigned char *data, size_t len)
 {
-  int i;
+  size_t i;
   unsigned char ret = 0;
   for (i=0; i<len; i++) ret ^= (unsigned char)data[i];
   return ret;
