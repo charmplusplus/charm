@@ -52,9 +52,9 @@ int readShmCma(
   int numOps,
   size_t total_bytes) {
 
-  int nread = process_vm_readv(remote_pid, local, numOps, remote, numOps, 0);
+  ssize_t nread = process_vm_readv(remote_pid, local, numOps, remote, numOps, 0);
   if(nread != total_bytes) {
-    CmiAbort("process_vm_readv failed!\n");
+    CmiAbort("process_vm_readv failed! Size to be read:%zu bytes, Size actually read:%zd bytes (negative value indicates error), error no:%d, error message:%s!\n", total_bytes, nread, errno, strerror(errno));
     return errno;
   }
   return 0;
@@ -70,9 +70,9 @@ int writeShmCma(
   int numOps,
   size_t total_bytes) {
 
-  int nread = process_vm_writev(remote_pid, local, numOps, remote, numOps, 0);
-  if(nread != total_bytes) {
-    CmiAbort("process_vm_writev failed!\n");
+  ssize_t nwrite = process_vm_writev(remote_pid, local, numOps, remote, numOps, 0);
+  if(nwrite != total_bytes) {
+    CmiAbort("process_vm_writev failed! Size to be written:%zu bytes, Size actually written:%zd bytes (negative value indicates error), error no:%d, error message:%s!\n", total_bytes, nwrite, errno, strerror(errno));
     return errno;
   }
   return 0;
