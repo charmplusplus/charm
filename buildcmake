@@ -62,8 +62,6 @@ fi
 # Build options
 target=$1
 triplet=$2
-shift
-shift
 
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
@@ -128,6 +126,11 @@ opt_compiler=""
 # Misc options
 VERBOSE=0
 ONLY_CONFIGURE=0
+
+processArgs() {
+
+shift # target
+shift # triplet
 
 while [[ $# -gt 0 ]]; do
   arg=$1
@@ -361,7 +364,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+}
+
+# Process original command-line arguments
+eval processArgs "$@"
+
 ############ End option parsing
+
+if [[ $opt_cuda -eq 1 ]]; then
+  echo "Warning: CMake build is not supported with CUDA, running ./buildold instead."
+  sleep 2
+  ./buildold "$@"
+  exit $?
+fi
 
 if [[ "$target" = "${target%AMPI-only}AMPI-only" ]]; then
     opt_ampi_only=1
