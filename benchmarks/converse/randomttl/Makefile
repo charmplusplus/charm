@@ -13,6 +13,12 @@ test: randomttl
 	$(call run, ./randomttl +p4 2 1000)
 	$(call run, ./randomttl +p6 5 1000)
 
+testp: randomttl
+	$(call run, ./randomttl +p$(P) $$(( $(P) / 2 )) 1000 )
+	$(call run, ./randomttl +p$(P) $$(( $(P) / 2 )) 1000 )
+	$(call run, ./randomttl +p$(P) $$(( $(P) - 1 )) 1000 )
+	$(call run, ./randomttl +p$(P) $$(( $(P) - 1 )) 1000 )
+
 clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o

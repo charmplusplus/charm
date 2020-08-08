@@ -23,3 +23,5 @@ clean:
 test: all
 	$(call run, +p4 ./jacobi1d 32 32 4 )
 
+testp: all
+	$(call run, +p$(P) ./jacobi1d $$(( $(P) * 80 ))  $$(( $(P) * 80 )) $$(( $(P) * 10 )) )
