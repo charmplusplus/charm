@@ -153,7 +153,7 @@ struct GPUManager {
     comm_buffer_size = 1 << 26; // 64MB by default
 
     // Shared memory region for CUDA IPC
-    use_shm = true;
+    use_shm = false;
     shm_ptr = NULL;
     shm_file = -1;
     shm_chunk_size = 0;
