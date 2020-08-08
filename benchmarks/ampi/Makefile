@@ -7,7 +7,8 @@ DIRS = \
   speed \
 
 ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
-  DIRS += isomalloc
+# enable when messages with 64-bit sizes are supported
+#  DIRS += isomalloc
 endif
 
 TESTDIRS = $(DIRS)
