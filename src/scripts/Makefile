@@ -19,6 +19,9 @@
 #
 #     make charm++ OPTS="-g -save -verbose"
 #
+# On making changes to this file, ensure that the same changes are ported to
+# cmake/Makefile.tests in order to maintain consistency with the cmake based build
+# system, which is the default build system
 ###############################################################################
 
 SHELL=/bin/sh
@@ -35,32 +38,8 @@ CXXFLAGS=-I.
 
 all: charm++ LIBS AMPI f90charm TSM SM PVM everylb
 
-all-test: all-test-tests all-test-examples all-test-benchmarks
 
-all-test-tests: LIBS
-	$(MAKE) -C ../tests all
-
-all-test-examples: LIBS
-	$(MAKE) -C ../examples all
-
-all-test-benchmarks: LIBS
-	$(MAKE) -C ../benchmarks all
-
-all-zc: charm++
-	$(MAKE) -C ../tests/charm++/zerocopy all
-	$(MAKE) -C ../examples/charm++/zerocopy all
-	$(MAKE) -C ../benchmarks/charm++/zerocopy all
-
-all-test-AMPI: all-test-AMPI-tests all-test-AMPI-examples all-test-AMPI-benchmarks
-
-all-test-AMPI-tests: AMPI
-	$(MAKE) -C ../tests/ampi all
-
-all-test-AMPI-examples: AMPI
-	$(MAKE) -C ../examples/ampi all
-
-all-test-AMPI-benchmarks: AMPI
-	$(MAKE) -C ../benchmarks/ampi all
+include ../../cmake/Makefile.tests.common
 
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
@@ -172,59 +151,6 @@ Tau:
 LIBS: CONVLIBS CHARMLIBS everylb
 	echo "Built LIBS Successfully"
 
-test syncfttest mpisyncfttest: LIBS
-	$(MAKE) -C ../tests $@
-	$(MAKE) -C ../examples $@
-	$(MAKE) -C ../benchmarks $@
-
-test-tests: LIBS
-	$(MAKE) -C ../tests test
-
-test-examples: LIBS
-	$(MAKE) -C ../examples test
-
-test-benchmarks: LIBS
-	$(MAKE) -C ../benchmarks test
-
-test-zc: charm++
-	$(MAKE) -C ../tests/charm++/zerocopy test
-	$(MAKE) -C ../examples/charm++/zerocopy test
-	$(MAKE) -C ../benchmarks/charm++/zerocopy test
-
-test-converse: converse test-tests-converse test-examples-converse test-benchmarks-converse
-
-test-charm: charm++ test-tests-charm test-examples-charm test-benchmarks-charm
-
-test-AMPI: AMPI test-tests-AMPI test-examples-AMPI test-benchmarks-AMPI
-
-test-tests-converse: converse
-	$(MAKE) -C ../tests test-converse
-
-test-tests-charm: charm++
-	$(MAKE) -C ../tests test-charm
-
-test-tests-AMPI: AMPI
-	$(MAKE) -C ../tests test-AMPI
-
-test-examples-converse: converse
-	$(MAKE) -C ../examples test-converse
-
-test-examples-charm: charm++
-	$(MAKE) -C ../examples test-charm
-
-test-examples-AMPI: AMPI
-	$(MAKE) -C ../examples test-AMPI
-
-test-benchmarks-converse: converse
-	$(MAKE) -C ../benchmarks test-converse
-
-test-benchmarks-charm: charm++
-	$(MAKE) -C ../benchmarks test-charm
-
-test-benchmarks-AMPI: AMPI
-	$(MAKE) -C ../benchmarks test-AMPI
-
-
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
 SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
@@ -284,7 +210,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h ckrdmadevice.h \
+	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
 	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
@@ -296,6 +222,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  middle.h middle-conv.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkMulticast.decl.h	\
           CkReduction.decl.h \
+          CkSyncBarrier.decl.h \
           waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkCheckpointStatus.decl.h CkMemCheckpoint.decl.h \
           LBManager.decl.h MetaBalancer.decl.h CentralLB.decl.h TreeLB.decl.h TreeLevel.decl.h \
@@ -736,7 +663,7 @@ CK_LIBS_CORE=$(L)/libck.a
 
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
-	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o ckrdmadevice.o \
+	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o ckrdmadevice.o cksyncbarrier.o \
            waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
 	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
@@ -809,7 +736,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
   ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
   conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
-  CkReduction.decl.h \
+  CkReduction.decl.h cksyncbarrier.h CkSyncBarrier.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
   cklocation.h ckmulticast.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h LBObj.h LBOM.h LBComm.h \
   LBMachineUtil.h LBManager.decl.h MetaBalancer.decl.h BaseLB.decl.h \

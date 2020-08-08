@@ -5,3 +5,4 @@
 *.ci linguist-language=C++
 
 cmake/Makefile.tests linguist-language=Makefile
+cmake/Makefile.tests.common linguist-language=Makefile

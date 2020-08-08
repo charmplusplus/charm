@@ -319,19 +319,19 @@ static void hapiMapping(char** argv) {
   CmiUnlock(csv_gpu_manager.device_mapping_lock);
 #endif
 
-  // Check if user opted out of shared memory optimizations for
+  // Check if user opted in to POSIX shared memory optimizations for
   // inter-process GPU messaging
-  bool no_shm = false;
-  if (CmiGetArgFlagDesc(argv, "+gpunoshm",
-        "disable shared memory optimizations for inter-process GPU messaging")) {
-    no_shm = true;
+  bool use_shm = false;
+  if (CmiGetArgFlagDesc(argv, "+gpushm",
+        "enable shared memory optimizations for inter-process GPU messaging")) {
+    use_shm = true;
     if (CmiMyPe() == 0) {
-      CmiPrintf("HAPI> Disabled shared memory optimizations for inter-process GPU messaging\n");
+      CmiPrintf("HAPI> Enabled POSIX shared memory optimizations for inter-process GPU messaging\n");
     }
   }
 
   if (CmiMyRank() == 0) {
-    if (no_shm) csv_gpu_manager.use_shm = false;
+    if (use_shm) csv_gpu_manager.use_shm = true;
   }
 
   CmiNodeBarrier();
