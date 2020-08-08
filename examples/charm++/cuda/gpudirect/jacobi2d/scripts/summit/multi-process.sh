@@ -13,6 +13,9 @@ ppn=1
 n_iters=100
 warmup_iters=10
 grid_size=32768
+zerocopy=""
+#zerocopy_options="+gpucommbuffer 1024 +gpuipceventpool 2048"
+zerocopy_options="+gpunoshm"
 sync=""
 pemap="L0,4,84,88"
 
@@ -25,6 +28,6 @@ do
   for iter in 1 2 3
   do
     echo "# Iteration $iter"
-    exe jsrun -n4 -a1 -c$ppn -g1 -K2 -r4 ./jacobi2d -s $grid_size -b $block_size -i $n_iters -w $warmup_iters $sync +ppn $ppn +pemap $pemap +gpumap block +gpunoshm
+    exe jsrun -n4 -a1 -c$ppn -g1 -K2 -r4 ./jacobi2d -s $grid_size -b $block_size -i $n_iters -w $warmup_iters $zerocopy $sync +ppn $ppn +pemap $pemap +gpumap block $zerocopy_options
   done
 done
