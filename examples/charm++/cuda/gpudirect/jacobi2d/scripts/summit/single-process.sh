@@ -26,6 +26,6 @@ do
   for iter in 1 2 3
   do
     echo "# Iteration $iter"
-    exe jsrun -n1 -a1 -c$ppn -g4 ./jacobi2d -s $grid_size -b $block_size -i $n_iters -w $warmup_iters $zerocopy $sync +ppn $ppn +pemap $pemap +gpumap block +gpunoshm
+    exe jsrun -n1 -a1 -c$ppn -g4 ./jacobi2d -s $grid_size -b $block_size -i $n_iters -w $warmup_iters $zerocopy $sync +ppn $ppn +pemap $pemap +gpumap block
   done
 done
