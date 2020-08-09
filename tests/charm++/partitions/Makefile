@@ -29,17 +29,15 @@ endif
 
 testp: all
 ifeq ($(CMK_NO_PARTITIONS),1)
-	echo "Skipping test since build does not support partitions"
+	@echo "Skipping test since build does not support partitions"
 else ifeq ($(CMK_BLUEGENEQ),1)
-	echo "Skipping partitions test on BGQ"
+	@echo "Skipping partitions test on BGQ"
+else ifneq (,$(filter %0 %2 %4 %6 %8,$(P))) # if P is even
+	@echo "P is even, running partitions test with $(P)/2 partitions"
+	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) 2 +partitions $$(( $(P) / 2 )))
 else
-	@if [ $$(( $(P) % 2 )) = 0 ]; then \
-	echo "P is even, running partitions test with $(P)/2 partitions" && \
-	echo $(call run, ./hello +p$(P) $$(( $(P) * 4 )) 2 +partitions $$(( $(P) / 2 )) ) && \
-	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) 2 +partitions $$(( $(P) / 2 )) ); \
-	else echo "P is odd, running partitions test with 1 partition" && \
-	echo $(call run, ./hello +p$(P) $$(( $(P) * 4 )) $(P) +partitions 1) && \
-	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) $(P) +partitions 1); fi
+	@echo "P is odd, running partitions test with 1 partition"
+	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) $(P) +partitions 1)
 endif
 
 smptest: all
