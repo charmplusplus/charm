@@ -16,10 +16,10 @@ nodegroupTest.o : nodegroupTest.C cifiles
 
 test: all
 ifeq ($(CMK_MULTICORE),1)
-	echo "Skipping nodegroupTest test on MULTICORE builds as it has to be run on even number of logical nodes"
+	@echo "Skipping nodegroupTest test on MULTICORE builds as it has to be run on even number of logical nodes"
 else
 ifeq ($(CMK_UTH),1)
-	echo "Skipping nodegroupTest test on UTH builds as it has to be run on even number of logical nodes"
+	@echo "Skipping nodegroupTest test on UTH builds as it has to be run on even number of logical nodes"
 else
 	$(call run, +p4 ./nodegroupTest)
 ifeq ($(CMK_USE_CMA),1)
@@ -30,10 +30,10 @@ endif
 
 testp: all
 ifeq ($(CMK_MULTICORE),1)
-	echo "Skipping nodegroupTest test on MULTICORE builds as it has to be run on even number of logical nodes"
+	@echo "Skipping nodegroupTest test on MULTICORE builds as it has to be run on even number of logical nodes"
 else
 ifeq ($(CMK_UTH),1)
-	echo "Skipping nodegroupTest test on UTH builds as it has to be run on even number of logical nodes"
+	@echo "Skipping nodegroupTest test on UTH builds as it has to be run on even number of logical nodes"
 else
 	$(call run, +p$(P) ./nodegroupTest)
 ifeq ($(CMK_USE_CMA),1)

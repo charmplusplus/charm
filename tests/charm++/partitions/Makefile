@@ -20,9 +20,9 @@ hello.o: hello.C hello.decl.h
 
 test: all
 ifeq ($(CMK_NO_PARTITIONS),1)
-	echo "Skipping test since build does not support partitions"
+	@echo "Skipping test since build does not support partitions"
 else ifeq ($(CMK_BLUEGENEQ),1)
-	echo "Skipping partitions test on BGQ"
+	@echo "Skipping partitions test on BGQ"
 else
 	$(call run, ./hello +p4 10 2 +partitions 2)
 endif
@@ -42,9 +42,9 @@ endif
 
 smptest: all
 ifeq ($(CMK_NO_PARTITIONS),1)
-	echo "Skipping test since build does not support partitions"
+	@echo "Skipping test since build does not support partitions"
 else ifeq ($(CMK_BLUEGENEQ),1)
-	echo "Skipping partitions test on BGQ"
+	@echo "Skipping partitions test on BGQ"
 else
 	$(call run, ./hello +p4 10 2 +partitions 2 ++ppn 2)
 endif
