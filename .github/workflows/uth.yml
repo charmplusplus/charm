@@ -17,3 +17,8 @@ jobs:
         make -C uth-linux-x86_64/tests test
         make -C uth-linux-x86_64/examples test
         make -C uth-linux-x86_64/benchmarks test
+    - name: testp P=2
+      run: |
+        make -C uth-linux-x86_64/tests testp P=2
+        make -C uth-linux-x86_64/examples testp P=2
+        make -C uth-linux-x86_64/benchmarks testp P=2

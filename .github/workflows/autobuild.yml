@@ -6,7 +6,7 @@ on:
 
 jobs:
   might:
-    timeout-minutes: 60
+    timeout-minutes: 120
 
     runs-on: might
     name: netlrts-linux-x86_64 -pedantic
@@ -20,3 +20,13 @@ jobs:
         make -C netlrts-linux-x86_64/tests test TESTOPTS=++local
         make -C netlrts-linux-x86_64/examples test TESTOPTS=++local
         make -C netlrts-linux-x86_64/benchmarks test TESTOPTS=++local
+    - name: testp P=2
+      run: |
+        make -C netlrts-linux-x86_64/tests testp P=2 TESTOPTS=++local
+        make -C netlrts-linux-x86_64/examples testp P=2 TESTOPTS=++local
+        make -C netlrts-linux-x86_64/benchmarks testp P=2 TESTOPTS=++local
+    - name: testp P=3
+      run: |
+        make -C netlrts-linux-x86_64/tests testp P=3 TESTOPTS=++local
+        make -C netlrts-linux-x86_64/examples testp P=3 TESTOPTS=++local
+        make -C netlrts-linux-x86_64/benchmarks testp P=3 TESTOPTS=++local

@@ -23,8 +23,10 @@ matrix:
     - ./build all-test mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
     - make -C mpi-linux-x86_64-smp/tests test TESTOPTS="+setcpuaffinity"
     - make -C mpi-linux-x86_64-smp/examples test TESTOPTS="+setcpuaffinity"
-    # Crashes in test-gnu-isomalloc:
-    #- make -C mpi-linux-x86_64-smp/benchmarks test TESTOPTS="+setcpuaffinity"
+    - make -C mpi-linux-x86_64-smp/benchmarks test TESTOPTS="+setcpuaffinity"
+    - make -C mpi-linux-x86_64-smp/tests testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
+    - make -C mpi-linux-x86_64-smp/examples testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
+    - make -C mpi-linux-x86_64-smp/benchmarks testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
 
   - os: osx
     name: "NetLRTS-Darwin"
@@ -34,6 +36,9 @@ matrix:
     - make -C netlrts-darwin-x86_64/examples test TESTOPTS="++local"
     # Hangs in mpibench:
     #- make -C netlrts-darwin-x86_64/benchmarks test TESTOPTS="++local"
+    - make -C netlrts-darwin-x86_64/tests testp P=2 TESTOPTS="++local"
+    - make -C netlrts-darwin-x86_64/examples testp P=2 TESTOPTS="++local"
+    #- make -C netlrts-darwin-x86_64/benchmarks testp P=2 TESTOPTS="++local"
 
   - os: windows
     name: "NetLRTS-Win"
