@@ -7,7 +7,9 @@ DIRS = \
   speed \
 
 ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
-# enable when messages with 64-bit sizes are supported
+# can reevaluate inclusion of this benchmark based on:
+# - support for 64-bit Converse messages (Issue #1378)
+# - shrinking the test to complete in 30 seconds or less
 #  DIRS += isomalloc
 endif
 
