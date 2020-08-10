@@ -3,9 +3,12 @@ mainmodule jacobi2d {
 
   readonly CProxy_Main main_proxy;
   readonly CProxy_Block block_proxy;
-  readonly int grid_size;
-  readonly int block_size;
-  readonly int n_chares;
+  readonly int grid_width;
+  readonly int grid_height;
+  readonly int block_width;
+  readonly int block_height;
+  readonly int n_chares_x;
+  readonly int n_chares_y;
   readonly int n_iters;
   readonly int warmup_iters;
   readonly bool sync_ver;
