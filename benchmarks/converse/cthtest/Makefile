@@ -1,4 +1,5 @@
 -include ../../common.mk
+-include ../../../include/conv-mach-opt.mak
 CHARMC=../../../bin/charmc $(OPTS)
 
 LINKLINE=$(CHARMC) -o pgm pgm.o -language converse++
@@ -20,7 +21,9 @@ test: pgm
 
 
 testp: pgm
+ifneq ($(CMK_UTH),1)
 	$(call run, ./pgm +p$(P))
+endif
 
 clean:
 	rm -f conv-host *.o pgm *.bak pgm.*.log pgm.sts *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
