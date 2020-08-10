@@ -14,8 +14,8 @@ n_iters=10
 warmup_iters=0
 grid_size=32768
 zerocopy=""
-#zerocopy_options="+gpucommbuffer 1024 +gpuipceventpool 2048"
-zerocopy_options="+gpunoshm"
+#zerocopy_options="+gpushm +gpucommbuffer 1024 +gpuipceventpool 2048"
+zerocopy_options=""
 sync=""
 pemap="L0,4,84,88"
 
