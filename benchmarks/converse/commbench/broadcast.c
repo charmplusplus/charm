@@ -221,6 +221,16 @@ static void bcast_central(void* msg) {
 void broadcast_init(void) {
   void* msg;
 
+  if (CpvAccess(oversubscribed)) {
+    EmptyMsg emsg;
+    CmiInitMsgHeader(emsg.core, sizeof(EmptyMsg));
+    if (CmiMyPe() == 0)
+      CmiPrintf("[broadcast] Skipping due to oversubscription.\n");
+    CmiSetHandler(&emsg, CpvAccess(ack_handler));
+    CmiSyncSend(0, sizeof(EmptyMsg), &emsg);
+    return;
+  }
+
   msg = CmiAlloc(CmiMsgHeaderSizeBytes + sizes[0].size);
   CmiSetHandler(msg, CpvAccess(bcast_handler));
   CpvAccess(starttime) = CmiWallTimer();
