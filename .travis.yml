@@ -34,11 +34,10 @@ matrix:
     - ./build all-test netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
     - make -C netlrts-darwin-x86_64/tests test TESTOPTS="++local"
     - make -C netlrts-darwin-x86_64/examples test TESTOPTS="++local"
-    # Hangs in mpibench:
-    #- make -C netlrts-darwin-x86_64/benchmarks test TESTOPTS="++local"
+    - make -C netlrts-darwin-x86_64/benchmarks test TESTOPTS="++local"
     - make -C netlrts-darwin-x86_64/tests testp P=2 TESTOPTS="++local"
     - make -C netlrts-darwin-x86_64/examples testp P=2 TESTOPTS="++local"
-    #- make -C netlrts-darwin-x86_64/benchmarks testp P=2 TESTOPTS="++local"
+    - make -C netlrts-darwin-x86_64/benchmarks testp P=2 TESTOPTS="++local"
 
   - os: windows
     name: "NetLRTS-Win"

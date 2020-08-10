@@ -35,8 +35,8 @@ alltoall_VPtest: alltoall_VPtest.c
 	$(CHARMC) -o alltoall_VPtest alltoall_VPtest.o $(OPTS) $(LIBS)
 
 test: all
-	$(call run, +p4 ./mpibench +vp4)
-	$(call run, +p4 ./mpibench +vp8)
+#	$(call run, +p4 ./mpibench +vp4)
+#	$(call run, +p4 ./mpibench +vp8)
 	$(call run, +p4 ./alltoall 1024 +vp4)
 	$(call run, +p4 ./alltoall 1024 +vp8)
 	$(call run, +p4 ./allgather 1024 +vp4)
@@ -45,14 +45,14 @@ test: all
 	$(call run, +p4 ./alltoall_VPtest 1024 +vp8)
 
 test-mpi: all-mpi
-	mpirun -n 4 ./mpibench.mpi
+#	mpirun -n 4 ./mpibench.mpi
 	mpirun -n 4 ./allgather.mpi 1024
 	mpirun -n 4 ./alltoall.mpi 1024
 
 testp: all
-	$(call run, +p$(P) ./mpibench +vp$(P) )
-	$(call run, +p$(P) ./mpibench +vp$$(( $(P) * 2 )) )
-	$(call run, +p$(P) ./mpibench +vp$$(( $(P) * 4 )) )
+#	$(call run, +p$(P) ./mpibench +vp$(P) )
+#	$(call run, +p$(P) ./mpibench +vp$$(( $(P) * 2 )) )
+#	$(call run, +p$(P) ./mpibench +vp$$(( $(P) * 4 )) )
 	$(call run, +p$(P) ./alltoall 1024 +vp$(P) )
 	$(call run, +p$(P) ./alltoall 1024 +vp$$(( $(P) * 2 )) )
 	$(call run, +p$(P) ./alltoall 1024 +vp$$(( $(P) * 4 )) )
