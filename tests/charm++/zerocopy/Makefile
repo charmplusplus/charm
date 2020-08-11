@@ -6,8 +6,14 @@ DIRS = \
   dereg_and_nodereg \
   bcast_nonzero_root \
   pup_buffer \
+  large_p2p \
+
+NONSCALEDIRS = \
+  large_p2p \
 
 TESTDIRS = $(DIRS)
+
+TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 
 all: $(foreach i,$(DIRS),build-$i)
 
