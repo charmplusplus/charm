@@ -1070,6 +1070,9 @@ const int tramDefaultCutoffFractionDenominator = 2;
 const char *tramMaxItemsBuffered = "maxItems";
 const int tramDefaultMaxItemsBuffered = 1000;
 
+const char *tramArgNodeLevel = "nodeLevel";
+const int tramDefaultNodeLevel = 0;
+
 void Entry::genTramTypes() {
   Attribute* aggregate = getAttribute(SAGGREGATE);
 
@@ -1086,6 +1089,7 @@ void Entry::genTramTypes() {
     int cutoffFractionNumerator = aggregate->getArgument(tramArgCutoffFractionNumerator, tramDefaultCutoffFractionNumerator);
     int cutoffFractionDenominator = aggregate->getArgument(tramArgCutoffFractionDenominator, tramDefaultCutoffFractionDenominator);
     int maxItemsBuffered = aggregate->getArgument(tramMaxItemsBuffered, tramDefaultMaxItemsBuffered);
+    int nodeLevel = aggregate->getArgument(tramArgNodeLevel, tramDefaultNodeLevel);
 
     Attribute::Argument *arg = aggregate->getArgs();
     while (arg) {
@@ -1094,7 +1098,8 @@ void Entry::genTramTypes() {
           && strcmp(arg->name, tramArgThresholdFractionDenominator)
           && strcmp(arg->name, tramArgCutoffFractionNumerator)
           && strcmp(arg->name, tramArgCutoffFractionDenominator)
-          && strcmp(arg->name, tramMaxItemsBuffered)) {
+          && strcmp(arg->name, tramMaxItemsBuffered)
+          && strcmp(arg->name, tramArgNodeLevel)) {
         XLAT_ERROR_NOCOL("unsupported argument to aggregate attribute",
                          first_line_);
       }
@@ -1107,11 +1112,16 @@ void Entry::genTramTypes() {
       numDimensions = tramDefaultNumDimensions;
     }
 
+    if (nodeLevel != 0 && nodeLevel != 1) {
+      XLAT_ERROR_NOCOL("TRAM currently supports node-level 0 and 1", first_line_);
+      nodeLevel = tramDefaultNodeLevel;
+    }
+
     container->tramInstances.push_back(TramInfo(typeString.get_string(), nodeTypeString.get_string(),
           nameString.get_string(), itemTypeString.get_string(), numDimensions,
           bufferSize, maxItemsBuffered, thresholdFractionNumerator,
           thresholdFractionDenominator, cutoffFractionNumerator,
-          cutoffFractionDenominator));
+          cutoffFractionDenominator, nodeLevel));
     tramInstanceIndex = container->tramInstances.size();
   }
 }
@@ -1163,6 +1173,7 @@ void Entry::genTramInstantiation(XStr& str) {
       int thresholdFractionDen = container->tramInstances[i].thresholdFractionDenominator;
       int cutoffFractionNum = container->tramInstances[i].cutoffFractionNumerator;
       int cutoffFractionDen = container->tramInstances[i].cutoffFractionDenominator;
+      int nodeLevel = container->tramInstances[i].nodeLevel;
 
       str << "  {\n    const int nDims = " << numDimensions << ";\n";
 
@@ -1193,16 +1204,19 @@ void Entry::genTramInstantiation(XStr& str) {
           << "    if (itemsPerBuffer == 0) {\n"
           << "      itemsPerBuffer = 1;\n"
           << "    }\n"
+          << "    int nodeLevel = " << nodeLevel <<";\n"
           << "    CProxy_" << container->tramInstances[i].nodeType.c_str()
-          << " tramNodeProxy =\n"
-          << "    CProxy_" << container->tramInstances[i].nodeType.c_str()
+          << " tramNodeProxy;\n"
+          << "    if (nodeLevel > 0) {\n"
+          << "      tramNodeProxy = CProxy_" << container->tramInstances[i].nodeType.c_str()
           << "::ckNew();\n"
+          << "    }\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()
           << " tramProxy =\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()
           << "::ckNew(tramNodeProxy, nDims, dims, gId, tramBufferSize, false, 0.01, "
           << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
-          << "cutoffFractionNum, cutoffFractionDen);\n"
+          << "cutoffFractionNum, cutoffFractionDen, nodeLevel);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
           << "  }\n";
     }

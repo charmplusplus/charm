@@ -23,13 +23,14 @@ struct TramInfo {
   int thresholdFractionDenominator;
   int cutoffFractionNumerator;
   int cutoffFractionDenominator;
+  int nodeLevel;
 
   TramInfo(const char* t, const char* nt, const char* n, const char* i, int nd, int b,
-    int mib, int tfn, int tfd, int cfn, int cfd)
+    int mib, int tfn, int tfd, int cfn, int cfd, int nl)
     : type(t), nodeType(nt), name(n), itemType(i), numDimensions(nd), bufferSize(b),
     maxItemsBuffered(mib), thresholdFractionNumerator(tfn),
     thresholdFractionDenominator(tfd), cutoffFractionNumerator(cfn),
-    cutoffFractionDenominator(cfd) {}
+    cutoffFractionDenominator(cfd), nodeLevel(nl) {}
 };
 
 /* Chare or group is a templated entity */

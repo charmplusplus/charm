@@ -250,6 +250,8 @@ private:
   int cutoffFractionNumerator;
   int cutoffFractionDenominator;
 
+  int nodeLevel; // Logical node support: 0 (group-based) or 1 (nodegroup-based)
+
   virtual void initLocalClients() { CkAbort("Called what should be a pure virtual base method"); }
 
   void sendLargestBuffer();
@@ -285,7 +287,7 @@ protected:
                   int *dimensionSizes, int bufferSize,
                   bool yieldFlag, double progressPeriodInMs,
                   int mib, int tfn, int tfd,
-                  int cfn, int cfd);
+                  int cfn, int cfd, int nl);
 
 public:
   MeshStreamer() {}
@@ -431,13 +433,7 @@ void MeshStreamer<dtype, RouterType>::
 ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
            int *dimensionSizes, int bufferSize,
            bool yieldFlag, double progressPeriodInMs,
-           int mib, int tfn, int tfd, int cfn, int cfd) {
-  // Pass the group's proxy to the nodegroup so that it can invoke
-  // the group's entry methods
-  if (CkMyRank() == 0) {
-    nodeGroupProxy.ckLocalBranch()->setGroupProxy(this->thisProxy);
-  }
-
+           int mib, int tfn, int tfd, int cfn, int cfd, int nl) {
   numDimensions_ = numDimensions;
   maxNumDataItemsBuffered_ = maxNumDataItemsBuffered;
   yieldFlag_ = yieldFlag;
@@ -451,6 +447,15 @@ ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
   thresholdFractionDenominator = tfd;
   cutoffFractionNumerator = cfn;
   cutoffFractionDenominator = cfd;
+  nodeLevel = nl;
+
+  if (nodeLevel > 0) {
+    // Pass the group's proxy to the nodegroup so that it can invoke
+    // the group's entry methods
+    if (CkMyRank() == 0) {
+      nodeGroupProxy.ckLocalBranch()->setGroupProxy(this->thisProxy);
+    }
+  }
 
   myRouter_.initializeRouter(numDimensions_, myIndex_, dimensionSizes);
   int maxNumBuffers = myRouter_.maxNumAllocatedBuffers();
@@ -538,7 +543,11 @@ sendMeshStreamerMessage(MeshStreamerMessageV *destinationBuffer,
     CkPrintf("[%d] sending intermediate to %d\n",
              myIndex_, destinationIndex);
 #endif
-    this->nodeGroupProxy[CmiNodeOf(destinationIndex)].receiveAlongRoute(destinationBuffer);
+    if (nodeLevel > 0) {
+      this->nodeGroupProxy[CmiNodeOf(destinationIndex)].receiveAlongRoute(destinationBuffer);
+    } else {
+      this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
+    }
   }
 }
 
@@ -837,9 +846,15 @@ receiveAlongRoute(MeshStreamerMessageV *msg) {
   lastDestinationPe = -1;
   for (int i = 0; i < msg->numDataItems; i++) {
     destinationPe = msg->destinationPes[i];
-    // Messages with this PE as the final destination should have already been
-    // delivered by the nodegroup
-    if (destinationPe != myIndex_ && destinationPe != TRAM_BROADCAST) {
+    if (destinationPe == myIndex_) {
+      // With node-level support, messages with this PE as destination
+      // should have been delivered already by the nodegroup
+      if (nodeLevel == 0) {
+        localDeliver(msg->dataItems + msg->getoffset<dtype>(i),
+            msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
+            msg->destObjects[i], msg->sourcePes[i]);
+      }
+    } else if (destinationPe != TRAM_BROADCAST) {
       if (destinationPe != lastDestinationPe) {
         // do this once per sequence of items with the same destination
         myRouter_.determineRoute(destinationPe,
@@ -1131,11 +1146,11 @@ public:
       CkGroupID clientGID, int bufferSize, bool yieldFlag,
       double progressPeriodInMs, int maxItemsBuffered,
       int _thresholdFractionNum, int _thresholdFractionDen,
-      int _cutoffFractionNum, int _cutoffFractionDen) {
+      int _cutoffFractionNum, int _cutoffFractionDen, int nodeLevel) {
     this->nodeGroupProxy = nodeGroupProxy;
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
         progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
-        _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
+        _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen, nodeLevel);
     clientGID_ = clientGID;
     clientObj_ = (ClientType*)CkLocalBranch(clientGID_);
   }
@@ -1244,11 +1259,12 @@ public:
       CkArrayID clientAID, int bufferSize, bool yieldFlag,
       double progressPeriodInMs, int maxItemsBuffered,
       int _thresholdFractionNum, int _thresholdFractionDen,
-      int _cutoffFractionNum, int _cutoffFractionDen) {
+      int _cutoffFractionNum, int _cutoffFractionDen, int nodeLevel) {
     this->nodeGroupProxy = nodeGroupProxy;
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
                      progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
-                     _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen);
+                     _thresholdFractionDen, _cutoffFractionNum,
+                     _cutoffFractionDen, nodeLevel);
     clientAID_ = clientAID;
     clientArrayMgr_ = clientAID_.ckLocalBranch();
     clientLocMgr_ = clientArrayMgr_->getLocMgr();

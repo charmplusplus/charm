@@ -50,7 +50,8 @@ module NDMeshStreamer {
                             CkGroupID clientGID, int bufferSize, bool yieldFlag,
                             double progressPeriodInMs, int maxItemsBuffered,
                             int _thresholdFractionNum, int _thresholdFractionDen,
-                            int _cutoffFractionNum, int _cutoffFractionDen);
+                            int _cutoffFractionNum, int _cutoffFractionDen,
+                            int nodeLevel);
   };
 
   template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
@@ -60,7 +61,8 @@ module NDMeshStreamer {
                             CkArrayID clientAID, int bufferSize, bool yieldFlag,
                             double progressPeriodInMs, int maxItemsBuffered,
                             int _thresholdFractionNum, int _thresholdFractionDen,
-                            int _cutoffFractionNum, int _cutoffFractionDen);
+                            int _cutoffFractionNum, int _cutoffFractionDen,
+                            int nodeLevel);
     entry void processLocationRequest(CkArrayIndex arrayId, int deliveredToPe,
                                       int sourcePe);
     entry void resendMisdeliveredItems(CkArrayIndex arrayId, int destinationPe);
