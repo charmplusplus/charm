@@ -1,5 +1,5 @@
 DIRS = \
-  largedata \
+  large_bcast \
   zerocopy_with_qd \
   direct_api \
   zc_post_modify_size \
