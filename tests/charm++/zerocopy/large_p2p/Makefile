@@ -16,7 +16,7 @@ cifiles: large_p2p.ci
 large_p2p.o: large_p2p.C cifiles
 	$(CHARMC) -c large_p2p.C
 
-test: all
+test: all # Passed parameter is MAX_CMA_RW_COUNT + 6
 	$(call run, +p1 ./large_p2p 2147479558 )
 	$(call run, +p2 ./large_p2p 2147479558 )
 ifeq ($(CMK_USE_CMA),1)

@@ -19,7 +19,7 @@ all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 
-testp: $(foreach i,$(TESTDIRS),testp-$i)
+testp: $(foreach i,$(TESTPDIRS),testp-$i)
 
 smptest: $(foreach i,$(TESTDIRS),smptest-$i)
 

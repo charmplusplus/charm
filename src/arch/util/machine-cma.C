@@ -3,7 +3,7 @@
 #endif
 #include <sys/uio.h>
 
-#define MAX_CMA_RW_COUNT 2147479552
+#define MAX_CMA_RW_COUNT 0x7ffff000 //2147479552 in decimal
 
 // Method checks if process has permissions to use CMA
 int CmiInitCma() {
