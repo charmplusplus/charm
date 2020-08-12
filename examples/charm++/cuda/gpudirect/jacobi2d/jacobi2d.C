@@ -302,6 +302,13 @@ class Block : public CBase_Block {
 
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_width, block_height, compute_stream);
+    invokeInitKernel(d_new_temperature, block_width, block_height, compute_stream);
+
+    // Enforce boundary conditions
+    invokeBoundaryKernels(d_temperature, block_width, block_height, left_bound,
+        right_bound, top_bound, bottom_bound, compute_stream);
+    invokeBoundaryKernels(d_new_temperature, block_width, block_height, left_bound,
+        right_bound, top_bound, bottom_bound, compute_stream);
 
 #if CUDA_SYNC
     cudaStreamSynchronize(compute_stream);
@@ -328,10 +335,6 @@ class Block : public CBase_Block {
     hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
 
 #if !COMM_ONLY
-    // Enforce boundary conditions
-    invokeBoundaryKernels(d_temperature, block_width, block_height, left_bound,
-        right_bound, top_bound, bottom_bound, compute_stream);
-
     // Invoke GPU kernel for Jacobi computation
     invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
         compute_stream);

@@ -9,7 +9,7 @@ __global__ void initKernel(DataType* temperature, int block_width,
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   int j = blockDim.y * blockIdx.y + threadIdx.y;
   if (i < block_width + 2 && j < block_height + 2) {
-    temperature[(block_width + 2) * j + i] = 0;
+    temperature[IDX(i,j)] = 0;
   }
 }
 
@@ -17,7 +17,7 @@ __global__ void leftBoundaryKernel(DataType* temperature, int block_width,
     int block_height) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_height) {
-    temperature[(block_width + 2) * (1 + j)] = 1;
+    temperature[IDX(0,1+j)] = 1;
   }
 }
 
@@ -25,7 +25,7 @@ __global__ void rightBoundaryKernel(DataType* temperature, int block_width,
     int block_height) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_height) {
-    temperature[(block_width + 2) * (1 + j) + (block_width + 1)] = 1;
+    temperature[IDX(block_width+1,1+j)] = 1;
   }
 }
 
@@ -33,7 +33,7 @@ __global__ void topBoundaryKernel(DataType* temperature, int block_width,
     int block_height) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i < block_width) {
-    temperature[1 + i] = 1;
+    temperature[IDX(1+i,0)] = 1;
   }
 }
 
@@ -41,7 +41,7 @@ __global__ void bottomBoundaryKernel(DataType* temperature, int block_width,
     int block_height) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i < block_width) {
-    temperature[(block_width + 2) * (block_height + 1) + (1 + i)] = 1;
+    temperature[IDX(1+i,block_height+1)] = 1;
   }
 }
 
@@ -52,19 +52,13 @@ __global__ void jacobiKernel(DataType* temperature, DataType* new_temperature,
 
   if (i <= block_width && j <= block_height) {
 #ifdef TEST_CORRECTNESS
-    new_temperature[j * (block_width + 2) + i] =
-        (temperature[j * (block_width + 2) + (i - 1)] +
-         temperature[j * (block_width + 2) + (i + 1)] +
-         temperature[(j - 1) * (block_width + 2) + i] +
-         temperature[(j + 1) * (block_width + 2) + i] +
-         temperature[j * (block_width + 2) + i]) % 100000;
+    new_temperature[IDX(i,j)] = (temperature[IDX(i-1,j)] + temperature[IDX(i+1,j)] +
+      temperature[IDX(i,j-1)] + temperature[IDX(i,j+1)] + temperature[IDX(i,j)]) %
+      1e5;
 #else
-    new_temperature[j * (block_width + 2) + i] =
-        (temperature[j * (block_width + 2) + (i - 1)] +
-         temperature[j * (block_width + 2) + (i + 1)] +
-         temperature[(j - 1) * (block_width + 2) + i] +
-         temperature[(j + 1) * (block_width + 2) + i] +
-         temperature[j * (block_width + 2) + i]) * DIVIDEBY5;
+    new_temperature[IDX(i,j)] = (temperature[IDX(i-1,j)] + temperature[IDX(i+1,j)] +
+      temperature[IDX(i,j-1)] + temperature[IDX(i,j+1)] + temperature[IDX(i,j)]) *
+      DIVIDEBY5;
 #endif
   }
 }
@@ -73,7 +67,7 @@ __global__ void leftPackingKernel(DataType* temperature, DataType* ghost,
     int block_width, int block_height) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_height) {
-    ghost[j] = temperature[(block_width + 2) * (1 + j) + 1];
+    ghost[j] = temperature[IDX(1,1+j)];
   }
 }
 
@@ -81,7 +75,7 @@ __global__ void rightPackingKernel(DataType* temperature, DataType* ghost,
     int block_width, int block_height) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_height) {
-    ghost[j] = temperature[(block_width + 2) * (1 + j) + (block_width)];
+    ghost[j] = temperature[IDX(block_width,1+j)];
   }
 }
 
@@ -89,7 +83,7 @@ __global__ void leftUnpackingKernel(DataType* temperature, DataType* ghost,
     int block_width, int block_height) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_height) {
-    temperature[(block_width + 2) * (1 + j)] = ghost[j];
+    temperature[IDX(0,1+j)] = ghost[j];
   }
 }
 
@@ -97,7 +91,7 @@ __global__ void rightUnpackingKernel(DataType* temperature, DataType* ghost,
     int block_width, int block_height) {
   int j = blockDim.x * blockIdx.x + threadIdx.x;
   if (j < block_height) {
-    temperature[(block_width + 2) * (1 + j) + (block_width + 1)] = ghost[j];
+    temperature[IDX(block_width+1,1+j)] = ghost[j];
   }
 }
 
@@ -155,10 +149,10 @@ void invokePackingKernels(DataType* d_temperature, DataType* d_left_ghost,
   dim3 block_dim(TILE_SIZE * TILE_SIZE);
   dim3 grid_dim((block_height + (block_dim.x - 1)) / block_dim.x);
   if (!left_bound) {
-    leftPackingKernel<<<block_dim, grid_dim, 0, stream>>>(d_temperature, d_left_ghost, block_width, block_height);
+    leftPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_left_ghost, block_width, block_height);
   }
   if (!right_bound) {
-    rightPackingKernel<<<block_dim, grid_dim, 0, stream>>>(d_temperature, d_right_ghost, block_width, block_height);
+    rightPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_right_ghost, block_width, block_height);
   }
   hapiCheck(cudaPeekAtLastError());
 }
@@ -168,9 +162,9 @@ void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost, bool is_l
   dim3 block_dim(TILE_SIZE * TILE_SIZE);
   dim3 grid_dim((block_height + (block_dim.x - 1)) / block_dim.x);
   if (is_left) {
-    leftUnpackingKernel<<<block_dim, grid_dim, 0, stream>>>(d_temperature, d_ghost, block_width, block_height);
+    leftUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_ghost, block_width, block_height);
   } else {
-    rightUnpackingKernel<<<block_dim, grid_dim, 0, stream>>>(d_temperature, d_ghost, block_width, block_height);
+    rightUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_ghost, block_width, block_height);
   }
   hapiCheck(cudaPeekAtLastError());
 }
