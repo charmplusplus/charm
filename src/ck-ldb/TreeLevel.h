@@ -561,8 +561,7 @@ class RootLevel : public LevelLogic
       decisions[0] = migMsg;
       for (int i = 1; i < num_children; i++)
       {
-        CkReferenceMsg(migMsg);
-        decisions[i] = migMsg;
+        decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&migMsg);
       }
     }
     else
@@ -647,8 +646,7 @@ class RootLevel : public LevelLogic
       decisions[0] = migMsg;
       for (int i = 1; i < num_children; i++)
       {
-        CkReferenceMsg(migMsg);
-        decisions[i] = migMsg;
+        decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&migMsg);
       }
     }
   }
@@ -902,8 +900,7 @@ class NodeSetLevel : public LevelLogic
     decisions[0] = migMsg;
     for (int i = 1; i < num_children; i++)
     {
-      CkReferenceMsg(migMsg);
-      decisions[i] = migMsg;
+      decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&migMsg);
     }
     migMsg = nullptr;
   }
@@ -1004,8 +1001,7 @@ class NodeLevel : public LevelLogic
       decisions[0] = decision;
       for (int i = 1; i < pes.size(); i++)
       {
-        CkReferenceMsg(decision);
-        decisions[i] = decision;
+        decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&decision);
       }
     }
   }
@@ -1058,8 +1054,7 @@ class NodeLevel : public LevelLogic
     decisions[0] = migMsg;
     for (int i = 1; i < pes.size(); i++)
     {
-      CkReferenceMsg(migMsg);
-      decisions[i] = migMsg;
+      decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&migMsg);
     }
   }
 
@@ -1268,8 +1263,7 @@ class MsgAggregator : public LevelLogic
     decisions[0] = decision;
     for (int i = 1; i < num_children + 1; i++)
     {
-      CkReferenceMsg(decision);
-      decisions[i] = decision;
+      decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&decision);
     }
   }
 
