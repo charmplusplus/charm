@@ -63,7 +63,7 @@ class PE_Root_Tree : public LBTreeBuilderCommon
       comm_children[0].assign(children, children + num_children);
       free(children);
     }
-    comm_logic[0] = new MsgAggregator(num_children);
+    comm_logic[0] = new MsgAggregator();
 
     // root of tree (level 1)
     if (CkMyPe() == rootPE)
@@ -170,7 +170,7 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
         comm_children[lvl].assign(children, children + num_children);
         free(children);
       }
-      comm_logic[lvl] = new MsgAggregator(num_children);
+      comm_logic[lvl] = new MsgAggregator();
     }
 
     // root of tree (level 2)
@@ -284,7 +284,7 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
         comm_children[lvl].assign(children, children + num_children);
         free(children);
       }
-      comm_logic[lvl] = new MsgAggregator(num_children);
+      comm_logic[lvl] = new MsgAggregator();
     }
 
     // nodeset level (level 2)

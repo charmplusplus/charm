@@ -288,10 +288,9 @@ void TreeLB::loadBalanceSubtree(int level)
   awaitingLB[level] = false;
   if (level == 0) return lb_done();
 
-  std::vector<TreeLBMessage*> decisions;
   /// CkMessage *inter_subtree_migrations = nullptr;
   IDM idm;
-  logic[level]->loadBalance(decisions, idm);
+  TreeLBMessage* decision = logic[level]->loadBalance(idm);
   if (idm.size() > 0)
   {
     // this can happen when final destinations of chares has been decided,
@@ -315,24 +314,30 @@ void TreeLB::loadBalanceSubtree(int level)
   level -= 1;
   int curr_child = 0;
   std::vector<int>& children = comm_children[level];
-  for (int i = 0; i < decisions.size(); i++)
+  std::vector<TreeLBMessage*> decisions = comm_logic[level]->splitDecision(decision, children);
+
+  // If the lower level logic has something here, deliver it, otherwise eat the first
+  // decision message
+  if (logic[level] != nullptr)
   {
-    if ((i == 0) && (logic[level] != nullptr))
-    {
-      CkAssert(decisions.size() == children.size() + 1);
-      // first decision msg is for this PE
-      receiveDecision(decisions[0], level);
-    }
-    else
-    {
-      decisions[i]->level = level;
-      // Necessary because in some cases every message in decisions is actually
-      // the same message that we are reusing, so mark as unused
-      _SET_USED(UsrToEnv(decisions[i]), 0);
-      CkPrintf("[%d] - lbst to %d with %d incoming\n", CkMyPe(), children[curr_child], ((LLBMigrateMsg*)decisions[i])->num_incoming[children[curr_child]]);
-      thisProxy[children[curr_child++]].sendDecisionDown((CkMessage*)decisions[i]);
-      CkPrintf("[%d] - lbst to %d packed %s \n", CkMyPe(), children[curr_child - 1], UsrToEnv(decisions[i])->isPacked() ? "true" : "false");
-    }
+    receiveDecision(decisions[0], level);
+  }
+  else
+  {
+    delete decisions[0];
+  }
+
+  for (int i = 1; i < decisions.size(); i++)
+  {
+    decisions[i]->level = level;
+    // Necessary because in some cases every message in decisions is actually
+    // the same message that we are reusing, so mark as unused
+    _SET_USED(UsrToEnv(decisions[i]), 0);
+    CkPrintf("[%d] - lbst to %d with %d incoming\n", CkMyPe(), children[curr_child],
+             ((LLBMigrateMsg*)decisions[i])->num_incoming[children[curr_child]]);
+    thisProxy[children[curr_child++]].sendDecisionDown((CkMessage*)decisions[i]);
+    CkPrintf("[%d] - lbst to %d packed %s \n", CkMyPe(), children[curr_child - 1],
+             UsrToEnv(decisions[i])->isPacked() ? "true" : "false");
   }
 }
 
@@ -366,9 +371,9 @@ void TreeLB::sendDecisionDown(CkMessage* msg)
   {
     // comm logic is free to split (scatter) the message, or send same msg to every child,
     // etc.
-    std::vector<TreeLBMessage*> decisions;
     CkAssert(comm_logic[level] != nullptr);
-    comm_logic[level]->splitDecision(decision, decisions);
+    std::vector<TreeLBMessage*> decisions =
+        comm_logic[level]->splitDecision(decision, children);
     CkAssert(decisions.size() == children.size() + 1);
     decisions[0]->level = level;
     receiveDecision(decisions[0], level);
