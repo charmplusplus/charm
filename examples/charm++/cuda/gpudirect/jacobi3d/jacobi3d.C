@@ -75,36 +75,43 @@ public:
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "W:H:D:w:h:d:i:u:yzp")) != -1) {
+    bool dims[6] = {false, false, false, false, false, false};
+    while ((c = getopt(m->argc, m->argv, "X:Y:Z:x:y:z:i:w:sdp")) != -1) {
       switch (c) {
-        case 'W':
+        case 'X':
           grid_width = atoi(optarg);
+          dims[0] = true;
           break;
-        case 'H':
+        case 'Y':
           grid_height = atoi(optarg);
+          dims[1] = true;
           break;
-        case 'D':
+        case 'Z':
           grid_depth = atoi(optarg);
+          dims[2] = true;
           break;
-        case 'w':
+        case 'x':
           block_width = atoi(optarg);
+          dims[3] = true;
           break;
-        case 'h':
+        case 'y':
           block_height = atoi(optarg);
+          dims[4] = true;
           break;
-        case 'd':
+        case 'z':
           block_depth = atoi(optarg);
+          dims[5] = true;
           break;
         case 'i':
           n_iters = atoi(optarg);
           break;
-        case 'u':
+        case 'w':
           warmup_iters = atoi(optarg);
           break;
-        case 'y':
+        case 's':
           sync_ver = true;
           break;
-        case 'z':
+        case 'd':
           use_zerocopy = true;
           break;
         case 'p':
@@ -122,6 +129,11 @@ public:
     }
     delete m;
 
+    // If only the X dimension is given, use it for Y and Z as well
+    if (dims[0] && !dims[1] && !dims[2]) grid_height = grid_depth = grid_width;
+    if (dims[3] && !dims[4] && !dims[5]) block_height = block_depth = block_width;
+
+    // Check valid grid/block configuration
     if (grid_width % block_width != 0 || grid_height % block_height != 0 ||
         grid_depth % block_depth != 0) {
       CkAbort("Invalid grid & block configuration\n");
@@ -307,7 +319,7 @@ class Block : public CBase_Block {
       left_bound = true;
     else
       neighbors++;
-    if (thisIndex.x == n_chares_x - 1)
+    if (thisIndex.x == n_chares_x-1)
       right_bound = true;
     else
       neighbors++;
@@ -315,7 +327,7 @@ class Block : public CBase_Block {
       top_bound = true;
     else
       neighbors++;
-    if (thisIndex.y == n_chares_y - 1)
+    if (thisIndex.y == n_chares_y-1)
       bottom_bound = true;
     else
       neighbors++;
@@ -323,7 +335,7 @@ class Block : public CBase_Block {
       front_bound = true;
     else
       neighbors++;
-    if (thisIndex.z == n_chares_z - 1)
+    if (thisIndex.z == n_chares_z-1)
       back_bound = true;
     else
       neighbors++;
