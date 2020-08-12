@@ -417,11 +417,17 @@ class StrategyWrapper : public IStrategyWrapper
 #if CMK_ERROR_CHECKING
       if ((CkMyPe() == 0 || isTreeRoot) && _lb_args.debug() > 0)
 #endif
+      {
         CkPrintf(
             "[%d] strategy %s time=%f secs, maxLoad after strategy=%f, num_migrations=%d "
             "migrations_sum_hops=%u\n",
             CkMyPe(), strategy_name.c_str(), strategy_time, maxLoad, migMsg->n_moves,
             migrations_sum_hops);
+        for (const auto& o : objs)
+        {
+          CkPrintf("oid: %d going to %d\n", o.id, procMap[migMsg->to_pes[o.id]]);
+        }
+      }
     }
 
     delete sol;

@@ -9,6 +9,6 @@ mainmodule hello {
 
   array [1D] Hello {
     entry Hello();
-    entry void work();
+    entry [reductiontarget] void work();
   };
 }
