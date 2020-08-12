@@ -278,15 +278,11 @@ void TreeLB::receiveStats(TreeLBMessage* stats, int level)
 
 void TreeLB::loadBalanceSubtree(int level)
 {
-  CkPrintf("[%d] TreeLB::loadBalanceSubtree - level=%d (%s)\n", CkMyPe(), level, awaitingLB[level] ? "true" : "false");
-
-  if (!awaitingLB[level])
-  {
-    CkPrintf("[%d] Awaiting LB is false\n", CkMyPe());
-    return;
-  }
+  if (!awaitingLB[level]) return;
   awaitingLB[level] = false;
   if (level == 0) return lb_done();
+
+  // CkPrintf("[%d] TreeLB::loadBalanceSubtree - level=%d\n", CkMyPe(), level);
 
   /// CkMessage *inter_subtree_migrations = nullptr;
   IDM idm;
@@ -333,11 +329,7 @@ void TreeLB::loadBalanceSubtree(int level)
     // Necessary because in some cases every message in decisions is actually
     // the same message that we are reusing, so mark as unused
     _SET_USED(UsrToEnv(decisions[i]), 0);
-    CkPrintf("[%d] - lbst to %d with %d incoming\n", CkMyPe(), children[curr_child],
-             ((LLBMigrateMsg*)decisions[i])->num_incoming[children[curr_child]]);
     thisProxy[children[curr_child++]].sendDecisionDown((CkMessage*)decisions[i]);
-    CkPrintf("[%d] - lbst to %d packed %s \n", CkMyPe(), children[curr_child - 1],
-             UsrToEnv(decisions[i])->isPacked() ? "true" : "false");
   }
 }
 
@@ -359,8 +351,6 @@ void TreeLB::multicastIDM(const IDM& mig_order, int num_pes, int* _pes)
 void TreeLB::sendDecisionDown(CkMessage* msg)
 {
   TreeLBMessage* decision = (TreeLBMessage*)msg;
-  CkPrintf("[%d] - sdd with %d incoming\n", CkMyPe(), ((LLBMigrateMsg*)decision)->num_incoming[0]);
-  CkPrintf("[%d] - sdd in msg packed %s\n", CkMyPe(), UsrToEnv(decision)->isPacked() ? "true" : "false");
   int level = decision->level;
   std::vector<int>& children = comm_children[level];
   if (children.size() == 0)
@@ -384,26 +374,25 @@ void TreeLB::sendDecisionDown(CkMessage* msg)
       // the same message that we are reusing, so mark as unused
       _SET_USED(UsrToEnv(decisions[i + 1]), 0);
       thisProxy[children[i]].sendDecisionDown((CkMessage*)decisions[i + 1]);
-      CkPrintf("[%d] - sdd to %d packed %s \n", CkMyPe(), children[i], UsrToEnv(decisions[i+1])->isPacked() ? "true" : "false");
     }
   }
 }
 
 void TreeLB::receiveDecision(TreeLBMessage* decision, int level)
 {
-  fprintf(stderr, "[%d] TreeLB::receiveDecision, level=%d\n", CkMyPe(), level);
+  // fprintf(stderr, "[%d] TreeLB::receiveDecision, level=%d\n", CkMyPe(), level);
 
   // incoming and outgoing are integers. logic objects determine and interpret these
   // values
   int& incoming = expected_incoming[level];
   int& outgoing = expected_outgoing[level];
   logic[level]->processDecision(decision, incoming, outgoing);
-  fprintf(stderr, "[%d] level=%d incoming=%d outgoing=%d\n", CkMyPe(), level, incoming,
-          outgoing);
+  // fprintf(stderr, "[%d] level=%d incoming=%d outgoing=%d\n", CkMyPe(), level, incoming,
+  // outgoing);
   if (incoming == 0 && outgoing == 0)
   {
     // no exchange with other subtrees, can do lb for my subtree now
-   loadBalanceSubtree(level);
+    loadBalanceSubtree(level);
   }
   else
   {
@@ -476,9 +465,7 @@ void TreeLB::objMovedIn(bool waitBarrier)
   // fprintf(stderr, "[%d] TreeLB::objMovedIn\n", CkMyPe());
 
   int level = 0;
-  //CkAssert(numLevels > 0 && awaitingLB[level]);
-  CkAssert(numLevels > 0);
-  CkAssert(awaitingLB[level]);
+  CkAssert(numLevels > 0 && awaitingLB[level]);
   load_received[level] += 1;
   checkLoadExchanged(level);
 }

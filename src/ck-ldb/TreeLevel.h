@@ -423,10 +423,6 @@ class StrategyWrapper : public IStrategyWrapper
             "migrations_sum_hops=%u\n",
             CkMyPe(), strategy_name.c_str(), strategy_time, maxLoad, migMsg->n_moves,
             migrations_sum_hops);
-        for (const auto& o : objs)
-        {
-          CkPrintf("oid: %d going to %d\n", o.id, procMap[migMsg->to_pes[o.id]]);
-        }
       }
     }
 
@@ -1266,7 +1262,7 @@ class MsgAggregator : public LevelLogic
         decisions[i] = remoteMsg;
       }
     }
-    
+
     return decisions;
   }
 };
