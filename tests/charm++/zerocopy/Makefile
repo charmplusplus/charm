@@ -6,7 +6,7 @@ DIRS = \
   dereg_and_nodereg \
   bcast_nonzero_root \
   pup_buffer \
-  large_p2p \
+#  large_p2p \ # not running as a part of make test since test requires over 4 GB of memory which causes failures during CI
 
 NONSCALEDIRS = \
   large_p2p \
