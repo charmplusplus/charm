@@ -3,6 +3,8 @@
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_Hello helloProxy;
 
+#define MAXITERS 2000
+
 class Main : public CBase_Main {
   public:
     Main(CkArgMsg* m) {
@@ -22,10 +24,12 @@ class Main : public CBase_Main {
 
 class Hello : public CBase_Hello {
   int pe;
+  int counter;
 
   public:
     Hello() {
       usesAtSync = true;
+      counter = 0;
       pe = CkMyPe();
       CkPrintf("Hello, I'm chare %d on PE %d\n", thisIndex, pe);
     }
@@ -34,6 +38,7 @@ class Hello : public CBase_Hello {
 
     void pup(PUP::er &p) {
       p|pe;
+      p|counter;
     }
 
     void work() {
@@ -55,8 +60,18 @@ class Hello : public CBase_Hello {
 
       pe = CkMyPe();
 
-      CkCallback cb(CkReductionTarget(Hello, work), thisProxy);
-      contribute(cb);
+      counter++;
+
+      if (counter == MAXITERS)
+      {
+        CkCallback cb(CkReductionTarget(Main, done), mainProxy);
+        contribute(cb);
+      }
+      else
+      {
+        CkCallback cb(CkReductionTarget(Hello, work), thisProxy);
+        contribute(cb);
+      }
     }
 };
 
