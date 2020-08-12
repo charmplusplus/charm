@@ -1,8 +1,16 @@
 #!/bin/bash
 #BSUB -W 10
 #BSUB -P csc357
-#BSUB -nnodes 1
-#BSUB -J jacobi3d
+#BSUB -nnodes 16
+#BSUB -J jacobi3d-e-n16
+
+# These need to be changed between submissions
+file=jacobi3d-e
+n_nodes=16
+n_procs=$((n_nodes * 6))
+grid_width=6144
+grid_height=4096
+grid_depth=2048
 
 # Function to display commands
 exe() { echo "\$ $@" ; "$@" ; }
@@ -11,15 +19,8 @@ cd $HOME/work/charm/examples/charm++/cuda/gpudirect/jacobi3d
 
 ppn=1
 pemap="L0,4,8,84,88,92"
-
 n_iters=100
 warmup_iters=10
-
-# These need to be changed according to node count
-grid_width=3072
-grid_height=2048
-grid_depth=512
-
 sync=""
 
 echo "# Jacobi3D Performance Benchmarking"
@@ -56,6 +57,6 @@ do
   for iter in 1 2 3
   do
     echo "# Iteration $iter"
-    exe jsrun -n6 -a1 -c$ppn -g1 -K3 -r6 ./jacobi3d -X $grid_width -Y $grid_height -Z $grid_depth -x $block_width -y $block_height -z $block_depth -w $warmup_iters -i $n_iters +ppn $ppn +pemap $pemap
+    exe jsrun -n$n_procs -a1 -c$ppn -g1 -K3 -r6 ./$file -X $grid_width -Y $grid_height -Z $grid_depth -x $block_width -y $block_height -z $block_depth -w $warmup_iters -i $n_iters +ppn $ppn +pemap $pemap
   done
 done
