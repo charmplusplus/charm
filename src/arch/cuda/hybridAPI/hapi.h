@@ -5,21 +5,14 @@
 /* See hapi_functions.h for the majority of function declarations provided
  * by the Hybrid API. */
 
-/******************** DEPRECATED ********************/
-// HAPI wrappers whose behavior is controlled by user defined variables,
-// which are HAPI_USE_CUDAMALLOCHOST and HAPI_MEMPOOL.
-#ifdef HAPI_USE_CUDAMALLOCHOST
-#  ifdef HAPI_MEMPOOL
-#    define hapiHostMalloc hapiPoolMalloc
-#    define hapiHostFree   hapiPoolFree
-#  else
-#    define hapiHostMalloc cudaMallocHost
-#    define hapiHostFree   cudaFreeHost
-#  endif // HAPI_MEMPOOL
+// HAPI wrappers for pinned host memory allocation
+#ifdef HAPI_MEMPOOL
+#define hapiHostMalloc hapiPoolMalloc
+#define hapiHostFree   hapiPoolFree
 #else
-#  define hapiHostMalloc malloc
-#  define hapiHostFree   free
-#endif // HAPI_USE_CUDAMALLOCHOST
+#define hapiHostMalloc cudaMallocHost
+#define hapiHostFree   cudaFreeHost
+#endif // HAPI_MEMPOOL
 
 #ifdef __cplusplus
 
