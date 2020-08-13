@@ -1146,7 +1146,7 @@ static int findPool(size_t size){
     if (newpool.head == NULL) {
       CmiPrintf("[HAPI (%d)] findPool: failed to allocate newpool %d head, size %zu\n",
              CmiMyPe(), boundary_array_len, size);
-      CmiAbort("[HAPI] failed newpool allocation");
+      return -1;
     }
     newpool.size = size;
 #ifdef HAPI_MEMPOOL_DEBUG
@@ -1217,7 +1217,7 @@ static void returnBufferToPool(int pool, BufferPoolHeader* hd) {
 #endif
 }
 
-void* hapiPoolMalloc(size_t size) {
+void hapiPoolMalloc(void** ptr, size_t size) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
 #if CMK_SMP
@@ -1256,19 +1256,21 @@ void* hapiPoolMalloc(size_t size) {
   }
 
   int pool = findPool(size);
-  void* buf = getBufferFromPool(pool, size);
+  if (pool < 0) {
+    *ptr = NULL;
+  } else {
+    *ptr = getBufferFromPool(pool, size);
 
 #ifdef HAPI_MEMPOOL_DEBUG
-  CmiPrintf("[HAPI (%d)] hapiPoolMalloc size %zu pool %d left %d\n",
-         CmiMyPe(), size, pool,
-         csv_gpu_manager.mempool_free_bufs_[pool].num);
+    CmiPrintf("[HAPI (%d)] hapiPoolMalloc size %zu pool %d left %d\n",
+          CmiMyPe(), size, pool,
+          csv_gpu_manager.mempool_free_bufs_[pool].num);
 #endif
+  }
 
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.mempool_lock_);
 #endif
-
-  return buf;
 }
 
 void hapiPoolFree(void* ptr) {
@@ -1484,11 +1486,8 @@ cudaError_t hapiMallocHost(void** ptr, size_t size) {
 }
 
 cudaError_t hapiMallocHostPool(void** ptr, size_t size) {
-  void* tmp_ptr = hapiPoolMalloc(size);
-  if (tmp_ptr) {
-    *ptr = tmp_ptr;
-    return cudaSuccess;
-  }
+  hapiPoolMalloc(ptr, size);
+  if (*ptr) return cudaSuccess;
   else return cudaErrorMemoryAllocation;
 }
 

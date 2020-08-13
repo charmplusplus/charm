@@ -43,7 +43,7 @@ AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHostPool, void*)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpyAsync, void*, const void*, size_t, enum cudaMemcpyKind, cudaStream_t)
 
 // Explicit memory allocations using pinned memory pool.
-AMPI_CUSTOM_FUNC(void*, hapiPoolMalloc, size_t)
+AMPI_CUSTOM_FUNC(void, hapiPoolMalloc, void**, size_t)
 AMPI_CUSTOM_FUNC(void, hapiPoolFree, void*)
 
 // Provides support for detecting errors with CUDA API calls.
