@@ -62,8 +62,8 @@ class PE_Root_Tree : public LBTreeBuilderCommon
     {
       comm_children[0].assign(children, children + num_children);
       free(children);
+      comm_logic[0] = new MsgAggregator();
     }
-    comm_logic[0] = new MsgAggregator();
 
     // root of tree (level 1)
     if (CkMyPe() == rootPE)
@@ -127,6 +127,7 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
       // pes in my node excluding me
       comm_children[lvl].resize(CkNodeSize(mynode) - 1);
       std::iota(comm_children[lvl].begin(), comm_children[lvl].end(), level1root + 1);
+      comm_logic[lvl] = new MsgAggregator();
     }
     else
     {
@@ -169,8 +170,8 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
       {
         comm_children[lvl].assign(children, children + num_children);
         free(children);
+        comm_logic[lvl] = new MsgAggregator();
       }
-      comm_logic[lvl] = new MsgAggregator();
     }
 
     // root of tree (level 2)
@@ -234,6 +235,7 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
       // pes in my node excluding me
       comm_children[lvl].resize(CkNodeSize(mynode) - 1);
       std::iota(comm_children[lvl].begin(), comm_children[lvl].end(), level1root + 1);
+      comm_logic[lvl] = new MsgAggregator();
     }
     else
     {
@@ -283,8 +285,8 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
       {
         comm_children[lvl].assign(children, children + num_children);
         free(children);
+        comm_logic[lvl] = new MsgAggregator();
       }
-      comm_logic[lvl] = new MsgAggregator();
     }
 
     // nodeset level (level 2)
@@ -313,6 +315,7 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
         if (pe != mype)
           comm_children[lvl - 1].push_back(pe);
       }
+      comm_logic[lvl - 1] = new MsgAggregator();
 
       RootLevel* level = new RootLevel(num_groups);
       level->configure(_lb_args.testPeSpeed(), config["Root"]);
