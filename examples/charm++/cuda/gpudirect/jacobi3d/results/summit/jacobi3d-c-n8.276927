@@ -1,0 +1,359 @@
+# Jacobi3D Performance Benchmarking
+# Block size 1024 x 1024 x 512
+# Iteration 1
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 1024 -y 1024 -z 512 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.003 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 1024 x 1024 x 512, Chares: 6 x 4 x 2, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.747 s
+Total time: 3.043 s
+Average iteration time: 30425.880 us
+[Partition 0][Node 0] End of program
+# Iteration 2
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 1024 -y 1024 -z 512 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.005 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 1024 x 1024 x 512, Chares: 6 x 4 x 2, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.697 s
+Total time: 3.049 s
+Average iteration time: 30491.418 us
+[Partition 0][Node 0] End of program
+# Iteration 3
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 1024 -y 1024 -z 512 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.003 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 1024 x 1024 x 512, Chares: 6 x 4 x 2, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.628 s
+Total time: 3.031 s
+Average iteration time: 30308.963 us
+[Partition 0][Node 0] End of program
+# Block size 1024 x 512 x 512
+# Iteration 1
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 1024 -y 512 -z 512 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 1024 x 512 x 512, Chares: 6 x 8 x 2, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.554 s
+Total time: 2.251 s
+Average iteration time: 22514.365 us
+[Partition 0][Node 0] End of program
+# Iteration 2
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 1024 -y 512 -z 512 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.005 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 1024 x 512 x 512, Chares: 6 x 8 x 2, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.676 s
+Total time: 2.272 s
+Average iteration time: 22721.235 us
+[Partition 0][Node 0] End of program
+# Iteration 3
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 1024 -y 512 -z 512 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 1024 x 512 x 512, Chares: 6 x 8 x 2, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.648 s
+Total time: 2.326 s
+Average iteration time: 23256.083 us
+[Partition 0][Node 0] End of program
+# Block size 512 x 512 x 512
+# Iteration 1
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 512 -y 512 -z 512 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 512 x 512 x 512, Chares: 12 x 8 x 2, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.783 s
+Total time: 2.166 s
+Average iteration time: 21657.799 us
+[Partition 0][Node 0] End of program
+# Iteration 2
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 512 -y 512 -z 512 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 512 x 512 x 512, Chares: 12 x 8 x 2, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.707 s
+Total time: 2.168 s
+Average iteration time: 21679.819 us
+[Partition 0][Node 0] End of program
+# Iteration 3
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 512 -y 512 -z 512 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 512 x 512 x 512, Chares: 12 x 8 x 2, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.636 s
+Total time: 2.181 s
+Average iteration time: 21805.600 us
+[Partition 0][Node 0] End of program
+# Block size 512 x 512 x 256
+# Iteration 1
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 512 -y 512 -z 256 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 512 x 512 x 256, Chares: 12 x 8 x 4, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.845 s
+Total time: 2.790 s
+Average iteration time: 27904.777 us
+[Partition 0][Node 0] End of program
+# Iteration 2
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 512 -y 512 -z 256 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.003 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 512 x 512 x 256, Chares: 12 x 8 x 4, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.668 s
+Total time: 2.720 s
+Average iteration time: 27201.566 us
+[Partition 0][Node 0] End of program
+# Iteration 3
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 512 -y 512 -z 256 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 512 x 512 x 256, Chares: 12 x 8 x 4, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.753 s
+Total time: 2.772 s
+Average iteration time: 27724.089 us
+[Partition 0][Node 0] End of program
+# Block size 512 x 256 x 256
+# Iteration 1
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 512 -y 256 -z 256 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 512 x 256 x 256, Chares: 12 x 16 x 4, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.950 s
+Total time: 3.425 s
+Average iteration time: 34248.387 us
+[Partition 0][Node 0] End of program
+# Iteration 2
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 512 -y 256 -z 256 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 512 x 256 x 256, Chares: 12 x 16 x 4, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.819 s
+Total time: 3.423 s
+Average iteration time: 34228.847 us
+[Partition 0][Node 0] End of program
+# Iteration 3
+$ jsrun -n48 -a1 -c1 -g1 -K3 -r6 ./jacobi3d-c -X 6144 -Y 4096 -Z 1024 -x 512 -y 256 -z 256 -w 10 -i 100 +ppn 1 +pemap L0,4,8,84,88,92
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 48 processes, 1 worker threads (PEs) + 0 comm threads per process, 48 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-407-g331b884
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (logical indices): 0,4,8,84,88,92
+Charm++> Running on 8 hosts (2 sockets x 0 cores x 4 PUs = 4-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 6 device(s) per host
+HAPI> Enabling P2P access between devices
+
+[CUDA 2D Jacobi example]
+Grid: 6144 x 4096 x 1024, Block: 512 x 256 x 256, Chares: 12 x 16 x 4, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 2.880 s
+Total time: 3.466 s
+Average iteration time: 34657.555 us
+[Partition 0][Node 0] End of program
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@batch1>
+Subject: Job 276927: <jacobi3d-c-n8> in cluster <summit> Done
+
+Job <jacobi3d-c-n8> was submitted from host <login4> by user <jchoi> in cluster <summit> at Wed Aug 12 18:42:47 2020
+Job was executed on host(s) <1*batch1>, in queue <batch>, as user <jchoi> in cluster <summit> at Wed Aug 12 18:43:18 2020
+                            <42*h30n07>
+                            <42*h30n08>
+                            <42*h30n15>
+                            <42*h30n16>
+                            <42*h50n07>
+                            <42*h50n08>
+                            <42*h50n12>
+                            <42*h50n16>
+</ccs/home/jchoi> was used as the home directory.
+</ccs/home/jchoi/work/charm/examples/charm++/cuda/gpudirect/jacobi3d/scripts/summit> was used as the working directory.
+Started at Wed Aug 12 18:43:18 2020
+Terminated at Wed Aug 12 18:45:50 2020
+Results reported at Wed Aug 12 18:45:50 2020
+
+The output (if any) is above this job summary.
+
