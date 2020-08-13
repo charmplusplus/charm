@@ -34,8 +34,8 @@ int CmiGetRdmaCommonInfoSize() {
 #if CMK_USE_CMA
 #include <sys/uio.h> // for struct iovec
 extern int cma_works;
-int readShmCma(pid_t, struct iovec *, struct iovec *, int, size_t);
-int writeShmCma(pid_t, struct iovec *, struct iovec *, int, size_t);
+int readShmCma(pid_t, char*, char*, size_t);
+int writeShmCma(pid_t, char *, char *, size_t);
 
 // These methods are also used by the generic layer implementation of the Direct API
 void CmiIssueRgetUsingCMA(
@@ -47,20 +47,10 @@ void CmiIssueRgetUsingCMA(
   int destPe,
   size_t size) {
 
-  // Use SHM transport for a PE on the same host
-  struct iovec local, remote;
-  // local memory address
-  local.iov_base = (void *)destAddr;
-  local.iov_len  = size;
-
-  // remote memory address
-  remote.iov_base = (void *)srcAddr;
-  remote.iov_len  = size;
-
   // get remote process id
   CmiCommonRdmaInfo_t *remoteCommInfo = (CmiCommonRdmaInfo_t *)srcInfo;
   pid_t pid = remoteCommInfo->pid;
-  readShmCma(pid, &local, &remote, 1, size);
+  readShmCma(pid, (char *)destAddr, (char *)srcAddr, size);
 }
 
 void CmiIssueRputUsingCMA(
@@ -72,20 +62,10 @@ void CmiIssueRputUsingCMA(
   int srcPe,
   size_t size) {
 
-  // Use SHM transport for a PE on the same host
-  struct iovec local, remote;
-  // local memory address
-  local.iov_base = (void *)srcAddr;
-  local.iov_len  = size;
-
-  // remote memory address
-  remote.iov_base = (void *)destAddr;
-  remote.iov_len  = size;
-
   // get remote process id
   CmiCommonRdmaInfo_t *remoteCommInfo = (CmiCommonRdmaInfo_t *)destInfo;
   pid_t pid = remoteCommInfo->pid;
-  writeShmCma(pid, &local, &remote, 1, size);
+  writeShmCma(pid, (char *)srcAddr, (char *)destAddr, size);
 }
 #endif
 

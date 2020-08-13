@@ -2,7 +2,8 @@
 
 set -o nounset -o posix -o pipefail
 
-progname=$(basename $0)
+progname=$(basename "$0")
+progdir=$(dirname "$0")
 
 verbose=0
 num_ranks=1
@@ -74,15 +75,19 @@ processArgs() {
         virtual_ranks=1
         ;;
 
+      --)
+        cmd="$@ "
+        return
+        ;;
+
+      -*)
+        echo "$progname error: unknown option \"$arg\""
+        exit 1
+        ;;
+
       *)
-        if [[ -x $arg ]]; then
-            # Stop argument parsing when finding an executable
-            cmd="$arg $@ "
-            return
-        else
-            # Other arguments to charmrun, e.g. +balancer RotateLB
-            charmrun_args+="$arg "
-        fi
+        cmd="\"$arg\" $@ "
+        return
         ;;
     esac
   done
@@ -90,39 +95,30 @@ processArgs() {
 
 eval processArgs "$@"
 
-if [[ -z $cmd ]]; then
-  echo "$progname error: missing command to execute"
-  usage
-  exit 2
-fi
-
 handle_hosts
 
-full_cmd="./charmrun $charmrun_args "
-
 if [[ $verbose == 0 ]]; then
-  full_cmd+="++quiet "
+  charmrun_args+="++quiet "
 fi
 
 if [[ -z $hosts ]]; then
-  full_cmd+="++local "
+  charmrun_args+="++local "
 else
-  full_cmd+="++nodelist ampirun-nodelist "
+  charmrun_args+="++nodelist ampirun-nodelist "
 fi
-
-full_cmd+="$cmd"
 
 if [[ $virtual_ranks == 0 ]]; then
-  full_cmd+="+p$num_ranks "
+  cmd+="+p$num_ranks "
 else
-  full_cmd+="+vp$num_ranks +p$num_hosts "
+  cmd+="+vp$num_ranks +p$num_hosts "
 fi
 
-if [[ $verbose == 1 ]]; then
-  echo "Executing '$full_cmd'"
-fi
+Do() {
+  [[ $verbose == 1 ]] && echo "$progname: Executing $@" 1>&2
+  eval "$@"
+}
 
-eval $full_cmd
+Do "$progdir/charmrun" $charmrun_args $cmd
 status=$?
 
 rm -f ampirun-nodelist
