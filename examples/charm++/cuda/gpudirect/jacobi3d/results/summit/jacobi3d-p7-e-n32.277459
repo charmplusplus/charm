@@ -1,0 +1,89 @@
+# Jacobi3D Performance Benchmarking
+# Block size 512 x 512 x 256
+# Iteration 1
+$ jsrun -n192 -a1 -c7 -g1 -K3 -r6 ./jacobi3d-e -X 12288 -Y 4096 -Z 2048 -x 512 -y 512 -z 256 -w 10 -i 100 +ppn 7 +pemap L0-168:4
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 192 processes, 7 worker threads (PEs) + 0 comm threads per process, 1344 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 192 processes, 7 worker threads (PEs) + 0 comm threads per process, 1344 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 192 processes, 7 worker threads (PEs) + 0 comm threads per process, 1344 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-397-g5f3ed94
+ERROR:  One or more process (first noticed rank 133) terminated with signal 11 (core dumped)
+# Iteration 2
+$ jsrun -n192 -a1 -c7 -g1 -K3 -r6 ./jacobi3d-e -X 12288 -Y 4096 -Z 2048 -x 512 -y 512 -z 256 -w 10 -i 100 +ppn 7 +pemap L0-168:4
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 192 processes, 7 worker threads (PEs) + 0 comm threads per process, 1344 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 192 processes, 7 worker threads (PEs) + 0 comm threads per process, 1344 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 192 processes, 7 worker threads (PEs) + 0 comm threads per process, 1344 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 192 processes, 7 worker threads (PEs) + 0 comm threads per process, 1344 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-397-g5f3ed94
+ERROR:  One or more process (first noticed rank 72) terminated with signal 11 (core dumped)
+# Iteration 3
+$ jsrun -n192 -a1 -c7 -g1 -K3 -r6 ./jacobi3d-e -X 12288 -Y 4096 -Z 2048 -x 512 -y 512 -z 256 -w 10 -i 100 +ppn 7 +pemap L0-168:4
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 192 processes, 7 worker threads (PEs) + 0 comm threads per process, 1344 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Choosing optimized barrier algorithm name I0:MultiLeaderBarrier:SHMEM:P2P
+Charm++> Running in SMP mode: 192 processes, 7 worker threads (PEs) + 0 comm threads per process, 1344 PEs total
+Charm++> There's no comm. thread. Work threads both send and receive messages
+Converse/Charm++ Commit ID: v6.11.0-devel-397-g5f3ed94
+User defined signal 2
+ERROR:  One or more process (first noticed rank 67) terminated with signal 12
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@batch3>
+Subject: Job 277459: <jacobi3d-p7-e-n32> in cluster <summit> Exited
+
+Job <jacobi3d-p7-e-n32> was submitted from host <batch5> by user <jchoi> in cluster <summit> at Thu Aug 13 00:33:54 2020
+Job was executed on host(s) <1*batch3>, in queue <batch>, as user <jchoi> in cluster <summit> at Thu Aug 13 01:17:02 2020
+                            <42*f11n09>
+                            <42*f11n10>
+                            <42*f11n11>
+                            <42*f11n12>
+                            <42*f11n13>
+                            <42*f11n14>
+                            <42*f11n15>
+                            <42*f11n16>
+                            <42*f11n17>
+                            <42*f11n18>
+                            <42*f12n01>
+                            <42*f12n02>
+                            <42*f12n03>
+                            <42*f12n04>
+                            <42*f12n05>
+                            <42*f12n06>
+                            <42*f12n07>
+                            <42*f12n08>
+                            <42*f12n09>
+                            <42*f12n10>
+                            <42*f12n11>
+                            <42*f12n12>
+                            <42*f12n13>
+                            <42*f12n14>
+                            <42*f12n15>
+                            <42*f12n16>
+                            <42*f12n17>
+                            <42*f12n18>
+                            <42*f13n01>
+                            <42*f13n02>
+                            <42*f13n03>
+                            <42*f13n04>
+</ccs/home/jchoi> was used as the home directory.
+</ccs/home/jchoi/work/charm/examples/charm++/cuda/gpudirect/jacobi3d/scripts/summit> was used as the working directory.
+Started at Thu Aug 13 01:17:02 2020
+Terminated at Thu Aug 13 01:27:20 2020
+Results reported at Thu Aug 13 01:27:20 2020
+
+The output (if any) is above this job summary.
+
