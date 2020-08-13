@@ -284,10 +284,9 @@ void TreeLB::loadBalanceSubtree(int level)
 
   // CkPrintf("[%d] TreeLB::loadBalanceSubtree - level=%d\n", CkMyPe(), level);
 
-  std::vector<TreeLBMessage*> decisions;
   /// CkMessage *inter_subtree_migrations = nullptr;
   IDM idm;
-  logic[level]->loadBalance(decisions, idm);
+  TreeLBMessage* decision = logic[level]->loadBalance(idm);
   if (idm.size() > 0)
   {
     // this can happen when final destinations of chares has been decided,
@@ -308,26 +307,8 @@ void TreeLB::loadBalanceSubtree(int level)
   }
 
   // send decision to next level
-  level -= 1;
-  int curr_child = 0;
-  std::vector<int>& children = comm_children[level];
-  for (int i = 0; i < decisions.size(); i++)
-  {
-    if ((i == 0) && (logic[level] != nullptr))
-    {
-      CkAssert(decisions.size() == children.size() + 1);
-      // first decision msg is for this PE
-      receiveDecision(decisions[0], level);
-    }
-    else
-    {
-      decisions[i]->level = level;
-      // Necessary because in some cases every message in decisions is actually
-      // the same message that we are reusing, so mark as unused
-      _SET_USED(UsrToEnv(decisions[i]), 0);
-      thisProxy[children[curr_child++]].sendDecisionDown((CkMessage*)decisions[i]);
-    }
-  }
+  decision->level = level - 1;
+  sendDecisionDown((CkMessage*)decision);
 }
 
 void TreeLB::multicastIDM(const IDM& mig_order, int num_pes, int* _pes)
@@ -348,9 +329,9 @@ void TreeLB::multicastIDM(const IDM& mig_order, int num_pes, int* _pes)
 void TreeLB::sendDecisionDown(CkMessage* msg)
 {
   TreeLBMessage* decision = (TreeLBMessage*)msg;
-  int level = decision->level;
+  const int level = decision->level;
   std::vector<int>& children = comm_children[level];
-  if (children.size() == 0)
+  if (children.empty())
   {
     receiveDecision(decision, level);
   }
@@ -358,15 +339,20 @@ void TreeLB::sendDecisionDown(CkMessage* msg)
   {
     // comm logic is free to split (scatter) the message, or send same msg to every child,
     // etc.
-    std::vector<TreeLBMessage*> decisions;
     CkAssert(comm_logic[level] != nullptr);
-    comm_logic[level]->splitDecision(decision, decisions);
+    std::vector<TreeLBMessage*> decisions =
+        comm_logic[level]->splitDecision(decision, children);
     CkAssert(decisions.size() == children.size() + 1);
-    decisions[0]->level = level;
-    receiveDecision(decisions[0], level);
+    if (logic[level] != nullptr)
+    {
+      receiveDecision(decisions[0], level);
+    }
+    else
+    {
+      delete decisions[0];
+    }
     for (int i = 0; i < children.size(); i++)
     {
-      decisions[i + 1]->level = level;
       // Necessary because in some cases every message in decisions is actually
       // the same message that we are reusing, so mark as unused
       _SET_USED(UsrToEnv(decisions[i + 1]), 0);
