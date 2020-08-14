@@ -1,5 +1,8 @@
 language: cpp
 
+os: linux
+dist: xenial
+
 # Necessary for Windows builds - do not convert LF to CRLF:
 git:
   autocrlf: false
@@ -13,7 +16,7 @@ before_install:
         }
       fi
 
-matrix:
+jobs:
   include:
   - os: linux
     name: "MPI-Linux SMP"
@@ -21,23 +24,15 @@ matrix:
     script:
     - sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
     - ./build all-test mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C mpi-linux-x86_64-smp/tests test TESTOPTS="+setcpuaffinity"
-    - make -C mpi-linux-x86_64-smp/examples test TESTOPTS="+setcpuaffinity"
-    - make -C mpi-linux-x86_64-smp/benchmarks test TESTOPTS="+setcpuaffinity"
-    - make -C mpi-linux-x86_64-smp/tests testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
-    - make -C mpi-linux-x86_64-smp/examples testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
-    - make -C mpi-linux-x86_64-smp/benchmarks testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
+    - make -C mpi-linux-x86_64-smp/tmp test TESTOPTS="+setcpuaffinity"
+    #- make -C mpi-linux-x86_64-smp/tmp testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
 
   - os: osx
     name: "NetLRTS-Darwin"
     script:
     - ./build all-test netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C netlrts-darwin-x86_64/tests test TESTOPTS="++local"
-    - make -C netlrts-darwin-x86_64/examples test TESTOPTS="++local"
-    - make -C netlrts-darwin-x86_64/benchmarks test TESTOPTS="++local"
-    - make -C netlrts-darwin-x86_64/tests testp P=2 TESTOPTS="++local"
-    - make -C netlrts-darwin-x86_64/examples testp P=2 TESTOPTS="++local"
-    - make -C netlrts-darwin-x86_64/benchmarks testp P=2 TESTOPTS="++local"
+    - make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
+    - make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
 
   - os: windows
     name: "NetLRTS-Win"
