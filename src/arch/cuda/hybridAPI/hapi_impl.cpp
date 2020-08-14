@@ -1217,7 +1217,7 @@ static void returnBufferToPool(int pool, BufferPoolHeader* hd) {
 #endif
 }
 
-void hapiPoolMalloc(void** ptr, size_t size) {
+cudaError_t hapiPoolMalloc(void** ptr, size_t size) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
 #if CMK_SMP
@@ -1257,28 +1257,34 @@ void hapiPoolMalloc(void** ptr, size_t size) {
 
   int pool = findPool(size);
   if (pool < 0) {
-    *ptr = NULL;
-  } else {
-    *ptr = getBufferFromPool(pool, size);
+    *ptr = nullptr;
+
+#if CMK_SMP
+    CmiUnlock(csv_gpu_manager.mempool_lock_);
+#endif
+
+    return cudaErrorMemoryAllocation;
+  }
+  *ptr = getBufferFromPool(pool, size);
 
 #ifdef HAPI_MEMPOOL_DEBUG
-    CmiPrintf("[HAPI (%d)] hapiPoolMalloc size %zu pool %d left %d\n",
-          CmiMyPe(), size, pool,
-          csv_gpu_manager.mempool_free_bufs_[pool].num);
+  CmiPrintf("[HAPI (%d)] hapiPoolMalloc size %zu pool %d left %d\n",
+      CmiMyPe(), size, pool, csv_gpu_manager.mempool_free_bufs_[pool].num);
 #endif
-  }
 
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.mempool_lock_);
 #endif
+
+  return cudaSuccess;
 }
 
-void hapiPoolFree(void* ptr) {
+cudaError_t hapiPoolFree(void* ptr) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
-  // check if mempool was initialized, just return if not
+  // Check if mempool was initialized
   if (!csv_gpu_manager.mempool_initialized_)
-    return;
+    return cudaErrorInitializationError;
 
   BufferPoolHeader* hd = ((BufferPoolHeader*)ptr) - 1;
   int pool = hd->slot;
@@ -1302,6 +1308,8 @@ void hapiPoolFree(void* ptr) {
          CmiMyPe(), size, pool,
          csv_gpu_manager.mempool_free_bufs_[pool].num);
 #endif
+
+  return cudaSuccess;
 }
 
 #ifdef HAPI_INSTRUMENT_WRS

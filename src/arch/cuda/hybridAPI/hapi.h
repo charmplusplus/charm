@@ -7,11 +7,11 @@
 
 // HAPI wrappers for pinned host memory allocation
 #ifdef HAPI_MEMPOOL
-#define hapiHostMalloc hapiPoolMalloc
-#define hapiHostFree   hapiPoolFree
+#define hapiMallocHost hapiPoolMalloc
+#define hapiFreeHost   hapiPoolFree
 #else
-#define hapiHostMalloc cudaMallocHost
-#define hapiHostFree   cudaFreeHost
+#define hapiMallocHost cudaMallocHost
+#define hapiFreeHost   cudaFreeHost
 #endif // HAPI_MEMPOOL
 
 #ifdef __cplusplus
