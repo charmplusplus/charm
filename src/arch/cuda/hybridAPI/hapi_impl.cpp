@@ -1481,37 +1481,6 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
   hapiQdCreate(1);
 }
 
-cudaError_t hapiMalloc(void** devPtr, size_t size) {
-  return cudaMalloc(devPtr, size);
-}
-
-cudaError_t hapiFree(void* devPtr) {
-  return cudaFree(devPtr);
-}
-
-cudaError_t hapiMallocHost(void** ptr, size_t size) {
-  return cudaMallocHost(ptr, size);
-}
-
-cudaError_t hapiMallocHostPool(void** ptr, size_t size) {
-  hapiPoolMalloc(ptr, size);
-  if (*ptr) return cudaSuccess;
-  else return cudaErrorMemoryAllocation;
-}
-
-cudaError_t hapiFreeHost(void* ptr) {
-  return cudaFreeHost(ptr);
-}
-
-cudaError_t hapiFreeHostPool(void *ptr) {
-  hapiPoolFree(ptr);
-  return cudaSuccess;
-}
-
-cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {
-  return cudaMemcpyAsync(dst, src, count, kind, stream);
-}
-
 void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int line) {
   if (retCode != cudaSuccess) {
     fprintf(stderr, "Fatal CUDA Error [%d] %s at %s:%d\n", retCode, cudaGetErrorString(retCode), file, line);
