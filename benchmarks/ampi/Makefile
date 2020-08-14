@@ -8,7 +8,7 @@ DIRS = \
 
 ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
 # can reevaluate inclusion of this benchmark based on:
-# - support for 64-bit Converse messages (Issue #1378)
+# - support for migrating Isomalloc heaps >= 2 GiB
 # - shrinking the test to complete in 30 seconds or less
 #  DIRS += isomalloc
 endif

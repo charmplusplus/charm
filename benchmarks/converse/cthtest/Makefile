@@ -1,5 +1,4 @@
 -include ../../common.mk
--include ../../../include/conv-mach-opt.mak
 CHARMC=../../../bin/charmc $(OPTS)
 
 LINKLINE=$(CHARMC) -o pgm pgm.o -language converse++

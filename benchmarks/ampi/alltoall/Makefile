@@ -35,6 +35,7 @@ alltoall_VPtest: alltoall_VPtest.c
 	$(CHARMC) -o alltoall_VPtest alltoall_VPtest.o $(OPTS) $(LIBS)
 
 test: all
+# mpibench disabled because it hangs
 #	$(call run, +p4 ./mpibench +vp4)
 #	$(call run, +p4 ./mpibench +vp8)
 	$(call run, +p4 ./alltoall 1024 +vp4)
