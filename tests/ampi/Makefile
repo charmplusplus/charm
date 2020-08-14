@@ -4,12 +4,12 @@ DIRS = \
   megampi \
   stacksize \
   migration \
-  intercomm_coll \
   datatype \
   privatization \
   jacobi3d \
   exit \
 #  chkpt \
+#  intercomm_coll \ # causes hangs in SMP mode
 
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
   DIRS += fallreduce

@@ -21,21 +21,51 @@ message("# with the below configuration information.                     #")
 message("# You can run './buildold' to use the previous build system.    #")
 message("#################################################################")
 
-if(CMAKE_VERSION VERSION_GREATER 3.11)
+if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
   cmake_policy(SET CMP0075 OLD)
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
-project(Charm++ LANGUAGES CXX C VERSION 6.10.1)
+project(Charm++ LANGUAGES CXX C VERSION 6.10.2)
 
-find_package(Threads REQUIRED)
+find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
 
 # We need C++11 for (almost) all targets
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-enable_language(Fortran OPTIONAL)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(CMK_COMPILER gcc)
+  get_filename_component(mytmp ${CMAKE_CXX_COMPILER} NAME)
+  if(mytmp MATCHES "-")
+    string(REGEX REPLACE ".*(-.*)" "\\1" CMK_COMPILER_SUFFIX ${mytmp})
+  endif()
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(CMK_COMPILER clang)
+  get_filename_component(mytmp ${CMAKE_CXX_COMPILER} NAME)
+  if(mytmp MATCHES "-")
+    string(REGEX REPLACE ".*(-.*)" "\\1" CMK_COMPILER_SUFFIX ${mytmp})
+  endif()
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+  set(CMK_COMPILER icc)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Cray")
+  set(CMK_COMPILER craycc)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "PGI")
+  set(CMK_COMPILER pgcc)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
+  set(CMK_COMPILER xlc)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR (CMAKE_CXX_COMPILER_ID STREQUAL "" AND (CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")))
+  set(CMK_COMPILER msvc)
+else()
+  message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
+# No Fortran support with MSVC
+if(NOT CMK_COMPILER STREQUAL "msvc")
+  enable_language(Fortran OPTIONAL)
+endif()
+
 if(CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
   FortranCInterface_VERIFY()
@@ -50,35 +80,9 @@ else()
   set(CMK_CAN_LINK_FORTRAN 0)
 endif()
 
-if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
-  set(CMK_COMPILER gcc)
-  get_filename_component(mytmp ${CMAKE_CXX_COMPILER} NAME)
-  if(mytmp MATCHES "-")
-    string(REGEX REPLACE ".*(-.*)" "\\1" CMK_COMPILER_SUFFIX ${mytmp})
-  endif()
-elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "AppleClang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
-  set(CMK_COMPILER clang)
-  get_filename_component(mytmp ${CMAKE_CXX_COMPILER} NAME)
-  if(mytmp MATCHES "-")
-    string(REGEX REPLACE ".*(-.*)" "\\1" CMK_COMPILER_SUFFIX ${mytmp})
-  endif()
-elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
-  set(CMK_COMPILER icc)
-elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "Cray")
-  set(CMK_COMPILER craycc)
-elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "PGI")
-  set(CMK_COMPILER pgcc)
-elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "XL")
-  set(CMK_COMPILER xlc)
-elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
-  set(CMK_COMPILER msvc)
-else()
-  message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
-endif()
-
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,uth,verbs")
-set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
 
 # Platform specific options (choose multiple if desired):
 option(SMP "Enable shared-memory communication within a single multi-processor machine instead of message passing." ON)
@@ -92,7 +96,7 @@ option(SYNCFT "Compile with Charm++ fault tolerance support" OFF)
 option(PAPI "Compile with PAPI performance counter support" OFF)
 
 # Enable/disable features:
-option(ERROR_CHECKING      "Enable error checking" OFF)
+set(ERROR_CHECKING "" CACHE STRING "Enable error checking")
 option(AMPI_ERROR_CHECKING "Enable AMPI error checking" OFF)
 option(STATS               "Enable statistics collection" OFF)
 set(TRACING "" CACHE STRING "Enable tracing modules")
@@ -122,6 +126,14 @@ if(TRACING STREQUAL "")
     set(TRACING 1)
   else()
     set(TRACING 0)
+  endif()
+endif()
+
+if(ERROR_CHECKING STREQUAL "")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(ERROR_CHECKING 1)
+  else()
+    set(ERROR_CHECKING 0)
   endif()
 endif()
 
@@ -159,7 +171,18 @@ endif()
 set(CMK_REPLAYSYSTEM ${REPLAY})
 
 if(${TARGET} STREQUAL "all-test")
-  message(WARNING "Setting TARGET to LIBS instead of all-test.")
+  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test)
+  add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
+        conv-partition conv-util hwloc conv-static conv-core ldb-rand
+        memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
+        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
+        create_symlinks moduleCkCache trace-converse moduleCommonLBs
+        moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
+        threads-default-tls ldb-neighbor ldb-workstealing modulearmci
+        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc)
+  if(CMK_CAN_LINK_FORTRAN)
+    add_dependencies(all-test moduleampif conv-utilf ckmainf)
+  endif()
   set(TARGET "LIBS")
 endif()
 
@@ -211,7 +234,12 @@ else()
   set(CMK_MULTICORE 0)
 endif()
 
-set(CMK_USE_ZLIB ${ZLIB})
+if(NOT ${CMK_COMPILER} STREQUAL "msvc")
+  set(CMK_USE_ZLIB ${ZLIB})
+else()
+  set(CMK_USE_ZLIB 0)
+endif()
+
 if(${CMK_USE_ZLIB})
   find_package(ZLIB REQUIRED)
   set(CMK_SYSLIBS "$CMK_SYSLIBS -lz")
@@ -224,15 +252,24 @@ IF(JPEG_FOUND)
   set(CMK_USE_LIBJPEG 1)
 ENDIF()
 
+# Check for Python
+# PythonCCS requires Python v2.x and is the only target that uses this
+# With CMake 3.12+ we could use FindPython() here
+set(CMK_HAS_PYTHON 0)
+set(CMK_PYTHON_VERSION "")
+set(CMK_BUILD_PYTHON "")
+
+set(Python_ADDITIONAL_VERSIONS 2)
 find_package(PythonInterp)
+
 if(PYTHONINTERP_FOUND)
-  set(CMK_HAS_PYTHON 1)
-  set(CMK_PYTHON_VERSION ${PYTHON_VERSION_STRING})
-  set(CMK_BUILD_PYTHON ${PYTHON_VERSION_STRING})
-else()
-  set(CMK_HAS_PYTHON 0)
-  set(CMK_PYTHON_VERSION "")
-  set(CMK_BUILD_PYTHON "")
+  set(__MY_PYTHON_VER "${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}")
+  check_include_file(python${__MY_PYTHON_VER}/Python.h __MY_HAS_PYTHONH)
+  if(__MY_HAS_PYTHONH)
+    set(CMK_HAS_PYTHON 1)
+    set(CMK_PYTHON_VERSION ${__MY_PYTHON_VER})
+    set(CMK_BUILD_PYTHON ${__MY_PYTHON_VER})
+  endif()
 endif()
 
 set(CMK_REFNUM_TYPE ${REFNUM_TYPE})
@@ -271,7 +308,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(CHARM_OS "darwin")
   set(CMK_MACOSX 1)
   set(CMK_SHARED_SUF "dylib")
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
   set(CHARM_OS "win")
   set(CMK_WINDOWS 1)
   set(CMK_POST_EXE ".exe")
@@ -289,7 +326,7 @@ else()
 endif()
 
 set(CMK_POWER7 0)
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
   set(CHARM_CPU "x86_64")
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "powerpc" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^ppc")
   set(CHARM_CPU "ppc64le")
@@ -375,7 +412,7 @@ if (NOT CMK_MEMPOOL_CUTOFFNUM)
 endif()
 
 set(CMK_OPTIMIZE 0)
-if(${CMAKE_BUILD_TYPE} MATCHES "Release" OR ${CMAKE_BUILD_TYPE} MATCHES "RelWithDebInfo")
+if(CMAKE_BUILD_TYPE MATCHES "Release" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
     set(CMK_OPTIMIZE 1)
     add_compile_options(-optimize -production)
     set(BUILDOPTS "${BUILDOPTS} -optimize -production")
@@ -393,7 +430,7 @@ if(${TARGET} STREQUAL "charm4py")
   set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -build-shared")
 endif()
 
-if(${CMAKE_BUILD_TYPE} MATCHES "Debug" OR ${CMAKE_BUILD_TYPE} MATCHES "RelWithDebInfo")
+if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
   add_compile_options(-g)
   set(BUILDOPTS "${BUILDOPTS} -g")
   set(OPTS "${OPTS} -g")
@@ -487,6 +524,8 @@ configure_file(src/arch/common/cc-gcc.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.h                      include/ COPYONLY)
 configure_file(src/arch/common/cc-mpi.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-mpiopts.sh                 include/ COPYONLY)
+configure_file(src/arch/common/cc-msvc.h                     include/ COPYONLY)
+configure_file(src/arch/common/cc-msvc.sh                    include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-craype.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.h              include/ COPYONLY)
@@ -573,6 +612,12 @@ if(UCX_PMI)
   configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.h include/ COPYONLY)
 endif()
 
+if(CMK_COMPILER STREQUAL "msvc")
+  configure_file(src/arch/win/unix2nt_cc                      bin/ COPYONLY)
+  configure_file(src/arch/win/unix2nt_ar                      bin/ COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/src/arch/win/unistd.h    include/ COPYONLY)
+endif()
+
 # Header files
 configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
 if(EXISTS src/arch/${GDIR}/conv-common.sh)
@@ -649,6 +694,7 @@ endif()
 
 # Charmxi
 add_subdirectory(src/xlat-i)
+add_dependencies(charmxi create_symlinks)
 
 # Converse
 add_subdirectory(src/QuickThreads)
@@ -674,8 +720,7 @@ set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
 include(ExternalProject)
 ExternalProject_Add(hwloc
     URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
-    # touch: update timestamps on these files so that hwloc's Makefile does not invoke automake
-    CONFIGURE_COMMAND touch ${hwloc_dir}/aclocal.m4 ${hwloc_dir}/Makefile.in ${hwloc_dir}/configure &&
+    CONFIGURE_COMMAND
         ${hwloc_dir}/configure
         --disable-cairo
         --disable-cuda
@@ -694,13 +739,14 @@ ExternalProject_Add(hwloc
         HWLOC_FLAGS=${CHARM_CC_FLAGS}
         CFLAGS=${CHARM_CC_FLAGS}
         CC=${CHARM_CC}
+        CC_FOR_BUILD=${CHARM_CC}
         > /dev/null
     BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
+    INSTALL_COMMAND test -f hwloc/.libs/libhwloc_embedded.lib && cp hwloc/.libs/libhwloc_embedded.lib hwloc/.libs/libhwloc_embedded.a || true # On Windows, the library is created as .lib
     COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
-    INSTALL_COMMAND "" #empty
 )
 
 # TopoManager
@@ -852,7 +898,10 @@ if(NOT ${CMAKE_DL_LIBS} STREQUAL "")
     set(DL_LIB "-l${CMAKE_DL_LIBS}")
 endif()
 file(APPEND ${optfile_sh} "CMK_HWLOC_LIBS=\"-lhwloc_embedded -lm\"\n" )
-file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
+
+if (NOT CMK_WINDOWS)
+  file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
+endif()
 
 if(UCX_PMI)
   file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${UCX_PMI}.sh\n")
@@ -899,7 +948,7 @@ foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC)
 endforeach()
 
 # Options that need no .h/.sh additions
-foreach(opt TRACING TRACING_COMMTHREAD)
+foreach(opt TRACING TRACING_COMMTHREAD ERROR_CHECKING)
     if(${opt})
         set(opts_enabled "${opts_enabled}${opt} ")
     endif()
@@ -977,19 +1026,33 @@ message("  Enabled options: ${opts_enabled}")
 message("==============================")
 
 # Make symlinks
+if(CMK_WINDOWS)
+  # add_executable(createlink src/arch/win/createlink.cpp)
+  # target_compile_options(createlink PRIVATE -seq -D_WIN32_WINNT=0x0500)
+  # target_link_libraries(createlink -seq)
+  # set(SYSTEMLN "${CMAKE_BINARY_DIR}/bin/createlink.exe")
+  set(SYSTEMLN "ln")
+else()
+  set(SYSTEMLN "ln -s")
+endif()
+
 add_custom_target(create_symlinks ALL
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/bin ${CMAKE_SOURCE_DIR}/bin
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/lib ${CMAKE_SOURCE_DIR}/lib
-                  COMMAND test ${BUILD_SHARED} -eq 1 && ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/lib_so ${CMAKE_SOURCE_DIR}/lib_so || true
+                  COMMAND test ${BUILD_SHARED} = 1 && ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/lib_so ${CMAKE_SOURCE_DIR}/lib_so || true
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/include ${CMAKE_SOURCE_DIR}/include
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/include ${CMAKE_SOURCE_DIR}/tmp
 
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/include ${CMAKE_BINARY_DIR}/tmp
 
-                  COMMAND test -d ${CMAKE_BINARY_DIR}/benchmarks || env SYSTEMLN='ln -s' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/benchmarks ${CMAKE_BINARY_DIR}/benchmarks && true
-                  COMMAND test -d ${CMAKE_BINARY_DIR}/examples || env SYSTEMLN='ln -s' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/examples ${CMAKE_BINARY_DIR}/examples && true
-                  COMMAND test -d ${CMAKE_BINARY_DIR}/tests || env SYSTEMLN='ln -s' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/tests && true
+                  COMMAND test -d ${CMAKE_BINARY_DIR}/benchmarks || env SYSTEMLN='${SYSTEMLN}' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/benchmarks ${CMAKE_BINARY_DIR}/benchmarks && true
+                  COMMAND test -d ${CMAKE_BINARY_DIR}/examples || env SYSTEMLN='${SYSTEMLN}' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/examples ${CMAKE_BINARY_DIR}/examples && true
+                  COMMAND test -d ${CMAKE_BINARY_DIR}/tests || env SYSTEMLN='${SYSTEMLN}' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/tests && true
                  )
+
+# if(CMK_WINDOWS)
+#   add_dependencies(create_symlinks createlink)
+# endif()
 
 # Create the .vdir/.gdir/VERSION files
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
