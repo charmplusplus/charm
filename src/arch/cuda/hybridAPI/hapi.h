@@ -269,6 +269,14 @@ static inline void hapiAddCallback(cudaStream_t a, void* b) {
   hapiAddCallback(a, b, NULL);
 }
 
+// Overloaded C++ wrappers for selecting whether to pool or not using a bool.
+static inline cudaError_t hapiMallocHost(void** ptr, size_t size, bool pool) {
+  return pool ? hapiMallocHostPool(ptr, size) : hapiMallocHost(ptr, size);
+}
+static inline cudaError_t hapiFreeHost(void* ptr, bool pool) {
+  return pool ? hapiFreeHostPool(ptr) : hapiFreeHost(ptr);
+}
+
 #endif /* defined __cplusplus */
 
 #endif /* !defined AMPI_INTERNAL_SKIP_FUNCTIONS */
