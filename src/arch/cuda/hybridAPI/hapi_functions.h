@@ -38,8 +38,6 @@ AMPI_CUSTOM_FUNC(cudaError_t, hapiMalloc, void**, size_t)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiFree, void*)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiMallocHost, void**, size_t)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHost, void*)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMallocHostPool, void**, size_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHostPool, void*)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpyAsync, void*, const void*, size_t, enum cudaMemcpyKind, cudaStream_t)
 
 // Explicit memory allocations using pinned memory pool.

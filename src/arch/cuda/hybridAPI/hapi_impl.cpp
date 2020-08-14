@@ -1493,19 +1493,8 @@ cudaError_t hapiMallocHost(void** ptr, size_t size) {
   return cudaMallocHost(ptr, size);
 }
 
-cudaError_t hapiMallocHostPool(void** ptr, size_t size) {
-  hapiPoolMalloc(ptr, size);
-  if (*ptr) return cudaSuccess;
-  else return cudaErrorMemoryAllocation;
-}
-
 cudaError_t hapiFreeHost(void* ptr) {
   return cudaFreeHost(ptr);
-}
-
-cudaError_t hapiFreeHostPool(void *ptr) {
-  hapiPoolFree(ptr);
-  return cudaSuccess;
 }
 
 cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {
