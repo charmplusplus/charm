@@ -20,27 +20,31 @@ hello.o: hello.C hello.decl.h
 
 test: all
 ifeq ($(CMK_NO_PARTITIONS),1)
-	echo "Skipping test since build does not support partitions"
+	@echo "Skipping test since build does not support partitions"
 else ifeq ($(CMK_BLUEGENEQ),1)
-	echo "Skipping partitions test on BGQ"
+	@echo "Skipping partitions test on BGQ"
 else
 	$(call run, ./hello +p4 10 2 +partitions 2)
 endif
 
 testp: all
 ifeq ($(CMK_NO_PARTITIONS),1)
-	echo "Skipping test since build does not support partitions"
+	@echo "Skipping test since build does not support partitions"
 else ifeq ($(CMK_BLUEGENEQ),1)
-	echo "Skipping partitions test on BGQ"
+	@echo "Skipping partitions test on BGQ"
+else ifneq (,$(filter %0 %2 %4 %6 %8,$(P))) # if P is even
+	@echo "P is even, running partitions test with $(P)/2 partitions"
+	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) 2 +partitions $$(( $(P) / 2 )))
 else
-	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) $$(( $(P) / 2 )) +partitions $$(( $(P) / 2 )) )
+	@echo "P is odd, running partitions test with 1 partition"
+	$(call run, ./hello +p$(P) $$(( $(P) * 4 )) $(P) +partitions 1)
 endif
 
 smptest: all
 ifeq ($(CMK_NO_PARTITIONS),1)
-	echo "Skipping test since build does not support partitions"
+	@echo "Skipping test since build does not support partitions"
 else ifeq ($(CMK_BLUEGENEQ),1)
-	echo "Skipping partitions test on BGQ"
+	@echo "Skipping partitions test on BGQ"
 else
 	$(call run, ./hello +p4 10 2 +partitions 2 ++ppn 2)
 endif
