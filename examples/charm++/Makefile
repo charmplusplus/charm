@@ -36,6 +36,7 @@ DIRS = \
 TESTDIRS = $(DIRS)
 
 NONSCALEDIRS = \
+  array_map \
   ckcallback \
   cksequence \
   hello \
