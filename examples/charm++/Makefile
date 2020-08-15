@@ -36,6 +36,7 @@ DIRS = \
   zerocopy \
 
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+# requires fixups
 #  DIRS += f90charm
 endif
 

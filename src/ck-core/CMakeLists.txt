@@ -134,7 +134,9 @@ if(${CMK_CAN_LINK_FORTRAN})
         VERBATIM
     )
     add_library(ckmainf mainf.f90)
-    add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h ${ck-ci-sources})
+
+    add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h)
+    add_dependencies(f90charm ck)
 endif()
 
 add_library(mpi-mainmodule mpi-mainmodule.C)
