@@ -42,4 +42,9 @@ add_dependencies(trace-converse ck)
 
 if(CMK_CAN_LINK_FORTRAN)
     add_library(tracef_f tracef_f.f90)
+    add_custom_command(TARGET tracef_f
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/tracemod.mod ${CMAKE_BINARY_DIR}/include/
+        VERBATIM
+    )
 endif()
