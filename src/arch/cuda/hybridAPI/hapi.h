@@ -5,22 +5,6 @@
 /* See hapi_functions.h for the majority of function declarations provided
  * by the Hybrid API. */
 
-/******************** DEPRECATED ********************/
-// HAPI wrappers whose behavior is controlled by user defined variables,
-// which are HAPI_USE_CUDAMALLOCHOST and HAPI_MEMPOOL.
-#ifdef HAPI_USE_CUDAMALLOCHOST
-#  ifdef HAPI_MEMPOOL
-#    define hapiHostMalloc hapiPoolMalloc
-#    define hapiHostFree   hapiPoolFree
-#  else
-#    define hapiHostMalloc cudaMallocHost
-#    define hapiHostFree   cudaFreeHost
-#  endif // HAPI_MEMPOOL
-#else
-#  define hapiHostMalloc malloc
-#  define hapiHostFree   free
-#endif // HAPI_USE_CUDAMALLOCHOST
-
 #ifdef __cplusplus
 
 #include <cstring>
@@ -278,10 +262,10 @@ static inline void hapiAddCallback(cudaStream_t a, void* b) {
 
 // Overloaded C++ wrappers for selecting whether to pool or not using a bool.
 static inline cudaError_t hapiMallocHost(void** ptr, size_t size, bool pool) {
-  return pool ? hapiMallocHostPool(ptr, size) : hapiMallocHost(ptr, size);
+  return pool ? hapiPoolMalloc(ptr, size) : hapiMallocHost(ptr, size);
 }
 static inline cudaError_t hapiFreeHost(void* ptr, bool pool) {
-  return pool ? hapiFreeHostPool(ptr) : hapiFreeHost(ptr);
+  return pool ? hapiPoolFree(ptr) : hapiFreeHost(ptr);
 }
 
 #endif /* defined __cplusplus */
