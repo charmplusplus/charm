@@ -1,16 +1,22 @@
 -include ../../common.mk
+-include ../../../include/conv-mach-opt.mak
 CHARMC=../../../bin/charmc $(OPTS) 
 OBJS=pgm.o ctests.o 
 FOBJS=$(OBJS) ftests.o
 COBJS=$(OBJS) ftests_fallback.o
 
-all: pgm 
+TARGETS := pgm
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  TARGETS += fpgm
+endif
+
+all: $(TARGETS)
 
 pgm: $(COBJS)
-	$(CHARMC) -o pgm $(COBJS) -language ampi -module fem
+	$(CHARMC) -o $@ $^ -language ampi -module fem
 
 fpgm: $(FOBJS)
-	$(CHARMC) -o pgm $(FOBJS) -language ampif -module fem
+	$(CHARMC) -o $@ $^ -language ampif -module fem
 
 pgm.o: pgm.C
 	$(CHARMC) -c pgm.C
@@ -27,7 +33,9 @@ ftests_fallback.o: ftests_fallback.C
 clean:
 	rm -f pgm fpgm *.o *.MOD *.mod charmrun
 
-test: pgm
+test: $(addprefix test-,$(TARGETS))
+
+test-pgm: pgm
 	$(call run, ./pgm +p1 +vp1)
 	$(call run, ./pgm +p1 +vp2)
 	$(call run, ./pgm +p2 +vp1)
@@ -39,7 +47,16 @@ test: pgm
 	$(call run, ./pgm +p1 +vp3 -read)
 	rm -f fem_mesh_vp3_*
 
-test-mig:
-	rm -fr pgm pgm.o
-	make OPTS="-DENABLE_MIG=1 -memory isomalloc -balancer RandCentLB" pgm
-	$(call run, ./pgm +p2)
+test-fpgm: fpgm
+	$(call run, ./fpgm +p1 +vp1)
+	$(call run, ./fpgm +p1 +vp2)
+	$(call run, ./fpgm +p2 +vp1)
+	$(call run, ./fpgm +p2 +vp2)
+	$(call run, ./fpgm +p2 +vp3)
+	$(call run, ./fpgm +p2 +vp4)
+	-@rm -f fem_mesh_vp3_*
+	$(call run, ./fpgm +p1 +vp3 -write)
+	$(call run, ./fpgm +p1 +vp3 -read)
+	rm -f fem_mesh_vp3_*
+
+.PHONY: all clean test test-pgm test-fpgm
