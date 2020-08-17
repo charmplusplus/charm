@@ -111,7 +111,9 @@ class bbox3d {
   public:
   bbox3d() {}
   bbox3d(const rSeg1d &x,const rSeg1d &y,const rSeg1d &z)
-  {segs[0]=x; segs[1]=y; segs[2]=z;}
+  {
+    segs[0]=x; segs[1]=y; segs[2]=z;
+  }
   bbox3d(const CkVector3d &a,const CkVector3d &b,const CkVector3d &c)
   {
     segs[0].init(a[0],b[0],c[0]);
