@@ -405,7 +405,7 @@ fi
 my_os=$(echo "$triplet" | cut -d '-' -f2)
 my_dir=$(dirname "$0")
 
-if [[ $opt_network = "mpi" && $my_os == "win" ]]; then
+if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
   echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
   sleep 2
   ./buildold "$@"
