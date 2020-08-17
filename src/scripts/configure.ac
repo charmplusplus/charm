@@ -2948,6 +2948,7 @@ test_link_fortran_main "whether the C++ linker succeeds with a Fortran entry poi
 if test $pass -eq 1
 then
   add_flag "CMK_CAN_LINK_FORTRAN='1'" "Fortran"
+  add_make_flag "CMK_CAN_LINK_FORTRAN:=1" "Fortran"
 fi
 
 ### check for OpenMP availability ###
