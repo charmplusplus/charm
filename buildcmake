@@ -405,6 +405,13 @@ fi
 my_os=$(echo "$triplet" | cut -d '-' -f2)
 my_dir=$(dirname "$0")
 
+if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
+  echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
+  sleep 2
+  ./buildold "$@"
+  exit $?
+fi
+
 # Special handling for Windows compiler
 if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
   # Need to use unix2nt_cc on Windows/Cygwin
