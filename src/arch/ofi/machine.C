@@ -1423,7 +1423,7 @@ void LrtsExit(int exitcode)
     mempool_destroy(CpvAccess(mempool));
 #endif
 
-    if(!CharmLibInterOperate || userDrivenMode) {
+    if(!CharmLibInterOperate) {
         ret = runtime_barrier();
         if (ret) {
             MACHSTATE1(2, "runtime_barrier() returned %i", ret);
