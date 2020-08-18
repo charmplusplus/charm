@@ -193,7 +193,7 @@ if(${CMK_AMPI_WITH_ROMIO})
     add_dependencies(romio moduleampi ampi-compat ck modulecompletion
         conv-partition conv-util hwloc conv-static conv-core ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer)
+        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer hello)
     if(${CMK_CAN_LINK_FORTRAN})
         add_dependencies(romio moduleampif conv-utilf)
     endif()
