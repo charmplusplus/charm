@@ -13,8 +13,8 @@ module collide {
   };
   array[1D] threadCollide {
     entry threadCollide(CProxy_TCharm threads,
-	CProxy_threadCollideMgr tmgr,
-    	CollideHandle cmgr);
+        CProxy_threadCollideMgr tmgr,
+        CollideHandle cmgr);
     entry void resultsDone(void);
   };
 };
