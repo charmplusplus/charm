@@ -206,6 +206,19 @@ CmiStartFn mymain(int argc, char *argv[])
   // Wait for all PEs of the node to complete topology init
   CmiNodeAllBarrier();
 
+#if CMK_CONVERSE_MPI && CMK_SMP
+  if (CmiMyPe() == 0 && CmiNumPhysicalNodes() == 1 && CmiNumNodes()*2 > CmiNumCores()) {
+    CmiPrintf("Skipping pingpong_multipairs due to oversubscription.\n");
+
+    char *exitMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+    CmiSetHandler((char *)exitMsg, CpvAccess(exitHandler));
+    CmiSyncSend(0, CmiMsgHeaderSizeBytes, exitMsg);
+    CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, exitMsg);
+
+    return 0;
+  }
+#endif
+
   // Node 0 waits till all processors finish their topology processing
   if(CmiMyPe() == 0) {
     // Signal all PEs to begin computing
