@@ -1309,7 +1309,7 @@ void LrtsExit(int exitcode) {
 #endif
 #endif
     
-   if(!CharmLibInterOperate) {
+   if(!CharmLibInterOperate || userDrivenMode) {
 #if ! CMK_AUTOBUILD
 #if !defined(_WIN32)
       sigaction(SIGINT, &signal_int, NULL);
@@ -1318,7 +1318,10 @@ void LrtsExit(int exitcode) {
 #endif
       MPI_Finalize();
 #endif
-      exit(exitcode);
+      // Still want to return control to the user in userDrivenMode
+      if (!userDrivenMode) {
+        exit(exitcode);
+      }
     }
 }
 
