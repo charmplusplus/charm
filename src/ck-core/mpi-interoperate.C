@@ -164,7 +164,7 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 }
 
 // CharmLibExit is called for both forms of interop when the application is
-// done with Charm. It does all necessary cleanup for Charm++ and return
+// done with Charm. It does all necessary cleanup for Charm++ and returns
 // control to the user afterwards. In the case of userDrivenMode, this would
 // also include calling MPI_Finalize. In regular MPI interop, MPI_Finalize
 // is not called.
