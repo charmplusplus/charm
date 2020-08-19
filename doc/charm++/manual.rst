@@ -3852,7 +3852,7 @@ manner:
 .. code-block:: c++
 
      msg->arr1[13] = 1;
-     msg->arr2[5] = .82;
+     msg->arr2[5] = 32.82;
      msg->arr3[2] = MyPointerlessStruct();
      // etc.
 
