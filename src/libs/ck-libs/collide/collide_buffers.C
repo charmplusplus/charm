@@ -1,5 +1,5 @@
 /*
-Ancient, hideous custom memory management classes.
+   Ancient, hideous custom memory management classes.
 FIXME: replace these with something well-tested,
 standard, and modern, like std::vector.
 
@@ -12,9 +12,9 @@ Orion Sky Lawlor, olawlor@acm.org, 2001/2/5
 #include "charm++.h"
 
 /************** MemoryBuffer ****************
-Manages an expandable buffer of bytes.  Like std::vector,
-but typeless.
-*/
+  Manages an expandable buffer of bytes.  Like std::vector,
+  but typeless.
+  */
 
 memoryBuffer::memoryBuffer()//Empty initial buffer
 {
