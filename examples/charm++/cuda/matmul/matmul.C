@@ -135,14 +135,14 @@ class Workers : public CBase_Workers {
     NVTXTracer nvtx_range("Workers::~Workers", NVTXColor::WetAsphalt);
 #endif
 
-    hapiFreeHost(h_A);
-    hapiFreeHost(h_B);
-    hapiFreeHost(h_C);
+    hapiCheck(cudaFreeHost(h_A));
+    hapiCheck(cudaFreeHost(h_B));
+    hapiCheck(cudaFreeHost(h_C));
     hapiCheck(cudaStreamDestroy(stream));
 #ifndef USE_WR
-    hapiFree(d_A);
-    hapiFree(d_B);
-    hapiFree(d_C);
+    hapiCheck(cudaFree(d_A));
+    hapiCheck(cudaFree(d_B));
+    hapiCheck(cudaFree(d_C));
 
     if (useCublas) cublasDestroy(handle);
 #endif

@@ -89,6 +89,7 @@ if(${CMK_CAN_LINK_FORTRAN})
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampif.dir/ampif.C.o ${CMAKE_BINARY_DIR}/lib/ampif.o
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampifimpl.dir/ampifimpl.f90.o ${CMAKE_BINARY_DIR}/lib/ampifimpl.o
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampimod.dir/ampimod.f90.o ${CMAKE_BINARY_DIR}/lib/ampimod.o
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/mpi.mod ${CMAKE_BINARY_DIR}/include/
         VERBATIM
     )
 endif()
@@ -192,7 +193,7 @@ if(${CMK_AMPI_WITH_ROMIO})
     add_dependencies(romio moduleampi ampi-compat ck modulecompletion
         conv-partition conv-util hwloc conv-static conv-core ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer)
+        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer hello)
     if(${CMK_CAN_LINK_FORTRAN})
         add_dependencies(romio moduleampif conv-utilf)
     endif()
