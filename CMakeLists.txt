@@ -861,6 +861,12 @@ if(${TARGET} STREQUAL "charm4py")
   add_dependencies(charm hwloc)
 endif()
 
+# Check that we are able to build and link an executable
+add_executable(hello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
+add_dependencies(hello ck ldb-rand memory-default threads-default conv-static
+  conv-core ckmain conv-machine conv-util conv-partition conv-ldb ckqt
+  moduleNDMeshStreamer modulecompletion tmgr)
+
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
 
