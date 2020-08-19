@@ -1309,7 +1309,7 @@ void LrtsExit(int exitcode) {
 #endif
 #endif
     
-   if(!CharmLibInterOperate || userDrivenMode) {
+   if(!CharmLibInterOperate) {
 #if ! CMK_AUTOBUILD
 #if !defined(_WIN32)
       sigaction(SIGINT, &signal_int, NULL);
