@@ -1423,7 +1423,7 @@ void LrtsExit(int exitcode)
     mempool_destroy(CpvAccess(mempool));
 #endif
 
-    if(!CharmLibInterOperate) {
+    if(!CharmLibInterOperate || userDrivenMode) {
         ret = runtime_barrier();
         if (ret) {
             MACHSTATE1(2, "runtime_barrier() returned %i", ret);
@@ -1434,7 +1434,9 @@ void LrtsExit(int exitcode)
             MACHSTATE1(2, "runtime_fini() returned %i", ret);
             CmiAbort("OFI::LrtsExit failed");
         }
-        exit(exitcode);
+        if (!userDrivenMode) {
+          exit(exitcode);
+        }
     }
 
     MACHSTATE(2, "} OFI::LrtsExit");
