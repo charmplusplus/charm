@@ -2701,6 +2701,74 @@ applications. RotateLB and RandCentLB are more useful for debugging
 object migrations. The compiler and runtime options are described in
 section :numref:`lbOption`.
 
+**TreeLB and its configuration**
+
+Recent changes in the LB infrastructure add support for a user-configurable
+hierarchical load balancing using TreeLB. While the legacy centralized
+strategies above are still supported, TreeLB allows performing load
+balancing at multiple levels and supports load balancing trees with different
+levels. For example, a 2-level tree consists of PEs and a root while a
+3-level tree consists of PEs, processes and a root at the top. A 4-level
+tree consists of PEs, proceeses, ProcessGroup and a root. The load balancing
+strategy to be used at each level and frequency at which to invoke LB
+at each level can be specified using command line parameters or using a json
+config file. We provide examples of these below:
+
+Creating a 2-level tree that uses GreedyRefine strategy at the root
+
+.. code-block:: json
+
+  {
+    "tree": "PE_Root",
+    "Root":
+    {
+        "pe": 0,
+        "strategies": ["GreedyRefine"]
+    }
+  }
+
+Creating a 3-level tree that uses Greedy strategy at process level
+and GreedyRefine strategy at the root
+
+.. code-block:: json
+
+  {
+    "tree": "PE_Process_Root",
+    "Root":
+    {
+        "pe": 0,
+        "step_freq": 3,
+        "strategies": ["GreedyRefine"]
+    },
+    "Process":
+    {
+        "strategies": ["Greedy"]
+    }
+  }
+
+Creating a 4-level tree that uses GreedyRefine strategy at process level,
+process-group level and at the root
+
+.. code-block:: json
+
+  {
+    "tree": "PE_Process_ProcessGroup_Root",
+    "Root":
+    {
+        "pe": 0,
+        "strategies": ["GreedyRefine"]
+    },
+    "ProcessGroup":
+    {
+        "step_freq": 5,
+        "strategies": ["GreedyRefine"]
+    },
+    "Process":
+    {
+        "strategies": ["GreedyRefine"]
+    }
+  }
+
 **Metabalancer to automatically schedule load balancing**
 
 Metabalancer can be invoked to automatically decide when to invoke the
