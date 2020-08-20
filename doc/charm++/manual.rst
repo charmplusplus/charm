@@ -2709,7 +2709,7 @@ strategies above are still supported, TreeLB allows performing load
 balancing at multiple levels and supports load balancing trees with different
 levels. For example, a 2-level tree consists of PEs and a root while a
 3-level tree consists of PEs, processes and a root at the top. A 4-level
-tree consists of PEs, proceeses, ProcessGroup and a root. The load balancing
+tree consists of PEs, processes, ProcessGroup and a root. The load balancing
 strategy to be used at each level and frequency at which to invoke LB
 at each level can be specified using command line parameters or using a json
 config file. We provide examples of these below:
