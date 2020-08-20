@@ -4377,10 +4377,12 @@ void LrtsExit(int exitcode)
     //printf("FINAL [%d, %d]  register=%lld, send=%lld\n", myrank, CmiMyRank(), register_memory_size, buffered_send_msg);
     mempool_destroy(CpvAccess(mempool));
 #endif
-    if(!CharmLibInterOperate) {
+    if(!CharmLibInterOperate || userDrivenMode) {
       PMI_Barrier();
       PMI_Finalize();
-      exit(exitcode);
+      if (!userDrivenMode) {
+        exit(exitcode);
+      }
     }
 }
 

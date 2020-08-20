@@ -676,13 +676,15 @@ void LrtsExit(int exitcode)
     PCQueueDestroy(ucxCtx.txQueue);
 #endif
 
-    if(!CharmLibInterOperate) {
+    if(!CharmLibInterOperate || userDrivenMode) {
         ret = runtime_barrier();
         UCX_CHECK_PMI_RET(ret, "runtime_barrier");
 
         ret = runtime_fini();
         UCX_CHECK_PMI_RET(ret, "runtime_fini");
-        exit(exitcode);
+        if (!userDrivenMode) {
+          exit(exitcode);
+        }
     }
 }
 
