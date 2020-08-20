@@ -2536,6 +2536,11 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
       }
 #endif
       msg->array_hops()++;
+      // If we are hopping more than twice, we've discovered a stale chain
+      // of cache entries. Just route through home instead.
+      if (msg->array_hops() > 2 && CkMyPe() != homePe(id)) {
+        destPE = homePe(id);
+      }
       CkArrayManagerDeliver(destPE,msg,opts);
       return true;
     }
