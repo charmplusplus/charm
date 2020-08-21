@@ -146,8 +146,8 @@ option(BUILD_CUDA          "Build with CUDA support" OFF)
 option(PXSHM               "Build with PXSHM" OFF)
 option(QLOGIC              "QLogic based Infiniband" OFF)
 
-# UCX PMI options
-set(UCX_PMI "" CACHE STRING "PMI type for UCX layer, can be one of simplepmi, simplepmi2, or ompipmix")
+# LRTS PMI options
+set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, or ompipmix")
 
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 
@@ -607,9 +607,9 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/machine-persistent.C)
   configure_file(src/arch/${GDIR}/machine-persistent.C          include/ COPYONLY)
 endif()
 
-if(UCX_PMI)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.sh include/ COPYONLY)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.h include/ COPYONLY)
+if(LRTS_PMI)
+  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-${LRTS_PMI}.sh include/ COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-${LRTS_PMI}.h include/ COPYONLY)
 endif()
 
 if(CMK_COMPILER STREQUAL "msvc")
@@ -909,8 +909,8 @@ if (NOT CMK_WINDOWS)
   file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
 endif()
 
-if(UCX_PMI)
-  file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${UCX_PMI}.sh\n")
+if(LRTS_PMI)
+  file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${LRTS_PMI}.sh\n")
 endif()
 
 # Create conv-mach-opt.h
@@ -926,8 +926,8 @@ if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NET
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
 endif()
 
-if(UCX_PMI)
-  file(APPEND ${optfile_h} "#include \"conv-mach-${UCX_PMI}.h\"\n")
+if(LRTS_PMI)
+  file(APPEND ${optfile_h} "#include \"conv-mach-${LRTS_PMI}.h\"\n")
 endif()
 
 # Create conv-mach-opt.mak
