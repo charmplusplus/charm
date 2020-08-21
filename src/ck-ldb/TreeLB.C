@@ -23,6 +23,7 @@ void TreeLB::init(const CkLBOptions& opts)
   // create and turn on by default
   startLbFnHdl = lbmgr->AddStartLBFn(this, &TreeLB::StartLB);
 
+  /*
   json config;
   std::ifstream ifs(_lb_args.treeLBFile(), std::ifstream::in);
   if (ifs.good())
@@ -86,6 +87,7 @@ void TreeLB::init(const CkLBOptions& opts)
   }
   ifs.close();
   configure(config);
+  */
 
   // TODO this functionality needs to move to LBManager
   if (_lb_args.statsOn())
@@ -114,6 +116,7 @@ TreeLB::~TreeLB()
 #endif
 }
 
+/*
 void TreeLB::configure(LBTreeBuilder& builder, json& config)
 {
 #if CMK_LBDB_ON
@@ -185,6 +188,7 @@ void TreeLB::configure(json& config)
 
 #endif
 }
+*/
 
 void TreeLB::InvokeLB()
 {

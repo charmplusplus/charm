@@ -57,13 +57,15 @@ template <typename O, typename P, typename S>
 class GreedyRefine : public Strategy<O, P, S>
 {
  public:
-  GreedyRefine(json& config)
+  GreedyRefine()
   {
+    /*
     const auto& option = config.find("tolerance");
     if (option != config.end())
     {
       tolerance = *option;
     }
+    */
   }
 
   void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)

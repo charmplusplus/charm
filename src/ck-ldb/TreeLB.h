@@ -3,9 +3,9 @@
 
 #include "BaseLB.h"
 #include "TreeLB.decl.h"
-#include "json.hpp"
+//#include "json.hpp"
 #include <vector>
-using json = nlohmann::json;
+//using json = nlohmann::json;
 
 #define DEBUG__TREE_LB_L1 0
 #define DEBUG__TREE_LB_L2 0
@@ -131,7 +131,7 @@ class LBTreeBuilder
   /// return number of levels in tree
   virtual uint8_t build(std::vector<LevelLogic*>& logic, std::vector<int>& comm_parent,
                         std::vector<std::vector<int>>& comm_children,
-                        std::vector<LevelLogic*>& comm_logic, json& config) = 0;
+                        std::vector<LevelLogic*>& comm_logic) = 0;
 
   virtual ~LBTreeBuilder() {}
 };
@@ -147,8 +147,10 @@ class TreeLB : public CBase_TreeLB
   virtual ~TreeLB();
 
   /// these can be called multiple times to re-configure
+  /*
   void configure(LBTreeBuilder& builder, json& config);
   void configure(json& config);
+  */
 
   // start load balancing (non-AtSync mode)  NOTE: This seems to do a broadcast
   // (is this the behavior we want?)

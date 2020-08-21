@@ -254,11 +254,11 @@ class StrategyWrapper : public IStrategyWrapper
 #endif
   };
 
-  StrategyWrapper(const std::string& _strategy_name, bool _isTreeRoot, json& config)
+  StrategyWrapper(const std::string& _strategy_name, bool _isTreeRoot)
   {
     strategy_name = _strategy_name;
     isTreeRoot = _isTreeRoot;
-    strategy = TreeStrategyFactory::makeStrategy<O, P, Solution>(strategy_name, config);
+    strategy = TreeStrategyFactory::makeStrategy<O, P, Solution>(strategy_name);
   }
 
   virtual ~StrategyWrapper() { delete strategy; }
@@ -460,6 +460,7 @@ class RootLevel : public LevelLogic
    * mode 0: receive obj stats
    * mode 1: receive aggregated group load
    */
+  /*
   virtual void configure(bool rateAware, json& config)
   {
     using namespace TreeStrategy;
@@ -495,6 +496,7 @@ class RootLevel : public LevelLogic
       }
     }
   }
+  */
 
   virtual void depositStats(TreeLBMessage* stats)
   {
@@ -671,6 +673,7 @@ class NodeSetLevel : public LevelLogic
     for (auto w : wrappers) delete w;
   }
 
+  /*
   virtual void configure(bool rateAware, json& config, int _cutoff_freq = 1)
   {
     using namespace TreeStrategy;
@@ -696,6 +699,7 @@ class NodeSetLevel : public LevelLogic
     cutoff_freq = _cutoff_freq;
     CkAssert(cutoff_freq > 0);
   }
+  */
 
   virtual void depositStats(TreeLBMessage* stats)
   {
@@ -925,6 +929,7 @@ class NodeLevel : public LevelLogic
     for (auto w : wrappers) delete w;
   }
 
+  /*
   virtual void configure(bool rateAware, json& config, int _cutoff_freq = 1)
   {
     using namespace TreeStrategy;
@@ -950,6 +955,7 @@ class NodeLevel : public LevelLogic
     cutoff_freq = _cutoff_freq;
     CkAssert(cutoff_freq > 0);
   }
+  */
 
   virtual bool cutoff() { return (lbmgr->step() + 1) % cutoff_freq != 0; }
 

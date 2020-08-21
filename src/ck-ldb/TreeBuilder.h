@@ -37,16 +37,18 @@ class PE_Root_Tree : public LBTreeBuilderCommon
 
   virtual uint8_t build(std::vector<LevelLogic*>& logic, std::vector<int>& comm_parent,
                         std::vector<std::vector<int>>& comm_children,
-                        std::vector<LevelLogic*>& comm_logic, json& config)
+                        std::vector<LevelLogic*>& comm_logic)
   {
     uint8_t L = 2;  // num levels
     reset(L, logic, comm_parent, comm_children, comm_logic);
 
     int rootPE = 0;
+    /*
     if (config.contains("Root") && config["Root"].contains("pe"))
     {
       rootPE = config["Root"]["pe"];
     }
+    */
     CkAssert(rootPE >= 0 && rootPE < CkNumPes());
 
     LBManager* lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
@@ -69,12 +71,13 @@ class PE_Root_Tree : public LBTreeBuilderCommon
     if (CkMyPe() == rootPE)
     {
       RootLevel* level = new RootLevel();
-      level->configure(_lb_args.testPeSpeed(), config["Root"]);
+      //level->configure(_lb_args.testPeSpeed(), config["Root"]);
       logic[1] = level;
     }
 
     if (CkMyPe() == 0 && !quietModeRequested)
     {
+      /*
       auto& strategies = config["Root"]["strategies"];
       if (strategies.size() == 1)
       {
@@ -86,6 +89,7 @@ class PE_Root_Tree : public LBTreeBuilderCommon
       {
         CkPrintf("[%d] TreeLB: Using PE_Root tree\n", CkMyPe());
       }
+      */
     }
 
     return L;
@@ -99,16 +103,18 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
 
   virtual uint8_t build(std::vector<LevelLogic*>& logic, std::vector<int>& comm_parent,
                         std::vector<std::vector<int>>& comm_children,
-                        std::vector<LevelLogic*>& comm_logic, json& config)
+                        std::vector<LevelLogic*>& comm_logic)
   {
     uint8_t L = 3;  // num levels
     reset(L, logic, comm_parent, comm_children, comm_logic);
 
     int rootPE = 0;
+    /*
     if (config.contains("Root") && config["Root"].contains("pe"))
     {
       rootPE = config["Root"]["pe"];
     }
+    */
     CkAssert(rootPE >= 0 && rootPE < CkNumPes());
 
     int mype = CkMyPe();
@@ -135,10 +141,12 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
     }
 
     int step_freq_lvl2 = 1;
+    /*
     if (config.contains("Root") && config["Root"].contains("step_freq"))
     {
       step_freq_lvl2 = config["Root"]["step_freq"];
     }
+    */
 
     // node level (level 1)
     lvl = 1;
@@ -148,7 +156,7 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
       std::iota(pes_in_node.begin(), pes_in_node.end(), level1root);
 
       NodeLevel* level = new NodeLevel(lbmgr, pes_in_node);
-      level->configure(_lb_args.testPeSpeed(), config["Process"], step_freq_lvl2);
+      //level->configure(_lb_args.testPeSpeed(), config["Process"], step_freq_lvl2);
       logic[lvl] = level;
 
       // set up comm-tree between levels 1 and 2
@@ -179,7 +187,7 @@ class PE_Node_Root_Tree : public LBTreeBuilderCommon
     if (mype == level2root)
     {
       RootLevel* level = new RootLevel();
-      level->configure(_lb_args.testPeSpeed(), config["Root"]);
+      //level->configure(_lb_args.testPeSpeed(), config["Root"]);
       logic[lvl] = level;
     }
 
@@ -205,16 +213,18 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
 
   virtual uint8_t build(std::vector<LevelLogic*>& logic, std::vector<int>& comm_parent,
                         std::vector<std::vector<int>>& comm_children,
-                        std::vector<LevelLogic*>& comm_logic, json& config)
+                        std::vector<LevelLogic*>& comm_logic)
   {
     uint8_t L = 4;  // num levels
     reset(L, logic, comm_parent, comm_children, comm_logic);
 
     int rootPE = 0;
+    /*
     if (config.contains("Root") && config["Root"].contains("pe"))
     {
       rootPE = config["Root"]["pe"];
     }
+    */
     CkAssert(rootPE >= 0 && rootPE < CkNumPes());
 
     int mype = CkMyPe();
@@ -243,18 +253,22 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
     }
 
     int step_freq_lvl2 = 1;
+    /*
     if (config.contains("ProcessGroup") && config["ProcessGroup"].contains("step_freq"))
     {
       step_freq_lvl2 = config["ProcessGroup"]["step_freq"];
     }
+    */
 
     int step_freq_lvl3 = step_freq_lvl2;
+    /*
     if (config.contains("Root") && config["Root"].contains("step_freq"))
     {
       step_freq_lvl3 = config["Root"]["step_freq"];
       if (step_freq_lvl3 % step_freq_lvl2 != 0)
         CkAbort("step_freq of Root level is not multiple of previous level\n");
     }
+    */
 
     // node level (level 1)
     lvl = 1;
@@ -264,7 +278,7 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
       std::iota(pes_in_node.begin(), pes_in_node.end(), level1root);
 
       NodeLevel* level = new NodeLevel(lbmgr, pes_in_node);
-      level->configure(_lb_args.testPeSpeed(), config["Process"], step_freq_lvl2);
+      //level->configure(_lb_args.testPeSpeed(), config["Process"], step_freq_lvl2);
       logic[lvl] = level;
 
       // set up comm-tree between levels 1 and 2
@@ -298,7 +312,7 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
       std::iota(pes_in_group.begin(), pes_in_group.end(), GroupFirstPe(mygroup));
       
       NodeSetLevel* level = new NodeSetLevel(lbmgr, pes_in_group);
-      level->configure(_lb_args.testPeSpeed(), config["ProcessGroup"], step_freq_lvl3);
+      //level->configure(_lb_args.testPeSpeed(), config["ProcessGroup"], step_freq_lvl3);
       logic[lvl] = level;
 
       if (mype != level3root)
@@ -318,13 +332,15 @@ class PE_Node_NodeSet_Root_Tree : public LBTreeBuilderCommon
       comm_logic[lvl - 1] = new MsgAggregator();
 
       RootLevel* level = new RootLevel(num_groups);
-      level->configure(_lb_args.testPeSpeed(), config["Root"]);
+      //level->configure(_lb_args.testPeSpeed(), config["Root"]);
       logic[lvl] = level;
     }
 
+    /*
     if (CkMyPe() == 0 && !quietModeRequested)
       CkPrintf("[%d] TreeLB: Using PE_Process_ProcessGroup_Root tree with %d groups\n",
                CkMyPe(), int(config["ProcessGroup"]["num_groups"]));
+               */
 
     return L;
   }
