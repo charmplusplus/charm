@@ -93,10 +93,12 @@
 #include "request.h"
 
 /* Runtime to exchange EP addresses during LrtsInit() */
-#if CMK_USE_PMI
+#if CMK_USE_PMI || CMK_USE_SIMPLEPMI
 #include "runtime-pmi.C"
 #elif CMK_USE_PMI2
 #include "runtime-pmi2.C"
+#elif CMK_USE_PMIX
+#include "runtime-pmix.C"
 #endif
 
 #define USE_MEMPOOL 0
