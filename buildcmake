@@ -464,7 +464,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DCCS="$opt_ccs" \
   -DCHARMDEBUG="$opt_charmdebug" \
   -DCONTROLPOINT="$opt_controlpoint" \
-  -DBUILD_CUDA="$opt_cuda" \
+  -DCUDA="$opt_cuda" \
   -DDRONE_MODE="$opt_drone_mode" \
   -DERROR_CHECKING="$opt_error_checking" \
   -DEXTRA_OPTS="$opt_extra_opts" \
