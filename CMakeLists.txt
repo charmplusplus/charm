@@ -141,7 +141,7 @@ endif()
 option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
-option(BUILD_CUDA          "Build with CUDA support" OFF)
+option(CUDA                "Build with CUDA support" OFF)
 
 option(PXSHM               "Build with PXSHM" OFF)
 option(QLOGIC              "QLogic based Infiniband" OFF)
@@ -157,7 +157,8 @@ string(REPLACE ";" " " MY_EXTRA_OPTS "${MY_EXTRA_OPTS}")
 set(OPTS "${OPTS} ${MY_EXTRA_OPTS}")
 set(OPTSATBUILDTIME "${OPTSATBUILDTIME} ${MY_EXTRA_OPTS}")
 
-set(CUDA ${BUILD_CUDA})
+# We need both BUILD_CUDA and CUDA
+set(BUILD_CUDA ${CUDA})
 
 # Also build shared Charm++ libraries in lib_so/
 if(BUILD_SHARED)
@@ -559,7 +560,7 @@ configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 
 set(CUDA_DIR "")
-if(BUILD_CUDA)
+if(CUDA)
   file(GLOB_RECURSE hybridAPI-h-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.h)
   file(GLOB_RECURSE hybridAPI-cxx-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.cpp)
   foreach(file ${hybridAPI-h-sources})
@@ -567,12 +568,8 @@ if(BUILD_CUDA)
   endforeach()
 
   find_package(CUDA REQUIRED)
-  # message(FATAL_ERROR ${CUDA_TOOLKIT_ROOT_DIR})
   set(CUDA_DIR ${CUDA_TOOLKIT_ROOT_DIR})
   add_library(cudahybridapi ${hybridAPI-cxx-sources})
-  # foreach(file ${hybridAPI-cxx-sources})
-  #   configure_file(${file} include/hybridAPI/ COPYONLY)
-  # endforeach()
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
