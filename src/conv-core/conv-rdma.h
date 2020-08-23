@@ -127,7 +127,7 @@ class CmiNcpyBuffer {
 
 #if CMK_ERROR_CHECKING
   void checkRegModeIsValid() {
-    if(regMode < CMK_BUFFER_REG || regMode > CMK_BUFFER_NOREG) CmiAbort("checkRegModeIsValid: Invalid value for regMode!\n");
+    if(regMode > CMK_BUFFER_NOREG) CmiAbort("checkRegModeIsValid: Invalid value for regMode!\n");
   }
 
   void checkDeregModeIsValid() {
