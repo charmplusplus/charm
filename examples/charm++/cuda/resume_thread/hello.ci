@@ -11,6 +11,5 @@ mainmodule hello {
   array [1D] Hello {
     entry Hello();
     entry [threaded] void greet();
-    entry void doneCallback();
   };
 };

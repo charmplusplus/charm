@@ -59,22 +59,16 @@ class Hello : public CBase_Hello {
     // Invoke GPU kernel
     invokeKernel(stream);
 
-    // Add callback to be invoked when GPU kernel completes
-    CkCallback* done_cb = new CkCallback(CkIndex_Hello::doneCallback(), thisProxy[thisIndex]);
-    hapiAddCallback(stream, done_cb);
-
-    // Suspend thread
+    // Suspend thread which will be resumed when GPU kernel completes
     resume_cb = new CkCallbackResumeThread();
+    hapiAddCallback(stream, resume_cb);
     delete resume_cb;
+
+    // GPU kernel complete, resuming thread
+    CkPrintf("[%d] Kernel complete, resuming thread\n", thisIndex);
 
     // Thread resumed, return to Main
     contribute(CkCallback(CkReductionTarget(Main, done), mainProxy));
-  }
-
-  void doneCallback() {
-    // GPU kernel complete, resume thread
-    CkPrintf("[%d] Kernel complete, resuming thread\n", thisIndex);
-    resume_cb->send();
   }
 };
 
