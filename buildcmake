@@ -371,12 +371,6 @@ eval processArgs "$@"
 
 ############ End option parsing
 
-if [[ $opt_cuda -eq 1 ]]; then
-  echo "Warning: CMake build is not supported with CUDA, running ./buildold instead."
-  sleep 2
-  ./buildold "$@"
-  exit $?
-fi
 
 if [[ "$target" = "${target%AMPI-only}AMPI-only" ]]; then
     opt_ampi_only=1
@@ -432,7 +426,7 @@ done
 
 # Append certain features and compilers to the end of the build directory name
 builddir_extra=""
-for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent; do
+for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda; do
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
