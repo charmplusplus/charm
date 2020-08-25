@@ -220,8 +220,11 @@ class collideVoxel : public CBase_collideVoxel
 class serialCollideClient : public collideClient {
   CollisionClientFn clientFn;
   void *clientParam;
+  CkCallback clientCb;
+  bool useCb;
   public:
   serialCollideClient(void);
+  serialCollideClient(CkCallback clientCb_);
 
   /// Call this client function on processor 0:
   void setClient(CollisionClientFn clientFn,void *clientParam);
