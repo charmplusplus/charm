@@ -54,5 +54,5 @@ do
   fi
 
   echo "# Block size $block_width x $block_height x $block_depth"
-  exe jsrun -n$n_procs -a1 -c$ppn -g1 -K3 -r6 nsys profile -f true -o jacobi3d-n$n_nodes-p%q{OMPI_COMM_WORLD_RANK} ./$file -X $grid_width -Y $grid_height -Z $grid_depth -x $block_width -y $block_height -z $block_depth -w $warmup_iters -i $n_iters +ppn $ppn +pemap $pemap
+  exe jsrun -n$n_procs -a1 -c$ppn -g1 -K3 -r6 nsys profile -f true -o jacobi3d-n$n_nodes-x$block_width-y$block_height-z$block_depth-p%q{OMPI_COMM_WORLD_RANK} ./$file -X $grid_width -Y $grid_height -Z $grid_depth -x $block_width -y $block_height -z $block_depth -w $warmup_iters -i $n_iters +ppn $ppn +pemap $pemap
 done
