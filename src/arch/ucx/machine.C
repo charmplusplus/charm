@@ -22,7 +22,7 @@
 #include <ucs/type/status.h>
 #include <ucs/datastruct/mpool.h>
 
-#if CMK_USE_PMI
+#if CMK_USE_PMI || CMK_USE_SIMPLEPMI
 #include "runtime-pmi.C"
 #elif CMK_USE_PMI2
 #include "runtime-pmi2.C"
