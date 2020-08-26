@@ -491,7 +491,11 @@ class RootLevel : public LevelLogic
       if (option != config.end())
       {
         const std::string& strategy_name = config["strategies"][0];
-        if (strategy_name == "dummy") group_strategy_dummy = true;
+        if (strategy_name == "Dummy") group_strategy_dummy = true;
+        else
+        {
+          CkAbort("TreeLB: Cannot specify non-dummy strategy for root level of PE_Process_ProcessGroup_Root tree\n");
+        }
       }
     }
   }
