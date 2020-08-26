@@ -144,7 +144,6 @@ option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 option(CUDA                "Build with CUDA support" OFF)
 
 option(PXSHM               "Build with PXSHM" OFF)
-option(QLOGIC              "QLogic based Infiniband" OFF)
 
 # LRTS PMI options
 set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, or ompipmix")
@@ -960,7 +959,7 @@ foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_B
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA)
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA PAPI)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
@@ -970,7 +969,7 @@ foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA)
 endforeach()
 
 # Options that need no .h/.sh additions
-foreach(opt TRACING TRACING_COMMTHREAD ERROR_CHECKING)
+foreach(opt TRACING TRACING_COMMTHREAD ERROR_CHECKING LBUSERDATA QLOGIC BUILD_SHARED TASK_QUEUE DRONE_MODE LOCKLESS_QUEUE CHARMDEBUG CCS CONTROLPOINT AMPI_ERROR_CHECKING AMPI_MPICH_TESTS NUMA RANDOMIZED_MSGQ REPLAY SHRINKEXPAND STATS ZLIB)
     if(${opt})
         set(opts_enabled "${opts_enabled}${opt} ")
     endif()
