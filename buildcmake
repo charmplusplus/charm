@@ -316,7 +316,7 @@ while [[ $# -gt 0 ]]; do
   # Miscellaneous options
     -k)
       # -k is an option for make, not for the compiler.
-      echo "*** Warning: Ignoring '-k' option."
+      echo "*** Note: Ignoring '-k' option."
       ;;
     --help)
       help
@@ -358,7 +358,7 @@ while [[ $# -gt 0 ]]; do
       opt_incdir+="-I${arg#*=} "
       ;;
     *)
-      echo "*** Warning: Adding unknown option '$arg' to compiler flags."
+      echo "*** Note: Adding unknown option '$arg' to compiler flags."
       opt_extra_opts+="$arg "
       ;;
   esac
@@ -416,13 +416,14 @@ fi
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
 
+if [[ $VERBOSE -eq 1 ]]; then
+  echo "Build options for $triplet:"
 
-echo "Build options for $triplet:"
-
-# Print selected options
-for option in ${!opt*}; do
-  echo "  $option = ${!option}"
-done
+  # Print selected options
+  for option in ${!opt*}; do
+    echo "  $option = ${!option}"
+  done
+fi
 
 # Append certain features and compilers to the end of the build directory name
 builddir_extra=""
