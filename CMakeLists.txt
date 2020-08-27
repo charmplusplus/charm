@@ -229,6 +229,12 @@ if(${OMP})
     find_package(OpenMP REQUIRED)
 endif()
 
+if(${SMP})
+  set(CMK_SMP 1)
+else()
+  set(CMK_SMP 0)
+endif()
+
 if(${NETWORK} STREQUAL "multicore")
   set(SMP 0)
   set(CMK_MULTICORE 1)
