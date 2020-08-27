@@ -175,18 +175,30 @@ public:
     int destinationPe, lastDestinationPe = -1;
     Route destinationRoute;
     bool all_delivered = true;
+    std::vector<int> indices[CkMyNodeSize()];
 
     for (int i = 0; i < msg->numDataItems; i++) {
       destinationPe = msg->destinationPes[i];
       if (CmiNodeOf(destinationPe) == myIndex_) {
+        indices[CmiRankOf(destinationPe)].push_back(i);
+        /*
         this->groupProxy[destinationPe].localDeliver(
             msg->dataItems + msg->getoffset<dtype>(i),
             msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
             msg->destObjects[i], msg->sourcePes[i]);
+            */
       } else {
         all_delivered = false;
       }
     }
+
+    for (int i = 0; i < CkMyNodeSize(); i++) {
+      if (indices[i].size() > 0) {
+        this->groupProxy[i].localMassDeliver((uint64_t)msg, indices[i]);
+      }
+    }
+
+    // TODO: How to free the message? Tell group to reduce back?
 
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
     envelope *env = UsrToEnv(msg);
@@ -197,7 +209,8 @@ public:
 
     if (all_delivered) {
       // All data items have been locally delivered
-      delete msg;
+      // TODO: Free msg to avoid memory leak
+      //delete msg;
     } else {
       // Some data items remaining, delegate to the group
       // TODO: This should eventually be handled by the nodegroup
@@ -295,6 +308,7 @@ public:
 
   // entry
   virtual void localDeliver(const char* data, size_t size, CkArrayIndex arrayId, int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
+  virtual void localMassDeliver(uint64_t msg_ptr, std::vector<int> indices) { CkAbort("Called what should be a pure virtual base method"); }
   void receiveAlongRoute(MeshStreamerMessageV *msg);
   void enablePeriodicFlushing(){
     if (progressPeriodInMs_ <= 0) {
@@ -886,7 +900,7 @@ receiveAlongRoute(MeshStreamerMessageV *msg) {
 #endif
   }
 
-  delete msg;
+  //delete msg;
 }
 
 template <class dtype, class RouterType>
@@ -1127,6 +1141,23 @@ private:
     delete msg;
   }
 
+  inline void localMassDeliver(uint64_t msg_ptr, std::vector<int> indices) override {
+    MeshStreamerMessageV* msg = (MeshStreamerMessageV*)msg_ptr;
+
+    for (auto& index : indices) {
+      char* data = msg->dataItems + msg->getoffset<dtype>(index);
+      size_t size = msg->getoffset<dtype>(index+1) - msg->getoffset<dtype>(index);
+      CkArrayIndex arrayId = msg->destObjects[index];
+      int sourcePe = msg->sourcePes[index];
+
+      EntryMethod(data, clientObj_);
+      if (this->useCompletionDetection_) {
+        this->detectorLocalObj_->consume();
+      }
+      QdProcess(1);
+    }
+  }
+
   inline void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,
       int sourcePe) override {
     EntryMethod(const_cast<char*>(data), clientObj_);
@@ -1194,6 +1225,10 @@ private:
   int thresholdFractionDen;
   int cutoffFractionNum;
   int cutoffFractionDen;
+
+  inline void localMassDeliver(uint64_t msg_ptr, std::vector<int> indices) override {
+    // TODO
+  }
 
   inline void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,
       int sourcePe) override {
