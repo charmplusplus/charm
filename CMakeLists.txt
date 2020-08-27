@@ -229,7 +229,7 @@ if(${OMP})
     find_package(OpenMP REQUIRED)
 endif()
 
-if(${SMP})
+if(SMP)
   set(CMK_SMP 1)
 else()
   set(CMK_SMP 0)
