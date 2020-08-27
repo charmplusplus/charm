@@ -236,7 +236,7 @@ else()
 endif()
 
 if(${NETWORK} STREQUAL "multicore")
-  set(SMP 0)
+  set(CMK_SMP 1)
   set(CMK_MULTICORE 1)
 else()
   set(CMK_MULTICORE 0)
