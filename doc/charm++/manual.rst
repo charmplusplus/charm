@@ -10949,12 +10949,12 @@ appropriate choices for the build one wants to perform.
    ================================================================ =====================================================================
    Machine                                                          Build command
    ================================================================ =====================================================================
-   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    Multicore (single node, shared memory) 64 bit Linux              ``./build charm++ multicore-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux                                            ``./build charm++ netlrts-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux (intel compilers)                          ``./build charm++ netlrts-linux-x86_64 icc --with-production -j8``
    Net with 64 bit Linux (shared memory)                            ``./build charm++ netlrts-linux-x86_64 smp --with-production -j8``
    Net with 64 bit Linux (checkpoint restart based fault tolerance) ``./build charm++ netlrts-linux-x86_64 syncft --with-production -j8``
+   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    MPI with 64 bit Linux                                            ``./build charm++ mpi-linux-x86_64 --with-production -j8``
    MPI with 64 bit Linux (shared memory)                            ``./build charm++ mpi-linux-x86_64 smp --with-production -j8``
    MPI with 64 bit Linux (mpicxx wrappers)                          ``./build charm++ mpi-linux-x86_64 mpicxx --with-production -j8``

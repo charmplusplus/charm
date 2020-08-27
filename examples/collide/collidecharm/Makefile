@@ -14,7 +14,7 @@ cifiles: hello.ci
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o hello charmrun
 
-hello.o: hello.C 
+hello.o: hello.C
 	$(CHARMC) -c hello.C
 
 test: all
