@@ -42,9 +42,6 @@ class CkLBArgs
   bool _lb_metaLbOn;
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
-  std::vector<const char*>
-      _lb_legacyCentralizedStrategies;  // list of centralized strategies specified by
-                                        // command-line (legacy mode)
 
  public:
   CkLBArgs()
@@ -82,10 +79,6 @@ class CkLBArgs
   inline double& targetRatio() { return _lb_targetRatio; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
-  inline std::vector<const char*>& legacyCentralizedStrategies()
-  {
-    return _lb_legacyCentralizedStrategies;
-  }
 };
 
 extern CkLBArgs _lb_args;
@@ -105,10 +98,13 @@ class CkLBOptions
 {
  private:
   int seqno;  // for centralized lb, the seqno
+  const char* legacyName;
  public:
-  CkLBOptions() : seqno(-1) {}
-  CkLBOptions(int s) : seqno(s) {}
+  CkLBOptions() : seqno(-1), legacyName(nullptr) {}
+  CkLBOptions(int s) : seqno(s), legacyName(nullptr) {}
+  CkLBOptions(int s, const char* legacyName) : seqno(s), legacyName(legacyName) {}
   int getSeqNo() const { return seqno; }
+  const char* getLegacyName() const { return legacyName; }
 };
 PUPbytes(CkLBOptions)
 
@@ -121,7 +117,7 @@ CkpvExtern(bool, lbmanagerInited);
 // LB options, mostly controled by user parameter
 extern char* _lbtopo;
 
-typedef void (*LBCreateFn)();
+typedef void (*LBCreateFn)(const CkLBOptions&);
 typedef BaseLB* (*LBAllocFn)();
 void LBDefaultCreate(LBCreateFn f);
 
@@ -478,6 +474,7 @@ class LBManager : public CBase_LBManager
   static bool avail_vector_set;
   int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
+  int currentLBIndex;
 
  public:
   CkVec<BaseLB*> loadbalancers;

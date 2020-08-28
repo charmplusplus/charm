@@ -34,12 +34,12 @@ void TreeLB::init(const CkLBOptions& opts)
       CkExit(1);
     }
   }
-  else if (_lb_args.legacyCentralizedStrategies().size() > 0)
+  else if (opts.getLegacyName() != nullptr)
   {
     // support legacy mode, e.g. map "+GreedyLB" to PE_Root tree using Greedy
     // use 2-level tree
     config["tree"] = "PE_Root";
-    config["Root"]["strategies"] = {_lb_args.legacyCentralizedStrategies()[0]};
+    config["Root"]["strategies"] = {opts.getLegacyName()};
     if (CkMyPe() == 0 && !quietModeRequested)
       CkPrintf("[%d] TreeLB in LEGACY MODE support\n", CkMyPe());
   }
@@ -479,6 +479,10 @@ void TreeLB::lb_done()
   {
     CkPrintf("--------- Finished LB step %d ---------\n", lbmgr->step());
   }
+
+  // Advance to next load balancer
+  if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+    lbmgr->nextLoadbalancer(seqno);
 
   // Increment to next step
   lbmgr->incStep();
