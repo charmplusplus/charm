@@ -17,7 +17,7 @@ public:
 
   virtual ~LBTreeBuilder() {}
   template <typename T>
-  T getProperty(const char* property, T defaultValue, const json& config) = delete;
+  T getProperty(const char* property, const T defaultValue, const json& config) const = delete;
 
 protected:
   int rootPE = 0;
@@ -39,8 +39,8 @@ protected:
 
 private:
   template <typename T>
-  T getPropertyHelper(const char* property, T defaultValue, const json& config,
-                      bool (json::*checkFn)() const)
+  T getPropertyHelper(const char* property, const T defaultValue, const json& config,
+                      bool (json::*checkFn)() const) const
   {
     if (config.contains(property))
     {
@@ -57,26 +57,26 @@ private:
 };
 
 template <>
-int LBTreeBuilder::getProperty<int>(const char* property, int defaultValue, const json& config)
+int LBTreeBuilder::getProperty<int>(const char* property, const int defaultValue, const json& config) const
 {
   return getPropertyHelper(property, defaultValue, config, &json::is_number_integer);
 }
 
 template <>
-uint8_t LBTreeBuilder::getProperty<uint8_t>(const char* property, uint8_t defaultValue, const json& config)
+uint8_t LBTreeBuilder::getProperty<uint8_t>(const char* property, const uint8_t defaultValue, const json& config) const
 {
   return getPropertyHelper(property, defaultValue, config, &json::is_number_unsigned);
 }
 
 template <>
-bool LBTreeBuilder::getProperty<bool>(const char* property, bool defaultValue, const json& config)
+bool LBTreeBuilder::getProperty<bool>(const char* property, const bool defaultValue, const json& config) const
 {
   return getPropertyHelper(property, defaultValue, config, &json::is_boolean);
 }
 
 template <>
 std::vector<std::string> LBTreeBuilder::getProperty<std::vector<std::string>>(
-    const char* property, std::vector<std::string> defaultValue, const json& config)
+    const char* property, const std::vector<std::string> defaultValue, const json& config) const
 {
   return getPropertyHelper(property, defaultValue, config, &json::is_array);
 }
