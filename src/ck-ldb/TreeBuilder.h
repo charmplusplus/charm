@@ -85,6 +85,7 @@ class PE_Root_Tree : public LBTreeBuilder
 {
 private:
   std::vector<std::string> strategies;
+  bool repeat_strategies;
 
 public:
   PE_Root_Tree(json& config)
@@ -96,6 +97,8 @@ public:
     rootPE = getProperty("pe", 0, root_config);
     if (rootPE < 0 || rootPE >= CkNumPes())
       CkAbort("TreeLB: Root PE %d is not a valid PE.\n", rootPE);
+
+    repeat_strategies = getProperty("repeat_strategies", false, root_config);
 
     strategies = getProperty("strategies", std::vector<std::string>(), root_config);
     if (strategies.empty())
@@ -133,7 +136,7 @@ public:
     if (CkMyPe() == rootPE)
     {
       RootLevel* level = new RootLevel();
-      level->configure(_lb_args.testPeSpeed(), config["root"]);
+      level->configure(_lb_args.testPeSpeed(), strategies, config["root"], repeat_strategies);
       logic[1] = level;
     }
 
@@ -165,6 +168,7 @@ private:
   int step_freq_lvl2;
   // Pad with spot for the PE level so that level index matches logic levels
   std::array<std::vector<std::string>, 3> strategies;
+  std::array<bool, 3> repeat_strategies;
 
 public:
   PE_Node_Root_Tree(json& config)
@@ -176,6 +180,7 @@ public:
     }
     const auto& process_config = config.at("process");
 
+    repeat_strategies[1] = getProperty("repeat_strategies", false, process_config);
     strategies[1] = getProperty("strategies", std::vector<std::string>(), process_config);
     if (strategies[1].empty())
       CkAbort("TreeLB: Non-empty Section \"strategies\" must exist inside \"process\".\n");
@@ -193,6 +198,7 @@ public:
 
     step_freq_lvl2 = getProperty("step_freq", 1, root_config);
 
+    repeat_strategies[2] = getProperty("repeat_strategies", false, root_config);
     strategies[2] = getProperty("strategies", std::vector<std::string>(), root_config);
     if (strategies[2].empty())
       CkAbort("TreeLB: Non-empty Section \"strategies\" must exist inside \"root\".\n");
@@ -236,7 +242,8 @@ public:
       std::iota(pes_in_node.begin(), pes_in_node.end(), level1root);
 
       NodeLevel* level = new NodeLevel(lbmgr, pes_in_node);
-      level->configure(_lb_args.testPeSpeed(), config["process"], step_freq_lvl2);
+      level->configure(_lb_args.testPeSpeed(), strategies[1], config["process"],
+                       repeat_strategies[1], step_freq_lvl2);
       logic[1] = level;
 
       // set up comm-tree between levels 1 and 2
@@ -266,7 +273,8 @@ public:
     if (mype == level2root)
     {
       RootLevel* level = new RootLevel();
-      level->configure(_lb_args.testPeSpeed(), config["root"]);
+      level->configure(_lb_args.testPeSpeed(), strategies[2], config["root"],
+                       repeat_strategies[2]);
       logic[2] = level;
     }
 
@@ -308,14 +316,13 @@ private:
   int GroupOf(int pe) { return CkNodeOf(pe) / group_size; }
   int GroupFirstPe(int group) { return CkNodeFirst(group * group_size); }
 
-  int num_groups;
-  int group_size;
-
-  int step_freq_lvl2;
-  int step_freq_lvl3;
+  int num_groups, group_size, step_freq_lvl2, step_freq_lvl3;
+  bool token_passing;
   
   // Pad with spot for the PE level so that level index matches logic levels
-  std::array<std::vector<std::string>, 4> strategies;
+  // and don't add spot for root level since it can't have strategies
+  std::array<std::vector<std::string>, 3> strategies;
+  std::array<bool, 3> repeat_strategies;
 
 public:
   PE_Node_NodeSet_Root_Tree(json& config)
@@ -325,6 +332,7 @@ public:
       CkAbort("TreeLB: Configuration must include \"process\" section.\n");
     const auto& process_config = config.at("process");
 
+    repeat_strategies[1] = getProperty("repeat_strategies", false, process_config);
     strategies[1] = getProperty("strategies", std::vector<std::string>(), process_config);
     if (strategies[1].empty())
       CkAbort(
@@ -336,7 +344,7 @@ public:
     const auto& processgroup_config = config.at("processgroup");
 
     num_groups = getProperty("num_groups", 0, processgroup_config);
-    if (num_groups <= 0 || num_groups >= CkNumNodes())
+    if (num_groups <= 0 || num_groups > CkNumNodes())
       CkAbort("TreeLB: \"num_groups\" has an invalid value.\n");
     // NOTE to simplify things for now, assume equal number of nodes per group
     CkAssert(CkNumNodes() % num_groups == 0);
@@ -344,6 +352,7 @@ public:
 
     step_freq_lvl2 = getProperty("step_freq", 1, processgroup_config);
 
+    repeat_strategies[2] = getProperty("repeat_strategies", false, processgroup_config);
     strategies[2] =
         getProperty("strategies", std::vector<std::string>(), processgroup_config);
     if (strategies[2].empty())
@@ -364,13 +373,9 @@ public:
     if (step_freq_lvl3 % step_freq_lvl2 != 0)
       CkAbort("TreeLB: step_freq of root level is not multiple of previous level.\n");
 
-    strategies[3] =
-        getProperty("strategies", std::vector<std::string>(), root_config);
-    if (strategies[3].size() >= 2 ||
-        !strategies[3].empty() && strategies[3][0] != "Dummy")
-      CkAbort(
-          "TreeLB: Can only specify \"Dummy\" strategy for root level of "
-          "PE_Process_ProcessGroup_Root tree.\n");
+    token_passing = getProperty("token_passing", true, root_config);
+    if (root_config.contains("repeat_strategies") || root_config.contains("strategies"))
+      CkAbort("TreeLB: Root level of PE_Process_ProcessGroup_Root tree cannot have strategies.\n");
   }
 
   virtual ~PE_Node_NodeSet_Root_Tree() {}
@@ -413,7 +418,7 @@ public:
       std::iota(pes_in_node.begin(), pes_in_node.end(), level1root);
 
       NodeLevel* level = new NodeLevel(lbmgr, pes_in_node);
-      level->configure(_lb_args.testPeSpeed(), config["process"], step_freq_lvl2);
+      level->configure(_lb_args.testPeSpeed(), strategies[1], config["process"], repeat_strategies[1], step_freq_lvl2);
       logic[1] = level;
 
       // set up comm-tree between levels 1 and 2
@@ -446,7 +451,7 @@ public:
       std::iota(pes_in_group.begin(), pes_in_group.end(), GroupFirstPe(mygroup));
 
       NodeSetLevel* level = new NodeSetLevel(lbmgr, pes_in_group);
-      level->configure(_lb_args.testPeSpeed(), config["processgroup"], step_freq_lvl3);
+      level->configure(_lb_args.testPeSpeed(), strategies[2], config["processgroup"], repeat_strategies[2], step_freq_lvl3);
       logic[2] = level;
 
       if (mype != level3root) comm_parent[2] = level3root;
@@ -465,7 +470,8 @@ public:
       comm_logic[2] = new MsgAggregator();
 
       RootLevel* level = new RootLevel(num_groups);
-      level->configure(_lb_args.testPeSpeed(), config["root"]);
+      // The root level of this tree has no strategies, so pass empty strategy vector
+      level->configure(_lb_args.testPeSpeed(), {""}, config["root"], false, token_passing);
       logic[3] = level;
     }
 
@@ -490,7 +496,7 @@ public:
       }
       CkPrintf("\n");
 
-      CkPrintf("\tRoot: %s\n", strategies[3].empty() ? "TokenPassing" : "Dummy");
+      CkPrintf("\tRoot: %s\n", token_passing ? "TokenPassing" : "Dummy");
 
       if (_lb_args.debug() > 0)
       {
