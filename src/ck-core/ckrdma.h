@@ -275,8 +275,6 @@ struct NcpyBcastRootAckInfo : public NcpyBcastAckInfo {
 
 struct NcpyBcastInterimAckInfo : public NcpyBcastAckInfo {
   void *msg;
-  void *parentBcastAckInfo;
-  int origPe;
   bool isRecv;
   bool isArray;
 };
