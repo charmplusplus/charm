@@ -39,6 +39,11 @@ CkGroupID CollideSerialClient(CollisionClientFn clientFn,void *clientParam)
   return cl;
 }
 
+CkGroupID CollideSerialClient(CkCallback clientCb)
+{
+  CProxy_serialCollideClient cl = CProxy_serialCollideClient::ckNew(clientCb);
+  return cl;
+}
 
 /// Create a collider group to contribute objects to.
 ///  Should be called on processor 0.
@@ -620,6 +625,15 @@ collideClient::~collideClient() {}
 serialCollideClient::serialCollideClient(void) {
   clientFn=NULL;
   clientParam=NULL;
+  clientCb = CkCallback(CkCallback::ignore);
+  useCb = false;
+}
+
+serialCollideClient::serialCollideClient(CkCallback clientCb_) {
+  clientFn=NULL;
+  clientParam=NULL;
+  clientCb = clientCb_;
+  useCb = true;
 }
 
 /// Call this client function on processor 0:
@@ -631,9 +645,14 @@ void serialCollideClient::setClient(CollisionClientFn clientFn_,void *clientPara
 void serialCollideClient::collisions(ArrayElement *src,
     int step,CollisionList &colls)
 {
-  CkCallback cb(CkIndex_serialCollideClient::reductionDone(0),0,thisgroup);
-  src->contribute(colls.length()*sizeof(Collision),colls.getData(),
+  if(useCb) { // Use user passed callback as reduction target
+    src->contribute(colls.length()*sizeof(Collision),colls.getData(),
+      CkReduction::concat, clientCb);
+  } else { // Use client fn with reduction targetted at serialCollideClient::reductionDone
+    CkCallback cb(CkIndex_serialCollideClient::reductionDone(0),0,thisgroup);
+    src->contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat,cb);
+  }
 }
 
 //This is called after the collideVoxel Collision reduction completes

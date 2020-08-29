@@ -5,6 +5,7 @@ module collidecharm {
   };
   group serialCollideClient : collideClient {
     entry serialCollideClient();
+    entry serialCollideClient(CkCallback clientCb_);
     entry void reductionDone(CkReductionMsg *m);
   };
 
