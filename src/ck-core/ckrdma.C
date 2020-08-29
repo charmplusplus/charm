@@ -1003,8 +1003,9 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
                                 handleMsgOnChildPostCompletionForRecvBcast(env);
                                 break;
 
-      case CkNcpyMode::CMA   :  if(t->child_count == 0) {
-                                  sendAckMsgToParent(env);
+      case CkNcpyMode::CMA   :  // Invoke the Ack handler on the parent node to signal completion
+                                sendAckMsgToParent(env);
+                                if(t->child_count == 0) {
                                   handleMsgOnChildPostCompletionForRecvBcast(env);
                                 } else {
                                   // Allocate a structure NcpyBcastInterimAckInfo to maintain state for ack handling
@@ -1250,19 +1251,7 @@ void CkRdmaEMBcastAckHandler(void *ack) {
 #if CMK_REG_REQUIRED
         deregisterMemFromMsg(myMsg, true);
 #endif
-        // send a message to the parent to signal completion
-        int srcPe;
         CkArray *mgr = NULL;
-        envelope *env = (envelope *)bcastInterimAckInfo->msg;
-        CkUnpackMessage(&env); // Unpack message before sending it to getParentBcastAckInfo
-        char *ref = (char *)(getParentBcastAckInfo(bcastInterimAckInfo->msg, srcPe));
-        CkPackMessage(&env);
-
-        NcpyBcastInterimAckInfo *ncpyBcastAck = (NcpyBcastInterimAckInfo *)ref;
-
-        // Invoke CkRdmaEMBcastAckHandler on my parent node
-        invokeRemoteNcpyAckHandler(ncpyBcastAck->origPe, ncpyBcastAck->parentBcastAckInfo, ncpyHandlerIdx::BCAST_ACK);
-
         CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_DONE_MSG;
 
         CkUnpackMessage(&myMsg); // DO NOT REMOVE THIS
@@ -1277,7 +1266,7 @@ void CkRdmaEMBcastAckHandler(void *ack) {
         } else {
           // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
           // that this is the final message containing the posted pointers
-          CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+          CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
           QdCreate(1);
           enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
         }
@@ -1295,12 +1284,6 @@ void CkRdmaEMBcastAckHandler(void *ack) {
 #if CMK_REG_REQUIRED
         deregisterMemFromMsg(myMsg, false);
 #endif
-        // send a message to the parent to signal completion
-        envelope *env = (envelope *)bcastInterimAckInfo->msg;
-        CkUnpackMessage(&env); // Unpack message before sending it to getParentBcastAckInfo
-        sendAckMsgToParent(env);
-        CkPackMessage(&env);
-
         forwardMessageToPeerNodes(myMsg, myMsg->getMsgtype());
 
         // enquque message to execute EM on the intermediate node
@@ -1433,10 +1416,10 @@ void handleMsgUsingCMAPostCompletionForSendBcast(envelope *copyenv, envelope *en
   CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(getRootNode(env)));
   CkPackMessage(&env);
 
-  if(t.child_count == 0) { // child node
+  // Send an ack message to the parent node to signal completion
+  invokeRemoteNcpyAckHandler(source.pe, (void *)source.refAckInfo, ncpyHandlerIdx::BCAST_ACK);
 
-    // Send a message to the parent node to signal completion
-    invokeRemoteNcpyAckHandler(source.pe, (void *)source.refAckInfo, ncpyHandlerIdx::BCAST_ACK);
+  if(t.child_count == 0) { // child node
 
     // Only forwarding is to peer PEs
     forwardMessageToPeerNodes(copyenv, copyenv->getMsgtype());
@@ -1461,11 +1444,11 @@ void processBcastSendEmApiCompletion(NcpyEmInfo *ncpyEmInfo, int destPe) {
   envelope *myEnv = (envelope *)(ncpyEmInfo->msg);
   CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(getRootNode(myEnv)));
 
-  if(t.child_count == 0) { // Child Node
+  CkUnpackMessage(&myEnv); // Unpack message before sending it to sendAckMsgToParent
+  sendAckMsgToParent(myEnv); // Send a ack message to the parent node to signal completion
+  CkPackMessage(&myEnv);
 
-    CkUnpackMessage(&myEnv); // Unpack message before sending it to sendAckMsgToParent
-    sendAckMsgToParent(myEnv);
-    CkPackMessage(&myEnv);
+  if(t.child_count == 0) { // Child Node
 
     // Since I am a child node, no more forwarding to any more childing
     // Only forwarding is to peer PEs
@@ -1566,11 +1549,12 @@ void CkRdmaEMBcastPostAckHandler(void *msg) {
 
   CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(getRootNode(env)));
 
-  // send a message to your parents if you are a child node
+  // send an ack message to your parent node
+  sendAckMsgToParent(env);
+
   if(t.child_count == 0) {
 
     // Send message to all peer elements on this PE
-    sendAckMsgToParent(env);
     handleMsgOnChildPostCompletionForRecvBcast(env);
 
   } else if(t.child_count !=0 && t.parent != -1) {
@@ -1606,12 +1590,6 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *env, NcpyBcastInterimAckInfo *bcast
   for(int i=0; i<numops; i++){
     // unpack from current message
     up|source;
-
-    const void *bcastAckInfoTemp = source.refAckInfo;
-    int orig_source_pe = source.pe;
-
-    bcastAckInfo->parentBcastAckInfo = (void *)bcastAckInfoTemp;
-    bcastAckInfo->origPe = orig_source_pe;
 
     source.refAckInfo = bcastAckInfo;
     source.pe = origPe;
