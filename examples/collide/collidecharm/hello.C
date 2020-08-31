@@ -41,8 +41,14 @@ class main : public CBase_main
       mid = thishandle;
 
       CollideGrid3d gridMap(CkVector3d(0,0,0),CkVector3d(2,100,2));
+
+#if COLLIDE_USE_CB
+      CollideHandle collide = CollideCreate(gridMap,
+          CollideSerialClient(CkCallback(CkIndex_main::printCollisionCb(NULL), thisProxy)));
+#else
       CollideHandle collide=CollideCreate(gridMap,
           CollideSerialClient(printCollisionHandler,0));
+#endif
 
       arr = CProxy_Hello::ckNew(collide,nElements);
 
@@ -54,6 +60,15 @@ class main : public CBase_main
       CkPrintf("All done\n");
       CkExit();
     };
+
+    void printCollisionCb(CkReductionMsg *msg) {
+      Collision *colls = (Collision *)msg->getData();
+      int nColl = msg->getSize()/sizeof(Collision);
+      CkPrintf("Calling collision handler using a callback\n");
+      printCollisionHandler(NULL, nColl, colls);
+
+      delete msg;
+    }
 };
 
 class Hello : public CBase_Hello
