@@ -5,6 +5,7 @@
 #include <utility>
 #include <sstream>
 
+#define COMM_ONLY 0
 #define CUDA_SYNC 0
 
 /* readonly */ CProxy_Main main_proxy;
@@ -32,19 +33,12 @@ extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     cudaStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
     int block_width, int block_height, int block_depth, cudaStream_t stream);
-extern void invokeLeftPackingKernel(DataType* d_temperature, DataType* d_ghost,
-    int block_width, int block_height, int block_depth, cudaStream_t stream);
-extern void invokeRightPackingKernel(DataType* d_temperature, DataType* d_ghost,
-    int block_width, int block_height, int block_depth, cudaStream_t stream);
-extern void invokeTopPackingKernel(DataType* d_temperature, DataType* d_ghost,
-    int block_width, int block_height, int block_depth, cudaStream_t stream);
-extern void invokeBottomPackingKernel(DataType* d_temperature, DataType* d_ghost,
-    int block_width, int block_height, int block_depth, cudaStream_t stream);
-extern void invokeFrontPackingKernel(DataType* d_temperature, DataType* d_ghost,
-    int block_width, int block_height, int block_depth, cudaStream_t stream);
-extern void invokeBackPackingKernel(DataType* d_temperature, DataType* d_ghost,
-    int block_width, int block_height, int block_depth, cudaStream_t stream);
-
+extern void invokePackingKernels(DataType* d_temperature, DataType* d_left_ghost,
+    DataType* d_right_ghost, DataType* d_top_ghost, DataType* d_bottom_ghost,
+    DataType* d_front_ghost, DataType* d_back_ghost, bool left_bound,
+    bool right_bound, bool top_bound, bool bottom_bound, bool front_bound,
+    bool back_bound, int block_width, int block_height, int block_depth,
+    cudaStream_t stream);
 extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     int dir, int block_width, int block_height, int block_depth,
     cudaStream_t stream);
@@ -258,25 +252,10 @@ class Block : public CBase_Block {
   DataType* __restrict__ d_recv_back_ghost;
 
   cudaStream_t compute_stream;
-  cudaStream_t pack_stream;
-  cudaStream_t unpack_stream;
-  cudaStream_t d2h_stream;
-  cudaStream_t h2d_stream;
+  cudaStream_t comm_stream;
 
-  cudaEvent_t unpack_compute_ev;
-  cudaEvent_t compute_pack_ev;
-  cudaEvent_t pack_d2h_left_ev;
-  cudaEvent_t pack_d2h_right_ev;
-  cudaEvent_t pack_d2h_top_ev;
-  cudaEvent_t pack_d2h_bottom_ev;
-  cudaEvent_t pack_d2h_front_ev;
-  cudaEvent_t pack_d2h_back_ev;
-  cudaEvent_t h2d_unpack_left_ev;
-  cudaEvent_t h2d_unpack_right_ev;
-  cudaEvent_t h2d_unpack_top_ev;
-  cudaEvent_t h2d_unpack_bottom_ev;
-  cudaEvent_t h2d_unpack_front_ev;
-  cudaEvent_t h2d_unpack_back_ev;
+  cudaEvent_t compute_event;
+  cudaEvent_t comm_event;
 
   bool left_bound, right_bound, top_bound, bottom_bound, front_bound, back_bound;
 
@@ -315,25 +294,10 @@ class Block : public CBase_Block {
     }
 
     hapiCheck(cudaStreamDestroy(compute_stream));
-    hapiCheck(cudaStreamDestroy(pack_stream));
-    hapiCheck(cudaStreamDestroy(unpack_stream));
-    hapiCheck(cudaStreamDestroy(d2h_stream));
-    hapiCheck(cudaStreamDestroy(h2d_stream));
+    hapiCheck(cudaStreamDestroy(comm_stream));
 
-    hapiCheck(cudaEventDestroy(unpack_compute_ev));
-    hapiCheck(cudaEventDestroy(compute_pack_ev));
-    hapiCheck(cudaEventDestroy(pack_d2h_left_ev));
-    hapiCheck(cudaEventDestroy(pack_d2h_right_ev));
-    hapiCheck(cudaEventDestroy(pack_d2h_top_ev));
-    hapiCheck(cudaEventDestroy(pack_d2h_bottom_ev));
-    hapiCheck(cudaEventDestroy(pack_d2h_front_ev));
-    hapiCheck(cudaEventDestroy(pack_d2h_back_ev));
-    hapiCheck(cudaEventDestroy(h2d_unpack_left_ev));
-    hapiCheck(cudaEventDestroy(h2d_unpack_right_ev));
-    hapiCheck(cudaEventDestroy(h2d_unpack_top_ev));
-    hapiCheck(cudaEventDestroy(h2d_unpack_bottom_ev));
-    hapiCheck(cudaEventDestroy(h2d_unpack_front_ev));
-    hapiCheck(cudaEventDestroy(h2d_unpack_back_ev));
+    hapiCheck(cudaEventDestroy(compute_event));
+    hapiCheck(cudaEventDestroy(comm_event));
   }
 
   void init() {
@@ -412,25 +376,10 @@ class Block : public CBase_Block {
     }
 
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
-    hapiCheck(cudaStreamCreateWithPriority(&pack_stream, cudaStreamDefault, -1));
-    hapiCheck(cudaStreamCreateWithPriority(&unpack_stream, cudaStreamDefault, -1));
-    hapiCheck(cudaStreamCreateWithPriority(&d2h_stream, cudaStreamDefault, -1));
-    hapiCheck(cudaStreamCreateWithPriority(&h2d_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
 
-    hapiCheck(cudaEventCreateWithFlags(&unpack_compute_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&compute_pack_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&pack_d2h_left_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&pack_d2h_right_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&pack_d2h_top_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&pack_d2h_bottom_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&pack_d2h_front_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&pack_d2h_back_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&h2d_unpack_left_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&h2d_unpack_right_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&h2d_unpack_top_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&h2d_unpack_bottom_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&h2d_unpack_front_ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&h2d_unpack_back_ev, cudaEventDisableTiming));
+    hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
+    hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
 
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_width, block_height, block_depth, compute_stream);
@@ -464,23 +413,27 @@ class Block : public CBase_Block {
       std::to_string(z) << ")";
     NVTXTracer(os.str(), NVTXColor::WetAsphalt);
 
-    // Enforce unpack -> compute dependency
-    hapiCheck(cudaEventRecord(unpack_compute_ev, unpack_stream));
-    hapiCheck(cudaStreamWaitEvent(compute_stream, unpack_compute_ev, 0));
+    // Operations in compute stream should only be executed when
+    // operations in communication stream (transfers and unpacking) complete
+    hapiCheck(cudaEventRecord(comm_event, comm_stream));
+    hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
 
+#if !COMM_ONLY
     // Invoke GPU kernel for Jacobi computation
     invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
         block_depth, compute_stream);
+#endif
 
-    // Enforce compute -> d2h dependency
-    hapiCheck(cudaEventRecord(compute_pack_ev, compute_stream));
-    hapiCheck(cudaStreamWaitEvent(d2h_stream, compute_pack_ev, 0));
+    // Operations in communication stream (packing and transfers) should
+    // only be executed when operations in compute stream complete
+    hapiCheck(cudaEventRecord(compute_event, compute_stream));
+    hapiCheck(cudaStreamWaitEvent(comm_stream, compute_event, 0));
 
     // Copy final temperature data back to host
     if (print_elements && (my_iter == warmup_iters + n_iters)) {
       hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
             sizeof(DataType) * (block_width+2)*(block_height+2)*(block_depth+2),
-            cudaMemcpyDeviceToHost, d2h_stream));
+            cudaMemcpyDeviceToHost, comm_stream));
     }
 
     if (sync_ver) {
@@ -505,74 +458,58 @@ class Block : public CBase_Block {
     NVTXTracer(os.str(), NVTXColor::Emerald);
 
     if (use_zerocopy) {
-      // TODO
+#if !COMM_ONLY
+      // Pack non-contiguous ghosts to temporary contiguous buffers on device
+      invokePackingKernels(d_new_temperature, d_send_left_ghost,
+          d_send_right_ghost, d_send_top_ghost, d_send_bottom_ghost,
+          d_send_front_ghost, d_send_back_ghost, left_bound, right_bound,
+          top_bound, bottom_bound, front_bound, back_bound, block_width,
+          block_height, block_depth, comm_stream);
+#endif
     } else {
-      // Pack and transfer ghosts from device to host
-      if (!left_bound) {
-        invokeLeftPackingKernel(d_new_temperature, d_left_ghost,
-            block_width, block_height, block_depth, pack_stream);
-        hapiCheck(cudaEventRecord(pack_d2h_left_ev, pack_stream));
-        hapiCheck(cudaStreamWaitEvent(d2h_stream, pack_d2h_left_ev, 0));
+#if !COMM_ONLY
+      // Pack non-contiguous ghosts to temporary contiguous buffers on device
+      invokePackingKernels(d_new_temperature, d_left_ghost, d_right_ghost,
+          d_top_ghost, d_bottom_ghost, d_front_ghost, d_back_ghost, left_bound,
+          right_bound, top_bound, bottom_bound, front_bound, back_bound,
+          block_width, block_height, block_depth, comm_stream);
+#endif
+
+      // Transfer ghosts from device to host
+      if (!left_bound)
         hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost,
               block_height * block_depth * sizeof(DataType),
-              cudaMemcpyDeviceToHost, d2h_stream));
-      }
-      if (!right_bound) {
-        invokeRightPackingKernel(d_new_temperature, d_right_ghost,
-            block_width, block_height, block_depth, pack_stream);
-        hapiCheck(cudaEventRecord(pack_d2h_right_ev, pack_stream));
-        hapiCheck(cudaStreamWaitEvent(d2h_stream, pack_d2h_right_ev, 0));
+              cudaMemcpyDeviceToHost, comm_stream));
+      if (!right_bound)
         hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost,
               block_height * block_depth * sizeof(DataType),
-              cudaMemcpyDeviceToHost, d2h_stream));
-      }
-      if (!top_bound) {
-        invokeTopPackingKernel(d_new_temperature, d_top_ghost,
-            block_width, block_height, block_depth, pack_stream);
-        hapiCheck(cudaEventRecord(pack_d2h_top_ev, pack_stream));
-        hapiCheck(cudaStreamWaitEvent(d2h_stream, pack_d2h_top_ev, 0));
+              cudaMemcpyDeviceToHost, comm_stream));
+      if (!top_bound)
         hapiCheck(cudaMemcpyAsync(h_top_ghost, d_top_ghost,
               block_width * block_depth * sizeof(DataType),
-              cudaMemcpyDeviceToHost, d2h_stream));
-      }
-      if (!bottom_bound) {
-        invokeBottomPackingKernel(d_new_temperature, d_bottom_ghost,
-            block_width, block_height, block_depth, pack_stream);
-        hapiCheck(cudaEventRecord(pack_d2h_bottom_ev, pack_stream));
-        hapiCheck(cudaStreamWaitEvent(d2h_stream, pack_d2h_bottom_ev, 0));
+              cudaMemcpyDeviceToHost, comm_stream));
+      if (!bottom_bound)
         hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_bottom_ghost,
               block_width * block_depth * sizeof(DataType),
-              cudaMemcpyDeviceToHost, d2h_stream));
-      }
-      if (!front_bound) {
-        invokeFrontPackingKernel(d_new_temperature, d_front_ghost,
-            block_width, block_height, block_depth, pack_stream);
-        hapiCheck(cudaEventRecord(pack_d2h_front_ev, pack_stream));
-        hapiCheck(cudaStreamWaitEvent(d2h_stream, pack_d2h_front_ev, 0));
+              cudaMemcpyDeviceToHost, comm_stream));
+      if (!front_bound)
         hapiCheck(cudaMemcpyAsync(h_front_ghost, d_front_ghost,
               block_width * block_height * sizeof(DataType),
-              cudaMemcpyDeviceToHost, d2h_stream));
-      }
-      if (!back_bound) {
-        invokeBackPackingKernel(d_new_temperature, d_back_ghost,
-            block_width, block_height, block_depth, pack_stream);
-        hapiCheck(cudaEventRecord(pack_d2h_back_ev, pack_stream));
-        hapiCheck(cudaStreamWaitEvent(d2h_stream, pack_d2h_back_ev, 0));
+              cudaMemcpyDeviceToHost, comm_stream));
+      if (!back_bound)
         hapiCheck(cudaMemcpyAsync(h_back_ghost, d_back_ghost,
               block_width * block_height * sizeof(DataType),
-              cudaMemcpyDeviceToHost, d2h_stream));
-      }
+              cudaMemcpyDeviceToHost, comm_stream));
     }
-    hapiCheck(cudaPeekAtLastError());
 
 #if CUDA_SYNC
-    cudaStreamSynchronize(d2h_stream);
+    cudaStreamSynchronize(comm_stream);
     thisProxy[thisIndex].packGhostsDone();
 #else
     // Add asynchronous callback to be invoked when packing kernels and
     // ghost transfers are complete
     CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
-    hapiAddCallback(d2h_stream, cb);
+    hapiAddCallback(comm_stream, cb);
 #endif
   }
 
@@ -584,7 +521,6 @@ class Block : public CBase_Block {
 
     // Send ghosts to neighboring chares
     if (use_zerocopy) {
-      /* TODO
       if (!left_bound)
         thisProxy(x-1, y, z).receiveGhostsZC(my_iter, RIGHT, block_height * block_depth,
             CkDeviceBuffer(d_send_left_ghost, comm_stream));
@@ -603,7 +539,6 @@ class Block : public CBase_Block {
       if (!back_bound)
         thisProxy(x, y, z+1).receiveGhostsZC(my_iter, BACK, block_width * block_height,
             CkDeviceBuffer(d_send_back_ghost, comm_stream));
-            */
     } else {
       if (!left_bound)
         thisProxy(x-1, y, z).receiveGhostsReg(my_iter, RIGHT,
@@ -638,8 +573,7 @@ class Block : public CBase_Block {
       case BACK:   buf = d_recv_back_ghost;   break;
       default: CkAbort("Error: invalid direction");
     }
-    // TODO
-    //devicePost[0].cuda_stream = comm_stream;
+    devicePost[0].cuda_stream = comm_stream;
   }
 
   void processGhostsZC(int dir, int size, DataType* gh) {
@@ -648,7 +582,10 @@ class Block : public CBase_Block {
       "," << std::to_string(z) << ")";
     NVTXTracer(os.str(), NVTXColor::Amethyst);
 
-    // TODO
+#if !COMM_ONLY
+    invokeUnpackingKernel(d_temperature, gh, dir, block_width, block_height,
+        block_depth, comm_stream);
+#endif
   }
 
   void processGhostsReg(int dir, int size, DataType* gh) {
@@ -658,24 +595,23 @@ class Block : public CBase_Block {
     NVTXTracer(os.str(), NVTXColor::Amethyst);
 
     DataType* h_ghost = nullptr; DataType* d_ghost = nullptr;
-    cudaEvent_t ev;
     switch (dir) {
-      case LEFT:   h_ghost = h_left_ghost; d_ghost = d_left_ghost; ev = h2d_unpack_left_ev; break;
-      case RIGHT:  h_ghost = h_right_ghost; d_ghost = d_right_ghost; ev = h2d_unpack_right_ev; break;
-      case TOP:    h_ghost = h_top_ghost; d_ghost = d_top_ghost; ev = h2d_unpack_top_ev;break;
-      case BOTTOM: h_ghost = h_bottom_ghost; d_ghost = d_bottom_ghost; ev = h2d_unpack_bottom_ev;break;
-      case FRONT:  h_ghost = h_front_ghost; d_ghost = d_front_ghost; ev = h2d_unpack_front_ev;break;
-      case BACK:   h_ghost = h_back_ghost; d_ghost = d_back_ghost; ev = h2d_unpack_back_ev;break;
+      case LEFT:   h_ghost = h_left_ghost; d_ghost = d_left_ghost;     break;
+      case RIGHT:  h_ghost = h_right_ghost; d_ghost = d_right_ghost;   break;
+      case TOP:    h_ghost = h_top_ghost; d_ghost = d_top_ghost;       break;
+      case BOTTOM: h_ghost = h_bottom_ghost; d_ghost = d_bottom_ghost; break;
+      case FRONT:  h_ghost = h_front_ghost; d_ghost = d_front_ghost;   break;
+      case BACK:   h_ghost = h_back_ghost; d_ghost = d_back_ghost; break;
       default: CkAbort("Error: invalid direction");
     }
 
     memcpy(h_ghost, gh, size * sizeof(DataType));
     hapiCheck(cudaMemcpyAsync(d_ghost, h_ghost, size * sizeof(DataType),
-          cudaMemcpyHostToDevice, h2d_stream));
-    hapiCheck(cudaEventRecord(ev, h2d_stream));
-    hapiCheck(cudaStreamWaitEvent(unpack_stream, ev, 0));
+          cudaMemcpyHostToDevice, comm_stream));
+#if !COMM_ONLY
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
-        block_depth, unpack_stream);
+        block_depth, comm_stream);
+#endif
   }
 
   void print() {
