@@ -622,14 +622,14 @@ void preprocessRdmaCaseForRgets(int &layerInfoSize, int &ncpyObjSize, int &extra
     totalMsgSize += sizeof(NcpyEmInfo) + numops*(sizeof(NcpyEmBufferInfo) + extraSize);
 }
 
-void setNcpyEmInfo(char *ref, envelope *env, int &msgsize, int &numops, void *forwardMsg, ncpyEmApiMode emMode) {
+void setNcpyEmInfo(char *ref, envelope *env, int &numops, void *forwardMsg, ncpyEmApiMode emMode) {
 
     NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)ref;
     ncpyEmInfo->numOps = numops;
     ncpyEmInfo->counter = 0;
     ncpyEmInfo->msg = env;
 
-    ncpyEmInfo->forwardMsg = forwardMsg; // useful only for BCAST, NULL for P2P
+    ncpyEmInfo->forwardMsg = forwardMsg; // useful only for Send Bcast, NULL for others
     ncpyEmInfo->pe = CkMyPe();
     ncpyEmInfo->mode = emMode; // P2P or BCAST
 }
@@ -793,7 +793,7 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
 
   if(ncpyMode == CkNcpyMode::RDMA) {
     ref = (char *)copyenv + CK_ALIGN(msgsize, 16) + bufsize;
-    setNcpyEmInfo(ref, copyenv, msgsize, numops, forwardMsg, emMode);
+    setNcpyEmInfo(ref, copyenv, numops, forwardMsg, emMode);
   }
 
   char *buf = (char *)copyenv + CK_ALIGN(msgsize, 16);
@@ -896,13 +896,7 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
  * the destination to perform zerocopy operations as a part of the Zerocopy Entry Method
  * API
  */
-void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs){
-
-  if(emMode == ncpyEmApiMode::BCAST_SEND)
-    CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
-
-  // Iterate over the ncpy buffer and either perform the operations
-  int msgsize = env->getTotalsize();
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs){
 
   int refSize = 0;
   char *ref;
@@ -911,7 +905,6 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
   CkNcpyMode ncpyMode = findTransferMode(getSrcPe(env), CkMyPe());
   CmiSpanningTreeInfo *t = NULL;
   if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
-
 
   if(emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
     t = getSpanningTreeInfo(rootNode);
@@ -930,7 +923,7 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
     CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
 
   if(ncpyMode == CkNcpyMode::RDMA) {
-    setNcpyEmInfo(ref, env, msgsize, numops, forwardMsg, emMode);
+    setNcpyEmInfo(ref, env, numops, NULL, emMode);
   }
 
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
