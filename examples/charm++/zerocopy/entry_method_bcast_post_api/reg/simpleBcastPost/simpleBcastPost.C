@@ -1,6 +1,6 @@
 #include "simpleBcastPost.decl.h"
 
-#define DEBUG(x) //x
+#define DEBUG(x) x
 
 CProxy_Main mainProxy;
 int bufferSize;
@@ -29,7 +29,7 @@ class Main : public CBase_Main{
     } else if(m->argc == 2 ) {
       size = atoi(m->argv[1]);
     } else {
-      size = CkNumPes() * 3; // default with 10 chare array elements per pe
+      size = CkNumPes() * 2; // default with 10 chare array elements per pe
     }
 
     delete m;
@@ -89,7 +89,7 @@ class zcArray : public CBase_zcArray {
   public:
   zcArray() {
     myBuffer = new int[bufferSize];
-    DEBUG(CkPrintf("[%d][%d][%d][%d] Array element: constructed and allocated buffer is %p\n", CkMyPe(), CkMyNode(), CmiMyRank(), thisIndex, myBuffer);)
+    //DEBUG(CkPrintf("[%d][%d][%d][%d] Array element: constructed and allocated buffer is %p\n", CkMyPe(), CkMyNode(), CmiMyRank(), thisIndex, myBuffer);)
   }
 
   void recvLargeArray(int *&ptr1, int &n1, CkCallback doneCb, CkNcpyBufferPost *) {

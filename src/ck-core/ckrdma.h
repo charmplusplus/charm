@@ -8,6 +8,7 @@
 #include "envelope.h"
 #include "ckcallback.h"
 #include "conv-rdma.h"
+#include <vector>
 
 /*********************************** Zerocopy Direct API **********************************/
 
@@ -25,25 +26,64 @@
 #define CkNcpyStatus CmiNcpyStatus
 #define CkNcpyMode CmiNcpyMode
 
+
+struct NcpyBcastRecvPeerAckInfo;
+
 // P2P_SEND mode is used for EM P2P Send API
 // BCAST_SEND mode is used for EM BCAST Send API
 // P2P_RECV mode is used for EM P2P Recv API
 // BCAST_RECV mode is used for EM BCAST Send API
 enum class ncpyEmApiMode : char { P2P_SEND, BCAST_SEND, P2P_RECV, BCAST_RECV };
 
-// Struct passed in a ZC Post Entry Method to allow receiver side to post
-struct CkNcpyBufferPost {
-  // regMode
-  unsigned short int regMode;
+struct NcpyPostEmInfo {
+  // envelope of the received message
+  envelope *env;
 
-  // deregMode
-  unsigned short int deregMode;
+  // rootNode;
+  int rootNode;
+
+  // mode
+  ncpyEmApiMode emMode;
+
+  // num rdma ops
+  int numops;
 };
+
+class CkNcpyBufferPost;
+
+void CkOnesidedInit();
+
+void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag);
+
+template <typename T>
+static inline constexpr size_t safe_sizeof(T * ptr)
+{
+    return sizeof(T);
+}
+template <>
+inline constexpr size_t safe_sizeof(void * ptr)
+{
+    return 1;
+}
+
+template <typename T>
+void CkPostBuffer(T *buffer, size_t size, int tag) {
+  int destSize = (std::is_same<T, void>::value) ? size : safe_sizeof(buffer) * size;
+  //constexpr int destSize = (std::is_same<T *, void *>::value) ? 1 : sizeof(T);
+  void *destBuffer = (void *)buffer;
+  CkPostBufferInternal(destBuffer, destSize, tag);
+}
 
 // Class to represent an Zerocopy buffer
 // CkSendBuffer(....) passed by the user internally translates to a CkNcpyBuffer
 class CkNcpyBuffer : public CmiNcpyBuffer {
+
   public:
+
+  //int *tagArray;
+  std::vector< std::vector<int>> *tagArray;
+
+  NcpyBcastRecvPeerAckInfo *peerAckInfo;
 
   // callback to be invoked on the sender/receiver
   CkCallback cb;
@@ -74,6 +114,8 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
   void pup(PUP::er &p) {
     CmiNcpyBuffer::pup(p);
     p|cb;
+    p((char *)&tagArray, sizeof(tagArray));
+    p((char *)&peerAckInfo, sizeof(peerAckInfo));
   }
 
   friend void CkRdmaDirectAckHandler(void *ack);
@@ -84,7 +126,7 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
-  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
+  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, void **arrPtrs, int *arrSizes, int localIndex, CkNcpyBufferPost *postStructs);
 
   friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
@@ -135,7 +177,6 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int reg
   return CkNcpyBuffer(ptr_, 0, regMode_, deregMode_);
 }
 
-
 // NOTE: Inside CkRdmaIssueRgets, a large message allocation is made consisting of space
 // for the destination or receiver buffers and some additional information required for processing
 // and acknowledgment handling. The space for additional information is typically equal to
@@ -153,8 +194,20 @@ struct NcpyEmInfo{
   ncpyEmApiMode mode; // used to distinguish between p2p and bcast
   void *msg; // pointer to the Charm++ message which will be enqueued after completion of all Rgets
   void *forwardMsg; // used for the ncpy broadcast api
+
+  int arrayId;
+  //int *tagArray;
+  std::vector< std::vector<int>> *tagArray;
+
+  NcpyBcastRecvPeerAckInfo *peerAckInfo;
 };
 
+
+
+
+void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *postStructs);
+void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *postStructs, int arrayIndex, void *ackInfo);
+void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, CkNcpyBufferPost *postStructs);
 
 // This structure is used to store the buffer information specific to each buffer being sent
 // using the Zerocopy Entry Method API. A variable of the structure stores the information associated
@@ -171,7 +224,7 @@ struct NcpyEmBufferInfo{
  */
 envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg = NULL);
 
-void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, void **arrPtrs, int *arrSizes, int localIndex, CkNcpyBufferPost *postStructs);
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info);
 
@@ -198,9 +251,18 @@ struct NcpyBcastRecvPeerAckInfo{
 #else
   int numPeers;
 #endif
+
+#if CMK_SMP
+  std::atomic<int> numElems;
+#else
+  int numElems;
+#endif
+
+
   void *bcastAckInfo;
   void *msg;
   int peerParentPe;
+
 #if CMK_SMP
     int getNumPeers() const {
        return numPeers.load(std::memory_order_acquire);
@@ -220,6 +282,28 @@ struct NcpyBcastRecvPeerAckInfo{
     int incNumPeers() { return numPeers++; }
     int decNumPeers() { return numPeers--; }
 #endif
+
+#if CMK_SMP
+    int getNumElems() const {
+       return numElems.load(std::memory_order_acquire);
+    }
+    void setNumElems(int r) {
+       return numElems.store(r, std::memory_order_release);
+    }
+    int incNumElems() {
+        return numElems.fetch_add(1, std::memory_order_release);
+    }
+    int decNumElems() {
+         return numElems.fetch_sub(1, std::memory_order_release);
+    }
+#else
+    int getNumElems() const { return numElems; }
+    void setNumElems(int r) { numElems = r; }
+    int incNumElems() { return numElems++; }
+    int decNumElems() { return numElems--; }
+#endif
+
+
 
 };
 
@@ -400,6 +484,55 @@ inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo, ncpyHan
 int getRootNode(envelope *env);
 
 
+void setNcpyEmInfo(char *ref, envelope *env, int &numops, void *forwardMsg, ncpyEmApiMode emMode);
+
+// Struct passed in a ZC Post Entry Method to allow receiver side to post
+struct CkNcpyBufferPost {
+  // regMode
+  unsigned short int regMode;
+
+  // deregMode
+  unsigned short int deregMode;
+
+  // index within message
+  int index;
+
+  bool postLater;
+
+  size_t tag;
+
+  // NcpyEmInfo
+  NcpyEmInfo *ncpyEmInfo;
+
+//#if !CMK_ONESIDED_IMPL
+  void *srcBuffer;
+  size_t srcSize;
+
+  int opIndex;
+  int arrayIndex;
+
+  //int *tagArray;
+  //vector<vector<int>> *tagArray;
+  std::vector< std::vector<int>> *tagArray;
+//#endif
+};
+
+int CkPostBufferLaterInternal(CkNcpyBufferPost *post, int index, bool nodeLevel);
+
+void updatePeerCounter(void *ref);
+
+void updateTagArray(envelope *env, int localElems);
+
+void setPosted(std::vector<std::vector<int>> *tagArray, envelope *env, int elemIndex, int numops, int opIndex);
+
+//bool isUnposted(std::vector<std::vector<int>> *tagArray, int arraySize, int localIndex, int numops);
+bool isUnposted(std::vector<std::vector<int>> *tagArray, envelope *env, int localIndex, int numops);
+//bool isUnposted(int *tagArray, int arraySize, int localIndex, int numops);
+
+int extractStoredBuffer(std::vector<std::vector<int>> *tagArray, envelope *env, int localIndex, int numops, int opIndex, void *&ptr);
+//int extractStoredBuffer(std::vector<std::vector<int>> *tagArray, int arraySize, int numops, int arrayIndex, int count, void *&ptr);
+//int extractStoredBuffer(int *tagArray, int arraySize, int numops, int arrayIndex, int count, void *&ptr);
+
 // Function declaration for EM Ncpy Ack handler initialization
 void initEMNcpyAckHandler(void);
 
@@ -413,6 +546,11 @@ struct zcPupPendingRgetsMsg {
 #endif
 };
 
+void handleArrayMsgOnChildPostCompletionForRecvBcast(envelope *env);
+
+void handleGroupMsgOnChildPostCompletionForRecvBcast(envelope *env);
+
+void handleNGMsgOnChildPostCompletionForRecvBcast(envelope *env);
 
 void zcPupGetCompleted(NcpyOperationInfo *ncpyOpInfo);
 
@@ -425,3 +563,4 @@ void CkRdmaZCPupCustomHandler(void *ack);
 
 void _ncpyAckHandler(ncpyHandlerMsg *msg);
 #endif
+

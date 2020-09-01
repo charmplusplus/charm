@@ -299,6 +299,10 @@ public:
 /// Pack/unpack routine (called before and after migration)
   void pup(PUP::er &p);
 
+  int CkPostBufferLater(CkNcpyBufferPost *post, int index) {
+    return CkPostBufferLaterInternal(post, index, false);
+  }
+
 //Overridden functions:
   /// Called by the system just before and after migration to another processor:
   virtual void ckAboutToMigrate(void);
@@ -612,6 +616,15 @@ public:
     }
   }
 
+  inline size_t getNumLocalElems() {
+    return localElemVec.size();
+  }
+
+  inline unsigned int getEltLocalIndex(const CmiUInt8 id) {
+    const auto itr = localElems.find(id);
+    return ( itr == localElems.end() ? -1 : itr->second);
+  } 
+
   virtual CkMigratable* getEltFromArrMgr(const CmiUInt8 id) {
     const auto itr = localElems.find(id);
     return ( itr == localElems.end() ? NULL : localElemVec[itr->second] );
@@ -746,6 +759,8 @@ public:
   }
   void flushStates();
   void forwardZCMsgToOtherElems(envelope *env);
+  void forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem);
+  void forwardZCMsgToZerothElem(envelope *env);
 
 
         static bool isIrreducible() { return true; }
@@ -792,6 +807,7 @@ public:
   int incrementBcastNo();
 
   bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
+  bool deliverAlreadyDelivered(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
 #if CMK_CHARM4PY
   void deliver(CkArrayMessage *bcast, std::vector<CkMigratable*> &elements, int arrayId, bool doFree);
 #endif

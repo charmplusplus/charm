@@ -1265,13 +1265,33 @@ void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 }
 
 /// Deliver a copy of the given broadcast to the given local element
-bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
-				    bool doFree)
+bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree)
 {
   int &elBcastNo=getData(el);
   // if this array element already received this message, skip it
   if (elBcastNo >= getBcastNo()) return false;
   elBcastNo++;
+  DEBB((AA "Delivering broadcast %d to element %s\n" AB,elBcastNo,idx2str(el)));
+
+  CkAssert(UsrToEnv(bcast)->getMsgtype() == ArrayBcastFwdMsg);
+
+  if (!broadcastViaScheduler)
+    return el->ckInvokeEntry(bcast->array_ep_bcast(), bcast, doFree);
+  else {
+    if (!doFree) {
+      CkArrayMessage *newMsg = (CkArrayMessage *)CkCopyMsg((void **)&bcast);
+      bcast = newMsg;
+    }
+    envelope *env = UsrToEnv(bcast);
+    env->setRecipientID(el->ckGetID());
+    CkArrayManagerDeliver(CkMyPe(), bcast, 0);
+    return true;
+  }
+}
+
+bool CkArrayBroadcaster::deliverAlreadyDelivered(CkArrayMessage *bcast, ArrayElement *el, bool doFree)
+{
+  int &elBcastNo=getData(el);
   DEBB((AA "Delivering broadcast %d to element %s\n" AB,elBcastNo,idx2str(el)));
 
   CkAssert(UsrToEnv(bcast)->getMsgtype() == ArrayBcastFwdMsg);
@@ -1538,6 +1558,7 @@ void CkArray::recvBroadcast(CkMessage* m) {
     // All operations done, already consumed by other array elements, now
     // deliver to the first element
 
+    CmiPrintf("[%d][%d][%d] Received an ALL_DONE_MSG\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
     bool doFree = true; // free it since all ops are done
     broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
   } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG && len > 0 ) {
@@ -1557,6 +1578,13 @@ void CkArray::recvBroadcast(CkMessage* m) {
 #if CMK_CHARM4PY
     broadcaster->deliver(msg, localElemVec, thisgroup.idx, stableLocations);
 #else
+//#if CMK_ONESIDED_IMPL
+      // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
+      // first element during CMK_ZC_BCAST_ALL_DONE_MSG
+      if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
+        updateTagArray(env, localElemVec.size());
+      }
+//#endif
     for (unsigned int i = 0; i < len; ++i) {
       bool doFree = false;
       if (stableLocations && i == len-1) doFree = true;
@@ -1588,6 +1616,19 @@ void CkArray::forwardZCMsgToOtherElems(envelope *env) {
     if (stableLocations && i == len-1 && CMI_ZC_MSGTYPE(env)!=CMK_ZC_BCAST_RECV_DONE_MSG) doFree = true;
     broadcaster->deliver((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[i], doFree);
   }
+}
+
+void CkArray::forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem) {
+  bool doFree = false;
+  //int msgType = CMI_ZC_MSGTYPE(env);
+  //CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_MY_RECV_DONE_MSG;
+  broadcaster->deliverAlreadyDelivered((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)elem, doFree);
+  //CMI_ZC_MSGTYPE(env) = msgType;
+}
+
+void CkArray::forwardZCMsgToZerothElem(envelope *env) {
+  bool doFree = true;
+  broadcaster->deliverAlreadyDelivered((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[0], doFree);
 }
 
 void CkArray::flushStates() {

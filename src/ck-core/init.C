@@ -159,6 +159,8 @@ CkpvDeclare(GroupIDTable*, _groupIDTable);
 CkpvDeclare(CmiImmediateLockType, _groupTableImmLock);
 CkpvDeclare(UInt, _numGroups);
 
+CkpvDeclare(ReqTagPostMap, ncpyPostedReqMap);
+
 CkpvDeclare(CkCoreState *, _coreState);
 
 CksvDeclare(UInt, _numNodeGroups);
@@ -167,6 +169,11 @@ CksvDeclare(GroupIDTable, _nodeGroupIDTable);
 CksvDeclare(CmiImmediateLockType, _nodeGroupTableImmLock);
 CksvDeclare(CmiNodeLock, _nodeLock);
 CksvDeclare(CmiNodeLock, _nodeZCPendingLock);
+
+CksvDeclare(ReqTagPostMap, ncpyPostedReqNodeMap);
+CksvDeclare(CmiNodeLock, _nodeZCPostReqLock);
+CksvDeclare(int, postNodeTag);
+
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 CkpvDeclare(int, _charmEpoch);
 
@@ -1325,6 +1332,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(char ,startedEvac);
 #endif
 	CpvInitialize(int,serializer);
+	CkpvInitialize(ReqTagPostMap, ncpyPostedReqMap);
 
 	_initChareTables();            // for checkpointable plain chares
 
@@ -1336,6 +1344,9 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(CmiNodeLock, _nodeZCPendingLock);
 	CksvInitialize(PtrVec*,_nodeBocInitVec);
 	CksvInitialize(UInt,_numInitNodeMsgs);
+	CksvInitialize(ReqTagPostMap, ncpyPostedReqNodeMap);
+	CksvInitialize(CmiNodeLock, _nodeZCPostReqLock);
+	CksvInitialize(int, postNodeTag);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
 	CksvInitialize(bool, _triggersSent);
@@ -1372,10 +1383,13 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
+		CksvAccess(_nodeZCPostReqLock) = CmiCreateLock();
+		CksvAccess(postNodeTag) = -1;
 
 		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
 
+	CkOnesidedInit();
 
 	CkCallbackInit();
 	
