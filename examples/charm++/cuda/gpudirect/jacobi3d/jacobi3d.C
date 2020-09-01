@@ -10,6 +10,7 @@
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
+/* readonly */ int num_chares;
 /* readonly */ int grid_width;
 /* readonly */ int grid_height;
 /* readonly */ int grid_depth;
@@ -56,12 +57,10 @@ public:
   Main(CkArgMsg* m) {
     // Set default values
     main_proxy = thisProxy;
+    num_chares = CkNumPes();
     grid_width = 512;
     grid_height = 512;
     grid_depth = 512;
-    block_width = 256;
-    block_height = 256;
-    block_depth = 256;
     n_iters = 100;
     warmup_iters = 10;
     use_zerocopy = false;
@@ -75,32 +74,23 @@ public:
 
     // Process arguments
     int c;
-    bool dims[6] = {false, false, false, false, false, false};
-    while ((c = getopt(m->argc, m->argv, "X:Y:Z:x:y:z:i:w:sdp")) != -1) {
+    bool dims[3] = {false, false, false};
+    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:sdp")) != -1) {
       switch (c) {
-        case 'X':
+        case 'c':
+          num_chares = atoi(optarg);
+          break;
+        case 'x':
           grid_width = atoi(optarg);
           dims[0] = true;
           break;
-        case 'Y':
+        case 'y':
           grid_height = atoi(optarg);
           dims[1] = true;
           break;
-        case 'Z':
+        case 'z':
           grid_depth = atoi(optarg);
           dims[2] = true;
-          break;
-        case 'x':
-          block_width = atoi(optarg);
-          dims[3] = true;
-          break;
-        case 'y':
-          block_height = atoi(optarg);
-          dims[4] = true;
-          break;
-        case 'z':
-          block_depth = atoi(optarg);
-          dims[5] = true;
           break;
         case 'i':
           n_iters = atoi(optarg);
@@ -131,18 +121,49 @@ public:
 
     // If only the X dimension is given, use it for Y and Z as well
     if (dims[0] && !dims[1] && !dims[2]) grid_height = grid_depth = grid_width;
-    if (dims[3] && !dims[4] && !dims[5]) block_height = block_depth = block_width;
 
-    // Check valid grid/block configuration
-    if (grid_width % block_width != 0 || grid_height % block_height != 0 ||
-        grid_depth % block_depth != 0) {
-      CkAbort("Invalid grid & block configuration\n");
+    // Setup 3D grid of chares
+    double area[3];
+    int ipx, ipy, ipz, nremain;
+    double surf, bestsurf;
+    area[0] = grid_width * grid_height;
+    area[1] = grid_width * grid_depth;
+    area[2] = grid_height * grid_depth;
+    bestsurf = 2.0 * (area[0] + area[1] + area[2]);
+    ipx = 1;
+    while (ipx <= num_chares) {
+      if (num_chares % ipx == 0) {
+        nremain = num_chares / ipx;
+        ipy = 1;
+
+        while (ipy <= nremain) {
+          if (nremain % ipy == 0) {
+            ipz = nremain / ipy;
+            surf = area[0] / ipx / ipy + area[1] / ipx / ipz + area[2] / ipy / ipz;
+
+            if (surf < bestsurf) {
+              bestsurf = surf;
+              n_chares_x = ipx;
+              n_chares_y = ipy;
+              n_chares_z = ipz;
+            }
+          }
+          ipy++;
+        }
+      }
+      ipx++;
     }
 
-    // Number of chares per dimension
-    n_chares_x = grid_width / block_width;
-    n_chares_y = grid_height / block_height;
-    n_chares_z = grid_depth / block_depth;
+    if (n_chares_x * n_chares_y * n_chares_z != num_chares) {
+      CkPrintf("ERROR: Bad grid of chares: %d x %d x %d != %d\n",
+          n_chares_x, n_chares_y, n_chares_z, num_chares);
+      CkExit(-1);
+    }
+
+    // Calculate block size
+    block_width = grid_width / n_chares_x;
+    block_height = grid_height / n_chares_y;
+    block_depth = grid_depth / n_chares_z;
 
     // Print configuration
     CkPrintf("\n[CUDA 2D Jacobi example]\n");

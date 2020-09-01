@@ -3,6 +3,7 @@ mainmodule jacobi3d {
 
   readonly CProxy_Main main_proxy;
   readonly CProxy_Block block_proxy;
+  readonly int num_chares;
   readonly int grid_width;
   readonly int grid_height;
   readonly int grid_depth;
