@@ -161,6 +161,8 @@ CkpvDeclare(GroupIDTable*, _groupIDTable);
 CkpvDeclare(CmiImmediateLockType, _groupTableImmLock);
 CkpvDeclare(UInt, _numGroups);
 
+CkpvDeclare(ReqTagPostMap, ncpyPostedReqMap);
+
 CkpvDeclare(CkCoreState *, _coreState);
 
 CksvDeclare(UInt, _numNodeGroups);
@@ -1339,6 +1341,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(char ,startedEvac);
 #endif
 	CpvInitialize(int,serializer);
+	CkpvDeclare(ReqTagPostMap, ncpyPostedReqMap);
 
 	_initChareTables();            // for checkpointable plain chares
 
@@ -1394,6 +1397,7 @@ void _initCharm(int unused_argc, char **argv)
 		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
 
+	CkOnesidedInit();
 
 	CkCallbackInit();
 	

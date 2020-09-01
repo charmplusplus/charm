@@ -649,6 +649,8 @@ void ParamList::beginUnmarshall(XStr& str) {
           for (int index = 0; index < entry->numRdmaRecvParams; index++) {
             str << "  ncpyPost[" << index << "].regMode = CK_BUFFER_REG;\n";
             str << "  ncpyPost[" << index << "].deregMode = CK_BUFFER_DEREG;\n";
+            str << "  ncpyPost[" << index << "].index = " << index << ";\n";
+            str << "  ncpyPost[" << index << "].postLater = false;\n";
           }
         }
       }

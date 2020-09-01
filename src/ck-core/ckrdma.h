@@ -25,20 +25,35 @@
 #define CkNcpyStatus CmiNcpyStatus
 #define CkNcpyMode CmiNcpyMode
 
+
 // P2P_SEND mode is used for EM P2P Send API
 // BCAST_SEND mode is used for EM BCAST Send API
 // P2P_RECV mode is used for EM P2P Recv API
 // BCAST_RECV mode is used for EM BCAST Send API
 enum class ncpyEmApiMode : char { P2P_SEND, BCAST_SEND, P2P_RECV, BCAST_RECV };
 
-// Struct passed in a ZC Post Entry Method to allow receiver side to post
-struct CkNcpyBufferPost {
-  // regMode
-  unsigned short int regMode;
+struct NcpyPostEmInfo {
+  // envelope of the received message
+  envelope *env;
 
-  // deregMode
-  unsigned short int deregMode;
+  // rootNode;
+  int rootNode;
+
+  // mode
+  ncpyEmApiMode emMode;
+
+  // num rdma ops
+  int numops;
 };
+
+class CkNcpyBufferPost;
+
+void CkOnesidedInit();
+
+template <typename T>
+void CkPostBuffer(T *buffer, size_t size, int tag);
+
+
 
 // Class to represent an Zerocopy buffer
 // CkSendBuffer(....) passed by the user internally translates to a CkNcpyBuffer
@@ -159,6 +174,27 @@ struct NcpyEmInfo{
   void *forwardMsg; // used for the ncpy broadcast api
 };
 
+// Struct passed in a ZC Post Entry Method to allow receiver side to post
+struct CkNcpyBufferPost {
+  // regMode
+  unsigned short int regMode;
+
+  // deregMode
+  unsigned short int deregMode;
+
+  // index within message
+  int index;
+
+  bool postLater;
+
+  size_t tag;
+
+  // NcpyEmInfo
+  NcpyEmInfo *ncpyEmInfo;
+};
+
+size_t CkPostBufferLater(CkNcpyBufferPost *post, int index);
+void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, CkNcpyBufferPost *postStructs);
 
 // This structure is used to store the buffer information specific to each buffer being sent
 // using the Zerocopy Entry Method API. A variable of the structure stores the information associated
@@ -430,3 +466,4 @@ void CkRdmaZCPupCustomHandler(void *ack);
 
 void _ncpyAckHandler(ncpyHandlerMsg *msg);
 #endif
+

@@ -2026,13 +2026,29 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           str << "buffPtrs, buffSizes, devicePost);\n";
         } else {
           str << "#if CMK_ONESIDED_IMPL\n";
-          str << "  if(CMI_IS_ZC_RECV(env)) \n";
+          str << "  if(CMI_IS_ZC_RECV(env)) {\n";
+          str << "    int numPostLater=0;\n";
+            for (int index = 0; index < numRdmaRecvParams; index++)
+              str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
+          str << "    CmiPrintf(\" [%d][%d][%d] numPostLater = %d\\n\", CkMyPe(), CmiMyNode(), CmiMyRank(), numPostLater);\n";
+          str << "    if(numPostLater > 0) {\n";
+          str << "      CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), ";
+          if(isSDAGGen)
+            str << "genClosure->num_rdma_fields, genClosure->num_root_node, ";
+          else
+            str << "impl_num_rdma_fields, impl_num_root_node, ";
+          str << "ncpyPost);\n";
+          //str << "      NcpyEmInfo *ncpyEmInfo = new NcpyEmInfo();\n";
+          //for (int index = 1; index < numRdmaRecvParams; index++)
+          //    str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
+          str << "    } else \n";
           str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), ";
           if(isSDAGGen)
             str << "genClosure->num_rdma_fields, genClosure->num_root_node, ";
           else
             str << "impl_num_rdma_fields, impl_num_root_node, ";
           str << "buffPtrs, buffSizes, ncpyPost);\n";
+          str << "  }\n";
           str << "#endif\n";
         }
       }
