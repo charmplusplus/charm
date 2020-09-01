@@ -37,6 +37,6 @@ do
   do
     date
     echo -e "# Run $iter\n"
-    exe jsrun -n$n_procs -a1 -c$ppn -g1 -K2 -r4 ./$file -x $grid_width -y $grid_height -z $grid_depth -w $warmup_iters -i $n_iters +ppn $ppn +pemap $pemap
+    exe jsrun -n$n_procs -a1 -c$ppn -g1 -K2 -r4 ./$file -c $num_chares -x $grid_width -y $grid_height -z $grid_depth -w $warmup_iters -i $n_iters +ppn $ppn +pemap $pemap
   done
 done
