@@ -9,6 +9,7 @@ set(conv-util-c-sources
 
 set(conv-util-h-sources
     cmirdmautils.h
+    pup.h
 )
 
 set(conv-util-cxx-sources

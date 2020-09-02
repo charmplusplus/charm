@@ -50,10 +50,26 @@ class CkNcpyBufferPost;
 
 void CkOnesidedInit();
 
+void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag);
+
 template <typename T>
-void CkPostBuffer(T *buffer, size_t size, int tag);
+static inline constexpr size_t safe_sizeof(T * ptr)
+{
+    return sizeof(T);
+}
+template <>
+inline constexpr size_t safe_sizeof(void * ptr)
+{
+    return 1;
+}
 
-
+template <typename T>
+void CkPostBuffer(T *buffer, size_t size, int tag) {
+  int destSize = (std::is_same<T, void>::value) ? size : safe_sizeof(buffer) * size;
+  //constexpr int destSize = (std::is_same<T *, void *>::value) ? 1 : sizeof(T);
+  void *destBuffer = (void *)buffer;
+  CkPostBufferInternal(destBuffer, destSize, tag);
+}
 
 // Class to represent an Zerocopy buffer
 // CkSendBuffer(....) passed by the user internally translates to a CkNcpyBuffer

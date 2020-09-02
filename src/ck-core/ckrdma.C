@@ -1025,7 +1025,7 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, int numops, int rootN
   }
 }
 
-void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, CkNcpyBufferPost *postStructs) {
+void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, CkNcpyBufferPost *post) {
 
   CmiPrintf("[%d][%d][%d] CkRdmaPostLaterPreprocess env=%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), env);
   int refSize = 0;
@@ -1047,7 +1047,9 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
   setNcpyEmInfo(ref, env, numops, NULL, emMode);
 
   for(int i=0; i<numops; i++) {
-    postStructs[i].ncpyEmInfo = (NcpyEmInfo *)ref;
+    post[i].ncpyEmInfo = (NcpyEmInfo *)ref;
+    CmiPrintf("[%d][%d][%d] CkPostBufferLater i=%d posting tag=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, post[i].tag);
+    CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
   }
 }
 
@@ -1055,14 +1057,12 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
 size_t CkPostBufferLater(CkNcpyBufferPost *post, int index) {
   post[index].postLater = true; 
   post[index].tag = CkpvAccess(postTag)++;
-  CmiPrintf("[%d][%d][%d] CkPostBufferLater index=%d posting tag=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), index, post[index].tag);
-  CkpvAccess(ncpyPostedReqMap).emplace(post[index].tag, post[index]);
   return post[index].tag;
 }
 
-template <typename T>
-void CkPostBuffer(T *buffer, size_t size, int tag) {
-  CmiPrintf("[%d][%d][%d] CkPostBuffer buffer=%p, size=%d, tag=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), buffer, size, tag);
+void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
+
+  CmiPrintf("[%d][%d][%d] CkPostBuffer buffer=%p, size=%d, tag=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), destBuffer, destSize, tag);
   auto iter = CkpvAccess(ncpyPostedReqMap).find(tag);
 
   if(iter == CkpvAccess(ncpyPostedReqMap).end()) { // Entry not found in ncpyPostedReqMap
@@ -1076,12 +1076,17 @@ void CkPostBuffer(T *buffer, size_t size, int tag) {
   int numops = post.ncpyEmInfo->numOps;
   ncpyEmApiMode emMode = post.ncpyEmInfo->mode;
 
+  if(emMode == ncpyEmApiMode::P2P_RECV)
+    CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
+
   int destIndex = post.index;
 
   int refSize = 0;
   char *ref;
   int layerInfoSize, ncpyObjSize, extraSize;
   int rootNode;
+
+  layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
 
   CkNcpyMode ncpyMode = findTransferMode(getSrcPe(env), CkMyPe());
 
@@ -1091,7 +1096,7 @@ void CkPostBuffer(T *buffer, size_t size, int tag) {
   CmiSpanningTreeInfo *t = NULL;
   if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
 
-  ref = post.ncpyEmInfo;
+  ref = (char *)post.ncpyEmInfo;
 
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
@@ -1115,7 +1120,7 @@ void CkPostBuffer(T *buffer, size_t size, int tag) {
 
     if(i == destIndex) {
 
-      if(source.cnt < sizeof(T) * size)
+      if(source.cnt < destSize)
         CkAbort("CkRdmaIssueRgets: Size of the posted buffer > Size of the source buffer\n");
 
 #if CMK_USE_CMA && CMK_REG_REQUIRED
@@ -1124,12 +1129,12 @@ void CkPostBuffer(T *buffer, size_t size, int tag) {
 #endif
 
       // destination buffer
-      CkNcpyBuffer dest((const void *)buffer, size * sizeof(T), post.regMode, post.deregMode);
+      CkNcpyBuffer dest((const void *)destBuffer, destSize, post.regMode, post.deregMode);
 
       performEmApiNcpyTransfer(source, dest, i, t, ref, extraSize, ncpyMode, rootNode, emMode);
 
       //Update the CkRdmaWrapper pointer of the new message
-      source.ptr = buffer;
+      source.ptr = destBuffer;
 
       source.isRegistered = dest.isRegistered;
 
@@ -1138,7 +1143,6 @@ void CkPostBuffer(T *buffer, size_t size, int tag) {
       source.deregMode = dest.deregMode;
 
       memcpy(source.layerInfo, dest.layerInfo, layerInfoSize);
-
     }
     p|source;
   }
@@ -1157,7 +1161,8 @@ void CkPostBuffer(T *buffer, size_t size, int tag) {
                                 enqueueNcpyMessage(CkMyPe(), env);
                                 break;
 
-      case CkNcpyMode::RDMA  :  performRgets(ref, numops, extraSize);
+      case CkNcpyMode::RDMA  :  CmiPrintf("calling performRgets\n"); 
+                                performRgets(ref, numops, extraSize);
                                 break;
 
       default                :  CmiAbort("Invalid transfer mode\n");
