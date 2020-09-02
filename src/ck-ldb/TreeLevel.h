@@ -39,8 +39,10 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
 
   // Dimension of vector loads in this msg. Note that this can be 0. Object loads are
   // stored as (regular walltime, <vector load>) where dimension gives the size of <vector
-  // load>.
-  unsigned int dimension;
+  // load>. This can be -1 if there are no objects on this PE, in which case the value of
+  // dimension in another dimension will determine the dimension of the new message when
+  // merging.
+  int dimension;
 
   int* pe_ids;              // IDs of the pes in this msg
   float* bgloads;           // bgloads[i] is background load of i-th pe in this msg
@@ -66,7 +68,15 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     unsigned int nPes = 0;
     size_t minPosDimension = std::numeric_limits<size_t>::max();
     size_t maxPosDimension = std::numeric_limits<size_t>::min();
-    unsigned int dimension = ((LBStatsMsg_1*)msgs[0])->dimension;
+    int dimension = -1;
+    for (const auto& msg : msgs)
+    {
+      if (((LBStatsMsg_1*)msg)->dimension > -1)
+      {
+        dimension = ((LBStatsMsg_1*)msg)->dimension;
+        break;
+      }
+    }
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
@@ -74,7 +84,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
       nPes += msg->nPes;
       minPosDimension = std::min(minPosDimension, msg->posDimension);
       maxPosDimension = std::max(maxPosDimension, msg->posDimension);
-      CkAssert(dimension == msg->dimension);
+      CkAssert(dimension == msg->dimension || msg->nObjs == 0);
     }
     CkAssertMsg(msgs.empty() || minPosDimension == maxPosDimension,
                 "Position of every object for LB must be of same dimension");
@@ -86,6 +96,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
       newMsg = new (nPes, nPes, 0, nPes + 1, nObjs, nObjs * posDimension, nObjs * (1 + dimension)) LBStatsMsg_1;
     newMsg->nObjs = nObjs;
     newMsg->nPes = nPes;
+    newMsg->dimension = dimension;
     newMsg->posDimension = posDimension;
     int pe_cnt = 0;
     int obj_cnt = 0;
@@ -121,6 +132,19 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     int pe_cnt = 0;
     int obj_cnt = 0;
     float total_load = 0;
+
+    int dimension = -1;
+    for (const auto& treeMsg : msgs)
+    {
+      LBStatsMsg_1* msg = (LBStatsMsg_1*)treeMsg;
+      if (msg->dimension > -1)
+      {
+        dimension = msg->dimension;
+        break;
+      }
+    }
+    CkAssert(objs.empty() || dimension > -1);
+
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
@@ -133,7 +157,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
         migMsg->obj_start[pe] = obj_cnt;
         int local_id = 0;
         for (int k = msg->obj_start[j]; k < msg->obj_start[j + 1];
-             k += 1 + msg->dimension, obj_cnt++, local_id++)
+             k += 1 + dimension, obj_cnt++, local_id++)
         {
           objs[obj_cnt].populate(obj_cnt, msg->oloads + k, pe);
           if (msg->posDimension > 0)
@@ -592,8 +616,19 @@ class RootLevel : public LevelLogic
     {
       // msg has object loads
       CkAssert(wrappers.size() > current_strategy);
-      const auto dimension = ((LBStatsMsg_1*)stats_msgs[0])->dimension;
-      CkAssert(dimension <= 10);
+
+      int dimension = -1;
+      for (const auto& treeMsg : stats_msgs)
+      {
+        LBStatsMsg_1* msg = (LBStatsMsg_1*)treeMsg;
+        if (msg->dimension > -1)
+        {
+          dimension = msg->dimension;
+          break;
+        }
+      }
+      CkAssert(nObjs == 0 || (dimension > -1 && dimension <= 10));
+
       IStrategyWrapper* wrapper = wrappers[current_strategy][dimension];
       CkAssert(wrapper != nullptr);
       CkAssert(nPes == CkNumPes());
@@ -1143,8 +1178,8 @@ class PELevel : public LevelLogic
     // TODO: Allow for different dimensions
     // Assumes that every PE has at least one object for LB
     // If dimension is 0, then phases are not being used
-    CkAssert(nobjs > 0);
-    const auto dimension = myObjs[0].vectorLoad.size();
+    // If there are no objects, set dimension to -1
+    const auto dimension = (nobjs == 0) ? -1 : myObjs[0].vectorLoad.size();
     const auto nobjLoads = nobjs * (1 + dimension);
 
     // TODO verify that non-migratable objects are not added to msg and are only counted
