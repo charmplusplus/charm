@@ -1057,8 +1057,6 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
   int layerInfoSize, ncpyObjSize, extraSize;
 
   CkNcpyMode ncpyMode = findTransferMode(getSrcPe(env), CkMyPe());
-  CmiSpanningTreeInfo *t = NULL;
-  if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
 
   layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
 
@@ -1119,11 +1117,8 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
     preprocessRdmaCaseForRgets(layerInfoSize, ncpyObjSize, extraSize, refSize, numops);
   }
 
-  if(emMode == ncpyEmApiMode::BCAST_RECV)
-    CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
 
   CmiSpanningTreeInfo *t = NULL;
-  if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
 
   ref = (char *)post.ncpyEmInfo;
 
@@ -1134,7 +1129,8 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
   p|numops;
   p|rootNode;
 
-  if(emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
+  if(emMode == ncpyEmApiMode::BCAST_RECV) {
+    if(_topoTree == NULL) CkAbort("CkPostBufferInternal: topo tree has not been calculated \n");
     t = getSpanningTreeInfo(rootNode);
   }
 
