@@ -71,6 +71,7 @@ opt_ccs=0
 opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
+opt_destination=""
 opt_drone_mode=0
 opt_error_checking= #undef
 opt_extra_opts=""
@@ -344,6 +345,9 @@ while [[ $# -gt 0 ]]; do
         shift
       fi
       ;;
+    --destination=*)
+      opt_destination=${arg#*=}
+      ;;
     --suffix=*)
       opt_suffix=-${arg#*=}
       ;;
@@ -435,7 +439,11 @@ for c in $opt_lrts_pmi $opt_compiler; do
   [[ -n $c ]] &&  builddir_extra+="-${c}"
 done
 
-builddir=$triplet$builddir_extra$opt_suffix
+if [[ -n $opt_destination ]]; then
+  builddir=$opt_destination$opt_suffix
+else
+  builddir=$triplet$builddir_extra$opt_suffix
+fi
 
 rm -rf "$builddir"
 
