@@ -385,13 +385,18 @@ inline void zcQdIncrement() {
 
 /************************* Zerocopy Entry Method API - Utility functions ******************/
 
+void performRget(char *ref, int index, int extraSize) {
+  // Launch rget
+  NcpyEmBufferInfo *ncpyEmBufferInfo = (NcpyEmBufferInfo *)(ref + sizeof(NcpyEmInfo) + index *(sizeof(NcpyEmBufferInfo) + extraSize));
+  NcpyOperationInfo *ncpyOpInfo = &(ncpyEmBufferInfo->ncpyOpInfo);
+  zcQdIncrement();
+  CmiIssueRget(ncpyOpInfo);
+}
+
 void performRgets(char *ref, int numops, int extraSize) {
   // Launch rgets
   for(int i=0; i<numops; i++){
-    NcpyEmBufferInfo *ncpyEmBufferInfo = (NcpyEmBufferInfo *)(ref + sizeof(NcpyEmInfo) + i *(sizeof(NcpyEmBufferInfo) + extraSize));
-    NcpyOperationInfo *ncpyOpInfo = &(ncpyEmBufferInfo->ncpyOpInfo);
-    zcQdIncrement();
-    CmiIssueRget(ncpyOpInfo);
+    performRget(ref, i, extraSize);
   }
 }
 
@@ -435,6 +440,12 @@ void CkRdmaEMAckHandler(int destPe, void *ack) {
 
   NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)(ref - (emBuffInfo->index) * (sizeof(NcpyEmBufferInfo) + ncpyObjSize - sizeof(NcpyOperationInfo)) - sizeof(NcpyEmInfo));
   ncpyEmInfo->counter++; // Operation completed, update counter
+
+
+  //envelope *env= (envelope *)ncpyEmInfo->msg;
+
+  //CmiPrintf("[%d][%d][%d] CkRdmaEMAckHandler ncpyEmInfo=%p, counter=%d, numops=%d isPacked=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ncpyEmInfo, ncpyEmInfo->counter, ncpyEmInfo->numOps, env->isPacked());
+  CmiPrintf("[%d][%d][%d] CkRdmaEMAckHandler ncpyEmInfo=%p, ncpyEmBufferInfo=%p, counter=%d, numops=%d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ncpyEmInfo, emBuffInfo, ncpyEmInfo->counter, ncpyEmInfo->numOps);
 
 #if CMK_REG_REQUIRED
   CmiSpanningTreeInfo *t = NULL;
@@ -592,6 +603,17 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, cha
                                                  // It'll be freed when the message is freed by the RTS after the execution of the entry method
   ncpyOpInfo->refPtr = ncpyEmBufferInfo;
 
+  //int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+  int ncpyObjSize = getNcpyOpInfoTotalSize(
+                    layerInfoSize,
+                    sizeof(CkCallback),
+                    layerInfoSize,
+                    0);
+
+  NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)(ncpyEmBufferInfo - (ncpyEmBufferInfo->index) * (sizeof(NcpyEmBufferInfo) + ncpyObjSize - sizeof(NcpyOperationInfo)) - sizeof(NcpyEmInfo));
+
+  CmiPrintf("[%d][%d][%d] CmiIssueRgets original ref = %p, ncpyEmInfo=%p, ncpyEmBufferInfo=%p (ref=%p)\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ref, ncpyEmInfo, ncpyEmBufferInfo, ncpyOpInfo->refPtr);
+
   // Do no launch Rgets here as they could potentially cause a race condition in the SMP mode
   // The race condition is caused when an RGET completes and invokes the CkRdmaDirectAckHandler
   // on the comm. thread as the message is being inside this for loop on the worker thread
@@ -717,6 +739,8 @@ int getRootNode(envelope *env) {
 }
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info) {
+
+  CmiPrintf("[%d][%d][%d] handleEntryMethodApiCompletion rget completed\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
 
 #if CMK_REG_REQUIRED
   // send a message to the source to de-register and invoke callback
@@ -1029,7 +1053,7 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
 
   CmiPrintf("[%d][%d][%d] CkRdmaPostLaterPreprocess env=%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), env);
   int refSize = 0;
-  char *ref;
+  char *ref = NULL;
   int layerInfoSize, ncpyObjSize, extraSize;
 
   CkNcpyMode ncpyMode = findTransferMode(getSrcPe(env), CkMyPe());
@@ -1041,21 +1065,22 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
   if(ncpyMode == CkNcpyMode::RDMA) {
     preprocessRdmaCaseForRgets(layerInfoSize, ncpyObjSize, extraSize, refSize, numops);
     ref = (char *)CmiAlloc(refSize);
+    setNcpyEmInfo(ref, env, numops, NULL, emMode);
+
   } else {
     ref = (char *)CmiAlloc(sizeof(NcpyEmInfo));
+    setNcpyEmInfo(ref, env, numops, NULL, emMode);
   }
-  setNcpyEmInfo(ref, env, numops, NULL, emMode);
 
   for(int i=0; i<numops; i++) {
     post[i].ncpyEmInfo = (NcpyEmInfo *)ref;
-    CmiPrintf("[%d][%d][%d] CkPostBufferLater i=%d posting tag=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, post[i].tag);
+    CmiPrintf("[%d][%d][%d] CkPostBufferLater i=%d posting tag=%d and setting ncpyEmInfo to %p and extraSize is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, post[i].tag, post[i].ncpyEmInfo, extraSize);
     CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
   }
 }
 
-
 size_t CkPostBufferLater(CkNcpyBufferPost *post, int index) {
-  post[index].postLater = true; 
+  post[index].postLater = true;
   post[index].tag = CkpvAccess(postTag)++;
   return post[index].tag;
 }
@@ -1090,6 +1115,10 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
 
   CkNcpyMode ncpyMode = findTransferMode(getSrcPe(env), CkMyPe());
 
+  if(ncpyMode == CkNcpyMode::RDMA) {
+    preprocessRdmaCaseForRgets(layerInfoSize, ncpyObjSize, extraSize, refSize, numops);
+  }
+
   if(emMode == ncpyEmApiMode::BCAST_RECV)
     CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
 
@@ -1109,7 +1138,7 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
     t = getSpanningTreeInfo(rootNode);
   }
 
-  CkAssert(numops == 1);
+  //CkAssert(numops == 1);
 
   // source buffer
   CkNcpyBuffer source;
@@ -1147,6 +1176,29 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
     p|source;
   }
 
+  bool allOpsComplete = false;
+
+  // check for completion
+  if(ncpyMode != CkNcpyMode::RDMA) { //operation is complete
+    if(numops == 1) // complete
+      allOpsComplete = true;
+    else { // update counter
+      NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)ref;
+      ncpyEmInfo->counter++;
+      if(ncpyEmInfo->counter == ncpyEmInfo->numOps) {
+        allOpsComplete = true;
+      }
+    }
+  } else {
+    CmiPrintf("[%d][%d][%d] calling performRget and ncpyEmInfo is %p and numOps is %d, counter = %d and isPacked=%d and extraSize=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ref, ((NcpyEmInfo *)ref)->numOps, ((NcpyEmInfo *)ref)->counter, env->isPacked(), extraSize);
+    performRget(ref, destIndex, extraSize);
+  }
+
+  if(!allOpsComplete) // wait for all ops to be complete
+    return;
+  else {
+    CmiFree(ref);
+  }
 
   if(emMode == ncpyEmApiMode::P2P_RECV) {
     switch(ncpyMode) {
@@ -1159,10 +1211,6 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
                                 }
                                 QdCreate(1);
                                 enqueueNcpyMessage(CkMyPe(), env);
-                                break;
-
-      case CkNcpyMode::RDMA  :  CmiPrintf("calling performRgets\n"); 
-                                performRgets(ref, numops, extraSize);
                                 break;
 
       default                :  CmiAbort("Invalid transfer mode\n");
@@ -1185,9 +1233,6 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
                                   NcpyBcastInterimAckInfo *bcastAckInfo = allocateInterimNodeAckObj(env, NULL, CkMyPe());
                                   handleMsgOnInterimPostCompletionForRecvBcast(env, bcastAckInfo, CkMyPe());
                                 }
-                                break;
-
-      case CkNcpyMode::RDMA  :  performRgets(ref, numops, extraSize);
                                 break;
 
       default                :  CmiAbort("Invalid transfer mode\n");
