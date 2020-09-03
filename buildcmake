@@ -13,14 +13,14 @@ command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
 if [[ $rc -ne 0 ]]; then
   echo "Warning: CMake unavailable, running ./buildold instead."
   sleep 2
-  $my_srcdir/buildold "$@"
+  "$my_srcdir"/buildold "$@"
   exit $?
 fi
 
 if [[ $(uname) == "MSYS"* || $(uname) == "MINGW"* ]]; then
   echo "Warning: CMake build is not supported under MSYS, running ./buildold instead."
   sleep 2
-  $my_srcdir/buildold "$@"
+  "$my_srcdir"/buildold "$@"
   exit $?
 fi
 
@@ -32,7 +32,7 @@ cmake_version_full=$(cmake --version | head -1 | cut -f 3 -d' ')
 if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 4) ]]; then
   echo "Warning: The CMake version on your system is too old (needed: 3.4.0 or later; available: $cmake_version_full), running ./buildold instead."
   sleep 2
-  $my_srcdir/buildold "$@"
+  "$my_srcdir"/buildold "$@"
   exit $?
 fi
 
@@ -46,7 +46,7 @@ usage()
 
 help()
 {
-  $my_srcdir/buildold --help
+  "$my_srcdir"/buildold --help
   exit 0
 }
 
@@ -407,14 +407,14 @@ my_os=$(echo "$triplet" | cut -d '-' -f2)
 if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
   echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
   sleep 2
-  $my_srcdir/buildold "$@"
+  "$my_srcdir"/buildold "$@"
   exit $?
 fi
 
 # Special handling for Windows compiler
 if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
   # Need to use unix2nt_cc on Windows/Cygwin
-  opt_CC=$(realpath "$my_src_dir")/src/arch/win/unix2nt_cc
+  opt_CC=$(realpath "$my_srcdir")/src/arch/win/unix2nt_cc
   opt_CXX=$opt_CC
   opt_FC=
 fi
@@ -464,7 +464,7 @@ if [[ -n $opt_incdir ]]; then
   echo "USER_OPTS_CXX='$opt_incdir'" >> include/conv-mach-pre.sh
 fi
 
-CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake $my_srcdir \
+CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE="$opt_production" \
   -DCMK_AMPI_ONLY="$opt_ampi_only" \
