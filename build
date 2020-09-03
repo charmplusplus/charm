@@ -1,4 +1,7 @@
 #!/bin/bash
 
-./buildcmake "$@"
+# Determine the location of this script
+my_srcdir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+$my_srcdir/buildcmake "$@"
 exit $?
