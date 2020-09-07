@@ -30,5 +30,5 @@ do
   num_chares=$((n_procs * overdecomp))
 
   echo -e "# ODF-$overdecomp\n"
-  exe jsrun -n$n_procs -a1 -c$ppn -g1 -K3 -r6 nsys profile -t cuda -s none -b none -f true -o jacobi3d-n$n_nodes-odf$overdecomp-p%q{OMPI_COMM_WORLD_RANK} ./$file -c $num_chares -x $grid_width -y $grid_height -z $grid_depth -w $warmup_iters -i $n_iters +ppn $ppn +pemap $pemap
+  exe jsrun -n$n_procs -a1 -c$ppn -g1 -K3 -r6 nsys profile -t cuda -s none -b none -f true -o $file-n$n_nodes-odf$overdecomp-p%q{OMPI_COMM_WORLD_RANK} ./$file -c $num_chares -x $grid_width -y $grid_height -z $grid_depth -w $warmup_iters -i $n_iters +ppn $ppn +pemap $pemap
 done
