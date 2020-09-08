@@ -18,6 +18,7 @@ namespace TreeStrategy
 // The second parameter is whether or not the constructor takes a json& config argument
 // (which some strategies to accept additional parameters from the config file)
 #define FOREACH_STRATEGY(STRATEGY)    \
+  STRATEGY(GreedyNorm, true, false)   \
   STRATEGY(Greedy, false, false)      \
   STRATEGY(GreedyRefine, true, false) \
   STRATEGY(RefineA, false, false)     \
