@@ -383,6 +383,13 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
             str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_RECV_MSG;\n";
         }
         str << "#else\n";
+        if(hasrecvrdma) {
+          if (isP2P)
+            str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_MSG;\n";
+          else
+            str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_RECV_MSG;\n";
+        }
+
         if (!hasArrays) str << "  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
         callEach(&Parameter::marshallRdmaArrayData, str);
         str << "#endif\n";
@@ -693,9 +700,9 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, boo
         str << "    buffPtrs[" << count << "] = (void *)" << "ncpyBuffer_";
         str << name << "_ptr;\n";
         if(isSDAGGen)
-          str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
+          str << "    buffSizes[" << count << "] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
         else
-          str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * " << arrLen << ".t;\n";
+          str << "    buffSizes[" << count << "] = sizeof(" << dt << ") * " << arrLen << ".t;\n";
         str <<  "  }\n";
         str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
 
@@ -722,17 +729,27 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, boo
 
         str << "  }\n";
       } else {
+        //str << "    int numPostLater=0;\n";
+        //  for (int index = 0; index < entry->numRdmaRecvParams; index++)
+        //    str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
+        //str << "    CmiPrintf(\" [%d][%d][%d] numPostLater = %d\\n\", CkMyPe(), CmiMyNode(), CmiMyRank(), numPostLater);\n";
+        //str << "    if(numPostLater > 0) {\n";
+        //// save the message so
+
+        //str << "    } else {\n";
+        //
+        str << "  if(ncpyPost[" << count << "].postLater == false) { \n";
         // Error checking if posted buffer is larger than the source buffer
-        str << "  if(impl_cnt_" << name << " < " ;
+        str << "    if(impl_cnt_" << name << " < " ;
         if(isSDAGGen)
            str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
         else
           str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
 
-        str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
+        str << "      CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
 
         // memcpy the pointer into the user passed buffer
-        str << "  memcpy(" << "ncpyBuffer_" << name << "_ptr,";
+        str << "    memcpy(" << "ncpyBuffer_" << name << "_ptr,";
         if(isSDAGGen)
           str << "genClosure->";
         str << name << ",";
@@ -741,6 +758,13 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, boo
           str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
         else
           str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
+        str << "  } else {\n";
+        str << "    ncpyPost[" << count << "].srcBuffer =";
+        if(isSDAGGen)
+          str << "genClosure->";
+        str << name << ";\n";
+        str << "    ncpyPost[" << count++  << "].srcSize = impl_cnt_" << name << ";\n";
+        str << "  }\n";
       }
     } else if (devicePath) {
       str << "  if(CMI_IS_ZC_DEVICE(env)) {\n";

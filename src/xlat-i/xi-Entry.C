@@ -1918,6 +1918,11 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "  }\n";
       str << "  if (is_inline) {\n";
     }
+    if(param->hasRecvRdma()) {
+      str << "#if !CMK_ONESIDED_IMPL\n";
+      str << "  if ((CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG) || (CMI_IS_ZC_RECV(env) && numPostLater == 0))\n";
+      str << "#endif\n";
+    }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
     if(param->hasRecvRdma()) {
       str << "#if CMK_ONESIDED_IMPL\n";
@@ -2011,6 +2016,11 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           str << "  void *buffPtrs["<< numRdmaRecvParams <<"];\n";
           str << "  int buffSizes["<< numRdmaRecvParams <<"];\n";
           str << "#endif\n";
+
+          str << "    int numPostLater=0;\n";
+          for (int index = 0; index < numRdmaRecvParams; index++)
+            str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
+
         }
         param->storePostedRdmaPtrs(str, isSDAGGen);
         if (param->hasDevice()) {
@@ -2027,10 +2037,10 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         } else {
           str << "#if CMK_ONESIDED_IMPL\n";
           str << "  if(CMI_IS_ZC_RECV(env)) {\n";
-          str << "    int numPostLater=0;\n";
-            for (int index = 0; index < numRdmaRecvParams; index++)
-              str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
-          str << "    CmiPrintf(\" [%d][%d][%d] numPostLater = %d\\n\", CkMyPe(), CmiMyNode(), CmiMyRank(), numPostLater);\n";
+          //str << "    int numPostLater=0;\n";
+          //  for (int index = 0; index < numRdmaRecvParams; index++)
+          //    str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
+          //str << "    CmiPrintf(\" [%d][%d][%d] numPostLater = %d\\n\", CkMyPe(), CmiMyNode(), CmiMyRank(), numPostLater);\n";
           str << "    if(numPostLater > 0) {\n";
           str << "      CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), ";
           if(isSDAGGen)
@@ -2049,6 +2059,9 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
             str << "impl_num_rdma_fields, impl_num_root_node, ";
           str << "buffPtrs, buffSizes, ncpyPost);\n";
           str << "  }\n";
+          str << "#else\n";
+          str << "    if(numPostLater > 0)\n";
+          str << "      CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), " << numRdmaRecvParams << ", ncpyPost);\n";
           str << "#endif\n";
         }
       }

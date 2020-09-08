@@ -168,9 +168,6 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int reg
   return CkNcpyBuffer(ptr_, 0, regMode_, deregMode_);
 }
 
-
-
-#if CMK_ONESIDED_IMPL
 // NOTE: Inside CkRdmaIssueRgets, a large message allocation is made consisting of space
 // for the destination or receiver buffers and some additional information required for processing
 // and acknowledgment handling. The space for additional information is typically equal to
@@ -190,26 +187,11 @@ struct NcpyEmInfo{
   void *forwardMsg; // used for the ncpy broadcast api
 };
 
-// Struct passed in a ZC Post Entry Method to allow receiver side to post
-struct CkNcpyBufferPost {
-  // regMode
-  unsigned short int regMode;
 
-  // deregMode
-  unsigned short int deregMode;
 
-  // index within message
-  int index;
 
-  bool postLater;
-
-  size_t tag;
-
-  // NcpyEmInfo
-  NcpyEmInfo *ncpyEmInfo;
-};
-
-size_t CkPostBufferLater(CkNcpyBufferPost *post, int index);
+void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *postStructs);
+#if CMK_ONESIDED_IMPL
 void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, CkNcpyBufferPost *postStructs);
 
 // This structure is used to store the buffer information specific to each buffer being sent
@@ -456,6 +438,34 @@ inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo, ncpyHan
 int getRootNode(envelope *env);
 
 #endif /* End of CMK_ONESIDED_IMPL */
+
+void setNcpyEmInfo(char *ref, envelope *env, int &numops, void *forwardMsg, ncpyEmApiMode emMode);
+
+// Struct passed in a ZC Post Entry Method to allow receiver side to post
+struct CkNcpyBufferPost {
+  // regMode
+  unsigned short int regMode;
+
+  // deregMode
+  unsigned short int deregMode;
+
+  // index within message
+  int index;
+
+  bool postLater;
+
+  size_t tag;
+
+  // NcpyEmInfo
+  NcpyEmInfo *ncpyEmInfo;
+
+#if !CMK_ONESIDED_IMPL
+  void *srcBuffer;
+  size_t srcSize;
+#endif
+};
+
+size_t CkPostBufferLater(CkNcpyBufferPost *post, int index);
 
 // Function declaration for EM Ncpy Ack handler initialization
 void initEMNcpyAckHandler(void);

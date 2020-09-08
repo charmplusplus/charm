@@ -651,18 +651,6 @@ void preprocessRdmaCaseForRgets(int &layerInfoSize, int &ncpyObjSize, int &extra
     totalMsgSize += sizeof(NcpyEmInfo) + numops*(sizeof(NcpyEmBufferInfo) + extraSize);
 }
 
-void setNcpyEmInfo(char *ref, envelope *env, int &numops, void *forwardMsg, ncpyEmApiMode emMode) {
-
-    NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)ref;
-    ncpyEmInfo->numOps = numops;
-    ncpyEmInfo->counter = 0;
-    ncpyEmInfo->msg = env;
-
-    ncpyEmInfo->forwardMsg = forwardMsg; // useful only for Send Bcast, NULL for others
-    ncpyEmInfo->pe = CkMyPe();
-    ncpyEmInfo->mode = emMode; // P2P or BCAST
-}
-
 /* Zerocopy Entry Method API Functions */
 // Method called to unpack rdma pointers
 void CkPackRdmaPtrs(char *msgBuf){
@@ -1075,12 +1063,6 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
     CmiPrintf("[%d][%d][%d] CkPostBufferLater i=%d posting tag=%d and setting ncpyEmInfo to %p and extraSize is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, post[i].tag, post[i].ncpyEmInfo, extraSize);
     CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
   }
-}
-
-size_t CkPostBufferLater(CkNcpyBufferPost *post, int index) {
-  post[index].postLater = true;
-  post[index].tag = CkpvAccess(postTag)++;
-  return post[index].tag;
 }
 
 void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
@@ -2178,8 +2160,65 @@ inline void _ncpyBcastNoHandler(ncpyBcastNoMsg *bcastNoMsg) {
 
   arrProxy[bcastNoMsg->srcPe].sendZCBroadcast(w);
 }
-
 #endif  /* End of CMK_ONESIDED_IMPL */
+
+#if !CMK_ONESIDED_IMPL
+void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *post) {
+  char *ref = (char *)CmiAlloc(sizeof(NcpyEmInfo));
+  setNcpyEmInfo(ref, env, numops, NULL, emMode);
+
+  for(int i=0; i<numops; i++) {
+    post[i].ncpyEmInfo = (NcpyEmInfo *)ref;
+    CmiPrintf("[%d][%d][%d] CkPostBufferLater i=%d posting tag=%d and setting ncpyEmInfo to %p \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, post[i].tag, post[i].ncpyEmInfo);
+    CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
+  }
+}
+
+void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
+  CmiPrintf("[%d][%d][%d] CkPostBuffer buffer=%p, size=%d, tag=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), destBuffer, destSize, tag);
+  auto iter = CkpvAccess(ncpyPostedReqMap).find(tag);
+
+  if(iter == CkpvAccess(ncpyPostedReqMap).end()) { // Entry not found in ncpyPostedReqMap
+    CkAbort("CkPostBuffer: Tag:%d not found on Pe:%d\n", tag, CmiMyPe());
+  }
+
+  CkNcpyBufferPost post = iter->second;
+  CkpvAccess(ncpyPostedReqMap).erase(iter);
+
+  envelope *env = (envelope *)post.ncpyEmInfo->msg;
+  int numops = post.ncpyEmInfo->numOps;
+  ncpyEmApiMode emMode = post.ncpyEmInfo->mode;
+
+  memcpy(destBuffer, post.srcBuffer, post.srcSize);
+
+  post.ncpyEmInfo->counter++;
+  if(post.ncpyEmInfo->counter == numops) {
+    CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
+    // Enqueue message
+    enqueueNcpyMessage(CkMyPe(), post.ncpyEmInfo->msg);
+    // Free ncpyEmInfo
+    CmiFree(post.ncpyEmInfo);
+  }
+}
+#endif
+
+void setNcpyEmInfo(char *ref, envelope *env, int &numops, void *forwardMsg, ncpyEmApiMode emMode) {
+
+    NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)ref;
+    ncpyEmInfo->numOps = numops;
+    ncpyEmInfo->counter = 0;
+    ncpyEmInfo->msg = env;
+
+    ncpyEmInfo->forwardMsg = forwardMsg; // useful only for Send Bcast, NULL for others
+    ncpyEmInfo->pe = CkMyPe();
+    ncpyEmInfo->mode = emMode; // P2P or BCAST
+}
+
+size_t CkPostBufferLater(CkNcpyBufferPost *post, int index) {
+  post[index].postLater = true;
+  post[index].tag = CkpvAccess(postTag)++;
+  return post[index].tag;
+}
 
 // Register converse handler for invoking ncpy ack
 void initEMNcpyAckHandler(void) {
@@ -2224,6 +2263,9 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
   }
 }
 #endif  /* End of CMK_ONESIDED_IMPL */
+
+
+
 
 
 /***************************** Zerocopy PUP Support ****************************/
