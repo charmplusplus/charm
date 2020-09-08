@@ -95,7 +95,7 @@ template <int N>
 struct obj_N_data
 {
   float totalload;
-  float load[N];
+  std::array<float, N> load = {};
 };
 
 template <int N, bool multi = (N > 1)>
@@ -192,8 +192,8 @@ class Proc
 template <int N>
 struct proc_N_data
 {
-  float load[N] = {0};
-  float bgload[N] = {0};
+  std::array<float, N> load = {};
+  std::array<float, N> bgload = {};
   float totalload = 0;
 };
 struct proc_1_data
@@ -216,7 +216,7 @@ class Proc<N, false, multi>
   {
     id = _id;
     // TODO: implement vector bgload
-    std::fill_n(this->bgload, N, *_bgload);
+    std::fill_n(this->bgload.begin(), N, *_bgload);
   }
 
   inline float getLoad() const { return this->totalload; }
@@ -302,13 +302,13 @@ class Proc<N, true, multi>
  public:
   int id = -1;
   static constexpr auto dimension = N;
-  float speed[N] = {1.0};
+  std::array<float, N> speed;
 
   inline void populate(int _id, float* _bgload, float* _speed)
   {
     id = _id;
-    std::copy_n(_bgload, N, this->bgload);
-    std::copy_n(_speed, N, this->speed);
+    std::copy_n(_bgload, N, this->bgload.begin());
+    std::copy_n(_speed, N, this->speed.begin());
   }
 
   inline float getLoad() const { return this->totalload; }
