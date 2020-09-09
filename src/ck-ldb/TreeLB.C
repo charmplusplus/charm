@@ -2,6 +2,7 @@
 #include "TreeLB.h"
 #include "spanningTree.h"
 #include <fstream>  // TODO delete if json file is read from LBManager
+#include "json.hpp"
 
 extern int quietModeRequested;
 
