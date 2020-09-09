@@ -13,6 +13,8 @@
 #include "TreeLB.h"
 #include "topology.h"
 
+#include "json.hpp"
+
 CkGroupID _lbmgr;
 
 CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
