@@ -600,6 +600,7 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
   if(CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_P2P_RECV_MSG ||
      CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_MSG)
     CkDeliverMessageReadonly(epIdx,msg,obj); // Do not free a P2P_RECV_MSG or BCAST_RECV_MSG
+  else
 #endif
     CkDeliverMessageFree(epIdx,msg,obj);
 }
@@ -1178,10 +1179,8 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
     bool doFree = true;
-#if CMK_ONESIDED_IMPL
     if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) // Do not free a P2P_RECV_MSG
       doFree = false;
-#endif
     iter->second->ckInvokeEntry(env->getEpIdx(), msg, doFree);
   } else {
     // Otherwise fallback to delivery through the array manager

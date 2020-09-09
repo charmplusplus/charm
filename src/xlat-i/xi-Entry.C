@@ -1899,9 +1899,9 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
 
   else {  // Normal case: call regular method
     if(param->hasRecvRdma()) {
-      str << "#if CMK_ONESIDED_IMPL\n";
+      //str << "#if CMK_ONESIDED_IMPL\n";
       str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
-      str << "#endif\n";
+      //str << "#endif\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
@@ -2017,7 +2017,6 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           str << "  int buffSizes["<< numRdmaRecvParams <<"];\n";
           str << "#endif\n";
 
-          str << "    int numPostLater=0;\n";
           for (int index = 0; index < numRdmaRecvParams; index++)
             str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
 
@@ -2058,11 +2057,11 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           else
             str << "impl_num_rdma_fields, impl_num_root_node, ";
           str << "buffPtrs, buffSizes, ncpyPost);\n";
-          str << "  }\n";
           str << "#else\n";
           str << "    if(numPostLater > 0)\n";
           str << "      CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), " << numRdmaRecvParams << ", ncpyPost);\n";
           str << "#endif\n";
+          str << "  }\n";
         }
       }
       // pack pointers if it's a broadcast message

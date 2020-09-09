@@ -2193,6 +2193,9 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
 
   post.ncpyEmInfo->counter++;
   if(post.ncpyEmInfo->counter == numops) {
+
+    CmiPrintf("[%d][%d][%d] CkPostBuffer generic layer all ops completed\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+
     CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
     // Enqueue message
     enqueueNcpyMessage(CkMyPe(), post.ncpyEmInfo->msg);
