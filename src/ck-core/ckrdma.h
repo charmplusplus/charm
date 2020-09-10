@@ -459,10 +459,10 @@ struct CkNcpyBufferPost {
   // NcpyEmInfo
   NcpyEmInfo *ncpyEmInfo;
 
-#if !CMK_ONESIDED_IMPL
+//#if !CMK_ONESIDED_IMPL
   void *srcBuffer;
   size_t srcSize;
-#endif
+//#endif
 };
 
 size_t CkPostBufferLater(CkNcpyBufferPost *post, int index);

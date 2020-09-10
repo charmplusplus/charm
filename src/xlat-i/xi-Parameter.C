@@ -706,7 +706,7 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, boo
           str << "    buffSizes[" << count << "] = sizeof(" << dt << ") * " << arrLen << ".t;\n";
         str <<  "  }\n";
         str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
-
+        str << "    if(ncpyPost[" << count << "].postLater == false ) {\n";
         // Error checking if posted buffer is larger than the source buffer
         str << "  if( ";
         if(isSDAGGen)
@@ -728,6 +728,13 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, boo
         else
           str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
 
+        str << "    } else {\n";
+        str << "      ncpyPost[" << count << "].srcBuffer =";
+        if(isSDAGGen)
+          str << "genClosure->";
+        str << " (void *) ncpyBuffer_" << name << ".ptr;\n";
+        str << "      ncpyPost[" << count  << "].srcSize = ncpyBuffer_" << name << ".cnt;\n";
+        str << "    }\n";
         str << "  }\n";
       } else {
         //str << "    int numPostLater=0;\n";

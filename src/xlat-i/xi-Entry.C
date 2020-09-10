@@ -1904,10 +1904,13 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       //str << "#endif\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
       str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG ) {\n";
       //str << "#endif\n";
+      str << " if(numPostLater == 0)\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
       //str << "#if CMK_ONESIDED_IMPL\n";
+      str << " else\n";
+      str << "   CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), " << numRdmaRecvParams << ", ncpyPost);\n";
       str << "    }\n";
       str << "  } else {\n";
       str << "#endif\n";

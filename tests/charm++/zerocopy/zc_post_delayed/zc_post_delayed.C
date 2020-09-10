@@ -1,6 +1,6 @@
 #include "zc_post_delayed.decl.h"
 #define SIZE 2000
-#define NUM_ELEMENTS_PER_PE 2
+#define NUM_ELEMENTS_PER_PE 3
 #define CONSTANT 188
 
 CProxy_arr arrProxy;
