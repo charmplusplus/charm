@@ -29,7 +29,7 @@ clean:
 	rm -rf pdf html
 
 check-sphinx:
-	@which -s sphinx-build || { echo "Sphinx (http://www.sphinx-doc.org) not found. Install it with 'pip install sphinx'."; exit 1; }
+	@command -v sphinx-build || { echo "Sphinx (http://www.sphinx-doc.org) not found. Install it with 'pip install sphinx'."; exit 1; }
 
 check-latex: check-sphinx
-	@which -s pdflatex || { echo "Warning: Pdflatex not found. Exiting."; exit 1; }
+	@command -v pdflatex || { echo "Warning: Pdflatex not found. Exiting."; exit 1; }
