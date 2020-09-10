@@ -2711,8 +2711,9 @@ levels. For example, a 2-level tree consists of PEs and a root while a
 3-level tree consists of PEs, processes and a root at the top. A 4-level
 tree consists of PEs, processes, ProcessGroups and a root. The load balancing
 strategy to be used at each level and frequency at which to invoke LB
-at each level can be specified using command line parameters or using a json
-config file. We provide examples of these below:
+at each level can be specified using a json config file with name treelb.json
+or by specifying the json file name using command line option +TreeLBFile.
+We provide examples of some config files below:
 
 Creating a 2-level tree that uses the GreedyRefine strategy at the root:
 
@@ -2747,9 +2748,10 @@ and the GreedyRefine strategy at the root:
   }
 
 Creating a 4-level tree that uses the GreedyRefine strategy at process level
-and process-group level. A strategy is not allowed at root level since
-given the size of the PE tree communicating all object load information
-to the root can be expensive.
+and process-group level. The number of user-specified process groups is 4 in
+this example. A strategy is not allowed at root level for a 4-level tree since
+communicating all object load information to the root can be expensive given
+the size of the PE tree.
 
 .. code-block:: json
 
@@ -2759,11 +2761,11 @@ to the root can be expensive.
     {
         "pe": 0,
     },
-    "processGroup":
+    "processgroup":
     {
         "step_freq": 5,
-        "strategies": ["GreedyRefine"]
-        "num_groups" : <number of process groups>
+        "strategies": ["GreedyRefine"],
+        "num_groups": 4
     },
     "process":
     {
