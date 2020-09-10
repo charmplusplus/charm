@@ -2709,61 +2709,63 @@ strategies above are still supported, TreeLB allows performing load
 balancing at multiple levels and supports load balancing trees with different
 levels. For example, a 2-level tree consists of PEs and a root while a
 3-level tree consists of PEs, processes and a root at the top. A 4-level
-tree consists of PEs, processes, ProcessGroup and a root. The load balancing
+tree consists of PEs, processes, ProcessGroups and a root. The load balancing
 strategy to be used at each level and frequency at which to invoke LB
 at each level can be specified using command line parameters or using a json
 config file. We provide examples of these below:
 
-Creating a 2-level tree that uses GreedyRefine strategy at the root
+Creating a 2-level tree that uses the GreedyRefine strategy at the root:
 
 .. code-block:: json
 
   {
     "tree": "PE_Root",
-    "Root":
+    "root":
     {
         "pe": 0,
         "strategies": ["GreedyRefine"]
     }
   }
 
-Creating a 3-level tree that uses Greedy strategy at process level
-and GreedyRefine strategy at the root
+Creating a 3-level tree that uses the Greedy strategy at process level
+and the GreedyRefine strategy at the root:
 
 .. code-block:: json
 
   {
     "tree": "PE_Process_Root",
-    "Root":
+    "root":
     {
         "pe": 0,
         "step_freq": 3,
         "strategies": ["GreedyRefine"]
     },
-    "Process":
+    "process":
     {
         "strategies": ["Greedy"]
     }
   }
 
-Creating a 4-level tree that uses GreedyRefine strategy at process level,
-process-group level and at the root
+Creating a 4-level tree that uses the GreedyRefine strategy at process level
+and process-group level. A strategy is not allowed at root level since
+given the size of the PE tree communicating all object load information
+to the root can be expensive.
 
 .. code-block:: json
 
   {
     "tree": "PE_Process_ProcessGroup_Root",
-    "Root":
+    "root":
     {
         "pe": 0,
-        "strategies": ["GreedyRefine"]
     },
-    "ProcessGroup":
+    "processGroup":
     {
         "step_freq": 5,
         "strategies": ["GreedyRefine"]
+        "num_groups" : <number of process groups>
     },
-    "Process":
+    "process":
     {
         "strategies": ["GreedyRefine"]
     }
@@ -9783,8 +9785,8 @@ above can be used for this.
 
 .. _lbWriteNewLB:
 
-Writing a new load balancing strategy
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Writing a new load balancing strategy (Legacy centralized load balancer)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Charm++ programmers can choose an existing load balancing strategy from
 Charm++’s built-in strategies(see :numref:`lbStrategy`) for the best
@@ -9859,6 +9861,44 @@ to the Charm++ build system:
 #. Run ``make depends`` to update dependence rule of Charm++ files. And
    run ``make charm++`` to compile Charm++ which includes the new load
    balancing strategy files.
+
+Writing a new load balancing strategy with TreeLB
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Writing a load balancing strategy with TreeLB is very simple. It involves
+implementing a template class Strategy defined in TreeStrategyBase.h header
+file. Specifically, the load balancing strategy needs to be implemented in
+the solve method, which receives objects and processors as vectors. The
+solution needs to be stored in the solution object and is used by the load
+balancing framework to perform object migrations accordingly. The bool
+objSorted argument specifes whether the vector of objects is sorted by
+load values. This new strategy can written in a header file and included in
+the TreeStrategyFactory.h header file along with the mapping of the
+strategy name and class to be invoked for the newly implemented strategy.
+
+.. code-block:: c++
+
+  namespace TreeStrategy
+  {
+  template <typename O, typename P, typename S>
+  class FooLB : public Strategy<O, P, S>
+  {
+  public:
+    void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)
+    {
+      for (const auto& o : objs)
+      {
+        P p = procs[index];
+        /// The strategy goes here
+        /// The strategy goes here
+        /// The strategy goes here
+        solution.assign(o, p);  // update solution (assumes solution updates processor load)
+        index = (index+1)%procs.size();
+      }
+    }
+  };
+
+  }  // namespace TreeStrategy
 
 .. _lbdatabase:
 
