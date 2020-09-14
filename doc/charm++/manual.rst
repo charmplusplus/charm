@@ -2703,19 +2703,26 @@ section :numref:`lbOption`.
 
 **TreeLB and its configuration**
 
-Recent changes in the LB infrastructure add support for a user-configurable
-hierarchical load balancing using TreeLB. While the legacy centralized
-strategies above are still supported, TreeLB allows performing load
-balancing at multiple levels and supports load balancing trees with different
-levels. For example, a 2-level tree consists of PEs and a root while a
-3-level tree consists of PEs, processes and a root at the top. A 4-level
-tree consists of PEs, processes, ProcessGroups and a root. The load balancing
-strategy to be used at each level and frequency at which to invoke LB
-at each level can be specified using a json config file with name treelb.json
-or by specifying the json file name using command line option +TreeLBFile.
-We provide examples of some config files below:
+TreeLB allows for user-configurable hierarchical load balancing. While
+the legacy centralized strategies above are still supported, TreeLB
+allows load balancing to be performed at different levels and
+frequencies in a modular way. TreeLB includes several kinds of trees:
+the 2-level tree consists of PEs and a root (essentially the same as
+centralized load balancing), the 3-level tree consists of PEs,
+processes, and a root at the top, and the 4-level tree consists of
+PEs, processes, process groups and a root. Each level only balances
+load within its corresponding domain; for example, for the 3-level
+PE-Process-Root tree during process steps, each process runs the
+specified LB strategy over only the PEs and objects contained within
+the process, while, at root steps, the root strategy is run over all
+PEs and objects in the job. The load balancing strategy to be used at
+each level and frequency at which to invoke LB at each level can be
+specified using a JSON configuration file with name `treelb.json` or
+by specifying the JSON file name using command line option
+`+TreeLBFile`. We provide examples of some configuration files below:
 
-Creating a 2-level tree that uses the GreedyRefine strategy at the root:
+Creating a 2-level tree that first uses the Greedy strategy and then
+the GreedyRefine strategy at the root:
 
 .. code-block:: json
 
@@ -2724,12 +2731,13 @@ Creating a 2-level tree that uses the GreedyRefine strategy at the root:
     "root":
     {
         "pe": 0,
-        "strategies": ["GreedyRefine"]
+        "strategies": ["Greedy", "GreedyRefine"]
     }
   }
 
-Creating a 3-level tree that uses the Greedy strategy at process level
-and the GreedyRefine strategy at the root:
+Creating a 3-level tree that uses the Greedy strategy at the process level
+and the GreedyRefine strategy at the root, which runs only every three
+steps:
 
 .. code-block:: json
 
@@ -2747,11 +2755,15 @@ and the GreedyRefine strategy at the root:
     }
   }
 
-Creating a 4-level tree that uses the GreedyRefine strategy at process level
-and process-group level. The number of user-specified process groups is 4 in
+Creating a 4-level tree that uses the GreedyRefine strategy at the process
+and process group levels. The number of user-specified process groups is four in
 this example. A strategy is not allowed at root level for a 4-level tree since
 communicating all object load information to the root can be expensive given
-the size of the PE tree.
+the size of the PE tree. Load is balanced at the process group level
+every five steps and at the root level every ten steps. Note also that
+the process group usage of GreedyRefine provides a custom parameter to
+the strategy. This will only be used for the process group level version of
+GreedyRefine, not the process level version.
 
 .. code-block:: json
 
@@ -2760,18 +2772,84 @@ the size of the PE tree.
     "root":
     {
         "pe": 0,
+        "step_freq": 10
     },
     "processgroup":
     {
         "step_freq": 5,
         "strategies": ["GreedyRefine"],
-        "num_groups": 4
+        "num_groups": 4,
+        "GreedyRefine":
+        {
+            "tolerance": 1.03
+        }
     },
     "process":
     {
         "strategies": ["GreedyRefine"]
     }
   }
+
+**TreeLB Configuration Parameters**
+
+The following parameters may be used to specify the configuration of TreeLB:
+
+- `tree` (**required**): String specifying the tree to use. Can be one of "PE_Root",
+  "PE_Process_Root", or "PE_Process_ProcessGroup_Root".
+- `root` (**required**): The configuration block for the root level of the
+  tree.
+
+- `pe`: Integer specifying the root PE. (default = `0`)
+  - `token_passing` : Boolean specifying whether to use the coarsened
+    token passing strategy or not, only allowed for the "PE_Process_ProcessGroup_Root"
+    tree. If false, load will only be balanced within process groups
+    at most, never across the whole job. (default = `true`)
+
+- `processgroup` (**required** for "PE_Process_ProcessGroup_Root" tree): The configuration block for
+  the process group level of the tree.
+
+  - `num_groups` (**required**): Integer specifying the number of process
+    groups to create.
+
+- `process` (**required** for "PE_Process_Root" and
+  "PE_Process_ProcessGroup_Root" trees): The configuration block for
+  the process level of the tree.
+- `mcast_bfactor`: 8-bit integer specifying the branching factor of
+  the communication tree used to send inter-subtree migrations for the
+  4-level tree's token passing scheme. (default = `4`)
+
+The `root`, `processgroup`, and `process` blocks may include the
+following tree level configuration parameters:
+
+- `strategies` (**required** except for root level of
+  "PE_Process_ProcessGroup_Root" tree): List of strings specifying which
+  LB  strategies to run at the given level.
+- `repeat_strategies`: Boolean specifying if the whole list of
+  strategies should be repeated or not. If true, start back at the
+  beginning when the end of `strategies` is reached, otherwise keep
+  repeating the last strategy (e.g. for `"strategies": ["1", "2"]`,
+  `true` would result in 1, 2, 1, 2, ...; `false` in 1, 2, 2, 2, ...).
+  (default = `false`)
+- `step_freq`: Integer specifying frequency at which to balance at the given
+  level of the tree. Not allowed to be specified on the level
+  immediately above the PE level of the tree, which implicitly has a
+  value of 1. This value must be a multiple of the value for the level
+  below it. For example, for the 4-level tree, this can be specified
+  for the process group and root levels, and the value for the root
+  level must be a multiple of the process group value. If these values
+  are given as 2 and 4, respectively, then load balancing will be
+  performed at the following levels in sequence: process, process
+  group, process, root, process, and so on. (default = max(value of
+  the level below, `1`))
+- Individual strategies can also be configured using parameters in
+  this file. These should be placed in a block with a key exactly
+  matching the name of the load balancer, and can be parsed from
+  within the strategy's constructor.
+
+  - `GreedyRefine`:
+
+    - `tolerance`: Float specifying the tolerance GreedyRefine should
+      allow above the maximum load of Greedy.
 
 **Metabalancer to automatically schedule load balancing**
 
@@ -9868,15 +9946,17 @@ Writing a new load balancing strategy with TreeLB
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Writing a load balancing strategy with TreeLB is very simple. It involves
-implementing a template class Strategy defined in TreeStrategyBase.h header
-file. Specifically, the load balancing strategy needs to be implemented in
-the solve method, which receives objects and processors as vectors. The
-solution needs to be stored in the solution object and is used by the load
-balancing framework to perform object migrations accordingly. The bool
-objSorted argument specifes whether the vector of objects is sorted by
-load values. This new strategy can written in a header file and included in
-the TreeStrategyFactory.h header file along with the mapping of the
-strategy name and class to be invoked for the newly implemented strategy.
+implementing a class inheriting from the abstract `Strategy` class
+defined in the `TreeStrategyBase.h` header file. Specifically, the
+load balancing strategy needs to be implemented in the `solve` method,
+which receives objects and processors as vectors. The solution
+needs to be stored in the `solution` object and is used by the load
+balancing framework to perform object migrations accordingly. The
+`bool objSorted` argument specifes whether the incoming vector of
+objects is sorted by load values or not. This new strategy can written
+in a header file and included in the `TreeStrategyFactory.h` header
+file along with the mapping of the strategy name and class to be
+invoked for the newly implemented strategy.
 
 .. code-block:: c++
 
@@ -9888,6 +9968,7 @@ strategy name and class to be invoked for the newly implemented strategy.
   public:
     void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)
     {
+      int index = 0;
       for (const auto& o : objs)
       {
         P p = procs[index];
@@ -9895,7 +9976,7 @@ strategy name and class to be invoked for the newly implemented strategy.
         /// The strategy goes here
         /// The strategy goes here
         solution.assign(o, p);  // update solution (assumes solution updates processor load)
-        index = (index+1)%procs.size();
+        index = (index + 1) % procs.size();
       }
     }
   };
