@@ -784,7 +784,11 @@ do
 		# See https://github.com/UIUC-PPL/charm/issues/2617 for details.
 		OPTS="$OPTS $arg"
 		;;
-
+	*.tbd)
+		# Pass through text-based libraries (*.tbd) on MacOS.
+		# See https://github.com/UIUC-PPL/charm/issues/3045 for details.
+		OPTS="$OPTS $arg"
+		;;
 	-D*|-I*)
 		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null
 		then

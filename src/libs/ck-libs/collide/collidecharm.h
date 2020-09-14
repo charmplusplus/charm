@@ -38,6 +38,11 @@ typedef void (*CollisionClientFn)(void *param,int nColl,Collision *colls);
 ///  complete Collision list.
 CkGroupID CollideSerialClient(CollisionClientFn clientFn,void *clientParam);
 
+/// Call this on processor 0 to build a Collision client that
+/// uses the passed callback as the reduction target for the final,
+/// complete Collision list.
+CkGroupID CollideSerialClient(CkCallback clientCb);
+
 /****************** Collision Interface ******************/
 typedef CkGroupID CollideHandle;
 
