@@ -2906,8 +2906,8 @@ to configure the load balancer, etc. These functions are:
    .. code-block:: c++
 
       // if used in an array element
-      LBDatabase *lbdb = getLBDB();
-      lbdb->SetLBPeriod(5.0);
+      LBManager* lbmgr = getLBMgr();
+      lbmgr->SetLBPeriod(5.0);
 
       // if used outside of an array element
       LBSetPeriod(5.0);
