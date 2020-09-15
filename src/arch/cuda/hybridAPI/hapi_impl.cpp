@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#define CUDA_API_PER_THREAD_DEFAULT_STREAM
 #include <cuda_runtime.h>
 
 #include "converse.h"
@@ -689,31 +690,17 @@ hapiWorkRequest::hapiWorkRequest() :
     kernel_cb(NULL), device_to_host_cb(NULL), runKernel(NULL), state(0),
     user_data(NULL), free_user_data(false), free_host_to_device_cb(false),
     free_kernel_cb(false), free_device_to_host_cb(false)
-  {
+{
 #ifdef HAPI_TRACE
-    trace_name = "";
+  trace_name = "";
 #endif
 #ifdef HAPI_INSTRUMENT_WRS
-    chare_index = -1;
+  chare_index = -1;
 #endif
 
-  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-
-#if CMK_SMP
-    CmiLock(csv_gpu_manager.stream_lock_);
-#endif
-
-    // Create default per-PE streams if none exist
-    if (csv_gpu_manager.getStream(0) == NULL) {
-      csv_gpu_manager.createNStreams(CmiMyNodeSize());
-    }
-
-    stream = csv_gpu_manager.getStream(CmiMyRank() % csv_gpu_manager.getNStreams());
-
-#if CMK_SMP
-    CmiUnlock(csv_gpu_manager.stream_lock_);
-#endif
-  }
+  // Use CUDA per-thread default stream
+  stream = cudaStreamPerThread;
+}
 
 static void shmInit() {
   if (!CsvAccess(gpu_manager).use_shm) return;
