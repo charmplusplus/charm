@@ -1267,13 +1267,33 @@ void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 }
 
 /// Deliver a copy of the given broadcast to the given local element
-bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
-				    bool doFree)
+bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree)
 {
   int &elBcastNo=getData(el);
   // if this array element already received this message, skip it
   if (elBcastNo >= getBcastNo()) return false;
   elBcastNo++;
+  DEBB((AA "Delivering broadcast %d to element %s\n" AB,elBcastNo,idx2str(el)));
+
+  CkAssert(UsrToEnv(bcast)->getMsgtype() == ArrayBcastFwdMsg);
+
+  if (!broadcastViaScheduler)
+    return el->ckInvokeEntry(bcast->array_ep_bcast(), bcast, doFree);
+  else {
+    if (!doFree) {
+      CkArrayMessage *newMsg = (CkArrayMessage *)CkCopyMsg((void **)&bcast);
+      bcast = newMsg;
+    }
+    envelope *env = UsrToEnv(bcast);
+    env->setRecipientID(el->ckGetID());
+    CkArrayManagerDeliver(CkMyPe(), bcast, 0);
+    return true;
+  }
+}
+
+bool CkArrayBroadcaster::deliverAlreadyDelivered(CkArrayMessage *bcast, ArrayElement *el, bool doFree)
+{
+  int &elBcastNo=getData(el);
   DEBB((AA "Delivering broadcast %d to element %s\n" AB,elBcastNo,idx2str(el)));
 
   CkAssert(UsrToEnv(bcast)->getMsgtype() == ArrayBcastFwdMsg);
@@ -1597,6 +1617,18 @@ void CkArray::forwardZCMsgToOtherElems(envelope *env) {
     if (stableLocations && i == len-1 && CMI_ZC_MSGTYPE(env)!=CMK_ZC_BCAST_RECV_DONE_MSG) doFree = true;
     broadcaster->deliver((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[i], doFree);
   }
+}
+void CkArray::forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem) {
+  bool doFree = false;
+  int msgType = CMI_ZC_MSGTYPE(env);
+  CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_MY_RECV_DONE_MSG;
+  broadcaster->deliverAlreadyDelivered((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)elem, doFree);
+  CMI_ZC_MSGTYPE(env) = msgType;
+}
+
+void CkArray::forwardZCMsgToZerothElem(envelope *env) {
+  bool doFree = true;
+  broadcaster->deliverAlreadyDelivered((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[0], doFree);
 }
 #endif
 

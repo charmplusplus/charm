@@ -688,6 +688,32 @@ void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
   }
 }
 
+void ParamList::extractPostedPtrs(XStr& str, bool isSDAGGen) {
+//  //if (hasDevice()) {
+//  //  int count = 0; // Used to keep track of indices
+//  //  callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen, true, count);
+//  //} else {
+    int count = 0;
+    str << "#if CMK_ONESIDED_IMPL\n";
+    callEach(&Parameter::extractPostedPtrs, str, true, isSDAGGen, false, count);
+
+//    str << "#else\n";
+    //callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen, false);
+    str << "#endif\n";
+//  // }
+}
+
+void Parameter::extractPostedPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count) {
+  Type* dt = type->deref();  // Type, without &
+  if (isRdma()) {
+    if(count == 0) {
+      str << "void *peerAckInfo = (void *)(ncpyBuffer_" << name << ".peerAckInfo);\n";
+    }
+    // count, env, thisIndex, CkNcpyBuffer
+    str << arrLen << ".t = extractStoredBuffer(ncpyBuffer_" << name << ".tagArray, arraySize, localIndex, "<< count++ << ", (void *&)ncpyBuffer_" << name << "_ptr);\n";
+  }
+}
+
 void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count) {
   Type* dt = type->deref();  // Type, without &
 
@@ -734,6 +760,9 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, boo
           str << "genClosure->";
         str << " (void *) ncpyBuffer_" << name << ".ptr;\n";
         str << "      ncpyPost[" << count  << "].srcSize = ncpyBuffer_" << name << ".cnt;\n";
+        str << "      ncpyPost[" << count  << "].tagArray = ncpyBuffer_" << name << ".tagArray;\n";
+        str << "      ncpyPost[" << count  << "].opIndex = " << count << ";\n";
+        str << "      ncpyPost[" << count  << "].arrayIndex = impl_obj->thisIndex;\n";
         str << "    }\n";
         str << "  }\n";
       } else {

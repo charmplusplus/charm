@@ -26,6 +26,8 @@
 #define CkNcpyMode CmiNcpyMode
 
 
+struct NcpyBcastRecvPeerAckInfo;
+
 // P2P_SEND mode is used for EM P2P Send API
 // BCAST_SEND mode is used for EM BCAST Send API
 // P2P_RECV mode is used for EM P2P Recv API
@@ -74,7 +76,12 @@ void CkPostBuffer(T *buffer, size_t size, int tag) {
 // Class to represent an Zerocopy buffer
 // CkSendBuffer(....) passed by the user internally translates to a CkNcpyBuffer
 class CkNcpyBuffer : public CmiNcpyBuffer {
+
   public:
+
+  int *tagArray;
+
+  NcpyBcastRecvPeerAckInfo *peerAckInfo;
 
   // callback to be invoked on the sender/receiver
   CkCallback cb;
@@ -105,6 +112,8 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
   void pup(PUP::er &p) {
     CmiNcpyBuffer::pup(p);
     p|cb;
+    p((char *)&tagArray, sizeof(tagArray));
+    p((char *)&peerAckInfo, sizeof(peerAckInfo));
   }
 
   friend void CkRdmaDirectAckHandler(void *ack);
@@ -185,12 +194,17 @@ struct NcpyEmInfo{
   ncpyEmApiMode mode; // used to distinguish between p2p and bcast
   void *msg; // pointer to the Charm++ message which will be enqueued after completion of all Rgets
   void *forwardMsg; // used for the ncpy broadcast api
+
+  int arrayId;
+  int *tagArray;
+  NcpyBcastRecvPeerAckInfo *peerAckInfo;
 };
 
 
 
 
 void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *postStructs);
+void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *postStructs, int arrayIndex);
 #if CMK_ONESIDED_IMPL
 void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, CkNcpyBufferPost *postStructs);
 
@@ -462,10 +476,19 @@ struct CkNcpyBufferPost {
 //#if !CMK_ONESIDED_IMPL
   void *srcBuffer;
   size_t srcSize;
+
+  int opIndex;
+  int arrayIndex;
+
+  int *tagArray;
 //#endif
 };
 
 size_t CkPostBufferLater(CkNcpyBufferPost *post, int index);
+
+void updatePeerCounter(void *ref);
+
+int extractStoredBuffer(int *tagArray, int arraySize, int arrayIndex, int count, void *&ptr);
 
 // Function declaration for EM Ncpy Ack handler initialization
 void initEMNcpyAckHandler(void);

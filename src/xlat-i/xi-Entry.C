@@ -1910,8 +1910,16 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
       //str << "#if CMK_ONESIDED_IMPL\n";
       str << " else\n";
-      str << "   CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), " << numRdmaRecvParams << ", ncpyPost);\n";
+      str << "   CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), " << numRdmaRecvParams << ", ncpyPost, impl_obj->thisIndex);\n";
       str << "    }\n";
+      str << "  } else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_MY_RECV_DONE_MSG) {\n";
+      //str << "    int opIndex = " << count << ";\n";
+      str << "    CkArray *mgr = getArrayMgrFromMsg(env);\n";
+      str << "    int localIndex = mgr->getEltLocalIndex(impl_obj->thisIndex);\n";
+      str << "    int arraySize = mgr->getNumLocalElems();\n";
+      param->extractPostedPtrs(str, false);
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
+      str << "    updatePeerCounter(peerAckInfo);\n";
       str << "  } else {\n";
       str << "#endif\n";
     } else if (param->hasDevice()) {
