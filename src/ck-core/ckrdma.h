@@ -204,7 +204,7 @@ struct NcpyEmInfo{
 
 
 void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *postStructs);
-void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *postStructs, int arrayIndex);
+void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *postStructs, int arrayIndex, void *ackInfo);
 #if CMK_ONESIDED_IMPL
 void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, CkNcpyBufferPost *postStructs);
 

@@ -1909,9 +1909,11 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << " if(numPostLater == 0)\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
       //str << "#if CMK_ONESIDED_IMPL\n";
-      str << " else\n";
-      str << "   CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), " << numRdmaRecvParams << ", ncpyPost, impl_obj->thisIndex);\n";
+      str << " else {\n";
+      param->printPeerAckInfo(str, isSDAGGen);
+      str << "   CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), " << numRdmaRecvParams << ", ncpyPost, impl_obj->thisIndex, peerAckInfo);\n";
       str << "    }\n";
+      str << "  }\n";
       str << "  } else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_MY_RECV_DONE_MSG) {\n";
       //str << "    int opIndex = " << count << ";\n";
       str << "    CkArray *mgr = getArrayMgrFromMsg(env);\n";

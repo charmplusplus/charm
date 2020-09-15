@@ -1341,7 +1341,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(char ,startedEvac);
 #endif
 	CpvInitialize(int,serializer);
-	CkpvDeclare(ReqTagPostMap, ncpyPostedReqMap);
+	CkpvInitialize(ReqTagPostMap, ncpyPostedReqMap);
 
 	_initChareTables();            // for checkpointable plain chares
 

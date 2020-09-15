@@ -703,6 +703,29 @@ void ParamList::extractPostedPtrs(XStr& str, bool isSDAGGen) {
 //  // }
 }
 
+void ParamList::printPeerAckInfo(XStr& str, bool isSDAGGen) {
+//  //if (hasDevice()) {
+//  //  int count = 0; // Used to keep track of indices
+//  //  callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen, true, count);
+//  //} else {
+    int count = 0;
+    str << "#if CMK_ONESIDED_IMPL\n";
+    callEach(&Parameter::printPeerAckInfo, str, true, isSDAGGen, false, count);
+
+//    str << "#else\n";
+    //callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen, false);
+    str << "#endif\n";
+//  // }
+}
+
+void Parameter::printPeerAckInfo(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count) {
+  Type* dt = type->deref();  // Type, without &
+  if (isRdma() && count == 0) {
+    str << "void *peerAckInfo = (void *)(ncpyBuffer_" << name << ".peerAckInfo);\n";
+    count++;
+  }
+}
+
 void Parameter::extractPostedPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count) {
   Type* dt = type->deref();  // Type, without &
   if (isRdma()) {

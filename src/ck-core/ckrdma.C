@@ -1057,7 +1057,8 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
     if(numElems > 1) {
       tagArray = new int[numElems * numops];
       peerAckInfo = new NcpyBcastRecvPeerAckInfo();
-      peerAckInfo->setNumPeers(numElems - 1);
+      //peerAckInfo->setNumPeers(numElems - 1);
+      peerAckInfo->setNumPeers(0);
       peerAckInfo->msg = (void *)env;
       peerAckInfo->peerParentPe = CmiMyPe();
     }
@@ -1281,7 +1282,7 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
 void updatePeerCounter(void *ref) {
   NcpyBcastRecvPeerAckInfo *peerAckInfo = (NcpyBcastRecvPeerAckInfo *)ref;
   //peerAckInfo->decNumPeers();
-  CmiPrintf("[%d][%d][%d] updatePeerCounter peerAckInfo=%p and numPeers is %d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), peerAckInfo, peerAckInfo->numPeers);
+  CmiPrintf("[%d][%d][%d] updatePeerCounter peerAckInfo=%p and numPeers is %d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), peerAckInfo, peerAckInfo->getNumPeers());
   if(peerAckInfo->decNumPeers() - 1 == 0) {
     CmiPrintf("[%d][%d][%d] updatePeerCounter ready to enqueue msg\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
     envelope *env = (envelope *)peerAckInfo->msg;
@@ -1295,7 +1296,7 @@ void updatePeerCounter(void *ref) {
 void incPeerCounter(void *ref) {
   NcpyBcastRecvPeerAckInfo *peerAckInfo = (NcpyBcastRecvPeerAckInfo *)ref;
   peerAckInfo->incNumPeers();
-  CmiPrintf("[%d][%d][%d] incPeerCounter incremented to %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), peerAckInfo->numPeers);
+  CmiPrintf("[%d][%d][%d] incPeerCounter incremented to %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), peerAckInfo->getNumPeers());
 }
 
 int extractStoredBuffer(int *tagArray, int arraySize, int arrayIndex, int count, void *&ptr) {
@@ -1988,6 +1989,16 @@ void handleArrayMsgOnChildPostCompletionForRecvBcast(envelope *env) {
   CkArray *mgr = getArrayMgrFromMsg(env);
   mgr->forwardZCMsgToOtherElems(env);
 
+#if CMK_SMP
+  if(CmiMyNodeSize() > 1) {
+    sendRecvDoneMsgToPeers(env, mgr);
+  } else
+#endif
+  {
+    CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+    QdCreate(1);
+    CmiHandleMessage(env);
+  }
   //TODO: Equeue the basic message if there are no elements
 }
 
@@ -2270,7 +2281,10 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
   }
 }
 
-void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *post, int arrayIndex) {
+void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *post, int arrayIndex, void *peerAckInfo) {
+
+  incPeerCounter(peerAckInfo);
+
   char *ref = (char *)CmiAlloc(sizeof(NcpyEmInfo));
   setNcpyEmInfo(ref, env, numops, NULL, emMode);
 
