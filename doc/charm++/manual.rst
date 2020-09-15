@@ -2701,25 +2701,27 @@ applications. RotateLB and RandCentLB are more useful for debugging
 object migrations. The compiler and runtime options are described in
 section :numref:`lbOption`.
 
-**TreeLB and its configuration**
+**TreeLB and its Configuration**
 
 TreeLB allows for user-configurable hierarchical load balancing. While
 the legacy centralized strategies above are still supported, TreeLB
 allows load balancing to be performed at different levels and
 frequencies in a modular way. TreeLB includes several kinds of trees:
-the 2-level tree consists of PEs and a root (essentially the same as
-centralized load balancing), the 3-level tree consists of PEs,
-processes, and a root at the top, and the 4-level tree consists of
-PEs, processes, process groups and a root. Each level only balances
+the 2-level tree consists of PE and root levels (essentially the same as
+centralized load balancing), the 3-level tree consists of PE,
+process, and root levels, and the 4-level tree consists of
+PE, process, process group, and root levels (process groups are
+collections of consecutive processes; the number of groups is
+configurable, see below). Each level only balances
 load within its corresponding domain; for example, for the 3-level
 PE-Process-Root tree during process steps, each process runs the
 specified LB strategy over only the PEs and objects contained within
 the process, while, at root steps, the root strategy is run over all
 PEs and objects in the job. The load balancing strategy to be used at
 each level and frequency at which to invoke LB at each level can be
-specified using a JSON configuration file with name `treelb.json` or
+specified using a JSON configuration file with name ``treelb.json`` or
 by specifying the JSON file name using command line option
-`+TreeLBFile`. We provide examples of some configuration files below:
+``+TreeLBFile``. We provide examples of some configuration files below:
 
 Creating a 2-level tree that first uses the Greedy strategy and then
 the GreedyRefine strategy at the root:
@@ -2762,8 +2764,8 @@ communicating all object load information to the root can be expensive given
 the size of the PE tree. Load is balanced at the process group level
 every five steps and at the root level every ten steps. Note also that
 the process group usage of GreedyRefine provides a custom parameter to
-the strategy. This will only be used for the process group level version of
-GreedyRefine, not the process level version.
+the strategy. This parameter will only be used for the process group
+level version of GreedyRefine, not the process level version.
 
 .. code-block:: json
 
@@ -2794,43 +2796,43 @@ GreedyRefine, not the process level version.
 
 The following parameters may be used to specify the configuration of TreeLB:
 
-- `tree` (**required**): String specifying the tree to use. Can be one of "PE_Root",
+- ``tree`` (**required**): String specifying the tree to use. Can be one of "PE_Root",
   "PE_Process_Root", or "PE_Process_ProcessGroup_Root".
-- `root` (**required**): The configuration block for the root level of the
+- ``root`` (**required**): The configuration block for the root level of the
   tree.
 
-- `pe`: Integer specifying the root PE. (default = `0`)
-  - `token_passing` : Boolean specifying whether to use the coarsened
+  - ``pe``: Integer specifying the root PE. (default = ``0``)
+  - ``token_passing`` : Boolean specifying whether to use the coarsened
     token passing strategy or not, only allowed for the "PE_Process_ProcessGroup_Root"
     tree. If false, load will only be balanced within process groups
-    at most, never across the whole job. (default = `true`)
+    at most, never across the whole job. (default = ``true``)
 
-- `processgroup` (**required** for "PE_Process_ProcessGroup_Root" tree): The configuration block for
+- ``processgroup`` (**required** for "PE_Process_ProcessGroup_Root" tree): The configuration block for
   the process group level of the tree.
 
-  - `num_groups` (**required**): Integer specifying the number of process
+  - ``num_groups`` (**required**): Integer specifying the number of process
     groups to create.
 
-- `process` (**required** for "PE_Process_Root" and
+- ``process`` (**required** for "PE_Process_Root" and
   "PE_Process_ProcessGroup_Root" trees): The configuration block for
   the process level of the tree.
-- `mcast_bfactor`: 8-bit integer specifying the branching factor of
+- ``mcast_bfactor``: 8-bit integer specifying the branching factor of
   the communication tree used to send inter-subtree migrations for the
-  4-level tree's token passing scheme. (default = `4`)
+  4-level tree's token passing scheme. (default = ``4``)
 
-The `root`, `processgroup`, and `process` blocks may include the
+The ``root``, ``processgroup``, and ``process`` blocks may include the
 following tree level configuration parameters:
 
-- `strategies` (**required** except for root level of
+- ``strategies`` (**required** except for root level of
   "PE_Process_ProcessGroup_Root" tree): List of strings specifying which
   LB  strategies to run at the given level.
-- `repeat_strategies`: Boolean specifying if the whole list of
+- ``repeat_strategies``: Boolean specifying if the whole list of
   strategies should be repeated or not. If true, start back at the
-  beginning when the end of `strategies` is reached, otherwise keep
-  repeating the last strategy (e.g. for `"strategies": ["1", "2"]`,
-  `true` would result in 1, 2, 1, 2, ...; `false` in 1, 2, 2, 2, ...).
-  (default = `false`)
-- `step_freq`: Integer specifying frequency at which to balance at the given
+  beginning when the end of ``strategies`` is reached, otherwise keep
+  repeating the last strategy (e.g. for ``"strategies": ["1", "2"]``,
+  ``true`` would result in 1, 2, 1, 2, ...; ``false`` in 1, 2, 2, 2, ...).
+  (default = ``false``)
+- ``step_freq``: Integer specifying frequency at which to balance at the given
   level of the tree. Not allowed to be specified on the level
   immediately above the PE level of the tree, which implicitly has a
   value of 1. This value must be a multiple of the value for the level
@@ -2840,15 +2842,15 @@ following tree level configuration parameters:
   are given as 2 and 4, respectively, then load balancing will be
   performed at the following levels in sequence: process, process
   group, process, root, process, and so on. (default = max(value of
-  the level below, `1`))
+  the level below, ``1``))
 - Individual strategies can also be configured using parameters in
   this file. These should be placed in a block with a key exactly
   matching the name of the load balancer, and can be parsed from
   within the strategy's constructor.
 
-  - `GreedyRefine`:
+  - ``GreedyRefine``:
 
-    - `tolerance`: Float specifying the tolerance GreedyRefine should
+    - ``tolerance``: Float specifying the tolerance GreedyRefine should
       allow above the maximum load of Greedy.
 
 **Metabalancer to automatically schedule load balancing**
@@ -9865,13 +9867,19 @@ above can be used for this.
 
 .. _lbWriteNewLB:
 
-Writing a new load balancing strategy (Legacy centralized load balancer)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Writing a new load balancing strategy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Charm++ programmers can choose an existing load balancing strategy from
 Charm++’s built-in strategies(see :numref:`lbStrategy`) for the best
 performance based on the characteristics of their applications. However,
 they can also choose to write their own load balancing strategies.
+
+Users are recommended to use the TreeLB structure to write new custom
+strategies if possible (see :numref:`lbWriteNewTreeLB`). Currently,
+TreeLB may not be suitable for distributed strategies, if
+communication graph information is needed, or when working with legacy
+strategies.
 
 The Charm++ load balancing framework provides a simple scheme to
 incorporate new load balancing strategies. The programmer needs to write
@@ -9942,21 +9950,26 @@ to the Charm++ build system:
    run ``make charm++`` to compile Charm++ which includes the new load
    balancing strategy files.
 
+.. _lbWriteNewTreeLB:
+
 Writing a new load balancing strategy with TreeLB
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Writing a load balancing strategy with TreeLB is very simple. It involves
-implementing a class inheriting from the abstract `Strategy` class
-defined in the `TreeStrategyBase.h` header file. Specifically, the
-load balancing strategy needs to be implemented in the `solve` method,
+implementing a class inheriting from the abstract ``Strategy`` class
+defined in the ``TreeStrategyBase.h`` header file. Specifically, the
+load balancing strategy needs to be implemented in the ``solve`` method,
 which receives objects and processors as vectors. The solution
-needs to be stored in the `solution` object and is used by the load
+needs to be stored in the ``solution`` object using its
+``assign(O object, P pe)`` instance method and is used by the load
 balancing framework to perform object migrations accordingly. The
-`bool objSorted` argument specifes whether the incoming vector of
-objects is sorted by load values or not. This new strategy can written
-in a header file and included in the `TreeStrategyFactory.h` header
-file along with the mapping of the strategy name and class to be
-invoked for the newly implemented strategy.
+``bool objSorted`` argument specifies whether the incoming vector of
+objects is sorted by load values or not. This new strategy can be written
+in a header file and must be included in the ``TreeStrategyFactory.h``
+header file along with the mapping of the strategy name and class to
+be invoked for the newly implemented strategy. It can then be used by
+linking a program with TreeLB and specifying the newly created
+strategy in the configuration file.
 
 .. code-block:: c++
 
@@ -9968,19 +9981,17 @@ invoked for the newly implemented strategy.
   public:
     void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)
     {
+      // The strategy goes here.
+      // This is a simple example strategy that round-robin assigns objects to processors.
       int index = 0;
       for (const auto& o : objs)
       {
         P p = procs[index];
-        /// The strategy goes here
-        /// The strategy goes here
-        /// The strategy goes here
-        solution.assign(o, p);  // update solution (assumes solution updates processor load)
+        solution.assign(o, p); // update solution object
         index = (index + 1) % procs.size();
       }
     }
   };
-
   }  // namespace TreeStrategy
 
 .. _lbdatabase:
