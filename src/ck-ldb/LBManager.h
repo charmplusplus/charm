@@ -7,7 +7,7 @@
 #define LBMANAGER_H
 
 #include "LBDatabase.h"
-#include "json.hpp"
+#include "json_fwd.hpp"
 using json = nlohmann::json;
 
 #define LB_FORMAT_VERSION 3
