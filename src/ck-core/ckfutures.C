@@ -137,13 +137,15 @@ int createFuture(void)
   /* if the freelist is empty, allocate more futures. */
   if (fs->freelist == -1) {
     origsize = fs->max;
-    // origsize may overflow CMK_REFNUM_TYPE, creating problems when waiting on this future
-    CkAssert( ( origsize <= std::numeric_limits<CMK_REFNUM_TYPE>::max() - origsize ) );
     fs->max = fs->max * 2;
     fs->array = (Future*)realloc(fs->array, sizeof(Future)*(fs->max));
     _MEMCHECK(fs->array);
     addedFutures(origsize, fs->max);
   }
+  
+  // handle may overflow CMK_REFNUM_TYPE, creating problems when waiting on this future
+  CkAssert(fs->freelist <= std::numeric_limits<CMK_REFNUM_TYPE>::max());
+
   handle = fs->freelist;
   fut = fs->array + handle;
   fs->freelist = fut->next;
