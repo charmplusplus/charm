@@ -14,7 +14,7 @@ module NDMeshStreamer {
   template<class dtype, class RouterType>
   group [migratable] MeshStreamer {
     entry void localDeliver(const char data[size], size_t size, CkArrayIndex arrayId, int sourcePe);
-    entry void localMassDeliver(uint64_t msg_ptr, std::vector<int> indices);
+    entry void localMassDeliver(uint64_t msg_ptr);
     entry void receiveAlongRoute(MeshStreamerMessageV *msg);
     entry void enablePeriodicFlushing();
     entry void finish();

@@ -155,14 +155,52 @@ public:
   }
 };
 
+struct SharedMessageData {
+  MeshStreamerMessageV* msg;
+  int delivered;
+  int pes;
+
+  void ctorHelper() {
+    delivered = 0;
+    pes = 0;
+  }
+
+  SharedMessageData() {
+    ctorHelper();
+  }
+
+  SharedMessageData(MeshStreamerMessageV* msg_) : msg(msg_) {
+    ctorHelper();
+  }
+};
+
 template <class dtype, class RouterType>
 class MeshStreamerNG : public CBase_MeshStreamerNG<dtype, RouterType> {
   CProxy_MeshStreamer<dtype, RouterType> groupProxy;
   int myIndex_;
+  int firstPe;
+  int lastPe;
+#if CMK_SMP
+  CmiNodeLock shared_map_lock;
+#endif
 
 public:
+  std::unordered_map<MeshStreamerMessageV*, SharedMessageData> shared_map;
+
   MeshStreamerNG() {
     myIndex_ = CkMyNode();
+    firstPe = CkNodeFirst(CkMyNode());
+    lastPe = firstPe + CkMyNodeSize() - 1;
+    CmiEnforce(CkNodeOf(lastPe) == myIndex_);
+#if CMK_SMP
+    shared_map_lock = CmiCreateLock();
+#endif
+  }
+
+  ~MeshStreamerNG() {
+#if CMK_SMP
+    CmiDestroyLock(shared_map_lock);
+#endif
   }
 
   void setGroupProxy(CProxy_MeshStreamer<dtype, RouterType> groupProxy) {
@@ -172,53 +210,28 @@ public:
   // May be executed by multiple PEs concurrently, but should be fine
   // since each of them are handling a different MeshStreamerMessageV
   void receiveAlongRoute(MeshStreamerMessageV *msg) {
-    int destinationPe, lastDestinationPe = -1;
-    Route destinationRoute;
-    bool all_delivered = true;
-    std::vector<int> indices[CkMyNodeSize()];
+    // Create data structure for tracking data item delivery by PEs in this logical node
+    lockSharedMap();
+    shared_map[msg] = SharedMessageData(msg);
+    unlockSharedMap();
 
-    for (int i = 0; i < msg->numDataItems; i++) {
-      destinationPe = msg->destinationPes[i];
-      if (CmiNodeOf(destinationPe) == myIndex_) {
-        indices[CmiRankOf(destinationPe)].push_back(i);
-        /*
-        this->groupProxy[destinationPe].localDeliver(
-            msg->dataItems + msg->getoffset<dtype>(i),
-            msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
-            msg->destObjects[i], msg->sourcePes[i]);
-            */
-      } else {
-        all_delivered = false;
-      }
+    // Pass message pointer to PEs in this logical node and have them
+    // go through the data items and perform local delivery
+    for (int pe = firstPe; pe <= lastPe; pe++) {
+      this->groupProxy[pe].localMassDeliver((uint64_t)msg);
     }
+  }
 
-    for (int i = 0; i < CkMyNodeSize(); i++) {
-      if (indices[i].size() > 0) {
-        this->groupProxy[i].localMassDeliver((uint64_t)msg, indices[i]);
-      }
-    }
-
-    // TODO: How to free the message? Tell group to reduce back?
-
-#ifdef CMK_TRAM_VERBOSE_OUTPUT
-    envelope *env = UsrToEnv(msg);
-    CkPrintf("[%d] received along route from %d %d items finalMsgCount: %d"
-               " msgType: %d\n", myIndex_, env->getSrcPe(),
-               msg->numDataItems, msg->finalMsgCount, msg->msgType);
+  inline void lockSharedMap() {
+#if CMK_SMP
+    CmiLock(shared_map_lock);
 #endif
+  }
 
-    if (all_delivered) {
-      // All data items have been locally delivered
-      // TODO: Free msg to avoid memory leak
-      //delete msg;
-    } else {
-      // Some data items remaining, delegate to the group
-      // TODO: This should eventually be handled by the nodegroup
-      //       once the message buffers are moved
-      this->groupProxy[msg->destinationIndex].receiveAlongRoute(msg);
-    }
-
-    // XXX: Staged completion is not supported
+  inline void unlockSharedMap() {
+#if CMK_SMP
+    CmiUnlock(shared_map_lock);
+#endif
   }
 
   void pup(PUP::er& p) {
@@ -308,7 +321,7 @@ public:
 
   // entry
   virtual void localDeliver(const char* data, size_t size, CkArrayIndex arrayId, int sourcePe) { CkAbort("Called what should be a pure virtual base method"); }
-  virtual void localMassDeliver(uint64_t msg_ptr, std::vector<int> indices) { CkAbort("Called what should be a pure virtual base method"); }
+  void localMassDeliver(uint64_t msg_ptr);
   void receiveAlongRoute(MeshStreamerMessageV *msg);
   void enablePeriodicFlushing(){
     if (progressPeriodInMs_ <= 0) {
@@ -705,6 +718,40 @@ storeMessage(int destinationPe, const Route& destinationRoute,
     sendLargestBuffer();
     hasSentRecently_ = true;
   }
+}
+
+template <class dtype, class RouterType>
+inline void MeshStreamer<dtype, RouterType>::localMassDeliver(uint64_t msg_ptr) {
+  MeshStreamerMessageV* msg = (MeshStreamerMessageV*)msg_ptr;
+  int delivered = 0;
+
+  // Deliver data items with this PE as destination
+  for (int i = 0; i < msg->numDataItems; i++) {
+    if (msg->destinationPes[i] == myIndex_) {
+      localDeliver(msg->dataItems + msg->getoffset<dtype>(i),
+          msg->getoffset<dtype>(i+1) - msg->getoffset<dtype>(i),
+          msg->destObjects[i], msg->sourcePes[i]);
+      delivered++;
+    }
+  }
+
+  // Increment delivered count and PE count for this message
+  // TODO: Can this coarse locking be improved?
+  nodeGroupProxy.ckLocalBranch()->lockSharedMap();
+  SharedMessageData& data = nodeGroupProxy.ckLocalBranch()->shared_map[msg];
+  data.delivered += delivered;
+  data.pes++;
+  if (data.pes == CkMyNodeSize()) {
+    // Delete message if all data items are delivered
+    if (data.delivered == msg->numDataItems) {
+      delete msg;
+    } else {
+      // Last PE should forward message to the next destination
+      // TODO: This is inefficient
+      this->thisProxy[msg->destinationIndex].receiveAlongRoute(msg);
+    }
+  }
+  nodeGroupProxy.ckLocalBranch()->unlockSharedMap();
 }
 
 template <class dtype, class RouterType>
@@ -1141,23 +1188,6 @@ private:
     delete msg;
   }
 
-  inline void localMassDeliver(uint64_t msg_ptr, std::vector<int> indices) override {
-    MeshStreamerMessageV* msg = (MeshStreamerMessageV*)msg_ptr;
-
-    for (auto& index : indices) {
-      char* data = msg->dataItems + msg->getoffset<dtype>(index);
-      size_t size = msg->getoffset<dtype>(index+1) - msg->getoffset<dtype>(index);
-      CkArrayIndex arrayId = msg->destObjects[index];
-      int sourcePe = msg->sourcePes[index];
-
-      EntryMethod(data, clientObj_);
-      if (this->useCompletionDetection_) {
-        this->detectorLocalObj_->consume();
-      }
-      QdProcess(1);
-    }
-  }
-
   inline void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,
       int sourcePe) override {
     EntryMethod(const_cast<char*>(data), clientObj_);
@@ -1226,7 +1256,7 @@ private:
   int cutoffFractionNum;
   int cutoffFractionDen;
 
-  inline void localMassDeliver(uint64_t msg_ptr, std::vector<int> indices) override {
+  inline void localMassDeliver(uint64_t msg_ptr) override {
     // TODO
   }
 
