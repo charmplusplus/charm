@@ -8,6 +8,7 @@
 #include "envelope.h"
 #include "ckcallback.h"
 #include "conv-rdma.h"
+#include <vector>
 
 /*********************************** Zerocopy Direct API **********************************/
 
@@ -79,7 +80,8 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
 
   public:
 
-  int *tagArray;
+  //int *tagArray;
+  std::vector< std::vector<int>> *tagArray;
 
   NcpyBcastRecvPeerAckInfo *peerAckInfo;
 
@@ -196,7 +198,9 @@ struct NcpyEmInfo{
   void *forwardMsg; // used for the ncpy broadcast api
 
   int arrayId;
-  int *tagArray;
+  //int *tagArray;
+  std::vector< std::vector<int>> *tagArray;
+
   NcpyBcastRecvPeerAckInfo *peerAckInfo;
 };
 
@@ -250,9 +254,18 @@ struct NcpyBcastRecvPeerAckInfo{
 #else
   int numPeers;
 #endif
+
+#if CMK_SMP
+  std::atomic<int> numElems;
+#else
+  int numElems;
+#endif
+
+
   void *bcastAckInfo;
   void *msg;
   int peerParentPe;
+
 #if CMK_SMP
     int getNumPeers() const {
        return numPeers.load(std::memory_order_acquire);
@@ -272,6 +285,28 @@ struct NcpyBcastRecvPeerAckInfo{
     int incNumPeers() { return numPeers++; }
     int decNumPeers() { return numPeers--; }
 #endif
+
+#if CMK_SMP
+    int getNumElems() const {
+       return numElems.load(std::memory_order_acquire);
+    }
+    void setNumElems(int r) {
+       return numElems.store(r, std::memory_order_release);
+    }
+    int incNumElems() {
+        return numElems.fetch_add(1, std::memory_order_release);
+    }
+    int decNumElems() {
+         return numElems.fetch_sub(1, std::memory_order_release);
+    }
+#else
+    int getNumElems() const { return numElems; }
+    void setNumElems(int r) { numElems = r; }
+    int incNumElems() { return numElems++; }
+    int decNumElems() { return numElems--; }
+#endif
+
+
 
 };
 
@@ -480,7 +515,9 @@ struct CkNcpyBufferPost {
   int opIndex;
   int arrayIndex;
 
-  int *tagArray;
+  //int *tagArray;
+  //vector<vector<int>> *tagArray;
+  std::vector< std::vector<int>> *tagArray;
 //#endif
 };
 
@@ -488,9 +525,13 @@ size_t CkPostBufferLater(CkNcpyBufferPost *post, int index);
 
 void updatePeerCounter(void *ref);
 
-bool isUnposted(int *tagArray, int arraySize, int localIndex, int numops);
+void updateTagArray(envelope *env, int localElems);
 
-int extractStoredBuffer(int *tagArray, int arraySize, int numops, int arrayIndex, int count, void *&ptr);
+bool isUnposted(std::vector<std::vector<int>> *tagArray, int arraySize, int localIndex, int numops);
+//bool isUnposted(int *tagArray, int arraySize, int localIndex, int numops);
+
+int extractStoredBuffer(std::vector<std::vector<int>> *tagArray, int arraySize, int numops, int arrayIndex, int count, void *&ptr);
+//int extractStoredBuffer(int *tagArray, int arraySize, int numops, int arrayIndex, int count, void *&ptr);
 
 // Function declaration for EM Ncpy Ack handler initialization
 void initEMNcpyAckHandler(void);

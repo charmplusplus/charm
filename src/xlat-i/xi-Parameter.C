@@ -730,7 +730,7 @@ void Parameter::printPeerAckInfo(XStr& str, bool genRdma, bool isSDAGGen, bool d
   Type* dt = type->deref();  // Type, without &
   if (isRdma() && count == 0) {
     str << "void *peerAckInfo = (void *)(ncpyBuffer_" << name << ".peerAckInfo);\n";
-    str << "int *tagArray = (ncpyBuffer_" << name << ".tagArray);\n";
+    str << "std::vector< std::vector<int> > *tagArray = (ncpyBuffer_" << name << ".tagArray);\n";
     count++;
   }
 }

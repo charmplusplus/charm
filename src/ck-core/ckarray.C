@@ -1583,13 +1583,22 @@ void CkArray::recvBroadcast(CkMessage* m) {
 #if CMK_CHARM4PY
     broadcaster->deliver(msg, localElemVec, thisgroup.idx, stableLocations);
 #else
+#if CMK_ONESIDED_IMPL
+      // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
+      // first element during CMK_ZC_BCAST_ALL_DONE_MSG
+      if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
+        updateTagArray(env, localElemVec.size());
+      }
+#endif
     for (unsigned int i = 0; i < len; ++i) {
       bool doFree = false;
       if (stableLocations && i == len-1) doFree = true;
 #if CMK_ONESIDED_IMPL
       // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
       // first element during CMK_ZC_BCAST_ALL_DONE_MSG
-      if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
+      if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
+        doFree = false;
+      }
 #endif
       CmiAssert(i < localElemVec.size());
       broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);

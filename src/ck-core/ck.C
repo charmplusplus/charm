@@ -1067,11 +1067,11 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 
   _invokeEntry(epIdx,env,obj);
 
-#if CMK_ONESIDED_IMPL && CMK_SMP
-  if(msgType == CMK_ZC_BCAST_RECV_DONE_MSG) {
-    updatePeerCounterAndPush(env);
-  }
-#endif
+//#if CMK_ONESIDED_IMPL && CMK_SMP
+//  if(msgType == CMK_ZC_BCAST_RECV_DONE_MSG) {
+//    updatePeerCounterAndPush(env);
+//  }
+//#endif
 
 #if CMK_LBDB_ON
   if (objstopped) the_lbmgr->ObjectStart(objHandle);
