@@ -1055,9 +1055,9 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
     int numElems = mgr->getNumLocalElems();
 
     if(numElems > 1) {
-      tagArray = new int[numElems * numops];
+      tagArray = new int[CmiMyNodeSize() * numElems * numops];
 
-      memset(tagArray, -1, numElems * numops * sizeof(int));
+      memset(tagArray, -1, CmiMyNodeSize() * numElems * numops * sizeof(int));
 
       peerAckInfo = new NcpyBcastRecvPeerAckInfo();
       //peerAckInfo->setNumPeers(numElems - 1);
@@ -1258,11 +1258,11 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
     post->ncpyEmInfo->counter++;
 
     CkArray *mgr = getArrayMgrFromMsg(env);
-    int size = mgr->getNumLocalElems();
+    int arraySize = mgr->getNumLocalElems();
 
     CkMigratable *elem = mgr->getEltFromArrMgr(post->arrayIndex);
     int localIndex = mgr->getEltLocalIndex(post->arrayIndex);
-    post->tagArray[localIndex*numops + post->opIndex] = post->tag;
+    post->tagArray[CmiMyRank() * arraySize * numops + localIndex * numops + post->opIndex] = post->tag;
 
     int arrayIndex = post->ncpyEmInfo->arrayId;
     if(post->ncpyEmInfo->counter == numops) {
@@ -1300,14 +1300,14 @@ void incPeerCounter(void *ref) {
   CmiPrintf("[%d][%d][%d] incPeerCounter incremented to %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), peerAckInfo->getNumPeers());
 }
 
-bool isUnposted(int *tagArray, int localIndex, int numops) {
+bool isUnposted(int *tagArray, int arraySize, int localIndex, int numops) {
   int opIndex = 0;
-  CmiPrintf("[%d][%d][%d] isPosted value of tagArray is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), tagArray[localIndex*numops + opIndex]);
-  return (tagArray[localIndex*numops + opIndex] == -1);
+  CmiPrintf("[%d][%d][%d] isPosted value of tagArray is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), tagArray[CmiMyRank() * arraySize * numops + localIndex * numops + opIndex]);
+  return (tagArray[CmiMyRank() * arraySize * numops + localIndex * numops + opIndex] == -1);
 }
 
-int extractStoredBuffer(int *tagArray, int numops, int arrayIndex, int count, void *&ptr) {
-  int tag = tagArray[arrayIndex * numops + count];
+int extractStoredBuffer(int *tagArray, int arraySize, int numops, int arrayIndex, int count, void *&ptr) {
+  int tag = tagArray[CmiMyRank() * arraySize * numops + arrayIndex * numops + count];
   auto iter = CkpvAccess(ncpyPostedReqMap).find(tag);
 
   if(iter == CkpvAccess(ncpyPostedReqMap).end()) { // Entry not found in ncpyPostedReqMap
@@ -1563,9 +1563,10 @@ void CkRdmaEMBcastAckHandler(void *ack) {
         } else {
           // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
           // that this is the final message containing the posted pointers
-          CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
-          QdCreate(1);
-          enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
+
+          //CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+          //QdCreate(1);
+          //enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
         }
 #else
         // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi

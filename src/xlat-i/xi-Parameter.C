@@ -738,11 +738,11 @@ void Parameter::printPeerAckInfo(XStr& str, bool genRdma, bool isSDAGGen, bool d
 void Parameter::extractPostedPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count) {
   Type* dt = type->deref();  // Type, without &
   if (isRdma()) {
-    if(count == 0) {
-      str << "void *peerAckInfo = (void *)(ncpyBuffer_" << name << ".peerAckInfo);\n";
-    }
+    //if(count == 0) {
+    //  str << "void *peerAckInfo = (void *)(ncpyBuffer_" << name << ".peerAckInfo);\n";
+    //}
     // count, env, thisIndex, CkNcpyBuffer
-    str << arrLen << ".t = extractStoredBuffer(ncpyBuffer_" << name << ".tagArray, impl_num_rdma_fields, localIndex, "<< count++ << ", (void *&)ncpyBuffer_" << name << "_ptr);\n";
+    str << arrLen << ".t = extractStoredBuffer(ncpyBuffer_" << name << ".tagArray, arraySize, impl_num_rdma_fields, localIndex, "<< count++ << ", (void *&)ncpyBuffer_" << name << "_ptr);\n";
   }
 }
 

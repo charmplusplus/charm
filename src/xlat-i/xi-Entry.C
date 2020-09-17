@@ -1957,7 +1957,7 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "    int arraySize = mgr->getNumLocalElems();\n";
       param->printPeerAckInfo(str, isSDAGGen);
 
-      str << "      if(isUnposted(tagArray, localIndex, impl_num_rdma_fields)) {\n";
+      str << "      if(isUnposted(tagArray, arraySize, localIndex, impl_num_rdma_fields)) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
       for (int index = 0; index < numRdmaRecvParams; index++)
         str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
