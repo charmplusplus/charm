@@ -488,6 +488,8 @@ size_t CkPostBufferLater(CkNcpyBufferPost *post, int index);
 
 void updatePeerCounter(void *ref);
 
+bool isUnposted(int *tagArray, int localIndex, int size);
+
 int extractStoredBuffer(int *tagArray, int arraySize, int arrayIndex, int count, void *&ptr);
 
 // Function declaration for EM Ncpy Ack handler initialization

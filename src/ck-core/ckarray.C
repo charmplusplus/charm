@@ -1620,10 +1620,10 @@ void CkArray::forwardZCMsgToOtherElems(envelope *env) {
 }
 void CkArray::forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem) {
   bool doFree = false;
-  int msgType = CMI_ZC_MSGTYPE(env);
-  CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_MY_RECV_DONE_MSG;
+  //int msgType = CMI_ZC_MSGTYPE(env);
+  //CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_MY_RECV_DONE_MSG;
   broadcaster->deliverAlreadyDelivered((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)elem, doFree);
-  CMI_ZC_MSGTYPE(env) = msgType;
+  //CMI_ZC_MSGTYPE(env) = msgType;
 }
 
 void CkArray::forwardZCMsgToZerothElem(envelope *env) {
