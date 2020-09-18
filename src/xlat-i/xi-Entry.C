@@ -1952,12 +1952,12 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       }
       str << "  } else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
 
-      str << "    CkArray *mgr = getArrayMgrFromMsg(env);\n";
-      str << "    int localIndex = mgr->getEltLocalIndex(impl_obj->thisIndex);\n";
-      str << "    int arraySize = mgr->getNumLocalElems();\n";
+      //str << "    CkArray *mgr = getArrayMgrFromMsg(env);\n";
+      //str << "    int localIndex = mgr->getEltLocalIndex(impl_obj->thisIndex);\n";
+      //str << "    int arraySize = mgr->getNumLocalElems();\n";
       param->printPeerAckInfo(str, isSDAGGen);
 
-      str << "      if(isUnposted(tagArray, arraySize, localIndex, impl_num_rdma_fields)) {\n";
+      str << "      if(isUnposted(tagArray, env, impl_obj->thisIndex, impl_num_rdma_fields)) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
       for (int index = 0; index < numRdmaRecvParams; index++)
         str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";

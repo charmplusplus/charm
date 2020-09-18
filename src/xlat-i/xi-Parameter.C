@@ -742,7 +742,7 @@ void Parameter::extractPostedPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool 
     //  str << "void *peerAckInfo = (void *)(ncpyBuffer_" << name << ".peerAckInfo);\n";
     //}
     // count, env, thisIndex, CkNcpyBuffer
-    str << arrLen << ".t = extractStoredBuffer(ncpyBuffer_" << name << ".tagArray, arraySize, impl_num_rdma_fields, localIndex, "<< count++ << ", (void *&)ncpyBuffer_" << name << "_ptr);\n";
+    str << arrLen << ".t = extractStoredBuffer(ncpyBuffer_" << name << ".tagArray, env, impl_obj->thisIndex, impl_num_rdma_fields, "<< count++ << ", (void *&)ncpyBuffer_" << name << "_ptr);\n";
   }
 }
 

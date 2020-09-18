@@ -527,10 +527,12 @@ void updatePeerCounter(void *ref);
 
 void updateTagArray(envelope *env, int localElems);
 
-bool isUnposted(std::vector<std::vector<int>> *tagArray, int arraySize, int localIndex, int numops);
+//bool isUnposted(std::vector<std::vector<int>> *tagArray, int arraySize, int localIndex, int numops);
+bool isUnposted(std::vector<std::vector<int>> *tagArray, envelope *env, int localIndex, int numops);
 //bool isUnposted(int *tagArray, int arraySize, int localIndex, int numops);
 
-int extractStoredBuffer(std::vector<std::vector<int>> *tagArray, int arraySize, int numops, int arrayIndex, int count, void *&ptr);
+int extractStoredBuffer(std::vector<std::vector<int>> *tagArray, envelope *env, int localIndex, int numops, int opIndex, void *&ptr);
+//int extractStoredBuffer(std::vector<std::vector<int>> *tagArray, int arraySize, int numops, int arrayIndex, int count, void *&ptr);
 //int extractStoredBuffer(int *tagArray, int arraySize, int numops, int arrayIndex, int count, void *&ptr);
 
 // Function declaration for EM Ncpy Ack handler initialization
@@ -546,6 +548,11 @@ struct zcPupPendingRgetsMsg {
 #endif
 };
 
+void handleArrayMsgOnChildPostCompletionForRecvBcast(envelope *env);
+
+void handleGroupMsgOnChildPostCompletionForRecvBcast(envelope *env);
+
+void handleNGMsgOnChildPostCompletionForRecvBcast(envelope *env);
 
 void zcPupGetCompleted(NcpyOperationInfo *ncpyOpInfo);
 

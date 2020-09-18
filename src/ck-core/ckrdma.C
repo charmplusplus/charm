@@ -1098,6 +1098,36 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
     CmiPrintf("[%d][%d][%d] CkRdmaPostLaterPreprocess Array Bcast Msg env=%p numops=%d num array elems = %d, tagArray =%p, peerAckInfo=%p and setting it to %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), env, numops, numElems, tagArray, peerAckInfo, numElems - 1);
   }
 
+#if CMK_SMP
+  else if(env->getMsgtype() == ForBocMsg) {
+
+    //CkArray *mgr = getArrayMgrFromMsg(env);
+    int numElems = CmiMyNodeSize();
+
+    //if(numElems > 1) {
+      //tagArray = new int[CmiMyNodeSize() * numElems * numops];
+      tagArray = new std::vector< std::vector<int> >;
+      //int[CmiMyNodeSize() * numElems * numops];
+
+      //memset(tagArray, -1, CmiMyNodeSize() * numElems * numops * sizeof(int));
+      tagArray->resize(CmiMyNodeSize());
+
+      for(int i=0; i < CmiMyNodeSize(); i++) {
+        (*tagArray)[i].resize(numops);
+        std::fill((*tagArray)[i].begin(), (*tagArray)[i].end(), -1);
+      }
+
+      peerAckInfo = new NcpyBcastRecvPeerAckInfo();
+      //peerAckInfo->setNumPeers(CmiMyNodeSize() * numElems - 1);
+      peerAckInfo->setNumElems(numElems - 1);
+      peerAckInfo->setNumPeers(0);
+      peerAckInfo->msg = (void *)env;
+      peerAckInfo->peerParentPe = CmiMyPe();
+    //}
+      CmiPrintf("[%d][%d][%d] CkRdmaPostLaterPreprocess Group Bcast Msg env=%p numops=%d num array elems = %d, tagArray =%p, peerAckInfo=%p and setting it to %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), env, numops, numElems, tagArray, peerAckInfo, numElems - 1);
+  }
+#endif
+
   if(ncpyMode == CkNcpyMode::RDMA) {
     preprocessRdmaCaseForRgets(layerInfoSize, ncpyObjSize, extraSize, refSize, numops);
     ref = (char *)CmiAlloc(refSize);
@@ -1287,29 +1317,36 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
 
     post->ncpyEmInfo->counter++;
 
-    CkArray *mgr = getArrayMgrFromMsg(env);
-    int arraySize = mgr->getNumLocalElems();
+    if(env->getMsgtype() == ArrayBcastFwdMsg) {
+      CkArray *mgr = getArrayMgrFromMsg(env);
+      int arraySize = mgr->getNumLocalElems();
 
-    CkMigratable *elem = mgr->getEltFromArrMgr(post->arrayIndex);
-    int localIndex = mgr->getEltLocalIndex(post->arrayIndex);
-    //post->tagArray[CmiMyRank() * arraySize * numops + localIndex * numops + post->opIndex] = post->tag;
-    //post->tagArray[CmiMyRank() * arraySize * numops + localIndex * numops + post->opIndex] = post->tag;
-    //
-    //post->tagArray[CmiMyRank()][localIndex*numops + post->opIndex] = (int )(post->tag);
-    (*(post->tagArray))[CmiMyRank()][localIndex * numops + post->opIndex] = post->tag;
+      CkMigratable *elem = mgr->getEltFromArrMgr(post->arrayIndex);
+      int localIndex = mgr->getEltLocalIndex(post->arrayIndex);
+      //post->tagArray[CmiMyRank() * arraySize * numops + localIndex * numops + post->opIndex] = post->tag;
+      //post->tagArray[CmiMyRank() * arraySize * numops + localIndex * numops + post->opIndex] = post->tag;
+      //
+      //post->tagArray[CmiMyRank()][localIndex*numops + post->opIndex] = (int )(post->tag);
+      (*(post->tagArray))[CmiMyRank()][localIndex * numops + post->opIndex] = post->tag;
 
-    int arrayIndex = post->ncpyEmInfo->arrayId;
-    if(post->ncpyEmInfo->counter == numops) {
+      int arrayIndex = post->ncpyEmInfo->arrayId;
+
+      if(post->ncpyEmInfo->counter == numops) {
 
 
-      CmiPrintf("[%d][%d][%d] CkPostBuffer rdma layer all ops completed for secondary array element idx=%d, elem is %p, count=%d, localElemId=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), arrayIndex, elem, post->opIndex, mgr->getEltLocalIndex(post->arrayIndex));
-
-      mgr->forwardZCMsgToSpecificElem(env, elem);
+        CmiPrintf("[%d][%d][%d] CkPostBuffer rdma layer all ops completed for secondary array element idx=%d, elem is %p, count=%d, localElemId=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), arrayIndex, elem, post->opIndex, mgr->getEltLocalIndex(post->arrayIndex));
+        mgr->forwardZCMsgToSpecificElem(env, elem);
+      }
       //CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
       //// Enqueue message
       //enqueueNcpyMessage(CkMyPe(), post.ncpyEmInfo->msg);
       //// Free ncpyEmInfo
       //CmiFree(post.ncpyEmInfo);
+    } else if(env->getMsgtype() == ForBocMsg) {
+      int localIndex = CmiMyRank();
+      (*(post->tagArray))[CmiMyRank()][post->opIndex] = post->tag;
+      CmiPrintf("[%d][%d][%d] CkPostBuffer rdma layer all ops completed for secondary group element group idx=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), CmiMyRank());
+      CmiHandleMessage(env);
     }
   }
 }
@@ -1335,15 +1372,35 @@ void incPeerCounter(void *ref) {
   CmiPrintf("[%d][%d][%d] incPeerCounter incremented to %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), peerAckInfo->getNumPeers());
 }
 
-bool isUnposted(std::vector<std::vector<int>> *tagArray, int arraySize, int localIndex, int numops) {
+bool isUnposted(std::vector<std::vector<int>> *tagArray, envelope *env, int elemIndex, int numops) {
   int opIndex = 0;
-  CmiPrintf("[%d][%d][%d] isPosted value of tagArray is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), (*tagArray)[CmiMyRank()][localIndex * numops + opIndex]);
-  //return (tagArray[CmiMyRank() * arraySize * numops + localIndex * numops + opIndex] == -1);
-  return ((*tagArray)[CmiMyRank()][localIndex * numops + opIndex] == -1 );
+  int localIndex = -1;
+  if(env->getMsgtype() == ArrayBcastFwdMsg) {
+    CkArray *mgr = getArrayMgrFromMsg(env);
+    int arraySize = mgr->getNumLocalElems();
+    localIndex = mgr->getEltLocalIndex(elemIndex);
+    CmiPrintf("[%d][%d][%d] isPosted value of tagArray is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), (*tagArray)[CmiMyRank()][localIndex * numops + opIndex]);
+    //return (tagArray[CmiMyRank() * arraySize * numops + localIndex * numops + opIndex] == -1);
+    return ((*tagArray)[CmiMyRank()][localIndex * numops + opIndex] == -1 );
+  } else {
+    localIndex = CmiMyRank();
+    CmiPrintf("[%d][%d][%d] isPosted value of tagArray for groups is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), (*tagArray)[CmiMyRank()][opIndex]);
+    return ((*tagArray)[CmiMyRank()][opIndex] == -1 );
+  }
 }
 
-int extractStoredBuffer(std::vector<std::vector<int>> *tagArray, int arraySize, int numops, int arrayIndex, int count, void *&ptr) {
-  int tag = (*tagArray)[CmiMyRank()][arrayIndex * numops + count];
+int extractStoredBuffer(std::vector<std::vector<int>> *tagArray, envelope *env, int elemIndex, int numops, int opIndex, void *&ptr) {
+  int tag = -1;
+  int localIndex = -1;
+  if(env->getMsgtype() == ArrayBcastFwdMsg) {
+    CkArray *mgr = getArrayMgrFromMsg(env);
+    int arraySize = mgr->getNumLocalElems();
+    localIndex = mgr->getEltLocalIndex(elemIndex);
+    tag = (*tagArray)[CmiMyRank()][localIndex * numops + opIndex];
+  } else if(env->getMsgtype() == ForBocMsg) {
+    localIndex = CmiMyRank();
+    tag = (*tagArray)[CmiMyRank()][opIndex];
+  }
 
   //int tag = tagArray[CmiMyRank() * arraySize * numops + arrayIndex * numops + count];
   auto iter = CkpvAccess(ncpyPostedReqMap).find(tag);
@@ -1584,36 +1641,48 @@ void CkRdmaEMBcastAckHandler(void *ack) {
 #if CMK_REG_REQUIRED
         deregisterMemFromMsg(myMsg, true);
 #endif
+
+
+        //handleMsgOnChildPostCompletionForRecvBcast(env);
+
         CkArray *mgr = NULL;
         CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_DONE_MSG;
 
         CkUnpackMessage(&myMsg); // DO NOT REMOVE THIS
 
-        CmiPrintf("[%d][%d][%d] isRecv interim node\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+        CmiPrintf("[%d][%d][%d] isRecv interim node msgType:%d, arrayBcastMsgType:%d, ForBocMsg:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), myMsg->getMsgtype(), ArrayBcastFwdMsg, ForBocMsg);
 
         if(bcastInterimAckInfo->isArray) {
-          mgr = getArrayMgrFromMsg(myMsg);
-          mgr->forwardZCMsgToOtherElems(myMsg);
+          handleArrayMsgOnChildPostCompletionForRecvBcast(myMsg);
+        } else if(myMsg->getMsgtype() == ForBocMsg) {
+          handleGroupMsgOnChildPostCompletionForRecvBcast(myMsg);
+        } else if(myMsg->getMsgtype() == ForNodeBocMsg) {
+          handleNGMsgOnChildPostCompletionForRecvBcast(myMsg);
         }
-#if CMK_SMP
-        if(CmiMyNodeSize() > 1 && myMsg->getMsgtype() != ForNodeBocMsg) {
-          sendRecvDoneMsgToPeers(myMsg, mgr);
-        } else {
-          // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
-          // that this is the final message containing the posted pointers
 
-          //CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
-          //QdCreate(1);
-          //enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
-        }
-#else
-        // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
-        // that this is the final message containing the posted pointers
-        //CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
-
-        //QdCreate(1);
-        //enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
-#endif
+//        if(bcastInterimAckInfo->isArray) {
+//          mgr = getArrayMgrFromMsg(myMsg);
+//          mgr->forwardZCMsgToOtherElems(myMsg);
+//        }
+//#if CMK_SMP
+//        if(CmiMyNodeSize() > 1 && myMsg->getMsgtype() != ForNodeBocMsg) {
+//          sendRecvDoneMsgToPeers(myMsg, mgr);
+//        } else {
+//          // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
+//          // that this is the final message containing the posted pointers
+//
+//          //CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+//          //QdCreate(1);
+//          //enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
+//        }
+//#else
+//        // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
+//        // that this is the final message containing the posted pointers
+//        //CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+//
+//        //QdCreate(1);
+//        //enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
+//#endif
       } else { // bcast send api
 
         // deregister using the message
