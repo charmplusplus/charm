@@ -85,3 +85,19 @@
 #define CMK_REG_REQUIRED                                   CMK_ONESIDED_IMPL
 
 #define CMK_CONVERSE_MPI                                   0
+
+/*
+ * Specifies which version of PMI to use.
+ * See src/arch/ofi/machine.C
+ */
+#define CMK_USE_PMI                                     1
+#define CMK_USE_PMI2                                    0
+#define CMK_USE_PMIX                                    0
+
+/*
+ * Use Simple client-side implementation of PMI.
+ * Valid only for CMK_USE_PMI.
+ * Optional in an SLURM environment.
+ * See src/arch/util/proc_management/simple_pmi/
+ */
+#define CMK_USE_SIMPLEPMI                               1

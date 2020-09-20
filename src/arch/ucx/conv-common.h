@@ -85,3 +85,9 @@
 
 #undef  CMK_HAS_CMA
 #define  CMK_HAS_CMA                                       0
+
+/* By default use simple PMI */
+#define CMK_USE_PMI                    1
+#define CMK_USE_SIMPLEPMI              1
+#define CMK_USE_PMI2                   0
+#define CMK_USE_PMIX                   0

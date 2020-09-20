@@ -28,6 +28,12 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   set(CMK_HAS_OPENMP 0)
 endif()
 
+# CMA
+set(CMK_USE_CMA ${CMK_HAS_CMA})
+if(NETWORK STREQUAL "multicore" OR NETWORK MATCHES "bluegeneq")
+  set(CMK_USE_CMA 0)
+endif()
+
 
 # Misc. linker flags (mostly for Charm4py)
 include(CheckCCompilerFlag)
@@ -95,6 +101,8 @@ set(CMK_CKSECTIONINFO_STL 1)
 # Create conv-autoconfig.h by iterating over all variable names and #defining them.
 get_cmake_property(_variableNames VARIABLES)
 list (SORT _variableNames)
+
+list(REMOVE_ITEM _variableNames CMK_USE_CMA)
 
 set(optfile ${CMAKE_BINARY_DIR}/include/conv-autoconfig.h)
 file(REMOVE ${optfile})

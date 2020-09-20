@@ -67,11 +67,16 @@ endif
 .C.o:
 	$(CHARMC) -c $<
 
-all: AMPI AMPIF $(COMPATLIB) $(ROMIO)
+MAJOR_TARGETS := AMPI
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  MAJOR_TARGETS += AMPIF
+endif
+
+all: $(MAJOR_TARGETS) $(COMPATLIB) $(ROMIO)
 
 # AMPI and AMPIF are order-only dependencies (|), i.e., no up-to-date check
 # is done, in order to prevent ROMIO recompilation when AMPI changes.
-$(ROMIO): | AMPI AMPIF
+$(ROMIO): | $(MAJOR_TARGETS)
 	@echo "Building ROMIO"
 # update timestamps on these files so that ROMIO's Makefile does not run configure a second time
 	@touch romio/aclocal.m4 romio/Makefile.in romio/configure romio/config.status
@@ -112,11 +117,11 @@ $(DEST): $(OBJS) headers
 	cp $(AMPI_LIB).dep $(AMPI_LIBDIR)/$(AMPI_LIB).dep
 
 $(DESTF): $(OBJS) headers
-	-$(CHARMC) -c ampifimpl.f90 -o $(AMPIFIMPL_OBJ)
-	-$(CHARMC) -c ampimod.f90 -o $(AMPIMOD_OBJ)
-	-$(CHARMC) -cpmod ../../../../include mpi.M
-	-$(CHARMC) $(OBJS) $(AMPIFIMPL_OBJ) $(AMPIMOD_OBJ) -o $@
-	-cp $(AMPI_LIB)f.dep $(AMPI_LIBDIR)/$(AMPI_LIB)f.dep
+	$(CHARMC) -c ampifimpl.f90 -o $(AMPIFIMPL_OBJ)
+	$(CHARMC) -c ampimod.f90 -o $(AMPIMOD_OBJ)
+	$(CHARMC) -cpmod ../../../../include mpi.M
+	$(CHARMC) $(OBJS) $(AMPIFIMPL_OBJ) $(AMPIMOD_OBJ) -o $@
+	cp $(AMPI_LIB)f.dep $(AMPI_LIBDIR)/$(AMPI_LIB)f.dep
 
 $(COMPATLIB): $(COMPAT)
 	$(CHARMC) $(COMPAT) -o $@
@@ -210,7 +215,7 @@ $(FUNCPTR_SHIM_FMPIMAIN_OBJ): ampi_funcptr_shim_fmpimain.C
 	$(CHARMC) -fPIE -c $< -o $@
 
 $(FUNCPTR_SHIM_FORTRAN_OBJ): ampif.C $(HEADDEP)
-	-$(CHARMC) -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
+	$(CHARMC) -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
 
 $(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP)
 	$(CHARMC) -c $< -o $@
@@ -226,4 +231,4 @@ $(GLOBALS_PIP_OBJ): ampi_globals_pip.C $(HEADDEP)
 
 clean:
 	rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) $(COMPATLIB) conv-host charmrun headers *.mod
-	- cd romio && $(MAKE) clean
+	-$(MAKE) -C romio clean
