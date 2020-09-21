@@ -1256,10 +1256,6 @@ private:
   int cutoffFractionNum;
   int cutoffFractionDen;
 
-  inline void localMassDeliver(uint64_t msg_ptr) override {
-    // TODO
-  }
-
   inline void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,
       int sourcePe) override {
     ClientType *clientObj;
