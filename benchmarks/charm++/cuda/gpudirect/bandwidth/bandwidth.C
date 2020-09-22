@@ -30,7 +30,8 @@ class Main : public CBase_Main {
     window_size = 64;
 
     if (CkNumPes() != 2) {
-      CkAbort("There should be 2 PEs");
+      CkPrintf("Error: there should be 2 PEs");
+      CkExit(1);
     }
 
     // Process command line arguments
@@ -56,14 +57,15 @@ class Main : public CBase_Main {
           window_size = atoi(optarg);
           break;
         default:
-          CkAbort("Unknown command line argument detected");
+          CkPrintf("Unknown command line argument detected");
+          CkExit(1);
       }
     }
     delete m;
 
     if (n_iters_reg > MAX_ITERS || n_iters_large > MAX_ITERS) {
       CkPrintf("Number of iterations must be less than %d\n", MAX_ITERS);
-      CkExit();
+      CkExit(1);
     }
 
     // Print info
