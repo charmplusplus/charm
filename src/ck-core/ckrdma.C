@@ -17,15 +17,21 @@
 
 // Integer used to store the ncpy ack handler idx
 static int ncpy_handler_idx, ncpy_bcastNo_handler_idx, zcpy_pup_complete_handler_idx;
-CkpvDeclare(size_t, postTag);
+CkpvDeclare(int, postTag);
 CkpvExtern(ReqTagPostMap, ncpyPostedReqMap);
 CpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets);
 CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
 CksvExtern(CmiNodeLock, _nodeZCPendingLock);
 
+//#if CMK_SMP
+CksvExtern(int, postNodeTag);
+CksvExtern(ReqTagPostMap, ncpyPostedReqNodeMap);
+CksvExtern(CmiNodeLock, _nodeZCPostReqLock);
+//#endif
+
 void CkOnesidedInit() {
-  CkpvInitialize(size_t, postTag);
-  CkpvAccess(postTag) = 0;
+  CkpvInitialize(int, postTag);
+  CkpvAccess(postTag) = 1;
 }
 
 /*********************************** Zerocopy Direct API **********************************/
@@ -1144,16 +1150,35 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
   for(int i=0; i<numops; i++) {
     post[i].ncpyEmInfo = (NcpyEmInfo *)ref;
     CmiPrintf("[%d][%d][%d] CkPostBufferLater i=%d posting tag=%d and setting ncpyEmInfo to %p and extraSize is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, post[i].tag, post[i].ncpyEmInfo, extraSize);
-    CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
+
+    if(env->getMsgtype() == ForNodeBocMsg) {
+      CmiLock(CksvAccess(_nodeZCPostReqLock));
+      CksvAccess(ncpyPostedReqNodeMap).emplace(post[i].tag, post[i]);
+      CmiUnlock(CksvAccess(_nodeZCPostReqLock));
+    } else {
+      CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
+    }
   }
 }
 
 void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
-  CmiPrintf("[%d][%d][%d] CkPostBuffer buffer=%p, size=%d, tag=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), destBuffer, destSize, tag);
-  auto iter = CkpvAccess(ncpyPostedReqMap).find(tag);
 
-  if(iter == CkpvAccess(ncpyPostedReqMap).end()) { // Entry not found in ncpyPostedReqMap
-    CkAbort("CkPostBuffer: Tag:%d not found on Pe:%d\n", tag, CmiMyPe());
+  CmiPrintf("[%d][%d][%d] CkPostBuffer buffer=%p, size=%d, tag=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), destBuffer, destSize, tag);
+
+  auto iter = (tag >= 0) ? CkpvAccess(ncpyPostedReqMap).find(tag) : CksvAccess(ncpyPostedReqNodeMap).find(tag);
+
+  if(tag >= 0) {
+    //auto iter = CkpvAccess(ncpyPostedReqMap).find(tag);
+
+    if(iter == CkpvAccess(ncpyPostedReqMap).end()) { // Entry not found in ncpyPostedReqMap
+      CkAbort("CkPostBuffer: Tag:%d not found on Pe:%d\n", tag, CmiMyPe());
+    }
+  } else {
+    //auto iter = CksvAccess(ncpyPostedReqNodeMap).find(tag);
+
+    if(iter == CksvAccess(ncpyPostedReqNodeMap).end()) { // Entry not found in ncpyPostedReqNodeMap
+      CkAbort("CkPostBuffer: Tag:%d not found on Node:%d\n", tag, CmiMyNode());
+    }
   }
 
   CkNcpyBufferPost *post = &(iter->second);
@@ -1391,12 +1416,12 @@ bool isUnposted(std::vector<std::vector<int>> *tagArray, envelope *env, int elem
   } else {
     localIndex = CmiMyRank();
     CmiPrintf("[%d][%d][%d] isPosted value of tagArray for groups is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), (*tagArray)[CmiMyRank()][opIndex]);
-    return ((*tagArray)[CmiMyRank()][opIndex] == -1 );
+    return ((*tagArray)[CmiMyRank()][opIndex] == 0);
   }
 }
 
 int extractStoredBuffer(std::vector<std::vector<int>> *tagArray, envelope *env, int elemIndex, int numops, int opIndex, void *&ptr) {
-  int tag = -1;
+  int tag = 0;
   int localIndex = -1;
   if(env->getMsgtype() == ArrayBcastFwdMsg) {
     CkArray *mgr = getArrayMgrFromMsg(env);
@@ -2399,7 +2424,14 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
   for(int i=0; i<numops; i++) {
     post[i].ncpyEmInfo = (NcpyEmInfo *)ref;
     CmiPrintf("[%d][%d][%d] CkPostBufferLater i=%d posting tag=%d and setting ncpyEmInfo to %p \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, post[i].tag, post[i].ncpyEmInfo);
-    CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
+    if(env->getMsgtype() == ForNodeBocMsg) {
+      CmiLock(CksvAccess(_nodeZCPostReqLock));
+      CksvAccess(ncpyPostedReqNodeMap).emplace(post[i].tag, post[i]);
+      CmiUnlock(CksvAccess(_nodeZCPostReqLock));
+    } else {
+      CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
+    }
+    //CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
   }
 }
 
@@ -2415,7 +2447,14 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
   for(int i=0; i<numops; i++) {
     post[i].ncpyEmInfo = (NcpyEmInfo *)ref;
     CmiPrintf("[%d][%d][%d] CkPostBufferLater i=%d posting tag=%d and setting ncpyEmInfo to %p \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, post[i].tag, post[i].ncpyEmInfo);
-    CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
+    if(env->getMsgtype() == ForNodeBocMsg) {
+      CmiLock(CksvAccess(_nodeZCPostReqLock));
+      CksvAccess(ncpyPostedReqNodeMap).emplace(post[i].tag, post[i]);
+      CmiUnlock(CksvAccess(_nodeZCPostReqLock));
+    } else {
+      CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
+    }
+//    CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
   }
 }
 
@@ -2463,9 +2502,14 @@ void setNcpyEmInfo(char *ref, envelope *env, int &numops, void *forwardMsg, ncpy
     ncpyEmInfo->mode = emMode; // P2P or BCAST
 }
 
-size_t CkPostBufferLater(CkNcpyBufferPost *post, int index) {
+int CkPostBufferLaterInternal(CkNcpyBufferPost *post, int index, bool nodeLevel) {
   post[index].postLater = true;
-  post[index].tag = CkpvAccess(postTag)++;
+
+  if(nodeLevel)
+    post[index].tag = CksvAccess(postNodeTag)--;
+  else
+    post[index].tag = CkpvAccess(postTag)++;
+
   return post[index].tag;
 }
 

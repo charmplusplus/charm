@@ -521,7 +521,7 @@ struct CkNcpyBufferPost {
 //#endif
 };
 
-size_t CkPostBufferLater(CkNcpyBufferPost *post, int index);
+int CkPostBufferLaterInternal(CkNcpyBufferPost *post, int index, bool nodeLevel);
 
 void updatePeerCounter(void *ref);
 

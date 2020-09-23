@@ -299,6 +299,10 @@ public:
 /// Pack/unpack routine (called before and after migration)
   void pup(PUP::er &p);
 
+  int CkPostBufferLater(CkNcpyBufferPost *post, int index) {
+    return CkPostBufferLaterInternal(post, index, false);
+  }
+
 //Overridden functions:
   /// Called by the system just before and after migration to another processor:
   virtual void ckAboutToMigrate(void);

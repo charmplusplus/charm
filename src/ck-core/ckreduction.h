@@ -19,6 +19,7 @@ The calls needed to use the reduction manager are:
 #define _CKREDUCTION_H
 
 #include "CkReduction.decl.h"
+#include "ckrdma.h"
 
 #ifdef _PIPELINED_ALLREDUCE_
 #define FRAG_SIZE 131072
@@ -615,6 +616,10 @@ class NodeGroup : public CkNodeReductionMgr {
 
     CK_REDUCTION_CONTRIBUTE_METHODS_DECL
     void contributeWithCounter(CkReductionMsg *msg,int count);
+
+    int CkPostBufferLater(CkNcpyBufferPost *post, int index) {
+      return CkPostBufferLaterInternal(post, index, true);
+    }
 };
 
 
@@ -875,6 +880,10 @@ class Group : public CkReductionMgr
 
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
         CK_BARRIER_CONTRIBUTE_METHODS_DECL
+
+  int CkPostBufferLater(CkNcpyBufferPost *post, int index) {
+    return CkPostBufferLaterInternal(post, index, false);
+  }
 };
 
 #ifdef _PIPELINED_ALLREDUCE_
