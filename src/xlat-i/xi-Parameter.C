@@ -785,7 +785,7 @@ void Parameter::copyFromPostedPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool
         str << "      ncpyPost[" << count  << "].srcSize = ncpyBuffer_" << name << ".cnt;\n";
         str << "      ncpyPost[" << count  << "].tagArray = ncpyBuffer_" << name << ".tagArray;\n";
         str << "      ncpyPost[" << count  << "].opIndex = " << count << ";\n";
-        str << "      ncpyPost[" << count  << "].arrayIndex = impl_obj->thisIndex;\n";
+        str << "      ncpyPost[" << count++ << "].arrayIndex = impl_obj->thisIndex;\n";
         str << "    }\n";
         //str << "  }\n";
       } else {

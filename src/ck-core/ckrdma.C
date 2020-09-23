@@ -1345,8 +1345,10 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
     } else if(env->getMsgtype() == ForBocMsg) {
       int localIndex = CmiMyRank();
       (*(post->tagArray))[CmiMyRank()][post->opIndex] = post->tag;
-      CmiPrintf("[%d][%d][%d] CkPostBuffer rdma layer all ops completed for secondary group element group idx=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), CmiMyRank());
-      CmiHandleMessage(env);
+      if(post->ncpyEmInfo->counter == numops) {
+        CmiPrintf("[%d][%d][%d] CkPostBuffer rdma layer all ops completed for secondary group element group idx=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), CmiMyRank());
+        CmiHandleMessage(env);
+      }
     }
   }
 }
@@ -1360,9 +1362,13 @@ void updatePeerCounter(void *ref) {
     CmiPrintf("[%d][%d][%d] updatePeerCounter ready to enqueue msg\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
     envelope *env = (envelope *)peerAckInfo->msg;
     CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
-    CkArray *mgr = getArrayMgrFromMsg(env);
-    //mgr->forwardZCMsgToZerothElem(env);
-    CmiPushPE(CmiRankOf(peerAckInfo->peerParentPe), env);
+
+    if(env->getMsgtype() == ArrayBcastFwdMsg) {
+      CkArray *mgr = getArrayMgrFromMsg(env);
+      mgr->forwardZCMsgToZerothElem(env);
+    } else if(env->getMsgtype() == ForBocMsg) {
+      CmiPushPE(CmiRankOf(peerAckInfo->peerParentPe), env);
+    }
   }
 }
 
