@@ -1,0 +1,19 @@
+mainmodule cudacallback {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Worker workers;
+  readonly int iterations;
+  readonly int data_count;
+  readonly int offload_pe;
+  readonly bool offload;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void done();
+  };
+
+  group Worker {
+    entry Worker();
+    entry void run();
+    entry void kernelDone();
+  };
+};
