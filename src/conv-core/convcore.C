@@ -3046,16 +3046,39 @@ CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
   return (CmiCommHandle) 0;
 }
 
-void CmiFreeListSendFn(int npes, const int *pes, int len, char *msg)
+void CmiFreeListSendFn(int npes, const int* pes, int len, char* msg)
 {
-  int i;
-  for(i=0;i<npes-1;i++) {
-    CmiSyncSend(pes[i], len, msg);
-  }
-  if (npes>0)
-    CmiSyncSendAndFree(pes[npes-1], len, msg);
-  else 
+  if (npes <= 0)
+  {
     CmiFree(msg);
+    return;
+  }
+
+  const int myNode = CmiMyNode();
+
+  // Since we reuse msg for multiple sends, separate into local vs remote sends
+  // to avoid race between remote sending and local unpacking.
+  // To avoid copies, use original message for type of send needed for pes[0],
+  // then copy if other type is found later.
+  char* localMsg = (myNode == CmiNodeOf(pes[0])) ? msg : nullptr;
+  char* remoteMsg = (myNode == CmiNodeOf(pes[0])) ? nullptr : msg;
+
+  for (int i = 0; i < npes; i++)
+  {
+    if (myNode == CmiNodeOf(pes[i]))
+    {
+      if (localMsg == nullptr) localMsg = CmiCopyMsg(msg, len);
+      CmiSyncSend(pes[i], len, localMsg);
+    }
+    else
+    {
+      if (remoteMsg == nullptr) remoteMsg = CmiCopyMsg(msg, len);
+      CmiSyncSend(pes[i], len, remoteMsg);
+    }
+  }
+
+  if (localMsg != nullptr) CmiFree(localMsg);
+  if (remoteMsg != nullptr) CmiFree(remoteMsg);
 }
 
 #endif
