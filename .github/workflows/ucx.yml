@@ -1,4 +1,4 @@
-name: UCX 1.8.1 Linux
+name: UCX 1.9.0 Linux
 
 on: [push]
 
@@ -20,7 +20,7 @@ jobs:
       run: sudo apt install libevent-dev
     - name: build-ucx
       run: |
-        git clone --recursive --depth 1 --shallow-submodules --branch v1.8.1 https://github.com/openucx/ucx.git
+        git clone --recursive --depth 1 --shallow-submodules --branch v1.9.0 https://github.com/openucx/ucx.git
         cd ucx
         ./autogen.sh
         ./contrib/configure-release --disable-numa
@@ -28,9 +28,9 @@ jobs:
         sudo make install
     - name: build-ompi
       run: |
-        wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.4.tar.gz
-        tar -xf openmpi-4.0.4.tar.gz
-        cd openmpi-4.0.4/
+        wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.5.tar.gz
+        tar -xf openmpi-4.0.5.tar.gz
+        cd openmpi-4.0.5/
         ./configure --enable-mca-no-build=btl-uct --enable-install-libpmix
         make -j 4
         sudo make install
