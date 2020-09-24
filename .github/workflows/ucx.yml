@@ -28,9 +28,9 @@ jobs:
         sudo make install
     - name: build-pmix
       run: |
-        wget https://github.com/openpmix/openpmix/releases/download/v2.2.4/pmix-2.2.4.tar.gz
-        tar xf pmix-2.2.4.tar.gz
-        cd pmix-2.2.4
+        wget https://github.com/openpmix/openpmix/releases/download/v3.1.5/pmix-3.1.5.tar.gz
+        tar xf pmix-3.1.5.tar.gz
+        cd pmix-3.1.5
         ./configure
         make -j4
         sudo make install
