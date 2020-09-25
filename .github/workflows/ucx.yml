@@ -20,18 +20,10 @@ jobs:
       run: sudo apt-get install libevent-dev libhwloc-dev
     - name: build-ompi
       run: |
-        wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.5.tar.gz
-        tar -xf openmpi-4.0.5.tar.gz
-        cd openmpi-4.0.5/
-        ./configure --enable-mca-no-build=btl-uct
-        make -j4
-        sudo make install
-    - name: build-pmix
-      run: |
-        wget https://github.com/openpmix/openpmix/releases/download/v3.1.5/pmix-3.1.5.tar.gz
-        tar -xf pmix-3.1.5.tar.gz
-        cd pmix-3.1.5
-        ./configure
+        wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.4.tar.gz
+        tar -xf openmpi-4.0.4.tar.gz
+        cd openmpi-4.0.4/
+        ./configure --enable-mca-no-build=btl-uct --enable-install-libpmix
         make -j4
         sudo make install
     - name: build-ucx
