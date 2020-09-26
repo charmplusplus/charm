@@ -18,20 +18,20 @@ jobs:
     #  uses: mxschmitt/action-tmate@v2
     - name: install-prerequisites
       run: sudo apt-get install libevent-dev libhwloc-dev
-    - name: build-ompi
-      run: |
-        wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.4.tar.gz
-        tar -xf openmpi-4.0.4.tar.gz
-        cd openmpi-4.0.4/
-        ./configure --enable-mca-no-build=btl-uct --enable-install-libpmix
-        make -j4
-        sudo make install
     - name: build-ucx
       run: |
         git clone --recursive --depth 1 --shallow-submodules --branch v1.9.0 https://github.com/openucx/ucx.git
         cd ucx
         ./autogen.sh
         ./contrib/configure-release --disable-numa
+        make -j4
+        sudo make install
+    - name: build-ompi
+      run: |
+        wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.4.tar.gz
+        tar -xf openmpi-4.0.4.tar.gz
+        cd openmpi-4.0.4/
+        ./configure --enable-mca-no-build=btl-uct --enable-install-libpmix
         make -j4
         sudo make install
     - name: build
