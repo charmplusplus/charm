@@ -333,6 +333,9 @@
 /* Define to 1 if the system has the type `RelationProcessorPackage'. */
 #undef HAVE_RELATIONPROCESSORPACKAGE
 
+/* Define to 1 if you have the <rocm_smi/rocm_smi.h> header file. */
+#undef HAVE_ROCM_SMI_ROCM_SMI_H
+
 /* Define to 1 if you have the `setlocale' function. */
 #undef HAVE_SETLOCALE
 
@@ -397,6 +400,9 @@
 
 /* Define to 1 if you have the <sys/sysctl.h> header file. */
 #undef HAVE_SYS_SYSCTL_H
+
+/* Define to 1 if you have the <sys/thr.h> header file. */
+#undef HAVE_SYS_THR_H
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
@@ -623,6 +629,9 @@
 
 /* Define to 1 if pthread mutexes are available */
 #undef HWLOC_HAVE_PTHREAD_MUTEX
+
+/* Define to 1 if you have the `RSMI' library. */
+#undef HWLOC_HAVE_RSMI
 
 /* Define to 1 if glibc provides a prototype of sched_setaffinity() */
 #undef HWLOC_HAVE_SCHED_SETAFFINITY
