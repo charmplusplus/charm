@@ -3033,57 +3033,23 @@ void CmiGroupInit(void)
 
 void CmiSyncListSendFn(int npes, const int* pes, int len, char* msg)
 {
-  // When in SMP mode, each send to a remote PE needs its own message,
-  // otherwise there is a race between setting the rank in the Converse
-  // header and the actual comm thread send
+  // When in SMP mode, each send needs its own message, there is a race between unpacking
+  // for local PEs and there is a race between setting the rank in the Converse header and
+  // the actual comm thread send for remote PEs
 #if CMK_SMP
-  const int myNode = CmiMyNode();
-  bool containsLocal = false;
-  int remoteCount = 0;
+  for (int i = 0; i < npes - 1; i++)
+  {
+    const char* msgCopy = CmiCopyMsg(msg, len);
+    CmiSyncSendAndFree(pes[i], len, msgCopy);
+  }
 
+  if (npes > 0) CmiSyncSend(pes[npes - 1], len, msg);
+#else
   for (int i = 0; i < npes; i++)
   {
-    if (CmiNodeOf(pes[i]) == myNode)
-      containsLocal = true;
-    else
-      remoteCount++;
+    CmiSyncSend(pes[i], len, msg);
   }
-
-  if (remoteCount > 0)
-  {
-    char* remoteMsg;
-    // If there are also local sends, make a copy for
-    // remote sends to avoid pack/unpack race
-    if (containsLocal)
-      remoteMsg = CmiCopyMsg(msg, len);
-    else
-    {
-      remoteMsg = msg;
-      // Increment refcount so original message isn't deleted when freed below
-      CmiReference(remoteMsg);
-    }
-
-    for (int i = 0; i < npes; i++)
-    {
-      if (CmiNodeOf(pes[i]) == myNode)
-        CmiSyncSend(pes[i], len, msg);
-      else
-      {
-        const char* currentMsg =
-            (remoteCount == 1) ? remoteMsg : CmiCopyMsg(remoteMsg, len);
-        CmiSyncSendAndFree(pes[i], len, currentMsg);
-        remoteCount--;
-      }
-    }
-  }
-  else
 #endif
-  {
-    for (int i = 0; i < npes; i++)
-    {
-      CmiSyncSend(pes[i], len, msg);
-    }
-  }
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
