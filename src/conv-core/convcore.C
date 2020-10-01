@@ -3031,11 +3031,58 @@ void CmiGroupInit(void)
 
 #if CMK_MULTICAST_LIST_USE_COMMON_CODE
 
-void CmiSyncListSendFn(int npes, const int *pes, int len, char *msg)
+void CmiSyncListSendFn(int npes, const int* pes, int len, char* msg)
 {
-  int i;
-  for(i=0;i<npes;i++) {
-    CmiSyncSend(pes[i], len, msg);
+  // When in SMP mode, each send to a remote PE needs its own message,
+  // otherwise there is a race between setting the rank in the Converse
+  // header and the actual comm thread send
+#if CMK_SMP
+  const int myNode = CmiMyNode();
+  bool containsLocal = false;
+  int remoteCount = 0;
+
+  for (int i = 0; i < npes; i++)
+  {
+    if (CmiNodeOf(pes[i]) == myNode)
+      containsLocal = true;
+    else
+      remoteCount++;
+  }
+
+  if (remoteCount > 0)
+  {
+    char* remoteMsg;
+    // If there are also local sends, make a copy for
+    // remote sends to avoid pack/unpack race
+    if (containsLocal)
+      remoteMsg = CmiCopyMsg(msg, len);
+    else
+    {
+      remoteMsg = msg;
+      // Increment refcount so original message isn't deleted when freed below
+      CmiReference(remoteMsg);
+    }
+
+    for (int i = 0; i < npes; i++)
+    {
+      if (CmiNodeOf(pes[i]) == myNode)
+        CmiSyncSend(pes[i], len, msg);
+      else
+      {
+        const char* currentMsg =
+            (remoteCount == 1) ? remoteMsg : CmiCopyMsg(remoteMsg, len);
+        CmiSyncSendAndFree(pes[i], len, currentMsg);
+        remoteCount--;
+      }
+    }
+  }
+  else
+#endif
+  {
+    for (int i = 0; i < npes; i++)
+    {
+      CmiSyncSend(pes[i], len, msg);
+    }
   }
 }
 
@@ -3048,37 +3095,8 @@ CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
 
 void CmiFreeListSendFn(int npes, const int* pes, int len, char* msg)
 {
-  if (npes <= 0)
-  {
-    CmiFree(msg);
-    return;
-  }
-
-  const int myNode = CmiMyNode();
-
-  // Since we reuse msg for multiple sends, separate into local vs remote sends
-  // to avoid race between remote sending and local unpacking.
-  // To avoid copies, use original message for type of send needed for pes[0],
-  // then copy if other type is found later.
-  char* localMsg = (myNode == CmiNodeOf(pes[0])) ? msg : nullptr;
-  char* remoteMsg = (myNode == CmiNodeOf(pes[0])) ? nullptr : msg;
-
-  for (int i = 0; i < npes; i++)
-  {
-    if (myNode == CmiNodeOf(pes[i]))
-    {
-      if (localMsg == nullptr) localMsg = CmiCopyMsg(msg, len);
-      CmiSyncSend(pes[i], len, localMsg);
-    }
-    else
-    {
-      if (remoteMsg == nullptr) remoteMsg = CmiCopyMsg(msg, len);
-      CmiSyncSend(pes[i], len, remoteMsg);
-    }
-  }
-
-  if (localMsg != nullptr) CmiFree(localMsg);
-  if (remoteMsg != nullptr) CmiFree(remoteMsg);
+  CmiSyncListSendFn(npes, pes, len, msg);
+  CmiFree(msg);
 }
 
 #endif
