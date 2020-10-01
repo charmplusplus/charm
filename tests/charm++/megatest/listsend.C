@@ -1,4 +1,5 @@
 #include "listsend.h"
+#include <numeric>
 
 #define VALUE 0x01ABCDEF
 
