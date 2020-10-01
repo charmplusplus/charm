@@ -3047,7 +3047,14 @@ void CmiSyncListSendFn(int npes, const int* pes, int len, char* msg)
 #else
   for (int i = 0; i < npes; i++)
   {
-    CmiSyncSend(pes[i], len, msg);
+    // Copy if this is a self send to avoid unpack/send race
+    if (pes[i] == CmiMyPe() && npes > 1)
+    {
+      const char* msgCopy = CmiCopyMsg(msg, len);
+      CmiSyncSendAndFree(pes[i], len, msgCopy);
+    }
+    else
+      CmiSyncSend(pes[i], len, msg);
   }
 #endif
 }
