@@ -81,7 +81,7 @@ EOF])
 
     # Get the version of hwloc that we are installing
     AC_MSG_CHECKING([for hwloc version])
-    HWLOC_VERSION="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION`"
+    HWLOC_VERSION=`sh "$HWLOC_top_srcdir/config/hwloc_get_version.sh" "$HWLOC_top_srcdir/VERSION"`
     if test "$?" != "0"; then
         AC_MSG_ERROR([Cannot continue])
     fi
@@ -90,16 +90,16 @@ EOF])
     AC_DEFINE_UNQUOTED([HWLOC_VERSION], ["$HWLOC_VERSION"],
                        [The library version, always available, even in embedded mode, contrary to VERSION])
 
-    HWLOC_VERSION_MAJOR="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --major`"
+    HWLOC_VERSION_MAJOR=`sh "$HWLOC_top_srcdir/config/hwloc_get_version.sh" "$HWLOC_top_srcdir/VERSION" --major`
     AC_DEFINE_UNQUOTED([HWLOC_VERSION_MAJOR], [$HWLOC_VERSION_MAJOR], [The library version major number])
-    HWLOC_VERSION_MINOR="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --minor`"
+    HWLOC_VERSION_MINOR=`sh "$HWLOC_top_srcdir/config/hwloc_get_version.sh" "$HWLOC_top_srcdir/VERSION" --minor`
     AC_DEFINE_UNQUOTED([HWLOC_VERSION_MINOR], [$HWLOC_VERSION_MINOR], [The library version minor number])
-    HWLOC_VERSION_RELEASE="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --release`"
+    HWLOC_VERSION_RELEASE=`sh "$HWLOC_top_srcdir/config/hwloc_get_version.sh" "$HWLOC_top_srcdir/VERSION" --release`
     AC_DEFINE_UNQUOTED([HWLOC_VERSION_RELEASE], [$HWLOC_VERSION_RELEASE], [The library version release number])
-    HWLOC_VERSION_GREEK="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --greek`"
+    HWLOC_VERSION_GREEK=`sh "$HWLOC_top_srcdir/config/hwloc_get_version.sh" "$HWLOC_top_srcdir/VERSION" --greek`
     AC_DEFINE_UNQUOTED([HWLOC_VERSION_GREEK], ["$HWLOC_VERSION_GREEK"], [The library version optional greek suffix string])
 
-    HWLOC_RELEASE_DATE="`sh $HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --release-date`"
+    HWLOC_RELEASE_DATE=`sh "$HWLOC_top_srcdir/config/hwloc_get_version.sh" "$HWLOC_top_srcdir/VERSION" --release-date`
     AC_SUBST(HWLOC_RELEASE_DATE)
 
     # Debug mode?
@@ -434,13 +434,6 @@ EOF])
     AC_CHECK_HEADERS([strings.h])
     AC_CHECK_HEADERS([ctype.h])
 
-    if test x$hwloc_freebsd = xyes; then
-
-      AC_CHECK_HEADERS([sys/domainset.h])
-
-    fi
-
-
     AC_CHECK_FUNCS([strcasecmp], [
       _HWLOC_CHECK_DECL([strcasecmp], [
 	AC_DEFINE([HWLOC_HAVE_DECL_STRCASECMP], [1], [Define to 1 if function `strcasecmp' is declared by system headers])
@@ -460,47 +453,254 @@ EOF])
     ])
     AC_CHECK_HEADERS([sys/mman.h])
 
-    old_CPPFLAGS="$CPPFLAGS"
-    CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0601"
-    AC_CHECK_TYPES([KAFFINITY,
-                    PROCESSOR_CACHE_TYPE,
-                    CACHE_DESCRIPTOR,
-                    LOGICAL_PROCESSOR_RELATIONSHIP,
-                    RelationProcessorPackage,
-                    SYSTEM_LOGICAL_PROCESSOR_INFORMATION,
-                    GROUP_AFFINITY,
-                    PROCESSOR_RELATIONSHIP,
-                    NUMA_NODE_RELATIONSHIP,
-                    CACHE_RELATIONSHIP,
-                    PROCESSOR_GROUP_INFO,
-                    GROUP_RELATIONSHIP,
-                    SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX,
-		    PSAPI_WORKING_SET_EX_BLOCK,
-		    PSAPI_WORKING_SET_EX_INFORMATION,
-		    PROCESSOR_NUMBER],
-                    [],[],[[#include <windows.h>]])
-    CPPFLAGS="$old_CPPFLAGS"
-    AC_CHECK_LIB([gdi32], [main],
-                 [HWLOC_LIBS="-lgdi32 $HWLOC_LIBS"
-                  AC_DEFINE([HAVE_LIBGDI32], 1, [Define to 1 if we have -lgdi32])])
-    AC_CHECK_LIB([user32], [PostQuitMessage], [hwloc_have_user32="yes"])
+    if test x$hwloc_freebsd = xyes; then
+      echo
+      echo "**** FreeBSD-specific checks"
 
-    AC_CHECK_HEADER([windows.h], [
-      AC_DEFINE([HWLOC_HAVE_WINDOWS_H], [1], [Define to 1 if you have the `windows.h' header.])
-    ])
+      AC_CHECK_HEADERS([sys/domainset.h])
+      AC_CHECK_HEADERS([sys/thr.h])
+      AC_CHECK_HEADERS([pthread_np.h])
+      AC_CHECK_HEADERS([sys/cpuset.h],,,[[#include <sys/param.h>]])
+      AC_CHECK_FUNCS([cpuset_setaffinity])
+      AC_CHECK_FUNCS([cpuset_setid])
 
-    AC_CHECK_HEADERS([sys/lgrp_user.h], [
-      AC_CHECK_LIB([lgrp], [lgrp_init],
-                   [HWLOC_LIBS="-llgrp $HWLOC_LIBS"
-                    AC_DEFINE([HAVE_LIBLGRP], 1, [Define to 1 if we have -llgrp])
-                    AC_CHECK_DECLS([lgrp_latency_cookie],,,[[#include <sys/lgrp_user.h>]])
+      echo "**** end of FreeBSD-specific checks"
+      echo
+    fi
+
+    if test x$hwloc_windows = xyes; then
+      echo
+      echo "**** Windows-specific checks"
+
+      AC_CHECK_HEADER([windows.h], [
+        AC_DEFINE([HWLOC_HAVE_WINDOWS_H], [1], [Define to 1 if you have the `windows.h' header.])
       ])
-    ])
-    AC_CHECK_HEADERS([kstat.h], [
-      AC_CHECK_LIB([kstat], [main],
-                   [HWLOC_LIBS="-lkstat $HWLOC_LIBS"
-                    AC_DEFINE([HAVE_LIBKSTAT], 1, [Define to 1 if we have -lkstat])])
-    ])
+
+      old_CPPFLAGS="$CPPFLAGS"
+      CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0601"
+      AC_CHECK_TYPES([KAFFINITY,
+                      PROCESSOR_CACHE_TYPE,
+                      CACHE_DESCRIPTOR,
+                      LOGICAL_PROCESSOR_RELATIONSHIP,
+                      RelationProcessorPackage,
+                      SYSTEM_LOGICAL_PROCESSOR_INFORMATION,
+                      GROUP_AFFINITY,
+                      PROCESSOR_RELATIONSHIP,
+                      NUMA_NODE_RELATIONSHIP,
+                      CACHE_RELATIONSHIP,
+                      PROCESSOR_GROUP_INFO,
+                      GROUP_RELATIONSHIP,
+                      SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX,
+                      PSAPI_WORKING_SET_EX_BLOCK,
+                      PSAPI_WORKING_SET_EX_INFORMATION,
+                      PROCESSOR_NUMBER],
+                      [],[],[[#include <windows.h>]])
+      CPPFLAGS="$old_CPPFLAGS"
+
+      AC_CHECK_DECLS([GetModuleFileName], [], [], [#include <windows.h>])
+
+      AC_CHECK_LIB([gdi32], [main],
+                   [HWLOC_LIBS="-lgdi32 $HWLOC_LIBS"
+                    AC_DEFINE([HAVE_LIBGDI32], 1, [Define to 1 if we have -lgdi32])])
+      AC_CHECK_LIB([user32], [PostQuitMessage], [hwloc_have_user32="yes"])
+
+      AC_PATH_PROGS([HWLOC_MS_LIB], [lib])
+      AC_ARG_VAR([HWLOC_MS_LIB], [Path to Microsoft's Visual Studio `lib' tool])
+
+      echo "**** end of Windows-specific checks"
+      echo
+    fi
+
+    if test x$hwloc_solaris = xyes; then
+      echo
+      echo "**** Solaris-specific checks"
+
+      AC_CHECK_HEADERS([sys/lgrp_user.h], [
+        AC_CHECK_LIB([lgrp], [lgrp_init],
+                     [HWLOC_LIBS="-llgrp $HWLOC_LIBS"
+                      AC_DEFINE([HAVE_LIBLGRP], 1, [Define to 1 if we have -llgrp])
+                      AC_CHECK_DECLS([lgrp_latency_cookie],,,[[#include <sys/lgrp_user.h>]])
+        ])
+      ])
+      AC_CHECK_HEADERS([kstat.h], [
+        AC_CHECK_LIB([kstat], [main],
+                     [HWLOC_LIBS="-lkstat $HWLOC_LIBS"
+                      AC_DEFINE([HAVE_LIBKSTAT], 1, [Define to 1 if we have -lkstat])])
+      ])
+
+      AC_CHECK_HEADERS([picl.h], [
+        AC_CHECK_LIB([picl], [picl_initialize],
+                     [HWLOC_LIBS="-lpicl $HWLOC_LIBS"])])
+
+      echo "**** end of Solaris-specific checks"
+      echo
+    fi
+
+    if test x$hwloc_aix = xyes; then
+      echo
+      echo "**** AIX-specific checks"
+
+      AC_SEARCH_LIBS([pthread_getthrds_np], [pthread], [
+        AC_DEFINE([HWLOC_HAVE_PTHREAD_GETTHRDS_NP], 1, `Define to 1 if you have pthread_getthrds_np')
+      ])
+
+      echo "**** end of AIX-specific checks"
+      echo
+    fi
+
+    if test x$hwloc_linux = xyes; then
+      echo
+      echo "**** Linux-specific checks"
+
+      AC_CHECK_DECLS([sched_getcpu],,[:],[[
+        #ifndef _GNU_SOURCE
+        # define _GNU_SOURCE
+        #endif
+        #include <sched.h>
+      ]])
+
+      _HWLOC_CHECK_DECL([sched_setaffinity], [
+	hwloc_have_sched_setaffinity=yes
+        AC_DEFINE([HWLOC_HAVE_SCHED_SETAFFINITY], [1], [Define to 1 if glibc provides a prototype of sched_setaffinity()])
+        AS_IF([test "$HWLOC_STRICT_ARGS_CFLAGS" = "FAIL"],[
+          AC_MSG_WARN([Support for sched_setaffinity() requires a C compiler which])
+          AC_MSG_WARN([considers incorrect argument counts to be a fatal error.])
+          AC_MSG_ERROR([Cannot continue.])
+        ])
+        AC_MSG_CHECKING([for old prototype of sched_setaffinity])
+        hwloc_save_CFLAGS=$CFLAGS
+        CFLAGS="$CFLAGS $HWLOC_STRICT_ARGS_CFLAGS"
+        AC_COMPILE_IFELSE([
+            AC_LANG_PROGRAM([[
+              #ifndef _GNU_SOURCE
+              # define _GNU_SOURCE
+              #endif
+              #include <sched.h>
+              static unsigned long mask;
+              ]], [[ sched_setaffinity(0, (void*) &mask); ]])],
+            [AC_DEFINE([HWLOC_HAVE_OLD_SCHED_SETAFFINITY], [1], [Define to 1 if glibc provides the old prototype (without length) of sched_setaffinity()])
+             AC_MSG_RESULT([yes])],
+            [AC_MSG_RESULT([no])])
+        CFLAGS=$hwloc_save_CFLAGS
+      ], , [[
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#include <sched.h>
+      ]])
+
+      AC_MSG_CHECKING([for working CPU_SET])
+      AC_LINK_IFELSE([
+        AC_LANG_PROGRAM([[
+          #include <sched.h>
+          cpu_set_t set;
+        ]], [[ CPU_ZERO(&set); CPU_SET(0, &set);]])],
+        [AC_DEFINE([HWLOC_HAVE_CPU_SET], [1], [Define to 1 if the CPU_SET macro works])
+         AC_MSG_RESULT([yes])],
+        [AC_MSG_RESULT([no])])
+
+      AC_MSG_CHECKING([for working CPU_SET_S])
+      AC_LINK_IFELSE([
+        AC_LANG_PROGRAM([[
+          #include <sched.h>
+          cpu_set_t *set;
+        ]], [[
+          set = CPU_ALLOC(1024);
+          CPU_ZERO_S(CPU_ALLOC_SIZE(1024), set);
+          CPU_SET_S(CPU_ALLOC_SIZE(1024), 0, set);
+          CPU_FREE(set);
+        ]])],
+        [AC_DEFINE([HWLOC_HAVE_CPU_SET_S], [1], [Define to 1 if the CPU_SET_S macro works])
+         AC_MSG_RESULT([yes])],
+        [AC_MSG_RESULT([no])])
+
+      AC_MSG_CHECKING([for working syscall with 6 parameters])
+      AC_LINK_IFELSE([
+        AC_LANG_PROGRAM([[
+          #include <unistd.h>
+          #include <sys/syscall.h>
+          ]], [[syscall(0, 1, 2, 3, 4, 5, 6);]])],
+        [AC_DEFINE([HWLOC_HAVE_SYSCALL], [1], [Define to 1 if function `syscall' is available with 6 parameters])
+         AC_MSG_RESULT([yes])],
+        [AC_MSG_RESULT([no])])
+
+      # Linux libudev support
+      if test "x$enable_libudev" != xno; then
+        AC_CHECK_HEADERS([libudev.h], [
+          AC_CHECK_LIB([udev], [udev_device_new_from_subsystem_sysname], [
+            HWLOC_LIBS="$HWLOC_LIBS -ludev"
+            AC_DEFINE([HWLOC_HAVE_LIBUDEV], [1], [Define to 1 if you have libudev.])
+          ])
+        ])
+      fi
+
+      echo "**** end of Linux-specific checks"
+      echo
+    fi
+
+    if test "x$hwloc_linux" != "xyes" ; then
+      # Don't look for sys/sysctl.h on Linux because it's deprecated and
+      # generates a warning in GCC10. Also it's unneeded.
+      AC_CHECK_HEADERS([sys/param.h])
+      AC_CHECK_HEADERS([sys/sysctl.h], [
+        AC_CHECK_DECLS([CTL_HW, HW_NCPU, HW_REALMEM64, HW_MEMSIZE64, HW_PHYSMEM64, HW_USERMEM64, HW_REALMEM, HW_MEMSIZE, HW_PHYSMEM, HW_USERMEM],,,[[
+        #if HAVE_SYS_PARAM_H
+        #include <sys/param.h>
+        #endif
+        #include <sys/sysctl.h>
+        ]])
+      ],,[
+        AC_INCLUDES_DEFAULT
+        #if HAVE_SYS_PARAM_H
+        #include <sys/param.h>
+        #endif
+      ])
+
+      # Don't detect sysctl* on Linux because its sysctl() syscall is
+      # long deprecated and unneeded. Some libc still expose the symbol
+      # and raise a big warning at link time.
+
+      # Do a full link test instead of just using AC_CHECK_FUNCS, which
+      # just checks to see if the symbol exists or not.  For example,
+      # the prototype of sysctl uses u_int, which on some platforms
+      # (such as FreeBSD) is only defined under __BSD_VISIBLE, __USE_BSD
+      # or other similar definitions.  So while the symbols "sysctl" and
+      # "sysctlbyname" might still be available in libc (which autoconf
+      # checks for), they might not be actually usable.
+      AC_MSG_CHECKING([for sysctl])
+      AC_TRY_LINK([
+                 #include <stdio.h>
+                 #include <sys/types.h>
+                 #include <sys/sysctl.h>
+                 ],
+                  [return sysctl(NULL,0,NULL,NULL,NULL,0);],
+                  [AC_DEFINE([HAVE_SYSCTL],[1],[Define to '1' if sysctl is present and usable])
+                   AC_MSG_RESULT(yes)],
+                  [AC_MSG_RESULT(no)])
+      AC_MSG_CHECKING([for sysctlbyname])
+      AC_TRY_LINK([
+                 #include <stdio.h>
+                 #include <sys/types.h>
+                 #include <sys/sysctl.h>
+                 ],
+                  [return sysctlbyname(NULL,NULL,NULL,NULL,0);],
+                  [AC_DEFINE([HAVE_SYSCTLBYNAME],[1],[Define to '1' if sysctlbyname is present and usable])
+                   AC_MSG_RESULT(yes)],
+                  [AC_MSG_RESULT(no)])
+    fi
+
+    AC_CHECK_DECLS([pthread_setaffinity_np],,[:],[[
+      #include <pthread.h>
+      #ifdef HAVE_PTHREAD_NP_H
+      #  include <pthread_np.h>
+      #endif
+    ]])
+    AC_CHECK_DECLS([pthread_getaffinity_np],,[:],[[
+      #include <pthread.h>
+      #ifdef HAVE_PTHREAD_NP_H
+      #  include <pthread_np.h>
+      #endif
+    ]])
 
     AC_CHECK_DECLS([fabsf], [
       AC_CHECK_LIB([m], [fabsf],
@@ -513,10 +713,6 @@ EOF])
     if test x$need_libm = xyes; then
       HWLOC_LIBS="-lm $HWLOC_LIBS"
     fi
-
-    AC_CHECK_HEADERS([picl.h], [
-      AC_CHECK_LIB([picl], [picl_initialize],
-                   [HWLOC_LIBS="-lpicl $HWLOC_LIBS"])])
 
     AC_CHECK_DECLS([_SC_NPROCESSORS_ONLN,
     		_SC_NPROCESSORS_CONF,
@@ -571,60 +767,8 @@ return 0;
       AC_DEFINE([HWLOC_HAVE_CORRECT_SNPRINTF], 1, [Define to 1 if snprintf supports NULL output buffer and returns the correct length on truncation])
     fi
 
-    if test "x$hwloc_linux" != "xyes" ; then
-      # Don't look for sys/sysctl.h on Linux because it's deprecated and
-      # generates a warning in GCC10. Also it's unneeded.
-      AC_CHECK_HEADERS([sys/param.h])
-      AC_CHECK_HEADERS([sys/sysctl.h], [
-        AC_CHECK_DECLS([CTL_HW, HW_NCPU, HW_REALMEM64, HW_MEMSIZE64, HW_PHYSMEM64, HW_USERMEM64, HW_REALMEM, HW_MEMSIZE, HW_PHYSMEM, HW_USERMEM],,,[[
-        #if HAVE_SYS_PARAM_H
-        #include <sys/param.h>
-        #endif
-        #include <sys/sysctl.h>
-        ]])
-      ],,[
-        AC_INCLUDES_DEFAULT
-        #if HAVE_SYS_PARAM_H
-        #include <sys/param.h>
-        #endif
-      ])
-
-      # Don't detect sysctl* on Linux because its sysctl() syscall is
-      # long deprecated and unneeded. Some libc still expose the symbol
-      # and raise a big warning at link time.
-
-      # Do a full link test instead of just using AC_CHECK_FUNCS, which
-      # just checks to see if the symbol exists or not.  For example,
-      # the prototype of sysctl uses u_int, which on some platforms
-      # (such as FreeBSD) is only defined under __BSD_VISIBLE, __USE_BSD
-      # or other similar definitions.  So while the symbols "sysctl" and
-      # "sysctlbyname" might still be available in libc (which autoconf
-      # checks for), they might not be actually usable.
-      AC_MSG_CHECKING([for sysctl])
-      AC_TRY_LINK([
-                 #include <stdio.h>
-                 #include <sys/types.h>
-                 #include <sys/sysctl.h>
-                 ],
-                  [return sysctl(NULL,0,NULL,NULL,NULL,0);],
-                  [AC_DEFINE([HAVE_SYSCTL],[1],[Define to '1' if sysctl is present and usable])
-                   AC_MSG_RESULT(yes)],
-                  [AC_MSG_RESULT(no)])
-      AC_MSG_CHECKING([for sysctlbyname])
-      AC_TRY_LINK([
-                 #include <stdio.h>
-                 #include <sys/types.h>
-                 #include <sys/sysctl.h>
-                 ],
-                  [return sysctlbyname(NULL,NULL,NULL,NULL,0);],
-                  [AC_DEFINE([HAVE_SYSCTLBYNAME],[1],[Define to '1' if sysctlbyname is present and usable])
-                   AC_MSG_RESULT(yes)],
-                  [AC_MSG_RESULT(no)])
-    fi
-
     AC_CHECK_DECLS([getprogname], [], [], [AC_INCLUDES_DEFAULT])
     AC_CHECK_DECLS([getexecname], [], [], [AC_INCLUDES_DEFAULT])
-    AC_CHECK_DECLS([GetModuleFileName], [], [], [#include <windows.h>])
     # program_invocation_name and __progname may be available but not exported in headers
     AC_MSG_CHECKING([for program_invocation_name])
     AC_TRY_LINK([
@@ -665,80 +809,6 @@ return 0;
     if test "x$hwloc_thread_t" != "x" ; then
       AC_DEFINE_UNQUOTED(hwloc_thread_t, $hwloc_thread_t, [Define this to the thread ID type])
     fi
-
-    AC_CHECK_DECLS([sched_getcpu],,[:],[[
-      #ifndef _GNU_SOURCE
-      # define _GNU_SOURCE
-      #endif
-      #include <sched.h>
-    ]])
-
-    _HWLOC_CHECK_DECL([sched_setaffinity], [
-      AC_DEFINE([HWLOC_HAVE_SCHED_SETAFFINITY], [1], [Define to 1 if glibc provides a prototype of sched_setaffinity()])
-      AS_IF([test "$HWLOC_STRICT_ARGS_CFLAGS" = "FAIL"],[
-        AC_MSG_WARN([Support for sched_setaffinity() requires a C compiler which])
-        AC_MSG_WARN([considers incorrect argument counts to be a fatal error.])
-        AC_MSG_ERROR([Cannot continue.])
-      ])
-      AC_MSG_CHECKING([for old prototype of sched_setaffinity])
-      hwloc_save_CFLAGS=$CFLAGS
-      CFLAGS="$CFLAGS $HWLOC_STRICT_ARGS_CFLAGS"
-      AC_COMPILE_IFELSE([
-          AC_LANG_PROGRAM([[
-              #ifndef _GNU_SOURCE
-              # define _GNU_SOURCE
-              #endif
-              #include <sched.h>
-              static unsigned long mask;
-              ]], [[ sched_setaffinity(0, (void*) &mask); ]])],
-          [AC_DEFINE([HWLOC_HAVE_OLD_SCHED_SETAFFINITY], [1], [Define to 1 if glibc provides the old prototype (without length) of sched_setaffinity()])
-           AC_MSG_RESULT([yes])],
-          [AC_MSG_RESULT([no])])
-      CFLAGS=$hwloc_save_CFLAGS
-    ], , [[
-#ifndef _GNU_SOURCE
-# define _GNU_SOURCE
-#endif
-#include <sched.h>
-]])
-
-    AC_MSG_CHECKING([for working CPU_SET])
-    AC_LINK_IFELSE([
-      AC_LANG_PROGRAM([[
-        #include <sched.h>
-        cpu_set_t set;
-        ]], [[ CPU_ZERO(&set); CPU_SET(0, &set);]])],
-	[AC_DEFINE([HWLOC_HAVE_CPU_SET], [1], [Define to 1 if the CPU_SET macro works])
-         AC_MSG_RESULT([yes])],
-        [AC_MSG_RESULT([no])])
-
-    AC_MSG_CHECKING([for working CPU_SET_S])
-    AC_LINK_IFELSE([
-      AC_LANG_PROGRAM([[
-          #include <sched.h>
-          cpu_set_t *set;
-        ]], [[
-          set = CPU_ALLOC(1024);
-          CPU_ZERO_S(CPU_ALLOC_SIZE(1024), set);
-          CPU_SET_S(CPU_ALLOC_SIZE(1024), 0, set);
-          CPU_FREE(set);
-        ]])],
-        [AC_DEFINE([HWLOC_HAVE_CPU_SET_S], [1], [Define to 1 if the CPU_SET_S macro works])
-         AC_MSG_RESULT([yes])],
-        [AC_MSG_RESULT([no])])
-
-    AC_MSG_CHECKING([for working syscall with 6 parameters])
-    AC_LINK_IFELSE([
-      AC_LANG_PROGRAM([[
-          #include <unistd.h>
-          #include <sys/syscall.h>
-          ]], [[syscall(0, 1, 2, 3, 4, 5, 6);]])],
-        [AC_DEFINE([HWLOC_HAVE_SYSCALL], [1], [Define to 1 if function `syscall' is available with 6 parameters])
-         AC_MSG_RESULT([yes])],
-        [AC_MSG_RESULT([no])])
-
-    AC_PATH_PROGS([HWLOC_MS_LIB], [lib])
-    AC_ARG_VAR([HWLOC_MS_LIB], [Path to Microsoft's Visual Studio `lib' tool])
 
     AC_PATH_PROG([BASH], [bash])
 
@@ -796,7 +866,6 @@ return 0;
 
     AS_IF([test "$hwloc_c_vendor" != "android"], [AC_CHECK_FUNCS([openat], [hwloc_have_openat=yes])])
 
-
     AC_CHECK_HEADERS([malloc.h])
     AC_CHECK_FUNCS([getpagesize memalign posix_memalign])
 
@@ -816,37 +885,6 @@ return 0;
 	],[
 	 AC_DEFINE([HAVE_DECL_RUNNING_ON_VALGRIND], [0], [Embedded mode; just assume we do not have Valgrind support])
 	])
-
-    AC_CHECK_HEADERS([pthread_np.h])
-    AC_CHECK_DECLS([pthread_setaffinity_np],,[:],[[
-      #include <pthread.h>
-      #ifdef HAVE_PTHREAD_NP_H
-      #  include <pthread_np.h>
-      #endif
-    ]])
-    AC_CHECK_DECLS([pthread_getaffinity_np],,[:],[[
-      #include <pthread.h>
-      #ifdef HAVE_PTHREAD_NP_H
-      #  include <pthread_np.h>
-      #endif
-    ]])
-    AC_CHECK_FUNC([sched_setaffinity], [hwloc_have_sched_setaffinity=yes])
-    AC_CHECK_HEADERS([sys/cpuset.h],,,[[#include <sys/param.h>]])
-    AC_CHECK_FUNCS([cpuset_setaffinity])
-    AC_SEARCH_LIBS([pthread_getthrds_np], [pthread],
-      AC_DEFINE([HWLOC_HAVE_PTHREAD_GETTHRDS_NP], 1, `Define to 1 if you have pthread_getthrds_np')
-    )
-    AC_CHECK_FUNCS([cpuset_setid])
-
-    # Linux libudev support
-    if test "x$enable_libudev" != xno; then
-      AC_CHECK_HEADERS([libudev.h], [
-	AC_CHECK_LIB([udev], [udev_device_new_from_subsystem_sysname], [
-	  HWLOC_LIBS="$HWLOC_LIBS -ludev"
-	  AC_DEFINE([HWLOC_HAVE_LIBUDEV], [1], [Define to 1 if you have libudev.])
-	])
-      ])
-    fi
 
     AS_IF([test "x$enable_32bits_pci_domain" = "xyes"], [
       AC_DEFINE([HWLOC_HAVE_32BITS_PCI_DOMAIN], 1,
@@ -1019,40 +1057,51 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
     fi
     # don't add LIBS/CFLAGS/REQUIRES yet, depends on plugins
 
-    # X11 support
-    AC_PATH_XTRA
-
-    CPPFLAGS_save=$CPPFLAGS
-    LIBS_save=$LIBS
-
-    CPPFLAGS="$CPPFLAGS $X_CFLAGS"
-    LIBS="$LIBS $X_PRE_LIBS $X_LIBS $X_EXTRA_LIBS"
-    AC_CHECK_HEADERS([X11/Xlib.h],
-        [AC_CHECK_LIB([X11], [XOpenDisplay],
-            [
-             # the GL backend just needs XOpenDisplay
-             hwloc_enable_X11=yes
-             # lstopo needs more
-             AC_CHECK_HEADERS([X11/Xutil.h],
-                [AC_CHECK_HEADERS([X11/keysym.h],
-                    [AC_DEFINE([HWLOC_HAVE_X11_KEYSYM], [1], [Define to 1 if X11 headers including Xutil.h and keysym.h are available.])
-                     hwloc_x11_keysym_happy=yes
-                     HWLOC_X11_CPPFLAGS="$X_CFLAGS"
-                     AC_SUBST([HWLOC_X11_CPPFLAGS])
-                     HWLOC_X11_LIBS="$X_PRE_LIBS $X_LIBS -lX11 $X_EXTRA_LIBS"
-                     AC_SUBST([HWLOC_X11_LIBS])])
-                ], [], [#include <X11/Xlib.h>])
-            ])
-         ])
-    CPPFLAGS=$CPPFLAGS_save
-    LIBS=$LIBS_save
+    # RSMI support, rocm_smi64 is just library name and not related to 32/64 bits
+    hwloc_rsmi_happy=no
+    if test "x$enable_io" != xno && test "x$enable_rsmi" != "xno"; then
+      hwloc_rsmi_happy=yes
+      AC_CHECK_HEADERS([rocm_smi/rocm_smi.h], [
+        AC_CHECK_LIB([rocm_smi64], [rsmi_init], [HWLOC_RSMI_LIBS="-lrocm_smi64"], [hwloc_rsmi_happy=no])
+        ], [hwloc_rsmi_happy=no])
+    fi
+    AC_SUBST(HWLOC_RSMI_LIBS)
+    # If we asked for rsmi support but couldn't deliver, fail
+    AS_IF([test "$enable_rsmi" = "yes" -a "$hwloc_rsmi_happy" = "no"],
+      [AC_MSG_WARN([Specified --enable-rsmi switch, but could not])
+      AC_MSG_WARN([find appropriate support])
+      AC_MSG_ERROR([Cannot continue])])
+    if test "x$hwloc_rsmi_happy" = "xyes"; then
+      AC_DEFINE([HWLOC_HAVE_RSMI], [1], [Define to 1 if you have the `RSMI' library.])
+      AC_SUBST([HWLOC_HAVE_RSMI], [1])
+      hwloc_components="$hwloc_components rsmi"
+      hwloc_rsmi_component_maybeplugin=1
+    else
+      AC_SUBST([HWLOC_HAVE_RSMI], [0])
+    fi
+    # don't add LIBS/CFLAGS/REQUIRES yet, depends on plugins
 
     # GL Support
     hwloc_gl_happy=no
     if test "x$enable_io" != xno && test "x$enable_gl" != "xno"; then
 	hwloc_gl_happy=yes
 
-	AS_IF([test "$hwloc_enable_X11" != "yes"],
+        # some X11 support (less then lstopo in hwloc_internal.m4)
+        AC_PATH_XTRA
+
+        CPPFLAGS_save=$CPPFLAGS
+        LIBS_save=$LIBS
+
+        CPPFLAGS="$CPPFLAGS $X_CFLAGS"
+        LIBS="$LIBS $X_PRE_LIBS $X_LIBS $X_EXTRA_LIBS"
+        AC_CHECK_HEADERS([X11/Xlib.h],
+            [AC_CHECK_LIB([X11], [XOpenDisplay],
+                [hwloc_enable_X11=yes])
+            ])
+        CPPFLAGS=$CPPFLAGS_save
+        LIBS=$LIBS_save
+
+        AS_IF([test "$hwloc_enable_X11" != "yes"],
               [AC_MSG_WARN([X11 not found; GL disabled])
                hwloc_gl_happy=no])
 
@@ -1257,9 +1306,9 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
 
     # Static components output file
     hwloc_static_components_dir=${HWLOC_top_builddir}/hwloc
-    mkdir -p ${hwloc_static_components_dir}
+    mkdir -p "${hwloc_static_components_dir}"
     hwloc_static_components_file=${hwloc_static_components_dir}/static-components.h
-    rm -f ${hwloc_static_components_file}
+    rm -f "${hwloc_static_components_file}"
 
     HWLOC_PREPARE_FILTER_COMPONENTS([$requested_plugins])
     # Now we have some hwloc_<name>_component_wantplugin=1
@@ -1270,7 +1319,7 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
     # and hwloc_static/plugin_components=list (space separated)
     AC_MSG_CHECKING([components to build statically])
     AC_MSG_RESULT($hwloc_static_components)
-    HWLOC_LIST_STATIC_COMPONENTS([$hwloc_static_components_file], [$hwloc_static_components])
+    HWLOC_LIST_STATIC_COMPONENTS(["$hwloc_static_components_file"], [$hwloc_static_components])
     AC_MSG_CHECKING([components to build as plugins])
     AC_MSG_RESULT([$hwloc_plugin_components])
 
@@ -1291,6 +1340,10 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
           [HWLOC_LIBS="$HWLOC_LIBS $HWLOC_NVML_LIBS"
            HWLOC_CFLAGS="$HWLOC_CFLAGS $HWLOC_NVML_CFLAGS"
            HWLOC_REQUIRES="$HWLOC_NVML_REQUIRES $HWLOC_REQUIRES"])
+    AS_IF([test "$hwloc_rsmi_component" = "static"],
+          [HWLOC_LIBS="$HWLOC_LIBS $HWLOC_RSMI_LIBS"
+           HWLOC_CFLAGS="$HWLOC_CFLAGS $HWLOC_RSMI_CFLAGS"
+           HWLOC_REQUIRES="$HWLOC_RSMI_REQUIRES $HWLOC_REQUIRES"])
     AS_IF([test "$hwloc_gl_component" = "static"],
           [HWLOC_LIBS="$HWLOC_LIBS $HWLOC_GL_LIBS"
            HWLOC_CFLAGS="$HWLOC_CFLAGS $HWLOC_GL_CFLAGS"
@@ -1305,7 +1358,7 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
     #
     AC_SUBST(HWLOC_REQUIRES)
     AC_SUBST(HWLOC_CFLAGS)
-    HWLOC_CPPFLAGS='-I$(HWLOC_top_builddir)/include -I$(HWLOC_top_srcdir)/include'
+    HWLOC_CPPFLAGS='-I"$(HWLOC_top_builddir)"/include -I"$(HWLOC_top_srcdir)"/include'
     AC_SUBST(HWLOC_CPPFLAGS)
     AC_SUBST(HWLOC_LDFLAGS)
     AC_SUBST(HWLOC_LIBS)
@@ -1383,6 +1436,7 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_HAVE_PCIACCESS], [test "$hwloc_pciaccess_happy" = "yes"])
         AM_CONDITIONAL([HWLOC_HAVE_OPENCL], [test "$hwloc_opencl_happy" = "yes"])
         AM_CONDITIONAL([HWLOC_HAVE_NVML], [test "$hwloc_nvml_happy" = "yes"])
+        AM_CONDITIONAL([HWLOC_HAVE_RSMI], [test "$hwloc_rsmi_happy" = "yes"])
         AM_CONDITIONAL([HWLOC_HAVE_BUNZIPP], [test "x$BUNZIPP" != "xfalse"])
         AM_CONDITIONAL([HWLOC_HAVE_USER32], [test "x$hwloc_have_user32" = "xyes"])
 
@@ -1417,6 +1471,7 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_OPENCL_BUILD_STATIC], [test "x$hwloc_opencl_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_CUDA_BUILD_STATIC], [test "x$hwloc_cuda_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_NVML_BUILD_STATIC], [test "x$hwloc_nvml_component" = "xstatic"])
+        AM_CONDITIONAL([HWLOC_RSMI_BUILD_STATIC], [test "x$hwloc_rsmi_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_GL_BUILD_STATIC], [test "x$hwloc_gl_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_XML_LIBXML_BUILD_STATIC], [test "x$hwloc_xml_libxml_component" = "xstatic"])
 

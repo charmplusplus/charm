@@ -31,6 +31,7 @@ sources = \
         topology.c \
         traversal.c \
         distances.c \
+        memattrs.c \
         components.c \
         bind.c \
         bitmap.c \
@@ -101,6 +102,17 @@ hwloc_nvml_la_CFLAGS = $(AM_CFLAGS) $(HWLOC_NVML_CFLAGS) -DHWLOC_INSIDE_PLUGIN
 hwloc_nvml_la_LDFLAGS = $(plugins_ldflags) $(HWLOC_NVML_LIBS)
 endif
 endif HWLOC_HAVE_NVML
+
+if HWLOC_HAVE_RSMI
+if HWLOC_RSMI_BUILD_STATIC
+sources += topology-rsmi.c
+else
+plugins_LTLIBRARIES += hwloc_rsmi.la
+hwloc_rsmi_la_SOURCES = topology-rsmi.c
+hwloc_rsmi_la_CFLAGS = $(AM_CFLAGS) $(HWLOC_RSMI_CFLAGS) -DHWLOC_INSIDE_PLUGIN
+hwloc_rsmi_la_LDFLAGS = $(plugins_ldflags) $(HWLOC_RSMI_LIBS)
+endif
+endif HWLOC_HAVE_RSMI
 
 if HWLOC_HAVE_GL
 if HWLOC_GL_BUILD_STATIC
