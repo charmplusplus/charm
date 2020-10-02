@@ -1715,7 +1715,6 @@ bool ampiParent::getBuiltinAttributeWin(int keyval, void *attribute_val, WinStru
   }
 }
 
-
 // Call copy_fn for each user-defined keyval
 int ampiParent::dupUserAttributes(int old_context, std::unordered_map<int, uintptr_t> & old_attr, std::unordered_map<int, uintptr_t> & new_attr) noexcept {
   for (auto & attr : old_attr) {
