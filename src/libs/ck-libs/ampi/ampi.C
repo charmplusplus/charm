@@ -1799,12 +1799,10 @@ int ampiParent::getAttr(int context, std::unordered_map<int, uintptr_t> & attrib
     *flag = 0;
     return MPI_ERR_KEYVAL;
   }
-#if 0
   else if (getBuiltinAttribute(keyval, attribute_val)) {
     *flag = 1;
     return MPI_SUCCESS;
   }
-#endif
   else if (getUserAttribute(context, attributes, keyval, attribute_val, flag)) {
     *flag = 1;
     return MPI_SUCCESS;
