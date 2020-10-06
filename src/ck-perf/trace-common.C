@@ -224,6 +224,8 @@ static void traceCommonInit(char **argv)
   }
 }
 
+extern char** Cmi_argvcopy;
+
 /** Write out the common parts of the .sts file. */
 void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE \"%s\"\n",CMK_MACHINE_NAME);
@@ -234,7 +236,19 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
-#endif	
+#endif
+
+  fprintf(stsfp, "RUNLINE \"");
+  int index = 0;
+  while (Cmi_argvcopy[index] != nullptr)
+  {
+    if (index > 0)
+      fprintf(stsfp, " ");
+    fprintf(stsfp, "%s", Cmi_argvcopy[index]);
+    index++;
+  }
+  fprintf(stsfp, "\"\n");
+
   fprintf(stsfp, "TOTAL_CHARES %d\n", (int)_chareTable.size());
   fprintf(stsfp, "TOTAL_EPS %d\n", (int)_entryTable.size());
   fprintf(stsfp, "TOTAL_MSGS %d\n", (int)_msgTable.size());
