@@ -100,6 +100,7 @@ DIST_STUB=( \
   utils/hwloc/test-hwloc-info.sh.am \
   utils/hwloc/test-fake-plugin.sh.am \
   utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh.am \
+  utils/hwloc/test-parsing-flags.sh.am \
   utils/lstopo/test-lstopo.sh.am \
   utils/lstopo/test-lstopo-shmem.sh.am \
   utils/lstopo/lstopo-windows.c \
@@ -111,11 +112,12 @@ done
 
 # Run autoreconf once first so identifying patches for cherry-picking is easier
 autoreconf -ivf
-if [[ $? != 0 ]]; then
+ret="$?"
+rm -rf autom4te.cache/
+if [[ $ret != 0 ]]; then
   echo "$0 needs to be updated for this hwloc version."
   exit 1
 fi
-rm -rf autom4te.cache/
 find . -name '*~' -delete
 
 cd ..
