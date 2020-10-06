@@ -5858,6 +5858,15 @@ Other functions complete the API for futures. *CkReleaseFuture* destroys
 a future. *CkProbeFuture* tests whether the future has already finished
 computing the value of the expression.
 
+The maximum number of outstanding futures a PE may have is limited by the size of
+*CMK_REFNUM_TYPE*. Specifically, no more than :math:`2^{SIZE}-1`, where :math:`SIZE`
+is the size of *CMK_REFNUM_TYPE* in bits, may be outstanding at any time.
+Waiting on more futures will cause a fatal error in non-production builds,
+and will cause the program to hang in production builds. To overcome this limit,
+build Charm++ with a larger *CMK_REFNUM_TYPE*, e.g., specifying
+``--with-refnum-type=uint`` when building Charm++.
+
+
 The Converse version of future functions can be found in the :ref:`conv-futures`
 section.
 
