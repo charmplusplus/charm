@@ -6,6 +6,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <ctime>        // std::time_t, std::gmtime
+#include <chrono>       // std::chrono::system_clock
+
 #include "charm.h"
 #include "middle.h"
 #include "cklists.h"
@@ -248,6 +251,19 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
     index++;
   }
   fprintf(stsfp, "\"\n");
+
+  // write timestamp in ISO 8601 format
+  using std::chrono::system_clock;
+  const time_t now = system_clock::to_time_t(system_clock::now());
+  struct tm currentTime;
+#if defined(_WIN32) || defined(_WIN64)
+  gmtime_s(&currentTime, &now);
+#else
+  gmtime_r(&now, &currentTime);
+#endif
+  char timeBuffer[sizeof("YYYY-mm-ddTHH:MM:SSZ")];
+  strftime(timeBuffer, sizeof(timeBuffer), "%FT%TZ", &currentTime);
+  fprintf(stsfp, "TIMESTAMP %s\n", timeBuffer);
 
   fprintf(stsfp, "TOTAL_CHARES %d\n", (int)_chareTable.size());
   fprintf(stsfp, "TOTAL_EPS %d\n", (int)_entryTable.size());
