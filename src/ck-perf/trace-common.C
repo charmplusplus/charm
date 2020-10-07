@@ -241,7 +241,7 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
 #endif
 
-  fprintf(stsfp, "RUNLINE \"");
+  fprintf(stsfp, "COMMANDLINE \"");
   int index = 0;
   while (Cmi_argvcopy[index] != nullptr)
   {
