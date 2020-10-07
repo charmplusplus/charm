@@ -56,6 +56,17 @@ module NDMeshStreamer {
   };
 
   template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
+  nodegroup [migratable] NodeGroupMeshStreamer : MeshStreamer<dtype, RouterType> {
+    entry NodeGroupMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> nodeGroupProxy,
+                                int numDimensions, int dimensionSizes[numDimensions],
+                                CkGroupID clientGID, int bufferSize, bool yieldFlag,
+                                double progressPeriodInMs, int maxItemsBuffered,
+                                int _thresholdFractionNum, int _thresholdFractionDen,
+                                int _cutoffFractionNum, int _cutoffFractionDen,
+                                int nodeLevel);
+  };
+
+  template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
   group [migratable] ArrayMeshStreamer : MeshStreamer<dtype, RouterType> {
     entry ArrayMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> nodeGroupProxy,
                             int numDimensions, int dimensionSizes[numDimensions],

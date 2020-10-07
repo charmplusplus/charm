@@ -117,9 +117,9 @@ void Entry::check() {
           "and take a single argument",
           first_line_);
 
-    if (!external && !((container->isGroup() && !container->isNodeGroup()) || container->isArray()))
+    if (!external && !(container->isGroup() || container->isNodeGroup() || container->isArray()))
       XLAT_ERROR_NOCOL(
-          "'aggregate' entry methods can only be used in regular groups and chare arrays",
+          "'aggregate' entry methods can only be used in groups, nodegroups and chare arrays",
           first_line_);
   }
 
@@ -1001,15 +1001,15 @@ XStr Entry::dataItemType() {
 XStr Entry::aggregatorType() {
   XStr groupType;
   if (container->isGroup()) {
-    groupType << "GroupMeshStreamer<" << param->param->type << ", "
-              << container->baseName() << ", SimpleMeshRouter"
-              << ", " << container->indexName() << "::_callmarshall_" << epStr() << ">";
+    groupType << "GroupMeshStreamer<";
+  } else if (container->isNodeGroup()) {
+    groupType << "NodeGroupMeshStreamer<";
   } else if (container->isArray()) {
-    groupType << "ArrayMeshStreamer<" << param->param->type << ", "
-              << container->baseName() << ", "
-              << "SimpleMeshRouter, " << container->indexName() << "::_callmarshall_"
-              << epStr() << ">";
+    groupType << "ArrayMeshStreamer<";
   }
+  groupType << param->param->type << ", " << container->baseName()
+            << ", SimpleMeshRouter, " << container->indexName()
+            << "::_callmarshall_" << epStr() << ">";
   return groupType;
 }
 
@@ -1023,16 +1023,15 @@ XStr Entry::aggregatorNodeType() {
 XStr Entry::aggregatorGlobalType(XStr& scope) {
   XStr groupType;
   if (container->isGroup()) {
-    groupType << "GroupMeshStreamer<" << param->param->type << ", " << scope
-              << container->baseName() << ", SimpleMeshRouter"
-              << ", " << scope << container->indexName() << "::_callmarshall_" << epStr()
-              << ">";
+    groupType << "GroupMeshStreamer<";
+  } else if (container->isNodeGroup()) {
+    groupType << "NodeGroupMeshStreamer<";
   } else if (container->isArray()) {
-    groupType << "ArrayMeshStreamer<" << param->param->type << ", "
-              << scope << container->baseName() << ", "
-              << "SimpleMeshRouter, " << scope << container->indexName()
-              << "::_callmarshall_" << epStr() << ">";
+    groupType << "ArrayMeshStreamer<";
   }
+  groupType  << param->param->type << ", " << scope << container->baseName()
+             << ", SimpleMeshRouter, " << scope << container->indexName()
+             << "::_callmarshall_" << epStr() << ">";
   return groupType;
 }
 

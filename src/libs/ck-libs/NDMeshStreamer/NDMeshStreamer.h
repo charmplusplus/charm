@@ -1233,6 +1233,78 @@ public:
   }
 };
 
+template <class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype, ClientType> >
+class NodeGroupMeshStreamer :
+  public CBase_NodeGroupMeshStreamer<dtype, ClientType, RouterType, EntryMethod> {
+private:
+  CkGroupID clientGID_;
+  ClientType *clientObj_;
+
+  void receiveAtDestination(MeshStreamerMessageV* msg) override {
+    for (int i = 0; i < msg->numDataItems; i++) {
+      EntryMethod(msg->dataItems + msg->getoffset<dtype>(i), clientObj_);
+    }
+
+    if (this->useStagedCompletion_) {
+#ifdef CMK_TRAM_VERBOSE_OUTPUT
+      envelope* env = UsrToEnv(msg);
+      CkPrintf("[%d] received at dest from %d %d items finalMsgCount: %d"
+               " msgType: %d\n", this->myIndex_, env->getSrcPe(),
+               msg->numDataItems, msg->finalMsgCount, msg->msgType);
+#endif
+      this->markMessageReceived(msg->msgType, msg->finalMsgCount);
+    } else if (this->useCompletionDetection_) {
+      this->detectorLocalObj_->consume(msg->numDataItems);
+    }
+    QdProcess(msg->numDataItems);
+    delete msg;
+  }
+
+  inline void localDeliver(const char* data, size_t size, CkArrayIndex arrayId,
+      int sourcePe) override {
+    EntryMethod(const_cast<char*>(data), clientObj_);
+    if (this->useCompletionDetection_) {
+      this->detectorLocalObj_->consume();
+    }
+    QdProcess(1);
+  }
+
+  inline void initLocalClients() override {
+    // No action required
+  }
+
+public:
+  NodeGroupMeshStreamer(CProxy_MeshStreamerNG<dtype, RouterType> nodeGroupProxy,
+      int numDimensions, int* dimensionSizes,
+      CkGroupID clientGID, int bufferSize, bool yieldFlag,
+      double progressPeriodInMs, int maxItemsBuffered,
+      int _thresholdFractionNum, int _thresholdFractionDen,
+      int _cutoffFractionNum, int _cutoffFractionDen, int nodeLevel) {
+    this->nodeGroupProxy = nodeGroupProxy;
+    this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
+        progressPeriodInMs, maxItemsBuffered, _thresholdFractionNum,
+        _thresholdFractionDen, _cutoffFractionNum, _cutoffFractionDen, nodeLevel);
+    clientGID_ = clientGID;
+    clientObj_ = (ClientType*)CkLocalBranch(clientGID_);
+  }
+
+  NodeGroupMeshStreamer(CkMigrateMessage*) {}
+
+  inline void insertData(const dtype& dataItem, int destinationPe) {
+    this->createDetectors();
+
+    DataItemHandle<dtype> tempHandle(const_cast<dtype*>(&dataItem));
+    MeshStreamer<dtype, RouterType>::insertData(&tempHandle, destinationPe);
+  }
+
+  void pup(PUP::er& p) override {
+    p|clientGID_;
+    if (p.isUnpacking()) {
+      clientObj_ = (ClientType*)CkLocalBranch(clientGID_);
+    }
+  }
+};
+
 template <class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
 class ArrayMeshStreamer :
   public CBase_ArrayMeshStreamer<dtype, ClientType, RouterType, EntryMethod> {
