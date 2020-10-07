@@ -1000,7 +1000,7 @@ XStr Entry::dataItemType() {
 
 XStr Entry::aggregatorType() {
   XStr groupType;
-  if (container->isGroup()) {
+  if (container->isGroup() && !(container->isNodeGroup())) {
     groupType << "GroupMeshStreamer<";
   } else if (container->isNodeGroup()) {
     groupType << "NodeGroupMeshStreamer<";
@@ -1022,7 +1022,7 @@ XStr Entry::aggregatorNodeType() {
 
 XStr Entry::aggregatorGlobalType(XStr& scope) {
   XStr groupType;
-  if (container->isGroup()) {
+  if (container->isGroup() && !(container->isNodeGroup())) {
     groupType << "GroupMeshStreamer<";
   } else if (container->isNodeGroup()) {
     groupType << "NodeGroupMeshStreamer<";
