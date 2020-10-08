@@ -7,7 +7,7 @@ Charm++ Documentation
 - Charm++ Development: https://github.com/UIUC-PPL/charm
 - Nightly regression tests: http://charm.cs.illinois.edu/autobuild/cur/
 - Charm++ mailing list: charm@cs.illinois.edu
-- Charm++ discourse group: https://charm.discourse.group
+- Charm++ discussion: https://github.com/UIUC-PPL/charm/discussions
 
 
 .. toctree::
