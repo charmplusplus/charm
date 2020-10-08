@@ -17,6 +17,9 @@ test: all
 	$(call run, ./longIdle +p1 +longIdleThresh 0.1) # 0.1 is the threshold time for triggering LONG_IDLE
 	$(call run, ./longIdle +p2 +longIdleThresh 0.1)
 
+testp: all
+	$(call run, ./longIdle +p$(P) +longIdleThresh 0.1) # 0.1 is the threshold time for triggering LONG_IDLE
+
 smptest:
 	$(call run, ./longIdle +p2 ++ppn 2 +longIdleThresh 0.1)
 	$(call run, ./longIdle +p4 ++ppn 2 +longIdleThresh 0.1)

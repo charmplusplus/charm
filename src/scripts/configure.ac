@@ -7,7 +7,7 @@
 # Increment the second and third digits when making a minor feature release
 # Increment the first digit when making a major feature release
 
-AC_INIT([Charm++], [61001], [charm@cs.illinois.edu], [charm], [https://charm.cs.illinois.edu/])
+AC_INIT([Charm++], [61002], [charm@cs.illinois.edu], [charm], [https://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
@@ -2404,6 +2404,10 @@ CMK_HAS_CMA="$pass"
 test "$CMK_HAS_CMA" = '1' -a "$CMK_MULTICORE" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_USE_CMA='1' || CMK_USE_CMA='0'
 add_make_flag "CMK_USE_CMA:=$CMK_USE_CMA" 'Cross Memory Attach'
 
+test "$CMK_WINDOWS" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_SUPPORTS_MEMORY_ISOMALLOC='1' || CMK_SUPPORTS_MEMORY_ISOMALLOC='0'
+add_flag "CMK_SUPPORTS_MEMORY_ISOMALLOC='$CMK_SUPPORTS_MEMORY_ISOMALLOC'" '-memory isomalloc'
+add_make_flag "CMK_SUPPORTS_MEMORY_ISOMALLOC:=$CMK_SUPPORTS_MEMORY_ISOMALLOC" '-memory isomalloc'
+
 #### check if -rdynamic works ####
 cat > $t <<EOT
 int main() {
@@ -2944,6 +2948,7 @@ test_link_fortran_main "whether the C++ linker succeeds with a Fortran entry poi
 if test $pass -eq 1
 then
   add_flag "CMK_CAN_LINK_FORTRAN='1'" "Fortran"
+  add_make_flag "CMK_CAN_LINK_FORTRAN:=1" "Fortran"
 fi
 
 ### check for OpenMP availability ###

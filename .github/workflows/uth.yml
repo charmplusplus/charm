@@ -13,4 +13,6 @@ jobs:
     - name: build
       run: ./build all-test uth-linux-x86_64 -g -j4 --with-production
     - name: test
-      run: make -C uth-linux-x86_64/tests test && make -C uth-linux-x86_64/examples test
+      run: make -C uth-linux-x86_64/tmp test
+    - name: testp P=2
+      run: make -C uth-linux-x86_64/tmp testp P=2

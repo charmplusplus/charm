@@ -13,4 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: sudo apt-get update && sudo apt-get -y install libibverbs-dev && ./build LIBS verbs-linux-x86_64 smp -j4
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install libibverbs-dev
+        ./build all-test verbs-linux-x86_64 smp -j4 -g

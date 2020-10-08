@@ -19,6 +19,9 @@
 #
 #     make charm++ OPTS="-g -save -verbose"
 #
+# On making changes to this file, ensure that the same changes are ported to
+# cmake/Makefile.tests in order to maintain consistency with the cmake based build
+# system, which is the default build system
 ###############################################################################
 
 SHELL=/bin/sh
@@ -33,34 +36,10 @@ CXX=$(CHARMC)
 CFLAGS=-I.
 CXXFLAGS=-I.
 
-all: charm++ LIBS AMPI f90charm TSM SM PVM everylb
+all: charm++ LIBS AMPI TSM SM PVM everylb
 
-all-test: all-test-tests all-test-examples all-test-benchmarks
 
-all-test-tests: LIBS
-	$(MAKE) -C ../tests all
-
-all-test-examples: LIBS
-	$(MAKE) -C ../examples all
-
-all-test-benchmarks: LIBS
-	$(MAKE) -C ../benchmarks all
-
-all-zc: charm++
-	$(MAKE) -C ../tests/charm++/zerocopy all
-	$(MAKE) -C ../examples/charm++/zerocopy all
-	$(MAKE) -C ../benchmarks/charm++/zerocopy all
-
-all-test-AMPI: all-test-AMPI-tests all-test-AMPI-examples all-test-AMPI-benchmarks
-
-all-test-AMPI-tests: AMPI
-	$(MAKE) -C ../tests/ampi all
-
-all-test-AMPI-examples: AMPI
-	$(MAKE) -C ../examples/ampi all
-
-all-test-AMPI-benchmarks: AMPI
-	$(MAKE) -C ../benchmarks/ampi all
+include ../../cmake/Makefile.tests.common
 
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
@@ -94,7 +73,7 @@ AMPIC AMPIF: AMPI
 ARMCI: charm++ LIBS
 
 
-f90charm: charm++ $(L)/libf90charm.a
+f90charm: charm++
 
 libcharm: charm++
 	cd $(L) ; $(CHARMC) -standalone -whole-archive -c++stl -shared -o libcharm.so $(LIBCHARM_LIBS)
@@ -138,7 +117,7 @@ $(L)/libckmain.a: main.o
 	$(CHARMC) -o $@ $^
 
 $(L)/libckmainf.a: mainf.o
-	-$(CHARMC) -o $@ $^ || touch $@
+	$(CHARMC) -o $@ $^
 
 translators: charmxi conv-cpm
 
@@ -171,59 +150,6 @@ Tau:
 
 LIBS: CONVLIBS CHARMLIBS everylb
 	echo "Built LIBS Successfully"
-
-test syncfttest mpisyncfttest: LIBS
-	$(MAKE) -C ../tests $@
-	$(MAKE) -C ../examples $@
-	$(MAKE) -C ../benchmarks $@
-
-test-tests: LIBS
-	$(MAKE) -C ../tests test
-
-test-examples: LIBS
-	$(MAKE) -C ../examples test
-
-test-benchmarks: LIBS
-	$(MAKE) -C ../benchmarks test
-
-test-zc: charm++
-	$(MAKE) -C ../tests/charm++/zerocopy test
-	$(MAKE) -C ../examples/charm++/zerocopy test
-	$(MAKE) -C ../benchmarks/charm++/zerocopy test
-
-test-converse: converse test-tests-converse test-examples-converse test-benchmarks-converse
-
-test-charm: charm++ test-tests-charm test-examples-charm test-benchmarks-charm
-
-test-AMPI: AMPI test-tests-AMPI test-examples-AMPI test-benchmarks-AMPI
-
-test-tests-converse: converse
-	$(MAKE) -C ../tests test-converse
-
-test-tests-charm: charm++
-	$(MAKE) -C ../tests test-charm
-
-test-tests-AMPI: AMPI
-	$(MAKE) -C ../tests test-AMPI
-
-test-examples-converse: converse
-	$(MAKE) -C ../examples test-converse
-
-test-examples-charm: charm++
-	$(MAKE) -C ../examples test-charm
-
-test-examples-AMPI: AMPI
-	$(MAKE) -C ../examples test-AMPI
-
-test-benchmarks-converse: converse
-	$(MAKE) -C ../benchmarks test-converse
-
-test-benchmarks-charm: charm++
-	$(MAKE) -C ../benchmarks test-charm
-
-test-benchmarks-AMPI: AMPI
-	$(MAKE) -C ../benchmarks test-AMPI
-
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
@@ -268,7 +194,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh conv-mach-common.h \
       cmipool.h mempool.h cmiqueue.h \
-      cmitls.h lrtslock.h conv-rdma.h lrts-common.h conv-header.h
+      cmitls.h lrtslock.h conv-rdma.h conv-rdmadevice.h lrts-common.h conv-header.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -277,14 +203,14 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
 	sockRoutines.h sockRoutines.C cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
-	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp cmirdmautils.h
+	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp json_fwd.hpp cmirdmautils.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h debug-charm.h\
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h\
+	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
 	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
@@ -296,6 +222,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  middle.h middle-conv.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkMulticast.decl.h	\
           CkReduction.decl.h \
+          CkSyncBarrier.decl.h \
           waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkCheckpointStatus.decl.h CkMemCheckpoint.decl.h \
           LBManager.decl.h MetaBalancer.decl.h CentralLB.decl.h TreeLB.decl.h TreeLevel.decl.h \
@@ -427,7 +354,10 @@ endif
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.a $(L)/libldb-spray.a   $(L)/libldb-workstealing.a  $(L)/libldb-neighbor.a $(L)/libldb-none.a $(L)/libldb-test.a
 
-TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a 
+TRACELIBS = $(L)/libtrace-converse.a
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  TRACELIBS += $(L)/libtracef_f.a
+endif
 
 BUILD_TRACING := $(CMK_TRACE_ENABLED)
 
@@ -490,12 +420,6 @@ endif
 endif
 endif
 
-ifneq ($(findstring -win-,$(CMK_VDIR)),)
-  IS_WINDOWS := 1
-else
-  IS_WINDOWS := 0
-endif
-
 THREADLIBS = \
   $(L)/libthreads-default.a \
   $(L)/libthreads-default-tls.a \
@@ -505,7 +429,7 @@ THREADLIBS = \
   $(L)/libthreads-uFcontext-tls.a \
   $(L)/libthreads-stackcopy.a \
 
-ifneq ($(IS_WINDOWS),0)
+ifeq (1,$(CMK_WINDOWS))
 
 THREADLIBS += \
   $(L)/libthreads-fibers.a \
@@ -528,10 +452,14 @@ endif
 CVLIBS=$(L)/libconv-core.a \
 	$(L)/conv-static.o \
 	$(L)/libconv-machine.a \
-	$(L)/libconv-util.a $(L)/libconv-utilf.a \
+	$(L)/libconv-util.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
 	$(L)/libccs-client.a $(L)/libconv-partition.a $(L)/libhwloc_embedded.a \
 	$(L)/libconv-ldb.a
+
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  CVLIBS += $(L)/libconv-utilf.a
+endif
 
 LIBCONV_CORE=convcore.o hrctimer.o conv-conds.o conv-taskQ.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o \
@@ -540,7 +468,7 @@ LIBCONV_CORE=convcore.o hrctimer.o conv-conds.o conv-taskQ.o queueing.o msgmgr.o
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o memory-darwin-clang.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o commitid.o conv-interoperate.o conv-rdma.o \
+	cmitls.o memoryaffinity.o commitid.o conv-interoperate.o conv-rdma.o conv-rdmadevice.o \
 
 LIBCONV_LDB = topology.o generate.o edgelist.o
 
@@ -606,7 +534,7 @@ $(L)/libconv-util.a: $(LIBCONV_UTIL)
 	$(CHARMC) -o $@ $(LIBCONV_UTIL)
 
 $(L)/libconv-utilf.a: $(LIBCONV_UTILF)
-	-$(CHARMC) -o $@ $(LIBCONV_UTILF) || touch $@
+	$(CHARMC) -o $@ $(LIBCONV_UTILF)
 
 $(L)/libconv-ldb.a: $(LIBCONV_LDB)
 	$(CHARMC) -o $@ $^
@@ -624,7 +552,8 @@ pup_f.f90: pup_f.f90.sh
 	rm -f pup_f.f90 && ./pup_f.f90.sh
 
 pup_f.o: pup_f.f90 $(CVHEADERS)
-	-$(CHARMC) -c pup_f.f90 && $(CHARMC) -cpmod ../include pupmod.M || touch pup_f.o
+	$(CHARMC) -c $<
+	$(CHARMC) -cpmod ../include pupmod.M
 
 ## Converse load balancers (seed balancers, -balance)
 $(L)/libldb-none.a: cldb.none.C $(CVHEADERS)
@@ -738,11 +667,9 @@ $(L)/libglobal-swap.a: global-elfgot.C $(CVHEADERS)
 #
 ###############################################################################
 
-CK_LIBS_CORE=$(L)/libck.a
-
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
-	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o\
+	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o ckrdmadevice.o cksyncbarrier.o \
            waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
 	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
@@ -754,7 +681,12 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
            trace-controlPoints.o mpi-interoperate.o ckregex.o sdag.o \
 
-charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a $(L)/libckmainf.a
+CKLIBS = $(L)/libck.a $(L)/libckmain.a
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  CKLIBS += $(L)/libckf.a $(L)/libckmainf.a $(L)/libf90charm.a
+endif
+
+charm-core: converse $(CKLIBS)
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr
 
 CHARMLIBS: charm++ CONVLIBS
@@ -763,24 +695,27 @@ CHARMLIBS: charm++ CONVLIBS
 $(L)/libck.a: $(LIBCK_CORE) 
 	$(CHARMC) -o $@ $(LIBCK_CORE)
 
-## Charm fortran AMPI
-
-CK_FOR_LIBS_CORE=$(L)/libckf.a
+## Fortran
 
 LIBCKF_CORE=charmf.o charmmod.o
 
 $(L)/libckf.a: $(LIBCKF_CORE)
-	-$(CHARMC) -o $@ $(LIBCKF_CORE) || touch $@
+	$(CHARMC) -o $@ $^
 
 charmf.o:  charmf.C $(CKHEADERS) charmf.h
 	$(CHARMC) -c -I. charmf.C
 
 charmmod.o: charmmod.f90
-	-$(CHARMC) -c charmmod.f90 || touch $@
-	-$(CHARMC) -cpmod ../include charm.M
+	$(CHARMC) -c charmmod.f90
+	$(CHARMC) -cpmod ../include charm.M
 
 mainf.o: mainf.f90
-	-$(CHARMC) -o $@ -c $< || touch $@
+	$(CHARMC) -o $@ -c $<
+
+$(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C
+	$(CHARMC) f90main.ci
+	$(CHARMC) -c f90main.C
+	$(CHARMC) -o $@ f90main.o
 
 ## Tracing libraries (profiling, -tracemode)
 LIBTRACE_PROJ=trace-projections.o
@@ -815,7 +750,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
   ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
   conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
-  CkReduction.decl.h \
+  CkReduction.decl.h cksyncbarrier.h CkSyncBarrier.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
   cklocation.h ckmulticast.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h LBObj.h LBOM.h LBComm.h \
   LBMachineUtil.h LBManager.decl.h MetaBalancer.decl.h BaseLB.decl.h \
@@ -857,10 +792,11 @@ $(L)/libtrace-converse.a: $(LIBTRACE_CONVERSE)
 
 LIBTRACE_FOR=tracef_f.o
 $(L)/libtracef_f.a: $(LIBTRACE_FOR)
-	-$(CHARMC) -o $@ $(LIBTRACE_FOR) || touch $@
+	$(CHARMC) -o $@ $^
 
-tracef_f.o: tracef_f.f90
-	-$(CHARMC) -o $@ -c tracef_f.f90 && $(CHARMC) -cpmod ../include tracemod.M  || touch $@
+$(LIBTRACE_FOR): tracef_f.f90
+	$(CHARMC) -o $@ -c $<
+	$(CHARMC) -cpmod ../include tracemod.M
 
 # used for make depends
 TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o trace-perf.o picsautoperfAPI.o picsautoperf.o trace-summary.o  trace-simple.o \
@@ -965,11 +901,6 @@ pvmc_groups.o: pvmc_groups.C pvmc.h pvm3.h converse.h
 
 pvmc_main.o: pvmc_main.C pvmc.h pvm3.h converse.h
 	$(CHARMC) -o $@ pvmc_main.C
-
-$(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C
-	$(CHARMC) f90main.ci
-	$(CHARMC) -c -DAMPI_FORTRAN=1 f90main.C
-	-$(CHARMC) -o $@ f90main.o
 
 ##############################################################################
 # adding this entry for files which do not belong to any of other locations

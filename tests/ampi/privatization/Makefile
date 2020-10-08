@@ -4,9 +4,10 @@ AMPICC=../../../bin/ampicxx $(OPTS)
 AMPIF90=../../../bin/ampif90 $(OPTS)
 
 
-LANGUAGES := \
-  cxx \
-  f90 \
+LANGUAGES := cxx
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  LANGUAGES += f90
+endif
 
 
 # for constructing individual build rules
@@ -83,7 +84,13 @@ all: $(foreach i,$(TARGETS),$i)
 ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
+
 test: $(foreach i,$(TARGETS),test-$i)
+ifeq (,$(TARGETS))
+	@echo $(EMPTY_MESSAGE)
+endif
+
+testp: $(foreach i,$(TARGETS),testp-$i)
 ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
@@ -133,6 +140,17 @@ test-f90-$1: f90-$1
 	$$(call run, ./f90-$1 +p1 +vp4 +balancer RandCentLB)
 	$$(call run, ./f90-$1 +p2 +vp2 +balancer RandCentLB)
 	$$(call run, ./f90-$1 +p2 +vp4 +balancer RandCentLB)
+
+testp-cxx-$1: cxx-$1
+	$$(call run, ./cxx-$1 +p$(P) +vp$(P) +balancer RandCentLB)
+	$$(call run, ./cxx-$1 +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB)
+	$$(call run, ./cxx-$1 +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB)
+
+testp-f90-$1: f90-$1
+	$$(call run, ./f90-$1 +p$(P) +vp$(P) +balancer RandCentLB)
+	$$(call run, ./f90-$1 +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB)
+	$$(call run, ./f90-$1 +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB)
+
 
 endef
 

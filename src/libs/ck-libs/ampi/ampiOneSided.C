@@ -730,10 +730,9 @@ AMPI_API_IMPL(int, MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
   *newwin = ptr->createWinInstance(base, size, disp_unit, info);
   /* set the builtin attributes on the window */
   WinStruct *winStruct = parent->getWinStruct(*newwin);
-  auto & attributes = ptr->getWinObjInstance(winStruct)->getAttributes();
-  parent->setAttr(*newwin, attributes, MPI_WIN_BASE, &base);
-  parent->setAttr(*newwin, attributes, MPI_WIN_SIZE, &size);
-  parent->setAttr(*newwin, attributes, MPI_WIN_DISP_UNIT, &disp_unit);
+  winStruct->base = base;
+  winStruct->size = size;
+  winStruct->disp_unit = disp_unit;
   ptr = ptr->barrier(); // synchronize all participating virtual processes
   return MPI_SUCCESS;
 }
@@ -751,10 +750,9 @@ AMPI_API_IMPL(int, MPI_Win_allocate, MPI_Aint size, int disp_unit, MPI_Info info
   *win = ptr->createWinInstance(*((void**)baseptr), size, disp_unit, info);
   /* set the builtin attributes on the window */
   WinStruct *winStruct = parent->getWinStruct(*win);
-  auto & attributes = ptr->getWinObjInstance(winStruct)->getAttributes();
-  parent->setAttr(*win, attributes, MPI_WIN_BASE, &baseptr);
-  parent->setAttr(*win, attributes, MPI_WIN_SIZE, &size);
-  parent->setAttr(*win, attributes, MPI_WIN_DISP_UNIT, &disp_unit);
+  winStruct->base = baseptr;
+  winStruct->size = size;
+  winStruct->disp_unit = disp_unit;
   winStruct->ownsMemory = true;
   ptr = ptr->barrier(); // synchronize all participating virtual processes
   return MPI_SUCCESS;
@@ -1363,7 +1361,7 @@ AMPI_API_IMPL(int, MPI_Win_get_attr, MPI_Win win, int key, void* value, int* fla
   ampiParent *parent = getAmpiParent();
   WinStruct *winStruct = parent->getWinStruct(win);
   auto & attributes = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getAttributes();
-  return parent->getAttr(win, attributes, key, value, flag);
+  return parent->getAttrWin(win, attributes, key, value, flag, winStruct);
 }
 
 AMPI_API_IMPL(int, MPI_Win_set_attr, MPI_Win win, int key, void* value)
@@ -1372,7 +1370,7 @@ AMPI_API_IMPL(int, MPI_Win_set_attr, MPI_Win win, int key, void* value)
   ampiParent *parent = getAmpiParent();
   WinStruct *winStruct = parent->getWinStruct(win);
   auto & attributes = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getAttributes();
-  return parent->setAttr(win, attributes, key, value);
+  return parent->setAttrWin(win, attributes, key, value);
 }
 
 AMPI_API_IMPL(int, MPI_Win_set_name, MPI_Win win, const char *name)
