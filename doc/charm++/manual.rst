@@ -5864,7 +5864,7 @@ is the size of *CMK_REFNUM_TYPE* in bits, may be outstanding at any time.
 Waiting on more futures will cause a fatal error in non-production builds,
 and will cause the program to hang in production builds. The default *CMK_REFNUM_TYPE*
 is ``unsigned short``, limiting each PE to 65,535 outstanding futures.
-To increase this limit, build Charm++ with a larger *CMK_REFNUM_TYPE*, e.g., specifying
+To increase this limit, build Charm++ with a larger *CMK_REFNUM_TYPE*, e.g. specifying
 ``--with-refnum-type=uint`` when building Charm++.
 
 
