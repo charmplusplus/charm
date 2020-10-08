@@ -3,16 +3,16 @@
 
 #define VALUE 0x01ABCDEF
 
-void listsend_moduleinit(void) {}
+void listsend_moduleinit() {}
 
-void listsend_init(void) { CProxy_listsend_main::ckNew(0); }
+void listsend_init() { CProxy_listsend_main::ckNew(0); }
 
-listsend_main::listsend_main(void) : count(0), checkedIn(CkNumPes(), false)
+listsend_main::listsend_main() : count(0), checkedIn(CkNumPes(), false)
 {
   groupProxy = CProxy_listsend_group::ckNew(thishandle);
 }
 
-void listsend_main::initDone(void)
+void listsend_main::initDone()
 {
   std::vector<int> pes(CkNumPes());
   std::iota(pes.begin(), pes.end(), 0);

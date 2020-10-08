@@ -3042,8 +3042,9 @@ void CmiSyncListSendFn(int npes, const int* pes, int len, char* msg)
     const char* msgCopy = CmiCopyMsg(msg, len);
     CmiSyncSendAndFree(pes[i], len, msgCopy);
   }
-
-  if (npes > 0) CmiSyncSend(pes[npes - 1], len, msg);
+  // No need to copy and free for the last send, so use the original message
+  if (npes > 0)
+    CmiSyncSend(pes[npes - 1], len, msg);
 #else
   for (int i = 0; i < npes; i++)
   {

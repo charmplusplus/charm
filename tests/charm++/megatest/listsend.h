@@ -10,9 +10,9 @@ private:
   std::vector<bool> checkedIn;
   CProxy_listsend_group groupProxy;
 public:
-  listsend_main(void);
+  listsend_main();
   listsend_main(CkMigrateMessage *) {}
-  void initDone(void);
+  void initDone();
   void check(int, unsigned int);
 };
 
