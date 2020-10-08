@@ -292,7 +292,7 @@ void CmiFreeNodeSendFn(int destNode, int size, char *msg);
 
 /* Functions and variables regarding machine startup */
 static char     **Cmi_argv;
-static char     **Cmi_argvcopy;
+char            **Cmi_argvcopy;
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret);
