@@ -121,7 +121,7 @@ and AMPI.
 I have a suggestion/feature request/bug report. Who should I send it to?
 ------------------------------------------------------------------------
 
-Please open an issue on our `GitHub <https://github.com/UIUC-PPL/charm>`_.
+Please open an issue or discussion on our `GitHub <https://github.com/UIUC-PPL/charm>`_.
 We are always glad to get feedback on our software.
 
 Installation and Usage
