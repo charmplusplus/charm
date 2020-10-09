@@ -100,8 +100,7 @@ syntax() {
   num_help_strings="$(grep -c AS_HELP_STRING "$configure_ac")"
   num_help_items="$(echo "$help_items" | wc -l)"
   if [ $num_help_strings != $num_help_items ]; then
-    echo '<Warning>: Not all parameters were able to be displayed. Please open an issue on our GitHub: 
- https://github.com/UIUC-PPL/charm'
+    echo '<Warning>: Not all parameters were able to be displayed. Please open an issue on our GitHub: https://github.com/UIUC-PPL/charm'
   fi
 
 
