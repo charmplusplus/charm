@@ -333,7 +333,7 @@ The UIUC Parallel Programming Laboratory web page, with information
 on past and present research, is at https://charm.cs.illinois.edu
 
 For questions, comments, suggestions, improvements, or bug reports,
-please contact us on our GitHub, https://github.com/UIUC-PPL/charm
+please create an issue or discussion on our GitHub, https://github.com/UIUC-PPL/charm
 
 
 ## Authors
