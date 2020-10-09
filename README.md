@@ -327,7 +327,7 @@ binaries and takes much less linking time.
 The Charm++ documentation is at https://charm.readthedocs.io/
 
 The Charm++ web page, with more information, more programs,
-and the latest version of Charm++, is at	https://charmplusplus.org
+and the latest version of Charm++, is at https://charmplusplus.org
 
 The UIUC Parallel Programming Laboratory web page, with information
 on past and present research, is at https://charm.cs.illinois.edu

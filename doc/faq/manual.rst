@@ -6,7 +6,7 @@ Frequently Asked Questions
    :depth: 3
 
 For answers to questions not on this list, please contact us
-on our `GitHub <https://github.com/UIUC-PPL/charm>`_
+on our `GitHub <https://github.com/UIUC-PPL/charm>`_.
 
 Big Questions
 =============
