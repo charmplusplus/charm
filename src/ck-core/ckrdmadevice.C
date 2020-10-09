@@ -54,7 +54,7 @@
 #include "hapi.h"
 #include "gpumanager.h"
 
-#define TIMING_BREAKDOWN 1
+#define TIMING_BREAKDOWN 0
 #if TIMING_BREAKDOWN
 #define N_TIMER 16
 #define N_COUNT 1000
