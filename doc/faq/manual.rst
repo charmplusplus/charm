@@ -5,8 +5,8 @@ Frequently Asked Questions
 .. contents::
    :depth: 3
 
-For answers to questions not on this list, please contact us at
-charm@cs.illinois.edu.
+For answers to questions not on this list, please contact us
+on our `GitHub <https://github.com/UIUC-PPL/charm>`_
 
 Big Questions
 =============
@@ -121,7 +121,8 @@ and AMPI.
 I have a suggestion/feature request/bug report. Who should I send it to?
 ------------------------------------------------------------------------
 
-Our mailing list is charm@cs.illinois.edu. We’re always glad to get feedback on our software.
+Please open an issue on our `GitHub <https://github.com/UIUC-PPL/charm>`_.
+We are always glad to get feedback on our software.
 
 Installation and Usage
 ======================
@@ -129,7 +130,7 @@ Installation and Usage
 How do I get Charm++?
 ---------------------
 
-See our `download <http://charm.cs.uiuc.edu/download/>`_ page.
+See our `download <https://charm.cs.uiuc.edu/download/>`_ page.
 
 Should I use the GIT version of Charm++?
 ----------------------------------------
@@ -143,7 +144,8 @@ How do I compile Charm++?
 -------------------------
 
 Run the interactive build script ``./build`` with no extra arguments If
-this fails, email charm@cs.illinois.edu with the problem. Include the build line used (this is
+this fails, please open an issue on our `GitHub <https://github.com/UIUC-PPL/charm>`_
+with the problem. Include the build line used (this is
 saved automatically in ``smart-build.log``)
 
 If you have a very unusual machine configuration, you will have to run
@@ -151,8 +153,9 @@ If you have a very unusual machine configuration, you will have to run
 choose the closest architecture, and then you may have to modify the
 associated conf-mach.sh and conv-mach.h files in src/arch to point to
 your desired compilers and options. If you develop a significantly
-different platform, send the modified files to charm@cs.illinois.edu so we can include it in
-the distribution.
+different platform, please open a pull request on our
+`GitHub <https://github.com/UIUC-PPL/charm>`_
+with the modified files so we can include it in the distribution.
 
 How do I compile AMPI?
 ----------------------
