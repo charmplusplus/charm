@@ -57,6 +57,7 @@
 #define TIMING_BREAKDOWN 1
 #if TIMING_BREAKDOWN
 #define N_TIMER 16
+#define N_COUNT 1000
 #endif
 
 CsvExtern(GPUManager, gpu_manager);
@@ -64,8 +65,8 @@ CsvExtern(GPUManager, gpu_manager);
 // Invoked after post entry method
 bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
 #if TIMING_BREAKDOWN
-  static double total_times[N_TIMER] = {0};
-  static int count = 0;
+  static thread_local double total_times[N_TIMER] = {0};
+  static thread_local int count = 0;
   count++;
 
   double start_time = CkWallTimer();
@@ -202,7 +203,7 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     avg_times[0] += avg_times[i];
   }
 
-  if (count == 1000) {
+  if (count == N_COUNT) {
     CkPrintf("[PE %d] CkRdmaDeviceIssueRgets: %.3lf us (1: %.3lf, 2: %.3lf, 3: %.3lf, 4: %.3lf, 5: %.3lf, 6: %.3lf)\n",
         CkMyPe(), avg_times[0], avg_times[1], avg_times[2], avg_times[3], avg_times[4], avg_times[5], avg_times[6]);
   }
@@ -302,8 +303,8 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
 // Performs sender-side operations necessary for device zerocopy
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 #if TIMING_BREAKDOWN
-  static double total_times[N_TIMER] = {0};
-  static int count = 0;
+  static thread_local double total_times[N_TIMER] = {0};
+  static thread_local int count = 0;
   count++;
 
   double start_time = CkWallTimer();
@@ -411,7 +412,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     avg_times[0] += avg_times[i];
   }
 
-  if (count == 1000) {
+  if (count == N_COUNT) {
     CkPrintf("[PE %d] CkRdmaDeviceOnSender: %.3lf us (1: %.3lf, 2: %.3lf, 3: %.3lf, 4: %.3lf)\n",
         CkMyPe(), avg_times[0], avg_times[1], avg_times[2], avg_times[3], avg_times[4]);
   }
