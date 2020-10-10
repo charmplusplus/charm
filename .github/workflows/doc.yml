@@ -16,5 +16,6 @@ jobs:
     - uses: actions/checkout@v2
     - name: sphinx
       run: |
+        pip install sphinx sphinx_rtd_theme
         cd doc
         make html
