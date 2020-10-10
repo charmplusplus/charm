@@ -6,6 +6,7 @@ ROMIO integrated into AMPI:
 
 * Commented out the unconditional assignment of MPI_IMPL in the configure
   script so that AMPI can specify it when configuring.
+* ampi_mpi has been added to known_mpi_impls in configure.ac.
 * Used MPI_Info_* calls from AMPI, and darray calls from ROMIO.
 * Set -DHAVE_STATUS_SET_BYTES in configure and configure.in, and
   add status setting call in adio/common/status_setb.c
