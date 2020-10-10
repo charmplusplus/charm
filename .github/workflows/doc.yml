@@ -1,0 +1,20 @@
+name: Sphinx-doc
+
+# Check if documentation builds with sphinx. Only triggered if a file
+# in doc/ is changed.
+
+on:
+  push:
+    paths: 'doc/**'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: sphinx
+      run: |
+        cd doc
+        make html
