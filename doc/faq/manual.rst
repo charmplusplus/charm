@@ -86,7 +86,7 @@ Several large applications use Charm++.
 - We have significant collaborations with groups in Materials Science,
   Chemistry, Astrophysics, Network Simulation, Operation Research,
   Contagion Effects, in Illinois, New York, California, Washington, and
-  Virginia. See also `Applications <https://hpccharm.com/products.html#applications>`_ for a more complete list.
+  Virginia. See also `Applications <https://hpccharm.com/applications>`_ for a more complete list.
 
 Who created Charm++?
 --------------------
