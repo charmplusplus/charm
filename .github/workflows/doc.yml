@@ -5,7 +5,8 @@ name: Sphinx-doc
 
 on:
   push:
-    paths: 'doc/**'
+    paths: 
+      - 'doc/**'
 
 jobs:
   build:
