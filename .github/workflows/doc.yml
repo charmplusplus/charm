@@ -15,6 +15,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    -
+      uses: actions/setup-python@v1
+      with:
+        python-version: '3.x'
     - name: sphinx
       run: |
         pip3 install sphinx sphinx_rtd_theme
