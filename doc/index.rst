@@ -3,9 +3,9 @@ Charm++ Documentation
 =====================
 
 
-- Charm++ Tutorial: http://charmplusplus.org/tutorial/
+- Charm++ Tutorial: https://charmplusplus.org/tutorial/
 - Charm++ Development: https://github.com/UIUC-PPL/charm
-- Nightly regression tests: http://charm.cs.illinois.edu/autobuild/cur/
+- Nightly regression tests: https://charm.cs.illinois.edu/autobuild/cur/
 - Charm++ discussion: https://github.com/UIUC-PPL/charm/discussions
 
 
