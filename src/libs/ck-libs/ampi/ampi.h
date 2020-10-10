@@ -4,6 +4,7 @@
 #include <stdlib.h> /* for redefinition of exit() below */
 #include <inttypes.h> /* for intptr_t */
 #include "charm-api.h"
+#include "conv-config.h"
 
 #define AMPI_INTERNAL_SKIP_FUNCTIONS
 
@@ -999,10 +1000,12 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_File_call_errhandler APMPI_File_call_errhandler
 #define  MPI_File_create_errhandler  AMPI_File_create_errhandler
 #define PMPI_File_create_errhandler APMPI_File_create_errhandler
+#if !CMK_AMPI_WITH_ROMIO
 #define  MPI_File_get_errhandler  AMPI_File_get_errhandler
 #define PMPI_File_get_errhandler APMPI_File_get_errhandler
 #define  MPI_File_set_errhandler  AMPI_File_set_errhandler
 #define PMPI_File_set_errhandler APMPI_File_set_errhandler
+#endif
 
 #define  MPI_Close_port  AMPI_Close_port
 #define PMPI_Close_port APMPI_Close_port

@@ -10,6 +10,10 @@
     * #include of files violating any of the above
  */
 
+#ifndef CMK_AMPI_WITH_ROMIO
+# error You must include conv-config.h before including this file!
+#endif
+
 #ifndef AMPI_NOIMPL_ONLY
 
 #ifndef AMPI_FUNC
@@ -451,8 +455,11 @@ AMPI_FUNC(int, MPI_Abort, MPI_Comm comm, int errorcode)
 AMPI_FUNC(int, MPI_Pcontrol, const int level, ...)
 AMPI_FUNC(int, MPI_File_call_errhandler, MPI_File fh, int errorcode)
 AMPI_FUNC(int, MPI_File_create_errhandler, MPI_File_errhandler_function *function, MPI_Errhandler *errhandler)
+#if !CMK_AMPI_WITH_ROMIO
+/* Disable in ROMIO's mpio_functions.h if enabling these. */
 AMPI_FUNC(int, MPI_File_get_errhandler, MPI_File file, MPI_Errhandler *errhandler)
 AMPI_FUNC(int, MPI_File_set_errhandler, MPI_File file, MPI_Errhandler errhandler)
+#endif
 
 /*********************One sided communication routines *****************/
 #ifndef MPI_WIN_NULL_DELETE_FN
