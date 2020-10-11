@@ -779,15 +779,18 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 
 	CmiNodeBarrier();
 
-	// restore mainchares
-	FILE* fMain = openCheckpointFile(dirname, "MainChares", "rb");
-	if(fMain && CkMyPe()==0){ // only main chares have been checkpointed, we restart on PE0
-		PUP::fromDisk pMain(fMain, PUP::er::IS_CHECKPOINT);
-		CkPupMainChareData(pMain, args);
-		CmiFclose(fMain);
-		DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
-		//bdcastRO(); // moved to CkPupMainChareData()
-	}
+        // Restore mainchares on PE 0
+        if (CkMyPe() == 0)
+        {
+          FILE* fMain = openCheckpointFile(dirname, "MainChares", "rb");
+          if (fMain)
+          {
+            PUP::fromDisk pMain(fMain, PUP::er::IS_CHECKPOINT);
+            CkPupMainChareData(pMain, args);
+            CmiFclose(fMain);
+            DEBCHK("[%d]CkRestartMain: mainchares restored\n", CkMyPe());
+          }
+        }
 
 #ifndef CMK_CHARE_USE_PTR
         // restore chares only when number of pes is the same
@@ -915,4 +918,3 @@ public:
 
 #include "CkCheckpoint.def.h"
 #include "CkCheckpointStatus.def.h"
-
