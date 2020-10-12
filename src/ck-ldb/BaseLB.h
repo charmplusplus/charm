@@ -277,9 +277,8 @@ public:
 #if CMK_LBDB_ON
 
 #define CreateLBFunc_Def(x, str)		\
-void Create##x(void) { 	\
-  int seqno = LBManagerObj()->getLoadbalancerTicket();	\
-  CProxy_##x::ckNew(CkLBOptions(seqno)); 	\
+void Create##x(const CkLBOptions& opts) { 	\
+  CProxy_##x::ckNew(opts); 	\
 }	\
 \
 BaseLB *Allocate##x(void) { \

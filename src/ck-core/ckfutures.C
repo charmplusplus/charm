@@ -19,6 +19,7 @@ in remote process control.
 #include "ckarray.h"
 #include "ckfutures.h"
 #include <stdlib.h>
+#include <limits>
 
 typedef struct Future_s {
   bool ready;
@@ -141,6 +142,10 @@ int createFuture(void)
     _MEMCHECK(fs->array);
     addedFutures(origsize, fs->max);
   }
+  
+  // handle may overflow CMK_REFNUM_TYPE, creating problems when waiting on this future
+  CkAssert(fs->freelist <= std::numeric_limits<CMK_REFNUM_TYPE>::max());
+
   handle = fs->freelist;
   fut = fs->array + handle;
   fs->freelist = fut->next;
