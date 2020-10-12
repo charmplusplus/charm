@@ -63,6 +63,14 @@ extern UInt  numZerocopyROops;
 #endif
 #endif
 
+#ifndef CMK_CHARE_USE_PTR
+
+CkpvExtern(std::vector<void *>, chare_objs);
+CkpvExtern(std::vector<int>, chare_types);
+CkpvExtern(std::vector<VidBlock *>, vidblocks);
+
+#endif
+
 void CkCreateLocalChare(int epIdx, envelope *env);
 
 // helper class to get number of array elements
@@ -173,25 +181,33 @@ static void addPartitionDirectory(ostringstream &path) {
   }
 }
 
-static FILE* openCheckpointFile(const char *dirname, const char *basename,
-    const char *mode, int id = -1) {
+static std::string getCheckpointFileName(const char* dirname, const char* basename,
+                                         const int id = -1)
+{
   ostringstream out;
   out << dirname;
   addPartitionDirectory(out);
-  if (id != -1) {
-    int subdir_id = id / SUBDIR_SIZE;
+  if (id != -1)
+  {
+    const int subdir_id = id / SUBDIR_SIZE;
     out << "/sub" << subdir_id;
   }
   out << "/" << basename;
-  if (id != -1) {
+  if (id != -1)
+  {
     out << "_" << id;
   }
   out << ".dat";
+  return out.str();
+}
 
-  FILE *fp = CmiFopen(out.str().c_str(), mode);
+static FILE* openCheckpointFile(const char *dirname, const char *basename,
+    const char *mode, const int id = -1) {
+  std::string filename = getCheckpointFileName(dirname, basename, id);
+  FILE *fp = CmiFopen(filename.c_str(), mode);
   if (!fp) {
     CkAbort("PE %d failed to open checkpoint file: %s, mode: %s, status: %s",
-        CkMyPe(), out.str().c_str(), mode, strerror(errno));
+        CkMyPe(), filename.c_str(), mode, strerror(errno));
   }
   return fp;
 }
@@ -267,46 +283,45 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
   }
 
 #ifndef CMK_CHARE_USE_PTR
-	// save plain singleton chares into Chares.dat
-	FILE* fChares = openCheckpointFile(dirname, "Chares", "wb", CkMyPe());
-	PUP::toDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
-	CkPupChareData(pChares);
-	if(pChares.checkError())
-	  success = false;
-	if(CmiFclose(fChares)!=0)
-	  success = false;
+  // only create chare checkpoint file if this PE actually has data
+  if (CkpvAccess(chare_objs).size() > 0 || CkpvAccess(vidblocks).size() > 0)
+  {
+    // save plain singleton chares into Chares.dat
+    FILE* fChares = openCheckpointFile(dirname, "Chares", "wb", CkMyPe());
+    PUP::toDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
+    CkPupChareData(pChares);
+    if (pChares.checkError()) success = false;
+    if (CmiFclose(fChares) != 0) success = false;
+  }
 #endif
 
-	// save groups into Groups.dat
-	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
-	FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", CkMyPe());
-	PUP::toDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
-        CkPupGroupData(pGroups);
-	if(pGroups.checkError())
-	  success = false;
-	if(CmiFclose(fGroups)!=0)
-	  success = false;
+  // save groups into Groups.dat
+  // content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed),
+  // groups(PUP'ed)
+  FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", CkMyPe());
+  PUP::toDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
+  CkPupGroupData(pGroups);
+  if (pGroups.checkError()) success = false;
+  if (CmiFclose(fGroups) != 0) success = false;
 
-	// save nodegroups into NodeGroups.dat
-	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
-	if (CkMyRank() == 0) {
-	  FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", CkMyNode());
-	  PUP::toDisk pNodeGroups(fNodeGroups, PUP::er::IS_CHECKPOINT);
-          CkPupNodeGroupData(pNodeGroups);
-	  if(pNodeGroups.checkError())
-	    success = false;
-	  if(CmiFclose(fNodeGroups)!=0)
-	    success = false;
-  	}
+  // save nodegroups into NodeGroups.dat
+  // content of the file: numNodeGroups, GroupInfo[numNodeGroups],
+  // _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
+  if (CkMyRank() == 0)
+  {
+    FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", CkMyNode());
+    PUP::toDisk pNodeGroups(fNodeGroups, PUP::er::IS_CHECKPOINT);
+    CkPupNodeGroupData(pNodeGroups);
+    if (pNodeGroups.checkError()) success = false;
+    if (CmiFclose(fNodeGroups) != 0) success = false;
+  }
 
-	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
-	FILE *datFile = openCheckpointFile(dirname, "arr", "wb", CkMyPe());
-	PUP::toDisk  p(datFile, PUP::er::IS_CHECKPOINT);
-	CkPupArrayElementsData(p);
-	if(p.checkError())
-	  success = false;
-	if(CmiFclose(datFile)!=0)
-	  success = false;
+  // DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
+  FILE* datFile = openCheckpointFile(dirname, "arr", "wb", CkMyPe());
+  PUP::toDisk p(datFile, PUP::er::IS_CHECKPOINT);
+  CkPupArrayElementsData(p);
+  if (p.checkError()) success = false;
+  if (CmiFclose(datFile) != 0) success = false;
 
 #if ! CMK_DISABLE_SYNC
 #if CMK_HAS_SYNC_FUNC
@@ -394,10 +409,6 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 }
 
 #ifndef CMK_CHARE_USE_PTR
-
-CkpvExtern(std::vector<void *>, chare_objs);
-CkpvExtern(std::vector<int>, chare_types);
-CkpvExtern(std::vector<VidBlock *>, vidblocks);
 
 // handle plain non-migratable chare
 void CkPupChareData(PUP::er &p)
@@ -777,16 +788,24 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
 		//bdcastRO(); // moved to CkPupMainChareData()
 	}
-	
+
 #ifndef CMK_CHARE_USE_PTR
-	// restore chares only when number of pes is the same 
-	if(CkNumPes() == _numPes) {
-		FILE* fChares = openCheckpointFile(dirname, "Chares", "rb", CkMyPe());
-		PUP::fromDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
-		CkPupChareData(pChares);
-		CmiFclose(fChares);
-		if (CmiMyRank() == 0) _chareRestored = true;
-	}
+        // restore chares only when number of pes is the same
+        if (CkNumPes() == _numPes)
+        {
+          // A chare checkpoint file only exists when the PE actually contained singleton
+          // chares at checkpoint time, so check to see if the file exists before trying
+          // to restore
+          std::string filename = getCheckpointFileName(dirname, "Chares", CkMyPe());
+          FILE* fChares = CmiFopen(filename.c_str(), "rb");
+          if (fChares)
+          {
+            PUP::fromDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
+            CkPupChareData(pChares);
+            CmiFclose(fChares);
+            _chareRestored = true;
+          }
+        }
 #endif
 
 	// restore groups
