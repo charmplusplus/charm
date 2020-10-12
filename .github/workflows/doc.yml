@@ -9,7 +9,7 @@ on:
       - 'doc/**'
 
 jobs:
-  build:
+  sphinx-build:
 
     runs-on: ubuntu-latest
 
@@ -19,8 +19,9 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: '3.x'
-    - name: sphinx
+    - name: Install prerequisites
+      run: pip3 install sphinx sphinx_rtd_theme        
+    - name: Run sphinx
       run: |
-        pip3 install sphinx sphinx_rtd_theme
         cd doc
         make html
