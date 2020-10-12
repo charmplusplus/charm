@@ -1659,11 +1659,11 @@ describe their kernels using a work request struct, which includes the
 buffers to be copied, callbacks to be invoked, and kernel to be
 executed. Additionally, users can take advantage of a pre-allocated host
 side pinned memory pool allocated by the runtime via invoking
-``hapi_poolMalloc``. Finally, the user must compile this code using the
+``hapiPoolMalloc``. Finally, the user must compile this code using the
 appropriate ``nvcc`` compiler as per usual.
 
-More details on using GPUs in Charm++ can be found in the :ref:`gpumanager`
-entry in the larger Libraries Manual.
+More details on using GPUs in Charm++ can be found in Section :numref:`sec-gpu`
+of the Charm++ manual.
 
 Converse Programming
 ====================
