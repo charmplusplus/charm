@@ -1056,14 +1056,6 @@ typedef void (*MPI_MigrateFn)(void);
 
 #define  MPI_CONVERSION_FN_NULL  AMPI_CONVERSION_FN_NULL
 #define PMPI_CONVERSION_FN_NULL APMPI_CONVERSION_FN_NULL
-#define  MPI_File_iread_all  AMPI_File_iread_all
-#define PMPI_File_iread_all APMPI_File_iread_all
-#define  MPI_File_iread_at_all  AMPI_File_iread_at_all
-#define PMPI_File_iread_at_all APMPI_File_iread_at_all
-#define  MPI_File_iwrite_all  AMPI_File_iwrite_all
-#define PMPI_File_iwrite_all APMPI_File_iwrite_all
-#define  MPI_File_iwrite_at_all  AMPI_File_iwrite_at_all
-#define PMPI_File_iwrite_at_all APMPI_File_iwrite_at_all
 
 #define  MPI_Status_f082f  AMPI_Status_f082f
 #define PMPI_Status_f082f APMPI_Status_f082f
