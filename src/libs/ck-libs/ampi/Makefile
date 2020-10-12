@@ -181,10 +181,10 @@ ampi_noimpl.o: ampi_noimpl.C $(HEADDEP) headers
 compat_ampicpp.o: compat_ampicpp.C
 	$(CHARMC) -c compat_ampicpp.C
 
-ampi.o: ampi.C $(HEADDEP)
+ampi.o: ampi.C $(HEADDEP) headers
 	$(CHARMC) -c ampi.C
 
-$(AMPIF_OBJ): ampif.C $(HEADDEP)
+$(AMPIF_OBJ): ampif.C $(HEADDEP) headers
 	$(CHARMC) -c $< -o $@
 
 ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP) headers
@@ -199,7 +199,7 @@ mpich-alltoall.o: mpich-alltoall.C $(HEADDEP) headers
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
 
-ddt.o: ddt.C ddt.h $(HEADDEP)
+ddt.o: ddt.C ddt.h $(HEADDEP) headers
 
 $(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -c $< -o $@
