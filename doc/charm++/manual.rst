@@ -8939,7 +8939,7 @@ following example shows how this API can be used.
 
    CkSetPeHelpsOtherThreads(1);
 
-.. _sec:gpu:
+.. _sec-gpu:
 
 GPU Support
 -----------
