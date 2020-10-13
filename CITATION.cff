@@ -59,7 +59,7 @@ references:
       city: "Boca Raton"
     section: "Chapter 1: The Charm++ Programming Model"
     title: "Parallel Science and Engineering Applications: The Charm++ Approach"
-    url: "http://charm.cs.illinois.edu/newPapers/13-46/paper.pdf"
+    url: "https://charm.cs.illinois.edu/newPapers/13-46/paper.pdf"
     year: 2013
     notes: |
       @incollection{Kale2013,

@@ -77,8 +77,6 @@ all: $(MAJOR_TARGETS) $(COMPATLIB) $(ROMIO)
 
 $(ROMIO): $(ROMIO_DEPS)
 	@echo "Building ROMIO"
-# update timestamps on these files so that ROMIO's Makefile does not run configure a second time
-	@touch romio/aclocal.m4 romio/Makefile.in romio/configure romio/config.status
 	cd romio &&                                                                  \
 		MPI_IMPL="ampi" FROM_MPICH="no" FROM_LAM="no" FROM_OMPI="no"         \
 		MPI_LIB=""                                                           \
@@ -95,7 +93,7 @@ $(ROMIO): $(ROMIO_DEPS)
 		--srcdir=`pwd`
 
 	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
-	$(MAKE) -C romio
+	$(MAKE) -C romio AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
 	cp romio/.libs/libromio.a $@
 ifneq ($(ROMIOLIBSHARED),)
 	cp romio/.libs/libromio.$(CMK_SHARED_SUF) $(ROMIOLIBSHARED)

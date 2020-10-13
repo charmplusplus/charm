@@ -187,10 +187,11 @@ then
 
   if [ -n "$GLOBALS_FUNCPTR" -o "$CMK_WINDOWS" = '1' ]
   then
-    SHIM_OPTS='-DAMPI_USE_FUNCPTR'
+    SHIM_OPTS='-standalone -DAMPI_USE_FUNCPTR'
     SHIM_OBJS="\"$CHARMLIB/ampi_funcptr_shim.o\" $SHIM_MAIN_OBJS"
     [ "$AMPICC_MODE" = 'ampif' ] && SHIM_OBJS="$SHIM_OBJS \"$CHARMLIB/ampi_funcptr_shim_fortran.o\" \"$CHARMLIB/ampifimpl.o\" \"$CHARMLIB/ampimod.o\""
-    LOADER_OBJS="\"$CHARMLIB/ampi_funcptr_loader.o\""
+    LOADER_OBJS="\"$CHARMLIB/ampi_funcptr_loader.o\" $ROMIO"
+    ROMIO=''
   else
     SHIM_OPTS=''
     SHIM_OBJS=''
