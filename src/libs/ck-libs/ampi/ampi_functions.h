@@ -696,12 +696,10 @@ AMPI_FUNC_NOIMPL(int, MPI_Win_sync, MPI_Win win)
 /* A.2.11 I/O C Bindings */
 
 AMPI_FUNC_NOIMPL(int, MPI_CONVERSION_FN_NULL, void *userbuf, MPI_Datatype datatype, int count, void *filebuf, MPI_Offset position, void *extra_state)
-#if 0
 AMPI_FUNC_NOIMPL(int, MPI_File_iread_all, MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 AMPI_FUNC_NOIMPL(int, MPI_File_iread_at_all, MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 AMPI_FUNC_NOIMPL(int, MPI_File_iwrite_all, MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 AMPI_FUNC_NOIMPL(int, MPI_File_iwrite_at_all, MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
-#endif
 // AMPI_FUNC_NOIMPL(int, MPI_Register_datarep, const char *datarep, MPI_Datarep_conversion_function *read_conversion_fn, MPI_Datarep_conversion_function *write_conversion_fn, MPI_Datarep_extent_function *dtype_file_extent_fn, void *extra_state) //Provided by ROMIO
 
 
