@@ -4,13 +4,13 @@ all: html pdf
 
 pdf: check-latex
 	@echo "Building PDF documentation"
-	sphinx-build -b latex -n . pdf
+	sphinx-build -W -b latex -n . pdf
 	make -C pdf
 	@echo "PDF documentation built. Open ./pdf/charm.pdf in a PDF viewer."
 
 html: check-sphinx
 	@echo "Building HTML documentation"
-	sphinx-build -n . html
+	sphinx-build -W -n . html
 	@echo "HTML documentation built. Open ./html/index.html in a web browser."
 
 # This rule was used to copy the manual to our local web server
