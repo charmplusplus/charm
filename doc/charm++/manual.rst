@@ -8939,7 +8939,7 @@ following example shows how this API can be used.
 
    CkSetPeHelpsOtherThreads(1);
 
-.. _sec:gpu:
+.. _sec-gpu:
 
 GPU Support
 -----------
@@ -10311,12 +10311,12 @@ mass of the particles with velocity greater than 1:
 
 .. code-block:: python
 
-   size = ck.read((``numparticles'', 0));
+   size = ck.read(("numparticles", 0));
    for i in range(0, size):
-       vel = ck.read((``velocity'', i));
-       mass = ck.read((``mass'', i));
+       vel = ck.read(("velocity", i));
+       mass = ck.read(("mass", i));
        mass = mass * 2;
-       if (vel > 1): ck.write((``mass'', i), mass);
+       if (vel > 1): ck.write(("mass", i), mass);
 
 Instead of all these read and writes, it will be better to be able to
 write:
@@ -11257,7 +11257,7 @@ After downloading and unpacking Charm++, it can be installed in the following wa
    $ make -j4
 
 
-By default, CMake builds the netlrts version. 
+By default, CMake builds the netlrts version.
 Other configuration options can be specified in the cmake command above.
 For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the following command can be used:
 
