@@ -760,14 +760,15 @@ No, but a manual migration can be triggered using *migrateMe*.
 When not using ``AtSync`` for LB, when does the LB start up? Where is the code that periodically checks if load balancing can be done?
 --------------------------------------------------------------------------------------------------------------------------------------
 
-If not using ``usesAtSync``, the load balancer can start up at anytime.
-There is a dummy ``AtSync`` for each array element which by default
-tells the load balancer that it is always ready. The LDBD manager has a
-syncer (``LBDB::batsyncer``) which periodically calls ``AtSync`` roughly
-every 1ms to trigger the load balancing (this timeout can be changed
-with the *+LBPeriod* option). In this load balancing mode, users have to
-make sure all migratable objects are always ready to migrate (e.g. not
-depending on a global variable which cannot be migrated).
+If not using ``usesAtSync``, load balancing will not run by
+default. If one does not want to use ``AtSync``, but instead run in a
+mode where load balancing is automatically run periodically, the user
+must run with the *+LBPeriod <time in seconds>* runtime option. Load
+balancing will be invoked automatically by the runtime system,
+waiting at least the specified value of time between successive
+calls. In this load balancing mode, users have to make sure all
+migratable objects are always ready to migrate (e.g. not depending on
+a global variable which cannot be migrated).
 
 Should I use AtSync explicitly, or leave it to the system?
 ----------------------------------------------------------
