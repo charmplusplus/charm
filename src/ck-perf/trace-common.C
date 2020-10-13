@@ -228,6 +228,7 @@ static void traceCommonInit(char **argv)
 }
 
 extern char** Cmi_argvcopy;
+extern const char* const CmiCommitID;
 
 /** Write out the common parts of the .sts file. */
 void traceWriteSTS(FILE *stsfp,int nUserEvents) {
@@ -265,6 +266,7 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   strftime(timeBuffer, sizeof(timeBuffer), "%FT%TZ", &currentTime);
   fprintf(stsfp, "TIMESTAMP %s\n", timeBuffer);
 
+  fprintf(stsfp, "CHARMVERSION %s\n", CmiCommitID);
   fprintf(stsfp, "TOTAL_CHARES %d\n", (int)_chareTable.size());
   fprintf(stsfp, "TOTAL_EPS %d\n", (int)_entryTable.size());
   fprintf(stsfp, "TOTAL_MSGS %d\n", (int)_msgTable.size());

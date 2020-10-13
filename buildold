@@ -926,7 +926,7 @@ printError()
   Echo "-------------------------------------------------"
   Echo "Charm++ NOT BUILT. Either cd into $DESTINATION/tmp and try"
   Echo "to resolve the problems yourself, visit"
-  Echo "    http://charm.cs.illinois.edu/"
+  Echo "    https://charm.cs.illinois.edu/"
   Echo "for more information. Otherwise, please open an issue on our GitHub https://github.com/UIUC-PPL/charm"
   exit $MAKEEXIT
 }
