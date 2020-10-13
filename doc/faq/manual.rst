@@ -14,7 +14,7 @@ Big Questions
 What is Charm++?
 ----------------
 
-`Charm++ <http://charm.cs.uiuc.edu/research/charm/>`_ is a
+`Charm++ <https://charm.cs.illinois.edu/research/charm/>`_ is a
 runtime library to let C++ objects communicate with each other
 efficiently. The programming model is thus an asynchronous message
 driven paradigm, like Java RMI, or RPC; but it is targeted towards
@@ -24,8 +24,8 @@ Charm++ programs do not proceed in lockstep. The flow of control is
 determined by the order in which remote method invocations occur. This
 can be controlled by the user through Structure Control Flow using
 :ref:`Structured Dagger <sec:sdag>`, or
-`Charisma <http://charm.cs.uiuc.edu/research/orch>`_, or
-compiler supported higher level languages `Charj <http://charm.cs.uiuc.edu/research/charj>`_.
+`Charisma <https://charm.cs.illinois.edu/research/orch>`_, or
+compiler supported higher level languages `Charj <https://charm.cs.illinois.edu/research/charj>`_.
 
 Charm++ has demonstrated scalability up to hundreds of thousands of
 processors, and provides extremely advanced load balancing and object
@@ -48,7 +48,7 @@ programming and high-level abstractions such as Charm++ Arrays make it
 simpler and more expressive than many other parallel languages. So you
 will have to write some new code, but not as much as you might think.
 This is particularly true when using one of the Charm++
-`frameworks <http://charm.cs.uiuc.edu/research/>`_.
+`frameworks <https://charm.cs.illinois.edu/research/>`_.
 
 I can already write parallel applications in MPI. Why should I use Charm++?
 ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ are very difficult to provide in MPI. If you have a working MPI code but
 have scalability problems because of dynamic behavior, load imbalance,
 or communication costs, Charm++ might dramatically improve your
 performance. You can even run your MPI code on Charm++ unchanged using
-`AMPI <http://charm.cs.uiuc.edu/research/ampi/>`_.
+`AMPI <https://charm.cs.illinois.edu/research/ampi/>`_.
 
 Will Charm++ run on my machine?
 -------------------------------
@@ -80,31 +80,31 @@ Does anybody actually use Charm++?
 
 Several large applications use Charm++.
 
-- The large, production-quality molecular dynamics application `NAMD <http://charm.cs.illinois.edu/research/moldyn/>`_.
-- The cosmological simulator `ChaNGa <http://charm.cs.illinois.edu/research/cosmology/>`_.
-- The atomistic simulation framework `OpenAtom <http://charm.cs.illinois.edu/OpenAtom/>`_.
+- The large, production-quality molecular dynamics application `NAMD <https://charm.cs.illinois.edu/research/moldyn/>`_.
+- The cosmological simulator `ChaNGa <https://charm.cs.illinois.edu/research/cosmology/>`_.
+- The atomistic simulation framework `OpenAtom <https://charm.cs.illinois.edu/OpenAtom/>`_.
 - We have significant collaborations with groups in Materials Science,
   Chemistry, Astrophysics, Network Simulation, Operation Research,
   Contagion Effects, in Illinois, New York, California, Washington, and
-  Virginia. See also `Applications <http://hpccharm.com/products.html#applications>`_ for a more complete list.
+  Virginia. See also `Applications <https://hpccharm.com/applications>`_ for a more complete list.
 
 Who created Charm++?
 --------------------
 
 Prof. `L.V. Kale <kale@illinois.edu>`_, of the
-`Computer Science Department <http://www.cs.illinois.edu/>`_
-of the `University of Illinois at Urbana-Champaign <http://www.illinois.edu/>`_,
-and his research group, the `Parallel Programming Lab <http://charm.cs.illinois.edu/>`_.
+`Computer Science Department <https://www.cs.illinois.edu/>`_
+of the `University of Illinois at Urbana-Champaign <https://www.illinois.edu/>`_,
+and his research group, the `Parallel Programming Lab <https://charm.cs.illinois.edu/>`_.
 Nearly a hundred people have contributed something to the project over the course of
 approximately 20 years; a partial list of contributors appears on the
-`people <http://charm.cs.illinois.edu/people/>`_ page.
+`people <https://charm.cs.illinois.edu/people/>`_ page.
 
 What is the future of Charm++?
 ------------------------------
 
 Our research group of approximately twenty people are actively engaged
 in maintaining and extending Charm++; and in particular the Charm++
-`frameworks <http://charm.cs.uiuc.edu/research/>`_.
+`frameworks <https://charm.cs.illinois.edu/research/>`_.
 Several other groups are dependent on Charm++, so we expect to continue
 improving Charm++ indefinitely.
 
@@ -115,7 +115,7 @@ Charm++ is open-source and free for research, educational, and academic
 use. The University of Illinois retains the copyright to the software,
 and requires a license for any commercial redistribution of our
 software. The actual, legal license is included with Charm++ (in
-charm/LICENSE). Contact `Charmworks, Inc. <http://hpccharm.com/>`_ for commercial support and licensing of Charm++
+charm/LICENSE). Contact `Charmworks, Inc. <https://hpccharm.com/>`_ for commercial support and licensing of Charm++
 and AMPI.
 
 I have a suggestion/feature request/bug report. Who should I send it to?
@@ -130,7 +130,7 @@ Installation and Usage
 How do I get Charm++?
 ---------------------
 
-See our `download <https://charm.cs.uiuc.edu/download/>`_ page.
+See our `download <https://charm.cs.illinois.edu/download/>`_ page.
 
 Should I use the GIT version of Charm++?
 ----------------------------------------
@@ -760,14 +760,15 @@ No, but a manual migration can be triggered using *migrateMe*.
 When not using ``AtSync`` for LB, when does the LB start up? Where is the code that periodically checks if load balancing can be done?
 --------------------------------------------------------------------------------------------------------------------------------------
 
-If not using ``usesAtSync``, the load balancer can start up at anytime.
-There is a dummy ``AtSync`` for each array element which by default
-tells the load balancer that it is always ready. The LDBD manager has a
-syncer (``LBDB::batsyncer``) which periodically calls ``AtSync`` roughly
-every 1ms to trigger the load balancing (this timeout can be changed
-with the *+LBPeriod* option). In this load balancing mode, users have to
-make sure all migratable objects are always ready to migrate (e.g. not
-depending on a global variable which cannot be migrated).
+If not using ``usesAtSync``, load balancing will not run by
+default. If one does not want to use ``AtSync``, but instead run in a
+mode where load balancing is automatically run periodically, the user
+must run with the *+LBPeriod <time in seconds>* runtime option. Load
+balancing will be invoked automatically by the runtime system,
+waiting at least the specified value of time between successive
+calls. In this load balancing mode, users have to make sure all
+migratable objects are always ready to migrate (e.g. not depending on
+a global variable which cannot be migrated).
 
 Should I use AtSync explicitly, or leave it to the system?
 ----------------------------------------------------------
@@ -1121,16 +1122,16 @@ Charm Debug.
 
 .. code-block:: bash
 
-    git clone git://charm.cs.uiuc.edu/ccs_tools.git
-    cd ccs_tools
-    ant
+   $ git clone git@github.com:UIUC-PPL/ccs_tools
+   $ cd ccs_tools
+   $ ant
 
 This will create the executable ``bin/charmdebug``. To start, simply
 substitute "charmdebug" to "charmrun":
 
-.. code-block:: none
+.. code-block:: bash
 
-   shell> <path>/charmdebug ./myprogram
+   $ ./charmdebug ./myprogram
 
 You can find more detailed information in the debugger manual in
 :ref:`charmdebug`.
@@ -1152,18 +1153,18 @@ How do I use *gdb* with Charm++ programs?
 It depends on the machine. On the netlrts- versions of Charm++, like
 netlrts-linux-x86_64, you can just run the serial debugger:
 
-.. code-block:: none
+.. code-block:: bash
 
-   shell> gdb myprogram
+   $ gdb myprogram
 
 If the problem only shows up in parallel, and you’re running on an X
 terminal, you can use the *++debug* or *++debug-no-pause* options of
 charmrun to get a separate window for each process:
 
-.. code-block:: none
+.. code-block:: bash
 
-   shell> export DISPLAY="myterminal:0"
-   shell> ./charmrun ./myprogram +p2 ++debug
+   $ export DISPLAY="myterminal:0"
+   $ ./charmrun ./myprogram +p2 ++debug
 
 When I try to use the *++debug* option I get: ``remote host not responding... connection closed``
 -------------------------------------------------------------------------------------------------
@@ -1412,7 +1413,7 @@ support.
 
 A good reference for which compiler versions provide what level of
 standard support can be found at
-http://en.cppreference.com/w/cpp/compiler_support
+https://en.cppreference.com/w/cpp/compiler_support
 
 Developers of several Charm++ applications have reported good results
 using features in more recent C++ standards, with the caveat of
@@ -1671,7 +1672,7 @@ Converse Programming
 What is Converse? Should I use it?
 ----------------------------------
 
-`Converse <http://charm.cs.uiuc.edu/research/converse/>`_ is the low-level
+`Converse <https://charm.cs.illinois.edu/research/converse/>`_ is the low-level
 portable messaging layer that Charm++ is built on, but
 you don’t have to know anything about Converse to use Charm++. You might
 want to learn about Converse if you want a capable, portable foundation
