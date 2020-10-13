@@ -1558,7 +1558,6 @@ void mpi_file_create_errhandler(void (*function)(MPI_File*,int*,...), int *errha
   *ierr = MPI_File_create_errhandler(function, errhandler);
 }
 
-#if 0
 void mpi_file_set_errhandler(MPI_File* file, int* errhandler, int *ierr) noexcept
 {
   *ierr = MPI_File_set_errhandler(*file, *errhandler);
@@ -1568,7 +1567,6 @@ void mpi_file_get_errhandler(MPI_File* file, int *errhandler, int *ierr) noexcep
 {
   *ierr = MPI_File_get_errhandler(*file, errhandler);
 }
-#endif
 
 void mpi_errhandler_create(void (*function)(MPI_Comm*,int*,...), int *errhandler, int *ierr) noexcept
 {
