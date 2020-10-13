@@ -8,6 +8,7 @@
 #include <cuda_runtime.h>
 
 #define CkNcpyModeDevice CmiNcpyModeDevice
+#define CkDeviceStatus CmiDeviceStatus
 
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
@@ -60,6 +61,9 @@ public:
     cb = cb_;
     cuda_stream = cuda_stream_;
   }
+
+  CkDeviceStatus get(CkDeviceBuffer& src);
+  CkDeviceStatus put(CkDeviceBuffer& dst);
 
   void pup(PUP::er &p) {
     CmiDeviceBuffer::pup(p);

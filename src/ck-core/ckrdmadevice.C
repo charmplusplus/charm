@@ -56,6 +56,44 @@
 
 CsvExtern(GPUManager, gpu_manager);
 
+/****************************** Direct (Persistent) API ******************************/
+
+CkDeviceStatus CkDeviceBuffer::get(CkDeviceBuffer& src) {
+   // Check that the source buffer fits into the destination buffer
+  if (cnt < src.cnt) {
+    CkAbort("CkDeviceBuffer::get: Destination buffer is smaller than source buffer\n");
+  }
+
+  // Check that this PE is the correct destination
+  CkAssert(src.dest_pe == CkMyPe());
+
+  CkNcpyModeDevice mode = findTransferModeDevice(src.src_pe, CkMyPe());
+
+  if (mode == CkNcpyModeDevice::MEMCPY) {
+    cudaMemcpyAsync((void*)ptr, src.ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
+    // TODO: Need to support stack-allocated CkCallback
+    if (cb.type != CkCallback::ignore) {
+      hapiAddCallback(cuda_stream, &cb);
+    }
+    if (src.cb.type != CkCallback::ignore) {
+      hapiAddCallback(cuda_stream, &src.cb);
+    }
+  } else if (mode == CkNcpyModeDevice::IPC) {
+    // TODO
+    CkAbort("TODO");
+  } else {
+    CkAbort("Persistant GPU messaging is not yet supported for inter-node messages");
+  }
+
+  return CkDeviceStatus::incomplete;
+}
+
+CkDeviceStatus CkDeviceBuffer::put(CkDeviceBuffer& dst) {
+  return CkDeviceStatus::incomplete;
+}
+
+/****************************** Recv Entry Method API ******************************/
+
 // Invoked after post entry method
 bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
   // Determine if the subsequent regular entry method should be invoked
