@@ -67,11 +67,11 @@ struct hapiCallbackMessage {
 #ifndef HAPI_CUDA_CALLBACK
 typedef struct hapiEvent {
   cudaEvent_t event;
-  void* cb;
+  CkCallback cb;
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
 
-  hapiEvent(cudaEvent_t event_, void* cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
+  hapiEvent(cudaEvent_t event_, CkCallback cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
             : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_) {}
 } hapiEvent;
 
@@ -423,7 +423,7 @@ static void hapiMapping(char** argv) {
 }
 
 #ifndef HAPI_CUDA_CALLBACK
-void recordEvent(cudaStream_t stream, void* cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
+void recordEvent(cudaStream_t stream, CkCallback cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
   // create CUDA event and insert into stream
   cudaEvent_t ev;
   cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
@@ -637,7 +637,7 @@ void hapiEnqueue(hapiWorkRequest* wr) {
 #ifdef HAPI_CUDA_CALLBACK
     addCallback(wr, AfterHostToDevice);
 #else
-    recordEvent(wr->stream, wr->host_to_device_cb, NULL);
+    //recordEvent(wr->stream, wr->host_to_device_cb, NULL);
 #endif
   }
 
@@ -652,7 +652,7 @@ void hapiEnqueue(hapiWorkRequest* wr) {
 #ifdef HAPI_CUDA_CALLBACK
     addCallback(wr, AfterKernel);
 #else
-    recordEvent(wr->stream, wr->kernel_cb, NULL);
+    //recordEvent(wr->stream, wr->kernel_cb, NULL);
 #endif
   }
 
@@ -667,10 +667,10 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   addCallback(wr, AfterDeviceToHost);
 #else
   if (wr->device_to_host_cb) {
-    recordEvent(wr->stream, wr->device_to_host_cb, NULL, wr);
+    //recordEvent(wr->stream, wr->device_to_host_cb, NULL, wr);
   }
   else {
-    recordEvent(wr->stream, NULL, NULL, wr);
+    //recordEvent(wr->stream, NULL, NULL, wr);
   }
 #endif
 
@@ -1374,10 +1374,7 @@ void hapiPollEvents(void* param, double cur_time) {
     hapiEvent hev = queue.front();
     if (cudaEventQuery(hev.event) == cudaSuccess) {
       // invoke Charm++ callback if one was given
-      if (hev.cb) {
-        CmiAssert(hapiInvokeCallback);
-        hapiInvokeCallback(hev.cb, hev.cb_msg);
-      }
+      hev.cb.send(hev.cb_msg);
 
       // clean up hapiWorkRequest
       if (hev.wr) {
@@ -1432,7 +1429,7 @@ cudaStream_t hapiGetStream() {
 }
 
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
-void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
+void hapiAddCallback(cudaStream_t stream, CkCallback cb, void* cb_msg) {
 #ifndef HAPI_CUDA_CALLBACK
   // record CUDA event
   recordEvent(stream, cb, cb_msg);

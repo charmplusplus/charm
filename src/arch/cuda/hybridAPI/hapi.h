@@ -1,6 +1,7 @@
 #ifndef __HAPI_H_
 #define __HAPI_H_
 #include <cuda_runtime.h>
+#include "ckcallback.h"
 
 /* See hapi_functions.h for the majority of function declarations provided
  * by the Hybrid API. */
@@ -256,7 +257,7 @@ extern "C" {
 #ifdef __cplusplus
 
 // Provide a C++-only stub for this function's default parameter.
-static inline void hapiAddCallback(cudaStream_t a, void* b) {
+static inline void hapiAddCallback(cudaStream_t a, CkCallback b) {
   hapiAddCallback(a, b, NULL);
 }
 

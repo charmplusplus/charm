@@ -31,7 +31,7 @@ AMPI_CUSTOM_FUNC(cudaStream_t, hapiGetStream, void)
 // Add a Charm++ callback function to be invoked after the previous operation
 // in the stream completes. This call should be placed after data transfers or
 // a kernel invocation.
-AMPI_CUSTOM_FUNC(void, hapiAddCallback, cudaStream_t, void*, void*)
+AMPI_CUSTOM_FUNC(void, hapiAddCallback, cudaStream_t, CkCallback, void*)
 
 // Thin wrappers for memory related CUDA API calls.
 AMPI_CUSTOM_FUNC(cudaError_t, hapiMalloc, void**, size_t)
