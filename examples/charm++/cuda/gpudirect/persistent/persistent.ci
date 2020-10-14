@@ -1,0 +1,40 @@
+mainmodule persistent {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_PersistentArray array_proxy;
+  //readonly CProxy_PersistentGroup group_proxy;
+  //readonly CProxy_PersistentNodeGroup nodegroup_proxy;
+  readonly int block_size;
+  readonly int n_iters;
+  readonly bool lb_test;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [threaded] void test();
+  };
+
+  array [1D] PersistentArray {
+    entry PersistentArray();
+    entry void send();
+    entry void recv(CkDeviceBuffer buf);
+    entry void srcCb();
+    entry void dstCb();
+  };
+
+  /*
+  group PersistentGroup {
+    entry PersistentGroup();
+    entry void send();
+    entry void recv(CkDeviceBuffer buf);
+    entry void srcCb();
+    entry void dstCb();
+  };
+
+  nodegroup PersistentNodeGroup {
+    entry PersistentNodeGroup();
+    entry void send();
+    entry void recv(CkDeviceBuffer buf);
+    entry void srcCb();
+    entry void dstCb();
+  };
+  */
+};
