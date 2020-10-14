@@ -6,6 +6,8 @@
 
 #include "mpioimpl.h"
 
+#ifndef AMPI
+
 #ifndef HAVE_MPI_TYPE_SIZE_X
 int MPI_Type_size_x(MPI_Datatype datatype, MPI_Count *size)
 {
@@ -24,3 +26,5 @@ int MPI_Status_set_elements_x(MPI_Status *status, MPI_Datatype datatype,
     return MPI_Status_set_elements(status, datatype, count_int);
 }
 #endif
+
+#endif /* !AMPI */
