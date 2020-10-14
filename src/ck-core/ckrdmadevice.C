@@ -64,9 +64,6 @@ CkDeviceStatus CkDeviceBuffer::get(CkDeviceBuffer& src) {
     CkAbort("CkDeviceBuffer::get: Destination buffer is smaller than source buffer\n");
   }
 
-  // Check that this PE is the correct destination
-  CkAssert(src.dest_pe == CkMyPe());
-
   CkNcpyModeDevice mode = findTransferModeDevice(src.src_pe, CkMyPe());
 
   if (mode == CkNcpyModeDevice::MEMCPY) {
