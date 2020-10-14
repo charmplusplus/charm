@@ -23,7 +23,7 @@ jobs:
     dist: xenial
     script:
     - sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
-    - ./build all-test mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla --build-shared
+    - ./build all-test mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
     - make -C mpi-linux-x86_64-smp/tmp test TESTOPTS="+setcpuaffinity"
     # Disabled due to several hangs and segfaults.
     #- make -C mpi-linux-x86_64-smp/tmp testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
@@ -31,7 +31,7 @@ jobs:
   - os: osx
     name: "NetLRTS-Darwin"
     script:
-    - ./build all-test netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - ./build all-test netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla --build-shared
     - make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
     - make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
 
