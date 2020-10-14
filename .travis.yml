@@ -31,7 +31,7 @@ jobs:
   - os: osx
     name: "NetLRTS-Darwin"
     script:
-    - ./build all-test netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla --build-shared
+    - ./build all-test netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla --build-shared || exit 1
     - make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
     - make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
 
