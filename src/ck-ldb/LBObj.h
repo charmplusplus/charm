@@ -80,6 +80,15 @@ public:
 #endif
   }
 
+  inline void setTiming(LBRealType cputime, int phase)
+  {
+    if (data.vectorLoad.size() < phase + 1)
+    {
+      data.vectorLoad.resize(phase + 1);
+    }
+    data.vectorLoad[phase] = cputime;
+  }
+
   inline void setPosition(const std::vector<LBRealType>& pos)
   {
     data.position = pos;
