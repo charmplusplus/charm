@@ -8247,12 +8247,27 @@ The API to checkpoint the application is:
 
 .. code-block:: c++
 
-     void CkStartCheckpoint(char* dirname, const CkCallback& cb);
+     void CkStartCheckpoint(char* dirname, const CkCallback& cb, bool
+     requestStatus = false, int writersPerNode = 0);
 
 The string ``dirname`` is the destination directory where the checkpoint
 files will be stored, and ``cb`` is the callback function which will be
 invoked after the checkpoint is done, as well as when the restart is
-complete. Here is an example of a typical use:
+complete. If ``CkStartCheckpoint`` is called again before ``cb`` has
+been called, the new request may be silently dropped. When the
+optional parameter ``requestStatus`` is true, the callback ``cb`` is
+sent a message of type ``CkCheckpointStatusMsg`` which includes an
+``int status`` field of value ``CK_CHECKPOINT_SUCCESS`` or
+``CK_CHECKPOINT_FAILURE`` indicating the success of the checkpointing
+operation. ``writersPerNode`` is an optional parameter that controls
+the number of PEs per logical node simultaneously allowed to write
+checkpoints. By default, it allows all PEs on a node to write at once,
+but should be tuned for large runs to avoid overloading the
+filesystem. Once set, this value persists for future calls to
+``CkStartCheckpoint``, so it does not need to be provided on every
+invocation (specifying 0 also leaves it at its current value).
+
+Here is an example of a typical use:
 
 .. code-block:: c++
 
