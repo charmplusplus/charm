@@ -810,7 +810,7 @@ void CkStartCheckpoint(const char* dirname, const CkCallback& cb, bool requestSt
   *          broadcast message.
   **/
 
-CkCallback cb;
+CkCallback globalCb;
 void CkRestartMain(const char* dirname, CkArgMsg *args){
 	int i;
 	char filename[1024];
@@ -828,7 +828,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	pRO|_numPes;
 	int _numNodes = -1;
 	pRO|_numNodes;
-	pRO|cb;
+	pRO|globalCb;
 	if (CmiMyRank() == 0) CkPupROData(pRO);
 	bool requestStatus = false;
 	pRO|requestStatus;
@@ -912,11 +912,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		if(requestStatus)
 		{
 		  CkCheckpointStatusMsg * m = new CkCheckpointStatusMsg(CK_CHECKPOINT_SUCCESS);
-		  cb.send(m); 
+		  globalCb.send(m);
 		}
 		else
 		{
-		  cb.send();
+		  globalCb.send();
 		}
 	}
 }
@@ -960,7 +960,7 @@ void CkResumeRestartMain(char * msg) {
   if(CkMyPe()==0) {
     CmiPrintf("[%d]CkResumeRestartMain done. sending out callback.\n",CkMyPe());
     CkPrintf("Restart from shared memory  finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
-    cb.send();
+    globalCb.send();
   }
 }
 #endif
