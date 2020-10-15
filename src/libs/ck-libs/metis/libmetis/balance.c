@@ -1,10 +1,10 @@
 /*!
 \file
-\brief Functions for the edge-based balancing 
+\brief Functions for the edge-based balancing
 
 \date Started 7/23/97
-\author George  
-\author Copyright 1997-2011, Regents of the University of Minnesota 
+\author George
+\author Copyright 1997-2011, Regents of the University of Minnesota
 \version\verbatim $Id: balance.c 10187 2011-06-13 13:46:57Z karypis $ \endverbatim
 */
 
@@ -15,7 +15,7 @@
 **************************************************************************/
 void Balance2Way(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
 {
-  if (ComputeLoadImbalanceDiff(graph, 2, ctrl->pijbm, ctrl->ubfactors) <= 0) 
+  if (ComputeLoadImbalanceDiff(graph, 2, ctrl->pijbm, ctrl->ubfactors) <= 0)
     return;
 
   if (graph->ncon == 1) {
@@ -71,9 +71,9 @@ void Bnd2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
   from      = (pwgts[0] < tpwgts[0] ? 1 : 0);
   to        = (from+1)%2;
 
-  IFSET(ctrl->dbglvl, METIS_DBG_REFINE, 
+  IFSET(ctrl->dbglvl, METIS_DBG_REFINE,
      printf("Partitions: [%6"PRIDX" %6"PRIDX"] T[%6"PRIDX" %6"PRIDX"], Nv-Nb[%6"PRIDX" %6"PRIDX"]. ICut: %6"PRIDX" [B]\n",
-             pwgts[0], pwgts[1], tpwgts[0], tpwgts[1], graph->nvtxs, graph->nbnd, 
+             pwgts[0], pwgts[1], tpwgts[0], tpwgts[1], graph->nvtxs, graph->nbnd,
              graph->mincut));
 
   queue = rpqCreate(nvtxs);
@@ -109,14 +109,14 @@ void Bnd2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
     where[higain] = to;
     moved[higain] = nswaps;
 
-    IFSET(ctrl->dbglvl, METIS_DBG_MOVEINFO, 
-      printf("Moved %6"PRIDX" from %"PRIDX". [%3"PRIDX" %3"PRIDX"] %5"PRIDX" [%4"PRIDX" %4"PRIDX"]\n", higain, from, ed[higain]-id[higain], vwgt[higain], mincut, pwgts[0], pwgts[1]));
+    IFSET(ctrl->dbglvl, METIS_DBG_MOVEINFO,
+      printf("Moved %6" PRIDX " from %" PRIDX ". [%3" PRIDX " %3" PRIDX "] %5" PRIDX " [%4" PRIDX " %4" PRIDX "]\n", higain, from, ed[higain]-id[higain], vwgt[higain], mincut, pwgts[0], pwgts[1]));
 
     /**************************************************************
     * Update the id[i]/ed[i] values of the affected nodes
     ***************************************************************/
     SWAP(id[higain], ed[higain], tmp);
-    if (ed[higain] == 0 && xadj[higain] < xadj[higain+1]) 
+    if (ed[higain] == 0 && xadj[higain] < xadj[higain+1])
       BNDDelete(nbnd, bndind,  bndptr, higain);
 
     for (j=xadj[higain]; j<xadj[higain+1]; j++) {
@@ -139,14 +139,14 @@ void Bnd2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
       else {
         if (ed[k] > 0) {  /* It will now become a boundary vertex */
           BNDInsert(nbnd, bndind, bndptr, k);
-          if (moved[k] == -1 && where[k] == from && vwgt[k] <= mindiff) 
+          if (moved[k] == -1 && where[k] == from && vwgt[k] <= mindiff)
             rpqInsert(queue, k, ed[k]-id[k]);
         }
       }
     }
   }
 
-  IFSET(ctrl->dbglvl, METIS_DBG_REFINE, 
+  IFSET(ctrl->dbglvl, METIS_DBG_REFINE,
     printf("\tMinimum cut: %6"PRIDX", PWGTS: [%6"PRIDX" %6"PRIDX"], NBND: %6"PRIDX"\n", mincut, pwgts[0], pwgts[1], nbnd));
 
   graph->mincut = mincut;
@@ -159,11 +159,11 @@ void Bnd2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
 
 
 /*************************************************************************
-* This function balances two partitions by moving the highest gain 
+* This function balances two partitions by moving the highest gain
 * (including negative gain) vertices to the other domain.
 * It is used only when tha unbalance is due to non contigous
 * subdomains. That is, the are no boundary vertices.
-* It moves vertices from the domain that is overweight to the one that 
+* It moves vertices from the domain that is overweight to the one that
 * is underweight.
 **************************************************************************/
 void General2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
@@ -199,7 +199,7 @@ void General2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
   from      = (pwgts[0] < tpwgts[0] ? 1 : 0);
   to        = (from+1)%2;
 
-  IFSET(ctrl->dbglvl, METIS_DBG_REFINE, 
+  IFSET(ctrl->dbglvl, METIS_DBG_REFINE,
      printf("Partitions: [%6"PRIDX" %6"PRIDX"] T[%6"PRIDX" %6"PRIDX"], Nv-Nb[%6"PRIDX" %6"PRIDX"]. ICut: %6"PRIDX" [B]\n",
              pwgts[0], pwgts[1], tpwgts[0], tpwgts[1], graph->nvtxs, graph->nbnd, graph->mincut));
 
@@ -233,14 +233,14 @@ void General2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
     where[higain] = to;
     moved[higain] = nswaps;
 
-    IFSET(ctrl->dbglvl, METIS_DBG_MOVEINFO, 
+    IFSET(ctrl->dbglvl, METIS_DBG_MOVEINFO,
       printf("Moved %6"PRIDX" from %"PRIDX". [%3"PRIDX" %3"PRIDX"] %5"PRIDX" [%4"PRIDX" %4"PRIDX"]\n", higain, from, ed[higain]-id[higain], vwgt[higain], mincut, pwgts[0], pwgts[1]));
 
     /**************************************************************
     * Update the id[i]/ed[i] values of the affected nodes
     ***************************************************************/
     SWAP(id[higain], ed[higain], tmp);
-    if (ed[higain] == 0 && bndptr[higain] != -1 && xadj[higain] < xadj[higain+1]) 
+    if (ed[higain] == 0 && bndptr[higain] != -1 && xadj[higain] < xadj[higain+1])
       BNDDelete(nbnd, bndind,  bndptr, higain);
     if (ed[higain] > 0 && bndptr[higain] == -1)
       BNDInsert(nbnd, bndind,  bndptr, higain);
@@ -256,14 +256,14 @@ void General2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
         rpqUpdate(queue, k, ed[k]-id[k]);
 
       /* Update its boundary information */
-      if (ed[k] == 0 && bndptr[k] != -1) 
+      if (ed[k] == 0 && bndptr[k] != -1)
         BNDDelete(nbnd, bndind, bndptr, k);
-      else if (ed[k] > 0 && bndptr[k] == -1)  
+      else if (ed[k] > 0 && bndptr[k] == -1)
         BNDInsert(nbnd, bndind, bndptr, k);
     }
   }
 
-  IFSET(ctrl->dbglvl, METIS_DBG_REFINE, 
+  IFSET(ctrl->dbglvl, METIS_DBG_REFINE,
     printf("\tMinimum cut: %6"PRIDX", PWGTS: [%6"PRIDX" %6"PRIDX"], NBND: %6"PRIDX"\n", mincut, pwgts[0], pwgts[1], nbnd));
 
   graph->mincut = mincut;
@@ -280,7 +280,7 @@ void General2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
 **************************************************************************/
 void McGeneral2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
 {
-  idx_t i, ii, j, k, l, kwgt, nvtxs, ncon, nbnd, nswaps, from, to, pass, 
+  idx_t i, ii, j, k, l, kwgt, nvtxs, ncon, nbnd, nswaps, from, to, pass,
         me, limit, tmp, cnum;
   idx_t *xadj, *adjncy, *vwgt, *adjwgt, *where, *pwgts, *id, *ed, *bndptr, *bndind;
   idx_t *moved, *swaps, *perm, *qnum, *qsizes;
@@ -336,8 +336,8 @@ void McGeneral2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
             continue;
 
           k = iargmax2_nrm(ncon, vwgt+i*ncon, invtvwgt);
-          if (k == j && 
-              qsizes[2*qnum[i]+from] > qsizes[2*j+from] && 
+          if (k == j &&
+              qsizes[2*qnum[i]+from] > qsizes[2*j+from] &&
               vwgt[i*ncon+qnum[i]]*invtvwgt[qnum[i]] < 1.3*vwgt[i*ncon+j]*invtvwgt[j]) {
             qsizes[2*qnum[i]+from]--;
             qsizes[2*j+from]++;
@@ -358,9 +358,9 @@ void McGeneral2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
   if (ctrl->dbglvl&METIS_DBG_REFINE) {
     printf("Parts: [");
     for (l=0; l<ncon; l++)
-      printf("(%6"PRIDX" %6"PRIDX" %.3"PRREAL" %.3"PRREAL") ", 
+      printf("(%6"PRIDX" %6"PRIDX" %.3"PRREAL" %.3"PRREAL") ",
           pwgts[l], pwgts[ncon+l], ntpwgts[l], ntpwgts[ncon+l]);
-    printf("] Nv-Nb[%5"PRIDX", %5"PRIDX"]. ICut: %6"PRIDX", LB: %+.3"PRREAL" [B]\n", 
+    printf("] Nv-Nb[%5"PRIDX", %5"PRIDX"]. ICut: %6"PRIDX", LB: %+.3"PRREAL" [B]\n",
            graph->nvtxs, graph->nbnd, graph->mincut, minbal);
   }
 
@@ -393,8 +393,8 @@ void McGeneral2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
     iaxpy(ncon, -1, vwgt+higain*ncon, 1, pwgts+from*ncon, 1);
     newbal = ComputeLoadImbalanceDiffVec(graph, 2, ctrl->pijbm, ctrl->ubfactors, newbalv);
 
-    if (newbal < minbal || (newbal == minbal && 
-        (newcut < mincut || 
+    if (newbal < minbal || (newbal == minbal &&
+        (newcut < mincut ||
          (newcut == mincut && BetterBalance2Way(ncon, minbalv, newbalv))))) {
       mincut      = newcut;
       minbal      = newbal;
@@ -415,7 +415,7 @@ void McGeneral2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
     if (ctrl->dbglvl&METIS_DBG_MOVEINFO) {
       printf("Moved %6"PRIDX" from %"PRIDX"(%"PRIDX"). Gain: %5"PRIDX", "
              "Cut: %5"PRIDX", NPwgts: ", higain, from, cnum, ed[higain]-id[higain], newcut);
-      for (l=0; l<ncon; l++) 
+      for (l=0; l<ncon; l++)
         printf("(%6"PRIDX", %6"PRIDX") ", pwgts[l], pwgts[ncon+l]);
       printf(", %+.3"PRREAL" LB: %+.3"PRREAL"\n", minbal, newbal);
     }
@@ -425,7 +425,7 @@ void McGeneral2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
     * Update the id[i]/ed[i] values of the affected nodes
     ***************************************************************/
     SWAP(id[higain], ed[higain], tmp);
-    if (ed[higain] == 0 && bndptr[higain] != -1 && xadj[higain] < xadj[higain+1]) 
+    if (ed[higain] == 0 && bndptr[higain] != -1 && xadj[higain] < xadj[higain+1])
       BNDDelete(nbnd, bndind,  bndptr, higain);
     if (ed[higain] > 0 && bndptr[higain] == -1)
       BNDInsert(nbnd, bndind,  bndptr, higain);
@@ -441,9 +441,9 @@ void McGeneral2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
         rpqUpdate(queues[2*qnum[k]+where[k]], k, ed[k]-id[k]);
 
       /* Update its boundary information */
-      if (ed[k] == 0 && bndptr[k] != -1) 
+      if (ed[k] == 0 && bndptr[k] != -1)
         BNDDelete(nbnd, bndind, bndptr, k);
-      else if (ed[k] > 0 && bndptr[k] == -1)  
+      else if (ed[k] > 0 && bndptr[k] == -1)
         BNDInsert(nbnd, bndind, bndptr, k);
     }
   }
@@ -479,7 +479,7 @@ void McGeneral2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
   }
 
   if (ctrl->dbglvl&METIS_DBG_REFINE) {
-    printf("\tMincut: %6"PRIDX" at %5"PRIDX", NBND: %6"PRIDX", NPwgts: [", 
+    printf("\tMincut: %6"PRIDX" at %5"PRIDX", NBND: %6"PRIDX", NPwgts: [",
         mincut, mincutorder, nbnd);
     for (l=0; l<ncon; l++)
       printf("(%6"PRIDX", %6"PRIDX") ", pwgts[l], pwgts[ncon+l]);
@@ -490,7 +490,7 @@ void McGeneral2WayBalance(ctrl_t *ctrl, graph_t *graph, real_t *ntpwgts)
   graph->nbnd   = nbnd;
 
 
-  for (i=0; i<2*ncon; i++) 
+  for (i=0; i<2*ncon; i++)
     rpqDestroy(queues[i]);
 
   WCOREPOP;

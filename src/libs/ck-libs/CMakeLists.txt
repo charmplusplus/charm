@@ -11,7 +11,16 @@ add_dependencies(moduleCkSparseContiguousReducer ck)
 configure_file(sparseContiguousReducer/cksparsecontiguousreducer.h ${CMAKE_BINARY_DIR}/include COPYONLY)
 
 # multiphaseSharedArrays
-add_library(modulemsa multiphaseSharedArrays/msa.h multiphaseSharedArrays/msa-common.h multiphaseSharedArrays/msa-distArray.h multiphaseSharedArrays/msa-DistPageMgr.h multiphaseSharedArrays/msa-distArray.C)
+
+set(msa-h-sources multiphaseSharedArrays/msa.h multiphaseSharedArrays/msa-common.h multiphaseSharedArrays/msa-distArray.h multiphaseSharedArrays/msa-DistPageMgr.h)
+add_library(modulemsa ${msa-h-sources} multiphaseSharedArrays/msa-distArray.C)
+
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/msa)
+
+foreach(file ${msa-h-sources})
+    configure_file(${file} ${CMAKE_BINARY_DIR}/include/msa COPYONLY)
+endforeach()
+
 add_dependencies(modulemsa ck)
 
 # armci
@@ -196,3 +205,37 @@ foreach(file ${amr-h-sources})
   configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach()
 
+
+
+# ParFUM
+
+set(parfum-h-sources ParFUM/ParFUM_internals.h ParFUM/ParFUM_locking.h ParFUM/ParFUM_Mesh_Modify.h ParFUM/ParFUM_Adapt_Algs.h ParFUM/ParFUM_Adapt.h ParFUM/ParFUM_Interpolate.h ParFUM/ParFUM_SA.h ParFUM/import.h ParFUM/adapt_adj.h ParFUM/bulk_adapt_ops.h ParFUM/bulk_adapt.h ParFUM/ParFUM.h ParFUM/ParFUMf.h ParFUM/ParFUM_Types.h)
+
+set(parfum-cxx-sources ParFUM/ParFUM.C ParFUM/mesh.C ParFUM/symmetries.C ParFUM/partition.C ParFUM/map.C ParFUM/compat.C ParFUM/call_init.C ParFUM/parallel_part.C ParFUM/mesh_modify.C ParFUM/mesh_adjacency.C ParFUM/adapt.C ParFUM/adapt_algs.C ParFUM/adapt_if.C ParFUM/interpolate.C ParFUM/lock.C ParFUM/util.C ParFUM/lock_node.C ParFUM/adapt_lock.C ParFUM/ParFUM_SA.C ParFUM/global_numbering.C ParFUM/import.C ParFUM/adapt_adj.C ParFUM/bulk_adapt_ops.C ParFUM/bulk_adapt.C ParFUM/mesh_feature_detect.C ParFUM/MsaHashtable.C)
+
+set(parfum-compat-cxx-sources ParFUM/compat_init.C ParFUM/compat_finit.C ParFUM/compat_driver.C ParFUM/compat_fdriver.C)
+
+add_library(moduleParFUM ${parfum-cxx-sources})
+add_library(ParFUM-compat ${parfum-compat-cxx-sources})
+
+add_dependencies(moduleParFUM ck)
+
+target_include_directories(moduleParFUM PRIVATE ParFUM/)
+
+
+# metis
+
+set(metis-cxx-sources metis/libmetis/auxapi.C metis/libmetis/balance.C metis/libmetis/bucketsort.C metis/libmetis/checkgraph.C metis/libmetis/
+ metis/libmetis/ metis/libmetis/coarsen.C metis/libmetis/compress.C metis/libmetis/contig.C metis/libmetis/debug.C metis/libmetis/fm.C metis/libmetis/fortran.C metis/libmetis/
+ metis/libmetis/ metis/libmetis/frename.C metis/libmetis/gklib.C metis/libmetis/graph.C metis/libmetis/initpart.C metis/libmetis/kmetis.C metis/libmetis/kwayfm.C metis/libmetis/
+ metis/libmetis/ metis/libmetis/kwayrefine.C metis/libmetis/mcutil.C metis/libmetis/mesh.C metis/libmetis/meshpart.C metis/libmetis/minconn.C metis/libmetis/mincover.C metis/libmetis/
+ metis/libmetis/ metis/libmetis/mmd.C metis/libmetis/ometis.C metis/libmetis/options.C metis/libmetis/parmetis.C metis/libmetis/pmetis.C metis/libmetis/refine.C metis/libmetis/
+ metis/libmetis/ metis/libmetis/separator.C metis/libmetis/sfm.C metis/libmetis/srefine.C metis/libmetis/stat.C metis/libmetis/timing.C metis/libmetis/util.C metis/libmetis/wspace.C)
+
+
+add_library(ckmetis EXCLUDE_FROM_ALL ${metis-cxx-sources})
+add_dependencies(ckmetis ck)
+configure_file(metis/libmetis/metis.h ${CMAKE_BINARY_DIR}/include COPYONLY)
+
+target_include_directories(ckmetis PRIVATE metis/GKlib .)
+target_compile_options(ckmetis PRIVATE -Wno-reserved-user-defined-literal)
