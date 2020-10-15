@@ -19,8 +19,7 @@ Highlights:
   https://charm.readthedocs.io/en/latest/charm++/manual.html#load-balancing
   for more information.
 
-- Support for persistent intra-node GPU messages, and experimental support for
-  regular (nonpersistent) intra-node GPU messages. This feature allows data to be
+- Experimental support for intra-node GPU messages, allowing data to be
   sent to/from GPU memory without going through host memory. Please
   see
   https://charm.readthedocs.io/en/latest/charm++/manual.html#gpu-support for
