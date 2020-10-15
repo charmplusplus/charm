@@ -20,8 +20,7 @@ Misc:
   venue for Charm++ questions and discussions instead of the
   charm@cs.illinois.edu mailing list.
 
-- The BigSim emulation facility has been removed from the runtime
-  system.
+- The BigSim emulator has been removed from Charm++.
 
 Charm++ Features & Fixes:
 
