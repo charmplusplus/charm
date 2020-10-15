@@ -10,7 +10,7 @@ This is a feature release, with the following major changes:
 Misc:
 
 - Charm++ now builds with CMake by default when using the `./build`
-  script (requires version 3.4 or higher). The old build system is
+  script (requires CMake version 3.4 or higher). The old build system is
   still available by using `./buildold`. Please see
   https://charm.readthedocs.io/en/latest/charm++/manual.html#installation-with-cmake
   for more information.
