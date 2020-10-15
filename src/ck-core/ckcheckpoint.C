@@ -32,6 +32,7 @@ void noopit(const char*, ...)
 
 #define SUBDIR_SIZE 256
 
+CkGroupID _sysChkptWriteMgr;
 CkGroupID _sysChkptMgr;
 
 typedef struct _GroupInfo{
@@ -212,6 +213,62 @@ static FILE* openCheckpointFile(const char *dirname, const char *basename,
   return fp;
 }
 
+class CkCheckpointWriteMgr : public CBase_CkCheckpointWriteMgr
+{
+private:
+  const int firstPE = CkNodeFirst(CkMyNode());
+  const int nodeSize = CkMyNodeSize();
+  int numWriters = CkMyNodeSize();
+  int numComplete = 0;
+  int index = 0;
+  bool inProgress = false;
+
+  const char* dirname;
+  CkCallback cb;
+  bool requestStatus;
+
+public:
+  CkCheckpointWriteMgr() {}
+
+  CkCheckpointWriteMgr(CkMigrateMessage* m) : CBase_CkCheckpointWriteMgr(m) {}
+
+  void Checkpoint(const char* dirname, CkCallback cb, bool requestStatus = false,
+                  int writersPerNode = 0)
+  {
+    // If currently checkpointing, drop new requests
+    if (inProgress) return;
+    inProgress = true;
+    numComplete = 0;
+
+    if (writersPerNode > 0) numWriters = std::min(writersPerNode, nodeSize);
+
+    // Save params for future invocations and kick off the first numWriters PEs to start
+    // checkpointing
+    this->dirname = dirname;
+    this->cb = cb;
+    this->requestStatus = requestStatus;
+    for (index = firstPE; index < firstPE + numWriters; index++)
+      CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname, cb, requestStatus);
+  }
+
+  void FinishedCheckpoint()
+  {
+    numComplete++;
+
+    // If there's another PE to kick off, do so
+    if (index < firstPE + nodeSize)
+    {
+      CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname, cb, requestStatus);
+      index++;
+    }
+    // If there isn't, then check if all the PEs are finished
+    else if (numComplete == nodeSize)
+    {
+      inProgress = false;
+    }
+  }
+};
+
 /**
  * There is only one Checkpoint Manager in the whole system
 **/
@@ -337,6 +394,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	// Use barrier instead of contribute here:
 	// barrier is stateless and multiple calls to it do not overlap.
 	barrier(CkCallback(CkReductionTarget(CkCheckpointMgr, SendRestartCB), 0, thisgroup));
+	CProxy_CkCheckpointWriteMgr(_sysChkptWriteMgr)[CkMyNode()].FinishedCheckpoint();
 }
 
 void CkCheckpointMgr::SendRestartCB(void){
@@ -729,19 +787,20 @@ void CkTestArrayElements()
 }
 */
 
-void CkStartCheckpoint(const char* dirname,const CkCallback& cb, bool requestStatus)
+void CkStartCheckpoint(const char* dirname, const CkCallback& cb, bool requestStatus,
+                       int writersPerNode)
 {
-  if(cb.isInvalid()) 
+  if (cb.isInvalid())
     CkAbort("callback after checkpoint is not set properly");
 
-  if(cb.containsPointer())
+  if (cb.containsPointer())
     CkAbort("Cannot restart from a callback based on a pointer");
 
+  CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 
-	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
-	
-	// hand over to checkpoint managers for per-processor checkpointing
-	CProxy_CkCheckpointMgr(_sysChkptMgr).Checkpoint(dirname, cb, requestStatus);
+  // hand over to checkpoint managers for per-processor checkpointing
+  CProxy_CkCheckpointWriteMgr(_sysChkptWriteMgr)
+      .Checkpoint(dirname, cb, requestStatus, writersPerNode);
 }
 
 /**
@@ -910,6 +969,7 @@ void CkResumeRestartMain(char * msg) {
 class CkCheckpointInit : public Chare {
 public:
   CkCheckpointInit(CkArgMsg *msg) {
+    _sysChkptWriteMgr = CProxy_CkCheckpointWriteMgr::ckNew();
     _sysChkptMgr = CProxy_CkCheckpointMgr::ckNew();
     delete msg;
   }
