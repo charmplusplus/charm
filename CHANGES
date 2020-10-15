@@ -7,6 +7,21 @@ What's new in Charm++ 6.11.0
 
 This is a feature release, with the following major changes:
 
+Highlights:
+
+- A significant overhaul of the load balancing infrastructure and the
+  addition of TreeLB, a new, more flexible and extensible base LB,
+  intended to replace the previous CentralLB and HybridBaseLB designs
+  (load balancers using these previous designs are still
+  supported). Some included strategies have been rewritten to use
+  TreeLB, unused and extraneous strategies have been removed. Please
+  see
+  https://charm.readthedocs.io/en/latest/charm++/manual.html#load-balancing
+  for more information.
+
+- Support for intra-node direct GPU messages, allowing data to be sent
+  to/from GPU memory without touching host memory.
+
 Misc:
 
 - Charm++ now builds with CMake by default when using the `./build`
@@ -24,19 +39,6 @@ Misc:
 
 Charm++ Features & Fixes:
 
-- A significant overhaul of the load balancing infrastructure and the
-  addition of TreeLB, a new, more flexible and extensible base LB,
-  intended to replace the previous CentralLB and HybridBaseLB designs
-  (load balancers using these previous designs are still
-  supported). Some included strategies have been rewritten to use
-  TreeLB, unused and extraneous strategies have been removed. Please
-  see
-  https://charm.readthedocs.io/en/latest/charm++/manual.html#load-balancing
-  for more information.
-
-- Support for intra-node GPU messages, allowing data to be sent
-  to/from GPU memory without touching host memory.
-
 - Support for variable sized messages in TRAM.
 
 - Added a pup_buffer API with zero copy functionality.
@@ -45,7 +47,7 @@ Charm++ Features & Fixes:
   duplication of messages. Expedited nokeep array broadcasts are also
   allowed now.
 
-- Added CmiNodeReduce API for node level reductions.
+- Added CmiNodeReduce API for Converse node level reductions.
 
 - Builds with CMK_OPTIMIZE=1 will only segfault to aid in debugging in
   CmiAbort when ++debug or +truecrash are provided.
@@ -90,7 +92,8 @@ Adaptive MPI:
   longer uses the filesystem to pass data. Isomalloc sync can be
   disabled with +no_isomalloc_sync.
 
-- Added AMPI-only build target, AMPI-only.
+- Added AMPI-only build target, AMPI-only. This build optimizes AMPI
+  by disabling features of Charm++ that AMPI doesn't use.
 
 - Fixed tlsglobals migration on macOS.
 
@@ -100,8 +103,6 @@ Adaptive MPI:
 
 - Accept arguments from AMPI_BUILD_FLAGS environment variable for
   ampiCC.
-
-- Added PUP methods for derived datatypes.
 
 - Improved portability of fsglobals and pipglobals.
 
