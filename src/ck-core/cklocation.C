@@ -1834,15 +1834,25 @@ void CkMigratable::UserSetLBLoad()
 
 #if CMK_LBDB_ON  // For load balancing:
 // user can call this helper function to set obj load (for model-based lb)
-void CkMigratable::setObjTime(double cputime) { myRec->setObjTime(cputime); }
-void CkMigratable::setObjPosition(const std::vector<LBRealType>& pos)
-{
-  myRec->setObjPosition(pos);
+void CkMigratable::setObjTime(double cputime) {
+	myRec->setObjTime(cputime);
 }
-double CkMigratable::getObjTime() { return myRec->getObjTime(); }
+
+void CkMigratable::setObjTime(double cputime, int phase) {
+  myRec->setObjTime(cputime, phase);
+}
+
+double CkMigratable::getObjTime() {
+	return myRec->getObjTime();
+}
 
 const std::vector<LBRealType> CkMigratable::getObjVectorLoad() const {
   return myRec->getObjVectorLoad();
+}
+
+void CkMigratable::setObjPosition(const std::vector<LBRealType>& pos)
+{
+  myRec->setObjPosition(pos);
 }
 
 #  if CMK_LB_USER_DATA
@@ -2070,13 +2080,13 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 }
 #else
 void CkMigratable::setObjTime(double cputime) {}
-void CkMigratable::setObjPosition(const std::vector<LBRealType> pos) {}
+void CkMigratable::setObjTime(double cputime, int phase) {}
 double CkMigratable::getObjTime() { return 0.0; }
 const std::vector<LBRealType> CkMigratable::getObjVectorLoad() const
 {
   return std::vector<LBRealType>();
 };
-
+void CkMigratable::setObjPosition(const std::vector<LBRealType> pos) {}
 #  if CMK_LB_USER_DATA
 void* CkMigratable::getObjUserData(int idx) { return NULL; }
 #  endif
@@ -2168,6 +2178,9 @@ double CkLocRec::getObjTime()
   LBRealType walltime, cputime;
   lbmgr->GetObjLoad(ldHandle, walltime, cputime);
   return walltime;
+}
+void CkLocRec::setObjTime(double cputime, int phase) {
+  lbmgr->EstObjLoad(ldHandle, cputime, phase);
 }
 const std::vector<LBRealType>& CkLocRec::getObjPosition()
 {
