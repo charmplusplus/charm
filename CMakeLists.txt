@@ -173,7 +173,8 @@ endif()
 set(CMK_REPLAYSYSTEM ${REPLAY})
 
 if(${TARGET} STREQUAL "all-test")
-  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test)
+  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test
+        COMMENT "Building all-test" VERBATIM)
   add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
         ampi_funcptr_shim ampi_funcptr_shim_main
         ampi_funcptr_loader ampi_funcptr_loader_stub
@@ -183,7 +184,8 @@ if(${TARGET} STREQUAL "all-test")
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
         threads-default-tls ldb-neighbor ldb-workstealing modulearmci
-        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc)
+        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc
+        ampi_globals_fs)
   if(CMK_CAN_LINK_FORTRAN)
     add_dependencies(all-test moduleampif conv-utilf ckmainf
         ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)

@@ -8,13 +8,13 @@
 all-test: all-test-tests all-test-examples all-test-benchmarks
 
 all-test-tests: LIBS
-	$(MAKE) -C ../tests all
+	$(MAKE) MAKEFLAGS=$${MAKEFLAGS#$(SILENT)} -C ../tests all
 
 all-test-examples: LIBS
-	$(MAKE) -C ../examples all
+	$(MAKE) MAKEFLAGS=$${MAKEFLAGS#$(SILENT)} -C ../examples all
 
 all-test-benchmarks: LIBS
-	$(MAKE) -C ../benchmarks all
+	$(MAKE) MAKEFLAGS=$${MAKEFLAGS#$(SILENT)} -C ../benchmarks all
 
 all-zc: charm++
 	$(MAKE) -C ../tests/charm++/zerocopy all
