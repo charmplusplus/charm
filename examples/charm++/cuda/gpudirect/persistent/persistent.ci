@@ -14,10 +14,54 @@ mainmodule persistent {
 
   array [1D] PersistentArray {
     entry PersistentArray();
-    entry void send();
-    entry void recv(CkDeviceBuffer buf);
-    entry void srcCb();
-    entry void dstCb();
+    entry void initSend();
+    entry void initRecv(CkDeviceBuffer send_buf, CkDeviceBuffer recv_buf);
+
+    entry void testGet(int iter) {
+      serial {
+        if (me == 1) {
+          my_recv_buf.get(peer_send_buf);
+        }
+      }
+
+      when callback() serial {
+        if (me == 0) {
+          CkPrintf("[PE %d, iter %d] GET: src callback\n", me, iter);
+          if (iter == n_iters-1) {
+            container.fill(0);
+          } else {
+            container.fill(iter+1);
+          }
+        } else {
+          CkPrintf("[PE %d, iter %d] GET: dst callback\n", me, iter);
+          container.verify(iter);
+        }
+      }
+    }
+
+    entry void testPut(int iter) {
+      serial {
+        if (me == 0) {
+          my_send_buf.put(peer_recv_buf);
+        }
+      }
+
+      when callback() serial {
+        if (me == 0) {
+          CkPrintf("[PE %d, iter %d] PUT: src callback\n", me, iter);
+          if (iter == n_iters-1) {
+            container.fill(0);
+          } else {
+            container.fill(iter+1);
+          }
+        } else {
+          CkPrintf("[PE %d, iter %d] PUT: dst callback\n", me, iter);
+          container.verify(iter);
+        }
+      }
+    }
+
+    entry void callback();
   };
 
   /*

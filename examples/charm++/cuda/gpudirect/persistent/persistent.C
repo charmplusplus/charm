@@ -15,17 +15,15 @@
 extern void invokeFillKernel(double*, int, double, cudaStream_t);
 
 struct Container {
-  double* h_local_data;
   double* h_remote_data;
   double* d_local_data;
   double* d_remote_data;
   cudaStream_t stream;
 
-  Container() : h_local_data(nullptr), h_remote_data(nullptr),
-    d_local_data(nullptr), d_remote_data(nullptr) {}
+  Container() : h_remote_data(nullptr), d_local_data(nullptr),
+    d_remote_data(nullptr) {}
 
   ~Container() {
-    hapiCheck(cudaFreeHost(h_local_data));
     hapiCheck(cudaFreeHost(h_remote_data));
     hapiCheck(cudaFree(d_local_data));
     hapiCheck(cudaFree(d_remote_data));
@@ -33,7 +31,6 @@ struct Container {
   }
 
   void init() {
-    hapiCheck(cudaMallocHost(&h_local_data, sizeof(double) * block_size));
     hapiCheck(cudaMallocHost(&h_remote_data, sizeof(double) * block_size));
     hapiCheck(cudaMalloc(&d_local_data, sizeof(double) * block_size));
     hapiCheck(cudaMalloc(&d_remote_data, sizeof(double) * block_size));
@@ -41,11 +38,7 @@ struct Container {
   }
 
   void fill(double val) {
-    for (int i = 0; i < block_size; i++) {
-      h_local_data[i] = val;
-    }
     invokeFillKernel(d_local_data, block_size, val, stream);
-    invokeFillKernel(d_remote_data, block_size, val, stream);
 
     hapiCheck(cudaStreamSynchronize(stream));
   }
@@ -124,9 +117,14 @@ public:
     start_time = CkWallTimer();
 
     CkPrintf("Testing chare array...\n");
-    for (int i = 1; i <= n_iters; i++) {
-      CkPrintf("Iteration %d\n", i);
-      array_proxy[0].send();
+    array_proxy.initSend();
+    CkWaitQD();
+    for (int i = 0; i < n_iters; i++) {
+      array_proxy.testGet(i);
+      CkWaitQD();
+    }
+    for (int i = 0; i < n_iters; i++) {
+      array_proxy.testPut(i);
       CkWaitQD();
     }
     CkPrintf("PASS\n");
@@ -155,14 +153,20 @@ public:
 };
 
 class PersistentArray : public CBase_PersistentArray {
+  PersistentArray_SDAG_CODE
+
   Container container;
-  CkDeviceBuffer buf;
-  int pe;
-  int iter;
+  CkDeviceBuffer my_send_buf;
+  CkDeviceBuffer my_recv_buf;
+  CkDeviceBuffer peer_send_buf;
+  CkDeviceBuffer peer_recv_buf;
+  int me;
+  int peer;
 
 public:
   PersistentArray() {
-    iter = 0;
+    me = CkMyPe();
+    peer = (CkMyPe() == 0) ? 1 : 0;
     usesAtSync = true;
     container.init();
   }
@@ -171,42 +175,24 @@ public:
     container.init();
   }
 
-  void pup(PUP::er& p) {
-    p|pe;
-  }
+  void pup(PUP::er& p) {}
 
-  void send() {
-    iter++;
-    container.fill(iter);
-    buf = CkDeviceBuffer(container.d_local_data, sizeof(double) * block_size,
-        CkCallback(CkIndex_PersistentArray::srcCb(), thisProxy[thisIndex]),
+  void initSend() {
+    container.fill(0);
+
+    // Initialize and send my metadata to peer
+    my_send_buf = CkDeviceBuffer(container.d_local_data, sizeof(double) * block_size,
+        CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
         container.stream);
-    thisProxy[1].recv(buf);
-
-    if (lb_test) {
-      pe = CkMyPe();
-      AtSync();
-    }
-  }
-
-  void recv(CkDeviceBuffer src_buf) {
-    iter++;
-    buf = CkDeviceBuffer(container.d_remote_data, sizeof(double) * block_size,
-        CkCallback(CkIndex_PersistentArray::dstCb(), thisProxy[thisIndex]),
+    my_recv_buf = CkDeviceBuffer(container.d_remote_data, sizeof(double) * block_size,
+        CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
         container.stream);
-    buf.get(src_buf);
+    thisProxy[peer].initRecv(my_send_buf, my_recv_buf);
   }
 
-  void srcCb() { CkPrintf("PersistentArray %d, srcCb\n", thisIndex); }
-
-  void dstCb() {
-    CkPrintf("PersistentArray %d, dstCb\n", thisIndex);
-    container.verify(iter);
-
-    if (lb_test) {
-      pe = CkMyPe();
-      AtSync();
-    }
+  void initRecv(CkDeviceBuffer send_buf, CkDeviceBuffer recv_buf) {
+    peer_send_buf = send_buf;
+    peer_recv_buf = recv_buf;
   }
 
   void ResumeFromSync() {}
