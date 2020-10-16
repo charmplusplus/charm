@@ -141,14 +141,12 @@ endif()
 option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
-option(F90CHARM            "Build f90charm" OFF)
-option(BUILD_CUDA          "Build with CUDA support" OFF)
+option(CUDA                "Build with CUDA support" OFF)
 
 option(PXSHM               "Build with PXSHM" OFF)
-option(QLOGIC              "QLogic based Infiniband" OFF)
 
-# UCX PMI options
-set(UCX_PMI "" CACHE STRING "PMI type for UCX layer, can be one of simplepmi, simplepmi2, or ompipmix")
+# LRTS PMI options
+set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, or ompipmix")
 
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 
@@ -157,6 +155,9 @@ add_compile_options("${MY_EXTRA_OPTS}")
 string(REPLACE ";" " " MY_EXTRA_OPTS "${MY_EXTRA_OPTS}")
 set(OPTS "${OPTS} ${MY_EXTRA_OPTS}")
 set(OPTSATBUILDTIME "${OPTSATBUILDTIME} ${MY_EXTRA_OPTS}")
+
+# We need both BUILD_CUDA and CUDA
+set(BUILD_CUDA ${CUDA})
 
 # Also build shared Charm++ libraries in lib_so/
 if(BUILD_SHARED)
@@ -174,6 +175,8 @@ set(CMK_REPLAYSYSTEM ${REPLAY})
 if(${TARGET} STREQUAL "all-test")
   add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test)
   add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
+        ampi_funcptr_shim ampi_funcptr_shim_main
+        ampi_funcptr_loader ampi_funcptr_loader_stub
         conv-partition conv-util hwloc conv-static conv-core ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
         conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
@@ -182,7 +185,14 @@ if(${TARGET} STREQUAL "all-test")
         threads-default-tls ldb-neighbor ldb-workstealing modulearmci
         modulecollidecharm modulecollide memory-os memory-gnu-isomalloc)
   if(CMK_CAN_LINK_FORTRAN)
-    add_dependencies(all-test moduleampif conv-utilf ckmainf)
+    add_dependencies(all-test moduleampif conv-utilf ckmainf
+        ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
+  endif()
+  if(CMK_SUPPORTS_FSGLOBALS)
+    add_dependencies(all-test ampi_globals_fs)
+  endif()
+  if(CMK_SUPPORTS_PIPGLOBALS)
+    add_dependencies(all-test ampi_globals_pip)
   endif()
   set(TARGET "LIBS")
 endif()
@@ -228,8 +238,14 @@ if(${OMP})
     find_package(OpenMP REQUIRED)
 endif()
 
+if(SMP)
+  set(CMK_SMP 1)
+else()
+  set(CMK_SMP 0)
+endif()
+
 if(${NETWORK} STREQUAL "multicore")
-  set(SMP 0)
+  set(CMK_SMP 1)
   set(CMK_MULTICORE 1)
 else()
   set(CMK_MULTICORE 0)
@@ -557,6 +573,19 @@ configure_file(src/arch/common/conv-mach-tsan.sh             include/ COPYONLY)
 configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 
+set(CUDA_DIR "")
+if(CUDA)
+  file(GLOB_RECURSE hybridAPI-h-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.h)
+  file(GLOB_RECURSE hybridAPI-cxx-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.cpp)
+  foreach(file ${hybridAPI-h-sources})
+    configure_file(${file} include/ COPYONLY)
+  endforeach()
+
+  find_package(CUDA REQUIRED)
+  set(CUDA_DIR ${CUDA_TOOLKIT_ROOT_DIR})
+  add_library(cudahybridapi ${hybridAPI-cxx-sources})
+endif()
+
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
@@ -608,9 +637,9 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/machine-persistent.C)
   configure_file(src/arch/${GDIR}/machine-persistent.C          include/ COPYONLY)
 endif()
 
-if(UCX_PMI)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.sh include/ COPYONLY)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-${UCX_PMI}.h include/ COPYONLY)
+if(LRTS_PMI)
+  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-${LRTS_PMI}.sh include/ COPYONLY)
+  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-${LRTS_PMI}.h include/ COPYONLY)
 endif()
 
 if(CMK_COMPILER STREQUAL "msvc")
@@ -632,6 +661,7 @@ configure_file(src/arch/util/lrtslock.h                      include/ COPYONLY)
 configure_file(src/arch/util/mempool.h                       include/ COPYONLY)
 configure_file(src/arch/util/machine.h                       include/ COPYONLY)
 configure_file(src/arch/util/machine-lrts.h                  include/ COPYONLY)
+configure_file(src/arch/util/machine-rdma.h                  include/ COPYONLY)
 configure_file(src/arch/util/machine-smp.h                   include/ COPYONLY)
 configure_file(src/arch/util/pcqueue.h                       include/ COPYONLY)
 configure_file(src/util/pup_c_functions.h                    include/ COPYONLY)
@@ -862,6 +892,12 @@ if(${TARGET} STREQUAL "charm4py")
   add_dependencies(charm hwloc)
 endif()
 
+# Check that we are able to build and link an executable
+add_executable(hello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
+add_dependencies(hello ck ldb-rand memory-default threads-default conv-static
+  conv-core ckmain conv-machine conv-util conv-partition conv-ldb ckqt
+  moduleNDMeshStreamer modulecompletion tmgr)
+
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
 
@@ -891,7 +927,7 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
         CMK_MACOSX CMK_POST_EXE CMK_SHARED_SUF CMK_USER_SUFFIX OPTS_LD
         CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED
-        CMK_SUPPORTS_MEMORY_ISOMALLOC)
+        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 
@@ -904,8 +940,8 @@ if (NOT CMK_WINDOWS)
   file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
 endif()
 
-if(UCX_PMI)
-  file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${UCX_PMI}.sh\n")
+if(LRTS_PMI)
+  file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${LRTS_PMI}.sh\n")
 endif()
 
 # Create conv-mach-opt.h
@@ -921,25 +957,25 @@ if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NET
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
 endif()
 
-if(UCX_PMI)
-  file(APPEND ${optfile_h} "#include \"conv-mach-${UCX_PMI}.h\"\n")
+if(LRTS_PMI)
+  file(APPEND ${optfile_h} "#include \"conv-mach-${LRTS_PMI}.h\"\n")
 endif()
 
 # Create conv-mach-opt.mak
 set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
 
 file(WRITE  ${optfile_mak} "# Build-time options header for Makefiles, automatically generated by cmake.\n")
-foreach(l BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTHON
+foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTHON
         CMK_CHARMDEBUG CMK_COMPILER CMK_GDIR CMK_HAS_MALLOC_HOOK CMK_HAS_MMAP CMK_LIBJPEG
         CMK_LUSTREAPI CMK_MULTICORE CMK_UTH CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS
         CMK_SHARED_SUF CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
         CMK_TRACE_ENABLED CMK_USE_LRTS CMK_VDIR OPTSATBUILDTIME CMK_AMPI_ONLY CMK_WINDOWS
-        CMK_USER_SUFFIX CMK_CAN_LINK_FORTRAN CMK_SUPPORTS_MEMORY_ISOMALLOC)
+        CMK_USE_CMA CMK_USER_SUFFIX CMK_CAN_LINK_FORTRAN CMK_SUPPORTS_MEMORY_ISOMALLOC)
     file(APPEND ${optfile_mak} "${l}:=${${l}}\n" )
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC)
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA PAPI)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
@@ -949,7 +985,10 @@ foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC)
 endforeach()
 
 # Options that need no .h/.sh additions
-foreach(opt TRACING TRACING_COMMTHREAD ERROR_CHECKING)
+foreach(opt TRACING TRACING_COMMTHREAD ERROR_CHECKING LBUSERDATA QLOGIC
+  BUILD_SHARED TASK_QUEUE DRONE_MODE LOCKLESS_QUEUE CHARMDEBUG CCS CONTROLPOINT
+  AMPI_ERROR_CHECKING AMPI_MPICH_TESTS NUMA RANDOMIZED_MSGQ REPLAY SHRINKEXPAND
+  STATS ZLIB)
     if(${opt})
         set(opts_enabled "${opts_enabled}${opt} ")
     endif()
@@ -1046,9 +1085,10 @@ add_custom_target(create_symlinks ALL
 
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/include ${CMAKE_BINARY_DIR}/tmp
 
-                  COMMAND test -d ${CMAKE_BINARY_DIR}/benchmarks || env SYSTEMLN='${SYSTEMLN}' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/benchmarks ${CMAKE_BINARY_DIR}/benchmarks && true
-                  COMMAND test -d ${CMAKE_BINARY_DIR}/examples || env SYSTEMLN='${SYSTEMLN}' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/examples ${CMAKE_BINARY_DIR}/examples && true
-                  COMMAND test -d ${CMAKE_BINARY_DIR}/tests || env SYSTEMLN='${SYSTEMLN}' ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/tests && true
+                  COMMAND test -d ${CMAKE_BINARY_DIR}/benchmarks || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/benchmarks ${CMAKE_BINARY_DIR}/benchmarks && true
+                  COMMAND test -d ${CMAKE_BINARY_DIR}/examples || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/examples ${CMAKE_BINARY_DIR}/examples && true
+                  COMMAND test -d ${CMAKE_BINARY_DIR}/tests || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/tests && true
+                  VERBATIM
                  )
 
 # if(CMK_WINDOWS)

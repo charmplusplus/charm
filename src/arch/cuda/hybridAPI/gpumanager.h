@@ -37,8 +37,7 @@ struct cuda_ipc_event_shared {
 struct cuda_ipc_device_info {
   std::vector<cudaEvent_t> src_event_pool;
   std::vector<cudaEvent_t> dst_event_pool;
-  // Flag per event pair
-  // 0: free, 1: used by source, 2: used by destination
+  // Flag per event pair (0: free, 1: used)
   std::vector<int> event_pool_flags;
   // Offset in device comm buffer (per event)
   std::vector<size_t> event_pool_buff_offsets;
@@ -108,6 +107,7 @@ struct GPUManager {
   size_t comm_buffer_size;
 
   // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
+  bool use_shm;
   void* shm_ptr;
   std::string shm_name;
   int shm_file;
@@ -115,8 +115,9 @@ struct GPUManager {
   size_t shm_size;
   void* shm_my_ptr;
 
-  // CUDA IPC event pool size (per PE)
-  int cuda_ipc_event_pool_size;
+  // CUDA IPC event pool
+  int cuda_ipc_event_pool_size_pe;
+  int cuda_ipc_event_pool_size_total;
 
   // CUDA IPC handles opened for processes on the same node
   // Vector size is equal to the number of devices on the physical node
@@ -152,6 +153,7 @@ struct GPUManager {
     comm_buffer_size = 1 << 26; // 64MB by default
 
     // Shared memory region for CUDA IPC
+    use_shm = false;
     shm_ptr = NULL;
     shm_file = -1;
     shm_chunk_size = 0;
@@ -159,7 +161,8 @@ struct GPUManager {
     shm_my_ptr = NULL;
 
     // Number of CUDA IPC events per PE
-    cuda_ipc_event_pool_size = -1;
+    cuda_ipc_event_pool_size_pe = -1;
+    cuda_ipc_event_pool_size_total = -1;
 
     // Allocate host/device buffers array (both user and system-addressed)
     host_buffers_ = new void*[NUM_BUFFERS*2];

@@ -67,37 +67,41 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
     # I/O?
     AC_ARG_ENABLE([io],
                   AS_HELP_STRING([--disable-io],
-                                 [Disable I/O discovery entirely (PCI, LinuxIO, CUDA, OpenCL, NVML, GL)]))
+                                 [Disable I/O discovery build entirely (PCI, LinuxIO, CUDA, OpenCL, NVML, RSMI, GL) instead of only disabling it at runtime by default]))
 
     # PCI?
     AC_ARG_ENABLE([pci],
                   AS_HELP_STRING([--disable-pci],
-                                 [Disable the PCI device discovery]))
-
-    # OpenCL?
-    AC_ARG_ENABLE([opencl],
-                  AS_HELP_STRING([--disable-opencl],
-                                 [Disable the OpenCL device discovery]))
-
-    # CUDA?
-    AC_ARG_ENABLE([cuda],
-                  AS_HELP_STRING([--disable-cuda],
-                                 [Disable the CUDA device discovery using libcudart]))
-
-    # NVML?
-    AC_ARG_ENABLE([nvml],
-                  AS_HELP_STRING([--disable-nvml],
-                                 [Disable the NVML device discovery]))
-
+                                 [Disable the PCI device discovery build (instead of only disabling PCI at runtime by default)]))
     # 32bits_pci_domain?
     AC_ARG_ENABLE([32bits-pci-domain],
                   AS_HELP_STRING([--enable-32bits-pci-domain],
                                  [Enable 32 bits PCI domains (domains > 16bits are ignored by default). WARNING: This breaks the library ABI, don't enable unless really needed.]))
 
+    # OpenCL?
+    AC_ARG_ENABLE([opencl],
+                  AS_HELP_STRING([--disable-opencl],
+                                 [Disable the OpenCL device discovery build (instead of only disabling OpenCL at runtime by default)]))
+
+    # CUDA?
+    AC_ARG_ENABLE([cuda],
+                  AS_HELP_STRING([--disable-cuda],
+                                 [Disable the CUDA device discovery build using libcudart (instead of only disabling CUDA at runtime by default)]))
+
+    # NVML?
+    AC_ARG_ENABLE([nvml],
+                  AS_HELP_STRING([--disable-nvml],
+                                 [Disable the NVML device discovery build (instead of only disabling NVML at runtime by default)]))
+
+    # RSMI?
+    AC_ARG_ENABLE([rsmi],
+                  AS_HELP_STRING([--disable-rsmi],
+                                 [Disable the ROCm SMI device discovery]))
+
     # GL/Display
     AC_ARG_ENABLE([gl],
 		  AS_HELP_STRING([--disable-gl],
-				 [Disable the GL display device discovery]))
+				 [Disable the GL display device discovery (instead of only disabling GL at runtime by default)]))
 
     # LibUdev
     AC_ARG_ENABLE([libudev],
@@ -237,6 +241,30 @@ EOF
     fi
     AC_SUBST([HWLOC_runstatedir])
 
+    # X11 support
+    AC_PATH_XTRA
+
+    CPPFLAGS_save=$CPPFLAGS
+    LIBS_save=$LIBS
+
+    CPPFLAGS="$CPPFLAGS $X_CFLAGS"
+    LIBS="$LIBS $X_PRE_LIBS $X_LIBS $X_EXTRA_LIBS"
+    AC_CHECK_HEADERS([X11/Xlib.h],
+        [AC_CHECK_LIB([X11], [XOpenDisplay],
+            [ AC_CHECK_HEADERS([X11/Xutil.h],
+                [AC_CHECK_HEADERS([X11/keysym.h],
+                    [AC_DEFINE([HWLOC_HAVE_X11_KEYSYM], [1], [Define to 1 if X11 headers including Xutil.h and keysym.h are available.])
+                     hwloc_x11_keysym_happy=yes
+                     HWLOC_X11_CPPFLAGS="$X_CFLAGS"
+                     AC_SUBST([HWLOC_X11_CPPFLAGS])
+                     HWLOC_X11_LIBS="$X_PRE_LIBS $X_LIBS -lX11 $X_EXTRA_LIBS"
+                     AC_SUBST([HWLOC_X11_LIBS])])
+                ], [], [#include <X11/Xlib.h>])
+            ])
+         ])
+    CPPFLAGS=$CPPFLAGS_save
+    LIBS=$LIBS_save
+
     # Cairo support
     hwloc_cairo_happy=no
     if test "x$enable_cairo" != "xno"; then
@@ -293,7 +321,7 @@ EOF
     chosen_curses=""
     for curses in ncurses curses
     do
-      for lib in "" -ltermcap -l${curses}w -l$curses
+      for lib in "" -ltermcap -l${curses}w -l$curses -ltinfo
       do
         AC_MSG_CHECKING(termcap support using $curses and $lib)
         LIBS="$hwloc_old_LIBS $lib"
@@ -441,6 +469,7 @@ int foo(void) {
         hwloc_config_prefix[utils/hwloc/test-hwloc-distrib.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-info.sh]
         hwloc_config_prefix[utils/hwloc/test-fake-plugin.sh]
+        hwloc_config_prefix[utils/hwloc/test-parsing-flags.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/Makefile]
         hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh]
         hwloc_config_prefix[utils/lstopo/test-lstopo.sh]
@@ -473,6 +502,7 @@ int foo(void) {
       hwloc_config_prefix[utils/hwloc/test-hwloc-distrib.sh] \
       hwloc_config_prefix[utils/hwloc/test-hwloc-info.sh] \
       hwloc_config_prefix[utils/hwloc/test-fake-plugin.sh] \
+      hwloc_config_prefix[utils/hwloc/test-parsing-flags.sh] \
       hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh] \
       hwloc_config_prefix[utils/lstopo/test-lstopo.sh] \
       hwloc_config_prefix[utils/lstopo/test-lstopo-shmem.sh] \
@@ -499,6 +529,7 @@ int foo(void) {
 	hwloc_config_prefix[tests/hwloc/ports/topology-opencl.c]:hwloc_config_prefix[hwloc/topology-opencl.c]
 	hwloc_config_prefix[tests/hwloc/ports/topology-cuda.c]:hwloc_config_prefix[hwloc/topology-cuda.c]
 	hwloc_config_prefix[tests/hwloc/ports/topology-nvml.c]:hwloc_config_prefix[hwloc/topology-nvml.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-rsmi.c]:hwloc_config_prefix[hwloc/topology-rsmi.c]
 	hwloc_config_prefix[tests/hwloc/ports/topology-gl.c]:hwloc_config_prefix[hwloc/topology-gl.c]
 	hwloc_config_prefix[tests/hwloc/ports/lstopo-windows.c]:hwloc_config_prefix[utils/lstopo/lstopo-windows.c])
     ])

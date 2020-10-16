@@ -14,6 +14,8 @@ all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 
+testp: $(foreach i,$(TESTDIRS),testp-$i)
+
 syncfttest mpisyncfttest:
 
 clean: $(foreach i,$(DIRS),clean-$i)

@@ -11,11 +11,10 @@ jobs:
           command: ./build all-test netlrts-linux-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
       - run:
           name: Test
-          command: |
-            make -C netlrts-linux-x86_64/tests test TESTOPTS="++local"
-            make -C netlrts-linux-x86_64/examples test TESTOPTS="++local"
-            #Timeout in test-alltoall:
-            #make -C netlrts-linux-x86_64/benchmarks test TESTOPTS="++local"
+          command: make -C netlrts-linux-x86_64/tmp test TESTOPTS="++local"
+      - run:
+          name: TestP P=2
+          command: make -C netlrts-linux-x86_64/tmp testp P=2 TESTOPTS="++local"
 
   NetLRTS-smp:
     machine:
@@ -28,11 +27,10 @@ jobs:
           command: ./build all-test netlrts-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
       - run:
           name: Test
-          command: |
-            make -C netlrts-linux-x86_64-smp/tests test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle"
-            make -C netlrts-linux-x86_64-smp/examples test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle"
-            #Timeout in test-alltoall:
-            #make -C netlrts-linux-x86_64-smp/benchmarks test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle"
+          command: make -C netlrts-linux-x86_64-smp/tmp test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle"
+      - run:
+          name: TestP P=4 PPN=2
+          command: make -C netlrts-linux-x86_64-smp/tmp testp P=4 TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle ++ppn 2"
 
 workflows:
   version: 2

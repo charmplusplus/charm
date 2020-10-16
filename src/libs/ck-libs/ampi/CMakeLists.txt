@@ -2,75 +2,96 @@ set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoa
 
 set(ampi-f90-sources ampifimpl.f90 ampimod.f90)
 
-set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h mpio_functions.h mpio.h mpio_functions.h mpio_globals.h mpiof.h)
+set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h
+                   romio-stub/mpio_functions.h romio-stub/mpio.h romio-stub/mpio_globals.h romio-stub/mpiof.h)
 
 add_library(ampi-compat compat_ampi.c
        compat_ampim.C compat_ampifm.C compat_ampicm.C
        compat_ampicpp.C)
 
 add_library(moduleampi ${ampi-cxx-sources} ${ampi-h-sources})
-add_dependencies(moduleampi moduletcharm ck ampi_funcptr_shim ampi_funcptr_shim_main ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
+add_dependencies(moduleampi moduletcharm ck)
 
 
 # fsglobals/pipglobals
-add_library(ampi_funcptr_shim OBJECT ampi_funcptr_shim.C)
-target_compile_options(ampi_funcptr_shim PRIVATE -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden)
 
-add_library(ampi_funcptr_shim_main OBJECT ampi_funcptr_shim_main.C)
-target_compile_options(ampi_funcptr_shim_main PRIVATE -fPIE)
+add_library(ampi_funcptr_shim ampi_funcptr_shim.C)
+target_compile_options(ampi_funcptr_shim PRIVATE -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden)
+add_dependencies(ampi_funcptr_shim moduleampi)
+add_custom_command(TARGET ampi_funcptr_shim
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim.dir/ampi_funcptr_shim.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim.o
+    VERBATIM
+)
 
-add_library(ampi_funcptr_shim_fortran OBJECT ampif.C)
-target_compile_options(ampi_funcptr_shim_fortran PRIVATE -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden)
+add_library(ampi_funcptr_shim_main ampi_funcptr_shim_main.C)
+target_compile_options(ampi_funcptr_shim_main PRIVATE -language ampi -fPIE)
+add_dependencies(ampi_funcptr_shim_main moduleampi)
+add_custom_command(TARGET ampi_funcptr_shim_main
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_main.dir/ampi_funcptr_shim_main.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_main.o
+    VERBATIM
+)
 
-add_library(ampi_funcptr_shim_fmpimain OBJECT ampi_funcptr_shim_fmpimain.C)
-target_compile_options(ampi_funcptr_shim_fmpimain PRIVATE -fPIE)
+add_library(ampi_funcptr_loader ampi_funcptr_loader.C)
+target_compile_options(ampi_funcptr_loader PRIVATE -language ampi)
+add_dependencies(ampi_funcptr_loader moduleampi)
+add_custom_command(TARGET ampi_funcptr_loader
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_loader.dir/ampi_funcptr_loader.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_loader.o
+    VERBATIM
+)
 
-add_library(ampi_funcptr_loader OBJECT ampi_funcptr_loader.C)
+add_library(ampi_funcptr_loader_stub ampi_funcptr_loader_stub.C)
+target_compile_options(ampi_funcptr_loader_stub PRIVATE -language ampi)
+add_dependencies(ampi_funcptr_loader_stub moduleampi)
+add_custom_command(TARGET ampi_funcptr_loader_stub
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_loader_stub.dir/ampi_funcptr_loader_stub.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_loader_stub.o
+    VERBATIM
+)
 
-add_library(ampi_funcptr_loader_stub OBJECT ampi_funcptr_loader_stub.C)
+if(CMK_CAN_LINK_FORTRAN)
+    add_library(ampi_funcptr_shim_fortran ampif.C)
+    target_compile_options(ampi_funcptr_shim_fortran PRIVATE -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden)
+    add_dependencies(ampi_funcptr_shim_fortran moduleampi moduleampif)
+    add_custom_command(TARGET ampi_funcptr_shim_fortran
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fortran.dir/ampif.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran.o
+        VERBATIM
+    )
 
-if(${CMK_SUPPORTS_FSGLOBALS})
-    add_library(ampi_globals_fs OBJECT ampi_globals_fs.C)
-    add_dependencies(ampi_globals_fs ck)
-    add_dependencies(moduleampi ampi_globals_fs)
-    add_custom_command(TARGET moduleampi
+    add_library(ampi_funcptr_shim_fmpimain ampi_funcptr_shim_fmpimain.C)
+    target_compile_options(ampi_funcptr_shim_fmpimain PRIVATE -language ampi -fPIE)
+    add_dependencies(ampi_funcptr_shim_fmpimain moduleampi moduleampif)
+    add_custom_command(TARGET ampi_funcptr_shim_fmpimain
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fmpimain.dir/ampi_funcptr_shim_fmpimain.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fmpimain.o
+        VERBATIM
+    )
+endif()
+
+if(CMK_SUPPORTS_FSGLOBALS)
+    add_library(ampi_globals_fs ampi_globals_fs.C)
+    target_compile_options(ampi_globals_fs PRIVATE -language ampi)
+    add_dependencies(ampi_globals_fs moduleampi)
+    add_custom_command(TARGET ampi_globals_fs
         POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_globals_fs.dir/ampi_globals_fs.C.o ${CMAKE_BINARY_DIR}/lib/ampi_globals_fs.o
         VERBATIM
     )
 endif()
 
-if(${CMK_SUPPORTS_PIPGLOBALS})
-    add_library(ampi_globals_pip OBJECT ampi_globals_pip.C)
-    add_dependencies(ampi_globals_pip ck)
-    add_dependencies(moduleampi ampi_globals_pip)
-    add_custom_command(TARGET moduleampi
+if(CMK_SUPPORTS_PIPGLOBALS)
+    add_library(ampi_globals_pip ampi_globals_pip.C)
+    target_compile_options(ampi_globals_pip PRIVATE -language ampi)
+    add_dependencies(ampi_globals_pip moduleampi)
+    add_custom_command(TARGET ampi_globals_pip
         POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_globals_pip.dir/ampi_globals_pip.C.o ${CMAKE_BINARY_DIR}/lib/ampi_globals_pip.o
         VERBATIM
     )
 endif()
-
-add_dependencies(ampi_funcptr_shim ck)
-add_dependencies(ampi_funcptr_shim_main ck)
-add_dependencies(ampi_funcptr_shim_fortran ck)
-add_dependencies(ampi_funcptr_shim_fmpimain ck)
-add_dependencies(ampi_funcptr_loader ck)
-add_dependencies(ampi_funcptr_loader_stub ck)
-
-add_dependencies(moduleampi ampi_funcptr_shim ampi_funcptr_shim_main ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain ampi_funcptr_loader ampi_funcptr_loader_stub)
-
-add_custom_command(TARGET moduleampi
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim.dir/ampi_funcptr_shim.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim.o
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_main.dir/ampi_funcptr_shim_main.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_main.o
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fortran.dir/ampif.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran.o
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fmpimain.dir/ampi_funcptr_shim_fmpimain.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fmpimain.o
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_loader.dir/ampi_funcptr_loader.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_loader.o
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_loader_stub.dir/ampi_funcptr_loader_stub.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_loader_stub.o
-    VERBATIM
-)
-
 
 
 if(${CMK_CAN_LINK_FORTRAN})
@@ -89,6 +110,7 @@ if(${CMK_CAN_LINK_FORTRAN})
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampif.dir/ampif.C.o ${CMAKE_BINARY_DIR}/lib/ampif.o
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampifimpl.dir/ampifimpl.f90.o ${CMAKE_BINARY_DIR}/lib/ampifimpl.o
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampimod.dir/ampimod.f90.o ${CMAKE_BINARY_DIR}/lib/ampimod.o
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/mpi.mod ${CMAKE_BINARY_DIR}/include/
         VERBATIM
     )
 endif()
@@ -192,8 +214,20 @@ if(${CMK_AMPI_WITH_ROMIO})
     add_dependencies(romio moduleampi ampi-compat ck modulecompletion
         conv-partition conv-util hwloc conv-static conv-core ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer)
-    if(${CMK_CAN_LINK_FORTRAN})
+        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer hello)
+    add_dependencies(ampi_funcptr_shim romio)
+    add_dependencies(ampi_funcptr_shim_main romio)
+    add_dependencies(ampi_funcptr_loader romio)
+    add_dependencies(ampi_funcptr_loader_stub romio)
+    if(CMK_CAN_LINK_FORTRAN)
         add_dependencies(romio moduleampif conv-utilf)
+        add_dependencies(ampi_funcptr_shim_fortran romio)
+        add_dependencies(ampi_funcptr_shim_fmpimain romio)
+    endif()
+    if(CMK_SUPPORTS_FSGLOBALS)
+        add_dependencies(ampi_globals_fs romio)
+    endif()
+    if(CMK_SUPPORTS_PIPGLOBALS)
+        add_dependencies(ampi_globals_pip romio)
     endif()
 endif()

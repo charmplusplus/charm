@@ -6,6 +6,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <ctime>        // std::time_t, std::gmtime
+#include <chrono>       // std::chrono::system_clock
+
 #include "charm.h"
 #include "middle.h"
 #include "cklists.h"
@@ -224,6 +227,9 @@ static void traceCommonInit(char **argv)
   }
 }
 
+extern char** Cmi_argvcopy;
+extern const char* const CmiCommitID;
+
 /** Write out the common parts of the .sts file. */
 void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE \"%s\"\n",CMK_MACHINE_NAME);
@@ -234,7 +240,33 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
-#endif	
+#endif
+
+  fprintf(stsfp, "COMMANDLINE \"");
+  int index = 0;
+  while (Cmi_argvcopy[index] != nullptr)
+  {
+    if (index > 0)
+      fprintf(stsfp, " ");
+    fprintf(stsfp, "%s", Cmi_argvcopy[index]);
+    index++;
+  }
+  fprintf(stsfp, "\"\n");
+
+  // write timestamp in ISO 8601 format
+  using std::chrono::system_clock;
+  const time_t now = system_clock::to_time_t(system_clock::now());
+  struct tm currentTime;
+#if defined(_WIN32) || defined(_WIN64)
+  gmtime_s(&currentTime, &now);
+#else
+  gmtime_r(&now, &currentTime);
+#endif
+  char timeBuffer[sizeof("YYYY-mm-ddTHH:MM:SSZ")];
+  strftime(timeBuffer, sizeof(timeBuffer), "%FT%TZ", &currentTime);
+  fprintf(stsfp, "TIMESTAMP %s\n", timeBuffer);
+
+  fprintf(stsfp, "CHARMVERSION %s\n", CmiCommitID);
   fprintf(stsfp, "TOTAL_CHARES %d\n", (int)_chareTable.size());
   fprintf(stsfp, "TOTAL_EPS %d\n", (int)_entryTable.size());
   fprintf(stsfp, "TOTAL_MSGS %d\n", (int)_msgTable.size());
