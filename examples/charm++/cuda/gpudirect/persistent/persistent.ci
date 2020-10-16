@@ -1,7 +1,7 @@
 mainmodule persistent {
   readonly CProxy_Main main_proxy;
   readonly CProxy_PersistentArray array_proxy;
-  //readonly CProxy_PersistentGroup group_proxy;
+  readonly CProxy_PersistentGroup group_proxy;
   //readonly CProxy_PersistentNodeGroup nodegroup_proxy;
   readonly int block_size;
   readonly int n_iters;
@@ -26,14 +26,12 @@ mainmodule persistent {
 
       when callback() serial {
         if (me == 0) {
-          CkPrintf("[PE %d, iter %d] GET: src callback\n", me, iter);
           if (iter == n_iters-1) {
             container.fill(0);
           } else {
             container.fill(iter+1);
           }
         } else {
-          CkPrintf("[PE %d, iter %d] GET: dst callback\n", me, iter);
           container.verify(iter);
         }
       }
@@ -48,14 +46,60 @@ mainmodule persistent {
 
       when callback() serial {
         if (me == 0) {
-          CkPrintf("[PE %d, iter %d] PUT: src callback\n", me, iter);
           if (iter == n_iters-1) {
             container.fill(0);
           } else {
             container.fill(iter+1);
           }
         } else {
-          CkPrintf("[PE %d, iter %d] PUT: dst callback\n", me, iter);
+          container.verify(iter);
+        }
+      }
+    }
+
+    entry void callback();
+  };
+
+  group PersistentGroup {
+    entry PersistentGroup();
+    entry void initSend();
+    entry void initRecv(CkDeviceBuffer send_buf, CkDeviceBuffer recv_buf);
+
+    entry void testGet(int iter) {
+      serial {
+        if (me == 1) {
+          my_recv_buf.get(peer_send_buf);
+        }
+      }
+
+      when callback() serial {
+        if (me == 0) {
+          if (iter == n_iters-1) {
+            container.fill(0);
+          } else {
+            container.fill(iter+1);
+          }
+        } else {
+          container.verify(iter);
+        }
+      }
+    }
+
+    entry void testPut(int iter) {
+      serial {
+        if (me == 0) {
+          my_send_buf.put(peer_recv_buf);
+        }
+      }
+
+      when callback() serial {
+        if (me == 0) {
+          if (iter == n_iters-1) {
+            container.fill(0);
+          } else {
+            container.fill(iter+1);
+          }
+        } else {
           container.verify(iter);
         }
       }
@@ -65,14 +109,6 @@ mainmodule persistent {
   };
 
   /*
-  group PersistentGroup {
-    entry PersistentGroup();
-    entry void send();
-    entry void recv(CkDeviceBuffer buf);
-    entry void srcCb();
-    entry void dstCb();
-  };
-
   nodegroup PersistentNodeGroup {
     entry PersistentNodeGroup();
     entry void send();

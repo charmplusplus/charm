@@ -6,7 +6,7 @@
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_PersistentArray array_proxy;
-/* readonly */ //CProxy_PersistentGroup group_proxy;
+/* readonly */ CProxy_PersistentGroup group_proxy;
 /* readonly */ //CProxy_PersistentNodeGroup nodegroup_proxy;
 /* readonly */ int block_size;
 /* readonly */ int n_iters;
@@ -106,7 +106,7 @@ public:
 
     // Create chares
     array_proxy = CProxy_PersistentArray::ckNew(CkNumPes());
-    //group_proxy = CProxy_PersistentGroup::ckNew();
+    group_proxy = CProxy_PersistentGroup::ckNew();
     //nodegroup_proxy = CProxy_PersistentNodeGroup::ckNew();
 
     // Begin testing
@@ -129,14 +129,20 @@ public:
     }
     CkPrintf("PASS\n");
 
-    /*
     CkPrintf("Testing chare group...\n");
+    group_proxy.initSend();
+    CkWaitQD();
     for (int i = 0; i < n_iters; i++) {
-      group_proxy[0].send();
+      group_proxy.testGet(i);
+      CkWaitQD();
+    }
+    for (int i = 0; i < n_iters; i++) {
+      group_proxy.testPut(i);
       CkWaitQD();
     }
     CkPrintf("PASS\n");
 
+    /*
     if (test_nodegroup) {
       CkPrintf("Testing chare nodegroup...\n");
       for (int i = 0; i < n_iters; i++) {
@@ -198,39 +204,44 @@ public:
   void ResumeFromSync() {}
 };
 
-// TODO
-/*
 class PersistentGroup : public CBase_PersistentGroup {
+  PersistentGroup_SDAG_CODE
+
   Container container;
-  CkDeviceBuffer buf;
+  CkDeviceBuffer my_send_buf;
+  CkDeviceBuffer my_recv_buf;
+  CkDeviceBuffer peer_send_buf;
+  CkDeviceBuffer peer_recv_buf;
+  int me;
+  int peer;
 
 public:
   PersistentGroup() {
-    container.init((thisIndex == 0) ? 1 : 2);
+    me = CkMyPe();
+    peer = (CkMyPe() == 0) ? 1 : 0;
+    container.init();
   }
 
-  void send() {
-    buf = CkDeviceBuffer(container.d_local_data, sizeof(double) * block_size,
-        CkCallback(CkIndex_PersistentGroup::srcCb(), thisProxy[thisIndex]),
+  void initSend() {
+    container.fill(0);
+
+    // Initialize and send my metadata to peer
+    my_send_buf = CkDeviceBuffer(container.d_local_data, sizeof(double) * block_size,
+        CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
         container.stream);
-    thisProxy[1].recv(buf);
-  }
-
-  void recv(CkDeviceBuffer src_buf) {
-    buf = CkDeviceBuffer(container.d_remote_data, sizeof(double) * block_size,
-        CkCallback(CkIndex_PersistentGroup::dstCb(), thisProxy[thisIndex]),
+    my_recv_buf = CkDeviceBuffer(container.d_remote_data, sizeof(double) * block_size,
+        CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
         container.stream);
-    buf.get(src_buf);
+    thisProxy[peer].initRecv(my_send_buf, my_recv_buf);
   }
 
-  void srcCb() { CkPrintf("PersistentGroup %d, srcCb\n", thisIndex); }
-
-  void dstCb() {
-    CkPrintf("PersistentGroup %d, dstCb\n", thisIndex);
-    container.verify(1);
+  void initRecv(CkDeviceBuffer send_buf, CkDeviceBuffer recv_buf) {
+    peer_send_buf = send_buf;
+    peer_recv_buf = recv_buf;
   }
 };
 
+/*
 class PersistentNodeGroup : public CBase_PersistentNodeGroup {
   Container container;
   CkDeviceBuffer buf;
