@@ -80,6 +80,7 @@ if(CMK_SUPPORTS_FSGLOBALS)
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_globals_fs.dir/ampi_globals_fs.C.o ${CMAKE_BINARY_DIR}/lib/ampi_globals_fs.o
         VERBATIM
     )
+    add_dependencies(all-test ampi_globals_fs)
 endif()
 
 if(CMK_SUPPORTS_PIPGLOBALS)
@@ -91,6 +92,7 @@ if(CMK_SUPPORTS_PIPGLOBALS)
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_globals_pip.dir/ampi_globals_pip.C.o ${CMAKE_BINARY_DIR}/lib/ampi_globals_pip.o
         VERBATIM
     )
+    add_dependencies(all-test ampi_globals_pip)
 endif()
 
 

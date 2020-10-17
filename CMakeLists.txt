@@ -184,17 +184,10 @@ if(${TARGET} STREQUAL "all-test")
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
         threads-default-tls ldb-neighbor ldb-workstealing modulearmci
-        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc
-        ampi_globals_fs)
+        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc)
   if(CMK_CAN_LINK_FORTRAN)
     add_dependencies(all-test moduleampif conv-utilf ckmainf
         ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
-  endif()
-  if(CMK_SUPPORTS_FSGLOBALS)
-    add_dependencies(all-test ampi_globals_fs)
-  endif()
-  if(CMK_SUPPORTS_PIPGLOBALS)
-    add_dependencies(all-test ampi_globals_pip)
   endif()
   set(TARGET "LIBS")
 endif()
