@@ -2701,6 +2701,158 @@ applications. RotateLB and RandCentLB are more useful for debugging
 object migrations. The compiler and runtime options are described in
 section :numref:`lbOption`.
 
+**TreeLB and its Configuration**
+
+TreeLB allows for user-configurable hierarchical load balancing. While
+the legacy centralized strategies above are still supported, TreeLB
+allows load balancing to be performed at different levels and
+frequencies in a modular way. TreeLB includes several kinds of trees:
+the 2-level tree consists of PE and root levels (essentially the same as
+centralized load balancing), the 3-level tree consists of PE,
+process, and root levels, and the 4-level tree consists of
+PE, process, process group, and root levels (process groups are
+collections of consecutive processes; the number of groups is
+configurable, see below). Each level only balances
+load within its corresponding domain; for example, for the 3-level
+PE-Process-Root tree during process steps, each process runs the
+specified LB strategy over only the PEs and objects contained within
+the process, while, at root steps, the root strategy is run over all
+PEs and objects in the job. The load balancing strategy to be used at
+each level and frequency at which to invoke LB at each level can be
+specified using a JSON configuration file with name ``treelb.json`` or
+by specifying the JSON file name using command line option
+``+TreeLBFile``. We provide examples of some configuration files below:
+
+Creating a 2-level tree that first uses the Greedy strategy and then
+the GreedyRefine strategy at the root:
+
+.. code-block:: json
+
+  {
+    "tree": "PE_Root",
+    "root":
+    {
+        "pe": 0,
+        "strategies": ["Greedy", "GreedyRefine"]
+    }
+  }
+
+Creating a 3-level tree that uses the Greedy strategy at the process level
+and the GreedyRefine strategy at the root, which runs only every three
+steps:
+
+.. code-block:: json
+
+  {
+    "tree": "PE_Process_Root",
+    "root":
+    {
+        "pe": 0,
+        "step_freq": 3,
+        "strategies": ["GreedyRefine"]
+    },
+    "process":
+    {
+        "strategies": ["Greedy"]
+    }
+  }
+
+Creating a 4-level tree that uses the GreedyRefine strategy at the process
+and process group levels. The number of user-specified process groups is four in
+this example. A strategy is not allowed at root level for a 4-level tree since
+communicating all object load information to the root can be expensive given
+the size of the PE tree. Load is balanced at the process group level
+every five steps and at the root level every ten steps. Note also that
+the process group usage of GreedyRefine provides a custom parameter to
+the strategy. This parameter will only be used for the process group
+level version of GreedyRefine, not the process level version.
+
+.. code-block:: json
+
+  {
+    "tree": "PE_Process_ProcessGroup_Root",
+    "root":
+    {
+        "pe": 0,
+        "step_freq": 10
+    },
+    "processgroup":
+    {
+        "step_freq": 5,
+        "strategies": ["GreedyRefine"],
+        "num_groups": 4,
+        "GreedyRefine":
+        {
+            "tolerance": 1.03
+        }
+    },
+    "process":
+    {
+        "strategies": ["GreedyRefine"]
+    }
+  }
+
+**TreeLB Configuration Parameters**
+
+The following parameters may be used to specify the configuration of TreeLB:
+
+- ``tree`` (**required**): String specifying the tree to use. Can be one of "PE_Root",
+  "PE_Process_Root", or "PE_Process_ProcessGroup_Root".
+- ``root`` (**required**): The configuration block for the root level of the
+  tree.
+
+  - ``pe``: Integer specifying the root PE. (default = ``0``)
+  - ``token_passing`` : Boolean specifying whether to use the coarsened
+    token passing strategy or not, only allowed for the "PE_Process_ProcessGroup_Root"
+    tree. If false, load will only be balanced within process groups
+    at most, never across the whole job. (default = ``true``)
+
+- ``processgroup`` (**required** for "PE_Process_ProcessGroup_Root" tree): The configuration block for
+  the process group level of the tree.
+
+  - ``num_groups`` (**required**): Integer specifying the number of process
+    groups to create.
+
+- ``process`` (**required** for "PE_Process_Root" and
+  "PE_Process_ProcessGroup_Root" trees): The configuration block for
+  the process level of the tree.
+- ``mcast_bfactor``: 8-bit integer specifying the branching factor of
+  the communication tree used to send inter-subtree migrations for the
+  4-level tree's token passing scheme. (default = ``4``)
+
+The ``root``, ``processgroup``, and ``process`` blocks may include the
+following tree level configuration parameters:
+
+- ``strategies`` (**required** except for root level of
+  "PE_Process_ProcessGroup_Root" tree): List of strings specifying which
+  LB  strategies to run at the given level.
+- ``repeat_strategies``: Boolean specifying if the whole list of
+  strategies should be repeated or not. If true, start back at the
+  beginning when the end of ``strategies`` is reached, otherwise keep
+  repeating the last strategy (e.g. for ``"strategies": ["1", "2"]``,
+  ``true`` would result in 1, 2, 1, 2, ...; ``false`` in 1, 2, 2, 2, ...).
+  (default = ``false``)
+- ``step_freq``: Integer specifying frequency at which to balance at the given
+  level of the tree. Not allowed to be specified on the level
+  immediately above the PE level of the tree, which implicitly has a
+  value of 1. This value must be a multiple of the value for the level
+  below it. For example, for the 4-level tree, this can be specified
+  for the process group and root levels, and the value for the root
+  level must be a multiple of the process group value. If these values
+  are given as 2 and 4, respectively, then load balancing will be
+  performed at the following levels in sequence: process, process
+  group, process, root, process, and so on. (default = max(value of
+  the level below, ``1``))
+- Individual strategies can also be configured using parameters in
+  this file. These should be placed in a block with a key exactly
+  matching the name of the load balancer, and can be parsed from
+  within the strategy's constructor.
+
+  - ``GreedyRefine``:
+
+    - ``tolerance``: Float specifying the tolerance GreedyRefine should
+      allow above the maximum load of Greedy.
+
 **Metabalancer to automatically schedule load balancing**
 
 Metabalancer can be invoked to automatically decide when to invoke the
@@ -2906,8 +3058,8 @@ to configure the load balancer, etc. These functions are:
    .. code-block:: c++
 
       // if used in an array element
-      LBDatabase *lbdb = getLBDB();
-      lbdb->SetLBPeriod(5.0);
+      LBManager* lbmgr = getLBMgr();
+      lbmgr->SetLBPeriod(5.0);
 
       // if used outside of an array element
       LBSetPeriod(5.0);
@@ -5705,6 +5857,16 @@ return the value for the current future.
 Other functions complete the API for futures. *CkReleaseFuture* destroys
 a future. *CkProbeFuture* tests whether the future has already finished
 computing the value of the expression.
+
+The maximum number of outstanding futures a PE may have is limited by the size of
+*CMK_REFNUM_TYPE*. Specifically, no more than :math:`2^{SIZE}-1` futures, where :math:`SIZE`
+is the size of *CMK_REFNUM_TYPE* in bits, may be outstanding at any time.
+Waiting on more futures will cause a fatal error in non-production builds,
+and will cause the program to hang in production builds. The default *CMK_REFNUM_TYPE*
+is ``unsigned short``, limiting each PE to 65,535 outstanding futures.
+To increase this limit, build Charm++ with a larger *CMK_REFNUM_TYPE*, e.g. specifying
+``--with-refnum-type=uint`` to use ``unsigned int`` when building Charm++.
+
 
 The Converse version of future functions can be found in the :ref:`conv-futures`
 section.
@@ -8787,7 +8949,7 @@ following example shows how this API can be used.
 
    CkSetPeHelpsOtherThreads(1);
 
-.. _sec:gpu:
+.. _sec-gpu:
 
 GPU Support
 -----------
@@ -9723,6 +9885,12 @@ Charm++’s built-in strategies(see :numref:`lbStrategy`) for the best
 performance based on the characteristics of their applications. However,
 they can also choose to write their own load balancing strategies.
 
+Users are recommended to use the TreeLB structure to write new custom
+strategies if possible (see :numref:`lbWriteNewTreeLB`). Currently,
+TreeLB may not be suitable for distributed strategies, if
+communication graph information is needed, or when working with legacy
+strategies.
+
 The Charm++ load balancing framework provides a simple scheme to
 incorporate new load balancing strategies. The programmer needs to write
 their strategy for load balancing based on the instrumented ProcArray
@@ -9791,6 +9959,50 @@ to the Charm++ build system:
 #. Run ``make depends`` to update dependence rule of Charm++ files. And
    run ``make charm++`` to compile Charm++ which includes the new load
    balancing strategy files.
+
+.. _lbWriteNewTreeLB:
+
+Writing a new load balancing strategy with TreeLB
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Writing a load balancing strategy with TreeLB is very simple. It involves
+implementing a class inheriting from the abstract ``Strategy`` class
+defined in the ``TreeStrategyBase.h`` header file. Specifically, the
+load balancing strategy needs to be implemented in the ``solve`` method,
+which receives objects and processors as vectors. The solution
+needs to be stored in the ``solution`` object using its
+``assign(O object, P pe)`` instance method and is used by the load
+balancing framework to perform object migrations accordingly. The
+``bool objSorted`` argument specifies whether the incoming vector of
+objects is sorted by load values or not. This new strategy can be written
+in a header file and must be included in the ``TreeStrategyFactory.h``
+header file along with the mapping of the strategy name and class to
+be invoked for the newly implemented strategy. It can then be used by
+linking a program with TreeLB and specifying the newly created
+strategy in the configuration file.
+
+.. code-block:: c++
+
+  namespace TreeStrategy
+  {
+  template <typename O, typename P, typename S>
+  class FooLB : public Strategy<O, P, S>
+  {
+  public:
+    void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)
+    {
+      // The strategy goes here.
+      // This is a simple example strategy that round-robin assigns objects to processors.
+      int index = 0;
+      for (const auto& o : objs)
+      {
+        P p = procs[index];
+        solution.assign(o, p); // update solution object
+        index = (index + 1) % procs.size();
+      }
+    }
+  };
+  }  // namespace TreeStrategy
 
 .. _lbdatabase:
 
@@ -10109,12 +10321,12 @@ mass of the particles with velocity greater than 1:
 
 .. code-block:: python
 
-   size = ck.read((``numparticles'', 0));
+   size = ck.read(("numparticles", 0));
    for i in range(0, size):
-       vel = ck.read((``velocity'', i));
-       mass = ck.read((``mass'', i));
+       vel = ck.read(("velocity", i));
+       mass = ck.read(("mass", i));
        mass = mass * 2;
-       if (vel > 1): ck.write((``mass'', i), mass);
+       if (vel > 1): ck.write(("mass", i), mass);
 
 Instead of all these read and writes, it will be better to be able to
 write:
@@ -10949,12 +11161,12 @@ appropriate choices for the build one wants to perform.
    ================================================================ =====================================================================
    Machine                                                          Build command
    ================================================================ =====================================================================
-   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    Multicore (single node, shared memory) 64 bit Linux              ``./build charm++ multicore-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux                                            ``./build charm++ netlrts-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux (intel compilers)                          ``./build charm++ netlrts-linux-x86_64 icc --with-production -j8``
    Net with 64 bit Linux (shared memory)                            ``./build charm++ netlrts-linux-x86_64 smp --with-production -j8``
    Net with 64 bit Linux (checkpoint restart based fault tolerance) ``./build charm++ netlrts-linux-x86_64 syncft --with-production -j8``
+   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    MPI with 64 bit Linux                                            ``./build charm++ mpi-linux-x86_64 --with-production -j8``
    MPI with 64 bit Linux (shared memory)                            ``./build charm++ mpi-linux-x86_64 smp --with-production -j8``
    MPI with 64 bit Linux (mpicxx wrappers)                          ``./build charm++ mpi-linux-x86_64 mpicxx --with-production -j8``
@@ -11055,7 +11267,7 @@ After downloading and unpacking Charm++, it can be installed in the following wa
    $ make -j4
 
 
-By default, CMake builds the netlrts version. 
+By default, CMake builds the netlrts version.
 Other configuration options can be specified in the cmake command above.
 For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the following command can be used:
 

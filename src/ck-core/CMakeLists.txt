@@ -66,7 +66,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/ckheap.h ../ck-ldb/ckset.h
     ../ck-ldb/elements.h
     ../ck-ldb/lbdb.h ../ck-ldb/manager.h
-    ../ck-ldb/idm.h ../util/json.hpp)
+    ../ck-ldb/idm.h ../util/json.hpp ../util/json_fwd.hpp)
 
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 

@@ -203,7 +203,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
 	sockRoutines.h sockRoutines.C cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
-	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp cmirdmautils.h
+	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp json_fwd.hpp cmirdmautils.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h debug-charm.h\
@@ -489,7 +489,7 @@ cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/confi
 $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
 
 hwloc-target:  conv-autoconfig.h
-	( $(MAKE) -C hwloc )
+	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	( test -e hwloc/hwloc/.libs/libhwloc_embedded.lib && cp -f hwloc/hwloc/.libs/libhwloc_embedded.lib hwloc/hwloc/.libs/libhwloc_embedded.a ) || true
 	( cp -f hwloc/hwloc/.libs/libhwloc_embedded.a $(L) )
 	( cp -f hwloc/include/hwloc.h $(INC) )

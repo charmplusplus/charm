@@ -784,7 +784,11 @@ do
 		# See https://github.com/UIUC-PPL/charm/issues/2617 for details.
 		OPTS="$OPTS $arg"
 		;;
-
+	*.tbd)
+		# Pass through text-based libraries (*.tbd) on MacOS.
+		# See https://github.com/UIUC-PPL/charm/issues/3045 for details.
+		OPTS="$OPTS $arg"
+		;;
 	-D*|-I*)
 		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null
 		then
@@ -1209,7 +1213,7 @@ then
        OPTS_LD="$OPTS_LD $USE_UNDEFINED_DYNAMIC"
 fi
 
-if [ "$BUILD_SHARE" = "1" ]
+if [ "$BUILD_SHARE" = "1" -a "$USER_INITIATED_SHARED" = '0' ]
 then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
@@ -2114,7 +2118,7 @@ case "$OBJECT" in
 	;;
 *.so|*.so.*|*.sl|*.dylib)
 # Make shared library
-	if [ "$BUILD_SHARE" = '1' ]
+	if [ "$BUILD_SHARE" = '1' -a "$USER_INITIATED_SHARED" = '0' ]
 	then
 	  	MakeSO
 	fi
@@ -2122,7 +2126,7 @@ case "$OBJECT" in
 *.a)
 # Make regular (.a, non-shared) library
 	# in case building charm so, build .so under lib_so as well # Gengbin
-	if [ "$BUILD_SHARE" = "1" ]
+	if [ "$BUILD_SHARE" = "1" -a "$USER_INITIATED_SHARED" = '0' ]
 	then
 	  COPY_EXIT=""
 	  OBJECT_SAVE=$OBJECT

@@ -4380,7 +4380,9 @@ void LrtsExit(int exitcode)
     if(!CharmLibInterOperate || userDrivenMode) {
       PMI_Barrier();
       PMI_Finalize();
-      exit(exitcode);
+      if (!userDrivenMode) {
+        exit(exitcode);
+      }
     }
 }
 

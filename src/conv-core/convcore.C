@@ -3031,12 +3031,33 @@ void CmiGroupInit(void)
 
 #if CMK_MULTICAST_LIST_USE_COMMON_CODE
 
-void CmiSyncListSendFn(int npes, const int *pes, int len, char *msg)
+void CmiSyncListSendFn(int npes, const int* pes, int len, char* msg)
 {
-  int i;
-  for(i=0;i<npes;i++) {
-    CmiSyncSend(pes[i], len, msg);
+  // When in SMP mode, each send needs its own message, there is a race between unpacking
+  // for local PEs and there is a race between setting the rank in the Converse header and
+  // the actual comm thread send for remote PEs
+#if CMK_SMP
+  for (int i = 0; i < npes - 1; i++)
+  {
+    const char* msgCopy = CmiCopyMsg(msg, len);
+    CmiSyncSendAndFree(pes[i], len, msgCopy);
   }
+  // No need to copy and free for the last send, so use the original message
+  if (npes > 0)
+    CmiSyncSend(pes[npes - 1], len, msg);
+#else
+  for (int i = 0; i < npes; i++)
+  {
+    // Copy if this is a self send to avoid unpack/send race
+    if (pes[i] == CmiMyPe() && npes > 1)
+    {
+      const char* msgCopy = CmiCopyMsg(msg, len);
+      CmiSyncSendAndFree(pes[i], len, msgCopy);
+    }
+    else
+      CmiSyncSend(pes[i], len, msg);
+  }
+#endif
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
@@ -3046,16 +3067,10 @@ CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
   return (CmiCommHandle) 0;
 }
 
-void CmiFreeListSendFn(int npes, const int *pes, int len, char *msg)
+void CmiFreeListSendFn(int npes, const int* pes, int len, char* msg)
 {
-  int i;
-  for(i=0;i<npes-1;i++) {
-    CmiSyncSend(pes[i], len, msg);
-  }
-  if (npes>0)
-    CmiSyncSendAndFree(pes[npes-1], len, msg);
-  else 
-    CmiFree(msg);
+  CmiSyncListSendFn(npes, pes, len, msg);
+  CmiFree(msg);
 }
 
 #endif

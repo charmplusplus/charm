@@ -1,4 +1,4 @@
-name: UCX 1.8.1 Linux
+name: UCX 1.9.0 Linux
 
 on: [push]
 
@@ -16,11 +16,11 @@ jobs:
     # the build.
     #- name: Tmate session for debugging
     #  uses: mxschmitt/action-tmate@v2
-    - name: install-libevent
-      run: sudo apt install libevent-dev
+    - name: install-prerequisites
+      run: sudo apt-get install libevent-dev libhwloc-dev
     - name: build-ucx
       run: |
-        git clone --recursive --depth 1 --shallow-submodules --branch v1.8.1 https://github.com/openucx/ucx.git
+        git clone --recursive --depth 1 --shallow-submodules --branch v1.9.0 https://github.com/openucx/ucx.git
         cd ucx
         ./autogen.sh
         ./contrib/configure-release --disable-numa
@@ -32,12 +32,13 @@ jobs:
         tar -xf openmpi-4.0.4.tar.gz
         cd openmpi-4.0.4/
         ./configure --enable-mca-no-build=btl-uct --enable-install-libpmix
-        make -j 4
+        make -j4
         sudo make install
     - name: build
       run: ./build all-test ucx-linux-x86_64 ompipmix -g -j4 --with-production
     - name: test
       run: |
+        export PATH=/usr/local/bin:$PATH
         export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
         export OMPI_MCA_rmaps_base_oversubscribe=1
         make -C ucx-linux-x86_64-ompipmix/tests test
