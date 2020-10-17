@@ -15,7 +15,7 @@ mainmodule persistent {
   array [1D] PersistentArray {
     entry PersistentArray();
     entry void initSend();
-    entry void initRecv(CkDeviceBuffer send_buf, CkDeviceBuffer recv_buf);
+    entry void initRecv(CkDevicePersistent send_buf, CkDevicePersistent recv_buf);
 
     entry void testGet(int iter) {
       serial {
@@ -63,7 +63,7 @@ mainmodule persistent {
   group PersistentGroup {
     entry PersistentGroup();
     entry void initSend();
-    entry void initRecv(CkDeviceBuffer send_buf, CkDeviceBuffer recv_buf);
+    entry void initRecv(CkDevicePersistent send_buf, CkDevicePersistent recv_buf);
 
     entry void testGet(int iter) {
       serial {
@@ -112,7 +112,7 @@ mainmodule persistent {
   nodegroup PersistentNodeGroup {
     entry PersistentNodeGroup();
     entry void send();
-    entry void recv(CkDeviceBuffer buf);
+    entry void recv(CkDevicePersistent buf);
     entry void srcCb();
     entry void dstCb();
   };

@@ -58,55 +58,65 @@ CsvExtern(GPUManager, gpu_manager);
 
 /****************************** Direct (Persistent) API ******************************/
 
-CkDeviceStatus CkDeviceBuffer::get(CkDeviceBuffer& src) {
+CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
   // Check that the source buffer fits into the destination buffer
   if (cnt < src.cnt) {
-    CkAbort("CkDeviceBuffer::get: Destination buffer is smaller than source buffer\n");
+    CkAbort("CkDevicePersistent::get: Destination buffer is smaller than source buffer\n");
   }
 
-  CkNcpyModeDevice mode = findTransferModeDevice(src.src_pe, CkMyPe());
+  CkNcpyModeDevice mode = findTransferModeDevice(src.pe, CkMyPe());
 
+  // Perform get
   if (mode == CkNcpyModeDevice::MEMCPY) {
     cudaMemcpyAsync((void*)ptr, src.ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
-    // TODO: Need to support stack-allocated CkCallback
-    if (src.cb.type != CkCallback::ignore) {
-      hapiAddCallback(cuda_stream, src.cb);
-    }
-    if (cb.type != CkCallback::ignore) {
-      hapiAddCallback(cuda_stream, cb);
-    }
   } else if (mode == CkNcpyModeDevice::IPC) {
-    // TODO
-    CkAbort("TODO");
+    if (!ipc_open) {
+      cudaIpcOpenMemHandle(&src.ipc_ptr, src.cuda_ipc_handle, cudaIpcMemLazyEnablePeerAccess);
+      ipc_open = true;
+    }
+    cudaMemcpyAsync((void*)ptr, src.ipc_ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
   } else {
     CkAbort("Persistant GPU messaging is currently not supported for inter-node messages");
+  }
+
+  // Set callbacks to be invoked once get is complete
+  if (src.cb.type != CkCallback::ignore) {
+    hapiAddCallback(cuda_stream, src.cb);
+  }
+  if (cb.type != CkCallback::ignore) {
+    hapiAddCallback(cuda_stream, cb);
   }
 
   return CkDeviceStatus::incomplete;
 }
 
-CkDeviceStatus CkDeviceBuffer::put(CkDeviceBuffer& dst) {
+CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
   // Check that the source buffer fits into the destination buffer
   if (dst.cnt < cnt) {
-    CkAbort("CkDeviceBuffer::get: Destination buffer is smaller than source buffer\n");
+    CkAbort("CkDevicePersistent::get: Destination buffer is smaller than source buffer\n");
   }
 
-  CkNcpyModeDevice mode = findTransferModeDevice(CkMyPe(), dst.src_pe);
+  CkNcpyModeDevice mode = findTransferModeDevice(CkMyPe(), dst.pe);
 
+  // Perform put
   if (mode == CkNcpyModeDevice::MEMCPY) {
     cudaMemcpyAsync((void*)dst.ptr, ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
-    // TODO: Need to support stack-allocated CkCallback
-    if (cb.type != CkCallback::ignore) {
-      hapiAddCallback(cuda_stream, cb);
-    }
-    if (dst.cb.type != CkCallback::ignore) {
-      hapiAddCallback(cuda_stream, dst.cb);
-    }
   } else if (mode == CkNcpyModeDevice::IPC) {
-    // TODO
-    CkAbort("TODO");
+    if (!ipc_open) {
+      cudaIpcOpenMemHandle(&dst.ipc_ptr, dst.cuda_ipc_handle, cudaIpcMemLazyEnablePeerAccess);
+      ipc_open = true;
+    }
+    cudaMemcpyAsync(dst.ipc_ptr, ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
   } else {
     CkAbort("Persistant GPU messaging is not yet supported for inter-node messages");
+  }
+
+  // Set callbacks to be invoked once get is complete
+  if (cb.type != CkCallback::ignore) {
+    hapiAddCallback(cuda_stream, cb);
+  }
+  if (dst.cb.type != CkCallback::ignore) {
+    hapiAddCallback(cuda_stream, dst.cb);
   }
 
   return CkDeviceStatus::incomplete;

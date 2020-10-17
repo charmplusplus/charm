@@ -162,10 +162,10 @@ class PersistentArray : public CBase_PersistentArray {
   PersistentArray_SDAG_CODE
 
   Container container;
-  CkDeviceBuffer my_send_buf;
-  CkDeviceBuffer my_recv_buf;
-  CkDeviceBuffer peer_send_buf;
-  CkDeviceBuffer peer_recv_buf;
+  CkDevicePersistent my_send_buf;
+  CkDevicePersistent my_recv_buf;
+  CkDevicePersistent peer_send_buf;
+  CkDevicePersistent peer_recv_buf;
   int me;
   int peer;
 
@@ -187,16 +187,16 @@ public:
     container.fill(0);
 
     // Initialize and send my metadata to peer
-    my_send_buf = CkDeviceBuffer(container.d_local_data, sizeof(double) * block_size,
+    my_send_buf = CkDevicePersistent(container.d_local_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
         container.stream);
-    my_recv_buf = CkDeviceBuffer(container.d_remote_data, sizeof(double) * block_size,
+    my_recv_buf = CkDevicePersistent(container.d_remote_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
         container.stream);
     thisProxy[peer].initRecv(my_send_buf, my_recv_buf);
   }
 
-  void initRecv(CkDeviceBuffer send_buf, CkDeviceBuffer recv_buf) {
+  void initRecv(CkDevicePersistent send_buf, CkDevicePersistent recv_buf) {
     peer_send_buf = send_buf;
     peer_recv_buf = recv_buf;
   }
@@ -208,10 +208,10 @@ class PersistentGroup : public CBase_PersistentGroup {
   PersistentGroup_SDAG_CODE
 
   Container container;
-  CkDeviceBuffer my_send_buf;
-  CkDeviceBuffer my_recv_buf;
-  CkDeviceBuffer peer_send_buf;
-  CkDeviceBuffer peer_recv_buf;
+  CkDevicePersistent my_send_buf;
+  CkDevicePersistent my_recv_buf;
+  CkDevicePersistent peer_send_buf;
+  CkDevicePersistent peer_recv_buf;
   int me;
   int peer;
 
@@ -226,16 +226,16 @@ public:
     container.fill(0);
 
     // Initialize and send my metadata to peer
-    my_send_buf = CkDeviceBuffer(container.d_local_data, sizeof(double) * block_size,
+    my_send_buf = CkDevicePersistent(container.d_local_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
         container.stream);
-    my_recv_buf = CkDeviceBuffer(container.d_remote_data, sizeof(double) * block_size,
+    my_recv_buf = CkDevicePersistent(container.d_remote_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
         container.stream);
     thisProxy[peer].initRecv(my_send_buf, my_recv_buf);
   }
 
-  void initRecv(CkDeviceBuffer send_buf, CkDeviceBuffer recv_buf) {
+  void initRecv(CkDevicePersistent send_buf, CkDevicePersistent recv_buf) {
     peer_send_buf = send_buf;
     peer_recv_buf = recv_buf;
   }
@@ -244,7 +244,7 @@ public:
 /*
 class PersistentNodeGroup : public CBase_PersistentNodeGroup {
   Container container;
-  CkDeviceBuffer buf;
+  CkDevicePersistent buf;
 
 public:
   PersistentNodeGroup() {
@@ -252,14 +252,14 @@ public:
   }
 
   void send() {
-    buf = CkDeviceBuffer(container.d_local_data, sizeof(double) * block_size,
+    buf = CkDevicePersistent(container.d_local_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentNodeGroup::srcCb(), thisProxy[thisIndex]),
         container.stream);
     thisProxy[1].recv(buf);
   }
 
-  void recv(CkDeviceBuffer src_buf) {
-    buf = CkDeviceBuffer(container.d_remote_data, sizeof(double) * block_size,
+  void recv(CkDevicePersistent src_buf) {
+    buf = CkDevicePersistent(container.d_remote_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentNodeGroup::dstCb(), thisProxy[thisIndex]),
         container.stream);
     buf.get(src_buf);
