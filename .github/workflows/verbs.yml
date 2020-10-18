@@ -16,4 +16,5 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get -y install libibverbs-dev
+        # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
         ./build all-test verbs-linux-x86_64 smp -j4 -g --build-shared
