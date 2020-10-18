@@ -174,7 +174,7 @@ set(CMK_REPLAYSYSTEM ${REPLAY})
 
 if(${TARGET} STREQUAL "all-test")
   add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test
-        COMMENT "Building all-test" VERBATIM)
+        COMMENT "Building all-test. This will take several minutes.")
   add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
         ampi_funcptr_shim ampi_funcptr_shim_main
         ampi_funcptr_loader ampi_funcptr_loader_stub
