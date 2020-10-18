@@ -11,7 +11,7 @@
 # charm builds, you would have to manually copy them to <charm-arch>/tmp/Makefile
 
 # Figure out whether make's silent mode was requested:
-# $(MAKEFLAGS) will contain "s".
+# $(MAKEFLAGS) will contain "s". $(SILENT) is used in Makefile.tests.common.
 SILENT:=$(findstring s,$(word 1, $(MAKEFLAGS)))
 ifneq ($(SILENT),s)
 	SILENT:=xxxxx # Dummy value to enable string substitution
