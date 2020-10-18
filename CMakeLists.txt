@@ -172,26 +172,6 @@ endif()
 
 set(CMK_REPLAYSYSTEM ${REPLAY})
 
-if(${TARGET} STREQUAL "all-test")
-  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test
-        COMMENT "Building all-test. This will take several minutes.")
-  add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
-        ampi_funcptr_shim ampi_funcptr_shim_main
-        ampi_funcptr_loader ampi_funcptr_loader_stub
-        conv-partition conv-util hwloc conv-static conv-core ldb-rand
-        memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
-        create_symlinks moduleCkCache trace-converse moduleCommonLBs
-        moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
-        threads-default-tls ldb-neighbor ldb-workstealing modulearmci
-        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc)
-  if(CMK_CAN_LINK_FORTRAN)
-    add_dependencies(all-test moduleampif conv-utilf ckmainf
-        ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
-  endif()
-  set(TARGET "LIBS")
-endif()
-
 string(TOLOWER "${TARGET}" target_lower)
 
 if(${target_lower} STREQUAL "changa")
@@ -451,6 +431,33 @@ endif()
 
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
+
+if(${TARGET} STREQUAL "all-test")
+  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test
+        COMMENT "Building all-test. This will take several minutes.")
+  add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
+        ampi_funcptr_shim ampi_funcptr_shim_main
+        ampi_funcptr_loader ampi_funcptr_loader_stub
+        conv-partition conv-util hwloc conv-static conv-core ldb-rand
+        memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
+        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
+        create_symlinks moduleCkCache trace-converse moduleCommonLBs
+        moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
+        threads-default-tls ldb-neighbor ldb-workstealing modulearmci
+        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc
+        ampi_globals_fs)
+  if(CMK_CAN_LINK_FORTRAN)
+    add_dependencies(all-test moduleampif conv-utilf ckmainf
+        ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
+  endif()
+  if(CMK_SUPPORTS_FSGLOBALS)
+    add_dependencies(all-test ampi_globals_fs)
+  endif()
+  if(CMK_SUPPORTS_PIPGLOBALS)
+    add_dependencies(all-test ampi_globals_pip)
+  endif()
+  set(TARGET "LIBS")
+endif()
 
 configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @ONLY)
 
