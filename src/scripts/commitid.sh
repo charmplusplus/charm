@@ -4,6 +4,8 @@
 # recorded value in charm-version.h. Copy over that if it's changed, so that
 # Make sees a more recent file.
 
+# This script is only used in the old build system.
+
 VOLD=""
 if test -r charm-version.h
 then
@@ -23,7 +25,7 @@ else
     echo "$(cd "$SRCBASE" && git describe --long --always)\"" >> charm-version.h.new || touch charm-version.h.new
 fi
 
-VNEW=$(cat charm-version.h.new)
+VNEW=$(grep CHARM_VERSION charm-version.h.new | awk '{print $3}')
 
 if test -n "$VNEW" -a "$VOLD" != "$VNEW"
 then
