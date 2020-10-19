@@ -65,7 +65,7 @@ git add -u
 object_id=$(git write-tree)
 
 # Construct the target file/folder name
-version="charm-$(cat src/scripts/charm-version.h)"
+version="charm-$(grep CHARM_VERSION src/scripts/charm-version.h | awk '{print $3}')"
 
 # Generate the distribution tarball
 git archive --format=tar.gz --prefix="$version/" -o "$version.tar.gz" "$object_id"
