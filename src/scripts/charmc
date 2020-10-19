@@ -389,7 +389,7 @@ filterLegacyLB()
 printVersion()
 {
 	findCharmBin $0
-	version=`cat $CHARMBIN/../include/VERSION`
+	version=`cat $CHARMBIN/../include/charm-version.h`
 	echo Charm++ Version $version
 }
 

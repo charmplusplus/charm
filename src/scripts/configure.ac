@@ -42,7 +42,9 @@ CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
-echo AC_PACKAGE_VERSION > ../include/VERSION
+# Need /bin/echo since not all /bin/sh echo builtins support -n
+/bin/echo -n "#define CHARM_API_VERSION " > ../include/charm-api-version.h
+echo AC_PACKAGE_VERSION >> ../include/charm-api-version.h
 AC_DEFINE_UNQUOTED([CHARM_VERSION], AC_PACKAGE_VERSION, [Charm++ Release/API version number])
 
 charmout="charmconfig.out"

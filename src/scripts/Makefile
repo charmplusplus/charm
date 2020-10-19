@@ -266,14 +266,14 @@ conv-autoconfig.h: configure conv-autoconfig.h.in config_opts.sh
 	@. ./config_opts.sh; echo ./configure $(QUIET) $$CONFIG_OPTS;  \
 	./configure $(QUIET) $$CONFIG_OPTS && touch conv-autoconfig.h
 
-.PHONY: clean veryclean VERSION.new config
+.PHONY: clean veryclean charm-version.h.new config
 
-VERSION: VERSION.new
+charm-version.h: charm-version.h.new
 	SRCBASE=$(SRCBASE) ./commitid.sh
 
-commitid.C: VERSION
+commitid.C: charm-version.h
 	echo "extern const char * const CmiCommitID;" > $@
-	echo "const char * const CmiCommitID = \"`cat VERSION`\";" >> $@
+	echo "const char * const CmiCommitID = \"$(cat charm-version.h | grep CHARM_VERSION | awk '{print $3}')\";" >> $@
 commitid.o: CC=$(CHARMC)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)

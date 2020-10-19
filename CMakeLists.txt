@@ -1095,10 +1095,11 @@ add_custom_target(create_symlinks ALL
 #   add_dependencies(create_symlinks createlink)
 # endif()
 
-# Create the .vdir/.gdir/VERSION files
+# Create the .vdir/.gdir/charm-version.h/charm-api-version.h files
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
 file(WRITE ${CMAKE_BINARY_DIR}/include/.vdir   "${CMK_VDIR}\n")
-file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
+file(WRITE ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION "${CHARM_VERSION}"\n")
+file(WRITE ${CMAKE_BINARY_DIR}/include/charm-api-version.h "#define CHARM_API_VERSION ${PROJECT_VERSION}\n")
 
 
 # Copy the Makefile used for building and running tests
