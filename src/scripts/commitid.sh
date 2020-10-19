@@ -7,7 +7,7 @@
 VOLD=""
 if test -r charm-version.h
 then
-    VOLD=$(cat charm-version.h | grep CHARM_VERSION | awk '{print $3}')
+    VOLD=$(grep CHARM_VERSION charm-version.h | awk '{print $3}')
 fi
 
 
