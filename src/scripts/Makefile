@@ -273,7 +273,7 @@ charm-version.h: charm-version.h.new
 
 commitid.C: charm-version.h
 	echo "extern const char * const CmiCommitID;" > $@
-	echo "const char * const CmiCommitID = \"$(cat charm-version.h | grep CHARM_VERSION | awk '{print $3}')\";" >> $@
+	echo "const char * const CmiCommitID = $$(grep CHARM_VERSION charm-version.h | awk '{print $$3}');" >> $@
 commitid.o: CC=$(CHARMC)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
