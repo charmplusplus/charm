@@ -40,6 +40,8 @@ jobs:
     script:
     - choco upgrade -y cygwin cyg-get
     - cyg-get.bat cmake make gcc-core binutils libtool
+    - unset CC
+    - unset CXX
     - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 --without-romio -g --with-production -j3"
     - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests -j3"
     # Disabled lines would extend the CI's duration too much.
