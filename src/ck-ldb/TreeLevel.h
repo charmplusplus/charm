@@ -69,17 +69,11 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     size_t minPosDimension = std::numeric_limits<size_t>::max();
     size_t maxPosDimension = std::numeric_limits<size_t>::min();
     int dimension = -1;
-    for (const auto& msg : msgs)
-    {
-      if (((LBStatsMsg_1*)msg)->dimension > -1)
-      {
-        dimension = ((LBStatsMsg_1*)msg)->dimension;
-        break;
-      }
-    }
+
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
+      dimension = std::max(dimension, msg->dimension);
       nObjs += msg->nObjs;
       nPes += msg->nPes;
       minPosDimension = std::min(minPosDimension, msg->posDimension);
@@ -110,9 +104,22 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
       if (rateAware)
         memcpy(newMsg->speeds + pe_cnt, msg->speeds, sizeof(float) * msg_npes);
       // memcpy(newMsg->obj_start + pe_cnt, msg->obj_start, sizeof(int)*msg_npes);
+      const auto msgDimension = msg->dimension;
       for (int j = 0; j < msg_npes; j++)
-        newMsg->obj_start[pe_cnt + j] = msg->obj_start[j] + load_cnt;
-      memcpy(newMsg->oloads + load_cnt, msg->oloads, sizeof(float) * (msg->nObjs * (1 + dimension)));
+      {
+        int index = j * (1 + dimension) + load_cnt;
+        const int peStart = msg->obj_start[j];
+        newMsg->obj_start[pe_cnt + j] = index;
+
+        for (int k = 0; k < 1 + msgDimension; k++)
+        {
+          newMsg->oloads[index++] = msg->oloads[k + peStart];
+        }
+        for (int k = 1 + msgDimension; k < 1 + dimension; k++)
+        {
+          newMsg->oloads[index++] = 0;
+        }
+      }
       memcpy(newMsg->positions + obj_cnt * posDimension, msg->positions,
              sizeof(float) * msg->nObjs * posDimension);
       obj_cnt += msg->nObjs;
@@ -133,18 +140,6 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     int obj_cnt = 0;
     float total_load = 0;
 
-    int dimension = -1;
-    for (const auto& treeMsg : msgs)
-    {
-      LBStatsMsg_1* msg = (LBStatsMsg_1*)treeMsg;
-      if (msg->dimension > -1)
-      {
-        dimension = msg->dimension;
-        break;
-      }
-    }
-    CkAssert(objs.empty() || dimension > -1);
-
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
@@ -156,10 +151,15 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
         procs[pe_cnt++].resetLoad();
         migMsg->obj_start[pe] = obj_cnt;
         int local_id = 0;
+        const int msgDimension = 1 + msg->dimension;
         for (int k = msg->obj_start[j]; k < msg->obj_start[j + 1];
-             k += 1 + dimension, obj_cnt++, local_id++)
+             k += msgDimension, obj_cnt++, local_id++)
         {
-          objs[obj_cnt].populate(obj_cnt, msg->oloads + k, pe);
+          float load[1 + O::dimension];
+          memcpy(load, msg->oloads + k, sizeof(float) * msgDimension);
+          if (msgDimension < 1 + O::dimension)
+            memset(load + msgDimension, 0, sizeof(float) * (1 + O::dimension - msgDimension));
+          objs[obj_cnt].populate(obj_cnt, load, pe);
           if (msg->posDimension > 0)
             objs[obj_cnt].setPosition(
               std::vector<float>(msg->positions + k * msg->posDimension,
@@ -172,6 +172,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
         }
       }
     }
+
     CkAssert(obj_cnt == objs.size());
     CkAssert(pe_cnt == procs.size());
     return total_load;
@@ -620,12 +621,8 @@ class RootLevel : public LevelLogic
       int dimension = -1;
       for (const auto& treeMsg : stats_msgs)
       {
-        LBStatsMsg_1* msg = (LBStatsMsg_1*)treeMsg;
-        if (msg->dimension > -1)
-        {
-          dimension = msg->dimension;
-          break;
-        }
+        const LBStatsMsg_1* msg = (LBStatsMsg_1*)treeMsg;
+        dimension = std::max(dimension, msg->dimension);
       }
       CkAssert(nObjs == 0 || (dimension > -1 && dimension <= 10));
 
@@ -1154,6 +1151,7 @@ class PELevel : public LevelLogic
     if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
     myObjs.clear();
     LBRealType nonMigratableLoad = 0;
+    int dimension = -1;
     size_t minPosDimension = std::numeric_limits<size_t>::max();
     size_t maxPosDimension = std::numeric_limits<size_t>::min();
     for (int i = 0; i < nobjs; i++)
@@ -1161,6 +1159,7 @@ class PELevel : public LevelLogic
       if (allLocalObjs[i].migratable)
       {
         myObjs.emplace_back(allLocalObjs[i]);
+        dimension = std::max(dimension, (int)myObjs[i].vectorLoad.size());
         minPosDimension = std::min(minPosDimension, allLocalObjs[i].position.size());
         maxPosDimension = std::max(maxPosDimension, allLocalObjs[i].position.size());
       }
@@ -1175,7 +1174,6 @@ class PELevel : public LevelLogic
     const size_t posDimension = (nobjs == 0) ? 0 : minPosDimension;
 
     // Currently assumes that every object sent to LB has the same dimension
-    // TODO: Allow for different dimensions
     // Assumes that every PE has at least one object for LB
     // If dimension is 0, then phases are not being used
     // If there are no objects, set dimension to -1
@@ -1225,12 +1223,14 @@ class PELevel : public LevelLogic
       else
         msg->oloads[index++] = float(myObjs[i].wallTime);
 
-      // Currently assumes that every object sent to LB has the same dimension
-      // TODO: Allow for different dimensions
-      CkAssert(myObjs[i].vectorLoad.size() == dimension);
-      for (int j = 0; j < dimension; j++)
+      const auto currentDim = myObjs[i].vectorLoad.size();
+      for (int j = 0; j < currentDim; j++)
       {
         msg->oloads[index++] = float(myObjs[i].vectorLoad[j]);
+      }
+      for (int j = currentDim; j < dimension; j++)
+      {
+        msg->oloads[index++] = 0;
       }
       if (posDimension > 0)
       {
