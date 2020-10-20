@@ -336,7 +336,8 @@ namespace Builder {
     Type* ret;
     char *name;
     Value* stackSize;
-    int eattrib;
+    // int eattrib;
+    xi::Attribute* attribs;
     SDAG::Construct* sdag;
 
     void addSDAG(SDAG::Construct* sdag_) {
@@ -347,12 +348,13 @@ namespace Builder {
       : ret(ret_)
       , name(name_)
       , stackSize(stackSize_)
-      , eattrib(0)
+      , attribs(NULL)
       , sdag(sdag_)
     { }
 
     void addAttribute(BUILDER_ENTRY_ATTRIBUTES attribute) {
-      eattrib |= attribute;
+      attribs = new xi::Attribute(attribute, NULL, attribs);
+      // eattrib |= attribute;
     }
 
     xi::Entry* generateAst() {
@@ -361,7 +363,7 @@ namespace Builder {
       if (sdag) scons = new xi::SdagEntryConstruct(sdag->generateAst());
       xi::ParamList* pl = EntryType::generateAst();
       xi::Entry* entry = new xi::Entry(lineno,
-                                       eattrib,
+                                       attribs,
                                        ret ? ret->generateAst() : NULL,
                                        name,
                                        pl,
