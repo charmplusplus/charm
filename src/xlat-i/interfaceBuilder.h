@@ -336,7 +336,6 @@ namespace Builder {
     Type* ret;
     char *name;
     Value* stackSize;
-    // int eattrib;
     xi::Attribute* attribs;
     SDAG::Construct* sdag;
 
@@ -354,7 +353,6 @@ namespace Builder {
 
     void addAttribute(BUILDER_ENTRY_ATTRIBUTES attribute) {
       attribs = new xi::Attribute(attribute, NULL, attribs);
-      // eattrib |= attribute;
     }
 
     xi::Entry* generateAst() {
