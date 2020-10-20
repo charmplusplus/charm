@@ -54,6 +54,12 @@
 #include "hapi.h"
 #include "gpumanager.h"
 
+#define TIMING_BREAKDOWN 0
+#if TIMING_BREAKDOWN
+#define N_TIMER 16
+#define N_COUNT 1000
+#endif
+
 CsvExtern(GPUManager, gpu_manager);
 
 /****************************** Direct (Persistent) API ******************************/
@@ -145,6 +151,14 @@ CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
 
 // Invoked after post entry method
 bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
+#if TIMING_BREAKDOWN
+  static thread_local double total_times[N_TIMER] = {0};
+  static thread_local int count = 0;
+  count++;
+
+  double start_time = CkWallTimer();
+#endif
+
   // Determine if the subsequent regular entry method should be invoked
   // inline (intra-node) or not (inter-node)
   bool is_inline = true;
@@ -163,6 +177,10 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   CkAssert(numops == received_numops);
 
   CkDeviceBuffer source;
+
+#if TIMING_BREAKDOWN
+  total_times[1] += CkWallTimer() - start_time;
+#endif
 
   for (int i = 0; i < numops; i++) {
     // Unpack source buffer (from sender)
@@ -192,20 +210,39 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       cuda_ipc_device_info& device_info =
         csv_gpu_manager.cuda_ipc_device_infos[source.device_idx];
 
+#if TIMING_BREAKDOWN
+      start_time = CkWallTimer();
+#endif
+
       // 1. Make user-provided stream wait for IPC event using cudaStreamWaitEvent
       //    (source buffer to device comm buffer on source)
       hapiCheck(cudaStreamWaitEvent(postStructs[i].cuda_stream,
             device_info.src_event_pool[source.event_idx], 0));
+
+#if TIMING_BREAKDOWN
+      total_times[2] += CkWallTimer() - start_time;
+      start_time = CkWallTimer();
+#endif
 
       // 2. Invoke cudaMemcpyAsync (from source device comm buffer to destination buffer)
       hapiCheck(cudaMemcpyAsync((void*)dest.ptr,
             (void*)((char*)device_info.buffer + source.comm_offset),
             dest.cnt, cudaMemcpyDeviceToDevice, postStructs[i].cuda_stream));
 
+#if TIMING_BREAKDOWN
+      total_times[3] += CkWallTimer() - start_time;
+      start_time = CkWallTimer();
+#endif
+
       // 3. Record IPC event so that the sender can query it for freeing
       //    device comm buffer and corresponding pair of CUDA IPC events
       hapiCheck(cudaEventRecord(device_info.dst_event_pool[source.event_idx],
             postStructs[i].cuda_stream));
+
+#if TIMING_BREAKDOWN
+      total_times[4] += CkWallTimer() - start_time;
+      start_time = CkWallTimer();
+#endif
 
       // 4. Set flag in shared memory so that the sender can start querying
       //    completion of the IPC event
@@ -216,6 +253,10 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       pthread_mutex_lock(&shm_event_shared->lock);
       shm_event_shared->dst_flag = true;
       pthread_mutex_unlock(&shm_event_shared->lock);
+
+#if TIMING_BREAKDOWN
+      total_times[5] += CkWallTimer() - start_time;
+#endif
     } else {
       // Transfer the received/unpacked data on host to the destination device buffer
       // TODO: Use GPUDirect RDMA for inter-node
@@ -224,9 +265,35 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
             cudaMemcpyHostToDevice, postStructs[i].cuda_stream));
     }
 
+#if TIMING_BREAKDOWN
+    start_time = CkWallTimer();
+#endif
+
     // Add source callback for polling, so that it can be invoked once the transfer is complete
     hapiAddCallback(postStructs[i].cuda_stream, source.cb);
+
+#if TIMING_BREAKDOWN
+    total_times[6] += CkWallTimer() - start_time;
+#endif
   }
+
+#if TIMING_BREAKDOWN
+  double avg_times[N_TIMER] = {0};
+  avg_times[1] = total_times[1] / count * 1e6;
+  avg_times[2] = total_times[2] / (count * numops) * 1e6;
+  avg_times[3] = total_times[3] / (count * numops) * 1e6;
+  avg_times[4] = total_times[4] / (count * numops) * 1e6;
+  avg_times[5] = total_times[5] / (count * numops) * 1e6;
+  avg_times[6] = total_times[6] / (count * numops) * 1e6;
+  for (int i = 1; i < N_TIMER; i++) {
+    avg_times[0] += avg_times[i];
+  }
+
+  if (count == N_COUNT) {
+    CkPrintf("[PE %d] CkRdmaDeviceIssueRgets: %.3lf us (1: %.3lf, 2: %.3lf, 3: %.3lf, 4: %.3lf, 5: %.3lf, 6: %.3lf)\n",
+        CkMyPe(), avg_times[0], avg_times[1], avg_times[2], avg_times[3], avg_times[4], avg_times[5], avg_times[6]);
+  }
+#endif
 
   return is_inline;
 }
@@ -321,6 +388,14 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
 
 // Performs sender-side operations necessary for device zerocopy
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
+#if TIMING_BREAKDOWN
+  static thread_local double total_times[N_TIMER] = {0};
+  static thread_local int count = 0;
+  count++;
+
+  double start_time = CkWallTimer();
+#endif
+
   // TODO: Need to handle the case where the destination PE could be wrong
   //       (due to migration, etc.). Currently the code relies on a global
   //       location update after migration (with CMK_GLOBAL_LOCATION_UPDATE).
@@ -334,6 +409,10 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     buffers[i]->dest_pe = dest_pe;
   }
 
+#if TIMING_BREAKDOWN
+  total_times[1] += CkWallTimer() - start_time;
+#endif
+
   if (transfer_mode == CkNcpyModeDevice::MEMCPY) {
     // Don't need to do anything for intra-process
     return;
@@ -343,6 +422,10 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 
     for (int i = 0; i < numops; i++) {
+#if TIMING_BREAKDOWN
+      start_time = CkWallTimer();
+#endif
+
 #if CMK_SMP
       CmiLock(dm->lock);
 #endif
@@ -365,13 +448,28 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       CmiUnlock(dm->lock);
 #endif
 
+#if TIMING_BREAKDOWN
+      total_times[2] += CkWallTimer() - start_time;
+      start_time = CkWallTimer();
+#endif
+
       // Initiate transfer from source buffer to device comm buffer
       hapiCheck(cudaMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
             cudaMemcpyDeviceToDevice, buffers[i]->cuda_stream));
 
+#if TIMING_BREAKDOWN
+      total_times[3] += CkWallTimer() - start_time;
+      start_time = CkWallTimer();
+#endif
+
       // Record event
       cuda_ipc_device_info& my_device_info = csv_gpu_manager.cuda_ipc_device_infos[dm->global_index];
       hapiCheck(cudaEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->cuda_stream));
+
+#if TIMING_BREAKDOWN
+      total_times[4] += CkWallTimer() - start_time;
+      start_time = CkWallTimer();
+#endif
     }
   } else {
     // Use a naive host-staged mechanism
@@ -389,6 +487,22 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       hapiCheck(cudaStreamSynchronize(buffers[i]->cuda_stream));
     }
   }
+
+#if TIMING_BREAKDOWN
+  double avg_times[N_TIMER] = {0};
+  avg_times[1] = total_times[1] / count * 1e6;
+  avg_times[2] = total_times[2] / (count * numops) * 1e6;
+  avg_times[3] = total_times[3] / (count * numops) * 1e6;
+  avg_times[4] = total_times[4] / (count * numops) * 1e6;
+  for (int i = 1; i < N_TIMER; i++) {
+    avg_times[0] += avg_times[i];
+  }
+
+  if (count == N_COUNT) {
+    CkPrintf("[PE %d] CkRdmaDeviceOnSender: %.3lf us (1: %.3lf, 2: %.3lf, 3: %.3lf, 4: %.3lf)\n",
+        CkMyPe(), avg_times[0], avg_times[1], avg_times[2], avg_times[3], avg_times[4]);
+  }
+#endif
 }
 
 #endif // CMK_CUDA
