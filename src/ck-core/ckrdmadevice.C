@@ -58,6 +58,23 @@ CsvExtern(GPUManager, gpu_manager);
 
 /****************************** Direct (Persistent) API ******************************/
 
+void CkDevicePersistent::init() {
+  pe = CkMyPe();
+
+  // Create a CUDA IPC handle for inter-process communication
+  hapiCheck(cudaIpcGetMemHandle(&cuda_ipc_handle, (void*)ptr));
+  ipc_ptr = nullptr;
+  ipc_open = false;
+}
+
+void CkDevicePersistent::pup(PUP::er& p) {
+  p((char*)&ptr, sizeof(ptr));
+  p|cnt;
+  p|pe;
+  p|cb;
+  p((char*)&cuda_ipc_handle, sizeof(cuda_ipc_handle));
+}
+
 CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
   // Check that the source buffer fits into the destination buffer
   if (cnt < src.cnt) {
@@ -71,7 +88,8 @@ CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
     cudaMemcpyAsync((void*)ptr, src.ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
   } else if (mode == CkNcpyModeDevice::IPC) {
     if (!ipc_open) {
-      cudaIpcOpenMemHandle(&src.ipc_ptr, src.cuda_ipc_handle, cudaIpcMemLazyEnablePeerAccess);
+      hapiCheck(cudaIpcOpenMemHandle(&src.ipc_ptr, src.cuda_ipc_handle,
+            cudaIpcMemLazyEnablePeerAccess));
       ipc_open = true;
     }
     cudaMemcpyAsync((void*)ptr, src.ipc_ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
@@ -103,7 +121,8 @@ CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
     cudaMemcpyAsync((void*)dst.ptr, ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
   } else if (mode == CkNcpyModeDevice::IPC) {
     if (!ipc_open) {
-      cudaIpcOpenMemHandle(&dst.ipc_ptr, dst.cuda_ipc_handle, cudaIpcMemLazyEnablePeerAccess);
+      hapiCheck(cudaIpcOpenMemHandle(&dst.ipc_ptr, dst.cuda_ipc_handle,
+            cudaIpcMemLazyEnablePeerAccess));
       ipc_open = true;
     }
     cudaMemcpyAsync(dst.ipc_ptr, ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);

@@ -13,9 +13,9 @@
 struct CkDevicePersistent {
   const void* ptr;
   size_t cnt;
-  int pe;
   CkCallback cb;
   cudaStream_t cuda_stream;
+  int pe;
   cudaIpcMemHandle_t cuda_ipc_handle;
   void* ipc_ptr;
   bool ipc_open;
@@ -25,17 +25,17 @@ struct CkDevicePersistent {
   ~CkDevicePersistent() {}
 
   explicit CkDevicePersistent(const void* ptr_, size_t cnt_)
-    : ptr(ptr_), cnt(cnt_), pe(CkMyPe()), cb(CkCallback(CkCallback::ignore)) {
+    : ptr(ptr_), cnt(cnt_), cb(CkCallback(CkCallback::ignore)) {
     init();
   }
 
   explicit CkDevicePersistent(const void* ptr_, size_t cnt_, const CkCallback& cb_)
-    : ptr(ptr_), cnt(cnt_), pe(CkMyPe()), cb(cb_) {
+    : ptr(ptr_), cnt(cnt_), cb(cb_) {
     init();
   }
 
   explicit CkDevicePersistent(const void* ptr_, size_t cnt_, cudaStream_t cuda_stream_)
-    : ptr(ptr_), cnt(cnt_), pe(CkMyPe()), cb(CkCallback(CkCallback::ignore)),
+    : ptr(ptr_), cnt(cnt_), cb(CkCallback(CkCallback::ignore)),
       cuda_stream(cuda_stream_) {
     init();
   }
@@ -46,20 +46,8 @@ struct CkDevicePersistent {
     init();
   }
 
-  void init() {
-    // Create a CUDA IPC handle for inter-process communication
-    cudaIpcGetMemHandle(&cuda_ipc_handle, (void*)ptr);
-    ipc_ptr = nullptr;
-    ipc_open = false;
-  }
-
-  void pup(PUP::er& p) {
-    p((char*)&ptr, sizeof(ptr));
-    p|cnt;
-    p|pe;
-    p|cb;
-    p((char*)&cuda_ipc_handle, sizeof(cuda_ipc_handle));
-  }
+  void init();
+  void pup(PUP::er& p);
 
   CkDeviceStatus get(CkDevicePersistent& src);
   CkDeviceStatus put(CkDevicePersistent& dst);
