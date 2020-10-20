@@ -129,6 +129,7 @@ public:
     }
     CkPrintf("PASS\n");
 
+    /*
     CkPrintf("Testing chare group...\n");
     group_proxy.initSend();
     CkWaitQD();
@@ -142,7 +143,6 @@ public:
     }
     CkPrintf("PASS\n");
 
-    /*
     if (test_nodegroup) {
       CkPrintf("Testing chare nodegroup...\n");
       for (int i = 0; i < n_iters; i++) {
