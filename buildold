@@ -762,7 +762,7 @@ EOF
     $DESTINATION/tmp/system_ln $DESTINATION/$newdir $newdir
   done
   rm -f charm-version.h
-  $DESTINATION/tmp/system_ln $DESTINATION/include/charm-api-version.h charm-api-version.h
+  $DESTINATION/tmp/system_ln $DESTINATION/include/charm-version.h charm-version.h
 fi
 
 Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"

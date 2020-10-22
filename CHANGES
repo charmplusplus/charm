@@ -43,9 +43,10 @@ Misc:
 Charm++ Features & Fixes:
 
 - We have removed the `VERSION` file. Charm++ programs that need to check the
-  Charm++ version should now use the `CHARM_API_VERSION`, `CHARM_API_VERSION_MAJOR`,
-  `CHARM_API_VERSION_MINOR`, and `CHARM_API_VERSION_PATCH` values defined when compiling
-  any Charm++ application.
+  Charm++ version should now use the `CHARM_VERSION`, `CHARM_VERSION_MAJOR`,
+  `CHARM_VERSION_MINOR`, and `CHARM_VERSION_PATCH` C macros defined when compiling
+  a Charm++ application. We also provide a `CHARM_VERSION_GIT` macro for the exact
+  git revision of Charm++.
 
 - Support for variable sized messages in TRAM.
 

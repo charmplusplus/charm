@@ -9,26 +9,26 @@
 VOLD=""
 if test -r charm-version.h
 then
-    VOLD=$(grep CHARM_VERSION charm-version.h | awk '{print $3}')
+    VOLD=$(grep CHARM_VERSION_GIT charm-version-git.h | awk '{print $3}')
 fi
 
 
-echo -n "#define CHARM_VERSION \"" > charm-version.h.new
+echo -n "#define CHARM_VERSION_GIT \"" > charm-version-git.h.new
 
 # Potentially set by the higher-level package-tarball.sh script
 if [ "$RELEASE" = "1" ]
 then
     echo Release mode
-    echo "$(cd "$SRCBASE" && git describe --exact-match)\"" >> charm-version.h.new || exit 1
+    echo "$(cd "$SRCBASE" && git describe --exact-match)\"" >> charm-version-git.h.new || exit 1
 else
     echo Dev mode
-    echo "$(cd "$SRCBASE" && git describe --long --always)\"" >> charm-version.h.new || touch charm-version.h.new
+    echo "$(cd "$SRCBASE" && git describe --long --always)\"" >> charm-version-git.h.new || touch charm-version-git.h.new
 fi
 
-VNEW=$(grep CHARM_VERSION charm-version.h.new | awk '{print $3}')
+VNEW=$(grep CHARM_VERSION_GIT charm-version-git.h.new | awk '{print $3}')
 
 if test -n "$VNEW" -a "$VOLD" != "$VNEW"
 then
-    cp charm-version.h.new charm-version.h
-    echo Copying charm-version.h.new = "$VNEW" over charm-version.h = "$VOLD"
+    cp charm-version-git.h.new charm-version-git.h
+    echo Copying charm-version-git.h.new = "$VNEW" over charm-version-git.h = "$VOLD"
 fi

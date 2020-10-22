@@ -42,9 +42,19 @@ CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
-# Need /bin/echo since not all /bin/sh echo builtins support -n
-/bin/echo -n "#define CHARM_API_VERSION " > ../include/charm-api-version.h
-echo AC_PACKAGE_VERSION >> ../include/charm-api-version.h
+CHARM_VERSION_API=AC_PACKAGE_VERSION
+CHARM_VERSION_MAJOR=`echo $CHARM_VERSION_API | cut -c1`
+CHARM_VERSION_MINOR=`echo $CHARM_VERSION_API | cut -c2-3`
+CHARM_VERSION_PATCH=`echo $CHARM_VERSION_API | cut -c4-5`
+
+if test "$CHARM_VERSION_PATCH" -lt 10 ; then
+  CHARM_VERSION_PATCH_PREFIX="0"
+fi
+
+echo "#define CHARM_VERSION_MAJOR $CHARM_VERSION_MAJOR" > ../include/charm-version.h
+echo "#define CHARM_VERSION_MINOR $CHARM_VERSION_MINOR" >> ../include/charm-version.h
+echo "#define CHARM_VERSION_PATCH $CHARM_VERSION_PATCH" >> ../include/charm-version.h
+
 AC_DEFINE_UNQUOTED([CHARM_VERSION], AC_PACKAGE_VERSION, [Charm++ Release/API version number])
 
 charmout="charmconfig.out"
@@ -52,7 +62,7 @@ charmout="charmconfig.out"
 MAKEFILE_EXT=Make.extlib
 
 Echo() {
-	echo $* 
+	echo $*
 	echo $* >> $charmout
 }
 
