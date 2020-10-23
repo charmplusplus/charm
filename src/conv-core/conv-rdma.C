@@ -20,9 +20,13 @@ int CmiGetRdmaCommonInfoSize() {
 }
 
 void CmiSetNcpyAckSize(int ackSize) {}
+
+void CmiForwardNodeBcastMsg(int size, char *msg) {}
+
+void CmiForwardProcBcastMsg(int size, char *msg) {}
+
 #endif
 
-#if !CMK_ONESIDED_IMPL
 /****************************** Zerocopy Direct API For non-RDMA layers *****************************/
 /* Support for generic implementation */
 
@@ -70,11 +74,8 @@ static void putDataHandler(ConverseRdmaMsg *payloadMsg) {
   CmiFree(payloadMsg);
 }
 
-void CmiSetDirectNcpyAckHandler(RdmaAckCallerFn fn) {
-  ncpyDirectAckHandlerFn = fn;
-}
 
-void CmiIssueRget(NcpyOperationInfo *ncpyOpInfo) {
+void CmiIssueRgetCopyBased(NcpyOperationInfo *ncpyOpInfo) {
 
   int ncpyOpInfoSize = ncpyOpInfo->ncpyOpInfoSize;
 
@@ -90,10 +91,11 @@ void CmiIssueRget(NcpyOperationInfo *ncpyOpInfo) {
   CmiSyncSendAndFree(ncpyOpInfo->srcPe, sizeof(ConverseRdmaMsg) + ncpyOpInfoSize, getReqMsg);
 
   // free original ncpyOpinfo
-  CmiFree(ncpyOpInfo);
+  if(ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO)
+    CmiFree(ncpyOpInfo);
 }
 
-void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
+void CmiIssueRputCopyBased(NcpyOperationInfo *ncpyOpInfo) {
 
   int ncpyOpInfoSize = ncpyOpInfo->ncpyOpInfoSize;
   int size = ncpyOpInfo->srcSize;
@@ -123,19 +125,12 @@ void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
                      payloadMsg);
 }
 
-void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode) {}
-
-void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode) {}
-
-#endif
 
 // Rget/Rput operations are implemented as normal converse messages
 // This method is invoked during converse initialization to initialize these message handlers
 void CmiOnesidedDirectInit(void) {
-#if !CMK_ONESIDED_IMPL
   get_request_handler_idx = CmiRegisterHandler((CmiHandler)getRequestHandler);
   put_data_handler_idx = CmiRegisterHandler((CmiHandler)putDataHandler);
-#endif
   zc_pup_handler_idx = CmiRegisterHandler((CmiHandler)zcPupHandler);
 }
 
@@ -347,3 +342,62 @@ void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest) {
   }
 }
 
+/* Support for Nocopy Direct API */
+void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
+void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo);
+
+void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo);
+
+void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
+
+#if CMK_REG_REQUIRED
+void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo);
+#endif
+
+
+/* Perform an RDMA Get operation into the local destination address from the remote source address*/
+void CmiIssueRget(NcpyOperationInfo *ncpyOpInfo) {
+#if CMK_USE_LRTS && CMK_ONESIDED_IMPL
+  // Use network RDMA for a PE on a remote host
+  LrtsIssueRget(ncpyOpInfo);
+#else
+  CmiIssueRgetCopyBased(ncpyOpInfo);
+#endif
+}
+
+/* Perform an RDMA Put operation into the remote destination address from the local source address */
+void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
+#if CMK_USE_LRTS && CMK_ONESIDED_IMPL
+  // Use network RDMA for a PE on a remote host
+  LrtsIssueRput(ncpyOpInfo);
+#else
+  CmiIssueRputCopyBased(ncpyOpInfo);
+#endif
+}
+
+/* De-register registered memory for pointer */
+void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
+#if CMK_USE_LRTS && CMK_ONESIDED_IMPL
+  LrtsDeregisterMem(ptr, info, pe, mode);
+#endif
+}
+
+#if CMK_REG_REQUIRED
+void CmiInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
+#if CMK_USE_LRTS && CMK_ONESIDED_IMPL
+  LrtsInvokeRemoteDeregAckHandler(pe, ncpyOpInfo);
+#endif
+}
+#endif
+
+/* Set the machine specific information for a nocopy pointer */
+void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode){
+#if CMK_USE_LRTS && CMK_ONESIDED_IMPL
+  LrtsSetRdmaBufferInfo(info, ptr, size, mode);
+#endif
+}
+
+/* Set the ack handler function used in the Direct API */
+void CmiSetDirectNcpyAckHandler(RdmaAckCallerFn fn){
+  ncpyDirectAckHandlerFn = fn;
+}

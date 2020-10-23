@@ -69,10 +69,9 @@ void CmiIssueRputUsingCMA(
 }
 #endif
 
-#if CMK_ONESIDED_IMPL
 
 // Function Pointer to the acknowledement handler function for the Direct API
-RdmaAckHandlerFn ncpyDirectAckHandlerFn;
+extern RdmaAckHandlerFn ncpyDirectAckHandlerFn;
 
 typedef struct _cmi_rdma_direct_ack {
   const void *srcAddr;
@@ -82,55 +81,8 @@ typedef struct _cmi_rdma_direct_ack {
   int ackSize;
 } CmiRdmaDirectAck;
 
-/* Support for Nocopy Direct API */
-void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
-void LrtsSetRdmaNcpyAck(RdmaAckHandlerFn fn);
-void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo);
-
-void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo);
-
-void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
-
-#if CMK_REG_REQUIRED
-void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo);
-#endif
-
-/* Set the machine specific information for a nocopy pointer */
-void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode){
-  LrtsSetRdmaBufferInfo(info, ptr, size, mode);
-}
-
 void CmiInvokeNcpyAck(void *ack) {
   ncpyDirectAckHandlerFn(ack);
 }
 
-/* Set the ack handler function used in the Direct API */
-void CmiSetDirectNcpyAckHandler(RdmaAckHandlerFn fn){
-  ncpyDirectAckHandlerFn = fn;
-}
-
-/* Perform an RDMA Get operation into the local destination address from the remote source address*/
-void CmiIssueRget(NcpyOperationInfo *ncpyOpInfo) {
-  // Use network RDMA for a PE on a remote host
-  LrtsIssueRget(ncpyOpInfo);
-}
-
-/* Perform an RDMA Put operation into the remote destination address from the local source address */
-void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
-  // Use network RDMA for a PE on a remote host
-  LrtsIssueRput(ncpyOpInfo);
-}
-
-/* De-register registered memory for pointer */
-void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
-  LrtsDeregisterMem(ptr, info, pe, mode);
-}
-
-#if CMK_REG_REQUIRED
-void CmiInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
-  LrtsInvokeRemoteDeregAckHandler(pe, ncpyOpInfo);
-}
-#endif
-
-#endif /*End of CMK_ONESIDED_IMPL */
 #endif

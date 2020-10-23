@@ -55,13 +55,11 @@ extern int Cmi_myoldpe;
 extern char *_shrinkexpand_basedir;
 #endif
 
-#if CMK_ONESIDED_IMPL
 // Required for broadcasting RO Data after recovering from failure
 #if CMK_SMP
 extern std::atomic<UInt> numZerocopyROops;
 #else
 extern UInt  numZerocopyROops; 
-#endif
 #endif
 
 #ifndef CMK_CHARE_USE_PTR
