@@ -1,6 +1,6 @@
 # This file was modified for Charm++:
 # - renamed target from "metis" to "ckmetis".
-# - add GKlib_sources to ckmetis
+# - add "file(GLOB GKlib_sources ...)"
 
 # Add this directory for internal users.
 include_directories(.)
