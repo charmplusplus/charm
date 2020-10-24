@@ -3173,11 +3173,6 @@ void CmiMulticastInit(void)
 extern void CmiMulticastInit(void);
 #endif
 
-#if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
-extern void *arena_malloc(int size);
-extern void arena_free(void *blockPtr);
-#endif
-
 /***************************************************************************
  *
  * Memory Allocation routines 
@@ -3206,9 +3201,7 @@ void *CmiAlloc(int size)
 
   char *res;
 
-#if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
-  res = (char*) arena_malloc(size+sizeof(CmiChunkHeader));
-#elif CMK_USE_IBVERBS | CMK_USE_IBUD
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
   res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CMK_CONVERSE_UGNI || CMK_OFI
   res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
@@ -3336,9 +3329,7 @@ void CmiFree(void *blk)
     CpvAccess(BlocksAllocated)--;
 #endif
 
-#if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
-    arena_free(BLKSTART(parentBlk));
-#elif CMK_USE_IBVERBS | CMK_USE_IBUD
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
     /* is this message the head of a MultipleSend that we received?
        Then the parts with INFIMULTIPOOL have metadata which must be 
        unregistered and freed.  */
