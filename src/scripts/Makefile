@@ -36,6 +36,12 @@ CXX=$(CHARMC)
 CFLAGS=-I.
 CXXFLAGS=-I.
 
+ifeq (false,$(CMK_NO_BUILD_SHARED))
+  HWLOC_SHARED := yes
+else
+  HWLOC_SHARED := no
+endif
+
 all: charm++ LIBS AMPI TSM SM PVM everylb
 
 
@@ -256,7 +262,7 @@ headers: dirs+sources
 	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
-configure: Makefile.am configure.ac
+configure: configure.ac
 	autoreconf
 
 conv-autoconfig.h.in: configure.ac
@@ -489,6 +495,27 @@ cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/confi
 $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
 
 hwloc-target:  conv-autoconfig.h
+	@( cd hwloc && \
+    ./configure \
+    --disable-cairo \
+    --disable-cuda \
+    --disable-gl \
+    --disable-libxml2 \
+    --disable-nvml \
+    --disable-opencl \
+    --disable-pci \
+    --disable-libudev \
+    --disable-visibility \
+    --enable-embedded-mode \
+    --enable-shared=$(HWLOC_SHARED) \
+    --enable-static \
+    --with-hwloc-symbol-prefix=cmi_ \
+    --without-x \
+    HWLOC_FLAGS="$(HWLOC_CC_FLAGS)" \
+    CFLAGS="$(HWLOC_CC_FLAGS)" \
+    CC="$(HWLOC_CC)" \
+    CC_FOR_BUILD="$(HWLOC_CC)" \
+    > /dev/null )
 	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	( test -e hwloc/hwloc/.libs/libhwloc_embedded.lib && cp -f hwloc/hwloc/.libs/libhwloc_embedded.lib hwloc/hwloc/.libs/libhwloc_embedded.a ) || true
 	( cp -f hwloc/hwloc/.libs/libhwloc_embedded.a $(L) )
