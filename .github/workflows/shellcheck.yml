@@ -24,5 +24,6 @@ jobs:
           src/scripts/commitid.sh \
           src/scripts/testrun \
           src/arch/uth/charmrun \
+          src/arch/sim/charmrun \
           src/arch/multicore/charmrun \
           src/arch/mpi-win-x86_64/charmrun \
