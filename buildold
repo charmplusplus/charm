@@ -32,8 +32,8 @@ syntax() {
   echo '  everylb         compile EveryLB suite of load balancing strategies'
   echo ''
   fi
-  echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
+  echo '<versions>: '
+  ( cd $src ; ls -1 | egrep -v '(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
@@ -912,6 +912,7 @@ echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
 echo "SRCBASE=$srcbase" > $DESTINATION/tmp/charmpath.mk
 
 echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > "$DESTINATION/tmp/config_opts.sh"
+echo "OPTS=\"$OPTS\"" >> "$DESTINATION/tmp/config_opts.sh"
 chmod +x "$DESTINATION/tmp/config_opts.sh"
 echo "OPTSATBUILDTIME:=$OPTS" >> $ConvMak
 
