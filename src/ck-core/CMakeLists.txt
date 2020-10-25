@@ -43,6 +43,7 @@ set(ldb-cxx-sources
     ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C
     ../ck-ldb/EveryLB.C
     ../ck-ldb/LButil.C
+    ../ck-ldb/RecBipartLB.C
     ../ck-ldb/Refiner.C ../ck-ldb/RefinerTemp.C
     ../ck-ldb/TempAwareRefineLB.C
     ../ck-ldb/ckgraph.C ../ck-ldb/ckheap.C
@@ -57,6 +58,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
     ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h
     ../ck-ldb/RandomForestModel.h
+    ../ck-ldb/RecBipartLB.h
     ../ck-ldb/Refiner.h
     ../ck-ldb/RefinerTemp.h
     ../ck-ldb/ScotchLB.h ../ck-ldb/ScotchRefineLB.h
