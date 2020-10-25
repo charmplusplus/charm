@@ -42,10 +42,10 @@ libraries written in Charm for other languages.
 #endif
 
 
-/**
+/** 
  * Define a new Fortran-callable API routine, returning void,
- * that does nothing but map its arguments onto some
- * (presumably analogous) C routine.
+ * that does nothing but map its arguments onto some 
+ * (presumably analogous) C routine. 
  *
  *  @param CAPITALNAME Fortran routine name to define, in all capital letters.
  *  @param Cname C routine to call, in normal case.
@@ -59,7 +59,7 @@ FTN_NAME(CAPITALNAME,lowername) routine_args { \
 	Cname c_args;\
 }
 
-/**
+/** 
  * Like FORTRAN_AS_C, but with a return type as the first parameter.
  */
 #define FORTRAN_AS_C_RETURN(returnType, CAPITALNAME,Cname,lowername, routine_args,c_args) \
@@ -78,4 +78,3 @@ FTN_NAME(CAPITALNAME,lowername) routine_args { \
 #endif
 
 #endif /*Def(thisHeader) */
-

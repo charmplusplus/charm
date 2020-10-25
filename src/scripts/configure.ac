@@ -61,7 +61,7 @@ charmout="charmconfig.out"
 MAKEFILE_EXT=Make.extlib
 
 Echo() {
-	echo $*
+	echo $* 
 	echo $* >> $charmout
 }
 
