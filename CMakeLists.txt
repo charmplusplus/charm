@@ -1107,7 +1107,8 @@ add_custom_target(create_symlinks ALL
 # Create the .vdir/.gdir/charm-version.h/charm-version-git.h files
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
 file(WRITE ${CMAKE_BINARY_DIR}/include/.vdir   "${CMK_VDIR}\n")
-file(WRITE ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION_MAJOR ${PROJECT_VERSION_MAJOR}\n")
+file(WRITE ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION ${CHARM_VERSION}\n")
+file(APPEND ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION_MAJOR ${PROJECT_VERSION_MAJOR}\n")
 file(APPEND ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION_MINOR ${PROJECT_VERSION_MINOR}\n")
 file(APPEND ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION_PATCH ${PROJECT_VERSION_PATCH}\n")
 

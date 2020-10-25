@@ -42,20 +42,19 @@ CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
-CHARM_VERSION_API=AC_PACKAGE_VERSION
-CHARM_VERSION_MAJOR=`echo $CHARM_VERSION_API | cut -c1`
-CHARM_VERSION_MINOR=`echo $CHARM_VERSION_API | cut -c2-3`
-CHARM_VERSION_PATCH=`echo $CHARM_VERSION_API | cut -c4-5`
+CHARM_VERSION=AC_PACKAGE_VERSION
+CHARM_VERSION_MAJOR=`echo $CHARM_VERSION | cut -c1`
+CHARM_VERSION_MINOR=`echo $CHARM_VERSION | cut -c2-3`
+CHARM_VERSION_PATCH=`echo $CHARM_VERSION | cut -c4-5`
 
 if test "$CHARM_VERSION_PATCH" -lt 10 ; then
-  CHARM_VERSION_PATCH_PREFIX="0"
+  CHARM_VERSION_PATCH=${CHARM_VERSION_PATCH#0} # remove leading '0'
 fi
 
-echo "#define CHARM_VERSION_MAJOR $CHARM_VERSION_MAJOR" > ../include/charm-version.h
+echo "#define CHARM_VERSION $CHARM_VERSION" > ../include/charm-version.h
+echo "#define CHARM_VERSION_MAJOR $CHARM_VERSION_MAJOR" >> ../include/charm-version.h
 echo "#define CHARM_VERSION_MINOR $CHARM_VERSION_MINOR" >> ../include/charm-version.h
 echo "#define CHARM_VERSION_PATCH $CHARM_VERSION_PATCH" >> ../include/charm-version.h
-
-AC_DEFINE_UNQUOTED([CHARM_VERSION], AC_PACKAGE_VERSION, [Charm++ Release/API version number])
 
 charmout="charmconfig.out"
 /bin/rm -rf $charmout

@@ -7,6 +7,7 @@ libraries written in Charm for other languages.
 #define __CHARM_API_H
 
 #include "charm-version.h"
+#include "charm-version-git.h"
 
 #include "conv-config.h" /* for CMK_FORTRAN symbols */
 
