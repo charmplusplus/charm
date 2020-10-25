@@ -1437,7 +1437,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #define CmiSyncNodeSend(n,s,m)        CmiSyncSend(CmiNodeFirst(n),s,m)
 #define CmiAsyncNodeSend(n,s,m)       CmiAsyncSend(CmiNodeFirst(n),s,m)
 #define CmiSyncNodeSendAndFree(n,s,m) CmiSyncSendAndFree(CmiNodeFirst(n),s,m)
-#if CMK_UTH_VERSION || CMK_MULTICORE
+#if CMK_MULTICORE
 #define CmiSyncNodeBroadcast(s,m)           do { \
           int _i; \
           for(_i=0; _i<CmiNumNodes(); _i++) \
