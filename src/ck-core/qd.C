@@ -67,7 +67,7 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   state->propagate(msg);
   msg->setPhase(1);
   DEBUGP(("[%d] _bcastQD1: State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
-#if ! CMK_SHARED_VARS_UNIPROCESSOR && !CMK_MULTICORE
+#if !CMK_MULTICORE
 /*
   QdState *comm_state;
   static int comm_create=0, comm_process=0;
