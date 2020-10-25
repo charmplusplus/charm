@@ -484,54 +484,6 @@ void CmiMemcpy_qpx (void *dst, const void *src, size_t n);
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
 #endif
 
-#if CMK_SHARED_VARS_UNIPROCESSOR /*Used only by uth- and sim- versions*/
-
-extern int _Cmi_mype;
-extern int _Cmi_numpes;
-
-#define CmiMyPe()              _Cmi_mype
-#define CmiMyRank()            _Cmi_mype
-#define CmiNumPes()            _Cmi_numpes
-#define CmiMyNodeSize()        _Cmi_numpes
-#define CmiMyNode()            0
-#define CmiNumNodes()          1
-#define CmiNodeFirst(node)     0
-#define CmiNodeSize(node)      _Cmi_numpes
-#define CmiNodeOf(pe)          0
-#define CmiRankOf(pe)          (pe)
-
-#define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
-#define CpvExtern(t,v)  extern t* CMK_TAG(Cpv_,v)
-#ifdef __cplusplus
-#define CpvCExtern(t,v)  extern "C" t* CMK_TAG(Cpv_,v)
-#else
-#define CpvCExtern(t,v)    CpvExtern(t,v)
-#endif
-#define CpvStaticDeclare(t,v) static t* CMK_TAG(Cpv_,v)
-#define CpvInitialize(t,v)\
-  do  { if (CMK_TAG(Cpv_,v)==0)\
-        { CMK_TAG(Cpv_,v) = CpvInit_Alloc(t,CmiNumPes()); }}\
-  while(0)
-#define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
-#define CpvAccess(v) CMK_TAG(Cpv_,v)[CmiMyPe()]
-#define CpvAccessOther(v, r) CMK_TAG(Cpv_,v)[r]
-
-#define CmiMemLock() 0
-#define CmiMemUnlock() 0
-extern void CmiNodeBarrier(void);
-extern void CmiNodeAllBarrier(void);
-#define CmiSvAlloc CmiAlloc
-
-typedef int *CmiNodeLock;
-extern CmiNodeLock  CmiCreateLock(void);
-extern void         CmiLock(CmiNodeLock lock);
-extern void         CmiUnlock(CmiNodeLock lock);
-extern int          CmiTryLock(CmiNodeLock lock);
-extern void         CmiDestroyLock(CmiNodeLock lock);
-
-#define CmiInCommThread() (0)
-
-#endif
 
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
 

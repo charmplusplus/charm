@@ -33,7 +33,7 @@ syntax() {
   echo ''
   fi
   echo '<versions>: '
-  ( cd $src ; ls -1 | egrep -v '(^mpi$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^mpi$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'

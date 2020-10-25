@@ -3969,7 +3969,7 @@ extern "C" int _IO_file_overflow(FILE *, int);
     - Working Cpv's and CmiNodeBarrier.
     - CthInit to already have been called.  CthInit is called
       from the machine layer directly, because some machine layers
-      (like uth) use Converse threads internally.
+      use Converse threads internally.
 
   Initialization is somewhat subtle, in that various modules
   won't work properly until they're initialized.  For example,

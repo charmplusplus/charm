@@ -174,7 +174,7 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
 // check if counters became dirty and notify parents
 static inline void _handlePhase2(QdState *state, QdMsg *msg)
 {
-//  This assertion seems too strong for smp and uth version.
+//  This assertion seems too strong for smp version.
   DEBUGP(("[%d] _handlePhase2: stage: %d, msg phase: %d \n", CmiMyPe(), state->getStage(), msg->getPhase()));
   CkAssert(state->getStage()==2);
   state->subtreeSetDirty(msg->getDirty());
