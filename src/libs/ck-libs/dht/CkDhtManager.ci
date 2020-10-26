@@ -1,0 +1,10 @@
+module CkDhtManager {
+
+  template<typename CkDhtKey, typename CkDhtValue>
+  nodegroup CkDhtManager {
+    entry CkDhtManager();
+    entry void request(CkDhtKey key, ck::future<CkDhtValue> f);
+    entry void insert(CkDhtKey,CkDhtValue);
+    entry void remove(CkDhtKey);
+  };
+};

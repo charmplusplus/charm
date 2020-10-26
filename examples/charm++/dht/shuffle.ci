@@ -1,0 +1,12 @@
+mainmodule shuffle {
+  mainchare Main {
+    entry [nokeep] Main(CkArgMsg* m);
+  };
+
+  array [1D] Shuffler {
+    entry Shuffler(int n, const ck::dht<int, int>&);
+    entry [threaded] void shuffle(CkCallback);
+  };
+
+  array [1D] CkDhtManager<size_t, int>;
+};
