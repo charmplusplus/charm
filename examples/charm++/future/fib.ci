@@ -1,6 +1,6 @@
 mainmodule fib {
   mainchare Main {
-    entry Main(CkArgMsg* m);
+    entry [nokeep] Main(CkArgMsg* m);
     entry [threaded] void run(int);
   };
 

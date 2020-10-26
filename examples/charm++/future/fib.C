@@ -25,7 +25,6 @@ struct Fib : public CBase_Fib {
   void calc(int n) {
     if (n < THRESHOLD) {
       prev.set(seqFib(n));
-      delete this;
     } else {
       ck::future<int> f1, f2;
       CProxy_Fib::ckNew(n - 1, f1);
@@ -33,6 +32,7 @@ struct Fib : public CBase_Fib {
       prev.set(f1.get() + f2.get());
       f1.release(); f2.release();
     }
+    delete this;
   }
 
 private:
