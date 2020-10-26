@@ -157,8 +157,10 @@ void BQueue::push(Vertex* vert)
 RecBipartLB::RecBipartLB(const CkLBOptions& opt) : CBase_RecBipartLB(opt)
 {
   lbname = "RecBipartLB";
-  if (CkMyPe() == 0 && (quietModeRequested == 0)) { CkPrintf("CharmLB> RecBipartLB created.\n");
-}
+  if (CkMyPe() == 0 && (quietModeRequested == 0))
+  {
+    CkPrintf("CharmLB> RecBipartLB created.\n");
+  }
 }
 
 bool RecBipartLB::QueryBalanceNow(int _step) { return true; }
@@ -200,7 +202,6 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
   if (nump == 1)
   {
     parray->procs[peno].totalLoad() = 0.0;
-//    for (int i = 0; i < pvertices.size(); i++)
     for (Vertex* vertex : pvertices)
     {
       vertex->setNewPe(peno);
@@ -221,7 +222,7 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
   {
     level++;
     RecursiveBiPart(ogr, pvertices, 2 * parent - 1,
-                    numerator);  // nump =6 =>numerator =3, nump =7=>numertaor =3
+                    numerator);  // nump =6 =>numerator =3, nump =7=>numerator =3
     level--;
     return;
   }
@@ -241,9 +242,9 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
   int KLFMruns = (int)(pvertices.size() / 5);
 
   // initialize from the parent partition
-  for (auto & pvertice : pvertices)
+  for (auto& pvertex : pvertices)
   {
-    int id = pvertice->getVertexId();
+    const int id = pvertex->getVertexId();
     vhelpers[id]->setPartition(2 * parent);
     vhelpers[id]->setMarked(false);
     vhelpers[id]->setBoundaryline(false);
@@ -279,8 +280,10 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
     taken[v->getVertexId()] = true;
 
     // this case is useful if the last remaining vertex is way too large/heavy
-    if (count == pvertices.size() - 1) { break;
-}
+    if (count == pvertices.size() - 1)
+    {
+      break;
+    }
 
     // visit neighbors of a vertex
     while (true)
@@ -299,16 +302,19 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
         break;
       }
 
-      if (swap) {
+      if (swap)
+      {
         nbr = v->sendToList[ei].getNeighborId();
-      } else {
+      }
+      else
+      {
         nbr = v->recvFromList[ei].getNeighborId();
-}
+      }
 
       Vertex_helper* u = (vhelpers[nbr]);
       visitcount++;
 
-      // not all neighbos of v belong to the parent partition
+      // not all neighbors of v belong to the parent partition
       if ((!u->getMarked()) && (u->getPartition() == 2 * parent) &&
           (u->getLevel() == level))
       {
@@ -319,9 +325,9 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
     }    // end of while(1)loop
 
     // if you have visited enough vertices, stop Breadth First traversal
-    if (loadseen >=
-        (ratio * pload))  // if nump is even, ratio=1/2, if nump is odd say 7, ratio =
-                          // 3/7. 1st rec call will have nump =3 and second nump = 4
+    // if nump is even, ratio = 1/2, if nump is odd say 7, ratio =
+    // 3/7. 1st rec call will have nump = 3 and second nump = 4
+    if (loadseen >= (ratio * pload))
     {
       getout = true;
     }
@@ -348,8 +354,10 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
 
   for (Vertex* v : pvertices)
   {
-    if (!taken[v->getVertexId()]) { partition2.push_back(v);
-}
+    if (!taken[v->getVertexId()])
+    {
+      partition2.push_back(v);
+    }
   }
 
   int initialedgecut = 0;
@@ -358,7 +366,7 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
   // says BQueue
   BQueue* q1 = new BQueue(1);
   BQueue* q2 = new BQueue(2);
-  int tempsize = que2.size();
+  const int tempsize = que2.size();
 
   for (i = 0; i < tempsize; i++)
   {
@@ -501,9 +509,10 @@ void adjustqueues(ObjGraph* ogr, BQueue* que1, BQueue* que2, vector<Vertex*>& pa
       }
 
       if (vhelpers[wid]->getLevel() == level &&
-          vhelpers[wid]->getPartition() == (2 * parent - 1)) {
+          vhelpers[wid]->getPartition() == (2 * parent - 1))
+      {
         vhelpers[uid]->incEdgestopart1(edge->getNumBytes());
-}
+      }
     }
   }
   *initialedgecut = edgecut;
@@ -552,8 +561,10 @@ void RefineBoundary(ObjGraph* ogr, vector<Vertex*>& partition1,
                     double ratio)
 {
   const int r = std::min(runs, (int)std::min(que1->q.size(), que2->q.size()));
-  if (r == 0) { return;
-}
+  if (r == 0)
+  {
+    return;
+  }
 
   int newedgecut = initialedgecut;
 
@@ -563,7 +574,7 @@ void RefineBoundary(ObjGraph* ogr, vector<Vertex*>& partition1,
     {
       if (partition1.size() > 1 &&
           !que1->q.empty())  // because if part1 has only one vertex which is heavier
-                               // than the whole part2, swapping it wouldnt make sense
+                             // than the whole part2, swapping it wouldnt make sense
       {
         const double xfer = (ogr->vertices[que1->getVertextoswap()]).getVertexLoad();
         part1load -= xfer;
@@ -671,8 +682,7 @@ Vertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
         vhelpers[uid]->decEdgestopart1(edge->getNumBytes());
       }
       else if (vhelpers[uid]->getPartition() == (2 * parent - 1) &&
-               vhelpers[uid]->getLevel() == level &&
-               !vhelpers[uid]->getBoundaryline())
+               vhelpers[uid]->getLevel() == level && !vhelpers[uid]->getBoundaryline())
       // nbr u of v which was in part1, but not in boundaryline1, is now introduced to
       // boundaryline1
       {
@@ -705,15 +715,15 @@ Vertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
             edgenested = (Edge*)&(u->recvFromList[einested]);
           }
           if (vhelpers[wid]->getLevel() == level &&
-              vhelpers[wid]->getPartition() == (2 * parent - 1)) {
+              vhelpers[wid]->getPartition() == (2 * parent - 1))
+          {
             vhelpers[uid]->incEdgestopart1(edgenested->getNumBytes());
-}
+          }
         }
         q1->push(u);  // also sets boundaryline=true
       }
       if (vhelpers[uid]->getPartition() == 2 * parent &&
-          vhelpers[uid]->getLevel() == level &&
-          vhelpers[uid]->getBoundaryline() &&
+          vhelpers[uid]->getLevel() == level && vhelpers[uid]->getBoundaryline() &&
           vhelpers[uid]->getEdgestopart1() == 0)
       // vertex in part2, on boundaryline2, now not a part of boundaryline2
       {
@@ -729,8 +739,7 @@ Vertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
         vhelpers[uid]->decEdgestopart2(edge->getNumBytes());
       }
       else if (vhelpers[uid]->getPartition() == 2 * parent &&
-               vhelpers[uid]->getLevel() == level &&
-               !vhelpers[uid]->getBoundaryline())
+               vhelpers[uid]->getLevel() == level && !vhelpers[uid]->getBoundaryline())
       // vertex which was in part2, but not in boundaryline2, is now introduced to
       // boundaryline2
       {
@@ -764,16 +773,16 @@ Vertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
           }
 
           if (vhelpers[wid]->getLevel() == level &&
-              vhelpers[wid]->getPartition() == (2 * parent)) {
+              vhelpers[wid]->getPartition() == (2 * parent))
+          {
             vhelpers[uid]->incEdgestopart2(edgenested->getNumBytes());
-}
+          }
         }
 
         q1->push(u);  // q1 is boundaryline2
       }
       if (vhelpers[uid]->getPartition() == (2 * parent - 1) &&
-          vhelpers[uid]->getLevel() == level &&
-          vhelpers[uid]->getBoundaryline() &&
+          vhelpers[uid]->getLevel() == level && vhelpers[uid]->getBoundaryline() &&
           vhelpers[uid]->getEdgestopart2() == 0)
       // vertex in part1, on boundaryline1, now not a part of boundaryline1
       {
