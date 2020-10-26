@@ -5801,11 +5801,11 @@ by means of the following functions:
 
 .. code-block:: c++
 
-   CkFuture CkCreateFuture(void) -or- ck::future<T>()
-   void CkReleaseFuture(CkFuture fut) -or- void ck::future<T>::release()
-   int CkProbeFuture(CkFuture fut) -or- bool ck::future<T>::probe()
-   void *CkWaitFuture(CkFuture fut) -or- T ck::future<T>::get()
-   void CkSendToFuture(CkFuture fut, void *msg) -or- void ck::future<T>::set(T)
+   CkFuture CkCreateFuture(void); /* or */ ck::future<T>()
+   void CkReleaseFuture(CkFuture fut); /* or */ void ck::future<T>::release()
+   int CkProbeFuture(CkFuture fut); /* or */ bool ck::future<T>::probe()
+   void *CkWaitFuture(CkFuture fut); /* or */ T ck::future<T>::get()
+   void CkSendToFuture(CkFuture fut, void *msg); /* or */ void ck::future<T>::set(T)
 
 To illustrate the use of all these functions, a Fibonacci example in
 Charm++ using futures in presented below:
@@ -5859,7 +5859,7 @@ a future. *CkProbeFuture* tests whether the future has already finished
 computing the value of the expression.
 
 A similar example, using the object-oriented interface, is available under
-`examples\charm++\future`.
+`examples/charm++/future`.
 
 The maximum number of outstanding futures a PE may have is limited by the size of
 *CMK_REFNUM_TYPE*. Specifically, no more than :math:`2^{SIZE}-1` futures, where :math:`SIZE`
