@@ -1,4 +1,3 @@
-#include <ck/future.h>
 #include "fib.decl.h"
 
 #define THRESHOLD 3
