@@ -3133,17 +3133,6 @@ Below are the descriptions about the compiler and runtime options:
    installation of any third party libraries you wish to use to the
    Charm++ search paths.
 
-#. **Building individual load balancers**
-
-   Load balancers can be built individually by changing the current
-   working directory to the *tmp* subdirectory of your build and making
-   them by name.
-
-   .. code-block:: bash
-
-      $ cd netlrts-linux-x86_64/tmp
-      $ make PhasebyArrayLB
-
 #. **Write and use your own load balancer**
 
    Refer Section :numref:`lbWriteNewLB` for writing a new load
@@ -3152,13 +3141,12 @@ Below are the descriptions about the compiler and runtime options:
    path to the library and link the load balancer into an application
    using *-module FooLB*.
 
-   You can create a library by modifying the Makefile in the following
-   way. This will create *libmoduleFooLB.a*.
+   You can create a library in the following way. This will create
+   *libmoduleFooLB.a*.
 
-   .. code-block:: makefile
+   .. code-block::
 
-      libmoduleFooLB.a: FooLB.o
-        $(CHARMC) -o libmoduleFooLB.a FooLB.o
+      $ bin/charmc -o libmoduleFooLB.a FooLB.C
 
    To include this balancer in your application, the Makefile can be
    changed in the following way
