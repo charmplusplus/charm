@@ -15,4 +15,5 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo);
 
 void CmiInvokeNcpyAck(void *ack);
 
+int CmiGetRdmaCommonInfoSize();
 #endif
