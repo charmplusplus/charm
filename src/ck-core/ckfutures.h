@@ -61,12 +61,12 @@ void _futuresModuleInit(void);
 }
 
 namespace ck {
-  template<typename T>
-  class future {
+  template <typename T> class future {
     CkFuture handle_;
-public:
+
+  public:
     future() { handle_ = CkCreateFuture(); }
-    future(const future<T>& other) { handle_ = other.handle_; }
+    future(const future<T> &other) { handle_ = other.handle_; }
 
     T get() {
       CkMarshallMsg *msg = (CkMarshallMsg *)CkWaitFuture(handle_);
@@ -77,18 +77,18 @@ public:
       return std::move(holder.t);
     }
 
-    void set(const T& value) {
+    void set(const T &value) {
       PUP::sizer s;
-      s | (typename std::decay<decltype(value)>::type&) value;
+      s | (typename std::decay<decltype(value)>::type &)value;
       CkMarshallMsg *msg = CkAllocateMarshallMsg(s.size(), NULL);
       PUP::toMem p((void *)msg->msgBuf);
-      p | (typename std::decay<decltype(value)>::type&) value;
+      p | (typename std::decay<decltype(value)>::type &)value;
       CkSendToFuture(handle_, msg);
     }
 
     bool probe() { return CkProbeFuture(handle_); }
     void release() { CkReleaseFuture(handle_); }
-    void pup(PUP::er& p){ p | handle_; }
+    void pup(PUP::er &p) { p | handle_; }
   };
 }
 #endif

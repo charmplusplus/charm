@@ -5796,8 +5796,8 @@ is created, a *reference* is returned immediately. However, if the
 *value* calculated by the future is needed, the calling program blocks
 until the value is available.
 
-We provide C-compatible and object-oriented interfaces for using futures,
-by means of the following functions:
+We provide both C-compatible and object-oriented interfaces for using
+futures, which include the following functions:
 
 .. code-block:: c++
 
@@ -5807,8 +5807,10 @@ by means of the following functions:
    void *CkWaitFuture(CkFuture fut); /* or */ T ck::future<T>::get()
    void CkSendToFuture(CkFuture fut, void *msg); /* or */ void ck::future<T>::set(T)
 
-To illustrate the use of all these functions, a Fibonacci example in
-Charm++ using futures in presented below:
+You will note that the object-oriented versions are methods of `ck::future`,
+which can be templated with any pup'able type. An example of the
+object-oriented interface is available under `examples/charm++/future`,
+with an equivalent example for the C-compatible interface presented below:
 
 .. code-block:: charmci
 
@@ -5857,9 +5859,6 @@ return the value for the current future.
 Other functions complete the API for futures. *CkReleaseFuture* destroys
 a future. *CkProbeFuture* tests whether the future has already finished
 computing the value of the expression.
-
-A similar example, using the object-oriented interface, is available under
-`examples/charm++/future`.
 
 The maximum number of outstanding futures a PE may have is limited by the size of
 *CMK_REFNUM_TYPE*. Specifically, no more than :math:`2^{SIZE}-1` futures, where :math:`SIZE`

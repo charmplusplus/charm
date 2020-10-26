@@ -3,9 +3,9 @@
 #define THRESHOLD 3
 
 struct Main : public CBase_Main {
-  Main(CkArgMsg* m) { thisProxy.run(atoi(m->argv[1])); }
+  Main(CkArgMsg *m) { thisProxy.run(atoi(m->argv[1])); }
 
-  void run(int n) { 
+  void run(int n) {
     ck::future<int> f;
     CProxy_Fib::ckNew(n, f);
     CkPrintf("Fibonacci number is: %d\n", f.get());
@@ -15,10 +15,7 @@ struct Main : public CBase_Main {
 };
 
 struct Fib : public CBase_Fib {
-  Fib(int n, const ck::future<int> &prev_)
-    : prev(prev_) {
-    thisProxy.calc(n);
-  }
+  Fib(int n, const ck::future<int> &prev_) : prev(prev_) { thisProxy.calc(n); }
 
   int seqFib(int n) { return (n < 2) ? n : seqFib(n - 1) + seqFib(n - 2); }
 
@@ -30,7 +27,8 @@ struct Fib : public CBase_Fib {
       CProxy_Fib::ckNew(n - 1, f1);
       CProxy_Fib::ckNew(n - 2, f2);
       prev.set(f1.get() + f2.get());
-      f1.release(); f2.release();
+      f1.release();
+      f2.release();
     }
     delete this;
   }
@@ -40,4 +38,3 @@ private:
 };
 
 #include "fib.def.h"
-
