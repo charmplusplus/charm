@@ -835,7 +835,6 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
       if (!usesImplBuf) {
         str << "  genClosure->_impl_marshall = impl_msg_typed;\n";
         str << "  CkReferenceMsg(genClosure->_impl_marshall);\n";
-      } else {
       }
     }
   }

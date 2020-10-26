@@ -113,7 +113,6 @@ static void bdcastRO(void){
 	// Allocate and fill out the RODataMessage
 	envelope *env = _allocEnv(RODataMsg, ps.size());
 	PUP::toMem pp((char *)EnvToUsr(env), PUP::er::IS_CHECKPOINT);
-#if CMK_ONESIDED_IMPL
 	// Messages of type 'RODataMsg' need to have numZerocopyROops pupped in order
 	// to be processed inside _processRODataMsg
 #if CMK_SMP
@@ -121,7 +120,6 @@ static void bdcastRO(void){
 	pp|numZerocopyROopsTemp;
 #else
 	pp|numZerocopyROops;
-#endif
 #endif
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 	
