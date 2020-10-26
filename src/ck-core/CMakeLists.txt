@@ -105,6 +105,8 @@ add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C)
 add_dependencies(moduleDistributedLB ck)
 add_library(moduleTreeLB ../ck-ldb/TreeLB.C)
 add_dependencies(moduleTreeLB ck)
+add_library(moduleRecBipartLB ../ck-ldb/RecBipartLB.C)
+add_dependencies(moduleRecBipartLB ck)
 
 # Only for backwards compatibility
 add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
