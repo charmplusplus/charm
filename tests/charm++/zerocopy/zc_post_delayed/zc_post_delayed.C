@@ -80,10 +80,10 @@ class tester : public CBase_tester {
     }
 
     void callBcastReadyToPost() {
-      if(++counter == 1) {
+      if(++counter == 3) {
         counter = 0;
-        //arrProxy.readyToPost();
-        //grpProxy.readyToPost();
+        arrProxy.readyToPost();
+        grpProxy.readyToPost();
         ngProxy.readyToPost();
       }
     }
