@@ -122,7 +122,7 @@ static void createLoadBalancer(const char* lbname, const char* legacybalancer = 
   {  // invalid lb name
     CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname);
     lbRegistry.displayLBs();  // display help page
-    CkAbort("Abort");
+    CkExit(1);
   }
   // invoke function to create load balancer
   int seqno = LBManagerObj()->getLoadbalancerTicket();
