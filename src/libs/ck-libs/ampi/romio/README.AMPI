@@ -36,6 +36,9 @@ ROMIO integrated into AMPI:
   order to provide MPI_File_{get,set}_errhandler. See mpi-io/Makefile.mk.
 * PMPI function declarations in mpio_functions.h have been disabled.
   This does not affect PMPI functionality.
+* MPI_Type_size_x and MPI_Status_set_elements_x in large_count.c are ifdef'd
+  out, since they are provided by AMPI, but the ROMIO configure check for their
+  presence is faulty.
 
 
 Variable privatization

@@ -175,6 +175,8 @@ set(CMK_REPLAYSYSTEM ${REPLAY})
 if(${TARGET} STREQUAL "all-test")
   add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test)
   add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
+        ampi_funcptr_shim ampi_funcptr_shim_main
+        ampi_funcptr_loader ampi_funcptr_loader_stub
         conv-partition conv-util hwloc conv-static conv-core ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
         conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
@@ -183,7 +185,14 @@ if(${TARGET} STREQUAL "all-test")
         threads-default-tls ldb-neighbor ldb-workstealing modulearmci
         modulecollidecharm modulecollide memory-os memory-gnu-isomalloc)
   if(CMK_CAN_LINK_FORTRAN)
-    add_dependencies(all-test moduleampif conv-utilf ckmainf)
+    add_dependencies(all-test moduleampif conv-utilf ckmainf
+        ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
+  endif()
+  if(CMK_SUPPORTS_FSGLOBALS)
+    add_dependencies(all-test ampi_globals_fs)
+  endif()
+  if(CMK_SUPPORTS_PIPGLOBALS)
+    add_dependencies(all-test ampi_globals_pip)
   endif()
   set(TARGET "LIBS")
 endif()
@@ -484,8 +493,15 @@ if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
 endif()
 
 set(CMK_ENABLE_C11   ${CMAKE_C11_EXTENSION_COMPILE_OPTION})
-set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
-set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
+
+# Use -std=gnu++11 if available
+if(NOT "${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}" STREQUAL "")
+  set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
+  set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_EXTENSION_COMPILE_OPTION})
+else()
+  set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
+  set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
+endif()
 
 set(CMK_CC ${CMAKE_C_COMPILER})
 set(CMK_CXX ${CMAKE_CXX_COMPILER})
