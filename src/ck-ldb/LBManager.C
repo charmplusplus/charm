@@ -43,7 +43,7 @@ class LBDBRegistry
     LBCreateFn cfn;
     LBAllocFn afn;
     std::string help;
-    int shown;  // if 0, donot show in help page
+    bool shown;  // if false, do not show in help page
     LBDBEntry() : name(""), cfn(0), afn(0), help(""), shown(1) {}
     LBDBEntry(int) {}
     LBDBEntry(std::string n, LBCreateFn cf, LBAllocFn af, std::string h, int show = 1)
