@@ -115,12 +115,12 @@ void LBRegisterBalancer(std::string name, LBCreateFn fn, LBAllocFn afn, std::str
 LBAllocFn getLBAllocFn(const char* lbname) { return lbRegistry.getLBAllocFn(lbname); }
 
 // create a load balancer group using the strategy name
-static void createLoadBalancer(const char* lbname, const char* legacybalancer = nullptr)
+static void createLoadBalancer(const std::string& lbname, const char* legacybalancer = nullptr)
 {
   LBCreateFn fn = lbRegistry.search(lbname);
   if (!fn)
   {  // invalid lb name
-    CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname);
+    CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname.c_str());
     lbRegistry.displayLBs();  // display help page
     if(lbname == "help")
       CkExit(0);
