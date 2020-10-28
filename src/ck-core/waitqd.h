@@ -2,6 +2,7 @@
 #define _WAITQD_H
 
 #include "charm++.h"
+#include "ckfutures.h"
 #include "waitqd.decl.h"
 
 extern "C" void CkWaitQD(void);
