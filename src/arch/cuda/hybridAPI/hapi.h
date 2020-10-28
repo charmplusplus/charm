@@ -1,13 +1,13 @@
 #ifndef __HAPI_H_
 #define __HAPI_H_
 #include <cuda_runtime.h>
-#include "ckcallback.h"
 
 /* See hapi_functions.h for the majority of function declarations provided
  * by the Hybrid API. */
 
 #ifdef __cplusplus
 
+#include "ckcallback.h"
 #include <cstring>
 #include <cstdlib>
 #include <vector>
@@ -210,10 +210,13 @@ typedef struct hapiRequestTimeInfo {
 } hapiRequestTimeInfo;
 #endif /* defined HAPI_INSTRUMENT_WRS */
 
+// API for Charm++ programs, using CkCallback
 static void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg);
+#ifdef __cplusplus
 static inline void hapiAddCallback(cudaStream_t stream, const CkCallback& cb) {
   hapiAddCallback(stream, cb, nullptr);
 }
+#endif
 
 #ifndef AMPI_INTERNAL_SKIP_FUNCTIONS
 
