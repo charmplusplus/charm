@@ -37,8 +37,8 @@ pushd src/scripts
 
 # Emit a static indicator of the original commit
 SRCBASE=$(pwd) ./commitid.sh
-git add -f charm-version.h
-rm charm-version.h.new
+git add -f charm-version-git.h
+rm charm-version-git.h.new
 
 # Run autotools so users don't need to
 autoreconf
@@ -56,7 +56,7 @@ git add -u
 object_id=$(git write-tree)
 
 # Construct the target file/folder name
-version="charm-$(grep CHARM_VERSION src/scripts/charm-version.h | awk '{print $3}' | tr -d \")"
+version="charm-$(grep CHARM_VERSION_GIT src/scripts/charm-version-git.h | awk '{print $3}' | tr -d \")"
 
 # Generate the distribution tarball
 git archive --format=tar.gz --prefix="$version/" -o "$version.tar.gz" "$object_id"
