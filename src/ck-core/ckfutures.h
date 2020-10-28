@@ -1,7 +1,9 @@
 #ifndef _CKFUTURES_H_
 #define _CKFUTURES_H_
 
+#ifdef __cplusplus
 #include "ckmarshall.h"
+#endif
 #include "CkFutures.decl.h"
 
 /**
