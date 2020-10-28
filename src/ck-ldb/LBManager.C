@@ -44,9 +44,9 @@ class LBDBRegistry
     LBAllocFn afn;
     std::string help;
     bool shown;  // if false, do not show in help page
-    LBDBEntry() : name(""), cfn(0), afn(0), help(""), shown(1) {}
+    LBDBEntry() : name(""), cfn(0), afn(0), help(""), shown(true) {}
     LBDBEntry(int) {}
-    LBDBEntry(std::string n, LBCreateFn cf, LBAllocFn af, std::string h, int show = 1)
+    LBDBEntry(std::string n, LBCreateFn cf, LBAllocFn af, std::string h, bool show = true)
         : name(n), cfn(cf), afn(af), help(h), shown(show){};
   };
   CkVec<LBDBEntry> lbtables;       // a list of available LBs linked
@@ -68,7 +68,7 @@ class LBDBRegistry
     CmiPrintf("\n");
   }
   void addEntry(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
-                int shown)
+                bool shown)
   {
     lbtables.push_back(LBDBEntry(name, fn, afn, help, shown));
   }
@@ -107,7 +107,7 @@ void LBDefaultCreate(const char* lbname) { lbRegistry.addCompiletimeBalancer(lbn
 
 // default is to show the helper
 void LBRegisterBalancer(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
-                        int shown)
+                        bool shown)
 {
   lbRegistry.addEntry(name, fn, afn, help, shown);
 }
