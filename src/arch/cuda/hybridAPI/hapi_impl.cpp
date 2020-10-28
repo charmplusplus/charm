@@ -698,6 +698,10 @@ hapiWorkRequest::hapiWorkRequest() :
   device_to_host_cb_set = false;
 }
 
+void hapiWorkRequestSetCallback(hapiWorkRequest* wr, void* cb) {
+  wr->setCallback(*(CkCallback*)cb);
+}
+
 static void shmInit() {
   if (!CsvAccess(gpu_manager).use_shm) return;
 
@@ -1459,6 +1463,10 @@ void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg) {
   // even if all PEs seem idle
   CmiAssert(hapiQdCreate);
   hapiQdCreate(1);
+}
+
+void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
+  hapiAddCallback(stream, *(CkCallback*)cb, cb_msg);
 }
 
 cudaError_t hapiMalloc(void** devPtr, size_t size) {

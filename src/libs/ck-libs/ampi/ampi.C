@@ -11742,7 +11742,9 @@ int AMPI_GPU_Iinvoke_wr(hapiWorkRequest *to_call, MPI_Request *request)
   *request = ptr->postReq(newreq);
 
   // A callback that completes the corresponding request
-  to_call->setCallback(CkCallback(&AMPI_GPU_complete, newreq));
+  CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
+  hapiWorkRequestSetCallback(to_call, cb);
+  delete cb;
   hapiEnqueue(to_call);
 }
 
@@ -11758,7 +11760,9 @@ int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request)
   *request = ptr->postReq(newreq);
 
   // A callback that completes the corresponding request
-  hapiAddCallback(stream, CkCallback(&AMPI_GPU_complete, newreq), nullptr);
+  CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
+  hapiAddCallback(stream, cb, nullptr);
+  delete cb;
 }
 
 CLINKAGE

@@ -210,6 +210,10 @@ typedef struct hapiRequestTimeInfo {
 } hapiRequestTimeInfo;
 #endif /* defined HAPI_INSTRUMENT_WRS */
 
+static void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg);
+static inline void hapiAddCallback(cudaStream_t stream, const CkCallback& cb) {
+  hapiAddCallback(stream, cb, nullptr);
+}
 
 #ifndef AMPI_INTERNAL_SKIP_FUNCTIONS
 
@@ -229,8 +233,8 @@ extern "C" {
 #ifdef __cplusplus
 
 // Provide a C++-only stub for this function's default parameter.
-static inline void hapiAddCallback(cudaStream_t a, const CkCallback& b) {
-  hapiAddCallback(a, b, NULL);
+static inline void hapiAddCallback(cudaStream_t stream, void* cb) {
+  hapiAddCallback(stream, cb, nullptr);
 }
 
 // Overloaded C++ wrappers for selecting whether to pool or not using a bool.

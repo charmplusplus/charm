@@ -20,6 +20,10 @@ AMPI_CUSTOM_FUNC(hapiWorkRequest*, hapiCreateWorkRequest, void)
 // and kernel execution are directly put into a CUDA stream.
 AMPI_CUSTOM_FUNC(void, hapiEnqueue, hapiWorkRequest* wr)
 
+/******************** DEPRECATED ********************/
+// Set the callback of a work request
+AMPI_CUSTOM_FUNC(void, hapiWorkRequestSetCallback, hapiWorkRequest* wr, void*)
+
 // The runtime queries the compute capability of the device, and creates as
 // many streams as the maximum number of concurrent kernels.
 AMPI_CUSTOM_FUNC(int, hapiCreateStreams, void)
@@ -31,7 +35,7 @@ AMPI_CUSTOM_FUNC(cudaStream_t, hapiGetStream, void)
 // Add a Charm++ callback function to be invoked after the previous operation
 // in the stream completes. This call should be placed after data transfers or
 // a kernel invocation.
-AMPI_CUSTOM_FUNC(void, hapiAddCallback, cudaStream_t, const CkCallback&, void*)
+AMPI_CUSTOM_FUNC(void, hapiAddCallback, cudaStream_t, void*, void*)
 
 // Thin wrappers for memory related CUDA API calls.
 AMPI_CUSTOM_FUNC(cudaError_t, hapiMalloc, void**, size_t)
