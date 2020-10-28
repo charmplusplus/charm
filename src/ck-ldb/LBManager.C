@@ -39,14 +39,14 @@ class LBDBRegistry
   // table for all available LBs linked in
   struct LBDBEntry
   {
-    const char* name;
+    std::string name;
     LBCreateFn cfn;
     LBAllocFn afn;
-    const char* help;
+    std::string help;
     int shown;  // if 0, donot show in help page
-    LBDBEntry() : name(0), cfn(0), afn(0), help(0), shown(1) {}
+    LBDBEntry() : name(""), cfn(0), afn(0), help(""), shown(1) {}
     LBDBEntry(int) {}
-    LBDBEntry(const char* n, LBCreateFn cf, LBAllocFn af, const char* h, int show = 1)
+    LBDBEntry(std::string n, LBCreateFn cf, LBAllocFn af, std::string h, int show = 1)
         : name(n), cfn(cf), afn(af), help(h), shown(show){};
   };
   CkVec<LBDBEntry> lbtables;       // a list of available LBs linked
@@ -63,11 +63,11 @@ class LBDBRegistry
     for (int i = 0; i < lbtables.length(); i++)
     {
       LBDBEntry& entry = lbtables[i];
-      if (entry.shown) CmiPrintf("* %s:	%s\n", entry.name, entry.help);
+      if (entry.shown) CmiPrintf("* %s:\t%s\n", entry.name.c_str(), entry.help.c_str());
     }
     CmiPrintf("\n");
   }
-  void addEntry(const char* name, LBCreateFn fn, LBAllocFn afn, const char* help,
+  void addEntry(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
                 int shown)
   {
     lbtables.push_back(LBDBEntry(name, fn, afn, help, shown));
@@ -82,21 +82,21 @@ class LBDBRegistry
 
     runtime_lbs.push_back(name);
   }
-  LBCreateFn search(const char* name)
+  LBCreateFn search(std::string name)
   {
-    char* ptr = strpbrk((char*)name, ":,");
-    int slen = ptr != NULL ? ptr - name : strlen(name);
+    const auto index = name.find_first_of(":,");
     for (int i = 0; i < lbtables.length(); i++)
-      if (0 == strncmp(name, lbtables[i].name, slen)) return lbtables[i].cfn;
-    return NULL;
+      if (0 == lbtables[i].name.compare(0, index, name))
+        return lbtables[i].cfn;
+    return nullptr;
   }
-  LBAllocFn getLBAllocFn(const char* name)
+  LBAllocFn getLBAllocFn(std::string name)
   {
-    char* ptr = strpbrk((char*)name, ":,");
-    int slen = ptr - name;
+    const auto index = name.find_first_of(":,");
     for (int i = 0; i < lbtables.length(); i++)
-      if (0 == strncmp(name, lbtables[i].name, slen)) return lbtables[i].afn;
-    return NULL;
+      if (0 == lbtables[i].name.compare(0, index, name))
+        return lbtables[i].afn;
+    return nullptr;
   }
 };
 
@@ -106,7 +106,7 @@ static std::vector<std::string> lbNames;
 void LBDefaultCreate(const char* lbname) { lbRegistry.addCompiletimeBalancer(lbname); }
 
 // default is to show the helper
-void LBRegisterBalancer(const char* name, LBCreateFn fn, LBAllocFn afn, const char* help,
+void LBRegisterBalancer(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
                         int shown)
 {
   lbRegistry.addEntry(name, fn, afn, help, shown);

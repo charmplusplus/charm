@@ -6,7 +6,8 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(TreeLB, "TreeLB")
+CreateLBFunc_Def(TreeLB, "Pluggable hierarchical LB with available strategies:" +
+                             TreeStrategy::getLBNamesString());
 
 void TreeLB::Migrated(int waitBarrier)
 {

@@ -258,7 +258,7 @@ class StrategyWrapper : public IStrategyWrapper
   {
     strategy_name = _strategy_name;
     isTreeRoot = _isTreeRoot;
-    strategy = TreeStrategyFactory::makeStrategy<O, P, Solution>(strategy_name, config);
+    strategy = TreeStrategy::Factory::makeStrategy<O, P, Solution>(strategy_name, config);
   }
 
   virtual ~StrategyWrapper() { delete strategy; }

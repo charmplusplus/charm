@@ -121,7 +121,7 @@ typedef void (*LBCreateFn)(const CkLBOptions&);
 typedef BaseLB* (*LBAllocFn)();
 void LBDefaultCreate(LBCreateFn f);
 
-void LBRegisterBalancer(const char*, LBCreateFn, LBAllocFn, const char*, int shown = 1);
+void LBRegisterBalancer(std::string, LBCreateFn, LBAllocFn, std::string, int shown = 1);
 
 void _LBMgrInit();
 
