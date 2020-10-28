@@ -1,12 +1,8 @@
 #ifndef _CKFUTURES_H_
 #define _CKFUTURES_H_
 
+#include "ckmarshall.h"
 #include "CkFutures.decl.h"
-
-#ifdef __cplusplus
-extern CkMarshallMsg *CkAllocateMarshallMsg(int size, const CkEntryOptions *opts);
-#include <type_traits>
-#endif
 
 /**
 \addtogroup CkFutures
