@@ -1000,10 +1000,8 @@ XStr Entry::dataItemType() {
 
 XStr Entry::aggregatorType() {
   XStr groupType;
-  if (container->isGroup() && !(container->isNodeGroup())) {
+  if (container->isGroup()) {
     groupType << "GroupMeshStreamer<";
-  } else if (container->isNodeGroup()) {
-    groupType << "NodeGroupMeshStreamer<";
   } else if (container->isArray()) {
     groupType << "ArrayMeshStreamer<";
   }
@@ -1022,10 +1020,8 @@ XStr Entry::aggregatorNodeType() {
 
 XStr Entry::aggregatorGlobalType(XStr& scope) {
   XStr groupType;
-  if (container->isGroup() && !(container->isNodeGroup())) {
+  if (container->isGroup()) {
     groupType << "GroupMeshStreamer<";
-  } else if (container->isNodeGroup()) {
-    groupType << "NodeGroupMeshStreamer<";
   } else if (container->isArray()) {
     groupType << "ArrayMeshStreamer<";
   }
@@ -1217,6 +1213,7 @@ void Entry::genTramInstantiation(XStr& str) {
           << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
           << "cutoffFractionNum, cutoffFractionDen, nodeLevel);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
+          << "    tramGroupIDs[" << i << "] = tramProxy.ckGetGroupID().idx;\n"
           << "  }\n";
     }
   }
