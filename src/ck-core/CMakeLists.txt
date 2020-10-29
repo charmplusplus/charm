@@ -82,18 +82,20 @@ add_library(moduleCommonLBs
 )
 add_dependencies(moduleCommonLBs ck)
 
-if(${EVERYLB})
-add_library(moduleEveryLB
-    ${ldb-cxx-sources}
-    ${ldb-h-sources}
-)
-configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
-add_dependencies(moduleEveryLB ck)
+if(EVERYLB)
+    add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
+    configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
+    add_dependencies(moduleEveryLB ck ckmetis)
 
-add_library(moduleMetisLB ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
-add_dependencies(moduleMetisLB ck libckmetis)
+    add_library(moduleMetisLB ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
 
-add_custom_target(libckmetis COMMAND make -C ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis ${CMAKE_BINARY_DIR}/src/libs/ck-libs/metis/libmetis) # defines "ckmetis" target
+
+    target_include_directories(ckmetis PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/GKlib )
+    target_include_directories(moduleMetisLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
+    target_include_directories(moduleEveryLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
+
+    add_dependencies(moduleMetisLB ck ckmetis)
 endif()
 
 # Single LBs

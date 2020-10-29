@@ -42,6 +42,14 @@ Misc:
 
 Charm++ Features & Fixes:
 
+- We have renamed the `VERSION` file to `charm-version.h` and made it compatible
+  with C. Charm++ programs that need to check the
+  Charm++ version should use the `CHARM_VERSION`, `CHARM_VERSION_MAJOR`,
+  `CHARM_VERSION_MINOR`, and `CHARM_VERSION_PATCH` C macros defined when compiling
+  a Charm++ application. We also provide a `CHARM_VERSION_GIT` macro for the exact
+  git revision of Charm++. In shell scripts, you can determine the version information
+  like this: `$ grep "CHARM_VERSION " charm-version.h | awk '{print $3}'`.
+
 - Support for variable sized messages in TRAM.
 
 - Added a pup_buffer API with zero copy functionality.
