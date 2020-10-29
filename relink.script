@@ -35,10 +35,10 @@ do
   ln -s "$1/$i" "$i"
 done
 
-rm -f VERSION
+rm -f charm-version.h
 
-if test -f "$1/include/VERSION"
+if test -f "$1/include/charm-version.h"
 then
-  echo ln -s "$1/include/VERSION" VERSION
-  ln -s "$1/include/VERSION" VERSION
+  echo ln -s "$1/include/charm-version.h" charm-version.h
+  ln -s "$1/include/charm-version.h" charm-version.h
 fi
