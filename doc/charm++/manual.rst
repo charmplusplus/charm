@@ -3144,7 +3144,7 @@ Below are the descriptions about the compiler and runtime options:
    You can create a library in the following way. This will create
    *libmoduleFooLB.a*.
 
-   .. code-block::
+   .. code-block:: bash
 
       $ bin/charmc -o libmoduleFooLB.a FooLB.C
 
