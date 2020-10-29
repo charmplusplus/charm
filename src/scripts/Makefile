@@ -36,6 +36,12 @@ CXX=$(CHARMC)
 CFLAGS=-I.
 CXXFLAGS=-I.
 
+ifeq (false,$(CMK_NO_BUILD_SHARED))
+  HWLOC_SHARED := yes
+else
+  HWLOC_SHARED := no
+endif
+
 all: charm++ LIBS AMPI TSM SM PVM everylb
 
 
@@ -247,7 +253,7 @@ ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \
 	ckset.h LBSimulation.h  \
 
-basics: headers
+basics: headers charm-version-git.h
 	touch basics
 
 # Headers is used only for the dependencies
@@ -256,7 +262,7 @@ headers: dirs+sources
 	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
-configure: Makefile.am configure.ac
+configure: configure.ac
 	autoreconf
 
 conv-autoconfig.h.in: configure.ac
@@ -266,14 +272,15 @@ conv-autoconfig.h: configure conv-autoconfig.h.in config_opts.sh
 	@. ./config_opts.sh; echo ./configure $(QUIET) $$CONFIG_OPTS;  \
 	./configure $(QUIET) $$CONFIG_OPTS && touch conv-autoconfig.h
 
-.PHONY: clean veryclean VERSION.new config
+.PHONY: clean veryclean charm-version-git.h.new config
 
-VERSION: VERSION.new
+charm-version-git.h: charm-version-git.h.new dirs+sources
 	SRCBASE=$(SRCBASE) ./commitid.sh
+	./system_ln $$PWD/charm-version-git.h ../include/charm-version-git.h
 
-commitid.C: VERSION
+commitid.C: charm-version-git.h
 	echo "extern const char * const CmiCommitID;" > $@
-	echo "const char * const CmiCommitID = \"`cat VERSION`\";" >> $@
+	echo "const char * const CmiCommitID = $$(grep CHARM_VERSION_GIT charm-version-git.h | awk '{print $$3}');" >> $@
 commitid.o: CC=$(CHARMC)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
@@ -488,7 +495,28 @@ converse: charmrun-target swapglobal-target conv-cpm tmgr hwloc-target
 cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
 $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
 
-hwloc-target:  conv-autoconfig.h
+hwloc-target:  conv-autoconfig.h charm-version-git.h
+	@( cd hwloc && \
+    ./configure \
+    --disable-cairo \
+    --disable-cuda \
+    --disable-gl \
+    --disable-libxml2 \
+    --disable-nvml \
+    --disable-opencl \
+    --disable-pci \
+    --disable-libudev \
+    --disable-visibility \
+    --enable-embedded-mode \
+    --enable-shared=$(HWLOC_SHARED) \
+    --enable-static \
+    --with-hwloc-symbol-prefix=cmi_ \
+    --without-x \
+    HWLOC_FLAGS="$(HWLOC_CC_FLAGS)" \
+    CFLAGS="$(HWLOC_CC_FLAGS)" \
+    CC="$(HWLOC_CC)" \
+    CC_FOR_BUILD="$(HWLOC_CC)" \
+    > /dev/null )
 	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	( test -e hwloc/hwloc/.libs/libhwloc_embedded.lib && cp -f hwloc/hwloc/.libs/libhwloc_embedded.lib hwloc/hwloc/.libs/libhwloc_embedded.a ) || true
 	( cp -f hwloc/hwloc/.libs/libhwloc_embedded.a $(L) )

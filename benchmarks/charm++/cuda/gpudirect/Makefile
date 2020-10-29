@@ -1,5 +1,6 @@
 DIRS = \
-  pingpong \
+  latency \
+  bandwidth \
 
 TESTDIRS = $(DIRS)
 
