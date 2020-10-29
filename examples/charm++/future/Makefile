@@ -17,7 +17,9 @@ $(BINARY): $(patsubst %.C,%.o,$(wildcard *.C))
 %.o: %.C %.decl.h %.def.h
 	$(CHARMC) $(CHARMCFLAGS) $<
 
-%.decl.h %.def.h: %.ci
+%.def.h: %.decl.h ;
+
+%.decl.h: %.ci
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: $(BINARY)

@@ -5799,13 +5799,19 @@ until the value is available.
 We provide both C-compatible and object-oriented interfaces for using
 futures, which include the following functions:
 
-.. code-block:: c++
-
-   CkFuture CkCreateFuture(void); /* or */ ck::future<T>()
-   void CkReleaseFuture(CkFuture fut); /* or */ void ck::future<T>::release()
-   int CkProbeFuture(CkFuture fut); /* or */ bool ck::future<T>::probe()
-   void *CkWaitFuture(CkFuture fut); /* or */ T ck::future<T>::get()
-   void CkSendToFuture(CkFuture fut, void *msg); /* or */ void ck::future<T>::set(T)
++------------------------------------------------------+------------------------------------+
+| C                                                    | C++                                |
++======================================================+====================================+
+| :code:`CkFuture CkCreateFuture(void)`                | :code:`ck::future()`               |
++------------------------------------------------------+------------------------------------+
+| :code:`void CkReleaseFuture(CkFuture fut)`           | :code:`void ck::future::release()` |
++------------------------------------------------------+------------------------------------+
+| :code:`int CkProbeFuture(CkFuture fut)`              | :code:`bool ck::future::probe()`   |
++------------------------------------------------------+------------------------------------+
+| :code:`void *CkWaitFuture(CkFuture fut)`             | :code:`T ck::future::get()`        |
++------------------------------------------------------+------------------------------------+
+| :code:`void CkSendToFuture(CkFuture fut, void *msg)` | :code:`void ck::future::set(T)`    |
++------------------------------------------------------+------------------------------------+
 
 You will note that the object-oriented versions are methods of `ck::future`,
 which can be templated with any pup'able type. An example of the
