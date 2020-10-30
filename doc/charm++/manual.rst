@@ -12980,6 +12980,8 @@ Acknowledgements
 
 -  Juan Galvez
 
+-  Justin Szaday
+
 -  Kavitha Chandrasekar
 
 -  Laxmikant Kale
@@ -13085,6 +13087,8 @@ Acknowledgements
 -  Yan Shi
 
 -  Yogesh Mehta
+
+-  Zane Fink
 
 -  Zheng Shao
 
