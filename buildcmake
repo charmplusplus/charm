@@ -119,10 +119,10 @@ case "$triplet" in
     ;;
 esac
 
-# Compiler options
-opt_CC= #undef
-opt_CXX= #undef
-opt_FC= #undef
+# Compiler selection. By default, use whatever is specified in the environment.
+opt_CC=${CC:-}
+opt_CXX=${CXX:-}
+opt_FC=${FC:-}
 
 opt_compiler=""
 
