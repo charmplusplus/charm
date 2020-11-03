@@ -440,9 +440,9 @@ if(${TARGET} STREQUAL "all-test")
   add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
         ampi_funcptr_shim ampi_funcptr_shim_main
         ampi_funcptr_loader ampi_funcptr_loader_stub
-        conv-partition conv-util hwloc conv-static conv-core ldb-rand
+        converse conv-static ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
+        conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
         threads-default-tls ldb-neighbor ldb-workstealing modulearmci
@@ -741,9 +741,172 @@ add_dependencies(charmxi create_symlinks)
 # Converse
 add_subdirectory(src/QuickThreads)
 add_subdirectory(src/util/boost-context)
+
+set(conv-core-h-sources
+    src/util/cmitls.h
+    src/conv-core/cmipool.h
+    src/conv-core/cmidemangle.h
+    src/conv-core/conv-config.h
+    src/conv-core/conv-cpath.h
+    src/conv-core/conv-cpm.h
+    src/conv-core/conv-header.h
+    src/conv-core/conv-ooc.h
+    src/conv-core/conv-qd.h
+    src/conv-core/conv-random.h
+    src/conv-core/conv-rdma.h
+    src/conv-core/conv-rdmadevice.h
+    src/conv-core/conv-taskQ.h
+    src/conv-core/conv-trace.h
+    src/conv-core/converse.h
+    src/conv-core/cpthreads.h
+    src/conv-core/debug-conv++.h
+    src/conv-core/debug-conv.h
+    src/conv-core/hrctimer.h
+    src/conv-core/mem-arena.h
+    src/conv-core/memory-gnu-threads.h
+    src/conv-core/memory-isomalloc.h
+    src/conv-core/msgq.h
+    src/conv-core/persistent.h
+    src/conv-core/queueing.h
+    src/conv-core/quiescence.h
+    src/conv-core/taskqueue.h
+)
+
+set(conv-core-cxx-sources
+    src/conv-core/cmipool.C
+    src/conv-core/conv-conds.C
+    src/conv-core/conv-rdma.C
+    src/conv-core/conv-rdmadevice.C
+    src/conv-core/convcore.C
+    src/conv-core/cpm.C
+    src/conv-core/cpthreads.C
+    src/conv-core/cpuaffinity.C
+    src/conv-core/debug-conv.C
+    src/conv-core/futures.C
+    src/conv-core/global-nop.C
+    src/conv-core/isomalloc.C
+    src/conv-core/mem-arena.C
+    src/conv-core/memoryaffinity.C
+    src/conv-core/msgmgr.C
+    src/conv-core/quiescence.C
+    src/conv-core/random.C
+    src/util/cmitls.C
+    src/conv-core/conv-interoperate.C
+    src/conv-core/conv-taskQ.C
+    src/conv-core/cputopology.C
+    src/conv-core/debug-conv++.C
+    src/conv-core/memory-darwin-clang.C
+    src/conv-core/queueing.C
+    src/conv-core/hrctimer.C
+)
+
+set(conv-ccs-h-sources
+    src/conv-ccs/ccs-auth.h
+    src/conv-ccs/ccs-builtins.h
+    src/conv-ccs/ccs-server.h
+    src/conv-ccs/conv-ccs.h
+)
+
+set(conv-ccs-cxx-sources
+    src/conv-ccs/conv-ccs.C
+    src/conv-ccs/ccs-builtins.C
+    src/conv-ccs/middle-ccs.C
+)
+
+set(conv-perf-cxx-sources
+    src/conv-perf/traceCore.C
+    src/conv-perf/traceCoreCommon.C
+    src/conv-perf/machineProjections.C
+)
+
+set(conv-perf-h-sources
+    src/conv-perf/allEvents.h
+    src/conv-perf/charmEvents.h
+    src/conv-perf/charmProjections.h
+    src/conv-perf/converseEvents.h
+    src/conv-perf/converseProjections.h
+    src/conv-perf/machineEvents.h
+    src/conv-perf/machineProjections.h
+    src/conv-perf/threadEvents.h
+    src/conv-perf/traceCore.h
+    src/conv-perf/traceCoreAPI.h
+    src/conv-perf/traceCoreCommon.h
+)
+
+foreach(filename ${conv-core-h-sources} ${conv-ccs-h-sources} ${conv-perf-h-sources})
+    configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+endforeach()
+
+find_program(GIT git)
+
+if(GIT AND EXISTS ${CMAKE_SOURCE_DIR}/.git)
+  execute_process(COMMAND git describe --exact-match
+             OUTPUT_VARIABLE CHARM_VERSION_GIT
+             RESULT_VARIABLE git_result
+             OUTPUT_STRIP_TRAILING_WHITESPACE
+             ERROR_QUIET
+             )
+  if(NOT ${git_result} EQUAL 0)
+    execute_process(COMMAND git describe --long --always
+             OUTPUT_VARIABLE CHARM_VERSION_GIT
+             OUTPUT_STRIP_TRAILING_WHITESPACE
+             )
+  endif()
+else()
+  set(CHARM_VERSION_GIT "v${CHARM_VERSION}")
+endif()
+
+file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.C CONTENT
+"extern const char * const CmiCommitID;
+const char * const CmiCommitID = \"${CHARM_VERSION_GIT}\";
+"
+)
+
 add_subdirectory(src/conv-core)
-add_subdirectory(src/conv-ldb)
-add_subdirectory(src/util)
+
+set(conv-util-c-sources
+    src/arch/util/lz4.c
+)
+
+set(conv-util-h-sources
+    src/util/cmirdmautils.h
+)
+
+set(conv-util-cxx-sources
+    src/arch/util/mempool.C
+    src/arch/util/persist-comm.C
+    src/util/cmirdmautils.C
+    src/util/crc32.C
+    src/util/sockRoutines.C
+    src/util/ckdll.C
+    src/util/ckhashtable.C
+    src/util/ckimage.C
+    src/util/conv-lists.C
+    src/util/hilbert.C
+    src/util/partitioning_strategies.C
+    src/util/pup_c.C
+    src/util/pup_cmialloc.C
+    src/util/pup_paged.C
+    src/util/pup_toNetwork.C
+    src/util/pup_toNetwork4.C
+    src/util/pup_util.C
+    src/util/pup_xlater.C
+    src/util/spanningTree.C
+)
+
+configure_file(${conv-util-h-sources} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+
+if(${CMK_CAN_LINK_FORTRAN})
+    add_library(conv-utilf pup_f.f90)
+    target_compile_options(conv-utilf PRIVATE -cpmod)
+endif()
+
+add_custom_command(OUTPUT pup_f.f90 COMMAND ${CMAKE_SOURCE_DIR}/src/util/pup_f.f90.sh > /dev/null)
+
+set(conv-partition-cxx-sources
+    src/util/custom_partitioner.C
+    src/util/set_partition_params.C
+)
 
 # Hwloc
 if(${BUILD_SHARED})
@@ -791,14 +954,50 @@ ExternalProject_Add(hwloc
 )
 
 # TopoManager
-set(tmgr-cxx-sources src/util/topomanager/TopoManager.C src/util/topomanager/CrayNid.c src/util/topomanager/BGQTorus.C)
+set(tmgr-c-sources src/util/topomanager/CrayNid.c)
+set(tmgr-cxx-sources src/util/topomanager/TopoManager.C src/util/topomanager/BGQTorus.C)
 set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h src/util/topomanager/XTTorus.h src/util/topomanager/BGQTorus.h)
 file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
-add_library(tmgr ${tmgr-cxx-sources} ${tmgr-h-sources})
 foreach(filename ${tmgr-h-sources})
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
 
+# Converse
+add_library(converse
+    ${CMAKE_BINARY_DIR}/include/commitid.C
+    ${conv-core-cxx-sources}
+    ${conv-core-h-sources}
+    ${conv-ccs-h-sources}
+    ${conv-ccs-cxx-sources}
+    ${conv-perf-cxx-sources}
+    ${conv-perf-h-sources}
+    ${conv-util-c-sources}
+    ${conv-util-cxx-sources}
+    ${conv-util-h-sources}
+    ${conv-partition-cxx-sources}
+    src/conv-ldb/cldb.C
+    src/arch/${GDIR}/machine.C
+    ${tmgr-c-sources}
+    ${tmgr-cxx-sources}
+    ${tmgr-h-sources}
+)
+add_dependencies(converse hwloc)
+
+add_library(conv-static OBJECT src/conv-core/conv-static.c)
+add_dependencies(converse conv-static)
+add_custom_command(TARGET converse
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
+    VERBATIM
+)
+
+target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
+target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
+target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
+
+add_subdirectory(src/conv-ldb)
+
+# LIBS
 if(${TARGET} STREQUAL "LIBS")
   add_subdirectory(src/libs/conv-libs)
   add_subdirectory(src/libs/ck-libs)
@@ -893,7 +1092,7 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck converse memory-default threads-default hwloc_embedded ldb-rand conv-ldb "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
@@ -901,8 +1100,8 @@ endif()
 # Check that we are able to build and link an executable
 add_executable(hello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
 add_dependencies(hello ck ldb-rand memory-default threads-default conv-static
-  conv-core ckmain conv-machine conv-util conv-partition conv-ldb ckqt
-  moduleNDMeshStreamer modulecompletion tmgr)
+  converse ckmain conv-ldb ckqt
+  moduleNDMeshStreamer modulecompletion)
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
