@@ -421,7 +421,17 @@ then
   if [[ $FORCE -eq 0 ]]
   then
     echo "To attempt a partial rebuild, run 'make' in \"$builddir\"."
-    echo "To remove the existing data and run configure again, run this script with --force."
+    echo "To remove the existing data and reconfigure, run this script again with --force."
+    exit 1
+  else
+    echo "Removing existing data and starting over. (--force)"
+  fi
+elif [[ -e "$builddir" ]]
+then
+  echo "\"$builddir\" already exists but is in an inconsistent state."
+  if [[ $FORCE -eq 0 ]]
+  then
+    echo "To remove the existing data and reconfigure, run this script again with --force."
     exit 1
   else
     echo "Removing existing data and starting over. (--force)"

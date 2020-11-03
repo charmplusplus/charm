@@ -721,7 +721,17 @@ then
   if [ -z "$FORCE" ]
   then
     Echo "To attempt a partial rebuild, run 'make' in \"$DESTINATION/tmp\"."
-    Echo "To remove the existing data and run configure again, run this script again with --force."
+    Echo "To remove the existing data and reconfigure, run this script again with --force."
+    exit 1
+  else
+    Echo "Removing existing data and starting over. (--force)"
+  fi
+elif [ -e "$DESTINATION" ]
+then
+  Echo "\"$DESTINATION\" already exists but is in an inconsistent state."
+  if [ -z "$FORCE" ]
+  then
+    Echo "To remove the existing data and reconfigure, run this script again with --force."
     exit 1
   else
     Echo "Removing existing data and starting over. (--force)"
