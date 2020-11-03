@@ -47,6 +47,10 @@ struct CkDevicePersistent {
   }
 
   void init();
+
+  // Should only be used for exchanging between chares, not for migration.
+  // After the owner chare migrates, CkDevicePersistent needs to be recreated
+  // and exchanged again.
   void pup(PUP::er& p);
 
   CkDeviceStatus get(CkDevicePersistent& src);
