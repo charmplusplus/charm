@@ -342,7 +342,7 @@ while [[ $# -gt 0 ]]; do
       ONLY_CONFIGURE=1
       ;;
     --force)
-      # Overwrite existing configuration
+      # Overwrite existing build directory
       FORCE=1
       ;;
     -j)
@@ -420,7 +420,7 @@ then
   echo "The configure step has already taken place for the specified build."
   if [[ $FORCE -eq 0 ]]
   then
-    echo "To attempt a partial rebuild, run make in \"$builddir\"."
+    echo "To attempt a partial rebuild, run 'make' in \"$builddir\"."
     echo "To remove the existing data and run configure again, run this script with --force."
     exit 1
   else
