@@ -7,7 +7,7 @@
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_PersistentArray array_proxy;
 /* readonly */ CProxy_PersistentGroup group_proxy;
-/* readonly */ //CProxy_PersistentNodeGroup nodegroup_proxy;
+/* readonly */ CProxy_PersistentNodeGroup nodegroup_proxy;
 /* readonly */ int block_size;
 /* readonly */ int n_iters;
 /* readonly */ bool lb_test;
@@ -64,7 +64,6 @@ struct Container {
 };
 
 class Main : public CBase_Main {
-  bool test_nodegroup;
   double start_time;
 
 public:
@@ -72,17 +71,11 @@ public:
     main_proxy = thisProxy;
     block_size = 128;
     n_iters = 10;
-    test_nodegroup = true;
     lb_test = false;
 
     // Check if there are 2 PEs
     if (CkNumPes() != 2) {
       CkAbort("Should be run with 2 PEs");
-    }
-
-    // Don't do nodegroup test if run with 1 process
-    if (CmiNumNodes() == 1) {
-      test_nodegroup = false;
     }
 
     // Process command line arguments
@@ -106,14 +99,13 @@ public:
 
     // Print info
     CkPrintf("[CUDA Zerocopy Verification Test]\n"
-        "Block size: %d, Iters: %d, Nodegroup: %s, LB test: %s\n",
-        block_size, n_iters, test_nodegroup ? "true" : "false",
-        lb_test ? "true" : "false");
+        "Block size: %d, Iters: %d, LB test: %s\n",
+        block_size, n_iters, lb_test ? "true" : "false");
 
     // Create chares
     array_proxy = CProxy_PersistentArray::ckNew(CkNumPes());
     group_proxy = CProxy_PersistentGroup::ckNew();
-    //nodegroup_proxy = CProxy_PersistentNodeGroup::ckNew();
+    nodegroup_proxy = CProxy_PersistentNodeGroup::ckNew();
 
     // Begin testing
     thisProxy.test();
@@ -157,16 +149,23 @@ public:
     }
     CkPrintf("PASS\n");
 
-    /*
-    if (test_nodegroup) {
+    if (CmiNumNodes() != 1) {
       CkPrintf("Testing chare nodegroup...\n");
+      nodegroup_proxy.initSend();
       for (int i = 0; i < n_iters; i++) {
-        nodegroup_proxy[0].send();
+        nodegroup_proxy[1].fill(i);
+        CkWaitQD();
+        nodegroup_proxy.testGet(i);
+        CkWaitQD();
+      }
+      for (int i = 0; i < n_iters; i++) {
+        nodegroup_proxy[0].fill(i);
+        CkWaitQD();
+        nodegroup_proxy.testPut(i);
         CkWaitQD();
       }
       CkPrintf("PASS\n");
     }
-    */
 
     CkPrintf("Elapsed: %.6lf s\n", CkWallTimer() - start_time);
     CkExit();
@@ -260,37 +259,43 @@ public:
   }
 };
 
-/*
 class PersistentNodeGroup : public CBase_PersistentNodeGroup {
+  PersistentNodeGroup_SDAG_CODE
+
   Container container;
-  CkDevicePersistent buf;
+  CkDevicePersistent my_send_buf;
+  CkDevicePersistent my_recv_buf;
+  CkDevicePersistent peer_send_buf;
+  CkDevicePersistent peer_recv_buf;
+  int me;
+  int peer;
 
 public:
   PersistentNodeGroup() {
-    container.init((thisIndex == 0) ? 1 : 2);
+    me = CkMyNode();
+    peer = (CkMyNode() == 0) ? 1 : 0;
+    container.init();
   }
 
-  void send() {
-    buf = CkDevicePersistent(container.d_local_data, sizeof(double) * block_size,
-        CkCallback(CkIndex_PersistentNodeGroup::srcCb(), thisProxy[thisIndex]),
+  void initSend() {
+    // Initialize and send my metadata to peer
+    my_send_buf = CkDevicePersistent(container.d_local_data, sizeof(double) * block_size,
+        CkCallback(CkIndex_PersistentNodeGroup::callback(), thisProxy[thisIndex]),
         container.stream);
-    thisProxy[1].recv(buf);
-  }
-
-  void recv(CkDevicePersistent src_buf) {
-    buf = CkDevicePersistent(container.d_remote_data, sizeof(double) * block_size,
-        CkCallback(CkIndex_PersistentNodeGroup::dstCb(), thisProxy[thisIndex]),
+    my_recv_buf = CkDevicePersistent(container.d_remote_data, sizeof(double) * block_size,
+        CkCallback(CkIndex_PersistentNodeGroup::callback(), thisProxy[thisIndex]),
         container.stream);
-    buf.get(src_buf);
+    thisProxy[peer].initRecv(my_send_buf, my_recv_buf);
   }
 
-  void srcCb() { CkPrintf("PersistentNodeGroup %d, srcCb\n", thisIndex); }
+  void initRecv(CkDevicePersistent send_buf, CkDevicePersistent recv_buf) {
+    peer_send_buf = send_buf;
+    peer_recv_buf = recv_buf;
+  }
 
-  void dstCb() {
-    CkPrintf("PersistentNodeGroup %d, dstCb\n", thisIndex);
-    container.verify(1);
+  void fill(int iter) {
+    container.fill(iter);
   }
 };
-*/
 
 #include "persistent.def.h"
