@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "converse.h" // for CmiMemoryUsage etc.
 
 int max_msgs = 2;
 
@@ -262,4 +263,5 @@ int main(int argc, char** argv)
 
 EXIT:
   MPI_Finalize();
+  return 0;
 }

@@ -364,6 +364,8 @@ if(${PROJECT_VERSION_PATCH} LESS 10)
 endif()
 set(CHARM_VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}")
 
+unset(CHARM_VERSION_PATCH_PREFIX)
+
 set(CHARM_PLATFORM "${NETWORK}-${CHARM_OS}-${CHARM_CPU}")
 
 
@@ -493,8 +495,15 @@ if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
 endif()
 
 set(CMK_ENABLE_C11   ${CMAKE_C11_EXTENSION_COMPILE_OPTION})
-set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
-set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
+
+# Use -std=gnu++11 if available
+if(NOT "${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}" STREQUAL "")
+  set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
+  set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_EXTENSION_COMPILE_OPTION})
+else()
+  set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
+  set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
+endif()
 
 set(CMK_CC ${CMAKE_C_COMPILER})
 set(CMK_CXX ${CMAKE_CXX_COMPILER})
@@ -1024,7 +1033,7 @@ endif()
 # Get version information
 find_program(GIT git)
 
-if(GIT)
+if(GIT AND EXISTS ${CMAKE_SOURCE_DIR}/.git)
   execute_process(COMMAND git describe --exact-match --dirty=*
              OUTPUT_VARIABLE CHARM_VERSION_GIT
              RESULT_VARIABLE git_result
@@ -1095,10 +1104,15 @@ add_custom_target(create_symlinks ALL
 #   add_dependencies(create_symlinks createlink)
 # endif()
 
-# Create the .vdir/.gdir/VERSION files
+# Create the .vdir/.gdir/charm-version.h/charm-version-git.h files
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
 file(WRITE ${CMAKE_BINARY_DIR}/include/.vdir   "${CMK_VDIR}\n")
-file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
+file(WRITE ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION ${CHARM_VERSION}\n")
+file(APPEND ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION_MAJOR ${PROJECT_VERSION_MAJOR}\n")
+file(APPEND ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION_MINOR ${PROJECT_VERSION_MINOR}\n")
+file(APPEND ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION_PATCH ${PROJECT_VERSION_PATCH}\n")
+
+file(WRITE ${CMAKE_BINARY_DIR}/include/charm-version-git.h "#define CHARM_VERSION_GIT \"${CHARM_VERSION_GIT}\"\n")
 
 
 # Copy the Makefile used for building and running tests
