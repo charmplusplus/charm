@@ -6,6 +6,7 @@ mainmodule persistent {
   readonly int block_size;
   readonly int n_iters;
   readonly bool lb_test;
+  readonly int lb_period;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
@@ -28,6 +29,9 @@ mainmodule persistent {
       when callback() serial {
         if (me == 0) {
           container.verify(iter);
+        }
+        if (lb_test && ((iter+1) % lb_period == 0)) {
+          AtSync();
         }
       }
     }

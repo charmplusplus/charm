@@ -11,6 +11,7 @@
 /* readonly */ int block_size;
 /* readonly */ int n_iters;
 /* readonly */ bool lb_test;
+/* readonly */ int lb_period;
 
 extern void invokeFillKernel(double*, int, double, cudaStream_t);
 
@@ -31,8 +32,11 @@ struct Container {
   }
 
   void pup(PUP::er& p) {
-    if (p.isUnpacking()) init();
-    PUParray(p, h_remote_data, sizeof(double) * block_size);
+    if (p.isUnpacking()) {
+      init();
+    }
+    // TODO
+    //PUParray(p, h_remote_data, sizeof(double) * block_size);
     // Data on GPU device do not migrate
   }
 
@@ -72,6 +76,7 @@ public:
     block_size = 128;
     n_iters = 10;
     lb_test = false;
+    lb_period = 3;
 
     // Check if there are 2 PEs
     if (CkNumPes() != 2) {
@@ -80,7 +85,7 @@ public:
 
     // Process command line arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:i:l")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:i:lp:")) != -1) {
       switch (c) {
         case 's':
           block_size = atoi(optarg);
@@ -91,6 +96,9 @@ public:
         case 'l':
           lb_test = true;
           break;
+        case 'p':
+          lb_period = atoi(optarg);
+          break;
         default:
           CkAbort("Unknown command line argument detected");
       }
@@ -99,8 +107,8 @@ public:
 
     // Print info
     CkPrintf("[CUDA Zerocopy Verification Test]\n"
-        "Block size: %d, Iters: %d, LB test: %s\n",
-        block_size, n_iters, lb_test ? "true" : "false");
+        "Block size: %d, Iters: %d, LB: %s (period: %d)\n",
+        block_size, n_iters, lb_test ? "true" : "false", lb_period);
 
     // Create chares
     array_proxy = CProxy_PersistentArray::ckNew(CkNumPes());
@@ -123,6 +131,11 @@ public:
       CkWaitQD();
       array_proxy.testGet(i);
       CkWaitQD();
+      if (lb_test && ((i+1) % lb_period == 0)) {
+        CkPrintf("LB step (iter %d), calling initSend\n", i);
+        array_proxy.initSend();
+        CkWaitQD();
+      }
     }
     for (int i = 0; i < n_iters; i++) {
       array_proxy[0].fill(i);
@@ -191,9 +204,13 @@ public:
     container.init();
   }
 
-  PersistentArray(CkMigrateMessage* m) {}
+  PersistentArray(CkMigrateMessage* m) {
+    usesAtSync = true;
+  }
 
   void pup(PUP::er& p) {
+    p|me;
+    p|peer;
     p|container;
   }
 
