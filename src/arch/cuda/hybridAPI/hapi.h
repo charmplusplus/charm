@@ -210,14 +210,6 @@ typedef struct hapiRequestTimeInfo {
 } hapiRequestTimeInfo;
 #endif /* defined HAPI_INSTRUMENT_WRS */
 
-// API for Charm++ programs, using CkCallback
-static void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg);
-#ifdef __cplusplus
-static inline void hapiAddCallback(cudaStream_t stream, const CkCallback& cb) {
-  hapiAddCallback(stream, cb, nullptr);
-}
-#endif
-
 #ifndef AMPI_INTERNAL_SKIP_FUNCTIONS
 
 #define AMPI_CUSTOM_FUNC(return_type, function_name, ...) \
@@ -236,6 +228,10 @@ extern "C" {
 #ifdef __cplusplus
 
 // Provide a C++-only stub for this function's default parameter.
+void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg);
+static inline void hapiAddCallback(cudaStream_t stream, const CkCallback& cb) {
+  hapiAddCallback(stream, cb, nullptr);
+}
 static inline void hapiAddCallback(cudaStream_t stream, void* cb) {
   hapiAddCallback(stream, cb, nullptr);
 }
