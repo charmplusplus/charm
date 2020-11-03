@@ -30,6 +30,12 @@ struct Container {
     hapiCheck(cudaStreamDestroy(stream));
   }
 
+  void pup(PUP::er& p) {
+    if (p.isUnpacking()) init();
+    PUParray(p, h_remote_data, sizeof(double) * block_size);
+    // Data on GPU device do not migrate
+  }
+
   void init() {
     hapiCheck(cudaMallocHost(&h_remote_data, sizeof(double) * block_size));
     hapiCheck(cudaMalloc(&d_local_data, sizeof(double) * block_size));
@@ -117,32 +123,41 @@ public:
     start_time = CkWallTimer();
 
     CkPrintf("Testing chare array...\n");
+    // Exchange CkDevicePersistents
     array_proxy.initSend();
     CkWaitQD();
     for (int i = 0; i < n_iters; i++) {
+      array_proxy[1].fill(i);
+      CkWaitQD();
       array_proxy.testGet(i);
       CkWaitQD();
     }
     for (int i = 0; i < n_iters; i++) {
+      array_proxy[0].fill(i);
+      CkWaitQD();
       array_proxy.testPut(i);
       CkWaitQD();
     }
     CkPrintf("PASS\n");
 
-    /*
     CkPrintf("Testing chare group...\n");
     group_proxy.initSend();
     CkWaitQD();
     for (int i = 0; i < n_iters; i++) {
+      group_proxy[1].fill(i);
+      CkWaitQD();
       group_proxy.testGet(i);
       CkWaitQD();
     }
     for (int i = 0; i < n_iters; i++) {
+      group_proxy[0].fill(i);
+      CkWaitQD();
       group_proxy.testPut(i);
       CkWaitQD();
     }
     CkPrintf("PASS\n");
 
+    /*
     if (test_nodegroup) {
       CkPrintf("Testing chare nodegroup...\n");
       for (int i = 0; i < n_iters; i++) {
@@ -177,15 +192,13 @@ public:
     container.init();
   }
 
-  PersistentArray(CkMigrateMessage* m) {
-    container.init();
+  PersistentArray(CkMigrateMessage* m) {}
+
+  void pup(PUP::er& p) {
+    p|container;
   }
 
-  void pup(PUP::er& p) {}
-
   void initSend() {
-    container.fill(0);
-
     // Initialize and send my metadata to peer
     my_send_buf = CkDevicePersistent(container.d_local_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
@@ -199,6 +212,10 @@ public:
   void initRecv(CkDevicePersistent send_buf, CkDevicePersistent recv_buf) {
     peer_send_buf = send_buf;
     peer_recv_buf = recv_buf;
+  }
+
+  void fill(int iter) {
+    container.fill(iter);
   }
 
   void ResumeFromSync() {}
@@ -223,14 +240,12 @@ public:
   }
 
   void initSend() {
-    container.fill(0);
-
     // Initialize and send my metadata to peer
     my_send_buf = CkDevicePersistent(container.d_local_data, sizeof(double) * block_size,
-        CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
+        CkCallback(CkIndex_PersistentGroup::callback(), thisProxy[thisIndex]),
         container.stream);
     my_recv_buf = CkDevicePersistent(container.d_remote_data, sizeof(double) * block_size,
-        CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
+        CkCallback(CkIndex_PersistentGroup::callback(), thisProxy[thisIndex]),
         container.stream);
     thisProxy[peer].initRecv(my_send_buf, my_recv_buf);
   }
@@ -238,6 +253,10 @@ public:
   void initRecv(CkDevicePersistent send_buf, CkDevicePersistent recv_buf) {
     peer_send_buf = send_buf;
     peer_recv_buf = recv_buf;
+  }
+
+  void fill(int iter) {
+    container.fill(iter);
   }
 };
 
