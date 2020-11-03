@@ -5796,19 +5796,27 @@ is created, a *reference* is returned immediately. However, if the
 *value* calculated by the future is needed, the calling program blocks
 until the value is available.
 
-Charm++ provides all the necessary infrastructure to use futures by
-means of the following functions:
+We provide both C-compatible and object-oriented interfaces for using
+futures, which include the following functions:
 
-.. code-block:: c++
++------------------------------------------------------+------------------------------------+
+| C                                                    | C++                                |
++======================================================+====================================+
+| :code:`CkFuture CkCreateFuture(void)`                | :code:`ck::future()`               |
++------------------------------------------------------+------------------------------------+
+| :code:`void CkReleaseFuture(CkFuture fut)`           | :code:`void ck::future::release()` |
++------------------------------------------------------+------------------------------------+
+| :code:`int CkProbeFuture(CkFuture fut)`              | :code:`bool ck::future::probe()`   |
++------------------------------------------------------+------------------------------------+
+| :code:`void *CkWaitFuture(CkFuture fut)`             | :code:`T ck::future::get()`        |
++------------------------------------------------------+------------------------------------+
+| :code:`void CkSendToFuture(CkFuture fut, void *msg)` | :code:`void ck::future::set(T)`    |
++------------------------------------------------------+------------------------------------+
 
-    CkFuture CkCreateFuture(void)
-    void CkReleaseFuture(CkFuture fut)
-    int CkProbeFuture(CkFuture fut)
-    void *CkWaitFuture(CkFuture fut)
-    void CkSendToFuture(CkFuture fut, void *msg)
-
-To illustrate the use of all these functions, a Fibonacci example in
-Charm++ using futures in presented below:
+You will note that the object-oriented versions are methods of `ck::future`,
+which can be templated with any pup'able type. An example of the
+object-oriented interface is available under `examples/charm++/future`,
+with an equivalent example for the C-compatible interface presented below:
 
 .. code-block:: charmci
 
@@ -5857,6 +5865,16 @@ return the value for the current future.
 Other functions complete the API for futures. *CkReleaseFuture* destroys
 a future. *CkProbeFuture* tests whether the future has already finished
 computing the value of the expression.
+
+The maximum number of outstanding futures a PE may have is limited by the size of
+*CMK_REFNUM_TYPE*. Specifically, no more than :math:`2^{SIZE}-1` futures, where :math:`SIZE`
+is the size of *CMK_REFNUM_TYPE* in bits, may be outstanding at any time.
+Waiting on more futures will cause a fatal error in non-production builds,
+and will cause the program to hang in production builds. The default *CMK_REFNUM_TYPE*
+is ``unsigned short``, limiting each PE to 65,535 outstanding futures.
+To increase this limit, build Charm++ with a larger *CMK_REFNUM_TYPE*, e.g. specifying
+``--with-refnum-type=uint`` to use ``unsigned int`` when building Charm++.
+
 
 The Converse version of future functions can be found in the :ref:`conv-futures`
 section.
@@ -8939,7 +8957,7 @@ following example shows how this API can be used.
 
    CkSetPeHelpsOtherThreads(1);
 
-.. _sec:gpu:
+.. _sec-gpu:
 
 GPU Support
 -----------
@@ -10311,12 +10329,12 @@ mass of the particles with velocity greater than 1:
 
 .. code-block:: python
 
-   size = ck.read((``numparticles'', 0));
+   size = ck.read(("numparticles", 0));
    for i in range(0, size):
-       vel = ck.read((``velocity'', i));
-       mass = ck.read((``mass'', i));
+       vel = ck.read(("velocity", i));
+       mass = ck.read(("mass", i));
        mass = mass * 2;
-       if (vel > 1): ck.write((``mass'', i), mass);
+       if (vel > 1): ck.write(("mass", i), mass);
 
 Instead of all these read and writes, it will be better to be able to
 write:
@@ -11257,7 +11275,7 @@ After downloading and unpacking Charm++, it can be installed in the following wa
    $ make -j4
 
 
-By default, CMake builds the netlrts version. 
+By default, CMake builds the netlrts version.
 Other configuration options can be specified in the cmake command above.
 For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the following command can be used:
 
@@ -12970,6 +12988,8 @@ Acknowledgements
 
 -  Juan Galvez
 
+-  Justin Szaday
+
 -  Kavitha Chandrasekar
 
 -  Laxmikant Kale
@@ -13075,6 +13095,8 @@ Acknowledgements
 -  Yan Shi
 
 -  Yogesh Mehta
+
+-  Zane Fink
 
 -  Zheng Shao
 

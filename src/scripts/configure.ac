@@ -42,8 +42,19 @@ CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
-echo AC_PACKAGE_VERSION > ../include/VERSION
-AC_DEFINE_UNQUOTED([CHARM_VERSION], AC_PACKAGE_VERSION, [Charm++ Release/API version number])
+CHARM_VERSION=AC_PACKAGE_VERSION
+CHARM_VERSION_MAJOR=`echo $CHARM_VERSION | cut -c1`
+CHARM_VERSION_MINOR=`echo $CHARM_VERSION | cut -c2-3`
+CHARM_VERSION_PATCH=`echo $CHARM_VERSION | cut -c4-5`
+
+if test "$CHARM_VERSION_PATCH" -lt 10 ; then
+  CHARM_VERSION_PATCH=${CHARM_VERSION_PATCH#0} # remove leading '0'
+fi
+
+echo "#define CHARM_VERSION $CHARM_VERSION" > ../include/charm-version.h
+echo "#define CHARM_VERSION_MAJOR $CHARM_VERSION_MAJOR" >> ../include/charm-version.h
+echo "#define CHARM_VERSION_MINOR $CHARM_VERSION_MINOR" >> ../include/charm-version.h
+echo "#define CHARM_VERSION_PATCH $CHARM_VERSION_PATCH" >> ../include/charm-version.h
 
 charmout="charmconfig.out"
 /bin/rm -rf $charmout
@@ -2997,53 +3008,9 @@ else
 fi
 
 
-# for hwloc
-eval "`./charmc -print-building-blocks $OPTS`"
-export CC="$(get_full_command_name "$CMK_SEQ_CC")"
-export CXX="$(get_full_command_name "$CMK_SEQ_CXX")"
-export CC_FOR_BUILD="$(get_full_command_name "$CMK_NATIVE_CC")"
-AC_SUBST(CC_FOR_BUILD)
-export HWLOC_FLAGS="$CHARM_CC_FLAGS"
-export CFLAGS="$CMK_SEQ_CC_FLAGS"
-export AR="$(get_full_command_name "${CMK_SEQ_AR%% *}")"
-enable_embedded_mode='yes'
-enable_static='yes'
-if test "$CMK_NO_BUILD_SHARED" = 'false'
-then
-  # Force building of shared hwloc library in embedded mode.
-  # See https://github.com/UIUC-PPL/charm/issues/2599 and 
-  # https://github.com/open-mpi/hwloc/issues/371 for more details.
-  enable_shared='yes'
-  export am_libhwloc_embedded_la_rpath="-rpath $CHARMLIBSO"
-else
-  enable_shared='no'
-  export am_libhwloc_embedded_la_rpath=''
-fi
-AC_SUBST(am_libhwloc_embedded_la_rpath)
-enable_pci='no'
-enable_libudev='no'
-enable_libxml2='no'
-enable_visibility='no'
-enable_nvml='no'
-enable_opencl='no'
-enable_gl='no'
-enable_cairo='no'
-. hwloc/VERSION
-export libhwloc_so_version
-AC_SUBST(libhwloc_so_version)
-
-echo "Configuring hwloc:"
-AC_CONFIG_AUX_DIR(hwloc/config)
-AC_CANONICAL_TARGET
-AC_USE_SYSTEM_EXTENSIONS
-LT_INIT
-
-AM_INIT_AUTOMAKE([no-define])
-
-AC_CONFIG_MACRO_DIR(hwloc/config)
-HWLOC_SET_SYMBOL_PREFIX([cmi_])
-HWLOC_SETUP_CORE([hwloc], [happy=yes], [happy=no])
-HWLOC_DO_AM_CONDITIONALS
-add_flag 'CMK_HWLOC_LIBS="-lhwloc_embedded '"$HWLOC_EMBEDDED_LIBS"'"' "hwloc"
+eval `"$CHARMBIN/charmc" $OPTS -print-building-blocks -standalone`
+add_make_flag "HWLOC_CC:=$CHARM_CC" "hwloc"
+add_make_flag "HWLOC_CC_FLAGS:=$CHARM_CC_FLAGS" "hwloc"
+add_flag 'CMK_HWLOC_LIBS="-lhwloc_embedded -lm"' "hwloc"
 
 AC_OUTPUT
