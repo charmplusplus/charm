@@ -2,7 +2,6 @@
 import os
 import sys
 import csv
-import math
 import statistics
 
 # Number of GPUs
