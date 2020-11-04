@@ -16,7 +16,10 @@ mainmodule jacobi3d {
   readonly int n_iters;
   readonly int warmup_iters;
   readonly bool use_zerocopy;
+  readonly bool use_persistent;
   readonly bool print_elements;
+
+  message PersistentMsg;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
@@ -37,6 +40,7 @@ mainmodule jacobi3d {
     entry void packGhosts();
     entry void packGhostsDone();
     entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
+    entry void receiveGhostsP(PersistentMsg* msg);
     entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
 
     entry void exchangeGhosts() {
@@ -60,6 +64,12 @@ mainmodule jacobi3d {
           when receiveGhostsZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
             serial {
               processGhostsZC(dir, w, buf);
+            }
+          }
+        } else if (use_persistent) {
+          when receiveGhostsP[my_iter](PersistentMsg* msg) {
+            serial {
+              processGhostsP(msg);
             }
           }
         } else {
