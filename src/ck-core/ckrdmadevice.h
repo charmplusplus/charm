@@ -20,9 +20,7 @@ struct CkDevicePersistent {
   void* ipc_ptr;
   bool ipc_open;
 
-  CkDevicePersistent() {}
-
-  ~CkDevicePersistent() {}
+  CkDevicePersistent() : ptr(nullptr), cnt(0), pe(-1), ipc_ptr(nullptr), ipc_open(false) {}
 
   explicit CkDevicePersistent(const void* ptr_, size_t cnt_)
     : ptr(ptr_), cnt(cnt_), cb(CkCallback(CkCallback::ignore)) {
@@ -47,6 +45,8 @@ struct CkDevicePersistent {
   }
 
   void init();
+  void open();
+  void close();
 
   // Should only be used for exchanging between chares, not for migration.
   // After the owner chare migrates, CkDevicePersistent needs to be recreated

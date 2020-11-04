@@ -219,9 +219,11 @@ public:
     my_send_buf = CkDevicePersistent(container.d_local_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
         container.stream);
+    my_send_buf.open();
     my_recv_buf = CkDevicePersistent(container.d_remote_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentArray::callback(), thisProxy[thisIndex]),
         container.stream);
+    my_recv_buf.open();
     thisProxy[peer].initRecv(my_send_buf, my_recv_buf);
   }
 
@@ -234,6 +236,10 @@ public:
     container.fill(iter);
   }
 
+  void ckAboutToMigrate() {
+    peer_send_buf.close();
+    peer_recv_buf.close();
+  }
   void ResumeFromSync() {}
 };
 
@@ -260,9 +266,11 @@ public:
     my_send_buf = CkDevicePersistent(container.d_local_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentGroup::callback(), thisProxy[thisIndex]),
         container.stream);
+    my_send_buf.open();
     my_recv_buf = CkDevicePersistent(container.d_remote_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentGroup::callback(), thisProxy[thisIndex]),
         container.stream);
+    my_recv_buf.open();
     thisProxy[peer].initRecv(my_send_buf, my_recv_buf);
   }
 
@@ -299,9 +307,11 @@ public:
     my_send_buf = CkDevicePersistent(container.d_local_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentNodeGroup::callback(), thisProxy[thisIndex]),
         container.stream);
+    my_send_buf.open();
     my_recv_buf = CkDevicePersistent(container.d_remote_data, sizeof(double) * block_size,
         CkCallback(CkIndex_PersistentNodeGroup::callback(), thisProxy[thisIndex]),
         container.stream);
+    my_recv_buf.open();
     thisProxy[peer].initRecv(my_send_buf, my_recv_buf);
   }
 
