@@ -35,8 +35,7 @@ struct Container {
     if (p.isUnpacking()) {
       init();
     }
-    // TODO
-    //PUParray(p, h_remote_data, sizeof(double) * block_size);
+    PUParray(p, h_remote_data, block_size);
     // Data on GPU device do not migrate
   }
 
