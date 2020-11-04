@@ -7,8 +7,8 @@
 #define LBMANAGER_H
 
 #include "LBDatabase.h"
-//#include "json.hpp"
-//using json = nlohmann::json;
+#include "json.hpp"
+using json = nlohmann::json;
 
 #define LB_FORMAT_VERSION 3
 
@@ -247,10 +247,8 @@ class LBManager : public CBase_LBManager
 
   void pup(PUP::er& p);
 
-  /*
   void configureTreeLB(const char* json_str);
   void configureTreeLB(json& config);
-  */
 
   /*
    * Calls from object managers to load database

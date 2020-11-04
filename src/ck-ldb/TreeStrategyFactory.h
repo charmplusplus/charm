@@ -15,11 +15,12 @@ class TreeStrategyFactory
   // during preprocessing will not be part of the executable (because the templates
   // won't be instantiated)
   template <class O, class P, class S>
-  static TreeStrategy::Strategy<O, P, S>* makeStrategy(const std::string& name)
+  static TreeStrategy::Strategy<O, P, S>* makeStrategy(const std::string& name,
+                                                       json& config)
   {
     using namespace TreeStrategy;
     if (name == "Greedy") return new Greedy<O, P, S>();
-    if (name == "GreedyRefine") return new GreedyRefine<O, P, S>();
+    if (name == "GreedyRefine") return new GreedyRefine<O, P, S>(config);
     if (name == "RefineA") return new RefineA<O, P, S>();
     if (name == "RefineB") return new RefineB<O, P, S>();
     if (name == "Random") return new Random<O, P, S>();

@@ -685,7 +685,6 @@ void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
 {
   if (lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB")
   {
-    /*
     json config;
     if (lbNames[switchTo] == "Hybrid")
     {
@@ -702,7 +701,6 @@ void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
       config["Root"]["strategies"] = {lbNames[switchTo]};
     }
     configureTreeLB(config);
-    */
   }
   else
   {
@@ -774,7 +772,6 @@ void LBManager::pup(PUP::er& p)
   }
 }
 
-/*
 void configureTreeLB(const char* json_str)
 {
   ((LBManager*)CkLocalBranch(_lbmgr))->configureTreeLB(json_str);
@@ -800,7 +797,6 @@ void LBManager::configureTreeLB(json& config)
   }
   if (!found) CkAbort("LBManager: TreeLB is not in my list of load balancers");
 }
-*/
 
 void LBManager::ResetAdaptive()
 {
