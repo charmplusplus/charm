@@ -75,6 +75,7 @@ never be excluded...
 #include "CkSyncBarrier.decl.h"
 #if CMK_CHARM4PY
 #include "TreeLB.h"
+// #include "trace-projectionsBOC.h"
 #endif
 
 #if CMK_CUDA
@@ -87,6 +88,11 @@ extern void (*hapiQdCreate)(int);
 extern void (*hapiQdProcess)(int);
 extern void QdCreate(int);
 extern void QdProcess(int);
+#endif
+
+#if CMK_CHARM4PY
+extern void _createTraceprojections(char **argv);
+extern void _registerTraceProjections();
 #endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
@@ -1518,6 +1524,8 @@ void _initCharm(int unused_argc, char **argv)
                   have to somehow be registered during init.
                 */
 		_registerTreeLB();
+    _registerTraceProjections();
+
 #endif
 
 		/**
