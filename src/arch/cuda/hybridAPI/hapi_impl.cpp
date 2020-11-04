@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#define CUDA_API_PER_THREAD_DEFAULT_STREAM
 #include <cuda_runtime.h>
 
 #include "converse.h"
@@ -689,31 +690,17 @@ hapiWorkRequest::hapiWorkRequest() :
     kernel_cb(NULL), device_to_host_cb(NULL), runKernel(NULL), state(0),
     user_data(NULL), free_user_data(false), free_host_to_device_cb(false),
     free_kernel_cb(false), free_device_to_host_cb(false)
-  {
+{
 #ifdef HAPI_TRACE
-    trace_name = "";
+  trace_name = "";
 #endif
 #ifdef HAPI_INSTRUMENT_WRS
-    chare_index = -1;
+  chare_index = -1;
 #endif
 
-  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-
-#if CMK_SMP
-    CmiLock(csv_gpu_manager.stream_lock_);
-#endif
-
-    // Create default per-PE streams if none exist
-    if (csv_gpu_manager.getStream(0) == NULL) {
-      csv_gpu_manager.createNStreams(CmiMyNodeSize());
-    }
-
-    stream = csv_gpu_manager.getStream(CmiMyRank() % csv_gpu_manager.getNStreams());
-
-#if CMK_SMP
-    CmiUnlock(csv_gpu_manager.stream_lock_);
-#endif
-  }
+  // Use CUDA per-thread default stream
+  stream = cudaStreamPerThread;
+}
 
 static void shmInit() {
   if (!CsvAccess(gpu_manager).use_shm) return;
@@ -1146,7 +1133,7 @@ static int findPool(size_t size){
     if (newpool.head == NULL) {
       CmiPrintf("[HAPI (%d)] findPool: failed to allocate newpool %d head, size %zu\n",
              CmiMyPe(), boundary_array_len, size);
-      CmiAbort("[HAPI] failed newpool allocation");
+      return -1;
     }
     newpool.size = size;
 #ifdef HAPI_MEMPOOL_DEBUG
@@ -1217,7 +1204,7 @@ static void returnBufferToPool(int pool, BufferPoolHeader* hd) {
 #endif
 }
 
-void* hapiPoolMalloc(size_t size) {
+cudaError_t hapiPoolMalloc(void** ptr, size_t size) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
 #if CMK_SMP
@@ -1256,27 +1243,35 @@ void* hapiPoolMalloc(size_t size) {
   }
 
   int pool = findPool(size);
-  void* buf = getBufferFromPool(pool, size);
+  if (pool < 0) {
+    *ptr = nullptr;
+
+#if CMK_SMP
+    CmiUnlock(csv_gpu_manager.mempool_lock_);
+#endif
+
+    return cudaErrorMemoryAllocation;
+  }
+  *ptr = getBufferFromPool(pool, size);
 
 #ifdef HAPI_MEMPOOL_DEBUG
   CmiPrintf("[HAPI (%d)] hapiPoolMalloc size %zu pool %d left %d\n",
-         CmiMyPe(), size, pool,
-         csv_gpu_manager.mempool_free_bufs_[pool].num);
+      CmiMyPe(), size, pool, csv_gpu_manager.mempool_free_bufs_[pool].num);
 #endif
 
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.mempool_lock_);
 #endif
 
-  return buf;
+  return cudaSuccess;
 }
 
-void hapiPoolFree(void* ptr) {
+cudaError_t hapiPoolFree(void* ptr) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
-  // check if mempool was initialized, just return if not
+  // Check if mempool was initialized
   if (!csv_gpu_manager.mempool_initialized_)
-    return;
+    return cudaErrorInitializationError;
 
   BufferPoolHeader* hd = ((BufferPoolHeader*)ptr) - 1;
   int pool = hd->slot;
@@ -1300,6 +1295,8 @@ void hapiPoolFree(void* ptr) {
          CmiMyPe(), size, pool,
          csv_gpu_manager.mempool_free_bufs_[pool].num);
 #endif
+
+  return cudaSuccess;
 }
 
 #ifdef HAPI_INSTRUMENT_WRS
@@ -1483,22 +1480,8 @@ cudaError_t hapiMallocHost(void** ptr, size_t size) {
   return cudaMallocHost(ptr, size);
 }
 
-cudaError_t hapiMallocHostPool(void** ptr, size_t size) {
-  void* tmp_ptr = hapiPoolMalloc(size);
-  if (tmp_ptr) {
-    *ptr = tmp_ptr;
-    return cudaSuccess;
-  }
-  else return cudaErrorMemoryAllocation;
-}
-
 cudaError_t hapiFreeHost(void* ptr) {
   return cudaFreeHost(ptr);
-}
-
-cudaError_t hapiFreeHostPool(void *ptr) {
-  hapiPoolFree(ptr);
-  return cudaSuccess;
 }
 
 cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {

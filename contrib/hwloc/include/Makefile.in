@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# Copyright © 2009-2019 Inria.  All rights reserved.
+# Copyright © 2009-2020 Inria.  All rights reserved.
 # Copyright © 2009-2010 Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 # Copyright © 2011      Oracle and/or its affiliates.  All rights reserved.
@@ -183,12 +183,12 @@ am__installdirs = "$(DESTDIR)$(includedir)" \
 	"$(DESTDIR)$(include_hwlocdir)" \
 	"$(DESTDIR)$(include_hwloc_autogendir)"
 am__include_hwloc_HEADERS_DIST = hwloc/bitmap.h hwloc/helper.h \
-	hwloc/inlines.h hwloc/diff.h hwloc/shmem.h hwloc/distances.h \
-	hwloc/export.h hwloc/openfabrics-verbs.h hwloc/opencl.h \
-	hwloc/cuda.h hwloc/cudart.h hwloc/nvml.h hwloc/plugins.h \
-	hwloc/gl.h hwloc/rename.h hwloc/deprecated.h hwloc/linux.h \
-	hwloc/linux-libnuma.h private/solaris-chiptype.h \
-	hwloc/glibc-sched.h
+	hwloc/inlines.h hwloc/memattrs.h hwloc/diff.h hwloc/shmem.h \
+	hwloc/distances.h hwloc/export.h hwloc/openfabrics-verbs.h \
+	hwloc/opencl.h hwloc/cuda.h hwloc/cudart.h hwloc/nvml.h \
+	hwloc/rsmi.h hwloc/plugins.h hwloc/gl.h hwloc/rename.h \
+	hwloc/deprecated.h hwloc/linux.h hwloc/linux-libnuma.h \
+	private/solaris-chiptype.h hwloc/glibc-sched.h
 am__noinst_HEADERS_DIST = private/private.h private/debug.h \
 	private/misc.h private/xml.h private/components.h \
 	private/internal-components.h private/cpuid-x86.h \
@@ -273,6 +273,7 @@ HWLOC_GL_LIBS = @HWLOC_GL_LIBS@
 HWLOC_HAVE_LIBXML2 = @HWLOC_HAVE_LIBXML2@
 HWLOC_HAVE_NVML = @HWLOC_HAVE_NVML@
 HWLOC_HAVE_OPENCL = @HWLOC_HAVE_OPENCL@
+HWLOC_HAVE_RSMI = @HWLOC_HAVE_RSMI@
 HWLOC_LDFLAGS = @HWLOC_LDFLAGS@
 HWLOC_LIBS = @HWLOC_LIBS@
 HWLOC_LIBS_PRIVATE = @HWLOC_LIBS_PRIVATE@
@@ -294,6 +295,7 @@ HWLOC_PLUGINS_PATH = @HWLOC_PLUGINS_PATH@
 HWLOC_PS_LIBS = @HWLOC_PS_LIBS@
 HWLOC_RELEASE_DATE = @HWLOC_RELEASE_DATE@
 HWLOC_REQUIRES = @HWLOC_REQUIRES@
+HWLOC_RSMI_LIBS = @HWLOC_RSMI_LIBS@
 HWLOC_TERMCAP_LIBS = @HWLOC_TERMCAP_LIBS@
 HWLOC_VERSION = @HWLOC_VERSION@
 HWLOC_W3_GENERATOR = @HWLOC_W3_GENERATOR@
@@ -426,13 +428,15 @@ xz = @xz@
 @HWLOC_BUILD_STANDALONE_TRUE@include_hwlocdir = $(includedir)/hwloc
 @HWLOC_BUILD_STANDALONE_TRUE@include_hwloc_HEADERS = hwloc/bitmap.h \
 @HWLOC_BUILD_STANDALONE_TRUE@	hwloc/helper.h hwloc/inlines.h \
-@HWLOC_BUILD_STANDALONE_TRUE@	hwloc/diff.h hwloc/shmem.h \
-@HWLOC_BUILD_STANDALONE_TRUE@	hwloc/distances.h hwloc/export.h \
+@HWLOC_BUILD_STANDALONE_TRUE@	hwloc/memattrs.h hwloc/diff.h \
+@HWLOC_BUILD_STANDALONE_TRUE@	hwloc/shmem.h hwloc/distances.h \
+@HWLOC_BUILD_STANDALONE_TRUE@	hwloc/export.h \
 @HWLOC_BUILD_STANDALONE_TRUE@	hwloc/openfabrics-verbs.h \
 @HWLOC_BUILD_STANDALONE_TRUE@	hwloc/opencl.h hwloc/cuda.h \
 @HWLOC_BUILD_STANDALONE_TRUE@	hwloc/cudart.h hwloc/nvml.h \
-@HWLOC_BUILD_STANDALONE_TRUE@	hwloc/plugins.h hwloc/gl.h \
-@HWLOC_BUILD_STANDALONE_TRUE@	hwloc/rename.h hwloc/deprecated.h \
+@HWLOC_BUILD_STANDALONE_TRUE@	hwloc/rsmi.h hwloc/plugins.h \
+@HWLOC_BUILD_STANDALONE_TRUE@	hwloc/gl.h hwloc/rename.h \
+@HWLOC_BUILD_STANDALONE_TRUE@	hwloc/deprecated.h \
 @HWLOC_BUILD_STANDALONE_TRUE@	$(am__append_2) $(am__append_3) \
 @HWLOC_BUILD_STANDALONE_TRUE@	$(am__append_4)
 @HWLOC_BUILD_STANDALONE_TRUE@include_hwloc_autogendir = $(includedir)/hwloc/autogen

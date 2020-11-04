@@ -258,7 +258,7 @@ class StrategyWrapper : public IStrategyWrapper
   {
     strategy_name = _strategy_name;
     isTreeRoot = _isTreeRoot;
-    strategy = TreeStrategyFactory::makeStrategy<O, P, Solution>(strategy_name, config);
+    strategy = TreeStrategy::Factory::makeStrategy<O, P, Solution>(strategy_name, config);
   }
 
   virtual ~StrategyWrapper() { delete strategy; }
@@ -460,7 +460,9 @@ class RootLevel : public LevelLogic
    * mode 0: receive obj stats
    * mode 1: receive aggregated group load
    */
-  virtual void configure(bool rateAware, json& config)
+  virtual void configure(bool rateAware, std::vector<std::string> strategies,
+                         json& config, bool repeat_strategies = false,
+                         bool token_passing = true)
   {
     using namespace TreeStrategy;
     for (auto w : wrappers) delete w;
@@ -468,7 +470,7 @@ class RootLevel : public LevelLogic
     if (num_groups == -1)
     {
       current_strategy = 0;
-      for (const std::string& strategy_name : config["strategies"])
+      for (const std::string& strategy_name : strategies)
       {
         if (rateAware)
         {
@@ -481,18 +483,11 @@ class RootLevel : public LevelLogic
               strategy_name, true, config[strategy_name]));
         }
       }
-      repeat_strategies = true;
-      const auto& option = config.find("repeat_strategies");
-      if (option != config.end()) repeat_strategies = *option;
+      this->repeat_strategies = repeat_strategies;
     }
     else
     {
-      const auto& option = config.find("strategies");
-      if (option != config.end())
-      {
-        const std::string& strategy_name = config["strategies"][0];
-        if (strategy_name == "dummy") group_strategy_dummy = true;
-      }
+      group_strategy_dummy = !token_passing;
     }
   }
 
@@ -671,13 +666,15 @@ class NodeSetLevel : public LevelLogic
     for (auto w : wrappers) delete w;
   }
 
-  virtual void configure(bool rateAware, json& config, int _cutoff_freq = 1)
+  virtual void configure(bool rateAware, std::vector<std::string> strategies,
+                         json& config, bool repeat_strategies = false,
+                         int _cutoff_freq = 1)
   {
     using namespace TreeStrategy;
     for (auto w : wrappers) delete w;
     wrappers.clear();
     current_strategy = 0;
-    for (const std::string& strategy_name : config["strategies"])
+    for (const std::string& strategy_name : strategies)
     {
       if (rateAware)
       {
@@ -690,9 +687,7 @@ class NodeSetLevel : public LevelLogic
             strategy_name, false, config[strategy_name]));
       }
     }
-    repeat_strategies = true;
-    const auto& option = config.find("repeat_strategies");
-    if (option != config.end()) repeat_strategies = *option;
+    this->repeat_strategies = repeat_strategies;;
     cutoff_freq = _cutoff_freq;
     CkAssert(cutoff_freq > 0);
   }
@@ -925,13 +920,15 @@ class NodeLevel : public LevelLogic
     for (auto w : wrappers) delete w;
   }
 
-  virtual void configure(bool rateAware, json& config, int _cutoff_freq = 1)
+  virtual void configure(bool rateAware, std::vector<std::string> strategies,
+                         json& config, bool repeat_strategies = false,
+                         int _cutoff_freq = 1)
   {
     using namespace TreeStrategy;
     for (auto w : wrappers) delete w;
     wrappers.clear();
     current_strategy = 0;
-    for (const std::string& strategy_name : config["strategies"])
+    for (const std::string& strategy_name : strategies)
     {
       if (rateAware)
       {
@@ -944,9 +941,7 @@ class NodeLevel : public LevelLogic
             strategy_name, false, config[strategy_name]));
       }
     }
-    repeat_strategies = true;
-    const auto& option = config.find("repeat_strategies");
-    if (option != config.end()) repeat_strategies = *option;
+    this->repeat_strategies = repeat_strategies;
     cutoff_freq = _cutoff_freq;
     CkAssert(cutoff_freq > 0);
   }

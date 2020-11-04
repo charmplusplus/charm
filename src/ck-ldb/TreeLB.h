@@ -125,16 +125,7 @@ class LevelLogic
   std::vector<TreeLBMessage*> stats_msgs;
 };
 
-class LBTreeBuilder
-{
- public:
-  /// return number of levels in tree
-  virtual uint8_t build(std::vector<LevelLogic*>& logic, std::vector<int>& comm_parent,
-                        std::vector<std::vector<int>>& comm_children,
-                        std::vector<LevelLogic*>& comm_logic, json& config) = 0;
-
-  virtual ~LBTreeBuilder() {}
-};
+class LBTreeBuilder;
 
 // TODO All load balancers should probably just inherit from a common
 // interface, and the load balancers should just register themselves

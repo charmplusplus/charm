@@ -108,7 +108,7 @@ add_library(global-swap global-elfgot.C)
 
 find_program(GIT git)
 
-if(GIT)
+if(GIT AND EXISTS ${CMAKE_SOURCE_DIR}/.git)
   execute_process(COMMAND git describe --exact-match
              OUTPUT_VARIABLE CHARM_VERSION_GIT
              RESULT_VARIABLE git_result
@@ -238,10 +238,3 @@ configure_file(../langs/pvmc/pvmc.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(../langs/pvmc/pvm3.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(../langs/simplemsg/sm.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(../langs/simplemsg/simplemsg.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-
-
-if(${F90CHARM})
-    include(../ci-files.cmake)
-    add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h)
-    target_compile_definitions(f90charm PRIVATE -DAMPI_FORTRAN=1)
-endif()

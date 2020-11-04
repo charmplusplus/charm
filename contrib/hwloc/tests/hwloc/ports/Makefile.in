@@ -113,7 +113,7 @@ CONFIG_CLEAN_FILES = topology-solaris.c topology-solaris-chiptype.c \
 	topology-aix.c topology-windows.c topology-darwin.c \
 	topology-freebsd.c topology-netbsd.c topology-hpux.c \
 	topology-bgq.c topology-opencl.c topology-cuda.c \
-	topology-nvml.c topology-gl.c lstopo-windows.c
+	topology-nvml.c topology-rsmi.c topology-gl.c lstopo-windows.c
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -194,6 +194,7 @@ HWLOC_GL_LIBS = @HWLOC_GL_LIBS@
 HWLOC_HAVE_LIBXML2 = @HWLOC_HAVE_LIBXML2@
 HWLOC_HAVE_NVML = @HWLOC_HAVE_NVML@
 HWLOC_HAVE_OPENCL = @HWLOC_HAVE_OPENCL@
+HWLOC_HAVE_RSMI = @HWLOC_HAVE_RSMI@
 HWLOC_LDFLAGS = @HWLOC_LDFLAGS@
 HWLOC_LIBS = @HWLOC_LIBS@
 HWLOC_LIBS_PRIVATE = @HWLOC_LIBS_PRIVATE@
@@ -215,6 +216,7 @@ HWLOC_PLUGINS_PATH = @HWLOC_PLUGINS_PATH@
 HWLOC_PS_LIBS = @HWLOC_PS_LIBS@
 HWLOC_RELEASE_DATE = @HWLOC_RELEASE_DATE@
 HWLOC_REQUIRES = @HWLOC_REQUIRES@
+HWLOC_RSMI_LIBS = @HWLOC_RSMI_LIBS@
 HWLOC_TERMCAP_LIBS = @HWLOC_TERMCAP_LIBS@
 HWLOC_VERSION = @HWLOC_VERSION@
 HWLOC_W3_GENERATOR = @HWLOC_W3_GENERATOR@

@@ -31,7 +31,7 @@ set(ck-cxx-sources
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     charm-api.h charm.h charmf.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
     ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
-    ckevacuation.h ckfutures.h cklocation.h cklocrec.h
+    ckevacuation.h ckmarshall.h ckfutures.h cklocation.h cklocrec.h
     ckmemcheckpoint.h ckmessage.h ckmigratable.h ckmulticast.h
     ckobjQ.h ckrdma.h ckrdmadevice.h ckreduction.h cksection.h
     ckstream.h cksyncbarrier.h debug-charm.h envelope-path.h envelope.h init.h
@@ -66,7 +66,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/ckheap.h ../ck-ldb/ckset.h
     ../ck-ldb/elements.h
     ../ck-ldb/lbdb.h ../ck-ldb/manager.h
-    ../ck-ldb/idm.h ../util/json.hpp)
+    ../ck-ldb/idm.h ../util/json.hpp ../util/json_fwd.hpp)
 
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
@@ -82,18 +82,20 @@ add_library(moduleCommonLBs
 )
 add_dependencies(moduleCommonLBs ck)
 
-if(${EVERYLB})
-add_library(moduleEveryLB
-    ${ldb-cxx-sources}
-    ${ldb-h-sources}
-)
-configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
-add_dependencies(moduleEveryLB ck)
+if(EVERYLB)
+    add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
+    configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
+    add_dependencies(moduleEveryLB ck ckmetis)
 
-add_library(moduleMetisLB ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
-add_dependencies(moduleMetisLB ck libckmetis)
+    add_library(moduleMetisLB ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
 
-add_custom_target(libckmetis COMMAND make -C ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis ${CMAKE_BINARY_DIR}/src/libs/ck-libs/metis/libmetis) # defines "ckmetis" target
+
+    target_include_directories(ckmetis PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/GKlib )
+    target_include_directories(moduleMetisLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
+    target_include_directories(moduleEveryLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
+
+    add_dependencies(moduleMetisLB ck ckmetis)
 endif()
 
 # Single LBs
@@ -128,7 +130,15 @@ target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../uti
 if(${CMK_CAN_LINK_FORTRAN})
     add_library(ckf charmf.C charmmod.f90 charmf.h)
     add_dependencies(ckf ck)
+    add_custom_command(TARGET ckf
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/charm.mod ${CMAKE_BINARY_DIR}/include/
+        VERBATIM
+    )
     add_library(ckmainf mainf.f90)
+
+    add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h)
+    add_dependencies(f90charm ck)
 endif()
 
 add_library(mpi-mainmodule mpi-mainmodule.C)

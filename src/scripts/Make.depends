@@ -13,7 +13,7 @@ BaseLB.o: BaseLB.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -37,7 +37,7 @@ CentralLB.o: CentralLB.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -64,7 +64,7 @@ CentralPredictor.o: CentralPredictor.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -80,7 +80,7 @@ CommonLBs.o: CommonLBs.C LBManager.h LBDatabase.h lbdb.h converse.h \
  pup_c.h pup_c_functions.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h \
  conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
  cmirdmautils.h debug-conv.h charm.h conv-rdma.h pup.h middle.h \
- middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h charm++.h cklists.h pup_stl.h conv-config.h \
  ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h ckrdma.h \
  envelope.h pup.h charm.h middle.h cklists.h objid.h ckcallback.h \
@@ -105,7 +105,7 @@ DistBaseLB.o: DistBaseLB.C BaseLB.h LBManager.h LBDatabase.h lbdb.h \
  pup_c.h pup_c_functions.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h \
  conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
  cmirdmautils.h debug-conv.h charm.h conv-rdma.h pup.h middle.h \
- middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h charm++.h cklists.h pup_stl.h conv-config.h \
  ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h ckrdma.h \
  envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h converse.h \
@@ -129,11 +129,11 @@ DistributedLB.o: DistributedLB.C DistributedLB.h DistBaseLB.h BaseLB.h \
  lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h cmirdmautils.h debug-conv.h \
  charm.h conv-rdma.h pup.h middle.h middle-conv.h LBObj.h LBOM.h LBComm.h \
- LBMachineUtil.h json.hpp LBManager.decl.h charm++.h cklists.h pup_stl.h \
- conv-config.h ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h \
- ckrdma.h envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h \
- converse.h pup.h ckcallback.h cksection.h ckarrayindex.h objid.h \
- conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
+ LBMachineUtil.h json_fwd.hpp LBManager.decl.h charm++.h cklists.h \
+ pup_stl.h conv-config.h ckbitvector.h ckstream.h init.h charm-api.h \
+ ckhashtable.h ckrdma.h envelope.h pup.h charm.h middle.h cklists.h \
+ objid.h charm.h converse.h pup.h ckcallback.h cksection.h ckarrayindex.h \
+ objid.h conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
  debug-conv++.h simd.h ckmessage.h CkMarshall.decl.h sdag.h pup_stl.h \
  envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
  ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
@@ -152,7 +152,7 @@ EveryLB.o: EveryLB.C LBManager.h LBDatabase.h lbdb.h converse.h \
  pup_c.h pup_c_functions.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h \
  conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
  cmirdmautils.h debug-conv.h charm.h conv-rdma.h pup.h middle.h \
- middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h charm++.h cklists.h pup_stl.h conv-config.h \
  ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h ckrdma.h \
  envelope.h pup.h charm.h middle.h cklists.h objid.h ckcallback.h \
@@ -185,7 +185,7 @@ HybridBaseLB.o: HybridBaseLB.C HybridBaseLB.h charm++.h charm.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -211,7 +211,7 @@ LBDatabase.o: LBDatabase.C LBManager.h LBDatabase.h lbdb.h converse.h \
  pup_c.h pup_c_functions.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h \
  conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
  cmirdmautils.h debug-conv.h charm.h conv-rdma.h pup.h middle.h \
- middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h charm++.h cklists.h pup_stl.h conv-config.h \
  ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h ckrdma.h \
  envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h converse.h \
@@ -233,7 +233,7 @@ LBMachineUtil.o: LBMachineUtil.C LBManager.h LBDatabase.h lbdb.h \
  pup_c.h pup_c_functions.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h \
  conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
  cmirdmautils.h debug-conv.h charm.h conv-rdma.h pup.h middle.h \
- middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h charm++.h cklists.h pup_stl.h conv-config.h \
  ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h ckrdma.h \
  envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h converse.h \
@@ -264,7 +264,7 @@ LBManager.o: LBManager.C converse.h conv-header.h conv-config.h \
  ckrdmadevice.h conv-rdmadevice.h conv-header.h ckobjQ.h ckreduction.h \
  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h \
  ckarray.h cklocation.h LBManager.h LBDatabase.h lbdb.h LBObj.h LBOM.h \
- LBComm.h LBMachineUtil.h json.hpp LBManager.decl.h BaseLB.decl.h \
+ LBComm.h LBMachineUtil.h json_fwd.hpp LBManager.decl.h BaseLB.decl.h \
  MetaBalancer.h RandomForestModel.h MetaBalancer.decl.h CkLocation.decl.h \
  ckarrayoptions.h ckmulticast.h CkMulticast.decl.h cklocrec.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h waitqd.h \
@@ -291,7 +291,7 @@ LBObj.o: LBObj.C charm++.h charm.h converse.h conv-header.h conv-config.h \
  envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
  ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -313,7 +313,7 @@ LBSimulation.o: LBSimulation.C LBSimulation.h charm++.h charm.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -330,7 +330,7 @@ LButil.o: LButil.C elements.h converse.h conv-header.h conv-config.h \
  conv-lists.h conv-trace.h persistent.h cmirdmautils.h debug-conv.h \
  lbdb.h charm.h conv-rdma.h pup.h middle.h middle-conv.h ckset.h \
  cklists.h pup_stl.h conv-config.h ckheap.h BaseLB.h LBManager.h \
- LBDatabase.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h charm++.h ckbitvector.h ckstream.h init.h charm-api.h \
  ckhashtable.h ckrdma.h envelope.h pup.h charm.h middle.h cklists.h \
  objid.h charm.h converse.h pup.h ckcallback.h cksection.h ckarrayindex.h \
@@ -352,18 +352,19 @@ MetaBalancer.o: MetaBalancer.C converse.h conv-header.h conv-config.h \
  lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h cmirdmautils.h debug-conv.h \
  MetaBalancer.h LBManager.h LBDatabase.h lbdb.h charm.h conv-rdma.h pup.h \
- middle.h middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
- LBManager.decl.h charm++.h cklists.h pup_stl.h conv-config.h \
- ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h ckrdma.h \
- envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h converse.h \
- pup.h ckcallback.h cksection.h ckarrayindex.h objid.h conv-ccs.h \
- sockRoutines.h ccs-server.h register.h debug-charm.h debug-conv++.h \
- simd.h ckmessage.h CkMarshall.decl.h sdag.h pup_stl.h envelope.h \
- debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h ckreduction.h \
- CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h \
- ckarray.h cklocation.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
- CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
- CkFutures.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
+ middle.h middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h \
+ json_fwd.hpp LBManager.decl.h charm++.h cklists.h pup_stl.h \
+ conv-config.h ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h \
+ ckrdma.h envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h \
+ converse.h pup.h ckcallback.h cksection.h ckarrayindex.h objid.h \
+ conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
+ debug-conv++.h simd.h ckmessage.h CkMarshall.decl.h sdag.h pup_stl.h \
+ envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
+ ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
+ CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h \
+ CkLocation.decl.h ckarrayoptions.h ckmulticast.h CkMulticast.decl.h \
+ cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h \
+ waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  CkCheckpointStatus.decl.h ckevacuation.h trace.h pathHistory.h \
  PathHistory.decl.h ckcallback-ccs.h CkCallback.decl.h BaseLB.decl.h \
  RandomForestModel.h MetaBalancer.decl.h topology.h MetaBalancer.def.h
@@ -375,11 +376,11 @@ MetisLB.o: MetisLB.C MetisLB.h CentralLB.h BaseLB.h LBManager.h \
  lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h cmirdmautils.h debug-conv.h \
  charm.h conv-rdma.h pup.h middle.h middle-conv.h LBObj.h LBOM.h LBComm.h \
- LBMachineUtil.h json.hpp LBManager.decl.h charm++.h cklists.h pup_stl.h \
- conv-config.h ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h \
- ckrdma.h envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h \
- converse.h pup.h ckcallback.h cksection.h ckarrayindex.h objid.h \
- conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
+ LBMachineUtil.h json_fwd.hpp LBManager.decl.h charm++.h cklists.h \
+ pup_stl.h conv-config.h ckbitvector.h ckstream.h init.h charm-api.h \
+ ckhashtable.h ckrdma.h envelope.h pup.h charm.h middle.h cklists.h \
+ objid.h charm.h converse.h pup.h ckcallback.h cksection.h ckarrayindex.h \
+ objid.h conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
  debug-conv++.h simd.h ckmessage.h CkMarshall.decl.h sdag.h pup_stl.h \
  envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
  ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
@@ -400,7 +401,7 @@ Refiner.o: Refiner.C Refiner.h elements.h converse.h conv-header.h \
  cmirdmautils.h debug-conv.h lbdb.h charm.h conv-rdma.h pup.h middle.h \
  middle-conv.h ckset.h cklists.h pup_stl.h conv-config.h ckheap.h \
  CentralLB.h BaseLB.h LBManager.h LBDatabase.h LBObj.h LBOM.h LBComm.h \
- LBMachineUtil.h json.hpp LBManager.decl.h charm++.h ckbitvector.h \
+ LBMachineUtil.h json_fwd.hpp LBManager.decl.h charm++.h ckbitvector.h \
  ckstream.h init.h charm-api.h ckhashtable.h ckrdma.h envelope.h pup.h \
  charm.h middle.h cklists.h objid.h charm.h converse.h pup.h ckcallback.h \
  cksection.h ckarrayindex.h objid.h conv-ccs.h sockRoutines.h \
@@ -424,7 +425,7 @@ RefinerTemp.o: RefinerTemp.C RefinerTemp.h elements.h converse.h \
  cmirdmautils.h debug-conv.h lbdb.h charm.h conv-rdma.h pup.h middle.h \
  middle-conv.h ckset.h cklists.h pup_stl.h conv-config.h ckheap.h \
  CentralLB.h BaseLB.h LBManager.h LBDatabase.h LBObj.h LBOM.h LBComm.h \
- LBMachineUtil.h json.hpp LBManager.decl.h charm++.h ckbitvector.h \
+ LBMachineUtil.h json_fwd.hpp LBManager.decl.h charm++.h ckbitvector.h \
  ckstream.h init.h charm-api.h ckhashtable.h ckrdma.h envelope.h pup.h \
  charm.h middle.h cklists.h objid.h charm.h converse.h pup.h ckcallback.h \
  cksection.h ckarrayindex.h objid.h conv-ccs.h sockRoutines.h \
@@ -447,11 +448,11 @@ ScotchLB.o: ScotchLB.C ScotchLB.h CentralLB.h BaseLB.h LBManager.h \
  lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h cmirdmautils.h debug-conv.h \
  charm.h conv-rdma.h pup.h middle.h middle-conv.h LBObj.h LBOM.h LBComm.h \
- LBMachineUtil.h json.hpp LBManager.decl.h charm++.h cklists.h pup_stl.h \
- conv-config.h ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h \
- ckrdma.h envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h \
- converse.h pup.h ckcallback.h cksection.h ckarrayindex.h objid.h \
- conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
+ LBMachineUtil.h json_fwd.hpp LBManager.decl.h charm++.h cklists.h \
+ pup_stl.h conv-config.h ckbitvector.h ckstream.h init.h charm-api.h \
+ ckhashtable.h ckrdma.h envelope.h pup.h charm.h middle.h cklists.h \
+ objid.h charm.h converse.h pup.h ckcallback.h cksection.h ckarrayindex.h \
+ objid.h conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
  debug-conv++.h simd.h ckmessage.h CkMarshall.decl.h sdag.h pup_stl.h \
  envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
  ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
@@ -471,7 +472,7 @@ TempAwareRefineLB.o: TempAwareRefineLB.C TempAwareRefineLB.h CentralLB.h \
  pup_c_functions.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h \
  conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
  cmirdmautils.h debug-conv.h charm.h conv-rdma.h pup.h middle.h \
- middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h charm++.h cklists.h pup_stl.h conv-config.h \
  ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h ckrdma.h \
  envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h converse.h \
@@ -497,11 +498,11 @@ TreeLB.o: TreeLB.C TreeBuilder.h TreeLB.h BaseLB.h LBManager.h \
  lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h cmirdmautils.h debug-conv.h \
  charm.h conv-rdma.h pup.h middle.h middle-conv.h LBObj.h LBOM.h LBComm.h \
- LBMachineUtil.h json.hpp LBManager.decl.h charm++.h cklists.h pup_stl.h \
- conv-config.h ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h \
- ckrdma.h envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h \
- converse.h pup.h ckcallback.h cksection.h ckarrayindex.h objid.h \
- conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
+ LBMachineUtil.h json_fwd.hpp LBManager.decl.h charm++.h cklists.h \
+ pup_stl.h conv-config.h ckbitvector.h ckstream.h init.h charm-api.h \
+ ckhashtable.h ckrdma.h envelope.h pup.h charm.h middle.h cklists.h \
+ objid.h charm.h converse.h pup.h ckcallback.h cksection.h ckarrayindex.h \
+ objid.h conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
  debug-conv++.h simd.h ckmessage.h CkMarshall.decl.h sdag.h pup_stl.h \
  envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
  ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
@@ -511,7 +512,7 @@ TreeLB.o: TreeLB.C TreeBuilder.h TreeLB.h BaseLB.h LBManager.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h waitqd.h \
  waitqd.decl.h ckcheckpoint.h ckcallback.h CkCheckpointStatus.decl.h \
  ckevacuation.h trace.h pathHistory.h PathHistory.decl.h ckcallback-ccs.h \
- CkCallback.decl.h BaseLB.decl.h TreeLB.decl.h idm.h TreeLevel.h \
+ CkCallback.decl.h BaseLB.decl.h TreeLB.decl.h idm.h json.hpp TreeLevel.h \
  ../include/TopoManager.h ../include/topomanager_config.h \
  ../include/converse.h TreeStrategyBase.h TreeStrategyFactory.h greedy.h \
  pheap.h refine.h TreeLevel.decl.h TreeLevel.def.h spanningTree.h \
@@ -531,7 +532,7 @@ arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -539,10 +540,7 @@ arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
  CkCheckpointStatus.decl.h ckevacuation.h trace.h pathHistory.h \
  PathHistory.decl.h ckcallback-ccs.h CkCallback.decl.h \
  trace-controlPoints.h trace.h envelope.h register.h trace-common.h \
- controlPoints.h conv-config.h ControlPoints.decl.h charm++.h sdag.h \
- charm-api.h arrayRedistributor.h pathHistory.h cp_effects.h ck.h qd.h \
- stats.h ../include/TopoManager.h ../include/topomanager_config.h \
- ../include/converse.h ckarray.h
+ controlPoints.h conv-config.h pathHistory.h arrayRedistributor.h
 
 ccs-builtins.o: ccs-builtins.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
@@ -569,7 +567,7 @@ charmProjections.o: charmProjections.C converse.h conv-header.h \
  ckrdmadevice.h conv-rdmadevice.h ckobjQ.h ckreduction.h \
  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h \
  ckarray.h cklocation.h LBManager.h LBDatabase.h lbdb.h LBObj.h LBOM.h \
- LBComm.h LBMachineUtil.h json.hpp LBManager.decl.h BaseLB.decl.h \
+ LBComm.h LBMachineUtil.h json_fwd.hpp LBManager.decl.h BaseLB.decl.h \
  MetaBalancer.h RandomForestModel.h MetaBalancer.decl.h CkLocation.decl.h \
  ckarrayoptions.h ckmulticast.h CkMulticast.decl.h cklocrec.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h waitqd.h \
@@ -592,7 +590,7 @@ ck.o: ck.C ck.h qd.h ckcallback.h cksection.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -617,7 +615,7 @@ ckIgetControl.o: ckIgetControl.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -639,7 +637,7 @@ ckarray.o: ckarray.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -663,7 +661,7 @@ ckarrayoptions.o: ckarrayoptions.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -687,7 +685,7 @@ ckbitvector.o: ckbitvector.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -709,7 +707,7 @@ ckcallback.o: ckcallback.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -731,7 +729,7 @@ ckcheckpoint.o: ckcheckpoint.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -765,7 +763,7 @@ ckfutures.o: ckfutures.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -781,7 +779,7 @@ ckgraph.o: ckgraph.C ckgraph.h BaseLB.h LBManager.h LBDatabase.h lbdb.h \
  pup_c.h pup_c_functions.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h \
  conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
  cmirdmautils.h debug-conv.h charm.h conv-rdma.h pup.h middle.h \
- middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ middle-conv.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h charm++.h cklists.h pup_stl.h conv-config.h \
  ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h ckrdma.h \
  envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h converse.h \
@@ -834,7 +832,7 @@ cklocation.o: cklocation.C hilbert.h partitioning_strategies.h charm++.h \
  ckrdmadevice.h conv-rdmadevice.h ckobjQ.h ckreduction.h \
  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h \
  ckarray.h cklocation.h LBManager.h LBDatabase.h lbdb.h LBObj.h LBOM.h \
- LBComm.h LBMachineUtil.h json.hpp LBManager.decl.h BaseLB.decl.h \
+ LBComm.h LBMachineUtil.h json_fwd.hpp LBManager.decl.h BaseLB.decl.h \
  MetaBalancer.h RandomForestModel.h MetaBalancer.decl.h CkLocation.decl.h \
  ckarrayoptions.h ckmulticast.h CkMulticast.decl.h cklocrec.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h waitqd.h \
@@ -857,7 +855,7 @@ ckmemcheckpoint.o: ckmemcheckpoint.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -881,7 +879,7 @@ ckmulticast.o: ckmulticast.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -904,7 +902,7 @@ ckobjQ.o: ckobjQ.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -926,7 +924,7 @@ ckrdma.o: ckrdma.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -951,7 +949,7 @@ ckrdmadevice.o: ckrdmadevice.C envelope.h pup.h converse.h conv-header.h \
  ckrdmadevice.h conv-rdmadevice.h conv-header.h ckobjQ.h ckreduction.h \
  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h \
  ckarray.h cklocation.h LBManager.h LBDatabase.h lbdb.h LBObj.h LBOM.h \
- LBComm.h LBMachineUtil.h json.hpp LBManager.decl.h BaseLB.decl.h \
+ LBComm.h LBMachineUtil.h json_fwd.hpp LBManager.decl.h BaseLB.decl.h \
  MetaBalancer.h RandomForestModel.h MetaBalancer.decl.h CkLocation.decl.h \
  ckarrayoptions.h ckmulticast.h CkMulticast.decl.h cklocrec.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h waitqd.h \
@@ -973,7 +971,7 @@ ckreduction.o: ckreduction.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1008,7 +1006,7 @@ cksyncbarrier.o: cksyncbarrier.C cksyncbarrier.h CkSyncBarrier.decl.h \
  envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
  ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1059,19 +1057,17 @@ controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
  CkFutures.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  CkCheckpointStatus.decl.h ckevacuation.h trace.h pathHistory.h \
  PathHistory.decl.h ckcallback-ccs.h CkCallback.decl.h controlPoints.h \
- conv-config.h ControlPoints.decl.h charm++.h envelope.h sdag.h \
- charm-api.h arrayRedistributor.h pathHistory.h cp_effects.h ck.h qd.h \
- stats.h ../include/TopoManager.h ../include/topomanager_config.h \
- ../include/converse.h ckarray.h trace-controlPoints.h trace.h register.h \
- trace-common.h trace-projections.h ckhashtable.h pup.h pathHistory.h \
- cp_effects.h ControlPoints.def.h
+ conv-config.h trace-controlPoints.h trace.h envelope.h register.h \
+ trace-common.h charm++.h trace-projections.h ckhashtable.h pup.h \
+ pathHistory.h cp_effects.h ck.h qd.h stats.h ../include/TopoManager.h \
+ ../include/topomanager_config.h ../include/converse.h ckarray.h
 
 conv-ccs.o: conv-ccs.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
@@ -1152,7 +1148,7 @@ cp_effects.o: cp_effects.C cp_effects.h charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1211,7 +1207,7 @@ custom_partitioner.o: custom_partitioner.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1226,21 +1222,7 @@ debug-charm.o: debug-charm.C converse.h conv-header.h conv-config.h \
  conv-lists.h conv-trace.h persistent.h cmirdmautils.h debug-conv.h \
  ckhashtable.h pup.h conv-ccs.h sockRoutines.h ccs-server.h debug-charm.h \
  debug-conv++.h register.h charm.h conv-rdma.h cklists.h pup_stl.h \
- conv-config.h middle.h middle-conv.h ck.h qd.h ckcallback.h cksection.h \
- ckarrayindex.h objid.h envelope.h pup.h charm.h middle.h cklists.h \
- objid.h init.h charm-api.h ckrdma.h charm++.h ckbitvector.h ckstream.h \
- simd.h ckmessage.h CkMarshall.decl.h sdag.h pup_stl.h envelope.h \
- debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h ckreduction.h \
- CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h \
- ckarray.h cklocation.h LBManager.h LBDatabase.h lbdb.h LBObj.h LBOM.h \
- LBComm.h LBMachineUtil.h json.hpp LBManager.decl.h BaseLB.decl.h \
- MetaBalancer.h RandomForestModel.h MetaBalancer.decl.h CkLocation.decl.h \
- ckarrayoptions.h ckmulticast.h CkMulticast.decl.h cklocrec.h \
- ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h waitqd.h \
- waitqd.decl.h ckcheckpoint.h ckcallback.h CkCheckpointStatus.decl.h \
- ckevacuation.h trace.h pathHistory.h PathHistory.decl.h ckcallback-ccs.h \
- CkCallback.decl.h stats.h ../include/TopoManager.h \
- ../include/topomanager_config.h ../include/converse.h
+ conv-config.h middle.h middle-conv.h
 
 debug-conv++.o: debug-conv++.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
@@ -1271,7 +1253,7 @@ debug-message.o: debug-message.C ck.h qd.h ckcallback.h cksection.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1334,7 +1316,7 @@ init.o: init.C ckcheckpoint.h pup.h converse.h conv-header.h \
  conv-rdmadevice.h conv-header.h ckobjQ.h ckreduction.h \
  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h \
  ckarray.h cklocation.h LBManager.h LBDatabase.h lbdb.h LBObj.h LBOM.h \
- LBComm.h LBMachineUtil.h json.hpp LBManager.decl.h BaseLB.decl.h \
+ LBComm.h LBMachineUtil.h json_fwd.hpp LBManager.decl.h BaseLB.decl.h \
  MetaBalancer.h RandomForestModel.h MetaBalancer.decl.h CkLocation.decl.h \
  ckarrayoptions.h ckmulticast.h CkMulticast.decl.h cklocrec.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h waitqd.h \
@@ -1365,7 +1347,7 @@ lbdbf.o: lbdbf.C charm++.h charm.h converse.h conv-header.h conv-config.h \
  envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
  ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1397,7 +1379,7 @@ main.o: main.C ck.h qd.h ckcallback.h cksection.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1414,11 +1396,11 @@ manager.o: manager.C manager.h CentralLB.h BaseLB.h LBManager.h \
  lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h cmirdmautils.h debug-conv.h \
  charm.h conv-rdma.h pup.h middle.h middle-conv.h LBObj.h LBOM.h LBComm.h \
- LBMachineUtil.h json.hpp LBManager.decl.h charm++.h cklists.h pup_stl.h \
- conv-config.h ckbitvector.h ckstream.h init.h charm-api.h ckhashtable.h \
- ckrdma.h envelope.h pup.h charm.h middle.h cklists.h objid.h charm.h \
- converse.h pup.h ckcallback.h cksection.h ckarrayindex.h objid.h \
- conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
+ LBMachineUtil.h json_fwd.hpp LBManager.decl.h charm++.h cklists.h \
+ pup_stl.h conv-config.h ckbitvector.h ckstream.h init.h charm-api.h \
+ ckhashtable.h ckrdma.h envelope.h pup.h charm.h middle.h cklists.h \
+ objid.h charm.h converse.h pup.h ckcallback.h cksection.h ckarrayindex.h \
+ objid.h conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
  debug-conv++.h simd.h ckmessage.h CkMarshall.decl.h sdag.h pup_stl.h \
  envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
  ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
@@ -1475,7 +1457,7 @@ modifyScheduler.o: modifyScheduler.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1498,7 +1480,7 @@ mpi-interoperate.o: mpi-interoperate.C mpi-interoperate.h converse.h \
  ckrdmadevice.h conv-rdmadevice.h ckobjQ.h ckreduction.h \
  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h \
  ckarray.h cklocation.h LBManager.h LBDatabase.h lbdb.h LBObj.h LBOM.h \
- LBComm.h LBMachineUtil.h json.hpp LBManager.decl.h BaseLB.decl.h \
+ LBComm.h LBMachineUtil.h json_fwd.hpp LBManager.decl.h BaseLB.decl.h \
  MetaBalancer.h RandomForestModel.h MetaBalancer.decl.h CkLocation.decl.h \
  ckarrayoptions.h ckmulticast.h CkMulticast.decl.h cklocrec.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h waitqd.h \
@@ -1521,7 +1503,7 @@ mpi-mainmodule.o: mpi-mainmodule.C mpi_main.decl.h charm++.h charm.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1545,7 +1527,7 @@ msgalloc.o: msgalloc.C ck.h qd.h ckcallback.h cksection.h charm.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1589,7 +1571,7 @@ pathHistory.o: pathHistory.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1619,7 +1601,7 @@ picsautoperf.o: picsautoperf.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1646,7 +1628,7 @@ picsautoperfAPI.o: picsautoperfAPI.C picsdefs.h picsdefscpp.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1671,7 +1653,7 @@ picsdecisiontree.o: picsdecisiontree.C picsdefs.h picsdecisiontree.h \
  envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
  ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1693,7 +1675,7 @@ picstreenode.o: picstreenode.C picstreenode.h charm++.h charm.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1764,7 +1746,7 @@ qd.o: qd.C ck.h qd.h ckcallback.h cksection.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1782,10 +1764,7 @@ queueing.o: queueing.C queueing.h conv-config.h conv-autoconfig.h \
  persistent.h cmirdmautils.h debug-conv.h
 
 quiescence.o: quiescence.C conv-config.h conv-autoconfig.h conv-common.h \
- conv-mach-common.h conv-mach.h conv-mach-opt.h lrts-common.h converse.h \
- conv-header.h cmiqueue.h pup_c.h pup_c_functions.h lrtslock.h queueing.h \
- conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
- conv-trace.h persistent.h cmirdmautils.h debug-conv.h quiescence.h
+ conv-mach-common.h conv-mach.h conv-mach-opt.h lrts-common.h
 
 random.o: random.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
@@ -1814,7 +1793,7 @@ register.o: register.C ck.h qd.h ckcallback.h cksection.h charm.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1857,7 +1836,7 @@ spanningTree.o: spanningTree.C spanningTree.h charm++.h charm.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1902,7 +1881,7 @@ trace-controlPoints.o: trace-controlPoints.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1933,7 +1912,7 @@ trace-counter.o: trace-counter.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1955,7 +1934,7 @@ trace-memory.o: trace-memory.C trace-memory.h charm++.h charm.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -1977,7 +1956,7 @@ trace-perf.o: trace-perf.C trace-perf.h charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -2003,7 +1982,7 @@ trace-projections.o: trace-projections.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -2029,7 +2008,7 @@ trace-projector.o: trace-projector.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -2056,7 +2035,7 @@ trace-simple.o: trace-simple.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -2079,7 +2058,7 @@ trace-summary.o: trace-summary.C charm++.h charm.h converse.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -2103,7 +2082,7 @@ trace-utilization.o: trace-utilization.C trace-utilization.h charm++.h \
  ckrdmadevice.h conv-rdmadevice.h ckobjQ.h ckreduction.h \
  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h \
  ckarray.h cklocation.h LBManager.h LBDatabase.h lbdb.h LBObj.h LBOM.h \
- LBComm.h LBMachineUtil.h json.hpp LBManager.decl.h BaseLB.decl.h \
+ LBComm.h LBMachineUtil.h json_fwd.hpp LBManager.decl.h BaseLB.decl.h \
  MetaBalancer.h RandomForestModel.h MetaBalancer.decl.h CkLocation.decl.h \
  ckarrayoptions.h ckmulticast.h CkMulticast.decl.h cklocrec.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h waitqd.h \
@@ -2143,7 +2122,7 @@ tracec.o: tracec.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -2166,7 +2145,7 @@ tracef.o: tracef.C charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
@@ -2195,7 +2174,7 @@ waitqd.o: waitqd.C waitqd.h charm++.h charm.h converse.h conv-header.h \
  pup_stl.h envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBManager.h \
- LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json.hpp \
+ LBDatabase.h lbdb.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h json_fwd.hpp \
  LBManager.decl.h BaseLB.decl.h MetaBalancer.h RandomForestModel.h \
  MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
  CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \

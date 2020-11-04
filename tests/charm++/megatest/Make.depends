@@ -210,3 +210,9 @@ groupdependence.o: \
 	megatest.h \
 	groupdependence.def.h
 	$(CHARMC) -o groupdependence.o groupdependence.C
+listsend.o: \
+	listsend.C \
+	listsend.decl.h \
+	megatest.h \
+	listsend.def.h
+	$(CHARMC) -o listsend.o listsend.C

@@ -1,7 +1,6 @@
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 #define NUMTIMES 1
 #define REPS 2000

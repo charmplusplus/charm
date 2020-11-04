@@ -34,44 +34,8 @@ OBJS=megatest.o \
      callback.o \
      inlineem.o \
      completion_test.o \
-     groupdependence.o
-
-
-
-#     priolongtest.o \
-
-# reverse order of the above OBJS
-OBJS_REV=megatest.o \
-     bitvector.o	\
-     immediatering.o \
-     callback.o	\
-     reduction.o \
-     inherit.o \
-     templates.o \
-     rotest.o \
-     statistics.o \
-     priotest.o \
-     priomsg.o \
-     marshall.o \
-     migration.o \
-     queens.o \
-     packtest.o \
-     arrayring.o \
-     fib.o \
-     synctest.o \
-     nodecast.o \
-     groupcast.o \
-     groupmulti.o \
-     groupsectiontest.o \
-     multisectiontest.o \
-     varraystest.o \
-     varsizetest.o \
-     nodering.o \
-     groupring.o \
-     inlineem.o \
-     groupdependence.o
-
-#     priolongtest.o \
+     groupdependence.o \
+     listsend.o
 
 CIFILES =  \
       arrayring.def.h  immediatering.def.h  nodering.def.h   rotest.def.h  \
@@ -81,7 +45,7 @@ CIFILES =  \
       groupcast.def.h  migration.def.h      queens.def.h     varraystest.def.h\
       groupring.def.h  nodecast.def.h       reduction.def.h  varsizetest.def.h\
       groupsectiontest.def.h multisectiontest.def.h inlineem.def.h varsizetest2.def.h\
-      groupmulti.def.h completion_test.def.h groupdependence.def.h #priolongtest.def.h
+      groupmulti.def.h completion_test.def.h groupdependence.def.h listsend.def.h
 
 .SUFFIXES:
 .SUFFIXES: .o .C .def.h .decl.h .ci .h
@@ -130,4 +94,3 @@ depends:  $(CIFILES)
               perl $(CHARMBIN)/dep.pl $(CHARMINC) /usr/include /usr/local >> $(DEPENDFILE); \
               echo '	$$(CHARMC) -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
         done;
-
