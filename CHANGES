@@ -2,6 +2,122 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.11.0
+================================================================================
+
+This is a feature release, with the following major changes:
+
+Highlights:
+
+- A significant overhaul of the load balancing infrastructure and the
+  addition of TreeLB, a new, more flexible and extensible base LB,
+  intended to replace the previous CentralLB and HybridBaseLB designs
+  (load balancers using these previous designs are still
+  supported). Some included strategies have been rewritten to use
+  TreeLB, unused and extraneous strategies have been removed. Please
+  see
+  https://charm.readthedocs.io/en/latest/charm++/manual.html#load-balancing
+  for more information.
+
+- Experimental support for intra-node GPU messages, allowing data to be
+  sent to/from GPU memory without going through host memory. Please
+  see
+  https://charm.readthedocs.io/en/latest/charm++/manual.html#gpu-support for
+  more information.
+
+Misc:
+
+- Charm++ now builds with CMake by default when using the `./build`
+  script (requires CMake version 3.4 or higher). The old build system is
+  still available by using `./buildold`. Please see
+  https://charm.readthedocs.io/en/latest/charm++/manual.html#installation-with-cmake
+  for more information.
+
+- We have adopted GitHub discussions
+  (https://github.com/UIUC-PPL/charm/discussions) as the preferred
+  venue for Charm++ questions and discussions instead of the
+  charm@cs.illinois.edu mailing list.
+
+- The BigSim emulator has been removed from Charm++.
+
+Charm++ Features & Fixes:
+
+- We have renamed the `VERSION` file to `charm-version.h` and made it compatible
+  with C. Charm++ programs that need to check the
+  Charm++ version should use the `CHARM_VERSION`, `CHARM_VERSION_MAJOR`,
+  `CHARM_VERSION_MINOR`, and `CHARM_VERSION_PATCH` C macros defined when compiling
+  a Charm++ application. We also provide a `CHARM_VERSION_GIT` macro for the exact
+  git revision of Charm++. In shell scripts, you can determine the version information
+  like this: `$ grep "CHARM_VERSION " charm-version.h | awk '{print $3}'`.
+
+- Support for variable sized messages in TRAM.
+
+- Added a pup_buffer API with zero copy functionality.
+
+- Array broadcasts are now node aware, avoiding unnecessary
+  duplication of messages. Expedited nokeep array broadcasts are also
+  allowed now.
+
+- Added CmiNodeReduce API for Converse node level reductions.
+
+- Builds with CMK_OPTIMIZE=1 will only segfault to aid in debugging in
+  CmiAbort when ++debug or +truecrash are provided.
+
+- Callbacks used in liveViz have been made ASLR safe.
+
+- Updated implementation of atomics, locks, and fences to use C++11/C11
+  versions where suitable.
+
+- Fixed bugs in HAPI and updated implementation to use new CUDA APIs.
+
+- Added whenidle attribute to indicate entry method to be called when
+  a PE is idle.
+
+- Improved performance, support, and fixes for UCX. IBM Power is now
+  supported with UCX.
+
+- The CmiSyncSend family now tries to avoid copies for nokeep
+  messages.
+
+- Fixed bug with element IDs with CMK_GLOBAL_LOCATION_UPDATE.
+
+- Fixed bug in BlockMap in array creation.
+
+- Added CcdPROCESSOR_LONG_IDLE to run a function during long periods
+  of idleness and CcdSCHEDLOOP to run a function during every
+  scheduler loop.
+
+- Added isCheckpoint() and isMigration() methods for users to
+  condition logic inside PUP based on its purpose.
+
+- Added execution metadata to Projections logs.
+
+- Added several new benchmarks and tests.
+
+- Bounded number of hops messages can take when chares frequently
+  migrate.
+
+Adaptive MPI:
+
+- Isomalloc sync is now enabled by default and the implementation no
+  longer uses the filesystem to pass data. Isomalloc sync can be
+  disabled with +no_isomalloc_sync.
+
+- Added AMPI-only build target, AMPI-only. This build optimizes AMPI
+  by disabling features of Charm++ that AMPI doesn't use.
+
+- Fixed tlsglobals migration on macOS.
+
+- Fixed bugs in activation of migration callbacks.
+
+- Fixed a bug in MPI_Waitsome.
+
+- Accept arguments from AMPI_BUILD_FLAGS environment variable for
+  ampiCC.
+
+- Improved portability of fsglobals and pipglobals.
+
+================================================================================
 What's new in Charm++ 6.10.2
 ================================================================================
 
