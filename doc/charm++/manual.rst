@@ -5796,19 +5796,27 @@ is created, a *reference* is returned immediately. However, if the
 *value* calculated by the future is needed, the calling program blocks
 until the value is available.
 
-Charm++ provides all the necessary infrastructure to use futures by
-means of the following functions:
+We provide both C-compatible and object-oriented interfaces for using
+futures, which include the following functions:
 
-.. code-block:: c++
++------------------------------------------------------+------------------------------------+
+| C                                                    | C++                                |
++======================================================+====================================+
+| :code:`CkFuture CkCreateFuture(void)`                | :code:`ck::future()`               |
++------------------------------------------------------+------------------------------------+
+| :code:`void CkReleaseFuture(CkFuture fut)`           | :code:`void ck::future::release()` |
++------------------------------------------------------+------------------------------------+
+| :code:`int CkProbeFuture(CkFuture fut)`              | :code:`bool ck::future::probe()`   |
++------------------------------------------------------+------------------------------------+
+| :code:`void *CkWaitFuture(CkFuture fut)`             | :code:`T ck::future::get()`        |
++------------------------------------------------------+------------------------------------+
+| :code:`void CkSendToFuture(CkFuture fut, void *msg)` | :code:`void ck::future::set(T)`    |
++------------------------------------------------------+------------------------------------+
 
-    CkFuture CkCreateFuture(void)
-    void CkReleaseFuture(CkFuture fut)
-    int CkProbeFuture(CkFuture fut)
-    void *CkWaitFuture(CkFuture fut)
-    void CkSendToFuture(CkFuture fut, void *msg)
-
-To illustrate the use of all these functions, a Fibonacci example in
-Charm++ using futures in presented below:
+You will note that the object-oriented versions are methods of `ck::future`,
+which can be templated with any pup'able type. An example of the
+object-oriented interface is available under `examples/charm++/future`,
+with an equivalent example for the C-compatible interface presented below:
 
 .. code-block:: charmci
 
@@ -8247,12 +8255,27 @@ The API to checkpoint the application is:
 
 .. code-block:: c++
 
-     void CkStartCheckpoint(char* dirname, const CkCallback& cb);
+     void CkStartCheckpoint(char* dirname, const CkCallback& cb, bool
+     requestStatus = false, int writersPerNode = 0);
 
 The string ``dirname`` is the destination directory where the checkpoint
 files will be stored, and ``cb`` is the callback function which will be
 invoked after the checkpoint is done, as well as when the restart is
-complete. Here is an example of a typical use:
+complete. If ``CkStartCheckpoint`` is called again before ``cb`` has
+been called, the new request may be silently dropped. When the
+optional parameter ``requestStatus`` is true, the callback ``cb`` is
+sent a message of type ``CkCheckpointStatusMsg`` which includes an
+``int status`` field of value ``CK_CHECKPOINT_SUCCESS`` or
+``CK_CHECKPOINT_FAILURE`` indicating the success of the checkpointing
+operation. ``writersPerNode`` is an optional parameter that controls
+the number of PEs per logical node simultaneously allowed to write
+checkpoints. By default, it allows all PEs on a node to write at once,
+but should be tuned for large runs to avoid overloading the
+filesystem. Once set, this value persists for future calls to
+``CkStartCheckpoint``, so it does not need to be provided on every
+invocation (specifying 0 also leaves it at its current value).
+
+Here is an example of a typical use:
 
 .. code-block:: c++
 
@@ -12980,6 +13003,8 @@ Acknowledgements
 
 -  Juan Galvez
 
+-  Justin Szaday
+
 -  Kavitha Chandrasekar
 
 -  Laxmikant Kale
@@ -13085,6 +13110,8 @@ Acknowledgements
 -  Yan Shi
 
 -  Yogesh Mehta
+
+-  Zane Fink
 
 -  Zheng Shao
 
