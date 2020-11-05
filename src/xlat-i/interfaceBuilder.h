@@ -347,7 +347,7 @@ namespace Builder {
       : ret(ret_)
       , name(name_)
       , stackSize(stackSize_)
-      , attribs(NULL)
+      , attribs(nullptr)
       , sdag(sdag_)
     { }
 
