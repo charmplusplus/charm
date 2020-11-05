@@ -895,16 +895,16 @@ if(${TARGET} STREQUAL "charm4py")
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
   set(CMK_TRACE_ENABLED 1)
-  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb trace-converse "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb trace-projections "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
+else()
+  # Check that we are able to build and link an executable
+  add_executable(hello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
+  add_dependencies(hello ck ldb-rand memory-default threads-default conv-static
+    conv-core ckmain conv-machine conv-util conv-partition conv-ldb ckqt
+    moduleNDMeshStreamer modulecompletion tmgr)
 endif()
-
-# Check that we are able to build and link an executable
-add_executable(hello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(hello ck ldb-rand memory-default threads-default conv-static
-  conv-core ckmain conv-machine conv-util conv-partition conv-ldb ckqt
-  moduleNDMeshStreamer modulecompletion tmgr)
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
