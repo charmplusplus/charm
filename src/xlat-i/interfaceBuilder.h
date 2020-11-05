@@ -352,7 +352,7 @@ namespace Builder {
     { }
 
     void addAttribute(BUILDER_ENTRY_ATTRIBUTES attribute) {
-      attribs = new xi::Attribute(attribute, NULL, attribs);
+      attribs = new xi::Attribute(attribute, nullptr, attribs);
     }
 
     xi::Entry* generateAst() {
