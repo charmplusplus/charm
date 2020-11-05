@@ -32,8 +32,8 @@ syntax() {
   echo '  everylb         compile EveryLB suite of load balancing strategies'
   echo ''
   fi
-  echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
+  echo '<versions>: '
+  ( cd $src ; ls -1 | egrep -v '(^mpi$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
@@ -100,7 +100,7 @@ syntax() {
   num_help_strings="$(grep -c AS_HELP_STRING "$configure_ac")"
   num_help_items="$(echo "$help_items" | wc -l)"
   if [ $num_help_strings != $num_help_items ]; then
-    echo '<Warning>: Not all parameters were able to be displayed. Please notify the Charm++ developers at charm@cs.illinois.edu.'
+    echo '<Warning>: Not all parameters were able to be displayed. Please open an issue on our GitHub: https://github.com/UIUC-PPL/charm'
   fi
 
 
@@ -142,9 +142,8 @@ syntax() {
   echo ' 3. Does a "make -jN <target> <version> OPTS=<charmc-options>" in <destination>/tmp.'
   echo "That's all build does.  The rest is handled by the Makefile."
   echo ''
-  echo 'Thank you for using Charm++, please send questions or comments to '
-  echo 'Parallel Programming Lab at University of Illinois at Urbana-Champaign'
-  echo '(email: charm@cs.illinois.edu).'
+  echo 'Thank you for using Charm++, please open an issue or discussion on the Charm++'
+  echo 'GitHub at https://github.com/UIUC-PPL/charm if you have any questions.'
 
   else
   echo ''
@@ -762,8 +761,8 @@ EOF
     fi
     $DESTINATION/tmp/system_ln $DESTINATION/$newdir $newdir
   done
-  rm -f VERSION
-  $DESTINATION/tmp/system_ln $DESTINATION/include/VERSION VERSION
+  rm -f charm-version.h
+  $DESTINATION/tmp/system_ln $DESTINATION/include/charm-version.h charm-version.h
 fi
 
 Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
@@ -913,6 +912,7 @@ echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
 echo "SRCBASE=$srcbase" > $DESTINATION/tmp/charmpath.mk
 
 echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > "$DESTINATION/tmp/config_opts.sh"
+echo "OPTS=\"$OPTS\"" >> "$DESTINATION/tmp/config_opts.sh"
 chmod +x "$DESTINATION/tmp/config_opts.sh"
 echo "OPTSATBUILDTIME:=$OPTS" >> $ConvMak
 
@@ -927,8 +927,8 @@ printError()
   Echo "-------------------------------------------------"
   Echo "Charm++ NOT BUILT. Either cd into $DESTINATION/tmp and try"
   Echo "to resolve the problems yourself, visit"
-  Echo "    http://charm.cs.illinois.edu/"
-  Echo "for more information. Otherwise, email the developers at charm@cs.illinois.edu"
+  Echo "    https://charm.cs.illinois.edu/"
+  Echo "for more information. Otherwise, please open an issue on our GitHub https://github.com/UIUC-PPL/charm"
   exit $MAKEEXIT
 }
 

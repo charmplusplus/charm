@@ -888,7 +888,9 @@ void mpi_type_set_attr(int *datatype, int *type_keyval, void *attribute_val, int
 
 void mpi_type_get_attr(int *datatype, int *type_keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  *ierr = MPI_Type_get_attr(*datatype, *type_keyval, attribute_val, flag);
+  int * result;
+  *ierr = MPI_Type_get_attr(*datatype, *type_keyval, &result, flag);
+  *(intptr_t *)attribute_val = *result;
 }
 
 void mpi_type_delete_attr(int *datatype, int *type_keyval, int *ierr) noexcept
@@ -1556,6 +1558,8 @@ void mpi_file_create_errhandler(void (*function)(MPI_File*,int*,...), int *errha
   *ierr = MPI_File_create_errhandler(function, errhandler);
 }
 
+#if !CMK_AMPI_WITH_ROMIO
+// Disable ROMIO's get_errhf.c and set_errhf.c if enabling these.
 void mpi_file_set_errhandler(MPI_File* file, int* errhandler, int *ierr) noexcept
 {
   *ierr = MPI_File_set_errhandler(*file, *errhandler);
@@ -1565,6 +1569,7 @@ void mpi_file_get_errhandler(MPI_File* file, int *errhandler, int *ierr) noexcep
 {
   *ierr = MPI_File_get_errhandler(*file, errhandler);
 }
+#endif
 
 void mpi_errhandler_create(void (*function)(MPI_Comm*,int*,...), int *errhandler, int *ierr) noexcept
 {
@@ -1774,7 +1779,9 @@ void mpi_comm_set_attr(int *comm, int *keyval, void* attribute_val, int *ierr) n
 
 void mpi_comm_get_attr(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  *ierr = MPI_Comm_get_attr(*comm, *keyval, attribute_val, flag);
+  int * result;
+  *ierr = MPI_Comm_get_attr(*comm, *keyval, &result, flag);
+  *(intptr_t *)attribute_val = *result;
 }
 
 void mpi_comm_delete_attr(int *comm, int *keyval, int *ierr) noexcept
@@ -1800,7 +1807,9 @@ void mpi_attr_put(int *comm, int *keyval, void* attribute_val, int *ierr) noexce
 
 void mpi_attr_get(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  *ierr = MPI_Attr_get(*comm, *keyval, attribute_val, flag);
+  int * result;
+  *ierr = MPI_Attr_get(*comm, *keyval, &result, flag);
+  *(intptr_t *)attribute_val = *result;
 }
 
 void mpi_attr_delete(int *comm, int *keyval, int *ierr) noexcept
@@ -1880,7 +1889,9 @@ void mpi_win_delete_attr(int *win, int *key, int *ierr) noexcept
 void mpi_win_get_attr(int *win, int *win_keyval, void *attribute_val, int *flag,
                       int *ierr) noexcept
 {
-  *ierr = MPI_Win_get_attr(*win, *win_keyval, attribute_val, flag);
+  int * result;
+  *ierr = MPI_Win_get_attr(*win, *win_keyval, &result, flag);
+  *(intptr_t *)attribute_val = *result;
 }
 
 void mpi_win_set_attr(int *win, int *win_keyval, void *attribute_val, int *ierr) noexcept

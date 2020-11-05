@@ -46,6 +46,9 @@ int        _Cmi_numpes;
 int        Cmi_nodesize;
 int        Cmi_stacksize = 64000;
 char     **CmiArgv;
+// Named Cmi_argvcopy to replicate name used in other machine layers,
+// used in Projections to get command line args
+char     **Cmi_argvcopy;
 CmiStartFn CmiStart;
 int        CmiUsched;
 CthThread *CmiThreads;
@@ -337,6 +340,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CmiSwitchToPE = CmiSwitchToPEFn;
 
   CmiArgv = CmiCopyArgs(argv);
+  Cmi_argvcopy = CmiCopyArgs(argv);
   CmiStart = fn;
   CmiUsched = usched;
   CmiParseArgs(CmiArgv);
