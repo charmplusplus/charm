@@ -3133,17 +3133,6 @@ Below are the descriptions about the compiler and runtime options:
    installation of any third party libraries you wish to use to the
    Charm++ search paths.
 
-#. **Building individual load balancers**
-
-   Load balancers can be built individually by changing the current
-   working directory to the *tmp* subdirectory of your build and making
-   them by name.
-
-   .. code-block:: bash
-
-      $ cd netlrts-linux-x86_64/tmp
-      $ make PhasebyArrayLB
-
 #. **Write and use your own load balancer**
 
    Refer Section :numref:`lbWriteNewLB` for writing a new load
@@ -3152,13 +3141,12 @@ Below are the descriptions about the compiler and runtime options:
    path to the library and link the load balancer into an application
    using *-module FooLB*.
 
-   You can create a library by modifying the Makefile in the following
-   way. This will create *libmoduleFooLB.a*.
+   You can create a library in the following way. This will create
+   *libmoduleFooLB.a*.
 
-   .. code-block:: makefile
+   .. code-block:: bash
 
-      libmoduleFooLB.a: FooLB.o
-        $(CHARMC) -o libmoduleFooLB.a FooLB.o
+      $ bin/charmc -o libmoduleFooLB.a FooLB.C
 
    To include this balancer in your application, the Makefile can be
    changed in the following way
@@ -8255,12 +8243,27 @@ The API to checkpoint the application is:
 
 .. code-block:: c++
 
-     void CkStartCheckpoint(char* dirname, const CkCallback& cb);
+     void CkStartCheckpoint(char* dirname, const CkCallback& cb, bool
+     requestStatus = false, int writersPerNode = 0);
 
 The string ``dirname`` is the destination directory where the checkpoint
 files will be stored, and ``cb`` is the callback function which will be
 invoked after the checkpoint is done, as well as when the restart is
-complete. Here is an example of a typical use:
+complete. If ``CkStartCheckpoint`` is called again before ``cb`` has
+been called, the new request may be silently dropped. When the
+optional parameter ``requestStatus`` is true, the callback ``cb`` is
+sent a message of type ``CkCheckpointStatusMsg`` which includes an
+``int status`` field of value ``CK_CHECKPOINT_SUCCESS`` or
+``CK_CHECKPOINT_FAILURE`` indicating the success of the checkpointing
+operation. ``writersPerNode`` is an optional parameter that controls
+the number of PEs per logical node simultaneously allowed to write
+checkpoints. By default, it allows all PEs on a node to write at once,
+but should be tuned for large runs to avoid overloading the
+filesystem. Once set, this value persists for future calls to
+``CkStartCheckpoint``, so it does not need to be provided on every
+invocation (specifying 0 also leaves it at its current value).
+
+Here is an example of a typical use:
 
 .. code-block:: c++
 
