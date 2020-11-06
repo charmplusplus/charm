@@ -805,12 +805,12 @@ static CkGroupID _groupCreate(envelope *env)
 static CkGroupID _nodeGroupCreate(envelope *env)
 {
   CkGroupID groupNum;
-  CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));                // change for proc 0 and other processors
-  if(CkMyNode() == 0)				// should this be CkMyPe() or CkMyNode()?
-          groupNum.idx = CksvAccess(_numNodeGroups)++;
-   else
-          groupNum.idx = _getGroupIdx(CkNumNodes(),CkMyNode(),CksvAccess(_numNodeGroups)++);
-  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+
+  // obtain IDs from same stream as group chares
+  if(CkMyPe() == 0)
+     groupNum.idx = CkpvAccess(_numGroups)++;
+  else
+     groupNum.idx = _getGroupIdx(CkNumPes(),CkMyPe(),CkpvAccess(_numGroups)++);
   _createNodeGroup(groupNum, env);
   return groupNum;
 }

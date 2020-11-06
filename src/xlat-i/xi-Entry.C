@@ -1213,7 +1213,6 @@ void Entry::genTramInstantiation(XStr& str) {
           << "maxItemsBuffered, thresholdFractionNum, thresholdFractionDen, "
           << "cutoffFractionNum, cutoffFractionDen, nodeLevel);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
-          << "    tramGroupIDs[" << i << "] = tramProxy.ckGetGroupID().idx;\n"
           << "  }\n";
     }
   }

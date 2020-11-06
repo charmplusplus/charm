@@ -975,12 +975,6 @@ void Chare::genTramDecls(XStr& str) {
     }
     str << "\n";
   }
-  if (forElement == forAll) {
-    // For collective proxy, store TRAM group IDs so that CkLocalBranch
-    // can be properly performed to retrieve the corresponding TRAM instance
-    // (added to support nodegroups)
-    str << "    static int tramGroupIDs[" << static_cast<int>(tramInstances.size()) << "];\n";
-  }
 }
 
 void Chare::genTramInits(XStr& str) {
