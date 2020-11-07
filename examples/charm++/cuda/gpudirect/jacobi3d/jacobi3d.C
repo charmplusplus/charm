@@ -1,4 +1,5 @@
 #include "hapi.h"
+#include "hapi_nvtx.h"
 #include "jacobi3d.decl.h"
 #include "jacobi3d.h"
 #include <utility>
@@ -21,8 +22,8 @@
 /* readonly */ int n_chares_z;
 /* readonly */ int n_iters;
 /* readonly */ int warmup_iters;
+/* readonly */ bool sync_ver;
 /* readonly */ bool use_zerocopy;
-/* readonly */ bool use_persistent;
 /* readonly */ bool print_elements;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
@@ -42,12 +43,6 @@ extern void invokePackingKernels(DataType* d_temperature, DataType* d_left_ghost
 extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     int dir, int block_width, int block_height, int block_depth,
     cudaStream_t stream);
-
-class PersistentMsg : public CMessage_PersistentMsg {
-  int dir;
-
-  PersistentMsg(int dir_) : dir(dir_) {}
-};
 
 class Main : public CBase_Main {
   int my_iter;
@@ -69,8 +64,8 @@ public:
     n_iters = 100;
     warmup_iters = 10;
     use_zerocopy = false;
-    use_persistent = false;
     print_elements = false;
+    sync_ver = false;
     my_iter = 0;
 
     // Initialize aggregate timers
@@ -80,7 +75,7 @@ public:
     // Process arguments
     int c;
     bool dims[3] = {false, false, false};
-    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:dsp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:sdp")) != -1) {
       switch (c) {
         case 'c':
           num_chares = atoi(optarg);
@@ -103,11 +98,11 @@ public:
         case 'w':
           warmup_iters = atoi(optarg);
           break;
+        case 's':
+          sync_ver = true;
+          break;
         case 'd':
           use_zerocopy = true;
-          break;
-        case 's':
-          use_persistent = true;
           break;
         case 'p':
           print_elements = true;
@@ -116,19 +111,13 @@ public:
           CkPrintf(
               "Usage: %s -W [grid width] -H [grid height] -D [grid depth] "
               "-w [block width] -h [block height] -d [block depth] "
-              "-i [iterations] -u [warmup] -z (use GPU zerocopy) "
-              "-s (use persistent) -p (print blocks)\n",
+              "-i [iterations] -u [warmup] -y (use sync version) "
+              "-z (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
       }
     }
     delete m;
-
-    // Zerocopy and persistent cannot be used together
-    if (use_zerocopy && use_persistent) {
-      CkPrintf("Zerocopy and persistent cannot be used together!\n");
-      CkExit(-1);
-    }
 
     // If only the X dimension is given, use it for Y and Z as well
     if (dims[0] && !dims[1] && !dims[2]) grid_height = grid_depth = grid_width;
@@ -179,10 +168,10 @@ public:
     // Print configuration
     CkPrintf("\n[CUDA 3D Jacobi example]\n");
     CkPrintf("Grid: %d x %d x %d, Block: %d x %d x %d, Chares: %d x %d x %d, "
-        "Iterations: %d, Warm-up: %d, Zerocopy: %d, Persistent: %d, Print: %d\n\n",
+        "Iterations: %d, Warm-up: %d, Bulk-synchronous: %d, Zerocopy: %d, Print: %d\n\n",
         grid_width, grid_height, grid_depth, block_width, block_height, block_depth,
-        n_chares_x, n_chares_y, n_chares_z, n_iters, warmup_iters, use_zerocopy,
-        use_persistent, print_elements);
+        n_chares_x, n_chares_y, n_chares_z, n_iters, warmup_iters, sync_ver,
+        use_zerocopy, print_elements);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares_x, n_chares_y, n_chares_z);
@@ -224,6 +213,10 @@ public:
     double total_time = CkWallTimer() - start_time;
     CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
         total_time, (total_time / n_iters) * 1e6);
+    if (sync_ver) {
+      CkPrintf("Comm time per iteration: %.3lf us\nUpdate time per iteration: %.3lf us\n",
+          (comm_agg_time / n_iters) * 1e6, (update_agg_time / n_iters) * 1e6);
+    }
 
     if (print_elements) {
       sleep(1);
@@ -240,9 +233,6 @@ public:
 
 class Block : public CBase_Block {
   Block_SDAG_CODE
-
-  CkDevicePersistent p_my_bufs[DIR_COUNT];
-  CkDevicePersistent p_neighbor_bufs[DIR_COUNT];
 
  public:
   int my_iter;
@@ -302,7 +292,14 @@ class Block : public CBase_Block {
     hapiCheck(cudaFreeHost(h_bottom_ghost));
     hapiCheck(cudaFreeHost(h_front_ghost));
     hapiCheck(cudaFreeHost(h_back_ghost));
-    if (use_zerocopy || use_persistent) {
+    if (!use_zerocopy) {
+      hapiCheck(cudaFree(d_left_ghost));
+      hapiCheck(cudaFree(d_right_ghost));
+      hapiCheck(cudaFree(d_top_ghost));
+      hapiCheck(cudaFree(d_bottom_ghost));
+      hapiCheck(cudaFree(d_front_ghost));
+      hapiCheck(cudaFree(d_back_ghost));
+    } else {
       hapiCheck(cudaFree(d_send_left_ghost));
       hapiCheck(cudaFree(d_send_right_ghost));
       hapiCheck(cudaFree(d_send_top_ghost));
@@ -315,13 +312,6 @@ class Block : public CBase_Block {
       hapiCheck(cudaFree(d_recv_bottom_ghost));
       hapiCheck(cudaFree(d_recv_front_ghost));
       hapiCheck(cudaFree(d_recv_back_ghost));
-    } else {
-      hapiCheck(cudaFree(d_left_ghost));
-      hapiCheck(cudaFree(d_right_ghost));
-      hapiCheck(cudaFree(d_top_ghost));
-      hapiCheck(cudaFree(d_bottom_ghost));
-      hapiCheck(cudaFree(d_front_ghost));
-      hapiCheck(cudaFree(d_back_ghost));
     }
 
     hapiCheck(cudaStreamDestroy(compute_stream));
@@ -338,6 +328,11 @@ class Block : public CBase_Block {
     x = thisIndex.x;
     y = thisIndex.y;
     z = thisIndex.z;
+
+    std::ostringstream os;
+    os << "Init (" << std::to_string(x) << "," << std::to_string(y) << "," <<
+      std::to_string(z) << ")";
+    NVTXTracer(os.str(), NVTXColor::Turquoise);
 
     // Check bounds and set number of valid neighbors
     left_bound = right_bound = top_bound = bottom_bound = front_bound = back_bound = false;
@@ -379,7 +374,14 @@ class Block : public CBase_Block {
     hapiCheck(cudaMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width * block_depth));
     hapiCheck(cudaMallocHost((void**)&h_front_ghost, sizeof(DataType) * block_width * block_height));
     hapiCheck(cudaMallocHost((void**)&h_back_ghost, sizeof(DataType) * block_width * block_height));
-    if (use_zerocopy || use_persistent) {
+    if (!use_zerocopy) {
+      hapiCheck(cudaMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height * block_depth));
+      hapiCheck(cudaMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height * block_depth));
+      hapiCheck(cudaMalloc((void**)&d_top_ghost, sizeof(DataType) * block_width * block_depth));
+      hapiCheck(cudaMalloc((void**)&d_bottom_ghost, sizeof(DataType) * block_width * block_depth));
+      hapiCheck(cudaMalloc((void**)&d_front_ghost, sizeof(DataType) * block_width * block_height));
+      hapiCheck(cudaMalloc((void**)&d_back_ghost, sizeof(DataType) * block_width * block_height));
+    } else {
       hapiCheck(cudaMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height * block_depth));
       hapiCheck(cudaMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height * block_depth));
       hapiCheck(cudaMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width * block_depth));
@@ -392,49 +394,13 @@ class Block : public CBase_Block {
       hapiCheck(cudaMalloc((void**)&d_recv_bottom_ghost, sizeof(DataType) * block_width * block_depth));
       hapiCheck(cudaMalloc((void**)&d_recv_front_ghost, sizeof(DataType) * block_width * block_height));
       hapiCheck(cudaMalloc((void**)&d_recv_back_ghost, sizeof(DataType) * block_width * block_height));
-    } else {
-      hapiCheck(cudaMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_top_ghost, sizeof(DataType) * block_width * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_bottom_ghost, sizeof(DataType) * block_width * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_front_ghost, sizeof(DataType) * block_width * block_height));
-      hapiCheck(cudaMalloc((void**)&d_back_ghost, sizeof(DataType) * block_width * block_height));
     }
 
-    // Create CUDA streams and events
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
     hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
 
     hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
     hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
-
-    // Create persistent buffers
-    if (use_persistent) {
-      p_my_bufs[LEFT] = CkDevicePersistent(d_send_left_ghost,
-          sizeof(DataType) * block_height * block_depth,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-      p_my_bufs[RIGHT] = CkDevicePersistent(d_send_right_ghost,
-          sizeof(DataType) * block_height * block_depth,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-      p_my_bufs[TOP] = CkDevicePersistent(d_send_top_ghost,
-          sizeof(DataType) * block_width * block_depth,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-      p_my_bufs[BOTTOM] = CkDevicePersistent(d_send_bottom_ghost,
-          sizeof(DataType) * block_width * block_depth,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-      p_my_bufs[FRONT] = CkDevicePersistent(d_send_front_ghost,
-          sizeof(DataType) * block_width * block_height,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-      p_my_bufs[BACK] = CkDevicePersistent(d_send_back_ghost,
-          sizeof(DataType) * block_width * block_height,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-    }
 
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_width, block_height, block_depth, compute_stream);
@@ -463,6 +429,11 @@ class Block : public CBase_Block {
   }
 
   void update() {
+    std::ostringstream os;
+    os << "update (" << std::to_string(x) << "," << std::to_string(y) << "," <<
+      std::to_string(z) << ")";
+    NVTXTracer(os.str(), NVTXColor::WetAsphalt);
+
     // Operations in compute stream should only be executed when
     // operations in communication stream (transfers and unpacking) complete
     hapiCheck(cudaEventRecord(comm_event, comm_stream));
@@ -485,6 +456,16 @@ class Block : public CBase_Block {
             sizeof(DataType) * (block_width+2)*(block_height+2)*(block_depth+2),
             cudaMemcpyDeviceToHost, comm_stream));
     }
+
+    if (sync_ver) {
+#if CUDA_SYNC
+      cudaStreamSynchronize(compute_stream);
+      thisProxy[thisIndex].updateDone();
+#else
+      CkCallback* cb = new CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
+      hapiAddCallback(compute_stream, cb);
+#endif
+    }
   }
 
   void updateDone() {
@@ -492,6 +473,11 @@ class Block : public CBase_Block {
   }
 
   void packGhosts() {
+    std::ostringstream os;
+    os << "packGhosts (" << std::to_string(x) << "," << std::to_string(y) <<
+      "," << std::to_string(z) << ")";
+    NVTXTracer(os.str(), NVTXColor::Emerald);
+
     if (use_zerocopy) {
 #if !COMM_ONLY
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
@@ -549,6 +535,11 @@ class Block : public CBase_Block {
   }
 
   void sendGhosts() {
+    std::ostringstream os;
+    os << "sendGhosts (" << std::to_string(x) << "," << std::to_string(y) <<
+      "," << std::to_string(z) << ")";
+    NVTXTracer(os.str(), NVTXColor::PeterRiver);
+
     // Send ghosts to neighboring chares
     if (use_zerocopy) {
       if (!left_bound)
@@ -607,17 +598,23 @@ class Block : public CBase_Block {
   }
 
   void processGhostsZC(int dir, int size, DataType* gh) {
+    std::ostringstream os;
+    os << "processGhostsZC (" << std::to_string(x) << "," << std::to_string(y) <<
+      "," << std::to_string(z) << ")";
+    NVTXTracer(os.str(), NVTXColor::Amethyst);
+
 #if !COMM_ONLY
     invokeUnpackingKernel(d_temperature, gh, dir, block_width, block_height,
         block_depth, comm_stream);
 #endif
   }
 
-  void processGhostsP(PersistentMsg* msg) {
-    // TODO
-  }
-
   void processGhostsReg(int dir, int size, DataType* gh) {
+    std::ostringstream os;
+    os << "processGhostsReg (" << std::to_string(x) << "," << std::to_string(y) <<
+      "," << std::to_string(z) << ")";
+    NVTXTracer(os.str(), NVTXColor::Amethyst);
+
     DataType* h_ghost = nullptr; DataType* d_ghost = nullptr;
     switch (dir) {
       case LEFT:   h_ghost = h_left_ghost; d_ghost = d_left_ghost;     break;
