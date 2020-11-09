@@ -1209,7 +1209,7 @@ void initQd(char **argv)
 	CpvInitialize(QdState*, _qd);
 	CpvAccess(_qd) = new QdState();
 	if (CmiMyRank() == 0) {
-#if !defined(CMK_CPV_IS_SMP) && !CMK_SHARED_VARS_UNIPROCESSOR
+#if !defined(CMK_CPV_IS_SMP)
 	CpvAccessOther(_qd, 1) = new QdState(); // for i/o interrupt
 #endif
 	}

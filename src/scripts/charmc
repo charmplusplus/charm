@@ -1461,11 +1461,6 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    if [ "$CMK_GDIR" = "uth" ]
-    then
-      echo "Error: -tlsglobals is not supported with the uth machine layer."
-      exit 1
-    fi
     if [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" != '1' ] && [ "$CMK_COMPILER" != 'clang' -o "$CMK_MACOSX" != '1' ]
     then
       echo "Warning: -tlsglobals may not work with compilers that do not recognize -mno-tls-direct-seg-refs."
