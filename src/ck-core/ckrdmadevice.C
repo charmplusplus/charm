@@ -66,13 +66,18 @@ CsvExtern(GPUManager, gpu_manager);
 
 void CkDevicePersistent::init() {
   pe = CkMyPe();
+  cb_msg = nullptr;
   ipc_ptr = nullptr;
   ipc_open = false;
 }
 
 void CkDevicePersistent::open() {
-  // Create a CUDA IPC handle for inter-process communication
-  hapiCheck(cudaIpcGetMemHandle(&cuda_ipc_handle, (void*)ptr));
+  CkNcpyModeDevice mode = findTransferModeDevice(CkMyPe(), pe);
+
+  if (mode == CkNcpyModeDevice::IPC) {
+    // Create a CUDA IPC handle for inter-process communication
+    hapiCheck(cudaIpcGetMemHandle(&cuda_ipc_handle, (void*)ptr));
+  }
 }
 
 void CkDevicePersistent::close() {
@@ -80,6 +85,10 @@ void CkDevicePersistent::close() {
   if (ipc_open) {
     hapiCheck(cudaIpcCloseMemHandle(ipc_ptr));
   }
+}
+
+void CkDevicePersistent::set_msg(void* msg) {
+  cb_msg = msg;
 }
 
 void CkDevicePersistent::pup(PUP::er& p) {
@@ -114,10 +123,10 @@ CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
 
   // Set callbacks to be invoked once get is complete
   if (src.cb.type != CkCallback::ignore) {
-    hapiAddCallback(cuda_stream, src.cb);
+    hapiAddCallback(cuda_stream, src.cb, src.cb_msg);
   }
   if (cb.type != CkCallback::ignore) {
-    hapiAddCallback(cuda_stream, cb);
+    hapiAddCallback(cuda_stream, cb, cb_msg);
   }
 
   return CkDeviceStatus::incomplete;
@@ -126,7 +135,7 @@ CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
 CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
   // Check that the source buffer fits into the destination buffer
   if (dst.cnt < cnt) {
-    CkAbort("CkDevicePersistent::get: Destination buffer is smaller than source buffer\n");
+    CkAbort("CkDevicePersistent::put: Destination buffer is smaller than source buffer\n");
   }
 
   CkNcpyModeDevice mode = findTransferModeDevice(CkMyPe(), dst.pe);
@@ -147,10 +156,10 @@ CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
 
   // Set callbacks to be invoked once get is complete
   if (cb.type != CkCallback::ignore) {
-    hapiAddCallback(cuda_stream, cb);
+    hapiAddCallback(cuda_stream, cb, cb_msg);
   }
   if (dst.cb.type != CkCallback::ignore) {
-    hapiAddCallback(cuda_stream, dst.cb);
+    hapiAddCallback(cuda_stream, dst.cb, dst.cb_msg);
   }
 
   return CkDeviceStatus::incomplete;

@@ -14,13 +14,15 @@ struct CkDevicePersistent {
   const void* ptr;
   size_t cnt;
   CkCallback cb;
+  void* cb_msg;
   cudaStream_t cuda_stream;
   int pe;
   cudaIpcMemHandle_t cuda_ipc_handle;
   void* ipc_ptr;
   bool ipc_open;
 
-  CkDevicePersistent() : ptr(nullptr), cnt(0), pe(-1), ipc_ptr(nullptr), ipc_open(false) {}
+  CkDevicePersistent() : ptr(nullptr), cnt(0), cb(CkCallback(CkCallback::ignore)),
+                         cb_msg(nullptr), pe(-1), ipc_ptr(nullptr), ipc_open(false) {}
 
   explicit CkDevicePersistent(const void* ptr_, size_t cnt_)
     : ptr(ptr_), cnt(cnt_), cb(CkCallback(CkCallback::ignore)) {
@@ -47,6 +49,7 @@ struct CkDevicePersistent {
   void init();
   void open();
   void close();
+  void set_msg(void* msg);
 
   // Should only be used for exchanging between chares, not for migration.
   // After the owner chare migrates, CkDevicePersistent needs to be recreated

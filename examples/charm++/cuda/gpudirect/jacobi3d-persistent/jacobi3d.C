@@ -16,6 +16,9 @@
 /* readonly */ int block_width;
 /* readonly */ int block_height;
 /* readonly */ int block_depth;
+/* readonly */ size_t x_surf_size;
+/* readonly */ size_t y_surf_size;
+/* readonly */ size_t z_surf_size;
 /* readonly */ int n_chares_x;
 /* readonly */ int n_chares_y;
 /* readonly */ int n_chares_z;
@@ -44,6 +47,7 @@ extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     cudaStream_t stream);
 
 class PersistentMsg : public CMessage_PersistentMsg {
+public:
   int dir;
 
   PersistentMsg(int dir_) : dir(dir_) {}
@@ -176,6 +180,11 @@ public:
     block_height = grid_height / n_chares_y;
     block_depth = grid_depth / n_chares_z;
 
+    // Calculate surface sizes
+    x_surf_size = block_height * block_depth * sizeof(DataType);
+    y_surf_size = block_width * block_depth * sizeof(DataType);
+    z_surf_size = block_width * block_height * sizeof(DataType);
+
     // Print configuration
     CkPrintf("\n[CUDA 3D Jacobi example]\n");
     CkPrintf("Grid: %d x %d x %d, Block: %d x %d x %d, Chares: %d x %d x %d, "
@@ -241,8 +250,9 @@ public:
 class Block : public CBase_Block {
   Block_SDAG_CODE
 
-  CkDevicePersistent p_my_bufs[DIR_COUNT];
-  CkDevicePersistent p_neighbor_bufs[DIR_COUNT];
+  std::vector<CkDevicePersistent> p_send_bufs;
+  std::vector<CkDevicePersistent> p_recv_bufs;
+  std::vector<CkDevicePersistent> p_neighbor_bufs;
 
  public:
   int my_iter;
@@ -373,32 +383,32 @@ class Block : public CBase_Block {
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
     hapiCheck(cudaMalloc((void**)&d_new_temperature,
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
-    hapiCheck(cudaMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height * block_depth));
-    hapiCheck(cudaMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height * block_depth));
-    hapiCheck(cudaMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width * block_depth));
-    hapiCheck(cudaMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width * block_depth));
-    hapiCheck(cudaMallocHost((void**)&h_front_ghost, sizeof(DataType) * block_width * block_height));
-    hapiCheck(cudaMallocHost((void**)&h_back_ghost, sizeof(DataType) * block_width * block_height));
+    hapiCheck(cudaMallocHost((void**)&h_left_ghost, x_surf_size));
+    hapiCheck(cudaMallocHost((void**)&h_right_ghost, x_surf_size));
+    hapiCheck(cudaMallocHost((void**)&h_top_ghost, y_surf_size));
+    hapiCheck(cudaMallocHost((void**)&h_bottom_ghost, y_surf_size));
+    hapiCheck(cudaMallocHost((void**)&h_front_ghost, z_surf_size));
+    hapiCheck(cudaMallocHost((void**)&h_back_ghost, z_surf_size));
     if (use_zerocopy || use_persistent) {
-      hapiCheck(cudaMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_send_front_ghost, sizeof(DataType) * block_width * block_height));
-      hapiCheck(cudaMalloc((void**)&d_send_back_ghost, sizeof(DataType) * block_width * block_height));
-      hapiCheck(cudaMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_recv_top_ghost, sizeof(DataType) * block_width * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_recv_bottom_ghost, sizeof(DataType) * block_width * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_recv_front_ghost, sizeof(DataType) * block_width * block_height));
-      hapiCheck(cudaMalloc((void**)&d_recv_back_ghost, sizeof(DataType) * block_width * block_height));
+      hapiCheck(cudaMalloc((void**)&d_send_left_ghost, x_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_send_right_ghost, x_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_send_top_ghost, y_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_send_bottom_ghost, y_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_send_front_ghost, z_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_send_back_ghost, z_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_recv_left_ghost, x_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_recv_right_ghost, x_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_recv_top_ghost, y_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_recv_bottom_ghost, y_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_recv_front_ghost, z_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_recv_back_ghost, z_surf_size));
     } else {
-      hapiCheck(cudaMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_top_ghost, sizeof(DataType) * block_width * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_bottom_ghost, sizeof(DataType) * block_width * block_depth));
-      hapiCheck(cudaMalloc((void**)&d_front_ghost, sizeof(DataType) * block_width * block_height));
-      hapiCheck(cudaMalloc((void**)&d_back_ghost, sizeof(DataType) * block_width * block_height));
+      hapiCheck(cudaMalloc((void**)&d_left_ghost, x_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_right_ghost, x_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_top_ghost, y_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_bottom_ghost, y_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_front_ghost, z_surf_size));
+      hapiCheck(cudaMalloc((void**)&d_back_ghost, z_surf_size));
     }
 
     // Create CUDA streams and events
@@ -408,32 +418,37 @@ class Block : public CBase_Block {
     hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
     hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
 
-    // Create persistent buffers
     if (use_persistent) {
-      p_my_bufs[LEFT] = CkDevicePersistent(d_send_left_ghost,
-          sizeof(DataType) * block_height * block_depth,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-      p_my_bufs[RIGHT] = CkDevicePersistent(d_send_right_ghost,
-          sizeof(DataType) * block_height * block_depth,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-      p_my_bufs[TOP] = CkDevicePersistent(d_send_top_ghost,
-          sizeof(DataType) * block_width * block_depth,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-      p_my_bufs[BOTTOM] = CkDevicePersistent(d_send_bottom_ghost,
-          sizeof(DataType) * block_width * block_depth,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-      p_my_bufs[FRONT] = CkDevicePersistent(d_send_front_ghost,
-          sizeof(DataType) * block_width * block_height,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
-      p_my_bufs[BACK] = CkDevicePersistent(d_send_back_ghost,
-          sizeof(DataType) * block_width * block_height,
-          CkCallback(CkIndex_Block::receiveGhostsP(nullptr), thisProxy[thisIndex]),
-          comm_stream);
+      CkCallback send_cb = CkCallback(CkIndex_Block::sendGhostP(),
+          thisProxy[thisIndex]);
+      CkCallback recv_cb = CkCallback(CkIndex_Block::recvGhostP(nullptr),
+          thisProxy[thisIndex]);
+
+      p_send_bufs.reserve(DIR_COUNT);
+      p_recv_bufs.reserve(DIR_COUNT);
+      p_neighbor_bufs.resize(DIR_COUNT);
+
+      // Create persistent buffers
+      p_send_bufs.emplace_back(d_send_left_ghost,   x_surf_size, send_cb, comm_stream);
+      p_send_bufs.emplace_back(d_send_right_ghost,  x_surf_size, send_cb, comm_stream);
+      p_send_bufs.emplace_back(d_send_top_ghost,    y_surf_size, send_cb, comm_stream);
+      p_send_bufs.emplace_back(d_send_bottom_ghost, y_surf_size, send_cb, comm_stream);
+      p_send_bufs.emplace_back(d_send_front_ghost,  z_surf_size, send_cb, comm_stream);
+      p_send_bufs.emplace_back(d_send_back_ghost,   z_surf_size, send_cb, comm_stream);
+      p_recv_bufs.emplace_back(d_recv_left_ghost,   x_surf_size, recv_cb, comm_stream);
+      p_recv_bufs.emplace_back(d_recv_right_ghost,  x_surf_size, recv_cb, comm_stream);
+      p_recv_bufs.emplace_back(d_recv_top_ghost,    y_surf_size, recv_cb, comm_stream);
+      p_recv_bufs.emplace_back(d_recv_bottom_ghost, y_surf_size, recv_cb, comm_stream);
+      p_recv_bufs.emplace_back(d_recv_front_ghost,  z_surf_size, recv_cb, comm_stream);
+      p_recv_bufs.emplace_back(d_recv_back_ghost,   z_surf_size, recv_cb, comm_stream);
+
+      // Send persistent buffer info to neighbors
+      if (!left_bound)   thisProxy(x-1, y, z).initRecv(RIGHT, p_recv_bufs[LEFT]);
+      if (!right_bound)  thisProxy(x+1, y, z).initRecv(LEFT, p_recv_bufs[RIGHT]);
+      if (!top_bound)    thisProxy(x, y-1, z).initRecv(BOTTOM, p_recv_bufs[TOP]);
+      if (!bottom_bound) thisProxy(x, y+1, z).initRecv(TOP, p_recv_bufs[BOTTOM]);
+      if (!front_bound)  thisProxy(x, y, z-1).initRecv(BACK, p_recv_bufs[FRONT]);
+      if (!back_bound)   thisProxy(x, y, z+1).initRecv(FRONT, p_recv_bufs[BACK]);
     }
 
     // Initialize temperature data
@@ -456,10 +471,6 @@ class Block : public CBase_Block {
     CkCallback* cb = new CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
     hapiAddCallback(compute_stream, cb);
 #endif
-  }
-
-  void initDone() {
-    contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
   }
 
   void update() {
@@ -492,7 +503,7 @@ class Block : public CBase_Block {
   }
 
   void packGhosts() {
-    if (use_zerocopy) {
+    if (use_persistent || use_zerocopy) {
 #if !COMM_ONLY
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
       invokePackingKernels(d_new_temperature, d_send_left_ghost,
@@ -513,87 +524,130 @@ class Block : public CBase_Block {
       // Transfer ghosts from device to host
       if (!left_bound)
         hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost,
-              block_height * block_depth * sizeof(DataType),
-              cudaMemcpyDeviceToHost, comm_stream));
+              x_surf_size, cudaMemcpyDeviceToHost, comm_stream));
       if (!right_bound)
         hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost,
-              block_height * block_depth * sizeof(DataType),
-              cudaMemcpyDeviceToHost, comm_stream));
+              x_surf_size, cudaMemcpyDeviceToHost, comm_stream));
       if (!top_bound)
         hapiCheck(cudaMemcpyAsync(h_top_ghost, d_top_ghost,
-              block_width * block_depth * sizeof(DataType),
-              cudaMemcpyDeviceToHost, comm_stream));
+              y_surf_size, cudaMemcpyDeviceToHost, comm_stream));
       if (!bottom_bound)
         hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_bottom_ghost,
-              block_width * block_depth * sizeof(DataType),
-              cudaMemcpyDeviceToHost, comm_stream));
+              y_surf_size, cudaMemcpyDeviceToHost, comm_stream));
       if (!front_bound)
         hapiCheck(cudaMemcpyAsync(h_front_ghost, d_front_ghost,
-              block_width * block_height * sizeof(DataType),
-              cudaMemcpyDeviceToHost, comm_stream));
+              z_surf_size, cudaMemcpyDeviceToHost, comm_stream));
       if (!back_bound)
         hapiCheck(cudaMemcpyAsync(h_back_ghost, d_back_ghost,
-              block_width * block_height * sizeof(DataType),
-              cudaMemcpyDeviceToHost, comm_stream));
+              z_surf_size, cudaMemcpyDeviceToHost, comm_stream));
     }
 
+    if (use_persistent) {
+      thisProxy[thisIndex].packGhostsDone();
+    } else {
 #if CUDA_SYNC
-    cudaStreamSynchronize(comm_stream);
-    thisProxy[thisIndex].packGhostsDone();
+      cudaStreamSynchronize(comm_stream);
+      thisProxy[thisIndex].packGhostsDone();
 #else
-    // Add asynchronous callback to be invoked when packing kernels and
-    // ghost transfers are complete
-    CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
-    hapiAddCallback(comm_stream, cb);
+      // Add asynchronous callback to be invoked when packing kernels and
+      // ghost transfers are complete
+      CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
+      hapiAddCallback(comm_stream, cb);
 #endif
+    }
   }
 
   void sendGhosts() {
     // Send ghosts to neighboring chares
-    if (use_zerocopy) {
+    // PersistentMsg is used to store the direction
+    if (use_persistent) {
+      PersistentMsg* msg;
+      if (!left_bound) {
+        msg = new PersistentMsg(RIGHT);
+        p_neighbor_bufs[LEFT].set_msg(msg);
+        p_neighbor_bufs[LEFT].cb.setRefNum(my_iter);
+        p_send_bufs[LEFT].cb.setRefNum(my_iter);
+        p_send_bufs[LEFT].put(p_neighbor_bufs[LEFT]);
+      }
+      if (!right_bound) {
+        msg = new PersistentMsg(LEFT);
+        p_neighbor_bufs[RIGHT].set_msg(msg);
+        p_neighbor_bufs[RIGHT].cb.setRefNum(my_iter);
+        p_send_bufs[RIGHT].cb.setRefNum(my_iter);
+        p_send_bufs[RIGHT].put(p_neighbor_bufs[RIGHT]);
+      }
+      if (!top_bound) {
+        msg = new PersistentMsg(BOTTOM);
+        p_neighbor_bufs[TOP].set_msg(msg);
+        p_neighbor_bufs[TOP].cb.setRefNum(my_iter);
+        p_send_bufs[TOP].cb.setRefNum(my_iter);
+        p_send_bufs[TOP].put(p_neighbor_bufs[TOP]);
+      }
+      if (!bottom_bound) {
+        msg = new PersistentMsg(TOP);
+        p_neighbor_bufs[BOTTOM].set_msg(msg);
+        p_neighbor_bufs[BOTTOM].cb.setRefNum(my_iter);
+        p_send_bufs[BOTTOM].cb.setRefNum(my_iter);
+        p_send_bufs[BOTTOM].put(p_neighbor_bufs[BOTTOM]);
+      }
+      if (!front_bound) {
+        msg = new PersistentMsg(BACK);
+        p_neighbor_bufs[FRONT].set_msg(msg);
+        p_neighbor_bufs[FRONT].cb.setRefNum(my_iter);
+        p_send_bufs[FRONT].cb.setRefNum(my_iter);
+        p_send_bufs[FRONT].put(p_neighbor_bufs[FRONT]);
+      }
+      if (!back_bound) {
+        msg = new PersistentMsg(FRONT);
+        p_neighbor_bufs[BACK].set_msg(msg);
+        p_neighbor_bufs[BACK].cb.setRefNum(my_iter);
+        p_send_bufs[BACK].cb.setRefNum(my_iter);
+        p_send_bufs[BACK].put(p_neighbor_bufs[BACK]);
+      }
+    } else if (use_zerocopy) {
       if (!left_bound)
-        thisProxy(x-1, y, z).receiveGhostsZC(my_iter, RIGHT, block_height * block_depth,
+        thisProxy(x-1, y, z).recvGhostZC(my_iter, RIGHT, block_height * block_depth,
             CkDeviceBuffer(d_send_left_ghost, comm_stream));
       if (!right_bound)
-        thisProxy(x+1, y, z).receiveGhostsZC(my_iter, LEFT, block_height * block_depth,
+        thisProxy(x+1, y, z).recvGhostZC(my_iter, LEFT, block_height * block_depth,
             CkDeviceBuffer(d_send_right_ghost, comm_stream));
       if (!top_bound)
-        thisProxy(x, y-1, z).receiveGhostsZC(my_iter, BOTTOM, block_width * block_depth,
+        thisProxy(x, y-1, z).recvGhostZC(my_iter, BOTTOM, block_width * block_depth,
             CkDeviceBuffer(d_send_top_ghost, comm_stream));
       if (!bottom_bound)
-        thisProxy(x, y+1, z).receiveGhostsZC(my_iter, TOP, block_width * block_depth,
+        thisProxy(x, y+1, z).recvGhostZC(my_iter, TOP, block_width * block_depth,
             CkDeviceBuffer(d_send_bottom_ghost, comm_stream));
       if (!front_bound)
-        thisProxy(x, y, z-1).receiveGhostsZC(my_iter, BACK, block_width * block_height,
+        thisProxy(x, y, z-1).recvGhostZC(my_iter, BACK, block_width * block_height,
             CkDeviceBuffer(d_send_front_ghost, comm_stream));
       if (!back_bound)
-        thisProxy(x, y, z+1).receiveGhostsZC(my_iter, FRONT, block_width * block_height,
+        thisProxy(x, y, z+1).recvGhostZC(my_iter, FRONT, block_width * block_height,
             CkDeviceBuffer(d_send_back_ghost, comm_stream));
     } else {
       if (!left_bound)
-        thisProxy(x-1, y, z).receiveGhostsReg(my_iter, RIGHT,
+        thisProxy(x-1, y, z).recvGhostReg(my_iter, RIGHT,
             block_height * block_depth, h_left_ghost);
       if (!right_bound)
-        thisProxy(x+1, y, z).receiveGhostsReg(my_iter, LEFT,
+        thisProxy(x+1, y, z).recvGhostReg(my_iter, LEFT,
             block_height * block_depth, h_right_ghost);
       if (!top_bound)
-        thisProxy(x, y-1, z).receiveGhostsReg(my_iter, BOTTOM,
+        thisProxy(x, y-1, z).recvGhostReg(my_iter, BOTTOM,
             block_width * block_depth, h_top_ghost);
       if (!bottom_bound)
-        thisProxy(x, y+1, z).receiveGhostsReg(my_iter, TOP,
+        thisProxy(x, y+1, z).recvGhostReg(my_iter, TOP,
             block_width * block_depth, h_bottom_ghost);
       if (!front_bound)
-        thisProxy(x, y, z-1).receiveGhostsReg(my_iter, BACK,
+        thisProxy(x, y, z-1).recvGhostReg(my_iter, BACK,
             block_width * block_height, h_front_ghost);
       if (!back_bound)
-        thisProxy(x, y, z+1).receiveGhostsReg(my_iter, FRONT,
+        thisProxy(x, y, z+1).recvGhostReg(my_iter, FRONT,
             block_width * block_height, h_back_ghost);
     }
   }
 
   // This is the post entry method, the regular entry method is defined as a
   // SDAG entry method in the .ci file
-  void receiveGhostsZC(int ref, int dir, int &size, DataType *&buf, CkDeviceBufferPost *devicePost) {
+  void recvGhostZC(int ref, int dir, int &size, DataType *&buf, CkDeviceBufferPost *devicePost) {
     switch (dir) {
       case LEFT:   buf = d_recv_left_ghost;   break;
       case RIGHT:  buf = d_recv_right_ghost;  break;
@@ -606,18 +660,35 @@ class Block : public CBase_Block {
     devicePost[0].cuda_stream = comm_stream;
   }
 
-  void processGhostsZC(int dir, int size, DataType* gh) {
+  void processGhostZC(int dir, int size, DataType* gh) {
 #if !COMM_ONLY
     invokeUnpackingKernel(d_temperature, gh, dir, block_width, block_height,
         block_depth, comm_stream);
 #endif
   }
 
-  void processGhostsP(PersistentMsg* msg) {
-    // TODO
+  void processGhostP(PersistentMsg* msg) {
+    DataType* d_ghost = nullptr;
+    int dir = msg->dir;
+    switch (dir) {
+      case LEFT:   d_ghost = d_left_ghost;   break;
+      case RIGHT:  d_ghost = d_right_ghost;  break;
+      case TOP:    d_ghost = d_top_ghost;    break;
+      case BOTTOM: d_ghost = d_bottom_ghost; break;
+      case FRONT:  d_ghost = d_front_ghost;  break;
+      case BACK:   d_ghost = d_back_ghost;   break;
+      default: CkAbort("Error: invalid direction");
+    }
+
+#if !COMM_ONLY
+    invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
+        block_depth, comm_stream);
+#endif
+
+    delete msg;
   }
 
-  void processGhostsReg(int dir, int size, DataType* gh) {
+  void processGhostReg(int dir, int size, DataType* gh) {
     DataType* h_ghost = nullptr; DataType* d_ghost = nullptr;
     switch (dir) {
       case LEFT:   h_ghost = h_left_ghost; d_ghost = d_left_ghost;     break;
@@ -625,7 +696,7 @@ class Block : public CBase_Block {
       case TOP:    h_ghost = h_top_ghost; d_ghost = d_top_ghost;       break;
       case BOTTOM: h_ghost = h_bottom_ghost; d_ghost = d_bottom_ghost; break;
       case FRONT:  h_ghost = h_front_ghost; d_ghost = d_front_ghost;   break;
-      case BACK:   h_ghost = h_back_ghost; d_ghost = d_back_ghost; break;
+      case BACK:   h_ghost = h_back_ghost; d_ghost = d_back_ghost;     break;
       default: CkAbort("Error: invalid direction");
     }
 

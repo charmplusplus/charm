@@ -10,6 +10,9 @@ mainmodule jacobi3d {
   readonly int block_width;
   readonly int block_height;
   readonly int block_depth;
+  readonly size_t x_surf_size;
+  readonly size_t y_surf_size;
+  readonly size_t z_surf_size;
   readonly int n_chares_x;
   readonly int n_chares_y;
   readonly int n_chares_z;
@@ -34,14 +37,31 @@ mainmodule jacobi3d {
   array [3D] Block {
     entry Block(void);
     entry void init();
-    entry void initDone();
+    entry void initRecv(int dir, CkDevicePersistent p_buf);
     entry void update();
-    entry void updateDone();
     entry void packGhosts();
     entry void packGhostsDone();
-    entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
-    entry void receiveGhostsP(PersistentMsg* msg);
-    entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
+    entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
+    entry void recvGhostP(PersistentMsg* msg);
+    entry void sendGhostP() {}
+    entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
+
+    entry void initDone() {
+      if (use_persistent) {
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when initRecv(int dir, CkDevicePersistent p_buf) {
+            serial {
+              p_neighbor_bufs[dir] = p_buf;
+              p_neighbor_bufs[dir].open();
+            }
+          }
+        }
+      }
+
+      serial {
+        contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
+      }
+    }
 
     entry void exchangeGhosts() {
       serial {
@@ -59,23 +79,32 @@ mainmodule jacobi3d {
         }
       }
 
+      /*
+      if (use_persistent && my_iter > 0) {
+        // Ensure halo data from previous iteration have been received my neighbors
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when sendGhostP[my_iter-1]() {}
+        }
+      }
+      */
+
       for (remote_count = 0; remote_count < neighbors; remote_count++) {
         if (use_zerocopy) {
-          when receiveGhostsZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
+          when recvGhostZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
             serial {
-              processGhostsZC(dir, w, buf);
+              processGhostZC(dir, w, buf);
             }
           }
         } else if (use_persistent) {
-          when receiveGhostsP[my_iter](PersistentMsg* msg) {
+          when recvGhostP[my_iter](PersistentMsg* msg) {
             serial {
-              processGhostsP(msg);
+              processGhostP(msg);
             }
           }
         } else {
-          when receiveGhostsReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
+          when recvGhostReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
             serial {
-              processGhostsReg(dir, w, buf);
+              processGhostReg(dir, w, buf);
             }
           }
         }
