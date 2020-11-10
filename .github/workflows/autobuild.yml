@@ -14,6 +14,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+      with:
+        ref: autobuild
     - name: build
       run: |
         ./build all-test netlrts-linux-x86_64 smp -g -j4 --with-production --enable-error-checking
