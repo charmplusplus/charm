@@ -797,16 +797,17 @@ Vertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
   return v;
 }
 
-Vertex* removePtr(vector<Vertex*>& vec, int id)
+Vertex* removePtr(vector<Vertex*>& vec, const int id)
 {
-  auto it = std::find_if(vec.begin(), vec.end(),
-                         [id](Vertex* ptr) { return ptr->getVertexId() == id; });
-
-  if (it != vec.end())
+  for (auto& ptr : vec)
   {
-    std::iter_swap(it, vec.end() - 1);
-    vec.pop_back();
-    return *it;
+    if (ptr->getVertexId() == id)
+    {
+      Vertex* value = ptr;
+      ptr = vec.back();
+      vec.pop_back();
+      return value;
+    }
   }
 
   return nullptr;
