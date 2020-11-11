@@ -361,7 +361,7 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
 
 void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo);
 
-#if CMK_SMP || CMK_UTH_VERSION
+#if CMK_SMP
 void updatePeerCounterAndPush(envelope *env);
 #endif
 

@@ -1054,13 +1054,13 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
   }
 #endif
 
-#if CMK_SMP || CMK_UTH_VERSION
+#if CMK_SMP
   unsigned short int msgType = CMI_ZC_MSGTYPE(env); // store msgType as msg could be freed
 #endif
 
   _invokeEntry(epIdx,env,obj);
 
-#if CMK_SMP || CMK_UTH_VERSION
+#if CMK_SMP
   if(msgType == CMK_ZC_BCAST_RECV_DONE_MSG) {
     updatePeerCounterAndPush(env);
   }

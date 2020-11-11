@@ -1600,7 +1600,7 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *env, NcpyBcastInterimAckInfo *bcast
 #endif
 }
 
-#if CMK_SMP || CMK_UTH_VERSION
+#if CMK_SMP
 void updatePeerCounterAndPush(envelope *env) {
   int pe;
   int numops, rootNode;
@@ -1694,7 +1694,7 @@ void handleArrayMsgOnChildPostCompletionForRecvBcast(envelope *env) {
   CkArray *mgr = getArrayMgrFromMsg(env);
   mgr->forwardZCMsgToOtherElems(env);
 
-#if CMK_SMP || CMK_UTH_VERSION
+#if CMK_SMP
   if(CmiMyNodeSize() > 1) {
     sendRecvDoneMsgToPeers(env, mgr);
   } else
@@ -1708,7 +1708,7 @@ void handleArrayMsgOnChildPostCompletionForRecvBcast(envelope *env) {
 
 void handleGroupMsgOnChildPostCompletionForRecvBcast(envelope *env) {
   CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_DONE_MSG;
-#if CMK_SMP || CMK_UTH_VERSION
+#if CMK_SMP
   if(CmiMyNodeSize() > 1) {
     sendRecvDoneMsgToPeers(env, NULL);
   } else
