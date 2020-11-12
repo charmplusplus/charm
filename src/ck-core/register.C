@@ -33,6 +33,8 @@ void _registerInit(void)
 int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack,
                   CkDeallocFnPtr dealloc, size_t size)
 {
+  auto messageSize = _msgTable.size();
+  CkPrintf( "Creating message %d with name %s\n", messageSize, name );
   return _msgTable.add(new MsgInfo(name, pack, unpack, dealloc, size));
 }
 
@@ -145,7 +147,7 @@ void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, in
   *startEpIdx = epIdxCtor;
 }
 
-void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+void CkRegisterArrayExt(const char *s, const char **emNames, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(ArrayElemExt), TypeArray);
   CkRegisterBase(__idx, CkIndex_ArrayElement::__idx);
 
@@ -158,7 +160,10 @@ void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *
   CkRegisterEp(s, ArrayElemExt::__AtSyncEntryMethod, 0, __idx, 0);
 
   for (int i=3; i < numEntryMethods; i++)
-    CkRegisterEp(s, ArrayElemExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+    {
+    CkPrintf("Name: %s\n", emNames[i]);
+    CkRegisterEp(emNames[i], ArrayElemExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+    }
 
   *chareIdx = __idx;
   *startEpIdx = epIdxCtor;

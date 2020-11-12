@@ -467,10 +467,8 @@ static inline void _traceInit(char **argv)
   // check if trace is turned on/off for this pe
   CkpvAccess(traceOnPe) = checkTraceOnPe(argv);
 
-#if !CMK_CHARM4PY
   // defined in moduleInit.C
   _createTraces(argv);
-#endif
 
   // Now setup the control point tracing module if desired. It is always compiled/linked in, but is not always enabled
   // FIXME: make sure it is safe to use argv in SMP version 
@@ -484,6 +482,7 @@ static inline void _traceInit(char **argv)
   
 
   // set trace on/off
+  CkPrintf("Setting up the traces!\n");
   CkpvAccess(_traces)->setTraceOnPE(CkpvAccess(traceOnPe));
 
 #if CMK_SMP_TRACE_COMMTHREAD

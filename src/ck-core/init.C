@@ -75,6 +75,7 @@ never be excluded...
 #include "CkSyncBarrier.decl.h"
 #if CMK_CHARM4PY
 #include "TreeLB.h"
+
 // #include "trace-projectionsBOC.h"
 #endif
 
@@ -91,8 +92,13 @@ extern void QdProcess(int);
 #endif
 
 #if CMK_CHARM4PY
-extern void _createTraceprojections(char **argv);
+#warning "Charm4Py Being built!!!!"
 extern void _registerTraceProjections();
+extern void _createTraceprojections(char **argv);
+void _createTraces(char **argv) { (void)argv;
+  CmiPrintf("Creating traces!\n");
+_createTraceprojections(argv);
+}
 #endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
@@ -1316,6 +1322,7 @@ void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
+  CkPrintf("INIT CHARM!!!!!\n\n\n\n\n");
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
 	std::set_terminate([](){ CkAbort("Unhandled C++ exception in user code.\n");});
 
@@ -1456,6 +1463,7 @@ void _initCharm(int unused_argc, char **argv)
 	initCharmProjections();
 #if CMK_TRACE_IN_CHARM
         // initialize trace module in ck
+  CkPrintf("CMKT RACE IN CHARM\n");
         traceCharmInit(argv);
 #endif
  	
@@ -1523,8 +1531,10 @@ void _initCharm(int unused_argc, char **argv)
                   Without an executable (charm4py just uses libcharm.so), the load balancers in libcharm.so
                   have to somehow be registered during init.
                 */
+
 		_registerTreeLB();
     _registerTraceProjections();
+    // _createTraces(argv);
 
 #endif
 
