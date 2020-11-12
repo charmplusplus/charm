@@ -2955,11 +2955,6 @@ test_link_fortran_main() {
 }
 test_link_fortran_main "whether the C++ linker succeeds with a Fortran entry point" "yes" "no" ""
 /bin/rm -f conftest.f90 test.o testlink out
-if test $pass -eq 1
-then
-  add_flag "CMK_CAN_LINK_FORTRAN='1'" "Fortran"
-  add_make_flag "CMK_CAN_LINK_FORTRAN:=1" "Fortran"
-fi
 
 ### check for OpenMP availability ###
 cat > $tc <<EOT
