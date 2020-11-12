@@ -27,8 +27,7 @@ class Main : public CBase_Main{
       CProxy_RRMap rrMap = CProxy_RRMap::ckNew();
       CkArrayOptions opts(numElements);
       opts.setMap(rrMap);
-      CProxy_zerocopyObject zerocopyObj = CProxy_zerocopyObject::ckNew(opts);
-      zerocopyObj.testZeroCopy(thisProxy);
+      CProxy_zerocopyObject zerocopyObj = CProxy_zerocopyObject::ckNew(thisProxy, opts);
     }
 
     void done(){
@@ -111,6 +110,8 @@ class zerocopyObject : public CBase_zerocopyObject{
       sdagCb = CkCallback(idx_sdagZeroCopySent, thisProxy[thisIndex]);
       compReductionCb = CkCallback(CkReductionTarget(Main, done), mainProxy);
       lbReductionCb = CkCallback(CkReductionTarget(zerocopyObject, BarrierDone), thisProxy);
+
+      testZeroCopy();
     }
 
     void pup(PUP::er &p){
@@ -196,7 +197,7 @@ class zerocopyObject : public CBase_zerocopyObject{
         nextStep();
     }
 
-    void testZeroCopy(CProxy_Main mProxy){
+    void testZeroCopy(){
       iSize1 = 210;
       iSize2 = 11;
       dSize1 = 4700;
@@ -206,7 +207,6 @@ class zerocopyObject : public CBase_zerocopyObject{
       iOffset1 = 3;
       cOffset1 = 2;
 
-      mainProxy = mProxy;
       if(thisIndex < numElements/2){
         assignValues(iArr1, iSize1);
         assignValues(iArr2, iSize2);
