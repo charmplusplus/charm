@@ -10,8 +10,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Tmate session for debugging
-      uses: mxschmitt/action-tmate@v2
     - name: build
       run: ./buildold all-test netlrts-linux-x86_64 -g -j4 --with-production
     - name: test
