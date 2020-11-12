@@ -110,7 +110,7 @@ public:
 #if CMK_LB_USER_DATA
   inline void *getDBUserData(int idx) { return  data.getUserData(idx); }
 #endif
-  inline const std::vector<LBRealType> getVectorLoad() const
+  inline const std::vector<LBRealType>& getVectorLoad() const
   {
     return data.vectorLoad;
   }

@@ -6,6 +6,7 @@
 #include "LBMachineUtil.h"
 
 #include <vector>
+#include <string>
 
 class LBDatabase {
 friend class LBManager;
@@ -215,4 +216,6 @@ public:
     return 0;
   #endif
   };
+
+  void dump(std::string fileNameBase, int step);
 };

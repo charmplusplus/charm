@@ -1,5 +1,7 @@
 #include "LBManager.h"
 
+#include <fstream>
+
 LBDatabase::LBDatabase() {
   omCount = omsRegistering = 0;
   obj_walltime = 0;
@@ -316,4 +318,41 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime, int phase)
   CmiAssert(obj != NULL);
   obj->setTiming(cputime, phase);
 #endif
+}
+
+/**
+   Dumps the database on this PE to file
+   Each object is dumped as two lines:
+
+   First:  "<OM ID> <Object ID> <walltime>"
+   Second: "<vector load dim 0> <vector load dim 1> ..."
+
+   Note that the second line will be blank if the object has
+   no vector load
+ */
+void LBDatabase::dump(std::string fileNameBase, int step)
+{
+  std::string filename = fileNameBase + "_step" + std::to_string(step) + "_" +
+                         std::to_string(CkMyPe()) + ".txt";
+  std::ofstream file(filename);
+  for (const auto& entry : objs)
+  {
+    const auto& obj = entry.obj;
+    if (obj)
+    {
+      LBRealType w, c;
+      obj->getTime(&w, &c);
+      const LDObjHandle handle = obj->GetLDObjHandle();
+
+      file << handle.omID().id.idx << " " << handle.objID() << " " << w << "\n";
+      const auto& vec = obj->getVectorLoad();
+      for (const auto& val : vec)
+      {
+        file << val << " ";
+      }
+      file << "\n";
+    }
+  }
+
+  file.close();
 }

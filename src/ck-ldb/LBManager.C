@@ -485,6 +485,11 @@ void LBManager::initnodeFn()
 
 void LBManager::InvokeLB()
 {
+  if (mystep == LBSimulation::dumpStep)
+  {
+    DumpDatabase();
+  }
+
   if (loadbalancers.size() > 0)
   {
     loadbalancers[currentLBIndex]->InvokeLB();
@@ -598,10 +603,7 @@ void LBManager::MigrationDone()
 
 void LBManager::DumpDatabase()
 {
-#ifdef DEBUG
-  CmiPrintf("Database contains %d object managers\n", omCount);
-  CmiPrintf("Database contains %d objects\n", objs.size());
-#endif
+  lbdb_obj->dump("lbdump", mystep);
 }
 
 void LBManager::Migrated(LDObjHandle h, int waitBarrier)
