@@ -8,6 +8,7 @@
 #define TOTAL_ITER    40
 
 int numElements;
+CProxy_Main mProxy;
 
 //Main chare
 class Main : public CBase_Main{
@@ -17,7 +18,10 @@ class Main : public CBase_Main{
         ckout<<"Usage: zerocopy <numelements>"<<endl;
         CkExit(1);
       }
+
       numElements = atoi(m->argv[1]);
+      mProxy = thisProxy;
+
       delete m;
       if(numElements%2 != 0){
         ckout<<"Argument <numelements> should be even"<<endl;
@@ -27,7 +31,7 @@ class Main : public CBase_Main{
       CProxy_RRMap rrMap = CProxy_RRMap::ckNew();
       CkArrayOptions opts(numElements);
       opts.setMap(rrMap);
-      CProxy_zerocopyObject zerocopyObj = CProxy_zerocopyObject::ckNew(thisProxy, opts);
+      CProxy_zerocopyObject zerocopyObj = CProxy_zerocopyObject::ckNew(opts);
     }
 
     void done(){
@@ -80,7 +84,6 @@ class zerocopyObject : public CBase_zerocopyObject{
   bool firstMigrationPending;
   CkCallback cb, sdagCb, cbCopy, compReductionCb, lbReductionCb;
   int idx_zerocopySent, idx_sdagZeroCopySent;;
-  CProxy_Main mainProxy;
 
   public:
     zerocopyObject_SDAG_CODE
@@ -110,7 +113,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       cb = CkCallback(idx_zerocopySent, thisProxy[thisIndex]);
       cbCopy = cb;
       sdagCb = CkCallback(idx_sdagZeroCopySent, thisProxy[thisIndex]);
-      compReductionCb = CkCallback(CkReductionTarget(Main, done), mainProxy);
+      compReductionCb = CkCallback(CkReductionTarget(Main, done), mProxy);
       lbReductionCb = CkCallback(CkReductionTarget(zerocopyObject, BarrierDone), thisProxy);
 
       testZeroCopy();
@@ -126,7 +129,6 @@ class zerocopyObject : public CBase_zerocopyObject{
       p|mixedZeroCopySentCounter;
       p|sdagZeroCopySentCounter;
       p|sdagZeroCopyRecvCounter;
-      p|mainProxy;
       p|sdagCb;
       p|compReductionCb;
       p|lbReductionCb;

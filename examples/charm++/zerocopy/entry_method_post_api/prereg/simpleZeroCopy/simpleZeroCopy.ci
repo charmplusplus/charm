@@ -1,6 +1,7 @@
 mainmodule simpleZeroCopy {
 
   readonly int numElements;
+  readonly CProxy_Main mProxy;
 
   mainchare Main {
     entry Main(CkArgMsg *m);
@@ -8,7 +9,7 @@ mainmodule simpleZeroCopy {
   };
 
   array [1D] zerocopyObject{
-    entry zerocopyObject(CProxy_Main mProxy);
+    entry zerocopyObject();
     entry void ResumeFromSync();
     entry void zerocopySent(CkDataMsg *msg);
     entry void send(int n1, int ptr1[n1], int n2, double ptr2[n2], int n3, char ptr3[n3]);
