@@ -10,13 +10,14 @@ add_library(ampi-compat compat_ampi.c
        compat_ampicpp.C)
 
 add_library(moduleampi ${ampi-cxx-sources} ${ampi-h-sources})
+target_compile_options(moduleampi PRIVATE -DAMPI_NO_UNIMPLEMENTED_WARNINGS)
 add_dependencies(moduleampi moduletcharm ck)
 
 
 # fsglobals/pipglobals
 
 add_library(ampi_funcptr_shim ampi_funcptr_shim.C)
-target_compile_options(ampi_funcptr_shim PRIVATE -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden)
+target_compile_options(ampi_funcptr_shim PRIVATE -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared -fvisibility=hidden)
 add_dependencies(ampi_funcptr_shim moduleampi)
 add_custom_command(TARGET ampi_funcptr_shim
     POST_BUILD
@@ -34,7 +35,7 @@ add_custom_command(TARGET ampi_funcptr_shim_main
 )
 
 add_library(ampi_funcptr_loader ampi_funcptr_loader.C)
-target_compile_options(ampi_funcptr_loader PRIVATE -language ampi)
+target_compile_options(ampi_funcptr_loader PRIVATE -language ampi -DAMPI_NO_UNIMPLEMENTED_WARNINGS)
 add_dependencies(ampi_funcptr_loader moduleampi)
 add_custom_command(TARGET ampi_funcptr_loader
     POST_BUILD
@@ -96,6 +97,7 @@ endif()
 
 if(${CMK_CAN_LINK_FORTRAN})
     add_library(moduleampif ${ampi-f90-sources} ${ampi-cxx-sources} ${ampi-h-sources})
+    target_compile_options(moduleampif PRIVATE -DAMPI_NO_UNIMPLEMENTED_WARNINGS)
     add_dependencies(moduleampif moduletcharm ck)
 
     add_library(ampif OBJECT ampif.C)

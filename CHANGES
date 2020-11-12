@@ -40,6 +40,12 @@ Misc:
 
 - The BigSim emulator has been removed from Charm++.
 
+- The following unmaintained machine layers have been removed from Charm++:
+  * uth (Machine layer that uses user-level threads for execution)
+  * sim (Machine layer that simulates a simple message-passing machine with communications processors; based
+         on the Dagger simulator)
+  * shmem (Machine layer built on top of the OpenSHMEM API)
+
 Charm++ Features & Fixes:
 
 - We have renamed the `VERSION` file to `charm-version.h` and made it compatible
