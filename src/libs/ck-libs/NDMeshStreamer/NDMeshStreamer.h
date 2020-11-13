@@ -817,7 +817,7 @@ receiveAlongRoute(MeshStreamerMessageV *msg) {
     if (msg->finalMsgCount != -2) {
       markMessageReceived(msg->msgType, msg->finalMsgCount);
     }
-#if !CMK_MULTICORE && !CMK_UTH_VERSION
+#if !CMK_MULTICORE
     else if (stagedCompletionStarted_) {
       checkForCompletedStages();
     }

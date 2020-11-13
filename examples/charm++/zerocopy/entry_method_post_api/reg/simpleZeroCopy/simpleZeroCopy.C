@@ -8,6 +8,7 @@
 #define TOTAL_ITER    40
 
 int numElements;
+CProxy_Main mProxy;
 
 //Main chare
 class Main : public CBase_Main{
@@ -17,7 +18,10 @@ class Main : public CBase_Main{
         ckout<<"Usage: zerocopy <numelements>"<<endl;
         CkExit(1);
       }
+
       numElements = atoi(m->argv[1]);
+      mProxy = thisProxy;
+
       delete m;
       if(numElements%2 != 0){
         ckout<<"Argument <numelements> should be even"<<endl;
@@ -28,7 +32,6 @@ class Main : public CBase_Main{
       CkArrayOptions opts(numElements);
       opts.setMap(rrMap);
       CProxy_zerocopyObject zerocopyObj = CProxy_zerocopyObject::ckNew(opts);
-      zerocopyObj.testZeroCopy(thisProxy);
     }
 
     void done(){
@@ -79,7 +82,6 @@ class zerocopyObject : public CBase_zerocopyObject{
   bool firstMigrationPending;
   CkCallback cb, sdagCb, cbCopy, compReductionCb, lbReductionCb;
   int idx_zerocopySent, idx_sdagZeroCopySent;;
-  CProxy_Main mainProxy;
 
   public:
     zerocopyObject_SDAG_CODE
@@ -109,8 +111,10 @@ class zerocopyObject : public CBase_zerocopyObject{
       cb = CkCallback(idx_zerocopySent, thisProxy[thisIndex]);
       cbCopy = cb;
       sdagCb = CkCallback(idx_sdagZeroCopySent, thisProxy[thisIndex]);
-      compReductionCb = CkCallback(CkReductionTarget(Main, done), mainProxy);
+      compReductionCb = CkCallback(CkReductionTarget(Main, done), mProxy);
       lbReductionCb = CkCallback(CkReductionTarget(zerocopyObject, BarrierDone), thisProxy);
+
+      testZeroCopy();
     }
 
     void pup(PUP::er &p){
@@ -123,7 +127,6 @@ class zerocopyObject : public CBase_zerocopyObject{
       p|mixedZeroCopySentCounter;
       p|sdagZeroCopySentCounter;
       p|sdagZeroCopyRecvCounter;
-      p|mainProxy;
       p|sdagCb;
       p|compReductionCb;
       p|lbReductionCb;
@@ -196,7 +199,7 @@ class zerocopyObject : public CBase_zerocopyObject{
         nextStep();
     }
 
-    void testZeroCopy(CProxy_Main mProxy){
+    void testZeroCopy(){
       iSize1 = 210;
       iSize2 = 11;
       dSize1 = 4700;
@@ -206,7 +209,6 @@ class zerocopyObject : public CBase_zerocopyObject{
       iOffset1 = 3;
       cOffset1 = 2;
 
-      mainProxy = mProxy;
       if(thisIndex < numElements/2){
         assignValues(iArr1, iSize1);
         assignValues(iArr2, iSize2);

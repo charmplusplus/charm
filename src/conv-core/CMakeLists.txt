@@ -108,7 +108,7 @@ add_library(global-swap global-elfgot.C)
 
 find_program(GIT git)
 
-if(GIT)
+if(GIT AND EXISTS ${CMAKE_SOURCE_DIR}/.git)
   execute_process(COMMAND git describe --exact-match
              OUTPUT_VARIABLE CHARM_VERSION_GIT
              RESULT_VARIABLE git_result
