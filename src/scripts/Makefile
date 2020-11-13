@@ -212,7 +212,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp json_fwd.hpp cmirdmautils.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
-	  ckfutures.h ckIgetControl.h debug-charm.h\
+	  ckmarshall.h ckfutures.h ckIgetControl.h debug-charm.h\
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
@@ -253,7 +253,7 @@ ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \
 	ckset.h LBSimulation.h  \
 
-basics: headers
+basics: headers charm-version-git.h
 	touch basics
 
 # Headers is used only for the dependencies
@@ -272,14 +272,15 @@ conv-autoconfig.h: configure conv-autoconfig.h.in config_opts.sh
 	@. ./config_opts.sh; echo ./configure $(QUIET) $$CONFIG_OPTS;  \
 	./configure $(QUIET) $$CONFIG_OPTS && touch conv-autoconfig.h
 
-.PHONY: clean veryclean VERSION.new config
+.PHONY: clean veryclean charm-version-git.h.new config
 
-VERSION: VERSION.new
+charm-version-git.h: charm-version-git.h.new dirs+sources
 	SRCBASE=$(SRCBASE) ./commitid.sh
+	./system_ln $$PWD/charm-version-git.h ../include/charm-version-git.h
 
-commitid.C: VERSION
+commitid.C: charm-version-git.h
 	echo "extern const char * const CmiCommitID;" > $@
-	echo "const char * const CmiCommitID = \"`cat VERSION`\";" >> $@
+	echo "const char * const CmiCommitID = $$(grep CHARM_VERSION_GIT charm-version-git.h | awk '{print $$3}');" >> $@
 commitid.o: CC=$(CHARMC)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
@@ -494,7 +495,7 @@ converse: charmrun-target swapglobal-target conv-cpm tmgr hwloc-target
 cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
 $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
 
-hwloc-target:  conv-autoconfig.h
+hwloc-target:  conv-autoconfig.h charm-version-git.h
 	@( cd hwloc && \
     ./configure \
     --disable-cairo \

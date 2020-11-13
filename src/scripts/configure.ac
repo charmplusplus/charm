@@ -42,8 +42,19 @@ CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
-echo AC_PACKAGE_VERSION > ../include/VERSION
-AC_DEFINE_UNQUOTED([CHARM_VERSION], AC_PACKAGE_VERSION, [Charm++ Release/API version number])
+CHARM_VERSION=AC_PACKAGE_VERSION
+CHARM_VERSION_MAJOR=`echo $CHARM_VERSION | cut -c1`
+CHARM_VERSION_MINOR=`echo $CHARM_VERSION | cut -c2-3`
+CHARM_VERSION_PATCH=`echo $CHARM_VERSION | cut -c4-5`
+
+if test "$CHARM_VERSION_PATCH" -lt 10 ; then
+  CHARM_VERSION_PATCH=${CHARM_VERSION_PATCH#0} # remove leading '0'
+fi
+
+echo "#define CHARM_VERSION $CHARM_VERSION" > ../include/charm-version.h
+echo "#define CHARM_VERSION_MAJOR $CHARM_VERSION_MAJOR" >> ../include/charm-version.h
+echo "#define CHARM_VERSION_MINOR $CHARM_VERSION_MINOR" >> ../include/charm-version.h
+echo "#define CHARM_VERSION_PATCH $CHARM_VERSION_PATCH" >> ../include/charm-version.h
 
 charmout="charmconfig.out"
 /bin/rm -rf $charmout
@@ -129,7 +140,6 @@ add_make_flag "CMK_MACOSX:=$CMK_MACOSX" 'basic setup'
 add_make_flag "CMK_WINDOWS:=$CMK_WINDOWS" 'basic setup'
 add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
 add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
-add_make_flag "CMK_UTH:=$CMK_UTH" 'basic setup'
 add_make_flag "CMK_USE_LRTS:=$CMK_USE_LRTS" 'basic setup'
 add_make_flag "BUILD_CUDA:=$BUILD_CUDA" 'basic setup'
 AC_DEFINE_UNQUOTED(CMK_POST_EXE, $CMK_POST_EXE, [basic setup])
