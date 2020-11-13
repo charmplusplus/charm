@@ -276,8 +276,11 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   for(i=0;i<_chareTable.size();i++)
     fprintf(stsfp, "CHARE %d \"%s\" %d\n", (int)i, _chareTable[i]->name, _chareTable[i]->ndims);
   for(i=0;i<_entryTable.size();i++)
+    {
+      CkPrintf("Chare entry name: %s\n", _entryTable[i]->name);
     fprintf(stsfp, "ENTRY CHARE %d \"%s\" %d %d\n", (int)i, _entryTable[i]->name,
                  (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
+    }
   for(i=0;i<_msgTable.size();i++)
     fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
 }

@@ -158,11 +158,12 @@ void CkRegisterArrayExt(const char *s, const char **emNames, int numEntryMethods
   CkRegisterMigCtor(__idx, epidx);
 
   CkRegisterEp(s, ArrayElemExt::__AtSyncEntryMethod, 0, __idx, 0);
+  CkPrintf("OnPE: %d, Registering array chare: %s\n", CkMyPe(), s);
 
   for (int i=3; i < numEntryMethods; i++)
     {
-    CkPrintf("Name: %s\n", emNames[i]);
-    CkRegisterEp(emNames[i], ArrayElemExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+      CkPrintf("OnPE: %d, Name: %s\n", CkMyPe(), emNames[i]);
+      CkRegisterEp(emNames[i], ArrayElemExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
     }
 
   *chareIdx = __idx;
