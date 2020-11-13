@@ -28,8 +28,7 @@ mainmodule jacobi3d {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void initDone();
     entry void startIter();
-    entry [reductiontarget] void updateDone();
-    entry [reductiontarget] void commDone();
+    entry [reductiontarget] void warmupDone();
     entry [reductiontarget] void allDone();
     entry void printDone();
   };
@@ -52,7 +51,6 @@ mainmodule jacobi3d {
           when initRecv(int dir, CkDevicePersistent p_buf) {
             serial {
               p_neighbor_bufs[dir] = p_buf;
-              p_neighbor_bufs[dir].open();
             }
           }
         }
@@ -66,6 +64,7 @@ mainmodule jacobi3d {
     entry void exchangeGhosts() {
       serial {
         my_iter++;
+        CkPrintf("Chare %d,%d,%d, iter %d: exchangeGhosts\n", thisIndex.x, thisIndex.y, thisIndex.z, my_iter);
         update();
         packGhosts();
       }
@@ -98,7 +97,8 @@ mainmodule jacobi3d {
         } else if (use_persistent) {
           when recvGhostP[my_iter](PersistentMsg* msg) {
             serial {
-              processGhostP(msg);
+              CkPrintf("Chare %d,%d,%d, iter %d: recvGhostP dir %d\n", thisIndex.x, thisIndex.y, thisIndex.z, my_iter, msg->dir);
+              //processGhostP(msg);
             }
           }
         } else {
@@ -112,7 +112,7 @@ mainmodule jacobi3d {
 
       serial {
         if (my_iter <= warmup_iters) {
-          contribute(CkCallback(CkReductionTarget(Main, commDone), main_proxy));
+          contribute(CkCallback(CkReductionTarget(Main, warmupDone), main_proxy));
         } else {
           if (my_iter < warmup_iters + n_iters) {
             thisProxy[thisIndex].exchangeGhosts();
