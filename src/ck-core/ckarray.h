@@ -745,9 +745,7 @@ public:
     return broadcaster;
   }
   void flushStates();
-#if CMK_ONESIDED_IMPL
   void forwardZCMsgToOtherElems(envelope *env);
-#endif
 
 
         static bool isIrreducible() { return true; }
@@ -757,7 +755,6 @@ public:
 // with usage in maps' populateInitial()
 typedef CkArray CkArrMgr;
 
-#if CMK_ONESIDED_IMPL
 struct ncpyBcastNoMsg{
   char cmicore[CmiMsgHeaderSizeBytes];
   int srcPe;
@@ -765,7 +762,6 @@ struct ncpyBcastNoMsg{
 };
 
 void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize);
-#endif
 
 /*@}*/
 
