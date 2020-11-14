@@ -752,10 +752,8 @@ else()
     set(hwloc_shared no)
 endif()
 
-# Determine arguments to pass to hwloc's configure
-set(command ${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS})
-execute_process(COMMAND ${command} COMMAND grep CHARM_CC_FLAGS= COMMAND cut -c16- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC_FLAGS)
-execute_process(COMMAND ${command} COMMAND grep CHARM_CC= COMMAND cut -c10- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC)
+# Used to determine arguments to pass to hwloc's configure
+set(building_blocks_command "${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS}")
 
 # FIXME: copy .so
 set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
@@ -763,26 +761,27 @@ include(ExternalProject)
 ExternalProject_Add(hwloc
     URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
     CONFIGURE_COMMAND
-        ${hwloc_dir}/configure
-        --disable-cairo
-        --disable-cuda
-        --disable-gl
-        --disable-libxml2
-        --disable-nvml
-        --disable-opencl
-        --disable-pci
-        --disable-libudev
-        --disable-visibility
-        --enable-embedded-mode
-        --enable-shared=${hwloc_shared}
-        --enable-static
-        --with-hwloc-symbol-prefix=cmi_
-        --without-x
-        HWLOC_FLAGS=${CHARM_CC_FLAGS}
-        CFLAGS=${CHARM_CC_FLAGS}
-        CC=${CHARM_CC}
-        CC_FOR_BUILD=${CHARM_CC}
-        > /dev/null
+      bash "-c" "eval $(${building_blocks_command}) && \
+        ${hwloc_dir}/configure \
+        --disable-cairo \
+        --disable-cuda \
+        --disable-gl \
+        --disable-libxml2 \
+        --disable-nvml \
+        --disable-opencl \
+        --disable-pci \
+        --disable-libudev \
+        --disable-visibility \
+        --enable-embedded-mode \
+        --enable-shared=${hwloc_shared} \
+        --enable-static \
+        --with-hwloc-symbol-prefix=cmi_ \
+        --without-x \
+        HWLOC_FLAGS=\"$CHARM_CC_FLAGS\" \
+        CFLAGS=\"$CHARM_CC_FLAGS\" \
+        CC=$CHARM_CC \
+        CC_FOR_BUILD=$CHARM_CC \
+        > /dev/null"
     BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
     INSTALL_COMMAND test -f hwloc/.libs/libhwloc_embedded.lib && cp hwloc/.libs/libhwloc_embedded.lib hwloc/.libs/libhwloc_embedded.a || true # On Windows, the library is created as .lib
     COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
