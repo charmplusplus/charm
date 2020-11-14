@@ -182,8 +182,8 @@ while [[ $# -gt 0 ]]; do
       opt_CXX=${arg/cc/++}
       opt_compiler+="$arg "
       ;;
-    gfortran)
-      opt_FC=gfortran
+    gfortran|gfortran-*)
+      opt_FC=$arg
       opt_compiler+="$arg "
       ;;
     clang)
