@@ -19,7 +19,7 @@ struct CkDevicePersistent {
   int pe;
   cudaIpcMemHandle_t cuda_ipc_handle;
   void* ipc_ptr;
-  bool ipc_open;
+  bool ipc_open; // Used only by the remote chare
 
   CkDevicePersistent() : ptr(nullptr), cnt(0), cb(CkCallback(CkCallback::ignore)),
                          cb_msg(nullptr), pe(-1), ipc_ptr(nullptr), ipc_open(false) {}

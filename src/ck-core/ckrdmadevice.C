@@ -72,19 +72,13 @@ void CkDevicePersistent::init() {
 }
 
 void CkDevicePersistent::open() {
-  CkNcpyModeDevice mode = findTransferModeDevice(CkMyPe(), pe);
-
-  if (mode == CkNcpyModeDevice::IPC) {
-    // Create a CUDA IPC handle for inter-process communication
-    hapiCheck(cudaIpcGetMemHandle(&cuda_ipc_handle, (void*)ptr));
-  }
+  // Create a CUDA IPC handle for inter-process communication
+  hapiCheck(cudaIpcGetMemHandle(&cuda_ipc_handle, (void*)ptr));
 }
 
 void CkDevicePersistent::close() {
   // Close the CUDA IPC handle if it was opened
-  if (ipc_open) {
-    hapiCheck(cudaIpcCloseMemHandle(ipc_ptr));
-  }
+  hapiCheck(cudaIpcCloseMemHandle(ipc_ptr));
 }
 
 void CkDevicePersistent::set_msg(void* msg) {
