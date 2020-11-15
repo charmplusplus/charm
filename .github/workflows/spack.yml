@@ -32,4 +32,5 @@ jobs:
         source share/spack/setup-env.sh
         spack compiler find
         spack compiler list
+        export VERBOSE=1
         spack install -v charmpp@develop
