@@ -568,7 +568,6 @@ class Block : public CBase_Block {
         p_neighbor_bufs[FRONT].cb.setRefNum(my_iter);
         p_send_bufs[FRONT].cb.setRefNum(my_iter);
         p_send_bufs[FRONT].put(p_neighbor_bufs[FRONT]);
-        CkPrintf("Chare %d,%d,%d, iter %d: sendGhosts to dir %d\n", thisIndex.x, thisIndex.y, thisIndex.z, my_iter, FRONT);
       }
       if (!back_bound) {
         msg = new PersistentMsg(FRONT);
@@ -576,7 +575,6 @@ class Block : public CBase_Block {
         p_neighbor_bufs[BACK].cb.setRefNum(my_iter);
         p_send_bufs[BACK].cb.setRefNum(my_iter);
         p_send_bufs[BACK].put(p_neighbor_bufs[BACK]);
-        CkPrintf("Chare %d,%d,%d, iter %d: sendGhosts to dir %d\n", thisIndex.x, thisIndex.y, thisIndex.z, my_iter, BACK);
       }
     } else if (use_zerocopy) {
       if (!left_bound)
