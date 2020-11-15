@@ -1,4 +1,4 @@
-name: Spack MacOS / Linux
+name: Spack
 
 on: pull_request
 
@@ -16,11 +16,14 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install Spack and build charm
+    - name: Install Spack
       run: |
         cd ..
         git clone https://github.com/spack/spack
         cd spack
         source share/spack/setup-env.sh
-        sed -i 's,master,${{ github.base_ref }},' var/spack/repos/builtin/packages/charmpp/package.py
+        [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran
+        sed -i -e 's,master,${{ github.base_ref }},' var/spack/repos/builtin/packages/charmpp/package.py
+    - name: Build Charm++
+      run: |
         spack install charmpp@develop
