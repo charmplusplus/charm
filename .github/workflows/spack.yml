@@ -1,0 +1,26 @@
+name: Spack MacOS / Linux
+
+on: pull_request
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install Spack and build charm
+      run: |
+        cd ..
+        git clone https://github.com/spack/spack
+        cd spack
+        source share/spack/setup-env.sh
+        sed -i 's,master,${{ github.base_ref }},' var/spack/repos/builtin/packages/charmpp/package.py
+        spack install charmpp@develop
