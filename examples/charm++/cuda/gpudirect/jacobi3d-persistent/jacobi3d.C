@@ -643,12 +643,12 @@ class Block : public CBase_Block {
     DataType* d_ghost = nullptr;
     int dir = msg->dir;
     switch (dir) {
-      case LEFT:   d_ghost = d_left_ghost;   break;
-      case RIGHT:  d_ghost = d_right_ghost;  break;
-      case TOP:    d_ghost = d_top_ghost;    break;
-      case BOTTOM: d_ghost = d_bottom_ghost; break;
-      case FRONT:  d_ghost = d_front_ghost;  break;
-      case BACK:   d_ghost = d_back_ghost;   break;
+      case LEFT:   d_ghost = d_recv_left_ghost;   break;
+      case RIGHT:  d_ghost = d_recv_right_ghost;  break;
+      case TOP:    d_ghost = d_recv_top_ghost;    break;
+      case BOTTOM: d_ghost = d_recv_bottom_ghost; break;
+      case FRONT:  d_ghost = d_recv_front_ghost;  break;
+      case BACK:   d_ghost = d_recv_back_ghost;   break;
       default: CkAbort("Error: invalid direction");
     }
 

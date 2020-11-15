@@ -64,7 +64,6 @@ mainmodule jacobi3d {
     entry void exchangeGhosts() {
       serial {
         my_iter++;
-        CkPrintf("Chare %d,%d,%d, iter %d: exchangeGhosts\n", thisIndex.x, thisIndex.y, thisIndex.z, my_iter);
         update();
         packGhosts();
       }
@@ -97,8 +96,7 @@ mainmodule jacobi3d {
         } else if (use_persistent) {
           when recvGhostP[my_iter](PersistentMsg* msg) {
             serial {
-              CkPrintf("Chare %d,%d,%d, iter %d: recvGhostP dir %d\n", thisIndex.x, thisIndex.y, thisIndex.z, my_iter, msg->dir);
-              //processGhostP(msg);
+              processGhostP(msg);
             }
           }
         } else {
