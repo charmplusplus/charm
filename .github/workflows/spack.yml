@@ -25,8 +25,11 @@ jobs:
         sed -i -e 's,master,${{ github.head_ref }},' var/spack/repos/builtin/packages/charmpp/package.py
         sed -i -e '/automake/d' var/spack/repos/builtin/packages/charmpp/package.py
         sed -i -e '/autoconf/d' var/spack/repos/builtin/packages/charmpp/package.py
+
     - name: Build Charm++
       run: |
         cd ../spack
         source share/spack/setup-env.sh
+        spack compiler find
+        spack compiler list
         spack install -v charmpp@develop
