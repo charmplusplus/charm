@@ -22,8 +22,9 @@ jobs:
         git clone https://github.com/spack/spack
         cd spack
         [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran
-        echo ${{ github.base_ref }}
-        sed -i -e 's,master,${{ github.base_ref }},' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e 's,master,${{ github.head_ref }},' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e '/automake/d' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e '/autoconf/d' var/spack/repos/builtin/packages/charmpp/package.py
     - name: Build Charm++
       run: |
         cd ../spack
