@@ -21,9 +21,10 @@ jobs:
         cd ..
         git clone https://github.com/spack/spack
         cd spack
-        source share/spack/setup-env.sh
         [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran
         sed -i -e 's,master,${{ github.base_ref }},' var/spack/repos/builtin/packages/charmpp/package.py
     - name: Build Charm++
       run: |
+        cd ../spack
+        source share/spack/setup-env.sh
         spack install charmpp@develop
