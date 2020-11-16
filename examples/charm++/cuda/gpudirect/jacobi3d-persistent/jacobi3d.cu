@@ -80,7 +80,7 @@ __global__ void jacobiKernel(DataType* temperature, DataType* new_temperature,
     new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
       temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
       temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
-      temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) % 1e5;
+      temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) % 10000;
 #else
     new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
       temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +

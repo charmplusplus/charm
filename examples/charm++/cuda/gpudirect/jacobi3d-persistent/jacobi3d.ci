@@ -42,7 +42,7 @@ mainmodule jacobi3d {
     entry void packGhostsDone();
     entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void recvGhostP(PersistentMsg* msg);
-    entry void sendGhostP() {}
+    entry void sendGhostP() {} // TODO
     entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
 
     entry void initDone() {
@@ -77,15 +77,6 @@ mainmodule jacobi3d {
         }
       }
 
-      /*
-      if (use_persistent && my_iter > 0) {
-        // Ensure halo data from previous iteration have been received my neighbors
-        for (remote_count = 0; remote_count < neighbors; remote_count++) {
-          when sendGhostP[my_iter-1]() {}
-        }
-      }
-      */
-
       for (remote_count = 0; remote_count < neighbors; remote_count++) {
         if (use_zerocopy) {
           when recvGhostZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
@@ -94,10 +85,16 @@ mainmodule jacobi3d {
             }
           }
         } else if (use_persistent) {
-          when recvGhostP[my_iter](PersistentMsg* msg) {
-            serial {
+          overlap {
+            when recvGhostP[my_iter](PersistentMsg* msg) serial {
               processGhostP(msg);
             }
+            // TODO: Add this back in once hang with reference numbers in CkCallback is fixed
+            /*
+            when sendGhostP[my_iter]() serial {
+              CkPrintf("Chare %d, iter %d: Received sendGhostP\n", thisIndex.z, my_iter);
+            }
+            */
           }
         } else {
           when recvGhostReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
