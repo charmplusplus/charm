@@ -173,6 +173,8 @@ public:
     my_send_buf = CkDevicePersistent(d_local_data, max_size, stream);
     my_recv_buf = CkDevicePersistent(d_remote_data, max_size,
         CkCallback(CkIndex_Block::recv(), thisProxy[thisIndex]), stream);
+    my_send_buf.open();
+    my_recv_buf.open();
     thisProxy[peer].initRecv(my_send_buf, my_recv_buf);
   }
 
