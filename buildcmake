@@ -426,7 +426,7 @@ then
   else
     echo "Removing existing data and starting over. (--force)"
   fi
-elif [[ -e "$builddir" ]] && [[ ! -e "$builddir"/.spack ]]
+elif [[ -e "$builddir" && ! -e "$builddir/.spack" ]]
 then
   echo "\"$builddir\" already exists but is in an inconsistent state."
   if [[ $FORCE -eq 0 ]]
