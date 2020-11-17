@@ -88,7 +88,6 @@ charm4py: libcharm
 
 LIBCHARM_LIBS= libck.a libconverse.a \
                libmemory-default.a libthreads-default.a \
-               libhwloc_embedded.a \
                libldb-rand.a
 
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
@@ -463,7 +462,6 @@ CVLIBS=$(L)/libconverse.a \
 	$(L)/conv-static.o \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
 	$(L)/libccs-client.a \
-	$(L)/libhwloc_embedded.a \
 
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
   CVLIBS += $(L)/libconv-utilf.a
@@ -495,15 +493,15 @@ LIBTMGR = TopoManager.o CrayNid.o BGQTorus.o
 
 include Makefile.machine
 
-converse: charmrun-target swapglobal-target conv-cpm $(L)/libconverse.a hwloc-target
+converse: charmrun-target swapglobal-target conv-cpm $(L)/libconverse.a
 
-cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
+cpuaffinity.o $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
 $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
 
 topomanager_config.h:
 	@echo "// empty" > topomanager_config.h
 
-hwloc-target:  conv-autoconfig.h charm-version-git.h
+hwloc-target: conv-autoconfig.h
 	@( cd hwloc && \
     ./configure \
     --disable-cairo \
@@ -526,16 +524,11 @@ hwloc-target:  conv-autoconfig.h charm-version-git.h
     CC_FOR_BUILD="$(HWLOC_CC)" \
     > /dev/null )
 	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
-	( test -e hwloc/hwloc/.libs/libhwloc_embedded.lib && cp -f hwloc/hwloc/.libs/libhwloc_embedded.lib hwloc/hwloc/.libs/libhwloc_embedded.a ) || true
-	( cp -f hwloc/hwloc/.libs/libhwloc_embedded.a $(L) )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
-ifeq (false,$(CMK_NO_BUILD_SHARED))
-	( test -d ../lib_so && cp -f hwloc/hwloc/.libs/libhwloc_embedded.*$(CMK_SHARED_SUF)* ../lib_so/ ) || true
-endif
 	touch $@
 
-charmrun-target: hwloc-target charmrun  sockRoutines.C sockRoutines.h ccs-server.C ccs-server.h sockRoutines-seq.o $(L)/libck.a $(L)/libhwloc_embedded.a $(CVLIBS) conv-static.o
+charmrun-target: charmrun sockRoutines.C sockRoutines.h ccs-server.C ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS) conv-static.o
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
 
 QUICK_THREADS: $(CVHEADERS)
@@ -551,8 +544,8 @@ endif
 CONVLIBS: converse
 	$(MAKE) -C libs convlibs
 
-$(L)/libconverse.a: $(LIBCONV_CORE) $(LIBCONV_UTIL) $(LIBCONV_PARTITION) $(LIBCONV_LDB) machine.o $(LIBTMGR)
-	$(CHARMC) $(TAU_LIBS) -o $@ $^
+$(L)/libconverse.a: $(LIBCONV_CORE) $(LIBCONV_UTIL) $(LIBCONV_PARTITION) $(LIBCONV_LDB) machine.o $(LIBTMGR) | hwloc-target
+	$(CHARMC) $(TAU_LIBS) -o $@ $^ $(wildcard hwloc/hwloc/*.o)
 
 $(L)/conv-static.o: conv-static.o
 	cp -f $< $@
