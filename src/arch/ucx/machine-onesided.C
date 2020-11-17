@@ -40,28 +40,27 @@ void UcxRmaReqCompleted(void *request, ucs_status_t status)
 
     CmiInvokeNcpyAck(req->ncpyAck);
     ucp_rkey_destroy(req->rkey);
-    UCX_REQUEST_FREE(req);
+    ucp_request_free(req);
     UCX_LOG(4, "RMA req completed %p", req);
 }
 
-void UcxRmaSendCompleted(void *request, ucs_status_t status)
+void UcxRmaSendCompleted(void *request, ucs_status_t status, void *user_data)
 {
     UcxRequest *req = (UcxRequest*)request;
     CmiEnforce(status == UCS_OK);
 
-    UCX_REQUEST_FREE(req);
+    ucp_request_free(req);
     UCX_LOG(4, "RMA Send completed %p", req);
 }
 
-void UcxRmaSendCompletedAndFree(void *request, ucs_status_t status)
+void UcxRmaSendCompletedAndFree(void *request, ucs_status_t status, void *user_data)
 {
-    UcxRequest *req = (UcxRequest*)request;
     CmiEnforce(status == UCS_OK);
 
-    CmiFree(req->msgBuf);
+    CmiFree(user_data); // user_data points to the message buffer
 
-    UCX_REQUEST_FREE(req);
-    UCX_LOG(4, "RMA Send completed %p", req);
+    ucp_request_free(request);
+    UCX_LOG(4, "RMA Send completed %p", request);
 }
 
 void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size,
@@ -161,7 +160,8 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo)
 
         UcxSendMsg(CmiNodeOf(ncpyOpInfo->srcPe), ncpyOpInfo->srcPe,
                    ncpyOpInfo->ncpyOpInfoSize, (char*)ncpyOpInfo,
-                   UCX_RMA_TAG_REG_AND_SEND_BACK, UcxRmaSendCompleted);
+                   UCX_AM_ID_RMA_REG_AND_SEND_BACK, UCP_AM_SEND_FLAG_EAGER,
+                   UcxRmaSendCompleted);
 
         UCX_LOG(4, "Sending PUT REQ to %d, mem size %d", ncpyOpInfo->srcPe,ncpyOpInfo->srcSize);
     }
@@ -176,7 +176,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo)
     // as a reverse operation with the remote destination performing a GET
     UcxSendMsg(CmiNodeOf(ncpyOpInfo->destPe), ncpyOpInfo->destPe,
                ncpyOpInfo->ncpyOpInfoSize, (char*)ncpyOpInfo,
-               UCX_RMA_TAG_GET, UcxRmaSendCompleted);
+               UCX_AM_ID_RMA_GET, UCP_AM_SEND_FLAG_EAGER, UcxRmaSendCompleted);
     UCX_LOG(4, "Sending Get REQ to %d, mem size %d", ncpyOpInfo->destPe,ncpyOpInfo->srcSize);
 }
 
@@ -203,7 +203,7 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo)
         CmiAbort("UCX: LrtsInvokeRemoteDeregAckHandler - ncpyOpInfo->opMode is not valid for dereg\n");
     }
 
-    UcxSendMsg(CmiNodeOf(pe), pe,
-               newNcpyOpInfo->ncpyOpInfoSize, (char*)newNcpyOpInfo,
-               UCX_RMA_TAG_DEREG_AND_ACK, UcxRmaSendCompletedAndFree);
+    UcxSendMsg(CmiNodeOf(pe), pe, newNcpyOpInfo->ncpyOpInfoSize, (char*)newNcpyOpInfo,
+               UCX_AM_ID_RMA_TAG_DEREG_AND_ACK, UCP_AM_SEND_FLAG_EAGER,
+               UcxRmaSendCompletedAndFree);
 }
