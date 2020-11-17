@@ -19,7 +19,7 @@ jobs:
     - name: Install Spack
       run: |
         cd ..
-        git clone --branch charmpp-fixes --depth 1 https://github.com/spack/spack
+        git clone --branch charmpp-fixes --depth 1 https://github.com/matthiasdiener/spack
         cd spack
         [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran gfortran-7 gfortran-8 gfortran-9 gfortran-10
         sed -i -e 's,master,${{ github.head_ref }},' var/spack/repos/builtin/packages/charmpp/package.py
