@@ -896,7 +896,7 @@ set(conv-util-cxx-sources
 
 configure_file(${conv-util-h-sources} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
-if(${CMK_CAN_LINK_FORTRAN})
+if(CMK_CAN_LINK_FORTRAN)
     add_library(conv-utilf pup_f.f90)
     target_compile_options(conv-utilf PRIVATE -cpmod)
 endif()
@@ -980,6 +980,7 @@ add_library(converse
     ${tmgr-c-sources}
     ${tmgr-cxx-sources}
     ${tmgr-h-sources}
+    ${all-ci-outputs}
 )
 add_dependencies(converse hwloc)
 
