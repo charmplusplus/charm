@@ -1707,7 +1707,7 @@ fi
 
 if [ -z "$STANDALONE" ]
 then
-  ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES"
+  ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $BAL_OBJ $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES"
   case "$PARADIGM" in
   "charm"|"charm++"|"f90charm")
     ALL_LIBS="$ALL_LIBS -lmoduleNDMeshStreamer -lmodulecompletion"
