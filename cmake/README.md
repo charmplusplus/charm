@@ -18,6 +18,7 @@ to the Charm++ root directory):
 |---------------------------------------|------------------------------------------------|
 | CMakeLists.txt                        | Main file; option parsing                      |
 | cmake/ci-files.cmake                  | Targets to create .decl.h files from .ci files |
+| cmake/converse.cmake                  | Targets for Converse                           |
 | cmake/detect-features.cmake           | Main system/compiler feature detection         |
 | cmake/detect-features-c.cmake         | Compiler feature detection for C               |
 | cmake/detect-features-cxx.cmake       | Compiler feature detection for C++             |
@@ -33,7 +34,6 @@ to the Charm++ root directory):
 | src/QuickThreads/CMakeLists.txt       | QuickThreads targets                           |
 | src/util/boost-context/CMakeLists.txt | Boost context library targets                  |
 | src/util/charmrun-src/CMakeLists.txt  | Charmrun target                                |
-| src/util/CMakeLists.txt               | Conv-util targets                              |
 | src/xlat-i/CMakeLists.txt             | Charmxi target                                 |
 
 There are other CMakeLists.txt files in the Charm++ distribution, but these are unrelated
