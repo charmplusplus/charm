@@ -711,10 +711,11 @@ void updateTagArray(envelope *env, int localElems) {
     (*(w.tagArray))[CmiMyRank()].resize(localElems * numops);
     std::fill((*w.tagArray)[CmiMyRank()].begin(), (*w.tagArray)[CmiMyRank()].end(), -1);
 
-    w.peerAckInfo->setNumElems(w.peerAckInfo->getNumElems() + localElems);
+    //w.peerAckInfo->setNumElems(w.peerAckInfo->getNumElems() + localElems);
+    w.peerAckInfo->incNumElems(localElems);
     w.peerAckInfo->decNumPeers();
 
-    //CmiPrintf("[%d][%d][%d] updateTagArray and numPeers is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), w.peerAckInfo->getNumPeers());
+    CmiPrintf("[%d][%d][%d] updateTagArray and numPeers is %d, localElems is %d and numElems is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), w.peerAckInfo->getNumPeers(), localElems, w.peerAckInfo->getNumElems());
 
   }
 }
@@ -1188,7 +1189,7 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
       peerAckInfo->msg = (void *)env;
       peerAckInfo->peerParentPe = CmiMyPe();
     //}
-    //CmiPrintf("[%d][%d][%d] CkRdmaPostLaterPreprocess Array Bcast Msg env=%p numops=%d num array elems = %d, tagArray =%p, peerAckInfo=%p and setting it to %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), env, numops, numElems, tagArray, peerAckInfo, numElems - 1);
+    CmiPrintf("[%d][%d][%d] CkRdmaPostLaterPreprocess Array Bcast Msg env=%p numops=%d num array elems = %d, tagArray =%p, peerAckInfo=%p and setting localElems to %d and numPeers to %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), env, numops, numElems, tagArray, peerAckInfo, peerAckInfo->getNumElems(), peerAckInfo->getNumPeers());
   }
 
 #if CMK_SMP
@@ -1469,7 +1470,7 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
 void updatePeerCounter(void *ref) {
   NcpyBcastRecvPeerAckInfo *peerAckInfo = (NcpyBcastRecvPeerAckInfo *)ref;
   //peerAckInfo->decNumPeers();
-  CmiPrintf("[%d][%d][%d] updatePeerCounter peerAckInfo=%p and numPeers is %d  and numElems is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), peerAckInfo, peerAckInfo->getNumPeers(), peerAckInfo->getNumElems());
+  CmiPrintf("[%d][%d][%d] ^^^^^^ updatePeerCounter begin peerAckInfo=%p and numPeers is %d  and numElems is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), peerAckInfo, peerAckInfo->getNumPeers(), peerAckInfo->getNumElems());
 
   if(peerAckInfo->decNumElems() - 1 == 0 && peerAckInfo->getNumPeers() == 0) {
     //CmiPrintf("[%d][%d][%d] updatePeerCounter ready to enqueue msg\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
@@ -1491,6 +1492,8 @@ void updatePeerCounter(void *ref) {
       CmiPushPE(CmiRankOf(peerAckInfo->peerParentPe), env);
     }
   }
+
+  CmiPrintf("[%d][%d][%d] ######## updatePeerCounter end peerAckInfo=%p and numPeers is %d  and numElems is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), peerAckInfo, peerAckInfo->getNumPeers(), peerAckInfo->getNumElems());
 }
 
 void incPeerCounter(void *ref) {

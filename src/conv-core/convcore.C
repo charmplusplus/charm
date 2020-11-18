@@ -3944,6 +3944,8 @@ extern int quietMode;
 int quietMode; // quiet mode active (CmiPrintf's are disabled)
 CmiSpanningTreeInfo* _topoTree = NULL;
 
+#define CMK_HAS_IO_FILE_OVERFLOW 0
+
 #if CMK_HAS_IO_FILE_OVERFLOW
 extern "C" int _IO_file_overflow(FILE *, int);
 #endif

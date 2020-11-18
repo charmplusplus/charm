@@ -293,6 +293,9 @@ struct NcpyBcastRecvPeerAckInfo{
     int incNumElems() {
         return numElems.fetch_add(1, std::memory_order_release);
     }
+    int incNumElems(int r) {
+        return numElems.fetch_add(r, std::memory_order_release);
+    }
     int decNumElems() {
          return numElems.fetch_sub(1, std::memory_order_release);
     }
