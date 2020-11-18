@@ -442,7 +442,7 @@ if(${TARGET} STREQUAL "all-test")
         ampi_funcptr_loader ampi_funcptr_loader_stub
         converse conv-static ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
+        ckqt tcharm-compat moduleNDMeshStreamer
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
         threads-default-tls ldb-neighbor ldb-workstealing modulearmci
@@ -743,7 +743,6 @@ include(cmake/converse.cmake)
 add_subdirectory(src/QuickThreads)
 add_subdirectory(src/util/boost-context)
 add_subdirectory(src/conv-core)
-add_subdirectory(src/conv-ldb)
 
 # Hwloc
 if(${BUILD_SHARED})
@@ -885,7 +884,7 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck converse memory-default threads-default hwloc_embedded ldb-rand conv-ldb "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck converse memory-default threads-default hwloc_embedded ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
@@ -893,7 +892,7 @@ endif()
 # Check that we are able to build and link an executable
 add_executable(hello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
 add_dependencies(hello ck ldb-rand memory-default threads-default conv-static
-  converse ckmain conv-ldb ckqt
+  converse ckmain ckqt
   moduleNDMeshStreamer modulecompletion)
 
 # Create conv-mach-opt.sh

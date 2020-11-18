@@ -89,7 +89,7 @@ charm4py: libcharm
 LIBCHARM_LIBS= libck.a libconverse.a \
                libmemory-default.a libthreads-default.a \
                libhwloc_embedded.a \
-               libldb-rand.a libconv-ldb.a
+               libldb-rand.a
 
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
@@ -464,7 +464,6 @@ CVLIBS=$(L)/libconverse.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
 	$(L)/libccs-client.a \
 	$(L)/libhwloc_embedded.a \
-	$(L)/libconv-ldb.a
 
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
   CVLIBS += $(L)/libconv-utilf.a
@@ -552,7 +551,7 @@ endif
 CONVLIBS: converse
 	$(MAKE) -C libs convlibs
 
-$(L)/libconverse.a: $(LIBCONV_CORE) $(LIBCONV_UTIL) $(LIBCONV_PARTITION) machine.o $(LIBTMGR)
+$(L)/libconverse.a: $(LIBCONV_CORE) $(LIBCONV_UTIL) $(LIBCONV_PARTITION) $(LIBCONV_LDB) machine.o $(LIBTMGR)
 	$(CHARMC) $(TAU_LIBS) -o $@ $^
 
 $(L)/conv-static.o: conv-static.o
@@ -563,9 +562,6 @@ machine.o: machine.C $(CVHEADERS)
 
 $(L)/libconv-utilf.a: $(LIBCONV_UTILF)
 	$(CHARMC) -o $@ $(LIBCONV_UTILF)
-
-$(L)/libconv-ldb.a: $(LIBCONV_LDB)
-	$(CHARMC) -o $@ $^
 
 $(L)/libccs-client.a: ccs-client.o
 	$(CHARMC) -o $@ ccs-client.o

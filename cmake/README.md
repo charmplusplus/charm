@@ -27,7 +27,6 @@ to the Charm++ root directory):
 | src/ck-perf/CMakeLists.txt            | Targets for ck-perf                            |
 | src/ck-pics/CMakeLists.txt            | Targets for ck-pics                            |
 | src/conv-core/CMakeLists.txt          | Targets for conv-core                          |
-| src/conv-ldb/CMakeLists.txt           | Targets for conv-ldb                           |
 | src/libs/ck-libs/ampi/CMakeLists.txt  | AMPI targets                                   |
 | src/libs/ck-libs/CMakeLists.txt       | Misc Ck libs targets                           |
 | src/libs/conv-libs/CMakeLists.txt     | Misc. Conv libs targets                        |

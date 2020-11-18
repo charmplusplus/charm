@@ -163,6 +163,28 @@ set(conv-partition-cxx-sources
     src/util/set_partition_params.C
 )
 
+# conv-ldb
+set(conv-ldb-cxx-sources
+    src/conv-ldb/cldb.C
+    src/conv-ldb/topology.C
+    src/conv-ldb/edgelist.C
+    src/conv-ldb/generate.C
+)
+
+set(conv-ldb-h-sources
+    src/conv-ldb/cldb.h
+    src/conv-ldb/graphdefs.h
+    src/conv-ldb/topology.h
+)
+
+add_library(ldb-none src/conv-ldb/cldb.none.C ${conv-ldb-h-sources})
+add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
+add_library(ldb-rand src/conv-ldb/cldb.rand.C ${conv-ldb-h-sources})
+add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
+add_library(ldb-workstealing src/conv-ldb/cldb.workstealing.C src/conv-ldb/cldb.workstealing.h ${conv-ldb-h-sources})
+add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
+# add_library(ldb-prioritycentralized src/conv-ldb/cldb.prioritycentralized.C src/conv-ldb/cldb.prioritycentralized.h ${conv-ldb-h-sources})
+
 # TopoManager
 set(tmgr-c-sources src/util/topomanager/CrayNid.c)
 set(tmgr-cxx-sources src/util/topomanager/TopoManager.C src/util/topomanager/BGQTorus.C)
@@ -182,7 +204,8 @@ add_library(converse
     ${conv-util-cxx-sources}
     ${conv-util-h-sources}
     ${conv-partition-cxx-sources}
-    src/conv-ldb/cldb.C
+    ${conv-ldb-cxx-sources}
+    ${conv-ldb-h-sources}
     src/arch/${GDIR}/machine.C
     ${tmgr-c-sources}
     ${tmgr-cxx-sources}
@@ -196,6 +219,7 @@ foreach(filename
     ${conv-ccs-h-sources}
     ${conv-perf-h-sources}
     ${conv-util-h-sources}
+    ${conv-ldb-h-sources}
     ${tmgr-h-sources}
 )
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)

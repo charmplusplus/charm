@@ -216,7 +216,7 @@ if(${CMK_AMPI_WITH_ROMIO})
     add_dependencies(romio moduleampi ampi-compat ck modulecompletion
         converse conv-static ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-ldb ckqt tcharm-compat moduleNDMeshStreamer hello)
+        ckqt tcharm-compat moduleNDMeshStreamer hello)
     add_dependencies(ampi_funcptr_shim romio)
     add_dependencies(ampi_funcptr_shim_main romio)
     add_dependencies(ampi_funcptr_loader romio)

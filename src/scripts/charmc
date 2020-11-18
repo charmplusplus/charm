@@ -1560,7 +1560,7 @@ fi
 
 Debug "Finished with TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
-BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
+BAL_OBJ="-lldb-$BALANCE"
 
 # Check for valid choice of MEMORY
 
