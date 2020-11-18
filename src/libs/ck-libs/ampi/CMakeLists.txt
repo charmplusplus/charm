@@ -214,9 +214,9 @@ if(${CMK_AMPI_WITH_ROMIO})
     # Since we link a program with charmc as part of ROMIO's configure,
     # we need all libraries built at this point.
     add_dependencies(romio moduleampi ampi-compat ck modulecompletion
-        conv-partition conv-util hwloc conv-static conv-core ldb-rand
+        converse conv-static ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer hello)
+        ckqt tcharm-compat moduleNDMeshStreamer hello)
     add_dependencies(ampi_funcptr_shim romio)
     add_dependencies(ampi_funcptr_shim_main romio)
     add_dependencies(ampi_funcptr_loader romio)
