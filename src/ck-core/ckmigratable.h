@@ -99,7 +99,6 @@ public:
   void AtSync(int waitForMigration=1);
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
-  friend class LocalBarrier;
 private:
   void ResumeFromSyncHelper();
 public:

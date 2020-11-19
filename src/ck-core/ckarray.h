@@ -425,7 +425,7 @@ typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
@@ -745,9 +745,7 @@ public:
     return broadcaster;
   }
   void flushStates();
-#if CMK_ONESIDED_IMPL
   void forwardZCMsgToOtherElems(envelope *env);
-#endif
 
 
         static bool isIrreducible() { return true; }
@@ -757,7 +755,6 @@ public:
 // with usage in maps' populateInitial()
 typedef CkArray CkArrMgr;
 
-#if CMK_ONESIDED_IMPL
 struct ncpyBcastNoMsg{
   char cmicore[CmiMsgHeaderSizeBytes];
   int srcPe;
@@ -765,7 +762,6 @@ struct ncpyBcastNoMsg{
 };
 
 void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize);
-#endif
 
 /*@}*/
 
@@ -796,7 +792,7 @@ public:
   int incrementBcastNo();
 
   bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
   void deliver(CkArrayMessage *bcast, std::vector<CkMigratable*> &elements, int arrayId, bool doFree);
 #endif
 

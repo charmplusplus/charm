@@ -22,6 +22,9 @@ ataTest.decl.h: ataTest.ci
 test-ataTest: ataTest
 	$(call run, +p4 ./ataTest )
 
+testp: all
+	$(call run, +p$(P) ./ataTest )
+
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o ataTest charmrun
 

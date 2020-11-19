@@ -72,9 +72,9 @@ never be excluded...
 #include <sstream>
 #include <limits.h>
 #include "spanningTree.h"
-#if CMK_CHARMPY
-#include "GreedyRefineLB.h"
-#include "RandCentLB.h"
+#include "CkSyncBarrier.decl.h"
+#if CMK_CHARM4PY
+#include "TreeLB.h"
 #endif
 
 #if CMK_CUDA
@@ -123,7 +123,6 @@ UInt  _numInitMsgs = 0;
  */
 CksvDeclare(UInt,_numInitNodeMsgs);
 
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
 std::atomic<UInt> numZerocopyROops = {0};
 #else
@@ -134,7 +133,6 @@ bool usedCMAForROBcastTransfer = false;
 NcpyROBcastAckInfo *roBcastAckInfo;
 int   _roRdmaDoneHandlerIdx;
 CksvDeclare(int,  _numPendingRORdmaTransfers);
-#endif
 
 int   _infoIdx;
 int   _charmHandlerIdx;
@@ -668,14 +666,8 @@ static void _exitHandler(envelope *env)
 #endif
 
 #if CMK_CUDA
-      // Ensure all PEs have finished GPU work
-      CmiNodeBarrier();
-
-      if (CmiMyRank() == 0) {
-        shmCleanup();
-
-        hapiExitCsv();
-      }
+      // Clean up HAPI
+      hapiExit();
 #endif
 
       //everyone exits here - there may be issues with leftover messages in the queue
@@ -911,7 +903,6 @@ static inline void _processRODataMsg(envelope *env)
     PUP::fromMem pu((char *)EnvToUsr(env));
     CmiSpanningTreeInfo &t = *_topoTree;
 
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
     UInt numZerocopyROopsTemp;
     pu|numZerocopyROopsTemp;
@@ -927,14 +918,13 @@ static inline void _processRODataMsg(envelope *env)
     if(numZerocopyROops > 0 && t.child_count != 0) {
       readonlyAllocateOnSource();
     }
-#endif
 
     for(size_t i=0;i<_readonlyTable.size();i++) {
       _readonlyTable[i]->pupData(pu);
     }
 
     // Forward message to peers after numZerocopyROops has been initialized
-#if CMK_ONESIDED_IMPL && CMK_SMP
+#if CMK_SMP
     if(CMI_IS_ZC_BCAST(env)) {
       // Send message to peers
       CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
@@ -967,7 +957,6 @@ static void _roRestartHandler(void *msg)
   _triggerHandler(NULL);
 }
 
-#if CMK_ONESIDED_IMPL
 static void _roRdmaDoneHandler(envelope *env) {
 
   switch(env->getMsgtype()) {
@@ -1011,12 +1000,10 @@ static void _roRdmaDoneHandler(envelope *env) {
       break;
   }
 }
-#endif
 
 void checkForInitDone(bool rdmaROCompleted) {
 
   bool noPendingRORdmaTransfers = true;
-#if CMK_ONESIDED_IMPL
   // Ensure that there are no pending RO Rdma transfers on Rank 0 when numZerocopyROops > 0
 #if CMK_SMP
   if(numZerocopyROops.load(std::memory_order_relaxed) > 0)
@@ -1024,7 +1011,6 @@ void checkForInitDone(bool rdmaROCompleted) {
   if(numZerocopyROops > 0)
 #endif
     noPendingRORdmaTransfers = rdmaROCompleted;
-#endif
   if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs && noPendingRORdmaTransfers)
     _initDone();
 }
@@ -1088,7 +1074,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
   DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
-#if CMK_ONESIDED_IMPL && CMK_USE_CMA
+#if CMK_USE_CMA
   if(usedCMAForROBcastTransfer) {
     checkForInitDone(true); // RO ZCPY Bcast operation was completed inline (using CMA)
   } else
@@ -1157,6 +1143,7 @@ static void _nullFn(void *, void *)
 }
 
 extern void _registerLBManager(void);
+extern void _registerTreeLevel(void);
 extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
@@ -1165,6 +1152,7 @@ extern void _registerControlPoints(void);
 extern void _registerTraceControlPoints();
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
+extern void _cksyncbarrierInit();
 extern void _loadbalancerInit();
 extern void _metabalancerInit();
 #if CMK_SMP && CMK_TASKQUEUE
@@ -1213,7 +1201,7 @@ void initQd(char **argv)
 	CpvInitialize(QdState*, _qd);
 	CpvAccess(_qd) = new QdState();
 	if (CmiMyRank() == 0) {
-#if !defined(CMK_CPV_IS_SMP) && !CMK_SHARED_VARS_UNIPROCESSOR
+#if !defined(CMK_CPV_IS_SMP)
 	CpvAccessOther(_qd, 1) = new QdState(); // for i/o interrupt
 #endif
 	}
@@ -1254,7 +1242,6 @@ void _sendReadonlies() {
   //Determine the size of the RODataMessage
   PUP::sizer ps;
 
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
   UInt numZerocopyROopsTemp;
   numZerocopyROopsTemp = numZerocopyROops;
@@ -1262,26 +1249,21 @@ void _sendReadonlies() {
 #else
   ps|numZerocopyROops;
 #endif
-#endif
 
   for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
-#if CMK_ONESIDED_IMPL
   if(CkNumNodes() > 1 && numZerocopyROops > 0) { // No ZC ops are performed when CkNumNodes <= 1
     readonlyAllocateOnSource();
   }
-#endif
 
   //Allocate and fill out the RODataMessage
   envelope *env = _allocEnv(RODataMsg, ps.size());
   PUP::toMem pp((char *)EnvToUsr(env));
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
   numZerocopyROopsTemp = numZerocopyROops;
   pp|numZerocopyROopsTemp;
 #else
   pp|numZerocopyROops;
-#endif
 #endif
   for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 
@@ -1290,7 +1272,7 @@ void _sendReadonlies() {
   CmiSetHandler(env, _initHandlerIdx);
   DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
   CmiSyncBroadcast(env->getTotalsize(), (char *)env);
-#if CMK_ONESIDED_IMPL && CMK_SMP
+#if CMK_SMP
   if(numZerocopyROops > 0) {
     // Send message to peers
     CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
@@ -1361,9 +1343,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	CksvInitialize(objNumRdmaOpsMap, pendingZCOps);
 
-#if CMK_ONESIDED_IMPL
 	CksvInitialize(int, _numPendingRORdmaTransfers);
-#endif
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
@@ -1384,9 +1364,7 @@ void _initCharm(int unused_argc, char **argv)
 	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
           	CksvAccess(_numInitNodeMsgs) = 0;
 
-#if CMK_ONESIDED_IMPL
 		CksvAccess(_numPendingRORdmaTransfers) = 0;
-#endif
 
 		CksvAccess(_nodeLock) = CmiCreateLock();
 		CksvAccess(_nodeGroupTable) = new GroupTable();
@@ -1417,9 +1395,7 @@ void _initCharm(int unused_argc, char **argv)
 	CmiAssignOnce(&_initHandlerIdx, CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
 	CmiAssignOnce(&_roRestartHandlerIdx, CkRegisterHandler(_roRestartHandler));
 
-#if CMK_ONESIDED_IMPL
 	CmiAssignOnce(&_roRdmaDoneHandlerIdx, CkRegisterHandler(_roRdmaDoneHandler));
-#endif
 
 	CmiAssignOnce(&_exitHandlerIdx, CkRegisterHandler(_exitHandler));
 	//added for interoperabilitY
@@ -1438,6 +1414,7 @@ void _initCharm(int unused_argc, char **argv)
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
+        _cksyncbarrierInit();
 	_loadbalancerInit();
         _metabalancerInit();
 
@@ -1505,7 +1482,9 @@ void _initCharm(int unused_argc, char **argv)
 		*/
 		_registerCkFutures();
 		_registerCkArray();
+		_registerCkSyncBarrier();
 		_registerLBManager();
+		_registerTreeLevel();
     _registerMetaBalancer();
 		_registerCkCallback();
 		_registerwaitqd();
@@ -1514,18 +1493,15 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_MEM_CHECKPOINT
 		_registerCkMemCheckpoint();
 #endif
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
                 /**
                   Load balancers are currently registered in Charm++ through a C file that is generated and
                   and compiled by charmc when making an executable. That file contains appropriate calls to
                   register whatever load balancers are being linked in.
                   Without an executable (charm4py just uses libcharm.so), the load balancers in libcharm.so
                   have to somehow be registered during init.
-                  With the planned load balancing framework, load balancer registration will hopefully go away,
-                  at least for strategies used in central/hybrid, because they will stop being chares.
                 */
-		_registerGreedyRefineLB();
-		_registerRandCentLB();
+		_registerTreeLB();
 #endif
 
 		/**
@@ -1533,7 +1509,7 @@ void _initCharm(int unused_argc, char **argv)
 		  "mainmodule" .ci file.  It will include calls to 
 		  register all the .ci files.
 		*/
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
 		CkRegisterMainModule();
 #else
                 // CkRegisterMainModule doesn't exist in charm4py because there is no executable.
@@ -1554,7 +1530,7 @@ void _initCharm(int unused_argc, char **argv)
 		  programs, which don't have a .ci file and hence have
 		  no other way to control the _register process.
 		*/
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
 		_registerExternalModules(argv);
 #endif
 	}
@@ -1674,49 +1650,6 @@ void _initCharm(int unused_argc, char **argv)
 #endif
     }
 
-#if CMK_CUDA
-    // Only worker threads execute the following
-    if (!CmiInCommThread()) {
-      if (CmiMyRank() == 0) {
-        hapiInitCsv(); // Initialize per-process variables (GPUManager)
-      }
-      hapiInitCpv(); // Initialize per-PE variables
-
-      CmiNodeBarrier();
-
-      hapiMapping(argv); // Perform PE-device mapping
-
-      // Register polling function to be invoked at every scheduler loop
-      CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
-
-      CmiNodeBarrier();
-
-      if (CmiMyRank() == 0) {
-        shmCreate(); // Create shared memory region to be shared across processes on the same host
-      }
-
-      CmiNodeBarrier();
-
-      ipcHandleCreate(); // Create CUDA IPC handles
-    }
-
-    // Ensure CUDA IPC handles are available for all processes
-    // FIXME: This only needs to be a host-wide synchronization
-    CmiBarrier();
-
-    if (!CmiInCommThread()) {
-      if (CmiMyRank() == 0) {
-        ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
-      }
-
-      // Register callback functions and initialize Charm++ layer functions
-      hapiRegisterCallbacks();
-      hapiInvokeCallback = CUDACallbackManager;
-      hapiQdCreate = QdCreate;
-      hapiQdProcess = QdProcess;
-    }
-#endif
-
     if(CmiMyPe() == 0) {
         char *topoFilename;
         if(CmiGetArgStringDesc(argv,"+printTopo",&topoFilename,"topo file name")) 
@@ -1734,6 +1667,16 @@ void _initCharm(int unused_argc, char **argv)
             fclose(fp);
         }
     }
+
+#if CMK_CUDA
+  // Perform HAPI initialization for GPU support
+  hapiInit(argv);
+
+  // Initialize Charm++ layer functions
+  hapiInvokeCallback = CUDACallbackManager;
+  hapiQdCreate = QdCreate;
+  hapiQdProcess = QdProcess;
+#endif
 
 #if CMK_USE_PXSHM && ( CMK_CRAYXE || CMK_CRAYXC ) && CMK_SMP
       // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized

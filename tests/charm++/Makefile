@@ -26,12 +26,22 @@ DIRS = \
   within_node_bcast \
   longIdle \
   bombard \
+  varTRAM \
 
 FTDIRS = \
   jacobi3d \
   jacobi3d-sdag \
 
 TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
+
+NONSCALEDIRS = \
+  alignment \
+  queue \
+  sdag \
+  sparse \
+  charmxi_parsing \
+
+TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 
 all: $(foreach i,$(DIRS),build-$i)
 
@@ -41,6 +51,8 @@ ifneq ($(CMK_MULTICORE),1)
 	make smptest
 endif
 endif
+
+testp: $(foreach i,$(TESTPDIRS),testp-$i)
 
 smptest: $(foreach i,$(TESTDIRS),smptest-$i)
 
@@ -55,6 +67,9 @@ $(foreach i,$(DIRS),build-$i):
 
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(TESTPDIRS),testp-$i):
+	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
 $(foreach i,$(DIRS),smptest-$i):
 	$(MAKE) -C $(subst smptest-,,$@) smptest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'

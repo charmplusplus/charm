@@ -2,16 +2,15 @@ CDIR := $(shell cd ../../../.. && pwd)
 -include $(CDIR)/include/conv-mach-opt.mak
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h \
-		ampi-interoperate.h ampi.decl.h \
-		mpio_globals.h \
-		ampi_functions.h mpio_functions.h
-HEADDEP=$(HEADERS) ampiimpl.h ddt.h \
+HEADERS=ampi.h ampif.h ampi_functions.h \
+		ampi-interoperate.h ampiimpl.h ampi.decl.h ddt.h \
+		$(addprefix romio-stub/,mpio.h mpiof.h mpio_functions.h mpio_globals.h)
+HEADDEP=$(HEADERS) \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
 	   compat_ampicpp.o
-OBJS=ampi.o ampif.o ampiOneSided.o \
+OBJS=ampi.o $(AMPIF_OBJ) ampiOneSided.o \
      ampiMisc.o ddt.o mpich-alltoall.o ampi_mpix.o ampi_noimpl.o
 
 AMPI_LIB=libmoduleampi
@@ -21,23 +20,36 @@ DESTF=$(AMPI_LIBDIR)/$(AMPI_LIB)f.a
 COMPATLIB=$(AMPI_LIBDIR)/libampi-compat.a
 ROMIOLIB=$(AMPI_LIBDIR)/libampiromio
 
+AMPIF_OBJ=$(AMPI_LIBDIR)/ampif.o
 AMPIFIMPL_OBJ=$(AMPI_LIBDIR)/ampifimpl.o
 AMPIMOD_OBJ=$(AMPI_LIBDIR)/ampimod.o
 
 FUNCPTR_SHIM_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim.o
-FUNCPTR_FORTRAN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_fortran.o
+FUNCPTR_SHIM_MAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_main.o
+FUNCPTR_SHIM_FORTRAN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran.o
+FUNCPTR_SHIM_FMPIMAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fmpimain.o
 FUNCPTR_LOADER_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader.o
-FUNCPTR_PIPGLOBALS_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_pipglobals.o
-FUNCPTR_FSGLOBALS_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_fsglobals.o
+FUNCPTR_LOADER_STUB_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader_stub.o
+GLOBALS_PIP_OBJ=$(AMPI_LIBDIR)/ampi_globals_pip.o
+GLOBALS_FS_OBJ=$(AMPI_LIBDIR)/ampi_globals_fs.o
 
-AMPI_TARGET = $(DEST) $(FUNCPTR_SHIM_OBJ) $(FUNCPTR_LOADER_OBJ)
-AMPIF_TARGET = $(DESTF) $(FUNCPTR_FORTRAN_OBJ)
+AMPI_TARGET = \
+  $(DEST) \
+  $(FUNCPTR_SHIM_OBJ) \
+  $(FUNCPTR_SHIM_MAIN_OBJ) \
+  $(FUNCPTR_LOADER_OBJ) \
+  $(FUNCPTR_LOADER_STUB_OBJ) \
+
+AMPIF_TARGET = \
+  $(DESTF) \
+  $(FUNCPTR_SHIM_FORTRAN_OBJ) \
+  $(FUNCPTR_SHIM_FMPIMAIN_OBJ) \
 
 ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
-  AMPI_TARGET += $(FUNCPTR_PIPGLOBALS_OBJ)
+  AMPI_TARGET += $(GLOBALS_PIP_OBJ)
 endif
 ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
-  AMPI_TARGET += $(FUNCPTR_FSGLOBALS_OBJ)
+  AMPI_TARGET += $(GLOBALS_FS_OBJ)
 endif
 
 ifeq ($(CMK_NO_BUILD_SHARED),false)
@@ -54,14 +66,17 @@ endif
 .C.o:
 	$(CHARMC) -c $<
 
-all: AMPI AMPIF $(COMPATLIB) $(ROMIO)
+MAJOR_TARGETS := AMPI
+ROMIO_DEPS = $(DEST)
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  MAJOR_TARGETS += AMPIF
+  ROMIO_DEPS += $(DESTF)
+endif
 
-# AMPI and AMPIF are order-only dependencies (|), i.e., no up-to-date check
-# is done, in order to prevent ROMIO recompilation when AMPI changes.
-$(ROMIO): | AMPI AMPIF
+all: $(MAJOR_TARGETS) $(COMPATLIB) $(ROMIO)
+
+$(ROMIO): $(ROMIO_DEPS)
 	@echo "Building ROMIO"
-# update timestamps on these files so that ROMIO's Makefile does not run configure a second time
-	@touch romio/aclocal.m4 romio/Makefile.in romio/configure romio/config.status
 	cd romio &&                                                                  \
 		MPI_IMPL="ampi" FROM_MPICH="no" FROM_LAM="no" FROM_OMPI="no"         \
 		MPI_LIB=""                                                           \
@@ -78,7 +93,7 @@ $(ROMIO): | AMPI AMPIF
 		--srcdir=`pwd`
 
 	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
-	$(MAKE) -C romio
+	$(MAKE) -C romio AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
 	cp romio/.libs/libromio.a $@
 ifneq ($(ROMIOLIBSHARED),)
 	cp romio/.libs/libromio.$(CMK_SHARED_SUF) $(ROMIOLIBSHARED)
@@ -99,11 +114,11 @@ $(DEST): $(OBJS) headers
 	cp $(AMPI_LIB).dep $(AMPI_LIBDIR)/$(AMPI_LIB).dep
 
 $(DESTF): $(OBJS) headers
-	-$(CHARMC) -c ampifimpl.f90 -o $(AMPIFIMPL_OBJ)
-	-$(CHARMC) -c ampimod.f90 -o $(AMPIMOD_OBJ)
-	-$(CHARMC) -cpmod ../../../../include mpi.M
-	-$(CHARMC) $(OBJS) $(AMPIFIMPL_OBJ) $(AMPIMOD_OBJ) -o $@
-	-cp $(AMPI_LIB)f.dep $(AMPI_LIBDIR)/$(AMPI_LIB)f.dep
+	$(CHARMC) -c ampifimpl.f90 -o $(AMPIFIMPL_OBJ)
+	$(CHARMC) -c ampimod.f90 -o $(AMPIMOD_OBJ)
+	$(CHARMC) -cpmod ../../../../include mpi.M
+	$(CHARMC) $(OBJS) $(AMPIFIMPL_OBJ) $(AMPIMOD_OBJ) -o $@
+	cp $(AMPI_LIB)f.dep $(AMPI_LIBDIR)/$(AMPI_LIB)f.dep
 
 $(COMPATLIB): $(COMPAT)
 	$(CHARMC) $(COMPAT) -o $@
@@ -114,12 +129,8 @@ headers: $(HEADERS)
 	# Put AMPI's mpi.h in a separate directory to support the MPI machine layer and MPI interop
 	mkdir -p $(CDIR)/include/ampi/
 	cp ampi.h $(CDIR)/include/ampi/mpi.h
-
 	cp ampif.h $(CDIR)/include/mpif.h
-	cp ampiimpl.h $(CDIR)/include/          # For AMPI + Charm++ interop
-	cp ddt.h $(CDIR)/include/               # For AMPI + Charm++ interop
-	cp ampi-interoperate.h $(CDIR)/include/ # For AMPI + Charm++ interop
-	cp mpio_globals.h $(CDIR)/include/
+
 	cp ampiCC $(CDIR)/bin/ampicc
 	cp ampiCC $(CDIR)/bin/ampiCC
 	cp ampiCC $(CDIR)/bin/ampicxx
@@ -160,48 +171,58 @@ compat_ampicm.o: compat_ampicm.C
 compat_ampi.o: compat_ampi.c
 	$(CHARMC) -c compat_ampi.c
 
-ampi_mpix.o: ampi_mpix.C $(HEADDEP)
+ampi_mpix.o: ampi_mpix.C $(HEADDEP) headers
 
-ampi_noimpl.o: ampi_noimpl.C $(HEADDEP)
+ampi_noimpl.o: ampi_noimpl.C $(HEADDEP) headers
+	$(CHARMC) -c $< -DAMPI_NO_UNIMPLEMENTED_WARNINGS
 
 compat_ampicpp.o: compat_ampicpp.C
 	$(CHARMC) -c compat_ampicpp.C
 
-ampi.o: ampi.C $(HEADDEP)
+ampi.o: ampi.C $(HEADDEP) headers
 	$(CHARMC) -c ampi.C
 
-ampif.o: ampif.C $(HEADDEP)
-	$(CHARMC) -c ampif.C
+$(AMPIF_OBJ): ampif.C $(HEADDEP) headers
+	$(CHARMC) -c $< -o $@
 
-ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP)
+ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP) headers
 	$(CHARMC) -c ampiOneSided.C
 
-ampiMisc.o: ampiMisc.C ampiimpl.h $(HEADDEP)
+ampiMisc.o: ampiMisc.C ampiimpl.h $(HEADDEP) headers
 	$(CHARMC) -c ampiMisc.C
 
-mpich-alltoall.o: mpich-alltoall.C $(HEADDEP)
+mpich-alltoall.o: mpich-alltoall.C $(HEADDEP) headers
 	$(CHARMC) -c mpich-alltoall.C
 
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
 
-ddt.o: ddt.C ddt.h $(HEADDEP)
+ddt.o: ddt.C ddt.h $(HEADDEP) headers
 
-$(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP)
-	$(CHARMC) -ampi-funcptr-shim -c $< -o $@
+$(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP) headers | $(ROMIO)
+	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared -fvisibility=hidden -c $< -o $@
 
-$(FUNCPTR_FORTRAN_OBJ): ampif.C $(HEADDEP)
-	-$(CHARMC) -ampi-funcptr-shim -c $< -o $@
+$(FUNCPTR_SHIM_MAIN_OBJ): ampi_funcptr_shim_main.C | $(ROMIO)
+	$(CHARMC) -language ampi -fPIE -c $< -o $@
 
-$(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP)
-	$(CHARMC) -c $< -o $@
+$(FUNCPTR_SHIM_FMPIMAIN_OBJ): ampi_funcptr_shim_fmpimain.C | $(ROMIO)
+	$(CHARMC) -language ampi -fPIE -c $< -o $@
 
-$(FUNCPTR_FSGLOBALS_OBJ): ampi_funcptr_fsglobals.C $(HEADDEP)
-	$(CHARMC) -c $< -o $@
+$(FUNCPTR_SHIM_FORTRAN_OBJ): ampif.C $(HEADDEP) headers | $(ROMIO)
+	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
 
-$(FUNCPTR_PIPGLOBALS_OBJ): ampi_funcptr_pipglobals.C $(HEADDEP)
-	$(CHARMC) -c $< -o $@
+$(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP) headers | $(ROMIO)
+	$(CHARMC) -language ampi -DAMPI_NO_UNIMPLEMENTED_WARNINGS -c $< -o $@
+
+$(FUNCPTR_LOADER_STUB_OBJ): ampi_funcptr_loader_stub.C $(HEADDEP) headers | $(ROMIO)
+	$(CHARMC) -language ampi -c $< -o $@
+
+$(GLOBALS_FS_OBJ): ampi_globals_fs.C $(HEADDEP) headers | $(ROMIO)
+	$(CHARMC) -language ampi -c $< -o $@
+
+$(GLOBALS_PIP_OBJ): ampi_globals_pip.C $(HEADDEP) headers | $(ROMIO)
+	$(CHARMC) -language ampi -c $< -o $@
 
 clean:
 	rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) $(COMPATLIB) conv-host charmrun headers *.mod
-	- cd romio && $(MAKE) clean
+	-$(MAKE) -C romio clean

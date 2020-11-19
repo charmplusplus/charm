@@ -12,6 +12,9 @@ pgm: $(OBJS)
 test: pgm
 	$(call run, ./pgm +p4 )
 
+testp: pgm
+	$(call run, ./pgm +p$(P))
+
 memoryAccess.o: memoryAccess.c
 	$(CHARMC) memoryAccess.c
 

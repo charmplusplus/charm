@@ -1,44 +1,54 @@
 language: cpp
 
-before_install:	
-  - |	
-      if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then	
-        git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {	
-          echo "Only docs were updated, stopping build process."	
-          exit	
-        }	
+os: linux
+dist: xenial
+
+# Necessary for Windows builds - do not convert LF to CRLF:
+git:
+  autocrlf: false
+
+before_install:
+  - |
+      if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+        git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {
+          echo "Only docs were updated, stopping build process."
+          exit
+        }
       fi
 
-matrix:
+jobs:
   include:
   - os: linux
     name: "MPI-Linux SMP"
     dist: xenial
     script:
     - sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
-    - ./build LIBS mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C mpi-linux-x86_64-smp/tests TESTOPTS="+setcpuaffinity"
-    - make -C mpi-linux-x86_64-smp/examples TESTOPTS="+setcpuaffinity"
+    - ./build all-test mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla --build-shared || exit 1
+    # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+    - make -C mpi-linux-x86_64-smp/tmp test TESTOPTS="+setcpuaffinity"
+    # Disabled due to several hangs and segfaults.
+    #- make -C mpi-linux-x86_64-smp/tmp testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
 
   - os: osx
     name: "NetLRTS-Darwin"
     script:
-    - ./build LIBS netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C netlrts-darwin-x86_64/tests test TESTOPTS="++local"
-    - make -C netlrts-darwin-x86_64/examples test TESTOPTS="++local"
+    - ./build all-test netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla --build-shared || exit 1
+    # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+    - make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
+    - make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
 
   - os: windows
     name: "NetLRTS-Win"
     script:
-    - rm -rf C:/tools/msys64
-    - choco upgrade -y msys2
-    - export msys2='cmd //C RefreshEnv.cmd '
-    - export msys2+='& set MSYS=winsymlinks:nativestrict '
-    - export msys2+='& C:\\tools\\msys64\\msys2_shell.cmd -defterm -no-start'
-    - export mingw64="$msys2 -mingw64 -full-path -here -c \$\* --"
-    - export msys2+=" -msys2 -c \$\* --"
-    - $msys2 pacman --sync --noconfirm --needed autoconf libtool automake make autoconf-archive pkg-config
-    - export PATH=/C/tools/msys64/mingw64/bin:$PATH
-    - $mingw64 src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 -j3 --without-romio --with-production --enable-error-checking --enable-lbuserdata
-    - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tmp -j3 all-test-tests
-    - $mingw64 src/arch/win/travis.sh make -C netlrts-win-x86_64/tests/charm++ test
+    - choco upgrade -y cygwin cyg-get
+    - cyg-get.bat cmake make gcc-core binutils libtool
+    - unset CC
+    - unset CXX
+    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 --without-romio -g --with-production -j3"
+    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests -j3"
+    # Disabled lines would extend the CI's duration too much.
+    #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/examples -j3"
+    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/benchmarks -j3"
+    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests test TESTOPTS=++local"
+    #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/examples test TESTOPTS=++local"
+    #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/benchmarks test TESTOPTS=++local"

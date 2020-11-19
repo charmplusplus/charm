@@ -3,6 +3,7 @@
 
 #include "stddef.h"
 #include "conv-header.h"
+#include <stdio.h>
 
 // Structure that can be used across layers
 typedef struct ncpystruct{
@@ -18,7 +19,7 @@ typedef struct ncpystruct{
   char *srcAck;
   const void *srcRef;
   int srcPe;
-  int srcSize;
+  size_t srcSize;
   short int srcLayerSize;
   short int srcAckSize;
   unsigned char srcRegMode;
@@ -30,7 +31,7 @@ typedef struct ncpystruct{
   char *destAck;
   const void *destRef;
   int destPe;
-  int destSize;
+  size_t destSize;
   short int destAckSize;
   short int destLayerSize;
   unsigned char destRegMode;
@@ -97,7 +98,7 @@ void setNcpyOpInfo(
   int srcLayerSize,
   char *srcAck,
   int srcAckSize,
-  int srcSize,
+  size_t srcSize,
   unsigned short int srcRegMode,
   unsigned short int srcDeregMode,
   unsigned short int isSrcRegistered,
@@ -108,7 +109,7 @@ void setNcpyOpInfo(
   int destLayerSize,
   char *destAck,
   int destAckSize,
-  int destSize,
+  size_t destSize,
   unsigned short int destRegMode,
   unsigned short int destDeregMode,
   unsigned short int isdestRegistered,

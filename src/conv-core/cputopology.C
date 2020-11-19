@@ -79,7 +79,9 @@ public:
   static int supported;
 
   ~CpuTopology() {
-    delete [] bynodes;
+    auto n = bynodes;
+    bynodes = nullptr;
+    delete [] n;
   }
 
     // return -1 when not supported

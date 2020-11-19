@@ -2,6 +2,7 @@
 
 export FROM_CHARMRUN='1'
 
+pre_args=''
 cmd=""
 args=""
 QUIET=0
@@ -14,7 +15,7 @@ while [ $# -gt 0 ]
 do
         case $1 in
 	+p|+ppn|++ppn)
-		args=$args" "$1" "$2
+		args="$args $1 $2"
 		shift;
 		shift
 		;;
@@ -62,7 +63,7 @@ do
 		;;
 	*)
 		if [ -z "$cmd" ]; then
-			cmd=$1
+			cmd="$1"
 		else
 			args=$args" "$1
 		fi
@@ -73,11 +74,11 @@ done
 
 test $QUIET -eq 1 && args=$args" "++quiet
 
-if [ "$DEBUG" = '1' -o "$DEBUG_NO_PAUSE" = '1' ]
+if [ "$DEBUG" = '1' ] || [ "$DEBUG_NO_PAUSE" = '1' ]
 then
   if [ -z "$DEBUGGER" ]
   then
-    [ "`uname -s 2>/dev/null`" = 'Darwin' ] && DEBUGGER='lldb' || DEBUGGER='gdb'
+    [ "$(uname -s 2>/dev/null)" = 'Darwin' ] && DEBUGGER='lldb' || DEBUGGER='gdb'
   fi
 
   DEBUG_RUN='-ex r'
@@ -88,12 +89,13 @@ then
     DEBUG_POSTFIX='--'
   fi
 
-  args="$DEBUG_POSTFIX $args"
-  [ "$DEBUG_NO_PAUSE" = '1' ] && args="$DEBUG_RUN $args"
-  args="$XTERM -e $DEBUGGER $args"
+  pre_args="$DEBUG_POSTFIX $pre_args"
+  [ "$DEBUG_NO_PAUSE" = '1' ] && pre_args="$DEBUG_RUN $pre_args"
+  pre_args="$XTERM -e $DEBUGGER $pre_args"
 fi
 
-test $QUIET -eq 0 && echo Running command: $cmd $args
+test $QUIET -eq 0 && echo Running command: "$pre_args" "$cmd" "$args"
 test $QUIET -eq 0 && echo
 
-exec $cmd $args
+# shellcheck disable=SC2086
+exec $pre_args "$cmd" $args

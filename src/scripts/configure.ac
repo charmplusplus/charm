@@ -1,8 +1,13 @@
-# Decimal representation of Charm++ release line and API revision
-# Increment the last 2 digits when making an API change
-# Increase the first three after branching for a release
+# Numerical representation of Charm++ release line and API revision
+# Essentially just the version number stripped of decimal points with minor
+#   fields padded to 2 digits each. (e.g. 6.10.1 -> 61001)
+# Ensure that this number is always numerically and lexicographically increasing.
+#
+# Increment the last 2 digits when making a bugfix release
+# Increment the second and third digits when making a minor feature release
+# Increment the first digit when making a major feature release
 
-AC_INIT(Charm++, 61001, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
+AC_INIT([Charm++], [61002], [charm@cs.illinois.edu], [charm], [https://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
@@ -37,8 +42,19 @@ CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
-echo AC_PACKAGE_VERSION > ../include/VERSION
-AC_DEFINE_UNQUOTED([CHARM_VERSION], AC_PACKAGE_VERSION, [Charm++ Release/API version number])
+CHARM_VERSION=AC_PACKAGE_VERSION
+CHARM_VERSION_MAJOR=`echo $CHARM_VERSION | cut -c1`
+CHARM_VERSION_MINOR=`echo $CHARM_VERSION | cut -c2-3`
+CHARM_VERSION_PATCH=`echo $CHARM_VERSION | cut -c4-5`
+
+if test "$CHARM_VERSION_PATCH" -lt 10 ; then
+  CHARM_VERSION_PATCH=${CHARM_VERSION_PATCH#0} # remove leading '0'
+fi
+
+echo "#define CHARM_VERSION $CHARM_VERSION" > ../include/charm-version.h
+echo "#define CHARM_VERSION_MAJOR $CHARM_VERSION_MAJOR" >> ../include/charm-version.h
+echo "#define CHARM_VERSION_MINOR $CHARM_VERSION_MINOR" >> ../include/charm-version.h
+echo "#define CHARM_VERSION_PATCH $CHARM_VERSION_PATCH" >> ../include/charm-version.h
 
 charmout="charmconfig.out"
 /bin/rm -rf $charmout
@@ -109,19 +125,26 @@ remove_make_flag() {
 
 add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
 add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
+add_flag "CMK_MACOSX='$CMK_MACOSX'" 'basic setup'
 add_flag "CMK_WINDOWS='$CMK_WINDOWS'" 'basic setup'
 add_flag "CMK_BLUEGENEQ='$CMK_BLUEGENEQ'" 'basic setup'
+add_flag "CMK_POST_EXE='$CMK_POST_EXE'" 'basic setup'
+add_flag "CMK_SHARED_SUF='$CMK_SHARED_SUF'" 'basic setup'
+add_flag "CMK_USER_SUFFIX='$CMK_USER_SUFFIX'" 'basic setup'
 add_make_flag "CMK_COMPILER:=$CMK_COMPILER" 'basic setup'
 add_make_flag "CMK_SMP:=$CMK_SMP" 'basic setup'
 add_make_flag "CMK_SHARED_SUF:=$CMK_SHARED_SUF" 'basic setup'
+add_make_flag "CMK_USER_SUFFIX:=$CMK_USER_SUFFIX" 'basic setup'
 add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
 add_make_flag "CMK_MACOSX:=$CMK_MACOSX" 'basic setup'
 add_make_flag "CMK_WINDOWS:=$CMK_WINDOWS" 'basic setup'
 add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
 add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
-add_make_flag "CMK_UTH:=$CMK_UTH" 'basic setup'
 add_make_flag "CMK_USE_LRTS:=$CMK_USE_LRTS" 'basic setup'
 add_make_flag "BUILD_CUDA:=$BUILD_CUDA" 'basic setup'
+AC_DEFINE_UNQUOTED(CMK_POST_EXE, $CMK_POST_EXE, [basic setup])
+AC_DEFINE_UNQUOTED(CMK_SHARED_SUF, $CMK_SHARED_SUF, [basic setup])
+AC_DEFINE_UNQUOTED(CMK_USER_SUFFIX, $CMK_USER_SUFFIX, [basic setup])
 
 # enable/disable error checking
 AC_ARG_ENABLE([error-checking],
@@ -357,19 +380,19 @@ else
   AC_DEFINE_UNQUOTED(CMK_SHRINK_EXPAND, 0, [disable shrinkexpand])
 fi
 
-AC_ARG_ENABLE([charmpy],
-            [AS_HELP_STRING([--enable-charmpy],
+AC_ARG_ENABLE([charm4py],
+            [AS_HELP_STRING([--enable-charm4py],
               [enable charm4py support])],
-            [enable_charmpy=$enableval],
-            [enable_charmpy=no])
+            [enable_charm4py=$enableval],
+            [enable_charm4py=no])
 
-if test "$enable_charmpy" = "yes"
+if test "$enable_charm4py" = "yes"
 then
   Echo "charm4py support is enabled"
-  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 1, [enable charmpy])
+  AC_DEFINE_UNQUOTED(CMK_CHARM4PY, 1, [enable charm4py])
 else
   Echo "charm4py support is disabled"
-  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 0, [disable charmpy])
+  AC_DEFINE_UNQUOTED(CMK_CHARM4PY, 0, [disable charm4py])
 fi
 
 AC_ARG_WITH([numa],
@@ -803,8 +826,15 @@ then
     add_flag 'CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="1"' "tlsglobals"
 fi
 
+# Test for a flag important for shared linking
+test_cxx "whether C++ compiler accepts -fvisibility=hidden" "yes" "no" "-fvisibility=hidden"
+if test $strictpass -eq 1
+then
+    add_flag 'CMK_COMPILER_KNOWS_FVISIBILITY="1"' "-fvisibility=hidden"
+fi
+
 # Determine compiler/linker flags to build libcharm.so for charm4py
-if test "$enable_charmpy" = "yes"
+if test "$enable_charm4py" = "yes"
 then
 
   cat > $t <<EOT
@@ -1051,6 +1081,16 @@ int main() {
 EOT
 test_cxx "whether has malloc.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLOC_H, $pass, [whether has malloc.h])
+
+#### test if has strings.h ####
+cat > $t <<EOT
+#include <strings.h>
+int main() {
+  return 0;
+}
+EOT
+test_cxx "whether has strings.h " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STRINGS_H, $pass, [whether has strings.h])
 
 #### test if has alloca.h ####
 cat > $t <<EOT
@@ -1439,6 +1479,20 @@ EOT
 test_linkc "whether synchronization primitives (__sync_synchronize) works in C" "yes" "no" ""
 
 AC_DEFINE_UNQUOTED(CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE, $pass, [whether sync_synchronize primitives works in C])
+
+
+### test for _IO_file_overflow ###
+
+cat > $tc <<EOT
+#include <stdio.h>
+extern int _IO_file_overflow(FILE *, int);
+int main()
+{
+  return _IO_file_overflow(stdout, -1);
+}
+EOT
+test_linkc "whether has _IO_file_overflow" "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK_HAS_IO_FILE_OVERFLOW], $pass, [whether has _IO_file_overflow])
 
 
 ### test for __executable_start ###
@@ -2043,6 +2097,17 @@ AC_DEFINE_UNQUOTED(CMK_HAS_BINDPROCESSOR, $pass, [whether the bindprocessor()
 exists])
 
 
+#### check if visibility attribute works ####
+cat > $t <<EOT
+__attribute__((visibility("default"))) int myfunc();
+int myfunc()
+{
+  return 0;
+}
+EOT
+test_cxx 'whether has __attribute__((visibility("default")))' "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_ATTRIBUTE_VISIBILITY_DEFAULT, $pass, [whether has __attribute__((visibility("default")))])
+
 #### check if dlopen works ####
 skip_dl=0
 test -n "$CMK_NO_DL" && skip_dl=1
@@ -2157,7 +2222,7 @@ CMK_HAS_REALPATH="$pass"
 case "$CMK_VDIR" in
   *-win-*)
     CMK_CAN_GET_BINARY_PATH='1'
-    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='0' # TODO: technically possible, but more work to be done
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='1'
     ;;
   *-darwin*)
     CMK_CAN_GET_BINARY_PATH='1'
@@ -2349,6 +2414,10 @@ CMK_HAS_CMA="$pass"
 test "$CMK_HAS_CMA" = '1' -a "$CMK_MULTICORE" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_USE_CMA='1' || CMK_USE_CMA='0'
 add_make_flag "CMK_USE_CMA:=$CMK_USE_CMA" 'Cross Memory Attach'
 
+test "$CMK_WINDOWS" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_SUPPORTS_MEMORY_ISOMALLOC='1' || CMK_SUPPORTS_MEMORY_ISOMALLOC='0'
+add_flag "CMK_SUPPORTS_MEMORY_ISOMALLOC='$CMK_SUPPORTS_MEMORY_ISOMALLOC'" '-memory isomalloc'
+add_make_flag "CMK_SUPPORTS_MEMORY_ISOMALLOC:=$CMK_SUPPORTS_MEMORY_ISOMALLOC" '-memory isomalloc'
+
 #### check if -rdynamic works ####
 cat > $t <<EOT
 int main() {
@@ -2370,6 +2439,9 @@ if test "$CAN_EXPORT_SYMBOLS" = '1'; then
   add_flag 'CMK_LD="$CMK_LD '$TRACE_LINK_FLAG'"' "exporting program symbols to shared objects"
   add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "exporting program symbols to shared objects"
 fi
+
+test_link "whether has -Wl,-undefined,dynamic_lookup" "yes" "no" "" "-Wl,-undefined,dynamic_lookup"
+add_flag "CMK_LINKER_KNOWS_UNDEFINED='$strictpass'" "importing program symbols from shared objects"
 
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
@@ -2886,6 +2958,7 @@ test_link_fortran_main "whether the C++ linker succeeds with a Fortran entry poi
 if test $pass -eq 1
 then
   add_flag "CMK_CAN_LINK_FORTRAN='1'" "Fortran"
+  add_make_flag "CMK_CAN_LINK_FORTRAN:=1" "Fortran"
 fi
 
 ### check for OpenMP availability ###
@@ -2934,53 +3007,9 @@ else
 fi
 
 
-# for hwloc
-eval "`./charmc -print-building-blocks $OPTS`"
-export CC="$(get_full_command_name "$CMK_SEQ_CC")"
-export CXX="$(get_full_command_name "$CMK_SEQ_CXX")"
-export CC_FOR_BUILD="$(get_full_command_name "$CMK_NATIVE_CC")"
-AC_SUBST(CC_FOR_BUILD)
-export HWLOC_FLAGS="$CHARM_CC_FLAGS"
-export CFLAGS="$CMK_SEQ_CC_FLAGS"
-export AR="$(get_full_command_name "${CMK_SEQ_AR%% *}")"
-enable_embedded_mode='yes'
-enable_static='yes'
-if test "$CMK_NO_BUILD_SHARED" = 'false'
-then
-  # Force building of shared hwloc library in embedded mode.
-  # See https://github.com/UIUC-PPL/charm/issues/2599 and 
-  # https://github.com/open-mpi/hwloc/issues/371 for more details.
-  enable_shared='yes'
-  export am_libhwloc_embedded_la_rpath="-rpath $CHARMLIBSO"
-else
-  enable_shared='no'
-  export am_libhwloc_embedded_la_rpath=''
-fi
-AC_SUBST(am_libhwloc_embedded_la_rpath)
-enable_pci='no'
-enable_libudev='no'
-enable_libxml2='no'
-enable_visibility='no'
-enable_nvml='no'
-enable_opencl='no'
-enable_gl='no'
-enable_cairo='no'
-. hwloc/VERSION
-export libhwloc_so_version
-AC_SUBST(libhwloc_so_version)
-
-echo "Configuring hwloc:"
-AC_CONFIG_AUX_DIR(hwloc/config)
-AC_CANONICAL_TARGET
-AC_USE_SYSTEM_EXTENSIONS
-LT_INIT
-
-AM_INIT_AUTOMAKE([no-define])
-
-AC_CONFIG_MACRO_DIR(hwloc/config)
-HWLOC_SET_SYMBOL_PREFIX([cmi_])
-HWLOC_SETUP_CORE([hwloc], [happy=yes], [happy=no])
-HWLOC_DO_AM_CONDITIONALS
-add_flag 'CMK_HWLOC_LIBS="-lhwloc_embedded '"$HWLOC_EMBEDDED_LIBS"'"' "hwloc"
+eval `"$CHARMBIN/charmc" $OPTS -print-building-blocks -standalone`
+add_make_flag "HWLOC_CC:=$CHARM_CC" "hwloc"
+add_make_flag "HWLOC_CC_FLAGS:=$CHARM_CC_FLAGS" "hwloc"
+add_flag 'CMK_HWLOC_LIBS="-lhwloc_embedded -lm"' "hwloc"
 
 AC_OUTPUT

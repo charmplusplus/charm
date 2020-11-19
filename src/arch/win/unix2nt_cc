@@ -1,10 +1,13 @@
 #!/bin/bash
+
+set -o errexit
+
 ##############################################################################
 # unix2nt_cc:  for VC++ ver 8 and later (VS 2003, 2008, 2010)
-# Maps UNIX C/C++ compiler command-line options to 
+# Maps UNIX C/C++ compiler command-line options to
 # Microsoft Visual C++ command line options.
-# That is, this script is a UNIX-ifying wrapper for 
-# the NT CL and LINK commands. 
+# That is, this script is a UNIX-ifying wrapper for
+# the NT CL and LINK commands.
 #
 # Known bugs: pathnames with spaces cause quoting problems.
 ##############################################################################
@@ -76,8 +79,8 @@ LINK_COMMON='-nologo -subsystem:console -DYNAMICBASE:NO'
 #else
 #LINK_COMMON+=" -LIBPATH:`cygpath -d \"$VCC_DIR/Lib/amd64\"`"
 #fi
-#LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib 
-#  comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib 
+#LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib
+#  comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib
 #  odbc32.lib odbccp32.lib -SUBSYSTEM:CONSOLE -INCREMENTAL:NO -MACHINE:IX86 '
 LINK_POST='ws2_32.lib kernel32.lib user32.lib psapi.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib -MACHINE:X64 -ERRORREPORT:PROMPT '
 
@@ -218,7 +221,7 @@ do
 		CL_MT='-MTd'
 		CL_DLL='-LDd'
 		;;
-	-c) 
+	-c)
 		CL+=' -c'
 		ML+=' -c'
         ;;
@@ -322,7 +325,7 @@ do
 			DOLINK='1'
 		fi
 		;;
-	
+
 #Object file or library-- add to link
 	*.o|*.a|*.lib|*.obj)
 		if [[ -n "$DOCOMPILE" ]]
@@ -338,8 +341,8 @@ do
 		base=`stripExtension $arg`
 		source="$arg"
 		CL+=" -Tc`cygpath -w $arg`"
-		OBJ_OUTPUT="-Fo$base.o"
-		LINK+=" $base.o"
+		OBJ_OUTPUT="-Fo$(cygpath -w $base).o"
+		LINK+=" $(cygpath -w $base).o"
 		DOCOMPILE='1'
 		;;
 #ASM source file
@@ -348,7 +351,7 @@ do
 		source="$arg"
 		ML+=" -Ta`cygpath -w $arg`"
 #		OUTPUT="-Fo$base.o"
-		LINK+=" $base.o"
+		LINK+=" $(cygpath -w $base).o"
 		DOASSEMBLE='1'
 		;;
 #C++ source file
@@ -360,7 +363,7 @@ do
 		LINK+=" $base.o"
 		DOCOMPILE='1'
 		;;
-	'-fno-lifetime-dse'|'-rdynamic'|'-Wl,--export-dynamic')
+	'-fno-lifetime-dse'|'-rdynamic'|'-Wl,--export-dynamic'|'-fvisibility=hidden'|'-Wl,-undefined,dynamic_lookup')
 		# Error out so configure knows not to pass us these arguments, avoiding the below warning.
 		exit 1
 		;;
@@ -390,7 +393,7 @@ fi
 #if [[ -n "$CL" ]]
 if [[ -n "$DOCOMPILE" ]]
 then
-	OPTS="$CL_OPTS $OUTPUT $CL"
+	OPTS="$CL_OPTS $OUTPUT $CL -I." # '-I.' in case input file is a full path
 	[[ -n "$DOLINK" && -z "$OUTPUT" ]] && OPTS+=" $OBJ_OUTPUT"
 	[[ -n "$VERBOSE" ]] && echo "unix2nt_cc> $CL_CMD" $OPTS
 	"$CL_CMD" $OPTS
@@ -419,8 +422,8 @@ then
 	"$LINK_CMD" $OPTS
 	if [[ $? -ne 0 ]]
 	then
-		Abort "Error executing" "$LINK_CMD" $OPTS 
-	fi	
+		Abort "Error executing" "$LINK_CMD" $OPTS
+	fi
 fi
 
 exit 0

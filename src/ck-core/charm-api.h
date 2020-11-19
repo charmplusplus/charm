@@ -6,6 +6,9 @@ libraries written in Charm for other languages.
 #ifndef __CHARM_API_H
 #define __CHARM_API_H
 
+#include "charm-version.h"
+#include "charm-version-git.h"
+
 #include "conv-config.h" /* for CMK_FORTRAN symbols */
 
 /** Used to define a C language entry point*/
@@ -65,6 +68,13 @@ FTN_NAME(CAPITALNAME,lowername) routine_args { \
 	return Cname c_args;\
 }
 
+/** Shared object symbol exporting */
+#ifdef _WIN32
+# define CMI_EXPORT __declspec(dllexport)
+#elif CMK_HAS_ATTRIBUTE_VISIBILITY_DEFAULT
+# define CMI_EXPORT __attribute__((visibility("default")))
+#else
+# define CMI_EXPORT
+#endif
 
 #endif /*Def(thisHeader) */
-

@@ -178,7 +178,7 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool forceIn
         d.array.refnum = 0;
 }
 
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
 CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
@@ -223,7 +223,7 @@ CkCallback::CkCallback(ArrayElement *p, int ep,bool forceInline) {
         d.array.refnum = 0;
 }
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 // currently this is only used with Charm4py, so we are only enabling it for that case
 // to guarantee best performance for non-charm4py applications
@@ -320,7 +320,7 @@ void CkCallback::send(void *msg) const
   // immediate entry method
   int opts = 0;
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
   if (isExtCallback) { // callback target is external
     CkCallbackSendExt(*this, msg);
     return;
@@ -417,7 +417,7 @@ void CkCallback::send(void *msg) const
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
 		CkBroadcastMsgArray(d.array.ep, msg, d.array.id);
 		break;
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
 	case bcastSection: {
 		if(!msg)msg=CkAllocSysMsg();
                 if (d.section.hasRefnum) CkSetRefNum(msg, d.section.refnum);
@@ -506,7 +506,7 @@ void CkCallback::pup(PUP::er &p) {
   default:
     CkAbort("Inconsistent CkCallback type");
   }
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
   p|isExtCallback;
 #endif
 }
@@ -525,7 +525,7 @@ bool CkCallback::containsPointer() const {
   case bcastGroup:
   case bcastNodeGroup:
   case bcastArray:
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
   case bcastSection:
 #endif
     return false;
@@ -534,7 +534,7 @@ bool CkCallback::containsPointer() const {
   case callCFn:
   case call1Fn:
   case replyCCS:
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
   case bcastSection:
 #endif
     return true;

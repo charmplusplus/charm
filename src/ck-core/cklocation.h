@@ -44,7 +44,6 @@ public:
 //#if CMK_LBDB_ON
 #include "LBManager.h"
 #include "MetaBalancer.h"
-class LBManager;
 //#endif
 
 //Forward declarations
@@ -126,7 +125,7 @@ public:
   std::unordered_map<int, bool> dynamicIns;
 };
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 extern int (*ArrayMapProcNumExtCallback)(int, int, const int *);
 

@@ -16,6 +16,8 @@
 # include "mpio_globals.h"
 #endif
 
+extern int quietModeRequested;
+
 // Set to 1 to print debug statements
 #define AMPI_DO_DEBUG 0
 
@@ -52,8 +54,6 @@
 // '""', which indicates a nonexistent argument)
 #define PRINT_ARG(arg, last) \
   if ("\"\""!=#arg) std::cout << #arg << "=" << arg << (last ? "" : ", ");
-
-extern int quietModeRequested;
 
 // Prints PE:VP, function name, and argument name/value for each function argument
 #define AMPI_DEBUG_ARGS(function_name, ...) \
@@ -378,6 +378,12 @@ class WinStruct{
  public:
   MPI_Comm comm;
   int index;
+
+  void * base = nullptr;
+  MPI_Aint size = 0;
+  int disp_unit = 0;
+  int create_flavor = MPI_WIN_FLAVOR_CREATE;
+  int model = MPI_WIN_SEPARATE;
 
   // Windows created with MPI_Win_allocate/MPI_Win_allocate_shared need to free their
   // memory region on MPI_Win_free.
@@ -2107,13 +2113,6 @@ class ampiParent final : public CBase_ampiParent {
   std::vector<OpStruct> userOps; // list of any user-defined MPI_Ops
   std::vector<AmpiMsg *> matchedMsgs; // for use with MPI_Mprobe and MPI_Mrecv
 
-  /* MPI_*_get_attr C binding returns a *pointer* to an integer,
-   *  so there needs to be some storage somewhere to point to.
-   * All builtin keyvals are ints, except for MPI_WIN_BASE, which
-   *  is a pointer, and MPI_WIN_SIZE, which is an MPI_Aint. */
-  int* kv_builtin_storage;
-  MPI_Aint* win_size_storage;
-  void** win_base_storage;
   CkPupPtrVec<KeyvalNode> kvlist;
   void* bsendBuffer;   // NOTE: we don't actually use this for buffering of MPI_Bsend's,
   int bsendBufferSize; //       we only keep track of it to return it from MPI_Buffer_detach
@@ -2131,10 +2130,6 @@ class ampiParent final : public CBase_ampiParent {
 #if CMK_AMPI_WITH_ROMIO
   ADIO_GlobalStruct romio_globals;
 #endif
-
- private:
-  bool kv_set_builtin(int keyval, void* attribute_val) noexcept;
-  bool kv_get_builtin(int keyval) noexcept;
 
  public:
   void prepareCtv() noexcept;
@@ -2410,15 +2405,23 @@ class ampiParent final : public CBase_ampiParent {
 
   int createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
                   int *keyval, void* extra_state) noexcept;
-  bool getBuiltinAttribute(int keyval, void *attribute_val) noexcept;
+  bool getBuiltinAttributeComm(int keyval, void *attribute_val) noexcept;
+  bool getBuiltinAttributeWin(int keyval, void *attribute_val, WinStruct * winStruct) noexcept;
   int setUserAttribute(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
   bool getUserAttribute(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
   int dupUserAttributes(int old_context, std::unordered_map<int, uintptr_t> & old_attr, std::unordered_map<int, uintptr_t> & new_attr) noexcept;
   int freeUserAttributes(int context, std::unordered_map<int, uintptr_t> & attributes) noexcept;
   int freeKeyval(int keyval) noexcept;
 
-  int setAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
-  int getAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
+  int getAttrComm(MPI_Comm comm, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
+  int getAttrType(MPI_Datatype datatype, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
+  int getAttrWin(MPI_Win win, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag, WinStruct * winStruct) noexcept;
+  int setAttrComm(MPI_Comm comm, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
+  int setAttrType(MPI_Datatype datatype, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept
+  {
+    return setUserAttribute(datatype, attributes, keyval, attribute_val);
+  }
+  int setAttrWin(MPI_Win win, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
   int deleteAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval) noexcept;
 
   int addWinStruct(WinStruct *win) noexcept;
@@ -2985,5 +2988,46 @@ inline void ampiVerifyNodeinit(const char * routineName)
 #define AMPI_API_INIT(routineName, ...) ampiVerifyNodeinit(routineName); \
   TCHARM_API_TRACE(routineName, "ampi"); \
   AMPI_DEBUG_ARGS(routineName, __VA_ARGS__)
+
+
+#ifdef _WIN32
+
+#ifndef WIN32_LEAN_AND_MEAN
+# define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+# define NOMINMAX
+#endif
+#include <windows.h>
+
+typedef HMODULE SharedObject;
+
+#define dlopen(name, flags) LoadLibrary(name)
+#define dlsym(handle, name) ((void(*)())GetProcAddress((handle), (name)))
+#define dlclose(handle) FreeLibrary(handle)
+#define dlerror() ""
+
+#else
+
+#if CMK_DLL_USE_DLOPEN
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#endif
+
+typedef void * SharedObject;
+
+#endif
+
+typedef int (*ampi_maintype)(int, char **);
+typedef void (*ampi_fmaintype)(void);
+
+ampi_maintype AMPI_Main_Get_C(SharedObject myexe);
+ampi_fmaintype AMPI_Main_Get_F(SharedObject myexe);
+int AMPI_Main_Dispatch(SharedObject myexe, int argc, char ** argv);
 
 #endif // _AMPIIMPL_H

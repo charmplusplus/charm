@@ -456,7 +456,7 @@ void ArrayElement::CkAbort(const char *format, ...) const
 void ArrayElement::recvBroadcast(CkMessage *m){
 }
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 ArrayElemExt::ArrayElemExt(void *impl_msg)
 {
@@ -1245,14 +1245,12 @@ int CkArrayBroadcaster::incrementBcastNo() {
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
 
-#if CMK_ONESIDED_IMPL
   if((CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_SEND_MSG ||
       CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_MSG) &&
       getRootNode(UsrToEnv(msg)) != 0 &&
       CkMyPe() == 0) {
     // Do not increment as it has already been incremented
   } else
-#endif
   {
     incBcastNo();
   }
@@ -1292,7 +1290,7 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
   }
 }
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 extern void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int);
 
@@ -1423,7 +1421,6 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
       DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,
           CpvAccess(serializer)));
       CProxy_CkArray ap(_aid);
-#if CMK_ONESIDED_IMPL
       if (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG ||
           CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) {
         // ZC Bcast is implemented on non-zero root nodes by sending a small
@@ -1437,7 +1434,6 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
         w.opts = opts;
         ap[CpvAccess(serializer)].incrementBcastNoAndSendBack(CkMyPe(), w);
       } else
-#endif
       {
         // Regular Bcast (non ZC) is implemented on non-zero root nodes by
         // forwarding the message to PE 0 and then having PE 0 perform the
@@ -1533,7 +1529,6 @@ void CkArray::recvBroadcast(CkMessage* m) {
   broadcaster->incoming(msg);
 
   int len = localElemVec.size();
-#if CMK_ONESIDED_IMPL
   // extract this field here so we can still check it even if msg is freed
   const auto zc_msgtype = CMI_ZC_MSGTYPE(env);
 
@@ -1558,24 +1553,21 @@ void CkArray::recvBroadcast(CkMessage* m) {
     bool doFree = false;
     broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
   } else
-#endif
   {
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
     broadcaster->deliver(msg, localElemVec, thisgroup.idx, stableLocations);
 #else
     for (unsigned int i = 0; i < len; ++i) {
       bool doFree = false;
       if (stableLocations && i == len-1) doFree = true;
-#if CMK_ONESIDED_IMPL
       // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
       // first element during CMK_ZC_BCAST_ALL_DONE_MSG
       if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
-#endif
       CmiAssert(i < localElemVec.size());
       broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
     }
 
-#endif // CMK_CHARMPY
+#endif // CMK_CHARM4PY
   }
 
   // CkArrayBroadcaster doesn't have msg buffered, and there was no last
@@ -1585,7 +1577,6 @@ void CkArray::recvBroadcast(CkMessage* m) {
   }
 }
 
-#if CMK_ONESIDED_IMPL
 void CkArray::forwardZCMsgToOtherElems(envelope *env) {
 
   CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_DONE_MSG;
@@ -1598,7 +1589,6 @@ void CkArray::forwardZCMsgToOtherElems(envelope *env) {
     broadcaster->deliver((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[i], doFree);
   }
 }
-#endif
 
 void CkArray::flushStates() {
   CkReductionMgr::flushStates();

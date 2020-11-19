@@ -3,9 +3,9 @@
 
 #include <cuda_runtime.h>
 #include "converse.h"
-#include "buggy.h"
+#include "buddy_allocator.h"
 
-// Manages a GPU device - accessible through GPUManager
+// Manages a GPU device, accessible through GPUManager
 struct DeviceManager {
 #if CMK_SMP
   // Used in SMP mode, should be locked by the caller
@@ -17,7 +17,7 @@ struct DeviceManager {
   int global_index; // Within physical node
 
   // Buddy allocator for communication buffer
-  buggy::allocator* comm_buffer;
+  buddy::allocator* comm_buffer;
 
   DeviceManager(int local_index_, int global_index_) :
     local_index(local_index_), global_index(global_index_), comm_buffer(nullptr) {
@@ -33,9 +33,13 @@ struct DeviceManager {
     destroy_comm_buffer();
   }
 
+  buddy::allocator* get_comm_buffer() {
+    return comm_buffer;
+  }
+
   void create_comm_buffer(size_t size) {
     if (comm_buffer == nullptr)
-      comm_buffer = new buggy::allocator(size);
+      comm_buffer = new buddy::allocator(size);
   }
 
   void* alloc_comm_buffer(size_t size) {
@@ -46,7 +50,7 @@ struct DeviceManager {
     comm_buffer->free((void*)(comm_buffer->base_ptr + offset));
   }
 
-  size_t comm_buffer_free_size() {
+  size_t get_comm_buffer_free_size() {
     return comm_buffer->get_free_size();
   }
 
@@ -56,7 +60,6 @@ struct DeviceManager {
       comm_buffer = nullptr;
     }
   }
-
 };
 
 #endif // __DEVICEMANAGER_H_

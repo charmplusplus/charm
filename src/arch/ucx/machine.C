@@ -22,7 +22,7 @@
 #include <ucs/type/status.h>
 #include <ucs/datastruct/mpool.h>
 
-#if CMK_USE_PMI
+#if CMK_USE_PMI || CMK_USE_SIMPLEPMI
 #include "runtime-pmi.C"
 #elif CMK_USE_PMI2
 #include "runtime-pmi2.C"
@@ -617,7 +617,9 @@ static inline int ProcessTxQueue()
             } else {
                 ((UcxRequest*)status_ptr)->msgBuf = req->msgBuf;
             }
-        } else if(req->op == UCX_RMA_OP_GET || req->op == UCX_RMA_OP_PUT) { // RMA Get or Put
+        }
+#if CMK_ONESIDED_IMPL
+        else if(req->op == UCX_RMA_OP_GET || req->op == UCX_RMA_OP_PUT) { // RMA Get or Put
 
             // Post the GET or PUT operation from the comm thread
             UcxRmaOp((NcpyOperationInfo *)(req->msgBuf), req->op);
@@ -649,6 +651,10 @@ static inline int ProcessTxQueue()
           store_req->device_op = req->device_op;
           store_req->msgBuf = req->msgBuf;
 #endif
+        }
+#endif
+        else {
+          CmiAbort("[%d][%d][%d] UCX:ProcessTxQueue req->op(%d) is Invalid\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), req->op);
         }
         CmiFree(req);
         return 1;
@@ -723,7 +729,9 @@ void LrtsExit(int exitcode)
 
         ret = runtime_fini();
         UCX_CHECK_PMI_RET(ret, "runtime_fini");
-        exit(exitcode);
+        if (!userDrivenMode) {
+          exit(exitcode);
+        }
     }
 }
 

@@ -18,7 +18,7 @@ then
   test ! -f "../include/hapi.h" && ./system_ln "../tmp/hybridAPI/hapi.h" ../include
   test ! -f "../include/gpumanager.h" && ./system_ln "../tmp/hybridAPI/gpumanager.h" ../include
   test ! -f "../include/devicemanager.h" && ./system_ln "../tmp/hybridAPI/devicemanager.h" ../include
-  test ! -f "../include/buggy.h" && ./system_ln "../tmp/hybridAPI/buggy.h" ../include
+  test ! -f "../include/buddy_allocator.h" && ./system_ln "../tmp/hybridAPI/buddy_allocator.h" ../include
   test ! -f "../include/hapi_nvtx.h" && ./system_ln "../tmp/hybridAPI/hapi_nvtx.h" ../include
 
 #make library
