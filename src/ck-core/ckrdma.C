@@ -2258,9 +2258,11 @@ void handleArrayMsgOnChildPostCompletionForRecvBcast(envelope *env) {
   } else
 #endif
   {
-    //CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
-    //QdCreate(1);
-    //CmiHandleMessage(env);
+    if(mgr->getNumLocalElems() == 1) { // this is the only element
+      CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+      QdCreate(1);
+      CmiHandleMessage(env);
+    }
   }
   //TODO: Equeue the basic message if there are no elements
 }

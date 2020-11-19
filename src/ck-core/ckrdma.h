@@ -303,6 +303,7 @@ struct NcpyBcastRecvPeerAckInfo{
     int getNumElems() const { return numElems; }
     void setNumElems(int r) { numElems = r; }
     int incNumElems() { return numElems++; }
+    int incNumElems(int r) { numElems += r; return numElems; }
     int decNumElems() { return numElems--; }
 #endif
 

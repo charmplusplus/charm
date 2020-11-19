@@ -111,7 +111,7 @@ class arr : public CBase_arr {
     }
 
     void recv_zerocopy(int *&buffer, size_t &size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
-      CkPrintf("[%d][%d][%d][%d] =========== recv_zerocopy post em\n", CkMyPe(), CkMyNode(), CkMyRank(), thisIndex);
+      CkPrintf("[%d][%d][%d][%d] =========== recv_zerocopy arr post em\n", CkMyPe(), CkMyNode(), CkMyRank(), thisIndex);
       tag = CkPostBufferLater(ncpyPost, 0);
 
       thisProxy[thisIndex].readyToPost();
@@ -129,7 +129,7 @@ class arr : public CBase_arr {
     }
 
     void recv_zerocopy(int *buffer, size_t size, bool isBcast) {
-      CkPrintf("[%d][%d][%d][%d] ^^^^^^^^^^^ recv_zerocopy regular em\n", CkMyPe(), CkMyNode(), CkMyRank(), thisIndex);
+      CkPrintf("[%d][%d][%d][%d] ^^^^^^^^^^^ recv_zerocopy arr regular em\n", CkMyPe(), CkMyNode(), CkMyRank(), thisIndex);
       verifyValuesWithConstant(destBuffer, SIZE, CONSTANT);
 
       if(isBcast) {
@@ -158,7 +158,7 @@ class grp : public CBase_grp {
     }
 
     void recv_zerocopy(int *&buffer1, size_t &size1, int *&buffer2, size_t &size2, bool isBcast, CkNcpyBufferPost *ncpyPost) {
-      CkPrintf("[%d][%d][%d][%d] =========== recv_zerocopy post em\n", CkMyPe(), CkMyNode(), CkMyRank(), thisIndex);
+      CkPrintf("[%d][%d][%d][%d] =========== recv_zerocopy group post em\n", CkMyPe(), CkMyNode(), CkMyRank(), thisIndex);
       tag1 = CkPostBufferLater(ncpyPost, 0);
       tag2 = CkPostBufferLater(ncpyPost, 1);
 
@@ -179,7 +179,7 @@ class grp : public CBase_grp {
     }
 
     void recv_zerocopy(int *buffer1, size_t size1, int *buffer2, size_t size2, bool isBcast ) {
-      CkPrintf("[%d][%d][%d][%d] ^^^^^^^^^^^ recv_zerocopy regular em\n", CkMyPe(), CkMyNode(), CkMyRank(), thisIndex);
+      CkPrintf("[%d][%d][%d][%d] ^^^^^^^^^^^ recv_zerocopy group regular em\n", CkMyPe(), CkMyNode(), CkMyRank(), thisIndex);
       verifyValuesWithConstant(destBuffer1, SIZE, CONSTANT);
       verifyValuesWithConstant(destBuffer2, SIZE, CONSTANT);
 
