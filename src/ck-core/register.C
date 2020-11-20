@@ -147,7 +147,7 @@ void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, in
   *startEpIdx = epIdxCtor;
 }
 
-void CkRegisterArrayExt(const char *s, const char **emNames, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+void CkRegisterArrayExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(ArrayElemExt), TypeArray);
   CkRegisterBase(__idx, CkIndex_ArrayElement::__idx);
 
@@ -160,7 +160,7 @@ void CkRegisterArrayExt(const char *s, const char **emNames, int numEntryMethods
   CkRegisterEp(s, ArrayElemExt::__AtSyncEntryMethod, 0, __idx, 0);
   CkPrintf("OnPE: %d, Registering array chare: %s\n", CkMyPe(), s);
 
-  for (int i=3; i < numEntryMethods; i++)
+  for (int i=emNamesStart+3; i < emNamesStart+numEntryMethods; i++)
     {
       CkPrintf("OnPE: %d, Name: %s\n", CkMyPe(), emNames[i]);
       CkRegisterEp(emNames[i], ArrayElemExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
