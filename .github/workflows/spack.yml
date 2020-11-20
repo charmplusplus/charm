@@ -22,6 +22,7 @@ jobs:
         git clone --depth 1 https://github.com/spack/spack
         cd spack
         [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran gfortran-7 gfortran-8 gfortran-9 gfortran-10
+        [[ $(uname) == "Darwin" ]] && brew uninstall gcc
         sed -i -e 's,="master",="${{ github.head_ref }}",' var/spack/repos/builtin/packages/charmpp/package.py
         sed -i -e '/automake/d' var/spack/repos/builtin/packages/charmpp/package.py
         sed -i -e '/autoconf/d' var/spack/repos/builtin/packages/charmpp/package.py
