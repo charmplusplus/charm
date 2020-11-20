@@ -218,7 +218,7 @@ extern void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx
 extern void CkRegisterSectionManagerExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 /* extern void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx); */
-  extern void CkRegisterArrayExt(const char *s, const char **emNames, int numEntryMethods, int *chareIdx, int *startEpIdx);
+  extern void CkRegisterArrayExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg);
 #endif
 
