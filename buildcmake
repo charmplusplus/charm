@@ -491,7 +491,7 @@ fi
 
 # Create builddir and its contents
 
-rm -rf "$builddir"/*
+rm -rf "${builddir:?}"/*
 
 mkdir -p "$builddir"
 
