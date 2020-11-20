@@ -33,4 +33,4 @@ jobs:
         spack compiler find
         spack compiler list
         export VERBOSE=1
-        spack install -v -j1 charmpp@master %gcc
+        spack install -v -j1 charmpp@master
