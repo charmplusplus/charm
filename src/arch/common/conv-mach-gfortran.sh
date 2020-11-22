@@ -18,13 +18,6 @@ CMK_CF90=''
 # (presumably the most modern).
 [ -z "$CMK_CF90" ] && CMK_CF90=$(command -v gfortran f95 gfortran-{19..4} gfortran-mp-{19..4} 2>/dev/null | head -1)
 
-
-command -v gfortran f95 gfortran-{19..4} gfortran-mp-{19..4}
-
-echo CMK_CF90 = $CMK_CF90
-
-exit 44
-
 [ -z "$CMK_CF90" ] && { echo 'No gfortran found, exiting'; exit 1; }
 
 # Find libgfortran, which we need to link to manually as the C++ compiler does
