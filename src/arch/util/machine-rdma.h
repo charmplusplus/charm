@@ -16,27 +16,13 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo);
 void CmiInvokeNcpyAck(void *ack);
 
 #if CMK_CUDA
+// Function pointer to acknowledgement handler
+typedef void (*RdmaAckHandlerFn)(void *token);
+
 void LrtsSendDevice(DeviceRdmaOp* op);
 void LrtsRecvDevice(DeviceRdmaOp* op);
 
-void CmiSendDevice(DeviceRdmaOp* op) {
-  LrtsSendDevice(op);
-}
-
-void CmiRecvDevice(DeviceRdmaOp* op) {
-  LrtsRecvDevice(op);
-}
-
-RdmaAckHandlerFn rdmaDeviceRecvHandlerFn;
-
-void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn) {
-  // Set handler function that gets invoked when data transfer is complete (on receiver)
-  rdmaDeviceRecvHandlerFn = fn;
-}
-
-void CmiInvokeRecvHandler(void* data) {
-  rdmaDeviceRecvHandlerFn(data);
-}
+void CmiInvokeRecvHandler(void* data);
 #endif
 
 int CmiGetRdmaCommonInfoSize();

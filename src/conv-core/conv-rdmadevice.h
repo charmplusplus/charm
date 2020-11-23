@@ -2,6 +2,7 @@
 #define _CONV_RDMADEVICE_H_
 
 #include "conv-header.h"
+#include "cmirdmautils.h"
 #include "pup.h"
 
 #if CMK_CUDA
@@ -71,6 +72,8 @@ public:
 };
 
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
+
+typedef void (*RdmaAckCallerFn)(void *token);
 
 void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
 void CmiRdmaDeviceSendInit();

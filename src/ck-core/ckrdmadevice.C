@@ -47,6 +47,7 @@
 #endif
 #include "envelope.h"
 #include "charm++.h"
+#include "ck.h"
 #include "ckrdmadevice.h"
 
 #if CMK_CUDA
@@ -248,9 +249,9 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // Store necessary data to save and send to sender
       DeviceRdmaOp& send_op = rdma_msgs[i]->op;
       DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
-      save_op.src_pe   = send_op.src_pe   = source.pe;
+      save_op.src_pe   = send_op.src_pe   = source.src_pe;
       save_op.src_ptr  = send_op.src_ptr  = source.ptr;
-      save_op.dest_pe  = send_op.dest_pe  = CmiMyPe();
+      save_op.dest_pe  = send_op.dest_pe  = CkMyPe();
       save_op.dest_ptr = send_op.dest_ptr = dest.ptr;
       save_op.size     = send_op.size     = std::min(source.cnt, dest.cnt);
       save_op.info     = send_op.info     = (DeviceRdmaInfo*)rdma_data;

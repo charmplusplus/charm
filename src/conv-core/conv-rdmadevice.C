@@ -41,4 +41,25 @@ void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg, DeviceRdmaOp* op) {
   CmiSyncSendAndFree(msg->op.src_pe, sizeof(DeviceRdmaOpMsg), msg);
 }
 
+#include "machine-rdma.h"
+
+void CmiSendDevice(DeviceRdmaOp* op) {
+  LrtsSendDevice(op);
+}
+
+void CmiRecvDevice(DeviceRdmaOp* op) {
+  LrtsRecvDevice(op);
+}
+
+RdmaAckHandlerFn rdmaDeviceRecvHandlerFn;
+
+void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn) {
+  // Set handler function that gets invoked when data transfer is complete (on receiver)
+  rdmaDeviceRecvHandlerFn = fn;
+}
+
+void CmiInvokeRecvHandler(void* data) {
+  rdmaDeviceRecvHandlerFn(data);
+}
+
 #endif // CMK_CUDA
