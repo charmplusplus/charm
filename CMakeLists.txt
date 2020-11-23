@@ -890,7 +890,8 @@ if(${TARGET} STREQUAL "charm4py")
 endif()
 
 # Check that we are able to build and link an executable
-add_executable(hello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
+add_custom_target(hello ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tests/charm++/simplearrayhello
+  COMMENT "Building Simple Array Hello test to validate linking.")
 add_dependencies(hello ck ldb-rand memory-default threads-default conv-static
   converse ckmain ckqt
   moduleNDMeshStreamer modulecompletion)

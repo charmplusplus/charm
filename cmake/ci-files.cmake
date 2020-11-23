@@ -1,8 +1,6 @@
 # List all *.ci files in src/
 file(GLOB_RECURSE ci-files ${CMAKE_SOURCE_DIR}/src/*.ci)
 
-list(APPEND ci-files ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.ci)
-
 foreach(in_f ${ci-files})
 
     # Special handling for ci files whose filename is not the same as the module name
