@@ -9,6 +9,7 @@ HybridBaseLB.decl.h HybridBaseLB.def.h: HybridBaseLB.ci.stamp
 LBManager.decl.h LBManager.def.h: LBManager.ci.stamp
 MetaBalancer.decl.h MetaBalancer.def.h: MetaBalancer.ci.stamp
 MetisLB.decl.h MetisLB.def.h: MetisLB.ci.stamp
+RecBipartLB.decl.h RecBipartLB.def.h: RecBipartLB.ci.stamp
 ScotchLB.decl.h ScotchLB.def.h: ScotchLB.ci.stamp
 ScotchRefineLB.decl.h ScotchRefineLB.def.h: ScotchRefineLB.ci.stamp
 ScotchTopoLB.decl.h ScotchTopoLB.def.h: ScotchTopoLB.ci.stamp

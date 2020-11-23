@@ -182,8 +182,8 @@ while [[ $# -gt 0 ]]; do
       opt_CXX=${arg/cc/++}
       opt_compiler+="$arg "
       ;;
-    gfortran)
-      opt_FC=gfortran
+    gfortran|gfortran-*)
+      opt_FC=$arg
       opt_compiler+="$arg "
       ;;
     clang)
@@ -426,7 +426,7 @@ then
   else
     echo "Removing existing data and starting over. (--force)"
   fi
-elif [[ -e "$builddir" ]]
+elif [[ -e "$builddir" && ! -e "$builddir/.spack" ]]
 then
   echo "\"$builddir\" already exists but is in an inconsistent state."
   if [[ $FORCE -eq 0 ]]
@@ -491,9 +491,9 @@ fi
 
 # Create builddir and its contents
 
-rm -rf "$builddir"
+rm -rf "${builddir:?}"/*
 
-mkdir "$builddir"
+mkdir -p "$builddir"
 
 cd "$builddir"
 
