@@ -72,6 +72,13 @@ public:
 
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
 
+void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
+void CmiRdmaDeviceSendInit();
+void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg, DeviceRdmaOp* op);
+
+void CmiSendDevice(DeviceRdmaOp* op);
+void CmiRecvDevice(DeviceRdmaOp* op);
+
 #endif // CMK_CUDA
 
 #endif // _CONV_RDMADEVICE_H_

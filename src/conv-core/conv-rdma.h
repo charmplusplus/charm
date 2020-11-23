@@ -4,10 +4,6 @@
 #include "cmirdmautils.h"
 #include "pup.h"
 
-#if CMK_CUDA
-#include <cuda_runtime.h>
-#endif
-
 /*********************************** Zerocopy Direct API **********************************/
 typedef void (*RdmaAckCallerFn)(void *token);
 
@@ -90,12 +86,6 @@ void CmiSetNcpyAckSize(int ackSize);
 // CkNcpyMode::CMA indicates that the PEs are on the same physical node and CMA can be used
 // CkNcpyMode::RDMA indicates that the neither MEMCPY or CMA can be used and REMOTE Direct Memory Access needs to be used
 enum class CmiNcpyMode : char { MEMCPY, CMA, RDMA };
-
-// Represents the mode of device-side zerocopy transfer
-// MEMCPY indicates that the PEs are on the same logical node and cudaMemcpyDeviceToDevice can be used
-// IPC indicates that the PEs are on different logical nodes within the same physical node and CUDA IPC can be used
-// RDMA indicates that the PEs are on different physical nodes and requires GPUDirect RDMA
-enum class CmiNcpyModeDevice : char { MEMCPY, IPC, RDMA };
 
 // Represents the completion status of the zerocopy transfer (used as a return value for CkNcpyBuffer::get & CkNcpyBuffer:::put)
 // CMA and MEMCPY transfers complete instantly and return CkNcpyStatus::complete
@@ -262,8 +252,6 @@ class CmiNcpyBuffer {
     PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
   }
 
-  ~CmiNcpyBuffer() {}
-
   void memcpyGet(CmiNcpyBuffer &source);
   void memcpyPut(CmiNcpyBuffer &destination);
 
@@ -282,69 +270,6 @@ class CmiNcpyBuffer {
 
 };
 
-#if CMK_CUDA
-class CmiDeviceBuffer {
-public:
-  // Pointer to and size of the buffer
-  const void* ptr;
-  size_t cnt;
-
-  // Home PE
-  int pe;
-
-  // Used for CUDA IPC
-  int device_idx;
-  size_t comm_offset;
-  int event_idx;
-  cudaStream_t cuda_stream;
-
-  // Stores the actual data if device-side zerocopy cannot be performed
-  /*
-  bool data_stored;
-  void* data;
-  */
-
-  CmiDeviceBuffer() : ptr(NULL), cnt(0), pe(-1) { init(); }
-
-  explicit CmiDeviceBuffer(const void* ptr_, size_t cnt_) : ptr(ptr_), cnt(cnt_),
-    pe(CmiMyPe()) { init(); }
-
-  void init() {
-    device_idx = -1;
-    comm_offset = 0;
-    event_idx = -1;
-    cuda_stream = cudaStreamPerThread;
-
-    /*
-    data_stored = false;
-    data = NULL;
-    */
-  }
-
-  void pup(PUP::er &p) {
-    p((char *)&ptr, sizeof(ptr));
-    p|cnt;
-    p|pe;
-    p|device_idx;
-    p|comm_offset;
-    p|event_idx;
-    /*
-    p|data_stored;
-    if (data_stored) {
-      if (p.isUnpacking()) {
-        cudaMallocHost(&data, cnt);
-      }
-      PUParray(p, (char*)data, cnt);
-    }
-    */
-  }
-
-  ~CmiDeviceBuffer() {
-    //if (data) cudaFreeHost(data);
-  }
-};
-#endif
-
 /***************************** Other Util *********************************/
 
 void invokeZCPupHandler(void *ref, int pe);
@@ -354,7 +279,6 @@ inline void deregisterBuffer(CmiNcpyBuffer &buffInfo) {
 }
 CmiNcpyMode findTransferMode(int srcPe, int destPe);
 CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode);
-CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
 
 
 // Converse message to invoke the Ncpy handler on a remote process
@@ -376,15 +300,5 @@ zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src);
 zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src, std::function<void (void *)> deallocate);
 
 void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest);
-
-/**************************** Direct GPU Messaging ***************************/
-#if CMK_CUDA
-void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
-void CmiRdmaDeviceSendInit();
-void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg, DeviceRdmaOp* op);
-
-void CmiSendDevice(DeviceRdmaOp* op);
-void CmiRecvDevice(DeviceRdmaOp* op);
-#endif // CMK_CUDA
 
 #endif

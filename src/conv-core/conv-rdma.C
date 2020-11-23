@@ -270,23 +270,6 @@ CmiNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
     return CmiNcpyMode::RDMA;
 }
 
-#if CMK_CUDA
-CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe) {
-  if (CmiNodeOf(srcPe) == CmiNodeOf(destPe)) {
-    // Same logical node
-    return CmiNcpyModeDevice::MEMCPY;
-  }
-  else if (CmiPeOnSamePhysicalNode(srcPe, destPe)) {
-    // Different logical nodes, same physical node
-    return CmiNcpyModeDevice::IPC;
-  }
-  else {
-    // Different physical nodes, requires GPUDirect RDMA
-    return CmiNcpyModeDevice::RDMA;
-  }
-}
-#endif
-
 zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src) {
   zcPupSourceInfo *srcInfo = new zcPupSourceInfo();
   srcInfo->src = src;
@@ -350,33 +333,6 @@ void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest) {
     CpvAccess(newZCPupGets).push_back(ncpyOpInfo);
   }
 }
-
-/**************************** Direct GPU Messaging ***************************/
-
-#if CMK_CUDA
-static int rdma_device_send_handler_idx;
-
-static void CmiRdmaDeviceSendHandler(DeviceRdmaOpMsg* msg) {
-  DeviceRdmaOp* op = &msg->op;
-
-  // Send device buffer through UCX with a special tag, so that it gets properly handled on the receiver
-  CmiSendDevice(op);
-}
-
-void CmiRdmaDeviceSendInit() {
-  // Register handler that initiates data transfer (sender -> receiver)
-  rdma_device_send_handler_idx = CmiRegisterHandler((CmiHandler)CmiRdmaDeviceSendHandler);
-}
-
-void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg, DeviceRdmaOp* op) {
-  // Post a receive for device data
-  CmiRecvDevice(op);
-
-  // Send message with destination address to sender
-  CmiSetHandler(msg, rdma_device_send_handler_idx);
-  CmiSyncSendAndFree(msg->op.src_pe, sizeof(DeviceRdmaOpMsg), msg);
-}
-#endif
 
 #if CMK_USE_LRTS
 #include "machine-rdma.h"
