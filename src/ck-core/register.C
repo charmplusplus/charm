@@ -34,7 +34,6 @@ int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack,
                   CkDeallocFnPtr dealloc, size_t size)
 {
   auto messageSize = _msgTable.size();
-  CkPrintf( "Creating message %d with name %s\n", messageSize, name );
   return _msgTable.add(new MsgInfo(name, pack, unpack, dealloc, size));
 }
 

@@ -4047,7 +4047,6 @@ void ConverseCommonInit(char **argv)
 #endif
 
 #if CMK_TRACE_ENABLED
-  CmiPrintf("Initializing Tracing!!!!\n\n\n\n");
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
 #endif

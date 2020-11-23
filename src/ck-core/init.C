@@ -92,11 +92,9 @@ extern void QdProcess(int);
 #endif
 
 #if CMK_CHARM4PY
-#warning "Charm4Py Being built!!!!"
 extern void _registerTraceProjections();
 extern void _createTraceprojections(char **argv);
 void _createTraces(char **argv) { (void)argv;
-  CmiPrintf("Creating traces!\n");
 _createTraceprojections(argv);
 }
 #endif
@@ -1322,7 +1320,6 @@ void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
-  CkPrintf("INIT CHARM!!!!!\n\n\n\n\n");
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
 	std::set_terminate([](){ CkAbort("Unhandled C++ exception in user code.\n");});
 
@@ -1463,7 +1460,6 @@ void _initCharm(int unused_argc, char **argv)
 	initCharmProjections();
 #if CMK_TRACE_IN_CHARM
         // initialize trace module in ck
-  CkPrintf("CMKT RACE IN CHARM\n");
         traceCharmInit(argv);
 #endif
  	
