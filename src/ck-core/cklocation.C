@@ -1470,20 +1470,20 @@ void CkMigratable::pup(PUP::er &p) {
 	if(p.isUnpacking()){myRec->AsyncEvacuate(asyncEvacuate);}
 #endif
 
-        int refcount = -1;
-        // Only pup refcount when migrating. Will result in problems if pup'd when
+        int epoch = -1;
+        // Only pup epoch when migrating. Will result in problems if pup'd when
         // checkpointing since it will not match the value of the freshly inited barrier
         // upon restart
         if (usesAtSync && p.isMigration())
         {
           if (p.isPacking())
           {
-            refcount = (*ldBarrierHandle)->refcount;
+            epoch = (*ldBarrierHandle)->epoch;
           }
-          p | refcount;
+          p | epoch;
         }
 
-        ckFinishConstruction(refcount);
+        ckFinishConstruction(epoch);
 }
 
 void CkMigratable::ckDestroy(void) {}
@@ -1612,7 +1612,7 @@ void CkMigratable::metaLBCallLB() {
     myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
 }
 
-void CkMigratable::ckFinishConstruction(int refcount)
+void CkMigratable::ckFinishConstruction(int epoch)
 {
 //	if ((!usesAtSync) || barrierRegistered) return;
 	if (usesAtSync && _lb_args.lbperiod() != -1.0)
@@ -1622,7 +1622,7 @@ void CkMigratable::ckFinishConstruction(int refcount)
 	if (barrierRegistered) return;
 	DEBL((AA "Registering barrier client for %s\n" AB,idx2str(thisIndexMax)));
 	if (usesAtSync) {
-	  ldBarrierHandle = CkSyncBarrier::Object()->AddClient(this, &CkMigratable::ResumeFromSyncHelper, refcount);
+	  ldBarrierHandle = CkSyncBarrier::Object()->AddClient(this, &CkMigratable::ResumeFromSyncHelper, epoch);
 	}
 	barrierRegistered=true;
 }
