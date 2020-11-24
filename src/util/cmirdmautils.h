@@ -1,9 +1,9 @@
 #ifndef _CKRDMAUTILS_H
 #define _CKRDMAUTILS_H
 
-#include "stddef.h"
 #include "conv-header.h"
 #include <stdio.h>
+#include <stddef.h>
 
 // Structure that can be used across layers
 typedef struct ncpystruct{
