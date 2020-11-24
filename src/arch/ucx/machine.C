@@ -126,6 +126,10 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
                               ucp_tag_recv_info_t *info);
 static void UcxPrepostRxBuffers();
 
+#if CMK_CUDA
+CpvDeclare(int, tag_counter);
+#endif
+
 #if CMK_ONESIDED_IMPL
 #include "machine-onesided.h"
 #endif
@@ -249,6 +253,7 @@ static void UcxInitEps(int numNodes, int myId)
 }
 
 // Should be called for every node (not PE)
+// XXX: Seems to be called from every PE (excluding comm threads)
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
     ucp_params_t cParams;
@@ -315,6 +320,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     UCX_LOG(5, "Initialized: preposted reqs %d, rndv thresh %d\n",
             ucxCtx.numRxReqs, ucxCtx.eagerSize);
+
+#if CMK_CUDA
+    CpvInitialize(int, tag_counter);
+    CpvAccess(tag_counter) = 0;
+#endif
 }
 
 static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
@@ -800,6 +810,24 @@ void UcxRecvDeviceCompleted(void* request, ucs_status_t status,
   UCX_REQUEST_FREE(req);
 }
 
+void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
+  tag = ((uint64_t)CpvAccess(tag_counter)++ << (32 + UCX_TAG_MSG_BITS)) | (CmiMyPe() << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_DEVICE;
+#if CMK_SMP
+  UcxPendingRequest* req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
+  req->msgBuf = (void*)ptr;
+  req->size   = size;
+  req->tag    = tag;
+  req->dNode  = CmiNodeOf(dest_pe);
+  req->cb     = UcxSendDeviceCompleted;
+  req->op     = UCX_DEVICE_SEND_OP;
+
+  PCQueuePush(ucxCtx.txQueue, (char *)req);
+#else
+  // TODO
+#endif // CMK_SMP
+}
+
+/*
 void LrtsSendDevice(DeviceRdmaOp* op)
 {
 #if CMK_SMP
@@ -830,6 +858,7 @@ void LrtsSendDevice(DeviceRdmaOp* op)
   }
 #endif
 }
+*/
 
 void LrtsRecvDevice(DeviceRdmaOp* op)
 {

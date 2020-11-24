@@ -24,7 +24,7 @@ static void CmiRdmaDeviceSendHandler(DeviceRdmaOpMsg* msg) {
   DeviceRdmaOp* op = &msg->op;
 
   // Send device buffer through UCX with a special tag, so that it gets properly handled on the receiver
-  CmiSendDevice(op);
+  //CmiSendDevice(op);
 }
 
 void CmiRdmaDeviceSendInit() {
@@ -43,8 +43,14 @@ void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg, DeviceRdmaOp* op) {
 
 #include "machine-rdma.h"
 
+/*
 void CmiSendDevice(DeviceRdmaOp* op) {
   LrtsSendDevice(op);
+}
+*/
+
+void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
+  LrtsSendDevice(dest_pe, ptr, size, tag);
 }
 
 void CmiRecvDevice(DeviceRdmaOp* op) {

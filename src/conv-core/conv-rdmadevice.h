@@ -30,6 +30,9 @@ public:
   int event_idx;
   cudaStream_t cuda_stream;
 
+  // Used for UCX
+  uint64_t tag;
+
   // Store the actual data for host-staged inter-node messaging (no GPUDirect RDMA)
   bool data_stored;
   void* data;
@@ -57,6 +60,7 @@ public:
     p|device_idx;
     p|comm_offset;
     p|event_idx;
+    p|tag;
     p|data_stored;
     if (data_stored) {
       if (p.isUnpacking()) {
@@ -79,7 +83,8 @@ void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
 void CmiRdmaDeviceSendInit();
 void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg, DeviceRdmaOp* op);
 
-void CmiSendDevice(DeviceRdmaOp* op);
+//void CmiSendDevice(DeviceRdmaOp* op);
+void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
 void CmiRecvDevice(DeviceRdmaOp* op);
 
 #endif // CMK_CUDA

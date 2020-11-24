@@ -398,6 +398,8 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
   return -1;
 }
 
+CpvExtern(int, tag_counter);
+
 // Performs sender-side operations necessary for device zerocopy
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 #if TIMING_BREAKDOWN
@@ -425,6 +427,14 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   total_times[1] += CkWallTimer() - start_time;
 #endif
 
+  // FIXME: Always use UCX
+  // Post ucp_tag_send_nb's to send GPU data. When receiver receives the metadata,
+  // it should post ucp_tag_recv_nb's to receive the GPU data.
+  for (int i = 0; i < numops; i++) {
+    CmiSendDevice(dest_pe, buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
+  }
+
+  /*
   if (transfer_mode == CkNcpyModeDevice::MEMCPY) {
     // Don't need to do anything for intra-process
     return;
@@ -515,6 +525,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
         CkMyPe(), avg_times[0], avg_times[1], avg_times[2], avg_times[3], avg_times[4]);
   }
 #endif
+  */
 }
 
 #endif // CMK_CUDA
