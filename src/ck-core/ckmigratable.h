@@ -103,7 +103,7 @@ private:
   void ResumeFromSyncHelper();
 public:
   void ReadyMigrate(bool ready);
-  void ckFinishConstruction(void);
+  void ckFinishConstruction(int refcount = -1);
   void setMigratable(int migratable);
   void setPupSize(size_t obj_pup_size);
 #else
@@ -111,7 +111,7 @@ public:
   void setMigratable(int migratable)  { }
   void setPupSize(size_t obj_pup_size) { }
 public:
-  void ckFinishConstruction(void) { }
+  void ckFinishConstruction(int refcount) { }
 #endif
 
 #if CMK_OUT_OF_CORE
