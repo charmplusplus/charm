@@ -779,7 +779,41 @@ ExternalProject_Add(hwloc
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
 )
-file(GLOB hwloc-objects ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/*.o)
+
+set(hwloc-objects
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/base64.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/bind.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/bitmap.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/components.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/diff.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/distances.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/memattrs.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/misc.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/pci-common.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/shmem.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-noos.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-synthetic.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-x86.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-xml-nolibxml.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-xml.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology.o
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/traversal.o
+)
+
+if(CMK_MACOSX)
+  set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-darwin.o")
+elseif(CMK_WINDOWS)
+  set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-windows.o")
+else()
+  set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-linux.o")
+endif()
+
+set_source_files_properties(
+  ${hwloc-objects}
+  PROPERTIES
+  EXTERNAL_OBJECT true
+  GENERATED true
+)
 
 # Converse
 include(cmake/converse.cmake)
