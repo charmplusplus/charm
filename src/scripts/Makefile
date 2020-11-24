@@ -545,7 +545,7 @@ CONVLIBS: converse
 	$(MAKE) -C libs convlibs
 
 $(L)/libconverse.a: $(LIBCONV_CORE) $(LIBCONV_UTIL) $(LIBCONV_PARTITION) $(LIBCONV_LDB) machine.o $(LIBTMGR) | hwloc-target
-	$(CHARMC) $(TAU_LIBS) -o $@ $^ $(wildcard hwloc/hwloc/*.o)
+	$(CHARMC) $(TAU_LIBS) -o $@ $^ $(wildcard hwloc/hwloc/*.o) $(wildcard hwloc/hwloc/*.obj)
 
 $(L)/conv-static.o: conv-static.o
 	cp -f $< $@
