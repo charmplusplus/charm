@@ -983,7 +983,7 @@ for FILE in $FILES
 do
 
 	case "$FILE" in
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
+	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co|*.obj)
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
 	*.c|*.s|*.S|*.asm|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
@@ -1999,7 +1999,7 @@ do
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
 		;;
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
+	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co|*.obj)
 		[ ! -s $FILE ] && Abort "$FILE: file not recognized: File truncated"
 		;;
 	*.M|*.mod)

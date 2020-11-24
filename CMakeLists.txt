@@ -738,83 +738,8 @@ endif()
 add_subdirectory(src/xlat-i)
 add_dependencies(charmxi create_symlinks)
 
-# Hardware Locality (hwloc)
-if(${BUILD_SHARED})
-    set(hwloc_shared yes)
-else()
-    set(hwloc_shared no)
-endif()
-
-# Used to determine arguments to pass to hwloc's configure
-set(building_blocks_command "${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS}")
-
-set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
-include(ExternalProject)
-ExternalProject_Add(hwloc
-    URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
-    CONFIGURE_COMMAND
-      bash "-c" "eval $(${building_blocks_command}) && \
-        ${hwloc_dir}/configure \
-        --disable-cairo \
-        --disable-cuda \
-        --disable-gl \
-        --disable-libxml2 \
-        --disable-nvml \
-        --disable-opencl \
-        --disable-pci \
-        --disable-libudev \
-        --disable-visibility \
-        --enable-embedded-mode \
-        --enable-shared=${hwloc_shared} \
-        --enable-static \
-        --with-hwloc-symbol-prefix=cmi_ \
-        --without-x \
-        HWLOC_FLAGS=\"$CHARM_CC_FLAGS\" \
-        CFLAGS=\"$CHARM_CC_FLAGS\" \
-        CC=$CHARM_CC \
-        CC_FOR_BUILD=$CHARM_CC \
-        > /dev/null"
-    BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-    INSTALL_COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
-    COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
-    COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
-)
-
-set(hwloc-objects
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/base64.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/bind.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/bitmap.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/components.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/diff.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/distances.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/memattrs.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/misc.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/pci-common.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/shmem.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-noos.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-synthetic.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-x86.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-xml-nolibxml.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-xml.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology.o
-  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/traversal.o
-)
-
-if(CMK_MACOSX)
-  set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-darwin.o")
-elseif(CMK_WINDOWS)
-  set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-windows.o")
-else()
-  set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-linux.o")
-  set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-hardwired.o")
-endif()
-
-set_source_files_properties(
-  ${hwloc-objects}
-  PROPERTIES
-  EXTERNAL_OBJECT true
-  GENERATED true
-)
+# Hwloc
+include(cmake/hwloc.cmake)
 
 # Converse
 include(cmake/converse.cmake)
