@@ -775,11 +775,9 @@ ExternalProject_Add(hwloc
         CC_FOR_BUILD=$CHARM_CC \
         > /dev/null"
     BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-    COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
+    INSTALL_COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
-    INSTALL_COMMAND
-      echo
 )
 
 set(hwloc-objects
@@ -808,6 +806,7 @@ elseif(CMK_WINDOWS)
   set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-windows.o")
 else()
   set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-linux.o")
+  set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-hardwired.o")
 endif()
 
 set_source_files_properties(
