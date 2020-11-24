@@ -17,28 +17,6 @@ CkSyncBarrierInit::CkSyncBarrierInit(CkArgMsg* m)
   delete m;
 }
 
-class LBClient
-{
-public:
-  Chare* chare;
-  std::function<void()> fn;
-  int refcount;
-
-  LBClient(Chare* chare, std::function<void()> fn, int refcount)
-      : chare(chare), fn(fn), refcount(refcount)
-  {
-  }
-};
-
-class LBReceiver
-{
-public:
-  std::function<void()> fn;
-  int on;
-
-  LBReceiver(std::function<void()> fn, int on = 1) : fn(fn), on(on) {}
-};
-
 void CkSyncBarrier::reset()
 {
   if (rank0pe)
@@ -51,17 +29,37 @@ void CkSyncBarrier::reset()
     received_from_rank0 = false;
 }
 
-LDBarrierClient CkSyncBarrier::AddClient(Chare* chare, std::function<void()> fn)
+// Since AtSync() is global across all registered objects, the refcount should be consistent
+// across PEs. The incoming client might have called AtSync() before it gets migrated in, so
+// track it and check the barrier if necessary.
+LDBarrierClient CkSyncBarrier::AddClient(Chare* chare, std::function<void()> fn,
+                                         int refcount)
 {
-  LBClient* new_client = new LBClient(chare, fn, cur_refcount);
+  if (refcount == -1)
+    refcount = cur_refcount;
+  else if (refcount > cur_refcount)
+  {
+    // If the incoming client is ahead, then record those syncs and check the barrier if
+    // it can trigger. Do this asynchronously so that the caller functions for object
+    // construction finish first.
+    at_count += refcount - cur_refcount;
+    if (at_count >= clients.size())
+      thisProxy[thisIndex].CheckBarrier(false);
+  }
 
+  LBClient* new_client = new LBClient(chare, fn, refcount);
   return LDBarrierClient(clients.insert(clients.end(), new_client));
 }
 
 void CkSyncBarrier::RemoveClient(LDBarrierClient c)
 {
+  const auto refcount = (*c)->refcount;
+  if (refcount > cur_refcount)
+    at_count -= refcount - cur_refcount;
   delete *(c);
   clients.erase(c);
+  if (at_count >= clients.size())
+      thisProxy[thisIndex].CheckBarrier(false);
 }
 
 LDBarrierReceiver CkSyncBarrier::AddReceiver(std::function<void()> fn)
@@ -173,7 +171,7 @@ void CkSyncBarrier::CheckBarrier(bool flood_atsync)
 
     for (auto& c : clients)
     {
-      if (c->refcount < cur_refcount)
+      if (c->refcount <= cur_refcount)
       {
         at_barrier = false;
         break;
