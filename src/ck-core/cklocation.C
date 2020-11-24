@@ -1450,40 +1450,44 @@ CkMigratable::CkMigratable(CkMigrateMessage *m): Chare(m) {
 
 int CkMigratable::ckGetChareType(void) const {return thisChareType;}
 
-void CkMigratable::pup(PUP::er &p) {
-	DEBM((AA "In CkMigratable::pup %s\n" AB,idx2str(thisIndexMax)));
-	Chare::pup(p);
-	p|thisIndexMax;
-	p(usesAtSync);
-  p(can_reset);
-	p(usesAutoMeasure);
-#if CMK_LBDB_ON 
-	int readyMigrate = 0;
-	if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
-	p|readyMigrate;
-	if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
+void CkMigratable::pup(PUP::er& p)
+{
+  DEBM((AA "In CkMigratable::pup %s\n" AB, idx2str(thisIndexMax)));
+  Chare::pup(p);
+  p | thisIndexMax;
+  p | usesAtSync;
+  p | can_reset;
+  p | usesAutoMeasure;
+
+#if CMK_LBDB_ON
+  bool readyMigrate = false;
+  if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
+  p | readyMigrate;
+  if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
 #endif
-	if(p.isUnpacking()) barrierRegistered=false;
 
 #if CMK_FAULT_EVAC
-	p | asyncEvacuate;
-	if(p.isUnpacking()){myRec->AsyncEvacuate(asyncEvacuate);}
+  p | asyncEvacuate;
+  if (p.isUnpacking())
+  {
+    myRec->AsyncEvacuate(asyncEvacuate);
+  }
 #endif
 
-        int epoch = -1;
-        // Only pup epoch when migrating. Will result in problems if pup'd when
-        // checkpointing since it will not match the value of the freshly inited barrier
-        // upon restart
-        if (usesAtSync && p.isMigration())
-        {
-          if (p.isPacking())
-          {
-            epoch = (*ldBarrierHandle)->epoch;
-          }
-          p | epoch;
-        }
+  int epoch = -1;
+  // Only pup epoch when migrating. Will result in problems if pup'd when
+  // checkpointing since it will not match the value of the freshly inited barrier
+  // upon restart
+  if (usesAtSync && p.isMigration())
+  {
+    if (p.isPacking())
+    {
+      epoch = (*ldBarrierHandle)->epoch;
+    }
+    p | epoch;
+  }
 
-        ckFinishConstruction(epoch);
+  if (p.isUnpacking()) ckFinishConstruction(epoch);
 }
 
 void CkMigratable::ckDestroy(void) {}
