@@ -18,7 +18,6 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
 
 /* ### Beginning of Machine-startup Related Functions ### */
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID);
-void LrtsInitCommThread(int* argc, char*** argv, int* numNodes, int* myNodeID);
 
 void LrtsPreCommonInit(int everReturn);
 void LrtsPostCommonInit(int everReturn);

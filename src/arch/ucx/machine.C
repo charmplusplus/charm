@@ -251,18 +251,15 @@ static void UcxInitEps(int numNodes, int myId)
 // Should be called for every node (not PE)
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
-    int ret;
-
-    ret = runtime_init(myNodeID, numNodes);
-    UCX_CHECK_PMI_RET(ret, "runtime_init");
-}
-
-void LrtsInitCommThread(int* argc, char*** argv, int* numNodes, int* myNodeID)
-{
     ucp_params_t cParams;
     ucp_config_t *config;
     ucp_worker_params_t wParams;
     ucs_status_t status;
+    int ret;
+
+    ret = runtime_init(myNodeID, numNodes);
+    UCX_CHECK_PMI_RET(ret, "runtime_init");
+
     status = ucp_config_read("Charm++", NULL, &config);
     UCX_CHECK_STATUS(status, "ucp_config_read");
 
