@@ -18,10 +18,10 @@ class LBClient
 public:
   Chare* chare;
   std::function<void()> fn;
-  int refcount;
+  int epoch;
 
-  LBClient(Chare* chare, std::function<void()> fn, int refcount)
-      : chare(chare), fn(fn), refcount(refcount)
+  LBClient(Chare* chare, std::function<void()> fn, int epoch)
+      : chare(chare), fn(fn), epoch(epoch)
   {
   }
 };
@@ -45,7 +45,7 @@ private:
 
   std::vector<bool> rank_needs_flood;
 
-  int cur_refcount;
+  int cur_epoch;
   int at_count;
   bool on;
   bool rank0pe;
@@ -59,7 +59,7 @@ private:
   void init()
   {
     CkpvAccess(cksyncbarrierInited) = true;
-    cur_refcount = 1;
+    cur_epoch = 1;
     iter_no = -1;
     propagated_atsync_step = 0;
     at_count = 0;
@@ -93,11 +93,11 @@ public:
   void CheckBarrier(bool flood_atsync = false);
   void recvLbStart(int lb_step, int sourcenode, int pe);
 
-  LDBarrierClient AddClient(Chare* chare, std::function<void()> fn, int refcount = -1);
+  LDBarrierClient AddClient(Chare* chare, std::function<void()> fn, int epoch = -1);
   template <typename T>
-  inline LDBarrierClient AddClient(T* obj, void (T::*method)(void), int refcount = -1)
+  inline LDBarrierClient AddClient(T* obj, void (T::*method)(void), int epoch = -1)
   {
-    return AddClient((Chare*)obj, std::bind(method, obj), refcount);
+    return AddClient((Chare*)obj, std::bind(method, obj), epoch);
   }
 
   void RemoveClient(LDBarrierClient h);
