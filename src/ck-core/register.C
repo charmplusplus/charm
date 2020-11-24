@@ -102,15 +102,18 @@ void CkRegisterGroupIrr(int chareIndex,int isIrr){
 // TODO give a unique name to entry methods when calling CkRegisterEp
 // (no need has appeared for this so this is very low priority)
 
-void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+void CkRegisterGroupExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(GroupExt), TypeGroup);
   CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
 
   int epIdxCtor = CkRegisterEp(s, GroupExt::__GroupExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
   CkRegisterDefaultCtor(__idx, epIdxCtor);
 
-  for (int i=1; i < numEntryMethods; i++)
-    CkRegisterEp(s, GroupExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+  for (int i=emNamesStart + 1; i < emNamesStart+numEntryMethods; i++)
+    {
+      CkPrintf("Registering group entry method: %s\n", emNames[i]);
+      CkRegisterEp(emNames[i], GroupExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+    }
 
   *chareIdx = __idx;
   *startEpIdx = epIdxCtor;
