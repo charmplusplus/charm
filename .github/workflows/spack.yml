@@ -26,7 +26,7 @@ jobs:
         # Use this branch for testing, not master
         sed -i -e 's,="master",="${{ github.head_ref }}",' var/spack/repos/builtin/packages/charmpp/package.py
         
-        # 
+        # Add +setcpuaffinity option to TESTOPTS
         sed -i -e 's,\+\+local,++local +setcpuaffinity,' var/spack/repos/builtin/packages/charmpp/package.py
 
         # No need for automake/autoconf
