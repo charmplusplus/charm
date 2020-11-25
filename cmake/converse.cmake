@@ -210,6 +210,7 @@ add_library(converse
     ${tmgr-c-sources}
     ${tmgr-cxx-sources}
     ${tmgr-h-sources}
+    ${hwloc-objects}
     ${all-ci-outputs}
 )
 add_dependencies(converse hwloc)

@@ -738,56 +738,14 @@ endif()
 add_subdirectory(src/xlat-i)
 add_dependencies(charmxi create_symlinks)
 
+# Hwloc
+include(cmake/hwloc.cmake)
+
 # Converse
 include(cmake/converse.cmake)
 add_subdirectory(src/QuickThreads)
 add_subdirectory(src/util/boost-context)
 add_subdirectory(src/conv-core)
-
-# Hwloc
-if(${BUILD_SHARED})
-    set(hwloc_shared yes)
-else()
-    set(hwloc_shared no)
-endif()
-
-# Used to determine arguments to pass to hwloc's configure
-set(building_blocks_command "${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS}")
-
-# FIXME: copy .so
-set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
-include(ExternalProject)
-ExternalProject_Add(hwloc
-    URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
-    CONFIGURE_COMMAND
-      bash "-c" "eval $(${building_blocks_command}) && \
-        ${hwloc_dir}/configure \
-        --disable-cairo \
-        --disable-cuda \
-        --disable-gl \
-        --disable-libxml2 \
-        --disable-nvml \
-        --disable-opencl \
-        --disable-pci \
-        --disable-libudev \
-        --disable-visibility \
-        --enable-embedded-mode \
-        --enable-shared=${hwloc_shared} \
-        --enable-static \
-        --with-hwloc-symbol-prefix=cmi_ \
-        --without-x \
-        HWLOC_FLAGS=\"$CHARM_CC_FLAGS\" \
-        CFLAGS=\"$CHARM_CC_FLAGS\" \
-        CC=$CHARM_CC \
-        CC_FOR_BUILD=$CHARM_CC \
-        > /dev/null"
-    BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-    INSTALL_COMMAND test -f hwloc/.libs/libhwloc_embedded.lib && cp hwloc/.libs/libhwloc_embedded.lib hwloc/.libs/libhwloc_embedded.a || true # On Windows, the library is created as .lib
-    COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
-    COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
-    COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
-    COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
-)
 
 # LIBS
 if(${TARGET} STREQUAL "LIBS")
@@ -884,7 +842,7 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck converse memory-default threads-default hwloc_embedded ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
@@ -931,7 +889,6 @@ endforeach(l)
 if(NOT ${CMAKE_DL_LIBS} STREQUAL "")
     set(DL_LIB "-l${CMAKE_DL_LIBS}")
 endif()
-file(APPEND ${optfile_sh} "CMK_HWLOC_LIBS=\"-lhwloc_embedded -lm\"\n" )
 
 if (NOT CMK_WINDOWS)
   file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
