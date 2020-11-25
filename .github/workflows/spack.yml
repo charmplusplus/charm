@@ -44,4 +44,4 @@ jobs:
         spack compiler list
         # See bug #3167:
         [[ $(uname) == "Linux" ]] && smp="~smp"
-        spack install -v --test root charmpp@master
+        spack install -v --test root charmpp@master $smp
