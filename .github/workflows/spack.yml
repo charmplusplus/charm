@@ -36,4 +36,4 @@ jobs:
         source share/spack/setup-env.sh
         spack compiler find
         spack compiler list
-        spack install -v charmpp@master
+        spack install -v --test root charmpp@master
