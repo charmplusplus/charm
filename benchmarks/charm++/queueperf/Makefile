@@ -9,7 +9,7 @@ test: $(TARGETS)
 	$(call run, ./msgqtest  +p1)
 
 queueperf: pgm.C main.decl.h
-	$(CHARMC) -o $@ pgm.C
+	$(CHARMC) $(OPTS) -o $@ pgm.C
 
 msgqtest.C: main.decl.h
 
