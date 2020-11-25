@@ -11,8 +11,8 @@ test: $(TARGETS)
 smptest: $(TARGETS)
 
 queue: pgm.C main.decl.h
-	$(CHARMC) -c pgm.C
-	$(CHARMC) -o $@ pgm.o
+	$(CHARMC) $(OPTS) -c pgm.C
+	$(CHARMC) $(OPTS) -o $@ pgm.o
 
 msgqtest.C: main.decl.h
 
