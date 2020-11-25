@@ -25,6 +25,9 @@ jobs:
 
         # Use this branch for testing, not master
         sed -i -e 's,="master",="${{ github.head_ref }}",' var/spack/repos/builtin/packages/charmpp/package.py
+        
+        # 
+        sed -i -e 's,\+\+local,++local +setcpuaffinity,' var/spack/repos/builtin/packages/charmpp/package.py
 
         # No need for automake/autoconf
         sed -i -e '/automake/d' var/spack/repos/builtin/packages/charmpp/package.py
@@ -34,7 +37,6 @@ jobs:
       run: |
         cd ../spack
         source share/spack/setup-env.sh
-        export TESTOPTS="+setcpuaffinity ++local"
         spack compiler find
         spack compiler list
         spack install -v --test root charmpp@master
