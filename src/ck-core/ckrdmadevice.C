@@ -71,12 +71,14 @@ void CkRdmaDeviceRecvHandler(void* data) {
   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
   DeviceRdmaInfo* info = op->info;
 
-  // Invoke source callback
+  // TODO: Invoke source callback
+  /*
   if (op->cb) {
     CkCallback* cb = (CkCallback*)op->cb;
     cb->send();
     delete cb;
   }
+  */
 
   // Update counter (there may be multiple buffers in transit)
   info->counter++;
@@ -113,6 +115,56 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // Change message header to invoke regular entry method
   CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
 
+  // FIXME: Always use UCX
+  is_inline = false;
+
+  // Allocate and fill in metadata for this zerocopy operation
+  void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) * sizeof(DeviceRdmaOp) * numops);
+  CmiEnforce(rdma_data);
+  DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
+  rdma_info->n_ops = numops;
+  rdma_info->counter = 0;
+  //rdma_info->msg = env; // Reuse this message
+  size_t msg_size = 65;
+  CkMarshallMsg* new_msg = CkAllocateMarshallMsg(msg_size, NULL);
+  memcpy(new_msg->msgBuf, ((CkMarshallMsg*)EnvToUsr(env))->msgBuf, msg_size);
+  envelope* new_env = UsrToEnv(new_msg);
+  memcpy(new_env, env, sizeof(envelope));
+  rdma_info->msg = new_env;
+
+  // Start unpacking marshalled message
+  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
+  int received_numops;
+  up|received_numops;
+  CkAssert(numops == received_numops);
+
+  CkDeviceBuffer source;
+
+  // Unpack source buffer info and store for retrieval
+  for (int i = 0; i < numops; i++) {
+    up|source;
+
+    DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
+        + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
+    save_op.src_pe = source.src_pe;
+    save_op.src_ptr = source.ptr;
+    save_op.dest_pe = CkMyPe();
+    save_op.dest_ptr = arrPtrs[i];
+    save_op.size = (size_t)arrSizes[i];
+    save_op.info = rdma_info;
+    save_op.cb = new CkCallback(source.cb);
+    save_op.tag = source.tag;
+  }
+
+  // Post ucp_tag_recv_nb's to receive GPU data
+  for (int i = 0; i < numops; i++) {
+    DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
+        + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
+    QdCreate(1);
+    CmiRecvDevice(save_op);
+  }
+
+  /*
   // RDMA setup for inter-node communication
   void* rdma_data = NULL; // Used internally, should only be freed after RDMA completion
   DeviceRdmaOpMsg** rdma_msgs = NULL; // Converse messages sent to sender
@@ -129,16 +181,14 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
     // [1] Reuse env
     // Doesn't work, causes zero handler error
-    /*
     rdma_info->msg = env;
-    */
+
     // [2] Store a copy of the message
     // This doesn't work with GPU buffers for some reason (works with host buffers)
-    /*
     size_t msg_size = env->getTotalsize();
     rdma_info->msg = CmiAlloc(msg_size);
     memcpy(rdma_info->msg, env, msg_size);
-    */
+
     // [3] Copy CkMarshallMsg entirely
     // Otherwise regular entry method doesn't get invoked, with zero handler error
     // TODO: Find out why this is necessary, remove if it can be fixed
@@ -306,6 +356,7 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         CkMyPe(), avg_times[0], avg_times[1], avg_times[2], avg_times[3], avg_times[4], avg_times[5], avg_times[6]);
   }
 #endif
+  */
 
   return is_inline;
 }

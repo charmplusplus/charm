@@ -630,8 +630,10 @@ static inline int ProcessTxQueue()
 
             // Post the GET or PUT operation from the comm thread
             UcxRmaOp((NcpyOperationInfo *)(req->msgBuf), req->op);
+        }
+#endif
 #if CMK_CUDA
-        } else if (req->op == UCX_DEVICE_SEND_OP) { // Send device data
+        else if (req->op == UCX_DEVICE_SEND_OP) { // Send device data
           ucs_status_ptr_t status_ptr;
           status_ptr = ucp_tag_send_nb(ucxCtx.eps[req->dNode], req->msgBuf,
                                        req->size, ucp_dt_make_contig(1),
@@ -653,11 +655,17 @@ static inline int ProcessTxQueue()
                                        req->recv_cb);
           CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
 
-          // Callback function is always invoked for receive, store necessary info in request
-          UcxRequest* store_req = (UcxRequest*)status_ptr;
-          store_req->device_op = req->device_op;
-          store_req->msgBuf = req->msgBuf;
-#endif
+          UcxRequest* ret_req = (UcxRequest*)status_ptr;
+          if (ret_req->completed) {
+            // Recv was completed immediately
+            CmiInvokeRecvHandler(req->device_op);
+            UCX_REQUEST_FREE(ret_req);
+          } else {
+            // Recv wasn't completed immediately, recv_cb will be invoked
+            // sometime later
+            ret_req->device_op = req->device_op;
+            ret_req->msgBuf = req->msgBuf;
+          }
         }
 #endif
         else {
@@ -799,15 +807,22 @@ void UcxRecvDeviceCompleted(void* request, ucs_status_t status,
                             ucp_tag_recv_info_t* info)
 {
   UcxRequest* req = (UcxRequest*)request;
-  DeviceRdmaOp* device_op = req->device_op;
 
   if (ucs_unlikely(status == UCS_ERR_CANCELED)) return;
   CmiEnforce(status == UCS_OK);
 
-  // Invoke recv handler since data transfer is complete
-  CmiInvokeRecvHandler(device_op);
+  if (req->msgBuf != NULL) {
+    // Request was completed sometime after ucp_tag_recv_nb
+    DeviceRdmaOp* device_op = req->device_op;
 
-  UCX_REQUEST_FREE(req);
+    // Invoke recv handler since data transfer is complete
+    CmiInvokeRecvHandler(device_op);
+    UCX_REQUEST_FREE(req);
+  } else {
+    // Request was completed immediately
+    // Handle recv in the caller
+    req->completed = 1;
+  }
 }
 
 void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
@@ -824,23 +839,7 @@ void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
   PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
   // TODO
-#endif // CMK_SMP
-}
-
-/*
-void LrtsSendDevice(DeviceRdmaOp* op)
-{
-#if CMK_SMP
-  UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
-  req->msgBuf = (void*)op->src_ptr;
-  req->size   = op->size;
-  req->tag    = UCX_MSG_TAG_DEVICE;
-  req->dNode  = CmiNodeOf(op->dest_pe);
-  req->cb     = UcxSendDeviceCompleted;
-  req->op     = UCX_DEVICE_SEND_OP;
-
-  PCQueuePush(ucxCtx.txQueue, (char *)req);
-#else
+  /*
   UcxRequest *req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[CmiNodeOf(op->dest_pe)],
                                                  op->src_ptr, op->size,
                                                  ucp_dt_make_contig(1),
@@ -856,9 +855,9 @@ void LrtsSendDevice(DeviceRdmaOp* op)
     req->device_op = op;
     req->msgBuf = (void*)op->src_ptr;
   }
-#endif
+  */
+#endif // CMK_SMP
 }
-*/
 
 void LrtsRecvDevice(DeviceRdmaOp* op)
 {
@@ -866,14 +865,16 @@ void LrtsRecvDevice(DeviceRdmaOp* op)
   UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
   req->msgBuf    = (void*)op->dest_ptr;
   req->size      = op->size;
-  req->tag       = UCX_MSG_TAG_DEVICE;
+  req->tag       = op->tag;
   req->op        = UCX_DEVICE_RECV_OP;
   req->device_op = op;
-  req->mask      = UCX_MSG_TAG_MASK;
+  req->mask      = UCX_MSG_TAG_MASK_FULL;
   req->recv_cb   = UcxRecvDeviceCompleted;
 
   PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
+  // TODO
+  /*
   UcxRequest* req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, (void*)op->dest_ptr,
                                                  op->size, ucp_dt_make_contig(1),
                                                  UCX_MSG_TAG_DEVICE,
@@ -885,6 +886,7 @@ void LrtsRecvDevice(DeviceRdmaOp* op)
   // Callback function is always invoked for receive, store necessary info in request
   req->device_op = op;
   req->msgBuf = (void*)op->dest_ptr;
+  */
 #endif
 }
 #endif // CMK_CUDA

@@ -79,13 +79,9 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
 
 typedef void (*RdmaAckCallerFn)(void *token);
 
-void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
-void CmiRdmaDeviceSendInit();
-void CmiRdmaDeviceIssueRget(DeviceRdmaOpMsg* msg, DeviceRdmaOp* op);
-
-//void CmiSendDevice(DeviceRdmaOp* op);
 void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
 void CmiRecvDevice(DeviceRdmaOp* op);
+void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
 
 #endif // CMK_CUDA
 

@@ -74,6 +74,7 @@ typedef struct DeviceRdmaOp_ {
   size_t size;
   DeviceRdmaInfo* info;
   void* cb;
+  uint64_t tag;
 } DeviceRdmaOp;
 
 typedef struct DeviceRdmaOpMsg_ {
