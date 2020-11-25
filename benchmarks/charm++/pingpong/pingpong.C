@@ -23,11 +23,11 @@ class Fancy
 class CkArrayIndexFancy : public CkArrayIndex {
   Fancy *f;
   public:
-    CkArrayIndexFancy(const char *str)
+    CkArrayIndexFancy(const char *str) 
     {
         /// Use placement new to ensure that the custom index object is placed in the memory reserved for it in the base class
         f = new (index) Fancy(str);
-        nInts=3;
+        nInts=3; 
     }
     friend bool operator< (const CkArrayIndexFancy &lhs, const CkArrayIndexFancy &rhs) { return (lhs.f < rhs.f); }
 };
@@ -43,18 +43,18 @@ class PingMsg : public CMessage_PingMsg
 class FragMsg : public CMessage_FragMsg
 {
   public:
-    char *x;
-    int fragmentId;
-    int numFragments;
-    int pipeSize;
+    char *x; 
+    int fragmentId; 
+    int numFragments; 
+    int pipeSize; 
     bool copy;
-    bool allocate;
+    bool allocate; 
 
-  FragMsg(int sequenceNumber, int total, int size, bool copyFragments,
-          bool allocMsgs)
-    : fragmentId(sequenceNumber), numFragments(total), pipeSize(size),
+  FragMsg(int sequenceNumber, int total, int size, bool copyFragments, 
+          bool allocMsgs) 
+    : fragmentId(sequenceNumber), numFragments(total), pipeSize(size), 
       copy(copyFragments), allocate(allocMsgs) {}
-
+  
 };
 
 class IdMsg : public CMessage_IdMsg
@@ -83,7 +83,7 @@ class main : public CBase_main
   CProxy_PingG gid;
   CProxy_PingN ngid;
   CProxy_PingMarshall arrM;
-  bool warmupRun;
+  bool warmupRun; 
 public:
   main(CkMigrateMessage *m) {}
   main(CkArgMsg* m)
@@ -124,7 +124,7 @@ public:
     arrF[CkArrayIndexFancy("second")].insert(P2);
     arrF.doneInserting();
     phase=0;
-    warmupRun = true;
+    warmupRun = true; 
     CkStartQD(CkCallback(CkIndex_main::maindone(), mainProxy));
     delete m;
   };
@@ -152,33 +152,33 @@ public:
       case 5:
         cid.start(reportTime);
         break;
-      case 6:
-        isPipelined = false;
+      case 6:       
+        isPipelined = false; 
         copyFragments = false;
-        allocMsgs = false;
+        allocMsgs = false; 
         gid[0].start(reportTime, isPipelined, copyFragments, allocMsgs, 0);
         break;
-      case 7:
-        isPipelined = true;
+      case 7: 
+        isPipelined = true; 
         copyFragments = false;
         allocMsgs = false;
         gid[0].start(reportTime, isPipelined, copyFragments, allocMsgs, pipeSize);
         break;
       case 8:
-        isPipelined = true;
-        copyFragments = false;
+        isPipelined = true; 
+        copyFragments = false; 
         allocMsgs = true;
         gid[0].start(reportTime, isPipelined, copyFragments, allocMsgs, pipeSize);
         break;
       case 9:
-        isPipelined = true;
-        copyFragments = true;
+        isPipelined = true; 
+        copyFragments = true; 
         allocMsgs = true;
         gid[0].start(reportTime, isPipelined, copyFragments, allocMsgs, pipeSize);
-        // repeat pipelined test for different fragment sizes
+        // repeat pipelined test for different fragment sizes 
         if (!warmupRun && pipeSize < .5 * payload) {
-          pipeSize *= 2;
-          phase = 5;
+          pipeSize *= 2; 
+          phase = 5; 
         }
         break;
       case 10:
@@ -189,26 +189,26 @@ public:
         CkExit();
     }
     if (!warmupRun) {
-      phase++;
+      phase++; 
     }
-    warmupRun = !warmupRun;
+    warmupRun = !warmupRun; 
   };
 };
 
 class PingG : public CBase_PingG
 {
-  bool printResult;
+  bool printResult; 
   CProxyElement_PingG *pp;
   int niter;
   int me, nbr;
   double start_time, end_time;
   PingMsg *collectedMsg;
   FragMsg **fragments;
-  int numFragmentsReceived;
-  int numFragmentsTotal;
-  bool copyFragments;
-  bool allocateMsgs;
-  int pipeSize;
+  int numFragmentsReceived; 
+  int numFragmentsTotal; 
+  bool copyFragments; 
+  bool allocateMsgs; 
+  int pipeSize; 
 
   // for recv_zerocopy having an nocopy parameter
   char *zerocopyMsg;
@@ -219,8 +219,8 @@ public:
     nbr = (me+1)%CkNumPes();
     pp = new CProxyElement_PingG(thisgroup,nbr);
     niter = 0;
-    numFragmentsReceived = 0;
-    numFragmentsTotal = -1;
+    numFragmentsReceived = 0; 
+    numFragmentsTotal = -1; 
 
     // Unlike other entry methods, the entry method with the nocopy parameter
     // uses a character buffer
@@ -230,31 +230,31 @@ public:
   void start(bool reportTime, bool isPipelined, bool copy, bool allocate, int fragSize)
   {
     niter = 0;
-    printResult = reportTime;
-    pipeSize = fragSize;
+    printResult = reportTime; 
+    pipeSize = fragSize;     
     copyFragments = copy;
-    allocateMsgs = allocate;
+    allocateMsgs = allocate; 
     PingMsg *msg = new (payload) PingMsg;
     if (isPipelined) {
-      // CkPrintf("[%d] allocating collected msg\n", CkMyPe());
+      // CkPrintf("[%d] allocating collected msg\n", CkMyPe()); 
       collectedMsg = msg;
-      numFragmentsTotal = (payload + pipeSize - 1) / pipeSize;
-      // CkPrintf("[%d] allocating fragments \n", CkMyPe());
-      fragments = new FragMsg*[numFragmentsTotal];
-      int fragmentSize = pipeSize;
-      if (!allocateMsgs) {
+      numFragmentsTotal = (payload + pipeSize - 1) / pipeSize; 
+      // CkPrintf("[%d] allocating fragments \n", CkMyPe()); 
+      fragments = new FragMsg*[numFragmentsTotal]; 
+      int fragmentSize = pipeSize; 
+      if (!allocateMsgs) {        
         // allocate once and reuse
         for (int i = 0; i < numFragmentsTotal; i++) {
           if (i == numFragmentsTotal - 1) {
-            fragmentSize = payload - i * fragmentSize;
+            fragmentSize = payload - i * fragmentSize;  
           }
-          // CkPrintf("[%d] allocating %d\n", CkMyPe(), i);
-          fragments[i] = new (fragmentSize)
-            FragMsg(i, numFragmentsTotal, fragmentSize, copyFragments,
-                    allocateMsgs);
+          // CkPrintf("[%d] allocating %d\n", CkMyPe(), i); 
+          fragments[i] = new (fragmentSize) 
+            FragMsg(i, numFragmentsTotal, fragmentSize, copyFragments, 
+                    allocateMsgs); 
         }
       }
-      pipelinedSend();
+      pipelinedSend(); 
     }
     else {
       start_time = CkWallTimer();
@@ -306,48 +306,48 @@ public:
   }
 
   void pipelinedSend() {
-    int fragmentSize = pipeSize;
-    FragMsg *fragMsg;
-    for (int i = 0; i < numFragmentsTotal; i++) {
+    int fragmentSize = pipeSize; 
+    FragMsg *fragMsg; 
+    for (int i = 0; i < numFragmentsTotal; i++) {      
       if (i == numFragmentsTotal - 1) {
-        fragmentSize = payload - i * fragmentSize;
+        fragmentSize = payload - i * fragmentSize;  
       }
       if (allocateMsgs) {
-        // CkPrintf("[%d] allocating %d\n", CkMyPe(), i);
-        fragMsg = new (fragmentSize)
-          FragMsg(i, numFragmentsTotal, fragmentSize, copyFragments, allocateMsgs);
+        // CkPrintf("[%d] allocating %d\n", CkMyPe(), i); 
+        fragMsg = new (fragmentSize) 
+          FragMsg(i, numFragmentsTotal, fragmentSize, copyFragments, allocateMsgs); 
       }
       else {
-        fragMsg = fragments[i];
+        fragMsg = fragments[i]; 
       }
       if (copyFragments) {
-        // CkPrintf("[%d] copying %d\n", CkMyPe(), i);
-        memcpy(fragMsg->x, ((char *) collectedMsg ) + i * pipeSize, fragmentSize);
+        // CkPrintf("[%d] copying %d\n", CkMyPe(), i); 
+        memcpy(fragMsg->x, ((char *) collectedMsg ) + i * pipeSize, fragmentSize); 
       }
-      // CkPrintf("[%d] sending %d\n", CkMyPe(), i);
+      // CkPrintf("[%d] sending %d\n", CkMyPe(), i); 
       (*pp).pipelinedRecv(fragMsg);
     }
     if (copyFragments) {
-      // CkPrintf("[%d] deleting collectedMsg \n", CkMyPe());
-      delete collectedMsg;
-      collectedMsg = NULL;
+      // CkPrintf("[%d] deleting collectedMsg \n", CkMyPe()); 
+      delete collectedMsg; 
+      collectedMsg = NULL; 
     }
   }
 
   // local function
   void setupPipelinedRecv(FragMsg *msg) {
       if (me == 1) {
-        numFragmentsTotal = msg->numFragments;
-        pipeSize = msg->pipeSize;
+        numFragmentsTotal = msg->numFragments; 
+        pipeSize = msg->pipeSize; 
         if (niter == 0) {
-          // CkPrintf("[%d] allocating fragments\n", CkMyPe());
-          fragments = new FragMsg*[numFragmentsTotal];
-          copyFragments = msg->copy;
+          // CkPrintf("[%d] allocating fragments\n", CkMyPe()); 
+          fragments = new FragMsg*[numFragmentsTotal]; 
+          copyFragments = msg->copy; 
           allocateMsgs = msg->allocate;
         }
       }
       if (copyFragments) {
-        // CkPrintf("[%d] allocating collectedMsg\n", CkMyPe());
+        // CkPrintf("[%d] allocating collectedMsg\n", CkMyPe()); 
         collectedMsg = new (payload) PingMsg();
       }
       else {
@@ -364,7 +364,7 @@ public:
         CkPrintf("Roundtrip time for Groups "
                  "(%d KB pipe, %s memcpy, "
                  "%s allocs) is %lf us\n",
-                 pipeSize / 1024,
+                 pipeSize / 1024, 
                  copyFragments ? "w/" : "no",
                  allocateMsgs  ? "w/" : "no",
                  1.0e6*(end_time-start_time)/titer);
@@ -372,42 +372,42 @@ public:
       // if fragments were being kept for resending, delete them here
       if (!allocateMsgs) {
         for (int i = 0; i < numFragmentsTotal; i++) {
-          // CkPrintf("[%d] deleting fragments %d\n", CkMyPe(), i);
-          delete fragments[i];
-          fragments[i] = NULL;
+          // CkPrintf("[%d] deleting fragments %d\n", CkMyPe(), i); 
+          delete fragments[i]; 
+          fragments[i] = NULL; 
         }
       }
-      // CkPrintf("[%d] deleting collectedMsg \n", CkMyPe());
-      delete collectedMsg;
+      // CkPrintf("[%d] deleting collectedMsg \n", CkMyPe()); 
+      delete collectedMsg; 
       mainProxy.maindone();
     }
     else {
       // reply for last iteration
-      pipelinedSend();
+      pipelinedSend(); 
     }
-    // CkPrintf("[%d] deleting fragments \n", CkMyPe());
-    delete [] fragments;
-    fragments = NULL;
+    // CkPrintf("[%d] deleting fragments \n", CkMyPe()); 
+    delete [] fragments; 
+    fragments = NULL; 
   }
 
   void pipelinedRecv(FragMsg *msg) {
-    //    CkPrintf("[%d] receiving fragment %d of %d\n", CkMyPe(), msg->fragmentId + 1,
+    //    CkPrintf("[%d] receiving fragment %d of %d\n", CkMyPe(), msg->fragmentId + 1, 
     //       msg->numFragments);
     if (numFragmentsReceived == 0) {
       setupPipelinedRecv(msg);
     }
-    numFragmentsReceived++;
+    numFragmentsReceived++; 
     if (copyFragments) {
-      // CkPrintf("[%d] copying received %d\n", CkMyPe(), msg->fragmentId);
-      memcpy(&collectedMsg->x[msg->fragmentId * pipeSize], msg->x, msg->pipeSize);
+      // CkPrintf("[%d] copying received %d\n", CkMyPe(), msg->fragmentId); 
+      memcpy(&collectedMsg->x[msg->fragmentId * pipeSize], msg->x, msg->pipeSize); 
     }
     if (allocateMsgs) {
-      // CkPrintf("[%d] deleting %d\n", CkMyPe(), msg->fragmentId);
-      delete msg;
-      msg = NULL;
+      // CkPrintf("[%d] deleting %d\n", CkMyPe(), msg->fragmentId); 
+      delete msg; 
+      msg = NULL; 
     }
     else {
-      fragments[msg->fragmentId] = msg;
+      fragments[msg->fragmentId] = msg; 
     }
     if (numFragmentsReceived == numFragmentsTotal) {
       niter++;
@@ -422,7 +422,7 @@ public:
         finishPipelinedTest();
       }
       else {
-        pipelinedSend();
+        pipelinedSend(); 
       }
     }
   }
@@ -431,7 +431,7 @@ public:
 
 class PingN : public CBase_PingN
 {
-  bool printResult;
+  bool printResult; 
   int niter;
   int me, nbr;
   CkNcpyBuffer mySrcInfo, otherDestInfo;
@@ -481,14 +481,14 @@ public:
   }
   void start(bool reportTime)
   {
-    niter = 0;
-    printResult = reportTime;
+    niter = 0; 
+    printResult = reportTime; 
     start_time = CkWallTimer();
     thisProxy[nbr].recv(new (payload) PingMsg);
   }
   void startRDMA(bool reportTime)
   {
-    printResult = reportTime;
+    printResult = reportTime; 
     niter=0;
     start_time = CkWallTimer();
 
@@ -576,7 +576,7 @@ public:
 
 class Ping1 : public CBase_Ping1
 {
-  bool printResult;
+  bool printResult; 
   CProxy_Ping1 *pp;
   int niter;
   double start_time, end_time;
@@ -597,7 +597,7 @@ public:
   void start(bool reportTime)
   {
     niter = 0;
-    printResult = reportTime;
+    printResult = reportTime; 
     (*pp)[1].recv(new (payload) PingMsg);
     start_time = CkWallTimer();
   }
@@ -670,7 +670,7 @@ public:
 
 class Ping2 : public CBase_Ping2
 {
-  bool printResult;
+  bool printResult; 
   CProxy_Ping2 *pp;
   int niter;
   double start_time, end_time;
@@ -684,7 +684,7 @@ public:
   void start(bool reportTime)
   {
     niter = 0;
-    printResult = reportTime;
+    printResult = reportTime; 
     (*pp)(0,1).recv(new (payload) PingMsg);
     start_time = CkWallTimer();
   }
@@ -710,7 +710,7 @@ public:
 
 class Ping3 : public CBase_Ping3
 {
-  bool printResult;
+  bool printResult; 
   CProxy_Ping3 *pp;
   int niter;
   double start_time, end_time;
@@ -724,7 +724,7 @@ public:
   void start(bool reportTime)
   {
     niter = 0;
-    printResult = reportTime;
+    printResult = reportTime; 
     (*pp)(0,0,1).recv(new (payload) PingMsg);
     start_time = CkWallTimer();
   }
@@ -750,7 +750,7 @@ public:
 
 class PingF : public CBase_PingF
 {
-  bool printResult;
+  bool printResult; 
   CProxy_PingF *pp;
   int niter;
   double start_time, end_time;
@@ -766,7 +766,7 @@ public:
   void start(bool reportTime)
   {
     niter = 0;
-    printResult = reportTime;
+    printResult = reportTime; 
     (*pp)[CkArrayIndexFancy("second")].recv(new (payload) PingMsg);
     start_time = CkWallTimer();
   }
@@ -794,7 +794,7 @@ public:
 
 class PingC : public CBase_PingC
 {
-  bool printResult;
+  bool printResult; 
   CProxy_PingC *pp;
   int niter;
   double start_time, end_time;
@@ -825,7 +825,7 @@ class PingC : public CBase_PingC
   void start(bool reportTime)
   {
     niter = 0;
-    printResult = reportTime;
+    printResult = reportTime; 
     niter = 0;
     pp->recvReuse(new (payload) PingMsg);
     start_time = CkWallTimer();
@@ -930,7 +930,7 @@ class PingC : public CBase_PingC
 
 class PingMarshall : public CBase_PingMarshall
 {
-  bool printResult;
+  bool printResult; 
   CProxy_PingMarshall *pp;
   int niter;
   double start_time, end_time;
@@ -947,7 +947,7 @@ public:
   void start(bool reportTime)
   {
     niter = 0;
-    printResult = reportTime;
+    printResult = reportTime; 
     (*pp)(1).recv(data, payload);
     start_time = CkWallTimer();
   }
