@@ -6,7 +6,7 @@ all: integrate
 integrate: pgm.o
 	$(CHARMC) pgm.o  -o integrate -language charm++
 
-integrate.o : pgm.C pgm.h pgm.ci
+pgm.o : pgm.C pgm.h pgm.ci
 	$(CHARMC) -c pgm.ci pgm.C
 
 clean:
