@@ -34,6 +34,7 @@ jobs:
       run: |
         cd ../spack
         source share/spack/setup-env.sh
+        export TESTOPTS="+setcpuaffinity ++local"
         spack compiler find
         spack compiler list
         spack install -v --test root charmpp@master
