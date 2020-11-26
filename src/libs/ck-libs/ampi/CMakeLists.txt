@@ -455,7 +455,7 @@ add_library(moduleampi
     ${ampi-h-sources}
     ${romio-objects}
 )
-target_compile_options(moduleampi PRIVATE -DAMPI_NO_UNIMPLEMENTED_WARNINGS -language ampi)
+target_compile_options(moduleampi PRIVATE -DAMPI_NO_UNIMPLEMENTED_WARNINGS -I${CMAKE_BINARY_DIR}/include/ampi/)
 add_dependencies(moduleampi moduletcharm ck)
 
 
@@ -467,15 +467,15 @@ if(${CMK_CAN_LINK_FORTRAN})
         ${romio-objects}
         ${romio-fortran-objects}
     )
-    target_compile_options(moduleampif PRIVATE -DAMPI_NO_UNIMPLEMENTED_WARNINGS -language ampi)
+    target_compile_options(moduleampif PRIVATE -DAMPI_NO_UNIMPLEMENTED_WARNINGS -I${CMAKE_BINARY_DIR}/include/ampi/)
     add_dependencies(moduleampif moduletcharm ck)
 
     add_library(ampif OBJECT ampif.C)
-    target_compile_options(ampif PRIVATE -language ampi)
+    target_compile_options(ampif PRIVATE -I${CMAKE_BINARY_DIR}/include/ampi/)
     add_library(ampifimpl OBJECT ampifimpl.f90)
-    target_compile_options(ampifimpl PRIVATE -language ampi)
+    target_compile_options(ampifimpl PRIVATE -I${CMAKE_BINARY_DIR}/include/ampi/)
     add_library(ampimod OBJECT ampimod.f90)
-    target_compile_options(ampimod PRIVATE -cpmod -language ampi)
+    target_compile_options(ampimod PRIVATE -cpmod -I${CMAKE_BINARY_DIR}/include/ampi/)
     add_dependencies(ampif ck)
     add_dependencies(ampifimpl ck)
     add_dependencies(ampimod ck)
