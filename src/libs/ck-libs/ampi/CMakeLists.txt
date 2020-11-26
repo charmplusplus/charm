@@ -142,7 +142,7 @@ configure_file(libmoduleampif.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
 # ROMIO
 set(romio-objects)
 set(romio-fortran-objects)
-if(${CMK_AMPI_WITH_ROMIO})
+if(CMK_AMPI_WITH_ROMIO)
     set(romio_dir ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio)
 
     if(CMK_WINDOWS)
@@ -322,7 +322,7 @@ if(${CMK_AMPI_WITH_ROMIO})
         ${romio_dir}/mpi-io/write_sh${obj_suf}
     )
 
-    if(${CMK_CAN_LINK_FORTRAN})
+    if(CMK_CAN_LINK_FORTRAN)
         set(romio_f77 yes)
 
         set(romio-fortran-objects
@@ -459,7 +459,7 @@ target_compile_options(moduleampi PRIVATE -DAMPI_NO_UNIMPLEMENTED_WARNINGS -I${C
 add_dependencies(moduleampi moduletcharm ck)
 
 
-if(${CMK_CAN_LINK_FORTRAN})
+if(CMK_CAN_LINK_FORTRAN)
     add_library(moduleampif
         ${ampi-f90-sources}
         ${ampi-cxx-sources}
@@ -490,7 +490,7 @@ if(${CMK_CAN_LINK_FORTRAN})
 endif()
 
 
-if(${CMK_AMPI_WITH_ROMIO})
+if(CMK_AMPI_WITH_ROMIO)
     add_dependencies(moduleampi romio)
     if(CMK_CAN_LINK_FORTRAN)
         add_dependencies(moduleampif romio)
