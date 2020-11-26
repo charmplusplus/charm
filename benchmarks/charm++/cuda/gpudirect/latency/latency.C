@@ -77,19 +77,24 @@ class Main : public CBase_Main {
   void initDone() {
     CkPrintf("Starting %s test...\n", zerocopy ? "zerocopy" : "regular");
     cur_size = min_size;
-    testBegin(cur_size, zerocopy);
+    testSetup();
   }
 
-  void testBegin(size_t size, bool zerocopy) {
+  void testSetup() {
+    // Tell chares to memset their GPU data, will reduce back to testStart
+    block_proxy.memset(cur_size);
+  }
+
+  void testStart() {
     // Start ping
-    block_proxy[0].send(size, zerocopy);
+    block_proxy[0].send(cur_size, zerocopy);
   }
 
   void testEnd() {
     cur_size *= 2;
     if (cur_size <= max_size) {
       // Proceed to next message size
-      thisProxy.testBegin(cur_size, zerocopy);
+      thisProxy.testSetup();
     } else {
       if (!zerocopy) {
         // Regular case done, proceed to zerocopy case
@@ -175,6 +180,14 @@ public:
 
     // Reduce back to main
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
+  }
+
+  void memset(size_t size) {
+    hapiCheck(cudaMemset(d_local_data, 'a', size));
+    hapiCheck(cudaMemset(d_remote_data, 'b', size));
+
+    // Reduce back to main
+    contribute(CkCallback(CkReductionTarget(Main, testStart), main_proxy));
   }
 
   void send(size_t size, bool zerocopy) {
