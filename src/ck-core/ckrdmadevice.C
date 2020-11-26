@@ -156,6 +156,11 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     save_op.tag = source.tag;
   }
 
+#if TIMING_BREAKDOWN
+  total_times[1] += CkWallTimer() - start_time;
+  start_time = CkWallTimer();
+#endif
+
   // Post ucp_tag_recv_nb's to receive GPU data
   for (int i = 0; i < numops; i++) {
     DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
@@ -163,6 +168,13 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     QdCreate(1);
     CmiRecvDevice(save_op);
   }
+
+#if TIMING_BREAKDOWN
+  total_times[2] += CkWallTimer() - start_time;
+  if (count == N_COUNT) {
+    CkPrintf("!!! %lf us, %lf us\n", total_times[1] / count * 1e6, total_times[2] / count * 1e6);
+  }
+#endif
 
   /*
   // RDMA setup for inter-node communication

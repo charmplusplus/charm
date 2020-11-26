@@ -253,7 +253,7 @@ static void UcxInitEps(int numNodes, int myId)
 }
 
 // Should be called for every node (not PE)
-// XXX: Seems to be called from every PE (excluding comm threads)
+// Only invoked by comm threads
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
     ucp_params_t cParams;
@@ -645,7 +645,6 @@ static inline int ProcessTxQueue()
           } else {
             // Callback function will be invoked once send completes
             UcxRequest* store_req = (UcxRequest*)status_ptr;
-            store_req->device_op = req->device_op;
             store_req->msgBuf = req->msgBuf;
           }
         } else if (req->op == UCX_DEVICE_RECV_OP) { // Recv device data
