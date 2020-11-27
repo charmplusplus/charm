@@ -42,6 +42,7 @@ class CkSyncBarrier : public CBase_CkSyncBarrier
 private:
   std::list<LBClient*> clients;
   std::list<LBReceiver*> receivers;
+  std::list<LBReceiver*> endReceivers;
 
   std::vector<bool> rank_needs_flood;
 
@@ -101,6 +102,9 @@ public:
   }
 
   void RemoveClient(LDBarrierClient h);
+
+  // A receiver is a callback function that is called when all of the clients on this PE
+  // reach this barrier
   LDBarrierReceiver AddReceiver(std::function<void()> fn);
   template <typename T>
   inline LDBarrierReceiver AddReceiver(T* obj, void (T::*method)(void))
@@ -108,7 +112,17 @@ public:
     return AddReceiver(std::bind(method, obj));
   }
 
+  // An end receiver is a callback function that is called when the receivers on this PE
+  // have finished executing, right before the clients are resumed
+  LDBarrierReceiver AddEndReceiver(std::function<void()> fn);
+  template <typename T>
+  inline LDBarrierReceiver AddEndReceiver(T* obj, void (T::*method)(void))
+  {
+    return AddEndReceiver(std::bind(method, obj));
+  }
+
   void RemoveReceiver(LDBarrierReceiver h);
+  void RemoveEndReceiver(LDBarrierReceiver h);
   void TurnOnReceiver(LDBarrierReceiver h);
   void TurnOffReceiver(LDBarrierReceiver h);
   void AtBarrier(LDBarrierClient _n_c, bool flood_atsync = false);

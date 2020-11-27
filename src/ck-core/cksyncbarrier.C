@@ -69,10 +69,22 @@ LDBarrierReceiver CkSyncBarrier::AddReceiver(std::function<void()> fn)
   return LDBarrierReceiver(receivers.insert(receivers.end(), new_receiver));
 }
 
+LDBarrierReceiver CkSyncBarrier::AddEndReceiver(std::function<void()> fn)
+{
+  LBReceiver* new_receiver = new LBReceiver(fn);
+  return LDBarrierReceiver(endReceivers.insert(endReceivers.end(), new_receiver));
+}
+
 void CkSyncBarrier::RemoveReceiver(LDBarrierReceiver c)
 {
   delete *(c);
   receivers.erase(c);
+}
+
+void CkSyncBarrier::RemoveEndReceiver(LDBarrierReceiver c)
+{
+  delete *(c);
+  endReceivers.erase(c);
 }
 
 void CkSyncBarrier::TurnOnReceiver(LDBarrierReceiver c) { (*c)->on = 1; }
@@ -202,6 +214,13 @@ void CkSyncBarrier::CallReceivers(void)
 
 void CkSyncBarrier::ResumeClients(void)
 {
+  for (auto& er : endReceivers)
+  {
+    if (er->on)
+    {
+      er->fn();
+    }
+  }
   for (auto& c : clients) c->fn();
 
   reset();
