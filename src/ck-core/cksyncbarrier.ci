@@ -9,7 +9,7 @@ module CkSyncBarrier {
     entry void CkSyncBarrier(void);
     entry void ResumeClients();
     entry void recvLbStart(int lb_step, int sourcenode, int pe);
-    entry void CheckBarrier(bool flood_atsync);
+    entry void CheckBarrier();
   };
 
 };
