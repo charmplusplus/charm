@@ -2087,8 +2087,8 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 
 CkLocMgr::~CkLocMgr() {
 #if CMK_LBDB_ON
-  syncBarrier->RemoveClient(lbBarrierClient);
   syncBarrier->RemoveReceiver(lbBarrierReceiver);
+  syncBarrier->RemoveEndReceiver(lbBarrierEndReceiver);
   lbmgr->UnregisterOM(myLBHandle);
 #endif
   map->unregisterArray(mapHandle);
@@ -3279,19 +3279,15 @@ void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 	// Tell the lbdb that I'm registering objects
 	lbmgr->RegisteringObjects(myLBHandle);
 
-	/*Set up the dummy barrier-- the load balancer needs
-	  us to call Registering/DoneRegistering during each AtSync,
-	  and this is the only way to do so.
-	*/
+	// Set up callbacks for this LocMgr to call Registering/DoneRegistering during
+	// each AtSync.
 	lbBarrierReceiver = syncBarrier->AddReceiver([=]() {
 	  DEBL((AA "CkLocMgr AtSync Receiver called\n" AB));
 	  lbmgr->RegisteringObjects(myLBHandle);
 	});
-	lbBarrierClient = syncBarrier->AddClient(this, [=]() {
+	lbBarrierEndReceiver = syncBarrier->AddEndReceiver([=]() {
 	  lbmgr->DoneRegisteringObjects(myLBHandle);
-	  syncBarrier->AtBarrier(lbBarrierClient);
 	});
-	syncBarrier->AtBarrier(lbBarrierClient);
 }
 
 void CkLocMgr::startInserting(void)
