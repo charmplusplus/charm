@@ -19,9 +19,11 @@ CkSyncBarrierInit::CkSyncBarrierInit(CkArgMsg* m)
 
 void CkSyncBarrier::reset()
 {
+  startedAtSync = false;
+
   if (rank0pe)
   {
-    std::fill(rank_needs_flood.begin(), rank_needs_flood.end(), true);
+    std::fill(rank_needs_kick.begin(), rank_needs_kick.end(), true);
     received_from_left = false;
     received_from_right = false;
   }
@@ -43,8 +45,8 @@ LDBarrierClient CkSyncBarrier::AddClient(Chare* chare, std::function<void()> fn,
     // it can trigger. Do this asynchronously so that the caller functions for object
     // construction finish first.
     at_count += epoch - cur_epoch;
-    if (at_count >= clients.size())
-      thisProxy[thisIndex].CheckBarrier(false);
+    if (on && !startedAtSync && at_count >= clients.size() + 1)
+      thisProxy[thisIndex].CheckBarrier();
   }
 
   LBClient* new_client = new LBClient(chare, fn, epoch);
@@ -58,8 +60,8 @@ void CkSyncBarrier::RemoveClient(LDBarrierClient c)
     at_count -= epoch - cur_epoch;
   delete *(c);
   clients.erase(c);
-  if (at_count >= clients.size())
-      thisProxy[thisIndex].CheckBarrier(false);
+  if (on && !startedAtSync && at_count >= clients.size())
+      thisProxy[thisIndex].CheckBarrier();
 }
 
 LDBarrierReceiver CkSyncBarrier::AddReceiver(std::function<void()> fn)
@@ -91,12 +93,12 @@ void CkSyncBarrier::TurnOnReceiver(LDBarrierReceiver c) { (*c)->on = 1; }
 
 void CkSyncBarrier::TurnOffReceiver(LDBarrierReceiver c) { (*c)->on = 0; }
 
-void CkSyncBarrier::AtBarrier(LDBarrierClient h, bool flood_atsync)
+void CkSyncBarrier::AtBarrier(LDBarrierClient h)
 {
   (*h)->epoch++;
   at_count++;
 
-  CheckBarrier(flood_atsync);
+  CheckBarrier();
 }
 
 void CkSyncBarrier::DecreaseBarrier(int c) { at_count -= c; }
@@ -118,21 +120,21 @@ void CkSyncBarrier::propagate_atsync()
     }
     else
     {  // Rank0 PE
-      // Flood non-zero ranks on this node
-      for (int i = 1; i < rank_needs_flood.size(); ++i)
+      // Kick non-zero ranks on this node
+      for (int i = 1; i < rank_needs_kick.size(); ++i)
       {
-        if (rank_needs_flood[i])
+        if (rank_needs_kick[i])
         {
           thisProxy[mype + i].recvLbStart(cur_epoch, mynode, mype);
         }
       }
       if (!received_from_left && mynode > 0)
-      {  // Flood left node
+      {  // Kick left node
         int pe = CkNodeFirst(mynode - 1);
         thisProxy[pe].recvLbStart(cur_epoch, mynode, mype);
       }
       if (!received_from_right && mynode < CkNumNodes() - 1)
-      {  // Flood right node
+      {  // Kick right node
         int pe = CkNodeFirst(mynode + 1);
         thisProxy[pe].recvLbStart(cur_epoch, mynode, mype);
       }
@@ -143,7 +145,11 @@ void CkSyncBarrier::propagate_atsync()
 
 void CkSyncBarrier::recvLbStart(int lb_step, int sourcenode, int pe)
 {
-  if (lb_step != cur_epoch || startedAtSync) return;
+  if (lb_step > currentKick)
+    currentKick = lb_step;
+  if (lb_step < cur_epoch || startedAtSync)
+    return;
+
   const int mype = CkMyPe();
   const int mynode = CkNodeOf(mype);
   if (sourcenode < mynode)
@@ -151,20 +157,21 @@ void CkSyncBarrier::recvLbStart(int lb_step, int sourcenode, int pe)
   else if (sourcenode > mynode)
     received_from_right = true;
   else if (rank0pe) // convert incoming pe number to local rank
-    rank_needs_flood[pe - mype] = false;
+    rank_needs_kick[pe - mype] = false;
   else
     received_from_rank0 = true;
+
   if (clients.empty())
-    CheckBarrier(true);  // Empty PE invokes barrier on self on receiving a flood msg
+    CheckBarrier();  // Empty PE invokes barrier on self on receiving a kick
 }
 
-void CkSyncBarrier::CheckBarrier(bool flood_atsync)
+void CkSyncBarrier::CheckBarrier()
 {
   if (!on) return;
 
   const auto client_count = clients.size();
 
-  if (client_count == 0 && !flood_atsync) return;
+  if ((client_count == 0 && currentKick < cur_epoch) || startedAtSync) return;
 
   if (at_count >= client_count)
   {
@@ -203,6 +210,10 @@ void CkSyncBarrier::CallReceivers(void)
 
 void CkSyncBarrier::ResumeClients(void)
 {
+  // The end receiver or client functions may trigger the barrier again, so make sure
+  // reset() is called before them to put the barrier in a valid state to be triggered
+  reset();
+
   for (auto& er : endReceivers)
   {
     if (er->on)
@@ -211,9 +222,6 @@ void CkSyncBarrier::ResumeClients(void)
     }
   }
   for (auto& c : clients) c->fn();
-
-  reset();
-  startedAtSync = false;
 }
 
 void CkSyncBarrier::pup(PUP::er& p)

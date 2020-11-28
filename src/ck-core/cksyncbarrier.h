@@ -44,14 +44,14 @@ private:
   std::list<LBReceiver*> receivers;
   std::list<LBReceiver*> endReceivers;
 
-  std::vector<bool> rank_needs_flood;
+  std::vector<bool> rank_needs_kick;
 
   int cur_epoch;
   int at_count;
   bool on;
   bool rank0pe;
   int propagated_atsync_step;
-  int iter_no;
+  int currentKick;
   bool received_from_left;
   bool received_from_right;
   bool received_from_rank0;
@@ -61,15 +61,14 @@ private:
   {
     CkpvAccess(cksyncbarrierInited) = true;
     cur_epoch = 1;
-    iter_no = -1;
+    currentKick = 0;
     propagated_atsync_step = 0;
     at_count = 0;
     on = false;
-    startedAtSync = false;
     rank0pe = CkMyRank() == 0;
     if (rank0pe)
     {
-      rank_needs_flood.resize(CkNodeSize(CkMyNode()));
+      rank_needs_kick.resize(CkNodeSize(CkMyNode()));
     }
     reset();
   }
@@ -91,7 +90,7 @@ public:
                                            : nullptr;
   }
 
-  void CheckBarrier(bool flood_atsync = false);
+  void CheckBarrier();
   void recvLbStart(int lb_step, int sourcenode, int pe);
 
   LDBarrierClient AddClient(Chare* chare, std::function<void()> fn, int epoch = -1);
@@ -125,7 +124,7 @@ public:
   void RemoveEndReceiver(LDBarrierReceiver h);
   void TurnOnReceiver(LDBarrierReceiver h);
   void TurnOffReceiver(LDBarrierReceiver h);
-  void AtBarrier(LDBarrierClient _n_c, bool flood_atsync = false);
+  void AtBarrier(LDBarrierClient _n_c);
   void DecreaseBarrier(int c);
   void TurnOn()
   {
