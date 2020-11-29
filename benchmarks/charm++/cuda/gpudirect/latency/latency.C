@@ -1,7 +1,7 @@
 #include "latency.decl.h"
 #include "hapi.h"
 
-#define MAX_ITERS 10000
+#define MAX_ITERS 1000000
 #define LARGE_MESSAGE_SIZE 8192
 
 /* readonly */ CProxy_Main main_proxy;
@@ -34,7 +34,7 @@ class Main : public CBase_Main {
 
     // Process command line arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:x:i:l:w:")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:x:i:l:w:z")) != -1) {
       switch (c) {
         case 's':
           min_size = atoi(optarg);
@@ -51,6 +51,9 @@ class Main : public CBase_Main {
         case 'w':
           warmup_iters = atoi(optarg);
           break;
+        case 'z':
+          zerocopy = true;
+          break;
         default:
           CkPrintf("Unknown command line argument detected");
           CkExit(1);
@@ -65,8 +68,12 @@ class Main : public CBase_Main {
 
     // Print info
     CkPrintf("# Charm++ GPU Latency Test\n"
-        "# Message sizes: %lu - %lu bytes\n# Iterations: %d regular, %d large\n# Warmup: %d\n",
-        min_size, max_size, n_iters_reg, n_iters_large, warmup_iters);
+        "# Message sizes: %lu - %lu bytes\n"
+        "# Iterations: %d regular, %d large\n"
+        "# Warmup: %d\n"
+        "# Zerocopy only: %s\n",
+        min_size, max_size, n_iters_reg, n_iters_large, warmup_iters,
+        zerocopy ? "true" : "false");
 
     // Create block group chare
     block_proxy = CProxy_Block::ckNew();
