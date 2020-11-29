@@ -233,7 +233,7 @@ public:
   // into the stream (that may be dependent on the arriving data)
   void receiveZC(size_t size, char* data) {
     // Wait for data transfer to complete
-    cudaStreamSynchronize(stream);
+    //cudaStreamSynchronize(stream);
 
     afterReceive(size, true);
   }
