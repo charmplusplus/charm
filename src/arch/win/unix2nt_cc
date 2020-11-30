@@ -363,9 +363,8 @@ do
 		LINK+=" $base.o"
 		DOCOMPILE='1'
 		;;
-	'-fno-stack-protector')
+	-fno-stack-protector)
 		CL_OPTS+=" -GS-"
-		shift
 		;;
 	'-fno-lifetime-dse'|'-rdynamic'|'-Wl,--export-dynamic'|'-fvisibility=hidden'|'-Wl,-undefined,dynamic_lookup')
 		# Error out so configure knows not to pass us these arguments, avoiding the below warning.
