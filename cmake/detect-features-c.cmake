@@ -144,6 +144,13 @@ check_function_exists(sysctlbyname HAVE_SYSCTLBYNAME)
 check_function_exists(uname HAVE_UNAME)
 check_function_exists(usleep CMK_HAS_USLEEP)
 
+# C compiler flags
+check_c_compiler_flag(-ftls-model=initial-exec CMK_COMPILER_KNOWS_FTLS_MODEL)
+if(CMK_COMPILER_KNOWS_FTLS_MODEL)
+  set(OPTS_CC "${OPTS_CC} -ftls-model=initial-exec")
+  set(OPTS_CXX "${OPTS_CXX} -ftls-model=initial-exec")
+endif()
+
 
 # Complex tests
 
