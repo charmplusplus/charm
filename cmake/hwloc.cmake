@@ -36,7 +36,7 @@ ExternalProject_Add(hwloc
         CC=$CHARM_CC \
         CC_FOR_BUILD=$CHARM_CC \
         > /dev/null"
-    BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
+    BUILD_COMMAND $(MAKE) V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
     INSTALL_COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/

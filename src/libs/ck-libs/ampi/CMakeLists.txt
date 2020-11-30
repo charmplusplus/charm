@@ -421,7 +421,7 @@ if(CMK_AMPI_WITH_ROMIO)
         COMMAND cp -f ${romio_dir}/include/mpio.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f ${romio_dir}/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f ${romio_dir}/include/mpio_functions.h ${CMAKE_BINARY_DIR}/include/
-        BUILD_COMMAND make -C ${romio_dir} AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: V=$(VERBOSE)
+        BUILD_COMMAND $(MAKE) -C ${romio_dir} AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: V=$(VERBOSE)
         INSTALL_COMMAND ""
         LIST_SEPARATOR ^^
     )
