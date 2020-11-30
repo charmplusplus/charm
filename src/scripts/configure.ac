@@ -827,12 +827,13 @@ then
 fi
 
 # Test for a flag tlsglobals needs
-test_cc "whether C compiler accepts -ftls-model=initial-exec" "yes" "no" "-ftls-model=initial-exec"
+test_cxx "whether C++ compiler accepts -ftls-model=initial-exec" "yes" "no" "-ftls-model=initial-exec"
 if test $strictpass -eq 1
 then
     add_flag 'CMK_COMPILER_KNOWS_FTLS_MODEL="1"' "tlsglobals"
     OPTS_CC="$OPTS_CC -ftls-model=initial-exec"
     OPTS_CXX="$OPTS_CXX -ftls-model=initial-exec"
+    OPTS_LD="$OPTS_LD -ftls-model=initial-exec"
 fi
 
 # Test for a flag important for shared linking
