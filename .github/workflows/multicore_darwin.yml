@@ -11,10 +11,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
+      run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing --build-shared -charm-shared
     - name: test
       run: |
-        make -C multicore-darwin-x86_64/tmp all-test -j3 OPTS="-g -tracemode projections"
+        make -C multicore-darwin-x86_64/tmp all-test -j3 OPTS="-g -tracemode projections -charm-shared"
         make -C multicore-darwin-x86_64/tmp test
     - name: projections
       run: |

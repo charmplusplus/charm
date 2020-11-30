@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: ./build all-test netlrts-linux-x86_64 -g -j6 --with-production -pedantic
+      run: ./build all-test netlrts-linux-x86_64 -g -j6 --with-production --build-shared -charm-shared -pedantic
     - name: test
       run: make -C netlrts-linux-x86_64/tmp test TESTOPTS="++local"
     - name: testp P=2
