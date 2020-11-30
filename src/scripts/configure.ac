@@ -724,14 +724,11 @@ AC_MSG_RESULT("$CMK_NATIVE_CXX")
 AC_MSG_CHECKING("Sequential C++ compiler as")
 AC_MSG_RESULT("$CMK_SEQ_CXX")
 
-if echo "$CMK_CC" | grep -E "gcc|clang|icc" > /dev/null 2> /dev/null
+test_link "whether compiler accepts -fno-stack-protector" "ok" "no" "-fno-stack-protector"
+if test $strictpass -eq 1
 then
-  test_link "whether compiler accept -fno-stack-protector" "ok" "no" "-fno-stack-protector"
-  if test $strictpass -eq 1
-  then
-	add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "stack-protection disabling"
-	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "stack-protection disabling"
-  fi
+  add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "stack-protection disabling"
+  add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "stack-protection disabling"
 fi
 
 #### check if C++ compiler will accept C++11 features without warning ####
