@@ -1107,6 +1107,7 @@ fi
 if [ "$TLSGLOBALS" = "1" ]
 then
     TLSGLOBALS_OPTS=''
+    [[ "$CMK_COMPILER_KNOWS_FTLS_MODEL" = '1' ]] && TLSGLOBALS_OPTS+=" -ftls-model=initial-exec"
     [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" = '1' ] && TLSGLOBALS_OPTS="$TLSGLOBALS_OPTS -mno-tls-direct-seg-refs"
     OPTS_CC="$OPTS_CC $TLSGLOBALS_OPTS"
     OPTS_CXX="$OPTS_CXX $TLSGLOBALS_OPTS"
