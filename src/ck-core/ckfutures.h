@@ -84,7 +84,7 @@ namespace ck {
       CkSendToFuture(handle_, msg);
     }
 
-    bool probe() { return CkProbeFuture(handle_); }
+    bool is_ready() { return CkProbeFuture(handle_); }
     void release() { CkReleaseFuture(handle_); }
     void pup(PUP::er &p) { p | handle_; }
   };
