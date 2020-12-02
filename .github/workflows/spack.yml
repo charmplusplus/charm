@@ -42,6 +42,4 @@ jobs:
         source share/spack/setup-env.sh
         spack compiler find
         spack compiler list
-        # See bug #3168:
-        [[ $(uname) == "Linux" ]] && smp="~smp"
-        spack install -v --test root charmpp@master $smp
+        spack install -v --test root charmpp@master
