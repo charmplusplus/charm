@@ -34,6 +34,15 @@ if(${CMK_COMPILER_KNOWS_LIFETIMEDSE})
   set(OPTS_CXX "${OPTS_CXX} -fno-lifetime-dse")
 endif()
 
+# Needed so that tlsglobals works correctly with --build-shared
+# See https://github.com/UIUC-PPL/charm/issues/3168 for details.
+check_cxx_compiler_flag("-ftls-model=initial-exec" CMK_COMPILER_KNOWS_FTLS_MODEL)
+if(CMK_COMPILER_KNOWS_FTLS_MODEL)
+  set(OPTS_CC "${OPTS_CC} -ftls-model=initial-exec")
+  set(OPTS_CXX "${OPTS_CXX} -ftls-model=initial-exec")
+  set(OPTS_LD "${OPTS_LD} -ftls-model=initial-exec")
+endif()
+
 # Allow seeing own symbols dynamically, needed for programmatic backtraces
 check_cxx_compiler_flag("-rdynamic" CMK_COMPILER_KNOWS_RDYNAMIC)
 check_cxx_compiler_flag("-Wl,--export-dynamic" CMK_LINKER_KNOWS_EXPORT_DYNAMIC)

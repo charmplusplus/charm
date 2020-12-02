@@ -25,6 +25,9 @@ jobs:
 
         # Use this branch for testing, not master
         sed -i -e 's,="master",="${{ github.head_ref }}",' var/spack/repos/builtin/packages/charmpp/package.py
+        
+        # Use a fork, not the main repo
+        sed -i -e 's,UIUC-PPL/charm.git,${{github.event.pull_request.head.repo.full_name}},' var/spack/repos/builtin/packages/charmpp/package.py
 
         # Compile with debug symbols
         sed -i -e 's,build(target,options.append("-g"); build(target,' var/spack/repos/builtin/packages/charmpp/package.py
@@ -42,6 +45,4 @@ jobs:
         source share/spack/setup-env.sh
         spack compiler find
         spack compiler list
-        # See bug #3168:
-        [[ $(uname) == "Linux" ]] && smp="~smp"
-        spack install -v --test root charmpp@master $smp
+        spack install -v --test root charmpp@master

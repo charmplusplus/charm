@@ -825,6 +825,17 @@ then
     add_flag 'CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="1"' "tlsglobals"
 fi
 
+# Needed so that tlsglobals works correctly with --build-shared
+# See https://github.com/UIUC-PPL/charm/issues/3168 for details.
+test_cxx "whether C++ compiler accepts -ftls-model=initial-exec" "yes" "no" "-ftls-model=initial-exec"
+if test $strictpass -eq 1
+then
+    add_flag 'CMK_COMPILER_KNOWS_FTLS_MODEL="1"' "tlsglobals"
+    OPTS_CC="$OPTS_CC -ftls-model=initial-exec"
+    OPTS_CXX="$OPTS_CXX -ftls-model=initial-exec"
+    OPTS_LD="$OPTS_LD -ftls-model=initial-exec"
+fi
+
 # Test for a flag important for shared linking
 test_cxx "whether C++ compiler accepts -fvisibility=hidden" "yes" "no" "-fvisibility=hidden"
 if test $strictpass -eq 1
