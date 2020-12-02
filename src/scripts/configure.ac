@@ -725,6 +725,7 @@ AC_MSG_CHECKING("Sequential C++ compiler as")
 AC_MSG_RESULT("$CMK_SEQ_CXX")
 
 # Needed to avoid migratable threads failing the stack check
+# See https://github.com/UIUC-PPL/charm/pull/3174 for details.
 test_link "whether compiler accepts -fno-stack-protector" "ok" "no" "-fno-stack-protector"
 if test $strictpass -eq 1
 then

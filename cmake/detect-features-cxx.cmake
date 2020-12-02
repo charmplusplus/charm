@@ -21,6 +21,7 @@ check_cxx_compiler_flag("-mno-tls-direct-seg-refs" CMK_COMPILER_KNOWS_TLSDIRECTS
 check_cxx_compiler_flag("-fvisibility=hidden" CMK_COMPILER_KNOWS_FVISIBILITY)
 
 # Needed to avoid migratable threads failing the stack check
+# See https://github.com/UIUC-PPL/charm/pull/3174 for details.
 check_cxx_compiler_flag("-fno-stack-protector" CMK_COMPILER_KNOWS_FNOSTACKPROTECTOR)
 if(${CMK_COMPILER_KNOWS_FNOSTACKPROTECTOR})
   set(OPTS_CC "${OPTS_CC} -fno-stack-protector")
