@@ -111,7 +111,6 @@ void CkRegisterGroupExt(const char *s, const char **emNames, int emNamesStart, i
 
   for (int i=emNamesStart + 1; i < emNamesStart+numEntryMethods; i++)
     {
-      CkPrintf("Registering group entry method: %s\n", emNames[i]);
       CkRegisterEp(emNames[i], GroupExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
     }
 
@@ -190,7 +189,7 @@ int CkRegisterMainChare(int chareIdx, int entryIdx)
 
 #if CMK_CHARM4PY
 
-void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+void CkRegisterMainChareExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(MainchareExt), TypeMainChare);
   CkRegisterBase(__idx, CkIndex_Chare::__idx);
 
@@ -198,8 +197,10 @@ void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, i
   CkRegisterMessagePupFn(epIdxCtor, (CkMessagePupFn)CkArgMsg::ckDebugPup);
   CkRegisterMainChare(__idx, epIdxCtor);
 
-  for (int i=1; i < numEntryMethods; i++)
-    CkRegisterEp(s, MainchareExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+  for (int i=emNamesStart+1; i < emNamesStart+numEntryMethods; i++)
+    {
+      CkRegisterEp(emNames[i], MainchareExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+    }
 
   *chareIdx = __idx;
   *startEpIdx = epIdxCtor;
