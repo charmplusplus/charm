@@ -435,7 +435,7 @@ include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
 
 if(${TARGET} STREQUAL "all-test")
-  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test
+  add_custom_target(all-test ALL COMMAND $(MAKE) -C ${CMAKE_BINARY_DIR}/tmp all-test
         COMMENT "Building all-test. This will take several minutes.")
   add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
         ampi_funcptr_shim ampi_funcptr_shim_main
