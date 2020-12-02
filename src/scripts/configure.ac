@@ -724,14 +724,13 @@ AC_MSG_RESULT("$CMK_NATIVE_CXX")
 AC_MSG_CHECKING("Sequential C++ compiler as")
 AC_MSG_RESULT("$CMK_SEQ_CXX")
 
-if echo "$CMK_CC" | grep -E "gcc|clang|icc" > /dev/null 2> /dev/null
+# Needed to avoid migratable threads failing the stack check
+# See https://github.com/UIUC-PPL/charm/pull/3174 for details.
+test_link "whether compiler accepts -fno-stack-protector" "ok" "no" "-fno-stack-protector"
+if test $strictpass -eq 1
 then
-  test_link "whether compiler accept -fno-stack-protector" "ok" "no" "-fno-stack-protector"
-  if test $strictpass -eq 1
-  then
-	add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "stack-protection disabling"
-	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "stack-protection disabling"
-  fi
+  add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "stack-protection disabling"
+  add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "stack-protection disabling"
 fi
 
 #### check if C++ compiler will accept C++11 features without warning ####
@@ -826,7 +825,8 @@ then
     add_flag 'CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="1"' "tlsglobals"
 fi
 
-# Test for a flag tlsglobals needs
+# Needed so that tlsglobals works correctly with --build-shared
+# See https://github.com/UIUC-PPL/charm/issues/3168 for details.
 test_cxx "whether C++ compiler accepts -ftls-model=initial-exec" "yes" "no" "-ftls-model=initial-exec"
 if test $strictpass -eq 1
 then
