@@ -1,6 +1,6 @@
 name: NetLRTS Linux buildold
 
-on: [push]
+on: pull_request
 
 jobs:
   build:

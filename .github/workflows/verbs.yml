@@ -4,7 +4,7 @@ name: Verbs Linux Buildonly Tarball
 # Also test packaging a tarball and building from it.
 # Since it is buildonly, test both build and buildold with the tarball.
 
-on: [push]
+on: pull_request
 
 jobs:
   build:
