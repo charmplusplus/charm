@@ -118,7 +118,7 @@ void CkRegisterGroupExt(const char *s, const char **emNames, int emNamesStart, i
   *startEpIdx = epIdxCtor;
 }
 
-void CkRegisterSectionManagerExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+void CkRegisterSectionManagerExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(SectionManagerExt), TypeGroup);
   CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
 
@@ -127,8 +127,10 @@ void CkRegisterSectionManagerExt(const char *s, int numEntryMethods, int *chareI
 
   CkRegisterEp(s, SectionManagerExt::__sendToSection, CkMarshallMsg::__idx, __idx, 0);
 
-  for (int i=2; i < numEntryMethods; i++)
-    CkRegisterEp(s, SectionManagerExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+  for (int i=emNamesStart+2; i < numEntryMethods+emNamesStart; i++)
+    {
+      CkRegisterEp(emNames[i], SectionManagerExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+    }
 
   *chareIdx = __idx;
   *startEpIdx = epIdxCtor;
