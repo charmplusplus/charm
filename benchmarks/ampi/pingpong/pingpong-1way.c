@@ -28,7 +28,7 @@ int main(int argc, char** argv)
     if (my_id == 0)
     {
       printf(
-          "Doesn't have required input params. Usage: ./pgm <min-msg-size> "
+          "Doesn't have required input params. Usage: ./pingpong <min-msg-size> "
           "<max-msg-size> <low-iter> <high-iter> <print-format (0 for csv, 1 for "
           "regular)>\n");
     }

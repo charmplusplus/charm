@@ -435,14 +435,14 @@ include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
 
 if(${TARGET} STREQUAL "all-test")
-  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test
+  add_custom_target(all-test ALL COMMAND $(MAKE) -C ${CMAKE_BINARY_DIR}/tmp all-test
         COMMENT "Building all-test. This will take several minutes.")
   add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
         ampi_funcptr_shim ampi_funcptr_shim_main
         ampi_funcptr_loader ampi_funcptr_loader_stub
-        conv-partition conv-util hwloc conv-static conv-core ldb-rand
+        converse conv-static ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
+        ckqt tcharm-compat moduleNDMeshStreamer
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
         threads-default-tls ldb-neighbor ldb-workstealing modulearmci
@@ -738,68 +738,16 @@ endif()
 add_subdirectory(src/xlat-i)
 add_dependencies(charmxi create_symlinks)
 
+# Hwloc
+include(cmake/hwloc.cmake)
+
 # Converse
+include(cmake/converse.cmake)
 add_subdirectory(src/QuickThreads)
 add_subdirectory(src/util/boost-context)
 add_subdirectory(src/conv-core)
-add_subdirectory(src/conv-ldb)
-add_subdirectory(src/util)
 
-# Hwloc
-if(${BUILD_SHARED})
-    set(hwloc_shared yes)
-else()
-    set(hwloc_shared no)
-endif()
-
-# Determine arguments to pass to hwloc's configure
-set(command ${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS})
-execute_process(COMMAND ${command} COMMAND grep CHARM_CC_FLAGS= COMMAND cut -c16- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC_FLAGS)
-execute_process(COMMAND ${command} COMMAND grep CHARM_CC= COMMAND cut -c10- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC)
-
-# FIXME: copy .so
-set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
-include(ExternalProject)
-ExternalProject_Add(hwloc
-    URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
-    CONFIGURE_COMMAND
-        ${hwloc_dir}/configure
-        --disable-cairo
-        --disable-cuda
-        --disable-gl
-        --disable-libxml2
-        --disable-nvml
-        --disable-opencl
-        --disable-pci
-        --disable-libudev
-        --disable-visibility
-        --enable-embedded-mode
-        --enable-shared=${hwloc_shared}
-        --enable-static
-        --with-hwloc-symbol-prefix=cmi_
-        --without-x
-        HWLOC_FLAGS=${CHARM_CC_FLAGS}
-        CFLAGS=${CHARM_CC_FLAGS}
-        CC=${CHARM_CC}
-        CC_FOR_BUILD=${CHARM_CC}
-        > /dev/null
-    BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-    INSTALL_COMMAND test -f hwloc/.libs/libhwloc_embedded.lib && cp hwloc/.libs/libhwloc_embedded.lib hwloc/.libs/libhwloc_embedded.a || true # On Windows, the library is created as .lib
-    COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
-    COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
-    COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
-    COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
-)
-
-# TopoManager
-set(tmgr-cxx-sources src/util/topomanager/TopoManager.C src/util/topomanager/CrayNid.c src/util/topomanager/BGQTorus.C)
-set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h src/util/topomanager/XTTorus.h src/util/topomanager/BGQTorus.h)
-file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
-add_library(tmgr ${tmgr-cxx-sources} ${tmgr-h-sources})
-foreach(filename ${tmgr-h-sources})
-    configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-endforeach()
-
+# LIBS
 if(${TARGET} STREQUAL "LIBS")
   add_subdirectory(src/libs/conv-libs)
   add_subdirectory(src/libs/ck-libs)
@@ -894,7 +842,7 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
@@ -902,8 +850,8 @@ endif()
 # Check that we are able to build and link an executable
 add_executable(hello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
 add_dependencies(hello ck ldb-rand memory-default threads-default conv-static
-  conv-core ckmain conv-machine conv-util conv-partition conv-ldb ckqt
-  moduleNDMeshStreamer modulecompletion tmgr)
+  converse ckmain ckqt
+  moduleNDMeshStreamer modulecompletion)
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
@@ -941,7 +889,6 @@ endforeach(l)
 if(NOT ${CMAKE_DL_LIBS} STREQUAL "")
     set(DL_LIB "-l${CMAKE_DL_LIBS}")
 endif()
-file(APPEND ${optfile_sh} "CMK_HWLOC_LIBS=\"-lhwloc_embedded -lm\"\n" )
 
 if (NOT CMK_WINDOWS)
   file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")

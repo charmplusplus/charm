@@ -16,7 +16,7 @@ CMK_LD_SHARED_ABSOLUTE_PATH=true
 
 CMK_DEFS="$CMK_DEFS -mmacosx-version-min=10.7 -D_DARWIN_C_SOURCE"
 
-if command -v gfortran >/dev/null 2>&1
+if command -v gfortran gfortran-{19..4} gfortran-mp-{19..4} >/dev/null 2>&1
 then
   . $CHARMINC/conv-mach-gfortran.sh
 fi

@@ -1,16 +1,16 @@
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
-all: pgm
+all: whenidle
 
-pgm:  idlework.o
-	$(CHARMC) idlework.o  -o pgm -language charm++
+whenidle:  idlework.o
+	$(CHARMC) idlework.o  -o whenidle -language charm++
 
 idlework.o : idlework.C idlework.h idlework.ci
 	$(CHARMC) -c idlework.ci idlework.C
 
-test: pgm
-	$(call run, +p4 ./pgm )
+test: whenidle
+	$(call run, +p4 ./whenidle )
 
 clean:
-	rm -f conv-host pgm *.def.h *.decl.h *.o *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f conv-host whenidle *.def.h *.decl.h *.o *~ charmrun charmrun.exe whenidle.exe whenidle.pdb whenidle.ilk
