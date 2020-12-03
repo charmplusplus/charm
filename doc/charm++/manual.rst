@@ -9151,6 +9151,14 @@ Inter-node messages will be transferred using the naive host-staged mechanism
 where the data is first transferred to the host from the source GPU, sent over
 the network, then transferred to the destination GPU.
 
+An optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory
+and pre-allocated GPU communication buffers are availble through runtime flags.
+This significantly reduces the overheads from creation and opening of CUDA IPC handles
+especially for relatively smaller messages. ``+gpushm`` will turn on this optimization
+feature, ``+gpucommbuffer [size]`` specifies the size of the communication buffer
+allocated on each GPU (default is 64MB), and ``+gpuipceventpool`` determines the number of
+CUDA IPC events per PE that is used for this feature (default is 16).
+
 Examples using the direct GPU messaging feature can be found in
 ``examples/charm++/cuda/gpudirect``.
 
