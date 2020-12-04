@@ -19,6 +19,14 @@
 #include "allEvents.h"          //projector
 #include "register.h" // for _entryTable
 
+// To get username
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#include <Lmcons.h>
+#else
+#include <pwd.h>
+#endif
+
 CpvExtern(int, _traceCoreOn);   // projector
 
 #if ! CMK_TRACE_ENABLED
@@ -240,6 +248,17 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
+#endif
+
+#if defined(_WIN32) || defined(_WIN64)
+  TCHAR username[UNLEN + 1];
+  DWORD size = UNLEN + 1;
+  if (GetUserName(username, &size))
+    fprintf(stsfp, "USERNAME \"%s\"\n", username);
+#else
+  const struct passwd* pw = getpwuid(getuid());
+  if (pw != nullptr)
+    fprintf(stsfp, "USERNAME \"%s\"\n", pw->pw_name);
 #endif
 
   fprintf(stsfp, "COMMANDLINE \"");
