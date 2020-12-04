@@ -3,7 +3,7 @@ name: ShellCheck
 # See https://github.com/koalaman/shellcheck/wiki
 # for explanations of ShellCheck error codes
 
-on: [push]
+on: pull_request
 
 jobs:
   build:
@@ -23,7 +23,5 @@ jobs:
           relink.script \
           src/scripts/commitid.sh \
           src/scripts/testrun \
-          src/arch/uth/charmrun \
-          src/arch/sim/charmrun \
           src/arch/multicore/charmrun \
           src/arch/mpi-win-x86_64/charmrun \

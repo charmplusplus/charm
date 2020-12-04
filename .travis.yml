@@ -18,28 +18,13 @@ before_install:
 
 jobs:
   include:
-  - os: linux
-    name: "MPI-Linux SMP"
-    dist: xenial
-    script:
-    - sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
-    - ./build all-test mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C mpi-linux-x86_64-smp/tmp test TESTOPTS="+setcpuaffinity"
-    # Disabled due to several hangs and segfaults.
-    #- make -C mpi-linux-x86_64-smp/tmp testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
-
-  - os: osx
-    name: "NetLRTS-Darwin"
-    script:
-    - ./build all-test netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
-    - make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
-
   - os: windows
     name: "NetLRTS-Win"
     script:
     - choco upgrade -y cygwin cyg-get
     - cyg-get.bat cmake make gcc-core binutils libtool
+    - unset CC
+    - unset CXX
     - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 --without-romio -g --with-production -j3"
     - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests -j3"
     # Disabled lines would extend the CI's duration too much.

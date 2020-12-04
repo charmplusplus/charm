@@ -1,10 +1,10 @@
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
-all: pgm
+all: integratePUPable
 
-pgm: pgm.o
-	$(CHARMC) pgm.o  -o pgm -language charm++
+integratePUPable: pgm.o
+	$(CHARMC) pgm.o  -o integratePUPable -language charm++
 
 pgm.o : pgm.C pgm.h pgm.decl.h
 	$(CHARMC) -c pgm.C
@@ -13,10 +13,10 @@ pgm.decl.h: pgm.ci
 	$(CHARMC) -c pgm.ci
 
 clean:
-	rm -f pgm *.o conv-host *.decl.h *.def.h *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f integratePUPable *.o conv-host *.decl.h *.def.h *~ charmrun charmrun.exe integratePUPable.exe integratePUPable.pdb integratePUPable.ilk
 
-test: pgm
-	$(call run, ./pgm +p2 1000000 100 )
+test: integratePUPable
+	$(call run, ./integratePUPable +p2 1000000 100 )
 
-testp: pgm
-	$(call run, ./pgm +p$(P) 1000000 $$(( $(P) * 10 )) )
+testp: integratePUPable
+	$(call run, ./integratePUPable +p$(P) 1000000 $$(( $(P) * 10 )) )

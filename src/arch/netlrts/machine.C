@@ -267,9 +267,6 @@ int _kq = -1;
 #define PRINTBUFSIZE 16384
 
 #include "machine-rdma.h"
-#if CMK_ONESIDED_IMPL
-#include "machine-onesided.h"
-#endif
 
 #if CMK_SHRINK_EXPAND
 extern void resumeAfterRealloc(void);

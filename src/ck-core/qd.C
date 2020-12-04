@@ -67,7 +67,7 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   state->propagate(msg);
   msg->setPhase(1);
   DEBUGP(("[%d] _bcastQD1: State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
-#if ! CMK_SHARED_VARS_UNIPROCESSOR && !CMK_MULTICORE
+#if !CMK_MULTICORE
 /*
   QdState *comm_state;
   static int comm_create=0, comm_process=0;
@@ -174,7 +174,7 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
 // check if counters became dirty and notify parents
 static inline void _handlePhase2(QdState *state, QdMsg *msg)
 {
-//  This assertion seems too strong for smp and uth version.
+//  This assertion seems too strong for smp version.
   DEBUGP(("[%d] _handlePhase2: stage: %d, msg phase: %d \n", CmiMyPe(), state->getStage(), msg->getPhase()));
   CkAssert(state->getStage()==2);
   state->subtreeSetDirty(msg->getDirty());
