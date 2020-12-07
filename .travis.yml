@@ -33,3 +33,10 @@ jobs:
     - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests test TESTOPTS=++local"
     #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/examples test TESTOPTS=++local"
     #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/benchmarks test TESTOPTS=++local"
+  - os: linux
+    arch: arm64
+    name: "NetLRTS-Arm64"
+    script:
+    - ./build all-test netlrts-linux-arm8 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C netlrts-linux-arm8/tests test TESTOPTS="++local"
+    - make -C netlrts-linux-arm8/examples test TESTOPTS="++local"
