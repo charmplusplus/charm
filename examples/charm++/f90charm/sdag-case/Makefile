@@ -31,3 +31,6 @@ caseTest: $(OBJS)
 
 test: caseTest
 	$(call run, +p$(PROCS) ./$< )
+
+testp: caseTest
+	$(call run, +p$(P) ./$< )

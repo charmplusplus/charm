@@ -994,7 +994,11 @@ static void arg_init(int argc, const char **argv)
 
   if (arg_verbose) arg_quiet = 0;
 
-  if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
+  if (arg_debug || arg_debug_no_pause
+#if CMK_USE_SSH
+      || arg_in_xterm
+#endif
+     ) {
     fprintf(stderr, "Charmrun> scalable start disabled under ++debug and ++in-xterm:\n"
                     "NOTE: will make an SSH connection per process launched,"
                     " instead of per physical node.\n");

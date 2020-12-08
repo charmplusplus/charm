@@ -1,4 +1,4 @@
-# Copyright © 2009-2019 Inria.  All rights reserved.
+# Copyright © 2009-2020 Inria.  All rights reserved.
 # Copyright © 2009-2010 Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 # Copyright © 2011      Oracle and/or its affiliates.  All rights reserved.
@@ -19,6 +19,7 @@ include_hwloc_HEADERS = \
         hwloc/bitmap.h \
         hwloc/helper.h \
         hwloc/inlines.h \
+        hwloc/memattrs.h \
         hwloc/diff.h \
         hwloc/shmem.h \
         hwloc/distances.h \
@@ -28,6 +29,7 @@ include_hwloc_HEADERS = \
         hwloc/cuda.h \
         hwloc/cudart.h \
         hwloc/nvml.h \
+        hwloc/rsmi.h \
         hwloc/plugins.h \
         hwloc/gl.h \
         hwloc/rename.h \

@@ -258,7 +258,7 @@ class StrategyWrapper : public IStrategyWrapper
   {
     strategy_name = _strategy_name;
     isTreeRoot = _isTreeRoot;
-    strategy = TreeStrategyFactory::makeStrategy<O, P, Solution>(strategy_name, config);
+    strategy = TreeStrategy::Factory::makeStrategy<O, P, Solution>(strategy_name, config);
   }
 
   virtual ~StrategyWrapper() { delete strategy; }
@@ -417,11 +417,13 @@ class StrategyWrapper : public IStrategyWrapper
 #if CMK_ERROR_CHECKING
       if ((CkMyPe() == 0 || isTreeRoot) && _lb_args.debug() > 0)
 #endif
+      {
         CkPrintf(
             "[%d] strategy %s time=%f secs, maxLoad after strategy=%f, num_migrations=%d "
             "migrations_sum_hops=%u\n",
             CkMyPe(), strategy_name.c_str(), strategy_time, maxLoad, migMsg->n_moves,
             migrations_sum_hops);
+      }
     }
 
     delete sol;
@@ -458,7 +460,9 @@ class RootLevel : public LevelLogic
    * mode 0: receive obj stats
    * mode 1: receive aggregated group load
    */
-  virtual void configure(bool rateAware, json& config)
+  virtual void configure(bool rateAware, std::vector<std::string> strategies,
+                         json& config, bool repeat_strategies = false,
+                         bool token_passing = true)
   {
     using namespace TreeStrategy;
     for (auto w : wrappers) delete w;
@@ -466,7 +470,7 @@ class RootLevel : public LevelLogic
     if (num_groups == -1)
     {
       current_strategy = 0;
-      for (const std::string& strategy_name : config["strategies"])
+      for (const std::string& strategy_name : strategies)
       {
         if (rateAware)
         {
@@ -479,18 +483,11 @@ class RootLevel : public LevelLogic
               strategy_name, true, config[strategy_name]));
         }
       }
-      repeat_strategies = true;
-      const auto& option = config.find("repeat_strategies");
-      if (option != config.end()) repeat_strategies = *option;
+      this->repeat_strategies = repeat_strategies;
     }
     else
     {
-      const auto& option = config.find("strategies");
-      if (option != config.end())
-      {
-        const std::string& strategy_name = config["strategies"][0];
-        if (strategy_name == "dummy") group_strategy_dummy = true;
-      }
+      group_strategy_dummy = !token_passing;
     }
   }
 
@@ -508,7 +505,7 @@ class RootLevel : public LevelLogic
     }
   }
 
-  void loadBalance(std::vector<TreeLBMessage*>& decisions, IDM& idm)
+  TreeLBMessage* loadBalance(IDM& idm)
   {
 #if DEBUG__TREE_LB_L1
     // print('[' + str(charm.myPe()) + ']', self.__class__, 'loadBalance')
@@ -551,13 +548,7 @@ class RootLevel : public LevelLogic
       for (auto msg : stats_msgs) delete (LBStatsMsg_1*)msg;
       stats_msgs.clear();
       nPes = nObjs = 0;
-      decisions.resize(num_children);
-      decisions[0] = migMsg;
-      for (int i = 1; i < num_children; i++)
-      {
-        CkReferenceMsg(migMsg);
-        decisions[i] = migMsg;
-      }
+      return migMsg;
     }
     else
     {
@@ -637,13 +628,7 @@ class RootLevel : public LevelLogic
         migMsg->dest_groups[i] = mig.dst_group;
         migMsg->loads[i] = mig.load;
       }
-      decisions.resize(num_children);
-      decisions[0] = migMsg;
-      for (int i = 1; i < num_children; i++)
-      {
-        CkReferenceMsg(migMsg);
-        decisions[i] = migMsg;
-      }
+      return migMsg;
     }
   }
 
@@ -681,13 +666,15 @@ class NodeSetLevel : public LevelLogic
     for (auto w : wrappers) delete w;
   }
 
-  virtual void configure(bool rateAware, json& config, int _cutoff_freq = 1)
+  virtual void configure(bool rateAware, std::vector<std::string> strategies,
+                         json& config, bool repeat_strategies = false,
+                         int _cutoff_freq = 1)
   {
     using namespace TreeStrategy;
     for (auto w : wrappers) delete w;
     wrappers.clear();
     current_strategy = 0;
-    for (const std::string& strategy_name : config["strategies"])
+    for (const std::string& strategy_name : strategies)
     {
       if (rateAware)
       {
@@ -700,9 +687,7 @@ class NodeSetLevel : public LevelLogic
             strategy_name, false, config[strategy_name]));
       }
     }
-    repeat_strategies = true;
-    const auto& option = config.find("repeat_strategies");
-    if (option != config.end()) repeat_strategies = *option;
+    this->repeat_strategies = repeat_strategies;;
     cutoff_freq = _cutoff_freq;
     CkAssert(cutoff_freq > 0);
   }
@@ -855,7 +840,7 @@ class NodeSetLevel : public LevelLogic
     return load;
   }
 
-  virtual void loadBalance(std::vector<TreeLBMessage*>& decisions, IDM& idm)
+  virtual TreeLBMessage* loadBalance(IDM& idm)
   {
     CkAssert(wrappers.size() > current_strategy);
     IStrategyWrapper* wrapper = wrappers[current_strategy];
@@ -892,14 +877,9 @@ class NodeSetLevel : public LevelLogic
     {
       current_strategy++;
     }
-    decisions.resize(num_children);
-    decisions[0] = migMsg;
-    for (int i = 1; i < num_children; i++)
-    {
-      CkReferenceMsg(migMsg);
-      decisions[i] = migMsg;
-    }
+    TreeLBMessage* decision = migMsg;
     migMsg = nullptr;
+    return decision;
   }
 
  protected:
@@ -940,13 +920,15 @@ class NodeLevel : public LevelLogic
     for (auto w : wrappers) delete w;
   }
 
-  virtual void configure(bool rateAware, json& config, int _cutoff_freq = 1)
+  virtual void configure(bool rateAware, std::vector<std::string> strategies,
+                         json& config, bool repeat_strategies = false,
+                         int _cutoff_freq = 1)
   {
     using namespace TreeStrategy;
     for (auto w : wrappers) delete w;
     wrappers.clear();
     current_strategy = 0;
-    for (const std::string& strategy_name : config["strategies"])
+    for (const std::string& strategy_name : strategies)
     {
       if (rateAware)
       {
@@ -959,9 +941,7 @@ class NodeLevel : public LevelLogic
             strategy_name, false, config[strategy_name]));
       }
     }
-    repeat_strategies = true;
-    const auto& option = config.find("repeat_strategies");
-    if (option != config.end()) repeat_strategies = *option;
+    this->repeat_strategies = repeat_strategies;
     cutoff_freq = _cutoff_freq;
     CkAssert(cutoff_freq > 0);
   }
@@ -981,31 +961,26 @@ class NodeLevel : public LevelLogic
   virtual void processDecision(TreeLBMessage* decision, int& incoming, int& outgoing)
   {
     // will just forward the decision from the root
-    this->decision = (TreeLBMessage*)CkCopyMsg((void**)&decision);
+    CkReferenceMsg(decision); // Add a reference since caller deletes this message
+    this->decision = decision;
     incoming = outgoing = 0;
   }
 
-  virtual void loadBalance(std::vector<TreeLBMessage*>& decisions, IDM& idm)
+  virtual TreeLBMessage* loadBalance(IDM& idm)
   {
-    decisions.resize(pes.size());
     if (cutoff())
     {
-      withinNodeLoadBalance(decisions);
+      return withinNodeLoadBalance();
     }
     else
     {
       // just forward decision from root to children
-      decisions[0] = decision;
-      for (int i = 1; i < pes.size(); i++)
-      {
-        CkReferenceMsg(decision);
-        decisions[i] = decision;
-      }
+      return decision;
     }
   }
 
  protected:
-  void withinNodeLoadBalance(std::vector<TreeLBMessage*>& decisions)
+  LLBMigrateMsg* withinNodeLoadBalance()
   {
     CkAssert(wrappers.size() > current_strategy);
     IStrategyWrapper* wrapper = wrappers[current_strategy];
@@ -1049,12 +1024,7 @@ class NodeLevel : public LevelLogic
     // need to cast pointer to ensure delete of CMessage_LBStatsMsg_1 is called
     for (auto msg : stats_msgs) delete (LBStatsMsg_1*)msg;
     stats_msgs.clear();
-    decisions[0] = migMsg;
-    for (int i = 1; i < pes.size(); i++)
-    {
-      CkReferenceMsg(migMsg);
-      decisions[i] = migMsg;
-    }
+    return migMsg;
   }
 
   LBManager* lbmgr;
@@ -1240,7 +1210,7 @@ class PELevel : public LevelLogic
 class MsgAggregator : public LevelLogic
 {
  public:
-  MsgAggregator(int _num_children) : num_children(_num_children) {}
+  MsgAggregator() {}
 
   virtual ~MsgAggregator() {}
 
@@ -1253,22 +1223,43 @@ class MsgAggregator : public LevelLogic
     return newMsg;
   }
 
-  virtual void splitDecision(TreeLBMessage* decision,
-                             std::vector<TreeLBMessage*>& decisions)
+  virtual std::vector<TreeLBMessage*> splitDecision(TreeLBMessage* decision,
+                                                    std::vector<int>& children)
   {
-    // just send same msg
-    CkAssert(num_children > 0);
-    decisions.resize(num_children + 1);
-    decisions[0] = decision;
-    for (int i = 1; i < num_children + 1; i++)
-    {
-      CkReferenceMsg(decision);
-      decisions[i] = decision;
-    }
-  }
+    const int myNode = CkMyNode();
+    std::vector<TreeLBMessage*> decisions(children.size() + 1);
 
- protected:
-  int num_children;
+    // Avoid allocating a new message until we get to a non-local child
+    TreeLBMessage* remoteMsg = nullptr;
+
+    // The first element is always for the local PE, the caller must delete it manually if
+    // it is not used
+    decisions[0] = decision;
+    for (int i = 1; i < decisions.size(); ++i)
+    {
+      if (CkNodeOf(children[i-1]) == myNode)
+      {
+        CkReferenceMsg(decision);
+        decisions[i] = decision;
+      }
+      // Use separate message for messages outside the process because it will get packed
+      // and mess up local uses of the message
+      else
+      {
+        if (remoteMsg == nullptr)
+        {
+          remoteMsg = (TreeLBMessage*)CkCopyMsg((void**)&decision);
+        }
+        else
+        {
+          CkReferenceMsg(remoteMsg);
+        }
+        decisions[i] = remoteMsg;
+      }
+    }
+
+    return decisions;
+  }
 };
 
 #endif /* TREELEVEL_H */

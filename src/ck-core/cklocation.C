@@ -1629,7 +1629,7 @@ void CkMigratable::AtSync(int waitForMigration)
   if (usesAutoMeasure == false) UserSetLBLoad();
 
   if(_lb_psizer_on || _lb_args.metaLbOn()){
-    PUP::sizer ps;
+    PUP::sizer ps(PUP::er::IS_MIGRATION);
     this->virtual_pup(ps);
     if(_lb_psizer_on)
       setPupSize(ps.size());
@@ -2536,6 +2536,11 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
       }
 #endif
       msg->array_hops()++;
+      // If we are hopping more than twice, we've discovered a stale chain
+      // of cache entries. Just route through home instead.
+      if (msg->array_hops() > 2 && CkMyPe() != homePe(id)) {
+        destPE = homePe(id);
+      }
       CkArrayManagerDeliver(destPE,msg,opts);
       return true;
     }
@@ -2901,7 +2906,7 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 //First pass: find size of migration message
 	size_t bufSize;
 	{
-		PUP::sizer p;
+		PUP::sizer p(PUP::er::IS_MIGRATION);
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		bufSize=p.size(); 
 	}
@@ -2927,7 +2932,7 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
     );
 
 	{
-		PUP::toMem p(msg->packData); 
+		PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION); 
 		p.becomeDeleting(); 
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		if (p.size()!=bufSize) {
@@ -2978,7 +2983,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 {
 	const CkArrayIndex &idx=msg->idx;
 		
-	PUP::fromMem p(msg->packData); 
+	PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
 	
 	if (msg->nManagers < managers.size())
 		CkAbort("Array element arrived from location with fewer managers!\n");

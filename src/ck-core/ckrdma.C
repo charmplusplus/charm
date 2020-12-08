@@ -11,6 +11,8 @@
 #include "ckarray.h"
 #include "cklocation.h"
 
+void CmiFreeBroadcastAllExceptMeFn(int size, char *msg);
+
 #if CMK_SMP
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
 #endif
@@ -290,7 +292,7 @@ void CkRdmaDirectAckHandler(void *ack) {
   switch(info->opMode) {
     case CMK_DIRECT_API             : handleDirectApiCompletion(info); // Ncpy Direct API
                                       break;
-#if CMK_ONESIDED_IMPL
+
     case CMK_EM_API                 : handleEntryMethodApiCompletion(info); // Ncpy EM API invoked through a GET
                                       break;
 
@@ -311,7 +313,7 @@ void CkRdmaDirectAckHandler(void *ack) {
 
     case CMK_READONLY_BCAST         : readonlyGetCompleted(info);
                                       break;
-#endif
+
     case CMK_ZC_PUP                 : zcPupGetCompleted(info);
                                       break;
 
@@ -373,7 +375,6 @@ inline void zcQdIncrement() {
 }
 
 
-#if CMK_ONESIDED_IMPL
 /*********************************** Zerocopy Entry Method API ****************************/
 
 /************************* Zerocopy Entry Method API - Utility functions ******************/
@@ -622,14 +623,14 @@ void preprocessRdmaCaseForRgets(int &layerInfoSize, int &ncpyObjSize, int &extra
     totalMsgSize += sizeof(NcpyEmInfo) + numops*(sizeof(NcpyEmBufferInfo) + extraSize);
 }
 
-void setNcpyEmInfo(char *ref, envelope *env, int &msgsize, int &numops, void *forwardMsg, ncpyEmApiMode emMode) {
+void setNcpyEmInfo(char *ref, envelope *env, int &numops, void *forwardMsg, ncpyEmApiMode emMode) {
 
     NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)ref;
     ncpyEmInfo->numOps = numops;
     ncpyEmInfo->counter = 0;
     ncpyEmInfo->msg = env;
 
-    ncpyEmInfo->forwardMsg = forwardMsg; // useful only for BCAST, NULL for P2P
+    ncpyEmInfo->forwardMsg = forwardMsg; // useful only for Send Bcast, NULL for others
     ncpyEmInfo->pe = CkMyPe();
     ncpyEmInfo->mode = emMode; // P2P or BCAST
 }
@@ -793,7 +794,7 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
 
   if(ncpyMode == CkNcpyMode::RDMA) {
     ref = (char *)copyenv + CK_ALIGN(msgsize, 16) + bufsize;
-    setNcpyEmInfo(ref, copyenv, msgsize, numops, forwardMsg, emMode);
+    setNcpyEmInfo(ref, copyenv, numops, forwardMsg, emMode);
   }
 
   char *buf = (char *)copyenv + CK_ALIGN(msgsize, 16);
@@ -896,13 +897,7 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
  * the destination to perform zerocopy operations as a part of the Zerocopy Entry Method
  * API
  */
-void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs){
-
-  if(emMode == ncpyEmApiMode::BCAST_SEND)
-    CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
-
-  // Iterate over the ncpy buffer and either perform the operations
-  int msgsize = env->getTotalsize();
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs){
 
   int refSize = 0;
   char *ref;
@@ -911,7 +906,6 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
   CkNcpyMode ncpyMode = findTransferMode(getSrcPe(env), CkMyPe());
   CmiSpanningTreeInfo *t = NULL;
   if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
-
 
   if(emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
     t = getSpanningTreeInfo(rootNode);
@@ -930,7 +924,7 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
     CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
 
   if(ncpyMode == CkNcpyMode::RDMA) {
-    setNcpyEmInfo(ref, env, msgsize, numops, forwardMsg, emMode);
+    setNcpyEmInfo(ref, env, numops, NULL, emMode);
   }
 
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
@@ -1003,8 +997,9 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
                                 handleMsgOnChildPostCompletionForRecvBcast(env);
                                 break;
 
-      case CkNcpyMode::CMA   :  if(t->child_count == 0) {
-                                  sendAckMsgToParent(env);
+      case CkNcpyMode::CMA   :  // Invoke the Ack handler on the parent node to signal completion
+                                sendAckMsgToParent(env);
+                                if(t->child_count == 0) {
                                   handleMsgOnChildPostCompletionForRecvBcast(env);
                                 } else {
                                   // Allocate a structure NcpyBcastInterimAckInfo to maintain state for ack handling
@@ -1250,19 +1245,7 @@ void CkRdmaEMBcastAckHandler(void *ack) {
 #if CMK_REG_REQUIRED
         deregisterMemFromMsg(myMsg, true);
 #endif
-        // send a message to the parent to signal completion
-        int srcPe;
         CkArray *mgr = NULL;
-        envelope *env = (envelope *)bcastInterimAckInfo->msg;
-        CkUnpackMessage(&env); // Unpack message before sending it to getParentBcastAckInfo
-        char *ref = (char *)(getParentBcastAckInfo(bcastInterimAckInfo->msg, srcPe));
-        CkPackMessage(&env);
-
-        NcpyBcastInterimAckInfo *ncpyBcastAck = (NcpyBcastInterimAckInfo *)ref;
-
-        // Invoke CkRdmaEMBcastAckHandler on my parent node
-        invokeRemoteNcpyAckHandler(ncpyBcastAck->origPe, ncpyBcastAck->parentBcastAckInfo, ncpyHandlerIdx::BCAST_ACK);
-
         CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_DONE_MSG;
 
         CkUnpackMessage(&myMsg); // DO NOT REMOVE THIS
@@ -1277,7 +1260,7 @@ void CkRdmaEMBcastAckHandler(void *ack) {
         } else {
           // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
           // that this is the final message containing the posted pointers
-          CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+          CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
           QdCreate(1);
           enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
         }
@@ -1295,12 +1278,6 @@ void CkRdmaEMBcastAckHandler(void *ack) {
 #if CMK_REG_REQUIRED
         deregisterMemFromMsg(myMsg, false);
 #endif
-        // send a message to the parent to signal completion
-        envelope *env = (envelope *)bcastInterimAckInfo->msg;
-        CkUnpackMessage(&env); // Unpack message before sending it to getParentBcastAckInfo
-        sendAckMsgToParent(env);
-        CkPackMessage(&env);
-
         forwardMessageToPeerNodes(myMsg, myMsg->getMsgtype());
 
         // enquque message to execute EM on the intermediate node
@@ -1433,10 +1410,10 @@ void handleMsgUsingCMAPostCompletionForSendBcast(envelope *copyenv, envelope *en
   CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(getRootNode(env)));
   CkPackMessage(&env);
 
-  if(t.child_count == 0) { // child node
+  // Send an ack message to the parent node to signal completion
+  invokeRemoteNcpyAckHandler(source.pe, (void *)source.refAckInfo, ncpyHandlerIdx::BCAST_ACK);
 
-    // Send a message to the parent node to signal completion
-    invokeRemoteNcpyAckHandler(source.pe, (void *)source.refAckInfo, ncpyHandlerIdx::BCAST_ACK);
+  if(t.child_count == 0) { // child node
 
     // Only forwarding is to peer PEs
     forwardMessageToPeerNodes(copyenv, copyenv->getMsgtype());
@@ -1461,11 +1438,11 @@ void processBcastSendEmApiCompletion(NcpyEmInfo *ncpyEmInfo, int destPe) {
   envelope *myEnv = (envelope *)(ncpyEmInfo->msg);
   CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(getRootNode(myEnv)));
 
-  if(t.child_count == 0) { // Child Node
+  CkUnpackMessage(&myEnv); // Unpack message before sending it to sendAckMsgToParent
+  sendAckMsgToParent(myEnv); // Send a ack message to the parent node to signal completion
+  CkPackMessage(&myEnv);
 
-    CkUnpackMessage(&myEnv); // Unpack message before sending it to sendAckMsgToParent
-    sendAckMsgToParent(myEnv);
-    CkPackMessage(&myEnv);
+  if(t.child_count == 0) { // Child Node
 
     // Since I am a child node, no more forwarding to any more childing
     // Only forwarding is to peer PEs
@@ -1566,11 +1543,12 @@ void CkRdmaEMBcastPostAckHandler(void *msg) {
 
   CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(getRootNode(env)));
 
-  // send a message to your parents if you are a child node
+  // send an ack message to your parent node
+  sendAckMsgToParent(env);
+
   if(t.child_count == 0) {
 
     // Send message to all peer elements on this PE
-    sendAckMsgToParent(env);
     handleMsgOnChildPostCompletionForRecvBcast(env);
 
   } else if(t.child_count !=0 && t.parent != -1) {
@@ -1606,12 +1584,6 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *env, NcpyBcastInterimAckInfo *bcast
   for(int i=0; i<numops; i++){
     // unpack from current message
     up|source;
-
-    const void *bcastAckInfoTemp = source.refAckInfo;
-    int orig_source_pe = source.pe;
-
-    bcastAckInfo->parentBcastAckInfo = (void *)bcastAckInfoTemp;
-    bcastAckInfo->origPe = orig_source_pe;
 
     source.refAckInfo = bcastAckInfo;
     source.pe = origPe;
@@ -1944,7 +1916,8 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
   }
 
   // Free ncpyOpInfo allocated inside readonlyGet
-  CmiFree(ncpyOpInfo);
+  if(ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO)
+    CmiFree(ncpyOpInfo);
 }
 /***************************** End of Zerocopy Readonly Bcast Support ****************************/
 
@@ -1987,14 +1960,11 @@ inline void _ncpyBcastNoHandler(ncpyBcastNoMsg *bcastNoMsg) {
   arrProxy[bcastNoMsg->srcPe].sendZCBroadcast(w);
 }
 
-#endif  /* End of CMK_ONESIDED_IMPL */
 
 // Register converse handler for invoking ncpy ack
 void initEMNcpyAckHandler(void) {
-#if CMK_ONESIDED_IMPL
   ncpy_bcastNo_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyBcastNoHandler);
   ncpy_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyAckHandler);
-#endif
 #if CMK_SMP
   zcpy_pup_complete_handler_idx = CmiRegisterHandler((CmiHandler)_zcpyPupCompleteHandler);
 #endif
@@ -2010,7 +1980,6 @@ inline void invokeRemoteNcpyAckHandler(int pe, void *ref, ncpyHandlerIdx opMode)
   CmiSyncSendAndFree(pe, sizeof(ncpyHandlerMsg), (char *)msg);
 }
 
-#if CMK_ONESIDED_IMPL
 inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
   QdProcess(1);
 
@@ -2031,7 +2000,6 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
                                                  break;
   }
 }
-#endif  /* End of CMK_ONESIDED_IMPL */
 
 
 /***************************** Zerocopy PUP Support ****************************/

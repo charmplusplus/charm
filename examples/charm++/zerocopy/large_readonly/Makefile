@@ -25,6 +25,12 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p6 ./readonly +noCMAForZC)
 endif
 
+testp: all
+	$(call run, +p$(P) ./readonly)
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./readonly +noCMAForZC)
+endif
+
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o readonly charmrun cifiles
 

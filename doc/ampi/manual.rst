@@ -225,7 +225,7 @@ Installing AMPI
 ---------------
 
 AMPI is included in the source distribution of Charm++. To get the
-latest sources from PPL, visit: http://charm.cs.illinois.edu/software
+latest sources from PPL, visit: https://charm.cs.illinois.edu/software
 
 and follow the download links. Then build Charm++ and AMPI from source.
 

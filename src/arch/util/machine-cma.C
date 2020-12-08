@@ -3,6 +3,8 @@
 #endif
 #include <sys/uio.h>
 
+#define MAX_CMA_RW_COUNT 0x7ffff000 //2147479552 in decimal
+
 // Method checks if process has permissions to use CMA
 int CmiInitCma() {
   char buffer   = '0';
@@ -46,17 +48,33 @@ void CmiDisplayCMAThresholds(int cma_min_threshold, int cma_max_threshold) {
  * list of local buffers over SHM using the cma library
  */
 int readShmCma(
-  pid_t remote_pid,
-  struct iovec *local,
-  struct iovec *remote,
-  int numOps,
-  size_t total_bytes) {
+  pid_t remotePid,
+  char *localAddr,
+  char *remoteAddr,
+  size_t totalBytes) {
 
-  int nread = process_vm_readv(remote_pid, local, numOps, remote, numOps, 0);
-  if(nread != total_bytes) {
-    CmiAbort("process_vm_readv failed!\n");
-    return errno;
+  int numOps = 1;
+  size_t toBeReadTotal = totalBytes, nread_total = 0, offset = 0;
+  struct iovec local, remote;
+
+  while(toBeReadTotal) {
+    local.iov_base = (char *)localAddr + offset;
+    remote.iov_base = (char *)remoteAddr + offset;
+
+    ssize_t toBeRead  = (toBeReadTotal > MAX_CMA_RW_COUNT) ? MAX_CMA_RW_COUNT : toBeReadTotal;
+    local.iov_len  = toBeRead;
+    remote.iov_len  = toBeRead;
+
+    ssize_t nread = process_vm_readv(remotePid, &local, numOps, &remote, numOps, 0);
+    if(nread != toBeRead) {
+      CmiAbort("process_vm_readv failed! Size to be read:%zu bytes, Size actually read:%zd bytes (negative value indicates error), error no:%d, error message:%s!\n", toBeRead, nread, errno, strerror(errno));
+      return errno;
+    }
+    // successful operation (nread == toBeRead)
+    toBeReadTotal -= toBeRead;
+    offset += toBeRead;
   }
+  // all reading is complete
   return 0;
 }
 
@@ -64,17 +82,33 @@ int readShmCma(
  * list of local buffers over SHM using the cma library
  */
 int writeShmCma(
-  pid_t remote_pid,
-  struct iovec *local,
-  struct iovec *remote,
-  int numOps,
-  size_t total_bytes) {
+  pid_t remotePid,
+  char *localAddr,
+  char *remoteAddr,
+  size_t totalBytes) {
 
-  int nread = process_vm_writev(remote_pid, local, numOps, remote, numOps, 0);
-  if(nread != total_bytes) {
-    CmiAbort("process_vm_writev failed!\n");
-    return errno;
+  int numOps = 1;
+  size_t toBeWrittenTotal = totalBytes, nwriteTotal = 0, offset = 0;
+  struct iovec local, remote;
+
+  while(toBeWrittenTotal) {
+    local.iov_base = (char *)localAddr + offset;
+    remote.iov_base = (char *)remoteAddr + offset;
+
+    ssize_t toBeWritten = (toBeWrittenTotal > MAX_CMA_RW_COUNT) ? MAX_CMA_RW_COUNT : toBeWrittenTotal;
+    local.iov_len = toBeWritten;
+    remote.iov_len = toBeWritten;
+
+    ssize_t nwrite = process_vm_writev(remotePid, &local, numOps, &remote, numOps, 0);
+    if(nwrite != toBeWritten) {
+      CmiAbort("process_vm_writev failed! Size to be written:%zu bytes, Size actually written:%zd bytes (negative value indicates error), error no:%d, error message:%s!\n", toBeWritten, nwrite, errno, strerror(errno));
+      return errno;
+    }
+    // successful operation (nwrite == toBeWritten)
+    toBeWrittenTotal -= toBeWritten;
+    offset += toBeWritten;
   }
+  // all writing is complete
   return 0;
 }
 
@@ -99,17 +133,10 @@ void handleOneCmaMdMsg(int *sizePtr, char **msgPtr) {
   // Allocate a buffer to hold the buffer
   destAddr = (char *)CmiAlloc(bufInfo->size);
 
-  local.iov_base = (void *)destAddr;
-  local.iov_len  = bufInfo->size;
-
-  remote.iov_base = bufInfo->srcAddr;
-  remote.iov_len  = bufInfo->size;
-
   // Perform CMA read into destAddr
   readShmCma(bufInfo->srcPid,
-             &local,
-             &remote,
-             1,
+             destAddr,
+             (char *)bufInfo->srcAddr,
              bufInfo->size);
 
   // Send the buffer md msg back as an ack msg to signal CMA read completion in order to free buffers

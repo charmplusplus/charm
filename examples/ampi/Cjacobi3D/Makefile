@@ -13,10 +13,8 @@ AMPI_TARGETS := \
   jacobi.tls \
   jacobi-get \
 
-ifneq ($(CMK_WINDOWS),1)
-ifneq ($(CMK_BLUEGENEQ),1)
-AMPI_TARGETS += jacobi.iso
-endif
+ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
+  AMPI_TARGETS += jacobi.iso
 endif
 
 ampi: $(AMPI_TARGETS)
@@ -42,12 +40,8 @@ jacobi.iso: jacobi.C
 	$(CHARMC) -o $@ jacobi.iso.o -memory isomalloc
 
 jacobi.tls: jacobi.C
-ifeq ($(CMK_UTH),1)
-	@echo "Skipping jacobi.tls test on UTH (tlsglobals not supported)."
-else
 	-$(CHARMC) -c -tlsglobals jacobi.C -o jacobi.tls.o
 	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobals
-endif
 
 jacobi.rose: jacobi.C
 	$(CHARMC) -roseomptlsglobals -o jacobi.rose.o -c $<
@@ -64,11 +58,28 @@ jacobi-get-tokens:
 test: ampi
 	$(call run, +p3 ./jacobi.pup 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1 )
 	$(call run, +p3 ./jacobi 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1 )
-ifneq ($(CMK_WINDOWS),1)
-ifneq ($(CMK_BLUEGENEQ),1)
+ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
 	$(call run, +p3 ./jacobi.iso 2 2 2 40 +vp8 +balancer RotateLB +LBDebug 1)
 endif
+
+testp: ampi
+	$(call run, +p$(P) ./jacobi.pup $(P) 1 1 40 +vp$(P) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.pup $(P) 2 1 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.pup $(P) 2 2 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
+
+	$(call run, +p$(P) ./jacobi $(P) 1 1 40 +vp$(P) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi $(P) 2 1 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi $(P) 2 2 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
+
+ifneq ($(CMK_WINDOWS),1)
+ifneq ($(CMK_BLUEGENEQ),1)
+	$(call run, +p$(P) ./jacobi.iso $(P) 1 1 40 +vp$(P) +balancer RotateLB +LBDebug 1)
+	$(call run, +p$(P) ./jacobi.iso $(P) 2 1 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.iso $(P) 2 2 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
 endif
+endif
+
+
 
 clean:
 	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls ampirun

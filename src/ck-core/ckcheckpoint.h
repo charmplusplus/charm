@@ -52,8 +52,11 @@ void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
 //void CkTestArrayElements();
 
-void CkStartCheckpoint(const char* dirname,const CkCallback& cb, bool requestStatus = false);
-void CkRestartMain(const char* dirname, CkArgMsg *args);
+// If writersPerNode <= 0 the number of writers is unchanged, if > 0, then set to
+// min(writersPerNode, CkMyNodeSize())
+void CkStartCheckpoint(const char* dirname, const CkCallback& cb,
+                       bool requestStatus = false, int writersPerNode = 0);
+void CkRestartMain(const char* dirname, CkArgMsg* args);
 #if CMK_SHRINK_EXPAND
 void CkResumeRestartMain(char *msg);
 #endif

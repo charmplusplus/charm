@@ -1,0 +1,109 @@
+mainmodule jacobi2d {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Block block_proxy;
+  readonly int grid_size;
+  readonly int block_size;
+  readonly int n_chares;
+  readonly int n_iters;
+  readonly bool sync_ver;
+  readonly bool use_zerocopy;
+  readonly bool print;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void initDone();
+    entry [reductiontarget] void commDone();
+    entry [reductiontarget] void updateDone();
+    entry [reductiontarget] void done();
+    entry void printDone();
+  };
+
+  array [2D] Block {
+    entry Block(void);
+    entry void init();
+    entry void initDone();
+    entry void packGhostsDone();
+    entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice double gh[w]);
+    entry void receiveGhostsReg(int ref, int dir, int w, double gh[w]);
+    entry void sendGhostDone();
+    entry void updateDone();
+
+    entry void exchangeGhosts() {
+      serial {
+        packGhosts();
+        // Packed buffers can be enqueued for sending right away with zerocopy
+        // Without it, they should first be transferred to host memory
+        if (use_zerocopy) {
+          sendGhosts();
+        }
+      }
+
+      if (!use_zerocopy) {
+        when packGhostsDone() {
+          serial {
+            sendGhosts();
+          }
+        }
+      }
+
+      for (remote_count = 0; remote_count < neighbors; remote_count++) {
+        if (use_zerocopy) {
+          when receiveGhostsZC[my_iter](int ref, int dir, int w, nocopydevice double buf[w]) {
+            serial {
+              processGhostsZC(dir, w, buf);
+            }
+          }
+        } else {
+          when receiveGhostsReg[my_iter](int ref, int dir, int w, double buf[w]) {
+            serial {
+              processGhostsReg(dir, w, buf);
+            }
+          }
+        }
+      }
+
+      // With device-side zerocopy in asynchronous mode, need to wait until
+      // ghost transfers are complete before updating the block
+      if (use_zerocopy && !sync_ver) {
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when sendGhostDone() {
+            serial {}
+          }
+        }
+      }
+
+      serial {
+        if (sync_ver) {
+          CkCallback cb(CkReductionTarget(Main, commDone), main_proxy);
+          contribute(cb);
+        } else {
+          update();
+        }
+      }
+
+      when updateDone() {
+        serial {
+          // Swap pointers
+          std::swap(d_temperature, d_new_temperature);
+
+          // Iteration comoplete
+          if (sync_ver) {
+            my_iter++;
+            CkCallback cb(CkReductionTarget(Main, updateDone), main_proxy);
+            contribute(cb);
+          } else {
+            if (my_iter++ < n_iters) {
+              thisProxy[thisIndex].exchangeGhosts();
+            } else {
+              CkCallback cb(CkReductionTarget(Main, done), main_proxy);
+              contribute(cb);
+            }
+          }
+        }
+      }
+    }
+
+    entry void update();
+    entry void print();
+  };
+};
