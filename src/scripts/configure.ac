@@ -2573,7 +2573,7 @@ AC_DEFINE_UNQUOTED([CMK_HAS_MULTIPROCESSING_H], $pass, [whether has Multiprocess
 #### test if "ntohl" is available ####
 cat > $t <<EOT
 #if defined(_WIN32) || defined(__MINGW_H)
-#include <winsock.h>
+#include <Winsock2.h>
 #else
 #include <stdint.h>
 #include <arpa/inet.h>
