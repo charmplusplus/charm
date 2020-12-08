@@ -118,6 +118,11 @@ void TCharm::procInit()
     if (CkMyPe() == 0)
       CkPrintf("TCharm> stack size is set to %d.\n", tcharm_stacksize);
   }
+  if (CkMyRank()!=0) { // rank 0 eats "+vp<N>" and "-vp<N>" in nodeInit
+    int ignored;
+    CmiGetArgIntDesc(argv,"-vp",&ignored,NULL);
+    CmiGetArgIntDesc(argv,"+vp",&ignored,NULL);
+  }
   if (CkMyPe()==0) { // Echo various debugging options:
     if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
     if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
