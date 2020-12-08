@@ -19,6 +19,7 @@ module collidecharm {
         CProxy_collideClient client,
         CkArrayID cells);
     entry void voxelMessageRecvd(void);
+    entry void recvMap(std::unordered_map<int, int> localHistMap[size], int size);
   };
 
   array [3D] collideVoxel {

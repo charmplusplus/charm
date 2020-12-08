@@ -97,6 +97,10 @@ class seg1dT {
   bool intersectsHalf(const seg1d &b) const {
     return containsHalf(b.min)||b.containsHalf(min);
   }
+  //Get the length of this seg
+  T getLength() const {
+    return max-min;
+  }
 
   inline void pup(PUP::er &p) {
     p|min;
@@ -141,6 +145,9 @@ class bbox3d {
     return bbox3d(segs[0].getIntersection(b.segs[0]),
         segs[1].getIntersection(b.segs[1]),
         segs[2].getIntersection(b.segs[2]));
+  }
+  double getLength(int i) const {
+    return segs[i].getLength();
   }
   //Interior or boundary (closed interval)
   bool intersects(const bbox3d &b) const {

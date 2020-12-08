@@ -157,12 +157,16 @@ class collideMgr : public CBase_collideMgr
   CProxy_collideClient client; //Collision client group
 
   int nContrib;//Number of registered contributors
+  int contribCount2;//Number of registered contributors
   int contribCount;//Number of contribute calls given this step
+
+  std::unordered_map<int, int> aggHistMap[3];
 
   CollisionAggregator aggregator;
   int msgsSent;//Messages sent out to voxels
   int msgsRecvd;//Return-receipt messages received from voxels
   void tryAdvance(void);
+
   protected:
   //Check if we're barren-- if so, advance now
   virtual void pleaseAdvance(void);
@@ -187,6 +191,10 @@ class collideMgr : public CBase_collideMgr
 
   //collideVoxels send a return receipt here
   void voxelMessageRecvd(void);
+
+  void recvMap(std::unordered_map<int, int> *localHistMap, int size);
+  //void recvMap(std::unordered_map<int, int> localHistMap);
+
 };
 
 /********************** collideVoxel ********************

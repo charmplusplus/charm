@@ -3,6 +3,8 @@
  * Orion Sky Lawlor, olawlor@acm.org, 4/8/2001
  */
 #include "charm++.h"
+#include <assert.h>
+#include "pup_stl.h"
 #include "collidecharm_impl.h"
 
 #define COLLIDE_TRACE 0
@@ -407,6 +409,7 @@ collideMgr::collideMgr(const CollideGrid3d &gridMap_,
 {
   steps=0;
   nContrib=0;
+  contribCount2=0;
   contribCount=0;
   msgsSent=msgsRecvd=0;
 }
@@ -428,10 +431,53 @@ void collideMgr::contribute(int chunkNo,
     int n,const bbox3d *boxes,const int *prio)
 {
   //printf("[%d] Receiving contribution from %d\n",CkMyPe(), chunkNo);
+
+  std::unordered_map<int, int> localHistMap[3];
+  std::unordered_map<int, int>::iterator it;
+  double bucketSize = 2.0, len[3], key;
+  for(int i=0; i < n; i++) {
+    for(int j=0; j < 3; j++) {
+      len[j] = boxes[i].getLength(j);
+      key = (int)(len[j]/bucketSize);
+
+      it = localHistMap[j].find(key);
+      if(it != localHistMap[j].end())
+        it->second++;             // updated entry
+      else
+        localHistMap[j][key] = 1; // first entry
+    }
+    //CkPrintf("[%d][%d][%d] chunk No=%d, lengths are %lf, %lf, %lf\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), chunkNo, len[0], len[1], len[2]);
+  }
+
+  int sum[3];
+  memset(sum, 0, sizeof(int) * 3);
+
+  for(int j=0; j < 3; j++) {
+    for( it = localHistMap[j].begin(); it != localHistMap[j].end(); it++) {
+      CkPrintf("[%d][%d][%d][%d] Axis=%d, Key=%d, Value=%d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), chunkNo, j, it->first, it->second);
+      sum[j] += it->second;
+    }
+  }
+
+  for(int j=0; j < 3; j++)
+    assert(sum[j] == n);
+
+
   CM_STATUS("collideMgr::contribute "<<n<<" boxes from "<<chunkNo);
   aggregator.aggregate(CkMyPe(),chunkNo,n,boxes,prio);
   aggregator.send(); //Deliver all outgoing messages
   if (++contribCount==nContrib) { //That's everybody
+
+    for(int j=0; j < 3; j++) {
+      for( it = localHistMap[j].begin(); it != localHistMap[j].end(); it++) {
+        CkPrintf("[%d][%d][%d] ******* Print0: Axis=%d, Key=%d, Value=%d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), j, it->first, it->second);
+      }
+    }
+
+
+
+    thisProxy[0].recvMap(localHistMap, 1);
+
     //aggregator.send(); //Deliver all outgoing messages
     //if (getStepCount()%8==7)
     aggregator.compact();//Blow away all the old voxels (saves memory)
@@ -439,6 +485,64 @@ void collideMgr::contribute(int chunkNo,
   }
   //printf("[%d] DONE receiving contribution from %d\n",CkMyPe(), chunkNo);
 }
+
+void collideMgr::recvMap(std::unordered_map<int, int> *localHistMap, int size) {
+
+  std::unordered_map<int, int>::iterator it;
+  int j=0;
+    for( it = localHistMap[j].begin(); it != localHistMap[j].end(); it++) {
+      //CkPrintf("[%d][%d][%d] Axis=%d, Key=%d, Value=%d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), j, it->first, it->second);
+      CkPrintf("[%d][%d][%d] ^^^^^^ Print2: Axis=%d, Key=%d, Value=%d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), j, it->first, it->second);
+      //sum[j] += it->second;
+    }
+
+
+  //std::unordered_map<int, int>::iterator it1, it2;
+  //for(int j=0; j < 3; j++) {
+  //  for( it1 = localHistMap[j].begin(); it1 != localHistMap[j].end(); it1++) {
+  //    it2 = aggHistMap[j].find(it1->first);
+  //    if(it2 != aggHistMap[j].end()) { // found
+  //      it2->second += it1->second;
+  //    } else { // insert
+  //      aggHistMap[j][it1->first] = it1->second;
+  //    }
+  //  }
+  //}
+  contribCount2++;
+  if(contribCount2 == CkNumPes()) {
+    CkPrintf("[%d][%d][%d] All groups contributed \n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+  }
+}
+
+
+//void collideMgr::recvMap(std::unordered_map<int, int> localHistMap[3]) {
+//
+//  std::unordered_map<int, int>::iterator it;
+//  for(int j=0; j < 3; j++) {
+//    for( it = localHistMap[j].begin(); it != localHistMap[j].end(); it++) {
+//      //CkPrintf("[%d][%d][%d] Axis=%d, Key=%d, Value=%d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), j, it->first, it->second);
+//      CkPrintf("[%d][%d][%d] ^^^^^^ Print2: Axis=%d, Key=%d, Value=%d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), j, it->first, it->second);
+//      //sum[j] += it->second;
+//    }
+//  }
+//
+//
+//  //std::unordered_map<int, int>::iterator it1, it2;
+//  //for(int j=0; j < 3; j++) {
+//  //  for( it1 = localHistMap[j].begin(); it1 != localHistMap[j].end(); it1++) {
+//  //    it2 = aggHistMap[j].find(it1->first);
+//  //    if(it2 != aggHistMap[j].end()) { // found
+//  //      it2->second += it1->second;
+//  //    } else { // insert
+//  //      aggHistMap[j][it1->first] = it1->second;
+//  //    }
+//  //  }
+//  //}
+//  contribCount2++;
+//  if(contribCount2 == CkNumPes()) {
+//    CkPrintf("[%d][%d][%d] All groups contributed \n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+//  }
+//}
 
 inline CkArrayIndex3D buildIndex(const CollideLoc3d &l)
 {return CkArrayIndex3D(l.x,l.y,l.z);}
