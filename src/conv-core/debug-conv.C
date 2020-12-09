@@ -50,7 +50,7 @@ u_long ntohl(u_long netlong) {
 }
 #else
 #if defined _WIN32
-#include <winsock.h>
+#include <Winsock2.h>
 #else
 #include <arpa/inet.h>
 #include <netinet/in.h>
