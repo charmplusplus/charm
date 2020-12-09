@@ -79,8 +79,8 @@ void TCharm::nodeInit()
 
   char **argv = CkGetArgv();
   nChunks = CkNumPes();
-  CmiGetArgIntDesc(argv,"-vp",&nChunks,"Set the total number of virtual processors");
-  CmiGetArgIntDesc(argv,"+vp",&nChunks,NULL);
+  CmiGetArgIntDesc(argv, "-vp", &nChunks, "Set the total number of virtual processors");
+  CmiGetArgIntDesc(argv, "+vp", &nChunks, nullptr);
 }
 
 void TCharm::procInit()
@@ -118,10 +118,10 @@ void TCharm::procInit()
     if (CkMyPe() == 0)
       CkPrintf("TCharm> stack size is set to %d.\n", tcharm_stacksize);
   }
-  if (CkMyRank()!=0) { // rank 0 eats "+vp<N>" and "-vp<N>" in nodeInit
+  if (CkMyRank() != 0) { // rank 0 eats "+vp<N>" and "-vp<N>" in nodeInit
     int ignored;
-    CmiGetArgIntDesc(argv,"-vp",&ignored,NULL);
-    CmiGetArgIntDesc(argv,"+vp",&ignored,NULL);
+    CmiGetArgIntDesc(argv, "-vp", &ignored, nullptr);
+    CmiGetArgIntDesc(argv, "+vp", &ignored, nullptr);
   }
   if (CkMyPe()==0) { // Echo various debugging options:
     if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
