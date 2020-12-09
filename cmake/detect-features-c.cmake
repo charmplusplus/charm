@@ -421,7 +421,11 @@ check_c_source_compiles("
 #include <ucontext.h>
 struct _libc_fpstate   fpstate;
 fpregset_t *fp;
-int main() {}
+int main()
+{
+  ucontext_t context;
+  context.uc_mcontext.fpregs = 0;
+}
 " CMK_CONTEXT_FPU_POINTER)
 
 check_c_source_compiles("

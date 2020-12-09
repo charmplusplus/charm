@@ -1,6 +1,6 @@
 name: NAMD
 
-on: [push]
+on: pull_request
 
 jobs:
   build:
@@ -23,7 +23,7 @@ jobs:
       run: |
         cd ../namd/Linux-x86_64-g++
         ./charmrun ++local +p2 ./namd2 src/alanin
-        
+
     - name: Cache apoa1 files
       id: cache-apoa1-files
       uses: actions/cache@v2.0.0
@@ -40,7 +40,7 @@ jobs:
         sed -i 's,500,250,' apoa1/apoa1.namd # Reduce number of steps
         sed -i 's,/usr/tmp,/tmp,' apoa1/apoa1.namd # Change output prefix
         rm apoa1.tar.gz
-    
+
     - name: test-namd-apoa1
       run: |
         cd ../namd/Linux-x86_64-g++
