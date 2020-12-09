@@ -265,9 +265,7 @@ class CmiNcpyBuffer {
   void rdmaGet(CmiNcpyBuffer &source, int ackSize, char *srcAck, char *destAck);
   void rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck);
 
-#if CMK_ONESIDED_IMPL
   friend inline void deregisterBuffer(CmiNcpyBuffer &buffInfo);
-#endif
 
 
 };
