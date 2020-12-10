@@ -1,12 +1,15 @@
 module collidecharm {
   message objListMsg;
 
+  initnode void registerMinMaxBboxDims(void);
+
   group collideClient {
   };
   group serialCollideClient : collideClient {
     entry serialCollideClient();
-    entry serialCollideClient(CkCallback clientCb_);
+    entry serialCollideClient(Ckallback clientCb_);
     entry void reductionDone(CkReductionMsg *m);
+    entry [reductiontarget] void voxelCountDone(int result);
   };
 
   group syncReductionMgr {
@@ -20,6 +23,9 @@ module collidecharm {
         CkArrayID cells);
     entry void voxelMessageRecvd(void);
     entry void recvMap(std::unordered_map<int, int> localHistMap[size], int size);
+    entry [reductiontarget] void receiveMinMaxData(CkReductionMsg *msg);
+
+    entry void histogram(double minMax[6], int numBuckets[3]);
   };
 
   array [3D] collideVoxel {

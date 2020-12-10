@@ -27,6 +27,30 @@
 #  define COL_STATUS(x) /*empty*/
 #endif
 
+CkReduction::reducerType minMaxBboxDimType;
+
+
+CkReductionMsg *minMaxBbox(int nMsg, CkReductionMsg **msgs) {
+
+  double *result = (double *)msgs[0]->getData();
+  for(int i=1; i < nMsg; i++) {
+    double *contrib = (double *)msgs[i]->getData();
+    for(int j=0; j < 3; j++) {
+      if(contrib[j] < result[j])
+        result[j] = contrib[j];
+    }
+    for(int j=3; j < 6; j++) {
+      if(contrib[j] > result[j])
+        result[j] = contrib[j];
+    }
+  }
+  return CkReductionMsg::buildNew(6*sizeof(double), result);
+}
+
+void registerMinMaxBboxDims(void) {
+  minMaxBboxDimType = CkReduction::addReducer(minMaxBbox);
+}
+
 /*************** Charm++ User External Interface ********
   Implementation of collide.h routines.
   */
@@ -76,7 +100,7 @@ void CollideBoxesPrio(CollideHandle h,int chunkNo,
     int nBox,const bbox3d *boxes,const int *prio)
 {
   CProxy_collideMgr mgr(h);
-  mgr.ckLocalBranch()->contribute(chunkNo,nBox,boxes,prio);
+  mgr.ckLocalBranch()->contributeBoxes(chunkNo,nBox,boxes,prio);
 }
 
 /******************** objListMsg **********************/
@@ -427,11 +451,12 @@ void collideMgr::unregisterContributor(int chunkNo)
 }
 
 //Clients call this to contribute their triangle lists
-void collideMgr::contribute(int chunkNo,
+void collideMgr::contributeBoxes(int chunkNo,
     int n,const bbox3d *boxes,const int *prio)
 {
   //printf("[%d] Receiving contribution from %d\n",CkMyPe(), chunkNo);
 
+  /*
   std::unordered_map<int, int> localHistMap[3];
   std::unordered_map<int, int>::iterator it;
   double bucketSize = 2.0, len[3], key;
@@ -462,21 +487,43 @@ void collideMgr::contribute(int chunkNo,
   for(int j=0; j < 3; j++)
     assert(sum[j] == n);
 
+      */
 
   CM_STATUS("collideMgr::contribute "<<n<<" boxes from "<<chunkNo);
   aggregator.aggregate(CkMyPe(),chunkNo,n,boxes,prio);
   aggregator.send(); //Deliver all outgoing messages
   if (++contribCount==nContrib) { //That's everybody
 
-    for(int j=0; j < 3; j++) {
-      for( it = localHistMap[j].begin(); it != localHistMap[j].end(); it++) {
-        CkPrintf("[%d][%d][%d] ******* Print0: Axis=%d, Key=%d, Value=%d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), j, it->first, it->second);
-      }
+    //for(int j=0; j < 3; j++) {
+    //  for( it = localHistMap[j].begin(); it != localHistMap[j].end(); it++) {
+    //    CkPrintf("[%d][%d][%d] ******* Print0: Axis=%d, Key=%d, Value=%d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), j, it->first, it->second);
+    //  }
+    //}
+
+    double minMax[6], len;
+
+    minMax[0] = minMax[3] = boxes[0].getLength(0);
+    minMax[1] = minMax[4] = boxes[0].getLength(1);
+    minMax[2] = minMax[5] = boxes[0].getLength(2);
+
+    // local max and min elements
+    for(int i=1; i < n; i++) {
+      for(int j=0; j < 3; j++) {
+        len = boxes[i].getLength(j);
+        if(len < minMax[j])
+          minMax[j] = len;
+        if(len > minMax[j + 3])
+          minMax[j + 3] = len;
+       }
     }
 
+    for(int j=0; j < 3; j++) {
+      CkPrintf("[%d][%d][%d] Axis=%d, Min=%lf, Max=%lf \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), j, minMax[j], minMax[j + 3]);
+    }
 
-
-    thisProxy[0].recvMap(localHistMap, 1);
+    CkCallback cbMinMax(CkIndex_collideMgr::receiveMinMaxData(NULL), thisProxy[0]);
+    contribute(6 * sizeof(double), minMax, minMaxBboxDimType, cbMinMax);
+    //thisProxy[0].recvMap(localHistMap, 1);
 
     //aggregator.send(); //Deliver all outgoing messages
     //if (getStepCount()%8==7)
@@ -484,6 +531,28 @@ void collideMgr::contribute(int chunkNo,
     tryAdvance();
   }
   //printf("[%d] DONE receiving contribution from %d\n",CkMyPe(), chunkNo);
+}
+
+void collideMgr::receiveMinMaxData(CkReductionMsg *msg) {
+
+  double *result = (double *)(msg->getData());
+  for(int j=0; j < 3; j++) {
+    CkPrintf("[%d][%d][%d] Reduction Complete Axis=%d, Min=%lf, Max=%lf \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), j, result[j], result[j + 3]);
+  }
+
+  int numBuckets[3] = {10, 10, 10};
+  thisProxy.histogram(result, numBuckets);
+}
+
+void collideMgr::histogram(double *minMax, int *numBuckets) {
+  double bucketSize[3];
+  for(int j=0; j < 3; j++) {
+    bucketSize[j] = (minMax[3+j] - minMax[j])/10;
+    CkPrintf("[%d][%d][%d] Histogram Axis=%d, Min=%lf, Max=%lf, Num Buckets = %d, Bucket Size = %lf\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), j, minMax[j], minMax[j + 3], numBuckets[j], bucketSize[j]);
+  }
+
+
+
 }
 
 void collideMgr::recvMap(std::unordered_map<int, int> *localHistMap, int size) {
@@ -749,6 +818,11 @@ void serialCollideClient::setClient(CollisionClientFn clientFn_,void *clientPara
 void serialCollideClient::collisions(ArrayElement *src,
     int step,CollisionList &colls)
 {
+  int myCount = 1;
+
+  CkCallback countCb(CkReductionTarget(serialCollideClient, voxelCountDone), thisProxy[0]);
+  src->contribute(sizeof(int), &myCount, CkReduction::sum_int, countCb);
+
   if(useCb) { // Use user passed callback as reduction target
     src->contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat, clientCb);
@@ -757,6 +831,10 @@ void serialCollideClient::collisions(ArrayElement *src,
     src->contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat,cb);
   }
+}
+
+void serialCollideClient::voxelCountDone(int result) {
+    CkPrintf("[%d][%d][%d][%d] ^^^^^^ serialCollideClient and total voxels are :%d ^^^^^^ \n", CkMyPe(), CkMyNode(), CkMyRank(), thisIndex, result);
 }
 
 //This is called after the collideVoxel Collision reduction completes

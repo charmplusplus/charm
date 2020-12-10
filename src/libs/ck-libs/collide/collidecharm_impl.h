@@ -182,7 +182,7 @@ class collideMgr : public CBase_collideMgr
   void unregisterContributor(int chunkNo);
 
   //Clients call this to contribute their objects
-  void contribute(int chunkNo,
+  void contributeBoxes(int chunkNo,
       int n,const bbox3d *boxes,const int *prio);
 
   //voxelAggregators deliver messages to voxels via this bottleneck
@@ -194,6 +194,10 @@ class collideMgr : public CBase_collideMgr
 
   void recvMap(std::unordered_map<int, int> *localHistMap, int size);
   //void recvMap(std::unordered_map<int, int> localHistMap);
+  //
+
+  void receiveMinMaxData(CkReductionMsg *msg);
+  void histogram(double *minMax, int *numBuckets);
 
 };
 
@@ -243,6 +247,8 @@ class serialCollideClient : public collideClient {
 
   /// Called after the reduction is complete:
   virtual void reductionDone(CkReductionMsg *m);
+
+  void voxelCountDone(int result);
 };
 
 #if CMK_TRACE_ENABLED
