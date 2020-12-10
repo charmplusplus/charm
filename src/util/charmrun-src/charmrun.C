@@ -232,10 +232,10 @@ static int is_quote(char c) { return (c == '\'' || c == '"'); }
 static void zap_newline(char *s)
 {
   const size_t len = strlen(s);
-  if (len > 1 && s[len-1] == '\n')
+  if (len >= 1 && s[len-1] == '\n')
     s[len-1] = '\0';
   /* in case of DOS ^m */
-  if (len > 2 && s[len-2] == '\r')
+  if (len >= 2 && s[len-2] == '\r')
     s[len-2] = '\0';
 }
 
