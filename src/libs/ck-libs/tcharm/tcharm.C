@@ -11,7 +11,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 
 CtvDeclare(TCharm *,_curTCharm);
 
-static int lastNumChunks=0;
+static int nChunks;
 
 class TCharmTraceLibList {
 	enum {maxLibs=20,maxLibNameLen=15};
@@ -61,6 +61,11 @@ CsvDeclare(funcmap*, tcharm_funcmap);
 
 void TCharm::nodeInit()
 {
+  static bool tcharm_nodeinit_has_been_called;
+  if (tcharm_nodeinit_has_been_called)
+    return;
+  tcharm_nodeinit_has_been_called = true;
+
 #if CMK_TRACE_ENABLED
   if (CsvAccess(tcharm_funcmap) == NULL) {
     CsvInitialize(funcmap*, tcharm_funcmap);
@@ -71,6 +76,11 @@ void TCharm::nodeInit()
   // Assumes no anytime migration and only static insertion
   _isAnytimeMigration = false;
   _isStaticInsertion = true;
+
+  char **argv = CkGetArgv();
+  nChunks = CkNumPes();
+  CmiGetArgIntDesc(argv, "-vp", &nChunks, "Set the total number of virtual processors");
+  CmiGetArgIntDesc(argv, "+vp", &nChunks, nullptr);
 }
 
 void TCharm::procInit()
@@ -108,10 +118,10 @@ void TCharm::procInit()
     if (CkMyPe() == 0)
       CkPrintf("TCharm> stack size is set to %d.\n", tcharm_stacksize);
   }
-  if (CkMyPe()!=0) { //Processor 0 eats "+vp<N>" and "-vp<N>" later:
-  	int ignored;
-  	while (CmiGetArgIntDesc(argv,"-vp",&ignored,NULL)) {}
-  	while (CmiGetArgIntDesc(argv,"+vp",&ignored,NULL)) {}
+  if (CkMyRank() != 0) { // rank 0 eats "+vp<N>" and "-vp<N>" in nodeInit
+    int ignored;
+    CmiGetArgIntDesc(argv, "-vp", &ignored, nullptr);
+    CmiGetArgIntDesc(argv, "+vp", &ignored, nullptr);
   }
   if (CkMyPe()==0) { // Echo various debugging options:
     if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
@@ -571,11 +581,6 @@ CLINKAGE int TCHARM_Get_num_chunks()
 {
 	TCHARMAPI("TCHARM_Get_num_chunks");
 	if (CkMyPe()!=0) CkAbort("TCHARM_Get_num_chunks should only be called on PE 0 during setup!");
-	int nChunks=CkNumPes();
-	char **argv=CkGetArgv();
-	CmiGetArgIntDesc(argv,"-vp",&nChunks,"Set the total number of virtual processors");
-	CmiGetArgIntDesc(argv,"+vp",&nChunks,NULL);
-	lastNumChunks=nChunks;
 	return nChunks;
 }
 FLINKAGE int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)()
