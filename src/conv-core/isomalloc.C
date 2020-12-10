@@ -301,7 +301,7 @@ typedef struct
 static void * __cur_stack_frame(void)
 {
   char __dummy = 'A';
-  void * top_of_stack = (void *)&__dummy;
+  void * top_of_stack = (void *)(uintptr_t)(void *)&__dummy;
   return top_of_stack;
 }
 /*Estimate the location of the static data region*/

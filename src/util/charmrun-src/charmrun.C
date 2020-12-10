@@ -231,13 +231,12 @@ static int is_quote(char c) { return (c == '\'' || c == '"'); }
 
 static void zap_newline(char *s)
 {
-  char *p = s + strlen(s) - 1;
-  if (*p == '\n')
-    *p = '\0';
+  const size_t len = strlen(s);
+  if (len > 1 && s[len-1] == '\n')
+    s[len-1] = '\0';
   /* in case of DOS ^m */
-  p--;
-  if (*p == '\15')
-    *p = '\0';
+  if (len > 2 && s[len-2] == '\r')
+    s[len-2] = '\0';
 }
 
 /* get substring from lo to hi, remove quote chars */
@@ -4375,7 +4374,7 @@ static void start_nodes_daemon(std::vector<nodetab_process> & process_table)
       printf("Charmrun> Starting node program %d on '%s' as %s.\n", p.nodeno,
              h->name, arg_nodeprog_r);
     free(arg_nodeprog_r);
-    sprintf(task.env, "NETSTART=%s", create_netstart(p.nodeno));
+    sprintf(task.env, "NETSTART=%.240s", create_netstart(p.nodeno));
 
     char nodeArgBuffer[5120]; /*Buffer to hold assembled program arguments*/
     char *argBuf;

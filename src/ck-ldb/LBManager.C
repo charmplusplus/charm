@@ -77,7 +77,7 @@ class LBDBRegistry
   {
     if (legacyLBName != nullptr)
     {
-      legacy_runtime_treelbs.emplace(runtime_lbs.size(), legacyLBName);
+      legacy_runtime_treelbs.emplace((int)runtime_lbs.size(), legacyLBName);
     }
 
     runtime_lbs.push_back(name);
