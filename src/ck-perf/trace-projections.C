@@ -935,7 +935,7 @@ void LogEntry::pup(PUP::er &p)
 
 TraceProjections::TraceProjections(char **argv): 
   _logPool(NULL), curevent(0), inEntry(false), computationStarted(false),
-	traceNestedEvents(false), converseExit(false),
+	traceNestedEvents(true), converseExit(false),
 	currentPhaseID(0), lastPhaseEvent(NULL), endTime(0.0)
 {
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
@@ -953,7 +953,7 @@ TraceProjections::TraceProjections(char **argv):
     CmiGetArgFlagDesc(argv,"+checknested",
 		      "check projections nest begin end execute events");
   traceNestedEvents = 
-    CmiGetArgFlagDesc(argv,"+tracenested",
+    !CmiGetArgFlagDesc(argv,"+notracenested",
               "trace projections nest begin/end execute events");
   int binary = 
     CmiGetArgFlagDesc(argv,"+binary-trace",
