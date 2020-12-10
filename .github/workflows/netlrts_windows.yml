@@ -1,0 +1,34 @@
+name: NetLRTS Windows
+
+on: pull_request
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    timeout-minutes: 90
+
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: git mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake autoconf automake make
+    - name: build
+      run: |
+        . src/arch/win/ci.sh
+        ./build AMPI netlrts-win-x86_64 --with-production -j3 -g
+    - name: test
+      run: |
+        . src/arch/win/ci.sh
+        make -C netlrts-win-x86_64/tests OPTS="-g" -j3
+        make -C netlrts-win-x86_64/tests test TESTOPTS="++local"

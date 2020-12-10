@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to set environment variables for Travis Windows VMs
+# Script to set environment variables for Continuous Integration Windows VMs
 
 export INCLUDE=""
 export INCLUDE="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE;$INCLUDE"
@@ -28,7 +28,3 @@ export VCINSTALLDIR="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC"
 export WindowsSdkDir="C:\Program Files (x86)\Windows Kits\10"
 
 export PATH="/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64:$PATH"
-
-export TESTOPTS="++local"
-
-"$@"
