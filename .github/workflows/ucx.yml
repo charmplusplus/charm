@@ -41,5 +41,5 @@ jobs:
         export PATH=/usr/local/bin:$PATH
         export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
         export OMPI_MCA_rmaps_base_oversubscribe=1
-        make -C ucx-linux-x86_64-openpmix/tests test
-        make -C ucx-linux-x86_64-openpmix/examples test
+        make -C ucx-linux-x86_64-openpmix/tests test TESTOPTS="++local"
+        make -C ucx-linux-x86_64-openpmix/examples test TESTOPTS="++local"
