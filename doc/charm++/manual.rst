@@ -11359,8 +11359,8 @@ you can build UCX from scratch using the following steps:
 
 After installing UCX, there are several supported process management interfaces (PMI)
 that can be specified as options in order to build Charm++ with UCX. These include
-Simple PMI, Slurm PMI, Slurm PMI 2 and PMIx (using OpenMPI). Currently, in order to
-use PMIx for process management, it is required to have OpenMPI installed on the system.
+Simple PMI, Slurm PMI, Slurm PMI 2 and PMIx (included in OpenMPI or OpenPMIx). Currently, in order to
+use PMIx for process management, it is required to have either OpenMPI or OpenPMIx installed on the system.
 Additionally, in order to use the other supported process management interfaces, it is
 required to have a non-OpenMPI based MPI implementation installed on the system (e.g.
 Intel MPI, MVAPICH, MPICH, etc.).
@@ -11389,7 +11389,41 @@ Similarly, to build the Charm++ target with Slurm PMI 2, specify ``slurmpmi2`` i
 
    $ ./build charm++ ucx-linux-x86_64 slurmpmi2 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
 
-To build the Charm++ target with PMIx, you would require an OpenMPI implementation with PMIx
+To build the Charm++ target with PMIx, you can either use PMIx included in OpenMPI or
+use OpenPMIx directly. Note that PMIx is no longer included in OpenMPI distributions
+as of v4.0.5, so we recommend building with OpenPMIx instead.
+
+To use OpenPMIx directly, you first need to install libevent (https://github.com/libevent/libevent)
+if it's not available on your system:
+
+.. code-block:: bash
+
+   $ wget https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
+   $ tar -xf libevent-2.1.12-stable.tar.gz
+   $ cd libevent-2.1.12-stable
+   $ ./configure --prefix=$HOME/libevent-2.1.12-stable/build
+   $ make -j
+   $ make install
+
+Then you can download and build PMIx as follows:
+
+.. code-block:: bash
+
+   $ wget https://github.com/openpmix/openpmix/releases/download/v3.1.5/pmix-3.1.5.tar.gz
+   $ tar -xf pmix-3.1.5.tar.gz
+   $ cd pmix-3.1.5
+   $ ./configure --prefix=$HOME/pmix-3.1.5/build --with-libevent=$HOME/libevent-2.1.12-stable/build
+   $ make -j
+   $ make install
+
+Finally, Charm++ with the UCX backend can be built with OpenPMIx using the following command
+(with the OpenPMIx installation passed as an additional ``--basedir`` argument):
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 openpmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/pmix-3.1.5/build -j
+
+To use PMIx included with OpenMPI, you would require an OpenMPI implementation with PMIx
 enabled to be installed on your system. In case OpenMPI is not available in your environment,
 you can build OpenMPI from scratch using the following steps:
 
@@ -11397,13 +11431,14 @@ you can build OpenMPI from scratch using the following steps:
 
   $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
   $ tar -xvf openmpi-4.0.1.tar.gz
+  $ cd openmpi-4.0.1
   $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
   $ make -j24
   $ make install all
 
 After installing OpenMPI or using the pre-installed OpenMPI, you can build the Charm++ target with
 the UCX backend by specifying ``ompipmix`` in the build command and passing the OpenMPI installation
-path as ``--basedir`` (in addition to passing the UCX build directory)
+path as ``--basedir`` (in addition to passing the UCX build directory):
 
 .. code-block:: bash
 

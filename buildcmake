@@ -165,7 +165,7 @@ while [[ $# -gt 0 ]]; do
     pxshm)
       opt_pxshm=1
       ;;
-    simplepmi|slurmpmi|slurmpmi2|ompipmix)
+    simplepmi|slurmpmi|slurmpmi2|ompipmix|openpmix)
       opt_lrts_pmi=$arg
       ;;
     persistent)
