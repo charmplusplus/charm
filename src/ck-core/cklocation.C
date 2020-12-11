@@ -1511,7 +1511,7 @@ CkMigratable::~CkMigratable() {
 	if (barrierRegistered) {
 	  DEBL((AA "Removing barrier for element %s\n" AB,idx2str(thisIndexMax)));
 	  if (usesAtSync)
-	    myRec->getSyncBarrier()->RemoveClient(ldBarrierHandle);
+	    myRec->getSyncBarrier()->removeClient(ldBarrierHandle);
 	}
 
   if (_lb_args.metaLbOn()) {
@@ -1612,7 +1612,7 @@ void CkMigratable::recvLBPeriod(void *data) {
 
 void CkMigratable::metaLBCallLB() {
   if(usesAtSync)
-    myRec->getSyncBarrier()->AtBarrier(ldBarrierHandle);
+    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
 }
 
 void CkMigratable::ckFinishConstruction(int epoch)
@@ -1625,7 +1625,7 @@ void CkMigratable::ckFinishConstruction(int epoch)
 	if (barrierRegistered) return;
 	DEBL((AA "Registering barrier client for %s\n" AB,idx2str(thisIndexMax)));
 	if (usesAtSync) {
-	  ldBarrierHandle = myRec->getSyncBarrier()->AddClient(
+	  ldBarrierHandle = myRec->getSyncBarrier()->addClient(
 	    this, [=]() { this->ResumeFromSyncHelper(); }, epoch);
 	}
 	barrierRegistered=true;
@@ -1656,7 +1656,7 @@ void CkMigratable::AtSync(int waitForMigration)
   }
 
   if (!_lb_args.metaLbOn()) {
-    myRec->getSyncBarrier()->AtBarrier(ldBarrierHandle);
+    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
     return;
   }
 
@@ -2087,8 +2087,8 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 
 CkLocMgr::~CkLocMgr() {
 #if CMK_LBDB_ON
-  syncBarrier->RemoveReceiver(lbBarrierReceiver);
-  syncBarrier->RemoveEndReceiver(lbBarrierEndReceiver);
+  syncBarrier->removeReceiver(lbBarrierReceiver);
+  syncBarrier->removeEndReceiver(lbBarrierEndReceiver);
   lbmgr->UnregisterOM(myLBHandle);
 #endif
   map->unregisterArray(mapHandle);
@@ -3281,11 +3281,11 @@ void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 
 	// Set up callbacks for this LocMgr to call Registering/DoneRegistering during
 	// each AtSync.
-	lbBarrierReceiver = syncBarrier->AddReceiver([=]() {
+	lbBarrierReceiver = syncBarrier->addReceiver([=]() {
 	  DEBL((AA "CkLocMgr AtSync Receiver called\n" AB));
 	  lbmgr->RegisteringObjects(myLBHandle);
 	});
-	lbBarrierEndReceiver = syncBarrier->AddEndReceiver([=]() {
+	lbBarrierEndReceiver = syncBarrier->addEndReceiver([=]() {
 	  lbmgr->DoneRegisteringObjects(myLBHandle);
 	});
 }

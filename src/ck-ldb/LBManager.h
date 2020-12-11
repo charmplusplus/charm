@@ -453,7 +453,6 @@ class LBManager : public CBase_LBManager
   }
   void RemoveLocalBarrierReceiver(LDBarrierReceiver h);
   void AtLocalBarrier(LDBarrierClient _n_c);
-  void DecreaseLocalBarrier(int c);
   void TurnOnBarrierReceiver(LDBarrierReceiver h);
   void TurnOffBarrierReceiver(LDBarrierReceiver h);
 
