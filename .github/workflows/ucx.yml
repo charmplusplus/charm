@@ -26,6 +26,14 @@ jobs:
         ./contrib/configure-release --disable-numa
         make -j4
         sudo make install
+    - name: build-ompi
+      run: |
+        wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.4.tar.gz
+        tar -xf openmpi-4.0.4.tar.gz
+        cd openmpi-4.0.4
+        ./configure --enable-mca-no-build=btl-uct
+        make -j
+        sudo make install
     - name: build-openpmix
       run: |
         wget https://github.com/openpmix/openpmix/releases/download/v3.1.5/pmix-3.1.5.tar.gz
@@ -41,5 +49,5 @@ jobs:
         export PATH=/usr/local/bin:$PATH
         export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
         export OMPI_MCA_rmaps_base_oversubscribe=1
-        make -C ucx-linux-x86_64-openpmix/tests test TESTOPTS="++local"
-        make -C ucx-linux-x86_64-openpmix/examples test TESTOPTS="++local"
+        make -C ucx-linux-x86_64-openpmix/tests test
+        make -C ucx-linux-x86_64-openpmix/examples test
