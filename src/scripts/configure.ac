@@ -2269,27 +2269,6 @@ AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIPGLOBALS, $CMK_SUPPORTS_PIPGLOBALS, [whether s
 add_flag "CMK_SUPPORTS_PIPGLOBALS=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
 add_make_flag "CMK_SUPPORTS_PIPGLOBALS:=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
 
-
-### test gethostname ####
-cat > $tc <<EOT
-#ifdef _WIN32
-#include <Winsock2.h>
-#else
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#endif
-
-int main()
-{
-  char hostname[[1000]];
-  gethostname(hostname, 999);
-  return 0;
-}
-EOT
-test_cc "whether gethostname call exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_GETHOSTNAME, $pass, [whether gethostname() exists])
-
 #### check if getProcAddress works ####
 cat > $t <<EOT
 #include "ckdll_win32.C"
