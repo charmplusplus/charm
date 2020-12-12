@@ -8,19 +8,20 @@
  *  Orion Sky Lawlor, olawlor@acm.org 9/29/2001
  */
 
+#include "TopoManager.h"
+#include "charm++.h"
+#include "ck.h"
+#include "cksyncbarrier.h"
 #include "hilbert.h"
 #include "partitioning_strategies.h"
-#include "charm++.h"
-#include "register.h"
-#include "ck.h"
-#include "trace.h"
-#include "TopoManager.h"
-#include <vector>
-#include <algorithm>
-#include <sstream>
-#include <limits>
 #include "pup_stl.h"
+#include "register.h"
+#include "trace.h"
+#include <algorithm>
+#include <limits>
+#include <sstream>
 #include <stdarg.h>
+#include <vector>
 
 #if CMK_LBDB_ON
 #include "LBManager.h"
@@ -1449,27 +1450,44 @@ CkMigratable::CkMigratable(CkMigrateMessage *m): Chare(m) {
 
 int CkMigratable::ckGetChareType(void) const {return thisChareType;}
 
-void CkMigratable::pup(PUP::er &p) {
-	DEBM((AA "In CkMigratable::pup %s\n" AB,idx2str(thisIndexMax)));
-	Chare::pup(p);
-	p|thisIndexMax;
-	p(usesAtSync);
-  p(can_reset);
-	p(usesAutoMeasure);
-#if CMK_LBDB_ON 
-	int readyMigrate = 0;
-	if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
-	p|readyMigrate;
-	if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
+void CkMigratable::pup(PUP::er& p)
+{
+  DEBM((AA "In CkMigratable::pup %s\n" AB, idx2str(thisIndexMax)));
+  Chare::pup(p);
+  p | thisIndexMax;
+  p | usesAtSync;
+  p | can_reset;
+  p | usesAutoMeasure;
+
+#if CMK_LBDB_ON
+  bool readyMigrate = false;
+  if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
+  p | readyMigrate;
+  if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
 #endif
-	if(p.isUnpacking()) barrierRegistered=false;
 
 #if CMK_FAULT_EVAC
-	p | asyncEvacuate;
-	if(p.isUnpacking()){myRec->AsyncEvacuate(asyncEvacuate);}
+  p | asyncEvacuate;
+  if (p.isUnpacking())
+  {
+    myRec->AsyncEvacuate(asyncEvacuate);
+  }
 #endif
-	
-	ckFinishConstruction();
+
+  int epoch = -1;
+  // Only pup epoch when migrating. Will result in problems if pup'd when
+  // checkpointing since it will not match the value of the freshly inited barrier
+  // upon restart
+  if (usesAtSync && p.isMigration())
+  {
+    if (p.isPacking())
+    {
+      epoch = (*ldBarrierHandle)->epoch;
+    }
+    p | epoch;
+  }
+
+  if (p.isUnpacking()) ckFinishConstruction(epoch);
 }
 
 void CkMigratable::ckDestroy(void) {}
@@ -1598,7 +1616,7 @@ void CkMigratable::metaLBCallLB() {
     myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
 }
 
-void CkMigratable::ckFinishConstruction(void)
+void CkMigratable::ckFinishConstruction(int epoch)
 {
 //	if ((!usesAtSync) || barrierRegistered) return;
 	if (usesAtSync && _lb_args.lbperiod() != -1.0)
@@ -1608,7 +1626,7 @@ void CkMigratable::ckFinishConstruction(void)
 	if (barrierRegistered) return;
 	DEBL((AA "Registering barrier client for %s\n" AB,idx2str(thisIndexMax)));
 	if (usesAtSync) {
-	  ldBarrierHandle = myRec->getLBMgr()->AddLocalBarrierClient(this, &CkMigratable::ResumeFromSyncHelper);
+	  ldBarrierHandle = CkSyncBarrier::Object()->AddClient(this, &CkMigratable::ResumeFromSyncHelper, epoch);
 	}
 	barrierRegistered=true;
 }
@@ -2070,7 +2088,6 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 CkLocMgr::~CkLocMgr() {
 #if CMK_LBDB_ON
   lbmgr->RemoveLocalBarrierClient(lbBarrierClient);
-  lbmgr->DecreaseLocalBarrier(1);
   lbmgr->RemoveLocalBarrierReceiver(lbBarrierReceiver);
   lbmgr->UnregisterOM(myLBHandle);
 #endif
