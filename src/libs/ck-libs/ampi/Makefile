@@ -221,7 +221,7 @@ ampi.decl.h ampi.def.h: ampi.ci
 ddt.o: ddt.C ddt.h $(HEADDEP) headers
 
 $(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP) headers | $(ROMIO)
-	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared -fvisibility=hidden -c $< -o $@
+	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared -c $< -o $@
 
 $(FUNCPTR_SHIM_MAIN_OBJ): ampi_funcptr_shim_main.C | $(ROMIO)
 	$(CHARMC) -language ampi -fPIE -c $< -o $@
@@ -230,7 +230,7 @@ $(FUNCPTR_SHIM_FMPIMAIN_OBJ): ampi_funcptr_shim_fmpimain.C | $(ROMIO)
 	$(CHARMC) -language ampi -fPIE -c $< -o $@
 
 $(FUNCPTR_SHIM_FORTRAN_OBJ): ampif.C $(HEADDEP) headers | $(ROMIO)
-	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
+	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -c $< -o $@
 
 $(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -DAMPI_NO_UNIMPLEMENTED_WARNINGS -c $< -o $@
