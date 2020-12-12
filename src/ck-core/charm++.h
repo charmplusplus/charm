@@ -470,13 +470,8 @@ template <class Parent,class CProxy_Derived>
 struct CBaseT1 : Parent, virtual CBase {
   CBASE_MEMBERS;
 
-#if CMK_HAS_RVALUE_REFERENCES
   template <typename... Args>
   CBaseT1(Args&&... args) : Parent(std::forward<Args>(args)...) { thisProxy = this; }
-#else
-  template <typename... Args>
-  CBaseT1(Args... args) : Parent(args...) { thisProxy = this; }
-#endif
 
   void parent_pup(PUP::er &p) {
     recursive_pup<Parent>(this, p);
