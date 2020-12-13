@@ -248,7 +248,7 @@ getExtension() {
 #        se_ret=`echo $se_base | awk -F. '{if (NF<=1) print ""; else print "."$NF}'`
 #	echo $se_ret
 	se_ret=`echo $1 | sed -e 's/.*\././'`
-	if test "$se_ret" = $1
+	if [[ "$se_ret" = $1 ]]
         then
           echo ""
         else
@@ -417,15 +417,15 @@ fi
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
 CHARMLIBSO=
-if test -d "$CHARMBIN/../lib_so"
+if [[ -d "$CHARMBIN/../lib_so" ]]
 then
   CHARMLIBSO=`cd $CHARMBIN/../lib_so 2>/dev/null && pwd`
   #getting absolute path is harder than thought because of symbolic links and ..
   #ksh needs cd -P to resolve werid symbolic links, however -P is not portable
   #csh is ok too if it exists
-  test -z "$CHARMLIBSO" && CHARMLIBSO=`cd -P $CHARMBIN/../lib_so 2>/dev/null && pwd`
-  test -z "$CHARMLIBSO" && CHARMLIBSO=`csh -c "cd $CHARMBIN/../lib_so >& /dev/null && pwd"`
-  test -z "$CHARMLIBSO" && echo "$CHARMBIN/../lib_so: not found" && exit 1
+  [[ -z "$CHARMLIBSO" ]] && CHARMLIBSO=`cd -P $CHARMBIN/../lib_so 2>/dev/null && pwd`
+  [[ -z "$CHARMLIBSO" ]] && CHARMLIBSO=`csh -c "cd $CHARMBIN/../lib_so >& /dev/null && pwd"`
+  [[ -z "$CHARMLIBSO" ]] && echo "$CHARMBIN/../lib_so: not found" && exit 1
 fi
 
 ##############################################################################
@@ -1371,7 +1371,7 @@ then
     CMK_XIOPTS="$CMK_XIOPTS -count-tokens"
 fi
 
-if test "$CMK_WITH_TAU" = "true"
+if [[ "$CMK_WITH_TAU" = "true" ]]
 then
   echo "include $TAU_MAKEFILE" > _make.tau.tmp
   echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
@@ -1622,7 +1622,7 @@ MAKE_LD="0"
 CORE_LIBS="-lconverse $TRACE_OBJ -lm"
 
 # get TAU stub makefile variables
-if test "$CMK_WITH_TAU" = "true"
+if [[ "$CMK_WITH_TAU" = "true" ]]
 then
   echo "include $TAU_MAKEFILE" > _make.tau.tmp
   echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
@@ -1822,7 +1822,7 @@ Copyobj() {
 		[[ ! -d $COPYTO ]] && DoNoErrCheck $RM $COPYTO
 		Do $CP $OBJECT $COPYTO
 	fi
-	test -n "$COPY_EXIT" && Success
+	[[ -n "$COPY_EXIT" ]] && Success
 }
 
 Copymod() {
@@ -1934,7 +1934,7 @@ do
 		    FILE="rose_$FILE"
 		    ;;
 		*.f90|*.F90|*.fpp|*.FPP)
-		    test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
+		    [[ -z "$PREPROCESS" ]] && OPTS_F90="$OPTS_F90 -c"
 		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 $FILE
 		    FILE="rose_$FILE"
 		    ;;
@@ -1944,7 +1944,7 @@ do
 	case "$FILE" in
 	*.ci)
                 XIOPTS=$CMK_XIOPTS
-                test "$PARADIGM" = "f90charm" && XIOPTS="$XIOPTS -f90"
+                [[ "$PARADIGM" = "f90charm" ]] && XIOPTS="$XIOPTS -f90"
                 if [[ "$PREPROCESS_CI" = "yes" ]]
                 then
 		  Do $CMK_CPP_CHARM $OPTS_CPP $FILE | Do $CHARMBIN/charmxi $XIOPTS -orig-file $FILE
@@ -1972,7 +1972,7 @@ do
 		fi
 		;;
 	*.f|*.F|*.f77|*.F77)
-		test -z "$CMK_CF90_FIXED" && Abort "No F90 compiler (CMK_CF90_FIXED) defined"
+		[[ -z "$CMK_CF90_FIXED" ]] && Abort "No F90 compiler (CMK_CF90_FIXED) defined"
 		Do $CMK_CF90_FIXED -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 -c $FILE $DESTO
 		if [[ "$Do_res" -ne 0 ]]
 		then
@@ -1980,8 +1980,8 @@ do
 		fi
 		;;
 	*.f90|*.F90|*.fpp|*.FPP)
-		test -z "$CMK_CF90" && Abort "No F90 compiler (CMK_CF90) defined"
-		test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
+		[[ -z "$CMK_CF90" ]] && Abort "No F90 compiler (CMK_CF90) defined"
+		[[ -z "$PREPROCESS" ]] && OPTS_F90="$OPTS_F90 -c"
 		Do $CMK_CF90 -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 $FILE $DESTO
 		if [[ "$Do_res" -ne 0 ]]
 		then
@@ -2021,14 +2021,14 @@ MakeSO() {
 	Debugf "Running ldro..."
 	DoNoErrCheck $RM $OBJECT
 	# convert to absolute path if required
-	if test -n "$CMK_LD_SHARED_ABSOLUTE_PATH"
+	if [[ -n "$CMK_LD_SHARED_ABSOLUTE_PATH" ]]
 	then
 	dir=`dirname $OBJECT`
 	fname=`basename $OBJECT`
 	dir=`cd $dir; pwd`
 	OBJECT=$dir/$fname
 	fi
-	if test "$MAKE_LD" = '1'
+	if [[ "$MAKE_LD" = '1' ]]
 	then
 	  soTool="$CMK_LD $CMK_LD_FLAGS"
 	else
@@ -2217,7 +2217,7 @@ fi
 
 if [[ ! -r $MEM_OBJ_FILE || ! -s $MEM_OBJ_FILE ]]
 then
-  (cd $CHARMLIB ; list=`ls libmemory-* 2>/dev/null`; test -n "$list" && for i in $list; do [[ -s $i ]] && ls -l $i; done )
+  (cd $CHARMLIB ; list=`ls libmemory-* 2>/dev/null`; [[ -n "$list" ]] && for i in $list; do [[ -s $i ]] && ls -l $i; done )
   Abort "charmc : No such memory mode $MEMORY"
 fi
 
@@ -2229,7 +2229,7 @@ fi
 
 if [[ ! -r $THREAD_OBJ_FILE || ! -s $THREAD_OBJ_FILE ]]
 then
-  (cd $CHARMLIB ; list=`ls libthreads-* 2>/dev/null`; test -n "$list" && for i in $list; do [[ -s $i ]] && ls -l $i; done )
+  (cd $CHARMLIB ; list=`ls libthreads-* 2>/dev/null`; [[ -n "$list" ]] && for i in $list; do [[ -s $i ]] && ls -l $i; done )
   Abort "charmc : No such thread mode $THREAD"
 fi
 
@@ -2244,38 +2244,38 @@ then
         echo "extern void _register$module(void);" >> $modInitSrc
     done
     for trace in $TRACEMODE; do
-        if test $trace = "summary"
+        if [[ $trace = "summary" ]]
         then
           echo "  extern void _registerTraceSummary();" >> $modInitSrc
-        elif test $trace = "projections"
+        elif [[ $trace = "projections" ]]
         then
           echo "  extern void _registerTraceProjections();" >> $modInitSrc
-        elif test $trace = "simple"
+        elif [[ $trace = "simple" ]]
         then
           echo "  extern void _registerTraceSimple();" >> $modInitSrc
-        elif test $trace = "Tau"
+        elif [[ $trace = "Tau" ]]
         then
           echo "  extern void _registerTraceTau();" >> $modInitSrc
-        elif test $trace = "utilization"
+        elif [[ $trace = "utilization" ]]
         then
           echo "  extern void _registerTraceUtilization();" >> $modInitSrc
-        elif test $trace = "controlPoints"
+        elif [[ $trace = "controlPoints" ]]
         then
           echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
-        elif test $trace = "perfReport"
+        elif [[ $trace = "perfReport" ]]
         then
           Do $CP $CHARMBIN/fuzzytree.txt fuzzytree.txt
           Do $CP $CHARMBIN/tree.txt tree.txt
           echo "  extern void _registerTraceAutoPerf();" >> $modInitSrc
 
-        elif test $trace = "all"
+        elif [[ $trace = "all" ]]
         then
           echo "  extern void _registerTraceProjections();" >> $modInitSrc
           echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
           echo "  extern void _registerTraceSummary();" >> $modInitSrc
         fi
     done
-    if test -n "$BALANCER"
+    if [[ -n "$BALANCER" ]]
     then
         echo "extern void LBDefaultCreate(const char *);" >> $modInitSrc
     fi
@@ -2285,36 +2285,36 @@ then
         echo "  _register$module();" >> $modInitSrc
     done
     for trace in $TRACEMODE; do
-        if test $trace = "summary"
+        if [[ $trace = "summary" ]]
         then
           echo "  _registerTraceSummary();" >> $modInitSrc
-        elif test $trace = "projections"
+        elif [[ $trace = "projections" ]]
         then
           echo "  _registerTraceProjections();" >> $modInitSrc
-        elif test $trace = "Tau"
+        elif [[ $trace = "Tau" ]]
         then
           TRACE_WITH_TAU=1
           echo "  _registerTraceTau();" >> $modInitSrc
-        elif test $trace = "simple"
+        elif [[ $trace = "simple" ]]
         then
           echo "  _registerTraceSimple();" >> $modInitSrc
-        elif test $trace = "utilization"
+        elif [[ $trace = "utilization" ]]
         then
           echo "  _registerTraceUtilization();" >>  $modInitSrc
-        elif test $trace = "controlPoints"
+        elif [[ $trace = "controlPoints" ]]
         then
           echo "  _registerTraceControlPoints();" >> $modInitSrc
-        elif test $trace = "perfReport"
+        elif [[ $trace = "perfReport" ]]
         then
           echo "  _registerTraceAutoPerf();" >> $modInitSrc
-        elif test $trace = "all"
+        elif [[ $trace = "all" ]]
         then
           echo "  _registerTraceProjections();" >> $modInitSrc
           echo "  _registerTraceControlPoints();" >> $modInitSrc
           echo "  _registerTraceSummary();" >> $modInitSrc
         fi
     done
-    if test -n "$BALANCER"
+    if [[ -n "$BALANCER" ]]
     then
         [[ -n "$VERBOSE" ]] && echo "Adding load balancer for $BALANCER"
         for deflb in $BALANCER
@@ -2378,7 +2378,7 @@ fi
 #
 ########################################################################
 
-if test "$COPY_CHARMRUN" = "true"
+if [[ "$COPY_CHARMRUN" = "true" ]]
 then
   targ=charmrun$CMK_POST_EXE
   [[ ! -x $CHARMBIN/$targ && -n "$CMK_POST_EXE" ]] && targ=charmrun
