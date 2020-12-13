@@ -115,6 +115,7 @@ void CmiForwardProcBcastMsg(int size, char *msg) {
 #if CMK_SMP
 // API to forward message to peer PEs
 void CmiForwardMsgToPeers(int size, char *msg) {
+  CMI_DEST_RANK(msg) = CmiMyRank(); // Reset DEST RANK before forwarding to peers
   SendToPeers(size, msg);
 }
 #endif

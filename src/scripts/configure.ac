@@ -724,14 +724,13 @@ AC_MSG_RESULT("$CMK_NATIVE_CXX")
 AC_MSG_CHECKING("Sequential C++ compiler as")
 AC_MSG_RESULT("$CMK_SEQ_CXX")
 
-if echo "$CMK_CC" | grep -E "gcc|clang|icc" > /dev/null 2> /dev/null
+# Needed to avoid migratable threads failing the stack check
+# See https://github.com/UIUC-PPL/charm/pull/3174 for details.
+test_link "whether compiler accepts -fno-stack-protector" "ok" "no" "-fno-stack-protector"
+if test $strictpass -eq 1
 then
-  test_link "whether compiler accept -fno-stack-protector" "ok" "no" "-fno-stack-protector"
-  if test $strictpass -eq 1
-  then
-	add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "stack-protection disabling"
-	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "stack-protection disabling"
-  fi
+  add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "stack-protection disabling"
+  add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "stack-protection disabling"
 fi
 
 #### check if C++ compiler will accept C++11 features without warning ####
@@ -824,6 +823,17 @@ test_cxx "whether C++ compiler accepts -mno-tls-direct-seg-refs" "yes" "no" "-mn
 if test $strictpass -eq 1
 then
     add_flag 'CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="1"' "tlsglobals"
+fi
+
+# Needed so that tlsglobals works correctly with --build-shared
+# See https://github.com/UIUC-PPL/charm/issues/3168 for details.
+test_cxx "whether C++ compiler accepts -ftls-model=initial-exec" "yes" "no" "-ftls-model=initial-exec"
+if test $strictpass -eq 1
+then
+    add_flag 'CMK_COMPILER_KNOWS_FTLS_MODEL="1"' "tlsglobals"
+    OPTS_CC="$OPTS_CC -ftls-model=initial-exec"
+    OPTS_CXX="$OPTS_CXX -ftls-model=initial-exec"
+    OPTS_LD="$OPTS_LD -ftls-model=initial-exec"
 fi
 
 # Test for a flag important for shared linking
@@ -2259,27 +2269,6 @@ AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIPGLOBALS, $CMK_SUPPORTS_PIPGLOBALS, [whether s
 add_flag "CMK_SUPPORTS_PIPGLOBALS=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
 add_make_flag "CMK_SUPPORTS_PIPGLOBALS:=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
 
-
-### test gethostname ####
-cat > $tc <<EOT
-#ifdef _WIN32
-#include <Winsock2.h>
-#else
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#endif
-
-int main()
-{
-  char hostname[[1000]];
-  gethostname(hostname, 999);
-  return 0;
-}
-EOT
-test_cc "whether gethostname call exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_GETHOSTNAME, $pass, [whether gethostname() exists])
-
 #### check if getProcAddress works ####
 cat > $t <<EOT
 #include "ckdll_win32.C"
@@ -2563,7 +2552,7 @@ AC_DEFINE_UNQUOTED([CMK_HAS_MULTIPROCESSING_H], $pass, [whether has Multiprocess
 #### test if "ntohl" is available ####
 cat > $t <<EOT
 #if defined(_WIN32) || defined(__MINGW_H)
-#include <winsock.h>
+#include <Winsock2.h>
 #else
 #include <stdint.h>
 #include <arpa/inet.h>
@@ -3010,6 +2999,5 @@ fi
 eval `"$CHARMBIN/charmc" $OPTS -print-building-blocks -standalone`
 add_make_flag "HWLOC_CC:=$CHARM_CC" "hwloc"
 add_make_flag "HWLOC_CC_FLAGS:=$CHARM_CC_FLAGS" "hwloc"
-add_flag 'CMK_HWLOC_LIBS="-lhwloc_embedded -lm"' "hwloc"
 
 AC_OUTPUT

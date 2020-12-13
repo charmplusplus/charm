@@ -165,7 +165,7 @@ while [[ $# -gt 0 ]]; do
     pxshm)
       opt_pxshm=1
       ;;
-    simplepmi|slurmpmi|slurmpmi2|ompipmix)
+    simplepmi|slurmpmi|slurmpmi2|ompipmix|openpmix)
       opt_lrts_pmi=$arg
       ;;
     persistent)
@@ -426,7 +426,7 @@ then
   else
     echo "Removing existing data and starting over. (--force)"
   fi
-elif [[ -e "$builddir" ]]
+elif [[ -e "$builddir" && ! -e "$builddir/.spack" ]]
 then
   echo "\"$builddir\" already exists but is in an inconsistent state."
   if [[ $FORCE -eq 0 ]]
@@ -491,9 +491,9 @@ fi
 
 # Create builddir and its contents
 
-rm -rf "$builddir"
+rm -rf "${builddir:?}"/*
 
-mkdir "$builddir"
+mkdir -p "$builddir"
 
 cd "$builddir"
 

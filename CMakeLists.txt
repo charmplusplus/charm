@@ -146,7 +146,7 @@ option(CUDA                "Build with CUDA support" OFF)
 option(PXSHM               "Build with PXSHM" OFF)
 
 # LRTS PMI options
-set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, or ompipmix")
+set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, ompipmix, or openpmix")
 
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 
@@ -320,14 +320,18 @@ endif()
 set(CMK_POWER7 0)
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
   set(CHARM_CPU "x86_64")
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "i386" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "i686")
+  set(CHARM_CPU "i386")
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "powerpc" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^ppc")
   set(CHARM_CPU "ppc64le")
   execute_process(COMMAND grep f Makefile RESULT_VARIABLE isppc7 OUTPUT_QUIET ERROR_QUIET)
   if(${isppc7})
     set(CMK_POWER7 1)
   endif()
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm7")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv6" OR CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
   set(CHARM_CPU "arm7")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
+  set(CHARM_CPU "arm8")
 else()
   message(FATAL_ERROR "Unsupported CPU ${CMAKE_SYSTEM_PROCESSOR}.")
 endif()
@@ -435,7 +439,7 @@ include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
 
 if(${TARGET} STREQUAL "all-test")
-  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test
+  add_custom_target(all-test ALL COMMAND $(MAKE) -C ${CMAKE_BINARY_DIR}/tmp all-test
         COMMENT "Building all-test. This will take several minutes.")
   add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
         ampi_funcptr_shim ampi_funcptr_shim_main
@@ -738,56 +742,14 @@ endif()
 add_subdirectory(src/xlat-i)
 add_dependencies(charmxi create_symlinks)
 
+# Hwloc
+include(cmake/hwloc.cmake)
+
 # Converse
 include(cmake/converse.cmake)
 add_subdirectory(src/QuickThreads)
 add_subdirectory(src/util/boost-context)
 add_subdirectory(src/conv-core)
-
-# Hwloc
-if(${BUILD_SHARED})
-    set(hwloc_shared yes)
-else()
-    set(hwloc_shared no)
-endif()
-
-# Used to determine arguments to pass to hwloc's configure
-set(building_blocks_command "${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS}")
-
-# FIXME: copy .so
-set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
-include(ExternalProject)
-ExternalProject_Add(hwloc
-    URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
-    CONFIGURE_COMMAND
-      bash "-c" "eval $(${building_blocks_command}) && \
-        ${hwloc_dir}/configure \
-        --disable-cairo \
-        --disable-cuda \
-        --disable-gl \
-        --disable-libxml2 \
-        --disable-nvml \
-        --disable-opencl \
-        --disable-pci \
-        --disable-libudev \
-        --disable-visibility \
-        --enable-embedded-mode \
-        --enable-shared=${hwloc_shared} \
-        --enable-static \
-        --with-hwloc-symbol-prefix=cmi_ \
-        --without-x \
-        HWLOC_FLAGS=\"$CHARM_CC_FLAGS\" \
-        CFLAGS=\"$CHARM_CC_FLAGS\" \
-        CC=$CHARM_CC \
-        CC_FOR_BUILD=$CHARM_CC \
-        > /dev/null"
-    BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-    INSTALL_COMMAND test -f hwloc/.libs/libhwloc_embedded.lib && cp hwloc/.libs/libhwloc_embedded.lib hwloc/.libs/libhwloc_embedded.a || true # On Windows, the library is created as .lib
-    COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
-    COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
-    COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
-    COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
-)
 
 # LIBS
 if(${TARGET} STREQUAL "LIBS")
@@ -884,7 +846,7 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck converse memory-default threads-default hwloc_embedded ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
@@ -931,7 +893,6 @@ endforeach(l)
 if(NOT ${CMAKE_DL_LIBS} STREQUAL "")
     set(DL_LIB "-l${CMAKE_DL_LIBS}")
 endif()
-file(APPEND ${optfile_sh} "CMK_HWLOC_LIBS=\"-lhwloc_embedded -lm\"\n" )
 
 if (NOT CMK_WINDOWS)
   file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")

@@ -1,19 +1,19 @@
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
-all: pgm
+all: ring
 
-pgm:  ring.o
-	$(CHARMC) ring.o  -o pgm -language charm++
+ring:  ring.o
+	$(CHARMC) ring.o  -o ring -language charm++
 
 ring.o : ring.C ring.h ring.ci
 	$(CHARMC) -c ring.ci ring.C
 
-test: pgm
-	$(call run, +p4 ./pgm )
+test: ring
+	$(call run, +p4 ./ring )
 
-testp: pgm
-	$(call run, +p$(P) ./pgm )
+testp: ring
+	$(call run, +p$(P) ./ring )
 
 clean:
-	rm -f conv-host pgm *.def.h *.decl.h *.o *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f conv-host ring *.def.h *.decl.h *.o *~ charmrun charmrun.exe ring.exe ring.pdb ring.ilk

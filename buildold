@@ -726,7 +726,7 @@ then
   else
     Echo "Removing existing data and starting over. (--force)"
   fi
-elif [ -e "$DESTINATION" ]
+elif [ -e "$DESTINATION" -a ! -e "$DESTINATION/.spack" ]
 then
   Echo "\"$DESTINATION\" already exists but is in an inconsistent state."
   if [ -z "$FORCE" ]

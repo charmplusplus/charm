@@ -983,7 +983,7 @@ for FILE in $FILES
 do
 
 	case "$FILE" in
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
+	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co|*.obj)
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
 	*.c|*.s|*.S|*.asm|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
@@ -1106,7 +1106,8 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    TLSGLOBALS_OPTS='-ftls-model=initial-exec'
+    TLSGLOBALS_OPTS=''
+    [[ "$CMK_COMPILER_KNOWS_FTLS_MODEL" = '1' ]] && TLSGLOBALS_OPTS+=" -ftls-model=initial-exec"
     [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" = '1' ] && TLSGLOBALS_OPTS="$TLSGLOBALS_OPTS -mno-tls-direct-seg-refs"
     OPTS_CC="$OPTS_CC $TLSGLOBALS_OPTS"
     OPTS_CXX="$OPTS_CXX $TLSGLOBALS_OPTS"
@@ -1618,7 +1619,7 @@ modInitObj="$modInitName.o"
 MAKE_LDXX="0"
 MAKE_LD="0"
 
-CORE_LIBS="-lconverse $TRACE_OBJ $CMK_HWLOC_LIBS"
+CORE_LIBS="-lconverse $TRACE_OBJ -lm"
 
 # get TAU stub makefile variables
 if test "$CMK_WITH_TAU" = "true"
@@ -1999,7 +2000,7 @@ do
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
 		;;
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
+	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co|*.obj)
 		[ ! -s $FILE ] && Abort "$FILE: file not recognized: File truncated"
 		;;
 	*.M|*.mod)
