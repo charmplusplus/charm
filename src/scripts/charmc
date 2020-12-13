@@ -181,7 +181,7 @@ End() {
 	then
         for FILE in `echo $FILES`
         do
-            #BASE=`stripExtention $FILE`
+            #BASE=`stripExtension $FILE`
             MYTMP=`basename $FILE`".TMP"
             $RM $MYTMP.P.C $MYTMP.cpp $MYTMP.space $MYTMP.xlat $MYTMP.o
             $RM $MYTMP.c $MYTMP.c.0.h $MYTMP.c.1.h $MYTMP.c.2.h
@@ -228,11 +228,11 @@ Do() {
 	[[ $Do_res -eq 0 || -n "$NOABORT" ]] || Abort "Command $@ returned error code $Do_res"
 }
 
-# This procedure removes the extention (the ".c" in "./main.c") from
+# This procedure removes the extension (the ".c" in "./main.c") from
 # its first argument, and prints the result. Unlike the builtin command
 # basename, it keeps the directory path.
 # Args: <name to strip>
-stripExtention() {
+stripExtension() {
 	se_base=`basename $1`
 #	se_base=`echo $1 | awk -F/ '{print $NF}'`
 	se_strip=`echo $se_base | awk -F. '{ORS="";print $1;for (i=2;i<NF;i++) print "."$i}'`
@@ -240,10 +240,10 @@ stripExtention() {
 	echo $se_ret
 }
 
-# GetExtention returns the extention on the given file name
+# GetExtension returns the extension on the given file name
 # or "" if none.  (e.g. "./bob/snack.c" returns ".c")
-# Args: <name to find extention of>
-getExtention() {
+# Args: <name to find extension of>
+getExtension() {
 #	se_base=`echo $1 | awk -F/ '{print $NF}'`
 #        se_ret=`echo $se_base | awk -F. '{if (NF<=1) print ""; else print "."$NF}'`
 #	echo $se_ret
@@ -987,12 +987,12 @@ do
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
 	*.c|*.s|*.S|*.asm|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
-		BASE=`stripExtention \`basename $FILE\``
+		BASE=`stripExtension \`basename $FILE\``
 		BASEO="$BASE.o"
 
 		if [[ $numFiles = 1 && -n "$OBJECT" ]]
 		then
-			OBJ_EXT=`getExtention $OBJECT`
+			OBJ_EXT=`getExtension $OBJECT`
 			if [[ "$OBJ_EXT" = '.o' || "$OBJ_EXT" = '.co' ]]
 			then
 				BASEO=$OBJECT
@@ -1860,8 +1860,8 @@ Debug "Preprocessing GEN-CPM files"
 
 for FILE in `echo $GENCPM`
 do
-# This used to be "$FILE:r", which strips the extention
-	BASE=`stripExtention $FILE`
+# This used to be "$FILE:r", which strips the extension
+	BASE=`stripExtension $FILE`
 	MYTMP=`basename $FILE`".TMP"
 	DELETE="$DELETE $MYTMP.c $MYTMP.i"
 	DoNoErrCheck $RM $BASE.cpm.h $MYTMP.c
@@ -1883,9 +1883,9 @@ Debug "About to compile..."
 
 for FILE in $FILES
 do
-	BASE=`stripExtention \`basename $FILE\``
+	BASE=`stripExtension \`basename $FILE\``
 	MYTMP=`basename $FILE`".TMP"
-	FILE_EXT=`getExtention $FILE`
+	FILE_EXT=`getExtension $FILE`
 	BASEO="$BASE.o"
 	DESTO="-o $BASEO"
 
@@ -1897,7 +1897,7 @@ do
 	# same c file such as memory.C.
 	if [[ $numFiles = 1 && -n "$OBJECT" ]]
 	then
-		OBJ_EXT=`getExtention $OBJECT`
+		OBJ_EXT=`getExtension $OBJECT`
 		if [[ "$OBJ_EXT" = '.o' || "$OBJ_EXT" = '.co' ]]
 		then
 			BASEO=$OBJECT
@@ -1910,7 +1910,7 @@ do
         case "$FILE_EXT" in
         .c|.s|.S|.asm|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[[ $VERBOSE ]] && echo "Compiling $FILE"
-		DoNoErrCheck $RM $BASEO `stripExtention $BASEO`.f.o
+		DoNoErrCheck $RM $BASEO `stripExtension $BASEO`.f.o
         esac
 #	fi
 	if [[ ! -z "$SKIPLINK" ]]
@@ -2185,7 +2185,7 @@ for trace in $TRACEMODE; do
 done
 fi
 
-BAL_EXT=`getExtention $BALANCE`
+BAL_EXT=`getExtension $BALANCE`
 if [[ -z "$BAL_EXT" ]]; then
   # Balance has no extension-- is a library reference
   if [[ -f "${CHARMLIB}/libldb-$BALANCE.a" ]]; then
