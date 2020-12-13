@@ -392,24 +392,6 @@ public:
 
 #endif
 
-// As described in http://www.gotw.ca/publications/mxc++-item-4.htm
-template<typename D, typename B>
-class IsDerivedFrom
-{
-  class No { };
-  class Yes { No no[3]; };
-
-  static Yes Test( B* ); // not defined
-  static No Test( ... ); // not defined
-
-  static void Constraints(D* p) { B* pb = p; pb = p; }
-
-public:
-  enum { Is = sizeof(Test(static_cast<D*>(0))) == sizeof(Yes) };
-
-  IsDerivedFrom() { void(*p)(D*) = Constraints; }
-};
-
 /// Base case for the infrastructure to recursively handle inheritance
 /// through CBase_foo from anything that implements X::pup(). Chare
 /// classes have generated specializations that call PUPs for their
@@ -420,13 +402,13 @@ public:
 /// The specialized templates are structs for reasons explained by
 /// http://www.gotw.ca/publications/mill17.htm
 struct CBase { };
-template <typename T, int automatic>
+template <typename T, bool automatic>
 struct recursive_pup_impl {
   void operator()(T *obj, PUP::er &p);
 };
 
 template <typename T>
-struct recursive_pup_impl<T, 1> {
+struct recursive_pup_impl<T, true> {
   void operator()(T *obj, PUP::er &p) {
     obj->parent_pup(p);
     obj->_sdag_pup(p);
@@ -435,14 +417,14 @@ struct recursive_pup_impl<T, 1> {
 };
 
 template <typename T>
-struct recursive_pup_impl<T, 0> {
+struct recursive_pup_impl<T, false> {
   void operator()(T *obj, PUP::er &p) {
     obj->T::pup(p);
   }
 };
 template <typename T>
 void recursive_pup(T *obj, PUP::er &p) {
-  recursive_pup_impl<T, IsDerivedFrom<T, CBase>::Is>()(obj, p);
+  recursive_pup_impl<T, std::is_base_of<CBase, T>::value>()(obj, p);
 }
 
 class CProxy_ArrayBase;
