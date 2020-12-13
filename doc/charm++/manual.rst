@@ -11344,8 +11344,8 @@ UCX stands for Unified Communication X and is a high performance communication
 library that can be used as a backend networking layer for Charm++ builds on
 supported transports like Mellanox Infiniband, Intel Omni-Path, Cray GNI, TCP/IP, etc.
 
-In order to install Charm++ with the UCX backend, you require UCX or HPC-X modules
-in your environment. In case UCX or HPC-X is not available in your environment,
+In order to install Charm++ with the UCX backend, UCX or HPC-X modules are required
+in your environment. In case UCX and HPC-X are not available in your environment,
 you can build UCX from scratch using the following steps:
 
 .. code-block:: bash
@@ -11359,7 +11359,7 @@ you can build UCX from scratch using the following steps:
 
 After installing UCX, there are several supported process management interfaces (PMI)
 that can be specified as options in order to build Charm++ with UCX. These include
-Simple PMI, Slurm PMI, Slurm PMI 2 and PMIx (included in OpenMPI or OpenPMIx). Currently, in order to
+Simple PMI, Slurm PMI, Slurm PMI 2, and PMIx (included in OpenMPI or OpenPMIx). Currently, in order to
 use PMIx for process management, it is required to have either OpenMPI or OpenPMIx installed on the system.
 Additionally, in order to use the other supported process management interfaces, it is
 required to have a non-OpenMPI based MPI implementation installed on the system (e.g.
@@ -11432,7 +11432,7 @@ Finally, Charm++ with the UCX backend can be built with OpenPMIx using the follo
 
 It should be noted that in the absence of a working launcher such as ``jsrun``, an MPI distribution
 such as OpenMPI may also be required to run Charm++ applications built with the UCX backend
-and OpenPMIx. Since you no longer need PMIx included with OpenMPI, any verison of OpenMPI can be built
+and OpenPMIx. Since you no longer need PMIx included with OpenMPI, any version of OpenMPI can be built
 (including v4.0.5 and later) with your build of OpenPMIx using the ``--with-pmix`` flag,
 such as the following:
 
@@ -11448,8 +11448,8 @@ such as the following:
 Before executing a Charm++ program, you may need to check that ``LD_LIBRARY_PATH`` and ``PATH``
 are set to include OpenPMIx (and OpenMPI, if needed).
 
-To use PMIx included with OpenMPI, you would require an OpenMPI implementation with PMIx
-enabled to be installed on your system. As a reminder, PMIx is no longer included in OpenMPI
+To use PMIx included with OpenMPI, an OpenMPI implementation with PMIx enabled is required
+to be installed on your system. As a reminder, PMIx is no longer included in OpenMPI
 distributions of v4.0.5 or later. In case OpenMPI is not available in your environment,
 you can build OpenMPI from scratch using the following steps:
 
