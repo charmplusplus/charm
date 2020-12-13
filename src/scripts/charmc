@@ -73,6 +73,8 @@ OPTS_CC=''
 OPTS_CXX=''
 OPTS_F90=''
 OPTS_LD=''
+# Additional options specified by the user
+ARG_OPTS=()
 ARG_OPTS_CPP=()
 ARG_OPTS_LDRO=()
 ARG_OPTS_CC=()
@@ -400,7 +402,7 @@ do
 		# Make sure these compiler options are passed through even if no
 		# file to compile is specified
 		PASSTHROUGH_COMPILER_OPTIONS+=("$arg")
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 
 	"-machine")
@@ -644,7 +646,7 @@ do
 # Run preprocessor only
 		PREPROCESS="yes"
 		SKIPLINK="yes"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
         "-preprocess")
 # Run preprocessor as an extra step, continue after preprocessing
@@ -657,21 +659,21 @@ do
 	"-P"|"-S")
 # Run preprocessor/assembler only
 		SKIPLINK="yes"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 #------ Dependency generation ---------
 	"-M" | "-MM" | "-MMD" | "-MG" | "-MD")
 		SKIPLINK="yes"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		GENDEPENDS="yes"
 		;;
 	"-MF" | "-MT" | "-MQ")	#-MP will pass through automatically
-		OPTS+=("$arg" "$1")
+		ARG_OPTS+=("$arg" "$1")
 		shift
 		;;
 #--------------------------------------
     "-count-tokens")
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
         COUNTTOKENS="yes"
         ;;
 	"-default-to-aout")
@@ -724,12 +726,12 @@ do
 	@*.rsp)
 		# Pass through response files (*.rsp) to the compiler.
 		# See https://github.com/UIUC-PPL/charm/issues/2617 for details.
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 	*.tbd)
 		# Pass through text-based libraries (*.tbd) on MacOS.
 		# See https://github.com/UIUC-PPL/charm/issues/3045 for details.
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 	-D*|-I*)
 		ARG_OPTS_CPP+=("$arg")
@@ -753,7 +755,7 @@ do
 
 	-LANG*)
 		Warning "passing unrecognized option $arg to all compilers and linkers"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 	-shared|-G)
 		USER_INITIATED_SHARED='1'
@@ -885,7 +887,7 @@ do
 		;;
 
 	"-pg"|"-g"|-W*|-O*)
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 
 	-no-charmrun)
@@ -943,7 +945,7 @@ do
 
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 	*.*)
 		[[ -n "$VERBOSE" ]] && echo "Adding file $arg..."
@@ -954,7 +956,7 @@ do
 	*)
 #		printUsage  "Error: Unrecognized argument $arg"
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 	esac
 done
@@ -1025,12 +1027,14 @@ Debug "Read config script, setting defaults..."
 Debug "Setting vars..."
 
 # above this point, these OPTS_* are strings; below, they are arrays
-OPTS_CPP=($OPTS_CPP "${ARG_OPTS_CPP[@]}")
-OPTS_LDRO=($OPTS_LDRO "${ARG_OPTS_LDRO[@]}")
-OPTS_CC=($OPTS_CC "${ARG_OPTS_CC[@]}")
-OPTS_CXX=($OPTS_CXX "${ARG_OPTS_CXX[@]}")
-OPTS_F90=($OPTS_F90 "${ARG_OPTS_F90[@]}")
-OPTS_LD=($OPTS_LD "${ARG_OPTS_LD[@]}")
+OPTS_CPP=($OPTS_CPP)
+OPTS_LDRO=($OPTS_LDRO)
+OPTS_CC=($OPTS_CC)
+OPTS_CXX=($OPTS_CXX)
+OPTS_F90=($OPTS_F90)
+OPTS_LD=($OPTS_LD)
+
+OPTS_LDRO+=("${ARG_OPTS_LDRO[@]}")
 
 if [[ "$USE_BUILD_OPTIONS" = '1' ]]
 then
@@ -1373,11 +1377,13 @@ then
     CMK_XIOPTS+=" -count-tokens"
 fi
 
+OPTS_CPP+=("${ARG_OPTS_CPP[@]}")
+
 #Add generic options to the compiler- and linker-options
-OPTS_CC=("${OPTS[@]}" "${OPTS_CC[@]}")
-OPTS_CXX=("${OPTS[@]}" "${OPTS_CXX[@]}")
-OPTS_F90=("${OPTS[@]}" "${OPTS_F90[@]}")
-OPTS_LD=("${OPTS[@]}" "${OPTS_LD[@]}")
+OPTS_CC=("${OPTS[@]}" "${OPTS_CC[@]}" "${ARG_OPTS[@]}" "${ARG_OPTS_CC[@]}")
+OPTS_CXX=("${OPTS[@]}" "${OPTS_CXX[@]}" "${ARG_OPTS[@]}" "${ARG_OPTS_CXX[@]}")
+OPTS_F90=("${OPTS[@]}" "${OPTS_F90[@]}" "${ARG_OPTS[@]}" "${ARG_OPTS_F90[@]}")
+OPTS_LD=("${OPTS[@]}" "${OPTS_LD[@]}" "${ARG_OPTS[@]}" "${ARG_OPTS_LD[@]}")
 
 ##############################################################################
 #
