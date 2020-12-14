@@ -63,15 +63,18 @@ namespace ck {
     CkFuture handle_;
 
   public:
-    future() { handle_ = CkCreateFuture(); }
+    future() { }
+    future(const CkFuture &handle): handle_(handle) { }
     future(const future<T> &other) { handle_ = other.handle_; }
 
     T get() {
+      if (handle_.pe != CkMyPe()) {
+        CkAbort("non-local future value retrieval is currently unsupported");
+      }
       CkMarshallMsg *msg = (CkMarshallMsg *)CkWaitFuture(handle_);
       PUP::fromMem p(msg->msgBuf);
       PUP::detail::TemporaryObjectHolder<T> holder;
       p | holder;
-      delete msg;
       return std::move(holder.t);
     }
 
@@ -85,9 +88,19 @@ namespace ck {
     }
 
     bool is_ready() { return CkProbeFuture(handle_); }
-    void release() { CkReleaseFuture(handle_); }
+    void release() {
+      if ((handle_.pe == CkMyPe()) && is_ready()) {
+        delete (CkMarshallMsg *)CkWaitFuture(handle_);
+      }
+      CkReleaseFuture(handle_);
+    }
     void pup(PUP::er &p) { p | handle_; }
   };
+
+  template <typename T>
+  future<T> make_future() {
+    return future<T>(CkCreateFuture());
+  }
 }
 #endif
 

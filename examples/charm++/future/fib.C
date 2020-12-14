@@ -6,7 +6,7 @@ struct Main : public CBase_Main {
   Main(CkArgMsg *m) { thisProxy.run(atoi(m->argv[1])); }
 
   void run(int n) {
-    ck::future<int> f;
+    auto f = ck::make_future<int>();
     CProxy_Fib::ckNew(n, f);
     CkPrintf("Fibonacci number is: %d\n", f.get());
     f.release();
@@ -23,7 +23,8 @@ struct Fib : public CBase_Fib {
     if (n < THRESHOLD) {
       prev.set(seqFib(n));
     } else {
-      ck::future<int> f1, f2;
+      auto f1 = ck::make_future<int>();
+      auto f2 = ck::make_future<int>();
       CProxy_Fib::ckNew(n - 1, f1);
       CProxy_Fib::ckNew(n - 2, f2);
       prev.set(f1.get() + f2.get());
