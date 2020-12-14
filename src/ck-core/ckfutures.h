@@ -63,7 +63,8 @@ namespace ck {
     CkFuture handle_;
 
   public:
-    future() { }
+    future() { handle_ = CkCreateFuture(); }
+    future(PUP::reconstruct) { }
     future(const CkFuture &handle): handle_(handle) { }
     future(const future<T> &other) { handle_ = other.handle_; }
 
@@ -96,11 +97,6 @@ namespace ck {
     }
     void pup(PUP::er &p) { p | handle_; }
   };
-
-  template <typename T>
-  future<T> make_future() {
-    return future<T>(CkCreateFuture());
-  }
 }
 #endif
 
