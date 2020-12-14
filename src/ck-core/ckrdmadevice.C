@@ -107,10 +107,10 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // Determine if the subsequent regular entry method should be invoked
   // inline (intra-node) or not (inter-node)
   bool is_inline = true;
-  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  //GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   // Find which mode of transfer should be used
-  CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
+  //CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
 
   // Change message header to invoke regular entry method
   CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
@@ -476,10 +476,10 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // TODO: Need to handle the case where the destination PE could be wrong
   //       (due to migration, etc.). Currently the code relies on a global
   //       location update after migration (with CMK_GLOBAL_LOCATION_UPDATE).
-  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  //GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   // Determine transfer mode (intra-process, inter-process, inter-node)
-  CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
+  //CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
 
   // Store destination PE in the metadata message
   for (int i = 0; i < numops; i++) {
