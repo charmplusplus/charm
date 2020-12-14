@@ -88,7 +88,7 @@ namespace ck {
     }
 
     bool const is_ready() const { return CkProbeFuture(handle_); }
-    void release() const { CkReleaseFuture(handle_); }
+    void release() { CkReleaseFuture(handle_); }
     void pup(PUP::er &p) { p | handle_; }
   };
 }
