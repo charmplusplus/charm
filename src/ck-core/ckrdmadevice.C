@@ -88,10 +88,10 @@ void CkRdmaDeviceRecvHandler(void* data) {
   if (info->counter == info->n_ops) {
     QdCreate(1);
     enqueueNcpyMessage(op->dest_pe, info->msg);
-  }
 
-  // Free RDMA metadata
-  CmiFree(info);
+    // Free RDMA metadata
+    CmiFree(info);
+  }
 }
 
 // Invoked after post entry method
@@ -118,18 +118,18 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // FIXME: Always use UCX
   is_inline = false;
 
+  // Create a copy of this message for regular entry method invocation
+  size_t msg_size = env->getTotalsize();
+  envelope* new_env = (envelope*)CmiAlloc(msg_size);
+  memcpy(new_env, env, msg_size);
+
   // Allocate and fill in metadata for this zerocopy operation
   void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) * sizeof(DeviceRdmaOp) * numops);
   CmiEnforce(rdma_data);
   DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
   rdma_info->n_ops = numops;
   rdma_info->counter = 0;
-  //rdma_info->msg = env; // Reuse this message
-  size_t msg_size = 65;
-  CkMarshallMsg* new_msg = CkAllocateMarshallMsg(msg_size, NULL);
-  memcpy(new_msg->msgBuf, ((CkMarshallMsg*)EnvToUsr(env))->msgBuf, msg_size);
-  envelope* new_env = UsrToEnv(new_msg);
-  memcpy(new_env, env, sizeof(envelope));
+  //rdma_info->msg = env; // Reusing this message doesn't work
   rdma_info->msg = new_env;
 
   // Start unpacking marshalled message
