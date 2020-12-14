@@ -62,11 +62,14 @@ namespace ck {
   template <typename T> class future {
     CkFuture handle_;
 
+    static_assert(std::is_same<typename std::remove_cv<T>::type, T>::value,
+          "ck::future must have a non-const, non-volatile value type");
+
   public:
     future() { handle_ = CkCreateFuture(); }
     future(const future<T> &other) { handle_ = other.handle_; }
 
-    T get() {
+    T const get() const {
       CkMarshallMsg *msg = (CkMarshallMsg *)CkWaitFuture(handle_);
       PUP::fromMem p(msg->msgBuf);
       PUP::detail::TemporaryObjectHolder<T> holder;
@@ -75,7 +78,7 @@ namespace ck {
       return std::move(holder.t);
     }
 
-    void set(const T &value) {
+    void set(const T &value) const {
       PUP::sizer s;
       s | (typename std::decay<decltype(value)>::type &)value;
       CkMarshallMsg *msg = CkAllocateMarshallMsg(s.size(), NULL);
@@ -84,8 +87,8 @@ namespace ck {
       CkSendToFuture(handle_, msg);
     }
 
-    bool is_ready() { return CkProbeFuture(handle_); }
-    void release() { CkReleaseFuture(handle_); }
+    bool const is_ready() const { return CkProbeFuture(handle_); }
+    void release() const { CkReleaseFuture(handle_); }
     void pup(PUP::er &p) { p | handle_; }
   };
 }
