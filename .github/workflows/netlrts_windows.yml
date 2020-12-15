@@ -2,10 +2,6 @@ name: NetLRTS Windows
 
 on: pull_request
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
   build:
     timeout-minutes: 90

@@ -1,30 +1,41 @@
 #!/bin/bash
 
-# Script to set environment variables for Continuous Integration Windows VMs
+# a default set of environment variables for Visual Studio under Cygwin or MSYS2
 
-export INCLUDE=""
-export INCLUDE="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE;$INCLUDE"
-export INCLUDE="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\INCLUDE;$INCLUDE"
-export INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\ucrt;$INCLUDE"
-export INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\shared;$INCLUDE"
-export INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\um;$INCLUDE"
-export INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\winrt;$INCLUDE"
+# VS 2015
+# VCVER="14.0"
+# SDKVER="10.0.15063.0"
 
-export LIB=""
-export LIB="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\LIB\amd64;$LIB"
-export LIB="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB\amd64;$LIB"
-export LIB="C:\Program Files (x86)\Windows Kits\10\lib\10.0.15063.0\ucrt\x64;$LIB"
-export LIB="C:\Program Files (x86)\Windows Kits\10\lib\10.0.15063.0\um\x64;$LIB"
+# VS 2019
+VCVER="16.0"
+SDKVER="10.0.19030.0"
 
-export LIBPATH=""
-export LIBPATH="\Microsoft.VCLibs\14.0\References\CommonConfiguration\neutral;$LIBPATH"
-export LIBPATH="C:\Program Files (x86)\Windows Kits\10\References;$LIBPATH"
-export LIBPATH="C:\Program Files (x86)\Windows Kits\10\UnionMetadata;$LIBPATH"
-export LIBPATH="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB\amd64;$LIBPATH"
-export LIBPATH="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\LIB\amd64;$LIBPATH"
-export LIBPATH="C:\Windows\Microsoft.NET\Framework64\v4.0.30319;$LIBPATH"
+INCLUDE=""
+INCLUDE="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\INCLUDE;$INCLUDE"
+INCLUDE="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\ATLMFC\INCLUDE;$INCLUDE"
+INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\$SDKVER\ucrt;$INCLUDE"
+INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\$SDKVER\shared;$INCLUDE"
+INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\$SDKVER\um;$INCLUDE"
+INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\$SDKVER\winrt;$INCLUDE"
+export INCLUDE
 
-export VCINSTALLDIR="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC"
+LIB=""
+LIB="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\LIB\amd64;$LIB"
+LIB="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\ATLMFC\LIB\amd64;$LIB"
+LIB="C:\Program Files (x86)\Windows Kits\10\lib\$SDKVER\ucrt\x64;$LIB"
+LIB="C:\Program Files (x86)\Windows Kits\10\lib\$SDKVER\um\x64;$LIB"
+export LIB
+
+LIBPATH=""
+LIBPATH="\Microsoft.VCLibs\$VCVER\References\CommonConfiguration\neutral;$LIBPATH"
+LIBPATH="C:\Program Files (x86)\Windows Kits\10\References;$LIBPATH"
+LIBPATH="C:\Program Files (x86)\Windows Kits\10\UnionMetadata;$LIBPATH"
+LIBPATH="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\ATLMFC\LIB\amd64;$LIBPATH"
+LIBPATH="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\LIB\amd64;$LIBPATH"
+export LIBPATH
+
+export VCINSTALLDIR="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC"
 export WindowsSdkDir="C:\Program Files (x86)\Windows Kits\10"
 
-export PATH="/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/BIN/amd64:$PATH"
+VSPATH=$(cygpath -u "C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\BIN\amd64")
+export PATH="$VSPATH:$PATH"
