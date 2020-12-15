@@ -18,7 +18,7 @@ jobs:
       with:
         msystem: MINGW64
         update: true
-        install: git mingw-w64-x86_64-{toolchain,make,libtool,cmake} make libtool autoconf automake
+        install: git mingw-w64-x86_64-toolchain mingw-w64-x86_64-libtool mingw-w64-x86_64-cmake make libtool autoconf automake
     - name: build
       run: |
         . src/arch/win/vsenv.sh
