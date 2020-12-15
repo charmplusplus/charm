@@ -155,8 +155,6 @@ LIBS: CONVLIBS CHARMLIBS everylb
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
-SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
-
 NATIVECHARMC=../bin/charmc -host $(CHARMOPTS)
 
 CHARMXI=../bin/charmc -intrinsic $(OPTS)
@@ -563,7 +561,7 @@ ccs-client.o: ccs-client.C $(CVHEADERS)
 	$(CHARMC) -DCMK_NOT_USE_CONVERSE=1 ccs-client.C
 
 sockRoutines-seq.o: sockRoutines.C $(CVHEADERS) $(UTILHEADERS)
-	$(SEQCHARMC) -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o sockRoutines.C
+	$(CHARMC) -seq -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o sockRoutines.C
 
 pup_f.f90: pup_f.f90.sh
 	rm -f pup_f.f90 && ./pup_f.f90.sh
