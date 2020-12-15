@@ -5,37 +5,47 @@
 # VS 2015
 # VCVER="14.0"
 # SDKVER="10.0.15063.0"
+# export VCINSTALLDIR="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC"
+
+# VS 2017
+# VSYEAR="2017"
+# VCVER="15.0"
+# SDKVER="10.0.17763.0"
 
 # VS 2019
+VSYEAR="2019"
 VCVER="16.0"
 SDKVER="10.0.19030.0"
 
+export VCINSTALLDIR="C:\Program Files (x86)\Microsoft Visual Studio $VSYEAR\Enterprise\VC"
+export WindowsSdkDir="C:\Program Files (x86)\Windows Kits\10"
+
+# debug
+find $(cygpath -u "C:\Program Files (x86)\Microsoft Visual Studio $VSYEAR")
+find $(cygpath -u "$WindowsSdkDir")
+
 INCLUDE=""
-INCLUDE="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\INCLUDE;$INCLUDE"
-INCLUDE="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\ATLMFC\INCLUDE;$INCLUDE"
-INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\$SDKVER\ucrt;$INCLUDE"
-INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\$SDKVER\shared;$INCLUDE"
-INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\$SDKVER\um;$INCLUDE"
-INCLUDE="C:\Program Files (x86)\Windows Kits\10\include\$SDKVER\winrt;$INCLUDE"
+INCLUDE="$VCINSTALLDIR\INCLUDE;$INCLUDE"
+INCLUDE="$VCINSTALLDIR\ATLMFC\INCLUDE;$INCLUDE"
+INCLUDE="$WindowsSdkDir\include\$SDKVER\ucrt;$INCLUDE"
+INCLUDE="$WindowsSdkDir\include\$SDKVER\shared;$INCLUDE"
+INCLUDE="$WindowsSdkDir\include\$SDKVER\um;$INCLUDE"
+INCLUDE="$WindowsSdkDir\include\$SDKVER\winrt;$INCLUDE"
 export INCLUDE
 
 LIB=""
-LIB="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\LIB\amd64;$LIB"
-LIB="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\ATLMFC\LIB\amd64;$LIB"
-LIB="C:\Program Files (x86)\Windows Kits\10\lib\$SDKVER\ucrt\x64;$LIB"
-LIB="C:\Program Files (x86)\Windows Kits\10\lib\$SDKVER\um\x64;$LIB"
+LIB="$VCINSTALLDIR\LIB\amd64;$LIB"
+LIB="$VCINSTALLDIR\ATLMFC\LIB\amd64;$LIB"
+LIB="$WindowsSdkDir\lib\$SDKVER\ucrt\x64;$LIB"
+LIB="$WindowsSdkDir\lib\$SDKVER\um\x64;$LIB"
 export LIB
 
 LIBPATH=""
-LIBPATH="\Microsoft.VCLibs\$VCVER\References\CommonConfiguration\neutral;$LIBPATH"
-LIBPATH="C:\Program Files (x86)\Windows Kits\10\References;$LIBPATH"
-LIBPATH="C:\Program Files (x86)\Windows Kits\10\UnionMetadata;$LIBPATH"
-LIBPATH="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\ATLMFC\LIB\amd64;$LIBPATH"
-LIBPATH="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\LIB\amd64;$LIBPATH"
+LIBPATH="$WindowsSdkDir\References;$LIBPATH"
+LIBPATH="$WindowsSdkDir\UnionMetadata;$LIBPATH"
+LIBPATH="$VCINSTALLDIR\ATLMFC\LIB\amd64;$LIBPATH"
+LIBPATH="$VCINSTALLDIR\LIB\amd64;$LIBPATH"
 export LIBPATH
 
-export VCINSTALLDIR="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC"
-export WindowsSdkDir="C:\Program Files (x86)\Windows Kits\10"
-
-VSPATH=$(cygpath -u "C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC\BIN\amd64")
-export PATH="$VSPATH:$PATH"
+VSBIN=$(cygpath -u "$VCINSTALLDIR\BIN\amd64")
+export PATH="$VSBIN:$PATH"
