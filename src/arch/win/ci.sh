@@ -2,27 +2,39 @@
 
 # a default set of environment variables for Visual Studio under Cygwin or MSYS2
 
+
 # VS 2015
 # VCVER="14.0"
 # SDKVER="10.0.15063.0"
-# export VCINSTALLDIR="C:\Program Files (x86)\Microsoft Visual Studio $VCVER\VC"
+
+# TOOLARCH="amd64"
+# SDKARCH="x64"
+
+# export VCINSTALLDIR="C:\\Program Files (x86)\\Microsoft Visual Studio $VCVER\\VC"
+# VSBIN="$(cygpath -u "$VCINSTALLDIR\\BIN\\$TOOLARCH")"
+
 
 # VS 2017
 # VSYEAR="2017"
 # VCVER="15.0"
 # SDKVER="10.0.17763.0"
+# TOOLVER=""
 
 # VS 2019
 VSYEAR="2019"
 VCVER="16.0"
-SDKVER="10.0.19030.0"
+SDKVER="10.0.19041.0"
+TOOLVER="14.28.29333"
 
-export VCINSTALLDIR="C:\\Program Files (x86)\\Microsoft Visual Studio\\$VSYEAR\\Enterprise\\VC"
+TOOLARCH="x64"
+SDKARCH="x64"
+
+export VCINSTALLDIR="C:\\Program Files (x86)\\Microsoft Visual Studio\\$VSYEAR\\Enterprise\\VC\\Tools\\MSVC\\$TOOLVER"
+VSBIN="$(cygpath -u "$VCINSTALLDIR\\bin\\Hostx64\\$TOOLARCH")"
+
+
 export WindowsSdkDir="C:\\Program Files (x86)\\Windows Kits\\10"
-
-# debug
-find "$(cygpath -u "C:\\Program Files (x86)\\Microsoft Visual Studio\\$VSYEAR")"
-find "$(cygpath -u "$WindowsSdkDir")"
+export PATH="$VSBIN:$PATH"
 
 INCLUDE=""
 INCLUDE="$VCINSTALLDIR\\INCLUDE;$INCLUDE"
@@ -34,18 +46,15 @@ INCLUDE="$WindowsSdkDir\\include\\$SDKVER\\winrt;$INCLUDE"
 export INCLUDE
 
 LIB=""
-LIB="$VCINSTALLDIR\\LIB\\amd64;$LIB"
-LIB="$VCINSTALLDIR\\ATLMFC\\LIB\\amd64;$LIB"
-LIB="$WindowsSdkDir\\lib\\$SDKVER\\ucrt\\x64;$LIB"
-LIB="$WindowsSdkDir\\lib\\$SDKVER\\um\\x64;$LIB"
+LIB="$VCINSTALLDIR\\LIB\\$TOOLARCH;$LIB"
+LIB="$VCINSTALLDIR\\ATLMFC\\LIB\\$TOOLARCH;$LIB"
+LIB="$WindowsSdkDir\\lib\\$SDKVER\\ucrt\\$SDKARCH;$LIB"
+LIB="$WindowsSdkDir\\lib\\$SDKVER\\um\\$SDKARCH;$LIB"
 export LIB
 
 LIBPATH=""
 LIBPATH="$WindowsSdkDir\\References;$LIBPATH"
 LIBPATH="$WindowsSdkDir\\UnionMetadata;$LIBPATH"
-LIBPATH="$VCINSTALLDIR\\ATLMFC\\LIB\\amd64;$LIBPATH"
-LIBPATH="$VCINSTALLDIR\\LIB\\amd64;$LIBPATH"
+LIBPATH="$VCINSTALLDIR\\ATLMFC\\LIB\\$TOOLARCH;$LIBPATH"
+LIBPATH="$VCINSTALLDIR\\LIB\\$TOOLARCH;$LIBPATH"
 export LIBPATH
-
-VSBIN="$(cygpath -u "$VCINSTALLDIR\\BIN\\amd64")"
-export PATH="$VSBIN:$PATH"
