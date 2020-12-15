@@ -18,11 +18,11 @@ jobs:
       with:
         msystem: MINGW64
         update: true
-        install: git mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake autoconf automake make
+        install: git mingw-w64-x86_64-{toolchain,make,libtool,cmake} make libtool autoconf automake
     - name: build
       run: |
         . src/arch/win/vsenv.sh
-        ./build AMPI netlrts-win-x86_64 --with-production -j3 -g || ( cat netlrts-win-x86_64/tmp/hwloc/config.log ; exit 1 )
+        ./build AMPI netlrts-win-x86_64 --with-production -j3 -g
     - name: test
       run: |
         . src/arch/win/vsenv.sh

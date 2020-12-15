@@ -522,7 +522,7 @@ hwloc-target: conv-autoconfig.h
     CFLAGS="$(HWLOC_CC_FLAGS)" \
     CC="$(HWLOC_CC)" \
     CC_FOR_BUILD="$(HWLOC_CC)" \
-    > /dev/null )
+    > /dev/null || ( cat config.log ; exit 1 ) )
 	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
