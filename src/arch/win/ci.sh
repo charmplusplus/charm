@@ -21,8 +21,8 @@ export VCINSTALLDIR="C:\Program Files (x86)\Microsoft Visual Studio $VSYEAR\Ente
 export WindowsSdkDir="C:\Program Files (x86)\Windows Kits\10"
 
 # debug
-find $(cygpath -u "C:\Program Files (x86)\Microsoft Visual Studio $VSYEAR")
-find $(cygpath -u "$WindowsSdkDir")
+find "$(cygpath -u "C:\Program Files (x86)\Microsoft Visual Studio $VSYEAR")"
+find "$(cygpath -u "$WindowsSdkDir")"
 
 INCLUDE=""
 INCLUDE="$VCINSTALLDIR\INCLUDE;$INCLUDE"
@@ -47,5 +47,5 @@ LIBPATH="$VCINSTALLDIR\ATLMFC\LIB\amd64;$LIBPATH"
 LIBPATH="$VCINSTALLDIR\LIB\amd64;$LIBPATH"
 export LIBPATH
 
-VSBIN=$(cygpath -u "$VCINSTALLDIR\BIN\amd64")
+VSBIN="$(cygpath -u "$VCINSTALLDIR\BIN\amd64")"
 export PATH="$VSBIN:$PATH"
