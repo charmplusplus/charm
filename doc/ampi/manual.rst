@@ -519,31 +519,41 @@ provided that it takes place *after* ``MPI_Init``.
 Global Variable Privatization
 -----------------------------
 
-For the aforementioned benefits to be effective, AMPI needs to map
-multiple user-level threads onto each OS process. Traditional MPI
+In AMPI, ranks are implemented as user-level threads that coexist
+within OS processes or OS threads, depending on how the Charm++
+runtime was built. Traditional MPI
 programs assume that each rank has an entire OS process to itself,
 and that only one thread of control exists within its address space.
 This allows them to safely use global and static variables in their
 code. However, global and static variables are problematic for
 multi-threaded environments such as AMPI or OpenMP. This is because
 there is a single instance of those variables, so they will be shared
-among different threads in the single address space, and this could
-lead to the program producing an incorrect result or crashing. Figure
-:numref:`fig_global` shows an example of a multi-threaded
-application with two threads in a single process. :math:`var` is a
-global or static variable in this example. Thread 1 assigns a value to
-it, then it gets blocked for communication and another thread can
-continue. Then, thread 2 is scheduled next and accesses :math:`var`,
-which is wrong. The semantics of this program needs separate instances
-of :math:`var` for each of the threads. This is where the need arises
-for some special handling of these unsafe variables in existing MPI
-applications in order to run correctly with AMPI.
+among different ranks in the single address space, and this could lead
+to the program producing an incorrect result or crashing.
 
-.. _fig_global:
-.. figure:: figs/global.png
-   :width: 4.6in
+The following code is an example of this problem. Each rank queries its
+numeric ID, stores it in a global variable, waits on a global barrier,
+and then prints the value that was stored. If this code is run with
+multiple ranks virtualized inside one OS process, each rank will store
+its ID in the same single location in memory. The result is that all
+ranks will print the ID of whichever one was the last to successfully
+update that location. For this code to be semantically valid with AMPI,
+each rank needs its own separate instance of the variable. This is
+where the need arises for some special handling of these unsafe
+variables in existing MPI applications, which we call *privatization*.
 
-   Mutable global or static variables are an issue for AMPI
+.. code-block:: c++
+
+  int rank_global;
+
+  void print_ranks(void)
+  {
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank_global);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    printf("rank: %d\n", rank_global);
+  }
 
 The basic transformation needed to port MPI programs to AMPI is
 privatization of global and static variables. Module variables, "saved"
@@ -551,14 +561,14 @@ subroutine local variables, and common blocks in Fortran90 also belong to
 this category. Certain API calls use global variables internally, such as
 ``strtok`` in the C standard library, and as a result they are also
 unsafe. If such a program is executed without privatization on AMPI, all
-the AMPI threads that reside in the same process will access the same
+the AMPI ranks that reside in the same process will access the same
 copy of such variables, which is clearly not the desired semantics. Note
 that global variables that are constant or are only written to once
 during initialization with the same value across all ranks are already
 thread-safe.
 
 To ensure AMPI programs execute correctly, it is necessary to make such
-variables "private" to individual threads. We provide several options to
+variables "private" to individual ranks. We provide several options to
 achieve this with varying degrees of portability and required developer
 effort.
 
