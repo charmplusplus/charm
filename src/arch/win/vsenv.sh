@@ -28,8 +28,9 @@ TOOLVER="14.28.29333"
 
 TOOLARCH="x64"
 SDKARCH="x64"
+EDITION="Enterprise"
 
-export VCINSTALLDIR="C:\\Program Files (x86)\\Microsoft Visual Studio\\$VSYEAR\\Enterprise\\VC\\Tools\\MSVC\\$TOOLVER"
+export VCINSTALLDIR="C:\\Program Files (x86)\\Microsoft Visual Studio\\$VSYEAR\\$EDITION\\VC\\Tools\\MSVC\\$TOOLVER"
 VSBIN="$(cygpath -u "$VCINSTALLDIR\\bin\\Hostx64\\$TOOLARCH")"
 
 
