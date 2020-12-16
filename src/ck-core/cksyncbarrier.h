@@ -50,7 +50,7 @@ private:
   std::vector<bool> rankNeedsKick;
 
   int atCount = 0;
-  int curEpoch = 1;
+  int curEpoch = 0;
   int curKickEpoch = 0;
   bool on = false;
   bool isRank0pe = CkMyRank() == 0;

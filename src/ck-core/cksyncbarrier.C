@@ -169,7 +169,7 @@ void CkSyncBarrier::kick(int kickEpoch, const int sourceNode, const int sourcePe
 
   // Ignore the kick if it's for an epoch we've already completed or we're currently
   // triggered
-  if (kickEpoch < curEpoch || startedAtSync)
+  if (kickEpoch <= curEpoch || startedAtSync)
     return;
 
   const int myPe = CkMyPe();
@@ -196,7 +196,7 @@ void CkSyncBarrier::checkBarrier()
 
   // If there are no clients and the current kick is out of date or we're currently in the
   // barrier, then return without triggering the barrier
-  if ((clientCount == 0 && curKickEpoch < curEpoch) || startedAtSync)
+  if ((clientCount == 0 && curKickEpoch <= curEpoch) || startedAtSync)
     return;
 
   if (atCount >= clientCount)
@@ -217,11 +217,11 @@ void CkSyncBarrier::checkBarrier()
     if (atBarrier)
     {
       startedAtSync = true;
+      curEpoch++;
       // Propagate kick message to trigger barrier on PEs that don't have any AtSync
       // elements on them
       propagateKick();
       atCount -= clientCount;
-      curEpoch++;
       callReceiverList(beginReceivers);
       callReceiverList(receivers);
     }
