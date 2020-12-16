@@ -1,4 +1,4 @@
-name: NetLRTS Windows
+name: Multicore Windows
 
 on: pull_request
 
@@ -22,9 +22,8 @@ jobs:
     - name: build
       run: |
         . src/arch/win/vsenv.sh
-        ./build AMPI netlrts-win-x86_64 --with-production -j3 -g
+        ./build AMPI multicore-win-x86_64 --with-production -j2 -g
+        make -C multicore-win-x86_64/tests OPTS="-g" -j2
     - name: test
       run: |
-        . src/arch/win/vsenv.sh
-        make -C netlrts-win-x86_64/tests OPTS="-g" -j3
-        make -C netlrts-win-x86_64/tests test TESTOPTS="++local"
+        make -C multicore-win-x86_64/tests test TESTOPTS="+setcpuaffinity"
