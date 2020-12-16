@@ -1,10 +1,10 @@
-name: NetLRTS TCP Windows
+name: NetLRTS Windows
 
 on: pull_request
 
 jobs:
   build:
-    timeout-minutes: 180
+    timeout-minutes: 90
 
     runs-on: windows-latest
 
@@ -22,7 +22,7 @@ jobs:
     - name: build
       run: |
         . src/arch/win/vsenv.sh
-        ./build AMPI netlrts-win-x86_64 --with-production -j2 --without-romio
+        ./build AMPI netlrts-win-x86_64 --with-production -j2
         make -C netlrts-win-x86_64/tests -j2
     - name: test
       run: |
