@@ -49,6 +49,7 @@ private:
   std::vector<bool> rankNeedsKick;
 
   int atCount = 0;
+  int finishedReceivers = 0;
   int curEpoch = 0;
   int curKickEpoch = 0;
   bool on = false;

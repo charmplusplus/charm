@@ -3284,6 +3284,7 @@ void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 	lbBarrierReceiver = syncBarrier->addReceiver([=]() {
 	  DEBL((AA "CkLocMgr AtSync Receiver called\n" AB));
 	  lbmgr->RegisteringObjects(myLBHandle);
+          syncBarrier->resumeClients();
 	});
 	lbBarrierEndReceiver = syncBarrier->addEndReceiver([=]() {
 	  lbmgr->DoneRegisteringObjects(myLBHandle);

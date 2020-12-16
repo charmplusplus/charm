@@ -22,6 +22,7 @@ CkSyncBarrierInit::CkSyncBarrierInit(CkArgMsg* m)
 void CkSyncBarrier::reset()
 {
   startedAtSync = false;
+  finishedReceivers = 0;
 
   if (isRank0pe)
   {
@@ -216,18 +217,23 @@ void CkSyncBarrier::callReceivers()
 
 void CkSyncBarrier::resumeClients()
 {
-  // The end receiver or client functions may trigger the barrier again, so make sure
-  // reset() is called before them to put the barrier in a valid state to be triggered
-  reset();
-
-  for (const auto& er : endReceivers)
+  // All receivers must have checked in before we call end receivers and resume clients
+  finishedReceivers++;
+  if (finishedReceivers == receivers.size())
   {
-    if (er->on)
+    // The end receiver or client functions may trigger the barrier again, so make sure
+    // reset() is called before them to put the barrier in a valid state to be triggered
+    reset();
+
+    for (const auto& er : endReceivers)
     {
-      er->fn();
+      if (er->on)
+      {
+        er->fn();
+      }
     }
+    for (const auto& c : clients) c->fn();
   }
-  for (const auto& c : clients) c->fn();
 }
 
 void CkSyncBarrier::pup(PUP::er& p)
