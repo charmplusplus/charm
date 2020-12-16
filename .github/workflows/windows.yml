@@ -22,8 +22,8 @@ jobs:
     - name: build
       run: |
         . src/arch/win/vsenv.sh
-        ./build AMPI netlrts-win-x86_64 tcp --with-production -j2 -g
-        make -C netlrts-win-x86_64-tcp/tests OPTS="-g" -j2
+        ./build AMPI netlrts-win-x86_64 --with-production -j3 --without-romio
+        make -C netlrts-win-x86_64/tests -j3
     - name: test
       run: |
-        make -C netlrts-win-x86_64-tcp/tests test TESTOPTS="++local +setcpuaffinity"
+        make -C netlrts-win-x86_64/tests test TESTOPTS="++local +setcpuaffinity"
