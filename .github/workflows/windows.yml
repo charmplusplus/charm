@@ -4,7 +4,7 @@ on: pull_request
 
 jobs:
   build:
-    timeout-minutes: 90
+    timeout-minutes: 180
 
     runs-on: windows-latest
 
@@ -22,8 +22,8 @@ jobs:
     - name: build
       run: |
         . src/arch/win/vsenv.sh
-        ./build AMPI netlrts-win-x86_64 --with-production -j3 --without-romio
-        make -C netlrts-win-x86_64/tests -j3
+        ./build AMPI netlrts-win-x86_64 --with-production -j2 --without-romio
+        make -C netlrts-win-x86_64/tests -j2
     - name: test
       run: |
-        make -C netlrts-win-x86_64/tests test TESTOPTS="++local +setcpuaffinity"
+        make -C netlrts-win-x86_64/tests test TESTOPTS="++local"
