@@ -889,14 +889,13 @@ public:
 
       mapping.resize(numChares);
       FILE *mapf = fopen("mapfile", "r");
-      TopoManager tmgr;
-      int x, y, z, t;
+      int peNum;
 
       for(int i=0; i<numChares; i++) {
-        if (fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t) != 4) {
+        if (fscanf(mapf, "%d\n", &peNum) != 1) {
           CkAbort("ReadFileMap> reading from mapfile failed!");
         }
-        mapping[i] = tmgr.coordinatesToRank(x, y, z, t);
+        mapping[i] = peNum;
       }
       fclose(mapf);
     }
