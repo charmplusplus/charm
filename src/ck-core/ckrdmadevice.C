@@ -71,14 +71,12 @@ void CkRdmaDeviceRecvHandler(void* data) {
   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
   DeviceRdmaInfo* info = op->info;
 
-  // TODO: Invoke source callback
-  /*
+  // Invoke source callbacks
   if (op->cb) {
     CkCallback* cb = (CkCallback*)op->cb;
     cb->send();
     delete cb;
   }
-  */
 
   // Update counter (there may be multiple buffers in transit)
   info->counter++;
