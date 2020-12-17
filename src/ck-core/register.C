@@ -125,7 +125,7 @@ void CkRegisterSectionManagerExt(const char *s, const char **emNames, int emName
   int epIdxCtor = CkRegisterEp(s, SectionManagerExt::__SectionManagerExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
   CkRegisterDefaultCtor(__idx, epIdxCtor);
 
-  CkRegisterEp(s, SectionManagerExt::__sendToSection, CkMarshallMsg::__idx, __idx, 0);
+  CkRegisterEp("sendToSection", SectionManagerExt::__sendToSection, CkMarshallMsg::__idx, __idx, 0);
 
   for (int i=emNamesStart+2; i < numEntryMethods+emNamesStart; i++)
     {
@@ -136,7 +136,7 @@ void CkRegisterSectionManagerExt(const char *s, const char **emNames, int emName
   *startEpIdx = epIdxCtor;
 }
 
-void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+void CkRegisterArrayMapExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(ArrayMapExt), TypeGroup);
   CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
 
@@ -144,7 +144,7 @@ void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, in
   CkRegisterDefaultCtor(__idx, epIdxCtor);
 
   for (int i=1; i < numEntryMethods; i++)
-    CkRegisterEp(s, ArrayMapExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+    CkRegisterEp(emNames[i], ArrayMapExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
 
   *chareIdx = __idx;
   *startEpIdx = epIdxCtor;
