@@ -21,7 +21,7 @@ else
 fi
 if [[ ! -d "`cygpath -u "$VCC_DIR"`" ]]
 then
-  echo "VCC_DIR: $VCC_DIR is not set properly!"
+  echo "\$VCINSTALLDIR is not set properly: $VCC_DIR"
   exit 1
 fi
 if [[ -n "$WINDOWSSDKDIR" ]]
@@ -35,7 +35,7 @@ else
 fi
 if [[ ! -d "`cygpath -u "$SDK_DIR"`" ]]
 then
-  echo "SDK_DIR: $SDK_DIR is not set properly!"
+  echo "\$WindowsSdkDir is not set properly: $SDK_DIR"
   exit 1
 fi
 
