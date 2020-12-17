@@ -1206,11 +1206,7 @@ void CmiInitCPUAffinity(char **argv)
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
-#if CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
-#else
-    CmiAbort("Cannot get unique name for this host.\n");
-#endif
   }
   CmiNodeAllBarrier();
 

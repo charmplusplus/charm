@@ -260,10 +260,10 @@ class LBManager : public CBase_LBManager
   }
   int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest); }
   void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh); }
-  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(this, omh); }
+  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(omh); }
   void DoneRegisteringObjects(LDOMHandle omh)
   {
-    lbdb_obj->DoneRegisteringObjects(this, omh);
+    lbdb_obj->DoneRegisteringObjects(omh);
   }
   void ObjectStart(const LDObjHandle& h) { lbdb_obj->ObjectStart(h); }
   void ObjectStop(const LDObjHandle& h) { lbdb_obj->ObjectStop(h); }

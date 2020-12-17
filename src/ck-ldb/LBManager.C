@@ -527,7 +527,7 @@ void LBManager::init(void)
   }
   else
   {
-    AddLocalBarrierReceiver([this](void) { this->InvokeLB(); });
+    CkSyncBarrier::Object()->AddReceiver([this](void) { this->InvokeLB(); });
   }
 }
 

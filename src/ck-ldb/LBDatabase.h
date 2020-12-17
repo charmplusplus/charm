@@ -1,3 +1,6 @@
+#ifndef LBDATABASE_H
+#define LBDATABASE_H
+
 #include "lbdb.h"
 
 #include "LBObj.h"
@@ -7,8 +10,11 @@
 
 #include <vector>
 
+class CkSyncBarrier;
+
 class LBDatabase {
 friend class LBManager;
+private:
   LBDatabase();
   struct LBObjEntry {
     static const LDObjIndex DEFAULT_NEXT = -1;
@@ -18,7 +24,6 @@ friend class LBManager;
     LBObjEntry(LBObj* obj, LDObjIndex nextEmpty = DEFAULT_NEXT) : obj(obj), nextEmpty(nextEmpty) {}
   };
 
-private:
   std::vector<LBObjEntry> objs;
   std::vector<LBOM*> oms;
   LDObjIndex objsEmptyHead;
@@ -30,6 +35,7 @@ private:
   bool statsAreOn;
   double obj_walltime;
   LBMachineUtil machineUtil;
+  CkSyncBarrier* syncBarrier;
 
 
 
@@ -91,7 +97,6 @@ public:
   inline void Migratable(LDObjHandle h) { LbObj(h)->SetMigratable(true); };
   inline void setPupSize(LDObjHandle h, size_t pup_size) { LbObj(h)->setPupSize(pup_size);};
   inline void UseAsyncMigrate(LDObjHandle h, bool flag) { LbObj(h)->UseAsyncMigrate(flag); };
-public:
   inline int GetCommDataSz(void) {
     if (commTable)
       return commTable->CommCount();
@@ -111,8 +116,8 @@ public:
   LDOMHandle RegisterOM(LDOMid userID, void *userptr, LDCallbacks cb);
   int Migrate(LDObjHandle h, int dest);
   void UnregisterOM(LDOMHandle omh);
-  void RegisteringObjects(LBManager *mgr, LDOMHandle omh);
-  void DoneRegisteringObjects(LBManager *mgr, LDOMHandle omh);
+  void RegisteringObjects(LDOMHandle omh);
+  void DoneRegisteringObjects(LDOMHandle omh);
   int GetObjDataSz(void);
   void GetObjData(LDObjData *data);
   void MetaLBCallLBOnChares();
@@ -208,3 +213,4 @@ public:
   };
 };
 
+#endif /* LBDATABASE_H */

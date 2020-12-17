@@ -18,21 +18,6 @@ before_install:
 
 jobs:
   include:
-  - os: windows
-    name: "NetLRTS-Win"
-    script:
-    - choco upgrade -y cygwin cyg-get
-    - cyg-get.bat cmake make gcc-core binutils libtool
-    - unset CC
-    - unset CXX
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 --without-romio -g --with-production -j3"
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests -j3"
-    # Disabled lines would extend the CI's duration too much.
-    #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/examples -j3"
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/benchmarks -j3"
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests test TESTOPTS=++local"
-    #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/examples test TESTOPTS=++local"
-    #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/benchmarks test TESTOPTS=++local"
   - os: linux
     arch: arm64
     name: "NetLRTS-Arm64"
