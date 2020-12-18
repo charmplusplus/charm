@@ -344,7 +344,7 @@ int get_cpu_affinity(cpu_set_t *cpuset) {
 int get_thread_affinity(cpu_set_t *cpuset) {
 #if CMK_HAS_PTHREAD_SETAFFINITY
   CPU_ZERO(cpuset);
-  if (errno = pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), cpuset)) {
+  if ((errno = pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), cpuset))) {
     perror("pthread_getaffinity");
     return -1;
   }
