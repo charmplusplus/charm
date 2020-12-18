@@ -122,7 +122,7 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   memcpy(new_env, env, msg_size);
 
   // Allocate and fill in metadata for this zerocopy operation
-  void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) * sizeof(DeviceRdmaOp) * numops);
+  void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * numops);
   CmiEnforce(rdma_data);
   DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
   rdma_info->n_ops = numops;
@@ -480,6 +480,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   //CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
 
   // Store destination PE in the metadata message
+  // FIXME: Not necessary? save_op.dest_pe is set to CkMyPe() on the receiver
   for (int i = 0; i < numops; i++) {
     buffers[i]->dest_pe = dest_pe;
   }
