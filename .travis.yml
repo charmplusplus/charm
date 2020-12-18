@@ -28,5 +28,5 @@ jobs:
     arch: ppc64le
     name: "NetLRTS-Power"
     script:
-    - ./build all-test pami-linux-ppc64le gcc -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C pami-linux-ppc64le/tmp test TESTOPTS="++local"
+    - ./build all-test netlrts-linux-ppc64le -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C netlrts-linux-ppc64le/tmp test TESTOPTS="++local"
