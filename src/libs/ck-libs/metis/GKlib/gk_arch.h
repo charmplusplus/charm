@@ -73,7 +73,7 @@ typedef ptrdiff_t ssize_t;
 
 /* MSC does not have INFINITY defined */
 #ifndef INFINITY
-#define INFINITY FLT_MAX
+//#define INFINITY FLT_MAX
 #endif
 #endif
 

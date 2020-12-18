@@ -2550,8 +2550,8 @@ test_cxx "whether has Multiprocessing.h for Apple " "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK_HAS_MULTIPROCESSING_H], $pass, [whether has Multiprocessing.h])
 
 #### test if "ntohl" is available ####
-cat > $t <<EOT
-#if defined(_WIN32) || defined(__MINGW_H)
+cat > $tc <<EOT
+#ifdef _WIN32
 #include <Winsock2.h>
 #else
 #include <stdint.h>
