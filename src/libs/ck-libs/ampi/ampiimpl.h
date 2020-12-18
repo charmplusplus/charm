@@ -2700,6 +2700,12 @@ class ampi final : public CBase_ampi {
                        MPI_Datatype type,MPI_Comm destcomm) noexcept;
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm,CMK_REFNUM_TYPE seq) noexcept;
+#if CMK_CUDA
+  AmpiMsg *makeCudaMsg(int t,int sRank,const void *buf,int count,
+                       MPI_Datatype type,CProxy_ampi destProxy,
+                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq,
+                       ampi* destPtr) noexcept;
+#endif
 
   MPI_Request send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                    MPI_Comm destcomm, AmpiSendType sendType=BLOCKING_SEND, MPI_Request=MPI_REQUEST_NULL) noexcept;
@@ -2713,6 +2719,11 @@ class ampi final : public CBase_ampi {
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
                                  int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
                                  MPI_Request reqIdx) noexcept;
+#if CMK_CUDA
+  inline MPI_Request sendCudaMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
+                                 int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destElem,
+                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx, ampi* destPtr) noexcept;
+#endif
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx, ampi* destPtr) const noexcept {
 #if CMK_MULTICORE
     return true;

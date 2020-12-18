@@ -3001,6 +3001,20 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
   return msg;
 }
 
+#if CMK_CUDA
+AmpiMsg *ampi::makeCudaMsg(int t,int sRank,const void *buf,int count,
+                           MPI_Datatype type,CProxy_ampi destProxy,
+                           int destIdx, int ssendReq,CMK_REFNUM_TYPE seq,
+                           ampi* destPtr) noexcept
+{
+  CkAssert(ssendReq >= 0);
+
+  // TODO
+  CkPrintf("ampi::makeCudaMsg\n");
+  CkExit();
+}
+#endif
+
 void ampi::waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept
 {
   if (*req != MPI_REQUEST_NULL && (sendType == BLOCKING_SEND || sendType == BLOCKING_SSEND)) {
@@ -3148,6 +3162,24 @@ MPI_Request ampi::sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype ty
   return reqIdx;
 }
 
+#if CMK_CUDA
+MPI_Request ampi::sendCudaMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
+                              int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destProxy,
+                              int destIdx, AmpiSendType sendType, MPI_Request reqIdx, ampi* destPtr) noexcept
+{
+  if (reqIdx == MPI_REQUEST_NULL) {
+    reqIdx = postReq(parent->reqPool.newReq<SsendReq>((void*)buf, count, type, rank, t, destcomm, sRank, getDDT(),
+                                                      (sendType == BLOCKING_SSEND) ?
+                                                      AMPI_REQ_BLOCKED : AMPI_REQ_PENDING));
+  }
+
+  // TODO
+  destProxy[destIdx].genericSync(makeCudaMsg(t, sRank, buf, count, type, destProxy, destIdx, reqIdx, seq, NULL));
+
+  return reqIdx;
+}
+#endif
+
 MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype type,
                            int rank, MPI_Comm destcomm, CProxy_ampi arrProxy, AmpiSendType sendType,
                            MPI_Request reqIdx) noexcept
@@ -3172,6 +3204,17 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int size = ddt->getSize(count);
   ampi *destPtr = arrProxy[destIdx].ckLocal();
+#if CMK_CUDA
+  // Check if user buffer is on the GPU
+  // TODO: Implement a cache to speed up this check
+  cudaPointerAttributes attr;
+  cudaError_t ret = cudaPointerGetAttributes(&attr, buf);
+  if (ret == cudaSuccess
+      && (attr.type == cudaMemoryTypeDevice || attr.type == cudaMemoryTypeManaged)) {
+    return sendCudaMsg(t, sRank, buf, type, count, rank, destcomm,
+                       seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
+  }
+#endif
 #if AMPI_PE_LOCAL_IMPL
   if (destPtr != nullptr && destPtr->parent != nullptr) {
     // Complete message inline to PE-local destination VP
