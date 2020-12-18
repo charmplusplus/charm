@@ -3050,7 +3050,7 @@ AmpiMsg *ampi::makeCudaMsg(int t, int sRank, const void *buf, int count,
     CmiSendDevice(destPe, srcInfo.ptr, srcInfo.cnt, srcInfo.tag);
 
     // Pack metadata
-    AmpiMsgType msgType = NCPY_MSG;
+    AmpiMsgType msgType = CUDA_MSG;
     PUP::sizer pupSizer;
     pupSizer | msgType;
     pupSizer | srcInfo;
@@ -3351,6 +3351,11 @@ void ampi::requestPut(MPI_Request reqIdx, CkNcpyBuffer targetInfo) noexcept {
 bool ampi::processSsendMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
                            int count, MPI_Request req) noexcept {
   CkAssert(req != MPI_REQUEST_NULL);
+#if CMK_CUDA
+  if (msg->isCudaMsg()) {
+    return processSsendCudaMsg(msg, buf, type, count, req);
+  }
+#endif
   if (msg->isNcpyShmMsg()) {
     return processSsendNcpyShmMsg(msg, buf, type, count, req);
   }
@@ -3464,6 +3469,34 @@ bool ampi::processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
   }
   targetInfo.get(srcInfo);
   return ireq.complete; // did the get() complete inline (i.e. src is in same process as target)?
+}
+
+bool ampi::processSsendCudaMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept {
+  MSG_ORDER_DEBUG(
+    CkPrintf("[%d] AMPI vp %d receiving GPU buffer with req %d\n",
+             CkMyPe(), parent->thisIndex, req);
+  )
+  CkDeviceBuffer srcInfo;
+  msg->getDeviceBuffer(srcInfo);
+
+  void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp));
+  CmiEnforce(rdma_data);
+  DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
+  rdma_info->n_ops = 1;
+  rdma_info->counter = 0;
+  DeviceRdmaOp* rdma_op = (DeviceRdmaOp*)((char*)rdma_data + sizeof(DeviceRdmaInfo));
+  rdma_op->src_pe = srcInfo.src_pe;
+  rdma_op->src_ptr = srcInfo.ptr;
+  rdma_op->dest_pe = CkMyPe();
+  rdma_op->size = srcInfo.cnt;
+  rdma_op->info = rdma_info;
+  rdma_op->cb = new CkCallback(srcInfo.cb);
+  rdma_op->tag = srcInfo.tag;
+
+  // TODO: Check how recv callback will be invoked
+  CmiRecvDevice(rdma_op);
+
+  return ireq.complete;
 }
 
 // Returns true if the message was processed,

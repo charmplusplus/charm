@@ -1728,10 +1728,18 @@ inline void pupFromBuf(const void *data,T &t) noexcept {
 
 class AmpiMsgPool;
 
+#if CMK_CUDA
+enum AmpiMsgType : char {
+  NCPY_SHM_MSG,
+  NCPY_MSG,
+  CUDA_MSG
+};
+#else
 enum AmpiMsgType : bool {
   NCPY_SHM_MSG = true,
   NCPY_MSG     = false
 };
+#endif
 
 class AmpiMsg final : public CMessage_AmpiMsg {
  private:
@@ -1770,17 +1778,33 @@ class AmpiMsg final : public CMessage_AmpiMsg {
       return srcRank;
     }
   }
+#if CMK_CUDA
+  inline AmpiMsgType isNcpyShmMsg() const noexcept { CkAssert(isSsend()); return (((AmpiMsgType*)data)[0] == NCPY_SHM_MSG); }
+  inline AmpiMsgType isCudaMsg() const noexcept { CkAssert(isSsend()); return (((AmpiMsgType*)data)[0] == CUDA_MSG); }
+#else
   inline AmpiMsgType isNcpyShmMsg() const noexcept { CkAssert(isSsend()); return ((AmpiMsgType*)data)[0]; }
+#endif
   inline void getNcpyShmBuffer(AmpiNcpyShmBuffer& srcInfo) noexcept {
     CkAssert(isNcpyShmMsg());
     PUP::fromMem p(data+sizeof(AmpiMsgType));
     p | srcInfo;
   }
   inline void getNcpyBuffer(CkNcpyBuffer& srcInfo) noexcept {
+#if CMK_CUDA
+    CkAssert(!isNcpyShmMsg() && !isCudaMsg());
+#else
     CkAssert(!isNcpyShmMsg());
+#endif
     PUP::fromMem p(data+sizeof(AmpiMsgType));
     p | srcInfo;
   }
+#if CMK_CUDA
+  inline void getDeviceBuffer(CkDeviceBuffer& srcInfo) noexcept {
+    CkAssert(isCudaMsg());
+    PUP::fromMem p(data+sizeof(AmpiMsgType));
+    p | srcInfo;
+  }
+#endif
   inline int getSrcRank() const noexcept { return srcRank; }
   inline int getLength() const noexcept { return length; }
   inline char* getData() const noexcept { return data; }
@@ -2742,6 +2766,9 @@ class ampi final : public CBase_ampi {
   inline bool processSsendMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline bool processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline bool processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
+#if CMK_CUDA
+  inline bool processSsendCudaMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
+#endif
   inline bool processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline void processRdmaMsg(const void *sbuf, int slength, void* rbuf, int rcount, MPI_Datatype rtype) noexcept;
   inline void processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count) noexcept;
