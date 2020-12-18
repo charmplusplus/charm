@@ -147,11 +147,11 @@ include	$(TAU_MAKEFILE) #stub-makefile
 
 #builds TAU's trace library
 Tau: 
-	echo "buliding charm trace library with support for TAU."
+	@echo "Building Charm trace library with support for TAU."
 	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
 
 LIBS: CONVLIBS CHARMLIBS everylb
-	echo "Built LIBS Successfully"
+	@echo "Built LIBS successfully"
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
