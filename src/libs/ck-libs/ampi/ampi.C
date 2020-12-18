@@ -2863,6 +2863,29 @@ void ampi::completedRdmaRecv(CkDataMsg *msg) noexcept
   // [nokeep] entry method, so do not delete msg
 }
 
+#if CMK_CUDA
+void ampi::completedCudaSend(CkDataMsg *msg) noexcept
+{
+  // refnum is the index into reqList for this SendReq
+  int reqIdx = CkGetRefNum(msg);
+  //CkDeviceBuffer* srcInfo = (CkDeviceBuffer*)(msg->data);
+
+  MSG_ORDER_DEBUG(
+      CkPrintf("[%d] VP %d in completedCudaSend, reqIdx = %d\n",
+               CkMyPe(), parent->thisIndex, reqIdx);
+  )
+
+  AmpiRequestList& reqList = getReqs();
+  AmpiRequest& sreq = (*reqList[reqIdx]);
+  sreq.complete = true;
+
+  handleBlockedReq(&sreq);
+  resumeThreadIfReady();
+
+  // [nokeep] entry method, so do not delete msg
+}
+#endif
+
 void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type) noexcept
 {
   if (buf == MPI_BOTTOM) {
@@ -3002,16 +3025,49 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
 }
 
 #if CMK_CUDA
-AmpiMsg *ampi::makeCudaMsg(int t,int sRank,const void *buf,int count,
-                           MPI_Datatype type,CProxy_ampi destProxy,
-                           int destIdx, int ssendReq,CMK_REFNUM_TYPE seq,
+AmpiMsg *ampi::makeCudaMsg(int t, int sRank, const void *buf, int count,
+                           MPI_Datatype type, CProxy_ampi destProxy,
+                           int destIdx, int ssendReq, CMK_REFNUM_TYPE seq,
                            ampi* destPtr) noexcept
 {
   CkAssert(ssendReq >= 0);
 
-  // TODO
-  CkPrintf("ampi::makeCudaMsg\n");
-  CkExit();
+  CkDDT_DataType* ddt = getDDT()->getType(type);
+
+  if (ddt->isContig()) {
+    int len = ddt->getSize(count);
+
+    // Create callback to be invoked on the sender when send completes
+    CkCallback sendCB(CkIndex_ampi::completedCudaSend(NULL), thisProxy[thisIndex], true /*inline*/);
+    sendCB.setRefnum(ssendReq);
+
+    // Create metadata for the source GPU buffer
+    CkDeviceBuffer srcInfo = CkDeviceBuffer(buf, len, sendCB);
+
+    // Send source GPU buffer via UCX
+    // Tag will be created by the UCX layer
+    int destPe = destProxy.ckLocalBranch()->lastKnown(CkArrayIndex1D(destIdx));
+    CmiSendDevice(destPe, srcInfo.ptr, srcInfo.cnt, srcInfo.tag);
+
+    // Pack metadata
+    AmpiMsgType msgType = NCPY_MSG;
+    PUP::sizer pupSizer;
+    pupSizer | msgType;
+    pupSizer | srcInfo;
+    int srcInfoLen = pupSizer.size();
+    AmpiMsg* msg = CkpvAccess(msgPool).newAmpiMsg(seq, ssendReq, t, sRank, srcInfoLen);
+    msg->setLength(len); // Set AmpiMsg's length to be that of the real msg payload
+    PUP::toMem pupPacker(msg->getData());
+    pupPacker | msgType;
+    pupPacker | srcInfo;
+
+    return msg;
+  } else {
+    // TODO
+    CkAbort("Direct GPU communication with non-contiguous datatypes are currnetly not supported");
+
+    return NULL;
+  }
 }
 #endif
 

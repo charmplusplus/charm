@@ -2633,6 +2633,7 @@ class ampi final : public CBase_ampi {
   void genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank) noexcept;
   void completedRdmaSend(CkDataMsg *msg) noexcept;
   void completedRdmaRecv(CkDataMsg *msg) noexcept;
+  void completedCudaSend(CkDataMsg *msg) noexcept;
   void requestPut(MPI_Request req, CkNcpyBuffer targetInfo) noexcept;
   void bcastResult(AmpiMsg *msg) noexcept;
   void barrierResult(void) noexcept;
