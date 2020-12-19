@@ -85,6 +85,7 @@ typedef struct UcxRequest
 #endif
 #if CMK_CUDA
     DeviceRdmaOp*  device_op;
+    bool           ampi;
 #endif
 } UcxRequest;
 
@@ -116,6 +117,7 @@ typedef struct UcxPendingRequest
     DeviceRdmaOp*           device_op;
     ucp_tag_t               mask;
     ucp_tag_recv_callback_t recv_cb;
+    bool                    ampi;
 #endif
 } UcxPendingRequest;
 #endif
@@ -657,13 +659,18 @@ static inline int ProcessTxQueue()
           UcxRequest* ret_req = (UcxRequest*)status_ptr;
           if (ret_req->completed) {
             // Recv was completed immediately
-            CmiInvokeRecvHandler(req->device_op);
+            if (req->ampi) {
+              CmiInvokeAmpiRecvHandler(req->device_op);
+            } else {
+              CmiInvokeRecvHandler(req->device_op);
+            }
             UCX_REQUEST_FREE(ret_req);
           } else {
             // Recv wasn't completed immediately, recv_cb will be invoked
             // sometime later
             ret_req->device_op = req->device_op;
             ret_req->msgBuf = req->msgBuf;
+            ret_req->ampi = req->ampi;
           }
         }
 #endif
@@ -815,7 +822,11 @@ void UcxRecvDeviceCompleted(void* request, ucs_status_t status,
     DeviceRdmaOp* device_op = req->device_op;
 
     // Invoke recv handler since data transfer is complete
-    CmiInvokeRecvHandler(device_op);
+    if (req->ampi) {
+      CmiInvokeAmpiRecvHandler(device_op);
+    } else {
+      CmiInvokeRecvHandler(device_op);
+    }
     UCX_REQUEST_FREE(req);
   } else {
     // Request was completed immediately
@@ -855,7 +866,7 @@ void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
 #endif // CMK_SMP
 }
 
-void LrtsRecvDevice(DeviceRdmaOp* op)
+void LrtsRecvDevice(DeviceRdmaOp* op, bool ampi)
 {
 #if CMK_SMP
   UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
@@ -866,6 +877,7 @@ void LrtsRecvDevice(DeviceRdmaOp* op)
   req->device_op = op;
   req->mask      = UCX_MSG_TAG_MASK_FULL;
   req->recv_cb   = UcxRecvDeviceCompleted;
+  req->ampi      = ampi;
 
   PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
@@ -878,13 +890,18 @@ void LrtsRecvDevice(DeviceRdmaOp* op)
   UcxRequest* req = (UcxRequest*)status_ptr;
   if (req->completed) {
     // Recv was completed immediately
-    CmiInvokeRecvHandler(op);
+    if (ampi) {
+      CmiInvokeAmpiRecvHandler(op);
+    } else {
+      CmiInvokeRecvHandler(op);
+    }
     UCX_REQUEST_FREE(req);
   } else {
     // Recv wasn't completed immediately, recv_cb will be invoked
     // sometime later
     req->device_op = op;
     req->msgBuf = (void*)op->dest_ptr;
+    req->ampi = ampi;
   }
 #endif
 }

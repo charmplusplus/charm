@@ -2863,9 +2863,9 @@ void ampi::completedRdmaRecv(CkDataMsg *msg) noexcept
   // [nokeep] entry method, so do not delete msg
 }
 
-#if CMK_CUDA
 void ampi::completedCudaSend(CkDataMsg *msg) noexcept
 {
+#if CMK_CUDA
   // refnum is the index into reqList for this SendReq
   int reqIdx = CkGetRefNum(msg);
   //CkDeviceBuffer* srcInfo = (CkDeviceBuffer*)(msg->data);
@@ -2883,8 +2883,27 @@ void ampi::completedCudaSend(CkDataMsg *msg) noexcept
   resumeThreadIfReady();
 
   // [nokeep] entry method, so do not delete msg
-}
 #endif
+}
+
+void ampi::completedCudaRecv(CkDataMsg* msg) noexcept
+{
+#if CMK_CUDA
+  // refnum is the index into reqList for this IReq
+  int reqIdx = CkGetRefNum(msg);
+
+  MSG_ORDER_DEBUG(
+    CkPrintf("[%d] VP %d in completedCudaRecv, reqIdx = %d\n", CkMyPe(), parent->thisIndex, reqIdx);
+  )
+  AmpiRequestList& reqList = getReqs();
+  IReq& ireq = *((IReq*)(reqList[reqIdx]));
+  CkAssert(!ireq.complete);
+  ireq.complete = true;
+
+  handleBlockedReq(&ireq);
+  resumeThreadIfReady();
+#endif
+}
 
 void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type) noexcept
 {
@@ -3490,13 +3509,25 @@ bool ampi::processSsendCudaMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
   rdma_op->dest_pe = CkMyPe();
   rdma_op->size = srcInfo.cnt;
   rdma_op->info = rdma_info;
-  rdma_op->cb = new CkCallback(srcInfo.cb);
+  rdma_op->src_cb = new CkCallback(srcInfo.cb);
+  rdma_op->dst_cb = new CkCallback(CkIndex_ampi::completedCudaRecv(NULL), thisProxy[thisIndex], true /*inline*/);
+  ((CkCallback*)(rdma_op->dst_cb))->setRefnum(req);
   rdma_op->tag = srcInfo.tag;
 
-  // TODO: Check how recv callback will be invoked
-  CmiRecvDevice(rdma_op);
+  //QdCreate(1);
+  CmiRecvDevice(rdma_op, true);
+
+  /*
+  CkDDT_DataType* ddt = getDDT()->getType(type);
+  int len = ddt->getSize(count);
+  IReq& ireq = *((Ireq*)(parent->ampiReqs[req]));
+  ireq.length = len;
 
   return ireq.complete;
+  */
+
+  // Recv always completes after ampi::completedCudaRecv is invoked
+  return false;
 }
 
 // Returns true if the message was processed,

@@ -72,8 +72,8 @@ void CkRdmaDeviceRecvHandler(void* data) {
   DeviceRdmaInfo* info = op->info;
 
   // Invoke source callbacks
-  if (op->cb) {
-    CkCallback* cb = (CkCallback*)op->cb;
+  if (op->src_cb) {
+    CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
     delete cb;
   }
@@ -86,6 +86,36 @@ void CkRdmaDeviceRecvHandler(void* data) {
   if (info->counter == info->n_ops) {
     QdCreate(1);
     enqueueNcpyMessage(op->dest_pe, info->msg);
+
+    // Free RDMA metadata
+    CmiFree(info);
+  }
+}
+
+void CkRdmaDeviceAmpiRecvHandler(void* data) {
+  // Process QD to mark completion of the outstanding RDMA operation
+  //QdProcess(1);
+
+  DeviceRdmaOp* op = (DeviceRdmaOp*)data;
+  DeviceRdmaInfo* info = op->info;
+
+  // Invoke source callbacks
+  if (op->src_cb) {
+    CkCallback* cb = (CkCallback*)op->src_cb;
+    cb->send();
+    delete cb;
+  }
+
+  // Update counter
+  info->counter++;
+
+  // Check if all buffers have been received (only 1 for AMPI)
+  if (info->counter == info->n_ops) {
+    // Invoke destination callback
+    CmiEnforce(op->dst_cb);
+    CkCallback* cb = (CkCallback*)op->dst_cb;
+    cb->send();
+    delete cb;
 
     // Free RDMA metadata
     CmiFree(info);
@@ -150,7 +180,7 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
-    save_op.cb = new CkCallback(source.cb);
+    save_op.src_cb = new CkCallback(source.cb);
     save_op.tag = source.tag;
   }
 
@@ -164,7 +194,7 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
     QdCreate(1);
-    CmiRecvDevice(save_op);
+    CmiRecvDevice(save_op, false);
   }
 
 #if TIMING_BREAKDOWN

@@ -80,8 +80,8 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
 typedef void (*RdmaAckCallerFn)(void *token);
 
 void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
-void CmiRecvDevice(DeviceRdmaOp* op);
-void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
+void CmiRecvDevice(DeviceRdmaOp* op, bool ampi);
+void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn1, RdmaAckCallerFn fn2);
 
 #endif // CMK_CUDA
 

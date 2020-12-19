@@ -20,9 +20,10 @@ void CmiInvokeNcpyAck(void *ack);
 typedef void (*RdmaAckHandlerFn)(void *token);
 
 void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
-void LrtsRecvDevice(DeviceRdmaOp* op);
+void LrtsRecvDevice(DeviceRdmaOp* op, bool ampi);
 
 void CmiInvokeRecvHandler(void* data);
+void CmiInvokeAmpiRecvHandler(void* data);
 #endif
 
 int CmiGetRdmaCommonInfoSize();

@@ -1779,8 +1779,8 @@ class AmpiMsg final : public CMessage_AmpiMsg {
     }
   }
 #if CMK_CUDA
-  inline AmpiMsgType isNcpyShmMsg() const noexcept { CkAssert(isSsend()); return (((AmpiMsgType*)data)[0] == NCPY_SHM_MSG); }
-  inline AmpiMsgType isCudaMsg() const noexcept { CkAssert(isSsend()); return (((AmpiMsgType*)data)[0] == CUDA_MSG); }
+  inline bool isNcpyShmMsg() const noexcept { CkAssert(isSsend()); return (((AmpiMsgType*)data)[0] == NCPY_SHM_MSG); }
+  inline bool isCudaMsg() const noexcept { CkAssert(isSsend()); return (((AmpiMsgType*)data)[0] == CUDA_MSG); }
 #else
   inline AmpiMsgType isNcpyShmMsg() const noexcept { CkAssert(isSsend()); return ((AmpiMsgType*)data)[0]; }
 #endif
@@ -2657,7 +2657,10 @@ class ampi final : public CBase_ampi {
   void genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank) noexcept;
   void completedRdmaSend(CkDataMsg *msg) noexcept;
   void completedRdmaRecv(CkDataMsg *msg) noexcept;
+#if CMK_CUDA
   void completedCudaSend(CkDataMsg *msg) noexcept;
+  void completedCudaRecv(CkDataMsg *msg) noexcept;
+#endif
   void requestPut(MPI_Request req, CkNcpyBuffer targetInfo) noexcept;
   void bcastResult(AmpiMsg *msg) noexcept;
   void barrierResult(void) noexcept;

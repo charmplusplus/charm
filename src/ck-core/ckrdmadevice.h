@@ -70,6 +70,7 @@ public:
 };
 
 void CkRdmaDeviceRecvHandler(void* data);
+void CkRdmaDeviceAmpiRecvHandler(void* data);
 bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
 
