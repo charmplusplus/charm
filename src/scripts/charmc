@@ -256,6 +256,11 @@ getExtention() {
         fi
 }
 
+getAbsPath()
+{
+  ( cd "$*" >/dev/null 2>&1 && pwd || echo "$*" )
+}
+
 Debugf() {
 	[ -n "$VERBOSE" ] && echo "charmc>" $@
 }
@@ -414,18 +419,13 @@ then
 	PROG_EXT=".exe"
 fi
 
-CHARMLIB="$CHARMBIN/../lib"
-CHARMINC="$CHARMBIN/../include"
+CHARMDIR="$(getAbsPath "$CHARMBIN/..")"
+CHARMLIB="$CHARMDIR/lib"
+CHARMINC="$CHARMDIR/include"
 CHARMLIBSO=
-if test -d "$CHARMBIN/../lib_so"
+if test -d "$CHARMDIR/lib_so"
 then
-  CHARMLIBSO=`cd $CHARMBIN/../lib_so 2>/dev/null && pwd`
-  #getting absolute path is harder than thought because of symbolic links and ..
-  #ksh needs cd -P to resolve werid symbolic links, however -P is not portable
-  #csh is ok too if it exists
-  test -z "$CHARMLIBSO" && CHARMLIBSO=`cd -P $CHARMBIN/../lib_so 2>/dev/null && pwd`
-  test -z "$CHARMLIBSO" && CHARMLIBSO=`csh -c "cd $CHARMBIN/../lib_so >& /dev/null && pwd"`
-  test -z "$CHARMLIBSO" && echo "$CHARMBIN/../lib_so: not found" && exit 1
+  CHARMLIBSO="$CHARMDIR/lib_so"
 fi
 
 ##############################################################################
