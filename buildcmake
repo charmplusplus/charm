@@ -499,7 +499,7 @@ cd "$builddir"
 
 if [[ -n $opt_libdir ]]; then
   mkdir -p include
-  echo "USER_OPTS_LD=$opt_libdir" >> include/conv-mach-pre.sh
+  echo "USER_OPTS_LD='$opt_libdir'" >> include/conv-mach-pre.sh
 fi
 
 if [[ -n $opt_incdir ]]; then
