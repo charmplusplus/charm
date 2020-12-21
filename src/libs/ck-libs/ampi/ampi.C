@@ -3083,7 +3083,7 @@ AmpiMsg *ampi::makeCudaMsg(int t, int sRank, const void *buf, int count,
     return msg;
   } else {
     // TODO
-    CkAbort("Direct GPU communication with non-contiguous datatypes are currnetly not supported");
+    CkAbort("Direct GPU communication with non-contiguous datatypes are currently not supported");
 
     return NULL;
   }
@@ -3490,45 +3490,50 @@ bool ampi::processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
   return ireq.complete; // did the get() complete inline (i.e. src is in same process as target)?
 }
 
+#if CMK_CUDA
 bool ampi::processSsendCudaMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept {
   MSG_ORDER_DEBUG(
     CkPrintf("[%d] AMPI vp %d receiving GPU buffer with req %d\n",
              CkMyPe(), parent->thisIndex, req);
   )
-  CkDeviceBuffer srcInfo;
-  msg->getDeviceBuffer(srcInfo);
 
-  void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp));
-  CmiEnforce(rdma_data);
-  DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
-  rdma_info->n_ops = 1;
-  rdma_info->counter = 0;
-  DeviceRdmaOp* rdma_op = (DeviceRdmaOp*)((char*)rdma_data + sizeof(DeviceRdmaInfo));
-  rdma_op->src_pe = srcInfo.src_pe;
-  rdma_op->src_ptr = srcInfo.ptr;
-  rdma_op->dest_pe = CkMyPe();
-  rdma_op->size = srcInfo.cnt;
-  rdma_op->info = rdma_info;
-  rdma_op->src_cb = new CkCallback(srcInfo.cb);
-  rdma_op->dst_cb = new CkCallback(CkIndex_ampi::completedCudaRecv(NULL), thisProxy[thisIndex], true /*inline*/);
-  ((CkCallback*)(rdma_op->dst_cb))->setRefnum(req);
-  rdma_op->tag = srcInfo.tag;
-
-  //QdCreate(1);
-  CmiRecvDevice(rdma_op, true);
-
-  /*
   CkDDT_DataType* ddt = getDDT()->getType(type);
-  int len = ddt->getSize(count);
-  IReq& ireq = *((Ireq*)(parent->ampiReqs[req]));
-  ireq.length = len;
 
-  return ireq.complete;
-  */
+  if (ddt->isContig()) {
+    CkDeviceBuffer srcInfo;
+    msg->getDeviceBuffer(srcInfo);
+
+    int len = ddt->getSize(count);
+    CkAssert(len <= srcInfo.cnt);
+
+    void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp));
+    CmiEnforce(rdma_data);
+    DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
+    rdma_info->n_ops = 1;
+    rdma_info->counter = 0;
+    DeviceRdmaOp* rdma_op = (DeviceRdmaOp*)((char*)rdma_data + sizeof(DeviceRdmaInfo));
+    rdma_op->src_pe = srcInfo.src_pe;
+    rdma_op->src_ptr = srcInfo.ptr;
+    rdma_op->dest_pe = CkMyPe();
+    rdma_op->dest_ptr = buf;
+    rdma_op->size = len;
+    rdma_op->info = rdma_info;
+    rdma_op->src_cb = new CkCallback(srcInfo.cb);
+    rdma_op->dst_cb = new CkCallback(CkIndex_ampi::completedCudaRecv(NULL), thisProxy[thisIndex], true /*inline*/);
+    ((CkCallback*)(rdma_op->dst_cb))->setRefnum(req);
+    rdma_op->tag = srcInfo.tag;
+
+    //QdCreate(1);
+    CmiRecvDevice(rdma_op, true);
+  } else {
+    // TODO
+    CkAbort("Direct GPU communication with non-contiguous datatypes are currently not supported");
+  }
 
   // Recv always completes after ampi::completedCudaRecv is invoked
   return false;
 }
+#endif
 
 // Returns true if the message was processed,
 // false if it is a sync msg that could not yet be processed
