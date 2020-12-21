@@ -13,6 +13,28 @@ public:
   CkSyncBarrierInit(CkMigrateMessage* m) : Chare(m) {}
 };
 
+class LBClient
+{
+public:
+  Chare* chare;
+  std::function<void()> fn;
+  int epoch;
+
+  LBClient(Chare* chare, std::function<void()> fn, int epoch)
+      : chare(chare), fn(fn), epoch(epoch)
+  {
+  }
+};
+
+class LBReceiver
+{
+public:
+  std::function<void()> fn;
+  int on;
+
+  LBReceiver(std::function<void()> fn, int on = 1) : fn(fn), on(on) {}
+};
+
 CkpvExtern(bool, cksyncbarrierInited);
 
 class CkSyncBarrier : public CBase_CkSyncBarrier
@@ -23,7 +45,7 @@ private:
 
   std::vector<bool> rank_needs_flood;
 
-  int cur_refcount;
+  int cur_epoch;
   int at_count;
   bool on;
   bool rank0pe;
@@ -37,7 +59,7 @@ private:
   void init()
   {
     CkpvAccess(cksyncbarrierInited) = true;
-    cur_refcount = 1;
+    cur_epoch = 1;
     iter_no = -1;
     propagated_atsync_step = 0;
     at_count = 0;
@@ -54,7 +76,6 @@ private:
   void propagate_atsync();
   void reset();
   void CallReceivers(void);
-  void CheckBarrier(bool flood_atsync = false);
 
 public:
   CkSyncBarrier() { init(); };
@@ -69,11 +90,24 @@ public:
                                            : nullptr;
   }
 
+  void CheckBarrier(bool flood_atsync = false);
   void recvLbStart(int lb_step, int sourcenode, int pe);
 
-  LDBarrierClient AddClient(Chare* chare, std::function<void()> fn);
+  LDBarrierClient AddClient(Chare* chare, std::function<void()> fn, int epoch = -1);
+  template <typename T>
+  inline LDBarrierClient AddClient(T* obj, void (T::*method)(void), int epoch = -1)
+  {
+    return AddClient((Chare*)obj, std::bind(method, obj), epoch);
+  }
+
   void RemoveClient(LDBarrierClient h);
   LDBarrierReceiver AddReceiver(std::function<void()> fn);
+  template <typename T>
+  inline LDBarrierReceiver AddReceiver(T* obj, void (T::*method)(void))
+  {
+    return AddReceiver(std::bind(method, obj));
+  }
+
   void RemoveReceiver(LDBarrierReceiver h);
   void TurnOnReceiver(LDBarrierReceiver h);
   void TurnOffReceiver(LDBarrierReceiver h);
