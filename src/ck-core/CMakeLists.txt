@@ -76,29 +76,26 @@ add_library(ck ${ck-cxx-sources} ${ck-h-sources} ${all-ci-outputs})
 add_library(ckmain main.C)
 add_dependencies(ckmain ck)
 
-add_library(moduleCommonLBs
-    ../ck-ldb/CommonLBs.C
-    ../ck-ldb/DistributedLB.C
-    ../ck-ldb/TreeLB.C
-    ../ck-ldb/manager.C
-)
-add_dependencies(moduleCommonLBs ck)
+# CommonLBs used to be a subset of EveryLB, but they were unified as
+# part of the LB refactor. However, maintain both targets for
+# backwards compatibility and for possible future divergence.
+add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
+add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
+configure_file(../ck-ldb/libmoduleCommonLBs.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
+configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
+add_dependencies(moduleCommonLBs ck ckmetis)
+add_dependencies(moduleEveryLB ck ckmetis)
 
-if(EVERYLB)
-    add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
-    configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
-    add_dependencies(moduleEveryLB ck ckmetis)
+add_library(moduleMetisLB ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
 
-    add_library(moduleMetisLB ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis ${CMAKE_BINARY_DIR}/src/libs/ck-libs/metis/libmetis) # defines "ckmetis" target
 
-    add_subdirectory(${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis ${CMAKE_BINARY_DIR}/src/libs/ck-libs/metis/libmetis) # defines "ckmetis" target
+target_include_directories(ckmetis PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/GKlib )
+target_include_directories(moduleMetisLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
+target_include_directories(moduleCommonLBs PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
+target_include_directories(moduleEveryLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
 
-    target_include_directories(ckmetis PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/GKlib )
-    target_include_directories(moduleMetisLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
-    target_include_directories(moduleEveryLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
-
-    add_dependencies(moduleMetisLB ck ckmetis)
-endif()
+add_dependencies(moduleMetisLB ck ckmetis)
 
 # Single LBs
 add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C)
