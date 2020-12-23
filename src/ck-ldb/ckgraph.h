@@ -63,10 +63,9 @@ class Edge {
     Edge(int _id, int _msgs, int _bytes) : id(_id), msgs(_msgs),
       bytes(_bytes) {
     }
-    ~Edge() { }
-    inline int getNeighborId() { return id; }
-    inline int getNumMsgs() { return msgs; }
-    inline int getNumBytes() { return bytes; }
+    inline int getNeighborId() const { return id; }
+    inline int getNumMsgs() const { return msgs; }
+    inline int getNumBytes() const { return bytes; }
     inline void setNumBytes(int _bytes) { bytes = _bytes; }
 
   private:
@@ -125,25 +124,25 @@ class Vertex {
   friend class ObjGraph;
 
   public:
-    Vertex() {}
+    Vertex() = default;
     Vertex(int i, double cl, bool mig, int curpe, int newpe=-1, size_t pupsize=0):
         id(i), compLoad(cl), migratable(mig), currPe(curpe), newPe(newpe),
         pupSize(pupsize)  {}
-    inline int getVertexId() { return id; }
+    inline int getVertexId() const { return id; }
     inline double getVertexLoad() const { return compLoad; }
-    inline int getCurrentPe() { return currPe; }
-    inline int getNewPe() { return newPe; }
+    inline int getCurrentPe() const { return currPe; }
+    inline int getNewPe() const { return newPe; }
     inline void setNewPe(int _newpe) { newPe = _newpe; }
-    inline bool isMigratable() { return migratable; }
+    inline bool isMigratable() const { return migratable; }
 
     // list of vertices this vertex sends messages to and receives from
     std::vector<Edge> sendToList;
     std::vector<Edge> recvFromList;
     std::vector<McastSrc> mcastToList;
     std::vector<McastDest> mcastFromList;
-		double getCompLoad() {return compLoad;}
-		void setCompLoad(double s) {compLoad = s;}
-    int getCurrPe() {return currPe;}
+    double getCompLoad() const { return compLoad; }
+    void setCompLoad(double s) { compLoad = s; }
+    int getCurrPe() { return currPe; }
     void setCurrPe(int s) {currPe = s;}
 
 
