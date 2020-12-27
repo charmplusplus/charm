@@ -70,7 +70,7 @@ namespace ck {
 
     T get() const {
       if (handle_.pe != CkMyPe()) {
-        CkAbort("non-local future value retrieval is currently unsupported");
+        CkAbort("A future's value can only be retrieved on the PE it was created on.");
       }
       CkMarshallMsg *msg = (CkMarshallMsg *)CkWaitFuture(handle_);
       PUP::fromMem p(msg->msgBuf);
@@ -91,7 +91,9 @@ namespace ck {
     CkFuture handle() const { return handle_; }
     bool is_ready() const { return CkProbeFuture(handle_); }
     void release() {
-      if ((handle_.pe == CkMyPe()) && is_ready()) {
+      if (handle_.pe != CkMyPe()) {
+        CkAbort("A future can only be released on the PE it was created on.");
+      } else if (is_ready()) {
         delete (CkMarshallMsg *)CkWaitFuture(handle_);
       }
       CkReleaseFuture(handle_);
