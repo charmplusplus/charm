@@ -45,7 +45,7 @@ u_long ntohl(u_long netlong) {
 #endif
   union { uint32_t i; unsigned char c[4]; } uaw;
   uaw.i = netlong;
-  netlong = uaw.c[0]<<24 + uaw.c[1]<<16 + uaw.c[2]<<8 + uaw.c[3];
+  netlong = (uaw.c[0]<<24) + (uaw.c[1]<<16) + (uaw.c[2]<<8) + uaw.c[3];
   return netlong;
 }
 #else
