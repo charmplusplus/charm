@@ -68,7 +68,7 @@ namespace ck {
     future(const CkFuture &handle): handle_(handle) { }
     future(const future<T> &other) { handle_ = other.handle_; }
 
-    T get() {
+    T get() const {
       if (handle_.pe != CkMyPe()) {
         CkAbort("non-local future value retrieval is currently unsupported");
       }
@@ -88,7 +88,8 @@ namespace ck {
       CkSendToFuture(handle_, msg);
     }
 
-    bool is_ready() { return CkProbeFuture(handle_); }
+    CkFuture handle() const { return handle_; }
+    bool is_ready() const { return CkProbeFuture(handle_); }
     void release() {
       if ((handle_.pe == CkMyPe()) && is_ready()) {
         delete (CkMarshallMsg *)CkWaitFuture(handle_);
