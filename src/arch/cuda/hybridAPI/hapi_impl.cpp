@@ -660,7 +660,7 @@ void hapiEnqueue(hapiWorkRequest* wr) {
     recordEvent(wr->stream, wr->device_to_host_cb, NULL, wr);
   }
   else {
-    recordEvent(wr->stream, NULL, NULL, wr);
+    recordEvent(wr->stream, CkCallback::ignore, NULL, wr);
   }
 #endif
 
