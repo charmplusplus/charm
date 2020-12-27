@@ -77,7 +77,7 @@ class LBDBRegistry
   {
     if (legacyLBName != nullptr)
     {
-      legacy_runtime_treelbs.emplace(runtime_lbs.size(), legacyLBName);
+      legacy_runtime_treelbs.emplace((int)runtime_lbs.size(), legacyLBName);
     }
 
     runtime_lbs.push_back(name);
@@ -527,7 +527,7 @@ void LBManager::init(void)
   }
   else
   {
-    AddLocalBarrierReceiver([this](void) { this->InvokeLB(); });
+    CkSyncBarrier::Object()->AddReceiver([this](void) { this->InvokeLB(); });
   }
 }
 

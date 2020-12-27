@@ -193,7 +193,7 @@ void CpdNotify(int type, ...) {
 #if CMK_HAS_GETPID
     pid = getpid();
 #endif
-    CmiPrintf("CPD: %d Freeze %d\n",CmiMyPe(),pid);
+    CmiPrintf("CPD: %d Freeze %d\n", CmiMyPe(), (int)pid);
     break;
   case CPD_BREAKPOINT:
     CmiPrintf("CPD: %d BP %s\n",CmiMyPe(), va_arg(list, char*));

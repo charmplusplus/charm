@@ -146,7 +146,7 @@ option(CUDA                "Build with CUDA support" OFF)
 option(PXSHM               "Build with PXSHM" OFF)
 
 # LRTS PMI options
-set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, or ompipmix")
+set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, ompipmix, or openpmix")
 
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 
@@ -852,8 +852,8 @@ if(${TARGET} STREQUAL "charm4py")
 endif()
 
 # Check that we are able to build and link an executable
-add_executable(hello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(hello ck ldb-rand memory-default threads-default conv-static
+add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
+add_dependencies(ckhello ck ldb-rand memory-default threads-default conv-static
   converse ckmain ckqt
   moduleNDMeshStreamer modulecompletion)
 

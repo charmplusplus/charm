@@ -62,8 +62,7 @@ pgm.o: pgm.C client.decl.h mylib.h mylib.decl.h mylib.def.h utils.h client.def.h
 
 # Rule to generate dependency info for charm++ interface (ci) definition files
 %.di: %.ci
-	$(info Generating dependencies for $<)
-	@$(CXX) -M $< > $@
+	$(CXX) -M $< > $@
 
 %.ci.stamp: %.ci
 	$(CXX) $< && touch $@

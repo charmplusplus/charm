@@ -498,7 +498,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
-  #if CMK_HAS_GETHOSTNAME && !CMK_BLUEGENEQ
+  #if !CMK_BLUEGENEQ
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
     // fprintf(stderr, "[%d] IP is %d.%d.%d.%d\n", CmiMyPe(), myip.data[0],myip.data[1],myip.data[2],myip.data[3]);
   #else

@@ -431,7 +431,7 @@ if(CMK_AMPI_WITH_ROMIO)
     add_dependencies(romio ck modulecompletion
         converse conv-static ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain
-        ckqt moduleNDMeshStreamer hello)
+        ckqt moduleNDMeshStreamer ckhello)
 
     add_dependencies(ampi_funcptr_shim romio)
     add_dependencies(ampi_funcptr_shim_main romio)
