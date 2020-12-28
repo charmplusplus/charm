@@ -972,7 +972,7 @@ TraceProjections::TraceProjections(char **argv):
   const bool compressed =
       CmiGetArgFlagDesc(argv, "+gz-trace", "Write log files compressed with gzip");
   CmiGetArgFlagDesc(argv, "+no-gz-trace",
-                    "Disable writing log files pre-compressed with gzip");
+                    "Disable writing log files compressed with gzip");
   if (CkMyPe() == 0 && compressed)
     CkPrintf("Warning> gz-trace is not supported on this machine!\n");
 #endif
