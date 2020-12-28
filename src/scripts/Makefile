@@ -147,15 +147,13 @@ include	$(TAU_MAKEFILE) #stub-makefile
 
 #builds TAU's trace library
 Tau: 
-	echo "buliding charm trace library with support for TAU."
+	@echo "Building Charm trace library with support for TAU."
 	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
 
 LIBS: CONVLIBS CHARMLIBS everylb
-	echo "Built LIBS Successfully"
+	@echo "Built LIBS successfully"
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
-
-SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 
 NATIVECHARMC=../bin/charmc -host $(CHARMOPTS)
 
@@ -522,7 +520,7 @@ hwloc-target: conv-autoconfig.h
     CFLAGS="$(HWLOC_CC_FLAGS)" \
     CC="$(HWLOC_CC)" \
     CC_FOR_BUILD="$(HWLOC_CC)" \
-    > /dev/null )
+    > /dev/null || ( cat config.log ; exit 1 ) )
 	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
@@ -563,7 +561,7 @@ ccs-client.o: ccs-client.C $(CVHEADERS)
 	$(CHARMC) -DCMK_NOT_USE_CONVERSE=1 ccs-client.C
 
 sockRoutines-seq.o: sockRoutines.C $(CVHEADERS) $(UTILHEADERS)
-	$(SEQCHARMC) -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o sockRoutines.C
+	$(CHARMC) -seq -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o sockRoutines.C
 
 pup_f.f90: pup_f.f90.sh
 	rm -f pup_f.f90 && ./pup_f.f90.sh

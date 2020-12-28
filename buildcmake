@@ -165,7 +165,7 @@ while [[ $# -gt 0 ]]; do
     pxshm)
       opt_pxshm=1
       ;;
-    simplepmi|slurmpmi|slurmpmi2|ompipmix)
+    simplepmi|slurmpmi|slurmpmi2|ompipmix|openpmix)
       opt_lrts_pmi=$arg
       ;;
     persistent)
@@ -499,7 +499,7 @@ cd "$builddir"
 
 if [[ -n $opt_libdir ]]; then
   mkdir -p include
-  echo "USER_OPTS_LD=$opt_libdir" >> include/conv-mach-pre.sh
+  echo "USER_OPTS_LD='$opt_libdir'" >> include/conv-mach-pre.sh
 fi
 
 if [[ -n $opt_incdir ]]; then

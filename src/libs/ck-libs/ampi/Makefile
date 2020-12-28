@@ -114,7 +114,8 @@ $(ROMIO): headers
 		--enable-static=yes                                                  \
 		--enable-shared=no                                                   \
 		--disable-weak-symbols                                               \
-		--srcdir=`pwd`
+		--srcdir=`pwd`                                                       \
+		|| ( cat config.log ; exit 1 )
 
 	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
 	$(MAKE) -C romio AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
