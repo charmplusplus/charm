@@ -970,7 +970,7 @@ TraceProjections::TraceProjections(char **argv):
 #else
   // consume the flags so there's no confusion
   const bool compressed =
-      CmiGetArgFlagDesc(argv, "+gz-trace", "Write log files pre-compressed with gzip");
+      CmiGetArgFlagDesc(argv, "+gz-trace", "Write log files compressed with gzip");
   CmiGetArgFlagDesc(argv, "+no-gz-trace",
                     "Disable writing log files pre-compressed with gzip");
   if (CkMyPe() == 0 && compressed)
