@@ -392,7 +392,6 @@ class Block : public CBase_Block {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
       invokePackingKernels(d_temperature, d_send_ghosts, bounds,
           block_width, block_height, block_depth, comm_stream);
-      cudaStreamSynchronize(comm_stream); // FIXME
     } else {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
       invokePackingKernels(d_temperature, d_ghosts, bounds,
@@ -436,7 +435,6 @@ class Block : public CBase_Block {
           p_neighbor_bufs[dir].set_msg(msg);
           p_neighbor_bufs[dir].cb.setRefNum(my_iter);
           p_send_bufs[dir].put(p_neighbor_bufs[dir]);
-          cudaStreamSynchronize(comm_stream); // FIXME
         }
       }
     } else if (use_zerocopy) {
@@ -500,7 +498,6 @@ class Block : public CBase_Block {
 
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
         block_depth, comm_stream);
-    cudaStreamSynchronize(comm_stream); // FIXME
 
     delete msg;
   }
@@ -527,18 +524,9 @@ class Block : public CBase_Block {
     // Invoke GPU kernel for Jacobi computation
     invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
         block_depth, compute_stream);
-    // FIXME
-    cudaStreamSynchronize(compute_stream);
 
     CkCallback update_cb(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
     hapiAddCallback(compute_stream, update_cb);
-
-    /* TODO
-    // Operations in communication stream (packing and transfers) should
-    // only be executed when operations in compute stream complete
-    hapiCheck(cudaEventRecord(compute_event, compute_stream));
-    hapiCheck(cudaStreamWaitEvent(comm_stream, compute_event, 0));
-    */
   }
 
   void prepNextIter() {
