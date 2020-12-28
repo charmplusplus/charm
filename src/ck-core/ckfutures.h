@@ -64,14 +64,18 @@ namespace ck {
 
   public:
     future() { handle_ = CkCreateFuture(); }
+    future(PUP::reconstruct) { }
+    future(const CkFuture &handle): handle_(handle) { }
     future(const future<T> &other) { handle_ = other.handle_; }
 
-    T get() {
+    T get() const {
+      if (handle_.pe != CkMyPe()) {
+        CkAbort("A future's value can only be retrieved on the PE it was created on.");
+      }
       CkMarshallMsg *msg = (CkMarshallMsg *)CkWaitFuture(handle_);
       PUP::fromMem p(msg->msgBuf);
       PUP::detail::TemporaryObjectHolder<T> holder;
       p | holder;
-      delete msg;
       return std::move(holder.t);
     }
 
@@ -84,8 +88,16 @@ namespace ck {
       CkSendToFuture(handle_, msg);
     }
 
-    bool is_ready() { return CkProbeFuture(handle_); }
-    void release() { CkReleaseFuture(handle_); }
+    CkFuture handle() const { return handle_; }
+    bool is_ready() const { return CkProbeFuture(handle_); }
+    void release() {
+      if (handle_.pe != CkMyPe()) {
+        CkAbort("A future can only be released on the PE it was created on.");
+      } else if (is_ready()) {
+        delete (CkMarshallMsg *)CkWaitFuture(handle_);
+      }
+      CkReleaseFuture(handle_);
+    }
     void pup(PUP::er &p) { p | handle_; }
   };
 }
