@@ -75,8 +75,6 @@ never be excluded...
 #include "CkSyncBarrier.decl.h"
 #if CMK_CHARM4PY
 #include "TreeLB.h"
-
-// #include "trace-projectionsBOC.h"
 #endif
 
 #if CMK_CUDA
