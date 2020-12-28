@@ -29,8 +29,8 @@
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
     int block_height, int block_depth, cudaStream_t stream);
-extern void invokeGhostInitKernels(std::vector<DataType*>& ghosts,
-    std::vector<size_t>& ghost_sizes, cudaStream_t stream);
+extern void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
+    const std::vector<size_t>& ghost_sizes, cudaStream_t stream);
 extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     int block_height, int block_depth, bool bounds[], cudaStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
@@ -195,7 +195,7 @@ public:
   void startIter() {
     if (my_iter++ == warmup_iters) start_time = CkWallTimer();
 
-    block_proxy.exchangeGhosts();
+    block_proxy.run();
   }
 
   void warmupDone() {
@@ -206,16 +206,6 @@ public:
     double total_time = CkWallTimer() - start_time;
     CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
         total_time, (total_time / n_iters) * 1e6);
-
-    if (print_elements) {
-      sleep(1);
-      block_proxy(0,0,0).print();
-    } else {
-      CkExit();
-    }
-  }
-
-  void printDone() {
     CkExit();
   }
 };
@@ -233,14 +223,14 @@ class Block : public CBase_Block {
   int remote_count;
   int x, y, z;
 
-  DataType* __restrict__ h_temperature;
-  DataType* __restrict__ d_temperature;
-  DataType* __restrict__ d_new_temperature;
+  DataType* h_temperature;
+  DataType* d_temperature;
+  DataType* d_new_temperature;
 
-  DataType* __restrict__ h_ghosts[DIR_COUNT];
-  DataType* __restrict__ d_ghosts[DIR_COUNT];
-  DataType* __restrict__ d_send_ghosts[DIR_COUNT];
-  DataType* __restrict__ d_recv_ghosts[DIR_COUNT];
+  DataType* h_ghosts[DIR_COUNT];
+  DataType* d_ghosts[DIR_COUNT];
+  DataType* d_send_ghosts[DIR_COUNT];
+  DataType* d_recv_ghosts[DIR_COUNT];
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
@@ -357,12 +347,29 @@ class Block : public CBase_Block {
     invokeInitKernel(d_new_temperature, block_width, block_height, block_depth, compute_stream);
 
     // Initialize ghost data
-    std::vector<DataType*> ghosts;
-    // TODO
     if (use_zerocopy || use_persistent) {
+      std::vector<DataType*> send_ghosts;
+      std::vector<DataType*> recv_ghosts;
+      for (int i = 0; i < DIR_COUNT; i++) {
+        send_ghosts.push_back(d_send_ghosts[i]);
+        recv_ghosts.push_back(d_recv_ghosts[i]);
+      }
+      invokeGhostInitKernels(send_ghosts, ghost_sizes, compute_stream);
+      invokeGhostInitKernels(recv_ghosts, ghost_sizes, compute_stream);
     } else {
+      std::vector<DataType*> ghosts;
+      for (int i = 0; i < DIR_COUNT; i++) {
+        ghosts.push_back(d_ghosts[i]);
+      }
+      invokeGhostInitKernels(ghosts, ghost_sizes, compute_stream);
+
+      for (int i = 0; i < DIR_COUNT; i++) {
+        int ghost_count = ghost_sizes[i] / sizeof(DataType);
+        for (int j = 0; j < ghost_count; j++) {
+          h_ghosts[i][j] = 0;
+        }
+      }
     }
-    invokeGhostInitKernels(ghosts, ghost_sizes, compute_stream);
 
     // Enforce boundary conditions
     invokeBoundaryKernels(d_temperature, block_width, block_height, block_depth,
@@ -380,37 +387,15 @@ class Block : public CBase_Block {
 #endif
   }
 
-  void update() {
-    // Operations in compute stream should only be executed when
-    // operations in communication stream (transfers and unpacking) complete
-    hapiCheck(cudaEventRecord(comm_event, comm_stream));
-    hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
-
-    // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
-        block_depth, compute_stream);
-
-    // Operations in communication stream (packing and transfers) should
-    // only be executed when operations in compute stream complete
-    hapiCheck(cudaEventRecord(compute_event, compute_stream));
-    hapiCheck(cudaStreamWaitEvent(comm_stream, compute_event, 0));
-
-    // Copy final temperature data back to host
-    if (print_elements && (my_iter == warmup_iters + n_iters)) {
-      hapiCheck(cudaMemcpyAsync(h_temperature, d_new_temperature,
-            sizeof(DataType) * (block_width+2)*(block_height+2)*(block_depth+2),
-            cudaMemcpyDeviceToHost, comm_stream));
-    }
-  }
-
   void packGhosts() {
     if (use_persistent || use_zerocopy) {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_new_temperature, d_send_ghosts, bounds,
+      invokePackingKernels(d_temperature, d_send_ghosts, bounds,
           block_width, block_height, block_depth, comm_stream);
+      cudaStreamSynchronize(comm_stream); // FIXME
     } else {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_new_temperature, d_ghosts, bounds,
+      invokePackingKernels(d_temperature, d_ghosts, bounds,
           block_width, block_height, block_depth, comm_stream);
 
       // Transfer ghosts from device to host
@@ -441,8 +426,8 @@ class Block : public CBase_Block {
 
   void sendGhosts() {
     // Send ghosts to neighboring chares
-    // PersistentMsg is used to store the direction
     if (use_persistent) {
+      // PersistentMsg is used to store the direction
       PersistentMsg* msg;
       for (int dir = 0; dir < DIR_COUNT; dir++) {
         int rev_dir = (dir % 2 == 0) ? (dir+1) : (dir-1);
@@ -450,8 +435,8 @@ class Block : public CBase_Block {
           msg = new PersistentMsg(rev_dir);
           p_neighbor_bufs[dir].set_msg(msg);
           p_neighbor_bufs[dir].cb.setRefNum(my_iter);
-          p_send_bufs[dir].cb.setRefNum(my_iter);
           p_send_bufs[dir].put(p_neighbor_bufs[dir]);
+          cudaStreamSynchronize(comm_stream); // FIXME
         }
       }
     } else if (use_zerocopy) {
@@ -509,13 +494,13 @@ class Block : public CBase_Block {
   }
 
   void processGhostP(PersistentMsg* msg) {
-    DataType* d_ghost = nullptr;
     int dir = msg->dir;
     CkAssert(dir >= 0 && dir < DIR_COUNT);
-    d_ghost = d_recv_ghosts[dir];
+    DataType* d_ghost = d_recv_ghosts[dir];
 
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
         block_depth, comm_stream);
+    cudaStreamSynchronize(comm_stream); // FIXME
 
     delete msg;
   }
@@ -533,7 +518,49 @@ class Block : public CBase_Block {
         block_depth, comm_stream);
   }
 
+  void update() {
+    // Operations in compute stream should only be executed when
+    // operations in communication stream (transfers and unpacking) complete
+    hapiCheck(cudaEventRecord(comm_event, comm_stream));
+    hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
+
+    // Invoke GPU kernel for Jacobi computation
+    invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
+        block_depth, compute_stream);
+    // FIXME
+    cudaStreamSynchronize(compute_stream);
+
+    CkCallback update_cb(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
+    hapiAddCallback(compute_stream, update_cb);
+
+    /* TODO
+    // Operations in communication stream (packing and transfers) should
+    // only be executed when operations in compute stream complete
+    hapiCheck(cudaEventRecord(compute_event, compute_stream));
+    hapiCheck(cudaStreamWaitEvent(comm_stream, compute_event, 0));
+    */
+  }
+
+  void prepNextIter() {
+    std::swap(d_temperature, d_new_temperature);
+    my_iter++;
+    if (my_iter <= warmup_iters) {
+      contribute(CkCallback(CkReductionTarget(Main, warmupDone), main_proxy));
+    } else {
+      if (my_iter < warmup_iters + n_iters) {
+        thisProxy[thisIndex].run();
+      } else {
+        contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
+      }
+    }
+  }
+
   void print() {
+    hapiCheck(cudaMemcpyAsync(h_temperature, d_temperature,
+          sizeof(DataType) * (block_width+2)*(block_height+2)*(block_depth+2),
+          cudaMemcpyDeviceToHost, comm_stream));
+    cudaStreamSynchronize(comm_stream);
+
     CkPrintf("[%d,%d,%d]\n", thisIndex.x, thisIndex.y, thisIndex.z);
     for (int k = 0; k < block_depth+2; k++) {
       for (int j = 0; j < block_height+2; j++) {
@@ -551,7 +578,7 @@ class Block : public CBase_Block {
 
     if (thisIndex.x == n_chares_x-1 && thisIndex.y == n_chares_y-1 &&
         thisIndex.z == n_chares_z-1) {
-      main_proxy.printDone();
+      thisProxy.printDone();
     } else {
       if (thisIndex.x == n_chares_x-1 && thisIndex.y == n_chares_y-1) {
         thisProxy(0, 0, thisIndex.z+1).print();

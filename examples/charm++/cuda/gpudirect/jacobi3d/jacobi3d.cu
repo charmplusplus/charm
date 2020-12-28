@@ -217,8 +217,8 @@ void invokeInitKernel(DataType* d_temperature, int block_width, int block_height
   hapiCheck(cudaPeekAtLastError());
 }
 
-void invokeGhostInitKernels(std::vector<DataType*>& ghosts,
-    std::vector<size_t>& ghost_sizes, cudaStream_t stream) {
+void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
+    const std::vector<size_t>& ghost_sizes, cudaStream_t stream) {
   dim3 block_dim(256);
   for (int i = 0; i < ghosts.size(); i++) {
     DataType* ghost = ghosts[i];

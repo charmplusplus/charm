@@ -30,19 +30,19 @@ mainmodule jacobi3d {
     entry void startIter();
     entry [reductiontarget] void warmupDone();
     entry [reductiontarget] void allDone();
-    entry void printDone();
   };
 
   array [3D] Block {
     entry Block(void);
     entry void init();
     entry void initRecv(int dir, CkDevicePersistent p_buf);
-    entry void update();
-    entry void packGhosts();
     entry void packGhostsDone();
     entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void recvGhostP(PersistentMsg* msg);
     entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
+    entry void updateDone();
+    entry void print();
+    entry void printDone();
 
     entry void initDone() {
       if (use_persistent) {
@@ -60,22 +60,17 @@ mainmodule jacobi3d {
       }
     }
 
-    entry void exchangeGhosts() {
+    entry void run() {
+      // Pack and send ghost data to neighbors
       serial {
-        my_iter++;
-        update();
         packGhosts();
       }
 
-      when packGhostsDone() {
-        serial {
-          // When packing is done, we know that the new temperatures have been updated
-          // (because the host doesn't separately detect when the Jacobi kernel completes)
-          std::swap(d_temperature, d_new_temperature);
-          sendGhosts();
-        }
+      when packGhostsDone() serial {
+        sendGhosts();
       }
 
+      // Receive ghost data from neighbors
       for (remote_count = 0; remote_count < neighbors; remote_count++) {
         if (use_zerocopy) {
           when recvGhostZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
@@ -84,10 +79,8 @@ mainmodule jacobi3d {
             }
           }
         } else if (use_persistent) {
-          overlap {
-            when recvGhostP[my_iter](PersistentMsg* msg) serial {
-              processGhostP(msg);
-            }
+          when recvGhostP[my_iter](PersistentMsg* msg) serial {
+            processGhostP(msg);
           }
         } else {
           when recvGhostReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
@@ -98,19 +91,28 @@ mainmodule jacobi3d {
         }
       }
 
+      // Perform Jacobian update
       serial {
-        if (my_iter <= warmup_iters) {
-          contribute(CkCallback(CkReductionTarget(Main, warmupDone), main_proxy));
-        } else {
-          if (my_iter < warmup_iters + n_iters) {
-            thisProxy[thisIndex].exchangeGhosts();
-          } else {
-            contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
+        update();
+      }
+
+      // Iteration complete
+      when updateDone() serial {
+        if (print_elements) {
+          if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
+            CkPrintf("Printing iteration %d\n", my_iter);
+            thisProxy[thisIndex].print();
           }
+        } else {
+          prepNextIter();
+        }
+      }
+
+      if (print_elements) {
+        when printDone() serial {
+          prepNextIter();
         }
       }
     }
-
-    entry void print();
   };
 };
