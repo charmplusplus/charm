@@ -99,7 +99,7 @@ mainmodule jacobi3d {
       // Iteration complete
       when updateDone() serial {
         if (print_elements) {
-          if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
+          if (x == 0 && y == 0 && z == 0) {
             CkPrintf("Printing iteration %d\n", my_iter);
             thisProxy[thisIndex].print();
           }

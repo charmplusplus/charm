@@ -276,18 +276,18 @@ class Block : public CBase_Block {
     // Check bounds and set number of valid neighbors
     for (int i = 0; i < DIR_COUNT; i++) bounds[i] = false;
 
-    if (thisIndex.x == 0)            bounds[LEFT] = true;
-    else                             neighbors++;
-    if (thisIndex.x == n_chares_x-1) bounds[RIGHT]= true;
-    else                             neighbors++;
-    if (thisIndex.y == 0)            bounds[TOP] = true;
-    else                             neighbors++;
-    if (thisIndex.y == n_chares_y-1) bounds[BOTTOM] = true;
-    else                             neighbors++;
-    if (thisIndex.z == 0)            bounds[FRONT] = true;
-    else                             neighbors++;
-    if (thisIndex.z == n_chares_z-1) bounds[BACK] = true;
-    else                             neighbors++;
+    if (x == 0)            bounds[LEFT] = true;
+    else                   neighbors++;
+    if (x == n_chares_x-1) bounds[RIGHT]= true;
+    else                   neighbors++;
+    if (y == 0)            bounds[TOP] = true;
+    else                   neighbors++;
+    if (y == n_chares_y-1) bounds[BOTTOM] = true;
+    else                   neighbors++;
+    if (z == 0)            bounds[FRONT] = true;
+    else                   neighbors++;
+    if (z == n_chares_z-1) bounds[BACK] = true;
+    else                   neighbors++;
 
     // Allocate memory and create CUDA entities
     hapiCheck(cudaMallocHost((void**)&h_temperature,
@@ -549,7 +549,7 @@ class Block : public CBase_Block {
           cudaMemcpyDeviceToHost, comm_stream));
     cudaStreamSynchronize(comm_stream);
 
-    CkPrintf("[%d,%d,%d]\n", thisIndex.x, thisIndex.y, thisIndex.z);
+    CkPrintf("[%d,%d,%d]\n", x, y, z);
     for (int k = 0; k < block_depth+2; k++) {
       for (int j = 0; j < block_height+2; j++) {
         for (int i = 0; i < block_width+2; i++) {
@@ -564,17 +564,16 @@ class Block : public CBase_Block {
       CkPrintf("\n");
     }
 
-    if (thisIndex.x == n_chares_x-1 && thisIndex.y == n_chares_y-1 &&
-        thisIndex.z == n_chares_z-1) {
+    if (x == n_chares_x-1 && y == n_chares_y-1 && z == n_chares_z-1) {
       thisProxy.printDone();
     } else {
-      if (thisIndex.x == n_chares_x-1 && thisIndex.y == n_chares_y-1) {
-        thisProxy(0, 0, thisIndex.z+1).print();
+      if (x == n_chares_x-1 && y == n_chares_y-1) {
+        thisProxy(0,0,z+1).print();
       } else {
-        if (thisIndex.x == n_chares_x-1) {
-          thisProxy(0, thisIndex.y+1, thisIndex.z).print();
+        if (x == n_chares_x-1) {
+          thisProxy(0,y+1,z).print();
         } else {
-          thisProxy(thisIndex.x+1, thisIndex.y, thisIndex.z).print();
+          thisProxy(x+1,y,z).print();
         }
       }
     }
