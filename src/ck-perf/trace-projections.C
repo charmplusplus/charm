@@ -962,17 +962,19 @@ TraceProjections::TraceProjections(char **argv):
   int nSubdirs = 0;
   CmiGetArgIntDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
 
-
 #if CMK_USE_ZLIB
   int compressed = true;
   CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
   int disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files pre-compressed with gzip");
   compressed = compressed && !disableCompressed;
 #else
-  // consume the flag so there's no confusing
-  CmiGetArgFlagDesc(argv,"+gz-trace",
-		    "Write log files pre-compressed with gzip");
-  if(CkMyPe() == 0) CkPrintf("Warning> gz-trace is not supported on this machine!\n");
+  // consume the flags so there's no confusion
+  const bool compressed =
+      CmiGetArgFlagDesc(argv, "+gz-trace", "Write log files pre-compressed with gzip");
+  CmiGetArgFlagDesc(argv, "+no-gz-trace",
+                    "Disable writing log files pre-compressed with gzip");
+  if (CkMyPe() == 0 && compressed)
+    CkPrintf("Warning> gz-trace is not supported on this machine!\n");
 #endif
 
   int writeSummaryFiles = CmiGetArgFlagDesc(argv,"+write-analysis-file","Enable writing summary files "); 

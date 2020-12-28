@@ -12506,7 +12506,7 @@ tracemode:
 
 -  ``+gz-trace``: generate gzip (if available) compressed log files.
 
--  ``+gz-no-trace``: generate regular (not compressed) log files.
+-  ``+no-gz-trace``: generate regular (not compressed) log files.
 
 -  ``+checknested``: a debug option. Checks if events are improperly
    nested while recorded and issue a warning immediately.
