@@ -968,6 +968,8 @@ TraceProjections::TraceProjections(char **argv):
   CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
   int disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files pre-compressed with gzip");
   compressed = compressed && !disableCompressed;
+  if (binary && compressed)
+    CkAbort("Binary logs cannot be compressed with gzip, must use +no-gz-trace with +binary-trace");
 #else
   // consume the flag so there's no confusing
   CmiGetArgFlagDesc(argv,"+gz-trace",
