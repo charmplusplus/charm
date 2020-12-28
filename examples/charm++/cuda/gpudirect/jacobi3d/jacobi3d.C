@@ -29,17 +29,14 @@
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
     int block_height, int block_depth, cudaStream_t stream);
+extern void invokeGhostInitKernels(std::vector<DataType*>& ghosts,
+    std::vector<size_t>& ghost_sizes, cudaStream_t stream);
 extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
-    int block_height, int block_depth, bool left_bound, bool right_bound,
-    bool top_bound, bool bottom_bound, bool front_bound, bool back_bound,
-    cudaStream_t stream);
+    int block_height, int block_depth, bool bounds[], cudaStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
     int block_width, int block_height, int block_depth, cudaStream_t stream);
-extern void invokePackingKernels(DataType* d_temperature, DataType* d_left_ghost,
-    DataType* d_right_ghost, DataType* d_top_ghost, DataType* d_bottom_ghost,
-    DataType* d_front_ghost, DataType* d_back_ghost, bool left_bound,
-    bool right_bound, bool top_bound, bool bottom_bound, bool front_bound,
-    bool back_bound, int block_width, int block_height, int block_depth,
+extern void invokePackingKernels(DataType* d_temperature, DataType* d_ghosts[],
+    bool bounds[], int block_width, int block_height, int block_depth,
     cudaStream_t stream);
 extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     int dir, int block_width, int block_height, int block_depth,
@@ -109,10 +106,9 @@ public:
           break;
         default:
           CkPrintf(
-              "Usage: %s -W [grid width] -H [grid height] -D [grid depth] "
-              "-w [block width] -h [block height] -d [block depth] "
-              "-i [iterations] -u [warmup] -z (use GPU zerocopy) "
-              "-s (use persistent) -p (print blocks)\n",
+              "Usage: %s -x [grid width] -y [grid height] -z [grid depth] "
+              "-c [number of chares] -i [iterations] -w [warmup iterations] "
+              "-d (use GPU zerocopy) -s (use persistent) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
       }
@@ -241,33 +237,10 @@ class Block : public CBase_Block {
   DataType* __restrict__ d_temperature;
   DataType* __restrict__ d_new_temperature;
 
-  DataType* __restrict__ h_left_ghost;
-  DataType* __restrict__ h_right_ghost;
-  DataType* __restrict__ h_top_ghost;
-  DataType* __restrict__ h_bottom_ghost;
-  DataType* __restrict__ h_front_ghost;
-  DataType* __restrict__ h_back_ghost;
-
-  DataType* __restrict__ d_left_ghost;
-  DataType* __restrict__ d_right_ghost;
-  DataType* __restrict__ d_top_ghost;
-  DataType* __restrict__ d_bottom_ghost;
-  DataType* __restrict__ d_front_ghost;
-  DataType* __restrict__ d_back_ghost;
-
-  DataType* __restrict__ d_send_left_ghost;
-  DataType* __restrict__ d_send_right_ghost;
-  DataType* __restrict__ d_send_top_ghost;
-  DataType* __restrict__ d_send_bottom_ghost;
-  DataType* __restrict__ d_send_front_ghost;
-  DataType* __restrict__ d_send_back_ghost;
-
-  DataType* __restrict__ d_recv_left_ghost;
-  DataType* __restrict__ d_recv_right_ghost;
-  DataType* __restrict__ d_recv_top_ghost;
-  DataType* __restrict__ d_recv_bottom_ghost;
-  DataType* __restrict__ d_recv_front_ghost;
-  DataType* __restrict__ d_recv_back_ghost;
+  DataType* __restrict__ h_ghosts[DIR_COUNT];
+  DataType* __restrict__ d_ghosts[DIR_COUNT];
+  DataType* __restrict__ d_send_ghosts[DIR_COUNT];
+  DataType* __restrict__ d_recv_ghosts[DIR_COUNT];
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
@@ -275,7 +248,7 @@ class Block : public CBase_Block {
   cudaEvent_t compute_event;
   cudaEvent_t comm_event;
 
-  bool left_bound, right_bound, top_bound, bottom_bound, front_bound, back_bound;
+  bool bounds[DIR_COUNT];
 
   Block() {}
 
@@ -284,31 +257,15 @@ class Block : public CBase_Block {
     hapiCheck(cudaFree(d_temperature));
     hapiCheck(cudaFree(d_new_temperature));
     if (use_zerocopy || use_persistent) {
-      hapiCheck(cudaFree(d_send_left_ghost));
-      hapiCheck(cudaFree(d_send_right_ghost));
-      hapiCheck(cudaFree(d_send_top_ghost));
-      hapiCheck(cudaFree(d_send_bottom_ghost));
-      hapiCheck(cudaFree(d_send_front_ghost));
-      hapiCheck(cudaFree(d_send_back_ghost));
-      hapiCheck(cudaFree(d_recv_left_ghost));
-      hapiCheck(cudaFree(d_recv_right_ghost));
-      hapiCheck(cudaFree(d_recv_top_ghost));
-      hapiCheck(cudaFree(d_recv_bottom_ghost));
-      hapiCheck(cudaFree(d_recv_front_ghost));
-      hapiCheck(cudaFree(d_recv_back_ghost));
+      for (int i = 0; i < DIR_COUNT; i++) {
+        hapiCheck(cudaFree(d_send_ghosts[i]));
+        hapiCheck(cudaFree(d_recv_ghosts[i]));
+      }
     } else {
-      hapiCheck(cudaFreeHost(h_left_ghost));
-      hapiCheck(cudaFreeHost(h_right_ghost));
-      hapiCheck(cudaFreeHost(h_top_ghost));
-      hapiCheck(cudaFreeHost(h_bottom_ghost));
-      hapiCheck(cudaFreeHost(h_front_ghost));
-      hapiCheck(cudaFreeHost(h_back_ghost));
-      hapiCheck(cudaFree(d_left_ghost));
-      hapiCheck(cudaFree(d_right_ghost));
-      hapiCheck(cudaFree(d_top_ghost));
-      hapiCheck(cudaFree(d_bottom_ghost));
-      hapiCheck(cudaFree(d_front_ghost));
-      hapiCheck(cudaFree(d_back_ghost));
+      for (int i = 0; i < DIR_COUNT; i++) {
+        hapiCheck(cudaFreeHost(h_ghosts[i]));
+        hapiCheck(cudaFree(d_ghosts[i]));
+      }
     }
 
     hapiCheck(cudaStreamDestroy(compute_stream));
@@ -327,31 +284,20 @@ class Block : public CBase_Block {
     z = thisIndex.z;
 
     // Check bounds and set number of valid neighbors
-    left_bound = right_bound = top_bound = bottom_bound = front_bound = back_bound = false;
-    if (thisIndex.x == 0)
-      left_bound = true;
-    else
-      neighbors++;
-    if (thisIndex.x == n_chares_x-1)
-      right_bound = true;
-    else
-      neighbors++;
-    if (thisIndex.y == 0)
-      top_bound = true;
-    else
-      neighbors++;
-    if (thisIndex.y == n_chares_y-1)
-      bottom_bound = true;
-    else
-      neighbors++;
-    if (thisIndex.z == 0)
-      front_bound = true;
-    else
-      neighbors++;
-    if (thisIndex.z == n_chares_z-1)
-      back_bound = true;
-    else
-      neighbors++;
+    for (int i = 0; i < DIR_COUNT; i++) bounds[i] = false;
+
+    if (thisIndex.x == 0)            bounds[LEFT] = true;
+    else                             neighbors++;
+    if (thisIndex.x == n_chares_x-1) bounds[RIGHT]= true;
+    else                             neighbors++;
+    if (thisIndex.y == 0)            bounds[TOP] = true;
+    else                             neighbors++;
+    if (thisIndex.y == n_chares_y-1) bounds[BOTTOM] = true;
+    else                             neighbors++;
+    if (thisIndex.z == 0)            bounds[FRONT] = true;
+    else                             neighbors++;
+    if (thisIndex.z == n_chares_z-1) bounds[BACK] = true;
+    else                             neighbors++;
 
     // Allocate memory and create CUDA entities
     hapiCheck(cudaMallocHost((void**)&h_temperature,
@@ -360,32 +306,18 @@ class Block : public CBase_Block {
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
     hapiCheck(cudaMalloc((void**)&d_new_temperature,
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
+    std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
+      y_surf_size, z_surf_size, z_surf_size};
     if (use_zerocopy || use_persistent) {
-      hapiCheck(cudaMalloc((void**)&d_send_left_ghost, x_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_send_right_ghost, x_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_send_top_ghost, y_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_send_bottom_ghost, y_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_send_front_ghost, z_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_send_back_ghost, z_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_recv_left_ghost, x_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_recv_right_ghost, x_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_recv_top_ghost, y_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_recv_bottom_ghost, y_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_recv_front_ghost, z_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_recv_back_ghost, z_surf_size));
+      for (int i = 0; i < DIR_COUNT; i++) {
+        hapiCheck(cudaMalloc((void**)&d_send_ghosts[i], ghost_sizes[i]));
+        hapiCheck(cudaMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
+      }
     } else {
-      hapiCheck(cudaMallocHost((void**)&h_left_ghost, x_surf_size));
-      hapiCheck(cudaMallocHost((void**)&h_right_ghost, x_surf_size));
-      hapiCheck(cudaMallocHost((void**)&h_top_ghost, y_surf_size));
-      hapiCheck(cudaMallocHost((void**)&h_bottom_ghost, y_surf_size));
-      hapiCheck(cudaMallocHost((void**)&h_front_ghost, z_surf_size));
-      hapiCheck(cudaMallocHost((void**)&h_back_ghost, z_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_left_ghost, x_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_right_ghost, x_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_top_ghost, y_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_bottom_ghost, y_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_front_ghost, z_surf_size));
-      hapiCheck(cudaMalloc((void**)&d_back_ghost, z_surf_size));
+      for (int i = 0; i < DIR_COUNT; i++) {
+        hapiCheck(cudaMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
+        hapiCheck(cudaMalloc((void**)&d_ghosts[i], ghost_sizes[i]));
+      }
     }
 
     // Create CUDA streams and events
@@ -395,55 +327,48 @@ class Block : public CBase_Block {
     hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
     hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
 
+    // Create persistent buffers
     if (use_persistent) {
-      CkCallback send_cb = CkCallback(CkIndex_Block::sendGhostP(),
-          thisProxy[thisIndex]);
-      CkCallback recv_cb = CkCallback(CkIndex_Block::recvGhostP(nullptr),
-          thisProxy[thisIndex]);
+      CkCallback recv_cb = CkCallback(CkIndex_Block::recvGhostP(nullptr), thisProxy[thisIndex]);
 
       p_send_bufs.reserve(DIR_COUNT);
       p_recv_bufs.reserve(DIR_COUNT);
       p_neighbor_bufs.resize(DIR_COUNT);
 
-      // Create persistent buffers
-      p_send_bufs.emplace_back(d_send_left_ghost,   x_surf_size, send_cb, comm_stream);
-      p_send_bufs.emplace_back(d_send_right_ghost,  x_surf_size, send_cb, comm_stream);
-      p_send_bufs.emplace_back(d_send_top_ghost,    y_surf_size, send_cb, comm_stream);
-      p_send_bufs.emplace_back(d_send_bottom_ghost, y_surf_size, send_cb, comm_stream);
-      p_send_bufs.emplace_back(d_send_front_ghost,  z_surf_size, send_cb, comm_stream);
-      p_send_bufs.emplace_back(d_send_back_ghost,   z_surf_size, send_cb, comm_stream);
-      p_recv_bufs.emplace_back(d_recv_left_ghost,   x_surf_size, recv_cb, comm_stream);
-      p_recv_bufs.emplace_back(d_recv_right_ghost,  x_surf_size, recv_cb, comm_stream);
-      p_recv_bufs.emplace_back(d_recv_top_ghost,    y_surf_size, recv_cb, comm_stream);
-      p_recv_bufs.emplace_back(d_recv_bottom_ghost, y_surf_size, recv_cb, comm_stream);
-      p_recv_bufs.emplace_back(d_recv_front_ghost,  z_surf_size, recv_cb, comm_stream);
-      p_recv_bufs.emplace_back(d_recv_back_ghost,   z_surf_size, recv_cb, comm_stream);
-
-      // Open persistent buffers that will be sent to neighbors
       for (int i = 0; i < DIR_COUNT; i++) {
+        p_send_bufs.emplace_back(d_send_ghosts[i], ghost_sizes[i], CkCallback::ignore, comm_stream);
+        p_recv_bufs.emplace_back(d_recv_ghosts[i], ghost_sizes[i], recv_cb, comm_stream);
+
+        // Open buffers that will be sent to neighbors
         p_recv_bufs[i].open();
       }
 
       // Send persistent buffer info to neighbors
-      if (!left_bound)   thisProxy(x-1, y, z).initRecv(RIGHT, p_recv_bufs[LEFT]);
-      if (!right_bound)  thisProxy(x+1, y, z).initRecv(LEFT, p_recv_bufs[RIGHT]);
-      if (!top_bound)    thisProxy(x, y-1, z).initRecv(BOTTOM, p_recv_bufs[TOP]);
-      if (!bottom_bound) thisProxy(x, y+1, z).initRecv(TOP, p_recv_bufs[BOTTOM]);
-      if (!front_bound)  thisProxy(x, y, z-1).initRecv(BACK, p_recv_bufs[FRONT]);
-      if (!back_bound)   thisProxy(x, y, z+1).initRecv(FRONT, p_recv_bufs[BACK]);
+      if (!bounds[LEFT])   thisProxy(x-1, y, z).initRecv(RIGHT, p_recv_bufs[LEFT]);
+      if (!bounds[RIGHT])  thisProxy(x+1, y, z).initRecv(LEFT, p_recv_bufs[RIGHT]);
+      if (!bounds[TOP])    thisProxy(x, y-1, z).initRecv(BOTTOM, p_recv_bufs[TOP]);
+      if (!bounds[BOTTOM]) thisProxy(x, y+1, z).initRecv(TOP, p_recv_bufs[BOTTOM]);
+      if (!bounds[FRONT])  thisProxy(x, y, z-1).initRecv(BACK, p_recv_bufs[FRONT]);
+      if (!bounds[BACK])   thisProxy(x, y, z+1).initRecv(FRONT, p_recv_bufs[BACK]);
     }
 
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_width, block_height, block_depth, compute_stream);
     invokeInitKernel(d_new_temperature, block_width, block_height, block_depth, compute_stream);
 
+    // Initialize ghost data
+    std::vector<DataType*> ghosts;
+    // TODO
+    if (use_zerocopy || use_persistent) {
+    } else {
+    }
+    invokeGhostInitKernels(ghosts, ghost_sizes, compute_stream);
+
     // Enforce boundary conditions
     invokeBoundaryKernels(d_temperature, block_width, block_height, block_depth,
-        left_bound, right_bound, top_bound, bottom_bound, front_bound, back_bound,
-        compute_stream);
+        bounds, compute_stream);
     invokeBoundaryKernels(d_new_temperature, block_width, block_height, block_depth,
-        left_bound, right_bound, top_bound, bottom_bound, front_bound, back_bound,
-        compute_stream);
+        bounds, compute_stream);
 
 #if CUDA_SYNC
     cudaStreamSynchronize(compute_stream);
@@ -481,37 +406,22 @@ class Block : public CBase_Block {
   void packGhosts() {
     if (use_persistent || use_zerocopy) {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_new_temperature, d_send_left_ghost,
-          d_send_right_ghost, d_send_top_ghost, d_send_bottom_ghost,
-          d_send_front_ghost, d_send_back_ghost, left_bound, right_bound,
-          top_bound, bottom_bound, front_bound, back_bound, block_width,
-          block_height, block_depth, comm_stream);
+      invokePackingKernels(d_new_temperature, d_send_ghosts, bounds,
+          block_width, block_height, block_depth, comm_stream);
     } else {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_new_temperature, d_left_ghost, d_right_ghost,
-          d_top_ghost, d_bottom_ghost, d_front_ghost, d_back_ghost, left_bound,
-          right_bound, top_bound, bottom_bound, front_bound, back_bound,
+      invokePackingKernels(d_new_temperature, d_ghosts, bounds,
           block_width, block_height, block_depth, comm_stream);
 
       // Transfer ghosts from device to host
-      if (!left_bound)
-        hapiCheck(cudaMemcpyAsync(h_left_ghost, d_left_ghost,
-              x_surf_size, cudaMemcpyDeviceToHost, comm_stream));
-      if (!right_bound)
-        hapiCheck(cudaMemcpyAsync(h_right_ghost, d_right_ghost,
-              x_surf_size, cudaMemcpyDeviceToHost, comm_stream));
-      if (!top_bound)
-        hapiCheck(cudaMemcpyAsync(h_top_ghost, d_top_ghost,
-              y_surf_size, cudaMemcpyDeviceToHost, comm_stream));
-      if (!bottom_bound)
-        hapiCheck(cudaMemcpyAsync(h_bottom_ghost, d_bottom_ghost,
-              y_surf_size, cudaMemcpyDeviceToHost, comm_stream));
-      if (!front_bound)
-        hapiCheck(cudaMemcpyAsync(h_front_ghost, d_front_ghost,
-              z_surf_size, cudaMemcpyDeviceToHost, comm_stream));
-      if (!back_bound)
-        hapiCheck(cudaMemcpyAsync(h_back_ghost, d_back_ghost,
-              z_surf_size, cudaMemcpyDeviceToHost, comm_stream));
+      std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
+        y_surf_size, z_surf_size, z_surf_size};
+      for (int i = 0; i < DIR_COUNT; i++) {
+        if (!bounds[i]) {
+          hapiCheck(cudaMemcpyAsync(h_ghosts[i], d_ghosts[i], ghost_sizes[i],
+                cudaMemcpyDeviceToHost, comm_stream));
+        }
+      }
     }
 
     if (use_persistent) {
@@ -534,101 +444,62 @@ class Block : public CBase_Block {
     // PersistentMsg is used to store the direction
     if (use_persistent) {
       PersistentMsg* msg;
-      if (!left_bound) {
-        msg = new PersistentMsg(RIGHT);
-        p_neighbor_bufs[LEFT].set_msg(msg);
-        p_neighbor_bufs[LEFT].cb.setRefNum(my_iter);
-        p_send_bufs[LEFT].cb.setRefNum(my_iter);
-        p_send_bufs[LEFT].put(p_neighbor_bufs[LEFT]);
-      }
-      if (!right_bound) {
-        msg = new PersistentMsg(LEFT);
-        p_neighbor_bufs[RIGHT].set_msg(msg);
-        p_neighbor_bufs[RIGHT].cb.setRefNum(my_iter);
-        p_send_bufs[RIGHT].cb.setRefNum(my_iter);
-        p_send_bufs[RIGHT].put(p_neighbor_bufs[RIGHT]);
-      }
-      if (!top_bound) {
-        msg = new PersistentMsg(BOTTOM);
-        p_neighbor_bufs[TOP].set_msg(msg);
-        p_neighbor_bufs[TOP].cb.setRefNum(my_iter);
-        p_send_bufs[TOP].cb.setRefNum(my_iter);
-        p_send_bufs[TOP].put(p_neighbor_bufs[TOP]);
-      }
-      if (!bottom_bound) {
-        msg = new PersistentMsg(TOP);
-        p_neighbor_bufs[BOTTOM].set_msg(msg);
-        p_neighbor_bufs[BOTTOM].cb.setRefNum(my_iter);
-        p_send_bufs[BOTTOM].cb.setRefNum(my_iter);
-        p_send_bufs[BOTTOM].put(p_neighbor_bufs[BOTTOM]);
-      }
-      if (!front_bound) {
-        msg = new PersistentMsg(BACK);
-        p_neighbor_bufs[FRONT].set_msg(msg);
-        p_neighbor_bufs[FRONT].cb.setRefNum(my_iter);
-        p_send_bufs[FRONT].cb.setRefNum(my_iter);
-        p_send_bufs[FRONT].put(p_neighbor_bufs[FRONT]);
-      }
-      if (!back_bound) {
-        msg = new PersistentMsg(FRONT);
-        p_neighbor_bufs[BACK].set_msg(msg);
-        p_neighbor_bufs[BACK].cb.setRefNum(my_iter);
-        p_send_bufs[BACK].cb.setRefNum(my_iter);
-        p_send_bufs[BACK].put(p_neighbor_bufs[BACK]);
+      for (int dir = 0; dir < DIR_COUNT; dir++) {
+        int rev_dir = (dir % 2 == 0) ? (dir+1) : (dir-1);
+        if (!bounds[dir]) {
+          msg = new PersistentMsg(rev_dir);
+          p_neighbor_bufs[dir].set_msg(msg);
+          p_neighbor_bufs[dir].cb.setRefNum(my_iter);
+          p_send_bufs[dir].cb.setRefNum(my_iter);
+          p_send_bufs[dir].put(p_neighbor_bufs[dir]);
+        }
       }
     } else if (use_zerocopy) {
-      if (!left_bound)
+      if (!bounds[LEFT])
         thisProxy(x-1, y, z).recvGhostZC(my_iter, RIGHT, block_height * block_depth,
-            CkDeviceBuffer(d_send_left_ghost, comm_stream));
-      if (!right_bound)
+            CkDeviceBuffer(d_send_ghosts[LEFT], comm_stream));
+      if (!bounds[RIGHT])
         thisProxy(x+1, y, z).recvGhostZC(my_iter, LEFT, block_height * block_depth,
-            CkDeviceBuffer(d_send_right_ghost, comm_stream));
-      if (!top_bound)
+            CkDeviceBuffer(d_send_ghosts[RIGHT], comm_stream));
+      if (!bounds[TOP])
         thisProxy(x, y-1, z).recvGhostZC(my_iter, BOTTOM, block_width * block_depth,
-            CkDeviceBuffer(d_send_top_ghost, comm_stream));
-      if (!bottom_bound)
+            CkDeviceBuffer(d_send_ghosts[TOP], comm_stream));
+      if (!bounds[BOTTOM])
         thisProxy(x, y+1, z).recvGhostZC(my_iter, TOP, block_width * block_depth,
-            CkDeviceBuffer(d_send_bottom_ghost, comm_stream));
-      if (!front_bound)
+            CkDeviceBuffer(d_send_ghosts[BOTTOM], comm_stream));
+      if (!bounds[FRONT])
         thisProxy(x, y, z-1).recvGhostZC(my_iter, BACK, block_width * block_height,
-            CkDeviceBuffer(d_send_front_ghost, comm_stream));
-      if (!back_bound)
+            CkDeviceBuffer(d_send_ghosts[FRONT], comm_stream));
+      if (!bounds[BACK])
         thisProxy(x, y, z+1).recvGhostZC(my_iter, FRONT, block_width * block_height,
-            CkDeviceBuffer(d_send_back_ghost, comm_stream));
+            CkDeviceBuffer(d_send_ghosts[BACK], comm_stream));
     } else {
-      if (!left_bound)
+      if (!bounds[LEFT])
         thisProxy(x-1, y, z).recvGhostReg(my_iter, RIGHT,
-            block_height * block_depth, h_left_ghost);
-      if (!right_bound)
+            block_height * block_depth, h_ghosts[LEFT]);
+      if (!bounds[RIGHT])
         thisProxy(x+1, y, z).recvGhostReg(my_iter, LEFT,
-            block_height * block_depth, h_right_ghost);
-      if (!top_bound)
+            block_height * block_depth, h_ghosts[RIGHT]);
+      if (!bounds[TOP])
         thisProxy(x, y-1, z).recvGhostReg(my_iter, BOTTOM,
-            block_width * block_depth, h_top_ghost);
-      if (!bottom_bound)
+            block_width * block_depth, h_ghosts[TOP]);
+      if (!bounds[BOTTOM])
         thisProxy(x, y+1, z).recvGhostReg(my_iter, TOP,
-            block_width * block_depth, h_bottom_ghost);
-      if (!front_bound)
+            block_width * block_depth, h_ghosts[BOTTOM]);
+      if (!bounds[FRONT])
         thisProxy(x, y, z-1).recvGhostReg(my_iter, BACK,
-            block_width * block_height, h_front_ghost);
-      if (!back_bound)
+            block_width * block_height, h_ghosts[FRONT]);
+      if (!bounds[BACK])
         thisProxy(x, y, z+1).recvGhostReg(my_iter, FRONT,
-            block_width * block_height, h_back_ghost);
+            block_width * block_height, h_ghosts[BACK]);
     }
   }
 
   // This is the post entry method, the regular entry method is defined as a
   // SDAG entry method in the .ci file
   void recvGhostZC(int ref, int dir, int &size, DataType *&buf, CkDeviceBufferPost *devicePost) {
-    switch (dir) {
-      case LEFT:   buf = d_recv_left_ghost;   break;
-      case RIGHT:  buf = d_recv_right_ghost;  break;
-      case TOP:    buf = d_recv_top_ghost;    break;
-      case BOTTOM: buf = d_recv_bottom_ghost; break;
-      case FRONT:  buf = d_recv_front_ghost;  break;
-      case BACK:   buf = d_recv_back_ghost;   break;
-      default: CkAbort("Error: invalid direction");
-    }
+    CkAssert(dir >= 0 && dir < DIR_COUNT);
+    buf = d_recv_ghosts[dir];
     devicePost[0].cuda_stream = comm_stream;
   }
 
@@ -640,15 +511,8 @@ class Block : public CBase_Block {
   void processGhostP(PersistentMsg* msg) {
     DataType* d_ghost = nullptr;
     int dir = msg->dir;
-    switch (dir) {
-      case LEFT:   d_ghost = d_recv_left_ghost;   break;
-      case RIGHT:  d_ghost = d_recv_right_ghost;  break;
-      case TOP:    d_ghost = d_recv_top_ghost;    break;
-      case BOTTOM: d_ghost = d_recv_bottom_ghost; break;
-      case FRONT:  d_ghost = d_recv_front_ghost;  break;
-      case BACK:   d_ghost = d_recv_back_ghost;   break;
-      default: CkAbort("Error: invalid direction");
-    }
+    CkAssert(dir >= 0 && dir < DIR_COUNT);
+    d_ghost = d_recv_ghosts[dir];
 
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
         block_depth, comm_stream);
@@ -658,15 +522,9 @@ class Block : public CBase_Block {
 
   void processGhostReg(int dir, int size, DataType* gh) {
     DataType* h_ghost = nullptr; DataType* d_ghost = nullptr;
-    switch (dir) {
-      case LEFT:   h_ghost = h_left_ghost; d_ghost = d_left_ghost;     break;
-      case RIGHT:  h_ghost = h_right_ghost; d_ghost = d_right_ghost;   break;
-      case TOP:    h_ghost = h_top_ghost; d_ghost = d_top_ghost;       break;
-      case BOTTOM: h_ghost = h_bottom_ghost; d_ghost = d_bottom_ghost; break;
-      case FRONT:  h_ghost = h_front_ghost; d_ghost = d_front_ghost;   break;
-      case BACK:   h_ghost = h_back_ghost; d_ghost = d_back_ghost;     break;
-      default: CkAbort("Error: invalid direction");
-    }
+    CkAssert(dir >= 0 && dir < DIR_COUNT);
+    h_ghost = h_ghosts[dir];
+    d_ghost = d_ghosts[dir];
 
     memcpy(h_ghost, gh, size * sizeof(DataType));
     hapiCheck(cudaMemcpyAsync(d_ghost, h_ghost, size * sizeof(DataType),

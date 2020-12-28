@@ -42,7 +42,6 @@ mainmodule jacobi3d {
     entry void packGhostsDone();
     entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void recvGhostP(PersistentMsg* msg);
-    entry void sendGhostP() {} // TODO
     entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
 
     entry void initDone() {
@@ -89,12 +88,6 @@ mainmodule jacobi3d {
             when recvGhostP[my_iter](PersistentMsg* msg) serial {
               processGhostP(msg);
             }
-            // TODO: Add this back in once hang with reference numbers in CkCallback is fixed
-            /*
-            when sendGhostP[my_iter]() serial {
-              CkPrintf("Chare %d, iter %d: Received sendGhostP\n", thisIndex.z, my_iter);
-            }
-            */
           }
         } else {
           when recvGhostReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
