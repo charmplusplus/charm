@@ -963,7 +963,7 @@ TraceProjections::TraceProjections(char **argv):
   CmiGetArgIntDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
 
 #if CMK_USE_ZLIB
-  int compressed = true;
+  bool compressed = true;
   CmiGetArgFlagDesc(argv,"+gz-trace","Write log files compressed with gzip");
   const bool disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files compressed with gzip");
   compressed = compressed && !disableCompressed;
