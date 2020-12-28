@@ -121,7 +121,7 @@ typedef void (*LBCreateFn)(const CkLBOptions&);
 typedef BaseLB* (*LBAllocFn)();
 void LBDefaultCreate(LBCreateFn f);
 
-void LBRegisterBalancer(const char*, LBCreateFn, LBAllocFn, const char*, int shown = 1);
+void LBRegisterBalancer(std::string, LBCreateFn, LBAllocFn, std::string, bool shown = true);
 
 void _LBMgrInit();
 
@@ -260,10 +260,10 @@ class LBManager : public CBase_LBManager
   }
   int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest); }
   void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh); }
-  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(this, omh); }
+  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(omh); }
   void DoneRegisteringObjects(LDOMHandle omh)
   {
-    lbdb_obj->DoneRegisteringObjects(this, omh);
+    lbdb_obj->DoneRegisteringObjects(omh);
   }
   void ObjectStart(const LDObjHandle& h) { lbdb_obj->ObjectStart(h); }
   void ObjectStop(const LDObjHandle& h) { lbdb_obj->ObjectStop(h); }

@@ -4,6 +4,7 @@ module EveryLB {
   extern module TreeLB;
   extern module DistributedLB;
   extern module MetisLB;
+  extern module RecBipartLB;
 
   initnode void initEveryLB(void);
 };

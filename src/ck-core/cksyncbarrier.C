@@ -17,28 +17,6 @@ CkSyncBarrierInit::CkSyncBarrierInit(CkArgMsg* m)
   delete m;
 }
 
-class LBClient
-{
-public:
-  Chare* chare;
-  std::function<void()> fn;
-  int refcount;
-
-  LBClient(Chare* chare, std::function<void()> fn, int refcount)
-      : chare(chare), fn(fn), refcount(refcount)
-  {
-  }
-};
-
-class LBReceiver
-{
-public:
-  std::function<void()> fn;
-  int on;
-
-  LBReceiver(std::function<void()> fn, int on = 1) : fn(fn), on(on) {}
-};
-
 void CkSyncBarrier::reset()
 {
   if (rank0pe)
@@ -51,17 +29,37 @@ void CkSyncBarrier::reset()
     received_from_rank0 = false;
 }
 
-LDBarrierClient CkSyncBarrier::AddClient(Chare* chare, std::function<void()> fn)
+// Since AtSync() is global across all registered objects, the epoch should be consistent
+// across PEs. The incoming client might have called AtSync() before it gets migrated in, so
+// track it and check the barrier if necessary.
+LDBarrierClient CkSyncBarrier::AddClient(Chare* chare, std::function<void()> fn,
+                                         int epoch)
 {
-  LBClient* new_client = new LBClient(chare, fn, cur_refcount);
+  if (epoch == -1)
+    epoch = cur_epoch;
+  else if (epoch > cur_epoch)
+  {
+    // If the incoming client is ahead, then record those syncs and check the barrier if
+    // it can trigger. Do this asynchronously so that the caller functions for object
+    // construction finish first.
+    at_count += epoch - cur_epoch;
+    if (at_count >= clients.size())
+      thisProxy[thisIndex].CheckBarrier(false);
+  }
 
+  LBClient* new_client = new LBClient(chare, fn, epoch);
   return LDBarrierClient(clients.insert(clients.end(), new_client));
 }
 
 void CkSyncBarrier::RemoveClient(LDBarrierClient c)
 {
+  const auto epoch = (*c)->epoch;
+  if (epoch > cur_epoch)
+    at_count -= epoch - cur_epoch;
   delete *(c);
   clients.erase(c);
+  if (at_count >= clients.size())
+      thisProxy[thisIndex].CheckBarrier(false);
 }
 
 LDBarrierReceiver CkSyncBarrier::AddReceiver(std::function<void()> fn)
@@ -83,7 +81,7 @@ void CkSyncBarrier::TurnOffReceiver(LDBarrierReceiver c) { (*c)->on = 0; }
 
 void CkSyncBarrier::AtBarrier(LDBarrierClient h, bool flood_atsync)
 {
-  (*h)->refcount++;
+  (*h)->epoch++;
   at_count++;
 
   CheckBarrier(flood_atsync);
@@ -93,7 +91,7 @@ void CkSyncBarrier::DecreaseBarrier(int c) { at_count -= c; }
 
 void CkSyncBarrier::propagate_atsync()
 {
-  if (propagated_atsync_step < cur_refcount)
+  if (propagated_atsync_step < cur_epoch)
   {
     const int mype = CkMyPe();
     const int mynode = CkNodeOf(mype);
@@ -103,7 +101,7 @@ void CkSyncBarrier::propagate_atsync()
       {
         // If this PE is non-rank0 and non-empty PE, then trigger AtSync barrier on rank0
         int node_rank0_pe = CkNodeFirst(mynode);
-        thisProxy[node_rank0_pe].recvLbStart(cur_refcount, mynode, mype);
+        thisProxy[node_rank0_pe].recvLbStart(cur_epoch, mynode, mype);
       }
     }
     else
@@ -113,27 +111,27 @@ void CkSyncBarrier::propagate_atsync()
       {
         if (rank_needs_flood[i])
         {
-          thisProxy[mype + i].recvLbStart(cur_refcount, mynode, mype);
+          thisProxy[mype + i].recvLbStart(cur_epoch, mynode, mype);
         }
       }
       if (!received_from_left && mynode > 0)
       {  // Flood left node
         int pe = CkNodeFirst(mynode - 1);
-        thisProxy[pe].recvLbStart(cur_refcount, mynode, mype);
+        thisProxy[pe].recvLbStart(cur_epoch, mynode, mype);
       }
       if (!received_from_right && mynode < CkNumNodes() - 1)
       {  // Flood right node
         int pe = CkNodeFirst(mynode + 1);
-        thisProxy[pe].recvLbStart(cur_refcount, mynode, mype);
+        thisProxy[pe].recvLbStart(cur_epoch, mynode, mype);
       }
     }
-    propagated_atsync_step = cur_refcount;
+    propagated_atsync_step = cur_epoch;
   }
 }
 
 void CkSyncBarrier::recvLbStart(int lb_step, int sourcenode, int pe)
 {
-  if (lb_step != cur_refcount || startedAtSync) return;
+  if (lb_step != cur_epoch || startedAtSync) return;
   const int mype = CkMyPe();
   const int mynode = CkNodeOf(mype);
   if (sourcenode < mynode)
@@ -163,7 +161,7 @@ void CkSyncBarrier::CheckBarrier(bool flood_atsync)
   // If there are no clients, resume as soon as we're turned on
   if (client_count == 0)
   {
-    cur_refcount++;
+    cur_epoch++;
     CallReceivers();
   }
 
@@ -173,7 +171,7 @@ void CkSyncBarrier::CheckBarrier(bool flood_atsync)
 
     for (auto& c : clients)
     {
-      if (c->refcount < cur_refcount)
+      if (c->epoch <= cur_epoch)
       {
         at_barrier = false;
         break;
@@ -185,7 +183,7 @@ void CkSyncBarrier::CheckBarrier(bool flood_atsync)
       startedAtSync = true;
       propagate_atsync();
       at_count -= client_count;
-      cur_refcount++;
+      cur_epoch++;
       CallReceivers();
     }
   }

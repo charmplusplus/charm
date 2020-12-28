@@ -20624,9 +20624,9 @@ $as_echo_n "checking if MPI_LONG_LONG_INT is defined in mpi.h... " >&6; }
          MPI_Finalize();
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 
@@ -20636,7 +20636,7 @@ $as_echo "#define HAVE_MPI_LONG_LONG_INT /**/" >>confdefs.h
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 
    else
 
@@ -20878,9 +20878,9 @@ $as_echo_n "checking if MPI_Info functions are defined in the MPI implementation
          MPI_Finalize();
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 
@@ -20900,7 +20900,7 @@ $as_echo "no" >&6; }
       MPI_FINFO3="      INTEGER MPI_INFO_NULL"
       MPI_FINFO4="      PARAMETER (MPI_INFO_NULL=0)"
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 
 else
 
@@ -20930,9 +20930,9 @@ $as_echo_n "checking if MPI_SGI_type_is_contig is defined... " >&6; }
          MPI_Finalize();
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
   else
@@ -20942,7 +20942,7 @@ $as_echo "no" >&6; }
 $as_echo "#define NO_MPI_SGI_type_is_contig /**/" >>confdefs.h
 
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 
 
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking if MPI-2 combiners are defined in mpi.h" >&5
@@ -20959,9 +20959,9 @@ $as_echo_n "checking if MPI-2 combiners are defined in mpi.h... " >&6; }
          MPI_Finalize();
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 
@@ -20971,7 +20971,7 @@ $as_echo "#define HAVE_MPI_COMBINERS /**/" >>confdefs.h
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 
 
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking if MPI_OFFSET_KIND is defined in mpif.h" >&5
@@ -20986,9 +20986,9 @@ $as_echo_n "checking if MPI_OFFSET_KIND is defined in mpif.h... " >&6; }
       stop
       end
 EOF
-  rm -f conftest$EXEEXT
-  $F77 $FFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.f $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $F77 $FFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.f $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
      MPI_OFFSET_KIND1="!"
@@ -20997,7 +20997,7 @@ $as_echo "yes" >&6; }
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
   fi
-  rm -f conftest$EXEEXT mpitest.f
+  rm -f conftest.$OBJEXT mpitest.f
 
 fi
 #
@@ -21020,9 +21020,9 @@ $as_echo_n "checking if darray and subarray constructors are defined in the MPI 
          MPI_Finalize();
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 
@@ -21048,7 +21048,7 @@ $as_echo "no" >&6; }
       MPI_FARRAY6="      PARAMETER (MPI_DISTRIBUTE_NONE=123)"
       MPI_FARRAY7="      PARAMETER (MPI_DISTRIBUTE_DFLT_DARG=-49767)"
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 
 fi
 if test $FROM_MPICH = yes ; then
@@ -23617,9 +23617,9 @@ $as_echo_n "checking if mpiof.h is included in mpif.h... " >&6; }
       stop
       end
 EOF
-  rm -f conftest$EXEEXT
-  $F77 $FFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.f $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $F77 $FFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.f $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
       MPIOF_H_INCLUDED=1
@@ -23627,7 +23627,7 @@ $as_echo "yes" >&6; }
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
   fi
-  rm -f conftest$EXEEXT mpitest.f
+  rm -f conftest.$OBJEXT mpitest.f
 
    fi
 fi
@@ -23779,19 +23779,19 @@ $as_echo_n "checking if a simple MPI program compiles and links... " >&6; }
          MPI_Finalize();
      }
 EOF
-  rm -f conftest$EXEEXT
-  cmd="$CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB"
+  rm -f conftest.$OBJEXT
+  cmd="$CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB"
   echo "$as_me:$LINENO: $cmd" >&5
   $cmd >&5 2>&5
-  if test ! -x conftest$EXEEXT ; then
+  if test ! -f conftest.$OBJEXT ; then
       echo "$as_me:$LINENO: failed program was:" >&5
       sed 's/^/| /' mpitest.c >&5
-      rm -f conftest$EXEEXT mpitest.c
+      rm -f conftest.$OBJEXT mpitest.c
       as_fn_error $? "Unable to compile a simple MPI program.
 Use environment variables to provide the location of MPI libraries and
 include directories" "$LINENO" 5
   else
-      rm -f conftest$EXEEXT mpitest.c
+      rm -f conftest.$OBJEXT mpitest.c
   fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
@@ -23955,9 +23955,9 @@ $as_echo_n "checking if MPIR_Status_set_bytes is defined... " >&6; }
          MPI_Finalize();
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 
@@ -23967,7 +23967,7 @@ $as_echo "#define HAVE_STATUS_SET_BYTES /**/" >>confdefs.h
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 
 
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking support for generalized requests" >&5
@@ -23984,9 +23984,9 @@ $as_echo_n "checking support for generalized requests... " >&6; }
        MPI_Finalize();
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 
@@ -23997,7 +23997,7 @@ $as_echo "#define HAVE_MPI_GREQUEST 1" >>confdefs.h
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 
 
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking support for MPICH memory macros" >&5
@@ -24011,9 +24011,9 @@ $as_echo_n "checking support for MPICH memory macros... " >&6; }
       MPIU_Free(NULL);
   }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 
@@ -24023,7 +24023,7 @@ $as_echo "#define HAVE_MPIU_FUNCS 1" >>confdefs.h
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 
 
 $as_echo "#define PRINT_ERR_MSG 1" >>confdefs.h

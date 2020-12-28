@@ -461,6 +461,7 @@ $explanations{"simplepmi"} = "Use simple PMI for task launching";
 $explanations{"slurmpmi"} = "Use Slurm PMI for task launching";
 $explanations{"slurmpmi2"} = "Use Slurm PMI2 for task launching";
 $explanations{"ompipmix"} = "Use Open MPI PMIX for task launching";
+$explanations{"openpmix"} = "Use OpenPMIx for task launching";
 $explanations{"tsan"} = "Compile Charm++ with support for Thread Sanitizer";
 
 

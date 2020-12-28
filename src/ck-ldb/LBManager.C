@@ -39,14 +39,14 @@ class LBDBRegistry
   // table for all available LBs linked in
   struct LBDBEntry
   {
-    const char* name;
+    std::string name;
     LBCreateFn cfn;
     LBAllocFn afn;
-    const char* help;
-    int shown;  // if 0, donot show in help page
-    LBDBEntry() : name(0), cfn(0), afn(0), help(0), shown(1) {}
+    std::string help;
+    bool shown;  // if false, do not show in help page
+    LBDBEntry() : name(""), cfn(0), afn(0), help(""), shown(true) {}
     LBDBEntry(int) {}
-    LBDBEntry(const char* n, LBCreateFn cf, LBAllocFn af, const char* h, int show = 1)
+    LBDBEntry(std::string n, LBCreateFn cf, LBAllocFn af, std::string h, bool show = true)
         : name(n), cfn(cf), afn(af), help(h), shown(show){};
   };
   CkVec<LBDBEntry> lbtables;       // a list of available LBs linked
@@ -63,12 +63,12 @@ class LBDBRegistry
     for (int i = 0; i < lbtables.length(); i++)
     {
       LBDBEntry& entry = lbtables[i];
-      if (entry.shown) CmiPrintf("* %s:	%s\n", entry.name, entry.help);
+      if (entry.shown) CmiPrintf("* %s:\t%s\n", entry.name.c_str(), entry.help.c_str());
     }
     CmiPrintf("\n");
   }
-  void addEntry(const char* name, LBCreateFn fn, LBAllocFn afn, const char* help,
-                int shown)
+  void addEntry(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
+                bool shown)
   {
     lbtables.push_back(LBDBEntry(name, fn, afn, help, shown));
   }
@@ -77,26 +77,26 @@ class LBDBRegistry
   {
     if (legacyLBName != nullptr)
     {
-      legacy_runtime_treelbs.emplace(runtime_lbs.size(), legacyLBName);
+      legacy_runtime_treelbs.emplace((int)runtime_lbs.size(), legacyLBName);
     }
 
     runtime_lbs.push_back(name);
   }
-  LBCreateFn search(const char* name)
+  LBCreateFn search(std::string name)
   {
-    char* ptr = strpbrk((char*)name, ":,");
-    int slen = ptr != NULL ? ptr - name : strlen(name);
+    const auto index = name.find_first_of(":,");
     for (int i = 0; i < lbtables.length(); i++)
-      if (0 == strncmp(name, lbtables[i].name, slen)) return lbtables[i].cfn;
-    return NULL;
+      if (0 == lbtables[i].name.compare(0, index, name))
+        return lbtables[i].cfn;
+    return nullptr;
   }
-  LBAllocFn getLBAllocFn(const char* name)
+  LBAllocFn getLBAllocFn(std::string name)
   {
-    char* ptr = strpbrk((char*)name, ":,");
-    int slen = ptr - name;
+    const auto index = name.find_first_of(":,");
     for (int i = 0; i < lbtables.length(); i++)
-      if (0 == strncmp(name, lbtables[i].name, slen)) return lbtables[i].afn;
-    return NULL;
+      if (0 == lbtables[i].name.compare(0, index, name))
+        return lbtables[i].afn;
+    return nullptr;
   }
 };
 
@@ -106,8 +106,8 @@ static std::vector<std::string> lbNames;
 void LBDefaultCreate(const char* lbname) { lbRegistry.addCompiletimeBalancer(lbname); }
 
 // default is to show the helper
-void LBRegisterBalancer(const char* name, LBCreateFn fn, LBAllocFn afn, const char* help,
-                        int shown)
+void LBRegisterBalancer(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
+                        bool shown)
 {
   lbRegistry.addEntry(name, fn, afn, help, shown);
 }
@@ -115,14 +115,17 @@ void LBRegisterBalancer(const char* name, LBCreateFn fn, LBAllocFn afn, const ch
 LBAllocFn getLBAllocFn(const char* lbname) { return lbRegistry.getLBAllocFn(lbname); }
 
 // create a load balancer group using the strategy name
-static void createLoadBalancer(const char* lbname, const char* legacybalancer = nullptr)
+static void createLoadBalancer(const std::string& lbname, const char* legacybalancer = nullptr)
 {
   LBCreateFn fn = lbRegistry.search(lbname);
   if (!fn)
   {  // invalid lb name
-    CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname);
+    CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname.c_str());
     lbRegistry.displayLBs();  // display help page
-    CkAbort("Abort");
+    if(lbname == "help")
+      CkExit(0);
+    else
+      CkExit(1);
   }
   // invoke function to create load balancer
   int seqno = LBManagerObj()->getLoadbalancerTicket();
@@ -524,7 +527,7 @@ void LBManager::init(void)
   }
   else
   {
-    AddLocalBarrierReceiver([this](void) { this->InvokeLB(); });
+    CkSyncBarrier::Object()->AddReceiver([this](void) { this->InvokeLB(); });
   }
 }
 

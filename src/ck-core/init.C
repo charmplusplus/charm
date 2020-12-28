@@ -138,7 +138,6 @@ UInt  _numInitMsgs = 0;
  */
 CksvDeclare(UInt,_numInitNodeMsgs);
 
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
 std::atomic<UInt> numZerocopyROops = {0};
 #else
@@ -149,7 +148,6 @@ bool usedCMAForROBcastTransfer = false;
 NcpyROBcastAckInfo *roBcastAckInfo;
 int   _roRdmaDoneHandlerIdx;
 CksvDeclare(int,  _numPendingRORdmaTransfers);
-#endif
 
 int   _infoIdx;
 int   _charmHandlerIdx;
@@ -920,7 +918,6 @@ static inline void _processRODataMsg(envelope *env)
     PUP::fromMem pu((char *)EnvToUsr(env));
     CmiSpanningTreeInfo &t = *_topoTree;
 
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
     UInt numZerocopyROopsTemp;
     pu|numZerocopyROopsTemp;
@@ -936,14 +933,13 @@ static inline void _processRODataMsg(envelope *env)
     if(numZerocopyROops > 0 && t.child_count != 0) {
       readonlyAllocateOnSource();
     }
-#endif
 
     for(size_t i=0;i<_readonlyTable.size();i++) {
       _readonlyTable[i]->pupData(pu);
     }
 
     // Forward message to peers after numZerocopyROops has been initialized
-#if CMK_ONESIDED_IMPL && CMK_SMP
+#if CMK_SMP
     if(CMI_IS_ZC_BCAST(env)) {
       // Send message to peers
       CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
@@ -976,7 +972,6 @@ static void _roRestartHandler(void *msg)
   _triggerHandler(NULL);
 }
 
-#if CMK_ONESIDED_IMPL
 static void _roRdmaDoneHandler(envelope *env) {
 
   switch(env->getMsgtype()) {
@@ -1020,12 +1015,10 @@ static void _roRdmaDoneHandler(envelope *env) {
       break;
   }
 }
-#endif
 
 void checkForInitDone(bool rdmaROCompleted) {
 
   bool noPendingRORdmaTransfers = true;
-#if CMK_ONESIDED_IMPL
   // Ensure that there are no pending RO Rdma transfers on Rank 0 when numZerocopyROops > 0
 #if CMK_SMP
   if(numZerocopyROops.load(std::memory_order_relaxed) > 0)
@@ -1033,7 +1026,6 @@ void checkForInitDone(bool rdmaROCompleted) {
   if(numZerocopyROops > 0)
 #endif
     noPendingRORdmaTransfers = rdmaROCompleted;
-#endif
   if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs && noPendingRORdmaTransfers)
     _initDone();
 }
@@ -1097,7 +1089,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
   DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
-#if CMK_ONESIDED_IMPL && CMK_USE_CMA
+#if CMK_USE_CMA
   if(usedCMAForROBcastTransfer) {
     checkForInitDone(true); // RO ZCPY Bcast operation was completed inline (using CMA)
   } else
@@ -1224,7 +1216,7 @@ void initQd(char **argv)
 	CpvInitialize(QdState*, _qd);
 	CpvAccess(_qd) = new QdState();
 	if (CmiMyRank() == 0) {
-#if !defined(CMK_CPV_IS_SMP) && !CMK_SHARED_VARS_UNIPROCESSOR
+#if !defined(CMK_CPV_IS_SMP)
 	CpvAccessOther(_qd, 1) = new QdState(); // for i/o interrupt
 #endif
 	}
@@ -1265,7 +1257,6 @@ void _sendReadonlies() {
   //Determine the size of the RODataMessage
   PUP::sizer ps;
 
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
   UInt numZerocopyROopsTemp;
   numZerocopyROopsTemp = numZerocopyROops;
@@ -1273,26 +1264,21 @@ void _sendReadonlies() {
 #else
   ps|numZerocopyROops;
 #endif
-#endif
 
   for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
-#if CMK_ONESIDED_IMPL
   if(CkNumNodes() > 1 && numZerocopyROops > 0) { // No ZC ops are performed when CkNumNodes <= 1
     readonlyAllocateOnSource();
   }
-#endif
 
   //Allocate and fill out the RODataMessage
   envelope *env = _allocEnv(RODataMsg, ps.size());
   PUP::toMem pp((char *)EnvToUsr(env));
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
   numZerocopyROopsTemp = numZerocopyROops;
   pp|numZerocopyROopsTemp;
 #else
   pp|numZerocopyROops;
-#endif
 #endif
   for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 
@@ -1301,7 +1287,7 @@ void _sendReadonlies() {
   CmiSetHandler(env, _initHandlerIdx);
   DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
   CmiSyncBroadcast(env->getTotalsize(), (char *)env);
-#if CMK_ONESIDED_IMPL && CMK_SMP
+#if CMK_SMP
   if(numZerocopyROops > 0) {
     // Send message to peers
     CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
@@ -1372,9 +1358,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	CksvInitialize(objNumRdmaOpsMap, pendingZCOps);
 
-#if CMK_ONESIDED_IMPL
 	CksvInitialize(int, _numPendingRORdmaTransfers);
-#endif
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
@@ -1395,9 +1379,7 @@ void _initCharm(int unused_argc, char **argv)
 	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
           	CksvAccess(_numInitNodeMsgs) = 0;
 
-#if CMK_ONESIDED_IMPL
 		CksvAccess(_numPendingRORdmaTransfers) = 0;
-#endif
 
 		CksvAccess(_nodeLock) = CmiCreateLock();
 		CksvAccess(_nodeGroupTable) = new GroupTable();
@@ -1428,9 +1410,7 @@ void _initCharm(int unused_argc, char **argv)
 	CmiAssignOnce(&_initHandlerIdx, CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
 	CmiAssignOnce(&_roRestartHandlerIdx, CkRegisterHandler(_roRestartHandler));
 
-#if CMK_ONESIDED_IMPL
 	CmiAssignOnce(&_roRdmaDoneHandlerIdx, CkRegisterHandler(_roRdmaDoneHandler));
-#endif
 
 	CmiAssignOnce(&_exitHandlerIdx, CkRegisterHandler(_exitHandler));
 	//added for interoperabilitY

@@ -50,6 +50,8 @@ namespace PUP {
   template <class T>
   inline void operator|(er &p,std::complex<T> &v);
   template <class T>
+  inline void operator|(er &p, std::shared_ptr<T> &t);
+  template <class T>
   inline void operator|(er &p, std::unique_ptr<T, std::default_delete<T>> &ptr);
   template <class charType>
   inline void operator|(er &p,typename std::basic_string<charType> &v);
@@ -488,6 +490,37 @@ using Requires = typename requires_impl<
 
   template <typename T>
   inline void operator|(PUP::er& p, std::unique_ptr<T>& t) {
+    pup(p, t);
+  }
+
+  template <typename T,
+            Requires<!std::is_base_of<PUP::able, T>::value> = nullptr>
+  inline void pup(PUP::er& p, std::shared_ptr<T>& t) {
+    bool is_nullptr = nullptr == t;
+    p | is_nullptr;
+    if (!is_nullptr) {
+      T* t1;
+      if (p.isUnpacking()) {
+        t1 = new T;
+      } else {
+        t1 = t.get();
+      }
+      p | *t1;
+      if (p.isUnpacking()) {
+        t.reset(t1);
+      }
+    }
+  }
+
+  template <class T, Requires<std::is_base_of<PUP::able, T>::value> = nullptr>
+  inline void pup(PUP::er &p, std::shared_ptr<T> &t) {
+    PUP::able* _ = (p.isUnpacking()) ? nullptr : t.get();
+    p(&_);
+    if (p.isUnpacking()) { t.reset(dynamic_cast<T*>(_)); }
+  }
+
+  template <typename T>
+  inline void operator|(PUP::er& p, std::shared_ptr<T>& t) {
     pup(p, t);
   }
 

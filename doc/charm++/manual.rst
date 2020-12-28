@@ -3133,17 +3133,6 @@ Below are the descriptions about the compiler and runtime options:
    installation of any third party libraries you wish to use to the
    Charm++ search paths.
 
-#. **Building individual load balancers**
-
-   Load balancers can be built individually by changing the current
-   working directory to the *tmp* subdirectory of your build and making
-   them by name.
-
-   .. code-block:: bash
-
-      $ cd netlrts-linux-x86_64/tmp
-      $ make PhasebyArrayLB
-
 #. **Write and use your own load balancer**
 
    Refer Section :numref:`lbWriteNewLB` for writing a new load
@@ -3152,13 +3141,12 @@ Below are the descriptions about the compiler and runtime options:
    path to the library and link the load balancer into an application
    using *-module FooLB*.
 
-   You can create a library by modifying the Makefile in the following
-   way. This will create *libmoduleFooLB.a*.
+   You can create a library in the following way. This will create
+   *libmoduleFooLB.a*.
 
-   .. code-block:: makefile
+   .. code-block:: bash
 
-      libmoduleFooLB.a: FooLB.o
-        $(CHARMC) -o libmoduleFooLB.a FooLB.o
+      $ bin/charmc -o libmoduleFooLB.a FooLB.C
 
    To include this balancer in your application, the Makefile can be
    changed in the following way
@@ -5796,19 +5784,27 @@ is created, a *reference* is returned immediately. However, if the
 *value* calculated by the future is needed, the calling program blocks
 until the value is available.
 
-Charm++ provides all the necessary infrastructure to use futures by
-means of the following functions:
+We provide both C-compatible and object-oriented interfaces for using
+futures, which include the following functions:
 
-.. code-block:: c++
++------------------------------------------------------+-------------------------------------+
+| C                                                    | C++                                 |
++======================================================+=====================================+
+| :code:`CkFuture CkCreateFuture(void)`                | :code:`ck::future()`                |
++------------------------------------------------------+-------------------------------------+
+| :code:`void CkReleaseFuture(CkFuture fut)`           | :code:`void ck::future::release()`  |
++------------------------------------------------------+-------------------------------------+
+| :code:`int CkProbeFuture(CkFuture fut)`              | :code:`bool ck::future::is_ready()` |
++------------------------------------------------------+-------------------------------------+
+| :code:`void *CkWaitFuture(CkFuture fut)`             | :code:`T ck::future::get()`         |
++------------------------------------------------------+-------------------------------------+
+| :code:`void CkSendToFuture(CkFuture fut, void *msg)` | :code:`void ck::future::set(T)`     |
++------------------------------------------------------+-------------------------------------+
 
-    CkFuture CkCreateFuture(void)
-    void CkReleaseFuture(CkFuture fut)
-    int CkProbeFuture(CkFuture fut)
-    void *CkWaitFuture(CkFuture fut)
-    void CkSendToFuture(CkFuture fut, void *msg)
-
-To illustrate the use of all these functions, a Fibonacci example in
-Charm++ using futures in presented below:
+You will note that the object-oriented versions are methods of `ck::future`,
+which can be templated with any pup'able type. An example of the
+object-oriented interface is available under `examples/charm++/future`,
+with an equivalent example for the C-compatible interface presented below:
 
 .. code-block:: charmci
 
@@ -8247,12 +8243,27 @@ The API to checkpoint the application is:
 
 .. code-block:: c++
 
-     void CkStartCheckpoint(char* dirname, const CkCallback& cb);
+     void CkStartCheckpoint(char* dirname, const CkCallback& cb, bool
+     requestStatus = false, int writersPerNode = 0);
 
 The string ``dirname`` is the destination directory where the checkpoint
 files will be stored, and ``cb`` is the callback function which will be
 invoked after the checkpoint is done, as well as when the restart is
-complete. Here is an example of a typical use:
+complete. If ``CkStartCheckpoint`` is called again before ``cb`` has
+been called, the new request may be silently dropped. When the
+optional parameter ``requestStatus`` is true, the callback ``cb`` is
+sent a message of type ``CkCheckpointStatusMsg`` which includes an
+``int status`` field of value ``CK_CHECKPOINT_SUCCESS`` or
+``CK_CHECKPOINT_FAILURE`` indicating the success of the checkpointing
+operation. ``writersPerNode`` is an optional parameter that controls
+the number of PEs per logical node simultaneously allowed to write
+checkpoints. By default, it allows all PEs on a node to write at once,
+but should be tuned for large runs to avoid overloading the
+filesystem. Once set, this value persists for future calls to
+``CkStartCheckpoint``, so it does not need to be provided on every
+invocation (specifying 0 also leaves it at its current value).
+
+Here is an example of a typical use:
 
 .. code-block:: c++
 
@@ -11331,10 +11342,10 @@ UCX
 ^^^
 UCX stands for Unified Communication X and is a high performance communication
 library that can be used as a backend networking layer for Charm++ builds on
-supported transports like Infiniband, Omni-Path, gni, TCP/IP, etc.
+supported transports like Mellanox Infiniband, Intel Omni-Path, Cray GNI, TCP/IP, etc.
 
-In order to install Charm++ with UCX backend, you require UCX or HPC-X modules
-in your environment. In case UCX or HPC-X is not available in your environment,
+In order to install Charm++ with the UCX backend, UCX or HPC-X modules are required
+in your environment. In case UCX and HPC-X are not available in your environment,
 you can build UCX from scratch using the following steps:
 
 .. code-block:: bash
@@ -11348,16 +11359,21 @@ you can build UCX from scratch using the following steps:
 
 After installing UCX, there are several supported process management interfaces (PMI)
 that can be specified as options in order to build Charm++ with UCX. These include
-Simple PMI, Slurm PMI, Slurm PMI 2 and PMIx (using OpenMPI). Currently, in order to
-use PMIx for process management, it is required to have OpenMPI installed on the system.
+Simple PMI, Slurm PMI, Slurm PMI 2, and PMIx (included in OpenMPI or OpenPMIx). Currently, in order to
+use PMIx for process management, it is required to have either OpenMPI or OpenPMIx installed on the system.
 Additionally, in order to use the other supported process management interfaces, it is
 required to have a non-OpenMPI based MPI implementation installed on the system (e.g.
 Intel MPI, MVAPICH, MPICH, etc.).
+
+It should be noted that the **PMIx** version is the *most stable* version of using the UCX backend.
+We're in the process of debugging some recent issues with Simple PMI, Slurm PMI and Slurm PMI2.
 
 The following section shows examples of build commands that can be used to build targets
 with the UCX backend using different process management interfaces. It should be noted that
 unless UCX is installed in a system directory, in order for Charm++ to find the UCX installation,
 it is required to pass the UCX build directory as ``--basedir``.
+
+**Simple PMI, Slurm PMI and Slurm PMI 2**
 
 To build the Charm++ target with Simple PMI, do not specify any additional option as shown
 in the build command.
@@ -11378,28 +11394,81 @@ Similarly, to build the Charm++ target with Slurm PMI 2, specify ``slurmpmi2`` i
 
    $ ./build charm++ ucx-linux-x86_64 slurmpmi2 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
 
-To build the Charm++ target with PMIx, you would require an OpenMPI implementation with PMIx
-enabled to be installed on your system. In case OpenMPI is not available in your environment,
+**PMIx (OpenPMIx or as included in OpenMPI)**
+
+To build the Charm++ target with PMIx, you can either use OpenPMIx directly or use the version of
+PMIx included in OpenMPI. Note that PMIx is no longer included in OpenMPI distributions
+as of v4.0.5, so we recommend building with OpenPMIx instead.
+
+To use OpenPMIx directly, you first need to install libevent (https://github.com/libevent/libevent)
+if it's not available on your system:
+
+.. code-block:: bash
+
+   $ wget https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
+   $ tar -xf libevent-2.1.12-stable.tar.gz
+   $ cd libevent-2.1.12-stable
+   $ ./configure --prefix=$HOME/libevent-2.1.12-stable/build
+   $ make -j
+   $ make install
+
+Then you can download and build OpenPMIx as follows:
+
+.. code-block:: bash
+
+   $ wget https://github.com/openpmix/openpmix/releases/download/v3.1.5/pmix-3.1.5.tar.gz
+   $ tar -xf pmix-3.1.5.tar.gz
+   $ cd pmix-3.1.5
+   $ ./configure --prefix=$HOME/pmix-3.1.5/build --with-libevent=$HOME/libevent-2.1.12-stable/build
+   $ make -j
+   $ make install
+
+Finally, Charm++ with the UCX backend can be built with OpenPMIx using the following command
+(with the OpenPMIx installation passed as an additional ``--basedir`` argument):
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 openpmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/pmix-3.1.5/build -j
+
+It should be noted that in the absence of a working launcher such as ``jsrun``, an MPI distribution
+such as OpenMPI may also be required to run Charm++ applications built with the UCX backend
+and OpenPMIx. Since you no longer need PMIx included with OpenMPI, any version of OpenMPI can be built
+(including v4.0.5 and later) with your build of OpenPMIx using the ``--with-pmix`` flag,
+such as the following:
+
+.. code-block:: bash
+
+   $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.5.tar.gz
+   $ tar -xf openmpi-4.0.5.tar.gz
+   $ cd openmpi-4.0.5
+   $ ./configure --enable-mca-no-build=btl-uct --with-pmix=$HOME/pmix-3.1.5/build --prefix=$HOME/openmpi-4.0.5/build
+   $ make -j
+   $ make install
+
+Before executing a Charm++ program, you may need to check that ``LD_LIBRARY_PATH`` and ``PATH``
+are set to include OpenPMIx (and OpenMPI, if needed).
+
+To use PMIx included with OpenMPI, an OpenMPI implementation with PMIx enabled is required
+to be installed on your system. As a reminder, PMIx is no longer included in OpenMPI
+distributions of v4.0.5 or later. In case OpenMPI is not available in your environment,
 you can build OpenMPI from scratch using the following steps:
 
 .. code-block:: bash
 
-  $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
-  $ tar -xvf openmpi-4.0.1.tar.gz
-  $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
-  $ make -j24
-  $ make install all
+   $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
+   $ tar -xvf openmpi-4.0.1.tar.gz
+   $ cd openmpi-4.0.1
+   $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
+   $ make -j24
+   $ make install all
 
 After installing OpenMPI or using the pre-installed OpenMPI, you can build the Charm++ target with
 the UCX backend by specifying ``ompipmix`` in the build command and passing the OpenMPI installation
-path as ``--basedir`` (in addition to passing the UCX build directory)
+path as ``--basedir`` (in addition to passing the UCX build directory):
 
 .. code-block:: bash
 
    $ ./build charm++ ucx-linux-x86_64 ompipmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/openmpi-4.0.1/build -j16
-
-It should be noted that the pmix version is the most stable version of using the UCX backend. We're in the
-process of debugging some recent issues with Simple PMI, Slurm PMI and Slurm PMI2.
 
 .. _sec:compile:
 
@@ -12980,6 +13049,8 @@ Acknowledgements
 
 -  Juan Galvez
 
+-  Justin Szaday
+
 -  Kavitha Chandrasekar
 
 -  Laxmikant Kale
@@ -13085,6 +13156,8 @@ Acknowledgements
 -  Yan Shi
 
 -  Yogesh Mehta
+
+-  Zane Fink
 
 -  Zheng Shao
 

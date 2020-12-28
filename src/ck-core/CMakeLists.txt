@@ -31,7 +31,7 @@ set(ck-cxx-sources
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     charm-api.h charm.h charmf.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
     ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
-    ckevacuation.h ckfutures.h cklocation.h cklocrec.h
+    ckevacuation.h ckmarshall.h ckfutures.h cklocation.h cklocrec.h
     ckmemcheckpoint.h ckmessage.h ckmigratable.h ckmulticast.h
     ckobjQ.h ckrdma.h ckrdmadevice.h ckreduction.h cksection.h
     ckstream.h cksyncbarrier.h debug-charm.h envelope-path.h envelope.h init.h
@@ -43,6 +43,7 @@ set(ldb-cxx-sources
     ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C
     ../ck-ldb/EveryLB.C
     ../ck-ldb/LButil.C
+    ../ck-ldb/RecBipartLB.C
     ../ck-ldb/Refiner.C ../ck-ldb/RefinerTemp.C
     ../ck-ldb/TempAwareRefineLB.C
     ../ck-ldb/ckgraph.C ../ck-ldb/ckheap.C
@@ -57,6 +58,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
     ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h
     ../ck-ldb/RandomForestModel.h
+    ../ck-ldb/RecBipartLB.h
     ../ck-ldb/Refiner.h
     ../ck-ldb/RefinerTemp.h
     ../ck-ldb/ScotchLB.h ../ck-ldb/ScotchRefineLB.h
@@ -103,6 +105,8 @@ add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C)
 add_dependencies(moduleDistributedLB ck)
 add_library(moduleTreeLB ../ck-ldb/TreeLB.C)
 add_dependencies(moduleTreeLB ck)
+add_library(moduleRecBipartLB ../ck-ldb/RecBipartLB.C ../ck-ldb/RecBipartLB.h)
+add_dependencies(moduleRecBipartLB ck)
 
 # Only for backwards compatibility
 add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
@@ -129,12 +133,8 @@ target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../uti
 # Fortran interface
 if(${CMK_CAN_LINK_FORTRAN})
     add_library(ckf charmf.C charmmod.f90 charmf.h)
+    target_compile_options(ckf PRIVATE -cpmod)
     add_dependencies(ckf ck)
-    add_custom_command(TARGET ckf
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/charm.mod ${CMAKE_BINARY_DIR}/include/
-        VERBATIM
-    )
     add_library(ckmainf mainf.f90)
 
     add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h)
