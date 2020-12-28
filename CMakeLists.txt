@@ -897,7 +897,7 @@ if(${TARGET} STREQUAL "charm4py")
   target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   if(${TRACING})
-    target_link_libraries(charm trace-projections "-Llib/ -standalone -whole-archive -c++stl -shared")
+    target_link_libraries(charm trace-summary trace-projections "-Llib/ -standalone -whole-archive -c++stl -shared")
   endif()
 
   add_dependencies(charm hwloc)

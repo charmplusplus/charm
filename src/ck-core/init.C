@@ -93,9 +93,13 @@ extern void QdProcess(int);
 
 #if CMK_CHARM4PY && CMK_TRACE_ENABLED
 extern void _registerTraceProjections();
+extern void _registerTraceSummary();
 extern void _createTraceprojections(char **argv);
+extern void _createTracesummary(char **argv);
+
 void _createTraces(char **argv) { (void)argv;
 _createTraceprojections(argv);
+_createTracesummary(argv);
 }
 
 #elif CMK_CHARM4PY
@@ -1534,6 +1538,7 @@ void _initCharm(int unused_argc, char **argv)
 
 #if CMK_TRACE_ENABLED
       _registerTraceProjections();
+      _registerTraceSummary();
 #endif
 
 
