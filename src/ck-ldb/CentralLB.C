@@ -45,19 +45,15 @@ CkGroupID loadbalancer;
 int * lb_ptr;
 bool load_balancer_created;
 
-CreateLBFunc_Def(CentralLB, "CentralLB base class")
+static void lbinit()
+{
+  LBRegisterBalancer<CentralLB>("CentralLB", "CentralLB base class");
+}
 
 static int broadcastThreshold = 32;
 
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);
-
-/*
-void CreateCentralLB()
-{
-  CProxy_CentralLB::ckNew(0);
-}
-*/
 
 void CentralLB::initLB(const CkLBOptions &opt)
 {

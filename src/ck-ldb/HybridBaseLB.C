@@ -9,7 +9,10 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(HybridBaseLB, "HybridBase load balancer")
+static void lbinit()
+{
+  LBRegisterBalancer<HybridBaseLB>("HybridBaseLB", "HybridBase load balancer");
+}
 
 class DummyMsg: public CMessage_DummyMsg 
 {
