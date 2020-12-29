@@ -29,6 +29,7 @@ void printCollisionHandler(void *param,int nColl,Collision *colls)
 
 class main : public CBase_main
 {
+  CollideHandle collide;
   public:
     main(CkMigrateMessage *m) {}
     main(CkArgMsg* m)
@@ -42,12 +43,19 @@ class main : public CBase_main
 
       CollideGrid3d gridMap(CkVector3d(0,0,0),CkVector3d(2,100,2));
 
+#if COLLIDE_USE_CB2
+      collide = CollideCreate(gridMap,
+          CollideSerialClient(
+            CkCallback(CkIndex_main::collisionDoneCb(NULL), thisProxy),
+            CkCallback(CkIndex_main::printCollisionCb(NULL), thisProxy) ));
+#else
 #if COLLIDE_USE_CB
-      CollideHandle collide = CollideCreate(gridMap,
+      collide = CollideCreate(gridMap,
           CollideSerialClient(CkCallback(CkIndex_main::printCollisionCb(NULL), thisProxy)));
 #else
-      CollideHandle collide=CollideCreate(gridMap,
+      collide=CollideCreate(gridMap,
           CollideSerialClient(printCollisionHandler,0));
+#endif
 #endif
 
       arr = CProxy_Hello::ckNew(collide,nElements);
@@ -60,6 +68,12 @@ class main : public CBase_main
       CkPrintf("All done\n");
       CkExit();
     };
+
+    void collisionDoneCb(CkReductionMsg *msg) {
+      CkPrintf("Collision detection complete (First callback called!)\n");
+      delete msg;
+      CollideGetResults(collide);
+    }
 
     void printCollisionCb(CkReductionMsg *msg) {
       Collision *colls = (Collision *)msg->getData();

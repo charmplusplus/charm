@@ -217,6 +217,8 @@ class collideMgr : public CBase_collideMgr
 
   //collideVoxels send a return receipt here
   void voxelMessageRecvd(void);
+
+  void signalVoxelsToContribute(void);
 };
 
 /********************** collideVoxel ********************
@@ -231,6 +233,7 @@ class collideVoxel : public CBase_collideVoxel
   void status(const char *msg);
   void emptyMessages();
   void collide(const bbox3d &territory,CollisionList &dest);
+  CollisionList myColls;
   public:
   collideVoxel(void);
   collideVoxel(CkMigrateMessage *m);
@@ -242,6 +245,9 @@ class collideVoxel : public CBase_collideVoxel
       const CollideGrid3d &gridMap,
       const CProxy_collideClient &client,
       const collideStats &statObj);
+
+  void contributeCollisions(int step,
+      const CProxy_collideClient &client);
 };
 
 
@@ -251,11 +257,12 @@ class collideVoxel : public CBase_collideVoxel
 class serialCollideClient : public collideClient {
   CollisionClientFn clientFn;
   void *clientParam;
-  CkCallback clientCb;
-  bool useCb;
-  public:
+  CkCallback clientCb1, clientCb2;
+
+ public:
   serialCollideClient(void);
   serialCollideClient(CkCallback clientCb_);
+  serialCollideClient(CkCallback clientCb1_, CkCallback clientCb2_);
 
   /// Call this client function on processor 0:
   void setClient(CollisionClientFn clientFn,void *clientParam);
@@ -266,6 +273,8 @@ class serialCollideClient : public collideClient {
 
   /// Called after the reduction is complete:
   virtual void reductionDone(CkReductionMsg *m);
+
+  void signalCollisionDone(ArrayElement *src);
 };
 
 #if CMK_TRACE_ENABLED

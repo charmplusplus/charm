@@ -6,6 +6,7 @@ module collidecharm {
   group serialCollideClient : collideClient {
     entry serialCollideClient();
     entry serialCollideClient(CkCallback clientCb_);
+    entry serialCollideClient(CkCallback clientCb1_, CkCallback clientCb2_);
     entry void reductionDone(CkReductionMsg *m);
   };
 
@@ -26,6 +27,7 @@ module collidecharm {
         CkArrayID cells,
         collideStats statObj);
     entry void voxelMessageRecvd(void);
+    entry void signalVoxelsToContribute(void);
   };
 
   array [3D] collideVoxel {
@@ -36,5 +38,7 @@ module collidecharm {
         CollideGrid3d gridMap,
         CProxy_collideClient client,
         collideStats statObj);
+    entry void contributeCollisions(int step,
+        CProxy_collideClient &client);
   };
 };

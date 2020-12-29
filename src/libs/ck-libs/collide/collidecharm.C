@@ -45,6 +45,12 @@ CkGroupID CollideSerialClient(CkCallback clientCb)
   return cl;
 }
 
+CkGroupID CollideSerialClient(CkCallback clientCb1, CkCallback clientCb2)
+{
+  CProxy_serialCollideClient cl = CProxy_serialCollideClient::ckNew(clientCb1, clientCb2);
+  return cl;
+}
+
 /// Create a collider group to contribute objects to.
 ///  Should be called on processor 0.
 CollideHandle CollideCreate(const CollideGrid3d &gridMap,
@@ -84,6 +90,12 @@ void CollideBoxesPrio(CollideHandle h,int chunkNo,
 {
   CProxy_collideMgr mgr(h);
   mgr.ckLocalBranch()->contribute(chunkNo,nBox,boxes,prio);
+}
+
+void CollideGetResults(CollideHandle h)
+{
+  CProxy_collideMgr mgr(h);
+  mgr.ckLocalBranch()->signalVoxelsToContribute();
 }
 
 /******************** objListMsg **********************/
@@ -511,6 +523,10 @@ void collideMgr::reductionFinished(void)
   voxelProxy.startCollision(steps,gridMap,client,statObj);
 }
 
+void collideMgr::signalVoxelsToContribute(void) {
+  voxelProxy.contributeCollisions(steps, client);
+}
+
 
 /********************** collideVoxel *********************/
 
@@ -628,29 +644,54 @@ void collideVoxel::startCollision(int step,
       gridMap.grid2world(1,rSeg1d(thisIndex.y,thisIndex.y+1)),
       gridMap.grid2world(2,rSeg1d(thisIndex.z,thisIndex.z+1))
       );
-  CollisionList colls;
-  collide(territory,colls);
-  client.ckLocalBranch()->collisions(this,step,colls);
+
+  if(client.ckLocalBranch()->useCbType == client.ckLocalBranch()->useCallbackType::twoCb) {
+    collide(territory, myColls);
+    client.ckLocalBranch()->signalCollisionDone(this);
+  } else {
+    CollisionList colls;
+    collide(territory,colls);
+    client.ckLocalBranch()->collisions(this,step,colls);
+  }
 
   emptyMessages();
   CC_STATUS("} startCollision");
 }
 
+void collideVoxel::contributeCollisions(int step,
+    const CProxy_collideClient &client) {
+  client.ckLocalBranch()->collisions(this,step,myColls);
+  //TODO: Free myColls
+  myColls.empty();
+}
+
 collideClient::~collideClient() {}
+
+void collideClient::signalCollisionDone(ArrayElement *src) { }
 
 /********************** serialCollideClient *****************/
 serialCollideClient::serialCollideClient(void) {
   clientFn=NULL;
   clientParam=NULL;
-  clientCb = CkCallback(CkCallback::ignore);
-  useCb = false;
+  clientCb1 = CkCallback(CkCallback::ignore);
+  clientCb2 = CkCallback(CkCallback::ignore);
+  useCbType = useCallbackType::noCb;
 }
 
 serialCollideClient::serialCollideClient(CkCallback clientCb_) {
   clientFn=NULL;
   clientParam=NULL;
-  clientCb = clientCb_;
-  useCb = true;
+  clientCb1 = CkCallback(CkCallback::ignore);
+  clientCb2 = clientCb_;
+  useCbType = useCallbackType::oneCb;
+}
+
+serialCollideClient::serialCollideClient(CkCallback clientCb1_, CkCallback clientCb2_) {
+  clientFn=NULL;
+  clientParam=NULL;
+  clientCb1 = clientCb1_;
+  clientCb2 = clientCb2_;
+  useCbType = useCallbackType::twoCb;
 }
 
 /// Call this client function on processor 0:
@@ -659,16 +700,23 @@ void serialCollideClient::setClient(CollisionClientFn clientFn_,void *clientPara
   clientParam=clientParam_;
 }
 
+void serialCollideClient::signalCollisionDone(ArrayElement *src) {
+  if(useCbType == useCallbackType::twoCb) {// Use user passed first callback as reduction target without results
+    src->contribute(0, NULL, CkReduction::nop, clientCb1);
+  }
+}
+
 void serialCollideClient::collisions(ArrayElement *src,
     int step,CollisionList &colls)
 {
-  if(useCb) { // Use user passed callback as reduction target
-    src->contribute(colls.length()*sizeof(Collision),colls.getData(),
-      CkReduction::concat, clientCb);
-  } else { // Use client fn with reduction targetted at serialCollideClient::reductionDone
+
+  if(useCbType == useCallbackType::noCb) {// Use client fn with reduction targetted at serialCollideClient::reductionDone
     CkCallback cb(CkIndex_serialCollideClient::reductionDone(0),0,thisgroup);
     src->contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat,cb);
+  } else { // Use user passed callback as reduction target with results
+    src->contribute(colls.length()*sizeof(Collision),colls.getData(),
+      CkReduction::concat, clientCb2);
   }
 }
 

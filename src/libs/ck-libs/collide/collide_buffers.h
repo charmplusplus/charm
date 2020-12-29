@@ -122,7 +122,7 @@ template <class T> class growableBufferT : public bufferT<T> {
   }
   void reallocate(int Len) {
     buf.reallocate(Len*sT);
-    setData((T*)buf.getData());
+    this->setData((T*)buf.getData());
     this->setLength(0);
     max=Len;
   }

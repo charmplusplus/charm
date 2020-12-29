@@ -23,9 +23,12 @@ struct collideStats; // forward declaration for collideStats
   */
 class collideClient : public Group {
   public:
+    enum useCallbackType { noCb, oneCb, twoCb };
+    useCallbackType useCbType;
     virtual ~collideClient();
     virtual void collisions(ArrayElement *src,
         int step,CollisionList &colls) =0;
+    virtual void signalCollisionDone(ArrayElement *src);
 };
 
 /********************** serialCollideClient *****************
@@ -43,6 +46,12 @@ CkGroupID CollideSerialClient(CollisionClientFn clientFn,void *clientParam);
 /// uses the passed callback as the reduction target for the final,
 /// complete Collision list.
 CkGroupID CollideSerialClient(CkCallback clientCb);
+
+/// Call this on processor 0 to build a Collision client that
+/// uses the first passed callback as the primary reduction target
+/// without the collision results and the second passed callback
+/// as the reduction target for the final complete Collision list.
+CkGroupID CollideSerialClient(CkCallback clientCb1, CkCallback clientCb2);
 
 /****************** Collision Interface ******************/
 typedef CkGroupID CollideHandle;
@@ -62,5 +71,11 @@ void CollideUnregister(CollideHandle h,int chunkNo);
 /// registered at creation time.
 void CollideBoxesPrio(CollideHandle h,int chunkNo,
     int nBox,const bbox3d *boxes,const int *prio=NULL);
+
+/// Call this on processor 0 to get the collision results
+/// This function is typically used when the user wants to determine
+/// when the collision library completes processing without requiring
+/// access to the results
+void CollideGetResults(CollideHandle h);
 
 #endif

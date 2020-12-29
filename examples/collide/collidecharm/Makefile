@@ -1,15 +1,18 @@
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
-OBJS = hello_fn.o hello_cb.o
+OBJS = hello_fn.o hello_cb.o hello_cb2.o
 
-all:	cifiles hello_fn hello_cb
+all:	cifiles hello_fn hello_cb hello_cb2
 
 hello_fn: hello_fn.o
 	$(CHARMC) -language charm++ -module collidecharm -o hello_fn hello_fn.o
 
 hello_cb: hello_cb.o
 	$(CHARMC) -language charm++ -module collidecharm -o hello_cb hello_cb.o
+
+hello_cb2: hello_cb2.o
+	$(CHARMC) -language charm++ -module collidecharm -o hello_cb2 hello_cb2.o
 
 cifiles: hello.ci
 	$(CHARMC)  hello.ci
@@ -23,7 +26,11 @@ hello_fn.o: hello.C
 hello_cb.o: hello.C
 	$(CHARMC) -DCOLLIDE_USE_CB=1 -c hello.C -o hello_cb.o
 
+hello_cb2.o: hello.C
+	$(CHARMC) -DCOLLIDE_USE_CB2=1 -c hello.C -o hello_cb2.o
+
 test: all
 	$(call run, ./hello_fn +p4 10 )
 	$(call run, ./hello_cb +p4 10 )
+	$(call run, ./hello_cb2 +p4 10 )
 	$(call run, ./hello_cb +p4 10 +printVoxCount)

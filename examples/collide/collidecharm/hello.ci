@@ -5,6 +5,7 @@ mainmodule hello {
   mainchare main {
     entry main(CkArgMsg*);
     entry void maindone(void);
+    entry void collisionDoneCb(CkReductionMsg *);
     entry void printCollisionCb(CkReductionMsg *);
   };
 
