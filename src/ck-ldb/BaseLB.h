@@ -280,8 +280,11 @@ public:
 #if CMK_LBDB_ON
 
 #  define CreateLBFunc_Def(x, str)                                                       \
+    CMK_DEPRECATED_MSG("Use LBRegisterBalancer() instead of CreateLBFunc_Def()")         \
     void Create##x(const CkLBOptions& opts) { CProxy_##x::ckNew(opts); }                 \
+    CMK_DEPRECATED_MSG("Use LBRegisterBalancer() instead of CreateLBFunc_Def()")         \
     BaseLB* Allocate##x(void) { return new x(static_cast<CkMigrateMessage*>(nullptr)); } \
+    CMK_DEPRECATED_MSG("Use LBRegisterBalancer() instead of CreateLBFunc_Def()")         \
     static void lbinit(void) { LBRegisterBalancer(#x, Create##x, Allocate##x, str); }
 
 #else /* CMK_LBDB_ON */
