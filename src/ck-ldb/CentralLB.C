@@ -47,7 +47,7 @@ bool load_balancer_created;
 
 static void lbinit()
 {
-  LBRegisterBalancer<CentralLB>("CentralLB", "CentralLB base class");
+  LBRegisterBalancer<CentralLB>("CentralLB", "CentralLB base class", false);
 }
 
 static int broadcastThreshold = 32;
