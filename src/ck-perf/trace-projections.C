@@ -967,6 +967,8 @@ TraceProjections::TraceProjections(char **argv):
   CmiGetArgFlagDesc(argv,"+gz-trace","Write log files compressed with gzip");
   const bool disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files compressed with gzip");
   compressed = compressed && !disableCompressed;
+  if (binary && compressed)
+    CkAbort("Binary logs cannot be compressed with gzip, must use +no-gz-trace with +binary-trace");
 #else
   // consume the flags so there's no confusion
   const bool compressed =
