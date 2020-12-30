@@ -517,7 +517,12 @@ using Requires = typename requires_impl<
   inline void pup(PUP::er &p, std::shared_ptr<T> &t) {
     PUP::able* _ = (p.isUnpacking()) ? nullptr : t.get();
     p(&_);
-    if (p.isUnpacking()) { t.reset(dynamic_cast<T*>(_)); }
+    if (p.isUnpacking()) {
+      // the shared ptr must be created with the original PUP::able ptr
+      // otherwise the dynamic cast can lead to invalid free's
+      // (it changes the pointer's address)
+      t = std::dynamic_pointer_cast<T>(std::shared_ptr<PUP::able>(_));
+    }
   }
 
   template <typename T>
