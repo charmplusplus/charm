@@ -976,7 +976,7 @@ TraceProjections::TraceProjections(char **argv):
   CmiGetArgFlagDesc(argv, "+no-gz-trace",
                     "Disable writing log files compressed with gzip");
   if (CkMyPe() == 0 && compressed)
-    CkPrintf("Warning> gz-trace is not supported on this machine!\n");
+    CkPrintf("Warning> gz-trace is not supported because Charm++ was built without zlib!\n");
 #endif
 
   int writeSummaryFiles = CmiGetArgFlagDesc(argv,"+write-analysis-file","Enable writing summary files "); 
