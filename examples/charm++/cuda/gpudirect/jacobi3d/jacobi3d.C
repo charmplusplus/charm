@@ -15,6 +15,9 @@
 /* readonly */ int block_width;
 /* readonly */ int block_height;
 /* readonly */ int block_depth;
+/* readonly */ int x_surf_count;
+/* readonly */ int y_surf_count;
+/* readonly */ int z_surf_count;
 /* readonly */ size_t x_surf_size;
 /* readonly */ size_t y_surf_size;
 /* readonly */ size_t z_surf_size;
@@ -30,7 +33,7 @@
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
     int block_height, int block_depth, cudaStream_t stream);
 extern void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
-    const std::vector<size_t>& ghost_sizes, cudaStream_t stream);
+    const std::vector<int>& ghost_counts, cudaStream_t stream);
 extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     int block_height, int block_depth, bool bounds[], cudaStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
@@ -167,10 +170,13 @@ public:
     block_height = grid_height / n_chares_y;
     block_depth = grid_depth / n_chares_z;
 
-    // Calculate surface sizes
-    x_surf_size = block_height * block_depth * sizeof(DataType);
-    y_surf_size = block_width * block_depth * sizeof(DataType);
-    z_surf_size = block_width * block_height * sizeof(DataType);
+    // Calculate surface count and sizes
+    x_surf_count = block_height * block_depth;
+    y_surf_count = block_width * block_depth;
+    z_surf_count = block_width * block_height;
+    x_surf_size = x_surf_count * sizeof(DataType);
+    y_surf_size = y_surf_count * sizeof(DataType);
+    z_surf_size = z_surf_count * sizeof(DataType);
 
     // Print configuration
     CkPrintf("\n[CUDA 3D Jacobi example]\n");
@@ -347,6 +353,8 @@ class Block : public CBase_Block {
     invokeInitKernel(d_new_temperature, block_width, block_height, block_depth, compute_stream);
 
     // Initialize ghost data
+    std::vector<int> ghost_counts = {x_surf_count, x_surf_count, y_surf_count,
+      y_surf_count, z_surf_count, z_surf_count};
     if (use_zerocopy || use_persistent) {
       std::vector<DataType*> send_ghosts;
       std::vector<DataType*> recv_ghosts;
@@ -354,17 +362,17 @@ class Block : public CBase_Block {
         send_ghosts.push_back(d_send_ghosts[i]);
         recv_ghosts.push_back(d_recv_ghosts[i]);
       }
-      invokeGhostInitKernels(send_ghosts, ghost_sizes, compute_stream);
-      invokeGhostInitKernels(recv_ghosts, ghost_sizes, compute_stream);
+      invokeGhostInitKernels(send_ghosts, ghost_counts, compute_stream);
+      invokeGhostInitKernels(recv_ghosts, ghost_counts, compute_stream);
     } else {
       std::vector<DataType*> ghosts;
       for (int i = 0; i < DIR_COUNT; i++) {
         ghosts.push_back(d_ghosts[i]);
       }
-      invokeGhostInitKernels(ghosts, ghost_sizes, compute_stream);
+      invokeGhostInitKernels(ghosts, ghost_counts, compute_stream);
 
       for (int i = 0; i < DIR_COUNT; i++) {
-        int ghost_count = ghost_sizes[i] / sizeof(DataType);
+        int ghost_count = ghost_counts[i];
         for (int j = 0; j < ghost_count; j++) {
           h_ghosts[i][j] = 0;
         }
@@ -439,55 +447,59 @@ class Block : public CBase_Block {
       }
     } else if (use_zerocopy) {
       if (!bounds[LEFT])
-        thisProxy(x-1, y, z).recvGhostZC(my_iter, RIGHT, block_height * block_depth,
-            CkDeviceBuffer(d_send_ghosts[LEFT], comm_stream));
+        thisProxy(x-1, y, z).recvGhostZC(my_iter, RIGHT, x_surf_count,
+            CkDeviceBuffer(d_send_ghosts[LEFT], x_surf_count, comm_stream));
       if (!bounds[RIGHT])
-        thisProxy(x+1, y, z).recvGhostZC(my_iter, LEFT, block_height * block_depth,
-            CkDeviceBuffer(d_send_ghosts[RIGHT], comm_stream));
+        thisProxy(x+1, y, z).recvGhostZC(my_iter, LEFT, x_surf_count,
+            CkDeviceBuffer(d_send_ghosts[RIGHT], x_surf_count, comm_stream));
       if (!bounds[TOP])
-        thisProxy(x, y-1, z).recvGhostZC(my_iter, BOTTOM, block_width * block_depth,
-            CkDeviceBuffer(d_send_ghosts[TOP], comm_stream));
+        thisProxy(x, y-1, z).recvGhostZC(my_iter, BOTTOM, y_surf_count,
+            CkDeviceBuffer(d_send_ghosts[TOP], y_surf_count, comm_stream));
       if (!bounds[BOTTOM])
-        thisProxy(x, y+1, z).recvGhostZC(my_iter, TOP, block_width * block_depth,
-            CkDeviceBuffer(d_send_ghosts[BOTTOM], comm_stream));
+        thisProxy(x, y+1, z).recvGhostZC(my_iter, TOP, y_surf_count,
+            CkDeviceBuffer(d_send_ghosts[BOTTOM], y_surf_count, comm_stream));
       if (!bounds[FRONT])
-        thisProxy(x, y, z-1).recvGhostZC(my_iter, BACK, block_width * block_height,
-            CkDeviceBuffer(d_send_ghosts[FRONT], comm_stream));
+        thisProxy(x, y, z-1).recvGhostZC(my_iter, BACK, z_surf_count,
+            CkDeviceBuffer(d_send_ghosts[FRONT], z_surf_count, comm_stream));
       if (!bounds[BACK])
-        thisProxy(x, y, z+1).recvGhostZC(my_iter, FRONT, block_width * block_height,
-            CkDeviceBuffer(d_send_ghosts[BACK], comm_stream));
+        thisProxy(x, y, z+1).recvGhostZC(my_iter, FRONT, z_surf_count,
+            CkDeviceBuffer(d_send_ghosts[BACK], z_surf_count, comm_stream));
     } else {
       if (!bounds[LEFT])
         thisProxy(x-1, y, z).recvGhostReg(my_iter, RIGHT,
-            block_height * block_depth, h_ghosts[LEFT]);
+            x_surf_count, h_ghosts[LEFT]);
       if (!bounds[RIGHT])
         thisProxy(x+1, y, z).recvGhostReg(my_iter, LEFT,
-            block_height * block_depth, h_ghosts[RIGHT]);
+            x_surf_count, h_ghosts[RIGHT]);
       if (!bounds[TOP])
         thisProxy(x, y-1, z).recvGhostReg(my_iter, BOTTOM,
-            block_width * block_depth, h_ghosts[TOP]);
+            y_surf_count, h_ghosts[TOP]);
       if (!bounds[BOTTOM])
         thisProxy(x, y+1, z).recvGhostReg(my_iter, TOP,
-            block_width * block_depth, h_ghosts[BOTTOM]);
+            y_surf_count, h_ghosts[BOTTOM]);
       if (!bounds[FRONT])
         thisProxy(x, y, z-1).recvGhostReg(my_iter, BACK,
-            block_width * block_height, h_ghosts[FRONT]);
+            z_surf_count, h_ghosts[FRONT]);
       if (!bounds[BACK])
         thisProxy(x, y, z+1).recvGhostReg(my_iter, FRONT,
-            block_width * block_height, h_ghosts[BACK]);
+            z_surf_count, h_ghosts[BACK]);
     }
   }
 
   // This is the post entry method, the regular entry method is defined as a
   // SDAG entry method in the .ci file
-  void recvGhostZC(int ref, int dir, int &size, DataType *&buf, CkDeviceBufferPost *devicePost) {
+  void recvGhostZC(int ref, int dir, int &count, DataType *&buf, CkDeviceBufferPost *devicePost) {
     CkAssert(dir >= 0 && dir < DIR_COUNT);
     buf = d_recv_ghosts[dir];
+    if (dir == LEFT || dir == RIGHT) count = x_surf_count;
+    else if (dir == TOP || dir == BOTTOM) count = y_surf_count;
+    else if (dir == FRONT || dir == BACK) count = z_surf_count;
     devicePost[0].cuda_stream = comm_stream;
   }
 
-  void processGhostZC(int dir, int size, DataType* gh) {
-    invokeUnpackingKernel(d_temperature, gh, dir, block_width, block_height,
+  void processGhostZC(int dir, int count, DataType* gh) {
+    // FIXME: d_recv_ghosts[dir] should be used instead of gh
+    invokeUnpackingKernel(d_temperature, d_recv_ghosts[dir], dir, block_width, block_height,
         block_depth, comm_stream);
   }
 

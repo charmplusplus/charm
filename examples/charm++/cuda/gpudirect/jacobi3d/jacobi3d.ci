@@ -10,6 +10,9 @@ mainmodule jacobi3d {
   readonly int block_width;
   readonly int block_height;
   readonly int block_depth;
+  readonly int x_surf_count;
+  readonly int y_surf_count;
+  readonly int z_surf_count;
   readonly size_t x_surf_size;
   readonly size_t y_surf_size;
   readonly size_t z_surf_size;

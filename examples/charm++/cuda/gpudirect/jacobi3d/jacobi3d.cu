@@ -218,16 +218,16 @@ void invokeInitKernel(DataType* d_temperature, int block_width, int block_height
 }
 
 void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
-    const std::vector<size_t>& ghost_sizes, cudaStream_t stream) {
+    const std::vector<int>& ghost_counts, cudaStream_t stream) {
   dim3 block_dim(256);
   for (int i = 0; i < ghosts.size(); i++) {
     DataType* ghost = ghosts[i];
-    size_t ghost_size = ghost_sizes[i];
+    int ghost_count = ghost_counts[i];
 
-    dim3 grid_dim((ghost_size+block_dim.x-1)/block_dim.x);
+    dim3 grid_dim((ghost_count+block_dim.x-1)/block_dim.x);
 
     ghostInitKernel<<<grid_dim, block_dim, 0, stream>>>(ghost,
-        ghost_size / sizeof(DataType));
+        ghost_count);
     hapiCheck(cudaPeekAtLastError());
   }
 }
