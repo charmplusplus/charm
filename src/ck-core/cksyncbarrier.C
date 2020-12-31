@@ -180,6 +180,7 @@ void CkSyncBarrier::CheckBarrier(bool flood_atsync)
 
     if (at_barrier)
     {
+      _TRACE_END_PHASE();
       startedAtSync = true;
       propagate_atsync();
       at_count -= client_count;
