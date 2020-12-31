@@ -1,0 +1,123 @@
+#include "charm++.h"
+#include "charm.h"
+#include "middle-conv.h"
+#include "trace-commSummary.h"
+#include "trace-commSummaryBOC.h"
+#include <fstream>
+
+CkpvStaticDeclare(TraceCommSummary*, _trace);
+
+CkGroupID traceCommSummaryGID;
+
+void _createTracecommSummary(char** argv)
+{
+  CkpvInitialize(TraceCommSummary*, _trace);
+  CkpvAccess(_trace) = new TraceCommSummary(argv);
+  CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
+}
+
+TraceCommSummary::TraceCommSummary(char** argv) : myPe(CkMyPe()), myNode(CkMyNode())
+{
+  if (CkpvAccess(traceOnPe) == 0) return;
+}
+
+void TraceCommSummary::beginExecute(CmiObjId* tid) { beginExecute(-1, -1, -1, myPe, 0); }
+
+void TraceCommSummary::beginExecute(char* msg) { beginExecute(-1, -1, -1, myPe, 0); }
+
+void TraceCommSummary::beginExecute(envelope* e, void* obj)
+{
+  // no envelope means thread execution
+  if (e == nullptr)
+  {
+    beginExecute(-1, -1, -1, myPe, 0);
+  }
+  else
+  {
+    beginExecute(-1, -1, -1, e->getSrcPe(), e->getTotalsize());
+  }
+}
+
+void TraceCommSummary::beginExecute(int event, int msgType, int ep, int srcPe, int mlen,
+                                    CmiObjId* idx, void* obj)
+{
+  if (srcPe == myPe)
+  {
+    selfCount.back()++;
+    selfBytes.back() += mlen;
+  }
+  else if (CkNodeOf(srcPe) == myNode)
+  {
+    localCount.back()++;
+    localBytes.back() += mlen;
+  }
+  else
+  {
+    remoteCount.back()++;
+    remoteBytes.back() += mlen;
+  }
+}
+
+void TraceCommSummary::endPhase()
+{
+  selfCount.push_back(0);
+  selfBytes.push_back(0);
+  localCount.push_back(0);
+  localBytes.push_back(0);
+  remoteCount.push_back(0);
+  remoteBytes.push_back(0);
+}
+
+void TraceCommSummary::traceClose(void)
+{
+  CkpvAccess(_trace)->endComputation();
+  // remove myself from traceArray so that no tracing will be called.
+  CkpvAccess(_traces)->removeTrace(this);
+
+  std::ofstream f(std::string(CkpvAccess(traceRoot)) + "." + std::to_string(myPe) + ".csumm");
+  f << "selfCount\n";
+  for (const auto& count : selfCount)
+  {
+    f << count << "\n";
+  }
+  f << "selfBytes\n";
+  for (const auto& bytes : selfBytes)
+  {
+    f << bytes << "\n";
+  }
+  f << "localCount\n";
+  for (const auto& count : localCount)
+  {
+    f << count << "\n";
+  }
+  f << "localBytes\n";
+  for (const auto& bytes : localBytes)
+  {
+    f << bytes << "\n";
+  }
+  f << "remoteCount\n";
+  for (const auto& count : remoteCount)
+  {
+    f << count << "\n";
+  }
+  f << "remoteBytes\n";
+  for (const auto& bytes : remoteBytes)
+  {
+    f << bytes << "\n";
+  }
+
+  f.close();
+}
+
+extern "C" void traceCommSummaryExitFunction() { CkContinueExit(); }
+
+// Initialization of the parallel trace module.
+void initTraceCommSummaryBOC()
+{
+  if (CkMyRank() == 0)
+  {
+    registerExitFn(traceCommSummaryExitFunction);
+  }
+}
+
+#include "TraceCommSummary.def.h"
