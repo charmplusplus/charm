@@ -36,7 +36,7 @@ main::main(CkArgMsg *m)
     std::vector<bool> dataToCompare3{ false, false, true};
     execute_example<bool>(dataToCompare3);
 
-    // create a vector of 10 heap-allocated pings
+    // create a vector of heap-allocated pings
     std::vector<Ping*>* pings = new std::vector<Ping*>();
     for (int i = 0; i < CkNumPes() * 4; i++) {
       pings->push_back(new Ping(i + 1));

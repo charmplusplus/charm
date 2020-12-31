@@ -1120,26 +1120,22 @@ struct ptr_helper<T, false> {
     bool is_nullptr = nullptr == t;
     p | is_nullptr;
     if (!is_nullptr) {
-      T *t1;
       if (p.isUnpacking()) {
-        initialize_ptr(t1);
-      } else {
-        t1 = t;
+        initialize_ptr(t);
       }
-      p | *t1;
-      if (p.isUnpacking()) t = t1;
+      p | *t;
     }
   }
 
  protected:
   template <typename U>
-  typename std::enable_if<std::is_constructible<U, reconstruct>::value>::type
+  inline typename std::enable_if<std::is_constructible<U, reconstruct>::value>::type
   initialize_ptr(U *&u) const {
     u = new U(reconstruct());
   }
 
   template <typename U>
-  typename std::enable_if<!std::is_constructible<U, reconstruct>::value>::type
+  inline typename std::enable_if<!std::is_constructible<U, reconstruct>::value>::type
   initialize_ptr(U *&u) const {
     u = new U();
   }
