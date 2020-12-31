@@ -461,7 +461,7 @@ using Requires = typename requires_impl<
             Requires<!std::is_base_of<PUP::able, T>::value> = nullptr>
   inline void pup(PUP::er& p, std::unique_ptr<T>& t) {
     T* t1 = t.get();
-    PUP::ptr_helper<T>()(t1);
+    PUP::ptr_helper<T>()(p, t1);
     if (p.isUnpacking()) {
       t.reset(t1);
     }
@@ -488,7 +488,7 @@ using Requires = typename requires_impl<
             Requires<!std::is_base_of<PUP::able, T>::value> = nullptr>
   inline void pup(PUP::er& p, std::shared_ptr<T>& t) {
     T* t1 = t.get();
-    PUP::ptr_helper<T>()(t1);
+    PUP::ptr_helper<T>()(p, t1);
     if (p.isUnpacking()) {
       t.reset(t1);
     }
