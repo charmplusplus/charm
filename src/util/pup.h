@@ -769,6 +769,9 @@ public:
 	virtual const PUP_ID &get_PUP_ID(void) const=0;
 };
 
+template <typename T, bool PUPable = std::is_base_of<PUP::able, T>::value>
+struct ptr_helper;
+
 #define SINGLE_ARG(...) __VA_ARGS__
 
 //Declarations which create routines implemeting the | operator.
@@ -934,17 +937,10 @@ public:
 	inline operator T* () { allocated=0; return ptr; }
 	
 	inline void pup(PUP::er &p) {
-		bool ptrWasNull=(ptr==0);
-		
-		PUP::able *ptr_able=ptr; // T must inherit from PUP::able!
-		p|ptr_able; //Pack as a PUP::able *
-		ptr=(T *)ptr_able;
-		
-		if (ptrWasNull) 
-		{ //PUP just allocated a new object for us-- 
-		  // make sure it gets deleted eventually.
-			allocated=ptr;
-		}
+    PUP::ptr_helper<T>()(p, ptr);
+    if (p.isUnpacking()) {
+      allocated = ptr;
+    }
 	}
 	friend inline void operator|(PUP::er &p,CkPointer<T> &v) {v.pup(p);}
 };
@@ -1104,6 +1100,51 @@ PUP_BUILTIN_SUPPORT(CmiUInt16)
 #define PUPv(field,len) \
   do{  if (p.hasComments()) p.comment(#field); PUParray(p,field,len); } while(0)
 
+namespace PUP {
+template <typename T>
+struct ptr_helper<T, true> {
+  inline void operator()(PUP::er &p, T *&t) const {
+    bool is_nullptr = nullptr == t;
+    p | is_nullptr;
+    if (!is_nullptr) {
+      PUP::able *t_able = static_cast<PUP::able *>(t);
+      p | t_able;
+      if (p.isUnpacking()) t = static_cast<T *>(t_able);
+    }
+  }
+};
+
+template <typename T>
+struct ptr_helper<T, false> {
+  inline void operator()(PUP::er &p, T *&t) const {
+    bool is_nullptr = nullptr == t;
+    p | is_nullptr;
+    if (!is_nullptr) {
+      T *t1;
+      if (p.isUnpacking()) {
+        initialize_ptr(t1);
+      } else {
+        t1 = t;
+      }
+      p | *t1;
+      if (p.isUnpacking()) t = t1;
+    }
+  }
+
+ protected:
+  template <typename U>
+  typename std::enable_if<std::is_constructible<U, reconstruct>::value>::type
+  initialize_ptr(U *&u) const {
+    u = new U(reconstruct());
+  }
+
+  template <typename U>
+  typename std::enable_if<!std::is_constructible<U, reconstruct>::value>::type
+  initialize_ptr(U *&u) const {
+    u = new U();
+  }
+};
+}
 
 #endif //def __CK_PUP_H
 

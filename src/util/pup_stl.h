@@ -460,19 +460,10 @@ using Requires = typename requires_impl<
   template <typename T,
             Requires<!std::is_base_of<PUP::able, T>::value> = nullptr>
   inline void pup(PUP::er& p, std::unique_ptr<T>& t) {
-    bool is_nullptr = nullptr == t;
-    p | is_nullptr;
-    if (!is_nullptr) {
-      T* t1;
-      if (p.isUnpacking()) {
-        t1 = new T;
-      } else {
-        t1 = t.get();
-      }
-      p | *t1;
-      if (p.isUnpacking()) {
-        t.reset(t1);
-      }
+    T* t1 = t.get();
+    PUP::ptr_helper<T>()(t1);
+    if (p.isUnpacking()) {
+      t.reset(t1);
     }
   }
 
@@ -496,19 +487,10 @@ using Requires = typename requires_impl<
   template <typename T,
             Requires<!std::is_base_of<PUP::able, T>::value> = nullptr>
   inline void pup(PUP::er& p, std::shared_ptr<T>& t) {
-    bool is_nullptr = nullptr == t;
-    p | is_nullptr;
-    if (!is_nullptr) {
-      T* t1;
-      if (p.isUnpacking()) {
-        t1 = new T;
-      } else {
-        t1 = t.get();
-      }
-      p | *t1;
-      if (p.isUnpacking()) {
-        t.reset(t1);
-      }
+    T* t1 = t.get();
+    PUP::ptr_helper<T>()(t1);
+    if (p.isUnpacking()) {
+      t.reset(t1);
     }
   }
 
@@ -520,7 +502,7 @@ using Requires = typename requires_impl<
       // the shared ptr must be created with the original PUP::able ptr
       // otherwise the dynamic cast can lead to invalid free's
       // (it changes the pointer's address)
-      t = std::dynamic_pointer_cast<T>(std::shared_ptr<PUP::able>(_));
+      t = std::static_pointer_cast<T>(std::shared_ptr<PUP::able>(_));
     }
   }
 
