@@ -846,7 +846,7 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-L/ccs/home/zanef2/.local/ucx/lib -L/ccs/home/zanef2/.local/pmix/lib -Llib/ -lucp -lpmix -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
