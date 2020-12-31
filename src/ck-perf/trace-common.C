@@ -261,7 +261,7 @@ extern const char* const CmiCommitID;
 /** Write out the common parts of the .sts file. */
 void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE \"%s\"\n",CMK_MACHINE_NAME);
-#if CMK_SMP_TRACE_COMMTHREAD
+#if CMK_SMP_TRACE_COMMTHREAD && !CMK_SMP_NO_COMMTHD
   //Assuming there's only 1 comm thread now! --Chao Mei
   //considering the extra comm thread per node
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());
