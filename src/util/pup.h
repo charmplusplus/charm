@@ -937,10 +937,10 @@ public:
 	inline operator T* () { allocated=0; return ptr; }
 	
 	inline void pup(PUP::er &p) {
-    PUP::ptr_helper<T>()(p, ptr);
-    if (p.isUnpacking()) {
-      allocated = ptr;
-    }
+		PUP::ptr_helper<T>()(p, ptr);
+		if (p.isUnpacking()) {
+			allocated = ptr;
+		}
 	}
 	friend inline void operator|(PUP::er &p,CkPointer<T> &v) {v.pup(p);}
 };

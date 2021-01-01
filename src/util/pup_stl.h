@@ -500,8 +500,8 @@ using Requires = typename requires_impl<
     p(&_);
     if (p.isUnpacking()) {
       // the shared ptr must be created with the original PUP::able ptr
-      // otherwise the dynamic cast can lead to invalid free's
-      // (it changes the pointer's address)
+      // otherwise the static cast can lead to invalid frees
+      // (since it can change the pointer's value)
       t = std::static_pointer_cast<T>(std::shared_ptr<PUP::able>(_));
     }
   }
