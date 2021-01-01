@@ -74,38 +74,16 @@ void TraceCommSummary::traceClose(void)
   // remove myself from traceArray so that no tracing will be called.
   CkpvAccess(_traces)->removeTrace(this);
 
-  std::ofstream f(std::string(CkpvAccess(traceRoot)) + "." + std::to_string(myPe) + ".csumm");
-  f << "selfCount\n";
-  for (const auto& count : selfCount)
+  std::ofstream f(std::string(CkpvAccess(traceRoot)) + "." + std::to_string(myPe) +
+                  ".csumm");
+  f << "PE Phase selfCount selfBytes localCount localBytes remoteCount remoteBytes\n";
+  for (int i = 0; i < selfCount.size(); i++)
   {
-    f << count << "\n";
+    f << myPe << " " << i << " " << selfCount[i] << " " << selfBytes[i] << " "
+      << localCount[i] << " " << localBytes[i] << " " << remoteCount[i] << " "
+      << remoteBytes[i] << " "
+      << "\n";
   }
-  f << "selfBytes\n";
-  for (const auto& bytes : selfBytes)
-  {
-    f << bytes << "\n";
-  }
-  f << "localCount\n";
-  for (const auto& count : localCount)
-  {
-    f << count << "\n";
-  }
-  f << "localBytes\n";
-  for (const auto& bytes : localBytes)
-  {
-    f << bytes << "\n";
-  }
-  f << "remoteCount\n";
-  for (const auto& count : remoteCount)
-  {
-    f << count << "\n";
-  }
-  f << "remoteBytes\n";
-  for (const auto& bytes : remoteBytes)
-  {
-    f << bytes << "\n";
-  }
-
   f.close();
 }
 
