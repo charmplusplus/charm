@@ -2863,9 +2863,9 @@ void ampi::completedRdmaRecv(CkDataMsg *msg) noexcept
   // [nokeep] entry method, so do not delete msg
 }
 
+#if CMK_CUDA
 void ampi::completedCudaSend(CkDataMsg *msg) noexcept
 {
-#if CMK_CUDA
   // refnum is the index into reqList for this SendReq
   int reqIdx = CkGetRefNum(msg);
   //CkDeviceBuffer* srcInfo = (CkDeviceBuffer*)(msg->data);
@@ -2883,12 +2883,12 @@ void ampi::completedCudaSend(CkDataMsg *msg) noexcept
   resumeThreadIfReady();
 
   // [nokeep] entry method, so do not delete msg
-#endif
 }
+#endif
 
+#if CMK_CUDA
 void ampi::completedCudaRecv(CkDataMsg* msg) noexcept
 {
-#if CMK_CUDA
   // refnum is the index into reqList for this IReq
   int reqIdx = CkGetRefNum(msg);
 
@@ -2902,8 +2902,8 @@ void ampi::completedCudaRecv(CkDataMsg* msg) noexcept
 
   handleBlockedReq(&ireq);
   resumeThreadIfReady();
-#endif
 }
+#endif
 
 void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type) noexcept
 {

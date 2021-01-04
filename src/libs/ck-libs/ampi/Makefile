@@ -1,5 +1,8 @@
 CDIR := $(shell cd ../../../.. && pwd)
 -include $(CDIR)/include/conv-mach-opt.mak
+ifeq (1,$(BUILD_CUDA))
+	OPTS += " -DCMK_CUDA=1"
+endif
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h ampi_functions.h \
