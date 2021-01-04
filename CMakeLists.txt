@@ -849,7 +849,7 @@ if(${TARGET} STREQUAL "charm4py")
   target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-L/ccs/home/zanef2/.local/ucx/lib -L/ccs/home/zanef2/.local/pmix/lib -Llib/ -lucp -lpmix -standalone -whole-archive -c++stl -shared")
 
   if(CUDA)
-    target_link_libraries(cudahybridapi ${CUDA_LIBRARIES} "-Llib/ -standalone -whole-archive -c++stl -shared")
+    target_link_libraries(charm cudahybridapi ${CUDA_LIBRARIES} "-Llib/ -standalone -whole-archive -c++stl -shared")
   endif()
 
   add_dependencies(charm hwloc)
