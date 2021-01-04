@@ -487,6 +487,9 @@ extern void CkCallWhenIdle(int epIdx, void* obj);
 
 
 #if CMK_CHARM4PY
+#ifndef __cplusplus
+#include <stdbool.h>
+#endif
 extern bool CkCudaEnabled();
 #endif
 
