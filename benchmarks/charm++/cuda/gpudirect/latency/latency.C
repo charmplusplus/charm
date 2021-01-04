@@ -206,7 +206,7 @@ public:
       cudaStreamSynchronize(stream);
       thisProxy[peer].receiveReg(size, h_local_data);
     } else {
-      thisProxy[peer].receiveZC(size, CkDeviceBuffer(d_local_data, stream));
+      thisProxy[peer].receiveZC(size, CkDeviceBuffer(d_local_data, size, stream));
     }
   }
 
@@ -232,7 +232,7 @@ public:
   // The user can either wait for it to complete or offload other operations
   // into the stream (that may be dependent on the arriving data)
   void receiveZC(size_t size, char* data) {
-    // Wait for data transfer to complete
+    // Wait for data transfer to complete (no need for UCX)
     //cudaStreamSynchronize(stream);
 
     afterReceive(size, true);
