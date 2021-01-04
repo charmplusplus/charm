@@ -1320,7 +1320,7 @@ void CkArrayBroadcaster::deliver(CkArrayMessage *bcast,
     for (int i=0; i < numInts; i++) validIndexes[j++] = index[i];
     numValidElements++;
   }
-  char *msg_buf = ck::get_message_buffer((ck::marshall_msg)impl_msg);
+  char *msg_buf = ck::get_message_buffer((ck::marshall_msg)bcast);
   PUP::fromMem implP(msg_buf);
   int msgSize; implP|msgSize;
   int ep; implP|ep;
