@@ -525,34 +525,6 @@ void _registerCkCallback(void); //used by init
 
 void CkCallbackInit();
 
-#ifdef __cplusplus
-#include "ckmarshall.h"
-
-namespace ck {
-template <class>
-class callback;
-
-template <class R, class... Args>
-class callback<R(Args...)> {
- public:
-  callback(PUP::reconstruct) {}
-  callback(const CkCallback &cb) : cb_(cb) {}
-
-  CkCallback &handle() { return cb_; }
-  CkCallback handle() const { return cb_; }
-
-  void send(Args... args) const {
-    cb_.send(ck::make_marshall_message(args...));
-  }
-
-  void pup(PUP::er &p) { p | cb_; }
-
- private:
-  CkCallback cb_;
-};
-}
-#endif
-
 #endif
 
 

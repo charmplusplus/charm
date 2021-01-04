@@ -14,12 +14,11 @@ inline char *get_message_buffer(marshall_msg msg);
 
 template <class... Args>
 inline marshall_msg make_marshall_message(Args... args) {
-  using expander = int[];
   PUP::sizer s;
-  (void)expander{0, (void(s | args), 0)...};
+  PUP::many(s, args...);
   CkMarshallMsg *msg = CkAllocateMarshallMsg(s.size());
   PUP::toMem p(get_message_buffer(msg));
-  (void)expander{0, (void(p | args), 0)...};
+  PUP::many(p, args...);
   return msg;
 }
 }

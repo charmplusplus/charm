@@ -12,7 +12,7 @@
 class CkEntryOptions : public CkNoncopyable {
   int queueingtype;  // CK_QUEUEING type
   int prioBits;  // Number of bits of priority to use
-  typedef unsigned int prio_t;  // Datatype used to represent priorities
+  using prio_t = unsigned int;  // Datatype used to represent priorities
   prio_t *prioPtr;  // Points to message priority values
   prio_t prioStore;  // For short priorities, stores the priority value
   std::vector<CkGroupID> depGroupIDs;  // group dependencies
@@ -20,11 +20,11 @@ class CkEntryOptions : public CkNoncopyable {
   CkEntryOptions(void)
       : queueingtype(CK_QUEUEING_FIFO),
         prioBits(0),
-        prioPtr(NULL),
+        prioPtr(nullptr),
         prioStore(0) {}
 
   ~CkEntryOptions() {
-    if (prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+    if (prioPtr != nullptr && queueingtype != CK_QUEUEING_IFIFO &&
         queueingtype != CK_QUEUEING_ILIFO) {
       delete[] prioPtr;
       prioBits = 0;
@@ -39,7 +39,7 @@ class CkEntryOptions : public CkNoncopyable {
     return *this;
   }
   inline CkEntryOptions &setPriority(int prioBits_, const prio_t *prioPtr_) {
-    if (prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+    if (prioPtr != nullptr && queueingtype != CK_QUEUEING_IFIFO &&
         queueingtype != CK_QUEUEING_ILIFO) {
       delete[] prioPtr;
       prioBits = 0;
@@ -54,7 +54,7 @@ class CkEntryOptions : public CkNoncopyable {
   }
   inline CkEntryOptions &setPriority(const CkBitVector &cbv) {
     if (!cbv.data.empty()) {
-      if (prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+      if (prioPtr != nullptr && queueingtype != CK_QUEUEING_IFIFO &&
           queueingtype != CK_QUEUEING_ILIFO) {
         delete[] prioPtr;
         prioBits = 0;
