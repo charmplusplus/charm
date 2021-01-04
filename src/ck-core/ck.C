@@ -2543,6 +2543,12 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
   }
 }
 
+// we want to expose access to this macro to external clients e.g. Charm4Py
+bool CkCudaEnabled()
+{
+  return CMK_CUDA;
+}
+
 #endif
 
 //------------------- Message Watcher (record/replay) ----------------

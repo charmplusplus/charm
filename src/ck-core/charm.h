@@ -485,6 +485,11 @@ extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
 extern void CkCallWhenIdle(int epIdx, void* obj);
 
+
+#if CMK_CHARM4PY
+extern bool CkCudaEnabled();
+#endif
+
 #ifdef __cplusplus
 }
 #endif
