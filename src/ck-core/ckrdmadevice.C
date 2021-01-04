@@ -489,8 +489,6 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
   return -1;
 }
 
-CpvExtern(int, tag_counter);
-
 // Performs sender-side operations necessary for device zerocopy
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 #if TIMING_BREAKDOWN

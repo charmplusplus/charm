@@ -37,6 +37,7 @@
 #define UCX_MSG_NUM_RX_REQS_MAX         1024
 #define UCX_TAG_MSG_BITS                4
 #define UCX_TAG_RMA_BITS                4
+#define UCX_TAG_PE_BITS                 32
 #define UCX_MSG_TAG_EAGER               UCS_BIT(0)
 #define UCX_MSG_TAG_PROBE               UCS_BIT(1)
 #define UCX_MSG_TAG_DEVICE              UCS_BIT(2)
@@ -837,7 +838,7 @@ void UcxRecvDeviceCompleted(void* request, ucs_status_t status,
 
 void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
   // FIXME: Is this tag generation OK?
-  tag = ((uint64_t)CpvAccess(tag_counter)++ << (32 + UCX_TAG_MSG_BITS)) | (CmiMyPe() << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_DEVICE;
+  tag = ((uint64_t)CpvAccess(tag_counter)++ << (UCX_TAG_PE_BITS + UCX_TAG_MSG_BITS)) | (CmiMyPe() << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_DEVICE;
 #if CMK_SMP
   UcxPendingRequest* req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
   req->msgBuf = (void*)ptr;
