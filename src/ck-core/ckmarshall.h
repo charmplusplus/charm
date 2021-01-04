@@ -10,7 +10,7 @@ CkMarshallMsg *CkAllocateMarshallMsg(int size, const CkEntryOptions *opts = null
 namespace ck {
 using marshall_msg = CkMarshallMsg *;
 
-inline void *get_message_buffer(marshall_msg msg);
+inline char *get_message_buffer(marshall_msg msg);
 
 template <class... Args>
 inline marshall_msg make_marshall_message(Args... args) {
@@ -34,14 +34,14 @@ public:
 };
 
 namespace ck {
-  inline void* get_message_buffer(marshall_msg msg) {
-    return (void*)msg->msgBuf;
+  inline char *get_message_buffer(marshall_msg msg) {
+    return msg->msgBuf;
   }
 }
 
 CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size, const CkEntryOptions *opts);
 
-inline CkMarshallMsg* CkAllocateMarshallMsg(int size, const CkEntryOptions *opts) {
+inline CkMarshallMsg *CkAllocateMarshallMsg(int size, const CkEntryOptions *opts) {
   if (opts == NULL) {
     CkMarshallMsg *newMemory = new (size, 0) CkMarshallMsg;
     setMemoryTypeMessage(UsrToEnv(newMemory));

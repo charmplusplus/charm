@@ -290,7 +290,7 @@ public:
   static void __entryMethod(void *impl_msg, void *impl_obj_void) {
     //fprintf(stderr, "MainchareExt:: entry method invoked\n");
     MainchareExt *obj = static_cast<MainchareExt *>(impl_obj_void);
-    void *impl_buf = ck::get_message_buffer((ck::marshall_msg)impl_msg);
+    char *impl_buf = ck::get_message_buffer((ck::marshall_msg)impl_msg);
     PUP::fromMem implP(impl_buf);
     int msgSize; implP|msgSize;
     int ep; implP|ep;
@@ -996,7 +996,7 @@ public:
   static void __entryMethod(void *impl_msg, void *impl_obj_void) {
     //fprintf(stderr, "GroupExt:: entry method invoked\n");
     GroupExt *obj = static_cast<GroupExt *>(impl_obj_void);
-    void *impl_buf = ck::get_message_buffer((ck::marshall_msg)impl_msg);
+    char *impl_buf = ck::get_message_buffer((ck::marshall_msg)impl_msg);
     PUP::fromMem implP(impl_buf);
     int msgSize; implP|msgSize;
     int ep; implP|ep;
@@ -1019,7 +1019,7 @@ public:
   // entry methods of SectionManager other than sendToSection
   static void __entryMethod(void *impl_msg, void *impl_obj_void) {
     SectionManagerExt *obj = static_cast<SectionManagerExt *>(impl_obj_void);
-    void *impl_buf = ck::get_message_buffer((ck::marshall_msg)impl_msg);
+    char *impl_buf = ck::get_message_buffer((ck::marshall_msg)impl_msg);
     PUP::fromMem implP(impl_buf);
     int msgSize; implP|msgSize;
     implP|obj->ep;

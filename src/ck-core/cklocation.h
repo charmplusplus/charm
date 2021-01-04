@@ -140,7 +140,7 @@ public:
   static void __entryMethod(void *impl_msg, void *impl_obj_void) {
     //fprintf(stderr, "ArrayMapExt:: entry method invoked\n");
     ArrayMapExt *obj = static_cast<ArrayMapExt *>(impl_obj_void);
-    void *impl_buf = ck::get_message_buffer((ck::marshall_msg)impl_msg);
+    char *impl_buf = ck::get_message_buffer((ck::marshall_msg)impl_msg);
     PUP::fromMem implP(impl_buf);
     int msgSize; implP|msgSize;
     int ep; implP|ep;
