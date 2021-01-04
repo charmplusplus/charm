@@ -73,18 +73,15 @@ namespace ck {
         CkAbort("A future's value can only be retrieved on the PE it was created on.");
       }
       CkMarshallMsg *msg = (CkMarshallMsg *)CkWaitFuture(handle_);
-      PUP::fromMem p(msg->msgBuf);
+      PUP::fromMem p(ck::get_message_buffer(msg));
       PUP::detail::TemporaryObjectHolder<T> holder;
       p | holder;
       return std::move(holder.t);
     }
 
     void set(const T &value) {
-      PUP::sizer s;
-      s | (typename std::decay<decltype(value)>::type &)value;
-      CkMarshallMsg *msg = CkAllocateMarshallMsg(s.size(), NULL);
-      PUP::toMem p((void *)msg->msgBuf);
-      p | (typename std::decay<decltype(value)>::type &)value;
+      auto msg = ck::make_marshall_message(
+        (typename std::decay<decltype(value)>::type &)value);
       CkSendToFuture(handle_, msg);
     }
 

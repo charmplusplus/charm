@@ -5,12 +5,18 @@
 struct Main : public CBase_Main {
   Main(CkArgMsg *m) { thisProxy.run(atoi(m->argv[1])); }
 
+  void result(int n) {
+    CkPrintf("Fibonacci number is: %d\n", n);
+    CkExit();
+  }
+
   void run(int n) {
     ck::future<int> f;
     CProxy_Fib::ckNew(n, f);
-    CkPrintf("Fibonacci number is: %d\n", f.get());
+    // TODO use ci::Main::result::make_callback(thisProxy) when available
+    auto cb = ck::callback<void(int)>(CkCallback(CkIndex_Main::result(0), thisProxy));
+    cb.send(f.get());
     f.release();
-    CkExit();
   }
 };
 
