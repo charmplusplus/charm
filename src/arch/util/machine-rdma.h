@@ -15,5 +15,16 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo);
 
 void CmiInvokeNcpyAck(void *ack);
 
+#if CMK_CUDA
+// Function pointer to acknowledgement handler
+typedef void (*RdmaAckHandlerFn)(void *token);
+
+void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
+void LrtsRecvDevice(DeviceRdmaOp* op, bool ampi);
+
+void CmiInvokeRecvHandler(void* data);
+void CmiInvokeAmpiRecvHandler(void* data);
+#endif
+
 int CmiGetRdmaCommonInfoSize();
 #endif

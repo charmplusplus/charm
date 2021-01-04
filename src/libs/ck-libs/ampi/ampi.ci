@@ -51,6 +51,10 @@ module ampi {
     entry EXPEDITED void completedSend(int sreqIdx);
     entry EXPEDITED_NOKEEP void completedRdmaSend(CkDataMsg *msg);
     entry EXPEDITED_NOKEEP void completedRdmaRecv(CkDataMsg *msg);
+#if CMK_CUDA
+    entry EXPEDITED_NOKEEP void completedCudaSend(CkDataMsg *msg);
+    entry EXPEDITED_NOKEEP void completedCudaRecv(CkDataMsg *msg);
+#endif
     entry EXPEDITED void requestPut(MPI_Request req, CkNcpyBuffer targetInfo);
     entry EXPEDITED_REDN void barrierResult(void);
     entry EXPEDITED_REDN void ibarrierResult(void);
