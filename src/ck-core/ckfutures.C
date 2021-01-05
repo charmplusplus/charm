@@ -25,8 +25,8 @@ in remote process control.
 typedef struct Future_s {
   bool ready;
   void *value;
-  CthThread waiters;
-  int next; 
+  std::vector<CthThread> waiters;
+  int next;
 } Future;
 
 typedef struct {
@@ -150,7 +150,7 @@ int createFuture(void)
   fs->freelist = fut->next;
   fut->ready = false;
   fut->value = 0;
-  fut->waiters = 0;
+  fut->waiters = {};
   fut->next = 0;
   return handle;
 }
@@ -186,8 +186,7 @@ void *CkWaitFutureID(CkFutureID handle)
   void *value;
 
   if (!(fut->ready)) {
-    CthSetNext(self, fut->waiters);
-    fut->waiters = self;
+    fut->waiters.push_back(self);
     while (!fut->ready) { CthSuspend(); }
   }
 
@@ -199,6 +198,75 @@ void *CkWaitFutureID(CkFutureID handle)
 	"gets a CthAwaken call *before* the sync method returns.");
 #endif
   return value;
+}
+
+void Future_dropWaiter(Future* future, const CthThread& th) {
+  auto& waiting = future->waiters;
+  auto it = std::find(waiting.begin(), waiting.end(), th);
+  if (it != waiting.end()) {
+    waiting.erase(it);
+  }
+}
+
+std::pair<CkFutureID, void*> CkWaitAnyID(const std::vector<CkFutureID>& handles) {
+  auto self = CthSelf();
+  auto fs = &(CpvAccess(futurestate));
+  const int n = handles.size();
+  std::vector<Future*> futures;
+  for (auto handle : handles) {
+    auto future = fs->array[handle].get();
+    futures.push_back(future);
+    if (!future->ready) {
+      future->waiters.push_back(self);
+    }
+  }
+  do {
+    // suspend until...
+    CthSuspend();
+    for (int i = 0; i < n; i++) {
+      // a future becomes ready
+      if (futures[i]->ready) {
+        // drop ourself from all the futures
+        for (auto future: futures) Future_dropWaiter(future, self);
+        // then return the pair
+        return std::make_pair(handles[i], futures[i]->value);
+      }
+    }
+  } while (true);
+}
+
+std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& handles) {
+  const int n = handles.size();
+  std::vector<void*> result(n, nullptr);
+  std::vector<Future*> futures;
+  auto self = CthSelf();
+  auto fs = &(CpvAccess(futurestate));
+  for (auto handle : handles) {
+    auto future = fs->array[handle].get();
+    futures.push_back(future);
+    if (!future->ready) {
+      future->waiters.push_back(self);
+    }
+  }
+  // while not all of the values have been received
+  do {
+    // then, update the results for ready futures
+    for (int i = 0; i < n; i++) {
+      auto fut = futures[i];
+      if (fut && fut->ready) {
+        if (fut->value == nullptr) break;
+        result[i] = fut->value;
+        futures[i] = nullptr;
+      }
+    }
+    if (std::all_of(futures.begin(), futures.end(), [](Future* f) { return !f; })) {
+      break;
+    } else {
+      // suspend the thread
+      CthSuspend();
+    }
+  } while (true);
+  return result;
 }
 
 void CkReleaseFuture(CkFuture fut)
@@ -231,9 +299,10 @@ static void setFuture(CkFutureID handle, void *pointer)
   if (pointer==NULL) CkAbort("setFuture called with NULL!");
 #endif
   fut->value = pointer;
-  for (t=fut->waiters; t; t=CthGetNext(t))
+  for (auto t: fut->waiters) {
     CthAwaken(t);
-  fut->waiters = 0;
+  }
+  fut->waiters = {};
 }
 
 void _futuresModuleInit(void)

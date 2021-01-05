@@ -41,6 +41,8 @@ CkFutureID CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int pe);
 CkFutureID CkRemoteNodeBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int node);
 
 void* CkWaitFutureID(CkFutureID futNum);
+std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& handles);
+std::pair<CkFutureID,void*> CkWaitAnyID(const std::vector<CkFutureID>& handles);
 void CkWaitVoidFuture(CkFutureID futNum);
 void CkReleaseFutureID(CkFutureID futNum);
 int CkProbeFutureID(CkFutureID futNum);
@@ -63,20 +65,25 @@ namespace ck {
     CkFuture handle_;
 
   public:
+    using value_type = T;
+
     future() { handle_ = CkCreateFuture(); }
     future(PUP::reconstruct) { }
     future(const CkFuture &handle): handle_(handle) { }
     future(const future<T> &other) { handle_ = other.handle_; }
 
+    static T unmarshall_value(CkMarshallMsg *msg) {
+      PUP::fromMem p(msg->msgBuf);
+      PUP::detail::TemporaryObjectHolder<T> holder;
+      p | holder;
+      return holder.t;
+    }
+
     T get() const {
       if (handle_.pe != CkMyPe()) {
         CkAbort("A future's value can only be retrieved on the PE it was created on.");
       }
-      CkMarshallMsg *msg = (CkMarshallMsg *)CkWaitFuture(handle_);
-      PUP::fromMem p(msg->msgBuf);
-      PUP::detail::TemporaryObjectHolder<T> holder;
-      p | holder;
-      return std::move(holder.t);
+      return unmarshall_value((CkMarshallMsg *)CkWaitFuture(handle_));
     }
 
     void set(const T &value) {
@@ -99,7 +106,25 @@ namespace ck {
       CkReleaseFuture(handle_);
     }
     void pup(PUP::er &p) { p | handle_; }
+
+    inline bool operator==(const future<T>& other) const {
+      return (this->handle_.id == other.handle_.id) &&
+             (this->handle_.pe == other.handle_.pe);
+    }
   };
+
+  // returns a pair with the value and fulfilled future
+  template<typename InputIter, typename T = typename InputIter::value_type::value_type>
+  std::pair<T, InputIter> wait_any(InputIter first, InputIter last) {
+    std::vector<CkFutureID> handles(last - first);
+    std::transform(first, last, handles.begin(),
+      [](future<T>& f) { return f.handle().id; });
+    auto pair = CkWaitAnyID(handles);
+    auto value = future<T>::unmarshall_value((CkMarshallMsg*)pair.second);
+    auto which = std::find_if(first, last,
+      [&pair](future<T>& f) { return f.handle().id == pair.first; });
+    return std::make_pair(value, which);
+  }
 }
 #endif
 

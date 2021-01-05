@@ -23,12 +23,21 @@ struct Fib : public CBase_Fib {
     if (n < THRESHOLD) {
       prev.set(seqFib(n));
     } else {
-      ck::future<int> f1, f2;
-      CProxy_Fib::ckNew(n - 1, f1);
-      CProxy_Fib::ckNew(n - 2, f2);
-      prev.set(f1.get() + f2.get());
-      f1.release();
-      f2.release();
+      std::vector<ck::future<int>> pending(2);
+      CProxy_Fib::ckNew(n - 1, pending[0]);
+      CProxy_Fib::ckNew(n - 2, pending[1]);
+      int sum = 0;
+      while (pending.size()) {
+        // wait for any of the futures in pending to become ready
+        auto pair = ck::wait_any(pending.begin(), pending.end());
+        // add the received value to the sum
+        sum += pair.first;
+        // then release and erase the fulfilled future
+        pair.second->release();
+        pending.erase(pair.second);
+      }
+      // set the parent's value to the sum
+      prev.set(sum);
     }
     delete this;
   }
