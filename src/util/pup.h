@@ -909,26 +909,15 @@ class CkPointer {
 	void operator=(CkPointer<T> &&) = delete;
 protected:
 	T *peek(void) {return ptr;}
+	CkPointer(T *src, T *alloc): allocated(alloc), ptr(src) {}
 public:
 	/// Used on the send side, and does *not* delete the object.
-	CkPointer(T *src)  ///< Marshall this object.
-	{ 
-		allocated=0; //Don't ever delete src
-		ptr=src;
-	}
-	CkPointer(CkPointer<T> &&src)
-	{
-		allocated = src.allocated;
-		ptr = src.ptr;
-
-		src.allocated = nullptr;
-		src.ptr = nullptr;
-	}
-	
+	CkPointer(T *src): CkPointer(src, nullptr) {}
 	/// Begin completely empty: used on marshalling recv side.
-	CkPointer(void) { 
-		ptr=allocated=0;
-	}
+	CkPointer(void): CkPointer(nullptr, nullptr) {}
+	/// Move constructor (copy src fields, then invalidate)
+	CkPointer(CkPointer<T> &&src): CkPointer(src.ptr, src.allocated)
+	{ src.allocated = src.ptr = nullptr; }
 	
 	~CkPointer() { if (allocated) delete allocated; }
 	
