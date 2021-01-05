@@ -208,7 +208,7 @@ void Future_dropWaiter(Future* future, const CthThread& th) {
   }
 }
 
-std::pair<CkFutureID, void*> CkWaitAnyID(const std::vector<CkFutureID>& handles) {
+std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles) {
   auto self = CthSelf();
   auto fs = &(CpvAccess(futurestate));
   const int n = handles.size();
@@ -221,52 +221,28 @@ std::pair<CkFutureID, void*> CkWaitAnyID(const std::vector<CkFutureID>& handles)
     }
   }
   do {
-    // suspend until...
-    CthSuspend();
     for (int i = 0; i < n; i++) {
-      // a future becomes ready
+      // when a future is ready
       if (futures[i]->ready) {
         // drop ourself from all the futures
         for (auto future: futures) Future_dropWaiter(future, self);
-        // then return the pair
-        return std::make_pair(handles[i], futures[i]->value);
+        // then return the value/handle pair
+        return std::make_pair(futures[i]->value, handles[i]);
       }
     }
+    // suspend until a future becomes ready...
+    CthSuspend();
   } while (true);
 }
 
-std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& handles) {
-  const int n = handles.size();
-  std::vector<void*> result(n, nullptr);
-  std::vector<Future*> futures;
-  auto self = CthSelf();
-  auto fs = &(CpvAccess(futurestate));
-  for (auto handle : handles) {
-    auto future = fs->array[handle].get();
-    futures.push_back(future);
-    if (!future->ready) {
-      future->waiters.push_back(self);
-    }
+std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& ids) {
+  // a more sophisticated solution should be implemented that interleaves
+  // waiting on multiple futures... but this works in the meantime
+  std::vector<void*> results;
+  for (auto id: ids) {
+    results.push_back(CkWaitFutureID(id));
   }
-  // while not all of the values have been received
-  do {
-    // then, update the results for ready futures
-    for (int i = 0; i < n; i++) {
-      auto fut = futures[i];
-      if (fut && fut->ready) {
-        if (fut->value == nullptr) break;
-        result[i] = fut->value;
-        futures[i] = nullptr;
-      }
-    }
-    if (std::all_of(futures.begin(), futures.end(), [](Future* f) { return !f; })) {
-      break;
-    } else {
-      // suspend the thread
-      CthSuspend();
-    }
-  } while (true);
-  return result;
+  return results;
 }
 
 void CkReleaseFuture(CkFuture fut)

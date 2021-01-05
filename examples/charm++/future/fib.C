@@ -27,14 +27,24 @@ struct Fib : public CBase_Fib {
       CProxy_Fib::ckNew(n - 1, pending[0]);
       CProxy_Fib::ckNew(n - 2, pending[1]);
       int sum = 0;
-      while (pending.size()) {
-        // wait for any of the futures in pending to become ready
-        auto pair = ck::wait_any(pending.begin(), pending.end());
-        // add the received value to the sum
-        sum += pair.first;
-        // then release and erase the fulfilled future
-        pair.second->release();
-        pending.erase(pair.second);
+      if (n % 2 == 0) {
+        // even n's use wait any
+        while (pending.size()) {
+          // wait for any of the futures in pending to become ready
+          auto pair = ck::wait_any(pending.begin(), pending.end());
+          // add the received value to the sum
+          sum += pair.first;
+          // then release and erase the fulfilled future
+          pair.second->release();
+          pending.erase(pair.second);
+        }
+      } else {
+        // odds use wait all
+        auto values = ck::wait_all(pending.begin(), pending.end());
+        for (int i = 0; i < pending.size(); i++) {
+          sum += values[i];
+          pending[i].release();
+        }
       }
       // set the parent's value to the sum
       prev.set(sum);

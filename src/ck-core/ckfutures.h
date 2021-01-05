@@ -41,8 +41,6 @@ CkFutureID CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int pe);
 CkFutureID CkRemoteNodeBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int node);
 
 void* CkWaitFutureID(CkFutureID futNum);
-std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& handles);
-std::pair<CkFutureID,void*> CkWaitAnyID(const std::vector<CkFutureID>& handles);
 void CkWaitVoidFuture(CkFutureID futNum);
 void CkReleaseFutureID(CkFutureID futNum);
 int CkProbeFutureID(CkFutureID futNum);
@@ -59,6 +57,9 @@ void _futuresModuleInit(void);
 
 #ifdef __cplusplus
 }
+
+std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& handles);
+std::pair<void*,CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles);
 
 namespace ck {
   template <typename T> class future {
@@ -120,10 +121,23 @@ namespace ck {
     std::transform(first, last, handles.begin(),
       [](future<T>& f) { return f.handle().id; });
     auto pair = CkWaitAnyID(handles);
-    auto value = future<T>::unmarshall_value((CkMarshallMsg*)pair.second);
+    auto value = future<T>::unmarshall_value((CkMarshallMsg*)pair.first);
     auto which = std::find_if(first, last,
-      [&pair](future<T>& f) { return f.handle().id == pair.first; });
+      [&pair](future<T>& f) { return f.handle().id == pair.second; });
     return std::make_pair(value, which);
+  }
+
+  // returns a list of all the values
+  template<typename InputIter, typename T = typename InputIter::value_type::value_type>
+  std::vector<T> wait_all(InputIter first, InputIter last) {
+    std::vector<T> result;
+    std::vector<CkFutureID> handles;
+    std::transform(first, last, std::back_inserter(handles),
+      [](future<T>& f) { return f.handle().id; });
+    auto values = CkWaitAllIDs(handles);
+    std::transform(values.begin(), values.end(), std::back_inserter(result),
+      [](void* value) { return future<T>::unmarshall_value((CkMarshallMsg*)value); });
+    return result;
   }
 }
 #endif
