@@ -20,6 +20,7 @@ in remote process control.
 #include "ckfutures.h"
 #include <stdlib.h>
 #include <limits>
+#include <memory>
 
 typedef struct Future_s {
   bool ready;
@@ -29,7 +30,7 @@ typedef struct Future_s {
 } Future;
 
 typedef struct {
-  Future *array;
+  std::vector<std::unique_ptr<Future>> array{};
   int max;
   int freelist;
 }
@@ -115,15 +116,14 @@ class CkSemaPool {
 CpvStaticDeclare(FutureState, futurestate);
 CpvStaticDeclare(CkSemaPool*, semapool);
 
-static void addedFutures(int lo, int hi)
+static void addedFutures(FutureState *fs, int lo, int hi)
 {
-  int i;
-  FutureState *fs = &(CpvAccess(futurestate));
-  Future *array = fs->array;
+  for (auto i = lo; i < hi; i++) {
+    auto &ptr = fs->array[i];
+    if (!ptr) ptr.reset(new Future());
+    ptr->next = (i == (hi - 1)) ? fs->freelist : i + 1;
+  }
 
-  for (i=lo; i<hi; i++)
-    array[i].next = i+1;
-  array[hi-1].next = fs->freelist;
   fs->freelist = lo;
 }
 
@@ -132,22 +132,21 @@ inline
 int createFuture(void)
 {
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut; int handle, origsize;
+  int handle, origsize;
 
   /* if the freelist is empty, allocate more futures. */
   if (fs->freelist == -1) {
     origsize = fs->max;
     fs->max = fs->max * 2;
-    fs->array = (Future*)realloc(fs->array, sizeof(Future)*(fs->max));
-    _MEMCHECK(fs->array);
-    addedFutures(origsize, fs->max);
+    fs->array.resize(fs->max);
+    addedFutures(fs, origsize, fs->max);
   }
   
   // handle may overflow CMK_REFNUM_TYPE, creating problems when waiting on this future
   CkAssert(fs->freelist <= std::numeric_limits<CMK_REFNUM_TYPE>::max());
 
   handle = fs->freelist;
-  fut = fs->array + handle;
+  Future* fut = fs->array[handle].get();
   fs->freelist = fut->next;
   fut->ready = false;
   fut->value = 0;
@@ -167,7 +166,7 @@ CkFuture CkCreateFuture(void)
 void CkReleaseFutureID(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut = (fs->array)+handle;
+  Future *fut = fs->array[handle].get();
   fut->next = fs->freelist;
   fs->freelist = handle;
 }
@@ -175,7 +174,7 @@ void CkReleaseFutureID(CkFutureID handle)
 int CkProbeFutureID(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut = (fs->array)+handle;
+  Future *fut = fs->array[handle].get();
   return (int)(fut->ready);
 }
 
@@ -183,15 +182,15 @@ void *CkWaitFutureID(CkFutureID handle)
 {
   CthThread self = CthSelf();
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut = (fs->array)+handle;
+  Future *fut = fs->array[handle].get();
   void *value;
 
   if (!(fut->ready)) {
     CthSetNext(self, fut->waiters);
     fut->waiters = self;
-    while (!(fut->ready)) { CthSuspend(); fut = (fs->array)+handle; }
+    while (!fut->ready) { CthSuspend(); }
   }
-  fut = (fs->array)+handle;
+
   value = fut->value;
 #if CMK_ERROR_CHECKING
   if (value==NULL) 
@@ -226,7 +225,7 @@ static void setFuture(CkFutureID handle, void *pointer)
 {
   CthThread t;
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut = (fs->array)+handle;
+  Future* fut = fs->array[handle].get();
   fut->ready = true;
 #if CMK_ERROR_CHECKING
   if (pointer==NULL) CkAbort("setFuture called with NULL!");
@@ -241,11 +240,11 @@ void _futuresModuleInit(void)
 {
   CpvInitialize(FutureState, futurestate);
   CpvInitialize(CkSemaPool *, semapool);
-  CpvAccess(futurestate).array = (Future *)malloc(10*sizeof(Future));
-  _MEMCHECK(CpvAccess(futurestate).array);
-  CpvAccess(futurestate).max   = 10;
-  CpvAccess(futurestate).freelist = -1;
-  addedFutures(0,10);
+  auto fs = &(CpvAccess(futurestate));
+  fs->array.resize(10);
+  fs->max = 10;
+  fs->freelist = -1;
+  addedFutures(fs, 0, 10);
   CpvAccess(semapool) = new CkSemaPool();
 }
 
