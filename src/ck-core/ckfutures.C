@@ -244,7 +244,7 @@ void *CkWaitFutureID(CkFutureID handle)
 
 std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles) {
   auto fs = &(CpvAccess(futurestate));
-  auto ready = handles.end() != std::find_if(handles.begin(), handles.end(),
+  const auto ready = std::any_of(handles.begin(), handles.end(),
     [&fs](const CkFutureID& id) { return fs->is_ready(id); });
   if (!ready) fs->request(handles, std::make_shared<FutureToThread>(CthSelf()));
   do {
@@ -261,7 +261,7 @@ std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& ids) {
   // a more sophisticated solution should be implemented that interleaves
   // waiting on multiple futures... but this works in the meantime
   std::vector<void*> results;
-  for (auto id: ids) {
+  for (auto id : ids) {
     results.push_back(CkWaitFutureID(id));
   }
   return results;
@@ -492,4 +492,3 @@ void CkSemaDestroy(CkSemaID id)
 
 /*@}*/
 #include "CkFutures.def.h"
-
