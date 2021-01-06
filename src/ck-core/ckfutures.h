@@ -3,8 +3,9 @@
 
 #ifdef __cplusplus
 #include "ckmarshall.h"
+#else
+#include "pup.h"
 #endif
-#include "CkFutures.decl.h"
 
 /**
 \addtogroup CkFutures
@@ -20,6 +21,8 @@ typedef struct _CkFuture {
 } CkFuture;
 PUPbytes(CkFuture)
 
+#include "CkFutures.decl.h"
+
 /* forward declare */
 struct CkArrayID;
 
@@ -30,6 +33,7 @@ extern "C" {
 CkFuture CkCreateFuture(void);
 void  CkSendToFuture(CkFuture fut, void *msg);
 void* CkWaitFuture(CkFuture futNum);
+CkFuture CkLocalizeFuture(const CkFuture &fut);
 void CkReleaseFuture(CkFuture futNum);
 int CkProbeFuture(CkFuture futNum);
 
@@ -81,9 +85,6 @@ namespace ck {
     }
 
     T get() const {
-      if (handle_.pe != CkMyPe()) {
-        CkAbort("A future's value can only be retrieved on the PE it was created on.");
-      }
       return unmarshall_value(static_cast<CkMarshallMsg*>(CkWaitFuture(handle_)));
     }
 
@@ -99,9 +100,7 @@ namespace ck {
     CkFuture handle() const { return handle_; }
     bool is_ready() const { return CkProbeFuture(handle_); }
     void release() {
-      if (handle_.pe != CkMyPe()) {
-        CkAbort("A future can only be released on the PE it was created on.");
-      } else if (is_ready()) {
+      if (handle_.pe == CkMyPe() && is_ready()) {
         delete (CkMarshallMsg *)CkWaitFuture(handle_);
       }
       CkReleaseFuture(handle_);
