@@ -29,7 +29,7 @@ struct Fib : public CBase_Fib {
       int sum = 0;
       if (n % 2 == 0) {
         // even n's use wait any
-        while (pending.size()) {
+        while (!pending.empty()) {
           // wait for any of the futures in pending to become ready
           auto pair = ck::wait_any(pending.begin(), pending.end());
           // add the received value to the sum

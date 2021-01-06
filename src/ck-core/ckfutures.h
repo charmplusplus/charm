@@ -59,7 +59,7 @@ void _futuresModuleInit(void);
 }
 
 std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& handles);
-std::pair<void*,CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles);
+std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles);
 
 namespace ck {
   template <typename T> class future {
@@ -84,7 +84,7 @@ namespace ck {
       if (handle_.pe != CkMyPe()) {
         CkAbort("A future's value can only be retrieved on the PE it was created on.");
       }
-      return unmarshall_value((CkMarshallMsg *)CkWaitFuture(handle_));
+      return unmarshall_value(static_cast<CkMarshallMsg*>(CkWaitFuture(handle_)));
     }
 
     void set(const T &value) {
@@ -117,11 +117,13 @@ namespace ck {
   // returns a pair with the value and fulfilled future
   template<typename InputIter, typename T = typename InputIter::value_type::value_type>
   std::pair<T, InputIter> wait_any(InputIter first, InputIter last) {
-    std::vector<CkFutureID> handles(last - first);
-    std::transform(first, last, handles.begin(),
+    const int n = last - first;
+    std::vector<CkFutureID> handles;
+    handles.reserve(n);
+    std::transform(first, last, std::back_inserter(handles),
       [](future<T>& f) { return f.handle().id; });
     auto pair = CkWaitAnyID(handles);
-    auto value = future<T>::unmarshall_value((CkMarshallMsg*)pair.first);
+    auto value = future<T>::unmarshall_value(static_cast<CkMarshallMsg*>(pair.first));
     auto which = std::find_if(first, last,
       [&pair](future<T>& f) { return f.handle().id == pair.second; });
     return std::make_pair(value, which);
@@ -130,13 +132,16 @@ namespace ck {
   // returns a list of all the values
   template<typename InputIter, typename T = typename InputIter::value_type::value_type>
   std::vector<T> wait_all(InputIter first, InputIter last) {
+    const int n = last - first;
     std::vector<T> result;
     std::vector<CkFutureID> handles;
+    result.reserve(n);
+    handles.reserve(n);
     std::transform(first, last, std::back_inserter(handles),
       [](future<T>& f) { return f.handle().id; });
     auto values = CkWaitAllIDs(handles);
     std::transform(values.begin(), values.end(), std::back_inserter(result),
-      [](void* value) { return future<T>::unmarshall_value((CkMarshallMsg*)value); });
+      [](void* value) { return future<T>::unmarshall_value(static_cast<CkMarshallMsg*>(value)); });
     return result;
   }
 }
