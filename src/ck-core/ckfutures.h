@@ -79,9 +79,7 @@ namespace ck {
     }
 
     void set(const T &value) {
-      auto msg = ck::make_marshall_message(
-        (typename std::decay<decltype(value)>::type &)value);
-      CkSendToFuture(handle_, msg);
+      CkSendToFuture(handle_, ck::make_marshall_message(value));
     }
 
     CkFuture handle() const { return handle_; }

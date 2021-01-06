@@ -13,8 +13,8 @@ using marshall_msg = CkMarshallMsg *;
 inline char *get_message_buffer(marshall_msg msg);
 
 template <class... Args>
-inline marshall_msg make_marshall_message(Args&... _args) {
-  auto args = std::forward_as_tuple(_args...);
+inline marshall_msg make_marshall_message(const Args&... _args) {
+  auto args = std::forward_as_tuple(const_cast<Args&>(_args)...);
   auto size = PUP::size(args);
   auto msg = CkAllocateMarshallMsg(size);
   PUP::toMemBuf(args, get_message_buffer(msg), size);
