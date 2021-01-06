@@ -995,14 +995,6 @@ namespace PUP {
 		public: enum {value=0};
 	};
 
-template <class... Args>
-inline void many(er& p, Args... args) {
-	/* see: https://riptutorial.com/cplusplus/example/3208/iterating-over-a-parameter-pack
-		* or: https://stackoverflow.com/questions/25680461/variadic-template-pack-expansion/25683817#25683817 */
-	using expander = int[];
-	(void)expander{0, (void(p | args), 0)...};
-}
-
 // Defines is_pupable to allow enums to be pupped in pup_stl.h
 namespace details {
 

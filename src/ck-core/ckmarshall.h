@@ -13,14 +13,23 @@ using marshall_msg = CkMarshallMsg *;
 inline char *get_message_buffer(marshall_msg msg);
 
 template <class... Args>
-inline marshall_msg make_marshall_message(Args... args) {
+inline marshall_msg make_marshall_message(Args&... _args) {
+  auto args = std::forward_as_tuple(_args...);
   PUP::sizer s;
-  PUP::many(s, args...);
+  s | args;
   CkMarshallMsg *msg = CkAllocateMarshallMsg(s.size());
   PUP::toMem p(get_message_buffer(msg));
-  PUP::many(p, args...);
+  p | args;
   return msg;
 }
+
+template <class... Args>
+inline void unmarshall(marshall_msg msg, Args&... _args) {
+  auto args = std::forward_as_tuple(_args...);
+  PUP::fromMem p(get_message_buffer(msg));
+  p | args;
+}
+
 }
 
 #include "ckmessage.h"

@@ -72,11 +72,10 @@ namespace ck {
       if (handle_.pe != CkMyPe()) {
         CkAbort("A future's value can only be retrieved on the PE it was created on.");
       }
-      CkMarshallMsg *msg = (CkMarshallMsg *)CkWaitFuture(handle_);
-      PUP::fromMem p(ck::get_message_buffer(msg));
-      PUP::detail::TemporaryObjectHolder<T> holder;
-      p | holder;
-      return std::move(holder.t);
+      auto msg = static_cast<ck::marshall_msg>(CkWaitFuture(handle_));
+      T result;
+      ck::unmarshall(msg, result);
+      return result;
     }
 
     void set(const T &value) {
