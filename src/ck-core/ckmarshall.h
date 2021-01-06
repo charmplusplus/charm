@@ -15,11 +15,9 @@ inline char *get_message_buffer(marshall_msg msg);
 template <class... Args>
 inline marshall_msg make_marshall_message(Args&... _args) {
   auto args = std::forward_as_tuple(_args...);
-  PUP::sizer s;
-  s | args;
-  CkMarshallMsg *msg = CkAllocateMarshallMsg(s.size());
-  PUP::toMem p(get_message_buffer(msg));
-  p | args;
+  auto size = PUP::size(args);
+  auto msg = CkAllocateMarshallMsg(size);
+  PUP::toMemBuf(args, get_message_buffer(msg), size);
   return msg;
 }
 
