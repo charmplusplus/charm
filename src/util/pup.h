@@ -995,6 +995,7 @@ namespace PUP {
 		public: enum {value=0};
 	};
 
+
 // Defines is_pupable to allow enums to be pupped in pup_stl.h
 namespace details {
 
