@@ -1,18 +1,46 @@
 #ifndef _CKMARSHALL_H_
 #define _CKMARSHALL_H_
 
-#include "charm++.h"
+// This is the message type marshalled parameters get packed into:
+class CkMarshallMsg;
+class CkEntryOptions;
+
+CkMarshallMsg *CkAllocateMarshallMsg(int size, const CkEntryOptions *opts = nullptr);
+
+namespace ck {
+using marshall_msg = CkMarshallMsg *;
+
+inline char *get_message_buffer(marshall_msg msg);
+
+template <class... Args>
+inline marshall_msg make_marshall_message(Args... args) {
+  PUP::sizer s;
+  PUP::many(s, args...);
+  CkMarshallMsg *msg = CkAllocateMarshallMsg(s.size());
+  PUP::toMem p(get_message_buffer(msg));
+  PUP::many(p, args...);
+  return msg;
+}
+}
+
+#include "ckmessage.h"
+#include "ckentryopts.h"
 #include "CkMarshall.decl.h"
 
-// This is the message type marshalled parameters get packed into:
 class CkMarshallMsg : public CMessage_CkMarshallMsg {
 public:
   char *msgBuf;
 };
 
+namespace ck {
+  inline char *get_message_buffer(marshall_msg msg) {
+    return msg->msgBuf;
+  }
+}
+
 CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size, const CkEntryOptions *opts);
 
-inline CkMarshallMsg *CkAllocateMarshallMsg(int size, const CkEntryOptions *opts = NULL) {
+inline CkMarshallMsg *CkAllocateMarshallMsg(int size, const CkEntryOptions *opts) {
   if (opts == NULL) {
     CkMarshallMsg *newMemory = new (size, 0) CkMarshallMsg;
     setMemoryTypeMessage(UsrToEnv(newMemory));
