@@ -445,6 +445,22 @@ void CUDACallbackManager(void *fn, void *msg) {
 }
 #endif
 
+#if CMK_CHARM4PY
+int CUDAPointerOnDevice(const void *ptr)
+{
+#if CMK_CUDA
+  cudaPointerAttributes attr;
+  cudaError_t ret = cudaPointerGetAttributes(&attr, ptr);
+  if (ret == cudaSuccess
+      && (attr.type == cudaMemoryTypeDevice || attr.type == cudaMemoryTypeManaged)) {
+    return 1;
+  }
+#endif
+  return 0;
+}
+
+#endif
+
 void QdCreate(int n) {
   CpvAccess(_qd)->create(n);
 }
@@ -2544,7 +2560,7 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
 }
 
 // we want to expose access to this macro to external clients e.g. Charm4Py
-bool CkCudaEnabled()
+int CkCudaEnabled()
 {
   return CMK_CUDA;
 }
