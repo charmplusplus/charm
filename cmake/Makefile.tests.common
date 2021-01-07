@@ -8,15 +8,15 @@
 all-test: all-test-tests all-test-examples all-test-benchmarks
 
 all-test-tests: LIBS
-	# Remove the silent flag from MAKEFLAGS
-	MAKEFLAGS=$${MAKEFLAGS#$(SILENT)} $(MAKE)  -C ../tests all
+# Remove the silent flag from MAKEFLAGS
+	MAKEFLAGS=$${MAKEFLAGS#$(SILENT)} $(MAKE) -C ../tests all
 
 all-test-examples: LIBS
-	# Remove the silent flag from MAKEFLAGS
+# Remove the silent flag from MAKEFLAGS
 	MAKEFLAGS=$${MAKEFLAGS#$(SILENT)} $(MAKE) -C ../examples all
 
 all-test-benchmarks: LIBS
-	# Remove the silent flag from MAKEFLAGS
+# Remove the silent flag from MAKEFLAGS
 	MAKEFLAGS=$${MAKEFLAGS#$(SILENT)} $(MAKE) -C ../benchmarks all
 
 all-zc: charm++

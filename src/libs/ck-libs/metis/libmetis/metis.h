@@ -67,7 +67,7 @@
 /* Include c99 int definitions and need constants. When building the library,
  * these are already defined by GKlib; hence the test for _GKLIB_H_ */
 #ifndef _GKLIB_H_
-#ifdef COMPILER_MSC
+#if defined COMPILER_MSC && 0
 #include <limits.h>
 
 typedef __int32 int32_t;
