@@ -38,6 +38,20 @@ struct Fib : public CBase_Fib {
           pair.second->release();
           pending.erase(pair.second);
         }
+      } else if (n % 3 == 0) {
+        // div by three (but not by two) use wait_some
+        auto pair = ck::wait_some(pending.begin(), pending.end());
+        for (const auto& value : pair.first) {
+          sum += value;
+        }
+        // in a real program, one could go off and do something else...
+        // but we'll just wait on whatever's still outstanding
+        for (auto it = pair.second; it < pending.end(); it++) {
+          sum += it->get();
+        }
+        for (auto& f : pending) {
+          f.release();
+        }
       } else {
         // odds use wait all
         auto values = ck::wait_all(pending.begin(), pending.end());
