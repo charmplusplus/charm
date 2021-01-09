@@ -2534,6 +2534,76 @@ void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgS
   }
 }
 
+void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
+                                  int epIdx, int num_bufs, char *msg,
+                                  int msgSize,
+                                  long *devBufPtrs,
+                                  long *devBufSizesInBytes,
+                                  long *streamPtrs, int numDevBufs
+                                  )
+{
+#if CMK_CUDA
+  int totalSize = 0;
+  int impl_off = 0;
+  CkGroupID gId;
+  gId.idx = aid;
+  CkArrayIndex1D arrIndex(*idx);
+
+  CProxyElement_ArrayBase destProxy = CProxyElement_ArrayBase(gId, arrIndex);
+  int destPe = destProxy.ckLocalBranch()->lastKnown(arrIndex);
+
+  CkDeviceBuffer deviceBuffs[numDevBufs];
+  for(int i = 0; i < numDevBufs; ++i)
+    {
+      deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i], streamPtrs[i]);
+      deviceBuffs[i].cnt = devBufSizesInBytes[i];
+    }
+
+  CkRdmaDeviceOnSender(destPe, numDevBufs, (CkDeviceBuffer **) &deviceBuffs);
+  // find the size of the PUP'd data
+  {
+    PUP::sizer implP;
+    implP | numDevBufs;
+    for(int i = 0; i < numDevBufs; ++i)
+      {
+        implP | devBufSizesInBytes[i];
+        implP | deviceBuffs[i];
+      }
+    implP | msgSize;
+    implP | epIdx;
+    impl_off += implP.size();
+  }
+  impl_off += msgSize;
+
+  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,0);
+  {
+    PUP::toMem implP((void *) impl_msg->msgBuf);
+    implP | numDevBufs;
+    for(int i = 0; i < numDevBufs; ++i)
+      {
+        implP | devBufSizesInBytes[i];
+        implP | deviceBuffs[i];
+      }
+      implP | msgSize;
+      implP | epIdx;
+
+      implP(msg, msgSize);
+  }
+
+  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);
+  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;
+  impl_amsg->array_setIfNotThere(CkArray_IfNotThere_buffer);
+
+  // guess this is not required?
+  // CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_DEVICE_MSG;
+  CProxyElement_ArrayBase::ckSendWrapper(gId, arrIndex, impl_amsg, epIdx, 0);
+
+#else
+  CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
+#endif
+}
+
+
 void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
   int totalSize = 0;
