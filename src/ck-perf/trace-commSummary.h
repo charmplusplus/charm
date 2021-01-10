@@ -1,9 +1,6 @@
 #ifndef _COMMSUMMARY_H
 #define _COMMSUMMARY_H
 
-#include <errno.h>
-#include <stdio.h>
-
 #include "envelope.h"
 #include "register.h"
 #include "trace-common.h"
@@ -19,9 +16,29 @@ private:
 public:
   TraceCommSummary(char** argv);
 
-  void beginExecute(envelope*, void*) override;
-  void beginExecute(char*) override;
-  void beginExecute(CmiObjId* tid) override;
+  void beginExecute(envelope* e, void* /*unused*/) override
+  {
+    // no envelope means thread execution
+    if (e == nullptr)
+    {
+      beginExecute(-1, -1, -1, myPe, 0);
+    }
+    else
+    {
+      beginExecute(-1, -1, -1, e->getSrcPe(), e->getTotalsize());
+    }
+  }
+
+  void beginExecute(char* /*unused*/) override
+  {
+    beginExecute(-1, -1, -1, myPe, 0);
+  }
+
+  void beginExecute(CmiObjId* /* unused */) override
+  {
+    beginExecute(-1, -1, -1, myPe, 0);
+  }
+
   void beginExecute(int event,                // event type defined in trace-common.h
                     int msgType,              // message type
                     int ep,                   // Charm++ entry point id

@@ -16,27 +16,7 @@ void _createTracecommSummary(char** argv)
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
 }
 
-TraceCommSummary::TraceCommSummary(char** argv) : myPe(CkMyPe()), myNode(CkMyNode())
-{
-  if (CkpvAccess(traceOnPe) == 0) return;
-}
-
-void TraceCommSummary::beginExecute(CmiObjId* tid) { beginExecute(-1, -1, -1, myPe, 0); }
-
-void TraceCommSummary::beginExecute(char* msg) { beginExecute(-1, -1, -1, myPe, 0); }
-
-void TraceCommSummary::beginExecute(envelope* e, void* obj)
-{
-  // no envelope means thread execution
-  if (e == nullptr)
-  {
-    beginExecute(-1, -1, -1, myPe, 0);
-  }
-  else
-  {
-    beginExecute(-1, -1, -1, e->getSrcPe(), e->getTotalsize());
-  }
-}
+TraceCommSummary::TraceCommSummary(char** argv) : myPe(CkMyPe()), myNode(CkMyNode()) {}
 
 void TraceCommSummary::beginExecute(int event, int msgType, int ep, int srcPe, int mlen,
                                     CmiObjId* idx, void* obj)
