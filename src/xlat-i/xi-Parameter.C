@@ -694,14 +694,13 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, boo
           str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
       }
     } else if (devicePath) {
-      str << "  if(CMI_IS_ZC_DEVICE(env)) {\n";
       str << "    buffPtrs[" << count << "] = (void *)" << "deviceBuffer_";
       str << name << "_ptr;\n";
-      if(isSDAGGen)
-        str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
+      str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * ";
+      if (isSDAGGen)
+        str << "genClosure->"<< arrLen << ";\n";
       else
-        str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * " << arrLen << ".t;\n";
-      str <<  "  }\n";
+        str << arrLen << ".t;\n";
     }
   }
 }
