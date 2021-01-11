@@ -108,10 +108,6 @@ target_triplet = @target@
 # pkgconfig_DATA += netloc.pc Disabled until the netloc API is public
 @BUILD_NETLOC_TRUE@@HWLOC_BUILD_STANDALONE_TRUE@am__append_5 = netloc.pc
 @BUILD_NETLOCSCOTCH_TRUE@@BUILD_NETLOC_TRUE@@HWLOC_BUILD_STANDALONE_TRUE@am__append_6 = netlocscotch.pc
-
-# Only install entire visual studio subdirectory if we're building in
-# standalone mode
-@HWLOC_BUILD_STANDALONE_TRUE@am__append_7 = contrib/windows
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/hwloc.m4 \
@@ -337,6 +333,7 @@ HWLOC_GL_LIBS = @HWLOC_GL_LIBS@
 HWLOC_HAVE_LIBXML2 = @HWLOC_HAVE_LIBXML2@
 HWLOC_HAVE_NVML = @HWLOC_HAVE_NVML@
 HWLOC_HAVE_OPENCL = @HWLOC_HAVE_OPENCL@
+HWLOC_HAVE_RSMI = @HWLOC_HAVE_RSMI@
 HWLOC_LDFLAGS = @HWLOC_LDFLAGS@
 HWLOC_LIBS = @HWLOC_LIBS@
 HWLOC_LIBS_PRIVATE = @HWLOC_LIBS_PRIVATE@
@@ -358,6 +355,7 @@ HWLOC_PLUGINS_PATH = @HWLOC_PLUGINS_PATH@
 HWLOC_PS_LIBS = @HWLOC_PS_LIBS@
 HWLOC_RELEASE_DATE = @HWLOC_RELEASE_DATE@
 HWLOC_REQUIRES = @HWLOC_REQUIRES@
+HWLOC_RSMI_LIBS = @HWLOC_RSMI_LIBS@
 HWLOC_TERMCAP_LIBS = @HWLOC_TERMCAP_LIBS@
 HWLOC_VERSION = @HWLOC_VERSION@
 HWLOC_W3_GENERATOR = @HWLOC_W3_GENERATOR@
@@ -497,7 +495,7 @@ ACLOCAL_AMFLAGS = -I ./config
 #
 EXTRA_DIST = README VERSION COPYING AUTHORS \
 	config/hwloc_get_version.sh config/distscript.sh \
-	$(am__append_5) $(am__append_7)
+	$(am__append_5)
 SUBDIRS = include hwloc $(am__append_1) $(am__append_2)
 
 # Do not let automake automatically add the non-standalone dirs to the
@@ -972,10 +970,10 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-@HWLOC_BUILD_STANDALONE_FALSE@install-data-local:
-@HWLOC_HAVE_WINDOWS_FALSE@install-data-local:
 @HWLOC_BUILD_STANDALONE_FALSE@uninstall-local:
 @HWLOC_HAVE_WINDOWS_FALSE@uninstall-local:
+@HWLOC_BUILD_STANDALONE_FALSE@install-data-local:
+@HWLOC_HAVE_WINDOWS_FALSE@install-data-local:
 clean: clean-recursive
 
 clean-am: clean-generic clean-libtool mostlyclean-am

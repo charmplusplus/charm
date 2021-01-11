@@ -37,26 +37,17 @@ pushd src/scripts
 
 # Emit a static indicator of the original commit
 SRCBASE=$(pwd) ./commitid.sh
-git add -f VERSION
-rm VERSION.new
-
-# Symlink hwloc in temporarily
-ln -s ../../contrib/hwloc hwloc
+git add -f charm-version-git.h
+rm charm-version-git.h.new
 
 # Run autotools so users don't need to
 autoreconf
 autoheader
 rm -rf autom4te.cache
-git add -f aclocal.m4 configure conv-autoconfig.h.in
-
-# Remove symlink
-rm hwloc
+git add -f configure conv-autoconfig.h.in
 
 # Done with build scripts
 popd
-
-# Add requisite hwloc Makefile.in
-git add -f contrib/hwloc/{,src/,include/}Makefile.in
 
 # Stage all of the modified files
 git add -u
@@ -65,7 +56,7 @@ git add -u
 object_id=$(git write-tree)
 
 # Construct the target file/folder name
-version="charm-$(cat src/scripts/VERSION)"
+version="charm-$(grep CHARM_VERSION_GIT src/scripts/charm-version-git.h | awk '{print $3}' | tr -d \")"
 
 # Generate the distribution tarball
 git archive --format=tar.gz --prefix="$version/" -o "$version.tar.gz" "$object_id"

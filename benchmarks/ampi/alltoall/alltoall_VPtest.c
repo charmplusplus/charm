@@ -2,66 +2,12 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
-
-#define INIT_SEC 1000000
-
-struct itimerval* tim;
-unsigned int Timers = 0;
+#include <string.h>
+#include "converse.h" // for CmiMemoryUsage etc.
 
 int max_msgs = 2;
 
 char hash(int p, int i) { return (p * (100 - p) * 770 + i * i * 3) % 127; }
-
-void Create_Timers(int n);
-void Start_Timer(int i, int which);
-float Read_Timer(int i, int which);
-
-void Create_Timers(int n)
-{
-  if (Timers > 0)
-  {
-    fprintf(stderr, "Create_Timers: timers already created!\n");
-    exit(-1);
-  }
-
-  tim = (struct itimerval*)malloc(n * sizeof(struct itimerval));
-  Timers = n;
-}
-
-void Start_Timer(int i, int which)
-{
-  if (i >= Timers)
-  {
-    fprintf(stderr, "Start_Timers: out-of-range timer index %d\n", i);
-    exit(-1);
-  }
-
-  tim[i].it_value.tv_sec = INIT_SEC;
-  tim[i].it_value.tv_usec = 0;
-  tim[i].it_interval.tv_sec = INIT_SEC;
-  tim[i].it_interval.tv_usec = 0;
-
-  setitimer(which, &(tim[i]), NULL);
-}
-
-float Read_Timer(int i, int which)
-{
-  float elapsed_time;
-
-  if (i >= Timers)
-  {
-    fprintf(stderr, "Read_Timer: out-of-range timer index %d\n", i);
-    exit(-1);
-  }
-
-  getitimer(which, &(tim[i]));
-
-  elapsed_time = ((float)INIT_SEC - tim[i].it_value.tv_sec) -
-                 ((float)tim[i].it_value.tv_usec / 1000000);
-
-  return elapsed_time;
-}
 
 int main(int argc, char** argv)
 {
@@ -70,8 +16,8 @@ int main(int argc, char** argv)
   char* message; /* storage for the message */
   int i, j, k, msg_size;
   MPI_Status status; /* return status for receive */
-  float elapsed_time_msec;
-  float bandwidth;
+  double startTime = 0;
+  double elapsed_time_sec;
   char *sndbuf, *recvbuf;
   int memory_before, memory_after;
   int memory_diff, local_memory_max;
@@ -110,11 +56,6 @@ int main(int argc, char** argv)
   for (j = 0; j < p; j++) memset(sndbuf + j * msg_size, hash(my_id, j), msg_size);
   memset(recvbuf, 0, msg_size * p);
 
-  if (my_id == 0)
-  {
-    Create_Timers(1);
-  }
-
   // Test Long
   if (1)
   {
@@ -133,7 +74,7 @@ int main(int argc, char** argv)
 
     if (my_id == 0)
     {
-      Start_Timer(0, ITIMER_REAL);
+      startTime = MPI_Wtime();
     }
     for (i = 0; i < max_msgs; i++)
     {
@@ -141,6 +82,10 @@ int main(int argc, char** argv)
                          MPI_COMM_WORLD);
     }
     MPI_Barrier(MPI_COMM_WORLD);
+    if (my_id == 0)
+    {
+      elapsed_time_sec = (MPI_Wtime() - startTime) / max_msgs;
+    }
     memory_after = CmiMemoryUsage();
 
     if (CmiMaxMemoryUsage() < memory_before)
@@ -149,18 +94,20 @@ int main(int argc, char** argv)
       local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
     // Reduce MAX here
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_max_large, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_min_large, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+    MPI_Reduce(&local_memory_max, &memory_max_large, 1,
+               MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_memory_max, &memory_min_large, 1,
+               MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD);
 
     if (my_id == 0)
-      printf("Large Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\n",
-             (memory_max_large) / 1024, (memory_min_large) / 1024, p, msg_size);
+      printf("Large Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\t Elapsed Time for AlltoAll_long=%8.3f us\n",
+             (memory_max_large) / 1024, (memory_min_large) / 1024, p, msg_size, elapsed_time_sec * 1e6);
 
     for (j = 0; j < p; j++)
       for (k = 0; k < msg_size; k++)
+      {
         assert(*(recvbuf + j * msg_size + k) == hash(j, my_id));
+      }
   }
 
 // Test Short
@@ -178,12 +125,16 @@ int main(int argc, char** argv)
     MPI_Barrier(MPI_COMM_WORLD);
 
     if(my_id == 0){
-      Start_Timer (0, ITIMER_REAL);
+      startTime = MPI_Wtime();
     }
     for(i=0; i<max_msgs; i++) {
       AMPI_Alltoall_short(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
     }
     MPI_Barrier(MPI_COMM_WORLD);
+    if (my_id == 0)
+    {
+      elapsed_time_sec = (MPI_Wtime() - startTime) / max_msgs;
+    }
     memory_after = CmiMemoryUsage();
 
     if (CmiMaxMemoryUsage() < memory_before)
@@ -192,14 +143,18 @@ int main(int argc, char** argv)
       local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
     // Reduce MAX here
-    assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_max_small, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
-    assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_min_small, 1, MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+    MPI_Reduce(&local_memory_max, &memory_max_small, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_memory_max, &memory_min_small, 1, MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD);
 
-    if(my_id==0)printf("Small Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\n", (memory_max_small) / 1024, (memory_min_small) / 1024, p, msg_size);
+    if(my_id==0)
+      printf("Small Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\t Elapsed Time for AlltoAll_short=%8.3f us\n",
+          (memory_max_small) / 1024, (memory_min_small) / 1024, p, msg_size, elapsed_time_sec * 1e6);
 
     for(j=0;j<p;j++)
       for(k=0;k<msg_size;k++)
+      {
         assert(*(recvbuf+j*msg_size+k) == hash(j,my_id) );
+      }
   }
 #endif
 
@@ -221,7 +176,7 @@ int main(int argc, char** argv)
 
     if (my_id == 0)
     {
-      Start_Timer(0, ITIMER_REAL);
+      startTime = MPI_Wtime();
     }
     for (i = 0; i < max_msgs; i++)
     {
@@ -229,6 +184,10 @@ int main(int argc, char** argv)
                            MPI_COMM_WORLD);
     }
     MPI_Barrier(MPI_COMM_WORLD);
+    if (my_id == 0)
+    {
+      elapsed_time_sec = (MPI_Wtime() - startTime) / max_msgs;
+    }
     memory_after = CmiMemoryUsage();
 
     if (CmiMaxMemoryUsage() < memory_before)
@@ -237,18 +196,20 @@ int main(int argc, char** argv)
       local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
     // Reduce MAX here
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_max_medium, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_min_medium, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+    MPI_Reduce(&local_memory_max, &memory_max_medium, 1,
+               MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_memory_max, &memory_min_medium, 1,
+               MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD);
 
     if (my_id == 0)
-      printf("Med   Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\n",
-             (memory_max_medium) / 1024, (memory_min_medium) / 1024, p, msg_size);
+      printf("Medium Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\tElapsed Time for AlltoAll_medium=%8.3f us\n",
+             (memory_max_medium) / 1024, (memory_min_medium) / 1024, p, msg_size, elapsed_time_sec * 1e6);
 
     for (j = 0; j < p; j++)
       for (k = 0; k < msg_size; k++)
+      {
         assert(*(recvbuf + j * msg_size + k) == hash(j, my_id));
+      }
   }
 
   // Test standard version
@@ -268,7 +229,7 @@ int main(int argc, char** argv)
 
     if (my_id == 0)
     {
-      Start_Timer(0, ITIMER_REAL);
+      startTime = MPI_Wtime();
     }
     for (i = 0; i < max_msgs; i++)
     {
@@ -276,6 +237,10 @@ int main(int argc, char** argv)
                    MPI_COMM_WORLD);
     }
     MPI_Barrier(MPI_COMM_WORLD);
+    if (my_id == 0)
+    {
+      elapsed_time_sec = (MPI_Wtime() - startTime) / max_msgs;
+    }
     memory_after = CmiMemoryUsage();
 
     if (CmiMaxMemoryUsage() < memory_before)
@@ -284,25 +249,27 @@ int main(int argc, char** argv)
       local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
     // Reduce MAX here
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_max_normal, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_min_normal, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+    MPI_Reduce(&local_memory_max, &memory_max_normal, 1,
+               MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_memory_max, &memory_min_normal, 1,
+               MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD);
 
-    if (my_id == 0)
-      printf("Norm  Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\n",
-             (memory_max_normal) / 1024, (memory_min_normal) / 1024, p, msg_size);
+
+  if (my_id == 0)
+      printf("Startd Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\tElapsed Time for AlltoAll (standard version)=%8.3fus\n",
+             (memory_max_normal) / 1024, (memory_min_normal) / 1024, p, msg_size, elapsed_time_sec * 1e6);
 
     for (j = 0; j < p; j++)
       for (k = 0; k < msg_size; k++)
+      {
         assert(*(recvbuf + j * msg_size + k) == hash(j, my_id));
+      }
   }
-
-  if (my_id == 0) printf("\n");
 
   free(sndbuf);
   free(recvbuf);
 
 EXIT:
   MPI_Finalize();
+  return 0;
 }

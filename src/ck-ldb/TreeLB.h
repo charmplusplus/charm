@@ -68,7 +68,7 @@ class LevelLogic
    * Note that the logic decides the content of decision msgs: they could all
    * be the same message (broadcast), or it could be a scatter, etc.
    */
-  virtual void loadBalance(std::vector<TreeLBMessage*>& decisions, IDM& idm)
+  virtual TreeLBMessage*  loadBalance(IDM& idm)
   {
     CkAbort("LevelLogic::loadBalance not implemented\n");
   }
@@ -79,8 +79,8 @@ class LevelLogic
    * comm-tree that communicates with the next level
    * IMPORTANT: logic must delete decision if no longer needed
    */
-  virtual void splitDecision(TreeLBMessage* decision,
-                             std::vector<TreeLBMessage*>& decisions)
+  virtual std::vector<TreeLBMessage*> splitDecision(TreeLBMessage* decision,
+                                                    std::vector<int>& children)
   {
     CkAbort("LevelLogic::splitDecision not implemented\n");
   }
@@ -125,16 +125,7 @@ class LevelLogic
   std::vector<TreeLBMessage*> stats_msgs;
 };
 
-class LBTreeBuilder
-{
- public:
-  /// return number of levels in tree
-  virtual uint8_t build(std::vector<LevelLogic*>& logic, std::vector<int>& comm_parent,
-                        std::vector<std::vector<int>>& comm_children,
-                        std::vector<LevelLogic*>& comm_logic, json& config) = 0;
-
-  virtual ~LBTreeBuilder() {}
-};
+class LBTreeBuilder;
 
 // TODO All load balancers should probably just inherit from a common
 // interface, and the load balancers should just register themselves

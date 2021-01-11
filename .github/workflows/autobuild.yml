@@ -5,8 +5,8 @@ on:
     - cron: '01 05 * * *' # UTC, corresponds to 00:01 CDT
 
 jobs:
-  build:
-    timeout-minutes: 60
+  might:
+    timeout-minutes: 120
 
     runs-on: might
     name: netlrts-linux-x86_64 -pedantic
@@ -16,10 +16,8 @@ jobs:
     - name: build
       run: ./build all-test netlrts-linux-x86_64 -g -j6 --with-production -pedantic
     - name: test
-      run: |
-        make -C netlrts-linux-x86_64/tests all -j3
-        make -C netlrts-linux-x86_64/tests test TESTOPTS=++local
-        make -C netlrts-linux-x86_64/examples all -j3
-        make -C netlrts-linux-x86_64/examples test TESTOPTS=++local
-        make -C netlrts-linux-x86_64/benchmarks all -j3
-        make -C netlrts-linux-x86_64/benchmarks test TESTOPTS=++local
+      run: make -C netlrts-linux-x86_64/tmp test TESTOPTS="++local"
+    - name: testp P=2
+      run: make -C netlrts-linux-x86_64/tmp testp P=2 TESTOPTS="++local"
+    - name: testp P=3
+      run: make -C netlrts-linux-x86_64/tmp testp P=3 TESTOPTS="++local"

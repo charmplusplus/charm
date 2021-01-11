@@ -41,7 +41,7 @@ void CmiIssueRgetUsingCMA(
   const void* destAddr,
   void *destInfo,
   int destPe,
-  int size);
+  size_t size);
 
 void CmiIssueRputUsingCMA(
   const void* destAddr,
@@ -50,7 +50,7 @@ void CmiIssueRputUsingCMA(
   const void* srcAddr,
   void *srcInfo,
   int srcPe,
-  int size);
+  size_t size);
 #endif
 
 // Allocation from pool
@@ -265,9 +265,7 @@ class CmiNcpyBuffer {
   void rdmaGet(CmiNcpyBuffer &source, int ackSize, char *srcAck, char *destAck);
   void rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck);
 
-#if CMK_ONESIDED_IMPL
   friend inline void deregisterBuffer(CmiNcpyBuffer &buffInfo);
-#endif
 
 
 };

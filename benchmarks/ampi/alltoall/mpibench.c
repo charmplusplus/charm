@@ -1,30 +1,11 @@
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
-#include <unistd.h>
 
 #define NUMTIMES 1
 #define REPS 2000
 #define MAX_SIZE 131072
 #define NUM_SIZES 9
-
-#ifndef MPIWTIME
-void getclockvalue(double* retval)
-{
-  static long zsec = 0;
-  static long zusec = 0;
-  struct timeval tp;
-  struct timezone tzp;
-
-  gettimeofday(&tp, &tzp);
-
-  if (zsec == 0) zsec = tp.tv_sec;
-  if (zusec == 0) zusec = tp.tv_usec;
-
-  *retval = (tp.tv_sec - zsec) + (tp.tv_usec - zusec) * 0.000001;
-}
-#endif
 
 int main(int argc, char** argv)
 {
@@ -61,12 +42,7 @@ int main(int argc, char** argv)
   sendb = (int*)malloc(MAX_SIZE * sizeof(int) * numprocs);
   recvb = (int*)malloc(MAX_SIZE * sizeof(int) * numprocs);
 
-#ifdef MPIWTIME
   startwtime = MPI_Wtime();
-#else
-  getclockvalue(&startwtime);
-  getclockvalue(&endwtime);
-#endif
 
   MPI_Barrier(MPI_COMM_WORLD);
 
@@ -82,20 +58,16 @@ int main(int argc, char** argv)
       }
       MPI_Alltoall(sendb, size, MPI_INT, recvb, size, MPI_INT, MPI_COMM_WORLD);
       MPI_Barrier(MPI_COMM_WORLD);
-#ifdef MPIWTIME
+
       startwtime = MPI_Wtime();
-#else
-      getclockvalue(&startwtime);
-#endif
+
       for (k = 0; k < REPS; k++)
       {
         MPI_Alltoall(sendb, size, MPI_INT, recvb, size, MPI_INT, MPI_COMM_WORLD);
       }
-#ifdef MPIWTIME
+
       endwtime = MPI_Wtime();
-#else
-      getclockvalue(&endwtime);
-#endif
+
       opertime[i][num_sizes] = (endwtime - startwtime) / (float)(REPS);
     }
   }

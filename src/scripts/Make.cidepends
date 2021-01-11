@@ -9,11 +9,13 @@ HybridBaseLB.decl.h HybridBaseLB.def.h: HybridBaseLB.ci.stamp
 LBManager.decl.h LBManager.def.h: LBManager.ci.stamp
 MetaBalancer.decl.h MetaBalancer.def.h: MetaBalancer.ci.stamp
 MetisLB.decl.h MetisLB.def.h: MetisLB.ci.stamp
+RecBipartLB.decl.h RecBipartLB.def.h: RecBipartLB.ci.stamp
 ScotchLB.decl.h ScotchLB.def.h: ScotchLB.ci.stamp
 ScotchRefineLB.decl.h ScotchRefineLB.def.h: ScotchRefineLB.ci.stamp
 ScotchTopoLB.decl.h ScotchTopoLB.def.h: ScotchTopoLB.ci.stamp
 TempAwareRefineLB.decl.h TempAwareRefineLB.def.h: TempAwareRefineLB.ci.stamp
 TreeLB.decl.h TreeLB.def.h: TreeLB.ci.stamp
+TreeLevel.decl.h TreeLevel.def.h: TreeLevel.ci.stamp
 ZoltanLB.decl.h ZoltanLB.def.h: ZoltanLB.ci.stamp
 CkArray.decl.h CkArray.def.h: ckarray.ci.stamp
 CkCallback.decl.h CkCallback.def.h: ckcallback.ci.stamp
@@ -25,6 +27,7 @@ CkMarshall.decl.h CkMarshall.def.h: ckmarshall.ci.stamp
 CkMemCheckpoint.decl.h CkMemCheckpoint.def.h: ckmemcheckpoint.ci.stamp
 CkMulticast.decl.h CkMulticast.def.h: ckmulticast.ci.stamp
 CkReduction.decl.h CkReduction.def.h: ckreduction.ci.stamp
+CkSyncBarrier.decl.h CkSyncBarrier.def.h: cksyncbarrier.ci.stamp
 ControlPoints.decl.h ControlPoints.def.h: controlPoints.ci.stamp
 ControlPointsNoTrace.decl.h ControlPointsNoTrace.def.h: controlPointsNoTrace.ci.stamp
 f90main.decl.h f90main.def.h: f90main.ci.stamp
@@ -37,5 +40,4 @@ TraceProjections.decl.h TraceProjections.def.h: trace-projections.ci.stamp
 TraceSimple.decl.h TraceSimple.def.h: trace-simple.ci.stamp
 TraceSummary.decl.h TraceSummary.def.h: trace-summary.ci.stamp
 TraceUtilization.decl.h TraceUtilization.def.h: trace-utilization.ci.stamp
-TreeLevel.decl.h TreeLevel.def.h: TreeLevel.ci.stamp
 waitqd.decl.h waitqd.def.h: waitqd.ci.stamp

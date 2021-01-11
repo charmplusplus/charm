@@ -3024,12 +3024,33 @@ void CmiGroupInit(void)
 
 #if CMK_MULTICAST_LIST_USE_COMMON_CODE
 
-void CmiSyncListSendFn(int npes, const int *pes, int len, char *msg)
+void CmiSyncListSendFn(int npes, const int* pes, int len, char* msg)
 {
-  int i;
-  for(i=0;i<npes;i++) {
-    CmiSyncSend(pes[i], len, msg);
+  // When in SMP mode, each send needs its own message, there is a race between unpacking
+  // for local PEs and there is a race between setting the rank in the Converse header and
+  // the actual comm thread send for remote PEs
+#if CMK_SMP
+  for (int i = 0; i < npes - 1; i++)
+  {
+    const char* msgCopy = CmiCopyMsg(msg, len);
+    CmiSyncSendAndFree(pes[i], len, msgCopy);
   }
+  // No need to copy and free for the last send, so use the original message
+  if (npes > 0)
+    CmiSyncSend(pes[npes - 1], len, msg);
+#else
+  for (int i = 0; i < npes; i++)
+  {
+    // Copy if this is a self send to avoid unpack/send race
+    if (pes[i] == CmiMyPe() && npes > 1)
+    {
+      const char* msgCopy = CmiCopyMsg(msg, len);
+      CmiSyncSendAndFree(pes[i], len, msgCopy);
+    }
+    else
+      CmiSyncSend(pes[i], len, msg);
+  }
+#endif
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
@@ -3039,16 +3060,10 @@ CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
   return (CmiCommHandle) 0;
 }
 
-void CmiFreeListSendFn(int npes, const int *pes, int len, char *msg)
+void CmiFreeListSendFn(int npes, const int* pes, int len, char* msg)
 {
-  int i;
-  for(i=0;i<npes-1;i++) {
-    CmiSyncSend(pes[i], len, msg);
-  }
-  if (npes>0)
-    CmiSyncSendAndFree(pes[npes-1], len, msg);
-  else 
-    CmiFree(msg);
+  CmiSyncListSendFn(npes, pes, len, msg);
+  CmiFree(msg);
 }
 
 #endif
@@ -3151,11 +3166,6 @@ void CmiMulticastInit(void)
 extern void CmiMulticastInit(void);
 #endif
 
-#if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
-extern void *arena_malloc(int size);
-extern void arena_free(void *blockPtr);
-#endif
-
 /***************************************************************************
  *
  * Memory Allocation routines 
@@ -3184,9 +3194,7 @@ void *CmiAlloc(int size)
 
   char *res;
 
-#if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
-  res = (char*) arena_malloc(size+sizeof(CmiChunkHeader));
-#elif CMK_USE_IBVERBS | CMK_USE_IBUD
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
   res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CMK_CONVERSE_UGNI || CMK_OFI
   res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
@@ -3270,10 +3278,8 @@ static void *CmiAllocFindEnclosing(void *blk) {
 
 void CmiInitMsgHeader(void *msg, int size) {
   if(size >= CmiMsgHeaderSizeBytes) {
-#if CMK_ONESIDED_IMPL
     // Set zcMsgType in the converse message header to CMK_REG_NO_ZC_MSG
     CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
-#endif
     CMI_MSG_NOKEEP(msg) = 0;
   }
 }
@@ -3314,9 +3320,7 @@ void CmiFree(void *blk)
     CpvAccess(BlocksAllocated)--;
 #endif
 
-#if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
-    arena_free(BLKSTART(parentBlk));
-#elif CMK_USE_IBVERBS | CMK_USE_IBUD
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
     /* is this message the head of a MultipleSend that we received?
        Then the parts with INFIMULTIPOOL have metadata which must be 
        unregistered and freed.  */
@@ -3956,7 +3960,7 @@ extern "C" int _IO_file_overflow(FILE *, int);
     - Working Cpv's and CmiNodeBarrier.
     - CthInit to already have been called.  CthInit is called
       from the machine layer directly, because some machine layers
-      (like uth) use Converse threads internally.
+      use Converse threads internally.
 
   Initialization is somewhat subtle, in that various modules
   won't work properly until they're initialized.  For example,
@@ -3984,7 +3988,22 @@ void ConverseCommonInit(char **argv)
   CmiIOInit(argv);
 #endif
   if (CmiMyPe() == 0)
+  {
     CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
+
+#if !CMK_OPTIMIZE
+    CmiPrintf(
+        "Charm++ built without optimization.\n"
+        "Do not use for performance benchmarking (build with --with-production to do "
+        "so).\n");
+#endif
+#if CMK_ERROR_CHECKING
+    CmiPrintf(
+        "Charm++ built with internal error checking enabled.\n"
+        "Do not use for performance benchmarking (build without --enable-error-checking "
+        "to do so).\n");
+#endif
+  }
 
   CpvInitialize(int, cmiMyPeIdle);
   CpvAccess(cmiMyPeIdle) = 0;

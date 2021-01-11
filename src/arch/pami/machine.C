@@ -330,7 +330,7 @@ volatile int outstanding_recvs;
 
 
 static char     **Cmi_argv;
-static char     **Cmi_argvcopy;
+char            **Cmi_argvcopy;
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
 

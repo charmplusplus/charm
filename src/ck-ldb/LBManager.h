@@ -7,7 +7,7 @@
 #define LBMANAGER_H
 
 #include "LBDatabase.h"
-#include "json.hpp"
+#include "json_fwd.hpp"
 using json = nlohmann::json;
 
 #define LB_FORMAT_VERSION 3
@@ -42,9 +42,6 @@ class CkLBArgs
   bool _lb_metaLbOn;
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
-  std::vector<const char*>
-      _lb_legacyCentralizedStrategies;  // list of centralized strategies specified by
-                                        // command-line (legacy mode)
 
  public:
   CkLBArgs()
@@ -82,10 +79,6 @@ class CkLBArgs
   inline double& targetRatio() { return _lb_targetRatio; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
-  inline std::vector<const char*>& legacyCentralizedStrategies()
-  {
-    return _lb_legacyCentralizedStrategies;
-  }
 };
 
 extern CkLBArgs _lb_args;
@@ -105,10 +98,13 @@ class CkLBOptions
 {
  private:
   int seqno;  // for centralized lb, the seqno
+  const char* legacyName;
  public:
-  CkLBOptions() : seqno(-1) {}
-  CkLBOptions(int s) : seqno(s) {}
+  CkLBOptions() : seqno(-1), legacyName(nullptr) {}
+  CkLBOptions(int s) : seqno(s), legacyName(nullptr) {}
+  CkLBOptions(int s, const char* legacyName) : seqno(s), legacyName(legacyName) {}
   int getSeqNo() const { return seqno; }
+  const char* getLegacyName() const { return legacyName; }
 };
 PUPbytes(CkLBOptions)
 
@@ -121,66 +117,11 @@ CkpvExtern(bool, lbmanagerInited);
 // LB options, mostly controled by user parameter
 extern char* _lbtopo;
 
-typedef void (*LBCreateFn)();
+typedef void (*LBCreateFn)(const CkLBOptions&);
 typedef BaseLB* (*LBAllocFn)();
 void LBDefaultCreate(LBCreateFn f);
 
-void LBRegisterBalancer(const char*, LBCreateFn, LBAllocFn, const char*, int shown = 1);
-
-class LocalBarrier
-{
-  friend class LBManager;
-
- public:
-  LocalBarrier()
-  {
-    cur_refcount = 1;
-    client_count = 0;
-    iter_no = -1;
-    propagated_atsync_step = 0;
-    max_receiver = 0;
-    at_count = 0;
-    on = false;
-  };
-  ~LocalBarrier(){};
-
-  void SetMgr(LBManager* mgr) { _mgr = mgr; };
-  void propagate_atsync();
-
-  LDBarrierClient AddClient(Chare* chare, std::function<void()> fn);
-  void RemoveClient(LDBarrierClient h);
-  LDBarrierReceiver AddReceiver(std::function<void()> fn);
-  void RemoveReceiver(LDBarrierReceiver h);
-  void TurnOnReceiver(LDBarrierReceiver h);
-  void TurnOffReceiver(LDBarrierReceiver h);
-  void AtBarrier(LDBarrierClient _n_c, bool flood_atsync = false);
-  void DecreaseBarrier(int c);
-  void TurnOn()
-  {
-    on = true;
-    CheckBarrier();
-  };
-  void TurnOff() { on = false; };
-
- public:
-  void CallReceivers(void);
-  void CheckBarrier(bool flood_atsync = false);
-  void ResumeClients(void);
-
-  std::list<LBClient*> clients;
-  std::list<LBReceiver*> receivers;
-
-  LBManager* _mgr;
-
-  int cur_refcount;
-  int client_count;
-  int max_receiver;
-  int at_count;
-  bool on;
-  int propagated_atsync_step;
-  int step;
-  int iter_no;
-};
+void LBRegisterBalancer(std::string, LBCreateFn, LBAllocFn, std::string, bool shown = true);
 
 void _LBMgrInit();
 
@@ -271,7 +212,6 @@ class LBManager : public CBase_LBManager
 
   LBDatabase* lbdb_obj;
 
-  LocalBarrier localBarrier;  // local barrier to trigger LB automatically
   bool useBarrier;            // use barrier or not
 
   PredictCB* predictCBFn;
@@ -279,14 +219,7 @@ class LBManager : public CBase_LBManager
   int startLBFn_count;
 
  public:
-  std::list<int> local_pes_to_notify;
   int chare_count;
-  bool received_from_left;
-  bool received_from_right;
-  bool received_from_rank0;
-  bool rank0pe;
-
-  bool startedAtSync;
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
@@ -297,6 +230,7 @@ class LBManager : public CBase_LBManager
 
  private:
   void init();
+  void InvokeLB();
 
  public:
   LBDatabase* getLBDB() { return lbdb_obj; }
@@ -318,7 +252,6 @@ class LBManager : public CBase_LBManager
   //  LDOMHandle RegisterOM(LDOMid userID, void *userptr, LDCallbacks cb);
 
   static void periodicLB(void*);
-  void callAt();
   void setTimer();
 
   LDOMHandle RegisterOM(LDOMid userID, void* userptr, LDCallbacks cb)
@@ -327,10 +260,10 @@ class LBManager : public CBase_LBManager
   }
   int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest); }
   void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh); }
-  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(this, omh); }
+  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(omh); }
   void DoneRegisteringObjects(LDOMHandle omh)
   {
-    lbdb_obj->DoneRegisteringObjects(this, omh);
+    lbdb_obj->DoneRegisteringObjects(omh);
   }
   void ObjectStart(const LDObjHandle& h) { lbdb_obj->ObjectStart(h); }
   void ObjectStop(const LDObjHandle& h) { lbdb_obj->ObjectStop(h); }
@@ -424,8 +357,6 @@ class LBManager : public CBase_LBManager
   void DumpDatabase(void);
 
   void reset();
-  void recvLbStart(int lb_step, int phynode, int pe);
-  void invokeLbStart(int pe, int lb_step, int phynode, int mype);
 
   /*
    * Calls from load balancer to load database
@@ -505,54 +436,29 @@ class LBManager : public CBase_LBManager
 
   void Migrated(LDObjHandle h, int waitBarrier = 1);
 
+  LDBarrierClient AddLocalBarrierClient(Chare* obj, std::function<void()> fn);
   template <typename T>
   inline LDBarrierClient AddLocalBarrierClient(T* obj, void (T::*method)(void))
   {
     return AddLocalBarrierClient((Chare*)obj, std::bind(method, obj));
   }
-  inline LDBarrierClient AddLocalBarrierClient(Chare* obj, std::function<void()> fn)
-  {
-    return localBarrier.AddClient(obj, fn);
-  }
 
-  inline void RemoveLocalBarrierClient(LDBarrierClient h)
-  {
-    localBarrier.RemoveClient(h);
-  }
+  void RemoveLocalBarrierClient(LDBarrierClient h);
 
+  LDBarrierReceiver AddLocalBarrierReceiver(std::function<void()> fn);
   template <typename T>
   inline LDBarrierReceiver AddLocalBarrierReceiver(T* obj, void (T::*method)(void))
   {
     return AddLocalBarrierReceiver(std::bind(method, obj));
   }
-  inline LDBarrierReceiver AddLocalBarrierReceiver(std::function<void()> fn)
-  {
-    return localBarrier.AddReceiver(fn);
-  }
+  void RemoveLocalBarrierReceiver(LDBarrierReceiver h);
+  void AtLocalBarrier(LDBarrierClient _n_c);
+  void DecreaseLocalBarrier(int c);
+  void TurnOnBarrierReceiver(LDBarrierReceiver h);
+  void TurnOffBarrierReceiver(LDBarrierReceiver h);
 
-  inline void RemoveLocalBarrierReceiver(LDBarrierReceiver h)
-  {
-    localBarrier.RemoveReceiver(h);
-  }
-  inline void AtLocalBarrier(LDBarrierClient _n_c)
-  {
-    if (useBarrier) localBarrier.AtBarrier(_n_c);
-  }
-  inline void DecreaseLocalBarrier(int c)
-  {
-    if (useBarrier) localBarrier.DecreaseBarrier(c);
-  }
-  inline void TurnOnBarrierReceiver(LDBarrierReceiver h)
-  {
-    localBarrier.TurnOnReceiver(h);
-  }
-  inline void TurnOffBarrierReceiver(LDBarrierReceiver h)
-  {
-    localBarrier.TurnOffReceiver(h);
-  }
-
-  inline void LocalBarrierOn(void) { localBarrier.TurnOn(); };
-  inline void LocalBarrierOff(void) { localBarrier.TurnOff(); };
+  void LocalBarrierOn(void);
+  void LocalBarrierOff(void);
   void ResumeClients();
   static int ProcessorSpeed();
   inline void SetLBPeriod(double s) {}
@@ -568,6 +474,7 @@ class LBManager : public CBase_LBManager
   static bool avail_vector_set;
   int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
+  int currentLBIndex;
 
  public:
   CkVec<BaseLB*> loadbalancers;

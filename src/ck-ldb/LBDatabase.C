@@ -1,4 +1,5 @@
-#include "LBManager.h"
+#include "LBDatabase.h"
+#include "cksyncbarrier.h"
 
 LBDatabase::LBDatabase() {
   omCount = omsRegistering = 0;
@@ -7,6 +8,7 @@ LBDatabase::LBDatabase() {
   obj_running = false;
   objsEmptyHead = -1;
   commTable = new LBCommTable;
+  syncBarrier = CkSyncBarrier::Object();
 }
 
 LDOMHandle LBDatabase::RegisterOM(LDOMid userID, void* userPtr, LDCallbacks cb) {
@@ -29,38 +31,38 @@ void LBDatabase::UnregisterOM(LDOMHandle omh) {
   omCount--;
 }
 
-void LBDatabase::RegisteringObjects(LBManager *mgr, LDOMHandle omh) {
+void LBDatabase::RegisteringObjects(LDOMHandle omh) {
   // for an unregistered anonymous OM to join and control the barrier
   if (omh.id.id.idx == 0) {
     if (omsRegistering == 0)
-      mgr->LocalBarrierOff();
+      syncBarrier->TurnOff();
     omsRegistering++;
   }
   else {
     LBOM* om = oms[omh.handle];
     if (!om->RegisteringObjs()) {
       if (omsRegistering == 0)
-        mgr->LocalBarrierOff();
+        syncBarrier->TurnOff();
       omsRegistering++;
       om->SetRegisteringObjs(true);
     }
   }
 }
 
-void LBDatabase::DoneRegisteringObjects(LBManager *mgr, LDOMHandle omh)
+void LBDatabase::DoneRegisteringObjects(LDOMHandle omh)
 {
   // for an unregistered anonymous OM to join and control the barrier
   if (omh.id.id.idx == 0) {
     omsRegistering--;
     if (omsRegistering == 0)
-      mgr->LocalBarrierOn();
+      syncBarrier->TurnOn();
   }
   else {
     LBOM* om = oms[omh.handle];
     if (om->RegisteringObjs()) {
       omsRegistering--;
       if (omsRegistering == 0)
-        mgr->LocalBarrierOn();
+        syncBarrier->TurnOn();
       om->SetRegisteringObjs(false);
     }
   }

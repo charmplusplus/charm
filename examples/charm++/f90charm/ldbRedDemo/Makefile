@@ -20,5 +20,8 @@ balanceDemo.decl.h: ldbRedDemo.ci
 test: ldbRedDemo
 	$(call run, +p2 ./ldbRedDemo +balancer RotateLB +LBDebug 1)
 
+testp: ldbRedDemo
+	$(call run, +p$(P) ./ldbRedDemo +balancer RotateLB +LBDebug 1)
+
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o ldbRedDemo charmrun *.mod

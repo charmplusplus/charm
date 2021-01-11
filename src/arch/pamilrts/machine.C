@@ -796,7 +796,7 @@ void LrtsExit(int exitcode)
   }
 
   CmiNodeBarrier();
-  if(!CharmLibInterOperate || userDrivenMode) {
+  if(!CharmLibInterOperate) {
 #if CMK_SMP
     if (rank0) {
       // Wait for other threads (except me and the comm thread) to exit and join

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2019 Inria.  All rights reserved.
+ * Copyright © 2009-2020 Inria.  All rights reserved.
  * Copyright © 2009-2012, 2020 Université Bordeaux
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -75,16 +75,49 @@ int hwloc_hide_errors(void)
   return hide;
 }
 
-void hwloc_report_os_error(const char *msg, int line)
+
+/* format the obj info to print in error messages */
+static void
+report_insert_error_format_obj(char *buf, size_t buflen, hwloc_obj_t obj)
 {
+  char typestr[64];
+  char *cpusetstr;
+  char *nodesetstr = NULL;
+
+  hwloc_obj_type_snprintf(typestr, sizeof(typestr), obj, 0);
+  hwloc_bitmap_asprintf(&cpusetstr, obj->cpuset);
+  if (obj->nodeset) /* may be missing during insert */
+    hwloc_bitmap_asprintf(&nodesetstr, obj->nodeset);
+  if (obj->os_index != HWLOC_UNKNOWN_INDEX)
+    snprintf(buf, buflen, "%s (P#%u cpuset %s%s%s)",
+             typestr, obj->os_index, cpusetstr,
+             nodesetstr ? " nodeset " : "",
+             nodesetstr ? nodesetstr : "");
+  else
+    snprintf(buf, buflen, "%s (cpuset %s%s%s)",
+             typestr, cpusetstr,
+             nodesetstr ? " nodeset " : "",
+             nodesetstr ? nodesetstr : "");
+  free(cpusetstr);
+  free(nodesetstr);
+}
+
+static void report_insert_error(hwloc_obj_t new, hwloc_obj_t old, const char *msg, const char *reason)
+{
+  char newstr[512];
+  char oldstr[512];
   static int reported = 0;
+
+  report_insert_error_format_obj(newstr, sizeof(newstr), new);
+  report_insert_error_format_obj(oldstr, sizeof(oldstr), old);
 
   if (!reported && !hwloc_hide_errors()) {
     fprintf(stderr, "****************************************************************************\n");
     fprintf(stderr, "* hwloc %s received invalid information from the operating system.\n", HWLOC_VERSION);
     fprintf(stderr, "*\n");
-    fprintf(stderr, "* %s\n", msg);
-    fprintf(stderr, "* Error occurred in topology.c line %d\n", line);
+    fprintf(stderr, "* Failed with: %s\n", msg);
+    fprintf(stderr, "* while inserting %s at %s\n", newstr, oldstr);
+    fprintf(stderr, "* coming from: %s\n", reason);
     fprintf(stderr, "*\n");
     fprintf(stderr, "* The following FAQ entry in the hwloc documentation may help:\n");
     fprintf(stderr, "*   What should I do when hwloc reports \"operating system\" warnings?\n");
@@ -264,7 +297,7 @@ hwloc_setup_pu_level(struct hwloc_topology *topology,
 
       hwloc_debug_2args_bitmap("cpu %u (os %u) has cpuset %s\n",
 		 cpu, oscpu, obj->cpuset);
-      hwloc_insert_object_by_cpuset(topology, obj);
+      hwloc__insert_object_by_cpuset(topology, NULL, obj, "core:pulevel");
 
       cpu++;
     }
@@ -970,6 +1003,7 @@ hwloc__topology_dup(hwloc_topology_t *newp,
   memcpy(new->support.discovery, old->support.discovery, sizeof(*old->support.discovery));
   memcpy(new->support.cpubind, old->support.cpubind, sizeof(*old->support.cpubind));
   memcpy(new->support.membind, old->support.membind, sizeof(*old->support.membind));
+  memcpy(new->support.misc, old->support.misc, sizeof(*old->support.misc));
 
   new->allowed_cpuset = hwloc_bitmap_tma_dup(tma, old->allowed_cpuset);
   new->allowed_nodeset = hwloc_bitmap_tma_dup(tma, old->allowed_nodeset);
@@ -1005,6 +1039,10 @@ hwloc__topology_dup(hwloc_topology_t *newp,
     goto out_with_topology;
 
   err = hwloc_internal_distances_dup(new, old);
+  if (err < 0)
+    goto out_with_topology;
+
+  err = hwloc_internal_memattrs_dup(new, old);
   if (err < 0)
     goto out_with_topology;
 
@@ -1229,31 +1267,6 @@ hwloc__object_cpusets_compare_first(hwloc_obj_t obj1, hwloc_obj_t obj2)
   return 0;
 }
 
-/* format the obj info to print in error messages */
-static void
-hwloc__report_error_format_obj(char *buf, size_t buflen, hwloc_obj_t obj)
-{
-	char typestr[64];
-	char *cpusetstr;
-	char *nodesetstr = NULL;
-	hwloc_obj_type_snprintf(typestr, sizeof(typestr), obj, 0);
-	hwloc_bitmap_asprintf(&cpusetstr, obj->cpuset);
-	if (obj->nodeset) /* may be missing during insert */
-	  hwloc_bitmap_asprintf(&nodesetstr, obj->nodeset);
-	if (obj->os_index != HWLOC_UNKNOWN_INDEX)
-	  snprintf(buf, buflen, "%s (P#%u cpuset %s%s%s)",
-		   typestr, obj->os_index, cpusetstr,
-		   nodesetstr ? " nodeset " : "",
-		   nodesetstr ? nodesetstr : "");
-	else
-	  snprintf(buf, buflen, "%s (cpuset %s%s%s)",
-		   typestr, cpusetstr,
-		   nodesetstr ? " nodeset " : "",
-		   nodesetstr ? nodesetstr : "");
-	free(cpusetstr);
-	free(nodesetstr);
-}
-
 /*
  * How to insert objects into the topology.
  *
@@ -1390,9 +1403,9 @@ hwloc__insert_try_merge_group(hwloc_obj_t old, hwloc_obj_t new)
  */
 static struct hwloc_obj *
 hwloc___insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t cur, hwloc_obj_t obj,
-			        hwloc_report_error_t report_error)
+			        const char *reason)
 {
-  hwloc_obj_t child, next_child = NULL;
+  hwloc_obj_t child, next_child = NULL, tmp;
   /* These will always point to the pointer to their next last child. */
   hwloc_obj_t *cur_children = &cur->first_child;
   hwloc_obj_t *obj_children = &obj->first_child;
@@ -1430,18 +1443,10 @@ hwloc___insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t cur
 
       case HWLOC_OBJ_INCLUDED:
 	/* OBJ is strictly contained is some child of CUR, go deeper.  */
-	return hwloc___insert_object_by_cpuset(topology, child, obj, report_error);
+	return hwloc___insert_object_by_cpuset(topology, child, obj, reason);
 
       case HWLOC_OBJ_INTERSECTS:
-        if (report_error) {
-	  char childstr[512];
-	  char objstr[512];
-	  char msg[1100];
-	  hwloc__report_error_format_obj(objstr, sizeof(objstr), obj);
-	  hwloc__report_error_format_obj(childstr, sizeof(childstr), child);
-	  snprintf(msg, sizeof(msg), "%s intersects with %s without inclusion!", objstr, childstr);
-	  report_error(msg, __LINE__);
-	}
+        report_insert_error(obj, child, "intersection without inclusion", reason);
 	goto putback;
 
       case HWLOC_OBJ_DIFFERENT:
@@ -1464,6 +1469,8 @@ hwloc___insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t cur
 	if (setres == HWLOC_OBJ_EQUAL) {
 	  obj->memory_first_child = child->memory_first_child;
 	  child->memory_first_child = NULL;
+	  for(tmp=obj->memory_first_child; tmp; tmp = tmp->next_sibling)
+	    tmp->parent = obj;
 	}
 	break;
     }
@@ -1483,7 +1490,9 @@ hwloc___insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t cur
   return obj;
 
  putback:
-  /* Put-back OBJ children in CUR and return an error. */
+  /* OBJ cannot be inserted.
+   * Put-back OBJ children in CUR and return an error.
+   */
   if (putp)
     cur_children = putp; /* No need to try to insert before where OBJ was supposed to go */
   else
@@ -1492,12 +1501,12 @@ hwloc___insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t cur
   while ((child = obj->first_child) != NULL) {
     /* Remove from OBJ */
     obj->first_child = child->next_sibling;
-    obj->parent = cur;
-    /* Find child position in CUR, and insert. */
+    /* Find child position in CUR, and reinsert it. */
     while (*cur_children && hwloc__object_cpusets_compare_first(*cur_children, child) < 0)
       cur_children = &(*cur_children)->next_sibling;
     child->next_sibling = *cur_children;
     *cur_children = child;
+    child->parent = cur;
   }
   return NULL;
 }
@@ -1521,7 +1530,7 @@ hwloc__find_obj_covering_memory_cpuset(struct hwloc_topology *topology, hwloc_ob
 
 static struct hwloc_obj *
 hwloc__find_insert_memory_parent(struct hwloc_topology *topology, hwloc_obj_t obj,
-				 hwloc_report_error_t report_error)
+                                 const char *reason)
 {
   hwloc_obj_t parent, group, result;
 
@@ -1573,7 +1582,7 @@ hwloc__find_insert_memory_parent(struct hwloc_topology *topology, hwloc_obj_t ob
     return parent;
   }
 
-  result = hwloc__insert_object_by_cpuset(topology, parent, group, report_error);
+  result = hwloc__insert_object_by_cpuset(topology, parent, group, reason);
   if (!result) {
     /* failed to insert, fallback to larger parent */
     return parent;
@@ -1586,8 +1595,7 @@ hwloc__find_insert_memory_parent(struct hwloc_topology *topology, hwloc_obj_t ob
 /* only works for MEMCACHE and NUMAnode with a single bit in nodeset */
 static hwloc_obj_t
 hwloc___attach_memory_object_by_nodeset(struct hwloc_topology *topology, hwloc_obj_t parent,
-					hwloc_obj_t obj,
-					hwloc_report_error_t report_error)
+					hwloc_obj_t obj, const char *reason)
 {
   hwloc_obj_t *curp = &parent->memory_first_child;
   unsigned first = hwloc_bitmap_first(obj->nodeset);
@@ -1611,20 +1619,12 @@ hwloc___attach_memory_object_by_nodeset(struct hwloc_topology *topology, hwloc_o
       if (obj->type == HWLOC_OBJ_NUMANODE) {
 	if (cur->type == HWLOC_OBJ_NUMANODE) {
 	  /* identical NUMA nodes? ignore the new one */
-	  if (report_error) {
-	    char curstr[512];
-	    char objstr[512];
-	    char msg[1100];
-	    hwloc__report_error_format_obj(curstr, sizeof(curstr), cur);
-	    hwloc__report_error_format_obj(objstr, sizeof(objstr), obj);
-	    snprintf(msg, sizeof(msg), "%s and %s have identical nodesets!", objstr, curstr);
-	    report_error(msg, __LINE__);
-	  }
+          report_insert_error(obj, cur, "NUMAnodes with identical nodesets", reason);
 	  return NULL;
 	}
 	assert(cur->type == HWLOC_OBJ_MEMCACHE);
 	/* insert the new NUMA node below that existing memcache */
-	return hwloc___attach_memory_object_by_nodeset(topology, cur, obj, report_error);
+	return hwloc___attach_memory_object_by_nodeset(topology, cur, obj, reason);
 
       } else {
 	assert(obj->type == HWLOC_OBJ_MEMCACHE);
@@ -1637,7 +1637,7 @@ hwloc___attach_memory_object_by_nodeset(struct hwloc_topology *topology, hwloc_o
 	     * (depth starts from the NUMA node).
 	     * insert the new memcache below the existing one
 	     */
-	    return hwloc___attach_memory_object_by_nodeset(topology, cur, obj, report_error);
+	    return hwloc___attach_memory_object_by_nodeset(topology, cur, obj, reason);
 	}
 	/* insert the memcache above the existing memcache or numa node */
 	obj->next_sibling = cur->next_sibling;
@@ -1673,8 +1673,7 @@ hwloc___attach_memory_object_by_nodeset(struct hwloc_topology *topology, hwloc_o
  */
 struct hwloc_obj *
 hwloc__attach_memory_object(struct hwloc_topology *topology, hwloc_obj_t parent,
-			    hwloc_obj_t obj,
-			    hwloc_report_error_t report_error)
+			    hwloc_obj_t obj, const char *reason)
 {
   hwloc_obj_t result;
 
@@ -1704,7 +1703,7 @@ hwloc__attach_memory_object(struct hwloc_topology *topology, hwloc_obj_t parent,
   hwloc_bitmap_copy(obj->complete_cpuset, parent->complete_cpuset);
 #endif
 
-  result = hwloc___attach_memory_object_by_nodeset(topology, parent, obj, report_error);
+  result = hwloc___attach_memory_object_by_nodeset(topology, parent, obj, reason);
   if (result == obj) {
     /* Add the bit to the top sets, and to the parent CPU-side object */
     if (obj->type == HWLOC_OBJ_NUMANODE) {
@@ -1722,8 +1721,7 @@ hwloc__attach_memory_object(struct hwloc_topology *topology, hwloc_obj_t parent,
 /* insertion routine that lets you change the error reporting callback */
 struct hwloc_obj *
 hwloc__insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t root,
-			       hwloc_obj_t obj,
-			       hwloc_report_error_t report_error)
+			       hwloc_obj_t obj, const char *reason)
 {
   struct hwloc_obj *result;
 
@@ -1740,20 +1738,20 @@ hwloc__insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t root
 
   if (hwloc__obj_type_is_memory(obj->type)) {
     if (!root) {
-      root = hwloc__find_insert_memory_parent(topology, obj, report_error);
+      root = hwloc__find_insert_memory_parent(topology, obj, reason);
       if (!root) {
 	hwloc_free_unlinked_object(obj);
 	return NULL;
       }
     }
-    return hwloc__attach_memory_object(topology, root, obj, report_error);
+    return hwloc__attach_memory_object(topology, root, obj, reason);
   }
 
   if (!root)
     /* Start at the top. */
     root = topology->levels[0][0];
 
-  result = hwloc___insert_object_by_cpuset(topology, root, obj, report_error);
+  result = hwloc___insert_object_by_cpuset(topology, root, obj, reason);
   if (result && result->type == HWLOC_OBJ_PU) {
       /* Add the bit to the top sets */
       if (hwloc_bitmap_isset(result->cpuset, result->os_index))
@@ -1769,12 +1767,6 @@ hwloc__insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t root
 
 /* the default insertion routine warns in case of error.
  * it's used by most backends */
-struct hwloc_obj *
-hwloc_insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t obj)
-{
-  return hwloc__insert_object_by_cpuset(topology, NULL, obj, hwloc_report_os_error);
-}
-
 void
 hwloc_insert_object_by_parent(struct hwloc_topology *topology, hwloc_obj_t parent, hwloc_obj_t obj)
 {
@@ -1917,6 +1909,7 @@ hwloc_topology_insert_group_object(struct hwloc_topology *topology, hwloc_obj_t 
       if (hwloc_bitmap_isset(nodeset, numa->os_index))
 	hwloc_bitmap_or(obj->cpuset, obj->cpuset, numa->cpuset);
   }
+  /* FIXME insert by nodeset to group NUMAs even if CPUless? */
 
   cmp = hwloc_obj_cmp_sets(obj, root);
   if (cmp == HWLOC_OBJ_INCLUDED) {
@@ -2047,7 +2040,7 @@ hwloc_find_insert_io_parent_by_complete_cpuset(struct hwloc_topology *topology, 
   hwloc_bitmap_and(cpuset, cpuset, hwloc_topology_get_topology_cpuset(topology));
   group_obj->cpuset = hwloc_bitmap_dup(cpuset);
   group_obj->attr->group.kind = HWLOC_GROUP_KIND_IO;
-  parent = hwloc__insert_object_by_cpuset(topology, largeparent, group_obj, hwloc_report_os_error);
+  parent = hwloc__insert_object_by_cpuset(topology, largeparent, group_obj, "topology:io_parent");
   if (!parent)
     /* Failed to insert the Group, maybe a conflicting cpuset */
     return largeparent;
@@ -3251,7 +3244,7 @@ hwloc_discover(struct hwloc_topology *topology,
    * produced by hwloc_setup_pu_level()
    */
 
-  /* To be able to just use hwloc_insert_object_by_cpuset to insert the object
+  /* To be able to just use hwloc__insert_object_by_cpuset to insert the object
    * in the topology according to the cpuset, the cpuset field must be
    * initialized.
    */
@@ -3356,7 +3349,7 @@ hwloc_discover(struct hwloc_topology *topology,
     hwloc_bitmap_set(node->nodeset, 0);
     memcpy(&node->attr->numanode, &topology->machine_memory, sizeof(topology->machine_memory));
     memset(&topology->machine_memory, 0, sizeof(topology->machine_memory));
-    hwloc_insert_object_by_cpuset(topology, node);
+    hwloc__insert_object_by_cpuset(topology, NULL, node, "core:defaultnumanode");
   } else {
     /* if we're sure we found all NUMA nodes without their sizes (x86 backend?),
      * we could split topology->total_memory in all of them.
@@ -3514,6 +3507,7 @@ hwloc_topology_setup_defaults(struct hwloc_topology *topology)
   memset(topology->support.discovery, 0, sizeof(*topology->support.discovery));
   memset(topology->support.cpubind, 0, sizeof(*topology->support.cpubind));
   memset(topology->support.membind, 0, sizeof(*topology->support.membind));
+  memset(topology->support.misc, 0, sizeof(*topology->support.misc));
 
   /* Only the System object on top by default */
   topology->next_gp_index = 1; /* keep 0 as an invalid value */
@@ -3590,6 +3584,7 @@ hwloc__topology_init (struct hwloc_topology **topologyp,
   topology->support.discovery = hwloc_tma_malloc(tma, sizeof(*topology->support.discovery));
   topology->support.cpubind = hwloc_tma_malloc(tma, sizeof(*topology->support.cpubind));
   topology->support.membind = hwloc_tma_malloc(tma, sizeof(*topology->support.membind));
+  topology->support.misc = hwloc_tma_malloc(tma, sizeof(*topology->support.misc));
 
   topology->nb_levels_allocated = nblevels; /* enough for default 10 levels = Mach+Pack+Die+NUMA+L3+L2+L1d+L1i+Co+PU */
   topology->levels = hwloc_tma_calloc(tma, topology->nb_levels_allocated * sizeof(*topology->levels));
@@ -3598,6 +3593,7 @@ hwloc__topology_init (struct hwloc_topology **topologyp,
   hwloc__topology_filter_init(topology);
 
   hwloc_internal_distances_init(topology);
+  hwloc_internal_memattrs_init(topology);
 
   topology->userdata_export_cb = NULL;
   topology->userdata_import_cb = NULL;
@@ -3691,7 +3687,7 @@ hwloc_topology_set_flags (struct hwloc_topology *topology, unsigned long flags)
     return -1;
   }
 
-  if (flags & ~(HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED|HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM|HWLOC_TOPOLOGY_FLAG_THISSYSTEM_ALLOWED_RESOURCES)) {
+  if (flags & ~(HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED|HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM|HWLOC_TOPOLOGY_FLAG_THISSYSTEM_ALLOWED_RESOURCES|HWLOC_TOPOLOGY_FLAG_IMPORT_SUPPORT)) {
     errno = EINVAL;
     return -1;
   }
@@ -3828,6 +3824,7 @@ hwloc_topology_clear (struct hwloc_topology *topology)
   /* no need to set to NULL after free() since callers will call setup_defaults() or just destroy the rest of the topology */
   unsigned l;
   hwloc_internal_distances_destroy(topology);
+  hwloc_internal_memattrs_destroy(topology);
   hwloc_free_object_and_children(topology->levels[0][0]);
   hwloc_bitmap_free(topology->allowed_cpuset);
   hwloc_bitmap_free(topology->allowed_nodeset);
@@ -3858,6 +3855,7 @@ hwloc_topology_destroy (struct hwloc_topology *topology)
   free(topology->support.discovery);
   free(topology->support.cpubind);
   free(topology->support.membind);
+  free(topology->support.misc);
   free(topology);
 }
 
@@ -3873,7 +3871,9 @@ hwloc_topology_load (struct hwloc_topology *topology)
     return -1;
   }
 
+  /* initialize envvar-related things */
   hwloc_internal_distances_prepare(topology);
+  hwloc_internal_memattrs_prepare(topology);
 
   if (getenv("HWLOC_XML_USERDATA_NOT_DECODED"))
     topology->userdata_not_decoded = 1;
@@ -3963,6 +3963,10 @@ hwloc_topology_load (struct hwloc_topology *topology)
    * don't refresh() concurrently (disallowed).
    */
   hwloc_internal_distances_refresh(topology);
+
+  /* Same for memattrs */
+  hwloc_internal_memattrs_need_refresh(topology);
+  hwloc_internal_memattrs_refresh(topology);
 
   topology->is_loaded = 1;
 
@@ -4246,6 +4250,7 @@ hwloc_topology_restrict(struct hwloc_topology *topology, hwloc_const_bitmap_t se
 
   /* some objects may have disappeared, we need to update distances objs arrays */
   hwloc_internal_distances_invalidate_cached_objs(topology);
+  hwloc_internal_memattrs_need_refresh(topology);
 
   hwloc_filter_levels_keep_structure(topology);
   hwloc_propagate_symmetric_subtree(topology, topology->levels[0][0]);
@@ -4332,6 +4337,14 @@ hwloc_topology_allow(struct hwloc_topology *topology,
   errno = EINVAL;
  error:
   return -1;
+}
+
+int
+hwloc_topology_refresh(struct hwloc_topology *topology)
+{
+  hwloc_internal_distances_refresh(topology);
+  hwloc_internal_memattrs_refresh(topology);
+  return 0;
 }
 
 int

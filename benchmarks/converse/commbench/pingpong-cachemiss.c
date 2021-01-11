@@ -111,8 +111,11 @@ static void recvTime(TimeMessage* msg) {
     }
   }
   if (pva(numRecv) == CmiNumNodes()) {
-    for (j = 0; j < pva(numSizes); j++)
-      pva(gavg)[j] /= (CmiNumNodes() * (CmiNumNodes() - 1));
+    if (CmiNumNodes() > 1) {
+      const double divisor = (double)(CmiNumNodes() * (CmiNumNodes() - 1));
+      for (j = 0; j < pva(numSizes); j++)
+        pva(gavg)[j] /= divisor;
+    }
     for (j = 0; j < pva(numSizes); j++) {
       CmiPrintf("%d\t\t%le\n", sizes[j].size, pva(gavg)[j]);
 
@@ -308,7 +311,14 @@ void pingpong_cachemiss_init(void) {
   CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
 
   if (CmiNumNodes() == 1) {
-    CmiPrintf("[pingpong] This benchmark requires > 1 nodes.\n");
+    CmiPrintf("[pingpong-cachemiss] This benchmark requires > 1 nodes.\n");
+    CmiSetHandler(&m, pva(ack_handler));
+    CmiSyncSend(0, sizeof(EmptyMsg), &m);
+    return;
+  }
+  if (CpvAccess(oversubscribed)) {
+    if (CmiMyPe() == 0)
+      CmiPrintf("[pingpong-cachemiss] Skipping due to oversubscription.\n");
     CmiSetHandler(&m, pva(ack_handler));
     CmiSyncSend(0, sizeof(EmptyMsg), &m);
     return;

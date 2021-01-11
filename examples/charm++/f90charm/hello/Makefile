@@ -20,6 +20,9 @@ hellof.o: hellof.f90
 test: pgm
 	$(call run, +p2 ./pgm +balancer RotateLB +LBDebug 1)
 
+testp: pgm
+	$(call run, +p$(P) ./pgm +balancer RotateLB +LBDebug 1)
+
 clean:
 	rm -f charmrun conv-host pgm *.o *.mod *.decl.h *.def.h
 
