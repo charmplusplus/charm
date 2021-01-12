@@ -1,0 +1,31 @@
+# This Makefile contains the rules to build & test Charm++
+
+# The rules below are for compatibility with the CMake build system
+#
+# On making changes to this file, ensure that the same changes are ported
+# to src/scripts/Makefile in order to maintain consistency with the old
+# non-cmake based build system
+#
+# Changes to cmake/Makefile.tests will be reflected in <charm-arch>/tmp/Makefile
+# for a new cmake based build. If you want these changes to reflect in the existing
+# charm builds, you would have to manually copy them to <charm-arch>/tmp/Makefile
+
+# Figure out whether make's silent mode was requested, in which case
+# $(MAKEFLAGS) will contain "s". $(SILENT) is used in Makefile.tests.common.
+SILENT:=$(findstring s,$(word 1, $(MAKEFLAGS)))
+
+all: charm++
+
+charm++:
+	@$(MAKE) -C .. -q lib/libmoduletcharm.a || $(MAKE) -C ..
+
+AMPI: charm++
+	@$(MAKE) -C .. -q lib/libmoduleampi.a || { echo "=== You are missing the AMPI targets. Please build Charm++ with './build AMPI <...>'. ==="; exit 1; }
+
+LIBS: charm++
+	@$(MAKE) -C .. -q lib/libmoduleCkCache.a || { echo "=== You are missing the LIBS targets. Please build Charm++ with './build LIBS <...>'. ==="; exit 1; }
+
+converse: charm++
+
+include Makefile.tests.common
+

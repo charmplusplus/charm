@@ -29,11 +29,12 @@ endef
 $(foreach i,$(CANDIDATES),$(eval $(call TEST_TARGET_AVAILABILITY,$i)))
 
 # command pieces
-TESTFLAGS := +balancer RandCentLB +LBPeriod 0.01
+TESTFLAGS := +balancer RandCentLB
 
 # build rules
 all: $(foreach i,$(TARGETS),$i)
 test: $(foreach i,$(TARGETS),test-$i)
+testp: $(foreach i,$(TARGETS),testp-$i)
 
 everything: $(foreach i,$(VARIANTS),$i)
 test-everything: $(foreach i,$(VARIANTS),test-$i)
@@ -42,7 +43,7 @@ test-everything: $(foreach i,$(VARIANTS),test-$i)
 define VARIANT_RULES
 
 $1: $1.o
-	$$(AMPICC) -o $$@ $$^ -module CommonLBs -memory $1
+	$$(AMPICC) -o $$@ $$^ -memory $1
 
 $1.o: test.C
 	$$(AMPICC) -o $$@ -memory $1 -Disomalloc_method=$1 -c $$<
@@ -53,6 +54,11 @@ test-$1: $1
 	$$(call run, ./$1 +p1 +vp4 $(TESTFLAGS) )
 	$$(call run, ./$1 +p2 +vp2 $(TESTFLAGS) )
 	$$(call run, ./$1 +p2 +vp4 $(TESTFLAGS) )
+
+testp-$1: $1
+	$$(call run, ./$1 +p$(P) +vp$(P) $(TESTFLAGS) )
+	$$(call run, ./$1 +p$(P) +vp$$(( $(P) * 2 )) $(TESTFLAGS) )
+	$$(call run, ./$1 +p$(P) +vp$$(( $(P) * 4 )) $(TESTFLAGS) )
 
 endef
 

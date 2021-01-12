@@ -149,18 +149,18 @@ public:
 
 class LiveVizBalanceGroup : public CBase_LiveVizBalanceGroup {
 private:
-  CkGroupID lbdbID;
-  LBDatabase* lbdb;
+  CkGroupID lbmgrID;
+  LBManager* lbmgr;
   int* data;
   int data_size;
   bool balancingOn;
 
 public:
   LiveVizBalanceGroup() {
-    lbdbID = _lbdb;
-    lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
-    lbdb->AddLocalBarrierReceiver((LDResumeFn)staticRecvAtSync, (void*)this);
-    lbdb->AddMigrationDoneFn(staticDoneLB, (void*)this);
+    lbmgrID = _lbmgr;
+    lbmgr = (LBManager*)CkLocalBranch(lbmgrID);
+    lbmgr->AddLocalBarrierReceiver(this, &LiveVizBalanceGroup::recvAtSync);
+    lbmgr->AddMigrationDoneFn(this, &LiveVizBalanceGroup::doneLB);
 
     data_size = CkNumPes() * 4 + 1;
     data = new int[data_size];
@@ -170,8 +170,8 @@ public:
       data[(i*4)+2] = data[(i*4)+3] = data[(i*4)+4] = 0;
     }
 
-    for (int i = 0; i < lbdb->getNLoadBalancers(); i++) {
-      lbdb->getLoadBalancers()[0]->turnOff();
+    for (int i = 0; i < lbmgr->getNLoadBalancers(); i++) {
+      lbmgr->getLoadBalancers()[0]->turnOff();
     }
     balancingOn = false;
     if (thisIndex == 0)
@@ -183,10 +183,10 @@ public:
   void pup(PUP::er& p) {
     p | balancingOn;
     if (p.isUnpacking()) {
-      lbdbID = _lbdb;
-      lbdb = (LBDatabase*)CkLocalBranch(lbdbID);
-      lbdb->AddLocalBarrierReceiver((LDResumeFn)staticRecvAtSync, (void*)this);
-      lbdb->AddMigrationDoneFn(staticDoneLB, (void*)this);
+      lbmgrID = _lbmgr;
+      lbmgr = (LBManager*)CkLocalBranch(lbmgrID);
+      lbmgr->AddLocalBarrierReceiver(this, &LiveVizBalanceGroup::recvAtSync);
+      lbmgr->AddMigrationDoneFn(this, &LiveVizBalanceGroup::doneLB);
       data_size = CkNumPes() * 4 + 1;
       data = new int[data_size];
       data[0] = CkNumPes();
@@ -195,11 +195,11 @@ public:
         data[(i*4)+2] = data[(i*4)+3] = data[(i*4)+4] = 0;
       }
       if (!balancingOn) {
-        for (int i = 0; i < lbdb->getNLoadBalancers(); i++) {
-          lbdb->getLoadBalancers()[0]->turnOff();
+        for (int i = 0; i < lbmgr->getNLoadBalancers(); i++) {
+          lbmgr->getLoadBalancers()[0]->turnOff();
         }
       }
-      if (p.isRestarting() && thisIndex == 0) {
+      if (p.isCheckpoint() && thisIndex == 0) {
         thisProxy[thisIndex].registerCallbacks(); // need to go through the scheduler
       }
     }
@@ -210,21 +210,13 @@ public:
   CcsRegisterHandler("lvBalanceInteraction", CkCallback(CkIndex_LiveVizBalanceGroup::doBalanceRequest(NULL), thisProxy[0]));
   }
 
-  static void staticRecvAtSync(void* data) {
-    ((LiveVizBalanceGroup*)data)->recvAtSync();
-  }
-
-  static void staticDoneLB(void* data) {
-    ((LiveVizBalanceGroup*)data)->doneLB();
-  }
-
   void recvAtSync() {
-    int osz = lbdb->GetObjDataSz();
+    int osz = lbmgr->GetObjDataSz();
     LDObjData* objData = new LDObjData[osz]; 
-    lbdb->GetObjData(objData);
+    lbmgr->GetObjData(objData);
     
     double wt, cput, idle, bgwt, bgcpu;
-    lbdb->GetTime(&wt, &cput, &idle, &bgwt, &bgcpu);
+    lbmgr->GetTime(&wt, &cput, &idle, &bgwt, &bgcpu);
 
     int len = (osz*2) + 4;
     int* buf = new int[len];
@@ -243,22 +235,22 @@ public:
     delete[] buf;
 
     if (!balancingOn) {
-      lbdb->ResumeClients();
-      lbdb->ClearLoads();
+      lbmgr->ResumeClients();
+      lbmgr->ClearLoads();
     }
   }
 
   void doneLB() {
     balancingOn = false;
-    for (int i = 0; i < lbdb->getNLoadBalancers(); i++) {
-      lbdb->getLoadBalancers()[0]->turnOff();
+    for (int i = 0; i < lbmgr->getNLoadBalancers(); i++) {
+      lbmgr->getLoadBalancers()[0]->turnOff();
     }
   }
 
   void doBalanceRequest(CkCcsRequestMsg* msg) {
     thisProxy.doBalance();
     int x;
-    if (lbdb->getNLoadBalancers() > 0) {
+    if (lbmgr->getNLoadBalancers() > 0) {
       x = 1;
     } else {
       x = 0;
@@ -268,8 +260,8 @@ public:
   }
 
   void doBalance() {
-    if (lbdb->getNLoadBalancers() > 0) {
-      lbdb->getLoadBalancers()[0]->turnOn();
+    if (lbmgr->getNLoadBalancers() > 0) {
+      lbmgr->getLoadBalancers()[0]->turnOn();
       balancingOn = true;
     } else {
       CmiPrintf("Can't turn on load balancing, no LB specified!\n");

@@ -20,6 +20,7 @@ romio_mpi_sources +=          \
     mpi-io/get_amode.c        \
     mpi-io/get_atom.c         \
     mpi-io/get_bytoff.c       \
+    mpi-io/get_errh.c         \
     mpi-io/get_extent.c       \
     mpi-io/get_group.c        \
     mpi-io/get_info.c         \
@@ -27,6 +28,8 @@ romio_mpi_sources +=          \
     mpi-io/get_posn_sh.c      \
     mpi-io/get_size.c         \
     mpi-io/get_view.c         \
+    mpi-io/ioreq_c2f.c        \
+    mpi-io/ioreq_f2c.c        \
     mpi-io/iread.c            \
     mpi-io/iread_all.c        \
     mpi-io/iread_at.c         \
@@ -55,6 +58,7 @@ romio_mpi_sources +=          \
     mpi-io/seek.c             \
     mpi-io/seek_sh.c          \
     mpi-io/set_atom.c         \
+    mpi-io/set_errh.c         \
     mpi-io/set_info.c         \
     mpi-io/set_size.c         \
     mpi-io/set_view.c         \
@@ -81,8 +85,6 @@ romio_other_sources +=       \
 
 # helper variables for conditionally compiled sources
 mpio_request_sources=   \
-    mpi-io/ioreq_c2f.c  \
-    mpi-io/ioreq_f2c.c  \
     mpi-io/iotest.c     \
     mpi-io/iotestall.c  \
     mpi-io/iotestany.c  \
@@ -91,10 +93,6 @@ mpio_request_sources=   \
     mpi-io/iowaitall.c  \
     mpi-io/iowaitany.c  \
     mpi-io/iowaitsome.c
-
-mpio_extra_sources =  \
-    mpi-io/get_errh.c \
-    mpi-io/set_errh.c
 
 # not used in MPICH, we use generalized requests instead
 if BUILD_MPIO_REQUEST

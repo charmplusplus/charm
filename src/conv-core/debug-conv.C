@@ -45,12 +45,12 @@ u_long ntohl(u_long netlong) {
 #endif
   union { uint32_t i; unsigned char c[4]; } uaw;
   uaw.i = netlong;
-  netlong = uaw.c[0]<<24 + uaw.c[1]<<16 + uaw.c[2]<<8 + uaw.c[3];
+  netlong = (uaw.c[0]<<24) + (uaw.c[1]<<16) + (uaw.c[2]<<8) + uaw.c[3];
   return netlong;
 }
 #else
 #if defined _WIN32
-#include <winsock.h>
+#include <Winsock2.h>
 #else
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -261,9 +261,6 @@ void * (*CpdGetNextMessage)(CsdSchedulerState_t*);
 
 void CpdFreezeModeScheduler(void)
 {
-#if CMK_BIGSIM_CHARM
-    CmiAbort("Cannot run CpdFreezeModeScheduler inside BigSim emulated environment");
-#else
 #if CMK_CCS_AVAILABLE
     void *msg;
     void *debugQ=CpvAccess(debugQueue);
@@ -316,20 +313,17 @@ void CpdFreezeModeScheduler(void)
         CmiHandleMessage(queuedMsg);
     }
 #endif
-#endif
 }
 
 void CpdMemoryMarkClean(char *msg);
 
 void CpdInit(void)
 {
-#if ! CMK_BIGSIM_CHARM
   CpvInitialize(int, freezeModeFlag);
   CpvAccess(freezeModeFlag) = 0;
 
   CpvInitialize(void *, debugQueue);
   CpvAccess(debugQueue) = CdsFifo_Create();
-#endif
 
   CpvInitialize(void *, conditionalQueue);
   CpvAccess(conditionalQueue) = CdsFifo_Create();
@@ -371,7 +365,7 @@ void CpdInit(void)
 /* If CharmDebug is attached, try to send it a message and wait */
 void CpdAborting(const char *message) {
 #if CMK_CCS_AVAILABLE
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag) {
     CpdNotify(CPD_ABORT, message);
     CpdFreeze();
   }

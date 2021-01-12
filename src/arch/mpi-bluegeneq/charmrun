@@ -3,6 +3,8 @@
 # good for job less than 30 minutes
 # have to pass bank using -A or set PROJECT environment variable
 
+export FROM_CHARMRUN='1'
+
 args=""
 
 # Arguments that need to be passed to the charm application, not mpirun (e.g. ++quiet)

@@ -169,9 +169,6 @@ class LineFFTinfo {
 
 #include "fftlib.decl.h"
 
-PUPmarshall(NormalFFTinfo)
-PUPmarshall(LineFFTinfo)
-
 
 typedef struct _SlabArrayInfo{
     int count;

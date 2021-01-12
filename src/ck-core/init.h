@@ -6,10 +6,14 @@
 #include <new>   // for in-place new operator
 #include "ckhashtable.h"
 #include <vector>
+#include "ckrdma.h"
 
 typedef CkQ<void *> PtrQ;
 class envelope;
 typedef std::vector<CkZeroPtr<envelope> > PtrVec;
+
+// Map to store object index and number of pending rdma ops
+typedef std::unordered_map<CmiUInt8, CmiUInt1> ObjNumRdmaOpsMap;
 
 class IrrGroup;
 class TableEntry {

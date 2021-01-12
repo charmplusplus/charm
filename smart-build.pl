@@ -350,8 +350,6 @@ if($arch eq ""){
 
 if($arch eq "netlrts-darwin"){
 	$arch = "netlrts-darwin-x86_64";
-} elsif($arch eq "multicore-linux-arm7"){
-	$arch = "multicore-arm7";
 }
 
 
@@ -456,14 +454,14 @@ $explanations{"pgf90"} = "Use Portland Group's pgf90 Fortran compiler";
 $explanations{"syncft"} = "Use fault tolerance support";
 $explanations{"omp"} = "Build Charm++ with integrated OpenMP support";
 $explanations{"papi"} = "Enable PAPI performance counters";
-$explanations{"pedantic"} = "Enable pedantic compiler warnings";
-$explanations{"bigemulator"} = "Build additional BigSim libraries";
-$explanations{"bigsim"} = "Compile Charm++ as running on the BigSim emulator";
 $explanations{"nolb"} = "Build without load balancing support";
 $explanations{"perftools"} = "Build with support for the Cray perftools";
 $explanations{"persistent"} = "Build the persistent communication interface";
+$explanations{"simplepmi"} = "Use simple PMI for task launching";
 $explanations{"slurmpmi"} = "Use Slurm PMI for task launching";
 $explanations{"slurmpmi2"} = "Use Slurm PMI2 for task launching";
+$explanations{"ompipmix"} = "Use Open MPI PMIX for task launching";
+$explanations{"openpmix"} = "Use OpenPMIx for task launching";
 $explanations{"tsan"} = "Compile Charm++ with support for Thread Sanitizer";
 
 

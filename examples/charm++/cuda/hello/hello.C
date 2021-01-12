@@ -32,7 +32,7 @@ class Main : public CBase_Main {
 
     // print configuration
     CkPrintf("\n[CUDA hello example]\n");
-    CkPrintf("Chares: %d\n", nElements);
+    CkPrintf("PEs: %d, Chares: %d\n", CkNumPes(), nElements);
 
     // create 1D chare array
     arr = CProxy_Hello::ckNew(nElements);
@@ -57,21 +57,28 @@ class Hello : public CBase_Hello {
   ~Hello() { hapiCheck(cudaStreamDestroy(stream)); }
 
   void greet() {
-    CkArrayIndex1D myIndex = CkArrayIndex1D(thisIndex);
-    CkCallback* cb =
-        new CkCallback(CkIndex_Hello::pass(), myIndex, thisArrayID);
+    int device;
+    hapiCheck(cudaGetDevice(&device));
+    cudaDeviceProp prop;
+    hapiCheck(cudaGetDeviceProperties(&prop, device));
 
-    CkPrintf("Hello, I'm chare %d!\n", thisIndex);
-    if (thisIndex < nElements - 1)
-      kernelSetup(stream, (void*)cb);
-    else
-      // we've been around once, we're done
-      mainProxy.done();
+    CkPrintf("Hello, I'm chare %d, on PE %d using GPU #%d %s\n",
+        thisIndex, CkMyPe(), device, prop.name);
+
+    CkArrayIndex1D myIndex = CkArrayIndex1D(thisIndex);
+    CkCallback* cb = new CkCallback(CkIndex_Hello::pass(), myIndex, thisArrayID);
+
+    kernelSetup(stream, (void*)cb);
   }
 
   void pass() {
-    // pass the hello on
-    thisProxy[thisIndex + 1].greet();
+    if (thisIndex == nElements - 1) {
+      // we've been around once, we're done
+      mainProxy.done();
+    } else {
+      // pass the hello on
+      thisProxy[thisIndex + 1].greet();
+    }
   }
 };
 

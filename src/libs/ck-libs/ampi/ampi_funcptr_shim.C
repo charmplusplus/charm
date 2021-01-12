@@ -1,7 +1,7 @@
 // This object can be linked to AMPI binaries in place of the RTS.
 
 #ifndef AMPI_USE_FUNCPTR
-# error This file requires -ampi-funcptr-shim.
+# error This file requires -fPIE -DAMPI_USE_FUNCPTR.
 #endif
 #include "ampi_funcptr.h"
 
@@ -21,7 +21,7 @@
 
 // Provide an interface to link the function pointers at runtime.
 
-extern "C" void AMPI_FuncPtr_Unpack(struct AMPI_FuncPtr_Transport * x)
+extern "C" CMI_EXPORT void AMPI_FuncPtr_Unpack(struct AMPI_FuncPtr_Transport * x)
 {
 #define AMPI_CUSTOM_FUNC(return_type, function_name, ...) \
   function_name = x->function_name;
@@ -39,18 +39,4 @@ extern "C" void AMPI_FuncPtr_Unpack(struct AMPI_FuncPtr_Transport * x)
 #undef AMPI_FUNC
 #undef AMPI_FUNC_NOIMPL
 #undef AMPI_CUSTOM_FUNC
-}
-
-
-// Provide a stub entry point so the program will link without any special effort.
-
-#include <stdio.h>
-
-#ifdef main
-# undef main
-#endif
-int main()
-{
-  fprintf(stderr, "Do not run this binary directly!\n");
-  return 1;
 }

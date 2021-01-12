@@ -14,7 +14,7 @@ Adding modules (e.g. load balancers) to libcharm.so
 ---------------------------------------------------
 
 Currently, modules need to be manually registered (there is a section in
-init.C with #if CMK_CHARMPY where this can be done), and the LIBCHARM_LIBS variable in the Makefile
+init.C with #if CMK_CHARM4PY where this can be done), and the LIBCHARM_LIBS variable in the Makefile
 needs to be modified to include the module.
 
 Developer documentation
@@ -76,7 +76,7 @@ during linking of final program executable.
 
 Problem is that when accesing the Charm shared library from Charm4py, these functions
 are never defined, so I have disabled calls to them in some cases, or bypassed with alternative
-code with #if CMK_CHARMPY macro.
+code with #if CMK_CHARM4PY macro.
 
 This means that I implemented an alternative way of registering the main
 module, via a callback to external client (called from init.C).

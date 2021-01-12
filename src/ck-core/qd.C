@@ -55,12 +55,6 @@ extern int _qdCommHandlerIdx;
 // a fake QD which just wait for several seconds to triger QD callback
 int _dummy_dq = 0;                      /* seconds to wait for */
 
-#if CMK_BIGSIM_CHARM
-// this is a hack for bgcharm++, I need to figure out a better
-// way to do this
-#undef CmiSyncSendAndFree
-#define CmiSyncSendAndFree    CmiFreeSendFn
-#endif
 
 CpvDeclare(QdState*, _qd);
 
@@ -73,7 +67,7 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   state->propagate(msg);
   msg->setPhase(1);
   DEBUGP(("[%d] _bcastQD1: State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
-#if ! CMK_SHARED_VARS_UNIPROCESSOR && !CMK_MULTICORE
+#if !CMK_MULTICORE
 /*
   QdState *comm_state;
   static int comm_create=0, comm_process=0;
@@ -180,7 +174,7 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
 // check if counters became dirty and notify parents
 static inline void _handlePhase2(QdState *state, QdMsg *msg)
 {
-//  This assertion seems too strong for smp and uth version.
+//  This assertion seems too strong for smp version.
   DEBUGP(("[%d] _handlePhase2: stage: %d, msg phase: %d \n", CmiMyPe(), state->getStage(), msg->getPhase()));
   CkAssert(state->getStage()==2);
   state->subtreeSetDirty(msg->getDirty());
@@ -285,11 +279,7 @@ void CkStartQD(const CkCallback& cb)
 #if CMK_MEM_CHECKPOINT
   CmiGetRestartPhase(env) = 9999;        // make sure it is always executed
 #endif
-#if CMK_BIGSIM_CHARM
-  CmiFreeSendFn(0, env->getTotalsize(), (char *)env);
-#else
   _CldEnqueue(0, env, _infoIdx);
-#endif
 }
 
 void CkStartQD(int eIdx, const CkChareID *cid)

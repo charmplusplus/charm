@@ -912,7 +912,7 @@ hwloc_synthetic_insert_attached(struct hwloc_topology *topology,
 
   hwloc_synthetic_set_attr(&attached->attr, child);
 
-  hwloc_insert_object_by_cpuset(topology, child);
+  hwloc__insert_object_by_cpuset(topology, NULL, child, "synthetic:attached");
 
   hwloc_synthetic_insert_attached(topology, data, attached->next, set);
 }
@@ -964,7 +964,7 @@ hwloc__look_synthetic(struct hwloc_topology *topology,
 
     hwloc_synthetic_set_attr(&curlevel->attr, obj);
 
-    hwloc_insert_object_by_cpuset(topology, obj);
+    hwloc__insert_object_by_cpuset(topology, NULL, obj, "synthetic");
   }
 
   hwloc_synthetic_insert_attached(topology, data, curlevel->attached, set);
@@ -1503,6 +1503,7 @@ hwloc_topology_export_synthetic(struct hwloc_topology * topology,
     signed pdepth;
 
     node = hwloc_get_obj_by_type(topology, HWLOC_OBJ_NUMANODE, 0);
+    assert(node);
     assert(hwloc__obj_type_is_normal(node->parent->type)); /* only depth-1 memory children for now */
     pdepth = node->parent->depth;
 

@@ -1,13 +1,13 @@
 /*
-Configuration flags for Collision detection.
+   Configuration flags for Collision detection.
 
-Orion Sky Lawlor, olawlor@acm.org, 2003/3/19
-*/
+   Orion Sky Lawlor, olawlor@acm.org, 2003/3/19
+   */
 #ifndef __UIUC_CHARM_COLLIDE_CFG_H
 #define __UIUC_CHARM_COLLIDE_CFG_H
 
 /// Statistics collection:
-#ifndef COLLIDE_STATS 
+#ifndef COLLIDE_STATS
 #define COLLIDE_STATS 0
 #endif
 

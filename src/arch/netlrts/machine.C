@@ -200,6 +200,7 @@ int printf(const char *fmt, ...) {
 
 
 #include "converse.h"
+#include "cmirdmautils.h"
 #include "memory-isomalloc.h"
 
 #include <stdio.h>
@@ -266,9 +267,6 @@ int _kq = -1;
 #define PRINTBUFSIZE 16384
 
 #include "machine-rdma.h"
-#if CMK_ONESIDED_IMPL
-#include "machine-onesided.h"
-#endif
 
 #if CMK_SHRINK_EXPAND
 extern void resumeAfterRealloc(void);
@@ -361,16 +359,12 @@ static void KillOnAllSigs(int sigNo)
   already_in_signal_handler=1;
 
 #if CMK_CCS_AVAILABLE
-  if (CpvAccess(cmiArgDebugFlag) && CmiMyRank()==0) {
+  if (cmiArgDebugFlag && CmiMyRank()==0) {
     int reply = 0;
     CpdNotify(CPD_SIGNAL,sigNo);
-#if ! CMK_BIGSIM_CHARM
     CcsSendReplyNoError(4,&reply);/*Send an empty reply if not*/
     CpvAccess(freezeModeFlag) = 1;
     CpdFreezeModeScheduler();
-#else
-    CpdFreeze();
-#endif
   }
 #endif
   
@@ -953,7 +947,7 @@ static int sendone_abort_fn(SOCKET skt,int code,const char *msg) {
 	// so printing an error makes no sense. The message is not seen normally
 	// since processes are spawned by charmrun as DETACHED_PROCESS by default and
 	// have no console output.
-	// With CMK_CHARMPY=1 on Windows, charmrun spawns one process in same console,
+	// With CMK_CHARM4PY=1 on Windows, charmrun spawns one process in same console,
 	// because any output before charm starts needs to be seen (e.g. Python syntax errors)
 	// so this print needs to be disabled
 	fprintf(stderr,"Socket error %d in ctrl_sendone! %s\n",code,msg);
@@ -2159,8 +2153,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   Cmi_truecrash = 1;
 #endif
   if (CmiGetArgFlagDesc(*argv,"+truecrash","Do not install signal handlers") ||
-      CmiGetArgFlagDesc(*argv,"++debug",NULL /*meaning: don't show this*/) ||
-      CmiNumNodes()<=32) Cmi_truecrash = 1;
+      CmiGetArgFlagDesc(*argv,"++debug",NULL /*meaning: don't show this*/) ) Cmi_truecrash = 1;
     /* netpoll disable signal */
   if (CmiGetArgFlagDesc(*argv,"+netpoll","Do not use SIGIO--poll instead")) Cmi_netpoll = 1;
   if (CmiGetArgFlagDesc(*argv,"+netint","Use SIGIO")) Cmi_netpoll = 0;

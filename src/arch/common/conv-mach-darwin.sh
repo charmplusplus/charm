@@ -14,13 +14,19 @@ CMK_SHARED_SUF="dylib"
 CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
 CMK_LD_SHARED_ABSOLUTE_PATH=true
 
-CMK_DEFS="$CMK_DEFS -mmacosx-version-min=10.7 -D_DARWIN_C_SOURCE"
+CMK_DEFS="$CMK_DEFS -D_DARWIN_C_SOURCE"
 
-if command -v gfortran >/dev/null 2>&1
+if command -v gfortran gfortran-{19..4} gfortran-mp-{19..4} >/dev/null 2>&1
 then
   . $CHARMINC/conv-mach-gfortran.sh
 fi
 
-# Assumes gfortran compiler:
-CMK_CF77="$CMK_CF77 -mmacosx-version-min=10.7"
-CMK_CF90="$CMK_CF90 -mmacosx-version-min=10.7"
+CMK_NATIVE_CC='clang'
+CMK_NATIVE_LD='clang'
+CMK_NATIVE_CXX='clang++'
+CMK_NATIVE_LDXX='clang++'
+
+CMK_NATIVE_CC_FLAGS="$CMK_CC_FLAGS"
+CMK_NATIVE_LD_FLAGS="$CMK_LD_FLAGS"
+CMK_NATIVE_CXX_FLAGS="$CMK_CXX_FLAGS"
+CMK_NATIVE_LDXX_FLAGS="$CMK_LDXX_FLAGS"

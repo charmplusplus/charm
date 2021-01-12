@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2019 Inria.  All rights reserved.
+ * Copyright © 2009-2020 Inria.  All rights reserved.
  * Copyright © 2009-2011, 2013 Université Bordeaux
  * Copyright © 2014-2018 Cisco Systems, Inc.  All rights reserved.
  * Copyright © 2015      Research Organization for Information Science
@@ -175,7 +175,9 @@ hwloc_look_pci(struct hwloc_backend *backend, struct hwloc_disc_status *dstatus)
   ret = pci_system_init();
   if (ret) {
     HWLOC_PCIACCESS_UNLOCK();
-    hwloc_debug("%s", "Can not initialize libpciaccess\n");
+    if (!hwloc_hide_errors())
+      fprintf(stderr, "PCI: Failed to initialize libpciaccess with pci_system_init(): %d (%s)\n",
+              ret, strerror(errno));
     return -1;
   }
 
@@ -200,13 +202,15 @@ hwloc_look_pci(struct hwloc_backend *backend, struct hwloc_disc_status *dstatus)
     dev = pcidev->dev;
     func = pcidev->func;
 
+#ifndef HWLOC_HAVE_32BITS_PCI_DOMAIN
     if (domain > 0xffff) {
       static int warned = 0;
-      if (!warned)
-	fprintf(stderr, "Ignoring PCI device with non-16bit domain\n");
+      if (!warned && !hwloc_hide_errors())
+	fprintf(stderr, "Ignoring PCI device with non-16bit domain.\nPass --enable-32bits-pci-domain to configure to support such devices\n(warning: it would break the library ABI, don't enable unless really needed).\n");
       warned = 1;
       continue;
     }
+#endif
 
     /* initialize the config space in case we fail to read it (missing permissions, etc). */
     memset(config_space_cache, 0xff, CONFIG_SPACE_CACHESIZE);

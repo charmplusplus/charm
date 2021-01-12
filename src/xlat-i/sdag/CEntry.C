@@ -14,10 +14,13 @@ void CEntry::generateDeps(XStr& op) {
 
 void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
                           Entry* entry, std::list<CStateVar*>* params, XStr* next, bool isDummy) {
-  int numRdmaParams = 0;
+  int numRdmaParams = 0, numDeviceRdmaParams = 0;
   for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end(); ++it) {
     CStateVar& var = **it;
-    if (var.isRdma) numRdmaParams++;
+    if (var.isRdma) {
+      if (var.isDevice) numDeviceRdmaParams++;
+      else numRdmaParams++;
+    }
   }
   // generate wrapper for local calls to the function
   templateGuardBegin(false, defs);
@@ -41,21 +44,22 @@ void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
         CStateVar& var = **it;
         if (var.name) {
           if (var.isRdma) {
-            defs << "#if CMK_ONESIDED_IMPL\n";
-            if (var.isFirstRdma) {
-              defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams << ";\n";
-              // Root node is used for ZC Bcast and since this is a direct sdag call
-              // CkMyNode() is the root source node for the broadcast
-              defs << "  genClosure->getP" << i++ << "() = " << "CkMyNode()" << ";\n";
+            if (var.isDevice) {
+              if (var.isFirstDeviceRdma) {
+                defs << "  genClosure->getP" << i++ << "() = " << numDeviceRdmaParams << ";\n";
+              }
+              defs << "  genClosure->getP" << i << "() = "
+                   << "deviceBuffer_" << var.name << ";\n";
+            } else {
+              if (var.isFirstRdma) {
+                defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams << ";\n";
+                // Root node is used for ZC Bcast and since this is a direct sdag call
+                // CkMyNode() is the root source node for the broadcast
+                defs << "  genClosure->getP" << i++ << "() = " << "CkMyNode()" << ";\n";
+              }
+              defs << "  genClosure->getP" << i << "() = "
+                   << "ncpyBuffer_" << var.name << ";\n";
             }
-            defs << "  genClosure->getP" << i << "() = "
-                 << "ncpyBuffer_" << var.name << ";\n";
-            defs << "#else\n";
-            defs << "  genClosure->getP" << i << "() = "
-                 << "(" << var.type << "*)"
-                 << "ncpyBuffer_" << var.name << ".ptr"
-                 << ";\n";
-            defs << "#endif\n";
           } else
             defs << "  genClosure->getP" << i << "() = " << var.name << ";\n";
         }
@@ -84,8 +88,13 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
       if (i > 0) signature << ", ";
       if (sv->byConst) signature << "const ";
 
-      if (sv->isRdma)
-        signature << "CkNcpyBuffer ";
+      if (sv->isRdma) {
+        if (sv->isDevice) {
+          signature << "CkDeviceBuffer ";
+        } else {
+          signature << "CkNcpyBuffer ";
+        }
+      }
       else
         signature << sv->type << " ";
       if (sv->arrayLength != 0)
@@ -98,7 +107,11 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
       }
       if (sv->name != 0) {
         if (sv->isRdma) {
-          signature << "ncpyBuffer_" << sv->name;
+          if (sv->isDevice) {
+            signature << "deviceBuffer_" << sv->name;
+          } else {
+            signature << "ncpyBuffer_" << sv->name;
+          }
         } else {
           signature << sv->name;
         }
@@ -134,11 +147,6 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
        << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";
   defs << "  if (!__dep.get()) _sdag_init();\n";
 
-#if CMK_BIGSIM_CHARM
-  defs << "  void* _bgParentLog = NULL;\n";
-  defs << "  CkElapse(0.01e-6);\n";
-  SdagConstruct::generateTlineEndCall(defs);
-#endif
 
   if (needsParamMarshalling || isVoid) {
     // If the genClosure doesn't have a refnum yet, then assign the first
@@ -148,9 +156,6 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
               "genClosure->setRefnum(genClosure->getP0());\n";
 
 // add the incoming message to a buffer
-#if CMK_BIGSIM_CHARM
-    defs << "  SDAG::Buffer* cmsgbuf = ";
-#endif
 
     // note that there will always be a closure even when the method has no
     // parameters for consistency
@@ -162,11 +167,8 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
     // keeping a meta-structure for every message passed in
 
     // increase reference count by one for the state parameter
-    defs << "  CmiReference(UsrToEnv(" << sv->name << "_msg));\n";
+    defs << "  CkReferenceMsg(" << sv->name << "_msg);\n";
 
-#if CMK_BIGSIM_CHARM
-    defs << "  SDAG::Buffer* cmsgbuf = ";
-#endif
     // refnum automatically extracted from msg by MsgClosure::MsgClosure(...)
     defs << "  __dep->pushBuffer(" << entryNum << ", new SDAG::MsgClosure(" << sv->name
          << "_msg"
@@ -185,9 +187,6 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
   defs << "    mergePathHistory(currentSaved);\n";
 #endif
   SdagConstruct::generateTraceEndCall(defs, 2);
-#if CMK_BIGSIM_CHARM
-  SdagConstruct::generateEndExec(defs);
-#endif
 
   if (whenList.size() == 1) {
     (*whenList.begin())->generateWhenCode(defs, 2);

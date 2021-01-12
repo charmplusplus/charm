@@ -26,3 +26,6 @@ jacobi2d.o: jacobi2d.C jacobi2d.decl.h
 
 test: jacobi2d
 	$(call run, +p2 ./jacobi2d 32 16 )
+
+testp: jacobi2d
+	$(call run, +p$(P) ./jacobi2d $$(( $(P) * 16 )) 8 )
