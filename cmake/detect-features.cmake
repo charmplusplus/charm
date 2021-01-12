@@ -12,20 +12,26 @@ endif()
 set(CMK_MACHINE_NAME \"${CHARM_PLATFORM}\")
 
 set(CMK_CCS_AVAILABLE 1)
-if(${NETWORK} STREQUAL "uth" OR ${NETWORK} STREQUAL "pami" OR ${NETWORK} STREQUAL "pamilrts")
+if(${NETWORK} STREQUAL "pami" OR ${NETWORK} STREQUAL "pamilrts")
   set(CMK_CCS_AVAILABLE 0)
 endif()
 
 set(CMK_NO_PARTITIONS 0)
-if(${NETWORK} STREQUAL "netlrts" OR ${NETWORK} STREQUAL "multicore" OR ${NETWORK} STREQUAL "uth" OR ${NETWORK} STREQUAL "pami" OR ${NETWORK} STREQUAL "shmem" OR ${NETWORK} STREQUAL "sim")
+if(${NETWORK} STREQUAL "netlrts" OR ${NETWORK} STREQUAL "multicore" OR ${NETWORK} STREQUAL "pami")
   set(CMK_NO_PARTITIONS 1)
 endif()
 
 set(CMK_HAS_OPENMP ${OPENMP_FOUND})
 
-if(${CMAKE_CXX_COMPILER_ID} STREQUAL "AppleClang")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   # TODO: Apple clang needs external library for OpenMP support, disable for now.
   set(CMK_HAS_OPENMP 0)
+endif()
+
+# CMA
+set(CMK_USE_CMA ${CMK_HAS_CMA})
+if(NETWORK STREQUAL "multicore" OR NETWORK MATCHES "bluegeneq")
+  set(CMK_USE_CMA 0)
 endif()
 
 
@@ -63,17 +69,17 @@ endif()
 set(CMAKE_REQUIRED_FLAGS "")
 
 # Support for fsglobals/pipglobals
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+if(CMK_WINDOWS)
   set(CMK_SUPPORTS_FSGLOBALS 1)
-elseif(${CMK_HAS_DLOPEN} AND ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+elseif(CMK_HAS_DLOPEN AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(CMK_SUPPORTS_FSGLOBALS 1)
-elseif(${CMK_HAS_DLOPEN} AND (${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH}))
+elseif(CMK_HAS_DLOPEN AND (${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH}))
   set(CMK_SUPPORTS_FSGLOBALS 1)
 else()
   set(CMK_SUPPORTS_FSGLOBALS 0)
 endif()
 
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+if(CMK_WINDOWS)
   set(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY 1)
 else()
   set(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY ${CMK_HAS_DLOPEN})
@@ -95,6 +101,8 @@ set(CMK_CKSECTIONINFO_STL 1)
 # Create conv-autoconfig.h by iterating over all variable names and #defining them.
 get_cmake_property(_variableNames VARIABLES)
 list (SORT _variableNames)
+
+list(REMOVE_ITEM _variableNames CMK_USE_CMA)
 
 set(optfile ${CMAKE_BINARY_DIR}/include/conv-autoconfig.h)
 file(REMOVE ${optfile})

@@ -1,3 +1,5 @@
+-include ../../include/conv-mach-opt.mak
+
 DIRS = \
   allToAll \
   array_map \
@@ -33,9 +35,15 @@ DIRS = \
   user-driven-interop \
   zerocopy \
 
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+# requires fixups
+#  DIRS += f90charm
+endif
+
 TESTDIRS = $(DIRS)
 
 NONSCALEDIRS = \
+  array_map \
   ckcallback \
   cksequence \
   hello \

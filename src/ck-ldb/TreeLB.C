@@ -1,11 +1,24 @@
 #include "TreeBuilder.h"  // TODO this can be deleted if we change it so that LBManager instantiates the builders
 #include "TreeLB.h"
+#include "TreeStrategyFactory.h"
 #include "spanningTree.h"
 #include <fstream>  // TODO delete if json file is read from LBManager
+#include <sstream>
+#include "json.hpp"
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(TreeLB, "TreeLB")
+static void lbinit()
+{
+  const auto& names = TreeStrategy::LBNames;
+  std::ostringstream o;
+  for (const auto& name : names)
+  {
+    o << "\n\t" << name;
+  }
+  LBRegisterBalancer<TreeLB>(
+      "TreeLB", "Pluggable hierarchical LB with available strategies:" + o.str());
+}
 
 void TreeLB::Migrated(int waitBarrier)
 {
@@ -25,23 +38,26 @@ void TreeLB::init(const CkLBOptions& opts)
 
   json config;
   std::ifstream ifs(_lb_args.treeLBFile(), std::ifstream::in);
-  if (ifs.good())
-  {
-    config = json::parse(ifs, nullptr, false);
-    if (config.is_discarded())
-    {
-      CkPrintf("Error reading TreeLB configuration file: %s\n", _lb_args.treeLBFile());
-      CkExit(1);
-    }
-  }
-  else if (_lb_args.legacyCentralizedStrategies().size() > 0)
+  if (opts.getLegacyName() != nullptr)
   {
     // support legacy mode, e.g. map "+GreedyLB" to PE_Root tree using Greedy
     // use 2-level tree
     config["tree"] = "PE_Root";
-    config["Root"]["strategies"] = {_lb_args.legacyCentralizedStrategies()[0]};
+    config["root"]["strategies"] = {opts.getLegacyName()};
     if (CkMyPe() == 0 && !quietModeRequested)
       CkPrintf("[%d] TreeLB in LEGACY MODE support\n", CkMyPe());
+  }
+  else if (ifs.good())
+  {
+    config = json::parse(ifs, nullptr, false);
+    if (config.is_discarded())
+    {
+      CkPrintf(
+          "Error reading TreeLB configuration file: %s.\n"
+          "Ensure your configuration file is valid JSON.\n",
+          _lb_args.treeLBFile());
+      CkExit(1);
+    }
   }
   else
   {
@@ -59,29 +75,29 @@ void TreeLB::init(const CkLBOptions& opts)
     {
       // use 4-level tree
       config["tree"] = "PE_Process_ProcessGroup_Root";
-      config["Root"]["pe"] = 0;
-      config["ProcessGroup"]["num_groups"] = CmiNumPhysicalNodes() / 32;
-      config["Root"]["step_freq"] = 10;
-      config["ProcessGroup"]["step_freq"] = 5;
-      config["Process"]["strategies"] = {"GreedyRefine"};
-      config["ProcessGroup"]["strategies"] = {"GreedyRefine"};
-      config["ProcessGroup"]["GreedyRefine"]["tolerance"] = 1.03;
+      config["root"]["pe"] = 0;
+      config["processgroup"]["num_groups"] = CmiNumPhysicalNodes() / 32;
+      config["root"]["step_freq"] = 10;
+      config["processgroup"]["step_freq"] = 5;
+      config["process"]["strategies"] = {"GreedyRefine"};
+      config["processgroup"]["strategies"] = {"GreedyRefine"};
+      config["processgroup"]["GreedyRefine"]["tolerance"] = 1.03;
     }
     else if (CmiNumNodes() > 1 && CmiNodeSize(0) > 1)
     {
       // use 3-level tree
       config["tree"] = "PE_Process_Root";
-      config["Root"]["pe"] = 0;
-      config["Root"]["step_freq"] = 3;
-      config["Root"]["strategies"] = {"GreedyRefine"};
-      config["Process"]["strategies"] = {"GreedyRefine"};
+      config["root"]["pe"] = 0;
+      config["root"]["step_freq"] = 3;
+      config["root"]["strategies"] = {"GreedyRefine"};
+      config["process"]["strategies"] = {"GreedyRefine"};
     }
     else
     {
       // use 2-level tree
       config["tree"] = "PE_Root";
-      config["Root"]["pe"] = 0;
-      config["Root"]["strategies"] = {"GreedyRefine"};
+      config["root"]["pe"] = 0;
+      config["root"]["strategies"] = {"GreedyRefine"};
     }
   }
   ifs.close();
@@ -123,11 +139,9 @@ void TreeLB::configure(LBTreeBuilder& builder, json& config)
     CkPrintf("[%d] Reconfiguring TreeLB\n", CkMyPe());
   }
 
-  auto config_entry = config.find("mcast_bfactor");
-  if (config_entry != config.end()) mcast_bfactor = *config_entry;
-
-  config_entry = config.find("report_lb_times_at_step");
-  if (config_entry != config.end()) step_report_lb_times = *config_entry;
+  mcast_bfactor = builder.getProperty("mcast_bfactor", mcast_bfactor, config);
+  step_report_lb_times =
+      builder.getProperty("report_lb_times_at_step", step_report_lb_times, config);
 
   if (numLevels > 0)
   {
@@ -160,29 +174,27 @@ void TreeLB::configure(LBTreeBuilder& builder, json& config)
 void TreeLB::configure(json& config)
 {
 #if CMK_LBDB_ON
-
-  LBTreeBuilder* builder;
   const std::string& tree_type = config["tree"];
   if (tree_type == "PE_Root")
   {
-    builder = new PE_Root_Tree();
+    // builder = new PE_Root_Tree();
+    auto tree = PE_Root_Tree(config);
+    configure(tree, config);
   }
   else if (tree_type == "PE_Process_Root")
   {
-    builder = new PE_Node_Root_Tree();
+    auto tree = PE_Node_Root_Tree(config);
+    configure(tree, config);
   }
   else if (tree_type == "PE_Process_ProcessGroup_Root")
   {
-    builder = new PE_Node_NodeSet_Root_Tree(config["ProcessGroup"]["num_groups"]);
+    auto tree = PE_Node_NodeSet_Root_Tree(config);
+    configure(tree, config);
   }
   else
   {
     CkAbort("TreeLB: configured tree not recognized\n");
   }
-
-  configure(*builder, config);
-  delete builder;
-
 #endif
 }
 
@@ -284,10 +296,9 @@ void TreeLB::loadBalanceSubtree(int level)
 
   // CkPrintf("[%d] TreeLB::loadBalanceSubtree - level=%d\n", CkMyPe(), level);
 
-  std::vector<TreeLBMessage*> decisions;
   /// CkMessage *inter_subtree_migrations = nullptr;
   IDM idm;
-  logic[level]->loadBalance(decisions, idm);
+  TreeLBMessage* decision = logic[level]->loadBalance(idm);
   if (idm.size() > 0)
   {
     // this can happen when final destinations of chares has been decided,
@@ -308,26 +319,8 @@ void TreeLB::loadBalanceSubtree(int level)
   }
 
   // send decision to next level
-  level -= 1;
-  int curr_child = 0;
-  std::vector<int>& children = comm_children[level];
-  for (int i = 0; i < decisions.size(); i++)
-  {
-    if ((i == 0) && (logic[level] != nullptr))
-    {
-      CkAssert(decisions.size() == children.size() + 1);
-      // first decision msg is for this PE
-      receiveDecision(decisions[0], level);
-    }
-    else
-    {
-      decisions[i]->level = level;
-      // Necessary because in some cases every message in decisions is actually
-      // the same message that we are reusing, so mark as unused
-      _SET_USED(UsrToEnv(decisions[i]), 0);
-      thisProxy[children[curr_child++]].sendDecisionDown((CkMessage*)decisions[i]);
-    }
-  }
+  decision->level = level - 1;
+  sendDecisionDown((CkMessage*)decision);
 }
 
 void TreeLB::multicastIDM(const IDM& mig_order, int num_pes, int* _pes)
@@ -348,9 +341,9 @@ void TreeLB::multicastIDM(const IDM& mig_order, int num_pes, int* _pes)
 void TreeLB::sendDecisionDown(CkMessage* msg)
 {
   TreeLBMessage* decision = (TreeLBMessage*)msg;
-  int level = decision->level;
+  const int level = decision->level;
   std::vector<int>& children = comm_children[level];
-  if (children.size() == 0)
+  if (children.empty())
   {
     receiveDecision(decision, level);
   }
@@ -358,15 +351,20 @@ void TreeLB::sendDecisionDown(CkMessage* msg)
   {
     // comm logic is free to split (scatter) the message, or send same msg to every child,
     // etc.
-    std::vector<TreeLBMessage*> decisions;
     CkAssert(comm_logic[level] != nullptr);
-    comm_logic[level]->splitDecision(decision, decisions);
+    std::vector<TreeLBMessage*> decisions =
+        comm_logic[level]->splitDecision(decision, children);
     CkAssert(decisions.size() == children.size() + 1);
-    decisions[0]->level = level;
-    receiveDecision(decisions[0], level);
+    if (logic[level] != nullptr)
+    {
+      receiveDecision(decisions[0], level);
+    }
+    else
+    {
+      delete decisions[0];
+    }
     for (int i = 0; i < children.size(); i++)
     {
-      decisions[i + 1]->level = level;
       // Necessary because in some cases every message in decisions is actually
       // the same message that we are reusing, so mark as unused
       _SET_USED(UsrToEnv(decisions[i + 1]), 0);
@@ -493,6 +491,10 @@ void TreeLB::lb_done()
   {
     CkPrintf("--------- Finished LB step %d ---------\n", lbmgr->step());
   }
+
+  // Advance to next load balancer
+  if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+    lbmgr->nextLoadbalancer(seqno);
 
   // Increment to next step
   lbmgr->incStep();

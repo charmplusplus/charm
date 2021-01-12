@@ -9,7 +9,10 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(HybridBaseLB, "HybridBase load balancer")
+static void lbinit()
+{
+  LBRegisterBalancer<HybridBaseLB>("HybridBaseLB", "HybridBase load balancer");
+}
 
 class DummyMsg: public CMessage_DummyMsg 
 {
@@ -778,7 +781,7 @@ void HybridBaseLB::TotalObjMigrated(int count, int atlevel)
   }
 }
 
-void HybridBaseLB::Migrated(LDObjHandle h, int waitBarrier)
+void HybridBaseLB::Migrated(int waitBarrier)
 {
   LevelData *lData = levelData[0];
 
@@ -1369,5 +1372,3 @@ int HybridBaseLB::useMem()
 #include "HybridBaseLB.def.h"
 
 /*@{*/
-
-

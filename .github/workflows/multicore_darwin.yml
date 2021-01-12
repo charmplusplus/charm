@@ -1,6 +1,6 @@
 name: Multicore Darwin tracing
 
-on: [push]
+on: pull_request
 
 jobs:
   build:
@@ -11,20 +11,17 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: ./build all-test multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
+      run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
     - name: test
       run: |
-        make -C multicore-darwin-x86_64/tests all -j3 OPTS="-tracemode projections"
-        make -C multicore-darwin-x86_64/tests test
-        make -C multicore-darwin-x86_64/examples all -j3 OPTS="-tracemode projections"
-        make -C multicore-darwin-x86_64/examples test
-        make -C multicore-darwin-x86_64/benchmarks all -j3 OPTS="-tracemode projections"
-        make -C multicore-darwin-x86_64/benchmarks test
+        make -C multicore-darwin-x86_64/tmp all-test -j3 OPTS="-g -tracemode projections"
+        make -C multicore-darwin-x86_64/tmp test
     - name: projections
       run: |
         git clone https://github.com/UIUC-PPL/projections
         cd projections
         make
-        cd ../multicore-darwin-x86_64/tests/charm++/megatest
-        ../../../../projections/bin/projections --exit pgm.sts
-        
+        proj=$PWD/bin/projections
+        cd ..
+        files=$(find . -name *.sts)
+        for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done

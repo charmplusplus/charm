@@ -10,6 +10,10 @@
     * #include of files violating any of the above
  */
 
+#ifndef CMK_AMPI_WITH_ROMIO
+# error You must include conv-config.h before including this file!
+#endif
+
 #ifndef AMPI_NOIMPL_ONLY
 
 #ifndef AMPI_FUNC
@@ -451,8 +455,11 @@ AMPI_FUNC(int, MPI_Abort, MPI_Comm comm, int errorcode)
 AMPI_FUNC(int, MPI_Pcontrol, const int level, ...)
 AMPI_FUNC(int, MPI_File_call_errhandler, MPI_File fh, int errorcode)
 AMPI_FUNC(int, MPI_File_create_errhandler, MPI_File_errhandler_function *function, MPI_Errhandler *errhandler)
+#if !CMK_AMPI_WITH_ROMIO
+/* Disable in ROMIO's mpio_functions.h if enabling these. */
 AMPI_FUNC(int, MPI_File_get_errhandler, MPI_File file, MPI_Errhandler *errhandler)
 AMPI_FUNC(int, MPI_File_set_errhandler, MPI_File file, MPI_Errhandler errhandler)
+#endif
 
 /*********************One sided communication routines *****************/
 #ifndef MPI_WIN_NULL_DELETE_FN
@@ -695,11 +702,6 @@ AMPI_FUNC_NOIMPL(int, MPI_Win_sync, MPI_Win win)
 /* A.2.11 I/O C Bindings */
 
 AMPI_FUNC_NOIMPL(int, MPI_CONVERSION_FN_NULL, void *userbuf, MPI_Datatype datatype, int count, void *filebuf, MPI_Offset position, void *extra_state)
-AMPI_FUNC_NOIMPL(int, MPI_File_iread_all, MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
-AMPI_FUNC_NOIMPL(int, MPI_File_iread_at_all, MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
-AMPI_FUNC_NOIMPL(int, MPI_File_iwrite_all, MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
-AMPI_FUNC_NOIMPL(int, MPI_File_iwrite_at_all, MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
-// AMPI_FUNC_NOIMPL(int, MPI_Register_datarep, const char *datarep, MPI_Datarep_conversion_function *read_conversion_fn, MPI_Datarep_conversion_function *write_conversion_fn, MPI_Datarep_extent_function *dtype_file_extent_fn, void *extra_state) //Provided by ROMIO
 
 
 /* A.2.12 Language Bindings C Bindings */

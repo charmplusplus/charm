@@ -7,6 +7,7 @@ void ctxt_init(void) {
   double starttime, endtime;
   int i;
   EmptyMsg msg;
+  CmiInitMsgHeader(msg.core, sizeof(EmptyMsg));
 
   starttime = CmiWallTimer();
   for (i = 0; i < NITER; i++) CthYield();

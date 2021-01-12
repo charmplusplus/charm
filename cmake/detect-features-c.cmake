@@ -3,8 +3,12 @@ include(CheckFunctionExists)
 include(CheckCSourceCompiles)
 include(CheckSymbolExists)
 
-set(CMAKE_EXTRA_INCLUDE_FILES sys/types.h sys/socket.h)
-set(CMAKE_REQUIRED_LIBRARIES -lm ${CMAKE_DL_LIBS} -pthread)
+if(NOT CHARM_OS STREQUAL "win")
+  set(CMAKE_EXTRA_INCLUDE_FILES sys/types.h sys/socket.h)
+  set(CMAKE_REQUIRED_LIBRARIES -lm ${CMAKE_DL_LIBS} -pthread)
+else()
+  set(CMAKE_REQUIRED_LIBRARIES -lm -pthread)
+endif()
 set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
 
 # C types and type sizes
@@ -75,20 +79,23 @@ check_function_exists(clzl HAVE_CLZL)
 check_symbol_exists(dlopen dlfcn.h CMK_DLL_USE_DLOPEN)
 set(CMK_HAS_DLOPEN ${CMK_DLL_USE_DLOPEN})
 check_symbol_exists(dlmopen dlfcn.h CMK_HAS_DLMOPEN)
-check_function_exists(fabsf HAVE_DECL_FABSF)
-check_function_exists(fabsf CMK_HAS_FABSF)
+check_symbol_exists(fabsf "math.h" HAVE_DECL_FABSF)
+set(CMK_HAS_FABSF ${HAVE_DECL_FABSF})
 check_symbol_exists(fdatasync unistd.h CMK_HAS_FDATASYNC_FUNC)
 check_function_exists(fsync CMK_HAS_FSYNC_FUNC)
-check_function_exists(ffs HAVE_FFS)
+check_symbol_exists(ffs "strings.h" HAVE_FFS)
 check_function_exists(ffsl HAVE_FFSL)
 check_function_exists(fls HAVE_FLS)
 check_function_exists(flsl HAVE_FLSL)
 check_function_exists(getexecname HAVE_DECL_GETEXECNAME)
-check_function_exists(gethostname CMK_HAS_GETHOSTNAME)
 check_function_exists(getifaddrs CMK_HAS_GETIFADDRS)
 check_function_exists(getpagesize HAVE_GETPAGESIZE)
 check_function_exists(getpagesize CMK_HAS_GETPAGESIZE)
 check_function_exists(getpid CMK_HAS_GETPID)
+check_type_size(pid_t MY_HAS_PID_T)
+if(NOT MY_HAS_PID_T)
+  set(CMK_HAS_GETPID 0)
+endif()
 check_function_exists(getprogname HAVE_DECL_GETPROGNAME)
 check_symbol_exists(get_myaddress rpc/rpc.h CMK_HAS_GET_MYADDRESS)
 check_function_exists(host_info HAVE_HOST_INFO)
@@ -139,7 +146,7 @@ check_function_exists(usleep CMK_HAS_USLEEP)
 
 # Complex tests
 
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+if(CMK_WINDOWS OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(CMK_CAN_GET_BINARY_PATH 1)
 elseif(${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH})
   set(CMK_CAN_GET_BINARY_PATH 1)
@@ -413,7 +420,11 @@ check_c_source_compiles("
 #include <ucontext.h>
 struct _libc_fpstate   fpstate;
 fpregset_t *fp;
-int main() {}
+int main()
+{
+  ucontext_t context;
+  context.uc_mcontext.fpregs = 0;
+}
 " CMK_CONTEXT_FPU_POINTER)
 
 check_c_source_compiles("

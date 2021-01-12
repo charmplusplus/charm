@@ -6,6 +6,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <ctime>        // std::time_t, std::gmtime
+#include <chrono>       // std::chrono::system_clock
+
 #include "charm.h"
 #include "middle.h"
 #include "cklists.h"
@@ -15,6 +18,34 @@
 #include "trace-common.h"
 #include "allEvents.h"          //projector
 #include "register.h" // for _entryTable
+
+// To get username
+#if defined(_WIN32) || defined(_WIN64)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <Lmcons.h>
+#else
+#include <pwd.h>
+#endif
+
+// To get hostname
+#if defined(_WIN32) || defined(_WIN64)
+#  include <Winsock2.h>
+#else
+#  include <unistd.h>
+#  include <limits.h> // For HOST_NAME_MAX
+#endif
+
+#ifndef HOST_NAME_MAX
+// Apple seems to not adhere to POSIX and defines this non-standard variable
+// instead of HOST_NAME_MAX
+#  ifdef MAXHOSTNAMELEN
+#    define HOST_NAME_MAX MAXHOSTNAMELEN
+// Windows docs say 256 bytes (so 255 + 1 added at use) will always be sufficient
+#  else
+#    define HOST_NAME_MAX 255
+#  endif
+#endif
 
 CpvExtern(int, _traceCoreOn);   // projector
 
@@ -224,6 +255,9 @@ static void traceCommonInit(char **argv)
   }
 }
 
+extern char** Cmi_argvcopy;
+extern const char* const CmiCommitID;
+
 /** Write out the common parts of the .sts file. */
 void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE \"%s\"\n",CMK_MACHINE_NAME);
@@ -234,7 +268,49 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
-#endif	
+#endif
+
+#if defined(_WIN32) || defined(_WIN64)
+  TCHAR username[UNLEN + 1];
+  DWORD size = UNLEN + 1;
+  if (GetUserName(username, &size))
+    fprintf(stsfp, "USERNAME \"%s\"\n", username);
+#else
+  const struct passwd* pw = getpwuid(getuid());
+  if (pw != nullptr)
+    fprintf(stsfp, "USERNAME \"%s\"\n", pw->pw_name);
+#endif
+
+  // Add 1 for null terminator
+  char hostname[HOST_NAME_MAX + 1];
+  if(gethostname(hostname, HOST_NAME_MAX + 1) == 0)
+    fprintf(stsfp, "HOSTNAME \"%s\"\n", hostname);
+
+  fprintf(stsfp, "COMMANDLINE \"");
+  int index = 0;
+  while (Cmi_argvcopy[index] != nullptr)
+  {
+    if (index > 0)
+      fprintf(stsfp, " ");
+    fprintf(stsfp, "%s", Cmi_argvcopy[index]);
+    index++;
+  }
+  fprintf(stsfp, "\"\n");
+
+  // write timestamp in ISO 8601 format
+  using std::chrono::system_clock;
+  const time_t now = system_clock::to_time_t(system_clock::now());
+  struct tm currentTime;
+#if defined(_WIN32) || defined(_WIN64)
+  gmtime_s(&currentTime, &now);
+#else
+  gmtime_r(&now, &currentTime);
+#endif
+  char timeBuffer[sizeof("YYYY-mm-ddTHH:MM:SSZ")];
+  strftime(timeBuffer, sizeof(timeBuffer), "%FT%TZ", &currentTime);
+  fprintf(stsfp, "TIMESTAMP %s\n", timeBuffer);
+
+  fprintf(stsfp, "CHARMVERSION %s\n", CmiCommitID);
   fprintf(stsfp, "TOTAL_CHARES %d\n", (int)_chareTable.size());
   fprintf(stsfp, "TOTAL_EPS %d\n", (int)_entryTable.size());
   fprintf(stsfp, "TOTAL_MSGS %d\n", (int)_msgTable.size());

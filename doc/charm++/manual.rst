@@ -1923,7 +1923,9 @@ instead use a for loop:
 Note that ``int iter;`` is declared in the chare’s class definition and
 not in the ``.ci`` file. This is necessary because the Charm++ interface
 translator does not fully parse the declarations in the ``for`` loop
-header, because of the inherent complexities of C++.
+header, because of the inherent complexities of C++. Finally, there is
+currently no mechanism by which to ``break`` or ``continue`` from an
+SDAG loop.
 
 SDAG also supports conditional execution of statements and blocks with
 ``if`` statements. The syntax of SDAG ``if`` statements matches that of
@@ -2699,6 +2701,158 @@ applications. RotateLB and RandCentLB are more useful for debugging
 object migrations. The compiler and runtime options are described in
 section :numref:`lbOption`.
 
+**TreeLB and its Configuration**
+
+TreeLB allows for user-configurable hierarchical load balancing. While
+the legacy centralized strategies above are still supported, TreeLB
+allows load balancing to be performed at different levels and
+frequencies in a modular way. TreeLB includes several kinds of trees:
+the 2-level tree consists of PE and root levels (essentially the same as
+centralized load balancing), the 3-level tree consists of PE,
+process, and root levels, and the 4-level tree consists of
+PE, process, process group, and root levels (process groups are
+collections of consecutive processes; the number of groups is
+configurable, see below). Each level only balances
+load within its corresponding domain; for example, for the 3-level
+PE-Process-Root tree during process steps, each process runs the
+specified LB strategy over only the PEs and objects contained within
+the process, while, at root steps, the root strategy is run over all
+PEs and objects in the job. The load balancing strategy to be used at
+each level and frequency at which to invoke LB at each level can be
+specified using a JSON configuration file with name ``treelb.json`` or
+by specifying the JSON file name using command line option
+``+TreeLBFile``. We provide examples of some configuration files below:
+
+Creating a 2-level tree that first uses the Greedy strategy and then
+the GreedyRefine strategy at the root:
+
+.. code-block:: json
+
+  {
+    "tree": "PE_Root",
+    "root":
+    {
+        "pe": 0,
+        "strategies": ["Greedy", "GreedyRefine"]
+    }
+  }
+
+Creating a 3-level tree that uses the Greedy strategy at the process level
+and the GreedyRefine strategy at the root, which runs only every three
+steps:
+
+.. code-block:: json
+
+  {
+    "tree": "PE_Process_Root",
+    "root":
+    {
+        "pe": 0,
+        "step_freq": 3,
+        "strategies": ["GreedyRefine"]
+    },
+    "process":
+    {
+        "strategies": ["Greedy"]
+    }
+  }
+
+Creating a 4-level tree that uses the GreedyRefine strategy at the process
+and process group levels. The number of user-specified process groups is four in
+this example. A strategy is not allowed at root level for a 4-level tree since
+communicating all object load information to the root can be expensive given
+the size of the PE tree. Load is balanced at the process group level
+every five steps and at the root level every ten steps. Note also that
+the process group usage of GreedyRefine provides a custom parameter to
+the strategy. This parameter will only be used for the process group
+level version of GreedyRefine, not the process level version.
+
+.. code-block:: json
+
+  {
+    "tree": "PE_Process_ProcessGroup_Root",
+    "root":
+    {
+        "pe": 0,
+        "step_freq": 10
+    },
+    "processgroup":
+    {
+        "step_freq": 5,
+        "strategies": ["GreedyRefine"],
+        "num_groups": 4,
+        "GreedyRefine":
+        {
+            "tolerance": 1.03
+        }
+    },
+    "process":
+    {
+        "strategies": ["GreedyRefine"]
+    }
+  }
+
+**TreeLB Configuration Parameters**
+
+The following parameters may be used to specify the configuration of TreeLB:
+
+- ``tree`` (**required**): String specifying the tree to use. Can be one of "PE_Root",
+  "PE_Process_Root", or "PE_Process_ProcessGroup_Root".
+- ``root`` (**required**): The configuration block for the root level of the
+  tree.
+
+  - ``pe``: Integer specifying the root PE. (default = ``0``)
+  - ``token_passing`` : Boolean specifying whether to use the coarsened
+    token passing strategy or not, only allowed for the "PE_Process_ProcessGroup_Root"
+    tree. If false, load will only be balanced within process groups
+    at most, never across the whole job. (default = ``true``)
+
+- ``processgroup`` (**required** for "PE_Process_ProcessGroup_Root" tree): The configuration block for
+  the process group level of the tree.
+
+  - ``num_groups`` (**required**): Integer specifying the number of process
+    groups to create.
+
+- ``process`` (**required** for "PE_Process_Root" and
+  "PE_Process_ProcessGroup_Root" trees): The configuration block for
+  the process level of the tree.
+- ``mcast_bfactor``: 8-bit integer specifying the branching factor of
+  the communication tree used to send inter-subtree migrations for the
+  4-level tree's token passing scheme. (default = ``4``)
+
+The ``root``, ``processgroup``, and ``process`` blocks may include the
+following tree level configuration parameters:
+
+- ``strategies`` (**required** except for root level of
+  "PE_Process_ProcessGroup_Root" tree): List of strings specifying which
+  LB  strategies to run at the given level.
+- ``repeat_strategies``: Boolean specifying if the whole list of
+  strategies should be repeated or not. If true, start back at the
+  beginning when the end of ``strategies`` is reached, otherwise keep
+  repeating the last strategy (e.g. for ``"strategies": ["1", "2"]``,
+  ``true`` would result in 1, 2, 1, 2, ...; ``false`` in 1, 2, 2, 2, ...).
+  (default = ``false``)
+- ``step_freq``: Integer specifying frequency at which to balance at the given
+  level of the tree. Not allowed to be specified on the level
+  immediately above the PE level of the tree, which implicitly has a
+  value of 1. This value must be a multiple of the value for the level
+  below it. For example, for the 4-level tree, this can be specified
+  for the process group and root levels, and the value for the root
+  level must be a multiple of the process group value. If these values
+  are given as 2 and 4, respectively, then load balancing will be
+  performed at the following levels in sequence: process, process
+  group, process, root, process, and so on. (default = max(value of
+  the level below, ``1``))
+- Individual strategies can also be configured using parameters in
+  this file. These should be placed in a block with a key exactly
+  matching the name of the load balancer, and can be parsed from
+  within the strategy's constructor.
+
+  - ``GreedyRefine``:
+
+    - ``tolerance``: Float specifying the tolerance GreedyRefine should
+      allow above the maximum load of Greedy.
+
 **Metabalancer to automatically schedule load balancing**
 
 Metabalancer can be invoked to automatically decide when to invoke the
@@ -2904,8 +3058,8 @@ to configure the load balancer, etc. These functions are:
    .. code-block:: c++
 
       // if used in an array element
-      LBDatabase *lbdb = getLBDB();
-      lbdb->SetLBPeriod(5.0);
+      LBManager* lbmgr = getLBMgr();
+      lbmgr->SetLBPeriod(5.0);
 
       // if used outside of an array element
       LBSetPeriod(5.0);
@@ -2979,17 +3133,6 @@ Below are the descriptions about the compiler and runtime options:
    installation of any third party libraries you wish to use to the
    Charm++ search paths.
 
-#. **Building individual load balancers**
-
-   Load balancers can be built individually by changing the current
-   working directory to the *tmp* subdirectory of your build and making
-   them by name.
-
-   .. code-block:: bash
-
-      $ cd netlrts-linux-x86_64/tmp
-      $ make PhasebyArrayLB
-
 #. **Write and use your own load balancer**
 
    Refer Section :numref:`lbWriteNewLB` for writing a new load
@@ -2998,13 +3141,12 @@ Below are the descriptions about the compiler and runtime options:
    path to the library and link the load balancer into an application
    using *-module FooLB*.
 
-   You can create a library by modifying the Makefile in the following
-   way. This will create *libmoduleFooLB.a*.
+   You can create a library in the following way. This will create
+   *libmoduleFooLB.a*.
 
-   .. code-block:: makefile
+   .. code-block:: bash
 
-      libmoduleFooLB.a: FooLB.o
-        $(CHARMC) -o libmoduleFooLB.a FooLB.o
+      $ bin/charmc -o libmoduleFooLB.a FooLB.C
 
    To include this balancer in your application, the Makefile can be
    changed in the following way
@@ -5642,19 +5784,27 @@ is created, a *reference* is returned immediately. However, if the
 *value* calculated by the future is needed, the calling program blocks
 until the value is available.
 
-Charm++ provides all the necessary infrastructure to use futures by
-means of the following functions:
+We provide both C-compatible and object-oriented interfaces for using
+futures, which include the following functions:
 
-.. code-block:: c++
++------------------------------------------------------+-------------------------------------+
+| C                                                    | C++                                 |
++======================================================+=====================================+
+| :code:`CkFuture CkCreateFuture(void)`                | :code:`ck::future()`                |
++------------------------------------------------------+-------------------------------------+
+| :code:`void CkReleaseFuture(CkFuture fut)`           | :code:`void ck::future::release()`  |
++------------------------------------------------------+-------------------------------------+
+| :code:`int CkProbeFuture(CkFuture fut)`              | :code:`bool ck::future::is_ready()` |
++------------------------------------------------------+-------------------------------------+
+| :code:`void *CkWaitFuture(CkFuture fut)`             | :code:`T ck::future::get()`         |
++------------------------------------------------------+-------------------------------------+
+| :code:`void CkSendToFuture(CkFuture fut, void *msg)` | :code:`void ck::future::set(T)`     |
++------------------------------------------------------+-------------------------------------+
 
-    CkFuture CkCreateFuture(void)
-    void CkReleaseFuture(CkFuture fut)
-    int CkProbeFuture(CkFuture fut)
-    void *CkWaitFuture(CkFuture fut)
-    void CkSendToFuture(CkFuture fut, void *msg)
-
-To illustrate the use of all these functions, a Fibonacci example in
-Charm++ using futures in presented below:
+You will note that the object-oriented versions are methods of `ck::future`,
+which can be templated with any pup'able type. An example of the
+object-oriented interface is available under `examples/charm++/future`,
+with an equivalent example for the C-compatible interface presented below:
 
 .. code-block:: charmci
 
@@ -5703,6 +5853,16 @@ return the value for the current future.
 Other functions complete the API for futures. *CkReleaseFuture* destroys
 a future. *CkProbeFuture* tests whether the future has already finished
 computing the value of the expression.
+
+The maximum number of outstanding futures a PE may have is limited by the size of
+*CMK_REFNUM_TYPE*. Specifically, no more than :math:`2^{SIZE}-1` futures, where :math:`SIZE`
+is the size of *CMK_REFNUM_TYPE* in bits, may be outstanding at any time.
+Waiting on more futures will cause a fatal error in non-production builds,
+and will cause the program to hang in production builds. The default *CMK_REFNUM_TYPE*
+is ``unsigned short``, limiting each PE to 65,535 outstanding futures.
+To increase this limit, build Charm++ with a larger *CMK_REFNUM_TYPE*, e.g. specifying
+``--with-refnum-type=uint`` to use ``unsigned int`` when building Charm++.
+
 
 The Converse version of future functions can be found in the :ref:`conv-futures`
 section.
@@ -8083,12 +8243,27 @@ The API to checkpoint the application is:
 
 .. code-block:: c++
 
-     void CkStartCheckpoint(char* dirname, const CkCallback& cb);
+     void CkStartCheckpoint(char* dirname, const CkCallback& cb, bool
+     requestStatus = false, int writersPerNode = 0);
 
 The string ``dirname`` is the destination directory where the checkpoint
 files will be stored, and ``cb`` is the callback function which will be
 invoked after the checkpoint is done, as well as when the restart is
-complete. Here is an example of a typical use:
+complete. If ``CkStartCheckpoint`` is called again before ``cb`` has
+been called, the new request may be silently dropped. When the
+optional parameter ``requestStatus`` is true, the callback ``cb`` is
+sent a message of type ``CkCheckpointStatusMsg`` which includes an
+``int status`` field of value ``CK_CHECKPOINT_SUCCESS`` or
+``CK_CHECKPOINT_FAILURE`` indicating the success of the checkpointing
+operation. ``writersPerNode`` is an optional parameter that controls
+the number of PEs per logical node simultaneously allowed to write
+checkpoints. By default, it allows all PEs on a node to write at once,
+but should be tuned for large runs to avoid overloading the
+filesystem. Once set, this value persists for future calls to
+``CkStartCheckpoint``, so it does not need to be provided on every
+invocation (specifying 0 also leaves it at its current value).
+
+Here is an example of a typical use:
 
 .. code-block:: c++
 
@@ -8784,6 +8959,200 @@ following example shows how this API can be used.
    interuppted by loop-level work from other PEs */
 
    CkSetPeHelpsOtherThreads(1);
+
+.. _sec-gpu:
+
+GPU Support
+-----------
+
+Overview
+~~~~~~~~
+
+GPUs are throughput-oriented devices with peak computational
+capabilities that greatly surpass equivalent-generation CPUs but with
+limited control logic. This currently constrains them to be used as
+accelerator devices controlled by code on the CPU. Traditionally,
+programmers have had to either (a) halt the execution of work on the CPU
+whenever issuing GPU work to simplify synchronization or (b) issue GPU
+work asynchronously and carefully manage and synchronize concurrent GPU
+work in order to ensure progress and good performance. The latter becomes
+significantly more difficult with overdecomposition as in Charm++, where
+numerous concurrent objects launch computational kernels and initiate
+data transfers on the GPU.
+
+The support for GPUs in the Charm++ runtime system consist of the
+**GPU Manager** module and **Hybrid API (HAPI)**. HAPI exposes the core
+functionalities of GPU Manager to the Charm++ user. Currently only NVIDIA GPUs
+(and CUDA) are supported, although we are actively working on providing
+support for AMD and Intel GPUs as well. CUDA code can be integrated in
+Charm++ just like any C/C++ program to offload computational kernels,
+but when used naively, performance will most likely be far from ideal.
+This is because overdecomposition, a core concept of Charm++, creates
+relatively fine-grained objects and tasks that needs support from the
+runtime to be executed efficiently.
+
+We strongly recommend using CUDA Streams to assign one more streams
+to each chare, so that multiple GPU operations initiated by different
+chares can be executed concurrently when possible. Concurrent Kernel
+Execution in CUDA allows kernels in different streams to execute
+concurrently on the device unless a single kernel uses all of the available
+GPU resources. It should be noted that concurrent data transfers (even when
+they are in different streams) are limited by the number of DMA engines
+on the GPU, and most current GPUs have only one engine per direction
+(host-to-device, device-to-host).
+
+In addition to using CUDA Streams to maximize concurrency, another
+important consideration is avoiding synchronization calls such as
+``cudaStreamSynchronize`` or ``cudaDeviceSynchronize``. This is because
+the chare that has just enqueued some work to the GPU should yield the
+PE, in order to allow other chares waiting on the same PE to execute.
+Because of the message-driven execution pattern in Charm++, it is infeasible
+for the user to asynchronously detect when a GPU operation completes,
+either by manually polling the GPU or adding a CUDA Callback to the stream.
+One of the core functionalities of GPU Manager is supporting this asynchronous
+detection, which allows a Charm++ callback to be invoked when all previous
+operations in a specified CUDA stream complete. This is exposed to the
+user via a HAPI call, which is demonstrated in the usage section below.
+
+Enabling GPU Support
+~~~~~~~~~~~~~~~~~~~~
+
+GPU support via GPU Manager and HAPI is not included by default when
+building Charm++. Use ``build`` with the ``cuda`` option to build Charm++
+with GPU support (CMake build is currently not supported), e.g.
+
+.. code-block:: bash
+
+   $ ./build charm++ netlrts-linux-x86_64 cuda -j8 --with-production
+
+Building with GPU support requires an installation of the CUDA Toolkit on the
+system, which is automatically found by the build script. If the script fails
+to find it, provide the path as one of ``CUDATOOLKIT_HOME``, ``CUDA_DIR``,
+or ``CUDA_HOME`` environment variables.
+
+Using GPU Support through HAPI
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As explained in the Overview section, use of CUDA streams is strongly
+recommended. This provides the opportunity for kernels offloaded by chares
+to execute concurrently on the GPU.
+
+In a typical Charm++ application using CUDA, the ``.C`` and ``.ci`` files
+would contain the Charm++ code, whereas a ``.cu`` file would contain the
+definition of CUDA kernels and functions that serve as entry points
+from the Charm++ application to use GPU capabilities. Calls to CUDA and/or
+HAPI to invoke kernels, perform data transfers, or enqueue detection for
+GPU work completion would be placed inside this file, although they could
+also be put in the ``.C`` file provided that the right header files are
+included (``<cuda_runtime.h>`` and/or ``"hapi.h"``). The user should make sure
+that the CUDA kernels are compiled by ``nvcc``, however.
+
+After the necessary GPU operations are enqueued in the appropriate CUDA stream,
+the user would call ``hapiAddCallback`` to have a Charm++ callback to be invoked
+when all previous operations in the stream complete. For example,
+``hapiAddCallback`` can be called after a kernel invocation and a device-to-host
+data transfer to asynchronously 'enqueue' a Charm++ callback that prints out
+the data computed by the GPU to ``stdout``. The GPU Manager module ensures
+that the Charm++ callback will only be invoked once the GPU kernel and
+device-to-host data transfer complete.
+
+The following is a list of HAPI functions:
+
+.. code-block:: c++
+
+   void hapiAddCallback(cudaStream_t stream, CkCallback* callback);
+
+   void hapiCreateStreams();
+   cudaStream_t hapiGetStream();
+
+   void* hapiPoolMalloc(int size);
+   void hapiPoolFree(void* ptr);
+
+   hapiCheck(code);
+
+``hapiCreateStreams`` creates as many streams as the maximum number of
+concurrent kernels supported by the GPU device. ``hapiGetStream`` hands
+out a stream created by the runtime in a round-robin fashion.
+``hapiPool`` functions provides memory pool functionalities which are
+used to obtain/free device memory without interrupting the GPU.
+``hapiCheck`` is used to check if the input code block executes without
+errors. The provided code should return ``cudaError_t`` for it to work.
+
+Examples using CUDA and HAPI can be found under
+``examples/charm++/cuda``. Codes under ``#ifdef USE_WR`` use the
+``hapiWorkRequest`` scheme, which is now deprecated.
+
+Direct GPU Messaging
+~~~~~~~~~~~~~~~~~~~~
+
+Inspired by CUDA-aware MPI, the direct GPU messaging feature in Charm++
+attempts to reduce the latency and increase the bandwidth for inter-GPU
+data transfers by bypassing host memory. In Charm++, however, some
+metadata exchanges between the sender and receiver are required as the
+destination buffer is not known by the sender. Thus our approach is
+based on the Zero Copy Entry Method Post API (section :numref:`nocopyapi`),
+where the sender sends a metadata message containing the address of the
+source buffer on the GPU and the receiver posts an Rget from the source
+buffer to the destination buffer (also on the GPU).
+
+To send a GPU buffer using direct GPU messaging, add a ``nocopydevice``
+specifier to the parameter of the receiving entry method in the ``.ci`` file:
+
+.. code-block:: charmci
+
+   entry void foo(int size, nocopydevice double arr[size]);
+
+This entry method should be invoked on the sender by wrapping the
+source buffer with ``CkDeviceBuffer``, whose constructor takes a pointer
+to the source buffer, a Charm++ callback to be invoked once the transfer
+completes (optional), and a CUDA stream associated with the transfer
+(also optional):
+
+.. code-block:: c++
+
+   // Constructors of CkDeviceBuffer
+   CkDeviceBuffer(const void* ptr);
+   CkDeviceBuffer(const void* ptr, const CkCallback& cb);
+   CkDeviceBuffer(const void* ptr, cudaStream_t stream);
+   CkDeviceBuffer(const void* ptr, const CkCallback& cb, cudaStream_t stream);
+
+   // Call on sender
+   someProxy.foo(source_buffer, cb, stream);
+
+As with the Zero Copy Entry Method Post API, two entry methods
+(post entry method and regular entry method) must be specified, and the
+post entry method has an additional ``CkDeviceBufferPost`` argument that
+can be used to specify the CUDA stream where the data transfer will be
+enqueued:
+
+.. code-block:: c++
+
+   // Post entry method
+   void foo(int& size, double*& arr, CkDeviceBufferPost* post) {
+     arr = dest_buffer; // Inform the location of the destination buffer to the runtime
+     post[0].cuda_stream = stream; // Perform the data transfer in the specified CUDA stream
+   }
+
+   // Regular entry method
+   void foo(int size, double* arr) {
+     // Data transfer into arr has been initiated
+     ...
+   }
+
+The specified CUDA stream can be used by the receiver to asynchronously invoke
+GPU operations dependent on the arriving data, without explicitly synchronizing
+with the host. This brings us to an important difference from the host-side
+Zero Copy API: the regular entry method is invoked after the data transfer is
+**initiated**, not after it is complete. It should also be noted that the
+regular entry method can be defined as a SDAG method if so desired.
+
+Currently the direct GPU messaging feature is limited to **intra-node** messages.
+Inter-node messages will be transferred using the naive host-staged mechanism
+where the data is first transferred to the host from the source GPU, sent over
+the network, then transferred to the destination GPU.
+
+Examples using the direct GPU messaging feature can be found in
+``examples/charm++/cuda/gpudirect``.
 
 .. _sec:mpiinterop:
 
@@ -9527,6 +9896,12 @@ Charm++’s built-in strategies(see :numref:`lbStrategy`) for the best
 performance based on the characteristics of their applications. However,
 they can also choose to write their own load balancing strategies.
 
+Users are recommended to use the TreeLB structure to write new custom
+strategies if possible (see :numref:`lbWriteNewTreeLB`). Currently,
+TreeLB may not be suitable for distributed strategies, if
+communication graph information is needed, or when working with legacy
+strategies.
+
 The Charm++ load balancing framework provides a simple scheme to
 incorporate new load balancing strategies. The programmer needs to write
 their strategy for load balancing based on the instrumented ProcArray
@@ -9595,6 +9970,50 @@ to the Charm++ build system:
 #. Run ``make depends`` to update dependence rule of Charm++ files. And
    run ``make charm++`` to compile Charm++ which includes the new load
    balancing strategy files.
+
+.. _lbWriteNewTreeLB:
+
+Writing a new load balancing strategy with TreeLB
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Writing a load balancing strategy with TreeLB is very simple. It involves
+implementing a class inheriting from the abstract ``Strategy`` class
+defined in the ``TreeStrategyBase.h`` header file. Specifically, the
+load balancing strategy needs to be implemented in the ``solve`` method,
+which receives objects and processors as vectors. The solution
+needs to be stored in the ``solution`` object using its
+``assign(O object, P pe)`` instance method and is used by the load
+balancing framework to perform object migrations accordingly. The
+``bool objSorted`` argument specifies whether the incoming vector of
+objects is sorted by load values or not. This new strategy can be written
+in a header file and must be included in the ``TreeStrategyFactory.h``
+header file along with the mapping of the strategy name and class to
+be invoked for the newly implemented strategy. It can then be used by
+linking a program with TreeLB and specifying the newly created
+strategy in the configuration file.
+
+.. code-block:: c++
+
+  namespace TreeStrategy
+  {
+  template <typename O, typename P, typename S>
+  class FooLB : public Strategy<O, P, S>
+  {
+  public:
+    void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)
+    {
+      // The strategy goes here.
+      // This is a simple example strategy that round-robin assigns objects to processors.
+      int index = 0;
+      for (const auto& o : objs)
+      {
+        P p = procs[index];
+        solution.assign(o, p); // update solution object
+        index = (index + 1) % procs.size();
+      }
+    }
+  };
+  }  // namespace TreeStrategy
 
 .. _lbdatabase:
 
@@ -9913,12 +10332,12 @@ mass of the particles with velocity greater than 1:
 
 .. code-block:: python
 
-   size = ck.read((``numparticles'', 0));
+   size = ck.read(("numparticles", 0));
    for i in range(0, size):
-       vel = ck.read((``velocity'', i));
-       mass = ck.read((``mass'', i));
+       vel = ck.read(("velocity", i));
+       mass = ck.read(("mass", i));
        mass = mass * 2;
-       if (vel > 1): ck.write((``mass'', i), mass);
+       if (vel > 1): ck.write(("mass", i), mass);
 
 Instead of all these read and writes, it will be better to be able to
 write:
@@ -10753,22 +11172,23 @@ appropriate choices for the build one wants to perform.
    ================================================================ =====================================================================
    Machine                                                          Build command
    ================================================================ =====================================================================
-   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    Multicore (single node, shared memory) 64 bit Linux              ``./build charm++ multicore-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux                                            ``./build charm++ netlrts-linux-x86_64 --with-production -j8``
    Net with 64 bit Linux (intel compilers)                          ``./build charm++ netlrts-linux-x86_64 icc --with-production -j8``
    Net with 64 bit Linux (shared memory)                            ``./build charm++ netlrts-linux-x86_64 smp --with-production -j8``
    Net with 64 bit Linux (checkpoint restart based fault tolerance) ``./build charm++ netlrts-linux-x86_64 syncft --with-production -j8``
+   Net with 32 bit Linux                                            ``./build charm++ netlrts-linux-i386 --with-production -j8``
    MPI with 64 bit Linux                                            ``./build charm++ mpi-linux-x86_64 --with-production -j8``
    MPI with 64 bit Linux (shared memory)                            ``./build charm++ mpi-linux-x86_64 smp --with-production -j8``
    MPI with 64 bit Linux (mpicxx wrappers)                          ``./build charm++ mpi-linux-x86_64 mpicxx --with-production -j8``
    IBVERBS with 64 bit Linux                                        ``./build charm++ verbs-linux-x86_64 --with-production -j8``
    OFI with 64 bit Linux                                            ``./build charm++ ofi-linux-x86_64 --with-production -j8``
    UCX with 64 bit Linux                                            ``./build charm++ ucx-linux-x86_64 --with-production -j8``
-   UCX with 64 bit Linux (Armv8)                                    ``./build charm++ ucx-linux-arm8 --with-production -j8``
+   UCX with 64 bit Linux (AArch64)                                  ``./build charm++ ucx-linux-arm8 --with-production -j8``
    Net with 64 bit Windows                                          ``./build charm++ netlrts-win-x86_64 --with-production -j8``
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
-   Net with 64 bit Mac                                              ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
+   Net with 64 bit macOS (x86_64)                                   ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
+   Net with 64 bit macOS (ARM64)                                    ``./build charm++ netlrts-darwin-arm8 --with-production -j8``
    Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pami-bluegeneq --with-production -j8``
    Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pamilrts-bluegeneq --with-production -j8``
    Cray XE6                                                         ``./build charm++ gni-crayxe --with-production -j8``
@@ -10859,7 +11279,7 @@ After downloading and unpacking Charm++, it can be installed in the following wa
    $ make -j4
 
 
-By default, CMake builds the netlrts version. 
+By default, CMake builds the netlrts version.
 Other configuration options can be specified in the cmake command above.
 For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the following command can be used:
 
@@ -10923,10 +11343,10 @@ UCX
 ^^^
 UCX stands for Unified Communication X and is a high performance communication
 library that can be used as a backend networking layer for Charm++ builds on
-supported transports like Infiniband, Omni-Path, gni, TCP/IP, etc.
+supported transports like Mellanox Infiniband, Intel Omni-Path, Cray GNI, TCP/IP, etc.
 
-In order to install Charm++ with UCX backend, you require UCX or HPC-X modules
-in your environment. In case UCX or HPC-X is not available in your environment,
+In order to install Charm++ with the UCX backend, UCX or HPC-X modules are required
+in your environment. In case UCX and HPC-X are not available in your environment,
 you can build UCX from scratch using the following steps:
 
 .. code-block:: bash
@@ -10940,16 +11360,21 @@ you can build UCX from scratch using the following steps:
 
 After installing UCX, there are several supported process management interfaces (PMI)
 that can be specified as options in order to build Charm++ with UCX. These include
-Simple PMI, Slurm PMI, Slurm PMI 2 and PMIx (using OpenMPI). Currently, in order to
-use PMIx for process management, it is required to have OpenMPI installed on the system.
+Simple PMI, Slurm PMI, Slurm PMI 2, and PMIx (included in OpenMPI or OpenPMIx). Currently, in order to
+use PMIx for process management, it is required to have either OpenMPI or OpenPMIx installed on the system.
 Additionally, in order to use the other supported process management interfaces, it is
 required to have a non-OpenMPI based MPI implementation installed on the system (e.g.
 Intel MPI, MVAPICH, MPICH, etc.).
+
+It should be noted that the **PMIx** version is the *most stable* version of using the UCX backend.
+We're in the process of debugging some recent issues with Simple PMI, Slurm PMI and Slurm PMI2.
 
 The following section shows examples of build commands that can be used to build targets
 with the UCX backend using different process management interfaces. It should be noted that
 unless UCX is installed in a system directory, in order for Charm++ to find the UCX installation,
 it is required to pass the UCX build directory as ``--basedir``.
+
+**Simple PMI, Slurm PMI and Slurm PMI 2**
 
 To build the Charm++ target with Simple PMI, do not specify any additional option as shown
 in the build command.
@@ -10970,28 +11395,81 @@ Similarly, to build the Charm++ target with Slurm PMI 2, specify ``slurmpmi2`` i
 
    $ ./build charm++ ucx-linux-x86_64 slurmpmi2 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
 
-To build the Charm++ target with PMIx, you would require an OpenMPI implementation with PMIx
-enabled to be installed on your system. In case OpenMPI is not available in your environment,
+**PMIx (OpenPMIx or as included in OpenMPI)**
+
+To build the Charm++ target with PMIx, you can either use OpenPMIx directly or use the version of
+PMIx included in OpenMPI. Note that PMIx is no longer included in OpenMPI distributions
+as of v4.0.5, so we recommend building with OpenPMIx instead.
+
+To use OpenPMIx directly, you first need to install libevent (https://github.com/libevent/libevent)
+if it's not available on your system:
+
+.. code-block:: bash
+
+   $ wget https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
+   $ tar -xf libevent-2.1.12-stable.tar.gz
+   $ cd libevent-2.1.12-stable
+   $ ./configure --prefix=$HOME/libevent-2.1.12-stable/build
+   $ make -j
+   $ make install
+
+Then you can download and build OpenPMIx as follows:
+
+.. code-block:: bash
+
+   $ wget https://github.com/openpmix/openpmix/releases/download/v3.1.5/pmix-3.1.5.tar.gz
+   $ tar -xf pmix-3.1.5.tar.gz
+   $ cd pmix-3.1.5
+   $ ./configure --prefix=$HOME/pmix-3.1.5/build --with-libevent=$HOME/libevent-2.1.12-stable/build
+   $ make -j
+   $ make install
+
+Finally, Charm++ with the UCX backend can be built with OpenPMIx using the following command
+(with the OpenPMIx installation passed as an additional ``--basedir`` argument):
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 openpmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/pmix-3.1.5/build -j
+
+It should be noted that in the absence of a working launcher such as ``jsrun``, an MPI distribution
+such as OpenMPI may also be required to run Charm++ applications built with the UCX backend
+and OpenPMIx. Since you no longer need PMIx included with OpenMPI, any version of OpenMPI can be built
+(including v4.0.5 and later) with your build of OpenPMIx using the ``--with-pmix`` flag,
+such as the following:
+
+.. code-block:: bash
+
+   $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.5.tar.gz
+   $ tar -xf openmpi-4.0.5.tar.gz
+   $ cd openmpi-4.0.5
+   $ ./configure --enable-mca-no-build=btl-uct --with-pmix=$HOME/pmix-3.1.5/build --prefix=$HOME/openmpi-4.0.5/build
+   $ make -j
+   $ make install
+
+Before executing a Charm++ program, you may need to check that ``LD_LIBRARY_PATH`` and ``PATH``
+are set to include OpenPMIx (and OpenMPI, if needed).
+
+To use PMIx included with OpenMPI, an OpenMPI implementation with PMIx enabled is required
+to be installed on your system. As a reminder, PMIx is no longer included in OpenMPI
+distributions of v4.0.5 or later. In case OpenMPI is not available in your environment,
 you can build OpenMPI from scratch using the following steps:
 
 .. code-block:: bash
 
-  $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
-  $ tar -xvf openmpi-4.0.1.tar.gz
-  $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
-  $ make -j24
-  $ make install all
+   $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
+   $ tar -xvf openmpi-4.0.1.tar.gz
+   $ cd openmpi-4.0.1
+   $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
+   $ make -j24
+   $ make install all
 
 After installing OpenMPI or using the pre-installed OpenMPI, you can build the Charm++ target with
 the UCX backend by specifying ``ompipmix`` in the build command and passing the OpenMPI installation
-path as ``--basedir`` (in addition to passing the UCX build directory)
+path as ``--basedir`` (in addition to passing the UCX build directory):
 
 .. code-block:: bash
 
    $ ./build charm++ ucx-linux-x86_64 ompipmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/openmpi-4.0.1/build -j16
-
-It should be noted that the pmix version is the most stable version of using the UCX backend. We're in the
-process of debugging some recent issues with Simple PMI, Slurm PMI and Slurm PMI2.
 
 .. _sec:compile:
 
@@ -11845,6 +12323,8 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  nocopypost
 
+-  nocopydevice
+
 -  migratable
 
 -  python
@@ -12026,7 +12506,11 @@ tracemode:
 
 -  ``+gz-trace``: generate gzip (if available) compressed log files.
 
--  ``+gz-no-trace``: generate regular (not compressed) log files.
+-  ``+no-gz-trace``: generate regular (uncompressed) log files.
+
+-  ``+notracenested``: a debug option. Does not resume tracing outer
+   entry methods when entry methods are nested (as can happen with
+   ``[local]`` and ``[inline]`` calls.
 
 -  ``+checknested``: a debug option. Checks if events are improperly
    nested while recorded and issue a warning immediately.
@@ -12570,6 +13054,8 @@ Acknowledgements
 
 -  Juan Galvez
 
+-  Justin Szaday
+
 -  Kavitha Chandrasekar
 
 -  Laxmikant Kale
@@ -12675,6 +13161,8 @@ Acknowledgements
 -  Yan Shi
 
 -  Yogesh Mehta
+
+-  Zane Fink
 
 -  Zheng Shao
 

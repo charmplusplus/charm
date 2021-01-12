@@ -40,12 +40,8 @@ jacobi.iso: jacobi.C
 	$(CHARMC) -o $@ jacobi.iso.o -memory isomalloc
 
 jacobi.tls: jacobi.C
-ifeq ($(CMK_UTH),1)
-	@echo "Skipping jacobi.tls test on UTH (tlsglobals not supported)."
-else
 	-$(CHARMC) -c -tlsglobals jacobi.C -o jacobi.tls.o
 	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobals
-endif
 
 jacobi.rose: jacobi.C
 	$(CHARMC) -roseomptlsglobals -o jacobi.rose.o -c $<
@@ -67,19 +63,19 @@ ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
 endif
 
 testp: ampi
-	$(call run, +p$(P) ./jacobi.pup $(P) $(P) $(P) 40 +vp$(P) +balancer RotateLB +LBDebug 1 )
-	$(call run, +p$(P) ./jacobi.pup $(P) $(P) $(P) 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
-	$(call run, +p$(P) ./jacobi.pup $(P) $(P) $(P) 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.pup $(P) 1 1 40 +vp$(P) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.pup $(P) 2 1 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.pup $(P) 2 2 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
 
-	$(call run, +p$(P) ./jacobi $(P) $(P) $(P) 40 +vp$(P) +balancer RotateLB +LBDebug 1 )
-	$(call run, +p$(P) ./jacobi $(P) $(P) $(P) 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
-	$(call run, +p$(P) ./jacobi $(P) $(P) $(P) 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi $(P) 1 1 40 +vp$(P) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi $(P) 2 1 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi $(P) 2 2 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
 
 ifneq ($(CMK_WINDOWS),1)
 ifneq ($(CMK_BLUEGENEQ),1)
-	$(call run, +p$(P) ./jacobi.iso $(P) $(P) $(P) 40 +vp$(P) +balancer RotateLB +LBDebug 1)
-	$(call run, +p$(P) ./jacobi.iso $(P) $(P) $(P) 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
-	$(call run, +p$(P) ./jacobi.iso $(P) $(P) $(P) 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.iso $(P) 1 1 40 +vp$(P) +balancer RotateLB +LBDebug 1)
+	$(call run, +p$(P) ./jacobi.iso $(P) 2 1 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
+	$(call run, +p$(P) ./jacobi.iso $(P) 2 2 40 +vp$$(( $(P) * 4 )) +balancer RotateLB +LBDebug 1 )
 endif
 endif
 

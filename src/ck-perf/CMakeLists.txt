@@ -42,4 +42,5 @@ add_dependencies(trace-converse ck)
 
 if(CMK_CAN_LINK_FORTRAN)
     add_library(tracef_f tracef_f.f90)
+    target_compile_options(tracef_f PRIVATE -cpmod)
 endif()

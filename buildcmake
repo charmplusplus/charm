@@ -4,21 +4,23 @@
 
 set -o errexit -o nounset
 
-# Check that CMake is available and that the version is sufficiently new
+# Determine the location of this script
+my_srcdir="$(cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
+# Check that CMake is available and that the version is sufficiently new
 command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
 
 if [[ $rc -ne 0 ]]; then
   echo "Warning: CMake unavailable, running ./buildold instead."
   sleep 2
-  ./buildold "$@"
+  "$my_srcdir"/buildold "$@"
   exit $?
 fi
 
-if [[ $(uname) != "Linux" && $(uname) != "Darwin" ]]; then
-  echo "Warning: CMake build is only supported on Linux and Darwin, running ./buildold instead."
+if [[ $(uname) == "MSYS"* || $(uname) == "MINGW"* ]]; then
+  echo "Warning: CMake build is not supported under MSYS, running ./buildold instead."
   sleep 2
-  ./buildold "$@"
+  "$my_srcdir"/buildold "$@"
   exit $?
 fi
 
@@ -30,7 +32,7 @@ cmake_version_full=$(cmake --version | head -1 | cut -f 3 -d' ')
 if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 4) ]]; then
   echo "Warning: The CMake version on your system is too old (needed: 3.4.0 or later; available: $cmake_version_full), running ./buildold instead."
   sleep 2
-  ./buildold "$@"
+  "$my_srcdir"/buildold "$@"
   exit $?
 fi
 
@@ -44,7 +46,7 @@ usage()
 
 help()
 {
-  ./buildold --help
+  "$my_srcdir"/buildold --help
   exit 0
 }
 
@@ -62,8 +64,6 @@ fi
 # Build options
 target=$1
 triplet=$2
-shift
-shift
 
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
@@ -73,14 +73,16 @@ opt_ccs=0
 opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
+opt_destination=""
 opt_drone_mode=0
-opt_error_checking=0
+opt_error_checking= #undef
 opt_extra_opts=""
 opt_incdir=""
 opt_lbtime_type="double"
 opt_lbuserdata=0
 opt_libdir=""
 opt_lockless=0
+opt_lrts_pmi=""
 opt_mempool_cutoff=26
 opt_network=0
 opt_numa=0
@@ -103,9 +105,8 @@ opt_suffix=""
 opt_syncft=0
 opt_task_queue=0
 opt_tcp=0
-opt_tracing=0
+opt_tracing= #undef
 opt_tracing_commthread=0
-opt_ucx_pmi=""
 opt_zlib=1
 
 # default to building ROMIO on AMPI where supported
@@ -118,16 +119,22 @@ case "$triplet" in
     ;;
 esac
 
-# Compiler options
-opt_CC= #undef
-opt_CXX= #undef
-opt_FC= #undef
+# Compiler selection. By default, use whatever is specified in the environment.
+opt_CC=${CC:-}
+opt_CXX=${CXX:-}
+opt_FC=${FC:-}
 
 opt_compiler=""
 
 # Misc options
 VERBOSE=0
 ONLY_CONFIGURE=0
+FORCE=0
+
+processArgs() {
+
+shift # target
+shift # triplet
 
 while [[ $# -gt 0 ]]; do
   arg=$1
@@ -158,8 +165,8 @@ while [[ $# -gt 0 ]]; do
     pxshm)
       opt_pxshm=1
       ;;
-    slumrpmi|slurmpmi2|ompipmix)
-      opt_ucx_pmi=$arg
+    simplepmi|slurmpmi|slurmpmi2|ompipmix|openpmix)
+      opt_lrts_pmi=$arg
       ;;
     persistent)
       opt_persistent=1
@@ -175,8 +182,8 @@ while [[ $# -gt 0 ]]; do
       opt_CXX=${arg/cc/++}
       opt_compiler+="$arg "
       ;;
-    gfortran)
-      opt_FC=gfortran
+    gfortran|gfortran-*)
+      opt_FC=$arg
       opt_compiler+="$arg "
       ;;
     clang)
@@ -210,6 +217,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     pgcc|pgf90)
       echo "*** Warning: Ignoring unsupported option '$arg'."
+      ;;
+    msvc)
+      opt_CC=msvc # fake, will be replaced below
+      opt_compiler+="$arg "
       ;;
     mpicxx)
       opt_CC=mpicc
@@ -309,7 +320,7 @@ while [[ $# -gt 0 ]]; do
   # Miscellaneous options
     -k)
       # -k is an option for make, not for the compiler.
-      echo "*** Warning: Ignoring '-k' option."
+      echo "*** Note: Ignoring '-k' option."
       ;;
     --help)
       help
@@ -330,12 +341,19 @@ while [[ $# -gt 0 ]]; do
       # Run only cmake, not make
       ONLY_CONFIGURE=1
       ;;
+    --force)
+      # Overwrite existing build directory
+      FORCE=1
+      ;;
     -j)
       opt_parallel="$arg"
       if [[ $# -gt 0 && $1 == [0-9]* ]]; then
         opt_parallel+="$1"
         shift
       fi
+      ;;
+    --destination=*)
+      opt_destination=${arg#*=}
       ;;
     --suffix=*)
       opt_suffix=-${arg#*=}
@@ -351,20 +369,79 @@ while [[ $# -gt 0 ]]; do
       opt_incdir+="-I${arg#*=} "
       ;;
     *)
-      echo "*** Warning: Adding unknown option '$arg' to compiler flags."
+      echo "*** Note: Adding unknown option '$arg' to compiler flags."
       opt_extra_opts+="$arg "
       ;;
   esac
 done
 
+}
+
+# Process original command-line arguments
+eval processArgs "$@"
+
 ############ End option parsing
+
+
+# Make adjustments to $target if necessary
 
 if [[ "$target" = "${target%AMPI-only}AMPI-only" ]]; then
     opt_ampi_only=1
 
     # strip "-only" suffix from AMPI target
     target="${target%AMPI-only}AMPI"
+fi
 
+
+# Determine the build directory name
+
+# Append certain features and compilers to the end of $builddir
+builddir_extra=""
+for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda; do
+  [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
+done
+
+for c in $opt_lrts_pmi $opt_compiler; do
+  [[ -n $c ]] &&  builddir_extra+="-${c}"
+done
+
+if [[ -n $opt_destination ]]; then
+  # Note that $builddir_extra is intentionally ignored here
+  builddir=$opt_destination$opt_suffix
+else
+  builddir=$triplet$builddir_extra$opt_suffix
+fi
+
+
+# Check whether configure step has already taken place
+
+if [[ -f "$builddir/Makefile" ]]
+then
+  echo "The configure step has already taken place for the specified build."
+  if [[ $FORCE -eq 0 ]]
+  then
+    echo "To attempt a partial rebuild, run 'make' in \"$builddir\"."
+    echo "To remove the existing data and reconfigure, run this script again with --force."
+    exit 1
+  else
+    echo "Removing existing data and starting over. (--force)"
+  fi
+elif [[ -e "$builddir" && ! -e "$builddir/.spack" ]]
+then
+  echo "\"$builddir\" already exists but is in an inconsistent state."
+  if [[ $FORCE -eq 0 ]]
+  then
+    echo "To remove the existing data and reconfigure, run this script again with --force."
+    exit 1
+  else
+    echo "Removing existing data and starting over. (--force)"
+  fi
+fi
+
+
+# Build option setup
+
+if [[ $opt_ampi_only -eq 1 ]]; then
     # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
     # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
     # so we bump up the number of bits reserved for the collection in the objid.
@@ -383,37 +460,46 @@ else
   opt_network=$(echo "$triplet" | cut -d '-' -f1)
 fi
 
+my_os=$(echo "$triplet" | cut -d '-' -f2)
+
+if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
+  echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
+  sleep 2
+  "$my_srcdir"/buildold "$@"
+  exit $?
+fi
+
+# Special handling for Windows compiler
+if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
+  # Need to use unix2nt_cc on Windows/Cygwin
+  opt_CC=$(realpath "$my_srcdir")/src/arch/win/unix2nt_cc
+  opt_CXX=$opt_CC
+  opt_FC=
+fi
+
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
 
+if [[ $VERBOSE -eq 1 ]]; then
+  echo "Build options for $triplet:"
 
-echo "Build options for $triplet:"
+  # Print selected options
+  for option in ${!opt*}; do
+    echo "  $option = ${!option}"
+  done
+fi
 
-# Print selected options
-for option in ${!opt*}; do
-  echo "  $option = ${!option}"
-done
 
-# Append certain features and compilers to the end of the build directory name
-builddir_extra=""
-for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent; do
-  [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
-done
+# Create builddir and its contents
 
-for c in $opt_ucx_pmi $opt_compiler; do
-  [[ -n $c ]] &&  builddir_extra+="-${c}"
-done
+rm -rf "${builddir:?}"/*
 
-builddir=$triplet$builddir_extra$opt_suffix
-
-rm -rf "$builddir"
-
-mkdir "$builddir"
+mkdir -p "$builddir"
 
 cd "$builddir"
 
 if [[ -n $opt_libdir ]]; then
   mkdir -p include
-  echo "USER_OPTS_LD=$opt_libdir" >> include/conv-mach-pre.sh
+  echo "USER_OPTS_LD='$opt_libdir'" >> include/conv-mach-pre.sh
 fi
 
 if [[ -n $opt_incdir ]]; then
@@ -422,7 +508,11 @@ if [[ -n $opt_incdir ]]; then
   echo "USER_OPTS_CXX='$opt_incdir'" >> include/conv-mach-pre.sh
 fi
 
-CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
+
+# Run configure step
+
+CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
+  -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE="$opt_production" \
   -DCMK_AMPI_ONLY="$opt_ampi_only" \
   -DCMK_AMPI_WITH_ROMIO="$opt_romio" \
@@ -432,13 +522,14 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DCCS="$opt_ccs" \
   -DCHARMDEBUG="$opt_charmdebug" \
   -DCONTROLPOINT="$opt_controlpoint" \
-  -DBUILD_CUDA="$opt_cuda" \
+  -DCUDA="$opt_cuda" \
   -DDRONE_MODE="$opt_drone_mode" \
   -DERROR_CHECKING="$opt_error_checking" \
   -DEXTRA_OPTS="$opt_extra_opts" \
   -DLBTIME_TYPE="$opt_lbtime_type" \
   -DLBUSERDATA="$opt_lbuserdata" \
   -DLOCKLESS_QUEUE="$opt_lockless" \
+  -DLRTS_PMI="$opt_lrts_pmi" \
   -DCMK_MEMPOOL_CUTOFFNUM="$opt_mempool_cutoff" \
   -DNETWORK="$opt_network" \
   -DNUMA="$opt_numa" \
@@ -461,8 +552,10 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake .. \
   -DTCP="$opt_tcp" \
   -DTRACING="$opt_tracing" \
   -DTRACING_COMMTHREAD="$opt_tracing_commthread" \
-  -DUCX_PMI="$opt_ucx_pmi" \
   -DZLIB="$opt_zlib"
+
+
+# Run build step
 
 [[ $ONLY_CONFIGURE -eq 1 ]] && exit 0
 

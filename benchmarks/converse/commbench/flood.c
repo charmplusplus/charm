@@ -245,6 +245,13 @@ void flood_init(void) {
     CmiSyncSend(0, sizeof(EmptyMsg), &m);
     return;
   }
+  if (CpvAccess(oversubscribed)) {
+    if (CmiMyPe() == 0)
+      CmiPrintf("[flood] Skipping due to oversubscription.\n");
+    CmiSetHandler(&m, pva(ack_handler));
+    CmiSyncSend(0, sizeof(EmptyMsg), &m);
+    return;
+  }
   CmiSetHandler(&m, pva(nbrHandler));
   CmiSyncSend(0, sizeof(EmptyMsg), &m);
 }

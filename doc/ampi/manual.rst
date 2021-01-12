@@ -225,7 +225,7 @@ Installing AMPI
 ---------------
 
 AMPI is included in the source distribution of Charm++. To get the
-latest sources from PPL, visit: http://charm.cs.illinois.edu/software
+latest sources from PPL, visit: https://charm.cs.illinois.edu/software
 
 and follow the download links. Then build Charm++ and AMPI from source.
 
@@ -519,53 +519,237 @@ provided that it takes place *after* ``MPI_Init``.
 Global Variable Privatization
 -----------------------------
 
-For the before-mentioned benefits to be effective, one needs to map
-multiple user-level threads onto each processor. Traditional MPI
-programs assume that the entire processor is allocated to themselves,
-and that only one thread of control exists within the process’s address
-space. So, they may safely use global and static variables in the
-program. However, global and static variables are problematic for
+In AMPI, ranks are implemented as user-level threads that coexist
+within OS processes or OS threads, depending on how the Charm++
+runtime was built. Traditional MPI
+programs assume that each rank has an entire OS process to itself,
+and that only one thread of control exists within its address space.
+This allows them to safely use global and static variables in their
+code. However, global and static variables are problematic for
 multi-threaded environments such as AMPI or OpenMP. This is because
-there is a single instance of those variables so they will be shared
-among different threads in the single address space, so if programmers
-are not careful a wrong result may be produced by the program. Figure
-:numref:`fig_global` shows an example of a multi-threaded
-application with two threads in a single process. :math:`var` is a
-global or static variable in this example. Thread 1 assigns a value to
-it, then it gets blocked for communication and another thread can
-continue. Thereby, thread 2 is scheduled next and accesses :math:`var`
-which is wrong. The semantics of this program needs separate instances
-of :math:`var` for each of the threads. That is where the need arises to
-make some transformations to the original MPI program in order to run
-correctly with AMPI. Note, this is the only change necessary to run an
-MPI program with AMPI, that the program be thread-safe and have no
-global or static variables whose values differ across different MPI
-ranks. Also note that global variables that are constant or are only
-written to once to the same value across all ranks during initialization
-are already thread-safe.
+there is a single instance of those variables, so they will be shared
+among different ranks in the single address space, and this could lead
+to the program producing an incorrect result or crashing.
 
-.. _fig_global:
-.. figure:: figs/global.png
-   :width: 4.6in
+The following code is an example of this problem. Each rank queries its
+numeric ID, stores it in a global variable, waits on a global barrier,
+and then prints the value that was stored. If this code is run with
+multiple ranks virtualized inside one OS process, each rank will store
+its ID in the same single location in memory. The result is that all
+ranks will print the ID of whichever one was the last to successfully
+update that location. For this code to be semantically valid with AMPI,
+each rank needs its own separate instance of the variable. This is
+where the need arises for some special handling of these unsafe
+variables in existing MPI applications, which we call *privatization*.
 
-   Mutable global or static variables are an issue for AMPI
+.. code-block:: c++
 
+  int rank_global;
 
+  void print_ranks(void)
+  {
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank_global);
 
-The basic transformation needed to port the MPI program to AMPI is
-privatization of global variables. With the MPI process model, each MPI
-node can keep a copy of its own "permanent variables" - variables that
-are accessible from more than one subroutines without passing them as
-arguments. Module variables, "saved" subroutine local variables, and
-common blocks in Fortran90 belong to this category. If such a program is
-executed without privatization on AMPI, all the AMPI threads that reside
-in the same process will access the same copy of such variables, which
-is clearly not the desired semantics. To ensure correct execution of the
-original source program, it is necessary to make such variables
-"private" to individual threads. We provide three choices with varying
-degrees of developer effort required and varying degrees of portability:
-manual encapsulation of global state, a thread-local storage based
-automated mechanism, and global offset table based automated mechanism.
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    printf("rank: %d\n", rank_global);
+  }
+
+The basic transformation needed to port MPI programs to AMPI is
+privatization of global and static variables. Module variables, "saved"
+subroutine local variables, and common blocks in Fortran90 also belong to
+this category. Certain API calls use global variables internally, such as
+``strtok`` in the C standard library, and as a result they are also
+unsafe. If such a program is executed without privatization on AMPI, all
+the AMPI ranks that reside in the same process will access the same
+copy of such variables, which is clearly not the desired semantics. Note
+that global variables that are constant or are only written to once
+during initialization with the same value across all ranks are already
+thread-safe.
+
+To ensure AMPI programs execute correctly, it is necessary to make such
+variables "private" to individual ranks. We provide several options to
+achieve this with varying degrees of portability and required developer
+effort.
+
+.. warning::
+
+   If you are writing a new MPI application from scratch and would like
+   to support AMPI as a first-class target, it is highly recommended to
+   follow certain guidelines for writing your code to avoid the global
+   variable problem entirely, eliminating the need for time-consuming
+   refactoring or platform-specific privatization methods later on. See
+   the Manual Code Editing section below for an example of how to
+   structure your code in order to accomplish this.
+
+Manual Code Editing
+~~~~~~~~~~~~~~~~~~~
+
+With regard to performance and portability, the ideal approach to resolve
+the global variable problem is to refactor your code to avoid use of
+globals entirely. However, this comes with the obvious caveat that it
+requires developer time to implement and can involve invasive changes
+across the entire codebase, similar to converting a shared library to be
+reentrant in order to allow multiple instantiations from the same OS
+process. If these costs are a significant barrier to entry, it can be
+helpful to instead explore one of the simpler transformations or fully
+automated methods described below.
+
+We have employed a strategy of argument passing to do this privatization
+transformation. That is, the global variables are bunched together in a
+single user-defined type, which is allocated by each thread dynamically
+or on the stack. Then a pointer to this type is passed from subroutine
+to subroutine as an argument. Since the subroutine arguments are passed
+on the stack, which is not shared across all threads, each subroutine
+when executing within a thread operates on a private copy of the global
+variables.
+
+This scheme is demonstrated in the following examples. The original
+Fortran90 code contains a module ``shareddata``. This module is used in
+the ``MPI_MAIN`` subroutine and a subroutine ``subA``. Note that
+``PROGRAM PGM`` was renamed to ``SUBROUTINE MPI_MAIN`` and ``END PROGRAM``
+was renamed to ``END SUBROUTINE``.
+
+.. code-block:: fortran
+
+   !FORTRAN EXAMPLE
+   MODULE shareddata
+     INTEGER :: myrank
+     DOUBLE PRECISION :: xyz(100)
+   END MODULE
+
+   SUBROUTINE MPI_MAIN                               ! Previously PROGRAM PGM
+     USE shareddata
+     include 'mpif.h'
+     INTEGER :: i, ierr
+     CALL MPI_Init(ierr)
+     CALL MPI_Comm_rank(MPI_COMM_WORLD, myrank, ierr)
+     DO i = 1, 100
+       xyz(i) =  i + myrank
+     END DO
+     CALL subA
+     CALL MPI_Finalize(ierr)
+   END SUBROUTINE                                    ! Previously END PROGRAM
+
+   SUBROUTINE subA
+     USE shareddata
+     INTEGER :: i
+     DO i = 1, 100
+       xyz(i) = xyz(i) + 1.0
+     END DO
+   END SUBROUTINE
+
+.. code-block:: c++
+
+   //C Example
+   #include <mpi.h>
+
+   int myrank;
+   double xyz[100];
+
+   void subA();
+   int main(int argc, char** argv){
+     int i;
+     MPI_Init(&argc, &argv);
+     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+     for(i=0;i<100;i++)
+       xyz[i] = i + myrank;
+     subA();
+     MPI_Finalize();
+   }
+
+   void subA(){
+     int i;
+     for(i=0;i<100;i++)
+       xyz[i] = xyz[i] + 1.0;
+   }
+
+AMPI executes the main subroutine inside a user-level thread as a
+subroutine.
+
+Now we transform this program using the argument passing strategy. We
+first group the shared data into a user-defined type.
+
+.. code-block:: fortran
+
+   !FORTRAN EXAMPLE
+   MODULE shareddata
+     TYPE chunk ! modified
+       INTEGER :: myrank
+       DOUBLE PRECISION :: xyz(100)
+     END TYPE ! modified
+   END MODULE
+
+.. code-block:: c++
+
+   //C Example
+   struct shareddata{
+     int myrank;
+     double xyz[100];
+   };
+
+Now we modify the main subroutine to dynamically allocate this data and
+change the references to them. Subroutine ``subA`` is then modified to
+take this data as argument.
+
+.. code-block:: fortran
+
+   !FORTRAN EXAMPLE
+   SUBROUTINE MPI_Main
+     USE shareddata
+     USE AMPI
+     INTEGER :: i, ierr
+     TYPE(chunk), pointer :: c ! modified
+     CALL MPI_Init(ierr)
+     ALLOCATE(c) ! modified
+     CALL MPI_Comm_rank(MPI_COMM_WORLD, c%myrank, ierr)
+     DO i = 1, 100
+       c%xyz(i) =  i + c%myrank ! modified
+     END DO
+     CALL subA(c)
+     CALL MPI_Finalize(ierr)
+   END SUBROUTINE
+
+   SUBROUTINE subA(c)
+     USE shareddata
+     TYPE(chunk) :: c ! modified
+     INTEGER :: i
+     DO i = 1, 100
+       c%xyz(i) = c%xyz(i) + 1.0 ! modified
+     END DO
+   END SUBROUTINE
+
+.. code-block:: c++
+
+   //C Example
+   void MPI_Main{
+     int i,ierr;
+     struct shareddata *c;
+     ierr = MPI_Init();
+     c = (struct shareddata*)malloc(sizeof(struct shareddata));
+     ierr = MPI_Comm_rank(MPI_COMM_WORLD, c.myrank);
+     for(i=0;i<100;i++)
+       c.xyz[i] = i + c.myrank;
+     subA(c);
+     ierr = MPI_Finalize();
+   }
+
+   void subA(struct shareddata *c){
+     int i;
+     for(i=0;i<100;i++)
+       c.xyz[i] = c.xyz[i] + 1.0;
+   }
+
+With these changes, the above program can be made thread-safe. Note that
+it is not really necessary to dynamically allocate ``chunk``. One could
+have declared it as a local variable in subroutine ``MPI_Main``. (Or for
+a small example such as this, one could have just removed the
+``shareddata`` module, and instead declared both variables ``xyz`` and
+``myrank`` as local variables). This is indeed a good idea if shared
+data are small in size. For large shared data, it would be better to do
+heap allocation because in AMPI, the stack sizes are fixed at the
+beginning (and can be specified from the command line) and stacks do not
+grow dynamically.
 
 Automatic Thread-Local Storage Swapping
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -755,189 +939,33 @@ it does not handle static variables, has a context switching overhead
 that grows with the number of global variables, and is incompatible with
 SMP builds of AMPI, where multiple virtual ranks can execute
 simultaneously on different scheduler threads within an OS process.
+
 Currently, this feature only works on x86 and x86_64 platforms that
 fully support ELF, and it requires ld version 2.23 or older, or else a
 patched version of ld 2.24+ that we provide here:
 https://charm.cs.illinois.edu/gerrit/gitweb?p=libbfd-patches.git;a=tree;f=swapglobals
 
-Manual Code Editing
-~~~~~~~~~~~~~~~~~~~
-
-We have employed a strategy of argument passing to do this privatization
-transformation. That is, the global variables are bunched together in a
-single user-defined type, which is allocated by each thread dynamically
-or on the stack. Then a pointer to this type is passed from subroutine
-to subroutine as an argument. Since the subroutine arguments are passed
-on the stack, which is not shared across all threads, each subroutine
-when executing within a thread operates on a private copy of the global
-variables.
-
-This scheme is demonstrated in the following examples. The original
-Fortran90 code contains a module ``shareddata``. This module is used in
-the ``MPI_MAIN`` subroutine and a subroutine ``subA``. Note that
-``PROGRAM PGM`` was renamed to ``SUBROUTINE MPI_MAIN`` and ``END PROGRAM``
-was renamed to ``END SUBROUTINE``.
-
-.. code-block:: fortran
-
-   !FORTRAN EXAMPLE
-   MODULE shareddata
-     INTEGER :: myrank
-     DOUBLE PRECISION :: xyz(100)
-   END MODULE
-
-   SUBROUTINE MPI_MAIN                               ! Previously PROGRAM PGM
-     USE shareddata
-     include 'mpif.h'
-     INTEGER :: i, ierr
-     CALL MPI_Init(ierr)
-     CALL MPI_Comm_rank(MPI_COMM_WORLD, myrank, ierr)
-     DO i = 1, 100
-       xyz(i) =  i + myrank
-     END DO
-     CALL subA
-     CALL MPI_Finalize(ierr)
-   END SUBROUTINE                                    ! Previously END PROGRAM
-
-   SUBROUTINE subA
-     USE shareddata
-     INTEGER :: i
-     DO i = 1, 100
-       xyz(i) = xyz(i) + 1.0
-     END DO
-   END SUBROUTINE
-
-.. code-block:: c++
-
-   //C Example
-   #include <mpi.h>
-
-   int myrank;
-   double xyz[100];
-
-   void subA();
-   int main(int argc, char** argv){
-     int i;
-     MPI_Init(&argc, &argv);
-     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-     for(i=0;i<100;i++)
-       xyz[i] = i + myrank;
-     subA();
-     MPI_Finalize();
-   }
-
-   void subA(){
-     int i;
-     for(i=0;i<100;i++)
-       xyz[i] = xyz[i] + 1.0;
-   }
-
-AMPI executes the main subroutine inside a user-level thread as a
-subroutine.
-
-Now we transform this program using the argument passing strategy. We
-first group the shared data into a user-defined type.
-
-.. code-block:: fortran
-
-   !FORTRAN EXAMPLE
-   MODULE shareddata
-     TYPE chunk ! modified
-       INTEGER :: myrank
-       DOUBLE PRECISION :: xyz(100)
-     END TYPE ! modified
-   END MODULE
-
-.. code-block:: c++
-
-   //C Example
-   struct shareddata{
-     int myrank;
-     double xyz[100];
-   };
-
-Now we modify the main subroutine to dynamically allocate this data and
-change the references to them. Subroutine ``subA`` is then modified to
-take this data as argument.
-
-.. code-block:: fortran
-
-   !FORTRAN EXAMPLE
-   SUBROUTINE MPI_Main
-     USE shareddata
-     USE AMPI
-     INTEGER :: i, ierr
-     TYPE(chunk), pointer :: c ! modified
-     CALL MPI_Init(ierr)
-     ALLOCATE(c) ! modified
-     CALL MPI_Comm_rank(MPI_COMM_WORLD, c%myrank, ierr)
-     DO i = 1, 100
-       c%xyz(i) =  i + c%myrank ! modified
-     END DO
-     CALL subA(c)
-     CALL MPI_Finalize(ierr)
-   END SUBROUTINE
-
-   SUBROUTINE subA(c)
-     USE shareddata
-     TYPE(chunk) :: c ! modified
-     INTEGER :: i
-     DO i = 1, 100
-       c%xyz(i) = c%xyz(i) + 1.0 ! modified
-     END DO
-   END SUBROUTINE
-
-.. code-block:: c++
-
-   //C Example
-   void MPI_Main{
-     int i,ierr;
-     struct shareddata *c;
-     ierr = MPI_Init();
-     c = (struct shareddata*)malloc(sizeof(struct shareddata));
-     ierr = MPI_Comm_rank(MPI_COMM_WORLD, c.myrank);
-     for(i=0;i<100;i++)
-       c.xyz[i] = i + c.myrank;
-     subA(c);
-     ierr = MPI_Finalize();
-   }
-
-   void subA(struct shareddata *c){
-     int i;
-     for(i=0;i<100;i++)
-       c.xyz[i] = c.xyz[i] + 1.0;
-   }
-
-With these changes, the above program can be made thread-safe. Note that
-it is not really necessary to dynamically allocate ``chunk``. One could
-have declared it as a local variable in subroutine ``MPI_Main``. (Or for
-a small example such as this, one could have just removed the
-``shareddata`` module, and instead declared both variables ``xyz`` and
-``myrank`` as local variables). This is indeed a good idea if shared
-data are small in size. For large shared data, it would be better to do
-heap allocation because in AMPI, the stack sizes are fixed at the
-beginning (and can be specified from the command line) and stacks do not
-grow dynamically.
+For these reasons, and because more robust privatization methods are
+available, swapglobals is considered deprecated.
 
 Source-to-Source Transformation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Another approach is to do the changes described in the previous scheme
-automatically. It means that we can use a tool to transform the source
-code to move global or static variables in an object and pass them
-around. This approach is portable across systems and compilers and may
-also improve locality and hence cache utilization. It also does not have
-the context-switch overhead of swapping globals. We have multiple tools
-for automating these transformations for different languages. Currently,
-there is a tool called *Photran* (http://www.eclipse.org/photran) for
-refactoring Fortran codes
+One final approach is to use a tool to transform your program's source
+code, implementing the changes described in one of the sections above in
+an automated fashion.
+
+We have multiple tools for automating these transformations for different
+languages.
+Currently, there is a tool called *Photran*
+(http://www.eclipse.org/photran) for refactoring Fortran codes
 that can do this transformation. It is Eclipse-based and works by
-constructing Abstract Syntax Trees (ASTs) of the program. We also have a
-tool built on top of the *ROSE compiler* (http://rosecompiler.org/)
-that works for C/C++ and
-Fortran programs that is available upon request. It emits patches for
-all files containing global variables which can then be applied to the
-source code.
+constructing Abstract Syntax Trees (ASTs) of the program.
+We also have a tool built with *LLVM/LibTooling* that applies the
+TLS-Globals transformation to C/C++ codes, available upon request.
+
+Summary
+~~~~~~~
 
 Table :numref:`tab:portability` shows portability of
 different schemes.
@@ -948,11 +976,11 @@ different schemes.
    ==================== ===== ====== ==== ======= === ====== ===== =====
    Privatization Scheme Linux Mac OS BG/Q Windows x86 x86_64 PPC   ARM7
    ==================== ===== ====== ==== ======= === ====== ===== =====
+   Manual Code Editing  Yes   Yes    Yes  Yes     Yes Yes    Yes   Yes
    TLS-Globals          Yes   Yes    No   Maybe   Yes Yes    Maybe Maybe
    PiP-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
-   FS-Globals           Yes   Yes    No   Maybe   Yes Yes    Yes   Yes
+   FS-Globals           Yes   Yes    No   Yes     Yes Yes    Yes   Yes
    GOT-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
-   Manual Code Editing  Yes   Yes    Yes  Yes     Yes Yes    Yes   Yes
    ==================== ===== ====== ==== ======= === ====== ===== =====
 
 Extensions

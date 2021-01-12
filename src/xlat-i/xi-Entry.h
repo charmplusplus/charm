@@ -128,6 +128,7 @@ class Entry : public Member {
   int first_line_, last_line_;
   int numRdmaSendParams; // stores the number of rdma send parameters (marked nocopy)
   int numRdmaRecvParams; // stores the number of rdma recv parameters (marked nocopypost)
+  int numRdmaDeviceParams; // stores the number of rdma device parameters (marked device)
 
  private:
   Attribute *attribs;
