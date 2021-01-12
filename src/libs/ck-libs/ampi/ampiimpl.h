@@ -4,7 +4,6 @@
 #include <string.h> /* for strlen */
 #include <algorithm>
 #include <numeric>
-#include <forward_list>
 #include <bitset>
 #include <complex>
 #include <iostream>
@@ -16,6 +15,8 @@
 #if CMK_AMPI_WITH_ROMIO
 # include "mpio_globals.h"
 #endif
+
+extern int quietModeRequested;
 
 // Set to 1 to print debug statements
 #define AMPI_DO_DEBUG 0
@@ -53,8 +54,6 @@
 // '""', which indicates a nonexistent argument)
 #define PRINT_ARG(arg, last) \
   if ("\"\""!=#arg) std::cout << #arg << "=" << arg << (last ? "" : ", ");
-
-extern int quietModeRequested;
 
 // Prints PE:VP, function name, and argument name/value for each function argument
 #define AMPI_DEBUG_ARGS(function_name, ...) \
@@ -151,16 +150,16 @@ class fromzDisk : public zdisk {
 #endif
 #endif // AMPIMSGLOG
 
-/* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
- * if tracing is not being used (see bug #1640 for more details on the latter). */
+/* AMPI sends messages inline to PE-local destination VPs if
+ * tracing is disabled (see bug #1640). */
 #ifndef AMPI_PE_LOCAL_IMPL
-#define AMPI_PE_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#define AMPI_PE_LOCAL_IMPL ( !CMK_TRACE_ENABLED )
 #endif
 
-/* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
- * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
+/* AMPI sends messages using a zero copy protocol to Node-local destination VPs
+ * tracing is disabled (such msgs are currently untraced). */
 #ifndef AMPI_NODE_LOCAL_IMPL
-#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#define AMPI_NODE_LOCAL_IMPL ( CMK_SMP && !CMK_TRACE_ENABLED )
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
@@ -175,18 +174,15 @@ class fromzDisk : public zdisk {
 
 /* messages larger than or equal to this threshold will always block on a matching recv */
 #ifndef AMPI_SSEND_THRESHOLD_DEFAULT
-#if CMK_BIGSIM_CHARM // ZC Direct API-based rendezvous protocol is not supported by BigSim
-#define AMPI_SSEND_THRESHOLD_DEFAULT 1000000000
-#elif CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#if   CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
 #define AMPI_SSEND_THRESHOLD_DEFAULT 262144
 #else
 #define AMPI_SSEND_THRESHOLD_DEFAULT 131072
 #endif
 #endif
 
-/* AMPI uses RDMA sends if BigSim is not being used. */
 #ifndef AMPI_RDMA_IMPL
-#define AMPI_RDMA_IMPL !CMK_BIGSIM_CHARM
+#define AMPI_RDMA_IMPL 1
 #endif
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
@@ -198,11 +194,7 @@ extern int AMPI_RDMA_THRESHOLD;
 
 #define AMPI_ALLTOALL_THROTTLE   64
 #define AMPI_ALLTOALL_SHORT_MSG  256
-#if CMK_BIGSIM_CHARM
-#define AMPI_ALLTOALL_LONG_MSG   4194304
-#else
 #define AMPI_ALLTOALL_LONG_MSG   32768
-#endif
 
 typedef void (*MPI_MigrateFn)(void);
 
@@ -386,6 +378,12 @@ class WinStruct{
  public:
   MPI_Comm comm;
   int index;
+
+  void * base = nullptr;
+  MPI_Aint size = 0;
+  int disp_unit = 0;
+  int create_flavor = MPI_WIN_FLAVOR_CREATE;
+  int model = MPI_WIN_SEPARATE;
 
   // Windows created with MPI_Win_allocate/MPI_Win_allocate_shared need to free their
   // memory region on MPI_Win_free.
@@ -976,7 +974,6 @@ class ampiCommStruct {
     }
   }
 };
-PUPmarshall(ampiCommStruct)
 
 // group operations
 inline void outputOp(const std::vector<int>& vec) noexcept {
@@ -1165,10 +1162,6 @@ enum AmpiReqType : uint8_t {
 #endif
 };
 
-inline void operator|(PUP::er &p, AmpiReqType &r) {
-  pup_bytes(&p, (void *)&r, sizeof(AmpiReqType));
-}
-
 enum AmpiReqSts : char {
   AMPI_REQ_PENDING   = 0,
   AMPI_REQ_BLOCKED   = 1,
@@ -1200,11 +1193,6 @@ class AmpiRequest {
   bool complete      = false;
   bool blocked       = false; // this req is currently blocked on
 
-#if CMK_BIGSIM_CHARM
- public:
-  void *event        = nullptr; // the event point that corresponds to this message
-  int eventPe        = -1; // the PE that the event is located on
-#endif
 
  public:
   AmpiRequest() =default;
@@ -1295,13 +1283,6 @@ class AmpiRequest {
     p(reqIdx);
     p(complete);
     p(blocked);
-#if CMK_BIGSIM_CHARM
-    //needed for bigsim out-of-core emulation
-    //as the "log" is not moved from memory, this pointer is safe
-    //to be reused
-    p((char *)&event, sizeof(void *));
-    p(eventPe);
-#endif
   }
 
   virtual void print() const noexcept =0;
@@ -1762,11 +1743,6 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   MPI_Comm comm; // Communicator
  public:
   char *data; //Payload
-#if CMK_BIGSIM_CHARM
- public:
-  void *event;
-  int  eventPe; // the PE that the event is located
-#endif
 
  public:
   AmpiMsg() noexcept : data(NULL) {}
@@ -1862,32 +1838,39 @@ class AmpiMsg final : public CMessage_AmpiMsg {
 
 class AmpiMsgPool {
  private:
-  std::forward_list<AmpiMsg *> msgs; // list of free msgs
+  std::vector<AmpiMsg *> msgs; // list of free msgs
   int msgLength; // AmpiMsg::length of messages in the pool
   int maxMsgs; // max # of msgs in the pool
   int currMsgs; // current # of msgs in the pool
 
  public:
   AmpiMsgPool(int _numMsgs = 0, int _msgLength = 0) noexcept
-    : msgLength(_msgLength), maxMsgs(_numMsgs), currMsgs(0) {}
-  ~AmpiMsgPool() =default;
+    : msgs(_numMsgs), msgLength{_msgLength}, maxMsgs{_numMsgs}, currMsgs{0} {}
+  AmpiMsgPool(PUP::reconstruct) noexcept
+    : currMsgs{0} {}
+  ~AmpiMsgPool() {
+    for (int i = 0; i < currMsgs; ++i)
+      delete msgs[i];
+  }
   inline void clear() noexcept {
-    while (!msgs.empty()) {
-      delete msgs.front();
-      msgs.pop_front();
+    for (int i = 0; i < currMsgs; ++i) {
+      AmpiMsg *& msg = msgs[i];
+      delete msg;
+      msg = nullptr;
     }
     currMsgs = 0;
   }
   inline AmpiMsg* newAmpiMsg(CMK_REFNUM_TYPE seq, int ssendReq, int tag, int srcRank, int len) noexcept {
-    if (msgs.empty() || msgs.front()->origLength < len) {
+    if (currMsgs == 0 || msgs[currMsgs-1]->origLength < len) {
       int newlen = std::max(msgLength, len);
       AmpiMsg* msg = new (newlen, 0) AmpiMsg(seq, ssendReq, tag, srcRank, newlen);
       msg->setLength(len);
       return msg;
     } else {
-      AmpiMsg* msg = msgs.front();
-      msgs.pop_front();
+      AmpiMsg *& front = msgs[currMsgs-1];
+      AmpiMsg * msg = front;
       currMsgs--;
+      front = nullptr;
       msg->setSeq(seq);
       msg->setSsendReq(ssendReq);
       msg->setTag(tag);
@@ -1900,7 +1883,7 @@ class AmpiMsgPool {
     /* msg->origLength is the true size of the message's data buffer, while
      * msg->length is the space taken by the payload within it. */
     if (currMsgs != maxMsgs && msg->origLength >= msgLength && msg->origLength < 2*msgLength) {
-      msgs.push_front(msg);
+      msgs[currMsgs] = msg;
       currMsgs++;
     } else {
       delete msg;
@@ -1909,6 +1892,8 @@ class AmpiMsgPool {
   void pup(PUP::er& p) {
     p|msgLength;
     p|maxMsgs;
+    if (p.isUnpacking())
+      msgs.resize(maxMsgs);
     // Don't PUP the msgs in the free list or currMsgs, let the pool fill lazily
   }
 };
@@ -2087,8 +2072,6 @@ public:
     elements[destRank].decSeqOutgoing();
   }
 };
-PUPmarshall(AmpiSeqQ)
-
 
 inline CProxy_ampi ampiCommStruct::getProxy() const noexcept {return ampiID;}
 
@@ -2130,13 +2113,6 @@ class ampiParent final : public CBase_ampiParent {
   std::vector<OpStruct> userOps; // list of any user-defined MPI_Ops
   std::vector<AmpiMsg *> matchedMsgs; // for use with MPI_Mprobe and MPI_Mrecv
 
-  /* MPI_*_get_attr C binding returns a *pointer* to an integer,
-   *  so there needs to be some storage somewhere to point to.
-   * All builtin keyvals are ints, except for MPI_WIN_BASE, which
-   *  is a pointer, and MPI_WIN_SIZE, which is an MPI_Aint. */
-  int* kv_builtin_storage;
-  MPI_Aint* win_size_storage;
-  void** win_base_storage;
   CkPupPtrVec<KeyvalNode> kvlist;
   void* bsendBuffer;   // NOTE: we don't actually use this for buffering of MPI_Bsend's,
   int bsendBufferSize; //       we only keep track of it to return it from MPI_Buffer_detach
@@ -2146,6 +2122,7 @@ class ampiParent final : public CBase_ampiParent {
   CProxy_ampi tmpRProxy;
 
   MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
+  bool didMigrate{};
 
  public:
   bool ampiInitCallDone;
@@ -2153,10 +2130,6 @@ class ampiParent final : public CBase_ampiParent {
 #if CMK_AMPI_WITH_ROMIO
   ADIO_GlobalStruct romio_globals;
 #endif
-
- private:
-  bool kv_set_builtin(int keyval, void* attribute_val) noexcept;
-  bool kv_get_builtin(int keyval) noexcept;
 
  public:
   void prepareCtv() noexcept;
@@ -2231,6 +2204,7 @@ class ampiParent final : public CBase_ampiParent {
   void ckAboutToMigrate() noexcept;
   void ckJustMigrated() noexcept;
   void ckJustRestored() noexcept;
+  void resumeAfterMigration() noexcept;
   void setUserAboutToMigrateFn(MPI_MigrateFn f) noexcept;
   void setUserJustMigratedFn(MPI_MigrateFn f) noexcept;
   ~ampiParent() noexcept;
@@ -2431,15 +2405,23 @@ class ampiParent final : public CBase_ampiParent {
 
   int createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
                   int *keyval, void* extra_state) noexcept;
-  bool getBuiltinAttribute(int keyval, void *attribute_val) noexcept;
+  bool getBuiltinAttributeComm(int keyval, void *attribute_val) noexcept;
+  bool getBuiltinAttributeWin(int keyval, void *attribute_val, WinStruct * winStruct) noexcept;
   int setUserAttribute(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
   bool getUserAttribute(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
   int dupUserAttributes(int old_context, std::unordered_map<int, uintptr_t> & old_attr, std::unordered_map<int, uintptr_t> & new_attr) noexcept;
   int freeUserAttributes(int context, std::unordered_map<int, uintptr_t> & attributes) noexcept;
   int freeKeyval(int keyval) noexcept;
 
-  int setAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
-  int getAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
+  int getAttrComm(MPI_Comm comm, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
+  int getAttrType(MPI_Datatype datatype, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
+  int getAttrWin(MPI_Win win, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag, WinStruct * winStruct) noexcept;
+  int setAttrComm(MPI_Comm comm, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
+  int setAttrType(MPI_Datatype datatype, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept
+  {
+    return setUserAttribute(datatype, attributes, keyval, attribute_val);
+  }
+  int setAttrWin(MPI_Win win, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
   int deleteAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval) noexcept;
 
   int addWinStruct(WinStruct *win) noexcept;
@@ -3006,5 +2988,46 @@ inline void ampiVerifyNodeinit(const char * routineName)
 #define AMPI_API_INIT(routineName, ...) ampiVerifyNodeinit(routineName); \
   TCHARM_API_TRACE(routineName, "ampi"); \
   AMPI_DEBUG_ARGS(routineName, __VA_ARGS__)
+
+
+#ifdef _WIN32
+
+#ifndef WIN32_LEAN_AND_MEAN
+# define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+# define NOMINMAX
+#endif
+#include <windows.h>
+
+typedef HMODULE SharedObject;
+
+#define dlopen(name, flags) LoadLibrary(name)
+#define dlsym(handle, name) ((void(*)())GetProcAddress((handle), (name)))
+#define dlclose(handle) FreeLibrary(handle)
+#define dlerror() ""
+
+#else
+
+#if CMK_DLL_USE_DLOPEN
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#endif
+
+typedef void * SharedObject;
+
+#endif
+
+typedef int (*ampi_maintype)(int, char **);
+typedef void (*ampi_fmaintype)(void);
+
+ampi_maintype AMPI_Main_Get_C(SharedObject myexe);
+ampi_fmaintype AMPI_Main_Get_F(SharedObject myexe);
+int AMPI_Main_Dispatch(SharedObject myexe, int argc, char ** argv);
 
 #endif // _AMPIIMPL_H

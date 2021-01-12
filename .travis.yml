@@ -1,44 +1,32 @@
 language: cpp
 
-cache: ccache
-before_install:
-  - |
-      if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
-        git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {
-          echo "Only docs were updated, stopping build process."
-          exit
-        }
-      fi
+os: linux
+dist: xenial
 
-# Disable ccache on darwin since the brew install step fails.
-#install:
-#  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install ccache; fi
-#  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then export PATH="/usr/local/opt/ccache/libexec:$PATH"; fi
+# Necessary for Windows builds - do not convert LF to CRLF:
+git:
+  autocrlf: false
 
-matrix:
+# before_install:
+#   - |
+#       if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+#         git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {
+#           echo "Only docs were updated, stopping build process."
+#           exit
+#         }
+#       fi
+
+jobs:
   include:
   - os: linux
-    name: "MPI-Linux SMP"
-    dist: xenial
-    env: CACHE_NAME=mpi-linux-smp
+    arch: arm64
+    name: "NetLRTS-Arm64"
     script:
-    - sudo apt-get install -y mpich libmpich-dev
-    - ./build LIBS mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C mpi-linux-x86_64-smp/tmp -j3 all-test-tests all-test-examples OPTS="-g"
-    - make -C mpi-linux-x86_64-smp/tmp test-tests test-examples TESTOPTS="+setcpuaffinity"
-  - os: osx
-    name: "NetLRTS-Darwin"
-    env: CACHE_NAME=netlrts-darwin
+    - ./build all-test netlrts-linux-arm8 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C netlrts-linux-arm8/tmp test TESTOPTS="++local"
+  - os: linux
+    arch: ppc64le
+    name: "NetLRTS-Power"
     script:
-    - ./build LIBS netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C netlrts-darwin-x86_64/tmp -j3 all-test-tests all-test-examples OPTS="-g"
-    - make -C netlrts-darwin-x86_64/tmp test-tests test-examples TESTOPTS="++local"
- # Windows build does not work yet due to missing autoconf/automake
- # - os: windows
- #   name: "NetLRTS-Win"
- #   script:
- #   - choco install -y msys2
- #   - pacman -S autoconf automake
- #   - ./build LIBS netlrts-win-x86_64 -j2 -k --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
- #   - make -C netlrts-win-x86_64/tmp -k -j2 all-test-tests all-test-examples OPTS="-g"
- #   - make -C netlrts-win-x86_64/tmp -k test-tests test-examples TESTOPTS="++local"
+    - ./build all-test netlrts-linux-ppc64le -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C netlrts-linux-ppc64le/tmp test TESTOPTS="++local"

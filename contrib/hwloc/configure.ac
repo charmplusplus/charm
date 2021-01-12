@@ -1,9 +1,9 @@
 # -*- shell-script -*-
 #
 # Copyright © 2009      CNRS
-# Copyright © 2009-2018 Inria.  All rights reserved.
+# Copyright © 2009-2020 Inria.  All rights reserved.
 # Copyright © 2009, 2011-2012      Université Bordeaux
-# Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
+ * Copyright © 2009-2020 Cisco Systems, Inc.  All rights reserved.
 #
 # See COPYING in top-level directory.
 #
@@ -17,8 +17,8 @@
 ####################################################################
 
 AC_INIT([hwloc],
-        [m4_normalize(esyscmd([config/hwloc_get_version.sh VERSION --version]))],
-        [http://github.com/open-mpi/hwloc/issues], [hwloc])
+        [m4_normalize(esyscmd([sh config/hwloc_get_version.sh VERSION --version]))],
+        [https://github.com/open-mpi/hwloc/issues], [hwloc])
 AC_PREREQ(2.63)
 AC_CONFIG_AUX_DIR(./config)
 # Note that this directory must *exactly* match what was specified via
@@ -254,6 +254,7 @@ test "x$hwloc_linuxio_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list
 test "x$hwloc_opencl_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list OpenCL"
 test "x$hwloc_have_cudart" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list CUDA"
 test "x$hwloc_nvml_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list NVML"
+test "x$hwloc_rsmi_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list RSMI"
 test "x$hwloc_gl_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list GL"
 # if nothing, say "no"
 test "x$hwloc_probeio_list" = "x" && hwloc_probeio_list=" no"
@@ -272,7 +273,7 @@ EOF
 
 # Plugin support
 hwloc_plugin_summary=$hwloc_have_plugins
-test "x$hwloc_plugin_components" != "x" && hwloc_plugin_summary="yes ("`echo $hwloc_plugin_components`")" # echo removes the starting space
+test "x$hwloc_plugin_components" != "x" && hwloc_plugin_summary="$hwloc_plugins_load ("`echo $hwloc_plugin_components`")" # echo removes the starting space
 cat <<EOF
 Plugin support:              $hwloc_plugin_summary
 EOF

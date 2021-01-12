@@ -38,8 +38,6 @@ public:
   void DoneGossip();
   void InformMigration(int obj_id, int from_pe, double obj_load, bool force);
   void RecvAck(int obj_id, int assigned_pe, bool can_accept);
-  void turnOn();
-  void turnOff();
 
 private:
   // Load information obtained via gossipping
@@ -47,6 +45,7 @@ private:
   std::vector<int> pe_no;
   std::vector<double> loads;
   std::vector<double> distribution;
+  bool underloaded;
 
   minHeap* objs;
 

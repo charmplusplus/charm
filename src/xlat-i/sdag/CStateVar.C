@@ -12,11 +12,12 @@ CStateVar::CStateVar(int v, const char* t, int np, const char* n, XStr* r, const
       isRdma(false),
       isFirstRdma(false),
       isRecvRdma(false),
+      isDevice(false),
+      isFirstDeviceRdma(false),
       declaredRef(NULL),
       byConst(false),
       isCounter(false),
-      isSpeculator(false),
-      isBgParentLog(false) {
+      isSpeculator(false) {
   if (t != NULL) {
     type = new XStr(t);
   } else {
@@ -48,9 +49,10 @@ CStateVar::CStateVar(ParamList* pl)
       isRdma(pl->isRdma()),
       isFirstRdma(pl->isFirstRdma()),
       isRecvRdma(pl->isRecvRdma()),
+      isDevice(pl->isDevice()),
+      isFirstDeviceRdma(pl->isFirstDeviceRdma()),
       isCounter(false),
-      isSpeculator(false),
-      isBgParentLog(false) {}
+      isSpeculator(false) {}
 
 EncapState::EncapState(Entry* entry, std::list<CStateVar*>& vars)
     : entry(entry),
@@ -58,7 +60,6 @@ EncapState::EncapState(Entry* entry, std::list<CStateVar*>& vars)
       name(0),
       isMessage(false),
       isForall(false),
-      isBgParentLog(false),
       vars(vars) {}
 
 }  // namespace xi

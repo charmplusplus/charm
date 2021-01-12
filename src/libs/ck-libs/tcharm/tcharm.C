@@ -11,7 +11,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 
 CtvDeclare(TCharm *,_curTCharm);
 
-static int lastNumChunks=0;
+static int nChunks;
 
 class TCharmTraceLibList {
 	enum {maxLibs=20,maxLibNameLen=15};
@@ -61,6 +61,11 @@ CsvDeclare(funcmap*, tcharm_funcmap);
 
 void TCharm::nodeInit()
 {
+  static bool tcharm_nodeinit_has_been_called;
+  if (tcharm_nodeinit_has_been_called)
+    return;
+  tcharm_nodeinit_has_been_called = true;
+
 #if CMK_TRACE_ENABLED
   if (CsvAccess(tcharm_funcmap) == NULL) {
     CsvInitialize(funcmap*, tcharm_funcmap);
@@ -71,6 +76,11 @@ void TCharm::nodeInit()
   // Assumes no anytime migration and only static insertion
   _isAnytimeMigration = false;
   _isStaticInsertion = true;
+
+  char **argv = CkGetArgv();
+  nChunks = CkNumPes();
+  CmiGetArgIntDesc(argv, "-vp", &nChunks, "Set the total number of virtual processors");
+  CmiGetArgIntDesc(argv, "+vp", &nChunks, nullptr);
 }
 
 void TCharm::procInit()
@@ -108,10 +118,10 @@ void TCharm::procInit()
     if (CkMyPe() == 0)
       CkPrintf("TCharm> stack size is set to %d.\n", tcharm_stacksize);
   }
-  if (CkMyPe()!=0) { //Processor 0 eats "+vp<N>" and "-vp<N>" later:
-  	int ignored;
-  	while (CmiGetArgIntDesc(argv,"-vp",&ignored,NULL)) {}
-  	while (CmiGetArgIntDesc(argv,"+vp",&ignored,NULL)) {}
+  if (CkMyRank() != 0) { // rank 0 eats "+vp<N>" and "-vp<N>" in nodeInit
+    int ignored;
+    CmiGetArgIntDesc(argv, "-vp", &ignored, nullptr);
+    CmiGetArgIntDesc(argv, "+vp", &ignored, nullptr);
   }
   if (CkMyPe()==0) { // Echo various debugging options:
     if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
@@ -179,13 +189,9 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     if (tcharm_nomig) { /*Nonmigratable version, for debugging*/
       tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
     } else {
-      CmiIsomallocContext * heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
+      CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
       tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
     }
-#if CMK_BIGSIM_CHARM
-    BgAttach(tid);
-    BgUnsetStartOutOfCore();
-#endif
   }
   CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
@@ -226,17 +232,12 @@ void checkPupMismatch(PUP::er &p,int expected,const char *where)
 }
 
 void TCharm::pup(PUP::er &p) {
-  //BIGSIM_OOC DEBUGGING
-  //if(!p.isUnpacking()){
-  //  CmiPrintf("TCharm[%d] packing: ", thisIndex);
-  //  CthPrintThdStack(tid);
-  //}
-
   checkPupMismatch(p,5134,"before TCHARM");
   p(isStopped); p(exitWhenDone); p(isSelfDone); p(asyncMigrate);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
-  
+  p | resumeAfterMigrationCallback;
+
   if (sema.size()>0){
   	CkAbort("TCharm::pup> Cannot migrate with unconsumed semaphores!\n");
   }
@@ -244,7 +245,6 @@ void TCharm::pup(PUP::er &p) {
   DBG("Packing thread");
 #if CMK_ERROR_CHECKING
   if (!p.isSizing() && !isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
-    if(_BgOutOfCoreFlag==0) //not doing out-of-core scheduling
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
   }	
   if (tcharm_nomig && !p.isSizing()) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
@@ -306,13 +306,6 @@ void TCharm::pup(PUP::er &p) {
   
   s.endBlock(); //End of seeking block
   checkPupMismatch(p,5140,"after TCHARM");
-  
-  //BIGSIM_OOC DEBUGGING
-  //if(p.isUnpacking()){
-  //  CmiPrintf("TCharm[%d] unpacking: ", thisIndex);
-  //  CthPrintThdStack(tid);
-  //}
-
 }
 
 // Pup our thread and related data
@@ -323,9 +316,6 @@ void TCharm::pupThread(PUP::er &pc) {
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
-#if CMK_BIGSIM_CHARM
-      BgAttach(tid);
-#endif
     }
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
@@ -364,10 +354,7 @@ void TCharm::UserData::pup(PUP::er &p)
 
 TCharm::~TCharm()
 {
-  //BIGSIM_OOC DEBUGGING
-
   CthFree(tid);
-
   delete initMsg;
 }
 
@@ -412,6 +399,13 @@ int TCharm::add(const TCharm::UserData &d) noexcept
 {
   if (nUd>=maxUserData)
     CkAbort("TCharm: Registered too many user data fields!\n");
+
+  // disable use of pup_buffer which conflicts with pup routines
+  CthThread th = getThread();
+  auto ctx = CmiIsomallocGetThreadContext(th);
+  if (ctx.opaque != nullptr)
+    CmiIsomallocEnableRDMA(ctx, 0);
+
   int nu=nUd++;
   ud[nu]=d;
   return nu;
@@ -493,7 +487,10 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::allow_migrate()
 void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
-  start();
+  if (resumeAfterMigrationCallback.isInvalid())
+    start();
+  else
+    resumeAfterMigrationCallback.send();
 }
 
 
@@ -520,15 +517,7 @@ CkArrayID TCHARM_Get_threads() {
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::barrier() noexcept {
 	//Contribute to a synchronizing reduction
 	contribute(CkCallback(CkReductionTarget(TCharm, atBarrier), thisProxy[0]));
-#if CMK_BIGSIM_CHARM
-        void *curLog;		// store current log in timeline
-        _TRACE_BG_TLINE_END(&curLog);
-	TRACE_BG_AMPI_BREAK(NULL, "TCharm_Barrier_START", NULL, 0, 1);
-#endif
 	TCharm * dis = stop();
-#if CMK_BIGSIM_CHARM
-	 _TRACE_BG_SET_INFO(NULL, "TCHARM_Barrier_END",  &curLog, 1);
-#endif
 	return dis;
 }
 
@@ -592,11 +581,6 @@ CLINKAGE int TCHARM_Get_num_chunks()
 {
 	TCHARMAPI("TCHARM_Get_num_chunks");
 	if (CkMyPe()!=0) CkAbort("TCHARM_Get_num_chunks should only be called on PE 0 during setup!");
-	int nChunks=CkNumPes();
-	char **argv=CkGetArgv();
-	CmiGetArgIntDesc(argv,"-vp",&nChunks,"Set the total number of virtual processors");
-	CmiGetArgIntDesc(argv,"+vp",&nChunks,NULL);
-	lastNumChunks=nChunks;
 	return nChunks;
 }
 FLINKAGE int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)()
@@ -677,12 +661,7 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     mapID=CProxy_ConfigurableRRMap::ckNew();
     opts.setMap(mapID);
   } else if(mapping==NULL){
-#if CMK_BIGSIM_CHARM
-    mapID=CProxy_BlockMap::ckNew();
-    opts.setMap(mapID);
-#else
     /* do nothing: use the default map */
-#endif
   } else if(0 == strcmp(mapping,"BLOCK_MAP")) {
     CkPrintf("TCharm> using BLOCK_MAP\n");
     mapID = CProxy_BlockMap::ckNew();

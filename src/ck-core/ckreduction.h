@@ -271,7 +271,7 @@ private:
 };
 PUPbytes(CkReduction::reducerType)
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 //CkReductionTypesExt struct to expose the reducerTypes for external
 //modules like Charm4py
         /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -433,14 +433,6 @@ private:
                          // value = 0 to nFrags-1
         CkSectionInfo sid;   // section cookie for multicast
 	CkCallback callback; //What to do when done
-#if CMK_BIGSIM_CHARM
-public:
-	/* AMPI reductions use bare CkReductionMsg's instead of AmpiMsg's */
-	void *event; // the event point that corresponds to this message
-	int eventPe; // the PE that the event is located on
-private:
-        void *log;
-#endif
 	void *data;//Reduction data
 	double dataStorage;//Start of data array (so it's double-aligned)
 };
@@ -710,14 +702,13 @@ private:
 	bool inProgress;//Is a reduction started, but not complete?
 	bool creating;//Are elements still being created?
 	bool startRequested;//Should we start the next reduction when creation finished?
+      bool is_inactive;//Is it inactive
 	int gcount;//=el't created here - el't deleted here
 	int lcount;//Number of local contributors
 	int maxStartRequest; // the highest future ReductionStarting message received
 
 	//Current local and remote contributions
 	int nContrib,nRemote;
-  // Is it inactive
-  bool is_inactive;
 
         // simple barrier
         CkCallback barrier_storedCallback;
@@ -734,7 +725,7 @@ private:
 	CkMsgQ<CkReductionMsg> futureRemoteMsgs;
 
 	CkMsgQ<CkReductionMsg> finalMsgs;
-  std::map<int, int> inactiveList;
+      std::unordered_map<int, int> inactiveList;
 
 //State:
 	void startReduction(int number,int srcPE);

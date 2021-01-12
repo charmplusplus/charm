@@ -28,6 +28,12 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p6 ./bcast_nonzero_root +noCMAForZC)
 endif
 
+testp: all
+	$(call run, +p$(P) ./bcast_nonzero_root )
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./bcast_nonzero_root +noCMAForZC)
+endif
+
 smptest: all
 	$(call run, +p4 ./bcast_nonzero_root ++ppn 4)
 	$(call run, +p6 ./bcast_nonzero_root ++ppn 3)

@@ -42,9 +42,8 @@ public:
 
 /* Utility */
 //#if CMK_LBDB_ON
-#include "LBDatabase.h"
+#include "LBManager.h"
 #include "MetaBalancer.h"
-class LBDatabase;
 //#endif
 
 //Forward declarations
@@ -126,7 +125,7 @@ public:
   std::unordered_map<int, bool> dynamicIns;
 };
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 extern int (*ArrayMapProcNumExtCallback)(int, int, const int *);
 
@@ -289,6 +288,7 @@ typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHas
 typedef std::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
 typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
 typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
+typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
 
 	CkLocMgr(CkArrayOptions opts);
 	CkLocMgr(CkMigrateMessage *m);
@@ -430,8 +430,8 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
     void metaLBCallLB(CkLocRec *rec);
 
 #if CMK_LBDB_ON
-	LBDatabase *getLBDB(void) const { return the_lbdb; }
-    MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
+	LBManager *getLBMgr(void) const { return lbmgr; }
+	MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
 	const LDOMHandle &getOMHandle(void) const { return myLBHandle; }
 #endif
 
@@ -448,7 +448,6 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
         void updateLocation(const CkArrayIndex &idx, CmiUInt8 id, int nowOnPe);
         void updateLocation(CmiUInt8 id, int nowOnPe);
 	void reclaimRemote(const CkArrayIndex &idx,int deletedOnPe);
-	void dummyAtSync(void);
 
 	/// return a list of migratables in this local record
 	void migratableList(CkLocRec *rec, std::vector<CkMigratable *> &list);
@@ -492,6 +491,14 @@ private:
 public:
 	void callMethod(CkLocRec *rec,CkMigratable_voidfn_t fn);
 
+	// Deliver buffered msgs that were buffered because of active rdma gets
+	void deliverAnyBufferedRdmaMsgs(CmiUInt8);
+
+	// Take all those actions that were waiting for the rgets launched from pup_buffer to complete
+	// These actions include: calling ckJustMigrated, calling ResumeFromSync and delivering any buffered messages
+	// that were sent for the element (which was still carrying out rgets)
+	void processAfterActiveRgetsCompleted(CmiUInt8 id);
+
 //Data Members:
     //Map array ID to manager and elements
     ArrayIdMap managers;
@@ -511,8 +518,13 @@ public:
     MsgBuffer bufferedMsgs;
     MsgBuffer bufferedRemoteMsgs;
     MsgBuffer bufferedShadowElemMsgs;
+    MsgBuffer bufferedActiveRgetMsgs;
 
     IndexMsgBuffer bufferedIndexMsgs;
+
+    // Map stores the CkMigratable elements that have active Rgets
+    // ResumeFromSync is not called for these elements until the Rgets have completed
+    ElemMap toBeResumeFromSynced;
 
 	bool addElementToRec(CkLocRec *rec,CkArray *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
@@ -534,7 +546,7 @@ private:
 	int mapHandle;
 	CkArrayMap *map;
 
-	CkGroupID lbdbID;
+	CkGroupID lbmgrID;
 	CkGroupID metalbID;
 
 	std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
@@ -544,20 +556,15 @@ private:
 	void checkInBounds(const CkArrayIndex &idx);
 
 #if CMK_LBDB_ON
-	LBDatabase *the_lbdb;
+	CkSyncBarrier* syncBarrier;
+	LBManager *lbmgr;
   MetaBalancer *the_metalb;
-	LDBarrierClient dummyBarrierHandle;
-	static void staticDummyResumeFromSync(void* data);
-	void dummyResumeFromSync(void);
-	static void staticRecvAtSync(void* data);
-	void recvAtSync(void);
 	LDOMHandle myLBHandle;
+        LDBarrierClient lbBarrierClient;
         LDBarrierReceiver lbBarrierReceiver;
 #endif
 private:
-	void initLB(CkGroupID lbdbID, CkGroupID metalbID);
-
-
+	void initLB(CkGroupID lbmgrID, CkGroupID metalbID);
 };
 
 

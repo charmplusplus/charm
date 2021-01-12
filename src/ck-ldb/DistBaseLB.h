@@ -18,18 +18,13 @@ public:
   DistBaseLB(CkMigrateMessage *m) : CBase_DistBaseLB(m) {}
   ~DistBaseLB();
 
-  static void staticAtSync(void*);
-  void AtSync(void); // Everything is at the PE barrier
-
-  void barrierDone();
-	static void staticStartLB(void*);
-	void ProcessAtSync();
+  void InvokeLB(void);
+  void barrierDone(); // Everything is at the PE barrier
   void LoadBalance();
   void ResumeClients();
   void ResumeClients(int balancing);
   // Migrated-element callback
-  static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);
-  void Migrated(LDObjHandle h, int waitBarrier);
+  void Migrated(int waitBarrier);
 
   struct LDStats {  // Passed to Strategy
     int from_pe;

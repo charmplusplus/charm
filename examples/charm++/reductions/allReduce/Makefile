@@ -20,5 +20,5 @@ AllReduce.o: AllReduce.C AllReduce.decl.h AllReduce.h
 test: all
 	$(call run, ./AllReduce 20 100000 +p4 )
 
-bgtest: all
-	$(call run, ./AllReduce 20 100000 +p4 +x2 +y2 +z2 )
+testp: all
+	$(call run, ./AllReduce $$(( $(P) * 10 )) 100000 +p$(P) )

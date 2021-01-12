@@ -105,10 +105,6 @@ void _createTraceprojections(char **argv)
   CkpvInitialize(CkVec<UsrEvent *>*, usrStats);
   CkpvAccess(usrEvents) = new CkVec<UsrEvent *>();
   CkpvAccess(usrStats) = new CkVec<UsrEvent *>();
-#if CMK_BIGSIM_CHARM
-  // CthRegister does not call the constructor
-//  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
-#endif //CMK_BIGSIM_CHARM
   CkpvInitialize(TraceProjections*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
@@ -359,18 +355,6 @@ LogPool::~LogPool()
 #endif
   }
 
-#if CMK_BIGSIM_CHARM
-  extern int correctTimeLog;
-  if (correctTimeLog) {
-    createFile("-bg");
-    if (CkMyPe() == 0) {
-      createSts("-bg");
-    }
-    writeHeader();
-    if (CkMyPe() == 0) writeSts(NULL);
-    postProcessLog();
-  }
-#endif
 
   delete[] pool;
   delete [] fname;
@@ -558,18 +542,6 @@ void LogPool::writeStatis(void)
   fclose(statisfp);
 }
 
-#if CMK_BIGSIM_CHARM
-static void updateProjLog(void *data, double t, double recvT, void *ptr)
-{
-  LogEntry *log = (LogEntry *)data;
-  FILE *fp = *(FILE **)ptr;
-  log->time = t;
-  log->recvTime = recvT<0.0?0:recvT;
-//  log->write(fp);
-  toProjectionsFile p(fp);
-  log->pup(p);
-}
-#endif
 
 // flush log entries to disk
 void LogPool::flushLogBuffer()
@@ -666,31 +638,10 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
   }
   if(poolSize==numEntries) {
     flushLogBuffer();
-#if CMK_BIGSIM_CHARM
-    extern int correctTimeLog;
-    if (correctTimeLog) CmiAbort("I/O interrupt!\n");
-#endif
   }
-#if CMK_BIGSIM_CHARM
-  switch (type) {
-    case BEGIN_PROCESSING:
-      pool[numEntries-1].recvTime = BgGetRecvTime();
-    case END_PROCESSING:
-    case BEGIN_COMPUTATION:
-    case END_COMPUTATION:
-    case CREATION:
-    case BEGIN_PACK:
-    case END_PACK:
-    case BEGIN_UNPACK:
-    case END_UNPACK:
-    case USER_EVENT_PAIR:
-      bgAddProjEvent(&pool[numEntries-1], numEntries-1, time, updateProjLog, &fp, BG_EVENT_PROJ);
-  }
-#endif
 }
 
 void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileName){
-#ifndef CMK_BIGSIM_CHARM
   if (type == CREATION ||
       type == CREATION_MULTICAST ||
       type == CREATION_BCAST) {
@@ -701,7 +652,6 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
   if(poolSize == numEntries){
     flushLogBuffer();
   }
-#endif	
 }
 
 void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
@@ -715,7 +665,6 @@ void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
 
   
 void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
-#ifndef CMK_BIGSIM_CHARM
   if (type == CREATION ||
       type == CREATION_MULTICAST ||
       type == CREATION_BCAST) {
@@ -726,7 +675,6 @@ void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
   if(poolSize == numEntries){
     flushLogBuffer();
   }
-#endif	
 	
 }  
 
@@ -749,7 +697,6 @@ void LogPool::addUserSuppliedNote(char *note){
 
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
   //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
-#ifndef CMK_BIGSIM_CHARM
 #if MPI_TRACE_MACHINE_HACK
   //This part of code is used  to combine the contiguous
   //MPI_Test and MPI_Iprobe events to reduce the number of
@@ -772,7 +719,6 @@ void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, d
   if(poolSize == numEntries){
     flushLogBuffer();
   }
-#endif	
 }
 
 
@@ -798,9 +744,6 @@ void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 
 void LogPool::postProcessLog()
 {
-#if CMK_BIGSIM_CHARM
-  bgUpdateProj(1);   // event type
-#endif
 }
 
 void LogPool::modLastEntryTimestamp(double ts)
@@ -808,28 +751,6 @@ void LogPool::modLastEntryTimestamp(double ts)
   pool[numEntries-1].time = ts;
   //pool[numEntries-1].cputime = ts;
 }
-
-// /** Constructor for a multicast log entry */
-// 
-//  THIS WAS MOVED TO trace-projections.h with the other constructors
-// 
-// LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-// 	     int ml, CmiObjId *d, double rt, int numPe, int *pelist) 
-// {
-//     type = CREATION_MULTICAST; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
-//     if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
-//     recvTime = rt; 
-//     numpes = numPe;
-//     userSuppliedNote = NULL;
-//     if (pelist != NULL) {
-// 	pes = new int[numPe];
-// 	for (int i=0; i<numPe; i++) {
-// 	  pes[i] = pelist[i];
-// 	}
-//     } else {
-// 	pes= NULL;
-//     }
-// }
 
 //void LogEntry::addPapi(LONG_LONG_PAPI *papiVals)
 //{
@@ -928,36 +849,14 @@ void LogEntry::pup(PUP::er &p)
 	break;
     case USER_SUPPLIED_NOTE:
 	  p|itime;
-	  int length;
-	  length=0;
-	  if (p.isPacking()) length = strlen(userSuppliedNote);
-          p | length;
-	  char space;
-	  space = ' ';
-          p | space;
-	  if (p.isUnpacking()) {
-	    userSuppliedNote = new char[length+1];
-	    userSuppliedNote[length] = '\0';
-	  }
-   	  PUParray(p,userSuppliedNote, length);
+	  p|userSuppliedNote;
 	  break;
     case USER_SUPPLIED_BRACKETED_NOTE:
       //CkPrintf("Writting out a USER_SUPPLIED_BRACKETED_NOTE\n");
 	  p|itime;
 	  p|iEndTime;
 	  p|event;
-	  int length2;
-	  length2=0;
-	  if (p.isPacking()) length2 = strlen(userSuppliedNote);
-          p | length2;
-	  char space2;
-	  space2 = ' ';
-          p | space2;
-	  if (p.isUnpacking()) {
-	    userSuppliedNote = new char[length2+1];
-	    userSuppliedNote[length2] = '\0';
-	  }
-   	  PUParray(p,userSuppliedNote, length2);
+	  p|userSuppliedNote;
 	  break;
     case MEMORY_USAGE_CURRENT:
       p | memUsage;
@@ -979,16 +878,25 @@ void LogEntry::pup(PUP::er &p)
     case CREATION_BCAST:
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
-      p|event; p|pe; p|msglen; p|irecvtime; p|numpes;
-      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      p|event; p|pe; p|msglen; p|irecvtime;
+      { // Needed to control the scope of numpes
+        int numpes = pes.size();
+        p | numpes;
+        if (p.isUnpacking()) pes.resize(numpes);
+      }
+      if (p.isUnpacking()) recvTime = irecvtime / 1.0e6;
       break;
     case CREATION_MULTICAST:
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
-      p|event; p|pe; p|msglen; p|irecvtime; p|numpes;
-      if (p.isUnpacking()) pes = numpes?new int[numpes]:NULL;
-      for (i=0; i<numpes; i++) p|pes[i];
-      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      p|event; p|pe; p|msglen; p|irecvtime;
+      { // Needed to control the scope of numpes
+        int numpes = pes.size();
+        p | numpes;
+        if (p.isUnpacking()) pes.resize(numpes);
+      }
+      p | pes;
+      if (p.isUnpacking()) recvTime = irecvtime / 1.0e6;
       break;
     case MESSAGE_RECV:
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen;
@@ -1027,7 +935,7 @@ void LogEntry::pup(PUP::er &p)
 
 TraceProjections::TraceProjections(char **argv): 
   _logPool(NULL), curevent(0), inEntry(false), computationStarted(false),
-	traceNestedEvents(false), converseExit(false),
+	traceNestedEvents(true), converseExit(false),
 	currentPhaseID(0), lastPhaseEvent(NULL), endTime(0.0)
 {
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
@@ -1045,7 +953,7 @@ TraceProjections::TraceProjections(char **argv):
     CmiGetArgFlagDesc(argv,"+checknested",
 		      "check projections nest begin end execute events");
   traceNestedEvents = 
-    CmiGetArgFlagDesc(argv,"+tracenested",
+    !CmiGetArgFlagDesc(argv,"+notracenested",
               "trace projections nest begin/end execute events");
   int binary = 
     CmiGetArgFlagDesc(argv,"+binary-trace",
@@ -1054,17 +962,21 @@ TraceProjections::TraceProjections(char **argv):
   int nSubdirs = 0;
   CmiGetArgIntDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
 
-
 #if CMK_USE_ZLIB
-  int compressed = true;
-  CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
-  int disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files pre-compressed with gzip");
+  bool compressed = true;
+  CmiGetArgFlagDesc(argv,"+gz-trace","Write log files compressed with gzip");
+  const bool disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files compressed with gzip");
   compressed = compressed && !disableCompressed;
+  if (binary && compressed)
+    CkAbort("Binary logs cannot be compressed with gzip, must use +no-gz-trace with +binary-trace");
 #else
-  // consume the flag so there's no confusing
-  CmiGetArgFlagDesc(argv,"+gz-trace",
-		    "Write log files pre-compressed with gzip");
-  if(CkMyPe() == 0) CkPrintf("Warning> gz-trace is not supported on this machine!\n");
+  // consume the flags so there's no confusion
+  const bool compressed =
+      CmiGetArgFlagDesc(argv, "+gz-trace", "Write log files compressed with gzip");
+  CmiGetArgFlagDesc(argv, "+no-gz-trace",
+                    "Disable writing log files compressed with gzip");
+  if (CkMyPe() == 0 && compressed)
+    CkPrintf("Warning> gz-trace is not supported because Charm++ was built without zlib!\n");
 #endif
 
   int writeSummaryFiles = CmiGetArgFlagDesc(argv,"+write-analysis-file","Enable writing summary files "); 
@@ -1725,6 +1637,14 @@ void toProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
     };
 }
 
+void toProjectionsFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void toProjectionsFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
@@ -1755,6 +1675,14 @@ void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
     };
 }
 
+void fromProjectionsFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void fromProjectionsFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 #if CMK_USE_ZLIB
 void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
@@ -1777,6 +1705,14 @@ void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 #endif
     default: CmiAbort("Unrecognized pup type code!");
     };
+}
+
+void toProjectionsGZFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void toProjectionsGZFile::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
 }
 #endif
 
@@ -1851,11 +1787,7 @@ static void TraceProjectionsExitHandler()
 void initTraceProjectionsBOC()
 {
   // CkPrintf("[%d] Trace Projections initialization called!\n", CkMyPe());
-#ifdef __BIGSIM__
-  if (BgNodeRank() == 0) {
-#else
     if (CkMyRank() == 0) {
-#endif
       registerExitFn(TraceProjectionsExitHandler);
     }
 #if 0

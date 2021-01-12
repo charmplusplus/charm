@@ -1,4 +1,5 @@
 #include "pgm.h"
+#include <cstdint>
 
 CkChareID mainhandle;
 
@@ -47,7 +48,7 @@ void main::results(int cnt)
 
 piPart::piPart()
 { 
-  CrnSrand((int)(long) this);
+  CrnSrand((int)(uintptr_t) this);
 }
 
 void

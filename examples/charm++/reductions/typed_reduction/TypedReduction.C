@@ -24,7 +24,7 @@ static int fudged_random(int seed_val)
 
 Driver::Driver(CkArgMsg* args) {
     driverProxy = thisProxy;
-    array_size = 10;
+    array_size = 10 * CkNumPes();
     if (args->argc > 1) array_size = strtol(args->argv[1], NULL, 10);
     w = CProxy_Worker::ckNew(array_size);
     w.untyped_reduce();

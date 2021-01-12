@@ -35,5 +35,11 @@ main::main(CkArgMsg *m)
 
     std::vector<bool> dataToCompare3{ false, false, true};
     execute_example<bool>(dataToCompare3);
+
+    thisProxy.accept(std::make_shared<Ping>(42));
 }
 
+void main::accept(std::shared_ptr<Ping> ping)
+{
+    (*ping)();
+}

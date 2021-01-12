@@ -164,10 +164,10 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 }
 
 // CharmLibExit is called for both forms of interop when the application is
-// done with Charm. In userDrivenMode, this does a full exit and kills the
-// application, just like CkExit(). In MPI interop, it just kills the Charm
-// instance, but allows the outside application and other Charm instances to
-// continue.
+// done with Charm. It does all necessary cleanup for Charm++ and returns
+// control to the user afterwards. In the case of userDrivenMode, this would
+// also include calling MPI_Finalize. In regular MPI interop, MPI_Finalize
+// is not called.
 #undef CkExit
 #define CkExit CKEXIT_0 // CKEXIT_0 and other CkExit macros defined in charm.h
 void CharmLibExit() {

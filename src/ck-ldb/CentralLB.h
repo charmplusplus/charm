@@ -92,15 +92,11 @@ public:
 
   void pup(PUP::er &p);
 
-  void turnOn();
-  void turnOff();
-
   void SetPESpeed(int);
   int GetPESpeed();
   inline void setConcurrent(bool c) { concurrent = c; }
 
-  static void staticAtSync(void*);
-  void AtSync(void); // Everything is at the PE barrier
+  void InvokeLB(); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
   void SendStats();
@@ -131,18 +127,10 @@ public:
   void WillIbekilled(std::vector<char> avail, int);
   void StartCleanup();
 
-  // manual predictor start/stop
-  static void staticPredictorOn(void* data, void* model);
-  static void staticPredictorOnWin(void* data, void* model, int wind);
-  static void staticPredictorOff(void* data);
-  static void staticChangePredictor(void* data, void* model);
-
   // manual start load balancing
   inline void StartLB() { thisProxy.ProcessAtSync(); }
-  static void staticStartLB(void* data);
 
   // Migrated-element callback
-  static void staticMigrated(void* me, LDObjHandle h, int waitBarrier=1);
   void Migrated(int waitBarrier=1);
 
   void MigrationDone(int balancing);  // Call when migration is complete

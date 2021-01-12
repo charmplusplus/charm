@@ -52,15 +52,23 @@ OPTS=""
 #Specific options
 #charm internal flag, only pass to c and cxx, not f90
 OPTS_CPP_INTERNAL="-D__CHARMC__=1"
-OPTS_CPP=
+OPTS_CC_GENCPM=""
+OPTS_CPP=""
 OPTS_LDRO=""
 OPTS_CC=""
-OPTS_CC_GENCPM=""
 OPTS_CXX=""
 OPTS_F90=""
 OPTS_LD=""
+ARG_OPTS_CPP=""
+ARG_OPTS_LDRO=""
+ARG_OPTS_CC=""
+ARG_OPTS_CXX=""
+ARG_OPTS_F90=""
+ARG_OPTS_LD=""
 USE_PIC="0"
 USE_PIE='0'
+USE_FVISIBILITY_HIDDEN=''
+USE_UNDEFINED_DYNAMIC=''
 
 CHARMDEBUG=""
 LINK_PYTHON=""
@@ -108,7 +116,6 @@ USER_INITIATED_SHARED='0'
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
 ROSE_OMP_TLS_GLOBALS="no"
-AMPI_FUNCPTR_SHIM='0'
 PRINT_BUILDING_BLOCKS=""
 NOABORT=""
 
@@ -162,7 +169,7 @@ printUsage() {
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
     echo "  Other options that are not listed here will be passed directly to the"
     echo "underlying compiler and/or linker."
-    echo "Parallel Programming Lab, UIUC, 2019."
+    echo "Parallel Programming Lab, UIUC, 2020."
     echo $*
     exit 1
 }
@@ -247,6 +254,11 @@ getExtention() {
         else
           echo $se_ret
         fi
+}
+
+getAbsPath()
+{
+  ( cd "$*" >/dev/null 2>&1 && pwd || echo "$*" )
 }
 
 Debugf() {
@@ -366,10 +378,23 @@ then
 fi
 }
 
+filterLegacyLB()
+{
+    local module="$1"
+    local warningOn="$2"
+    case $module in GreedyLB|GreedyRefineLB|RefineLB|RandCentLB|DummyLB|RotateLB)
+        if [ "$warningOn" = "1" ]; then
+            Warning "Warning: $module is now part of TreeLB. To use it, you must also pass +balancer $module at runtime."
+        fi
+	module="TreeLB"
+    esac
+    echo $module
+}
+
 printVersion()
 {
 	findCharmBin $0
-	version=`cat $CHARMBIN/../include/VERSION`
+	version=$(grep "CHARM_VERSION " $CHARMBIN/../include/charm-version.h | awk '{print $3}')
 	echo Charm++ Version $version
 }
 
@@ -394,18 +419,13 @@ then
 	PROG_EXT=".exe"
 fi
 
-CHARMLIB="$CHARMBIN/../lib"
-CHARMINC="$CHARMBIN/../include"
+CHARMDIR="$(getAbsPath "$CHARMBIN/..")"
+CHARMLIB="$CHARMDIR/lib"
+CHARMINC="$CHARMDIR/include"
 CHARMLIBSO=
-if test -d "$CHARMBIN/../lib_so"
+if test -d "$CHARMDIR/lib_so"
 then
-  CHARMLIBSO=`cd $CHARMBIN/../lib_so 2>/dev/null && pwd`
-  #getting absolute path is harder than thought because of symbolic links and ..
-  #ksh needs cd -P to resolve werid symbolic links, however -P is not portable
-  #csh is ok too if it exists
-  test -z "$CHARMLIBSO" && CHARMLIBSO=`cd -P $CHARMBIN/../lib_so 2>/dev/null && pwd`
-  test -z "$CHARMLIBSO" && CHARMLIBSO=`csh -c "cd $CHARMBIN/../lib_so >& /dev/null && pwd"`
-  test -z "$CHARMLIBSO" && echo "$CHARMBIN/../lib_so: not found" && exit 1
+  CHARMLIBSO="$CHARMDIR/lib_so"
 fi
 
 ##############################################################################
@@ -476,7 +496,7 @@ do
 		"mblock") AddModules tcharmmain mblock ;;
 		"mblockf") AddModules tcharmmain mblock ; USE_F90_LIBRARIES="1" ;;
 
-		"charm"|"charm++"|"charm++f"|"f90charm"|"converse"|"converse++"|"bgcharm++"|"bgconverse++"|"bluegene"|"ckbluegene"|"bigsim")
+		"charm"|"charm++"|"charm++f"|"f90charm"|"converse"|"converse++")
 			PARADIGM="$1"
 			POST_LANGUAGE=1
 			;;
@@ -496,17 +516,24 @@ do
                 ;;
 
 	"-module"|"-modules")
-		AddModules `echo $1 | sed -e 's/,/ /g'`
+		local mod=`echo $1 | sed -e 's/,/ /g'`
+		for module in $mod; do
+			module=$(filterLegacyLB $module "0")
+			AddModules $module
+		done
                 INPUT_GIVEN="1"
 		shift
 		;;
 
 	"-balancer")
 #                test -n "$BALANCER" && Abort "More than one -balancer specified!"
-		BALANCER="$BALANCER $1"
-		mod=`echo $1| sed -e 's/:/ /' -e 's/,/ /g'`
-		AddModules $mod
+		local mod=`echo $1| sed -e 's/:/ /' -e 's/,/ /g'`
 		shift
+		for module in $mod; do
+			module=$(filterLegacyLB $module "1")
+			notInList $module $BALANCER && BALANCER="$BALANCER $module"
+			AddModules $module
+		done
 		;;
 
 	"-balance")
@@ -556,9 +583,16 @@ do
 		ROSE_OMP_TLS_GLOBALS="yes"
 		;;
 
-	"-ampi-funcptr-shim")
-		AMPI_FUNCPTR_SHIM='1'
+	"-fpie"|"-fPIE")
 		USE_PIE='1'
+		;;
+
+	"-fvisibility=hidden")
+		USE_FVISIBILITY_HIDDEN="$arg"
+		;;
+
+	"-Wl,-undefined,dynamic_lookup")
+		USE_UNDEFINED_DYNAMIC="$arg"
 		;;
 
 	"-verbose")
@@ -617,37 +651,37 @@ do
 		;;
 
 	"-cpp-option")
-		OPTS_CPP="$OPTS_CPP $1"
+		ARG_OPTS_CPP="$ARG_OPTS_CPP $1"
 		shift
 		;;
 
 	"-ldro-option")
-		OPTS_LDRO="$OPTS_LDRO $1"
+		ARG_OPTS_LDRO="$ARG_OPTS_LDRO $1"
 		shift
 		;;
 
 	"-cc-option")
-		OPTS_CC="$OPTS_CC $1"
+		ARG_OPTS_CC="$ARG_OPTS_CC $1"
 		shift
 		;;
 
 	"-c++-option")
-		OPTS_CXX="$OPTS_CXX $1"
+		ARG_OPTS_CXX="$ARG_OPTS_CXX $1"
 		shift
 		;;
 
 	"-f90-option")
-		OPTS_F90="$OPTS_F90 $1"
+		ARG_OPTS_F90="$ARG_OPTS_F90 $1"
 		shift
 		;;
 
 	"-ld-option"|"-ld++-option")
-		OPTS_LD="$OPTS_LD $1"
+		ARG_OPTS_LD="$ARG_OPTS_LD $1"
 		shift
 		;;
 
 	"-rpath")
-		OPTS_LD="$OPTS_LD -rpath $1"
+		ARG_OPTS_LD="$ARG_OPTS_LD -rpath $1"
 		shift
 		;;
 
@@ -738,11 +772,11 @@ do
 		;;
 
 	-I|--include-path)
-		OPTS_CPP="$OPTS_CPP -I$1"
+		ARG_OPTS_CPP="$ARG_OPTS_CPP -I$1"
 		shift
 		;;
 	--pre-include|-include|--system-include|-isystem|-iquote|-idirafter)
-		OPTS_CPP="$OPTS_CPP $arg $1"
+		ARG_OPTS_CPP="$ARG_OPTS_CPP $arg $1"
 		shift
 		;;
 	@*.rsp)
@@ -750,13 +784,17 @@ do
 		# See https://github.com/UIUC-PPL/charm/issues/2617 for details.
 		OPTS="$OPTS $arg"
 		;;
-
+	*.tbd)
+		# Pass through text-based libraries (*.tbd) on MacOS.
+		# See https://github.com/UIUC-PPL/charm/issues/3045 for details.
+		OPTS="$OPTS $arg"
+		;;
 	-D*|-I*)
 		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null
 		then
-		  OPTS_CPP="$OPTS_CPP "\"$arg\"
+		  ARG_OPTS_CPP="$ARG_OPTS_CPP "\"$arg\"
 		else
-		  OPTS_CPP="$OPTS_CPP $arg"
+		  ARG_OPTS_CPP="$ARG_OPTS_CPP $arg"
    		fi
 		;;
 
@@ -782,10 +820,10 @@ do
 		;;
 	-shared|-G)
 		USER_INITIATED_SHARED='1'
-		OPTS_LD="$OPTS_LD $arg"
+		ARG_OPTS_LD="$ARG_OPTS_LD $arg"
 		;;
 	-L*)
-		OPTS_LD="$OPTS_LD $arg"
+		ARG_OPTS_LD="$ARG_OPTS_LD $arg"
 		;;
 	-charm-shared|-cs)
 		CHARM_SHARED="1"
@@ -845,7 +883,7 @@ do
 		;;
 
 	-s)
-		OPTS_LD="$OPTS_LD   $arg"
+		ARG_OPTS_LD="$ARG_OPTS_LD   $arg"
 		;;
 	-no-charmrun)
 		COPY_CHARMRUN=false
@@ -945,10 +983,10 @@ for FILE in $FILES
 do
 
 	case "$FILE" in
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
+	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co|*.obj)
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
-	*.c|*.s|*.S|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
+	*.c|*.s|*.S|*.asm|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
 		BASE=`stripExtention \`basename $FILE\``
 		BASEO="$BASE.o"
 
@@ -988,6 +1026,13 @@ Debug "Read config script, setting defaults..."
 . $CHARMINC/conv-config.sh $CHARMINC
 
 Debug "Setting vars..."
+
+OPTS_CPP="$OPTS_CPP $ARG_OPTS_CPP"
+OPTS_LDRO="$OPTS_LDRO $ARG_OPTS_LDRO"
+OPTS_CC="$OPTS_CC $ARG_OPTS_CC"
+OPTS_CXX="$OPTS_CXX $ARG_OPTS_CXX"
+OPTS_F90="$OPTS_F90 $ARG_OPTS_F90"
+OPTS_LD="$OPTS_LD $ARG_OPTS_LD"
 
 if [ "$USE_BUILD_OPTIONS" = "1" ]
 then
@@ -1061,17 +1106,12 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    TLSGLOBALS_OPTS='-ftls-model=initial-exec'
+    TLSGLOBALS_OPTS=''
+    [[ "$CMK_COMPILER_KNOWS_FTLS_MODEL" = '1' ]] && TLSGLOBALS_OPTS+=" -ftls-model=initial-exec"
     [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" = '1' ] && TLSGLOBALS_OPTS="$TLSGLOBALS_OPTS -mno-tls-direct-seg-refs"
     OPTS_CC="$OPTS_CC $TLSGLOBALS_OPTS"
     OPTS_CXX="$OPTS_CXX $TLSGLOBALS_OPTS"
     OPTS_F90="$OPTS_F90 $TLSGLOBALS_OPTS"
-fi
-
-if [ "$AMPI_FUNCPTR_SHIM" = '1' ]
-then
-    OPTS_CC="$OPTS_CC -DAMPI_USE_FUNCPTR"
-    OPTS_CXX="$OPTS_CXX -DAMPI_USE_FUNCPTR"
 fi
 
 # Look up and add the dependencies for module $1
@@ -1081,6 +1121,13 @@ findModuleDep() {
 	PROCESSED_MODULES="$PROCESSED_MODULES $M"
 	#PRE_LIBRARIES=`AddList $PRE_LIBRARIES -lmodule$M`
 	PRE_LIBRARIES=`AddList -lmodule$M $PRE_LIBRARIES`
+
+	if [[ "$M" == 'CkLoop' && "$CMK_SMP" != '1' && "$CMK_WINDOWS" != '1' ]]; then
+		# CkLoop depends on pthreads in non-SMP, non-Windows machines,
+		# so make sure it is linked.
+		POST_LIBRARIES=`AddList $POST_LIBRARIES -pthread`
+	fi
+
 # HACK: add modules to both ends of library list, to avoid
 #  undefined symbol CkRegisterMainModule when it's in a module file.
 	POST_LIBRARIES=`AddList $POST_LIBRARIES -lmodule$M`
@@ -1135,14 +1182,6 @@ then
 	USE_PIC="1"
 fi
 
-if [ "$USE_PIC" = "1" ]
-then
-       OPTS_CC="$OPTS_CC $CMK_PIC"
-       OPTS_CXX="$OPTS_CXX $CMK_PIC"
-       OPTS_F90="$OPTS_F90 $CMK_PIC"
-       OPTS_LD="$OPTS_LD $CMK_PIC"
-fi
-
 if [ "$USE_PIE" = "1" ]
 then
        OPTS_CC="$OPTS_CC $CMK_PIE"
@@ -1151,7 +1190,31 @@ then
        OPTS_LD="$OPTS_LD $CMK_PIE"
 fi
 
-if [ "$BUILD_SHARE" = "1" ]
+if [ "$USE_PIC" = "1" ]
+then
+       OPTS_CC="$OPTS_CC $CMK_PIC"
+       OPTS_CXX="$OPTS_CXX $CMK_PIC"
+       OPTS_F90="$OPTS_F90 $CMK_PIC"
+       OPTS_LD="$OPTS_LD $CMK_PIC"
+fi
+
+if [[ "$CMK_COMPILER_KNOWS_FVISIBILITY" = '1' && -n "$USE_FVISIBILITY_HIDDEN" ]]
+then
+       OPTS_CC="$OPTS_CC $USE_FVISIBILITY_HIDDEN"
+       OPTS_CXX="$OPTS_CXX $USE_FVISIBILITY_HIDDEN"
+       OPTS_F90="$OPTS_F90 $USE_FVISIBILITY_HIDDEN"
+       OPTS_LD="$OPTS_LD $USE_FVISIBILITY_HIDDEN"
+fi
+
+if [[ "$CMK_LINKER_KNOWS_UNDEFINED" = '1' && -n "$USE_UNDEFINED_DYNAMIC" ]]
+then
+       OPTS_CC="$OPTS_CC $USE_UNDEFINED_DYNAMIC"
+       OPTS_CXX="$OPTS_CXX $USE_UNDEFINED_DYNAMIC"
+       OPTS_F90="$OPTS_F90 $USE_UNDEFINED_DYNAMIC"
+       OPTS_LD="$OPTS_LD $USE_UNDEFINED_DYNAMIC"
+fi
+
+if [ "$BUILD_SHARE" = "1" -a "$USER_INITIATED_SHARED" = '0' ]
 then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
@@ -1348,15 +1411,9 @@ case "$LANGUAGE" in
 	;;
 esac
 
-# update charm to bgcharm
-[ "$PARADIGM" = "charm++" -a -n "$CMK_BIGSIM" ] && PARADIGM="bgcharm++"
-[ "$PARADIGM" = "converse++" -a -n "$CMK_BIGSIM" ] && PARADIGM="bgconverse++"
-
-[ "$PARADIGM" = "bgcharm++" ] && TRACEMODE=`AddList $TRACEMODE bluegene`
-
 if [ $USE_F77_LIBRARIES = "1" ]
 then
-	POST_LIBRARIES="$POST_LIBRARIES $CMK_F77LIBS"
+	CMK_SYSLIBS="$CMK_SYSLIBS $CMK_F77LIBS"
 fi
 
 if [ $USE_F90_LIBRARIES = "1" ]
@@ -1367,7 +1424,8 @@ then
 		Abort "Error: Fortran support library $CHARMLIB/libconv-utilf.a missing. Is your Fortran compiler working?"
 	fi
 
-	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
+	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf"
+	CMK_SYSLIBS="$CMK_SYSLIBS $CMK_F90LIBS"
 fi
 
 # GEN-CPM options
@@ -1390,18 +1448,6 @@ case "$PARADIGM" in
         PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm -lckf"
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
 	;;
-"bluegene"|"bigsim")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bigsim -lconv-bigsim-logs"
-	;;
-"ckbluegene")
-        POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
-	;;
-"bgcharm++")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bigsim -lconv-bigsim-logs -lconv-bluegene-stub"
-	;;
-"bgconverse++")
-        MIDDLE_LIBS="$MIDDLE_LIBS -lconv-bigsim -lconv-bigsim-logs"
-	;;
 esac
 
 if [ "$AMPIMAIN" != "" ]
@@ -1416,11 +1462,6 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    if [ "$CMK_GDIR" = "uth" ]
-    then
-      echo "Error: -tlsglobals is not supported with the uth machine layer."
-      exit 1
-    fi
     if [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" != '1' ] && [ "$CMK_COMPILER" != 'clang' -o "$CMK_MACOSX" != '1' ]
     then
       echo "Warning: -tlsglobals may not work with compilers that do not recognize -mno-tls-direct-seg-refs."
@@ -1502,7 +1543,7 @@ if [ x"$TRACEMODE" != x ]
 then
 for trace in $TRACEMODE; do
     case "$PARADIGM" in
-        "converse"|"converse++"|"bgconverse++"|"bigsim"|"bluegene")
+        "converse"|"converse++")
             if [ "$trace" != "counter" ]; then
                 Warning "Tracemode $trace isn't supported in Converse-level programs; Dropping it"
                 TRACEMODE=`DropList $trace $TRACEMODE`
@@ -1518,20 +1559,15 @@ done
 
 fi
 
-if test x$PARADIGM = x"bgcharm++"
-then
-    BALANCE=bluegene
-fi
-
 Debug "Finished with TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
-BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
+BAL_OBJ="-lldb-$BALANCE -lconverse"
 
 # Check for valid choice of MEMORY
 
 # Set the default expansions of unprefixed variants
 case "$MEMORY" in
-  'verbose'|'paranoid'|'leak'|'isomalloc')
+  'verbose'|'record'|'paranoid'|'leak'|'isomalloc')
     MEMORY="os-$MEMORY"
     ;;
   charmdebug*)
@@ -1539,10 +1575,9 @@ case "$MEMORY" in
     ;;
 esac
 
-# Isomalloc does not work on BGQ or Windows:
-if [ "$CMK_BLUEGENEQ" = "1" -o "$CMK_COMPILER" = "msvc" ] && [ "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]
+if [[ "$CMK_SUPPORTS_MEMORY_ISOMALLOC" != '1' ]] && [[ "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]]
 then
-  Abort "Error: Isomalloc is not supported on BlueGene/Q or Windows."
+  Abort "Error: -memory isomalloc is not supported on this platform."
 fi
 
 MEM_OBJ="-lmemory-${MEMORY}"
@@ -1584,7 +1619,7 @@ modInitObj="$modInitName.o"
 MAKE_LDXX="0"
 MAKE_LD="0"
 
-CORE_LIBS="-lconv-core -ltmgr -lconv-util -lconv-partition $TRACE_OBJ $CMK_HWLOC_LIBS"
+CORE_LIBS="-lconverse $TRACE_OBJ -lm"
 
 # get TAU stub makefile variables
 if test "$CMK_WITH_TAU" = "true"
@@ -1611,7 +1646,7 @@ CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 case "$PARADIGM" in
 "f90charm")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-machine $CORE_LIBS "
+	MIDDLE_LIBS="-lck $MIDDLE_LIBS $CORE_LIBS "
 	if [ -z "$NO_MAIN" ]
 	then
 		MIDDLE_LIBS="-lckmainf $MIDDLE_LIBS"
@@ -1624,9 +1659,9 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
+"charm"|"charm++"|"f90charm")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-machine $CORE_LIBS "
+	MIDDLE_LIBS="-lck $MIDDLE_LIBS $CORE_LIBS "
 	if [ -z "$NO_MAIN" ]
 	then
 		if [ -n "$AMPIF" ]
@@ -1645,9 +1680,9 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
+"converse"|"converse++")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="-lconv-core $MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
+	MIDDLE_LIBS="-lconverse $MIDDLE_LIBS $CORE_LIBS -ltrace-converse "
 	;;
 "c"|"C"|"c++"|"C++"|"f90"|"f77")
   ;;
@@ -1675,7 +1710,7 @@ if [ -z "$STANDALONE" ]
 then
   ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES"
   case "$PARADIGM" in
-  "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
+  "charm"|"charm++"|"f90charm")
     ALL_LIBS="$ALL_LIBS -lmoduleNDMeshStreamer -lmodulecompletion"
     ;;
   esac
@@ -1685,10 +1720,10 @@ fi
 
 if [ -n "$LINK_WHOLE_ARCHIVE" ]
 then
-  ALL_LIBS="$CXX_NO_AS_NEEDED $LDXX_WHOLE_ARCHIVE_PRE $ALL_LIBS $LDXX_WHOLE_ARCHIVE_POST $CMK_SYSLIBS"
-else
-  ALL_LIBS="$ALL_LIBS $CMK_SYSLIBS"
+  ALL_LIBS="$CXX_NO_AS_NEEDED $LDXX_WHOLE_ARCHIVE_PRE $ALL_LIBS $LDXX_WHOLE_ARCHIVE_POST"
 fi
+
+ALL_LIBS="$ALL_LIBS $CMK_SYSLIBS"
 
 if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
 then
@@ -1831,7 +1866,7 @@ do
 	DELETE="$DELETE $MYTMP.c $MYTMP.i"
 	DoNoErrCheck $RM $BASE.cpm.h $MYTMP.c
 	Do touch $BASE.cpm.h
-	Do $LN -f -s $FILE $MYTMP.c
+	Do cp -f $FILE $MYTMP.c
 	Do $CHARM_CPP_C $CHARM_CPP_C_FLAGS $MYTMP.c > $MYTMP.i
 	Do $CHARMBIN/conv-cpm $MYTMP.i $BASE.cpm.h
 done
@@ -1882,7 +1917,7 @@ do
 #	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
 #	then
         case "$FILE_EXT" in
-        .c|.s|.S|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
+        .c|.s|.S|.asm|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASEO `stripExtention $BASEO`.f.o
         esac
@@ -1926,7 +1961,7 @@ do
 		  Do $CHARMBIN/charmxi $XIOPTS $FILE
                 fi
 		;;
-	*.c|*.s|*.S)
+	*.c|*.s|*.S|*.asm)
 		Do $CHARM_CC $CHARM_CC_FLAGS -c $FILE $DESTO
 		if [ "$Do_res" -ne 0 ]
 		then
@@ -1965,7 +2000,7 @@ do
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
 		;;
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
+	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co|*.obj)
 		[ ! -s $FILE ] && Abort "$FILE: file not recognized: File truncated"
 		;;
 	*.M|*.mod)
@@ -2036,7 +2071,7 @@ MakeSO() {
 		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		echo "!!  Failed to compile Charm++ shared library. You can disable shared   !!"
 		echo "!!  lib compilation by providing --no-build-shared build option like:  !!"
-		echo "!!     ./build charm++ netlrts-linux --no-build-shared -O              !!"
+		echo "!!     ./build charm++ netlrts-linux-x86_64 --no-build-shared          !!"
 		echo "!!  or reexecute this charmc command with the --no-build-shared option !!"
 		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		Abort "Command $soCmd returned error code $Do_res"
@@ -2079,7 +2114,7 @@ case "$OBJECT" in
 	;;
 *.so|*.so.*|*.sl|*.dylib)
 # Make shared library
-	if [ "$BUILD_SHARE" = '1' ]
+	if [ "$BUILD_SHARE" = '1' -a "$USER_INITIATED_SHARED" = '0' ]
 	then
 	  	MakeSO
 	fi
@@ -2087,7 +2122,7 @@ case "$OBJECT" in
 *.a)
 # Make regular (.a, non-shared) library
 	# in case building charm so, build .so under lib_so as well # Gengbin
-	if [ "$BUILD_SHARE" = "1" ]
+	if [ "$BUILD_SHARE" = "1" -a "$USER_INITIATED_SHARED" = '0' ]
 	then
 	  COPY_EXIT=""
 	  OBJECT_SAVE=$OBJECT

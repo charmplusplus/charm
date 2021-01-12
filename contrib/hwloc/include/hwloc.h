@@ -1,8 +1,8 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2019 Inria.  All rights reserved.
+ * Copyright © 2009-2020 Inria.  All rights reserved.
  * Copyright © 2009-2012 Université Bordeaux
- * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
+ * Copyright © 2009-2020 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -11,7 +11,7 @@
  *         ------------------------------------------------
  *               $tarball_directory/doc/doxygen-doc/
  *                                or
- *           http://www.open-mpi.org/projects/hwloc/doc/
+ *           https://www.open-mpi.org/projects/hwloc/doc/
  *=====================================================================
  *
  * FAIR WARNING: Do NOT expect to be able to figure out all the
@@ -93,7 +93,7 @@ extern "C" {
  * Two stable releases of the same series usually have the same ::HWLOC_API_VERSION
  * even if their HWLOC_VERSION are different.
  */
-#define HWLOC_API_VERSION 0x00020100
+#define HWLOC_API_VERSION 0x00020300
 
 /** \brief Indicate at runtime which hwloc API version was used at build time.
  *
@@ -102,7 +102,7 @@ extern "C" {
 HWLOC_DECLSPEC unsigned hwloc_get_api_version(void);
 
 /** \brief Current component and plugin ABI version (see hwloc/plugins.h) */
-#define HWLOC_COMPONENT_ABI 6
+#define HWLOC_COMPONENT_ABI 7
 
 /** @} */
 
@@ -173,8 +173,12 @@ typedef hwloc_const_bitmap_t hwloc_const_nodeset_t;
  * may be defined in the future!  If you need to compare types, use
  * hwloc_compare_types() instead.
  */
-#define HWLOC_OBJ_TYPE_MIN HWLOC_OBJ_MACHINE /**< \private Sentinel value */
 typedef enum {
+
+/** \cond */
+#define HWLOC_OBJ_TYPE_MIN HWLOC_OBJ_MACHINE /* Sentinel value */
+/** \endcond */
+
   HWLOC_OBJ_MACHINE,	/**< \brief Machine.
 			  * A set of processors and memory with cache
 			  * coherency.
@@ -192,7 +196,7 @@ typedef enum {
 			  */
   HWLOC_OBJ_CORE,	/**< \brief Core.
 			  * A computation unit (may be shared by several
-			  * logical processors).
+			  * PUs, aka logical processors).
 			  */
   HWLOC_OBJ_PU,		/**< \brief Processing Unit, or (Logical) Processor.
 			  * An execution unit (may share a core with some
@@ -251,24 +255,33 @@ typedef enum {
 			  */
 
   HWLOC_OBJ_BRIDGE,	/**< \brief Bridge (filtered out by default).
-			  * Any bridge that connects the host or an I/O bus,
+			  * Any bridge (or PCI switch) that connects the host or an I/O bus,
 			  * to another I/O bus.
-			  * They are not added to the topology unless I/O discovery
-			  * is enabled with hwloc_topology_set_flags().
+			  *
+			  * Bridges are not added to the topology unless their
+			  * filtering is changed (see hwloc_topology_set_type_filter()
+			  * and hwloc_topology_set_io_types_filter()).
+			  *
 			  * I/O objects are not listed in the main children list,
 			  * but rather in the dedicated io children list.
 			  * I/O objects have NULL CPU and node sets.
 			  */
   HWLOC_OBJ_PCI_DEVICE,	/**< \brief PCI device (filtered out by default).
-			  * They are not added to the topology unless I/O discovery
-			  * is enabled with hwloc_topology_set_flags().
+			  *
+			  * PCI devices are not added to the topology unless their
+			  * filtering is changed (see hwloc_topology_set_type_filter()
+			  * and hwloc_topology_set_io_types_filter()).
+			  *
 			  * I/O objects are not listed in the main children list,
 			  * but rather in the dedicated io children list.
 			  * I/O objects have NULL CPU and node sets.
 			  */
   HWLOC_OBJ_OS_DEVICE,	/**< \brief Operating system device (filtered out by default).
-			  * They are not added to the topology unless I/O discovery
-			  * is enabled with hwloc_topology_set_flags().
+			  *
+			  * OS devices are not added to the topology unless their
+			  * filtering is changed (see hwloc_topology_set_type_filter()
+			  * and hwloc_topology_set_io_types_filter()).
+			  *
 			  * I/O objects are not listed in the main children list,
 			  * but rather in the dedicated io children list.
 			  * I/O objects have NULL CPU and node sets.
@@ -278,6 +291,10 @@ typedef enum {
 			  * Objects without particular meaning, that can e.g. be
 			  * added by the application for its own use, or by hwloc
 			  * for miscellaneous objects such as MemoryModule (DIMMs).
+			  *
+			  * They are not added to the topology unless their filtering
+			  * is changed (see hwloc_topology_set_type_filter()).
+			  *
 			  * These objects are not listed in the main children list,
 			  * but rather in the dedicated misc children list.
 			  * Misc objects may only have Misc objects as children,
@@ -300,7 +317,6 @@ typedef enum {
 
   HWLOC_OBJ_DIE,	/**< \brief Die within a physical package.
 			 * A subpart of the physical package, that contains multiple cores.
-			 * \hideinitializer
 			 */
 
   HWLOC_OBJ_TYPE_MAX    /**< \private Sentinel value */
@@ -334,8 +350,7 @@ typedef enum hwloc_obj_osdev_type_e {
   HWLOC_OBJ_OSDEV_DMA,		/**< \brief Operating system dma engine device.
 				  * For instance the "dma0chan0" DMA channel on Linux. */
   HWLOC_OBJ_OSDEV_COPROC	/**< \brief Operating system co-processor device.
-				  * For instance "mic0" for a Xeon Phi (MIC) on Linux,
-				  * "opencl0d0" for a OpenCL device,
+				  * For instance "opencl0d0" for a OpenCL device,
 				  * "cuda0" for a CUDA device. */
 } hwloc_obj_osdev_type_t;
 
@@ -360,9 +375,8 @@ typedef enum hwloc_obj_osdev_type_e {
  */
 HWLOC_DECLSPEC int hwloc_compare_types (hwloc_obj_type_t type1, hwloc_obj_type_t type2) __hwloc_attribute_const;
 
-enum hwloc_compare_types_e {
-    HWLOC_TYPE_UNORDERED = INT_MAX	/**< \brief Value returned by hwloc_compare_types() when types can not be compared. \hideinitializer */
-};
+/** \brief Value returned by hwloc_compare_types() when types can not be compared. \hideinitializer */
+#define HWLOC_TYPE_UNORDERED INT_MAX
 
 /** @} */
 
@@ -509,7 +523,7 @@ struct hwloc_obj {
 					  *
                                           * \note Its value must not be changed, hwloc_bitmap_dup() must be used instead.
                                           */
-  hwloc_cpuset_t complete_cpuset;       /**< \brief The complete CPU set of logical processors of this object,
+  hwloc_cpuset_t complete_cpuset;       /**< \brief The complete CPU set of processors of this object,
                                           *
                                           * This may include not only the same as the cpuset field, but also some CPUs for
                                           * which topology information is unknown or incomplete, some offlines CPUs, and
@@ -530,6 +544,8 @@ struct hwloc_obj {
                                           * between this object and the NUMA node objects).
                                           *
                                           * In the end, these nodes are those that are close to the current object.
+                                          * Function hwloc_get_local_numanode_objs() may be used to list those NUMA
+                                          * nodes more precisely.
                                           *
                                           * If the ::HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED configuration flag is set,
                                           * some of these nodes may not be allowed for allocation,
@@ -614,7 +630,11 @@ union hwloc_obj_attr_u {
   } group;
   /** \brief PCI Device specific Object Attributes */
   struct hwloc_pcidev_attr_s {
-    unsigned short domain;
+#ifndef HWLOC_HAVE_32BITS_PCI_DOMAIN
+    unsigned short domain; /* Only 16bits PCI domains are supported by default */
+#else
+    unsigned int domain; /* 32bits PCI domain support break the library ABI, hence it's disabled by default */
+#endif
     unsigned char bus, dev, func;
     unsigned short class_id;
     unsigned short vendor_id, device_id, subvendor_id, subdevice_id;
@@ -629,7 +649,11 @@ union hwloc_obj_attr_u {
     hwloc_obj_bridge_type_t upstream_type;
     union {
       struct {
-	unsigned short domain;
+#ifndef HWLOC_HAVE_32BITS_PCI_DOMAIN
+	unsigned short domain; /* Only 16bits PCI domains are supported by default */
+#else
+	unsigned int domain; /* 32bits PCI domain support break the library ABI, hence it's disabled by default */
+#endif
 	unsigned char secondary_bus, subordinate_bus;
       } pci;
     } downstream;
@@ -859,7 +883,8 @@ hwloc_get_type_or_above_depth (hwloc_topology_t topology, hwloc_obj_type_t type)
 
 /** \brief Returns the type of objects at depth \p depth.
  *
- * \p depth should between 0 and hwloc_topology_get_depth()-1.
+ * \p depth should between 0 and hwloc_topology_get_depth()-1,
+ * or a virtual depth such as ::HWLOC_TYPE_DEPTH_NUMANODE.
  *
  * \return (hwloc_obj_type_t)-1 if depth \p depth does not exist.
  */
@@ -1355,7 +1380,7 @@ HWLOC_DECLSPEC int hwloc_get_proc_last_cpu_location(hwloc_topology_t topology, h
 typedef enum {
   /** \brief Reset the memory allocation policy to the system default.
    * Depending on the operating system, this may correspond to
-   * ::HWLOC_MEMBIND_FIRSTTOUCH (Linux),
+   * ::HWLOC_MEMBIND_FIRSTTOUCH (Linux, FreeBSD),
    * or ::HWLOC_MEMBIND_BIND (AIX, HP-UX, Solaris, Windows).
    * This policy is never returned by get membind functions.
    * The nodeset argument is ignored.
@@ -1917,7 +1942,31 @@ enum hwloc_topology_flags_e {
    * would result in the same behavior.
    * \hideinitializer
    */
-  HWLOC_TOPOLOGY_FLAG_THISSYSTEM_ALLOWED_RESOURCES = (1UL<<2)
+  HWLOC_TOPOLOGY_FLAG_THISSYSTEM_ALLOWED_RESOURCES = (1UL<<2),
+
+  /** \brief Import support from the imported topology.
+   *
+   * When importing a XML topology from a remote machine, binding is
+   * disabled by default (see ::HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM).
+   * This disabling is also marked by putting zeroes in the corresponding
+   * supported feature bits reported by hwloc_topology_get_support().
+   *
+   * The flag ::HWLOC_TOPOLOGY_FLAG_IMPORT_SUPPORT actually imports
+   * support bits from the remote machine. It also sets the flag
+   * \p imported_support in the struct hwloc_topology_misc_support array.
+   * If the imported XML did not contain any support information
+   * (exporter hwloc is too old), this flag is not set.
+   *
+   * Note that these supported features are only relevant for the hwloc
+   * installation that actually exported the XML topology
+   * (it may vary with the operating system, or with how hwloc was compiled).
+   *
+   * Note that setting this flag however does not enable binding for the
+   * locally imported hwloc topology, it only reports what the remote
+   * hwloc and machine support.
+   *
+   */
+  HWLOC_TOPOLOGY_FLAG_IMPORT_SUPPORT = (1UL<<3)
 };
 
 /** \brief Set OR'ed flags to non-yet-loaded topology.
@@ -2030,6 +2079,13 @@ struct hwloc_topology_membind_support {
   unsigned char get_area_memlocation;
 };
 
+/** \brief Flags describing miscellaneous features.
+ */
+struct hwloc_topology_misc_support {
+  /** Support was imported when importing another topology, see ::HWLOC_TOPOLOGY_FLAG_IMPORT_SUPPORT. */
+  unsigned char imported_support;
+};
+
 /** \brief Set of flags describing actual support for this topology.
  *
  * This is retrieved with hwloc_topology_get_support() and will be valid until
@@ -2040,6 +2096,7 @@ struct hwloc_topology_support {
   struct hwloc_topology_discovery_support *discovery;
   struct hwloc_topology_cpubind_support *cpubind;
   struct hwloc_topology_membind_support *membind;
+  struct hwloc_topology_misc_support *misc;
 };
 
 /** \brief Retrieve the topology support.
@@ -2050,6 +2107,18 @@ struct hwloc_topology_support {
  * call may still fail in some corner cases.
  *
  * These features are also listed by hwloc-info \--support
+ *
+ * The reported features are what the current topology supports
+ * on the current machine. If the topology was exported to XML
+ * from another machine and later imported here, support still
+ * describes what is supported for this imported topology after
+ * import. By default, binding will be reported as unsupported
+ * in this case (see ::HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM).
+ *
+ * Topology flag ::HWLOC_TOPOLOGY_FLAG_IMPORT_SUPPORT may be used
+ * to report the supported features of the original remote machine
+ * instead. If it was successfully imported, \p imported_support
+ * will be set in the struct hwloc_topology_misc_support array.
  */
 HWLOC_DECLSPEC const struct hwloc_topology_support *hwloc_topology_get_support(hwloc_topology_t __hwloc_restrict topology);
 
@@ -2096,8 +2165,8 @@ enum hwloc_type_filter_e {
    *
    * It is only useful for I/O object types.
    * For ::HWLOC_OBJ_PCI_DEVICE and ::HWLOC_OBJ_OS_DEVICE, it means that only objects
-   * of major/common kinds are kept (storage, network, OpenFabrics, Intel MICs, CUDA,
-   * OpenCL, NVML, and displays).
+   * of major/common kinds are kept (storage, network, OpenFabrics, CUDA,
+   * OpenCL, RSMI, NVML, and displays).
    * Also, only OS devices directly attached on PCI (e.g. no USB) are reported.
    * For ::HWLOC_OBJ_BRIDGE, it means that bridges are kept only if they have children.
    *
@@ -2169,13 +2238,14 @@ HWLOC_DECLSPEC void * hwloc_topology_get_userdata(hwloc_topology_t topology);
 enum hwloc_restrict_flags_e {
   /** \brief Remove all objects that became CPU-less.
    * By default, only objects that contain no PU and no memory are removed.
+   * This flag may not be used with ::HWLOC_RESTRICT_FLAG_BYNODESET.
    * \hideinitializer
    */
   HWLOC_RESTRICT_FLAG_REMOVE_CPULESS = (1UL<<0),
 
   /** \brief Restrict by nodeset instead of CPU set.
    * Only keep objects whose nodeset is included or partially included in the given set.
-   * This flag may not be used with ::HWLOC_RESTRICT_FLAG_BYNODESET.
+   * This flag may not be used with ::HWLOC_RESTRICT_FLAG_REMOVE_CPULESS.
    */
   HWLOC_RESTRICT_FLAG_BYNODESET =  (1UL<<3),
 
@@ -2358,6 +2428,22 @@ HWLOC_DECLSPEC hwloc_obj_t hwloc_topology_insert_group_object(hwloc_topology_t t
  */
 HWLOC_DECLSPEC int hwloc_obj_add_other_obj_sets(hwloc_obj_t dst, hwloc_obj_t src);
 
+/** \brief Refresh internal structures after topology modification.
+ *
+ * Modifying the topology (by restricting, adding objects, modifying structures
+ * such as distances or memory attributes, etc.) may cause some internal caches
+ * to become invalid. These caches are automatically refreshed when accessed
+ * but this refreshing is not thread-safe.
+ *
+ * This function is not thread-safe either, but it is a good way to end a
+ * non-thread-safe phase of topology modification. Once this refresh is done,
+ * multiple threads may concurrently consult the topology, objects, distances,
+ * attributes, etc.
+ *
+ * See also \ref threadsafety
+ */
+HWLOC_DECLSPEC int hwloc_topology_refresh(hwloc_topology_t topology);
+
 /** @} */
 
 
@@ -2372,6 +2458,9 @@ HWLOC_DECLSPEC int hwloc_obj_add_other_obj_sets(hwloc_obj_t dst, hwloc_obj_t src
 
 /* inline code of some functions above */
 #include "hwloc/inlines.h"
+
+/* memory attributes */
+#include "hwloc/memattrs.h"
 
 /* exporting to XML or synthetic */
 #include "hwloc/export.h"

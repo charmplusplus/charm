@@ -535,11 +535,7 @@ int check_stdio_header(CcsImplHeader *hdr) {
 }
 
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
-#if CMK_BIGSIM_CHARM
-#define MAX_PRINT_BUF_SIZE 1024
-#else
 #define MAX_PRINT_BUF_SIZE 8192
-#endif
 int print_fw_handler_idx;
 
 /* Receives messages passed to processor 0 by all other processors as a

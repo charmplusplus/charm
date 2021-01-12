@@ -1,6 +1,6 @@
 module BaseLB {
 
-extern module LBDatabase;
+extern module LBManager;
 
 message LBMigrateMsg {
   MigrateInfo moves[];
@@ -19,7 +19,6 @@ message LBVectorMigrateMsg {
 
 group [migratable] BaseLB {
   entry void BaseLB(const CkLBOptions &);  
-  entry void unregister(void);
 };
 
 };

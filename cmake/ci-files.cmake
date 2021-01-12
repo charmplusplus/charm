@@ -1,6 +1,8 @@
 # List all *.ci files in src/
 file(GLOB_RECURSE ci-files ${CMAKE_SOURCE_DIR}/src/*.ci)
 
+list(APPEND ci-files ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.ci)
+
 foreach(in_f ${ci-files})
 
     # Special handling for ci files whose filename is not the same as the module name
@@ -32,6 +34,8 @@ foreach(in_f ${ci-files})
         set(ci-output CkCallback.decl.h)
     elseif(${in_f} MATCHES src/ck-core/ckcheckpoint.ci)
         set(ci-output CkCheckpoint.decl.h)
+    elseif(${in_f} MATCHES src/ck-core/cksyncbarrier.ci)
+        set(ci-output CkSyncBarrier.decl.h)
     elseif(${in_f} MATCHES src/ck-perf/trace-controlPoints.ci)
         set(ci-output TraceControlPoints.decl.h)
     elseif(${in_f} MATCHES src/ck-cp/controlPoints.ci)
@@ -85,20 +89,26 @@ foreach(in_f ${ci-files})
         string(APPEND ci-output ".decl.h")
     endif()
 
-    set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/${ci-output})
+    string(REPLACE "decl.h" "def.h" ci-output-defh ${ci-output})
+
+    set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh})
+
+    if(CUDA)
+        set(CUDA_OPT "-DCMK_CUDA=1")
+    endif()
 
     if(${ci-output} MATCHES "search.decl.h")
-        set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output})
+        set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh})
         add_custom_command(
-          OUTPUT ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output}
-          COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${in_f}
+          OUTPUT ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output-defh}
+          COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${OPTS} ${CUDA_OPT} ${in_f}
           WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/cklibs
           DEPENDS ${in_f} charmxi
           )
     endif()
     add_custom_command(
-      OUTPUT ${CMAKE_BINARY_DIR}/include/${ci-output}
-      COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${in_f}
+      OUTPUT ${CMAKE_BINARY_DIR}/include/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh}
+      COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${OPTS} ${CUDA_OPT} ${in_f}
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/
       DEPENDS ${in_f} charmxi
       )

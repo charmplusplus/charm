@@ -1,6 +1,6 @@
 dnl -*- Autoconf -*-
 dnl
-dnl Copyright © 2010-2019 Inria.  All rights reserved.
+dnl Copyright © 2010-2020 Inria.  All rights reserved.
 dnl Copyright © 2009, 2011 Université Bordeaux
 dnl Copyright © 2004-2005 The Trustees of Indiana University and Indiana
 dnl                         University Research and Technology
@@ -67,32 +67,41 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
     # I/O?
     AC_ARG_ENABLE([io],
                   AS_HELP_STRING([--disable-io],
-                                 [Disable I/O discovery entirely (PCI, LinuxIO, CUDA, OpenCL, NVML, GL)]))
+                                 [Disable I/O discovery build entirely (PCI, LinuxIO, CUDA, OpenCL, NVML, RSMI, GL) instead of only disabling it at runtime by default]))
 
     # PCI?
     AC_ARG_ENABLE([pci],
                   AS_HELP_STRING([--disable-pci],
-                                 [Disable the PCI device discovery]))
+                                 [Disable the PCI device discovery build (instead of only disabling PCI at runtime by default)]))
+    # 32bits_pci_domain?
+    AC_ARG_ENABLE([32bits-pci-domain],
+                  AS_HELP_STRING([--enable-32bits-pci-domain],
+                                 [Enable 32 bits PCI domains (domains > 16bits are ignored by default). WARNING: This breaks the library ABI, don't enable unless really needed.]))
 
     # OpenCL?
     AC_ARG_ENABLE([opencl],
                   AS_HELP_STRING([--disable-opencl],
-                                 [Disable the OpenCL device discovery]))
+                                 [Disable the OpenCL device discovery build (instead of only disabling OpenCL at runtime by default)]))
 
     # CUDA?
     AC_ARG_ENABLE([cuda],
                   AS_HELP_STRING([--disable-cuda],
-                                 [Disable the CUDA device discovery using libcudart]))
+                                 [Disable the CUDA device discovery build using libcudart (instead of only disabling CUDA at runtime by default)]))
 
     # NVML?
     AC_ARG_ENABLE([nvml],
                   AS_HELP_STRING([--disable-nvml],
-                                 [Disable the NVML device discovery]))
+                                 [Disable the NVML device discovery build (instead of only disabling NVML at runtime by default)]))
+
+    # RSMI?
+    AC_ARG_ENABLE([rsmi],
+                  AS_HELP_STRING([--disable-rsmi],
+                                 [Disable the ROCm SMI device discovery]))
 
     # GL/Display
     AC_ARG_ENABLE([gl],
 		  AS_HELP_STRING([--disable-gl],
-				 [Disable the GL display device discovery]))
+				 [Disable the GL display device discovery (instead of only disabling GL at runtime by default)]))
 
     # LibUdev
     AC_ARG_ENABLE([libudev],
@@ -103,6 +112,17 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
     AC_ARG_ENABLE([plugins],
                   AS_HELP_STRING([--enable-plugins=name,...],
                                  [Build the given components as dynamically-loaded plugins]))
+
+    # Look for dlopen
+    # Not --disable-dlopen because $enable_dlopen is already used/set
+    AC_ARG_ENABLE([plugin-dlopen],
+                  AC_HELP_STRING([--disable-plugin-dlopen],
+                                 [Do not use dlopen for loading plugins.]))
+    # Look for ltdl
+    # Not --disable-ltdl for consistency wrt dlopen above
+    AC_ARG_ENABLE([plugin-ltdl],
+                  AC_HELP_STRING([--disable-plugin-ltdl],
+                                 [Do not use ltdl for loading plugins.]))
 
 ])dnl
 
@@ -155,6 +175,8 @@ EOF
     AC_MSG_RESULT([$hwloc_generate_doxs])
     AS_IF([test "x$hwloc_generate_doxs" = xyes -a "x$HWLOC_DOXYGEN_VERSION" = x1.6.2],
                  [hwloc_generate_doxs="no"; AC_MSG_WARN([doxygen 1.6.2 has broken short name support, disabling])])
+    AS_IF([test "x$hwloc_generate_doxs" = xyes -a "x$HWLOC_DOXYGEN_VERSION" = x1.8.16 -a "$HWLOC_top_builddir" = "$HWLOC_top_srcdir"],
+                 [hwloc_generate_doxs="no"; AC_MSG_WARN([doxygen 1.8.16 fails when building inside the source-tree, disabling])])
 
     AC_REQUIRE([AC_PROG_SED])
 
@@ -191,41 +213,6 @@ EOF
           [hwloc_install_doxs=no])
     AC_MSG_RESULT([$hwloc_install_doxs])
 
-    # For the common developer case, if we're in a developer checkout and
-    # using the GNU compilers, turn on maximum warnings unless
-    # specifically disabled by the user.
-    AC_MSG_CHECKING([whether to enable "picky" compiler mode])
-    hwloc_want_picky=0
-    AS_IF([test "$hwloc_c_vendor" = "gnu"],
-          [AS_IF([test -e "$srcdir/.git"],
-                 [hwloc_want_picky=1])])
-    if test "$enable_picky" = "yes"; then
-        if test "$GCC" = "yes"; then
-            AC_MSG_RESULT([yes])
-            hwloc_want_picky=1
-        else
-            AC_MSG_RESULT([no])
-            AC_MSG_WARN([Warning: --enable-picky used, but is currently only defined for the GCC compiler set -- automatically disabled])
-            hwloc_want_picky=0
-        fi
-    elif test "$enable_picky" = "no"; then
-        AC_MSG_RESULT([no])
-        hwloc_want_picky=0
-    else
-        if test "$hwloc_want_picky" = 1; then
-            AC_MSG_RESULT([yes (default)])
-        else
-            AC_MSG_RESULT([no (default)])
-        fi
-    fi
-    if test "$hwloc_want_picky" = 1; then
-        add="-Wall -Wunused-parameter -Wundef -Wno-long-long -Wsign-compare"
-        add="$add -Wmissing-prototypes -Wstrict-prototypes"
-        add="$add -Wcomment -pedantic -Wshadow"
-
-        HWLOC_CFLAGS="$HWLOC_CFLAGS $add"
-    fi
-
     # Generate some files for the docs
     AC_CONFIG_FILES(
         hwloc_config_prefix[doc/Makefile]
@@ -253,6 +240,30 @@ EOF
       HWLOC_runstatedir='${localstatedir}/run'
     fi
     AC_SUBST([HWLOC_runstatedir])
+
+    # X11 support
+    AC_PATH_XTRA
+
+    CPPFLAGS_save=$CPPFLAGS
+    LIBS_save=$LIBS
+
+    CPPFLAGS="$CPPFLAGS $X_CFLAGS"
+    LIBS="$LIBS $X_PRE_LIBS $X_LIBS $X_EXTRA_LIBS"
+    AC_CHECK_HEADERS([X11/Xlib.h],
+        [AC_CHECK_LIB([X11], [XOpenDisplay],
+            [ AC_CHECK_HEADERS([X11/Xutil.h],
+                [AC_CHECK_HEADERS([X11/keysym.h],
+                    [AC_DEFINE([HWLOC_HAVE_X11_KEYSYM], [1], [Define to 1 if X11 headers including Xutil.h and keysym.h are available.])
+                     hwloc_x11_keysym_happy=yes
+                     HWLOC_X11_CPPFLAGS="$X_CFLAGS"
+                     AC_SUBST([HWLOC_X11_CPPFLAGS])
+                     HWLOC_X11_LIBS="$X_PRE_LIBS $X_LIBS -lX11 $X_EXTRA_LIBS"
+                     AC_SUBST([HWLOC_X11_LIBS])])
+                ], [], [#include <X11/Xlib.h>])
+            ])
+         ])
+    CPPFLAGS=$CPPFLAGS_save
+    LIBS=$LIBS_save
 
     # Cairo support
     hwloc_cairo_happy=no
@@ -310,7 +321,7 @@ EOF
     chosen_curses=""
     for curses in ncurses curses
     do
-      for lib in "" -ltermcap -l${curses}w -l$curses
+      for lib in "" -ltermcap -l${curses}w -l$curses -ltinfo
       do
         AC_MSG_CHECKING(termcap support using $curses and $lib)
         LIBS="$hwloc_old_LIBS $lib"
@@ -458,6 +469,7 @@ int foo(void) {
         hwloc_config_prefix[utils/hwloc/test-hwloc-distrib.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-info.sh]
         hwloc_config_prefix[utils/hwloc/test-fake-plugin.sh]
+        hwloc_config_prefix[utils/hwloc/test-parsing-flags.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/Makefile]
         hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh]
         hwloc_config_prefix[utils/lstopo/test-lstopo.sh]
@@ -465,6 +477,7 @@ int foo(void) {
         hwloc_config_prefix[utils/netloc/infiniband/netloc_ib_gather_raw]
         hwloc_config_prefix[contrib/hwloc-ps.www/Makefile]
         hwloc_config_prefix[contrib/systemd/Makefile]
+        hwloc_config_prefix[contrib/completion/Makefile]
         hwloc_config_prefix[contrib/misc/Makefile]
         hwloc_config_prefix[contrib/windows/Makefile]
         hwloc_config_prefix[contrib/windows/test-windows-version.sh]
@@ -489,6 +502,7 @@ int foo(void) {
       hwloc_config_prefix[utils/hwloc/test-hwloc-distrib.sh] \
       hwloc_config_prefix[utils/hwloc/test-hwloc-info.sh] \
       hwloc_config_prefix[utils/hwloc/test-fake-plugin.sh] \
+      hwloc_config_prefix[utils/hwloc/test-parsing-flags.sh] \
       hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh] \
       hwloc_config_prefix[utils/lstopo/test-lstopo.sh] \
       hwloc_config_prefix[utils/lstopo/test-lstopo-shmem.sh] \
@@ -515,6 +529,7 @@ int foo(void) {
 	hwloc_config_prefix[tests/hwloc/ports/topology-opencl.c]:hwloc_config_prefix[hwloc/topology-opencl.c]
 	hwloc_config_prefix[tests/hwloc/ports/topology-cuda.c]:hwloc_config_prefix[hwloc/topology-cuda.c]
 	hwloc_config_prefix[tests/hwloc/ports/topology-nvml.c]:hwloc_config_prefix[hwloc/topology-nvml.c]
+	hwloc_config_prefix[tests/hwloc/ports/topology-rsmi.c]:hwloc_config_prefix[hwloc/topology-rsmi.c]
 	hwloc_config_prefix[tests/hwloc/ports/topology-gl.c]:hwloc_config_prefix[hwloc/topology-gl.c]
 	hwloc_config_prefix[tests/hwloc/ports/lstopo-windows.c]:hwloc_config_prefix[utils/lstopo/lstopo-windows.c])
     ])

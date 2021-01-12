@@ -635,8 +635,6 @@ is contributed by each participant processor. All these contributions
 are merged according to a merge-function provided by the user. A
 Converse handler is then invoked with the resulting message. Reductions
 can be on the entire set of processors, or on a subset of the whole.
-Currently reductions are only implemented on processors sets. No
-equivalent exists for SMP nodes.
 
 There are eight functions used to deposit a message into the system,
 summarized in Table :numref:`table:reductions`. Half
@@ -687,6 +685,35 @@ Table :numref:`table:reductions` are:
   void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
   CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn,
   CmiReductionID id);
+
+Additionally, there are variations of the global reduction functions
+that operate on a per-node basis, instead of per-PE.
+
+.. _table:nodereductions:
+.. table:: Node reductions functions in Converse
+
+   =========== =================== ======================
+   \           **global**          **global with ID**
+   =========== =================== ======================
+   **message** CmiNodeReduce       CmiNodeReduceID
+   **data**    CmiNodeReduceStruct CmiNodeReduceStructID
+   =========== =================== ======================
+
+The signatures for the functions in
+Table :numref:`table:nodereductions` are:
+
+.. code-block:: c++
+
+  void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
+
+  void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
+  CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn);
+
+  void CmiNodeReduceID(void *msg, int size, CmiReduceMergeFn mergeFn,
+  CmiReductionID id);
+
+  void CmiNodeReduceStructID(void *data, CmiReducePupFn pupFn, CmiReduceMergeFn mergeFn,
+  CmiHandler dest, CmiReduceDeleteFn deleteFn, CmiReductionID id);
 
 In all the above, msg is the Converse message deposited by the local
 processor, size is the size of the message msg, and data is a pointer to
@@ -763,6 +790,9 @@ uniquely identify the reduction, and match them correctly. (**Note:** No
 two reductions can be active at the same time with the same
 CmiReductionID. It is up to the user to guarantee this.)
 
+CmiNodeReduce, CmiNodeReduceStruct, CmiNodeReduceID, and
+CmiNodeReduceStructID are the same, but for nodes instead of PEs.
+
 A CmiReductionID can be obtained by the user in three ways, using one of
 the following functions:
 
@@ -797,6 +827,14 @@ zero, data is ignored. The message received by handlerIdx consists of
 the standard Converse header, followed by the requested CmiReductionID
 (represented as a 4 bytes integer the user can cast to a CmiReductionID,
 a 4 byte integer containing dataSize, and the data itself.
+
+.. code-block:: c++
+
+  CmiReductionID CmiGetGlobalNodeReduction()
+  CmiReductionID CmiGetDynamicNodeReduction()
+  void CmiGetDynamicNodeReductionRemote(int handlerIdx, int node, int dataSize, void *data)
+
+Same as above, but for nodes instead of PEs.
 
 The other four functions (CmiListReduce, CmiListReduceStruct,
 CmiGroupReduce, CmiGroupReduceStruct) are used for reductions over
@@ -1478,6 +1516,12 @@ the correct locations, even on a new processor. This is especially
 useful when the format of the data structure is complex or unknown, as
 with thread stacks.
 
+During Converse startup, a global reduction and broadcast takes place in
+order to find the intersection of available virtual address space across
+all logical nodes. If this operation causes an unwanted delay at startup
+or fails entirely for a system-specific reason, it can be disabled with
+the command line option ``+no_isomalloc_sync``.
+
 Effective management of the virtual address space across a distributed
 machine is a complex task that requires a certain level of organization.
 Therefore, Isomalloc is not well-suited to a fully dynamic API for
@@ -1491,7 +1535,7 @@ This API may evolve as new use cases emerge.
 
 .. code-block:: c++
 
-  CmiIsomallocContext * CmiIsomallocContextCreate(int myunit, int numunits)
+  CmiIsomallocContext CmiIsomallocContextCreate(int myunit, int numunits)
 
 Construct a context for a given unit of work, out of a total number of
 slots available. Successive calls to this function must always pass
@@ -1507,28 +1551,42 @@ interoperability between multiple simultaneous uses.
 
 .. code-block:: c++
 
-  void CmiIsomallocContextDelete(CmiIsomallocContext * ctx)
+  void CmiIsomallocContextDelete(CmiIsomallocContext ctx)
 
 Destroy a given context, releasing all allocations owned by it and all
 virtual address space used by it.
 
 .. code-block:: c++
 
-  void * CmiIsomallocContextMalloc(CmiIsomallocContext * ctx, size_t size)
+  void * CmiIsomallocContextMalloc(CmiIsomallocContext ctx, size_t size)
 
 Allocate ``size`` bytes at a unique virtual address. Returns a pointer
 to the allocated region.
 
 .. code-block:: c++
 
-  void * CmiIsomallocContextMallocAlign(CmiIsomallocContext * ctx, size_t align, size_t size)
+  void * CmiIsomallocContextMallocAlign(CmiIsomallocContext ctx, size_t align, size_t size)
 
 Same as above, but with the alignment also specified. It must be a power
 of two.
 
 .. code-block:: c++
 
-  void CmiIsomallocContextFree(CmiIsomallocContext * ctx, void * ptr)
+  void * CmiIsomallocContextCalloc(CmiIsomallocContext ctx, size_t nelem, size_t size)
+
+Same as ``CmiIsomallocContextMalloc``, but ``calloc`` instead of
+``malloc``.
+
+.. code-block:: c++
+
+  void * CmiIsomallocContextRealloc(CmiIsomallocContext ctx, void * ptr, size_t size)
+
+Same as ``CmiIsomallocContextMalloc``, but ``realloc`` instead of
+``malloc``.
+
+.. code-block:: c++
+
+  void CmiIsomallocContextFree(CmiIsomallocContext ctx, void * ptr)
 
 Release the given block, which must have been previously allocated by
 the given Isomalloc context. It may also release the underlying virtual
@@ -1540,7 +1598,7 @@ block more than once.
 
 .. code-block:: c++
 
-  void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext ** ctxptr)
+  void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext * ctxptr)
 
 Pack/Unpack the given context. This routine can be used to move contexts
 across processors, save them to disk, or checkpoint them.
@@ -1622,7 +1680,7 @@ other ``CthThread``.
 
 .. code-block:: c++
 
-  CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContext *ctx)
+  CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size, CmiIsomallocContextctx)
 
 Create a thread that can later be moved to other processors. Otherwise
 identical to CthCreate. An Isomalloc context is required for organized
@@ -1868,6 +1926,20 @@ CcdPROCESSOR_STILL_IDLE
    to execute. That is, this condition is raised while the processor
    utilization graph is flat.
 
+CcdPROCESSOR_LONG_IDLE
+   This is an extension of CcdPROCESSOR_STILL_IDLE for a relatively longer
+   period of time. It is raised when the scheduler finds that it doesn't
+   have any messages to execute for a long period of time. The default
+   LONG_IDLE time is 10 seconds. However, it is customizable using a user
+   passed runtime flag ``+longIdleThresh <long idle time in seconds>``.
+   This feature is useful for debugging hangs in applications. It can allow
+   the user to add a user defined function as a hook to execute when the program
+   goes into a long idle state, typically seen during hangs. The test program
+   ``tests/charm++/longIdle`` illustrates the usage of CcdPROCESSOR_LONG_IDLE.
+   Since the usage of CcdPROCESSOR_LONG_IDLE uses additional timers in the
+   scheduler loop, it is only enabled with error checking builds and requires
+   the user to build the target with ``--enable-error-checking``.
+
 CcdPROCESSOR_BEGIN_BUSY
    Raised when a message first arrives on an idle processor. That is,
    raised on the rising edge of the processor utilization graph.
@@ -1904,6 +1976,10 @@ CcdPERIODIC_12hour
 
 CcdPERIODIC_1day
    Raised once every day.
+
+CcdSCHEDLOOP
+   Raised at every scheduler loop. Use with caution to avoid adding
+   significant overhead to the scheduler.
 
 CcdQUIESCENCE
    Raised when the quiescence detection system has determined that the
@@ -1956,12 +2032,20 @@ callbacks from within ccd callbacks.
 
 .. code-block:: c++
 
-  void CcdRaiseCondition(int condNum)
+  double CcdRaiseCondition(int condNum)
 
 
 When this function is called, it invokes all the functions whose
 pointers were registered for the ``condNum`` via a *prior* call to
-``CcdCallOnCondition`` or ``CcdCallOnConditionKeep``.
+``CcdCallOnCondition`` or ``CcdCallOnConditionKeep``. The function
+internally calls ``CmiWallTimer`` and returns this value. When using
+``CcdRaiseCondition``, the return value can be used to determine the
+current walltime avoiding an additional call to ``CmiWallTimer``.
+However, it is important to note that the walltime value returned
+by ``CcdRaiseCondition`` could be stale by the time it is returned
+since registered functions are executed between the timer call and
+the return. For this reason, this walltime value returned should be
+used in situations where an exact or current timer value is not desired.
 
 .. code-block:: c++
 

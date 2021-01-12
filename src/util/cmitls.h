@@ -45,13 +45,12 @@ typedef struct tlsseg {
 extern "C" {
 #endif
 
-void CmiTLSInit(void);
+void CmiTLSInit(tlsseg_t * newThreadParent);
 
 tlsdesc_t CmiTLSGetDescription(void);
-tlsseg_t CmiTLSCreateSegUsingPtr(void *);
+void CmiTLSCreateSegUsingPtr(const tlsseg_t * threadParent, tlsseg_t * t, void * ptr);
 void * CmiTLSGetBuffer(tlsseg_t *);
 
-void CmiTLSSegmentGet(tlsseg_t *);
 void CmiTLSSegmentSet(tlsseg_t *);
 
 #ifdef __cplusplus

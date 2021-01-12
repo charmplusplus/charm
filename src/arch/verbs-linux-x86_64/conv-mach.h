@@ -28,7 +28,6 @@
 #define CMK_SSH_NOT_NEEDED                                 0
 
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
-#define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
 #define CMK_THREADS_USE_CONTEXT                            0
 #define CMK_THREADS_USE_FCONTEXT                           1

@@ -11,11 +11,15 @@
 #ifndef _GKLIB_H_
 #define _GKLIB_H_ 1
 
+#include "conv-config.h"
+
 #define GKMSPACE
 
 #if defined(_MSC_VER)
 #define __MSC__
+#ifndef USE_GKREGEX
 #define USE_GKREGEX
+#endif
 #define WIN32
 #endif
 #if defined(__ICC)
@@ -31,7 +35,12 @@
 # define CMK_THREADLOCAL __thread
 #endif
 
+#ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE
+#endif
+#ifndef __USE_XOPEN
+#define __USE_XOPEN
+#endif
 #include "gk_arch.h" /*!< This should be here, prior to the includes */
 
 

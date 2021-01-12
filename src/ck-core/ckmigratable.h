@@ -45,7 +45,7 @@ public:
   inline void ckStopTiming(void) {myRec->stopTiming();}
   //Begin load balancer measurements again (e.g., after CthSuspend)
   inline void ckStartTiming(void) {myRec->startTiming();}
-  inline LBDatabase *getLBDB(void) const {return myRec->getLBDB();}
+  inline LBManager *getLBMgr(void) const {return myRec->getLBMgr();}
   inline MetaBalancer *getMetaBalancer(void) const {return myRec->getMetaBalancer();}
 #else
   inline void ckStopTiming(void) { }
@@ -100,10 +100,10 @@ public:
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
 private:
-  static void staticResumeFromSync(void* data);
+  void ResumeFromSyncHelper();
 public:
   void ReadyMigrate(bool ready);
-  void ckFinishConstruction(void);
+  void ckFinishConstruction(int epoch = -1);
   void setMigratable(int migratable);
   void setPupSize(size_t obj_pup_size);
 #else
@@ -111,7 +111,7 @@ public:
   void setMigratable(int migratable)  { }
   void setPupSize(size_t obj_pup_size) { }
 public:
-  void ckFinishConstruction(void) { }
+  void ckFinishConstruction(int epoch) { }
 #endif
 
 #if CMK_OUT_OF_CORE

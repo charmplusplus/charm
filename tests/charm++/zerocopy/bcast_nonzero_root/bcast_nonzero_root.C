@@ -1,5 +1,5 @@
 #include "bcast_nonzero_root.decl.h"
-#define NUM_ELEMENTS_PER_PE 1
+#define NUM_ELEMENTS_PER_PE 10
 #define SIZE 129
 #define DEBUG(x) //x
 
@@ -144,19 +144,19 @@ class arr : public CBase_arr {
     }
 
     void recv_zerocopy(int *buffer, size_t size, int testIndex) {
-      DEBUG(CkPrintf("[%d][%d][%d] Array Send API: Entry Method\n", CkMyPe(), CkMyNode(), CkMyRank());)
+      DEBUG(CkPrintf("[%d][%d][%d][%d] Array Send API: Entry Method\n", thisIndex, CkMyPe(), CkMyNode(), CkMyRank());)
       verifyValuesWithIndex(buffer, SIZE);
       CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), testerProxy[testIndex]);
       contribute(doneCb);
     }
 
     void recv_zerocopy_post(int *&buffer, size_t &size, int testIndex, CkNcpyBufferPost *ncpyPost) {
-      DEBUG(CkPrintf("[%d][%d][%d] Array Post API: Post Entry Method\n", CkMyPe(), CkMyNode(), CkMyRank());)
+      DEBUG(CkPrintf("[%d][%d][%d][%d] Array Post API: Post Entry Method\n", thisIndex, CkMyPe(), CkMyNode(), CkMyRank());)
       buffer = destBuffer;
     }
 
     void recv_zerocopy_post(int *buffer, size_t size, int testIndex) {
-      DEBUG(CkPrintf("[%d][%d][%d] Array Post API: Regular Entry Method\n", CkMyPe(), CkMyNode(), CkMyRank());)
+      DEBUG(CkPrintf("[%d][%d][%d][%d] Array Post API: Regular Entry Method\n", thisIndex, CkMyPe(), CkMyNode(), CkMyRank());)
       verifyValuesWithIndex(destBuffer, SIZE);
 
       CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), testerProxy[testIndex]);

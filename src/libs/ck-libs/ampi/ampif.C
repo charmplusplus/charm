@@ -345,12 +345,6 @@ FLINKAGE {
 #define ampi_command_argument_count FTN_NAME( AMPI_COMMAND_ARGUMENT_COUNT , ampi_command_argument_count )
 #define ampi_get_command_argument FTN_NAME( AMPI_GET_COMMAND_ARGUMENT , ampi_get_command_argument )
 
-#if CMK_BIGSIM_CHARM
-#define ampi_set_start_event FTN_NAME( AMPI_SET_START_EVENT , ampi_set_start_event )
-#define ampi_set_end_event FTN_NAME( AMPI_SET_END_EVENT , ampi_set_end_event )
-#define begintracebigsim FTN_NAME (BEGINTRACEBIGSIM , begintracebigsim)
-#define endtracebigsim FTN_NAME (ENDTRACEBIGSIM , endtracebigsim)
-#endif
 
 #if CMK_CUDA
 #define ampi_gpu_invoke_wr FTN_NAME ( AMPI_GPU_INVOKE_WR  , ampi_gpu_invoke_wr )
@@ -894,7 +888,9 @@ void mpi_type_set_attr(int *datatype, int *type_keyval, void *attribute_val, int
 
 void mpi_type_get_attr(int *datatype, int *type_keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  *ierr = MPI_Type_get_attr(*datatype, *type_keyval, attribute_val, flag);
+  int * result;
+  *ierr = MPI_Type_get_attr(*datatype, *type_keyval, &result, flag);
+  *(intptr_t *)attribute_val = *result;
 }
 
 void mpi_type_delete_attr(int *datatype, int *type_keyval, int *ierr) noexcept
@@ -1562,6 +1558,8 @@ void mpi_file_create_errhandler(void (*function)(MPI_File*,int*,...), int *errha
   *ierr = MPI_File_create_errhandler(function, errhandler);
 }
 
+#if !CMK_AMPI_WITH_ROMIO
+// Disable ROMIO's get_errhf.c and set_errhf.c if enabling these.
 void mpi_file_set_errhandler(MPI_File* file, int* errhandler, int *ierr) noexcept
 {
   *ierr = MPI_File_set_errhandler(*file, *errhandler);
@@ -1571,6 +1569,7 @@ void mpi_file_get_errhandler(MPI_File* file, int *errhandler, int *ierr) noexcep
 {
   *ierr = MPI_File_get_errhandler(*file, errhandler);
 }
+#endif
 
 void mpi_errhandler_create(void (*function)(MPI_Comm*,int*,...), int *errhandler, int *ierr) noexcept
 {
@@ -1780,7 +1779,9 @@ void mpi_comm_set_attr(int *comm, int *keyval, void* attribute_val, int *ierr) n
 
 void mpi_comm_get_attr(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  *ierr = MPI_Comm_get_attr(*comm, *keyval, attribute_val, flag);
+  int * result;
+  *ierr = MPI_Comm_get_attr(*comm, *keyval, &result, flag);
+  *(intptr_t *)attribute_val = *result;
 }
 
 void mpi_comm_delete_attr(int *comm, int *keyval, int *ierr) noexcept
@@ -1806,7 +1807,9 @@ void mpi_attr_put(int *comm, int *keyval, void* attribute_val, int *ierr) noexce
 
 void mpi_attr_get(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  *ierr = MPI_Attr_get(*comm, *keyval, attribute_val, flag);
+  int * result;
+  *ierr = MPI_Attr_get(*comm, *keyval, &result, flag);
+  *(intptr_t *)attribute_val = *result;
 }
 
 void mpi_attr_delete(int *comm, int *keyval, int *ierr) noexcept
@@ -1886,7 +1889,9 @@ void mpi_win_delete_attr(int *win, int *key, int *ierr) noexcept
 void mpi_win_get_attr(int *win, int *win_keyval, void *attribute_val, int *flag,
                       int *ierr) noexcept
 {
-  *ierr = MPI_Win_get_attr(*win, *win_keyval, attribute_val, flag);
+  int * result;
+  *ierr = MPI_Win_get_attr(*win, *win_keyval, &result, flag);
+  *(intptr_t *)attribute_val = *result;
 }
 
 void mpi_win_set_attr(int *win, int *win_keyval, void *attribute_val, int *ierr) noexcept
@@ -2286,23 +2291,6 @@ void ampi_trace_end(int *ierr) noexcept
   *ierr = AMPI_Trace_end();
 }
 
-#if CMK_BIGSIM_CHARM
-void ampi_set_start_event(int *comm, int *ierr) {
-  *ierr = AMPI_Set_start_event(*comm);
-}
-
-void ampi_set_end_event(int *ierr) {
-  *ierr = AMPI_Set_end_event();
-}
-
-void begintracebigsim(char* msg){
-  beginTraceBigSim(msg);
-}
-
-void endtracebigsim(char* msg, char* param){
-  endTraceBigSim(msg, param);
-}
-#endif
 
 #if CMK_CUDA
 void ampi_gpu_iinvoke_wr(int *to_call, int *request, int *ierr) noexcept {
