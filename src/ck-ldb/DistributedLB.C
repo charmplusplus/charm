@@ -9,7 +9,10 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
+static void lbinit()
+{
+  LBRegisterBalancer<DistributedLB>("DistributedLB", "The distributed load balancer");
+}
 
 using std::vector;
 

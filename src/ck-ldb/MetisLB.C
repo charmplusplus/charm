@@ -14,7 +14,10 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
+static void lbinit()
+{
+  LBRegisterBalancer<MetisLB>("MetisLB", "Use Metis(tm) to partition object graph");
+}
 
 MetisLB::MetisLB(const CkLBOptions &opt): CBase_MetisLB(opt)
 {

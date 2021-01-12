@@ -20,7 +20,10 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(TempAwareRefineLB, "always assign the heaviest obj onto lightest loaded processor.")
+static void lbinit()
+{
+  LBRegisterBalancer<TempAwareRefineLB>("TempAwareRefineLB", "always assign the heaviest obj onto lightest loaded processor.");
+}
 
 #ifdef TEMP_LDB
 

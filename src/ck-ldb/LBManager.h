@@ -123,6 +123,15 @@ void LBDefaultCreate(LBCreateFn f);
 
 void LBRegisterBalancer(std::string, LBCreateFn, LBAllocFn, std::string, bool shown = true);
 
+template <typename T>
+void LBRegisterBalancer(std::string name, std::string description, bool shown = true)
+{
+  LBRegisterBalancer(
+      name, [](const CkLBOptions& opts) { T::proxy_t::ckNew(opts); },
+      []() -> BaseLB* { return new T(static_cast<CkMigrateMessage*>(nullptr)); },
+      description, shown);
+}
+
 void _LBMgrInit();
 
 // main chare
