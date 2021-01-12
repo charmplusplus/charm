@@ -2237,6 +2237,14 @@ void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
   ArrayMapProcNumExtCallback = cb;
 }
 
+#if CMK_CUDA
+void (*ArrayMsgGPUDirectRecvExtCallback)(int, int, int*, int, int, long*, void *, int, char*, int) = NULL;
+void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, long*, void *, int, char*,int))
+{
+  ArrayMsgGPUDirectRecvExtCallback = cb;
+}
+#endif
+
 int CkMyPeHook() { return CkMyPe(); }
 int CkNumPesHook() { return CkNumPes(); }
 
@@ -2559,6 +2567,8 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
       deviceBuffs[i].cnt = devBufSizesInBytes[i];
     }
 
+  int directCopySize = 0;
+
   CkRdmaDeviceOnSender(destPe, numDevBufs, (CkDeviceBuffer **) &deviceBuffs);
   // find the size of the PUP'd data
   {
@@ -2571,14 +2581,21 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
       }
     implP | msgSize;
     implP | epIdx;
+    implP | directCopySize;
     impl_off += implP.size();
   }
+
+  // store the size of the data that is used for
+  // GPU Direct. This needs to be separated from the
+  // data in the non-GPUdirect part of the message
+  directCopySize = impl_off;
   impl_off += msgSize;
 
   CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,0);
   {
     PUP::toMem implP((void *) impl_msg->msgBuf);
     implP | numDevBufs;
+    implP | directCopySize;
     for(int i = 0; i < numDevBufs; ++i)
       {
         implP | devBufSizesInBytes[i];
@@ -2590,12 +2607,12 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
       implP(msg, msgSize);
   }
 
+  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_DEVICE_MSG;
+
   UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);
   CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;
   impl_amsg->array_setIfNotThere(CkArray_IfNotThere_buffer);
 
-  // guess this is not required?
-  // CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_DEVICE_MSG;
   CProxyElement_ArrayBase::ckSendWrapper(gId, arrIndex, impl_amsg, epIdx, 0);
 
 #else

@@ -126,6 +126,9 @@ extern void registerReadOnlyRecvExtCallback(void (*cb)(int, char*));
 extern void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char*, int));
 extern void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int));
 extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int));
+#if CMK_CUDA
+  extern void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, long*, void *, int, char*,int));
+#endif
 extern void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int*, int, int, char *, int));
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
 extern void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int));
