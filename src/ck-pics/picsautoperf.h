@@ -202,7 +202,7 @@ private:
   double      endStepTimer;
   double      lastCriticalPathLength;
   double      lastAnalyzeTimer;
-  LBDatabase  *theLbdb;
+  LBManager  *theLbdb;
   std::vector<IntDoubleMap> solutions;
   std::vector<Condition*>    perfProblems;
   std::vector<int>            problemProcList;

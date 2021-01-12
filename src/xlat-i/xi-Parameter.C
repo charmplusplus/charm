@@ -57,7 +57,8 @@ Parameter::Parameter(int Nline, Type* Ntype, const char* Nname, const char* Narr
       given_name(Nname),
       podType(false),
       rdma(CMK_REG_NO_ZC_MSG),
-      firstRdma(false) {
+      firstRdma(false),
+      firstDeviceRdma(false) {
   if (isMessage()) {
     name = "impl_msg";
   }
@@ -110,7 +111,11 @@ void ParamList::printTypes(XStr& str, int withDefaultValues, int useConst) {
 
 int Parameter::print(XStr& str, int withDefaultValues, int useConst, int fwdNum) {
   if (isRdma()) {
-    str << "CkNcpyBuffer ncpyBuffer_" << name;
+    if (isDevice()) {
+      str << "CkDeviceBuffer deviceBuffer_" << name;
+    } else {
+      str << "CkNcpyBuffer ncpyBuffer_" << name;
+    }
   } else if (arrLen != NULL) {  // Passing arrays by const pointer-reference
     if (useConst) str << "const ";
     str << type << " *";
@@ -200,6 +205,42 @@ void ParamList::callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen
   } while (NULL != (cur = cur->next));
 }
 
+void ParamList::callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen, int &count) {
+  ParamList* cur = this;
+  do {
+    ((cur->param)->*f)(str, genRdma, isSDAGGen, count);
+  } while (NULL != (cur = cur->next));
+}
+
+void ParamList::callEach(rdmaheterofn_t f, XStr& str, bool genRdma, bool device) {
+  ParamList* cur = this;
+  do {
+    ((cur->param)->*f)(str, genRdma, device);
+  } while (NULL != (cur = cur->next));
+}
+
+void ParamList::callEach(rdmaheterocountfn_t f, XStr& str, bool genRdma, bool isSDAGGen, bool device) {
+  ParamList* cur = this;
+  int count = 0; // Used for the index of buffPtrs for Zcpy Post API
+  do {
+    ((cur->param)->*f)(str, genRdma, isSDAGGen, device, count);
+  } while (NULL != (cur = cur->next));
+}
+
+void ParamList::callEach(rdmaheterocountfn_t f, XStr& str, bool genRdma, bool isSDAGGen, bool device, int& count) {
+  ParamList* cur = this;
+  do {
+    ((cur->param)->*f)(str, genRdma, isSDAGGen, device, count);
+  } while (NULL != (cur = cur->next));
+}
+
+void ParamList::callEach(rdmadevicefn_t f, XStr& str, int& index) {
+  ParamList* cur = this;
+  do {
+    ((cur->param)->*f)(str, index);
+  } while (NULL != (cur = cur->next));
+}
+
 int ParamList::hasConditional() { return orEach(&Parameter::isConditional); }
 
 /** marshalling: pack fields into flat byte buffer **/
@@ -217,35 +258,63 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
       str << "  int impl_arrstart=0;\n";
       callEach(&Parameter::marshallRegArraySizes, str);
     }
+
     bool hasrdma = hasRdma();
     bool hasrecvrdma = hasRecvRdma();
+
+    Chare *container = entry->getContainer();
+    bool isP2P = (container->isChare() || container->isForElement());
+
+    // Generate device-related code only when this condition is met
+    bool deviceRdmaSupported = (hasDevice() && isP2P);
+
     if (hasrdma) {
-      str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
-      // Root node is pupped on the source as it is required for ZC Bcast when the source is non-zero
-      str << "  int impl_num_root_node = CkMyNode();\n";
-      callEach(&Parameter::marshallRdmaParameters, str, true);
-      str << "#else\n";
-      if (!hasArrays) str << "  int impl_arrstart=0;\n";
-      callEach(&Parameter::marshallRdmaParameters, str, false);
-      str << "#endif\n";
+      if (deviceRdmaSupported) {
+        str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams << ";\n";
+        str << "  int dest_pe;\n";
+        if (container->isChare()) {
+          // TODO: Following code doesn't work, don't support singleton chares for now
+          //str << "  dest_pe = CkRdmaGetDestPEChare(ckGetChareID().onPE, ckGetChareID().objPtr);\n";
+          str << "  CkAbort(\"Singleton chares are not supported\");\n";
+        } else if (container->isArray()) {
+          str << "  dest_pe = ckLocMgr()->lastKnown(ckGetIndex());\n";
+        } else if (container->isGroup() || container->isNodeGroup()) {
+          str << "  dest_pe = ckGetGroupPe();\n";
+        } else {
+          str << "  CkAbort(\"Unknown container type\");\n";
+        }
+        str << "  CkDeviceBuffer* device_buffers[" << entry->numRdmaDeviceParams << "];\n";
+        int device_rdma_index = 0;
+        callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
+        str << "  CkRdmaDeviceOnSender(dest_pe, impl_num_device_rdma_fields, device_buffers);\n";
+      } else if (hasDevice()) {
+        // Abort ASAP if broadcast or has host-side zero-copy
+        if (!isP2P) {
+          str << "  CkAbort(\"Broadcast not supported with device buffers\");\n";
+        }
+        if (hasSendRdma() || hasRecvRdma()) {
+          str << "  CkAbort(\"Host-side RDMA cannot be used along with device RDMA\");\n";
+        }
+      } else {
+        str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
+        // Root node is pupped on the source as it is required for ZC Bcast when the source is non-zero
+        str << "  int impl_num_root_node = CkMyNode();\n";
+        callEach(&Parameter::marshallRdmaParameters, str, true);
+      }
     }
     str << "  { //Find the size of the PUP'd data\n";
     str << "    PUP::sizer implP;\n";
     callEach(&Parameter::pup, str);
     if (hasrdma) {
-      str << "#if CMK_ONESIDED_IMPL\n";
-      str << "    implP|impl_num_rdma_fields;\n";
-      str << "  implP|impl_num_root_node;\n";
-      // All rdma parameters have to be pupped at the start
-      callEach(&Parameter::pupRdma, str, true);
-      str << "#else\n";
-      callEach(&Parameter::pupRdma, str, false);
-      if (!hasArrays) {
-        str << "    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
-        str << "    impl_off+=impl_arrstart;\n";
+      if (deviceRdmaSupported) {
+        str << "    implP|impl_num_device_rdma_fields;\n";
+        callEach(&Parameter::pupRdma, str, true, true);
+      } else if (!hasDevice()) {
+        str << "    implP|impl_num_rdma_fields;\n";
+        str << "    implP|impl_num_root_node;\n";
+        // All rdma parameters have to be pupped at the start
+        callEach(&Parameter::pupRdma, str, true, false);
       }
-      str << "#endif\n";
     }
     if (hasArrays) { /*round up pup'd data length--that's the first array*/
       str << "    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
@@ -263,13 +332,14 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     str << "  { //Copy over the PUP'd data\n";
     str << "    PUP::toMem implP((void *)impl_msg->msgBuf);\n";
     if (hasRdma()) {
-      str << "#if CMK_ONESIDED_IMPL\n";
-      str << "    implP|impl_num_rdma_fields;\n";
-      str << "  implP|impl_num_root_node;\n";
-      callEach(&Parameter::pupRdma, str, true);
-      str << "#else\n";
-      callEach(&Parameter::pupRdma, str, false);
-      str << "#endif\n";
+      if (deviceRdmaSupported) {
+        str << "    implP|impl_num_device_rdma_fields;\n";
+        callEach(&Parameter::pupRdma, str, true, true);
+      } else if (!hasDevice()) {
+        str << "    implP|impl_num_rdma_fields;\n";
+        str << "    implP|impl_num_root_node;\n";
+        callEach(&Parameter::pupRdma, str, true, false);
+      }
     }
     callEach(&Parameter::pup, str);
     callEach(&Parameter::copyPtr, str);
@@ -279,23 +349,22 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
       callEach(&Parameter::marshallArrayData, str);
     }
     if (hasrdma) {
-      str << "#if CMK_ONESIDED_IMPL\n";
-      Chare *container = entry->getContainer();
-      if(container->isChare() || container->isForElement()) {
-        if(hasSendRdma())
-          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_SEND_MSG;\n";
-        else if(hasrecvrdma)
-          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_MSG;\n";
-      } else { // Mark a Ncpy Bcast message to intercept it in the send code path
-        if(hasSendRdma())
-          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_SEND_MSG;\n";
-        else if(hasrecvrdma)
-          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_RECV_MSG;\n";
+      if (deviceRdmaSupported) {
+        str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_DEVICE_MSG;\n";
+      } else if (!hasDevice()) {
+        // Only need to set message header when there is no device buffer involved
+        if (isP2P) {
+          if(hasSendRdma())
+            str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_SEND_MSG;\n";
+          else if(hasrecvrdma)
+            str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_MSG;\n";
+        } else { // Mark a Ncpy Bcast message to intercept it in the send code path
+          if(hasSendRdma())
+            str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_SEND_MSG;\n";
+          else if(hasrecvrdma)
+            str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_RECV_MSG;\n";
+        }
       }
-      str << "#else\n";
-      if (!hasArrays) str << "  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
-      callEach(&Parameter::marshallRdmaArrayData, str);
-      str << "#endif\n";
     }
   }
 }
@@ -326,7 +395,7 @@ void Parameter::marshallRegArraySizes(XStr& str) {
 }
 
 void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
-  if (isRdma()) {
+  if (isRdma() && !isDevice()) {
     Type* dt = type->deref();  // Type, without &
     if (genRdma) {
       str << "  ncpyBuffer_" << name << ".cnt=sizeof(" << dt << ")*(" << arrLen
@@ -338,12 +407,30 @@ void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
   }
 }
 
-void Parameter::pupRdma(XStr& str, bool genRdma) {
+void Parameter::marshallDeviceRdmaParameters(XStr& str, int& index) {
+  if (isRdma() && isDevice()) {
+    Type* dt = type->deref();
+    str << "  deviceBuffer_" << name << ".cnt = sizeof(" << dt << ")*(" << arrLen
+      << ");\n";
+    str << "  device_buffers[" << index << "] = &deviceBuffer_" << name << ";\n";
+    index++;
+  }
+}
+
+void Parameter::pupRdma(XStr& str, bool genRdma, bool device) {
   if (isRdma()) {
-    if (genRdma)
-      str << "    implP|ncpyBuffer_" << name << ";\n";
-    else
-      pupArray(str);
+    bool hostPath = !device && !isDevice();
+    bool devicePath = device && isDevice();
+
+    if (hostPath) {
+      if (genRdma) {
+        str << "    implP|ncpyBuffer_" << name << ";\n";
+      } else {
+        pupArray(str);
+      }
+    } else if (devicePath) {
+      str << "    implP|deviceBuffer_" << name << ";\n";
+    }
   }
 }
 
@@ -365,7 +452,7 @@ void Parameter::pup(XStr& str) {
 }
 
 void Parameter::marshallRdmaArrayData(XStr& str) {
-  if (isRdma()) {
+  if (isRdma() && !isDevice()) {
     str << "  memcpy(impl_buf+impl_off_" << name << ","
         << "ncpyBuffer_" << name << ".ptr"
         << ",impl_cnt_" << name << ");\n";
@@ -440,34 +527,25 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
       } else {
         if (!needsClosure) {
           if (hasRdma()) {
-            str << "#if CMK_ONESIDED_IMPL\n";
-            str << "  char *impl_buf_begin = impl_buf;\n";
-            if(hasRecvRdma())
-              //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-              //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
-              str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-            str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
-            str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
-            str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
-            callEach(&Parameter::beginUnmarshallRdma, str, true);
-            str << "#else\n";
-            callEach(&Parameter::beginUnmarshallRdma, str, false);
-            str << "#endif\n";
+            if (hasDevice()) {
+              str << "  int impl_num_device_rdma_fields; implP|impl_num_device_rdma_fields;\n";
+              callEach(&Parameter::beginUnmarshallRdma, str, true, true);
+            } else {
+              str << "  char *impl_buf_begin = impl_buf;\n";
+              str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
+              str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
+              callEach(&Parameter::beginUnmarshallRdma, str, true, false);
+            }
           }
           callEach(&Parameter::beginUnmarshall, str);
         } else {
           if (hasRdma()) {
-            str << "#if CMK_ONESIDED_IMPL\n";
-            str << "  char *impl_buf_begin = impl_buf;\n";
-            if(hasRecvRdma())
-              //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-              //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
-              str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-            str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
-            callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true);
-            str << "#else\n";
-            callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, false);
-            str << "#endif\n";
+            if (hasDevice()) {
+              callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true, true);
+            } else {
+              str << "  char *impl_buf_begin = impl_buf;\n";
+              callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true, false);
+            }
           }
           callEach(&Parameter::beginUnmarshallSDAGCall, str);
         }
@@ -485,19 +563,15 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
       str << "  /* non two-param case */\n";
       if (!needsClosure) {
         if (hasRdma()) {
-          str << "#if CMK_ONESIDED_IMPL\n";
-          str << "  char *impl_buf_begin = impl_buf;\n";
-          if(hasRecvRdma())
-            //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-            //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
-            str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-          str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
-          str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
-          str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
-          callEach(&Parameter::beginUnmarshallRdma, str, true);
-          str << "#else\n";
-          callEach(&Parameter::beginUnmarshallRdma, str, false);
-          str << "#endif\n";
+          if (hasDevice()) {
+            str << "  int impl_num_device_rdma_fields; implP|impl_num_device_rdma_fields;\n";
+            callEach(&Parameter::beginUnmarshallRdma, str, true, true);
+          } else {
+            str << "  char *impl_buf_begin = impl_buf;\n";
+            str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
+            str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
+            callEach(&Parameter::beginUnmarshallRdma, str, true, false);
+          }
         }
         callEach(&Parameter::beginUnmarshall, str);
       } else
@@ -523,24 +597,21 @@ void ParamList::beginUnmarshall(XStr& str) {
     str << "*/\n";
     str << "  PUP::fromMem implP(impl_buf);\n";
     if (hasRdma()) {
-      str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  char *impl_buf_begin = impl_buf;\n";
-      if(hasRecvRdma())
-        //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-        //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
-        str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-      str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
-      str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
-      str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
-      callEach(&Parameter::beginUnmarshallRdma, str, true);
-      str << "#else\n";
-      callEach(&Parameter::beginUnmarshallRdma, str, false);
-      str << "#endif\n";
-      if (hasRecvRdma()) {
-        str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
-        for(int index=0; index < entry->numRdmaRecvParams; index++) {
-          str << "  ncpyPost[" <<index<<  "].regMode = CK_BUFFER_REG;\n";
-          str << "  ncpyPost[" <<index<<  "].deregMode = CK_BUFFER_DEREG;\n";
+      if (hasDevice()) {
+        str << "  int impl_num_device_rdma_fields; implP|impl_num_device_rdma_fields;\n";
+        callEach(&Parameter::beginUnmarshallRdma, str, true, true);
+        str << "  CkDeviceBufferPost devicePost[" << entry->numRdmaDeviceParams << "];\n";
+      } else {
+        str << "  char *impl_buf_begin = impl_buf;\n";
+        str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
+        str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
+        callEach(&Parameter::beginUnmarshallRdma, str, true, false);
+        if (hasRecvRdma()) {
+          str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
+          for (int index = 0; index < entry->numRdmaRecvParams; index++) {
+            str << "  ncpyPost[" << index << "].regMode = CK_BUFFER_REG;\n";
+            str << "  ncpyPost[" << index << "].deregMode = CK_BUFFER_DEREG;\n";
+          }
         }
       }
     }
@@ -548,82 +619,89 @@ void ParamList::beginUnmarshall(XStr& str) {
     str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
     str << "  /*Unmarshall arrays:*/\n";
     callEach(&Parameter::unmarshallRegArrayData, str);
-    if (hasRdma()) {
-      str << "#if !CMK_ONESIDED_IMPL\n";
-      callEach(&Parameter::unmarshallRdmaArrayData, str, true);
-      str << "#endif\n";
-    }
   }
 }
 
 void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
-  str << "#if CMK_ONESIDED_IMPL\n";
-  callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen);
-  str << "#else\n";
-  callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen);
-  str << "#endif\n";
+  if (hasDevice()) {
+    int count = 0; // Used to keep track of indices
+    callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen, true, count);
+  } else {
+    callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen, false);
+  }
 }
 
-void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count) {
-  if(isRdma()) {
-    if(genRdma) {
-      Type* dt = type->deref();
-      str << "  if(CMI_IS_ZC_RECV(env)) {\n";
-      str << "    buffPtrs["<< count <<"] = (void *)" << "ncpyBuffer_";
+void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count) {
+  Type* dt = type->deref();  // Type, without &
+
+  if (isRdma()) {
+    bool hostPath = !device && !isDevice();
+    bool devicePath = device && isDevice();
+
+    if (hostPath) {
+      if (genRdma) {
+        str << "  if(CMI_IS_ZC_RECV(env)) {\n";
+        str << "    buffPtrs[" << count << "] = (void *)" << "ncpyBuffer_";
+        str << name << "_ptr;\n";
+        if(isSDAGGen)
+          str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
+        else
+          str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * " << arrLen << ".t;\n";
+        str <<  "  }\n";
+        str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+
+        // Error checking if posted buffer is larger than the source buffer
+        str << "  if( ";
+        if(isSDAGGen)
+          str << "genClosure->";
+        str << "ncpyBuffer_" << name << ".cnt < " ;
+        if(isSDAGGen)
+           str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
+        else
+          str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
+
+        str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
+
+        str << "    memcpy(" << "ncpyBuffer_" << name << "_ptr,";
+        if(isSDAGGen)
+          str << "genClosure->";
+        str << "ncpyBuffer_" << name << ".ptr,";
+        if(isSDAGGen)
+          str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
+        else
+          str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
+
+        str << "  }\n";
+      } else {
+        // Error checking if posted buffer is larger than the source buffer
+        str << "  if(impl_cnt_" << name << " < " ;
+        if(isSDAGGen)
+           str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
+        else
+          str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
+
+        str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
+
+        // memcpy the pointer into the user passed buffer
+        str << "  memcpy(" << "ncpyBuffer_" << name << "_ptr,";
+        if(isSDAGGen)
+          str << "genClosure->";
+        str << name << ",";
+
+        if(isSDAGGen)
+          str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
+        else
+          str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
+      }
+    } else if (devicePath) {
+      str << "  if(CMI_IS_ZC_DEVICE(env)) {\n";
+      str << "    buffPtrs[" << count << "] = (void *)" << "deviceBuffer_";
       str << name << "_ptr;\n";
       if(isSDAGGen)
-        str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
+        str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
       else
-        str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * "<< arrLen << ".t;\n";
+        str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * " << arrLen << ".t;\n";
       str <<  "  }\n";
-
-      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
-
-      // Error checking if posted buffer is larger than the source buffer
-      str << "  if( ";
-      if(isSDAGGen)
-        str << "genClosure->";
-      str << "ncpyBuffer_" << name << ".cnt < " ;
-      if(isSDAGGen)
-         str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
-      else
-        str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
-
-      str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
-
-      str << "    memcpy(" << "ncpyBuffer_" << name << "_ptr,";
-      if(isSDAGGen)
-        str << "genClosure->";
-      str << "ncpyBuffer_" << name << ".ptr,";
-      if(isSDAGGen)
-        str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
-      else
-        str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
-
-      str << "  }\n";
-
-    } else {
-      Type* dt = type->deref();  // Type, without &
-
-      // Error checking if posted buffer is larger than the source buffer
-      str << "  if(impl_cnt_" << name << " < " ;
-      if(isSDAGGen)
-         str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
-      else
-        str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
-
-      str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
-
-      // memcpy the pointer into the user passed buffer
-      str << "  memcpy(" << "ncpyBuffer_" << name << "_ptr,";
-      if(isSDAGGen)
-        str << "genClosure->";
-      str << name << ",";
-
-      if(isSDAGGen)
-        str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
-      else
-        str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
     }
   }
 }
@@ -639,18 +717,31 @@ void Parameter::beginUnmarshallArray(XStr& str) {
   }
 }
 
-void Parameter::beginUnmarshallRdma(XStr& str,
-                                    bool genRdma) {  // First pass: unpack pup'd entries
-  Type* dt = type->deref();                          // Type, without &
-  if (isRdma()) {
-    if (genRdma) {
-      str << "  CkNcpyBuffer ncpyBuffer_" << name << ";\n";
-      str << "  implP|ncpyBuffer_" << name << ";\n";
+// First pass: unpack pup'd entries
+void Parameter::beginUnmarshallRdma(XStr& str, bool genRdma, bool device) {
+  Type* dt = type->deref(); // Type, without &
 
-      str << "  " << dt << " *ncpyBuffer_" << name <<"_ptr = ";
-      str << "("<<dt<< " *)" << " ncpyBuffer_" << name <<".ptr;\n";
-    } else
-      beginUnmarshallArray(str);
+  if (isRdma()) {
+    bool hostPath = !device && !isDevice();
+    bool devicePath = device && isDevice();
+
+    if (hostPath) {
+      if (genRdma) {
+        str << "  CkNcpyBuffer ncpyBuffer_" << name << ";\n";
+        str << "  implP|ncpyBuffer_" << name << ";\n";
+
+        str << "  " << dt << " *ncpyBuffer_" << name << "_ptr = ";
+        str << "(" << dt << " *)" << " ncpyBuffer_" << name << ".ptr;\n";
+      } else {
+        beginUnmarshallArray(str);
+      }
+    } else if (devicePath) {
+      str << "  CkDeviceBuffer deviceBuffer_" << name << ";\n";
+      str << "  implP|deviceBuffer_" << name << ";\n";
+
+      str << "  " << dt << " *deviceBuffer_" << name << "_ptr = ";
+      str << "(" << dt << " *)" << " deviceBuffer_" << name << ".ptr;\n";
+    }
   }
 }
 
@@ -666,21 +757,34 @@ void Parameter::beginUnmarshall(XStr& str) {  // First pass: unpack pup'd entrie
         << "implP|" << name << ";\n";
 }
 
-void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma) {
+void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma, bool device) {
   if (isRdma()) {
-    if (genRdma) {
-      if (isFirstRdma()) {
-        str << "  implP|genClosure->num_rdma_fields;\n";
-        str << "  implP|genClosure->num_root_node;\n";
+    bool hostPath = !device && !isDevice();
+    bool devicePath = device && isDevice();
+
+    if (hostPath) {
+      if (genRdma) {
+        if (isFirstRdma()) {
+          str << "  implP|genClosure->num_rdma_fields;\n";
+          str << "  implP|genClosure->num_root_node;\n";
+        }
+        str << "  implP|genClosure->ncpyBuffer_" << name << ";\n";
+        if (isRecvRdma()) {
+          Type* dt = type->deref();
+          str << "  " << dt << " *ncpyBuffer_" << name << "_ptr = ";
+          str << "(" << dt << " *)" << " (genClosure->ncpyBuffer_" << name << ").ptr;\n";
+        }
+      } else {
+        beginUnmarshallArray(str);
       }
-      str << "  implP|genClosure->ncpyBuffer_" << name << ";\n";
-      if(isRecvRdma()) {
-        Type* dt = type->deref();
-        str << "  " << dt << " *ncpyBuffer_" << name <<"_ptr = ";
-        str << "("<<dt<< " *)" << " (genClosure->ncpyBuffer_" << name <<").ptr;\n";
+    } else if (devicePath) {
+      if (isFirstDeviceRdma()) {
+        str << "  implP|genClosure->num_device_rdma_fields;\n";
       }
-    } else {
-      beginUnmarshallArray(str);
+      str << "  implP|genClosure->deviceBuffer_" << name << ";\n";
+      Type* dt = type->deref();
+      str << "  " << dt << " *deviceBuffer_" << name << "_ptr = ";
+      str << "(" << dt << " *)" << " (genClosure->deviceBuffer_" << name << ").ptr;\n";
     }
   }
 }
@@ -709,39 +813,28 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
         << " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()"
         << ";\n";
     if (hasRdma()) {
-      if(hasRecvRdma()) {
-        str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
-        for(int index=0; index < entry->numRdmaRecvParams; index++) {
-          str << "  ncpyPost[" <<index<<  "].regMode = CK_BUFFER_REG;\n";
-          str << "  ncpyPost[" <<index<<  "].deregMode = CK_BUFFER_DEREG;\n";
+      if (hasDevice()) {
+        str << "  CkDeviceBufferPost devicePost[" << entry->numRdmaDeviceParams << "];\n";
+        callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true, true);
+      } else {
+        if (hasRecvRdma()) {
+          str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
+          for (int index = 0; index < entry->numRdmaRecvParams; index++) {
+            str << "  ncpyPost[" << index << "].regMode = CK_BUFFER_REG;\n";
+            str << "  ncpyPost[" << index << "].deregMode = CK_BUFFER_DEREG;\n";
+          }
         }
+        str << "  char *impl_buf_begin = impl_buf;\n";
+        callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true, false);
       }
-      str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  char *impl_buf_begin = impl_buf;\n";
-      if(hasRecvRdma())
-        //str << "  if(!CMI_IS_ZC_RECV(env))\n";
-        str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
-      str << "    CkUnpackRdmaPtrs(impl_buf_begin);\n";
-      callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true);
-      str << "#else\n";
-      callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, false);
-      str << "#endif\n";
     }
     callEach(&Parameter::beginUnmarshallSDAGCall, str);
     str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
-    if (hasRdma()) str << "#if !CMK_ONESIDED_IMPL\n";
-    callEach(&Parameter::unmarshallRdmaArrayDataSDAGCall, str);
-    if (hasRdma()) str << "#endif\n";
     callEach(&Parameter::unmarshallRegArrayDataSDAGCall, str);
     if (hasArray || hasRdma()) {
       if (!usesImplBuf) {
         str << "  genClosure->_impl_marshall = impl_msg_typed;\n";
-        str << "  CmiReference(UsrToEnv(genClosure->_impl_marshall));\n";
-      } else {
-        if (hasRdma() && !hasArray) str << "#if !CMK_ONESIDED_IMPL\n";
-        str << "  genClosure->_impl_buf_in = impl_buf;\n";
-        str << "  genClosure->_impl_buf_size = implP.size();\n";
-        if (hasRdma() && !hasArray) str << "#endif\n";
+        str << "  CkReferenceMsg(genClosure->_impl_marshall);\n";
       }
     }
   }
@@ -750,28 +843,27 @@ void ParamList::beginUnmarshallSDAG(XStr& str) {
   if (isMarshalled()) {
     str << "          PUP::fromMem implP(impl_buf);\n";
     if (hasRdma()) {
-      str << "#if CMK_ONESIDED_IMPL\n";
-      /* Before migration of the closure structure, Rdmawrapper pointers
-       * store the offset to the actual buffer from the msgBuf
-       * After migration, the Rdmawrapper pointer needs to be adjusted
-       * to point to the msgBuf + offset. As the actual buffer is within
-       * the message, the adjusting should happen after the message is
-       * unpacked. (see code in Entry::genClosure)
-       */
-      callEach(&Parameter::adjustUnmarshalledRdmaPtrsSDAG, str);
-      str << "  implP|num_rdma_fields;\n";
-      str << "  implP|num_root_node;\n";
-      callEach(&Parameter::beginUnmarshallRdma, str, true);
-      str << "#else\n";
-      callEach(&Parameter::beginUnmarshallRdma, str, false);
-      str << "#endif\n";
+      if (hasDevice()) {
+        callEach(&Parameter::adjustUnmarshalledRdmaPtrsSDAG, str, true, true);
+        str << "  implP|num_device_rdma_fields;\n";
+        callEach(&Parameter::beginUnmarshallRdma, str, true, true);
+      } else {
+        /* Before migration of the closure structure, Rdmawrapper pointers
+         * store the offset to the actual buffer from the msgBuf
+         * After migration, the Rdmawrapper pointer needs to be adjusted
+         * to point to the msgBuf + offset. As the actual buffer is within
+         * the message, the adjusting should happen after the message is
+         * unpacked. (see code in Entry::genClosure)
+         */
+        callEach(&Parameter::adjustUnmarshalledRdmaPtrsSDAG, str, true, false);
+        str << "  implP|num_rdma_fields;\n";
+        str << "  implP|num_root_node;\n";
+        callEach(&Parameter::beginUnmarshallRdma, str, true, false);
+      }
     }
     callEach(&Parameter::beginUnmarshall, str);
     str << "          impl_buf+=CK_ALIGN(implP.size(),16);\n";
     // If there's no rdma support, unmarshall as a regular array
-    str << "#if !CMK_ONESIDED_IMPL\n";
-    callEach(&Parameter::unmarshallRdmaArrayDataSDAG, str);
-    str << "#endif\n";
     callEach(&Parameter::unmarshallRegArrayDataSDAG, str);
   }
 }
@@ -784,15 +876,21 @@ void Parameter::unmarshallRegArrayDataSDAG(XStr& str) {
   }
 }
 
-void Parameter::adjustUnmarshalledRdmaPtrsSDAG(XStr& str) {
+void Parameter::adjustUnmarshalledRdmaPtrsSDAG(XStr& str, bool genRdma, bool device) {
+  (void)genRdma; // Unused, needed to use this as a rdmaheterofn_t (otherwise same signature as rdmafn_t)
   if (isRdma()) {
-    str << "  ncpyBuffer_" << name << ".ptr = ";
-    str << "(void *)(impl_buf + (size_t)(ncpyBuffer_" << name << ".ptr));\n";
+    if (!device && !isDevice()) {
+      str << "  ncpyBuffer_" << name << ".ptr = ";
+      str << "(void *)(impl_buf + (size_t)(ncpyBuffer_" << name << ".ptr));\n";
+    } else if (device && isDevice()) {
+      str << "  deviceBuffer_" << name << ".ptr = ";
+      str << "(void *)(impl_buf + (size_t)(deviceBuffer_" << name << ".ptr));\n";
+    }
   }
 }
 
 void Parameter::unmarshallRdmaArrayDataSDAG(XStr& str) {
-  if (isRdma()) {
+  if (isRdma() && !isDevice()) {
     Type* dt = type->deref();  // Type, without &
     str << "          " << name << " = (" << dt << " *)(impl_buf+impl_off_" << name
         << ");\n";
@@ -808,7 +906,7 @@ void Parameter::unmarshallRegArrayDataSDAGCall(XStr& str) {
 }
 
 void Parameter::unmarshallRdmaArrayDataSDAGCall(XStr& str) {
-  if (isRdma()) {
+  if (isRdma() && !isDevice()) {
     Type* dt = type->deref();  // Type, without &
     str << "  genClosure->" << name << " = (" << dt << " *)(impl_buf+impl_off_" << name
         << ");\n";
@@ -835,7 +933,7 @@ void Parameter::unmarshallArrayData(XStr& str) {
 }
 
 void Parameter::unmarshallRdmaArrayData(XStr& str, bool genRegArray) {
-  if (isRdma() && genRegArray) unmarshallArrayData(str);
+  if (isRdma() && genRegArray && !isDevice()) unmarshallArrayData(str);
 }
 
 void Parameter::unmarshallRegArrayData(
@@ -850,15 +948,11 @@ void ParamList::unmarshall(XStr& str, bool isInline, bool isFirst, bool isRdmaPo
   else if (!isVoid()) {
     bool isSDAGGen = entry->sdagCon || entry->isWhenEntry;
     if (param->isRdma()) {
-      str << "\n#if CMK_ONESIDED_IMPL\n";
-      str << "ncpyBuffer_" << param->getName() << "_ptr";
-      str << "\n#else\n";
-      // for recv rdma
-      if(param->isRecvRdma())
+      if (param->isDevice()) {
+        str << "deviceBuffer_" << param->getName() << "_ptr";
+      } else {
         str << "ncpyBuffer_" << param->getName() << "_ptr";
-      else // for send rdma
-        str << param->getName();
-      str << "\n#endif\n";
+      }
     } else if (param->isArray() || isInline) {
       if(isRdmaPost && isSDAGGen) str << "genClosure->";
       str << param->getName();
@@ -936,20 +1030,11 @@ void Parameter::pupAllValues(XStr& str) {
            "  }\n"
            "  implDestP.synchronize(PUP::sync_end_array);\n";
   } else if (isRdma()) {
-    str << "#if CMK_ONESIDED_IMPL\n";
-    str << "  implDestP|ncpyBuffer_" << name << ";\n";
-    str << "#else\n";
-    str << "  implDestP.synchronize(PUP::sync_begin_array);\n"
-           "  { for (int impl_i=0;impl_i*(sizeof(*"
-        << name << "))<impl_cnt_" << name
-        << ";impl_i++) { \n"
-           "      implDestP.synchronize(PUP::sync_item);\n"
-           "      implDestP|"
-        << name
-        << "[impl_i];\n"
-           "  } } \n"
-           "  implDestP.synchronize(PUP::sync_end_array);\n";
-    str << "#endif\n";
+    if (isDevice()) {
+      str << "  implDestP|deviceBuffer_" << name << ";\n";
+    } else {
+      str << "  implDestP|ncpyBuffer_" << name << ";\n";
+    }
   } else /* not an array */ {
     if (isConditional())
       str << "  pup_pointer(&implDestP, (void**)&" << name << ");\n";
@@ -991,8 +1076,10 @@ int Parameter::isConditional(void) const { return conditional; }
 int Parameter::isRdma(void) const { return (rdma != CMK_REG_NO_ZC_MSG); }
 int Parameter::isSendRdma(void) const { return (rdma == CMK_ZC_P2P_SEND_MSG); }
 int Parameter::isRecvRdma(void) const { return (rdma == CMK_ZC_P2P_RECV_MSG); }
+int Parameter::isDevice(void) const { return (rdma == CMK_ZC_DEVICE_MSG); }
 int Parameter::getRdma(void) const { return rdma; }
 int Parameter::isFirstRdma(void) const { return firstRdma; }
+int Parameter::isFirstDeviceRdma(void) const { return firstDeviceRdma; }
 
 int Parameter::operator==(const Parameter& parm) const { return *type == *parm.type; }
 
@@ -1004,6 +1091,8 @@ void Parameter::setConditional(int c) {
 void Parameter::setRdma(int r) { rdma = r; }
 
 void Parameter::setFirstRdma(bool fr) { firstRdma = fr; }
+
+void Parameter::setFirstDeviceRdma(bool fr) { firstDeviceRdma = fr; }
 
 void Parameter::setAccelBufferType(int abt) {
   accelBufferType = ((abt < ACCEL_BUFFER_TYPE_MIN || abt > ACCEL_BUFFER_TYPE_MAX)
@@ -1028,9 +1117,12 @@ int ParamList::isMessage(void) const { return (next == NULL) && param->isMessage
 int ParamList::hasRdma(void) { return orEach(&Parameter::isRdma); }
 int ParamList::hasSendRdma(void) { return orEach(&Parameter::isSendRdma); }
 int ParamList::hasRecvRdma(void) { return orEach(&Parameter::isRecvRdma); }
+int ParamList::hasDevice(void) { return orEach(&Parameter::isDevice); }
 int ParamList::isRdma(void) { return param->isRdma(); }
+int ParamList::isDevice(void) { return param->isDevice(); }
 int ParamList::getRdma(void) { return param->getRdma(); }
 int ParamList::isFirstRdma(void) { return param->isFirstRdma(); }
+int ParamList::isFirstDeviceRdma(void) { return param->isFirstDeviceRdma(); }
 int ParamList::isRecvRdma(void) { return param->isRecvRdma(); }
 const char* ParamList::getArrayLen(void) const { return param->getArrayLen(); }
 int ParamList::isArray(void) const { return param->isArray(); }

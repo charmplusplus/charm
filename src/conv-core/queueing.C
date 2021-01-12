@@ -593,21 +593,31 @@ int CqsEmpty(Queue q)
 
 void CqsEnqueueGeneral(Queue q, void *data, int strategy, int priobits,unsigned int *prioptr)
 {
-    bool isFifo = (strategy == CQS_QUEUEING_FIFO  ||
-                   strategy == CQS_QUEUEING_IFIFO ||
-                   strategy == CQS_QUEUEING_BFIFO ||
-                   strategy == CQS_QUEUEING_LFIFO);
+#if CMK_FIFO_QUEUE_ONLY
+    CmiAssert(strategy == CQS_QUEUEING_FIFO);
+    ( (conv::msgQ<prio_t>*)(q->stlQ) )->enq(data, 0, true);
+#else
+    const bool isFifo = (strategy == CQS_QUEUEING_FIFO  ||
+                         strategy == CQS_QUEUEING_IFIFO ||
+                         strategy == CQS_QUEUEING_BFIFO ||
+                         strategy == CQS_QUEUEING_LFIFO);
     if (priobits >= sizeof(int)*8 && strategy != CQS_QUEUEING_FIFO && strategy != CQS_QUEUEING_LIFO)
         ( (conv::msgQ<prio_t>*)(q->stlQ) )->enq( data, prioptr[0], isFifo);
     else
         ( (conv::msgQ<prio_t>*)(q->stlQ) )->enq( data, 0, isFifo);
+#endif
 }
 
 void CqsEnqueueFifo(Queue q, void *data)
 { ( (conv::msgQ<prio_t>*)(q->stlQ) )->enq(data); }
 
 void CqsEnqueueLifo(Queue q, void *data)
-{ ( (conv::msgQ<prio_t>*)(q->stlQ) )->enq(data, 0, false); }
+{
+#if CMK_FIFO_QUEUE_ONLY
+    CmiAbort("CMK_FIFO_QUEUE_ONLY is set, but CqsEnqueueLifo was called!\n");
+#endif
+    ( (conv::msgQ<prio_t>*)(q->stlQ) )->enq(data, 0, false);
+}
 
 void CqsEnqueue(Queue q, void *data)
 { ( (conv::msgQ<prio_t>*)(q->stlQ) )->enq(data); }
@@ -630,6 +640,10 @@ int CqsEmpty(Queue q)
 void CqsEnqueueGeneral(Queue q, void *data, int strategy, 
            int priobits,unsigned int *prioptr)
 {
+#if CMK_FIFO_QUEUE_ONLY
+  CmiAssert(strategy == CQS_QUEUEING_FIFO);
+  CqsDeqEnqueueFifo(&(q->zeroprio), data);
+#else
   _deq d; int iprio;
   CmiInt8 lprio0, lprio;
   switch (strategy) {
@@ -704,6 +718,7 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
   default:
     CmiAbort("CqsEnqueueGeneral: invalid queueing strategy.\n");
   }
+#endif
   q->length++; if (q->length>q->maxlen) q->maxlen=q->length;
 }
 
@@ -715,6 +730,9 @@ void CqsEnqueueFifo(Queue q, void *data)
 
 void CqsEnqueueLifo(Queue q, void *data)
 {
+#if CMK_FIFO_QUEUE_ONLY
+  CmiAbort("CMK_FIFO_QUEUE_ONLY is set, but CqsEnqueueLifo was called!\n");
+#endif
   CqsDeqEnqueueLifo(&(q->zeroprio), data);
   q->length++; if (q->length>q->maxlen) q->maxlen=q->length;
 }

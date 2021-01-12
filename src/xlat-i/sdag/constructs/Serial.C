@@ -28,10 +28,6 @@ void SerialConstruct::propagateStateToChildren(std::list<EncapState*> encap,
 void SerialConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 
-#if CMK_BIGSIM_CHARM
-  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
-  generateBeginExec(defs, nameStr);
-#endif
 
   generateTraceBeginCall(defs, 1);
 
@@ -71,9 +67,6 @@ void SerialConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
 
   generateTraceEndCall(defs, 1);
 
-#if CMK_BIGSIM_CHARM
-  generateEndExec(defs);
-#endif
 
   indentBy(defs, 1);
   generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");

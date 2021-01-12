@@ -20,6 +20,3 @@ SimplePUP.o: SimplePUP.C SimplePUP.h HeapObject.h SimplePUP.decl.h
 test: all
 	$(call run, ./SimplePUP +p4  )
 	$(call run, ./SimplePUP +p4  )
-
-bgtest: all
-	$(call run, ./SimplePUP +p4 +x2 +y2 +z1)

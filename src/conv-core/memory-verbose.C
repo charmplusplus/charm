@@ -6,16 +6,12 @@ Orion Sky Lawlor, olawlor@acm.org, 6/22/2001
 
 *****************************************************************************/
 
-#if ! CMK_MEMORY_BUILD_OS
-/* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.C"
-#endif
-
 static int memInit=0;
-static int inMemVerbose=0;
+CpvStaticDeclare(int, inMemVerbose);
 
 static void meta_init(char **argv)
 {
+  CpvInitialize(int, inMemVerbose);
   if (CmiMyRank()==0) memInit=1;
   CmiNodeAllBarrier();
   if (memInit) CmiPrintf("CMI_MEMORY(%d)> Called meta_init\n", CmiMyPe());
@@ -32,10 +28,10 @@ static void *meta_malloc(size_t size)
 
 static void meta_free(void *mem)
 {
-  if (memInit && !inMemVerbose) {
-    inMemVerbose = 1;
+  if (memInit && !CpvAccess(inMemVerbose)) {
+    CpvAccess(inMemVerbose) = 1;
     CmiPrintf("CMI_MEMORY(%d)> free(%p)\n", CmiMyPe(),mem);
-    inMemVerbose = 0;
+    CpvAccess(inMemVerbose) = 0;
   }
   if (memInit>1) {int memBack=memInit; memInit=0; CmiPrintStackTrace(0); memInit=memBack;}
   mm_free(mem);

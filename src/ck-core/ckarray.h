@@ -147,7 +147,6 @@ public:
 
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxy_ArrayBase)
 
 class CProxyElement_ArrayBase:public CProxy_ArrayBase {
 private:
@@ -176,7 +175,6 @@ public:
 	ArrayElement *ckLocal(void) const;
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxyElement_ArrayBase)
 
 
 #define _AUTO_DELEGATE_MCASTMGR_ON_ 1
@@ -269,7 +267,6 @@ public:
 	inline int ckGetBfactor() const { return _sid[0].bfactor; }
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxySection_ArrayBase)
 
 //Simple C-like API:
 void CkSetMsgArrayIfNotThere(void *msg);
@@ -428,7 +425,7 @@ typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
@@ -547,8 +544,12 @@ void _ckArrayInit(void);
 class MsgPointerWrapper {
   public:
     void *msg;
+    int ep;
+    int opts;
     void pup(PUP::er &p) {
       pup_pointer(&p, &msg);
+      p|ep;
+      p|opts;
     }
 };
 
@@ -689,6 +690,10 @@ public:
   void sendExpeditedBroadcast(CkMessage *msg);
   void recvExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
   void recvBroadcastViaTree(CkMessage *msg);
+  void recvNoKeepBroadcast(CkMessage *msg) { recvBroadcast(msg); }
+  void sendNoKeepBroadcast(CkMessage *msg);
+  void recvNoKeepExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
+  void sendNoKeepExpeditedBroadcast(CkMessage *msg);
 
   void sendZCBroadcast(MsgPointerWrapper w);
 
@@ -740,9 +745,7 @@ public:
     return broadcaster;
   }
   void flushStates();
-#if CMK_ONESIDED_IMPL
   void forwardZCMsgToOtherElems(envelope *env);
-#endif
 
 
         static bool isIrreducible() { return true; }
@@ -752,7 +755,6 @@ public:
 // with usage in maps' populateInitial()
 typedef CkArray CkArrMgr;
 
-#if CMK_ONESIDED_IMPL
 struct ncpyBcastNoMsg{
   char cmicore[CmiMsgHeaderSizeBytes];
   int srcPe;
@@ -760,7 +762,6 @@ struct ncpyBcastNoMsg{
 };
 
 void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize);
-#endif
 
 /*@}*/
 
@@ -791,7 +792,7 @@ public:
   int incrementBcastNo();
 
   bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
   void deliver(CkArrayMessage *bcast, std::vector<CkMigratable*> &elements, int arrayId, bool doFree);
 #endif
 

@@ -4,34 +4,38 @@ DIRS = \
   megampi \
   stacksize \
   migration \
-  intercomm_coll \
   datatype \
   privatization \
   jacobi3d \
   exit \
 #  chkpt \
+#  intercomm_coll \ # causes hangs in SMP mode
+
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  DIRS += fallreduce
+endif
+
+NONSCALEDIRS = \
+  privatization \
+  datatype \
+  exit \
 
 ifeq ($(BUILD_MPICH_TESTS),true)
 DIRS += mpich-test
 endif
-
-NOBGDIRS = \
-  intercomm_coll \
-  privatization \
-  exit \
-  datatype \
 
 FTDIRS = \
   jacobi3d
 
 TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
 
+TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 
 all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 
-bgtest: $(foreach i,$(filter-out $(NOBGDIRS),$(TESTDIRS)),bgtest-$i)
+testp: $(foreach i,$(TESTPDIRS),testp-$i)
 
 syncfttest : $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
 
@@ -47,8 +51,8 @@ $(foreach i,$(DIRS),build-$i):
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
-$(foreach i,$(DIRS),bgtest-$i):
-	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+$(foreach i,$(TESTPDIRS),testp-$i):
+	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' P='$(P)'
 
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'
@@ -61,4 +65,3 @@ mpich-test/Makefile:
 
 build-mpich-test: mpich-test/Makefile
 test-mpich-test: mpich-test/Makefile
-bgtest-mpich-test: mpich-test/Makefile

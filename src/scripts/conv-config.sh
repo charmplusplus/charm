@@ -48,13 +48,13 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_LDXX" ] && CMK_LDXX="$CMK_CXX"
 [ -z "$CMK_NM" ] && CMK_NM='nm '
 [ -z "$CMK_SHARED_SUF" ] && CMK_SHARED_SUF='so'
+[ -z "$CMK_USER_SUFFIX" ] && CMK_USER_SUFFIX='.user'
 
 [ -z "$CMK_FPP" ] && CMK_FPP="$CMK_CF90"
 [ -z "$CMK_CF90_FIXED" ] && CMK_CF90_FIXED="$CMK_CF90"
 [ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
 [ -z "$CMK_CC_FASTEST" ] && CMK_CC_FASTEST="$CMK_CC"
-[ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
-[ -z "$CMK_CF77" ] && CMK_CF77_FIXED="$CMK_CF90"
+[ -z "$CMK_CF77" ] && CMK_CF77="$CMK_CF90"
 [ -z "$CMK_CF77_FIXED" ] && CMK_CF77_FIXED="$CMK_CF77"
 
 # set CMK_NATIVE defaults before adding potentially target-specific build-line args
@@ -84,7 +84,7 @@ OPTS_CXX="$OPTS_CXX $USER_OPTS_CXX"
 OPTS_LD="$OPTS_LD $USER_OPTS_LD"
 
 [ -z "$CMK_PIC" ] && CMK_PIC='-fpic'
-[ -z "$CMK_PIE" ] && CMK_PIE='-pie -fPIE'
+[ -z "$CMK_PIE" ] && CMK_PIE='-fPIE'
 
 [ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"
 [ -z "$CMK_SEQ_CXX" ] && CMK_SEQ_CXX="$CMK_CXX"

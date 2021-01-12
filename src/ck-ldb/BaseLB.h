@@ -6,7 +6,7 @@
 #ifndef BASELB_H
 #define BASELB_H
 
-#include "LBDatabase.h"
+#include "LBManager.h"
 
 #define PER_MESSAGE_SEND_OVERHEAD_DEFAULT   3.5e-5
 #define PER_BYTE_SEND_OVERHEAD_DEFAULT      8.5e-9
@@ -24,9 +24,7 @@ class BaseLB: public CBase_BaseLB
 protected:
   int  seqno;
   const char *lbname;
-  LBDatabase *theLbdb;
-  LDBarrierReceiver receiver;
-  int  notifier;
+  LBManager *lbmgr;
   int  startLbFnHdl;
 private:
   void initLB(const CkLBOptions &);
@@ -150,18 +148,20 @@ public:
 
   BaseLB(const CkLBOptions &opt)  { initLB(opt); }
   BaseLB(CkMigrateMessage *m):CBase_BaseLB(m) {
-    theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
+    lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   }
-  virtual ~BaseLB();
+  virtual ~BaseLB() {}
 
-  void unregister(); 
   inline const char *lbName() { return lbname; }
-  inline int step() { return theLbdb->step(); }
-  virtual void turnOff() { CmiAbort("turnOff not implemented"); }
-  virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
+  inline int step() { return lbmgr->step(); }
+  virtual void turnOff();
+  virtual void turnOn();
   virtual int  useMem()  { return 0; }
   virtual void pup(PUP::er &p);
   virtual void flushStates();
+//  virtual void AtSync(void) {  CmiAbort("AtSync not implemented"); } // Everything is at the PE barrier
+  virtual void InvokeLB(void) { CmiAbort("InvokeLB not implemented"); }
+  virtual void Migrated(int waitBarrier=1) { CmiAbort("Migrated not implemented"); }
 
   CkGroupID getGroupID() {return thisgroup;}
 };
@@ -269,38 +269,32 @@ public:
   LBVectorMigrateMsg(): level(0), n_moves(0) {}
 };
 
-// for a FooLB, the following macro defines these functions for each LB:
-// CreateFooLB():        create BOC and register with LBDatabase with a 
+// Deprecated, left around to support external custom load balancers
+// Internal load balancers should define lbinit directly and use LBRegisterBalancer<T>
+//
+// For a FooLB, the following macro defines these functions for each LB:
+// CreateFooLB():        create BOC and register with LBManager with a
 //                       sequence ticket,
 // AllocateFooLB():      allocate the class instead of a BOC
 // static void lbinit(): an init call for charm module registration
 #if CMK_LBDB_ON
 
-#define CreateLBFunc_Def(x, str)		\
-void Create##x(void) { 	\
-  int seqno = LBDatabaseObj()->getLoadbalancerTicket();	\
-  CProxy_##x::ckNew(CkLBOptions(seqno)); 	\
-}	\
-\
-BaseLB *Allocate##x(void) { \
-  return new x((CkMigrateMessage*)NULL);	\
-}	\
-\
-static void lbinit(void) {	\
-  LBRegisterBalancer(#x,	\
-                     Create##x,	\
-                     Allocate##x,	\
-                     str);	\
-}
+#  define CreateLBFunc_Def(x, str)                                                       \
+    CMK_DEPRECATED_MSG("Use LBRegisterBalancer() instead of CreateLBFunc_Def()")         \
+    void Create##x(const CkLBOptions& opts) { CProxy_##x::ckNew(opts); }                 \
+    CMK_DEPRECATED_MSG("Use LBRegisterBalancer() instead of CreateLBFunc_Def()")         \
+    BaseLB* Allocate##x(void) { return new x(static_cast<CkMigrateMessage*>(nullptr)); } \
+    CMK_DEPRECATED_MSG("Use LBRegisterBalancer() instead of CreateLBFunc_Def()")         \
+    static void lbinit(void) { LBRegisterBalancer(#x, Create##x, Allocate##x, str); }
 
-#else		/* CMK_LBDB_ON */
+#else /* CMK_LBDB_ON */
 
-#define CreateLBFunc_Def(x, str)	\
-void Create##x(void) {} 	\
-BaseLB *Allocate##x(void) { return NULL; }	\
-static void lbinit(void) {}
+#  define CreateLBFunc_Def(x, str)                \
+    void Create##x(void) {}                       \
+    BaseLB* Allocate##x(void) { return nullptr; } \
+    static void lbinit(void) {}
 
-#endif		/* CMK_LBDB_ON */
+#endif /* CMK_LBDB_ON */
 
 #endif
 

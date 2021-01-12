@@ -17,9 +17,6 @@
 
 void CreateHybridBaseLB();
 
-/// for backward compatibility
-typedef LBMigrateMsg NLBMigrateMsg;
-
 inline int mymin(int x, int y) { return x<y?x:y; }
 
 // base class
@@ -299,8 +296,7 @@ public:
   HybridBaseLB(CkMigrateMessage *m): CBase_HybridBaseLB(m) {}
   ~HybridBaseLB();
 
-  static void staticAtSync(void*);
-  void AtSync(void); // Everything is at the PE barrier
+  void InvokeLB();
   void ProcessAtSync(void);
 
   void ReceiveStats(CkMarshalledCLBStatsMessage &&m, int fromlevel); 
@@ -314,8 +310,7 @@ public:
   void TotalObjMigrated(int count, int level);
 
   // Migrated-element callback
-  static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);
-  void Migrated(LDObjHandle h, int waitBarrier);
+  void Migrated(int waitBarrier);
 
   void ObjMigrated(LDObjData data, LDCommData *cdata, int n, int level);
   void ObjsMigrated(CkVec<LDObjData>&& data, int m, LDCommData *cdata, int n, int level);
@@ -465,6 +460,6 @@ private:
 };
 
 
-#endif /* NBORBASELB_H */
+#endif /* HYBRIDBASELB_H */
 
 /*@}*/

@@ -20,3 +20,5 @@ manyToMany.o: manyToMany.C manyToMany.decl.h
 test: all
 	$(call run, ./manyToMany +p4 1024 )
 
+testp: all
+	$(call run, ./manyToMany +p$(P) 1024 )

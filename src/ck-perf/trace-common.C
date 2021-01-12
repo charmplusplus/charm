@@ -6,6 +6,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <ctime>        // std::time_t, std::gmtime
+#include <chrono>       // std::chrono::system_clock
+
 #include "charm.h"
 #include "middle.h"
 #include "cklists.h"
@@ -15,6 +18,34 @@
 #include "trace-common.h"
 #include "allEvents.h"          //projector
 #include "register.h" // for _entryTable
+
+// To get username
+#if defined(_WIN32) || defined(_WIN64)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <Lmcons.h>
+#else
+#include <pwd.h>
+#endif
+
+// To get hostname
+#if defined(_WIN32) || defined(_WIN64)
+#  include <Winsock2.h>
+#else
+#  include <unistd.h>
+#  include <limits.h> // For HOST_NAME_MAX
+#endif
+
+#ifndef HOST_NAME_MAX
+// Apple seems to not adhere to POSIX and defines this non-standard variable
+// instead of HOST_NAME_MAX
+#  ifdef MAXHOSTNAMELEN
+#    define HOST_NAME_MAX MAXHOSTNAMELEN
+// Windows docs say 256 bytes (so 255 + 1 added at use) will always be sufficient
+#  else
+#    define HOST_NAME_MAX 255
+#  endif
+#endif
 
 CpvExtern(int, _traceCoreOn);   // projector
 
@@ -28,11 +59,6 @@ static int warned = 0;
 #define DEBUGF(x)          // CmiPrintf x
 
 CkpvDeclare(TraceArray*, _traces);		// lists of all trace modules
-
-/* trace for bluegene */
-class TraceBluegene;
-CkpvDeclare(TraceBluegene*, _tracebg);
-int traceBluegeneLinked=0;			// if trace-bluegene is linked
 
 CkpvDeclare(bool,   dumpData);
 CkpvDeclare(double, traceInitTime);
@@ -63,11 +89,7 @@ int _sdagMsg, _sdagChare, _sdagEP;
 CtvDeclare(int, curThreadEvent);
 CpvDeclare(int, curPeEvent);
 
-#if CMK_BIGSIM_CHARM
-double TraceTimerCommon(){return TRACE_TIMER();}
-#else
 double TraceTimerCommon(){return TRACE_TIMER() - CkpvAccess(traceInitTime);}
-#endif
 #if CMK_TRACE_ENABLED
 void CthSetEventInfo(CthThread t, int event, int srcPE);
 #endif
@@ -210,11 +232,7 @@ static void traceCommonInit(char **argv)
 
   
   
-#ifdef __BIGSIM__
-  if(BgNodeRank()==0) {
-#else
   if(CkMyRank()==0) {
-#endif
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0, TypeInvalid);
     CkRegisterChareInCharm(_threadChare);
@@ -237,6 +255,9 @@ static void traceCommonInit(char **argv)
   }
 }
 
+extern char** Cmi_argvcopy;
+extern const char* const CmiCommitID;
+
 /** Write out the common parts of the .sts file. */
 void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE \"%s\"\n",CMK_MACHINE_NAME);
@@ -247,7 +268,49 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
-#endif	
+#endif
+
+#if defined(_WIN32) || defined(_WIN64)
+  TCHAR username[UNLEN + 1];
+  DWORD size = UNLEN + 1;
+  if (GetUserName(username, &size))
+    fprintf(stsfp, "USERNAME \"%s\"\n", username);
+#else
+  const struct passwd* pw = getpwuid(getuid());
+  if (pw != nullptr)
+    fprintf(stsfp, "USERNAME \"%s\"\n", pw->pw_name);
+#endif
+
+  // Add 1 for null terminator
+  char hostname[HOST_NAME_MAX + 1];
+  if(gethostname(hostname, HOST_NAME_MAX + 1) == 0)
+    fprintf(stsfp, "HOSTNAME \"%s\"\n", hostname);
+
+  fprintf(stsfp, "COMMANDLINE \"");
+  int index = 0;
+  while (Cmi_argvcopy[index] != nullptr)
+  {
+    if (index > 0)
+      fprintf(stsfp, " ");
+    fprintf(stsfp, "%s", Cmi_argvcopy[index]);
+    index++;
+  }
+  fprintf(stsfp, "\"\n");
+
+  // write timestamp in ISO 8601 format
+  using std::chrono::system_clock;
+  const time_t now = system_clock::to_time_t(system_clock::now());
+  struct tm currentTime;
+#if defined(_WIN32) || defined(_WIN64)
+  gmtime_s(&currentTime, &now);
+#else
+  gmtime_r(&now, &currentTime);
+#endif
+  char timeBuffer[sizeof("YYYY-mm-ddTHH:MM:SSZ")];
+  strftime(timeBuffer, sizeof(timeBuffer), "%FT%TZ", &currentTime);
+  fprintf(stsfp, "TIMESTAMP %s\n", timeBuffer);
+
+  fprintf(stsfp, "CHARMVERSION %s\n", CmiCommitID);
   fprintf(stsfp, "TOTAL_CHARES %d\n", (int)_chareTable.size());
   fprintf(stsfp, "TOTAL_EPS %d\n", (int)_entryTable.size());
   fprintf(stsfp, "TOTAL_MSGS %d\n", (int)_msgTable.size());
@@ -400,11 +463,6 @@ static int checkTraceOnPe(char **argv)
 {
   int traceOnPE = 1;
   char *procs = NULL;
-#if CMK_BIGSIM_CHARM
-  // check bgconfig file for settings
-  traceOnPE=0;
-  if (BgTraceProjectionOn(CkMyPe())) traceOnPE = 1;
-#endif
   if (CmiGetArgStringDesc(argv, "+traceprocessors", &procs, "A list of processors to trace, e.g. 0,10,20-30"))
   {
     CkListString procList(procs);
@@ -453,7 +511,7 @@ static inline void _traceInit(char **argv)
   // check if trace is turned on/off for this pe
   CkpvAccess(traceOnPe) = checkTraceOnPe(argv);
 
-#if !CMK_CHARMPY
+#if !CMK_CHARM4PY
   // defined in moduleInit.C
   _createTraces(argv);
 #endif
@@ -531,10 +589,6 @@ void traceEndIdle()
 }
 
 // CMK_TRACE_ENABLED is already guarded in convcore.C
-// converse thread tracing is not supported in blue gene simulator
-// in BigSim, threads need to be traced manually (because virtual processors
-// themselves are implemented as threads and we don't want them to be traced
-// In BigSim, so far, only AMPI threads are traced.
 void traceResume(int eventID, int srcPE, CmiObjId *tid)
 {
     _TRACE_BEGIN_EXECUTE_DETAILED(eventID, ForChareMsg, _threadEP, srcPE, 0, NULL, tid);
@@ -780,18 +834,12 @@ void traceFlushLog(void)
 */
 void traceClose(void)
 {
-#if ! CMK_BIGSIM_CHARM
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceClose();
-#endif   
 }
 
 void traceCharmClose(void)
 {
-#if CMK_BIGSIM_CHARM
-  OPTIMIZE_WARNING
-  CkpvAccess(_traces)->traceClose();
-#endif
 }
 
 /* **CW** This is the API called from user code to support CCS operations 

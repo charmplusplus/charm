@@ -1,6 +1,9 @@
 CMK_CPP_C='icc -E '
-CMK_CC="icc -fpic "
-CMK_CXX="icpc -fpic "
+CMK_CC="icc"
+CMK_CXX="icpc"
+
+CMK_CC_FLAGS="-fpic"
+CMK_CXX_FLAGS="-fpic"
 
 CMK_LD="icc -shared-intel "
 CMK_LDXX="icpc -shared-intel "
@@ -14,7 +17,7 @@ CMK_CF90="ifort -auto -fPIC "
 #CMK_CF90_FIXED="$CMK_CF90 -132 -FI "
 #FOR 64 bit machine
 CMK_CF90_FIXED="$CMK_CF90 -164 -FI "
-F90DIR=`which ifort 2> /dev/null`
+F90DIR=`command -v ifort 2> /dev/null`
 if test -x "$F90DIR"
 then
   MYDIR="$PWD"

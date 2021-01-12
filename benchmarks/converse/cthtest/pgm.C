@@ -32,12 +32,15 @@ class threadStackChecker {
   }
 };
 
-double timeStart;
-int nThreadStart = 0, nThreadFinish = 0;
+struct cthTestData {
+  double timeStart;
+  int nThreadStart, nThreadFinish;
+};
+CpvStaticDeclare(struct cthTestData, data);
+
 void runThread(void* msg) {
   (void)msg;
-  char myId = 'A' + nThreadStart;
-  nThreadStart++;
+  char myId = 'A' + CpvAccess(data).nThreadStart++;
   threadStackChecker sc(myId);
   VERBOSE(printf("Created thread %c at %p\n", myId, &myId);)
 
@@ -57,11 +60,11 @@ void runThread(void* msg) {
     sc.advance(myId, iter);
   }
 
-  nThreadFinish++;
-  if (nThreadFinish == NSPAWN) {  // We're the last thread: leave
-    double timeElapsed = CmiWallTimer() - timeStart;
+  const int myFinish = ++(CpvAccess(data).nThreadFinish);
+  if (myFinish == NSPAWN) {  // We're the last thread: leave
+    double timeElapsed = CmiWallTimer() - CpvAccess(data).timeStart;
     printf(" %d threads ran successfully (%.3f us per context switch)\n",
-          nThreadFinish, 1.0e6 * timeElapsed / (NITER * NSPAWN));
+          myFinish, 1.0e6 * timeElapsed / (NITER * NSPAWN));
     CsdExitScheduler();
   }
 }
@@ -69,9 +72,12 @@ void runThread(void* msg) {
 void test_init(int argc, char** argv) {
   (void)argc;
   (void)argv;
+
+  CpvInitialize(struct cthTestData, data);
+
   /* skip communication thread */
   if (CmiMyRank() != CmiMyNodeSize()) {
-    timeStart = CmiWallTimer();
+    CpvAccess(data).timeStart = CmiWallTimer();
     CthThread yielder = CthCreate((CthVoidFn)runThread, 0, 160000);
     CthAwaken(yielder);
   }

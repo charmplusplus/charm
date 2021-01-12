@@ -427,8 +427,7 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
 #if CMK_MEM_CHECKPOINT
   DEBUGF("[%d] inmem_restore restore: mgr: %d \n", CmiMyPe(), m->locMgr);  
   // m->index.print();
-  PUP::fromMem p(m->packData);
-  p.becomeRestarting();
+  PUP::fromMem p(m->packData, PUP::er::IS_CHECKPOINT);
   CkLocMgr *mgr = CProxy_CkLocMgr(m->locMgr).ckLocalBranch();
   CmiAssert(mgr);
   CmiUInt8 id = mgr->lookupID(m->index);
@@ -1165,8 +1164,7 @@ void CkMemCheckPT::gotReply(){
 
 void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,std::vector<CkGroupID> * gmap, std::vector<CkArrayIndex> * imap){
 #if CMK_CHKP_ALL
-	PUP::fromMem p(msg->packData);
-	p.becomeRestarting();
+	PUP::fromMem p(msg->packData, PUP::er::IS_CHECKPOINT);
 	int numElements = 0;
 	p|numElements;
 	if(p.isUnpacking()){
@@ -1401,8 +1399,7 @@ static void recoverProcDataHandler(char *msg)
    CpvAccess(chkpPointer) = CpvAccess(chkpNum)%2;
    CpvAccess(_curRestartPhase) = procMsg->cur_restart_phase;
    DEBUGF("[%d] ----- recoverProcDataHandler  cur_restart_phase:%d at time: %f\n", CkMyPe(), CpvAccess(_curRestartPhase), CkWallTimer());
-   PUP::fromMem p(procMsg->packData);
-   p.becomeRestarting();
+   PUP::fromMem p(procMsg->packData, PUP::er::IS_CHECKPOINT);
    _handleProcData(p);
 
    CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->resetLB(CkMyPe());
@@ -1464,6 +1461,7 @@ static void reportChkpSeqHandler(char * m)
 {
   CmiFree(m);
   CmiResetGlobalReduceSeqID();
+  CmiResetGlobalNodeReduceSeqID();
   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
   int num = CpvAccess(chkpNum);
   if(CkMyNode() == CpvAccess(_crashedNode))

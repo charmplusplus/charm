@@ -18,5 +18,5 @@ mainmodule hello {
     entry void start(int testNo);
     entry void recvMarshal(int n,char data[n]);
     entry void recvMessage(myMsg *m);
-  }; 
+  };
 };

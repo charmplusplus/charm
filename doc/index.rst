@@ -3,11 +3,10 @@ Charm++ Documentation
 =====================
 
 
-- Charm++ Tutorial: http://charmplusplus.org/tutorial/
+- Charm++ Tutorial: https://charmplusplus.org/tutorial/
 - Charm++ Development: https://github.com/UIUC-PPL/charm
-- Nightly regression tests: http://charm.cs.illinois.edu/autobuild/cur/
-- Charm++ mailing list: charm@cs.illinois.edu
-- Charm++ discourse group: https://charm.discourse.group
+- Nightly regression tests: https://charm.cs.illinois.edu/autobuild/cur/
+- Charm++ discussion: https://github.com/UIUC-PPL/charm/discussions
 
 
 .. toctree::
@@ -33,14 +32,6 @@ Charm++ Documentation
    netfem/manual
    mblock/manual
    pose/manual
-
-.. toctree::
-   :maxdepth: 1
-   :caption: BigSim (Blue Gene) Simulator
-   :numbered:
-
-   bigsim/manual
-   bignetsim/manual
 
 .. toctree::
    :maxdepth: 1

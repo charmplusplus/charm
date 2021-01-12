@@ -76,6 +76,7 @@ CpvStaticDeclare(int, num_tests_to_skip);
 CpvStaticDeclare(int, next_test_index);
 CpvStaticDeclare(int, shutdown_handler);
 CpvDeclare(int, ack_handler);
+CpvDeclare(char, oversubscribed);
 
 void commbench_shutdown(void* msg) {
   CmiFree(msg);
@@ -131,6 +132,7 @@ void commbench_init(int argc, char** argv) {
   int numtests, i;
   CpvInitialize(int, shutdown_handler);
   CpvInitialize(int, ack_handler);
+  CpvInitialize(char, oversubscribed);
   CpvAccess(shutdown_handler) =
     CmiRegisterHandler((CmiHandler)commbench_shutdown);
   CpvAccess(ack_handler) = CmiRegisterHandler((CmiHandler)commbench_ack);
@@ -149,6 +151,8 @@ void commbench_init(int argc, char** argv) {
 
   // Wait for all PEs of the node to complete topology init
   CmiNodeAllBarrier();
+
+  CpvAccess(oversubscribed) = CmiNumPhysicalNodes() == 1 && CmiNumPes() > CmiNumCores();
 
   // Update the argc after runtime parameters are extracted out
   argc = CmiGetArgc(argv);

@@ -1,4 +1,4 @@
-# Copyright © 2009-2018 Inria.  All rights reserved.
+# Copyright © 2009-2020 Inria.  All rights reserved.
 # Copyright © 2009-2012 Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 # Copyright © 2011-2012 Oracle and/or its affiliates.  All rights reserved.
@@ -21,9 +21,9 @@ endif
 
 pluginsdir = @HWLOC_PLUGINS_DIR@
 plugins_LTLIBRARIES =
-plugins_ldflags = -module -avoid-version -lltdl
+plugins_ldflags = -module -avoid-version $(HWLOC_DL_LIBS) $(HWLOC_LTDL_LIBS)
 # Beware that files are not rebuilt automatically when reconfiguring with different paths in these flags.
-AM_CPPFLAGS += -DHWLOC_PLUGINS_PATH=\"$(HWLOC_PLUGINS_PATH)\" -DRUNSTATEDIR=\"$(HWLOC_runstatedir)\"
+AM_CPPFLAGS += -DHWLOC_PLUGINS_PATH="\"$(HWLOC_PLUGINS_PATH)\"" -DRUNSTATEDIR="\"$(HWLOC_runstatedir)\""
 
 # Sources and ldflags
 
@@ -31,6 +31,7 @@ sources = \
         topology.c \
         traversal.c \
         distances.c \
+        memattrs.c \
         components.c \
         bind.c \
         bitmap.c \
@@ -101,6 +102,17 @@ hwloc_nvml_la_CFLAGS = $(AM_CFLAGS) $(HWLOC_NVML_CFLAGS) -DHWLOC_INSIDE_PLUGIN
 hwloc_nvml_la_LDFLAGS = $(plugins_ldflags) $(HWLOC_NVML_LIBS)
 endif
 endif HWLOC_HAVE_NVML
+
+if HWLOC_HAVE_RSMI
+if HWLOC_RSMI_BUILD_STATIC
+sources += topology-rsmi.c
+else
+plugins_LTLIBRARIES += hwloc_rsmi.la
+hwloc_rsmi_la_SOURCES = topology-rsmi.c
+hwloc_rsmi_la_CFLAGS = $(AM_CFLAGS) $(HWLOC_RSMI_CFLAGS) -DHWLOC_INSIDE_PLUGIN
+hwloc_rsmi_la_LDFLAGS = $(plugins_ldflags) $(HWLOC_RSMI_LIBS)
+endif
+endif HWLOC_HAVE_RSMI
 
 if HWLOC_HAVE_GL
 if HWLOC_GL_BUILD_STATIC
@@ -199,12 +211,10 @@ endif HWLOC_HAVE_WINDOWS
 # Installable library
 
 libhwloc_la_SOURCES = $(sources)
-libhwloc_la_LDFLAGS = $(ldflags) -version-info $(libhwloc_so_version) $(HWLOC_LIBS) $(HWLOC_LDFLAGS)
+libhwloc_la_LDFLAGS = $(ldflags) -version-info $(libhwloc_so_version) $(HWLOC_LIBS) $(HWLOC_DL_LIBS) $(HWLOC_LTDL_LIBS) $(HWLOC_LDFLAGS)
 
 if HWLOC_HAVE_PLUGINS
-AM_CPPFLAGS += $(LTDLINCL)
 libhwloc_la_LDFLAGS += -export-dynamic
-libhwloc_la_LIBADD = $(LIBLTDL)
 endif
 
 # Embedded library (note the lack of a .so version number -- that

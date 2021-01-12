@@ -1,4 +1,4 @@
-# Copyright © 2009-2019 Inria.  All rights reserved.
+# Copyright © 2009-2020 Inria.  All rights reserved.
 # Copyright © 2009      Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 # See COPYING in top-level directory.
@@ -22,7 +22,7 @@ if HWLOC_BUILD_STANDALONE
 if BUILD_NETLOC
 SUBDIRS += netloc
 endif
-SUBDIRS += utils tests contrib/systemd contrib/misc contrib/hwloc-ps.www
+SUBDIRS += utils tests contrib/systemd contrib/completion contrib/misc contrib/hwloc-ps.www
 # We need doc/ if HWLOC_BUILD_DOXYGEN, or during make install if HWLOC_INSTALL_DOXYGEN.
 # There's no INSTALL_SUBDIRS, so always enter doc/ and check HWLOC_BUILD/INSTALL_DOXYGEN there
 SUBDIRS += doc
@@ -56,22 +56,26 @@ endif HWLOC_BUILD_STANDALONE
 # Only install the valgrind suppressions file if we're building in
 # standalone mode
 if HWLOC_BUILD_STANDALONE
-bashcompdir = $(sysconfdir)/bash_completion.d
-dist_bashcomp_DATA = contrib/completion/hwloc-completion.bash
 dist_pkgdata_DATA = contrib/hwloc-valgrind.supp
-dist_doc_DATA = contrib/misc/dynamic_SVG_example.html
-endif
-
-# Only install entire visual studio subdirectory if we're building in
-# standalone mode
-if HWLOC_BUILD_STANDALONE
-EXTRA_DIST += contrib/windows
 endif
 
 if HWLOC_BUILD_STANDALONE
 dist-hook:
 	sh "$(top_srcdir)/config/distscript.sh" "$(top_srcdir)" "$(distdir)" "$(HWLOC_VERSION)"
-endif HWLOC_BUILD_STANDALONE
+else !HWLOC_BUILD_STANDALONE
+# Create directories needed by embedders' autogen (directories ignored by embedded dist)
+dist-hook:
+	@MKDIR_P@	\
+		$(distdir)/doc \
+		$(distdir)/netloc \
+		$(distdir)/utils \
+		$(distdir)/tests \
+		$(distdir)/contrib/completion \
+		$(distdir)/contrib/hwloc-ps.www \
+		$(distdir)/contrib/misc \
+		$(distdir)/contrib/systemd \
+		$(distdir)/contrib/windows
+endif !HWLOC_BUILD_STANDALONE
 
 if HWLOC_BUILD_STANDALONE
 if HWLOC_HAVE_WINDOWS

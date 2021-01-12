@@ -24,19 +24,24 @@ DIRS = \
   jacobi3d-sdag \
   zerocopy \
   within_node_bcast \
-
-# skip sdag, megatest and commtest
-BGDIRS = \
-  simplearrayhello \
-  load_balancing \
-  chkpt \
-  delegation \
+  longIdle \
+  bombard \
+  varTRAM \
 
 FTDIRS = \
   jacobi3d \
   jacobi3d-sdag \
 
 TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
+
+NONSCALEDIRS = \
+  alignment \
+  queue \
+  sdag \
+  sparse \
+  charmxi_parsing \
+
+TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 
 all: $(foreach i,$(DIRS),build-$i)
 
@@ -47,9 +52,9 @@ ifneq ($(CMK_MULTICORE),1)
 endif
 endif
 
-smptest: $(foreach i,$(TESTDIRS),smptest-$i)
+testp: $(foreach i,$(TESTPDIRS),testp-$i)
 
-bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
+smptest: $(foreach i,$(TESTDIRS),smptest-$i)
 
 syncfttest mpisyncfttest: $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
 
@@ -63,11 +68,11 @@ $(foreach i,$(DIRS),build-$i):
 $(foreach i,$(DIRS),test-$i):
 	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
+$(foreach i,$(TESTPDIRS),testp-$i):
+	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
 $(foreach i,$(DIRS),smptest-$i):
 	$(MAKE) -C $(subst smptest-,,$@) smptest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
-
-$(foreach i,$(DIRS),bgtest-$i):
-	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

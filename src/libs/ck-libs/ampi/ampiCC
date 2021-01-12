@@ -1,6 +1,13 @@
 #!/bin/bash
-AMPICC="$0"
-CHARMBIN=`dirname $0`
+
+# Filter extra cmake arguments
+# This has no effect when building Charm++ without cmake
+if [[ "$1" = "@CMAKE_C_COMPILER@" ]]; then shift; fi
+if [[ "$1" = "@CMAKE_CXX_COMPILER@" ]]; then shift; fi
+if [[ "$1" = "@CMAKE_Fortran_COMPILER@" ]]; then shift; fi
+
+[ -z "$AMPICC" ] && AMPICC="$(basename $0)"
+CHARMBIN=$(dirname $0)
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
 . "$CHARMINC/conv-mach-opt.sh"
@@ -8,10 +15,9 @@ CHARMINC="$CHARMBIN/../include"
 [ -z "$AMPICC_MODE" ] && AMPICC_MODE='ampi'
 VERBOSE=''
 STANDALONE=''
-ROMIO_CONFIGURE=''
-MPITEST=''
-FSGLOBALS=''
-PIPGLOBALS=''
+GLOBALS=''
+GLOBALS_SHARED=''
+GLOBALS_FUNCPTR=''
 EXPLICIT_COMPILATION=''
 BUILD_SHARE=''
 PASSTHROUGH_COMPILER_OPTIONS=''
@@ -19,13 +25,48 @@ PASSTHROUGH_COMPILER_OPTIONS=''
 ARGS=''
 OBJECT=''
 
+# protect rpath arguments from disappearing due to variable expansion
+ORIGIN='\$ORIGIN'
+
 processArgs() {
 while [ ! $# -eq 0 ]
 do
   arg="$1"
   case "$arg" in
-  -show)
-     echo "charmc"
+  -showme:command|--showme:command)
+     shift
+     echo "$CHARMBIN/$AMPICC" $ARGS "$@"
+     exit 0
+     ;;
+  -showme:compile|--showme:compile)
+     exit 0
+     ;;
+  -showme:link|--showme:link)
+     exit 0
+     ;;
+  -showme:incdirs|--showme:incdirs)
+     exit 0
+     ;;
+  -showme:libdirs|--showme:libdirs)
+     exit 0
+     ;;
+  -showme:libs|--showme:libs)
+     exit 0
+     ;;
+  -showme:version|--showme:version)
+     echo "AMPI ($AMPICC)"
+     exit 0
+     ;;
+  -showme:help|--showme:help)
+     echo "AMPI ($AMPICC)"
+     exit 0
+     ;;
+  -showme:*|--showme:*)
+     exit 1
+     ;;
+  -show*|--show*)
+     shift
+     echo "$CHARMBIN/$AMPICC" $ARGS "$@"
      exit 0
      ;;
   -v|--version|-print-search-dirs)
@@ -39,22 +80,14 @@ do
      STANDALONE='true'
      ;;
 
-  # These arguments manage compilation of ROMIO's configure tests.
-  # Simple environment tests will be compiled as standalone binaries,
-  # while MPI tests will be compiled with AMPI.
-  -ampi-romio-configure) # Strictly for internal use.
-     ROMIO_CONFIGURE='true'
-     ;;
-  mpitest*) # mpitest.c, mpitest1.c, mpitest.f, etc
-     ARGS="$ARGS \"$arg\""
-     MPITEST='true'
-     ;;
-
   -fsglobals)
-     FSGLOBALS='true'
+     GLOBALS='fs'
+     GLOBALS_SHARED='1'
      ;;
   -pipglobals)
-     PIPGLOBALS='true'
+     GLOBALS='pip'
+     GLOBALS_SHARED='1'
+     GLOBALS_FUNCPTR='1'
      ;;
 
   -c)
@@ -77,7 +110,7 @@ do
 done
 }
 
-eval processArgs "$@"
+eval processArgs "$AMPI_BUILD_FLAGS" "$@"
 
 # If there are no filename arguments specified, just pass through
 # compiler options to charmc. Helps with configure scripts that
@@ -94,16 +127,14 @@ Do() {
   eval "$@"
 }
 
-if [ -n "$FSGLOBALS" ]
+if [ "$GLOBALS" = 'fs' ]
 then
   if [ "$CMK_SUPPORTS_FSGLOBALS" != '1' ]
   then
     echo "Error: Prerequisites for -fsglobals support were not detected."
     exit 1
   fi
-fi
-
-if [ -n "$PIPGLOBALS" ]
+elif [ "$GLOBALS" = 'pip' ]
 then
   if [ "$CMK_SUPPORTS_PIPGLOBALS" != '1' ]
   then
@@ -114,33 +145,60 @@ fi
 
 AMPICC_POST_OPTS=''
 
-[ -n "$ROMIO_CONFIGURE" -a -z "$MPITEST" ] && STANDALONE='true'
-
 [ -n "$STANDALONE" ] && ARGS="$ARGS -standalone"
 
-[ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" -a -z "$ROMIO_CONFIGURE" ] && ROMIO='-lampiromio -pthread'
-
-FUNCPTR_SHIM_SUFFIX='.user'
-
-if [ -n "$FSGLOBALS" -o -n "$PIPGLOBALS" ]
+if [ -z "$STANDALONE" ]
 then
+  [ "$CMK_AMPI_WITH_ROMIO" = '1' ] && ROMIO='-pthread'
+
+  [ "$CMK_SUPPORTS_MEMORY_ISOMALLOC" = '1' ] && ARGS="-memory isomalloc $ARGS"
+  ARGS="-module CommonLBs $ARGS"
+fi
+
+ARGS+=" -language $AMPICC_MODE"
+
+if [ -n "$GLOBALS" ]
+then
+  USER_SUFFIX="$CMK_USER_SUFFIX.$CMK_SHARED_SUF"
+  if [ -n "$GLOBALS_SHARED" ]
+  then
+    SHARED_OPTS='-shared'
+    [ "$CMK_MACOSX" != '1' ] && SHIM_OPTS='-fPIE' || SHIM_OPTS=''
+    SHIM_MAIN_OBJS=''
+  else
+    SHARED_OPTS=''
+    SHIM_OPTS='-fPIE'
+    SHIM_MAIN_OBJS="\"$CHARMLIB/ampi_funcptr_shim_main.o\""
+  fi
+
+  if [ -n "$GLOBALS_FUNCPTR" -o "$CMK_WINDOWS" = '1' ]
+  then
+    SHIM_OPTS="$SHIM_OPTS -standalone -DAMPI_USE_FUNCPTR"
+    SHIM_OBJS="\"$CHARMLIB/ampi_funcptr_shim.o\" $SHIM_MAIN_OBJS"
+    [ "$AMPICC_MODE" = 'ampif' ] && SHIM_OBJS="$SHIM_OBJS \"$CHARMLIB/ampi_funcptr_shim_fortran.o\" \"$CHARMLIB/ampifimpl.o\" \"$CHARMLIB/ampimod.o\""
+    LOADER_OBJS="\"$CHARMLIB/ampi_funcptr_loader.o\" $ROMIO"
+    ROMIO=''
+  else
+    SHIM_OBJS=''
+    LOADER_OBJS="\"$CHARMLIB/ampi_funcptr_loader_stub.o\""
+    [ "$AMPICC_MODE" = 'ampif' ] && LOADER_OBJS="$LOADER_OBJS \"$CHARMLIB/ampif.o\" \"$CHARMLIB/ampifimpl.o\" \"$CHARMLIB/ampimod.o\""
+  fi
+  [ "$AMPICC_MODE" = 'ampif' ] && SHIM_OBJS="$SHIM_OBJS \"$CHARMLIB/ampi_funcptr_shim_fmpimain.o\""
+
   if [ -z "$EXPLICIT_COMPILATION" -a -z "$BUILD_SHARE" -a -z "$STANDALONE" ] # if linking an AMPI executable
   then
-    # link the user program against the shim
-    [ -z "$OBJECT" ] && USEROBJECT="a.out$FUNCPTR_SHIM_SUFFIX" || USEROBJECT="$OBJECT$FUNCPTR_SHIM_SUFFIX"
-    SHIM_OBJS="\"$CHARMLIB/ampi_funcptr_shim.o\""
-    [ "$AMPICC_MODE" = 'ampif' ] && SHIM_OBJS="$SHIM_OBJS \"$CHARMLIB/ampi_funcptr_fortran.o\" \"$CHARMLIB/ampifimpl.o\" \"$CHARMLIB/ampimod.o\""
-    Do $CHARMBIN/charmc $ARGS $AMPICC_POST_OPTS $SHIM_OBJS -standalone -ampi-funcptr-shim -o "$USEROBJECT"
+    # link the user program as its own file
+    [ -z "$OBJECT" ] && USEROBJECT="a.out$USER_SUFFIX" || USEROBJECT="${OBJECT%$CMK_POST_EXE}$USER_SUFFIX"
+    SHIM_OPTS="$SHIM_OPTS -standalone -Wl,-undefined,dynamic_lookup"
+    Do $CHARMBIN/charmc $ARGS $AMPICC_POST_OPTS $SHIM_OPTS $SHIM_OBJS $SHARED_OPTS -o "$USEROBJECT"
+    status=$?
+    [ $status -ne 0 ] && exit $status
 
     # set up linking the loader against the runtime
-    AMPICC_POST_OPTS="$AMPICC_POST_OPTS -clear-input \"$CHARMLIB/ampi_funcptr_loader.o\""
-    if [ -n "$FSGLOBALS" ]
-    then
-      AMPICC_POST_OPTS="$AMPICC_POST_OPTS \"$CHARMLIB/ampi_funcptr_fsglobals.o\""
-    elif [ -n "$PIPGLOBALS" ]
-    then
-      AMPICC_POST_OPTS="$AMPICC_POST_OPTS \"$CHARMLIB/ampi_funcptr_pipglobals.o\""
+    AMPICC_POST_OPTS="$AMPICC_POST_OPTS -clear-input $LOADER_OBJS \"$CHARMLIB/ampi_globals_$GLOBALS.o\""
 
+    if [ "$GLOBALS" = 'pip' ]
+    then
       # look for PiP-glibc
       [ -z "$PIP_GLIBC_INSTALL_DIR" ] && PIP_GLIBC_INSTALL_DIR='/opt/pip'
       pipldquery="$PIP_GLIBC_INSTALL_DIR/lib/ld-*.so"
@@ -155,7 +213,8 @@ then
       fi
     fi
   else
-    AMPICC_POST_OPTS="$AMPICC_POST_OPTS -ampi-funcptr-shim"
+    AMPICC_POST_OPTS="$AMPICC_POST_OPTS $SHIM_OPTS"
+    [ -z "$BUILD_SHARE" ] && AMPICC_POST_OPTS="$AMPICC_POST_OPTS $SHARED_OPTS"
   fi
 fi
 
@@ -164,7 +223,7 @@ then
   AMPICC_POST_OPTS="$AMPICC_POST_OPTS -o \"$OBJECT\""
 fi
 
-Do $CHARMBIN/charmc -language $AMPICC_MODE -default-to-aout $ARGS $AMPICC_POST_OPTS $ROMIO
+Do $CHARMBIN/charmc -default-to-aout $ARGS $AMPICC_POST_OPTS $ROMIO
 status=$?
 
 # Copy ampirun, but do not overwrite it if it already exists.

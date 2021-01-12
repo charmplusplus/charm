@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013-2019 Inria.  All rights reserved.
+ * Copyright © 2013-2020 Inria.  All rights reserved.
  * Copyright © 2016 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
  */
@@ -17,7 +17,11 @@ struct hwloc_backend;
 
 #ifdef HWLOC_INSIDE_PLUGIN
 /* needed for hwloc_plugin_check_namespace() */
+#ifdef HWLOC_HAVE_LTDL
 #include <ltdl.h>
+#else
+#include <dlfcn.h>
+#endif
 #endif
 
 
@@ -309,7 +313,13 @@ struct hwloc_component {
  * @{
  */
 
+/** \brief Check whether insertion errors are hidden */
+HWLOC_DECLSPEC int hwloc_hide_errors(void);
+
 /** \brief Add an object to the topology.
+ *
+ * Insert new object \p obj in the topology starting under existing object \p root
+ * (if \c NULL, the topology root object is used).
  *
  * It is sorted along the tree of other objects according to the inclusion of
  * cpusets, to eventually be added as a child of the smallest object including
@@ -323,32 +333,20 @@ struct hwloc_component {
  *
  * This shall only be called before levels are built.
  *
- * In case of error, hwloc_report_os_error() is called.
- *
  * The caller should check whether the object type is filtered-out before calling this function.
  *
  * The topology cpuset/nodesets will be enlarged to include the object sets.
+ *
+ * \p reason is a unique string identifying where and why this insertion call was performed
+ * (it will be displayed in case of internal insertion error).
  *
  * Returns the object on success.
  * Returns NULL and frees obj on error.
  * Returns another object and frees obj if it was merged with an identical pre-existing object.
  */
-HWLOC_DECLSPEC struct hwloc_obj *hwloc_insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t obj);
-
-/** \brief Type of error callbacks during object insertion */
-typedef void (*hwloc_report_error_t)(const char * msg, int line);
-/** \brief Report an insertion error from a backend */
-HWLOC_DECLSPEC void hwloc_report_os_error(const char * msg, int line);
-/** \brief Check whether insertion errors are hidden */
-HWLOC_DECLSPEC int hwloc_hide_errors(void);
-
-/** \brief Add an object to the topology and specify which error callback to use.
- *
- * This function is similar to hwloc_insert_object_by_cpuset() but it allows specifying
- * where to start insertion from (if \p root is NULL, the topology root object is used),
- * and specifying the error callback.
- */
-HWLOC_DECLSPEC struct hwloc_obj *hwloc__insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t root, hwloc_obj_t obj, hwloc_report_error_t report_error);
+HWLOC_DECLSPEC hwloc_obj_t
+hwloc__insert_object_by_cpuset(struct hwloc_topology *topology, hwloc_obj_t root,
+                               hwloc_obj_t obj, const char *reason);
 
 /** \brief Insert an object somewhere in the topology.
  *
@@ -418,14 +416,22 @@ static __hwloc_inline int
 hwloc_plugin_check_namespace(const char *pluginname __hwloc_attribute_unused, const char *symbol __hwloc_attribute_unused)
 {
 #ifdef HWLOC_INSIDE_PLUGIN
-  lt_dlhandle handle;
   void *sym;
-  handle = lt_dlopen(NULL);
+#ifdef HWLOC_HAVE_LTDL
+  lt_dlhandle handle = lt_dlopen(NULL);
+#else
+  void *handle = dlopen(NULL, RTLD_NOW|RTLD_LOCAL);
+#endif
   if (!handle)
     /* cannot check, assume things will work */
     return 0;
+#ifdef HWLOC_HAVE_LTDL
   sym = lt_dlsym(handle, symbol);
   lt_dlclose(handle);
+#else
+  sym = dlsym(handle, symbol);
+  dlclose(handle);
+#endif
   if (!sym) {
     static int verboseenv_checked = 0;
     static int verboseenv_value = 0;

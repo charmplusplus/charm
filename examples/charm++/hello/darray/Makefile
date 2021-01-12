@@ -20,5 +20,5 @@ hello.o: hello.C hello.decl.h
 test: all
 	$(call run, ./hello +p2 10 )
 
-bgtest: all
-	$(call run, ./hello +p2 10 +x2 +y2 +z1 )
+testp: all
+	$(call run, ./hello +p$(P) $$(( $(P) * 10 )) )

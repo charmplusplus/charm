@@ -80,11 +80,6 @@ and is set as the default.
     Use CUDA callback based scheme for Charm++ callback support. Default scheme
     is based on CUDA events.
 
-  HAPI_MEMPOOL
-    Allocate a pool of page-locked memory in advance to draw allocations from.
-    Can be useful when page-locked memory are frequently allocated/freed during
-    program execution.
-
   HAPI_TRACE
     Time for invocation and completion of GPU events (e.g. memory allocation,
     data transfer, kernel execution) are recorded.

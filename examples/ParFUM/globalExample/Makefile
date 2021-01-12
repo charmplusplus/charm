@@ -12,8 +12,5 @@ pgm.o: pgm.C
 test: pgm
 	$(call run, ./glbEx +vp4 +p2)
 
-bgtest: pgm
-	$(call run, ./glbEx +vp4 +p2 +x2 +y2 +z1)
-
 clean:
 	rm -rf pgm glbEx fpgm *.o *sts *log *projrc *sum charmrun NetFEM Paraview* ParaView* *~

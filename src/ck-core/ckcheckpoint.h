@@ -52,8 +52,11 @@ void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
 //void CkTestArrayElements();
 
-void CkStartCheckpoint(const char* dirname,const CkCallback& cb, bool requestStatus = false);
-void CkRestartMain(const char* dirname, CkArgMsg *args);
+// If writersPerNode <= 0 the number of writers is unchanged, if > 0, then set to
+// min(writersPerNode, CkMyNodeSize())
+void CkStartCheckpoint(const char* dirname, const CkCallback& cb,
+                       bool requestStatus = false, int writersPerNode = 0);
+void CkRestartMain(const char* dirname, CkArgMsg* args);
 #if CMK_SHRINK_EXPAND
 void CkResumeRestartMain(char *msg);
 #endif
@@ -64,7 +67,7 @@ int  CkCountArrayElements();
 #if CMK_SHRINK_EXPAND
 enum realloc_state : uint8_t { NO_REALLOC=0, REALLOC_MSG_RECEIVED=1, REALLOC_IN_PROGRESS=2 };
 extern realloc_state pending_realloc_state;
-extern CkGroupID _lbdb;
+extern CkGroupID _lbmgr;
 #endif
 
 // some useful flags (for disk checkpointing)

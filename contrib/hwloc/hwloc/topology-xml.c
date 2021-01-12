@@ -1,7 +1,7 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2019 Inria.  All rights reserved.
- * Copyright © 2009-2011 Université Bordeaux
+ * Copyright © 2009-2020 Inria.  All rights reserved.
+ * Copyright © 2009-2011, 2020 Université Bordeaux
  * Copyright © 2009-2018 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
  */
@@ -107,7 +107,8 @@ hwloc__xml_import_object_attr(struct hwloc_topology *topology,
 			      struct hwloc_xml_backend_data_s *data,
 			      struct hwloc_obj *obj,
 			      const char *name, const char *value,
-			      hwloc__xml_import_state_t state)
+			      hwloc__xml_import_state_t state,
+			      int *ignore)
 {
   if (!strcmp(name, "type")) {
     /* already handled */
@@ -252,11 +253,20 @@ hwloc__xml_import_object_attr(struct hwloc_topology *topology,
     case HWLOC_OBJ_PCI_DEVICE:
     case HWLOC_OBJ_BRIDGE: {
       unsigned domain, bus, dev, func;
-      if (sscanf(value, "%04x:%02x:%02x.%01x",
+      if (sscanf(value, "%x:%02x:%02x.%01x",
 		 &domain, &bus, &dev, &func) != 4) {
 	if (hwloc__xml_verbose())
 	  fprintf(stderr, "%s: ignoring invalid pci_busid format string %s\n",
 		  state->global->msgprefix, value);
+	*ignore = 1;
+#ifndef HWLOC_HAVE_32BITS_PCI_DOMAIN
+      } else if (domain > 0xffff) {
+	static int warned = 0;
+	if (!warned && !hwloc_hide_errors())
+	  fprintf(stderr, "Ignoring PCI device with non-16bit domain.\nPass --enable-32bits-pci-domain to configure to support such devices\n(warning: it would break the library ABI, don't enable unless really needed).\n");
+	warned = 1;
+	*ignore = 1;
+#endif
       } else {
 	obj->attr->pcidev.domain = domain;
 	obj->attr->pcidev.bus = bus;
@@ -278,7 +288,7 @@ hwloc__xml_import_object_attr(struct hwloc_topology *topology,
     case HWLOC_OBJ_PCI_DEVICE:
     case HWLOC_OBJ_BRIDGE: {
       unsigned classid, vendor, device, subvendor, subdevice, revision;
-      if (sscanf(value, "%04x [%04x:%04x] [%04x:%04x] %02x",
+      if (sscanf(value, "%x [%04x:%04x] [%04x:%04x] %02x",
 		 &classid, &vendor, &device, &subvendor, &subdevice, &revision) != 6) {
 	if (hwloc__xml_verbose())
 	  fprintf(stderr, "%s: ignoring invalid pci_type format string %s\n",
@@ -342,11 +352,20 @@ hwloc__xml_import_object_attr(struct hwloc_topology *topology,
     switch (obj->type) {
     case HWLOC_OBJ_BRIDGE: {
       unsigned domain, secbus, subbus;
-      if (sscanf(value, "%04x:[%02x-%02x]",
+      if (sscanf(value, "%x:[%02x-%02x]",
 		 &domain, &secbus, &subbus) != 3) {
 	if (hwloc__xml_verbose())
 	  fprintf(stderr, "%s: ignoring invalid bridge_pci format string %s\n",
 		  state->global->msgprefix, value);
+	*ignore = 1;
+#ifndef HWLOC_HAVE_32BITS_PCI_DOMAIN
+      } else if (domain > 0xffff) {
+	static int warned = 0;
+	if (!warned && !hwloc_hide_errors())
+	  fprintf(stderr, "Ignoring bridge to PCI with non-16bit domain.\nPass --enable-32bits-pci-domain to configure to support such devices\n(warning: it would break the library ABI, don't enable unless really needed).\n");
+	warned = 1;
+	*ignore = 1;
+#endif
       } else {
 	obj->attr->bridge.downstream.pci.domain = domain;
 	obj->attr->bridge.downstream.pci.secondary_bus = secbus;
@@ -426,6 +445,7 @@ hwloc__xml_import_object_attr(struct hwloc_topology *topology,
 	    memory->page_types = malloc(sizeof(*memory->page_types));
 	    memory->page_types_len = 1;
 	  }
+	  assert(memory->page_types);
 	  memory->page_types[0].size = lvalue << 10;
 	} else if (hwloc__xml_verbose()) {
 	  fprintf(stderr, "%s: ignoring huge_page_size_kB attribute for non-NUMAnode non-root object\n",
@@ -440,6 +460,7 @@ hwloc__xml_import_object_attr(struct hwloc_topology *topology,
 	    memory->page_types = malloc(sizeof(*memory->page_types));
 	    memory->page_types_len = 1;
 	  }
+	  assert(memory->page_types);
 	  memory->page_types[0].count = lvalue;
 	} else if (hwloc__xml_verbose()) {
 	  fprintf(stderr, "%s: ignoring huge_page_free attribute for non-NUMAnode non-root object\n",
@@ -673,14 +694,15 @@ hwloc__xml_import_userdata(hwloc_topology_t topology __hwloc_attribute_unused, h
   }
 
   if (!topology->userdata_import_cb) {
-    char *buffer;
+    const char *buffer;
     size_t reallength = encoded ? BASE64_ENCODED_LENGTH(length) : length;
     ret = state->global->get_content(state, &buffer, reallength);
     if (ret < 0)
       return -1;
 
   } else if (topology->userdata_not_decoded) {
-      char *buffer, *fakename;
+      const char *buffer;
+      char *fakename;
       size_t reallength = encoded ? BASE64_ENCODED_LENGTH(length) : length;
       ret = state->global->get_content(state, &buffer, reallength);
       if (ret < 0)
@@ -693,7 +715,7 @@ hwloc__xml_import_userdata(hwloc_topology_t topology __hwloc_attribute_unused, h
       free(fakename);
 
   } else if (encoded && length) {
-      char *encoded_buffer;
+      const char *encoded_buffer;
       size_t encoded_length = BASE64_ENCODED_LENGTH(length);
       ret = state->global->get_content(state, &encoded_buffer, encoded_length);
       if (ret < 0)
@@ -713,7 +735,7 @@ hwloc__xml_import_userdata(hwloc_topology_t topology __hwloc_attribute_unused, h
       }
 
   } else { /* always handle length==0 in the non-encoded case */
-      char *buffer = (char *) "";
+      const char *buffer = "";
       if (length) {
 	ret = state->global->get_content(state, &buffer, length);
 	if (ret < 0)
@@ -835,7 +857,7 @@ hwloc__xml_import_object(hwloc_topology_t topology,
 		  state->global->msgprefix,  attrname);
 	goto error_with_object;
       }
-      hwloc__xml_import_object_attr(topology, data, obj, attrname, attrvalue, state);
+      hwloc__xml_import_object_attr(topology, data, obj, attrname, attrvalue, state, &ignored);
     }
   }
 
@@ -1140,15 +1162,23 @@ hwloc__xml_import_object(hwloc_topology_t topology,
       ret = -1;
     }
 
-    if (ret < 0)
-      goto error;
+    if (ret < 0) {
+      if (parent && !ignored)
+        goto error;
+      else
+        goto error_with_object;
+    }
 
     state->global->close_child(&childstate);
 
     tag = NULL;
     ret = state->global->find_child(state, &childstate, &tag);
-    if (ret < 0)
-      goto error;
+    if (ret < 0) {
+      if (parent && !ignored)
+        goto error;
+      else
+        goto error_with_object;
+    }
     if (!ret)
       break;
   }
@@ -1207,6 +1237,79 @@ hwloc__xml_import_object(hwloc_topology_t topology,
     hwloc_free_unlinked_object(obj);
  error:
   return -1;
+}
+
+static int
+hwloc__xml_v2import_support(hwloc_topology_t topology,
+                            hwloc__xml_import_state_t state)
+{
+  char *name = NULL;
+  int value = 1; /* value is optional */
+  while (1) {
+    char *attrname, *attrvalue;
+    if (state->global->next_attr(state, &attrname, &attrvalue) < 0)
+      break;
+    if (!strcmp(attrname, "name"))
+      name = attrvalue;
+    else if (!strcmp(attrname, "value"))
+      value = atoi(attrvalue);
+    else {
+      if (hwloc__xml_verbose())
+	fprintf(stderr, "%s: ignoring unknown support attribute %s\n",
+		state->global->msgprefix, attrname);
+    }
+  }
+
+  if (name && topology->flags & HWLOC_TOPOLOGY_FLAG_IMPORT_SUPPORT) {
+#ifdef HWLOC_DEBUG
+    HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_support) == 4*sizeof(void*));
+    HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_discovery_support) == 5);
+    HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_cpubind_support) == 11);
+    HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_membind_support) == 15);
+    HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_misc_support) == 1);
+#endif
+
+#define DO(_cat,_name) if (!strcmp(#_cat "." #_name, name)) topology->support._cat->_name = value
+    DO(discovery,pu);
+    else DO(discovery,numa);
+    else DO(discovery,numa_memory);
+    else DO(discovery,disallowed_pu);
+    else DO(discovery,disallowed_numa);
+    else DO(cpubind,set_thisproc_cpubind);
+    else DO(cpubind,get_thisproc_cpubind);
+    else DO(cpubind,set_proc_cpubind);
+    else DO(cpubind,get_proc_cpubind);
+    else DO(cpubind,set_thisthread_cpubind);
+    else DO(cpubind,get_thisthread_cpubind);
+    else DO(cpubind,set_thread_cpubind);
+    else DO(cpubind,get_thread_cpubind);
+    else DO(cpubind,get_thisproc_last_cpu_location);
+    else DO(cpubind,get_proc_last_cpu_location);
+    else DO(cpubind,get_thisthread_last_cpu_location);
+    else DO(membind,set_thisproc_membind);
+    else DO(membind,get_thisproc_membind);
+    else DO(membind,set_proc_membind);
+    else DO(membind,get_proc_membind);
+    else DO(membind,set_thisthread_membind);
+    else DO(membind,get_thisthread_membind);
+    else DO(membind,set_area_membind);
+    else DO(membind,get_area_membind);
+    else DO(membind,alloc_membind);
+    else DO(membind,firsttouch_membind);
+    else DO(membind,bind_membind);
+    else DO(membind,interleave_membind);
+    else DO(membind,nexttouch_membind);
+    else DO(membind,migrate_membind);
+    else DO(membind,get_area_memlocation);
+
+    else if (!strcmp("custom.exported_support", name))
+      /* support was exported in a custom/fake field, mark it as imported here */
+      topology->support.misc->imported_support = 1;
+
+#undef DO
+  }
+
+  return 0;
 }
 
 static int
@@ -1288,7 +1391,8 @@ hwloc__xml_v2import_distances(hwloc_topology_t topology,
   nr_u64values = 0;
   while (1) {
     struct hwloc__xml_import_state_s childstate;
-    char *attrname, *attrvalue, *tag, *buffer;
+    char *attrname, *attrvalue, *tag;
+    const char *buffer;
     int length;
     int is_index = 0;
     int is_u64values = 0;
@@ -1327,7 +1431,7 @@ hwloc__xml_v2import_distances(hwloc_topology_t topology,
 
     if (is_index) {
       /* get indexes */
-      char *tmp, *tmp2;
+      const char *tmp, *tmp2;
       if (nr_indexes >= nbobjs) {
 	if (hwloc__xml_verbose())
 	  fprintf(stderr, "%s: %s with more than %u indexes\n",
@@ -1369,7 +1473,7 @@ hwloc__xml_v2import_distances(hwloc_topology_t topology,
 
     } else if (is_u64values) {
       /* get uint64_t values */
-      char *tmp;
+      const char *tmp;
       if (nr_u64values >= nbobjs*nbobjs) {
 	if (hwloc__xml_verbose())
 	  fprintf(stderr, "%s: %s with more than %u u64values\n",
@@ -1463,6 +1567,186 @@ hwloc__xml_v2import_distances(hwloc_topology_t topology,
 }
 
 static int
+hwloc__xml_import_memattr_value(hwloc_topology_t topology,
+                                hwloc_memattr_id_t id,
+                                unsigned long flags,
+                                hwloc__xml_import_state_t state)
+{
+  char *target_obj_gp_index_s = NULL;
+  char *target_obj_type_s = NULL;
+  hwloc_uint64_t target_obj_gp_index;
+  char *value_s = NULL;
+  hwloc_uint64_t value;
+  char *initiator_cpuset_s = NULL;
+  char *initiator_obj_gp_index_s = NULL;
+  char *initiator_obj_type_s = NULL;
+  hwloc_obj_type_t target_obj_type = HWLOC_OBJ_TYPE_NONE;
+
+  while (1) {
+    char *attrname, *attrvalue;
+    if (state->global->next_attr(state, &attrname, &attrvalue) < 0)
+      break;
+    if (!strcmp(attrname, "target_obj_gp_index"))
+      target_obj_gp_index_s = attrvalue;
+    else if (!strcmp(attrname, "target_obj_type"))
+      target_obj_type_s = attrvalue;
+    else if (!strcmp(attrname, "value"))
+      value_s = attrvalue;
+    else if (!strcmp(attrname, "initiator_cpuset"))
+      initiator_cpuset_s = attrvalue;
+    else if (!strcmp(attrname, "initiator_obj_gp_index"))
+      initiator_obj_gp_index_s = attrvalue;
+    else if (!strcmp(attrname, "initiator_obj_type"))
+      initiator_obj_type_s = attrvalue;
+    else {
+      if (hwloc__xml_verbose())
+        fprintf(stderr, "%s: ignoring unknown memattr_value attribute %s\n",
+                state->global->msgprefix, attrname);
+      return -1;
+    }
+  }
+
+  if (!target_obj_type_s) {
+    if (hwloc__xml_verbose())
+      fprintf(stderr, "%s: ignoring memattr_value without target_obj_type.\n",
+              state->global->msgprefix);
+    return -1;
+  }
+  if (hwloc_type_sscanf(target_obj_type_s, &target_obj_type, NULL, 0) < 0) {
+    if (hwloc__xml_verbose())
+      fprintf(stderr, "%s: failed to identify memattr_value target object type %s\n",
+              state->global->msgprefix, target_obj_type_s);
+    return -1;
+  }
+
+  if (!value_s || !target_obj_gp_index_s) {
+    if (hwloc__xml_verbose())
+      fprintf(stderr, "%s: ignoring memattr_value without value and target_obj_gp_index\n",
+              state->global->msgprefix);
+    return -1;
+  }
+  target_obj_gp_index = strtoull(target_obj_gp_index_s, NULL, 10);
+  value = strtoull(value_s, NULL, 10);
+
+  if (flags & HWLOC_MEMATTR_FLAG_NEED_INITIATOR) {
+    /* add a value with initiator */
+    struct hwloc_internal_location_s loc;
+    if (!initiator_cpuset_s && (!initiator_obj_gp_index_s || !initiator_obj_type_s)) {
+      if (hwloc__xml_verbose())
+        fprintf(stderr, "%s: ignoring memattr_value without initiator attributes\n",
+                state->global->msgprefix);
+      return -1;
+    }
+
+    /* setup the initiator */
+    if (initiator_cpuset_s) {
+      loc.type = HWLOC_LOCATION_TYPE_CPUSET;
+      loc.location.cpuset = hwloc_bitmap_alloc();
+      if (!loc.location.cpuset) {
+        if (hwloc__xml_verbose())
+          fprintf(stderr, "%s: failed to allocated memattr_value initiator cpuset\n",
+                  state->global->msgprefix);
+        return -1;
+      }
+      hwloc_bitmap_sscanf(loc.location.cpuset, initiator_cpuset_s);
+    } else {
+      loc.type = HWLOC_LOCATION_TYPE_OBJECT;
+      loc.location.object.gp_index = strtoull(initiator_obj_gp_index_s, NULL, 10);
+      if (hwloc_type_sscanf(initiator_obj_type_s, &loc.location.object.type, NULL, 0) < 0) {
+        if (hwloc__xml_verbose())
+          fprintf(stderr, "%s: failed to identify memattr_value initiator object type %s\n",
+                  state->global->msgprefix, initiator_obj_type_s);
+        return -1;
+      }
+    }
+
+    hwloc_internal_memattr_set_value(topology, id, target_obj_type, target_obj_gp_index, (unsigned)-1, &loc, value);
+
+    if (loc.type == HWLOC_LOCATION_TYPE_CPUSET)
+      hwloc_bitmap_free(loc.location.cpuset);
+
+  } else {
+    /* add a value without initiator */
+    hwloc_internal_memattr_set_value(topology, id, target_obj_type, target_obj_gp_index, (unsigned)-1, NULL, value);
+  }
+
+  return 0;
+}
+
+static int
+hwloc__xml_import_memattr(hwloc_topology_t topology,
+                          hwloc__xml_import_state_t state)
+{
+  char *name = NULL;
+  unsigned long flags = (unsigned long) -1;
+  hwloc_memattr_id_t id = (hwloc_memattr_id_t) -1;
+  int ret;
+
+  while (1) {
+    char *attrname, *attrvalue;
+    if (state->global->next_attr(state, &attrname, &attrvalue) < 0)
+      break;
+    if (!strcmp(attrname, "name"))
+      name = attrvalue;
+    else if (!strcmp(attrname, "flags"))
+      flags = strtoul(attrvalue, NULL, 10);
+    else {
+      if (hwloc__xml_verbose())
+        fprintf(stderr, "%s: ignoring unknown memattr attribute %s\n",
+                state->global->msgprefix, attrname);
+      return -1;
+    }
+  }
+
+  if (name && flags != (unsigned long) -1) {
+    hwloc_memattr_id_t _id;
+
+    ret = hwloc_memattr_get_by_name(topology, name, &_id);
+    if (ret < 0) {
+      /* register a new attribute */
+      ret = hwloc_memattr_register(topology, name, flags, &_id);
+      if (!ret)
+        id = _id;
+    } else {
+      /* check the flags of the existing attribute  */
+      unsigned long mflags;
+      ret = hwloc_memattr_get_flags(topology, _id, &mflags);
+      if (!ret && mflags == flags)
+        id = _id;
+    }
+    /* if there's no matching attribute, id is -1 and values will be ignored below */
+  }
+
+  while (1) {
+    struct hwloc__xml_import_state_s childstate;
+    char *tag;
+
+    ret = state->global->find_child(state, &childstate, &tag);
+    if (ret <= 0)
+      break;
+
+    if (!strcmp(tag, "memattr_value")) {
+      ret = hwloc__xml_import_memattr_value(topology, id, flags, &childstate);
+    } else {
+      if (hwloc__xml_verbose())
+        fprintf(stderr, "%s: memattr with unrecognized child %s\n",
+                state->global->msgprefix, tag);
+      ret = -1;
+    }
+
+    if (ret < 0)
+      goto error;
+
+    state->global->close_child(&childstate);
+  }
+
+  return state->global->close_tag(state);
+
+ error:
+  return -1;
+}
+
+static int
 hwloc__xml_import_diff_one(hwloc__xml_import_state_t state,
 			   hwloc_topology_diff_t *firstdiffp,
 			   hwloc_topology_diff_t *lastdiffp)
@@ -1548,7 +1832,7 @@ hwloc__xml_import_diff_one(hwloc__xml_import_state_t state,
       memset(&diff->obj_attr.diff, 0, sizeof(diff->obj_attr.diff));
       diff->obj_attr.diff.generic.type = obj_attr_type;
 
-      switch (atoi(obj_attr_type_s)) {
+      switch (obj_attr_type) {
       case HWLOC_TOPOLOGY_DIFF_OBJ_ATTR_SIZE:
 	diff->obj_attr.diff.uint64.oldvalue = strtoull(obj_attr_oldvalue_s, NULL, 0);
 	diff->obj_attr.diff.uint64.newvalue = strtoull(obj_attr_newvalue_s, NULL, 0);
@@ -1730,9 +2014,17 @@ hwloc_look_xml(struct hwloc_backend *backend, struct hwloc_disc_status *dstatus)
 	ret = hwloc__xml_v2import_distances(topology, &childstate, 1);
 	if (ret < 0)
 	  goto failed;
+      } else if (!strcmp(tag, "support")) {
+	ret = hwloc__xml_v2import_support(topology, &childstate);
+	if (ret < 0)
+	  goto failed;
+      } else if (!strcmp(tag, "memattr")) {
+        ret = hwloc__xml_import_memattr(topology, &childstate);
+        if (ret < 0)
+          goto failed;
       } else {
 	if (hwloc__xml_verbose())
-	  fprintf(stderr, "%s: ignoring unknown tag `%s' after root object, expected `distances2'\n",
+	  fprintf(stderr, "%s: ignoring unknown tag `%s' after root object.\n",
 		  data->msgprefix, tag);
 	goto done;
       }
@@ -1778,6 +2070,8 @@ done:
       if (nbobjs == data->nbnumanodes) {
 	hwloc_obj_t *objs = malloc(nbobjs*sizeof(hwloc_obj_t));
 	uint64_t *values = malloc(nbobjs*nbobjs*sizeof(*values));
+        assert(data->nbnumanodes > 0); /* v1dist->nbobjs is >0 after import */
+        assert(data->first_numanode);
 	if (objs && values) {
 	  hwloc_obj_t node;
 	  unsigned i;
@@ -1833,12 +2127,14 @@ done:
   /* keep the "Backend" information intact */
   /* we could add "BackendSource=XML" to notify that XML was used between the actual backend and here */
 
-  topology->support.discovery->pu = 1;
-  topology->support.discovery->disallowed_pu = 1;
-  if (data->nbnumanodes) {
-    topology->support.discovery->numa = 1;
-    topology->support.discovery->numa_memory = 1; // FIXME
-    topology->support.discovery->disallowed_numa = 1;
+  if (!(topology->flags & HWLOC_TOPOLOGY_FLAG_IMPORT_SUPPORT)) {
+    topology->support.discovery->pu = 1;
+    topology->support.discovery->disallowed_pu = 1;
+    if (data->nbnumanodes) {
+      topology->support.discovery->numa = 1;
+      topology->support.discovery->numa_memory = 1; // FIXME
+      topology->support.discovery->disallowed_numa = 1;
+    }
   }
 
   if (data->look_done)
@@ -2051,13 +2347,17 @@ hwloc__xml_export_object_contents (hwloc__xml_export_state_t state, hwloc_topolo
 	state->new_prop(state, "online_cpuset", setstring);
       free(setstring);
 
-      if (v1export || !obj->parent) {
+      if (v1export) {
 	hwloc_bitmap_t allowed_cpuset = hwloc_bitmap_dup(obj->cpuset);
 	hwloc_bitmap_and(allowed_cpuset, allowed_cpuset, topology->allowed_cpuset);
 	hwloc_bitmap_asprintf(&setstring, allowed_cpuset);
 	state->new_prop(state, "allowed_cpuset", setstring);
 	free(setstring);
 	hwloc_bitmap_free(allowed_cpuset);
+      } else if (!obj->parent) {
+	hwloc_bitmap_asprintf(&setstring, topology->allowed_cpuset);
+	state->new_prop(state, "allowed_cpuset", setstring);
+	free(setstring);
       }
     }
 
@@ -2072,13 +2372,17 @@ hwloc__xml_export_object_contents (hwloc__xml_export_state_t state, hwloc_topolo
     state->new_prop(state, "complete_nodeset", setstring);
     free(setstring);
 
-    if (v1export || !obj->parent) {
+    if (v1export) {
       hwloc_bitmap_t allowed_nodeset = hwloc_bitmap_dup(obj->nodeset);
       hwloc_bitmap_and(allowed_nodeset, allowed_nodeset, topology->allowed_nodeset);
       hwloc_bitmap_asprintf(&setstring, allowed_nodeset);
       state->new_prop(state, "allowed_nodeset", setstring);
       free(setstring);
       hwloc_bitmap_free(allowed_nodeset);
+    } else if (!obj->parent) {
+      hwloc_bitmap_asprintf(&setstring, topology->allowed_nodeset);
+      state->new_prop(state, "allowed_nodeset", setstring);
+      free(setstring);
     }
   }
 
@@ -2581,9 +2885,162 @@ hwloc__xml_v2export_distances(hwloc__xml_export_state_t parentstate, hwloc_topol
       hwloc___xml_v2export_distances(parentstate, dist);
 }
 
+static void
+hwloc__xml_v2export_support(hwloc__xml_export_state_t parentstate, hwloc_topology_t topology)
+{
+  struct hwloc__xml_export_state_s state;
+  char tmp[11];
+
+#ifdef HWLOC_DEBUG
+  HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_support) == 4*sizeof(void*));
+  HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_discovery_support) == 5);
+  HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_cpubind_support) == 11);
+  HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_membind_support) == 15);
+  HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_misc_support) == 1);
+#endif
+
+#define DO(_cat,_name) do {                                     \
+    if (topology->support._cat->_name) {                        \
+      parentstate->new_child(parentstate, &state, "support");   \
+      state.new_prop(&state, "name", #_cat "." #_name);         \
+      if (topology->support._cat->_name != 1) {                 \
+        sprintf(tmp, "%u", topology->support._cat->_name); \
+        state.new_prop(&state, "value", tmp);                   \
+      }                                                         \
+      state.end_object(&state, "support");                      \
+    }                                                           \
+  } while (0)
+
+  DO(discovery,pu);
+  DO(discovery,numa);
+  DO(discovery,numa_memory);
+  DO(discovery,disallowed_pu);
+  DO(discovery,disallowed_numa);
+  DO(cpubind,set_thisproc_cpubind);
+  DO(cpubind,get_thisproc_cpubind);
+  DO(cpubind,set_proc_cpubind);
+  DO(cpubind,get_proc_cpubind);
+  DO(cpubind,set_thisthread_cpubind);
+  DO(cpubind,get_thisthread_cpubind);
+  DO(cpubind,set_thread_cpubind);
+  DO(cpubind,get_thread_cpubind);
+  DO(cpubind,get_thisproc_last_cpu_location);
+  DO(cpubind,get_proc_last_cpu_location);
+  DO(cpubind,get_thisthread_last_cpu_location);
+  DO(membind,set_thisproc_membind);
+  DO(membind,get_thisproc_membind);
+  DO(membind,set_proc_membind);
+  DO(membind,get_proc_membind);
+  DO(membind,set_thisthread_membind);
+  DO(membind,get_thisthread_membind);
+  DO(membind,set_area_membind);
+  DO(membind,get_area_membind);
+  DO(membind,alloc_membind);
+  DO(membind,firsttouch_membind);
+  DO(membind,bind_membind);
+  DO(membind,interleave_membind);
+  DO(membind,nexttouch_membind);
+  DO(membind,migrate_membind);
+  DO(membind,get_area_memlocation);
+
+  /* misc.imported_support would be meaningless in the remote importer,
+   * but the importer needs to know whether we exported support or not
+   * (in case there are no support bit set at all),
+   * use a custom/fake field to do so.
+   */
+  parentstate->new_child(parentstate, &state, "support");
+  state.new_prop(&state, "name", "custom.exported_support");
+  state.end_object(&state, "support");
+
+#undef DO
+}
+
+static void
+hwloc__xml_export_memattr_target(hwloc__xml_export_state_t state,
+                                 struct hwloc_internal_memattr_s *imattr,
+                                 struct hwloc_internal_memattr_target_s *imtg)
+{
+  struct hwloc__xml_export_state_s vstate;
+  char tmp[255];
+
+  if (imattr->flags & HWLOC_MEMATTR_FLAG_NEED_INITIATOR) {
+    /* export all initiators */
+    unsigned k;
+    for(k=0; k<imtg->nr_initiators; k++) {
+      struct hwloc_internal_memattr_initiator_s *imi = &imtg->initiators[k];
+      state->new_child(state, &vstate, "memattr_value");
+      vstate.new_prop(&vstate, "target_obj_type", hwloc_obj_type_string(imtg->type));
+      snprintf(tmp, sizeof(tmp), "%llu", (unsigned long long) imtg->gp_index);
+      vstate.new_prop(&vstate, "target_obj_gp_index", tmp);
+      snprintf(tmp, sizeof(tmp), "%llu", (unsigned long long) imi->value);
+      vstate.new_prop(&vstate, "value", tmp);
+      switch (imi->initiator.type) {
+      case HWLOC_LOCATION_TYPE_OBJECT:
+        snprintf(tmp, sizeof(tmp), "%llu", (unsigned long long) imi->initiator.location.object.gp_index);
+        vstate.new_prop(&vstate, "initiator_obj_gp_index", tmp);
+        vstate.new_prop(&vstate, "initiator_obj_type", hwloc_obj_type_string(imi->initiator.location.object.type));
+        break;
+      case HWLOC_LOCATION_TYPE_CPUSET: {
+        char *setstring;
+        hwloc_bitmap_asprintf(&setstring, imi->initiator.location.cpuset);
+        if (setstring)
+          vstate.new_prop(&vstate, "initiator_cpuset", setstring);
+        free(setstring);
+        break;
+      }
+      default:
+        assert(0);
+      }
+      vstate.end_object(&vstate, "memattr_value");
+    }
+  } else {
+    /* just export the global value */
+    state->new_child(state, &vstate, "memattr_value");
+    vstate.new_prop(&vstate, "target_obj_type", hwloc_obj_type_string(imtg->type));
+    snprintf(tmp, sizeof(tmp), "%llu", (unsigned long long) imtg->gp_index);
+    vstate.new_prop(&vstate, "target_obj_gp_index", tmp);
+    snprintf(tmp, sizeof(tmp), "%llu", (unsigned long long) imtg->noinitiator_value);
+    vstate.new_prop(&vstate, "value", tmp);
+    vstate.end_object(&vstate, "memattr_value");
+  }
+}
+
+static void
+hwloc__xml_export_memattrs(hwloc__xml_export_state_t state, hwloc_topology_t topology)
+{
+  unsigned id;
+  for(id=0; id<topology->nr_memattrs; id++) {
+    struct hwloc_internal_memattr_s *imattr;
+    struct hwloc__xml_export_state_s mstate;
+    char tmp[255];
+    unsigned j;
+
+    if (id == HWLOC_MEMATTR_ID_CAPACITY || id == HWLOC_MEMATTR_ID_LOCALITY)
+      /* no need to export virtual memattrs */
+      continue;
+
+    imattr = &topology->memattrs[id];
+    if ((id == HWLOC_MEMATTR_ID_LATENCY || id == HWLOC_MEMATTR_ID_BANDWIDTH)
+        && !imattr->nr_targets)
+      /* no need to export target-less attributes for initial attributes, no release support attributes without those definitions */
+      continue;
+
+    state->new_child(state, &mstate, "memattr");
+    mstate.new_prop(&mstate, "name", imattr->name);
+    snprintf(tmp, sizeof(tmp), "%lu", imattr->flags);
+    mstate.new_prop(&mstate, "flags", tmp);
+
+    for(j=0; j<imattr->nr_targets; j++)
+      hwloc__xml_export_memattr_target(&mstate, imattr, &imattr->targets[j]);
+
+    mstate.end_object(&mstate, "memattr");
+  }
+}
+
 void
 hwloc__xml_export_topology(hwloc__xml_export_state_t state, hwloc_topology_t topology, unsigned long flags)
 {
+  char *env;
   hwloc_obj_t root = hwloc_get_root_obj(topology);
 
   if (flags & HWLOC_TOPOLOGY_EXPORT_XML_FLAG_V1) {
@@ -2626,6 +3083,10 @@ hwloc__xml_export_topology(hwloc__xml_export_state_t state, hwloc_topology_t top
   } else {
     hwloc__xml_v2export_object (state, topology, root, flags);
     hwloc__xml_v2export_distances (state, topology);
+    env = getenv("HWLOC_XML_EXPORT_SUPPORT");
+    if (!env || atoi(env))
+      hwloc__xml_v2export_support(state, topology);
+    hwloc__xml_export_memattrs(state, topology);
   }
 }
 
@@ -2921,6 +3382,7 @@ hwloc_export_obj_userdata(void *reserved,
     int encoded;
     size_t encoded_length;
     const char *realname;
+    assert(name);
     if (!strncmp(name, "base64", 6)) {
       encoded = 1;
       encoded_length = BASE64_ENCODED_LENGTH(length);
