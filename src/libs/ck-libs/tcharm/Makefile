@@ -2,7 +2,7 @@ include ../common.mk
 
 HEADERS=$(CDIR)/include/tcharm_impl.h $(CDIR)/include/tcharm.h \
         $(CDIR)/include/tcharmc.h $(CDIR)/include/tcharmf.h \
-        $(CDIR)/include/tcharm.decl.h
+        $(CDIR)/include/tcharm.decl.h ../liveViz/liveViz.h
 OBJS=tcharm.o
 COMPAT=compat_uns.o compat_us.o compat_funs.o compat_fus.o compat_regmm.o
 CHARMXI=$(CDIR)/tmp/charmxi

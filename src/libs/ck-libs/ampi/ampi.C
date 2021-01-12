@@ -11499,6 +11499,19 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
   return MPI_SUCCESS;
 }
 
+CLINKAGE
+int AMPI_Init_live_viz(int wOffset, int hOffset, int w, int h, unsigned char* buf)
+{
+  AMPI_API("AMPI_Init_live_viz");
+#if AMPI_WITH_LIVE_VIZ
+  // Set up the size of the window, the part of the window that this element will contribute,
+  // and the persistent buffer that the AMPI user will continuously update.
+  CkAssert(buf != NULL);
+  getAmpiParent()->liveVizSetup(wOffset, hOffset, w, h, buf);
+#endif
+  return MPI_SUCCESS;
+}
+
 #if CMK_FAULT_EVAC
 CLINKAGE
 int AMPI_Evacuate(void)

@@ -236,6 +236,12 @@ void TCharm::pup(PUP::er &p) {
   p(isStopped); p(exitWhenDone); p(isSelfDone); p(asyncMigrate);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
+
+#if AMPI_WITH_LIVE_VIZ
+  p|lvWidthOffset; p|lvHeightOffset; p|lvWidth; p|lvHeight;
+  p((char *)&lvBuffer, sizeof(unsigned char*)); // Assumes Isomalloc or no migration
+#endif
+
   p | resumeAfterMigrationCallback;
 
   if (sema.size()>0){
@@ -357,6 +363,14 @@ TCharm::~TCharm()
   CthFree(tid);
   delete initMsg;
 }
+
+#if AMPI_WITH_LIVE_VIZ
+// Called periodically by liveViz to get the next frame from all chare array elements.
+// The AMPI user is reponsible for continuously updating 'lvBuffer'.
+void TCharm::liveVizRequestNextFrame(liveVizRequestMsg *msg) noexcept {
+  liveVizDeposit(msg, lvWidthOffset, lvHeightOffset, lvWidth, lvHeight, lvBuffer, this);
+}
+#endif
 
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
 	if (destPE==CkMyPe()) return this;
@@ -681,7 +695,16 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
   }
   opts.setStaticInsertion(true);
   opts.setSectionAutoDelegate(false);
+#if AMPI_WITH_LIVE_VIZ
+  CProxy_TCharm tcharmProxy = CProxy_TCharm::ckNew(msg,opts);
+  // Initialize liveViz here, since the the chare array isn't exposed to AMPI users
+  CkCallback liveVizCB(CkIndex_TCharm::liveVizRequestNextFrame(NULL), tcharmProxy);
+  liveVizConfig cfg(liveVizConfig::pix_color, true);
+  liveVizInit(cfg, tcharmProxy, liveVizCB, opts);
+  return tcharmProxy;
+#else
   return CProxy_TCharm::ckNew(msg,opts);
+#endif
 }
 
 // Helper used when creating a new array bound to the TCHARM threads:

@@ -2131,6 +2131,13 @@ class ampiParent final : public CBase_ampiParent {
   ADIO_GlobalStruct romio_globals;
 #endif
 
+#if AMPI_WITH_LIVE_VIZ
+ public:
+  void liveVizSetup(int wOffset, int hOffset, int w, int h, unsigned char* buf) noexcept {
+    thread->liveVizSetup(wOffset, hOffset, w, h, buf);
+  }
+#endif
+
  public:
   void prepareCtv() noexcept;
   TCharm* getThread() noexcept { return thread; }

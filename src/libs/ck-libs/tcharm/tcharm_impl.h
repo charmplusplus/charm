@@ -19,6 +19,10 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 
 #include "cmitls.h"
 
+#if AMPI_WITH_LIVE_VIZ
+#include "liveViz.h"
+#endif
+
 #if 0
      /*Many debugging statements:*/
 #    define DBG(x) ckout<<"["<<thisIndex<<","<<CkMyPe()<<"] TCHARM> "<<x<<endl;
@@ -210,6 +214,15 @@ class TCharm: public CBase_TCharm
 
 #if CMK_FAULT_EVAC
 	CMI_WARN_UNUSED_RESULT TCharm * evacuate() noexcept;
+#endif
+
+#if AMPI_WITH_LIVE_VIZ
+  void liveVizRequestNextFrame(liveVizRequestMsg *msg) noexcept;
+  void liveVizSetup(int wOffset, int hOffset, int w, int h, unsigned char* buf) noexcept {
+    lvWidthOffset = wOffset, lvHeightOffset = hOffset; lvWidth = w; lvHeight = h; lvBuffer = buf;
+  }
+  int lvWidthOffset, lvHeightOffset, lvWidth, lvHeight;
+  unsigned char* lvBuffer;
 #endif
 
 	//Thread finished running
