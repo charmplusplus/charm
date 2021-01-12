@@ -159,7 +159,7 @@ int CcsIsRemoteRequest(void)
 void CcsCallerId(skt_ip_t *pip, unsigned int *pport)
 {
   *pip = CpvAccess(ccsReq)->attr.ip;
-  *pport = ChMessageInt(CpvAccess(ccsReq)->attr.port);
+  *pport = skt_get_port(pip);
 }
 
 extern int rep_fw_handler_idx;

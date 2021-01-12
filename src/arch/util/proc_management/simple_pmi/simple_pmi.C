@@ -1274,14 +1274,14 @@ static int PMIi_InitIfSingleton(void)
 static int accept_one_connection(int list_sock)
 {
     int gotit, new_sock;
-    struct sockaddr_in from;
+    struct sockaddr from;
     socklen_t len;
 
     len = sizeof(from);
     gotit = 0;
     while ( ! gotit )
     {
-	new_sock = accept(list_sock, (struct sockaddr *)&from, &len);
+	new_sock = accept(list_sock, &from, &len);
 	if (new_sock == -1)
 	{
 	    if (errno == EINTR)    /* interrupted? If so, try again */

@@ -31,7 +31,6 @@ extern "C" {
 /*Security attributes for a CCS request*/
 typedef struct {
   skt_ip_t ip;/*Source machine (or firewall)*/
-  ChMessageInt_t port;
   ChMessageInt_t replySalt;/*Salt value for reply hash*/
   unsigned char auth;/*1-- message authenticated; 0-- no authentication*/
   unsigned char level;/*Security level-- 0 to 255*/

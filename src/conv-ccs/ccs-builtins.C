@@ -34,7 +34,6 @@ void ccs_getinfo(char *msg);
 
 typedef struct killPortStruct{
   skt_ip_t ip;
-  unsigned int port;
   struct killPortStruct *next;
 } killPortStruct;
 /*Only 1 kill list per node-- no Cpv needed*/
@@ -47,9 +46,9 @@ static void ccs_killport(char *msg)
   skt_ip_t ip;
   unsigned int connPort;
   CcsCallerId(&ip,&connPort);
+  skt_set_port(&ip, port);
   killList=(killPortStruct *)malloc(sizeof(killPortStruct));
   killList->ip=ip;
-  killList->port=port;
   killList->next=oldList;
   CmiFree(msg);
 }
@@ -60,7 +59,7 @@ void CcsImpl_kill(void)
   skt_set_abort(noMoreErrors);
   while (killList!=NULL)
   {
-    SOCKET fd=skt_connect(killList->ip,killList->port,20);
+    SOCKET fd=skt_connect(&killList->ip,20);
     if (fd!=INVALID_SOCKET) {
       skt_sendN(fd,"die\n",strlen("die\n")+1);
       skt_close(fd);

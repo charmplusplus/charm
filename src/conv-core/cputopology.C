@@ -221,7 +221,8 @@ static void cpuTopoHandler(void *m)
     _procInfo *proc = msg->procs+i;
 
 /*   for debug
-  skt_print_ip(str, msg->ip);
+  char str[128];
+  skt_print_ip(str, sizeof(str), &msg->ip);
   printf("hostname: %d %s\n", msg->pe, str);
 */
     skt_ip_t & ip = proc->ip;

@@ -446,7 +446,7 @@ static void cpuAffinityHandler(void *m)
 
 /*   for debug
   char str[128];
-  skt_print_ip(str, msg->ip);
+  skt_print_ip(str, sizeof(str), &msg->ip);
   printf("hostname: %d %s\n", msg->pe, str);
 */
   CmiAssert(CmiMyPe()==0 && rankmsg != NULL);

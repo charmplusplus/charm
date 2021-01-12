@@ -2304,8 +2304,8 @@ int main()
         struct ifaddrs *interface;
         for( interface=interfaces; interface; interface=interface->ifa_next ) {
             if( (interface->ifa_flags & IFF_UP) && ! (interface->ifa_flags & IFF_LOOPBACK) ) {
-                const struct sockaddr_in *addr = (const struct sockaddr_in*)interface->ifa_addr;
-                if( addr && addr->sin_family==AF_INET ) {
+                const struct sockaddr *addr = (const struct sockaddr *)interface->ifa_addr;
+                if( addr && addr->sa_family == AF_INET ) {
                     break;
                 }
             }

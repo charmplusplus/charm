@@ -35,7 +35,11 @@ typedef int socklen_t;
 /*Just print out error message and exit*/
 static int default_skt_abort(SOCKET skt, int code, const char *msg)
 {
-  fprintf(stderr,"Fatal socket error: code %d-- %s\n",code,msg);
+  char buf[256];
+  const int err = errno;
+  buf[0] = '\0';
+  strerror_r(err, buf, sizeof(buf));
+  fprintf(stderr,"Fatal socket error: code %d -- %s -- %s\n", code, msg, buf);
   exit(1);
   return -1;
 }
@@ -232,7 +236,27 @@ int skt_select1(SOCKET fd,int msec)
 #endif
 
 /******* DNS *********/
-skt_ip_t _skt_invalid_ip={{0}};
+skt_ip_t _skt_invalid_ip = {0};
+
+void skt_assign_addr(skt_ip_t *addr, const struct sockaddr *sock)
+{
+  if (sock->sa_family == AF_INET6)
+    addr->in6 = *(const struct sockaddr_in6 *)sock;
+  else if (sock->sa_family == AF_INET)
+    addr->in = *(const struct sockaddr_in *)sock;
+  else
+    addr->a = *sock;
+}
+
+size_t skt_get_size(const skt_ip_t *addr)
+{
+  if (addr->a.sa_family == AF_INET6)
+    return sizeof(addr->in6);
+  else if (addr->a.sa_family == AF_INET)
+    return sizeof(addr->in);
+  else
+    return sizeof(skt_ip_t);
+}
 
 skt_ip_t skt_my_ip(void)
 {
@@ -247,60 +271,41 @@ skt_ip_t skt_my_ip(void)
         struct ifaddrs *iface;
         for( iface=ifaces; iface; iface=iface->ifa_next ) {
             if( (iface->ifa_flags & IFF_UP) && ! (iface->ifa_flags & IFF_LOOPBACK) ) {
-                const struct sockaddr_in *addr = (const struct sockaddr_in*)iface->ifa_addr;
-                if( addr && addr->sin_family==AF_INET ) {
+                const struct sockaddr *addr = (const struct sockaddr*)iface->ifa_addr;
+                if( addr && (addr->sa_family == AF_INET || addr->sa_family == AF_INET6) ) {
                     ifcount ++;
-                    if ( ifcount==1 ) memcpy(&ip, &addr->sin_addr, sizeof(ip));
+                    if ( ifcount==1 )
+                        skt_assign_addr(&ip, addr);
                 }
             }
         }
         freeifaddrs(ifaces);
   }
-  /* fprintf(stderr, "My IP is %d.%d.%d.%d\n", ip.data[0],ip.data[1],ip.data[2],ip.data[3]); */
   if (ifcount==1) return ip;
 #endif
-  
+
   if (gethostname(hostname, 999)==0) {
       skt_ip_t ip2 = skt_lookup_ip(hostname);
-      if ( ip2.data[0] != 127 ) return ip2;
+      if ( !skt_is_loopback(&ip2) ) return ip2;
       else if ( ifcount != 0 ) return ip;
   }
 
   return _skt_invalid_ip;
 }
 
-static int skt_parse_dotted(const char *str,skt_ip_t *ret)
-{
-  int i,v;
-  *ret=_skt_invalid_ip;
-  for (i=0;i<sizeof(skt_ip_t);i++) {
-    if (1!=sscanf(str,"%d",&v)) return 0;
-    if (v<0 || v>255) return 0;
-    while (isdigit(*str)) str++; /* Advance over number */
-    if (i!=sizeof(skt_ip_t)-1) { /*Not last time:*/
-      if (*str!='.') return 0; /*Check for dot*/
-    } else { /*Last time:*/
-      if (*str!=0) return 0; /*Check for end-of-string*/
-    }
-    str++;
-    ret->data[i]=(unsigned char)v;
-  }
-  return 1;
-}
-
-/* this is NOT thread safe ! */
 skt_ip_t skt_lookup_ip(const char *name)
 {
-  skt_ip_t ret=_skt_invalid_ip;
-  /*First try to parse the name as dotted decimal*/
-  if (skt_parse_dotted(name,&ret))
-    return ret;
-  else {/*Try a DNS lookup*/
-    struct hostent *h = gethostbyname(name);   /* not thread safe */
-    if (h==0) return _skt_invalid_ip;
-    memcpy(&ret,h->h_addr_list[0],h->h_length);
-    return ret;
+  struct addrinfo *result;
+  skt_ip_t addr;
+  int s = getaddrinfo(name, NULL, NULL, &result);
+  if (s != 0)
+  {
+    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+    return _skt_invalid_ip;
   }
+  skt_assign_addr(&addr, result->ai_addr);
+  freeaddrinfo(result);
+  return addr;
 }
 
 /* these 2 functions will return the inner node IP, special for
@@ -316,50 +321,84 @@ skt_ip_t skt_innode_lookup_ip(const char *name)
   return skt_lookup_ip(name);
 }
 
-/*Write as dotted decimal*/
-char *skt_print_ip(char *dest,skt_ip_t addr)
+/*Write numerically*/
+char *skt_print_ip(char *dest, size_t destsiz, const skt_ip_t *addr)
 {
-  char *o=dest;
-  int i;
-  for (i=0;i<sizeof(addr);i++) {
-    const char *trail=".";
-    if (i==sizeof(addr)-1) trail=""; /*No trailing separator dot*/
-    sprintf(o,"%d%s",(int)addr.data[i],trail);
-    o+=strlen(o);
-  }
+  int s = getnameinfo(&addr->a, sizeof(skt_ip_t), dest, destsiz, NULL, 0, NI_NUMERICHOST);
+  if (s != 0)
+    fprintf(stderr, "getnameinfo: %s\n", gai_strerror(s));
   return dest;
 }
-int skt_ip_match(skt_ip_t a,skt_ip_t b)
+/*Write hostname, if applicable*/
+char *skt_print_host(char *dest, size_t destsiz, const skt_ip_t *addr)
 {
-  return 0==memcmp(&a,&b,sizeof(a));
-}
-struct sockaddr_in skt_build_addr(skt_ip_t IP,int port)
-{
-  struct sockaddr_in ret={0};
-  ret.sin_family=AF_INET;
-  ret.sin_port = htons((short)port);
-  memcpy(&ret.sin_addr,&IP,sizeof(IP));
-  return ret;  
+  int s = getnameinfo(&addr->a, sizeof(skt_ip_t), dest, destsiz, NULL, 0, 0);
+  if (s != 0)
+    fprintf(stderr, "getnameinfo: %s\n", gai_strerror(s));
+  return dest;
 }
 
-SOCKET skt_datagram(unsigned int *port, int bufsize)
+static int skt_ip_match(const skt_ip_t *a, const skt_ip_t *b)
+{
+  return 0 == memcmp(a, b, sizeof(skt_ip_t));
+}
+int skt_ip_is_valid(const skt_ip_t *addr)
+{
+  return !skt_ip_match(addr, &_skt_invalid_ip);
+}
+
+void skt_set_port(skt_ip_t *addr, unsigned int port)
+{
+  if (addr->a.sa_family == AF_INET6)
+    addr->in6.sin6_port = htons(port);
+  else if (addr->a.sa_family == AF_INET)
+    addr->in.sin_port = htons(port);
+}
+unsigned int skt_get_port(const skt_ip_t *addr)
+{
+  if (addr->a.sa_family == AF_INET6)
+    return ntohs(addr->in6.sin6_port);
+  else if (addr->a.sa_family == AF_INET)
+    return ntohs(addr->in.sin_port);
+
+  return 0;
+}
+int skt_is_loopback(const skt_ip_t *addr)
+{
+  if (addr->a.sa_family == AF_INET6)
+    return IN6_IS_ADDR_LOOPBACK(&addr->in6.sin6_addr);
+  else if (addr->a.sa_family == AF_INET)
+    return (ntohl(addr->in.sin_addr.s_addr) & 0xFF000000u) == (127u<<24u);
+
+  return 0;
+}
+
+static skt_ip_t skt_build_addr(int port, int sa_family)
+{
+  skt_ip_t ret = _skt_invalid_ip;
+  ret.a.sa_family = sa_family;
+  skt_set_port(&ret, port);
+  return ret;
+}
+
+SOCKET skt_datagram(unsigned int *port, int bufsize, int sa_family)
 {  
   int connPort=(port==NULL)?0:*port;
-  struct sockaddr_in addr=skt_build_addr(_skt_invalid_ip,connPort);
+  skt_ip_t           addr = skt_build_addr(connPort, sa_family);
   socklen_t          len;
   SOCKET             ret;
   
 retry:
-  ret = socket(AF_INET,SOCK_DGRAM,0);
+  ret = socket(sa_family, SOCK_DGRAM, 0);
   if (ret == SOCKET_ERROR) {
     if (skt_should_retry()) goto retry;  
     return skt_abort(-1, 93490, "Error creating datagram socket.");
   }
-  if (bind(ret, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR)
+  if (bind(ret, &addr.a, skt_get_size(&addr)) == SOCKET_ERROR)
 	  return skt_abort(-1, 93491, "Error binding datagram socket.");
   
   len = sizeof(addr);
-  if (getsockname(ret, (struct sockaddr *)&addr , &len))
+  if (getsockname(ret, &addr.a, &len))
 	  return skt_abort(-1, 93492, "Error getting address on datagram socket.");
 
   if (bufsize) 
@@ -371,24 +410,26 @@ retry:
 		return skt_abort(-1, 93496, "Error on SNDBUF sockopt for datagram socket.");
   }
   
-  if (port!=NULL) *port = (int)ntohs(addr.sin_port);
+  if (port!=NULL) *port = skt_get_port(&addr);
   return ret;
 }
-SOCKET skt_server(unsigned int *port)
+SOCKET skt_server(unsigned int *port, int sa_family)
 {
-  return skt_server_ip(port,NULL);
+  skt_ip_t addr = skt_build_addr(port == NULL ? 0 : *port, sa_family);
+  SOCKET ret = skt_server_ip(&addr, sa_family);
+  if (port != NULL)
+    *port = skt_get_port(&addr);
+  return ret;
 }
 
-SOCKET skt_server_ip(unsigned int *port,skt_ip_t *ip)
+SOCKET skt_server_ip(skt_ip_t *addr, int sa_family)
 {
   SOCKET             ret;
-  socklen_t          len;
+  socklen_t          len = sizeof(skt_ip_t);
   int on = 1; /* for setsockopt */
-  int connPort=(port==NULL)?0:*port;
-  struct sockaddr_in addr=skt_build_addr((ip==NULL)?_skt_invalid_ip:*ip,connPort);
   
 retry:
-  ret = socket(PF_INET, SOCK_STREAM, 0);
+  ret = socket(sa_family, SOCK_STREAM, 0);
   
   if (ret == SOCKET_ERROR) {
     if (skt_should_retry()) goto retry;
@@ -396,54 +437,46 @@ retry:
   }
   setsockopt(ret, SOL_SOCKET, SO_REUSEADDR, (char *) &on, sizeof(on));
   
-  if (bind(ret, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) 
+  if (bind(ret, &addr->a, skt_get_size(addr)) == SOCKET_ERROR)
 	  return skt_abort(-1, 93484, "Error binding server socket.");
   if (listen(ret,5) == SOCKET_ERROR) 
 	  return skt_abort(-1, 93485, "Error listening on server socket.");
-  len = sizeof(addr);
-  if (getsockname(ret, (struct sockaddr *)&addr, &len) == SOCKET_ERROR) 
+  if (getsockname(ret, &addr->a, &len) == SOCKET_ERROR)
 	  return skt_abort(-1, 93486, "Error getting name on server socket.");
 
-  if (port!=NULL) *port = (int)ntohs(addr.sin_port);
-  if (ip!=NULL) memcpy(ip, &addr.sin_addr, sizeof(*ip));
   return ret;
 }
 
-SOCKET skt_accept(SOCKET src_fd,skt_ip_t *pip, unsigned int *port)
+SOCKET skt_accept(SOCKET src_fd, skt_ip_t *addr)
 {
-  socklen_t len;
-  struct sockaddr_in addr={0};
+  socklen_t len = sizeof(skt_ip_t);
   SOCKET ret;
-  len = sizeof(addr);
 retry:
-  ret = accept(src_fd, (struct sockaddr *)&addr, &len);
+  ret = accept(src_fd, &addr->a, &len);
   if (ret == SOCKET_ERROR) {
     if (skt_should_retry()) goto retry;
     else return skt_abort(-1, 93523, "Error in accept.");
   }
-  
-  if (port!=NULL) *port=ntohs(addr.sin_port);
-  if (pip!=NULL) memcpy(pip,&addr.sin_addr,sizeof(*pip));
+
   return ret;
 }
 
 
-SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
+SOCKET skt_connect(const skt_ip_t * addr, int timeout)
 {
-  struct sockaddr_in addr=skt_build_addr(ip,port);
   int                ok, begin;
   SOCKET             ret;
   
   begin = time(0);
   while (time(0)-begin < timeout) 
   {
-    ret = socket(AF_INET, SOCK_STREAM, 0);
+    ret = socket(addr->a.sa_family, SOCK_STREAM, 0);
     if (ret==SOCKET_ERROR) 
     {
 	  if (skt_should_retry()) continue;  
       else return skt_abort(-1, 93512, "Error creating socket");
     }
-    ok = connect(ret, (struct sockaddr *)&(addr), sizeof(addr));
+    ok = connect(ret, &addr->a, skt_get_size(addr));
     if (ok != SOCKET_ERROR) 
 	  return ret;/*Good connect*/
 	else { /*Bad connect*/
@@ -453,13 +486,13 @@ SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
 #if ! defined(_WIN32)
             if (ERRNO == ETIMEDOUT) continue;      /* time out is fine */
 #endif
-            return skt_abort(-1, 93515, "Error connecting to socket\n");
+            return skt_abort(-1, 93515, "Error connecting to socket");
           }
     }
   }
   /*Timeout*/
   if (timeout==60)
-     return skt_abort(-1, 93517, "Timeout in socket connect\n");
+     return skt_abort(-1, 93517, "Timeout in socket connect");
   return INVALID_SOCKET;
 }
 
@@ -713,7 +746,7 @@ int ChMessage_send(SOCKET fd,const ChMessage *src)
 
 #else
 
-skt_ip_t _skt_invalid_ip={{0}};
+skt_ip_t _skt_invalid_ip = {0};
 
 skt_ip_t skt_my_ip(void)
 {

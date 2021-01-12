@@ -208,10 +208,8 @@ typedef struct FutureMessageStruct {
 typedef struct OtherNodeStruct
 {
   int nodestart, nodesize;
-  skt_ip_t IP;
   unsigned int mach_id;
-  unsigned int dataport;
-  struct sockaddr_in addr;
+  skt_ip_t addr;
 #if CMK_USE_TCP 
   SOCKET	sock;		/* for TCP */
 #endif
@@ -330,9 +328,6 @@ int CmiLongSendQueue(int forNode,int longerThan) {
 }
 #endif
 
-extern void CmiGmConvertMachineID(unsigned int *mach_id);
-extern void CmiAmmassoNodeAddressesStoreHandler(int pe, struct sockaddr_in *addr, int port);
-
 /* initnode node table reply format:
  +------------------------------------------------------- 
  | 4 bytes  |   Number of nodes n                       ^
@@ -366,14 +361,12 @@ static void node_addresses_store(ChMessage *msg)
     MACHSTATE2(3,"node %d nodesize %d",i,nodes[i].nodesize);
     nodes[i].mach_id = ChMessageInt(d[i].mach_id);
 
-    nodes[i].IP=d[i].IP;
     if (i==Lrts_myNode) {
       Cmi_nodestart=nodes[i].nodestart;
       _Cmi_mynodesize=nodes[i].nodesize;
-      Cmi_self_IP=nodes[i].IP;
+      Cmi_self_IP=nodes[i].addr;
     }
-    nodes[i].dataport = ChMessageInt(d[i].dataport);
-    nodes[i].addr = skt_build_addr(nodes[i].IP,nodes[i].dataport);
+    nodes[i].addr = d[i].addr;
 
 #if CMK_USE_TCP
     nodes[i].sock = INVALID_SOCKET;
