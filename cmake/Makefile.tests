@@ -14,10 +14,15 @@
 # $(MAKEFLAGS) will contain "s". $(SILENT) is used in Makefile.tests.common.
 SILENT:=$(findstring s,$(word 1, $(MAKEFLAGS)))
 
+# Determine the full path of the build directory
+mkfile_path:=$(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_dir:=$(dir $(mkfile_path))
+
+
 all: charm++
 
 charm++:
-	@$(MAKE) -C .. -q lib/libmoduletcharm.a || $(MAKE) -C ..
+	$(MAKE) -C $(mkfile_dir)/..
 
 AMPI: charm++
 	@$(MAKE) -C .. -q lib/libmoduleampi.a || { echo "=== You are missing the AMPI targets. Please build Charm++ with './build AMPI <...>'. ==="; exit 1; }
