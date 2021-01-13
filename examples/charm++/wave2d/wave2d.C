@@ -65,7 +65,7 @@ public:
 
   void pup(PUP::er& p) {
     p | perf_data;
-    if (p.isRestarting() && thisIndex == 0) {
+    if (p.isUnpacking() && p.isCheckpoint() && thisIndex == 0) {
       thisProxy[thisIndex].registerHandlers();
     }
   }
