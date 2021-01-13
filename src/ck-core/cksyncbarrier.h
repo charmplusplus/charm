@@ -118,7 +118,8 @@ public:
 
   // A begin receiver is a callback function that is called after all of the clients on
   // this PE reach this barrier and before calling the actual receivers, useful for
-  // setting up for the execution of those receivers
+  // setting up for the execution of those receivers. Will only be called when a receiver
+  // exists.
   LDBarrierReceiver AddBeginReceiver(std::function<void()> fn);
   template <typename T>
   inline LDBarrierReceiver AddBeginReceiver(T* obj, void (T::*method)(void))
@@ -128,7 +129,7 @@ public:
 
   // An end receiver is a callback function that is called when the receivers on this PE
   // have finished executing, right before the clients are resumed, useful for cleaning up
-  // or resetting state
+  // or resetting state. Will only be called when a receiver exists.
   LDBarrierReceiver AddEndReceiver(std::function<void()> fn);
   template <typename T>
   inline LDBarrierReceiver AddEndReceiver(T* obj, void (T::*method)(void))
@@ -151,6 +152,8 @@ public:
   void TurnOff() { on = false; };
 
   void ResumeClients(void);
+
+  bool hasReceivers() { return !receivers.empty(); };
 };
 
 #endif /* CKSYNCBARRIER_H */

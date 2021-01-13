@@ -1633,16 +1633,20 @@ void CkMigratable::ckFinishConstruction(int epoch)
 
 void CkMigratable::AtSync(int waitForMigration)
 {
-	if (!usesAtSync)
-		CkAbort("You must set usesAtSync=true in your array element constructor to use AtSync!\n");
-	if(myRec->getLBMgr()->getNLoadBalancers() == 0) {
-		ResumeFromSync();
-		return;
-	}
-	myRec->AsyncMigrate(!waitForMigration);
-	if (waitForMigration) ReadyMigrate(true);
-	ckFinishConstruction();
-  DEBL((AA "Element %s going to sync\n" AB,idx2str(thisIndexMax)));
+  if (!usesAtSync)
+    CkAbort(
+        "You must set usesAtSync=true in your array element constructor to use "
+        "AtSync!\n");
+  // Only actually call AtSync when a receiver exists, otherwise skip it and
+  // directly call ResumeFromSync
+  if (!myRec->getSyncBarrier()->hasReceivers()) {
+    ResumeFromSync();
+    return;
+  }
+  myRec->AsyncMigrate(!waitForMigration);
+  if (waitForMigration) ReadyMigrate(true);
+  ckFinishConstruction();
+  DEBL((AA "Element %s going to sync\n" AB, idx2str(thisIndexMax)));
   // model-based load balancing, ask user to provide cpu load
   if (usesAutoMeasure == false) UserSetLBLoad();
 
