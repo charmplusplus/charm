@@ -64,29 +64,48 @@ void CkSyncBarrier::RemoveClient(LDBarrierClient c)
       thisProxy[thisIndex].CheckBarrier();
 }
 
-LDBarrierReceiver CkSyncBarrier::AddReceiver(std::function<void()> fn)
+LDBarrierReceiver CkSyncBarrier::AddReceiverHelper(std::function<void()> fn,
+                                                   std::list<LBReceiver*>& receiverList)
 {
   LBReceiver* new_receiver = new LBReceiver(fn);
+  return LDBarrierReceiver(receiverList.insert(receiverList.end(), new_receiver));
+}
 
-  return LDBarrierReceiver(receivers.insert(receivers.end(), new_receiver));
+LDBarrierReceiver CkSyncBarrier::AddReceiver(std::function<void()> fn)
+{
+  return AddReceiverHelper(std::move(fn), receivers);
+}
+
+LDBarrierReceiver CkSyncBarrier::AddBeginReceiver(std::function<void()> fn)
+{
+  return AddReceiverHelper(std::move(fn), beginReceivers);
 }
 
 LDBarrierReceiver CkSyncBarrier::AddEndReceiver(std::function<void()> fn)
 {
-  LBReceiver* new_receiver = new LBReceiver(fn);
-  return LDBarrierReceiver(endReceivers.insert(endReceivers.end(), new_receiver));
+  return AddReceiverHelper(std::move(fn), endReceivers);
+}
+
+void CkSyncBarrier::RemoveReceiverHelper(
+    LDBarrierReceiver r, std::list<LBReceiver*>& receiverList)
+{
+  delete *(r);
+  receiverList.erase(r);
 }
 
 void CkSyncBarrier::RemoveReceiver(LDBarrierReceiver c)
 {
-  delete *(c);
-  receivers.erase(c);
+  RemoveReceiverHelper(c, receivers);
+}
+
+void CkSyncBarrier::RemoveBeginReceiver(LDBarrierReceiver c)
+{
+  RemoveReceiverHelper(c, beginReceivers);
 }
 
 void CkSyncBarrier::RemoveEndReceiver(LDBarrierReceiver c)
 {
-  delete *(c);
-  endReceivers.erase(c);
+  RemoveReceiverHelper(c, endReceivers);
 }
 
 void CkSyncBarrier::TurnOnReceiver(LDBarrierReceiver c) { (*c)->on = 1; }
@@ -192,14 +211,15 @@ void CkSyncBarrier::CheckBarrier()
       propagate_atsync();
       at_count -= client_count;
       cur_epoch++;
-      CallReceivers();
+      CallReceiverList(beginReceivers);
+      CallReceiverList(receivers);
     }
   }
 }
 
-void CkSyncBarrier::CallReceivers(void)
+void CkSyncBarrier::CallReceiverList(const std::list<LBReceiver*>& receiverList)
 {
-  for (auto& r : receivers)
+  for (auto& r : receiverList)
   {
     if (r->on)
     {
@@ -214,13 +234,8 @@ void CkSyncBarrier::ResumeClients(void)
   // reset() is called before them to put the barrier in a valid state to be triggered
   reset();
 
-  for (auto& er : endReceivers)
-  {
-    if (er->on)
-    {
-      er->fn();
-    }
-  }
+  CallReceiverList(endReceivers);
+
   for (auto& c : clients) c->fn();
 }
 

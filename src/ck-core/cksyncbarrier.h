@@ -42,6 +42,7 @@ class CkSyncBarrier : public CBase_CkSyncBarrier
 private:
   std::list<LBClient*> clients;
   std::list<LBReceiver*> receivers;
+  std::list<LBReceiver*> beginReceivers;
   std::list<LBReceiver*> endReceivers;
 
   std::vector<bool> rank_needs_kick;
@@ -75,7 +76,11 @@ private:
 
   void propagate_atsync();
   void reset();
-  void CallReceivers(void);
+  static void CallReceiverList(const std::list<LBReceiver*>& receiverList);
+
+  static LDBarrierReceiver AddReceiverHelper(std::function<void()> fn,
+                                      std::list<LBReceiver*>& receiverList);
+  void RemoveReceiverHelper(LDBarrierReceiver r, std::list<LBReceiver*>& receiverList);
 
 public:
   CkSyncBarrier() { init(); };
@@ -111,8 +116,19 @@ public:
     return AddReceiver(std::bind(method, obj));
   }
 
+  // A begin receiver is a callback function that is called after all of the clients on
+  // this PE reach this barrier and before calling the actual receivers, useful for
+  // setting up for the execution of those receivers
+  LDBarrierReceiver AddBeginReceiver(std::function<void()> fn);
+  template <typename T>
+  inline LDBarrierReceiver AddBeginReceiver(T* obj, void (T::*method)(void))
+  {
+    return AddBeginReceiver(std::bind(method, obj));
+  }
+
   // An end receiver is a callback function that is called when the receivers on this PE
-  // have finished executing, right before the clients are resumed
+  // have finished executing, right before the clients are resumed, useful for cleaning up
+  // or resetting state
   LDBarrierReceiver AddEndReceiver(std::function<void()> fn);
   template <typename T>
   inline LDBarrierReceiver AddEndReceiver(T* obj, void (T::*method)(void))
@@ -120,6 +136,7 @@ public:
     return AddEndReceiver(std::bind(method, obj));
   }
 
+  void RemoveBeginReceiver(LDBarrierReceiver h);
   void RemoveReceiver(LDBarrierReceiver h);
   void RemoveEndReceiver(LDBarrierReceiver h);
   void TurnOnReceiver(LDBarrierReceiver h);

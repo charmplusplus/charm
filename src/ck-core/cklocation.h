@@ -560,7 +560,7 @@ private:
 	LBManager *lbmgr;
   MetaBalancer *the_metalb;
 	LDOMHandle myLBHandle;
-        LDBarrierReceiver lbBarrierReceiver;
+        LDBarrierReceiver lbBarrierBeginReceiver;
         LDBarrierReceiver lbBarrierEndReceiver;
 #endif
 private:

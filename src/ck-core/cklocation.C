@@ -2087,7 +2087,7 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 
 CkLocMgr::~CkLocMgr() {
 #if CMK_LBDB_ON
-  syncBarrier->RemoveReceiver(lbBarrierReceiver);
+  syncBarrier->RemoveBeginReceiver(lbBarrierBeginReceiver);
   syncBarrier->RemoveEndReceiver(lbBarrierEndReceiver);
   lbmgr->UnregisterOM(myLBHandle);
 #endif
@@ -3281,7 +3281,7 @@ void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 
 	// Set up callbacks for this LocMgr to call Registering/DoneRegistering during
 	// each AtSync.
-	lbBarrierReceiver = syncBarrier->AddReceiver([=]() {
+	lbBarrierBeginReceiver = syncBarrier->AddBeginReceiver([=]() {
 	  DEBL((AA "CkLocMgr AtSync Receiver called\n" AB));
 	  lbmgr->RegisteringObjects(myLBHandle);
 	});
