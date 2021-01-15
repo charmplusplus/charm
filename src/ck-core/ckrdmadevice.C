@@ -122,6 +122,111 @@ void CkRdmaDeviceAmpiRecvHandler(void* data) {
   }
 }
 
+#if CMK_CHARM4PY
+void CkRdmaDeviceExtRecvHandler(void* data) {
+  // Process QD to mark completion of the outstanding RDMA operation
+  //QdProcess(1);
+
+  DeviceRdmaOp* op = (DeviceRdmaOp*)data;
+  DeviceRdmaInfo* info = op->info;
+
+  // Invoke source callbacks
+  if (op->src_cb) {
+    CkCallback* cb = (CkCallback*)op->src_cb;
+    cb->send();
+    delete cb;
+  }
+
+  // Update counter
+  info->counter++;
+
+  // Check if all buffers have been received
+  if (info->counter == info->n_ops) {
+    // Invoke destination callback
+    CmiEnforce(op->dst_cb);
+    CkCallback* cb = (CkCallback*)op->dst_cb;
+    cb->send();
+    delete cb;
+
+    // Free RDMA metadata
+    CmiFree(info);
+  }
+}
+
+bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs)
+{
+
+#if TIMING_BREAKDOWN
+  static thread_local double total_times[N_TIMER] = {0};
+  static thread_local int count = 0;
+  count++;
+
+  double start_time = CkWallTimer();
+#endif
+
+  // Determine if the subsequent regular entry method should be invoked
+  // inline (intra-node) or not (inter-node)
+  bool is_inline = true;
+  //GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+
+  // Find which mode of transfer should be used
+  //CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
+
+  // FIXME: Always use UCX
+  is_inline = false;
+
+  // Allocate and fill in metadata for this zerocopy operation
+  void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * numops);
+  CmiEnforce(rdma_data);
+  DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
+  rdma_info->n_ops = numops;
+  rdma_info->counter = 0;
+  // we will not be forwarding the message
+  rdma_info->msg = nullptr;
+
+  CkAssert(numops == received_numops);
+
+  // store source buffers for retrieval
+  for (int i = 0; i < numops; i++) {
+    CkDeviceBuffer &source = sourceStructs[i];
+
+    DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
+        + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
+    save_op.src_pe = source.src_pe;
+    save_op.src_ptr = source.ptr;
+    save_op.dest_pe = CkMyPe();
+    save_op.dest_ptr = arrPtrs[i];
+    save_op.size = (size_t)arrSizes[i];
+    save_op.info = rdma_info;
+    save_op.src_cb = new CkCallback(source.cb);
+    save_op.tag = source.tag;
+  }
+
+#if TIMING_BREAKDOWN
+  total_times[1] += CkWallTimer() - start_time;
+  start_time = CkWallTimer();
+#endif
+
+  // Post ucp_tag_recv_nb's to receive GPU data
+  for (int i = 0; i < numops; i++) {
+    DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
+        + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
+    QdCreate(1);
+    CmiRecvDevice(save_op, false);
+  }
+
+#if TIMING_BREAKDOWN
+  total_times[2] += CkWallTimer() - start_time;
+  if (count == N_COUNT) {
+    CkPrintf("!!! %lf us, %lf us\n", total_times[1] / count * 1e6, total_times[2] / count * 1e6);
+  }
+#endif
+
+  return is_inline;
+
+}
+#endif
+
 // Invoked after post entry method
 bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
 #if TIMING_BREAKDOWN
@@ -400,6 +505,7 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
   return is_inline;
 }
+
 
 // Unused, left for future reference
 /*
