@@ -459,6 +459,24 @@ int CUDAPointerOnDevice(const void *ptr)
   return 0;
 }
 
+void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes, void *remoteBufInfo, void *streamPtrs)
+{
+  #if CMK_CUDA
+  void *hostArrPtrs = recvBufPtrs;
+  // create the post structs
+  // FIXME: this is consistent with the current Charm++ impl but will break as soon as it's changed
+  CkDeviceBufferPost *postStructs = nullptr;
+  streamPtrs = nullptr;
+
+  CkRdmaDeviceIssueRgetsFromUnpackedMessage(numBuffers, (CkDeviceBuffer*) remoteBufInfo, &hostArrPtrs,
+                                            arrSizes, postStructs
+                                            );
+
+  #else
+  CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
+  #endif
+
+}
 #endif
 
 void QdCreate(int n) {

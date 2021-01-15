@@ -490,8 +490,9 @@ extern void CkCallWhenIdle(int epIdx, void* obj);
 
 
 #if CMK_CHARM4PY
-extern int CkCudaEnabled();
+extern int CkCudaEnabled(void);
 extern int CUDAPointerOnDevice(const void *ptr);
+extern void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes, void *remoteBufInfo, void *streamPtrs);
 #endif
 
 #ifdef __cplusplus
