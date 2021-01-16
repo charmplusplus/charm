@@ -525,6 +525,153 @@ void _registerCkCallback(void); //used by init
 
 void CkCallbackInit();
 
+#include "ckmarshall.h"
+
+namespace ck {
+// cannot include "ckfutures.h" at this point
+// because we are still too early in the include process
+template <typename>
+class future;
+
+// accessible so users can implement their own callbacks
+namespace internal {
+template <class>
+class callback_base_;
+
+template <class R, class... Args>
+class callback_base_<R(Args...)> : public PUP::able {
+ public:
+  callback_base_() : PUP::able() {}
+  callback_base_(CkMigrateMessage *m) : PUP::able(m) {}
+
+  virtual R send(const Args &... args) = 0;
+
+  virtual void setRefNum(CMK_REFNUM_TYPE refnum) {
+    CkAbort("cannot set ref num of %s!", typeid(this).name());
+  }
+
+  virtual const PUP::able::PUP_ID &get_PUP_ID(void) const override {
+    CkAbort("cannot use %s as a PUP::able!", typeid(this).name());
+  }
+};
+}
+
+// anonymous so as to remain entirely hidden
+namespace {
+template <class T>
+class wrapped_future_ : public internal::callback_base_<void(T)> {
+  future<T> fut_;
+
+ public:
+  wrapped_future_(const future<T> &fut) : fut_(fut) {}
+  wrapped_future_(CkMigrateMessage *m) : internal::callback_base_<void(T)>(m) {}
+
+  virtual void send(const T &t) override { fut_.set(t); }
+
+  virtual void pup(PUP::er &p) override {
+    PUP::able::pup(p);
+    p | fut_;
+  }
+};
+
+template <class... Args>
+class wrapped_callback_ : public internal::callback_base_<void(Args...)> {
+  CkCallback cb_;
+
+ public:
+  wrapped_callback_(const CkCallback &cb) : cb_(cb) {}
+  wrapped_callback_(CkMigrateMessage *m)
+      : internal::callback_base_<void(Args...)>(m) {}
+
+  virtual void send(const Args &... args) override {
+    cb_.send(ck::make_marshall_message(args...));
+  }
+
+  virtual void setRefNum(CMK_REFNUM_TYPE refnum) override {
+    cb_.setRefNum(refnum);
+  }
+
+  virtual void pup(PUP::er &p) override {
+    PUP::able::pup(p);
+    p | cb_;
+  }
+};
+}
+template <class>
+class callback;
+
+template <class R, class... Args>
+struct callback<R(Args...)> {
+  using callback_t = std::shared_ptr<internal::callback_base_<R(Args...)>>;
+
+ private:
+  // get the first element of the parameter pack (when it is available)
+  using first_t = typename std::conditional<
+      sizeof...(Args) >= 1,
+      typename std::tuple_element<0, std::tuple<Args...>>::type, void>::type;
+  enum callback_type : uint8_t { FUTURE, CKCALLBACK, UNKNOWN };
+  callback_t impl_;
+
+ public:
+  callback() {}
+  callback(const callback_t &impl) : impl_(impl) {}
+
+  explicit operator bool() const { return ready(); }
+  inline bool ready() const { return (bool) impl_; }
+
+  inline R send(const Args &... args) {
+    CkAssert(ready());
+    return impl_->send(args...);
+  }
+
+  void pup(PUP::er &p) {
+    callback_type t;
+    if (p.isUnpacking()) {
+      p | t;
+      switch (t) {
+        case FUTURE:
+          impl_ = std::make_shared<wrapped_future_<first_t>>(nullptr);
+          break;
+        case CKCALLBACK:
+          impl_ = std::make_shared<wrapped_callback_<Args...>>(nullptr);
+          break;
+        default:
+          break;
+      }
+    } else {
+      if (std::dynamic_pointer_cast<wrapped_future_<first_t>>(impl_)) {
+        t = FUTURE;
+      } else if (std::dynamic_pointer_cast<wrapped_callback_<Args...>>(impl_)) {
+        t = CKCALLBACK;
+      } else {
+        t = UNKNOWN;
+      }
+      p | t;
+    }
+    if (t == UNKNOWN) {
+      p | impl_;
+    } else {
+      impl_->pup(p);
+    }
+  }
+
+  void setRefNum(CMK_REFNUM_TYPE refnum) {
+    CkAssert(ready());
+    impl_->setRefNum(refnum);
+  }
+};
+
+template <typename T>
+callback<void(T)> make_callback(const future<T> &f) {
+  return callback<void(T)>(std::make_shared<wrapped_future_<T>>(f));
+}
+
+template <typename... Ts>
+callback<void(Ts...)> make_callback(const CkCallback &cb) {
+  return callback<void(Ts...)>(std::make_shared<wrapped_callback_<Ts...>>(cb));
+}
+}
+
 #endif
 
 
