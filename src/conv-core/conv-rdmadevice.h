@@ -99,6 +99,7 @@ void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
 void CmiRecvDevice(DeviceRdmaOp* op, bool ampi);
 void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn1, RdmaAckCallerFn fn2);
 void CmiInvokeRecvHandler(void* data);
+void CmiInvokeAmpiRecvHandler(void* data);
 
 #endif // CMK_CUDA
 
