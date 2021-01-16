@@ -72,11 +72,13 @@ void CkRdmaDeviceRecvHandler(void* data) {
   DeviceRdmaInfo* info = op->info;
 
   // Invoke source callbacks
+  /*
   if (op->src_cb) {
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
     delete cb;
   }
+  */
 
   // Update counter (there may be multiple buffers in transit)
   info->counter++;
@@ -85,6 +87,7 @@ void CkRdmaDeviceRecvHandler(void* data) {
   // If so, invoke regular entry method
   if (info->counter == info->n_ops) {
     QdCreate(1);
+
     enqueueNcpyMessage(op->dest_pe, info->msg);
 
     // Free RDMA metadata
@@ -100,11 +103,13 @@ void CkRdmaDeviceAmpiRecvHandler(void* data) {
   DeviceRdmaInfo* info = op->info;
 
   // Invoke source callbacks
+  /*
   if (op->src_cb) {
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
     delete cb;
   }
+  */
 
   // Update counter
   info->counter++;
@@ -147,9 +152,13 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   is_inline = false;
 
   // Create a copy of this message for regular entry method invocation
+  /*
   size_t msg_size = env->getTotalsize();
   envelope* new_env = (envelope*)CmiAlloc(msg_size);
   memcpy(new_env, env, msg_size);
+  */
+  void* old_msg = EnvToUsr(env);
+  envelope* new_env = UsrToEnv(CkCopyMsg(&old_msg));
 
   // Allocate and fill in metadata for this zerocopy operation
   void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * numops);
@@ -174,13 +183,14 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
     DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
-    save_op.src_pe = source.src_pe;
-    save_op.src_ptr = source.ptr;
+    //save_op.src_pe = source.src_pe;
+    //save_op.src_ptr = source.ptr;
     save_op.dest_pe = CkMyPe();
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
-    save_op.src_cb = new CkCallback(source.cb);
+    // TODO: Allocate callback only if source is not CkCallback::ignore
+    //save_op.src_cb = new CkCallback(source.cb);
     save_op.tag = source.tag;
   }
 
@@ -195,6 +205,7 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
     QdCreate(1);
     CmiRecvDevice(save_op, false);
+    //CmiInvokeRecvHandler(save_op);
   }
 
 #if TIMING_BREAKDOWN
@@ -509,9 +520,11 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 
   // Store destination PE in the metadata message
   // FIXME: Not necessary? save_op.dest_pe is set to CkMyPe() on the receiver
+  /*
   for (int i = 0; i < numops; i++) {
     buffers[i]->dest_pe = dest_pe;
   }
+  */
 
 #if TIMING_BREAKDOWN
   total_times[1] += CkWallTimer() - start_time;

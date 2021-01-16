@@ -11,10 +11,11 @@
 
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
-  cudaStream_t cuda_stream;
+  //cudaStream_t cuda_stream;
 
   // Use per-thread stream by default
-  CkDeviceBufferPost() : cuda_stream(cudaStreamPerThread) {}
+  //CkDeviceBufferPost() : cuda_stream(cudaStreamPerThread) {}
+  //CkDeviceBufferPost() : cuda_stream(cudaStreamPerThread) {}
 };
 
 class CkDeviceBuffer : public CmiDeviceBuffer {
@@ -22,7 +23,9 @@ public:
   // Callback to be invoked on the sender/receiver
   CkCallback cb;
 
-  CkDeviceBuffer() : CmiDeviceBuffer() {}
+  CkDeviceBuffer() : CmiDeviceBuffer() {
+    cb = CkCallback(CkCallback::ignore);
+  }
 
   explicit CkDeviceBuffer(const void* ptr_) : CmiDeviceBuffer(ptr_, 0) {
     cb = CkCallback(CkCallback::ignore);
@@ -32,6 +35,7 @@ public:
     cb = cb_;
   }
 
+  /*
   explicit CkDeviceBuffer(const void* ptr_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, 0) {
     cb = CkCallback(CkCallback::ignore);
     cuda_stream = cuda_stream_;
@@ -41,6 +45,7 @@ public:
     cb = cb_;
     cuda_stream = cuda_stream_;
   }
+  */
 
 
   explicit CkDeviceBuffer(const void* ptr_, size_t cnt_) : CmiDeviceBuffer(ptr_, cnt_) {
@@ -51,6 +56,7 @@ public:
     cb = cb_;
   }
 
+  /*
   explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, cnt_) {
     cb = CkCallback(CkCallback::ignore);
     cuda_stream = cuda_stream_;
@@ -60,6 +66,7 @@ public:
     cb = cb_;
     cuda_stream = cuda_stream_;
   }
+  */
 
   void pup(PUP::er &p) {
     CmiDeviceBuffer::pup(p);

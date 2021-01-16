@@ -188,7 +188,7 @@ public:
     }
 
     // Set up buffer metadata
-    send_buffer = CkDeviceBuffer(d_local_data, stream);
+    send_buffer = CkDeviceBuffer(d_local_data);
 
     // Reduce back to main
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
@@ -230,7 +230,7 @@ public:
     // Inform the runtime where the incoming data should be stored
     // and which CUDA stream should be used for the transfer
     data = d_remote_data;
-    devicePost[0].cuda_stream = stream;
+    //devicePost[0].cuda_stream = stream;
   }
 
   // Second receive (regular entry method), invoked after the data transfer is initiated

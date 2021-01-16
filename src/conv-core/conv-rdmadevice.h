@@ -21,27 +21,38 @@ public:
   size_t cnt;
 
   // Source and destination PEs
+  /*
   int src_pe;
   int dest_pe;
+  */
 
   // Used for CUDA IPC
+  /*
   int device_idx;
   size_t comm_offset;
   int event_idx;
   cudaStream_t cuda_stream;
+  */
 
   // Used for UCX
   uint64_t tag;
 
   // Store the actual data for host-staged inter-node messaging (no GPUDirect RDMA)
+  /*
   bool data_stored;
   void* data;
+  */
 
-  CmiDeviceBuffer() : ptr(NULL), cnt(0), src_pe(-1), dest_pe(-1) { init(); }
+  //CmiDeviceBuffer() : ptr(NULL), cnt(0), src_pe(-1), dest_pe(-1) { init(); }
+  CmiDeviceBuffer() : ptr(NULL), cnt(0) {}
 
+  /*
   explicit CmiDeviceBuffer(const void* ptr_, size_t cnt_) : ptr(ptr_), cnt(cnt_),
     src_pe(CmiMyPe()), dest_pe(-1) { init(); }
+    */
+  explicit CmiDeviceBuffer(const void* ptr_, size_t cnt_) : ptr(ptr_), cnt(cnt_) {}
 
+  /*
   void init() {
     device_idx = -1;
     comm_offset = 0;
@@ -51,16 +62,20 @@ public:
     data_stored = false;
     data = NULL;
   }
+  */
 
   void pup(PUP::er &p) {
     p((char *)&ptr, sizeof(ptr));
     p|cnt;
+    /*
     p|src_pe;
     p|dest_pe;
     p|device_idx;
     p|comm_offset;
     p|event_idx;
+    */
     p|tag;
+    /*
     p|data_stored;
     if (data_stored) {
       if (p.isUnpacking()) {
@@ -68,10 +83,11 @@ public:
       }
       PUParray(p, (char*)data, cnt);
     }
+    */
   }
 
   ~CmiDeviceBuffer() {
-    if (data) cudaFreeHost(data);
+    //if (data) cudaFreeHost(data);
   }
 };
 
@@ -82,6 +98,7 @@ typedef void (*RdmaAckCallerFn)(void *token);
 void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
 void CmiRecvDevice(DeviceRdmaOp* op, bool ampi);
 void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn1, RdmaAckCallerFn fn2);
+void CmiInvokeRecvHandler(void* data);
 
 #endif // CMK_CUDA
 
