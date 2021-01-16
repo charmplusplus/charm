@@ -73,7 +73,7 @@ typedef struct DeviceRdmaOp_ {
   const void* dest_ptr;
   size_t size;
   DeviceRdmaInfo* info;
-  //void* src_cb;
+  void* src_cb;
   void* dst_cb;
   uint64_t tag;
 } DeviceRdmaOp;

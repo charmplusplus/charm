@@ -72,13 +72,11 @@ void CkRdmaDeviceRecvHandler(void* data) {
   DeviceRdmaInfo* info = op->info;
 
   // Invoke source callbacks
-  /*
   if (op->src_cb) {
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
     delete cb;
   }
-  */
 
   // Update counter (there may be multiple buffers in transit)
   info->counter++;
@@ -103,13 +101,11 @@ void CkRdmaDeviceAmpiRecvHandler(void* data) {
   DeviceRdmaInfo* info = op->info;
 
   // Invoke source callbacks
-  /*
   if (op->src_cb) {
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
     delete cb;
   }
-  */
 
   // Update counter
   info->counter++;
@@ -189,8 +185,8 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
-    // TODO: Allocate callback only if source is not CkCallback::ignore
-    //save_op.src_cb = new CkCallback(source.cb);
+    save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
+    save_op.dst_cb = nullptr;
     save_op.tag = source.tag;
   }
 

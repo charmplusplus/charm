@@ -3512,8 +3512,8 @@ bool ampi::processSsendCudaMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
     rdma_info->n_ops = 1;
     rdma_info->counter = 0;
     DeviceRdmaOp* rdma_op = (DeviceRdmaOp*)((char*)rdma_data + sizeof(DeviceRdmaInfo));
-    rdma_op->src_pe = srcInfo.src_pe;
-    rdma_op->src_ptr = srcInfo.ptr;
+    //rdma_op->src_pe = srcInfo.src_pe;
+    //rdma_op->src_ptr = srcInfo.ptr;
     rdma_op->dest_pe = CkMyPe();
     rdma_op->dest_ptr = buf;
     rdma_op->size = len;
