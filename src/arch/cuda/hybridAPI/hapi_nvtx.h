@@ -1,7 +1,7 @@
 #ifndef __HAPI_NVTX_H_
 #define __HAPI_NVTX_H_
 
-#include "nvToolsExt.h"
+#include "nvtx3/nvToolsExt.h"
 #include <type_traits>
 #include <string>
 

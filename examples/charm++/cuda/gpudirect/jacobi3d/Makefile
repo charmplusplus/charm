@@ -8,7 +8,7 @@ NVCC = nvcc
 NVCC_FLAGS = -c -std=c++11 -use_fast_math $(OPTS)
 LD_LIBS =
 
-TARGET = jacobi2d
+TARGET = jacobi3d
 all: $(TARGET)
 
 OBJS = $(TARGET).o $(TARGET)CUDA.o
