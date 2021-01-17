@@ -458,7 +458,8 @@ public:
         int numDevBufs; implP|numDevBufs;
         int directCopySize; implP|directCopySize;
         long devBufSizes[numDevBufs];
-        CkDeviceBuffer devBufs[numDevBufs];
+        // TODO: free this later
+        CkDeviceBuffer *devBufs = new CkDeviceBuffer[numDevBufs];
 
         for(int i = 0; i < numDevBufs; i++)
           {
@@ -467,7 +468,6 @@ public:
           }
         int msgSize; implP | msgSize;
         int epIdx; implP | epIdx;
-
 
         ArrayMsgGPUDirectRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
                                          int(e->thisIndexMax.getDimension()),
