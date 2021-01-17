@@ -50,7 +50,11 @@ void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn1, RdmaAckHandlerFn fn2) {
 #endif
 
 void CmiInvokeRecvHandler(void* data) {
+  #if CMK_CHARMPY
+  rdmaDeviceExtRecvHandlerFn(data);
+  #else
   rdmaDeviceRecvHandlerFn(data);
+  #endif
 }
 
 void CmiInvokeAmpiRecvHandler(void* data) {
