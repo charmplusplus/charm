@@ -153,7 +153,7 @@ void CkRdmaDeviceExtRecvHandler(void* data) {
   }
 }
 
-bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs)
+bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs, CkCallback &destCb)
 {
 
 #if TIMING_BREAKDOWN
@@ -184,8 +184,6 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourc
   // we will not be forwarding the message
   rdma_info->msg = nullptr;
 
-  CkAssert(numops == received_numops);
-
   // store source buffers for retrieval
   for (int i = 0; i < numops; i++) {
     CkDeviceBuffer &source = sourceStructs[i];
@@ -199,6 +197,7 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourc
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
     save_op.src_cb = new CkCallback(source.cb);
+    save_op.dst_cb = new CkCallback(destCb);
     save_op.tag = source.tag;
   }
 
