@@ -446,6 +446,8 @@ void CUDACallbackManager(void *fn, void *msg) {
 #endif
 
 #if CMK_CHARM4PY
+
+extern void (*DepositFutureWithIdFn)(void *, void*);
 int CUDAPointerOnDevice(const void *ptr)
 {
 #if CMK_CUDA
@@ -459,17 +461,24 @@ int CUDAPointerOnDevice(const void *ptr)
   return 0;
 }
 
-void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes, void *remoteBufInfo, void *streamPtrs)
+void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
+                        void *remoteBufInfo, void *streamPtrs, int *futureId)
 {
   #if CMK_CUDA
-  void *hostArrPtrs = recvBufPtrs;
+  long *recvBufAddrs = (long*) recvBufPtrs;
+  void *hostArrPtrs[numBuffers];
+  for(int i = 0; i < numBuffers; ++i)
+    {
+      hostArrPtrs[i] = (void*) recvBufAddrs[i];
+    }
+  CkCallback cb(DepositFutureWithIdFn, (void*) futureId);
   // create the post structs
   // FIXME: this is consistent with the current Charm++ impl but will break as soon as it's changed
   CkDeviceBufferPost *postStructs = nullptr;
   streamPtrs = nullptr;
 
-  CkRdmaDeviceIssueRgetsFromUnpackedMessage(numBuffers, (CkDeviceBuffer*) remoteBufInfo, &hostArrPtrs,
-                                            arrSizes, postStructs
+  CkRdmaDeviceIssueRgetsFromUnpackedMessage(numBuffers, (CkDeviceBuffer*) remoteBufInfo, hostArrPtrs,
+                                            arrSizes, postStructs, cb
                                             );
 
   #else
@@ -2255,6 +2264,12 @@ void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
   ArrayMapProcNumExtCallback = cb;
 }
 
+void (*DepositFutureWithIdFn)(void *, void*) = NULL;
+void registerDepositFutureWithIdFn(void (*cb)(void*, void*))
+{
+  DepositFutureWithIdFn = cb;
+}
+
 #if CMK_CUDA
 void (*ArrayMsgGPUDirectRecvExtCallback)(int, int, int*, int, int, long*, void *, int, char*, int) = NULL;
 void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, long*, void *, int, char*,int))
@@ -2579,15 +2594,17 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
   int destPe = destProxy.ckLocalBranch()->lastKnown(arrIndex);
 
   CkDeviceBuffer deviceBuffs[numDevBufs];
+  CkDeviceBuffer *deviceBufPtrs[numDevBufs];
   for(int i = 0; i < numDevBufs; ++i)
     {
-      deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i], streamPtrs[i]);
+      deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i], ((cudaStream_t*)streamPtrs)[i]);
       deviceBuffs[i].cnt = devBufSizesInBytes[i];
+      deviceBufPtrs[i] = &deviceBuffs[i];
     }
 
   int directCopySize = 0;
 
-  CkRdmaDeviceOnSender(destPe, numDevBufs, (CkDeviceBuffer **) &deviceBuffs);
+  CkRdmaDeviceOnSender(destPe, numDevBufs, deviceBufPtrs);
   // find the size of the PUP'd data
   {
     PUP::sizer implP;
@@ -2668,6 +2685,11 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
 int CkCudaEnabled()
 {
   return CMK_CUDA;
+}
+
+int CkDeviceBufferSizeInBytes()
+{
+  return sizeof(CkDeviceBuffer);
 }
 
 #endif
