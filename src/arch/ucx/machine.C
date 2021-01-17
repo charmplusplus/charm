@@ -221,7 +221,7 @@ static void UcxInitEps(int numNodes, int myId)
 
     for (i = 0; i < numNodes; ++i) {
         peer = (i + myId) % numNodes;
-        if (peer == myId) continue;
+        //if (peer == myId) continue;
 
         ret = snprintf(keys, maxkey, "UCX-size-%d", peer);
         UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
