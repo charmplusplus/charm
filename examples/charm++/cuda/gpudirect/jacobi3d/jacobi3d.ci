@@ -22,10 +22,7 @@ mainmodule jacobi3d {
   readonly int n_iters;
   readonly int warmup_iters;
   readonly bool use_zerocopy;
-  readonly bool use_persistent;
   readonly bool print_elements;
-
-  message PersistentMsg;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
@@ -38,26 +35,14 @@ mainmodule jacobi3d {
   array [3D] Block {
     entry Block(void);
     entry void init();
-    entry void initRecv(int dir, CkDevicePersistent p_buf);
     entry void packGhostsDone();
     entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
-    entry void recvGhostP(PersistentMsg* msg);
     entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
     entry void updateDone();
     entry void print();
     entry void printDone();
 
     entry void initDone() {
-      if (use_persistent) {
-        for (remote_count = 0; remote_count < neighbors; remote_count++) {
-          when initRecv(int dir, CkDevicePersistent p_buf) {
-            serial {
-              p_neighbor_bufs[dir] = p_buf;
-            }
-          }
-        }
-      }
-
       serial {
         contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
       }
@@ -80,10 +65,6 @@ mainmodule jacobi3d {
             serial {
               processGhostZC(dir, w, buf);
             }
-          }
-        } else if (use_persistent) {
-          when recvGhostP[my_iter](PersistentMsg* msg) serial {
-            processGhostP(msg);
           }
         } else {
           when recvGhostReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
