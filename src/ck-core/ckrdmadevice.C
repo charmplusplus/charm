@@ -182,13 +182,13 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourc
 
     DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
-    save_op.src_pe = source.src_pe;
-    save_op.src_ptr = source.ptr;
+    //save_op.src_pe = source.src_pe;
+    //save_op.src_ptr = source.ptr;
     save_op.dest_pe = CkMyPe();
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
-    save_op.src_cb = new CkCallback(source.cb);
+    save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = new CkCallback(destCb);
     save_op.tag = source.tag;
   }
@@ -199,6 +199,7 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourc
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
     QdCreate(1);
     CmiRecvDevice(save_op, DEVICE_RECV_TYPE_CHARM4PY);
+    // CmiInvokeExtRecvHandler(save_op);
   }
 
   return is_inline;

@@ -2595,7 +2595,8 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
   CkDeviceBuffer *deviceBufPtrs[numDevBufs];
   for(int i = 0; i < numDevBufs; ++i)
     {
-      deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i], ((cudaStream_t*)streamPtrs)[i]);
+      //deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i], ((cudaStream_t*)streamPtrs)[i]);
+      deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i]);
       deviceBuffs[i].cnt = devBufSizesInBytes[i];
       deviceBufPtrs[i] = &deviceBuffs[i];
     }
