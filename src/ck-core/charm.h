@@ -126,11 +126,15 @@ extern void registerReadOnlyRecvExtCallback(void (*cb)(int, char*));
 extern void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char*, int));
 extern void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int));
 extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int));
+#if CMK_CUDA
+extern void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, long*, void *, int, char*,int));
+#endif
 extern void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int*, int, int, char *, int));
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
 extern void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int));
 extern void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *));
 extern void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *));
+extern void registerDepositFutureWithIdFn(void (*cb)(void*, void*));
 extern void StartCharmExt(int argc, char **argv); // start Converse/Charm, argv are the command-line arguments
 extern int CkMyPeHook(void);   // function equivalent of CkMyPe macro
 extern int CkNumPesHook(void); // function equivalent of CkNumPes macro
@@ -484,6 +488,21 @@ extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
 extern void CkCallWhenIdle(int epIdx, void* obj);
+
+#if CMK_CHARM4PY
+extern int CkCudaEnabled(void);
+extern int CUDAPointerOnDevice(const void *ptr);
+extern void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
+                               void *remoteBufInfo, void *streamPtrs, int *futureId);
+extern void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
+                                         int epIdx, int num_bufs, char *msg,
+                                         int msgSize,
+                                         long *devBufPtrs,
+                                         long *devBufSizesInBytes,
+                                         long *streamPtrs, int numDevBufs
+                                         );
+extern int CkDeviceBufferSizeInBytes();
+#endif
 
 #ifdef __cplusplus
 }

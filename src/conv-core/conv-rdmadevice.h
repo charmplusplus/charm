@@ -97,7 +97,11 @@ typedef void (*RdmaAckCallerFn)(void *token);
 
 void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
 void CmiRecvDevice(DeviceRdmaOp* op, bool ampi);
+#if CMK_CHARM4PY
+void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn1, RdmaAckCallerFn fn2, RdmaAckCallerFn fn3);
+#else
 void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn1, RdmaAckCallerFn fn2);
+#endif
 void CmiInvokeRecvHandler(void* data);
 void CmiInvokeAmpiRecvHandler(void* data);
 

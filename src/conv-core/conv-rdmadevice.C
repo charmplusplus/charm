@@ -30,15 +30,29 @@ void CmiRecvDevice(DeviceRdmaOp* op, bool ampi) {
 
 RdmaAckHandlerFn rdmaDeviceRecvHandlerFn;
 RdmaAckHandlerFn rdmaDeviceAmpiRecvHandlerFn;
+#if CMK_CHARM4PY
+RdmaAckHandlerFn rdmaDeviceExtRecvHandlerFn;
 
+void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn1, RdmaAckHandlerFn fn2, RdmaAckHandlerFn fn3) {
+  // Set handler function that gets invoked when data transfer is complete (on receiver)
+  rdmaDeviceRecvHandlerFn = fn1;
+  rdmaDeviceAmpiRecvHandlerFn = fn2;
+  rdmaDeviceExtRecvHandlerFn = fn3;
+}
+#else
 void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn1, RdmaAckHandlerFn fn2) {
   // Set handler function that gets invoked when data transfer is complete (on receiver)
   rdmaDeviceRecvHandlerFn = fn1;
   rdmaDeviceAmpiRecvHandlerFn = fn2;
 }
+#endif // CMK_CHARM4PY
 
 void CmiInvokeRecvHandler(void* data) {
+#if CMK_CHARM4PY
+  rdmaDeviceExtRecvHandlerFn(data);
+#else
   rdmaDeviceRecvHandlerFn(data);
+#endif
 }
 
 void CmiInvokeAmpiRecvHandler(void* data) {
