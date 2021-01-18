@@ -198,7 +198,7 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourc
     DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
     QdCreate(1);
-    CmiRecvDevice(save_op, false);
+    CmiRecvDevice(save_op, DEVICE_RECV_TYPE_CHARM4PY);
   }
 
   return is_inline;
@@ -282,7 +282,7 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
     QdCreate(1);
-    CmiRecvDevice(save_op, false);
+    CmiRecvDevice(save_op, DEVICE_RECV_TYPE_CHARM);
     //CmiInvokeRecvHandler(save_op);
   }
 

@@ -24,8 +24,8 @@ void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
   LrtsSendDevice(dest_pe, ptr, size, tag);
 }
 
-void CmiRecvDevice(DeviceRdmaOp* op, bool ampi) {
-  LrtsRecvDevice(op, ampi);
+void CmiRecvDevice(DeviceRdmaOp* op, DeviceRecvType type) {
+  LrtsRecvDevice(op, type);
 }
 
 RdmaAckHandlerFn rdmaDeviceRecvHandlerFn;
@@ -48,15 +48,17 @@ void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn1, RdmaAckHandlerFn fn2) {
 #endif // CMK_CHARM4PY
 
 void CmiInvokeRecvHandler(void* data) {
-#if CMK_CHARM4PY
-  rdmaDeviceExtRecvHandlerFn(data);
-#else
   rdmaDeviceRecvHandlerFn(data);
-#endif
 }
 
 void CmiInvokeAmpiRecvHandler(void* data) {
   rdmaDeviceAmpiRecvHandlerFn(data);
 }
+
+#if CMK_CHARM4PY
+void CmiInvokeExtRecvHandler(void* data) {
+  rdmaDeviceExtRecvHandlerFn(data);
+}
+#endif
 
 #endif // CMK_CUDA

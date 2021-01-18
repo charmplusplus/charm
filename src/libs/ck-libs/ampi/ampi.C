@@ -3545,7 +3545,7 @@ bool ampi::processSsendCudaMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
     rdma_op->tag = srcInfo.tag;
 
     //QdCreate(1);
-    CmiRecvDevice(rdma_op, true);
+    CmiRecvDevice(rdma_op, DEVICE_RECV_TYPE_AMPI);
     //CmiInvokeAmpiRecvHandler(rdma_op);
   } else {
     // TODO
