@@ -9,8 +9,14 @@ all: commbench
 commbench: $(OBJS)
 	$(CHARMC) -o commbench $(OBJS) -language converse++
 
+HOST=$(shell hostname)
+
 test: commbench
+ifneq (,$(findstring golub,$(HOST)))
+	@echo "Skipping commbench on Golub because of performance bug"
+else
 	$(call run, ./commbench +p4 )
+endif
 
 testp: commbench
 	$(call run, ./commbench +p$(P))
