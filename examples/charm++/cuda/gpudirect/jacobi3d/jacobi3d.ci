@@ -1,14 +1,18 @@
-mainmodule jacobi2d {
-  include "jacobi2d.h";
+mainmodule jacobi3d {
+  include "jacobi3d.h";
 
   readonly CProxy_Main main_proxy;
   readonly CProxy_Block block_proxy;
+  readonly int num_chares;
   readonly int grid_width;
   readonly int grid_height;
+  readonly int grid_depth;
   readonly int block_width;
   readonly int block_height;
+  readonly int block_depth;
   readonly int n_chares_x;
   readonly int n_chares_y;
+  readonly int n_chares_z;
   readonly int n_iters;
   readonly int warmup_iters;
   readonly bool sync_ver;
@@ -25,7 +29,7 @@ mainmodule jacobi2d {
     entry void printDone();
   };
 
-  array [2D] Block {
+  array [3D] Block {
     entry Block(void);
     entry void init();
     entry void initDone();
