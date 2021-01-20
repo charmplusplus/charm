@@ -9,10 +9,10 @@ all: commbench
 commbench: $(OBJS)
 	$(CHARMC) -o commbench $(OBJS) -language converse++
 
-HOST=$(shell hostname)
+LOCALHOSTNAME:=$(shell hostname 2>/dev/null)
 
 test: commbench
-ifneq (,$(findstring golub,$(HOST)))
+ifneq (,$(findstring golub,$(LOCALHOSTNAME)))
 	@echo "Skipping commbench on Golub because of performance bug"
 else
 	$(call run, ./commbench +p4 )
@@ -62,4 +62,3 @@ clean:
 	rm -f TAGS *.o
 	rm -f commbench
 	rm -f conv-host charmrun charmrun.exe commbench.exe commbench.pdb commbench.ilk
-
