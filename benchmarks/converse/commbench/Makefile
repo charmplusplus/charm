@@ -20,7 +20,7 @@ endif
 
 testp: commbench
 ifneq (,$(findstring golub,$(LOCALHOSTNAME)))
-	@echo "Skipping commbench on Golub because of performance bug"
+	@echo "Skipping commbench on Golub because of performance bug #3257"
 else
 	$(call run, ./commbench +p$(P))
 endif
