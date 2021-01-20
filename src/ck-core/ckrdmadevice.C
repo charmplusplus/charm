@@ -125,6 +125,7 @@ void CkRdmaDeviceAmpiRecvHandler(void* data) {
 
 #if CMK_CHARM4PY
 void CkRdmaDeviceExtRecvHandler(void* data) {
+  CkPrintf("CkRdmaDeviceExtRecvHandler\n");
   // Process QD to mark completion of the outstanding RDMA operation
   QdProcess(1);
 
@@ -156,6 +157,7 @@ void CkRdmaDeviceExtRecvHandler(void* data) {
 
 bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs, CkCallback &destCb)
 {
+  CkPrintf("CkRdmaDeviceIssueRgetsFromUnpackedMessage\n");
   // Determine if the subsequent regular entry method should be invoked
   // inline (intra-node) or not (inter-node)
   bool is_inline = true;
@@ -188,9 +190,12 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourc
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
-    save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
+    // FIXME: Something wrong with unpacking the source callback
+    //save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
+    save_op.src_cb = nullptr;
     save_op.dst_cb = new CkCallback(destCb);
     save_op.tag = source.tag;
+    CkPrintf("Unpacked src CkDeviceBuffer, save_op.src_cb: %p, tag: %d\n", save_op.src_cb, source.tag);
   }
 
   // Post ucp_tag_recv_nb's to receive GPU data
@@ -198,8 +203,8 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourc
     DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
     QdCreate(1);
-    CmiRecvDevice(save_op, DEVICE_RECV_TYPE_CHARM4PY);
-    // CmiInvokeExtRecvHandler(save_op);
+    //CmiRecvDevice(save_op, DEVICE_RECV_TYPE_CHARM4PY);
+    CmiInvokeExtRecvHandler(save_op);
   }
 
   return is_inline;
@@ -613,7 +618,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // Post ucp_tag_send_nb's to send GPU data. When receiver receives the metadata,
   // it should post ucp_tag_recv_nb's to receive the GPU data.
   for (int i = 0; i < numops; i++) {
-    CmiSendDevice(dest_pe, buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
+    //CmiSendDevice(dest_pe, buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
   }
 
   /*

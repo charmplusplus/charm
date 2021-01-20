@@ -465,13 +465,18 @@ void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
                         void *remoteBufInfo, void *streamPtrs, int *futureId)
 {
 #if CMK_CUDA
+  CkPrintf("CkGetGPUDirectData, 1: %d, 2: %p, 3: %p, 4: %p, 5: %p, 6: %p\n",
+      numBuffers, recvBufPtrs, arrSizes, remoteBufInfo, streamPtrs, futureId);
+  CkDeviceBuffer* remoteBuf = (CkDeviceBuffer*)remoteBufInfo;
+
   long *recvBufAddrs = (long*) recvBufPtrs;
   void *hostArrPtrs[numBuffers];
-  for(int i = 0; i < numBuffers; ++i)
-    {
-      hostArrPtrs[i] = (void*) recvBufAddrs[i];
-    }
+  for (int i = 0; i < numBuffers; ++i) {
+    hostArrPtrs[i] = (void*) recvBufAddrs[i];
+    CkPrintf("Op %d: dest ptr: %p, size: %d, src ptr: %p\n", i, hostArrPtrs[i], arrSizes[i], remoteBuf->ptr);
+  }
   CkCallback cb(DepositFutureWithIdFn, (void*) futureId);
+  CkPrintf("Created callback with future ID %d\n", futureId[0]);
   // create the post structs
   // FIXME: this is consistent with the current Charm++ impl but will break as soon as it's changed
   CkDeviceBufferPost *postStructs = nullptr;
@@ -2582,8 +2587,8 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
                                   )
 {
 #if CMK_CUDA
-  int totalSize = 0;
   int impl_off = 0;
+  int d = 0;
   CkGroupID gId;
   gId.idx = aid;
   CkArrayIndex1D arrIndex(*idx);
@@ -2593,52 +2598,58 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
 
   CkDeviceBuffer deviceBuffs[numDevBufs];
   CkDeviceBuffer *deviceBufPtrs[numDevBufs];
-  for(int i = 0; i < numDevBufs; ++i)
-    {
-      //deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i], ((cudaStream_t*)streamPtrs)[i]);
-      deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i]);
-      deviceBuffs[i].cnt = devBufSizesInBytes[i];
-      deviceBufPtrs[i] = &deviceBuffs[i];
-    }
-
-  int directCopySize = 0;
-
-  CkRdmaDeviceOnSender(destPe, numDevBufs, deviceBufPtrs);
-  // find the size of the PUP'd data
-  {
-    PUP::sizer implP;
-    implP | numDevBufs;
-    for(int i = 0; i < numDevBufs; ++i)
-      {
-        implP | devBufSizesInBytes[i];
-        implP | deviceBuffs[i];
-      }
-    implP | msgSize;
-    implP | epIdx;
-    implP | directCopySize;
-    impl_off += implP.size();
+  for (int i = 0; i < numDevBufs; ++i) {
+    //deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i], ((cudaStream_t*)streamPtrs)[i]);
+    deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i]);
+    deviceBuffs[i].cnt = devBufSizesInBytes[i];
+    deviceBufPtrs[i] = &deviceBuffs[i];
+    CkPrintf("Sender op %d: src ptr: %p, size: %d, CkDeviceBuffer ptr: %p\n", i, devBufPtrs[i], deviceBuffs[i].cnt, deviceBufPtrs[i]);
   }
 
-  // store the size of the data that is used for
-  // GPU Direct. This needs to be separated from the
-  // data in the non-GPUdirect part of the message
-  directCopySize = impl_off;
-  impl_off += msgSize;
+  CkRdmaDeviceOnSender(destPe, numDevBufs, deviceBufPtrs);
+
+  // Find the size of the PUP'd data
+  int directCopySize = 0;
+  {
+    PUP::sizer implP;
+
+    // GPUDirect data
+    implP | numDevBufs;
+    implP | directCopySize;
+    for (int i = 0; i < numDevBufs; ++i) {
+      implP | devBufSizesInBytes[i];
+      implP | deviceBuffs[i];
+    }
+
+    // Store the size of the data that is used for
+    // GPU Direct. This needs to be separated from the
+    // data in the non-GPUdirect part of the message
+    directCopySize = implP.size();
+
+    // Regular Charm4Py message
+    implP | msgSize;
+    implP | epIdx;
+    implP | d;
+    implP(msg, msgSize);
+
+    impl_off += implP.size();
+  }
 
   CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,0);
   {
     PUP::toMem implP((void *) impl_msg->msgBuf);
+
     implP | numDevBufs;
     implP | directCopySize;
-    for(int i = 0; i < numDevBufs; ++i)
-      {
-        implP | devBufSizesInBytes[i];
-        implP | deviceBuffs[i];
-      }
-      implP | msgSize;
-      implP | epIdx;
+    for (int i = 0; i < numDevBufs; ++i) {
+      implP | devBufSizesInBytes[i];
+      implP | deviceBuffs[i];
+    }
 
-      implP(msg, msgSize);
+    implP | msgSize;
+    implP | epIdx;
+    implP | d;
+    implP(msg, msgSize);
   }
 
   CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_DEVICE_MSG;
