@@ -13,7 +13,7 @@ LOCALHOSTNAME:=$(shell hostname 2>/dev/null)
 
 test: commbench
 ifneq (,$(findstring golub,$(LOCALHOSTNAME)))
-	@echo "Skipping commbench on Golub because of performance bug"
+	@echo "Skipping commbench on Golub because of performance bug #3257"
 else
 	$(call run, ./commbench +p4 )
 endif
