@@ -462,19 +462,9 @@ int CUDAPointerOnDevice(const void *ptr)
 }
 
 void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
-                        void *remoteBufInfo, void *streamPtrs, int *futureId)
+                        void *remoteBufInfos, void *streamPtrs, int *futureId)
 {
 #if CMK_CUDA
-  CkPrintf("CkGetGPUDirectData, 1: %d, 2: %p, 3: %p, 4: %p, 5: %p, 6: %p\n",
-      numBuffers, recvBufPtrs, arrSizes, remoteBufInfo, streamPtrs, futureId);
-  CkDeviceBuffer* remoteBuf = (CkDeviceBuffer*)remoteBufInfo;
-
-  long *recvBufAddrs = (long*) recvBufPtrs;
-  void *hostArrPtrs[numBuffers];
-  for (int i = 0; i < numBuffers; ++i) {
-    hostArrPtrs[i] = (void*) recvBufAddrs[i];
-    CkPrintf("Op %d: dest ptr: %p, size: %d, src ptr: %p\n", i, hostArrPtrs[i], arrSizes[i], remoteBuf->ptr);
-  }
   CkCallback cb(DepositFutureWithIdFn, (void*) futureId);
   CkPrintf("Created callback with future ID %d\n", futureId[0]);
   // create the post structs
@@ -482,9 +472,10 @@ void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
   CkDeviceBufferPost *postStructs = nullptr;
   streamPtrs = nullptr;
 
-  CkRdmaDeviceIssueRgetsFromUnpackedMessage(numBuffers, (CkDeviceBuffer*) remoteBufInfo, hostArrPtrs,
-                                            arrSizes, postStructs, cb
-                                            );
+  // remoteBufInfos is an array of pointers to unpacked CkDeviceBuffers (each stored as long)
+  // recvBufPtrs is an array of pointers to destination GPU buffers
+  CkRdmaDeviceIssueRgetsFromUnpackedMessage(numBuffers, (CkDeviceBuffer**)remoteBufInfos, (void**)recvBufPtrs,
+                                            arrSizes, postStructs, cb);
 #else
   CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
 #endif // CMK_CUDA
@@ -2642,6 +2633,8 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
     implP | numDevBufs;
     implP | directCopySize;
     for (int i = 0; i < numDevBufs; ++i) {
+      CkPrintf("Sender PUP buf %d, ptr: %p, cnt: %d, tag: %zu\n", i,
+          deviceBuffs[i].ptr, deviceBuffs[i].cnt, deviceBuffs[i].tag);
       implP | devBufSizesInBytes[i];
       implP | deviceBuffs[i];
     }

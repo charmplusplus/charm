@@ -155,7 +155,7 @@ void CkRdmaDeviceExtRecvHandler(void* data) {
   }
 }
 
-bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs, CkCallback &destCb)
+bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer **sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs, CkCallback &destCb)
 {
   CkPrintf("CkRdmaDeviceIssueRgetsFromUnpackedMessage\n");
   // Determine if the subsequent regular entry method should be invoked
@@ -180,7 +180,7 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourc
 
   // store source buffers for retrieval
   for (int i = 0; i < numops; i++) {
-    CkDeviceBuffer &source = sourceStructs[i];
+    CkDeviceBuffer &source = *sourceStructs[i];
 
     DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
@@ -190,12 +190,11 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourc
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
-    // FIXME: Something wrong with unpacking the source callback
-    //save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
-    save_op.src_cb = nullptr;
+    save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = new CkCallback(destCb);
     save_op.tag = source.tag;
-    CkPrintf("Unpacked src CkDeviceBuffer, save_op.src_cb: %p, tag: %d\n", save_op.src_cb, source.tag);
+    CkPrintf("save_op.dest_ptr: %p, save_op.src_cb: %p\n", save_op.dest_ptr, save_op.src_cb);
+    CkPrintf("Unpacked src CkDeviceBuffer, ptr: %p, cnt: %d, tag: %d\n", source.ptr, source.cnt, source.tag);
   }
 
   // Post ucp_tag_recv_nb's to receive GPU data

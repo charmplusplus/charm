@@ -462,6 +462,8 @@ public:
         for (int i = 0; i < numDevBufs; i++) {
           implP | devBufSizes[i];
           implP | devBufs[i];
+          CkPrintf("Receiver PUP buf %d (%p), ptr: %p, cnt: %d, tag: %zu\n", i,
+              &devBufs[i], devBufs[i].ptr, devBufs[i].cnt, devBufs[i].tag);
         }
 
         int msgSize; implP | msgSize;
