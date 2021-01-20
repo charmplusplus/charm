@@ -19,7 +19,11 @@ else
 endif
 
 testp: commbench
+ifneq (,$(findstring golub,$(LOCALHOSTNAME)))
+	@echo "Skipping commbench on Golub because of performance bug"
+else
 	$(call run, ./commbench +p$(P))
+endif
 
 memoryAccess.o: memoryAccess.c
 	$(CHARMC) memoryAccess.c
