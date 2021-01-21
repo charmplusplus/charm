@@ -54,7 +54,7 @@ class tester : public CBase_tester {
       // Test p2p sends
       arrProxy[9].recv_zerocopy(CkSendBuffer(srcBuffer1), SIZE, false);
       grpProxy[CkNumPes() - 1].recv_zerocopy(CkSendBuffer(srcBuffer1), SIZE, CkSendBuffer(srcBuffer2), SIZE, false);
-      //ngProxy[CkNumNodes() - 1].recv_zerocopy(CkSendBuffer(srcBuffer1), SIZE, false);
+      ngProxy[CkNumNodes() - 1].recv_zerocopy(CkSendBuffer(srcBuffer1), SIZE, false);
     }
 
     void callP2pReadyToPost() {
@@ -67,7 +67,7 @@ class tester : public CBase_tester {
     }
 
     void p2pDone() {
-      if(++counter == 2) {
+      if(++counter == 3) {
         counter = 0;
         //CkPrintf("[%d][%d][%d] All tests have successfully completed\n", CkMyPe(), CkMyNode(), CkMyRank());
         //CkExit();
@@ -75,7 +75,7 @@ class tester : public CBase_tester {
         // Test bcast sends
         arrProxy.recv_zerocopy(CkSendBuffer(srcBuffer1), SIZE, true);
         grpProxy.recv_zerocopy(CkSendBuffer(srcBuffer1), SIZE, CkSendBuffer(srcBuffer2), SIZE, true);
-        //ngProxy.recv_zerocopy(CkSendBuffer(srcBuffer1), SIZE, true);
+        ngProxy.recv_zerocopy(CkSendBuffer(srcBuffer1), SIZE, true);
       }
     }
 
@@ -89,7 +89,7 @@ class tester : public CBase_tester {
     }
 
     void bcastDone() {
-      if(++counter == 2) {
+      if(++counter == 3) {
         counter = 0;
         delete [] srcBuffer1;
         delete [] srcBuffer2;
@@ -192,7 +192,7 @@ class grp : public CBase_grp {
         assignValuesToIndex(destBuffer1, SIZE); // Reset values
         assignValuesToIndex(destBuffer2, SIZE); // Reset values
         chareProxy.p2pDone();
-      }
+     }
     }
 };
 

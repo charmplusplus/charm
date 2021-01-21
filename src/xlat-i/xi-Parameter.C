@@ -707,36 +707,38 @@ void Parameter::copyFromPostedPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool
 
     if (hostPath) {
       if (genRdma) {
-        str << "    if(ncpyPost[" << count << "].postLater == false ) {\n";
-        // Error checking if posted buffer is larger than the source buffer
-        str << "  if( ";
-        if(isSDAGGen)
-          str << "genClosure->";
-        str << "ncpyBuffer_" << name << ".cnt < " ;
-        if(isSDAGGen)
-           str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
-        else
-          str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
+        //TODO: Uncomment this later
+        //str << "    if(ncpyPost[" << count << "].postLater == false ) {\n";
+        //// Error checking if posted buffer is larger than the source buffer
+        //str << "  if( ";
+        //if(isSDAGGen)
+        //  str << "genClosure->";
+        //str << "ncpyBuffer_" << name << ".cnt < " ;
+        //if(isSDAGGen)
+        //   str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
+        //else
+        //  str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
 
-        str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
+        //str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
 
-        str << "    memcpy(" << "ncpyBuffer_" << name << "_ptr,";
-        if(isSDAGGen)
-          str << "genClosure->";
-        str << "ncpyBuffer_" << name << ".ptr,";
-        if(isSDAGGen)
-          str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
-        else
-          str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
+        //str << "    memcpy(" << "ncpyBuffer_" << name << "_ptr,";
+        //if(isSDAGGen)
+        //  str << "genClosure->";
+        //str << "ncpyBuffer_" << name << ".ptr,";
+        //if(isSDAGGen)
+        //  str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
+        //else
+        //  str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
 
-        str << "   setPosted(tagArray, env, impl_obj->thisIndex, ";
-        if(isSDAGGen)
-          str << " genClosure->num_rdma_fields,";
-        else
-          str << " impl_num_rdma_fields,";
-        str << count << ");\n";
+        //str << "   setPosted(tagArray, env, impl_obj->thisIndex, ";
+        //if(isSDAGGen)
+        //  str << " genClosure->num_rdma_fields,";
+        //else
+        //  str << " impl_num_rdma_fields,";
+        //str << count << ");\n";
 
-        str << "    } else {\n";
+        //str << "    } else {\n";
+        str << "    {\n";
         str << "      ncpyPost[" << count << "].srcBuffer = (void *)";
         if(isSDAGGen) str << "genClosure->";
         str << "ncpyBuffer_" << name << ".ptr;\n";

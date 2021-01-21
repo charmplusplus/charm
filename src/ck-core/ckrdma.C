@@ -1240,13 +1240,13 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
     post[i].ncpyEmInfo = (NcpyEmInfo *)ref;
     //CmiPrintf("[%d][%d][%d] CkPostBufferLater i=%d posting tag=%d and setting ncpyEmInfo to %p and extraSize is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, post[i].tag, post[i].ncpyEmInfo, extraSize);
 
-    if(env->getMsgtype() == ForNodeBocMsg) {
-      CmiLock(CksvAccess(_nodeZCPostReqLock));
-      CksvAccess(ncpyPostedReqNodeMap).emplace(post[i].tag, post[i]);
-      CmiUnlock(CksvAccess(_nodeZCPostReqLock));
-    } else {
-      CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
-    }
+    //if(env->getMsgtype() == ForNodeBocMsg) {
+    //  CmiLock(CksvAccess(_nodeZCPostReqLock));
+    //  CksvAccess(ncpyPostedReqNodeMap).emplace(post[i].tag, post[i]);
+    //  CmiUnlock(CksvAccess(_nodeZCPostReqLock));
+    //} else {
+    //  CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
+    //}
   }
 }
 
@@ -2535,6 +2535,7 @@ inline void _ncpyBcastNoHandler(ncpyBcastNoMsg *bcastNoMsg) {
   arrProxy[bcastNoMsg->srcPe].sendZCBroadcast(w);
 }
 
+/*
 void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *post) {
   char *ref = (char *)CmiAlloc(sizeof(NcpyEmInfo));
   setNcpyEmInfo(ref, env, numops, NULL, emMode);
@@ -2552,6 +2553,7 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
     //CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
   }
 }
+*/
 
 void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, CkNcpyBufferPost *post, int arrayIndex, void *peerAckInfo) {
 
@@ -2565,13 +2567,13 @@ void CkRdmaPostLaterPreprocess(envelope *env, ncpyEmApiMode emMode, int numops, 
   for(int i=0; i<numops; i++) {
     post[i].ncpyEmInfo = (NcpyEmInfo *)ref;
     //CmiPrintf("[%d][%d][%d] CkPostBufferLater i=%d posting tag=%d and setting ncpyEmInfo to %p \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, post[i].tag, post[i].ncpyEmInfo);
-    if(env->getMsgtype() == ForNodeBocMsg) {
-      CmiLock(CksvAccess(_nodeZCPostReqLock));
-      CksvAccess(ncpyPostedReqNodeMap).emplace(post[i].tag, post[i]);
-      CmiUnlock(CksvAccess(_nodeZCPostReqLock));
-    } else {
-      CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
-    }
+    //if(env->getMsgtype() == ForNodeBocMsg) {
+    //  CmiLock(CksvAccess(_nodeZCPostReqLock));
+    //  CksvAccess(ncpyPostedReqNodeMap).emplace(post[i].tag, post[i]);
+    //  CmiUnlock(CksvAccess(_nodeZCPostReqLock));
+    //} else {
+    //  CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
+    //}
 //    CkpvAccess(ncpyPostedReqMap).emplace(post[i].tag, post[i]);
   }
 }
@@ -2591,11 +2593,15 @@ void setNcpyEmInfo(char *ref, envelope *env, int &numops, void *forwardMsg, ncpy
 int CkPostBufferLaterInternal(CkNcpyBufferPost *post, int index, bool nodeLevel) {
   post[index].postLater = true;
 
-  if(nodeLevel)
+  if(nodeLevel) {
     post[index].tag = CksvAccess(postNodeTag)--;
-  else
+    CmiLock(CksvAccess(_nodeZCPostReqLock));
+    CksvAccess(ncpyPostedReqNodeMap).emplace(post[index].tag, post[index]);
+    CmiUnlock(CksvAccess(_nodeZCPostReqLock));
+  } else {
     post[index].tag = CkpvAccess(postTag)++;
-
+    CkpvAccess(ncpyPostedReqMap).emplace(post[index].tag, post[index]);
+  }
   return post[index].tag;
 }
 

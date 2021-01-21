@@ -1885,6 +1885,12 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
     if(param->hasRecvRdma()) {
       //str << "#if CMK_ONESIDED_IMPL\n";
       str << "  if(CMI_IS_ZC_RECV(env)) {\n";
+      str << "      CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), ";
+      if(isSDAGGen)
+        str << "genClosure->num_rdma_fields, genClosure->num_root_node, ";
+      else
+        str << "impl_num_rdma_fields, impl_num_root_node, ";
+      str << "ncpyPost);\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
       if (param->hasDevice()) {
         str << "  void *buffPtrs["<< numRdmaDeviceParams <<"];\n";
@@ -1909,23 +1915,18 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
        //  for (int index = 0; index < numRdmaRecvParams; index++)
        //    str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
        //str << "    CmiPrintf(\" [%d][%d][%d] numPostLater = %d\\n\", CkMyPe(), CmiMyNode(), CmiMyRank(), numPostLater);\n";
-       str << "    if(numPostLater > 0) {\n";
-       str << "      CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), ";
-       if(isSDAGGen)
-         str << "genClosure->num_rdma_fields, genClosure->num_root_node, ";
-       else
-         str << "impl_num_rdma_fields, impl_num_root_node, ";
-       str << "ncpyPost);\n";
+       //str << "    if(numPostLater > 0) {\n";
        //str << "      NcpyEmInfo *ncpyEmInfo = new NcpyEmInfo();\n";
        //for (int index = 1; index < numRdmaRecvParams; index++)
        //    str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
-       str << "    } else \n";
-       str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), ";
-       if(isSDAGGen)
-         str << "genClosure->num_rdma_fields, genClosure->num_root_node, ";
-       else
-         str << "impl_num_rdma_fields, impl_num_root_node, ";
-       str << "buffPtrs, buffSizes, impl_obj->thisIndex, ncpyPost);\n";
+       //    TODO:Uncomment this later
+       //str << "    } else \n";
+       //str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), ";
+       //if(isSDAGGen)
+       //  str << "genClosure->num_rdma_fields, genClosure->num_root_node, ";
+       //else
+       //  str << "impl_num_rdma_fields, impl_num_root_node, ";
+       //str << "buffPtrs, buffSizes, impl_obj->thisIndex, ncpyPost);\n";
       }
       str << "  } else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
 
@@ -1939,16 +1940,20 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
         str << " genClosure->num_rdma_fields)) {\n";
       else
         str << " impl_num_rdma_fields)) {\n";
-      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+      str << "   CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), " << numRdmaRecvParams << ", ncpyPost, impl_obj->thisIndex, peerAckInfo);\n";
       for (int index = 0; index < numRdmaRecvParams; index++)
         str << "    if(ncpyPost[" << index << "].postLater) numPostLater++;\n";
       param->copyFromPostedPtrs(str, isSDAGGen);
-      str << " if(numPostLater == 0) {\n";
-      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
-      str << "    updatePeerCounter(peerAckInfo);\n";
-      //str << "      } else {\n";
-      str << "   } else\n";
-      str << "   CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), " << numRdmaRecvParams << ", ncpyPost, impl_obj->thisIndex, peerAckInfo);\n";
+
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+
+      //TODO: Uncomment this later
+      //str << " if(numPostLater == 0) {\n";
+      //genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
+      //str << "    updatePeerCounter(peerAckInfo);\n";
+      ////str << "      } else {\n";
+      //str << "   } else\n";
+      //str << "   CkRdmaPostLaterPreprocess(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), " << numRdmaRecvParams << ", ncpyPost, impl_obj->thisIndex, peerAckInfo);\n";
       //str << "      }\n";
       str << "  } else {\n";
       //str << "    CkArray *mgr = getArrayMgrFromMsg(env);\n";
