@@ -152,6 +152,8 @@ public:
   void TurnOff() { on = false; };
 
   void ResumeClients(void);
+
+  bool hasReceivers() { return !receivers.empty(); };
 };
 
 #endif /* CKSYNCBARRIER_H */
