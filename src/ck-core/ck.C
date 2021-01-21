@@ -466,7 +466,6 @@ void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
 {
 #if CMK_CUDA
   CkCallback cb(DepositFutureWithIdFn, (void*) futureId);
-  CkPrintf("Created callback with future ID %d\n", futureId[0]);
   // create the post structs
   // FIXME: this is consistent with the current Charm++ impl but will break as soon as it's changed
   CkDeviceBufferPost *postStructs = nullptr;
@@ -2594,7 +2593,6 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
     deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i]);
     deviceBuffs[i].cnt = devBufSizesInBytes[i];
     deviceBufPtrs[i] = &deviceBuffs[i];
-    CkPrintf("Sender op %d: src ptr: %p, size: %d, CkDeviceBuffer ptr: %p\n", i, devBufPtrs[i], deviceBuffs[i].cnt, deviceBufPtrs[i]);
   }
 
   CkRdmaDeviceOnSender(destPe, numDevBufs, deviceBufPtrs);
@@ -2633,8 +2631,6 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
     implP | numDevBufs;
     implP | directCopySize;
     for (int i = 0; i < numDevBufs; ++i) {
-      CkPrintf("Sender PUP buf %d, ptr: %p, cnt: %d, tag: %zu\n", i,
-          deviceBuffs[i].ptr, deviceBuffs[i].cnt, deviceBuffs[i].tag);
       implP | devBufSizesInBytes[i];
       implP | deviceBuffs[i];
     }

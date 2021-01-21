@@ -125,7 +125,6 @@ void CkRdmaDeviceAmpiRecvHandler(void* data) {
 
 #if CMK_CHARM4PY
 void CkRdmaDeviceExtRecvHandler(void* data) {
-  CkPrintf("CkRdmaDeviceExtRecvHandler\n");
   // Process QD to mark completion of the outstanding RDMA operation
   QdProcess(1);
 
@@ -157,7 +156,6 @@ void CkRdmaDeviceExtRecvHandler(void* data) {
 
 bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer **sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs, CkCallback &destCb)
 {
-  CkPrintf("CkRdmaDeviceIssueRgetsFromUnpackedMessage\n");
   // Determine if the subsequent regular entry method should be invoked
   // inline (intra-node) or not (inter-node)
   bool is_inline = true;
@@ -193,8 +191,6 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer **sour
     save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = new CkCallback(destCb);
     save_op.tag = source.tag;
-    CkPrintf("save_op.dest_ptr: %p, save_op.src_cb: %p\n", save_op.dest_ptr, save_op.src_cb);
-    CkPrintf("Unpacked src CkDeviceBuffer, ptr: %p, cnt: %d, tag: %d\n", source.ptr, source.cnt, source.tag);
   }
 
   // Post ucp_tag_recv_nb's to receive GPU data
