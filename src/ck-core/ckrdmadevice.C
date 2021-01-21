@@ -202,8 +202,8 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer **sour
     DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
     QdCreate(1);
-    //CmiRecvDevice(save_op, DEVICE_RECV_TYPE_CHARM4PY);
-    CmiInvokeExtRecvHandler(save_op);
+    CmiRecvDevice(save_op, DEVICE_RECV_TYPE_CHARM4PY);
+    //CmiInvokeExtRecvHandler(save_op);
   }
 
   return is_inline;
@@ -617,7 +617,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // Post ucp_tag_send_nb's to send GPU data. When receiver receives the metadata,
   // it should post ucp_tag_recv_nb's to receive the GPU data.
   for (int i = 0; i < numops; i++) {
-    //CmiSendDevice(dest_pe, buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
+    CmiSendDevice(dest_pe, buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
   }
 
   /*
