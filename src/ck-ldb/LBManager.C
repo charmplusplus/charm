@@ -84,7 +84,7 @@ class LBDBRegistry
   LBCreateFn search(std::string name)
   {
     const auto index = name.find_first_of(":,");
-    for (int i = 0; i < lbtables.length(); i++)
+    for (int i = 0; i < lbtables.size(); i++)
       if (0 == lbtables[i].name.compare(0, index, name))
         return lbtables[i].cfn;
     return nullptr;
@@ -92,7 +92,7 @@ class LBDBRegistry
   LBAllocFn getLBAllocFn(std::string name)
   {
     const auto index = name.find_first_of(":,");
-    for (int i = 0; i < lbtables.length(); i++)
+    for (int i = 0; i < lbtables.size(); i++)
       if (0 == lbtables[i].name.compare(0, index, name))
         return lbtables[i].afn;
     return nullptr;
@@ -140,13 +140,13 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
   // runtime specified load balancer
   if (!lbRegistry.runtime_lbs.empty())
   {
-    for (const auto& balancer : lbRegistry.runtime_lbs)
+    for (int i = 0; i < lbRegistry.runtime_lbs.size(); i++)
     {
       // If this is a legacy TreeLB, pass in the legacy LB name
       const char* legacybalancer = lbRegistry.legacy_runtime_treelbs.count(i) > 0
                                        ? lbRegistry.legacy_runtime_treelbs[i]
                                        : nullptr;
-      createLoadBalancer(balancer, legacybalancer);
+      createLoadBalancer(lbRegistry.runtime_lbs[i], legacybalancer);
     }
   }
   else if (!lbRegistry.compile_lbs.empty())
