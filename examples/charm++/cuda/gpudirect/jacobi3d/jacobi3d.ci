@@ -42,20 +42,23 @@ mainmodule jacobi3d {
     entry Block(void);
     entry void init();
     entry void initDone();
-    entry void packGhostsDone();
+    entry void packDone();
     entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
-    entry void updateDone();
     entry void print();
     entry void printDone();
 
     entry void run() {
-      // Pack and send ghost data to neighbors
       serial {
-        packGhosts();
+        // For computation-communication overlap, it is important that
+        // Jacobi update and packing kernel invocations of the same chare
+        // stay together
+        updateAndPack();
       }
 
-      when packGhostsDone() serial {
+      when packDone() serial {
+        std::swap(d_temperature, d_new_temperature);
+        my_iter++;
         sendGhosts();
       }
 
@@ -76,26 +79,20 @@ mainmodule jacobi3d {
         }
       }
 
-      // Perform Jacobian update
       serial {
-        update();
-      }
-
-      // Iteration complete
-      when updateDone() serial {
         if (print_elements) {
           if (x == 0 && y == 0 && z == 0) {
             CkPrintf("Printing iteration %d\n", my_iter);
             thisProxy[thisIndex].print();
           }
         } else {
-          prepNextIter();
+          proceed();
         }
       }
 
       if (print_elements) {
         when printDone() serial {
-          prepNextIter();
+          proceed();
         }
       }
     }

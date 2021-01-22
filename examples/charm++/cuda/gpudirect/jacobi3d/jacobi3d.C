@@ -392,29 +392,42 @@ class Block : public CBase_Block {
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
   }
 
-  void packGhosts() {
+  void updateAndPack() {
+    // Enforce unpack -> compute dependency
+    hapiCheck(cudaEventRecord(unpack_compute_event, manager->unpack_stream));
+    hapiCheck(cudaStreamWaitEvent(manager->compute_stream, unpack_compute_event, 0));
+
+    // Invoke GPU kernel for Jacobi computation
+    invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
+        block_depth, manager->compute_stream);
+    hapiCheck(cudaEventRecord(compute_pack_event, manager->compute_stream));
+
     std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
       y_surf_size, z_surf_size, z_surf_size};
 
     for (int i = 0; i < DIR_COUNT; i++) {
       if (!bounds[i]) {
-        // Pack non-contiguous ghost to temporary contiguous buffer on device
-        DataType* pack_ghost = use_zerocopy ? d_send_ghosts[i] : d_ghosts[i];
+        // Enforce compute -> pack dependency
         hapiCheck(cudaStreamWaitEvent(manager->pack_stream, compute_pack_event, 0));
+
+        // Pack
+        DataType* pack_ghost = use_zerocopy ? d_send_ghosts[i] : d_ghosts[i];
         invokePackingKernel(d_temperature, pack_ghost, i, block_width, block_height,
             block_depth, manager->pack_stream);
 
         if (!use_zerocopy) {
-          // Transfer ghosts from device to host when packing kernel completes
+          // Enforce pack -> d2h dependency
           hapiCheck(cudaEventRecord(pack_d2h_events[i], manager->pack_stream));
           hapiCheck(cudaStreamWaitEvent(manager->d2h_stream, pack_d2h_events[i], 0));
+
+          // Transfer ghosts from device to host when packing kernel completes
           hapiCheck(cudaMemcpyAsync(h_ghosts[i], d_ghosts[i], ghost_sizes[i],
                 cudaMemcpyDeviceToHost, manager->d2h_stream));
         }
       }
     }
 
-    CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
+    CkCallback* cb = new CkCallback(CkIndex_Block::packDone(), thisProxy[thisIndex]);
     if (use_zerocopy) {
       hapiAddCallback(manager->pack_stream, cb);
     } else {
@@ -488,31 +501,21 @@ class Block : public CBase_Block {
     DataType* h_ghost = h_ghosts[dir];
     DataType* d_ghost = d_ghosts[dir];
 
+    // Copy ghost from host to device buffer
     memcpy(h_ghost, gh, size * sizeof(DataType));
     hapiCheck(cudaMemcpyAsync(d_ghost, h_ghost, size * sizeof(DataType),
           cudaMemcpyHostToDevice, manager->h2d_stream));
+
+    // Enforce h2d -> unpack dependency
     hapiCheck(cudaEventRecord(h2d_unpack_events[dir], manager->h2d_stream));
     hapiCheck(cudaStreamWaitEvent(manager->unpack_stream, h2d_unpack_events[dir], 0));
+
+    // Unpack
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
         block_depth, manager->unpack_stream);
   }
 
-  void update() {
-    hapiCheck(cudaEventRecord(unpack_compute_event, manager->unpack_stream));
-    hapiCheck(cudaStreamWaitEvent(manager->compute_stream, unpack_compute_event, 0));
-
-    // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
-        block_depth, manager->compute_stream);
-    hapiCheck(cudaEventRecord(compute_pack_event, manager->compute_stream));
-
-    CkCallback* update_cb = new CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
-    hapiAddCallback(manager->compute_stream, update_cb);
-  }
-
-  void prepNextIter() {
-    std::swap(d_temperature, d_new_temperature);
-    my_iter++;
+  void proceed() {
     if (my_iter <= warmup_iters) {
       contribute(CkCallback(CkReductionTarget(Main, warmupDone), main_proxy));
     } else {
