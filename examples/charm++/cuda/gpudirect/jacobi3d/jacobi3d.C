@@ -4,9 +4,8 @@
 #include <utility>
 #include <sstream>
 
-#define CUDA_SYNC 0
-
 /* readonly */ CProxy_Main main_proxy;
+/* readonly */ CProxy_Manager manager_proxy;
 /* readonly */ CProxy_Block block_proxy;
 /* readonly */ int num_chares;
 /* readonly */ int grid_width;
@@ -37,8 +36,8 @@ extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     int block_height, int block_depth, bool bounds[], cudaStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
     int block_width, int block_height, int block_depth, cudaStream_t stream);
-extern void invokePackingKernels(DataType* d_temperature, DataType* d_ghosts[],
-    bool bounds[], int block_width, int block_height, int block_depth,
+extern void invokePackingKernel(DataType* d_temperature, DataType* d_ghost,
+    int dir, int block_width, int block_height, int block_depth,
     cudaStream_t stream);
 extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     int dir, int block_width, int block_height, int block_depth,
@@ -170,7 +169,12 @@ public:
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares_x, n_chares_y, n_chares_z);
+    manager_proxy = CProxy_Manager::ckNew();
     init_start_time = CkWallTimer();
+  }
+
+  void managerInitDone() {
+    CkPrintf("Managers initialized\n");
     block_proxy.init();
   }
 
@@ -198,6 +202,35 @@ public:
   }
 };
 
+class Manager : public CBase_Manager {
+public:
+  cudaStream_t compute_stream;
+  cudaStream_t h2d_stream;
+  cudaStream_t d2h_stream;
+  cudaStream_t unpack_stream;
+  cudaStream_t pack_stream;
+
+  Manager() {
+    // Create CUDA streams
+    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
+    hapiCheck(cudaStreamCreateWithPriority(&h2d_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&d2h_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&unpack_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&pack_stream, cudaStreamDefault, -1));
+
+    contribute(CkCallback(CkReductionTarget(Main, managerInitDone), main_proxy));
+  }
+
+  ~Manager() {
+    // Destroy CUDA streams
+    hapiCheck(cudaStreamDestroy(compute_stream));
+    hapiCheck(cudaStreamDestroy(h2d_stream));
+    hapiCheck(cudaStreamDestroy(d2h_stream));
+    hapiCheck(cudaStreamDestroy(unpack_stream));
+    hapiCheck(cudaStreamDestroy(pack_stream));
+  }
+};
+
 class Block : public CBase_Block {
   Block_SDAG_CODE
 
@@ -217,11 +250,11 @@ class Block : public CBase_Block {
   DataType* d_recv_ghosts[DIR_COUNT];
   CkDeviceBuffer send_ghosts_buf[DIR_COUNT];
 
-  cudaStream_t compute_stream;
-  cudaStream_t comm_stream;
-
-  cudaEvent_t compute_event;
-  cudaEvent_t comm_event;
+  Manager* manager;
+  cudaEvent_t compute_pack_event;
+  cudaEvent_t pack_d2h_events[DIR_COUNT];
+  cudaEvent_t h2d_unpack_events[DIR_COUNT];
+  cudaEvent_t unpack_compute_event;
 
   bool bounds[DIR_COUNT];
 
@@ -243,11 +276,12 @@ class Block : public CBase_Block {
       }
     }
 
-    hapiCheck(cudaStreamDestroy(compute_stream));
-    hapiCheck(cudaStreamDestroy(comm_stream));
-
-    hapiCheck(cudaEventDestroy(compute_event));
-    hapiCheck(cudaEventDestroy(comm_event));
+    hapiCheck(cudaEventDestroy(compute_pack_event));
+    for (int i = 0; i < DIR_COUNT; i++) {
+      hapiCheck(cudaEventDestroy(pack_d2h_events[i]));
+      hapiCheck(cudaEventDestroy(h2d_unpack_events[i]));
+    }
+    hapiCheck(cudaEventDestroy(unpack_compute_event));
   }
 
   void init() {
@@ -303,16 +337,18 @@ class Block : public CBase_Block {
       }
     }
 
-    // Create CUDA streams and events
-    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
-    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
-
-    hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
+    // Create CUDA events for enforcing dependencies
+    manager = manager_proxy.ckLocalBranch();
+    hapiCheck(cudaEventCreateWithFlags(&compute_pack_event, cudaEventDisableTiming));
+    for (int i = 0; i < DIR_COUNT; i++) {
+      hapiCheck(cudaEventCreateWithFlags(&pack_d2h_events[i], cudaEventDisableTiming));
+      hapiCheck(cudaEventCreateWithFlags(&h2d_unpack_events[i], cudaEventDisableTiming));
+    }
+    hapiCheck(cudaEventCreateWithFlags(&unpack_compute_event, cudaEventDisableTiming));
 
     // Initialize temperature data
-    invokeInitKernel(d_temperature, block_width, block_height, block_depth, compute_stream);
-    invokeInitKernel(d_new_temperature, block_width, block_height, block_depth, compute_stream);
+    invokeInitKernel(d_temperature, block_width, block_height, block_depth, manager->compute_stream);
+    invokeInitKernel(d_new_temperature, block_width, block_height, block_depth, manager->compute_stream);
 
     // Initialize ghost data
     std::vector<int> ghost_counts = {x_surf_count, x_surf_count, y_surf_count,
@@ -324,14 +360,14 @@ class Block : public CBase_Block {
         send_ghosts.push_back(d_send_ghosts[i]);
         recv_ghosts.push_back(d_recv_ghosts[i]);
       }
-      invokeGhostInitKernels(send_ghosts, ghost_counts, compute_stream);
-      invokeGhostInitKernels(recv_ghosts, ghost_counts, compute_stream);
+      invokeGhostInitKernels(send_ghosts, ghost_counts, manager->compute_stream);
+      invokeGhostInitKernels(recv_ghosts, ghost_counts, manager->compute_stream);
     } else {
       std::vector<DataType*> ghosts;
       for (int i = 0; i < DIR_COUNT; i++) {
         ghosts.push_back(d_ghosts[i]);
       }
-      invokeGhostInitKernels(ghosts, ghost_counts, compute_stream);
+      invokeGhostInitKernels(ghosts, ghost_counts, manager->compute_stream);
 
       for (int i = 0; i < DIR_COUNT; i++) {
         int ghost_count = ghost_counts[i];
@@ -343,50 +379,47 @@ class Block : public CBase_Block {
 
     // Enforce boundary conditions
     invokeBoundaryKernels(d_temperature, block_width, block_height, block_depth,
-        bounds, compute_stream);
+        bounds, manager->compute_stream);
     invokeBoundaryKernels(d_new_temperature, block_width, block_height, block_depth,
-        bounds, compute_stream);
+        bounds, manager->compute_stream);
 
-#if CUDA_SYNC
-    cudaStreamSynchronize(compute_stream);
-    thisProxy[thisIndex].initDone();
-#else
     // TODO: Support reduction callback in hapiAddCallback
     CkCallback* cb = new CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
-    hapiAddCallback(compute_stream, cb);
-#endif
+    hapiAddCallback(manager->compute_stream, cb);
+  }
+
+  void initDone() {
+    contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
   }
 
   void packGhosts() {
-    if (use_zerocopy) {
-      // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_temperature, d_send_ghosts, bounds,
-          block_width, block_height, block_depth, comm_stream);
-    } else {
-      // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_temperature, d_ghosts, bounds,
-          block_width, block_height, block_depth, comm_stream);
+    std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
+      y_surf_size, z_surf_size, z_surf_size};
 
-      // Transfer ghosts from device to host
-      std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
-        y_surf_size, z_surf_size, z_surf_size};
-      for (int i = 0; i < DIR_COUNT; i++) {
-        if (!bounds[i]) {
+    for (int i = 0; i < DIR_COUNT; i++) {
+      if (!bounds[i]) {
+        // Pack non-contiguous ghost to temporary contiguous buffer on device
+        DataType* pack_ghost = use_zerocopy ? d_send_ghosts[i] : d_ghosts[i];
+        hapiCheck(cudaStreamWaitEvent(manager->pack_stream, compute_pack_event, 0));
+        invokePackingKernel(d_temperature, pack_ghost, i, block_width, block_height,
+            block_depth, manager->pack_stream);
+
+        if (!use_zerocopy) {
+          // Transfer ghosts from device to host when packing kernel completes
+          hapiCheck(cudaEventRecord(pack_d2h_events[i], manager->pack_stream));
+          hapiCheck(cudaStreamWaitEvent(manager->d2h_stream, pack_d2h_events[i], 0));
           hapiCheck(cudaMemcpyAsync(h_ghosts[i], d_ghosts[i], ghost_sizes[i],
-                cudaMemcpyDeviceToHost, comm_stream));
+                cudaMemcpyDeviceToHost, manager->d2h_stream));
         }
       }
     }
 
-#if CUDA_SYNC
-    cudaStreamSynchronize(comm_stream);
-    thisProxy[thisIndex].packGhostsDone();
-#else
-    // Add asynchronous callback to be invoked when packing kernels and
-    // ghost transfers are complete
     CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
-    hapiAddCallback(comm_stream, cb);
-#endif
+    if (use_zerocopy) {
+      hapiAddCallback(manager->pack_stream, cb);
+    } else {
+      hapiAddCallback(manager->d2h_stream, cb);
+    }
   }
 
   void sendGhosts() {
@@ -444,36 +477,37 @@ class Block : public CBase_Block {
   }
 
   void processGhostZC(int dir, int count, DataType* gh) {
+    CkAssert(dir >= 0 && dir < DIR_COUNT);
     // XXX: d_recv_ghosts[dir] should be used instead of gh
     invokeUnpackingKernel(d_temperature, d_recv_ghosts[dir], dir, block_width, block_height,
-        block_depth, comm_stream);
+        block_depth, manager->unpack_stream);
   }
 
   void processGhostReg(int dir, int size, DataType* gh) {
-    DataType* h_ghost = nullptr; DataType* d_ghost = nullptr;
     CkAssert(dir >= 0 && dir < DIR_COUNT);
-    h_ghost = h_ghosts[dir];
-    d_ghost = d_ghosts[dir];
+    DataType* h_ghost = h_ghosts[dir];
+    DataType* d_ghost = d_ghosts[dir];
 
     memcpy(h_ghost, gh, size * sizeof(DataType));
     hapiCheck(cudaMemcpyAsync(d_ghost, h_ghost, size * sizeof(DataType),
-          cudaMemcpyHostToDevice, comm_stream));
+          cudaMemcpyHostToDevice, manager->h2d_stream));
+    hapiCheck(cudaEventRecord(h2d_unpack_events[dir], manager->h2d_stream));
+    hapiCheck(cudaStreamWaitEvent(manager->unpack_stream, h2d_unpack_events[dir], 0));
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
-        block_depth, comm_stream);
+        block_depth, manager->unpack_stream);
   }
 
   void update() {
-    // Operations in compute stream should only be executed when
-    // operations in communication stream (transfers and unpacking) complete
-    hapiCheck(cudaEventRecord(comm_event, comm_stream));
-    hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
+    hapiCheck(cudaEventRecord(unpack_compute_event, manager->unpack_stream));
+    hapiCheck(cudaStreamWaitEvent(manager->compute_stream, unpack_compute_event, 0));
 
     // Invoke GPU kernel for Jacobi computation
     invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
-        block_depth, compute_stream);
+        block_depth, manager->compute_stream);
+    hapiCheck(cudaEventRecord(compute_pack_event, manager->compute_stream));
 
     CkCallback* update_cb = new CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
-    hapiAddCallback(compute_stream, update_cb);
+    hapiAddCallback(manager->compute_stream, update_cb);
   }
 
   void prepNextIter() {
@@ -493,8 +527,8 @@ class Block : public CBase_Block {
   void print() {
     hapiCheck(cudaMemcpyAsync(h_temperature, d_temperature,
           sizeof(DataType) * (block_width+2)*(block_height+2)*(block_depth+2),
-          cudaMemcpyDeviceToHost, comm_stream));
-    cudaStreamSynchronize(comm_stream);
+          cudaMemcpyDeviceToHost, manager->d2h_stream));
+    cudaStreamSynchronize(manager->d2h_stream);
 
     CkPrintf("[%d,%d,%d]\n", x, y, z);
     for (int k = 0; k < block_depth+2; k++) {

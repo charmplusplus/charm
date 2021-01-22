@@ -2,6 +2,7 @@ mainmodule jacobi3d {
   include "jacobi3d.h";
 
   readonly CProxy_Main main_proxy;
+  readonly CProxy_Manager manager_proxy;
   readonly CProxy_Block block_proxy;
   readonly int num_chares;
   readonly int grid_width;
@@ -26,27 +27,27 @@ mainmodule jacobi3d {
 
   mainchare Main {
     entry Main(CkArgMsg* m);
+    entry [reductiontarget] void managerInitDone();
     entry [reductiontarget] void initDone();
     entry void startIter();
     entry [reductiontarget] void warmupDone();
     entry [reductiontarget] void allDone();
   };
 
+  nodegroup Manager {
+    entry Manager();
+  };
+
   array [3D] Block {
     entry Block(void);
     entry void init();
+    entry void initDone();
     entry void packGhostsDone();
     entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
     entry void updateDone();
     entry void print();
     entry void printDone();
-
-    entry void initDone() {
-      serial {
-        contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
-      }
-    }
 
     entry void run() {
       // Pack and send ghost data to neighbors
