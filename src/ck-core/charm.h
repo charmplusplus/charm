@@ -127,7 +127,7 @@ extern void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, cha
 extern void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int));
 extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int));
 #if CMK_CUDA
-  extern void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, long*, void *, int, char*,int));
+extern void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, long*, void *, int, char*,int));
 #endif
 extern void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int*, int, int, char *, int));
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
@@ -488,7 +488,6 @@ extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
 extern void CkCallWhenIdle(int epIdx, void* obj);
-
 
 #if CMK_CHARM4PY
 extern int CkCudaEnabled(void);

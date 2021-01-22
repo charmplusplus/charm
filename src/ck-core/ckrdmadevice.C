@@ -85,6 +85,7 @@ void CkRdmaDeviceRecvHandler(void* data) {
   // If so, invoke regular entry method
   if (info->counter == info->n_ops) {
     QdCreate(1);
+
     enqueueNcpyMessage(op->dest_pe, info->msg);
 
     // Free RDMA metadata
@@ -125,7 +126,7 @@ void CkRdmaDeviceAmpiRecvHandler(void* data) {
 #if CMK_CHARM4PY
 void CkRdmaDeviceExtRecvHandler(void* data) {
   // Process QD to mark completion of the outstanding RDMA operation
-  //QdProcess(1);
+  QdProcess(1);
 
   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
   DeviceRdmaInfo* info = op->info;
@@ -153,17 +154,8 @@ void CkRdmaDeviceExtRecvHandler(void* data) {
   }
 }
 
-bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs, CkCallback &destCb)
+bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer **sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs, CkCallback &destCb)
 {
-
-#if TIMING_BREAKDOWN
-  static thread_local double total_times[N_TIMER] = {0};
-  static thread_local int count = 0;
-  count++;
-
-  double start_time = CkWallTimer();
-#endif
-
   // Determine if the subsequent regular entry method should be invoked
   // inline (intra-node) or not (inter-node)
   bool is_inline = true;
@@ -186,45 +178,33 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourc
 
   // store source buffers for retrieval
   for (int i = 0; i < numops; i++) {
-    CkDeviceBuffer &source = sourceStructs[i];
+    CkDeviceBuffer &source = *sourceStructs[i];
 
     DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
-    save_op.src_pe = source.src_pe;
-    save_op.src_ptr = source.ptr;
+    //save_op.src_pe = source.src_pe;
+    //save_op.src_ptr = source.ptr;
     save_op.dest_pe = CkMyPe();
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
-    save_op.src_cb = new CkCallback(source.cb);
+    save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = new CkCallback(destCb);
     save_op.tag = source.tag;
   }
-
-#if TIMING_BREAKDOWN
-  total_times[1] += CkWallTimer() - start_time;
-  start_time = CkWallTimer();
-#endif
 
   // Post ucp_tag_recv_nb's to receive GPU data
   for (int i = 0; i < numops; i++) {
     DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
     QdCreate(1);
-    CmiRecvDevice(save_op, false);
+    CmiRecvDevice(save_op, DEVICE_RECV_TYPE_CHARM4PY);
+    //CmiInvokeExtRecvHandler(save_op);
   }
-
-#if TIMING_BREAKDOWN
-  total_times[2] += CkWallTimer() - start_time;
-  if (count == N_COUNT) {
-    CkPrintf("!!! %lf us, %lf us\n", total_times[1] / count * 1e6, total_times[2] / count * 1e6);
-  }
-#endif
 
   return is_inline;
-
 }
-#endif
+#endif // CMK_CHARM4PY
 
 // Invoked after post entry method
 bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
@@ -251,9 +231,13 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   is_inline = false;
 
   // Create a copy of this message for regular entry method invocation
+  /*
   size_t msg_size = env->getTotalsize();
   envelope* new_env = (envelope*)CmiAlloc(msg_size);
   memcpy(new_env, env, msg_size);
+  */
+  void* old_msg = EnvToUsr(env);
+  envelope* new_env = UsrToEnv(CkCopyMsg(&old_msg));
 
   // Allocate and fill in metadata for this zerocopy operation
   void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * numops);
@@ -278,13 +262,14 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
     DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
-    save_op.src_pe = source.src_pe;
-    save_op.src_ptr = source.ptr;
+    //save_op.src_pe = source.src_pe;
+    //save_op.src_ptr = source.ptr;
     save_op.dest_pe = CkMyPe();
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
-    save_op.src_cb = new CkCallback(source.cb);
+    save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
+    save_op.dst_cb = nullptr;
     save_op.tag = source.tag;
   }
 
@@ -298,7 +283,8 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
     QdCreate(1);
-    CmiRecvDevice(save_op, false);
+    CmiRecvDevice(save_op, DEVICE_RECV_TYPE_CHARM);
+    //CmiInvokeRecvHandler(save_op);
   }
 
 #if TIMING_BREAKDOWN
@@ -614,9 +600,11 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 
   // Store destination PE in the metadata message
   // FIXME: Not necessary? save_op.dest_pe is set to CkMyPe() on the receiver
+  /*
   for (int i = 0; i < numops; i++) {
     buffers[i]->dest_pe = dest_pe;
   }
+  */
 
 #if TIMING_BREAKDOWN
   total_times[1] += CkWallTimer() - start_time;

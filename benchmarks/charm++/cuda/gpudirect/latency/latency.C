@@ -136,6 +136,8 @@ public:
   cudaStream_t stream;
   bool stream_created;
 
+  CkDeviceBuffer send_buffer;
+
   Block() {
     memory_allocated = false;
     stream_created = false;
@@ -185,6 +187,9 @@ public:
       stream_created = true;
     }
 
+    // Set up buffer metadata
+    send_buffer = CkDeviceBuffer(d_local_data);
+
     // Reduce back to main
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
   }
@@ -206,7 +211,7 @@ public:
       cudaStreamSynchronize(stream);
       thisProxy[peer].receiveReg(size, h_local_data);
     } else {
-      thisProxy[peer].receiveZC(size, CkDeviceBuffer(d_local_data, size, stream));
+      thisProxy[peer].receiveZC(size, send_buffer);
     }
   }
 
@@ -225,7 +230,7 @@ public:
     // Inform the runtime where the incoming data should be stored
     // and which CUDA stream should be used for the transfer
     data = d_remote_data;
-    devicePost[0].cuda_stream = stream;
+    //devicePost[0].cuda_stream = stream;
   }
 
   // Second receive (regular entry method), invoked after the data transfer is initiated

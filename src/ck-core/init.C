@@ -1441,15 +1441,15 @@ void _initCharm(int unused_argc, char **argv)
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
 #if CMK_CUDA
-  #if CMK_CHARM4PY
+#if CMK_CHARM4PY
   CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler,
                         CkRdmaDeviceAmpiRecvHandler,
                         CkRdmaDeviceExtRecvHandler
                         );
-  #else
+#else
   CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler, CkRdmaDeviceAmpiRecvHandler);
-  #endif
-#endif
+#endif // CMK_CHARM4PY
+#endif // CMK_CUDA
 
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
 	initEMNcpyAckHandler();

@@ -1,0 +1,100 @@
+mainmodule jacobi3d {
+  include "jacobi3d.h";
+
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Manager manager_proxy;
+  readonly CProxy_Block block_proxy;
+  readonly int num_chares;
+  readonly int grid_width;
+  readonly int grid_height;
+  readonly int grid_depth;
+  readonly int block_width;
+  readonly int block_height;
+  readonly int block_depth;
+  readonly int x_surf_count;
+  readonly int y_surf_count;
+  readonly int z_surf_count;
+  readonly size_t x_surf_size;
+  readonly size_t y_surf_size;
+  readonly size_t z_surf_size;
+  readonly int n_chares_x;
+  readonly int n_chares_y;
+  readonly int n_chares_z;
+  readonly int n_iters;
+  readonly int warmup_iters;
+  readonly bool use_zerocopy;
+  readonly bool print_elements;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void managerInitDone();
+    entry [reductiontarget] void initDone();
+    entry void startIter();
+    entry [reductiontarget] void warmupDone();
+    entry [reductiontarget] void allDone();
+  };
+
+  nodegroup Manager {
+    entry Manager();
+  };
+
+  array [3D] Block {
+    entry Block(void);
+    entry void init();
+    entry void initDone();
+    entry void packDone();
+    entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
+    entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
+    entry void print();
+    entry void printDone();
+
+    entry void run() {
+      serial {
+        // For computation-communication overlap, it is important that
+        // Jacobi update and packing kernel invocations of the same chare
+        // stay together
+        updateAndPack();
+      }
+
+      when packDone() serial {
+        std::swap(d_temperature, d_new_temperature);
+        my_iter++;
+        sendGhosts();
+      }
+
+      // Receive ghost data from neighbors
+      for (remote_count = 0; remote_count < neighbors; remote_count++) {
+        if (use_zerocopy) {
+          when recvGhostZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
+            serial {
+              processGhostZC(dir, w, buf);
+            }
+          }
+        } else {
+          when recvGhostReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
+            serial {
+              processGhostReg(dir, w, buf);
+            }
+          }
+        }
+      }
+
+      serial {
+        if (print_elements) {
+          if (x == 0 && y == 0 && z == 0) {
+            CkPrintf("Printing iteration %d\n", my_iter);
+            thisProxy[thisIndex].print();
+          }
+        } else {
+          proceed();
+        }
+      }
+
+      if (print_elements) {
+        when printDone() serial {
+          proceed();
+        }
+      }
+    }
+  };
+};

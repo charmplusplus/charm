@@ -452,34 +452,30 @@ public:
     char *impl_buf = impl_msg_typed->msgBuf;
     PUP::fromMem implP(impl_buf);
 
-    #if CMK_CUDA
-    if(CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) == CMK_ZC_DEVICE_MSG)
-      {
-        int numDevBufs; implP|numDevBufs;
-        int directCopySize; implP|directCopySize;
+#if CMK_CUDA
+    if (CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) == CMK_ZC_DEVICE_MSG) {
+        int numDevBufs; implP | numDevBufs;
+        int directCopySize; implP | directCopySize;
         long devBufSizes[numDevBufs];
+
         // TODO: free this later
         CkDeviceBuffer *devBufs = new CkDeviceBuffer[numDevBufs];
+        for (int i = 0; i < numDevBufs; i++) {
+          implP | devBufSizes[i];
+          implP | devBufs[i];
+        }
 
-        for(int i = 0; i < numDevBufs; i++)
-          {
-            implP | devBufSizes[i];
-            implP | devBufs[i];
-          }
         int msgSize; implP | msgSize;
         int epIdx; implP | epIdx;
+        int d; implP | d;
 
         ArrayMsgGPUDirectRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
                                          int(e->thisIndexMax.getDimension()),
                                          e->thisIndexMax.data(), epIdx,
                                          numDevBufs, devBufSizes, devBufs,
-                                         msgSize, impl_buf+directCopySize,
-                                         0
-                                         );
-      }
-    else
-      {
-    #endif
+                                         msgSize, impl_buf+directCopySize+3*sizeof(int), 0);
+    } else {
+#endif
     int msgSize; implP|msgSize;
     int ep; implP|ep;
     int dcopy_start; implP|dcopy_start;
@@ -487,9 +483,9 @@ public:
                             int(e->thisIndexMax.getDimension()),
                             e->thisIndexMax.data(), ep, msgSize, impl_buf+(3*sizeof(int)),
                             dcopy_start);
-    #if CMK_CUDA
-      }
-    #endif
+#if CMK_CUDA
+    }
+#endif
   }
 
   static void __AtSyncEntryMethod(void *impl_msg, void *impl_obj_void) {

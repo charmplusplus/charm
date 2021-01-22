@@ -1052,6 +1052,10 @@ static void ampiProcInit() noexcept {
     CkpvAccess(msgSizesRanks).set(ranks);
   }
 #endif
+
+#if CMK_CUDA
+  CkpvInitialize(std::unordered_set<const void*>, cudaPointerCache);
+#endif
 }
 
 #if AMPIMSGLOG
@@ -3248,11 +3252,16 @@ MPI_Request ampi::sendCudaMsg(int t, int sRank, const void* buf, MPI_Datatype ty
                                                       AMPI_REQ_BLOCKED : AMPI_REQ_PENDING));
   }
 
-  // TODO
   destProxy[destIdx].genericSync(makeCudaMsg(t, sRank, buf, count, type, destProxy, destIdx, reqIdx, seq, NULL));
 
   return reqIdx;
 }
+#endif
+
+#if CMK_CUDA
+// Cache to speed up checking if user pointer points to GPU memory
+#include <unordered_set>
+CkpvDeclare(std::unordered_set<const void*>, cudaPointerCache);
 #endif
 
 MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype type,
@@ -3281,11 +3290,23 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   ampi *destPtr = arrProxy[destIdx].ckLocal();
 #if CMK_CUDA
   // Check if user buffer is on the GPU
-  // TODO: Implement a cache to speed up this check
-  cudaPointerAttributes attr;
-  cudaError_t ret = cudaPointerGetAttributes(&attr, buf);
-  if (ret == cudaSuccess
-      && (attr.type == cudaMemoryTypeDevice || attr.type == cudaMemoryTypeManaged)) {
+  bool gpu = false;
+  auto& cache = CkpvAccess(cudaPointerCache);
+  if (cache.find(buf) == cache.end()) {
+    // Pointer not found, check if it points to GPU memory
+    cudaPointerAttributes attr;
+    cudaError_t ret = cudaPointerGetAttributes(&attr, buf);
+    if (ret == cudaSuccess
+        && (attr.type == cudaMemoryTypeDevice || attr.type == cudaMemoryTypeManaged)) {
+      gpu = true;
+      cache.insert(buf);
+    }
+  } else {
+    // Pointer found in cache, it points to GPU memory
+    gpu = true;
+  }
+
+  if (gpu) {
     return sendCudaMsg(t, sRank, buf, type, count, rank, destcomm,
                        seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
   }
@@ -3512,8 +3533,8 @@ bool ampi::processSsendCudaMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
     rdma_info->n_ops = 1;
     rdma_info->counter = 0;
     DeviceRdmaOp* rdma_op = (DeviceRdmaOp*)((char*)rdma_data + sizeof(DeviceRdmaInfo));
-    rdma_op->src_pe = srcInfo.src_pe;
-    rdma_op->src_ptr = srcInfo.ptr;
+    //rdma_op->src_pe = srcInfo.src_pe;
+    //rdma_op->src_ptr = srcInfo.ptr;
     rdma_op->dest_pe = CkMyPe();
     rdma_op->dest_ptr = buf;
     rdma_op->size = len;
@@ -3524,7 +3545,8 @@ bool ampi::processSsendCudaMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
     rdma_op->tag = srcInfo.tag;
 
     //QdCreate(1);
-    CmiRecvDevice(rdma_op, true);
+    CmiRecvDevice(rdma_op, DEVICE_RECV_TYPE_AMPI);
+    //CmiInvokeAmpiRecvHandler(rdma_op);
   } else {
     // TODO
     CkAbort("Direct GPU communication with non-contiguous datatypes are currently not supported");

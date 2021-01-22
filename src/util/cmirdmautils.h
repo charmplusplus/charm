@@ -60,6 +60,12 @@ typedef struct ncpystruct{
 }NcpyOperationInfo;
 
 #if CMK_CUDA
+enum DeviceRecvType {
+  DEVICE_RECV_TYPE_CHARM,
+  DEVICE_RECV_TYPE_AMPI,
+  DEVICE_RECV_TYPE_CHARM4PY
+};
+
 typedef struct DeviceRdmaInfo_ {
   int n_ops; // Number of RDMA operations, i.e. number of buffers being sent
   int counter; // Used to track the number of completed RDMA operations
@@ -67,8 +73,8 @@ typedef struct DeviceRdmaInfo_ {
 } DeviceRdmaInfo;
 
 typedef struct DeviceRdmaOp_ {
-  int src_pe;
-  const void* src_ptr;
+  //int src_pe;
+  //const void* src_ptr;
   int dest_pe;
   const void* dest_ptr;
   size_t size;

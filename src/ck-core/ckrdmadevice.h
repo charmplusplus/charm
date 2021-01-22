@@ -11,10 +11,11 @@
 
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
-  cudaStream_t cuda_stream;
+  //cudaStream_t cuda_stream;
 
   // Use per-thread stream by default
-  CkDeviceBufferPost() : cuda_stream(cudaStreamPerThread) {}
+  //CkDeviceBufferPost() : cuda_stream(cudaStreamPerThread) {}
+  //CkDeviceBufferPost() : cuda_stream(cudaStreamPerThread) {}
 };
 
 class CkDeviceBuffer : public CmiDeviceBuffer {
@@ -22,7 +23,9 @@ public:
   // Callback to be invoked on the sender/receiver
   CkCallback cb;
 
-  CkDeviceBuffer() : CmiDeviceBuffer() {}
+  CkDeviceBuffer() : CmiDeviceBuffer() {
+    cb = CkCallback(CkCallback::ignore);
+  }
 
   explicit CkDeviceBuffer(const void* ptr_) : CmiDeviceBuffer(ptr_, 0) {
     cb = CkCallback(CkCallback::ignore);
@@ -32,6 +35,7 @@ public:
     cb = cb_;
   }
 
+  /*
   explicit CkDeviceBuffer(const void* ptr_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, 0) {
     cb = CkCallback(CkCallback::ignore);
     cuda_stream = cuda_stream_;
@@ -41,7 +45,7 @@ public:
     cb = cb_;
     cuda_stream = cuda_stream_;
   }
-
+  */
 
   explicit CkDeviceBuffer(const void* ptr_, size_t cnt_) : CmiDeviceBuffer(ptr_, cnt_) {
     cb = CkCallback(CkCallback::ignore);
@@ -51,6 +55,7 @@ public:
     cb = cb_;
   }
 
+  /*
   explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, cnt_) {
     cb = CkCallback(CkCallback::ignore);
     cuda_stream = cuda_stream_;
@@ -60,6 +65,7 @@ public:
     cb = cb_;
     cuda_stream = cuda_stream_;
   }
+  */
 
   void pup(PUP::er &p) {
     CmiDeviceBuffer::pup(p);
@@ -67,17 +73,16 @@ public:
   }
 
   friend bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
-  #if CMK_CHARM4PY
-
-  friend bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
-  #endif
+#if CMK_CHARM4PY
+  friend bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer **sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
+#endif
 };
 
 void CkRdmaDeviceRecvHandler(void* data);
 void CkRdmaDeviceAmpiRecvHandler(void* data);
 #if CMK_CHARM4PY
 void CkRdmaDeviceExtRecvHandler(void* data);
-bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer *sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs, CkCallback &destCb);
+bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer **sourceStructs, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs, CkCallback &destCb);
 #endif
 bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);

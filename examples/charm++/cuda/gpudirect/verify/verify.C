@@ -19,6 +19,7 @@ struct Container {
   double* h_remote_data;
   double* d_local_data;
   double* d_remote_data;
+  CkDeviceBuffer buffer;
   cudaStream_t stream;
 
   Container() : h_local_data(nullptr), h_remote_data(nullptr),
@@ -37,6 +38,7 @@ struct Container {
     hapiCheck(cudaMallocHost(&h_remote_data, sizeof(double) * block_size));
     hapiCheck(cudaMalloc(&d_local_data, sizeof(double) * block_size));
     hapiCheck(cudaMalloc(&d_remote_data, sizeof(double) * block_size));
+    buffer = CkDeviceBuffer(d_local_data);
     hapiCheck(cudaStreamCreate(&stream));
 
     for (int i = 0; i < block_size; i++) {
@@ -168,9 +170,8 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data,
-          CkCallback(CkIndex_VerifyArray::reuse(), thisProxy[thisIndex]),
-          container.stream));
+    container.buffer.cb = CkCallback(CkIndex_VerifyArray::reuse(), thisProxy[thisIndex]);
+    thisProxy[1].recv(block_size, container.buffer);
     if (lb_test) {
       pe = CkMyPe();
       AtSync();
@@ -178,8 +179,10 @@ public:
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
+    hapiCheck(cudaMemsetAsync(container.d_remote_data, 0, sizeof(double) * block_size, container.stream));
+    hapiCheck(cudaStreamSynchronize(container.stream));
     data = container.d_remote_data;
-    post[0].cuda_stream = container.stream;
+    //post[0].cuda_stream = container.stream;
   }
 
   void recv(int size, double* data) {
@@ -204,12 +207,14 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    thisProxy[1].recv(block_size, container.buffer);
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
+    hapiCheck(cudaMemsetAsync(container.d_remote_data, 0, sizeof(double) * block_size, container.stream));
+    hapiCheck(cudaStreamSynchronize(container.stream));
     data = container.d_remote_data;
-    post[0].cuda_stream = container.stream;
+    //post[0].cuda_stream = container.stream;
   }
 
   void recv(int size, double* data) {
@@ -226,12 +231,14 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    thisProxy[1].recv(block_size, container.buffer);
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
+    hapiCheck(cudaMemsetAsync(container.d_remote_data, 0, sizeof(double) * block_size, container.stream));
+    hapiCheck(cudaStreamSynchronize(container.stream));
     data = container.d_remote_data;
-    post[0].cuda_stream = container.stream;
+    //post[0].cuda_stream = container.stream;
   }
 
   void recv(int size, double* data) {

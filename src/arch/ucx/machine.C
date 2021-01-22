@@ -86,7 +86,7 @@ typedef struct UcxRequest
 #endif
 #if CMK_CUDA
     DeviceRdmaOp*  device_op;
-    bool           ampi;
+    DeviceRecvType type;
 #endif
 } UcxRequest;
 
@@ -118,7 +118,7 @@ typedef struct UcxPendingRequest
     DeviceRdmaOp*           device_op;
     ucp_tag_t               mask;
     ucp_tag_recv_callback_t recv_cb;
-    bool                    ampi;
+    DeviceRecvType          type;
 #endif
 } UcxPendingRequest;
 #endif
@@ -152,6 +152,27 @@ CpvDeclare(int, tag_counter);
 }
 
 #define UCX_CHECK_PMI_RET(_ret, _str) UCX_CHECK_RET(_ret, _str, _ret)
+
+#if CMK_CUDA
+inline void UcxInvokeRecvHandler(DeviceRdmaOp* op, DeviceRecvType type) {
+  switch (type) {
+    case DEVICE_RECV_TYPE_CHARM:
+      CmiInvokeRecvHandler(op);
+      break;
+    case DEVICE_RECV_TYPE_AMPI:
+      CmiInvokeAmpiRecvHandler(op);
+      break;
+#if CMK_CHARM4PY
+    case DEVICE_RECV_TYPE_CHARM4PY:
+      CmiInvokeExtRecvHandler(op);
+      break;
+#endif
+    default:
+      CmiAbort("Invvalid recv type: %d\n", type);
+      break;
+  }
+}
+#endif
 
 void UcxRequestInit(void *request)
 {
@@ -221,7 +242,7 @@ static void UcxInitEps(int numNodes, int myId)
 
     for (i = 0; i < numNodes; ++i) {
         peer = (i + myId) % numNodes;
-        if (peer == myId) continue;
+        //if (peer == myId) continue;
 
         ret = snprintf(keys, maxkey, "UCX-size-%d", peer);
         UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
@@ -660,18 +681,14 @@ static inline int ProcessTxQueue()
           UcxRequest* ret_req = (UcxRequest*)status_ptr;
           if (ret_req->completed) {
             // Recv was completed immediately
-            if (req->ampi) {
-              CmiInvokeAmpiRecvHandler(req->device_op);
-            } else {
-              CmiInvokeRecvHandler(req->device_op);
-            }
+            UcxInvokeRecvHandler(req->device_op, req->type);
             UCX_REQUEST_FREE(ret_req);
           } else {
             // Recv wasn't completed immediately, recv_cb will be invoked
             // sometime later
             ret_req->device_op = req->device_op;
             ret_req->msgBuf = req->msgBuf;
-            ret_req->ampi = req->ampi;
+            ret_req->type = req->type;
           }
         }
 #endif
@@ -819,15 +836,8 @@ void UcxRecvDeviceCompleted(void* request, ucs_status_t status,
   CmiEnforce(status == UCS_OK);
 
   if (req->msgBuf != NULL) {
-    // Request was completed sometime after ucp_tag_recv_nb
-    DeviceRdmaOp* device_op = req->device_op;
-
     // Invoke recv handler since data transfer is complete
-    if (req->ampi) {
-      CmiInvokeAmpiRecvHandler(device_op);
-    } else {
-      CmiInvokeRecvHandler(device_op);
-    }
+    UcxInvokeRecvHandler(req->device_op, req->type);
     UCX_REQUEST_FREE(req);
   } else {
     // Request was completed immediately
@@ -867,7 +877,7 @@ void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
 #endif // CMK_SMP
 }
 
-void LrtsRecvDevice(DeviceRdmaOp* op, bool ampi)
+void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
 {
 #if CMK_SMP
   UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
@@ -878,7 +888,7 @@ void LrtsRecvDevice(DeviceRdmaOp* op, bool ampi)
   req->device_op = op;
   req->mask      = UCX_MSG_TAG_MASK_FULL;
   req->recv_cb   = UcxRecvDeviceCompleted;
-  req->ampi      = ampi;
+  req->type      = type;
 
   PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
@@ -891,18 +901,14 @@ void LrtsRecvDevice(DeviceRdmaOp* op, bool ampi)
   UcxRequest* req = (UcxRequest*)status_ptr;
   if (req->completed) {
     // Recv was completed immediately
-    if (ampi) {
-      CmiInvokeAmpiRecvHandler(op);
-    } else {
-      CmiInvokeRecvHandler(op);
-    }
+    UcxInvokeRecvHandler(op, type);
     UCX_REQUEST_FREE(req);
   } else {
     // Recv wasn't completed immediately, recv_cb will be invoked
     // sometime later
     req->device_op = op;
     req->msgBuf = (void*)op->dest_ptr;
-    req->ampi = ampi;
+    req->type = type;
   }
 #endif
 }

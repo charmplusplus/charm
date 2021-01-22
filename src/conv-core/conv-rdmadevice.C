@@ -24,8 +24,8 @@ void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
   LrtsSendDevice(dest_pe, ptr, size, tag);
 }
 
-void CmiRecvDevice(DeviceRdmaOp* op, bool ampi) {
-  LrtsRecvDevice(op, ampi);
+void CmiRecvDevice(DeviceRdmaOp* op, DeviceRecvType type) {
+  LrtsRecvDevice(op, type);
 }
 
 RdmaAckHandlerFn rdmaDeviceRecvHandlerFn;
@@ -39,13 +39,13 @@ void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn1, RdmaAckHandlerFn fn2, RdmaAckHa
   rdmaDeviceAmpiRecvHandlerFn = fn2;
   rdmaDeviceExtRecvHandlerFn = fn3;
 }
-
 #else
 void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn1, RdmaAckHandlerFn fn2) {
   // Set handler function that gets invoked when data transfer is complete (on receiver)
   rdmaDeviceRecvHandlerFn = fn1;
   rdmaDeviceAmpiRecvHandlerFn = fn2;
 }
+#endif // CMK_CHARM4PY
 
 #endif
 
@@ -60,5 +60,11 @@ void CmiInvokeRecvHandler(void* data) {
 void CmiInvokeAmpiRecvHandler(void* data) {
   rdmaDeviceAmpiRecvHandlerFn(data);
 }
+
+#if CMK_CHARM4PY
+void CmiInvokeExtRecvHandler(void* data) {
+  rdmaDeviceExtRecvHandlerFn(data);
+}
+#endif
 
 #endif // CMK_CUDA
