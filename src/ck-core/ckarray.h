@@ -458,8 +458,7 @@ public:
         int directCopySize; implP | directCopySize;
         long devBufSizes[numDevBufs];
 
-        // TODO: free this later
-        CkDeviceBuffer *devBufs = new CkDeviceBuffer[numDevBufs];
+        CkDeviceBuffer devBufs[numDevBufs];
         for (int i = 0; i < numDevBufs; i++) {
           implP | devBufSizes[i];
           implP | devBufs[i];
