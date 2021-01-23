@@ -493,7 +493,7 @@ extern void CkCallWhenIdle(int epIdx, void* obj);
 extern int CkCudaEnabled(void);
 extern int CUDAPointerOnDevice(const void *ptr);
 extern void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
-                               void *remoteBufInfo, void *streamPtrs, int *futureId);
+                               void *remoteBufInfo, void *streamPtrs, int futureId);
 extern void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
                                          int epIdx, int num_bufs, char *msg,
                                          int msgSize,

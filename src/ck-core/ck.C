@@ -462,7 +462,7 @@ int CUDAPointerOnDevice(const void *ptr)
 }
 
 void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
-                        void *remoteBufInfos, void *streamPtrs, int *futureId)
+                        void *remoteBufInfos, void *streamPtrs, int futureId)
 {
 #if CMK_CUDA
   CkCallback cb(DepositFutureWithIdFn, (void*) futureId);
