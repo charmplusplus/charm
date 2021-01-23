@@ -47,8 +47,6 @@ void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn1, RdmaAckHandlerFn fn2) {
 }
 #endif // CMK_CHARM4PY
 
-#endif
-
 void CmiInvokeRecvHandler(void* data) {
   #if CMK_CHARMPY
   rdmaDeviceExtRecvHandlerFn(data);
