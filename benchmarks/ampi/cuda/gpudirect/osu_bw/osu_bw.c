@@ -28,7 +28,7 @@ int main (int argc, char *argv[]) {
 
   // Process command line arguments
   int c;
-  while ((c = getopt(argc, argv, "s:x:i:l:w:g:d:")) != -1) {
+  while ((c = getopt(argc, argv, "s:x:i:l:w:gd:")) != -1) {
     switch (c) {
       case 's':
         min_size = atoi(optarg);

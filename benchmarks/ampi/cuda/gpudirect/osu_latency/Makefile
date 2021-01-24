@@ -7,8 +7,10 @@ MPICC = mpicc $(MPIOPTS)
 
 TARGET = osu_latency
 
-all : $(TARGET).c
+all: $(TARGET).c
 	$(CHARMC) -o $(TARGET) $<
+
+mpi: $(TARGET).c
 	$(MPICC) -o $(TARGET)_mpi $< -lcuda -lcudart -L$(CUDA_DIR)/lib64
 
 clean:
