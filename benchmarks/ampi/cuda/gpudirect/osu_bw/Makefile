@@ -7,9 +7,11 @@ MPICC = mpicc $(MPIOPTS)
 
 TARGET = osu_bw
 
-all : $(TARGET).c
+all: $(TARGET).c
 	$(CHARMC) -o $(TARGET) $<
-#	$(MPICC) -o $(TARGET)_mpi $<
+
+mpi: $(TARGET).c
+	$(MPICC) -o $(TARGET)_mpi $< -lcuda -lcudart -L$(CUDA_DIR)/lib64
 
 clean:
 	rm -rf charmrun conv-host moduleinit* *.o $(TARGET) $(TARGET)_mpi *~ *.sts core ampirun

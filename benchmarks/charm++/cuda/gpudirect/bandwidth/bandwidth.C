@@ -140,6 +140,8 @@ public:
   cudaStream_t stream;
   bool stream_created;
 
+  CkDeviceBuffer send_buffer;
+
   Block() {
     memory_allocated = false;
     stream_created = false;
@@ -190,6 +192,9 @@ public:
       stream_created = true;
     }
 
+    // Set up buffer metadata
+    send_buffer = CkDeviceBuffer(d_local_data);
+
     // Reduce back to main
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
   }
@@ -207,14 +212,19 @@ public:
 
     start_time = CkWallTimer();
 
-    for (int i = 0; i < window_size; i++) {
-      if (!zerocopy) {
-        hapiCheck(cudaMemcpyAsync(h_local_data, d_local_data, size,
-              cudaMemcpyDeviceToHost, stream));
-        cudaStreamSynchronize(stream);
+    if (!zerocopy) {
+      for (int i = 0; i < window_size; i++) {
+        cudaMemcpyAsync(h_local_data, d_local_data, size, cudaMemcpyDeviceToHost,
+            stream);
+      }
+      cudaStreamSynchronize(stream);
+
+      for (int i = 0; i < window_size; i++) {
         thisProxy[peer].receiveReg(size, h_local_data);
-      } else {
-        thisProxy[peer].receiveZC(size, CkDeviceBuffer(d_local_data, size, stream));
+      }
+    } else {
+      for (int i = 0; i < window_size; i++) {
+        thisProxy[peer].receiveZC(size, send_buffer);
       }
     }
   }
@@ -224,7 +234,6 @@ public:
     memcpy(h_remote_data, data, size);
     hapiCheck(cudaMemcpyAsync(d_remote_data, h_remote_data, size,
           cudaMemcpyHostToDevice, stream));
-    cudaStreamSynchronize(stream);
 
     afterReceive(size, false);
   }
@@ -234,7 +243,7 @@ public:
     // Inform the runtime where the incoming data should be stored
     // and which CUDA stream should be used for the transfer
     data = d_remote_data;
-    devicePost[0].cuda_stream = stream;
+    //devicePost[0].cuda_stream = stream;
   }
 
   // Second receive (regular entry method), invoked after the data transfer is initiated
@@ -251,6 +260,10 @@ public:
     if (++recv_count == window_size) {
       CkAssert(CkMyPe() == 1);
       recv_count = 0;
+
+      if (!zerocopy) {
+        cudaStreamSynchronize(stream);
+      }
 
       thisProxy[peer].ack(size, zerocopy);
     }

@@ -5,12 +5,12 @@ CHARMC = ../../../../../bin/ampicxx $(OPTS)
 MPIOPTS = -O3
 MPICC = mpicc $(MPIOPTS)
 
-TARGET = osu_latency
+TARGET = jacobi3d
 
-all: $(TARGET).c
+all: $(TARGET).C
 	$(CHARMC) -o $(TARGET) $<
 
-mpi: $(TARGET).c
+mpi: $(TARGET).C
 	$(MPICC) -o $(TARGET)_mpi $< -lcuda -lcudart -L$(CUDA_DIR)/lib64
 
 clean:
