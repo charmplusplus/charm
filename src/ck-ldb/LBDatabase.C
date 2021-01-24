@@ -61,9 +61,13 @@ void LBDatabase::DoneRegisteringObjects(LDOMHandle omh)
     LBOM* om = oms[omh.handle];
     if (om->RegisteringObjs()) {
       omsRegistering--;
-      if (omsRegistering == 0)
-        syncBarrier->TurnOn();
       om->SetRegisteringObjs(false);
+      if (omsRegistering == 0)
+        // This call to TurnOn must come after the decrement of omsRegistering and the
+        // call to SetRegisteringObjs(false) because TurnOn() can start off a chain that
+        // calls RegisteringObjects(omh), so this ensures that the variables are in the correct
+        // state if flow reaches there.
+        syncBarrier->TurnOn();
     }
   }
 }
