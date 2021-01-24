@@ -2,7 +2,6 @@
 #include <vector>
 #include "jacobi3d.h"
 
-#define cudaCheck(code) cudaErrorDie(code, #code, __FILE__, __LINE__)
 void cudaErrorDie(cudaError_t ret, const char* code, const char* file, int line) {
   if (ret != cudaSuccess) {
     fprintf(stderr, "Fatal CUDA Error [%d] %s at %s:%d\n", ret,

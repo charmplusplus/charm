@@ -2,7 +2,7 @@
 
 OPTS = -O3
 CHARMC = ../../../../../bin/ampicxx $(OPTS)
-MPIOPTS = -O3
+MPIOPTS = -O3 -std=c++11
 MPICC = mpicc $(MPIOPTS)
 
 TARGET = jacobi3d
