@@ -117,7 +117,11 @@ int main (int argc, char *argv[]) {
           MPI_Recv(r_buf, 4, MPI_CHAR, 1, 101, MPI_COMM_WORLD, &reqstat[0]);
         } else {
           for (j = 0; j < window_size; j++) {
-            cudaMemcpy(s_buf_host, s_buf, size, cudaMemcpyDeviceToHost);
+            cudaMemcpyAsync(s_buf_host, s_buf, size, cudaMemcpyDeviceToHost, stream);
+          }
+          cudaStreamSynchronize(stream);
+
+          for (j = 0; j < window_size; j++) {
             MPI_Isend(s_buf_host, size, MPI_CHAR, 1, 100, MPI_COMM_WORLD, request + j);
           }
 
@@ -142,7 +146,12 @@ int main (int argc, char *argv[]) {
           MPI_Send(s_buf, 4, MPI_CHAR, 0, 101, MPI_COMM_WORLD);
         } else {
           for (j = 0; j < window_size; j++) {
-            MPI_Recv(r_buf_host, size, MPI_CHAR, 0, 100, MPI_COMM_WORLD, &reqstat[j]);
+            MPI_Irecv(r_buf_host, size, MPI_CHAR, 0, 100, MPI_COMM_WORLD, request + j);
+          }
+
+          MPI_Waitall(window_size, request, reqstat);
+
+          for (j = 0; j < window_size; j++) {
             cudaMemcpyAsync(r_buf, r_buf_host, size, cudaMemcpyHostToDevice, stream);
           }
           cudaStreamSynchronize(stream);
