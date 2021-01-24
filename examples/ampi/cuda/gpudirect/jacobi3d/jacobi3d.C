@@ -1,5 +1,6 @@
 #include <mpi.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <cuda_runtime.h>
 #include "jacobi3d.h"
