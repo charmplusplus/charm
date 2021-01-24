@@ -63,7 +63,7 @@ struct FutureState {
 
   // takes a free id from the set of released IDs, when one
   // is available, or increments the PE's local ID counter
-  // and uses the vupdated alue
+  // and uses the updated value
   CkFutureID next() {
     CkFutureID id;
     if (freeList.empty()) {
