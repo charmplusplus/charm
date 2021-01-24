@@ -61,6 +61,9 @@ struct FutureState {
  public:
   FutureState() : last(-1) {}
 
+  // takes a free id from the set of released IDs, when one
+  // is available, or increments the PE's local ID counter
+  // and uses the vupdated alue
   CkFutureID next() {
     CkFutureID id;
     if (freeList.empty()) {
@@ -73,11 +76,15 @@ struct FutureState {
     return id;
   }
 
+  // returns a future's value when it's available, otherwise
+  // returns nullptr
   void* operator[](CkFutureID f) const {
     auto found = values.find(f);
     return (found != values.end()) ? found->second : nullptr;
   }
 
+  // enqueue a request for a given future id, creating a
+  // queue as necessary
   void request(CkFutureID f, request_t req) {
     auto found = waiting.find(f);
     if (found != waiting.end()) {
@@ -87,23 +94,29 @@ struct FutureState {
     }
   }
 
+  // enuqueue a request to be fulfilled by multiple futures
   void request(const std::vector<CkFutureID>& fs, request_t req) {
-    for (auto f : fs) {
+    for (auto& f : fs) {
       request(f, req);
     }
   }
 
+  // stores a value for a given future id, and fulfills all
+  // outstanding requests for the value
   void fulfill(CkFutureID f, void* value) {
     values[f] = value;
     auto found = waiting.find(f);
     if (found != waiting.end()) {
-      for (auto th : found->second) {
+      for (auto& th : found->second) {
         th->fulfill(value);
       }
       waiting.erase(found);
     }
   }
 
+  // erase any listeners and values for a given future
+  // and adds it to the set of free future ids (that
+  // can be reused). note, does not free any memory
   void release(CkFutureID f) {
     values.erase(f);
     waiting.erase(f);
@@ -197,7 +210,7 @@ CpvStaticDeclare(CkSemaPool*, semapool);
 
 static 
 inline
-int createFuture(void)
+CkFutureID createFuture(void)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   return fs->next();
