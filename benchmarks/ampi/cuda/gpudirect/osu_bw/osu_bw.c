@@ -23,12 +23,12 @@ int main (int argc, char *argv[]) {
   int n_iters_reg = 1000;
   int n_iters_large = 100;
   int warmup_iters = 10;
-  int cuda_aware = 1; // TODO: Add non-CUDA-aware
+  int cuda_aware = 0;
   int window_size = 64;
 
   // Process command line arguments
   int c;
-  while ((c = getopt(argc, argv, "s:x:i:l:w:g:d")) != -1) {
+  while ((c = getopt(argc, argv, "s:x:i:l:w:g:d:")) != -1) {
     switch (c) {
       case 's':
         min_size = atoi(optarg);
@@ -87,6 +87,8 @@ int main (int argc, char *argv[]) {
     cudaMallocHost((void**)&s_buf_host, max_size);
     cudaMallocHost((void**)&r_buf_host, max_size);
   }
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
 
   MPI_Request request[window_size];
   MPI_Status reqstat[window_size];
@@ -111,9 +113,18 @@ int main (int argc, char *argv[]) {
           }
 
           MPI_Waitall(window_size, request, reqstat);
+
           MPI_Recv(r_buf, 4, MPI_CHAR, 1, 101, MPI_COMM_WORLD, &reqstat[0]);
         } else {
-          // TODO
+          for (j = 0; j < window_size; j++) {
+            cudaMemcpy(s_buf_host, s_buf, size, cudaMemcpyDeviceToHost);
+            MPI_Isend(s_buf_host, size, MPI_CHAR, 1, 100, MPI_COMM_WORLD, request + j);
+          }
+
+          MPI_Waitall(window_size, request, reqstat);
+
+          MPI_Recv(r_buf_host, 4, MPI_CHAR, 1, 101, MPI_COMM_WORLD, &reqstat[0]);
+          cudaMemcpy(r_buf, r_buf_host, 4, cudaMemcpyHostToDevice);
         }
       }
 
@@ -127,9 +138,17 @@ int main (int argc, char *argv[]) {
           }
 
           MPI_Waitall(window_size, request, reqstat);
+
           MPI_Send(s_buf, 4, MPI_CHAR, 0, 101, MPI_COMM_WORLD);
         } else {
-          // TODO
+          for (j = 0; j < window_size; j++) {
+            MPI_Recv(r_buf_host, size, MPI_CHAR, 0, 100, MPI_COMM_WORLD, &reqstat[j]);
+            cudaMemcpyAsync(r_buf, r_buf_host, size, cudaMemcpyHostToDevice, stream);
+          }
+          cudaStreamSynchronize(stream);
+
+          cudaMemcpy(s_buf_host, s_buf, 4, cudaMemcpyDeviceToHost);
+          MPI_Send(s_buf_host, 4, MPI_CHAR, 0, 101, MPI_COMM_WORLD);
         }
       }
     }
@@ -148,6 +167,7 @@ int main (int argc, char *argv[]) {
     cudaFreeHost(s_buf_host);
     cudaFreeHost(r_buf_host);
   }
+  cudaStreamDestroy(stream);
 
   MPI_Finalize();
 
