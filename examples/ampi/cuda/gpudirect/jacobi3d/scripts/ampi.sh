@@ -1,16 +1,17 @@
 #!/bin/bash
 #BSUB -W 10
 #BSUB -P csc357
-#BSUB -nnodes 1
-#BSUB -J jacobi3d-ampi-n1
+#BSUB -nnodes 512
+#BSUB -J jacobi3d-ampi-n512
+#BSUB -e /dev/null
 
 # These need to be changed between submissions
-file=jacobi3d
-n_nodes=1
+file=jacobi3d-bench
+n_nodes=512
 n_procs=$((n_nodes * 6))
-grid_width=1536
-grid_height=1536
-grid_depth=1536
+grid_width=12288
+grid_height=12288
+grid_depth=12288
 
 # Function to display commands
 exe() { echo "\$ $@" ; "$@" ; }
