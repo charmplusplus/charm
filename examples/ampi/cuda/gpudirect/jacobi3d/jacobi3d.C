@@ -491,21 +491,29 @@ int main (int argc, char *argv[]) {
   // Main iteration loop
   if (rank == 0) printf("Running iterations...\n");
   double start_time;
+  double comm_time;
+  double comm_start_time;
   for (int i = 0; i < param.n_iters + param.warmup_iters; i++) {
     if (i == param.warmup_iters) start_time = MPI_Wtime();
 
     block.updateAndPack();
 
+    comm_start_time = MPI_Wtime();
+
     block.exchangeGhosts();
+
+    if (i >= param.warmup_iters) comm_time += MPI_Wtime() - comm_start_time;
   }
   double total_time = MPI_Wtime() - start_time;
 
   // Finalize
   if (rank == 0) {
     printf("Completed %d iterations (%d warmup), "
-        "total time: %.3lf s (avg %.3lf ms)\n",
+        "total time: %.3lf s (avg %.3lf ms), "
+        "comm time: %.3lf s (avg %.3lf ms)\n",
         param.n_iters, param.warmup_iters,
-        total_time, total_time / param.n_iters * 1e3);
+        total_time, total_time / param.n_iters * 1e3,
+        comm_time, comm_time / param.n_iters * 1e3);
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
