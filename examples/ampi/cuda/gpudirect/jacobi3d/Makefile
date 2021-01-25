@@ -3,7 +3,7 @@
 OPTS = -O3
 CHARMC = ../../../../../bin/ampicxx $(OPTS)
 MPIOPTS = -O3 -std=c++11
-MPICC = mpicc $(MPIOPTS)
+MPICC = mpicxx $(MPIOPTS)
 
 TARGET = jacobi3d
 OBJS = $(TARGET).o $(TARGET)CUDA.o
