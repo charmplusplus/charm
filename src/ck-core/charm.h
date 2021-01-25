@@ -9,6 +9,9 @@
 #include <sys/types.h> /* for size_t */
 
 #ifdef __cplusplus
+#if CMK_CHARM4PY && CMK_CUDA
+#include <cuda_runtime.h>
+#endif
 #include "conv-rdma.h"
 #include "pup.h"
 extern "C" {
@@ -149,7 +152,6 @@ extern void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, 
 extern void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep);
 extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*));
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
-
 #endif
 /*********************************************************/
 /**
@@ -502,6 +504,9 @@ extern void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
                                          long *streamPtrs, int numDevBufs
                                          );
 extern int CkDeviceBufferSizeInBytes();
+extern void CkCUDAHtoD(void *dest, void *src, int nbytes, cudaStream_t stream);
+extern void CkCUDADtoH(void *dest, void *src, int nbytes, cudaStream_t stream);
+extern void CkCUDAStreamSynchronize(cudaStream_t stream);
 #endif
 
 #ifdef __cplusplus
