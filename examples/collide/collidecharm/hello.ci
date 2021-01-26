@@ -8,6 +8,11 @@ mainmodule hello {
     entry void printCollisionCb(CkReductionMsg *);
   };
 
+  group collResultCollector {
+    entry collResultCollector();
+    entry void myColls(CkDataMsg *msg);
+  }
+
   array [1D] Hello {
     entry Hello(CollideHandle collide);
     entry void DoIt(void);
