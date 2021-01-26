@@ -30,8 +30,8 @@ module collidecharm {
 
   array [3D] collideVoxel {
     entry collideVoxel();
-    entry [createhere] void add(objListMsg *);
-    //    entry [createhome] void add(objListMsg *);
+    //    entry [createhere] void add(objListMsg *);
+    entry [createhome] void add(objListMsg *);
     entry void startCollision(int step,
         CollideGrid3d gridMap,
         CProxy_collideClient client,
