@@ -14,13 +14,17 @@ This "sequential futures abstraction" is a well-studied concept
 in remote process control.
 */
 /*@{*/
+#include <limits>
+#include <memory>
+#include <vector>
+#include <cstdlib>
+#include <algorithm>
+#include <unordered_map>
+
 #include "charm++.h"
 #include "ck.h"
 #include "ckarray.h"
 #include "ckfutures.h"
-#include <stdlib.h>
-#include <limits>
-#include <memory>
 
 struct FutureRequest {
   virtual void fulfill(void* value) = 0;
@@ -55,7 +59,7 @@ struct FutureState {
  private:
   std::unordered_map<CkFutureID, void*> values;
   std::unordered_map<CkFutureID, request_queue_t> waiting;
-  std::set<CkFutureID> freeList;
+  std::vector<CkFutureID> freeList;
 
   CkFutureID last;
  public:
@@ -70,9 +74,10 @@ struct FutureState {
       id = ++last;
     } else {
       id = *freeList.begin();
-      freeList.erase(id);
+      freeList.erase(freeList.begin());
     }
-    CkAssert(id <= std::numeric_limits<CMK_REFNUM_TYPE>::max());
+    CkAssert(id <= std::numeric_limits<CMK_REFNUM_TYPE>::max() &&
+             "future count has exceeded CMK_REFNUM_TYPE, see manual.");
     return id;
   }
 
@@ -102,7 +107,7 @@ struct FutureState {
   }
 
   // stores a value for a given future id, and fulfills all
-  // outstanding requests for the value
+  // outstanding requests for the value (then erases them)
   void fulfill(CkFutureID f, void* value) {
     values[f] = value;
     auto found = waiting.find(f);
@@ -120,7 +125,9 @@ struct FutureState {
   void release(CkFutureID f) {
     values.erase(f);
     waiting.erase(f);
-    freeList.insert(f);
+    CkAssert(std::find(freeList.begin(), freeList.end(), f) == freeList.end() &&
+            "repeated frees of the same future");
+    freeList.push_back(f);
   }
 
   bool is_ready(CkFutureID f) {
