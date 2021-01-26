@@ -196,8 +196,8 @@ public:
 
   void allDone() {
     double total_time = CkWallTimer() - start_time;
-    CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
-        total_time, (total_time / n_iters) * 1e6);
+    CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf ms\n",
+        total_time, (total_time / n_iters) * 1e3);
     CkExit();
   }
 };
@@ -257,6 +257,8 @@ class Block : public CBase_Block {
   cudaEvent_t unpack_compute_event;
 
   bool bounds[DIR_COUNT];
+  double comm_start_time;
+  double comm_time;
 
   Block() {}
 
@@ -291,6 +293,7 @@ class Block : public CBase_Block {
     x = thisIndex.x;
     y = thisIndex.y;
     z = thisIndex.z;
+    comm_time = 0;
 
     // Check bounds and set number of valid neighbors
     for (int i = 0; i < DIR_COUNT; i++) bounds[i] = false;
@@ -436,6 +439,8 @@ class Block : public CBase_Block {
   }
 
   void sendGhosts() {
+    if (my_iter > warmup_iters) comm_start_time = CkWallTimer();
+
     // Send ghosts to neighboring chares
     if (use_zerocopy) {
       if (!bounds[LEFT])
@@ -519,9 +524,14 @@ class Block : public CBase_Block {
     if (my_iter <= warmup_iters) {
       contribute(CkCallback(CkReductionTarget(Main, warmupDone), main_proxy));
     } else {
+      comm_time += CkWallTimer() - comm_start_time;
       if (my_iter < warmup_iters + n_iters) {
         thisProxy[thisIndex].run();
       } else {
+        if (x == 0 && y == 0 && z == 0) {
+          CkPrintf("Chare 0 comm time: %.3lf s (avg %.3lf ms, only valid without overdecomposition)\n",
+            comm_time, comm_time / n_iters * 1e3);
+        }
         contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
       }
     }
