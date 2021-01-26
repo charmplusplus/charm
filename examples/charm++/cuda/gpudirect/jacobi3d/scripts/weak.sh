@@ -1,0 +1,44 @@
+#!/bin/bash
+#BSUB -W 30
+#BSUB -P csc357
+#BSUB -nnodes 256
+#BSUB -J jacobi3d-charm-weak-n256
+#BSUB -e /dev/null
+
+# These need to be changed between submissions
+file=jacobi3d-bench
+n_nodes=256
+n_procs=$((n_nodes * 6))
+grid_width=12288
+grid_height=12288
+grid_depth=6144
+
+# Function to display commands
+exe() { echo "\$ $@" ; "$@" ; }
+
+cd $HOME/work/charm-inter/examples/charm++/cuda/gpudirect/jacobi3d
+
+export LD_LIBRARY_PATH=$HOME/work/ucx-1.9.0/install/lib:$HOME/work/pmix-3.1.5/install/lib:/sw/summit/gdrcopy/2.0/lib64:$LD_LIBRARY_PATH
+
+ppn=1
+pemap="L0,4,8,84,88,92"
+n_iters=100
+warmup_iters=10
+
+echo "# Charm++ Jacobi3D Performance Benchmarking (GPUDirect off)"
+
+for iter in 1 2 3
+do
+  date
+  echo "# Run $iter"
+  exe jsrun -n$n_procs -a1 -c$ppn -g1 -K3 -r6 --smpiargs="-disable_gpu_hooks" ./$file -x $grid_width -y $grid_height -z $grid_depth -w $warmup_iters -i $n_iters +ppn $ppn +pemap $pemap
+done
+
+echo "# Charm++ Jacobi3D Performance Benchmarking (GPUDirect on)"
+
+for iter in 1 2 3
+do
+  date
+  echo "# Run $iter"
+  exe jsrun -n$n_procs -a1 -c$ppn -g1 -K3 -r6 --smpiargs="-disable_gpu_hooks" ./$file -x $grid_width -y $grid_height -z $grid_depth -w $warmup_iters -i $n_iters +ppn $ppn +pemap $pemap -d
+done
