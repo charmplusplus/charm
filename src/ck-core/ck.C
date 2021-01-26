@@ -478,6 +478,7 @@ void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
   // recvBufPtrs is an array of pointers to destination GPU buffers
   CkRdmaDeviceIssueRgetsFromUnpackedMessage(numBuffers, (CkDeviceBuffer**)remoteBufInfos, (void**)recvBufPtrs,
                                             arrSizes, postStructs, cb);
+  delete[] *((CkDeviceBuffer**) remoteBufInfos);
 #else
   CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
 #endif // CMK_CUDA
