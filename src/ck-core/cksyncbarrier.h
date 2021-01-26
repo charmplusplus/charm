@@ -42,15 +42,17 @@ class CkSyncBarrier : public CBase_CkSyncBarrier
 private:
   std::list<LBClient*> clients;
   std::list<LBReceiver*> receivers;
+  std::list<LBReceiver*> beginReceivers;
+  std::list<LBReceiver*> endReceivers;
 
-  std::vector<bool> rank_needs_flood;
+  std::vector<bool> rank_needs_kick;
 
   int cur_epoch;
   int at_count;
   bool on;
   bool rank0pe;
   int propagated_atsync_step;
-  int iter_no;
+  int currentKick;
   bool received_from_left;
   bool received_from_right;
   bool received_from_rank0;
@@ -60,22 +62,25 @@ private:
   {
     CkpvAccess(cksyncbarrierInited) = true;
     cur_epoch = 1;
-    iter_no = -1;
+    currentKick = 0;
     propagated_atsync_step = 0;
     at_count = 0;
     on = false;
-    startedAtSync = false;
     rank0pe = CkMyRank() == 0;
     if (rank0pe)
     {
-      rank_needs_flood.resize(CkNodeSize(CkMyNode()));
+      rank_needs_kick.resize(CkNodeSize(CkMyNode()));
     }
     reset();
   }
 
   void propagate_atsync();
   void reset();
-  void CallReceivers(void);
+  static void CallReceiverList(const std::list<LBReceiver*>& receiverList);
+
+  static LDBarrierReceiver AddReceiverHelper(std::function<void()> fn,
+                                      std::list<LBReceiver*>& receiverList);
+  void RemoveReceiverHelper(LDBarrierReceiver r, std::list<LBReceiver*>& receiverList);
 
 public:
   CkSyncBarrier() { init(); };
@@ -90,7 +95,7 @@ public:
                                            : nullptr;
   }
 
-  void CheckBarrier(bool flood_atsync = false);
+  void CheckBarrier();
   void recvLbStart(int lb_step, int sourcenode, int pe);
 
   LDBarrierClient AddClient(Chare* chare, std::function<void()> fn, int epoch = -1);
@@ -101,6 +106,9 @@ public:
   }
 
   void RemoveClient(LDBarrierClient h);
+
+  // A receiver is a callback function that is called when all of the clients on this PE
+  // reach this barrier
   LDBarrierReceiver AddReceiver(std::function<void()> fn);
   template <typename T>
   inline LDBarrierReceiver AddReceiver(T* obj, void (T::*method)(void))
@@ -108,10 +116,33 @@ public:
     return AddReceiver(std::bind(method, obj));
   }
 
+  // A begin receiver is a callback function that is called after all of the clients on
+  // this PE reach this barrier and before calling the actual receivers, useful for
+  // setting up for the execution of those receivers. Will only be called when a receiver
+  // exists.
+  LDBarrierReceiver AddBeginReceiver(std::function<void()> fn);
+  template <typename T>
+  inline LDBarrierReceiver AddBeginReceiver(T* obj, void (T::*method)(void))
+  {
+    return AddBeginReceiver(std::bind(method, obj));
+  }
+
+  // An end receiver is a callback function that is called when the receivers on this PE
+  // have finished executing, right before the clients are resumed, useful for cleaning up
+  // or resetting state. Will only be called when a receiver exists.
+  LDBarrierReceiver AddEndReceiver(std::function<void()> fn);
+  template <typename T>
+  inline LDBarrierReceiver AddEndReceiver(T* obj, void (T::*method)(void))
+  {
+    return AddEndReceiver(std::bind(method, obj));
+  }
+
   void RemoveReceiver(LDBarrierReceiver h);
+  void RemoveBeginReceiver(LDBarrierReceiver h);
+  void RemoveEndReceiver(LDBarrierReceiver h);
   void TurnOnReceiver(LDBarrierReceiver h);
   void TurnOffReceiver(LDBarrierReceiver h);
-  void AtBarrier(LDBarrierClient _n_c, bool flood_atsync = false);
+  void AtBarrier(LDBarrierClient _n_c);
   void DecreaseBarrier(int c);
   void TurnOn()
   {
@@ -121,6 +152,8 @@ public:
   void TurnOff() { on = false; };
 
   void ResumeClients(void);
+
+  bool hasReceivers() { return !receivers.empty(); };
 };
 
 #endif /* CKSYNCBARRIER_H */
