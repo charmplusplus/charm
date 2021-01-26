@@ -45,6 +45,12 @@ CkGroupID CollideSerialClient(CkCallback clientCb)
   return cl;
 }
 
+CkGroupID CollideDistributedClient(CkCallback clientCb)
+{
+  CProxy_distributedCollideClient cl = CProxy_distributedCollideClient::ckNew(clientCb);
+  return cl;
+}
+
 /// Create a collider group to contribute objects to.
 ///  Should be called on processor 0.
 CollideHandle CollideCreate(const CollideGrid3d &gridMap,
@@ -667,6 +673,17 @@ void serialCollideClient::reductionDone(CkReductionMsg *msg)
   delete msg;
 }
 
+/********************** distributedCollideClient *****************/
+distributedCollideClient::distributedCollideClient(CkCallback clientCb_) {
+  clientCb = clientCb_;
+  clientCb.transformBcastToLocalElem();
+}
 
+void distributedCollideClient::collisions(ArrayElement *src,
+    int step,CollisionList &colls)
+{
+  // Invoke clientCb
+  clientCb.send(CkDataMsg::buildNew(colls.length()*sizeof(Collision), colls.getData()));
+}
 
 #include "collidecharm.def.h"

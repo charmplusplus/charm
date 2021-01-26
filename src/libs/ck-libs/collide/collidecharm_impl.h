@@ -237,6 +237,21 @@ class serialCollideClient : public collideClient {
   virtual void reductionDone(CkReductionMsg *m);
 };
 
+
+/********************** distributedCollideClient *****************
+  Invokes the callback passed on every PE with the collision list
+  */
+class distributedCollideClient : public collideClient {
+  CkCallback clientCb;
+  public:
+  distributedCollideClient(CkCallback clientCb_);
+
+  /// Called by voxel array on each processor:
+  virtual void collisions(ArrayElement *src,
+      int step,CollisionList &colls);
+};
+
+
 #if CMK_TRACE_ENABLED
 // List of COLLIDE functions to trace:
 static const char *funclist[] = {"COLLIDE_Init", "COLLIDE_Boxes",

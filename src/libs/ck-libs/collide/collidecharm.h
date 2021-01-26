@@ -43,6 +43,8 @@ CkGroupID CollideSerialClient(CollisionClientFn clientFn,void *clientParam);
 /// complete Collision list.
 CkGroupID CollideSerialClient(CkCallback clientCb);
 
+CkGroupID CollideDistributedClient(CkCallback clientCb);
+
 /****************** Collision Interface ******************/
 typedef CkGroupID CollideHandle;
 
