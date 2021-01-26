@@ -2566,13 +2566,13 @@ Charm++ implements a generic, measurement-based load balancing
 framework which automatically instruments all Charm++ objects,
 collecting computational load and communication structure during
 execution and storing them into a load balancing database (this only
-happens when a load balancer is linked into the application; if no LB
-is used, this measurement does not happen). This instrumentation
-starts automatically at the beginning of application execution by
-default. It can be disabled at startup by passing the *+LBOff* flag at
-runtime, and toggled from the application by calling
-``LBTurnInstrumentOn()`` and ``LBTurnInstrumentOff()``, enabling or
-disabling instrumentation on the calling PE.
+happens when a load balancer is activated during execution, see
+section :numref:`lbOption`). This instrumentation starts automatically
+at the beginning of application execution by default. It can be
+disabled at startup by passing the *+LBOff* flag at runtime, and
+toggled from the application by calling ``LBTurnInstrumentOn()`` and
+``LBTurnInstrumentOff()``, enabling or disabling instrumentation on
+the calling PE.
 
 Charm++ then provides a collection of load balancing strategies whose
 job it is to decide on a new mapping of objects to processors based on
@@ -2593,10 +2593,10 @@ for dynamic applications.
 Two key terms in the Charm++ load balancing framework are:
 
 - The **load balancing manager** provides the interface of almost all
-  load balancing calls. On each processor, it manages load balancing
-  database, which stores the instrumented load data, and controls and
-  invokes the selected load balancing strategies. It is implemented as
-  a chare group called ``LBManager``.
+  load balancing calls. On each processor, it manages the load
+  balancing database, which stores the instrumented load data, and
+  controls and invokes the selected load balancing strategies. It is
+  implemented as a chare group called ``LBManager``.
 
 - A **load balancing strategy** gathers the relevant load data, runs a
   decision algorithm and produces the new mapping of the
@@ -2675,10 +2675,10 @@ balancers:
   respectively.
 
 In distributed approaches, load data is only exchanged among
-neighboring processors. There is no global synchronization. However,
-they will not, in general, provide an immediate restoration for load
-balance - the process is iterated until the load balance can be
-achieved.
+neighboring processors and there is no messaging outside this local
+neighborhood. However, they will not, in general, provide an immediate
+restoration for load balance - the process is iterated until the
+desired load balance can be achieved.
 
 Listed below are the distributed load balancers:
 
@@ -2922,36 +2922,35 @@ elements migratable (see migration section above) and choose a load
 balancing strategy (see the section :numref:`lbStrategy` for a
 description of available load balancing strategies).
 
-There are three different ways to use load balancing for chare arrays
-to meet different needs of the applications. These methods are
-different in how and when a load balancing phase starts. The two
-methods are: **AtSync mode** and **periodic load balancing mode**.
+There are two different ways to use load balancing for chare arrays to
+meet different needs of the applications. These methods are different
+in how and when a load balancing phase starts. The two methods are:
+**AtSync mode** and **periodic load balancing mode**.  In *AtSync
+mode*, the application invokes the load balancer explicitly at an
+appropriate location (generally at a pre-existing synchronization
+boundary) to trigger load balancing by inserting a function call
+(``AtSync()``) in the application source code.  In *periodic load
+balancing mode*, a user specifies only how often load balancing is to
+occur, using the *+LBPeriod* runtime option to specify the time
+interval.
 
-In *periodic load balancing mode*, a user specifies only how often
-load balancing is to occur, using the *+LBPeriod* runtime option to
-specify the time interval.
+.. note:: In AtSync mode, Applications that use dynamic insertion or
+   deletion of array elements must not be doing so when any element
+   calls ``AtSync()``. This is because AtSync mode requires an
+   application to have a fixed, known number of objects when
+   determining if ``AtSync()`` has been called by all relevant objects
+   in order to prevent race conditions (the implementation is designed
+   to be robust against these issues and will often be able to handle
+   them, but we make no guarantees if these rules are not obeyed). If
+   using dynamic insertion, please ensure that insertions and calls to
+   ``AtSync()`` cannot be interleaved and that ``doneInserting()`` is
+   called after insertions are complete and before any element calls
+   ``AtSync()``. Insertions and/or deletions may begin again after
+   load balancing is complete (i.e. ``ResumeFromSync()`` is called for
+   an object on the given PE for insertions or for the object in
+   question for deletions).
 
-In *AtSync mode*, the application invokes the load balancer explicitly
-at an appropriate location (generally at a pre-existing
-synchronization boundary) to trigger load balancing by inserting a
-function call (``AtSync()``) in the application source code.
-
-Note that applications that use dynamically insertion or deletion of
-array elements must not be doing so when any element calls
-``AtSync()``. This is because AtSync mode requires an application to
-have a fixed, known number of objects when determining if ``AtSync()``
-has been called by all relevant objects in order to prevent race
-conditions (the implementation is designed to be robust against these
-issues and will often be able to handle them, but we make no
-guarantees if these rules are not obeyed). If using dynamic insertion,
-please ensure that insertions and calls to ``AtSync()`` cannot be
-interleaved and that ``doneInserting()`` is called after insertions
-are complete and before any element calls ``AtSync()``. Insertions
-and/or deletions may begin again after load balancing is complete
-(i.e. ``ResumeFromSync()`` is called for an object on the given PE for
-insertions or for the object in question for deletions).
-
-The detailed APIs of these three methods are described as follows:
+The detailed APIs of these two methods are described as follows:
 
 #. **AtSync mode**: Using this method, elements can be migrated only
    at certain points in the execution, when the application invokes
@@ -2983,7 +2982,7 @@ The detailed APIs of these three methods are described as follows:
    load balancing is triggered. The objects can start executing again
    when ``ResumeFromSync()`` is called. In this case, the user
    redefines ``ResumeFromSync()`` to trigger the next iteration of the
-   application. This patter effectively results in a barrier at load
+   application. This pattern effectively results in a barrier at load
    balancing time (see example here :numref:`lbexample`).
 
 #. **Periodic load balancing mode**: This mode uses a timer to perform
@@ -3090,15 +3089,17 @@ allows programmers to easily experiment with different existing
 strategies by simply linking a pool of strategy modules and choosing one
 to use at runtime via a command line option.
 
-**Note:** linking a load balancing module is different from activating
+**Note:** linking a load balancing module is distinct from activating
 it:
 
   - link an LB module: to link an load balancing module (library) at
     compile time. You can link against multiple LB libraries.
 
-  - activate an LB: to actually ask the runtime to create an LB strategy
-    and use it for a given run. You can only activate load balancers
-    that have been already been linked in at compile time.
+  - activate an LB: to actually ask the runtime to create an LB
+    strategy and use it for a given run. You can only activate load
+    balancers that have been already been linked in at compile
+    time. The special ``-balancer {balancer name}`` link time argument
+    both links a module and activates it at runtime by default.
 
 Below are the descriptions about the compiler and runtime options:
 
@@ -3121,9 +3122,9 @@ Below are the descriptions about the compiler and runtime options:
        specified in CommonLBs plus *MetisLB and RecBipartLB*.
 
    - | *-balancer MetisLB*
-     | links the given load balancer and uses it at runtime. This is
-       equivalent to using *-module MetisLB* at compile time and then
-       *+balancer MetisLB* at runtime.
+     | links the given load balancer *and activates* it for use at
+       runtime. This is equivalent to using *-module MetisLB* at
+       compile time and then *+balancer MetisLB* at runtime.
 
    - | *-balancer GreedyLB -balancer RefineLB*
      | links both listed balancers, then invokes GreedyLB at the first
@@ -3138,29 +3139,6 @@ Below are the descriptions about the compiler and runtime options:
    *-balancer A* implies *-module A*, so you don’t have to write *-module A*
    again, although that is not invalid. Using CommonLBs is a convenient
    way to link against the commonly used existing load balancers.
-
-#. **Write and use your own load balancer**
-
-   Refer Section :numref:`lbWriteNewLB` for writing a new load
-   balancer. Compile it in the form of library and name it
-   *libmoduleFooLB.a* where *FooLB* is the new load balancer. Add the
-   path to the library and link the load balancer into an application
-   using *-module FooLB*.
-
-   You can create a library in the following way. This will create
-   *libmoduleFooLB.a*.
-
-   .. code-block:: bash
-
-      $ bin/charmc -o libmoduleFooLB.a FooLB.C
-
-   To include this balancer in your application, the Makefile can be
-   changed in the following way
-
-   .. code-block:: makefile
-
-      $(TARGET): $(OBJECTS)
-        $(CHARMC) -o $(TARGET) -L/path-to-the-lib $(OBJS) -module FooLB
 
 #. **Runtime options:**
 
@@ -8301,11 +8279,11 @@ will have been reconstructed and all proxy variables will be valid
 references to the restarted versions of whatever they originally
 referred to. The only caveat to this is when the application is
 restarted on a different number of processors than it was checkpointed
-on, in which case non-location invariant chares have special
-behavior. Singleton chares are not created or restored at all and
-group/nodegroup chares are created per PE/node, but each is restored
-from the checkpoint corresponding to the element originally on
-PE/node 0.
+on, in which case non-location invariant chares have special behavior:
+singleton chares are not created or restored at all and
+group/nodegroup chares are created per PE/node, but each
+group/nodegroup element is restored from the checkpoint corresponding
+to the element originally on PE/node 0.
 
 The checkpoint must be recorded at a synchronization point in the
 application, to ensure a consistent state upon restart. One easy way to
@@ -8368,11 +8346,13 @@ previous one at checkpoint time, so running a load balancer (see
 Section :numref:`loadbalancing`) after restart is suggested.
 
 If restart is not done on the same number of processors, the
-processor-specific data in a group/nodegroup branch cannot (and usually
-should not) be restored individually. A copy from processor 0 will be
-propagated to all the processors. Additionally, singleton chares will
-not be restored at all in this case, so they must be specially handled
-when restarting on a different number of processors.
+processor-specific data in a group/nodegroup branch cannot (and
+usually should not) be restored individually. A copy from processor 0
+will be propagated to all the processors. Additionally, singleton
+chares will not be restored at all in this case, so they must be
+specially handled when restarting on a different number of processors.
+One can, for example, explicitly test for a new number of PEs when
+unpacking and reconstruct singleton objects in that case.
 
 Choosing What to Save
 ^^^^^^^^^^^^^^^^^^^^^
@@ -9968,6 +9948,28 @@ referred.
 
    ProcArray and ObjGraph data structures to be used when writing a load
    balancing strategy
+
+Use your own load balancer
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Compile it in the form of a library and name it *libmoduleFooLB.a*
+where *FooLB* is the new load balancer. Add the path to the library
+and link the load balancer into an application using *-module FooLB*.
+
+You can create a library in the following way. This will create
+*libmoduleFooLB.a*.
+
+.. code-block:: bash
+
+   $ bin/charmc -o libmoduleFooLB.a FooLB.C
+
+To include this balancer in your application, the application's
+Makefile can be changed in the following way:
+
+.. code-block:: makefile
+
+   $(TARGET): $(OBJECTS)
+     $(CHARMC) -o $(TARGET) -L/path-to-the-lib $(OBJS) -module FooLB
 
 Incorporating this strategy into the Charm++ build framework is
 explained in the next section.
