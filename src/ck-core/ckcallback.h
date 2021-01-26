@@ -295,6 +295,18 @@ public:
           d.group.refnum = 0;
 	}
 
+  void transformBcastToLocalElem() {
+    if(type == bcastGroup) {
+      type = sendGroup;
+      d.group.onPE = CkMyPe();
+    } else if(type == bcastNodeGroup) {
+      type = sendNodeGroup;
+      d.group.onPE = CkMyNode();
+    } else {
+      CkAbort("CkCallback type needs to be either bcastGroup or bcastNodeGroup to be transformed!");
+    }
+  }
+
     // Send to nodegroup element
 	CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool forceInline=false);
 
