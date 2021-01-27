@@ -1,17 +1,16 @@
 #!/bin/bash
 #BSUB -W 30
 #BSUB -P csc357
-#BSUB -nnodes 1
-#BSUB -J jacobi3d-openmpi-weak-n1
-#BSUB -e /dev/null
+#BSUB -nnodes 16
+#BSUB -J jacobi3d-openmpi-weak-n16
 
 # These need to be changed between submissions
 file=jacobi3d_mpi-bench
-n_nodes=1
+n_nodes=16
 n_procs=$((n_nodes * 6))
-grid_width=1536
-grid_height=1536
-grid_depth=1536
+grid_width=6144
+grid_height=3072
+grid_depth=3072
 
 # Function to display commands
 exe() { echo "\$ $@" ; "$@" ; }

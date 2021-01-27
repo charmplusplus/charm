@@ -10,8 +10,8 @@ lsb_hosts = os.environ['LSB_HOSTS']
 x = lsb_hosts.split(' ')[1:]
 hosts = [x[i] for i in range(len(x)) if i % cores_per_node == 0]
 n_hosts = len(hosts)
-#print('Hosts:', hosts)
-#print('# of hosts:', n_hosts)
+print('Hosts:', hosts)
+print('# of hosts:', n_hosts)
 
 rankfile = open("rankfile-" + job_id, "w")
 

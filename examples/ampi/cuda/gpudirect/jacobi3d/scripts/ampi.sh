@@ -3,7 +3,6 @@
 #BSUB -P csc357
 #BSUB -nnodes 256
 #BSUB -J jacobi3d-ampi-strong-n256
-#BSUB -e /dev/null
 
 # These need to be changed between submissions
 file=jacobi3d-bench
