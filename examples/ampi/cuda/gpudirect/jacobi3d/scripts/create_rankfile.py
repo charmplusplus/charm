@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 import os
 
-cores_per_node = 42
 n_sockets = 2
 procs_per_socket = 3
 
 job_id = os.environ['LSB_JOBID']
-lsb_hosts = os.environ['LSB_HOSTS']
-x = lsb_hosts.split(' ')[1:]
-hosts = [x[i] for i in range(len(x)) if i % cores_per_node == 0]
+lsb_hosts = os.environ['LSB_MCPU_HOSTS']
+x = lsb_hosts.split(' ')[2:]
+x = x[:-1]
+hosts = [x[i] for i in range(len(x)) if i % 2 == 0]
 n_hosts = len(hosts)
 print('Hosts:', hosts)
 print('# of hosts:', n_hosts)

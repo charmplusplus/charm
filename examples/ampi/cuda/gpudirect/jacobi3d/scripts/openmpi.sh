@@ -21,6 +21,9 @@ module unload spectrum-mpi
 export PATH=$HOME/work/openmpi-4.1.0/install/bin:$HOME/work/ucx-1.9.0/install/bin:$PATH
 export LD_LIBRARY_PATH=$HOME/work/openmpi-4.1.0/install/lib:$HOME/work/ucx-1.9.0/install:/sw/summit/gdrcopy/2.0/lib64:$LD_LIBRARY_PATH
 
+echo 'LSB_MCPU_HOSTS:'
+echo $LSB_MCPU_HOSTS
+
 # Create rankfile for OpenMPI
 python3 scripts/create_rankfile.py
 
