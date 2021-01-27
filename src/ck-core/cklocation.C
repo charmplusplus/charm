@@ -2406,16 +2406,16 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 
   // Register with the map object
   mapID = opts.getMap();
-  map = (CkArrayMap*)CkLocalBranch(mapID);
-  if (map == NULL)
+  map = static_cast<CkArrayMap*>(CkLocalBranch(mapID));
+  if (map == nullptr)
     CkAbort("ERROR! Local branch of array map is NULL!");
   // TODO: Should this be registered here, CkArray, CkLocMgr, or none?
   mapHandle = map->registerArray(opts.getEnd(), thisgroup);
 
   cacheID = opts.getLocationCache();
-  cache = (CkLocCache*)CkLocalBranch(cacheID);
-  if (cache == NULL)
-    CkAbort("Error: NULL cache pointer in array creation\n");
+  cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
+  if (cache == nullptr)
+    CkAbort("ERROR! Local branch of location cache is NULL!\n");
   cache->handshake(this);
 
   // Figure out the mapping from indices to object IDs if one is possible
@@ -2467,12 +2467,14 @@ void CkLocMgr::pup(PUP::er& p)
     thislocalproxy = newlocalproxy;
 
     // Register with the map object
-    map = (CkArrayMap*)CkLocalBranch(mapID);
-    if (map == NULL)
+    map = static_cast<CkArrayMap*>(CkLocalBranch(mapID));
+    if (map == nullptr)
       CkAbort("ERROR! Local branch of array map is NULL!");
 
     // Register with the cache object
-    cache = (CkLocCache*)CkLocalBranch(cacheID);
+    cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
+    if (cache == nullptr)
+      CkAbort("ERROR! Local branch of location cache is NULL!");
     cache->handshake(this);
 
     // _lbdb is the fixed global groupID
@@ -2516,7 +2518,7 @@ void CkLocMgr::pup(PUP::er& p)
     int count = 0;
     std::vector<int> pe_list;
     std::vector<CmiUInt8> idx_list;
-    for (auto itr = cache->id2pe.begin(); itr != cache->id2pe.end(); ++itr)
+    for (const auto& itr : cache->id2pe)
     {
       if (homePe(itr->first) == CmiMyPe() && itr->second != CmiMyPe())
       {
@@ -2647,9 +2649,8 @@ void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer)
   messagesToFlush.swap(itr->second);
 
   // deliver all buffered messages
-  for (int i = 0; i < messagesToFlush.size(); ++i)
+  for (CkArrayMessage* m : messagesToFlush)
   {
-    CkArrayMessage* m = messagesToFlush[i];
     deliverMsg(m, UsrToEnv(m)->getArrayMgr(), id, NULL, CkDeliver_queue);
   }
 
@@ -2663,19 +2664,29 @@ void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer)
 void CkLocMgr::deliverAnyBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
                                       IndexMsgBuffer& buffer)
 {
-  auto idx_itr = buffer.find(idx);
-  if (idx_itr != buffer.end())
+  auto itr = buffer.find(idx);
+  // If there are no buffered msgs, don't do anything
+  if (itr == buffer.end())
+    return;
+
+  std::vector<CkArrayMessage*> messagesToFlush;
+  messagesToFlush.swap(itr->second);
+
+  // deliver all buffered messages
+  for (CkArrayMessage* m : messagesToFlush)
   {
-    vector<CkArrayMessage*>& msgs = idx_itr->second;
-    for (int i = 0; i < msgs.size(); ++i)
-    {
-      envelope* env = UsrToEnv(msgs[i]);
-      CkGroupID mgr = ck::ObjID(env->getRecipientID()).getCollectionID();
-      env->setRecipientID(ck::ObjID(mgr, id));
-      deliverMsg(msgs[i], mgr, id, &idx, CkDeliver_queue);
-    }
-    buffer.erase(idx_itr);
+    // These messages did not previously know the element ID, so set before sending
+    envelope* env = UsrToEnv(m);
+    CkGroupID mgr = ck::ObjID(env->getRecipientID()).getCollectionID();
+    env->setRecipientID(ck::ObjID(mgr, id));
+    // Send the updated message
+    deliverMsg(m, mgr, id, &idx, CkDeliver_queue);
   }
+
+  CkAssert(itr->second.empty());  // Nothing should have been added, since we
+                                  // ostensibly know where the object lives
+
+  buffer.erase(itr);
 }
 
 CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex& idx)
@@ -3019,7 +3030,7 @@ void CkLocMgr::sendMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& i
   CmiUInt8 id;
   if (lookupID(idx, id))
   {
-    // We know the elements ID so we can go through normal delivery channels
+    // We know the element's ID so we can go through normal delivery channels
     env->setRecipientID(ck::ObjID(mgr, id));
     deliverMsg(msg, mgr, id, &idx, type, opts);
   }

@@ -302,7 +302,7 @@ class CkLocCache : public CBase_CkLocCache
 {
 private:
   // Map of ID to PE
-  typedef std::unordered_map<CmiUInt8, int> IdPeMap;
+  using IdPeMap = std::unordered_map<CmiUInt8, int>;
   IdPeMap id2pe;
 
   // Temporarily needed to map ID to home PE
@@ -349,15 +349,15 @@ class CkLocMgr : public IrrGroup
 private:
   CkMagicNumber<CkMigratable> magic;  // To detect heap corruption
 
-  typedef std::unordered_map<CkArrayID, CkArray*, ArrayIDHasher> ArrayIdMap;
-  typedef std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
-  typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage*>, IndexHasher>
-      IndexMsgBuffer;
-  typedef std::unordered_map<CkArrayIndex, std::vector<int>, IndexHasher>
-      LocationRequestBuffer;
-  typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
-  typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
-  typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
+  using ArrayIdMap = std::unordered_map<CkArrayID, CkArray*, ArrayIDHasher>;
+  using MsgBuffer = std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> >;
+  using IndexMsgBuffer =
+      std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage*>, IndexHasher>;
+  using LocationRequestBuffer =
+      std::unordered_map<CkArrayIndex, std::vector<int>, IndexHasher>;
+  using IdxIdMap = std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher>;
+  using LocRecHash = std::unordered_map<CmiUInt8, CkLocRec*>;
+  using ElemMap = std::unordered_map<CmiUInt8, CkMigratable*>;
 
   // Internal interface:
   void AtSyncBarrierReached();
