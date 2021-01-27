@@ -111,9 +111,12 @@ vector<Vertex_helper*> vhelpers;
 int numparts, peno;
 ProcArray* parray;
 
-CreateLBFunc_Def(
-    RecBipartLB,
-    "Algorithm for load balacing based on recursive bipartitioning of object graph");
+static void lbinit()
+{
+  LBRegisterBalancer<RecBipartLB>(
+      "RecBipartLB",
+      "Algorithm for load balacing based on recursive bipartitioning of object graph");
+}
 
 // removes from BQueue but not from boundaryline
 bool BQueue::removeToSwap(Vertex* vert)
