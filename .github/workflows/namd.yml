@@ -14,7 +14,7 @@ jobs:
       run: |
         sudo apt-get -y install sfftw-dev
         cd ..
-        git clone https://charm.cs.illinois.edu/gerrit/namd
+        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}@gitlab.com/tcbgUIUC/namd.git
         cd namd
         ./config Linux-x86_64-g++ --charm-base ../charm --charm-arch netlrts-linux-x86_64 --without-tcl
         cd Linux-x86_64-g++
