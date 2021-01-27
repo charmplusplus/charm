@@ -584,13 +584,13 @@ static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
   if (locMgr.isZero())
   { //Create a new location manager
     CkGroupID locCache;
-    CkEntryOptions  e_opts1;
-    e_opts1.setGroupDepID(opts.getMap());       // group creation dependence
-    locCache = CProxy_CkLocCache::ckNew(&e_opts1);
+    CkEntryOptions locCacheOpts;
+    locCacheOpts.setGroupDepID(opts.getMap());       // group creation dependence
+    locCache = CProxy_CkLocCache::ckNew(&locCacheOpts);
     opts.setLocationCache(locCache);
-    CkEntryOptions e_opts2;
-    e_opts2.setGroupDepID(locCache);
-    locMgr = CProxy_CkLocMgr::ckNew(opts, &e_opts2);
+    CkEntryOptions locMgrOpts;
+    locMgrOpts.setGroupDepID(locCache);
+    locMgr = CProxy_CkLocMgr::ckNew(opts, &locMgrOpts);
     opts.setLocationManager(locMgr);
   }
   CkGroupID mCastMgr = opts.getMcastManager();
