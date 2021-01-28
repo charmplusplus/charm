@@ -262,10 +262,10 @@ class StrategyWrapper : public IStrategyWrapper
   }
 
   virtual ~StrategyWrapper()
-    {
-      delete strategy;
-      delete sol;
-    }
+  {
+    delete strategy;
+    delete sol;
+  }
 
   float prepStrategy(unsigned int nobjs, unsigned int nprocs,
                      std::vector<TreeLBMessage*>& msgs, LLBMigrateMsg* migMsg)
