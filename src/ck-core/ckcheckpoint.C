@@ -283,7 +283,7 @@ public:
 };
 
 // broadcast
-void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback _cb, bool _requestStatus){
+void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _requestStatus){
 	chkptStartTimer = CmiWallTimer();
 	requestStatus = _requestStatus;
 	// make dir on all PEs in case it is a local directory
@@ -331,7 +331,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback _cb, bool _requ
     } else
 #endif
     {
-      success &= checkpointOne(dirname, _cb, requestStatus);
+      success &= checkpointOne(dirname, cb, requestStatus);
     }
   }
 
@@ -384,7 +384,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback _cb, bool _requ
 #endif
 #endif
 	chkpStatus = success?CK_CHECKPOINT_SUCCESS:CK_CHECKPOINT_FAILURE;
-	restartCB = _cb;
+	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
 
 	// Use barrier instead of contribute here:
@@ -711,7 +711,7 @@ void CkPupProcessorData(PUP::er &p)
 }
 
 // called only on pe 0
-static bool checkpointOne(const char* dirname, CkCallback& _cb, bool requestStatus){
+static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatus){
 	CmiAssert(CkMyPe()==0);
 	char filename[1024];
 	
@@ -723,7 +723,7 @@ static bool checkpointOne(const char* dirname, CkCallback& _cb, bool requestStat
 	int _numNodes = CkNumNodes();
 
 	pRO|_numNodes;
-	pRO|_cb;
+	pRO|cb;
 	CkPupROData(pRO);
 	pRO|requestStatus;
 
