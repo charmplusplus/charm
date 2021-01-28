@@ -457,7 +457,7 @@ static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratab
   if (*stackSize==0) *stackSize=CthCpvAccess(_defaultStackSize);
   th->stacksize=*stackSize;
   if (!useMigratable || !CmiIsomallocEnabled()) {
-    CmiEnforce(*stackSize <= std::numeric_limits<size_t>::max());
+    CmiEnforce(*stackSize <= std::numeric_limits<int>::max());
     ret=malloc(*stackSize);
     CmiEnforce(ret != nullptr);
   } else {
