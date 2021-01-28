@@ -7,6 +7,7 @@
 
 #ifdef __cplusplus
 
+#include "ckcallback.h"
 #include <cstring>
 #include <cstdlib>
 #include <vector>
@@ -59,9 +60,13 @@ typedef struct hapiWorkRequest {
 
   // Charm++ callback functions to be executed after certain stages of
   // GPU execution
-  void* host_to_device_cb; // after host to device data transfer
-  void* kernel_cb; // after kernel execution
-  void* device_to_host_cb; // after device to host data transfer
+  CkCallback host_to_device_cb; // after host to device data transfer
+  CkCallback kernel_cb; // after kernel execution
+  CkCallback device_to_host_cb; // after device to host data transfer
+
+  bool host_to_device_cb_set;
+  bool kernel_cb_set;
+  bool device_to_host_cb_set;
 
 #ifdef HAPI_TRACE
   // short identifier used for tracing and logging
@@ -82,13 +87,7 @@ typedef struct hapiWorkRequest {
   void* user_data;
 
   // flags determining whether memory should be freed on destruction
-  // XXX: if different callbacks are used/set for the same WorkRequest,
-  // memory leaks could occur because they are only freed when the WorkRequest
-  // is destroyed
   bool free_user_data;
-  bool free_host_to_device_cb;
-  bool free_kernel_cb;
-  bool free_device_to_host_cb;
 
   // CUDA stream index provided by the user or assigned by GPUManager
   cudaStream_t stream;
@@ -105,13 +104,6 @@ typedef struct hapiWorkRequest {
   ~hapiWorkRequest() {
     if (free_user_data)
       std::free(user_data);
-
-    if (free_host_to_device_cb)
-      std::free(host_to_device_cb);
-    if (free_kernel_cb)
-      std::free(kernel_cb);
-    if (free_device_to_host_cb)
-      std::free(device_to_host_cb);
   }
 
   void setExecParams(dim3 _grid_dim, dim3 _block_dim, int _shared_mem = 0) {
@@ -134,42 +126,23 @@ typedef struct hapiWorkRequest {
     return buffers.size();
   }
 
-  void setHostToDeviceCallback(void* cb) {
+  void setHostToDeviceCallback(const CkCallback& cb) {
     host_to_device_cb = cb;
-    free_host_to_device_cb = false;
+    host_to_device_cb_set = true;
   }
 
-  void setHostToDeviceCallback(void* cb, bool free) {
-    host_to_device_cb = cb;
-    free_host_to_device_cb = free;
-  }
-
-  void setKernelCallback(void* cb) {
+  void setKernelCallback(const CkCallback& cb) {
     kernel_cb = cb;
-    free_kernel_cb = false;
+    kernel_cb_set = true;
   }
 
-  void setKernelCallback(void* cb, bool free) {
-    kernel_cb = cb;
-    free_kernel_cb = free;
-  }
-
-  void setDeviceToHostCallback(void* cb) {
+  void setDeviceToHostCallback(const CkCallback& cb) {
     device_to_host_cb = cb;
-    free_device_to_host_cb = false;
+    device_to_host_cb_set = true;
   }
 
-  void setDeviceToHostCallback(void* cb, bool free) {
-    device_to_host_cb = cb;
-    free_device_to_host_cb = free;
-  }
-
-  inline void setCallback(void* cb) {
-    setDeviceToHostCallback(cb, false);
-  }
-
-  inline void setCallback(void* cb, bool free) {
-    setDeviceToHostCallback(cb, free);
+  inline void setCallback(const CkCallback& cb) {
+    setDeviceToHostCallback(cb);
   }
 
 #ifdef HAPI_TRACE
@@ -237,7 +210,6 @@ typedef struct hapiRequestTimeInfo {
 } hapiRequestTimeInfo;
 #endif /* defined HAPI_INSTRUMENT_WRS */
 
-
 #ifndef AMPI_INTERNAL_SKIP_FUNCTIONS
 
 #define AMPI_CUSTOM_FUNC(return_type, function_name, ...) \
@@ -256,8 +228,12 @@ extern "C" {
 #ifdef __cplusplus
 
 // Provide a C++-only stub for this function's default parameter.
-static inline void hapiAddCallback(cudaStream_t a, void* b) {
-  hapiAddCallback(a, b, NULL);
+void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg);
+static inline void hapiAddCallback(cudaStream_t stream, const CkCallback& cb) {
+  hapiAddCallback(stream, cb, nullptr);
+}
+static inline void hapiAddCallback(cudaStream_t stream, void* cb) {
+  hapiAddCallback(stream, cb, nullptr);
 }
 
 // Overloaded C++ wrappers for selecting whether to pool or not using a bool.

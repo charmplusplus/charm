@@ -1152,7 +1152,7 @@ extern void _registerControlPoints(void);
 extern void _registerTraceControlPoints();
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
-extern void _cksyncbarrierInit();
+extern void _CkSyncBarrierInit();
 extern void _loadbalancerInit();
 extern void _metabalancerInit();
 #if CMK_SMP && CMK_TASKQUEUE
@@ -1414,7 +1414,7 @@ void _initCharm(int unused_argc, char **argv)
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
-        _cksyncbarrierInit();
+        _CkSyncBarrierInit();
 	_loadbalancerInit();
         _metabalancerInit();
 

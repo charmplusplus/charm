@@ -23,9 +23,9 @@ CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
-CMK_SYSINC="-I $PAMI_INC -I $LIBCOLL_INC"
-#CMK_SYSLIBS="-L $PAMI_LIB -L /usr/lib/powerpc64le-linux-gnu -lpami -libverbs -lnuma -lstdc++ -lc -ldl -lrt -lpthread"
-CMK_SYSLIBS="-L $PAMI_LIB -L $LIBCOLL_LIB -lcollectives -L /usr/lib/powerpc64le-linux-gnu -lpami -libverbs -lstdc++ -lc -ldl -lrt -lpthread"
+CMK_SYSINC="-I$PAMI_INC -I$LIBCOLL_INC"
+#CMK_SYSLIBS="-L$PAMI_LIB -L/usr/lib/powerpc64le-linux-gnu -lpami -libverbs -lnuma -lstdc++ -lc -ldl -lrt -lpthread"
+CMK_SYSLIBS="-L$PAMI_LIB -L$LIBCOLL_LIB -lcollectives -L/usr/lib/powerpc64le-linux-gnu -lpami -libverbs -lstdc++ -lc -ldl -lrt -lpthread"
 
 CMK_NATIVE_LIBS=''
 

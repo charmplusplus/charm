@@ -1511,7 +1511,7 @@ CkMigratable::~CkMigratable() {
 	if (barrierRegistered) {
 	  DEBL((AA "Removing barrier for element %s\n" AB,idx2str(thisIndexMax)));
 	  if (usesAtSync)
-	    myRec->getSyncBarrier()->RemoveClient(ldBarrierHandle);
+	    myRec->getSyncBarrier()->removeClient(ldBarrierHandle);
 	}
 
   if (_lb_args.metaLbOn()) {
@@ -1612,7 +1612,7 @@ void CkMigratable::recvLBPeriod(void *data) {
 
 void CkMigratable::metaLBCallLB() {
   if(usesAtSync)
-    myRec->getSyncBarrier()->AtBarrier(ldBarrierHandle);
+    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
 }
 
 void CkMigratable::ckFinishConstruction(int epoch)
@@ -1625,7 +1625,7 @@ void CkMigratable::ckFinishConstruction(int epoch)
 	if (barrierRegistered) return;
 	DEBL((AA "Registering barrier client for %s\n" AB,idx2str(thisIndexMax)));
 	if (usesAtSync) {
-	  ldBarrierHandle = myRec->getSyncBarrier()->AddClient(
+	  ldBarrierHandle = myRec->getSyncBarrier()->addClient(
 	    this, [=]() { this->ResumeFromSyncHelper(); }, epoch);
 	}
 	barrierRegistered=true;
@@ -1635,7 +1635,9 @@ void CkMigratable::AtSync(int waitForMigration)
 {
 	if (!usesAtSync)
 		CkAbort("You must set usesAtSync=true in your array element constructor to use AtSync!\n");
-	if(myRec->getLBMgr()->getNLoadBalancers() == 0) {
+	// Only actually call AtSync when a receiver exists, otherwise skip it and
+	// directly call ResumeFromSync
+	if (!myRec->getSyncBarrier()->hasReceivers()) {
 		ResumeFromSync();
 		return;
 	}
@@ -1656,7 +1658,7 @@ void CkMigratable::AtSync(int waitForMigration)
   }
 
   if (!_lb_args.metaLbOn()) {
-    myRec->getSyncBarrier()->AtBarrier(ldBarrierHandle);
+    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
     return;
   }
 
@@ -1813,7 +1815,7 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
 #if CMK_FAULT_EVAC
 	bounced  = false;
 #endif
-        syncBarrier = CkSyncBarrier::Object();
+        syncBarrier = CkSyncBarrier::object();
 	lbmgr=mgr->getLBMgr();
 	if(_lb_args.metaLbOn())
 	  the_metalb=mgr->getMetaBalancer();
@@ -2087,8 +2089,8 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 
 CkLocMgr::~CkLocMgr() {
 #if CMK_LBDB_ON
-  syncBarrier->RemoveClient(lbBarrierClient);
-  syncBarrier->RemoveReceiver(lbBarrierReceiver);
+  syncBarrier->removeBeginReceiver(lbBarrierBeginReceiver);
+  syncBarrier->removeEndReceiver(lbBarrierEndReceiver);
   lbmgr->UnregisterOM(myLBHandle);
 #endif
   map->unregisterArray(mapHandle);
@@ -3260,7 +3262,7 @@ void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 	  if (the_metalb == 0)
 		  CkAbort("MetaBalancer not yet created?\n");
 	}
-	syncBarrier = CkSyncBarrier::Object();
+	syncBarrier = CkSyncBarrier::object();
 	if (syncBarrier == nullptr)
 	  CkAbort("CkSyncBarrier not yet created?\n");
 	// Register myself as an object manager
@@ -3279,19 +3281,15 @@ void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 	// Tell the lbdb that I'm registering objects
 	lbmgr->RegisteringObjects(myLBHandle);
 
-	/*Set up the dummy barrier-- the load balancer needs
-	  us to call Registering/DoneRegistering during each AtSync,
-	  and this is the only way to do so.
-	*/
-	lbBarrierReceiver = syncBarrier->AddReceiver([=]() {
+	// Set up callbacks for this LocMgr to call Registering/DoneRegistering during
+	// each AtSync.
+	lbBarrierBeginReceiver = syncBarrier->addBeginReceiver([=]() {
 	  DEBL((AA "CkLocMgr AtSync Receiver called\n" AB));
 	  lbmgr->RegisteringObjects(myLBHandle);
 	});
-	lbBarrierClient = syncBarrier->AddClient(this, [=]() {
+	lbBarrierEndReceiver = syncBarrier->addEndReceiver([=]() {
 	  lbmgr->DoneRegisteringObjects(myLBHandle);
-	  syncBarrier->AtBarrier(lbBarrierClient);
 	});
-	syncBarrier->AtBarrier(lbBarrierClient);
 }
 
 void CkLocMgr::startInserting(void)
