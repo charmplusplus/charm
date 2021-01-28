@@ -484,14 +484,16 @@ These attributes are accessible from any rank by calling
 .. code-block:: fortran
 
    ! Fortran:
-   integer :: my_wth, flag, ierr
+   integer (kind=MPI_ADDRESS_KIND) :: my_wth
+   integer :: flag, ierr
    call MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, my_wth, flag, ierr)
 
 
 .. code-block:: c++
 
    // C/C++:
-   int my_wth, flag;
+   int * my_wth;
+   int flag;
    MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &my_wth, &flag);
 
 AMPI also provides extra communicator types that users can pass to
