@@ -1912,10 +1912,6 @@ int CsdScheduler(int maxmsgs)
       }
 #endif
 
-/*
-	EVAC
-*/
-
 
 extern void machine_OffloadAPIProgress(void);
 

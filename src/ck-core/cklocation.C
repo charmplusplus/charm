@@ -2876,7 +2876,6 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 
 	//Let all the elements know we're leaving
 	callMethod(rec,&CkMigratable::ckAboutToMigrate);
-	/*EVAC*/
 
 //First pass: find size of migration message
 	size_t bufSize;
@@ -2898,8 +2897,7 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 #else
 		false,
 #endif
-		bufSize, managers.size(),
-    false
+		bufSize, managers.size()
     );
 
 	{

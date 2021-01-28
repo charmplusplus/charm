@@ -1059,8 +1059,6 @@ void CentralLB::ProcessReceiveMigration()
   if (migrates_expected == 0 || migrates_completed == migrates_expected)
     MigrationDone(1);
   delete m;
-
-//	CkEvacuatedElement();
 #endif
 }
 

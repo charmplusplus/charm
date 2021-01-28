@@ -67,7 +67,6 @@ waits for the migrant contributions to straggle in.
 
 // For status and data messages from the builtin reducer functions.
 #define RED_DEB(x) //CkPrintf x
-#define DEBREVAC(x) CkPrintf x
 #define DEB_TUPLE(x) CkPrintf x
 #else
 //No debugging info-- empty defines
@@ -77,7 +76,6 @@ waits for the migrant contributions to straggle in.
 #define AB
 #define DEBN(x) //CkPrintf x
 #define RED_DEB(x) //CkPrintf x
-#define DEBREVAC(x) //CkPrintf x
 #define DEB_TUPLE(x) //CkPrintf x
 #endif
 
