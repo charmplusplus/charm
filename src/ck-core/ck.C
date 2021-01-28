@@ -8,6 +8,9 @@ clients, including the rest of Charm++, are actually C++.
 */
 #include "ck.h"
 #include "trace.h"
+#if CMK_CHARM4PY && CMK_CUDA
+#include "hapi.h"
+#endif
 #include "queueing.h"
 
 #include "pathHistory.h"
@@ -462,7 +465,7 @@ int CUDAPointerOnDevice(const void *ptr)
 }
 
 void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
-                        void *remoteBufInfos, void *streamPtrs, int *futureId)
+                        void *remoteBufInfos, void *streamPtrs, int futureId)
 {
 #if CMK_CUDA
   CkCallback cb(DepositFutureWithIdFn, (void*) futureId);
@@ -475,6 +478,7 @@ void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
   // recvBufPtrs is an array of pointers to destination GPU buffers
   CkRdmaDeviceIssueRgetsFromUnpackedMessage(numBuffers, (CkDeviceBuffer**)remoteBufInfos, (void**)recvBufPtrs,
                                             arrSizes, postStructs, cb);
+  delete[] *((CkDeviceBuffer**) remoteBufInfos);
 #else
   CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
 #endif // CMK_CUDA
@@ -2581,7 +2585,8 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
   int d = 0;
   CkGroupID gId;
   gId.idx = aid;
-  CkArrayIndex1D arrIndex(*idx);
+
+  CkArrayIndex arrIndex(ndims, idx);
 
   CProxyElement_ArrayBase destProxy = CProxyElement_ArrayBase(gId, arrIndex);
   int destPe = destProxy.ckLocalBranch()->lastKnown(arrIndex);
@@ -2677,6 +2682,33 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
   } else { // broadcast
     CkBroadcastMsgArray(epIdx, impl_amsg, gId, 0);
   }
+}
+
+void CkCUDAHtoD(void *dest, void *src, int nbytes, cudaStream_t stream)
+{
+  #if CMK_CUDA
+  hapiCheck(cudaMemcpyAsync(dest, src, (size_t) nbytes, cudaMemcpyHostToDevice, 0));
+  #else
+  CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
+  #endif
+}
+
+void CkCUDADtoH(void *dest, void *src, int nbytes, cudaStream_t stream)
+{
+  #if CMK_CUDA
+  hapiCheck(cudaMemcpyAsync(dest, src, (size_t) nbytes, cudaMemcpyDeviceToHost, 0));
+  #else
+  CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
+  #endif
+}
+
+void CkCUDAStreamSynchronize(cudaStream_t stream)
+{
+  #if CMK_CUDA
+  hapiCheck(cudaStreamSynchronize(0));
+  #else
+  CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
+  #endif
 }
 
 // we want to expose access to this macro to external clients e.g. Charm4Py

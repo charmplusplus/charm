@@ -491,6 +491,7 @@ bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   return is_inline;
 }
 
+
 // Unused, left for future reference
 /*
 int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr) {
