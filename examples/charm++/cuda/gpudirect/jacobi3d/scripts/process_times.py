@@ -15,7 +15,7 @@ end_node_count = int(sys.argv[3])
 csv_filename = job_name + '.csv'
 csv_file = open(csv_filename, 'w', newline='')
 writer = csv.writer(csv_file)
-writer.writerow(['Number of GPUs', 'AMPI-H-Total', 'error', 'AMPI-H-Comm', 'error', 'AMPI-D-Total', 'error', 'AMPI-D-Comm', 'error'])
+writer.writerow(['Number of GPUs', 'Charm++-H-Total', 'error', 'Charm++-H-Comm', 'error', 'Charm++-D-Total', 'error', 'Charm++-D-Comm', 'error'])
 
 def is_host(index):
   return index % 6 == 0 or index % 6 == 1 or index % 6 == 2
@@ -28,8 +28,8 @@ while cur_node_count <= end_node_count:
 
 for node_count in node_count_list:
   print('Node count:', str(node_count))
-  total_str = 'grep -ir "Completed" ' + job_name + '-n' + str(node_count) + '.* | cut -d " " -f11'
-  comm_str = 'grep -ir "Completed" ' + job_name + '-n' + str(node_count) + '.* | cut -d " " -f18'
+  total_str = 'grep -ir "Average iteration" ' + job_name + '-n' + str(node_count) + '.* | cut -d " " -f4'
+  comm_str = 'grep -ir "comm time" ' + job_name + '-n' + str(node_count) + '.* | cut -d " " -f8'
 
   total_stream = os.popen(total_str)
   total_lines = total_stream.readlines()
