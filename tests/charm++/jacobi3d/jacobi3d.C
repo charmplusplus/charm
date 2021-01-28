@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source: /cvsroot/charm/examples/bigsim/sdag/jacobi3d/jacobi3d.C,v $
- * $Author: bhatele $
- * $Date: 2009-06-04 21:50:17 $
- * $Revision: 1.5 $
- *****************************************************************************/
-
 /** \file jacobi3d.C
  *  Author: Abhinav S Bhatele
  *  Date Created: June 01st, 2009
@@ -34,11 +27,9 @@
 #include <vector>
 #include <utility>
 
-#define CKP_FREQ 200
-#define MAX_ITER		1000
-#define PRINT_FREQ	10
-
-// See README for documentation
+#define CKP_FREQ    100
+#define MAX_ITER    500
+#define PRINT_FREQ  10
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int arrayDimX;
@@ -149,11 +140,11 @@ class Main : public CBase_Main {
 	}
 
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
-        CkAbort("array_size_X % block_size_X != 0!");
+        CkAbort("array_size_X %% block_size_X != 0!");
       if (arrayDimY < blockDimY || arrayDimY % blockDimY != 0)
-        CkAbort("array_size_Y % block_size_Y != 0!");
+        CkAbort("array_size_Y %% block_size_Y != 0!");
       if (arrayDimZ < blockDimZ || arrayDimZ % blockDimZ != 0)
-        CkAbort("array_size_Z % block_size_Z != 0!");
+        CkAbort("array_size_Z %% block_size_Z != 0!");
 
       num_chare_x = arrayDimX / blockDimX;
       num_chare_y = arrayDimY / blockDimY;
@@ -169,7 +160,7 @@ class Main : public CBase_Main {
       array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y, num_chare_z);
 
       CkArray *jarr = array.ckLocalBranch();
-      int jmap[num_chare_x][num_chare_y][num_chare_z];
+      std::vector<std::vector<std::vector<int>>> jmap(num_chare_x, std::vector<std::vector<int> >(num_chare_y,std::vector <int>(num_chare_z)));
 
       int hops=0, p;
       for(int i=0; i<num_chare_x; i++)
@@ -180,10 +171,6 @@ class Main : public CBase_Main {
 
 		//Start the computation
 		startTime = CmiWallTimer();
-
-		//Registering the callback
-		CkCallback *cb = new CkCallback(CkIndex_Main::report(NULL), mainProxy);
-		array.ckSetReductionClient(cb);
 
 		array.doStep();
     }
@@ -266,10 +253,6 @@ class Jacobi: public CBase_Jacobi {
 	// Pupping function for migration and fault tolerance
 	// Condition: assuming the 3D Chare Arrays are NOT used
 	void pup(PUP::er &p){
-	
-		// calling parent's pup
-		CBase_Jacobi::pup(p);
-		
 		// pupping properties of this class
 		p | iterations;
 		p | imsg;
@@ -431,16 +414,17 @@ class Jacobi: public CBase_Jacobi {
 #ifdef CMK_MESSAGE_LOGGING
 		if(iterations % ckptFreq == 0){
 			AtSync();
-		} else {
-			contribute(sizeof(int), &iterations, CkReduction::max_int);
-		}
-#else
-		contribute(sizeof(int), &iterations, CkReduction::max_int);
+		} else
 #endif
+    {
+      CkCallback cb(CkIndex_Main::report(NULL), mainProxy);
+			contribute(sizeof(int), &iterations, CkReduction::max_int, cb);
+		}
 	}
 
 	void ResumeFromSync(){
-		contribute(sizeof(int), &iterations, CkReduction::max_int);
+    CkCallback cb(CkIndex_Main::report(NULL), mainProxy);
+		contribute(sizeof(int), &iterations, CkReduction::max_int, cb);
 	}
 
     // Check to see if we have received all neighbor values yet

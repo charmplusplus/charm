@@ -4,7 +4,7 @@ namespace Base { namespace Derived {
     B::B() {}
     B::B(CkMigrateMessage *m) {}
     void B::quit() {
-        CkExit();
+        CkAbort("Expected C::quit to be called as a virtual method");
     }
 } }
 

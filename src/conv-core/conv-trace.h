@@ -3,6 +3,10 @@
 
 #include "converse.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* 
  * These functions are called from Converse, and should be provided C binding
  * by the tracing strategies.
@@ -13,22 +17,34 @@ void traceCharmInit(char **argv);	/* init trace module in ck */
 void traceMessageRecv(char *msg, int pe);
 void traceBeginIdle(void);
 void traceEndIdle(void);
-void traceResume(CmiObjId *);
+void traceResume(int,int,CmiObjId *);
 void traceSuspend(void);
 void traceAwaken(CthThread t);
 void traceUserEvent(int);
-void beginAppWork();
-void endAppWork();
+void beginAppWork(void);
+void endAppWork(void);
+void beginTuneOverhead(void);
+void endTuneOverhead(void);
 void traceUserBracketEvent(int, double, double);
+void traceUserBracketEventNestedID(int, double, double, int nestedID);
+void traceBeginUserBracketEvent(int eventID);
+void traceBeginUserBracketEventNestedID(int eventID, int nestedID);
+void traceEndUserBracketEvent(int eventID);
+void traceEndUserBracketEventNestedID(int eventID, int nestedID);
 void traceUserSuppliedData(int);
-void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);
-void traceUserSuppliedNote(char*);
-void traceMemoryUsage();
+void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et);
+void traceUserSuppliedNote(const char*);
+void traceMemoryUsage(void);
 int  traceRegisterUserEvent(const char*, int e
 #ifdef __cplusplus
 =-1
 #endif
 );
+
+/*Declarations for user stat tracing functions*/
+int traceRegisterUserStat(const char *evt, int e);
+void updateStatPair(int e, double stat, double time);
+void updateStat(int e, double stat);
 
 #if CMK_SMP_TRACE_COMMTHREAD
 int  traceBeginCommOp(char *msg);
@@ -41,20 +57,14 @@ void traceGetMsgID(char *msg, int *pe, int *event);
 void traceSetMsgID(char *msg, int pe, int event);
 
 /* Support for machine layers to register their user events to projections */
-void registerMachineUserEventsFunction(void (*eventRegistrationFunc)());
-
-int traceRegisterFunction(const char*, int idx
-#ifdef __cplusplus
-=-999
-#endif
-);
-void traceBeginFuncIndexProj(int, char* file, int);
-void traceEndFuncIndexProj(int);
+void registerMachineUserEventsFunction(void (*eventRegistrationFunc)(void));
 
 void traceClose(void);
 void traceCharmClose(void);          /* close trace in ck */
 void traceBegin(void);
 void traceEnd(void);
+void traceBeginComm(void);
+void traceEndComm(void);
 void traceWriteSts(void);
 void traceFlushLog(void);
 
@@ -65,7 +75,7 @@ CpvExtern(int, traceOn);
 #define traceIsOn()  0
 #endif
 
-int  traceAvailable();
+int  traceAvailable(void);
 
 /* Comm thread tracing */
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -94,6 +104,10 @@ int  traceAvailable();
 #define TRACE_COMM_SET_MSGID(msg, pe, event) 
 #define TRACE_COMM_GET_MSGID(msg, pe, event) 
 #define TRACE_COMM_SET_COMM_MSGID(msg)
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

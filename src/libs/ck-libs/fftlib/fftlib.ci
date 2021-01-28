@@ -14,8 +14,7 @@ module fftlib {
 	// the application should make an array derived from this
 	array [1D] NormalSlabArray: SlabArray { 
 		entry NormalSlabArray(NormalFFTinfo &info, 
-			CProxy_NormalSlabArray src, CProxy_NormalSlabArray dest,
-			bool useCommlib, ComlibInstanceHandle &inst);
+			CProxy_NormalSlabArray src, CProxy_NormalSlabArray dest);
 		entry void acceptDataForFFT(int numPoints, complex points[numPoints], int posn, int info_id);
 		entry void acceptDataForIFFT(int numPoints, complex points[numPoints], int posn, int info_id);
 	};
@@ -33,8 +32,7 @@ module fftlib {
 
 	array [2D] NormalLineArray {
 		entry NormalLineArray (LineFFTinfo &info, 
-			CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, 
-			bool useCommlib, ComlibInstanceHandle &inst);
+			CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy);
 		entry void doFirstFFT(int id, int direction);
 		entry void doSecondFFT(SendFFTMsg *msg);
 		entry void doThirdFFT(SendFFTMsg *msg);

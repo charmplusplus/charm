@@ -1,3 +1,5 @@
+-include ../../common.mk
+-include ../../common.mk
 CHARMINC=../../../include
 CHARMBIN=../../../bin
 CHARMC=../../../bin/charmc $(OPTS)
@@ -16,7 +18,6 @@ OBJS=megatest.o \
      synctest.o \
      fib.o \
      arrayring.o \
-     tempotest.o \
      packtest.o \
      queens.o \
      migration.o \
@@ -32,61 +33,27 @@ OBJS=megatest.o \
      immediatering.o \
      callback.o \
      inlineem.o \
-     completion_test.o
-
-
-#     priolongtest.o \
-
-# reverse order of the above OBJS
-OBJS_REV=megatest.o \
-     bitvector.o	\
-     immediatering.o \
-     callback.o	\
-     reduction.o \
-     inherit.o \
-     templates.o \
-     rotest.o \
-     statistics.o \
-     priotest.o \
-     priomsg.o \
-     marshall.o \
-     migration.o \
-     queens.o \
-     packtest.o \
-     tempotest.o \
-     arrayring.o \
-     fib.o \
-     synctest.o \
-     nodecast.o \
-     groupcast.o \
-     groupmulti.o \
-     groupsectiontest.o \
-     multisectiontest.o \
-     varraystest.o \
-     varsizetest.o \
-     nodering.o \
-     groupring.o \
-     inlineem.o
-
-#     priolongtest.o \
+     completion_test.o \
+     groupdependence.o \
+     listsend.o
 
 CIFILES =  \
       arrayring.def.h  immediatering.def.h  nodering.def.h   rotest.def.h  \
       bitvector.def.h  inherit.def.h        packtest.def.h   synctest.def.h  \
       callback.def.h   marshall.def.h       priomsg.def.h    templates.def.h \
-      fib.def.h        megatest.def.h       priotest.def.h   tempotest.def.h  \
+      fib.def.h        megatest.def.h       priotest.def.h   \
       groupcast.def.h  migration.def.h      queens.def.h     varraystest.def.h\
       groupring.def.h  nodecast.def.h       reduction.def.h  varsizetest.def.h\
       groupsectiontest.def.h multisectiontest.def.h inlineem.def.h varsizetest2.def.h\
-      groupmulti.def.h completion_test.def.h #priolongtest.def.h
+      groupmulti.def.h completion_test.def.h groupdependence.def.h listsend.def.h
 
 .SUFFIXES:
 .SUFFIXES: .o .C .def.h .decl.h .ci .h
 
-all: pgm
+all: megatest
 
-pgm: $(OBJS)
-	$(CHARMC) -o pgm  $(OBJS) -language charm++ -module completion
+megatest: $(OBJS)
+	$(CHARMC) -o megatest  $(OBJS) -language charm++ -module completion
 
 .ci.decl.h:
 	$(CHARMC) -c $<
@@ -99,13 +66,20 @@ DEPENDFILE = Make.depends
 include $(DEPENDFILE)
 
 clean:
-	rm -r -f conv-host pgm pgm.exe pgm.pdb pgm.ilk *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
+	rm -r -f conv-host megatest megatest.exe megatest.pdb megatest.ilk *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
 
-test: pgm
-	./charmrun ./pgm +p1 $(TESTOPTS)
-	./charmrun ./pgm +p2 $(TESTOPTS)
-	./charmrun ./pgm +p3 $(TESTOPTS)
-	./charmrun ./pgm +p4 $(TESTOPTS)
+test: megatest
+	$(call run, ./megatest +p1 )
+	$(call run, ./megatest +p2 )
+	$(call run, ./megatest +p3 )
+	$(call run, ./megatest +p4 )
+
+testp: megatest
+	$(call run, ./megatest +p$(P) )
+
+smptest: megatest
+	$(call run, ./megatest +p2 ++ppn 2 )
+	$(call run, ./megatest +p4 ++ppn 2 )
 
 depends:  $(CIFILES)
 	echo "Creating " $(DEPENDFILE) " ...";	\
@@ -116,8 +90,7 @@ depends:  $(CIFILES)
         for i in $(OBJS) ; do \
               SRCFILE=`basename $$i .o`.C ; \
               echo "checking dependencies for $$SRCFILE" ; \
-              g++ -MM -I$(CHARMINC) $$SRCFILE | \
+              g++ -std=c++0x -MM -I$(CHARMINC) $$SRCFILE | \
               perl $(CHARMBIN)/dep.pl $(CHARMINC) /usr/include /usr/local >> $(DEPENDFILE); \
               echo '	$$(CHARMC) -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
         done;
-

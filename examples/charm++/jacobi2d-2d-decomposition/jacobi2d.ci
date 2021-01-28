@@ -1,0 +1,50 @@
+mainmodule jacobi2d {
+
+  readonly CProxy_Main mainProxy;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+  readonly int maxiterations;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done(int totalIter);
+  };
+
+  array [2D] Jacobi {
+    entry Jacobi(void);
+    entry void begin_iteration(void);
+    entry void receiveGhosts(int iter, int dir, int size, double ghosts[size]);
+    entry [reductiontarget] void recvConvergeResult(bool result);
+
+    entry void run() {
+      while (!converged && iterations < maxiterations) {
+        serial "begin_iteration" {
+          begin_iteration();
+        }
+        for(imsg = 0; imsg < neighbors; imsg++) {
+          // "iterations" keeps track of messages across steps
+          when receiveGhosts[iterations] (int iter, int dir, int size, double ghosts[size])
+            serial "process ghosts" {
+              processGhosts(dir, size, ghosts);
+            }
+        }
+        serial "compute" { 
+          check_and_compute();
+        }
+        serial "compute_converge" {
+          bool conv = (max_error <= THRESHOLD);
+          CkCallback cb(CkReductionTarget(Jacobi, recvConvergeResult), thisProxy);
+          contribute(sizeof(bool), &conv, CkReduction::logical_and_bool, cb);
+        }
+        when recvConvergeResult(bool result) serial "check_converge"{
+          converged = result;
+        if ((result || iterations>=maxiterations)  && thisIndex.x +thisIndex.y == 0) mainProxy.done(iterations);
+      }
+      }
+    };
+  };
+};

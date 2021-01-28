@@ -60,13 +60,13 @@
         integer index
 
         if (index .eq.  4) THEN
-            call SendTo_Hello_SayHi(objPtr%aid, 0, 1, objPtr%obj%data2,  &
+            call Hello_Invoke_SayHi(objPtr%aid, 0, 1, objPtr%obj%data2,  &
                                     objPtr%obj%len, objPtr%obj%s);
         endif
       END SUBROUTINE
 
 !    define fortran entry function
-      SUBROUTINE SayHi(objPtr, myIndex, data, data2, len, s)
+      SUBROUTINE Hello_Entry_SayHi(objPtr, myIndex, data, data2, len, s)
         USE HelloMod
         IMPLICIT NONE
 
@@ -97,7 +97,7 @@
 
         if (objPtr%obj%iter == 3) then
           if (next .ne. 0) then
-            call SendTo_Hello_SayHi(objPtr%aid, next, 1, data2, len, s);
+            call Hello_Invoke_SayHi(objPtr%aid, next, 1, data2, len, s);
           else
             objPtr%obj%data2 = data2
             objPtr%obj%len = len
@@ -107,7 +107,7 @@
         else if (objPtr%obj%iter == 5) then
           call CkExit();
         else 
-          call SendTo_Hello_SayHi(objPtr%aid, next, 1, data2, len, s);
+          call Hello_Invoke_SayHi(objPtr%aid, next, 1, data2, len, s);
         endif
 
       END SUBROUTINE
@@ -131,6 +131,6 @@
 	  s(i) = i;
         enddo
         d = 2.50
-        call SendTo_Hello_SayHi(aid, 0, 1, d, 4, s(3:6));
+        call Hello_Invoke_SayHi(aid, 0, 1, d, 4, s(3:6));
       END SUBROUTINE
 

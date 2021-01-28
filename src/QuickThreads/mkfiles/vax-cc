@@ -13,7 +13,7 @@ qt: md/vax.h qt.c md/vax.s
 	ln -s md/vax.h qtmd.h
 	$(CC) -pedantic -Wall -c -o qt.o qt.c
 	as -o qtmds.o md/vax.s
-	ar q libqt.a qt.o qtmds.o
+	ar q libckqt.a qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
@@ -22,4 +22,4 @@ stp:
 testpgm:
 	$(CC) -c meas.c
 	as -o qtmdb.o md/vax_b.s
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -o run meas.o qtmdb.o libstp.a libckqt.a

@@ -18,14 +18,14 @@ mainmodule leanmd {
     //this get called after the main constructor has called cell array constructor
     entry void run() {
       //compute array created, call for section creation
-      when computesCreated() atomic {
+      when computesCreated() serial {
         computeArray.doneInserting();
         CkPrintf("Starting simulation .... \n\n");
         cellArray.run();
         computeArray.run();
       }
       //when all chares are done
-      when done() atomic {
+      when done() serial {
         CkPrintf("Simulation completed\n");
         CkExit();
       }
@@ -48,23 +48,23 @@ mainmodule leanmd {
     entry void run() {
       for(stepCount = 1; stepCount <= finalStepCount; stepCount++) {
         //send current atom positions to my computes 
-        atomic { sendPositions(); } 
+        serial { sendPositions(); } 
 
         //update properties of atoms using new force values 
-        // when reduceForces(vec3 forces[n], int n) atomic { updateProperties(forces, n); }
+        // when reduceForces(vec3 forces[n], int n) serial { updateProperties(forces, n); }
         for(forceCount=0; forceCount < inbrs; forceCount++){
-        	when receiveForces[stepCount](int iter, vec3 forces[n], int n) atomic { addForces(forces); }
+        	when receiveForces[stepCount](int iter, vec3 forces[n], int n) serial { addForces(forces); }
 		}
 
-		atomic { updateProperties(); }
+		serial { updateProperties(); }
 
         if ((stepCount %  MIGRATE_STEPCOUNT) == 0) {
           //send atoms that have moved beyond my cell to neighbors
-          atomic { migrateParticles(); } 
+          serial { migrateParticles(); } 
     
           //receive particles from my neighbors
           for(updateCount = 0; updateCount < inbrs; updateCount++) {
-            when receiveParticles(CkVec<Particle> &updates) atomic {
+            when receiveParticles(CkVec<Particle> &updates) serial {
               for(int i=0; i < updates.length(); i++) {
                 particles.push_back(updates[i]);    //add particles that have moved from neighboring cells to my cell
               }
@@ -73,7 +73,7 @@ mainmodule leanmd {
         }
       }
       //everything done, reduction on kinetic energy
-      atomic { contribute(0,NULL,CkReduction::nop,CkCallback(CkReductionTarget(Main,done),mainProxy)); }
+      serial { contribute(0,NULL,CkReduction::nop,CkCallback(CkReductionTarget(Main,done),mainProxy)); }
     };
   };
 
@@ -86,11 +86,11 @@ mainmodule leanmd {
       for(stepCount = 1; stepCount <= finalStepCount; stepCount++) {
         //self interaction check
         if(thisIndex.x1==thisIndex.x2 && thisIndex.y1==thisIndex.y2 && thisIndex.z1==thisIndex.z2) {
-          when calculateForces[stepCount](ParticleDataMsg *msg) atomic { selfInteract(msg); }
+          when calculateForces[stepCount](ParticleDataMsg *msg) serial { selfInteract(msg); }
         } else {
           //receive positions from two cells - buffer the first one
-          when calculateForces[stepCount](ParticleDataMsg *msg) atomic { bufferedMsg = msg; }
-          when calculateForces[stepCount](ParticleDataMsg *msg) atomic { interact(msg); }
+          when calculateForces[stepCount](ParticleDataMsg *msg) serial { bufferedMsg = msg; }
+          when calculateForces[stepCount](ParticleDataMsg *msg) serial { interact(msg); }
         }
       }
     };

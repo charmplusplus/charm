@@ -27,7 +27,7 @@ class BinEntry {
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) { free(ptr); }
-#if defined(WIN32) || CMK_MULTIPLE_DELETE
+#if defined(_WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
     BinEntry(): _time(0.), _idleTime(0.) {}
@@ -250,12 +250,12 @@ class TraceSummary : public Trace {
     int execEvent;
     int execEp;
     int execPe;
+    int msgNum; /* used to handle multiple endComputation calls?? */
 
     /* per-log metadata maintained to derive cross-event information */
     double binStart; /* time of last filled bin? */
     double start, packstart, unpackstart, idleStart;
     double binTime, binIdle;
-    int msgNum; /* used to handle multiple endComputation calls?? */
     int inIdle;
     int inExec;
     int depth;
@@ -263,10 +263,10 @@ class TraceSummary : public Trace {
     TraceSummary(char **argv);
     void creation(envelope *e, int epIdx, int num=1) {}
 
-    void beginExecute(envelope *e);
+    void beginExecute(envelope *e, void *obj);
     void beginExecute(char *msg);
     void beginExecute(CmiObjId  *tid);
-    void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0, CmiObjId *idx=NULL);
+    void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0, CmiObjId *idx=NULL, void *obj=NULL);
     void endExecute(void);
     void endExecute(char *msg);
     void beginIdle(double currT);

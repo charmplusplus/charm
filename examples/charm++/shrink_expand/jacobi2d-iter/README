@@ -1,0 +1,32 @@
+Jacobi iteration with a 2D Array.
+
+This code uses a 2-D blocked decomposition of a 2-d array with more
+than one element per chare. The code runs for a specified number of
+iterations, using a reduction to start each successive iteration.
+
+A 5-point stencil pattern is used to update the value for each data
+element. For example, the new value for element X is the current
+value of X plus the current values of its left, right, top, and
+bottom neighbors.
+
+     T
+   L X R
+     B
+
+X'  = (X + L + R + T + B) / 5.0
+
+
+To run the program with liveviz, run the parallel job as shown in
+runserver.sh, or just do a "./runserver.sh"
+
+While the program is running, connect a visualization client to that
+server. To do this you can run "charm/java/bin/liveViz localhost 1234"
+Note that port 1234 is the port specified in runserver.sh. You should
+at this point see a window appear, with a black background, and
+a red/white grid in the upper left corner. Resize as needed. The parallel
+server job should also print out a series of lines whenever each worker
+is requested to provide a portion of the frame. Resizing the client
+window will cause the image to be requested again, but with a different
+size. The client can only connect while the server is running. So you may
+have to be quick to get to see anything. You may want to make the client
+perform more iterations so that you have more time to see things.

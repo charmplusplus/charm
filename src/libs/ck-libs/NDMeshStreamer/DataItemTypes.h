@@ -1,6 +1,8 @@
 #ifndef DATA_ITEM_TYPES_H
 #define DATA_ITEM_TYPES_H
 
+#include <utility>
+
 #define CHUNK_SIZE 256
 
 template<class dtype, class itype>
@@ -11,9 +13,22 @@ public:
   int sourcePe;
   dtype dataItem;
 
+  ArrayDataItem(){}
+
   ArrayDataItem(itype i, int srcPe, const dtype d)
     : arrayIndex(i), sourcePe(srcPe), dataItem(d) {}
+
+  void pup(PUP::er &p) {
+    p|arrayIndex;
+    p|sourcePe;
+    p|dataItem;
+  }
 };
+
+template <typename dtype, typename itype>
+void operator|(PUP::er &p, ArrayDataItem<dtype, itype>& obj) {
+   obj.pup(p);
+}
 
 class ChunkDataItem {
 
@@ -42,5 +57,12 @@ public:
   }
   
 };
+
+template <class dtype, class ClientType>
+inline int defaultMeshStreamerDeliver(char *data, void *clientObj_)
+{
+  ((ClientType *) clientObj_)->process(*((dtype *) data));
+  return 0;
+}
 
 #endif

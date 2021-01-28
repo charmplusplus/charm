@@ -1,3 +1,6 @@
+#ifndef MACHINE_PERSISTENT_H
+#define MACHINE_PERSISTENT_H
+
 /** @file
  * General implementation of persistent communication support
  * @ingroup Machine
@@ -8,6 +11,7 @@
 */
 /*@{*/
 
+#include "pami.h"
 #define PERSIST_MIN_SIZE               EAGER_CUTOFF 
 //#define COPY_HISTORY                          1
 // one is for receive one is to store the previous msg
@@ -70,12 +74,14 @@ CpvExtern(PersistentHandle *, phs);
 CpvExtern(int, phsSize);
 CpvExtern(int, curphs);
 
+void _initPersistent( pami_context_t *contexts, int nc);
 PersistentHandle getPersistentHandle(PersistentHandle h, int toindex);
 void *PerAlloc(int size);
 void PerFree(char *msg);
-int PumpPersistent();
+int PumpPersistent(void);
 void swapSendSlotBuffers(PersistentSendsTable *slot);
 void swapRecvSlotBuffers(PersistentReceivesTable *slot);
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes);
 void clearRecvSlot(PersistentReceivesTable *slot);
 
+#endif

@@ -37,7 +37,6 @@
 #include <float.h>
 #include <charm-api.h>
 
-#include "LBDatabase.h"
 #include "arrayRedistributor.h"
 #include "pathHistory.h" 
 
@@ -71,14 +70,14 @@ void registerControlPointTiming(double time);
 
 /// Called once each application step. Can be used instead of registerControlPointTiming()
 void controlPointTimingStamp();
-FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)();
+FLINKAGE void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)();
 
 
 /// The application specifies that it is ready to proceed to a new set of control point values.
 /// This should be called after registerControlPointTiming()
 /// This should be called before calling controlPoint()
 void gotoNextPhase();
-FDECL void FTN_NAME(GOTONEXTPHASE,gotonextphase)();
+FLINKAGE void FTN_NAME(GOTONEXTPHASE,gotonextphase)();
 
 /// Return an integral power of 2 between c1 and c2
 /// The value returned will likely change between subsequent invocations
@@ -90,7 +89,7 @@ int controlPoint(const char *name, int lb, int ub);
 
 /// A fortran callable one. I couldn't figure out how to pass a string from fortran to C++ yet
 /// So far fortran can only have one control point
-FDECL int FTN_NAME(CONTROLPOINT,controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub);
+FLINKAGE int FTN_NAME(CONTROLPOINT,controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub);
 
 
 /// Return an integer from the provided vector of values
@@ -139,7 +138,7 @@ public:
     if(isValid())
       CkPrintf("[%d] Idle Time is Min=%.2lf%% Avg=%.2lf%% Max=%.2lf%%\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);    
     else
-      CkPrintf("[%d] Idle Time is invalid\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);
+      CkPrintf("[%d] Idle Time is invalid\n", CkMyPe());
   }
   
 }; 
@@ -166,7 +165,7 @@ public:
     if(isValid())
       CkPrintf("[%d] Overhead Time is Min=%.2lf%% Avg=%.2lf%% Max=%.2lf%%\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);    
     else
-      CkPrintf("[%d] Overhead Time is invalid\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);
+      CkPrintf("[%d] Overhead Time is invalid\n", CkMyPe());
   }
   
 }; 
@@ -181,7 +180,7 @@ public:
   std::map<std::string,int> controlPoints; // The control point values for this phase(don't vary within the phase)
   std::vector<double> times;  // A list of times observed for iterations in this phase
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
   std::vector<PathHistoryTableEntry> criticalPaths;
 #endif
   
@@ -787,7 +786,10 @@ public:
   /// Check to see if we are in the shutdown process, and handle it appropriately.
   void checkForShutdown();
 
-  /// Start shutdown procedures for the controlPoints module(s). CkExit will be called once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
+  /// Start shutdown procedures for the controlPoints
+  /// module(s). CkContinueExit will be called once all outstanding
+  /// operations have completed (e.g. waiting for idle time & memory
+  /// usage to be gathered)
   void exitIfReady();
 
   /// All outstanding operations have completed, so do the shutdown now. First write files to disk, and then call CkExit().

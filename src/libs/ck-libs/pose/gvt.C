@@ -9,11 +9,6 @@ CkGroupID TheGVT;
 CpvExtern(int, stateRecovery);
 CpvExtern(eventID, theEventID);
 
-static void staticDoneLB(void *data)
-{
-  ((PVT*)data)->doneLB();
-}
-
 /// Basic Constructor
 PVT::PVT() 
 {
@@ -29,9 +24,6 @@ PVT::PVT()
   optGVT = POSE_UnsetTS; conGVT = POSE_UnsetTS;
   rdone=0;
   SRs=NULL;
-#ifdef POSE_COMM_ON
-  //com_debug = 1;
-#endif
 #if !CMK_TRACE_DISABLED
   localStats = (localStat *)CkLocalBranch(theLocalStats);
   if (pose_config.stats) {
@@ -88,7 +80,7 @@ PVT::PVT()
     localStats->TimerStop();
 #endif
 
-  LBDatabase::Object()->AddMigrationDoneFn(staticDoneLB, this);
+  LBManager::Object()->AddMigrationDoneFn(this, &PVT::doneLB);
 }
 
 /// PUP routine
@@ -145,7 +137,7 @@ void PVT::startPhase(prioBcMsg *m)
 {
   CProxy_GVT g(TheGVT);
   CProxy_PVT p(ThePVT);
-  register int i;
+  int i;
 
   if (startPhaseActive) return;
 #if !CMK_TRACE_DISABLED
@@ -256,11 +248,6 @@ void PVT::setGVT(GVTMsg *m)
   CkAssert(m->estGVT >= estGVT);
   estGVT = m->estGVT;
   int i, end = objs.getNumSpaces();
-#ifdef POSE_COMM_ON  
-  //PrioStreaming *pstrat = (PrioStreaming *)(POSE_commlib_insthndl.getStrategy());
-  //pstrat->setBasePriority((estGVT+10) - POSE_TimeMax);
-  //pstrat->setBasePriority(estGVT+10);
-#endif
   simdone = m->done;
   CkFreeMsg(m);
   waitForFirst = 1;
@@ -876,7 +863,7 @@ void GVT::computeGVT(UpdateMsg *m)
 
 void GVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
 {
-  register int i;
+  int i;
   SRentry *tab = (*SRs);
   SRentry *tmp = tab;
 
@@ -931,7 +918,7 @@ void GVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
 
 void PVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
 {
-  register int i;
+  int i;
   SRentry *tab = (*SRs);
   SRentry *tmp = tab;
 

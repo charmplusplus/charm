@@ -1,0 +1,38 @@
+mainmodule reductionBenchmark {
+
+    readonly config cfg;
+    readonly CProxy_QHogger hogger;
+    readonly CProxy_TestController mainProxy;
+
+    initproc void registerHandlers();
+
+    message DataMsg
+    {
+        double data[];
+    };
+
+
+    array[1D] MyChareArray
+    {
+        entry MyChareArray();
+        entry void crunchData(DataMsg *msg);
+    };
+
+
+    group QHogger
+    {
+        entry QHogger();
+        entry void doSomething(int flopM);
+    };
+
+
+    mainchare TestController
+    {
+        entry TestController(CkArgMsg *msg);
+        entry void receiveReduction(CkReductionMsg *msg);
+        entry void finishInit();
+        entry void startTest();
+    };
+
+};
+

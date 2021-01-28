@@ -1,21 +1,19 @@
+/* A Bison parser, made by GNU Bison 3.0.4.  */
 
-/* A Bison parser, made by GNU Bison 2.4.1.  */
+/* Bison interface for Yacc-like parsers in C
 
-/* Skeleton interface for Bison's Yacc-like parsers in C
-   
-      Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004, 2005, 2006
-   Free Software Foundation, Inc.
-   
+   Copyright (C) 1984, 1989-1990, 2000-2015 Free Software Foundation, Inc.
+
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
@@ -28,88 +26,104 @@
    special exception, which will cause the skeleton and the resulting
    Bison output files to be licensed under the GNU General Public
    License without this special exception.
-   
+
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
+#ifndef YY_YY_Y_TAB_H_INCLUDED
+# define YY_YY_Y_TAB_H_INCLUDED
+/* Debug traces.  */
+#ifndef YYDEBUG
+# define YYDEBUG 0
+#endif
+#if YYDEBUG
+extern int yydebug;
+#endif
 
-/* Tokens.  */
+/* Token type.  */
 #ifndef YYTOKENTYPE
 # define YYTOKENTYPE
-   /* Put the tokens into the symbol table, so that GDB and other debuggers
-      know about them.  */
-   enum yytokentype {
-     MODULE = 258,
-     MAINMODULE = 259,
-     EXTERN = 260,
-     READONLY = 261,
-     INITCALL = 262,
-     INITNODE = 263,
-     INITPROC = 264,
-     PUPABLE = 265,
-     CHARE = 266,
-     MAINCHARE = 267,
-     GROUP = 268,
-     NODEGROUP = 269,
-     ARRAY = 270,
-     MESSAGE = 271,
-     CONDITIONAL = 272,
-     CLASS = 273,
-     INCLUDE = 274,
-     STACKSIZE = 275,
-     THREADED = 276,
-     TEMPLATE = 277,
-     SYNC = 278,
-     IGET = 279,
-     EXCLUSIVE = 280,
-     IMMEDIATE = 281,
-     SKIPSCHED = 282,
-     INLINE = 283,
-     VIRTUAL = 284,
-     MIGRATABLE = 285,
-     CREATEHERE = 286,
-     CREATEHOME = 287,
-     NOKEEP = 288,
-     NOTRACE = 289,
-     APPWORK = 290,
-     VOID = 291,
-     CONST = 292,
-     PACKED = 293,
-     VARSIZE = 294,
-     ENTRY = 295,
-     FOR = 296,
-     FORALL = 297,
-     WHILE = 298,
-     WHEN = 299,
-     OVERLAP = 300,
-     ATOMIC = 301,
-     IF = 302,
-     ELSE = 303,
-     PYTHON = 304,
-     LOCAL = 305,
-     NAMESPACE = 306,
-     USING = 307,
-     IDENT = 308,
-     NUMBER = 309,
-     LITERAL = 310,
-     CPROGRAM = 311,
-     HASHIF = 312,
-     HASHIFDEF = 313,
-     INT = 314,
-     LONG = 315,
-     SHORT = 316,
-     CHAR = 317,
-     FLOAT = 318,
-     DOUBLE = 319,
-     UNSIGNED = 320,
-     ACCEL = 321,
-     READWRITE = 322,
-     WRITEONLY = 323,
-     ACCELBLOCK = 324,
-     MEMCRITICAL = 325,
-     REDUCTIONTARGET = 326,
-     CASE = 327
-   };
+  enum yytokentype
+  {
+    MODULE = 258,
+    MAINMODULE = 259,
+    EXTERN = 260,
+    READONLY = 261,
+    INITCALL = 262,
+    INITNODE = 263,
+    INITPROC = 264,
+    PUPABLE = 265,
+    CHARE = 266,
+    MAINCHARE = 267,
+    GROUP = 268,
+    NODEGROUP = 269,
+    ARRAY = 270,
+    MESSAGE = 271,
+    CONDITIONAL = 272,
+    CLASS = 273,
+    INCLUDE = 274,
+    STACKSIZE = 275,
+    THREADED = 276,
+    TEMPLATE = 277,
+    WHENIDLE = 278,
+    SYNC = 279,
+    IGET = 280,
+    EXCLUSIVE = 281,
+    IMMEDIATE = 282,
+    SKIPSCHED = 283,
+    INLINE = 284,
+    VIRTUAL = 285,
+    MIGRATABLE = 286,
+    AGGREGATE = 287,
+    CREATEHERE = 288,
+    CREATEHOME = 289,
+    NOKEEP = 290,
+    NOTRACE = 291,
+    APPWORK = 292,
+    VOID = 293,
+    CONST = 294,
+    NOCOPY = 295,
+    NOCOPYPOST = 296,
+    NOCOPYDEVICE = 297,
+    PACKED = 298,
+    VARSIZE = 299,
+    ENTRY = 300,
+    FOR = 301,
+    FORALL = 302,
+    WHILE = 303,
+    WHEN = 304,
+    OVERLAP = 305,
+    SERIAL = 306,
+    IF = 307,
+    ELSE = 308,
+    PYTHON = 309,
+    LOCAL = 310,
+    NAMESPACE = 311,
+    USING = 312,
+    IDENT = 313,
+    NUMBER = 314,
+    LITERAL = 315,
+    CPROGRAM = 316,
+    HASHIF = 317,
+    HASHIFDEF = 318,
+    INT = 319,
+    LONG = 320,
+    SHORT = 321,
+    CHAR = 322,
+    FLOAT = 323,
+    DOUBLE = 324,
+    UNSIGNED = 325,
+    SIZET = 326,
+    BOOL = 327,
+    ACCEL = 328,
+    READWRITE = 329,
+    WRITEONLY = 330,
+    ACCELBLOCK = 331,
+    MEMCRITICAL = 332,
+    REDUCTIONTARGET = 333,
+    CASE = 334,
+    TYPENAME = 335
+  };
 #endif
 /* Tokens.  */
 #define MODULE 258
@@ -132,67 +146,74 @@
 #define STACKSIZE 275
 #define THREADED 276
 #define TEMPLATE 277
-#define SYNC 278
-#define IGET 279
-#define EXCLUSIVE 280
-#define IMMEDIATE 281
-#define SKIPSCHED 282
-#define INLINE 283
-#define VIRTUAL 284
-#define MIGRATABLE 285
-#define CREATEHERE 286
-#define CREATEHOME 287
-#define NOKEEP 288
-#define NOTRACE 289
-#define APPWORK 290
-#define VOID 291
-#define CONST 292
-#define PACKED 293
-#define VARSIZE 294
-#define ENTRY 295
-#define FOR 296
-#define FORALL 297
-#define WHILE 298
-#define WHEN 299
-#define OVERLAP 300
-#define ATOMIC 301
-#define IF 302
-#define ELSE 303
-#define PYTHON 304
-#define LOCAL 305
-#define NAMESPACE 306
-#define USING 307
-#define IDENT 308
-#define NUMBER 309
-#define LITERAL 310
-#define CPROGRAM 311
-#define HASHIF 312
-#define HASHIFDEF 313
-#define INT 314
-#define LONG 315
-#define SHORT 316
-#define CHAR 317
-#define FLOAT 318
-#define DOUBLE 319
-#define UNSIGNED 320
-#define ACCEL 321
-#define READWRITE 322
-#define WRITEONLY 323
-#define ACCELBLOCK 324
-#define MEMCRITICAL 325
-#define REDUCTIONTARGET 326
-#define CASE 327
+#define WHENIDLE 278
+#define SYNC 279
+#define IGET 280
+#define EXCLUSIVE 281
+#define IMMEDIATE 282
+#define SKIPSCHED 283
+#define INLINE 284
+#define VIRTUAL 285
+#define MIGRATABLE 286
+#define AGGREGATE 287
+#define CREATEHERE 288
+#define CREATEHOME 289
+#define NOKEEP 290
+#define NOTRACE 291
+#define APPWORK 292
+#define VOID 293
+#define CONST 294
+#define NOCOPY 295
+#define NOCOPYPOST 296
+#define NOCOPYDEVICE 297
+#define PACKED 298
+#define VARSIZE 299
+#define ENTRY 300
+#define FOR 301
+#define FORALL 302
+#define WHILE 303
+#define WHEN 304
+#define OVERLAP 305
+#define SERIAL 306
+#define IF 307
+#define ELSE 308
+#define PYTHON 309
+#define LOCAL 310
+#define NAMESPACE 311
+#define USING 312
+#define IDENT 313
+#define NUMBER 314
+#define LITERAL 315
+#define CPROGRAM 316
+#define HASHIF 317
+#define HASHIFDEF 318
+#define INT 319
+#define LONG 320
+#define SHORT 321
+#define CHAR 322
+#define FLOAT 323
+#define DOUBLE 324
+#define UNSIGNED 325
+#define SIZET 326
+#define BOOL 327
+#define ACCEL 328
+#define READWRITE 329
+#define WRITEONLY 330
+#define ACCELBLOCK 331
+#define MEMCRITICAL 332
+#define REDUCTIONTARGET 333
+#define CASE 334
+#define TYPENAME 335
 
-
-
-
+/* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-typedef union YYSTYPE
+
+union YYSTYPE
 {
+#line 54 "xi-grammar.y" /* yacc.c:1909  */
 
-/* Line 1676 of yacc.c  */
-#line 23 "xi-grammar.y"
-
+  Attribute *attr;
+  Attribute::Argument *attrarg;
   AstChildren<Module> *modlist;
   Module *module;
   ConstructList *conslist;
@@ -224,22 +245,42 @@ typedef union YYSTYPE
   IncludeFile *includeFile;
   const char *strval;
   int intval;
-  Chare::attrib_t cattr;
+  unsigned int cattr; // actually Chare::attrib_t, but referring to that creates nasty #include issues
   SdagConstruct *sc;
+  IntExprConstruct *intexpr;
   WhenConstruct *when;
+  SListConstruct *slist;
+  CaseListConstruct *clist;
+  OListConstruct *olist;
+  SdagEntryConstruct *sentry;
   XStr* xstrptr;
   AccelBlock* accelBlock;
 
+#line 260 "y.tab.h" /* yacc.c:1909  */
+};
 
-
-/* Line 1676 of yacc.c  */
-#line 237 "y.tab.h"
-} YYSTYPE;
+typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
-# define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 #endif
 
+/* Location type.  */
+#if ! defined YYLTYPE && ! defined YYLTYPE_IS_DECLARED
+typedef struct YYLTYPE YYLTYPE;
+struct YYLTYPE
+{
+  int first_line;
+  int first_column;
+  int last_line;
+  int last_column;
+};
+# define YYLTYPE_IS_DECLARED 1
+# define YYLTYPE_IS_TRIVIAL 1
+#endif
+
+
 extern YYSTYPE yylval;
+extern YYLTYPE yylloc;
+int yyparse (void);
 
-
+#endif /* !YY_YY_Y_TAB_H_INCLUDED  */

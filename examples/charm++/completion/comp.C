@@ -3,11 +3,12 @@
 
 struct Main : public CBase_Main {
   CProxy_CompletionDetector detector;
-  const int num;
+  int num;
 
-  Main(CkArgMsg* msg)
-    : num(10) {
+  Main(CkArgMsg* msg) {
     delete msg;
+
+    num = 10 * CkNumPes();
     detector = CProxy_CompletionDetector::ckNew();
     detector.start_detection(num,
                              CkCallback(CkIndex_Main::startTest(), thisProxy),

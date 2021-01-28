@@ -51,7 +51,7 @@ void TCHARM_Migrate_to(int destPE);
 void TCHARM_Evacuate();
 
 int TCHARM_System(const char *shell_command);
-void TCHARM_Done(void);
+void TCHARM_Done(int exitcode);
 void TCHARM_Yield(void);
 
 /* Set/get thread-private ("thread global") data. */

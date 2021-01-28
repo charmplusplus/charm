@@ -9,7 +9,7 @@ mainmodule matmul2d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void done();
+    entry [reductiontarget] void done();
   };
 
   array [2D] Compute {
@@ -18,7 +18,7 @@ mainmodule matmul2d {
     entry void compute();
     entry void recvBlockA(float arr[size], int size, int whichBuf);
     entry void recvBlockB(float arr[size], int size, int whichBuf);
-    entry void resumeFromBarrier();
+    entry [reductiontarget] void resumeFromBarrier();
   };
 
   group ComputeMap : CkArrayMap {

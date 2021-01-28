@@ -1,7 +1,7 @@
 module CentralLB {
 
 extern module BaseLB;
-extern module LBDatabase;
+extern module LBManager;
 
 include "CentralLBMsg.h";
 
@@ -14,21 +14,28 @@ initnode void lbinit(void);
 group [migratable] CentralLB : BaseLB {
   entry void CentralLB(const CkLBOptions &);  
   entry void ProcessAtSync(void);
-  entry void SendStats();
+  entry [reductiontarget] void SendStats();
   entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
   entry void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage data);
-  entry void ReceiveCounts(CkReductionMsg *);
+  entry void ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage data);
+  entry [reductiontarget] void ReceiveCounts(int counts[n], int n);
   entry void LoadBalance(void);
   entry [threaded] void t_LoadBalance(void);
+  entry void ApplyDecision();
   entry void ResumeClients(int);
-  entry void ResumeClients(CkReductionMsg *);
+  entry [reductiontarget] void ResumeClients();
   entry void changeFreq(int);
   entry void ScatterMigrationResults(LBScatterMsg *);
   entry void ReceiveMigration(LBMigrateMsg*);
   entry void ReceiveMigration(LBScatterMsg*);
-  entry void ProcessReceiveMigration(CkReductionMsg  *);
-  entry void ProcessMigrationDecision(CkReductionMsg *);
+  entry [reductiontarget] void ProcessReceiveMigration();
+  entry [reductiontarget] void ProcessMigrationDecision();
   entry void MissMigrate(int);
+  entry void CheckForRealloc();
+  entry void ResumeFromReallocCheckpoint();
+  entry void MigrationDoneImpl(int);
+  entry void WillIbekilled(std::vector <char> avail, int);
+  entry void StartCleanup();
 };
 
 };

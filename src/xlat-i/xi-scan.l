@@ -1,5 +1,6 @@
 %{
 #include <string.h>
+#include "sdag/constructs/Constructs.h"
 #include "xi-symbol.h"
 #include <ctype.h>
 using namespace xi;
@@ -7,6 +8,7 @@ using namespace xi;
 #include <list>
 
 /* Global Variables and Functions - used in grammar.y */
+unsigned int yycolumn = 1;
 unsigned int lineno = 1;
 int in_bracket=0; /*Horrific hack to get "array length" code snippets (between []'s)*/
 int in_braces=0; /*Horrific hack to get SDAG entry code snippets (between {}'s)*/
@@ -15,7 +17,8 @@ std::list<Entry *> connectEntries;
 /* Local to file */
 unsigned char in_comment=0;
 int search(char *s);
-int count_newlines(char *s);
+void update_position();
+int count_newlines(const char *s);
 
 /* We return Tokens only when not in a comment. */
 #define Return if (!in_comment) return
@@ -56,30 +59,26 @@ nonBraces [^{}]*
 nonIntExpr [^();,:]*
 
 %%
-{nonBracket}	{ if (in_bracket) {Yval;return Token(CPROGRAM);} else REJECT;}
-{nonBraces}	{ if (in_braces) {Yval; lineno += count_newlines(yytext); return Token(CPROGRAM);} else REJECT;}
-{nonIntExpr}	{ if (in_int_expr) {Yval;return Token(CPROGRAM);} else REJECT;}
-"//".*		{ /* ignore single line comments */ }
-"\r"		{ /* ignore ^M characters for dos-unix compat */ }
-"/*"		{ in_comment = 1; /* Single line C-style comments */ }
-"*/"		{ in_comment = 0; }
-"#if" 		{ Return Token(HASHIF); }
-"#ifdef" 	{ Return Token(HASHIFDEF); }
-"#endif" 	{ in_comment = 0; /* comments */ }
-{ws}		{ /* ignore white space */ }
-{nl}		{ lineno++;}
-{number}	{ Yval; Return Token(NUMBER); }
-{literal}	{ Yval; Return Token(LITERAL); }
-{name}		{ Return Token(search(yytext)); }
-.		{ Return Token(yytext[0]); }
+{nonBracket}	{ if (in_bracket)  {Yval; update_position(); return Token(CPROGRAM);} else REJECT;}
+{nonBraces}		{ if (in_braces)   {Yval; lineno += count_newlines(yytext); update_position(); return Token(CPROGRAM);} else REJECT;}
+{nonIntExpr}	{ if (in_int_expr) {Yval; update_position(); return Token(CPROGRAM);} else REJECT;}
+"//".*		{ update_position(); /* ignore single line comments */ }
+"\r"		{ update_position(); /* ignore ^M characters for dos-unix compat */ }
+"/*"		{ update_position(); in_comment = 1; /* Single line C-style comments */ }
+"*/"		{ update_position(); in_comment = 0; }
+"#if" 		{ update_position(); Return Token(HASHIF); }
+"#ifdef" 	{ update_position(); Return Token(HASHIFDEF); }
+"#endif" 	{ update_position(); in_comment = 0; /* comments */ }
+{ws}		{ update_position(); /* ignore white space */ }
+{nl}		{ yycolumn = 1; lineno++;}
+{number}	{ update_position(); Yval; Return Token(NUMBER); }
+{literal}	{ update_position(); Yval; Return Token(LITERAL); }
+{name}		{ update_position(); Return Token(search(yytext)); }
+.			{ update_position(); Return Token(yytext[0]); }
 %%
 
-struct rwtable {
-  const char *res;	int tok;
-};
-
 /* Reserved word table */
-struct rwtable rwtable[] = {
+struct rwentry rwtable[] = {
 {  "module",	MODULE },
 {  "mainmodule",	MAINMODULE },
 {  "chare",	CHARE },
@@ -106,11 +105,16 @@ struct rwtable rwtable[] = {
 {  "template",	TEMPLATE },
 {  "class",	CLASS },
 {  "include",	INCLUDE },
+{  "whenidle",	WHENIDLE },
 {  "sync",	SYNC },
 {  "iget",       IGET },
 {  "exclusive",	EXCLUSIVE },
 {  "immediate",  IMMEDIATE },
 {  "expedited",  SKIPSCHED },
+{  "aggregate", AGGREGATE },
+{  "nocopy",  NOCOPY },
+{  "nocopypost",  NOCOPYPOST },
+{  "nocopydevice",  NOCOPYDEVICE },
 {  "inline",  	INLINE },
 {  "local",      LOCAL },
 {  "virtual",    VIRTUAL },
@@ -126,9 +130,11 @@ struct rwtable rwtable[] = {
 {  "double",     DOUBLE },
 {  "unsigned",   UNSIGNED },
 {  "void",	VOID },
+{  "size_t",	SIZET},
+{  "bool",	BOOL},
 {  "const",	CONST },
-{  "atomic", 	ATOMIC },
-{  "serial",    ATOMIC },
+{  "atomic", 	SERIAL },
+{  "serial",    SERIAL },
 {  "when", 	WHEN },
 {  "while", 	WHILE },
 {  "for",	FOR },
@@ -146,6 +152,7 @@ struct rwtable rwtable[] = {
 {  "memcritical", MEMCRITICAL },
 {  "reductiontarget", REDUCTIONTARGET },
 {  "case",       CASE },
+{  "typename", TYPENAME },
 {  "",		0 }
 };
 
@@ -160,16 +167,30 @@ int search(char *s)
   return IDENT;
 }
 
-// Oh my $DEITY...
-int count_newlines(char *s) {
-    int count = 0;
+void update_position()
+{
+  yylloc.first_line = yylloc.last_line = lineno;
+  yylloc.first_column = yycolumn;
+  yylloc.last_column = yycolumn + yyleng-1;
+  yycolumn += yyleng;
+}
 
-    while (*s != '\0') {
-        if (*s == '\n') count++;
-        s++;
-    }
+int count_newlines(const char *s)
+{
+  int count = 0;
 
-    return count;
+  while (*s != '\0') {
+    if (*s == '\n')
+      count++;
+    s++;
+  }
+
+  return count;
+}
+
+void scan_string(const char *str)
+{
+  yy_scan_string(str);
 }
 
 int yywrap() { return 1; }

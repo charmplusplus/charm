@@ -1,0 +1,16 @@
+mainmodule m {
+  mainchare A {
+    entry A(CkArgMsg*);
+    entry void bar() {
+      serial {
+        // {
+
+        /* { */
+
+        /*
+        {
+        */
+      }
+    }
+  }
+}

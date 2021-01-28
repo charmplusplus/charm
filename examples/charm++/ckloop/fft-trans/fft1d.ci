@@ -24,24 +24,24 @@ mainmodule fft1d {
     entry void initValidation();
     entry void doFFT() {
       for(iteration = 0; iteration < 3; ++iteration) {
-        atomic "transpose" {
+        serial "transpose" {
           if(thisIndex == 0)
             CkPrintf("TRANSPOSING\n");
           sendTranspose(iteration == 0 ? in : out);
         }
 
         for(count = 0; count < numChunks; ++count)
-          when getTranspose[iteration] (fftMsg *m) atomic {
+          when getTranspose[iteration] (fftMsg *m) serial {
             applyTranspose(m);
           }
 
-        if (iteration < 2) atomic "compute" {
+        if (iteration < 2) serial "compute" {
 	  fftHelperLaunch();
           if(iteration == 0)
               twiddle(validating ? 1 : -1);
         }
       }	
-      atomic {
+      serial {
         if(!validating)
           contribute(CkCallback(CkIndex_Main::doneFFT(), mainProxy));
         else {

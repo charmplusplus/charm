@@ -16,7 +16,7 @@ public:
   void IdleTime(LBRealType* walltime) { *walltime = total_idletime; };
 
 private:
-  enum { off, on } state;
+enum : uint8_t { off, on } state;
   LBRealType total_walltime;
   LBRealType total_idletime;
   double start_totalwall;

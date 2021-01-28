@@ -1,7 +1,5 @@
 #define CMK_SMP                                            1
 
-#undef CMK_NODE_QUEUE_AVAILABLE
-#define CMK_NODE_QUEUE_AVAILABLE                           1
 
 #undef CMK_SHARED_VARS_UNAVAILABLE
 #undef CMK_SHARED_VARS_POSIX_THREADS_SMP
@@ -17,4 +15,4 @@
 #define CMK_NOT_USE_TLS_THREAD                             1
 #endif
 
-#define CMK_PCQUEUE_LOCK                                   1
+/* #define CMK_PCQUEUE_LOCK                                   1 */

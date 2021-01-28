@@ -1,0 +1,18 @@
+Simple integration in Charm++, with integration function implemented
+indepedent of the chares that execute the computation.  See
+examples/integrate for the base implementation.
+
+Parameters are the number of slices and the number of chares.  Where
+the former should be an even multiple of the latter.
+
+Demonstrates basic problem decomposition in an chare array
+context. Work is divided up evenly across the chares and each one
+calculates the results for its slice and passes the result to the
+mainproxy.
+
+This example extends the same basic infrastructure as the integrate
+example to demonstrate the use of PUP::able to provide the additional
+flexibility of having the integration function used in each chare
+selected at chare creation time, rather than hardwired into the chare.
+Such functionality would be useful in handling computational cases
+where the appropriate function varied across the data range.

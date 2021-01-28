@@ -13,7 +13,7 @@ int main(int argc,char **argv)
 
   int rank;            /* process id */
   int p;                /* number of processes */
-  
+
   MPI_Init( &argc, &argv );
   MPI_Comm_rank( MPI_COMM_WORLD, &rank);
   MPI_Comm_size( MPI_COMM_WORLD, &p );
@@ -36,7 +36,7 @@ int main(int argc,char **argv)
 	       "CkMyPe() is %d, migrate_test is %d\n",
 	       rank, CkMyPe(), migrate_test);
 	//fflush(stdout);
-	AMPI_Migrateto(destination_pe);
+	AMPI_Migrate_to_pe(destination_pe);
 	printf("Leaving TCHARM_Migrate_to, "
                "FEM_My_partition is %d, "
 	       "CkMyPe() is %d, migrate_test is %d\n",

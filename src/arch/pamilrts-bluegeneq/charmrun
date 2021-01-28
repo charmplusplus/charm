@@ -1,13 +1,16 @@
-#!/bin/sh
+#!/bin/bash
 #
 # good for job less than 30 minutes
 # have to pass bank using -A or set PROJECT environment variable
+
+export FROM_CHARMRUN='1'
 
 args=""
 pes=1
 machinefile=""
 pernode=32
 envs=""
+QUIET=0
 
 while [ $# -gt 0 ]
 do
@@ -23,7 +26,7 @@ do
 		pes=$2
 		shift
 		;;
-	+p*)
+	+p[0-9]*)
 		pes=`echo $1 | awk '{print substr($1,3)}'`
 		;;
   -machinefile)
@@ -43,6 +46,12 @@ do
 		envs=$envs" --envs " $2
 		shift
 		;;
+	++quiet)
+		QUIET=1
+		;;
+	++no-quiet)
+		QUIET=0
+		;;
   --pernode)
     pernode=$2
     shift
@@ -55,12 +64,14 @@ do
 done
 
 
-printf "\nRunning on $pes processors: $args\n"
+test $QUIET -eq 1 && args=$args" "++quiet
+
+test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
 
 if test -n "$COBALT_JOBID"
 then
   # charmrun called from script
-  echo "runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB $envs : $args"
+  test $QUIET -eq 0 && echo "runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB $envs : $args"
   runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB $envs : $args
   exit $?
 else
@@ -72,8 +83,8 @@ queue_sub=qsub
 while [ true ]
 do
 
-echo "Submitting batch job for> $pes $args"
-echo " using the command> $queue_sub -t 30 -n $pes  $args"
+test $QUIET -eq 0 && echo "Submitting batch job for> $pes $args"
+test $QUIET -eq 0 && echo " using the command> $queue_sub -t 30 -n $pes  $args"
 jobid=""
 while [ -z "$jobid" ]
 do
@@ -86,10 +97,11 @@ do
   fi
   sleep 10
 done
-echo "Job enqueued under job ID $jobid"
+test $QUIET -eq 0 && echo "Job enqueued under job ID $jobid"
 
 output=$jobid.output
 err=$jobid.error
+log=$jobid.cobaltlog
 
 End() {
         echo "Charmrun> $queue_kill $jobid ..."
@@ -114,10 +126,21 @@ do
             status=`grep -c "exited with status 0" $err`
             if test $status != 0 ;
             then
-              echo "job exited with status 0: output in $output"
+              test $QUIET -eq 0 && echo "job exited with status 0: output in $output"
               exit 0
             else
               echo "job did not exit with status 0; error in $err, output in $output"
+              # display the error, output and cobaltlog for failed jobs
+              echo "==============================================================="
+              echo "Job error: $err"
+              cat $err
+              echo "==============================================================="
+              echo "Job output: $output"
+              cat $output
+              echo "==============================================================="
+              echo "Job scheduler log: $log"
+              cat $log
+              echo "==============================================================="
               exit 1
             fi
         fi

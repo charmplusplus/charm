@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /** \file jacobi3d.C
  *  Author: Abhinav S Bhatele
  *  Date Created: June 01st, 2009
@@ -149,11 +142,11 @@ class Main : public CBase_Main {
     }
 
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
-        CkAbort("array_size_X % block_size_X != 0!");
+        CkAbort("array_size_X %% block_size_X != 0!");
       if (arrayDimY < blockDimY || arrayDimY % blockDimY != 0)
-        CkAbort("array_size_Y % block_size_Y != 0!");
+        CkAbort("array_size_Y %% block_size_Y != 0!");
       if (arrayDimZ < blockDimZ || arrayDimZ % blockDimZ != 0)
-        CkAbort("array_size_Z % block_size_Z != 0!");
+        CkAbort("array_size_Z %% block_size_Z != 0!");
 
       num_chare_x = arrayDimX / blockDimX;
       num_chare_y = arrayDimY / blockDimY;
@@ -178,7 +171,7 @@ class Main : public CBase_Main {
 
       TopoManager tmgr;
       CkArray *jarr = array.ckLocalBranch();
-      int jmap[num_chare_x][num_chare_y][num_chare_z];
+      std::vector<std::vector<std::vector<int>>> jmap(num_chare_x, std::vector<std::vector<int> >(num_chare_y,std::vector <int>(num_chare_z)));
 
       int hops=0, p;
       for(int i=0; i<num_chare_x; i++)
@@ -286,12 +279,6 @@ class Jacobi: public CBase_Jacobi {
 	// Pupping function for migration and fault tolerance
 	// Condition: assuming the 3D Chare Arrays are NOT used
 	void pup(PUP::er &p){
-		
-		// calling parent's pup
-		CBase_Jacobi::pup(p);
-	
-		__sdag_pup(p);
-	
 		// pupping properties of this class
 		p | iterations;
 		p | imsg;
@@ -444,12 +431,12 @@ class Jacobi: public CBase_Jacobi {
             contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
 #endif
 		} else {
-			doStep();
+			thisProxy(thisIndex.x, thisIndex.y, thisIndex.z).doStep();
 		}
 	}
 
 	void ResumeFromSync(){
-		doStep();
+		thisProxy(thisIndex.x, thisIndex.y, thisIndex.z).doStep();
 	}
 
 

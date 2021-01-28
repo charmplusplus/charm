@@ -29,12 +29,13 @@ restarting of Charm++ programs. ...
 #include <pup.h>
 #include <ckcallback.h>
 #include <ckmessage.h>
+#include "CkCheckpointStatus.decl.h"
 
 // loop over all CkLocMgr and do "code"
 #define  CKLOCMGR_LOOP(code)	\
   for(i=0;i<numGroups;i++) {	\
     IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();	\
-    if(obj->isLocMgr())  {	\
+    if(obj && obj->isLocMgr())  {	\
       CkLocMgr *mgr = (CkLocMgr*)obj;	\
       code	\
     }	\
@@ -44,28 +45,43 @@ restarting of Charm++ programs. ...
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
 void CkPupChareData(PUP::er &p);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void CkPupGroupData(PUP::er &p,bool create=true);
-void CkPupNodeGroupData(PUP::er &p,bool create=true);
-#else
 void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);
-#endif
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
 void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
 //void CkTestArrayElements();
 
-void CkStartCheckpoint(const char* dirname,const CkCallback& cb);
-void CkRestartMain(const char* dirname, CkArgMsg *args);
+// If writersPerNode <= 0 the number of writers is unchanged, if > 0, then set to
+// min(writersPerNode, CkMyNodeSize())
+void CkStartCheckpoint(const char* dirname, const CkCallback& cb,
+                       bool requestStatus = false, int writersPerNode = 0);
+void CkRestartMain(const char* dirname, CkArgMsg* args);
+#if CMK_SHRINK_EXPAND
+void CkResumeRestartMain(char *msg);
+#endif
 #if __FAULT__
 int  CkCountArrayElements();
 #endif
 
+#if CMK_SHRINK_EXPAND
+enum realloc_state : uint8_t { NO_REALLOC=0, REALLOC_MSG_RECEIVED=1, REALLOC_IN_PROGRESS=2 };
+extern realloc_state pending_realloc_state;
+extern CkGroupID _lbmgr;
+#endif
+
 // some useful flags (for disk checkpointing)
-extern int _inrestart;           // 1: if is during restart process
-extern int _restarted;           // 1: if this run is after restart
+extern bool _inrestart;          // 1: if is during restart process
+extern bool _restarted;          // 1: if this run is after restart
 extern int _oldNumPes;           // number of processors in the last run
-extern int _chareRestored;       // 1: if chare is restored at restart
+extern bool _chareRestored;      // 1: if chare is restored at restart
+
+enum{CK_CHECKPOINT_SUCCESS, CK_CHECKPOINT_FAILURE};
+
+class CkCheckpointStatusMsg:public CMessage_CkCheckpointStatusMsg{
+public:
+  int status;
+  CkCheckpointStatusMsg(int _status): status(_status){}
+};
 
 #endif //_CKCHECKPOINT_H

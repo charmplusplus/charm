@@ -137,7 +137,7 @@ block::block(const char *filePrefix,int blockNo)
   if (fm==NULL) abort("Can't open .mblk file!");
   int sizes;
   if (3!=fscanf(fm,"%d%d%d",&sizes,&sizes,&sizes)) abort("Can't parse .mblk file's header");
-  locs=new vector3d[dim.getSize()];
+  locs.resize(dim.getSize());
   blockLoc i;
   BLOCKSPAN_FOR(i,blockSpan(blockLoc(0,0,0),dim)) {
     double x,y,z;
@@ -148,7 +148,6 @@ block::block(const char *filePrefix,int blockNo)
 }
 
 block::~block() {
-  delete[] locs;
   for (int p=0;p<nPatches;p++)
     delete patches[p];
   delete[] patches;

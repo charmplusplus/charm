@@ -1,3 +1,5 @@
+#if CMK_FAULT_EVAC
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,14 +7,7 @@
 #include "ck.h"
 #include "ckevacuation.h"
 
-//#define DEBUGC(x) x
-#define DEBUGC(x) 
-
-/***********************************************************************************************/
-/*
-	FAULT_EVAC
-*/
-
+#define DEBUGC(x) //x 
 
 
 int _ckEvacBcastIdx;
@@ -112,14 +107,13 @@ void CkStopScheduler(){
 }
 
 void CkEmmigrateElement(void *arg){
-	CkLocRec_local *rec = (CkLocRec_local *)arg;
-	CkLocMgr *mgr = rec->getLocMgr();
+	CkLocRec *rec = (CkLocRec *)arg;
 	const CkArrayIndex &idx = rec->getIndex();
 	int targetPE=getNextPE(idx);
 	//set this flag so that load balancer is not informed when
 	//this element migrates
 	rec->AsyncMigrate(true);
-	mgr->emigrate(rec,targetPE);
+	rec->migrateMe(targetPE);
 	CkEvacuatedElement();
 	
 }
@@ -155,7 +149,7 @@ void CkEvacuatedElement(){
 }
 
 int evacuate;
-extern "C" void CkClearAllArrayElements();
+void CkClearAllArrayElements();
 
 void CkDecideEvacPe(){
 	if(evacuate > 0){
@@ -173,7 +167,6 @@ int numEvacuated;
 /*
 	Code for moving off all the array elements on a processor
 */
-extern "C"
 void CkClearAllArrayElements(){
 	if(evacuate != 1){
 			return;
@@ -231,7 +224,7 @@ void CkClearAllArrayElementsCPP(){
 
 void CkElementEvacuate::addLocation(CkLocation &loc){
 	CkLocMgr *locMgr = loc.getManager();
-	CkLocRec_local *rec = loc.getLocalRecord();
+	CkLocRec *rec = loc.getLocalRecord();
 	const CkArrayIndex &i = loc.getIndex();
 	int targetPE=getNextPE(i);
 	if(rec->isAsyncEvacuate()){
@@ -245,7 +238,7 @@ void CkElementEvacuate::addLocation(CkLocation &loc){
 			This is in all probability a location containing an ampi, ampiParent and their
 			associated TCharm thread.
 		*/
-		CkVec<CkMigratable *>list;
+		std::vector<CkMigratable *>list;
 		locMgr->migratableList(rec,list);
 		DEBUGC(printf("[%d] ArrayElement not ready to Evacuate number of migratable %d \n",CkMyPe(),list.size()));
 		for(int i=0;i<list.size();i++){
@@ -314,9 +307,6 @@ int getNextSerializer(){
 }
 
 int CkNumValidPes(){
-#if CMK_BIGSIM_CHARM
-        return CkNumPes();
-#else
 	int count=0;
 	for(int i=0;i<CkNumPes();i++){
 		if(CpvAccess(_validProcessors)[i]){
@@ -324,7 +314,6 @@ int CkNumValidPes(){
 		}
 	}
 	return count;
-#endif
 }
 
 
@@ -345,3 +334,6 @@ void processRaiseEvacFile(char *raiseEvacFile){
 	}
 	fclose(fp);	
 }
+
+#endif
+

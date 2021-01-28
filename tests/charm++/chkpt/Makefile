@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = hello.o
@@ -20,14 +21,36 @@ hello.o: hello.C hello.decl.h
 
 test: all
 	-rm -fr log
-	./charmrun ./hello +p3 $(TESTOPTS)
+	$(call run, ./hello +p4 )
 	-sync
-	./charmrun ./hello +p3 +restart log $(TESTOPTS)
-	./charmrun ./hello +p4 +restart log $(TESTOPTS)
-	./charmrun ./hello +p2 +restart log $(TESTOPTS)
-
-bgtest: all
+	$(call run, ./hello +p4 +restart log )
+	$(call run, ./hello +p2 +restart log )
+	-sync
 	-rm -fr log
-	./charmrun ./hello +p2 +x3 +y1 +z1 $(TESTOPTS)
-	./charmrun ./hello +p2 +restart log  +x3 +y1 +z1 $(TESTOPTS)
-	./charmrun ./hello +p2 +restart log  +x2 +y2 +z1 $(TESTOPTS)
+	$(call run, ./hello +p2 )
+	-sync
+	$(call run, ./hello +p4 +restart log )
+
+testp: all
+	-rm -fr log
+	$(call run, ./hello +p$(P) )
+	-sync
+	$(call run, ./hello +p$(P) +restart log )
+	$(call run, ./hello +p$$(( $(P) / 2 )) +restart log )
+	-sync
+	-rm -fr log
+	$(call run, ./hello +p$(P) )
+	-sync
+	$(call run, ./hello +p$(P) +restart log )
+
+smptest: all
+	-rm -fr log
+	$(call run, ./hello +p4 ++ppn 2 )
+	-sync
+	$(call run, ./hello +p4 +restart log ++ppn 4 )
+	$(call run, ./hello +p2 +restart log ++ppn 2 )
+	-sync
+	-rm -fr log
+	$(call run, ./hello +p2 ++ppn 2)
+	-sync
+	$(call run, ./hello +p4 +restart log ++ppn 4 )

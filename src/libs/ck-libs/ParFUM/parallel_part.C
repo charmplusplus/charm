@@ -178,8 +178,6 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 	
   DEBUG(printf("[%d] Memory usage on vp 0 close to max %d \n",CkMyPe(),CmiMemoryUsage()));
 	//Free up the eptr and eind MSA arrays stored in data
-  delete &rPtr;
-  delete &rInd;
   data.arr1.FreeMem();
   data.arr2.FreeMem();
   nodepart.FreeMem();
@@ -258,7 +256,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
     call parmetis and get the resuts back from it
   */
   MSA1DINT::Read rPtr = data.arr1.getInitialWrite().syncToRead();
-  MSA1DINT::Read rInd = data.arr1.getInitialWrite().syncToRead();
+  MSA1DINT::Read rInd = data.arr2.getInitialWrite().syncToRead();
   struct partconndata *partdata = FEM_call_parmetis(data.nelem, rPtr, rInd, comm_context);
 	
   /*
@@ -270,6 +268,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MSA1DINTLIST::Accum nodepartAcc = nodepart.getInitialAccum();
 	
   FEM_write_nodepart(nodepartAcc,partdata,(MPI_Comm)comm_context);
+  MSA1DINTLIST::Read nodepartRead = nodepartAcc.syncToRead();
 	
   /*
     write to the msa that stores the nodes that belong to each partition
@@ -279,8 +278,6 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MPI_Bcast_pup(part2node,masterRank,(MPI_Comm)comm_context);
   part2node.enroll(numChunks);
   MSA1DNODELIST::Accum part2nodeAcc = part2node.getInitialAccum();
-  MSA1DINTLIST::Read nodepartRead = nodepartAcc.syncToRead();
-
 
   FEM_write_part2node(nodepartRead, part2nodeAcc, partdata, (MPI_Comm)comm_context);
 
@@ -309,8 +306,6 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   //printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",myRank,me.m->nElems(),me.m->node.size());
 	
 	//Free up the eptr and eind MSA arrays stored in data
-  delete &rPtr;
-  delete &rInd;
 	data.arr1.FreeMem();
 	data.arr2.FreeMem();
 	nodepart.FreeMem();
@@ -406,8 +401,8 @@ struct partconndata * FEM_call_parmetis(int nelem, MSA1DINT::Read &rPtr, MSA1DIN
     printf("\n");
   */
   int wgtflag=0,numflag=0,ncon=1,ncommonnodes=2,options[5],edgecut=0;
-  double ubvec = 1.05;
-  double *tpwgts = new double[numChunks];
+  float ubvec = 1.05;
+  float *tpwgts = new float[numChunks];
   int *parts = new int[numindices+1];
   for(int i=0;i<numChunks;i++){
     tpwgts[i]=1/(double)numChunks;
@@ -1148,8 +1143,6 @@ void makeGhost(FEM_Mesh *m,
   DEBUG(printf("[%d] Recv ghost nodes \n",myChunk));
   DEBUG(m->node.getGhostRecv().print());
 
-  delete &rDistTab;
-  delete &rGhostMeshes;
   delete distTab;
   delete ghostmeshes;
   MPI_Barrier(comm);

@@ -44,7 +44,9 @@
 
 /* readonly */ extern CProxy_TraceUtilizationBOC traceUtilizationGroupProxy;
 
-void collectUtilizationData(void *data, double currT);
+// This function has unused arguments to match the type of
+// CcdVoidFn, which CcdCallOnConditionKeep takes
+void collectUtilizationData(void *, double);
 
 
 
@@ -53,7 +55,7 @@ class TraceUtilizationInit : public Chare {
  public:
   TraceUtilizationInit(CkArgMsg *m) {
     delete m;
-    CkPrintf("[%d] TraceUtilizationInit creating traceUtilizationGroupProxy");
+    CkPrintf("[%d] TraceUtilizationInit creating traceUtilizationGroupProxy", CkMyPe());
     fflush(stdout);
    
     traceUtilizationGroupProxy = CProxy_TraceUtilizationBOC::ckNew();
@@ -205,9 +207,8 @@ double averageUtilizationInBuffer(compressedBuffer b);
 class TraceUtilization : public Trace {
  public:
   int execEp; // the currently executing EP
-  double start; // the start time for the currently executing EP
-
   unsigned int epInfoSize;
+  double start; // the start time for the currently executing EP
 
   double *cpuTime;     // NUM_BINS*epInfoSize
   int lastBinUsed;
@@ -216,7 +217,7 @@ class TraceUtilization : public Trace {
 
 
   TraceUtilization() {
-    execEp == TRACEON_EP;
+    execEp = TRACEON_EP;
     cpuTime = NULL;
     lastBinUsed = -1;
     numBinsSent = 0;
@@ -240,9 +241,9 @@ class TraceUtilization : public Trace {
 
   void creation(envelope *e, int epIdx, int num=1) {}
 
-  void beginExecute(envelope *e);
+  void beginExecute(envelope *e, void *obj);
   void beginExecute(CmiObjId  *tid);
-  void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0, CmiObjId *idx=NULL);
+  void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0, CmiObjId *idx=NULL, void *obj=NULL);
   void endExecute(void);
   void beginIdle(double currT) {}
   void endIdle(double currT) {}
@@ -308,7 +309,7 @@ class TraceUtilization : public Trace {
     if(cpuTime != NULL && interval <= lastBinUsed)
       return cpuTime[(interval%NUM_BINS)*epInfoSize+ep]; 
     else {
-      CkPrintf("getCPUtime called with invalid options: cpuTime=%p interval=%d ep=%d\n", cpuTime, (int)interval, (int)ep);
+      CkPrintf("getCPUtime called with invalid options: cpuTime=%p lastBinUsed=%d interval=%d ep=%d\n", cpuTime, lastBinUsed, (int)interval, (int)ep);
       return 0.0;
     }
   }

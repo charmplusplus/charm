@@ -1,18 +1,19 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
-all: pgm
+all: integrate
 
-pgm: pgm.o
-	$(CHARMC) pgm.o  -o pgm -language charm++
+integrate: pgm.o
+	$(CHARMC) pgm.o  -o integrate -language charm++
 
 pgm.o : pgm.C pgm.h pgm.ci
 	$(CHARMC) -c pgm.ci pgm.C
 
 clean:
-	rm -f pgm *.o conv-host *.decl.h *.def.h *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f integrate *.o conv-host *.decl.h *.def.h *~ charmrun charmrun.exe integrate.exe integrate.pdb integrate.ilk
 
-test: pgm
-	./charmrun ./pgm +p4 100 5 $(TESTOPTS)
+test: integrate
+	$(call run, ./integrate +p4 1000000 100)
 
-bgtest: pgm
-	./charmrun ./pgm +p4 100 5 +x2 +y2 +z1 $(TESTOPTS)
+testp: integrate
+	$(call run, ./integrate +p$(P) 1000000 $$(( $(P) * 10 )) )

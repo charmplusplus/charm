@@ -7,8 +7,10 @@
 
 #include "pup_c.h"
 
+/*If you are incrementing these numbers, you also need to increment MAJOR and MINOR
+variables in ParDebug.java(in ccs_tools) to match, otherwise CharmDebug won't work*/
 #define CHARMDEBUG_MAJOR   10
-#define CHARMDEBUG_MINOR    7
+#define CHARMDEBUG_MINOR   11
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,10 +26,10 @@ extern void (*CpdDebug_pupMemStat)(pup_er p, void *data);
 extern void (*CpdDebug_deleteMemStat)(void *ptr);
 extern void * (*CpdDebug_mergeMemStat)(int *size, void *data, void **remoteData, int numRemote);
 
-CpvExtern(int, cmiArgDebugFlag);
+extern int cmiArgDebugFlag; // Value is 0, unless reset in ConverseCommonInit
 extern char ** memoryBackup;
-extern void CpdCheckMemory();
-extern void CpdResetMemory();
+extern void CpdCheckMemory(void);
+extern void CpdResetMemory(void);
 
 void CpdInit(void);
 void CpdFreeze(void);

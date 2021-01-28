@@ -17,14 +17,13 @@ void handler(char *msg)
 
 void user_main(int argc, char **argv)
 {
-int i;
+  int i;
   CcsRegisterHandler("ping2", (CmiHandler)handler);
   CcsRegisterHandler("ping", (CmiHandler)handler);
   CmiPrintf("CCS Handlers registered.  Waiting for net requests...\n");
-  
 }
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   ConverseInit(argc, argv, user_main, 0, 0);
 }

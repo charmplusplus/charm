@@ -38,19 +38,18 @@
 #include "idxl.h"
 #include "idxl_comm.h"
 
-#include "ParFUM.decl.h"
 #include "msa/msa.h"
 #include "cklists.h"
 #include "pup.h"
-
 #include "ParFUM.h"
-
+#include "ElemList.h"
+#include "MsaHashtable.h"
 
 #include <iosfwd>
 
 #include "ParFUM_Adapt.decl.h"
 
-#if defined(WIN32)
+#if defined(_WIN32)
 #include <iterator>
 #endif
 
@@ -65,7 +64,7 @@ template<class Container, class Iterator>
 };
 #endif
 
-#if defined(WIN32) && defined(max)
+#if defined(_WIN32) && defined(max)
 #undef max
 #endif
 
@@ -367,12 +366,12 @@ class AllocTable2d : public BasicTable2d<T> {
 /// Return the human-readable version of this entity code, like "FEM_NODE".
 ///  storage, which must be at least 80 bytes long, is used for
 ///  non-static names, like the user tag "FEM_ELEM+2".
-CDECL const char *FEM_Get_entity_name(int entity,char *storage);
+CLINKAGE const char *FEM_Get_entity_name(int entity,char *storage);
 
 /// Return the human-readable version of this attribute code, like "FEM_CONN".
 ///  storage, which must be at least 80 bytes long, is used for
 ///  non-static names, like the user tag "FEM_DATA+7".
-CDECL const char *FEM_Get_attr_name(int attr,char *storage);
+CLINKAGE const char *FEM_Get_attr_name(int attr,char *storage);
 
 
 ///A user-visible 2D table attached to a FEM_Entity
@@ -505,7 +504,6 @@ class FEM_Attribute {
 			     const IDXL_Layout &layout, const char *caller);
 
 };
-PUPmarshall(FEM_Attribute)
 
 ///A single table of user data associated with an entity.
 /**
@@ -565,7 +563,6 @@ class FEM_DataAttribute : public FEM_Attribute {
    */
   void interpolate(int *iNodes,int rNode,int k);
 };
-PUPmarshall(FEM_DataAttribute)
 
 ///The FEM_Attribute is of type integer indices
 /**
@@ -614,7 +611,6 @@ class FEM_IndexAttribute : public FEM_Attribute {
   /// Copy src[srcEntity] into our dstEntity.
   virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
 };
-PUPmarshall(FEM_IndexAttribute)
 
 ///The FEM_Attribute is a variable set of integer indices
 /**
@@ -789,11 +785,9 @@ class FEM_Entity {
    * the last element, so that we always have a compact list, and we
    * allocate only when we need to
    */
-  int* invalidList;
-  ///length of invalid list
+  std::vector<int> invalidList;
+  ///active length of invalid list - *distinct* from vector's .size()
   int invalidListLen;
-  ///length of allocated invalid list
-  int invalidListAllLen;
 
  protected:
   /**
@@ -975,7 +969,6 @@ class FEM_Entity {
 
   void print(const char *type,const IDXL_Print_Map &map);
 };
-PUPmarshall(FEM_Entity)
 
 // Now that we have FEM_Entity, we can define attribute lenth, as entity length
 inline int FEM_Attribute::getLength(void) const { return e->size(); }
@@ -1036,7 +1029,6 @@ class FEM_Node : public FEM_Entity {
   bool hasConn(int idx);
   void print(const char *type,const IDXL_Print_Map &map);
 };
-PUPmarshall(FEM_Node)
 
 
 ///FEM_Elem is a type of FEM_Entity, which refers to elems
@@ -1085,8 +1077,6 @@ class FEM_Elem:public FEM_Entity {
   void connIs(int i,const int *src) {conn->get().setRow(i,src);}
   bool hasConn(int idx);
 };
-PUPmarshall(FEM_Elem)
-
 
 
 ///FEM_Sparse is a type of FEM_Entity, which refers to edges
@@ -1128,7 +1118,6 @@ class FEM_Sparse : public FEM_Elem {
   inline elem_t &setElem(void) {return elem->get();}
   inline const elem_t &getElem(void) const {return elem->get();}
 };
-PUPmarshall(FEM_Sparse)
 
 /** Describes a user function to pup a piece of mesh data
  */
@@ -1516,8 +1505,6 @@ class FEM_Mesh : public CkNoncopyable {
 
 };
 
-PUPmarshall(FEM_Mesh)
-
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
 FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *caller);
 FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char *caller);
@@ -1788,7 +1775,7 @@ class FEM_Ghost_Layer : public CkNoncopyable {
   public:
     bool add; //Add this kind of ghost element to the chunks
     int tuplesPerElem; //# of tuples surrounding this element
-    intArrayPtr elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
+    std::vector<int> elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
     elemGhostInfo(void) {add=false;tuplesPerElem=0;}
     ~elemGhostInfo(void) {}
     void pup(PUP::er &p) {//CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");
@@ -1801,19 +1788,7 @@ class FEM_Ghost_Layer : public CkNoncopyable {
     for(int i=0;i<FEM_MAX_ELTYPE;i++){
       p | elem[i].add;
       p | elem[i].tuplesPerElem;
-      if(elem[i].tuplesPerElem == 0){
-	continue;
-      }
-      int *arr;
-      if(p.isUnpacking()){
-	arr = new int[nodesPerTuple*elem[i].tuplesPerElem];
-      }else{
-	arr = elem[i].elem2tuple;
-      }
-      p(arr,nodesPerTuple*elem[i].tuplesPerElem);
-      if(p.isUnpacking()){
-	elem[i].elem2tuple = arr;
-      }
+      p | elem[i].elem2tuple;
     }
   }
 };
@@ -1999,7 +1974,7 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
   public:
     //  int recentElType; // should not be here, but if it is it should be pup'ed
     int tuplesPerElem; //# of tuples surrounding this element, i.e. number of faces on an element
-    intArrayPtr elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
+    std::vector<int> elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
     elemAdjInfo(void) {/*add=false;*/tuplesPerElem=0;}
     ~elemAdjInfo(void) {}
     void pup(PUP::er &p) {//CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");
@@ -2018,19 +1993,7 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 	  
 	  for(int i=0;i<FEM_MAX_ELTYPE;i++){
 		  p | elem[i].tuplesPerElem;
-		  if(elem[i].tuplesPerElem == 0){
-			  continue;
-		  }
-		  int *arr;
-		  if(p.isUnpacking()){
-			  arr = new int[nodesPerTuple*elem[i].tuplesPerElem];
-		  }else{
-			  arr = elem[i].elem2tuple;
-		  }
-		  p(arr,nodesPerTuple*elem[i].tuplesPerElem);
-		  if(p.isUnpacking()){
-			  elem[i].elem2tuple = arr;
-		  }
+		  p | elem[i].elem2tuple;
 	  }
   }
 };
@@ -2063,85 +2026,6 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 #endif
 
 #define MESH_CHUNK_TAG 3000
-#define MAX_SHARED_PER_NODE 20
-
-template <class T, bool PUP_EVERY_ELEMENT=true >
-class DefaultListEntry {
-    public:
-    template<typename U>
-    static inline void accumulate(T& a, const U& b) { a += b; }
-    // identity for initializing at start of accumulate
-    static inline T getIdentity() { return T(); }
-    static inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
-  };
-
-extern double elemlistaccTime;
-
-template <class T>
-class ElemList{
- public:
-  CkVec<T> *vec;
-  ElemList(){
-    vec = new CkVec<T>();
-  }
-  ~ElemList(){
-    delete vec;
-  }
-  ElemList(const ElemList &rhs){
-    vec = new CkVec<T>();
-    *this=rhs;
-  }
-  inline ElemList& operator=(const ElemList& rhs){
-    //		 vec = new CkVec<T>();
-    *vec = *(rhs.vec);
-		return *this;
-  }
-  inline ElemList& operator+=(const ElemList& rhs){
-    /*
-      add the new unique elements to the List
-    */
-    double _start = CkWallTimer();
-    for(int i=0;i<rhs.vec->length();i++){
-      vec->push_back((*(rhs.vec))[i]);
-    }
-    //		uniquify();
-    elemlistaccTime += (CkWallTimer() - _start);
-    return *this;
-  }
-  ElemList(const T &val){
-    vec =new CkVec<T>();
-    vec->push_back(val);
-  };
-  inline virtual void pup(PUP::er &p){
-    if(p.isUnpacking()){
-      vec = new CkVec<T>();
-    }
-    pupCkVec(p,*vec);
-  }
-};
-template <class T>
-class UniqElemList: public ElemList<T>{
-public:
-  UniqElemList(const T &val):ElemList<T>(val){};
-  UniqElemList():ElemList<T>(){};
-  inline void uniquify(){
-    CkVec<T> *lvec = this->vec;
-    lvec->quickSort(8);
-    if(lvec->length() != 0){
-      int count=0;
-      for(int i=1;i<lvec->length();i++){
-	if((*lvec)[count] == (*lvec)[i]){
-	}else{
-	  count++;
-	  if(i != count){
-	    (*lvec)[count] = (*lvec)[i];
-	  }
-	}
-      }
-      lvec->resize(count+1);
-    }
-  }
-};
 
 class NodeElem {
  public:
@@ -2151,80 +2035,46 @@ class NodeElem {
     owned by 1 element - numShared 0
     owned by 2 elements - numShared 2
   */
-  int numShared;
-  /*somewhat horrible semantics
-    -if numShared == 0 shared is NULL
-    - else stores all the chunks that share this node
-  */
-  int shared[MAX_SHARED_PER_NODE];
-  //	int *shared;
-  NodeElem(){
-    global = -1;
-    numShared = 0;
-    //		shared = NULL;
+  std::vector<int> shared;
+  NodeElem() : global(-1) {
   }
-  NodeElem(int g_,int num_){
-    global = g_; numShared= num_;
-    /*		if(numShared != 0){
-		shared = new int[numShared];
-		}else{
-		shared = NULL;
-		}*/
-    if(numShared > MAX_SHARED_PER_NODE){
-      CkAbort("In Parallel partition the max number of chunks per node exceeds limit\n");
-    }
+  NodeElem(int g_,int num_) : global(g_) {
+    shared.resize(num_);
   }
-  NodeElem(int g_){
-    global = g_;
-    numShared = 0;
-    //		shared = NULL;
+  NodeElem(int g_) : global(g_) {
   }
   NodeElem(const NodeElem &rhs){
-    //		shared=NULL;
     *this = rhs;
   }
-  inline NodeElem& operator=(const NodeElem &rhs){
+  NodeElem(NodeElem &&rhs){
+    *this = rhs;
+  }
+  NodeElem& operator=(const NodeElem &rhs){
     global = rhs.global;
-    numShared = rhs.numShared;
-    /*		if(shared != NULL){
-		delete [] shared;
-		}
-		shared = new int[numShared];*/
-    memcpy(&shared[0],&((rhs.shared)[0]),numShared*sizeof(int));
+    shared = rhs.shared;
+    return *this;
+  }
+  NodeElem& operator=(NodeElem &&rhs){
+    global = rhs.global;
+    shared = std::move(rhs.shared);
     return *this;
   }
 
-  inline	bool operator == (const NodeElem &rhs){
-    if(global == rhs.global){
-      return true;
-    }else{
-      return false;
-    }
+  bool operator ==(const NodeElem &rhs){
+    return global == rhs.global;
   }
-  inline 	bool operator >=(const NodeElem &rhs){
-    return (global >= rhs.global);
+  bool operator >=(const NodeElem &rhs){
+    return global >= rhs.global;
   }
-
-  inline bool operator <=(const NodeElem &rhs){
-    return (global <= rhs.global);
+  bool operator <=(const NodeElem &rhs){
+    return global <= rhs.global;
   }
 
   virtual void pup(PUP::er &p){
     p | global;
-    p | numShared;
-    /*		if(p.isUnpacking()){
-		if(numShared != 0){
-		shared = new int[numShared];
-		}else{
-		shared = NULL;
-		}
-		}*/
-    p(shared,numShared);
+    p | shared;
   }
   ~NodeElem(){
-    /*		if(shared != NULL){
-		delete [] shared;
-		}*/
   }
 };
 
@@ -2316,160 +2166,6 @@ class MeshElem{
 };
 
 
-class Hashnode{
-public:
-	class tupledata{
-		public:
-		enum {MAX_TUPLE = 8};
-			int nodes[MAX_TUPLE];
-			tupledata(int _nodes[MAX_TUPLE]){
-				memcpy(nodes,_nodes,sizeof(int)*MAX_TUPLE);
-			}
-			tupledata(tupledata &rhs){
-				memcpy(nodes,rhs.nodes,sizeof(int)*MAX_TUPLE);
-			}
-			tupledata(const tupledata &rhs){
-				memcpy(nodes,rhs.nodes,sizeof(int)*MAX_TUPLE);
-			}
-			tupledata(){};
-			//dont store the returned string
-			char *toString(int numnodes,char *str){
-				str[0]='\0';
-				for(int i=0;i<numnodes;i++){
-					sprintf(&str[strlen(str)],"%d ",nodes[i]);
-				}
-				return str;
-			}
-			inline int &operator[](int i){
-				return nodes[i];
-			}
-			inline const int &operator[](int i) const {
-				return nodes[i];
-			}
-			virtual void pup(PUP::er &p){
-				p(nodes,MAX_TUPLE);
-			}
-	};
-	int numnodes; //number of nodes in this tuple
-	//TODO: replace *nodes with the above tupledata class
-	tupledata nodes;	//the nodes in the tuple
-	int chunk;		//the chunk number to which this element belongs
-	int elementNo;		//local number of that element
-	Hashnode(){
-		numnodes=0;
-	};
-	Hashnode(int _num,int _chunk,int _elNo,int _nodes[tupledata::MAX_TUPLE]): nodes(_nodes){
-		numnodes = _num;
-		chunk = _chunk;
-		elementNo = _elNo;
-	}
-	Hashnode(const Hashnode &rhs){
-		*this = rhs;
-	}
-	inline Hashnode &operator=(const Hashnode &rhs){
-		numnodes = rhs.numnodes;
-		for(int i=0;i<numnodes;i++){
-			nodes[i] = rhs.nodes[i];
-		}
-		chunk = rhs.chunk;
-		elementNo = rhs.elementNo;
-                return *this;
-	}
-	inline bool operator==(const Hashnode &rhs){
-		if(numnodes != rhs.numnodes){
-			return false;
-		}
-		for(int i=0;i<numnodes;i++){
-			if(nodes[i] != rhs.nodes[i]){
-				return false;
-			}
-		}
-		if(chunk != rhs.chunk){
-			return false;
-		}
-		if(elementNo != rhs.elementNo){
-			return false;
-		}
-		return true;
-	}
-	inline bool operator>=(const Hashnode &rhs){
-		if(numnodes < rhs.numnodes){
-			return false;
-		};
-		if(numnodes > rhs.numnodes){
-			return true;
-		}
-
-    for(int i=0;i<numnodes;i++){
-      if(nodes[i] < rhs.nodes[i]){
-	return false;
-      }
-      if(nodes[i] > rhs.nodes[i]){
-	return true;
-      }
-    }
-    if(chunk < rhs.chunk){
-      return false;
-    }
-    if(chunk > rhs.chunk){
-      return true;
-    }
-    if(elementNo < rhs.elementNo){
-      return false;
-    }
-    if(elementNo > rhs.elementNo){
-      return true;
-    }
-    return true;
-  }
-
-  inline bool operator<=(const Hashnode &rhs){
-    if(numnodes < rhs.numnodes){
-      return true;
-    };
-    if(numnodes > rhs.numnodes){
-      return false;
-    }
-
-    for(int i=0;i<numnodes;i++){
-      if(nodes[i] < rhs.nodes[i]){
-	return true;
-      }
-      if(nodes[i] > rhs.nodes[i]){
-	return false;
-      }
-    }
-    if(chunk < rhs.chunk){
-      return true;
-    }
-    if(chunk > rhs.chunk){
-      return false;
-    }
-    if(elementNo < rhs.elementNo){
-      return true;
-    }
-    if(elementNo > rhs.elementNo){
-      return false;
-    }
-    return true;
-  }
-
-  inline bool equals(tupledata &tuple){
-    for(int i=0;i<numnodes;i++){
-      if(tuple.nodes[i] != nodes[i]){
-	return false;
-      }
-    }
-    return true;
-  }
-  virtual void pup(PUP::er &p){
-    p | numnodes;
-    p | nodes;
-    p | chunk;
-    p | elementNo;
-  }
-};
-
 typedef MSA::MSA2D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJOR> MSA2DRM;
 
 typedef MSA::MSA1D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINT;
@@ -2482,6 +2178,7 @@ typedef MSA::MSA1D<NodeList, DefaultListEntry<NodeList,true>,MSA_DEFAULT_ENTRIES
 
 typedef MSA::MSA1D<MeshElem,DefaultEntry<MeshElem,true>,1> MSA1DFEMMESH;
 
+#include "ParFUM.decl.h"
 
 
 struct conndata{

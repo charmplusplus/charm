@@ -1,0 +1,8 @@
+module m {
+    chare c {
+        entry [exclusive] c();
+    }
+    nodegroup ng {
+        entry [exclusive] ng();
+    }
+}

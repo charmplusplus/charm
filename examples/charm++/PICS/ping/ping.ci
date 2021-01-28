@@ -1,0 +1,43 @@
+mainmodule ping {
+  readonly CProxy_Main mainProxy;
+  readonly int payload;
+  readonly int workLoad;
+
+  mainchare Main{
+    entry Main(CkArgMsg *);
+    entry void prepare();
+    entry  void report(double d);
+    entry void run() {
+      for(iter = 0; iter<maxIter; iter++)
+      {
+        serial{
+          startTimer = CkWallTimer();
+          PICS_startStep(true);
+          PICS_startPhase(true, 0);
+          arr1[0].start();
+        }
+        when report(double sum) serial {
+          PICS_endPhase(true);
+          CkPrintf("End Phase\n");
+          PICS_endStepResumeCb(true, CkCallbackResumeThread());
+          CkPrintf("End Step and Resume CB\n");
+        }
+      }
+
+	
+      serial {
+        CkPrintf("------------------in exiting \n");
+        CkExit();
+      }
+    };
+  };
+
+  message PingMsg{char x[];};
+
+  array [1D] Ping1 {
+    entry Ping1();
+    entry void start();
+    entry void recv(PingMsg *);
+  };
+
+};

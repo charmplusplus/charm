@@ -1,37 +1,30 @@
-#include <stdlib.h>
 #include <stdio.h>
-#include "wr.h"
-
-extern workRequestQueue* wrQueue;
+#include "hapi.h"
 
 __global__ void helloKernel() {
 
 }
 
-extern "C"
-void *kernelSetup() {
-  workRequest *wr = new workRequest;
-  wr = (workRequest*) malloc(sizeof(workRequest));
+#if USE_WR
+void run_hello(hapiWorkRequest* wr, cudaStream_t kernel_stream, void** devBuffers) {
+  printf("Calling kernel...\n");
+  helloKernel<<<wr->grid_dim, wr->block_dim, wr->shared_mem, kernel_stream>>>();
+}
 
-  wr->dimGrid.x = 1;
-  wr->dimBlock.x = 1;
-  wr->smemSize = 0;
-  wr->id = 0;
-  wr->nBuffers = 0;
-  wr->bufferInfo = NULL;
+hapiWorkRequest* setupWorkRequest(cudaStream_t stream) {
+  hapiWorkRequest* wr = hapiCreateWorkRequest();
+  wr->setExecParams(dim3(1), dim3(1));
+  wr->setRunKernel(run_hello);
+  wr->setStream(stream);
 
   return wr;
 }
+#else
+void invokeKernel(cudaStream_t stream) {
+  dim3 grid_dim(1, 1);
+  dim3 block_dim(16, 16);
 
-void kernelSelect(workRequest *wr) {
-  printf("inside kernelSelect\n");
-  switch (wr->id) {
-  case 0:
-    printf("calling kernel\n");
-    helloKernel<<<wr->dimGrid,wr->dimBlock,wr->smemSize>>>();
-    break;
-  default:
-    printf("error: id %d not valid\n", wr->id);
-    break;
-  }
+  printf("Calling kernel...\n");
+  helloKernel<<<grid_dim, block_dim, 0, stream>>>();
 }
+#endif

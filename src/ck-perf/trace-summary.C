@@ -169,7 +169,6 @@ void _createTracesummary(char **argv)
 
 
 /// function call for starting a phase in trace summary logs 
-extern "C" 
 void CkSummary_StartPhase(int phase)
 {
    CkpvAccess(_trace)->startPhase(phase);
@@ -177,7 +176,6 @@ void CkSummary_StartPhase(int phase)
 
 
 /// function call for adding an event mark
-extern "C" 
 void CkSummary_MarkEvent(int eventType)
 {
    CkpvAccess(_trace)->addEventType(eventType);
@@ -611,8 +609,8 @@ void BinEntry::write(FILE* fp)
   writeU(fp, getU());
 }
 
-TraceSummary::TraceSummary(char **argv):binStart(0.0),idleStart(0.0),
-					binTime(0.0),binIdle(0.0),msgNum(0)
+TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
+					binTime(0.0),binIdle(0.0)
 {
   if (CkpvAccess(traceOnPe) == 0) return;
 
@@ -679,7 +677,7 @@ void TraceSummary::beginExecute(CmiObjId *tid)
   beginExecute(-1,-1,_threadEP,-1);
 }
 
-void TraceSummary::beginExecute(envelope *e)
+void TraceSummary::beginExecute(envelope *e, void *obj)
 {
   // no message means thread execution
   if (e==NULL) {
@@ -703,7 +701,7 @@ void TraceSummary::beginExecute(char *msg)
 #endif
 }
 
-void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx)
+void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx, void *obj)
 {
   if (execEp == TRACEON_EP) {
     endExecute();
@@ -975,14 +973,13 @@ void TraceSummaryBOC::traceSummaryParallelShutdown(int pe) {
     UInt    numBins = CkpvAccess(_trace)->pool()->getNumEntries();  
     //CkPrintf("trace shut down pe=%d bincount=%d\n", CkMyPe(), numBins);
     CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
-    CkCallback cb(CkIndex_TraceSummaryBOC::maxBinSize(NULL), sumProxy[0]);
+    CkCallback cb(CkReductionTarget(TraceSummaryBOC, maxBinSize), sumProxy[0]);
     contribute(sizeof(double), &(CkpvAccess(binSize)), CkReduction::max_double, cb);
 }
 
 // collect the max bin size
-void TraceSummaryBOC::maxBinSize(CkReductionMsg *msg)
+void TraceSummaryBOC::maxBinSize(double _maxBinSize)
 {
-    double _maxBinSize = *((double *)msg->getData());
     CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
     sumProxy.shrink(_maxBinSize);
 }
@@ -997,19 +994,18 @@ void TraceSummaryBOC::shrink(double _mBin){
     }
     double *sumData = CkpvAccess(_trace)->pool()->getCpuTime();  
     CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
-    CkCallback cb(CkIndex_TraceSummaryBOC::sumData(NULL), sumProxy[0]);
+    CkCallback cb(CkReductionTarget(TraceSummaryBOC, sumData), sumProxy[0]);
     contribute(sizeof(double) * numBins * epNums, CkpvAccess(_trace)->pool()->getCpuTime(), CkReduction::sum_double, cb);
 }
 
-void TraceSummaryBOC::sumData(CkReductionMsg *msg) {
-    double *sumData = (double *)msg->getData();
-    int     totalsize = msg->getSize()/sizeof(double);
+void TraceSummaryBOC::sumData(double *sumData, int totalsize) {
     UInt    epNums  = CkpvAccess(_trace)->pool()->getEpInfoSize();
     UInt    numBins = totalsize/epNums;  
     int     numEntries = epNums - NUM_DUMMY_EPS - 1; 
     char    *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sumall")+1];
     sprintf(fname, "%s.sumall", CkpvAccess(traceRoot));
     FILE *sumfp = fopen(fname, "w+");
+    delete [] fname;
     fprintf(sumfp, "ver:%3.1f cpu:%d numIntervals:%d numEPs:%d intervalSize:%e\n",
                 CkpvAccess(version), CkNumPes(),
                 numBins, numEntries, _maxBinSize);
@@ -1021,7 +1017,7 @@ void TraceSummaryBOC::sumData(CkReductionMsg *msg) {
     }
    fclose(sumfp);
    //CkPrintf("done with analysis\n");
-   CkExit();
+   CkContinueExit();
 }
 
 /// for TraceSummaryBOC
@@ -1171,24 +1167,22 @@ void TraceSummaryBOC::collectSummaryData(double startTime, double binSize,
   */
 
   CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
-  CkCallback cb(CkIndex_TraceSummaryBOC::summaryDataCollected(NULL), sumProxy[0]);
-  contribute(sizeof(double)*numBins, contribution, CkReduction::sum_double, 
+  CkCallback cb(CkReductionTarget(TraceSummaryBOC, summaryDataCollected), sumProxy[0]);
+  contribute(sizeof(double)*numBins, contribution, CkReduction::sum_double,
 	     cb);
+  delete [] contribution;
 }
 
-void TraceSummaryBOC::summaryDataCollected(CkReductionMsg *msg) {
+void TraceSummaryBOC::summaryDataCollected(double *recvData, int numBins) {
   CkAssert(CkMyPe() == 0);
   // **CWL** No memory management for the ccs buffer for now.
 
   // CkPrintf("[%d] Reduction completed and received\n", CkMyPe());
-  double *recvData = (double *)msg->getData();
-  int numBins = msg->getSize()/sizeof(double);
 
   // if there's an easier way to append a data block to a CkVec, I'll take it
   for (int i=0; i<numBins; i++) {
     ccsBufferedData->insertAtEnd(recvData[i]);
   }
-  delete msg;
 }
 
 
@@ -1220,30 +1214,27 @@ void TraceSummaryBOC::askSummary(int size)
     for (int i=0; i<n; i++) reductionBuffer[i] = localBins[i];
   }
 
+  CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+  CkCallback cb(CkReductionTarget(TraceSummaryBOC, sendSummaryBOC), 0, sumProxy);
   contribute(sizeof(BinEntry)*(size+1), reductionBuffer, 
-	     CkReduction::sum_double);
+	     CkReduction::sum_double, cb);
   delete [] reductionBuffer;
 }
 
-//extern "C" void _CkExit();
-
-void TraceSummaryBOC::sendSummaryBOC(CkReductionMsg *msg)
+void TraceSummaryBOC::sendSummaryBOC(double *results, int n)
 {
   if (CkpvAccess(_trace) == NULL) return;
 
   CkAssert(CkMyPe() == 0);
 
-  int n = msg->getSize()/sizeof(BinEntry);
   nBins = n-1;
-  bins = (BinEntry *)msg->getData();
+  bins = (BinEntry *)results;
   nTracedPEs = (int)bins[n-1].time();
   // CmiPrintf("traced: %d entry:%d\n", nTracedPEs, nBins);
 
   write();
 
-  delete msg;
-
-  CkExit();
+  CkContinueExit();
 }
 
 void TraceSummaryBOC::write(void) 
@@ -1291,10 +1282,16 @@ void TraceSummaryBOC::write(void)
 
 }
 
-extern "C" void CombineSummary()
+static void CombineSummary()
 {
 #if CMK_TRACE_ENABLED
   CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
+
+  if ((sumonly || sumDetail) && traceSummaryGID.isZero()) {
+    CkContinueExit();
+    return;
+  }
+
   if (sumonly) {
     CmiPrintf("[%d] Sum Only start!\n", CkMyPe());
       // pe 0 start the sumonly process
@@ -1306,51 +1303,20 @@ extern "C" void CombineSummary()
       sumProxy.traceSummaryParallelShutdown(-1);
   }
   else {
-    _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL);
-    CkExit();
+    CkContinueExit();
   }
 #else
-  CkExit();
+  CkContinueExit();
 #endif
 }
 
 void initTraceSummaryBOC()
 {
-#ifdef __BIGSIM__
-  if(BgNodeRank()==0) {
-#else
   if (CkMyRank() == 0) {
-#endif
     registerExitFn(CombineSummary);
   }
 }
 
-
-
-
-
-
 #include "TraceSummary.def.h"
 
-
 /*@}*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

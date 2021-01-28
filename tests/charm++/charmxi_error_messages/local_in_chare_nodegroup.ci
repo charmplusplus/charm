@@ -1,0 +1,8 @@
+mainmodule m {
+    chare c {
+        entry [local] void foo();
+    }
+    nodegroup g {
+        entry [local] void foo();
+    }
+}

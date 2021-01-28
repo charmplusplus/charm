@@ -8,6 +8,7 @@ CProxy_HelloGroup helloGroupProxy;
 CProxy_HelloNodeGroup helloNodeGroupProxy;
 int nElements;
 int chkpPENum;
+int chkpNodeNum;
 
 class Main : public CBase_Main {
   int step;
@@ -21,9 +22,12 @@ public:
     delete m;
     
     chkpPENum = CkNumPes();
+    chkpNodeNum = CkNumNodes();
     CkPrintf("Running Hello on %d processors for %d elements\n",CkNumPes(),nElements);
     mainProxy = thisProxy;
-    helloProxy = CProxy_Hello::ckNew(nElements);
+    CkArrayOptions helloOpts(nElements);
+    helloOpts.setBounds(10000);
+    helloProxy = CProxy_Hello::ckNew(helloOpts);
     helloProxy.SayHi();
 
     chelloProxy = CProxy_CHello::ckNew(0);
@@ -70,7 +74,6 @@ public:
   }
 
   void pup(PUP::er &p){
-    CBase_Main::pup(p);
     p|step;
     p|a; p(b,2);
     CkPrintf("Main's PUPer. a=%d(%p), b[0]=%d(%p), b[1]=%d\n",a,&a,b[0],b,b[1]);
@@ -95,7 +98,6 @@ public:
   }
   
   void pup(PUP::er &p){
-    CBase_Hello::pup(p);
     p|step;
   }
 };
@@ -113,7 +115,6 @@ public:
   }
 
   void pup(PUP::er &p){
-    CBase_CHello::pup(p);
     p|step;
     printf("CHello's PUPer. step=%d.\n", step);
   }
@@ -155,8 +156,8 @@ public:
     p|data;
     if(p.isUnpacking())
     {
-      CkPrintf("[%d] data on NOdeGroup %d\n", CkMyNode(), data);
-      if(chkpPENum == CkNumPes())
+      CkPrintf("[%d] data on NodeGroup %d\n", CkMyNode(), data);
+      if(chkpNodeNum == CkNumNodes())
       {
         if(data!=CkMyNode())
         {

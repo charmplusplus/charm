@@ -1,0 +1,9 @@
+mainmodule m {
+    mainchare mc {
+        entry mc(CkArgMsg*);
+        entry void foo(CkArgMsg*);
+    }
+    chare c {
+        entry c(CkArgMsg*);
+    }
+}

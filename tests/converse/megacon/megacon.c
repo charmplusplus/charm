@@ -1,4 +1,4 @@
- /**************************************************************************
+/**************************************************************************
  * DESCRIPTION:
  *
  * To add a test to megacon, you have to:
@@ -39,6 +39,7 @@ void deadlock_init(void);
 void multisend_init(void);
 void handler_init(void);
 void reduction_init(void);
+void nodereduction_init(void);
 
 void blkinhand_moduleinit(void);
 void posixth_moduleinit(void);
@@ -59,10 +60,11 @@ void deadlock_moduleinit(void);
 void multisend_moduleinit(void);
 void handler_moduleinit(void);
 void reduction_moduleinit(void);
+void nodereduction_moduleinit(void);
 
 struct testinfo
 {
-  char *name;
+  const char *name;
   void (*initiator)(void);
   void (*initializer)(void);
   int  reentrant;
@@ -90,6 +92,7 @@ tests[] = {
   { "handler",  handler_init,  handler_moduleinit,   1,  1 },
   { "multisend", multisend_init, multisend_moduleinit,  0,  1 },
   { "reduction", reduction_init, reduction_moduleinit, 0, 1 },
+  { "nodereduction", nodereduction_init, nodereduction_moduleinit, 0, 1 },
   { 0,0,0,0 },
 };
 
@@ -127,7 +130,7 @@ CpmInvokable megacon_shutdown(int n)
   }
 }
 
-int megacon_skip(char *test)
+int megacon_skip(const char *test)
 {
   int i;
   int num_skip = CpvAccess(num_tests_to_skip);
@@ -135,10 +138,10 @@ int megacon_skip(char *test)
   skip = CpvAccess(tests_to_skip);
   for (i=0; i<num_skip; i++) {
     if ((skip[i][0]=='-')&&(strcmp(skip[i]+1, test)==0))
-      {
-	/*	CmiPrintf("skipping test %s\n",skip[i]);*/
-	return 1 - CpvAccess(test_negate_skip);
-      }
+    {
+      // CmiPrintf("skipping test %s\n",skip[i]);
+      return 1 - CpvAccess(test_negate_skip);
+    }
   }
   return CpvAccess(test_negate_skip);
 }
@@ -154,7 +157,7 @@ nextidx:
   if (idx < bank) {
     numacks = tests[idx].numacks;
     if (megacon_skip(tests[idx].name)) {
-      /*      CmiPrintf("skipping test %s\n",tests[idx].name);*/
+      // CmiPrintf("skipping test %s\n",tests[idx].name);
       CpvAccess(next_test_index)++;
       goto nextidx;
     }
@@ -163,13 +166,13 @@ nextidx:
     CpvAccess(test_start_time) = CmiWallTimer();
     CmiPrintf("test %d: initiated [%s]\n", num, tests[idx].name);
     (tests[idx].initiator)();
-    return; 
+    return;
   }
   if (idx < (2*bank)) {
     pos = idx - bank;
     numacks = tests[pos].numacks;
     if ((tests[pos].reentrant == 0)||(megacon_skip(tests[pos].name))||
-	CpvAccess(test_negate_skip)) {
+        CpvAccess(test_negate_skip)) {
       CpvAccess(next_test_index)++;
       goto nextidx;
     }
@@ -188,8 +191,8 @@ nextidx:
     for (i=0; i<bank; i++) {
       numacks = tests[i].numacks;
       if (!megacon_skip(tests[i].name)) {
-	CpvAccess(acks_expected) += (numacks ? numacks : CmiNumPes());
-	(tests[i].initiator)();
+        CpvAccess(acks_expected) += (numacks ? numacks : CmiNumPes());
+        (tests[i].initiator)();
       }
     }
     return;
@@ -208,8 +211,8 @@ CpmInvokable megacon_ack()
   CpvAccess(acks_received)++;
   if (CpvAccess(acks_received) == CpvAccess(acks_expected)) {
     CmiPrintf("test %d: completed (%1.2f sec)\n",
-	      CpvAccess(next_test_number),
-	      CmiWallTimer() - CpvAccess(test_start_time));
+        CpvAccess(next_test_number),
+        CmiWallTimer() - CpvAccess(test_start_time));
     CpvAccess(next_test_number)++;
     CpvAccess(next_test_index)++;
     megacon_next();
@@ -218,6 +221,10 @@ CpmInvokable megacon_ack()
 
 void megacon_init(int argc, char **argv)
 {
+  void CpmModuleInit(void);
+  void CfutureModuleInit(void);
+  void CpthreadModuleInit(void);
+
   int numtests, i;
   CpmModuleInit();
   CfutureModuleInit();
@@ -234,6 +241,19 @@ void megacon_init(int argc, char **argv)
   CpvInitialize(int, next_test_number);
   CpvInitialize(int, acks_expected);
   CpvInitialize(int, acks_received);
+
+  // Set runtime cpuaffinity
+  CmiInitCPUAffinity(argv);
+
+  // Initialize CPU topology
+  CmiInitCPUTopology(argv);
+
+  // Wait for all PEs of the node to complete topology init
+  CmiNodeAllBarrier();
+
+  // Update the argc after runtime parameters are extracted out
+  argc = CmiGetArgc(argv);
+
   for (numtests=0; tests[numtests].name; numtests++);
   CpvAccess(test_bank_size) = numtests;
   CpvAccess(next_test_index) = 0;
@@ -243,10 +263,13 @@ void megacon_init(int argc, char **argv)
     if (strcmp(argv[i],"-only")==0)
       CpvAccess(test_negate_skip)=1;
   CpvAccess(num_tests_to_skip) = argc;
-  /*    if(CpvAccess(test_negate_skip)) {
+
+#if 0
+  if(CpvAccess(test_negate_skip)) {
     CpvAccess(num_tests_to_skip)--;
   }
-  */
+#endif
+
   CpvAccess(tests_to_skip) = argv;
   if (CmiMyPe()==0)
     megacon_next();

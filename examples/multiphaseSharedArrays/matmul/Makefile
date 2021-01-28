@@ -1,3 +1,4 @@
+-include ../../common.mk
 
 HEADERS=nepp.h params.h 
 PGM=t2d
@@ -12,12 +13,12 @@ include ../Makefile_common
 all: opt
 
 tt: opt
-	time ./charmrun ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 1 1
-	time ./charmrun ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 4 1
+	$(call run, ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 1 1)
+	$(call run, ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 4 1)
 
 t: opt
 	w
-	time ./charmrun ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 4 1
+	$(call run, ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 4 1)
 
 lem: opt
 	prun -n1 ./t2d 1 200000000 2000 5000 300 4 1
@@ -30,54 +31,54 @@ lem: opt
 
 tung: opt
 	$(HOME)/gennodelist.csh
-	./charmrun +p1 t2d 1 200000000 2000 5000 300 4 1
-	./charmrun +p2 t2d 2 200000000 2000 5000 300 4 1
-	./charmrun +p1 t2d 4 200000000 2000 5000 300 4 1
-	./charmrun +p2 t2d 8 200000000 2000 5000 300 4 1
+	$(call run, +p1 t2d 1 200000000 2000 5000 300 4 1)
+	$(call run, +p2 t2d 2 200000000 2000 5000 300 4 1)
+	$(call run, +p1 t2d 4 200000000 2000 5000 300 4 1)
+	$(call run, +p2 t2d 8 200000000 2000 5000 300 4 1)
 
 tung832:
-	./charmrun +p8 t2d 32 200000000 2000 5000 300 4 1
+	$(call run, +p8 t2d 32 200000000 2000 5000 300 4 1)
 
 tung816:
-	./charmrun +p8 t2d 16 200000000 2000 5000 300 4 1
+	$(call run, +p8 t2d 16 200000000 2000 5000 300 4 1)
 
 t1:
 	#make OPTS="-DOLD" c opt
 	w
-	time ./charmrun ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 1 1
+	$(call run, ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 1 1)
 
 # quick test on 1 cpu
 test: opt
-	./charmrun +p1 $(PGM) 2 1048576 100 500 100 1
-	./charmrun +p1 $(PGM) 4 1048576 100 500 100 2
-	./charmrun +p1 $(PGM) 8 1048576 100 500 100 3
-	./charmrun +p1 $(PGM) 2 1048576 100 500 100 4
-	./charmrun +p1 $(PGM) 4 1048576 100 500 100 5
-	./charmrun +p1 $(PGM) 8 1048576 100 500 100 6
+	$(call run, +p1 $(PGM) 2 1048576 100 500 100 1)
+	$(call run, +p1 $(PGM) 4 1048576 100 500 100 2)
+	$(call run, +p1 $(PGM) 8 1048576 100 500 100 3)
+	$(call run, +p1 $(PGM) 2 1048576 100 500 100 4)
+	$(call run, +p1 $(PGM) 4 1048576 100 500 100 5)
+	$(call run, +p1 $(PGM) 8 1048576 100 500 100 6)
 
 # quick test on 2 cpus
 test2: opt
-	./charmrun +p2 $(PGM) 2 1048576 100 500 100 1
-	./charmrun +p2 $(PGM) 4 1048576 100 500 100 2
-	./charmrun +p2 $(PGM) 8 1048576 100 500 100 3
-	./charmrun +p2 $(PGM) 4 1048576 100 500 100 4
-	./charmrun +p2 $(PGM) 16 1048576 100 500 100 5
-	./charmrun +p2 $(PGM) 64 1048576 100 500 100 6
+	$(call run, +p2 $(PGM) 2 1048576 100 500 100 1)
+	$(call run, +p2 $(PGM) 4 1048576 100 500 100 2)
+	$(call run, +p2 $(PGM) 8 1048576 100 500 100 3)
+	$(call run, +p2 $(PGM) 4 1048576 100 500 100 4)
+	$(call run, +p2 $(PGM) 16 1048576 100 500 100 5)
+	$(call run, +p2 $(PGM) 64 1048576 100 500 100 6)
 
 #bigtest
 bt: opt
-	time ./charmrun +p1 $(PGM) 1 200000000 2000 5000 300
-#	time ./charmrun +p1 t2d 1 200000000 2000 5000 300 1 1
-#opteron	time ./charmrun ++local +p1 t2d 1 200000000 2000 5000 300 4 1
+	$(call run, +p1 $(PGM) 1 200000000 2000 5000 300)
+#	 ./charmrun +p1 t2d 1 200000000 2000 5000 300 1 1
+#opteron	 ./charmrun ++local +p1 t2d 1 200000000 2000 5000 300 4 1
 
 bt2d: opt
-	time ./charmrun +p1 $(PGM) 1 200000000 2000 5000 300 2
+	$(call run, +p1 $(PGM) 1 200000000 2000 5000 300 2)
 
 bt3d: opt
-	time ./charmrun +p1 $(PGM) 1 200000000 2000 5000 300 3
+	$(call run, +p1 $(PGM) 1 200000000 2000 5000 300 3)
 
 bt4:
-	time ./charmrun +p1 $(PGM) 1 200000000 2000 5000 300 4 1
+	$(call run, +p1 $(PGM) 1 200000000 2000 5000 300 4 1)
 
 seq:
 	g++ -o mm_sequential -O3 mm_sequential.C
@@ -99,11 +100,11 @@ smallseqs:
 	g++ -UBIGGER_ALGO -DGLOBAL_VAR_VERSION -USKIP_INIT -o mmgi_s -O3 mm_sequential.C
 
 runseqs:
-	time ./mmgs
-	time ./mmgi
-	time ./mmms
-	time ./mmmi
+	 ./mmgs
+	 ./mmgi
+	 ./mmms
+	 ./mmmi
 
 runsmallseqs:
-	time ./mmgs_s
-	time ./mmgi_s
+	 ./mmgs_s
+	 ./mmgi_s

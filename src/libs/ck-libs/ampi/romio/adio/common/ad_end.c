@@ -1,7 +1,5 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
- *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
  */
@@ -12,10 +10,13 @@
 void ADIO_End(int *error_code)
 {
     ADIOI_Flatlist_node *curr, *next;
-    ADIOI_Malloc_async *tmp;
-    ADIOI_Malloc_req *tmp1;
+    ADIOI_Datarep *datarep, *datarep_next;
     
 /*    FPRINTF(stderr, "reached end\n"); */
+
+    /* if a default errhandler was set on MPI_FILE_NULL then we need to ensure
+     * that our reference to that errhandler is released */
+    MPI_File_set_errhandler(MPI_FILE_NULL, MPI_ERRORS_RETURN);
 
 /* delete the flattened datatype list */
     curr = ADIOI_Flatlist;
@@ -28,36 +29,26 @@ void ADIO_End(int *error_code)
     }
     ADIOI_Flatlist = NULL;
 
-    if (ADIOI_Async_list_head) {
-	FPRINTF(stderr, "ADIO_End: Error! There are outstanding nonblocking I/O operations!\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-
-/* free list of available ADIOI_Async_nodes. */
-    while (ADIOI_Malloc_async_head) {
-	ADIOI_Free(ADIOI_Malloc_async_head->ptr);
-	tmp = ADIOI_Malloc_async_head;
-	ADIOI_Malloc_async_head = ADIOI_Malloc_async_head->next;
-	ADIOI_Free(tmp);
-    }
-    ADIOI_Async_avail_head = ADIOI_Async_avail_tail = NULL;
-    ADIOI_Malloc_async_head = ADIOI_Malloc_async_tail = NULL;
-
-/* free all available request objects */
-    while (ADIOI_Malloc_req_head) {
-	ADIOI_Free(ADIOI_Malloc_req_head->ptr);
-	tmp1 = ADIOI_Malloc_req_head;
-	ADIOI_Malloc_req_head = ADIOI_Malloc_req_head->next;
-	ADIOI_Free(tmp1);
-    }
-    ADIOI_Malloc_req_head = ADIOI_Malloc_req_tail = NULL;
-
-/* free file, request, and info tables used for Fortran interface */
+/* free file and info tables used for Fortran interface */
     if (ADIOI_Ftable) ADIOI_Free(ADIOI_Ftable);
-    if (ADIOI_Reqtable) ADIOI_Free(ADIOI_Reqtable);
 #ifndef HAVE_MPI_INFO
     if (MPIR_Infotable) ADIOI_Free(MPIR_Infotable);
 #endif
+
+
+/* free the memory allocated for a new data representation, if any */
+    datarep = ADIOI_Datarep_head;
+    while (datarep) {
+        datarep_next = datarep->next;
+        ADIOI_Free(datarep->name);
+        ADIOI_Free(datarep);
+        datarep = datarep_next;
+    }
+
+    if( ADIOI_syshints != MPI_INFO_NULL)
+	    MPI_Info_free(&ADIOI_syshints);
+
+    MPI_Op_free(&ADIO_same_amode);
 
     *error_code = MPI_SUCCESS;
 }
@@ -65,12 +56,24 @@ void ADIO_End(int *error_code)
 
 
 /* This is the delete callback function associated with
-   ADIO_Init_keyval when MPI_COMM_WORLD is freed */
+   ADIO_Init_keyval when MPI_COMM_SELF is freed */
 
 int ADIOI_End_call(MPI_Comm comm, int keyval, void *attribute_val, void
 		  *extra_state)
 {
     int error_code;
+
+    ADIOI_UNREFERENCED_ARG(comm);
+    ADIOI_UNREFERENCED_ARG(attribute_val);
+    ADIOI_UNREFERENCED_ARG(extra_state);
+
+    MPI_Keyval_free(&keyval);
+
+    /* The end call will be called after all possible uses of this keyval, even
+     * if a file was opened with MPI_COMM_SELF.  Note, this assumes LIFO
+     * MPI_COMM_SELF attribute destruction behavior mandated by MPI-2.2. */
+    if (ADIOI_cb_config_list_keyval != MPI_KEYVAL_INVALID)
+        MPI_Keyval_free(&ADIOI_cb_config_list_keyval);
 
     ADIO_End(&error_code);
     return error_code;

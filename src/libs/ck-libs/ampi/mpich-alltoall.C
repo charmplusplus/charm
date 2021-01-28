@@ -1,15 +1,13 @@
-/* 
+/*
 
-The following code is adapted from alltoall.c in mpich2-1.0.3 
+The following code is adapted from alltoall.c in mpich2-1.0.3
 
-Licensing details should be addresssed, since this is copyrighted. 
+Please see the romio/COPYRIGHT file for licensing information.
 
 */
 
 #include "ampiimpl.h"
 #include "tcharm.h"
-#include "ampiEvents.h" /*** for trace generation for projector *****/
-#include "ampiProjections.h"
 
 
 /* This is the default implementation of alltoall. The algorithm is:
@@ -87,8 +85,8 @@ void MPICH_Localcopy(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   int rank;
  
-  AMPI_Comm_rank (MPI_COMM_WORLD, &rank);
-  AMPI_Sendrecv ( sendbuf, sendcount, sendtype,
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  getAmpiInstance(MPI_COMM_WORLD)->sendrecv ( sendbuf, sendcount, sendtype,
 				  rank, MPI_ATA_TAG, 
 				  recvbuf, recvcount, recvtype,
 				  rank, MPI_ATA_TAG,
@@ -101,7 +99,7 @@ inline void MPID_Datatype_get_extent_macro(MPI_Datatype &type, MPI_Aint &extent)
   extent = ddt->getExtent();
 }
 
-inline void MPID_Datatype_get_size_macro(MPI_Datatype &type, MPI_Aint &size){
+inline void MPID_Datatype_get_size_macro(MPI_Datatype &type, int &size){
   CkDDT_DataType *ddt = getAmpiInstance(MPI_COMM_WORLD)->getDDT()->getType(type);
   size = ddt->getSize();
 }
@@ -116,7 +114,7 @@ inline void MPID_Datatype_get_size_macro(MPI_Datatype &type, MPI_Aint &size){
    exchange using exclusive-or to create pairs. Else send to
    rank+i, receive from rank-i. */
 
-int MPICH_AlltoAll_long( 
+int AMPI_Alltoall_long(
 						void *sendbuf, 
 						int sendcount, 
 						MPI_Datatype sendtype, 
@@ -125,11 +123,12 @@ int MPICH_AlltoAll_long(
 						MPI_Datatype recvtype, 
 						MPI_Comm comm )
 {
+  AMPI_API("AMPI_Alltoall_long", sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
 
   int          comm_size, i, pof2;
   MPI_Aint     sendtype_extent, recvtype_extent;
  
-  int mpi_errno=MPI_SUCCESS, src, dst, rank, nbytes;
+  int src, dst, rank, nbytes;
   MPI_Status status;
   int sendtype_size;
 
@@ -176,7 +175,7 @@ int MPICH_AlltoAll_long(
 	  dst = (rank + i) % comm_size;
 	}
 
-	mpi_errno = AMPI_Sendrecv(((char *)sendbuf +
+	getAmpiInstance(comm)->sendrecv(((char *)sendbuf +
 							   dst*sendcount*sendtype_extent), 
 							  sendcount, sendtype, dst,
 							  MPI_ATA_TAG, 
@@ -186,7 +185,7 @@ int MPICH_AlltoAll_long(
 							  MPI_ATA_TAG, comm, &status);
   }
 
-  return (mpi_errno);
+  return MPI_SUCCESS;
 }
 
 
@@ -195,7 +194,7 @@ int MPICH_AlltoAll_long(
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if 0
-int MPICH_AlltoAll_short( 
+int AMPI_Alltoall_short(
 						 void *sendbuf, 
 						 int sendcount, 
 						 MPI_Datatype sendtype, 
@@ -204,6 +203,7 @@ int MPICH_AlltoAll_short(
 						 MPI_Datatype recvtype, 
 						 MPI_Comm comm )
 {
+  AMPI_API("AMPI_Alltoall_short", sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
 
   int          comm_size, i, pof2;
   MPI_Aint     sendtype_extent, recvtype_extent;
@@ -291,7 +291,7 @@ int MPICH_AlltoAll_short(
 	mpi_errno = MPI_Pack(recvbuf, 1, newtype, tmp_buf, pack_size, 
 						  &position, comm);
 
-	mpi_errno = AMPI_Sendrecv(tmp_buf, position, MPI_PACKED, dst,
+	getAmpiInstance(comm)->sendrecv(tmp_buf, position, MPI_PACKED, dst,
 							  MPI_ATA_TAG, recvbuf, 1, newtype,
 							  src, MPI_ATA_TAG, comm,
 							  MPI_STATUS_IGNORE);
@@ -356,7 +356,7 @@ int MPICH_AlltoAll_short(
 // MEDIUM MESSAGES
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int MPICH_AlltoAll_medium( 
+int AMPI_Alltoall_medium(
 						  void *sendbuf, 
 						  int sendcount, 
 						  MPI_Datatype sendtype, 
@@ -365,12 +365,12 @@ int MPICH_AlltoAll_medium(
 						  MPI_Datatype recvtype, 
 						  MPI_Comm comm )
 {
+  AMPI_API("AMPI_Alltoall_medium", sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
 
-  int          comm_size, i, pof2;
+  int          comm_size, i;
   MPI_Aint     sendtype_extent, recvtype_extent;
  
-  int mpi_errno=MPI_SUCCESS, src, dst, rank, nbytes;
-  MPI_Status status;
+  int mpi_errno=MPI_SUCCESS, dst, rank, nbytes;
   int sendtype_size;
 
   MPI_Request *reqarray;
@@ -402,37 +402,25 @@ int MPICH_AlltoAll_medium(
   }
         
   /* do the communication -- post all sends and receives: */
+  ampi *ptr = getAmpiInstance(comm);
   for ( i=0; i<comm_size; i++ ) { 
 	dst = (rank+i) % comm_size;
-	mpi_errno = AMPI_Irecv((char *)recvbuf +
-						   dst*recvcount*recvtype_extent, 
-						   recvcount, recvtype, dst,
-						   MPI_ATA_TAG, comm,
-						   &reqarray[i]);
-	
-	if (mpi_errno) {
-          free(reqarray);
-          free(starray);
-	  return MPI_ERR_OTHER;
-        }
+    ptr->irecv((char *)recvbuf + dst*recvcount*recvtype_extent, recvcount, recvtype, dst,
+               MPI_ATA_TAG, comm, &reqarray[i]);
   }
 
   for ( i=0; i<comm_size; i++ ) { 
 	dst = (rank+i) % comm_size;
-	mpi_errno = AMPI_Isend((char *)sendbuf +
-						   dst*sendcount*sendtype_extent, 
-						   sendcount, sendtype, dst,
-						   MPI_ATA_TAG, comm,
-						   &reqarray[i+comm_size]);
-	if (mpi_errno) {
-          free(reqarray);
-          free(starray);
-	  return mpi_errno;
-        }
+	/*mpi_errno = MPI_Isend((char *)sendbuf + dst*sendcount*sendtype_extent,
+	    sendcount, sendtype, dst, MPI_ATA_TAG, comm, &reqarray[i+comm_size]);*/
+	ptr->send(MPI_ATA_TAG, getAmpiInstance(comm)->getRank(),
+              (char *)sendbuf + dst*sendcount*sendtype_extent,
+		      sendcount, sendtype, dst, comm);
+	reqarray[i+comm_size] = MPI_REQUEST_NULL;
   }
-  
+
   /* ... then wait for *all* of them to finish: */
-  mpi_errno = AMPI_Waitall(2*comm_size,reqarray,starray);
+  mpi_errno = MPI_Waitall(2*comm_size,reqarray,starray);
 
   /* --BEGIN ERROR HANDLING-- */
 //   if (mpi_errno == MPI_ERR_IN_STATUS) {

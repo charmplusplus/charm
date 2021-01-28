@@ -8,7 +8,7 @@
 
 
 #include <stdlib.h>
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 #include <direct.h>
 #define CHDIR _chdir
 #define GETCWD _getcwd
@@ -46,9 +46,6 @@
 
 #define  CREATION_MULTICAST 21
 
-#define	 BEGIN_FUNC         22
-#define	 END_FUNC           23
-
 /* Memory tracing */
 #define  MEMORY_MALLOC      24
 #define  MEMORY_FREE        25
@@ -69,6 +66,11 @@
 #define END_PHASE           30
 #define SURROGATE_BLOCK     31 /* inserted by cluster analysis only */
 
+/* Custom User Stats*/
+#define USER_STAT           32
+
+#define BEGIN_USER_EVENT_PAIR  98
+#define END_USER_EVENT_PAIR    99
 #define  USER_EVENT_PAIR    100
 
 CkpvExtern(CmiInt8, CtrLogBufSize);
@@ -80,21 +82,14 @@ CkpvExtern(bool, verbose);
 CkpvExtern(double, traceInitTime);
 CkpvExtern(double, traceInitCpuTime);
 
-#if CMK_BIGSIM_CHARM
-#define  TRACE_TIMER   BgGetTime
-#define  TRACE_CPUTIMER   BgGetTime
-inline double TraceTimer() { return TRACE_TIMER(); }
-inline double TraceTimer(double t) { return t; }
-inline double TraceCpuTimer() { return TRACE_TIMER(); }
-inline double TraceCpuTimer(double t) { return t; }
-#else
 #define  TRACE_TIMER   CmiWallTimer
 #define  TRACE_CPUTIMER   CmiCpuTimer
 inline double TraceTimer() { return TRACE_TIMER() - CkpvAccess(traceInitTime); }
 inline double TraceTimer(double t) { return t - CkpvAccess(traceInitTime); }
 inline double TraceCpuTimer() { return TRACE_CPUTIMER() - CkpvAccess(traceInitCpuTime); }
 inline double TraceCpuTimer(double t) { return t - CkpvAccess(traceInitCpuTime); }
-#endif
+
+double TraceTimerCommon(); //TraceTimer to be used in common lrts layers
 
 #define TRACE_WARN(msg) if (CkpvAccess(verbose)) CmiPrintf(msg)
 
@@ -113,8 +108,7 @@ extern int _sdagMsg, _sdagChare, _sdagEP;
 
 /** Write out the common parts of the .sts file. */
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
-
-extern "C" void (*registerMachineUserEvents())();
+void (*registerMachineUserEvents())();
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
@@ -127,8 +121,9 @@ CkpvExtern(int, papiEventSet);
 CkpvExtern(LONG_LONG_PAPI*, papiValues);
 CkpvExtern(int, papiStarted);
 CkpvExtern(int, papiStopped);
-extern int papiEvents[NUMPAPIEVENTS];
-void initPAPI(); 
+CkpvExtern(int*, papiEvents);
+CkpvExtern(int, numEvents);
+void initPAPI();
 #endif
 
 #endif

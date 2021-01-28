@@ -1,32 +1,78 @@
-DIRS=megatest alignment pingpong simplearrayhello load_balancing chkpt delegation queue sdag ckAllocSysMsgTest method_templates xcastredn demand_creation migrate
+-include ../../include/conv-mach-opt.mak
 
-all:
-	for d in $(DIRS); do \
-		(cd $$d; $(MAKE) all OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+DIRS = \
+  megatest \
+  alignment \
+  simplearrayhello \
+  provisioning \
+  load_balancing \
+  chkpt \
+  delegation \
+  queue \
+  sdag \
+  ckAllocSysMsgTest \
+  method_templates \
+  demand_creation \
+  startupTest \
+  topology \
+  io \
+  sparse \
+  reductionTesting \
+  partitions \
+  charmxi_parsing \
+  jacobi3d \
+  jacobi3d-sdag \
+  zerocopy \
+  within_node_bcast \
+  longIdle \
+  bombard \
+  varTRAM \
 
-test:
-	for d in $(DIRS); do \
-		(cd $$d; $(MAKE) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+FTDIRS = \
+  jacobi3d \
+  jacobi3d-sdag \
 
-# skip sdag, megatest and commtest
-bgtest:
-	for d in pingpong simplearrayhello load_balancing chkpt delegation; do \
-		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
 
-syncfttest causalfttest mpisyncfttest:
-	for d in jacobi3d jacobi3d-sdag; do \
-		(cd $$d; $(MAKE) $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+NONSCALEDIRS = \
+  alignment \
+  queue \
+  sdag \
+  sparse \
+  charmxi_parsing \
 
-mlogfttest:
-	for d in jacobi3d-sdag; do \
-		(cd $$d; $(MAKE) $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 
-clean:
-	for d in $(DIRS); do (cd $$d; $(MAKE) clean OPTS='$(OPTS)'); done
+all: $(foreach i,$(DIRS),build-$i)
+
+test: $(foreach i,$(TESTDIRS),test-$i)
+ifeq ($(CMK_SMP),1)
+ifneq ($(CMK_MULTICORE),1)
+	make smptest
+endif
+endif
+
+testp: $(foreach i,$(TESTPDIRS),testp-$i)
+
+smptest: $(foreach i,$(TESTDIRS),smptest-$i)
+
+syncfttest mpisyncfttest: $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
+
+clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
 	rm -f core *~
+
+$(foreach i,$(DIRS),build-$i):
+	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+
+$(foreach i,$(DIRS),test-$i):
+	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(TESTPDIRS),testp-$i):
+	$(MAKE) -C $(subst testp-,,$@) testp OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),smptest-$i):
+	$(MAKE) -C $(subst smptest-,,$@) smptest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

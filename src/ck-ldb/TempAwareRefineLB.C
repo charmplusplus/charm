@@ -18,7 +18,12 @@
 #include "ckgraph.h"
 #include <algorithm>
 
-CreateLBFunc_Def(TempAwareRefineLB, "always assign the heaviest obj onto lightest loaded processor.")
+extern int quietModeRequested;
+
+static void lbinit()
+{
+  LBRegisterBalancer<TempAwareRefineLB>("TempAwareRefineLB", "always assign the heaviest obj onto lightest loaded processor.");
+}
 
 #ifdef TEMP_LDB
 
@@ -105,7 +110,7 @@ int getProcFreqPtr(int *freqs,int numAvail,int freq)
 #endif
 FILE *migFile;
 double starting;
-TempAwareRefineLB::TempAwareRefineLB(const CkLBOptions &opt): CentralLB(opt)
+TempAwareRefineLB::TempAwareRefineLB(const CkLBOptions &opt): CBase_TempAwareRefineLB(opt)
 {
 #ifdef TEMP_LDB
 starting=CmiWallTimer();
@@ -187,8 +192,8 @@ freqs[12] = 1333000;
 	procFreqNewEffect = NULL;
 	avgChipTemp=NULL;
   lbname = "TempAwareRefineLB";
-  if (CkMyPe()==0)
-    CkPrintf("[%d] TempAwareRefineLB created\n",CkMyPe());
+  if (CkMyPe()==0 && !quietModeRequested)
+    CkPrintf("CharmLB> TempAwareRefineLB created.\n");
 
   char logFile[100];
   snprintf(logFile, sizeof(logFile), "temp_freq.log.%d", CkMyPe());
@@ -234,27 +239,6 @@ bool TempAwareRefineLB::QueryBalanceNow(int _step)
   return true;
 }
 
-class ProcLoadGreater {
-  public:
-    bool operator()(ProcInfo p1, ProcInfo p2) {
-      return (p1.getTotalLoad() > p2.getTotalLoad());
-    }
-};
-
-class ProcLoadLesser {
-  public:
-    bool operator()(ProcInfo p1, ProcInfo p2) {
-      return (p1.getTotalLoad() < p2.getTotalLoad());
-    }
-};
-
-class ObjLoadGreater {
-  public:
-    bool operator()(Vertex v1, Vertex v2) {
-      return (v1.getVertexLoad() > v2.getVertexLoad());
-    }
-};
-/*
 void TempAwareRefineLB::changeFreq(int nFreq)
 {
 #ifdef TEMP_LDB
@@ -271,7 +255,7 @@ void TempAwareRefineLB::changeFreq(int nFreq)
   }
 #endif
 }
-*/
+
 #ifdef TEMP_LDB
 int getTaskIdForMigration(ObjGraph *ogr,int pe,int start)
 {

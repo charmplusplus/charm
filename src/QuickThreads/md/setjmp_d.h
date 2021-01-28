@@ -27,7 +27,7 @@ typedef struct qt_t qt_t1;
  
 typedef void *(qt_userf_t1)(void *pu);
 typedef void (qt_only_t1)(void *pu, void *pt, qt_userf_t1 *userf);
-typedef void *(qt_helper_t1)(qt_t1 *old, void *a0, void *a1);
+typedef void *(qt_helper_t1)(qt_t1 *oldptr, void *a0, void *a1);
  
 qt_t1 *qt_args(qt_t1 *,void *,void *,qt_userf_t1 *,qt_only_t1*);
 void *qt_block(qt_helper_t1 *, void *, void *, qt_t1 *);
@@ -35,8 +35,8 @@ void *qt_abort(qt_helper_t1 *, void *, void *, qt_t1 *);
  
 #define QT_ARGS(sp,u,t,uf,on) (qt_args(sp,u,t,(qt_userf_t1*)(uf),(qt_only_t1*)(on)))
 #define QT_VARGS(sp,nb,vargs,pt,startup,vuserf,cleanup) (qt_error(),(void*)0)
-#define QT_BLOCK(help,old,new,sp) (qt_block(help,old,new,sp))
-#define QT_BLOCKI(help,old,new,sp) (qt_block(help,old,new,sp))
-#define QT_ABORT(help,old,new,sp) (qt_abort(help,old,new,sp))
+#define QT_BLOCK(help,oldptr,newptr,sp) (qt_block(help,oldptr,newptr,sp))
+#define QT_BLOCKI(help,oldptr,newptr,sp) (qt_block(help,oldptr,newptr,sp))
+#define QT_ABORT(help,oldptr,newptr,sp) (qt_abort(help,oldptr,newptr,sp))
 
 #endif /* ndef QT_GENERIC1_H */

@@ -67,6 +67,7 @@ int CpdPythonGroup::buildIterator(PyObject *&data, void *iter) {
       if (arriter.elems.size() > 0) {
         data = PyLong_FromVoidPtr(arriter.elems[0]);
         nextElement = 1;
+        return 1;
       } else {
         return 0;
       }
@@ -93,7 +94,7 @@ int CpdPythonGroup::nextIteratorUpdate(PyObject *&data, PyObject *result, void *
     return 0;
   }
   if (nextElement > 0) {
-    if (nextElement == arriter.elems.size()) {
+    if ((size_t)nextElement == arriter.elems.size()) {
       nextElement = 0;
       arriter.elems.removeAll();
       return 0;
@@ -200,7 +201,7 @@ void CpdPythonGroup::cpdCheck(void *m) {
     CkPrintf("[%d] CpdPythonGroup::cpdCheck error while preparing interpreter\n",CkMyPe());
   }
   pyWorkers[pyReference].inUse = true;
-  CmiReference(UsrToEnv(msg));
+  CkReferenceMsg(msg);
   CthResume(CthCreate((CthVoidFn)_callthr_executeThread, new CkThrCallArg(msg,(PythonObject*)this), 0));
   if (resultNotNone) CpdFreeze();
 }

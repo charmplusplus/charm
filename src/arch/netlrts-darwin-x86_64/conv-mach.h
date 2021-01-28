@@ -1,10 +1,7 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-// specify the version of the UNIX APIs that we want to use (for ucontext headers)
-#define _XOPEN_SOURCE                                       
-
-#define CMK_64BIT    1
+#define CMK_64BIT                                          1
 
 #define CMK_NETPOLL                                        1
 
@@ -20,24 +17,23 @@
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 #define CMK_MALLOC_USE_GNUOLD_MALLOC                       0
 
+#undef CMK_MEMORY_BUILD_GNU_HOOKS
 #define CMK_MEMORY_BUILD_GNU_HOOKS                         0
 #define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
 
-#define CMK_NODE_QUEUE_AVAILABLE                           0
 
-#define CMK_RSH_IS_A_COMMAND                               1
-#define CMK_RSH_NOT_NEEDED                                 0
-#define CMK_RSH_USE_REMSH                                  0
+#define CMK_SSH_IS_A_COMMAND                               1
+#define CMK_SSH_NOT_NEEDED                                 0
 
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
-#define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  0
 
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 #define CMK_THREADS_USE_CONTEXT                            0
-#define CMK_THREADS_USE_JCONTEXT                           1
+#define CMK_THREADS_USE_JCONTEXT                           0
+#define CMK_THREADS_USE_FCONTEXT                           1
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           0
@@ -50,24 +46,13 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 
-#define CMK_TYPEDEF_INT2 short
-#define CMK_TYPEDEF_INT4 int
-#define CMK_TYPEDEF_INT8 long long
-#define CMK_TYPEDEF_UINT2 unsigned short
-#define CMK_TYPEDEF_UINT4 unsigned int
-#define CMK_TYPEDEF_UINT8 unsigned long long
-#define CMK_TYPEDEF_FLOAT4 float
-#define CMK_TYPEDEF_FLOAT8 double
 
-#define CMK_DEBUG_MODE					   0 
+#define CMK_DEBUG_MODE                                     0
 #define CMK_WEB_MODE                                       1
 
-#define CMK_LBDB_ON					   1
+#define CMK_LBDB_ON                                        1
 
-#define CMK_STACKSIZE_DEFAULT				   262144
-/*
-#define CMK_NO_ISO_MALLOC				   1
-*/
+#define CMK_STACKSIZE_DEFAULT                              262144
 
 
 /* Mac-specific optimizations */

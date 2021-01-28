@@ -1,12 +1,13 @@
 include ../common.mk
 
 HEADERS=collide_util.h bbox.h collide_cfg.h collide_buffers.h \
-	collidecharm.h collidec.h collidef.h 
-HEADDEP=$(HEADERS) collidecharm_impl.h \
-	collide_serial.h collide_buffers.h collide_cfg.h \
-	collide.decl.h collidecharm.decl.h headers
+  collidecharm.h collidec.h collidef.h collidecharm.decl.h
 
-COBJS=collide_util.o collide_serial.o collidecharm.o collide_buffers.o 
+HEADDEP=$(HEADERS) collidecharm_impl.h \
+  collide_serial.h collide_buffers.h collide_cfg.h \
+  collide.decl.h collidecharm.decl.h headers
+  
+COBJS=collide_util.o collide_serial.o collidecharm.o collide_buffers.o
 CLIB=libmodulecollidecharm
 CDEST=$(LIBDIR)/$(CLIB).a
 
@@ -16,11 +17,11 @@ DEST=$(LIBDIR)/$(LIB).a
 
 all: $(DEST) $(CDEST) headers
 
-$(DEST): $(OBJS) $(COMPAT) 
+$(DEST): $(OBJS) $(COMPAT)
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@
 	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
 
-$(CDEST): $(COBJS) $(COMPAT) 
+$(CDEST): $(COBJS) $(COMPAT)
 	$(CHARMC) $(COBJS) $(COMPAT) -o $@
 #	cp $(CLIB).dep $(LIBDIR)/$(CLIB).dep
 

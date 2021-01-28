@@ -1,13 +1,24 @@
-CHARMC=../../../bin/charmc $(OPTS)
+-include ../../common.mk
+CHARMC=../../../bin/ampif90 $(OPTS)
 
-pgm: test.o
-	$(CHARMC) -o pgm test.o -language ampif
+all: fallreduce
 
-test.o: test.f90
-	$(CHARMC) -c test.f90
+fallreduce: pgm.o
+	$(CHARMC) -o fallreduce pgm.o
+
+pgm.o: pgm.f90
+	$(CHARMC) -c pgm.f90
 
 #
 # clean up .o, .mod, .exe and EMACS backup files
 #
 clean:
-	rm -f *.o *.mod pgm *~ conv-host charmrun
+	rm -f *.o *.mod fallreduce *~ conv-host charmrun ampirun
+
+test: fallreduce
+	$(call run, ./fallreduce +p2 +vp4 )
+
+testp: fallreduce
+	$(call run, ./fallreduce +p$(P) +vp$(P))
+	$(call run, ./fallreduce +p$(P) +vp$$(( $(P) * 2 )))
+	$(call run, ./fallreduce +p$(P) +vp$$(( $(P) * 4 )))

@@ -15,7 +15,7 @@ Pack/unpack to 4-byte network-byte-order integer/float.
 This makes it easy to use platform-neutral on-the-wire types.
 */
 
-void PUP_toNetwork4_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+void PUP_toNetwork4_sizer::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
 {
 	switch (t) {
 	case PUP::Tchar: //Strings and bytes get copied as-is
@@ -28,9 +28,9 @@ void PUP_toNetwork4_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 	}
 }
 
-void PUP_toNetwork4_pack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+void PUP_toNetwork4_pack::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
 {
-	int i;
+	size_t i;
 	switch (t) {
 	case PUP::Tchar: //Strings and bytes get copied as-is
 	case PUP::Tuchar:
@@ -61,9 +61,9 @@ void PUP_toNetwork4_pack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 #undef casePUP_toNetwork4_type
 }
 
-void PUP_toNetwork4_unpack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+void PUP_toNetwork4_unpack::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
 {
-	int i;
+	size_t i;
 	switch (t) {
 	case PUP::Tchar: //Strings and bytes get copied as-is
 	case PUP::Tuchar:

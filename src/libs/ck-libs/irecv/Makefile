@@ -9,15 +9,12 @@ HEADERS = $(CDIR)/include/receiver.decl.h \
 LIBDEST =  $(CDIR)/lib/libirecv.a
 
 all: $(LIBDEST)
-
-$(LIBDEST) : $(LIB)
-	/bin/cp $(LIB) $(LIBDEST)
 	/bin/cp receiver.decl.h $(CDIR)/include
 	/bin/cp receiver.h $(CDIR)/include
 	/bin/cp receiverf.h $(CDIR)/include
 
-$(LIB): $(LIBOBJ)
-	$(CHARMC) -o $(LIB) $(LIBOBJ) 
+$(LIBDEST): $(LIBOBJ)
+	$(CHARMC) -o $@ $^
 
 receiver.o: receiver.C receiver.h receiver.decl.h receiver.def.h
 	$(CHARMC) -c receiver.C

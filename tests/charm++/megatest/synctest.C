@@ -4,7 +4,9 @@ void synctest_moduleinit(void) {}
 
 void synctest_init(void) 
 {
-  CProxy_synctest_main::ckNew();
+  // Construct this chare on PE 0, so that the array it creates does not need
+  // the asynchronous API.
+  CProxy_synctest_main::ckNew(0);
 }
 
 synctest_main::synctest_main(void) 

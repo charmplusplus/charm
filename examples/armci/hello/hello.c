@@ -31,10 +31,10 @@ int main(int argc, char * argv[]) {
 
   if (thisImage == 0) {
     ARMCI_Get(baseAddress[1], myBuffer, strlen("hello")+1, 1);
-    printf("[%d] %s %s\n",thisImage, baseAddress[0], myBuffer);
+    printf("[%d] %s %s\n",thisImage, (char *)baseAddress[0], myBuffer);
   } else if (thisImage == 1) {
     ARMCI_Get(baseAddress[0], myBuffer, strlen("hello")+1, 0);
-    printf("[%d] %s %s\n",thisImage, myBuffer, baseAddress[1]);
+    printf("[%d] %s %s\n",thisImage, myBuffer, (char *)baseAddress[1]);
   }
 
   // sanity check (should segfault)

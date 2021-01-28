@@ -6,20 +6,25 @@ libraries written in Charm for other languages.
 #ifndef __CHARM_API_H
 #define __CHARM_API_H
 
+#include "charm-version.h"
+#include "charm-version-git.h"
+
 #include "conv-config.h" /* for CMK_FORTRAN symbols */
 
+/** Used to define a C language entry point*/
 #ifdef __cplusplus
 #  define CLINKAGE extern "C"
 #else
 #  define CLINKAGE /*empty*/
 #endif
 
-/** Used to define a "C" entry point*/
+/** Used to define a Fortran-callable routine*/
+#define FLINKAGE CLINKAGE
+
+/* Deprecated linkage aliases */
 #undef CDECL /*<- used by Microsoft Visual C++*/
 #define CDECL CLINKAGE
-
-/** Used to define a Fortran-callable routine*/
-#define FDECL CLINKAGE
+#define FDECL FLINKAGE
 
 /** Fortran name mangling:
 */
@@ -49,7 +54,7 @@ libraries written in Charm for other languages.
  *  @param c_args Arguments to pass to C routine (e.g., "*idx-1")
  */
 #define FORTRAN_AS_C(CAPITALNAME,Cname,lowername, routine_args,c_args) \
-FDECL void \
+FLINKAGE void \
 FTN_NAME(CAPITALNAME,lowername) routine_args { \
 	Cname c_args;\
 }
@@ -58,11 +63,18 @@ FTN_NAME(CAPITALNAME,lowername) routine_args { \
  * Like FORTRAN_AS_C, but with a return type as the first parameter.
  */
 #define FORTRAN_AS_C_RETURN(returnType, CAPITALNAME,Cname,lowername, routine_args,c_args) \
-FDECL returnType \
+FLINKAGE returnType \
 FTN_NAME(CAPITALNAME,lowername) routine_args { \
 	return Cname c_args;\
 }
 
+/** Shared object symbol exporting */
+#ifdef _WIN32
+# define CMI_EXPORT __declspec(dllexport)
+#elif CMK_HAS_ATTRIBUTE_VISIBILITY_DEFAULT
+# define CMI_EXPORT __attribute__((visibility("default")))
+#else
+# define CMI_EXPORT
+#endif
 
 #endif /*Def(thisHeader) */
-

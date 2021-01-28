@@ -3,23 +3,38 @@
 
 CkpvDeclare(size_t *, _offsets);
 
-extern "C"
-void *CkAllocSysMsg(void)
+void *CkAllocSysMsg(const CkEntryOptions *opts)
 {
-  return CkpvAccess(_msgPool)->get();
+  if(opts == NULL)
+    return CkpvAccess(_msgPool)->get();
+
+  envelope *env = _allocEnv(ForChareMsg, 0, opts->getPriorityBits(), GroupDepNum{(int)opts->getGroupDepNum()});
+  setMemoryTypeMessage(env);
+  env->setMsgIdx(0);
+
+  env->setIsVarSysMsg(1);
+  // Set the message's queueing type
+  env->setQueueing((unsigned char)opts->getQueueing());
+
+  // Copy the priority bytes into the env from the opts
+  if (opts->getPriorityPtr() != NULL)
+    CmiMemcpy(env->getPrioPtr(), opts->getPriorityPtr(), env->getPrioBytes());
+
+  // Copy the group dependence into the env from the opts
+  if(opts->getGroupDepNum() > 0)
+    CmiMemcpy(env->getGroupDepPtr(), opts->getGroupDepPtr(), env->getGroupDepSize());
+
+  return EnvToUsr(env);
 }
 
-extern "C"
 void CkFreeSysMsg(void *m)
 {
   CkpvAccess(_msgPool)->put(m);
 }
 
-extern "C"
-void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits)
+void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits, GroupDepNum groupDepNum)
 {
-  register envelope* env;
-  env = _allocEnv(ForChareMsg, msgBytes, prioBits);
+  envelope* env = _allocEnv(ForChareMsg, msgBytes, prioBits, groupDepNum);
   setMemoryTypeMessage(env);
 
   env->setQueueing(_defaultQueueing);
@@ -28,16 +43,15 @@ void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits)
   return EnvToUsr(env);
 }
 
-extern "C"
 void* CkAllocBuffer(void *msg, int bufsize)
 {
   bufsize = CkMsgAlignLength(bufsize);
-  register envelope *env = UsrToEnv(msg);
-  register envelope *packbuf;
-  packbuf = _allocEnv(env->getMsgtype(), bufsize, 
-                      env->getPriobits());
+  envelope *env = UsrToEnv(msg);
+  envelope *packbuf = _allocEnv(env->getMsgtype(), bufsize,
+                      env->getPriobits(),
+                      GroupDepNum{(int)env->getGroupDepNum()});
   
-  register int size = packbuf->getTotalsize();
+  int size = packbuf->getTotalsize();
   CmiMemcpy(packbuf, env, sizeof(envelope));
   packbuf->setTotalsize(size);
   packbuf->setPacked(!env->isPacked());
@@ -46,7 +60,6 @@ void* CkAllocBuffer(void *msg, int bufsize)
   return EnvToUsr(packbuf);;
 }
 
-extern "C"
 void  CkFreeMsg(void *msg)
 {
   if (msg!=NULL) {
@@ -55,18 +68,17 @@ void  CkFreeMsg(void *msg)
 }
 
 
-extern "C"
 void* CkCopyMsg(void **pMsg)
 {// cannot simply memcpy, because srcMsg could be varsize msg
-  register void *srcMsg = *pMsg;
-  register envelope *env = UsrToEnv(srcMsg);
-  register unsigned char msgidx = env->getMsgIdx();
+  void *srcMsg = *pMsg;
+  envelope *env = UsrToEnv(srcMsg);
+  unsigned char msgidx = env->getMsgIdx();
   if(!env->isPacked() && _msgTable[msgidx]->pack) {
     srcMsg = _msgTable[msgidx]->pack(srcMsg);
     UsrToEnv(srcMsg)->setPacked(1);
   }
-  register int size = UsrToEnv(srcMsg)->getTotalsize();
-  register envelope *newenv = (envelope *) CmiAlloc(size);
+  int size = UsrToEnv(srcMsg)->getTotalsize();
+  envelope *newenv = (envelope *) CmiAlloc(size);
   CmiMemcpy(newenv, UsrToEnv(srcMsg), size);
   //memcpy(newenv, UsrToEnv(srcMsg), size);
   if(UsrToEnv(srcMsg)->isPacked() && _msgTable[msgidx]->unpack) {
@@ -83,14 +95,18 @@ void* CkCopyMsg(void **pMsg)
   return srcMsg;
 }
 
-extern "C"
+void* CkReferenceMsg(void* msg)
+{
+  CmiReference(UsrToEnv(msg));
+  return msg;
+}
+
 void  CkSetQueueing(void *msg, int strategy)
 {
   UsrToEnv(msg)->setQueueing((unsigned char) strategy);
 }
 
 
-extern "C"
 void* CkPriorityPtr(void *msg)
 {
 #if CMK_ERROR_CHECKING
@@ -102,12 +118,17 @@ void* CkPriorityPtr(void *msg)
 CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts)
 {
 	//Allocate the message
-	CkMarshallMsg *m=new (size,opts->getPriorityBits())CkMarshallMsg;
+	CkMarshallMsg *m=new (size,opts->getPriorityBits(),GroupDepNum{(int)opts->getGroupDepNum()}) CkMarshallMsg;
 	//Copy the user's priority data into the message
 	envelope *env=UsrToEnv(m);
 	setMemoryTypeMessage(env);
 	if (opts->getPriorityPtr() != NULL)
 		CmiMemcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes());
+
+	// Copy the group dependence into the env from the opts
+	if(opts->getGroupDepNum() > 0)
+		CmiMemcpy(env->getGroupDepPtr(), opts->getGroupDepPtr(), env->getGroupDepSize());
+
 	//Set the message's queueing type
 	env->setQueueing((unsigned char)opts->getQueueing());
 	return m;

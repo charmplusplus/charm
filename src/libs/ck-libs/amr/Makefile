@@ -20,8 +20,8 @@ amr.decl.h amr.def.h : amr.ci
 amr.o: amr.C $(HEADERS)
 	$(CHARMC) -c amr.C
 
-fifo.o: fifo.c fifo.h
-	$(CHARMC) -c fifo.c
+fifo.o: fifo.C fifo.h
+	$(CHARMC) -c fifo.C
 
 statcoll.o: statcoll.C statcoll.h
 	$(CHARMC) -c statcoll.C

@@ -1,0 +1,12 @@
+mainmodule m {
+  mainchare A {
+    entry A(CkArgMsg*);
+    entry void bar() {
+      for (i = 0; i < map["a;b"]; ++i) {
+        serial {
+          doStuff(i);
+        }
+      }
+    }
+  }
+}

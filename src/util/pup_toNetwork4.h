@@ -10,7 +10,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/1/2001
 
 class PUP_toNetwork4_sizer : public PUP::er {
 	size_t nBytes;
-	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
+	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
  public:
 	PUP_toNetwork4_sizer(void) :PUP::er(IS_SIZING) {nBytes=0;}
 	size_t size(void) const {return nBytes;}
@@ -36,7 +36,7 @@ class PUP_toNetwork4_pack : public PUP::er {
 		*buf++=(unsigned char)(i>>0);  //Low end last
 	}
 
-	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
+	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
  public:
 	PUP_toNetwork4_pack(void *dest) :PUP::er(IS_PACKING) {
 		start=buf=(unsigned char *)dest;
@@ -64,7 +64,7 @@ class PUP_toNetwork4_unpack : public PUP::er {
 		return ret;
 	}
 
-	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
+	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
  public:
 	PUP_toNetwork4_unpack(const void *src) :PUP::er(IS_UNPACKING) {
 		start=buf=(const unsigned char *)src;

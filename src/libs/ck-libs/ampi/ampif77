@@ -1,3 +1,10 @@
-#!/bin/sh
-CHARMBIN=`dirname $0`
-$CHARMBIN/charmc -language ampif $@
+#!/bin/bash
+CHARMBIN=$(dirname $0)
+
+# protect rpath arguments from disappearing due to variable expansion
+ORIGIN='\$ORIGIN'
+
+export AMPICC="$(basename $0)"
+export AMPICC_MODE='ampif'
+
+$CHARMBIN/ampiCC "$@"

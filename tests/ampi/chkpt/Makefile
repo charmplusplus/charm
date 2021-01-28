@@ -1,24 +1,25 @@
-CHARMC=../../../bin/charmc
+-include ../../common.mk
+CHARMC=../../../bin/ampicc
 
 all: hello
 
 ampi: hello
 
 hello: hello.c
-	$(CHARMC) -o hello hello.c -language ampi $(OPTS)
+	$(CHARMC) -o hello hello.c $(OPTS)
 
 test: hello
 	rm -rf log
-	./charmrun +p3 ./hello +vp8 $(TESTOPTS)
+	$(call run, +p4 ./hello +vp8 )
 	-sync
-	./charmrun +p3 ./hello +vp8 +restart log $(TESTOPTS)
-	./charmrun +p2 ./hello +vp8 +restart log $(TESTOPTS)
-
-bgtest: clean ampi
-	./charmrun +p3 ./hello +vp8 +x3 +y1 +z1
-	./charmrun +p3 ./hello +vp8 +restart log +x3 +y1 +z1
-	./charmrun +p2 ./hello +vp8 +restart log +x2 +y1 +z1
+	$(call run, +p4 ./hello +vp8 +restart log )
+	$(call run, +p2 ./hello +vp8 +restart log )
+	-sync
+	-rm -fr log
+	$(call run, +p2 ./hello +vp8 )
+	-sync
+	$(call run, +p4 ./hello +vp8 +restart log )
 
 clean:
-	rm -f *.o *.mod moduleinit.C hello *~ conv-host charmrun
+	rm -f *.o *.mod moduleinit.C hello *~ conv-host charmrun ampirun
 	rm -rf log

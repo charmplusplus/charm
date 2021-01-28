@@ -1,18 +1,19 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
-all: pgm
+all: speed
 
-pgm:  speed.o
-	$(CHARMC) speed.o  -o pgm -language charm++
+speed:  speed.o
+	$(CHARMC) speed.o  -o speed -language charm++
 
 speed.o : speed.C speed.h speed.ci
 	$(CHARMC) -c speed.ci speed.C
 
-test: pgm
-	./charmrun +p4 ./pgm 8 $(TESTOPTS)
+test: speed
+	$(call run, +p4 ./speed 8 )
 
-bgtest: pgm
-	./charmrun +p4 ./pgm 8 +x2 +y2 +z1 $(TESTOPTS)
+testp: speed
+	$(call run, +p$(P) ./speed $$(( $(P) * 2 )) )
 
 clean:
-	rm -f conv-host pgm *.def.h *.decl.h *.o *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f conv-host speed *.def.h *.decl.h *.o *~ charmrun charmrun.exe speed.exe speed.pdb speed.ilk

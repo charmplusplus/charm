@@ -152,7 +152,6 @@ void LV3D_Array::removeViewable(CkViewable *v) {
 	impl->remove(v);
 }
 void LV3D_Array::pup(PUP::er &p) {
-	CBase_LV3D_Array::pup(p);
 	/* everything in impl can be thrown out during a migration */
 	if (LV3D_Verbosity>1) {
 		const int *data=thisIndexMax.data();

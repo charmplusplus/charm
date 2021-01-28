@@ -3,15 +3,17 @@ module NDMeshStreamer {
 
   include "DataItemTypes.h";
 
-  template<class dtype>
-  message MeshStreamerMessage {
+  message MeshStreamerMessageV {
     int destinationPes[];
-    dtype dataItems[];
+    int sourcePes[];
+    std::uint16_t offsets[];
+    CkArrayIndex destObjects[];
+    char dataItems[];
   };
 
   template<class dtype, class RouterType>
-  group MeshStreamer {
-    entry void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
+  group [migratable] MeshStreamer {
+    entry void receiveAlongRoute(MeshStreamerMessageV *msg);
     entry void enablePeriodicFlushing();
     entry void finish();
     entry void init(int numLocalContributors, CkCallback startCb,
@@ -27,57 +29,29 @@ module NDMeshStreamer {
     entry void init(CkCallback endCb, int prio);
     entry [reductiontarget] void syncInit();
 
-    entry void receiveAtDestination(MeshStreamerMessage<dtype> *msg);
+    entry void receiveAtDestination(MeshStreamerMessageV *msg);
   };
 
-  template<class dtype, class ClientType, class RouterType>
-    group GroupMeshStreamer : MeshStreamer<dtype, RouterType> {
-    entry GroupMeshStreamer(
-          int maxNumDataItemsBuffered, int numDimensions,
-          int dimensionSizes[numDimensions],
-          CkGroupID clientGID,
-          bool yieldFlag = 0, double progressPeriodInMs = -1.0);
-
-    entry GroupMeshStreamer(
-          int numDimensions, int dimensionSizes[numDimensions],
-          CkGroupID clientGID,
-          int bufferSize, bool yieldFlag = 0,
-          double progressPeriodInMs = -1.0);
+  template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
+  group [migratable] GroupMeshStreamer : MeshStreamer<dtype, RouterType> {
+    entry GroupMeshStreamer(int numDimensions, int dimensionSizes[numDimensions],
+                            CkGroupID clientGID, int bufferSize, bool yieldFlag,
+                            double progressPeriodInMs, int maxItemsBuffered,
+                            int _thresholdFractionNum, int _thresholdFractionDen,
+                            int _cutoffFractionNum, int _cutoffFractionDen);
   };
 
-  template<class dtype, class itype, class ClientType, class RouterType>
-    group ArrayMeshStreamer :
-    MeshStreamer<ArrayDataItem<dtype, itype>, RouterType> {
-    entry ArrayMeshStreamer(
-          int maxNumDataItemsBuffered, int numDimensions,
-          int dimensionSizes[numDimensions], CkArrayID clientAID,
-          bool yieldFlag = 0, double progressPeriodInMs = -1.0);
-    entry ArrayMeshStreamer(
-          int numDimensions, int dimensionSizes[numDimensions],
-          CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
-          double progressPeriodInMs = -1.0);
-
-    entry void processLocationRequest(itype arrayId, int deliveredToPe,
+  template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
+  group [migratable] ArrayMeshStreamer :
+  MeshStreamer<dtype, RouterType> {
+    entry ArrayMeshStreamer(int numDimensions, int dimensionSizes[numDimensions],
+                            CkArrayID clientAID, int bufferSize, bool yieldFlag,
+                            double progressPeriodInMs, int maxItemsBuffered,
+                            int _thresholdFractionNum, int _thresholdFractionDen,
+                            int _cutoffFractionNum, int _cutoffFractionDen);
+    entry void processLocationRequest(CkArrayIndex arrayId, int deliveredToPe,
                                       int sourcePe);
-    entry void resendMisdeliveredItems(itype arrayId, int destinationPe);
-    entry void updateLocationAtSource(itype arrayId, int destinationPe);
-
+    entry void resendMisdeliveredItems(CkArrayIndex arrayId, int destinationPe);
+    entry void updateLocationAtSource(CkArrayIndex arrayId, int destinationPe);
   };
-
-  template<class dtype, class ClientType, class RouterType>
-    group GroupChunkMeshStreamer : MeshStreamer<ChunkDataItem, RouterType> {
-    entry GroupChunkMeshStreamer(
-          int maxNumDataItemsBuffered, int numDimensions,
-          int dimensionSizes[numDimensions], CkGroupID clientGID,
-          bool yieldFlag = 0, double progressPeriodInMs = -1.0,
-          bool userHandlesFreeing = false);
-
-    entry GroupChunkMeshStreamer(
-          int numDimensions, int dimensionSizes[numDimensions],
-          CkGroupID clientGID, int bufferSize, bool yieldFlag = 0,
-          double progressPeriodInMs = -1.0,
-          bool userHandlesFreeing = false);
-
-  };
-
 };

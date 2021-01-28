@@ -24,7 +24,7 @@ static void sendImmediate(int destNode,int iter) {
 // Converse immediate handler
 void immediatering_startHandler(void *vmsg)
 {
-  const int maxRings = 1000;
+  const int maxRings = 100;
   immediateMsg *msg=(immediateMsg *)vmsg;
 
   if(0!=strcmp(msg->data,"Array!")) {

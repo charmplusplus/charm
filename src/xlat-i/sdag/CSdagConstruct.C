@@ -1,355 +1,219 @@
-#include <string.h>
-#include <stdlib.h>
-#include "sdag-globals.h"
-#include "xi-symbol.h"
 #include "CParsedFile.h"
-#include "EToken.h"
 #include "CStateVar.h"
+#include "EToken.h"
+#include "constructs/Constructs.h"
+#include "sdag-globals.h"
+#include "xi-Chare.h"
+#include "xi-symbol.h"
 #include <list>
+#include <stdlib.h>
+#include <string.h>
 using std::list;
 #include <algorithm>
 using std::for_each;
+
+#if __cplusplus < 201103L
 #include <functional>
 using std::mem_fun;
-
-namespace xi {
-  SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1) {
-    init(t);
-    constructs->push_back(construct1);
-  }
-
-  SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList) {
-    init(t);
-    constructs->push_back(construct1);
-    constructs->insert(constructs->end(), aList->constructs->begin(), aList->constructs->end());
-  }
-
-  SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
-                               SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el) {
-    init(t);
-    text = txt;
-    con1 = c1; con2 = c2; con3 = c3; con4 = c4;
-    if (constructAppend != 0) constructs->push_back(constructAppend);
-    elist = el;
-  }
-
-  SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl) {
-    init(t);
-    text = new XStr(codeStr);
-    param = pl;
-  }
-
-  void SdagConstruct::init(EToken& t) {
-    con1 = 0; con2 = 0; con3 = 0; con4 = 0;
-    traceName = 0;
-    elist = 0;
-    constructs = new list<SdagConstruct*>();
-    type = t;
-  }
-
-  SdagConstruct::~SdagConstruct() {
-    delete constructs;
-    delete text;
-  }
-
-  void SdagConstruct::numberNodes(void) {
-    switch(type) {
-    case SSDAGENTRY: nodeNum = numSdagEntries++; break;
-    case SOVERLAP: nodeNum = numOverlaps++; break;
-    case SWHEN: nodeNum = numWhens++; break;
-    case SFOR: nodeNum = numFors++; break;
-    case SWHILE: nodeNum = numWhiles++; break;
-    case SIF: nodeNum = numIfs++; if(con2!=0) con2->numberNodes(); break;
-    case SELSE: nodeNum = numElses++; break;
-    case SFORALL: nodeNum = numForalls++; break;
-    case SSLIST: nodeNum = numSlists++; break;
-    case SOLIST: nodeNum = numOlists++; break;
-    case SATOMIC: nodeNum = numAtomics++; break;
-    case SCASE: nodeNum = numCases++; break;
-    case SCASELIST: nodeNum = numCaseLists++; break;
-    case SINT_EXPR:
-    case SIDENT: 
-    default:
-      break;
-    }
-    SdagConstruct *cn;
-    if (constructs != 0)
-      for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::numberNodes));
-  }
-
-  XStr* SdagConstruct::createLabel(const char* str, int nodeNum) {
-    char text[128];
-    if (nodeNum != -1)
-      sprintf(text, "_%s_%d", str, nodeNum);
-    else
-      sprintf(text, "%s", str);
-
-    return new XStr(text);
-  }
-
-  void SdagConstruct::labelNodes() {
-    switch(type) {
-    case SSDAGENTRY: label = createLabel(con1->text->charstar(), -1); break;
-    case SOVERLAP: label = createLabel("overlap", nodeNum); break;
-    case SWHEN: label = createLabel("when", nodeNum);
-      for (EntryList *el = elist; el != NULL; el = el->next)
-        el->entry->label = new XStr(el->entry->name);
-      break;
-    case SFOR: label = createLabel("for", nodeNum); break;
-    case SWHILE: label = createLabel("while", nodeNum); break;
-    case SIF: label = createLabel("if", nodeNum);
-      if (con2 != 0) con2->labelNodes();
-      break;
-    case SELSE: label = createLabel("else", nodeNum); break;
-    case SFORALL: label = createLabel("forall", nodeNum); break;
-    case SSLIST: label = createLabel("slist", nodeNum); break;
-    case SOLIST: label = createLabel("olist", nodeNum); break;
-    case SATOMIC: label = createLabel("atomic", nodeNum); break;
-    case SCASE: label = createLabel("case", nodeNum); break;
-    case SCASELIST: label = createLabel("caselist", nodeNum); break;
-    case SINT_EXPR: case SIDENT: default: break;
-    }
-    SdagConstruct *cn;
-    if (constructs != 0)
-      for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::labelNodes));
-  }
-
-  void EntryList::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
-    EntryList *el = this;
-    while (el != NULL) {
-      el->entry->generateEntryList(CEntrylist, thisWhen);
-      el = el->next;
-    }
-  }
-
-  void Entry::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
-    // case SENTRY:
-    bool found = false;
-   
-    for(list<CEntry *>::iterator entry=CEntrylist.begin(); 
-        entry != CEntrylist.end(); ++entry) {
-      if(*((*entry)->entry) == (const char *)name) 
-        {
-          ParamList *epl;
-          epl = (*entry)->paramlist;
-          ParamList *pl;
-          pl = param;
-          found = false;
-          if (((*entry)->paramlist->isVoid() == 1) && (pl->isVoid() == 1)) {
-            found = true;
-          }
-          while ((pl != NULL) && (epl != NULL))
-            {
-              bool kindMatches =
-                (pl->isArray() && epl->isArray()) ||
-                (pl->isBuiltin() && epl->isBuiltin()) ||
-                (pl->isReference() && epl->isReference()) ||
-                (pl->isMessage() && epl->isMessage()) ||
-                (pl->isNamed() && epl->isNamed());
-              bool baseNameMatches = (strcmp(pl->getBaseName(), epl->getBaseName()) == 0);
-              if (kindMatches && baseNameMatches)
-                found = true;
-
-              pl = pl->next;
-              epl = epl->next;
-            }
-          if (((pl == NULL) && (epl != NULL)) ||
-              ((pl != NULL) && (epl == NULL)))
-            found = false;
-          if (found) {
-            // check to see if thisWhen is already in entry's whenList
-            bool whenFound = false;
-            for(list<WhenConstruct*>::iterator it = (*entry)->whenList.begin();
-                it != (*entry)->whenList.end(); ++it) {
-              if ((*it)->nodeNum == thisWhen->nodeNum)
-                whenFound = true;
-            }
-            if(!whenFound)
-              (*entry)->whenList.push_back(thisWhen);
-            entryPtr = *entry;
-            if(intExpr != 0)
-              (*entry)->refNumNeeded = 1; 
-          } 
-        }
-    }
-    if(!found) {
-      CEntry *newEntry;
-      newEntry = new CEntry(new XStr(name), param, estateVars, paramIsMarshalled() );
-      CEntrylist.push_back(newEntry);
-      entryPtr = newEntry;
-      newEntry->whenList.push_back(thisWhen);
-      if(intExpr != 0)
-        newEntry->refNumNeeded = 1; 
-    }
-    //break;
-  }
-
-  void SdagConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
-    if (SIF == type && con2 != 0)
-      con2->generateEntryList(CEntrylist, thisWhen);
-    generateChildrenEntryList(CEntrylist, thisWhen);
-  }
-
-  void WhenConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
-    elist->generateEntryList(CEntrylist, this);  /* con1 is the WHEN's ELIST */
-    generateChildrenEntryList(CEntrylist, thisWhen);
-  }
-
-  void SdagConstruct::generateChildrenEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
-    if (constructs != 0)
-      for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end(); ++it)
-        (*it)->generateEntryList(CEntrylist, thisWhen);
-  }
-
-  void SdagConstruct::propagateState(int uniqueVarNum) {
-    CStateVar *sv; 
-    list<EncapState*> encap;
-
-    stateVars = new list<CStateVar*>();
-    ParamList *pl = param;
-    if (!pl->isVoid()) {
-      while (pl != NULL) {
-        stateVars->push_back(new CStateVar(pl));
-        pl = pl->next;
-      }
-    
-      EncapState* state = new EncapState(this->entry, *stateVars);
-      if (!this->entry->paramIsMarshalled() && !this->entry->param->isVoid())
-        state->isMessage = true;
-      encap.push_back(state);
-    }
-
-    encapState = encap;
-
-#if CMK_BIGSIM_CHARM
-    // adding _bgParentLog as the last extra parameter for tracing
-    stateVarsChildren = new list<CStateVar*>(*stateVars);
-    sv = new CStateVar(0, "void *", 0,"_bgParentLog", 0, NULL, 1);
-    sv->isBgParentLog = true;
-    stateVarsChildren->push_back(sv);
-
-    {
-      list<CStateVar*> lst;
-      lst.push_back(sv);
-      EncapState *state = new EncapState(NULL, lst);
-      state->type = new XStr("void");
-      state->name = new XStr("_bgParentLog");
-      state->isBgParentLog = true;
-      encapStateChild.push_back(state);
-      encap.push_back(state);
-    }
-#else
-    stateVarsChildren = stateVars; 
 #endif
 
-    encapStateChild = encap;
+namespace xi {
+SdagConstruct::SdagConstruct(EToken t, SdagConstruct* construct1) {
+  init(t);
+  constructs->push_back(construct1);
+}
 
-    list<CStateVar*> whensEntryMethodStateVars;
+SdagConstruct::SdagConstruct(EToken t, SdagConstruct* construct1, SdagConstruct* aList) {
+  init(t);
+  constructs->push_back(construct1);
+  constructs->insert(constructs->end(), aList->constructs->begin(),
+                     aList->constructs->end());
+}
+
+SdagConstruct::SdagConstruct(EToken t, XStr* txt, SdagConstruct* c1, SdagConstruct* c2,
+                             SdagConstruct* c3, SdagConstruct* c4,
+                             SdagConstruct* constructAppend, EntryList* el) {
+  init(t);
+  text = txt;
+  con1 = c1;
+  con2 = c2;
+  con3 = c3;
+  con4 = c4;
+  if (constructAppend != 0) constructs->push_back(constructAppend);
+  elist = el;
+}
+
+SdagConstruct::SdagConstruct(EToken t, const char* entryStr, const char* codeStr,
+                             ParamList* pl) {
+  init(t);
+  text = new XStr(codeStr);
+  param = pl;
+}
+
+void SdagConstruct::init(EToken& t) {
+  con1 = 0;
+  con2 = 0;
+  con3 = 0;
+  con4 = 0;
+  traceName = 0;
+  elist = 0;
+  constructs = new list<SdagConstruct*>();
+  type = t;
+  label_str = 0;
+}
+
+SdagConstruct::~SdagConstruct() {
+  delete constructs;
+  delete text;
+}
+
+void SdagConstruct::numberNodes(void) {
+  if (constructs != 0)
+    for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
+             mem_fun(&SdagConstruct::numberNodes));
+#else
+             [](SdagConstruct * c) { c->numberNodes(); } );
+#endif
+}
+
+XStr* SdagConstruct::createLabel(const char* str, int nodeNum) {
+  char text[128];
+  if (nodeNum != -1)
+    sprintf(text, "_%s_%d", str, nodeNum);
+  else
+    sprintf(text, "%s", str);
+
+  return new XStr(text);
+}
+
+void SdagConstruct::labelNodes() {
+  if (label_str != 0) label = createLabel(label_str, nodeNum);
+
+  if (constructs != 0)
+    for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
+             mem_fun(&SdagConstruct::labelNodes));
+#else
+             [](SdagConstruct * c) { c->labelNodes(); } );
+#endif
+}
+
+void EntryList::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct* thisWhen) {
+  EntryList* el = this;
+  while (el != NULL) {
+    el->entry->generateEntryList(CEntrylist, thisWhen);
+    el = el->next;
+  }
+}
+
+void Entry::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct* thisWhen) {
+  // case SENTRY:
+  bool found = false;
+
+  for (list<CEntry*>::iterator entry = CEntrylist.begin(); entry != CEntrylist.end();
+       ++entry) {
+    if (*((*entry)->entry) == (const char*)name) {
+      ParamList* epl;
+      epl = (*entry)->paramlist;
+      ParamList* pl;
+      pl = param;
+      found = false;
+      if (((*entry)->paramlist->isVoid() == 1) && (pl->isVoid() == 1)) {
+        found = true;
+      }
+      while ((pl != NULL) && (epl != NULL)) {
+        bool kindMatches =
+            (pl->isArray() && epl->isArray()) || (pl->isBuiltin() && epl->isBuiltin()) ||
+            (pl->isReference() && epl->isReference()) ||
+            (pl->isMessage() && epl->isMessage()) || (pl->isNamed() && epl->isNamed());
+        bool baseNameMatches = (strcmp(pl->getBaseName(), epl->getBaseName()) == 0);
+        if (kindMatches && baseNameMatches) found = true;
+
+        pl = pl->next;
+        epl = epl->next;
+      }
+      if (((pl == NULL) && (epl != NULL)) || ((pl != NULL) && (epl == NULL)))
+        found = false;
+      if (found) {
+        // check to see if thisWhen is already in entry's whenList
+        bool whenFound = false;
+        for (list<WhenConstruct*>::iterator it = (*entry)->whenList.begin();
+             it != (*entry)->whenList.end(); ++it) {
+          if ((*it)->nodeNum == thisWhen->nodeNum) whenFound = true;
+        }
+        if (!whenFound) (*entry)->whenList.push_back(thisWhen);
+        entryPtr = *entry;
+        if (intExpr != 0) (*entry)->refNumNeeded = 1;
+      }
+    }
+  }
+  if (!found) {
+    CEntry* newEntry;
+    newEntry = new CEntry(new XStr(name), param, estateVars, paramIsMarshalled(),
+                          first_line_, last_line_);
+    CEntrylist.push_back(newEntry);
+    entryPtr = newEntry;
+    newEntry->whenList.push_back(thisWhen);
+    if (intExpr != 0) newEntry->refNumNeeded = 1;
+  }
+  // break;
+}
+
+void SdagConstruct::generateEntryList(list<CEntry*>& CEntrylist,
+                                      WhenConstruct* thisWhen) {
+  if (SIF == type && con2 != 0) con2->generateEntryList(CEntrylist, thisWhen);
+  generateChildrenEntryList(CEntrylist, thisWhen);
+}
+
+void SdagConstruct::generateChildrenEntryList(list<CEntry*>& CEntrylist,
+                                              WhenConstruct* thisWhen) {
+  if (constructs != 0)
     for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
          ++it)
-      (*it)->propagateState(encap, *stateVarsChildren, whensEntryMethodStateVars, uniqueVarNum);
+      (*it)->generateEntryList(CEntrylist, thisWhen);
+}
+
+void SdagConstruct::propagateState(int uniqueVarNum) {
+  CStateVar* sv;
+  list<EncapState*> encap;
+
+  stateVars = new list<CStateVar*>();
+  ParamList* pl = param;
+  if (!pl->isVoid()) {
+    while (pl != NULL) {
+      stateVars->push_back(new CStateVar(pl));
+      pl = pl->next;
+    }
+
+    EncapState* state = new EncapState(this->entry, *stateVars);
+    if (!this->entry->paramIsMarshalled() && !this->entry->param->isVoid())
+      state->isMessage = true;
+    encap.push_back(state);
   }
 
-  void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist, int uniqueVarNum) {
-    CStateVar *sv;
-    list<CStateVar*> *whensEntryMethodStateVars = NULL;
+  encapState = encap;
 
-    encapState = encap;
+  stateVarsChildren = stateVars;
 
-    stateVars = new list<CStateVar*>();
-    switch(type) {
-    case SFORALL:
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      stateVarsChildren = new list<CStateVar*>(plist);
-      sv = new CStateVar(0,"int", 0, con1->text->charstar(), 0,NULL, 0);
-      stateVarsChildren->push_back(sv);
+  encapStateChild = encap;
 
-      {
-        list<CStateVar*> lst;
-        lst.push_back(sv);
-        EncapState *state = new EncapState(NULL, lst);
-        state->isForall = true;
-        state->type = new XStr("SDAG::ForallClosure");
-        XStr* name = new XStr();
-        *name << con1->text << "_cl";
-        state->name = name;
-        encap.push_back(state);
-      }
+  list<CStateVar*> whensEntryMethodStateVars;
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it)
+    (*it)->propagateState(encap, *stateVarsChildren, whensEntryMethodStateVars,
+                          uniqueVarNum);
+}
 
-      {
-        char txt[128];
-        sprintf(txt, "_cf%d", nodeNum);
-        counter = new XStr(txt);
-        sv = new CStateVar(0, "SDAG::CCounter *", 0, txt, 0, NULL, 1);
-        sv->isCounter = true;
-        stateVarsChildren->push_back(sv);
+void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist,
+                                   list<CStateVar*>& wlist, int uniqueVarNum) {
+  CStateVar* sv;
+  list<CStateVar*>* whensEntryMethodStateVars = NULL;
 
-        list<CStateVar*> lst;
-        lst.push_back(sv);
-        EncapState *state = new EncapState(NULL, lst);
-        state->type = new XStr("SDAG::CCounter");
-        state->name = new XStr(txt);
-        encap.push_back(state);
-      }
-      break;
-    case SIF:
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      stateVarsChildren = stateVars;
-      if(con2 != 0) con2->propagateState(encap, plist, wlist, uniqueVarNum);
-      break;
-    case SCASELIST:
-      stateVarsChildren = new list<CStateVar*>(plist);
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      {
-        char txt[128];
-        sprintf(txt, "_cs%d", nodeNum);
-        counter = new XStr(txt);
-        sv = new CStateVar(0, "SDAG::CSpeculator *", 0, txt, 0, NULL, 1);
-        sv->isSpeculator = true;
-        stateVarsChildren->push_back(sv);
+  encapState = encap;
 
-        for (std::list<SdagConstruct *>::iterator iter = constructs->begin();
-             iter != constructs->end();
-             ++iter) {
-          dynamic_cast<WhenConstruct*>(*iter)->speculativeState = sv;
-        }
-        list<CStateVar*> lst;
-        lst.push_back(sv);
-        EncapState *state = new EncapState(NULL, lst);
-        state->name = new XStr(txt);
-        state->type = new XStr("SDAG::CSpeculator");
-        encap.push_back(state);
-      }
-      
-      break;
-    case SOLIST:
-      stateVarsChildren = new list<CStateVar*>(plist);
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      {
-        char txt[128];
-        sprintf(txt, "_co%d", nodeNum);
-        counter = new XStr(txt);
-        sv = new CStateVar(0, "SDAG::CCounter *", 0, txt, 0, NULL, 1);
-        sv->isCounter = true;
-        stateVarsChildren->push_back(sv);
-
-        list<CStateVar*> lst;
-        lst.push_back(sv);
-        EncapState *state = new EncapState(NULL, lst);
-        state->type = new XStr("SDAG::CCounter");
-        state->name = new XStr(txt);
-        encap.push_back(state);
-      }
-      break;
-    case SFOR:
-    case SWHILE:
-    case SELSE:
-    case SSLIST:
-    case SOVERLAP:
-    case SCASE:
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      stateVarsChildren = stateVars;
-      break;
+  stateVars = new list<CStateVar*>();
+  switch (type) {
     case SINT_EXPR:
     case SIDENT:
     case SENTRY:
@@ -359,1074 +223,296 @@ namespace xi {
       fprintf(stderr, "internal error in sdag translator..\n");
       exit(1);
       break;
-    }
-
-    encapStateChild = encap;
-
-    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
-    delete whensEntryMethodStateVars;
   }
 
-  void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
-    CStateVar *sv;
-    list<CStateVar*> whensEntryMethodStateVars;
-    list<CStateVar*> whenCurEntry;
-    stateVars = new list<CStateVar*>();
-    stateVarsChildren = new list<CStateVar*>();
+  encapStateChild = encap;
 
-    for (list<CStateVar*>::iterator iter = plist.begin(); iter != plist.end(); ++iter) {
-      sv = *iter;
-      stateVars->push_back(sv);
-      stateVarsChildren->push_back(sv);
-    }
+  propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
+  delete whensEntryMethodStateVars;
+}
 
-    encapState = encap;
+void SdagConstruct::propagateStateToChildren(list<EncapState*> encap,
+                                             list<CStateVar*>& stateVarsChildren,
+                                             list<CStateVar*>& wlist, int uniqueVarNum) {
+  if (constructs != 0)
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+         ++it)
+      (*it)->propagateState(encap, stateVarsChildren, wlist, uniqueVarNum);
+}
 
-    EntryList *el;
-    el = elist;
-    ParamList *pl;
-    int cntr = 0;
-    bool dummy_var = false;
-    while (el != NULL) {
-      pl = el->entry->param;
-      if (!pl->isVoid()) {
-        while(pl != NULL) {
-          if (pl->getGivenName() == NULL){//if the parameter doesn't have a name, generate a dummy name
-            char s[128];
-            sprintf(s, "gen_name%d", cntr);
-            pl->setGivenName(s);
-            cntr++;
-            dummy_var = true;
-          }
-          sv = new CStateVar(pl);
-          if(!dummy_var){ //only if it's not a dummy variable, propagate it to the children 
-            stateVarsChildren->push_back(sv);
-            whensEntryMethodStateVars.push_back(sv);
-          }
-          else dummy_var = false;
-          whenCurEntry.push_back(sv);
-          el->entry->addEStateVar(sv);
-          pl = pl->next;
-        }
-      }
+void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
+  generateChildrenCode(decls, defs, entry);
+}
 
-      EncapState* state = new EncapState(el->entry, whenCurEntry);
-      if (!el->entry->paramIsMarshalled() && !el->entry->param->isVoid())
-        state->isMessage = true;
-      if (!el->entry->param->isVoid())
-	encap.push_back(state);
-      whenCurEntry.clear();
-      el = el->next;
-    }
+void SdagConstruct::generateChildrenCode(XStr& decls, XStr& defs, Entry* entry) {
+  if (constructs != 0)
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+         ++it)
+      (*it)->generateCode(decls, defs, entry);
+}
 
-    encapStateChild = encap;
-
-    propagateStateToChildren(encap, *stateVarsChildren, whensEntryMethodStateVars, uniqueVarNum);
-  }
-
-
-  void AtomicConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist, int uniqueVarNum) {
-    stateVars = new list<CStateVar*>();
-    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-    stateVarsChildren = stateVars;
-
-    encapState = encap;
-    encapStateChild = encap;
-  }
-
-  void SdagConstruct::propagateStateToChildren(list<EncapState*> encap, list<CStateVar*>& stateVarsChildren, list<CStateVar*>& wlist, int uniqueVarNum) {
-    if (constructs != 0)
-      for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end(); ++it)
-        (*it)->propagateState(encap, stateVarsChildren, wlist, uniqueVarNum);
-  }
-
-  void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
-    switch(type) {
-    case SSDAGENTRY: generateSdagEntry(decls, defs, entry); break;
-    case SSLIST: generateSlist(decls, defs, entry); break;
-    case SOLIST: generateOlist(decls, defs, entry); break;
-    case SFORALL: generateForall(decls, defs, entry); break;
-    case SIF: generateIf(decls, defs, entry);
-      if(con2 != 0) con2->generateCode(decls, defs, entry);
-      break;
-    case SELSE: generateElse(decls, defs, entry); break;
-    case SWHILE: generateWhile(decls, defs, entry); break;
-    case SFOR: generateFor(decls, defs, entry); break;
-    case SCASE: case SOVERLAP: generateOverlap(decls, defs, entry); break;
-    case SCASELIST: generateCaseList(decls, defs, entry); break;
-    default: break;
-    }
-    generateChildrenCode(decls, defs, entry);
-  }
-
-  void SdagConstruct::generateChildrenCode(XStr& decls, XStr& defs, Entry* entry) {
-    if (constructs != 0)
-      for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end(); ++it)
-        (*it)->generateCode(decls, defs, entry);
-  }
-
-  void SdagConstruct::buildTypes(list<EncapState*>& state) {
-    for (list<EncapState*>::iterator iter = state.begin(); iter != state.end(); ++iter) {
-      EncapState& encap = **iter;
-      if (!encap.type) {
-        if (encap.entry->entryPtr && encap.entry->entryPtr->decl_entry)
-          encap.type = encap.entry->entryPtr->decl_entry->genClosureTypeNameProxyTemp;
-        else
-          encap.type = encap.entry->genClosureTypeNameProxyTemp;
-      }
-    }
-  }
-
-  void WhenConstruct::generateWhenCode(XStr& op, int indent) {
-    buildTypes(encapState);
-    buildTypes(encapStateChild);
-
-    // generate the call for this when
-
-#if CMK_BIGSIM_CHARM
-    // bgLog2 stores the parent dependence of when, e.g. for, olist
-    indentBy(op, indent);
-    op << "cmsgbuf->bgLog2 = (void*)static_cast<SDAG::TransportableBigSimLog*>(c->closure[1])->log;\n";
-#endif
-
-    // output the when function's name
-    indentBy(op, indent);
-    op << this->label << "(";
-
-    // output all the arguments to the function that are stored in a continuation
-    int cur = 0;
-    for (list<EncapState*>::iterator iter = encapState.begin();
-         iter != encapState.end(); ++iter, ++cur) {
-      EncapState& state = **iter;
-      op << "\n";
-      indentBy(op, indent + 1);
-      if (state.isMessage)
-        op << "static_cast<" << *state.type << "*>(static_cast<SDAG::MsgClosure*>(c->closure[" << cur << "])->msg)";
-      else if (state.isBgParentLog)
-        op << "NULL";
+void SdagConstruct::buildTypes(list<EncapState*>& state) {
+  for (list<EncapState*>::iterator iter = state.begin(); iter != state.end(); ++iter) {
+    EncapState& encap = **iter;
+    if (!encap.type) {
+      if (encap.entry->entryPtr && encap.entry->entryPtr->decl_entry)
+        encap.type = encap.entry->entryPtr->decl_entry->genClosureTypeNameProxyTemp;
       else
-        op << "static_cast<" << *state.type << "*>(c->closure[" << cur << "])";
-      if (cur != encapState.size() - 1) op << ", ";
+        encap.type = encap.entry->genClosureTypeNameProxyTemp;
     }
-
-    int prev = cur;
-
-    cur = 0;
-    for (EntryList *el = elist; el != NULL; el = el->next, cur++)
-      if (el->entry->intExpr) {
-        if (prev > 0) op << ",";
-	op << "\n";
-        indentBy(op, indent + 1);
-        op << "c->refnums[" << cur << "]";
-      }
-
-    op << "\n";
-    indentBy(op, indent);
-    op << ");\n";
-#if CMK_BIGSIM_CHARM
-    generateTlineEndCall(op);
-    generateBeginExec(op, "sdagholder");
-#endif
   }
+}
 
-  void WhenConstruct::generateEntryName(XStr& defs, Entry* e, int curEntry) {
-    if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() == 1))
-      defs << e->getEntryName() << "_" << curEntry;
-    else {
-      for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end(); ++it) {
-        CStateVar* sv = *it;
-        defs << sv->name;
-      }
-    }
-    defs << "_buf";
-  }
+int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
+  int cur = 0;
 
-  void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
-    buildTypes(encapState);
-    buildTypes(encapStateChild);
+  list<EncapState*>& encaps = child ? encapStateChild : encapState;
 
-    int entryLen = 0, numRefs = 0;
+  // traverse all the state variables bring them into scope
+  for (list<EncapState*>::iterator iter = encaps.begin(); iter != encaps.end();
+       ++iter, ++cur) {
+    EncapState& state = **iter;
 
-    // count the number of entries this when contains (for logical ands) and
-    // the number of reference numbers
-    {
-      int cur = 0;
-      for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
-        entryLen++;
-        if (el->entry->intExpr) numRefs++;
-      }
-    }
+    indentBy(defs, cur + 1);
 
-    // if reference numbers exist for this when, generate a wrapper that calls
-    // the when method with the reference numbers determined based on the
-    // current state
-    if (numRefs > 0) {
-      sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-      generateClosureSignature(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState);
+    defs << "{\n";
 
-      // if we have a reference number in the closures, we need to unravel the state
-      int cur = 0;
-      for (EntryList *el = elist; el != NULL; el = el->next, cur++)
-        if (el->entry->intExpr) defs << "  CMK_REFNUM_TYPE refnum_" << cur << ";\n";
-      int indent = 2;
+    int i = 0;
+    for (list<CStateVar*>::iterator iter2 = state.vars.begin(); iter2 != state.vars.end();
+         ++iter2, ++i) {
+      CStateVar& var = **iter2;
 
-      // unravel the closures so the potential refnum expressions can be resolved
-      indent = unravelClosuresBegin(defs);
-      indentBy(defs, indent);
-      // create a new scope for unraveling the closures
-      defs << "{\n";
-
-      cur = 0;
-      // generate each refnum variable we need that can access the internal closure state
-      for (EntryList *el = elist; el != NULL; el = el->next, cur++)
-        if (el->entry->intExpr) {
-          indentBy(defs, indent + 1);
-          defs << "refnum_" << cur << " = " << (el->entry->intExpr ? el->entry->intExpr : "0") << ";\n";
-        }
-
-      // end the unraveling of closures
-      indentBy(defs, indent);
-      defs << "}\n";
-      unravelClosuresEnd(defs);
-
-      // generate the call to the actual when that takes the reference numbers as arguments
-      defs << "  return " << label << "(";
-      cur = 0;
-      for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
-        EncapState *state = *iter;
-        if (state->name) defs << *state->name; else defs << "gen" << cur;
-        if (cur != encapState.size() - 1) defs << ", ";
-      }
-      for (int i = 0; i < numRefs; i++) defs << (cur > 0 ? ", " : "") << "refnum_" << i;
-      defs << ");\n";
-
-      endMethod(defs);
-    }
-
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    generateClosureSignature(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState, numRefs);
-
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-#endif
-
-    if (entryLen > 1) defs << "  std::set<SDAG::Buffer*> ignore;\n";
-
-    XStr haveAllBuffersCond;
-    XStr removeMessagesIfFound, deleteMessagesIfFound;
-    XStr continutationSpec;
-
-    {
-      int cur = 0;
-      for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
-        Entry* e = el->entry;
-        XStr bufName("buf");
-        bufName << cur;
-        XStr refName;
-        refName << "refnum_" << cur;
-        defs << "  SDAG::Buffer* " << bufName << " = __dep->tryFindMessage("
-             << e->entryPtr->entryNum // entry number
-             << ", " << (e->intExpr ? "true" : "false") // has a ref number?
-             << ", " << (e->intExpr ? refName.get_string_const() : "0")  // the ref number
-             << ", " << (entryLen > 1 ? "&ignore" : "0") // the ignore set
-             << ");\n";
-        haveAllBuffersCond << bufName;
-        removeMessagesIfFound << "    __dep->removeMessage(" << bufName << ");\n";
-        deleteMessagesIfFound << "    delete " << bufName << ";\n";
-
-        // build the continutation specification for starting
-        // has a refnum, needs to be saved in the trigger
-        if (e->intExpr) {
-          continutationSpec << "    c->entries.push_back(" << e->entryPtr->entryNum << ");\n";
-          continutationSpec << "    c->refnums.push_back(refnum_" << cur << ");\n";
+      // if the var is one of the following it a system state var that should
+      // not be brought into scope
+      if (!var.isCounter && !var.isSpeculator) {
+        if (var.isRdma) {
+          if (var.isDevice) {
+            if (var.isFirstDeviceRdma) {
+              indentBy(defs, cur + 2);
+              defs << "int & num_device_rdma_fields = gen" << cur << "->getP"
+                   << i++ << "();\n";
+            }
+            indentBy(defs, cur + 2);
+            defs << "CkDeviceBuffer & deviceBuffer_" << var.name << " = gen" << cur
+                 << "->getP" << i << "();\n";
+            indentBy(defs, cur + 2);
+            defs << var.type << "* " << var.name << " = (" << var.type
+                 << "*) (deviceBuffer_" << var.name << ".ptr);\n";
+          } else {
+            if (var.isFirstRdma) {
+              indentBy(defs, cur + 2);
+              defs << "int "
+                   << "& num_rdma_fields = ";
+              defs << "gen" << cur;
+              defs << "->"
+                   << "getP" << i << "();\n";
+              indentBy(defs, cur + 2);
+              i++;
+              defs << "int "
+                   << "& num_root_node = ";
+              defs << "gen" << cur;
+              defs << "->"
+                   << "getP" << i++ << "();\n";
+            }
+            indentBy(defs, cur + 2);
+            defs << "CkNcpyBuffer "
+                 << "& ncpyBuffer_" << var.name << " = ";
+            defs << "gen" << cur << "->"
+                 << "getP" << i << "();\n";
+            indentBy(defs, cur + 2);
+            defs << var.type << "* " << var.name << " = "
+                 << "(" << var.type << "*) (ncpyBuffer_" << var.name << ".ptr);\n";
+          }
         } else {
-          continutationSpec << "    c->anyEntries.push_back(" << e->entryPtr->entryNum << ");\n";
-        }
-
-        // buffers attached that we should ignore when trying to match a logical
-        // AND condition
-        if (entryLen > cur + 1) {
-          haveAllBuffersCond << " && ";
-          defs << "  if (" << bufName << ") ignore.insert(" << bufName << ");\n";
-        }
-      }
-    }
-
-    // decide based on whether buffers are found for each entry on the when
-    defs << "  if (" << haveAllBuffersCond << ") {\n";
-
-#if CMK_BIGSIM_CHARM
-    {
-      // TODO: instead of this, add a length field to EntryList
-      defs << "    void* logs1["<< entryLen << "]; \n";
-      defs << "    void* logs2["<< entryLen + 1 << "]; \n";
-      int localnum = 0;
-      int cur = 0;
-      for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
-        XStr bufName("buf");
-        bufName << cur;
-        defs << "    logs1[" << localnum << "] = " << bufName << "->bgLog1; \n";
-        defs << "    logs2[" << localnum << "] = " << bufName << "->bgLog2; \n";
-        localnum++;
-      }
-      defs << "    logs2[" << localnum << "] = " << "_bgParentLog; \n";
-      generateEventBracket(defs, SWHEN);
-      defs << "    _TRACE_BG_FORWARD_DEPS(logs1,logs2,"<< localnum << ",_bgParentLog);\n";
-    }
-#endif
-
-    // remove all messages fetched from SDAG buffers
-    defs << removeMessagesIfFound;
-
-    // remove the current speculative state for case statements
-    if (speculativeState)
-      defs << "    __dep->removeAllSpeculationIndex(" << speculativeState->name << "->speculationIndex);\n";
-
-    // make call to next method
-    defs << "    ";
-
-    if (constructs && !constructs->empty())
-      generateCall(defs, encapState, encapStateChild, constructs->front()->label);
-    else
-      generateCall(defs, encapState, encapStateChild, label, "_end");
-
-    // delete all buffered messages now that they are not needed
-    defs << deleteMessagesIfFound;
-
-    defs << "    return 0;\n";
-    defs << "  } else {\n";
-    // did not find matching buffers, create a continuation
-
-    defs << "    SDAG::Continuation* c = new SDAG::Continuation(" << nodeNum << ");\n";
-
-    // iterate through current closures and save in a continuation
-    {
-      int cur = 0;
-      for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
-        EncapState& state = **iter;
-        defs << "    c->addClosure(";
-
-        // if the current state param is a message, create a thin wrapper for it
-        // (MsgClosure) for migration purposes
-        if (state.isMessage) defs << "new SDAG::MsgClosure(";
-        if (state.isBgParentLog) defs << "new SDAG::TransportableBigSimLog(";
-        state.name ? (defs << *state.name) : (defs << "gen" << cur);
-        if (state.isMessage || state.isBgParentLog) defs << ")";
-        defs << ");\n";
-      }
-    }
-
-    // save the continutation spec for restarting this context
-    defs << continutationSpec;
-
-    // register the newly formed continutation with the runtime
-    defs << "    __dep->reg(c);\n";
-
-    // return the continuation that was just created
-    defs << "    return c;\n";
-    defs << "  }\n";
-
-    endMethod(defs);
-
-    /**
-     *   Generate the ending of this 'when' clause, which calls the next in the
-     *   sequence and handling deallocation of messages
-     */
-
-    // generate the _end variant of this method
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs, SWHEN_END);
-#endif
-
-    // decrease the reference count of any message state parameters
-    // that are going out of scope
-
-    // first check if we have any messages going out of scope
-    bool messageOutOfScope = false;
-    int cur = 0;
-    for (EntryList *el = elist; el != NULL; el = el->next, cur++)
-      if (el->entry->param->isMessage() == 1)
-        messageOutOfScope = true;
-
-    // first unravel the closures so the message names are correspond to the
-    // state variable names
-    if (messageOutOfScope) {
-      int indent = unravelClosuresBegin(defs, true);
-
-      // call CmiFree on each state variable going out of scope that is a message
-      // (i.e. the ones that are currently brought in scope by the current
-      // EntryList
-      for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
-        if (el->entry->param->isMessage() == 1) {
-          CStateVar*& sv = *el->entry->stateVars.begin();
-          indentBy(defs, indent);
-          defs << "CmiFree(UsrToEnv(" << sv->name << "));\n";
-        }
-      }
-
-      unravelClosuresEnd(defs, true);
-    }
-
-    // generate call to the next in the sequence
-    defs << "  ";
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-
-    endMethod(defs);
-
-    generateChildrenCode(decls, defs, entry);
-  }
-
-  void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry) {
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-
-    int indent = unravelClosuresBegin(defs);
-    indentBy(defs, indent);
-    defs << "if (" << con1->text << ") {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    indentBy(defs, indent);
-    defs << "} else {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    indentBy(defs, indent);
-    defs << "}\n";
-    unravelClosuresEnd(defs);
-    endMethod(defs);
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-    indent = unravelClosuresBegin(defs);
-    indentBy(defs, indent);
-    defs << "if (" << con1->text << ") {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    indentBy(defs, indent);
-    defs << "} else {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    indentBy(defs, indent);
-    defs << "}\n";
-    unravelClosuresEnd(defs);
-    endMethod(defs);
-  }
-
-  void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry) {
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-#endif
-
-    int indent = unravelClosuresBegin(defs);
-
-    indentBy(defs, indent);
-    defs << con1->text << ";\n";
-    //Record only the beginning for FOR
-#if CMK_BIGSIM_CHARM
-    generateEventBracket(defs, SFOR);
-#endif
-    indentBy(defs, indent);
-    defs << "if (" << con2->text << ") {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    indentBy(defs, indent);
-    defs << "} else {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    indentBy(defs, indent);
-    defs << "}\n";
-
-    unravelClosuresEnd(defs);
-
-    endMethod(defs);
-
-    // trace
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    strcat(nameStr,"_end");
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-#endif
-    indent = unravelClosuresBegin(defs);
-
-    indentBy(defs, indent);
-    defs << con3->text << ";\n";
-    indentBy(defs, indent);
-    defs << "if (" << con2->text << ") {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    indentBy(defs, indent);
-    defs << "} else {\n";
-#if CMK_BIGSIM_CHARM
-    generateEventBracket(defs, SFOR_END);
-#endif
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    indentBy(defs, indent);
-    defs << "}\n";
-
-    unravelClosuresEnd(defs);
-
-    endMethod(defs);
-  }
-
-  int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
-    int cur = 0;
-
-    list<EncapState*>& encaps = child ? encapStateChild : encapState;
-
-    // traverse all the state variables bring them into scope
-    for (list<EncapState*>::iterator iter = encaps.begin(); iter != encaps.end(); ++iter, ++cur) {
-      EncapState& state = **iter;
-
-      indentBy(defs, cur + 1);
-
-      defs << "{\n";
-
-      int i = 0;
-      for (list<CStateVar*>::iterator iter2 = state.vars.begin(); iter2 != state.vars.end(); ++iter2, ++i) {
-        CStateVar& var = **iter2;
-
-        // if the var is one of the following it a system state var that should
-        // not be brought into scope
-        if (!var.isCounter && !var.isSpeculator && !var.isBgParentLog) {
           indentBy(defs, cur + 2);
-
-          defs << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
+          defs << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& "
+               << var.name << " = ";
           state.name ? (defs << *state.name) : (defs << "gen" << cur);
           if (!var.isMsg)
-            defs << "->" << "getP" << i << "();\n";
+            defs << "->"
+                 << "getP" << i << "();\n";
           else
             defs << ";\n";
         }
       }
     }
-
-    return cur + 1;
   }
 
-  void SdagConstruct::unravelClosuresEnd(XStr& defs, bool child) {
-    list<EncapState*>& encaps = child ? encapStateChild : encapState;
+  return cur + 1;
+}
 
-    int cur = encaps.size();
+void SdagConstruct::unravelClosuresEnd(XStr& defs, bool child) {
+  list<EncapState*>& encaps = child ? encapStateChild : encapState;
 
-    // traverse all the state variables bring them into scope
-    for (list<EncapState*>::iterator iter = encaps.begin(); iter != encaps.end(); ++iter, --cur) {
-      EncapState& state = **iter;
+  int cur = encaps.size();
 
-      indentBy(defs, cur);
+  // traverse all the state variables bring them into scope
+  for (list<EncapState*>::iterator iter = encaps.begin(); iter != encaps.end();
+       ++iter, --cur) {
+    EncapState& state = **iter;
 
-      defs << "}\n";
-    }
-  }
+    indentBy(defs, cur);
 
-  void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry) {
-    strcpy(nameStr,label->charstar());
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs, SIF);
-#endif
-
-    int indent = unravelClosuresBegin(defs);
-
-    indentBy(defs, indent);
-    defs << "if (" << con1->text << ") {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    indentBy(defs, indent);
-    defs << "} else {\n";
-    indentBy(defs, indent + 1);
-    if (con2 != 0)
-      generateCall(defs, encapStateChild, encapStateChild, con2->label);
-    else
-      generateCall(defs, encapStateChild, encapStateChild, label, "_end");
-    indentBy(defs, indent);
     defs << "}\n";
-
-    unravelClosuresEnd(defs);
-
-    endMethod(defs);
-
-    strcpy(nameStr,label->charstar());
-    strcat(nameStr,"_end");
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs,SIF_END);
-#endif
-    indentBy(defs, 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    endMethod(defs);
   }
+}
 
-  void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry) {
-    strcpy(nameStr,label->charstar());
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-#if CMK_BIGSIM_CHARM
-    // trace
-    generateBeginTime(defs);
-    generateEventBracket(defs, SELSE);
-#endif
-    defs << "  ";
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    endMethod(defs);
+void generateVarSignature(XStr& str, const XStr* name, const char* suffix,
+                          list<CStateVar*>* params) {}
+void generateVarSignature(XStr& decls, XStr& defs, const Entry* entry, bool declareStatic,
+                          const char* returnType, const XStr* name, bool isEnd,
+                          list<CStateVar*>* params) {
+  generateVarSignature(decls, defs, entry->getContainer(), declareStatic, returnType,
+                       name, isEnd, params);
+}
+void generateVarSignature(XStr& decls, XStr& defs, const Chare* chare, bool declareStatic,
+                          const char* returnType, const XStr* name, bool isEnd,
+                          list<CStateVar*>* params) {
+  decls << "  " << (declareStatic ? "static " : "") << returnType << " ";
 
-    // trace
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    strcat(nameStr,"_end");
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs,SELSE_END);
-#endif
-    defs << "  ";
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    endMethod(defs);
-  }
+  templateGuardBegin(false, defs);
+  defs << chare->tspec() << returnType << " " << chare->baseName() << "::";
 
-  void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry) {
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
+  XStr op;
 
-    unravelClosuresBegin(defs);
+  op << name;
+  if (isEnd) op << "_end";
+  op << "(";
 
-    defs << "  int __first = (" << con2->text << "), __last = (" << con3->text
-         << "), __stride = (" << con4->text << ");\n";
-    defs << "  if (__first > __last) {\n";
-    defs << "    int __tmp=__first; __first=__last; __last=__tmp;\n";
-    defs << "    __stride = -__stride;\n";
-    defs << "  }\n";
-    defs << "  SDAG::CCounter *" << counter << " = new SDAG::CCounter(__first,__last,__stride);\n";
-    defs << "  for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
-         << con1->text << "+=__stride) {\n";
-    defs << "    SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
-    defs << "    ";
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+  if (params) {
+    CStateVar* sv;
+    int count = 0;
+    for (list<CStateVar*>::iterator iter = params->begin(); iter != params->end();
+         ++iter) {
+      CStateVar* sv = *iter;
+      if (sv->isVoid != 1) {
+        if (count != 0) op << ", ";
 
-    defs << "  }\n";
+        // @TODO uncommenting this requires that PUP work on const types
+        // if (sv->byConst)
+        // op << "const ";
+        if (sv->type != 0) op << sv->type << " ";
+        if (sv->declaredRef) op << " &";
+        if (sv->arrayLength != NULL) op << "* ";
+        if (sv->name != 0) op << sv->name;
 
-    unravelClosuresEnd(defs);
-
-    endMethod(defs);
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-    defs << "  " << counter << "->decrement(); /* DECREMENT 1 */ \n";
-    defs << "  " << con1->text << "_cl->deref();\n";
-    defs << "  if (" << counter << "->isDone()) {\n";
-    defs << "    " << counter << "->deref();\n";
-    defs << "    ";
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "  }\n";
-    endMethod(defs);
-  }
-
-  void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry) {
-    SdagConstruct *cn;
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "  SDAG::CCounter *" << counter << "= new SDAG::CCounter(" <<
-      (int)constructs->size() << ");\n";
-
-    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
-         ++it) {
-      defs << "  ";
-      generateCall(defs, encapStateChild, encapStateChild, (*it)->label);
-    }
-    endMethod(defs);
-
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    strcat(nameStr,"_end");
-#if CMK_BIGSIM_CHARM
-    defs << "  CkVec<void*> " <<label << "_bgLogList;\n";
-#endif
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    defs << "  " <<label << "_bgLogList.insertAtEnd(_bgParentLog);\n";
-#endif
-    //Accumulate all the bgParent pointers that the calling when_end functions give
-    defs << "  " << counter << "->decrement();\n";
- 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-    defs << "  olist_" << counter << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
-#endif
-
-    defs << "  if (" << counter << "->isDone()) {\n";
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-    defs << "    currentlyExecutingPath = olist_" << counter << "_PathMergePoint; /* Critical Path Detection */ \n";
-    defs << "    olist_" << counter << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
-#endif
-
-    defs << "  " << counter << "->deref();\n";
-
-#if CMK_BIGSIM_CHARM
-    generateListEventBracket(defs, SOLIST_END);
-    defs << "    " << label <<"_bgLogList.length()=0;\n";
-#endif
-
-    defs << "    ";
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "  }\n";
-    endMethod(defs);
-  }
-
-  void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry) {
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs, SOVERLAP);
-#endif
-    defs << "  ";
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    endMethod(defs);
-
-    // trace
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    strcat(nameStr,"_end");
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs, SOVERLAP_END);
-#endif
-    defs << "  ";
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    endMethod(defs);
-  }
-
-  void SdagConstruct::generateCaseList(XStr& decls, XStr& defs, Entry* entry) {
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "  SDAG::CSpeculator* " << counter << " = new SDAG::CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
-  
-    defs << "  SDAG::Continuation* c = 0;\n";
-    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
-         ++it) {
-      defs << "  c = ";
-      generateCall(defs, encapStateChild, encapStateChild, (*it)->label);
-      defs << "  if (!c) return;\n";
-      defs << "  else c->speculationIndex = " << counter << "->speculationIndex;\n";
-    }
-    endMethod(defs);
-
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    strcat(nameStr,"_end");
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-
-    defs << "  " << counter << "->deref();\n";
-    defs << "  ";
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    endMethod(defs);
-  }
-
-  void SdagConstruct::generateSlist(XStr& decls, XStr& defs, Entry* entry) {
-    buildTypes(encapState);
-    buildTypes(encapStateChild);
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "  ";
-    generateCall(defs, encapState, encapState, constructs->front()->label);
-    endMethod(defs);
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-    defs << "  ";
-    generateCall(defs, encapState, encapStateChild, next->label, nextBeginOrEnd ? 0 : "_end");
-    endMethod(defs);
-  }
-
-  void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry) {
-    buildTypes(encapState);
-    buildTypes(encapStateChild);
-
-    if (entry->isConstructor()) {
-      std::cerr << cur_file << ":" << entry->getLine()
-                << ": Chare constructor cannot be defined with SDAG code" << std::endl;
-      exit(1);
-    }
-
-    decls << "public:\n";
-
-    XStr signature;
-
-    signature << con1->text;
-    signature << "(";
-    if (stateVars) {
-      int count = 0;
-      for (list<CStateVar*>::iterator iter = stateVars->begin(); iter != stateVars->end(); ++iter) {
-        CStateVar& var = **iter;
-        if (var.isVoid != 1) {
-          if (count != 0) signature << ", ";
-          if (var.type != 0) signature << var.type << " ";
-          if (var.arrayLength != NULL) signature << "* ";
-          if (var.name != 0) signature << var.name;
-          count++;
-        }
+        count++;
       }
     }
-    signature << ")";
+  }
 
-    if (!entry->param->isVoid())
-      decls << "  void " <<  signature << ";\n";
+  op << ")";
 
-    // generate wrapper for local calls to the function
-    if (entry->paramIsMarshalled() && !entry->param->isVoid())
-      generateLocalWrapper(decls, defs, entry->param->isVoid(), signature, entry, stateVars, con1->text);
+  decls << op << ";\n";
+  defs << op << " { // Potentially missing " << chare->baseName()
+       << "_SDAG_CODE in your class definition?\n";
+}
+void endMethod(XStr& op) {
+  op << "}\n";
+  templateGuardEnd(op);
+  op << "\n\n";
+}
 
-    generateClosureSignature(decls, defs, entry, false, "void", con1->text, false, encapState);
+void generateClosureSignature(XStr& decls, XStr& defs, const Entry* entry,
+                              bool declareStatic, const char* returnType,
+                              const XStr* name, bool isEnd, list<EncapState*> encap,
+                              int numRefs) {
+  generateClosureSignature(decls, defs, entry->getContainer(), declareStatic, returnType,
+                           name, isEnd, encap, numRefs);
+}
+void generateClosureSignature(XStr& decls, XStr& defs, const Chare* chare,
+                              bool declareStatic, const char* returnType,
+                              const XStr* name, bool isEnd, list<EncapState*> encap,
+                              int numRefs) {
+  decls << "  " << (declareStatic ? "static " : "") << returnType << " ";
 
-#if CMK_BIGSIM_CHARM
-    generateEndSeq(defs);
-#endif
-    if (!entry->getContainer()->isGroup() || !entry->isConstructor())
-      generateTraceEndCall(defs, 1);
+  templateGuardBegin(false, defs);
+  defs << chare->tspec() << returnType << " " << chare->baseName() << "::";
 
-    defs << "  if (!__dep.get()) _sdag_init();\n";
+  XStr op;
 
-    // is a message sdag entry, in this case since this is a SDAG entry, there
-    // will only be one parameter which is the message (called 'gen0')
-    if (!entry->paramIsMarshalled() && !entry->param->isVoid()) {
-      // increase reference count by one for the state parameter
-      defs << "  CmiReference(UsrToEnv(gen0));\n";
+  op << name;
+  if (isEnd) op << "_end";
+  op << "(";
+
+  int cur = 0;
+  for (list<EncapState*>::iterator iter = encap.begin(); iter != encap.end();
+       ++iter, ++cur) {
+    EncapState* state = *iter;
+
+    if (state->type) {
+      op << *state->type << "* ";
+      if (state->name)
+        op << *state->name;
+      else
+        op << "gen" << cur;
+    } else {
+      fprintf(stderr, "type was not propagated to this phase");
+      exit(120);
     }
 
-    defs << "  ";
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-
-#if CMK_BIGSIM_CHARM
-    generateTlineEndCall(defs);
-    generateBeginExec(defs, "spaceholder");
-#endif
-    if (!entry->getContainer()->isGroup() || !entry->isConstructor())
-      generateDummyBeginExecute(defs, 1);
-
-    endMethod(defs);
-
-    decls << "private:\n";
-    generateClosureSignature(decls, defs, entry, false, "void", con1->text, true,
-#if CMK_BIGSIM_CHARM
-                         encapStateChild
-#else
-                         encapState
-#endif
-                         );
-
-    if (!entry->paramIsMarshalled() && !entry->param->isVoid()) {
-      // decrease reference count by one for the message
-      defs << "  CmiFree(UsrToEnv(gen0));\n";
-    }
-
-    endMethod(defs);
+    if (cur != encap.size() - 1) op << ", ";
   }
 
-  void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
+  for (int i = 0; i < numRefs; i++)
+    op << ((cur + i) > 0 ? ", " : "") << "int refnum_" << i;
 
-#if CMK_BIGSIM_CHARM
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    generateBeginExec(defs, nameStr);
-#endif
+  op << ")";
 
-    generateTraceBeginCall(defs, 1);
+  decls << op << ";\n";
+  defs << op << " {\n";
+}
 
-    char* str = text->get_string();
-    bool hasCode = false;
+void SdagConstruct::generateCall(XStr& op, list<EncapState*>& scope,
+                                 list<EncapState*>& next, const XStr* name,
+                                 const char* nameSuffix) {
+  op << name << (nameSuffix ? nameSuffix : "") << "(";
 
-    while (*str != '\0') {
-      if (*str != '\n' && *str != ' ' && *str != '\t') {
-        hasCode = true;
-        break;
-      }
-      str++;
-    }
+  int cur = 0;
+  for (list<EncapState*>::iterator iter = next.begin(); iter != next.end();
+       ++iter, ++cur) {
+    EncapState* state = *iter;
 
-    if (hasCode) {
-      int indent = unravelClosuresBegin(defs);
-
-      indentBy(defs, indent);
-      defs << "{ // begin serial block\n";
-      defs << text << "\n";
-      indentBy(defs, indent);
-      defs << "} // end serial block\n";
-
-      unravelClosuresEnd(defs);
-    }
-
-    generateTraceEndCall(defs, 1);
-
-#if CMK_BIGSIM_CHARM
-    generateEndExec(defs);
-#endif
-
-    indentBy(defs, 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    endMethod(defs);
-  }
-
-  void generateVarSignature(XStr& str,
-                         const XStr* name, const char* suffix,
-                         list<CStateVar*>* params) {
-    
-  }
-  void generateVarSignature(XStr& decls, XStr& defs,
-                         const Entry* entry, bool declareStatic, const char* returnType,
-                         const XStr* name, bool isEnd,
-                         list<CStateVar*>* params) {
-    generateVarSignature(decls, defs, entry->getContainer(), declareStatic, returnType,
-                      name, isEnd, params);
-  }
-  void generateVarSignature(XStr& decls, XStr& defs,
-                         const Chare* chare, bool declareStatic, const char* returnType,
-                         const XStr* name, bool isEnd,
-                         list<CStateVar*>* params) {
-    decls << "  " << (declareStatic ? "static " : "") << returnType << " ";
-
-    templateGuardBegin(false, defs);
-    defs << chare->tspec() << returnType << " " << chare->baseName() << "::";
-
-    XStr op;
-
-    op << name;
-    if (isEnd)
-      op << "_end";
-    op << "(";
-
-    if (params) {
-      CStateVar *sv;
-      int count = 0;
-      for (list<CStateVar*>::iterator iter = params->begin();
-           iter != params->end();
-           ++iter) {
-        CStateVar *sv = *iter;
-        if (sv->isVoid != 1) {
-          if (count != 0)
-            op << ", ";
-
-          // @TODO uncommenting this requires that PUP work on const types
-          //if (sv->byConst)
-          //op << "const ";
-          if (sv->type != 0) 
-            op <<sv->type <<" ";
-          if (sv->declaredRef)
-            op <<" &";
-          if (sv->arrayLength != NULL) 
-            op <<"* ";
-          if (sv->name != 0)
-            op <<sv->name;
-
-          count++;
-        }
-      }
-    }
-
-    op << ")";
-
-    decls << op << ";\n";
-    defs << op << " {\n";
-  }
-  void endMethod(XStr& op) {
-    op << "}\n";
-    templateGuardEnd(op);
-    op << "\n\n";
-  }
-
-  void generateClosureSignature(XStr& decls, XStr& defs,
-                                const Entry* entry, bool declareStatic, const char* returnType,
-                                const XStr* name, bool isEnd,
-                                list<EncapState*> encap, int numRefs) {
-    generateClosureSignature(decls, defs, entry->getContainer(), declareStatic, returnType,
-                             name, isEnd, encap, numRefs);
-  }
-  void generateClosureSignature(XStr& decls, XStr& defs, const Chare* chare,
-                                bool declareStatic, const char* returnType,
-                                const XStr* name, bool isEnd, list<EncapState*> encap, int numRefs) {
-    decls << "  " << (declareStatic ? "static " : "") << returnType << " ";
-
-    templateGuardBegin(false, defs);
-    defs << chare->tspec() << returnType << " " << chare->baseName() << "::";
-
-    XStr op;
-
-    op << name;
-    if (isEnd) op << "_end";
-    op << "(";
-
-    int cur = 0;
-    for (list<EncapState*>::iterator iter = encap.begin();
-         iter != encap.end(); ++iter, ++cur) {
-      EncapState *state = *iter;
-
-      if (state->type) {
-        op << *state->type << "* ";
-        if (state->name) op << *state->name;
-        else op << "gen" << cur;
+    if (state->type) {
+      if (cur >= scope.size()) {
+        int offset = cur - scope.size();
+        if (!state->isMessage)
+          op << "static_cast<" << *state->type << "*>(buf" << offset << "->cl)";
+        else
+          op << "static_cast<" << *state->type << "*>(static_cast<SDAG::MsgClosure*>(buf"
+             << offset << "->cl)->msg)";
       } else {
-        fprintf(stderr, "type was not propagated to this phase");
-        exit(120);
+        if (state->name)
+          op << *state->name;
+        else
+          op << "gen" << cur;
       }
-
-      if (cur != encap.size() - 1) op << ", ";
+    } else {
+      fprintf(stderr, "type was not propagated to this phase");
+      exit(120);
     }
 
-    for (int i = 0; i < numRefs; i++) op << (cur > 0 ? "," : "") << "int refnum_" << i;
-
-    op << ")";
-
-    decls << op << ";\n";
-    defs << op << " {\n";
+    if (cur != next.size() - 1) op << ", ";
   }
 
-  void SdagConstruct::generateCall(XStr& op, list<EncapState*>& scope,
-                                      list<EncapState*>& next, const XStr* name,
-                                      const char* nameSuffix) {
-    op << name << (nameSuffix ? nameSuffix : "") << "(";
+  op << ");\n";
+}
 
-    int cur = 0;
-    for (list<EncapState*>::iterator iter = next.begin(); iter != next.end(); ++iter, ++cur) {
-      EncapState *state = *iter;
-
-      if (state->type) {
-        if (cur >= scope.size()) {
-          int offset = cur - scope.size();
-          if (!state->isMessage)
-            op << "static_cast<" << *state->type << "*>(buf" << offset << "->cl)";
-          else
-            op << "static_cast<" << *state->type << "*>(static_cast<SDAG::MsgClosure*>(buf" << offset << "->cl)->msg)";
-        } else {
-          if (state->name) op << *state->name; else op << "gen" << cur;
-        }
-      } else {
-        fprintf(stderr, "type was not propagated to this phase");
-        exit(120);
-      }
-
-      if (cur != next.size() - 1) op << ", ";
-    }
-
-    op << ");\n";
-  }
-
-  // boe = 1, if the next call is to begin construct
-  // boe = 0, if the next call is to end a contruct
-  void SdagConstruct::setNext(SdagConstruct *n, int boe) {
-    switch(type) {
+// boe = 1, if the next call is to begin construct
+// boe = 0, if the next call is to end a contruct
+void SdagConstruct::setNext(SdagConstruct* n, int boe) {
+  switch (type) {
     case SSLIST:
       next = n;
       nextBeginOrEnd = boe;
       {
-        if (constructs->empty())
-          return;
+        if (constructs->empty()) return;
 
         list<SdagConstruct*>::iterator it = constructs->begin();
-        SdagConstruct *cn = *it;
+        SdagConstruct* cn = *it;
         ++it;
 
-        for(; it != constructs->end(); ++it) {
+        for (; it != constructs->end(); ++it) {
           cn->setNext(*it, 1);
           cn = *it;
         }
@@ -1437,9 +523,8 @@ namespace xi {
       next = n;
       nextBeginOrEnd = boe;
       {
-        for(list<SdagConstruct*>::iterator it = constructs->begin();
-            it != constructs->end();
-            ++it) {
+        for (list<SdagConstruct*>::iterator it = constructs->begin();
+             it != constructs->end(); ++it) {
           (*it)->setNext(this, 0);
         }
       }
@@ -1452,158 +537,154 @@ namespace xi {
     case SWHEN:
     case SFOR:
     case SWHILE:
-    case SATOMIC:
+    case SSERIAL:
     case SELSE:
       next = n;
       nextBeginOrEnd = boe;
-      n = this; boe = 0; break;
+      n = this;
+      boe = 0;
+      break;
     case SIF:
       next = n;
       nextBeginOrEnd = boe;
-      if(con2 != 0)
-        con2->setNext(n, boe);
+      if (con2 != 0) con2->setNext(n, boe);
       n = this;
       boe = 0;
       break;
     default:
       break;
-    }
-    SdagConstruct *cn;
-    if (constructs != 0) {
-      for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
-           ++it) {
-        (*it)->setNext(n, boe);
-      }
-    }
   }
-
-  // for trace
-  void SdagConstruct::generateTrace() {
-    for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::generateTrace));
-    if (con1) con1->generateTrace();
-    if (con2) con2->generateTrace();
-    if (con3) con3->generateTrace();
-  }
-
-  void AtomicConstruct::generateTrace() {
-    char traceText[1024];
-    if (traceName) {
-      sprintf(traceText, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
-      // remove blanks
-      for (unsigned int i=0; i<strlen(traceText); i++)
-        if (traceText[i]==' '||traceText[i]=='\t') traceText[i]='_';
-    }
-    else {
-      sprintf(traceText, "%s%s", CParsedFile::className->charstar(), label->charstar());
-    }
-    traceName = new XStr(traceText);
-
-    if (con1) con1->generateTrace();
-  }
-
-  void SdagConstruct::generateTraceBeginCall(XStr& op, int indent) {
-    if (traceName) {
-      indentBy(op, indent);
-      op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, (" << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, NULL); \n";
-    }
-  }
-
-  void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent) {
-    indentBy(op, indent);
-    op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, NULL); \n";
-  }
-
-  void SdagConstruct::generateTraceEndCall(XStr& op, int indent) {
-    indentBy(op, indent);
-    op << "_TRACE_END_EXECUTE(); \n";
-  }
-
-  void SdagConstruct::generateBeginExec(XStr& op, const char *name) {
-    op << "     " << "_TRACE_BG_BEGIN_EXECUTE_NOMSG(\""<<name<<"\",&_bgParentLog,1);\n"; 
-  }
-
-  void SdagConstruct::generateEndExec(XStr& op){
-    op << "     " << "_TRACE_BG_END_EXECUTE(0);\n";
-  }
-
-  void SdagConstruct::generateBeginTime(XStr& op) {
-    //Record begin time for tracing
-    op << "  double __begintime = CkVTimer(); \n";
-  }
-
-  void SdagConstruct::generateTlineEndCall(XStr& op) {
-    //Trace this event
-    op <<"    _TRACE_BG_TLINE_END(&_bgParentLog);\n";
-  }
-
-  void SdagConstruct::generateEndSeq(XStr& op) {
-    op <<  "    void* _bgParentLog = NULL;\n";
-    op <<  "    CkElapse(0.01e-6);\n";
-    //op<<  "    BgElapse(1e-6);\n";
-    generateTlineEndCall(op);
-    generateTraceEndCall(op, 1);
-    generateEndExec(op);
-  }
-
-  void SdagConstruct::generateEventBracket(XStr& op, int eventType) {
-    (void) eventType;
-    //Trace this event
-    op << "     _TRACE_BG_USER_EVENT_BRACKET(\"" << nameStr
-       << "\", __begintime, CkVTimer(),&_bgParentLog); \n";
-  }
-
-  void SdagConstruct::generateListEventBracket(XStr& op, int eventType) {
-    (void) eventType;
-    op << "    _TRACE_BGLIST_USER_EVENT_BRACKET(\"" << nameStr
-       << "\",__begintime,CkVTimer(),&_bgParentLog, " << label
-       << "_bgLogList);\n";
-  }
-
-  void SdagConstruct::generateRegisterEp(XStr& defs) {
-    if (traceName)
-      defs << "  (void)_sdag_idx_" << traceName << "();\n";
-
-    for (list<SdagConstruct*>::iterator iter = constructs->begin(); iter != constructs->end(); ++iter)
-      (*iter)->generateRegisterEp(defs);
-    if (con1) con1->generateRegisterEp(defs);
-    if (con2) con2->generateRegisterEp(defs);
-    if (con3) con3->generateRegisterEp(defs);
-  }
-
-  void SdagConstruct::generateTraceEp(XStr& decls, XStr& defs, Chare* chare) {
-    if (traceName) {
-      XStr regName, idxName;
-
-      idxName << "_sdag_idx_" << traceName;
-      regName << "_sdag_reg_" << traceName;
-      generateVarSignature(decls, defs, chare, true, "int", &idxName, false, NULL);
-      defs << "  static int epidx = " << regName << "();\n"
-           << "  return epidx;\n";
-      endMethod(defs);
-
-      generateVarSignature(decls, defs, chare, true, "int", &regName, false, NULL);
-      defs << "  return CkRegisterEp(\""
-           << traceName << "\", NULL, 0, " << chare->indexName() << "::__idx, 0"
-           << ");\n";
-      endMethod(defs);
-    }
-
+  SdagConstruct* cn;
+  if (constructs != 0) {
     for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
          ++it) {
-      (*it)->generateTraceEp(decls, defs, chare);
-    }
-    if (con1) con1->generateTraceEp(decls, defs, chare);
-    if (con2) con2->generateTraceEp(decls, defs, chare);
-    if (con3) con3->generateTraceEp(decls, defs, chare);
-  }
-
-
-  void RemoveSdagComments(char *str) {
-    char *ptr = str;
-    while ((ptr = strstr(ptr, "//"))) {
-      char *lend = strstr(ptr, "\n");
-      if (lend==NULL) break;
-      while (ptr != lend) *ptr++=' ';
+      (*it)->setNext(n, boe);
     }
   }
 }
+
+// for trace
+void SdagConstruct::generateTrace() {
+  for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
+           mem_fun(&SdagConstruct::generateTrace));
+#else
+           [](SdagConstruct * c) { c->generateTrace(); } );
+#endif
+  if (con1) con1->generateTrace();
+  if (con2) con2->generateTrace();
+  if (con3) con3->generateTrace();
+}
+
+void SdagConstruct::generateTraceBeginCall(XStr& op, int indent) {
+  if (traceName) {
+    indentBy(op, indent);
+    op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, ("
+       << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, ";
+
+    if (entry->getContainer()->isArray())
+      op << "this->ckGetArrayIndex().getProjectionID()";
+    else
+      op << "NULL";
+
+    op << ", this); \n";
+  }
+}
+
+void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent, Entry* entry) {
+  indentBy(op, indent);
+  op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, ";
+
+  if (entry->getContainer()->isArray())
+    op << "this->ckGetArrayIndex().getProjectionID()";
+  else
+    op << "NULL";
+
+  op << ", this); \n";
+}
+
+void SdagConstruct::generateTraceEndCall(XStr& op, int indent) {
+  indentBy(op, indent);
+  op << "_TRACE_END_EXECUTE(); \n";
+}
+
+void SdagConstruct::generateBeginExec(XStr& op, const char* name) {
+  op << "     "
+     << "_TRACE_BG_BEGIN_EXECUTE_NOMSG(\"" << name << "\", &_bgParentLog,1);\n";
+}
+
+void SdagConstruct::generateEndExec(XStr& op) {
+  op << "     "
+     << "_TRACE_BG_END_EXECUTE(0);\n";
+}
+
+void SdagConstruct::generateBeginTime(XStr& op) {
+  // Record begin time for tracing
+  op << "  double __begintime = CkVTimer(); \n";
+}
+
+void SdagConstruct::generateTlineEndCall(XStr& op) {
+  // Trace this event
+  op << "    _TRACE_BG_TLINE_END(&_bgParentLog);\n";
+}
+
+void SdagConstruct::generateEndSeq(XStr& op) {
+  op << "    void* _bgParentLog = NULL;\n";
+  op << "    CkElapse(0.01e-6);\n";
+  // op<<  "    BgElapse(1e-6);\n";
+  generateTlineEndCall(op);
+  generateTraceEndCall(op, 1);
+  generateEndExec(op);
+}
+
+void SdagConstruct::generateEventBracket(XStr& op, int eventType) {
+  (void)eventType;
+  // Trace this event
+  op << "     _TRACE_BG_USER_EVENT_BRACKET(\"" << nameStr
+     << "\", __begintime, CkVTimer(), &_bgParentLog); \n";
+}
+
+void SdagConstruct::generateListEventBracket(XStr& op, int eventType) {
+  (void)eventType;
+  op << "     _TRACE_BGLIST_USER_EVENT_BRACKET(\"" << nameStr
+     << "\", __begintime,CkVTimer(), &_bgParentLog, " << label << "_bgLogList);\n";
+}
+
+void SdagConstruct::generateRegisterEp(XStr& defs) {
+  if (traceName) defs << "  (void)_sdag_idx_" << traceName << "();\n";
+
+  for (list<SdagConstruct*>::iterator iter = constructs->begin();
+       iter != constructs->end(); ++iter)
+    (*iter)->generateRegisterEp(defs);
+  if (con1) con1->generateRegisterEp(defs);
+  if (con2) con2->generateRegisterEp(defs);
+  if (con3) con3->generateRegisterEp(defs);
+}
+
+void SdagConstruct::generateTraceEp(XStr& decls, XStr& defs, Chare* chare) {
+  if (traceName) {
+    XStr regName, idxName;
+
+    idxName << "_sdag_idx_" << traceName;
+    regName << "_sdag_reg_" << traceName;
+    generateVarSignature(decls, defs, chare, true, "int", &idxName, false, NULL);
+    defs << "  static int epidx = " << regName << "();\n"
+         << "  return epidx;\n";
+    endMethod(defs);
+
+    generateVarSignature(decls, defs, chare, true, "int", &regName, false, NULL);
+    defs << "  return CkRegisterEp(\"" << traceName << "\", NULL, 0, "
+         << chare->indexName() << "::__idx, 0"
+         << ");\n";
+    endMethod(defs);
+  }
+
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it) {
+    (*it)->generateTraceEp(decls, defs, chare);
+  }
+  if (con1) con1->generateTraceEp(decls, defs, chare);
+  if (con2) con2->generateTraceEp(decls, defs, chare);
+  if (con3) con3->generateTraceEp(decls, defs, chare);
+}
+}  // namespace xi

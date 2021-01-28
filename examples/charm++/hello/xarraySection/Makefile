@@ -1,3 +1,4 @@
+-include ../../../common.mk
 # Point this to your charm installation
 CHARM ?= ../../../..
 
@@ -9,7 +10,6 @@ CHARMINC := $(CHARM)/include
 HDR       =
 SRC       = hello.C
 OBJ       = $(SRC:.C=.o)
-INTF      = hello.ci
 
 # Specify the exe name and the arguments to run it with
 NP        = 4
@@ -18,13 +18,8 @@ ARGS      = 10 3 3
 
 # Specify the compilers, run script, flags etc.
 CXX       = $(CHARMBIN)/charmc
-CHARMC    = $(CHARMBIN)/charmc
-OPT       = -O0 -g
-CPPFLAGS +=
-CXXFLAGS += -language charm++ $(OPT)
-LDFLAGS  += -module CkMulticast
-LDLIBS   +=
-EXEC      = ./charmrun
+CHARMC    = $(CHARMBIN)/charmc $(OPTS)
+CXXFLAGS += -language charm++ $(OPTS)
 EXECFLAGS = +p$(NP)
 ifdef $(NODELIST)
   EXECFLAGS += ++nodelist $(NODELIST)
@@ -33,43 +28,29 @@ endif
 
 ########### This stuff should be able take care of itself ############
 
-.PHONY: all clean again test bgtest translateInterface
+.PHONY: all clean again test translateInterface
 
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^
 
 clean:
-	$(RM) $(wildcard *.decl.h *.def.h *.d *.di *.o *.log *.projrc *.sts *.stamp) $(TARGET) charmrun
+	$(RM) $(wildcard *.decl.h *.def.h *.o *.log *.projrc *.sts *.stamp) $(TARGET) charmrun
 
 again:
 	$(MAKE) clean; $(MAKE)
 
 test: all
 	@echo "########################################################################################"
-	$(EXEC) $(EXECFLAGS) $(TARGET) $(ARGS)
+	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS))
 
-####### Pattern rules
-# Rule to generate dependency information for C++ source files
-%.d: %.C
-	$(info Generating dependencies for $<)
-	@g++ -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) -I$(CHARMINC) $< | perl $(CHARMBIN)/dep.pl $(CHARMINC) > $@
-#	@$(SHELL) -ec 'g++ -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) $< \
-#	| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
-#	[ -s $@ ] || rm -f $@'
-
-# Rule to generate dependency info for charm++ interface (ci) definition files
-%.di: %.ci
-	$(info Generating dependencies for $<)
-	@$(CHARMC) -M $< > $@
+hello.decl.h hello.def.h: hello.ci.stamp
 
 # Compilation rule for ci files
 %.ci.stamp: %.ci
 	$(info-ci)
 	$q$(CHARMC) $< && touch $@
 
-# Include the generated files containing dependency info
--include $(SRC:.C=.d)
--include $(INTF:.ci=.di)
-
+hello.o: hello.C hello.decl.h hello.def.h
+	$(CHARMC) -c hello.C

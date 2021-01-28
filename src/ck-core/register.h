@@ -4,6 +4,10 @@
 */
 #ifndef _REGISTER_H
 #define _REGISTER_H
+
+#include "charm.h"
+#include "cklists.h"
+
 /** \addtogroup CkRegister */
 /*@{*/
 
@@ -21,9 +25,6 @@ is completely direct-- the ck.C routines just access, e.g.,
 */
 class EntryInfo {
   public:
-    /// Human-readable name of entry method, including parameters.
-    const char *name;
-    
     /**
       A "call function" is how Charm++ actually invokes an 
       entry method on an object.  Call functions take two parameters:
@@ -52,17 +53,7 @@ class EntryInfo {
     int msgIdx;
     /// Our chare's index into the _chareTable
     int chareIdx;
-    /// Charm++ Tracing enabled for this ep (can change dynamically)
-    bool traceEnabled; 
-    /// Method doesn't keep (and delete) message passed in to it.
-    bool noKeep; 
-    /// true if this EP is charm internal functions
-    bool inCharm;
-    bool appWork; 
-#ifdef ADAPT_SCHED_MEM
-   /// true if this EP is used to be rescheduled when adjusting memory usage
-   bool isMemCritical;
-#endif
+
     /** 
       A "marshall unpack" function:
         1.) Pups method parameters out of the buffer passed in to it.
@@ -72,7 +63,7 @@ class EntryInfo {
       a whole set of combined messages.
     */
     CkMarshallUnpackFn marshallUnpack;
-    
+
 #if CMK_CHARMDEBUG
     /** 
       A "message pup" function pups the message accepted by 
@@ -85,15 +76,68 @@ class EntryInfo {
       marshalled messages.
     */
     CkMessagePupFn messagePup;
+    /// guard entryTable call and name swap for breakpoint in SMP
+    std::atomic<int> breakPointSet;
 #endif
 
-    EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
-      name(n), call(c), msgIdx(m), chareIdx(ci), 
+    /// Charm++ Tracing enabled for this ep (can change dynamically)
+    bool traceEnabled;
+    /// Method doesn't keep (and delete) message passed in to it.
+    bool noKeep;
+    /// Method is an immediate entry method and can bypass scheduler
+    bool isImmediate;
+    /// Method is an inline entry method and can bypass scheduler and execute inline
+    bool isInline;
+    /// true if this EP is charm internal functions
+    bool inCharm;
+    bool appWork;
+    bool ownsName; // if entry is templated or setName() is called, then free name in dtor
+#ifdef ADAPT_SCHED_MEM
+   /// true if this EP is used to be rescheduled when adjusting memory usage
+   bool isMemCritical;
+#endif
+
+    /// Human-readable name of entry method, including parameters.
+    const char *name;
+
+    EntryInfo(const char *n, CkCallFnPtr c, int m, int ci, bool ownsN=false) :
+      call(c), msgIdx(m), chareIdx(ci),
       marshallUnpack(0)
 #if CMK_CHARMDEBUG
-        , messagePup(0)
+      ,messagePup(0)
 #endif
-    { traceEnabled=true; noKeep=false; inCharm=false; appWork=false;}
+      ,traceEnabled(true), noKeep(false), isImmediate(false), isInline(false), inCharm(false), appWork(false),
+      ownsName(ownsN), name(n)
+    {
+      if (ownsName) initName(n);
+#if CMK_CHARMDEBUG
+      breakPointSet=0;
+#endif      
+    }
+
+    ~EntryInfo()
+    {
+      if (ownsName) delete [] name;
+    }
+
+    /// For changing the name after initialization
+    void setName(const char* new_name)
+    {
+      if (ownsName) delete [] name;
+      initName(new_name);
+    }
+
+  private:
+    // Should only be called from ctor or setName
+    void initName(const char* new_name)
+    {
+      size_t len = strlen(new_name);
+      // This is freed via the name pointer in the destructor
+      char* temp = new char[len + 1];
+      strcpy(temp, new_name);
+      name = temp;
+      ownsName = true;
+    }
 };
 
 /**
@@ -102,8 +146,6 @@ It is always stored in _msgTable.
 */
 class MsgInfo {
   public:
-    /// Human-readable name of message, like "CkMarshallMsg".
-    const char *name;
     /**
       A message pack function converts the (possibly complex)
       message into a flat array of bytes.  This method is called
@@ -135,8 +177,11 @@ class MsgInfo {
      */
     size_t size;
 
+    /// Human-readable name of message, like "CkMarshallMsg".
+    const char *name;
+
     MsgInfo(const char *n,CkPackFnPtr p,CkUnpackFnPtr u,CkDeallocFnPtr d,int s):
-      name(n), pack(p), unpack(u), dealloc(d), size(s)
+      pack(p), unpack(u), dealloc(d), size(s), name(n)
     {}
 };
 
@@ -149,7 +194,7 @@ class ChareInfo {
     /// Human-readable name of the chare class, like "MyFoo".
     const char *name;
     /// Size, in bytes, of the body of the chare.
-    int size;
+    size_t size;
     
     /// Constructor epIdx: default constructor and migration constructor (or -1 if none).
     int defCtor,migCtor; 
@@ -158,29 +203,37 @@ class ChareInfo {
     /// chareIdx of each base class.
     int bases[16];
     
-    /// For groups -- 1 if the group is Irreducible 
-    int isIrr;
-    
     /// chare type
     ChareType  chareType;
+    int mainChareIdx;
+
+    /// Number of dimensions for chare arrays (-1 if not an array, 0 is invalid)
+    int ndims;
+
+    /// For groups -- true if the group is Irreducible
+    bool isIrr;
 
     /// true if this EP is charm internal functions
     bool inCharm;
 
-    int mainChareIdx;      
-
-    ChareInfo(const char *n, int s, ChareType t) : name(n), size(s) {
+    ChareInfo(const char *n, size_t s, ChareType t) : name(n), size(s) {
       defCtor=migCtor=-1;
-      isIrr = numbases = 0;
+      isIrr = false;
+      numbases = 0;
       chareType = t;
       inCharm = false;
       mainChareIdx = -1;
+      ndims = -1;
     }
     void setDefaultCtor(int idx) { defCtor = idx; }
     int getDefaultCtor(void) { return defCtor; }
     void setMigCtor(int idx) { migCtor = idx; }
     int getMigCtor(void) { return migCtor; }
-    void addBase(int idx) { bases[numbases++] = idx; }
+    void addBase(int idx) {
+      CkAssert(numbases+1 <= 16); // 'bases' is declared as an array of size 16 above,
+                                  // but we could potentially make it a a std::vector
+      bases[numbases++] = idx;
+    }
     void setInCharm() { inCharm = true; }
     bool isInCharm() { return inCharm; }
     void setMainChareType(int idx) { mainChareIdx = idx; }
@@ -190,11 +243,11 @@ class ChareInfo {
 /// Describes a mainchare's constructor.  These are all executed at startup.
 class MainInfo {
   public:
+    void* obj; // real type is Chare*
     const char *name;
     int chareIdx;
     int entryIdx;
     int entryMigCtor;
-    void* obj; // real type is Chare*
     MainInfo(int c, int e) : name("main"), chareIdx(c), entryIdx(e) {}
     inline void* getObj(void) { return obj; }
     inline void setObj(void *_obj) { obj=_obj; }
@@ -203,14 +256,14 @@ class MainInfo {
 /// Describes a readonly global variable.
 class ReadonlyInfo {
   public:
-    /// Human-readable string name of variable (e.g., "nElements") and type (e.g., "int").
-    const char *name,*type;
     /// Size in bytes of basic value.
-    int size;
+    size_t size;
     /// Address of basic value.
     void *ptr;
     /// Pup routine for value, or NULL if no pup available.
     CkPupReadonlyFnPtr pup;
+    /// Human-readable string name of variable (e.g., "nElements") and type (e.g., "int").
+    const char *name,*type;
     
     /// Pup this global variable.
     void pupData(PUP::er &p) {
@@ -220,8 +273,8 @@ class ReadonlyInfo {
         p((char *)ptr,size);
     }
     ReadonlyInfo(const char *n,const char *t,
-	 int s, void *p,CkPupReadonlyFnPtr pf) 
-	: name(n), type(t), size(s), ptr(p), pup(pf) {}
+	 size_t s, void *p,CkPupReadonlyFnPtr pf)
+	: size(s), ptr(p), pup(pf), name(n), type(t) {}
 };
 
 /**
@@ -248,8 +301,8 @@ class CkRegisteredInfo {
 	void outOfBounds(int idx) {
 		const char *exampleName="";
 		if (vec.size()>0) exampleName=vec[0]->name;
-		CkPrintf("register.h> CkRegisteredInfo<%d,%s> called with invalid index "
-			"%d (should be less than %d)\n", sizeof(T),exampleName,
+		CkPrintf("register.h> CkRegisteredInfo<%zu,%s> called with invalid index "
+			"%d (should be less than %zu)\n", sizeof(T),exampleName,
 			idx, vec.size());
 		CkAbort("Registered idx is out of bounds-- is message or memory corrupted?");
 	}
@@ -258,7 +311,7 @@ public:
 	Subtle: we *don't* want to call vec's constructor,
 	because the order in which constructors for global
 	variables get called is undefined.
-	Hence we rely on the implicit zero-initialization 
+	Hence we rely on the implicit zero-initialization
 	that all globals get.
 	*/
 	CkRegisteredInfo() :vec(CkSkipInitialization()) {}
@@ -278,9 +331,7 @@ public:
 		return vec.size()-1;
 	}
 	
-	/// Return the number of registered entities in this table.
-	/// (This is a reference so the CpdLists can stay up to date).
-	size_t &size(void) {return vec.length();}
+	size_t size(void) {return vec.size();}
 	
 	/// Return the registered data at this index.
 	T *operator[](size_t idx) {
@@ -302,6 +353,8 @@ extern CkRegisteredInfo<ReadonlyMsgInfo> _readonlyMsgs;
 
 extern void _registerInit(void);
 extern void _registerDone(void);
+
+extern int CkGetChareIdx(const char *name);
 
 /*@}*/
 #endif

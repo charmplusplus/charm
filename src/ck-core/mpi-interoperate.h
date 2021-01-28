@@ -7,17 +7,34 @@
 
 #if CMK_CONVERSE_MPI
 #include <mpi.h>
-extern "C" void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
-#else
-extern "C" void CharmLibInit(int userComm, int argc, char **argv);
 #endif
 
-extern "C" void CharmLibExit();
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-extern "C" void LibCkExit(void);
+#if CMK_CONVERSE_MPI
+void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
+#else
+void CharmLibInit(int userComm, int argc, char **argv);
+#endif
 
-extern "C" void StartCharmScheduler();
-extern "C" void StopCharmScheduler();
+void CharmBeginInit(int argc, char** argv);
+void CharmFinishInit();
+void CharmInit(int argc, char** argv);
+
+void CharmLibExit();
+
+void LibCkExit(void);
+
+void StartCharmScheduler();
+void StopCharmScheduler();
+
+#ifdef __cplusplus
+}
+#endif
+
+#undef CkExit
 #define CkExit LibCkExit
 
 #endif //_MPI_INTEROPERATE_

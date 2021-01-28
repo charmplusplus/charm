@@ -1,3 +1,4 @@
+-include ../../../common.mk
 OPTS	= -O3
 CHARMC	= ../../../../bin/charmc $(OPTS)
 
@@ -24,8 +25,14 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o stencil3d stencil3d.prj charmrun *~
 
 test: stencil3d
-	./charmrun +p4 ./stencil3d 64 32 +balancer RefineLB $(TESTOPTS)
-	./charmrun +p4 ./stencil3d 64 32 +balancer GreedyLB $(TESTOPTS)
+	$(call run, +p4 ./stencil3d 64 32 +balancer RefineLB +LBDebug 1 )
+	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyLB +LBDebug 1 )
+	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyRefineLB +LBDebug 1 )
+	$(call run, +p4 ./stencil3d 64 32 +balancer DistributedLB +LBDebug 1 )
 
-bgtest: stencil3d
-	./charmrun +p4 ./stencil3d 32 16 +balancer CommLB +x2 +y2 +z1 +cth1 +wth1
+
+testp: stencil3d
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer RefineLB +LBDebug 1 )
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyLB +LBDebug 1 )
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyRefineLB +LBDebug 1 )
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer DistributedLB +LBDebug 1 )

@@ -3,12 +3,7 @@
 #include "mpi.h"
 #include <math.h>
 
-#if CMK_BIGSIM_CHARM
-extern void BgPrintf(char *);
-#define BGPRINTF(x)  if (thisIndex == 0) BgPrintf(x);
-#else
 #define BGPRINTF(x)
-#endif
 
 #define DIMX 100 
 #define DIMY 100
@@ -79,7 +74,7 @@ static void copyin(double *d, double t[DIMX][DIMY][DIMZ],
 int main(int ac, char** av)
 {
   int i,j,k,m,cidx;
-  int iter, niter;
+  int iter, niter, cp_idx;
   MPI_Status status;
   double error, tval, maxerr, tmpmaxerr, starttime, endtime, itertime;
   chunk *cp;
@@ -96,6 +91,7 @@ int main(int ac, char** av)
     if (thisIndex == 0)
       printf("Usage: jacobi X Y Z [nIter].\n");
     MPI_Finalize();
+    return 1;
   }
   NX = atoi(av[1]);
   NY = atoi(av[2]);
@@ -104,6 +100,7 @@ int main(int ac, char** av)
     if (thisIndex == 0) 
       printf("%d x %d x %d != %d\n", NX,NY,NZ, nblocks);
     MPI_Finalize();
+    return 2;
   }
   if (ac == 5)
     niter = atoi(av[4]);
@@ -114,7 +111,7 @@ int main(int ac, char** av)
 
   cp = new chunk;
 #if defined(AMPI) && ! defined(NO_PUP)
-  MPI_Register((void*)&cp, (MPI_PupFn) chunk_pup);
+  AMPI_Register_pup((MPI_PupFn)chunk_pup, (void*)&cp, &cp_idx);
 #endif
 
   index3d(thisIndex, cp->xidx, cp->yidx, cp->zidx);
@@ -161,26 +158,26 @@ int main(int ac, char** av)
     copyout(cp->sbzm, cp->t, 1, DIMX, 1, DIMY, 1, 1);
     copyout(cp->sbzp, cp->t, 1, DIMX, 1, DIMY, DIMZ, DIMZ);
 */
-    MPI_IGet(0, DIMY*DIMZ, MPI_DOUBLE, cp->xp, 0, DIMY*DIMZ, MPI_DOUBLE, win, &reqxp);
-    MPI_IGet(0, DIMY*DIMZ, MPI_DOUBLE, cp->xm, (DIMX-1)*DIMY*DIMZ, DIMY*DIMZ, MPI_DOUBLE, win, &reqxm);
-    MPI_IGet(0, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 0, DIMZ, linevec, win, &reqyp);
-    MPI_IGet(0, DIMX*DIMZ, MPI_DOUBLE, cp->yp, (DIMY-1), DIMZ, linevec, win, &reqym);
-    MPI_IGet(0, DIMX*DIMY, MPI_DOUBLE, cp->zp, 0, DIMX*DIMY, planevec, win, &reqzp);
-    MPI_IGet(0, DIMX*DIMY, MPI_DOUBLE, cp->zp, 0, DIMX*DIMY, planevec, win, &reqzm);
+    AMPI_Iget(0, DIMY*DIMZ, MPI_DOUBLE, cp->xp, 0, DIMY*DIMZ, MPI_DOUBLE, win, &reqxp);
+    AMPI_Iget(0, DIMY*DIMZ, MPI_DOUBLE, cp->xm, (DIMX-1)*DIMY*DIMZ, DIMY*DIMZ, MPI_DOUBLE, win, &reqxm);
+    AMPI_Iget(0, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 0, DIMZ, linevec, win, &reqyp);
+    AMPI_Iget(0, DIMX*DIMZ, MPI_DOUBLE, cp->yp, (DIMY-1), DIMZ, linevec, win, &reqym);
+    AMPI_Iget(0, DIMX*DIMY, MPI_DOUBLE, cp->zp, 0, DIMX*DIMY, planevec, win, &reqzp);
+    AMPI_Iget(0, DIMX*DIMY, MPI_DOUBLE, cp->zp, 0, DIMX*DIMY, planevec, win, &reqzm);
 
-    MPI_IGet_Wait(&reqxp, &stsxp, win);
-    MPI_IGet_Wait(&reqxm, &stsxm, win);
-    MPI_IGet_Wait(&reqyp, &stsyp, win);
-    MPI_IGet_Wait(&reqym, &stsym, win);
-    MPI_IGet_Wait(&reqzp, &stszp, win);
-    MPI_IGet_Wait(&reqzm, &stszm, win);
+    AMPI_Iget_wait(&reqxp, &stsxp, win);
+    AMPI_Iget_wait(&reqxm, &stsxm, win);
+    AMPI_Iget_wait(&reqyp, &stsyp, win);
+    AMPI_Iget_wait(&reqym, &stsym, win);
+    AMPI_Iget_wait(&reqzp, &stszp, win);
+    AMPI_Iget_wait(&reqzm, &stszm, win);
 
-    cp->sbxp = (double*)MPI_IGet_Data(stsxp);
-    cp->sbxm = (double*)MPI_IGet_Data(stsxm);
-    cp->sbyp = (double*)MPI_IGet_Data(stsyp);
-    cp->sbym = (double*)MPI_IGet_Data(stsym);
-    cp->sbzp = (double*)MPI_IGet_Data(stszp);
-    cp->sbzm = (double*)MPI_IGet_Data(stszm);
+    AMPI_Iget_data((double*)cp->sbxp, stsxp);
+    AMPI_Iget_data((double*)cp->sbxm, stsxm);
+    AMPI_Iget_data((double*)cp->sbyp, stsyp);
+    AMPI_Iget_data((double*)cp->sbym, stsym);
+    AMPI_Iget_data((double*)cp->sbzp, stszp);
+    AMPI_Iget_data((double*)cp->sbzm, stszm);
 
 
     if(iter > 25 &&  iter < 85 && thisIndex == 35)
@@ -395,12 +392,12 @@ cp->sbxm[j*DIMZ+i])/7.0;
 
     }
 
-    MPI_IGet_Free(&reqxp, &stsxp, win);
-    MPI_IGet_Free(&reqxm, &stsxm, win);
-    MPI_IGet_Free(&reqyp, &stsyp, win);
-    MPI_IGet_Free(&reqym, &stsym, win);
-    MPI_IGet_Free(&reqzp, &stszp, win);
-    MPI_IGet_Free(&reqzm, &stszm, win);
+    AMPI_Iget_free(&reqxp, &stsxp, win);
+    AMPI_Iget_free(&reqxm, &stsxm, win);
+    AMPI_Iget_free(&reqyp, &stsyp, win);
+    AMPI_Iget_free(&reqym, &stsym, win);
+    AMPI_Iget_free(&reqzp, &stszp, win);
+    AMPI_Iget_free(&reqzm, &stszm, win);
 
     MPI_Allreduce(&maxerr, &tmpmaxerr, 1, MPI_DOUBLE, MPI_MAX, 
                    MPI_COMM_WORLD);
@@ -416,7 +413,7 @@ cp->sbxm[j*DIMZ+i])/7.0;
     starttime = MPI_Wtime();
 #ifdef AMPI
     if(iter%20 == 10) {
-      MPI_Migrate();
+      AMPI_Migrate(AMPI_INFO_LB_SYNC);
     }
 #endif
   }

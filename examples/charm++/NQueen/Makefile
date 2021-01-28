@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC = ../../../bin/charmc -O3 $(OPTS) 
 default: all
 all: nqueen nqueen_neighbor nqueen_workstealing
@@ -48,8 +49,8 @@ counter.o: counter.C  Counter.decl.h Counter.def.h
 main.decl.h main.def.h : main.ci.stamp
 Counter.decl.h Counter.def.h : counter.ci.stamp
 
-test: all
-	 ./charmrun +p 4 ./nqueen 17 5 +CPGatherAll +CPSaveData +CPDefaultValues grainsize=5 +CPDivideConquer +CPSamplePeriod 0.25
+test: nqueen
+	$(call run, +p 4 ./nqueen 16 4 )
 
 clean:
 	rm -f main.decl.h main.def.h main.o

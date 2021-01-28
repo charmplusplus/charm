@@ -47,12 +47,12 @@ If we haven't gotten a contribution from all living contributors, node zero
 waits for the migrant contributions to straggle in.
 
 */
+#include <limits>
+
 #include "charm++.h"
 #include "ck.h"
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 #include "pathHistory.h"
-#endif
 
 #if CMK_DEBUG_REDUCTIONS
 //Debugging messages:
@@ -68,6 +68,7 @@ waits for the migrant contributions to straggle in.
 // For status and data messages from the builtin reducer functions.
 #define RED_DEB(x) //CkPrintf x
 #define DEBREVAC(x) CkPrintf x
+#define DEB_TUPLE(x) CkPrintf x
 #else
 //No debugging info-- empty defines
 #define DEBR(x) // CkPrintf x
@@ -77,16 +78,21 @@ waits for the migrant contributions to straggle in.
 #define DEBN(x) //CkPrintf x
 #define RED_DEB(x) //CkPrintf x
 #define DEBREVAC(x) //CkPrintf x
+#define DEB_TUPLE(x) //CkPrintf x
 #endif
 
 #ifndef INT_MAX
 #define INT_MAX 2147483647
 #endif
 
-extern int _inrestart;
+extern bool _inrestart;
+#if CMK_CHARM4PY
+//define a global instance of CkReductionTypesExt for external access
+CkReductionTypesExt charm_reducers;
+extern int (*PyReductionExt)(char**, int*, int, char**);
+#endif
 
-Group::Group()
-  : CkReductionMgr(CkpvAccess(_currentGroupRednMgr))
+Group::Group():thisIndex(CkMyPe())
 {
 	if (_inrestart) CmiAbort("A Group object did not call the migratable constructor of its base class!");
 
@@ -94,12 +100,9 @@ Group::Group()
 	contributorStamped(&reductionInfo);
 	contributorCreated(&reductionInfo);
 	doneCreatingContributors();
-#if !GROUP_LEVEL_REDUCTION
-	DEBR(("[%d,%d]Creating nodeProxy with gid %d\n",CkMyNode(),CkMyPe(),CkpvAccess(_currentGroupRednMgr)));
-#endif
 }
 
-Group::Group(CkMigrateMessage *msg):CkReductionMgr(msg)
+Group::Group(CkMigrateMessage *msg):CkReductionMgr(msg),thisIndex(CkMyPe())
 {
 	creatingContributors();
 	contributorStamped(&reductionInfo);
@@ -135,7 +138,7 @@ is constructed and ready to process other calls.
 */
 CkGroupReadyCallback::CkGroupReadyCallback(void)
 {
-  _isReady = 0;
+  _isReady = false;
 }
 void
 CkGroupReadyCallback::callBuffered(void)
@@ -177,17 +180,15 @@ the reduced message up the reduction tree to node zero, where
 they're passed to the user's client function.
 */
 
-CkReductionMgr::CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr)
+CkReductionMgr::CkReductionMgr()
   :
-#if !GROUP_LEVEL_REDUCTION
-  nodeProxy(groupRednMgr),
-#endif
-  thisProxy(thisgroup)
+  thisProxy(thisgroup),
+  isDestroying(false)
 { 
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
 #else
-  init_BinaryTree();
+  init_TopoTree();
 #endif
   redNo=0;
   completedRedNo = -1;
@@ -198,10 +199,6 @@ CkReductionMgr::CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr)
   nContrib=nRemote=0;
   is_inactive = false;
   maxStartRequest=0;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	numImmigrantRecObjs = 0;
-	numEmigrantRecObjs = 0;
-#endif
   disableNotifyChildrenStart = false;
 
   barrier_gCount=0;
@@ -212,6 +209,7 @@ CkReductionMgr::CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr)
 }
 
 CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
+                                                    , isDestroying(false)
 {
   numKids = -1;
   redNo=0;
@@ -229,20 +227,11 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   barrier_nSource=0;
   barrier_nContrib=barrier_nRemote=0;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  numImmigrantRecObjs = 0;
-  numEmigrantRecObjs = 0;
-#endif
 
 }
 
 CkReductionMgr::~CkReductionMgr()
 {
-#if !GROUP_LEVEL_REDUCTION
-  if (CkMyRank() == 0) {
-    delete nodeProxy.ckLocalBranch();
-  }
-#endif
 }
 
 void CkReductionMgr::flushStates()
@@ -261,11 +250,8 @@ void CkReductionMgr::flushStates()
   while (!futureRemoteMsgs.isEmpty()) delete futureRemoteMsgs.deq();
   while (!finalMsgs.isEmpty()) delete finalMsgs.deq();
 
-  adjVec.length()=0;
+  adjVec.clear();
 
-#if ! GROUP_LEVEL_REDUCTION
-  nodeProxy[CkMyNode()].ckLocalBranch()->flushStates();
-#endif
 }
 
 //////////// Reduction Manager Client API /////////////
@@ -278,20 +264,6 @@ void CkReductionMgr::ckSetReductionClient(CkCallback *cb)
   if (CkMyPe()!=0)
 	  CkError("WARNING: ckSetReductionClient should only be called from processor zero!\n");  
   storedCallback=*cb;
-#if ! GROUP_LEVEL_REDUCTION
-  CkCallback *callback =new CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(0),thishandle);
-  nodeProxy.ckSetReductionClient(callback);
-#endif
-}
-
-///////////////////////////// Contributor ////////////////////////
-//Contributors keep a copy of this structure:
-
-/*Contributor migration support:
-*/
-void contributorInfo::pup(PUP::er &p)
-{
-  p(redNo);
 }
 
 ////////////////////// Contributor list maintainance: /////////////////
@@ -350,6 +322,9 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
   // ignore from listener if it is during restart from crash
   if (CkInRestarting()) return;
 #endif
+
+  if (isDestroying) return;
+
   DEBR((AA "Contributor %p(%d) died\n" AB,ci,ci->redNo));
   //We lost a contributor
   gcount--;
@@ -424,61 +399,23 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
 // Each contributor must contribute exactly once to the each reduction.
 void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&(m->log));
-#endif
   DEBR((AA "Contributor %p contributed for %d in grp %d ismigratable %d \n" AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
-  //m->ci=ci;
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-
-	// if object is an immigrant recovery object, we send the contribution to the source PE
-	if(CpvAccess(_currentObj)->mlogData->immigrantRecFlag){
-		
-		// turning on the message-logging bypass flag
-		envelope *env = UsrToEnv(m);
-		env->flags = env->flags | CK_BYPASS_DET_MLOG;
-    	thisProxy[CpvAccess(_currentObj)->mlogData->immigrantSourcePE].contributeViaMessage(m);
-		return;
-	}
-
-    Chare *oldObj = CpvAccess(_currentObj);
-    CpvAccess(_currentObj) = this;
-
-	// adding contribution
-	addContribution(m);
-
-    CpvAccess(_currentObj) = oldObj;
-#else
   addContribution(m);
-#endif
 }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){
-	//if(CkMyPe() == 2) CkPrintf("[%d] ---> Contributing Via Message\n",CkMyPe());
-	
-	// turning off bypassing flag
-	envelope *env = UsrToEnv(m);
-	env->flags = env->flags & ~CK_BYPASS_DET_MLOG;
-
-	// adding contribution
-    addContribution(m);
-}
-#else
 void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){}
-#endif
 
 void CkReductionMgr::checkIsActive() {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) || CMK_MEM_CHECKPOINT
   return;
 #endif
 
   // Check the number of kids in the inactivelist before or at this redNo
-  std::map<int, int>::iterator it;
+  std::unordered_map<int, int>::iterator it;
   int c_inactive = 0;
   for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
     if (it->second <= redNo) {
@@ -510,10 +447,10 @@ void CkReductionMgr::checkAndAddToInactiveList(int id, int red_no) {
     thisProxy[id].ReductionStarting(new CkReductionNumberMsg(red_no));
   }
 
-  std::map<int, int>::iterator it;
+  std::unordered_map<int, int>::iterator it;
   it = inactiveList.find(id);
   if (it == inactiveList.end()) {
-    inactiveList.insert(std::pair<int, int>(id, red_no));
+    inactiveList.emplace(id, red_no);
   } else {
     it->second = red_no;
   }
@@ -528,7 +465,7 @@ void CkReductionMgr::checkAndAddToInactiveList(int id, int red_no) {
 * particular red_no
 */
 void CkReductionMgr::checkAndRemoveFromInactiveList(int id, int red_no) {
-  std::map<int, int>::iterator it;
+  std::unordered_map<int, int>::iterator it;
   it = inactiveList.find(id);
   if (it == inactiveList.end()) {
     return;
@@ -554,14 +491,14 @@ void CkReductionMgr::informParentInactive() {
 *  for the specified red_no
 */
 void CkReductionMgr::sendReductionStartingToKids(int red_no) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) || CMK_MEM_CHECKPOINT
   for (int k=0;k<treeKids();k++)
   {
-    DEBR((AA "Asking child PE %d to start #%d\n" AB,firstKid()+k,redNo));
+    DEBR((AA "Asking child PE %d to start #%d\n" AB,kids[k],redNo));
     thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
   }
 #else
-  std::map<int, int>::iterator it;
+  std::unordered_map<int, int>::iterator it;
   for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
     if (it->second <= red_no) {
       DEBR((AA "Parent sending reductionstarting to inactive kid %d\n" AB,
@@ -607,21 +544,7 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 // of migrants that missed the main reduction.
 void CkReductionMgr::LateMigrantMsg(CkReductionMsg *m)
 {
-#if GROUP_LEVEL_REDUCTION
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&(m->log));
-#endif
   addContribution(m);
-#else
-  m->secondaryCallback = m->callback;
-  m->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
-  CkArrayReductionMgr *nodeMgr=nodeProxy[CkMyNode()].ckLocalBranch();
-  nodeMgr->LateMigrantMsg(m);
-/*	int len = finalMsgs.length();
-	finalMsgs.enq(m);
-//	CkPrintf("[%d]Late Migrant Detected for %d ,  (%d %d )\n",CkMyPe(),m->redNo,len,finalMsgs.length());
-	endArrayReduction();*/
-#endif
 }
 
 //A late migrating contributor will never contribute to this reduction
@@ -656,73 +579,19 @@ void CkReductionMgr::startReduction(int number,int srcPE)
   inProgress=true;
  
 
-	/*
-		FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
   if(!CmiNodeAlive(CkMyPe())){
 	return;
   }
+#endif
 
+  // TODO: This is currently gotten from the command-line...but it could
+  // probably just be determined at runtime. I don't know if the CL option is
+  // even documented anywhere.
   if(disableNotifyChildrenStart) return;
  
   //Sent start requests to our kids (in case they don't already know)
-#if GROUP_LEVEL_REDUCTION
   sendReductionStartingToKids(redNo);
-  //for (int k=0;k<treeKids();k++)
-  //{
-  //  DEBR((AA "Asking child PE %d to start #%d\n" AB,firstKid()+k,redNo));
-  //  thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
-  //}
-#else
-  nodeProxy[CkMyNode()].ckLocalBranch()->startNodeGroupReduction(number,thisgroup);
-#endif
-	
-	/*
-  int temp;
-  //making it a broadcast done only by PE 0
-  if(!hasParent()){
-		temp = completedRedNo+1;
-		for(int i=temp;i<=number;i++){
-			for(int j=0;j<CkNumPes();j++){
-				if(j != CkMyPe() && j != srcPE){
-					if((CmiNodeAlive(j)||allowMessagesOnly !=-1){
-						thisProxy[j].ReductionStarting(new CkReductionNumberMsg(i));
-					}
-				}
-			}
-		}	
-	}	else{
-		temp = number;
-	}*/
-/*  if(!hasParent()){
-		temp = completedRedNo+1;
-	}	else{
-		temp = number;
-	}
-	for(int i=temp;i<=number;i++){
-	//	DEBR((AA "Asking all child PEs to start #%d \n" AB,i));
-		if(hasParent()){
-	  // kick-start your parent too ...
-			if(treeParent() != srcPE){
-				if(CmiNodeAlive(treeParent())||allowMessagesOnly !=-1){
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = oldObj;
-#endif
-		  		thisProxy[treeParent()].ReductionStarting(new CkReductionNumberMsg(i));
-				}	
-			}	
-		}
-	  for (int k=0;k<treeKids();k++)
-	  {
-			if(firstKid()+k != srcPE){
-				if(CmiNodeAlive(kids[k])||allowMessagesOnly !=-1){
-			    DEBR((AA "Asking child PE %d to start #%d\n" AB,kids[k],redNo));
-			    thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(i));
-				}	
-			}	
-  	}
-	}
-	*/
 }	
 
 /*Handle a message from one element for the reduction*/
@@ -730,15 +599,11 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
 {
   if (isPast(m->redNo))
   {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CmiAbort("this version should not have late migrations");
-#else
 	//We've moved on-- forward late contribution straight to root
     DEBR((AA "Migrant gives late contribution for #%d!\n" AB,m->redNo));
    	// if (!hasParent()) //Root moved on too soon-- should never happen
    	//   CkAbort("Late reduction contribution received at root!\n");
     thisProxy[0].LateMigrantMsg(m);
-#endif
   }
   else if (isFuture(m->redNo)) {//An early contribution-- add to future Q
     DEBR((AA "Contributor gives early contribution-- for #%d\n" AB,m->redNo));
@@ -764,41 +629,47 @@ void CkReductionMgr::finishReduction(void)
   	DEBR((AA "Either not in Progress or creating\n" AB));
   	return;
   }
-  //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	if (nContrib<(lcount+adj(redNo).lcount) - numImmigrantRecObjs + numEmigrantRecObjs){
-        DEBR((AA "Need more local messages %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
-		return;//Need more local messages
-	}
-#else
-  if (nContrib<(lcount+adj(redNo).lcount)){
-         DEBR((AA "Need more local messages %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
-	 return;//Need more local messages
-  }
-#endif
 
-#if GROUP_LEVEL_REDUCTION
+  bool partialReduction = false;
+
+  //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
+  if (nContrib<(lcount+adj(redNo).lcount)){
+         if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
+           partialReduction = true;
+         }
+         else {
+           DEBR((AA "Need more local messages %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
+           return; //Need more local messages
+         }
+  }
+
   if (nRemote<treeKids()) {
-    DEBR((AA "Need more remote messages %d %d\n" AB,nRemote,treeKids()));
-    return;//Need more remote messages
+    if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
+      partialReduction = true;
+    }
+    else {
+      DEBR((AA "Need more remote messages %d %d\n" AB,nRemote,treeKids()));
+      return; //Need more remote messages
+    }
   }
 	
-#endif
  
   DEBR((AA "Reducing data... %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
-  CkReductionMsg *result=reduceMessages();
+  CkReductionMsg *result=reduceMessages(msgs);
+  result->fromPE = CkMyPe();
   result->redNo=redNo;
+  DEBR((AA "Reduced gcount=%d; sourceFlag=%d\n" AB,result->gcount,result->sourceFlag));
 
-#if GROUP_LEVEL_REDUCTION
+  if (partialReduction) {
+    msgs.enq(result);
+    return;
+  }
+
   if (hasParent())
   {//Pass data up tree to parent
     DEBR((AA "Passing reduced data up to parent node %d.\n" AB,treeParent()));
     DEBR((AA "Message gcount is %d+%d+%d.\n" AB,result->gcount,gcount,adj(redNo).gcount));
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     result->gcount+=gcount+adj(redNo).gcount;
-#else
-    result->gcount+=gcount+adj(redNo).gcount;
-#endif
     thisProxy[treeParent()].RecvMsg(result);
   }
   else 
@@ -812,9 +683,7 @@ void CkReductionMgr::finishReduction(void)
       return; // Wait for migrants to contribute
     } else if (totalElements<result->nSources()) {
       DEBR((AA "Got %d of %d contributions\n" AB,result->nSources(),totalElements));
-#if !defined(_FAULT_CAUSAL_)
       CkAbort("ERROR! Too many contributions at root!\n");
-#endif
     }
     DEBR((AA "Passing result to client function\n" AB));
     CkSetRefNum(result, result->getUserFlag());
@@ -827,21 +696,6 @@ void CkReductionMgr::finishReduction(void)
 		    "You must register a client with either SetReductionClient or during contribute.\n");
   }
 
-#else
-  result->gcount+=gcount+adj(redNo).gcount;
-
-  result->secondaryCallback = result->callback;
-  result->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
-	DEBR((AA "Reduced mesg gcount %d localgcount %d\n" AB,result->gcount,gcount));
-
-  //CkPrintf("[%d] Got all local Messages in finishReduction %d in redNo %d\n",CkMyPe(),nContrib,redNo);
-
- // DEBR(("[%d,%d]Callback for redNo %d in group %d  mesggcount=%d localgcount=%d\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,ret->gcount,gcount));
-  
-  // Find our node reduction manager, and pass reduction to him:
-  CkArrayReductionMgr *nodeMgr=nodeProxy[CkMyNode()].ckLocalBranch();
-  nodeMgr->contributeArrayReduction(result);
-#endif
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
@@ -850,17 +704,8 @@ void CkReductionMgr::finishReduction(void)
   checkIsActive();
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
-#if !GROUP_LEVEL_REDUCTION
-    /* nodegroup reduction will adjust adjVec in endArrayReduction on PE 0 */
-  if(CkMyPe()!=0)
-#endif
-  {
-	completedRedNo++;
-  	for (i=1;i<(int)(adjVec.length());i++){
-	   adjVec[i-1]=adjVec[i];
-	}
-	adjVec.length()--;  
-  }
+  completedRedNo++;
+  adjVec.erase(adjVec.begin());
 
   inProgress=false;
   startRequested=false;
@@ -874,7 +719,6 @@ void CkReductionMgr::finishReduction(void)
     if (m!=NULL) //One of these addContributions may have finished us.
       addContribution(m);//<- if *still* early, puts it back in the queue
   }
-#if GROUP_LEVEL_REDUCTION
   n=futureRemoteMsgs.length();
   for (i=0;i<n;i++)
   {
@@ -883,7 +727,6 @@ void CkReductionMgr::finishReduction(void)
       RecvMsg(m);//<- if *still* early, puts it back in the queue
     }
   }
-#endif
 
   if(maxStartRequest >= redNo){
 	  startReduction(redNo,CkMyPe());
@@ -896,10 +739,6 @@ void CkReductionMgr::finishReduction(void)
 //Sent up the reduction tree with reduced data
   void CkReductionMgr::RecvMsg(CkReductionMsg *m)
 {
-#if GROUP_LEVEL_REDUCTION
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&m->log);
-#endif
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
     DEBR((AA "Recv'd remote contribution %d for #%d\n" AB,nRemote,m->redNo));
     // If the remote contribution is real, then check whether we can remove the
@@ -917,7 +756,6 @@ void CkReductionMgr::finishReduction(void)
     futureRemoteMsgs.enq(m);
   } 
   else CkAbort("Recv'd late remote contribution!\n");
-#endif
 }
 
 void CkReductionMgr::AddToInactiveList(CkReductionInactiveMsg *m) {
@@ -944,55 +782,63 @@ countAdjustment &CkReductionMgr::adj(int number)
   number--;
   if (number<0) CkAbort("Requested adjustment to prior reduction!\n");
   //Pad the adjustment vector with zeros until it's at least number long
-  while ((int)(adjVec.length())<=number)
-    adjVec.push_back(countAdjustment());
+  if (adjVec.size() <= number) { adjVec.resize(number + 1); }
   return adjVec[number];
 }
 
 //Combine (& free) the current message vector msgs.
-CkReductionMsg *CkReductionMgr::reduceMessages(void)
+CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_END_EXECUTE(1);
-  void* _bgParentLog = NULL;
-  _TRACE_BG_BEGIN_EXECUTE_NOMSG("GroupReduce", &_bgParentLog, 0);
-#endif
   CkReductionMsg *ret=NULL;
 
   //Look through the vector for a valid reducer, swapping out placeholder messages
   CkReduction::reducerType r=CkReduction::invalid;
   int msgs_gcount=0;//Reduced gcount
   int msgs_nSources=0;//Reduced nSources
-  int msgs_userFlag=-1;
+  CMK_REFNUM_TYPE msgs_userFlag=(CMK_REFNUM_TYPE)-1;
   CkCallback msgs_callback;
   int i;
   int nMsgs=0;
-  CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
   CkReductionMsg *m;
+  std::vector<CkReductionMsg *> msgArr(msgs.length());
   bool isMigratableContributor;
 
   // Copy message queue into msgArr, skipping placeholders:
   while (NULL!=(m=msgs.deq()))
   {
+    DEBR((AA "***** gcount=%d; sourceFlag=%d ismigratable %d \n" AB,m->gcount,m->nSources(),m->isMigratableContributor()));
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
       msgs_nSources+=m->nSources();
-#if CMK_BIGSIM_CHARM
-      _TRACE_BG_ADD_BACKWARD_DEP(m->log);
-#endif
 
-      // for "random" reducer type, only need to accept one message
-      if (nMsgs == 0 || m->reducer != CkReduction::random) {
+      // for "nop" reducer type, only need to accept one message
+      if (nMsgs == 0 || m->reducer != CkReduction::nop) {
         msgArr[nMsgs++]=m;
-        r=m->reducer;
-        if (!m->callback.isInvalid())
+        if (!m->callback.isInvalid()) {
+#if CMK_ERROR_CHECKING
+          if(nMsgs > 1 && !(msgs_callback == m->callback)) {
+            CkPrintf("Mismatched callback details: reducers (%s, %s); callback types (%s, %s)\n",
+                     CkReduction::reducerTable()[r].name, CkReduction::reducerTable()[m->reducer].name,
+                     CkCallback::typeName(msgs_callback.type), CkCallback::typeName(m->callback.type));
+            CkAbort("mis-matched client callbacks in reduction messages\n");
+          }
+#endif
           msgs_callback=m->callback;
-        if (m->userFlag!=-1)
+        }
+        r=m->reducer;
+        if (m->userFlag!=(CMK_REFNUM_TYPE)-1)
           msgs_userFlag=m->userFlag;
 	isMigratableContributor=m->isMigratableContributor();
-      }
-      else {
+      } else {
+#if CMK_ERROR_CHECKING
+        if(!(msgs_callback == m->callback)) {
+          CkPrintf("Mismatched callback details: reducers (%s, %s); callback types (%s, %s)\n",
+                     CkReduction::reducerTable()[r].name, CkReduction::reducerTable()[m->reducer].name,
+                     CkCallback::typeName(msgs_callback.type), CkCallback::typeName(m->callback.type));
+          CkAbort("mis-matched client callbacks in reduction messages\n");
+        }
+#endif
         delete m;
       }
     }
@@ -1008,42 +854,40 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   else
   {//Use the reducer to reduce the messages
 		//if there is only one msg to be reduced just return that message
-    if(nMsgs == 1 && msgArr[0]->reducer != CkReduction::set) {
-	ret = msgArr[0];	
+    if(nMsgs == 1 &&
+       msgArr[0]->reducer != CkReduction::set &&
+       msgArr[0]->reducer != CkReduction::tuple) {
+      ret = msgArr[0];
     }else{
-      if (msgArr[0]->reducer == CkReduction::random) {
-        // nMsgs > 1 indicates that reduction type is not random
-        // this means any data with reducer type random was submitted
+      if (msgArr[0]->reducer == CkReduction::nop) {
+        // nMsgs > 1 indicates that reduction type is not nop
+        // this means any data with reducer type nop was submitted
         // only so that counts would agree, and can be removed
         delete msgArr[0];
         msgArr[0] = msgArr[nMsgs - 1];
         nMsgs--;
       }
-      CkReduction::reducerFn f=CkReduction::reducerTable[r];
-      ret=(*f)(nMsgs,msgArr);
+      CkReduction::reducerFn f=CkReduction::reducerTable()[r].fn;
+      ret=(*f)(nMsgs,msgArr.data());
     }
     ret->reducer=r;
   }
 
-
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-
+#if USE_CRITICAL_PATH_HEADER_ARRAY
 #if CRITICAL_PATH_DEBUG > 3
-  CkPrintf("combining critical path information from messages in CkReductionMgr::reduceMessages\n");
+  CkPrintf("[%d] combining critical path information from messages in reduceMessages(). numMsgs=%d\n", CkMyPe(), nMsgs);
 #endif
-
   MergeablePathHistory path(CkpvAccess(currentlyExecutingPath));
   path.updateMax(UsrToEnv(ret));
-  // Combine the critical paths from all the reduction messages
+  // Combine the critical paths from all the reduction messages into the header for the new result
   for (i=0;i<nMsgs;i++){
     if (msgArr[i]!=ret){
       //      CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
       path.updateMax(UsrToEnv(msgArr[i]));
+    } else {
+      //	    CkPrintf("[%d] other path is ret = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
     }
   }
-  
-
 #if CRITICAL_PATH_DEBUG > 3
   CkPrintf("[%d] result path = %lf\n", CkMyPe(), path.getTime() );
 #endif
@@ -1055,17 +899,13 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 
 	//Go back through the vector, deleting old messages
   for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
-  delete [] msgArr;
 
   //Set the message counts
-  ret->redNo=redNo;
   ret->gcount=msgs_gcount;
   ret->userFlag=msgs_userFlag;
   ret->callback=msgs_callback;
   ret->sourceFlag=msgs_nSources;
-	ret->setMigratableContributor(isMigratableContributor);
-  ret->fromPE = CkMyPe();
-  DEBR((AA "Reduced gcount=%d; sourceFlag=%d\n" AB,ret->gcount,ret->sourceFlag));
+  ret->setMigratableContributor(isMigratableContributor);
 
   return ret;
 }
@@ -1090,9 +930,6 @@ void CkReductionMgr::pup(PUP::er &p)
   p|futureRemoteMsgs;
   p|finalMsgs;
   p|adjVec;
-#if !GROUP_LEVEL_REDUCTION
-  p|nodeProxy;
-#endif
   p|storedCallback;
     // handle CkReductionClientBundle
   if (storedCallback.type == CkCallback::callCFn && storedCallback.d.cfn.fn == CkReductionClientBundle::callbackCfn) 
@@ -1123,7 +960,7 @@ void CkReductionMgr::pup(PUP::er &p)
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
 #else
-    init_BinaryTree();
+    init_TopoTree();
 #endif
     is_inactive = false;
     checkIsActive();
@@ -1132,223 +969,101 @@ void CkReductionMgr::pup(PUP::er &p)
   DEBR(("[%d,%d] pupping _____________  gcount = %d \n",CkMyNode(),CkMyPe(),gcount));
 }
 
-
-//Callback for doing Reduction through NodeGroups added by Sayantan
-
-void CkReductionMgr::ArrayReductionHandler(CkReductionMsg *m){
-
-	int total = m->gcount+adj(m->redNo).gcount;
-	finalMsgs.enq(m);
-	//CkPrintf("ArrayReduction Handler Invoked for %d \n",m->redNo);
-	adj(m->redNo).mainRecvd = 1;
-	DEBR(("~~~~~~~~~~~~~ ArrayReductionHandler Callback called for redNo %d with mesgredNo %d at %.6f %d\n",completedRedNo,m->redNo,CmiWallTimer()));
-	endArrayReduction();
-}
-
-void CkReductionMgr :: endArrayReduction(){
-	CkReductionMsg *ret=NULL;
-  	int nMsgs=finalMsgs.length();
-	//CkPrintf("endArrayReduction Invoked for %d \n",completedRedNo+1);
-  	//Look through the vector for a valid reducer, swapping out placeholder messages
-	//CkPrintf("Length of Final Message %d \n",nMsgs);
-  	CkReduction::reducerType r=CkReduction::invalid;
-  	int msgs_gcount=0;//Reduced gcount
-  	int msgs_nSources=0;//Reduced nSources
-  	int msgs_userFlag=-1;
-  	CkCallback msgs_callback;
-	CkCallback msgs_secondaryCallback;
-	CkVec<CkReductionMsg *> tempMsgs;
-  	int i;
-	int numMsgs = 0;
-  	for (i=0;i<nMsgs;i++)
-  	{
-          CkReductionMsg *m=finalMsgs.deq();
-          if(m->redNo == completedRedNo +1){
-            msgs_gcount+=m->gcount;
-            if (m->sourceFlag!=0)
-            { //This is a real message from an element, not just a placeholder
-              msgs_nSources+=m->nSources();
-
-              // for "random" reducer type, only need to accept one message
-              if (tempMsgs.length() == 0 || m->reducer != CkReduction::random) {
-                r=m->reducer;
-                if (!m->callback.isInvalid())
-                  msgs_callback=m->callback;
-                if(!m->secondaryCallback.isInvalid())
-                  msgs_secondaryCallback = m->secondaryCallback;
-                if (m->userFlag!=-1)
-                  msgs_userFlag=m->userFlag;
-                tempMsgs.push_back(m);
-              }
-              else {
-                delete m;
-              }
-            }
-            else {
-              delete m;
-            }
-          }else{
-            finalMsgs.enq(m);
-          }
-	}
-	numMsgs = tempMsgs.length();
-
-	DEBR(("[%d]Total = %d %d Sources = %d Number of Messages %d Adj(Completed redno).mainRecvd %d\n",CkMyPe(),msgs_gcount,  adj(completedRedNo+1).gcount,msgs_nSources,numMsgs,adj(completedRedNo+1).mainRecvd));
-
-	if(numMsgs == 0){
-		return;
-	}
-	if(adj(completedRedNo+1).mainRecvd == 0){
-		for(i=0;i<numMsgs;i++){
-			finalMsgs.enq(tempMsgs[i]);
-		}
-		return;
-	}
-
-/*
-	NOT NEEDED ANYMORE DONE at nodegroup level
-	if(msgs_gcount  > msgs_nSources){
-		for(i=0;i<numMsgs;i++){
-			finalMsgs.enq(tempMsgs[i]);
-		}
-		return;
-	}*/
-
-	if (numMsgs==0||r==CkReduction::invalid)
-  		//No valid reducer in the whole vector
-    		ret=CkReductionMsg::buildNew(0,NULL);
-  	else{//Use the reducer to reduce the messages
-    		CkReduction::reducerFn f=CkReduction::reducerTable[r];
-		// has to be corrected elements from above need to be put into a temporary vector
-    		CkReductionMsg **msgArr=&tempMsgs[0];//<-- HACK!
-
-                if (numMsgs > 1 && msgArr[0]->reducer == CkReduction::random) {
-                  // nMsgs > 1 indicates that reduction type is not "random"
-                  // this means any data with reducer type random was submitted
-                  // only so that counts would agree, and can be removed
-                  delete msgArr[0];
-                  msgArr[0] = msgArr[numMsgs - 1];
-                  numMsgs--;
-                }
-
-    		ret=(*f)(numMsgs,msgArr);
-    		ret->reducer=r;
-
-  	}
-
-	
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-
-#if CRITICAL_PATH_DEBUG > 3
-	CkPrintf("[%d] combining critical path information from messages in CkReductionMgr::endArrayReduction(). numMsgs=%d\n", CkMyPe(), numMsgs);
-#endif
-
-	MergeablePathHistory path(CkpvAccess(currentlyExecutingPath));
-	path.updateMax(UsrToEnv(ret));
-	// Combine the critical paths from all the reduction messages into the header for the new result
-	for (i=0;i<numMsgs;i++){
-	  if (tempMsgs[i]!=ret){
-	    //	    CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(tempMsgs[i])->pathHistory.getTime() );
-	    path.updateMax(UsrToEnv(tempMsgs[i]));
-	  } else {
-	    //  CkPrintf("[%d] other path is ret = %lf\n", CkMyPe(), UsrToEnv(tempMsgs[i])->pathHistory.getTime() );
-	  }
-	}
-	// Also consider the path which got us into this entry method
-
-#if CRITICAL_PATH_DEBUG > 3
-	CkPrintf("[%d] result path = %lf\n", CkMyPe(), path.getTime() );
-#endif
-
-#endif
-  
-
-
-
-
-	for(i = 0;i<numMsgs;i++){
-		if (tempMsgs[i] != ret) delete tempMsgs[i];
-	}
-
-	//CkPrintf("Length of finalMsgs after endReduction %d \n",finalMsgs.length());
-	//CkPrintf("Data size of result = %d Length of finalMsg %d \n",ret->getLength(),finalMsgs.length());
-
-	ret->redNo=completedRedNo+1;
-  	ret->gcount=msgs_gcount;
-  	ret->userFlag=msgs_userFlag;
-  	ret->callback=msgs_callback;
-	ret->secondaryCallback = msgs_secondaryCallback;
-  	ret->sourceFlag=msgs_nSources;
-
-	DEBR(("~~~~~~~~~~~~~~~~~ About to call callback from end of GROUP REDUCTION %d at %.6f\n",completedRedNo,CmiWallTimer()));
-
-	CkSetRefNum(ret, ret->getUserFlag());
-	if (!ret->secondaryCallback.isInvalid())
-	    ret->secondaryCallback.send(ret);
-    else if (!storedCallback.isInvalid())
-	    storedCallback.send(ret);
-    else{
-      DEBR(("No reduction client for group %d \n",thisgroup.idx));
-	    CkAbort("No reduction client!\n"
-		    "You must register a client with either SetReductionClient or during contribute.\n");
-    }
-	completedRedNo++;
-
-	DEBR(("[%d,%d]------------END OF GROUP REDUCTION %d for group %d at %.6f\n",CkMyNode(),CkMyPe(),completedRedNo,thisgroup.idx,CkWallTimer()));
-
-	for (i=1;i<(int)(adjVec.length());i++)
-    		adjVec[i-1]=adjVec[i];
-	adjVec.length()--;
-	endArrayReduction();
-}
-
 void CkReductionMgr::init_BinaryTree(){
-	parent = (CkMyPe()-1)/TREE_WID;
-	int firstkid = CkMyPe()*TREE_WID+1;
-	numKids=CkNumPes()-firstkid;
-        if (numKids>TREE_WID) numKids=TREE_WID;
-        if (numKids<0) numKids=0;
+  if (CkNodeSize(CkMyNode()) > 1 && CkNodeFirst(CkMyNode()) != CkMyPe()) {
+    parent = CkNodeFirst(CkMyNode());
+    numKids = 0;
+  } else {
+    int parentNode = (CkMyNode()-1)/TREE_WID;
+    parent = CkMyNode() > 0 ? CkNodeFirst(parentNode) : -1;
+    // Add nodes that are my children
+    int firstKid = CkMyNode()*TREE_WID+1;
+    numKids=CkNumNodes()-firstKid;
+    if (numKids > TREE_WID) numKids = TREE_WID;
+    if (numKids < 0) numKids = 0;
+    for (int i = 0; i < numKids; i++) {
+      kids.push_back(CkNodeFirst(firstKid+i));
+#if CMK_FAULT_EVAC
+      newKids.push_back(CkNodeFirst(firstKid+i));
+#endif
+    }
 
-	for(int i=0;i<numKids;i++){
-		kids.push_back(firstkid+i);
-		newKids.push_back(firstkid+i);
-	}
+    // Add PEs on my node, which are also my children
+    numKids += CkNodeSize(CkMyNode())-1;
+    for (int i = 1; i < CkNodeSize(CkMyNode()); i++) {
+      kids.push_back(CkMyPe()+i);
+#if CMK_FAULT_EVAC
+      newKids.push_back(CkMyPe()+i);
+#endif
+    }
+  }
+}
+
+void CkReductionMgr::init_TopoTree() {
+  if (CkNodeSize(CkMyNode()) > 1 && CkNodeFirst(CkMyNode()) != CkMyPe()) {
+    parent = CkNodeFirst(CkMyNode());
+    numKids = 0;
+  } else {
+    if (_topoTree == NULL) CkAbort("CkReductionMgr:: topo tree has not been calculated\n");
+
+    CmiSpanningTreeInfo &t = *_topoTree;
+    if (t.parent != -1) parent = CkNodeFirst(t.parent);
+    else parent = -1;
+    numKids = t.child_count;
+    for (int i=0; i < numKids; i++) {
+      int child = CkNodeFirst(t.children[i]);
+      kids.push_back(child);
+#if CMK_FAULT_EVAC
+      newKids.push_back(child);
+#endif
+    }
+
+    // Add PEs on my node, which are also my children
+    numKids += CkNodeSize(CkMyNode())-1;
+    for (int i = 1; i < CkNodeSize(CkMyNode()); i++) {
+      kids.push_back(CkMyPe()+i);
+#if CMK_FAULT_EVAC
+      newKids.push_back(CkMyPe()+i);
+#endif
+    }
+  }
 }
 
 void CkReductionMgr::init_BinomialTree(){
-	int depth = (int )ceil((log((double )CkNumPes())/log((double)2)));
-	/*upperSize = (unsigned )pow((double)2,depth);*/
-	upperSize = (unsigned) 1 << depth;
-	label = upperSize-CkMyPe()-1;
-	int p=label;
-	int count=0;
-	while( p > 0){
-		if(p % 2 == 0)
-			break;
-		else{
-			p = p/2;
-			count++;
-		}
-	}
-	/*parent = label + rint(pow((double)2,count));*/
-	parent = label + (1<<count);
-	parent = upperSize -1 -parent;
-	int temp;
-	if(count != 0){
-		numKids = 0;
-		for(int i=0;i<count;i++){
-			/*temp = label - rint(pow((double)2,i));*/
-			temp = label - (1<<i);
-			temp = upperSize-1-temp;
-			if(temp <= CkNumPes()-1){
-				kids.push_back(temp);
-				numKids++;
-			}
-		}
-	}else{
-		numKids = 0;
-	//	kids = NULL;
-	}
+  if (CkNodeSize(CkMyNode()) > 1 && CkNodeFirst(CkMyNode()) != CkMyPe()) {
+    parent = CkNodeFirst(CkMyNode());
+    numKids = 0;
+  } else {
+    int depth = (int)ceil((log((double)CkNumNodes())/log((double)2)));
+    upperSize = (unsigned) 1 << depth;
+    label = upperSize-CkNodeFirst(CkMyNode())-1;
+    int p=label;
+    int count=0;
+    while( p > 0){
+      if(p % 2 == 0)
+        break;
+      else{
+        p = p/2;
+        count++;
+      }
+    }
+    parent = label + (1<<count);
+    parent = upperSize - 1 - parent;
+    int temp;
+    if(count != 0){
+      numKids = 0;
+      for(int i=0;i<count;i++){
+        temp = label - (1<<i);
+        temp = upperSize - 1 - temp;
+        if(temp <= CkNumPes()-1){
+          kids.push_back(temp);
+          numKids++;
+        }
+      }
+    }else{
+      numKids = 0;
+    }
+  }
 }
 
 
@@ -1363,11 +1078,6 @@ bool CkReductionMgr::hasParent(void) //Root Node
 int CkReductionMgr::treeParent(void) //My parent Node
 {
   return parent;
-}
-
-int CkReductionMgr::firstKid(void) //My first child Node
-{
-  return CkMyPe()*TREE_WID+1;
 }
 int CkReductionMgr::treeKids(void)//Number of children in tree
 {
@@ -1444,10 +1154,6 @@ void CkReductionMgr::Barrier_RecvMsg(CkReductionMsg *m)
 ////////////////////////////////
 //CkReductionMsg support
 
-//ReductionMessage default private constructor-- does nothing
-CkReductionMsg::CkReductionMsg(){}
-CkReductionMsg::~CkReductionMsg(){}
-
 //This define gives the distance from the start of the CkReductionMsg
 // object to the start of the user data area (just below last object field)
 #define ARM_DATASTART (sizeof(CkReductionMsg)-sizeof(double))
@@ -1455,35 +1161,30 @@ CkReductionMsg::~CkReductionMsg(){}
 //"Constructor"-- builds and returns a new CkReductionMsg.
 //  the "data" array you specify will be copied into this object.
 CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
-    CkReduction::reducerType reducer, CkReductionMsg *buf)
+    CkReduction::reducerType reducer/*=CkReduction::invalid*/, CkReductionMsg *buf/*=NULL*/)
 {
-  int len[1];
-  len[0]=NdataSize;
-  CkReductionMsg *ret = buf? buf:new(len,0)CkReductionMsg();
-  
+  int len[1] = { NdataSize };
+  CkReductionMsg *ret = buf ? buf : new(len,0) CkReductionMsg();
+
   ret->dataSize=NdataSize;
   if (srcData!=NULL && !buf)
     memcpy(ret->data,srcData,NdataSize);
-  ret->userFlag=-1;
+  ret->userFlag=(CMK_REFNUM_TYPE)-1;
   ret->reducer=reducer;
-  //ret->ci=NULL;
-  ret->sourceFlag=-1000;
+  ret->sourceFlag=std::numeric_limits<int>::min();
   ret->gcount=0;
   ret->migratableContributor = true;
-#if CMK_BIGSIM_CHARM
-  ret->log = NULL;
-#endif
   return ret;
 }
 
 // Charm kernel message runtime support:
 void *
-CkReductionMsg::alloc(int msgnum,size_t size,int *sz,int priobits)
+CkReductionMsg::alloc(int msgnum,size_t size,int *sz,int priobits,GroupDepNum groupDepNum)
 {
   int totalsize=ARM_DATASTART+(*sz);
   DEBR(("CkReductionMsg::Allocating %d store; %d bytes total\n",*sz,totalsize));
   CkReductionMsg *ret = (CkReductionMsg *)
-    CkAllocMsg(msgnum,totalsize,priobits);
+    CkAllocMsg(msgnum,totalsize,priobits,groupDepNum);
   ret->data=(void *)(&ret->dataStorage);
   return (void *) ret;
 }
@@ -1528,14 +1229,14 @@ The basic idea is to use the first message's data array as
 (pre-initialized!) scratch space for folding in the other messages.
  */
 
-static CkReductionMsg *invalid_reducer(int nMsg,CkReductionMsg **msg)
+static CkReductionMsg *invalid_reducer_fn(int nMsg,CkReductionMsg **msg)
 {
 	CkAbort("Called the invalid reducer type 0.  This probably\n"
 		"means you forgot to initialize your custom reducer index.\n");
 	return NULL;
 }
 
-static CkReductionMsg *nop(int nMsg,CkReductionMsg **msg)
+static CkReductionMsg *nop_fn(int nMsg,CkReductionMsg **msg)
 {
   return CkReductionMsg::buildNew(0,NULL, CkReduction::invalid, msg[0]);
 }
@@ -1562,11 +1263,18 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 
 //Use this macro for reductions that have the same type for all inputs
 #define SIMPLE_POLYMORPH_REDUCTION(nameBase,loop) \
-  SIMPLE_REDUCTION(nameBase##_int,int,"%d",loop) \
-  SIMPLE_REDUCTION(nameBase##_long,CmiInt8,"%d",loop) \
-  SIMPLE_REDUCTION(nameBase##_float,float,"%f",loop) \
-  SIMPLE_REDUCTION(nameBase##_double,double,"%f",loop)
-
+  SIMPLE_REDUCTION(nameBase##_char_fn,char,"%c",loop) \
+  SIMPLE_REDUCTION(nameBase##_short_fn,short,"%h",loop) \
+  SIMPLE_REDUCTION(nameBase##_int_fn,int,"%d",loop) \
+  SIMPLE_REDUCTION(nameBase##_long_fn,long,"%ld",loop) \
+  SIMPLE_REDUCTION(nameBase##_long_long_fn,long long,"%lld",loop) \
+  SIMPLE_REDUCTION(nameBase##_uchar_fn,unsigned char,"%c",loop) \
+  SIMPLE_REDUCTION(nameBase##_ushort_fn,unsigned short,"%hu",loop) \
+  SIMPLE_REDUCTION(nameBase##_uint_fn,unsigned int,"%u",loop) \
+  SIMPLE_REDUCTION(nameBase##_ulong_fn,unsigned long,"%lu",loop) \
+  SIMPLE_REDUCTION(nameBase##_ulong_long_fn,unsigned long long,"%llu",loop) \
+  SIMPLE_REDUCTION(nameBase##_float_fn,float,"%f",loop) \
+  SIMPLE_REDUCTION(nameBase##_double_fn,double,"%f",loop)
 
 //Compute the sum the numbers passed by each element.
 SIMPLE_POLYMORPH_REDUCTION(sum,ret[i]+=value[i];)
@@ -1583,27 +1291,78 @@ SIMPLE_POLYMORPH_REDUCTION(min,if (ret[i]>value[i]) ret[i]=value[i];)
 
 //Compute the logical AND of the integers passed by each element.
 // The resulting integer will be zero if any source integer is zero; else 1.
-SIMPLE_REDUCTION(logical_and,int,"%d",
+SIMPLE_REDUCTION(logical_and_fn,int,"%d",
         if (value[i]==0)
      ret[i]=0;
   ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
 )
 
+//Compute the logical AND of the integers passed by each element.
+// The resulting integer will be zero if any source integer is zero; else 1.
+SIMPLE_REDUCTION(logical_and_int_fn,int,"%d",
+        if (value[i]==0)
+     ret[i]=0;
+  ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
+)
+
+//Compute the logical AND of the bools passed by each element.
+// The resulting bool will be false if any source bool is false; else true.
+SIMPLE_REDUCTION(logical_and_bool_fn,bool,"%d",
+  if (!value[i]) ret[i]=false;
+)
+
 //Compute the logical OR of the integers passed by each element.
 // The resulting integer will be 1 if any source integer is nonzero; else 0.
-SIMPLE_REDUCTION(logical_or,int,"%d",
+SIMPLE_REDUCTION(logical_or_fn,int,"%d",
   if (value[i]!=0)
            ret[i]=1;
   ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
 )
 
-SIMPLE_REDUCTION(bitvec_and,int,"%d",ret[i]&=value[i];)
-SIMPLE_REDUCTION(bitvec_or,int,"%d",ret[i]|=value[i];)
-SIMPLE_REDUCTION(bitvec_xor,int,"%d",ret[i]^=value[i];)
+//Compute the logical OR of the integers passed by each element.
+// The resulting integer will be 1 if any source integer is nonzero; else 0.
+SIMPLE_REDUCTION(logical_or_int_fn,int,"%d",
+  if (value[i]!=0)
+           ret[i]=1;
+  ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
+)
+
+//Compute the logical OR of the bools passed by each element.
+// The resulting bool will be true if any source bool is true; else false.
+SIMPLE_REDUCTION(logical_or_bool_fn,bool,"%d",
+  if (value[i]) ret[i]=true;
+)
+
+//Compute the logical XOR of the integers passed by each element.
+// The resulting integer will be 1 if an odd number of source integers is nonzero; else 0.
+SIMPLE_REDUCTION(logical_xor_int_fn,int,"%d",
+  ret[i] = (!ret[i] != !value[i]);
+)
+
+//Compute the logical XOR of the bools passed by each element.
+// The resulting bool will be true if an odd number of source bools is true; else false.
+SIMPLE_REDUCTION(logical_xor_bool_fn,bool,"%d",
+  ret[i] = (ret[i] != value[i]);
+)
+
+SIMPLE_REDUCTION(bitvec_and_fn,int,"%d",ret[i]&=value[i];)
+SIMPLE_REDUCTION(bitvec_and_int_fn,int,"%d",ret[i]&=value[i];)
+SIMPLE_REDUCTION(bitvec_and_bool_fn,bool,"%d",ret[i]&=value[i];)
+
+SIMPLE_REDUCTION(bitvec_or_fn,int,"%d",ret[i]|=value[i];)
+SIMPLE_REDUCTION(bitvec_or_int_fn,int,"%d",ret[i]|=value[i];)
+SIMPLE_REDUCTION(bitvec_or_bool_fn,bool,"%d",ret[i]|=value[i];)
+
+SIMPLE_REDUCTION(bitvec_xor_fn,int,"%d",ret[i]^=value[i];)
+SIMPLE_REDUCTION(bitvec_xor_int_fn,int,"%d",ret[i]^=value[i];)
+SIMPLE_REDUCTION(bitvec_xor_bool_fn,bool,"%d",ret[i]^=value[i];)
 
 //Select one random message to pass on
-static CkReductionMsg *random(int nMsg,CkReductionMsg **msg) {
-  return CkReductionMsg::buildNew(msg[0]->getLength(),(void *)msg[0]->getData(), CkReduction::random, msg[0]);
+static CkReductionMsg *random_fn(int nMsg,CkReductionMsg **msg) {
+  int idx = (int)(CrnDrand()*(nMsg-1) + 0.5);
+  return CkReductionMsg::buildNew(msg[idx]->getLength(),
+                                  (void *)msg[idx]->getData(),
+                                  CkReduction::random, msg[idx]);
 }
 
 /////////////// concat ////////////////
@@ -1611,7 +1370,7 @@ static CkReductionMsg *random(int nMsg,CkReductionMsg **msg) {
 This reducer simply appends the data it recieves from each element,
 without any housekeeping data to separate them.
 */
-static CkReductionMsg *concat(int nMsg,CkReductionMsg **msg)
+static CkReductionMsg *concat_fn(int nMsg,CkReductionMsg **msg)
 {
   RED_DEB(("/ PE_%d: reduction_concat invoked on %d messages\n",CkMyPe(),nMsg));
   //Figure out how big a message we'll need
@@ -1660,7 +1419,7 @@ static CkReduction::setElement *SET_NEXT(CkReduction::setElement *cur)
 
 //Combine the data passed by each element into an list of reduction_set_elements.
 // Each element may contribute arbitrary data (with arbitrary length).
-static CkReductionMsg *set(int nMsg,CkReductionMsg **msg)
+static CkReductionMsg *set_fn(int nMsg,CkReductionMsg **msg)
 {
   RED_DEB(("/ PE_%d: reduction_set invoked on %d messages\n",CkMyPe(),nMsg));
   //Figure out how big a message we'll need
@@ -1685,13 +1444,13 @@ static CkReductionMsg *set(int nMsg,CkReductionMsg **msg)
     if (!msg[i]->isFromUser())
     {//This message is composite-- just copy it over (less terminating -1)
                         int messageBytes=msg[i]->getSize()-sizeof(int);
-                        RED_DEB(("|\tmsg[%d] is %d bytes\n",i,msg[i]->getSize()));
+                        RED_DEB(("|\tc msg[%d] is %d bytes\n",i,msg[i]->getSize()));
                         memcpy((void *)cur,(void *)msg[i]->getData(),messageBytes);
                         cur=(CkReduction::setElement *)(((char *)cur)+messageBytes);
     }
     else //This is a message from an element-- wrap it in a reduction_set_element
     {
-      RED_DEB(("|\tmsg[%d] is %d bytes\n",i,msg[i]->getSize()));
+      RED_DEB(("|\tu msg[%d] is %d bytes\n",i,msg[i]->getSize()));
       cur->dataSize=msg[i]->getSize();
       memcpy((void *)cur->data,(void *)msg[i]->getData(),msg[i]->getSize());
       cur=SET_NEXT(cur);
@@ -1714,73 +1473,497 @@ CkReduction::setElement *CkReduction::setElement::next(void)
     return n;//This is just another element
 }
 
+
+///////// statisticsElement
+
+CkReduction::statisticsElement::statisticsElement(double initialValue)
+  : count(1)
+  , mean(initialValue)
+  , m2(0.0)
+{}
+
+// statistics reducer
+// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
+// Chan, Tony F.; Golub, Gene H.; LeVeque, Randall J. (1979),
+// "Updating Formulae and a Pairwise Algorithm for Computing Sample Variances." (PDF),
+// Technical Report STAN-CS-79-773, Department of Computer Science, Stanford University.
+static CkReductionMsg* statistics_fn(int nMsgs, CkReductionMsg** msg)
+{
+  int nElem = msg[0]->getLength() / sizeof(CkReduction::statisticsElement);
+  CkReduction::statisticsElement* ret = (CkReduction::statisticsElement*)(msg[0]->getData());
+  for (int m = 1; m < nMsgs; m++)
+  {
+    CkReduction::statisticsElement* value = (CkReduction::statisticsElement*)(msg[m]->getData());
+    for (int i = 0; i < nElem; i++)
+    {
+      double a_count = ret[i].count;
+      ret[i].count += value[i].count;
+      double delta = value[i].mean - ret[i].mean;
+      ret[i].mean += delta * value[i].count / ret[i].count;
+      ret[i].m2 += value[i].m2 + delta * delta * value[i].count * a_count / ret[i].count;
+    }
+  }
+  return CkReductionMsg::buildNew(
+    nElem*sizeof(CkReduction::statisticsElement),
+    (void *)ret,
+    CkReduction::invalid,
+    msg[0]);
+}
+
+///////// tupleElement
+
+CkReduction::tupleElement::tupleElement()
+  : dataSize(0)
+  , data(NULL)
+  , reducer(CkReduction::invalid)
+  , owns_data(false)
+{}
+CkReduction::tupleElement::tupleElement(size_t dataSize_, void* data_, CkReduction::reducerType reducer_)
+  : dataSize(dataSize_)
+  , data((char*)data_)
+  , reducer(reducer_)
+  , owns_data(false)
+{
+}
+CkReduction::tupleElement::tupleElement(CkReduction::tupleElement&& rhs_move)
+  : dataSize(rhs_move.dataSize)
+  , data(rhs_move.data)
+  , reducer(rhs_move.reducer)
+  , owns_data(rhs_move.owns_data)
+{
+  rhs_move.dataSize = 0;
+  rhs_move.data = 0;
+  rhs_move.reducer = CkReduction::invalid;
+  rhs_move.owns_data = false;
+}
+CkReduction::tupleElement& CkReduction::tupleElement::operator=(CkReduction::tupleElement&& rhs_move)
+{
+  if (owns_data)
+    delete[] data;
+  dataSize = rhs_move.dataSize;
+  data = rhs_move.data;
+  reducer = rhs_move.reducer;
+  owns_data = rhs_move.owns_data;
+  rhs_move.dataSize = 0;
+  rhs_move.data = 0;
+  rhs_move.reducer = CkReduction::invalid;
+  rhs_move.owns_data = false;
+  return *this;
+}
+CkReduction::tupleElement::~tupleElement()
+{
+  if (owns_data)
+    delete[] data;
+}
+
+void CkReduction::tupleElement::pup(PUP::er &p) {
+  p|dataSize;
+  // TODO - it might be better to pack these raw, then we don't have to
+  //  transform & copy them out on unpacking, we could just use the message's
+  //  memory directly
+  if (p.isUnpacking()) {
+    data = new char[dataSize];
+    owns_data = true;
+  }
+  PUParray(p, data, dataSize);
+  if (p.isUnpacking()){
+    int temp;
+    p|temp;
+    reducer=(CkReduction::reducerType)temp;
+  } else {
+    int temp=(int)reducer;
+    p|temp;
+  }
+}
+
+CkReductionMsg* CkReductionMsg::buildFromTuple(CkReduction::tupleElement* reductions, int num_reductions)
+{
+  PUP::sizer ps;
+  ps|num_reductions;
+  PUParray(ps, reductions, num_reductions);
+
+  CkReductionMsg* msg = CkReductionMsg::buildNew(ps.size(), NULL, CkReduction::tuple);
+  PUP::toMem p(msg->data);
+  p|num_reductions;
+  PUParray(p, reductions, num_reductions);
+  if (p.size() != ps.size()) CmiAbort("Size mismatch packing CkReduction::tupleElement::tupleToBuffer\n");
+  return msg;
+}
+
+void CkReductionMsg::toTuple(CkReduction::tupleElement** out_reductions, int* num_reductions)
+{
+  PUP::fromMem p(this->getData());
+  p|(*num_reductions);
+  *out_reductions = new CkReduction::tupleElement[*num_reductions];
+  PUParray(p, *out_reductions, *num_reductions);
+}
+
+// tuple reducer
+CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg** messages)
+{
+  std::vector<CkReduction::tupleElement*> tuple_data(num_messages);
+  int num_reductions = 0;
+  for (int message_idx = 0; message_idx < num_messages; ++message_idx)
+  {
+    int itr_num_reductions = 0;
+    messages[message_idx]->toTuple(&tuple_data[message_idx], &itr_num_reductions);
+
+    // each message must submit the same reductions
+    if (num_reductions == 0)
+      num_reductions = itr_num_reductions;
+    else if (num_reductions != itr_num_reductions)
+      CmiAbort("num_reductions mismatch in CkReduction::tupleReduction");
+  }
+
+  DEB_TUPLE(("tupleReduction {\n  num_messages=%d,\n  num_reductions=%d,\n  length=%d\n",
+           num_messages, num_reductions, messages[0]->getLength()));
+
+  std::vector<CkReduction::tupleElement> return_data(num_reductions);
+  // using a raw buffer to avoid CkReductionMsg constructor/destructor, we want to manage
+  //  the inner memory of these temps ourselves to avoid unneeded copies
+  std::vector<char> simulated_messages_buffer(sizeof(CkReductionMsg) * num_reductions * num_messages);
+  std::vector<CkReductionMsg*> simulated_messages(num_messages);
+
+  // imagine the given data in a 2D layout where the messages are rows and reductions are columns
+  // here we grab each column and run that reduction
+
+  std::vector<CkReductionMsg *> msgs_to_delete;
+  msgs_to_delete.reserve(num_reductions);
+  for (int reduction_idx = 0; reduction_idx < num_reductions; ++reduction_idx)
+  {
+    DEB_TUPLE(("  reduction_idx=%d {\n", reduction_idx));
+    CkReduction::reducerType reducerType = CkReduction::invalid;
+    for (int message_idx = 0; message_idx < num_messages; ++message_idx)
+    {
+      CkReduction::tupleElement* reductions = (CkReduction::tupleElement*)(tuple_data[message_idx]);
+      CkReduction::tupleElement& element = reductions[reduction_idx];
+      DEB_TUPLE(("    msg %d, sf=%d, length=%d : { dataSize=%d, data=%p, reducer=%d },\n",
+                 message_idx, messages[message_idx]->sourceFlag, messages[message_idx]->getLength(), element.dataSize, element.data, element.reducer));
+
+      reducerType = element.reducer;
+
+      size_t sim_idx = (reduction_idx * num_messages + message_idx) * sizeof(CkReductionMsg);
+      CkReductionMsg& simulated_message = *(CkReductionMsg*)&simulated_messages_buffer[sim_idx];
+      simulated_message.dataSize = element.dataSize;
+      simulated_message.data = element.data;
+      simulated_message.reducer = element.reducer;
+      simulated_message.sourceFlag = messages[message_idx]->sourceFlag;
+      simulated_message.userFlag = messages[message_idx]->userFlag;
+      simulated_message.gcount = messages[message_idx]->gcount;
+      simulated_message.migratableContributor = messages[message_idx]->migratableContributor;
+      simulated_messages[message_idx] = &simulated_message;
+    }
+
+    // run the reduction and copy the result back to our data structure
+    const auto& reducerFp = CkReduction::reducerTable()[reducerType].fn;
+    CkReductionMsg* result = reducerFp(num_messages, simulated_messages.data());
+    DEB_TUPLE(("    result_len=%d\n  },\n", result->getLength()));
+    return_data[reduction_idx] = CkReduction::tupleElement(result->getLength(), result->getData(), reducerType);
+    // reducers are allowed to reuse the zeroth message's memory, so it is not safe to delete this
+    // all the time, and, even if it is, deletion must be deferred until after processing is complete.
+    if (result != simulated_messages[0]) {
+      msgs_to_delete.push_back(result);
+    }
+  }
+
+  CkReductionMsg* retval = CkReductionMsg::buildFromTuple(return_data.data(), num_reductions);
+  DEB_TUPLE(("} tupleReduction msg_size=%d\n", retval->getSize()));
+
+  for (auto data : tuple_data) delete[] data;
+  for (auto msg : msgs_to_delete) delete msg;
+
+  return retval;
+}
+
+
+#if CMK_CHARM4PY
+/////////////// external Python reducer ////////////////
+static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
+{
+    //CkPrintf("Reached external_py reducer, %d\n", nMsgs);
+    std::vector<char*> msg_data(nMsgs);
+    std::vector<int> msg_sizes(nMsgs);
+
+    for (int i = 0; i < nMsgs; i++)
+    {
+        msg_data[i] = (char*)(msg[i]->getData());
+        msg_sizes[i] = msg[i]->getSize();
+        //CkPrintf("[msg %d] size: %d data: %s\n", i, msg_sizes[i], msg_data[i]);
+    }
+
+    // send msg_data to Charm4py to perform reduction with Python reducer
+    // expected : pickle([reducer.__name__, result])
+    char* reduction_result;
+    int reduction_result_size = PyReductionExt(msg_data.data(), msg_sizes.data(), nMsgs, &reduction_result);
+    //CkPrintf("[charm side] Recvd reduction result: %s, size: %d\n", reduction_result, reduction_result_size);
+
+    return CkReductionMsg::buildNew(reduction_result_size, reduction_result);
+}
+#endif
+
 /////////////////// Reduction Function Table /////////////////////
 CkReduction::CkReduction() {} //Dummy private constructor
 
 //Add the given reducer to the list.  Returns the new reducer's
 // reducerType.  Must be called in the same order on every node.
-CkReduction::reducerType CkReduction::addReducer(reducerFn fn)
+CkReduction::reducerType CkReduction::addReducer(reducerFn fn, bool streamable, const char* name)
 {
-  reducerTable[nReducers]=fn;
-  return (reducerType)nReducers++;
+  CkAssert(CmiMyRank() == 0);
+  reducerType index = (reducerType)reducerTable().size();
+  reducerTable().emplace_back(fn, streamable, name);
+  return index;
 }
 
-/*Reducer table: maps reducerTypes to reducerFns.
+
+/*Reducer table: maps reducerTypes to reducerStructs.
 It's indexed by reducerType, so the order in this table
 must *exactly* match the reducerType enum declaration.
 The names don't have to match, but it helps.
 */
-int CkReduction::nReducers=CkReduction::lastSystemReducer;
+std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
+{
+  std::vector<CkReduction::reducerStruct> vec;
 
-CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
-    ::invalid_reducer,
-    ::nop,
+  vec.emplace_back(invalid_reducer_fn, true, "CkReduction::invalid");
+  vec.emplace_back(nop_fn, true, "CkReduction::nop");
   //Compute the sum the numbers passed by each element.
-    ::sum_int,::sum_long,::sum_float,::sum_double,
+  vec.emplace_back(sum_char_fn, true, "CkReduction::sum_char");
+  vec.emplace_back(sum_short_fn, true, "CkReduction::sum_short");
+  vec.emplace_back(sum_int_fn, true, "CkReduction::sum_int");
+  vec.emplace_back(sum_long_fn, true, "CkReduction::sum_long");
+  vec.emplace_back(sum_long_long_fn, true, "CkReduction::sum_long_long");
+  vec.emplace_back(sum_uchar_fn, true, "CkReduction::sum_uchar");
+  vec.emplace_back(sum_ushort_fn, true, "CkReduction::sum_ushort");
+  vec.emplace_back(sum_uint_fn, true, "CkReduction::sum_uint");
+  vec.emplace_back(sum_ulong_fn, true, "CkReduction::sum_ulong");
+  vec.emplace_back(sum_ulong_long_fn, true, "CkReduction::sum_ulong_long");
+  vec.emplace_back(sum_float_fn, true, "CkReduction::sum_float");
+  vec.emplace_back(sum_double_fn, true, "CkReduction::sum_double");
 
   //Compute the product the numbers passed by each element.
-    ::product_int,::product_long,::product_float,::product_double,
+  vec.emplace_back(product_char_fn, true, "CkReduction::product_char");
+  vec.emplace_back(product_short_fn, true, "CkReduction::product_short");
+  vec.emplace_back(product_int_fn, true, "CkReduction::product_int");
+  vec.emplace_back(product_long_fn, true, "CkReduction::product_long");
+  vec.emplace_back(product_long_long_fn, true, "CkReduction::product_long_long");
+  vec.emplace_back(product_uchar_fn, true, "CkReduction::product_uchar");
+  vec.emplace_back(product_ushort_fn, true, "CkReduction::product_ushort");
+  vec.emplace_back(product_uint_fn, true, "CkReduction::product_uint");
+  vec.emplace_back(product_ulong_fn, true, "CkReduction::product_ulong");
+  vec.emplace_back(product_ulong_long_fn, true, "CkReduction::product_ulong_long");
+  vec.emplace_back(product_float_fn, true, "CkReduction::product_float");
+  vec.emplace_back(product_double_fn, true, "CkReduction::product_double");
 
   //Compute the largest number passed by any element.
-    ::max_int,::max_long,::max_float,::max_double,
+  vec.emplace_back(max_char_fn, true, "CkReduction::max_char");
+  vec.emplace_back(max_short_fn, true, "CkReduction::max_short");
+  vec.emplace_back(max_int_fn, true, "CkReduction::max_int");
+  vec.emplace_back(max_long_fn, true, "CkReduction::max_long");
+  vec.emplace_back(max_long_long_fn, true, "CkReduction::max_long_long");
+  vec.emplace_back(max_uchar_fn, true, "CkReduction::max_uchar");
+  vec.emplace_back(max_ushort_fn, true, "CkReduction::max_ushort");
+  vec.emplace_back(max_uint_fn, true, "CkReduction::max_uint");
+  vec.emplace_back(max_ulong_fn, true, "CkReduction::max_ulong");
+  vec.emplace_back(max_ulong_long_fn, true, "CkReduction::max_ulong_long");
+  vec.emplace_back(max_float_fn, true, "CkReduction::max_float");
+  vec.emplace_back(max_double_fn, true, "CkReduction::max_double");
 
   //Compute the smallest number passed by any element.
-    ::min_int,::min_long,::min_float,::min_double,
+  vec.emplace_back(min_char_fn, true, "CkReduction::min_char");
+  vec.emplace_back(min_short_fn, true, "CkReduction::min_short");
+  vec.emplace_back(min_int_fn, true, "CkReduction::min_int");
+  vec.emplace_back(min_long_fn, true, "CkReduction::min_long");
+  vec.emplace_back(min_long_long_fn, true, "CkReduction::min_long_long");
+  vec.emplace_back(min_uchar_fn, true, "CkReduction::min_uchar");
+  vec.emplace_back(min_ushort_fn, true, "CkReduction::min_ushort");
+  vec.emplace_back(min_uint_fn, true, "CkReduction::min_uint");
+  vec.emplace_back(min_ulong_fn, true, "CkReduction::min_ulong");
+  vec.emplace_back(min_ulong_long_fn, true, "CkReduction::min_ulong_long");
+  vec.emplace_back(min_float_fn, true, "CkReduction::min_float");
+  vec.emplace_back(min_double_fn, true, "CkReduction::min_double");
 
-  //Compute the logical AND of the integers passed by each element.
-  // The resulting integer will be zero if any source integer is zero.
-    ::logical_and,
+  //Compute the logical AND of the values passed by each element.
+  // The resulting value will be zero if any source value is zero.
+    // logical_and deprecated in favor of logical_and_int
+  vec.emplace_back(logical_and_fn, true, "CkReduction::logical_and");
+  vec.emplace_back(logical_and_int_fn, true, "CkReduction::logical_and_int");
+  vec.emplace_back(logical_and_bool_fn, true, "CkReduction::logical_and_bool");
 
-  //Compute the logical OR of the integers passed by each element.
-  // The resulting integer will be 1 if any source integer is nonzero.
-    ::logical_or,
+  //Compute the logical OR of the values passed by each element.
+  // The resulting value will be 1 if any source value is nonzero.
+    // logical_or deprecated in favor of logical_or_int
+  vec.emplace_back(logical_or_fn, true, "CkReduction::logical_or");
+  vec.emplace_back(logical_or_int_fn, true, "CkReduction::logical_or_int");
+  vec.emplace_back(logical_or_bool_fn, true, "CkReduction::logical_or_bool");
 
-    // Compute the logical bitvector AND of the integers passed by each element.
-    ::bitvec_and,
+  //Compute the logical XOR of the values passed by each element.
+  // The resulting value will be 1 if an odd number of source values is nonzero.
+  // logical_xor does not exist
+  vec.emplace_back(logical_xor_int_fn, true, "CkReduction::logical_xor_int");
+  vec.emplace_back(logical_xor_bool_fn, true, "CkReduction::logical_xor_bool");
 
-    // Compute the logical bitvector OR of the integers passed by each element.
-    ::bitvec_or,
-    
-    // Compute the logical bitvector XOR of the integers passed by each element.
-    ::bitvec_xor,
+  // Compute the logical bitvector AND of the values passed by each element.
+    // bitvec_and deprecated in favor of bitvec_and_int
+  vec.emplace_back(bitvec_and_fn, true, "CkReduction::bitvec_and");
+  vec.emplace_back(bitvec_and_int_fn, true, "CkReduction::bitvec_and_int");
+  vec.emplace_back(bitvec_and_bool_fn, true, "CkReduction::bitvec_and_bool");
 
-    // Select one of the messages at random to pass on
-    ::random,
+  // Compute the logical bitvector OR of the values passed by each element.
+    // bitvec_or deprecated in favor of bitvec_or_int
+  vec.emplace_back(bitvec_or_fn, true, "CkReduction::bitvec_or");
+  vec.emplace_back(bitvec_or_int_fn, true, "CkReduction::bitvec_or_int");
+  vec.emplace_back(bitvec_or_bool_fn, true, "CkReduction::bitvec_or_bool");
+
+  // Compute the logical bitvector XOR of the values passed by each element.
+  vec.emplace_back(bitvec_xor_fn, true, "CkReduction::bitvec_xor");
+  vec.emplace_back(bitvec_xor_int_fn, true, "CkReduction::bitvec_xor_int");
+  vec.emplace_back(bitvec_xor_bool_fn, true, "CkReduction::bitvec_xor_bool");
+
+  // Select one of the messages at random to pass on
+  vec.emplace_back(random_fn, true, "CkReduction::random");
 
   //Concatenate the (arbitrary) data passed by each element
-    ::concat,
+  // This reduction is marked as unstreamable because of the n^2
+  // work required to stream it
+  vec.emplace_back(concat_fn, false, "CkReduction::concat");
 
   //Combine the data passed by each element into an list of setElements.
   // Each element may contribute arbitrary data (with arbitrary length).
-    ::set
+  // This reduction is marked as unstreamable because of the n^2
+  // work required to stream it
+  vec.emplace_back(set_fn, false, "CkReduction::set");
+
+  // Computes a count, mean, and variance for the contributed values
+  vec.emplace_back(statistics_fn, true, "CkReduction::statistics");
+
+  // Allows multiple reductions to be done in the same message
+  vec.emplace_back(CkReduction::tupleReduction_fn, false, "CkReduction::tuple");
+
+#if CMK_CHARM4PY
+  // Perform reduction using an external reducer defined in Python
+  vec.emplace_back(CkReduction::reducerStruct(::external_py, false, "CkReduction::custom_python"));
+#endif
+
+  return vec;
+}
+
+/* Wraps accesses to the reducerTable to prevent the static initialization
+order fiasco */
+std::vector<CkReduction::reducerStruct>& CkReduction::reducerTable()
+{
+  static std::vector<CkReduction::reducerStruct> table = initReducerTable();
+  return table;
+}
+
+#if CMK_CHARM4PY
+
+// Enum to detect type of contributors in a reduction
+typedef enum : uint8_t {
+    array=0,
+    group,
+    nodegroup
+} extContributorType;
+
+// Structure to store contribute parameters from external clients (e.g. Charm4py)
+struct CkExtContributeInfo
+{
+    int cbEpIdx;
+    int fid; // future ID (if reduction target is future)
+    void* data;
+    int numelems;
+    int dataSize;
+    CkReduction::reducerType redtype;
+    int id;                                 // arrayId or groupId
+    int *idx;                               // this is contributor index (PE for groups)
+    int ndims;                              // ensured to be 1 for groups
+    extContributorType contributorType;     // type of contributors
 };
 
+template <typename T>
+T* getExtContributor(CkExtContributeInfo* contribute_params);
 
+template <>
+ArrayElement* getExtContributor<ArrayElement>(CkExtContributeInfo* contribute_params)
+{
+    CkGroupID gId;
+    gId.idx = contribute_params->id;
+    CkArrayIndex arrIndex(contribute_params->ndims, contribute_params->idx);
+    CProxyElement_ArrayBase meProxy = CProxyElement_ArrayBase(gId, arrIndex);
+    return meProxy.ckLocal();
+}
 
+template <>
+Group* getExtContributor<Group>(CkExtContributeInfo* contribute_params)
+{
+    CkGroupID gId;
+    gId.idx = contribute_params->id;
+    return (Group*)CkLocalBranch(gId);
+}
 
+// Functions to perform reduction over contributors from external clients (e.g. Charm4py)
 
+extern "C" {
+void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr);
+void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims);
+void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe);
+void CkExtContributeToSection(CkExtContributeInfo* contribute_params, int sid_pe, int sid_cnt, int rootPE);
+}
 
+// Generic function to extract CkExtContributeInfo and perform reduction
+template <class T>
+void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
+{
+    T* me = getExtContributor<T>(contribute_params);
 
+    if (contribute_params->redtype == CkReduction::nop) {
+        contribute_params->dataSize = 0;
+        contribute_params->data = NULL;
+    }
+
+    me->contribute(contribute_params->dataSize, contribute_params->data, contribute_params->redtype, cb);
+}
+
+void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
+{
+    switch (contribute_params->contributorType) {
+        case extContributorType::array:
+            CkExtContribute<ArrayElement>(contribute_params, cb);
+            break;
+        case extContributorType::group:
+            CkExtContribute<Group>(contribute_params, cb);
+            break;
+        default : CkAbort("Invalid external contributor type!\n");
+    }
+}
+
+// When a reduction contributes to a singleton chare
+void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr)
+{
+    CkCallback cb(onPE, objPtr, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
+    CkExtContributeTo(contribute_params, cb);
+}
+
+// When a reduction contributes to an array element or broadcasts result to an array
+void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims)
+{
+    CkCallback cb(aid, idx, ndims, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
+    CkExtContributeTo(contribute_params, cb);
+}
+
+// When a reduction contributes to a group chare element or broadcasts result to group
+void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe)
+{
+    CkCallback cb(gid, pe, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
+    CkExtContributeTo(contribute_params, cb);
+}
+
+void CkExtContributeToSection(CkExtContributeInfo* contribute_params, int sid_pe, int sid_cnt, int rootPE)
+{
+    CkCallback cb(sid_pe, sid_cnt, rootPE, contribute_params->cbEpIdx);
+    CkExtContributeTo(contribute_params, cb);
+}
+
+#endif
 
 /********** Code added by Sayantan *********************/
 /** Locking is a big problem in the nodegroup code for smp.
@@ -1800,12 +1983,8 @@ CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
  ****/
  
 /**nodegroup reduction manager . Most of it is similar to the guy above***/
-NodeGroup::NodeGroup(void) {
+NodeGroup::NodeGroup(void):thisIndex(CkMyNode()) {
   __nodelock=CmiCreateLock();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    mlogData->objID.type = TypeNodeGroup;
-    mlogData->objID.data.group.onPE = CkMyNode();
-#endif
 
 }
 NodeGroup::~NodeGroup() {
@@ -1845,7 +2024,7 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
 #else
-  init_BinaryTree();
+  init_TopoTree();
 #endif
   storedCallback=NULL;
   redNo=0;
@@ -1859,15 +2038,14 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 
 
   creating=false;
-  interrupt = 0;
+  interrupt = false;
   DEBR((AA "In NodereductionMgr constructor at %d \n" AB,this));
-	/*
-		FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
 	blocked = false;
 	maxModificationRedNo = INT_MAX;
-	killed=0;
+	killed=false;
 	additionalGCount = newAdditionalGCount = 0;
+#endif
 }
 
 CkNodeReductionMgr::~CkNodeReductionMgr()
@@ -1888,7 +2066,7 @@ void CkNodeReductionMgr::flushStates()
   nContrib=nRemote=0;
 
   creating=false;
-  interrupt = 0;
+  interrupt = false;
   while (!msgs.isEmpty()) { delete msgs.deq(); }
   while (!futureMsgs.isEmpty()) delete futureMsgs.deq();
   while (!futureRemoteMsgs.isEmpty()) delete futureRemoteMsgs.deq();
@@ -1918,88 +2096,38 @@ void CkNodeReductionMgr::ckSetReductionClient(CkCallback *cb)
 
 void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    Chare *oldObj =CpvAccess(_currentObj);
-    CpvAccess(_currentObj) = this;
-#endif
 
-  //m->ci=ci;
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
   DEBR(("[%d,%d] NodeGroup %d> localContribute called for redNo %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo));
   addContribution(m);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = oldObj;
-#endif
 }
 
 
 void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&m->log);
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    Chare *oldObj =CpvAccess(_currentObj);
-    CpvAccess(_currentObj) = this;
-#endif
-  //m->ci=ci;
   m->redNo=ci->redNo++;
   m->gcount=count;
   DEBR(("[%d,%d] contributewithCounter started for %d at %0.6f{{{\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer()));
   addContribution(m);
   DEBR(("[%d,%d] }}}contributewithCounter finished for %d at %0.6f\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer()));
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = oldObj;
-#endif
 }
 
 
 //////////// Reduction Manager Remote Entry Points /////////////
 
-//Sent down the reduction tree (used by barren PEs)
-void CkNodeReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
-{
-  DEBR((AA "[%d] Received reductionStarting redNo %d\n" AB, CkMyPe(), m->num));
-  CmiLock(lockEverything);
-	/*
-		FAULT_EVAC
-	*/
-  if(blocked){
-	delete m;
-  	CmiUnlock(lockEverything);
-	return ;
-  }
-  int srcNode = CmiNodeOf((UsrToEnv(m))->getSrcPe());
-  if (isPresent(m->num) && !inProgress)
-  {
-    DEBR((AA "Starting Node reduction #%d at parent's request\n" AB,m->num));
-    startReduction(m->num,srcNode);
-    finishReduction();
-  } else if (isFuture(m->num)){
-  	DEBR(("[%d][%d] Message num %d Present redNo %d \n",CkMyNode(),CkMyPe(),m->num,redNo));
-  }
-  else //is Past
-    DEBR((AA "Ignoring node parent's late request to start #%d\n" AB,m->num));
-  CmiUnlock(lockEverything);
-  delete m;
-
-}
-
-
 void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 	DEBR(("[%d,%d] doRecvMsg called for  %d at %.6f[[[[[\n",CkMyNode(),CkMyPe(),m->redNo,CkWallTimer()));
-	/*
-		FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
 	if(blocked){
 		DEBR(("[%d] This node is blocked, so remote message is being buffered as no %d\n",CkMyNode(),bufferedRemoteMsgs.length()));
 		bufferedRemoteMsgs.enq(m);
 		return;
 	}
+#endif
 	
 	if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
 	    //DEBR((AA "Recv'd remote contribution %d for #%d at %d\n" AB,nRemote,m->redNo,this));
@@ -2023,12 +2151,9 @@ void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 //Sent up the reduction tree with reduced data
 void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&m->log);
-#endif
 #ifndef CMK_CPV_IS_SMP
 #if CMK_IMMEDIATE_MSG
-	if(interrupt == 1){
+	if(interrupt == true){
 		//CkPrintf("$$$$$$$$$How did i wake up in the middle of someone else's entry method ?\n");
 		CpvAccess(_qd)->process(-1);
 		CmiDelayImmediate();
@@ -2036,12 +2161,12 @@ void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 	}
 #endif	
 #endif
-   interrupt = 1;	
+   interrupt = true;
    CmiLock(lockEverything);   
    DEBR(("[%d,%d] Recv'd REMOTE contribution for %d at %.6f[[[\n",CkMyNode(),CkMyPe(),m->redNo,CkWallTimer()));
    doRecvMsg(m);
    CmiUnlock(lockEverything);    
-   interrupt = 0;
+   interrupt = false;
    DEBR(("[%d,%d] ]]]]]]Recv'd REMOTE contribution for %d at %.6f\n",CkMyNode(),CkMyPe(),m->redNo,CkWallTimer()));
 }
 
@@ -2063,51 +2188,16 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 	//If none of these cases, we need to start the reduction--
 	DEBR((AA "Starting Node reduction #%d on %p srcNode %d\n" AB,redNo,this,srcNode));
 	inProgress=true;
-
-	if(!_isNotifyChildInRed) return;
-
-	//Sent start requests to our kids (in case they don't already know)
-	
-	for (int k=0;k<treeKids();k++)
-	{
-#ifdef BINOMIAL_TREE
-		DEBR((AA "Asking child Node %d to start #%d\n" AB,kids[k],redNo));
-		thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
-#else
-		if(kids[k] != srcNode){
-			DEBR((AA "Asking child Node %d to start #%d\n" AB,kids[k],redNo));
-			thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
-		}	
-#endif
-	}
-
-	DEBR((AA "Asking all local groups to start #%d\n" AB,redNo));
-	// in case, nodegroup does not has the attached red group,
-	// it has to restart groups again
-	startLocalGroupReductions(number);
-/*
-	if (startLocalGroupReductions(number) == 0)
-          thisProxy[CkMyNode()].restartLocalGroupReductions(number);
-*/
-}
-
-// restart local groups until succeed
-void CkNodeReductionMgr::restartLocalGroupReductions(int number) {
-  CmiLock(lockEverything);    
-  if (startLocalGroupReductions(number) == 0)
-    thisProxy[CkMyNode()].restartLocalGroupReductions(number);
-  CmiUnlock(lockEverything);    
 }
 
 void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
-	/*
-		FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
 	if(blocked){
 		DEBR(("[%d] This node is blocked, so local message is being buffered as no %d\n",CkMyNode(),bufferedMsgs.length()));
 		bufferedMsgs.enq(m);
 		return;
 	}
+#endif
 	
 	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
 		DEBR((AA "Contributor gives early node contribution-- for #%d\n" AB,m->redNo));
@@ -2125,24 +2215,23 @@ void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
 //Handle a message from one element for the reduction
 void CkNodeReductionMgr::addContribution(CkReductionMsg *m)
 {
-  interrupt = 1;
+  interrupt = true;
   CmiLock(lockEverything);
   doAddContribution(m);
   CmiUnlock(lockEverything);
-  interrupt = 0;
+  interrupt = false;
 }
 
 void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
         CmiLock(lockEverything);   
-	/*
-		FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
 	if(blocked){
 		DEBR(("[%d] This node is blocked, so local message is being buffered as no %d\n",CkMyNode(),bufferedMsgs.length()));
 		bufferedMsgs.enq(m);
                 CmiUnlock(lockEverything);   
 		return;
 	}
+#endif
 	
 	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
 		DEBR((AA "Latemigrant gives early node contribution-- for #%d\n" AB,m->redNo));
@@ -2173,48 +2262,74 @@ void CkNodeReductionMgr::finishReduction(void)
   	return;
   }
 
-  if (nContrib<(lcount)){
-	DEBR((AA "Nodegrp Need more local messages %d %d\n" AB,nContrib,(lcount)));
+  bool partialReduction = false;
 
-	 return;//Need more local messages
+  if (nContrib<(lcount)){
+    if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
+      partialReduction = true;
+    }
+    else {
+      DEBR((AA "Nodegrp Need more local messages %d %d\n" AB,nContrib,(lcount)));
+      return;//Need more local messages
+    }
   }
   if (nRemote<treeKids()){
-	DEBR((AA "Nodegrp Need more Remote messages %d %d\n" AB,nRemote,treeKids()));
-
-	return;//Need more remote messages
+    if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
+      partialReduction = true;
+    }
+    else {
+      DEBR((AA "Nodegrp Need more Remote messages %d %d\n" AB,nRemote,treeKids()));
+      return;//Need more remote messages
+    }
   }
   if (nRemote>treeKids()){
 
-	  interrupt = 0;
+	  interrupt = false;
 	   CkAbort("Nodegrp Excess remote reduction message received!\n");
   }
 
   DEBR((AA "Reducing node data...\n" AB));
 
   /**reduce all messages received at this node **/
-  CkReductionMsg *result=reduceMessages();
+  CkReductionMsg *result=CkReductionMgr::reduceMessages(msgs);
+  result->redNo=redNo;
+  DEBR((AA "Node Reduced gcount=%d; sourceFlag=%d\n" AB,result->gcount,result->sourceFlag));
+
+  if (partialReduction) {
+    msgs.enq(result);
+    return;
+  }
 
   if (hasParent())
   {//Pass data up tree to parent
-	if(CmiNodeAlive(CkMyNode()) || killed == 0){
+#if CMK_FAULT_EVAC
+	if(CmiNodeAlive(CkMyNode()) || killed == false)
+#endif
+  {
     	DEBR((AA "Passing reduced data up to parent node %d. \n" AB,treeParent()));
     	DEBR(("[%d,%d] Passing data up to parentNode %d at %.6f for redNo %d with ncontrib %d\n",CkMyNode(),CkMyPe(),treeParent(),CkWallTimer(),redNo,nContrib));
-		/*
-			FAULT_EVAC
-		*/
+
+#if CMK_FAULT_EVAC
 			result->gcount += additionalGCount;//if u have replaced some node add its gcount to ur count
+#endif
 	    thisProxy[treeParent()].RecvMsg(result);
 	}
 
   }
   else
   {
-		if(result->isMigratableContributor() && result->gcount+additionalGCount != result->sourceFlag){
+		if(result->isMigratableContributor()
+#if CMK_FAULT_EVAC
+       && result->gcount+additionalGCount != result->sourceFlag
+#endif
+    ){
 		  DEBR(("[%d,%d] NodeGroup %d> Node Reduction %d not done yet gcounts %d sources %d migratable %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,redNo,result->gcount,result->sourceFlag,result->isMigratableContributor()));
 			msgs.enq(result);
 			return;
 		}
+#if CMK_FAULT_EVAC
 		result->gcount += additionalGCount;
+#endif
 	  /** if the reduction is finished and I am the root of the reduction tree
 	  then call the reductionhandler and other stuff ***/
 		
@@ -2239,7 +2354,9 @@ void CkNodeReductionMgr::finishReduction(void)
   // DEBR((AA "Reduction %d finished in group!\n" AB,redNo));
   //CkPrintf("[%d,%d]Reduction %d finished with %d\n",CkMyNode(),CkMyPe(),redNo,nContrib);
   redNo++;
+#if CMK_FAULT_EVAC
 	updateTree();
+#endif
   int i;
   inProgress=false;
   startRequested=false;
@@ -2250,29 +2367,29 @@ void CkNodeReductionMgr::finishReduction(void)
 
   for (i=0;i<n;i++)
   {
-    interrupt = 1;
+    interrupt = true;
 
     CkReductionMsg *m=futureMsgs.deq();
 
-    interrupt = 0;
+    interrupt = false;
     if (m!=NULL){ //One of these addContributions may have finished us.
       DEBR(("[%d,%d] NodeGroup %d> Mesg with redNo %d might be useful in new reduction %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo,redNo));
       doAddContribution(m);//<- if *still* early, puts it back in the queue
     }
   }
 
-  interrupt = 1;
+  interrupt = true;
 
   n=futureRemoteMsgs.length();
 
-  interrupt = 0;
+  interrupt = false;
   for (i=0;i<n;i++)
   {
-    interrupt = 1;
+    interrupt = true;
 
     CkReductionMsg *m=futureRemoteMsgs.deq();
 
-    interrupt = 0;
+    interrupt = false;
     if (m!=NULL)
       doRecvMsg(m);//<- if *still* early, puts it back in the queue
   }
@@ -2301,8 +2418,23 @@ void CkNodeReductionMgr::init_BinaryTree(){
 
 	for(int i=0;i<numKids;i++){
 		kids.push_back(firstkid+i);
+#if CMK_FAULT_EVAC
 		newKids.push_back(firstkid+i);
+#endif
 	}
+}
+
+void CkNodeReductionMgr::init_TopoTree() {
+  if (_topoTree == NULL) CkAbort("CkNodeReductionMgr:: topo tree has not been calculated\n");
+  CmiSpanningTreeInfo &t = *_topoTree;
+  parent = t.parent;
+  numKids = t.child_count;
+  for (int i=0; i < numKids; i++) {
+    kids.push_back(t.children[i]);
+#if CMK_FAULT_EVAC
+    newKids.push_back(t.children[i]);
+#endif
+  }
 }
 
 void CkNodeReductionMgr::init_BinomialTree(){
@@ -2373,127 +2505,6 @@ int CkNodeReductionMgr::treeKids(void)//Number of children in tree
 #endif
 }
 
-//Combine (& free) the current message vector msgs.
-CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
-{
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_END_EXECUTE(1);
-  void* _bgParentLog = NULL;
-  _TRACE_BG_BEGIN_EXECUTE_NOMSG("NodeReduce", &_bgParentLog, 0);
-#endif
-  CkReductionMsg *ret=NULL;
-
-  //Look through the vector for a valid reducer, swapping out placeholder messages
-  CkReduction::reducerType r=CkReduction::invalid;
-  int msgs_gcount=0;//Reduced gcount
-  int msgs_nSources=0;//Reduced nSources
-  int msgs_userFlag=-1;
-  CkCallback msgs_callback;
-  CkCallback msgs_secondaryCallback;
-  int i;
-  int nMsgs=0;
-  CkReductionMsg *m;
-  CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
-  bool isMigratableContributor;
-	
-
-  while(NULL!=(m=msgs.deq()))
-  {
-    DEBR((AA "***** gcount=%d; sourceFlag=%d ismigratable %d \n" AB,m->gcount,m->nSources(),m->isMigratableContributor()));	  
-    msgs_gcount+=m->gcount;
-    if (m->sourceFlag!=0)
-    { //This is a real message from an element, not just a placeholder
-      msgs_nSources+=m->nSources();
-#if CMK_BIGSIM_CHARM
-      _TRACE_BG_ADD_BACKWARD_DEP(m->log);
-#endif
-
-      if (nMsgs == 0 || m->reducer != CkReduction::random) {
-        msgArr[nMsgs++]=m;
-        r=m->reducer;
-        if (!m->callback.isInvalid())
-          msgs_callback=m->callback;
-        if(!m->secondaryCallback.isInvalid()){
-          msgs_secondaryCallback = m->secondaryCallback;
-        }
-        if (m->userFlag!=-1)
-          msgs_userFlag=m->userFlag;
-	isMigratableContributor= m->isMigratableContributor();
-      }
-      else {
-        delete m;
-      }
-    }
-    else
-    { //This is just a placeholder message-- replace it
-      delete m;
-    }
-  }
-
-  if (nMsgs==0||r==CkReduction::invalid)
-  //No valid reducer in the whole vector
-    ret=CkReductionMsg::buildNew(0,NULL);
-  else
-  {//Use the reducer to reduce the messages
-    if(nMsgs == 1){
-      ret = msgArr[0];
-    }else{
-      if (msgArr[0]->reducer == CkReduction::random) {
-        // nMsgs > 1 indicates that reduction type is not random
-        // this means any data with reducer type random was submitted
-        // only so that counts would agree, and can be removed
-        delete msgArr[0];
-        msgArr[0] = msgArr[nMsgs - 1];
-        nMsgs--;
-      }
-      CkReduction::reducerFn f=CkReduction::reducerTable[r];
-      ret=(*f)(nMsgs,msgArr);
-    }
-    ret->reducer=r;
-  }
-
-	
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-#if CRITICAL_PATH_DEBUG > 3
-	CkPrintf("[%d] combining critical path information from messages in CkNodeReductionMgr::reduceMessages(). numMsgs=%d\n", CkMyPe(), nMsgs);
-#endif
-	MergeablePathHistory path(CkpvAccess(currentlyExecutingPath));
-	path.updateMax(UsrToEnv(ret));
-	// Combine the critical paths from all the reduction messages into the header for the new result
-	for (i=0;i<nMsgs;i++){
-	  if (msgArr[i]!=ret){
-	    //	    CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
-	    path.updateMax(UsrToEnv(msgArr[i]));
-	  } else {
-	    //	    CkPrintf("[%d] other path is ret = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
-	  }
-	}
-#if CRITICAL_PATH_DEBUG > 3
-	CkPrintf("[%d] result path = %lf\n", CkMyPe(), path.getTime() );
-#endif
-
-#endif
-
-
-	//Go back through the vector, deleting old messages
-  for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
-  delete [] msgArr;
-  //Set the message counts
-  ret->redNo=redNo;
-  ret->gcount=msgs_gcount;
-  ret->userFlag=msgs_userFlag;
-  ret->callback=msgs_callback;
-  ret->secondaryCallback = msgs_secondaryCallback;
-  ret->sourceFlag=msgs_nSources;
-  ret->setMigratableContributor(isMigratableContributor);
-  DEBR((AA "Node Reduced gcount=%d; sourceFlag=%d\n" AB,ret->gcount,ret->sourceFlag));
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&ret->log);
-#endif
-
-  return ret;
-}
-
 void CkNodeReductionMgr::pup(PUP::er &p)
 {
 //We do not store the client function pointer or the client function parameter,
@@ -2509,8 +2520,12 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p|futureRemoteMsgs;
   p|futureLateMigrantMsgs;
   p|parent;
+
+#if CMK_FAULT_EVAC
   p|additionalGCount;
   p|newAdditionalGCount;
+#endif
+
   if(p.isUnpacking()) {
     gcount=CkNumNodes();
     thisProxy = thisgroup;
@@ -2518,14 +2533,16 @@ void CkNodeReductionMgr::pup(PUP::er &p)
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
 #else
-    init_BinaryTree();
+    init_TopoTree();
 #endif		
   }
+
+#if CMK_FAULT_EVAC
   p | blocked;
   p | maxModificationRedNo;
+#endif
 
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-  int isnull = (storedCallback == NULL);
+  bool isnull = (storedCallback == NULL);
   p | isnull;
   if (!isnull) {
     if (p.isUnpacking()) {
@@ -2533,12 +2550,11 @@ void CkNodeReductionMgr::pup(PUP::er &p)
     }
     p|*storedCallback;
   }
-#endif
 
 }
 
+#if CMK_FAULT_EVAC
 /*
-	FAULT_EVAC
 	Evacuate - is called when this processor realizes it might crash. In that case, it tries to change 
 	the reduction tree. It also needs to decide a reduction number after which it shall use the new 
 	reduction tree. 
@@ -2574,7 +2590,7 @@ void CkNodeReductionMgr::evacuate(){
 	*/
 		newParent = kids[0];
 		for(int i=numKids-1;i>=0;i--){
-			newKids.remove(i);
+			newKids.erase(newKids.begin() + i);
 		}
 		/*
 			Ask everybody for the highest reduction number they have seen and
@@ -2600,14 +2616,14 @@ void CkNodeReductionMgr::evacuate(){
 			Tell newParent (1st child) about its new children,
 			the current node and its children except the newParent
 		*/
-		int *newParentData = new int[numKids+2];
+		std::vector<int> newParentData(numKids+2);
+		newParentData[0] = CkMyNode();
 		for(int i=1;i<numKids;i++){
 			newParentData[i] = kids[i];
 		}
-		newParentData[0] = CkMyNode();
 		newParentData[numKids] = parent;
 		newParentData[numKids+1] = getTotalGCount()+additionalGCount;
-		thisProxy[newParent].modifyTree(NEWPARENT,numKids+2,newParentData);
+		thisProxy[newParent].modifyTree(NEWPARENT,numKids+2,newParentData.data());
 	}
 	readyDeletion = false;
 	blocked = true;
@@ -2655,7 +2671,7 @@ void CkNodeReductionMgr::modifyTree(int code,int size,int *data){
 		case LEAFPARENT:
 			for(int i=0;i<numKids;i++){
 				if(newKids[i] == data[0]){
-					newKids.remove(i);
+					newKids.erase(newKids.begin() + i);
 					break;
 				}
 			}
@@ -2789,18 +2805,18 @@ void CkNodeReductionMgr::DeleteChild(int deletedChild){
 	DEBREVAC(("[%d]%d> Deleting child %d \n",CkMyNode(),thisgroup.idx,deletedChild));
 	for(int i=0;i<numKids;i++){
 		if(kids[i] == deletedChild){
-			kids.remove(i);
+			kids.erase(kids.begin() + i);
 			break;
 		}
 	}
-	numKids = kids.length();
+	numKids = kids.size();
 	finishReduction();
 }
 
 void CkNodeReductionMgr::DeleteNewChild(int deletedChild){
-	for(int i=0;i<(int)(newKids.length());i++){
+	for(int i=0;i<(int)(newKids.size());i++){
 		if(newKids[i] == deletedChild){
-			newKids.remove(i);
+			newKids.erase(newKids.begin() + i);
 			break;
 		}
 	}
@@ -2829,15 +2845,6 @@ int CkNodeReductionMgr::findMaxRedNo(){
 	}
 	return max;
 }
-
-// initnode call. check the size of reduction table
-void CkReductionMgr::sanitycheck()
-{
-#if CMK_ERROR_CHECKING
-  int count = 0;
-  while (CkReduction::reducerTable[count] != NULL) count++;
-  CmiAssert(CkReduction::nReducers == count);
-#endif
-}
+#endif //CMK_FAULT_EVAC
 
 #include "CkReduction.def.h"

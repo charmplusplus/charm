@@ -24,4 +24,19 @@
 #define TRUE	1
 #endif
 
+void pvmc_init_bufs(void);
+void pvmc_init_comm(void);
+void pvmc_init_groups(void);
+void pvmc_user_main(int argc, char **argv);
+
+int pvmc_sendmsgsz(void);
+int pvmc_settidtag(int pvm_tid, int tag);
+int pvmc_packmsg(void *msgbuf);
+int pvmc_unpackmsg(void *msgbuf, void *start_of_msg);
+int pvmc_gettag(void *msgbuf);
+void *pvmc_mkitem(int nbytes, int type);
+void *pvmc_getitem(int n_bytes, int type);
+void *pvmc_getstritem(int *n_bytes);
+void pvmc_send_control_msg(int type, int pe);
+
 #endif

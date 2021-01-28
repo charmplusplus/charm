@@ -13,6 +13,8 @@
 #include "topology.h"
 
 #include "limits.h"
+#include <limits>
+#include <algorithm>
 
 #define VEC_SIZE 50
 #define IMB_TOLERANCE 1.1
@@ -20,22 +22,21 @@
 #define UTILIZATION_THRESHOLD 0.7
 #define NEGLECT_IDLE 2 // Should never be == 1
 #define MIN_STATS 6
-#define STATS_COUNT 8 // The number of stats collected during reduction
+#define STATS_COUNT 29 // The number of stats collected during reduction
+
+#define MAXDOUBLE  std::numeric_limits<double>::max()
 
 #define DEBAD(x) /*CkPrintf x*/
 #define DEBADDETAIL(x) /*CkPrintf x*/
 #define EXTRA_FEATURE 0
 
+using std::min;
+using std::max;
+
 CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
-  double lb_data[STATS_COUNT];
-  lb_data[1] = 0.0; // total number of processors contributing
-  lb_data[2] = 0.0; // total load
-  lb_data[3] = 0.0; // max load
-  lb_data[4] = 0.0; // idle time
-  lb_data[5] = 1.0; // utilization
-  lb_data[6] = 0.0; // total load with bg
-  lb_data[7] = 0.0; // max load with bg
-  for (int i = 0; i < nMsg; i++) {
+  double *lb_data;
+  lb_data = (double*)msgs[0]->getData();
+  for (int i = 1; i < nMsg; i++) {
     CkAssert(msgs[i]->getSize() == STATS_COUNT*sizeof(double));
     if (msgs[i]->getSize() != STATS_COUNT*sizeof(double)) {
       CkPrintf("Error!!! Reduction not correct. Msg size is %d\n",
@@ -43,36 +44,47 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
       CkAbort("Incorrect Reduction size in MetaBalancer\n");
     }
     double* m = (double *)msgs[i]->getData();
-    // Total count
-    lb_data[1] += m[1];
-    // Avg load
-    lb_data[2] += m[2];
-    // Max load
-    lb_data[3] = ((m[3] > lb_data[3])? m[3] : lb_data[3]);
-    // Avg idle
-    lb_data[4] += m[4];
-    // Get least utilization
-    lb_data[5] = ((m[5] < lb_data[5]) ? m[5] : lb_data[5]);
-    // Get Avg load with bg
-    lb_data[6] += m[6];
-    // Get Max load with bg
-    lb_data[7] = ((m[7] > lb_data[7])? m[7] : lb_data[7]);
-    if (i == 0) {
-      // Iteration no
-      lb_data[0] = m[0];
-    }
-    if (m[0] != lb_data[0]) {
+    lb_data[NUM_PROCS] += m[NUM_PROCS];
+    lb_data[TOTAL_LOAD] += m[TOTAL_LOAD];
+    lb_data[MAX_LOAD] = max(m[MAX_LOAD], lb_data[MAX_LOAD]);
+    lb_data[MIN_LOAD] = min(m[MIN_LOAD], lb_data[MIN_LOAD]);
+    lb_data[IDLE_TIME] += m[IDLE_TIME];
+    lb_data[UTILIZATION] = min(m[UTILIZATION], lb_data[UTILIZATION]);
+    lb_data[MAX_UTIL] = max(m[MAX_UTIL], lb_data[MAX_UTIL]);
+    lb_data[TOTAL_LOAD_W_BG] += m[TOTAL_LOAD_W_BG];
+    lb_data[MIN_BG] = min(m[MIN_BG], lb_data[MIN_BG]);
+    lb_data[MAX_LOAD_W_BG] = max(m[MAX_LOAD_W_BG], lb_data[MAX_LOAD_W_BG]);
+    lb_data[TOTAL_KBYTES] += m[TOTAL_KBYTES];
+    lb_data[TOTAL_KMSGS] += m[TOTAL_KMSGS];
+    lb_data[WITHIN_PE_KBYTES] += m[WITHIN_PE_KBYTES];
+    lb_data[OUTSIDE_PE_KBYTES] += m[OUTSIDE_PE_KBYTES];
+    lb_data[SUM_COMM_NEIGHBORS] += m[SUM_COMM_NEIGHBORS];
+    lb_data[MAX_COMM_NEIGHBORS] = max(m[MAX_COMM_NEIGHBORS], lb_data[MAX_COMM_NEIGHBORS]);
+    lb_data[SUM_OBJ_COUNT] += m[SUM_OBJ_COUNT];
+    lb_data[MAX_OBJ_COUNT] = max(m[MAX_OBJ_COUNT], lb_data[MAX_OBJ_COUNT]);
+    lb_data[MIN_OBJ_LOAD] = min(m[MIN_OBJ_LOAD], lb_data[MIN_OBJ_LOAD]);
+    lb_data[SUM_OBJ_LOAD] += m[SUM_OBJ_LOAD];
+    lb_data[MAX_OBJ_LOAD] = max(m[MAX_OBJ_LOAD], lb_data[MAX_OBJ_LOAD]);
+    lb_data[SUM_HOPS] += m[SUM_HOPS];
+    lb_data[SUM_HOP_KBYTES] += m[SUM_HOP_KBYTES];
+    lb_data[MAX_ITER_TIME] = max(m[MAX_ITER_TIME], lb_data[MAX_ITER_TIME]);
+    lb_data[LOAD_STDEV2] += m[LOAD_STDEV2];
+    lb_data[LOAD_SKEWNESS] += m[LOAD_SKEWNESS];
+    lb_data[LOAD_KURTOSIS] += m[LOAD_KURTOSIS];
+    lb_data[TOTAL_OVERLOADED_PES] += m[TOTAL_OVERLOADED_PES];
+
+    if (m[ITER_NO] != lb_data[ITER_NO]) {
       CkPrintf("Error!!! Reduction is intermingled between iteration %lf \
-        and %lf\n", lb_data[0], m[0]);
+        and %lf\n", lb_data[ITER_NO], m[ITER_NO]);
       CkAbort("Intermingling iterations in MetaBalancer\n");
     }
   }
-  return CkReductionMsg::buildNew(STATS_COUNT*sizeof(double), lb_data);
+  return CkReductionMsg::buildNew(msgs[0]->getSize(), NULL, msgs[0]->getReducer(), msgs[0]);
 }
 
 /*global*/ CkReduction::reducerType lbDataCollectionType;
 /*initnode*/ void registerLBDataCollection(void) {
-  lbDataCollectionType = CkReduction::addReducer(lbDataCollection);
+  lbDataCollectionType = CkReduction::addReducer(lbDataCollection, true, "lbDataCollection");
 }
 
 CkGroupID _metalb;
@@ -85,14 +97,17 @@ double _nobj_timer = 10.0;
 // mainchare
 MetaLBInit::MetaLBInit(CkArgMsg *m) {
 #if CMK_LBDB_ON
-  _metalbred = CProxy_MetaBalancerRedn::ckNew();
-  _metalb = CProxy_MetaBalancer::ckNew();
+  if (_lb_args.metaLbOn()) {
+    _metalbred = CProxy_MetaBalancerRedn::ckNew();
+    _metalb = CProxy_MetaBalancer::ckNew();
+  }
 #endif
   delete m;
 }
 
 // called from init.C
 void _metabalancerInit() {
+  _registerCommandLineOpt("+MetaLBNoObjTimer");
   CkpvInitialize(int, metalbInited);
   CkpvAccess(metalbInited) = 0;
   char **argv = CkGetArgv();
@@ -105,12 +120,19 @@ void MetaBalancer::initnodeFn() {
 
 // called by my constructor
 void MetaBalancer::init(void) {
-  lbdatabase = (LBDatabase *)CkLocalBranch(_lbdb);
+  lbmanager = (LBManager *)CkLocalBranch(_lbmgr);
   CkpvAccess(metalbInited) = 1;
   total_load_vec.resize(VEC_SIZE, 0.0);
   total_count_vec.resize(VEC_SIZE, 0);
+  max_load_vec.resize(VEC_SIZE, 0.0);
+  min_load_vec.resize(VEC_SIZE, MAXDOUBLE);
   prev_idle = 0.0;
+  prev_bytes = prev_msgs = 0;
+  prev_outsidepemsgs = prev_outsidepebytes = 0;
+  prev_hops = prev_hopbytes = 0;
+  prev_avg_load = 0;
   alpha_beta_cost_to_load = 1.0; // Some random value. TODO: Find the actual
+  chare_pup_size = 0;
 
   metaRdnGroup = (MetaBalancerRedn*)CkLocalBranch(_metalbred);
 
@@ -140,22 +162,43 @@ void MetaBalancer::init(void) {
   // to false so that it doesn't clear the handles.
   lb_in_progress = false;
 
+  // After the first reduction completes, we have a way to manually check for
+  // PEs without any objects. This flag is set to true if load is ever added
+  // so that the periodic call can be ignored if it comes late. Otherwise, it
+  // may come at a weird time and trigger an incorrect contribution.
+  ignore_periodic = false;
+
   is_prev_lb_refine = -1;
   if (_lb_args.metaLbOn()) {
     periodicCall((void *) this);
   }
+  if (_lb_args.metaLbModelDir() != NULL) {
+    current_balancer = -1;
+    if (CkMyPe() == 0) {
+      srand(time(NULL));
+      rFmodel = new ForestModel;
+      rFmodel->readModel(_lb_args.metaLbModelDir());
+    }
+  }
 }
 
 void MetaBalancer::pup(PUP::er& p) {
-	CBase_MetaBalancer::pup(p);
   if (p.isUnpacking()) {
-    lbdatabase = (LBDatabase *)CkLocalBranch(_lbdb);
+    lbmanager = (LBManager *)CkLocalBranch(_lbmgr);
     metaRdnGroup = (MetaBalancerRedn*)CkLocalBranch(_metalbred);
   }
   p|prev_idle;
   p|alpha_beta_cost_to_load;
   p|is_prev_lb_refine;
   p|lb_in_progress;
+  p|prev_bytes;
+  p|prev_msgs;
+  p|prev_outsidepemsgs;
+  p|prev_outsidepebytes;
+  p|prev_hops;
+  p|prev_hopbytes;
+  p|prev_avg_load;
+  p|chare_pup_size;
 }
 
 
@@ -171,6 +214,8 @@ void MetaBalancer::ResumeClients() {
   adaptive_struct.global_max_iter_no = 0;
   adaptive_struct.tentative_max_iter_no = -1;
   adaptive_struct.in_progress = false;
+  // TODO: Comment out setting of lb_strategy_cost and lb_migration_cost to 0 because by the time migration cost is set,
+  // ResumeClients might already be called thereby resetting strat_cost.
   adaptive_struct.lb_strategy_cost = 0.0;
   adaptive_struct.lb_migration_cost = 0.0;
   adaptive_struct.lb_msg_send_no = 0;
@@ -178,6 +223,9 @@ void MetaBalancer::ResumeClients() {
   adaptive_struct.total_syncs_called = 0;
 
   prev_idle = 0.0;
+  prev_bytes = prev_msgs = 0;
+  prev_outsidepemsgs = prev_outsidepebytes = 0;
+  prev_hops = prev_hopbytes = 0;
   if (lb_in_progress) {
     lbdb_no_obj_callback.clear();
     lb_in_progress = false;
@@ -193,14 +241,63 @@ int MetaBalancer::get_finished_iteration() {
   return adaptive_struct.finished_iteration_no;
 }
 
+void MetaBalancer::AdjustCountForNewContributor(int it_n) {
+#if CMK_LBDB_ON
+  int index;
+
+  // it_n is the first iteration this chare will contribute to.
+  // If the finished_iteration_no is < it_n, then we need to update the counts
+  // of all the other iterations from finished_iteration_no + 1 to it_n to
+  // discount the newly added chares.
+  for (int i = (get_finished_iteration()+1); i <= it_n; i++) {
+    index = i % VEC_SIZE;
+    total_count_vec[index]++;
+  }
+#endif
+}
+
+void MetaBalancer::AdjustCountForDeadContributor(int it_n) {
+#if CMK_LBDB_ON
+  int index;
+  // it_n is the last iteration this chare contributed to.
+  // If the finished_iteration_no is < it_n, then we need to update the counts
+  // of all the other iterations from finished_iteration_no + 1 to it_n.
+  for (int i = (get_finished_iteration() + 1); i <= it_n; i++) {
+    index = i % VEC_SIZE;
+    total_count_vec[index]--;
+  }
+
+  // Check whether any of the future iterations now become valid
+  for (int i = (it_n + 1); i <= adaptive_struct.lb_iteration_no; i++) {
+    index = i % VEC_SIZE;
+    // When this contributor dies, the objDataCount gets updated only later so
+    // we need to account for that by -1
+    if (total_count_vec[index] == (lbmanager->GetObjDataSz() - 1)){
+      ContributeStats(i);
+    }
+  }
+#endif
+}
+
+void MetaBalancer::SetCharePupSize(size_t psize) {
+  //pup method of the application should not have issues like 
+  //deleting datastructures without if(isPacking)
+  chare_pup_size = psize;
+}
+
 bool MetaBalancer::AddLoad(int it_n, double load) {
 #if CMK_LBDB_ON
+  // From here on out we can ignore the periodic call to check for NoObj PEs
+  // since our PE has objects. The subsequent checks for NoObj PEs are
+  // triggered by the regular control flow.
+  ignore_periodic = true;
+
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
   adaptive_struct.total_syncs_called++;
-  DEBADDETAIL(("At PE %d Total contribution for iteration %d is %d \
+  CkPrintf("At PE %d Total contribution for iteration %d is %d \
       total objs %d\n", CkMyPe(), it_n, total_count_vec[index],
-      lbdatabase->getLBDB()->ObjDataCount()));
+      lbmanager->GetObjDataSz());
 
   if (it_n <= adaptive_struct.finished_iteration_no) {
     CkAbort("Error!! Received load for iteration that has contributed\n");
@@ -209,80 +306,246 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     adaptive_struct.lb_iteration_no = it_n;
   }
   total_load_vec[index] += load;
-  if (total_count_vec[index] > lbdatabase->getLBDB()->ObjDataCount()) {
+  if (load > max_load_vec[index]) {
+    max_load_vec[index] = load;
+  }
+  if (load < min_load_vec[index]) {
+    min_load_vec[index] = load;
+  }
+  if (total_count_vec[index] > lbmanager->GetObjDataSz()) {
     CkPrintf("iteration %d received %d contributions and expected %d\n", it_n,
-        total_count_vec[index], lbdatabase->getLBDB()->ObjDataCount());
+        total_count_vec[index], lbmanager->GetObjDataSz());
     CkAbort("Abort!!! Received more contribution");
   }
-
-  if (total_count_vec[index] == lbdatabase->getLBDB()->ObjDataCount()) {
-    double idle_time, bg_walltime, cpu_bgtime;
-    lbdatabase->IdleTime(&idle_time);
-    lbdatabase->BackgroundLoad(&bg_walltime, &cpu_bgtime);
-
-    int sync_for_bg = adaptive_struct.total_syncs_called +
-        lbdatabase->getLBDB()->ObjDataCount();
-    bg_walltime = bg_walltime * lbdatabase->getLBDB()->ObjDataCount() / sync_for_bg;
-
-    if (it_n < NEGLECT_IDLE) {
-      prev_idle = idle_time;
-    }
-    idle_time -= prev_idle;
-
-    // The chares do not contribute their 0th iteration load. So the total syncs
-    // in reality is total_syncs_called + obj_counts
-    int total_countable_syncs = adaptive_struct.total_syncs_called +
-        (1 - NEGLECT_IDLE) * lbdatabase->getLBDB()->ObjDataCount(); // TODO: Fix me!
-    if (total_countable_syncs != 0) {
-      idle_time = idle_time * lbdatabase->getLBDB()->ObjDataCount() / total_countable_syncs;
-    }
-
-    double lb_data[STATS_COUNT];
-    lb_data[0] = it_n;
-    lb_data[1] = 1;
-    lb_data[2] = total_load_vec[index]; // For average load
-    lb_data[3] = total_load_vec[index]; // For max load
-    // Set utilization
-    if (total_load_vec[index] == 0.0) {
-    	lb_data[4] = 0.0;
-      lb_data[5] = 0.0;
-    } else {
-      lb_data[4] = total_load_vec[index]/(idle_time + total_load_vec[index]);
-      lb_data[5] = total_load_vec[index]/(idle_time + total_load_vec[index]);
-    }
-    lb_data[6] = lb_data[2] + bg_walltime; // For Avg load with bg
-    lb_data[7] = lb_data[6]; // For Max load with bg
-    total_load_vec[index] = 0.0;
-    total_count_vec[index] = 0;
-
-    adaptive_struct.finished_iteration_no = it_n;
-    DEBADDETAIL(("[%d] sends total load %lf idle time %lf utilization %lf at iter %d\n",
-        CkMyPe(), total_load_vec[index], idle_time,
-        lb_data[5], adaptive_struct.finished_iteration_no));
-
-    CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
-    contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
+  if (total_count_vec[index] == lbmanager->GetObjDataSz()){
+    ContributeStats(it_n);
   }
 #endif
   return true;
 }
 
-void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
-  double* load = (double *) msg->getData();
-  double avg = load[2]/load[1];
-  double max = load[3];
-  double avg_utilization = load[4]/load[1];
-  double min_utilization = load[5];
-  int iteration_n = (int) load[0];
-  double avg_load_bg = load[6]/load[1];
-  double max_load_bg = load[7];
+void MetaBalancer::ContributeStats(int it_n) {
+#if CMK_LBDB_ON
+  int index = it_n % VEC_SIZE;
+
+  double idle_time, bg_walltime, cpu_bgtime;
+  lbmanager->IdleTime(&idle_time);
+  lbmanager->BackgroundLoad(&bg_walltime, &cpu_bgtime);
+
+  int bytes, msgs, outsidepemsgs, outsidepebytes, num_nghbors, hops, hopbytes;
+  bytes = msgs = outsidepemsgs = outsidepebytes = num_nghbors = hops = hopbytes = 0;
+  if(_lb_args.traceComm())
+    lbmanager->GetCommInfo(bytes, msgs, outsidepemsgs,
+      outsidepebytes, num_nghbors, hops, hopbytes);
+
+
+  int sync_for_bg = adaptive_struct.total_syncs_called +
+    lbmanager->GetObjDataSz();
+  bg_walltime = bg_walltime * lbmanager->GetObjDataSz() / sync_for_bg;
+
+  if (it_n < NEGLECT_IDLE) {
+    prev_idle = idle_time;
+  }
+  idle_time -= prev_idle;
+
+  // The chares do not contribute their 0th iteration load. So the total syncs
+  // in reality is total_syncs_called + obj_counts
+  int total_countable_syncs = adaptive_struct.total_syncs_called +
+    (1 - NEGLECT_IDLE) * lbmanager->GetObjDataSz(); // TODO: Fix me!
+  if (total_countable_syncs != 0) {
+    idle_time = idle_time * lbmanager->GetObjDataSz() / total_countable_syncs;
+  }
+
+  double lb_data[STATS_COUNT];
+  lb_data[0] = it_n;
+  lb_data[NUM_PROCS] = 1;
+  lb_data[TOTAL_LOAD] = total_load_vec[index]; // For average load
+  lb_data[MAX_LOAD] = total_load_vec[index]; // For max load
+  lb_data[MIN_LOAD] = total_load_vec[index]; // For min load;
+  // Set utilization
+  if (total_load_vec[index] == 0.0) {
+    lb_data[IDLE_TIME] = 0.0;
+    lb_data[UTILIZATION] = 0.0;
+    lb_data[MAX_UTIL] = 0.0;
+  } else {
+    lb_data[IDLE_TIME] = total_load_vec[index]/(idle_time + total_load_vec[index]);
+    lb_data[UTILIZATION] = total_load_vec[index]/(idle_time + total_load_vec[index]);
+    lb_data[MAX_UTIL] = total_load_vec[index]/(idle_time + total_load_vec[index]);
+  }
+  lb_data[TOTAL_LOAD_W_BG] = lb_data[TOTAL_LOAD] + bg_walltime;
+  lb_data[MIN_BG] = lb_data[TOTAL_LOAD_W_BG];
+  lb_data[MAX_LOAD_W_BG] = lb_data[TOTAL_LOAD_W_BG];
+  lb_data[TOTAL_KBYTES] = ((double) bytes/1024.0);
+  lb_data[TOTAL_KMSGS] = ((double) msgs/1024.0);
+  lb_data[WITHIN_PE_KBYTES] = ((double) outsidepemsgs/1024.0);
+  lb_data[OUTSIDE_PE_KBYTES] = ((double) outsidepebytes/1024.0);
+  lb_data[SUM_COMM_NEIGHBORS] = num_nghbors;
+  lb_data[MAX_COMM_NEIGHBORS] = 0; // TODO
+  lb_data[SUM_OBJ_COUNT] = lbmanager->GetObjDataSz();
+  lb_data[MAX_OBJ_COUNT] = lb_data[SUM_OBJ_COUNT];
+  lb_data[SUM_OBJ_LOAD] = total_load_vec[index];
+  lb_data[MAX_OBJ_LOAD] = max_load_vec[index];
+  lb_data[MIN_OBJ_LOAD] = min_load_vec[index];
+  lb_data[LOAD_STDEV2] = (total_load_vec[index] - prev_avg_load)*
+      (total_load_vec[index] - prev_avg_load);
+  lb_data[LOAD_SKEWNESS] = (total_load_vec[index] - prev_avg_load)*
+      (total_load_vec[index] - prev_avg_load) *
+      (total_load_vec[index] - prev_avg_load);
+  lb_data[LOAD_KURTOSIS] = lb_data[LOAD_STDEV2]*lb_data[LOAD_STDEV2];
+  lb_data[TOTAL_OVERLOADED_PES] = (total_load_vec[index] > prev_avg_load) ? 1 : 0;
+  lb_data[SUM_HOPS] = 0;
+  lb_data[SUM_HOP_KBYTES] = 0;
+  if (msgs > 0) {
+    lb_data[SUM_HOPS] = (double) hops;
+    lb_data[SUM_HOP_KBYTES] = ((double) hopbytes/1024.0);
+  }
+  lb_data[MAX_ITER_TIME] = total_load_vec[index] + idle_time;
+
+  total_load_vec[index] = 0.0;
+  total_count_vec[index] = 0;
+  max_load_vec[index] = 0.0;
+  min_load_vec[index] = MAXDOUBLE;
+
+  adaptive_struct.finished_iteration_no = it_n;
+
+  DEBADDETAIL(("[%d] sends total load %lf idle time %lf utilization %lf at iter %d\n",
+        CkMyPe(), total_load_vec[index], idle_time,
+        lb_data[5], adaptive_struct.finished_iteration_no));
+
+  CkCallback cb(CkReductionTarget(MetaBalancer, ReceiveMinStats),
+        thisProxy[0]);
+  contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
+
+#endif
+}
+
+void MetaBalancer::ReceiveMinStats(double *load, int n) {
+    // verify number of elements sent for reduction
+  CmiAssert(n == STATS_COUNT);
+  double pe_count = load[NUM_PROCS];
+  double avg_load = load[TOTAL_LOAD]/load[NUM_PROCS];
+  double max_load = load[MAX_LOAD];
+  double min_load = load[MIN_LOAD];
+  double avg_utilization = load[IDLE_TIME]/load[NUM_PROCS];
+  double min_utilization = load[UTILIZATION];
+  int iteration_n = (int) load[ITER_NO];
+  double avg_load_bg = load[TOTAL_LOAD_W_BG]/load[NUM_PROCS];
+  double min_load_bg = load[MIN_BG];
+  double max_load_bg = load[MAX_LOAD_W_BG];
+  int total_objs = (int) load[SUM_OBJ_COUNT];
+  double total_Kbytes = load[TOTAL_KBYTES];
+  double total_Kmsgs = load[TOTAL_KMSGS];
+  double total_outsidepeKmsgs = load[WITHIN_PE_KBYTES];
+  double total_outsidepeKbytes = load[OUTSIDE_PE_KBYTES];
+  double avg_bg = avg_load_bg - avg_load;
+  double avg_comm_neighbors = load[SUM_COMM_NEIGHBORS]/total_objs;
+  double max_comm_neighbors = load[MAX_COMM_NEIGHBORS];
+  double avg_obj_load = load[SUM_OBJ_LOAD]/total_objs;
+  double min_obj_load = load[MIN_OBJ_LOAD];
+  double max_obj_load = load[MAX_OBJ_LOAD];
+  double avg_hops = load[SUM_HOPS]/(total_Kmsgs*1024.0); // The messages are in K
+  double avg_hop_Kbytes = load[SUM_HOP_KBYTES]/(total_Kmsgs*1024.0);
+  double standard_dev = sqrt(load[LOAD_STDEV2]/load[NUM_PROCS]);
+  double skewness = load[LOAD_SKEWNESS]/(load[NUM_PROCS] * standard_dev * standard_dev *
+      standard_dev);
+  double kurtosis = load[LOAD_KURTOSIS]/(load[NUM_PROCS] * standard_dev * standard_dev *
+      standard_dev * standard_dev) - 3;
+  int ovld_pes = (int) load[TOTAL_OVERLOADED_PES];
+  double max_utilization = load[MAX_UTIL];
+  double app_iteration_time = load[MAX_ITER_TIME];
+
+  // Features to be output
+  double pe_imbalance = max_load/avg_load;
+  double pe_load_std_frac = standard_dev/avg_load;
+  double pe_with_bg_imb = max_load_bg/avg_load_bg;
+  double bg_load_frac = avg_bg/avg_load;
+  double pe_gain = max_load - avg_load;
+  double internal_bytes_frac = (total_Kbytes-total_outsidepeKbytes)/total_Kbytes;
+  double comm_comp_ratio = (_lb_args.alpha()*total_Kmsgs+_lb_args.beta()*total_Kbytes)/(avg_load*pe_count);
+
 	// Set the max and avg to be the load with background
+  double max, avg, min;
 	max = max_load_bg;
 	avg = avg_load_bg;
+  min = min_load_bg;
+  thisProxy.PreviousAvgLoad(avg_load);
+
   DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Util : %lf \
       Min Util : %lf for %lf procs\n",iteration_n, avg, max, avg_utilization,
       min_utilization, load[1]));
-  delete msg;
+
+   if(adaptive_lbdb.history_data.size() > 0){ // probably a better check exists than this
+    double mslope, aslope, mc, ac;
+    double new_load_percent = max/avg;
+    getLineEq(new_load_percent, aslope, ac, mslope, mc);
+
+
+//    fprintf(fp,"\n%d %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %f %lf \
+//        %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %0.7lf %lf ",
+//        iteration_n, avg_load, min_load, max_load, standard_dev,
+//        avg_load_bg, min_load_bg, max_load_bg,
+//        avg_bg, avg_utilization, min_utilization, max_utilization,
+//        avg_obj_load, min_obj_load, max_obj_load, total_objs/pe_count, pe_count,
+//        total_bytes, total_msgs,
+//        total_outsidepebytes, total_outsidepemsgs,
+//        total_bytes-total_outsidepebytes, total_msgs-total_outsidepemsgs,
+//        avg_comm_neighbors, mslope, aslope,
+//        avg_hops, avg_hop_bytes, _lb_args.alpha(), _lb_args.beta(),
+//        app_iteration_time);
+
+    DEBAD(
+        ("Features:%lf %lf %lf %lf %lf %lf %lf %lf \
+       %lf %lf %lf %lf %lf %lf %lf %lf %lf \
+       %lf %lf %lf %lf %lf %lf %lf %d %lf\n",
+         pe_imbalance, pe_load_std_frac, pe_with_bg_imb, bg_load_frac, pe_gain,
+         avg_utilization, min_utilization, max_utilization, avg_obj_load, min_obj_load,
+         max_obj_load, total_objs / pe_count, pe_count, total_Kbytes, total_Kmsgs,
+         total_outsidepeKbytes / total_Kbytes, total_outsidepeKmsgs / total_Kmsgs,
+         internal_bytes_frac, avg_comm_neighbors, mslope, aslope, avg_hops,
+         avg_hop_Kbytes, comm_comp_ratio, chare_pup_size, app_iteration_time));
+
+    // Read test data as a data structure
+    if (_lb_args.metaLbModelDir() != NULL) {
+      std::vector<double> test_data{pe_imbalance,
+                                    pe_load_std_frac,
+                                    pe_with_bg_imb,
+                                    0,
+                                    bg_load_frac,
+                                    pe_gain,
+                                    avg_utilization,
+                                    min_utilization,
+                                    max_utilization,
+                                    avg_obj_load,
+                                    min_obj_load,
+                                    max_obj_load,
+                                    total_objs / pe_count,
+                                    pe_count,
+                                    total_Kbytes,
+                                    total_Kmsgs,
+                                    total_outsidepeKbytes / total_Kbytes,
+                                    total_outsidepeKmsgs / total_Kmsgs,
+                                    internal_bytes_frac,
+                                    (total_Kbytes - total_outsidepeKbytes) / total_Kmsgs,
+                                    avg_comm_neighbors,
+                                    mslope,
+                                    aslope,
+                                    avg_hops,
+                                    avg_hop_Kbytes,
+                                    comm_comp_ratio};
+      // Model returns value [1,num_lbs]
+      int predicted_lb = rFmodel->forestTest(test_data, 1, 26);
+      DEBAD(("***********Final classification = %d *****************\n", predicted_lb));
+
+      // predicted_lb-1 since predicted_lb class count in the model starts at 1
+      thisProxy.MetaLBSetLBOnChares(current_balancer, predicted_lb - 1);
+      current_balancer = predicted_lb - 1;
+    }
+    DEBAD(("mslope %lf aslope %lf\n", mslope, aslope));
+
+    pe_ld_skewness = skewness;
+    pe_ld_kurtosis = kurtosis;
+    total_ovld_pes = ovld_pes;
+  }
 
   // For processors with  no  objs, trigger MetaBalancer reduction
   if (adaptive_struct.final_lb_period != iteration_n) {
@@ -653,11 +916,15 @@ void MetaBalancer::LoadBalanceDecisionFinal(int req_no, int period) {
 			period:%d \n",CkMyPe(), adaptive_struct.lb_iteration_no, period));
   adaptive_struct.tentative_period = period;
   adaptive_struct.final_lb_period = period;
-  lbdatabase->MetaLBResumeWaitingChares(period);
+  lbmanager->MetaLBResumeWaitingChares(period);
 }
 
 void MetaBalancer::MetaLBCallLBOnChares() {
-  lbdatabase->MetaLBCallLBOnChares();
+  lbmanager->MetaLBCallLBOnChares();
+}
+
+void MetaBalancer::MetaLBSetLBOnChares(int switchFrom, int switchTo) {
+  lbmanager->switchLoadbalancer(switchFrom, switchTo);
 }
 
 void MetaBalancer::ReceiveIterationNo(int local_iter_no) {
@@ -718,13 +985,15 @@ void MetaBalancer::periodicCall(void *ad) {
 
 void MetaBalancer::checkForNoObj(void *ad) {
   MetaBalancer *s = (MetaBalancer *) ad;
-  s->HandleAdaptiveNoObj();
+  if (!s->ignore_periodic) {
+    s->HandleAdaptiveNoObj();
+  }
 }
 
-// Called by LBDatabase to indicate that no objs are there in this processor
+// Called by LBManager to indicate that no objs are there in this processor
 void MetaBalancer::HandleAdaptiveNoObj() {
 #if CMK_LBDB_ON
-  if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
+  if (lbmanager->GetObjDataSz() == 0) {
     adaptive_struct.finished_iteration_no++;
     adaptive_struct.lb_iteration_no++;
     DEBAD(("(%d) --HandleAdaptiveNoObj %d\n", CkMyPe(),
@@ -758,23 +1027,23 @@ void MetaBalancer::RegisterNoObjCallback(int index) {
 
 void MetaBalancer::TriggerAdaptiveReduction() {
 #if CMK_LBDB_ON
-  if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
+  if (lbmanager->GetObjDataSz() == 0) {
     adaptive_struct.finished_iteration_no++;
     adaptive_struct.lb_iteration_no++;
     double lb_data[STATS_COUNT];
-    lb_data[0] = adaptive_struct.finished_iteration_no;
-    lb_data[1] = 1;
-    lb_data[2] = 0.0;
-    lb_data[3] = 0.0;
-    lb_data[4] = 0.0;
-    lb_data[5] = 0.0;
-    lb_data[6] = 0.0;
-    lb_data[7] = 0.0;
+    lb_data[ITER_NO] = adaptive_struct.finished_iteration_no;
+    lb_data[NUM_PROCS] = 1;
+    lb_data[TOTAL_LOAD] = 0.0;
+    lb_data[MAX_LOAD] = 0.0;
+    lb_data[IDLE_TIME] = 0.0;
+    lb_data[UTILIZATION] = 0.0;
+    lb_data[TOTAL_LOAD_W_BG] = 0.0;
+    lb_data[MAX_LOAD_W_BG] = 0.0;
 
     DEBAD(("[%d] Triggered adaptive reduction for noobj %d\n", CkMyPe(),
           adaptive_struct.finished_iteration_no));
 
-    CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL),
+    CkCallback cb(CkReductionTarget(MetaBalancer, ReceiveMinStats),
         thisProxy[0]);
     contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
   }
@@ -863,7 +1132,6 @@ void MetaBalancerRedn::init() {
 }
 
 void MetaBalancerRedn::pup(PUP::er& p) {
-	CBase_MetaBalancerRedn::pup(p);
 }
 
 void MetaBalancerRedn::ReceiveIterNo(int max_iter) {
@@ -879,6 +1147,10 @@ void MetaBalancerRedn::ReceiveIterNo(int max_iter) {
 void MetaBalancerRedn::getMaxIter(int max_iter) {
   CkCallback cb(CkReductionTarget(MetaBalancerRedn, ReceiveIterNo), thisProxy[0]);
   contribute(sizeof(int), &max_iter, CkReduction::max_int, cb);
+}
+
+void MetaBalancer::PreviousAvgLoad(double avg) {
+  prev_avg_load = avg;
 }
 
 #include "MetaBalancer.def.h"

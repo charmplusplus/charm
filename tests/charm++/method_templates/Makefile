@@ -1,3 +1,4 @@
+-include ../../common.mk
 # Point this to your charm installation
 CHARMHOME = ../../..
 
@@ -14,14 +15,13 @@ INTF      = mylib.ci pgm.ci
 # Specify the exe name and the arguments to run it with
 NP        = 4
 TARGET    = testTemplateEP
-ARGS      = $(TESTOPTS)
+ARGS      =
 
 # Specify the compilers, run script, flags etc.
 CXX       = $(CHARMBIN)/charmc
 CXXFLAGS += -language charm++ $(OPTS)
 CPPFLAGS += $(OPTS)
 LDFLAGS  +=
-EXEC      = ./charmrun
 EXECFLAGS = +p$(NP)
 ifdef $(NODELIST)
   EXECFLAGS += ++nodelist $(NODELIST)
@@ -30,7 +30,7 @@ endif
 
 ########### This stuff should be able take care of itself ############
 
-.PHONY: all clean again test bgtest translateInterface
+.PHONY: all clean again test translateInterface
 
 all: $(TARGET)
 
@@ -45,7 +45,16 @@ again:
 
 test: all
 	@echo "########################################################################################"
-	$(EXEC) $(EXECFLAGS) ./$(TARGET) $(ARGS)
+	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS))
+
+testp: all
+	@echo "########################################################################################"
+	$(call run, +p$(P) ./$(TARGET) $(ARGS))
+
+smptest: all
+	@echo "########################################################################################"
+	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS) ++ppn 2)
+	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS) ++ppn 4)
 
 
 mylib.o: mylib.C mylib.h mylib.decl.h mylib.def.h
@@ -53,8 +62,7 @@ pgm.o: pgm.C client.decl.h mylib.h mylib.decl.h mylib.def.h utils.h client.def.h
 
 # Rule to generate dependency info for charm++ interface (ci) definition files
 %.di: %.ci
-	$(info Generating dependencies for $<)
-	@$(CXX) -M $< > $@
+	$(CXX) -M $< > $@
 
 %.ci.stamp: %.ci
 	$(CXX) $< && touch $@

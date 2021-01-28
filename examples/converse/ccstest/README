@@ -8,7 +8,7 @@ CCS Handlers registered.  Waiting for net requests...
 
 or just
 
-./charmrun +p2 ./server ++server 
+./charmrun +p2 ./server ++server
 ccs: 2
 ccs: Server IP = 128.174.241.108, Server port = 1912 $
 CCS Handlers registered.  Waiting for net requests...

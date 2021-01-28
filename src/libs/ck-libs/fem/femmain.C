@@ -20,10 +20,10 @@ Orion Sky Lawlor, olawlor@acm.org, 2003/7/13
 #include "converse.h" /* for CmiGetArg */
 #include "charm-api.h" /* for Fortran name mangling FTN_NAME */
 
-CDECL void fem_impl_call_init(void);
+CLINKAGE void fem_impl_call_init(void);
 
-FDECL void FTN_NAME(INIT,init)(void);
-FDECL void FTN_NAME(DRIVER,driver)(void);
+FLINKAGE void FTN_NAME(INIT,init)(void);
+FLINKAGE void FTN_NAME(DRIVER,driver)(void);
 
 int main(int argc,char **argv) {
 	MPI_Comm comm=MPI_COMM_WORLD;

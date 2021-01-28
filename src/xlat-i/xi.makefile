@@ -14,3 +14,6 @@ xi-scan.C: xi-scan.l
 
 sdag/sdag-trans.c: sdag/trans.l
 	flex -Psl -osdag/sdag-trans.c sdag/trans.l
+
+clean:
+	rm -rf xi-grammar.tab.h xi-grammar.tab.C xi-scan.C

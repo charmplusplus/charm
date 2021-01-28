@@ -1,10 +1,10 @@
 #include "pup_cmialloc.h"
 
-void PUP_cmiAllocSizer::bytes(void *,int n,size_t itemSize,PUP::dataType) {
+void PUP_cmiAllocSizer::bytes(void *,size_t n,size_t itemSize,PUP::dataType) {
     nBytes += n * itemSize;
 }
 
-void PUP_toCmiAllocMem::bytes(void *p, int n, size_t itemSize, 
+void PUP_toCmiAllocMem::bytes(void *p, size_t n, size_t itemSize, 
                               PUP::dataType t) {
 
     n *= itemSize;
@@ -12,7 +12,7 @@ void PUP_toCmiAllocMem::bytes(void *p, int n, size_t itemSize,
     buf += n;
 }
 
-void PUP_fromCmiAllocMem::bytes(void *p, int n, size_t itemSize, 
+void PUP_fromCmiAllocMem::bytes(void *p, size_t n, size_t itemSize, 
                                 PUP::dataType t)
 {
     n*=itemSize;
@@ -26,7 +26,7 @@ void PUP_cmiAllocSizer::pupCmiAllocBuf(void **msg) {
     pupCmiAllocBuf(msg, chnk_hdr.size);
 }
 
-void PUP_cmiAllocSizer::pupCmiAllocBuf(void **msg, int msg_size) {
+void PUP_cmiAllocSizer::pupCmiAllocBuf(void **msg, size_t msg_size) {
 
     //The cmialloced buf can only start at an aligned memory location
     //So nbytes has to be aligned
@@ -43,14 +43,14 @@ void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg) {
     pupCmiAllocBuf(msg, SIZEFIELD(msg));
 }
 
-void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg, int msg_size) {
+void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg, size_t msg_size) {
 
     CmiChunkHeader chnk_hdr;
 
     buf = origBuf + ALIGN8_LONG(size());
 
     chnk_hdr.size = msg_size;
-    chnk_hdr.ref = origBuf - (buf + sizeof(CmiChunkHeader));
+    chnk_hdr.setRef(origBuf - (buf + sizeof(CmiChunkHeader)));
     
     //Copy the Chunk header
     memcpy(buf, &chnk_hdr, sizeof(CmiChunkHeader));
@@ -65,7 +65,7 @@ void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg, int msg_size) {
 
 void PUP_fromCmiAllocMem::pupCmiAllocBuf(void **msg) {
     //First align buf
-    buf = (PUP::myByte *)ALIGN8_LONG((long)buf);
+    buf = (PUP::myByte *)(intptr_t)ALIGN8_LONG((intptr_t)buf);
 
     //Now get the chunk header
     CmiChunkHeader chnk_hdr;    
@@ -80,7 +80,7 @@ void PUP_fromCmiAllocMem::pupCmiAllocBuf(void **msg) {
     buf += chnk_hdr.size;
     
     //update the reference count of the original buf
-    REFFIELD(origBuf) ++;
+    REFFIELDINC(origBuf);
 }
 
 

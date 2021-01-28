@@ -4,6 +4,7 @@ mainmodule hello {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
+    entry void initDone(void);
     entry void done(void);
   };
 

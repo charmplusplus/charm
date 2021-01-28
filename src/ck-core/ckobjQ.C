@@ -33,7 +33,7 @@ void CkObjectMsgQ::create() {
 #if OBJQ_FIFO
     objQ = (void *)CdsFifo_Create();
 #else
-    objQ = (void *)CqsCreate(); 
+    objQ = CqsCreate();
 #endif
 }
 
@@ -110,7 +110,6 @@ Chare * CkFindObjectPtr(envelope *env)
     case ForVidMsg:
     case FillVidMsg:
       break;
-    case ForIDedObjMsg:
     case ForArrayEltMsg:
       obj = CkArrayMessageObjectPtr(env);
       break;
@@ -163,7 +162,7 @@ void _enqObjQueue(Chare *obj, envelope *env)
 void _ObjectQHandler(void *converseMsg)
 {
 #if CMK_OBJECT_QUEUE_AVAILABLE
-  register envelope *env = (envelope *)(converseMsg);
+  envelope *env = (envelope *)(converseMsg);
   Chare *obj = CkFindObjectPtr(env);
   // swap handler back
 //  CmiSetHandler(env, CmiGetXHandler(env));

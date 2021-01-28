@@ -1,3 +1,4 @@
+-include ../../common.mk
 # NOTE: This is the basic Makefile template that includes the additional
 #       Makefile.simulation makefile that is found in the location of the
 #       current installation of POSE.
@@ -24,7 +25,7 @@ CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS)
 
 # Default Location variables
 # **************************
-#POSE_ROOT=$(HOME)/charm/net-linux/lib
+#POSE_ROOT=$(HOME)/charm/netlrts-linux/lib
 
 # Default module names
 # - MAKE MODIFICATIONS HERE
@@ -125,7 +126,7 @@ test: $(PGM)
 	./pgm 16 0
 
 partest: $(PGM)
-	./charmrun +p4 ./pgm 16 0
+	$(call run, +p4 ./pgm 16 0)
 
 seqtest: $(PGM).seq
 	./pgm.seq 16 0

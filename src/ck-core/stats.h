@@ -3,6 +3,7 @@
 
 class Stats {
   private:
+    UInt pe;
     UInt charesCreated; // # of new chare msgs sent
     UInt charesProcessed; // # of new chare msgs processed
     UInt forCharesCreated; // # of for chare msgs created
@@ -19,6 +20,7 @@ class Stats {
     void *operator new(size_t size) { return _allocMsg(StatMsg, size); }
     void operator delete(void *ptr) { CkFreeMsg(ptr); }
     Stats() {
+      pe = CkMyPe();
       charesCreated = 0; 
       charesProcessed = 0; 
       forCharesCreated = 0; 
@@ -58,6 +60,7 @@ class Stats {
     void recordProcessNodeGroup(int x=1) { nodeGroupInitsProcessed += x; }
     void recordSendNodeBranch(int x=1) { nodeGroupMsgsCreated += x; }
     void recordProcessNodeBranch(int x=1) { nodeGroupMsgsProcessed += x; }
+    UInt getPe(void) const { return pe; }
     UInt getCharesCreated(void) const { return charesCreated; }
     UInt getCharesProcessed(void) const { return charesProcessed; }
     UInt getForCharesCreated(void) const { return forCharesCreated; }

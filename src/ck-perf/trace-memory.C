@@ -5,8 +5,7 @@
 #define DEBUGF(x) // CmiPrintf x
 
 CkpvStaticDeclare(TraceMemory*, _trace);
-extern "C" void memory_trace_all_existing_mallocs();
-extern "C" int get_memory_allocated_user_total();
+extern int get_memory_allocated_user_total();
 
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
@@ -44,7 +43,7 @@ void MemEntry::write(FILE *fp) {
 
 TraceMemory::TraceMemory(char **argv) {
   usedBuffer = 0;
-  firstTime = 1;
+  firstTime = true;
   traceDisabled = false;
   logBufSize = DefaultBufferSize;
   if (CmiGetArgIntDesc(argv,"+memlogsize",&logBufSize, 
@@ -74,7 +73,7 @@ inline void TraceMemory::flush() {
   const char *mode;
   if (firstTime) mode = "w";
   else mode = "a";
-  firstTime = 0;
+  firstTime = false;
   // flushing the logs
   char fname[1024];
   sprintf(fname, "memoryLog_%d", CkMyPe());

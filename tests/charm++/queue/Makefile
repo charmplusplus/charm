@@ -1,13 +1,18 @@
+-include ../../common.mk
 CHARMC := ../../../bin/charmc
 CXX := $(CHARMC) $(OPTS)
 
-TARGETS = pgm msgqtest
+TARGETS = queue msgqtest
 all: $(TARGETS)
 test: $(TARGETS)
-	./charmrun ./pgm $(TESTOPTS)
-	./charmrun ./msgqtest $(TESTOPTS)
+	$(call run, ./queue  +p1)
+	$(call run, ./msgqtest  +p1)
 
-pgm.C: main.decl.h
+smptest: $(TARGETS)
+
+queue: pgm.C main.decl.h
+	$(CHARMC) $(OPTS) -c pgm.C
+	$(CHARMC) $(OPTS) -o $@ pgm.o
 
 msgqtest.C: main.decl.h
 
@@ -18,4 +23,4 @@ test.ci.stamp: test.ci
 	touch $@
 
 clean:
-	rm -f $(TARGETS) *.o *.decl.h *.def.h test.ci.stamp charmrun pgm.exe pgm.pdb pgm.ilk
+	rm -f $(TARGETS) *.o *.decl.h *.def.h test.ci.stamp charmrun queue.exe queue.pdb queue.ilk

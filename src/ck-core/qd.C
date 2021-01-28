@@ -2,17 +2,59 @@
 
 #include "ck.h"
 
+class QdMsg {
+  private:
+    int phase; // 0..2
+    union {
+      struct { /* none */ } p1;
+      struct { CmiInt8 created; CmiInt8 processed; } p2;
+      struct { /* none */ } p3;
+      struct { char dirty; } p4;
+    } u;
+    CkCallback cb;
+  public:
+    int getPhase(void) { return phase; }
+    void setPhase(int p) { phase = p; }
+    CkCallback getCb(void) { CkAssert(phase==0); return cb; }
+    void setCb(CkCallback cb_) { CkAssert(phase==0); cb = cb_; }
+    CmiInt8 getCreated(void) { CkAssert(phase==1); return u.p2.created; }
+    void setCreated(CmiInt8 c) { CkAssert(phase==1); u.p2.created = c; }
+    CmiInt8 getProcessed(void) { CkAssert(phase==1); return u.p2.processed; }
+    void setProcessed(CmiInt8 p) { CkAssert(phase==1); u.p2.processed = p; }
+    char getDirty(void) { CkAssert(phase==2); return u.p4.dirty; }
+    void setDirty(char d) { CkAssert(phase==2); u.p4.dirty = d; }
+};
+
+class QdCommMsg {
+  public:
+    bool isCreated;     //  false: create   true: process
+    int count;
+};
+
+class QdCallback {
+  public:
+	CkCallback cb;
+  public:
+    QdCallback(int e, CkChareID c) : cb(e, c) {}
+	QdCallback(CkCallback cb_) : cb(cb_) {}
+//    void send(void) { CkSendMsg(ep,CkAllocMsg(0,0,0),&cid); }
+    void send(void) {
+      // pretending pe 0 in blue gene mode, switch back after the call.
+#if CMK_CONDS_USE_SPECIAL_CODE
+      int old = CmiSwitchToPE(0);
+#endif
+      cb.send(NULL);
+#if CMK_CONDS_USE_SPECIAL_CODE
+      CmiSwitchToPE(old);
+#endif
+    }
+};
+
 extern int _qdCommHandlerIdx;
 
 // a fake QD which just wait for several seconds to triger QD callback
 int _dummy_dq = 0;                      /* seconds to wait for */
 
-#if CMK_BIGSIM_CHARM
-// this is a hack for bgcharm++, I need to figure out a better
-// way to do this
-#undef CmiSyncSendAndFree
-#define CmiSyncSendAndFree    CmiFreeSendFn
-#endif
 
 CpvDeclare(QdState*, _qd);
 
@@ -25,7 +67,7 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   state->propagate(msg);
   msg->setPhase(1);
   DEBUGP(("[%d] _bcastQD1: State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
-#if ! CMK_SHARED_VARS_UNIPROCESSOR && !CMK_MULTICORE
+#if !CMK_MULTICORE
 /*
   QdState *comm_state;
   static int comm_create=0, comm_process=0;
@@ -103,7 +145,12 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
         if(CmiMyPe()==0) {
           DEBUGP(("ALL: %p getCCreated:%d getCProcessed:%d\n", state, state->getCCreated(), state->getCProcessed()));
           if(state->getCCreated()==state->getCProcessed()) {
-            _bcastQD2(state, msg);    // almost reached, one pass to make sure
+            if(state->oldCount == state->getCProcessed()) {// counts unchanged in second round
+              _bcastQD2(state, msg);    // almost reached, one pass to make sure
+            } else {
+              state->oldCount = state->getCProcessed();
+              _bcastQD1(state, msg);    // may have reached, go over again
+            }
           } else {
             _bcastQD1(state, msg);    // not reached, go over again
           }
@@ -127,7 +174,7 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
 // check if counters became dirty and notify parents
 static inline void _handlePhase2(QdState *state, QdMsg *msg)
 {
-//  This assertion seems too strong for smp and uth version.
+//  This assertion seems too strong for smp version.
   DEBUGP(("[%d] _handlePhase2: stage: %d, msg phase: %d \n", CmiMyPe(), state->getStage(), msg->getPhase()));
   CkAssert(state->getStage()==2);
   state->subtreeSetDirty(msg->getDirty());
@@ -150,7 +197,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
       }
     } else {
         // tell parent if the counters on the node is dirty or not
-      DEBUGP(("[%d] _handlePhase2 dirty:%d\n", CmiMyPe(), state->isDirty()));
+      DEBUGP(("[%d] _handlePhase2 dirty:%d\n", CmiMyPe(), (int)state->isDirty()));
       msg->setDirty(state->isDirty());
       envelope *env = UsrToEnv((void*)msg);
       CmiSyncSendAndFree(state->getParent(), env->getTotalsize(), (char *)env);
@@ -182,7 +229,7 @@ static void _invokeQD(QdMsg *msg)
 
 void _qdHandler(envelope *env)
 {
-  register QdMsg *msg = (QdMsg*) EnvToUsr(env);
+  QdMsg *msg = (QdMsg*) EnvToUsr(env);
   DEBUGP(("[%d] _qdHandler msg:%p \n", CmiMyPe(), msg));
   if (_dummy_dq > 0)
     CcdCallFnAfter((CcdVoidFn)_invokeQD,(void *)msg, _dummy_dq*1000); // in ms
@@ -194,16 +241,16 @@ void _qdHandler(envelope *env)
 // thread or interrupt handler, the counter is sent to rank 0 of the same node
 void _qdCommHandler(envelope *env)
 {
-  register QdCommMsg *msg = (QdCommMsg*) EnvToUsr(env);
+  QdCommMsg *msg = (QdCommMsg*) EnvToUsr(env);
   DEBUGP(("[%d] _qdCommHandler msg:%p \n", CmiMyPe(), msg));
-  if (msg->flag == 0)
+  if (!msg->isCreated)
     CpvAccess(_qd)->create(msg->count);
   else
     CpvAccess(_qd)->process(msg->count);
   CmiFree(env);
 }
 
-void QdState::sendCount(int flag, int count)
+void QdState::sendCount(bool isCreated, int count)
 {
   if (_dummy_dq == 0) {
 #if CMK_NET_VERSION && ! CMK_SMP && ! defined(CMK_CPV_IS_SMP)
@@ -212,10 +259,10 @@ void QdState::sendCount(int flag, int count)
         if (CmiMyRank() == CmiMyNodeSize())
 #endif
         {
-          register QdCommMsg *msg = (QdCommMsg*) CkAllocMsg(0,sizeof(QdCommMsg),0);
-          msg->flag = flag;
+          QdCommMsg *msg = (QdCommMsg*) CkAllocMsg(0,sizeof(QdCommMsg),0);
+          msg->isCreated = isCreated;
           msg->count = count;
-          register envelope *env = UsrToEnv((void *)msg);
+          envelope *env = UsrToEnv((void *)msg);
           CmiSetHandler(env, _qdCommHandlerIdx);
           CmiFreeSendFn(CmiNodeFirst(CmiMyNode()), env->getTotalsize(), (char *)env);
         }
@@ -224,22 +271,17 @@ void QdState::sendCount(int flag, int count)
 
 void CkStartQD(const CkCallback& cb)
 {
-  register QdMsg *msg = (QdMsg*) CkAllocMsg(0,sizeof(QdMsg),0);
+  QdMsg *msg = (QdMsg*) CkAllocMsg(0,sizeof(QdMsg),0);
   msg->setPhase(0);
   msg->setCb(cb);
-  register envelope *env = UsrToEnv((void *)msg);
+  envelope *env = UsrToEnv((void *)msg);
   CmiSetHandler(env, _qdHandlerIdx);
 #if CMK_MEM_CHECKPOINT
   CmiGetRestartPhase(env) = 9999;        // make sure it is always executed
 #endif
-#if CMK_BIGSIM_CHARM
-  CmiFreeSendFn(0, env->getTotalsize(), (char *)env);
-#else
   _CldEnqueue(0, env, _infoIdx);
-#endif
 }
 
-extern "C"
 void CkStartQD(int eIdx, const CkChareID *cid)
 {
   CkStartQD(CkCallback(eIdx, *cid));

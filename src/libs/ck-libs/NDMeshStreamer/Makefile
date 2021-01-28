@@ -29,6 +29,7 @@ $(INCDIR)/DataItemTypes.h: DataItemTypes.h
 
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ)
+	/bin/cp libmoduleNDMeshStreamer.dep $(CDIR)/lib
 
 NDMeshStreamer.def.h: NDMeshStreamer.decl.h
 

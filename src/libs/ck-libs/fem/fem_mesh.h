@@ -19,7 +19,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
 #  include "idxl_layout.h" /*for IDXL_Layout */
 #endif
 
-#if defined(WIN32) && defined(max)
+#if defined(_WIN32) && defined(max)
 #undef max
 #endif
 
@@ -294,12 +294,12 @@ class FEM_Mesh;
 /// Return the human-readable version of this entity code, like "FEM_NODE".
 ///  storage, which must be at least 80 bytes long, is used for
 ///  non-static names, like the user tag "FEM_ELEM+2".
-CDECL const char *FEM_Get_entity_name(int entity,char *storage);
+CLINKAGE const char *FEM_Get_entity_name(int entity,char *storage);
 
 /// Return the human-readable version of this attribute code, like "FEM_CONN".
 ///  storage, which must be at least 80 bytes long, is used for
 ///  non-static names, like the user tag "FEM_DATA+7".
-CDECL const char *FEM_Get_attr_name(int attr,char *storage);
+CLINKAGE const char *FEM_Get_attr_name(int attr,char *storage);
 
 
 
@@ -429,7 +429,6 @@ public:
 		const IDXL_Layout &layout, const char *caller);
 	
 };
-PUPmarshall(FEM_Attribute)
 
 
 /**
@@ -476,7 +475,6 @@ public:
 	void interpolate(int A,int B,int D,double frac);
 	void interpolate(int *iNodes,int rNode,int k);
 };
-PUPmarshall(FEM_DataAttribute)
 
 /**
  * This table maps an entity to a set of integer indices.
@@ -523,7 +521,6 @@ public:
 	/// Copy src[srcEntity] into our dstEntity.
 	virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
 };
-PUPmarshall(FEM_IndexAttribute)
 
 /*
 	This table maps an entity to a list of integer indices 
@@ -843,7 +840,6 @@ protected:
 	
 	void print(const char *type,const IDXL_Print_Map &map);
 };
-PUPmarshall(FEM_Entity)
 
 // Now that we have FEM_Entity, we can define attribute lenth, as entity length
 inline int FEM_Attribute::getLength(void) const { return e->size(); }
@@ -902,7 +898,6 @@ public:
 	bool hasConn(unsigned int idx);
 	void print(const char *type,const IDXL_Print_Map &map);
 };
-PUPmarshall(FEM_Node)
 
 /**
  * Describes one kind of FEM elements--the FEM_ELEM entity type.
@@ -949,8 +944,6 @@ public:
 	void connIs(int i,const int *src) {conn->get().setRow(i,src);}
 	bool hasConn(unsigned int idx);
 };
-PUPmarshall(FEM_Elem)
-
 
 
 /**
@@ -991,7 +984,6 @@ public:
 	inline elem_t &setElem(void) {return elem->get();}
 	inline const elem_t &getElem(void) const {return elem->get();}
 };
-PUPmarshall(FEM_Sparse)
 
 /** Describes a user function to pup a piece of mesh data 
 */
@@ -1315,13 +1307,8 @@ class FEM_Mesh : public CkNoncopyable {
 
   /// Get two elements adjacent to both n1 and n2
   void get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2) ;
-
-
-
-
-
 }; 
-PUPmarshall(FEM_Mesh)
+
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
 FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *caller);
 FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char *caller);

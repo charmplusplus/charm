@@ -4,6 +4,8 @@ module collide {
     Collision colls[];
   };
 
+  initnode void collideNodeInit(void);
+
   group threadCollideMgr : collideClient {
     entry threadCollideMgr(void);
     entry void sendRemote(CkReductionMsg *m);
@@ -11,8 +13,8 @@ module collide {
   };
   array[1D] threadCollide {
     entry threadCollide(CProxy_TCharm threads,
-	CProxy_threadCollideMgr tmgr,
-    	CollideHandle cmgr);
+        CProxy_threadCollideMgr tmgr,
+        CollideHandle cmgr);
     entry void resultsDone(void);
   };
 };

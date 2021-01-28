@@ -19,6 +19,14 @@ public:
   static void nodeInit(void) {
     TCHARM_User_node_setup();
     FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)();
+    _registerCommandLineOpt("+tcharm_nomig");
+    _registerCommandLineOpt("+tcharm_nothread");
+    _registerCommandLineOpt("+tcharm_nothreads");
+    _registerCommandLineOpt("+tcharm_trace");
+    _registerCommandLineOpt("+tcharm_stacksize");
+    _registerCommandLineOpt("-vp");
+    _registerCommandLineOpt("+vp");
+    _registerCommandLineOpt("+tcharm_getarg");
   }
   
   TCharmMain(CkArgMsg *msg) {

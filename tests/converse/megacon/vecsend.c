@@ -5,9 +5,9 @@
 CpvDeclare(int, vecsend_index);
 
 #define CmiMsgHeaderSizeInts \
-    ((CmiMsgHeaderSizeBytes+sizeof(int)-1)/sizeof(int))
+  ((CmiMsgHeaderSizeBytes+sizeof(int)-1)/sizeof(int))
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 void vecsend_handler(int *msg)
 {
@@ -18,8 +18,8 @@ void vecsend_handler(int *msg)
   if (CmiMyPe()==0) {
     for (i=CmiMsgHeaderSizeInts; i<3600; i++) {
       if (msg[i] != i) {
-	CmiPrintf("Failure in vecsend test, data corrupted.\n");
-	exit(1);
+        CmiPrintf("Failure in vecsend test, data corrupted.\n");
+        exit(1);
       }
     }
     Cpm_megacon_ack(CpmSend(0));
@@ -41,10 +41,10 @@ void vecsend_init()
     CmiPrintf("note: vecsend requires at least 2 processors, skipping test.\n");
     Cpm_megacon_ack(CpmSend(0));
   } else {
-	sizes = (int *) CmiAlloc(4*sizeof(int));
+    sizes = (int *) CmiAlloc(4*sizeof(int));
     msgs = (int **) CmiAlloc(4*sizeof(int *));
     sizes[0] = 1000; sizes[1] = 500; sizes[2] = 2000; sizes[3] = 100;
-    for(i=0;i<4;i++) msgs[i] = CmiAlloc(sizes[i]*sizeof(int));
+    for(i=0;i<4;i++) msgs[i] = (int *)CmiAlloc(sizes[i]*sizeof(int));
     for(i=0;i<4;i++) sizes[i] *= sizeof(int);
     for (i=CmiMsgHeaderSizeInts; i<1000; i++) msgs[0][i] = i;
     for (i=0; i<500; i++) msgs[1][i] = i+1000;

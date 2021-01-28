@@ -15,4 +15,4 @@
 #define CMIQueueEmpty   PCQueueEmpty
 #endif
 
-#endif //_CMI_QUEUE_DECL_H
+#endif /* _CMI_QUEUE_DECL_H */

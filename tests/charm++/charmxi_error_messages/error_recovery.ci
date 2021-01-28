@@ -1,0 +1,16 @@
+mainmodule m {
+  mainchare c {
+    entry int* baz();
+    entry [foobar,
+           woohoo] void fun();
+    entry int bar() {
+      case {
+        serial { /* that's right */ }
+      }
+    }
+  };
+
+  superchare sc {
+    entry void fun();
+  };
+};

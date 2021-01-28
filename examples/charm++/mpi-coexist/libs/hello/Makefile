@@ -1,5 +1,5 @@
-include ../../Makefile.in
-CHARMC:=../../${CHARMC}
+-include ../../../../common.mk
+CHARMC=../../../../../bin/charmc $(OPTS)
 
 all: libmodulehello.a
 

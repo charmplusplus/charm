@@ -9,13 +9,16 @@
 #include "converse.h"
 #include "lbdb.h"
 
+class LBObj; //Forward declaration
+template <class T> class CkVec; //Forward declaration
+
 // point to point communication data
 class LBCommData {
 
 friend class LBCommTable;
 
 public:
-  LBCommData(int _src_proc, LDOMid _destOM, LDObjid _destObj, int _destObjProc) {
+  LBCommData(int _src_proc, LDOMid _destOM, CmiUInt8 _destObj, int _destObjProc) {
     src_proc = _src_proc;
     destObj.init_objmsg(_destOM, _destObj, _destObjProc);
     n_messages = 0;
@@ -23,7 +26,7 @@ public:
     mykey = compute_key();
   };
 
-  LBCommData(LDObjHandle _srcObj, LDOMid _destOM, LDObjid _destObj, int _destObjProc) {
+  LBCommData(LDObjHandle _srcObj, LDOMid _destOM, CmiUInt8 _destObj, int _destObjProc) {
     src_proc = -1;
     srcObj = _srcObj;
     destObj.init_objmsg(_destOM, _destObj, _destObjProc);
@@ -33,7 +36,7 @@ public:
   };
 
   // multicast
-  LBCommData(LDObjHandle _srcObj, LDOMid _destOM, LDObjid *_destObjs, int _nobjs) {
+  LBCommData(LDObjHandle _srcObj, LDOMid _destOM, CmiUInt8 *_destObjs, int _nobjs) {
     src_proc = -1;
     srcObj = _srcObj;
     destObj.init_mcastmsg(_destOM, _destObjs, _nobjs);
@@ -109,6 +112,8 @@ public:
   LBCommData* HashSearch(const LBCommData &data);
   int CommCount() { return in_use; };
   void GetCommData(LDCommData* data);
+  void GetCommInfo(int& bytes, int& msgs, int& withinpebytes,
+      int& outsidepebytes, int& num_nghbor, int& hops, int& hopbytes);
 	
 private:
   void NewTable(int _sz) {
@@ -122,12 +127,8 @@ private:
   
   void Resize();
 
-#ifdef __BIGSIM__
-  enum { initial_sz = 1 };
-#else
-  enum { initial_sz = 10000 };
-#endif
-  enum TableState { nil, InUse } ;
+  enum { initial_sz = 500 };
+  enum TableState : uint8_t { nil, InUse } ;
   LBCommData* set;
   TableState* state;
   int cur_sz;

@@ -27,6 +27,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #define __CKARRAY_H
 
 #include "cklocation.h"
+#include "ckmulticast.h"
 #include "ckmemcheckpoint.h" // for CkArrayCheckPTReqMessage
 #include "ckarrayindex.h"
 
@@ -36,10 +37,6 @@ Orion Sky Lawlor, olawlor@acm.org
 extern void _registerCkArray(void);
 CpvExtern (int ,serializer);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#define _MLOG_BCAST_TREE_ 1
-#define _MLOG_BCAST_BFACTOR_ 8
-#endif
 
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
@@ -64,131 +61,6 @@ extern bool _isNotifyChildInRed;
 All these classes are defined in ckarray.C.
 */
 /*@{*/
-
-typedef int CkIndex1D;
-typedef struct {int x,y;} CkIndex2D;
-inline void operator|(PUP::er &p,CkIndex2D &i) {p(i.x); p(i.y);}
-typedef struct {int x,y,z;} CkIndex3D;
-inline void operator|(PUP::er &p,CkIndex3D &i) {p(i.x); p(i.y); p(i.z);}
-typedef struct {short int w,x,y,z;} CkIndex4D;
-inline void operator|(PUP::er &p,CkIndex4D &i) {p(i.w); p(i.x); p(i.y); p(i.z);}
-typedef struct {short int v,w,x,y,z;} CkIndex5D;
-inline void operator|(PUP::er &p,CkIndex5D &i) {p(i.v); p(i.w); p(i.x); p(i.y); p(i.z);}
-typedef struct {short int x1,y1,z1,x2,y2,z2;} CkIndex6D;
-inline void operator|(PUP::er &p,CkIndex6D &i) {p(i.x1); p(i.y1); p(i.z1); p(i.x2); p(i.y2); p(i.z2);}
-typedef struct {int data[CK_ARRAYINDEX_MAXLEN];} CkIndexMax;
-inline void operator|(PUP::er &p,CkIndexMax &i) {
-  for (int j=0;j<CK_ARRAYINDEX_MAXLEN;j++) {
-    p|i.data[j];
-  }
-}
-
-/// Simple ArrayIndex classes: the key is just integer indices.
-class CkArrayIndex1D : public CkArrayIndex {
-public:
-	CkArrayIndex1D() {}
-	// CkIndex1D is an int, so that conversion is automatic
-	CkArrayIndex1D(int i0) { init(1, 1, i0); }
-};
-class CkArrayIndex2D : public CkArrayIndex {
-public:
-	CkArrayIndex2D() {}
-	CkArrayIndex2D(int i0,int i1) { init(2, 2, i0, i1); }
-	CkArrayIndex2D(CkIndex2D idx) { init(2, 2, idx.x, idx.y); }
-};
-class CkArrayIndex3D : public CkArrayIndex {
-public:
-	CkArrayIndex3D() {}
-	CkArrayIndex3D(int i0,int i1,int i2) { init(3, 3, i0, i1, i2); }
-	CkArrayIndex3D(CkIndex3D idx) { init(3, 3, idx.x, idx.y, idx.z); }
-};
-class CkArrayIndex4D : public CkArrayIndex {
-public:
-	CkArrayIndex4D(){}
-	CkArrayIndex4D(short int i0,short int i1,short int i2,short int i3) { init(2, 4, i0, i1, i2, i3); }
-	CkArrayIndex4D(CkIndex4D idx) { init(2, 4, idx.w, idx.x, idx.y, idx.z); }
-};
-class CkArrayIndex5D : public CkArrayIndex {
-public:
-	CkArrayIndex5D() {}
-	CkArrayIndex5D(short int i0,short int i1,short int i2,short int i3,short int i4) { init(3, 5, i0, i1, i2, i3, i4); }
-	CkArrayIndex5D(CkIndex5D idx) { init(3, 5, idx.v, idx.w, idx.x, idx.y, idx.z); }
-};
-class CkArrayIndex6D : public CkArrayIndex {
-public:
-	CkArrayIndex6D(){}
-	CkArrayIndex6D(short int i0,short int i1,short int i2,short int i3,short int i4,short int i5) { init(3, 6, i0, i1, i2, i3, i4, i5); }
-	CkArrayIndex6D(CkIndex6D idx) { init(3, 6, idx.x1, idx.y1, idx.z1, idx.x2, idx.y2, idx.z2); }
-};
-
-/** A slightly more complex array index: the key is an object
- *  whose size is fixed at compile time.
- */
-template <class object> //Key object
-class CkArrayIndexT : public CkArrayIndex {
-public:
-	object obj;
-	CkArrayIndexT(const object &srcObj) {obj=srcObj;
-		nInts=sizeof(obj)/sizeof(int);
-		dimension=0; }
-};
-
-/********************* CkArrayListener ****************/
-///An arrayListener is an object that gets informed whenever
-/// an array element is created, migrated, or destroyed.
-///This abstract superclass just ignores everything sent to it.
-class ArrayElement;
-class CkArrayListener : public PUP::able {
-  int nInts; //Number of ints of data to store per element
-  int dataOffset; //Int offset of our data within the element
- public:
-  CkArrayListener(int nInts_);
-  CkArrayListener(CkMigrateMessage *m);
-  virtual void pup(PUP::er &p);
-  PUPable_abstract(CkArrayListener)
-
-  ///Register this array type.  Our data is stored in the element at dataOffset
-  virtual void ckRegister(CkArray *arrMgr,int dataOffset_);
-
-  ///Return the number of ints of data to store per element
-  inline int ckGetLen(void) const {return nInts;}
-  ///Return the offset of our data into the element
-  inline int ckGetOffset(void) const {return dataOffset;}
-  ///Return our data associated with this array element
-  inline int *ckGetData(ArrayElement *el) const;
-
-  ///Elements may be being created
-  virtual void ckBeginInserting(void) {}
-  ///No more elements will be created (for now)
-  virtual void ckEndInserting(void) {}
-
-//The stamp/creating/created/died sequence happens, in order, exactly
-// once per array element.  Migrations don't show up here.
-  ///Element creation message is about to be sent
-  virtual void ckElementStamp(int *eltInfo) {}
-  ///Element is about to be created on this processor
-  virtual void ckElementCreating(ArrayElement *elt) {}
-  ///Element was just created on this processor
-  /// Return false if the element migrated away or deleted itself.
-  virtual bool ckElementCreated(ArrayElement *elt)
-    { return true; }
-
-  ///Element is about to be destroyed
-  virtual void ckElementDied(ArrayElement *elt) {}
-
-//The leaving/arriving seqeunce happens once per migration.
-  ///Element is about to leave this processor (so about to call pup)
-  virtual void ckElementLeaving(ArrayElement *elt) {}
-
-  ///Element just arrived on this processor (so just called pup)
-  /// Return false if the element migrated away or deleted itself.
-  virtual bool ckElementArriving(ArrayElement *elt)
-    { return true; }
-
-  /// used by checkpointing to reset the states
-  virtual void flushState()  {}
-};
-
 /*@}*/
 
 //This simple arrayListener just prints each event to stdout:
@@ -215,118 +87,6 @@ class CkVerboseListener : public CkArrayListener {
 \addtogroup CkArray
 */
 /*@{*/
-/*********************** CkArrayOptions *******************************/
-/// Arguments for array creation:
-class CkArrayOptions {
-	friend class CkArray;
-
-	CkArrayIndex numInitial;///< Number of elements to create
-        /// Limits of element counts in each dimension of this and all bound
-        /// arrays
-        CkArrayIndex bounds;
-	CkGroupID map;///< Array location map object
-	CkGroupID locMgr;///< Location manager to bind to
-	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
-	CkCallback reductionClient; // Default target of reductions
-	bool anytimeMigration; // Elements are allowed to move freely
-	bool disableNotifyChildInRed; //Child elements are not notified when reduction starts
-	bool staticInsertion; // Elements are only inserted at construction
-        bool broadcastViaScheduler;     // broadcast inline or through scheduler
-
-	/// Set various safe defaults for all the constructors
-	void init();
-
- public:
- //Used by external world:
-	CkArrayOptions(void); ///< Default: empty array
-	CkArrayOptions(int ni1_); ///< With initial elements 1D
-	CkArrayOptions(int ni1_, int ni2_); ///< With initial elements 2D 
-	CkArrayOptions(int ni1_, int ni2_, int ni3); ///< With initial elements 3D
-	//CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_); ///< With initial elements 4D
-	//CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_, short ni5_); ///< With initial elements 5D
-	//CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_, short ni5_, short ni6_); ///< With initial elements 6D
-
-	/**
-	 * These functions return "this" so you can string them together, e.g.:
-	 *   foo(CkArrayOptions().setMap(mid).bindTo(aid));
-	 */
-
-	/// Create this many initial elements 1D
-	CkArrayOptions &setNumInitial(int ni)
-		{numInitial=CkArrayIndex1D(ni); return *this;}
-	/// Create this many initial elements 2D
-	CkArrayOptions &setNumInitial(int ni1, int ni2)
-		{numInitial=CkArrayIndex2D(ni1, ni2); return *this;}
-	/// Create this many initial elements 3D
-	CkArrayOptions &setNumInitial(int ni1, int ni2, int ni3)
-		{numInitial=CkArrayIndex3D(ni1 ,ni2, ni3); return *this;}
-        /*
-	/// Create this many initial elements 4D
-	CkArrayOptions &setNumInitial(short ni1, short ni2, short ni3, short ni4)
-		{numInitial=CkArrayIndex4D(ni1, ni2, ni3, ni4); return *this;}
-	/// Create this many initial elements 5D
-	CkArrayOptions &setNumInitial(short ni1, short ni2, short ni3, short ni4, short ni5)
-		{numInitial=CkArrayIndex5D(ni1, ni2, ni3, ni4, ni5); return *this;}
-	/// Create this many initial elements 6D
-	CkArrayOptions &setNumInitial(short ni1, short ni2, short ni3, short ni4, short ni5, short ni6)
-		{numInitial=CkArrayIndex6D(ni1, ni2, ni3, ni4, ni5, ni6); return *this;}
-        */
-
-	/// Allow up to this many elements in 1D
-	CkArrayOptions &setBounds(int ni)
-		{bounds=CkArrayIndex1D(ni); return *this;}
-	/// Allow up to this many elements in 2D
-	CkArrayOptions &setBounds(int ni1, int ni2)
-		{bounds=CkArrayIndex2D(ni1, ni2); return *this;}
-	/// Allow up to this many elements in 3D
-	CkArrayOptions &setBounds(int ni1, int ni2, int ni3)
-		{bounds=CkArrayIndex3D(ni1 ,ni2, ni3); return *this;}
-	/// Allow up to this many elements in 4D
-	CkArrayOptions &setBounds(short ni1, short ni2, short ni3, short ni4)
-		{bounds=CkArrayIndex4D(ni1, ni2, ni3, ni4); return *this;}
-	/// Allow up to this many elements in 5D
-	CkArrayOptions &setBounds(short ni1, short ni2, short ni3, short ni4, short ni5)
-		{bounds=CkArrayIndex5D(ni1, ni2, ni3, ni4, ni5); return *this;}
-	/// Allow up to this many elements in 6D
-	CkArrayOptions &setBounds(short ni1, short ni2, short ni3, short ni4, short ni5, short ni6)
-		{bounds=CkArrayIndex6D(ni1, ni2, ni3, ni4, ni5, ni6); return *this;}
-
-	/// Use this location map
-	CkArrayOptions &setMap(const CkGroupID &m)
-		{map=m; return *this;}
-
-	/// Bind our elements to this array
-	CkArrayOptions &bindTo(const CkArrayID &b);
-
-	/// Use this location manager
-	CkArrayOptions &setLocationManager(const CkGroupID &l)
-		{locMgr=l; return *this;}
-
-	/// Add an array listener component to this array (keeps the new'd listener)
-	CkArrayOptions &addListener(CkArrayListener *listener);
-
-	CkArrayOptions &setAnytimeMigration(bool b) { anytimeMigration = b; return *this; }
-	CkArrayOptions &setStaticInsertion(bool b);
-	CkArrayOptions &setBroadcastViaScheduler(bool b) { broadcastViaScheduler = b; return *this; }
-	CkArrayOptions &setReductionClient(CkCallback cb)
-	{ reductionClient = cb; return *this; }
-
-  //Used by the array manager:
-	const CkArrayIndex &getNumInitial(void) const {return numInitial;}
-	const CkArrayIndex &getBounds(void) const {return bounds;}
-	const CkGroupID &getMap(void) const {return map;}
-	const CkGroupID &getLocationManager(void) const {return locMgr;}
-	int getListeners(void) const {return arrayListeners.size();}
-	CkArrayListener *getListener(int listenerNum) {
-		CkArrayListener *ret=arrayListeners[listenerNum];
-		arrayListeners[listenerNum]=NULL; //Don't throw away this listener
-		return ret;
-	}
-
-	void pup(PUP::er &p);
-};
-PUPmarshall(CkArrayOptions)
-
 
 /*********************** Proxy Support ************************/
 //Needed by CBase_ArrayElement
@@ -352,6 +112,11 @@ public:
         CProxy_ArrayBase(const CkArrayID &aid)
                 :CProxy(), _aid(aid) { }
 	CProxy_ArrayBase(const ArrayElement *e);
+	CProxy_ArrayBase(const CProxy_ArrayBase &cs): CProxy(cs), _aid(cs.ckGetArrayID()) {}
+
+	bool operator==(const CProxy_ArrayBase& other) {
+		return ckGetArrayID() == other.ckGetArrayID();
+	}
 
 #if CMK_ERROR_CHECKING
 	inline void ckCheck(void) const{  //Make sure this proxy has a value
@@ -362,13 +127,15 @@ public:
 	inline void ckCheck(void) const {}
 #endif
 
-	static CkArrayID ckCreateEmptyArray(void);
+	static CkArrayID ckCreateEmptyArray(CkArrayOptions opts);
+        static void ckCreateEmptyArrayAsync(CkCallback cb, CkArrayOptions opts);
 	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts);
 
 	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx);
 	void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }
+	CkArray *ckLocalBranchOther(int rank) const { return _aid.ckLocalBranchOther(rank); }
 	CkLocMgr *ckLocMgr(void) const;
 	inline operator CkArrayID () const {return ckGetArrayID();}
 	unsigned int numLocalElements() const { return ckLocMgr()->numLocalElements(); }
@@ -380,7 +147,6 @@ public:
 
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxy_ArrayBase)
 
 class CProxyElement_ArrayBase:public CProxy_ArrayBase {
 private:
@@ -394,6 +160,11 @@ public:
                 :CProxy_ArrayBase(aid), _idx(idx) { }
 	CProxyElement_ArrayBase(const ArrayElement *e);
 
+	bool operator==(const CProxyElement_ArrayBase& other) {
+		return ckGetArrayID() == other.ckGetArrayID() &&
+				ckGetIndex() == other.ckGetIndex();
+	}
+
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) const;
 //      static void ckSendWrapper(void *me, void *m, int ep, int opts = 0);
@@ -404,92 +175,98 @@ public:
 	ArrayElement *ckLocal(void) const;
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxyElement_ArrayBase)
+
+
+#define _AUTO_DELEGATE_MCASTMGR_ON_ 1
 
 class CProxySection_ArrayBase:public CProxy_ArrayBase {
 private:
-	int _nsid;
-	CkSectionID *_sid;
+  std::vector<CkSectionID> _sid;
 public:
-	CProxySection_ArrayBase(): _nsid(0), _sid(NULL) {}
+	CProxySection_ArrayBase() =default;
 	CProxySection_ArrayBase(const CkArrayID &aid,
-		const CkArrayIndex *elems, const int nElems)
-		:CProxy_ArrayBase(aid), _nsid(1) { _sid = new CkSectionID(aid, elems, nElems); }
+		const CkArrayIndex *elems, const int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR);
+	CProxySection_ArrayBase(const CkArrayID &aid,
+		const std::vector<CkArrayIndex> &elems, int factor=USE_DEFAULT_BRANCH_FACTOR);
 	CProxySection_ArrayBase(const CkArrayID &aid,
 		const CkArrayIndex *elems, const int nElems, CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(aid, elems, nElems); }
+		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS) { _sid.emplace_back(aid, elems, nElems); }
+	CProxySection_ArrayBase(const CkArrayID &aid,
+		const std::vector<CkArrayIndex> &elems, CK_DELCTOR_PARAM)
+		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS) { _sid.emplace_back(aid, elems); }
 	CProxySection_ArrayBase(const CkSectionID &sid)
-		:CProxy_ArrayBase(sid._cookie.get_aid()), _nsid(1) { _sid = new CkSectionID(sid); }
+		:CProxy_ArrayBase(sid._cookie.get_aid()) { _sid.emplace_back(sid); }
 	CProxySection_ArrayBase(const CkSectionID &sid, CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(sid._cookie.get_aid(), CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(sid); }
+		:CProxy_ArrayBase(sid._cookie.get_aid(), CK_DELCTOR_ARGS) { _sid.emplace_back(sid); }
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs)
-		:CProxy_ArrayBase(cs.ckGetArrayID()), _nsid(cs._nsid) {
-      if (_nsid == 1) _sid = new CkSectionID(cs.ckGetArrayID(), cs.ckGetArrayElements(), cs.ckGetNumElements());
-      else if (_nsid > 1) {
-        _sid = new CkSectionID[_nsid];
-        for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-      } else _sid = NULL;
+		:CProxy_ArrayBase(cs) {
+        _sid.resize(cs._sid.size());
+        for (size_t i=0; i<_sid.size(); ++i) {
+          _sid[i] = cs._sid[i];
+        }
     }
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs, CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(cs.ckGetArrayID(),CK_DELCTOR_ARGS), _nsid(cs._nsid) {
-      if (_nsid == 1) _sid = new CkSectionID(cs.ckGetArrayID(), cs.ckGetArrayElements(), cs.ckGetNumElements());
-      else if (_nsid > 1) {
-        _sid = new CkSectionID[_nsid];
-        for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-      } else _sid = NULL;
+		:CProxy_ArrayBase(cs.ckGetArrayID(),CK_DELCTOR_ARGS) {
+        _sid.resize(cs._sid.size());
+        for (size_t i=0; i<_sid.size(); ++i) {
+          _sid[i] = cs._sid[i];
+        }
     }
-    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems)
-        :CProxy_ArrayBase(aid[0]), _nsid(n) {
-      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
-      else if (_nsid > 1) {
-      _sid = new CkSectionID[n];
-      for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
-      } else _sid = NULL;
-    }
+    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, int factor=USE_DEFAULT_BRANCH_FACTOR);
+    CProxySection_ArrayBase(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, int factor=USE_DEFAULT_BRANCH_FACTOR);
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
-        :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS), _nsid(n) {
-      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
-      else if (_nsid > 1) {
-      _sid = new CkSectionID[n];
-      for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
-      } else _sid = NULL;
+        :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS) {
+        _sid.resize(n);
+        for (size_t i=0; i<_sid.size(); ++i) {
+          _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
+        }
+    }
+    CProxySection_ArrayBase(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, CK_DELCTOR_PARAM)
+        :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS) {
+        _sid.resize(aid.size());
+        for (size_t i=0; i<_sid.size(); ++i) {
+          _sid[i] = CkSectionID(aid[i], elems[i]);
+        }
     }
 
-    ~CProxySection_ArrayBase() {
-      if (_nsid == 1) delete _sid;
-      else if (_nsid > 1) delete[] _sid;
-    }
+    ~CProxySection_ArrayBase() =default;
 
     CProxySection_ArrayBase &operator=(const CProxySection_ArrayBase &cs) {
       CProxy_ArrayBase::operator=(cs);
-      _nsid = cs._nsid;
-      if (_nsid == 1) _sid = new CkSectionID(*cs._sid);
-      else if (_nsid > 1) {
-        _sid = new CkSectionID[_nsid];
-        for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-      } else _sid = NULL;
+      _sid.resize(cs._sid.size());
+      for (size_t i=0; i<_sid.size(); ++i) {
+        _sid[i] = cs._sid[i];
+      }
       return *this;
     }
     
-	void ckSectionDelegate(CkDelegateMgr *d) 
-		{ ckDelegate(d); d->initDelegateMgr(this); }
+	void ckAutoDelegate(int opts=1);
+ 	using CProxy_ArrayBase::setReductionClient; //compilation error o/w
+	void setReductionClient(CkCallback *cb); 
+	void resetSection();
+
+	void ckSectionDelegate(CkDelegateMgr *d, int opts=1) {
+           ckDelegate(d);
+	   if(opts==1)
+              d->initDelegateMgr(this);
+        }
 //	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
 //	ArrayElement *ckLocal(void) const;
-    inline int ckGetNumSubSections() const { return _nsid; }
-	inline CkSectionInfo &ckGetSectionInfo() {return _sid->_cookie;}
-	inline CkSectionID *ckGetSectionIDs() {return _sid;}
+    inline int ckGetNumSubSections() const { return _sid.size(); }
+	inline CkSectionInfo &ckGetSectionInfo() {return _sid[0]._cookie;}
+	inline CkSectionID *ckGetSectionIDs() {return _sid.data();}
 	inline CkSectionID &ckGetSectionID() {return _sid[0];}
 	inline CkSectionID &ckGetSectionID(int i) {return _sid[i];}
 	inline CkArrayID ckGetArrayIDn(int i) const {return _sid[i]._cookie.get_aid();}
-    inline CkArrayIndex *ckGetArrayElements() const {return _sid[0]._elems;}
-    inline CkArrayIndex *ckGetArrayElements(int i) const {return _sid[i]._elems;}
-    inline int ckGetNumElements() const { return _sid[0]._nElems; }
-	inline int ckGetNumElements(int i) const { return _sid[i]._nElems; }
+    inline CkArrayIndex *ckGetArrayElements() const {return const_cast<CkArrayIndex *>(_sid[0]._elems.data());}
+    inline CkArrayIndex *ckGetArrayElements(int i) const {return const_cast<CkArrayIndex *>(_sid[i]._elems.data());}
+    inline int ckGetNumElements() const { return _sid[0]._elems.size(); }
+	inline int ckGetNumElements(int i) const { return _sid[i]._elems.size(); }
+	inline int ckGetBfactor() const { return _sid[0].bfactor; }
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxySection_ArrayBase)
 
 //Simple C-like API:
 void CkSetMsgArrayIfNotThere(void *msg);
@@ -520,7 +297,7 @@ public:
   virtual ~ArrayElement();
 
 /// Pack/unpack routine (called before and after migration)
-  virtual void pup(PUP::er &p);
+  void pup(PUP::er &p);
 
 //Overridden functions:
   /// Called by the system just before and after migration to another processor:
@@ -533,8 +310,8 @@ public:
   virtual char *ckDebugChareName(void);
   virtual int ckDebugChareID(char*, int);
 
-  /// Synonym for ckMigrate
-  inline void migrateMe(int toPe) {ckMigrate(toPe);}
+  void ckEmigrate(int toPe) {ckMigrate(toPe);}
+
 
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute2(CkArrayIndex myIndex, int dataSize,const void *data,CkReduction::reducerType type,
@@ -552,14 +329,22 @@ public:
 	// for _PIPELINED_ALLREDUCE_, assembler entry method
 	inline void defrag(CkReductionMsg* msg);
   inline const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
+  inline ck::ObjID ckGetID(void) const { return ck::ObjID(thisArrayID, myRec->getID()); }
 
   inline int ckGetArraySize(void) const { return numInitialElements; }
+
+  int getRedNo(void) const;
+
 protected:
   CkArray *thisArray;//My source array
   CkArrayID thisArrayID;//My source array's ID
 
   //More verbose form of abort
-  virtual void CkAbort(const char *str) const;
+  CMK_NORETURN
+#if defined __GNUC__ || defined __clang__
+  __attribute__ ((format (printf, 2, 3)))
+#endif
+  virtual void CkAbort(const char *format, ...) const;
 
 private:
 //Array implementation methods:
@@ -596,10 +381,9 @@ template <class T>
 class ArrayElementT : public ArrayElement
 {
 public:
+  using array_index_t = T;
+
   ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
-        mlogData->objID.data.array.idx=thisIndexMax;
-#endif
 }
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute(int dataSize,const void *data,CkReduction::reducerType type,
@@ -641,6 +425,96 @@ typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
+#if CMK_CHARM4PY
+
+extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
+extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
+extern void (*ArrayElemJoinExt)(int, int, int *, int, char*, int);
+extern void (*ArrayResumeFromSyncExtCallback)(int, int, int *);
+
+class ArrayElemExt: public ArrayElement {
+private:
+  int ctorEpIdx;
+
+public:
+  ArrayElemExt(void *impl_msg);
+  ArrayElemExt(CkMigrateMessage *m) { delete m; }
+
+  static void __ArrayElemExt(void *impl_msg, void *impl_obj_void) {
+    new (impl_obj_void) ArrayElemExt(impl_msg);
+  }
+
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    //fprintf(stderr, "ArrayElemExt:: Entry method invoked\n");
+    ArrayElemExt *e = static_cast<ArrayElemExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    int ep; implP|ep;
+    int dcopy_start; implP|dcopy_start;
+    ArrayMsgRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
+                            int(e->thisIndexMax.getDimension()),
+                            e->thisIndexMax.data(), ep, msgSize, impl_buf+(3*sizeof(int)),
+                            dcopy_start);
+  }
+
+  static void __AtSyncEntryMethod(void *impl_msg, void *impl_obj_void) {
+    ArrayElemExt *e = static_cast<ArrayElemExt *>(impl_obj_void);
+    //printf("ArrayElementExt:: calling AtSync elem->usesAtSync=%d\n", e->usesAtSync);
+    e->AtSync();
+    if (UsrToEnv(impl_msg)->isVarSysMsg() == 0) CkFreeSysMsg(impl_msg);
+  }
+
+  static void __CkMigrateMessage(void *impl_msg, void *impl_obj_void) {
+    //printf("ArrayElemExt:: Migration constructor invoked\n");
+    call_migration_constructor<ArrayElemExt> c = impl_obj_void;
+    c((CkMigrateMessage*)impl_msg);
+  }
+
+  // NOTE this assumes that calls to pup are due to array element migration
+  // not sure if it's always going to be the case
+  void pup(PUP::er &p) {
+    // because this is not generated code, looks like I need to make explicit call
+    // to parent pup method, otherwise fields in parent class like usesAtSync will
+    // not be pupped!
+    ArrayElement::pup(p);
+    int nDims = thisIndexMax.getDimension();
+    int aid = ((CkGroupID)thisArrayID).idx;
+    int data_size;
+    if (!p.isUnpacking()) { // packing or sizing
+      char *msg;
+      data_size = ArrayElemLeaveExt(aid, nDims, thisIndexMax.data(), &msg, p.isSizing());
+      p | data_size;
+      p | ctorEpIdx;
+      p(msg, data_size);
+    } else {
+      p | data_size;
+      p | ctorEpIdx;
+      PUP::fromMem *p_mem = (PUP::fromMem *)&p;
+      ArrayElemJoinExt(aid, nDims, thisIndexMax.data(), ctorEpIdx, p_mem->get_current_pointer(), data_size);
+      p_mem->advance(data_size);
+    }
+  }
+
+  void ResumeFromSync() {
+    if (!usesAtSync) {
+      // not sure in which cases it is useful to receive resumeFromSync if
+      // usesAtSync=false, but for now I'm disabling it because it is
+      // unnecessary overhead. In non-lb scenarios with NullLB, every LBPeriod
+      // (which is 0.5 s by default), the lb infrastructure calls atsync and
+      // resumefromsync on every chare array element, even if usesAtSync=false.
+      // that part of the lb infrastructure should be fixed first.
+      return;
+    }
+    ArrayResumeFromSyncExtCallback(((CkGroupID)thisArrayID).idx,
+                            int(thisIndexMax.getDimension()),
+                            thisIndexMax.data());
+  }
+};
+
+#endif
+
 /*@}*/
 
 
@@ -651,16 +525,35 @@ typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 /*@{*/
 
 #include "CkArray.decl.h"
-#include "CkArrayReductionMgr.decl.h"
+
+void CkSendAsyncCreateArray(int ctor, CkCallback cb, CkArrayOptions opts, void *ctorMsg);
+
+class CkArrayCreatedMsg : public CMessage_CkArrayCreatedMsg {
+public:
+  CkArrayID aid;
+  CkArrayCreatedMsg(CkArrayID _aid) : aid(_aid) { }
+};
 
 class CkArrayBroadcaster;
 class CkArrayReducer;
 
 void _ckArrayInit(void);
 
-//#include "ComlibArrayListener.h"  FILE DELETED!
+// Wrapper class to hold a message pointer
+// Used in ZC Bcast when root node is non-zero
+class MsgPointerWrapper {
+  public:
+    void *msg;
+    int ep;
+    int opts;
+    void pup(PUP::er &p) {
+      pup_pointer(&p, &msg);
+      p|ep;
+      p|opts;
+    }
+};
 
-class CkArray : public CkReductionMgr, public CkArrMgr {
+class CkArray : public CkReductionMgr {
   friend class ArrayElement;
   friend class CProxy_ArrayBase;
   friend class CProxyElement_ArrayBase;
@@ -668,22 +561,28 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
   CkMagicNumber<ArrayElement> magic; //To detect heap corruption
   CkLocMgr *locMgr;
   CkGroupID locMgrID;
+  CkGroupID mCastMgrID;
+  bool sectionAutoDelegate;
+  CkCallback initCallback;
   CProxy_CkArray thisProxy;
-  typedef CkMigratableListT<ArrayElement> ArrayElementList;
-  ArrayElementList *elements;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    int *children;
-    int numChildren;
-#endif
+  // Separate mapping and storing the element pointers to speed iteration in broadcast
+  std::unordered_map<CmiUInt8, unsigned int> localElems;
+  std::vector<CkMigratable *> localElemVec;
+
+  UShort recvBroadcastEpIdx;
 private:
   bool stableLocations;
 
 public:
 //Array Creation:
-  CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionProxy);
+  CkArray(CkArrayOptions &&c, CkMarshalledMessage &&initMsg);
   CkArray(CkMigrateMessage *m);
   ~CkArray();
   CkGroupID &getGroupID(void) {return thisgroup;}
+  CkGroupID &getmCastMgr(void) {return mCastMgrID;}
+  bool isSectionAutoDelegated(void) {return sectionAutoDelegate;}
+
+  UShort &getRecvBroadcastEpIdx(void) {return recvBroadcastEpIdx;}
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
@@ -697,33 +596,93 @@ public:
 	  {return locMgr->lastKnown(idx);}
   /// Deliver message to this element (directly if local)
   /// doFree if is local
-  inline int deliver(CkMessage *m,CkDeliver_t type,int opts=0)
-	  {return locMgr->deliver(m,type,opts);}
+  inline void deliver(CkMessage *m, const CkArrayIndex &idx, CkDeliver_t type,int opts=0)
+  { locMgr->sendMsg((CkArrayMessage*)m, thisgroup, idx, type, opts); }
+  inline int deliver(CkArrayMessage *m, CkDeliver_t type)
+  { return locMgr->deliverMsg(m, thisgroup, m->array_element_id(), NULL, type); }
+  /// Fetch a local element via its ID (return NULL if not local)
+  inline ArrayElement *lookup(const CmiUInt8 id) { return (ArrayElement*) getEltFromArrMgr(id); }
   /// Fetch a local element via its index (return NULL if not local)
-  inline ArrayElement *lookup(const CkArrayIndex &index)
-	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}
+  inline ArrayElement *lookup(const CkArrayIndex &idx) { 
+    CmiUInt8 id;
+    if (locMgr->lookupID(idx,id)) {
+      return (ArrayElement*) getEltFromArrMgr(id);
+    } else {
+      return NULL;
+    }
+  }
+
+  virtual CkMigratable* getEltFromArrMgr(const CmiUInt8 id) {
+    const auto itr = localElems.find(id);
+    return ( itr == localElems.end() ? NULL : localElemVec[itr->second] );
+  }
+  virtual void putEltInArrMgr(const CmiUInt8 id, CkMigratable* elt)
+  {
+    localElems[id] = localElemVec.size();
+    localElemVec.push_back(elt);
+  }
+  virtual void eraseEltFromArrMgr(const CmiUInt8 id)
+  {
+    auto itr = localElems.find(id);
+    if (itr != localElems.end()) {
+      unsigned int offset = itr->second;
+      localElems.erase(itr);
+      // Do not delete the CkMigratable itself (unlike in deleteElt)
+
+      if (offset != localElemVec.size() - 1) {
+        CkMigratable *moved = localElemVec[localElemVec.size()-1];
+        localElemVec[offset] = moved;
+        localElems[moved->ckGetID()] = offset;
+      }
+
+      localElemVec.pop_back();
+    }
+  }
+
+  void deleteElt(const CmiUInt8 id) {
+    auto itr = localElems.find(id);
+    if (itr != localElems.end()) {
+      unsigned int offset = itr->second;
+      localElems.erase(itr);
+      delete localElemVec[offset];
+
+      if (offset != localElemVec.size() - 1) {
+        CkMigratable *moved = localElemVec[localElemVec.size()-1];
+        localElemVec[offset] = moved;
+        localElems[moved->ckGetID()] = offset;
+      }
+
+      localElemVec.pop_back();
+    }
+  }
 
 //Creation:
   /// Create-after-migrate:
-  virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx,
-		  	CkElementCreation_t type);
+  /// Create an uninitialized element after migration
+  ///  The element's constructor will be called immediately after.
+  virtual CkMigratable *allocateMigrated(int elChareType, CkElementCreation_t type);
+  void stampListenerData(CkMigratable *elt);
 
   /// Prepare creation message:
-  void prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx);
+  void prepareCtorMsg(CkMessage *m, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
+
+  int findInitialHostPe(const CkArrayIndex &idx, int proposedPe);
 
   /// Create initial array elements:
-  virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg,int local=1);
+  virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg);
   virtual void doneInserting(void);
   virtual void beginInserting(void);
   void remoteDoneInserting(void);
   void remoteBeginInserting(void);
+  void initDone(void);
 
   /// Create manually:
-  virtual bool insertElement(CkMessage *);
+  bool insertElement(CkArrayMessage *, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
+  void insertElement(CkMarshalledMessage &&, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
 
 /// Demand-creation:
-  bool demandCreateElement(const CkArrayIndex &idx,
-  	int onPe,int ctor,CkDeliver_t type);
+  /// Demand-create an element at this index on this processor
+  void demandCreateElement(const CkArrayIndex &idx, int ctor, CkDeliver_t type);
 
 /// Broadcast communication:
   void sendBroadcast(CkMessage *msg);
@@ -731,6 +690,12 @@ public:
   void sendExpeditedBroadcast(CkMessage *msg);
   void recvExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
   void recvBroadcastViaTree(CkMessage *msg);
+  void recvNoKeepBroadcast(CkMessage *msg) { recvBroadcast(msg); }
+  void sendNoKeepBroadcast(CkMessage *msg);
+  void recvNoKeepExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
+  void sendNoKeepExpeditedBroadcast(CkMessage *msg);
+
+  void sendZCBroadcast(MsgPointerWrapper w);
 
   /// Whole array destruction, including all elements and the group itself
   void ckDestroy();
@@ -738,20 +703,15 @@ public:
   void pup(PUP::er &p);
   void ckJustMigrated(void){ doneInserting(); }
 
-  // COMLIB HACK
-  // Ok, this has gone very far... getting rid of it!
-  //ComlibArrayListener * calistener;
-  //ComlibArrayListener * getComlibArrayListener() {return calistener;}
-
   virtual bool isArrMgr(void) {return true;}
 
 private:
   CkArrayIndex numInitial;/// Number of initial array elements
   bool isInserting;/// Are we currently inserting elements?
+  int numPesInited;
 
 /// Allocate space for a new array element
-  ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,
-	CkMessage *msg,bool fromMigration);
+  ArrayElement *allocate(int elChareType, CkMessage *msg, bool fromMigration, int *listenerData);
 
 //Spring cleaning
   void springCleaning(void);
@@ -772,25 +732,113 @@ private:
 	      "You'll have to either use fewer array listeners, or increase the compile-time\n"
 	      "constant CK_ARRAYLISTENER_MAXLEN!\n");
   }
+
+  void incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper w);
+  void incrementBcastNo();
+
  private:
 
   CkArrayReducer *reducer; //Read-only copy of default reducer
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
+  CkArrayBroadcaster *getBroadcaster() {
+    return broadcaster;
+  }
   void flushStates();
+  void forwardZCMsgToOtherElems(envelope *env);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension
-	virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial.data()[0];}
-	void broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index);
-	static void staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index);
-#endif
 
-        static int isIrreducible() { return 1; }
+        static bool isIrreducible() { return true; }
 };
 
+// Maintain old name of former parent class for backwards API compatibility
+// with usage in maps' populateInitial()
+typedef CkArray CkArrMgr;
 
+struct ncpyBcastNoMsg{
+  char cmicore[CmiMsgHeaderSizeBytes];
+  int srcPe;
+  void *ref;
+};
+
+void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize);
 
 /*@}*/
+
+///This arrayListener is in charge of delivering broadcasts to the array.
+class CkArrayBroadcaster : public CkArrayListener {
+  inline int &getData(ArrayElement *el) {return *ckGetData(el);}
+public:
+  CkArrayBroadcaster(bool _stableLocations, bool _broadcastViaScheduler);
+  CkArrayBroadcaster(CkMigrateMessage *m);
+  virtual void pup(PUP::er &p);
+  virtual ~CkArrayBroadcaster();
+  PUPable_decl(CkArrayBroadcaster);
+
+  virtual void ckElementStamp(int *eltInfo) {*eltInfo=getBcastNo();}
+
+  ///Element was just created on this processor
+  /// Return false if the element migrated away or deleted itself.
+  virtual bool ckElementCreated(ArrayElement *elt)
+    { return bringUpToDate(elt); }
+
+  ///Element just arrived on this processor (so just called pup)
+  /// Return false if the element migrated away or deleted itself.
+  virtual bool ckElementArriving(ArrayElement *elt)
+    { return bringUpToDate(elt); }
+
+  void incoming(CkArrayMessage *msg);
+
+  int incrementBcastNo();
+
+  bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
+#if CMK_CHARM4PY
+  void deliver(CkArrayMessage *bcast, std::vector<CkMigratable*> &elements, int arrayId, bool doFree);
+#endif
+
+  void springCleaning(void);
+
+  void flushState();
+
+private:
+  //Number of broadcasts received (also serial number)
+#if CMK_SMP
+  std::atomic<int> bcastNo;
+#else
+  int bcastNo;
+#endif
+
+  int oldBcastNo;//Above value last spring cleaning
+  //This queue stores old broadcasts (in case a migrant arrives
+  // and needs to be brought up to date)
+  CkQ<CkArrayMessage *> oldBcasts;
+  bool stableLocations;
+  bool broadcastViaScheduler;
+
+  bool bringUpToDate(ArrayElement *el);
+
+public:
+#if CMK_SMP
+  int getBcastNo() const {
+    return bcastNo.load(std::memory_order_acquire);
+  }
+  void setBcastNo(int r) {
+    return bcastNo.store(r, std::memory_order_release);
+  }
+  int incBcastNo() {
+    return bcastNo.fetch_add(1, std::memory_order_release);
+  }
+  int decBcastNo() {
+    return bcastNo.fetch_sub(1, std::memory_order_release);
+  }
+#else
+  int getBcastNo() const { return bcastNo; }
+  void setBcastNo(int r) { bcastNo = r; }
+  int incBcastNo() { return bcastNo++; }
+  int decBcastNo() { return bcastNo--; }
+#endif
+
+
+};
 
 #endif

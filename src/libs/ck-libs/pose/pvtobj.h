@@ -56,10 +56,10 @@ class pvtObjectNode {
   /// Dump data fields
   void dump() {
     if (localObjPtr == NULL)
-      CkPrintf("ovt=%d index=%d present=%s sync=%s ptr=NULL",
+      CkPrintf("ovt=%lld index=%d present=%s sync=%s ptr=NULL",
 	       ovt, index, present?"true":"false", (sync==0)?"OPT":"CON");
     else 
-      CkPrintf("ovt=%d index=%d present=%s sync=%s ptr!=NULL",
+      CkPrintf("ovt=%lld index=%d present=%s sync=%s ptr!=NULL",
 	       ovt, index, present?"true":"false", (sync==0)?"OPT":"CON");
   }
   /// Check validity of data fields
@@ -89,7 +89,7 @@ class pvtObjects {
   inline int getNumSpaces() { return numSpaces; }
   /// Set posers to idle (ovt==-1)
   inline void SetIdle() { 
-    register int i; 
+    int i;
     for (i=0; i<numSpaces; i++) objs[i].setIdle();
   }                           
   /// Wake up all posers in list

@@ -10,7 +10,7 @@
 
 // #define USE_CRITICAL_PATH_HEADER_ARRAY
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
 // This critical path detection is still experimental
 // Added by Isaac (Dec 2008)
 
@@ -167,7 +167,7 @@ class PathHistory {
   }
   
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
   void createPath(PathHistory *parentPath){
     // Note that we are sending a message
     thisMethodSentAMessage = true;

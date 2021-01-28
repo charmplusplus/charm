@@ -1,0 +1,25 @@
+#inter-leaf key                 avg-min-max     key_in_int              OP      flag        value/index     symbol  parent
+-1      Root
+0       CPU_Util                AVG            UtilizationPercentage    SUB         -1          0.9      GT     1   Root 
+0       High_Overhead           AVG            OverheadPercentage       SUB         -1          0.1      GT     1   Root
+0       High_Idle               AVG             IdlePercentage          SUB         -1          0.1      GT     1   Root
+0       Small_Message           AVG             BytesPerMsg             SUB         -1          300      LT     1   High_Overhead 
+0       High_CacheMissRate      AVG             CacheMissRate           SUB         -1          0.1      GT     1   CPU_Util 
+0       LOW_CacheMissRate       AVG             CacheMissRate           SUB         -1          0.1      LT     1   CPU_Util 
+0       Few_Obj_Per_PE          AVG             NumObjectsPerPE         SUB         -1          1        LT     1   High_Idle 
+0       Large_Bytes_Per_Obj     MAX             BytesPerObject          DIV         0           AVG       NumMsgRecv  GT    1.2      1      High_Idle 
+0       Large_Bytes_PerMsg      AVG             BytesPerMsg             SUB         -1          100000      GT  1   High_Idle 
+0       Load_Imbalance          MAX             LoadPerPE               DIV         0           AVG       LoadPerPE         GT   1.1      1      High_Idle     
+0       Comm_Imbalance          MAX             NumMsgRecv              DIV         0           AVG       NumMsgRecv        GT   1.5      1      High_Idle
+0       Much_External_Comm      AVG             ExternalBytePerPE       DIV         0           AVG       BytesMsgRecv      GT   0.8      2      High_Idle  High_Overhead    
+1       Leaf_Up_Grainsize       UP              PICS_EFF_GRAINSIZE      2           Small_Message  High_Overhead
+1       Leaf_Up_Grainsize_1     UP              PICS_EFF_GRAINSIZE_1    1           High_Overhead
+1       Leaf_Up_Grainsize_2     UP              PICS_EFF_GRAINSIZE_2    1           High_Overhead
+1       Leaf_Down_Grainsize     DOWN            PICS_EFF_GRAINSIZE      3           Few_Obj_Per_PE High_CacheMissRate Load_Imbalance
+1       Leaf_Down_LDB_Frequency DOWN            PICS_EFF_LDBFREQUENCY   1           High_Overhead
+1       Leaf_Up_Nodesize        UP              PICS_EFF_NODESIZE       1           Much_External_Comm
+1       Leaf_Down_Aggregation   DOWN            PICS_EFF_AGGREGATION    1           Large_Bytes_PerMsg   
+1       Leaf_Down_Msgsize       DOWN            PICS_EFF_MESSAGESIZE    1           Large_Bytes_PerMsg
+1       Leaf_Up_Compression     UP              PICS_EFF_COMPRESSION    1           Large_Bytes_PerMsg   
+1       Leaf_Perf_Good          UP              PICS_EFF_PERFGOOD       1           LOW_CacheMissRate
+1       Leaf_Up_Replica         UP              PICS_EFF_REPLICA        1           Large_Bytes_Per_Obj 

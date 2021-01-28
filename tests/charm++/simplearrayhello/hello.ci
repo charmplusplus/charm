@@ -2,6 +2,8 @@ mainmodule hello {
   readonly CProxy_Main mainProxy;
   readonly int nElements;
 
+  readonly float values[3][3];
+
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void done(void);

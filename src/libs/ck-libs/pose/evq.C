@@ -17,9 +17,8 @@ eventQueue::eventQueue()
   e->done = -1;
   e->fnIdx = -99;
   e->msg = NULL;
-  e->commitBfr = NULL;
+  e->commitBfr.clear();
   e->spawnedList = NULL;
-  e->commitBfrLen = 0;
   e->next = e->prev = NULL;
   frontPtr = e;
   // create the back sentinel node
@@ -28,9 +27,8 @@ eventQueue::eventQueue()
   e->done = -1;
   e->fnIdx = -100;
   e->msg = NULL;
-  e->commitBfr = NULL;
+  e->commitBfr.clear();
   e->spawnedList = NULL;
-  e->commitBfrLen = 0;
   e->next = e->prev = NULL;
   currentPtr = backPtr = e; // when no unprocessed events, currentPtr=backPtr
   // link them together
@@ -250,8 +248,8 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // call commit fn
       obj->basicStats[0]++;
       CommitStatsHelper(obj, commitPtr);
-      if (commitPtr->commitBfrLen > 0)  { // print buffered output
-	CkPrintf("%s", commitPtr->commitBfr);
+      if (commitPtr->commitBfr.size() > 0)  { // print buffered output
+	CkPrintf("%s", commitPtr->commitBfr.data());
 	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
       }
       commitPtr = commitPtr->next;
@@ -265,8 +263,8 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
 	obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
 	obj->basicStats[0]++;
 	CommitStatsHelper(obj, commitPtr);
-	if (commitPtr->commitBfrLen > 0)  { // print buffered output
-	  CkPrintf("%s", commitPtr->commitBfr);
+	if (commitPtr->commitBfr.size() > 0)  { // print buffered output
+	  CkPrintf("%s", commitPtr->commitBfr.data());
 	  if (commitPtr->commitErr) CmiAbort("Commit ERROR");
 	}
 	commitPtr = commitPtr->next;
@@ -318,8 +316,8 @@ void eventQueue::CommitAll(sim *obj)
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
       obj->basicStats[0]++;
       CommitStatsHelper(obj, commitPtr);
-      if (commitPtr->commitBfrLen > 0)  { // print buffered output
-	CkPrintf("%s", commitPtr->commitBfr);
+      if (commitPtr->commitBfr.size() > 0)  { // print buffered output
+	CkPrintf("%s", commitPtr->commitBfr.data());
 	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
       }
     }
@@ -364,8 +362,8 @@ void eventQueue::CommitDoneEvents(sim *obj) {
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
       obj->basicStats[0]++;
       CommitStatsHelper(obj, commitPtr);
-      if (commitPtr->commitBfrLen > 0)  { // print buffered output
-	CkPrintf("%s", commitPtr->commitBfr);
+      if (commitPtr->commitBfr.size() > 0)  { // print buffered output
+	CkPrintf("%s", commitPtr->commitBfr.data());
 	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
       }
     }
@@ -487,7 +485,7 @@ char *eventQueue::dumpString() {
 #else
     sprintf(tempStr, PVT_DEBUG_BUFFER_LINE_LENGTH, "%d[%u.%d.%d]", e->timestamp, e->evID.id, e->evID.getPE(), e->done);
 #endif
-    strncat(str, tempStr,PVT_DEBUG_BUFFER_LINE_LENGTH);
+    strncat(str, tempStr, 32);
 
     if (e == frontPtr) strncat(str, "(FP)", PVT_DEBUG_BUFFER_LINE_LENGTH);
     if (e == currentPtr) strncat(str, "(CP)", PVT_DEBUG_BUFFER_LINE_LENGTH);
@@ -496,7 +494,7 @@ char *eventQueue::dumpString() {
     e = e->next;
   }
   char *eqs=eqh->dumpString();
-  strncat(str, eqs, PVT_DEBUG_BUFFER_LINE_LENGTH);
+  strncat(str, eqs, 32);
   delete [] tempStr;
   delete [] eqs;
   strncat(str, "end EVQ]", PVT_DEBUG_BUFFER_LINE_LENGTH);
@@ -509,7 +507,7 @@ void eventQueue::pup(PUP::er &p)
   p|tsOfLastInserted; p|recentAvgEventSparsity;
   p|sparsityStartTime; p|sparsityCalcCount;
   Event *tmp;
-  register int i;
+  int i;
   int countlist = 0;
   if (p.isUnpacking()) { // UNPACKING
     p(countlist); // unpack count of events in list
@@ -555,21 +553,19 @@ void eventQueue::sanitize()
   CmiAssert(frontPtr->done == -1);
   CmiAssert(frontPtr->fnIdx == -99);
   CmiAssert(frontPtr->msg == NULL);
-  CmiAssert(frontPtr->commitBfr == NULL);
+  CmiAssert(frontPtr->commitBfr.size() == 0);
   CmiAssert(frontPtr->spawnedList == NULL);
   CmiAssert(frontPtr->next != NULL);
   CmiAssert(frontPtr->prev == NULL);
-  CmiAssert(frontPtr->commitBfrLen == 0);
   CmiAssert(backPtr != NULL);
   CmiAssert(backPtr->timestamp == POSE_UnsetTS);
   CmiAssert(backPtr->done == -1);
   CmiAssert(backPtr->fnIdx == -100);
   CmiAssert(backPtr->msg == NULL);
-  CmiAssert(backPtr->commitBfr == NULL);
+  CmiAssert(backPtr->commitBfr.size() == 0);
   CmiAssert(backPtr->spawnedList == NULL);
   CmiAssert(backPtr->next == NULL);
   CmiAssert(backPtr->prev != NULL);
-  CmiAssert(backPtr->commitBfrLen == 0);
 
   // traverse forward
   Event *tmp = frontPtr->next;

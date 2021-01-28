@@ -5,7 +5,7 @@
 
 int initial_grainsize;
 
-class Main
+class Main : public CBase_Main
 {
 public:
     Main(CkArgMsg* msg )

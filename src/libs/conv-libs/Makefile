@@ -1,14 +1,15 @@
-CHARMC=../../../bin/charmc $(OPTS)
+DIRS = \
+  master-slave \
+  packlib \
 
-SIMPLE_DIRS= master-slave packlib ddt
-DIRS= $(SIMPLE_DIRS)
+all: $(foreach i,$(DIRS),build-$i)
 
-all: $(SIMPLE_DIRS)
+clean: $(foreach i,$(DIRS),clean-$i)
+	rm -f TAGS #*#
+	rm -f core *~
 
-.PHONY: $(DIRS)
+$(foreach i,$(DIRS),build-$i):
+	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
 
-$(DIRS):
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
-clean:
-	for d in $(DIRS); do make -C $$d clean OPTS='$(OPTS)'; done
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

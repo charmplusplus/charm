@@ -1,0 +1,11 @@
+mainmodule m {
+    mainchare c {
+        entry void bar(type_t);
+        entry void foo() {
+            when bar(code_t)
+                {}
+            when baz[ar](int)
+                {}
+        }
+    };
+};

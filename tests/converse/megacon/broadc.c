@@ -1,16 +1,16 @@
 #include <stdio.h>
 #include <converse.h>
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
-typedef struct bchare
+typedef struct bchare_s
 {
   int totalsent;
   int totalreplies;
 }
 *bchare;
 
-typedef struct mesg
+typedef struct mesg_s
 {
   char head[CmiMsgHeaderSizeBytes];
   int reply_pe;
@@ -29,29 +29,31 @@ void broadc_recv(mesg m)
     exit(1);
   }
   CmiSetHandler(m, CpvAccess(broadc_reply_idx));
-  CmiSyncSendAndFree(m->reply_pe, sizeof(struct mesg), m);
+  CmiSyncSendAndFree(m->reply_pe, sizeof(struct mesg_s), m);
 }
 
 void broadc_start_cycle(bchare c)
 {
-  struct mesg m={{0},CmiMyPe(),c,0x12345678}; struct mesg *mp; CmiCommHandle h;
+  struct mesg_s m={{0},CmiMyPe(),c,0x12345678}; struct mesg_s *mp; CmiCommHandle h;
+
+  CmiInitMsgHeader(m.head, sizeof(struct mesg_s));
   switch (c->totalsent) {
-  case 0:
-    CmiSetHandler(&m, CpvAccess(broadc_recv_idx));
-    CmiSyncBroadcastAll(sizeof(struct mesg),&m);
-    c->totalsent++;
-    break;
-  case 1:
-  case 2:
-    mp = (mesg)CmiAlloc(sizeof(struct mesg));
-    CmiSetHandler(mp, CpvAccess(broadc_recv_idx));
-    mp->reply_ptr = c; mp->reply_pe = CmiMyPe(); mp->magic = 0x12345678;
-    CmiSyncBroadcastAllAndFree(sizeof(struct mesg),mp);
-    c->totalsent++;
-    break;
-  case 3:
-    free(c);
-    Cpm_megacon_ack(CpmSend(0));
+    case 0:
+      CmiSetHandler(&m, CpvAccess(broadc_recv_idx));
+      CmiSyncBroadcastAll(sizeof(struct mesg_s),&m);
+      c->totalsent++;
+      break;
+    case 1:
+    case 2:
+      mp = (mesg)CmiAlloc(sizeof(struct mesg_s));
+      CmiSetHandler(mp, CpvAccess(broadc_recv_idx));
+      mp->reply_ptr = c; mp->reply_pe = CmiMyPe(); mp->magic = 0x12345678;
+      CmiSyncBroadcastAllAndFree(sizeof(struct mesg_s),mp);
+      c->totalsent++;
+      break;
+    case 3:
+      free(c);
+      Cpm_megacon_ack(CpmSend(0));
   }
 }
 
@@ -70,7 +72,7 @@ void broadc_reply(mesg m)
 
 void broadc_init(void)
 {
-  bchare c = (bchare)malloc(sizeof(struct bchare));
+  bchare c = (bchare)malloc(sizeof(struct bchare_s));
   c->totalsent = 0;
   c->totalreplies = 0;
   broadc_start_cycle(c);

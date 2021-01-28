@@ -362,8 +362,7 @@ public:
 
 static LBTopoVec lbTopoMap;
 
-extern "C"
-LBtopoFn LBTopoLookup(char *name)
+LBtopoFn LBTopoLookup(const char *name)
 {
   //printf("maplen: %d\n",lbTopoMap.length());
   for (int i=0; i<lbTopoMap.length(); i++) {
@@ -373,22 +372,23 @@ LBtopoFn LBTopoLookup(char *name)
 }
 
 // C wrapper functions
-/*extern "C" void getTopoNeighbors(void *topo, int myid, int* narray, int *n)
+#if 0
+void getTopoNeighbors(void *topo, int myid, int* narray, int *n)
 {
   ((LBTopology*)topo)->neighbors(myid, narray, *n);
 }
 
-extern "C" int getTopoMaxNeighbors(void *topo)
+int getTopoMaxNeighbors(void *topo)
 {
   return ((LBTopology*)topo)->max_neighbors();
 }
 
-extern "C" void printoutTopo()
+void printoutTopo()
 {
   for (int i=0; i<lbTopoMap.length(); i++) {
     CmiPrintf("  %s\n", lbTopoMap[i]->name);
   }
 }
-*/
+#endif
 
 #endif

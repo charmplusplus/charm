@@ -193,10 +193,7 @@ public: \
 	virtual void inhVirtual(int t) { \
 		if (t!=type+gen+methInh) badMeth(#className,"inhVirtual",t); \
 		((CProxy_inhCoord)coordinator).done();\
-        }\
-	virtual void pup(PUP::er &p) {\
-		parentName::pup(p);\
-	}\
+        }
 
 //Declares the parent method
 #define PARENT(className,type) \

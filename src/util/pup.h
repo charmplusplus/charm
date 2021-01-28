@@ -55,6 +55,9 @@ class bar {
 #define __CK_PUP_H
 
 #include <stdio.h> /*<- for "FILE *" */
+#include <type_traits>
+#include <utility>
+#include <functional>
 
 #ifndef __cplusplus
 #error "Use pup_c.h for C programs-- pup.h is for C++ programs"
@@ -66,7 +69,6 @@ class bar {
 #ifndef CHARM_H
 #  include "converse.h" // <- for CMK_* defines
 #endif
-extern "C" void CmiAbort(const char *msg);
 #endif
 
 //We need CkMigrateMessage only to distinguish the migration
@@ -75,6 +77,32 @@ extern "C" void CmiAbort(const char *msg);
 typedef struct {int is_only_a_name;} CkMigrateMessage;
 
 namespace PUP {
+  class er; // Forward declare for all sorts of things
+
+  /**
+   * A utility to let classes avoid default construction when they're
+   * about to be unpacked, by defining a constructor that takes a
+   * value of type PUP::reconstruct
+   */
+  struct reconstruct {};
+  namespace detail {
+    template <typename T, bool b = std::is_constructible<T, reconstruct>::value>
+    struct TemporaryObjectHolder { };
+    template <typename T>
+    struct TemporaryObjectHolder<T, true>
+    {
+      typename std::remove_cv<typename std::remove_reference<T>::type>::type t{reconstruct()};
+    };
+    template <typename T>
+    struct TemporaryObjectHolder<T, false>
+    {
+      typename std::remove_cv<typename std::remove_reference<T>::type>::type t{};
+    };
+    template <typename T>
+    void operator|(er &p, TemporaryObjectHolder<T> &t) {
+      p | t.t;
+    }
+  }
 
 #if CMK_LONG_LONG_DEFINED
 #define CMK_PUP_LONG_LONG long long
@@ -98,6 +126,33 @@ typedef enum {
   Tpointer,
   dataType_last //<- for setting table lengths, etc.
 } dataType;
+
+static inline dataType getXlateDataType(signed char *a) { return Tchar; }
+#if CMK_SIGNEDCHAR_DIFF_CHAR
+static inline dataType getXlateDataType(char *a) { return Tchar; }
+#endif
+static inline dataType getXlateDataType(short *a) { return Tshort; }
+static inline dataType getXlateDataType(int *a) { return Tint; }
+static inline dataType getXlateDataType(long *a) { return Tlong; }
+static inline dataType getXlateDataType(unsigned char *a) { return Tuchar; }
+static inline dataType getXlateDataType(unsigned short *a) { return Tushort; }
+static inline dataType getXlateDataType(unsigned int *a) { return Tuint; }
+static inline dataType getXlateDataType(unsigned long *a) { return Tulong; }
+static inline dataType getXlateDataType(float *a) { return Tfloat; }
+static inline dataType getXlateDataType(double *a) { return Tdouble; }
+#if CMK_LONG_DOUBLE_DEFINED
+static inline dataType getXlateDataType(long double *a) { return Tlongdouble; }
+#endif
+static inline dataType getXlateDataType(bool *a) { return Tbool; }
+#ifdef CMK_PUP_LONG_LONG
+static inline dataType getXlateDataType(CMK_PUP_LONG_LONG *a) { return Tlonglong; }
+static inline dataType getXlateDataType(unsigned CMK_PUP_LONG_LONG *a) { return Tulonglong; }
+#endif
+#if CMK_HAS_INT16
+static inline dataType getXlateDataType(CmiInt16 *a) { return Tint128; }
+static inline dataType getXlateDataType(CmiUInt16 *a) { return Tuint128; }
+#endif
+
 
 //This should be a 1-byte unsigned type
 typedef unsigned char myByte;
@@ -128,7 +183,7 @@ public:
 	//An evil hack to avoid inheritance and virtual functions among seekers--
 	// stores the PUP::er specific block start information.
 	union {
-		int off;
+		size_t off;
 		long loff;
 		const myByte *cptr;
 		myByte *ptr;
@@ -141,23 +196,31 @@ class er {
  private:
   er(const er &p);//You don't want to copy PUP::er's.
  protected:
-  /// These state bits describe various user-settable properties.
-  enum {IS_USERLEVEL=0x0004, // If set, this is *not* a migration pup-- it's something else.
-	IS_DELETING =0x0008, // If set, C & f90 objects should delete themselves after pup
-	IS_COMMENTS =0x0010,  // If set, this PUP::er wants comments and sync codes.
-	IS_RESTARTING=0x0020  // If set, it is during restarting
-  };
-  /// These state bits describe the PUP::er's direction.
-  enum {IS_SIZING   =0x0100,
-  	IS_PACKING  =0x0200,
-        IS_UNPACKING=0x0400,
-        TYPE_MASK   =0xFF00
-  };
-  unsigned int PUP_er_state;
-  explicit /* Makes constructor below behave better */
-    er(unsigned int inType): PUP_er_state(inType) {} //You don't want to create raw PUP::er's.
+   unsigned int PUP_er_state;
+   // You don't want to create raw PUP::er's.
+   explicit er(unsigned int inType) : PUP_er_state(inType) {}
+
+   /// These state bits describe the PUP::er's direction.
+   enum
+   {
+     IS_SIZING = 0x0100,
+     IS_PACKING = 0x0200,
+     IS_UNPACKING = 0x0400,
+     TYPE_MASK = 0xFF00
+   };
  public:
   virtual ~er();//<- does nothing, but might be needed by some child
+
+  // These state bits describe various user-settable properties. This needs to be public
+  // because it used when PUPers are created from the checkpointing and migration code.
+  enum
+  {
+    IS_USERLEVEL = 0x0004,   // If set, this is not a migration pup - it's something else.
+    IS_DELETING = 0x0008,    // If set, C & f90 objects should delete themselves after pup
+    IS_COMMENTS = 0x0010,    // If set, this PUP::er wants comments and sync codes.
+    IS_CHECKPOINT = 0x0020,  // If set, it is creating or restarting from a checkpoint
+    IS_MIGRATION = 0x0040    // If set, it is migrating between PEs (e.g. in LB)
+  };
 
   //State queries (exactly one of these will be true)
   bool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0?true:false;}
@@ -174,102 +237,55 @@ class er {
   void becomeUserlevel(void) {PUP_er_state|=IS_USERLEVEL;}
   bool isUserlevel(void) const {return (PUP_er_state&IS_USERLEVEL)!=0?true:false;}
   
-  //This indicates that the pup routine should not call system objects' pups.
-  void becomeRestarting(void) {PUP_er_state|=IS_RESTARTING;}
-  bool isRestarting(void) const {return (PUP_er_state&IS_RESTARTING)!=0?true:false;}
-  
+  bool isCheckpoint(void) const
+  {
+    return (PUP_er_state & IS_CHECKPOINT) != 0;
+  }
+
+  bool isMigration(void) const
+  {
+    return (PUP_er_state & IS_MIGRATION) != 0;
+  }
+
   bool hasComments(void) const {return (PUP_er_state&IS_COMMENTS)!=0?true:false;}
 
 //For single elements, pretend it's an array containing one element
-  void operator()(signed char &v)     {(*this)(&v,1);}
-#if CMK_SIGNEDCHAR_DIFF_CHAR
-  void operator()(char &v)            {(*this)(&v,1);}
-#endif
-  void operator()(short &v)           {(*this)(&v,1);}
-  void operator()(int &v)             {(*this)(&v,1);}
-  void operator()(long &v)            {(*this)(&v,1);}
-  void operator()(unsigned char &v)   {(*this)(&v,1);}
-  void operator()(unsigned short &v)  {(*this)(&v,1);}
-  void operator()(unsigned int &v)    {(*this)(&v,1);}
-  void operator()(unsigned long &v)   {(*this)(&v,1);}
-  void operator()(float &v)           {(*this)(&v,1);}
-  void operator()(double &v)          {(*this)(&v,1);}
-#if CMK_LONG_DOUBLE_DEFINED
-  void operator()(long double &v)     {(*this)(&v,1);}
-#endif
-  void operator()(bool &v)         {(*this)(&v,1);}
-#ifdef CMK_PUP_LONG_LONG
-  void operator()(CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
-  void operator()(unsigned CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
-#endif
-#if CMK_HAS_INT16
-  void operator()(CmiInt16 &v) {(*this)(&v,1);}
-  void operator()(CmiUInt16 &v) {(*this)(&v,1);}
-#endif
+  template<class T>
+  void operator()(T &v)               {(*this)(&v,1);}
+
   void operator()(void* &v,void* sig) {(*this)(&v,1,sig);}
-  
-//For arrays:
-  //Integral types:
-  void operator()(signed char *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(signed char),Tchar);}
-#if CMK_SIGNEDCHAR_DIFF_CHAR
-  void operator()(char *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(char),Tchar);}
-#endif
-  void operator()(short *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(short),Tshort);}
-  void operator()(int *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(int),Tint);}
-  void operator()(long *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(long),Tlong);}
 
-  //Unsigned integral types:
-  void operator()(unsigned char *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned char),Tuchar);}
-  void operator()(unsigned short *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned short),Tushort);}
-  void operator()(unsigned int *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned int),Tuint);}
-  void operator()(unsigned long *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned long),Tulong);}
+  //For arrays:
+  template<class T>
+  void operator()(T *a,size_t nItems) {
+    bytes((void *)a,nItems, sizeof(T), getXlateDataType(a));
+  }
 
-  //Floating-point types:
-  void operator()(float *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(float),Tfloat);}
-  void operator()(double *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(double),Tdouble);}
+  // Standard pup_buffer API that calls malloc for allocation on isUnpacking and free for deallocation on isPacking
+  template<class T>
+  void pup_buffer(T *&a, size_t nItems) {
+    pup_buffer((void *&)a, nItems, sizeof(T), getXlateDataType(a));
+  }
 
-#if CMK_LONG_DOUBLE_DEFINED
-  void operator()(long double *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(long double),Tlongdouble);}
-#endif
-
-  //For bools:
-  void operator()(bool *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(bool),Tbool);}
-
-#ifdef CMK_PUP_LONG_LONG
-  void operator()(CMK_PUP_LONG_LONG *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(CMK_PUP_LONG_LONG),Tlonglong);}
-  void operator()(unsigned CMK_PUP_LONG_LONG *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned CMK_PUP_LONG_LONG),Tulonglong);}
-#endif
-#if CMK_HAS_INT16
-  void operator()(CmiInt16 *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(CmiInt16),Tint128);}
-  void operator()(CmiUInt16 *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(CmiUInt16),Tuint128);}
-#endif
+  // Custom pup_buffer API that calls user provided 'allocate' function for allocation on isUnpacking and
+  // user provided 'deallocate' function for deallocation on isPacking
+  // Custom pup_buffer behaves same as the standard pup_buffer except for calling custom allocator and deallocator methods
+  template<class T>
+  void pup_buffer(T *&a, size_t nItems, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+    pup_buffer((void *&)a, nItems, sizeof(T), getXlateDataType(a), allocate, deallocate);
+  }
 
   //For pointers: the last parameter is to make it more difficult to call
   //(should not be used in normal code as pointers may loose meaning across processor)
-  void operator()(void **a,int nItems,void *pointerSignature)
-    {bytes((void *)a,nItems,sizeof(void *),Tpointer);}
-  
+  void operator()(void **a,size_t nItems,void *pointerSignature) {
+    (void)pointerSignature;
+    bytes((void *)a,nItems,sizeof(void *),Tpointer);
+  }
+
   //For raw memory (n gives number of bytes)
 /*
   // pup void * is error-prune, let's avoid it - Gengbin
-  void operator()(void *a,int nBytes)
+  void operator()(void *a,size_t nBytes)
     {bytes((void *)a,nBytes,1,Tbyte);}
 */
 
@@ -301,26 +317,34 @@ class er {
 
   //Generic bottleneck: pack/unpack n items of size itemSize
   // and data type t from p.  Desc describes the data item
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t) =0;
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t) =0;
   virtual void object(able** a);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t) = 0;
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) = 0;
 
   virtual size_t size(void) const { return 0; }
   
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
-  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
-  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+  virtual size_t impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,size_t off); /*Seek to the given offset*/
   virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
 
   //See more documentation before PUP_cmiAllocSizer in pup_cmialloc.h
   //Must be a CmiAlloced buf while packing
-  virtual void pupCmiAllocBuf(void **msg) 
-      {CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");}
+  virtual void pupCmiAllocBuf(void **msg) {
+    (void)msg;
+    CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");
+  }
 
   //In case source is not CmiAlloced the size can be passed and any
   //user buf can be converted into a cmialloc'ed buf
-  virtual void pupCmiAllocBuf(void **msg, int size)
-      {CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");}
+  virtual void pupCmiAllocBuf(void **msg, size_t size) {
+    (void)msg;
+    (void)size;
+    CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");
+  }
 };
 
 /**
@@ -362,11 +386,18 @@ class sizer : public er {
  protected:
   size_t nBytes;
   //Generic bottleneck: n items of size itemSize
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
  public:
   //Write data to the given buffer
-  sizer(void):er(IS_SIZING),nBytes(0) {}
-  
+  sizer(const unsigned int purpose = 0) : er(IS_SIZING | purpose), nBytes(0)
+  {
+    CmiAssert((purpose & TYPE_MASK) == 0);
+  }
+
   //Return the current number of bytes to be packed
   size_t size(void) const {return nBytes;}
 };
@@ -381,27 +412,54 @@ class mem : public er { //Memory-buffer packers and unpackers
  protected:
   myByte *origBuf;//Start of memory buffer
   myByte *buf;//Memory buffer (stuff gets packed into/out of here)
-  mem(unsigned int type,myByte *Nbuf):er(type),origBuf(Nbuf),buf(Nbuf) {}
+  mem(const unsigned int type, myByte* Nbuf, const unsigned int purpose = 0)
+      : er(type | purpose), origBuf(Nbuf), buf(Nbuf)
+  {
+    CmiAssert((purpose & TYPE_MASK) == 0);
+  }
   mem(const mem &p);			//You don't want to copy
   void operator=(const mem &p);		// You don't want to copy
 
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
-  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
-  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+  virtual size_t impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,size_t off); /*Seek to the given offset*/
  public:
   //Return the current number of buffer bytes used
   size_t size(void) const {return buf-origBuf;}
+
+  inline char* get_current_pointer() const {
+    return reinterpret_cast<char*>(buf);
+  }
+
+  inline char* get_orig_pointer() const {
+    return reinterpret_cast<char*>(origBuf);
+  }
+
+  inline void reset() {
+    buf = origBuf;
+  }
+
+  inline void advance(size_t const offset) {
+    buf += offset;
+  }
 };
 
 //For packing into a preallocated, presized memory buffer
 class toMem : public mem {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
  public:
   //Write data to the given buffer
-  toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
+  toMem(void* Nbuf, const unsigned int purpose = 0)
+      : mem(IS_PACKING, (myByte*)Nbuf, purpose)
+  {
+  }
 };
 template <class T>
 inline void toMemBuf(T &t,void *buf, size_t len) {
@@ -415,13 +473,22 @@ inline void toMemBuf(T &t,void *buf, size_t len) {
 class fromMem : public mem {
  protected:
   //Generic bottleneck: unpack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
+  void pup_buffer_generic(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, bool isMalloc);
+
  public:
   //Read data from the given buffer
-  fromMem(const void *Nbuf):mem(IS_UNPACKING,(myByte *)Nbuf) {}
+  fromMem(const void* Nbuf, const unsigned int purpose = 0)
+      : mem(IS_UNPACKING, (myByte*)Nbuf, purpose)
+  {
+  }
 };
 template <class T>
-inline void fromMemBuf(T &t,void *buf,int len) {
+inline void fromMemBuf(T &t,void *buf,size_t len) {
 	PUP::fromMem p(buf);
 	p|t;
 	if (p.size()!=len) CmiAbort("Size mismatch during PUP::fromMemBuf!\n"
@@ -432,38 +499,56 @@ inline void fromMemBuf(T &t,void *buf,int len) {
 class disk : public er {
  protected:
   FILE *F;//Disk file to read from/write to
-  disk(unsigned int type,FILE *f):er(type),F(f) {}
+  disk(const unsigned int type, FILE* f, const unsigned int purpose = 0)
+      : er(type | purpose), F(f)
+  {
+    CmiAssert((purpose & TYPE_MASK) == 0);
+  }
+
   disk(const disk &p);			//You don't want to copy
   void operator=(const disk &p);	// You don't want to copy
 
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
-  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
-  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+  virtual size_t impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,size_t off); /*Seek to the given offset*/
 };
 
 //For packing to a disk file
 class toDisk : public disk {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
+  bool error;
  public:
   // Write data to the given file pointer
   // (must be opened for binary write)
   // You must close the file yourself when done.
-  toDisk(FILE *f):disk(IS_PACKING,f) {}
+  toDisk(FILE* f, const unsigned int purpose = 0) : disk(IS_PACKING, f, purpose)
+  {
+    error = false;
+  }
+  bool checkError(){return error;}
 };
 
 //For unpacking from a disk file
 class fromDisk : public disk {
  protected:
   //Generic bottleneck: unpack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
  public:
   // Read data from the given file pointer 
   // (must be opened for binary read)
   // You must close the file yourself when done.
-  fromDisk(FILE *f):disk(IS_UNPACKING,f) {}
+  fromDisk(FILE* f, const unsigned int purpose = 0) : disk(IS_UNPACKING, f, purpose) {}
 };
 
 /************** PUP::er -- Text *****************/
@@ -484,14 +569,18 @@ class toTextUtil : public er {
   virtual void comment(const char *message);
   virtual void synchronize(unsigned int m);
  protected:
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
   virtual void object(able** a);
 };
 /* Return the number of characters, including terminating NULL */
 class sizerText : public toTextUtil {
  private:
   char line[1000];
-  int charCount; /*Total characters seen so far (not including NULL) */
+  size_t charCount; /*Total characters seen so far (not including NULL) */
  protected:
   virtual char *advance(char *cur);
  public:
@@ -503,7 +592,7 @@ class sizerText : public toTextUtil {
 class toText : public toTextUtil {
  private:
   char *buf;
-  int charCount; /*Total characters written so far (not including NULL) */
+  size_t charCount; /*Total characters written so far (not including NULL) */
  protected:
   virtual char *advance(char *cur);
  public:
@@ -516,7 +605,11 @@ class toText : public toTextUtil {
 class toTextFile : public er {
  protected:
   FILE *f;
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
  public:
   //Begin writing to this file, which should be opened for ascii write.
   // You must close the file yourself when done.
@@ -533,7 +626,11 @@ class fromTextFile : public er {
   CMK_TYPEDEF_INT8 readLongInt(const char *fmt="%lld");
   double readDouble(void);
   
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
   virtual void parseError(const char *what);
  public:
   //Begin writing to this file, which should be opened for ascii read.
@@ -595,8 +692,8 @@ public:
 	virtual size_t size(void) const { return p.size(); }
 	
 	virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
-	virtual int impl_tell(seekBlock &s); /*Give the current offset*/
-	virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+	virtual size_t impl_tell(seekBlock &s); /*Give the current offset*/
+	virtual void impl_seek(seekBlock &s,size_t off); /*Seek to the given offset*/
 	virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
 };
 
@@ -605,7 +702,7 @@ public:
 // translate during unpack-- "reader makes right".)
 class xlater : public wrap_er {
  protected:
-  typedef void (*dataConverterFn)(int N,const myByte *in,myByte *out,int nElem);
+  typedef void (*dataConverterFn)(int N,const myByte *in,myByte *out,size_t nElem);
   
   //This table is indexed by dataType, and contains an appropriate
   // conversion function to unpack a n-item array of the corresponding 
@@ -617,7 +714,11 @@ class xlater : public wrap_er {
     int isUnsigned,int intType,dataType dest);
   
   //Generic bottleneck: unpack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+
  public:
   xlater(const machineInfo &fromMachine, er &fromData);
 };
@@ -652,9 +753,10 @@ public:
 protected:
 	able() {}
 	able(CkMigrateMessage *) {}
-	virtual ~able();//Virtual destructor may be needed by some child
 
 public:
+	virtual ~able();//Virtual destructor may be needed by some child
+
 //Constructor function registration:
 	typedef able* (*constructor_function)(void);
 	static PUP_ID register_constructor(const char *className,
@@ -674,14 +776,14 @@ public:
 #define PUPable_operator_inside(className)\
     friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     friend inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+	PUP::able *pa=a;  p(&pa);  a=dynamic_cast<className *>(pa);\
     }
 
 //  Macros to be used outside a class body.
 #define PUPable_operator_outside(className)\
     inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+	PUP::able *pa=a;  p(&pa);  a=dynamic_cast<className *>(pa);\
     }
 
 //Declarations to include in a PUP::able's body.
@@ -703,6 +805,11 @@ public:\
     virtual const PUP::able::PUP_ID &get_PUP_ID(void) const; \
     static void register_PUP_ID(const char* name);
 
+#define PUPable_decl_base_template(baseClassName, className)                   \
+  PUPable_decl_inside_base_template(SINGLE_ARG(baseClassName),                 \
+                                    SINGLE_ARG(className))                     \
+  PUPable_operator_inside(SINGLE_ARG(className))
+
 #define PUPable_decl_inside_template(className)	\
 private: \
     static PUP::able* call_PUP_constructor(void) { \
@@ -713,6 +820,22 @@ public: \
         return my_PUP_ID; }					\
     static void register_PUP_ID(const char* name) { \
         my_PUP_ID=register_constructor(name,call_PUP_constructor);}
+
+#define PUPable_decl_inside_base_template(baseClassName, className)            \
+private:                                                                       \
+    static PUP::able *call_PUP_constructor(void) {                             \
+        return new className((CkMigrateMessage *)0);                           \
+    }                                                                          \
+    static PUP::able::PUP_ID my_PUP_ID;                                        \
+                                                                               \
+public:                                                                        \
+    virtual const PUP::able::PUP_ID &get_PUP_ID(void) const {                  \
+        return my_PUP_ID;                                                      \
+    }                                                                          \
+    static void register_PUP_ID(const char *name) {                            \
+        my_PUP_ID =                                                            \
+           baseClassName::register_constructor(name, call_PUP_constructor);    \
+    }
 
 //PUPable_decl for classes inside a namespace: in header at file scope
 #define PUPable_decl_outside(className) \
@@ -778,20 +901,9 @@ class CkPointer {
 	T *allocated; //Pointer that PUP dynamically allocated for us (recv only)
 	T *ptr; //Read-only pointer
 
-#if 0 /* Private (do-not-use) copy constructor.  This prevents allocated from being
-         deleted twice--once in the original, and again in the copy.*/
-	CkPointer(const CkPointer<T> &src); // Don't use this!
-#else /* Some compilers, like gcc3, have a hideous bug that causes them to *demand*
-         a public copy constructor when a class is used to initialize a const-reference
-	 from a temporary.  The public copy constructor should never be called, though. */
-public:
-	CkPointer(const CkPointer<T> &src) {
-		CmiAbort("PUPable_marshall's cannot be passed by value.  Pass them only by reference!");
-	}
-  	void operator=(const CkPointer<T> &src) {
-		CmiAbort("PUPable_marshall's cannot be passed by value.  Pass them only by reference!");
-	}
-#endif
+	CkPointer(const CkPointer<T> &) = delete;
+	void operator=(const CkPointer<T> &) = delete;
+	void operator=(CkPointer<T> &&) = delete;
 protected:
 	T *peek(void) {return ptr;}
 public:
@@ -800,6 +912,14 @@ public:
 	{ 
 		allocated=0; //Don't ever delete src
 		ptr=src;
+	}
+	CkPointer(CkPointer<T> &&src)
+	{
+		allocated = src.allocated;
+		ptr = src.ptr;
+
+		src.allocated = nullptr;
+		src.ptr = nullptr;
 	}
 	
 	/// Begin completely empty: used on marshalling recv side.
@@ -871,67 +991,61 @@ namespace PUP {
 	     if (PUP::as_bytes<someClass>::value) { ... }
 	*/
 	template<class T> class as_bytes {
-#ifdef CK_DEFAULT_BITWISE_PUP   /* OLD */
-		public: enum {value=1};
-#else /* normal case: don't pack as bytes by default */
+    /* default is to not pack as bytes by default */
 		public: enum {value=0};
-#endif
 	};
 
 
-#ifdef CK_DEFAULT_BITWISE_PUP   /* OLD compatability mode*/
-/// Default operator| and PUParray: copy as bytes.
-template <class T>
-inline void operator|(PUP::er &p,T &t) {p((void *)&t,sizeof(T));}
-template <class T>
-inline void PUParray(PUP::er &p,T *ta,int n) { p((void *)ta,n*sizeof(T)); }
+// Defines is_pupable to allow enums to be pupped in pup_stl.h
+namespace details {
 
-/* enable normal pup mode from CK_DEFAULT_BITWISE_PUP */
-#  define PUPmarshall(type) \
-template<class T> inline void operator|(PUP::er &p,T &t) { t.pup(p); } \
-template<class T> inline void PUParray(PUP::er &p,T *t,int n) { \
-	for (int i=0;i<n;i++) p|t[i]; \
+template <typename... Ts>
+struct make_void {
+  typedef void type;
+};
+template <typename... Ts>
+using void_t = typename make_void<Ts...>::type;
+
+template <typename T, typename U = void>
+struct is_pupable : std::false_type {};
+
+template <typename T>
+struct is_pupable<
+    T, void_t<decltype(std::declval<T>().pup(std::declval<PUP::er &>()))>>
+    : std::true_type {};
+
 }
 
-#else /* !CK_DEFAULT_BITWISE_PUP */
-/// Normal case: Call pup routines by default
 /**
-  Default operator|: call pup routine.
+  Default operator|: call pup routine (as long as T has a pup function).
 */
-template<class T>
-inline void operator|(PUP::er &p,T &t) { 
-	p.syncComment(PUP::sync_begin_object);
-	t.pup(p);
-	p.syncComment(PUP::sync_end_object); 
+template <class T, typename std::enable_if<details::is_pupable<T>::value, int>::type = 0>
+inline void operator|(PUP::er &p, T &t) {
+  p.syncComment(PUP::sync_begin_object);
+  t.pup(p);
+  p.syncComment(PUP::sync_end_object);
 }
 
 /**
   Default PUParray: pup each element.
 */
 template<class T>
-inline void PUParray(PUP::er &p,T *t,int n) {
+inline void PUParray(PUP::er &p,T *t,size_t n) {
 	p.syncComment(PUP::sync_begin_array);
-	for (int i=0;i<n;i++) {
+	for (size_t i=0;i<n;i++) {
 		p.syncComment(PUP::sync_item);
 		p|t[i];
 	}
 	p.syncComment(PUP::sync_end_array);
 }
 
-/* PUPmarshall macro: now a deprecated no-op */
-#  define PUPmarshall(type) /* empty, pup routines now the default */
-#endif
-#define PUPmarshal(type) PUPmarshall(type) /*Support this common misspelling*/
-
-
 /// Copy this type as raw memory (like memcpy).
 #define PUPbytes(type) \
-  inline void operator|(PUP::er &p,type &t) {p((char *)&t,sizeof(type));} \
-  inline void PUParray(PUP::er &p,type *ta,int n) { p((char *)ta,n*sizeof(type)); } \
+  namespace PUP { inline void operator|(PUP::er &p,type &t) {p((char *)&t,sizeof(type));} } \
+  namespace PUP { inline void PUParray(PUP::er &p,type *ta,size_t n) { p((char *)ta,n*sizeof(type)); } } \
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
   }; }
-#define PUPmarshallBytes(type) PUPbytes(type)
 
 /// Make PUP work with this function pointer type, copied as raw bytes.
 #define PUPfunctionpointer(fnPtrType) \
@@ -948,8 +1062,8 @@ inline void PUParray(PUP::er &p,T *t,int n) {
   operator| and PUParray use p(t) and p(ta,n).
 */
 #define PUP_BUILTIN_SUPPORT(type) \
-  namespace PUP { inline void operator|(er &p,type &t) {p(t);} }	\
-  namespace PUP { inline void PUParray(er &p,type *ta,int n) { p(ta,n); } } \
+  namespace PUP { inline void operator|(er &p,type &t) {p(t);} } \
+  namespace PUP { inline void PUParray(er &p,type *ta,size_t n) { p(ta,n); } } \
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
   }; }

@@ -9,13 +9,13 @@
 int LBSimulation::dumpStep = -1;  	     /// first step number to dump
 int LBSimulation::dumpStepSize = 1;          /// number of steps to dump 
 char* LBSimulation::dumpFile = (char*)"lbdata.dat"; /// dump file name
-int LBSimulation::doSimulation = 0; 	     /// flag if do simulation
+bool LBSimulation::doSimulation = false; 	     /// flag if do simulation
 int LBSimulation::simStep = -1;              /// first step number to simulate
 int LBSimulation::simStepSize = 1;           /// number of steps to simulate
 int LBSimulation::simProcs = 0; 	     /// simulation target procs
-int LBSimulation::procsChanged = 0;          /// flag if the number of procs has been changed
+bool LBSimulation::procsChanged = false;          /// flag if the number of procs has been changed
 
-int LBSimulation::showDecisionsOnly = 0;     /// flag to write all LB decisions
+bool LBSimulation::showDecisionsOnly = false;     /// flag to write all LB decisions
 int _lb_version = LB_FORMAT_VERSION;	     /// data file version
 
 /*****************************************************************************
@@ -140,7 +140,7 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 	    }
             else if (receiver_type == LD_OBJLIST_MSG) {
               int nobjs;
-              LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+              const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
 	      mcast_count ++;
 	      CkVec<int> pes;
 	      for (i=0; i<nobjs; i++) {
@@ -227,8 +227,8 @@ void LBInfo::print()
   CmiPrintf("[%d] is Maxloaded maxload: %f ObjLoad %f BgLoad %f\n",
 			max_loaded_proc, peLoads[max_loaded_proc], objLoads[max_loaded_proc], bgLoads[max_loaded_proc]);
   // the min and max object (calculated in getLoadInfo)
-  CmiPrintf("MinObj : %f  MaxObj : %f\n", minObjLoad, maxObjLoad, average);
-  CmiPrintf("Non-local comm: %d msgs %lld bytes\n", msgCount, msgBytes);
+  CmiPrintf("MinObj : %f  MaxObj : %f  Average : %f\n", minObjLoad, maxObjLoad, average);
+  CmiPrintf("Non-local comm: %d msgs %" PRIu64 " bytes\n", msgCount, msgBytes);
 }
 
 void LBInfo::getSummary(LBRealType &maxLoad, LBRealType &maxCpuLoad, LBRealType &totalLoad)
@@ -280,10 +280,7 @@ void LBSimulation::PrintDecisions(LBMigrateMsg *m, char *simFileName,
   FILE *f = fopen(resultFile, "w");
   fprintf(f, "%d %d\n", peCount, m->n_moves); // header
   for (int i=0; i<m->n_moves; i++) {
-    fprintf(f, "%d ", m->moves[i].obj.id.id[0]);
-    fprintf(f, "%d ", m->moves[i].obj.id.id[1]);
-    fprintf(f, "%d ", m->moves[i].obj.id.id[2]);
-    fprintf(f, "%d ", m->moves[i].obj.id.id[3]);
+    fprintf(f, "%" PRIu64 " ", m->moves[i].obj.id);
     fprintf(f, "%d\n",m->moves[i].to_pe);
   }
 }

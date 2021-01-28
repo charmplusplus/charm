@@ -23,16 +23,16 @@ mainmodule allToAll {
 	
         entry void doAllToAll() {
            
-            atomic {
+            serial {
                 sendAllToAll();
             }
 
             for(count = 0; count < msgCount*numChares; ++count){
-                when getAllToAll[iter](allToAllMsg *m) atomic {
+                when getAllToAll[iter](allToAllMsg *m) serial {
                     processAllToAll(m);
                 }
             }
-            atomic {
+            serial {
 			    iter++;
 				finish();
             }

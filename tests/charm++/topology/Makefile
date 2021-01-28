@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = rtc.o
@@ -17,5 +18,11 @@ rtc.o: rtc.C topo.decl.h
 	$(CHARMC) -c rtc.C
 
 test: all
-	./charmrun ./rtc +p4 $(TESTOPTS)
+	$(call run, ./rtc +p4 )
 
+testp: all
+	$(call run, ./rtc +p$(P) )
+
+smptest: all
+	$(call run, ./rtc +p2 ++ppn 2)
+	$(call run, ./rtc +p4 ++ppn 2)

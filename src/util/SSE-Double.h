@@ -1,7 +1,7 @@
 #ifndef __SSE_DOUBLE_H__
 #define __SSE_DOUBLE_H__
 
-#if CMK_USE_FMA4 && defined(__FMA4__)
+#if CMK_USE_AVX && defined(__AVX__)
 
 #include <x86intrin.h>
 

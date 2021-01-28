@@ -146,7 +146,7 @@ typedef void *(qt_block_t)(qt_helper_t *helper, void *a0, void *a1,
 /* Rearrange the parameters so that things passed to the helper
    function are already in the right argument registers. */
 #ifndef QT_ABORT
-extern qt_abort (qt_helper_t *h, void *a0, void *a1, qt_t *newthread);
+extern void *qt_abort (qt_helper_t *h, void *a0, void *a1, qt_t *newthread);
 /* The following does, technically, `return' a value, but the
    user had better not rely on it, since the function never
    returns. */ 

@@ -1,19 +1,21 @@
+-include ../../common.mk
 CHARMC=../../../bin/ampicc $(OPTS)
 
-all: pgm
+all: stacksize
 
-pgm: test.o
-	$(CHARMC) -o pgm test.o
+stacksize: test.o
+	$(CHARMC) -o stacksize test.o
 
 test.o: test.c
 	$(CHARMC) -c test.c
 
 clean:
-	rm -f *.o *.mod pgm *~ conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f *.o *.mod stacksize *~ conv-host charmrun charmrun.exe stacksize.exe stacksize.pdb stacksize.ilk ampirun
 
-test: pgm
-	./charmrun ./pgm +p2 +vp4 $(TESTOPTS)
+test: stacksize
+	$(call run, ./stacksize +p2 +vp4 )
 
-bgtest: pgm
-	./charmrun ./pgm +p2 +vp4 +x2 +y1 +z1 $(TESTOPTS)
-
+testp: stacksize
+	$(call run, ./stacksize +p$(P) +vp$(P) )
+	$(call run, ./stacksize +p$(P) +vp$$(( $(P) * 2 )) )
+	$(call run, ./stacksize +p$(P) +vp$$(( $(P) * 4 )) )

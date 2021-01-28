@@ -38,7 +38,7 @@ public:
     iter = 0; 
     arr = CProxy_Hello::ckNew(nElements);
     dataMsg *datamsg = new (msgSize) dataMsg();
-    startTimer = CmiWallTimer();
+    startTimer = CkWallTimer();
     arr.SayHi(datamsg);
   };
 
@@ -50,7 +50,7 @@ public:
           iter++;
           if(iter == maxIter)
           {
-              CkPrintf("All done %d %d  cost  %lf \n", nElements, msgSize, (CmiWallTimer()-startTimer)/maxIter);
+              CkPrintf("All done %d %d  cost  %lf \n", nElements, msgSize, (CkWallTimer()-startTimer)/maxIter);
               CkExit();
           }else
           {

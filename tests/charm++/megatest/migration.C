@@ -24,7 +24,6 @@ mig_Element::mig_Element()
 
 void mig_Element::pup(PUP::er &p)
 {
-  CBase_mig_Element::pup(p);//Call superclass
   p(origPE);
   p(sum);
   p(numDone);
@@ -44,10 +43,16 @@ mig_Element::arrive(void)
   } else {
     if(origPE==(-1)) origPE = CkMyPe();
     sum += CkMyPe() + 1;
-    self[thisIndex].arrive();
     int nextPE = (CkMyPe()+1)%CkNumPes();
     migrateMe(nextPE);
   }  
+}
+
+void
+mig_Element::ckJustMigrated()
+{
+  CProxy_mig_Element self(thisArrayID);
+  self[thisIndex].arrive();
 }
 
 void

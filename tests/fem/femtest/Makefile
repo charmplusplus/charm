@@ -1,60 +1,70 @@
-CHARMC=../../../bin/charmc $(OPTS) 
+-include ../../common.mk
+-include ../../../include/conv-mach-opt.mak
+CHARMC=../../../bin/charmc $(OPTS)
 
-all: pgm 
+TARGETS := femtest
+ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
+  TARGETS += femtest-mig
+endif
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  TARGETS += ffemtest
+endif
 
-pgm: pgm.o
-	$(CHARMC) -o pgm pgm.o -language fem
+all: $(TARGETS)
+
+femtest: pgm.o
+	$(CHARMC) -o $@ $^ -language fem
 
 pgm.o: pgm.C
-	$(CHARMC) -c pgm.C
+	$(CHARMC) -o $@ -c $<
 
-fpgm: fpgm.o
-	$(CHARMC) -o fpgm fpgm.o -language femf
+femtest-mig: pgm-mig.o
+	$(CHARMC) -o $@ $^ -language fem -DENABLE_MIG=1 -memory isomalloc -module TreeLB
+
+pgm-mig.o: pgm.C
+	$(CHARMC) -o $@ -c $< -DENABLE_MIG=1 -memory isomalloc -module TreeLB
+
+ffemtest: fpgm.o
+	$(CHARMC) -o $@ $^ -language femf
 
 fpgm.o: fpgm.f90
-	$(CHARMC) -c fpgm.f90
+	$(CHARMC) -o $@ -c $<
 
 clean:
-	rm -f pgm fpgm *.o conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk FEMVERSION
+	rm -f femtest femtest-mig ffemtest *.o conv-host charmrun charmrun.exe femtest.exe femtest.pdb femtest.ilk FEMVERSION
 
-test: pgm
-	./charmrun ./pgm +p1 +vp1 $(TESTOPTS)
-	./charmrun ./pgm +p1 +vp2 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp2 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp3 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp4 $(TESTOPTS)
-	-@rm -f fem_mesh_vp3_*
-	./charmrun ./pgm +vp3 -write $(TESTOPTS)
-	./charmrun ./pgm +vp3 -read $(TESTOPTS)
-	rm -f fem_mesh_vp3_*
-	-make testf
+test: $(addprefix test-,$(TARGETS))
 
-testf: fpgm
-	./charmrun ./fpgm +p1 +vp1 $(TESTOPTS)
-	./charmrun ./fpgm +p1 +vp2 $(TESTOPTS)
-	./charmrun ./fpgm +p2 +vp1 $(TESTOPTS)
-	./charmrun ./fpgm +p2 +vp2 $(TESTOPTS)
-	./charmrun ./fpgm +p2 +vp3 $(TESTOPTS)
-	./charmrun ./fpgm +p2 +vp4 $(TESTOPTS)
+test-femtest: femtest
+	$(call run, ./femtest +p1 +vp1 )
+	$(call run, ./femtest +p1 +vp2 )
+	$(call run, ./femtest +p2 +vp1 )
+	$(call run, ./femtest +p2 +vp2 )
+	$(call run, ./femtest +p2 +vp3 )
+	$(call run, ./femtest +p2 +vp4 )
 	-@rm -f fem_mesh_vp3_*
-	./charmrun ./fpgm +vp3 -write $(TESTOPTS)
-	./charmrun ./fpgm +vp3 -read $(TESTOPTS)
+	$(call run, ./femtest +p1 +vp3 -write )
+	$(call run, ./femtest +p1 +vp3 -read )
 	rm -f fem_mesh_vp3_*
 
-bgtest: pgm
-	./charmrun ./pgm +p1 +vp1 +x1 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p1 +vp2 +x1 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp1 +x2 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp2 +x2 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp3 +x2 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp4 +x2 +y1 +z1 $(TESTOPTS)
+test-femtest-mig: femtest-mig
+	$(call run, ./femtest-mig +p2 +vp2 +balancer RandCentLB )
+	$(call run, ./femtest-mig +p2 +vp3 +balancer RandCentLB )
+	$(call run, ./femtest-mig +p2 +vp4 +balancer RandCentLB )
+
+test-ffemtest: ffemtest
+	$(call run, ./ffemtest +p1 +vp1 )
+	$(call run, ./ffemtest +p1 +vp2 )
+	$(call run, ./ffemtest +p2 +vp1 )
+	$(call run, ./ffemtest +p2 +vp2 )
+	$(call run, ./ffemtest +p2 +vp3 )
+	$(call run, ./ffemtest +p2 +vp4 )
 	-@rm -f fem_mesh_vp3_*
-	./charmrun ./pgm +vp3 -write +x3 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +vp3 -read  +x3 +y1 +z1 $(TESTOPTS)
+	$(call run, ./ffemtest +p1 +vp3 -write )
+	$(call run, ./ffemtest +p1 +vp3 -read )
 	rm -f fem_mesh_vp3_*
 
-test-mig:
-	rm -fr pgm pgm.o
-	$(MAKE) OPTS="-DENABLE_MIG=1 -memory isomalloc -balancer RandCentLB" pgm
-	./charmrun ./pgm +p2 $(TESTOPTS)
+testf: test-ffemtest
+test-mig: test-femtest-mig
+
+.PHONY: all clean test test-femtest test-femtest-mig test-ffemtest testf test-mig

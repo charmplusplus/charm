@@ -8,36 +8,33 @@
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
-#define CMI_MPI_TRACE_USEREVENTS                           0
+#define CMI_MACH_TRACE_USEREVENTS                          0
 
 #define CMK_STACKSIZE_DEFAULT                              65536
 
 #define CMK_HANDLE_SIGUSR                                  1
 
 #if CMK_ERROR_CHECKING
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; unsigned char cksum, magic;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, redID; CmiInt4 root; unsigned char cksum, magic, mpiMsgType; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 #else
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; 
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, redID; CmiInt4 root; unsigned char mpiMsgType; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 #endif
+
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }
-#define CMK_MSG_HEADER_BIGSIM_    { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
-#define CMK_RSH_IS_A_COMMAND                               0
-#define CMK_RSH_NOT_NEEDED                                 1
-#define CMK_RSH_USE_REMSH                                  0
+#define CMK_SSH_IS_A_COMMAND                               0
+#define CMK_SSH_NOT_NEEDED                                 1
 
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
-
-#define CMK_CCS_AVAILABLE                                  1
 
 #define NODE_0_IS_CONVHOST                                 1
 
@@ -45,3 +42,11 @@
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
 
 #define CMK_LB_CPUTIMER					   0
+
+#if CMK_CXX_MPI_BINDINGS==0
+#define MPICH_IGNORE_CXX_SEEK //for build issues with mpich + intel
+#endif
+
+#define CMK_USE_COMMON_LOCK                                1
+
+#define CMK_ONESIDED_IMPL                                  1

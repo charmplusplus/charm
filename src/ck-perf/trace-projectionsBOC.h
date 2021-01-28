@@ -57,25 +57,24 @@ class KMeansBOC : public CBase_KMeansBOC {
  private:
   // commandline parameters
   bool autoCompute;
+  bool usePhases;
   int numK;
   int peNumKeep;
-  double entryThreshold;
-  bool usePhases;
-
   int numKReported;
+  double entryThreshold;
 
   // variables for correct data gathering across phases
   bool markedBegin;
   bool markedIdle;
+  bool selected;
+  int lastBeginEPIdx;
   double beginBlockTime;
   double beginIdleBlockTime;
-  int lastBeginEPIdx;
   int numSelectionIter;
-  bool selected;
 
   int currentPhase;
-  int lastPhaseIdx;
   double *currentExecTimes;
+  int lastPhaseIdx;
 
   // kMeans outlier structures - ALL processors will host this data
   int numEntryMethods;
@@ -100,20 +99,19 @@ class KMeansBOC : public CBase_KMeansBOC {
  public:
  KMeansBOC(bool outlierAutomatic, int numKSeeds, int _peNumKeep,
 	   double _entryThreshold, bool outlierUsePhases) :
-  autoCompute(outlierAutomatic), numK(numKSeeds), 
-    peNumKeep(_peNumKeep), entryThreshold(_entryThreshold),
-    usePhases(outlierUsePhases) {};
- KMeansBOC(CkMigrateMessage *m):CBase_KMeansBOC(m) {};
+  autoCompute(outlierAutomatic), usePhases(outlierUsePhases),
+  numK(numKSeeds), peNumKeep(_peNumKeep), entryThreshold(_entryThreshold) {}
+ KMeansBOC(CkMigrateMessage *m):CBase_KMeansBOC(m) {}
   
   void startKMeansAnalysis();
-  void flushCheck(CkReductionMsg *msg);
+  void flushCheck(bool someFlush);
   void flushCheckDone();
   void getNextPhaseMetrics();
   void collectKMeansData(); // C++ method
   void globalMetricRefinement(CkReductionMsg *msg);
   void initKSeeds(); // C++ method
   void findInitialClusters(KMeansStatsMessage *msg);
-  void updateKSeeds(CkReductionMsg *msg);
+  void updateKSeeds(double *modVector, int n);
   double calculateDistance(int k); // C++ method
   void updateSeedMembership(KSeedsMessage *msg);
   void findRepresentatives(); // C++ method
@@ -139,23 +137,23 @@ class TraceProjectionsBOC : public CBase_TraceProjectionsBOC {
   double endTime;
   double analysisStartTime;
   int endPe;                          // end PE which calls CkExit()
-  std::set<int> list;
   int          flush_count;
+  std::set<int> list;
  public:
  TraceProjectionsBOC(bool _findOutliers, bool _findStartTime) : findOutliers(_findOutliers), findStartTime(_findStartTime), parModulesRemaining(0), endPe(-1), flush_count(0) {};
  TraceProjectionsBOC(CkMigrateMessage *m):CBase_TraceProjectionsBOC(m), parModulesRemaining(0), endPe(-1), flush_count(0) {};
 
   void traceProjectionsParallelShutdown(int);
   void startTimeAnalysis();
-  void startTimeDone(CkReductionMsg *);
+  void startTimeDone(double result);
   void startEndTimeAnalysis();
-  void endTimeDone(CkReductionMsg *);
-  void kMeansDone(CkReductionMsg *);
+  void endTimeDone(double result);
   void kMeansDone(void);
+  void kMeansDoneFlushed(void);
   void finalize(void);
   void shutdownAnalysis(void);
   void closingTraces(void);
-  void closeParallelShutdown(CkReductionMsg *);
+  void closeParallelShutdown(void);
 
   void ccsOutlierRequest(CkCcsRequestMsg *);
 

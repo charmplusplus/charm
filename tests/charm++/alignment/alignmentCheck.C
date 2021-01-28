@@ -14,7 +14,7 @@ public:
   char *varArray2;
 };
 
-int alignCheck(intptr_t ptrToInt) {
+size_t alignCheck(intptr_t ptrToInt) {
   intptr_t align = 1;
   while ((ptrToInt & ~(align - 1)) == ptrToInt) {
     align <<= 1;
@@ -25,14 +25,14 @@ int alignCheck(intptr_t ptrToInt) {
 
 void alignmentTest(std::vector<TestMessage*> &allMsgs, const std::string &identifier) {
 
-  int alignHdr = std::numeric_limits<int>::max();
-  int alignEnv = std::numeric_limits<int>::max();
-  int alignUsr = std::numeric_limits<int>::max();
-  int alignVar1 = std::numeric_limits<int>::max();
-  int alignVar2 = std::numeric_limits<int>::max();
-  int alignPrio = std::numeric_limits<int>::max();
+  size_t alignHdr = std::numeric_limits<size_t>::max();
+  size_t alignEnv = std::numeric_limits<size_t>::max();
+  size_t alignUsr = std::numeric_limits<size_t>::max();
+  size_t alignVar1 = std::numeric_limits<size_t>::max();
+  size_t alignVar2 = std::numeric_limits<size_t>::max();
+  size_t alignPrio = std::numeric_limits<size_t>::max();
 
-  for (int i = 0; i < allMsgs.size(); i++) {
+  for (size_t i = 0; i < allMsgs.size(); i++) {
     TestMessage *msg = allMsgs[i];
     envelope *env = UsrToEnv(msg);
 
@@ -62,12 +62,12 @@ void alignmentTest(std::vector<TestMessage*> &allMsgs, const std::string &identi
   }
 
   CkPrintf("Alignment information at the %s:\n", identifier.c_str());
-  CkPrintf("Chunk header aligned to %d bytes\n", alignHdr);
-  CkPrintf("Envelope aligned to %d bytes\n", alignEnv);
-  CkPrintf("Start of user data aligned to %d bytes\n", alignUsr);
-  CkPrintf("First varsize array aligned to %d bytes\n", alignVar1);
-  CkPrintf("Second varsize array aligned to %d bytes\n", alignVar2);
-  CkPrintf("Priority field aligned to %d bytes\n", alignPrio);
+  CkPrintf("Chunk header aligned to %zu bytes\n", alignHdr);
+  CkPrintf("Envelope aligned to %zu bytes\n", alignEnv);
+  CkPrintf("Start of user data aligned to %zu bytes\n", alignUsr);
+  CkPrintf("First varsize array aligned to %zu bytes\n", alignVar1);
+  CkPrintf("Second varsize array aligned to %zu bytes\n", alignVar2);
+  CkPrintf("Priority field aligned to %zu bytes\n", alignPrio);
 
   if (alignEnv >= ALIGN_BYTES && alignUsr >= ALIGN_BYTES &&
       alignVar1 >= ALIGN_BYTES && alignVar2 >= ALIGN_BYTES &&
@@ -89,20 +89,19 @@ public:
     CProxy_Destination destinationChare =
       CProxy_Destination::ckNew(CkNumPes() - 1);
 
-    CkPrintf("Size of Converse envelope: %d bytes\n", CmiReservedHeaderSize);
-    CkPrintf("Size of Charm++ envelope: %d bytes\n", sizeof(envelope));
+    CkPrintf("Size of Converse envelope: %zu bytes\n", CmiReservedHeaderSize);
+    CkPrintf("Size of Charm++ envelope: %zu bytes\n", sizeof(envelope));
     CkPrintf("Default alignment: %d bytes\n", ALIGN_BYTES);
 
     int msgSizes[] = {varSize1, varSize2};
     std::vector<TestMessage *> allMsgs;
-    int prio = 1234;
     for (int i = 0; i < nCheck; i++) {
-      TestMessage *msg = new (msgSizes, prio) TestMessage();
+      TestMessage *msg = new (msgSizes, sizeof(int)*8) TestMessage();
       allMsgs.push_back(msg);
     }
     alignmentTest(allMsgs, "source");
 
-    for (int i = 0; i < allMsgs.size(); i++) {
+    for (size_t i = 0; i < allMsgs.size(); i++) {
       destinationChare.receiveMessage(allMsgs[i]);
     }
   }
@@ -120,7 +119,7 @@ public:
     allMsgs.push_back(msg);
     if (allMsgs.size() == nCheck) {
       alignmentTest(allMsgs, "destination");
-      for (int i = 0; i < allMsgs.size(); i++) {
+      for (size_t i = 0; i < allMsgs.size(); i++) {
         delete allMsgs[i];
       }
       CkExit();

@@ -16,8 +16,8 @@ public:
 	CkArrayIndex index;
 	double *packData;
 	int bud1, bud2;
-	int len;
-	int cp_flag;          // 1: from checkpoint 0: from recover
+	size_t len;
+	bool cp_flag;          // true: from checkpoint, false: from recover
 };
 
 
@@ -27,7 +27,8 @@ public:
 	int reportPe;		// chkpt starter
 	int failedpe;
 	int cur_restart_phase;
-	int len;
+	size_t len;
+	int pointer;
 	char *packData;
 };
 
@@ -47,7 +48,7 @@ public:
    virtual void updateBuffer(CkArrayCheckPTMessage *data) = 0;
    virtual CkArrayCheckPTMessage * getCopy() = 0;
    virtual void updateBuddy(int b1, int b2) = 0;
-   virtual int getSize() = 0;
+   virtual size_t getSize() = 0;
 };
 
 /// memory or disk checkpointing
@@ -55,42 +56,41 @@ public:
 #define CkCheckPoint_inDISK  2
 
 class CkCheckPTEntry{
-  CkArrayCheckPTMessage *data;
-  char * fname;
+  std::vector<CkArrayCheckPTMessage *> data;
+  std::string fname;
 public:
   int bud1, bud2;
   int where;
   void init(int _where, int idx)
   {
-    data = NULL;
+    data.resize(2, NULL);
     where = _where;
     if(where == CkCheckPoint_inDISK)
     {
 #if CMK_USE_MKSTEMP
-      fname = new char[64];
 #if CMK_CONVERSE_MPI
-      sprintf(fname, "/tmp/ckpt%d-%d-%d-XXXXXX",CmiMyPartition(), CkMyPe(), idx);
+      fname = "/tmp/ckpt" + std::to_string(CmiMyPartition()) + "-" + std::to_string(CkMyPe()) + "-" + std::to_string(idx) + "-XXXXXX";
 #else
-      sprintf(fname, "/tmp/ckpt%d-%d-XXXXXX", CkMyPe(), idx);
+      fname = "/tmp/ckpt" + std::to_string(CkMyPe()) + "-" + std::to_string(idx) + "-XXXXXX";
 #endif
-      if(mkstemp(fname)<0)
+      if(mkstemp(&fname[0])<0)
 	{
 	  CmiAbort("mkstemp fail in checkpoint");
 	}
 #else
-      fname=tmpnam(NULL);
+      fname = tmpnam(NULL);
 #endif
     }
   }
 
-  void updateBuffer(CkArrayCheckPTMessage * msg)
+  void updateBuffer(int pointer, CkArrayCheckPTMessage * msg)
   {
     if(where == CkCheckPoint_inDISK)
     {
       envelope *env = UsrToEnv(msg);
       CkUnpackMessage(&env);
-      data = (CkArrayCheckPTMessage *)EnvToUsr(env);
-      FILE *f = fopen(fname,"wb");
+      data[pointer] = (CkArrayCheckPTMessage *)EnvToUsr(env);
+      FILE *f = fopen(fname.c_str(),"wb");
       PUP::toDisk p(f);
       CkPupMessage(p, (void **)&msg);
       // delay sync to the end because otherwise the messages are blocked
@@ -103,19 +103,19 @@ public:
     {
       CmiAssert(where == CkCheckPoint_inMEM);
       CmiAssert(msg!=NULL);
-      if (data) delete data;
-      data = msg;
+      delete data[pointer];
+      data[pointer] = msg;
       bud1 = msg->bud1;
       bud2 = msg->bud2;
     }
   }
   
-  CkArrayCheckPTMessage * getCopy()
+  CkArrayCheckPTMessage * getCopy(int pointer)
   {
     if(where == CkCheckPoint_inDISK)
     {
       CkArrayCheckPTMessage *msg;
-      FILE *f = fopen(fname,"rb");
+      FILE *f = fopen(fname.c_str(),"rb");
       PUP::fromDisk p(f);
       CkPupMessage(p, (void **)&msg);
       fclose(f);
@@ -125,11 +125,11 @@ public:
     }else
     {
       CmiAssert(where == CkCheckPoint_inMEM);
-      if (data == NULL) {
+      if (data[pointer] == NULL) {
         CmiPrintf("[%d] recoverArrayElements: element does not have checkpoint data.", CkMyPe());
         CmiAbort("Abort!");
       }
-      return (CkArrayCheckPTMessage *)CkCopyMsg((void **)&data);
+      return (CkArrayCheckPTMessage *)CkCopyMsg((void **)&data[pointer]);
     }
   }
 };
@@ -142,7 +142,8 @@ public:
   virtual ~CkMemCheckPT();
   void pup(PUP::er& p);
   inline int BuddyPE(int pe);
-  void doItNow(int sp, CkCallback &);
+  inline int ReverseBuddyPE(int pe);
+  void doItNow(int sp, CkCallback &&);
   void restart(int diePe);
   void removeArrayElements();
   void createEntry(CkArrayID aid, CkGroupID loc, CkArrayIndex index, int buddy);
@@ -150,47 +151,49 @@ public:
   void gotData();
   void recvProcData(CkProcCheckPTMessage *);
   void cpFinish();
-  void syncFiles(CkReductionMsg *);
+  void syncFiles(void);
   void report();
   void recoverBuddies();
   void recoverEntry(CkArrayCheckPTMessage *msg);
   void recoverArrayElements();
-  void quiescence(CkCallback &);
+  void quiescence(CkCallback &&);
   void resetReductionMgr();
   void finishUp();
   void gotReply();
   void inmem_restore(CkArrayCheckPTMessage *m);
-  void updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe);
+  void updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUInt8 *id, int nowOnPe);
   void resetLB(int diepe);
-  int  isFailed(int pe);
+  bool isFailed(int pe);
   void pupAllElements(PUP::er &p);
   void startArrayCheckpoint();
   void recvArrayCheckpoint(CkArrayCheckPTMessage *m);
-  void recoverAll(CkArrayCheckPTMessage * msg, CkVec<CkGroupID> * gmap=NULL, CkVec<CkArrayIndex> * imap=NULL);
+  void recoverAll(CkArrayCheckPTMessage * msg, std::vector<CkGroupID> * gmap=NULL, std::vector<CkArrayIndex> * imap=NULL);
 public:
   static CkCallback  cpCallback;
 
-  static int inRestarting;
-  static int inCheckpointing;
-  static int inLoadbalancing;
+  static bool inRestarting;
+  static bool inCheckpointing;
+  static bool inLoadbalancing;
   static double startTime;
   static char*  stage;
+
 private:
-  CkVec<CkCheckPTInfo *> ckTable;
+  std::vector<CkCheckPTInfo *> ckTable;
   CkCheckPTEntry chkpTable[2];
 
   int recvCount, peCount;
   int expectCount, ackCount;
-    /// the processor who initiate the checkpointing
+  int recvChkpCount;//expect to receive both the processor checkpoint and array checkpoint from buddy PE
+  /// the processor who initiate the checkpointing
   int cpStarter;
-  CkVec<int> failedPes;
+  std::vector<int> failedPes;
   int thisFailedPe;
 
     /// to use memory or disk checkpointing
   int    where;
 private:
   void initEntry();
-  inline int isMaster(int pe);
+  inline bool isMaster(int pe);
 
   void failed(int pe);
   int  totalFailed();
@@ -206,13 +209,13 @@ void CkMemRestart(const char *, CkArgMsg *);
 void CkStartMemCheckpoint(CkCallback &cb);
 
 // true if inside a restarting phase
-extern "C" int CkInRestarting(); 
-extern "C" int CkInLdb(); 
+extern "C" int CkInRestarting();
+extern "C" int CkInLdb();
 extern "C" void CkSetInLdb(); 
 extern "C" void CkResetInLdb();
 
 extern "C" int CkHasCheckpoints();
 
-extern "C" void CkDieNow();
+void CkDieNow();
 
 #endif

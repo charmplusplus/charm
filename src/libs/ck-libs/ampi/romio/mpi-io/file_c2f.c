@@ -1,6 +1,5 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -17,6 +16,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_c2f as PMPI_File_c2f
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+MPI_Fint MPI_File_c2f(MPI_File fh) __attribute__((weak,alias("PMPI_File_c2f")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -36,30 +37,5 @@ Return Value:
 @*/
 MPI_Fint MPI_File_c2f(MPI_File fh)
 {
-#ifndef INT_LT_POINTER
-    return (MPI_Fint) fh;
-#else
-    int i;
-
-    if ((fh <= (MPI_File) 0) || (fh->cookie != ADIOI_FILE_COOKIE))
-	return (MPI_Fint) 0;
-    if (!ADIOI_Ftable) {
-	ADIOI_Ftable_max = 1024;
-	ADIOI_Ftable = (MPI_File *)
-	    ADIOI_Malloc(ADIOI_Ftable_max*sizeof(MPI_File)); 
-        ADIOI_Ftable_ptr = 0;  /* 0 can't be used though, because 
-                                  MPI_FILE_NULL=0 */
-	for (i=0; i<ADIOI_Ftable_max; i++) ADIOI_Ftable[i] = MPI_FILE_NULL;
-    }
-    if (ADIOI_Ftable_ptr == ADIOI_Ftable_max-1) {
-	ADIOI_Ftable = (MPI_File *) ADIOI_Realloc(ADIOI_Ftable, 
-                           (ADIOI_Ftable_max+1024)*sizeof(MPI_File));
-	for (i=ADIOI_Ftable_max; i<ADIOI_Ftable_max+1024; i++) 
-	    ADIOI_Ftable[i] = MPI_FILE_NULL;
-	ADIOI_Ftable_max += 1024;
-    }
-    ADIOI_Ftable_ptr++;
-    ADIOI_Ftable[ADIOI_Ftable_ptr] = fh;
-    return (MPI_Fint) ADIOI_Ftable_ptr;
-#endif
+    return MPIO_File_c2f(fh);
 }

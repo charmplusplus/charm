@@ -1,9 +1,7 @@
-CHARMC=../../../bin/charmc $(OPTS) $(MOPTS) 
-#CHARMC=$(HOME)/charm/bin/charmc $(OPTS) $(MOPTS) 
-
+-include ../../common.mk
+CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = startupTest.o
-
 
 all: startupTest
 
@@ -20,9 +18,13 @@ startupTest.o: startupTest.C startupTest.decl.h startupTest.h
 	$(CHARMC) -c startupTest.C
 
 test: all
-	./charmrun ./startupTest 20 10 0.01 1 $(TESTOPTS) 
-	./charmrun ./startupTest 200 10 0.0001 1 $(TESTOPTS) +p2
-	./charmrun ./startupTest 200 10 0.0001 1 $(TESTOPTS) +p4
+	$(call run, ./startupTest 20  10 0.01   1  +p1)
+	$(call run, ./startupTest 200 10 0.0001 1  +p2)
+	$(call run, ./startupTest 200 10 0.0001 1  +p4)
 
-bgtest: all
-	./charmrun ./startupTest 20 10 0.01 1 +p4 +x2 +y2 +z2
+testp: all
+	$(call run, ./startupTest $$(( $(P) * 20 )) $$(( $(P) * 10 )) 0.01   1  +p$(P))
+
+smptest: all
+	$(call run, ./startupTest 200 10 0.0001 1  +p2 ++ppn 2)
+	$(call run, ./startupTest 200 10 0.0001 1  +p4 ++ppn 2)

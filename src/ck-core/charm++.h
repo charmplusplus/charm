@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 #include <memory.h>
+#include <type_traits>
+#include <vector>
 
 #include "charm.h"
 #include "middle.h"
@@ -40,17 +42,23 @@ class CkArray;
 //This is for passing a single Charm++ message via parameter marshalling
 class CkMarshalledMessage {
 	void *msg;
-	//Don't use these: only pass by reference
-	void operator=(const CkMarshalledMessage &);
  public:
 	CkMarshalledMessage(void): msg(NULL) {}
 	CkMarshalledMessage(CkMessage *m): msg(m) {} //Takes ownership of message
-	CkMarshalledMessage(const CkMarshalledMessage &);
-	~CkMarshalledMessage() {if (msg) CkFreeMsg(msg);}
-	CkMessage *getMessage(void) {void *ret=msg; msg=NULL; return (CkMessage *)ret;}
+
+        CkMarshalledMessage(const CkMarshalledMessage &) = delete;
+	void operator=     (const CkMarshalledMessage &) = delete;
+        CkMarshalledMessage(CkMarshalledMessage &&rhs) { msg = rhs.msg; rhs.msg = NULL; }
+        void operator=     (CkMarshalledMessage &&rhs) { msg = rhs.msg; rhs.msg = NULL; }
+	~CkMarshalledMessage() { if (msg) CkFreeMsg(msg); }
+
+	CkMessage *getMessage(void) {
+          void *ret = msg;
+          msg = nullptr;
+          return (CkMessage *)ret;
+        }
 	void pup(PUP::er &p) {CkPupMessage(p,&msg,1);}
 };
-PUPmarshall(CkMarshalledMessage)
 
 /**
  * CkEntryOptions describes the options associated
@@ -64,10 +72,11 @@ class CkEntryOptions : public CkNoncopyable {
 	typedef unsigned int prio_t; //Datatype used to represent priorities
 	prio_t *prioPtr; //Points to message priority values
 	prio_t prioStore; //For short priorities, stores the priority value
-	CkGroupID  depGroupID;  // group dependence
+	std::vector<CkGroupID> depGroupIDs;  // group dependencies
 public:
 	CkEntryOptions(void): queueingtype(CK_QUEUEING_FIFO), prioBits(0), 
-                              prioPtr(NULL), prioStore(0) { depGroupID.setZero(); }
+                              prioPtr(NULL), prioStore(0) {
+	}
 
 	~CkEntryOptions() {
 		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
@@ -99,7 +108,7 @@ public:
         return *this;
 	}
 	inline CkEntryOptions& setPriority(const CkBitVector &cbv) {
-		if ( cbv.data != NULL ) {
+		if ( !cbv.data.empty() ) {
 			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
                              queueingtype != CK_QUEUEING_ILIFO ) {
 				delete [] prioPtr;
@@ -110,7 +119,7 @@ public:
 			int dataLength = (prioBits + (sizeof(prio_t)*8 - 1)) /
 		                 	(sizeof(prio_t)*8);
 			prioPtr = new prio_t[dataLength];
-			memcpy((void *)prioPtr, cbv.data, dataLength*sizeof(prio_t));
+			memcpy((void *)prioPtr, cbv.data.data(), dataLength*sizeof(prio_t));
 		} else {
 			queueingtype=CK_QUEUEING_BFIFO;
 			prioBits=0;
@@ -122,28 +131,35 @@ public:
 	}
 	
 	inline CkEntryOptions& setQueueing(int queueingtype_) { queueingtype=queueingtype_; return *this; }
-	inline CkEntryOptions& setGroupDepID(const CkGroupID &gid) { depGroupID = gid; return *this; }
+	inline CkEntryOptions& setGroupDepID(const CkGroupID &gid) {
+		depGroupIDs.clear();
+		depGroupIDs.push_back(gid);
+		return *this;
+	}
+	inline CkEntryOptions& addGroupDepID(const CkGroupID &gid) { depGroupIDs.push_back(gid); return *this; }
 
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
 	inline int getPriorityBits(void) const {return prioBits;}
 	inline const prio_t *getPriorityPtr(void) const {return prioPtr;}
-	inline const CkGroupID getGroupDepID() const { return depGroupID; }
+	inline CkGroupID getGroupDepID() const { return depGroupIDs[0]; }
+	inline CkGroupID getGroupDepID(int index) const { return depGroupIDs[index]; }
+	inline int getGroupDepSize() const { return sizeof(CkGroupID)*(depGroupIDs.size()); }
+	inline int getGroupDepNum() const { return depGroupIDs.size(); }
+	inline const CkGroupID *getGroupDepPtr() const { return &(depGroupIDs[0]); }
 };
 
-#include "CkMarshall.decl.h"
-//This is the message type marshalled parameters get packed into:
-class CkMarshallMsg : public CMessage_CkMarshallMsg {
-public: 
-	char *msgBuf;
-};
-
-
+#include "ckmarshall.h"
 
 //A queue-of-messages, like CkMsgQ<CkReductionMsg>
 template <class MSG>
 class CkMsgQ : public CkQ<MSG *> {
 public:
+	CkMsgQ() = default;
+	CkMsgQ(CkMsgQ&&) = default;
+	CkMsgQ(const CkMsgQ&) = delete;
+	void operator=(CkMsgQ&&) = delete;
+	void operator=(const CkMsgQ&) = delete;
 	~CkMsgQ() { //Delete the messages in the queue:
 		MSG *m;
 		while (NULL!=(m=this->deq())) delete m;
@@ -169,6 +185,10 @@ public:
 
 #include "ckcallback.h"
 
+#include "ckrdma.h"
+
+#include "ckrdmadevice.h"
+
 /********************* Superclass of all Chares ******************/
 #if CMK_MULTIPLE_DELETE
 #define CHARM_INPLACE_NEW \
@@ -185,10 +205,8 @@ public:
 
 // for object message queue
 #include "ckobjQ.h"
-
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-class ChareMlogData;
+#if CMK_SMP && CMK_TASKQUEUE
+#include "conv-taskQ.h"
 #endif
 
 #define CHARE_MAGIC    0x201201
@@ -210,13 +228,23 @@ class Chare {
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    ChareMlogData *mlogData;
-#endif
     Chare(CkMigrateMessage *m);
     Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
-    virtual void pup(PUP::er &p);//<- pack/unpack routine
+    virtual bool isLocMgr(void) { return false; }
+    /// Pack/UnPack - tell the runtime how to serialize this class's
+    /// data for migration, checkpoint, etc.
+    virtual void pup(PUP::er &p);
+    /// Routine that runtime the runtime actually calls, to enable
+    /// more intelligence in generated code that overrides this. The
+    /// actual pup() method must remain virtual, so that this
+    /// continues to work for older code.
+    virtual void virtual_pup(PUP::er &p) { pup(p); }
+    void parent_pup(PUP::er &p) {
+      (void)p;
+      CkAbort("Should never get here - only called in generated CBase code");
+    }
+
     inline const CkChareID &ckGetChareID(void) const {return thishandle;}
     inline void CkGetChareID(CkChareID *dest) const {*dest=thishandle;}
     // object message queue
@@ -243,6 +271,51 @@ class Chare {
 #endif
 };
 
+#if CMK_HAS_IS_CONSTRUCTIBLE
+#include <type_traits>
+
+template <typename T, bool has_migration_constructor = std::is_constructible<T, CkMigrateMessage*>::value>
+struct call_migration_constructor
+{
+  call_migration_constructor(void* t);
+  void operator()(void* impl_msg);
+};
+
+template <typename T>
+struct call_migration_constructor<T, true>
+{
+  void *impl_obj;
+  call_migration_constructor(void* t) : impl_obj(t) { }
+  void operator()(void* impl_msg)
+  {
+    new (impl_obj) T((CkMigrateMessage *)impl_msg);
+  }
+};
+
+template <typename T>
+struct call_migration_constructor<T, false>
+{
+  void *impl_obj;
+  call_migration_constructor(void* t) : impl_obj(t) { }
+  void operator()(void* impl_msg)
+  {
+    CkAbort("Attempted to migrate a type that lacks a migration constructor");
+  }
+};
+#else
+template <typename T>
+struct call_migration_constructor
+{
+  void *impl_obj;
+  call_migration_constructor(void* t) : impl_obj(t) { }
+  void operator()(void* impl_msg)
+  {
+    new (impl_obj) T((CkMigrateMessage *)impl_msg);
+  }
+};
+#endif
+
+
 //Superclass of all Groups that cannot participate in reductions.
 //  Undocumented: should only be used inside Charm++.
 /*forward*/ class Group;
@@ -263,63 +336,152 @@ class IrrGroup : public Chare {
     virtual int ckDebugChareID(char *, int);
 
     // Silly run-time type information
-    virtual int isNodeGroup() { return 0; };
-    virtual bool isLocMgr(void){ return false; }
+    virtual bool isNodeGroup() { return false; };
     virtual bool isArrMgr(void){ return false; }
     virtual bool isReductionMgr(void){ return false; }
-    static int isIrreducible(){ return 1;}
+    static bool isIrreducible(){ return true;}
     virtual void flushStates() {}
-		/*
-			FAULT_EVAC
-		*/
+
+    virtual void CkAddThreadListeners(CthThread tid, void *msg);
+
+#if CMK_FAULT_EVAC
 		virtual void evacuate(){};
 		virtual void doneEvacuate(){};
-    virtual void CkAddThreadListeners(CthThread tid, void *msg);
+#endif
 };
 
-#define CBASE_PROXY_MEMBERS(CProxy_Derived) \
-	typedef typename CProxy_Derived::local_t local_t; \
-	typedef typename CProxy_Derived::index_t index_t; \
-	typedef typename CProxy_Derived::proxy_t proxy_t; \
-	typedef typename CProxy_Derived::element_t element_t; \
-	CProxy_Derived thisProxy; 
+#if CMK_CHARM4PY
 
+extern void (*GroupMsgRecvExtCallback)(int, int, int, char *, int);        // callback to forward received msg to external Group chare
+extern void (*ChareMsgRecvExtCallback)(int, void*, int, int, char *, int); // callback to forward received msg to external Chare
+
+/// Supports readonlies outside of the C/C++ runtime. See README.charm4py
+class ReadOnlyExt {
+public:
+  static void *ro_data; // on PE 0, points to the readonly data that is broadcast to every PE
+  static size_t data_size;
+
+  static void setData(void *msg, size_t msgSize);
+  static void _roPup(void *pup_er); // pack/unpack readonly data
+};
+
+/// Lightweight object to support mainchares defined outside of the C/C++ runtime.
+/// Relays messages to appropiate external chare. See README.charm4py
+class MainchareExt: public Chare {
+public:
+  MainchareExt(CkArgMsg *m);
+
+  static void __Ctor_CkArgMsg(void *impl_msg, void *impl_obj_void) {
+    new (impl_obj_void) MainchareExt((CkArgMsg*)impl_msg);
+  }
+
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    //fprintf(stderr, "MainchareExt:: entry method invoked\n");
+    MainchareExt *obj = static_cast<MainchareExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    int ep; implP|ep;
+    int dcopy_start; implP|dcopy_start;
+    // relay msg to external chare
+    ChareMsgRecvExtCallback(obj->thishandle.onPE, obj->thishandle.objPtr, ep, msgSize,
+                            impl_buf+(3*sizeof(int)), dcopy_start);
+  }
+};
+
+#endif
+
+/// Base case for the infrastructure to recursively handle inheritance
+/// through CBase_foo from anything that implements X::pup(). Chare
+/// classes have generated specializations that call PUPs for their
+/// parents, SDAG, etc. The default case is an explicit specialization
+/// so that corner cases I haven't handled are more likely to produce
+/// linker errors, rather than potentially running incorrectly.
+///
+/// The specialized templates are structs for reasons explained by
+/// http://www.gotw.ca/publications/mill17.htm
+struct CBase { };
+template <typename T, bool automatic>
+struct recursive_pup_impl {
+  void operator()(T *obj, PUP::er &p);
+};
+
+template <typename T>
+struct recursive_pup_impl<T, true> {
+  void operator()(T *obj, PUP::er &p) {
+    obj->parent_pup(p);
+    obj->_sdag_pup(p);
+    obj->T::pup(p);
+  }
+};
+
+template <typename T>
+struct recursive_pup_impl<T, false> {
+  void operator()(T *obj, PUP::er &p) {
+    obj->T::pup(p);
+  }
+};
+template <typename T>
+void recursive_pup(T *obj, PUP::er &p) {
+  recursive_pup_impl<T, std::is_base_of<CBase, T>::value>()(obj, p);
+}
+
+class CProxy_ArrayBase;
+
+// CBaseX::pup must be an empty override, so that the recursive PUPing
+// doesn't call an implementation multiple times up the inheritance
+// hierarchy, and old-style calls to CBase_foo::pup actually produce
+// no-ops. We give the prototype for virtual_pup to avoid repetition.
+#define CBASE_MEMBERS                                         \
+  typedef typename CProxy_Derived::local_t local_t;           \
+  typedef typename CProxy_Derived::index_t index_t;           \
+  typedef typename CProxy_Derived::proxy_t proxy_t;           \
+  typedef typename CProxy_Derived::element_t element_t;       \
+  template <typename T = proxy_t>                             \
+  typename std::enable_if<std::is_base_of<CProxy_ArrayBase, T>::value>::type migrateMe(int toPe) { \
+    this->thisProxy[this->thisIndex].ckEmigrate(toPe);        \
+  }                                                           \
+  CProxy_Derived thisProxy;                                   \
+  void pup(PUP::er &p) { (void)p; }                           \
+  inline void _sdag_pup(PUP::er &p) { (void)p; }              \
+  void virtual_pup(PUP::er &p)
 
 /*Templated implementation of CBase_* classes.*/
 template <class Parent,class CProxy_Derived>
-class CBaseT1 : public Parent {
-public:
-	CBASE_PROXY_MEMBERS(CProxy_Derived)
+struct CBaseT1 : Parent, virtual CBase {
+  CBASE_MEMBERS;
 
-	CBaseT1(void) :Parent()  { thisProxy=this; }
-	CBaseT1(CkMigrateMessage *m) :Parent(m) { thisProxy=this; }
-	void pup(PUP::er &p) {
-		Parent::pup(p);
-		p|thisProxy;
-	}
+  template <typename... Args>
+  CBaseT1(Args&&... args) : Parent(std::forward<Args>(args)...) { thisProxy = this; }
+
+  void parent_pup(PUP::er &p) {
+    recursive_pup<Parent>(this, p);
+    p|thisProxy;
+  }
 };
 
 /*Templated version of above for multiple (at least duplicate) inheritance:*/
 template <class Parent1,class Parent2,class CProxy_Derived>
-class CBaseT2 : public Parent1, public Parent2 {
-public:
-	CBASE_PROXY_MEMBERS(CProxy_Derived)
+struct CBaseT2 : public Parent1, public Parent2, virtual CBase {
+  CBASE_MEMBERS;
 
-	CBaseT2(void) :Parent1(), Parent2()
-		{ thisProxy = (Parent1 *)this; }
-	CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m)
-		{ thisProxy = (Parent1 *)this; } 
-	void pup(PUP::er &p) {
-		Parent1::pup(p);
-		Parent2::pup(p);
-		p|thisProxy;
-	}
+  CBaseT2(void) :Parent1(), Parent2()
+    { thisProxy = (Parent1 *)this; }
+  CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m)
+    { thisProxy = (Parent1 *)this; }
 
-//These overloads are needed to prevent ambiguity for multiple inheritance:
-	inline const CkChareID &ckGetChareID(void) const
-		{return ((Parent1 *)this)->ckGetChareID();}
-	static int isIrreducible(){ return (Parent1::isIrreducible() && Parent2::isIrreducible());}
-	CHARM_INPLACE_NEW
+  void parent_pup(PUP::er &p) {
+    recursive_pup<Parent1>(this, p);
+    recursive_pup<Parent2>(this, p);
+    p|thisProxy;
+  }
+
+  //These overloads are needed to prevent ambiguity for multiple inheritance:
+  inline const CkChareID &ckGetChareID(void) const
+    {return ((Parent1 *)this)->ckGetChareID();}
+  static bool isIrreducible(){ return (Parent1::isIrreducible() && Parent2::isIrreducible());}
+  CHARM_INPLACE_NEW
 };
 
 #define BASEN(n) CMK_CONCAT(CBaseT, n)
@@ -329,11 +491,11 @@ public:
   BASEN(n)() : base(), PARENTN(n)() {}				      \
   BASEN(n)(CkMigrateMessage *m)                                       \
 	  : base(m), PARENTN(n)(m) {}				      \
-  void pup(PUP::er &p) {                                              \
-    base::pup(p);                                                     \
-    PARENTN(n)::pup(p);                                               \
+  void parent_pup(PUP::er &p) {                                       \
+    recursive_pup<base>(this, p);                                     \
+    recursive_pup<PARENTN(n)>(this, p);                               \
   }                                                                   \
-  static int isIrreducible() {                                        \
+  static bool isIrreducible() {                                       \
     return (base::isIrreducible() && PARENTN(n)::isIrreducible());    \
   }
 
@@ -472,7 +634,7 @@ class CkDelegateMgr : public IrrGroup {
     virtual void ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,CkArrayID a);
     virtual void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
     virtual void ArraySectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s,int opts);
-    virtual void initDelegateMgr(CProxy *proxy)  {}
+    virtual void initDelegateMgr(CProxy *proxy, int opts=0)  { (void)proxy; }
     virtual CkDelegateData* ckCopyDelegateData(CkDelegateData *data) {
         data->ref();
         return data;
@@ -509,12 +671,12 @@ class CkDelegateMgr : public IrrGroup {
 */
 class CProxy {
   private:
-    CkGroupID delegatedGroupId;      
-    int isNodeGroup; 
     mutable CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
     CkDelegateData *delegatedPtr; // private data for use by delegatedMgr.
+    CkGroupID delegatedGroupId;
+    bool isNodeGroup;
   protected: //Never allocate CProxy's-- only subclass them.
- CProxy() :  isNodeGroup(0), delegatedMgr(0), delegatedPtr(0)
+ CProxy() :  delegatedMgr(0), delegatedPtr(0), isNodeGroup(false)
       {delegatedGroupId.setZero(); }
 
 #define CK_DELCTOR_PARAM CkDelegateMgr *dTo,CkDelegateData *dPtr
@@ -598,8 +760,6 @@ class CProxy {
     void pup(PUP::er &p);
 };
 
-PUPmarshall(CProxy)
-
 
 /*The base classes of each proxy type
 */
@@ -634,7 +794,6 @@ class CProxy_Chare : public CProxy {
     	p((char *)&_ck_cid.objPtr,sizeof(_ck_cid.objPtr));
     }
 };
-PUPmarshall(CProxy_Chare)
 
 /******************* Reduction Declarations ****************/
 //Silly: need the type of a reduction client here so it can be used by proxies.
@@ -671,7 +830,6 @@ PUPbytes(CkReductionClientBundle)
 
 
 class CProxy_NodeGroup;
-class CProxy_CkArrayReductionMgr;
 class CProxy_Group : public CProxy {
   private:
     CkGroupID _ck_gid;
@@ -698,6 +856,10 @@ class CProxy_Group : public CProxy {
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
+    bool operator==(const CProxy_Group& other) {
+      return ckGetGroupID() == other.ckGetGroupID();
+    }
+
 #if CMK_ERROR_CHECKING
     inline void ckCheck(void) const {   //Make sure this proxy has a value
 	if (_ck_gid.isZero())
@@ -722,7 +884,6 @@ class CProxy_Group : public CProxy {
     }
     CK_REDUCTION_CLIENT_DECL
 };
-PUPmarshall(CProxy_Group)
 
 class CProxyElement_Group : public CProxy_Group {
   private:
@@ -738,93 +899,74 @@ class CProxyElement_Group : public CProxy_Group {
     /*CProxyElement_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy_Group(g), _onPE(CkMyPe()) {}*/
 
+    bool operator==(const CProxyElement_Group& other) {
+      return ckGetGroupID() == other.ckGetGroupID() &&
+             ckGetGroupPe() == other.ckGetGroupPe();
+    }
+
     int ckGetGroupPe(void) const {return _onPE;}
     void pup(PUP::er &p) {
     	CProxy_Group::pup(p);
     	p(_onPE);
     }
 };
-PUPmarshall(CProxyElement_Group)
 
+#define GROUP_SECTION_PROXY 1
 class CProxySection_Group : public CProxy_Group {
 private:
-  int _nsid;
-  CkSectionID *_sid;
+  std::vector<CkSectionID> _sid;
 public:
   CProxySection_Group() { }
-  CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems)
-      :CProxy_Group(gid), _nsid(1) { _sid = new CkSectionID(gid, elems, nElems); }
-  CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems,CK_DELCTOR_PARAM)
-      :CProxy_Group(gid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(gid, elems, nElems); }
+  CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR)
+      :CProxy_Group(gid), _sid({CkSectionID(gid, elems, nElems, factor)}) { }
+  CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems, CK_DELCTOR_PARAM)
+      :CProxy_Group(gid,CK_DELCTOR_ARGS), _sid({CkSectionID(gid, elems, nElems)}) { }
   CProxySection_Group(const CProxySection_Group &cs)
-      :CProxy_Group(cs.ckGetGroupID()), _nsid(cs._nsid) {
-    if (_nsid == 1) _sid = new CkSectionID(cs.ckGetGroupID(), cs.ckGetElements(), cs.ckGetNumElements());
-    else if (_nsid > 1) {
-      _sid = new CkSectionID[_nsid];
-      for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-    } else _sid = NULL;
-  }
+      :CProxy_Group(cs.ckGetGroupID()), _sid(cs._sid) { }
   CProxySection_Group(const CProxySection_Group &cs,CK_DELCTOR_PARAM)
-      :CProxy_Group(cs.ckGetGroupID(),CK_DELCTOR_ARGS), _nsid(cs._nsid) {
-    if (_nsid == 1) _sid = new CkSectionID(cs.ckGetGroupID(), cs.ckGetElements(), cs.ckGetNumElements());
-    else if (_nsid > 1) {
-      _sid = new CkSectionID[_nsid];
-      for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-    } else _sid = NULL;
-  }
+      :CProxy_Group(cs.ckGetGroupID(),CK_DELCTOR_ARGS), _sid(cs._sid) { }
   CProxySection_Group(const IrrGroup *g)
-      :CProxy_Group(g), _nsid(0) {}
-  CProxySection_Group(const int n, const CkGroupID *gid,  int const * const *elems, const int *nElems)
-      :CProxy_Group(gid[0]), _nsid(n) {
-    _sid = new CkSectionID[n];
-    for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i]);
+      :CProxy_Group(g) { }
+  CProxySection_Group(const int n, const CkGroupID *gid,  int const * const *elems, const int *nElems, int factor=USE_DEFAULT_BRANCH_FACTOR)
+      :CProxy_Group(gid[0]) {
+    _sid.resize(n);
+    for (int i=0; i<n; ++i) _sid[i] = CkSectionID{gid[i], elems[i], nElems[i], factor};
   }
   CProxySection_Group(const int n, const CkGroupID *gid, int const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
-      :CProxy_Group(gid[0],CK_DELCTOR_ARGS), _nsid(n) {
-    _sid = new CkSectionID[n];
-    for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i]);
+      :CProxy_Group(gid[0],CK_DELCTOR_ARGS) {
+    _sid.resize(n);
+    for (int i=0; i<n; ++i) _sid[i] = CkSectionID{gid[i], elems[i], nElems[i]};
   }
   
   ~CProxySection_Group() {
-    if (_nsid == 1) delete _sid;
-    else if (_nsid > 1) delete[] _sid;
   }
   
   CProxySection_Group &operator=(const CProxySection_Group &cs) {
     CProxy_Group::operator=(cs);
-    _nsid = cs._nsid;
-    if (_nsid == 1) _sid = new CkSectionID(*cs._sid);
-    else if (_nsid > 1) {
-      _sid = new CkSectionID[_nsid];
-      for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-    } else _sid = NULL;
+    _sid = cs._sid;
     return *this;
   }
-  
+ 
+  void ckSectionDelegate(CkDelegateMgr *d)
+  { ckDelegate(d); d->initDelegateMgr(this, GROUP_SECTION_PROXY); } 
   //void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
-  inline int ckGetNumSections() const {return _nsid;}
+  inline int ckGetNumSections() const {return _sid.size();}
   inline CkSectionInfo &ckGetSectionInfo() {return _sid[0]._cookie;}
-  inline CkSectionID *ckGetSectionIDs() {return _sid; }
+  inline CkSectionID *ckGetSectionIDs() {return _sid.data(); }
   inline CkSectionID &ckGetSectionID() {return _sid[0]; }
   inline CkSectionID &ckGetSectionID(int i) {return _sid[i]; }
-  inline CkGroupID ckGetGroupIDn(int i) const {return (CkGroupID)_sid[i]._cookie.info.aid;}
-  inline int *ckGetElements() const {return _sid[0].pelist;}
-  inline int *ckGetElements(int i) const {return _sid[i].pelist;}
-  inline int ckGetNumElements() const { return _sid[0].npes; }
-  inline int ckGetNumElements(int i) const { return _sid[i].npes; }
+  inline CkGroupID ckGetGroupIDn(int i) const {return _sid[i]._cookie.get_aid();}
+  inline const int *ckGetElements() const {return _sid[0].pelist.data();}
+  inline const int *ckGetElements(int i) const {return _sid[i].pelist.data();}
+  inline int ckGetNumElements() const { return _sid[0].pelist.size(); }
+  inline int ckGetNumElements(int i) const { return _sid[i].pelist.size(); }
+  inline int ckGetBfactor() const { return _sid[0].bfactor; }
   void pup(PUP::er &p) {
     CProxy_Group::pup(p);
-    p | _nsid;
-    if (p.isUnpacking()) {
-      if (_nsid == 1) _sid = new CkSectionID;
-      else if (_nsid > 1) _sid = new CkSectionID[_nsid];
-      else _sid = NULL;
-    }
-    for (int i=0; i<_nsid; ++i) p | _sid[i];
+    p | _sid;
   }
 };
-PUPmarshall(CProxySection_Group)
 
 /* These classes exist to provide chare indices for the basic
  chare types.*/
@@ -863,6 +1005,10 @@ class CProxy_NodeGroup : public CProxy{
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
+    bool operator==(const CProxy_NodeGroup& other) {
+      return ckGetGroupID() == other.ckGetGroupID();
+    }
+
 #if CMK_ERROR_CHECKING
     inline void ckCheck(void) const {   //Make sure this proxy has a value
 	if (_ck_gid.isZero())
@@ -889,8 +1035,31 @@ class CProxy_NodeGroup : public CProxy{
 
 };
 
+class CProxyElement_NodeGroup : public CProxy_NodeGroup {
+  private:
+    int _onNode;
+  public:
+    CProxyElement_NodeGroup() {}
+    CProxyElement_NodeGroup(CkGroupID g, int onNode)
+      : CProxy_NodeGroup(g), _onNode(onNode) {}
+    CProxyElement_NodeGroup(CkGroupID g, int onNode, CK_DELCTOR_PARAM)
+      : CProxy_NodeGroup(g, CK_DELCTOR_ARGS), _onNode(onNode) {}
+    CProxyElement_NodeGroup(const IrrGroup *g)
+      : CProxy_NodeGroup(g), _onNode(CkMyNode()) {}
+
+    bool operator ==(const CProxyElement_NodeGroup& other) {
+      return ckGetGroupID() == other.ckGetGroupID() &&
+             ckGetGroupPe() == other.ckGetGroupPe();
+    }
+
+    int ckGetGroupPe(void) const { return _onNode; }
+    void pup(PUP::er &p) {
+      CProxy_NodeGroup::pup(p);
+      p(_onNode);
+    }
+};
+
 typedef CProxy_Group CProxy_IrrGroup;
-typedef CProxyElement_Group CProxyElement_NodeGroup;
 typedef CProxyElement_Group CProxyElement_IrrGroup;
 typedef CProxySection_Group CProxySection_NodeGroup;
 typedef CProxySection_Group CProxySection_IrrGroup;
@@ -901,17 +1070,94 @@ typedef CProxySection_Group CProxySection_IrrGroup;
 //Defines the actual "Group"
 #include "ckreduction.h"
 
+#if CMK_CHARM4PY
+
+/// Lightweight object to support chares defined outside of the C/C++ runtime
+/// Relays messages to appropiate external chare. See README.charm4py
+class GroupExt: public Group {
+public:
+  GroupExt(void *impl_msg);
+
+  static void __GroupExt(void *impl_msg, void *impl_obj_void) {
+    new (impl_obj_void) GroupExt(impl_msg);
+  }
+
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    //fprintf(stderr, "GroupExt:: entry method invoked\n");
+    GroupExt *obj = static_cast<GroupExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    int ep; implP|ep;
+    int dcopy_start; implP|dcopy_start;
+    // relay received msg to external chare
+    GroupMsgRecvExtCallback(obj->thisgroup.idx, ep, msgSize, impl_buf+(3*sizeof(int)),
+                            dcopy_start);
+  }
+};
+
+class SectionManagerExt: public GroupExt {
+public:
+
+  SectionManagerExt(void *impl_msg) : GroupExt(impl_msg) {}
+
+  static void __SectionManagerExt(void *impl_msg, void *impl_obj_void) {
+    new (impl_obj_void) SectionManagerExt(impl_msg);
+  }
+
+  // entry methods of SectionManager other than sendToSection
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    SectionManagerExt *obj = static_cast<SectionManagerExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    implP|obj->ep;
+    int dcopy_start; implP|dcopy_start;
+    GroupMsgRecvExtCallback(obj->thisgroup.idx, obj->ep, msgSize, impl_buf+(3*sizeof(int)),
+                            dcopy_start);
+  }
+
+  // sendToSection entry method
+  static void __sendToSection(void *impl_msg, void *impl_obj_void) {
+    SectionManagerExt *obj = static_cast<SectionManagerExt *>(impl_obj_void);
+    obj->msg = impl_msg; // store msg for forwarding to children in multicast spanning tree
+    SectionManagerExt::__entryMethod(impl_msg, impl_obj_void);
+    // if msg != null because I haven't forwarded it (I'm a leaf) delete it now
+    CkFreeMsg(obj->msg);
+  }
+
+  // Used by Charm4py SectionManager to forward a multicast msg to its children without copying.
+  // The msg was received by SectionManagerExt::__sendToSection. When forwardMulticastMsg is reached, we
+  // are still inside the GroupMsgRecvExtCallback call, so the msg has not been deleted yet
+  void forwardMulticastMsg(int num_children, const int *children) {
+    CkSendMsgBranchMulti(ep, msg, thisgroup, num_children, children);
+    // CkSendMsgBranchMulti deletes the msg, so mark it as null to not delete it again
+    msg = nullptr;
+  }
+
+private:
+  int ep;
+  void *msg;
+};
+
+#endif
+
 class CkQdMsg {
   public:
-    void *operator new(size_t s) { return CkAllocMsg(0,(int)s,0); }
+    void *operator new(size_t s) { return CkAllocMsg(0,(int)s,0,GroupDepNum{}); }
     void operator delete(void* ptr) { CkFreeMsg(ptr); }
-    static void *alloc(int, size_t s, int*, int) {
-      return CkAllocMsg(0,(int)s,0);
+    static void *alloc(int, size_t s, int*, int, int) {
+      return CkAllocMsg(0,(int)s,0,GroupDepNum{});
     }
     static void *pack(CkQdMsg *m) { return (void*) m; }
     static CkQdMsg *unpack(void *buf) { return (CkQdMsg*) buf; }
     /// This is used to display message contents in the debugger.
-    static void ckDebugPup(PUP::er &p,void *msg) { }
+    static void ckDebugPup(PUP::er &p,void *msg) {
+      (void)p;
+      (void)msg;
+    }
 };
 
 class CkThrCallArg {
@@ -934,7 +1180,7 @@ void CmiMachineProgressImpl();
 
 #define CkNetworkProgress() {CpvAccess(networkProgressCount) ++; \
 if(CpvAccess(networkProgressCount) >=  networkProgressPeriod)  \
-    if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) { \
+    if (LBManagerObj()->StatsOn() == 0) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
     } \
@@ -942,7 +1188,7 @@ if(CpvAccess(networkProgressCount) >=  networkProgressPeriod)  \
 
 #define CkNetworkProgressAfter(p) {CpvAccess(networkProgressCount) ++; \
 if(CpvAccess(networkProgressCount) >=  p)  \
-    if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) { \
+    if (LBManagerObj()->StatsOn() == 0) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
     } \
@@ -951,70 +1197,93 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #endif
 
 
-#if defined(_FAULT_MLOG_) 
-#include "ckmessagelogging.h"
-#endif
-#if defined(_FAULT_CAUSAL_)
-#include "ckcausalmlog.h"
-#endif
 
 #include "ckmemcheckpoint.h"
 #include "readonly.h"
 #include "ckarray.h"
 #include "ckstream.h"
 #include "ckfutures.h"
-#include "tempo.h"
 #include "waitqd.h"
 #include "sdag.h"
 #include "ckcheckpoint.h"
 #include "ckevacuation.h"
-#include "ckarrayreductionmgr.h"
 #include "trace.h"
 #include "envelope.h"
+#include "pathHistory.h"
+#include "ckcallback-ccs.h"
 
 
+template<typename... tArgs>
+int CkRegisterEp(const std::string& name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags) {
+  std::string combined(name);
 
+  size_t argStart = name.find('(');
+  if (argStart == std::string::npos)
+    argStart = name.length();
 
+#if defined(__GNUG__) || defined(__clang__)
+  std::string functionName = __PRETTY_FUNCTION__;
+  std::string templateString = functionName.substr(functionName.find("tArgs = ") + 8);
+#ifdef __clang__
+  // Clang seems to use the format [tArgs = <args>], so remove the closing ]
+  // (the opening one will have been removed by the substr above)
+  if (templateString.rfind(']') != std::string::npos)
+    templateString.erase(templateString.rfind(']'));
+#else // __GNUG__
+  // Gcc seems to use the format [with tArgs = {args}; ...]
+  // so find and extract the substring bounded by {}
+  // Assumes that there are no occurrences of '}' inside tArgs
+  size_t openingPos = templateString.find('{'), closingPos = templateString.find('}');
+  if (openingPos != std::string::npos && closingPos != std::string::npos && closingPos > openingPos + 1)
+    templateString = templateString.substr(openingPos + 1, closingPos - openingPos - 1);
+  templateString = "<" + templateString + ">";
+#endif
+#elif defined(_MSC_VER)
+  // Vc++ seems to use the format int __cdecl CkRegisterEp<class tArgs>(...)
+  // so find '<' and try to match with '>' until a full expression is found
+  std::string functionName = __FUNCSIG__;
+  std::string templateString;
+  size_t openingIndex = functionName.find('<');
+  if (openingIndex != std::string::npos) {
+    int count = 1;
+    size_t index = openingIndex + 1;
+    while (count > 0 && index < functionName.length()) {
+      switch (functionName[index]) {
+        case '<':
+          count++;
+          break;
+        case '>':
+          count--;
+          break;
+        default:
+          break;
+      }
 
+      index++;
+    }
 
-CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts);
-inline CkMarshallMsg *CkAllocateMarshallMsg(int size,const CkEntryOptions *opts=NULL)
-{
-	if (opts==NULL) {
-	  CkMarshallMsg *newMemory = new (size,0)CkMarshallMsg;
-	  setMemoryTypeMessage(UsrToEnv(newMemory));
-	  return newMemory;
-	}
-	else return CkAllocateMarshallMsgNoninline(size,opts);
+    // if we've found a matching set of <>, then fill in args, otherwise leave empty
+    if (count == 0) {
+      templateString = functionName.substr(openingIndex, index - openingIndex + 1);
+    }
+  }
+#else
+  // { ()... } is a pack expansion, calls typeid(var).name() for each var in tArgs
+  std::vector<std::string> tArgNames = { (typeid(tArgs).name())... };
+
+  std::string templateString = "<";
+  for (auto it = tArgNames.begin(); it != tArgNames.end(); it++) {
+    templateString += *it;
+    if (it + 1 != tArgNames.end())
+      templateString += ", ";
+  }
+  templateString += ">";
+#endif
+
+  combined.insert(argStart, templateString);
+
+  return CkRegisterEpTemplated(combined.c_str(), call, msgIdx, chareIdx, ck_ep_flags);
 }
-
-
-
-
-
-
-
-template <typename T> 
-inline T *CkAllocateMarshallMsgT(int size,const CkEntryOptions *opts) 
-{ 
-  int priobits = 0; 
-  if (opts!=NULL) priobits = opts->getPriorityBits(); 
-  //Allocate the message 
-  T *m=new (size,priobits)T; 
-  //Copy the user's priority data into the message 
-  envelope *env=UsrToEnv(m); 
-  setMemoryTypeMessage(env); 
-  if (opts!=NULL) { 
-    CmiMemcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes()); 
-    //Set the message's queueing type 
-    env->setQueueing((unsigned char)opts->getQueueing()); 
-  } 
-  return m; 
-} 
-
-
-
-
 
 /************************** Debugging Utilities **************/
 
@@ -1067,6 +1336,9 @@ public:
     ++refcount;
   }
 };
+
+// Method to check if the Charm RTS initialization phase has completed
+void checkForInitDone(bool rdmaROCompleted);
 
 #endif
 

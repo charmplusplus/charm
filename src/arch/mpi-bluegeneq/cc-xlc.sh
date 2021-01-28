@@ -1,3 +1,4 @@
+CMK_COMPILER='bgxlc'
   
 
 

@@ -121,7 +121,7 @@ extern "C" void getImageHandler(char * msg)
 }
 
 
-#if CMK_USE_LIBJPEG && !defined(__CYGWIN__)
+#if CMK_USE_LIBJPEG
 #include <string> /* STL */
 #include "jpeglib.h" /* Independent JPEG Group's "libjpeg", version 6b */
 
@@ -272,7 +272,7 @@ void liveViz0Deposit(const liveVizRequest &req,byte * imageData)
     case liveVizRequest::compressionNone: /* send uncompressed pixels */
       CcsSendDelayedReply(req.replyToken, len, imageData);
       break;
-#if CMK_USE_LIBJPEG && !defined(__CYGWIN__)
+#if CMK_USE_LIBJPEG
     case liveVizRequest::compressionJPEG: { /* JPEG-compress the data */
       std::string data=JPEGcompressImage(req.wid,req.ht,
                 config.getNetworkBytesPerPixel(),imageData,

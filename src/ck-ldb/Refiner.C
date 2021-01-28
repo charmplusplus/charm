@@ -69,17 +69,19 @@ void Refiner::assign(computeInfo *c, int processor)
 
 void Refiner::assign(computeInfo *c, processorInfo *p)
 {
+   double speed_ratio = processors[c->oldProcessor].pe_speed / p->pe_speed;
    c->processor = p->Id;
    p->computeSet->insert((InfoRecord *) c);
-   p->computeLoad += c->load;
+   p->computeLoad += c->load * speed_ratio;
    p->load = p->computeLoad + p->backgroundLoad;
 }
 
 void  Refiner::deAssign(computeInfo *c, processorInfo *p)
 {
+   double speed_ratio = processors[c->oldProcessor].pe_speed / p->pe_speed;
    c->processor = -1;
    p->computeSet->remove(c);
-   p->computeLoad -= c->load;
+   p->computeLoad -= c->load * speed_ratio;
    p->load = p->computeLoad + p->backgroundLoad;
 }
 
@@ -112,7 +114,7 @@ double Refiner::computeMax()
   return max;
 }
 
-int Refiner::isHeavy(processorInfo *p)
+bool Refiner::isHeavy(processorInfo *p)
 {
   if (p->available == true) 
      return p->load > overLoad*averageLoad;
@@ -121,12 +123,12 @@ int Refiner::isHeavy(processorInfo *p)
   }
 }
 
-int Refiner::isLight(processorInfo *p)
+bool Refiner::isLight(processorInfo *p)
 {
   if (p->available == true) 
      return p->load < averageLoad;
   else 
-     return 0;
+     return false;
 }
 
 // move the compute jobs out from unavailable PE
@@ -205,9 +207,10 @@ int Refiner::refine()
 	    donor->computeSet->next((Iterator *)&nextCompute);
           continue;
         }
+	double speed_ratio = processors[c->oldProcessor].pe_speed / p->pe_speed;
 	//CkPrintf("c->load: %f p->load:%f overLoad*averageLoad:%f \n",
 	//c->load, p->load, overLoad*averageLoad);
-	if ( c->load + p->load < overLoad*averageLoad) {
+	if ( c->load * speed_ratio + p->load < overLoad*averageLoad) {
 	  // iout << iINFO << "Considering Compute : " 
 	  //      << c->Id << " with load " 
 	  //      << c->load << "\n" << endi;
@@ -251,14 +254,14 @@ int Refiner::refine()
   return finish;
 }
 
-int Refiner::multirefine()
+int Refiner::multirefine(bool reset)
 {
   computeAverage();
   double avg = averageLoad;
   double max = computeMax();
 
   const double overloadStep = 0.01;
-  const double overloadStart = 1.001;
+  const double overloadStart = overLoad;
   double dCurOverload = max / avg;
                                                                                 
   int minOverload = 0;
@@ -291,6 +294,20 @@ int Refiner::multirefine()
       overLoad = curOverload * overloadStep + overloadStart;
       if (_lb_args.debug()>=1)
       CmiPrintf("Testing curOverload %d = %f [min,max]= %d, %d\n", curOverload, overLoad, minOverload, maxOverload);
+
+      // Reset the processors datastructure to the original
+      if (reset) {
+        int i;
+        for (i = 0; i < P; i++) {
+          processors[i].computeLoad = 0;
+          delete processors[i].computeSet;
+          processors[i].computeSet = new Set();
+        }
+        for (i = 0; i < numComputes; i++)
+          assign((computeInfo *) &(computes[i]),
+              (processorInfo *) &(processors[computes[i].oldProcessor]));
+      }
+
       if (refine())
         maxOverload = curOverload;
       else
@@ -327,7 +344,9 @@ void Refiner::Refine(int count, BaseLB::LDStats* stats,
     CkPrintf("\n");
   }
 
-  multirefine();
+  // Perform multi refine but reset it to the original state before changing the
+  // refinement load balancing threshold.
+  multirefine(true);
 
   int nmoves = 0;
   for (int pe=0; pe < P; pe++) {

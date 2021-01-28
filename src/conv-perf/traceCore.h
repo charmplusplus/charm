@@ -17,7 +17,7 @@ class TraceCore;
 class TraceLogger;
 class TraceEntry;
 
-CpvCExtern(int, _traceCoreOn);
+CpvExtern(int, _traceCoreOn);
 /*** structure of events ***/
 
 struct TraceCoreEvent {
@@ -85,7 +85,7 @@ class TraceEntry
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) { free(ptr); }
-#if defined(WIN32) || CMK_MULTIPLE_DELETE
+#if defined(_WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
 
@@ -107,9 +107,9 @@ class TraceLogger
 
     int   binary;
 
-	int lastWriteFlag;		// set when writing log to file at end of program
+	bool lastWriteFlag;		// set when writing log to file at end of program
 	int prevLID, prevSeek;	// for writing logs to file
-	int isWriting;
+	bool isWriting;
 
   public:
     TraceLogger(char* program, int b);

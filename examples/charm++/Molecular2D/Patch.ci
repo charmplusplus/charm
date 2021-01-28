@@ -14,8 +14,8 @@ mainmodule Patch {
 
   mainchare Main {
     entry Main(CkArgMsg* msg);
-    entry void allDone();
-    entry void computeCreationDone();
+    entry [reductiontarget] void allDone();
+    entry [reductiontarget] void computeCreationDone();
   };
 
   array [2D] Patch {

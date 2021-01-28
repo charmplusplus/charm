@@ -19,9 +19,10 @@ in remote process control.
 #include "ckarray.h"
 #include "ckfutures.h"
 #include <stdlib.h>
+#include <limits>
 
 typedef struct Future_s {
-  int ready;
+  bool ready;
   void *value;
   CthThread waiters;
   int next; 
@@ -71,15 +72,14 @@ class CkSema {
 
 class CkSemaPool {
   private:
-    CkVec<CkSema*> pool;
+    std::vector<CkSema*> pool;
     CkQ<int> freelist;
   public:
     int getNew(void) {
-      CkSema *sem = new CkSema();
       int idx;
       if(freelist.isEmpty()) {
-        idx = pool.length();
-        pool.insertAtEnd(sem);
+        idx = pool.size();
+        pool.push_back(new CkSema());
       } else {
         idx = freelist.deq();
         pool[idx] = new CkSema();
@@ -142,17 +142,20 @@ int createFuture(void)
     _MEMCHECK(fs->array);
     addedFutures(origsize, fs->max);
   }
+  
+  // handle may overflow CMK_REFNUM_TYPE, creating problems when waiting on this future
+  CkAssert(fs->freelist <= std::numeric_limits<CMK_REFNUM_TYPE>::max());
+
   handle = fs->freelist;
   fut = fs->array + handle;
   fs->freelist = fut->next;
-  fut->ready = 0;
+  fut->ready = false;
   fut->value = 0;
   fut->waiters = 0;
   fut->next = 0;
   return handle;
 }
 
-extern "C"
 CkFuture CkCreateFuture(void)
 {
   CkFuture fut;
@@ -161,7 +164,6 @@ CkFuture CkCreateFuture(void)
   return fut;
 }
 
-extern "C"
 void CkReleaseFutureID(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
@@ -170,15 +172,13 @@ void CkReleaseFutureID(CkFutureID handle)
   fs->freelist = handle;
 }
 
-extern "C"
 int CkProbeFutureID(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
-  return (fut->ready);
+  return (int)(fut->ready);
 }
 
-extern "C"
 void *CkWaitFutureID(CkFutureID handle)
 {
   CthThread self = CthSelf();
@@ -202,25 +202,21 @@ void *CkWaitFutureID(CkFutureID handle)
   return value;
 }
 
-extern "C"
 void CkReleaseFuture(CkFuture fut)
 {
   CkReleaseFutureID(fut.id);
 }
 
-extern "C"
 int CkProbeFuture(CkFuture fut)
 {
   return CkProbeFutureID(fut.id);
 }
 
-extern "C"
 void *CkWaitFuture(CkFuture fut)
 {
   return CkWaitFutureID(fut.id);
 }
 
-extern "C"
 void CkWaitVoidFuture(CkFutureID handle)
 {
   CkFreeMsg(CkWaitFutureID(handle));
@@ -231,7 +227,7 @@ static void setFuture(CkFutureID handle, void *pointer)
   CthThread t;
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
-  fut->ready = 1;
+  fut->ready = true;
 #if CMK_ERROR_CHECKING
   if (pointer==NULL) CkAbort("setFuture called with NULL!");
 #endif
@@ -314,14 +310,14 @@ void *CkRemoteCall(int ep, void *m, const CkChareID *ID)
 }
 
 
-extern "C" CkFutureID CkCreateAttachedFuture(void *msg)
+CkFutureID CkCreateAttachedFuture(void *msg)
 {
   CkFutureID ret=createFuture();
   UsrToEnv(msg)->setRef(ret);
   return ret;
 }
 
-extern "C" CkFutureID CkCreateAttachedFutureSend(void *msg, int ep,
+CkFutureID CkCreateAttachedFutureSend(void *msg, int ep,
 CkArrayID id, CkArrayIndex idx,
 void(*fptr)(CkArrayID,CkArrayIndex,void*,int,int),int size)
 {
@@ -336,7 +332,7 @@ return ret;
 
 
 /*
-extern "C" CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int))
+CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int))
 {
   CkFutureID ret=createFuture();
   UsrToEnv(msg)->setRef(ret);
@@ -347,7 +343,7 @@ extern "C" CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void *obj,vo
   return ret;
 }
 */
-extern "C" void *CkWaitReleaseFuture(CkFutureID futNum)
+void *CkWaitReleaseFuture(CkFutureID futNum)
 {
 #if IGET_FLOWCONTROL
   TheIGetControlClass.iget_resend(futNum);
@@ -392,13 +388,11 @@ void CkSendToFutureID(CkFutureID futNum, void *m, int PE)
   fBOC[PE].SetFuture((FutureInitMsg *)m);
 }
 
-extern "C"
 void  CkSendToFuture(CkFuture fut, void *msg)
 {
   CkSendToFutureID(fut.id, msg, fut.pe);
 }
 
-extern "C"
 CkSemaID CkSemaCreate(void)
 {
   CkSemaID id;
@@ -407,7 +401,6 @@ CkSemaID CkSemaCreate(void)
   return id;
 }
 
-extern "C"
 void *CkSemaWait(CkSemaID id)
 {
 #if CMK_ERROR_CHECKING
@@ -418,7 +411,6 @@ void *CkSemaWait(CkSemaID id)
   return CpvAccess(semapool)->wait(id.idx);
 }
 
-extern "C"
 void CkSemaWaitN(CkSemaID id, int n, void *marray[])
 {
 #if CMK_ERROR_CHECKING
@@ -429,7 +421,6 @@ void CkSemaWaitN(CkSemaID id, int n, void *marray[])
   CpvAccess(semapool)->waitN(id.idx, n, marray);
 }
 
-extern "C"
 void CkSemaSignal(CkSemaID id, void *m)
 {
   UsrToEnv(m)->setRef(id.idx);
@@ -437,7 +428,6 @@ void CkSemaSignal(CkSemaID id, void *m)
   fBOC[id.pe].SetSema((FutureInitMsg *)m);
 }
 
-extern "C"
 void CkSemaDestroy(CkSemaID id)
 {
 #if CMK_ERROR_CHECKING

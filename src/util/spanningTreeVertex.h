@@ -1,6 +1,9 @@
 #ifndef SPANNING_TREE_VERTEX
 #define SPANNING_TREE_VERTEX
 
+#include "TopoManager.h"
+#define __DEBUG_SPANNING_TREE_ 0
+
 namespace topo {
 
 /// Alias for the actual data type of a vertex id (PE/node number)
@@ -26,6 +29,9 @@ class SpanningTreeVertex
         std::vector<int> childIndex;
         /// Constructor
         SpanningTreeVertex(const vtxType _id=-1): id(_id) {}
+
+        inline bool sameCoordinates(const SpanningTreeVertex &v) const
+        { return (X == v.X); }
 
     /// Overload == and < to keep users happy. Note: not member functions
     ///@{
@@ -66,13 +72,8 @@ inline int numHops(const SpanningTreeVertex &vtx1, const SpanningTreeVertex &vtx
     /// Assert that the dimensions of the coordinate vectors of the two vertices are the same
     //CkAssert(vtx1.X.size() == vtx2.X.size());
 
-    int nHops = 0;
-    for (int i=0, nDims=vtx1.X.size(); i<nDims; i++)
-        nHops += abs( vtx1.X[i] - vtx2.X[i] );
-    return nHops;
+  return TopoManager::getTopoManager()->getHopsBetweenRanks(getProcID(vtx1), getProcID(vtx2));
 }
-
-
 
 /// Pick the vertex closes to the parent in the given range
 template <typename Iterator>
@@ -81,11 +82,11 @@ inline Iterator pickClosest(const SpanningTreeVertex &parent, const Iterator sta
     /// @todo: Static assert that Iterator::value_type == SpanningTreeVertex
     Iterator itr     = start;
     Iterator closest = itr++;
-    int      minHops = numHops(parent,*closest); // aTopoMgr.getHopsBetweenRanks( parentPE, (*closest).id );
+    int      minHops = numHops(parent,*closest);
     /// Loop thro the range and identify the vertex closest to the parent
     for (; itr != end; itr++)
     {
-        int hops = numHops(parent,*itr); //aTopoMgr.getHopsBetweenRanks( parentPE, (*itr).id );
+        int hops = numHops(parent,*itr);
         if (hops < minHops)
         {
             closest = itr;

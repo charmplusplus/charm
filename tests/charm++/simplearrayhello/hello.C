@@ -4,6 +4,8 @@
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int nElements;
 
+/* readonly */ float values[3][3];
+
 /*mainchare*/
 class Main : public CBase_Main
 {
@@ -22,6 +24,10 @@ public:
 
     CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
 
+    for (int i = 0; i < 3; ++i)
+      for (int j = 0; j < 3; ++j)
+	values[i][j] = 3*i + j;
+
     arr[0].SayHi(17);
   };
 
@@ -38,14 +44,18 @@ class Hello : public CBase_Hello
 public:
   Hello()
   {
-    CkPrintf("Hello %d created\n",thisIndex);
+    CkPrintf("[%d] Hello %d created\n", CkMyPe(), thisIndex);
   }
 
   Hello(CkMigrateMessage *m) {}
   
   void SayHi(int hiNo)
   {
-    CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
+    for (int i = 0; i < 3; ++i)
+      for (int j = 0; j < 3; ++j)
+	CkAssert(values[i][j] == 3*i + j);
+
+    CkPrintf("[%d] Hi[%d] from element %d\n", CkMyPe(), hiNo, thisIndex);
     if (thisIndex < nElements-1)
       //Pass the hello on:
       thisProxy[thisIndex+1].SayHi(hiNo+1);

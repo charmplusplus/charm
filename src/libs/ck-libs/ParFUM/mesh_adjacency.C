@@ -23,7 +23,7 @@ FORTRAN_AS_C(CMIMEMORYCHECK,
 #endif
 
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_create_node_elem_adjacency(int fem_mesh){
 	const char *caller="FEM_Mesh_create_node_elem_adjacency"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -34,7 +34,7 @@ FORTRAN_AS_C(FEM_MESH_CREATE_NODE_ELEM_ADJACENCY,
              fem_mesh_create_node_elem_adjacency, 
              (int *fem_mesh),  (*fem_mesh) )
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_create_node_node_adjacency(int fem_mesh){
 	const char *caller="FEM_Mesh_create_node_node_adjacency"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -45,7 +45,7 @@ FORTRAN_AS_C(FEM_MESH_CREATE_NODE_NODE_ADJACENCY,
              fem_mesh_create_node_node_adjacency, 
              (int *fem_mesh),  (*fem_mesh) )
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_create_elem_elem_adjacency(int fem_mesh){
 	const char *caller="FEM_Mesh_create_elem_elem_adjacency"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -56,13 +56,13 @@ FORTRAN_AS_C(FEM_MESH_CREATE_ELEM_ELEM_ADJACENCY,
              fem_mesh_create_elem_elem_adjacency, 
              (int *fem_mesh),  (*fem_mesh) )
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_create_elem_node_adjacency(int fem_mesh){
   CkPrintf("WARNING: Do Not Call FEM_Mesh_create_elem_node_adjacency(), as the connectivity table should already exist\n");
 }
 
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_get2ElementsOnEdge(int fem_mesh, int n1, int n2, int *e1, int *e2){
 	const char *caller="FEM_Mesh_get2ElementsOnEdge"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -75,7 +75,7 @@ FORTRAN_AS_C(FEM_MESH_GET2ELEMENTSONEDGE,
              (*fem_mesh,*n1,*n2,e1,e2) )
 
 
-CDECL void
+CLINKAGE void
 FEM_Mesh_get2ElementsOnEdgeSorted(int fem_mesh, int n1, int n2, int *e1, int *e2){
   const char *caller="FEM_Mesh_get2ElementsOnEdge"; FEMAPI(caller);
   FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);

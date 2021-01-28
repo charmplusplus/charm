@@ -3,26 +3,33 @@
 
 class CkMigratable : public Chare {
 protected:
-  CkLocRec_local *myRec;
+  CkLocRec *myRec;
 private:
   int thisChareType;//My chare type
-  void commonInit(void);
-  bool asyncEvacuate;
   int atsync_iteration;
-
-  enum state {
+  double prev_load;
+  enum state : uint8_t {
     OFF,
     ON,
     PAUSE,
     DECIDED,
     LOAD_BALANCE
   } local_state;
-  double  prev_load;
   bool can_reset;
+protected:
+  bool usesAtSync;//You must set this in the constructor to use AtSync().
+  bool usesAutoMeasure; //You must set this to use auto lb instrumentation.
+  bool barrierRegistered;//True iff barrier handle below is set
 
+private: //Load balancer state:
+  LDBarrierClient ldBarrierHandle;//Transient (not migrated)
+  LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)
 public:
   CkArrayIndex thisIndexMax;
 
+private:
+  void commonInit(void);
+public:
   CkMigratable(void);
   CkMigratable(CkMigrateMessage *m);
   virtual ~CkMigratable();
@@ -31,13 +38,14 @@ public:
 
   virtual int ckGetChareType(void) const;// {return thisChareType;}
   const CkArrayIndex &ckGetArrayIndex(void) const {return myRec->getIndex();}
+  CmiUInt8 ckGetID(void) const { return myRec->getID(); }
 
 #if CMK_LBDB_ON  //For load balancing:
   //Suspend load balancer measurements (e.g., before CthSuspend)
   inline void ckStopTiming(void) {myRec->stopTiming();}
   //Begin load balancer measurements again (e.g., after CthSuspend)
   inline void ckStartTiming(void) {myRec->startTiming();}
-  inline LBDatabase *getLBDB(void) const {return myRec->getLBDB();}
+  inline LBManager *getLBMgr(void) const {return myRec->getLBMgr();}
   inline MetaBalancer *getMetaBalancer(void) const {return myRec->getMetaBalancer();}
 #else
   inline void ckStopTiming(void) { }
@@ -72,11 +80,11 @@ public:
 
 protected:
   /// A more verbose form of abort
-  virtual void CkAbort(const char *str) const;
-
-  bool usesAtSync;//You must set this in the constructor to use AtSync().
-  bool usesAutoMeasure; //You must set this to use auto lb instrumentation.
-  bool barrierRegistered;//True iff barrier handle below is set
+  CMK_NORETURN
+#if defined __GNUC__ || defined __clang__
+  __attribute__ ((format (printf, 2, 3)))
+#endif
+  virtual void CkAbort(const char *format, ...) const;
 
 public:
   virtual void ResumeFromSync(void);
@@ -91,13 +99,11 @@ public:
   void AtSync(int waitForMigration=1);
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
-private: //Load balancer state:
-  LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
-  LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)  
-  static void staticResumeFromSync(void* data);
+private:
+  void ResumeFromSyncHelper();
 public:
   void ReadyMigrate(bool ready);
-  void ckFinishConstruction(void);
+  void ckFinishConstruction(int epoch = -1);
   void setMigratable(int migratable);
   void setPupSize(size_t obj_pup_size);
 #else
@@ -105,7 +111,7 @@ public:
   void setMigratable(int migratable)  { }
   void setPupSize(size_t obj_pup_size) { }
 public:
-  void ckFinishConstruction(void) { }
+  void ckFinishConstruction(int epoch) { }
 #endif
 
 #if CMK_OUT_OF_CORE
@@ -118,10 +124,13 @@ private:
   bool isInCore; //If true, the object is present in memory
 #endif
 
-  // FAULT_EVAC
+#if CMK_FAULT_EVAC
+private:
+  bool asyncEvacuate;
   void AsyncEvacuate(bool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
 public:
   bool isAsyncEvacuate(){return asyncEvacuate;};
+#endif
 };
 
 #endif // CKMIGRATABLE_H

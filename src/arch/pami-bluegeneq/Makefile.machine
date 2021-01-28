@@ -1,0 +1,7 @@
+#force compilation of QPX based code with -O3
+
+LIBCONV_UTIL := ${LIBCONV_UTIL} cmimemcpy_qpx.o
+
+cmimemcpy_qpx.o: cmimemcpy_qpx.c cmimemcpy_qpx.h
+cmimemcpy_qpx.o: CFLAGS:=${CFLAGS} -O3
+

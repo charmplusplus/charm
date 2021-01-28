@@ -13,7 +13,7 @@ Orion Sky Lawlor, olawlor@acm.org, 2004/3/18
 /****************** toNetwork ********************
 */
 
-void PUP_toNetwork_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+void PUP_toNetwork_sizer::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
 {
 	switch (t) {
 	case PUP::Tchar: //Strings and bytes get copied as-is
@@ -38,6 +38,14 @@ void PUP_toNetwork_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 	}
 }
 
+void PUP_toNetwork_sizer::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void PUP_toNetwork_sizer::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
 #define casesPUP_toNetwork_types \
 	casePUP_toNetwork_type(Tfloat,float,float); \
 	casePUP_toNetwork_type(Tdouble,double,double); \
@@ -53,9 +61,9 @@ void PUP_toNetwork_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 	case PUP::Tsync: break; /* ignore syncs */ \
 	casePUP_toNetwork_type(Tpointer,void*,CMK_POINTER_SIZED_INT);
 
-void PUP_toNetwork_pack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+void PUP_toNetwork_pack::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
 {
-	int i;
+	size_t i;
 	switch (t) {
 	case PUP::Tchar: //Strings and bytes get copied as-is
 	case PUP::Tuchar:
@@ -79,9 +87,17 @@ void PUP_toNetwork_pack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
        	}
 }
 
-void PUP_toNetwork_unpack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+void PUP_toNetwork_pack::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void PUP_toNetwork_pack::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
+}
+
+void PUP_toNetwork_unpack::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
 {
-	int i;
+	size_t i;
 	switch (t) {
 	case PUP::Tchar: //Strings and bytes get copied as-is
 	case PUP::Tuchar:
@@ -103,6 +119,14 @@ void PUP_toNetwork_unpack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
        	default: 
        		CmiAbort("Unrecognized type passed to PUP_toNetwork_unpack!\n");
        	}
+}
+
+void PUP_toNetwork_unpack::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t) {
+  bytes(p, n, itemSize, t);
+}
+
+void PUP_toNetwork_unpack::pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+  bytes(p, n, itemSize, t);
 }
 
 

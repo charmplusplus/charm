@@ -40,9 +40,9 @@ struct CkArrayIndexBase
 {
     public:
         ///Length of index in *integers*
-        short int nInts;
+        short unsigned int nInts;
         ///Number of dimensions in this index, not valid for user-defined indices
-        short int dimension;
+        short unsigned int dimension;
         /// The actual index data
         union {
             int index[CK_ARRAYINDEX_MAXLEN];
@@ -52,14 +52,23 @@ struct CkArrayIndexBase
         /// Obtain usable object from base object. @warning: Dangerous pointer cast to child class!!!
         inline CkArrayIndex& asChild() const { return *(CkArrayIndex*)this; }
 
-        /// Permit serialization
-        void pup(PUP::er &p)
+        /// Permit serialization via calling pup(), but also declare this type as PUPbytes below
+        inline void pup(PUP::er &p)
         {
-            p|nInts;
-            p|dimension;
-            for (int i=0;i<nInts;i++) p|index[i];
+            p((char *)this, sizeof(CkArrayIndexBase));
         }
+
+        bool operator==(CkArrayIndexBase &other) {
+          if(nInts != other.nInts) return false;
+          if(dimension != other.dimension) return false;
+          for (int i=0;i<nInts;i++) {
+            if(index[i] != other.index[i]) return false;
+          }
+          return true;
+        }
+
 };
+PUPbytes(CkArrayIndexBase)
 
 
 
@@ -76,12 +85,30 @@ class CkArrayIndex: public CkArrayIndexBase
         /// Default
         CkArrayIndex() { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
 
-	CkArrayIndex(int idx) {init(1,1,idx);};
+        /// Create array index of 'ndims' dimensions with given size for each dimension
+        CkArrayIndex(int ndims, int dims[]) {
+          init_nd(ndims, dims);
+        }
+
+        /// Create array index of 'ndims' dimensions with same size 'val' for each dimension
+        CkArrayIndex(int ndims, int val) {
+          std::vector<int> dims(ndims, val);
+          init_nd(ndims, dims.data());
+        }
+
+	explicit CkArrayIndex(int idx) {init(1,1,idx);};
 
         /// Return a pointer to the actual index data
         int *data(void)             {return index; }
         /// Return a const pointer to the actual index data
         const int *data(void) const {return index; }
+
+        /// Return the dimension size
+        short getDimension(void) const            { return dimension; }
+        /// Return a pointer to the short index data
+        short *shortData(void)             { return indexShorts; }
+        /// Return a const pointer to the short index data
+        const short *shortData(void) const { return indexShorts; }
 
         /// Return the total number of elements (assuming a dense chare array)
         int getCombinedCount(void) const
@@ -89,11 +116,21 @@ class CkArrayIndex: public CkArrayIndexBase
             if      (dimension == 1) return data()[0];
             else if (dimension == 2) return data()[0] * data()[1];
             else if (dimension == 3) return data()[0] * data()[1] * data()[2];
+            else if (dimension == 4) return shortData()[0] * shortData()[1] * shortData()[2] *
+                                            shortData()[3];
+            else if (dimension == 5) return shortData()[0] * shortData()[1] * shortData()[2] *
+                                            shortData()[3] * shortData()[4];
+            else if (dimension == 6) return shortData()[0] * shortData()[1] * shortData()[2] *
+                                            shortData()[3] * shortData()[4] * shortData()[5];
             else return 0;
         }
 
         /// Used for debug prints elsewhere
-        void print() const { CmiPrintf("%d: %d %d %d\n", nInts, index[0], index[1], index[2]); }
+        void print() const {
+            if (dimension < 4) CmiPrintf("%d: %d %d %d\n", dimension, index[0], index[1], index[2]);
+            else CmiPrintf("%d: %d %d %d %d %d %d\n", dimension, indexShorts[0], indexShorts[1], indexShorts[2],
+                                                      indexShorts[3], indexShorts[4], indexShorts[5]);
+        }
 
         /// Equality comparison
         bool operator==(const CkArrayIndex& idx) const
@@ -107,10 +144,10 @@ class CkArrayIndex: public CkArrayIndexBase
         /// These routines allow CkArrayIndex to be used in a CkHashtableT
         inline CkHashCode hash(void) const
         {
-            register int i;
-            register const int *d=data();
-            register CkHashCode ret=d[0];
-            for (i=1;i<nInts;i++)
+            int i;
+            const int *d=data();
+            CkHashCode ret=d[0];
+            for (i=0;i<nInts;i++)
                 ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
             return ret;
         }
@@ -123,11 +160,10 @@ class CkArrayIndex: public CkArrayIndexBase
         { return (*(const CkArrayIndex *)a == *(const CkArrayIndex *)b); }
 
         /**
-         * @note: input arrayID is ignored
          * @todo: Chee Wai Lee had a FIXME note attached to this method because he
          * felt it was a temporary solution
          */
-        CmiObjId *getProjectionID(int arrayID)
+        CmiObjId *getProjectionID() const
         {
             CmiObjId *ret = new CmiObjId;
             int i;
@@ -181,12 +217,27 @@ class CkArrayIndex: public CkArrayIndexBase
                 indexShorts[i] = 0;
         }
 
+        inline void init_nd(int ndims, int dims[]) {
+          switch (ndims) {
+            case 1: init(1,1,dims[0]); break;
+            case 2: init(2,2,dims[0],dims[1]); break;
+            case 3: init(3,3,dims[0],dims[1],dims[2]); break;
+            case 4: init(2,4,dims[0],dims[1],dims[2],dims[3]); break;
+            case 5: init(3,5,dims[0],dims[1],dims[2],dims[3],dims[4]); break;
+            case 6: init(3,6,dims[0],dims[1],dims[2],dims[3],dims[4],dims[5]); break;
+            default: CkAbort("CKArrayIndex() unsupported number of dimensions\n");
+          }
+        }
+
 
         /// A very crude comparison operator to enable using in comparison-based containers
         friend bool operator< (const CkArrayIndex &lhs, const CkArrayIndex &rhs)
         {
+#if CMK_ERROR_CHECKING
             if (lhs.nInts != rhs.nInts)
                 CkAbort("cannot compare two indices of different cardinality");
+#endif
+
             for (int i = 0; i < lhs.nInts; i++)
                 if (lhs.data()[i] < rhs.data()[i])
                     return true;
@@ -212,32 +263,101 @@ typedef CkArrayIndex CkArrayIndexMax;
 
 class CkArray;
 
-class CkArrayID {
+struct CkArrayID {
+private:
 	CkGroupID _gid;
 public:
 	CkArrayID() : _gid() { }
 	CkArrayID(CkGroupID g) :_gid(g) {}
 	inline void setZero(void) {_gid.setZero();}
-	inline int isZero(void) const {return _gid.isZero();}
+	inline bool isZero(void) const {return _gid.isZero();}
 	operator CkGroupID() const {return _gid;}
 	CkArray *ckLocalBranch(void) const
 		{ return (CkArray *)CkLocalBranch(_gid); }
 	static CkArray *CkLocalBranch(CkArrayID id)
 		{ return (CkArray *)::CkLocalBranch(id); }
+	CkArray *ckLocalBranchOther(int rank) const
+		{ return (CkArray *)CkLocalBranchOther(_gid, rank); }
+	static CkArray *CkLocalBranchOther(CkArrayID id, int rank)
+		{ return (CkArray *)::CkLocalBranchOther(id, rank); }
 	void pup(PUP::er &p) {p | _gid; }
-	int operator == (const CkArrayID& other) const {
+	bool operator == (const CkArrayID& other) const {
 		return (_gid == other._gid);
 	}
     friend bool operator< (const CkArrayID &lhs, const CkArrayID &rhs) {
         return (lhs._gid < rhs._gid);
     }
 };
-PUPmarshall(CkArrayID)
+
+typedef int CkIndex1D;
+typedef struct {int x,y;} CkIndex2D;
+PUPbytes(CkIndex2D)
+typedef struct {int x,y,z;} CkIndex3D;
+PUPbytes(CkIndex3D)
+typedef struct {short int w,x,y,z;} CkIndex4D;
+PUPbytes(CkIndex4D)
+typedef struct {short int v,w,x,y,z;} CkIndex5D;
+PUPbytes(CkIndex5D)
+typedef struct {short int x1,y1,z1,x2,y2,z2;} CkIndex6D;
+PUPbytes(CkIndex6D)
+typedef struct {int data[CK_ARRAYINDEX_MAXLEN];} CkIndexMax;
+PUPbytes(CkIndexMax)
+
+/// Simple ArrayIndex classes: the key is just integer indices.
+class CkArrayIndex1D : public CkArrayIndex {
+public:
+	CkArrayIndex1D() {}
+	// CkIndex1D is an int, so that conversion is automatic
+	CkArrayIndex1D(int i0) { init(1, 1, i0); }
+};
+class CkArrayIndex2D : public CkArrayIndex {
+public:
+	CkArrayIndex2D() {}
+	CkArrayIndex2D(int i0,int i1) { init(2, 2, i0, i1); }
+	CkArrayIndex2D(CkIndex2D idx) { init(2, 2, idx.x, idx.y); }
+};
+class CkArrayIndex3D : public CkArrayIndex {
+public:
+	CkArrayIndex3D() {}
+	CkArrayIndex3D(int i0,int i1,int i2) { init(3, 3, i0, i1, i2); }
+	CkArrayIndex3D(CkIndex3D idx) { init(3, 3, idx.x, idx.y, idx.z); }
+};
+class CkArrayIndex4D : public CkArrayIndex {
+public:
+	CkArrayIndex4D(){}
+	CkArrayIndex4D(short int i0,short int i1,short int i2,short int i3) { init(2, 4, i0, i1, i2, i3); }
+	CkArrayIndex4D(CkIndex4D idx) { init(2, 4, idx.w, idx.x, idx.y, idx.z); }
+};
+class CkArrayIndex5D : public CkArrayIndex {
+public:
+	CkArrayIndex5D() {}
+	CkArrayIndex5D(short int i0,short int i1,short int i2,short int i3,short int i4) { init(3, 5, i0, i1, i2, i3, i4); }
+	CkArrayIndex5D(CkIndex5D idx) { init(3, 5, idx.v, idx.w, idx.x, idx.y, idx.z); }
+};
+class CkArrayIndex6D : public CkArrayIndex {
+public:
+	CkArrayIndex6D(){}
+	CkArrayIndex6D(short int i0,short int i1,short int i2,short int i3,short int i4,short int i5) { init(3, 6, i0, i1, i2, i3, i4, i5); }
+	CkArrayIndex6D(CkIndex6D idx) { init(3, 6, idx.x1, idx.y1, idx.z1, idx.x2, idx.y2, idx.z2); }
+};
+
+/** A slightly more complex array index: the key is an object
+ *  whose size is fixed at compile time.
+ */
+template <class object> //Key object
+class CkArrayIndexT : public CkArrayIndex {
+public:
+	object obj;
+	CkArrayIndexT(const object &srcObj) {obj=srcObj;
+		nInts=sizeof(obj)/sizeof(int);
+		dimension=0; }
+};
 
 namespace ck {
   class ArrayIndexCompressor {
   public:
-    virtual ObjID compress(const CkGroupID gid, const CkArrayIndex &idx) = 0;
+    virtual CmiUInt8 compress(const CkArrayIndex &idx) = 0;
+    virtual CkArrayIndex decompress(CmiUInt8 id) = 0;
   };
 
   class FixedArrayIndexCompressor : public ArrayIndexCompressor {
@@ -248,45 +368,71 @@ namespace ck {
       if (bounds.nInts == 0)
         return NULL;
 
-      std::vector<unsigned int> bits;
+      char dims = bounds.dimension;
+      char bits[6];
       unsigned int sum = 0;
+      bool shorts = bounds.dimension > 3;
 
       for (int i = 0; i < bounds.dimension; ++i) {
-        int bound = (bounds.nInts <= 3) ? bounds.index[i] : bounds.indexShorts[i];
+        int bound = shorts ? bounds.indexShorts[i] : bounds.index[i];
         unsigned int b = bitCount(bound);
-        bits.push_back(b);
+        bits[i] = b;
         sum += b;
       }
 
       if (sum > 48)
         return NULL;
 
-      return new FixedArrayIndexCompressor(bits);
+      return new FixedArrayIndexCompressor(dims, bits);
     }
 
     /// Pack the bits of @arg idx into an ObjID
-    ObjID compress(const CkGroupID gid, const CkArrayIndex &idx) {
-      CkAssert(idx.dimension == bitsPerDim.size());
+    CmiUInt8 compress(const CkArrayIndex &idx) {
+      CkAssert(idx.dimension == dims);
 
       CmiUInt8 eid = 0;
 
       bool shorts = idx.dimension > 3;
 
-      for (int i = 0; i < idx.dimension; ++i) {
+      for (unsigned int i = 0; i < idx.dimension; ++i) {
         unsigned int numBits = bitsPerDim[i];
         unsigned int thisDim = shorts ? idx.indexShorts[i] : idx.index[i];
         CkAssert(thisDim < (1UL << numBits));
         eid = (eid << numBits) | thisDim;
       }
+      return eid;
+    }
 
-      return ObjID(gid, eid);
+    CkArrayIndex decompress(CmiUInt8 id) {
+      int ix[6];
+      for (int i = dims - 1; i >= 0; --i) {
+        int bits = bitsPerDim[i];
+        ix[i] = id & ((1 << bits) - 1);
+        id >>= bits;
+      }
+
+      switch(dims) {
+      case 1:
+        return CkArrayIndex1D(ix[0]);
+      case 2:
+        return CkArrayIndex2D(ix[0], ix[1]);
+      case 3:
+        return CkArrayIndex3D(ix[0], ix[1], ix[2]);
+      case 4:
+        return CkArrayIndex4D(ix[0], ix[1], ix[2], ix[3]);
+      case 5:
+        return CkArrayIndex5D(ix[0], ix[1], ix[2], ix[3], ix[4]);
+      default:
+        return CkArrayIndex6D(ix[0], ix[1], ix[2], ix[3], ix[4], ix[5]);
+      }
     }
 
   private:
-    FixedArrayIndexCompressor(std::vector<unsigned int> bits)
-      : bitsPerDim(bits)
-      { }
-    std::vector<unsigned int> bitsPerDim;
+    FixedArrayIndexCompressor(char dims, char* bits)
+      : dims(dims)
+      { for (int i = 0; i < dims; i++) bitsPerDim[i] = bits[i]; }
+    char bitsPerDim[6];
+    char dims;
 
     /// Compute the number of bits to represent integer indices in the range
     /// [0..bound). Essentially, ceil(log2(bound)).

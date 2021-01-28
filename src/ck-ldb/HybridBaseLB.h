@@ -17,9 +17,6 @@
 
 void CreateHybridBaseLB();
 
-/// for backward compatibility
-typedef LBMigrateMsg NLBMigrateMsg;
-
 inline int mymin(int x, int y) { return x<y?x:y; }
 
 // base class
@@ -34,7 +31,7 @@ public:
   const char* name() const { return myname; }
   virtual int numLevels() const { return nLevels; }
   virtual int parent(int mype, int level) = 0;
-  virtual int isroot(int mype, int level) = 0;
+  virtual bool isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
   virtual void getChildren(int mype, int level, int *children, int &count) = 0;
   virtual int numNodes(int level) {
@@ -68,10 +65,10 @@ public:
     CmiAssert(0);
     return -1;
   }
-  virtual int isroot(int mype, int level) {
-    if (level == 0) return 0;
-    if (level == 1 && mype == toproot) return 1;
-    return 0;
+  virtual bool isroot(int mype, int level) {
+    if (level == 0) return false;
+    if (level == 1 && mype == toproot) return true;
+    return false;
   }
   virtual int numChildren(int mype, int level) {
     if (level == 0) return 0;
@@ -128,11 +125,11 @@ public:
     CmiAssert(0);
     return -1;
   }
-  virtual int isroot(int mype, int level) {
-    if (level == 0) return 0;
-    if (level == 1 && mype % span[0] == 0) return 1;
-    if (level == 2 && mype == toproot) return 1;
-    return 0;
+  virtual bool isroot(int mype, int level) {
+    if (level == 0) return false;
+    if (level == 1 && mype % span[0] == 0) return true;
+    if (level == 2 && mype == toproot) return true;
+    return false;
   }
   virtual int numChildren(int mype, int level) {
     if (level == 0) return 0;
@@ -193,12 +190,12 @@ public:
     CmiAssert(0);
     return -1;
   }
-  virtual int isroot(int mype, int level) {
-    if (level == 0) return 0;
-    if (level == 1 && (mype % span[0]) == 0) return 1;
-    if (level == 2 && ((mype-1)%(span[0]*span[1])) == 0) return 1;
-    if (level == 3 && mype == toproot) return 1;
-    return 0;
+  virtual bool isroot(int mype, int level) {
+    if (level == 0) return false;
+    if (level == 1 && (mype % span[0]) == 0) return true;
+    if (level == 2 && ((mype-1)%(span[0]*span[1])) == 0) return true;
+    if (level == 3 && mype == toproot) return true;
+    return false;
   }
   virtual int numChildren(int mype, int level) {
     if (level == 0) return 0;
@@ -258,13 +255,13 @@ public:
     for (int i=0; i<=level; i++) S*=span[i];
     return mype/S*S+level;
   }
-  virtual int isroot(int mype, int level) {
-    if (level == 0) return 0;
+  virtual bool isroot(int mype, int level) {
+    if (level == 0) return false;
     if (level == nLevels-1) return mype == toproot;
     int S = 1;
     for (int i=0; i<level; i++) S*=span[i];
-    if ((mype - (level-1)) % S == 0) return 1;
-    return 0;
+    if ((mype - (level-1)) % S == 0) return true;
+    return false;
   }
   virtual int numChildren(int mype, int level) {
     if (level == 0) return 0;
@@ -292,19 +289,18 @@ public:
   }
 };
 
-class HybridBaseLB : public BaseLB
+class HybridBaseLB : public CBase_HybridBaseLB
 {
 public:
   HybridBaseLB(const CkLBOptions &);
-  HybridBaseLB(CkMigrateMessage *m):BaseLB(m) {}
+  HybridBaseLB(CkMigrateMessage *m): CBase_HybridBaseLB(m) {}
   ~HybridBaseLB();
 
-  static void staticAtSync(void*);
-  void AtSync(void); // Everything is at the PE barrier
+  void InvokeLB();
   void ProcessAtSync(void);
 
-  void ReceiveStats(CkMarshalledCLBStatsMessage &m, int fromlevel); 
-  void ResumeClients(CkReductionMsg *msg);
+  void ReceiveStats(CkMarshalledCLBStatsMessage &&m, int fromlevel); 
+  void ResumeClients(double result);
   void ResumeClients(int balancing);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ReceiveVectorMigration(LBVectorMigrateMsg *); // Receive migration data
@@ -314,11 +310,10 @@ public:
   void TotalObjMigrated(int count, int level);
 
   // Migrated-element callback
-  static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);
-  void Migrated(LDObjHandle h, int waitBarrier);
+  void Migrated(int waitBarrier);
 
   void ObjMigrated(LDObjData data, LDCommData *cdata, int n, int level);
-  void ObjsMigrated(CkVec<LDObjData>& data, int m, LDCommData *cdata, int n, int level);
+  void ObjsMigrated(CkVec<LDObjData>&& data, int m, LDCommData *cdata, int n, int level);
   void VectorDone(int atlevel);
   void MigrationDone(int balancing);  // Call when migration is complete
   void StatsDone(int level);  // Call when LDStats migration is complete
@@ -341,7 +336,6 @@ public:
   };
 
 private:
-  CProxy_HybridBaseLB  thisProxy;
   int              foundNeighbors;
   CmiGroup            group1;              // level 1 multicast group
   int                 group1_created;
@@ -364,6 +358,7 @@ protected:
     return Strategy(stats);
   }
 
+  virtual CLBStatsMsg* AssembleStats();
   virtual int     useMem();
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index
 
@@ -442,7 +437,6 @@ protected:
 
 private:
   void FindNeighbors();
-  CLBStatsMsg* AssembleStats();
   void buildStats(int level);
   CLBStatsMsg * buildCombinedLBStatsMessage(int atlevel);
   void depositLBStatsMessage(CLBStatsMsg *msg, int atlevel);
@@ -466,6 +460,6 @@ private:
 };
 
 
-#endif /* NBORBASELB_H */
+#endif /* HYBRIDBASELB_H */
 
 /*@}*/

@@ -1,0 +1,7 @@
+mainmodule m {
+    mainchare c {
+        entry void bar(type_t);
+        entry [aggregate] void foo(int bar);
+        entry [aggregate] void foo(int bar, int baz);
+    };
+};

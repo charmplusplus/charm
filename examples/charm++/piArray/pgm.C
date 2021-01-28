@@ -1,22 +1,16 @@
 #include "pgm.h"
+#include <cstdint>
 
 CkChareID mainhandle;
 
-#define USE_REDUCTION 0
-
-void reductionHandler(void *param, int dataSize, void *data)
-{
-  CProxy_main m(mainhandle);
-  int d = *(int*)data;
-  m.results(d);
-}
+#define USE_REDUCTION 1
 
 main::main(CkArgMsg * m)
 { 
   if(m->argc != 3)
   {
     CkPrintf("Usage: pgm <nsamples> <nchares>\n");
-    CkAbort("");
+    CkExit(1);
   }
 
   ns = atoi(m->argv[1]);
@@ -32,9 +26,6 @@ main::main(CkArgMsg * m)
 
   CkPrintf("At time %lf, array created.\n", (CkWallTimer()-starttime));
 
-#if USE_REDUCTION
-  arr.setReductionClient(reductionHandler,(void *)NULL);
-#endif
   arr.compute(ns);
   responders = nc;
   count = 0;
@@ -57,7 +48,7 @@ void main::results(int cnt)
 
 piPart::piPart()
 { 
-  CrnSrand((int)(long) this);
+  CrnSrand((int)(uintptr_t) this);
 }
 
 void
@@ -70,11 +61,12 @@ piPart::compute(int ns)
     double y = CrnDrand();
     if ((x*x + y*y) <= 1.0) count++;
   }
-#if ! USE_REDUCTION
   CProxy_main mainproxy(mainhandle);
+#if ! USE_REDUCTION
   mainproxy.results(count);
 #else
-  contribute(sizeof(int), (void *)&count, CkReduction::sum_int);
+  CkCallback cb(CkReductionTarget(main, results), mainproxy);
+  contribute(sizeof(int), (void *)&count, CkReduction::sum_int, cb);
 #endif
 }
 

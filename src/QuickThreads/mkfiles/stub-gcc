@@ -8,7 +8,7 @@ qt: md/stub.h qt.c md/stub.c
 	ln -s md/stub.h qtmd.h
 	$(CC) -pedantic -Wall -c -o qt.o qt.c
 	$(CC) -pedantic -Wall -c -o qtmdc.o md/stub.c
-	ar q libqt.a qt.o qtmdc.o
+	ar q libckqt.a qt.o qtmdc.o
 
 stp:
 	$(CC) -c stp.c
@@ -17,6 +17,6 @@ stp:
 testpgm:
 	$(CC) -c meas.c
 	$(CC) -c -o qtmdb.o md/stub_b.c
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -o run meas.o qtmdb.o libstp.a libckqt.a
 	
 

@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include "collidecharm.h"
-#include "collideClient.h"
 #include "mpicollide.decl.h"
 #include "mpiCollisionClient.h"
 //header from Charm to enable Interoperation

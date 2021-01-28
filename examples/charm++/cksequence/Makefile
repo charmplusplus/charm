@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = cksequence_test.o
@@ -17,4 +18,4 @@ cksequence_test.o: cksequence_test.C cksequence_test.decl.h
 	$(CHARMC) -c cksequence_test.C
 
 test: all
-	./charmrun ./cksequence_test +p4 10 $(TESTOPTS)
+	$(call run, ./cksequence_test +p4 10 )

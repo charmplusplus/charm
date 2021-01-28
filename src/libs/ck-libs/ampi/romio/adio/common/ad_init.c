@@ -1,76 +1,45 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
  */
 
 #include "adio.h"
+#include "adio_extern.h"
 
-ADIOI_Flatlist_node *ADIOI_Flatlist;
-ADIOI_Async_node *ADIOI_Async_list_head, *ADIOI_Async_list_tail;
-    /* list of outstanding asynchronous requests */
-ADIOI_Async_node *ADIOI_Async_avail_head, *ADIOI_Async_avail_tail;
-    /* list of available (already malloced) nodes for above async list */
-ADIOI_Malloc_async *ADIOI_Malloc_async_head, *ADIOI_Malloc_async_tail;
-  /* list of malloced areas for async_list, which must be freed in ADIO_End */
+/* AMPI: Global variable initialization moved to ampi.C */
 
-ADIOI_Req_node *ADIOI_Req_avail_head, *ADIOI_Req_avail_tail;
-    /* list of available (already malloced) request objects */
-ADIOI_Malloc_req *ADIOI_Malloc_req_head, *ADIOI_Malloc_req_tail;
-    /* list of malloced areas for requests, which must be freed in ADIO_End */
+static void my_consensus(void *invec, void *inoutvec, int *len, MPI_Datatype *datatype)
+{
+    int i, *in, *inout;
+    in = (int*)invec;
+    inout = (int*)inoutvec;
 
-/* for f2c and c2f conversion */
-ADIO_File *ADIOI_Ftable;
-int ADIOI_Ftable_ptr, ADIOI_Ftable_max;
-ADIO_Request *ADIOI_Reqtable;
-int ADIOI_Reqtable_ptr, ADIOI_Reqtable_max;
-#ifndef HAVE_MPI_INFO
-MPI_Info *MPIR_Infotable;
-int MPIR_Infotable_ptr, MPIR_Infotable_max;
-#endif
-
-#ifdef XFS
-int ADIOI_Direct_read, ADIOI_Direct_write;
-#endif
-
-int ADIO_Init_keyval=MPI_KEYVAL_INVALID;
-
-MPI_Errhandler ADIOI_DFLT_ERR_HANDLER = MPI_ERRORS_RETURN;
+    for (i=0; i< *len; i++) {
+        if (in[i] != inout[i])
+	    inout[i] = ADIO_AMODE_NOMATCH;
+    }
+    return;
+}
 
 void ADIO_Init(int *argc, char ***argv, int *error_code)
 {
-#ifdef XFS
+#if defined(ROMIO_XFS) || defined(ROMIO_LUSTRE)
     char *c;
 #endif
 
+    ADIOI_UNREFERENCED_ARG(argc);
+    ADIOI_UNREFERENCED_ARG(argv);
+
 /* initialize the linked list containing flattened datatypes */
     ADIOI_Flatlist = (ADIOI_Flatlist_node *) ADIOI_Malloc(sizeof(ADIOI_Flatlist_node));
-    ADIOI_Flatlist->type = (MPI_Datatype) NULL;
+    ADIOI_Flatlist->type = MPI_DATATYPE_NULL;
     ADIOI_Flatlist->next = NULL;
     ADIOI_Flatlist->blocklens = NULL;
     ADIOI_Flatlist->indices = NULL;
 
-    ADIOI_Async_list_head = ADIOI_Async_list_tail = NULL;
-    ADIOI_Async_avail_head = ADIOI_Async_avail_tail = NULL;
-    ADIOI_Malloc_async_head = ADIOI_Malloc_async_tail = NULL;
-
-    ADIOI_Req_avail_head = ADIOI_Req_avail_tail = NULL;
-    ADIOI_Malloc_req_head = ADIOI_Malloc_req_tail = NULL;
-
-    ADIOI_Ftable = NULL;
-    ADIOI_Ftable_ptr = ADIOI_Ftable_max = 0;
-
-    ADIOI_Reqtable = NULL;
-    ADIOI_Reqtable_ptr = ADIOI_Reqtable_max = 0;
-
-#ifndef HAVE_MPI_INFO
-    MPIR_Infotable = NULL;
-    MPIR_Infotable_ptr = MPIR_Infotable_max = 0;
-#endif
-
-#ifdef XFS
+#if defined(ROMIO_XFS) || defined(ROMIO_LUSTRE)
     c = getenv("MPIO_DIRECT_READ");
     if (c && (!strcmp(c, "true") || !strcmp(c, "TRUE"))) 
 	ADIOI_Direct_read = 1;
@@ -81,5 +50,57 @@ void ADIO_Init(int *argc, char ***argv, int *error_code)
     else ADIOI_Direct_write = 0;
 #endif
 
+
+#ifdef ADIOI_MPE_LOGGING
+    {
+        MPE_Log_get_state_eventIDs( &ADIOI_MPE_open_a, &ADIOI_MPE_open_b );
+        MPE_Log_get_state_eventIDs( &ADIOI_MPE_read_a, &ADIOI_MPE_read_b );
+        MPE_Log_get_state_eventIDs( &ADIOI_MPE_write_a, &ADIOI_MPE_write_b );
+        MPE_Log_get_state_eventIDs( &ADIOI_MPE_lseek_a, &ADIOI_MPE_lseek_b );
+        MPE_Log_get_state_eventIDs( &ADIOI_MPE_close_a, &ADIOI_MPE_close_b );
+        MPE_Log_get_state_eventIDs( &ADIOI_MPE_writelock_a,
+                                    &ADIOI_MPE_writelock_b );
+        MPE_Log_get_state_eventIDs( &ADIOI_MPE_readlock_a,
+                                    &ADIOI_MPE_readlock_b );
+        MPE_Log_get_state_eventIDs( &ADIOI_MPE_unlock_a, &ADIOI_MPE_unlock_b );
+        MPE_Log_get_state_eventIDs( &ADIOI_MPE_postwrite_a,
+                                    &ADIOI_MPE_postwrite_b );
+	MPE_Log_get_state_eventIDs( &ADIOI_MPE_openinternal_a, 
+			&ADIOI_MPE_openinternal_b);
+	MPE_Log_get_state_eventIDs( &ADIOI_MPE_stat_a, &ADIOI_MPE_stat_b);
+	MPE_Log_get_state_eventIDs( &ADIOI_MPE_iread_a, &ADIOI_MPE_iread_b);
+	MPE_Log_get_state_eventIDs( &ADIOI_MPE_iwrite_a, &ADIOI_MPE_iwrite_b);
+
+        int  comm_world_rank;
+        MPI_Comm_rank( MPI_COMM_WORLD, &comm_world_rank );
+
+        if ( comm_world_rank == 0 ) {
+            MPE_Describe_state( ADIOI_MPE_open_a, ADIOI_MPE_open_b,
+                                "open", "orange" );
+            MPE_Describe_state( ADIOI_MPE_read_a, ADIOI_MPE_read_b,
+                                "read", "green" );
+            MPE_Describe_state( ADIOI_MPE_write_a, ADIOI_MPE_write_b,
+                                "write", "blue" );
+            MPE_Describe_state( ADIOI_MPE_lseek_a, ADIOI_MPE_lseek_b,
+                                "lseek", "red" );
+            MPE_Describe_state( ADIOI_MPE_close_a, ADIOI_MPE_close_b,
+                                "close", "grey" );
+            MPE_Describe_state( ADIOI_MPE_writelock_a, ADIOI_MPE_writelock_b,
+                                "writelock", "plum" );
+            MPE_Describe_state( ADIOI_MPE_readlock_a, ADIOI_MPE_readlock_b,
+                                "readlock", "magenta" );
+            MPE_Describe_state( ADIOI_MPE_unlock_a, ADIOI_MPE_unlock_b,
+                                "unlock", "purple" );
+            MPE_Describe_state( ADIOI_MPE_postwrite_a, ADIOI_MPE_postwrite_b,
+                                "postwrite", "ivory" );
+	    MPE_Describe_state( ADIOI_MPE_openinternal_a, ADIOI_MPE_openinternal_b, "open system", "blue");
+	    MPE_Describe_state( ADIOI_MPE_stat_a, ADIOI_MPE_stat_b, "stat", "purple");
+	    MPE_Describe_state( ADIOI_MPE_iread_a, ADIOI_MPE_iread_b, "iread", "purple");
+	    MPE_Describe_state( ADIOI_MPE_iwrite_a, ADIOI_MPE_iwrite_b, "iwrite", "purple");
+        }
+    }
+#endif
+
     *error_code = MPI_SUCCESS;
+    MPI_Op_create(my_consensus, 1, &ADIO_same_amode);
 }

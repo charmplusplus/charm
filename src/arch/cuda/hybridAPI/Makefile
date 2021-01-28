@@ -1,10 +1,10 @@
-#CUDA_DIR=/usr/local/cuda
 CHARMDIR=../..
-CHARMC=$(CHARMDIR)/bin/charmc
+-include $(CHARMDIR)/include/conv-mach-opt.mak
 
-NVCC = $(CUDA_DIR)/bin/nvcc
-NVCC_FLAGS = -c -use_fast_math -DGPU_MEMPOOL #-DGPU_PROFILE -DGPU_TRACE #-DGPU_MEMPOOL_DEBUG -DGPU_WRQ_VERBOSE #-device-debug -deviceemu
-NVCC_INC = -I$(CUDA_DIR)/include -I.. 
+CUDA_PATH := $(CUDA_DIR)
+CHARMC    := $(CHARMDIR)/bin/charmc
+FLAGS     := $(OPTSATBUILDTIME)
+INC       := -I$(CUDA_PATH)/include -I..
 
 all: libs
 	cp libcudahybridapi.a $(CHARMDIR)/lib
@@ -13,17 +13,16 @@ libs: libcudahybridapi.a
 
 install: libcudahybridapi.a
 	cp libcudahybridapi.a $(CHARMDIR)/lib
-#	cp hybridapi.o wrqueue.o $(CHARMDIR)/tmp
 
-libcudahybridapi.a: hybridapi.o wrqueue.o
+libcudahybridapi.a: hybridapi.o buddy_allocator.o
 	-rm -f $@
-	ar q $@ hybridapi.o wrqueue.o 
+	ar q $@ hybridapi.o buddy_allocator.o
 
-hybridapi.o: cuda-hybrid-api.cu cuda-hybrid-api.h
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o hybridapi.o cuda-hybrid-api.cu
+hybridapi.o: hapi_impl.cpp hapi_impl.h gpumanager.h devicemanager.h buddy_allocator.h hapi.h hapi_nvtx.h
+	$(CHARMC) $(FLAGS) $(INC) -o $@ $<
 
-wrqueue.o: wrqueue.cu wrqueue.h wr.h 
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o wrqueue.o wrqueue.cu
+buddy_allocator.o : buddy_allocator.cpp buddy_allocator.h
+	$(CHARMC) $(FLAGS) $(INC) -o $@ $<
 
 clean:
-	rm -f *.o *.a 
+	rm -f *.o *.a

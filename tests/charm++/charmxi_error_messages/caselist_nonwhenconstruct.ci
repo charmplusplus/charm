@@ -1,0 +1,10 @@
+mainmodule m {
+  mainchare A {
+    entry A();
+    entry void fun() {
+      case {
+        serial { /* woohoo */ }
+      }
+    }
+  }
+}

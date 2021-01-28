@@ -17,7 +17,7 @@ main::main(CkArgMsg *m)
 
   if(m->argc<6) {
     CkPrintf("Usage: simb <#objsPerProc> <#msgsPerObj> <msgSize(MIXED,SMALL,MEDIUM,LARGE)> [-g[f|m|c|z] | -t<granularity> ] <density(msgsPerVTU)>\n");
-    CkExit();
+    CkExit(1);
   }
   numObjs = atoi(m->argv[1]);
   totalObjs = numObjs * CkNumPes();
@@ -33,7 +33,7 @@ main::main(CkArgMsg *m)
     msgSize = LARGE;
   else {
     CkPrintf("Invalid message size: %s\n", m->argv[8]);
-    CkExit();
+    CkExit(1);
   }
 
   CkPrintf(">>> simb run with %d objects per processor each to send %d messages of %s size...\n", numObjs, numMsgs, m->argv[3]);

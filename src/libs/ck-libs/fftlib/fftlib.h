@@ -4,9 +4,8 @@
 #include <charm++.h>
 #include "ckcomplex.h"
 #include "rfftw.h"
-#include "EachToManyMulticastStrategy.h"
-#include "StreamingStrategy.h"
-#include "comlib.h"
+
+#define DEPRECATED(func) func
 
 #define COMPLEX_TO_REAL -11
 #define REAL_TO_COMPLEX -12
@@ -14,6 +13,8 @@
 #define NULL_TO_NULL -14
 
 #define MAX_FFTS 5
+
+#warning "This Charm 3D FFT library is deprecated. Use the new CharmFFT instead: http://charm.cs.illinois.edu/manuals/html/libraries/4.html"
 
 class NormalFFTinfo {
  public:
@@ -168,14 +169,10 @@ class LineFFTinfo {
 
 #include "fftlib.decl.h"
 
-PUPmarshall(NormalFFTinfo)
-PUPmarshall(LineFFTinfo)
-
 
 typedef struct _SlabArrayInfo{
     int count;
     NormalFFTinfo info;
-    ComlibInstanceHandle fftcommInstance;
 //    SlabArrayInfo() {count=0; info=NormalFFTinfo();}
 //    ~SlabArrayInfo() {}
 }SlabArrayInfo;
@@ -205,8 +202,6 @@ class SlabArray: public CBase_SlabArray {
 	virtual void doIFFT(int, int) = 0; //ffts data from dest to src
  protected:
 	CProxy_SlabArray srcProxy, destProxy;
-	bool fftuseCommlib;
-//	ComlibInstanceHandle fftcommInstance;
 	CkVec<SlabArrayInfo*> infoVec;
 };
 
@@ -216,20 +211,17 @@ class SlabArray: public CBase_SlabArray {
 
 class NormalSlabArray: public CBase_NormalSlabArray {
  public:
-	NormalSlabArray(CkMigrateMessage *m): SlabArray(m) {CkPrintf("migrate constructor called\n");}
+	NormalSlabArray(CkMigrateMessage *m): CBase_NormalSlabArray(m) {CkPrintf("migrate constructor called\n");}
 	NormalSlabArray() {
 #if VERBOSE
 	    CkPrintf("Empty constructor called\n");
 #endif
 	    fwd2DPlan = bwd2DPlan = (fftwnd_plan) NULL;
 	    fwd1DPlan = bwd1DPlan = (fftw_plan) NULL;
-	    fftuseCommlib = false;
-	    //fftcommInstance = ComlibInstanceHandle();
 	}
 
 	NormalSlabArray(NormalFFTinfo &info, 
-			CProxy_NormalSlabArray src, CProxy_NormalSlabArray dest, 
-			bool useCommlib, ComlibInstanceHandle inst);
+			CProxy_NormalSlabArray src, CProxy_NormalSlabArray dest);
 	~NormalSlabArray();
 
 
@@ -242,9 +234,7 @@ class NormalSlabArray: public CBase_NormalSlabArray {
 	void pup(PUP::er &p);
 
 	void setup(NormalFFTinfo &info, 
-		   CProxy_NormalSlabArray src, CProxy_NormalSlabArray dest, 
-		   bool useCommlib=false, 
-		   ComlibInstanceHandle inst=ComlibInstanceHandle());
+		   CProxy_NormalSlabArray src, CProxy_NormalSlabArray dest);
 protected:
 	fftwnd_plan fwd2DPlan, bwd2DPlan;
 	fftw_plan fwd1DPlan, bwd1DPlan;
@@ -254,7 +244,7 @@ protected:
 
 class NormalRealSlabArray: public CBase_NormalRealSlabArray {
  public:
-	NormalRealSlabArray(CkMigrateMessage *m): SlabArray(m) {}
+	NormalRealSlabArray(CkMigrateMessage *m): CBase_NormalRealSlabArray(m) {}
 	NormalRealSlabArray() {
 #if VERBOSE
 	    CkPrintf("Empty constructor called\n");
@@ -264,13 +254,10 @@ class NormalRealSlabArray: public CBase_NormalRealSlabArray {
 	    fwd1DYPlan = bwd1DYPlan = (fftw_plan) NULL;
 	    fwd1DZPlan = bwd1DZPlan = (fftw_plan) NULL;
 	    rfwd2DXYPlan = rfwd2DXYPlan = (rfftwnd_plan)NULL;
-	    fftuseCommlib = false;
-	    //fftcommInstance = ComlibInstanceHandle();	
 	}
 
 	NormalRealSlabArray(NormalFFTinfo &info,
-			    CProxy_NormalRealSlabArray, CProxy_NormalRealSlabArray, 
-			    bool useCommlib, ComlibInstanceHandle inst);
+			    CProxy_NormalRealSlabArray, CProxy_NormalRealSlabArray);
 	~NormalRealSlabArray();
 
 
@@ -291,12 +278,9 @@ class NormalRealSlabArray: public CBase_NormalRealSlabArray {
 	fftw_plan fwd1DZPlan, bwd1DZPlan;
 
 	NormalFFTinfo *fftinfos[MAX_FFTS];
-      bool fftuseCommlib;
-      ComlibInstanceHandle fftcommInstance;
 	
-      void setup(NormalFFTinfo &info, 
-		   CProxy_NormalRealSlabArray, CProxy_NormalRealSlabArray, 
-		   bool useCommlib, ComlibInstanceHandle inst);
+	void setup(NormalFFTinfo &info, 
+		   CProxy_NormalRealSlabArray, CProxy_NormalRealSlabArray);
 
  private:
 	complex *tempdataPtr;
@@ -360,7 +344,6 @@ class SparseSlabArray: public CBase_SparseSlabArray {
 typedef struct _PencilArrayInfo{
     int count;
     LineFFTinfo info;
-    ComlibInstanceHandle fftcommInstance;
 }PencilArrayInfo;
 
 class SendFFTMsg: public CMessage_SendFFTMsg {
@@ -379,13 +362,12 @@ class NormalLineArray : public CBase_NormalLineArray {
     NormalLineArray (CkMigrateMessage *m) {}
     NormalLineArray () {
 	fwdplan = bwdplan =NULL;
-	fftuseCommlib = false;
 	id = -1;
 	line = NULL;
     }
-    NormalLineArray (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, bool useCommlib, ComlibInstanceHandle &inst);
+    NormalLineArray (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy);
     ~NormalLineArray () {}
-    void setup (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, bool useCommlib, ComlibInstanceHandle &inst);
+    void setup (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy);
     void doFirstFFT(int id, int direction);
     void doSecondFFT(int ypos, complex *val, int size, int id, int direction);
     void doThirdFFT(int zpos, int ypos, complex *val, int size, int id, int direction);
@@ -396,7 +378,6 @@ class NormalLineArray : public CBase_NormalLineArray {
     void doFFT(int id, int direction) {doFirstFFT(id, direction);}
     virtual void doneFFT(int id, int direction);
     void setInstance(int id_) { id = id_; 
-    //mgrProxy.ckLocalBranch()->registerElement(id); 
     contribute(sizeof(int), &id_, CkReduction::sum_int);
     }
  protected:
@@ -405,7 +386,6 @@ class NormalLineArray : public CBase_NormalLineArray {
     int id;
 
     CProxy_NormalLineArray xProxy, yProxy, zProxy;
-    bool fftuseCommlib;
     CkVec<PencilArrayInfo*> infoVec;
 };
 

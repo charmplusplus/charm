@@ -1,17 +1,17 @@
+-include ../../common.mk
 # modify the path of CHARMC
 CHARMC=../../../bin/charmc $(OPTS)
 
-all: pgm
+all: integrateArray
 
-pgm: pgm.o
-	$(CHARMC) pgm.o  -o pgm -language charm++
+integrateArray: pgm.o
+	$(CHARMC) pgm.o  -o integrateArray -language charm++
 
-test: pgm
-	./charmrun +p4 ./pgm 1000000 100 $(TESTOPTS)
+test: integrateArray
+	$(call run, +p4 ./integrateArray 1000000 100 )
 
-bgtest: pgm
-	./charmrun +p4 ./pgm 1000000 100 +x2 +y2 +z2 $(TESTOPTS)
-
+testp: integrateArray
+	$(call run, ./integrateArray +p$(P) 1000000 $$(( $(P) * 10 )) )
 
 # compile program with trace projections - performance trace library
 pgm_prof: pgm.o
@@ -24,4 +24,4 @@ pgm.decl.h pgm.def.h: pgm.ci
 	$(CHARMC)  pgm.ci
 
 clean:
-	rm -f pgm pgm_prof *.o conv-host *.decl.h *.def.h *~ charmrun *.log *.sts core charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f integrateArray pgm_prof *.o conv-host *.decl.h *.def.h *~ charmrun *.log *.sts core charmrun.exe integrateArray.exe integrateArray.pdb integrateArray.ilk

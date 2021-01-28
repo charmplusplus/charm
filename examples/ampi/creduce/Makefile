@@ -1,32 +1,29 @@
+-include ../../common.mk
 CHARMC=../../../bin/ampicxx $(OPTS)
 
-all: pgm
+all: creduce
 
-ampi: clean pgm
+ampi: clean creduce
 
-pgm: test.C
+creduce: test.C
 	$(CHARMC) -c test.C
-	$(CHARMC) -o pgm test.o 
+	$(CHARMC) -o creduce test.o
 
 mpi: test.C
-	mpiCC -o pgm test.C $(OPTS)
+	mpiCC -o creduce test.C $(OPTS)
 
 clean:
-	rm -f *.o *.mod pgm *~ conv-host charmrun
+	rm -f *.o *.mod creduce *~ conv-host charmrun ampirun
 
-test: pgm
-	./charmrun ./pgm +p1 +vp1 $(TESTOPTS)
-	./charmrun ./pgm +p1 +vp2 $(TESTOPTS)
-	./charmrun ./pgm +p1 +vp4 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp2 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp4 $(TESTOPTS)
+test: creduce
+	$(call run, ./creduce +p1 +vp1 )
+	$(call run, ./creduce +p1 +vp2 )
+	$(call run, ./creduce +p1 +vp4 )
+	$(call run, ./creduce +p2 +vp1 )
+	$(call run, ./creduce +p2 +vp2 )
+	$(call run, ./creduce +p2 +vp4 )
 
-bgtest: ampi
-	./charmrun ./pgm +p1 +vp1 +x1 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p1 +vp2 +x1 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p1 +vp4 +x1 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp1 +x2 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp2 +x2 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp4 +x2 +y1 +z1 $(TESTOPTS)
-
+testp: creduce
+	$(call run, ./creduce +p$(P) +vp$(P) )
+	$(call run, ./creduce +p$(P) +vp$$(( $(P) * 2 )) )
+	$(call run, ./creduce +p$(P) +vp$$(( $(P) * 4 )) )

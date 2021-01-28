@@ -8,7 +8,7 @@
 #include "ParFUM_internals.h"
 
 
-CDECL void FEM_REF_INIT(int mesh) {
+CLINKAGE void FEM_REF_INIT(int mesh) {
   CkArrayID femRefId;
   int cid;
   int size;
@@ -47,7 +47,7 @@ void FEM_ADAPT_Init(int meshID) {
   CtvAccess(_adaptAlgs) = meshP->getfmMM()->getfmAdaptAlgs();
   CtvAccess(_adaptAlgs)->FEM_Adapt_Algs_Init(FEM_DATA+0, FEM_BOUNDARY,2); //dimension=2
 }
-FDECL void FTN_NAME(FEM_ADAPT_INIT,fem_adapt_init)(int *meshID)
+FLINKAGE void FTN_NAME(FEM_ADAPT_INIT,fem_adapt_init)(int *meshID)
 {
   FEM_ADAPT_Init(*meshID);
 }
@@ -59,7 +59,7 @@ void FEM_ADAPT_Refine(int meshID, int qm, int method, double factor,
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Refine");
     mesh->getfmMM()->getfmAdaptAlgs()->FEM_Refine(qm, method, factor, sizes);
 }
-FDECL void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int* meshID, 
+FLINKAGE void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int* meshID,
         int *qm, int *method, double *factor, double *sizes)
 {
   FEM_ADAPT_Refine(*meshID, *qm, *method, *factor, sizes);
@@ -71,7 +71,7 @@ FDECL void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int* meshID,
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Coarsen");
     mesh->getfmMM()->getfmAdaptAlgs()->FEM_Coarsen(qm, method, factor, sizes);
 }
-FDECL  void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int* meshID, 
+FLINKAGE  void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int* meshID,
         int *qm, int *method, double *factor, double *sizes)
 {
   FEM_ADAPT_Coarsen(*meshID, *qm, *method, *factor, sizes);
@@ -83,7 +83,7 @@ void FEM_ADAPT_AdaptMesh(int meshID, int qm, int method, double factor,
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_AdaptMesh");
     mesh->getfmMM()->getfmAdaptAlgs()->FEM_AdaptMesh(qm, method, factor, sizes);
 }
-FDECL void FTN_NAME(FEM_ADAPT_ADAPTMESH,fem_adapt_adaptmesh)(int* meshID, 
+FLINKAGE void FTN_NAME(FEM_ADAPT_ADAPTMESH,fem_adapt_adaptmesh)(int* meshID,
         int *qm, int *method, double *factor, double *sizes)
 {
   FEM_ADAPT_AdaptMesh(*meshID, *qm, *method, *factor, sizes);
@@ -94,7 +94,7 @@ FDECL void FTN_NAME(FEM_ADAPT_ADAPTMESH,fem_adapt_adaptmesh)(int* meshID,
   FEM_Mesh *meshP = FEM_Mesh_lookup(meshID, "FEM_ADAPT_SetElementSizeField");
   meshP->elem[0].setMeshSizing(elem, size);
 }
-FDECL  void FTN_NAME(FEM_ADAPT_SETELEMENTSIZEFIELD,fem_adapt_setelementsizefield)(int *meshID, int *elem, double *size)
+FLINKAGE  void FTN_NAME(FEM_ADAPT_SETELEMENTSIZEFIELD,fem_adapt_setelementsizefield)(int *meshID, int *elem, double *size)
 {
   FEM_ADAPT_SetElementSizeField(*meshID, *elem, *size);
 }
@@ -107,7 +107,7 @@ void FEM_ADAPT_SetElementsSizeField(int meshID, double *sizes) {
     meshP->elem[0].setMeshSizing(i, sizes[i]);
   }
 }
-FDECL  void FTN_NAME(FEM_ADAPT_SETELEMENTSSIZEFIELD,fem_adapt_setelementssizefield)(int *meshID, double *sizes)
+FLINKAGE  void FTN_NAME(FEM_ADAPT_SETELEMENTSSIZEFIELD,fem_adapt_setelementssizefield)(int *meshID, double *sizes)
 {
   FEM_ADAPT_SetElementsSizeField(*meshID, sizes);
 }
@@ -117,7 +117,7 @@ void FEM_ADAPT_SetReferenceMesh(int meshID) {
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_SetReferenceMesh");
     mesh->getfmMM()->getfmAdaptAlgs()->SetReferenceMesh();
 }
-FDECL void FTN_NAME(FEM_ADAPT_SETREFERENCEMESH, fem_adapt_setreferencemesh)(int* meshID)
+FLINKAGE void FTN_NAME(FEM_ADAPT_SETREFERENCEMESH, fem_adapt_setreferencemesh)(int* meshID)
 {
     FEM_ADAPT_SetReferenceMesh(*meshID);
 }
@@ -128,7 +128,7 @@ void FEM_ADAPT_GradateMesh(int meshID, double smoothness)
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
     mesh->getfmMM()->getfmAdaptAlgs()->GradateMesh(smoothness);
 }
-FDECL void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, double* smoothness)
+FLINKAGE void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, double* smoothness)
 {
     FEM_ADAPT_GradateMesh(*meshID, *smoothness);
 }
@@ -137,7 +137,7 @@ void FEM_ADAPT_TestMesh(int meshID) {
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
     mesh->getfmMM()->getfmAdaptAlgs()->tests(true);
 }
-FDECL void FTN_NAME(FEM_ADAPT_TESTMESH, fem_adapt_testmesh)(int* meshID)
+FLINKAGE void FTN_NAME(FEM_ADAPT_TESTMESH, fem_adapt_testmesh)(int* meshID)
 {
     FEM_ADAPT_TestMesh(*meshID);
 }
@@ -146,7 +146,7 @@ int FEM_ADAPT_SimpleRefineMesh(int meshID, double targetA, double xmin, double y
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
     return mesh->getfmMM()->getfmAdaptAlgs()->simple_refine(targetA,xmin,ymin,xmax,ymax);
 }
-FDECL void FTN_NAME(FEM_ADAPT_SIMPLEREFINEMESH, fem_adapt_simplerefinemesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax)
+FLINKAGE void FTN_NAME(FEM_ADAPT_SIMPLEREFINEMESH, fem_adapt_simplerefinemesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax)
 {
     FEM_ADAPT_SimpleRefineMesh(*meshID,*targetA,*xmin,*ymin,*xmax,*ymax);
 }
@@ -155,7 +155,7 @@ int FEM_ADAPT_SimpleCoarsenMesh(int meshID, double targetA, double xmin, double 
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
     return mesh->getfmMM()->getfmAdaptAlgs()->simple_coarsen(targetA,xmin,ymin,xmax,ymax);
 }
-FDECL void FTN_NAME(FEM_ADAPT_SIMPLECOARSENMESH, fem_adapt_simplecoarsenmesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax)
+FLINKAGE void FTN_NAME(FEM_ADAPT_SIMPLECOARSENMESH, fem_adapt_simplecoarsenmesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax)
 {
     FEM_ADAPT_SimpleCoarsenMesh(*meshID,*targetA,*xmin,*ymin,*xmax,*ymax);
 }

@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 all: hello
@@ -15,10 +16,14 @@ hello.ci.stamp: hello.ci
 	touch $@
 
 test: all
-	./charmrun +p3 ./hello 10 $(TESTOPTS)
+	$(call run, +p3 ./hello 10 )
 
-bgtest: all
-	./charmrun +p3 ./hello 10 +x1 +y1 +z3 $(TESTOPTS)
+testp: all
+	$(call run, +p$(P) ./hello $$(( $(P) * 8 )) )
+
+smptest: all
+	$(call run, +p2 ./hello 10 ++ppn 2 )
+	$(call run, +p4 ./hello 10 ++ppn 2 )
 
 clean:
 	rm -f conv-host *.o charmrun charmrun.exe

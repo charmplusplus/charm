@@ -1,0 +1,11 @@
+The kNeighbor microbenchmark which enhances the pingpong test by considering 
+the message contention. In each iteration, each element (usually one element 
+per core) will send and receive a message from its K neighbor cores on both 
+sides (in wraparound mode). The output tells how long each iteration takes.
+
+Usage:
+These args must be specified in the following order:
+
+<#elements> : is forced to be equal to #pes
+<#iterations> : number of iterations the test will run for
+<msg size> : the message size each element sends it to it's neighbors

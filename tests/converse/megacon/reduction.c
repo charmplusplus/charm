@@ -4,7 +4,7 @@ static int reduction_debug = 0;
 
 #define DebugPrintf  if (reduction_debug) CmiPrintf
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 typedef struct _mesg {
   char head[CmiMsgHeaderSizeBytes];
@@ -16,20 +16,20 @@ struct twoInts {
   int negative;
 };
 
-void pupTwoInts(pup_er p, void *data) {
+static void pupTwoInts(pup_er p, void *data) {
   struct twoInts *d = (struct twoInts *)data;
   DebugPrintf("[%d] called pupTwoInts on %p (%d/%d)\n",CmiMyPe(),data,d->positive,d->negative);
   pup_int(p, &d->positive);
   pup_int(p, &d->negative);
 }
 
-void deleteTwoInts(void *data) {
+static void deleteTwoInts(void *data) {
   DebugPrintf("[%d] called deleteTwoInts %p (%d/%d)\n",CmiMyPe(),data,
       ((struct twoInts*)data)->positive,((struct twoInts*)data)->negative);
   free(data);
 }
 
-void *mergeTwoInts(int *size, void *data, void **remote, int count) {
+static void *mergeTwoInts(int *size, void *data, void **remote, int count) {
   int i;
   struct twoInts *local = (struct twoInts *)data;
   DebugPrintf("[%d] called mergeTwoInts with local(%d/%d), %d remote(",CmiMyPe(),
@@ -44,12 +44,11 @@ void *mergeTwoInts(int *size, void *data, void **remote, int count) {
   return data;
 }
 
-CpvDeclare(int, broadcast_msg_idx);
-CpvDeclare(int, reduction_msg_idx);
-CpvDeclare(int, broadcast_struct_idx);
-CpvDeclare(int, reduction_struct_idx);
+CpvStaticDeclare(int, broadcast_msg_idx);
+CpvStaticDeclare(int, reduction_msg_idx);
+CpvStaticDeclare(int, broadcast_struct_idx);
 
-void * addMessage(int *size, void *data, void **remote, int count) {
+static void * addMessage(int *size, void *data, void **remote, int count) {
   mesg msg = (mesg)data;
   int i;
   DebugPrintf("[%d] called addMessage with local(%d), %d remote(",CmiMyPe(),msg->sum,count);
@@ -61,7 +60,8 @@ void * addMessage(int *size, void *data, void **remote, int count) {
   return data;
 }
 
-void reduction_msg(mesg m) {
+static void reduction_msg(mesg m) {
+  DebugPrintf("[%d] reduction_msg\n", CmiMyPe());
   int i, sum=0;
   CmiAssert(CmiMyPe() == 0);
   for (i=0; i<CmiNumPes(); ++i) sum += i+1;
@@ -73,15 +73,17 @@ void reduction_msg(mesg m) {
   CmiSyncBroadcastAllAndFree(sizeof(struct _mesg),m);
 }
 
-void broadcast_msg(mesg m) {
+static void broadcast_msg(mesg m) {
+  DebugPrintf("[%d] broadcast_msg\n", CmiMyPe());
   m->sum = CmiMyPe()+1;
   CmiSetHandler(m, CpvAccess(reduction_msg_idx));
   CmiReduce(m, sizeof(struct _mesg), addMessage);
 }
 
-void reduction_struct(void *data) {
+static void reduction_struct(void *data) {
+  DebugPrintf("[%d] reduction_struct\n", CmiMyPe());
   int i, sum=0;
-  struct twoInts *two = (struct twoInts *)data; 
+  struct twoInts *two = (struct twoInts *)data;
   CmiAssert(CmiMyPe() == 0);
   for (i=0; i<CmiNumPes(); ++i) sum += i+1;
   if (two->positive != sum || two->negative != -2*sum) {
@@ -92,7 +94,8 @@ void reduction_struct(void *data) {
   Cpm_megacon_ack(CpmSend(0));
 }
 
-void broadcast_struct(mesg m) {
+static void broadcast_struct(mesg m) {
+  DebugPrintf("[%d] broadcast_struct\n", CmiMyPe());
   struct twoInts *two = (struct twoInts*)malloc(sizeof(struct twoInts));
   CmiFree(m);
   DebugPrintf("[%d] allocated struct %p\n",CmiMyPe(),two);
@@ -108,7 +111,7 @@ void reduction_init(void)
   CmiSyncBroadcastAllAndFree(sizeof(struct _mesg),msg);
 }
 
-void reduction_moduleinit()
+void reduction_moduleinit(void)
 {
   CpvInitialize(int, broadcast_msg_idx);
   CpvInitialize(int, reduction_msg_idx);

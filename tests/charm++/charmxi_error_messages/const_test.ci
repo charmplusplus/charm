@@ -1,0 +1,6 @@
+mainmodule m {
+    mainchare Main {
+        entry Main();
+        entry void foo() const;
+    }
+};

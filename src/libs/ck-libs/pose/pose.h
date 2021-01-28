@@ -155,11 +155,6 @@ extern CkQ<Skipped_Event> POSE_Skipped_Events;
    simulation mode. */
 extern int poseIndexOfStopEvent;
 
-/// For getting access to the commlib strategy
-#ifdef POSE_COMM_ON
-extern ComlibInstanceHandle POSE_commlib_insthndl;
-#endif
-
 extern POSE_Config pose_config;
 
 /// Set busy wait time
@@ -172,10 +167,6 @@ void POSE_busy_wait(double n);
 /// Flag to indicate how foward execution should proceed
 /** 0 for normal forward execution; 1 for state recovery only */
 CpvExtern(int, stateRecovery);
-
-#ifdef POSE_COMM_ON
-extern int com_debug;
-#endif
 
 /// Class for user-specified callback
 class callBack : public CMessage_callBack

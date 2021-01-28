@@ -1,11 +1,33 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
-OBJS=blkinhand.o megacon.o ringsimple.o ring.o fibobj.o fibthr.o broadc.o priotest.o deadlock.o vars.o nodenum.o specmsg.o bigmsg.o vecsend.o posixth.o future.o multicast.o multisend.o handler.o reduction.o
+OBJS = \
+  blkinhand.o \
+  megacon.o \
+  ringsimple.o \
+  ring.o \
+  fibobj.o \
+  fibthr.o \
+  broadc.o \
+  priotest.o \
+  deadlock.o \
+  vars.o \
+  nodenum.o \
+  specmsg.o \
+  bigmsg.o \
+  vecsend.o \
+  posixth.o \
+  future.o \
+  multicast.o \
+  multisend.o \
+  handler.o \
+  reduction.o \
+  nodereduction.o \
 
-all: pgm
+all: megacon
 
-pgm: $(OBJS) 
-	$(CHARMC) -o pgm $(OBJS) -language converse++
+megacon: $(OBJS)
+	$(CHARMC) -o megacon $(OBJS) -language converse++
 
 megacon.o: megacon.c
 	$(CHARMC) -gen-cpm megacon.c
@@ -80,14 +102,24 @@ handler.o: handler.c
 reduction.o: reduction.c
 	$(CHARMC) reduction.c
 
+nodereduction.o: nodereduction.c
+	$(CHARMC) nodereduction.c
+
 clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
-	rm -f pgm
-	rm -f conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f megacon
+	rm -f conv-host charmrun charmrun.exe megacon.exe megacon.pdb megacon.ilk
 
-test: pgm
-	./charmrun ./pgm +p1 $(TESTOPTS)
-	./charmrun ./pgm +p2 $(TESTOPTS)
-	./charmrun ./pgm +p3 $(TESTOPTS)
-	./charmrun ./pgm +p4 $(TESTOPTS)
+test: megacon
+	$(call run, ./megacon +p1 )
+	$(call run, ./megacon +p2 )
+	$(call run, ./megacon +p3 )
+	$(call run, ./megacon +p4 )
+
+smptest: megacon
+	$(call run, ./megacon +p2 ++ppn 2)
+	$(call run, ./megacon +p4 ++ppn 2)
+
+testp: megacon
+	$(call run, ./megacon +p$(P) )

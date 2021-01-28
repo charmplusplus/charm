@@ -6,6 +6,14 @@
 
 #include <errno.h>
 #include <string.h>
+
+#ifndef __STDC_FORMAT_MACROS
+# define __STDC_FORMAT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+# define __STDC_LIMIT_MACROS
+#endif
+#include <inttypes.h>
 #include <sys/stat.h>		// for chmod
 
 #include "ckhashtable.h"
@@ -19,9 +27,6 @@
 //#include "queueing.h"
 #include <unistd.h>
 
-#if CMK_BIGSIM_CHARM
-#include "blue_impl.h"
-#endif
 
 
 #if CMK_CHARMDEBUG && CMK_CCS_AVAILABLE && !defined(_WIN32)
@@ -32,15 +37,8 @@ CkpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints w
 CkpvDeclare(DebugEntryTable, _debugEntryTable);
 CpdPersistentChecker persistentCheckerUselessClass;
 
-void CpdFinishInitialization() {
-  CkpvInitialize(int, skipBreakpoint);
-  CkpvAccess(skipBreakpoint) = 0;
-  CkpvInitialize(DebugEntryTable, _debugEntryTable);
-  CkpvAccess(_debugEntryTable).resize(_entryTable.size());
-}
-
-extern "C" void resetAllCRC();
-extern "C" void checkAllCRC(int report);
+void resetAllCRC();
+void checkAllCRC(int report);
 
 typedef struct DebugRecursiveEntry {
   int previousChareID;
@@ -56,20 +54,19 @@ void *CpdGetCurrentObject() { return _debugData.peek().obj; }
 void *CpdGetCurrentMsg() { return _debugData.peek().msg; }
 
 extern int cpdInSystem;
-extern "C" int CpdInUserCode() {return cpdInSystem==0 && _debugData.length()>0 && _debugData.peek().alreadyUserCode==1;}
+int CpdInUserCode() {return cpdInSystem==0 && _debugData.length()>0 && _debugData.peek().alreadyUserCode==1;}
 
 // Function called right before an entry method
 void CpdBeforeEp(int ep, void *obj, void *msg) {
 #if CMK_CHARMDEBUG
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag && CmiMyRank()==0) {
     DebugRecursiveEntry entry;
     entry.previousChareID = setMemoryChareIDFromPtr(obj);
     entry.alreadyUserCode = _entryTable[ep]->inCharm ? 0 : 1;
     entry.memoryBackup = NULL;
     entry.obj = obj;
     if (msg != NULL) {
-      entry.msg = msg;
-      CmiReference(UsrToEnv(msg));
+      entry.msg = CkReferenceMsg(msg);
     }
     else entry.msg = NULL;
     _debugData.push(entry);
@@ -80,7 +77,7 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
       CpdResetMemory();
       CpdSystemExit();
     }
-    CkVec<DebugPersistentCheck> &preExecutes = CkpvAccess(_debugEntryTable)[ep].preProcess;
+    std::vector<DebugPersistentCheck> &preExecutes = CkpvAccess(_debugEntryTable)[ep].preProcess;
     for (int i=0; i<preExecutes.size(); ++i) {
       preExecutes[i].object->cpdCheck(preExecutes[i].msg);
     }
@@ -91,9 +88,9 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
 // Function called right after an entry method
 void CpdAfterEp(int ep) {
 #if CMK_CHARMDEBUG
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (cmiArgDebugFlag && CmiMyRank()==0) {
     DebugRecursiveEntry entry = _debugData.peek();
-    CkVec<DebugPersistentCheck> &postExecutes = CkpvAccess(_debugEntryTable)[ep].postProcess;
+    std::vector<DebugPersistentCheck> &postExecutes = CkpvAccess(_debugEntryTable)[ep].postProcess;
     for (int i=0; i<postExecutes.size(); ++i) {
       postExecutes[i].object->cpdCheck(postExecutes[i].msg);
     }
@@ -340,7 +337,7 @@ public:
   }
 };
 
-#ifndef __CYGWIN__
+#if CMK_HAS_GET_MYADDRESS
 #include <rpc/rpc.h>
 #endif
 
@@ -353,7 +350,8 @@ void hostInfo(void *itemIter, pup_er pp, CpdListItemsRequest *req) {
 #if CMK_HAS_GET_MYADDRESS
   get_myaddress(&addr);
 #else
-  CmiAbort("hostInfo: get_myaddress does not work on this machine");
+  CmiAbort("CharmDebug: get_myaddress() does not work on this machine, are you missing "
+           "the rpc/rpc.h header (usually found in the glibc-dev package)?");
 #endif
   char *address = (char*)&addr.sin_addr.s_addr;
   PUPv(address, 4);
@@ -393,17 +391,8 @@ void CpdPupMessage(PUP::er &p, void *msg)
   if (envType == ForArrayEltMsg || envType == ArrayEltInitMsg) {
     int arrID = env->getArrayMgr().idx;
     PUPn(arrID);
-    CkArrayIndex &idx = env->getsetArrayIndex();
-    int nInts = idx.nInts;
-    int dimension = idx.dimension;
-    PUPn(nInts);
-    PUPn(dimension);
-    p.comment("index");
-    if (dimension >=4 && dimension <=6) {
-      p((short int *)idx.index, dimension);
-    } else {
-      p(idx.index, nInts);
-    }
+    CmiUInt8 id = env->getRecipientID();
+    PUPn(id);
   } else if (envType == ForNodeBocMsg || envType == ForBocMsg) {
     int groupID = env->getGroupNum().idx;
     PUPn(groupID);
@@ -504,12 +493,8 @@ public:
       p((char*)type, strlen(type));
       return;
     }
-#if ! CMK_BIGSIM_CHARM
     if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
     if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
-#else
-    isCharm=1; type="BG";
-#endif
     if (curObj < 0) type="Conditional";
     sprintf(name,"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
     p(name, strlen(name));
@@ -532,7 +517,7 @@ class CpdList_message : public CpdListAccessor {
   virtual const char * getPath(void) const {return "converse/message";}
   virtual size_t getLength(void) const {return 1;}
   virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
-    envelope *env = (envelope*)(((unsigned int)req.lo) + (((unsigned long)req.hi)<<32)+sizeof(CmiChunkHeader));
+    envelope *env = (envelope*)(((uint64_t)req.lo) + (((uint64_t)req.hi)<<32)+sizeof(CmiChunkHeader));
     beginItem(p, 0);
     const char *type="Converse";
     p.comment("name");
@@ -560,13 +545,7 @@ static void CpdDeliverMessageInt(int msgNum) {
     CmiReference(queuedMsg);
     CdsFifo_Enqueue(CpvAccess(conditionalQueue), queuedMsg);
   }  
-#if CMK_BIGSIM_CHARM
-  stopVTimer();
-  BgProcessMessageDefault(cta(threadinfo), queuedMsg);
-  startVTimer();
-#else
   CmiHandleMessage(queuedMsg);
-#endif
   CkpvAccess(skipBreakpoint) = 0;
   while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);  
 }
@@ -584,9 +563,14 @@ void *CpdGetNextMessageConditional(CsdSchedulerState_t *s) {
   if ((msg=CdsFifo_Dequeue(s->localQ)) != NULL) return msg;
   CqsDequeue((Queue_struct*)s->schedQ,(void **)&msg);
   if (msg!=NULL) return msg;
-  read(conditionalPipe[0], &len, 4);
+  if (4 != read(conditionalPipe[0], &len, 4))
+    CmiAbort("CpdGetNextMessageConditional: len read failed");
   msg = CmiAlloc(len);
-  read(conditionalPipe[0], msg, len);
+  if (len != read(conditionalPipe[0], msg, len))
+  {
+    CmiFree(msg);
+    CmiAbort("CpdGetNextMessageConditional: msg read failed");
+  }
   return msg;
 }
 
@@ -594,12 +578,14 @@ void *CpdGetNextMessageConditional(CsdSchedulerState_t *s) {
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
-extern "C" void CpdDeliverSingleMessage ();
+void CpdDeliverSingleMessage ();
 
 static pid_t CpdConditional_SetupComm() {
   int pipefd[2][2];
-  pipe(pipefd[0]); // parent to child
-  pipe(pipefd[1]); // child to parent
+  if (pipe(pipefd[0]) == -1)
+    CmiAbort("CpdConditional_SetupComm: parent to child pipe failed");
+  if (pipe(pipefd[1]) == -1)
+    CmiAbort("CpdConditional_SetupComm: child to parent pipe failed");
   
   if (conditionalShm == NULL) {
     struct shmid_ds dummy;
@@ -611,7 +597,9 @@ static pid_t CpdConditional_SetupComm() {
   }
   
   pid_t pid = fork();
-  if (pid > 0) {
+  if (pid < 0)
+    CmiAbort("CpdConditional_SetupComm: fork failed");
+  else if (pid > 0) {
     int bytes;
     CmiPrintf("parent %d\n",pid);
     close(pipefd[0][0]);
@@ -619,9 +607,14 @@ static pid_t CpdConditional_SetupComm() {
     conditionalPipe[0] = pipefd[1][0];
     conditionalPipe[1] = pipefd[0][1];
     //CpdConditionalDeliveryScheduler(pipefd[1][0], pipefd[0][1]);
-    read(conditionalPipe[0], &bytes, 4);
+    if (4 != read(conditionalPipe[0], &bytes, 4))
+      CmiAbort("CpdConditional_SetupComm: bytes read failed");
     char *buf = (char*)malloc(bytes);
-    read(conditionalPipe[0], buf, bytes);
+    if (bytes != read(conditionalPipe[0], buf, bytes))
+    {
+      free(buf);
+      CmiAbort("CpdConditional_SetupComm: buf read failed");
+    }
     CcsSendReply(bytes,buf);
     free(buf);
     return pid;
@@ -651,7 +644,7 @@ void CpdEndConditionalDelivery(char *msg) {
   _exit(0);
 }
 
-extern "C" void CpdEndConditionalDeliver_master() {
+void CpdEndConditionalDeliver_master() {
   close(conditionalPipe[0]);
   conditionalPipe[0] = 0;
   close(conditionalPipe[1]);
@@ -762,10 +755,20 @@ void CpdBreakPointInit()
   CkpvAccess(lastBreakPointMsg) = NULL;
   CkpvAccess(lastBreakPointObject) = NULL;
   CkpvAccess(lastBreakPointIndex) = 0;
-  CpvAccess(_debugMsg) = CkRegisterMsg("debug_msg",0,0,0,0);
-  CpvAccess(_debugChare) = CkRegisterChare("debug_Chare",0,TypeChare);
-  CkRegisterChareInCharm(CpvAccess(_debugChare));
+  if(CkMyRank() == 0)
+    {
+      CpvAccess(_debugMsg) = CkRegisterMsg("debug_msg",0,0,0,0);
+      CpvAccess(_debugChare) = CkRegisterChare("debug_Chare",0,TypeChare);
+      CkRegisterChareInCharm(CpvAccess(_debugChare));
+    }
   CpvAccess(breakPointEntryTable) = new CpdBpFuncTable_t(10,0.5,CkHashFunction_int,CkHashCompare_int );
+}
+
+void CpdFinishInitialization() {
+  CkpvInitialize(int, skipBreakpoint);
+  CkpvAccess(skipBreakpoint) = 0;
+  CkpvInitialize(DebugEntryTable, _debugEntryTable);
+  CkpvAccess(_debugEntryTable).resize(_entryTable.size());
 }
 
 static void _call_freeze_on_break_point(void * msg, void * object)
@@ -784,17 +787,13 @@ static void _call_freeze_on_break_point(void * msg, void * object)
       CkpvAccess(lastBreakPointMsg) = msg;
       CkpvAccess(lastBreakPointObject) = object;
       CkpvAccess(lastBreakPointIndex) = CkMessageToEpIdx(msg);
+      //      CkPrintf("[%d] notify for bp %s m %p o %p idx %d\n",CkMyPe(), breakPointEntryInfo->name, msg, object,CkpvAccess(lastBreakPointIndex));
       CpdNotify(CPD_BREAKPOINT,breakPointEntryInfo->name);
       CpdFreeze();
-#if CMK_BIGSIM_CHARM
-      stopVTimer();
-      ((workThreadInfo*)cta(threadinfo))->scheduler(-1);
-#endif
   }
 }
 
 //ccs handler when pressed the "next" command: deliver only a single message without unfreezing
-extern "C"
 void CpdDeliverSingleMessage () {
   if (!CpdIsFrozen()) return; /* Do something only if we are in freeze mode */
   if ( (CkpvAccess(lastBreakPointMsg) != NULL) && (CkpvAccess(lastBreakPointObject) != NULL) ) {
@@ -810,9 +809,6 @@ void CpdDeliverSingleMessage () {
     }
     CkpvAccess(lastBreakPointMsg) = NULL;
     CkpvAccess(lastBreakPointObject) = NULL;
-#if CMK_BIGSIM_CHARM
-    ((workThreadInfo*)cta(threadinfo))->stopScheduler();
-#endif
   }
   else {
     // we were not stopped at a breakpoint, then deliver the first message in the debug queue
@@ -824,36 +820,37 @@ void CpdDeliverSingleMessage () {
         CmiReference(queuedMsg);
         CdsFifo_Enqueue(CpvAccess(conditionalQueue),queuedMsg);
       }
-#if CMK_BIGSIM_CHARM
-      stopVTimer();
-      BgProcessMessageDefault(cta(threadinfo), queuedMsg);
-      startVTimer();
-#else
       CmiHandleMessage(queuedMsg);
-#endif
       CkpvAccess(skipBreakpoint) = 0;
     }
   }
 }
 
 //ccs handler when continue from a break point
-extern "C"
 void CpdContinueFromBreakPoint ()
 {
+  
+  //  CkPrintf("[%d] CpdContinueFromBreakPoint\n",CkMyPe());
+  
     CpdUnFreeze();
     if ( (CkpvAccess(lastBreakPointMsg) != NULL) && (CkpvAccess(lastBreakPointObject) != NULL) )
     {
         EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CkpvAccess(lastBreakPointIndex));
         if (breakPointEntryInfo != NULL) {
+	  //	  CkPrintf("[%d] Continue found calling lastBreakPoint\n",CkMyPe());
            breakPointEntryInfo->call(CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject));
-#if CMK_BIGSIM_CHARM
-           ((workThreadInfo*)cta(threadinfo))->stopScheduler();
-#endif
         } else {
           // This means that the breakpoint got deleted in the meanwhile
           
         }
     }
+#if 0
+    else 
+      {//debugging block
+	CmiPrintStackTrace(0);
+	CkPrintf("[%d] Continue found lastBreakPointmsg %p object %p idx %d\n",CkMyPe(), CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject), CkpvAccess(lastBreakPointIndex));
+    }
+#endif    
     CkpvAccess(lastBreakPointMsg) = NULL;
     CkpvAccess(lastBreakPointObject) = NULL;
 }
@@ -877,8 +874,14 @@ void CpdSetBreakPoint (char *msg)
              breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, 1, 0 );
              //CmiPrintf("Breakpoint is set for function %s with an epIdx = %ld\n", _entryTable[tableIdx]->name, tableIdx);
              CpvAccess(breakPointEntryTable)->put(tableIdx) = breakPointEntryInfo;
-             _entryTable[tableIdx]->name = "debug_breakpoint_ep";
-             _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
+#if CMK_SMP	     
+	    if(++_entryTable[tableIdx]->breakPointSet==CkMyNodeSize() )
+#endif	       
+	      {
+
+		_entryTable[tableIdx]->name = "debug_breakpoint_ep";
+		_entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
+	      }
            } else {
              if (breakPointEntryInfo->msgIdx == 0) {
                // Reset the breakpoint info
@@ -920,8 +923,14 @@ void CpdRemoveBreakPoint (char *msg)
         if (breakPointEntryInfo != NULL) {
           if (--breakPointEntryInfo->msgIdx == 0) {
             // If we are the last to delete the breakpoint, then restore the original name and call function pointer
-            _entryTable[idx]->name =  breakPointEntryInfo->name;
-            _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+#if CMK_SMP	    
+	    if(--_entryTable[idx]->breakPointSet==0)
+#endif	      
+	      {
+	      _entryTable[idx]->name =  breakPointEntryInfo->name;
+	      _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+	    }
+	    //	    CkPrintf("[%d] remonebp _entryTable[%d]->breakPointSet %d\n",CkMyPe(), idx,  _entryTable[idx]->breakPointSet.load());
           }
           reply = ~0 ;
           CkpvAccess(_debugEntryTable)[idx].isBreakpoint = false;
@@ -947,43 +956,33 @@ void CpdRemoveAllBreakPoints ()
     int idx = *(int *)keyPointer;
     if (--breakPointEntryInfo->msgIdx == 0) {
       // If we are the last to delete the breakpoint, then restore the original name and call function pointer
-      _entryTable[idx]->name =  breakPointEntryInfo->name;
-      _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+#if CMK_SMP	    
+      if(--_entryTable[idx]->breakPointSet==0)
+#endif	      
+	{
+	  _entryTable[idx]->name =  breakPointEntryInfo->name;
+	  _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+	}
+      //      CkPrintf("[%d] remallbp _entryTable[%d]->breakPointSet %d\n",CkMyPe(), idx,  _entryTable[idx]->breakPointSet.load());
     }
     CkpvAccess(_debugEntryTable)[idx].isBreakpoint = false;
   }
   CcsSendReply(sizeof(int), (void*)&reply);
 }
 
-extern "C" int CpdIsCharmDebugMessage(void *msg) {
+int CpdIsCharmDebugMessage(void *msg) {
   envelope *env = (envelope*)msg;
   // Later should use "isDebug" value, but for now just bypass all intrinsic EPs
   return CmiGetHandler(msg) != _charmHandlerIdx || env->getMsgtype() == ForVidMsg ||
          env->getMsgtype() == FillVidMsg || _entryTable[env->getEpIdx()]->inCharm;
 }
 
-#if CMK_BIGSIM_CHARM
-CpvExtern(int, _bgCcsHandlerIdx);
-extern "C" int CpdIsBgCharmDebugMessage(void *msg) {
-  envelope *env = (envelope*)msg;
-  if (CmiBgMsgFlag(msg) == BG_CLONE) {
-    env=*(envelope**)(((char*)msg)+CmiBlueGeneMsgHeaderSizeBytes);
-  }
-  if  ((((CmiBlueGeneMsgHeader*)env)->hID) == CpvAccess(_bgCcsHandlerIdx)) return 1;
-    // make sure it indeed is a charm message
-  if (CmiBgMsgHandle(env) == _charmHandlerIdx) {
-    return env->getMsgtype() == ForVidMsg || env->getMsgtype() == FillVidMsg ||
-         _entryTable[env->getEpIdx()]->inCharm;
-  }
-  return 1;
-}
-#endif
 
 CpvExtern(char *, displayArgument);
 
 void CpdStartGdb(void)
 {
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
   FILE *f;
   char gdbScript[200];
   int pid;
@@ -1013,11 +1012,11 @@ void CpdStartGdb(void)
      }
      pid = fork();
      if (pid < 0)
-        { perror("ERROR> forking to run debugger script\n"); exit(1); }
+        { CmiAbort("ERROR> forking to run debugger script\n"); }
      if (pid == 0)
      {
          //CmiPrintf("In child process to start script %s\n", gdbScript);
- if (-1 == execvp(gdbScript, NULL))
+ if (-1 == execlp(gdbScript, gdbScript, NULL))
             CmiPrintf ("Error> Could not Execute Debugger Script: %s\n",strerror
 (errno));
 
@@ -1026,13 +1025,11 @@ void CpdStartGdb(void)
 #endif
 }
 
-extern "C" {
-  size_t cpd_memory_length(void*);
-  void cpd_memory_pup(void*,void*,CpdListItemsRequest*);
-  void cpd_memory_leak(void*,void*,CpdListItemsRequest*);
-  size_t cpd_memory_getLength(void*);
-  void cpd_memory_get(void*,void*,CpdListItemsRequest*);
-}
+size_t cpd_memory_length(void*);
+void cpd_memory_pup(void*,void*,CpdListItemsRequest*);
+void cpd_memory_leak(void*,void*,CpdListItemsRequest*);
+size_t cpd_memory_getLength(void*);
+void cpd_memory_get(void*,void*,CpdListItemsRequest*);
 
 
 void CpdCharmInit()
@@ -1068,54 +1065,19 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_msgStack());
   CpdGetNextMessage = CsdNextMessage;
   CpdIsDebugMessage = CpdIsCharmDebugMessage;
-#if CMK_BIGSIM_CHARM
-  CpdIsDebugMessage = CpdIsBgCharmDebugMessage;
-#endif
 }
 
-#if CMK_BIGSIM_CHARM
-CpvExtern(int, _bgCcsHandlerIdx);
-CpvExtern(int, _bgCcsAck);
-extern "C" void req_fw_handler(char*);
-CkpvExtern(void *, debugQueue);
-CkpvExtern(int, freezeModeFlag);
-#include "blue_impl.h"
-extern void BgProcessMessageFreezeMode(threadInfo *, char *);
-
-void CpdBgInit()
-{
-        // Register the BG handler for CCS. Notice that this is put into a variable shared by
-        // the whole real processor. This because converse needs to find it. We check that all
-        // virtual processors register the same index for this handler.
-        int bgCcsHandlerIdx = CkRegisterHandler((CmiHandler)req_fw_handler);
-        if (CpvAccess(_bgCcsHandlerIdx) == 0) CpvAccess(_bgCcsHandlerIdx) = bgCcsHandlerIdx;
-        CkAssert(CpvAccess(_bgCcsHandlerIdx)==bgCcsHandlerIdx);
-        CpvAccess(_bgCcsAck) ++;
-        CcsReleaseMessages();
-        
-        CkpvInitialize(int, freezeModeFlag);
-        CkpvAccess(freezeModeFlag) = 0;
-
-        CkpvInitialize(void *, debugQueue);
-        CkpvAccess(debugQueue) = CdsFifo_Create();
-        
-        BgProcessMessage = BgProcessMessageFreezeMode;
-}
-#endif
 
 #else
 
 void CpdBreakPointInit() {}
 void CpdCharmInit() {}
-#if CMK_BIGSIM_CHARM
-void CpdBgInit() {}
-#endif
 
 void CpdFinishInitialization() {}
 
 void *CpdGetCurrentObject() {return NULL;}
 void *CpdGetCurrentMsg() {return NULL;}
-extern "C" void CpdEndConditionalDeliver_master() {}
+void CpdEndConditionalDeliver_master() {}
 
 void CpdBeforeEp(int ep, void *obj, void *msg) {}
 void CpdAfterEp(int ep) {}

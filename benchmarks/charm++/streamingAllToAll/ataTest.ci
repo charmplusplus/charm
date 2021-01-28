@@ -1,0 +1,26 @@
+mainmodule ataTest {
+
+  include "ataDatatype.h";
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_GroupMeshStreamer
+    <DataItem, Participant, SimpleMeshRouter> aggregator;
+  readonly CProxy_Participant allToAllGroup;
+  mainchare Main {
+    entry Main(CkArgMsg *args);
+    entry [reductiontarget] void start();
+    entry [reductiontarget] void prepare();
+    entry [reductiontarget] void allDone();
+  };
+
+  group Participant {
+    entry Participant();
+    entry [threaded] void communicate(int iters, bool useTram);
+    entry void receive(DataItem item);
+  };
+
+  message MeshStreamerMessage<DataItem>;
+  group GroupMeshStreamer<DataItem, Participant, SimpleMeshRouter>;
+  group MeshStreamer<DataItem, SimpleMeshRouter>;
+
+};

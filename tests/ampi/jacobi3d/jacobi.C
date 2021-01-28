@@ -3,7 +3,7 @@
 #include "mpi.h"
 
 #if CMK_BLUEGENE_CHARM
-extern void BgPrintf(char *);
+extern "C" void BgPrintf(const char *);
 #define BGPRINTF(x)  if (thisIndex == 0) BgPrintf(x);
 #else
 #define BGPRINTF(x)
@@ -15,6 +15,10 @@ extern void BgPrintf(char *);
 #define CKPT_FREQ 100
 #define NO_PUP
 
+/*
+ * These globals variables are written once to the same value on
+ * all ranks and so are safe wrt to AMPI's virtualization.
+ */
 int NX, NY, NZ;
 
 class chunk {
@@ -109,8 +113,9 @@ static void copyin(double *d, double t[DIMX+2][DIMY+2][DIMZ+2],
 int main(int ac, char** av)
 {
   int i,j,k,m,cidx;
-  int iter, niter;
+  int iter, niter, cp_idx;
   MPI_Status status;
+  MPI_Info hints;
   double error, tval, maxerr, tmpmaxerr, starttime, endtime, itertime;
   chunk *cp;
   int thisIndex, ierr, nblocks;
@@ -123,6 +128,7 @@ int main(int ac, char** av)
     if (thisIndex == 0)
       printf("Usage: jacobi X Y Z [nIter].\n");
     MPI_Finalize();
+    return 1;
   }
   NX = atoi(av[1]);
   NY = atoi(av[2]);
@@ -131,21 +137,24 @@ int main(int ac, char** av)
     if (thisIndex == 0) 
       printf("%d x %d x %d != %d\n", NX,NY,NZ, nblocks);
     MPI_Finalize();
+    return 2;
   }
   if (ac == 5)
     niter = atoi(av[4]);
   else
     niter = 20;
 
+  /* Set up MPI_Info hints for Message Logging FT */
+  MPI_Info_create(&hints);
+#ifdef CMK_MESSAGE_LOGGING
+  MPI_Info_set(hints, "ampi_checkpoint", "message_logging");
+#endif
+
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-#if CMK_AIX
-  cp = (chunk*)malloc(sizeof(chunk));
-#else
   cp = new chunk;
-#endif
 #if defined(AMPI) && ! defined(NO_PUP)
-  MPI_Register((void*)&cp, (MPI_PupFn) chunk_pup);
+  AMPI_Register_pup((MPI_PupFn)chunk_pup, (void*)&cp, &cp_idx);
 #endif
 
   index3d(thisIndex, cp->xidx, cp->yidx, cp->zidx);
@@ -229,9 +238,9 @@ int main(int ac, char** av)
 #ifdef AMPI
     if(iter%CKPT_FREQ == 50) {
 #ifdef CMK_MEM_CHECKPOINT
-		AMPI_MemCheckpoint();
+		AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
 #elif CMK_MESSAGE_LOGGING
-		MPI_Migrate();
+		AMPI_Migrate(hints);
 #endif
     }
 #endif

@@ -1,0 +1,12 @@
+mainmodule m {
+  mainchare A {
+    entry A(CkArgMsg*);
+    entry void bar() {
+      if (user_name == "Kcen, Sabia") {
+        serial {
+          CkPrintf("Tu tu- ruu ru...");
+        }
+      }
+    }
+  }
+}

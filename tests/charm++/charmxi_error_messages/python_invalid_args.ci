@@ -1,0 +1,7 @@
+mainmodule m {
+    mainchare [python] c {
+        entry [python] void foo(int a, int b);
+        entry [python] void bar();
+        entry void baz();
+    }
+}

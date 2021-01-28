@@ -1,0 +1,24 @@
+mainmodule qdtest {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_QD qdProxy;
+  readonly int n_chares;
+  readonly int n_iters;
+  readonly float busy_time;
+  readonly long long kernel_clock_count;
+  readonly size_t data_size;
+  readonly bool qd_off;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void start();
+    entry [reductiontarget] void done();
+  };
+
+  array [1D] QD {
+    entry QD();
+    entry void run();
+    entry void h2dDone();
+    entry void kernelDone();
+    entry void d2hDone();
+  };
+};

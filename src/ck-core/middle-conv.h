@@ -22,9 +22,10 @@
 #undef CkMyPe
 #undef CkNumPes
 
-#define CkRegisterHandler(x)          CmiRegisterHandler(x)
-#define CkNumberHandler(n, x)         CmiNumberHandler(n, x)
-#define CkNumberHandlerEx(n, x, p)    CmiNumberHandlerEx(n, x, p)
+#define CkRegisterHandler(x)          CmiRegisterHandler((CmiHandler)x)
+#define CkRegisterHandlerEx(x, p)     CmiRegisterHandlerEx((CmiHandlerEx)x, p)
+#define CkNumberHandler(n, x)         CmiNumberHandler(n, (CmiHandler)x)
+#define CkNumberHandlerEx(n, x, p)    CmiNumberHandlerEx(n, (CmiHandlerEx)x, p)
 
 #undef CmiSyncSend
 #undef CmiSyncSendAndFree
@@ -45,7 +46,7 @@
 #define CkElapse(x)   
 
 #if CMK_CHARMDEBUG
-extern "C" int ConverseDeliver(int pe);
+int ConverseDeliver(int pe);
 #else
 #define ConverseDeliver(pe)   1
 #endif
@@ -79,11 +80,11 @@ static inline void CmiSyncBroadcastAllAndFree(int x, char *y)
 {
   if (ConverseDeliver(x)) CmiFreeBroadcastAllFn(x, y);
 }
-static inline void CmiSyncListSend(int x, int *y, int w, char *z)
+static inline void CmiSyncListSend(int x, const int *y, int w, char *z)
 {
   if (ConverseDeliver(-1)) CmiSyncListSendFn(x, y, w, z);
 }
-static inline void CmiSyncListSendAndFree(int x, int *y, int w, char *z)
+static inline void CmiSyncListSendAndFree(int x, const int *y, int w, char *z)
 {
   if (ConverseDeliver(-1)) CmiFreeListSendFn(x, y, w, z);
 }

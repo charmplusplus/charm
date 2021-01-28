@@ -15,7 +15,7 @@ module PathHistory {
   };
 
 
- group pathHistoryManager {
+ group [migratable] pathHistoryManager {
      entry pathHistoryManager();
 
      entry void traceCriticalPathBackStepByStep(pathInformationMsg *msg);

@@ -1,0 +1,10 @@
+mainmodule m {
+  mainchare A {
+    entry A(CkArgMsg*);
+    entry void fun() {
+      serial {
+        CkPrintf("hope you like your compiler"); /* // */ CkPrintf("warnings");
+      }
+    }
+  }
+}

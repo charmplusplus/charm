@@ -9,7 +9,30 @@
 //
 ///////////////////////////////////////
 
+class Ping;
+
 #include "SimplePUP.decl.h"
+#include <vector>
+#include <cassert>
+
+class Ping: public PUP::able {
+  PUPable_decl(Ping);
+
+  Ping(int value) : value_(value) {}
+  Ping(CkMigrateMessage *m) : PUP::able(m) { }
+  virtual ~Ping() { }
+
+  virtual void pup(PUP::er &p) override {
+    PUP::able::pup(p);
+    p | value_;
+  }
+
+  void operator()() const {
+    CkPrintf("Ping %d!\n", value_);
+  }
+
+  int value_;
+};
 
 class main : public CBase_main {
 
@@ -19,10 +42,11 @@ public:
 
   main(CkArgMsg *m);
 
+  void accept(std::shared_ptr<Ping> ping);
+
 };
 
-
-class SimpleArray : public CBase_SimpleArray {
+template <typename U> class SimpleArray : public CBase_SimpleArray<U> {
 
  public:
   
@@ -37,25 +61,36 @@ class SimpleArray : public CBase_SimpleArray {
 
   ~SimpleArray(){}
 
-  void acceptData(HeapObject &inData){
-
+  void acceptData(const HeapObject<U> &inData,
+          const std::vector<U> &dataToCompare){
+    
     //do something to the object
     localCopy=inData;
+
+    assert(inData.data.size() == dataToCompare.size());
+    for (int i = 0; i < dataToCompare.size(); i++)
+    {
+        assert(inData.data[i] == dataToCompare[i]);
+    }
+
     localCopy.doWork();
 
-    if(thisIndex==0) //no one lower to pass to
+    if(this->thisIndex==0) //no one lower to pass to
       {
 	done();
       }
     else
       { // pass object down one index
-	thisProxy[thisIndex-1].acceptData(localCopy);
+	this->thisProxy[this->thisIndex-1].acceptData(localCopy, dataToCompare);
       }
   }
 
  private:
 
-  HeapObject localCopy;
+  HeapObject<U> localCopy;
 
 };
 
+#define CK_TEMPLATES_ONLY
+#include "SimplePUP.def.h"
+#undef CK_TEMPLATES_ONLY

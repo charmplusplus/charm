@@ -1,0 +1,24 @@
+mainmodule ParameterPack
+{
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main
+  {
+    entry Main(CkArgMsg *m);
+    entry void done();
+  };
+
+  chare ParameterPack
+  {
+    entry ParameterPack();
+
+    template <typename... Args>
+    entry [sync] size_t Test1(std::tuple<Args...>&& args);
+
+    template <class... Args>
+    entry [sync] std::tuple<Args...> Test2(std::tuple<Args...>&& args);
+  };
+
+  extern entry [sync] size_t ParameterPack Test1(std::tuple<int, int, double>&);
+  extern entry [sync] std::tuple<int, int, double> ParameterPack Test2(std::tuple<int, int, double>&);
+};

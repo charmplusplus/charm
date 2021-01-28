@@ -8,7 +8,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/16/2003
 ILSI_Comm::~ILSI_Comm() {}
 
 
-CDECL void ILSI_Param_new(ILSI_Param *param)
+CLINKAGE void ILSI_Param_new(ILSI_Param *param)
 {
 	param->maxResidual=1.0e-6;
 	param->maxIterations=0;

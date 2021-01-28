@@ -1,9 +1,10 @@
+-include ../../common.mk
 CHARMC=../../../bin/ampicxx $(OPTS)
 
-all: pgm
+all: migration
 
-pgm: test.o
-	$(CHARMC) -o pgm test.o 
+migration: test.o
+	$(CHARMC) -o migration test.o
 
 test.o: test.C
 	$(CHARMC) -c test.C
@@ -13,20 +14,17 @@ test.o: test.C
 # clean up .o, .mod, .exe and EMACS backup files
 #
 clean:
-	rm -f *.o *.mod pgm *~ conv-host charmrun test.o charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f *.o *.mod migration *~ conv-host charmrun test.o charmrun.exe migration.exe migration.pdb migration.ilk ampirun
 
-test: pgm
-	./charmrun ./pgm +p1 +vp1 $(TESTOPTS)
-	./charmrun ./pgm +p1 +vp4 $(TESTOPTS)
-	./charmrun ./pgm +p1 +vp20 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp4 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp20 $(TESTOPTS)
+test: migration
+	$(call run, ./migration +p1 +vp1 )
+	$(call run, ./migration +p1 +vp4 )
+	$(call run, ./migration +p1 +vp20 )
+	$(call run, ./migration +p2 +vp1 )
+	$(call run, ./migration +p2 +vp4 )
+	$(call run, ./migration +p2 +vp20 )
 
-bgtest: pgm
-	./charmrun ./pgm +p1 +vp1 +x1 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p1 +vp2 +x1 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p1 +vp4 +x1 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp2 +x2 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp4 +x2 +y1 +z1 $(TESTOPTS)
-	./charmrun ./pgm +p2 +vp1 +x2 +y1 +z1 $(TESTOPTS)
+testp: migration
+	$(call run, ./migration +p$(P) +vp$(P) )
+	$(call run, ./migration +p$(P) +vp$$(( $(P) * 2 )) )
+	$(call run, ./migration +p$(P) +vp$$(( $(P) * 4 )) )

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <algorithm>
+#include <vector>
 
 // Readonly proxy that is used by the HistogramMerger group
 CProxy_Main mainProxy;
@@ -21,7 +22,7 @@ class Main : public CBase_Main {
   Main(CkArgMsg *m){
     if(m->argc != 5){
       CkPrintf("[main] Usage: pgm <nChares> <nElementsPerChare> <maxElementValue> <nBins>\n");
-      CkExit();
+      CkExit(1);
     }
 
     // Process command-line arguments
@@ -49,7 +50,7 @@ class Main : public CBase_Main {
 
 
     // Now, create a number of bins
-    CkVec<int> bins(nBins);
+    std::vector<int> bins(nBins);
     int delta = maxElementValue/nBins;
     if(nBins*delta < maxElementValue) delta++;
 
@@ -61,7 +62,7 @@ class Main : public CBase_Main {
     // Broadcast these bin keys to the Histogram chare array. This will cause 
     // each chare to iterate through its set of values and count the number of
     // values that falls into the range implied by each bin.
-    histogramProxy.count(&bins[0], nBins);
+    histogramProxy.count(bins.data(), nBins);
   }
 
   void receiveHistogram(int *binCounts, int nBins){
@@ -81,7 +82,7 @@ class Main : public CBase_Main {
 };
 
 class Histogram : public CBase_Histogram {
-  CkVec<int> myValues;
+  std::vector<int> myValues;
 
   public:
   Histogram(int nElementsPerChare, int maxElementValue){
@@ -103,7 +104,7 @@ class Histogram : public CBase_Histogram {
 class HistogramMerger : public CBase_HistogramMerger {
   int nCharesOnMyPe;
   int nSubmissionsReceived;
-  CkVec<int> mergedCounts;
+  std::vector<int> mergedCounts;
 
   public:
   HistogramMerger(int nKeys){
@@ -135,7 +136,7 @@ class HistogramMerger : public CBase_HistogramMerger {
     // result to the main chare
     if(nSubmissionsReceived == nCharesOnMyPe){
       CkCallback cb(CkReductionTarget(Main, receiveHistogram), mainProxy);
-      contribute(mergedCounts.size()*sizeof(int), &mergedCounts[0], CkReduction::sum_int, cb);
+      contribute(mergedCounts.size()*sizeof(int), mergedCounts.data(), CkReduction::sum_int, cb);
     }
   }
 };
@@ -155,8 +156,7 @@ void Histogram::count(int *binKeys, int nKeys){
   int *search = NULL;
 
   // Allocate an array for the histogram and initialize the counts
-  CkVec<int> myCounts(nKeys);
-  for(int i = 0; i < nKeys; i++) myCounts[i] = 0;
+  std::vector<int> myCounts(nKeys, 0);
 
   // Iterate over values in myValues
   for(int i = 0; i < myValues.size(); i++){
@@ -172,7 +172,7 @@ void Histogram::count(int *binKeys, int nKeys){
   }
 
   // Submit partial results to HistogramMerger
-  histogramMergerProxy.ckLocalBranch()->submitCounts(&myCounts[0], myCounts.size());
+  histogramMergerProxy.ckLocalBranch()->submitCounts(myCounts.data(), myCounts.size());
 }
 
 

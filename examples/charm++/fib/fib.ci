@@ -6,15 +6,15 @@ mainmodule fib {
   chare Fib {
     entry Fib(int n, bool isRoot, CProxy_Fib parent);
     entry void calc(int n) {
-      if (n < THRESHOLD) atomic { respond(seqFib(n)); }
+      if (n < THRESHOLD) serial { respond(seqFib(n)); }
       else {
-        atomic {
+        serial {
           CProxy_Fib::ckNew(n - 1, false, thisProxy);
           CProxy_Fib::ckNew(n - 2, false, thisProxy);
         }
         when response(int val)
           when response(int val2)
-            atomic { respond(val + val2); }
+            serial { respond(val + val2); }
       }
     };
     entry void response(int val);

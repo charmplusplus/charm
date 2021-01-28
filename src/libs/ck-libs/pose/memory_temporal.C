@@ -145,6 +145,9 @@ char *TimePool::tmp_alloc(POSE_TimeType timestamp, int sz_in_bytes)
 #endif
       return mem;
     }
+    else {
+      return NULL;
+    }
   }
   else if (bkt == last_in_use) {  // we have some options if the target is last
     if (bkt->isVeryFull() && (timestamp >= (bkt->getStart() + bkt->getRange()))) { // let's make a new bucket, timestamp is far out enough

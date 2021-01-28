@@ -12,3 +12,7 @@
 
 #undef CMK_NETPOLL
 #define CMK_NETPOLL   1
+
+#ifdef CMK_SMP
+#define PXSHM_LOCK	1
+#endif

@@ -7,16 +7,13 @@
 
 class varsizetest2_Msg : public CMessage_varsizetest2_Msg {
  public:
-  
-#if NOCRASH
-    varsizetest2_Msg() {}
-#endif
+  varsizetest2_Msg(int, int, int);
   int check(void);
+  int seqnum;
   int isize;
   int fsize;
   int *iarray;
   float *farray;
-  int seqnum;
   CkChareID myMain;
 }; 
 

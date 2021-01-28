@@ -9,12 +9,6 @@ CProxy_sim POSE_Objects_RO;
 /// Coordinates all startup and shutdown behaviors for POSE simulations
 CkChareID POSE_Coordinator_ID;
 
-#ifdef POSE_COMM_ON
-/// Used with the CommLib
-extern CkGroupID dmid;
-//extern int com_debug;
-#endif
-
 /// Basic Constructor
 sim::sim() 
 {
@@ -239,9 +233,10 @@ void sim::Commit()
     Step(); // not done; try stepping again
 
 #if !CMK_TRACE_DISABLED
-  if(pose_config.stats)
+  if(pose_config.stats) {
     if (!tstat)  localStats->TimerStop();
     else localStats->SwitchTimer(tstat);
+  }
   if(pose_config.trace)
     traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif
@@ -281,9 +276,10 @@ void sim::CheckpointCommit() {
     localStats->SwitchTimer(SIM_TIMER);
 #endif
 #if !CMK_TRACE_DISABLED
-  if(pose_config.stats)
+  if(pose_config.stats) {
     if (!tstat)  localStats->TimerStop();
     else localStats->SwitchTimer(tstat);
+  }
   if(pose_config.trace)
     traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif

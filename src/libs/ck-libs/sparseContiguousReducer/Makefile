@@ -11,11 +11,8 @@ LIBDEST =  $(CDIR)/lib/$(LIB)
 
 all: $(LIBDEST) $(HEADERS)
 
-$(LIBDEST) : $(LIB)
-	/bin/cp $(LIB) $(LIBDEST)
-
-$(LIB): $(LIBOBJ)
-	$(CHARMC) -o $(LIB) $(LIBOBJ)
+$(LIBDEST) : $(LIBOBJ)
+	$(CHARMC) -o $@ $^
 
 cksparsecontiguousreducer.o: cksparsecontiguousreducer.C cksparsecontiguousreducer.h CkSparseContiguousReducer.decl.h CkSparseContiguousReducer.def.h
 	$(CHARMC) -c cksparsecontiguousreducer.C
@@ -27,7 +24,7 @@ INTERFACE: cksparsecontiguousreducer.ci
 	touch $@
 
 clean:
-	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB) INTERFACE
+	rm -f conv-host *.o *.decl.h *.def.h core INTERFACE
 
 realclean: clean
 	rm -f $(LIBDEST) $(HEADERS)

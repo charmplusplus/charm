@@ -27,13 +27,13 @@ public:
 protected:
   void create(int count, BaseLB::LDStats* stats, int* cur_p);
   virtual int refine();
-  int multirefine();
+  int multirefine(bool reset = 1);
   void assign(computeInfo *c, int p);
   void assign(computeInfo *c, processorInfo *p);
   void deAssign(computeInfo *c, processorInfo *pRec);
   virtual void computeAverage();
-  int isHeavy(processorInfo *p);
-  int isLight(processorInfo *p);
+  bool isHeavy(processorInfo *p);
+  bool isLight(processorInfo *p);
   void removeComputes();
 
   double overLoad;

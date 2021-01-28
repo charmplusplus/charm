@@ -6,14 +6,16 @@
   #include "emmintrin.h"
 #endif
 
-#if CMK_CELL_SPE != 0
-  #include "spu_intrinsics.h"
-#else
   #include "math.h"
-#endif
 
 #if defined(__VEC__)
   #include "altivec.h"
+  #ifdef pixel
+  #undef pixel
+  #endif
+  #ifdef bool
+  #undef bool
+  #endif
 #endif
 
 
@@ -27,7 +29,6 @@
 /* Flags to force architecture specific SIMD instructions off */
 #define SIMDIA_FORCE_NO_SSE       (0)
 #define SIMDIA_FORCE_NO_ALTIVEC   (0)
-#define SIMDIA_FORCE_NO_SPE_SIMD  (0)
 
 
 /***** Math Constants *****/
@@ -37,8 +38,8 @@
 
 
 /* TODO | FIXME - Find platform independent way of ensuring alignment
- * (using __attribute__((aligned(XXX))) doesn't seem to work in net-win and
- * net-sol builds).  Just to be safe since compilers should do this anyway.
+ * (using __attribute__((aligned(XXX))) doesn't seem to work in netlrts-win and
+ * netlrts-sol builds).  Just to be safe since compilers should do this anyway.
  */
 
 /* TODO | FIXME - Add a function that will test the functionality of the
@@ -483,159 +484,6 @@ inline __simdia_veci __simdia_vcmplelf(const  __simdia_vecf a, const  __simdia_v
 
 /*******************************************************************************
  *******************************************************************************
- ***** SPE SIMD Instructions
- *******************************************************************************
- *******************************************************************************/
-/* TODO | FIXME : Find a more general check for this (this is Charm++ specific) */
-#elif (CMK_CELL_SPE != 0) && (!(SIMDIA_FORCE_NO_SPE_SIMD))
-
-  /***** Data Types *****/
-  typedef vector signed int  simdia_veci;
-  typedef vector float       simdia_vecf;
-  typedef vector double     simdia_veclf;
-
-  /***** Insert *****/
-  #define  simdia_vinserti(v, s, i)  (spu_insert((s), (v), (i)))
-  #define  simdia_vinsertf(v, s, i)  (spu_insert((s), (v), (i)))
-  #define simdia_vinsertlf(v, s, i)  (spu_insert((s), (v), (i)))
-
-  /***** Extract *****/
-  #define  simdia_vextracti(v, i)  (spu_extract((v), (i)))
-  #define  simdia_vextractf(v, i)  (spu_extract((v), (i)))
-  #define simdia_vextractlf(v, i)  (spu_extract((v), (i)))
-
-  /***** Set *****/
-  #define  simdia_vseti(a)  (spu_splats((int)(a)))
-  #define  simdia_vsetf(a)  (spu_splats((float)(a)))
-  #define simdia_vsetlf(a)  (spu_splats((double)(a)))
-
-  /***** Constant Zero *****/
-  #define  simdia_const_vzeroi  (vseti(0))
-  #define  simdia_const_vzerof  (vsetf(0.0f))
-  #define simdia_const_vzerolf  (vsetlf(0.0))
-
-  /***** Constant One *****/
-  #define  simdia_const_vonei  (vseti(1))
-  #define  simdia_const_vonef  (vsetf(1.0f))
-  #define simdia_const_vonelf  (vsetlf(1.0))
-
-  /***** Constant Two *****/
-  #define  simdia_const_vtwoi  (vseti(2))
-  #define  simdia_const_vtwof  (vsetf(2.0f))
-  #define simdia_const_vtwolf  (vsetlf(2.0))
-
-  /***** Constant Negative One *****/
-  #define  simdia_const_vnegonei  (vseti(-1))
-  #define  simdia_const_vnegonef  (vsetf(-1.0f))
-  #define simdia_const_vnegonelf  (vsetlf(-1.0))
-
-  /***** Rotate *****/
-  #define   simdia_vrothi(a, s) (spu_rlqwbyte((a), (0x10-(((s)&0x3)<<2)) ))
-  #define   simdia_vrothf(a, s) (spu_rlqwbyte((a), (0x10-(((s)&0x3)<<2)) ))
-  #define  simdia_vrothlf(a, s) (spu_rlqwbyte((a),       (((s)&0x1)<<3)  ))
-  #define   simdia_vrotli(a, s) (spu_rlqwbyte((a), ((s)&0x3)<<2))
-  #define   simdia_vrotlf(a, s) (spu_rlqwbyte((a), ((s)&0x3)<<2))
-  #define  simdia_vrotllf(a, s) (spu_rlqwbyte((a), ((s)&0x1)<<3))
-
-  /***** Addition *****/
-  #define  simdia_vaddi(a, b)  (spu_add((a), (b)))
-  #define  simdia_vaddf(a, b)  (spu_add((a), (b)))
-  #define simdia_vaddlf(a, b)  (spu_add((a), (b)))
-
-  /***** Subtraction *****/
-  #define  simdia_vsubi(a, b)  (spu_sub((a), (b)))
-  #define  simdia_vsubf(a, b)  (spu_sub((a), (b)))
-  #define simdia_vsublf(a, b)  (spu_sub((a), (b)))
-
-  /***** Multiplication *****/
-  #define   simdia_vmulf(a, b)  (spu_mul((a), (b)))
-  #define  simdia_vmullf(a, b)  (spu_mul((a), (b)))
-
-  /***** Division *****/
-  #define simdia_vdivf(a, b)  (spu_mul((a), spu_re(b)))
-  inline simdia_veclf simdia_vdivlf(const simdia_veclf a, const simdia_veclf b) { simdia_veclf r = { 0.0, 0.0 }; spu_insert((spu_extract(a, 0) / spu_extract(b, 0)), r, 0); spu_insert((spu_extract(a, 1) / spu_extract(b, 1)), r, 1); return r; }
-
-  /***** Fused Multiply Add *****/
-  #define  simdia_vmaddf(a, b, c)  (spu_madd((a), (b), (c)))
-  #define simdia_vmaddlf(a, b, c)  (spu_madd((a), (b), (c)))
-
-  /***** Reciprocal *****/
-  #define  simdia_vrecipf(a)  (spu_re(a))
-  inline simdia_veclf simdia_vreciplf(const simdia_veclf a, const simdia_veclf b) { simdia_veclf r = { 0.0, 0.0 }; spu_insert((1.0f / spu_extract(a, 0)), r, 0); spu_insert((1.0f / spu_extract(a, 1)), r, 1); return r; }
-
-  /***** Square Root *****/
-  #define simdia_vsqrtf(a) (spu_re(spu_rsqrte(a)))
-  inline simdia_veclf simdia_vsqrtlf(const simdia_veclf a, const simdia_veclf b) { simdia_veclf r = { 0.0, 0.0 }; spu_insert(sqrt(spu_extract(a, 0)), r, 0); spu_insert(sqrt(spu_extract(a, 1)), r, 1); return r; }
-
-  /***** Reciprocal Square Root *****/
-  #define simdia_vrsqrtf(a) (spu_rsqrte(a))
-  inline simdia_veclf simdia_vrsqrtlf(const simdia_veclf a, const simdia_veclf b) { simdia_veclf r = { 0.0, 0.0 }; spu_insert((1.0f / sqrt(spu_extract(a, 0))), r, 0); spu_insert((1.0f / sqrt(spu_extract(a, 1))), r, 1); return r; }
-
-  /***** Not *****/
-  #define  simdia_vnoti(a)  (spu_nor((a), (a)))
-  #define  simdia_vnotf(a)  (spu_nor((a), (a)))
-  #define simdia_vnotlf(a)  (spu_nor((a), (a)))
-
-  /***** Or *****/
-  #define  simdia_vori(a, b)  (spu_or((a), (b)))
-  #define  simdia_vorf(a, b)  (spu_or((a), (b)))
-  #define simdia_vorlf(a, b)  (spu_or((a), (b)))
-
-  /***** Nor *****/
-  #define  simdia_vnori(a, b)  (spu_nor((a), (b)))
-  #define  simdia_vnorf(a, b)  (spu_nor((a), (b)))
-  #define simdia_vnorlf(a, b)  (spu_nor((a), (b)))
-
-  /***** And *****/
-  #define  simdia_vandi(a, b)  (spu_and((a), (b)))
-  #define  simdia_vandf(a, b)  (spu_and((a), (b)))
-  #define simdia_vandlf(a, b)  (spu_and((a), (b)))
-
-  /***** Nand *****/
-  #define  simdia_vnandi(a, b)  (spu_nand((a), (b)))
-  #define  simdia_vnandf(a, b)  (spu_nand((a), (b)))
-  #define simdia_vnandlf(a, b)  (spu_nand((a), (b)))
-
-  /***** Xor *****/
-  #define  simdia_vxori(a, b)  (spu_xor((a), (b)))
-  #define  simdia_vxorf(a, b)  (spu_xor((a), (b)))
-  #define simdia_vxorlf(a, b)  (spu_xor((a), (b)))
-
-  /***** Nxor *****/
-  #define  simdia_vnxori(a, b)  ( simdia_vnoti( simdia_vxori((a), (b))))
-  #define  simdia_vnxorf(a, b)  ( simdia_vnotf( simdia_vxorf((a), (b))))
-  #define simdia_vnxorlf(a, b)  (simdia_vnotlf(simdia_vxorlf((a), (b))))
-
-  /***** Equal To *****/
-  #define  simdia_vcmpeqi(a, b)  ((simdia_veci)(spu_cmpeq((a), (b))))
-  #define  simdia_vcmpeqf(a, b)  ((simdia_veci)(spu_cmpeq((a), (b))))
-  #define simdia_vcmpeqlf(a, b)  ((simdia_veci)(spu_cmpeq((a), (b))))
-
-  /***** Greater Than *****/
-  #define  simdia_vcmpgti(a, b)  ((simdia_veci)(spu_cmpgt((a), (b))))
-  #define  simdia_vcmpgtf(a, b)  ((simdia_veci)(spu_cmpgt((a), (b))))
-  #define simdia_vcmpgtlf(a, b)  ((simdia_veci)(spu_cmpgt((a), (b))))
-
-  // NOTE : Try to create versions of >= and < that do not double evaluate their inputs
-
-  /***** Greater Than or Equal To *****/
-  #define  simdia_vcmpgei(a, b)  (spu_or( simdia_vcmpeqi((a), (b)),  simdia_vcmpgti((a), (b))))
-  #define  simdia_vcmpgef(a, b)  (spu_or( simdia_vcmpeqf((a), (b)),  simdia_vcmpgtf((a), (b))))
-  #define simdia_vcmpgelf(a, b)  (spu_or(simdia_vcmpeqlf((a), (b)), simdia_vcmpgtlf((a), (b))))
-
-  /***** Less Than *****/
-  #define  simdia_vcmplti(a, b)  (spu_nor( simdia_vcmpgti((a), (b)),  simdia_vcmpeqi((a), (b))))
-  #define  simdia_vcmpltf(a, b)  (spu_nor( simdia_vcmpgtf((a), (b)),  simdia_vcmpeqf((a), (b))))
-  #define simdia_vcmpltlf(a, b)  (spu_nor(simdia_vcmpgtlf((a), (b)), simdia_vcmpeqlf((a), (b))))
-
-  /***** Less Than or Equal To *****/
-  #define  simdia_vcmplei(a, b)  (spu_nor( simdia_vcmpgti((a), (b)),  simdia_const_vzeroi))
-  #define  simdia_vcmplef(a, b)  (spu_nor( simdia_vcmpgtf((a), (b)),  simdia_const_vzerof))
-  #define simdia_vcmplelf(a, b)  (spu_nor(simdia_vcmpgtlf((a), (b)), simdia_const_vzerolf))
-
-
-/*******************************************************************************
- *******************************************************************************
  ***** AltiVec
  *******************************************************************************
  *******************************************************************************/
@@ -933,7 +781,6 @@ inline __simdia_veci __simdia_vcmplelf(const  __simdia_vecf a, const  __simdia_v
     #define simdia_vcmplelf __simdia_vcmplelf
   #endif
 
-
 /*******************************************************************************
  *******************************************************************************
  ***** Mapping to Generic C Implementation
@@ -1138,5 +985,10 @@ inline __simdia_veci __simdia_vcmplelf(const  __simdia_vecf a, const  __simdia_v
 #define  simdia_vmaddfss(a, b, c)  ( simdia_vmaddf((a),  simdia_vsetf(b),  simdia_vsetf(c)))
 #define simdia_vmaddlfss(a, b, c)  (simdia_vmaddlf((a), simdia_vsetlf(b), simdia_vsetlf(c)))
 
+#if defined(__VEC__)
+  #ifdef vector
+  #undef vector
+  #endif
+#endif
 
 #endif //__SIMDIA_H__

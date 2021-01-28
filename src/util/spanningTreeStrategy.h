@@ -169,6 +169,7 @@ template <typename Iterator,typename ValueType>
 class SpanningTreeStrategy
 {
     public:
+        virtual ~SpanningTreeStrategy(){}
         /// Concrete builders should implement this (preferably only for the appropriate specializations)
         virtual SpanningTreeVertex* buildNextGen(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches=2) = 0;
 };
@@ -306,6 +307,9 @@ inline void buildSpanningTree(const Iterator firstVtx,
  * its necessary that user code include this file and not just any of the individual strategy
  * headers that follow.
  */
+#if XE6_TOPOLOGY
+#define MAX_TORUS_DIM_SIZE 24
+#endif
 #include "treeStrategy_topoUnaware.h"
 #include "treeStrategy_nodeAware_minGens.h"
 #include "treeStrategy_nodeAware_minBytes.h"
@@ -328,9 +332,7 @@ inline SpanningTreeStrategy<Iterator>* getSpanningTreeStrategy(const Iterator fi
                                                                const Iterator beyondLastVtx,
                                                                const int maxBranches)
 {
-    #if CMK_BLUEGENEL || CMK_BLUEGENEP
-        return ( new SpanningTreeStrategy_3dTorus_minBytesHops<Iterator>() );
-    #elif XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
+    #if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
         return ( new SpanningTreeStrategy_3dTorus_minBytesHops<Iterator>() );
     #else
         /// Nested, utility class to let us to use the parent PE for different Iterator::value_types

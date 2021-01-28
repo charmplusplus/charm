@@ -30,7 +30,7 @@ class TraceSimple : public Trace {
   // "creation" of message(s) - message Sends
   void creation(envelope *, int epIdx, int num=1);
   void creation(char *msg) {}
-  void creationMulticast(envelope *, int epIdx, int num=1, int *pelist=NULL);
+  void creationMulticast(envelope *, int epIdx, int num=1, const int *pelist=NULL);
   void creationDone(int num=1);
   
   void messageRecv(char *env, int pe);
@@ -39,7 +39,7 @@ class TraceSimple : public Trace {
   // begin/end execution of a Charm++ entry point
   // NOTE: begin/endPack and begin/endUnpack can be called in between
   //       a beginExecute and its corresponding endExecute.
-  void beginExecute(envelope *);
+  void beginExecute(envelope *, void*);
   void beginExecute(char *) {}
   void beginExecute(CmiObjId *tid);
   void beginExecute(
@@ -48,7 +48,8 @@ class TraceSimple : public Trace {
 		    int ep,      // Charm++ entry point id
 		    int srcPe,   // Which PE originated the call
 		    int ml,      // message size
-		    CmiObjId* idx);    // index
+		    CmiObjId* idx,    // index
+            void* obj);
   void endExecute(void);
   
   // begin/end idle time for this pe
