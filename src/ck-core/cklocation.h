@@ -321,13 +321,13 @@ public:
   void updateLocation(CmiUInt8 id, int nowOnPe);
   void erase(CmiUInt8 id) { id2pe.erase(id); }
 
-  inline int whichPE(const CmiUInt8 id) const
+  int whichPE(const CmiUInt8 id) const
   {
     IdPeMap::const_iterator itr = id2pe.find(id);
     return itr != id2pe.end() ? itr->second : -1;
   }
 
-  inline int lastKnown(CmiUInt8 id) const
+  int lastKnown(CmiUInt8 id) const
   {
     int pe = whichPE(id);
     if (pe == -1)
@@ -472,40 +472,40 @@ public:
   CkLocMgr(CkMigrateMessage* m);
   ~CkLocMgr();
 
-  inline bool isLocMgr(void) { return true; }
+  bool isLocMgr(void) { return true; }
   CkGroupID& getGroupID(void) { return thisgroup; }
-  inline CProxy_CkLocMgr& getProxy(void) { return thisProxy; }
-  inline CProxyElement_CkLocMgr& getLocalProxy(void) { return thislocalproxy; }
+  CProxy_CkLocMgr& getProxy(void) { return thisProxy; }
+  CProxyElement_CkLocMgr& getLocalProxy(void) { return thislocalproxy; }
 
-  inline CkGroupID getLocationCache() const { return cacheID; }
+  CkGroupID getLocationCache() const { return cacheID; }
 
   // Interface used by external users:
   /// Home mapping
-  inline int homePe(const CkArrayIndex& idx) const
+  int homePe(const CkArrayIndex& idx) const
   {
     return CMK_RANK_0(map->homePe(mapHandle, idx));
   }
-  inline int homePe(const CmiUInt8 id) const
+  int homePe(const CmiUInt8 id) const
   {
     if (compressor)
       return CMK_RANK_0(homePe(compressor->decompress(id)));
     return CMK_RANK_0(id >> 24);
   }
-  inline int procNum(const CkArrayIndex& idx) const
+  int procNum(const CkArrayIndex& idx) const
   {
     return CMK_RANK_0(map->procNum(mapHandle, idx));
   }
-  inline bool isHome(const CkArrayIndex& idx) const { return homePe(idx) == CkMyPe(); }
-  inline int whichPE(const CmiUInt8 id) const { return cache->whichPE(id); }
-  inline int whichPE(const CkArrayIndex& idx) const
+  bool isHome(const CkArrayIndex& idx) const { return homePe(idx) == CkMyPe(); }
+  int whichPE(const CmiUInt8 id) const { return cache->whichPE(id); }
+  int whichPE(const CkArrayIndex& idx) const
   {
     CmiUInt8 id;
     if (!lookupID(idx, id))
       return -1;
     return cache->whichPE(id);
   }
-  inline int lastKnown(const CmiUInt8 id) const { return cache->lastKnown(id); }
-  inline int lastKnown(const CkArrayIndex& idx) const
+  int lastKnown(const CmiUInt8 id) const { return cache->lastKnown(id); }
+  int lastKnown(const CkArrayIndex& idx) const
   {
     int pe = whichPE(idx);
     if (pe == -1)
@@ -514,7 +514,7 @@ public:
       return pe;
   }
 
-  inline CmiUInt8 lookupID(const CkArrayIndex& idx) const
+  CmiUInt8 lookupID(const CkArrayIndex& idx) const
   {
     if (compressor)
     {
@@ -528,7 +528,7 @@ public:
     }
   }
 
-  inline bool lookupID(const CkArrayIndex& idx, CmiUInt8& id) const
+  bool lookupID(const CkArrayIndex& idx, CmiUInt8& id) const
   {
     if (compressor)
     {
@@ -550,7 +550,7 @@ public:
     }
   }
 
-  inline CkArrayIndex lookupIdx(const CmiUInt8& id) const
+  CkArrayIndex lookupIdx(const CmiUInt8& id) const
   {
     if (compressor)
     {
