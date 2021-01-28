@@ -8,10 +8,11 @@
 #include "converse.h"
 #include <sys/types.h> /* for size_t */
 
-#ifdef __cplusplus
 #if CMK_CHARM4PY && CMK_CUDA
 #include <cuda_runtime.h>
 #endif
+
+#ifdef __cplusplus
 #include "conv-rdma.h"
 #include "pup.h"
 extern "C" {
