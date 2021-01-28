@@ -11184,10 +11184,11 @@ appropriate choices for the build one wants to perform.
    IBVERBS with 64 bit Linux                                        ``./build charm++ verbs-linux-x86_64 --with-production -j8``
    OFI with 64 bit Linux                                            ``./build charm++ ofi-linux-x86_64 --with-production -j8``
    UCX with 64 bit Linux                                            ``./build charm++ ucx-linux-x86_64 --with-production -j8``
-   UCX with 64 bit Linux (Armv8)                                    ``./build charm++ ucx-linux-arm8 --with-production -j8``
+   UCX with 64 bit Linux (AArch64)                                  ``./build charm++ ucx-linux-arm8 --with-production -j8``
    Net with 64 bit Windows                                          ``./build charm++ netlrts-win-x86_64 --with-production -j8``
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
-   Net with 64 bit Mac                                              ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
+   Net with 64 bit macOS (x86_64)                                   ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
+   Net with 64 bit macOS (ARM64)                                    ``./build charm++ netlrts-darwin-arm8 --with-production -j8``
    Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pami-bluegeneq --with-production -j8``
    Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pamilrts-bluegeneq --with-production -j8``
    Cray XE6                                                         ``./build charm++ gni-crayxe --with-production -j8``
@@ -12505,7 +12506,11 @@ tracemode:
 
 -  ``+gz-trace``: generate gzip (if available) compressed log files.
 
--  ``+gz-no-trace``: generate regular (not compressed) log files.
+-  ``+no-gz-trace``: generate regular (uncompressed) log files.
+
+-  ``+notracenested``: a debug option. Does not resume tracing outer
+   entry methods when entry methods are nested (as can happen with
+   ``[local]`` and ``[inline]`` calls.
 
 -  ``+checknested``: a debug option. Checks if events are improperly
    nested while recorded and issue a warning immediately.

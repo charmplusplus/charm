@@ -5,18 +5,24 @@
 
 /**
  * \addtogroup CkLdb
-*/
+ */
+
 /*@{*/
 
 #include "MetisLB.h"
 #include "ckgraph.h"
+#include <algorithm>
+#include <cstddef>
 #include <metis.h>
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
+static void lbinit()
+{
+  LBRegisterBalancer<MetisLB>("MetisLB", "Use Metis(tm) to partition object graph");
+}
 
-MetisLB::MetisLB(const CkLBOptions &opt): CBase_MetisLB(opt)
+MetisLB::MetisLB(const CkLBOptions& opt) : CBase_MetisLB(opt)
 {
   lbname = "MetisLB";
   if (CkMyPe() == 0 && !quietModeRequested)
@@ -26,107 +32,107 @@ MetisLB::MetisLB(const CkLBOptions &opt): CBase_MetisLB(opt)
 void MetisLB::work(LDStats* stats)
 {
   /** ========================== INITIALIZATION ============================= */
-  ProcArray *parr = new ProcArray(stats);
-  ObjGraph *ogr = new ObjGraph(stats);
+  ProcArray* parr = new ProcArray(stats);
+  ObjGraph* ogr = new ObjGraph(stats);
 
   /** ============================= STRATEGY ================================ */
-  if (_lb_args.debug() >= 2) {
+  if (_lb_args.debug() >= 2)
+  {
     CkPrintf("[%d] In MetisLB Strategy...\n", CkMyPe());
   }
 
   // convert ObjGraph to the adjacency structure
-  idx_t numVertices = ogr->vertices.size();	// number of vertices
-  int numEdges = 0;				// number of edges
-
+  idx_t numVertices = ogr->vertices.size();
+  size_t numEdges = 0;
   double maxLoad = 0.0;
-  int i, j, k, vert;
 
   /** remove duplicate edges from recvFrom */
-  for(i = 0; i < numVertices; i++) {
-    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
-      vert = ogr->vertices[i].sendToList[j].getNeighborId();
-      for(k = 0; k < ogr->vertices[i].recvFromList.size(); k++) {
-	if(ogr->vertices[i].recvFromList[k].getNeighborId() == vert) {
-	  ogr->vertices[i].sendToList[j].setNumBytes(ogr->vertices[i].sendToList[j].getNumBytes() + ogr->vertices[i].recvFromList[k].getNumBytes());
-	  ogr->vertices[i].recvFromList.erase(ogr->vertices[i].recvFromList.begin() + k);
-        }
-      }
+  for (auto& vertex : ogr->vertices)
+  {
+    for (auto& outEdge : vertex.sendToList)
+    {
+      const auto nId = outEdge.getNeighborId();
+      auto& inList = vertex.recvFromList;
+
+      // Partition the incoming edges into {not from vertex nId}, {from vertex nId}
+      const auto it = std::partition(inList.begin(), inList.end(), [nId](const Edge& e) {
+        return e.getNeighborId() != nId;
+      });
+      // Add the bytes received from vertex nId to the outgoing edge to nId, and then
+      // remove those incoming edges
+      std::for_each(it, inList.end(), [&outEdge](const Edge& e) {
+        outEdge.setNumBytes(outEdge.getNumBytes() + e.getNumBytes());
+      });
+      inList.erase(it, inList.end());
     }
   }
 
   /** the object load is normalized to an integer between 0 and 256 */
-  for(i = 0; i < numVertices; i++) {
-    if(ogr->vertices[i].getVertexLoad() > maxLoad)
-      maxLoad = ogr->vertices[i].getVertexLoad();
-    numEdges = numEdges + ogr->vertices[i].sendToList.size() + ogr->vertices[i].recvFromList.size();
+  for (const auto& vertex : ogr->vertices)
+  {
+    maxLoad = std::max(maxLoad, vertex.getVertexLoad());
+    numEdges += vertex.sendToList.size() + vertex.recvFromList.size();
   }
 
   /* adjacency list */
-  idx_t *xadj = new idx_t[numVertices + 1];
+  std::vector<idx_t> xadj(numVertices + 1);
   /* id of the neighbors */
-  idx_t *adjncy = new idx_t[numEdges];
+  std::vector<idx_t> adjncy(numEdges);
   /* weights of the vertices */
-  idx_t *vwgt = new idx_t[numVertices];
+  std::vector<idx_t> vwgt(numVertices);
   /* weights of the edges */
-  idx_t *adjwgt = new idx_t[numEdges];
+  std::vector<idx_t> adjwgt(numEdges);
 
   int edgeNum = 0;
-  double ratio = 256.0/maxLoad;
+  const double ratio = 256.0 / maxLoad;
 
-  for(i = 0; i < numVertices; i++) {
+  for (int i = 0; i < numVertices; i++)
+  {
     xadj[i] = edgeNum;
     vwgt[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
-    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
-      adjncy[edgeNum] = ogr->vertices[i].sendToList[j].getNeighborId();
-      adjwgt[edgeNum] = ogr->vertices[i].sendToList[j].getNumBytes();
+    for (const auto& outEdge : ogr->vertices[i].sendToList)
+    {
+      adjncy[edgeNum] = outEdge.getNeighborId();
+      adjwgt[edgeNum] = outEdge.getNumBytes();
       edgeNum++;
     }
-    for(j = 0; j < ogr->vertices[i].recvFromList.size(); j++) {
-      adjncy[edgeNum] = ogr->vertices[i].recvFromList[j].getNeighborId();
-      adjwgt[edgeNum] = ogr->vertices[i].recvFromList[j].getNumBytes();
+    for (const auto& inEdge : ogr->vertices[i].recvFromList)
+    {
+      adjncy[edgeNum] = inEdge.getNeighborId();
+      adjwgt[edgeNum] = inEdge.getNumBytes();
       edgeNum++;
     }
   }
-  xadj[i] = edgeNum;
+
+  xadj[numVertices] = edgeNum;
   CkAssert(edgeNum == numEdges);
 
-  idx_t edgecut;		// number of edges cut by the partitioning
-  idx_t *pemap;
-
-  idx_t options[METIS_NOPTIONS];
-  METIS_SetDefaultOptions(options);
-  //options[METIS_OPTION_PTYPE] = METIS_PTYPE_RB;
+  std::array<idx_t, METIS_NOPTIONS> options;
+  METIS_SetDefaultOptions(options.data());
   // C style numbering
   options[METIS_OPTION_NUMBERING] = 0;
+  // options[METIS_OPTION_PTYPE] = METIS_PTYPE_RB;
 
-  // number of constrains
-  idx_t ncon = 1;
+  // number of constraints
+  constexpr idx_t numConstraints = 1;
+  idx_t ncon = numConstraints;
   // number of partitions
   idx_t numPes = parr->procs.size();
-  real_t* ubvec = new real_t[ncon];
   // allow 10% imbalance
-  ubvec[0] = 1.1;
-
-  // mapping of objs to partitions
-  pemap = new idx_t[numVertices];
+  std::array<real_t, numConstraints> ubvec = {1.1};
 
   // Specifies size of vertices for computing the total communication volume
-  idx_t *vsize = NULL;
+  constexpr idx_t* vsize = nullptr;
   // This array of size nparts specifies the desired weight for each partition
   // and setting it to NULL indicates graph should be equally divided among
   // partitions
-  real_t *tpwgts = NULL;
+  constexpr real_t* tpwgts = nullptr;
 
-  int option = 0;
-  if (WEIGHTED == option) {
-    // set up the different weights between 0 and 1
-    tpwgts = new real_t[numPes];
-    for (i = 0; i < numPes; i++) {
-      tpwgts[i] = 1.0/(real_t)numPes;
-    }
-  } else if (MULTI_CONSTRAINT == option) {
-    CkAbort("Multiple constraints not implemented.\n");
-  }
+  // Output fields:
+  // number of edges cut by the partitioning
+  idx_t edgecut;
+  // mapping of objs to partitions
+  std::vector<idx_t> pemap(numVertices);
 
   // numVertices: num vertices in the graph; ncon: num balancing constrains
   // xadj, adjncy: of size n+1 and adjncy of 2m, adjncy[xadj[i]] through and
@@ -137,27 +143,20 @@ void MetisLB::work(LDStats* stats)
   // tpwghts: target partition weight, can pass NULL to equally divide
   // ubvec: of size ncon to indicate allowed load imbalance tolerance (> 1.0)
   // options: array of options; edgecut: stores the edgecut; pemap: mapping
-  METIS_PartGraphRecursive(&numVertices, &ncon,  xadj, adjncy, vwgt, vsize, adjwgt,
-      &numPes, tpwgts, ubvec, options, &edgecut, pemap);
+  METIS_PartGraphRecursive(&numVertices, &ncon, xadj.data(), adjncy.data(), vwgt.data(),
+                           vsize, adjwgt.data(), &numPes, tpwgts, ubvec.data(),
+                           options.data(), &edgecut, pemap.data());
 
-  delete[] ubvec;
-  delete[] xadj;
-  delete[] adjncy;
-  delete[] vwgt;
-  delete[] adjwgt;
-  delete[] vsize;
-  delete[] tpwgts;
-
-  if (_lb_args.debug() >= 1) {
-   CkPrintf("[%d] MetisLB done! \n", CkMyPe());
+  if (_lb_args.debug() >= 1)
+  {
+    CkPrintf("[%d] MetisLB done! \n", CkMyPe());
   }
 
-  for(i = 0; i < numVertices; i++) {
-    if(pemap[i] != ogr->vertices[i].getCurrentPe())
+  for (int i = 0; i < numVertices; i++)
+  {
+    if (pemap[i] != ogr->vertices[i].getCurrentPe())
       ogr->vertices[i].setNewPe(pemap[i]);
   }
-
-  delete[] pemap;
 
   /** ============================== CLEANUP ================================ */
   ogr->convertDecisions(stats);
