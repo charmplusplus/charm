@@ -52,9 +52,11 @@ void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
     CkPrintf("In DistributedLB strategy at %lf\n", start_time);
   }
 
+  const int n_objs = stats->objData.size();
+
   // Set constants for this iteration (these depend on CkNumPes() or number of
   // objects, so may not be constant for the entire program)
-  kMaxObjPickTrials = stats->n_objs;
+  kMaxObjPickTrials = n_objs;
   // Maximum number of times we will try to find a PE to transfer an object
   // successfully
   kMaxTrials = CkNumPes();
@@ -66,7 +68,7 @@ void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
   my_stats = stats;
 
 	my_load = 0.0;
-	for (int i = 0; i < my_stats->n_objs; i++) {
+	for (int i = 0; i < n_objs; i++) {
 		my_load += my_stats->objData[i].wallTime; 
   }
   init_load = my_load;
@@ -376,7 +378,8 @@ void DistributedLB::Setup() {
   double avg_objload = 0.0;
   double max_objload = 0.0;
   // Count the number of objs that are migratable and whose load is not 0.
-  for(int i=0; i < my_stats->n_objs; i++) {
+  const int n_objs = my_stats->objData.size();
+  for(int i=0; i < n_objs; i++) {
     if (my_stats->objData[i].migratable &&
       my_stats->objData[i].wallTime > 0.000001) {
       objs_count++;
@@ -387,7 +390,7 @@ void DistributedLB::Setup() {
   // is that since we are making probabilistic transfer of load, sending small
   // objs will result in better load balance.
   objs = new minHeap(objs_count);
-  for(int i=0; i < my_stats->n_objs; i++) {
+  for(int i=0; i < n_objs; i++) {
     if (my_stats->objData[i].migratable &&
         my_stats->objData[i].wallTime > 0.0001) {
       InfoRecord* item = new InfoRecord;

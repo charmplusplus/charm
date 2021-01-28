@@ -18,6 +18,9 @@
 #endif
 #include <inttypes.h>
 #include <list>
+#include <vector>
+
+#include "pup_stl.h"
 
 class LBManager;//Forward declaration
 
@@ -70,6 +73,8 @@ struct LDObjKey {
   LDOMid omId;
   CmiUInt8 objId;
 public:
+  LDObjKey() : omId(), objId() { }
+  LDObjKey(LDOMid &om, CmiUInt8 obj) : omId(om), objId(obj) { }
   bool operator==(const LDObjKey& obj) const {
     return (bool)(omId == obj.omId && objId == obj.objId);
   }
@@ -115,34 +120,29 @@ public:
 CkpvExtern(LBUserDataLayout, lbobjdatalayout);
 
 class LBObjUserData {
-  char *data;
+  std::vector<char> data;
 public:
-  LBObjUserData() : data(NULL) {}
-
+  LBObjUserData() {
+    data.resize(CkpvAccess(lbobjdatalayout).size());
+  }
   LBObjUserData(const LBObjUserData &d) {
-    if (d.data != NULL) {
-      init();
-      memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
-    } else {
-      data = NULL;
-    }
+    this->data = d.data;
+  }
+  LBObjUserData(LBObjUserData &&d) {
+    this->data = std::move(d.data);
   }
 
-  ~LBObjUserData() { delete [] data; }
+  ~LBObjUserData() { }
   LBObjUserData &operator = (const LBObjUserData &d) {
-    if (d.data != NULL) {
-      if (data==NULL) init();
-      memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
-    } else if (data != NULL) {
-      delete [] data;
-      data = NULL;
-    }
+    this->data = d.data;
+    return *this;
+  }
+  LBObjUserData &operator = (LBObjUserData &&d) {
+    this->data = std::move(d.data);
     return *this;
   }
   inline void pup(PUP::er &p);
-  void *getData(int idx) { if (data==NULL) init(); return (void*)(data+idx); }
-private:
-  inline void init() { data = new char[CkpvAccess(lbobjdatalayout).size()]; }
+  void *getData(int idx) { return data.data()+idx; }
 };
 
 struct LDObjData {
@@ -186,18 +186,47 @@ struct LDObjStats {
 #define LD_OBJLIST_MSG   3
 
 struct LDCommDesc {
-  char type;
-  union {
+  LDCommDesc()
+    : type(LD_PROC_MSG)
+    , dest()
+  { }
+  LDCommDesc(LDOMid &omid, CmiUInt8 objid, int destObjProc) // init_objmsg
+    : type(LD_OBJ_MSG)
+    , dest(omid, objid, destObjProc)
+  { }
+  LDCommDesc(LDOMid &omid, CmiUInt8 *objid, int len) // init_mcastmsg
+    : type(LD_OBJLIST_MSG)
+    , dest(omid, objid, len)
+  { }
+  LDCommDesc(const LDCommDesc &rhs)
+  {
+    *this = rhs;
+  }
+
+  char type{};
+
+  union destunion {
+    destunion() : destProc() {}
+    destunion(LDOMid &omid, CmiUInt8 objid, int destObjProc)
+     : destObj(omid, objid, destObjProc)
+    { }
+    destunion(LDOMid &omid, CmiUInt8 *objid, int len)
+     : destObjs()
+    {
+      destObjs.reserve(len);
+      for (int i=0; i<len; i++)
+        destObjs.emplace_back(omid, objid[i]);
+	  }
+    ~destunion() {}
+
     int destProc;		/* 1:   processor level message */
     struct{
       LDObjKey  destObj;		/* 2:   object based message    */
       int destObjProc;
     } destObj;
-    struct {
-      LDObjKey  *objs;
-      int len;
-    } destObjs;			/* 3:   one to many message     */
+    std::vector<LDObjKey> destObjs; /* 3:   one to many message     */
   } dest;
+
   char &get_type() { return type; }
   char get_type() const { return type; }
   int proc() const { return type==LD_PROC_MSG?dest.destProc:-1; }
@@ -211,23 +240,9 @@ struct LDCommDesc {
 	{ CmiAssert(type==LD_OBJ_MSG); return dest.destObj.destObj; }
   LDObjKey const &get_destObj() const 
 	{ CmiAssert(type==LD_OBJ_MSG); return dest.destObj.destObj; }
-  LDObjKey * get_destObjs(int &len) 
-	{ CmiAssert(type==LD_OBJLIST_MSG); len=dest.destObjs.len; return dest.destObjs.objs; }
-  void init_objmsg(LDOMid &omid, CmiUInt8 &objid, int destObjProc) {
-	type=LD_OBJ_MSG; 
-  	dest.destObj.destObj.omID()=omid;
-  	dest.destObj.destObj.objID() =objid;
-  	dest.destObj.destObjProc = destObjProc;
-  }
-  void init_mcastmsg(LDOMid &omid, CmiUInt8 *objid, int len) {
-	type=LD_OBJLIST_MSG; 
-	dest.destObjs.len = len;
-	dest.destObjs.objs = new LDObjKey[len];
-        for (int i=0; i<len; i++) {
-  	  dest.destObjs.objs[i].omID()=omid;
-  	  dest.destObjs.objs[i].objID() =objid[i];
-	}
-  }
+  const LDObjKey * get_destObjs(int &len) const
+	{ CmiAssert(type==LD_OBJLIST_MSG); len=dest.destObjs.size(); return dest.destObjs.data(); }
+
   inline bool operator==(const LDCommDesc &obj) const;
   inline LDCommDesc &operator=(const LDCommDesc &c);
   inline void pup(PUP::er &p);
@@ -318,16 +333,7 @@ inline void LDObjHandle::pup(PUP::er &p) {
 }
 
 inline void LBObjUserData::pup(PUP::er &p) {
-  int hasData;
-  if (!p.isUnpacking()) hasData = data != NULL;
-  p|hasData;
-  if (p.isUnpacking()) {
-    if (hasData)
-      data = new char[CkpvAccess(lbobjdatalayout).size()];
-    else
-      data = NULL;
-  }
-  if (data) p(data, CkpvAccess(lbobjdatalayout).size());
+  p|data;
 }
 
 inline void LDObjData::pup(PUP::er &p) {
@@ -355,11 +361,7 @@ inline bool LDCommDesc::operator==(const LDCommDesc &obj) const {
     switch (type) {
     case LD_PROC_MSG: return dest.destProc == obj.dest.destProc;
     case LD_OBJ_MSG:  return dest.destObj.destObj == obj.dest.destObj.destObj;
-    case LD_OBJLIST_MSG: { if (dest.destObjs.len != obj.dest.destObjs.len) 
-                               return false;
-                           for (int i=0; i<dest.destObjs.len; i++)
-                             if (!(dest.destObjs.objs[i] == obj.dest.destObjs.objs[i])) return false;
-                           return true; }
+    case LD_OBJLIST_MSG: return dest.destObjs == obj.dest.destObjs;
     }
     return false;
 }
@@ -368,11 +370,7 @@ inline LDCommDesc & LDCommDesc::operator=(const LDCommDesc &c) {
     switch (type) {
     case LD_PROC_MSG: dest.destProc = c.dest.destProc; break;
     case LD_OBJ_MSG:  dest.destObj = c.dest.destObj; break;
-    case LD_OBJLIST_MSG: { dest.destObjs.len = c.dest.destObjs.len;
-                           dest.destObjs.objs = new LDObjKey[dest.destObjs.len];
-                           for (int i=0; i<dest.destObjs.len; i++)
-                             dest.destObjs.objs[i] = c.dest.destObjs.objs[i]; 
-                           break; }
+    case LD_OBJLIST_MSG: dest.destObjs = c.dest.destObjs; break;
     }
     return *this;
 }
@@ -386,11 +384,7 @@ inline void LDCommDesc::pup(PUP::er &p) {
 		     else
 		       p|dest.destObj.destObjProc; 
 		     break;
-  case LD_OBJLIST_MSG:  {  p|dest.destObjs.len; 
-                           if (p.isUnpacking()) 
-                               dest.destObjs.objs = new LDObjKey[dest.destObjs.len];
-                           for (int i=0; i<dest.destObjs.len; i++) p|dest.destObjs.objs[i];
-                           break; }
+  case LD_OBJLIST_MSG: p|dest.destObjs; break;
   }   // end of switch
 }
 

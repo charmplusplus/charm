@@ -308,15 +308,18 @@ void CentralLB::BuildStatsMsg()
 
   DEBUGF(("Processor %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n", CkMyPe(),msg->total_walltime,msg->total_cputime,msg->idletime,msg->bg_walltime,msg->bg_cputime));
 
-  msg->n_objs = osz;
-  lbmgr->GetObjData(msg->objData);
-  msg->n_comm = csz;
-  lbmgr->GetCommData(msg->commData);
+  msg->objData.clear();
+  msg->objData.resize(osz);
+  lbmgr->GetObjData(msg->objData.data());
+  msg->commData.clear();
+  msg->commData.resize(csz);
+  lbmgr->GetCommData(msg->commData.data());
 //  lbmgr->ClearLoads();
   DEBUGF(("PE %d BuildStatsMsg %d objs, %d comm\n",CkMyPe(),msg->n_objs,msg->n_comm));
 
   if(CkMyPe() == cur_ld_balancer) {
-    msg->avail_vector = new char[CkNumPes()];
+    msg->avail_vector.clear();
+    msg->avail_vector.resize(CkNumPes());
     LBManagerObj()->get_avail_vector(msg->avail_vector);
     msg->next_lb = LBManagerObj()->new_lbbalancer();
   }
@@ -418,6 +421,9 @@ void CentralLB::depositData(CLBStatsMsg *m)
   int i;
   if (m == NULL) return;
 
+  const int n_objs = m->objData.size();
+  const int n_comm = m->commData.size();
+
   const int pe = m->from_pe;
   struct ProcStats &procStat = statsData->procs[pe];
 #if defined(TEMP_LDB)
@@ -437,7 +443,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
 
   //procStat.utilization = 1.0;
   procStat.available = true;
-  procStat.n_objs = m->n_objs;
+  procStat.n_objs = n_objs;
 
   CmiAssert(statsData->objData.size() + m->n_objs <= statsData->objData.capacity());
   statsData->objData.insert(statsData->objData.end(), m->objData, m->objData + m->n_objs);
@@ -485,8 +491,8 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
     const int pe = m->from_pe;
     DEBUGF(("Stats msg received, %d %d %d %p step %d\n", pe,stats_msg_count,m->n_objs,m,step()));
 	
-    if (m->avail_vector!=NULL) {
-      LBManagerObj()->set_avail_vector(m->avail_vector,  m->next_lb);
+    if (!m->avail_vector.empty()) {
+      LBManagerObj()->set_avail_vector(m->avail_vector, m->next_lb);
     }
 
     if (statsMsgsList[pe] != 0) {
@@ -596,7 +602,7 @@ void CentralLB::LoadBalance()
   // if we are in simulation mode read data
   if (LBSimulation::doSimulation) simulationRead();
 
-  char *availVector = lbmgr->availVector();
+  const char *availVector = lbmgr->availVector();
   for(proc = 0; proc < clients; proc++)
       statsData->procs[proc].available = (bool)availVector[proc];
 
@@ -1069,8 +1075,8 @@ void CentralLB::CheckForRealloc(){
 
 void CentralLB::ResumeFromReallocCheckpoint(){
 #if CMK_SHRINK_EXPAND
-    std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
-    free(se_avail_vector);
+    std::vector<char> avail(se_avail_vector.begin(), se_avail_vector.begin() + CkNumPes());
+    se_avail_vector.clear();
     thisProxy.WillIbekilled(avail, numProcessAfterRestart);
 #endif
 }
@@ -1231,18 +1237,20 @@ void CentralLB::removeCommDataOfDeletedObjs(LDStats* stats) {
         int sidx = stats->getSendHash(cdata);
         if (sidx == -1) continue;
         int nobjs;
-        LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+        const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+        std::vector<LDObjKey> newobjs;
+        newobjs.reserve(nobjs);
         for (int id=0; id<nobjs; id++) {
           int idx = stats->getHash(objs[id]);
           if (idx == -1)
           {
-            objs[id] = objs[nobjs-1];
+            newobjs[id] = objs[nobjs-1];
             id--;
             nobjs--;
           }
         }
         if(nobjs == 0) continue;
-        cdata.receiver.dest.destObjs.len = nobjs;
+        cdata.receiver.dest.destObjs = std::move(newobjs);
         break;
       }
     }
@@ -1640,17 +1648,11 @@ int CentralLB::useMem() {
 */
 
 CLBStatsMsg::CLBStatsMsg(int osz, int csz) {
-  n_objs = osz;
-  n_comm = csz;
-  objData = new LDObjData[osz];
-  commData = new LDCommData[csz];
-  avail_vector = NULL;
+  objData.resize(osz);
+  commData.resize(csz);
 }
 
 CLBStatsMsg::~CLBStatsMsg() {
-  delete [] objData;
-  delete [] commData;
-  delete [] avail_vector;
 }
 
 void CLBStatsMsg::pup(PUP::er &p) {
@@ -1668,21 +1670,10 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|total_cputime;
   p|bg_cputime;
 #endif
-  p|n_objs;
-  if (p.isUnpacking()) objData = new LDObjData[n_objs];
-  for (i=0; i<n_objs; i++) p|objData[i];
-  p|n_comm;
-  if (p.isUnpacking()) commData = new LDCommData[n_comm];
-  for (i=0; i<n_comm; i++) p|commData[i];
+  p|objData;
+  p|commData;
 
-  int has_avail_vector;
-  if (!p.isUnpacking()) has_avail_vector = (avail_vector != NULL);
-  p|has_avail_vector;
-  if (p.isUnpacking()) {
-    if (has_avail_vector) avail_vector = new char[CkNumPes()];
-    else avail_vector = NULL;
-  }
-  if (has_avail_vector) p(avail_vector, CkNumPes());
+  p|avail_vector;
 
   p(next_lb);
 }
