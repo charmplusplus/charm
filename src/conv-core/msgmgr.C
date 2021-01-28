@@ -53,7 +53,7 @@ void CmmFreeAll(CmmTable t){
 void CmmPut(CmmTable t, int ntags, int *tags, void *msg)
 {
   int i;
-  CmmEntry e=(CmmEntry)CmiAlloc(sizeof(struct CmmEntryStruct)+(ntags*sizeof(int)));
+  CmmEntry e=(CmmEntry)CmiAlloc(sizeof(struct CmmEntryStruct)+((size_t)ntags*sizeof(int)));
   e->next = 0;
   e->msg = msg;
   e->ntags = ntags;
@@ -169,8 +169,8 @@ CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup)
       int ntags, *tags;
       void *msg;
       pup_int(p, &ntags);
-      CmiEnforce(ntags <= std::numeric_limits<size_t>::max() / sizeof(int));
-      tags = (int*) malloc(ntags*sizeof(int));
+      CmiEnforce(ntags <= std::numeric_limits<int>::max());
+      tags = (int*) malloc((size_t)ntags*sizeof(int));
       CmiEnforce(tags != nullptr);
       pup_ints(p, tags, ntags);
       msgpup(p,&msg);
