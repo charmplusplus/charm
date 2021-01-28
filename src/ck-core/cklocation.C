@@ -1161,17 +1161,17 @@ static int cmp(const void *first, const void *second)
 }
 
 void
-arrInfo::distrib(int *_speeds)
+arrInfo::distrib(int *speeds)
 {
   int _nelemsCount = _nelems.getCombinedCount();
   double total = 0.0;
   int npes = CkNumPes();
   int i,j,k;
   for(i=0;i<npes;i++)
-    total += (double) _speeds[i];
+    total += (double) speeds[i];
   std::vector<double> nspeeds(npes);
   for(i=0;i<npes;i++)
-    nspeeds[i] = (double) _speeds[i] / total;
+    nspeeds[i] = (double) speeds[i] / total;
   std::vector<int> cp(npes);
   for(i=0;i<npes;i++)
     cp[i] = (int) (nspeeds[i]*_nelemsCount);
@@ -1211,7 +1211,7 @@ arrInfo::getMap(const CkArrayIndex &i)
 
 //Speeds maps processor number to "speed" (some sort of iterations per second counter)
 // It is initialized by processor 0.
-static int* speeds;
+static int* globalSpeeds;
 
 #if CMK_USE_PROP_MAP
 typedef struct _speedmsg
@@ -1226,14 +1226,14 @@ static void _speedHdlr(void *m)
   speedMsg *msg=(speedMsg *)m;
   if (CmiMyRank()==0)
     for (int pe=0;pe<CmiNodeSize(msg->node);pe++)
-      speeds[CmiNodeFirst(msg->node)+pe] = msg->speed;  
+      globalSpeeds[CmiNodeFirst(msg->node)+pe] = msg->speed;
   CmiFree(m);
 }
 
 // initnode call
 void _propMapInit(void)
 {
-  speeds = new int[CkNumPes()];
+  globalSpeeds = new int[CkNumPes()];
   int hdlr = CkRegisterHandler(_speedHdlr);
   CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CkMyPe());
   int s = LBManager::ProcessorSpeed();
@@ -1248,10 +1248,10 @@ void _propMapInit(void)
 #else
 void _propMapInit(void)
 {
-  speeds = new int[CkNumPes()];
+  globalSpeeds = new int[CkNumPes()];
   int i;
   for(i=0;i<CkNumPes();i++)
-    speeds[i] = 1;
+    globalSpeeds[i] = 1;
 }
 #endif
 /**
@@ -1275,7 +1275,7 @@ public:
   {
     int idx = arrs.size();
     arrs.resize(idx+1);
-    arrs[idx] = new arrInfo(numElements, speeds);
+    arrs[idx] = new arrInfo(numElements, globalSpeeds);
     return idx;
   }
   void unregisterArray(int idx)
@@ -1295,7 +1295,7 @@ public:
     p|arrs;
     if(p.isUnpacking() && oldNumPes != CkNumPes()){
       for(int idx = 0; idx < arrs.length(); ++idx){
-        arrs[idx]->distrib(speeds);
+        arrs[idx]->distrib(globalSpeeds);
       }
     }
   }
