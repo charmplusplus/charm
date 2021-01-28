@@ -2585,7 +2585,8 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
   int d = 0;
   CkGroupID gId;
   gId.idx = aid;
-  CkArrayIndex1D arrIndex(*idx);
+
+  CkArrayIndex arrIndex(ndims, idx);
 
   CProxyElement_ArrayBase destProxy = CProxyElement_ArrayBase(gId, arrIndex);
   int destPe = destProxy.ckLocalBranch()->lastKnown(arrIndex);
