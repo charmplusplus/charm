@@ -7,7 +7,7 @@ typedef int DataType;
 typedef double DataType;
 #endif
 
-enum Direction { LEFT = 1, RIGHT, TOP, BOTTOM, FRONT, BACK };
+enum Direction { LEFT = 0, RIGHT, TOP, BOTTOM, FRONT, BACK, DIR_COUNT };
 
 #define IDX(i,j,k) ((block_width+2)*(block_height+2)*(k)+(block_width+2)*(j)+(i))
 

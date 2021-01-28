@@ -9151,8 +9151,71 @@ Inter-node messages will be transferred using the naive host-staged mechanism
 where the data is first transferred to the host from the source GPU, sent over
 the network, then transferred to the destination GPU.
 
+An optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
+and pre-allocated GPU communication buffers are available through runtime flags.
+This significantly reduces the overhead from creation and opening of CUDA IPC handles,
+especially for relatively small messages. ``+gpushm`` will turn on this optimization
+feature, ``+gpucommbuffer [size]`` specifies the size of the communication buffer
+allocated on each GPU (default is 64MB), and ``+gpuipceventpool`` determines the number of
+CUDA IPC events per PE that is used for this feature (default is 16).
+
 Examples using the direct GPU messaging feature can be found in
 ``examples/charm++/cuda/gpudirect``.
+
+Intra-node Persistent GPU Communication
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Persistent GPU communication is a feature designed to take advantage of the fact
+that the address and size of the source/destination buffers do not change in
+persistent communication. Such patterns are found in many applications, including
+iterative applications that exchange the same set of buffers between neighbors/peers
+at every iteration. This allows us to reduce the overheads involved with
+with direct GPU messaging, including the nature of the multi-hop mechanism and
+CUDA IPC setup, and directly issue ``cudaMemcpy`` calls at the message send sites
+(for a ``put`` type operation; a ``get`` type operation is also supported).
+In inter-process communication, CUDA IPC handles are created, exchanged
+and opened only once (this setup step can be performed again if the buffer addresses
+or sizes involved in the persistent communication change). Note that this feature
+is currently supported only for intra-node communication.
+
+Setup and communication routines are supported through ``CkDevicePersistent``:
+
+.. code-block:: c++
+
+   struct CkDevicePersistent {
+     // Constructors
+     CkDevicePersistent(const void* ptr, size_t size);
+     CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb);
+     CkDevicePersistent(const void* ptr, size_t size, cudaStream_t stream);
+     CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb, cudaStream_t stream);
+
+     void open(); // Creates an IPC handle for inter-process communication
+     void closes(); // Closes an opened IPC handle
+     void set_msg(void* msg); // Ties a Charm++ message to the stored callback
+     void get(CkDevicePersistent& src); // Initiates transfer from the specified source buffer
+     void put(CkDevicePersistent& dst); // Initiates transfer to the specified destination buffer
+   };
+
+``CkDevicePersistent`` objects should be created on both the sender and receiver chares,
+with the respective source and destination buffer addresses and sizes. The optional
+Charm++ callback object will be invoked once the communication using that persistent
+buffer is complete. For instance, if both sender and receiver ``CkDevicePersistent``
+objects have callbacks associated with them, the sender's callback will be invoked
+once the send operation is complete and when the user can reuse/free the associated buffer,
+and the receiver's callback will be invoked once the received data is available.
+The associated CUDA stream will be used in the ``cudaMemcpyAsync`` calls to asynchronously
+invoke the underlying data transfers, which are tracked to invoke the subsequent callbacks, if any.
+The ``open`` and ``close`` calls are required for CUDA IPC setup and teardown.
+``open`` should be called after the creation of the ``CkDevicePersistent`` object and before
+sending it to a communication peer, and ``close`` should be called when the persistent
+object will no longer be used or before migration.
+
+Once the ``CkDevicePersistent`` objects are created and ``open`` ed, they should be
+exchanged between the communication peers. After this setup stage, the objects'
+``get`` and ``put`` methods can be invoked freely to perform the desired communication.
+
+Examples using the intra-node persistent GPU communication can be found in
+``examples/charm++/cuda/gpudirect/persitent`` and ``examples/charm++/cuda/gpudirect/jacobi3d``.
 
 .. _sec:mpiinterop:
 
