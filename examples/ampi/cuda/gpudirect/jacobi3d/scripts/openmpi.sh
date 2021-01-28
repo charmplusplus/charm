@@ -1,16 +1,16 @@
 #!/bin/bash
 #BSUB -W 30
 #BSUB -P csc357
-#BSUB -nnodes 16
-#BSUB -J jacobi3d-openmpi-weak-n16
+#BSUB -nnodes 256
+#BSUB -J jacobi3d-openmpi-weak-n256
 
 # These need to be changed between submissions
 file=jacobi3d_mpi-bench
-n_nodes=16
+n_nodes=256
 n_procs=$((n_nodes * 6))
-grid_width=6144
-grid_height=3072
-grid_depth=3072
+grid_width=12288
+grid_height=12288
+grid_depth=6144
 
 # Function to display commands
 exe() { echo "\$ $@" ; "$@" ; }
@@ -47,3 +47,5 @@ do
   echo "# Run $iter"
   exe mpirun -rf rankfile-$LSB_JOBID -x PATH -x LD_LIBRARY_PATH ./$file -x $grid_width -y $grid_height -z $grid_depth -w $warmup_iters -i $n_iters -d
 done
+
+rm rankfile-$LSB_JOBID
