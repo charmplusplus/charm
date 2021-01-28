@@ -77,7 +77,7 @@ class LBDBRegistry
   {
     if (legacyLBName != nullptr)
     {
-      legacy_runtime_treelbs.emplace(runtime_lbs.size(), legacyLBName);
+      legacy_runtime_treelbs.emplace((int)runtime_lbs.size(), legacyLBName);
     }
 
     runtime_lbs.push_back(name);
@@ -527,7 +527,7 @@ void LBManager::init(void)
   }
   else
   {
-    AddLocalBarrierReceiver([this](void) { this->InvokeLB(); });
+    CkSyncBarrier::object()->addReceiver([this](void) { this->InvokeLB(); });
   }
 }
 
@@ -854,7 +854,7 @@ void LBManager::ResumeClients()
   }
   else
   {
-    CkSyncBarrier::Object()->ResumeClients();
+    CkSyncBarrier::object()->resumeClients();
   }
 #endif
 }
@@ -912,46 +912,41 @@ void LBManager::UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad)
 
 LDBarrierClient LBManager::AddLocalBarrierClient(Chare* obj, std::function<void()> fn)
 {
-  return CkSyncBarrier::Object()->AddClient(obj, fn);
+  return CkSyncBarrier::object()->addClient(obj, fn);
 }
 
 void LBManager::RemoveLocalBarrierClient(LDBarrierClient h)
 {
-  CkSyncBarrier::Object()->RemoveClient(h);
+  CkSyncBarrier::object()->removeClient(h);
 }
 
 LDBarrierReceiver LBManager::AddLocalBarrierReceiver(std::function<void()> fn)
 {
-  return CkSyncBarrier::Object()->AddReceiver(fn);
+  return CkSyncBarrier::object()->addReceiver(fn);
 }
 
 void LBManager::RemoveLocalBarrierReceiver(LDBarrierReceiver h)
 {
-  CkSyncBarrier::Object()->RemoveReceiver(h);
+  CkSyncBarrier::object()->removeReceiver(h);
 }
 
 void LBManager::AtLocalBarrier(LDBarrierClient _n_c)
 {
-  if (useBarrier) CkSyncBarrier::Object()->AtBarrier(_n_c);
-}
-
-void LBManager::DecreaseLocalBarrier(int c)
-{
-  if (useBarrier) CkSyncBarrier::Object()->DecreaseBarrier(c);
+  if (useBarrier) CkSyncBarrier::object()->atBarrier(_n_c);
 }
 
 void LBManager::TurnOnBarrierReceiver(LDBarrierReceiver h)
 {
-  CkSyncBarrier::Object()->TurnOnReceiver(h);
+  CkSyncBarrier::object()->turnOnReceiver(h);
 }
 
 void LBManager::TurnOffBarrierReceiver(LDBarrierReceiver h)
 {
-  CkSyncBarrier::Object()->TurnOffReceiver(h);
+  CkSyncBarrier::object()->turnOffReceiver(h);
 }
 
-void LBManager::LocalBarrierOn(void) { CkSyncBarrier::Object()->TurnOn(); };
-void LBManager::LocalBarrierOff(void) { CkSyncBarrier::Object()->TurnOff(); };
+void LBManager::LocalBarrierOn(void) { CkSyncBarrier::object()->turnOn(); };
+void LBManager::LocalBarrierOff(void) { CkSyncBarrier::object()->turnOff(); };
 
 #if CMK_LBDB_ON
 static void work(int iter_block, volatile int* result)

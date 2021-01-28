@@ -4,27 +4,27 @@ CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = pingpong.o
 
-all:	pgm
+all:	pingpong
 
-pgm: $(OBJS)
-	$(CHARMC) -language charm++ -o pgm $(OBJS)
+pingpong: $(OBJS)
+	$(CHARMC) -language charm++ -o pingpong $(OBJS)
 
-pgm.prj: $(OBJS)
-	$(CHARMC) -tracemode projections -language charm++ -o pgm.prj $(OBJS)
+pingpong.prj: $(OBJS)
+	$(CHARMC) -tracemode projections -language charm++ -o pingpong.prj $(OBJS)
 
 cifiles: pingpong.ci
 	$(CHARMC)  pingpong.ci
 	touch cifiles
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o pgm charmrun cifiles pgm.exe pgm.pdb pgm.ilk
+	rm -f *.decl.h *.def.h conv-host *.o pingpong charmrun cifiles pingpong.exe pingpong.pdb pingpong.ilk
 
 pingpong.o: pingpong.C cifiles
 	$(CHARMC) -I$(SRC)/conv-core pingpong.C
 
 test: all
 	@echo "Intra-processor Pingpong.."
-	$(call run, ./pgm +p1 )
+	$(call run, ./pingpong +p1 )
 	@echo "Inter-processor Pingpong.."
-	$(call run, ./pgm +p2 )
+	$(call run, ./pingpong +p2 )
 

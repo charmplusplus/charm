@@ -21,7 +21,7 @@ else
 fi
 if [[ ! -d "`cygpath -u "$VCC_DIR"`" ]]
 then
-  echo "VCC_DIR: $VCC_DIR is not set properly!"
+  echo "\$VCINSTALLDIR is not set properly: $VCC_DIR"
   exit 1
 fi
 if [[ -n "$WINDOWSSDKDIR" ]]
@@ -35,7 +35,7 @@ else
 fi
 if [[ ! -d "`cygpath -u "$SDK_DIR"`" ]]
 then
-  echo "SDK_DIR: $SDK_DIR is not set properly!"
+  echo "\$WindowsSdkDir is not set properly: $SDK_DIR"
   exit 1
 fi
 
@@ -44,7 +44,7 @@ fi
 CL_CMD='CL.EXE'
 # Define NOMINMAX to avoid definition of unexpected min(a,b) and max(a,b)
 # macros,per http://support.microsoft.com/kb/143208
-CL_COMMON='-nologo -W1 -EHsc -D_WINDOWS -DNOMINMAX -GS-'
+CL_COMMON='-nologo -W1 -EHsc -D_WINDOWS -DNOMINMAX'
 # CL_COMMON+=" -I`cygpath -d \"$SDK_DIR/Include\"`"
 # CL_COMMON+=" -I`cygpath -d \"$VCC_DIR/Include\"`"
 CL_MT='-MT'
@@ -243,7 +243,6 @@ do
 	-U*)
 		def=`echo $arg | awk -F@ '{print substr($1,3)}'`
 		CL+=" -U$def"
-		ML+=" -U$def"
 		;;
 	-I)
 		path="`cygpath -w $1`"
@@ -363,7 +362,11 @@ do
 		LINK+=" $base.o"
 		DOCOMPILE='1'
 		;;
-	'-fno-lifetime-dse'|'-rdynamic'|'-Wl,--export-dynamic'|'-fvisibility=hidden'|'-Wl,-undefined,dynamic_lookup')
+	-fno-stack-protector)
+		CL_OPTS+=" -GS-"
+		;;
+	-fno-lifetime-dse|-rdynamic|-Wl,--export-dynamic|-fvisibility=*|-Wl,-undefined,dynamic_lookup|-ftls-model=*)
+		# UNKNOWN_FLAGS
 		# Error out so configure knows not to pass us these arguments, avoiding the below warning.
 		exit 1
 		;;

@@ -2082,7 +2082,7 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
 
   // Create an entry for the unordered map with idx as the index and the vector size as the value
   CmiLock(CksvAccess(_nodeZCPendingLock));
-  CksvAccess(pendingZCOps).emplace(id, CpvAccess(newZCPupGets).size());
+  CksvAccess(pendingZCOps).emplace(id, (CmiUInt1)CpvAccess(newZCPupGets).size());
   CmiUnlock(CksvAccess(_nodeZCPendingLock));
 
   // Create an entry for the unordered map with idx as the index and vector of messages as the value

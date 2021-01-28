@@ -123,6 +123,15 @@ void LBDefaultCreate(LBCreateFn f);
 
 void LBRegisterBalancer(std::string, LBCreateFn, LBAllocFn, std::string, bool shown = true);
 
+template <typename T>
+void LBRegisterBalancer(std::string name, std::string description, bool shown = true)
+{
+  LBRegisterBalancer(
+      name, [](const CkLBOptions& opts) { T::proxy_t::ckNew(opts); },
+      []() -> BaseLB* { return new T(static_cast<CkMigrateMessage*>(nullptr)); },
+      description, shown);
+}
+
 void _LBMgrInit();
 
 // main chare
@@ -261,10 +270,10 @@ class LBManager : public CBase_LBManager
   }
   int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest); }
   void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh); }
-  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(this, omh); }
+  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(omh); }
   void DoneRegisteringObjects(LDOMHandle omh)
   {
-    lbdb_obj->DoneRegisteringObjects(this, omh);
+    lbdb_obj->DoneRegisteringObjects(omh);
   }
   void ObjectStart(const LDObjHandle& h) { lbdb_obj->ObjectStart(h); }
   void ObjectStop(const LDObjHandle& h) { lbdb_obj->ObjectStop(h); }
@@ -454,7 +463,6 @@ class LBManager : public CBase_LBManager
   }
   void RemoveLocalBarrierReceiver(LDBarrierReceiver h);
   void AtLocalBarrier(LDBarrierClient _n_c);
-  void DecreaseLocalBarrier(int c);
   void TurnOnBarrierReceiver(LDBarrierReceiver h);
   void TurnOffBarrierReceiver(LDBarrierReceiver h);
 

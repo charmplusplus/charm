@@ -5787,19 +5787,19 @@ until the value is available.
 We provide both C-compatible and object-oriented interfaces for using
 futures, which include the following functions:
 
-+------------------------------------------------------+------------------------------------+
-| C                                                    | C++                                |
-+======================================================+====================================+
-| :code:`CkFuture CkCreateFuture(void)`                | :code:`ck::future()`               |
-+------------------------------------------------------+------------------------------------+
-| :code:`void CkReleaseFuture(CkFuture fut)`           | :code:`void ck::future::release()` |
-+------------------------------------------------------+------------------------------------+
-| :code:`int CkProbeFuture(CkFuture fut)`              | :code:`bool ck::future::probe()`   |
-+------------------------------------------------------+------------------------------------+
-| :code:`void *CkWaitFuture(CkFuture fut)`             | :code:`T ck::future::get()`        |
-+------------------------------------------------------+------------------------------------+
-| :code:`void CkSendToFuture(CkFuture fut, void *msg)` | :code:`void ck::future::set(T)`    |
-+------------------------------------------------------+------------------------------------+
++------------------------------------------------------+-------------------------------------+
+| C                                                    | C++                                 |
++======================================================+=====================================+
+| :code:`CkFuture CkCreateFuture(void)`                | :code:`ck::future()`                |
++------------------------------------------------------+-------------------------------------+
+| :code:`void CkReleaseFuture(CkFuture fut)`           | :code:`void ck::future::release()`  |
++------------------------------------------------------+-------------------------------------+
+| :code:`int CkProbeFuture(CkFuture fut)`              | :code:`bool ck::future::is_ready()` |
++------------------------------------------------------+-------------------------------------+
+| :code:`void *CkWaitFuture(CkFuture fut)`             | :code:`T ck::future::get()`         |
++------------------------------------------------------+-------------------------------------+
+| :code:`void CkSendToFuture(CkFuture fut, void *msg)` | :code:`void ck::future::set(T)`     |
++------------------------------------------------------+-------------------------------------+
 
 You will note that the object-oriented versions are methods of `ck::future`,
 which can be templated with any pup'able type. An example of the
@@ -9151,8 +9151,71 @@ Inter-node messages will be transferred using the naive host-staged mechanism
 where the data is first transferred to the host from the source GPU, sent over
 the network, then transferred to the destination GPU.
 
+An optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
+and pre-allocated GPU communication buffers are available through runtime flags.
+This significantly reduces the overhead from creation and opening of CUDA IPC handles,
+especially for relatively small messages. ``+gpushm`` will turn on this optimization
+feature, ``+gpucommbuffer [size]`` specifies the size of the communication buffer
+allocated on each GPU (default is 64MB), and ``+gpuipceventpool`` determines the number of
+CUDA IPC events per PE that is used for this feature (default is 16).
+
 Examples using the direct GPU messaging feature can be found in
 ``examples/charm++/cuda/gpudirect``.
+
+Intra-node Persistent GPU Communication
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Persistent GPU communication is a feature designed to take advantage of the fact
+that the address and size of the source/destination buffers do not change in
+persistent communication. Such patterns are found in many applications, including
+iterative applications that exchange the same set of buffers between neighbors/peers
+at every iteration. This allows us to reduce the overheads involved with
+with direct GPU messaging, including the nature of the multi-hop mechanism and
+CUDA IPC setup, and directly issue ``cudaMemcpy`` calls at the message send sites
+(for a ``put`` type operation; a ``get`` type operation is also supported).
+In inter-process communication, CUDA IPC handles are created, exchanged
+and opened only once (this setup step can be performed again if the buffer addresses
+or sizes involved in the persistent communication change). Note that this feature
+is currently supported only for intra-node communication.
+
+Setup and communication routines are supported through ``CkDevicePersistent``:
+
+.. code-block:: c++
+
+   struct CkDevicePersistent {
+     // Constructors
+     CkDevicePersistent(const void* ptr, size_t size);
+     CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb);
+     CkDevicePersistent(const void* ptr, size_t size, cudaStream_t stream);
+     CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb, cudaStream_t stream);
+
+     void open(); // Creates an IPC handle for inter-process communication
+     void closes(); // Closes an opened IPC handle
+     void set_msg(void* msg); // Ties a Charm++ message to the stored callback
+     void get(CkDevicePersistent& src); // Initiates transfer from the specified source buffer
+     void put(CkDevicePersistent& dst); // Initiates transfer to the specified destination buffer
+   };
+
+``CkDevicePersistent`` objects should be created on both the sender and receiver chares,
+with the respective source and destination buffer addresses and sizes. The optional
+Charm++ callback object will be invoked once the communication using that persistent
+buffer is complete. For instance, if both sender and receiver ``CkDevicePersistent``
+objects have callbacks associated with them, the sender's callback will be invoked
+once the send operation is complete and when the user can reuse/free the associated buffer,
+and the receiver's callback will be invoked once the received data is available.
+The associated CUDA stream will be used in the ``cudaMemcpyAsync`` calls to asynchronously
+invoke the underlying data transfers, which are tracked to invoke the subsequent callbacks, if any.
+The ``open`` and ``close`` calls are required for CUDA IPC setup and teardown.
+``open`` should be called after the creation of the ``CkDevicePersistent`` object and before
+sending it to a communication peer, and ``close`` should be called when the persistent
+object will no longer be used or before migration.
+
+Once the ``CkDevicePersistent`` objects are created and ``open`` ed, they should be
+exchanged between the communication peers. After this setup stage, the objects'
+``get`` and ``put`` methods can be invoked freely to perform the desired communication.
+
+Examples using the intra-node persistent GPU communication can be found in
+``examples/charm++/cuda/gpudirect/persitent`` and ``examples/charm++/cuda/gpudirect/jacobi3d``.
 
 .. _sec:mpiinterop:
 
@@ -11184,10 +11247,11 @@ appropriate choices for the build one wants to perform.
    IBVERBS with 64 bit Linux                                        ``./build charm++ verbs-linux-x86_64 --with-production -j8``
    OFI with 64 bit Linux                                            ``./build charm++ ofi-linux-x86_64 --with-production -j8``
    UCX with 64 bit Linux                                            ``./build charm++ ucx-linux-x86_64 --with-production -j8``
-   UCX with 64 bit Linux (Armv8)                                    ``./build charm++ ucx-linux-arm8 --with-production -j8``
+   UCX with 64 bit Linux (AArch64)                                  ``./build charm++ ucx-linux-arm8 --with-production -j8``
    Net with 64 bit Windows                                          ``./build charm++ netlrts-win-x86_64 --with-production -j8``
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
-   Net with 64 bit Mac                                              ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
+   Net with 64 bit macOS (x86_64)                                   ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
+   Net with 64 bit macOS (ARM64)                                    ``./build charm++ netlrts-darwin-arm8 --with-production -j8``
    Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pami-bluegeneq --with-production -j8``
    Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pamilrts-bluegeneq --with-production -j8``
    Cray XE6                                                         ``./build charm++ gni-crayxe --with-production -j8``
@@ -11342,10 +11406,10 @@ UCX
 ^^^
 UCX stands for Unified Communication X and is a high performance communication
 library that can be used as a backend networking layer for Charm++ builds on
-supported transports like Infiniband, Omni-Path, gni, TCP/IP, etc.
+supported transports like Mellanox Infiniband, Intel Omni-Path, Cray GNI, TCP/IP, etc.
 
-In order to install Charm++ with UCX backend, you require UCX or HPC-X modules
-in your environment. In case UCX or HPC-X is not available in your environment,
+In order to install Charm++ with the UCX backend, UCX or HPC-X modules are required
+in your environment. In case UCX and HPC-X are not available in your environment,
 you can build UCX from scratch using the following steps:
 
 .. code-block:: bash
@@ -11359,16 +11423,21 @@ you can build UCX from scratch using the following steps:
 
 After installing UCX, there are several supported process management interfaces (PMI)
 that can be specified as options in order to build Charm++ with UCX. These include
-Simple PMI, Slurm PMI, Slurm PMI 2 and PMIx (using OpenMPI). Currently, in order to
-use PMIx for process management, it is required to have OpenMPI installed on the system.
+Simple PMI, Slurm PMI, Slurm PMI 2, and PMIx (included in OpenMPI or OpenPMIx). Currently, in order to
+use PMIx for process management, it is required to have either OpenMPI or OpenPMIx installed on the system.
 Additionally, in order to use the other supported process management interfaces, it is
 required to have a non-OpenMPI based MPI implementation installed on the system (e.g.
 Intel MPI, MVAPICH, MPICH, etc.).
+
+It should be noted that the **PMIx** version is the *most stable* version of using the UCX backend.
+We're in the process of debugging some recent issues with Simple PMI, Slurm PMI and Slurm PMI2.
 
 The following section shows examples of build commands that can be used to build targets
 with the UCX backend using different process management interfaces. It should be noted that
 unless UCX is installed in a system directory, in order for Charm++ to find the UCX installation,
 it is required to pass the UCX build directory as ``--basedir``.
+
+**Simple PMI, Slurm PMI and Slurm PMI 2**
 
 To build the Charm++ target with Simple PMI, do not specify any additional option as shown
 in the build command.
@@ -11389,28 +11458,81 @@ Similarly, to build the Charm++ target with Slurm PMI 2, specify ``slurmpmi2`` i
 
    $ ./build charm++ ucx-linux-x86_64 slurmpmi2 --with-production --enable-error-checking --basedir=$HOME/ucx/build -j16
 
-To build the Charm++ target with PMIx, you would require an OpenMPI implementation with PMIx
-enabled to be installed on your system. In case OpenMPI is not available in your environment,
+**PMIx (OpenPMIx or as included in OpenMPI)**
+
+To build the Charm++ target with PMIx, you can either use OpenPMIx directly or use the version of
+PMIx included in OpenMPI. Note that PMIx is no longer included in OpenMPI distributions
+as of v4.0.5, so we recommend building with OpenPMIx instead.
+
+To use OpenPMIx directly, you first need to install libevent (https://github.com/libevent/libevent)
+if it's not available on your system:
+
+.. code-block:: bash
+
+   $ wget https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
+   $ tar -xf libevent-2.1.12-stable.tar.gz
+   $ cd libevent-2.1.12-stable
+   $ ./configure --prefix=$HOME/libevent-2.1.12-stable/build
+   $ make -j
+   $ make install
+
+Then you can download and build OpenPMIx as follows:
+
+.. code-block:: bash
+
+   $ wget https://github.com/openpmix/openpmix/releases/download/v3.1.5/pmix-3.1.5.tar.gz
+   $ tar -xf pmix-3.1.5.tar.gz
+   $ cd pmix-3.1.5
+   $ ./configure --prefix=$HOME/pmix-3.1.5/build --with-libevent=$HOME/libevent-2.1.12-stable/build
+   $ make -j
+   $ make install
+
+Finally, Charm++ with the UCX backend can be built with OpenPMIx using the following command
+(with the OpenPMIx installation passed as an additional ``--basedir`` argument):
+
+.. code-block:: bash
+
+   $ ./build charm++ ucx-linux-x86_64 openpmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/pmix-3.1.5/build -j
+
+It should be noted that in the absence of a working launcher such as ``jsrun``, an MPI distribution
+such as OpenMPI may also be required to run Charm++ applications built with the UCX backend
+and OpenPMIx. Since you no longer need PMIx included with OpenMPI, any version of OpenMPI can be built
+(including v4.0.5 and later) with your build of OpenPMIx using the ``--with-pmix`` flag,
+such as the following:
+
+.. code-block:: bash
+
+   $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.5.tar.gz
+   $ tar -xf openmpi-4.0.5.tar.gz
+   $ cd openmpi-4.0.5
+   $ ./configure --enable-mca-no-build=btl-uct --with-pmix=$HOME/pmix-3.1.5/build --prefix=$HOME/openmpi-4.0.5/build
+   $ make -j
+   $ make install
+
+Before executing a Charm++ program, you may need to check that ``LD_LIBRARY_PATH`` and ``PATH``
+are set to include OpenPMIx (and OpenMPI, if needed).
+
+To use PMIx included with OpenMPI, an OpenMPI implementation with PMIx enabled is required
+to be installed on your system. As a reminder, PMIx is no longer included in OpenMPI
+distributions of v4.0.5 or later. In case OpenMPI is not available in your environment,
 you can build OpenMPI from scratch using the following steps:
 
 .. code-block:: bash
 
-  $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
-  $ tar -xvf openmpi-4.0.1.tar.gz
-  $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
-  $ make -j24
-  $ make install all
+   $ wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz
+   $ tar -xvf openmpi-4.0.1.tar.gz
+   $ cd openmpi-4.0.1
+   $ ./configure --enable-install-libpmix --prefix=$HOME/openmpi-4.0.1/build
+   $ make -j24
+   $ make install all
 
 After installing OpenMPI or using the pre-installed OpenMPI, you can build the Charm++ target with
 the UCX backend by specifying ``ompipmix`` in the build command and passing the OpenMPI installation
-path as ``--basedir`` (in addition to passing the UCX build directory)
+path as ``--basedir`` (in addition to passing the UCX build directory):
 
 .. code-block:: bash
 
    $ ./build charm++ ucx-linux-x86_64 ompipmix --with-production --enable-error-checking --basedir=$HOME/ucx/build --basedir=$HOME/openmpi-4.0.1/build -j16
-
-It should be noted that the pmix version is the most stable version of using the UCX backend. We're in the
-process of debugging some recent issues with Simple PMI, Slurm PMI and Slurm PMI2.
 
 .. _sec:compile:
 
@@ -12447,7 +12569,11 @@ tracemode:
 
 -  ``+gz-trace``: generate gzip (if available) compressed log files.
 
--  ``+gz-no-trace``: generate regular (not compressed) log files.
+-  ``+no-gz-trace``: generate regular (uncompressed) log files.
+
+-  ``+notracenested``: a debug option. Does not resume tracing outer
+   entry methods when entry methods are nested (as can happen with
+   ``[local]`` and ``[inline]`` calls.
 
 -  ``+checknested``: a debug option. Checks if events are improperly
    nested while recorded and issue a warning immediately.

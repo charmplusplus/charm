@@ -22,6 +22,7 @@ private:
   bool  readyMigrate;    /// status whether it is ready to migrate
   bool  enable_measure;
   int  nextPe;              /// next migration dest processor
+  CkSyncBarrier* syncBarrier;
   LBManager *lbmgr;
   MetaBalancer *the_metalb;
   LDObjHandle ldHandle;
@@ -56,6 +57,7 @@ public:
   inline const CkArrayIndex &getIndex(void) const {return idx;}
   inline CmiUInt8 getID() const { return id; }
   inline CkLocMgr *getLocMgr() const {return myLocMgr; }
+  inline CkSyncBarrier* getSyncBarrier() const { return syncBarrier; }
 
 #if CMK_LBDB_ON
 public:

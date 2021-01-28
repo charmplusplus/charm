@@ -4,16 +4,26 @@ CHARMC=../../../bin/charmc $(OPTS)
 OBJS=memoryAccess.o commbench.o overhead.o timer.o proc.o smputil.o pingpong.o \
     flood.o broadcast.o reduction.o ctxt.o pingpong-cachemiss.o
 
-all: pgm
+all: commbench
 
-pgm: $(OBJS)
-	$(CHARMC) -o pgm $(OBJS) -language converse++
+commbench: $(OBJS)
+	$(CHARMC) -o commbench $(OBJS) -language converse++
 
-test: pgm
-	$(call run, ./pgm +p4 )
+LOCALHOSTNAME:=$(shell hostname 2>/dev/null)
 
-testp: pgm
-	$(call run, ./pgm +p$(P))
+test: commbench
+ifneq (,$(findstring golub,$(LOCALHOSTNAME)))
+	@echo "Skipping commbench on Golub because of performance bug #3257"
+else
+	$(call run, ./commbench +p4 )
+endif
+
+testp: commbench
+ifneq (,$(findstring golub,$(LOCALHOSTNAME)))
+	@echo "Skipping commbench on Golub because of performance bug #3257"
+else
+	$(call run, ./commbench +p$(P))
+endif
 
 memoryAccess.o: memoryAccess.c
 	$(CHARMC) memoryAccess.c
@@ -54,6 +64,5 @@ ctxt.o: ctxt.c
 clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
-	rm -f pgm
-	rm -f conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
-
+	rm -f commbench
+	rm -f conv-host charmrun charmrun.exe commbench.exe commbench.pdb commbench.ilk

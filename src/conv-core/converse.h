@@ -165,6 +165,20 @@
 # define CMI_WARN_UNUSED_RESULT
 #endif
 
+#if defined __cplusplus && __cplusplus >= 201402L
+#  define CMK_DEPRECATED_MSG(x) [[deprecated(x)]]
+#  define CMK_DEPRECATED [[deprecated]]
+#elif defined __GNUC__ || defined __clang__
+#  define CMK_DEPRECATED_MSG(x) __attribute__((deprecated(x)))
+#  define CMK_DEPRECATED __attribute__((deprecated))
+#elif defined _MSC_VER
+#  define CMK_DEPRECATED_MSG(x) __declspec(deprecated(x))
+#  define CMK_DEPRECATED __declspec(deprecated)
+#else
+#  define CMK_DEPRECATED_MSG(x)
+#  define CMK_DEPRECATED
+#endif
+
 /* Paste the tokens x and y together, without any space between them.
    The ANSI C way to do this is the bizarre ## "token-pasting" 
    preprocessor operator.
