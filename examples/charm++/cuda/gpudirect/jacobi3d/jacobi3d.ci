@@ -10,81 +10,112 @@ mainmodule jacobi3d {
   readonly int block_width;
   readonly int block_height;
   readonly int block_depth;
+  readonly int x_surf_count;
+  readonly int y_surf_count;
+  readonly int z_surf_count;
+  readonly size_t x_surf_size;
+  readonly size_t y_surf_size;
+  readonly size_t z_surf_size;
   readonly int n_chares_x;
   readonly int n_chares_y;
   readonly int n_chares_z;
   readonly int n_iters;
   readonly int warmup_iters;
-  readonly bool sync_ver;
   readonly bool use_zerocopy;
+  readonly bool use_persistent;
   readonly bool print_elements;
+
+  message PersistentMsg;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void initDone();
     entry void startIter();
-    entry [reductiontarget] void updateDone();
-    entry [reductiontarget] void commDone();
+    entry [reductiontarget] void warmupDone();
     entry [reductiontarget] void allDone();
-    entry void printDone();
   };
 
   array [3D] Block {
     entry Block(void);
     entry void init();
-    entry void initDone();
-    entry void update();
-    entry void updateDone();
-    entry void packGhosts();
+    entry void initRecv(int dir, CkDevicePersistent p_buf);
     entry void packGhostsDone();
-    entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
-    entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
+    entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
+    entry void recvGhostP(PersistentMsg* msg);
+    entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
+    entry void updateDone();
+    entry void print();
+    entry void printDone();
 
-    entry void exchangeGhosts() {
-      serial {
-        my_iter++;
-        update();
-        if (!sync_ver) packGhosts();
-      }
-
-      when packGhostsDone() {
-        serial {
-          // When packing is done, we know that the new temperatures have been updated
-          // (because the host doesn't separately detect when the Jacobi kernel completes)
-          std::swap(d_temperature, d_new_temperature);
-          sendGhosts();
-        }
-      }
-
-      for (remote_count = 0; remote_count < neighbors; remote_count++) {
-        if (use_zerocopy) {
-          when receiveGhostsZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
+    entry void initDone() {
+      if (use_persistent) {
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when initRecv(int dir, CkDevicePersistent p_buf) {
             serial {
-              processGhostsZC(dir, w, buf);
-            }
-          }
-        } else {
-          when receiveGhostsReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
-            serial {
-              processGhostsReg(dir, w, buf);
+              p_neighbor_bufs[dir] = p_buf;
             }
           }
         }
       }
 
       serial {
-        if (sync_ver || my_iter <= warmup_iters) {
-          contribute(CkCallback(CkReductionTarget(Main, commDone), main_proxy));
-        } else {
-          if (my_iter < warmup_iters + n_iters) {
-            thisProxy[thisIndex].exchangeGhosts();
-          } else {
-            contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
-          }
-        }
+        contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
       }
     }
 
-    entry void print();
+    entry void run() {
+      // Pack and send ghost data to neighbors
+      serial {
+        packGhosts();
+      }
+
+      when packGhostsDone() serial {
+        sendGhosts();
+      }
+
+      // Receive ghost data from neighbors
+      for (remote_count = 0; remote_count < neighbors; remote_count++) {
+        if (use_zerocopy) {
+          when recvGhostZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
+            serial {
+              processGhostZC(dir, w, buf);
+            }
+          }
+        } else if (use_persistent) {
+          when recvGhostP[my_iter](PersistentMsg* msg) serial {
+            processGhostP(msg);
+          }
+        } else {
+          when recvGhostReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
+            serial {
+              processGhostReg(dir, w, buf);
+            }
+          }
+        }
+      }
+
+      // Perform Jacobian update
+      serial {
+        update();
+      }
+
+      // Iteration complete
+      when updateDone() serial {
+        if (print_elements) {
+          if (x == 0 && y == 0 && z == 0) {
+            CkPrintf("Printing iteration %d\n", my_iter);
+            thisProxy[thisIndex].print();
+          }
+        } else {
+          prepNextIter();
+        }
+      }
+
+      if (print_elements) {
+        when printDone() serial {
+          prepNextIter();
+        }
+      }
+    }
   };
 };
