@@ -752,6 +752,11 @@ struct Builtin_kvs {
   int appnum = 0;
   int lastusedcode = MPI_ERR_LASTCODE;
   int universe_size = 0;
+
+  int mype = CkMyPe();
+  int numpes = CkNumPes();
+  int mynode = CkMyNode();
+  int numnodes = CkNumNodes();
 };
 
 // ------------ startup support -----------
@@ -1696,10 +1701,10 @@ bool ampiParent::getBuiltinAttributeComm(int keyval, void *attribute_val) noexce
     case MPI_APPNUM:            *(int **)attribute_val = &(CkpvAccess(bikvs).appnum);            return true;
     case MPI_LASTUSEDCODE:      *(int **)attribute_val = &(CkpvAccess(bikvs).lastusedcode);      return true;
     case MPI_UNIVERSE_SIZE:     *(int **)attribute_val = &(CkpvAccess(bikvs).universe_size);     return true;
-    case AMPI_MY_WTH:           *(int *)attribute_val = CkMyPe();     return true;
-    case AMPI_NUM_WTHS:         *(int *)attribute_val = CkNumPes();   return true;
-    case AMPI_MY_PROCESS:       *(int *)attribute_val = CkMyNode();   return true;
-    case AMPI_NUM_PROCESSES:    *(int *)attribute_val = CkNumNodes(); return true;
+    case AMPI_MY_WTH:           *(int **)attribute_val = &(CkpvAccess(bikvs).mype);              return true;
+    case AMPI_NUM_WTHS:         *(int **)attribute_val = &(CkpvAccess(bikvs).numpes);            return true;
+    case AMPI_MY_PROCESS:       *(int **)attribute_val = &(CkpvAccess(bikvs).mynode);            return true;
+    case AMPI_NUM_PROCESSES:    *(int **)attribute_val = &(CkpvAccess(bikvs).numnodes);          return true;
     default: return false;
   }
 }
