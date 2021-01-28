@@ -1300,8 +1300,6 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
 
-	CpvInitialize(int,serializer);
-
 	_initChareTables();            // for checkpointable plain chares
 
 	CksvInitialize(UInt, _numNodeGroups);
@@ -1550,8 +1548,6 @@ void _initCharm(int unused_argc, char **argv)
 	}
     }
 #endif
-
-	CpvAccess(serializer) = 0;
 
     if (CkMyRank() == 0) {
       TopoManager_init();
