@@ -7,14 +7,14 @@ dist: xenial
 git:
   autocrlf: false
 
-before_install:
-  - |
-      if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
-        git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {
-          echo "Only docs were updated, stopping build process."
-          exit
-        }
-      fi
+# before_install:
+#   - |
+#       if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+#         git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {
+#           echo "Only docs were updated, stopping build process."
+#           exit
+#         }
+#       fi
 
 jobs:
   include:
