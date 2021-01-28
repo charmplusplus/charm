@@ -37,14 +37,6 @@ module CkReduction {
 
 	//Sent up the reduction tree with reduced data
 	entry [expedited] void RecvMsg(CkReductionMsg *);
-
-#if CMK_FAULT_EVAC
-	entry void DeleteChild(int child);
-	entry void DeleteNewChild(int child);
-	entry void modifyTree(int code,int size,int data[size]);
-	entry void collectMaxRedNo(int redNo);
-	entry void unblockNode(int maxRedNo);
-#endif
   };
 
   

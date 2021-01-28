@@ -56,7 +56,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ckarray.h"
 #include <stdarg.h>
 
-CpvDeclare(int ,serializer); // if !CMK_FAULT_EVAC, serializer is always 0
+CpvDeclare(int, serializer); // is always 0
 
 bool _isAnytimeMigration;
 bool _isStaticInsertion;
