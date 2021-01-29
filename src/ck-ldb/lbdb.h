@@ -210,6 +210,7 @@ struct LDCommDesc {
       for (int i = 0; i < len; i++)
         destObjs[i] = {omid, objid[i]};
     }
+    ~destunion() { }
 
     /* 1:   processor-level message */
     int destProc;
