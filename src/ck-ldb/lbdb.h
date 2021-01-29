@@ -187,44 +187,44 @@ struct LDObjStats {
 
 struct LDCommDesc {
   LDCommDesc()
-    : type(LD_PROC_MSG)
-    , dest()
-  { }
-  LDCommDesc(LDOMid &omid, CmiUInt8 objid, int destObjProc) // init_objmsg
-    : type(LD_OBJ_MSG)
-    , dest(omid, objid, destObjProc)
-  { }
-  LDCommDesc(LDOMid &omid, CmiUInt8 *objid, int len) // init_mcastmsg
-    : type(LD_OBJLIST_MSG)
-    , dest(omid, objid, len)
-  { }
-  LDCommDesc(const LDCommDesc &rhs)
+    : type(LD_PROC_MSG), dest() { }
+  LDCommDesc(LDOMid & omid, CmiUInt8 objid, int destObjProc) // init_objmsg
+    : type(LD_OBJ_MSG), dest(omid, objid, destObjProc) { }
+  LDCommDesc(LDOMid & omid, CmiUInt8 *objid, int len) // init_mcastmsg
+    : type(LD_OBJLIST_MSG), dest(omid, objid, len) { }
+  LDCommDesc(const LDCommDesc & rhs)
   {
     *this = rhs;
   }
 
-  char type{};
+  char type;
 
   union destunion {
     destunion() : destProc() {}
-    destunion(LDOMid &omid, CmiUInt8 objid, int destObjProc)
-     : destObj(omid, objid, destObjProc)
-    { }
-    destunion(LDOMid &omid, CmiUInt8 *objid, int len)
-     : destObjs()
+    destunion(LDOMid & omid, CmiUInt8 objid, int destObjProc)
+      : destObj(omid, objid, destObjProc) { }
+    destunion(LDOMid & omid, CmiUInt8 *objid, int len)
+      : destObjs()
     {
-      destObjs.reserve(len);
-      for (int i=0; i<len; i++)
-        destObjs.emplace_back(omid, objid[i]);
-	  }
-    ~destunion() {}
+      destObjs.resize(len);
+      for (int i = 0; i < len; i++)
+        destObjs[i] = {omid, objid[i]};
+    }
 
-    int destProc;		/* 1:   processor level message */
-    struct{
-      LDObjKey  destObj;		/* 2:   object based message    */
+    /* 1:   processor-level message */
+    int destProc;
+
+    /* 2:   object-based message    */
+    struct objstruct {
+      objstruct(LDOMid & omid, CmiUInt8 objid, int destObjProc_)
+        : destObj(omid, objid), destObjProc(destObjProc_) { }
+
+      LDObjKey  destObj;		
       int destObjProc;
     } destObj;
-    std::vector<LDObjKey> destObjs; /* 3:   one to many message     */
+
+    /* 3:   one-to-many message     */
+    std::vector<LDObjKey> destObjs;
   } dest;
 
   char &get_type() { return type; }
