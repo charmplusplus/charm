@@ -58,10 +58,6 @@ DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
 
   myStats.pe_speed = lbmgr->ProcessorSpeed();
   myStats.from_pe = CkMyPe();
-  myStats.n_objs = 0;
-  myStats.objData = NULL;
-  myStats.n_comm = 0;
-  myStats.commData = NULL;
 
   if (_lb_args.statsOn()) {
     lbmgr->CollectStatsOn();
@@ -96,21 +92,20 @@ void DistBaseLB::AssembleStats() {
 
   myStats.move = true; 
 
-  myStats.n_objs = lbmgr->GetObjDataSz();
-  if (myStats.objData) delete [] myStats.objData;
-  myStats.objData = new LDObjData[myStats.n_objs];
-  lbmgr->GetObjData(myStats.objData);
+  myStats.objData.clear();
+  myStats.objData.resize(lbmgr->GetObjDataSz());
+  lbmgr->GetObjData(myStats.objData.data());
 
-  myStats.n_comm = lbmgr->GetCommDataSz();
-  if (myStats.commData) delete [] myStats.commData;
-  myStats.commData = new LDCommData[myStats.n_comm];
-  lbmgr->GetCommData(myStats.commData);
+  myStats.commData.clear();
+  myStats.commData.resize(lbmgr->GetCommDataSz());
+  lbmgr->GetCommData(myStats.commData.data());
 
   myStats.obj_walltime = 0;
 #if CMK_LB_CPUTIMER
   myStats.obj_cputime = 0;
 #endif
-  for(int i=0; i < myStats.n_objs; i++) {
+  const int n_objs = myStats.objData.size();
+  for(int i = 0; i < n_objs; i++) {
     myStats.obj_walltime += myStats.objData[i].wallTime;
 #if CMK_LB_CPUTIMER
     myStats.obj_cputime += myStats.objData[i].cpuTime;
