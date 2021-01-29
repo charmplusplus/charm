@@ -1239,17 +1239,16 @@ void CentralLB::removeCommDataOfDeletedObjs(LDStats* stats) {
         int nobjs;
         const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
         std::vector<LDObjKey> newobjs;
-        newobjs.reserve(nobjs);
-        for (int id=0; id<nobjs; id++) {
+        newobjs.resize(nobjs);
+        for (int id = 0; id < nobjs; id++) {
           int idx = stats->getHash(objs[id]);
-          if (idx == -1)
-          {
+          if (idx == -1) {
             newobjs[id] = objs[nobjs-1];
             id--;
             nobjs--;
           }
         }
-        if(nobjs == 0) continue;
+        if (nobjs == 0) continue;
         cdata.receiver.dest.destObjs = std::move(newobjs);
         break;
       }
