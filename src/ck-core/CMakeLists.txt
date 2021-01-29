@@ -21,7 +21,7 @@ set(ck-cxx-sources
     ../ck-perf/tracec.C ../ck-perf/tracef.C ../conv-perf/charmProjections.C
     ../util/ckbitvector.C ../util/ckregex.C
     ck.C ckarray.C ckarrayoptions.C ckcallback.C
-    ckcheckpoint.C ckevacuation.C ckfutures.C ckIgetControl.C
+    ckcheckpoint.C ckfutures.C ckIgetControl.C
     cklocation.C ckmemcheckpoint.C ckmulticast.C
     ckobjQ.C ckrdma.C ckrdmadevice.C ckreduction.C cksyncbarrier.C debug-charm.C
     debug-message.C init.C modifyScheduler.C mpi-interoperate.C msgalloc.C
@@ -31,7 +31,7 @@ set(ck-cxx-sources
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     charm-api.h charm.h charmf.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
     ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
-    ckevacuation.h ckmarshall.h ckfutures.h cklocation.h cklocrec.h
+    ckmarshall.h ckfutures.h cklocation.h cklocrec.h
     ckmemcheckpoint.h ckmessage.h ckmigratable.h ckmulticast.h
     ckobjQ.h ckrdma.h ckrdmadevice.h ckreduction.h cksection.h
     ckstream.h cksyncbarrier.h debug-charm.h envelope-path.h envelope.h init.h
