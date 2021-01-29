@@ -5,7 +5,6 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
  */
 #include "tcharm_impl.h"
 #include "tcharm.h"
-#include "ckevacuation.h"
 #include <ctype.h>
 #include "memory-isomalloc.h"
 
@@ -196,9 +195,6 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
   isStopped=true;
-#if CMK_FAULT_EVAC
-	AsyncEvacuate(true);
-#endif
   exitWhenDone=initMsg->opts.exitWhenDone;
   isSelfDone = false;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
@@ -215,10 +211,6 @@ TCharm::TCharm(CkMigrateMessage *msg)
   initMsg=NULL;
   tid=NULL;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
-
-#if CMK_FAULT_EVAC
-	AsyncEvacuate(true);
-#endif
 }
 
 void checkPupMismatch(PUP::er &p,int expected,const char *where)
@@ -439,17 +431,6 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
   return this;
 #endif
 }
-
-#if CMK_FAULT_EVAC
-CMI_WARN_UNUSED_RESULT TCharm * TCharm::evacuate() noexcept {
-	//CkClearAllArrayElementsCPP();
-	if(CkpvAccess(startedEvac)){
-		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);
-		return suspend();
-	}
-	return this;
-}
-#endif
 
 //calls atsync with async mode
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::async_migrate() noexcept
@@ -814,14 +795,6 @@ CLINKAGE void TCHARM_Migrate_to(int destPE)
 	TCHARMAPI("TCHARM_Migrate_to");
 	TCharm * unused = TCharm::get()->migrateTo(destPE);
 }
-
-#if CMK_FAULT_EVAC
-CLINKAGE void TCHARM_Evacuate()
-{
-	TCHARMAPI("TCHARM_Migrate_to");
-	TCharm * unused = TCharm::get()->evacuate();
-}
-#endif
 
 FORTRAN_AS_C(TCHARM_MIGRATE_TO,TCHARM_Migrate_to,tcharm_migrate_to,
 	(int *destPE),(*destPE))
