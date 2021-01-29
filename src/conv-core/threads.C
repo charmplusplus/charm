@@ -94,7 +94,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits> // numeric_limits
 
 #include "converse.h"
 
@@ -449,8 +448,7 @@ static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratab
   if (*stackSize==0) *stackSize=CthCpvAccess(_defaultStackSize);
   th->stacksize=*stackSize;
   if (!useMigratable || !CmiIsomallocEnabled()) {
-    CmiEnforce(*stackSize <= std::numeric_limits<int>::max());
-    ret=malloc(*stackSize);
+    ret=malloc(*stackSize); 
     CmiEnforce(ret != nullptr);
   } else {
     th->isMigratable = useMigratable;

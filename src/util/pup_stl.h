@@ -37,7 +37,6 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <complex>
 #include <utility> /*for std::pair*/
 #include <chrono>
-#include <limits>
 #include "pup.h"
 
 #include <cstddef>
@@ -131,7 +130,6 @@ namespace PUP {
     size_t nChar=v.length();
     p|nChar;
     if (p.isUnpacking()) { //Unpack to temporary buffer
-      CmiEnforce(nChar <= std::numeric_limits<size_t>::max());
       char *buf=new char[nChar];
       CmiEnforce(buf != nullptr);
       p(buf,nChar);
