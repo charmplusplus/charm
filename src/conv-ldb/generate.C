@@ -45,13 +45,14 @@ static void initGraph(VerticesListType *graph);
 static void diameter(VerticesListType *graph);
 static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int numVertices, int n);
 
+extern EdgeListType * InitEdgeList(int);
+
 void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
 { int i;
   VerticesListType graph;
   int seed;
   EdgeListType * EdgeList;
   /* VerticesListType * vertices; */
-  extern EdgeListType * InitEdgeList(int);
   char dircmd[20], dirname[10];
 
   V = pV;
@@ -472,9 +473,10 @@ static void initGraph(VerticesListType *graph)
 
 static void enqueue(Q *q, int i);
 
+extern Q * makeQueue(void);
+
 static void diameter(VerticesListType *graph)
 {
-  extern Q * makeQueue(void);
   int i,j, k, v, w, start;
   int *distance;
   int *histogram;
