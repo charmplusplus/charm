@@ -400,10 +400,10 @@ void CentralLB::buildStats()
     for (int pe=0; pe<CkNumPes(); pe++) {
        CLBStatsMsg *msg = statsMsgsList[pe];
        if(msg == NULL) continue;
-       statsData->objData.insert(statsData->objData.end(), msg->objData, msg->objData + msg->n_objs);
-       statsData->from_proc.insert(statsData->from_proc.end(), msg->n_objs, pe);
-       statsData->to_proc.insert(statsData->to_proc.end(), msg->n_objs, pe);
-       statsData->commData.insert(statsData->commData.end(), msg->commData, msg->commData + msg->n_comm);
+       statsData->objData.insert(statsData->objData.end(), msg->objData.begin(), msg->objData.end());
+       statsData->from_proc.insert(statsData->from_proc.end(), msg->objData.size(), pe);
+       statsData->to_proc.insert(statsData->to_proc.end(), msg->objData.size(), pe);
+       statsData->commData.insert(statsData->commData.end(), msg->commData.begin(), msg->commData.end());
        // free the memory
        delete msg;
        statsMsgsList[pe]=0;
@@ -445,16 +445,16 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.available = true;
   procStat.n_objs = n_objs;
 
-  CmiAssert(statsData->objData.size() + m->n_objs <= statsData->objData.capacity());
-  statsData->objData.insert(statsData->objData.end(), m->objData, m->objData + m->n_objs);
-  statsData->from_proc.insert(statsData->from_proc.end(), m->n_objs, pe);
-  statsData->to_proc.insert(statsData->to_proc.end(), m->n_objs, pe);
+  CmiAssert(statsData->objData.size() + m->objData.size() <= statsData->objData.capacity());
+  statsData->objData.insert(statsData->objData.end(), m->objData.begin(), m->objData.end());
+  statsData->from_proc.insert(statsData->from_proc.end(), m->objData.size(), pe);
+  statsData->to_proc.insert(statsData->to_proc.end(), m->objData.size(), pe);
 
-  CmiAssert(statsData->commData.size() + m->n_comm <= statsData->commData.capacity());
-  statsData->commData.insert(statsData->commData.end(), m->commData, m->commData + m->n_comm);
+  CmiAssert(statsData->commData.size() + m->commData.size() <= statsData->commData.capacity());
+  statsData->commData.insert(statsData->commData.end(), m->commData.begin(), m->commData.end());
 
   statsData->n_migrateobjs +=
-      std::count_if(m->objData, m->objData + m->n_objs,
+      std::count_if(m->objData.begin(), m->objData.end(),
                     [](const LDObjData& data) { return data.migratable; });
   delete m;
 }
