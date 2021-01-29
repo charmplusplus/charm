@@ -2221,11 +2221,6 @@ void CthSetThreadID(CthThread th, int a, int b, int c);
 
 void CthTraceResume(CthThread t);
 
-#if CMK_FAULT_EVAC
-CpvExtern(char *,_validProcessors);
-#define CmiNodeAlive(x)  (CpvAccess(_validProcessors)[x])
-#endif
-
 int CmiEndianness(void);
 
 #if CMK_CHARMDEBUG

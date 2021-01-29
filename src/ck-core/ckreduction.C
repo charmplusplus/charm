@@ -67,7 +67,6 @@ waits for the migrant contributions to straggle in.
 
 // For status and data messages from the builtin reducer functions.
 #define RED_DEB(x) //CkPrintf x
-#define DEBREVAC(x) CkPrintf x
 #define DEB_TUPLE(x) CkPrintf x
 #else
 //No debugging info-- empty defines
@@ -77,7 +76,6 @@ waits for the migrant contributions to straggle in.
 #define AB
 #define DEBN(x) //CkPrintf x
 #define RED_DEB(x) //CkPrintf x
-#define DEBREVAC(x) //CkPrintf x
 #define DEB_TUPLE(x) //CkPrintf x
 #endif
 
@@ -577,13 +575,6 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 //If none of these cases, we need to start the reduction--
   DEBR((AA "Starting reduction #%d  %d %d \n" AB,redNo,completedRedNo,number));
   inProgress=true;
- 
-
-#if CMK_FAULT_EVAC
-  if(!CmiNodeAlive(CkMyPe())){
-	return;
-  }
-#endif
 
   // TODO: This is currently gotten from the command-line...but it could
   // probably just be determined at runtime. I don't know if the CL option is
@@ -983,18 +974,12 @@ void CkReductionMgr::init_BinaryTree(){
     if (numKids < 0) numKids = 0;
     for (int i = 0; i < numKids; i++) {
       kids.push_back(CkNodeFirst(firstKid+i));
-#if CMK_FAULT_EVAC
-      newKids.push_back(CkNodeFirst(firstKid+i));
-#endif
     }
 
     // Add PEs on my node, which are also my children
     numKids += CkNodeSize(CkMyNode())-1;
     for (int i = 1; i < CkNodeSize(CkMyNode()); i++) {
       kids.push_back(CkMyPe()+i);
-#if CMK_FAULT_EVAC
-      newKids.push_back(CkMyPe()+i);
-#endif
     }
   }
 }
@@ -1013,18 +998,12 @@ void CkReductionMgr::init_TopoTree() {
     for (int i=0; i < numKids; i++) {
       int child = CkNodeFirst(t.children[i]);
       kids.push_back(child);
-#if CMK_FAULT_EVAC
-      newKids.push_back(child);
-#endif
     }
 
     // Add PEs on my node, which are also my children
     numKids += CkNodeSize(CkMyNode())-1;
     for (int i = 1; i < CkNodeSize(CkMyNode()); i++) {
       kids.push_back(CkMyPe()+i);
-#if CMK_FAULT_EVAC
-      newKids.push_back(CkMyPe()+i);
-#endif
     }
   }
 }
@@ -2040,12 +2019,6 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
   creating=false;
   interrupt = false;
   DEBR((AA "In NodereductionMgr constructor at %d \n" AB,this));
-#if CMK_FAULT_EVAC
-	blocked = false;
-	maxModificationRedNo = INT_MAX;
-	killed=false;
-	additionalGCount = newAdditionalGCount = 0;
-#endif
 }
 
 CkNodeReductionMgr::~CkNodeReductionMgr()
@@ -2121,13 +2094,6 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
 
 void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 	DEBR(("[%d,%d] doRecvMsg called for  %d at %.6f[[[[[\n",CkMyNode(),CkMyPe(),m->redNo,CkWallTimer()));
-#if CMK_FAULT_EVAC
-	if(blocked){
-		DEBR(("[%d] This node is blocked, so remote message is being buffered as no %d\n",CkMyNode(),bufferedRemoteMsgs.length()));
-		bufferedRemoteMsgs.enq(m);
-		return;
-	}
-#endif
 	
 	if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
 	    //DEBR((AA "Recv'd remote contribution %d for #%d at %d\n" AB,nRemote,m->redNo,this));
@@ -2191,13 +2157,6 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 }
 
 void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
-#if CMK_FAULT_EVAC
-	if(blocked){
-		DEBR(("[%d] This node is blocked, so local message is being buffered as no %d\n",CkMyNode(),bufferedMsgs.length()));
-		bufferedMsgs.enq(m);
-		return;
-	}
-#endif
 	
 	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
 		DEBR((AA "Contributor gives early node contribution-- for #%d\n" AB,m->redNo));
@@ -2224,14 +2183,6 @@ void CkNodeReductionMgr::addContribution(CkReductionMsg *m)
 
 void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
         CmiLock(lockEverything);   
-#if CMK_FAULT_EVAC
-	if(blocked){
-		DEBR(("[%d] This node is blocked, so local message is being buffered as no %d\n",CkMyNode(),bufferedMsgs.length()));
-		bufferedMsgs.enq(m);
-                CmiUnlock(lockEverything);   
-		return;
-	}
-#endif
 	
 	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
 		DEBR((AA "Latemigrant gives early node contribution-- for #%d\n" AB,m->redNo));
@@ -2302,16 +2253,10 @@ void CkNodeReductionMgr::finishReduction(void)
 
   if (hasParent())
   {//Pass data up tree to parent
-#if CMK_FAULT_EVAC
-	if(CmiNodeAlive(CkMyNode()) || killed == false)
-#endif
   {
     	DEBR((AA "Passing reduced data up to parent node %d. \n" AB,treeParent()));
     	DEBR(("[%d,%d] Passing data up to parentNode %d at %.6f for redNo %d with ncontrib %d\n",CkMyNode(),CkMyPe(),treeParent(),CkWallTimer(),redNo,nContrib));
 
-#if CMK_FAULT_EVAC
-			result->gcount += additionalGCount;//if u have replaced some node add its gcount to ur count
-#endif
 	    thisProxy[treeParent()].RecvMsg(result);
 	}
 
@@ -2319,17 +2264,11 @@ void CkNodeReductionMgr::finishReduction(void)
   else
   {
 		if(result->isMigratableContributor()
-#if CMK_FAULT_EVAC
-       && result->gcount+additionalGCount != result->sourceFlag
-#endif
     ){
 		  DEBR(("[%d,%d] NodeGroup %d> Node Reduction %d not done yet gcounts %d sources %d migratable %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,redNo,result->gcount,result->sourceFlag,result->isMigratableContributor()));
 			msgs.enq(result);
 			return;
 		}
-#if CMK_FAULT_EVAC
-		result->gcount += additionalGCount;
-#endif
 	  /** if the reduction is finished and I am the root of the reduction tree
 	  then call the reductionhandler and other stuff ***/
 		
@@ -2354,9 +2293,6 @@ void CkNodeReductionMgr::finishReduction(void)
   // DEBR((AA "Reduction %d finished in group!\n" AB,redNo));
   //CkPrintf("[%d,%d]Reduction %d finished with %d\n",CkMyNode(),CkMyPe(),redNo,nContrib);
   redNo++;
-#if CMK_FAULT_EVAC
-	updateTree();
-#endif
   int i;
   inProgress=false;
   startRequested=false;
@@ -2418,9 +2354,6 @@ void CkNodeReductionMgr::init_BinaryTree(){
 
 	for(int i=0;i<numKids;i++){
 		kids.push_back(firstkid+i);
-#if CMK_FAULT_EVAC
-		newKids.push_back(firstkid+i);
-#endif
 	}
 }
 
@@ -2431,9 +2364,6 @@ void CkNodeReductionMgr::init_TopoTree() {
   numKids = t.child_count;
   for (int i=0; i < numKids; i++) {
     kids.push_back(t.children[i]);
-#if CMK_FAULT_EVAC
-    newKids.push_back(t.children[i]);
-#endif
   }
 }
 
@@ -2521,11 +2451,6 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p|futureLateMigrantMsgs;
   p|parent;
 
-#if CMK_FAULT_EVAC
-  p|additionalGCount;
-  p|newAdditionalGCount;
-#endif
-
   if(p.isUnpacking()) {
     gcount=CkNumNodes();
     thisProxy = thisgroup;
@@ -2537,11 +2462,6 @@ void CkNodeReductionMgr::pup(PUP::er &p)
 #endif		
   }
 
-#if CMK_FAULT_EVAC
-  p | blocked;
-  p | maxModificationRedNo;
-#endif
-
   bool isnull = (storedCallback == NULL);
   p | isnull;
   if (!isnull) {
@@ -2552,299 +2472,5 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   }
 
 }
-
-#if CMK_FAULT_EVAC
-/*
-	Evacuate - is called when this processor realizes it might crash. In that case, it tries to change 
-	the reduction tree. It also needs to decide a reduction number after which it shall use the new 
-	reduction tree. 
-*/
-void CkNodeReductionMgr::evacuate(){
-	DEBREVAC(("[%d] Evacuate called on nodereductionMgr \n",CkMyNode()));
-	if(treeKids() == 0){
-	/*
-		if the node going down is a leaf
-	*/
-		oldleaf=true;
-		DEBREVAC(("[%d] Leaf Node marks itself for deletion when evacuation is complete \n",CkMyNode()));
-		/*
-			Need to ask parent for the reduction number that it has seen. 
-			Since it is a leaf, the tree does not need to be rewired. 
-			We reuse the oldparent type of tree modification message to get 
-			the parent to block and tell us about the highest reduction number it has seen.
-			
-		*/
-		int data[2];
-		data[0]=CkMyNode();
-		data[1]=getTotalGCount()+additionalGCount;
-		thisProxy[treeParent()].modifyTree(LEAFPARENT,2,data);
-		newParent = treeParent();
-	}else{
-		DEBREVAC(("[%d]%d> Internal Node sends messages to change the redN tree \n",CkMyNode(),thisgroup.idx));
-		oldleaf= false;
-	/*
-		It is not a leaf. It needs to rewire the tree around itself.
-		It also needs to decide on a reduction No after which the new tree will be used
-		Till it decides on the new tree and the redNo at which it becomes valid,
-		all received messages will be buffered
-	*/
-		newParent = kids[0];
-		for(int i=numKids-1;i>=0;i--){
-			newKids.erase(newKids.begin() + i);
-		}
-		/*
-			Ask everybody for the highest reduction number they have seen and
-			also tell them about the new tree
-		*/
-		/*
-			Tell parent about its new child;
-		*/
-		int oldParentData[2];
-		oldParentData[0] = CkMyNode();
-		oldParentData[1] = newParent;
-		thisProxy[parent].modifyTree(OLDPARENT,2,oldParentData);
-
-		/*
-			Tell the other children about their new parent
-		*/
-		int childrenData=newParent;
-		for(int i=1;i<numKids;i++){
-			thisProxy[kids[i]].modifyTree(OLDCHILDREN,1,&childrenData);
-		}
-		
-		/*
-			Tell newParent (1st child) about its new children,
-			the current node and its children except the newParent
-		*/
-		std::vector<int> newParentData(numKids+2);
-		newParentData[0] = CkMyNode();
-		for(int i=1;i<numKids;i++){
-			newParentData[i] = kids[i];
-		}
-		newParentData[numKids] = parent;
-		newParentData[numKids+1] = getTotalGCount()+additionalGCount;
-		thisProxy[newParent].modifyTree(NEWPARENT,numKids+2,newParentData.data());
-	}
-	readyDeletion = false;
-	blocked = true;
-	numModificationReplies = 0;
-	tempModificationRedNo = findMaxRedNo();
-}
-
-/*
-	Depending on the code, use the data to change the tree
-	1. OLDPARENT : replace the old child with a new one
-	2. OLDCHILDREN: replace the parent
-	3. NEWPARENT:  add the children and change the parent
-	4. LEAFPARENT: delete the old child
-*/
-
-void CkNodeReductionMgr::modifyTree(int code,int size,int *data){
-	DEBREVAC(("[%d]%d> Received modifyTree request with code %d \n",CkMyNode(),thisgroup.idx,code));
-	int sender;
-	newKids = kids;
-	readyDeletion = false;
-	newAdditionalGCount = additionalGCount;
-	switch(code){
-		case OLDPARENT: 
-			for(int i=0;i<numKids;i++){
-				if(newKids[i] == data[0]){
-					newKids[i] = data[1];
-					break;
-				}
-			}
-			sender = data[0];
-			newParent = parent;
-			break;
-		case OLDCHILDREN:
-			newParent = data[0];
-			sender = parent;
-			break;
-		case NEWPARENT:
-			for(int i=0;i<size-2;i++){
-				newKids.push_back(data[i]);
-			}
-			newParent = data[size-2];
-			newAdditionalGCount += data[size-1];
-			sender = parent;
-			break;
-		case LEAFPARENT:
-			for(int i=0;i<numKids;i++){
-				if(newKids[i] == data[0]){
-					newKids.erase(newKids.begin() + i);
-					break;
-				}
-			}
-			sender = data[0];
-			newParent = parent;
-			newAdditionalGCount += data[1];
-			break;
-	};
-	blocked = true;
-	int maxRedNo = findMaxRedNo();
-	
-	thisProxy[sender].collectMaxRedNo(maxRedNo);
-}
-
-void CkNodeReductionMgr::collectMaxRedNo(int maxRedNo){
-	/*
-		Find out the maximum redNo that has been seen by 
-		the affected nodes
-	*/
-	numModificationReplies++;
-	if(maxRedNo > tempModificationRedNo){
-		tempModificationRedNo = maxRedNo;
-	}
-	if(numModificationReplies == numKids+1){
-		maxModificationRedNo = tempModificationRedNo;
-		/*
-			when all the affected nodes have replied, tell them the maximum.
-			Unblock yourself. deal with the buffered messages local and remote
-		*/
-		if(maxModificationRedNo == -1){
-			printf("[%d]%d> This array has not started reductions yet \n",CkMyNode(),thisgroup.idx);
-		}else{
-			DEBREVAC(("[%d]%d> maxModificationRedNo for this nodegroup %d \n",CkMyNode(),thisgroup.idx,maxModificationRedNo));
-		}
-		thisProxy[parent].unblockNode(maxModificationRedNo);
-		for(int i=0;i<numKids;i++){
-			thisProxy[kids[i]].unblockNode(maxModificationRedNo);
-		}
-		blocked = false;
-		updateTree();
-		clearBlockedMsgs();
-	}
-}
-
-void CkNodeReductionMgr::unblockNode(int maxRedNo){
-	maxModificationRedNo = maxRedNo;
-	updateTree();
-	blocked = false;
-	clearBlockedMsgs();
-}
-
-
-void CkNodeReductionMgr::clearBlockedMsgs(){
-	int len = bufferedMsgs.length();
-	for(int i=0;i<len;i++){
-		CkReductionMsg *m = bufferedMsgs.deq();
-		doAddContribution(m);
-	}
-	len = bufferedRemoteMsgs.length();
-	for(int i=0;i<len;i++){
-		CkReductionMsg *m = bufferedRemoteMsgs.deq();
-		doRecvMsg(m);
-	}
-
-}
-/*
-	if the reduction number exceeds the maxModificationRedNo, change the tree
-	to become the new one
-*/
-
-void CkNodeReductionMgr::updateTree(){
-	if(redNo > maxModificationRedNo){
-		parent = newParent;
-		kids = newKids;
-		maxModificationRedNo = INT_MAX;
-		numKids = kids.size();
-		readyDeletion = true;
-		additionalGCount = newAdditionalGCount;
-		DEBREVAC(("[%d]%d> Updating Tree numKids %d -> ",CkMyNode(),thisgroup.idx,numKids));
-		for(int i=0;i<(int)(newKids.size());i++){
-			DEBREVAC(("%d ",newKids[i]));
-		}
-		DEBREVAC(("\n"));
-	//	startReduction(redNo,CkMyNode());
-	}else{
-		if(maxModificationRedNo != INT_MAX){
-			DEBREVAC(("[%d]%d> Updating delayed because redNo %d maxModificationRedNo %d \n",CkMyNode(),thisgroup.idx,redNo,maxModificationRedNo));
-			startReduction(redNo,CkMyNode());
-			finishReduction();
-		}	
-	}
-}
-
-
-void CkNodeReductionMgr::doneEvacuate(){
-	DEBREVAC(("[%d] doneEvacuate called \n",CkMyNode()));
-/*	if(oldleaf){
-		
-			It used to be a leaf
-			Then as soon as future messages have been emptied you can 
-			send the parent a message telling them that they are not going
-			to receive anymore messages from this child
-		
-		DEBR(("[%d] At the end of evacuation emptying future messages %d \n",CkMyNode(),futureMsgs.length()));
-		while(futureMsgs.length() != 0){
-			int n = futureMsgs.length();
-			for(int i=0;i<n;i++){
-				CkReductionMsg *m = futureMsgs.deq();
-				if(isPresent(m->redNo)){
-					msgs.enq(m);
-				}else{
-					futureMsgs.enq(m);
-				}
-			}
-			CkReductionMsg *result = reduceMessages();
-			thisProxy[treeParent()].RecvMsg(result);
-			redNo++;
-		}
-		DEBR(("[%d] Asking parent %d to remove myself from list \n",CkMyNode(),treeParent()));
-		thisProxy[treeParent()].DeleteChild(CkMyNode());
-	}else{*/
-		if(readyDeletion){
-			thisProxy[treeParent()].DeleteChild(CkMyNode());
-		}else{
-			thisProxy[newParent].DeleteNewChild(CkMyNode());
-		}
-//	}
-}
-
-void CkNodeReductionMgr::DeleteChild(int deletedChild){
-	DEBREVAC(("[%d]%d> Deleting child %d \n",CkMyNode(),thisgroup.idx,deletedChild));
-	for(int i=0;i<numKids;i++){
-		if(kids[i] == deletedChild){
-			kids.erase(kids.begin() + i);
-			break;
-		}
-	}
-	numKids = kids.size();
-	finishReduction();
-}
-
-void CkNodeReductionMgr::DeleteNewChild(int deletedChild){
-	for(int i=0;i<(int)(newKids.size());i++){
-		if(newKids[i] == deletedChild){
-			newKids.erase(newKids.begin() + i);
-			break;
-		}
-	}
-	DEBREVAC(("[%d]%d> Deleting  new child %d readyDeletion %d newKids %d -> ",CkMyNode(),thisgroup.idx,deletedChild,readyDeletion,newKids.size()));
-	for(int i=0;i<(int)(newKids.size());i++){
-		DEBREVAC(("%d ",newKids[i]));
-	}
-	DEBREVAC(("\n"));
-	finishReduction();
-}
-
-int CkNodeReductionMgr::findMaxRedNo(){
-	int max = redNo;
-	for(int i=0;i<futureRemoteMsgs.length();i++){
-		if(futureRemoteMsgs[i]->redNo  > max){
-			max = futureRemoteMsgs[i]->redNo;
-		}
-	}
-	/*
-		if redNo is max (that is no future message) and the current reduction has not started
-		then tree can be changed before the reduction redNo can be started
-	*/ 
-	if(redNo == max && msgs.length() == 0){
-		DEBREVAC(("[%d] Redn %d has not received any contributions \n",CkMyNode(),max));
-		max--;
-	}
-	return max;
-}
-#endif //CMK_FAULT_EVAC
 
 #include "CkReduction.def.h"
