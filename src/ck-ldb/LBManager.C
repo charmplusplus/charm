@@ -431,7 +431,7 @@ void _loadbalancerInit()
 }
 
 bool LBManager::manualOn = false;
-std::vector<char> LBDatabase::avail_vector;
+std::vector<char> LBManager::avail_vector;
 CmiNodeLock avail_vector_lock;
 
 static LBRealType* _expectedLoad = NULL;
@@ -615,7 +615,7 @@ void LBManager::get_avail_vector(char* bitmap) const
   CmiAssert(num_proc <= avail_vector.size());
   std::copy(avail_vector.begin(), avail_vector.begin() + num_proc, bitmap);
 }
-void LBDatabase::get_avail_vector(std::vector<char> & bitmap) const
+void LBManager::get_avail_vector(std::vector<char> & bitmap) const
 {
   bitmap = avail_vector;
 }
@@ -647,7 +647,7 @@ void LBManager::set_avail_vector(const char* bitmap, int new_ld)
     }
   }
 }
-void LBDatabase::set_avail_vector(const std::vector<char> & bitmap, int new_ld)
+void LBManager::set_avail_vector(const std::vector<char> & bitmap, int new_ld)
 {
   int assigned = 0;
   const int num_proc = CkNumPes();
