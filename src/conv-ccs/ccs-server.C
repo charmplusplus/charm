@@ -66,7 +66,7 @@ Goes to some effort to minimize the number of "sends"
 header and data in-place.
 */
 static void CcsServer_writeReply(SOCKET fd,
-			 CcsSecMan *security,
+			 CcsSecMan *securityMgr,
 			 CcsSecAttr *attr,
 			 int replyLen,char *reply)
 {
@@ -79,7 +79,7 @@ static void CcsServer_writeReply(SOCKET fd,
   } header;
   if (attr->auth==1) 
   { /*Compose a reply SHA-1 hash header*/
-    CCS_AUTH_hash(security->getKey(security,attr),
+    CCS_AUTH_hash(securityMgr->getKey(securityMgr,attr),
 		  ChMessageInt(attr->replySalt),NULL,&aheader.hash);
     bufs[nBuffers]=&aheader; lens[nBuffers]=sizeof(aheader); nBuffers++;
   }
@@ -108,7 +108,7 @@ client challenge (4 bytes, s1)
 as well as client identifier and initial client salt. (8 bytes total).
 */
 static const char *CcsServer_createSalt(SOCKET fd,CCS_AUTH_clients *cl,
-					CcsSecMan *security,CcsSecAttr *attr)
+					CcsSecMan *securityMgr,CcsSecAttr *attr)
 {
   ChMessageInt_t s1;
   ChMessageInt_t s2=ChMessageInt_new(CCS_RAND_next(&cl->rand));
@@ -122,10 +122,10 @@ static const char *CcsServer_createSalt(SOCKET fd,CCS_AUTH_clients *cl,
   if (-1==skt_recvN(fd,&s1,sizeof(s1))) return "ERROR> CreateSalt challenge recv";
   if (-1==skt_sendN(fd,&s2,sizeof(s2))) return "ERROR> CreateSalt challenge send";
   if (-1==skt_recvN(fd,&s2hash,sizeof(s2hash))) return "ERROR> CreateSalt reply recv";
-  if (CCS_AUTH_differ(security->getKey(security,attr),ChMessageInt(s2),
+  if (CCS_AUTH_differ(securityMgr->getKey(securityMgr,attr),ChMessageInt(s2),
 		      NULL,&s2hash))
     return "ERROR> CreateSalt client hash mismatch! (bad password?)";
-  CCS_AUTH_hash(security->getKey(security,attr),ChMessageInt(s1),
+  CCS_AUTH_hash(securityMgr->getKey(securityMgr,attr),ChMessageInt(s1),
 		NULL,&reply.s1hash);
   clientId=CCS_AUTH_addClient(cl);
   reply.clientId=ChMessageInt_new(clientId);
@@ -147,7 +147,7 @@ The format is:
 -Regular CcsMessageHeader
 */
 static const char *CcsServer_SHA1_message(SOCKET fd,CCS_AUTH_clients *cl,
-					CcsSecMan *security,CcsSecAttr *attr,
+					CcsSecMan *securityMgr,CcsSecAttr *attr,
 					CcsMessageHeader *hdr)
 {
   ChMessageInt_t clientNo_net;
@@ -171,7 +171,7 @@ static const char *CcsServer_SHA1_message(SOCKET fd,CCS_AUTH_clients *cl,
   salt=CCS_AUTH_clientSalt(cl,clientNo);
   
   /*Check the client's hash*/
-  if (CCS_AUTH_differ(security->getKey(security,attr),salt,
+  if (CCS_AUTH_differ(securityMgr->getKey(securityMgr,attr),salt,
 		      hdr,&hash))
     return "ERROR> Authentication hash code MISMATCH-- bad or faked key";
 
@@ -183,7 +183,7 @@ static const char *CcsServer_SHA1_message(SOCKET fd,CCS_AUTH_clients *cl,
 Grab a message header from this socket.
  */
 static const char *CcsServer_readHeader(SOCKET fd,CCS_AUTH_clients *cl,
-			CcsSecMan *security,
+			CcsSecMan *securityMgr,
 			CcsSecAttr *attr,CcsMessageHeader *hdr) 
 {
   /*Read the first bytes*/
@@ -199,7 +199,7 @@ static const char *CcsServer_readHeader(SOCKET fd,CCS_AUTH_clients *cl,
       attr->auth=0;
       attr->level=0;
       attr->replySalt=ChMessageInt_new(0);
-      if (!security->allowRequest(security,attr))
+      if (!securityMgr->allowRequest(securityMgr,attr))
 	return "ERROR> Unauthenticated request denied at security check";
     /*Request is authorized-- grab the rest of the header*/
       hdr->len=*(ChMessageInt_t *)len;
@@ -215,14 +215,14 @@ static const char *CcsServer_readHeader(SOCKET fd,CCS_AUTH_clients *cl,
 	return "ERROR> Bad SHA-1 version field!";
       attr->auth=1;
       attr->level=len[3];/*Requested security level.*/
-      if (!security->allowRequest(security,attr))
+      if (!securityMgr->allowRequest(securityMgr,attr))
 	return "ERROR> Authenticated request denied at security check";
       
       switch(len[2]) {
       case 0x00: /*Regular message*/
-	return CcsServer_SHA1_message(fd,cl,security,attr,hdr); 
+	return CcsServer_SHA1_message(fd,cl,securityMgr,attr,hdr);
       case 0x01: /*Request for salt*/
-	return CcsServer_createSalt(fd,cl,security,attr);
+	return CcsServer_createSalt(fd,cl,securityMgr,attr);
       default: 
 	return "ERROR> Bad SHA-1 request field!";
       };
@@ -336,7 +336,7 @@ Since there's only one server, this is ugly but OK.
 */
 static SOCKET ccs_server_fd=SOCKET_ERROR;/*CCS request socket*/
 static CCS_AUTH_clients ccs_clientlist;
-static CcsSecMan *security;
+static CcsSecMan *globalSecurityMgr;
 
 /*Make a new Ccs Server socket, on the given port.
 Returns the actual port and IP address.
@@ -348,7 +348,7 @@ void CcsServer_new(skt_ip_t *ret_ip,int *use_port,const char *authFile)
   unsigned int port=0;if (use_port!=NULL) port=*use_port;
   
   CCS_AUTH_new(&ccs_clientlist);
-  security=CcsSecMan_default(authFile);
+  globalSecurityMgr=CcsSecMan_default(authFile);
   skt_init();
   ip=skt_my_ip();
   ccs_server_fd=skt_server(&port);
@@ -381,7 +381,7 @@ static int CcsServer_recvRequestData(SOCKET fd,
   CcsMessageHeader req;/*CCS header, from requestor*/
   int reqBytes, numPes, destPE;
   const char *err;
-  if (NULL!=(err=CcsServer_readHeader(fd,&ccs_clientlist,security,
+  if (NULL!=(err=CcsServer_readHeader(fd,&ccs_clientlist,globalSecurityMgr,
 				      &hdr->attr,&req))) 
   { /*Not a regular message-- write error message and return error.*/
     fprintf(stdout,"CCS %s\n",err);
@@ -461,7 +461,7 @@ void CcsServer_sendReply(CcsImplHeader *hdr,int repBytes,const void *repData)
   }
   old=skt_set_abort(reply_abortFn);
   CCSDBG(("CCS   Sending %d bytes of reply data\n",repBytes));
-  CcsServer_writeReply(fd,security,&hdr->attr,repBytes,(char *)repData);
+  CcsServer_writeReply(fd,globalSecurityMgr,&hdr->attr,repBytes,(char *)repData);
   skt_close(fd);
   CCSDBG(("CCS Reply socket closed.\n"));
   skt_set_abort(old);

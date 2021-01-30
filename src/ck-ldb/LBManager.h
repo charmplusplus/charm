@@ -235,6 +235,7 @@ class LBManager : public CBase_LBManager
   ~LBManager()
   {
     if (avail_vector) delete[] avail_vector;
+    delete lbdb_obj;
   }
 
  private:

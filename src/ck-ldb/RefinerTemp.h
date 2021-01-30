@@ -3,8 +3,8 @@
 */
 /*@{*/
 
-#ifndef _REFINER_H_
-#define _REFINER_H_
+#ifndef _REFINERTEMP_H_
+#define _REFINERTEMP_H_
 
 #include "elements.h"
 #include "ckheap.h"
@@ -55,7 +55,7 @@ double computeMax(int*);
   processorInfo* processors;
 };
 
-#endif /* _REFINER_H_ */
+#endif /* _REFINERTEMP_H_ */
 
 
 /*@}*/

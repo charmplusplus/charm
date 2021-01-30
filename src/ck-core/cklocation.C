@@ -620,7 +620,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim0*nDim1);
+      allpairs.resize((size_t)nDim0*nDim1);
       coords.resize(dims);
       for(int i=0; i<nDim0; i++)
         for(int j=0; j<nDim1; j++)
@@ -642,7 +642,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim0*nDim1*nDim2);
+      allpairs.resize((size_t)nDim0*nDim1*nDim2);
       coords.resize(dims);
       for(int i=0; i<nDim0; i++)
         for(int j=0; j<nDim1; j++)
@@ -667,7 +667,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim[0]*nDim[1]*nDim[2]*nDim[3]);
+      allpairs.resize((size_t)nDim[0]*nDim[1]*nDim[2]*nDim[3]);
       coords.resize(dims);
       for(int i=0; i<nDim[0]; i++)
         for(int j=0; j<nDim[1]; j++)
@@ -694,7 +694,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]);
+      allpairs.resize((size_t)nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]);
       coords.resize(dims);
       for(int i=0; i<nDim[0]; i++)
         for(int j=0; j<nDim[1]; j++)
@@ -724,7 +724,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]*nDim[5]);
+      allpairs.resize((size_t)nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]*nDim[5]);
       coords.resize(dims);
       for(int i=0; i<nDim[0]; i++)
         for(int j=0; j<nDim[1]; j++)
@@ -1128,9 +1128,9 @@ class arrInfo {
    std::vector<int> _map;
  public:
    arrInfo() {}
-   arrInfo(const CkArrayIndex& n, int *speeds) : _nelems(n), _map(_nelems.getCombinedCount())
+   arrInfo(const CkArrayIndex& n, int *_speeds) : _nelems(n), _map(_nelems.getCombinedCount())
    {
-     distrib(speeds);
+     distrib(_speeds);
    }
    ~arrInfo() {}
    int getMap(const CkArrayIndex &i);
@@ -1202,7 +1202,7 @@ arrInfo::getMap(const CkArrayIndex &i)
 
 //Speeds maps processor number to "speed" (some sort of iterations per second counter)
 // It is initialized by processor 0.
-static int* speeds;
+static int* globalSpeeds;
 
 #if CMK_USE_PROP_MAP
 typedef struct _speedmsg
@@ -1217,14 +1217,14 @@ static void _speedHdlr(void *m)
   speedMsg *msg=(speedMsg *)m;
   if (CmiMyRank()==0)
     for (int pe=0;pe<CmiNodeSize(msg->node);pe++)
-      speeds[CmiNodeFirst(msg->node)+pe] = msg->speed;  
+      globalSpeeds[CmiNodeFirst(msg->node)+pe] = msg->speed;
   CmiFree(m);
 }
 
 // initnode call
 void _propMapInit(void)
 {
-  speeds = new int[CkNumPes()];
+  globalSpeeds = new int[CkNumPes()];
   int hdlr = CkRegisterHandler(_speedHdlr);
   CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CkMyPe());
   int s = LBManager::ProcessorSpeed();
@@ -1239,10 +1239,10 @@ void _propMapInit(void)
 #else
 void _propMapInit(void)
 {
-  speeds = new int[CkNumPes()];
+  globalSpeeds = new int[CkNumPes()];
   int i;
   for(i=0;i<CkNumPes();i++)
-    speeds[i] = 1;
+    globalSpeeds[i] = 1;
 }
 #endif
 /**
@@ -1266,7 +1266,7 @@ public:
   {
     int idx = arrs.size();
     arrs.resize(idx+1);
-    arrs[idx] = new arrInfo(numElements, speeds);
+    arrs[idx] = new arrInfo(numElements, globalSpeeds);
     return idx;
   }
   void unregisterArray(int idx)
@@ -1286,7 +1286,7 @@ public:
     p|arrs;
     if(p.isUnpacking() && oldNumPes != CkNumPes()){
       for(int idx = 0; idx < arrs.length(); ++idx){
-        arrs[idx]->distrib(speeds);
+        arrs[idx]->distrib(globalSpeeds);
       }
     }
   }
