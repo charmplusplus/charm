@@ -17,7 +17,7 @@ exe() { echo "\$ $@" ; "$@" ; }
 
 cd $HOME/work/charm-inter/examples/charm++/cuda/gpudirect/jacobi3d
 
-export LD_LIBRARY_PATH=$HOME/work/ucx-1.9.0/install/lib:$HOME/work/pmix-3.1.5/install/lib:/sw/summit/gdrcopy/2.0/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$HOME/work/ucx/install/lib:$HOME/work/pmix-3.1.5/install/lib:/sw/summit/gdrcopy/2.0/lib64:$LD_LIBRARY_PATH
 
 ppn=1
 pemap="L0,4,8,84,88,92"

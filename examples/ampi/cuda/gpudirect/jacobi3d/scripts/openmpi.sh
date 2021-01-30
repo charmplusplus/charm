@@ -2,15 +2,15 @@
 #BSUB -W 30
 #BSUB -P csc357
 #BSUB -nnodes 256
-#BSUB -J jacobi3d-openmpi-weak-n256
+#BSUB -J jacobi3d-openmpi-strong-n256
 
 # These need to be changed between submissions
 file=jacobi3d_mpi-bench
 n_nodes=256
 n_procs=$((n_nodes * 6))
-grid_width=12288
-grid_height=12288
-grid_depth=6144
+grid_width=3072
+grid_height=3072
+grid_depth=3072
 
 # Function to display commands
 exe() { echo "\$ $@" ; "$@" ; }
@@ -18,8 +18,8 @@ exe() { echo "\$ $@" ; "$@" ; }
 cd $HOME/work/charm-inter/examples/ampi/cuda/gpudirect/jacobi3d
 
 module unload spectrum-mpi
-export PATH=$HOME/work/openmpi-4.1.0/install/bin:$HOME/work/ucx-1.9.0/install/bin:$PATH
-export LD_LIBRARY_PATH=$HOME/work/openmpi-4.1.0/install/lib:$HOME/work/ucx-1.9.0/install:/sw/summit/gdrcopy/2.0/lib64:$LD_LIBRARY_PATH
+export PATH=$HOME/work/openmpi-4.1.0/install/bin:$HOME/work/ucx/install/bin:$PATH
+export LD_LIBRARY_PATH=$HOME/work/openmpi-4.1.0/install/lib:$HOME/work/ucx/install/lib:/sw/summit/gdrcopy/2.0/lib64:$LD_LIBRARY_PATH
 
 echo 'LSB_MCPU_HOSTS:'
 echo $LSB_MCPU_HOSTS
