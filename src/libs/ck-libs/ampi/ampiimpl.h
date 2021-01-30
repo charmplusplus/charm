@@ -2648,6 +2648,7 @@ class ampi final : public CBase_ampi {
 
  private: // Used by the above entry methods that create new MPI_Comm objects
   CProxy_ampi createNewChildAmpiSync() noexcept;
+  void createNewSplitCommArray(MPI_Comm newComm, const std::vector<int> & indices) noexcept;
   void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi) noexcept;
 
   inline void handleBlockedReq(AmpiRequest* req) noexcept {

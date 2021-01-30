@@ -2213,6 +2213,22 @@ CProxy_ampi ampi::createNewChildAmpiSync() noexcept {
   return newAmpi;
 }
 
+void ampi::createNewSplitCommArray(MPI_Comm newComm, const std::vector<int> & indices) noexcept
+{
+  CProxy_ampi lastAmpi = createNewChildAmpiSync();
+
+  //FIXME: create a new communicator for each color, instead of
+  // (confusingly) re-using the same MPI_Comm number for each.
+  ampiCommStruct lastComm = ampiCommStruct(newComm, lastAmpi, indices);
+
+  for (int newIdx : indices)
+  {
+    lastAmpi[newIdx].insert(parentProxy,lastComm);
+  }
+
+  lastAmpi.doneInserting();
+}
+
 void ampi::splitPhase1(CkReductionMsg *msg) noexcept
 {
   //Order the keys, which orders the ranks properly:
@@ -2228,36 +2244,32 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
   }
 
   //Loop over the sorted keys, which gives us the new arrays:
-  int lastColor=keys[0].color-1; //The color we're building an array for
-  CProxy_ampi lastAmpi; //The array for lastColor
+  int lastColor=keys[0].color; //The color we're building an array for
   int lastRoot=0; //C value for new rank 0 process for latest color
-  ampiCommStruct lastComm; //Communicator info. for latest color
-  for (int c=0;c<nKeys;c++) {
-    if (keys[c].color!=lastColor)
+  for (int c=0;c<nKeys;c++)
+  {
+    if (keys[c].color != lastColor)
     { //Hit a new color-- need to build a new communicator and array
-      lastColor=keys[c].color;
-      lastRoot=c;
-
-      if (c!=0) lastAmpi.doneInserting();
-      lastAmpi = createNewChildAmpiSync();
-
       std::vector<int> indices; //Maps rank to array indices for new array
-      for (int i=c;i<nKeys;i++) {
-        if (keys[i].color!=lastColor) break; //Done with this color
+      for (int i = lastRoot; i < c; i++)
+      {
         int idx=myComm.getIndexForRank(keys[i].rank);
         indices.push_back(idx);
       }
+      createNewSplitCommArray(newComm, indices);
 
-      //FIXME: create a new communicator for each color, instead of
-      // (confusingly) re-using the same MPI_Comm number for each.
-      lastComm=ampiCommStruct(newComm,lastAmpi,indices);
+      lastColor=keys[c].color;
+      lastRoot=c;
     }
-    int newRank=c-lastRoot;
-    int newIdx=lastComm.getIndexForRank(newRank);
-
-    lastAmpi[newIdx].insert(parentProxy,lastComm);
   }
-  lastAmpi.doneInserting();
+
+  std::vector<int> indices; //Maps rank to array indices for new array
+  for (int i = lastRoot; i < nKeys; i++)
+  {
+    int idx=myComm.getIndexForRank(keys[i].rank);
+    indices.push_back(idx);
+  }
+  createNewSplitCommArray(newComm, indices);
 
   delete msg;
 }
