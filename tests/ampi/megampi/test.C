@@ -278,7 +278,8 @@ void MPI_Tester::testMigrate(void) {
 	beginTest(2,"Migration");
 
 #ifdef AMPI
-	int flag, srcPe;
+	int * srcPe;
+	int flag;
 	MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &srcPe, &flag);
 	if (!flag) {
 		printf("Missing AMPI_MY_WTH attribute on MPI_COMM_WORLD\n");
@@ -293,14 +294,14 @@ void MPI_Tester::testMigrate(void) {
 	
 	TEST_MPI(MPI_Barrier,(comm));
 
-	int destPe;
+	int * destPe;
 	MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &destPe, &flag);
 	if (!flag) {
 		printf("Missing AMPI_MY_WTH attribute on MPI_COMM_WORLD\n");
 		MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
 	}
-	if (srcPe!=destPe) printf("[%d] migrated from %d to %d\n",
-				rank,srcPe,destPe);
+	if (*srcPe != *destPe)
+		printf("[%d] migrated from %d to %d\n", rank, *srcPe, *destPe);
 #endif
 }
 
