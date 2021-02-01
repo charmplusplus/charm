@@ -318,7 +318,6 @@ FLINKAGE {
 #define ampi_load_stop_measure FTN_NAME( AMPI_LOAD_STOP_MEASURE, ampi_load_stop_measure )
 #define ampi_load_reset_measure FTN_NAME( AMPI_LOAD_RESET_MEASURE, ampi_load_reset_measure )
 #define ampi_load_set_value FTN_NAME( AMPI_SET_LOAD_VALUE, ampi_load_set_value )
-#define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
 #define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
 #define ampi_set_migratable FTN_NAME ( AMPI_SET_MIGRATABLE , ampi_set_migratable )
 #define ampi_register_pup FTN_NAME( AMPI_REGISTER_PUP , ampi_register_pup )
@@ -888,7 +887,7 @@ void mpi_type_set_attr(int *datatype, int *type_keyval, void *attribute_val, int
 
 void mpi_type_get_attr(int *datatype, int *type_keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  int tmp, *result = &tmp;
+  int * result;
   *ierr = MPI_Type_get_attr(*datatype, *type_keyval, &result, flag);
   *(intptr_t *)attribute_val = *result;
 }
@@ -1779,7 +1778,7 @@ void mpi_comm_set_attr(int *comm, int *keyval, void* attribute_val, int *ierr) n
 
 void mpi_comm_get_attr(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  int tmp, *result = &tmp;
+  int * result;
   *ierr = MPI_Comm_get_attr(*comm, *keyval, &result, flag);
   *(intptr_t *)attribute_val = *result;
 }
@@ -1807,7 +1806,7 @@ void mpi_attr_put(int *comm, int *keyval, void* attribute_val, int *ierr) noexce
 
 void mpi_attr_get(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  int tmp, *result = &tmp;
+  int * result;
   *ierr = MPI_Attr_get(*comm, *keyval, &result, flag);
   *(intptr_t *)attribute_val = *result;
 }
@@ -1889,7 +1888,7 @@ void mpi_win_delete_attr(int *win, int *key, int *ierr) noexcept
 void mpi_win_get_attr(int *win, int *win_keyval, void *attribute_val, int *flag,
                       int *ierr) noexcept
 {
-  int tmp, *result = &tmp;
+  int * result;
   *ierr = MPI_Win_get_attr(*win, *win_keyval, &result, flag);
   *(intptr_t *)attribute_val = *result;
 }
@@ -2176,13 +2175,6 @@ void ampi_load_set_value(double *value, int *ierr) noexcept
 {
   *ierr = AMPI_Load_set_value(*value);
 }
-
-#if CMK_FAULT_EVAC
-void ampi_evacuate(int *ierr) noexcept
-{
-  *ierr = AMPI_Evacuate();
-}
-#endif
 
 void ampi_migrate_to_pe(int *dest, int *ierr) noexcept
 {

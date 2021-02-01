@@ -255,11 +255,6 @@ class IrrGroup : public Chare {
     virtual void flushStates() {}
 
     virtual void CkAddThreadListeners(CthThread tid, void *msg);
-
-#if CMK_FAULT_EVAC
-		virtual void evacuate(){};
-		virtual void doneEvacuate(){};
-#endif
 };
 
 #if CMK_CHARM4PY
@@ -1115,7 +1110,6 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "waitqd.h"
 #include "sdag.h"
 #include "ckcheckpoint.h"
-#include "ckevacuation.h"
 #include "trace.h"
 #include "envelope.h"
 #include "pathHistory.h"

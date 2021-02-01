@@ -211,7 +211,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
+	  ckcheckpoint.h ckmemcheckpoint.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
 	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
@@ -686,7 +686,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o ckrdmadevice.o cksyncbarrier.o \
            waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
-	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o \
+	   ckcheckpoint.o ckmemcheckpoint.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o TreeLB.o HybridBaseLB.o DistBaseLB.o \
            ckgraph.o LButil.o RefinerTemp.o Refiner.o \
@@ -771,7 +771,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   LBMachineUtil.h LBManager.decl.h MetaBalancer.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
   trace.h trace-simple.h \
   register.h trace-common.h trace-simpleBOC.h TraceSimple.decl.h \
   TraceSimple.def.h ckregex.h

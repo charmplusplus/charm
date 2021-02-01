@@ -23,10 +23,10 @@ ProcArray::ProcArray(BaseLB::LDStats *stats) {
   avgLoad = 0.0;
   for(int pe = 0; pe < numPes; pe++) {
     procs[pe].id        = stats->procs[pe].pe;
-    procs[pe].overhead()  = stats->procs[pe].bg_walltime;
-    procs[pe].totalLoad() = stats->procs[pe].total_walltime - stats->procs[pe].idletime;
+    procs[pe].setOverhead(stats->procs[pe].bg_walltime);
+    procs[pe].setTotalLoad(stats->procs[pe].total_walltime - stats->procs[pe].idletime);
     procs[pe].available = stats->procs[pe].available;
-    avgLoad += procs[pe].totalLoad();
+    avgLoad += procs[pe].getTotalLoad();
 //		CkPrintf("PE%d overhead:%f totalLoad:%f \n",pe,procs[pe].overhead(),procs[pe].totalLoad());
   }
   avgLoad /= numPes;
@@ -34,7 +34,7 @@ ProcArray::ProcArray(BaseLB::LDStats *stats) {
 
 void ProcArray::resetTotalLoad() {
   for(int pe = 0; pe < procs.size(); pe++)
-    procs[pe].totalLoad() = procs[pe].overhead();
+    procs[pe].setTotalLoad(procs[pe].getOverhead());
 }
 
 ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
