@@ -20,6 +20,10 @@ AMPI_CUSTOM_FUNC(hapiWorkRequest*, hapiCreateWorkRequest, void)
 // and kernel execution are directly put into a CUDA stream.
 AMPI_CUSTOM_FUNC(void, hapiEnqueue, hapiWorkRequest* wr)
 
+/******************** DEPRECATED ********************/
+// Set the callback of a work request
+AMPI_CUSTOM_FUNC(void, hapiWorkRequestSetCallback, hapiWorkRequest* wr, void*)
+
 // The runtime queries the compute capability of the device, and creates as
 // many streams as the maximum number of concurrent kernels.
 AMPI_CUSTOM_FUNC(int, hapiCreateStreams, void)
