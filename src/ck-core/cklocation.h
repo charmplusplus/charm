@@ -559,8 +559,8 @@ private:
 	LBManager *lbmgr;
   MetaBalancer *the_metalb;
 	LDOMHandle myLBHandle;
-        LDBarrierClient lbBarrierClient;
-        LDBarrierReceiver lbBarrierReceiver;
+        LDBarrierReceiver lbBarrierBeginReceiver;
+        LDBarrierReceiver lbBarrierEndReceiver;
 #endif
 private:
 	void initLB(CkGroupID lbmgrID, CkGroupID metalbID);
