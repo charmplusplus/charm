@@ -2934,22 +2934,6 @@ balancing mode*, a user specifies only how often load balancing is to
 occur, using the *+LBPeriod* runtime option to specify the time
 interval.
 
-.. note:: In AtSync mode, Applications that use dynamic insertion or
-   deletion of array elements must not be doing so when any element
-   calls ``AtSync()``. This is because AtSync mode requires an
-   application to have a fixed, known number of objects when
-   determining if ``AtSync()`` has been called by all relevant objects
-   in order to prevent race conditions (the implementation is designed
-   to be robust against these issues and will often be able to handle
-   them, but we make no guarantees if these rules are not obeyed). If
-   using dynamic insertion, please ensure that insertions and calls to
-   ``AtSync()`` cannot be interleaved and that ``doneInserting()`` is
-   called after insertions are complete and before any element calls
-   ``AtSync()``. Insertions and/or deletions may begin again after
-   load balancing is complete (i.e. ``ResumeFromSync()`` is called for
-   an object on the given PE for insertions or for the object in
-   question for deletions).
-
 The detailed APIs of these two methods are described as follows:
 
 #. **AtSync mode**: Using this method, elements can be migrated only
@@ -2985,6 +2969,22 @@ The detailed APIs of these two methods are described as follows:
    application. This pattern effectively results in a barrier at load
    balancing time (see example here :numref:`lbexample`).
 
+   .. note:: In AtSync mode, Applications that use dynamic insertion or
+	     deletion of array elements must not be doing so when any element
+	     calls ``AtSync()``. This is because AtSync mode requires an
+	     application to have a fixed, known number of objects when
+	     determining if ``AtSync()`` has been called by all relevant objects
+	     in order to prevent race conditions (the implementation is designed
+	     to be robust against these issues and will often be able to handle
+	     them, but we make no guarantees if these rules are not obeyed). If
+	     using dynamic insertion, please ensure that insertions and calls to
+	     ``AtSync()`` cannot be interleaved and that ``doneInserting()`` is
+	     called after insertions are complete and before any element calls
+	     ``AtSync()``. Insertions and/or deletions may begin again after
+	     load balancing is complete (i.e. ``ResumeFromSync()`` is called for
+	     an object on the given PE for insertions or for the object in
+	     question for deletions).
+
 #. **Periodic load balancing mode**: This mode uses a timer to perform
    load balancing periodically at a user-specified interval. In order
    to use this mode, the user must provide the *+LBPeriod {period}*
@@ -3000,6 +3000,11 @@ The detailed APIs of these two methods are described as follows:
    where PUP routines for load balancing migration are only called
    after AtSync() and before ResumeFromSync(), so they can make some
    assumptions about state).
+
+   .. note:: Dynamic insertion works with periodic load balancing with
+	     no issues. However, dynamic deletion does not, since
+	     deletion may occur while the load balancing strategy is
+	     running.
 
 .. _lbmigobj:
 
@@ -3103,7 +3108,7 @@ it:
 
 Below are the descriptions about the compiler and runtime options:
 
-#. **Compile time options:**
+#. **Compile time options:** (to ``charmc``)
 
    - | *-module TreeLB -module RecBipartLB ...*
      | links the listed LB modules into an application, which can then
@@ -8283,7 +8288,8 @@ on, in which case non-location invariant chares have special behavior:
 singleton chares are not created or restored at all and
 group/nodegroup chares are created per PE/node, but each
 group/nodegroup element is restored from the checkpoint corresponding
-to the element originally on PE/node 0.
+to the element originally on PE/node 0. This does not effect
+mainchares, which are always restarted on PE 0.
 
 The checkpoint must be recorded at a synchronization point in the
 application, to ensure a consistent state upon restart. One easy way to
