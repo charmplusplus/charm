@@ -62,6 +62,8 @@ module ampi {
     entry EXPEDITED_THREADED_REDN void commCreatePhase1(MPI_Comm nextGroupComm);
     entry EXPEDITED_THREADED_REDN void intercommCreatePhase1(MPI_Comm nextInterComm);
     entry EXPEDITED_THREADED_REDN void intercommMergePhase1(MPI_Comm nextIntraComm);
+    entry EXPEDITED void exchangeProxyForSplitLocal(int, CProxy_ampi);
+    entry EXPEDITED void exchangeProxyForSplitRemote(int, CProxy_ampi);
 
     entry EXPEDITED void setRemoteProxy(CProxy_ampi rproxy);
     entry EXPEDITED_SYNC void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,

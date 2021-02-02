@@ -2599,6 +2599,9 @@ class ampi final : public CBase_ampi {
   CProxy_ampi remoteProxy; // valid only for intercommunicator
   CkPupPtrVec<win_obj> winObjects;
 
+  // Intercommunicator splitting:
+  std::unordered_map<int, CProxy_ampi> splitRProxyMap;
+
  private:
   inline bool isInOrder(int seqIdx, int seq) noexcept { return oorder.isInOrder(seqIdx, seq); }
   bool inorder(AmpiMsg *msg) noexcept;
@@ -2646,9 +2649,32 @@ class ampi final : public CBase_ampi {
   void intercommCreatePhase1(MPI_Comm nextInterComm) noexcept;
   void intercommMergePhase1(MPI_Comm nextIntraComm) noexcept;
 
+  void exchangeProxyForSplitLocal(int color, CProxy_ampi splitLocalProxy) noexcept {
+    auto iter = splitRProxyMap.find(color);
+    if (iter == splitRProxyMap.end()) {
+      splitRProxyMap.emplace(color, splitLocalProxy);
+    }
+    else {
+      CProxy_ampi splitRemoteProxy = iter->second;
+      splitRProxyMap.erase(iter);
+      splitLocalProxy.setRemoteProxy(splitRemoteProxy);
+    }
+  }
+  void exchangeProxyForSplitRemote(int color, CProxy_ampi splitRemoteProxy) noexcept {
+    auto iter = splitRProxyMap.find(color);
+    if (iter == splitRProxyMap.end()) {
+      splitRProxyMap.emplace(color, splitRemoteProxy);
+    }
+    else {
+      CProxy_ampi splitLocalProxy = iter->second;
+      splitRProxyMap.erase(iter);
+      splitLocalProxy.setRemoteProxy(splitRemoteProxy);
+    }
+  }
+
  private: // Used by the above entry methods that create new MPI_Comm objects
   CProxy_ampi createNewChildAmpiSync() noexcept;
-  void createNewSplitCommArray(MPI_Comm newComm, const std::vector<int> & indices) noexcept;
+  CProxy_ampi createNewSplitCommArray(MPI_Comm newComm, const std::vector<int> & indices) noexcept;
   void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi) noexcept;
 
   inline void handleBlockedReq(AmpiRequest* req) noexcept {
