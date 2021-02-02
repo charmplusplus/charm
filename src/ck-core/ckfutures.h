@@ -91,7 +91,7 @@ namespace ck {
       if (handle_.pe != CkMyPe()) {
         CkAbort("A future can only be released on the PE it was created on.");
       } else if (is_ready()) {
-        delete (CkMarshallMsg *)CkWaitFuture(handle_);
+        CkFreeMsg(CkWaitFuture(handle_));
       }
       CkReleaseFuture(handle_);
     }
