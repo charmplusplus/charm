@@ -263,9 +263,9 @@ void CentralLB::ReceiveCounts(int *counts, int n)
   int n_comm = counts[1];
 
     // resize database
-  statsData->objData.resize(n_objs);
-  statsData->from_proc.resize(n_objs);
-  statsData->to_proc.resize(n_objs);
+  statsData->objData.reserve(n_objs);
+  statsData->from_proc.reserve(n_objs);
+  statsData->to_proc.reserve(n_objs);
   statsData->commData.reserve(n_comm);
 
   DEBUGF(("[%d] ReceiveCounts: n_objs:%d n_comm:%d\n",CkMyPe(), n_objs, n_comm));
