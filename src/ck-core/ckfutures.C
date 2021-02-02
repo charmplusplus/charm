@@ -426,6 +426,23 @@ public:
   }
 };
 
+// TODO :
+// a poorly located helper function for getting a buffer from a message
+// should be moved elsewhere (when PR#3228 is merged), and probably named ck::get_message_buffer(void*)
+void* CkGetMsgBuffer(void* msg) {
+  auto env = UsrToEnv(msg);
+  auto idx = env->getMsgIdx();
+  if (idx == CMessage_CkMarshallMsg::__idx) {
+    return static_cast<CkMarshallMsg*>(msg)->msgBuf;
+  } else if (idx == CMessage_CkReductionMsg::__idx) {
+    return static_cast<CkReductionMsg*>(msg)->getData();
+  } else if (idx == CMessage_CkDataMsg::__idx) {
+    return static_cast<CkDataMsg*>(msg)->getData();
+  } else {
+    CkAbort("unsure how to handle msg of type %s.", _msgTable[idx]->name);
+  }
+}
+
 extern "C" 
 void CkSendToFutureID(CkFutureID futNum, void *m, int PE)
 {

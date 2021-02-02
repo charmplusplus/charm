@@ -1,6 +1,8 @@
 #ifndef _CKFUTURES_H_
 #define _CKFUTURES_H_
 
+#include "charm.h"
+
 #ifdef __cplusplus
 #include "ckmarshall.h"
 #endif
@@ -13,12 +15,6 @@
 These routines are implemented in ckfutures.C.
 */
 /*@{*/
-typedef unsigned long long CkFutureID;
-typedef struct _CkFuture {
-  CkFutureID id;
-  int        pe;
-} CkFuture;
-PUPbytes(CkFuture)
 
 /* forward declare */
 struct CkArrayID;
@@ -58,6 +54,8 @@ void _futuresModuleInit(void);
 #ifdef __cplusplus
 }
 
+void* CkGetMsgBuffer(void* msg);
+
 namespace ck {
   template <typename T> class future {
     CkFuture handle_;
@@ -72,8 +70,7 @@ namespace ck {
       if (handle_.pe != CkMyPe()) {
         CkAbort("A future's value can only be retrieved on the PE it was created on.");
       }
-      CkMarshallMsg *msg = (CkMarshallMsg *)CkWaitFuture(handle_);
-      PUP::fromMem p(msg->msgBuf);
+      PUP::fromMem p(CkGetMsgBuffer(CkWaitFuture(handle_)));
       PUP::detail::TemporaryObjectHolder<T> holder;
       p | holder;
       return std::move(holder.t);

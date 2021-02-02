@@ -249,6 +249,9 @@ static void CkCallbackSendExt(const CkCallback &cb, void *msg)
   int _pe = -1;
   int sectionInfo[3] = {-1, 0, 0};
   switch (cb.type) {
+    case CkCallback::sendFuture:
+      CkSendToFuture(cb.d.future.fut, msg);
+      break;
     case CkCallback::sendChare: // Send message to a chare
       CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.chare.refnum, sectionInfo,
                                   extResultMsgData, extResultMsgDataSizes);
@@ -328,6 +331,9 @@ void CkCallback::send(void *msg) const
 #endif
 
 	switch(type) {
+	case CkCallback::sendFuture:
+		CkSendToFuture(d.future.fut, msg);
+		break;
 	  //	CkPrintf("type:%d\n",type);
 	case ignore: //Just ignore the callback
 		if (msg) CkFreeMsg(msg);
@@ -454,6 +460,9 @@ void CkCallback::pup(PUP::er &p) {
   p|t;
   type = (callbackType)t;
   switch (type) {
+  case sendFuture:
+    p|d.future.fut;
+    break;
   case resumeThread:
     p|d.thread.onPE;
     p|d.thread.cb;
