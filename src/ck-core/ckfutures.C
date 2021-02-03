@@ -14,13 +14,17 @@ This "sequential futures abstraction" is a well-studied concept
 in remote process control.
 */
 /*@{*/
+#include <limits>
+#include <memory>
+#include <vector>
+#include <cstdlib>
+#include <algorithm>
+#include <unordered_map>
+
 #include "charm++.h"
 #include "ck.h"
 #include "ckarray.h"
 #include "ckfutures.h"
-#include <stdlib.h>
-#include <limits>
-#include <memory>
 
 struct FutureRequest {
   virtual void fulfill(void* value) = 0;
@@ -55,29 +59,37 @@ struct FutureState {
  private:
   std::unordered_map<CkFutureID, void*> values;
   std::unordered_map<CkFutureID, request_queue_t> waiting;
-  std::set<CkFutureID> freeList;
+  std::vector<CkFutureID> freeList;
 
   CkFutureID last;
  public:
   FutureState() : last(-1) {}
 
+  // takes a free id from the set of released IDs, when one
+  // is available, or increments the PE's local ID counter
+  // and uses the updated value
   CkFutureID next() {
     CkFutureID id;
     if (freeList.empty()) {
       id = ++last;
     } else {
       id = *freeList.begin();
-      freeList.erase(id);
+      freeList.erase(freeList.begin());
     }
-    CkAssert(id <= std::numeric_limits<CMK_REFNUM_TYPE>::max());
+    CkAssert(id <= std::numeric_limits<CMK_REFNUM_TYPE>::max() &&
+             "future count has exceeded CMK_REFNUM_TYPE, see manual.");
     return id;
   }
 
+  // returns a future's value when it's available, otherwise
+  // returns nullptr
   void* operator[](CkFutureID f) const {
     auto found = values.find(f);
     return (found != values.end()) ? found->second : nullptr;
   }
 
+  // enqueue a request for a given future id, creating a
+  // queue as necessary
   void request(CkFutureID f, request_t req) {
     auto found = waiting.find(f);
     if (found != waiting.end()) {
@@ -87,27 +99,36 @@ struct FutureState {
     }
   }
 
+  // enuqueue a request to be fulfilled by multiple futures
   void request(const std::vector<CkFutureID>& fs, request_t req) {
-    for (auto f : fs) {
+    for (auto& f : fs) {
       request(f, req);
     }
   }
 
+  // stores a value for a given future id, and fulfills all
+  // outstanding requests for the value (then erases them)
   void fulfill(CkFutureID f, void* value) {
     values[f] = value;
     auto found = waiting.find(f);
     if (found != waiting.end()) {
-      for (auto th : found->second) {
+      for (auto& th : found->second) {
         th->fulfill(value);
       }
       waiting.erase(found);
     }
   }
 
+  // erase any listeners and values for a given future
+  // and adds it to the set of free future ids (that
+  // can be reused). note, does not free any memory
   void release(CkFutureID f) {
     values.erase(f);
     waiting.erase(f);
-    freeList.insert(f);
+    CkAssert(std::find(freeList.begin(), freeList.end(), f) == freeList.end() &&
+            "repeated frees of the same future");
+    freeList.push_back(f);
+
   }
 
   bool is_ready(CkFutureID f) {
@@ -197,7 +218,7 @@ CpvStaticDeclare(CkSemaPool*, semapool);
 
 static 
 inline
-int createFuture(void)
+CkFutureID createFuture(void)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   return fs->next();

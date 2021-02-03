@@ -131,6 +131,7 @@ namespace PUP {
     p|nChar;
     if (p.isUnpacking()) { //Unpack to temporary buffer
       char *buf=new char[nChar];
+      CmiEnforce(buf != nullptr);
       p(buf,nChar);
       v=std::basic_string<char>(buf,nChar);
       delete[] buf;

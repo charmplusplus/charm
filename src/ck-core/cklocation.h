@@ -75,8 +75,8 @@ class CkArrayOptions;
 class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessage {
 public:
   CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_, bool ignoreArrival_, int length_,
-                               int nManagers_, bool bounced_)
-    : idx(idx_), id(id_), ignoreArrival(ignoreArrival_), length(length_), nManagers(nManagers_), bounced(bounced_)
+                               int nManagers_)
+    : idx(idx_), id(id_), ignoreArrival(ignoreArrival_), length(length_), nManagers(nManagers_)
   { }
 
 	CkArrayIndex idx; // Array index that is migrating
@@ -84,7 +84,6 @@ public:
 	bool ignoreArrival;   // if to inform LB of arrival
 	int length;//Size in bytes of the packed data
 	int nManagers; // Number of associated array managers
-	bool bounced; // Fault evac related?
 	char* packData;
 };
 
@@ -560,8 +559,8 @@ private:
 	LBManager *lbmgr;
   MetaBalancer *the_metalb;
 	LDOMHandle myLBHandle;
-        LDBarrierClient lbBarrierClient;
-        LDBarrierReceiver lbBarrierReceiver;
+        LDBarrierReceiver lbBarrierBeginReceiver;
+        LDBarrierReceiver lbBarrierEndReceiver;
 #endif
 private:
 	void initLB(CkGroupID lbmgrID, CkGroupID metalbID);
