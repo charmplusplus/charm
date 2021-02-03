@@ -1154,18 +1154,18 @@ class PELevel : public LevelLogic
     int dimension = -1;
     size_t minPosDimension = std::numeric_limits<size_t>::max();
     size_t maxPosDimension = std::numeric_limits<size_t>::min();
-    for (int i = 0; i < nobjs; i++)
+    for (const auto& obj : allLocalObjs)
     {
-      if (allLocalObjs[i].migratable)
+      if (obj.migratable)
       {
-        myObjs.emplace_back(allLocalObjs[i]);
-        dimension = std::max(dimension, (int)myObjs[i].vectorLoad.size());
-        minPosDimension = std::min(minPosDimension, allLocalObjs[i].position.size());
-        maxPosDimension = std::max(maxPosDimension, allLocalObjs[i].position.size());
+        myObjs.emplace_back(obj);
+        dimension = std::max(dimension, (int)obj.vectorLoad.size());
+        minPosDimension = std::min(minPosDimension, obj.position.size());
+        maxPosDimension = std::max(maxPosDimension, obj.position.size());
       }
       else
       {
-        nonMigratableLoad += allLocalObjs[i].wallTime;
+        nonMigratableLoad += obj.wallTime;
       }
     }
     nobjs = myObjs.size();
@@ -1177,7 +1177,6 @@ class PELevel : public LevelLogic
     // Assumes that every PE has at least one object for LB
     // If dimension is 0, then phases are not being used
     // If there are no objects, set dimension to -1
-    const auto dimension = (nobjs == 0) ? -1 : myObjs[0].vectorLoad.size();
     const auto nobjLoads = nobjs * (1 + dimension);
 
     // TODO verify that non-migratable objects are not added to msg and are only counted
