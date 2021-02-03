@@ -953,6 +953,70 @@ void LBManager::TurnOffBarrierReceiver(LDBarrierReceiver h)
 void LBManager::LocalBarrierOn(void) { CkSyncBarrier::Object()->TurnOn(); };
 void LBManager::LocalBarrierOff(void) { CkSyncBarrier::Object()->TurnOff(); };
 
+void LBManager::WakeUpThreads() {
+//  LDOMHandle _omh = (objs[0].obj)->parentOM();
+//  CkGroupID locMgrGid = _omh.id.id;
+
+  CkLocMgr *localLocMgr = (CkLocMgr *) CkLocalBranch(_lbmgr);
+  localLocMgr->wakeUp();
+}
+
+int LBManager::findMaxPerf(int _entry) {
+  double best_performance = performance[0];
+  int best_ppn = ppnCount[0];
+  for(int i=1; i<_entry; i++) {
+    if(performance[i] < best_performance) {
+#if VERBOSE
+      CkPrintf("\n %lf < %lf ?\n", performance[i], best_performance);
+#endif
+      best_performance = performance[i];
+      best_ppn = ppnCount[i];
+    }
+  }
+  if(CkMyRank()==0 && best_ppn!=final_ppn) {
+    CkPrintf("\n[PE-%d] Best performance has been for ppn = %d at time = %lf \n", CkMyPe(), best_ppn, best_performance);
+    fflush(stdout);
+  }
+  final_ppn = best_ppn;
+  if(final_ppn > CkNodeSize(0)) final_ppn =  CkNodeSize(0);
+  return best_ppn;
+}
+
+void LBManager::SetPPN(int pe_count) {
+  process_ppn = pe_count;
+}
+
+void LBManager::StartTiming(int pe_count, int entry){
+  performance[entry] = CkWallTimer();
+}
+
+void LBManager::StopTiming(int pe_count, int entry) {
+    if(ppnCount[entry]==0) {
+      entry_count++;
+      double now = CkWallTimer();
+      double then = performance[entry];
+      performance[entry] = now - then;
+//      if(pe_count == CkNodeSize(0))
+//        performance[entry] *= 1.33; //4 iterations / 3 iterations
+      ppnCount[entry] = pe_count;
+#if 0
+      CkPrintf("\n[PE-%d]Recording ppn[%d] = %d and perf[%d] = (%lf-%lf) %lfs\n", CkMyPe(),entry,
+                ppnCount[entry], entry, now, then, performance[entry]);
+#endif
+    }
+  }
+
+  void LBManager::SetBestPPN() {
+    process_ppn = findMaxPerf(entry_count);
+#if !VERBOSE
+    if(CkMyPe()==0)
+#endif
+    CkPrintf("\n[PE-%d] Setting Best at ppn=%d\n", CkMyPe(), unsigned(process_ppn));
+  }
+
+  int LBManager::GetPPN() { return process_ppn;}
+
+
 #if CMK_LBDB_ON
 static void work(int iter_block, volatile int* result)
 {

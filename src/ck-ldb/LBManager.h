@@ -197,6 +197,8 @@ class DefaultFunction : public LBPredictorFunction
   }
 };
 
+static std::atomic<int> process_ppn(CkNumPes());
+
 class LBManager : public CBase_LBManager
 {
  private:
@@ -229,6 +231,13 @@ class LBManager : public CBase_LBManager
 
  public:
   int chare_count;
+#define ENTRY_COUNT 16
+  int ppnCount[ENTRY_COUNT];
+  double performance[ENTRY_COUNT];
+  int entry;
+  int final_ppn;
+  int entry_count;
+  int best_ppn;
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
@@ -381,7 +390,7 @@ class LBManager : public CBase_LBManager
   void RemoveStartLBFn(int handle);
 
   void StartLB();
-  
+
   template <typename T>
   inline int AddMigrationDoneFn(T* obj, void (T::*method)(void))
   {
@@ -394,6 +403,14 @@ class LBManager : public CBase_LBManager
  public:
   inline void TurnManualLBOn() { useBarrier = false; }
   inline void TurnManualLBOff() { useBarrier = true; }
+  void WakeUpThreads();
+  int findMaxPerf(int _entry);
+  void SetPPN(int pe_count);
+  int GetPPN(void);
+  void StartTiming(int pe_count, int entry);
+  void StopTiming(int pe_count, int entry);
+  void SetBestPPN(void);
+
 
   inline void PredictorOn(LBPredictorFunction* model)
   {

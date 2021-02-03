@@ -399,6 +399,7 @@ typedef std::unordered_map<CmiUInt8, CkMigratable*> ElemMap;
 	///Done inserting elements for now
 	void doneInserting(void);
 	void startInserting(void);
+  void wakeUp(void);
 
 	// How many elements of each associated array are local to this PE?
 	// If this returns n, and there are k associated arrays, that

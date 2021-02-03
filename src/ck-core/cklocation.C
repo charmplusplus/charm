@@ -22,6 +22,8 @@
 #include <sstream>
 #include <stdarg.h>
 #include <vector>
+#include <mutex>
+#include <condition_variable>
 
 #if CMK_LBDB_ON
 #include "LBManager.h"
@@ -3302,6 +3304,28 @@ void CkLocMgr::doneInserting(void)
 {
 	lbmgr->DoneRegisteringObjects(myLBHandle);
 }
+
+static bool ready = false;
+static std::mutex m;
+static std::condition_variable cv;
+
+void CkLocMgr::wakeUp(){
+//    if(CkMyRank()==0)
+    {
+#if VERBOSE
+      CkPrintf("\n[PE-%d]Calling ready\n", CkMyPe());fflush(stdout);
+#endif
+      int ppn = getLBMgr()->GetPPN();
+      int pes_per_node = CkNumPes()/CkNumNodes();
+      ready = true;
+      int count = pes_per_node - ppn;
+//      for(int i=0;i<count;i++)
+//        cv.notify_one();
+      cv.notify_all();
+
+    }
+}
+
 #endif
 
 #include "CkLocation.def.h"
