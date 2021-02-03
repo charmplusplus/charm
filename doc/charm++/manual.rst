@@ -5863,9 +5863,25 @@ is ``unsigned short``, limiting each PE to 65,535 outstanding futures.
 To increase this limit, build Charm++ with a larger *CMK_REFNUM_TYPE*, e.g. specifying
 ``--with-refnum-type=uint`` to use ``unsigned int`` when building Charm++.
 
+There are additional facilities for operating on collections of futures, which include:
 
-The Converse version of future functions can be found in the :ref:`conv-futures`
-section.
++-------------------+-----------+-------------------------------------------------+
+| Function          | Blocking? | Description                                     |
++===================+===========+=================================================+
+| ``ck::wait_any``  | Yes       | Take a single value, as it becomes available,   |
+|                   |           | returning a pair with the value and position    |
+|                   |           | of the fulfilled future.                        |
++-------------------+-----------+-------------------------------------------------+
+| ``ck::wait_all``  | Yes       | Wait for all futures to become available,       |
+|                   |           | returning a list of values.                     |
++-------------------+-----------+-------------------------------------------------+
+| ``ck::wait_some`` | No        | Take all immediately available value, returning |
+|                   |           | a list of values and, separately, any           |
+|                   |           | outstanding futures.                            |
++-------------------+-----------+-------------------------------------------------+
+
+Note, these are also demonstrated in ``examples/charm++/future``. The Converse
+version of future functions can be found in the :ref:`conv-futures` section.
 
 .. _sec-completion:
 

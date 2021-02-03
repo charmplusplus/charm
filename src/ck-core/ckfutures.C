@@ -128,7 +128,6 @@ struct FutureState {
     CkAssert(std::find(freeList.begin(), freeList.end(), f) == freeList.end() &&
             "repeated frees of the same future");
     freeList.push_back(f);
-
   }
 
   bool is_ready(CkFutureID f) {
