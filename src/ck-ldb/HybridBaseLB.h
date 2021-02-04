@@ -346,8 +346,38 @@ protected:
   virtual LBMigrateMsg* Strategy(LDStats* stats);
   virtual void work(LDStats* stats);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
-  // helper function
-  LBMigrateMsg * createMigrateMsg(std::vector<MigrateInfo *> &migrateInfo, int count);
+
+  // Templated so it accepts both CkVec and std::vector, needed for NAMD support
+  // function used for any application that uses Strategy() instead of work()
+  template <template <typename...> class Container>
+  LBMigrateMsg* createMigrateMsg(Container<MigrateInfo*>& migrateInfo, int count)
+  {
+    const auto migrateCount =
+        migrateInfo.size() + levelData[currentLevel]->outObjs.size();
+    LBMigrateMsg* msg = new (migrateCount, 0, 0, 0) LBMigrateMsg;
+    msg->level = currentLevel;
+    msg->n_moves = migrateCount;
+
+    int i;
+    for (i = 0; i < migrateInfo.size(); i++)
+    {
+      const MigrateInfo* item = migrateInfo[i];
+      msg->moves[i] = *item;
+      delete item;
+      migrateInfo[i] = nullptr;
+    }
+
+    for (const auto& outObj : levelData[currentLevel]->outObjs)
+    {
+      MigrateInfo* item = &(msg->moves[i++]);
+      item->obj = outObj.handle;
+      item->from_pe = outObj.fromPe;
+      item->to_pe = -1;
+    }
+
+    return msg;
+  }
+
   virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats);
   void    printSummary(LDStats *stats, int count);
   void    initTree();

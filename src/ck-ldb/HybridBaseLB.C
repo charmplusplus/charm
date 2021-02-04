@@ -1237,37 +1237,6 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats)
 #endif
 }
 
-// function used for any application that uses Strategy() instead of work()
-LBMigrateMsg * HybridBaseLB::createMigrateMsg(std::vector<MigrateInfo *> &migrateInfo,int count)
-{
-  int i;
-
-  // merge outgoing objs
-  for (const auto& outObj : levelData[currentLevel]->outObjs) {
-    MigrateInfo *migrateMe = new MigrateInfo;
-    migrateMe->obj = outObj.handle;
-    migrateMe->from_pe = outObj.fromPe;
-    migrateMe->to_pe = -1;
-    migrateInfo.push_back(migrateMe);
-  }
-
-  if (_lb_args.printSummary())  printSummary(NULL, count);
-
-  int migrate_count=migrateInfo.size();
-  // ignore avail_vector, etc for now
-  //LBMigrateMsg * msg = new(migrate_count,count,count,0) LBMigrateMsg;
-  LBMigrateMsg* msg = new(migrate_count,0,0,0) LBMigrateMsg;
-  msg->level = currentLevel;
-  msg->n_moves = migrate_count;
-  for(i=0; i < migrate_count; i++) {
-    MigrateInfo* item = migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
-  } 
-  return msg;
-}
-
 int HybridBaseLB::NeighborIndex(int pe, int atlevel)
 {
     int peslot = -1;
