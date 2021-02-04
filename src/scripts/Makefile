@@ -76,9 +76,6 @@ AMPI:  charm++
 
 AMPIC AMPIF: AMPI
 
-ARMCI: charm++ LIBS
-
-
 f90charm: charm++
 
 libcharm: charm++
