@@ -318,7 +318,6 @@ FLINKAGE {
 #define ampi_load_stop_measure FTN_NAME( AMPI_LOAD_STOP_MEASURE, ampi_load_stop_measure )
 #define ampi_load_reset_measure FTN_NAME( AMPI_LOAD_RESET_MEASURE, ampi_load_reset_measure )
 #define ampi_load_set_value FTN_NAME( AMPI_SET_LOAD_VALUE, ampi_load_set_value )
-#define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
 #define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
 #define ampi_set_migratable FTN_NAME ( AMPI_SET_MIGRATABLE , ampi_set_migratable )
 #define ampi_register_pup FTN_NAME( AMPI_REGISTER_PUP , ampi_register_pup )
@@ -1558,6 +1557,8 @@ void mpi_file_create_errhandler(void (*function)(MPI_File*,int*,...), int *errha
   *ierr = MPI_File_create_errhandler(function, errhandler);
 }
 
+#if !CMK_AMPI_WITH_ROMIO
+// Disable ROMIO's get_errhf.c and set_errhf.c if enabling these.
 void mpi_file_set_errhandler(MPI_File* file, int* errhandler, int *ierr) noexcept
 {
   *ierr = MPI_File_set_errhandler(*file, *errhandler);
@@ -1567,6 +1568,7 @@ void mpi_file_get_errhandler(MPI_File* file, int *errhandler, int *ierr) noexcep
 {
   *ierr = MPI_File_get_errhandler(*file, errhandler);
 }
+#endif
 
 void mpi_errhandler_create(void (*function)(MPI_Comm*,int*,...), int *errhandler, int *ierr) noexcept
 {
@@ -2173,13 +2175,6 @@ void ampi_load_set_value(double *value, int *ierr) noexcept
 {
   *ierr = AMPI_Load_set_value(*value);
 }
-
-#if CMK_FAULT_EVAC
-void ampi_evacuate(int *ierr) noexcept
-{
-  *ierr = AMPI_Evacuate();
-}
-#endif
 
 void ampi_migrate_to_pe(int *dest, int *ierr) noexcept
 {

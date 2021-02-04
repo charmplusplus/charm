@@ -103,7 +103,7 @@ private:
   void ResumeFromSyncHelper();
 public:
   void ReadyMigrate(bool ready);
-  void ckFinishConstruction(void);
+  void ckFinishConstruction(int epoch = -1);
   void setMigratable(int migratable);
   void setPupSize(size_t obj_pup_size);
 #else
@@ -111,7 +111,7 @@ public:
   void setMigratable(int migratable)  { }
   void setPupSize(size_t obj_pup_size) { }
 public:
-  void ckFinishConstruction(void) { }
+  void ckFinishConstruction(int epoch) { }
 #endif
 
 #if CMK_OUT_OF_CORE
@@ -122,14 +122,6 @@ private:
   friend void CkArrayPrefetch_readFromSwap(FILE *swapfile,void *objptr);
   int prefetchObjID; //From CooRegisterObject
   bool isInCore; //If true, the object is present in memory
-#endif
-
-#if CMK_FAULT_EVAC
-private:
-  bool asyncEvacuate;
-  void AsyncEvacuate(bool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
-public:
-  bool isAsyncEvacuate(){return asyncEvacuate;};
 #endif
 };
 

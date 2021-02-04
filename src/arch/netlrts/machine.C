@@ -267,9 +267,6 @@ int _kq = -1;
 #define PRINTBUFSIZE 16384
 
 #include "machine-rdma.h"
-#if CMK_ONESIDED_IMPL
-#include "machine-onesided.h"
-#endif
 
 #if CMK_SHRINK_EXPAND
 extern void resumeAfterRealloc(void);
@@ -927,8 +924,6 @@ static void CmiDestroyLocks(void)
 /*Add a message to this processor's receive queue 
   Must be called while holding comm. lock
 */
-
-extern double evacTime;
 
 /***************************************************************
  Communication with charmrun:

@@ -4,11 +4,13 @@
 #include <stdlib.h> /* for redefinition of exit() below */
 #include <inttypes.h> /* for intptr_t */
 #include "charm-api.h"
+#include "conv-config.h"
 
 #define AMPI_INTERNAL_SKIP_FUNCTIONS
 
 #if CMK_CUDA
-#include "hapi.h"
+#include <cuda_runtime.h>
+typedef struct hapiWorkRequest hapiWorkRequest;
 #endif
 
 /* NON-standard define: this lets people #ifdef on
@@ -999,10 +1001,12 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_File_call_errhandler APMPI_File_call_errhandler
 #define  MPI_File_create_errhandler  AMPI_File_create_errhandler
 #define PMPI_File_create_errhandler APMPI_File_create_errhandler
+#if !CMK_AMPI_WITH_ROMIO
 #define  MPI_File_get_errhandler  AMPI_File_get_errhandler
 #define PMPI_File_get_errhandler APMPI_File_get_errhandler
 #define  MPI_File_set_errhandler  AMPI_File_set_errhandler
 #define PMPI_File_set_errhandler APMPI_File_set_errhandler
+#endif
 
 #define  MPI_Close_port  AMPI_Close_port
 #define PMPI_Close_port APMPI_Close_port
@@ -1056,14 +1060,6 @@ typedef void (*MPI_MigrateFn)(void);
 
 #define  MPI_CONVERSION_FN_NULL  AMPI_CONVERSION_FN_NULL
 #define PMPI_CONVERSION_FN_NULL APMPI_CONVERSION_FN_NULL
-#define  MPI_File_iread_all  AMPI_File_iread_all
-#define PMPI_File_iread_all APMPI_File_iread_all
-#define  MPI_File_iread_at_all  AMPI_File_iread_at_all
-#define PMPI_File_iread_at_all APMPI_File_iread_at_all
-#define  MPI_File_iwrite_all  AMPI_File_iwrite_all
-#define PMPI_File_iwrite_all APMPI_File_iwrite_all
-#define  MPI_File_iwrite_at_all  AMPI_File_iwrite_at_all
-#define PMPI_File_iwrite_at_all APMPI_File_iwrite_at_all
 
 #define  MPI_Status_f082f  AMPI_Status_f082f
 #define PMPI_Status_f082f APMPI_Status_f082f

@@ -5,13 +5,12 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
  */
 #include "tcharm_impl.h"
 #include "tcharm.h"
-#include "ckevacuation.h"
 #include <ctype.h>
 #include "memory-isomalloc.h"
 
 CtvDeclare(TCharm *,_curTCharm);
 
-static int lastNumChunks=0;
+static int nChunks;
 
 class TCharmTraceLibList {
 	enum {maxLibs=20,maxLibNameLen=15};
@@ -61,6 +60,11 @@ CsvDeclare(funcmap*, tcharm_funcmap);
 
 void TCharm::nodeInit()
 {
+  static bool tcharm_nodeinit_has_been_called;
+  if (tcharm_nodeinit_has_been_called)
+    return;
+  tcharm_nodeinit_has_been_called = true;
+
 #if CMK_TRACE_ENABLED
   if (CsvAccess(tcharm_funcmap) == NULL) {
     CsvInitialize(funcmap*, tcharm_funcmap);
@@ -71,6 +75,11 @@ void TCharm::nodeInit()
   // Assumes no anytime migration and only static insertion
   _isAnytimeMigration = false;
   _isStaticInsertion = true;
+
+  char **argv = CkGetArgv();
+  nChunks = CkNumPes();
+  CmiGetArgIntDesc(argv, "-vp", &nChunks, "Set the total number of virtual processors");
+  CmiGetArgIntDesc(argv, "+vp", &nChunks, nullptr);
 }
 
 void TCharm::procInit()
@@ -108,10 +117,10 @@ void TCharm::procInit()
     if (CkMyPe() == 0)
       CkPrintf("TCharm> stack size is set to %d.\n", tcharm_stacksize);
   }
-  if (CkMyPe()!=0) { //Processor 0 eats "+vp<N>" and "-vp<N>" later:
-  	int ignored;
-  	while (CmiGetArgIntDesc(argv,"-vp",&ignored,NULL)) {}
-  	while (CmiGetArgIntDesc(argv,"+vp",&ignored,NULL)) {}
+  if (CkMyRank() != 0) { // rank 0 eats "+vp<N>" and "-vp<N>" in nodeInit
+    int ignored;
+    CmiGetArgIntDesc(argv, "-vp", &ignored, nullptr);
+    CmiGetArgIntDesc(argv, "+vp", &ignored, nullptr);
   }
   if (CkMyPe()==0) { // Echo various debugging options:
     if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
@@ -186,9 +195,6 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
   isStopped=true;
-#if CMK_FAULT_EVAC
-	AsyncEvacuate(true);
-#endif
   exitWhenDone=initMsg->opts.exitWhenDone;
   isSelfDone = false;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
@@ -205,10 +211,6 @@ TCharm::TCharm(CkMigrateMessage *msg)
   initMsg=NULL;
   tid=NULL;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
-
-#if CMK_FAULT_EVAC
-	AsyncEvacuate(true);
-#endif
 }
 
 void checkPupMismatch(PUP::er &p,int expected,const char *where)
@@ -430,17 +432,6 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 #endif
 }
 
-#if CMK_FAULT_EVAC
-CMI_WARN_UNUSED_RESULT TCharm * TCharm::evacuate() noexcept {
-	//CkClearAllArrayElementsCPP();
-	if(CkpvAccess(startedEvac)){
-		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);
-		return suspend();
-	}
-	return this;
-}
-#endif
-
 //calls atsync with async mode
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::async_migrate() noexcept
 {
@@ -571,11 +562,6 @@ CLINKAGE int TCHARM_Get_num_chunks()
 {
 	TCHARMAPI("TCHARM_Get_num_chunks");
 	if (CkMyPe()!=0) CkAbort("TCHARM_Get_num_chunks should only be called on PE 0 during setup!");
-	int nChunks=CkNumPes();
-	char **argv=CkGetArgv();
-	CmiGetArgIntDesc(argv,"-vp",&nChunks,"Set the total number of virtual processors");
-	CmiGetArgIntDesc(argv,"+vp",&nChunks,NULL);
-	lastNumChunks=nChunks;
 	return nChunks;
 }
 FLINKAGE int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)()
@@ -813,14 +799,6 @@ CLINKAGE void TCHARM_Migrate_to(int destPE)
 	TCHARMAPI("TCHARM_Migrate_to");
 	TCharm * unused = TCharm::get()->migrateTo(destPE);
 }
-
-#if CMK_FAULT_EVAC
-CLINKAGE void TCHARM_Evacuate()
-{
-	TCHARMAPI("TCHARM_Migrate_to");
-	TCharm * unused = TCharm::get()->evacuate();
-}
-#endif
 
 FORTRAN_AS_C(TCHARM_MIGRATE_TO,TCHARM_Migrate_to,tcharm_migrate_to,
 	(int *destPE),(*destPE))

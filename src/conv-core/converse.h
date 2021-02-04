@@ -70,12 +70,10 @@
 #define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
 
 #define CMI_ZC_MSGTYPE(msg)                  ((CmiMsgHeaderBasic *)msg)->zcMsgType
-#if CMK_ONESIDED_IMPL
 #define CMI_IS_ZC_P2P(msg)                   (CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_SEND_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_RECV_MSG)
 #define CMI_IS_ZC_BCAST(msg)                 (CMI_ZC_MSGTYPE(msg) == CMK_ZC_BCAST_SEND_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_BCAST_RECV_MSG)
 #define CMI_IS_ZC_RECV(msg)                  (CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_RECV_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_BCAST_RECV_MSG)
 #define CMI_IS_ZC(msg)                       (CMI_IS_ZC_P2P(msg) || CMI_IS_ZC_BCAST(msg))
-#endif
 #define CMI_IS_ZC_DEVICE(msg)                (CMI_ZC_MSGTYPE(msg) == CMK_ZC_DEVICE_MSG)
 
 #define CMI_MSG_NOKEEP(msg)                  ((CmiMsgHeaderBasic *)msg)->nokeep
@@ -165,6 +163,20 @@
 # define CMI_WARN_UNUSED_RESULT _Check_return_
 #else
 # define CMI_WARN_UNUSED_RESULT
+#endif
+
+#if defined __cplusplus && __cplusplus >= 201402L
+#  define CMK_DEPRECATED_MSG(x) [[deprecated(x)]]
+#  define CMK_DEPRECATED [[deprecated]]
+#elif defined __GNUC__ || defined __clang__
+#  define CMK_DEPRECATED_MSG(x) __attribute__((deprecated(x)))
+#  define CMK_DEPRECATED __attribute__((deprecated))
+#elif defined _MSC_VER
+#  define CMK_DEPRECATED_MSG(x) __declspec(deprecated(x))
+#  define CMK_DEPRECATED __declspec(deprecated)
+#else
+#  define CMK_DEPRECATED_MSG(x)
+#  define CMK_DEPRECATED
 #endif
 
 /* Paste the tokens x and y together, without any space between them.
@@ -484,54 +496,6 @@ void CmiMemcpy_qpx (void *dst, const void *src, size_t n);
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
 #endif
 
-#if CMK_SHARED_VARS_UNIPROCESSOR /*Used only by uth- and sim- versions*/
-
-extern int _Cmi_mype;
-extern int _Cmi_numpes;
-
-#define CmiMyPe()              _Cmi_mype
-#define CmiMyRank()            _Cmi_mype
-#define CmiNumPes()            _Cmi_numpes
-#define CmiMyNodeSize()        _Cmi_numpes
-#define CmiMyNode()            0
-#define CmiNumNodes()          1
-#define CmiNodeFirst(node)     0
-#define CmiNodeSize(node)      _Cmi_numpes
-#define CmiNodeOf(pe)          0
-#define CmiRankOf(pe)          (pe)
-
-#define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
-#define CpvExtern(t,v)  extern t* CMK_TAG(Cpv_,v)
-#ifdef __cplusplus
-#define CpvCExtern(t,v)  extern "C" t* CMK_TAG(Cpv_,v)
-#else
-#define CpvCExtern(t,v)    CpvExtern(t,v)
-#endif
-#define CpvStaticDeclare(t,v) static t* CMK_TAG(Cpv_,v)
-#define CpvInitialize(t,v)\
-  do  { if (CMK_TAG(Cpv_,v)==0)\
-        { CMK_TAG(Cpv_,v) = CpvInit_Alloc(t,CmiNumPes()); }}\
-  while(0)
-#define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
-#define CpvAccess(v) CMK_TAG(Cpv_,v)[CmiMyPe()]
-#define CpvAccessOther(v, r) CMK_TAG(Cpv_,v)[r]
-
-#define CmiMemLock() 0
-#define CmiMemUnlock() 0
-extern void CmiNodeBarrier(void);
-extern void CmiNodeAllBarrier(void);
-#define CmiSvAlloc CmiAlloc
-
-typedef int *CmiNodeLock;
-extern CmiNodeLock  CmiCreateLock(void);
-extern void         CmiLock(CmiNodeLock lock);
-extern void         CmiUnlock(CmiNodeLock lock);
-extern int          CmiTryLock(CmiNodeLock lock);
-extern void         CmiDestroyLock(CmiNodeLock lock);
-
-#define CmiInCommThread() (0)
-
-#endif
 
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
 
@@ -1485,7 +1449,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #define CmiSyncNodeSend(n,s,m)        CmiSyncSend(CmiNodeFirst(n),s,m)
 #define CmiAsyncNodeSend(n,s,m)       CmiAsyncSend(CmiNodeFirst(n),s,m)
 #define CmiSyncNodeSendAndFree(n,s,m) CmiSyncSendAndFree(CmiNodeFirst(n),s,m)
-#if CMK_UTH_VERSION || CMK_MULTICORE
+#if CMK_MULTICORE
 #define CmiSyncNodeBroadcast(s,m)           do { \
           int _i; \
           for(_i=0; _i<CmiNumNodes(); _i++) \
@@ -2256,11 +2220,6 @@ CmiObjId *CthGetThreadID(CthThread th);
 void CthSetThreadID(CthThread th, int a, int b, int c);
 
 void CthTraceResume(CthThread t);
-
-#if CMK_FAULT_EVAC
-CpvExtern(char *,_validProcessors);
-#define CmiNodeAlive(x)  (CpvAccess(_validProcessors)[x])
-#endif
 
 int CmiEndianness(void);
 

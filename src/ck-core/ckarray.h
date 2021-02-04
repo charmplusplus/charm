@@ -35,8 +35,6 @@ Orion Sky Lawlor, olawlor@acm.org
 	Utility defines, includes, etc.
 */
 extern void _registerCkArray(void);
-CpvExtern (int ,serializer);
-
 
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
@@ -745,9 +743,7 @@ public:
     return broadcaster;
   }
   void flushStates();
-#if CMK_ONESIDED_IMPL
   void forwardZCMsgToOtherElems(envelope *env);
-#endif
 
 
         static bool isIrreducible() { return true; }
@@ -757,7 +753,6 @@ public:
 // with usage in maps' populateInitial()
 typedef CkArray CkArrMgr;
 
-#if CMK_ONESIDED_IMPL
 struct ncpyBcastNoMsg{
   char cmicore[CmiMsgHeaderSizeBytes];
   int srcPe;
@@ -765,7 +760,6 @@ struct ncpyBcastNoMsg{
 };
 
 void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize);
-#endif
 
 /*@}*/
 
