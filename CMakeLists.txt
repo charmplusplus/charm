@@ -449,7 +449,7 @@ if(${TARGET} STREQUAL "all-test")
         ckqt tcharm-compat moduleNDMeshStreamer
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
-        threads-default-tls ldb-neighbor ldb-workstealing modulearmci
+        threads-default-tls ldb-neighbor ldb-workstealing
         modulecollidecharm modulecollide memory-os memory-gnu-isomalloc
         ampi_globals_fs)
   if(CMK_CAN_LINK_FORTRAN)
