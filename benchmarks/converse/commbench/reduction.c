@@ -200,6 +200,14 @@ void reduction_init(void) {
   EmptyMsg emsg;
   CmiInitMsgHeader(emsg.core, sizeof(EmptyMsg));
 
+  if (CpvAccess(oversubscribed)) {
+    if (CmiMyPe() == 0)
+      CmiPrintf("[reduction] Skipping due to oversubscription.\n");
+    CmiSetHandler(&emsg, CpvAccess(ack_handler));
+    CmiSyncSend(0, sizeof(EmptyMsg), &emsg);
+    return;
+  }
+
   CmiSetHandler(&emsg, CpvAccess(sync_reply));
   CpvAccess(lasttime) = CmiWallTimer();
   CmiSyncSend(CpvAccess(currentPe), sizeof(EmptyMsg), &emsg);

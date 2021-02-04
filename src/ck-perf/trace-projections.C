@@ -752,28 +752,6 @@ void LogPool::modLastEntryTimestamp(double ts)
   //pool[numEntries-1].cputime = ts;
 }
 
-// /** Constructor for a multicast log entry */
-// 
-//  THIS WAS MOVED TO trace-projections.h with the other constructors
-// 
-// LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-// 	     int ml, CmiObjId *d, double rt, int numPe, int *pelist) 
-// {
-//     type = CREATION_MULTICAST; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
-//     if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
-//     recvTime = rt; 
-//     numpes = numPe;
-//     userSuppliedNote = NULL;
-//     if (pelist != NULL) {
-// 	pes = new int[numPe];
-// 	for (int i=0; i<numPe; i++) {
-// 	  pes[i] = pelist[i];
-// 	}
-//     } else {
-// 	pes= NULL;
-//     }
-// }
-
 //void LogEntry::addPapi(LONG_LONG_PAPI *papiVals)
 //{
 //#if CMK_HAS_COUNTER_PAPI
@@ -871,36 +849,14 @@ void LogEntry::pup(PUP::er &p)
 	break;
     case USER_SUPPLIED_NOTE:
 	  p|itime;
-	  int length;
-	  length=0;
-	  if (p.isPacking()) length = strlen(userSuppliedNote);
-          p | length;
-	  char space;
-	  space = ' ';
-          p | space;
-	  if (p.isUnpacking()) {
-	    userSuppliedNote = new char[length+1];
-	    userSuppliedNote[length] = '\0';
-	  }
-   	  PUParray(p,userSuppliedNote, length);
+	  p|userSuppliedNote;
 	  break;
     case USER_SUPPLIED_BRACKETED_NOTE:
       //CkPrintf("Writting out a USER_SUPPLIED_BRACKETED_NOTE\n");
 	  p|itime;
 	  p|iEndTime;
 	  p|event;
-	  int length2;
-	  length2=0;
-	  if (p.isPacking()) length2 = strlen(userSuppliedNote);
-          p | length2;
-	  char space2;
-	  space2 = ' ';
-          p | space2;
-	  if (p.isUnpacking()) {
-	    userSuppliedNote = new char[length2+1];
-	    userSuppliedNote[length2] = '\0';
-	  }
-   	  PUParray(p,userSuppliedNote, length2);
+	  p|userSuppliedNote;
 	  break;
     case MEMORY_USAGE_CURRENT:
       p | memUsage;
@@ -922,16 +878,25 @@ void LogEntry::pup(PUP::er &p)
     case CREATION_BCAST:
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
-      p|event; p|pe; p|msglen; p|irecvtime; p|numpes;
-      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      p|event; p|pe; p|msglen; p|irecvtime;
+      { // Needed to control the scope of numpes
+        int numpes = pes.size();
+        p | numpes;
+        if (p.isUnpacking()) pes.resize(numpes);
+      }
+      if (p.isUnpacking()) recvTime = irecvtime / 1.0e6;
       break;
     case CREATION_MULTICAST:
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
-      p|event; p|pe; p|msglen; p|irecvtime; p|numpes;
-      if (p.isUnpacking()) pes = numpes?new int[numpes]:NULL;
-      for (i=0; i<numpes; i++) p|pes[i];
-      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      p|event; p|pe; p|msglen; p|irecvtime;
+      { // Needed to control the scope of numpes
+        int numpes = pes.size();
+        p | numpes;
+        if (p.isUnpacking()) pes.resize(numpes);
+      }
+      p | pes;
+      if (p.isUnpacking()) recvTime = irecvtime / 1.0e6;
       break;
     case MESSAGE_RECV:
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen;
@@ -970,7 +935,7 @@ void LogEntry::pup(PUP::er &p)
 
 TraceProjections::TraceProjections(char **argv): 
   _logPool(NULL), curevent(0), inEntry(false), computationStarted(false),
-	traceNestedEvents(false), converseExit(false),
+	traceNestedEvents(true), converseExit(false),
 	currentPhaseID(0), lastPhaseEvent(NULL), endTime(0.0)
 {
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
@@ -988,7 +953,7 @@ TraceProjections::TraceProjections(char **argv):
     CmiGetArgFlagDesc(argv,"+checknested",
 		      "check projections nest begin end execute events");
   traceNestedEvents = 
-    CmiGetArgFlagDesc(argv,"+tracenested",
+    !CmiGetArgFlagDesc(argv,"+notracenested",
               "trace projections nest begin/end execute events");
   int binary = 
     CmiGetArgFlagDesc(argv,"+binary-trace",
@@ -997,17 +962,21 @@ TraceProjections::TraceProjections(char **argv):
   int nSubdirs = 0;
   CmiGetArgIntDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
 
-
 #if CMK_USE_ZLIB
-  int compressed = true;
-  CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
-  int disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files pre-compressed with gzip");
+  bool compressed = true;
+  CmiGetArgFlagDesc(argv,"+gz-trace","Write log files compressed with gzip");
+  const bool disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files compressed with gzip");
   compressed = compressed && !disableCompressed;
+  if (binary && compressed)
+    CkAbort("Binary logs cannot be compressed with gzip, must use +no-gz-trace with +binary-trace");
 #else
-  // consume the flag so there's no confusing
-  CmiGetArgFlagDesc(argv,"+gz-trace",
-		    "Write log files pre-compressed with gzip");
-  if(CkMyPe() == 0) CkPrintf("Warning> gz-trace is not supported on this machine!\n");
+  // consume the flags so there's no confusion
+  const bool compressed =
+      CmiGetArgFlagDesc(argv, "+gz-trace", "Write log files compressed with gzip");
+  CmiGetArgFlagDesc(argv, "+no-gz-trace",
+                    "Disable writing log files compressed with gzip");
+  if (CkMyPe() == 0 && compressed)
+    CkPrintf("Warning> gz-trace is not supported because Charm++ was built without zlib!\n");
 #endif
 
   int writeSummaryFiles = CmiGetArgFlagDesc(argv,"+write-analysis-file","Enable writing summary files "); 

@@ -70,7 +70,7 @@ public:
     CkPrintf("Iterations: %d\n", n_iters);
     CkPrintf("Busy time: %f s\n", busy_time);
     CkPrintf("Kernel clock count: %lld\n", kernel_clock_count);
-    CkPrintf("Data size: %llu\n", data_size);
+    CkPrintf("Data size: %zu\n", data_size);
     CkPrintf("QD off: %s\n\n", qd_off ? "true" : "false");
 
     // Create 1D chare array and start

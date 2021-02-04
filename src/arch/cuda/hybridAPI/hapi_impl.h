@@ -13,19 +13,12 @@ extern "C" {
 // Scale the amount of memory each node pins.
 #define HAPI_MEMPOOL_SCALE 1.0
 
-// Init & exit functions
-void hapiInitCsv();
-void hapiInitCpv();
-void hapiExitCsv();
-
-// Maps PEs to devices
-void hapiMapping(char** argv);
-
-// Registers callback handler functions.
-void hapiRegisterCallbacks();
+// HAPI init & exit functions
+void hapiInit(char** argv);
+void hapiExit();
 
 // Polls for GPU work completion. Does not do anything if HAPI_CUDA_CALLBACK is defined.
-void hapiPollEvents();
+void hapiPollEvents(void* param, double cur_time);
 
 // BufferPool constructs for mempool implementation.
 // Data and metadata reside in same chunk of memory.

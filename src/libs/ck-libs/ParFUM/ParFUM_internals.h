@@ -504,7 +504,6 @@ class FEM_Attribute {
 			     const IDXL_Layout &layout, const char *caller);
 
 };
-PUPmarshall(FEM_Attribute)
 
 ///A single table of user data associated with an entity.
 /**
@@ -564,7 +563,6 @@ class FEM_DataAttribute : public FEM_Attribute {
    */
   void interpolate(int *iNodes,int rNode,int k);
 };
-PUPmarshall(FEM_DataAttribute)
 
 ///The FEM_Attribute is of type integer indices
 /**
@@ -613,7 +611,6 @@ class FEM_IndexAttribute : public FEM_Attribute {
   /// Copy src[srcEntity] into our dstEntity.
   virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
 };
-PUPmarshall(FEM_IndexAttribute)
 
 ///The FEM_Attribute is a variable set of integer indices
 /**
@@ -788,11 +785,9 @@ class FEM_Entity {
    * the last element, so that we always have a compact list, and we
    * allocate only when we need to
    */
-  int* invalidList;
-  ///length of invalid list
+  std::vector<int> invalidList;
+  ///active length of invalid list - *distinct* from vector's .size()
   int invalidListLen;
-  ///length of allocated invalid list
-  int invalidListAllLen;
 
  protected:
   /**
@@ -974,7 +969,6 @@ class FEM_Entity {
 
   void print(const char *type,const IDXL_Print_Map &map);
 };
-PUPmarshall(FEM_Entity)
 
 // Now that we have FEM_Entity, we can define attribute lenth, as entity length
 inline int FEM_Attribute::getLength(void) const { return e->size(); }
@@ -1035,7 +1029,6 @@ class FEM_Node : public FEM_Entity {
   bool hasConn(int idx);
   void print(const char *type,const IDXL_Print_Map &map);
 };
-PUPmarshall(FEM_Node)
 
 
 ///FEM_Elem is a type of FEM_Entity, which refers to elems
@@ -1084,8 +1077,6 @@ class FEM_Elem:public FEM_Entity {
   void connIs(int i,const int *src) {conn->get().setRow(i,src);}
   bool hasConn(int idx);
 };
-PUPmarshall(FEM_Elem)
-
 
 
 ///FEM_Sparse is a type of FEM_Entity, which refers to edges
@@ -1127,7 +1118,6 @@ class FEM_Sparse : public FEM_Elem {
   inline elem_t &setElem(void) {return elem->get();}
   inline const elem_t &getElem(void) const {return elem->get();}
 };
-PUPmarshall(FEM_Sparse)
 
 /** Describes a user function to pup a piece of mesh data
  */
@@ -1515,8 +1505,6 @@ class FEM_Mesh : public CkNoncopyable {
 
 };
 
-PUPmarshall(FEM_Mesh)
-
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
 FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *caller);
 FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char *caller);
@@ -1787,7 +1775,7 @@ class FEM_Ghost_Layer : public CkNoncopyable {
   public:
     bool add; //Add this kind of ghost element to the chunks
     int tuplesPerElem; //# of tuples surrounding this element
-    intArrayPtr elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
+    std::vector<int> elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
     elemGhostInfo(void) {add=false;tuplesPerElem=0;}
     ~elemGhostInfo(void) {}
     void pup(PUP::er &p) {//CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");
@@ -1800,19 +1788,7 @@ class FEM_Ghost_Layer : public CkNoncopyable {
     for(int i=0;i<FEM_MAX_ELTYPE;i++){
       p | elem[i].add;
       p | elem[i].tuplesPerElem;
-      if(elem[i].tuplesPerElem == 0){
-	continue;
-      }
-      int *arr;
-      if(p.isUnpacking()){
-	arr = new int[nodesPerTuple*elem[i].tuplesPerElem];
-      }else{
-	arr = elem[i].elem2tuple;
-      }
-      p(arr,nodesPerTuple*elem[i].tuplesPerElem);
-      if(p.isUnpacking()){
-	elem[i].elem2tuple = arr;
-      }
+      p | elem[i].elem2tuple;
     }
   }
 };
@@ -1998,7 +1974,7 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
   public:
     //  int recentElType; // should not be here, but if it is it should be pup'ed
     int tuplesPerElem; //# of tuples surrounding this element, i.e. number of faces on an element
-    intArrayPtr elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
+    std::vector<int> elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
     elemAdjInfo(void) {/*add=false;*/tuplesPerElem=0;}
     ~elemAdjInfo(void) {}
     void pup(PUP::er &p) {//CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");
@@ -2017,19 +1993,7 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 	  
 	  for(int i=0;i<FEM_MAX_ELTYPE;i++){
 		  p | elem[i].tuplesPerElem;
-		  if(elem[i].tuplesPerElem == 0){
-			  continue;
-		  }
-		  int *arr;
-		  if(p.isUnpacking()){
-			  arr = new int[nodesPerTuple*elem[i].tuplesPerElem];
-		  }else{
-			  arr = elem[i].elem2tuple;
-		  }
-		  p(arr,nodesPerTuple*elem[i].tuplesPerElem);
-		  if(p.isUnpacking()){
-			  elem[i].elem2tuple = arr;
-		  }
+		  p | elem[i].elem2tuple;
 	  }
   }
 };
@@ -2062,7 +2026,6 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 #endif
 
 #define MESH_CHUNK_TAG 3000
-#define MAX_SHARED_PER_NODE 20
 
 class NodeElem {
  public:
@@ -2072,80 +2035,46 @@ class NodeElem {
     owned by 1 element - numShared 0
     owned by 2 elements - numShared 2
   */
-  int numShared;
-  /*somewhat horrible semantics
-    -if numShared == 0 shared is NULL
-    - else stores all the chunks that share this node
-  */
-  int shared[MAX_SHARED_PER_NODE];
-  //	int *shared;
-  NodeElem(){
-    global = -1;
-    numShared = 0;
-    //		shared = NULL;
+  std::vector<int> shared;
+  NodeElem() : global(-1) {
   }
-  NodeElem(int g_,int num_){
-    global = g_; numShared= num_;
-    /*		if(numShared != 0){
-		shared = new int[numShared];
-		}else{
-		shared = NULL;
-		}*/
-    if(numShared > MAX_SHARED_PER_NODE){
-      CkAbort("In Parallel partition the max number of chunks per node exceeds limit\n");
-    }
+  NodeElem(int g_,int num_) : global(g_) {
+    shared.resize(num_);
   }
-  NodeElem(int g_){
-    global = g_;
-    numShared = 0;
-    //		shared = NULL;
+  NodeElem(int g_) : global(g_) {
   }
   NodeElem(const NodeElem &rhs){
-    //		shared=NULL;
     *this = rhs;
   }
-  inline NodeElem& operator=(const NodeElem &rhs){
+  NodeElem(NodeElem &&rhs){
+    *this = rhs;
+  }
+  NodeElem& operator=(const NodeElem &rhs){
     global = rhs.global;
-    numShared = rhs.numShared;
-    /*		if(shared != NULL){
-		delete [] shared;
-		}
-		shared = new int[numShared];*/
-    memcpy(&shared[0],&((rhs.shared)[0]),numShared*sizeof(int));
+    shared = rhs.shared;
+    return *this;
+  }
+  NodeElem& operator=(NodeElem &&rhs){
+    global = rhs.global;
+    shared = std::move(rhs.shared);
     return *this;
   }
 
-  inline	bool operator == (const NodeElem &rhs){
-    if(global == rhs.global){
-      return true;
-    }else{
-      return false;
-    }
+  bool operator ==(const NodeElem &rhs){
+    return global == rhs.global;
   }
-  inline 	bool operator >=(const NodeElem &rhs){
-    return (global >= rhs.global);
+  bool operator >=(const NodeElem &rhs){
+    return global >= rhs.global;
   }
-
-  inline bool operator <=(const NodeElem &rhs){
-    return (global <= rhs.global);
+  bool operator <=(const NodeElem &rhs){
+    return global <= rhs.global;
   }
 
   virtual void pup(PUP::er &p){
     p | global;
-    p | numShared;
-    /*		if(p.isUnpacking()){
-		if(numShared != 0){
-		shared = new int[numShared];
-		}else{
-		shared = NULL;
-		}
-		}*/
-    p(shared,numShared);
+    p | shared;
   }
   ~NodeElem(){
-    /*		if(shared != NULL){
-		delete [] shared;
-		}*/
   }
 };
 

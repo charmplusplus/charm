@@ -286,41 +286,43 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
       // not be brought into scope
       if (!var.isCounter && !var.isSpeculator) {
         if (var.isRdma) {
-          if (var.isFirstRdma) {
-            defs << "#if CMK_ONESIDED_IMPL\n";
+          if (var.isDevice) {
+            if (var.isFirstDeviceRdma) {
+              indentBy(defs, cur + 2);
+              defs << "int & num_device_rdma_fields = gen" << cur << "->getP"
+                   << i++ << "();\n";
+            }
             indentBy(defs, cur + 2);
-            defs << "int "
-                 << "& num_rdma_fields = ";
-            defs << "gen" << cur;
-            defs << "->"
+            defs << "CkDeviceBuffer & deviceBuffer_" << var.name << " = gen" << cur
+                 << "->getP" << i << "();\n";
+            indentBy(defs, cur + 2);
+            defs << var.type << "* " << var.name << " = (" << var.type
+                 << "*) (deviceBuffer_" << var.name << ".ptr);\n";
+          } else {
+            if (var.isFirstRdma) {
+              indentBy(defs, cur + 2);
+              defs << "int "
+                   << "& num_rdma_fields = ";
+              defs << "gen" << cur;
+              defs << "->"
+                   << "getP" << i << "();\n";
+              indentBy(defs, cur + 2);
+              i++;
+              defs << "int "
+                   << "& num_root_node = ";
+              defs << "gen" << cur;
+              defs << "->"
+                   << "getP" << i++ << "();\n";
+            }
+            indentBy(defs, cur + 2);
+            defs << "CkNcpyBuffer "
+                 << "& ncpyBuffer_" << var.name << " = ";
+            defs << "gen" << cur << "->"
                  << "getP" << i << "();\n";
             indentBy(defs, cur + 2);
-            i++;
-            defs << "int "
-                 << "& num_root_node = ";
-            defs << "gen" << cur;
-            defs << "->"
-                 << "getP" << i << "();\n";
-            defs << "#else\n";
-            i++;
-            defs << "#endif\n";
+            defs << var.type << "* " << var.name << " = "
+                 << "(" << var.type << "*) (ncpyBuffer_" << var.name << ".ptr);\n";
           }
-          defs << "#if CMK_ONESIDED_IMPL\n";
-          indentBy(defs, cur + 2);
-          defs << "CkNcpyBuffer "
-               << "& ncpyBuffer_" << var.name << " = ";
-          defs << "gen" << cur << "->"
-               << "getP" << i << "();\n";
-          indentBy(defs, cur + 2);
-          defs << var.type << "* " << var.name << " = "
-               << "(" << var.type << "*) (ncpyBuffer_" << var.name << ".ptr);\n";
-          defs << "#else\n";
-          indentBy(defs, cur + 2);
-          defs << var.type << "*"
-               << "& " << var.name << " = ";
-          defs << "gen" << cur << "->"
-               << "getP" << i << "();\n";
-          defs << "#endif\n";
         } else {
           indentBy(defs, cur + 2);
           defs << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& "
@@ -581,7 +583,7 @@ void SdagConstruct::generateTraceBeginCall(XStr& op, int indent) {
        << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, ";
 
     if (entry->getContainer()->isArray())
-      op << "ckGetArrayIndex().getProjectionID()";
+      op << "this->ckGetArrayIndex().getProjectionID()";
     else
       op << "NULL";
 
@@ -594,7 +596,7 @@ void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent, Entry* entry
   op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, ";
 
   if (entry->getContainer()->isArray())
-    op << "ckGetArrayIndex().getProjectionID()";
+    op << "this->ckGetArrayIndex().getProjectionID()";
   else
     op << "NULL";
 

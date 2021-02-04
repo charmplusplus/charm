@@ -61,26 +61,24 @@ class Hello : public CBase_Hello {
     hapiCheck(cudaGetDevice(&device));
     cudaDeviceProp prop;
     hapiCheck(cudaGetDeviceProperties(&prop, device));
-    uint32_t* uuid_p = (uint32_t*)&prop.uuid;
 
-    CkPrintf("Hello, I'm chare %d, on PE %d using GPU #%d %s (UUID: %x-%x-%x-%x)\n",
-        thisIndex, CkMyPe(), device, prop.name, *uuid_p, *(uuid_p+1), *(uuid_p+2), *(uuid_p+3));
+    CkPrintf("Hello, I'm chare %d, on PE %d using GPU #%d %s\n",
+        thisIndex, CkMyPe(), device, prop.name);
 
-    if (thisIndex < nElements - 1) {
-      CkArrayIndex1D myIndex = CkArrayIndex1D(thisIndex);
-      CkCallback* cb = new CkCallback(CkIndex_Hello::pass(), myIndex, thisArrayID);
+    CkArrayIndex1D myIndex = CkArrayIndex1D(thisIndex);
+    CkCallback* cb = new CkCallback(CkIndex_Hello::pass(), myIndex, thisArrayID);
 
-      kernelSetup(stream, (void*)cb);
-    }
-    else {
-      // we've been around once, we're done
-      mainProxy.done();
-    }
+    kernelSetup(stream, (void*)cb);
   }
 
   void pass() {
-    // pass the hello on
-    thisProxy[thisIndex + 1].greet();
+    if (thisIndex == nElements - 1) {
+      // we've been around once, we're done
+      mainProxy.done();
+    } else {
+      // pass the hello on
+      thisProxy[thisIndex + 1].greet();
+    }
   }
 };
 

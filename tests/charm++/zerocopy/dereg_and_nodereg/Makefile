@@ -26,6 +26,12 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p6 ./dereg_and_nodereg 100 +noCMAForZC)
 endif
 
+testp: all
+	$(call run, +p$(P) ./dereg_and_nodereg $$(( $(P) * 8)) )
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./dereg_and_nodereg $$(( $(P) * 8)) +noCMAForZC)
+endif
+
 smptest: all
 	$(call run, +p4 ./dereg_and_nodereg 50 ++ppn 4)
 	$(call run, +p6 ./dereg_and_nodereg 100 ++ppn 3)

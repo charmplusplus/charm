@@ -5,27 +5,26 @@
 
 #include "converse.h"
 #include <charm++.h>
-
-/*
- * This C++ file contains the Charm stub functions
- */
+#include "cksyncbarrier.h"
 
 #include "DistributedLB.h"
 #include "LBManager.h"
 #include "LBSimulation.h"
+#include "TreeLB.h"
 #include "topology.h"
+
+#include "json.hpp"
 
 CkGroupID _lbmgr;
 
 CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
 
-CkpvDeclare(int, numLoadBalancers); /**< num of lb created */
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 
 // command line options
 CkLBArgs _lb_args;
-int _lb_predict = 0;
+bool _lb_predict = false;
 int _lb_predict_delay = 10;
 int _lb_predict_window = 20;
 bool _lb_psizer_on = false;
@@ -40,19 +39,22 @@ class LBDBRegistry
   // table for all available LBs linked in
   struct LBDBEntry
   {
-    const char* name;
+    std::string name;
     LBCreateFn cfn;
     LBAllocFn afn;
-    const char* help;
-    int shown;  // if 0, donot show in help page
-    LBDBEntry() : name(0), cfn(0), afn(0), help(0), shown(1) {}
+    std::string help;
+    bool shown;  // if false, do not show in help page
+    LBDBEntry() : name(""), cfn(0), afn(0), help(""), shown(true) {}
     LBDBEntry(int) {}
-    LBDBEntry(const char* n, LBCreateFn cf, LBAllocFn af, const char* h, int show = 1)
+    LBDBEntry(std::string n, LBCreateFn cf, LBAllocFn af, std::string h, bool show = true)
         : name(n), cfn(cf), afn(af), help(h), shown(show){};
   };
   CkVec<LBDBEntry> lbtables;       // a list of available LBs linked
   CkVec<const char*> compile_lbs;  // load balancers at compile time
   CkVec<const char*> runtime_lbs;  // load balancers at run time
+  // map of {index in runtime_lbs, name of legacy LB to instantiate TreeLB with}
+  // for use with the legacy LBs (e.g. GreedyLB -> the predefined Greedy version of TreeLB)
+  std::unordered_map<int, const char*> legacy_runtime_treelbs;
  public:
   LBDBRegistry() {}
   void displayLBs()
@@ -61,43 +63,51 @@ class LBDBRegistry
     for (int i = 0; i < lbtables.length(); i++)
     {
       LBDBEntry& entry = lbtables[i];
-      if (entry.shown) CmiPrintf("* %s:	%s\n", entry.name, entry.help);
+      if (entry.shown) CmiPrintf("* %s:\t%s\n", entry.name.c_str(), entry.help.c_str());
     }
     CmiPrintf("\n");
   }
-  void addEntry(const char* name, LBCreateFn fn, LBAllocFn afn, const char* help,
-                int shown)
+  void addEntry(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
+                bool shown)
   {
     lbtables.push_back(LBDBEntry(name, fn, afn, help, shown));
   }
   void addCompiletimeBalancer(const char* name) { compile_lbs.push_back(name); }
-  void addRuntimeBalancer(const char* name) { runtime_lbs.push_back(name); }
-  LBCreateFn search(const char* name)
+  void addRuntimeBalancer(const char* name, const char* legacyLBName = nullptr)
   {
-    char* ptr = strpbrk((char*)name, ":,");
-    int slen = ptr != NULL ? ptr - name : strlen(name);
-    for (int i = 0; i < lbtables.length(); i++)
-      if (0 == strncmp(name, lbtables[i].name, slen)) return lbtables[i].cfn;
-    return NULL;
+    if (legacyLBName != nullptr)
+    {
+      legacy_runtime_treelbs.emplace((int)runtime_lbs.size(), legacyLBName);
+    }
+
+    runtime_lbs.push_back(name);
   }
-  LBAllocFn getLBAllocFn(const char* name)
+  LBCreateFn search(std::string name)
   {
-    char* ptr = strpbrk((char*)name, ":,");
-    int slen = ptr - name;
+    const auto index = name.find_first_of(":,");
     for (int i = 0; i < lbtables.length(); i++)
-      if (0 == strncmp(name, lbtables[i].name, slen)) return lbtables[i].afn;
-    return NULL;
+      if (0 == lbtables[i].name.compare(0, index, name))
+        return lbtables[i].cfn;
+    return nullptr;
+  }
+  LBAllocFn getLBAllocFn(std::string name)
+  {
+    const auto index = name.find_first_of(":,");
+    for (int i = 0; i < lbtables.length(); i++)
+      if (0 == lbtables[i].name.compare(0, index, name))
+        return lbtables[i].afn;
+    return nullptr;
   }
 };
 
 static LBDBRegistry lbRegistry;
-static std::vector<const char*> lbNames;
+static std::vector<std::string> lbNames;
 
 void LBDefaultCreate(const char* lbname) { lbRegistry.addCompiletimeBalancer(lbname); }
 
 // default is to show the helper
-void LBRegisterBalancer(const char* name, LBCreateFn fn, LBAllocFn afn, const char* help,
-                        int shown)
+void LBRegisterBalancer(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
+                        bool shown)
 {
   lbRegistry.addEntry(name, fn, afn, help, shown);
 }
@@ -105,17 +115,21 @@ void LBRegisterBalancer(const char* name, LBCreateFn fn, LBAllocFn afn, const ch
 LBAllocFn getLBAllocFn(const char* lbname) { return lbRegistry.getLBAllocFn(lbname); }
 
 // create a load balancer group using the strategy name
-static void createLoadBalancer(const char* lbname)
+static void createLoadBalancer(const std::string& lbname, const char* legacybalancer = nullptr)
 {
   LBCreateFn fn = lbRegistry.search(lbname);
   if (!fn)
   {  // invalid lb name
-    CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname);
+    CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname.c_str());
     lbRegistry.displayLBs();  // display help page
-    CkAbort("Abort");
+    if(lbname == "help")
+      CkExit(0);
+    else
+      CkExit(1);
   }
   // invoke function to create load balancer
-  fn();
+  int seqno = LBManagerObj()->getLoadbalancerTicket();
+  fn(CkLBOptions(seqno, legacybalancer));
 }
 
 // mainchare
@@ -130,7 +144,11 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
     for (int i = 0; i < lbRegistry.runtime_lbs.size(); i++)
     {
       const char* balancer = lbRegistry.runtime_lbs[i];
-      createLoadBalancer(balancer);
+      // If this is a legacy TreeLB, pass in the legacy LB name
+      const char* legacybalancer = lbRegistry.legacy_runtime_treelbs.count(i) > 0
+                                       ? lbRegistry.legacy_runtime_treelbs[i]
+                                       : nullptr;
+      createLoadBalancer(balancer, legacybalancer);
     }
   }
   else if (lbRegistry.compile_lbs.size() > 0)
@@ -157,8 +175,6 @@ void _loadbalancerInit()
 {
   CkpvInitialize(bool, lbmanagerInited);
   CkpvAccess(lbmanagerInited) = false;
-  CkpvInitialize(int, numLoadBalancers);
-  CkpvAccess(numLoadBalancers) = 0;
 
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
@@ -167,6 +183,8 @@ void _loadbalancerInit()
   char** argv = CkGetArgv();
   char* balancer = NULL;
   CmiArgGroup("Charm++", "Load Balancer");
+
+  CmiGetArgStringDesc(argv, "+TreeLBFile", &_lb_args.treeLBFile(), "TreeLB config file");
 
   // turn on MetaBalancer if set
   _lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB", "Turn on MetaBalancer");
@@ -211,10 +229,42 @@ void _loadbalancerInit()
       CkPrintf(
           "Warning: MetaLB is activated. For Automatic strategy selection in MetaLB, "
           "pass directory of model files using +MetaLBModelDir.\n");
-    while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
+    if (CkMyRank() == 0)
     {
-      if (CkMyRank() == 0)
-        lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
+      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
+      {
+        bool isLegacyTreeLB = true;
+        const char* legacyBalancer;
+        if (strcmp(balancer, "GreedyLB") == 0)
+          legacyBalancer = "Greedy";
+        else if (strcmp(balancer, "GreedyRefineLB") == 0)
+          legacyBalancer = "GreedyRefine";
+        else if (strcmp(balancer, "RefineLB") == 0)
+          legacyBalancer = "RefineA";
+        else if (strcmp(balancer, "RandCentLB") == 0)
+          legacyBalancer = "Random";
+        else if (strcmp(balancer, "DummyLB") == 0)
+          legacyBalancer = "Dummy";
+        else if (strcmp(balancer, "RotateLB") == 0)
+          legacyBalancer = "Rotate";
+        else
+        {
+          lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
+          isLegacyTreeLB = false;
+        }
+
+        if (isLegacyTreeLB)
+        {
+          lbRegistry.addRuntimeBalancer("TreeLB", legacyBalancer);
+        }
+      }
+    }
+    else
+    {
+      // For other ranks, consume the +balancer arguments to avoid spuriously
+      // passing them to the application
+      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
+        ;
     }
   }
 
@@ -235,10 +285,6 @@ void _loadbalancerInit()
   // now called in cldb.C: CldModuleGeneralInit()
   // registerLBTopos();
   CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
-  // Read the percentage parameter for RefineKLB and GreedyRefineLB
-  CmiGetArgIntDesc(
-      argv, "+LBPercentMoves", &_lb_args.percentMovesAllowed(),
-      "Percentage of chares to be moved (used by RefineKLB and GreedyRefineLB) [0-100]");
 
   /**************** FUTURE PREDICTOR ****************/
   _lb_predict = CmiGetArgFlagDesc(argv, "+LBPredictor", "Turn on LB future predictor");
@@ -319,10 +365,6 @@ void _loadbalancerInit()
     _lb_args.debug() =
         CmiGetArgFlagDesc(argv, "+LBDebug", "Turn on LB debugging printouts");
 
-  // getting the size of the team with +teamSize
-  if (!CmiGetArgIntDesc(argv, "+teamSize", &_lb_args.teamSize(), "Team size"))
-    _lb_args.teamSize() = 1;
-
   // ask to print summary/quality of load balancer
   _lb_args.printSummary() =
       CmiGetArgFlagDesc(argv, "+LBPrintSummary", "Print load balancing result summary");
@@ -332,14 +374,14 @@ void _loadbalancerInit()
       argv, "+LBNoBackground", "Load balancer ignores the background load.");
   _lb_args.migObjOnly() = CmiGetArgFlagDesc(
       argv, "+LBObjOnly", "Only load balancing migratable objects, ignoring all others.");
-  if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = 1;
+  if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = true;
 
   // assume all CPUs are identical
   _lb_args.testPeSpeed() =
       CmiGetArgFlagDesc(argv, "+LBTestPESpeed", "Load balancer test all CPUs speed.");
   _lb_args.samePeSpeed() = CmiGetArgFlagDesc(
       argv, "+LBSameCpus", "Load balancer assumes all CPUs are of same speed.");
-  if (!_lb_args.testPeSpeed()) _lb_args.samePeSpeed() = 1;
+  if (!_lb_args.testPeSpeed()) _lb_args.samePeSpeed() = true;
 
   _lb_args.useCpuTime() = CmiGetArgFlagDesc(
       argv, "+LBUseCpuTime", "Load balancer uses CPU time instead of wallclock time.");
@@ -411,9 +453,9 @@ void LBManager::initnodeFn()
 
   _registerCommandLineOpt("+balancer");
   _registerCommandLineOpt("+LBPeriod");
+  _registerCommandLineOpt("+TreeLBFile");
   _registerCommandLineOpt("+LBLoop");
   _registerCommandLineOpt("+LBTopo");
-  _registerCommandLineOpt("+LBPercentMoves");
   _registerCommandLineOpt("+LBPredictor");
   _registerCommandLineOpt("+LBPredictorDelay");
   _registerCommandLineOpt("+LBPredictorWindow");
@@ -428,7 +470,6 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBShowDecisions");
   _registerCommandLineOpt("+LBSyncResume");
   _registerCommandLineOpt("+LBDebug");
-  _registerCommandLineOpt("+teamSize");
   _registerCommandLineOpt("+LBPrintSummary");
   _registerCommandLineOpt("+LBNoBackground");
   _registerCommandLineOpt("+LBObjOnly");
@@ -442,14 +483,16 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBBeta");
 }
 
-void LBManager::callAt()
+void LBManager::InvokeLB()
 {
-  localBarrier.CallReceivers();
-  if (nloadbalancers > 0) loadbalancers[0]->InvokeLB();
+  if (loadbalancers.size() > 0)
+  {
+    loadbalancers[currentLBIndex]->InvokeLB();
+  }
 }
 
 // Called at end of each load balancing cycle
-void LBManager::periodicLB(void* in) { ((LBManager*)in)->callAt(); }
+void LBManager::periodicLB(void* in) { ((LBManager*)in)->InvokeLB(); }
 
 void LBManager::setTimer()
 {
@@ -457,35 +500,15 @@ void LBManager::setTimer()
                      CkMyPe());
 }
 
-void LBManager::reset()
-{
-  if (rank0pe)
-  {
-    int peFirst = CkNodeFirst(CkMyNode());
-    local_pes_to_notify.clear();
-    for (int pe = peFirst; pe < peFirst + CkNodeSize(CkMyNode()); pe++)
-      local_pes_to_notify.insert(local_pes_to_notify.end(), pe);
-    received_from_left = false;
-    received_from_right = false;
-  }
-  else
-    received_from_rank0 = false;
-}
-
 // called my constructor
 void LBManager::init(void)
 {
   mystep = 0;
-  nloadbalancers = 0;
   new_ld_balancer = 0;
   chare_count = 0;
   metabalancer = nullptr;
   lbdb_obj = new LBDatabase();
-  localBarrier.SetMgr(this);
-  startedAtSync = false;
-  rank0pe = CkMyRank() == 0;
-  reset();
-
+  currentLBIndex = 0;
 #if CMK_LB_CPUTIMER
   obj_cputime = 0;
 #endif
@@ -499,34 +522,35 @@ void LBManager::init(void)
 #endif
 
   if (_lb_args.lbperiod() != -1.0)  // check if user set LBPeriod - fix later
+  {
     setTimer();
+  }
+  else
+  {
+    CkSyncBarrier::object()->addReceiver([this](void) { this->InvokeLB(); });
+  }
 }
 
-int LBManager::AddStartLBFn(LDStartLBFn fn, void* data)
+int LBManager::AddStartLBFn(std::function<void()> fn)
 {
   // Save startLB function
   StartLBCB* callbk = new StartLBCB;
 
   callbk->fn = fn;
-  callbk->data = data;
-  callbk->on = 1;
+  callbk->on = true;
   startLBFnList.push_back(callbk);
   startLBFn_count++;
   return startLBFnList.size() - 1;
 }
 
-void LBManager::RemoveStartLBFn(LDStartLBFn fn)
+void LBManager::RemoveStartLBFn(int handle)
 {
-  for (int i = 0; i < startLBFnList.size(); i++)
+  StartLBCB* callbk = startLBFnList[handle];
+  if (callbk)
   {
-    StartLBCB* callbk = startLBFnList[i];
-    if (callbk && callbk->fn == fn)
-    {
-      delete callbk;
-      startLBFnList[i] = 0;
-      startLBFn_count--;
-      break;
-    }
+    delete callbk;
+    startLBFnList[handle] = nullptr;
+    startLBFn_count--;
   }
 }
 
@@ -539,32 +563,27 @@ void LBManager::StartLB()
   for (int i = 0; i < startLBFnList.size(); i++)
   {
     StartLBCB* startLBFn = startLBFnList[i];
-    if (startLBFn && startLBFn->on) startLBFn->fn(startLBFn->data);
+    if (startLBFn && startLBFn->on) startLBFn->fn();
   }
 }
 
-int LBManager::AddMigrationDoneFn(LDMigrationDoneFn fn, void* data)
+int LBManager::AddMigrationDoneFn(std::function<void()> fn)
 {
   // Save migrationDone callback function
   MigrationDoneCB* callbk = new MigrationDoneCB;
 
   callbk->fn = fn;
-  callbk->data = data;
   migrationDoneCBList.push_back(callbk);
   return migrationDoneCBList.size() - 1;
 }
 
-void LBManager::RemoveMigrationDoneFn(LDMigrationDoneFn fn)
+void LBManager::RemoveMigrationDoneFn(int handle)
 {
-  for (int i = 0; i < migrationDoneCBList.size(); i++)
+  MigrationDoneCB* callbk = migrationDoneCBList[handle];
+  if (callbk)
   {
-    MigrationDoneCB* callbk = migrationDoneCBList[i];
-    if (callbk && callbk->fn == fn)
-    {
-      delete callbk;
-      migrationDoneCBList[i] = 0;
-      break;
-    }
+    delete callbk;
+    migrationDoneCBList[handle] = nullptr;
   }
 }
 
@@ -573,19 +592,8 @@ void LBManager::MigrationDone()
   for (int i = 0; i < migrationDoneCBList.size(); i++)
   {
     MigrationDoneCB* callbk = migrationDoneCBList[i];
-    if (callbk) callbk->fn(callbk->data);
+    if (callbk) callbk->fn();
   }
-}
-
-void LBManager::SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin,
-                               LDPredictFn off, LDPredictModelFn change, void* data)
-{
-  if (predictCBFn == NULL) predictCBFn = new PredictCB;
-  predictCBFn->on = on;
-  predictCBFn->onWin = onWin;
-  predictCBFn->off = off;
-  predictCBFn->change = change;
-  predictCBFn->data = data;
 }
 
 void LBManager::DumpDatabase()
@@ -599,7 +607,7 @@ void LBManager::DumpDatabase()
 void LBManager::Migrated(LDObjHandle h, int waitBarrier)
 {
   // Object migrated, inform load balancers
-  if (nloadbalancers > 0) loadbalancers[0]->Migrated(waitBarrier);
+  if (loadbalancers.size() > 0) loadbalancers[currentLBIndex]->Migrated(waitBarrier);
 }
 
 LBManager::LastLBInfo::LastLBInfo() { expectedLoad = _expectedLoad; }
@@ -646,11 +654,8 @@ void LBManager::set_avail_vector(char* bitmap, int new_ld)
 // and broadcast the ticket number to all processors
 int LBManager::getLoadbalancerTicket()
 {
-  int seq = nloadbalancers;
-  nloadbalancers++;
-  loadbalancers.resize(nloadbalancers);
-  loadbalancers[seq] = NULL;
-  return seq;
+  loadbalancers.push_back(nullptr);
+  return loadbalancers.size() - 1;
 }
 
 void LBManager::addLoadbalancer(BaseLB* lb, int seq)
@@ -659,16 +664,15 @@ void LBManager::addLoadbalancer(BaseLB* lb, int seq)
   if (seq == -1) return;
   if (CkMyPe() == 0)
   {
-    CmiAssert(seq < nloadbalancers);
+    CmiAssert(seq < loadbalancers.size());
     if (loadbalancers[seq])
     {
       CmiPrintf("Duplicate load balancer created at %d\n", seq);
       CmiAbort("LBManager");
     }
   }
-  else
-    nloadbalancers++;
-  loadbalancers.resize(seq + 1);
+  if (loadbalancers.size() < seq + 1)
+    loadbalancers.resize(seq + 1);
   loadbalancers[seq] = lb;
 }
 
@@ -676,27 +680,49 @@ void LBManager::addLoadbalancer(BaseLB* lb, int seq)
 void LBManager::nextLoadbalancer(int seq)
 {
   if (seq == -1) return;  // -1 means this is the only LB
-  int next = seq + 1;
+  currentLBIndex = seq + 1;
   if (_lb_args.loop())
   {
-    if (next == nloadbalancers) next = 0;
+    if (currentLBIndex == loadbalancers.size()) currentLBIndex = 0;
   }
   else
   {
-    if (next == nloadbalancers) next--;  // keep using the last one
+    if (currentLBIndex == loadbalancers.size()) currentLBIndex--;  // keep using the last one
   }
-  if (seq != next)
+  if (seq != currentLBIndex)
   {
     loadbalancers[seq]->turnOff();
-    CmiAssert(loadbalancers[next]);
-    loadbalancers[next]->turnOn();
+    CmiAssert(loadbalancers[currentLBIndex]);
+    loadbalancers[currentLBIndex]->turnOn();
   }
 }
 
 // switch strategy
 void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
 {
-  // TODO: Implement turn off / on
+  if (lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB")
+  {
+    json config;
+    if (lbNames[switchTo] == "Hybrid")
+    {
+      config["tree"] = "PE_Process_Root";
+      config["Root"]["pe"] = 0;
+      config["Root"]["step_freq"] = 3;
+      config["Root"]["strategies"] = {"GreedyRefine"};
+      config["Process"]["strategies"] = {"GreedyRefine"};
+    }
+    else
+    {
+      config["tree"] = "PE_Root";
+      config["Root"]["pe"] = 0;
+      config["Root"]["strategies"] = {lbNames[switchTo]};
+    }
+    configureTreeLB(config);
+  }
+  else
+  {
+    // TODO: Implement turn off / on for Distributed
+  }
 }
 
 // return the seq-th load balancer string name of
@@ -755,13 +781,38 @@ void LBManager::pup(PUP::er& p)
   p | mystep;
   if (p.isUnpacking())
   {
-    nloadbalancers = 0;
     if (_lb_args.metaLbOn())
     {
       // if unpacking set metabalancer using the id
       metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
     }
   }
+}
+
+void configureTreeLB(const char* json_str)
+{
+  ((LBManager*)CkLocalBranch(_lbmgr))->configureTreeLB(json_str);
+}
+
+void LBManager::configureTreeLB(const char* json_str)
+{
+  json config = json::parse(json_str);
+  configureTreeLB(config);
+}
+
+void LBManager::configureTreeLB(json& config)
+{
+  bool found = false;
+  for (int i = 0; i < loadbalancers.size(); i++)
+  {
+    if (strcmp(loadbalancers[i]->lbName(), "TreeLB") == 0)
+    {
+      ((TreeLB*)loadbalancers[i])->configure(config);
+      found = true;
+      // break; // not sure if there could be more than one TreeLB
+    }
+  }
+  if (!found) CkAbort("LBManager: TreeLB is not in my list of load balancers");
 }
 
 void LBManager::ResetAdaptive()
@@ -795,7 +846,16 @@ void LBManager::ResumeClients()
       metabalancer->ResumeClients();
     }
   }
-  localBarrier.ResumeClients();
+
+  // If periodic is enabled, reset the timer and don't resume clients
+  if (_lb_args.lbperiod() != -1.0)
+  {
+    setTimer();
+  }
+  else
+  {
+    CkSyncBarrier::object()->resumeClients();
+  }
 #endif
 }
 
@@ -850,6 +910,44 @@ void LBManager::UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad)
 #endif
 }
 
+LDBarrierClient LBManager::AddLocalBarrierClient(Chare* obj, std::function<void()> fn)
+{
+  return CkSyncBarrier::object()->addClient(obj, fn);
+}
+
+void LBManager::RemoveLocalBarrierClient(LDBarrierClient h)
+{
+  CkSyncBarrier::object()->removeClient(h);
+}
+
+LDBarrierReceiver LBManager::AddLocalBarrierReceiver(std::function<void()> fn)
+{
+  return CkSyncBarrier::object()->addReceiver(fn);
+}
+
+void LBManager::RemoveLocalBarrierReceiver(LDBarrierReceiver h)
+{
+  CkSyncBarrier::object()->removeReceiver(h);
+}
+
+void LBManager::AtLocalBarrier(LDBarrierClient _n_c)
+{
+  if (useBarrier) CkSyncBarrier::object()->atBarrier(_n_c);
+}
+
+void LBManager::TurnOnBarrierReceiver(LDBarrierReceiver h)
+{
+  CkSyncBarrier::object()->turnOnReceiver(h);
+}
+
+void LBManager::TurnOffBarrierReceiver(LDBarrierReceiver h)
+{
+  CkSyncBarrier::object()->turnOffReceiver(h);
+}
+
+void LBManager::LocalBarrierOn(void) { CkSyncBarrier::object()->turnOn(); };
+void LBManager::LocalBarrierOff(void) { CkSyncBarrier::object()->turnOff(); };
+
 #if CMK_LBDB_ON
 static void work(int iter_block, volatile int* result)
 {
@@ -864,37 +962,27 @@ static void work(int iter_block, volatile int* result)
 
 int LDProcessorSpeed()
 {
-  // for SMP version, if one processor have done this testing,
-  // we can skip the other processors by remember the number here
-  static int thisProcessorSpeed = -1;
-
   if (_lb_args.samePeSpeed() ||
       CkNumPes() == 1)  // I think it is safe to assume that we can
     return 1;           // skip this if we are only using 1 PE
 
-  if (thisProcessorSpeed != -1) return thisProcessorSpeed;
+  volatile int result = 0;
 
-  // if (CkMyPe()==0) CkPrintf("Measuring processor speeds...");
-
-  volatile static int result = 0;  // I don't care what this is, its just for
-                                   // timing, so this is thread safe.
   int wps = 0;
-  const double elapse = 0.4;
-  // First, count how many iterations for .2 second.
+  const double elapse = 0.2;
+  // First, count how many iterations happen in "elapse" seconds.
   // Since we are doing lots of function calls, this will be rough
   const double end_time = CmiCpuTimer() + elapse;
-  wps = 0;
   while (CmiCpuTimer() < end_time)
   {
     work(1000, &result);
     wps += 1000;
   }
 
-  // Now we have a rough idea of how many iterations there are per
-  // second, so just perform a few cycles of correction by
-  // running for what we think is 1 second.  Then correct
-  // the number of iterations per second to make it closer
-  // to the correct value
+  // Now we have a rough idea of how many iterations happen in
+  // "elapse" seconds, so just perform a few cycles of correction
+  // by running for what should take that long. Then correct the
+  // number of iterations if needed.
 
   for (int i = 0; i < 2; i++)
   {
@@ -905,16 +993,6 @@ int LDProcessorSpeed()
     wps = (int)((double)wps * correction + 0.5);
   }
 
-  // If necessary, do a check now
-  //    const double start_time3 = CmiWallTimer();
-  //    work(msec * 1e-3 * wps);
-  //    const double end_time3 = CmiWallTimer();
-  //    CkPrintf("[%d] Work block size is %d %d %f\n",
-  //	     thisIndex,wps,msec,1.e3*(end_time3-start_time3));
-  thisProcessorSpeed = wps;
-
-  // if (CkMyPe()==0) CkPrintf(" Done.\n");
-
   return wps;
 }
 
@@ -922,7 +1000,11 @@ int LDProcessorSpeed()
 int LDProcessorSpeed() { return 1; }
 #endif  // CMK_LBDB_ON
 
-int LBManager::ProcessorSpeed() { return LDProcessorSpeed(); }
+int LBManager::ProcessorSpeed()
+{
+  static int peSpeed = LDProcessorSpeed();
+  return peSpeed;
+}
 
 /*
   callable from user's code
@@ -957,7 +1039,7 @@ void TurnManualLBOff()
 #endif
 }
 
-extern "C" void LBTurnInstrumentOn()
+void LBTurnInstrumentOn()
 {
 #if CMK_LBDB_ON
   if (CkpvAccess(lbmanagerInited))
@@ -967,7 +1049,7 @@ extern "C" void LBTurnInstrumentOn()
 #endif
 }
 
-extern "C" void LBTurnInstrumentOff()
+void LBTurnInstrumentOff()
 {
 #if CMK_LBDB_ON
   if (CkpvAccess(lbmanagerInited))
@@ -977,14 +1059,14 @@ extern "C" void LBTurnInstrumentOff()
 #endif
 }
 
-extern "C" void LBTurnCommOn()
+void LBTurnCommOn()
 {
 #if CMK_LBDB_ON
   _lb_args.traceComm() = 1;
 #endif
 }
 
-extern "C" void LBTurnCommOff()
+void LBTurnCommOff()
 {
 #if CMK_LBDB_ON
   _lb_args.traceComm() = 0;
@@ -1037,202 +1119,6 @@ void LBSetPeriod(double second)
 }
 
 int LBRegisterObjUserData(int size) { return CkpvAccess(lbobjdatalayout).claim(size); }
-
-class LBClient
-{
- public:
-  Chare* chare;
-  std::function<void()> fn;
-  int refcount;
-
-  LBClient(Chare* chare, std::function<void()> fn, int refcount)
-      : chare(chare), fn(fn), refcount(refcount)
-  {
-  }
-};
-
-class LBReceiver
-{
- public:
-  std::function<void()> fn;
-  int on;
-
-  LBReceiver(std::function<void()> fn, int on = 1) : fn(fn), on(on) {}
-};
-
-LDBarrierClient LocalBarrier::AddClient(Chare* chare, std::function<void()> fn)
-{
-  LBClient* new_client = new LBClient(chare, fn, cur_refcount);
-
-  client_count++;
-
-  return LDBarrierClient(clients.insert(clients.end(), new_client));
-}
-
-void LocalBarrier::RemoveClient(LDBarrierClient c)
-{
-  delete *(c);
-  clients.erase(c);
-
-  client_count--;
-}
-
-LDBarrierReceiver LocalBarrier::AddReceiver(std::function<void()> fn)
-{
-  LBReceiver* new_receiver = new LBReceiver(fn);
-
-  return LDBarrierReceiver(receivers.insert(receivers.end(), new_receiver));
-}
-
-void LocalBarrier::RemoveReceiver(LDBarrierReceiver c)
-{
-  delete *(c);
-  receivers.erase(c);
-}
-
-void LocalBarrier::TurnOnReceiver(LDBarrierReceiver c) { (*c)->on = 1; }
-
-void LocalBarrier::TurnOffReceiver(LDBarrierReceiver c) { (*c)->on = 0; }
-
-void LocalBarrier::AtBarrier(LDBarrierClient h, bool flood_atsync)
-{
-  (*h)->refcount++;
-  at_count++;
-
-  CheckBarrier(flood_atsync);
-}
-
-void LocalBarrier::DecreaseBarrier(int c) { at_count -= c; }
-
-void LBManager::invokeLbStart(int pe, int lb_step, int myphynode, int mype)
-{
-  thisProxy[pe].recvLbStart(lb_step, myphynode, mype);
-}
-
-void LocalBarrier::propagate_atsync()
-{
-  if (propagated_atsync_step < cur_refcount)
-  {
-    int mype = CkMyPe();
-    int myphynode = CkNodeOf(mype);
-    if (!_mgr->rank0pe)
-    {
-      if (!_mgr->received_from_rank0)
-      {
-        // If this PE is non-rank0 and non-empty PE, then trigger AtSync barrier on rank0
-        int node_rank0_pe = CkNodeFirst(myphynode);
-        _mgr->invokeLbStart(node_rank0_pe, cur_refcount, myphynode, mype);
-      }
-    }
-    else
-    {  // Rank0 PE
-      int peFirst = CkNodeFirst(CkMyNode());
-      // Flood non-zero ranks on this node
-      for (std::list<int>::iterator it = _mgr->local_pes_to_notify.begin();
-           it != _mgr->local_pes_to_notify.end(); ++it)
-        _mgr->invokeLbStart(*it, cur_refcount, myphynode, mype);
-      if (!_mgr->received_from_left && myphynode > 0)
-      {  // Flood left node
-        int pe = CkNodeFirst(myphynode - 1);
-        _mgr->invokeLbStart(pe, cur_refcount, myphynode, mype);
-      }
-      if (!_mgr->received_from_right && myphynode < CkNumNodes() - 1)
-      {  // Flood right node
-        int pe = CkNodeFirst(myphynode + 1);
-        _mgr->invokeLbStart(pe, cur_refcount, myphynode, mype);
-      }
-    }
-    propagated_atsync_step = cur_refcount;
-  }
-}
-
-void LBManager::recvLbStart(int lb_step, int phynode, int pe)
-{
-  if (lb_step != localBarrier.cur_refcount || startedAtSync) return;
-  int mype = CkMyPe();
-  int myphynode = CkNodeOf(mype);
-  if (phynode < myphynode)
-    received_from_left = true;
-  else if (phynode > myphynode)
-    received_from_right = true;
-  else if (rank0pe)
-    local_pes_to_notify.remove(pe);
-  else
-    received_from_rank0 = true;
-  if (localBarrier.client_count == 1 &&
-      localBarrier.clients.front()
-          ->chare->isLocMgr())  // CkLocMgr is usually a client on each PE
-    localBarrier.CheckBarrier(
-        true);  // Empty PE invokes barrier on self on receiving a flood msg
-}
-
-void LocalBarrier::CheckBarrier(bool flood_atsync)
-{
-  if (_lb_args.lbperiod() != -1.0) return;
-
-  if (!on) return;
-
-  if (client_count == 1 && !flood_atsync)
-  {
-    if (clients.front()->chare->isLocMgr()) return;
-  }
-
-  // If there are no clients, resume as soon as we're turned on
-  if (client_count == 0)
-  {
-    cur_refcount++;
-    CallReceivers();
-  }
-
-  if (at_count >= client_count)
-  {
-    bool at_barrier = true;
-
-    for (auto& c : clients)
-    {
-      if (c->refcount < cur_refcount)
-      {
-        at_barrier = false;
-        break;
-      }
-    }
-
-    if (at_barrier)
-    {
-      _mgr->startedAtSync = true;
-      propagate_atsync();
-      at_count -= client_count;
-      cur_refcount++;
-      CallReceivers();
-      if (_mgr->nloadbalancers > 0) _mgr->loadbalancers[0]->InvokeLB();
-    }
-  }
-}
-
-void LocalBarrier::CallReceivers(void)
-{
-  for (auto& r : receivers)
-  {
-    if (r->on)
-    {
-      r->fn();
-    }
-  }
-}
-
-void LocalBarrier::ResumeClients(void)
-{
-  if (_lb_args.lbperiod() != -1.0)
-  {
-    _mgr->setTimer();
-    return;
-  }
-
-  for (auto& c : clients) c->fn();
-
-  _mgr->reset();
-  _mgr->startedAtSync = false;
-}
 
 #include "LBManager.def.h"
 

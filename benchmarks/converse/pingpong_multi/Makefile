@@ -12,6 +12,9 @@ pingpong.o: pingpong.C
 test: pingpong
 	$(call run, ./pingpong +p2 )
 
+testp: pingpong
+	$(call run, ./pingpong +p$(P) )
+
 clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o

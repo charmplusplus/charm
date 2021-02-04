@@ -98,7 +98,11 @@ tracemode:
 
 -  ``+gz-trace``: generate gzip (if available) compressed log files.
 
--  ``+gz-no-trace``: generate regular (not compressed) log files.
+-  ``+no-gz-trace``: generate regular (uncompressed) log files.
+
+-  ``+notracenested``: a debug option. Does not resume tracing outer
+   entry methods when entry methods are nested (as can happen with
+   ``[local]`` and ``[inline]`` calls.
 
 -  ``+checknested``: a debug option. Checks if events are improperly
    nested while recorded and issue a warning immediately.
@@ -448,7 +452,7 @@ The Projections Performance Visualization Tool
 
 The Projections Java-based visualization tool (henceforth referred to as
 simply Projections) can be downloaded from the Charm++ website at
-http://charm.cs.illinois.edu/software. The directory which you download
+https://charm.cs.illinois.edu/software. The directory which you download
 will henceforth be referred to as ``PROJECTIONS_LOCATION``.
 
 Building Projections

@@ -1,7 +1,7 @@
 #include <math.h>
 #include <charm++.h>
 
-#if defined(_WIN32)
+#ifdef _MSC_VER
 #define strcasecmp stricmp
 #endif
 
@@ -85,6 +85,8 @@ Topo::Topo(TopoInitMsg* _m)
 		break;
 	case TopoRandGraph:
 		ConstructRandGraph();
+		break;
+	case TopoError:
 		break;
 	};
 

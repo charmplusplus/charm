@@ -8,19 +8,20 @@
  *  Orion Sky Lawlor, olawlor@acm.org 9/29/2001
  */
 
+#include "TopoManager.h"
+#include "charm++.h"
+#include "ck.h"
+#include "cksyncbarrier.h"
 #include "hilbert.h"
 #include "partitioning_strategies.h"
-#include "charm++.h"
-#include "register.h"
-#include "ck.h"
-#include "trace.h"
-#include "TopoManager.h"
-#include <vector>
-#include <algorithm>
-#include <sstream>
-#include <limits>
 #include "pup_stl.h"
+#include "register.h"
+#include "trace.h"
+#include <algorithm>
+#include <limits>
+#include <sstream>
 #include <stdarg.h>
+#include <vector>
 
 #if CMK_LBDB_ON
 #include "LBManager.h"
@@ -275,11 +276,6 @@ public:
     if (i.dimension == 1) {
       //Map 1D integer indices in simple round-robin fashion
       int ans = (i.data()[0])%CkNumPes();
-#if CMK_FAULT_EVAC
-      while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CkpvAccess(startedEvac))){
-        ans = (ans+1)%CkNumPes();
-      }
-#endif
       return ans;
     }
     else {
@@ -288,11 +284,6 @@ public:
         //Map other indices based on their hash code, mod a big prime.
         unsigned int hash=(i.hash()+739)%1280107;
         int ans = (hash % CkNumPes());
-#if CMK_FAULT_EVAC
-        while(!CmiNodeAlive(ans)){
-          ans = (ans+1)%CkNumPes();
-        }
-#endif
         return ans;
       } else {
         if(!productsInit) { indexInit(); }
@@ -629,7 +620,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim0*nDim1);
+      allpairs.resize((size_t)nDim0*nDim1);
       coords.resize(dims);
       for(int i=0; i<nDim0; i++)
         for(int j=0; j<nDim1; j++)
@@ -651,7 +642,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim0*nDim1*nDim2);
+      allpairs.resize((size_t)nDim0*nDim1*nDim2);
       coords.resize(dims);
       for(int i=0; i<nDim0; i++)
         for(int j=0; j<nDim1; j++)
@@ -676,7 +667,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim[0]*nDim[1]*nDim[2]*nDim[3]);
+      allpairs.resize((size_t)nDim[0]*nDim[1]*nDim[2]*nDim[3]);
       coords.resize(dims);
       for(int i=0; i<nDim[0]; i++)
         for(int j=0; j<nDim[1]; j++)
@@ -703,7 +694,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]);
+      allpairs.resize((size_t)nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]);
       coords.resize(dims);
       for(int i=0; i<nDim[0]; i++)
         for(int j=0; j<nDim[1]; j++)
@@ -733,7 +724,7 @@ public:
       int index;
       int counter = 0;
       std::vector<int> coords;
-      allpairs.resize(nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]*nDim[5]);
+      allpairs.resize((size_t)nDim[0]*nDim[1]*nDim[2]*nDim[3]*nDim[4]*nDim[5]);
       coords.resize(dims);
       for(int i=0; i<nDim[0]; i++)
         for(int j=0; j<nDim[1]; j++)
@@ -1137,9 +1128,9 @@ class arrInfo {
    std::vector<int> _map;
  public:
    arrInfo() {}
-   arrInfo(const CkArrayIndex& n, int *speeds) : _nelems(n), _map(_nelems.getCombinedCount())
+   arrInfo(const CkArrayIndex& n, int *_speeds) : _nelems(n), _map(_nelems.getCombinedCount())
    {
-     distrib(speeds);
+     distrib(_speeds);
    }
    ~arrInfo() {}
    int getMap(const CkArrayIndex &i);
@@ -1211,7 +1202,7 @@ arrInfo::getMap(const CkArrayIndex &i)
 
 //Speeds maps processor number to "speed" (some sort of iterations per second counter)
 // It is initialized by processor 0.
-static int* speeds;
+static int* globalSpeeds;
 
 #if CMK_USE_PROP_MAP
 typedef struct _speedmsg
@@ -1226,14 +1217,14 @@ static void _speedHdlr(void *m)
   speedMsg *msg=(speedMsg *)m;
   if (CmiMyRank()==0)
     for (int pe=0;pe<CmiNodeSize(msg->node);pe++)
-      speeds[CmiNodeFirst(msg->node)+pe] = msg->speed;  
+      globalSpeeds[CmiNodeFirst(msg->node)+pe] = msg->speed;
   CmiFree(m);
 }
 
 // initnode call
 void _propMapInit(void)
 {
-  speeds = new int[CkNumPes()];
+  globalSpeeds = new int[CkNumPes()];
   int hdlr = CkRegisterHandler(_speedHdlr);
   CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CkMyPe());
   int s = LBManager::ProcessorSpeed();
@@ -1248,10 +1239,10 @@ void _propMapInit(void)
 #else
 void _propMapInit(void)
 {
-  speeds = new int[CkNumPes()];
+  globalSpeeds = new int[CkNumPes()];
   int i;
   for(i=0;i<CkNumPes();i++)
-    speeds[i] = 1;
+    globalSpeeds[i] = 1;
 }
 #endif
 /**
@@ -1275,7 +1266,7 @@ public:
   {
     int idx = arrs.size();
     arrs.resize(idx+1);
-    arrs[idx] = new arrInfo(numElements, speeds);
+    arrs[idx] = new arrInfo(numElements, globalSpeeds);
     return idx;
   }
   void unregisterArray(int idx)
@@ -1295,7 +1286,7 @@ public:
     p|arrs;
     if(p.isUnpacking() && oldNumPes != CkNumPes()){
       for(int idx = 0; idx < arrs.length(); ++idx){
-        arrs[idx]->distrib(speeds);
+        arrs[idx]->distrib(globalSpeeds);
       }
     }
   }
@@ -1433,10 +1424,6 @@ void CkMigratable::commonInit(void) {
     myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
   }
 #endif
-
-#if CMK_FAULT_EVAC
-	AsyncEvacuate(true);
-#endif
 }
 
 CkMigratable::CkMigratable(void) {
@@ -1449,27 +1436,36 @@ CkMigratable::CkMigratable(CkMigrateMessage *m): Chare(m) {
 
 int CkMigratable::ckGetChareType(void) const {return thisChareType;}
 
-void CkMigratable::pup(PUP::er &p) {
-	DEBM((AA "In CkMigratable::pup %s\n" AB,idx2str(thisIndexMax)));
-	Chare::pup(p);
-	p|thisIndexMax;
-	p(usesAtSync);
-  p(can_reset);
-	p(usesAutoMeasure);
-#if CMK_LBDB_ON 
-	int readyMigrate = 0;
-	if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
-	p|readyMigrate;
-	if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
-#endif
-	if(p.isUnpacking()) barrierRegistered=false;
+void CkMigratable::pup(PUP::er& p)
+{
+  DEBM((AA "In CkMigratable::pup %s\n" AB, idx2str(thisIndexMax)));
+  Chare::pup(p);
+  p | thisIndexMax;
+  p | usesAtSync;
+  p | can_reset;
+  p | usesAutoMeasure;
 
-#if CMK_FAULT_EVAC
-	p | asyncEvacuate;
-	if(p.isUnpacking()){myRec->AsyncEvacuate(asyncEvacuate);}
+#if CMK_LBDB_ON
+  bool readyMigrate = false;
+  if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
+  p | readyMigrate;
+  if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
 #endif
-	
-	ckFinishConstruction();
+
+  int epoch = -1;
+  // Only pup epoch when migrating. Will result in problems if pup'd when
+  // checkpointing since it will not match the value of the freshly inited barrier
+  // upon restart
+  if (usesAtSync && p.isMigration())
+  {
+    if (p.isPacking())
+    {
+      epoch = (*ldBarrierHandle)->epoch;
+    }
+    p | epoch;
+  }
+
+  if (p.isUnpacking()) ckFinishConstruction(epoch);
 }
 
 void CkMigratable::ckDestroy(void) {}
@@ -1493,7 +1489,7 @@ CkMigratable::~CkMigratable() {
 	if (barrierRegistered) {
 	  DEBL((AA "Removing barrier for element %s\n" AB,idx2str(thisIndexMax)));
 	  if (usesAtSync)
-		myRec->getLBMgr()->RemoveLocalBarrierClient(ldBarrierHandle);
+	    myRec->getSyncBarrier()->removeClient(ldBarrierHandle);
 	}
 
   if (_lb_args.metaLbOn()) {
@@ -1587,7 +1583,6 @@ void CkMigratable::recvLBPeriod(void *data) {
     local_state = LOAD_BALANCE;
 
     can_reset = true;
-    //myRec->AtLocalBarrier(ldBarrierHandle);
     return;
   }
   local_state = DECIDED;
@@ -1595,10 +1590,10 @@ void CkMigratable::recvLBPeriod(void *data) {
 
 void CkMigratable::metaLBCallLB() {
   if(usesAtSync)
-    myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
+    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
 }
 
-void CkMigratable::ckFinishConstruction(void)
+void CkMigratable::ckFinishConstruction(int epoch)
 {
 //	if ((!usesAtSync) || barrierRegistered) return;
 	if (usesAtSync && _lb_args.lbperiod() != -1.0)
@@ -1608,7 +1603,8 @@ void CkMigratable::ckFinishConstruction(void)
 	if (barrierRegistered) return;
 	DEBL((AA "Registering barrier client for %s\n" AB,idx2str(thisIndexMax)));
 	if (usesAtSync) {
-	  ldBarrierHandle = myRec->getLBMgr()->AddLocalBarrierClient(this, &CkMigratable::ResumeFromSyncHelper);
+	  ldBarrierHandle = myRec->getSyncBarrier()->addClient(
+	    this, [=]() { this->ResumeFromSyncHelper(); }, epoch);
 	}
 	barrierRegistered=true;
 }
@@ -1617,7 +1613,9 @@ void CkMigratable::AtSync(int waitForMigration)
 {
 	if (!usesAtSync)
 		CkAbort("You must set usesAtSync=true in your array element constructor to use AtSync!\n");
-	if(CkpvAccess(numLoadBalancers) == 0) {
+	// Only actually call AtSync when a receiver exists, otherwise skip it and
+	// directly call ResumeFromSync
+	if (!myRec->getSyncBarrier()->hasReceivers()) {
 		ResumeFromSync();
 		return;
 	}
@@ -1629,7 +1627,7 @@ void CkMigratable::AtSync(int waitForMigration)
   if (usesAutoMeasure == false) UserSetLBLoad();
 
   if(_lb_psizer_on || _lb_args.metaLbOn()){
-    PUP::sizer ps;
+    PUP::sizer ps(PUP::er::IS_MIGRATION);
     this->virtual_pup(ps);
     if(_lb_psizer_on)
       setPupSize(ps.size());
@@ -1638,7 +1636,7 @@ void CkMigratable::AtSync(int waitForMigration)
   }
 
   if (!_lb_args.metaLbOn()) {
-    myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
+    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
     return;
   }
 
@@ -1684,7 +1682,6 @@ void CkMigratable::AtSync(int waitForMigration)
     DEBAD(("[%d:%s] Went to load balance iter %d\n", CkMyPe(), idx2str(thisIndexMax), atsync_iteration));
     local_state = LOAD_BALANCE;
     can_reset = true;
-    //myRec->AtLocalBarrier(ldBarrierHandle);
   } else {
     DEBAD(("[%d:%s] Went to pause state iter %d\n", CkMyPe(), idx2str(thisIndexMax), atsync_iteration));
     local_state = PAUSE;
@@ -1793,9 +1790,7 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
 	asyncMigrate = false;
 	readyMigrate = true;
         enable_measure = true;
-#if CMK_FAULT_EVAC
-	bounced  = false;
-#endif
+        syncBarrier = CkSyncBarrier::object();
 	lbmgr=mgr->getLBMgr();
 	if(_lb_args.metaLbOn())
 	  the_metalb=mgr->getMetaBalancer();
@@ -1812,10 +1807,6 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
 		//  AsyncMigrate(true);
 		}
 	}
-#endif
-
-#if CMK_FAULT_EVAC
-	asyncEvacuate = true;
 #endif
 }
 CkLocRec::~CkLocRec()
@@ -2069,9 +2060,8 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 
 CkLocMgr::~CkLocMgr() {
 #if CMK_LBDB_ON
-  lbmgr->RemoveLocalBarrierClient(lbBarrierClient);
-  lbmgr->DecreaseLocalBarrier(1);
-  lbmgr->RemoveLocalBarrierReceiver(lbBarrierReceiver);
+  syncBarrier->removeBeginReceiver(lbBarrierBeginReceiver);
+  syncBarrier->removeEndReceiver(lbBarrierEndReceiver);
   lbmgr->UnregisterOM(myLBHandle);
 #endif
   map->unregisterArray(mapHandle);
@@ -2530,12 +2520,12 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
     int destPE = whichPE(id);
     if (destPE != -1)
     {
-#if CMK_FAULT_EVAC
-      if((!CmiNodeAlive(destPE) && destPE != allowMessagesOnly)){
-        CkAbort("Cannot send to a chare on a dead node");
-      }
-#endif
       msg->array_hops()++;
+      // If we are hopping more than twice, we've discovered a stale chain
+      // of cache entries. Just route through home instead.
+      if (msg->array_hops() > 2 && CkMyPe() != homePe(id)) {
+        destPE = homePe(id);
+      }
       CkArrayManagerDeliver(destPE,msg,opts);
       return true;
     }
@@ -2551,7 +2541,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
     return true;
   }
 
-  CkAssert(mgr == UsrToEnv(msg)->getArrayMgr());
+  CkAssert((CkGroupID)mgr == UsrToEnv(msg)->getArrayMgr());
   CkArray *arr = managers[mgr];
   if (!arr) {
     bufferedShadowElemMsgs[id].push_back(msg);
@@ -2873,35 +2863,24 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 	CK_MAGICNUMBER_CHECK
 	if (toPe==CkMyPe()) return; //You're already there!
 
-#if CMK_FAULT_EVAC
-	/*
-		if the toProcessor is already marked as invalid, dont emigrate
-		Shouldn't happen but might
-	*/
-	if(!CmiNodeAlive(toPe)){
-		return;
-	}
-#endif
-
 	CkArrayIndex idx=rec->getIndex();
         CmiUInt8 id = rec->getID();
 
 #if CMK_OUT_OF_CORE
 	/* Load in any elements that are out-of-core */
     for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
-		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getIndex());
+		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getID());
 		if (el) if (!el->isInCore) CooBringIn(el->prefetchObjID);
 	}
 #endif
 
 	//Let all the elements know we're leaving
 	callMethod(rec,&CkMigratable::ckAboutToMigrate);
-	/*EVAC*/
 
 //First pass: find size of migration message
 	size_t bufSize;
 	{
-		PUP::sizer p;
+		PUP::sizer p(PUP::er::IS_MIGRATION);
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		bufSize=p.size(); 
 	}
@@ -2918,16 +2897,11 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 #else
 		false,
 #endif
-		bufSize, managers.size(),
-#if CMK_FAULT_EVAC
-    rec->isBounced()
-#else
-    false
-#endif
+		bufSize, managers.size()
     );
 
 	{
-		PUP::toMem p(msg->packData); 
+		PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION); 
 		p.becomeDeleting(); 
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		if (p.size()!=bufSize) {
@@ -2978,7 +2952,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 {
 	const CkArrayIndex &idx=msg->idx;
 		
-	PUP::fromMem p(msg->packData); 
+	PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
 	
 	if (msg->nManagers < managers.size())
 		CkAbort("Array element arrived from location with fewer managers!\n");
@@ -3016,40 +2990,10 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 		CkAbort("Array element's pup routine has a direction mismatch.\n");
 	}
 
-#if CMK_FAULT_EVAC
-	/*
-			if this element came in as a result of being bounced off some other process,
-			then it needs to be resumed. It is assumed that it was bounced because load 
-			balancing caused it to move into a processor which later crashed
-	*/
-	if(msg->bounced){
-		callMethod(rec,&CkMigratable::ResumeFromSync);
-	}
-#endif
-
 	if(!zcRgetsActive) {
 		//Let all the elements know we've arrived
 		callMethod(rec,&CkMigratable::ckJustMigrated);
 	}
-
-#if CMK_FAULT_EVAC
-	/*
-		If this processor has started evacuating array elements on it 
-		dont let new immigrants in. If they arrive send them to what
-		would be their correct homePE.
-		Leave a record here mentioning the processor where it got sent
-	*/
-	if(CkpvAccess(startedEvac)){
-		int newhomePE = getNextPE(idx);
-		DEBM((AA "Migrated into failed processor index size %s resent to %d \n" AB,idx2str(idx),newhomePE));	
-		int targetPE=getNextPE(idx);
-		//set this flag so that load balancer is not informed when
-		//this element migrates
-		rec->AsyncMigrate(true);
-		rec->Bounced(true);
-		emigrate(rec,targetPE);
-	}
-#endif
 
 	delete msg;
 }
@@ -3114,11 +3058,6 @@ int CkLocMgr::lastKnown(const CkArrayIndex &idx) {
 	int pe = whichPE(idx);
 	if (pe==-1) return homePe(idx);
 	else{
-#if CMK_FAULT_EVAC
-		if(!CmiNodeAlive(pe)){
-			CkAbort("Last known PE is no longer alive");
-		}
-#endif
 		return pe;
 	}	
 }
@@ -3128,11 +3067,6 @@ int CkLocMgr::lastKnown(CmiUInt8 id) {
   int pe = whichPE(id);
   if (pe==-1) return homePe(id);
   else{
-#if CMK_FAULT_EVAC
-    if(!CmiNodeAlive(pe)){
-      CkAbort("Last known PE is no longer alive");
-    }
-#endif
     return pe;
   }	
 }
@@ -3223,8 +3157,6 @@ unsigned int CkLocMgr::numLocalElements()
 void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_) {}
 void CkLocMgr::startInserting(void) {}
 void CkLocMgr::doneInserting(void) {}
-void CkLocMgr::dummyAtSync(void) {}
-void CkLocMgr::AtSyncBarrierReached(void) {}
 #endif
 
 
@@ -3240,6 +3172,9 @@ void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 	  if (the_metalb == 0)
 		  CkAbort("MetaBalancer not yet created?\n");
 	}
+	syncBarrier = CkSyncBarrier::object();
+	if (syncBarrier == nullptr)
+	  CkAbort("CkSyncBarrier not yet created?\n");
 	// Register myself as an object manager
 	LDOMid myId;
 	myId.id = thisgroup;
@@ -3256,31 +3191,15 @@ void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 	// Tell the lbdb that I'm registering objects
 	lbmgr->RegisteringObjects(myLBHandle);
 
-	/*Set up the dummy barrier-- the load balancer needs
-	  us to call Registering/DoneRegistering during each AtSync,
-	  and this is the only way to do so.
-	*/
-	lbBarrierReceiver = lbmgr->AddLocalBarrierReceiver(this, &CkLocMgr::AtSyncBarrierReached);
-	lbBarrierClient = lbmgr->AddLocalBarrierClient(this, &CkLocMgr::dummyResumeFromSync);
-	dummyAtSync();
-}
-
-void CkLocMgr::dummyAtSync(void)
-{
-	DEBL((AA "dummyAtSync called\n" AB));
-	lbmgr->AtLocalBarrier(lbBarrierClient);
-}
-
-void CkLocMgr::dummyResumeFromSync()
-{
-	DEBL((AA "DummyResumeFromSync called\n" AB));
-	lbmgr->DoneRegisteringObjects(myLBHandle);
-	dummyAtSync();
-}
-void CkLocMgr::AtSyncBarrierReached()
-{
-	DEBL((AA "AtSyncBarrierReached called\n" AB));
-	lbmgr->RegisteringObjects(getOMHandle());
+	// Set up callbacks for this LocMgr to call Registering/DoneRegistering during
+	// each AtSync.
+	lbBarrierBeginReceiver = syncBarrier->addBeginReceiver([=]() {
+	  DEBL((AA "CkLocMgr AtSync Receiver called\n" AB));
+	  lbmgr->RegisteringObjects(myLBHandle);
+	});
+	lbBarrierEndReceiver = syncBarrier->addEndReceiver([=]() {
+	  lbmgr->DoneRegisteringObjects(myLBHandle);
+	});
 }
 
 void CkLocMgr::startInserting(void)

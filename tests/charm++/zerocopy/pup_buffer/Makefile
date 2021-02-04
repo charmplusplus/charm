@@ -21,6 +21,10 @@ test: all
 	$(call run, +p4 ./pup_buffer +balancer RotateLB)
 	$(call run, +p4 ./pup_buffer +balancer RotateLB +noCMAForZC)
 
+testp: all
+	$(call run, +p$(P) ./pup_buffer +balancer RotateLB)
+	$(call run, +p$(P) ./pup_buffer +balancer RotateLB +noCMAForZC)
+
 smptest: all
 	$(call run, +p2 ./pup_buffer ++ppn 2 +balancer RotateLB)
 	$(call run, +p2 ./pup_buffer ++ppn 2 +balancer RotateLB +noCMAForZC)

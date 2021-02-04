@@ -35,8 +35,6 @@ Orion Sky Lawlor, olawlor@acm.org
 	Utility defines, includes, etc.
 */
 extern void _registerCkArray(void);
-CpvExtern (int ,serializer);
-
 
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
@@ -147,7 +145,6 @@ public:
 
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxy_ArrayBase)
 
 class CProxyElement_ArrayBase:public CProxy_ArrayBase {
 private:
@@ -176,7 +173,6 @@ public:
 	ArrayElement *ckLocal(void) const;
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxyElement_ArrayBase)
 
 
 #define _AUTO_DELEGATE_MCASTMGR_ON_ 1
@@ -269,7 +265,6 @@ public:
 	inline int ckGetBfactor() const { return _sid[0].bfactor; }
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxySection_ArrayBase)
 
 //Simple C-like API:
 void CkSetMsgArrayIfNotThere(void *msg);
@@ -428,7 +423,7 @@ typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
 
 extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
@@ -748,9 +743,7 @@ public:
     return broadcaster;
   }
   void flushStates();
-#if CMK_ONESIDED_IMPL
   void forwardZCMsgToOtherElems(envelope *env);
-#endif
 
 
         static bool isIrreducible() { return true; }
@@ -760,7 +753,6 @@ public:
 // with usage in maps' populateInitial()
 typedef CkArray CkArrMgr;
 
-#if CMK_ONESIDED_IMPL
 struct ncpyBcastNoMsg{
   char cmicore[CmiMsgHeaderSizeBytes];
   int srcPe;
@@ -768,7 +760,6 @@ struct ncpyBcastNoMsg{
 };
 
 void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize);
-#endif
 
 /*@}*/
 
@@ -799,7 +790,7 @@ public:
   int incrementBcastNo();
 
   bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
-#if CMK_CHARMPY
+#if CMK_CHARM4PY
   void deliver(CkArrayMessage *bcast, std::vector<CkMigratable*> &elements, int arrayId, bool doFree);
 #endif
 

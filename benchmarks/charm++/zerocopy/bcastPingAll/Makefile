@@ -30,5 +30,11 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, ./ping_all +p2 +noCMAForZC)
 endif
 
+testp: all
+	$(call run, ./ping_all +p$(P) 16 1048576 100 10 0)
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, ./ping_all +p$(P) 16 1048576 100 10 0 +noCMAForZC)
+endif
+
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o ping_all charmrun cifiles

@@ -9,7 +9,10 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
+static void lbinit()
+{
+  LBRegisterBalancer<DistributedLB>("DistributedLB", "The distributed load balancer");
+}
 
 using std::vector;
 
@@ -29,26 +32,6 @@ void DistributedLB::initnodeFn()
 {
   _registerCommandLineOpt("+DistLBTargetRatio");
   _registerCommandLineOpt("+DistLBMaxPhases");
-}
-
-void DistributedLB::turnOn()
-{
-#if CMK_LBDB_ON
-  lbmgr->
-    TurnOnBarrierReceiver(receiver);
-  lbmgr->
-    TurnOnStartLBFn(startLbFnHdl);
-#endif
-}
-
-void DistributedLB::turnOff()
-{
-#if CMK_LBDB_ON
-  lbmgr->
-    TurnOffBarrierReceiver(receiver);
-  lbmgr->
-    TurnOffStartLBFn(startLbFnHdl);
-#endif
 }
 
 void DistributedLB::InitLB(const CkLBOptions &opt) {

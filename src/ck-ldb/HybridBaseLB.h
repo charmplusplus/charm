@@ -310,8 +310,7 @@ public:
   void TotalObjMigrated(int count, int level);
 
   // Migrated-element callback
-  static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);
-  void Migrated(LDObjHandle h, int waitBarrier);
+  void Migrated(int waitBarrier);
 
   void ObjMigrated(LDObjData data, LDCommData *cdata, int n, int level);
   void ObjsMigrated(CkVec<LDObjData>&& data, int m, LDCommData *cdata, int n, int level);
@@ -437,7 +436,6 @@ protected:
   StatsStrategy statsStrategy;
 
 private:
-  void AtBarrier(void);
   void FindNeighbors();
   void buildStats(int level);
   CLBStatsMsg * buildCombinedLBStatsMessage(int atlevel);

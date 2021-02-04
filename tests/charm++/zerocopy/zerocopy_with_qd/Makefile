@@ -26,6 +26,12 @@ ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p6 ./zerocopy_with_qd 142 +noCMAForZC)
 endif
 
+testp: all
+	$(call run, +p$(P) ./zerocopy_with_qd $$(( $(P) * 8)) )
+ifeq ($(CMK_USE_CMA),1)
+	$(call run, +p$(P) ./zerocopy_with_qd $$(( $(P) * 8)) +noCMAForZC)
+endif
+
 smptest: all
 	$(call run, +p4 ./zerocopy_with_qd 100 ++ppn 4)
 	$(call run, +p6 ./zerocopy_with_qd 142 ++ppn 3)

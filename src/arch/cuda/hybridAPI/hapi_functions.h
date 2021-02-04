@@ -20,6 +20,10 @@ AMPI_CUSTOM_FUNC(hapiWorkRequest*, hapiCreateWorkRequest, void)
 // and kernel execution are directly put into a CUDA stream.
 AMPI_CUSTOM_FUNC(void, hapiEnqueue, hapiWorkRequest* wr)
 
+/******************** DEPRECATED ********************/
+// Set the callback of a work request
+AMPI_CUSTOM_FUNC(void, hapiWorkRequestSetCallback, hapiWorkRequest* wr, void*)
+
 // The runtime queries the compute capability of the device, and creates as
 // many streams as the maximum number of concurrent kernels.
 AMPI_CUSTOM_FUNC(int, hapiCreateStreams, void)
@@ -38,13 +42,11 @@ AMPI_CUSTOM_FUNC(cudaError_t, hapiMalloc, void**, size_t)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiFree, void*)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiMallocHost, void**, size_t)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHost, void*)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMallocHostPool, void**, size_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHostPool, void*)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpyAsync, void*, const void*, size_t, enum cudaMemcpyKind, cudaStream_t)
 
 // Explicit memory allocations using pinned memory pool.
-AMPI_CUSTOM_FUNC(void*, hapiPoolMalloc, size_t)
-AMPI_CUSTOM_FUNC(void, hapiPoolFree, void*)
+AMPI_CUSTOM_FUNC(cudaError_t, hapiPoolMalloc, void**, size_t)
+AMPI_CUSTOM_FUNC(cudaError_t, hapiPoolFree, void*)
 
 // Provides support for detecting errors with CUDA API calls.
 AMPI_CUSTOM_FUNC(void, hapiErrorDie, cudaError_t, const char*, const char*, int)

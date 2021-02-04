@@ -93,7 +93,8 @@ enum cmiZCMsgType : unsigned char {
   CMK_ZC_BCAST_SEND_MSG = 4,
   CMK_ZC_BCAST_RECV_MSG = 5,
   CMK_ZC_BCAST_RECV_DONE_MSG = 6,
-  CMK_ZC_BCAST_RECV_ALL_DONE_MSG = 7
+  CMK_ZC_BCAST_RECV_ALL_DONE_MSG = 7,
+  CMK_ZC_DEVICE_MSG = 8
 };
 #endif //__cplusplus
 

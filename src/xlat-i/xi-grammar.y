@@ -37,6 +37,7 @@ namespace xi {
 const int MAX_NUM_ERRORS = 10;
 int num_errors = 0;
 bool firstRdma = true;
+bool firstDeviceRdma = true;
 
 bool enable_warnings = true;
 
@@ -51,6 +52,8 @@ void ReservedWord(int token, int fCol, int lCol);
 %locations
 
 %union {
+  Attribute *attr;
+  Attribute::Argument *attrarg;
   AstChildren<Module> *modlist;
   Module *module;
   ConstructList *conslist;
@@ -116,6 +119,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token CONST
 %token NOCOPY
 %token NOCOPYPOST
+%token NOCOPYDEVICE
 %token PACKED
 %token VARSIZE
 %token ENTRY
@@ -131,7 +135,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token NAMESPACE
 %token USING
 %token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
-%token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
+%token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED SIZET BOOL
 %token ACCEL
 %token READWRITE
 %token WRITEONLY
@@ -150,7 +154,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon OneOrMoreSemiColon MAttribs MAttribList MAttrib
 %type <intval>		OptConditional MsgArray
-%type <intval>		EAttribs EAttribList EAttrib OptVoid
+%type <intval>		EAttrib OptVoid
 %type <cattr>		CAttribs CAttribList CAttrib
 %type <cattr>		ArrayAttribs ArrayAttribList ArrayAttrib
 %type <tparam>		TParam
@@ -191,6 +195,8 @@ void ReservedWord(int token, int fCol, int lCol);
 %type <sentry>		OptSdagCode
 %type <when>            WhenConstruct NonWhenConstruct
 %type <intval>		PythonOptions
+%type <attrarg>		AttributeArg AttributeArgList
+%type <attr>		EAttribs EAttribList
 
 %%
 
@@ -255,6 +261,7 @@ Name		: IDENT
 		| SKIPSCHED { ReservedWord(SKIPSCHED, @$.first_column, @$.last_column); YYABORT; }
 		| NOCOPY { ReservedWord(NOCOPY, @$.first_column, @$.last_column); YYABORT; }
 		| NOCOPYPOST { ReservedWord(NOCOPYPOST, @$.first_column, @$.last_column); YYABORT; }
+		| NOCOPYDEVICE { ReservedWord(NOCOPYDEVICE, @$.first_column, @$.last_column); YYABORT; }
 		| INLINE { ReservedWord(INLINE, @$.first_column, @$.last_column); YYABORT; }
 		| VIRTUAL { ReservedWord(VIRTUAL, @$.first_column, @$.last_column); YYABORT; }
 		| MIGRATABLE { ReservedWord(MIGRATABLE, @$.first_column, @$.last_column); YYABORT; }
@@ -346,6 +353,7 @@ ConstructSemi   : USING NAMESPACE QualName
                   $5->print(*e->label);
                   $$ = e;
                   firstRdma = true;
+                  firstDeviceRdma = true;
                 }
                 ;
 
@@ -443,6 +451,10 @@ BuiltinType	: INT
 		{ $$ = new BuiltinType("long double"); }
 		| VOID
 		{ $$ = new BuiltinType("void"); }
+		| SIZET
+		{ $$ = new BuiltinType("size_t"); }
+		| BOOL
+		{ $$ = new BuiltinType("bool"); }
 		;
 
 NamedType	: Name OptTParams { $$ = new NamedType($1,$2); };
@@ -914,6 +926,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                     $7->param = new ParamList($5);
                   }
                   firstRdma = true;
+                  firstDeviceRdma = true;
 		}
 		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
 		{ 
@@ -924,6 +937,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                     $5->param = new ParamList($4);
                   }
                   firstRdma = true;
+                  firstDeviceRdma = true;
 		  if (e->param && e->param->isCkMigMsgPtr()) {
 		    WARNING("CkMigrateMsg chare constructor is taken for granted",
 		            @$.first_column, @$.last_column);
@@ -934,7 +948,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		}
 		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name OneOrMoreSemiColon/* DMK : Accelerated Entry Method */
                 {
-                  int attribs = SACCEL;
+                  Attribute* attribs = new Attribute(SACCEL);
                   const char* name = $6;
                   ParamList* paramList = $7;
                   ParamList* accelParamList = $8;
@@ -946,6 +960,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                   $$->setAccelCodeBody(codeBody);
                   $$->setAccelCallbackName(new XStr(callbackName));
                   firstRdma = true;
+                  firstDeviceRdma = true;
                 }
 		;
 
@@ -969,11 +984,20 @@ EAttribs	: /* Empty */
 		  YYABORT;
 		}
 		;
+AttributeArg:
+      Name ':' NUMBER { $$ = new Attribute::Argument($1, atoi($3)); }
+    ;
 
-EAttribList	: EAttrib
-		{ $$ = $1; }
-		| EAttrib ',' EAttribList
-		{ $$ = $1 | $3; }
+AttributeArgList:
+      AttributeArg                       { $$ = $1; }
+    | AttributeArg ',' AttributeArgList  { $$ = $1; $1->next = $3; }
+    ;
+
+EAttribList:
+      EAttrib                                           { $$ = new Attribute($1);           }
+    | EAttrib '(' AttributeArgList ')'                  { $$ = new Attribute($1, $3);       }
+		| EAttrib ',' EAttribList                           { $$ = new Attribute($1, NULL, $3); }
+		| EAttrib '(' AttributeArgList ')' ',' EAttribList  { $$ = new Attribute($1, $3, $6);   }
 		;
 
 EAttrib		: THREADED
@@ -1124,6 +1148,16 @@ Parameter	: Type
 			if(firstRdma) {
 				$$->setFirstRdma(true);
 				firstRdma = false;
+			}
+		}
+		| NOCOPYDEVICE ParamBracketStart CCode ']'
+		{ /*Stop grabbing CPROGRAM segments*/
+			in_bracket=0;
+			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
+			$$->setRdma(CMK_ZC_DEVICE_MSG);
+			if (firstDeviceRdma) {
+				$$->setFirstDeviceRdma(true);
+				firstDeviceRdma = false;
 			}
 		}
 		;
@@ -1347,13 +1381,15 @@ StartIntExpr	: '('
 
 SEntry		: IDENT EParameters
 		{
-		  $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, @$.first_line, @$.last_line);
+		  $$ = new Entry(lineno, NULL, 0, $1, $2, 0, 0, 0, @$.first_line, @$.last_line);
 		  firstRdma = true;
+		  firstDeviceRdma = true;
 		}
 		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
 		{
-		  $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, @$.first_line, @$.last_line);
+		  $$ = new Entry(lineno, NULL, 0, $1, $5, 0, 0, $3, @$.first_line, @$.last_line);
 		  firstRdma = true;
+		  firstDeviceRdma = true;
 		}
 		;
 

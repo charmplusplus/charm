@@ -41,7 +41,7 @@ void CmiIssueRgetUsingCMA(
   const void* destAddr,
   void *destInfo,
   int destPe,
-  int size);
+  size_t size);
 
 void CmiIssueRputUsingCMA(
   const void* destAddr,
@@ -50,7 +50,7 @@ void CmiIssueRputUsingCMA(
   const void* srcAddr,
   void *srcInfo,
   int srcPe,
-  int size);
+  size_t size);
 #endif
 
 // Allocation from pool
@@ -81,7 +81,7 @@ void CmiSetNcpyAckSize(int ackSize);
 #define CMK_COMMON_NOCOPY_DIRECT_BYTES 0
 #endif
 
-// Represents the mode of the zerocopy transfer
+// Represents the mode of host-side zerocopy transfer
 // CkNcpyMode::MEMCPY indicates that the PEs are on the logical node and memcpy can be used
 // CkNcpyMode::CMA indicates that the PEs are on the same physical node and CMA can be used
 // CkNcpyMode::RDMA indicates that the neither MEMCPY or CMA can be used and REMOTE Direct Memory Access needs to be used
@@ -127,11 +127,13 @@ class CmiNcpyBuffer {
 
 #if CMK_ERROR_CHECKING
   void checkRegModeIsValid() {
-    if(regMode < CMK_BUFFER_REG || regMode > CMK_BUFFER_NOREG) CmiAbort("checkRegModeIsValid: Invalid value for regMode!\n");
+    if (regMode > CMK_BUFFER_NOREG)
+      CmiAbort("checkRegModeIsValid: Invalid value for regMode!\n");
   }
 
   void checkDeregModeIsValid() {
-    if(deregMode < CMK_BUFFER_DEREG || deregMode > CMK_BUFFER_NODEREG) CmiAbort("checkDeregModeIsValid: Invalid value for deregMode!\n");
+    if (deregMode < CMK_BUFFER_DEREG || deregMode > CMK_BUFFER_NODEREG)
+      CmiAbort("checkDeregModeIsValid: Invalid value for deregMode!\n");
   }
 #endif
 
@@ -265,9 +267,7 @@ class CmiNcpyBuffer {
   void rdmaGet(CmiNcpyBuffer &source, int ackSize, char *srcAck, char *destAck);
   void rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck);
 
-#if CMK_ONESIDED_IMPL
   friend inline void deregisterBuffer(CmiNcpyBuffer &buffInfo);
-#endif
 
 
 };

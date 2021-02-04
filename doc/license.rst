@@ -2,4 +2,5 @@
 Charm++/Converse license
 ========================
 
-.. include:: ../LICENSE
+.. literalinclude:: ../LICENSE
+    :language: none

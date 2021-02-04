@@ -84,7 +84,7 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
-  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
+  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
 
   friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
@@ -98,10 +98,8 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
 
   friend void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode emMode);
 
-#if CMK_ONESIDED_IMPL
   friend void deregisterMemFromMsg(envelope *env, bool isRecv);
   friend void CkRdmaEMDeregAndAckHandler(void *ack);
-#endif
 };
 
 // Ack handler for the Zerocopy Direct API
@@ -138,8 +136,6 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int reg
 }
 
 
-
-#if CMK_ONESIDED_IMPL
 // NOTE: Inside CkRdmaIssueRgets, a large message allocation is made consisting of space
 // for the destination or receiver buffers and some additional information required for processing
 // and acknowledgment handling. The space for additional information is typically equal to
@@ -175,7 +171,7 @@ struct NcpyEmBufferInfo{
  */
 envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg = NULL);
 
-void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, int numops, int rootNode, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info);
 
@@ -275,8 +271,6 @@ struct NcpyBcastRootAckInfo : public NcpyBcastAckInfo {
 
 struct NcpyBcastInterimAckInfo : public NcpyBcastAckInfo {
   void *msg;
-  void *parentBcastAckInfo;
-  int origPe;
   bool isRecv;
   bool isArray;
 };
@@ -405,7 +399,6 @@ inline void deregisterSrcBuffer(NcpyOperationInfo *ncpyOpInfo);
 inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo, ncpyHandlerIdx opMode);
 int getRootNode(envelope *env);
 
-#endif /* End of CMK_ONESIDED_IMPL */
 
 // Function declaration for EM Ncpy Ack handler initialization
 void initEMNcpyAckHandler(void);

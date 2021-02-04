@@ -33,9 +33,14 @@ This file in metis was modified by Kavitha Chandrasekar at UIUC
 #endif
 
 
-#ifdef __MSC__ 
-  #include "ms_stdint.h"
-  #include "ms_inttypes.h"
+#ifdef __MSC__
+  #if _MSC_VER < 1800
+    #include "ms_stdint.h"
+    #include "ms_inttypes.h"
+  #else
+    #include <stdint.h>
+    #include <inttypes.h>
+  #endif
   #include "ms_stat.h"
 #else
 #ifndef SUNOS
@@ -68,7 +73,7 @@ typedef ptrdiff_t ssize_t;
 
 /* MSC does not have INFINITY defined */
 #ifndef INFINITY
-#define INFINITY FLT_MAX
+//#define INFINITY FLT_MAX
 #endif
 #endif
 

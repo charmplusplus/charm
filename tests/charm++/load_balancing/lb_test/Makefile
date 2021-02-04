@@ -30,6 +30,9 @@ Topo.o: Topo.C Topo.h Topo.decl.h
 test:  lb_test
 	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 )
 
+testp:  lb_test
+	$(call run, +p$(P) ./lb_test $$(( 25 * $(P))) 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 )
+
 smptest: lb_test
 	$(call run, +p2 ./lb_test 100 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 ++ppn 2)
 	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 ++ppn 2)

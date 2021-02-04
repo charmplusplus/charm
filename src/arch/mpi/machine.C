@@ -1318,7 +1318,10 @@ void LrtsExit(int exitcode) {
 #endif
       MPI_Finalize();
 #endif
-      exit(exitcode);
+      // Still want to return control to the user in userDrivenMode
+      if (!userDrivenMode) {
+        exit(exitcode);
+      }
     }
 }
 

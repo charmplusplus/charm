@@ -104,7 +104,7 @@ module refnum {
       }
 
       // This loop receives the rest of the messages (all odds except 1)
-      // It tests forall loops with a negative stride, and ones that don't end
+      // It tests forall loops with a negative stride, and ones that do not end
       // exactly on the end condition. These were previously broken.
       forall [index] (messages + (messages % 2 - 1):2, -2) {
         case {

@@ -174,7 +174,7 @@ for more information:
      will give:
     
       Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64
-      Supported options: clustermatic common cuda flang gfortran ifort local nolb omp ooc papi pedantic perftools persistent pgf90 pxshm scyld smp syncft sysvshm tcp tsan
+      Supported options: common cuda flang gfortran ifort local nolb omp ooc papi perftools persistent pgf90 pxshm smp syncft sysvshm tcp tsan
 
 
 ## Building the Source
@@ -327,13 +327,13 @@ binaries and takes much less linking time.
 The Charm++ documentation is at https://charm.readthedocs.io/
 
 The Charm++ web page, with more information, more programs,
-and the latest version of Charm++, is at	http://charmplusplus.org
+and the latest version of Charm++, is at https://charmplusplus.org
 
 The UIUC Parallel Programming Laboratory web page, with information
-on past and present research, is at http://charm.cs.illinois.edu
+on past and present research, is at https://charm.cs.illinois.edu
 
-The Charm++ mailing list, for questions, comments, suggestions,
-improvements, or bug reports is charm@cs.illinois.edu
+For questions, comments, suggestions, improvements, or bug reports,
+please create an issue or discussion on our GitHub, https://github.com/UIUC-PPL/charm
 
 
 ## Authors
@@ -354,9 +354,10 @@ Wesolowski, Esteban Meneses, Chao Mei, David Kunzman, Osman Sarood,
 Abhishek Gupta, Yanhua Sun, Ehsan Totoni, Akhil Langer, Cyril Bordage,
 Harshit Dokania, Prateek Jindal, Jonathan Lifflander, Xiang Ni,
 Harshitha Menon, Nikhil Jain, Vipul Harsh, Bilge Acun, Phil Miller,
-Seonmyeong Bak, and Karthik Senthil. Current developers include Eric Bohm,
-Ronak Buch, Michael Robson, Eric Mikida, Sam White, Juan Galvez, Nitin Bhat,
-Kavitha Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos,
-Raghavendra Kanakagiri, and Venkatasubrahmanian Narayanan.
+Seonmyeong Bak, Karthik Senthil, Juan Galvez, Michael Robson, Raghavendra
+Kanakagiri, and Venkatasubrahmanian Narayanan. Current developers include
+Eric Bohm, Ronak Buch, Eric Mikida, Sam White, Nitin Bhat, Kavitha
+Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos, Justin Szaday,
+and Zane Fink.
 
 Copyright (C) 1989-2020 Regents of the University of Illinois

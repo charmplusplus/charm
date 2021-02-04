@@ -68,9 +68,7 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
 
     // Forward regular messages, do not forward ncpy bcast messages as those messages
     // are forwarded separately after the completion of the payload transfer
-#if CMK_ONESIDED_IMPL
     if(!CMI_IS_ZC_BCAST(msg))
-#endif
       forwardProcBcastMsg(size, msg);
 
     CmiPushPE(0, msg);
@@ -95,9 +93,7 @@ void CmiForwardNodeBcastMsg(int size, char *msg) {
 static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
     // Forward regular messages, do not forward ncpy bcast messages as those messages
     // are forwarded separately after the completion of the payload transfer
-#if CMK_ONESIDED_IMPL
     if(!CMI_IS_ZC_BCAST(msg))
-#endif
       forwardNodeBcastMsg(size, msg);
 
     /* In SMP mode, this push operation needs to be executed
@@ -105,7 +101,7 @@ static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
      * earlier, then during the bcast msg forwarding period,
      * the msg could be already freed on the worker thread.
      * As a result, the forwarded message could be wrong!
-     * 
+     *
      */
     CmiPushNode(msg);
 }
@@ -119,6 +115,7 @@ void CmiForwardProcBcastMsg(int size, char *msg) {
 #if CMK_SMP
 // API to forward message to peer PEs
 void CmiForwardMsgToPeers(int size, char *msg) {
+  CMI_DEST_RANK(msg) = CmiMyRank(); // Reset DEST RANK before forwarding to peers
   SendToPeers(size, msg);
 }
 #endif
@@ -216,9 +213,7 @@ static void SendSpanningChildrenProc(int size, char *msg) {
 #if CMK_SMP
     // Forward regular messages, do not forward ncpy bcast messages as those messages
     // are forwarded separately after the completion of the payload transfer
-#if CMK_ONESIDED_IMPL
     if(!CMI_IS_ZC_BCAST(msg))
-#endif // end of CMK_ONESIDED_IMPL
       /* second send msgs to my peers on this node */
       SendToPeers(size, msg);
 #endif // end of CMK_SMP
@@ -236,9 +231,7 @@ static void SendHyperCubeProc(int size, char *msg) {
 #if CMK_SMP
     // Forward regular messages, do not forward ncpy bcast messages as those messages
     // are forwarded separately after the completion of the payload transfer
-#if CMK_ONESIDED_IMPL
     if(!CMI_IS_ZC_BCAST(msg))
-#endif // end of CMK_ONESIDED_IMPL
       /* second send msgs to my peers on this node */
       SendToPeers(size, msg);
 #endif // end of CMK_SMP
@@ -392,9 +385,7 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
 
 void CmiWithinNodeBroadcastFn(int size, char* msg) {
   CMI_DEST_RANK(msg) = CmiMyRank();
-#if CMK_ONESIDED_IMPL
   if(CMI_ZC_MSGTYPE(msg) != CMK_ZC_BCAST_RECV_MSG)
-#endif
     SendToPeers(size, msg);
   CmiSendSelf(msg);
 }

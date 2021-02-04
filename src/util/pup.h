@@ -196,23 +196,31 @@ class er {
  private:
   er(const er &p);//You don't want to copy PUP::er's.
  protected:
-  /// These state bits describe various user-settable properties.
-  enum {IS_USERLEVEL=0x0004, // If set, this is *not* a migration pup-- it's something else.
-	IS_DELETING =0x0008, // If set, C & f90 objects should delete themselves after pup
-	IS_COMMENTS =0x0010,  // If set, this PUP::er wants comments and sync codes.
-	IS_RESTARTING=0x0020  // If set, it is during restarting
-  };
-  /// These state bits describe the PUP::er's direction.
-  enum {IS_SIZING   =0x0100,
-  	IS_PACKING  =0x0200,
-        IS_UNPACKING=0x0400,
-        TYPE_MASK   =0xFF00
-  };
-  unsigned int PUP_er_state;
-  explicit /* Makes constructor below behave better */
-    er(unsigned int inType): PUP_er_state(inType) {} //You don't want to create raw PUP::er's.
+   unsigned int PUP_er_state;
+   // You don't want to create raw PUP::er's.
+   explicit er(unsigned int inType) : PUP_er_state(inType) {}
+
+   /// These state bits describe the PUP::er's direction.
+   enum
+   {
+     IS_SIZING = 0x0100,
+     IS_PACKING = 0x0200,
+     IS_UNPACKING = 0x0400,
+     TYPE_MASK = 0xFF00
+   };
  public:
   virtual ~er();//<- does nothing, but might be needed by some child
+
+  // These state bits describe various user-settable properties. This needs to be public
+  // because it used when PUPers are created from the checkpointing and migration code.
+  enum
+  {
+    IS_USERLEVEL = 0x0004,   // If set, this is not a migration pup - it's something else.
+    IS_DELETING = 0x0008,    // If set, C & f90 objects should delete themselves after pup
+    IS_COMMENTS = 0x0010,    // If set, this PUP::er wants comments and sync codes.
+    IS_CHECKPOINT = 0x0020,  // If set, it is creating or restarting from a checkpoint
+    IS_MIGRATION = 0x0040    // If set, it is migrating between PEs (e.g. in LB)
+  };
 
   //State queries (exactly one of these will be true)
   bool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0?true:false;}
@@ -229,10 +237,16 @@ class er {
   void becomeUserlevel(void) {PUP_er_state|=IS_USERLEVEL;}
   bool isUserlevel(void) const {return (PUP_er_state&IS_USERLEVEL)!=0?true:false;}
   
-  //This indicates that the pup routine is restoring from a checkpoint.
-  void becomeRestarting(void) {PUP_er_state|=IS_RESTARTING;}
-  bool isRestarting(void) const {return (PUP_er_state&IS_RESTARTING)!=0?true:false;}
-  
+  bool isCheckpoint(void) const
+  {
+    return (PUP_er_state & IS_CHECKPOINT) != 0;
+  }
+
+  bool isMigration(void) const
+  {
+    return (PUP_er_state & IS_MIGRATION) != 0;
+  }
+
   bool hasComments(void) const {return (PUP_er_state&IS_COMMENTS)!=0?true:false;}
 
 //For single elements, pretend it's an array containing one element
@@ -379,8 +393,11 @@ class sizer : public er {
 
  public:
   //Write data to the given buffer
-  sizer(void):er(IS_SIZING),nBytes(0) {}
-  
+  sizer(const unsigned int purpose = 0) : er(IS_SIZING | purpose), nBytes(0)
+  {
+    CmiAssert((purpose & TYPE_MASK) == 0);
+  }
+
   //Return the current number of bytes to be packed
   size_t size(void) const {return nBytes;}
 };
@@ -395,7 +412,11 @@ class mem : public er { //Memory-buffer packers and unpackers
  protected:
   myByte *origBuf;//Start of memory buffer
   myByte *buf;//Memory buffer (stuff gets packed into/out of here)
-  mem(unsigned int type,myByte *Nbuf):er(type),origBuf(Nbuf),buf(Nbuf) {}
+  mem(const unsigned int type, myByte* Nbuf, const unsigned int purpose = 0)
+      : er(type | purpose), origBuf(Nbuf), buf(Nbuf)
+  {
+    CmiAssert((purpose & TYPE_MASK) == 0);
+  }
   mem(const mem &p);			//You don't want to copy
   void operator=(const mem &p);		// You don't want to copy
 
@@ -435,7 +456,10 @@ class toMem : public mem {
 
  public:
   //Write data to the given buffer
-  toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
+  toMem(void* Nbuf, const unsigned int purpose = 0)
+      : mem(IS_PACKING, (myByte*)Nbuf, purpose)
+  {
+  }
 };
 template <class T>
 inline void toMemBuf(T &t,void *buf, size_t len) {
@@ -458,7 +482,10 @@ class fromMem : public mem {
 
  public:
   //Read data from the given buffer
-  fromMem(const void *Nbuf):mem(IS_UNPACKING,(myByte *)Nbuf) {}
+  fromMem(const void* Nbuf, const unsigned int purpose = 0)
+      : mem(IS_UNPACKING, (myByte*)Nbuf, purpose)
+  {
+  }
 };
 template <class T>
 inline void fromMemBuf(T &t,void *buf,size_t len) {
@@ -472,7 +499,12 @@ inline void fromMemBuf(T &t,void *buf,size_t len) {
 class disk : public er {
  protected:
   FILE *F;//Disk file to read from/write to
-  disk(unsigned int type,FILE *f):er(type),F(f) {}
+  disk(const unsigned int type, FILE* f, const unsigned int purpose = 0)
+      : er(type | purpose), F(f)
+  {
+    CmiAssert((purpose & TYPE_MASK) == 0);
+  }
+
   disk(const disk &p);			//You don't want to copy
   void operator=(const disk &p);	// You don't want to copy
 
@@ -496,7 +528,10 @@ class toDisk : public disk {
   // Write data to the given file pointer
   // (must be opened for binary write)
   // You must close the file yourself when done.
-  toDisk(FILE *f):disk(IS_PACKING,f) {error = false;}
+  toDisk(FILE* f, const unsigned int purpose = 0) : disk(IS_PACKING, f, purpose)
+  {
+    error = false;
+  }
   bool checkError(){return error;}
 };
 
@@ -513,7 +548,7 @@ class fromDisk : public disk {
   // Read data from the given file pointer 
   // (must be opened for binary read)
   // You must close the file yourself when done.
-  fromDisk(FILE *f):disk(IS_UNPACKING,f) {}
+  fromDisk(FILE* f, const unsigned int purpose = 0) : disk(IS_UNPACKING, f, purpose) {}
 };
 
 /************** PUP::er -- Text *****************/
@@ -718,9 +753,10 @@ public:
 protected:
 	able() {}
 	able(CkMigrateMessage *) {}
-	virtual ~able();//Virtual destructor may be needed by some child
 
 public:
+	virtual ~able();//Virtual destructor may be needed by some child
+
 //Constructor function registration:
 	typedef able* (*constructor_function)(void);
 	static PUP_ID register_constructor(const char *className,
@@ -955,29 +991,10 @@ namespace PUP {
 	     if (PUP::as_bytes<someClass>::value) { ... }
 	*/
 	template<class T> class as_bytes {
-#ifdef CK_DEFAULT_BITWISE_PUP   /* OLD */
-		public: enum {value=1};
-#else /* normal case: don't pack as bytes by default */
+    /* default is to not pack as bytes by default */
 		public: enum {value=0};
-#endif
 	};
 
-
-#ifdef CK_DEFAULT_BITWISE_PUP   /* OLD compatability mode*/
-/// Default operator| and PUParray: copy as bytes.
-template <class T>
-inline void operator|(PUP::er &p,T &t) {p((void *)&t,sizeof(T));}
-template <class T>
-inline void PUParray(PUP::er &p,T *ta,size_t n) { p((void *)ta,n*sizeof(T)); }
-
-/* enable normal pup mode from CK_DEFAULT_BITWISE_PUP */
-#  define PUPmarshall(type) \
-template<class T> inline void operator|(PUP::er &p,T &t) { t.pup(p); } \
-template<class T> inline void PUParray(PUP::er &p,T *t,size_t n) { \
-	for (size_t i=0;i<n;i++) p|t[i]; \
-}
-
-#else /* !CK_DEFAULT_BITWISE_PUP */
 
 // Defines is_pupable to allow enums to be pupped in pup_stl.h
 namespace details {
@@ -1022,12 +1039,6 @@ inline void PUParray(PUP::er &p,T *t,size_t n) {
 	p.syncComment(PUP::sync_end_array);
 }
 
-/* PUPmarshall macro: now a deprecated no-op */
-#  define PUPmarshall(type) /* empty, pup routines now the default */
-#endif
-#define PUPmarshal(type) PUPmarshall(type) /*Support this common misspelling*/
-
-
 /// Copy this type as raw memory (like memcpy).
 #define PUPbytes(type) \
   namespace PUP { inline void operator|(PUP::er &p,type &t) {p((char *)&t,sizeof(type));} } \
@@ -1035,7 +1046,6 @@ inline void PUParray(PUP::er &p,T *t,size_t n) {
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
   }; }
-#define PUPmarshallBytes(type) PUPbytes(type)
 
 /// Make PUP work with this function pointer type, copied as raw bytes.
 #define PUPfunctionpointer(fnPtrType) \

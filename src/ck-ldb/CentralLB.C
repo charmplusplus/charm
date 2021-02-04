@@ -45,31 +45,15 @@ CkGroupID loadbalancer;
 int * lb_ptr;
 bool load_balancer_created;
 
-CreateLBFunc_Def(CentralLB, "CentralLB base class")
+static void lbinit()
+{
+  LBRegisterBalancer<CentralLB>("CentralLB", "CentralLB base class", false);
+}
 
 static int broadcastThreshold = 32;
 
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);
-
-/*
-void CreateCentralLB()
-{
-  CProxy_CentralLB::ckNew(0);
-}
-*/
-
-void CentralLB::staticStartLB(void* data)
-{
-  CentralLB *me = (CentralLB*)(data);
-  me->StartLB();
-}
-
-void CentralLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
-{
-  CentralLB *me = (CentralLB*)(data);
-  me->Migrated(waitBarrier);
-}
 
 void CentralLB::initLB(const CkLBOptions &opt)
 {
@@ -80,7 +64,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   loadbalancer = thisgroup;
   // create and turn on by default
   startLbFnHdl = lbmgr->
-    AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
+    AddStartLBFn(this, &CentralLB::StartLB);
 
   // CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
   if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
@@ -97,7 +81,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (_lb_predict) predicted_model = new FutureModel(_lb_predict_window);
   else predicted_model=0;
   // register user interface callbacks
-  lbmgr->SetupPredictor((LDPredictModelFn)(staticPredictorOn),(LDPredictWindowFn)(staticPredictorOnWin),(LDPredictFn)(staticPredictorOff),(LDPredictModelFn)(staticChangePredictor),(void*)(this));
+  lbmgr->SetupPredictor(this, &CentralLB::predictorOn, &CentralLB::predictorOn, &CentralLB::predictorOff, &CentralLB::changePredictor);
 
   myspeed = lbmgr->ProcessorSpeed();
 
@@ -130,25 +114,8 @@ CentralLB::~CentralLB()
   delete statsData;
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   if (lbmgr) {
-    lbmgr->
-      RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+    lbmgr->RemoveStartLBFn(startLbFnHdl);
   }
-#endif
-}
-
-void CentralLB::turnOn() 
-{
-#if CMK_LBDB_ON
-  lbmgr->
-    TurnOnStartLBFn(startLbFnHdl);
-#endif
-}
-
-void CentralLB::turnOff() 
-{
-#if CMK_LBDB_ON
-  lbmgr->
-    TurnOffStartLBFn(startLbFnHdl);
 #endif
 }
 
@@ -175,9 +142,6 @@ void CentralLB::InvokeLB()
     MigrationDone(0);
     return;
   }
-#if CMK_FAULT_EVAC
-  if(CmiNodeAlive(CkMyPe()))
-#endif
   {
     thisProxy [CkMyPe()].ProcessAtSync();
   }
@@ -189,9 +153,6 @@ void CentralLB::ProcessAtSync()
 #if CMK_LBDB_ON
   if (reduction_started) return;              // reducton in progress
 
-#if CMK_FAULT_EVAC
-  CmiAssert(CmiNodeAlive(CkMyPe()));
-#endif
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
   }
@@ -541,13 +502,6 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
     const int pe = m->from_pe;
     DEBUGF(("Stats msg received, %d %d %d %p step %d\n", pe,stats_msg_count,m->n_objs,m,step()));
 	
-#if CMK_FAULT_EVAC
-    if(!CmiNodeAlive(pe)){
-	DEBUGF(("[%d] ReceiveStats called from invalidProcessor %d\n",CkMyPe(),pe));
-	continue;
-    }
-#endif
-	
     if (m->avail_vector!=NULL) {
       LBManagerObj()->set_avail_vector(m->avail_vector,  m->next_lb);
     }
@@ -587,11 +541,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
     }
   }    // end of for
 
-#if CMK_FAULT_EVAC
-  const int clients = CkNumValidPes();
-#else
   const int clients = CkNumPes();
-#endif
 
   DEBUGF(("THIS POINT count = %d, clients = %d\n",stats_msg_count,clients));
  
@@ -1058,12 +1008,6 @@ void CentralLB::ProcessReceiveMigration()
 
   for (i=0; i<CkNumPes(); i++) lbmgr->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
-#if CMK_FAULT_EVAC
-  if(!CmiNodeAlive(CkMyPe())){
-	delete m;
-	return;
-  }
-#endif
   migrates_expected = 0;
   future_migrates_expected = 0;
   for(i=0; i < m->n_moves; i++) {
@@ -1115,8 +1059,6 @@ void CentralLB::ProcessReceiveMigration()
   if (migrates_expected == 0 || migrates_completed == migrates_expected)
     MigrationDone(1);
   delete m;
-
-//	CkEvacuatedElement();
 #endif
 }
 
@@ -1209,9 +1151,6 @@ void CentralLB::MigrationDoneImpl (int balancing)
                 thisProxy));
   }
   else{
-#if CMK_FAULT_EVAC
-    if(CmiNodeAlive(CkMyPe()))
-#endif
     {
 	thisProxy [CkMyPe()].ResumeClients(balancing);
     }	
