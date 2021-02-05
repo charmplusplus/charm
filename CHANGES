@@ -2,7 +2,7 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
-What's new in Charm++ 6.11.0
+What's new in Charm++ 7.0.0
 ================================================================================
 
 This is a feature release, with the following major changes:
