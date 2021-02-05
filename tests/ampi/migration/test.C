@@ -68,10 +68,10 @@ int main(int argc, char **argv)
     for (int i=0; i<=num_pes; i++) {
       if (rank == 1) {
         int dest_pe = (my_pe + 1) % num_pes;
-	      printf("Trying to migrate rank %d from PE %d to %d\n", rank, my_pe, dest_pe);
-	      AMPI_Migrate_to_pe(dest_pe);
+	printf("Trying to migrate rank %d from PE %d to %d\n", rank, my_pe, dest_pe);
+	AMPI_Migrate_to_pe(dest_pe);
         my_pe = get_my_pe();
-	      printf("After migration of rank %d to PE %d\n", rank, my_pe);
+	printf("After migration of rank %d to PE %d\n", rank, my_pe);
       }
 
       MPI_Barrier(MPI_COMM_WORLD);
