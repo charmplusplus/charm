@@ -633,6 +633,8 @@ class CkArray : public CkReductionMgr
   typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage*>, IndexHasher>
       IndexMsgBuffer;
   IndexMsgBuffer bufferedIndexMsgs;
+  // We need a separate buffer for demand creation messages because it also serves as an
+  // indicator of whether a demand creation request has already been sent.
   IndexMsgBuffer bufferedCreationMsgs;
 
   CkMagicNumber<ArrayElement> magic;  // To detect heap corruption
@@ -675,29 +677,43 @@ public:
     int pe = locMgr->whichPe(idx);
     return pe == -1 ? homePe(idx) : pe;
   }
-  /// Deliver message to this element (directly if local)
-  /// doFree if is local
+
+  // Called by the runtime system to deliver an array message to this array
+  void deliver(CkArrayMessage* m, CkDeliver_t type)
+  {
+    recvMsg(m, m->array_element_id(), type);
+  }
+
+  // Methods for sending and receiving messages for array elements
+  // As a message moves through the system, it will either be sent, buffered, trigger
+  // demand creation, or invoked based on current conditions.
   void sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
                int opts = 0);
-  int deliverMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts = 0);
-  void sendUnknown(CkArrayMessage* msg, CmiUInt8 id, const CkArrayIndex& idx,
-                   CkDeliver_t type, int opts = 0);
-  void demandCreateUnknown(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
-                           int opts = 0);
-  void bufferUnknown(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
+  // Receive a msg which just arrived and needs to be delivered or forwarded.
+  void recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts = 0);
+
+  void recordSend(const CmiUInt8 id, const unsigned int bytes, int pe, const int opts = 0);
+
+private:
+  // These three methods are directly called by sendMsg and recvMsg
+  void sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts = 0);
+  void deliverToElement(CkArrayMessage* msg, ArrayElement* elem);
+  void handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
                      int opts = 0);
+
+  // If we don't want to send the message, we will buffer the messages and send either a
+  // location request or a demand creation request.
+  void bufferForLocation(CkArrayMessage* msg, const CkArrayIndex& idx);
+  void bufferForCreation(CkArrayMessage* msg, const CkArrayIndex& idx);
 
   void sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id);
 
-  inline void deliver(CkMessage* m, const CkArrayIndex& idx, CkDeliver_t type,
-                      int opts = 0)
-  {
-    sendMsg((CkArrayMessage*)m, idx, type, opts);
-  }
-  inline int deliver(CkArrayMessage* m, CkDeliver_t type)
-  {
-    return deliverMsg(m, m->array_element_id(), type);
-  }
+public:
+  // TODO: Make sure the demand creation pipeline still obeys message delivery type?
+  void demandCreateForMsg(CkArrayMessage* msg, const CkArrayIndex& idx);
+  void requestDemandCreation(const CkArrayIndex& idx, int ctor, int pe);
+  void demandCreateElement(const CkArrayIndex& idx, int ctor);
+
   /// Fetch a local element via its ID (return NULL if not local)
   inline ArrayElement* lookup(const CmiUInt8 id)
   {
@@ -791,14 +807,6 @@ public:
                      int listenerData[CK_ARRAYLISTENER_MAXLEN]);
   void insertElement(CkMarshalledMessage&&, const CkArrayIndex& idx,
                      int listenerData[CK_ARRAYLISTENER_MAXLEN]);
-
-  /// Demand-creation:
-  /// Demand-create an element at this index on this processor
-  void demandCreateElement(const CkArrayIndex& idx, int ctor, CkDeliver_t type);
-  bool demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx,
-                           CkDeliver_t type);
-  void requestDemandCreation(const CkArrayIndex& idx, int fromPe, int createOnPe,
-                             int chareType);
 
   /// Broadcast communication:
   void sendBroadcast(CkMessage* msg);

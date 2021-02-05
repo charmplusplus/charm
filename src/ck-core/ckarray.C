@@ -1067,8 +1067,11 @@ bool CkArray::insertElement(CkArrayMessage* m, const CkArrayIndex& idx,
   }
   else
   {
-    // TODO: Why?
-    // locMgr->deliverAllBufferedMsgs(id);
+    // The location record already existed, which means there's a sibling object here and
+    // we may have already buffered some messages.
+    // TODO: This may not be necessary because an inform call will occur once the element
+    // is inserted, which will trigger clearing the buffers.
+    sendBufferedMsgs(idx, id);
   }
 
   // Make sure the element doesn't already exist, then add it.
@@ -1141,20 +1144,6 @@ void CkArray::remoteBeginInserting(void)
   }
 }
 
-void CkArray::demandCreateElement(const CkArrayIndex& idx, int ctor)
-{
-  CkArrayMessage* m = (CkArrayMessage*)CkAllocSysMsg();
-  envelope* env = UsrToEnv(m);
-  env->setMsgtype(ArrayEltInitMsg);
-  env->setArrayMgr(thisgroup);
-  int listenerData[CK_ARRAYLISTENER_MAXLEN];
-  prepareCtorMsg(m, listenerData);
-  m->array_ep() = ctor;
-
-  DEBC((AA "Demand-creating %s\n" AB, idx2str(idx)));
-  insertElement(m, idx, listenerData);
-}
-
 void CkArray::insertInitial(const CkArrayIndex& idx, void* ctorMsg)
 {
   CkArrayMessage* m = (CkArrayMessage*)ctorMsg;
@@ -1207,9 +1196,9 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage* msg, int ep, int opts) cons
     else
     {
       if (opts & CK_MSG_INLINE)
-        localbranch->deliver(msg, _idx, CkDeliver_inline, opts & (~CK_MSG_INLINE));
+        localbranch->sendMsg(msg, _idx, CkDeliver_inline, opts & (~CK_MSG_INLINE));
       else
-        localbranch->deliver(msg, _idx, CkDeliver_queue, opts);
+        localbranch->sendMsg(msg, _idx, CkDeliver_queue, opts);
     }
   }
 }
@@ -1271,7 +1260,7 @@ void CkSendMsgArray(int entryIndex, void* msg, CkArrayID aID, const CkArrayIndex
   if (a == NULL)
     CkAbort("Cannot receive a message for an array without a local branch");
   else
-    a->deliver(m, idx, CkDeliver_queue, opts);
+    a->sendMsg(m, idx, CkDeliver_queue, opts);
 }
 
 void CkSendMsgArrayInline(int entryIndex, void* msg, CkArrayID aID,
@@ -1281,7 +1270,9 @@ void CkSendMsgArrayInline(int entryIndex, void* msg, CkArrayID aID,
   msg_prepareSend(m, entryIndex, aID);
   CkArray* a = (CkArray*)_localBranch(aID);
   int oldStatus = CkDisableTracing(entryIndex);  // avoid nested tracing
-  a->deliver(m, idx, CkDeliver_inline, opts);
+  // TODO: Why no check for null like above?
+  // TODO: Why does it not change opts to match inline delivery?
+  a->sendMsg(m, idx, CkDeliver_inline, opts);
   if (oldStatus)
     CkEnableTracing(entryIndex);
 }
@@ -1783,267 +1774,253 @@ void CkArray::ckDestroy()
   delete this;
 }
 
+// We are trying to send a message to an element of this array. This is the origin of
+// message sends, and is only called once and only on the source PE.
+// If we know the ID and location of the element, then we send the message to that PE.
+// If we don't know either the ID or the location, we call handleUnknown to either buffer
+// the message, forward it, or trigger demand creation of the element.
 void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
                       int opts)
 {
-  CK_MAGICNUMBER_CHECK
-  DEBS((AA "send %s\n" AB, idx2str(idx)));
-  envelope* env = UsrToEnv(msg);
-  env->setMsgtype(ForArrayEltMsg);
-
   locMgr->checkInBounds(idx);
 
+  envelope* env = UsrToEnv(msg);
+  env->setMsgtype(ForArrayEltMsg);
   if (type == CkDeliver_queue)
   {
     _TRACE_CREATION_DETAILED(env, msg->array_ep());
   }
 
-  // TODO: This was taken out of CkLocMgr::deliverMsg. Need to figure out where
-  // it belongs? Probably here and maybe in buffered sends. Or maybe buffered send
-  // should call this function, rather than deliver.
-  /*#if CMK_LBDB_ON
-    // TODO: This should maybe only be done from a send explicitly?
-    if (type == CkDeliver_queue
-        && !(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats()) {
-  #if CMK_GLOBAL_LOCATION_UPDATE
-      const CmiUInt8 lbObjId = ck::ObjID(thisgroup, id).getID();
-  #else
-      const CmiUInt8 lbObjId = id;
-  #endif
-      lbmgr->Send(
-          myLBHandle,
-          lbObjId,
-          UsrToEnv(msg)->getTotalsize(),
-          cache->lastKnown(id),
-          1);
-    }
-  #endif*/
-
   CmiUInt8 id;
   if (locMgr->lookupID(idx, id))
   {
+    // We know the ID, so fill in the rest of the envelope to allow for sending
     env->setRecipientID(ck::ObjID(thisgroup, id));
-    if (locMgr->whichPe(id) != -1)
+    int dest = locMgr->whichPe(id);
+    if (dest != -1)
     {
-      // We know the ID and the location, so we can send the message as normal
-      // Local deliver is probably different than remote delivery. Remote is one
-      // function call, local is unique.
-      deliverMsg(msg, id, type, opts);
+      // We know the ID AND the location, so we can send the message as normal.
+      // TODO: We need to make sure we DO NOT insert home into the location table as a
+      // shortcut. Because then we will have a harder time determining if an object exists
+      // or not. Similarly, if objects are deleted, we may run into issues.
+      sendToPe(msg, dest, type, opts);
     }
     else
     {
-      // We know the ID, but not the location. Fallback to a protocol which may
-      // send or buffer the message.
-      sendUnknown(msg, id, idx, type, opts);
+      // We know the ID but the location is unknown. This means the message can be sent,
+      // but we don't know where to send it.
+      handleUnknown(msg, idx, type, opts);
     }
   }
   else
   {
-    // We do not know the ID or the location, so buffer the message.
-    env->setRecipientID(ck::ObjID(thisgroup, 0));
-    if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
+    // We don't know the ID, so set a sentinel ID to prevent the message from being sent
+    // then handle the unknown (which will buffer or demand create).
+    env->setRecipientID(0);
+    handleUnknown(msg, idx, type, opts);
+  }
+}
+
+// We have just received a message for an element of this array. If the element exists
+// here, then deliver the message. If the element does not exist here, then we follow
+// similar logic as sendMsg to forward the message, buffer it, or trigger demand creation.
+void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts)
+{
+  msg->array_hops()++;
+
+  // First, if this is the actual location of the element, just deliver the message
+  // right away and completely avoid location management.
+  ArrayElement* elem = lookup(id);
+  if (elem)
+  {
+    deliverToElement(msg, elem);
+  }
+  else
+  {
+    // If the object is not here, figure out where we think it is and forward the message
+    int pe = locMgr->whichPe(id);
+    if (pe == -1)
     {
-      demandCreateUnknown(msg, idx, type, opts);
+      // The element is unknown to us. If we are it's home, then it just means it hasn't
+      // been created yet (or has been deleted). If we are not the home this can still
+      // occur if we knew the element but it has been deleted or our location cache has
+      // been purged.
+      const CkArrayIndex& idx = locMgr->lookupIdx(id);
+      handleUnknown(msg, idx, type, opts);
     }
     else
     {
-      // We can't send the message even if we wanted to, so buffer it.
-      bufferUnknown(msg, idx, type, opts);
+      // TODO: This currently doesn't work due to home of an id being different than the
+      // home of an index, as well as some issues with messages arriving before a
+      // migrating element.
+      // If we haven't found the element in two tries, send it back home.
+      // This limits message sends for cases where there's a lot of migration, creating
+      // potentially long chains of stale location entries. In cases where there is not
+      // a lot of migration, the number of hops is likely to be 2 or less anyways.
+      //if (msg->array_hops() > 1 && CkMyPe() != pe)
+      //{
+      //  pe = locMgr->homePe(id);
+      //}
+      sendToPe(msg, pe, type, opts);
     }
   }
 }
 
-int CkArray::deliverMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts)
+void CkArray::recordSend(const CmiUInt8 id, const unsigned int bytes, int pe, const int opts)
 {
-  CkAssert(thisgroup == UsrToEnv(msg)->getArrayMgr());
-  int destPE = locMgr->whichPe(id);
-  // TODO: I think deliverMsg is also called when a message is sent to home
-  // because it is small and unknown. So we may still need that path here too.
-  CkAssert(destPE >= 0);
-  if (destPE != CkMyPe() || type == CkDeliver_queue)
+#if CMK_LBDB_ON
+  if (!(opts & CK_MSG_LB_NOTRACE) && locMgr->getLBMgr()->CollectingCommStats())
   {
-    msg->array_hops()++;
-    // If we are hopping more than twice, we've discovered a stale chain
-    // of cache entries. Just route through home instead.
-    if (msg->array_hops() > 2 && CkMyPe() != locMgr->homePe(id))
-    {
-      destPE = locMgr->homePe(id);
-    }
-    CkArrayManagerDeliver(destPE, msg, opts);
-    return true;
+    // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
+    // is enabled, so add the group information if so.
+#  if CMK_GLOBAL_LOCATION_UPDATE
+    const CmiUInt8 lbObjId = ck::ObjID(thisgroup, id).getID();
+#  else
+    const CmiUInt8 lbObjId = id;
+#  endif
+    locMgr->getLBMgr()->Send(locMgr->myLBHandle, lbObjId, bytes, pe, 1);
   }
+#endif
+}
 
-  CkLocRec* rec = locMgr->elementNrec(id);
-  CkMigratable* obj = lookup(id);
-  // NOTE: If obj is NULL, then there shouldn't have been an element in anyones
-  // loc table, so we should not end up here I dont think. Maybe it is possible
-  // from someone else just sending to an elements home? Or if there's bound
-  // elemets elsewhere.
-  CkAssert(rec && obj);
-  /*if (obj == NULL) { // That sibling of this object isn't created yet!
-    if (opts & CK_MSG_KEEP) {
-      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-    }
-    if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer) {
-      return locMgr->demandCreateElement(msg, rec->getIndex(), CkMyPe(), type);
-    } else { // BUFFERING message for nonexistent element
-      locMgr->bufferedShadowElemMsgs[id].push_back(msg);
-      return true;
-    }
-  }*/
+// Send the msg to the designated PE. This is a private entry method and only called by
+// other methods in CkArray when the message is ready to send to the specified PE.
+// If pe is this PE then we know the object is supposed to be located here, but it is
+// possible that it has either been deleted or not been created yet.
+void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
+{
+  // This method should only be called for a valid PE, and with a properly filled in msg.
+  CkAssert(pe >= 0 && pe < CkNumPes());
+  CkAssert(thisgroup == UsrToEnv(msg)->getArrayMgr());
+  CkAssert(UsrToEnv(msg)->getRecipientID() != 0);
 
-  // TODO: This is not dead, it doesnt seem. CkSendMsgArrayInline calls
-  // CkArray::deliver with CkDeliver_inline, which should hit this path in some
-  // cases. One case where that function is used is a callback to an inline
-  // entry method. May be called somewhere else in CkArray.C.
+  // If the message is not for me, or is supposed to be queued, send it via the normal
+  // queuing infrastructure
+  if (pe != CkMyPe() || type == CkDeliver_queue)
+  {
+#if CMK_LBDB_ON
+    // Track message sends if the LB framework is collecting comm stats
+    if (msg->array_hops() == 0 && !(opts & CK_MSG_LB_NOTRACE) &&
+        locMgr->getLBMgr()->CollectingCommStats())
+    {
+      recordSend(msg->array_element_id(), UsrToEnv(msg)->getTotalsize(), pe, opts);
+    }
+#endif
+    CkArrayManagerDeliver(pe, msg, opts);
+  }
+  else
+  {
+    // If it is for me, and inline delivery, attempt to invoke the entry method
+    CmiUInt8 id = msg->array_element_id();
+    ArrayElement* elem = lookup(id);
+    if (elem == nullptr)
+    {
+      // The element has not yet been created but the location is known. This means the
+      // element is bound to a sibling that has already been created here.
+      if (msg->array_ifNotThere() == CkArray_IfNotThere_buffer)
+      {
+        // Directly buffer. Since we are the location of a sibling, we don't need to make
+        // a location request.
+        bufferedIDMsgs[id].push_back(msg);
+        return;
+      }
+      else
+      {
+        CkLocRec* rec = locMgr->elementNrec(id);
+        CkAssert(rec);
+        // Directly demand create. Since we are the location of a sibling, we don't need
+        // to request permission from home.
+        int chareType = _entryTable[msg->array_ep()]->chareIdx;
+        int ctor = _chareTable[chareType]->getDefaultCtor();
+        if (ctor == -1)
+        {
+          CkAbort(
+              "Can't create array element to handle message--\n"
+              "The element has no default constructor in the .ci file!\n");
+        }
+        demandCreateElement(rec->getIndex(), ctor);
+      }
+    }
+#if CMK_LBDB_ON
+    // This ensures that communication is tracked even for inline sends
+    if (msg->array_hops() == 0 && !(opts & CK_MSG_LB_NOTRACE) &&
+        locMgr->getLBMgr()->CollectingCommStats())
+    {
+      recordSend(msg->array_element_id(), UsrToEnv(msg)->getTotalsize(), pe, opts);
+    }
+#endif
+    deliverToElement(msg, elem);
+  }
+}
+
+// We have a message for the element. Invoke the appropriate entry method.
+void CkArray::deliverToElement(CkArrayMessage* msg, ArrayElement* elem)
+{
+  CkAssert(elem);
+  // The element already existed, or was literally just created via demand creation.
+  // If the message has multiple hops, trigger location updates to the message source.
   if (msg->array_hops() > 1)
     locMgr->multiHop(msg);
 
-  /*#if CMK_LBDB_ON
-    // if there is a running obj being measured, stop it temporarily
-    LDObjHandle objHandle;
-    bool wasAnObjRunning = false;
-    if ((wasAnObjRunning = the_lbdb->RunningObject(&objHandle))) {
-      the_lbdb->ObjectStop(objHandle);
-    }
-  #endif*/
-  // Finally, call the entry method
-  bool result = rec->invokeEntry(obj, (void*)msg, msg->array_ep(), true);
-  /*#if CMK_LBDB_ON
-    if (wasAnObjRunning) the_lbdb->ObjectStart(objHandle);
-  #endif*/
-  return result;
+  // TODO: This stop and start should probably be part of invoke. Or moved to a better
+  // part of the interfacing between arrays and LB
+  // Invoke the entry method
+#if CMK_LBDB_ON
+  // If there is a running obj being measured, stop it temporarily
+  LDObjHandle objHandle;
+  bool wasAnObjRunning = false;
+  if ((wasAnObjRunning = locMgr->getLBMgr()->RunningObject(&objHandle)))
+  {
+    locMgr->getLBMgr()->ObjectStop(objHandle);
+  }
+#endif
+  elem->ckInvokeEntry(msg->array_ep(), (void*)msg, true);
+#if CMK_LBDB_ON
+  if (wasAnObjRunning)
+    locMgr->getLBMgr()->ObjectStart(objHandle);
+#endif
 }
 
-// TODO: Need to come up with a design doc for exactly what cases can occur when
-// attempting to deliver a message:
-// 1. We don't know the ID - we aren't aware if the element even exists, need
-// to go through home
-// 2. We know the ID but don't have a location cached - we aren't aware if the
-// element even exists, so need to go through home BUT we can send the actual
-// message if we like because we have the ID at least.
-// 3. We know the ID, and have a location cached - we know that the element
-// exists (or existed but has been deleted), so we can send to that location.
-// Important here is that we don't insert a location into the cache UNTIL we
-// know the element exists. So this insertion must come from the element
-// arriving on us/being created on us, or being informed by someone via location
-// updates. Therefore it would be bad here (in deliver unknown) to insert home
-// as the location, because it would then imply in the future that we know where
-// the element is. Even though this would cause messages to take the same path
-// as the 'unknown' case, it may have other incorrect implications, such as not
-// doing demand creation, etc.
-void CkArray::sendUnknown(CkArrayMessage* msg, CmiUInt8 id, const CkArrayIndex& idx,
-                          CkDeliver_t type, int opts)
-{
-  CK_MAGICNUMBER_CHECK
-  CkAssert(id == msg->array_element_id());
-
-  int home = locMgr->homePe(idx);
-  if (UsrToEnv(msg)->getTotalsize() < _messageBufferingThreshold && home != CkMyPe())
-  {
-    // If the message is small, we can send it to its home and let home deal with
-    // forwarding it, or buffering it if it doesn't exist.
-    // TODO: This is a hack to ensure that home updates our location table if
-    // the object exists. There is probably a better way to do this.
-    msg->array_hops() += 2;
-    CkArrayManagerDeliver(home, msg, opts);
-  }
-  else if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
-  {
-    // If it's big and demand creation, buffer and send the request
-    demandCreateUnknown(msg, idx, type, opts);
-  }
-  else
-  {
-    // If it's big and not demand creation, buffer and send the request
-    bufferUnknown(msg, idx, type, opts);
-  }
-}
-
-bool CkArray::demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx,
-                                  CkDeliver_t type)
-{
-  int onPe = -1;
-  if (msg->array_ifNotThere() == CkArray_IfNotThere_createhere)
-  {
-    onPe = UsrToEnv(msg)->getsetArraySrcPe();
-  }
-  else
-  {  // Createhome
-    onPe = locMgr->homePe(idx);
-  }
-
-  int chareType = _entryTable[msg->array_ep()]->chareIdx;
-  int ctor = _chareTable[chareType]->getDefaultCtor();
-  if (ctor == -1)
-  {
-    CkAbort(
-        "Can't create array element to handle message--\n"
-        "The element has no default constructor in the .ci file!\n");
-  }
-
-  thisProxy[onPe].demandCreateElement(idx, ctor, type);
-  return onPe == CkMyPe();
-}
-
-void CkArray::demandCreateUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
-                                  CkDeliver_t type, int opts)
-{
-  int home = locMgr->homePe(idx);
-  if (home != CkMyPe())
-  {
-    if (bufferedCreationMsgs.find(idx) == bufferedCreationMsgs.end())
-    {
-      thisProxy[home].requestDemandCreation(
-          idx, CkMyPe(), msg->array_ifNotThere(),
-          _entryTable[UsrToEnv(msg)->getEpIdx()]->chareIdx);
-    }
-    bufferedCreationMsgs[idx].push_back(msg);
-  }
-  else
-  {
-    bufferedCreationMsgs[idx].push_back(msg);
-    demandCreateElement(msg, idx, type);
-  }
-}
-
-void CkArray::requestDemandCreation(const CkArrayIndex& idx, int fromPe, int createOnPe,
-                                    int chareType)
-{
-  CkAssert(locMgr->homePe(idx) == CkMyPe());
-  CkAssert(fromPe != CkMyPe());
-  int ctor = _chareTable[chareType]->getDefaultCtor();
-  if (ctor == -1)
-  {
-    CkAbort(
-        "Can't use demand creation for an element which has no default "
-        "constructor defined in the .ci file!\n");
-  }
-  // TODO: What if the location does already exist due to bound arrays, but the
-  // specific element does not?
-  if (!locMgr->requestLocation(idx, fromPe))
-  {
-    switch (createOnPe)
-    {
-      case CkArray_IfNotThere_createhome:
-        // TODO: How does this inform the "fromPe" to release the buffered msg?
-        // Answer: The requestLocation call in the if
-        thisProxy[CkMyPe()].demandCreateElement(idx, ctor, CkDeliver_inline);
-        // locMgr->demandCreateElement(idx, chareType, CkMyPe(), thisgroup);
-        break;
-      case CkArray_IfNotThere_createhere:
-        // locMgr->demandCreateElement(idx, chareType, fromPe, thisgroup);
-        thisProxy[fromPe].demandCreateElement(idx, ctor, CkDeliver_inline);
-        break;
-      default:
-        CkAbort("Invalid demand creation request\n");
-        break;
-    }
-  }
-}
-
-void CkArray::bufferUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
+// Handle a message to an unknown destination. If we at least know the ID, we have the
+// option to send the message to the elements home. If we don't know that, the message
+// must be buffered or trigger demand creation.
+void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
                             CkDeliver_t type, int opts)
+{
+  envelope* env = UsrToEnv(msg);
+  // TODO: Make sure this is actually a sentinel ID
+  bool hasID = env->getRecipientID() != 0;
+  bool isSmall = env->getTotalsize() < _messageBufferingThreshold;
+  int home = locMgr->homePe(idx);
+  if (msg->array_ifNotThere() == CkArray_IfNotThere_buffer)
+  {
+    if (isSmall && hasID && CkMyPe() != home)
+    {
+      sendToPe(msg, home, type, opts);
+    }
+    else
+    {
+      bufferForLocation(msg, idx);
+    }
+  }
+  else
+  {
+    // This is a message that utilizes demand creation
+    if (isSmall && hasID && CkMyPe() != home &&
+        msg->array_ifNotThere() != CkArray_IfNotThere_createhere)
+    {
+      sendToPe(msg, home, type, opts);
+    }
+    else
+    {
+      bufferForCreation(msg, idx);
+    }
+  }
+}
+
+// Buffer the message to be sent when we know the location, and send a request for the
+// location if we haven't send one yet for this index.
+void CkArray::bufferForLocation(CkArrayMessage* msg, const CkArrayIndex& idx)
 {
   if (bufferedIndexMsgs.find(idx) == bufferedIndexMsgs.end())
   {
@@ -2052,12 +2029,118 @@ void CkArray::bufferUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   bufferedIndexMsgs[idx].push_back(msg);
 }
 
+// Demand creation has 4 possible outcomes:
+// 1. Object doesn't exist yet, and it's createhome -> Create the element at its home
+// 2. Object doesn't exist yet, and it's createhere -> Check with home, then create here
+// 3. Object doesn't exist yet, but a bound sibling does -> Create with the sibling
+// 4. Object exists -> send the message as normal
+// NOTE: The only PE that knows if the object has been created or not is home. Furthermore
+// if a bound sibling has been created, it will appear as though the object exists until
+// the message reaches the sibling. So until that point, the message will follow the
+// normal send path.
+// TODO: What if an element is created with a regular constructor call, but that creation
+// message doesn't reach home until after a demand creation message reached home?  In that
+// case the object would already exist and the constructor could not be called.  This may
+// mean that demand creation is just not compatible with regular element creation, but if
+// that's the case it should be disabled in the proxy or something. Although we do have
+// multiple steps to constructing an object. Would invoking the constructor entry method
+// after the element has already been created be incorrect? Probably.
+
+// This is the method that actually does the creation of the local object. Inside of
+// insertElement there is logic for forwarding the creation if the object has migrated.
+// TODO: This and the other instances of creating an element can probably be combined
+// TODO: Why is there a field in the message for what to do when the element is not there?
+// Seems like sinces it's a property of the entry method, not the msg, we could just look
+// it up and save space in the message.
+// TODO: THe need for demand creation paths to need idx is flimsy in most cases. May be
+// able to eliminate a bit more reliance on idx, which would trickle up to handle
+// unknown stuff as well. The only time we have to rely on just idx is on the original
+// sending PE.
+void CkArray::demandCreateElement(const CkArrayIndex& idx, int ctor)
+{
+  CkArrayMessage* m = (CkArrayMessage*)CkAllocSysMsg();
+  envelope* env = UsrToEnv(m);
+  env->setMsgtype(ArrayEltInitMsg);
+  env->setArrayMgr(thisgroup);
+  int listenerData[CK_ARRAYLISTENER_MAXLEN];
+  prepareCtorMsg(m, listenerData);
+  m->array_ep() = ctor;
+
+  DEBC((AA "Demand-creating %s\n" AB, idx2str(idx)));
+  insertElement(m, idx, listenerData);
+}
+
+void CkArray::bufferForCreation(CkArrayMessage* msg, const CkArrayIndex& idx)
+{
+  // Only send a request if we haven't already requested
+  if (bufferedCreationMsgs.find(idx) == bufferedCreationMsgs.end())
+  {
+    // Figure out the constructor to call
+    int chareType = _entryTable[msg->array_ep()]->chareIdx;
+    int ctor = _chareTable[chareType]->getDefaultCtor();
+    if (ctor == -1)
+      CkAbort(
+          "Can't create array element to handle message--\n"
+          "The element has no default constructor in the .ci file!\n");
+
+    // Figure out the pe we are requesting for
+    int home = locMgr->homePe(idx);
+    int pe = home;
+    if (msg->array_ifNotThere() == CkArray_IfNotThere_createhere)
+      pe = UsrToEnv(msg)->getsetArraySrcPe();
+
+    // Send the request to the home PE
+    thisProxy[home].requestDemandCreation(idx, ctor, pe);
+  }
+  bufferedCreationMsgs[idx].push_back(msg);
+}
+
+// TODO: Need to make sure we use msg source PE for createhere cases where the message
+// has moved around, but ended up on an unknown PE because the element was deleted or
+// never created at some point?
+void CkArray::requestDemandCreation(const CkArrayIndex& idx, int ctor, int pe)
+{
+  // Only the home PE can fulfill requests for demand creation
+  CkAssert(locMgr->homePe(idx) == CkMyPe());
+
+  CmiUInt8 id;
+  if (!locMgr->lookupID(idx, id) || locMgr->whichPe(id) == -1)
+  {
+    // We (the home PE) do not know the elements location, therefore it (and its siblings)
+    // do not exist. So we can approve the demand creation request.
+    if (pe == CkMyPe())
+    {
+      // Directly create the element
+      demandCreateElement(idx, ctor);
+    }
+    else
+    {
+      // Trigger creation at the request site
+      thisProxy[pe].demandCreateElement(idx, ctor);
+    }
+  }
+  else
+  {
+    // The object (or one of its siblings already exists, tell the requester.
+    if (pe != CkMyPe())
+    {
+      // TODO: This API needs work
+      // TODO: The requester and the pe to create on may be different
+      locMgr->requestLocation(idx, pe);
+    }
+  }
+}
+
+// TODO: We can do better with these. Don't need to repeat the whole sendMsg call because
+// most likely this was triggered by a location request being fullfilled. Should be able
+// to skip directly to sendToPe(...). Once the requestLocation update is done, this can
+// maybe even almost go away.
 void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
 {
   for (CkArrayMessage* msg : bufferedIndexMsgs[idx])
   {
     UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
-    // TODO: Why all buffered messages delivered via queue?
+    // TODO: Is deliver_queue right?
     sendMsg(msg, idx, CkDeliver_queue);
   }
   bufferedIndexMsgs.erase(idx);
@@ -2065,7 +2148,7 @@ void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
   for (CkArrayMessage* msg : bufferedCreationMsgs[idx])
   {
     UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
-    // TODO: Why all buffered messages delivered via queue?
+    // TODO: Is deliver_queue right?
     sendMsg(msg, idx, CkDeliver_queue);
   }
   bufferedCreationMsgs.erase(idx);

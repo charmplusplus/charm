@@ -533,6 +533,7 @@ public:
     }
   }
 
+  // TODO: This should be better
   bool lookupID(const CkArrayIndex& idx, CmiUInt8& id) const
   {
     if (compressor)
