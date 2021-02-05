@@ -2800,9 +2800,10 @@ void CkLocMgr::reclaimRemote(const CkArrayIndex& idx, int deletedOnPe)
   if (!lookupID(idx, id))
     CkAbort("Cannot find ID for the given index\n");
 
-  // Delete the id and index from our location caching
+  // Delete the ID from location caching. Do not delete the idx to id mapping because
+  // that remains constant and we don't want messages to end up stranded because they
+  // can't figure out their index.
   cache->erase(id);
-  idx2id.erase(idx);
 }
 
 void CkLocMgr::removeFromTable(const CmiUInt8 id)
