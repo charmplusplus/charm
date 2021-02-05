@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <cstring>
 #include "mpi.h"
 
 int get_my_pe() {
