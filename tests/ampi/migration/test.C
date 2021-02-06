@@ -47,14 +47,14 @@ int main(int argc, char **argv)
       printf("Testing mapfile correctness\n");
       FILE *mapf = fopen("mapfile", "r");
       if (mapf == NULL) {
-	  printf("Missing file named 'mapfile'!\n");
+        printf("Missing file named 'mapfile'!\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
       }
 
       std::vector<int> init_pes(p);
       for (int i=0; i<p; i++) {
         if (fscanf(mapf, "%d\n", &init_pes[i]) != 1) {
-	    printf("Unrecongized mapfile formatting!\n");
+          printf("Unrecongized mapfile formatting!\n");
           MPI_Abort(MPI_COMM_WORLD, 1);
         }
       }
@@ -79,14 +79,14 @@ int main(int argc, char **argv)
     for (int i=0; i<=num_pes; i++) {
       if (rank == 1) {
         int dest_pe = (my_pe + 1) % num_pes;
-	printf("Trying to migrate rank %d from PE %d to %d\n", rank, my_pe, dest_pe);
-	AMPI_Migrate_to_pe(dest_pe);
-	my_pe = get_my_pe();
-	if (my_pe != dest_pe) {
-	  printf("Rank %d is on PE %d but should have migrated to PE %d!\n", rank, my_pe, dest_pe);
+        printf("Trying to migrate rank %d from PE %d to %d\n", rank, my_pe, dest_pe);
+        AMPI_Migrate_to_pe(dest_pe);
+        my_pe = get_my_pe();
+        if (my_pe != dest_pe) {
+          printf("Rank %d is on PE %d but should have migrated to PE %d!\n", rank, my_pe, dest_pe);
           MPI_Abort(MPI_COMM_WORLD, 1);
         }
-	  printf("After migration of rank %d to PE %d\n", rank, my_pe);
+        printf("After migration of rank %d to PE %d\n", rank, my_pe);
       }
 
       MPI_Barrier(MPI_COMM_WORLD);
