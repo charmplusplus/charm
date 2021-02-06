@@ -54,7 +54,7 @@ int main(int argc, char **argv)
       std::vector<int> init_pes(p);
       for (int i=0; i<p; i++) {
         if (fscanf(mapf, "%d\n", &init_pes[i]) != 1) {
-          printf("Unrecongized mapfile formatting!\n");
+          printf("Unrecognized mapfile formatting!\n");
           MPI_Abort(MPI_COMM_WORLD, 1);
         }
       }
