@@ -2630,8 +2630,10 @@ selection syntax still works and is specified in parentheses):
   remaining object to the least loaded processor when it is currently
   assigned to a heavily loaded processor, otherwise leaves the object
   on its current processor to limit migrations. It takes an optional
-  argument ``tolerance``, which specifies the tolerance it should allow
-  above the maximum load Greedy would produce. (Old: ``+balancer GreedyRefineLB``)
+  argument ``tolerance`` via the configuration file, which specifies
+  the tolerance it should allow above the maximum load Greedy would
+  produce (e.g. ``1.1`` allows the maximum load to be 10% higher than
+  Greedy's max load). (Old: ``+balancer GreedyRefineLB``)
 
 - **RefineA, RefineB**: Moves objects away from the most overloaded
   processors to reach average, limits the number of objects
@@ -2686,9 +2688,10 @@ Listed below are the distributed load balancers:
    about underloaded and overloaded processors in the system to do
    probabilistic transfer of load. This is a refinement based strategy.
 
-Custom strategies that are based on CentralLB or HybridBaseLB will
-continue to be supported for now, but support for these will likely be
-dropped in a future release.
+Custom strategies should be built using TreeLB or DistBaseLB (the base
+class for DistributedLB). Custom strategies that are based on
+CentralLB or HybridBaseLB will continue to be supported for now, but
+support for these will likely be dropped in a future release.
 
 All built-in load balancers that do not require external dependencies
 (that is, all of the above load balancers except for ScotchLB) are
@@ -2878,8 +2881,10 @@ following tree level configuration parameters:
 
   - ``GreedyRefine``:
 
-    - ``tolerance``: Float specifying the tolerance GreedyRefine should
-      allow above the maximum load of Greedy. (default = ``1``)
+    - ``tolerance``: Float specifying the tolerance GreedyRefine
+      should allow above the maximum load of Greedy, e.g. ``1.1``
+      allows the maximum load to be 10% higher than Greedy's max load.
+      (default = ``1``)
 
 **Metabalancer to automatically schedule load balancing**
 
