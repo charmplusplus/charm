@@ -38,6 +38,8 @@ Misc:
   venue for Charm++ questions and discussions instead of the
   charm@cs.illinois.edu mailing list.
 
+- Support for Blue Gene/Q targets has been deprecated.
+
 - Charm++ now runs on the new Apple M1 chips with the targets:
   multicore-darwin-arm8, netlrts-darwin-arm8, and mpi-darwin-arm8.
 
