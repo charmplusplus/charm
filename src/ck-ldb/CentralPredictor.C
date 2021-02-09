@@ -202,26 +202,20 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
 
   if (predicted_model->cur_stats < _lb_predict_delay) {
     // not yet ready to create the model, just store the relevant statistic
-    predicted_model->collection[predicted_model->start_stats].objData.resize(stats->n_objs);
-    predicted_model->collection[predicted_model->start_stats].commData.resize(stats->n_comm);
-    predicted_model->collection[predicted_model->start_stats].n_objs = stats->n_objs;
     predicted_model->collection[predicted_model->start_stats].n_migrateobjs = stats->n_migrateobjs;
-    predicted_model->collection[predicted_model->start_stats].n_comm = stats->n_comm;
-    for (i=0; i<stats->n_objs; ++i)
-      predicted_model->collection[predicted_model->start_stats].objData[i] = stats->objData[i];
-    for (i=0; i<stats->n_comm; ++i)
-      predicted_model->collection[predicted_model->start_stats].commData[i] = stats->commData[i];
+    predicted_model->collection[predicted_model->start_stats].objData = stats->objData;
+    predicted_model->collection[predicted_model->start_stats].commData = stats->commData;
     ++predicted_model->cur_stats;
     ++predicted_model->start_stats;
 
   } else {
-
+    const int n_objs = stats->objData.size();
     if (predicted_model->parameters == NULL) {     // time to create the new prediction model
       // allocate parameters
-      predicted_model->model_valid = new bool[stats->n_objs];
-      predicted_model->parameters = new double*[stats->n_objs];
-      for (i=0; i<stats->n_objs; ++i) predicted_model->parameters[i] = new double[predicted_model->predictor->num_params];
-      for (i=0; i<stats->n_objs; ++i) {
+      predicted_model->model_valid = new bool[n_objs];
+      predicted_model->parameters = new double*[n_objs];
+      for (i=0; i<n_objs; ++i) predicted_model->parameters[i] = new double[predicted_model->predictor->num_params];
+      for (i=0; i<n_objs; ++i) {
 	// initialization
 	predicted_model->predictor->initialize_params(predicted_model->parameters[i]);
 	predicted_model->predictor->print(predicted_model->parameters[i]);
@@ -241,11 +235,11 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
 
     } else {     // model already constructed, update it
 
-      double *error_model = new double[stats->n_objs];
-      double *error_default = new double[stats->n_objs];
+      double *error_model = new double[n_objs];
+      double *error_default = new double[n_objs];
 
       CkPrintf("Error in estimation:\n");
-      for (i=0; i<stats->n_objs; ++i) {
+      for (i=0; i<n_objs; ++i) {
 	error_model[i] = stats->objData[i].wallTime-predicted_model->predictor->predict(predicted_model->collection[(predicted_model->start_stats-1)%predicted_model->n_stats].objData[i].wallTime,predicted_model->parameters[i]);
 	error_default[i] = stats->objData[i].wallTime-predicted_model->collection[(predicted_model->start_stats-1)%predicted_model->n_stats].objData[i].wallTime;
 	CkPrintf("object %d: real time=%f, model error=%f, default error=%f\n",i,stats->objData[i].wallTime,error_model[i],error_default[i]);
@@ -255,16 +249,9 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
       if (predicted_model->start_stats >= predicted_model->n_stats) predicted_model->start_stats -= predicted_model->n_stats;
       if (predicted_model->cur_stats < predicted_model->n_stats) ++predicted_model->cur_stats;
 
-      predicted_model->collection[predicted_model->start_stats].objData.resize(stats->n_objs);
-      predicted_model->collection[predicted_model->start_stats].commData.resize(stats->n_comm);
-
-      predicted_model->collection[predicted_model->start_stats].n_objs = stats->n_objs;
       predicted_model->collection[predicted_model->start_stats].n_migrateobjs = stats->n_migrateobjs;
-      predicted_model->collection[predicted_model->start_stats].n_comm = stats->n_comm;
-      for (i=0; i<stats->n_objs; ++i)
-	predicted_model->collection[predicted_model->start_stats].objData[i] = stats->objData[i];
-      for (i=0; i<stats->n_comm; ++i)
-	predicted_model->collection[predicted_model->start_stats].commData[i] = stats->commData[i];      
+      predicted_model->collection[predicted_model->start_stats].objData = stats->objData;
+      predicted_model->collection[predicted_model->start_stats].commData = stats->commData;
       ++predicted_model->start_stats;      
 
       // check if model is ok
@@ -274,7 +261,7 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
       // the update of the model is done if the model does not approximate
       // sufficiently well the underlining function or if the time-invariante
       // approach is performing better
-      for (i=0; i<stats->n_objs; ++i) {
+      for (i=0; i<n_objs; ++i) {
         //if (fabs(error_model[i]) > 0.2*stats->objData[i].wallTime || fabs(error_model[i]) > fabs(error_default[i])) {
         if (fabs(error_model[i]) > fabs(error_default[i])) {  // no absolute error check
 	  predicted_model->model_valid[i] = false;
@@ -291,7 +278,7 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
 
     // use the model to update statistics
     double *param;
-    for (int i=0; i<stats->n_objs; ++i) {
+    for (int i=0; i<n_objs; ++i) {
       if (predicted_model->model_valid[i]) {
 	param = predicted_model->parameters[i];
 	stats->objData[i].wallTime = predicted_model->predictor->predict(stats->objData[i].wallTime, param);

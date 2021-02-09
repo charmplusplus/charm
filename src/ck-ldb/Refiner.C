@@ -11,7 +11,7 @@
 
 int* Refiner::AllocProcs(int count, BaseLB::LDStats* stats)
 {
-  return new int[stats->n_objs];
+  return new int[stats->objData.size()];
 }
 
 void Refiner::FreeProcs(int* bufs)
@@ -39,7 +39,7 @@ void Refiner::create(int count, BaseLB::LDStats* stats, int* procs)
     if (processors[i].available == true) numAvail++;
   }
 
-  for (i=0; i<stats->n_objs; i++)
+  for (i=0; i<stats->objData.size(); i++)
   {
 	LDObjData &odata = stats->objData[i];
 	computes[i].Id = i;
@@ -323,7 +323,7 @@ void Refiner::Refine(int count, BaseLB::LDStats* stats,
   //  CkPrintf("[%d] Refiner strategy\n",CkMyPe());
 
   P = count;
-  numComputes = stats->n_objs;
+  numComputes = stats->objData.size();
   computes = new computeInfo[numComputes];
   processors = new processorInfo[count];
 
