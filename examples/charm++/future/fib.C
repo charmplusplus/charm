@@ -62,7 +62,12 @@ struct Fib : public CBase_Fib {
           sum += value;
         }
       }
-      // release any remaining futures
+      // release any futures still in pending
+      // ps#1, if futures aren't removed, e.g. with ``wait_all``,
+      //       this is all of them.)
+      // ps#2, _all futures must be released_ or memory will be
+      //       leaked and the future id will be unavailable for
+      //       reuse (implementation details)
       for (auto& f : pending) {
         f.release();
       }

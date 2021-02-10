@@ -5865,20 +5865,20 @@ To increase this limit, build Charm++ with a larger *CMK_REFNUM_TYPE*, e.g. spec
 
 There are additional facilities for operating on collections of futures, which include:
 
-+-------------------+-----------+-------------------------------------------------+
-| Function          | Blocking? | Description                                     |
-+===================+===========+=================================================+
-| ``ck::wait_any``  | Yes       | Take a single value, as it becomes available,   |
-|                   |           | returning a pair with the value and position    |
-|                   |           | of the fulfilled future.                        |
-+-------------------+-----------+-------------------------------------------------+
-| ``ck::wait_all``  | Yes       | Wait for all futures to become available,       |
-|                   |           | returning a list of values.                     |
-+-------------------+-----------+-------------------------------------------------+
-| ``ck::wait_some`` | No        | Take all immediately available value, returning |
-|                   |           | a list of values and, separately, any           |
-|                   |           | outstanding futures.                            |
-+-------------------+-----------+-------------------------------------------------+
++-------------------+-----------+---------------------------------------------------+
+| Function          | Blocking? | Description                                       |
++===================+===========+===================================================+
+| ``ck::wait_any``  | Yes       | Take a value, as soon as one is available, and    |
+|                   |           | return a pair with the value and position of the  |
+|                   |           | fulfilled future. (``std::pair<T, InputIter>``)   |
++-------------------+-----------+---------------------------------------------------+
+| ``ck::wait_all``  | Yes       | Wait for all the futures to become available, and |
+|                   |           | return a vector of values. (``std::vector<T>``)   |
++-------------------+-----------+---------------------------------------------------+
+| ``ck::wait_some`` | No        | Take any immediately available values, returning  |
+|                   |           | the values and any outstanding futures.           |
+|                   |           | (``std::pair<std::vector<T>, InputIter>``)        |
++-------------------+-----------+---------------------------------------------------+
 
 Note, these are also demonstrated in ``examples/charm++/future``. The Converse
 version of future functions can be found in the :ref:`conv-futures` section.
