@@ -87,14 +87,12 @@ public:
     int count;			// number of processors in the array "procs"
     ProcStats *procs;		// processor statistics
 
-    int n_objs;			// total number of objects in the vector "objData"
     int n_migrateobjs;		// total number of migratable objects
-    CkVec<LDObjData> objData;	// LDObjData and LDCommData defined in lbdb.h
-    CkVec<int> from_proc;	// current pe an object is on
-    CkVec<int> to_proc;		// new pe you want the object to be on
+    std::vector<LDObjData> objData;	// LDObjData and LDCommData defined in lbdb.h
+    std::vector<int> from_proc;	// current pe an object is on
+    std::vector<int> to_proc;		// new pe you want the object to be on
 
-    int n_comm;			// number of edges in the vector "commData"
-    CkVec<LDCommData> commData;	// communication data - edge list representation
+    std::vector<LDCommData> commData;	// communication data - edge list representation
 				// of the communication between objects
 
     int *objHash;		// this a map from the hash for the 4 integer
@@ -126,11 +124,11 @@ public:
     int getRecvHash(LDCommData &cData);
     void clearCommHash();
     void clear() {
-      n_objs = n_migrateobjs = n_comm = 0;
-      objData.free();
-      commData.free();
-      from_proc.free();
-      to_proc.free();
+      n_migrateobjs = 0;
+      objData.clear();
+      commData.clear();
+      from_proc.clear();
+      to_proc.clear();
       deleteCommHash();
     }
     void clearBgLoad() {
