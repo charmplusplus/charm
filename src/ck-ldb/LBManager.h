@@ -232,7 +232,7 @@ class LBManager : public CBase_LBManager
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
-  ~LBManager() { }
+  ~LBManager() { delete lbdb_obj; }
 
  private:
   void init();
