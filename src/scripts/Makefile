@@ -76,9 +76,6 @@ AMPI:  charm++
 
 AMPIC AMPIF: AMPI
 
-ARMCI: charm++ LIBS
-
-
 f90charm: charm++
 
 libcharm: charm++
@@ -126,20 +123,6 @@ translators: charmxi conv-cpm
 msa: charm++
 	$(MAKE) -C libs/ck-libs/multiphaseSharedArrays
 
-jade: charm++ msa
-#	make the lib, include
-	$(MAKE) -C langs/jade
-
-
-# This should be done offline, since the user does not need to compile
-# parser files, etc.  All they need is the libjade + include files,
-# antlr.jar, jade.jar, and a few scripts which the jade target takes
-# care of.
-#jadeall: jade
-#	make parser.g -> .java files
-#	$(MAKE) -C langs/jade p
-#	make the jade.jar file
-#	$(MAKE) -C ../java/charm/jade
 
 #include TAU defs
 TAU_MAKEFILE=Make.tau
@@ -321,7 +304,6 @@ endif
 	./gathertree $(SRCBASE)/arch/util/proc_management        proc_management
 	./gathertree $(SRCBASE)/util                             .
 	./gathertree $(SRCBASE)/langs                            langs
-	./gathertree $(SRCBASE)/langs/jade                       langs/jade
 	./gathertree $(SRCBASE)/arch/common                      .
 	./gathertree $(SRCBASE)/arch/$(CMK_GDIR)                 .
 	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
