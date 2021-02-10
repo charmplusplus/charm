@@ -4,6 +4,7 @@
 */
 /*@{*/
 
+#include <algorithm>
 #include <charm++.h>
 #include "ck.h"
 #include "envelope.h"
@@ -1235,16 +1236,10 @@ void CentralLB::removeCommDataOfDeletedObjs(LDStats* stats) {
         int nobjs;
         const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
         std::vector<LDObjKey> newobjs;
-        newobjs.resize(nobjs);
-        for (int id = 0; id < nobjs; id++) {
-          int idx = stats->getHash(objs[id]);
-          if (idx == -1) {
-            newobjs[id] = objs[nobjs-1];
-            id--;
-            nobjs--;
-          }
-        }
-        if (nobjs == 0) continue;
+        newobjs.reserve(nobjs);
+        std::copy_if(objs, objs + nobjs, std::back_inserter(newobjs),
+                     [&](const LDObjKey& key) { return -1 != stats->getHash(key); });
+        if (newobjs.empty()) continue;
         cdata.receiver.dest.destObjs = std::move(newobjs);
         break;
       }
