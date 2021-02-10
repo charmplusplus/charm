@@ -308,19 +308,15 @@ void CentralLB::BuildStatsMsg()
 
   DEBUGF(("Processor %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n", CkMyPe(),msg->total_walltime,msg->total_cputime,msg->idletime,msg->bg_walltime,msg->bg_cputime));
 
-  msg->objData.clear();
   msg->objData.resize(osz);
   lbmgr->GetObjData(msg->objData.data());
-  msg->commData.clear();
   msg->commData.resize(csz);
   lbmgr->GetCommData(msg->commData.data());
 //  lbmgr->ClearLoads();
   DEBUGF(("PE %d BuildStatsMsg %d objs, %d comm\n",CkMyPe(),msg->n_objs,msg->n_comm));
 
   if(CkMyPe() == cur_ld_balancer) {
-    msg->avail_vector.clear();
-    msg->avail_vector.resize(CkNumPes());
-    LBManagerObj()->get_avail_vector(msg->avail_vector);
+    lbmgr->get_avail_vector(msg->avail_vector);
     msg->next_lb = LBManagerObj()->new_lbbalancer();
   }
 
@@ -445,12 +441,12 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.available = true;
   procStat.n_objs = n_objs;
 
-  CmiAssert(statsData->objData.size() + m->objData.size() <= statsData->objData.capacity());
+  CmiAssert(statsData->objData.size() + n_objs <= statsData->objData.capacity());
   statsData->objData.insert(statsData->objData.end(), m->objData.begin(), m->objData.end());
-  statsData->from_proc.insert(statsData->from_proc.end(), m->objData.size(), pe);
-  statsData->to_proc.insert(statsData->to_proc.end(), m->objData.size(), pe);
+  statsData->from_proc.insert(statsData->from_proc.end(), n_objs, pe);
+  statsData->to_proc.insert(statsData->to_proc.end(), n_objs, pe);
 
-  CmiAssert(statsData->commData.size() + m->commData.size() <= statsData->commData.capacity());
+  CmiAssert(statsData->commData.size() + n_objs <= statsData->commData.capacity());
   statsData->commData.insert(statsData->commData.end(), m->commData.begin(), m->commData.end());
 
   statsData->n_migrateobjs +=
