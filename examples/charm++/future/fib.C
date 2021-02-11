@@ -62,12 +62,15 @@ struct Fib : public CBase_Fib {
           sum += value;
         }
       }
-      // release any futures still in pending
-      // ps#1, if futures aren't removed, e.g. with ``wait_all``,
-      //       this is all of them.)
-      // ps#2, _all futures must be released_ or memory will be
-      //       leaked and the future id will be unavailable for
-      //       reuse (implementation details)
+      /* release any futures remaining in the vector `pending`.
+       *
+       * note #1: the wait_any and wait_some routes can remove
+       *          futures from the vector.
+       *
+       * note #2, futures must be released or memory will be
+       *          leaked and expired future ids will be 
+       *          unavailable for reuse.
+       */
       for (auto& f : pending) {
         f.release();
       }
