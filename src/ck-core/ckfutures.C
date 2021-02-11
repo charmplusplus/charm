@@ -36,7 +36,9 @@ class FutureToThread: public FutureRequest {
   FutureToThread(CthThread th_) : th(th_) {}
 
   virtual void fulfill(void* value) override {
+    // If we have a valid thread to wake up, do so
     if (th) CthAwaken(th);
+    // Then invalidate ourself
     th = nullptr;
   }
 };
@@ -48,7 +50,9 @@ class FutureToFuture: public FutureRequest {
   FutureToFuture(CkFuture fut_) : fut(fut_), fulfilled(false) {}
 
   virtual void fulfill(void* value) override {
+    // If we have not been fulfilled, forward the value
     if (!fulfilled) CkSendToFuture(fut, value);
+    // Then mark ourself as fulfilled
     fulfilled = true;
   }
 };
@@ -108,6 +112,7 @@ struct FutureState {
 
   // stores a value for a given future id, and fulfills all
   // outstanding requests for the value (then erases them)
+  // (this is usually called by the FutureBOC chare-group)
   void fulfill(CkFutureID f, void* value) {
     values[f] = value;
     auto found = waiting.find(f);
@@ -266,6 +271,11 @@ std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles)
   auto fs = &(CpvAccess(futurestate));
   const auto ready = std::any_of(handles.begin(), handles.end(),
     [&fs](const CkFutureID& id) { return fs->is_ready(id); });
+  /* A single request is generated, and enqueued for all the futures that we are
+   * interested in. Note, a request may only be fulfilled once, then it will expire
+   * and become a no-op; thus, the corresponding `CthAwaken` for this thread will
+   * only be called once (for more details, see FutureToThread::fulfill).
+   */ 
   if (!ready) fs->request(handles, std::make_shared<FutureToThread>(CthSelf()));
   do {
     if (!ready) CthSuspend();
