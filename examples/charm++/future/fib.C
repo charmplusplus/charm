@@ -45,7 +45,7 @@ struct Fib : public CBase_Fib {
           pending.erase(pair.second);
         }
       } else if (n % 3 == 0) {
-        // n's that are divsible by three (but not two) use wait_some
+        // n's that are divisible by three (but not two) use wait_some
         auto pair = ck::wait_some(pending.begin(), pending.end());
         for (const auto& value : pair.first) {
           sum += value;
