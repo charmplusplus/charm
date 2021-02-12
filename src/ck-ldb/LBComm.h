@@ -10,7 +10,6 @@
 #include "lbdb.h"
 
 class LBObj; //Forward declaration
-template <class T> class CkVec; //Forward declaration
 
 // point to point communication data
 class LBCommData {

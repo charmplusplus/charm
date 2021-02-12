@@ -313,6 +313,7 @@ elseif(IS_DIRECTORY "/bgsys")
   set(CHARM_OS "bluegeneq")
   set(CMK_BLUEGENEQ 1)
   set(CMK_SUPPORTS_MEMORY_ISOMALLOC 0)
+  message(DEPRECATION "Support for Blue Gene/Q targets has been deprecated as of Charm++ 7.0.0.")
 else()
   message(FATAL_ERROR "Unsupported operating system ${CMAKE_SYSTEM_NAME}.")
 endif()
@@ -449,7 +450,7 @@ if(${TARGET} STREQUAL "all-test")
         ckqt tcharm-compat moduleNDMeshStreamer
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
-        threads-default-tls ldb-neighbor ldb-workstealing modulearmci
+        threads-default-tls ldb-neighbor ldb-workstealing
         modulecollidecharm modulecollide memory-os memory-gnu-isomalloc
         ampi_globals_fs)
   if(CMK_CAN_LINK_FORTRAN)

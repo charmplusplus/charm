@@ -1,20 +1,27 @@
 mainmodule jacobi2d {
+  include "jacobi2d.h";
+
   readonly CProxy_Main main_proxy;
   readonly CProxy_Block block_proxy;
-  readonly int grid_size;
-  readonly int block_size;
-  readonly int n_chares;
+  readonly int grid_width;
+  readonly int grid_height;
+  readonly int block_width;
+  readonly int block_height;
+  readonly int n_chares_x;
+  readonly int n_chares_y;
   readonly int n_iters;
+  readonly int warmup_iters;
   readonly bool sync_ver;
   readonly bool use_zerocopy;
-  readonly bool print;
+  readonly bool print_elements;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void initDone();
-    entry [reductiontarget] void commDone();
+    entry void startIter();
     entry [reductiontarget] void updateDone();
-    entry [reductiontarget] void done();
+    entry [reductiontarget] void commDone();
+    entry [reductiontarget] void allDone();
     entry void printDone();
   };
 
@@ -22,39 +29,38 @@ mainmodule jacobi2d {
     entry Block(void);
     entry void init();
     entry void initDone();
-    entry void packGhostsDone();
-    entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice double gh[w]);
-    entry void receiveGhostsReg(int ref, int dir, int w, double gh[w]);
-    entry void sendGhostDone();
+    entry void update();
     entry void updateDone();
+    entry void packGhosts();
+    entry void packGhostsDone();
+    entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
+    entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
 
     entry void exchangeGhosts() {
       serial {
-        packGhosts();
-        // Packed buffers can be enqueued for sending right away with zerocopy
-        // Without it, they should first be transferred to host memory
-        if (use_zerocopy) {
-          sendGhosts();
-        }
+        my_iter++;
+        update();
+        if (!sync_ver) packGhosts();
       }
 
-      if (!use_zerocopy) {
-        when packGhostsDone() {
-          serial {
-            sendGhosts();
-          }
+      when packGhostsDone() {
+        serial {
+          // When packing is done, we know that the new temperatures have been updated
+          // (because the host doesn't separately detect when the Jacobi kernel completes)
+          std::swap(d_temperature, d_new_temperature);
+          sendGhosts();
         }
       }
 
       for (remote_count = 0; remote_count < neighbors; remote_count++) {
         if (use_zerocopy) {
-          when receiveGhostsZC[my_iter](int ref, int dir, int w, nocopydevice double buf[w]) {
+          when receiveGhostsZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
             serial {
               processGhostsZC(dir, w, buf);
             }
           }
         } else {
-          when receiveGhostsReg[my_iter](int ref, int dir, int w, double buf[w]) {
+          when receiveGhostsReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
             serial {
               processGhostsReg(dir, w, buf);
             }
@@ -62,48 +68,19 @@ mainmodule jacobi2d {
         }
       }
 
-      // With device-side zerocopy in asynchronous mode, need to wait until
-      // ghost transfers are complete before updating the block
-      if (use_zerocopy && !sync_ver) {
-        for (remote_count = 0; remote_count < neighbors; remote_count++) {
-          when sendGhostDone() {
-            serial {}
-          }
-        }
-      }
-
       serial {
-        if (sync_ver) {
-          CkCallback cb(CkReductionTarget(Main, commDone), main_proxy);
-          contribute(cb);
+        if (sync_ver || my_iter <= warmup_iters) {
+          contribute(CkCallback(CkReductionTarget(Main, commDone), main_proxy));
         } else {
-          update();
-        }
-      }
-
-      when updateDone() {
-        serial {
-          // Swap pointers
-          std::swap(d_temperature, d_new_temperature);
-
-          // Iteration comoplete
-          if (sync_ver) {
-            my_iter++;
-            CkCallback cb(CkReductionTarget(Main, updateDone), main_proxy);
-            contribute(cb);
+          if (my_iter < warmup_iters + n_iters) {
+            thisProxy[thisIndex].exchangeGhosts();
           } else {
-            if (my_iter++ < n_iters) {
-              thisProxy[thisIndex].exchangeGhosts();
-            } else {
-              CkCallback cb(CkReductionTarget(Main, done), main_proxy);
-              contribute(cb);
-            }
+            contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
           }
         }
       }
     }
 
-    entry void update();
     entry void print();
   };
 };

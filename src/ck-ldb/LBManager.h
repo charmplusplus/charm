@@ -123,6 +123,15 @@ void LBDefaultCreate(LBCreateFn f);
 
 void LBRegisterBalancer(std::string, LBCreateFn, LBAllocFn, std::string, bool shown = true);
 
+template <typename T>
+void LBRegisterBalancer(std::string name, std::string description, bool shown = true)
+{
+  LBRegisterBalancer(
+      name, [](const CkLBOptions& opts) { T::proxy_t::ckNew(opts); },
+      []() -> BaseLB* { return new T(static_cast<CkMigrateMessage*>(nullptr)); },
+      description, shown);
+}
+
 void _LBMgrInit();
 
 // main chare
@@ -226,6 +235,7 @@ class LBManager : public CBase_LBManager
   ~LBManager()
   {
     if (avail_vector) delete[] avail_vector;
+    delete lbdb_obj;
   }
 
  private:
@@ -453,7 +463,6 @@ class LBManager : public CBase_LBManager
   }
   void RemoveLocalBarrierReceiver(LDBarrierReceiver h);
   void AtLocalBarrier(LDBarrierClient _n_c);
-  void DecreaseLocalBarrier(int c);
   void TurnOnBarrierReceiver(LDBarrierReceiver h);
   void TurnOffBarrierReceiver(LDBarrierReceiver h);
 
@@ -477,13 +486,13 @@ class LBManager : public CBase_LBManager
   int currentLBIndex;
 
  public:
-  CkVec<BaseLB*> loadbalancers;
+  std::vector<BaseLB*> loadbalancers;
 
   std::vector<StartLBCB*> startLBFnList;
   std::vector<MigrationDoneCB*> migrationDoneCBList;
 
  public:
-  BaseLB** getLoadBalancers() { return loadbalancers.getVec(); }
+  BaseLB** getLoadBalancers() { return loadbalancers.data(); }
   int getNLoadBalancers() { return loadbalancers.size(); }
 
  public:

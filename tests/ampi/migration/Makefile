@@ -21,8 +21,8 @@ test: migration
 	$(call run, ./migration +p1 +vp4 )
 	$(call run, ./migration +p1 +vp20 )
 	$(call run, ./migration +p2 +vp1 )
-	$(call run, ./migration +p2 +vp4 )
-	$(call run, ./migration +p2 +vp20 )
+	$(call run, ./migration +p2 +vp4 --test_mapfile +mapping MAPFILE )
+	$(call run, ./migration +p2 +vp20 --test_mapfile +mapping MAPFILE )
 
 testp: migration
 	$(call run, ./migration +p$(P) +vp$(P) )

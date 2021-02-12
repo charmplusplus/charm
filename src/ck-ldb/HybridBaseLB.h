@@ -305,7 +305,7 @@ public:
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ReceiveVectorMigration(LBVectorMigrateMsg *); // Receive migration data
   virtual void GetObjsToMigrate(int toPe, double load, LDStats *stats,
-      int atlevel, CkVec<LDCommData>& comms, CkVec<LDObjData>& objs);
+                                int atlevel, std::vector<LDCommData>& comms, std::vector<LDObjData>& objs);
   void CreateMigrationOutObjs(int atlevel, LDStats* stats, int objidx);
   void TotalObjMigrated(int count, int level);
 
@@ -313,7 +313,7 @@ public:
   void Migrated(int waitBarrier);
 
   void ObjMigrated(LDObjData data, LDCommData *cdata, int n, int level);
-  void ObjsMigrated(CkVec<LDObjData>&& data, int m, LDCommData *cdata, int n, int level);
+  void ObjsMigrated(std::vector<LDObjData>&& data, int m, LDCommData *cdata, int n, int level);
   void VectorDone(int atlevel);
   void MigrationDone(int balancing);  // Call when migration is complete
   void StatsDone(int level);  // Call when LDStats migration is complete
@@ -346,12 +346,42 @@ protected:
   virtual LBMigrateMsg* Strategy(LDStats* stats);
   virtual void work(LDStats* stats);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
-  // helper function
-  LBMigrateMsg * createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo, int count);
+
+  // Templated so it accepts both CkVec and std::vector, needed for NAMD support
+  // function used for any application that uses Strategy() instead of work()
+  template <template <typename...> class Container>
+  LBMigrateMsg* createMigrateMsg(Container<MigrateInfo*>& migrateInfo, int count)
+  {
+    const auto migrateCount =
+        migrateInfo.size() + levelData[currentLevel]->outObjs.size();
+    LBMigrateMsg* msg = new (migrateCount, 0, 0, 0) LBMigrateMsg;
+    msg->level = currentLevel;
+    msg->n_moves = migrateCount;
+
+    int i;
+    for (i = 0; i < migrateInfo.size(); i++)
+    {
+      const MigrateInfo* item = migrateInfo[i];
+      msg->moves[i] = *item;
+      delete item;
+      migrateInfo[i] = nullptr;
+    }
+
+    for (const auto& outObj : levelData[currentLevel]->outObjs)
+    {
+      MigrateInfo* item = &(msg->moves[i++]);
+      item->obj = outObj.handle;
+      item->from_pe = outObj.fromPe;
+      item->to_pe = -1;
+    }
+
+    return msg;
+  }
+
   virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats);
   void    printSummary(LDStats *stats, int count);
   void    initTree();
-  void collectCommData(int objIdx, CkVec<LDCommData> &comm, int atlevel);
+  void collectCommData(int objIdx, std::vector<LDCommData> &comm, int atlevel);
 
   // Not to be used -- maintained for legacy applications
   virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs) {
@@ -379,10 +409,10 @@ protected:
     int info_recved;		// for CollectInfo()
     int vector_expected, vector_completed;
     int resumeAfterMigration;
-    CkVec<MigrationRecord> outObjs;
-    //CkVec<Location> unmatchedObjs;
+    std::vector<MigrationRecord> outObjs;
+    //std::vector<Location> unmatchedObjs;
     std::map< LDObjKey, int >  unmatchedObjs;
-    CkVec<Location> matchedObjs;	 // don't need to be sent up
+    std::vector<Location> matchedObjs;	 // don't need to be sent up
   public:
     LevelData(): parent(-1), children(NULL), nChildren(0), 
                  statsMsgsList(NULL), stats_msg_count(0),
@@ -415,8 +445,8 @@ protected:
       vector_completed = 0;
       resumeAfterMigration = 0;
       if (statsData) statsData->clear();
-      outObjs.free();
-      matchedObjs.free();
+      outObjs.clear();
+      matchedObjs.clear();
       unmatchedObjs.clear();
     }
     int useMem() {
@@ -428,7 +458,7 @@ protected:
     }
   };
 
-  CkVec<LevelData *>  levelData;
+  std::vector<LevelData *>  levelData;
 
   int currentLevel;
 
@@ -454,7 +484,7 @@ private:
   double totalLoad;
   double maxMem;                    // on level = max - 1
 
-  CkVec<Location> newObjs;
+  std::vector<Location> newObjs;
 
   int vector_n_moves;
 };

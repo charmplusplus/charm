@@ -76,9 +76,6 @@ AMPI:  charm++
 
 AMPIC AMPIF: AMPI
 
-ARMCI: charm++ LIBS
-
-
 f90charm: charm++
 
 libcharm: charm++
@@ -126,20 +123,6 @@ translators: charmxi conv-cpm
 msa: charm++
 	$(MAKE) -C libs/ck-libs/multiphaseSharedArrays
 
-jade: charm++ msa
-#	make the lib, include
-	$(MAKE) -C langs/jade
-
-
-# This should be done offline, since the user does not need to compile
-# parser files, etc.  All they need is the libjade + include files,
-# antlr.jar, jade.jar, and a few scripts which the jade target takes
-# care of.
-#jadeall: jade
-#	make parser.g -> .java files
-#	$(MAKE) -C langs/jade p
-#	make the jade.jar file
-#	$(MAKE) -C ../java/charm/jade
 
 #include TAU defs
 TAU_MAKEFILE=Make.tau
@@ -211,7 +194,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
+	  ckcheckpoint.h ckmemcheckpoint.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
 	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
@@ -321,7 +304,6 @@ endif
 	./gathertree $(SRCBASE)/arch/util/proc_management        proc_management
 	./gathertree $(SRCBASE)/util                             .
 	./gathertree $(SRCBASE)/langs                            langs
-	./gathertree $(SRCBASE)/langs/jade                       langs/jade
 	./gathertree $(SRCBASE)/arch/common                      .
 	./gathertree $(SRCBASE)/arch/$(CMK_GDIR)                 .
 	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
@@ -686,7 +668,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o ckrdmadevice.o cksyncbarrier.o \
            waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
-	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o \
+	   ckcheckpoint.o ckmemcheckpoint.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o TreeLB.o HybridBaseLB.o DistBaseLB.o \
            ckgraph.o LButil.o RefinerTemp.o Refiner.o \
@@ -771,7 +753,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   LBMachineUtil.h LBManager.decl.h MetaBalancer.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
   trace.h trace-simple.h \
   register.h trace-common.h trace-simpleBOC.h TraceSimple.decl.h \
   TraceSimple.def.h ckregex.h

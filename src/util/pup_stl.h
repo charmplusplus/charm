@@ -36,6 +36,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <string>
 #include <complex>
 #include <utility> /*for std::pair*/
+#include <chrono>
 #include "pup.h"
 
 #include <cstddef>
@@ -130,6 +131,7 @@ namespace PUP {
     p|nChar;
     if (p.isUnpacking()) { //Unpack to temporary buffer
       char *buf=new char[nChar];
+      CmiEnforce(buf != nullptr);
       p(buf,nChar);
       v=std::basic_string<char>(buf,nChar);
       delete[] buf;
@@ -516,7 +518,12 @@ using Requires = typename requires_impl<
   inline void pup(PUP::er &p, std::shared_ptr<T> &t) {
     PUP::able* _ = (p.isUnpacking()) ? nullptr : t.get();
     p(&_);
-    if (p.isUnpacking()) { t.reset(dynamic_cast<T*>(_)); }
+    if (p.isUnpacking()) {
+      // the shared ptr must be created with the original PUP::able ptr
+      // otherwise the dynamic cast can lead to invalid free's
+      // (it changes the pointer's address)
+      t = std::dynamic_pointer_cast<T>(std::shared_ptr<PUP::able>(_));
+    }
   }
 
   template <typename T>
@@ -664,6 +671,49 @@ using Requires = typename requires_impl<
     pup(p,engine);
   }
 
+  template <class Rep, class Period>
+  inline void pup(PUP::er& p, std::chrono::duration<Rep, Period>& duration)
+  {
+    Rep count;
+    if (p.isUnpacking())
+    {
+      p | count;
+      duration = std::chrono::duration<Rep, Period>(count);
+    }
+    else
+    {
+      count = duration.count();
+      p | count;
+    }
+  }
+
+  template <class Rep, class Period>
+  inline void operator|(PUP::er& p, std::chrono::duration<Rep, Period>& duration)
+  {
+    pup(p, duration);
+  }
+
+  template <class Clock, class Duration>
+  inline void pup(PUP::er& p, std::chrono::time_point<Clock, Duration>& tp)
+  {
+    Duration sinceEpoch;
+    if (p.isUnpacking())
+    {
+      p | sinceEpoch;
+      tp = std::chrono::duration<Clock, Duration>(sinceEpoch);
+    }
+    else
+    {
+      sinceEpoch = tp.time_since_epoch();
+      p | sinceEpoch;
+    }
+  }
+
+  template <class Clock, class Duration>
+  inline void operator|(PUP::er& p, std::chrono::time_point<Clock, Duration>& tp)
+  {
+    pup(p, tp);
+  }
 } // end of namespace PUP
 
 #endif

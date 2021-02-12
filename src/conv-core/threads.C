@@ -148,14 +148,6 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW;
 #define CthDebug(...)  //CmiPrintf(__VA_ARGS__)
 
   /**************************** Shared Base Thread Class ***********************/
-  /*
-     CMK_FAULT_EVAC
-     Moved the cmicore converse header from CthThreadBase to CthThreadToken.
-     The CthThreadToken gets enqueued in the converse queue instead of the
-     CthThread. This allows the thread to be moved out of a processor even
-     if there is an awaken call for it enqueued in the scheduler
-
-*/
 
 #define THD_MAGIC_NUM 0x12345678
 
@@ -457,6 +449,7 @@ static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratab
   th->stacksize=*stackSize;
   if (!useMigratable || !CmiIsomallocEnabled()) {
     ret=malloc(*stackSize); 
+    CmiEnforce(ret != nullptr);
   } else {
     th->isMigratable = useMigratable;
 #if CMK_THREADS_ALIAS_STACK

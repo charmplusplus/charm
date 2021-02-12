@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #Typical load balancers
-COMMON_LDBS="TreeLB DistributedLB"
+COMMON_LDBS="TreeLB DistributedLB MetisLB RecBipartLB"
 #Load balancers for more specialized circumstances
-SPECIALIZED_LDBS="MetisLB RecBipartLB"
+SPECIALIZED_LDBS=""
 #Load balanders which have an external dependency, or require some other kind of intervention
 UNCOMMON_LDBS="ScotchLB TempAwareRefineLB"
 

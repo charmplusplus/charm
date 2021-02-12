@@ -7,6 +7,7 @@
 #include <stdlib.h> // for size_t
 #include <string.h> // for memcpy
 #include <vector>
+#include <limits>
 
 //"Documentation" class: prevents people from using copy constructors 
 struct CkNoncopyable {
@@ -656,13 +657,14 @@ public:
 template <class T>
 class CkCompactVec : private CkSTLHelper<T> {
     typedef CkVec<T> this_type;
+    static constexpr size_t sentinel = std::numeric_limits<size_t>::max();
 
     T *block; //Elements of vector
     size_t blklen; //Allocated size of block (STL capacity) 
     size_t len; // total number of used elements in block, including ones before offset
     size_t offset;      // global seqno of the first element in the block
     size_t lastnull;    // the array index of the biggest consecutive NULLs
-    void makeBlock(int blklen_,int len_,int offset_=0,int lastnull_=-1) {
+    void makeBlock(int blklen_,int len_,int offset_=0,int lastnull_=sentinel) {
        if (blklen_==0) block=NULL; //< saves 1-byte allocations
        else {
          block=new T[blklen_];
@@ -675,14 +677,14 @@ class CkCompactVec : private CkSTLHelper<T> {
        len=0; blklen=0;
        delete[] block; 
        block=NULL;
-       offset=0; lastnull=-1;
+       offset=0; lastnull=sentinel;
     }
     void copyFrom(const this_type &src) {
        makeBlock(src.blklen, src.len, src.offset, src.lastnull);
        elementCopy(block,src.block,blklen);
     }
   public:
-    CkCompactVec(): block(NULL), blklen(0), len(0), offset(0), lastnull(-1) {}
+    CkCompactVec(): block(NULL), blklen(0), len(0), offset(0), lastnull(sentinel) {}
     ~CkCompactVec() { freeBlock(); }
     CkCompactVec(const this_type &src) {copyFrom(src);}
     CkCompactVec(int size) { makeBlock(size,size); } 
@@ -717,7 +719,7 @@ class CkCompactVec : private CkSTLHelper<T> {
       //if (newcapacity-offset-lastnull != blklen) return 0;
       elementCopy(block,oldBlock+lastnull+1,len-offset-lastnull-1);
       offset+=lastnull+1;   
-      lastnull=-1;
+      lastnull=sentinel;
       delete[] oldBlock; //WARNING: leaks if element copy throws exception
       return 1;
     }
@@ -749,7 +751,7 @@ class CkCompactVec : private CkSTLHelper<T> {
     void shrink() {
       for (size_t i=offset+lastnull+1; i<len; i++)
         block[i-offset-lastnull-1] = block[i-offset];
-      offset+=lastnull+1; lastnull=-1;
+      offset+=lastnull+1; lastnull=sentinel;
       //printf("shrink: len:%d offset:%d  blklen:%d\n", len, offset, blklen);
     }
     void remove(size_t pos) {
@@ -767,7 +769,7 @@ class CkCompactVec : private CkSTLHelper<T> {
           block[i-offset-lastnull-1] = block[i-offset];
         for (size_t i=pos; i<len-1; i++)
           block[i-offset-lastnull-1] = block[i-offset+1];
-        offset+=lastnull+1; lastnull=-1;
+        offset+=lastnull+1; lastnull=sentinel;
       }
       else {
       for (size_t i=pos; i<len-1; i++)
@@ -783,7 +785,7 @@ class CkCompactVec : private CkSTLHelper<T> {
     }
     void removeAll() {
       len = 0;
-      offset=0; lastnull=-1;
+      offset=0; lastnull=sentinel;
     }
 
     void clear()

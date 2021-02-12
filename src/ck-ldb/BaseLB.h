@@ -87,14 +87,12 @@ public:
     int count;			// number of processors in the array "procs"
     ProcStats *procs;		// processor statistics
 
-    int n_objs;			// total number of objects in the vector "objData"
     int n_migrateobjs;		// total number of migratable objects
-    CkVec<LDObjData> objData;	// LDObjData and LDCommData defined in lbdb.h
-    CkVec<int> from_proc;	// current pe an object is on
-    CkVec<int> to_proc;		// new pe you want the object to be on
+    std::vector<LDObjData> objData;	// LDObjData and LDCommData defined in lbdb.h
+    std::vector<int> from_proc;	// current pe an object is on
+    std::vector<int> to_proc;		// new pe you want the object to be on
 
-    int n_comm;			// number of edges in the vector "commData"
-    CkVec<LDCommData> commData;	// communication data - edge list representation
+    std::vector<LDCommData> commData;	// communication data - edge list representation
 				// of the communication between objects
 
     int *objHash;		// this a map from the hash for the 4 integer
@@ -126,11 +124,11 @@ public:
     int getRecvHash(LDCommData &cData);
     void clearCommHash();
     void clear() {
-      n_objs = n_migrateobjs = n_comm = 0;
-      objData.free();
-      commData.free();
-      from_proc.free();
-      to_proc.free();
+      n_migrateobjs = 0;
+      objData.clear();
+      commData.clear();
+      from_proc.clear();
+      to_proc.clear();
       deleteCommHash();
     }
     void clearBgLoad() {
@@ -269,37 +267,32 @@ public:
   LBVectorMigrateMsg(): level(0), n_moves(0) {}
 };
 
-// for a FooLB, the following macro defines these functions for each LB:
+// Deprecated, left around to support external custom load balancers
+// Internal load balancers should define lbinit directly and use LBRegisterBalancer<T>
+//
+// For a FooLB, the following macro defines these functions for each LB:
 // CreateFooLB():        create BOC and register with LBManager with a
 //                       sequence ticket,
 // AllocateFooLB():      allocate the class instead of a BOC
 // static void lbinit(): an init call for charm module registration
 #if CMK_LBDB_ON
 
-#define CreateLBFunc_Def(x, str)		\
-void Create##x(const CkLBOptions& opts) { 	\
-  CProxy_##x::ckNew(opts); 	\
-}	\
-\
-BaseLB *Allocate##x(void) { \
-  return new x((CkMigrateMessage*)NULL);	\
-}	\
-\
-static void lbinit(void) {	\
-  LBRegisterBalancer(#x,	\
-                     Create##x,	\
-                     Allocate##x,	\
-                     str);	\
-}
+#  define CreateLBFunc_Def(x, str)                                                       \
+    CMK_DEPRECATED_MSG("Use LBRegisterBalancer() instead of CreateLBFunc_Def()")         \
+    void Create##x(const CkLBOptions& opts) { CProxy_##x::ckNew(opts); }                 \
+    CMK_DEPRECATED_MSG("Use LBRegisterBalancer() instead of CreateLBFunc_Def()")         \
+    BaseLB* Allocate##x(void) { return new x(static_cast<CkMigrateMessage*>(nullptr)); } \
+    CMK_DEPRECATED_MSG("Use LBRegisterBalancer() instead of CreateLBFunc_Def()")         \
+    static void lbinit(void) { LBRegisterBalancer(#x, Create##x, Allocate##x, str); }
 
-#else		/* CMK_LBDB_ON */
+#else /* CMK_LBDB_ON */
 
-#define CreateLBFunc_Def(x, str)	\
-void Create##x(void) {} 	\
-BaseLB *Allocate##x(void) { return NULL; }	\
-static void lbinit(void) {}
+#  define CreateLBFunc_Def(x, str)                \
+    void Create##x(void) {}                       \
+    BaseLB* Allocate##x(void) { return nullptr; } \
+    static void lbinit(void) {}
 
-#endif		/* CMK_LBDB_ON */
+#endif /* CMK_LBDB_ON */
 
 #endif
 

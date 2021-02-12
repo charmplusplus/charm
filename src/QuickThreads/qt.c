@@ -42,14 +42,14 @@ void _qt_null (void)
 {
 }
 
+extern void abort(void);
+
 void qt_error (void)
 {
-  extern void abort(void);
   abort();
 }
 
 void _qt_error (void)
 {
-  extern void abort(void);
   abort();
 }

@@ -21,19 +21,8 @@ namespace TreeStrategy
   STRATEGY(Dummy, false)           \
   STRATEGY(Rotate, false)
 
-std::string getLBNamesString()
-{
-  // Eat the second parameter, it's needed for registration below
-#define STRINGIFYLB(_name, _) (#_name),
-  static const auto LBNames = {FOREACH_STRATEGY(STRINGIFYLB)};
-
-  std::ostringstream output;
-  for (const auto& name : LBNames)
-  {
-    output << "\n\t" << name;
-  }
-  return output.str();
-}
+#define STRINGIFYLB(_name, _) #_name,
+const auto LBNames = {FOREACH_STRATEGY(STRINGIFYLB)};
 
 class Factory
 {
@@ -50,7 +39,8 @@ public:
 #define LBNEEDS_CONFIG_true config
 #define LBNEEDS_CONFIG_false
 
-#define REGISTERLB(_name, _config) if (name == (#_name)) return new _name<O, P, S>(LBNEEDS_CONFIG(_config));
+#define REGISTERLB(_name, _config) \
+  if (name == (#_name)) return new _name<O, P, S>(LBNEEDS_CONFIG(_config));
     FOREACH_STRATEGY(REGISTERLB);
 
     std::string error_msg("Unrecognized strategy ");

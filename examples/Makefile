@@ -7,7 +7,6 @@ DIRS = \
   charm++ \
   converse \
   ampi \
-  armci \
   collide \
 
 TESTDIRS = $(DIRS)
