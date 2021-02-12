@@ -6,7 +6,7 @@
 
 #ifndef CK_BI_CONFIG
 #define CK_BI_CONFIG
-#ifdef CMK_BALANCED_INJECTION_API
+#if defined CMK_BALANCED_INJECTION_API && CMK_BALANCED_INJECTION_API
 #include <stdint.h>
 #include <gni_pub.h>
 
