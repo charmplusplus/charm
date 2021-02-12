@@ -81,13 +81,11 @@ CmiIdleLock_checkMessage
 #include "machine-smp.h"
 #include "sockRoutines.h"
 
-#if defined(__has_include)
-#  if __has_include(<barrier>)
-#    include <barrier>
-#  endif
+#if CMK_AMD64
+#  include <immintrin.h>
 #endif
-#include <mutex>
-#include <condition_variable>
+#include <atomic>
+#include <thread>
 
 void CmiStateInit(int pe, int rank, CmiState state);
 void CommunicationServerInit(void);
@@ -514,48 +512,101 @@ static void CmiDestroyLocks(void)
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
 
-#if __cpp_lib_barrier
+class Barrier
+{
+private:
+  std::atomic<bool> curSense;
+  std::atomic<unsigned int> curCount;
+  const unsigned int barrierCount;
 
-using Barrier = std::barrier;
+  void pause() const
+  {
+#  if CMK_AMD64
+    // From the Intel intrinsics guide: "Provide a hint to the processor that the code
+    // sequence is a spin-wait loop. This can help improve the performance and power
+    // consumption of spin-wait loops."
+    // Accomplishes two things: 1.) Relinquishes resources, saving power and improving the
+    // performance of other threads 2.) Prevents a false memory order violation from being
+    // detected when the barrier is reached, causing a flush penalty.
+    // Note: While this usually takes from 0 to a low double digits number of cycles, it
+    // can take up to 140 cycles (on Skylake), so it can be costly.
+    _mm_pause();  // MSVC's support for assembly is iffy, so use intrinsic
+#  elif CMK_ARM
+    // Notifies the hardware that the current task can be swapped out, recommended for use
+    // when spinning by ARM.
+    // https://developer.arm.com/documentation/dui0489/i/arm-and-thumb-instructions/yield?lang=en
+    asm volatile("yield");
+#  else
+    // For other platforms, do nothing.
+#  endif
+  }
 
-#else
+  template <size_t N>
+  void repeat_pause() const
+  {
+    pause();
+    repeat_pause<N - 1>();
+  }
 
-class Barrier {
+  template <>
+  void repeat_pause<0>() const {}
+
 public:
   Barrier(const Barrier&) = delete;
   Barrier& operator=(const Barrier&) = delete;
 
-  explicit Barrier(unsigned int count) :
-    curCount(count), barrierCount(count), curSense(true) {
+  explicit Barrier(unsigned int count)
+      : curCount(count), barrierCount(count), curSense(true)
+  {
   }
 
-  void arrive_and_wait() {
-    std::unique_lock<std::mutex> lock(barrierMutex);
+  void arrive_and_wait()
+  {
     const bool sense = curSense;
 
-    curCount--;
-
-    if (curCount == 0) {
-      curSense = !curSense;
+    // If we're last, reset the count and flip the sense
+    if (--curCount == 0)
+    {
       curCount = barrierCount;
-      barrierCond.notify_all();
+      curSense = !curSense;
       return;
     }
 
-    while (sense == curSense) {
-      barrierCond.wait(lock);
+    // Otherwise we're not the last, so start the progressive spin sequence:
+    // Define how many iterations to spend in each phase. These are arbitrary constants,
+    // they can be tuned for performance, but this should be generally alright.
+    constexpr auto spinIters = 5, pauseIters = 10, yieldIters = 1000;
+
+    // Straight up spin at first.
+    for (int i = 0; i < spinIters; i++)
+    {
+      if (sense != curSense)
+        return;
+    }
+
+    // If that's taking too long, then start pausing during each spin.
+    for (int i = 0; i < pauseIters; i++)
+    {
+      if (sense != curSense)
+        return;
+      pause();
+    }
+
+    // If we're still in the barrier, then it's time to lay off a bit
+    // and start yielding this thread at the OS level. Without this,
+    // oversubscribed scenarios become extremely costly.
+    while (true)
+    {
+      for (int i = 0; i < yieldIters; i++)
+      {
+        if (sense != curSense)
+          return;
+        repeat_pause<10>();
+      }
+      std::this_thread::yield();
     }
   }
-
-private:
-  std::mutex barrierMutex;
-  std::condition_variable barrierCond;
-  bool curSense;
-  unsigned int curCount;
-  const unsigned int barrierCount;
 };
-
-#endif
 
 /* Wait for all worker threads */
 void CmiNodeBarrier(void) {
