@@ -525,13 +525,15 @@ public:
 
   void arrive_and_wait()
   {
-    const bool sense = curSense;
+    const bool sense = curSense.load(std::memory_order_relaxed);
 
-    // If we're last, reset the count and flip the sense
-    if (--curCount == 0)
+    // If we're last, reset the count and flip the sense.
+    // Using acq_rel here effectively makes this read-modify-write a fence.
+    // Note: we compare against 1 because fetch_sub returns the previous value.
+    if (curCount.fetch_sub(1, std::memory_order_acq_rel) == 1)
     {
-      curCount = barrierCount;
-      curSense = !curSense;
+      curCount.store(barrierCount, std::memory_order_relaxed);
+      curSense.store(!sense, std::memory_order_release);
       return;
     }
 
@@ -543,14 +545,14 @@ public:
     // Straight up spin at first.
     for (int i = 0; i < spinIters; i++)
     {
-      if (sense != curSense)
+      if (sense != curSense.load(std::memory_order_acquire))
         return;
     }
 
     // If that's taking too long, then start pausing during each spin.
     for (int i = 0; i < pauseIters; i++)
     {
-      if (sense != curSense)
+      if (sense != curSense.load(std::memory_order_acquire))
         return;
       pause();
     }
@@ -562,7 +564,7 @@ public:
     {
       for (int i = 0; i < yieldIters; i++)
       {
-        if (sense != curSense)
+        if (sense != curSense.load(std::memory_order_acquire))
           return;
         repeat_pause<10>();
       }
