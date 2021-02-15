@@ -575,7 +575,7 @@ private:
   alignas(CMI_CACHE_LINE_SIZE) std::atomic<unsigned int> curCount;
   const unsigned int barrierCount;
 
-  void pause() const
+  CMI_FORCE_INLINE static void pause()
   {
 #  if CMK_AMD64
     // From the Intel intrinsics guide: "Provide a hint to the processor that the code
@@ -597,8 +597,11 @@ private:
 #  endif
   }
 
+  // This template rigmarole is to ensure that the compiler generates a sequences of
+  // pauses without anything else in between, using a regular loop doesn't do that on icc,
+  // for example
   template <size_t N>
-  void repeat_pause() const
+  CMI_FORCE_INLINE static void repeat_pause()
   {
     pause();
     repeat_pause<N - 1>();
@@ -606,7 +609,7 @@ private:
 };
 
 template <>
-void Barrier::repeat_pause<0>() const
+CMI_FORCE_INLINE void Barrier::repeat_pause<0>()
 {
 }
 
