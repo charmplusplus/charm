@@ -534,14 +534,14 @@ public:
     {
       curCount.store(barrierCount, std::memory_order_relaxed);
       curSense.store(!sense, std::memory_order_release);
-#  if __cpp_lib_atomic_wait
+#  ifdef __cpp_lib_atomic_wait
       curSense.notify_all();
 #  endif
       return;
     }
 
     // Use C++20's atomic wait/notify if it's available
-#  if __cpp_lib_atomic_wait
+#  ifdef __cpp_lib_atomic_wait
     // Waits while sense == curSense, cannot return spuriously, so no need for extra check
     curSense.wait(sense, std::memory_order_acquire);
 #  else
