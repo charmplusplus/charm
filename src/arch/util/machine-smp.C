@@ -543,7 +543,7 @@ public:
     // Straight up spin at first.
     for (int i = 0; i < spinIters; i++)
     {
-      if (sense != curSense.load(std::memory_order_acquire))
+      if (sense != curSense)
         return;
     }
 
