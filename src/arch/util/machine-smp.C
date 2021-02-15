@@ -534,9 +534,17 @@ public:
     {
       curCount.store(barrierCount, std::memory_order_relaxed);
       curSense.store(!sense, std::memory_order_release);
+#  if __cpp_lib_atomic_wait
+      curSense.notify_all();
+#  endif
       return;
     }
 
+    // Use C++20's atomic wait/notify if it's available
+#  if __cpp_lib_atomic_wait
+    // Waits while sense == curSense, cannot return spuriously, so no need for extra check
+    curSense.wait(sense, std::memory_order_acquire);
+#  else
     // Otherwise we're not the last, so start the progressive spin sequence:
     // Define how many iterations to spend in each phase. These are arbitrary constants,
     // they can be tuned for performance, but this should be generally alright.
@@ -570,6 +578,7 @@ public:
       }
       std::this_thread::yield();
     }
+#  endif
   }
 
 private:
