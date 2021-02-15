@@ -514,9 +514,65 @@ static void CmiDestroyLocks(void)
 
 class Barrier
 {
+public:
+  Barrier(const Barrier&) = delete;
+  Barrier& operator=(const Barrier&) = delete;
+
+  explicit Barrier(unsigned int count)
+      : curCount(count), barrierCount(count), curSense(true)
+  {
+  }
+
+  void arrive_and_wait()
+  {
+    const bool sense = curSense;
+
+    // If we're last, reset the count and flip the sense
+    if (--curCount == 0)
+    {
+      curCount = barrierCount;
+      curSense = !curSense;
+      return;
+    }
+
+    // Otherwise we're not the last, so start the progressive spin sequence:
+    // Define how many iterations to spend in each phase. These are arbitrary constants,
+    // they can be tuned for performance, but this should be generally alright.
+    constexpr auto spinIters = 5, pauseIters = 10, yieldIters = 1000;
+
+    // Straight up spin at first.
+    for (int i = 0; i < spinIters; i++)
+    {
+      if (sense != curSense.load(std::memory_order_acquire))
+        return;
+    }
+
+    // If that's taking too long, then start pausing during each spin.
+    for (int i = 0; i < pauseIters; i++)
+    {
+      if (sense != curSense)
+        return;
+      pause();
+    }
+
+    // If we're still in the barrier, then it's time to lay off a bit
+    // and start yielding this thread at the OS level. Without this,
+    // oversubscribed scenarios become extremely costly.
+    while (true)
+    {
+      for (int i = 0; i < yieldIters; i++)
+      {
+        if (sense != curSense)
+          return;
+        repeat_pause<10>();
+      }
+      std::this_thread::yield();
+    }
+  }
+
 private:
-  std::atomic<bool> curSense;
-  std::atomic<unsigned int> curCount;
+  alignas(CMI_CACHE_LINE_SIZE) std::atomic<bool> curSense;
+  alignas(CMI_CACHE_LINE_SIZE) std::atomic<unsigned int> curCount;
   const unsigned int barrierCount;
 
   void pause() const
@@ -547,66 +603,12 @@ private:
     pause();
     repeat_pause<N - 1>();
   }
-
-  template <>
-  void repeat_pause<0>() const {}
-
-public:
-  Barrier(const Barrier&) = delete;
-  Barrier& operator=(const Barrier&) = delete;
-
-  explicit Barrier(unsigned int count)
-      : curCount(count), barrierCount(count), curSense(true)
-  {
-  }
-
-  void arrive_and_wait()
-  {
-    const bool sense = curSense;
-
-    // If we're last, reset the count and flip the sense
-    if (--curCount == 0)
-    {
-      curCount = barrierCount;
-      curSense = !curSense;
-      return;
-    }
-
-    // Otherwise we're not the last, so start the progressive spin sequence:
-    // Define how many iterations to spend in each phase. These are arbitrary constants,
-    // they can be tuned for performance, but this should be generally alright.
-    constexpr auto spinIters = 5, pauseIters = 10, yieldIters = 1000;
-
-    // Straight up spin at first.
-    for (int i = 0; i < spinIters; i++)
-    {
-      if (sense != curSense)
-        return;
-    }
-
-    // If that's taking too long, then start pausing during each spin.
-    for (int i = 0; i < pauseIters; i++)
-    {
-      if (sense != curSense)
-        return;
-      pause();
-    }
-
-    // If we're still in the barrier, then it's time to lay off a bit
-    // and start yielding this thread at the OS level. Without this,
-    // oversubscribed scenarios become extremely costly.
-    while (true)
-    {
-      for (int i = 0; i < yieldIters; i++)
-      {
-        if (sense != curSense)
-          return;
-        repeat_pause<10>();
-      }
-      std::this_thread::yield();
-    }
-  }
 };
+
+template <>
+void Barrier::repeat_pause<0>() const
+{
+}
 
 /* Wait for all worker threads */
 void CmiNodeBarrier(void) {
