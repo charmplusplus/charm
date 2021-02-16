@@ -457,7 +457,7 @@ static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratab
     ret=CMK_THREADS_ALIAS_LOCATION;
 #else /* isomalloc */
     th->isomallocContext = ctx;
-    ret = CmiIsomallocContextMallocAlign(th->isomallocContext, 16, *stackSize);
+    ret = CmiIsomallocContextPermanentAllocAlign(th->isomallocContext, 16, *stackSize);
 #endif
   }
   _MEMCHECK(ret);
@@ -493,24 +493,16 @@ static void CthThreadBaseFree(CthThreadBase *th)
 
 #if CMK_THREADS_BUILD_TLS
   void * tlsptr = CmiTLSGetBuffer(&th->tlsseg);
-  if (th->isMigratable)
-  {
-    if (th->isomallocContext.opaque != nullptr)
-      CmiIsomallocContextFree(th->isomallocContext, tlsptr);
-  }
-  else
+  if (!th->isMigratable)
     CmiAlignedFree(tlsptr);
+  // else is handled by CmiIsomallocContextDelete
 #endif
 
 #if CMI_SWAPGLOBALS
   void * globalptr = th->threadGlobals.data_seg;
-  if (th->isMigratable)
-  {
-    if (th->isomallocContext.opaque != nullptr)
-      CmiIsomallocContextFree(th->isomallocContext, globalptr);
-  }
-  else
+  if (!th->isMigratable)
     free(globalptr);
+  // else is handled by CmiIsomallocContextDelete
 #endif
 
   if (th->isMigratable) {
@@ -614,7 +606,7 @@ static void CthInterceptionsCreate(CthThread th)
   {
     void * globalptr;
     if (base->isMigratable)
-      globalptr = CmiIsomallocContextMalloc(base->isomallocContext, globalsize);
+      globalptr = CmiIsomallocContextPermanentAlloc(base->isomallocContext, globalsize);
     else
       globalptr = malloc(globalsize);
     base->threadGlobals = CtgCreate(globalptr);
@@ -631,7 +623,7 @@ static void CthInterceptionsCreate(CthThread th)
   {
     void * tlsptr;
     if (base->isMigratable)
-      tlsptr = CmiIsomallocContextMallocAlign(base->isomallocContext, tlsdesc.align, tlsdesc.size);
+      tlsptr = CmiIsomallocContextPermanentAllocAlign(base->isomallocContext, tlsdesc.align, tlsdesc.size);
     else
       tlsptr = CmiAlignedAlloc(tlsdesc.align, tlsdesc.size);
     CmiTLSCreateSegUsingPtr(&CpvAccess(Cth_PE_TLS), &base->tlsseg, tlsptr);
