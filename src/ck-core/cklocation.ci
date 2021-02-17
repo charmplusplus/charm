@@ -46,6 +46,10 @@ module CkLocation {
     entry ReadFileMap(void);
   };
 
+  group [migratable] Simple1DFileMap : DefaultArrayMap {
+    entry Simple1DFileMap(void);
+  };
+
   group [migratable] BlockMap : DefaultArrayMap {
     entry BlockMap(void);
   };
