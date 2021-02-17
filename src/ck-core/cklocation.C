@@ -1166,6 +1166,72 @@ public:
   }
 };
 
+/**
+ * This map can be used for a simple (non-topology-aware) mapping of a 1D array when the
+ * mapping is provided through a file
+ */
+class Simple1DFileMap : public DefaultArrayMap
+{
+private:
+  std::vector<int> mapping;
+
+public:
+  Simple1DFileMap(void) {
+    DEBC((AA "Creating Simple1DFileMap\n" AB));
+  }
+
+  Simple1DFileMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
+
+  int registerArray(const CkArrayIndex& numElements, CkArrayID aid)
+  {
+    int idx = DefaultArrayMap::registerArray(numElements, aid);
+
+    if(mapping.size() == 0) {
+      int numChares;
+
+      if (amaps[idx]->_nelems.dimension == 1) {
+        numChares = amaps[idx]->_nelems.data()[0];
+      } else {
+        CkAbort("CkArrayIndex has more than 1 dimension for a Simple1DFileMap!");
+      }
+
+      mapping.resize(numChares);
+      FILE *mapf = fopen("mapfile", "r");
+      if (mapf == NULL) {
+        CkAbort("Simple1DFileMap failed to open file named 'mapfile'!");
+      }
+      int pe;
+
+      for(int i=0; i<numChares; i++) {
+        if (fscanf(mapf, "%d\n", &pe) != 1) {
+          CkAbort("Simple1DFileMap> reading from mapfile failed! Expected one int per line, one line per chare array element...");
+        }
+        mapping[i] = pe;
+      }
+      fclose(mapf);
+    }
+
+    return idx;
+  }
+
+  int procNum(int arrayHdl, const CkArrayIndex &i) {
+    int flati;
+
+    if (i.dimension == 1) {
+      flati = i.data()[0];
+    } else {
+      CkAbort("CkArrayIndex has more than 1 dimension for a 1D map!");
+    }
+
+    return mapping[flati];
+  }
+
+  void pup(PUP::er& p){
+    DefaultArrayMap::pup(p);
+    p|mapping;
+  }
+};
+
 // This is currently  here for backwards compatibility
 class BlockMap : public DefaultArrayMap
 {

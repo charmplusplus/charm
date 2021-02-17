@@ -190,6 +190,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     } else {
       CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
       tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
+      CmiIsomallocContextEnableRandomAccess(heapContext);
     }
   }
   CtvAccessOther(tid,_curTCharm)=this;
@@ -468,6 +469,11 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::allow_migrate()
 void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
+
+  CthThread th = getThread();
+  auto ctx = CmiIsomallocGetThreadContext(th);
+  CmiIsomallocContextJustMigrated(ctx);
+
   if (resumeAfterMigrationCallback.isInvalid())
     start();
   else
@@ -653,6 +659,10 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"MAPFILE")) {
     CkPrintf("TCharm> reading map from mapfile\n");
+    mapID = CProxy_Simple1DFileMap::ckNew();
+    opts.setMap(mapID);
+  } else if(0 == strcmp(mapping,"TOPO_MAPFILE")) {
+    CkPrintf("TCharm> reading topo map from mapfile\n");
     mapID = CProxy_ReadFileMap::ckNew();
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"PROP_MAP")) {
