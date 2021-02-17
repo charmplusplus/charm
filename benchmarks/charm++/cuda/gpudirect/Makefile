@@ -1,6 +1,7 @@
 DIRS = \
   latency \
   bandwidth \
+  latency-tag \
 
 TESTDIRS = $(DIRS)
 

@@ -711,4 +711,24 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   */
 }
 
+void CkTagSend(const void* ptr, size_t size, const CProxyElement_Group& grp, int tag, const CkCallback& cb) {
+  CkCallback* cb_copy = new CkCallback(cb);
+
+  // TODO: Support more than groups
+  int dest_pe = grp.ckGetGroupPe();
+
+  CmiTagSend(ptr, size, dest_pe, tag, cb_copy);
+}
+
+void CkTagRecv(const void* ptr, size_t size, int tag, const CkCallback& cb) {
+  CkCallback* cb_copy = new CkCallback(cb);
+
+  CmiTagRecv(ptr, size, tag, cb_copy);
+}
+
+void CkRdmaTagHandler(void* cb) {
+  static_cast<CkCallback*>(cb)->send();
+  delete static_cast<CkCallback*>(cb);
+}
+
 #endif // CMK_CUDA

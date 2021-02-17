@@ -87,6 +87,7 @@ typedef struct UcxRequest
 #if CMK_CUDA
     DeviceRdmaOp*  device_op;
     DeviceRecvType type;
+    void*          cb;
 #endif
 } UcxRequest;
 
@@ -912,6 +913,85 @@ void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
   }
 #endif
 }
+
+void UcxTagSendCompleted(void* request, ucs_status_t status) {
+  CmiEnforce(status == UCS_OK);
+  UcxRequest* req = (UcxRequest*)request;
+
+  CmiInvokeTagHandler(req->cb);
+
+  UCX_REQUEST_FREE(req);
+}
+
+void UcxTagRecvCompleted(void* request, ucs_status_t status,
+                         ucp_tag_recv_info_t* info) {
+  UcxRequest* req = (UcxRequest*)request;
+
+  if (ucs_unlikely(status == UCS_ERR_CANCELED)) return;
+  CmiEnforce(status == UCS_OK);
+
+  if (req->msgBuf != NULL) {
+    // Invoke handler since data transfer is complete
+    CmiInvokeTagHandler(req->cb);
+    UCX_REQUEST_FREE(req);
+  } else {
+    // Request was completed immediately
+    // Handle recv in the caller
+    req->completed = 1;
+  }
+}
+
+void LrtsTagSend(const void* ptr, size_t size, int dest_pe, int tag, void* cb) {
+  uint64_t ucx_tag = ((uint64_t)tag << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_DEVICE;
+#if CMK_SMP
+  // TODO
+#else
+  ucs_status_ptr_t status_ptr;
+  status_ptr = ucp_tag_send_nb(ucxCtx.eps[CmiNodeOf(dest_pe)], (void*)ptr, size,
+                               ucp_dt_make_contig(1), ucx_tag,
+                               UcxTagSendCompleted);
+
+  if (!UCS_PTR_IS_PTR(status_ptr)) {
+    // Either send was complete or error
+    CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
+    CmiEnforce(UCS_PTR_STATUS(status_ptr) == UCS_OK);
+
+    // Send complete
+    CmiInvokeTagHandler(cb);
+  } else {
+    // Callback function will be invoked once send completes
+    UcxRequest* req = (UcxRequest*)status_ptr;
+    req->msgBuf = (void*)ptr;
+    req->cb = cb;
+  }
+#endif
+}
+
+void LrtsTagRecv(const void* ptr, size_t size, int tag, void* cb) {
+  uint64_t ucx_tag = ((uint64_t)tag << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_DEVICE;
+#if CMK_SMP
+  // TODO
+#else
+  ucs_status_ptr_t status_ptr;
+  status_ptr = ucp_tag_recv_nb(ucxCtx.worker, (void*)ptr, size,
+                               ucp_dt_make_contig(1), ucx_tag,
+                               UCX_MSG_TAG_MASK_FULL, UcxTagRecvCompleted);
+  CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
+
+  UcxRequest* req = (UcxRequest*)status_ptr;
+  if (req->completed) {
+    // Recv was completed immediately
+    CmiInvokeTagHandler(cb);
+    UCX_REQUEST_FREE(req);
+  } else {
+    // Recv wasn't completed immediately, recv_cb will be invoked
+    // sometime later
+    req->msgBuf = (void*)ptr;
+    req->cb = cb;
+  }
+#endif
+}
+
 #endif // CMK_CUDA
 
 #if CMK_ONESIDED_IMPL

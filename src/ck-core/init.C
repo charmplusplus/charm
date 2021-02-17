@@ -1449,6 +1449,7 @@ void _initCharm(int unused_argc, char **argv)
 #else
   CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler, CkRdmaDeviceAmpiRecvHandler);
 #endif // CMK_CHARM4PY
+  CmiRdmaTagHandlerInit(CkRdmaTagHandler);
 #endif // CMK_CUDA
 
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api

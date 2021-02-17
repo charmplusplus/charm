@@ -108,6 +108,11 @@ void CmiInvokeAmpiRecvHandler(void* data);
 void CmiInvokeExtRecvHandler(void* data);
 #endif
 
+void CmiTagSend(const void* ptr, size_t size, int dest_pe, int tag, void* cb);
+void CmiTagRecv(const void* ptr, size_t size, int tag, void* cb);
+void CmiRdmaTagHandlerInit(RdmaAckCallerFn fn);
+void CmiInvokeTagHandler(void* cb);
+
 #endif // CMK_CUDA
 
 #endif // _CONV_RDMADEVICE_H_
