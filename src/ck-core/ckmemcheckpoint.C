@@ -1064,7 +1064,7 @@ void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUI
 
   for (int i=0; i<n; i++) {
     CkLocMgr *mgr = CProxy_CkLocMgr(g[i]).ckLocalBranch();
-    mgr->updateLocation(idx[i], id[i], nowOnPe);
+    //mgr->updateLocation(idx[i], id[i], nowOnPe);
   }
 	thisProxy[nowOnPe].gotReply();
 }

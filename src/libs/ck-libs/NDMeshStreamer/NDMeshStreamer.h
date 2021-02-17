@@ -1295,7 +1295,7 @@ public:
 
   void resendMisdeliveredItems(CkArrayIndex arrayId, int destinationPe) {
 
-    clientLocMgr_->updateLocation(arrayId, clientLocMgr_->lookupID(arrayId),destinationPe);
+    //clientLocMgr_->updateLocation(arrayId, clientLocMgr_->lookupID(arrayId),destinationPe);
 
     std::vector<dtype > &bufferedItems
       = misdeliveredItems[arrayId];
@@ -1315,7 +1315,7 @@ public:
     int prevOwner = clientArrayMgr_->lastKnown((CkArrayIndex)arrayId);
 
     if (prevOwner != destinationPe) {
-      clientLocMgr_->updateLocation(arrayId,clientLocMgr_->lookupID(arrayId), destinationPe);
+      //clientLocMgr_->updateLocation(arrayId,clientLocMgr_->lookupID(arrayId), destinationPe);
 
       // it is possible to also fix destinations of items buffered for arrayId,
       // but the search could be expensive; instead, with the current code

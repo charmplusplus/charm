@@ -8,15 +8,14 @@ module CkLocation {
   group [migratable] CkLocCache {
     entry CkLocCache();
     entry [expedited] void requestLocation(CmiUInt8 id, int peToTell);
-    entry [expedited] void updateLocation(CmiUInt8 id, int nowOnPe);
+    entry [expedited] void updateLocation(CkLocEntry newEntry);
   };
 
   group [migratable] CkLocMgr {
     entry CkLocMgr(CkArrayOptions opts);
     entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
     entry [expedited] void requestLocation(CkArrayIndex idx, int peToTell);
-    entry [expedited] void updateLocation(
-        CkArrayIndex idx, CmiUInt8 id, int nowOnPe);
+    entry [expedited] void updateLocation(CkArrayIndex idx, CkLocEntry e);
     entry [expedited] void requestDemandCreation(
         const CkArrayIndex& idx, int forPe, int onPe, int cType, CkArrayID mgr);
     entry void reclaimRemote(CkArrayIndex idx,int deletedOnPe);

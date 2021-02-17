@@ -2423,21 +2423,23 @@ void CkLocCache::requestLocation(CmiUInt8 id)
 
 void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 {
-  if (peToTell == CkMyPe())
-  {
-    return;
-  }
+  CkAssert(peToTell != CkMyPe());
 
-  int onPe = lastKnown(id);
-  thisProxy[peToTell].updateLocation(id, onPe);
+  LocationMap::const_iterator itr = locMap.find(id);
+  if (itr != locMap.end())
+  {
+    thisProxy[peToTell].updateLocation(itr->second);
+  }
 }
 
-void CkLocCache::updateLocation(CmiUInt8 id, int nowOnPe) { inform(id, nowOnPe); }
-
-void CkLocCache::inform(CmiUInt8 id, int nowOnPe)
+void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
-  id2pe[id] = nowOnPe;
-  notifyListeners(id, nowOnPe);
+  CkLocEntry& oldEntry = locMap[newEntry.id];
+  if (newEntry.epoch > oldEntry.epoch)
+  {
+    oldEntry = newEntry;
+    notifyListeners(newEntry.id, newEntry.pe);
+  }
 }
 
 /*************************** LocMgr: CREATION *****************************/
@@ -2574,19 +2576,24 @@ void CkLocMgr::informHome(const CkArrayIndex& idx, int nowOnPe)
   // TODO: If home == CkMyPe() should we call update locally?
   if (home != CkMyPe() && home != nowOnPe)
   {
-    thisProxy[home].updateLocation(idx, lookupID(idx), nowOnPe);
+    CmiUInt8 id = lookupID(idx);
+    thisProxy[home].updateLocation(idx, cache->locMap[id]);
   }
 }
 
 CkLocRec* CkLocMgr::createLocal(const CkArrayIndex& idx, bool forMigration,
-                                bool ignoreArrival, bool notifyHome)
+                                bool ignoreArrival, bool notifyHome, int epoch)
 {
   DEBC((AA "Adding new record for element %s\n" AB, idx2str(idx)));
   CmiUInt8 id = lookupID(idx);
 
   CkLocRec* rec = new CkLocRec(this, forMigration, ignoreArrival, idx, id);
   insertRec(rec, id);
-  inform(idx, id, CkMyPe());
+  CkLocEntry e;
+  e.id = id;
+  e.pe = CkMyPe();
+  e.epoch = epoch;
+  updateLocation(idx, e);
 
   if (notifyHome)
   {
@@ -2794,7 +2801,7 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   {
     // We found the ID so update the location for peToTell
     int onPe = lastKnown(idx);
-    thisProxy[peToTell].updateLocation(idx, id, onPe);
+    thisProxy[peToTell].updateLocation(idx, cache->locMap[id]);
     return true;
   }
   else
@@ -2806,9 +2813,10 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   }
 }
 
-void CkLocMgr::updateLocation(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe)
+void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
 {
-  inform(idx, id, nowOnPe);
+  cache->updateLocation(e);
+  inform(idx, e.id, e.pe);
 }
 
 void CkLocMgr::inform(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe)
@@ -2828,12 +2836,11 @@ void CkLocMgr::inform(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe)
     else
     {
       if (origPe < CkNumPes())
-        thisProxy[origPe].updateLocation(idx, id, nowOnPe);
+        thisProxy[origPe].updateLocation(idx, cache->locMap[id]);
     }
   }
 
   insertID(idx, id);
-  cache->inform(id, nowOnPe);
 
   auto itr = bufferedLocationRequests.find(idx);
   if (itr != bufferedLocationRequests.end())
@@ -2842,7 +2849,7 @@ void CkLocMgr::inform(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe)
     {
       DEBN(("%d Replying to buffered ID/location req to pe %d\n", CkMyPe(), pe));
       if (pe != CkMyPe())
-        thisProxy[pe].updateLocation(idx, id, nowOnPe);
+        thisProxy[pe].updateLocation(idx, cache->locMap[id]);
     }
     bufferedLocationRequests.erase(itr);
   }
@@ -3110,7 +3117,6 @@ void CkLocMgr::deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx,
 
   if (home != CkMyPe())
   {  // Forward the message to its home processor
-    cache->inform(id, home);
     if (UsrToEnv(msg)->getTotalsize() < _messageBufferingThreshold)
     {
       DEBM((AA "Forwarding message for unknown %u to home %d \n" AB, id, home));
@@ -3188,7 +3194,11 @@ void CkLocMgr::demandCreateElement(const CkArrayIndex& idx, int chareType, int o
 
   // Find the manager and build the element
   DEBC((AA "Demand-creating element %s on pe %d\n" AB, idx2str(idx), onPe));
-  inform(idx, getNewObjectID(idx), onPe);
+  CkLocEntry e;
+  e.id = getNewObjectID(idx);
+  e.pe = onPe;
+  e.epoch = 0;
+  updateLocation(idx, e);
   CProxy_CkArray(mgr)[onPe].demandCreateElement(idx, ctor, CkDeliver_inline);
 }
 
@@ -3236,7 +3246,7 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   {  // Send a routing message letting original sender know new element location
     DEBS((AA "Sending update back to %d for element %u\n" AB, srcPe,
           msg->array_element_id()));
-    cache->thisProxy[srcPe].updateLocation(msg->array_element_id(), CkMyPe());
+    cache->thisProxy[srcPe].updateLocation(cache->locMap[msg->array_element_id()]);
   }
 }
 
@@ -3437,7 +3447,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #else
                                                     false,
 #endif
-                                                    bufSize, managers.size());
+                                                    bufSize, managers.size(),
+                                                    cache->locMap[id].epoch+1);
 
   {
     PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION);
@@ -3465,7 +3476,16 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   duringMigration = false;
 
   // The element now lives on another processor-- tell ourselves and its home
-  inform(idx, id, toPe);
+  // TODO: If a message arrives and the epoch is higher than expected, we might want to
+  // hold it because it means theres an immigration incoming.
+  // TODO: CkLocCache should have a moveTo method to handle this. It would update the
+  // entry, and epoch. Could also take a list of PEs to notify about the move. This
+  // would allow NDMeshStreamer and others to proactively update senders.
+  CkLocEntry e;
+  e.id = id;
+  e.pe = toPe;
+  e.epoch = cache->locMap[id].epoch+1;
+  updateLocation(idx, e);
   informHome(idx, toPe);
 
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
@@ -3514,7 +3534,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 
   // Create a record for this element
   CkLocRec* rec =
-      createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */);
+      createLocal(idx, true, msg->ignoreArrival, false, msg->epoch /* home told on departure */);
 
   envelope* env = UsrToEnv(msg);
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
