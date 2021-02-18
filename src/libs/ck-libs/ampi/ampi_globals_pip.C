@@ -56,8 +56,14 @@ void AMPI_Node_Setup(int numranks)
   }
 }
 
-int main(int argc, char ** argv)
+// separate function so that setting a breakpoint is straightforward
+static int ampi_pipglobals(int argc, char ** argv)
 {
   const size_t myrank = TCHARM_Element();
   return AMPI_Main_Dispatch(rankdata[myrank].mainstruct, argc, argv);
+}
+
+int main(int argc, char ** argv)
+{
+  return ampi_pipglobals(argc, argv);
 }
