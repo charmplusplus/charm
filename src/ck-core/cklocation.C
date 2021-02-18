@@ -2390,7 +2390,7 @@ void CkLocCache::updateLocation(CmiUInt8 id, int nowOnPe) { inform(id, nowOnPe);
 void CkLocCache::inform(CmiUInt8 id, int nowOnPe)
 {
   id2pe[id] = nowOnPe;
-  mgr->deliverAllBufferedMsgs(id);
+  notifyListeners(id, nowOnPe);
 }
 
 /*************************** LocMgr: CREATION *****************************/
@@ -2417,6 +2417,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
   if (cache == nullptr)
     CkAbort("ERROR! Local branch of location cache is NULL!\n");
   cache->handshake(this);
+  cache->addListener([=](CmiUInt8 id, int pe) { this->deliverAllBufferedMsgs(id); });
 
   // Figure out the mapping from indices to object IDs if one is possible
   compressor = ck::FixedArrayIndexCompressor::make(bounds);

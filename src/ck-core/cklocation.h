@@ -305,6 +305,9 @@ private:
   using IdPeMap = std::unordered_map<CmiUInt8, int>;
   IdPeMap id2pe;
 
+  using Listener = std::function<void(CmiUInt8, int)>;
+  std::list<Listener> listeners;
+
   // Temporarily needed to map ID to home PE
   CkLocMgr* mgr;
 
@@ -320,6 +323,15 @@ public:
   void requestLocation(CmiUInt8 id, int peToTell);
   void updateLocation(CmiUInt8 id, int nowOnPe);
   void erase(CmiUInt8 id) { id2pe.erase(id); }
+
+  void addListener(Listener l) { listeners.push_back(l); }
+  void notifyListeners(CmiUInt8 id, int pe)
+  {
+    for (Listener& l : listeners)
+    {
+      l(id, pe);
+    }
+  }
 
   int whichPE(const CmiUInt8 id) const
   {
