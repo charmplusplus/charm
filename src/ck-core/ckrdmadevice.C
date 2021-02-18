@@ -711,8 +711,17 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   */
 }
 
+#define CKCALLBACK_POOL 1
+
+CkpvDeclare(CkCallbackPool, cbPool);
+
 void CkTagSend(const void* ptr, size_t size, const CProxyElement_Group& grp, int tag, const CkCallback& cb) {
+#if CKCALLBACK_POOL
+  CkCallback* cb_copy = CkpvAccess(cbPool).alloc();
+  new (cb_copy) CkCallback(cb);
+#else
   CkCallback* cb_copy = new CkCallback(cb);
+#endif
 
   // TODO: Support more than groups
   int dest_pe = grp.ckGetGroupPe();
@@ -721,14 +730,23 @@ void CkTagSend(const void* ptr, size_t size, const CProxyElement_Group& grp, int
 }
 
 void CkTagRecv(const void* ptr, size_t size, int tag, const CkCallback& cb) {
+#if CKCALLBACK_POOL
+  CkCallback* cb_copy = CkpvAccess(cbPool).alloc();
+  new (cb_copy) CkCallback(cb);
+#else
   CkCallback* cb_copy = new CkCallback(cb);
+#endif
 
   CmiTagRecv(ptr, size, tag, cb_copy);
 }
 
 void CkRdmaTagHandler(void* cb) {
   static_cast<CkCallback*>(cb)->send();
+#if CKCALLBACK_POOL
+  CkpvAccess(cbPool).free(static_cast<CkCallback*>(cb));
+#else
   delete static_cast<CkCallback*>(cb);
+#endif
 }
 
 #endif // CMK_CUDA

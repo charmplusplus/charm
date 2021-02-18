@@ -79,6 +79,7 @@ never be excluded...
 
 #if CMK_CUDA
 #include "hapi_impl.h"
+#include "ckrdmadevice.h"
 
 extern void (*hapiInvokeCallback)(void*, void*);
 extern void CUDACallbackManager(void*, void*);
@@ -87,6 +88,8 @@ extern void (*hapiQdCreate)(int);
 extern void (*hapiQdProcess)(int);
 extern void QdCreate(int);
 extern void QdProcess(int);
+
+CkpvExtern(CkCallbackPool, cbPool);
 #endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
@@ -1450,6 +1453,8 @@ void _initCharm(int unused_argc, char **argv)
   CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler, CkRdmaDeviceAmpiRecvHandler);
 #endif // CMK_CHARM4PY
   CmiRdmaTagHandlerInit(CkRdmaTagHandler);
+  CkpvInitialize(CkCallbackPool, cbPool);
+  CkpvAccess(cbPool) = CkCallbackPool();
 #endif // CMK_CUDA
 
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
