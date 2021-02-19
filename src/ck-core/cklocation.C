@@ -2363,8 +2363,6 @@ void CkLocMgr::flushLocalRecs(void)
 void CkLocMgr::flushAllRecs(void) { flushLocalRecs(); }
 
 /*************************** LocCache **************************/
-int CkLocCache::homePe(const CmiUInt8 id) const { return mgr->homePe(id); }
-
 void CkLocCache::requestLocation(CmiUInt8 id)
 {
   int home = homePe(id);
@@ -2416,7 +2414,6 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
   cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
   if (cache == nullptr)
     CkAbort("ERROR! Local branch of location cache is NULL!\n");
-  cache->handshake(this);
   cache->addListener([=](CmiUInt8 id, int pe) { this->deliverAllBufferedMsgs(id); });
 
   // Figure out the mapping from indices to object IDs if one is possible
@@ -2476,7 +2473,7 @@ void CkLocMgr::pup(PUP::er& p)
     cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
     if (cache == nullptr)
       CkAbort("ERROR! Local branch of location cache is NULL!");
-    cache->handshake(this);
+    cache->addListener([=](CmiUInt8 id, int pe) { this->deliverAllBufferedMsgs(id); });
 
     // _lbdb is the fixed global groupID
     initLB(lbmgrID, metalbID);
@@ -2690,12 +2687,13 @@ void CkLocMgr::deliverAnyBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
   buffer.erase(itr);
 }
 
+// TODO: Is this only called on HOME PE? It should be...
 CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex& idx)
 {
   CmiUInt8 id;
   if (!lookupID(idx, id))
   {
-    id = idCounter++ + ((CmiUInt8)CkMyPe() << 24);
+    id = idCounter++ + ((CmiUInt8)CkMyPe() << CMK_OBJID_ELEMENT_BITS);
     insertID(idx, id);
   }
   return id;

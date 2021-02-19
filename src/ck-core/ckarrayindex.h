@@ -380,7 +380,7 @@ namespace ck {
         sum += b;
       }
 
-      if (sum > 48)
+      if (sum > CMK_OBJID_ELEMENT_BITS)
         return NULL;
 
       return new FixedArrayIndexCompressor(dims, bits);

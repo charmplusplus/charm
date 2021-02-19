@@ -308,9 +308,6 @@ private:
   using Listener = std::function<void(CmiUInt8, int)>;
   std::list<Listener> listeners;
 
-  // Temporarily needed to map ID to home PE
-  CkLocMgr* mgr;
-
 public:
   CkLocCache() = default;
   CkLocCache(CkMigrateMessage* m) : CBase_CkLocCache(m) {}
@@ -318,7 +315,7 @@ public:
   void pup(PUP::er& p) {}
 
   void inform(CmiUInt8 id, int nowOnPe);
-  int homePe(const CmiUInt8 id) const;
+  int homePe(const CmiUInt8 id) const { return id >> CMK_OBJID_ELEMENT_BITS; }
   void requestLocation(CmiUInt8 id);
   void requestLocation(CmiUInt8 id, int peToTell);
   void updateLocation(CmiUInt8 id, int nowOnPe);
@@ -347,8 +344,6 @@ public:
     else
       return pe;
   }
-
-  void handshake(CkLocMgr* mgr) { this->mgr = mgr; }
 };
 
 /**
@@ -499,9 +494,7 @@ public:
   }
   int homePe(const CmiUInt8 id) const
   {
-    if (compressor)
-      return CMK_RANK_0(homePe(compressor->decompress(id)));
-    return CMK_RANK_0(id >> 24);
+    return CMK_RANK_0(id >> CMK_OBJID_ELEMENT_BITS);
   }
   int procNum(const CkArrayIndex& idx) const
   {
