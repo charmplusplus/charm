@@ -2620,7 +2620,9 @@ process). Each level is configurable with a list of strategies,
 frequency, and other parameters. See :numref:`treeLb` below for more
 detail, along with configuration and execution instructions. The
 following strategies can be used with TreeLB (the old runtime
-selection syntax still works and is specified in parentheses):
+selection syntax still works and is specified in parentheses, it uses
+the new TreeLB versions with a two level PE_Root tree rooted at PE 0,
+emulating the centralized structure of the old implementation):
 
 - **Greedy**: Uses a greedy algorithm that iterates over the objects
   and assigns the heaviest remaining object to the least loaded
@@ -2643,25 +2645,28 @@ selection syntax still works and is specified in parentheses):
 
 Listed below are load balancers intended for diagnostic purposes:
 
-- **Dummy**: Does nothing, does not move objects at all. (Old: ``+balancer DummyLB``)
+- **Dummy**: Does nothing, does not move objects at all. (Old:
+  ``+balancer DummyLB``)
 
-- **Random**: Randomly assigns objects to processors. (Old: ``+balancer RandCentLB``)
+- **Random**: Randomly assigns objects to processors. (Old:
+  ``+balancer RandCentLB``)
 
 - **Rotate**: Moves objects to the next available PE every time it is
   called. It is useful for debugging PUP routines and other migration
   related bugs. (Old: ``+balancer RotateLB``)
 
-However, not all non-distributed load balancers are currently
-supported by TreeLB, namely the centralized communication-aware load
-balancers:
+The following centralized communication-aware load balancers do not
+yet use TreeLB, but continue to be available using the old CentralLB
+infrastructure:
 
 - **RecBipartLB**: Uses recursive bipartitioning to partition the
-  object communication graph.
+  object communication graph. (``+balancer RecBipartLB``)
 
 - **MetisLB**: Uses `METIS
   <http://glaros.dtc.umn.edu/gkhome/metis/metis/overview>`__ to
   partition the object communication graph. METIS is distributed with
-  Charm++, so there is no need to separately get this dependence.
+  Charm++, so there is no need to separately get this
+  dependence. (``+balancer MetisLB``)
 
 - **ScotchLB**: Uses the `SCOTCH
   <http://www.labri.fr/perso/pelegrin/scotch/>`__ library for
@@ -2674,19 +2679,17 @@ balancers:
   (e.g. ``netlrts-linux-x86_64-smp/``). If SCOTCH is installed in a
   non-standard location, use the *-incdir* and *-libdir* build time
   options to point to the include and library directories used,
-  respectively.
+  respectively. (``+balancer ScotchLB``)
 
-In distributed approaches, load data is only exchanged among
-neighboring processors and there is no messaging outside this local
-neighborhood. However, they will not, in general, provide an immediate
-restoration for load balance - the process is iterated until the
-desired load balance can be achieved.
+In distributed approaches, the strategy executes across multiple PEs,
+providing scalable computational and communication performance.
 
 Listed below are the distributed load balancers:
 
--  **DistributedLB**: A load balancer which uses partial information
-   about underloaded and overloaded processors in the system to do
-   probabilistic transfer of load. This is a refinement based strategy.
+- **DistributedLB**: A load balancer which uses partial information
+  about underloaded and overloaded processors in the system to do
+  probabilistic transfer of load. This is a refinement based
+  strategy. (``+balancer DistributedLB``)
 
 Custom strategies should be built using TreeLB or DistBaseLB (the base
 class for DistributedLB). Custom strategies that are based on
@@ -2941,38 +2944,43 @@ interval.
 
 The detailed APIs of these two methods are described as follows:
 
-#. **AtSync mode**: Using this method, elements can be migrated only
-   at certain points in the execution, when the application invokes
-   ``AtSync()``. In order to use AtSync mode, one should set
-   ``usesAtSync`` to true in the array element constructor. When an
-   element is ready to migrate, call ``AtSync()`` [6]_. When all local
-   elements that have set ``usesAtSync`` to true call ``AtSync()``,
-   the load balancer is triggered. (Note that when the load balancer
-   is triggered, it is triggered for all array elements, even those
-   without ``usesAtSync`` set to true. If they are migratable, then
-   they should have PUP routines suitable for anytime migration.) Once
-   all migrations are completed, the load balancer calls the virtual
-   function ``ResumeFromSync()`` on each of the array elements. This
-   function can be redefined in the application.
+#. **AtSync mode**: Using this method, load balancing is triggered
+   only at certain points in the execution, when the application
+   invokes ``AtSync()``, which is essentially a non-blocking
+   barrier. In order to use AtSync mode, one should set the variable
+   ``usesAtSync`` to true in the constructors of chare array elements
+   that are participating in the AtSync barrier. When an element is
+   ready to start load balancing, it calls ``AtSync()`` [6]_. When all
+   local elements that have set ``usesAtSync`` to true call
+   ``AtSync()``, the load balancer is triggered. (Note that when the
+   load balancer is triggered, it is triggered for all array elements,
+   even those without ``usesAtSync`` set to true. If they are
+   migratable, then they should have PUP routines suitable for anytime
+   migration.) Once all local migrations (both in and out) are
+   completed, the load balancer calls the virtual function
+   ``ResumeFromSync()`` on each of the local array elements
+   participating in the AtSync barrier. This function is usually
+   overridden by the application to trigger the resumption of
+   execution.
 
-   Note that ``AtSync()`` is not a blocking call, it just gives a hint
-   to load balancing that it is time for load balancing. The object
-   may be migrated during the time between ``AtSync()`` and
+   Note that ``AtSync()`` is not a blocking call. The object may be
+   migrated during the time between ``AtSync()`` and
    ``ResumeFromSync()``. One can choose to let objects continue
-   working with incoming messages; however, keep in mind the object may
-   suddenly show up in another processor, so make sure no operations
-   that could possibly prevent migration be performed. This is the
-   automatic way of doing load balancing where the application does
-   not need to define ``ResumeFromSync()``.
+   working with incoming messages; however, keep in mind the object
+   may suddenly show up in another processor, so make sure no
+   operations that could possibly prevent migration be performed. This
+   is the automatic way of doing load balancing where the application
+   does not need to define ``ResumeFromSync()``.
 
    The more commonly used approach is to force the object to be idle
    until load balancing finishes. The user calls ``AtSync()`` at the
-   end of some iteration, then, when all elements reach that call,
-   load balancing is triggered. The objects can start executing again
-   when ``ResumeFromSync()`` is called. In this case, the user
-   redefines ``ResumeFromSync()`` to trigger the next iteration of the
-   application. This pattern effectively results in a barrier at load
-   balancing time (see example here :numref:`lbexample`).
+   end of some iteration, then, when all participating elements reach
+   that call, load balancing is triggered. The objects can start
+   executing again when ``ResumeFromSync()`` is called. In this case,
+   the user redefines ``ResumeFromSync()`` to trigger the next
+   iteration of the application. This pattern effectively results in a
+   barrier at load balancing time (see example here
+   :numref:`lbexample`).
 
    .. note:: In AtSync mode, Applications that use dynamic insertion or
 	     deletion of array elements must not be doing so when any element
