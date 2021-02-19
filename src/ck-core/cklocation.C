@@ -2406,6 +2406,10 @@ void CkLocCache::pup(PUP::er& p)
       p | id;
       p | pe;
       inform(id, pe);
+      if (homePe(id) != CkMyPe())
+      {
+        requestLocation(id, homePe(id));
+      }
       CkAssert(whichPE(id) == pe);
     }
   }
@@ -2509,6 +2513,7 @@ void CkLocMgr::pup(PUP::er& p)
   p | lbmgrID;
   p | metalbID;
   p | bounds;
+  p | idCounter;
   if (p.isUnpacking())
   {
     thisProxy = thisgroup;
@@ -2576,6 +2581,8 @@ void CkLocMgr::informHome(const CkArrayIndex& idx, int nowOnPe)
   // TODO: If home == CkMyPe() should we call update locally?
   if (home != CkMyPe() && home != nowOnPe)
   {
+    // TODO: This may not need to be an idx update. Pretty sure the home will always
+    // know the idx to id mapping.
     CmiUInt8 id = lookupID(idx);
     thisProxy[home].updateLocation(idx, cache->locMap[id]);
   }
@@ -2815,33 +2822,14 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
 
 void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
 {
+  // Set the mapping from idx to id
+  insertID(idx, e.id);
+
+  // Update the location information
   cache->updateLocation(e);
-  inform(idx, e.id, e.pe);
-}
 
-void CkLocMgr::inform(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe)
-{
-  // On restart, conservatively determine the next 'safe' ID to
-  // generate for new elements by the max over all of the elements with
-  // IDs corresponding to each PE
-  if (CkInRestarting())
-  {
-    CmiUInt8 maskedID = id & ((1u << 24) - 1);
-    CmiUInt8 origPe = id >> 24;
-    if (origPe == CkMyPe())
-    {
-      if (maskedID >= idCounter)
-        idCounter = maskedID + 1;
-    }
-    else
-    {
-      if (origPe < CkNumPes())
-        thisProxy[origPe].updateLocation(idx, cache->locMap[id]);
-    }
-  }
-
-  insertID(idx, id);
-
+  // Any location requests that we had to buffer because we didn't know how the index
+  // mapped to the id can now be replied to.
   auto itr = bufferedLocationRequests.find(idx);
   if (itr != bufferedLocationRequests.end())
   {
@@ -2849,13 +2837,14 @@ void CkLocMgr::inform(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe)
     {
       DEBN(("%d Replying to buffered ID/location req to pe %d\n", CkMyPe(), pe));
       if (pe != CkMyPe())
-        thisProxy[pe].updateLocation(idx, cache->locMap[id]);
+        thisProxy[pe].updateLocation(idx, cache->locMap[e.id]);
     }
     bufferedLocationRequests.erase(itr);
   }
 
-  deliverAllBufferedMsgs(id);
-  deliverAllBufferedMsgs(idx, id);
+  // Any messages that were buffered on index because we did not know the ID or location
+  // to send to can now be sent.
+  deliverAllBufferedMsgs(idx, e.id);
 }
 
 /*************************** LocMgr: DELETION *****************************/

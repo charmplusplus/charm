@@ -672,7 +672,6 @@ public:
 
   // Advisories:
   /// This index now lives on the given processor-- update local records
-  void inform(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe);
   void informHome(const CkArrayIndex& idx, int nowOnPe);
 
   /// This message took several hops to reach us-- fix it
