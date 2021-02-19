@@ -471,9 +471,9 @@ void CmiTagRecv(const void* ptr, size_t size, int tag, void* cb) {
   LrtsTagRecv(ptr, size, tag, cb);
 }
 
-RdmaAckHandlerFn rdmaTagHandlerFn;
+RdmaAckCallerFn rdmaTagHandlerFn;
 
-void CmiRdmaTagHandlerInit(RdmaAckHandlerFn fn) {
+void CmiRdmaTagHandlerInit(RdmaAckCallerFn fn) {
   rdmaTagHandlerFn = fn;
 }
 

@@ -88,9 +88,9 @@ extern void (*hapiQdCreate)(int);
 extern void (*hapiQdProcess)(int);
 extern void QdCreate(int);
 extern void QdProcess(int);
+#endif
 
 CkpvExtern(CkCallbackPool, cbPool);
-#endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
 

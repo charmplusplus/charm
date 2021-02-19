@@ -78,44 +78,6 @@ public:
 #endif
 };
 
-#define CKCALLBACK_POOL_SIZE 65536
-#define CKCALLBACK_POOL_INC_FACTOR 2
-
-struct CkCallbackPool {
-  std::forward_list<CkCallback*> cbs;
-  int max_size;
-  int cur_size;
-
-  CkCallbackPool(int initial_size = CKCALLBACK_POOL_SIZE) :
-    max_size(initial_size), cur_size(0) {}
-
-  ~CkCallbackPool() {
-    for (CkCallback* cb : cbs) delete cb;
-  }
-
-  inline CkCallback* alloc() {
-    if (cur_size == 0) {
-      // No remaining slots, need to expand
-      cbs.resize(max_size);
-      cur_size = max_size;
-      max_size *= 2;
-      for (CkCallback*& cb : cbs) cb = new CkCallback();
-    }
-
-    CkCallback* ret = cbs.front();
-    cbs.pop_front();
-    cur_size--;
-
-    return ret;
-  }
-
-  inline void free(CkCallback* cb) {
-    // No sanity check
-    cbs.push_front(cb);
-    cur_size++;
-  }
-};
-
 void CkRdmaDeviceRecvHandler(void* data);
 void CkRdmaDeviceAmpiRecvHandler(void* data);
 #if CMK_CHARM4PY

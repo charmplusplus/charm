@@ -86,11 +86,11 @@ typedef struct UcxRequest
     void           *ncpyAck;
     ucp_rkey_h     rkey;
 #endif
+    void*          cb;
 #if CMK_CUDA
     DeviceRdmaOp*  device_op;
     DeviceRecvType type;
 #endif
-    void*          cb;
 } UcxRequest;
 
 typedef struct UcxContext
@@ -117,13 +117,13 @@ typedef struct UcxPendingRequest
     int                     dNode;
     int                     op;
     ucp_send_callback_t     cb;
+    ucp_tag_recv_callback_t recv_cb;
+    ucp_tag_t               mask;
+    void*                   charm_cb;
 #if CMK_CUDA
     DeviceRdmaOp*           device_op;
-    ucp_tag_t               mask;
-    ucp_tag_recv_callback_t recv_cb;
     DeviceRecvType          type;
 #endif
-    void*                   charm_cb;
 } UcxPendingRequest;
 #endif
 
