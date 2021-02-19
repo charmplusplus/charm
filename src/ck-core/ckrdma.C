@@ -2089,3 +2089,45 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
   locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // does not require locking as it is owned by locMgr
 }
 /***************************** End of Zerocopy PUP Support ****************************/
+
+
+/***************************** Tagged API ****************************/
+
+#define CKCALLBACK_POOL 1 // Pool CkCallback allocations
+
+CkpvDeclare(CkCallbackPool, cbPool);
+
+void CkTagSend(const void* ptr, size_t size, int dst_pe, int tag, const CkCallback& cb) {
+#if CKCALLBACK_POOL
+  CkCallback* cb_copy = CkpvAccess(cbPool).alloc();
+  new (cb_copy) CkCallback(cb);
+#else
+  CkCallback* cb_copy = new CkCallback(cb);
+#endif
+
+  CmiTagSend(ptr, size, dst_pe, tag, cb_copy);
+  //CkRdmaTagHandler(cb_copy);
+}
+
+void CkTagRecv(const void* ptr, size_t size, int tag, const CkCallback& cb) {
+#if CKCALLBACK_POOL
+  CkCallback* cb_copy = CkpvAccess(cbPool).alloc();
+  new (cb_copy) CkCallback(cb);
+#else
+  CkCallback* cb_copy = new CkCallback(cb);
+#endif
+
+  CmiTagRecv(ptr, size, tag, cb_copy);
+  //CkRdmaTagHandler(cb_copy);
+}
+
+void CkRdmaTagHandler(void* cb) {
+  static_cast<CkCallback*>(cb)->send();
+#if CKCALLBACK_POOL
+  CkpvAccess(cbPool).free(static_cast<CkCallback*>(cb));
+#else
+  delete static_cast<CkCallback*>(cb);
+#endif
+}
+
+/***************************** End of Tagged API ****************************/

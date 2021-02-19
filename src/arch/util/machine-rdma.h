@@ -27,12 +27,12 @@ void CmiInvokeAmpiRecvHandler(void* data);
 #if CMK_CHARM4PY
 void CmiInvokeExtRecvHandler(void* data);
 #endif // CMK_CHARM4PY
+#endif // CMK_CUDA
 
 void LrtsTagSend(const void* ptr, size_t size, int dest_pe, int tag, void* cb);
 void LrtsTagRecv(const void* ptr, size_t size, int tag, void* cb);
 
 void CmiInvokeTagHandler(void* cb);
-#endif // CMK_CUDA
 
 int CmiGetRdmaCommonInfoSize();
 #endif

@@ -124,11 +124,6 @@ bool CkRdmaDeviceIssueRgetsFromUnpackedMessage(int numops, CkDeviceBuffer **sour
 #endif
 bool CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
-
-void CkTagSend(const void* ptr, size_t size, int dst_pe, int tag,  const CkCallback& cb);
-void CkTagRecv(const void* ptr, size_t size, int tag, const CkCallback& cb);
-void CkRdmaTagHandler(void* cb);
-
 #endif // CMK_CUDA
 
 #endif // _CKRDMADEVICE_H_

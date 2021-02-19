@@ -56,8 +56,10 @@ enum {
     UCX_RMA_OP_GET,     // RMA Get operation using UcxRmaOp
 #if CMK_CUDA
     UCX_DEVICE_SEND_OP, // Device send
-    UCX_DEVICE_RECV_OP  // Device recv
+    UCX_DEVICE_RECV_OP, // Device recv
 #endif
+    UCX_TAG_SEND_OP,    // Tagged API send
+    UCX_TAG_RECV_OP     // Tagged API recv
 };
 
 #define UCX_LOG(prio, fmt, ...) \
@@ -87,8 +89,8 @@ typedef struct UcxRequest
 #if CMK_CUDA
     DeviceRdmaOp*  device_op;
     DeviceRecvType type;
-    void*          cb;
 #endif
+    void*          cb;
 } UcxRequest;
 
 typedef struct UcxContext
@@ -121,6 +123,7 @@ typedef struct UcxPendingRequest
     ucp_tag_recv_callback_t recv_cb;
     DeviceRecvType          type;
 #endif
+    void*                   charm_cb;
 } UcxPendingRequest;
 #endif
 
@@ -184,6 +187,7 @@ void UcxRequestInit(void *request)
 #if CMK_CUDA
     req->device_op  = NULL;
 #endif
+    req->cb         = NULL;
 }
 
 static void UcxInitEps(int numNodes, int myId)
@@ -693,6 +697,44 @@ static inline int ProcessTxQueue()
           }
         }
 #endif
+        else if (req->op == UCX_TAG_SEND_OP) {
+          ucs_status_ptr_t status_ptr;
+          status_ptr = ucp_tag_send_nb(ucxCtx.eps[req->dNode], req->msgBuf,
+                                       req->size, ucp_dt_make_contig(1),
+                                       req->tag, req->cb);
+          if (!UCS_PTR_IS_PTR(status_ptr)) {
+            // Either send was complete or error
+            CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
+            CmiEnforce(UCS_PTR_STATUS(status_ptr) == UCS_OK);
+
+            // Send complete
+            CmiInvokeTagHandler(req->charm_cb);
+          } else {
+            // Callback function will be invoked once send completes
+            UcxRequest* store_req = (UcxRequest*)status_ptr;
+            store_req->msgBuf = req->msgBuf;
+            store_req->cb = req->charm_cb;
+          }
+        }
+        else if (req->op == UCX_TAG_RECV_OP) {
+          ucs_status_ptr_t status_ptr;
+          status_ptr = ucp_tag_recv_nb(ucxCtx.worker, req->msgBuf, req->size,
+                                       ucp_dt_make_contig(1), req->tag, req->mask,
+                                       req->recv_cb);
+          CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
+
+          UcxRequest* ret_req = (UcxRequest*)status_ptr;
+          if (ret_req->completed) {
+            // Recv was completed immediately
+            CmiInvokeTagHandler(req->charm_cb);
+            UCX_REQUEST_FREE(ret_req);
+          } else {
+            // Recv wasn't completed immediately, recv_cb will be invoked
+            // sometime later
+            ret_req->msgBuf = req->msgBuf;
+            ret_req->cb = req->charm_cb;
+          }
+        }
         else {
           CmiAbort("[%d][%d][%d] UCX:ProcessTxQueue req->op(%d) is Invalid\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), req->op);
         }
@@ -913,6 +955,7 @@ void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
   }
 #endif
 }
+#endif // CMK_CUDA
 
 void UcxTagSendCompleted(void* request, ucs_status_t status) {
   CmiEnforce(status == UCS_OK);
@@ -944,7 +987,16 @@ void UcxTagRecvCompleted(void* request, ucs_status_t status,
 void LrtsTagSend(const void* ptr, size_t size, int dest_pe, int tag, void* cb) {
   uint64_t ucx_tag = ((uint64_t)tag << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_DEVICE;
 #if CMK_SMP
-  // TODO
+  UcxPendingRequest* req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
+  req->msgBuf   = (void*)ptr;
+  req->size     = size;
+  req->tag      = ucx_tag;
+  req->dNode    = CmiNodeOf(dest_pe);
+  req->cb       = UcxTagSendCompleted;
+  req->op       = UCX_TAG_SEND_OP;
+  req->charm_cb = cb;
+
+  PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
   ucs_status_ptr_t status_ptr;
   status_ptr = ucp_tag_send_nb(ucxCtx.eps[CmiNodeOf(dest_pe)], (void*)ptr, size,
@@ -970,7 +1022,16 @@ void LrtsTagSend(const void* ptr, size_t size, int dest_pe, int tag, void* cb) {
 void LrtsTagRecv(const void* ptr, size_t size, int tag, void* cb) {
   uint64_t ucx_tag = ((uint64_t)tag << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_DEVICE;
 #if CMK_SMP
-  // TODO
+  UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
+  req->msgBuf    = (void*)ptr;
+  req->size      = size;
+  req->tag       = ucx_tag;
+  req->op        = UCX_TAG_RECV_OP;
+  req->mask      = UCX_MSG_TAG_MASK_FULL;
+  req->recv_cb   = UcxTagRecvCompleted;
+  req->charm_cb  = cb;
+
+  PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
   ucs_status_ptr_t status_ptr;
   status_ptr = ucp_tag_recv_nb(ucxCtx.worker, (void*)ptr, size,
@@ -991,8 +1052,6 @@ void LrtsTagRecv(const void* ptr, size_t size, int tag, void* cb) {
   }
 #endif
 }
-
-#endif // CMK_CUDA
 
 #if CMK_ONESIDED_IMPL
 #include "machine-onesided.C"

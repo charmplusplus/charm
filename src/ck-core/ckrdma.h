@@ -424,4 +424,10 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr);
 void CkRdmaZCPupCustomHandler(void *ack);
 
 void _ncpyAckHandler(ncpyHandlerMsg *msg);
+
+/***************************** Tagged API ****************************/
+void CkTagSend(const void* ptr, size_t size, int dst_pe, int tag,  const CkCallback& cb);
+void CkTagRecv(const void* ptr, size_t size, int tag, const CkCallback& cb);
+
+void CkRdmaTagHandler(void* cb);
 #endif
