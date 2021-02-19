@@ -294,7 +294,7 @@ void HybridBaseLB::buildStats(int atlevel)
 
   // statsMsgsList
   DEBUGF(("[%d] buildStats for %d nobj:%zu\n", CkMyPe(), stats_msg_count, statsData->objData.size()));
-  statsData->nprocs() = stats_msg_count;
+  statsData->procs.resize(stats_msg_count);
   int nobj = 0;
   int ncom = 0;
   for (int n=0; n<stats_msg_count; n++) {
@@ -382,8 +382,8 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
   cmsg->bg_cputime = 0.0;
 #endif
 
-  for (int pe=0; pe<statsData->nprocs(); pe++) {
-        struct ProcStats &procStat = statsData->procs[pe];
+  for (const auto& procStat : statsData->procs)
+  {
         cmsg->pe_speed += procStat.pe_speed;		// important
         cmsg->total_walltime += procStat.total_walltime;
         cmsg->idletime += procStat.idletime;
@@ -1213,7 +1213,8 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats)
     DEBUGF(("[%d] obj (%d %d %d %d) migrate from %d to %d\n", CkMyPe(), item->obj.objID().id[0], item->obj.objID().id[1], item->obj.objID().id[2], item->obj.objID().id[3], item->from_pe, item->to_pe));
   }
 
-  if (_lb_args.printSummary())  printSummary(stats, stats->nprocs());
+  if (_lb_args.printSummary())
+    printSummary(stats, stats->procs.size());
 
   // translate relative pe number to its real number
   for(i=0; i < migrate_count; i++) {

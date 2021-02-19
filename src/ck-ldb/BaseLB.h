@@ -84,8 +84,7 @@ public:
 
   /** Passed to the virtual functions Strategy(...) and work(...) */
   struct LDStats {
-    int count;			// number of processors in the array "procs"
-    ProcStats *procs;		// processor statistics
+    std::vector<ProcStats> procs;		// processor statistics
 
     int n_migrateobjs;		// total number of migratable objects
     std::vector<LDObjData> objData;	// LDObjData and LDCommData defined in lbdb.h
@@ -95,7 +94,7 @@ public:
     std::vector<LDCommData> commData;	// communication data - edge list representation
 				// of the communication between objects
 
-    int *objHash;		// this a map from the hash for the 4 integer
+    std::vector<int> objHash;		// this a map from the hash for the 4 integer
 				// LDObjId to the index in the vector "objData"
     int  hashSize;
 
@@ -106,11 +105,9 @@ public:
     double after_lb_max;
     double after_lb_avg;
 
-    LDStats(int c=0, int complete_flag=1);
-    /// the functions below should be used to obtain the number of processors
-    /// instead of accessing count directly
-    inline int nprocs() const { return count; }
-    inline int &nprocs() { return count; }
+    size_t nprocs() const { return procs.size(); }
+    void setNprocs(size_t count) { procs.resize(count); }
+    LDStats(int npes = CkNumPes(), int complete_flag = 1);
 
     void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
     /// build hash table
@@ -132,7 +129,7 @@ public:
       deleteCommHash();
     }
     void clearBgLoad() {
-      for (int i=0; i<nprocs(); i++) procs[i].clearBgLoad();
+      for (auto& proc : procs) proc.clearBgLoad();
     }
     void computeNonlocalComm(int &nmsgs, int &nbytes);
     double computeAverageLoad();

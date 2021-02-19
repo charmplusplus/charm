@@ -64,13 +64,11 @@ inline static int ObjKey(const CmiUInt8 &oid, const int hashSize) {
   return oid % hashSize;
 }
 
-BaseLB::LDStats::LDStats(int c, int complete)
+BaseLB::LDStats::LDStats(int npes, int complete)
 	: n_migrateobjs(0),
-          objHash(NULL), complete_flag(complete)
+          complete_flag(complete)
 {
-  count = c;
-  if (count == 0) count = CkNumPes();
-  procs = new ProcStats[count];
+  procs.resize(npes);
 }
 
 const static unsigned int doublingPrimes[] = {
@@ -146,14 +144,11 @@ static unsigned int primeLargerThan(unsigned int x)
 
 void BaseLB::LDStats::makeCommHash() {
   // hash table is already build
-  if (objHash) return;
+  if (!objHash.empty()) return;
    
-  int i;
   hashSize = primeLargerThan(objData.size() * 2);
-  objHash = new int[hashSize];
-  for(i=0;i<hashSize;i++)
-        objHash[i] = -1;
-  i = 0;
+  objHash.assign(hashSize, -1);
+  int i = 0;
   for(const auto& obj : objData) {
         const CmiUInt8 &oid = obj.objID();
         int hash = ObjKey(oid, hashSize);
@@ -165,8 +160,7 @@ void BaseLB::LDStats::makeCommHash() {
 }
 
 void BaseLB::LDStats::deleteCommHash() {
-  if (objHash) delete [] objHash;
-  objHash = NULL;
+  objHash.clear();
   for(auto& comm : commData) {
       comm.clearHash();
   }
@@ -238,7 +232,7 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 	      senderPE = to_proc[idx];
 	      CmiAssert(senderPE != -1);
 	    }
-	    CmiAssert(senderPE < nprocs() && senderPE >= 0);
+	    CmiAssert(senderPE < procs.size() && senderPE >= 0);
 
             // find receiver: point-to-point and multicast two cases
 	    int receiver_type = cdata.receiver.get_type();
@@ -253,7 +247,7 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 		}
 		else {
 	          receiverPE = to_proc[idx];
-                  CmiAssert(receiverPE < nprocs() && receiverPE >= 0);
+                  CmiAssert(receiverPE < procs.size() && receiverPE >= 0);
 		}
               }
 	      if(senderPE != receiverPE)
@@ -272,7 +266,7 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 		CmiAssert(idx != -1);
 	        if (idx == -1) continue;    // receiver has just been removed?
 	        receiverPE = to_proc[idx];
-		CmiAssert(receiverPE < nprocs() && receiverPE >= 0);
+		CmiAssert(receiverPE < procs.size() && receiverPE >= 0);
 		int exist = 0;
 	        for (auto pe : pes)
 		  if (receiverPE == pe) { exist=1; break; }
@@ -290,26 +284,24 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 }
 
 void BaseLB::LDStats::normalize_speed() {
-  int pe;
   double maxspeed = 0.0;
 
-  for(int pe=0; pe < nprocs(); pe++) {
-    if (procs[pe].pe_speed > maxspeed) maxspeed = procs[pe].pe_speed;
+  for (const auto& proc : procs)
+  {
+    if (proc.pe_speed > maxspeed) maxspeed = proc.pe_speed;
   }
-  for(int pe=0; pe < nprocs(); pe++)
-    procs[pe].pe_speed /= maxspeed;
+  for (auto& proc : procs) proc.pe_speed /= maxspeed;
 }
 
 void BaseLB::LDStats::print()
 {
 #if CMK_LBDB_ON
   int i;
-  CkPrintf("------------- Processor Data: %d -------------\n", nprocs());
-  for(int pe=0; pe < nprocs(); pe++) {
-    struct ProcStats &proc = procs[pe];
-
+  CkPrintf("------------- Processor Data: %zu -------------\n", procs.size());
+  for (const auto& proc : procs)
+  {
     CkPrintf("Proc %d (%d) Speed %f Total = %f Idle = %f Bg = %f nObjs = %d",
-      pe, proc.pe, proc.pe_speed, proc.total_walltime, proc.idletime,
+      i++, proc.pe, proc.pe_speed, proc.total_walltime, proc.idletime,
       proc.bg_walltime, proc.n_objs);
 #if CMK_LB_CPUTIMER
     CkPrintf(" CPU Total %f Bg %f", proc.total_cputime, proc.bg_cputime);
@@ -358,16 +350,19 @@ void BaseLB::LDStats::print()
 
 double BaseLB::LDStats::computeAverageLoad()
 {
-  int i, numAvail=0;
+  int numAvail = 0;
   double total = 0;
   for (const auto& obj : objData) total += obj.wallTime;
-                                                                                
-  for (i=0; i<nprocs(); i++)
-    if (procs[i].available == true) {
-        total += procs[i].bg_walltime;
-	numAvail++;
+
+  for (const auto& proc : procs)
+  {
+    if (proc.available)
+    {
+      total += proc.bg_walltime;
+      numAvail++;
     }
-                                                                                
+  }
+
   double averageLoad = total/numAvail;
   return averageLoad;
 }
@@ -398,41 +393,38 @@ void BaseLB::LDStats::removeObject(int obj)
 
 void BaseLB::LDStats::pup(PUP::er &p)
 {
-  int i;
-  p(count);
   p(n_migrateobjs);
-  if (p.isUnpacking()) {
-    // user can specify simulated processors other than the real # of procs.
-    int maxpe = nprocs() > LBSimulation::simProcs ? nprocs() : LBSimulation::simProcs;
-    procs = new ProcStats[maxpe];
-    objHash = NULL;
+  p|procs;
+  if (p.isUnpacking())
+  {
+    // user can specify simulated processors other than the real # of procs
+    if (LBSimulation::simProcs > procs.size())
+    {
+      procs.resize(LBSimulation::simProcs);
+    }
+    // ignore the background load when unpacking if the user changed the # of procs
+    if (LBSimulation::procsChanged)
+    {
+      const auto size = procs.size();
+      procs.clear();
+      procs.resize(size);
+    }
   }
-  // ignore the background load when unpacking if the user change the # of procs
-  // otherwise load everything
-  if (p.isUnpacking() && LBSimulation::procsChanged) {
-    ProcStats dummy;
-    for (i=0; i<nprocs(); i++) p|dummy;
-  }
-  else
-    for (i=0; i<nprocs(); i++) p|procs[i];
   p|objData;
   p|from_proc;
   // reset to_proc when unpacking
   if (p.isUnpacking())
     to_proc = from_proc;
   p|commData;
-  if (p.isUnpacking())
-    count = LBSimulation::simProcs;
   if (p.isUnpacking()) {
-    objHash = NULL;
-    if (_lb_args.lbversion() <= 1) 
-      for (i=0; i<nprocs(); i++) procs[i].pe = i;
+    if (_lb_args.lbversion() <= 1)
+      for (int i = 0; i < procs.size(); i++) procs[i].pe = i;
   }
 }
 
 int BaseLB::LDStats::useMem() { 
   // calculate the memory usage of this LB (superclass).
-  return sizeof(LDStats) + sizeof(ProcStats) * nprocs() +
+  return sizeof(LDStats) + sizeof(ProcStats) * procs.size() +
 	 (sizeof(LDObjData) + 2 * sizeof(int)) * objData.size() +
 	 sizeof(LDCommData) * commData.size();
 }

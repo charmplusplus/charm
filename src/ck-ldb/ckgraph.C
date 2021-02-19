@@ -14,7 +14,7 @@
 #include "ckgraph.h"
 
 ProcArray::ProcArray(BaseLB::LDStats *stats) {
-  int numPes = stats->nprocs();
+  const int numPes = stats->procs.size();
   // fill the processor array
   procs.resize(numPes);
 
