@@ -715,7 +715,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 
 CkpvDeclare(CkCallbackPool, cbPool);
 
-void CkTagSend(const void* ptr, size_t size, const CProxyElement_Group& grp, int tag, const CkCallback& cb) {
+void CkTagSend(const void* ptr, size_t size, int dst_pe, int tag, const CkCallback& cb) {
 #if CKCALLBACK_POOL
   CkCallback* cb_copy = CkpvAccess(cbPool).alloc();
   new (cb_copy) CkCallback(cb);
@@ -723,10 +723,8 @@ void CkTagSend(const void* ptr, size_t size, const CProxyElement_Group& grp, int
   CkCallback* cb_copy = new CkCallback(cb);
 #endif
 
-  // TODO: Support more than groups
-  int dest_pe = grp.ckGetGroupPe();
-
-  CmiTagSend(ptr, size, dest_pe, tag, cb_copy);
+  CmiTagSend(ptr, size, dst_pe, tag, cb_copy);
+  //CkRdmaTagHandler(cb_copy);
 }
 
 void CkTagRecv(const void* ptr, size_t size, int tag, const CkCallback& cb) {
@@ -738,6 +736,7 @@ void CkTagRecv(const void* ptr, size_t size, int tag, const CkCallback& cb) {
 #endif
 
   CmiTagRecv(ptr, size, tag, cb_copy);
+  //CkRdmaTagHandler(cb_copy);
 }
 
 void CkRdmaTagHandler(void* cb) {

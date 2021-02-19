@@ -271,7 +271,7 @@ public:
     cur_size = size;
     if (CkMyPe() == 0) start_time = CkWallTimer();
 
-    CkTagSend(d_local_data, cur_size, thisProxy[peer], iter,
+    CkTagSend(d_local_data, cur_size, peer, iter,
         CkCallback(CkIndex_Block::sendZCComplete(), thisProxy[thisIndex]));
   }
 
