@@ -392,8 +392,6 @@ void CentralLB::MissMigrate(int waitForBarrier)
 // not used when USE_REDUCTION = 1
 void CentralLB::buildStats()
 {
-    statsData->nprocs() = stats_msg_count;
-
     // copy all data in individual messages to this big structure
     // Space has already been reserved in ReceiveStats
     for (int pe=0; pe<CkNumPes(); pe++) {
@@ -539,7 +537,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
  
   if (stats_msg_count == clients) {
 	DEBUGF(("[%d] All stats messages received \n",CmiMyPe()));
-    statsData->nprocs() = stats_msg_count;
+    statsData->procs.resize(stats_msg_count);
     if (use_thread)
         thisProxy[CkMyPe()].t_LoadBalance();
     else

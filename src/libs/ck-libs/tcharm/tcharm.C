@@ -190,6 +190,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     } else {
       CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
       tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
+      CmiIsomallocContextEnableRandomAccess(heapContext);
     }
   }
   CtvAccessOther(tid,_curTCharm)=this;
@@ -468,6 +469,11 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::allow_migrate()
 void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
+
+  CthThread th = getThread();
+  auto ctx = CmiIsomallocGetThreadContext(th);
+  CmiIsomallocContextJustMigrated(ctx);
+
   if (resumeAfterMigrationCallback.isInvalid())
     start();
   else
