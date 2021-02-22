@@ -615,10 +615,6 @@ void LBManager::get_avail_vector(char* bitmap) const
   CmiAssert(num_proc <= avail_vector.size());
   std::copy(avail_vector.begin(), avail_vector.begin() + num_proc, bitmap);
 }
-void LBManager::get_avail_vector(std::vector<char> & bitmap) const
-{
-  bitmap = avail_vector;
-}
 
 // new_ld == -1(default) : calcualte a new ld
 //           -2 : ignore new ld

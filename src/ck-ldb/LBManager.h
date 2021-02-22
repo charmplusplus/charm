@@ -496,7 +496,7 @@ class LBManager : public CBase_LBManager
  public:
   const char *availVector() const { return avail_vector.data(); }
   void get_avail_vector(char * bitmap) const;
-  void get_avail_vector(std::vector<char> & bitmap) const;
+  void get_avail_vector(std::vector<char> & bitmap) const { bitmap = avail_vector; }
   void set_avail_vector(const char * bitmap, int new_ld = -1);
   void set_avail_vector(const std::vector<char> & bitmap, int new_ld = -1);
   int& new_lbbalancer() { return new_ld_balancer; }
@@ -546,7 +546,7 @@ inline void CkStartLB() { LBManager::Object()->StartLB(); }
 
 inline void get_avail_vector(std::vector<char> & bitmap) { LBManagerObj()->get_avail_vector(bitmap); }
 
-inline void set_avail_vector(std::vector<char> & bitmap) { LBManagerObj()->set_avail_vector(bitmap); }
+inline void set_avail_vector(const std::vector<char> & bitmap) { LBManagerObj()->set_avail_vector(bitmap); }
 
 //  a helper class to suspend/resume load instrumentation when calling into
 //  runtime apis

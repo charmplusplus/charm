@@ -869,7 +869,7 @@ void CkMemCheckPT::resetLB(int diepe)
 {
 #if CMK_LBDB_ON
   int i;
-  std::vector<char> bitmap(CkNumPes());
+  std::vector<char> bitmap;
   // set processor available bitmap
   get_avail_vector(bitmap);
 
