@@ -73,9 +73,6 @@ struct LDObjKey {
   LDOMid omId;
   CmiUInt8 objId;
 public:
-  LDObjKey() : omId(), objId() { }
-  LDObjKey(LDOMid &om, CmiUInt8 obj) : omId(om), objId(obj) { }
-  ~LDObjKey() { }
   bool operator==(const LDObjKey& obj) const {
     return (bool)(omId == obj.omId && objId == obj.objId);
   }
