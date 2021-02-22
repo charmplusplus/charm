@@ -53,6 +53,8 @@ Misc:
 
 - The following modules have been removed: ARMCI, Jade, and Charj.
 
+- The 'mpi-linux-mips64' target has been removed.
+
 Charm++ Features & Fixes:
 
 - We have renamed the `VERSION` file to `charm-version.h` and made it compatible
