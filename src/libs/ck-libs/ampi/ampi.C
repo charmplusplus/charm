@@ -999,7 +999,7 @@ static void ampiNodeInit() noexcept
 
    // ASSUME NO ANYTIME MIGRATION and STATIC INSERTON
   _isAnytimeMigration = false;
-  _isStaticInsertion = true;
+  _isStaticInsertion = false;
 }
 
 #if AMPI_PRINT_IDLE
